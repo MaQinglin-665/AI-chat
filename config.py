@@ -98,6 +98,17 @@ DEFAULT_CONFIG = {
         "presence_penalty": 0.35,
         "api_key_env": OPENAI_DEFAULT_KEY_ENV,
     },
+    "thinking": {
+        "enabled": True,
+        "max_tokens": 100,
+        "timeout_sec": 15,
+    },
+    "decision": {
+        "enabled": True,
+        "silence_probability": 0.15,
+        "silence_keywords": ["嗯", "哦", "ok", "好的", "知道了"],
+        "always_reply_keywords": ["塔菲", "taffy", "?", "？", "帮我", "告诉我"],
+    },
     "tts": {
         "provider": TTS_DEFAULT_PROVIDER,
         "voice": TTS_DEFAULT_VOICE,

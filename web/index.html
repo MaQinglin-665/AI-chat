@@ -1,0 +1,154 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI桌宠</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <canvas id="live2d-canvas"></canvas>
+
+  <section class="panel">
+    <div class="row top">
+      <strong id="assistant-name">Taffy</strong>
+      <span id="status">待机</span>
+    </div>
+
+    <div id="mic-meter-wrap" class="mic-meter-wrap" aria-live="off">
+      <span class="mic-label">Mic</span>
+      <div class="mic-meter-track">
+        <div id="mic-meter-fill" class="mic-meter-fill"></div>
+      </div>
+      <span id="mic-meter-text" class="mic-meter-text">未开麦</span>
+    </div>
+
+    <div id="chat-log" class="chat-log" aria-live="polite"></div>
+
+    <div id="attachment-preview" class="attachment-preview" hidden></div>
+
+    <div class="row controls">
+      <button id="attach-btn" type="button" title="添加图片或文件" aria-label="添加图片或文件">+</button>
+      <input id="chat-input" type="text" placeholder="和我说点什么..." />
+      <button id="send-btn" type="button">发送</button>
+    </div>
+    <input
+      id="attach-input"
+      type="file"
+      hidden
+      multiple
+      accept="image/*,.txt,.md,.json,.csv,.tsv,.yaml,.yml,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.h,.hpp,.go,.rs,.sh,.ps1,.bat,.sql,.log,.ini,.toml,.pdf,.doc,.docx"
+    />
+
+    <div class="row controls action-buttons">
+      <button id="mic-btn" type="button">语音输入</button>
+      <button id="speak-btn" type="button">语音开</button>
+      <button id="schedule-btn" type="button">日程</button>
+      <button id="persona-btn" type="button">人设卡</button>
+      <button id="lock-btn" type="button">桌面锁定: 关</button>
+      <button id="observe-btn" type="button">观察桌面: 开</button>
+      <button id="auto-chat-btn" type="button">自动对话: 关</button>
+    </div>
+  </section>
+
+  <div id="schedule-modal" class="schedule-modal" hidden>
+    <div class="schedule-dialog">
+      <div class="schedule-head">
+        <strong>日程安排</strong>
+        <button id="schedule-close-btn" class="schedule-close-btn" type="button" aria-label="关闭">关闭</button>
+      </div>
+
+      <div class="schedule-form">
+        <label class="schedule-field">
+          <span>执行时间</span>
+          <input id="schedule-datetime" type="datetime-local" />
+        </label>
+
+        <div class="schedule-grid">
+          <label class="schedule-field">
+            <span>重复方式</span>
+            <select id="schedule-repeat">
+              <option value="once">只执行一次</option>
+              <option value="daily">每天重复</option>
+            </select>
+          </label>
+
+          <label class="schedule-field">
+            <span>执行类型</span>
+            <select id="schedule-mode">
+              <option value="assistant">让 Taffy 主动完成</option>
+              <option value="tool">工具任务</option>
+              <option value="reminder">普通提醒</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="schedule-field">
+          <span>要做的事</span>
+          <textarea
+            id="schedule-task"
+            rows="4"
+            placeholder="例如：早上八点时，先向我问好，再提醒我今天把手头最重要的事先做完。"
+          ></textarea>
+        </label>
+
+        <div class="schedule-actions">
+          <button id="schedule-save-btn" type="button">添加日程</button>
+        </div>
+      </div>
+
+      <div class="schedule-list-wrap">
+        <div class="schedule-list-title">已设置日程</div>
+        <div id="schedule-list" class="schedule-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="persona-modal" class="persona-modal" hidden>
+    <div class="persona-dialog">
+      <div class="persona-head">
+        <strong>人设卡</strong>
+        <button id="persona-close-btn" class="persona-close-btn" type="button" aria-label="关闭">关闭</button>
+      </div>
+
+      <div class="persona-form">
+        <label class="persona-field">
+          <span>称呼与身份</span>
+          <textarea id="persona-identity" rows="2" placeholder="例如：你是 Taffy，是我熟悉的搭子，叫我小Q。"></textarea>
+        </label>
+
+        <label class="persona-field">
+          <span>我的偏好</span>
+          <textarea id="persona-preferences" rows="3" placeholder="例如：喜欢简短直给、喜欢被鼓励、喜欢二次元梗。"></textarea>
+        </label>
+
+        <label class="persona-field">
+          <span>我不喜欢</span>
+          <textarea id="persona-dislikes" rows="3" placeholder="例如：不喜欢太官话、长篇大论、机械重复。"></textarea>
+        </label>
+
+        <label class="persona-field">
+          <span>常聊话题</span>
+          <textarea id="persona-topics" rows="3" placeholder="例如：开发、游戏、学习计划、日常吐槽。"></textarea>
+        </label>
+
+        <label class="persona-field">
+          <span>希望 Taffy 怎么说话</span>
+          <textarea id="persona-reply-style" rows="3" placeholder="例如：像真人朋友，语气自然，有温度，别太模板化。"></textarea>
+        </label>
+
+        <label class="persona-field">
+          <span>希望 Taffy 怎么陪我</span>
+          <textarea id="persona-companionship-style" rows="3" placeholder="例如：情绪低落时先安抚，再给建议；高效场景直接给步骤。"></textarea>
+        </label>
+
+        <div class="persona-actions">
+          <button id="persona-save-btn" type="button">保存人设卡</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

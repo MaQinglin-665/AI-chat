@@ -153,6 +153,8 @@ const state = {
   emotionDayKey: "",
   animating: false,
   baseTransform: { x: 0, y: 0, scale: 1, rotation: 0 },
+  modelPosX: NaN,
+  modelPosY: NaN,
   dragData: null,
   windowDragRaf: 0,
   windowDragSessionRaf: 0,
@@ -482,11 +484,7 @@ function refreshDesktopBridgeReady() {
     !state.windowLocked &&
     (hasElectronMoveBridge || hasPyBridge);
   state.desktopCanCapture = state.desktopMode && hasElectronCaptureBridge;
-  state.useNativeWindowDrag =
-    state.desktopMode &&
-    state.uiView === "model" &&
-    state.desktopBridge === "electron" &&
-    !state.windowLocked;
+  state.useNativeWindowDrag = false;
   document.body.classList.toggle("native-window-drag", !!state.useNativeWindowDrag);
   document.documentElement.classList.toggle("native-window-drag", !!state.useNativeWindowDrag);
   if (state.windowLocked && state.windowDragActive) {
@@ -4723,25 +4721,28 @@ async function initLive2D() {
     state.pixiApp.stage.addChild(model);
     placeModel();
     attachDrag(model);
+    setupClickthroughHitTest();
     scheduleIdleMotionLoop();
 
     state.pixiApp.ticker.add(() => {
-      if (!state.model || state.animating || state.windowDragActive) {
+      if (!state.model) {
         return;
       }
-      const t = performance.now() / 1000;
-      const styleProfile = getStyleExpressionProfile(state.currentTalkStyle || "neutral");
-      const cadence = getActiveModelCadence();
-      const floatScale = clampNumber(
-        (Number(styleProfile.floatScale) || 1) * (Number(cadence?.floatAmp) || 1),
-        0.68,
-        1.36
-      );
-      const floatSpeed = Math.max(0.72, Math.min(1.4, Number(cadence?.floatSpeed) || 1));
-      const floatY = state.baseTransform.y + Math.sin(t * 1.5 * floatSpeed) * (4 * floatScale);
-      const floatRot = state.baseTransform.rotation + Math.sin(t * 1.2 * floatSpeed) * (0.02 * floatScale);
-      state.model.rotation = Number.isFinite(floatRot) ? floatRot : 0;
-      state.model.y = Number.isFinite(floatY) ? floatY : state.baseTransform.y;
+      if (!state.animating && !state.windowDragActive) {
+        const t = performance.now() / 1000;
+        const styleProfile = getStyleExpressionProfile(state.currentTalkStyle || "neutral");
+        const cadence = getActiveModelCadence();
+        const floatScale = clampNumber(
+          (Number(styleProfile.floatScale) || 1) * (Number(cadence?.floatAmp) || 1),
+          0.68,
+          1.36
+        );
+        const floatSpeed = Math.max(0.72, Math.min(1.4, Number(cadence?.floatSpeed) || 1));
+        const floatY = state.baseTransform.y + Math.sin(t * 1.5 * floatSpeed) * (4 * floatScale);
+        const floatRot = state.baseTransform.rotation + Math.sin(t * 1.2 * floatSpeed) * (0.02 * floatScale);
+        state.model.rotation = Number.isFinite(floatRot) ? floatRot : 0;
+        state.model.y = Number.isFinite(floatY) ? floatY : state.baseTransform.y;
+      }
       applyStyleExpressionLayer();
       updateMicroMotionLayer();
     });
@@ -4760,6 +4761,31 @@ async function initLive2D() {
       scaleX: model.scale?.x,
       scaleY: model.scale?.y
     });
+    // --- Tight-fit: resize Electron window to match model bounds ---
+    if (
+      state.desktopMode &&
+      state.uiView === "model" &&
+      state.desktopBridge === "electron" &&
+      state._stableModelBounds
+    ) {
+      const bounds = state._stableModelBounds;
+      const bw = Math.round(bounds.right - bounds.left);
+      const bh = Math.round(bounds.bottom - bounds.top);
+      // Add padding so the model isn't clipped at edges.
+      const pad = 40;
+      const fitW = Math.max(200, bw + pad * 2);
+      const fitH = Math.max(300, bh + pad);
+      const canvas = state.pixiApp.view;
+      const rect = canvas.getBoundingClientRect();
+      // Only resize if current window is significantly larger than needed.
+      if (rect.width > fitW * 1.15 || rect.height > fitH * 1.15) {
+        if (typeof window.electronAPI?.resizeWindow === "function") {
+          window.electronAPI.resizeWindow(fitW, fitH);
+          // Re-place model after resize settles.
+          setTimeout(() => { placeModel(); }, 80);
+        }
+      }
+    }
     setStatus(info);
   } catch (err) {
     console.error(err);
@@ -4811,13 +4837,27 @@ function placeModel() {
   scale = Math.max(0.05, Math.min(4.0, scale));
 
   model.scale.set(scale);
-  model.x = w * (state.modelConfig?.x_ratio ?? 0.26);
-  model.y = h * (state.modelConfig?.y_ratio ?? 0.96);
+  if (state.desktopMode && state.uiView === "model") {
+    if (!Number.isFinite(state.modelPosX) || !Number.isFinite(state.modelPosY)) {
+      state.modelPosX = w * 0.5;
+      state.modelPosY = h * 0.9;
+    }
+    model.x = state.modelPosX;
+    model.y = state.modelPosY;
+  } else {
+    model.x = w * (state.modelConfig?.x_ratio ?? 0.26);
+    model.y = h * (state.modelConfig?.y_ratio ?? 0.96);
+  }
   if (model.anchor && typeof model.anchor.set === "function") {
     model.anchor.set(0.5, 1.0);
   }
   model.visible = true;
   model.alpha = 1;
+  if (state.desktopMode && state.uiView === "model") {
+    clampModelVisibleInViewport(model);
+    state.modelPosX = Number(model.x) || (w * 0.5);
+    state.modelPosY = Number(model.y) || (h * 0.9);
+  }
   state.layoutWidth = w;
   state.layoutHeight = h;
   state.baseTransform = {
@@ -4925,10 +4965,48 @@ function attachDrag(model) {
         state.model.alpha = 1;
       }
     }
-    if (state.windowDragActive && state.desktopBridge === "electron") {
-      beginDesktopWindowDragSession();
-    }
+    // Fullscreen overlay: no window drag session needed.
     model.cursor = "grabbing";
+    if (state.windowDragActive && state.desktopBridge === "electron") {
+      const start = state.dragData?.lastGlobal || { x: Number(g.x) || 0, y: Number(g.y) || 0 };
+      const grabOffsetX = (Number(state.modelPosX) || Number(state.model?.x) || 0) - Number(start.x || 0);
+      const grabOffsetY = (Number(state.modelPosY) || Number(state.model?.y) || 0) - Number(start.y || 0);
+      const onDocMove = (ev) => {
+        if (!state.windowDragActive || !state.model) {
+          document.removeEventListener("pointermove", onDocMove);
+          return;
+        }
+        const canvas = state.pixiApp?.view;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        const renderer = state.pixiApp.renderer;
+        const rw = Number(renderer?.width) || rect.width;
+        const rh = Number(renderer?.height) || rect.height;
+        const gx = (ev.clientX - rect.left) * (rw / rect.width);
+        const gy = (ev.clientY - rect.top) * (rh / rect.height);
+        state.dragData.lastGlobal = { x: gx, y: gy };
+        const dxTap = Number(gx) - Number(state.lastPointerDownGlobal?.x || 0);
+        const dyTap = Number(gy) - Number(state.lastPointerDownGlobal?.y || 0);
+        if ((dxTap * dxTap + dyTap * dyTap) > (TAP_MOVE_THRESHOLD * TAP_MOVE_THRESHOLD)) {
+          state.pointerDragMoved = true;
+        }
+        state.modelPosX = gx + grabOffsetX;
+        state.modelPosY = gy + grabOffsetY;
+        state.model.x = state.modelPosX;
+        state.model.y = state.modelPosY;
+        state.baseTransform.x = state.modelPosX;
+        state.baseTransform.y = state.modelPosY;
+      };
+      document.addEventListener("pointermove", onDocMove);
+      const cleanup = () => {
+        document.removeEventListener("pointermove", onDocMove);
+        document.removeEventListener("pointerup", cleanup);
+        window.removeEventListener("pointerup", cleanup);
+      };
+      document.addEventListener("pointerup", cleanup);
+      window.addEventListener("pointerup", cleanup);
+    }
   });
   model.on("pointerup", () => {
     if (
@@ -5007,21 +5085,23 @@ function attachDrag(model) {
     if (state.desktopMode) {
       if (state.desktopCanMoveWindow && state.windowDragActive) {
         if (state.desktopBridge === "electron") {
+          // Handled by document-level pointermove listener.
           return;
-        }
-        const g = e.data?.global || state.dragData.data?.global;
-        if (g) {
-          const last = state.dragData.lastGlobal || g;
-          const dx = g.x - last.x;
-          const dy = g.y - last.y;
-          state.dragData.lastGlobal = { x: g.x, y: g.y };
-          if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
-            return;
+        } else {
+          const g = e.data?.global || state.dragData.data?.global;
+          if (g) {
+            const last = state.dragData.lastGlobal || g;
+            const dx = g.x - last.x;
+            const dy = g.y - last.y;
+            state.dragData.lastGlobal = { x: g.x, y: g.y };
+            if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
+              return;
+            }
+            state.suspendRelayoutUntil = performance.now() + 240;
+            moveDesktopWindowBy(dx, dy);
+            state.dragWindowAccumX = 0;
+            state.dragWindowAccumY = 0;
           }
-          state.suspendRelayoutUntil = performance.now() + 240;
-          moveDesktopWindowBy(dx, dy);
-          state.dragWindowAccumX = 0;
-          state.dragWindowAccumY = 0;
         }
       }
       // In desktop mode never move model itself to avoid drift/flicker.
@@ -5053,6 +5133,59 @@ function attachDrag(model) {
     model.y = pos.y;
     state.baseTransform.x = model.x;
     state.baseTransform.y = model.y;
+  });
+}
+
+function isPointOverVisibleModelArea(clientX, clientY) {
+  if (!state.model || !state.pixiApp) return false;
+  let bounds = state._stableModelBounds;
+  if (!bounds) {
+    const mw = Number(state.model.width) || 0;
+    const mh = Number(state.model.height) || 0;
+    if (mw <= 0 || mh <= 0) return false;
+    bounds = {
+      left: Number(state.model.x) - mw * 0.5,
+      right: Number(state.model.x) + mw * 0.5,
+      top: Number(state.model.y) - mh,
+      bottom: Number(state.model.y)
+    };
+  }
+  const canvas = state.pixiApp.view;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const renderer = state.pixiApp.renderer;
+  const rw = Number(renderer?.width) || 0;
+  const rh = Number(renderer?.height) || 0;
+  if (rw <= 0 || rh <= 0) return false;
+  const x = (clientX - rect.left) * (rw / rect.width);
+  const y = (clientY - rect.top) * (rh / rect.height);
+  const pad = 30;
+  return (
+    x >= bounds.left - pad &&
+    x <= bounds.right + pad &&
+    y >= bounds.top - pad &&
+    y <= bounds.bottom + pad
+  );
+}
+
+function setupClickthroughHitTest() {
+  if (state.desktopBridge !== "electron") return;
+  if (typeof window.electronAPI?.setClickthrough !== "function") return;
+  let lastClickthrough = true;
+  document.addEventListener("mousemove", (e) => {
+    if (state.windowDragActive) {
+      if (lastClickthrough) {
+        window.electronAPI.setClickthrough(false);
+        lastClickthrough = false;
+      }
+      return;
+    }
+    const over = isPointOverVisibleModelArea(e.clientX, e.clientY);
+    const want = !over;
+    if (want !== lastClickthrough) {
+      lastClickthrough = want;
+      window.electronAPI.setClickthrough(want);
+    }
   });
 }
 

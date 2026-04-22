@@ -1,0 +1,5 @@
+edge-tts
+mem0ai
+pywebview
+qdrant-client
+vosk

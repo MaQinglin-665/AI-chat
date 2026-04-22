@@ -1,0 +1,13 @@
+{
+  "name": "ai-desktop-pet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Live2D desktop pet with local Python backend and transparent desktop window",
+  "main": "electron/main.js",
+  "scripts": {
+    "start:electron": "electron electron/main.js"
+  },
+  "devDependencies": {
+    "electron": "^28.2.0"
+  }
+}

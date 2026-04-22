@@ -6,6 +6,7 @@ import random
 import re
 import hashlib
 import threading
+import time
 from datetime import datetime
 import urllib.error
 import urllib.request
@@ -32,6 +33,7 @@ from config import (
     OPENAI_DEFAULT_BASE_URL,
     OPENAI_DEFAULT_KEY_ENV,
     OPENAI_DEFAULT_MODEL,
+    ROOT_DIR,
     VOSK_MODEL_LARGE_ROOT,
     VOSK_MODEL_ROOT,
     WEB_DIR,
@@ -71,6 +73,7 @@ _VOSK_MODEL = None
 _SUMMARY_CACHE_LOCK = threading.Lock()
 _HISTORY_SUMMARY_CACHE = {"key": "", "summary": ""}
 TOOL_META_MARKER = "[[TAFFY_TOOL_META]]"
+RUNTIME_RESTART_EXIT_CODE = 75
 DEFAULT_HUMANIZE_SETTINGS = {
     "enabled": True,
     "strip_fillers": True,
@@ -79,6 +82,22 @@ DEFAULT_HUMANIZE_SETTINGS = {
     "refine_timeout_sec": 12,
     "refine_min_chars": 36,
 }
+
+
+def reset_runtime_state():
+    # Keep runtime cache coherent after config changes.
+    with _SUMMARY_CACHE_LOCK:
+        _HISTORY_SUMMARY_CACHE["key"] = ""
+        _HISTORY_SUMMARY_CACHE["summary"] = ""
+
+
+def schedule_runtime_restart(delay_sec=0.35):
+    def _restart_later():
+        time.sleep(max(0.1, float(delay_sec)))
+        os._exit(RUNTIME_RESTART_EXIT_CODE)
+
+    thread = threading.Thread(target=_restart_later, daemon=True, name="taffy-runtime-restart")
+    thread.start()
 
 
 def sanitize_history(history, max_items=12):
@@ -291,6 +310,14 @@ def infer_context_style(user_message, safe_history, is_auto=False):
     src = "\n".join(src_parts).lower()
 
     score = {"comfort": 0, "clear": 0, "playful": 0, "steady": 0}
+    emotion = load_emotion_state()
+    dominant = emotion.get("dominant", "neutral") if isinstance(emotion, dict) else "neutral"
+    if dominant == "happy":
+        score["playful"] += 3
+    elif dominant == "sad":
+        score["comfort"] += 3
+    elif dominant == "anxious":
+        score["steady"] += 2
 
     if re.search(r"(难过|伤心|焦虑|崩溃|压力|失眠|委屈|害怕|心累|痛苦|失落|不舒服|难受)", src):
         score["comfort"] += 5
@@ -325,29 +352,36 @@ def infer_reply_density(user_message, safe_history, is_auto=False):
     if re.search(r"(详细|展开|具体|一步一步|完整|仔细|分析|长一点|多说点)", text, re.I):
         return "expanded"
     visible_chars = len(re.sub(r"\s+", "", text))
-    if visible_chars <= 10:
+    if visible_chars <= 4:
         return "brief"
     if visible_chars >= 42:
         return "normal"
     question_marks = len(re.findall(r"[?？]", text))
     if question_marks >= 2:
         return "normal"
+    # Add Neuro-style unpredictability: occasionally override density
+    r = random.random()
+    if not is_auto:
+        if r < 0.15:
+            return "brief"     # 15% chance of ultra-short reply
+        elif r > 0.88:
+            return "expanded"  # 12% chance of long reply
     return "brief"
 
 
 def build_style_prompt_block(style_name):
     style = normalize_style_name(style_name)
     base = (
-        "回复风格要求：像真人朋友聊天，避免模板化、鸡汤腔、客服腔和书面腔。"
-        "默认只回1到2句，优先短句，除非用户明确要求详细。"
-        "先直接回答，再自然补半句，不要铺垫，不要总结，不要刻意抒情。"
+        "回复风格要求：有自己的想法和态度，不是什么都附和。"
+        "长度跟着话题走，无聊的一句带过，有意思的可以多说。"
+        "说话自然有个性，可以吐槽、反问、跑题、接梗。"
     )
     style_map = {
-        "comfort": "语气温柔、共情、节奏稍慢，但仍然简短，不讲大道理。",
-        "clear": "语气清晰直接、少废话，优先给结论，不要展开成长段。",
-        "playful": "语气轻快自然、略活泼，但别装可爱，别连续感叹。",
-        "steady": "语气稳重果断、信息密度高，短句表达，避免说教。",
-        "neutral": "语气自然日常、简洁友好，像真人随口回话。",
+        "comfort": "语气温和，先接住对方的感受。",
+        "clear": "语气直接，先给结论。",
+        "playful": "语气轻快活泼。",
+        "steady": "语气沉稳简练。",
+        "neutral": "语气自然随意。",
     }
     return f"{base}\n当前语境风格：{style}\n{style_map.get(style, style_map['neutral'])}"
 
@@ -356,24 +390,20 @@ def build_human_prompt_block(user_message, safe_history, is_auto=False):
     density = infer_reply_density(user_message, safe_history, is_auto=is_auto)
     user_text = str(user_message or "").strip()
     lines = [
-        "真人化要求：像熟人随口接话，不要像客服，不要像写总结。",
-        "少用这些开头：好的、当然可以、让我来、作为AI、总之、希望这能帮到你。",
-        "优先贴着用户最后一句回应，允许自然口语和半句停顿，但不要连续堆语气词。",
-        "不要引用不存在的前文，不要自称“刚才说过”未出现的信息；不确定就先问一句。",
-        "你正在和真实人类聊天。除非用户明确在问技术问题，否则不要把对方叫做设备、系统、终端或客户端。",
-        "没有必要时不要列点，不要把一句话能说完的事讲成三段。",
-        "能直接回答就直接回答；技术问题先给结论，情绪问题先接住感受。",
-        "别凭空编小剧场、递饮料、吃零食、眨眼卖萌这类画面，除非用户当前语境真的需要。",
-        "少用 emoji、波浪号和括号补充，避免故意装可爱。",
+        "像真人聊天一样回复，语气自然，有自己的态度和想法。",
+        "不要用客服腔、总结腔、教科书腔。",
+        "可以吐槽、反问、抬杠、跑题，像真人一样有个性。",
+        "不要引用不存在的前文，不确定就先问一句。",
+        "不要每次都以问句结尾。大部分时候直接把话说完就行，像真人一样有时候就是陈述。只有真的好奇才追问。",
     ]
     density_map = {
-        "brief": "本轮尽量像即时聊天，优先1句，通常不超过28个中文字符；真没必要就别解释。",
-        "normal": "本轮保持短回复，通常1到2句，先说重点，再补半句就够了。",
-        "expanded": "用户这轮愿意听详细一点，可以展开，但也要先给结论，别写成教程腔。",
+        "brief": "这轮极简回复，1句话甚至几个字就够了，像随口嘟囔。",
+        "normal": "这轮正常聊，2-3句，自然展开。",
+        "expanded": "这轮话多一点，可以展开讲、跑题、自言自语，4-6句都行。",
     }
     lines.append(density_map.get(density, density_map["normal"]))
     if re.fullmatch(r"(在吗|在嘛|在不在|在么|喂|嗨|hi|hello)[!！?？]*", user_text, re.I):
-        lines.append("如果用户只是在确认你在不在，就像真人那样简单接一句，比如“在，怎么啦？”，不要脑补对方情绪或处境。")
+        lines.append("如果用户只是在确认你在不在，就简单接一句，不要脑补对方情绪或处境。")
     recent_assistant = []
     for item in reversed(safe_history or []):
         if not isinstance(item, dict):
@@ -386,7 +416,7 @@ def build_human_prompt_block(user_message, safe_history, is_auto=False):
         compact = re.sub(r"\s+", "", content)
         if len(compact) > 16:
             compact = compact[:16] + "…"
-        recent_assistant.append(f"“{compact}”")
+        recent_assistant.append(f'"{compact}"')
         if len(recent_assistant) >= 2:
             break
     if recent_assistant:
@@ -571,7 +601,7 @@ def maybe_refine_assistant_reply(config, llm_cfg, provider, user_message, safe_h
     rewrite_prompt = (
         "你是中文聊天润色器。把下面这句助手回复改得更像真人当场说的话。\n"
         "要求：保留原意，不新增信息；默认1到2句；更口语，更自然；去掉客服腔、模板腔、AI腔；"
-        "不要出现“好的、当然可以、让我来、总之、希望这能帮到你、作为AI”等套话；"
+        "不要出现好的、当然可以、让我来、总之、希望这能帮到你、作为AI等套话；"
         "不要编吃东西、递饮料、虚拟道具、小剧场、emoji、波浪号、括号旁白；"
         "只输出改写后的最终回复。\n\n"
         f"用户刚才说：{str(user_message or '').strip()[:120]}\n"
@@ -658,7 +688,7 @@ def apply_human_address_guard(user_message, reply):
     for pattern, repl in replacements:
         out = re.sub(pattern, repl, out, flags=re.I)
 
-    # 非技术闲聊里，如果仍然出现“把人当设备”的表达，再做一次兜底替换。
+    # 非技术闲聊里，如果仍然出现"把人当设备"的表达，再做一次兜底替换。
     if re.search(r"(设备|终端|客户端|主机)", out, re.I):
         out = re.sub(r"(设备|终端|客户端|主机)", "你", out, flags=re.I)
 
@@ -736,21 +766,128 @@ _INNER_STATES = [
 # 随机状态的注入概率（0.0~1.0），低于此值则跳过本次注入，保留「正常」回复
 _STATE_INJECT_PROB = 0.12
 
+EMOTION_STATE_PATH = ROOT_DIR / "emotion_state.json"
+
+
+def load_emotion_state():
+    default_state = {
+        "valence": 0.0,
+        "arousal": 0.5,
+        "dominant": "neutral",
+        "history": [],
+        "updated_at": None,
+        "last_updated": None,
+    }
+    try:
+        if EMOTION_STATE_PATH.exists():
+            state = json.loads(EMOTION_STATE_PATH.read_text(encoding="utf-8"))
+            if not isinstance(state, dict):
+                state = {}
+            import time
+            last = state.get("last_updated", "")
+            if last and isinstance(last, str):
+                try:
+                    from datetime import datetime
+                    last_dt = datetime.fromisoformat(last)
+                    elapsed_min = (datetime.now() - last_dt).total_seconds() / 60
+                    if elapsed_min > 30:
+                        decay = min(0.5, elapsed_min / 120 * 0.3)
+                        state["valence"] = state.get("valence", 0) * (1 - decay)
+                        state["arousal"] = max(0.3, state.get("arousal", 0.5) * (1 - decay * 0.5))
+                except Exception:
+                    pass
+            merged = dict(default_state)
+            merged.update(state)
+            return merged
+        return dict(default_state)
+    except Exception:
+        return dict(default_state)
+
+def save_emotion_state(state):
+    try:
+        state["last_updated"] = datetime.now().isoformat()
+        EMOTION_STATE_PATH.write_text(
+            json.dumps(state, ensure_ascii=False, indent=2),
+            encoding="utf-8"
+        )
+    except Exception:
+        pass
+
+
+def update_emotion_from_reply(user_message, reply):
+    """Analyze user message + reply to shift emotion state."""
+    state = load_emotion_state()
+    combined = f"{user_message} {reply}".lower()
+
+    # Simple keyword-based emotion shift (lightweight, no LLM call)
+    positive = len(re.findall(
+        r"(开心|高兴|喜欢|太棒|哈哈|感谢|谢谢|好耶|有趣|可爱|爱|棒|nice|happy|love|great)", combined))
+    negative = len(re.findall(
+        r"(难过|伤心|生气|烦|讨厌|焦虑|害怕|累|痛|失望|sorry|sad|angry|bad|hate)", combined))
+    excited = len(re.findall(
+        r"(！|!|哈哈|太棒|好耶|wow|amazing|awesome|excited)", combined))
+
+    shift = (positive - negative) * 0.15
+    # Inertia: new value blends with old (70% old, 30% new)
+    old_valence = state.get("valence", 0.0)
+    state["valence"] = max(-1.0, min(1.0, old_valence * 0.7 + shift * 0.3))
+    state["arousal"] = max(0.0, min(1.0,
+        state.get("arousal", 0.3) * 0.8 + excited * 0.1))
+
+    v = state["valence"]
+    if v > 0.3:
+        state["dominant"] = "happy"
+    elif v > 0.1:
+        state["dominant"] = "playful"
+    elif v < -0.3:
+        state["dominant"] = "sad"
+    elif v < -0.1:
+        state["dominant"] = "anxious"
+    else:
+        state["dominant"] = "neutral"
+
+    history = state.get("history", [])
+    if not isinstance(history, list):
+        history = []
+    history.append({
+        "ts": datetime.now().isoformat(),
+        "valence": round(state["valence"], 3),
+        "dominant": state["dominant"],
+    })
+    if len(history) > 50:
+        history = history[-50:]
+    state["history"] = history
+
+    save_emotion_state(state)
+    return state
+
 
 def build_inner_state_block(config) -> str:
-    """
-    以 _STATE_INJECT_PROB 的概率随机抽取一条内心状态描述，
-    拼成 system prompt 的追加块。
-    可通过 config["personality"]["state_inject_prob"] 覆盖概率。
-    """
-    prob = float(
-        (config.get("personality") or {}).get("state_inject_prob", _STATE_INJECT_PROB)
-    )
-    prob = max(0.0, min(1.0, prob))
-    if random.random() > prob:
+    personality_cfg = (config.get("personality") or {}) if isinstance(config, dict) else {}
+    prob = float(personality_cfg.get("state_inject_prob", _STATE_INJECT_PROB))
+    emotion = load_emotion_state()
+    dominant = emotion.get("dominant", "neutral")
+    valence = emotion.get("valence", 0.0)
+    arousal = emotion.get("arousal", 0.3)
+
+    # Always inject emotion-based state when emotion is non-neutral
+    if abs(valence) > 0.15 or arousal > 0.5:
+        if dominant == "happy":
+            state_text = "现在心情不错，会比平时更活泼一点。"
+        elif dominant == "playful":
+            state_text = "有点小雀跃，可能会开玩笑。"
+        elif dominant == "sad":
+            state_text = "心情有点低落，说话会更安静温柔。"
+        elif dominant == "anxious":
+            state_text = "有点不安，回复会更谨慎。"
+        else:
+            state_text = random.choice(_INNER_STATES)
+        return f"【此刻内心状态】{state_text}"
+
+    # Fallback to random state with configured probability
+    if random.random() >= prob:
         return ""
-    state = random.choice(_INNER_STATES)
-    return f"【此刻状态（仅供参考，不要照搬原文）】{state}"
+    return f"【此刻内心状态】{random.choice(_INNER_STATES)}"
 
 
 def build_time_awareness_block() -> str:
@@ -897,9 +1034,118 @@ def wrap_vision_error(exc):
     return exc
 
 
+def generate_inner_thought(llm_cfg, user_message, safe_history,
+                           persona_summary="", emotion_state=None,
+                           config=None):
+    """Generate a brief inner thought before replying."""
+    thinking_cfg = (config or {}).get("thinking", {})
+    if not thinking_cfg.get("enabled", True):
+        return ""
+
+    emotion_hint = ""
+    if emotion_state and isinstance(emotion_state, dict):
+        dominant = emotion_state.get("dominant", "neutral")
+        valence = emotion_state.get("valence", 0)
+        if dominant == "happy":
+            emotion_hint = "你现在心情挺好的，想找点乐子。"
+        elif dominant in ("sad", "anxious"):
+            emotion_hint = "你有点烦，不太想认真回答。"
+        elif valence > 0.2:
+            emotion_hint = "你对这个人还算有好感。"
+        else:
+            emotion_hint = "你现在情绪一般。"
+
+    thinking_prompt = (
+        "你是 Taffy 的内心独白。用 Neuro-sama 的思维方式来想：\n\n"
+        "看到对方说的话后，你的大脑会经历这样的过程：\n"
+        "1. 先对对方的话产生第一反应（可以是吐槽、好奇、无聊、联想）\n"
+        "2. 然后可能会跳到一个完全无关的想法\n"
+        "3. 最后决定：要认真回、要敷衍、要抬杠、还是要故意跑题\n\n"
+        f"{emotion_hint}\n"
+        f"对方说：{user_message[:200]}\n\n"
+        "用2-3句话写出你的内心活动。要像真的在脑子里自言自语，"
+        "不要写成分析报告。不超过100字。"
+    )
+
+    messages = [
+        {"role": "system", "content": thinking_prompt},
+        {"role": "user", "content": user_message[:200]},
+    ]
+
+    try:
+        base_url = str(llm_cfg.get("base_url", OPENAI_DEFAULT_BASE_URL)).rstrip("/")
+        model = llm_cfg.get("model", OPENAI_DEFAULT_MODEL)
+        key_env = llm_cfg.get("api_key_env", OPENAI_DEFAULT_KEY_ENV)
+        api_key = str(llm_cfg.get("api_key", "")).strip() or os.environ.get(key_env, "").strip()
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        max_tokens = int(thinking_cfg.get("max_tokens", 150))
+        timeout = int(thinking_cfg.get("timeout_sec", 15))
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": max_tokens,
+            "stream": False,
+        }
+        data = http_post_json(
+            f"{base_url}/chat/completions", payload,
+            headers=headers, timeout=timeout
+        )
+        thought = str(
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+        ).strip()
+        return thought[:120]
+    except Exception:
+        return ""
+
+
+def should_reply(user_message, config=None, is_auto=False):
+    """Decide whether the pet should reply to this message."""
+    if not isinstance(config, dict):
+        config = load_config()
+    decision_cfg = config.get("decision", {})
+    if not decision_cfg.get("enabled", True):
+        return True
+
+    msg = str(user_message or "").strip().lower()
+
+    # Always reply to direct address or questions
+    always_keywords = decision_cfg.get("always_reply_keywords",
+        ["塔菲", "taffy", "?", "？", "帮我", "告诉我"])
+    for kw in always_keywords:
+        if kw.lower() in msg:
+            return True
+
+    # In non-auto mode (user explicitly typed), always reply
+    if not is_auto:
+        return True
+
+    # In auto mode, sometimes stay silent
+    silence_keywords = decision_cfg.get("silence_keywords",
+        ["嗯", "哦", "ok", "好的", "知道了"])
+    for kw in silence_keywords:
+        if msg == kw:
+            return False
+
+    # Random silence based on probability
+    prob = float(decision_cfg.get("silence_probability", 0.15))
+    if random.random() < prob:
+        return False
+
+    return True
+
+
 def call_llm(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
     if not isinstance(config, dict):
         config = load_config()
+    if not should_reply(user_message, config=config, is_auto=is_auto):
+        return ""
     llm_cfg = config.get("llm", {})
     provider = str(llm_cfg.get("provider", "")).strip().lower()
     base_url = str(llm_cfg.get("base_url", "")).strip().lower()
@@ -932,6 +1178,22 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
         history=history,
         base_prompt=base_prompt,
     )
+    # Thinking layer
+    thought = ""
+    thinking_cfg = config.get("thinking", {})
+    if thinking_cfg.get("enabled", True) and not is_auto:
+        thought = generate_inner_thought(
+            llm_cfg, user_message, safe_history,
+            persona_summary=assistant_prompt[:200],
+            emotion_state=load_emotion_state(),
+            config=config,
+        )
+    if thought:
+        thought_prefix = (
+            f"[你脑子里刚闪过的想法：{thought}]\n"
+            "——根据你的想法自然地回复。想法是内心活动，不要原封不动说出来，"
+            "但要让想法影响你说话的方向和态度。\n\n"
+        )
     prompt = build_prompt_with_style(
         config,
         user_message,
@@ -939,6 +1201,8 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
         base_prompt,
         is_auto=is_auto,
     )
+    effective_user_message = thought_prefix + user_message if thought else user_message
+
 
     tools_settings = get_tools_settings(config)
 
@@ -946,7 +1210,7 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
         messages = build_openai_messages(
             prompt=prompt,
             safe_history=safe_history,
-            user_message=user_message,
+            user_message=effective_user_message,
             image_data_url=image_data_url,
         )
         try:
@@ -954,7 +1218,7 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
                 raw_reply = call_openai_compatible_with_tools(llm_cfg, config, messages)
             else:
                 raw_reply = call_openai_compatible(llm_cfg, messages)
-            return finalize_assistant_reply(
+            final = finalize_assistant_reply(
                 config,
                 llm_cfg,
                 provider,
@@ -963,6 +1227,9 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
                 raw_reply,
                 is_auto=is_auto,
             )
+            if final and not is_auto:
+                update_emotion_from_reply(user_message, final)
+            return final
         except Exception as exc:
             if image_data_url:
                 raise wrap_vision_error(exc) from exc
@@ -989,12 +1256,12 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
         messages = build_ollama_messages(
             prompt=prompt,
             safe_history=safe_history,
-            user_message=user_message,
+            user_message=effective_user_message,
             image_base64=image_base64,
         )
         try:
             raw_reply = call_ollama(llm_cfg, messages, model_override=selected_model)
-            return finalize_assistant_reply(
+            final = finalize_assistant_reply(
                 config,
                 llm_cfg,
                 provider,
@@ -1003,6 +1270,9 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
                 raw_reply,
                 is_auto=is_auto,
             )
+            if final and not is_auto:
+                update_emotion_from_reply(user_message, final)
+            return final
         except Exception as exc:
             if image_data_url:
                 raise wrap_vision_error(exc) from exc
@@ -2028,6 +2298,10 @@ class PetHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Max-Age", "600")
         super().end_headers()
 
     def _send_json(self, data, status=HTTPStatus.OK):
@@ -2050,11 +2324,73 @@ class PetHandler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
         self.wfile.flush()
 
+    def _reload_runtime_config(self):
+        config = load_config()
+        reset_runtime_state()
+        server_cfg = config.get("server", {}) if isinstance(config, dict) else {}
+        host = str(server_cfg.get("host", DEFAULT_CONFIG["server"]["host"])).strip()
+        try:
+            port = int(server_cfg.get("port", DEFAULT_CONFIG["server"]["port"]))
+        except (TypeError, ValueError):
+            port = int(DEFAULT_CONFIG["server"]["port"])
+        return {
+            "ok": True,
+            "message": "配置已重载",
+            "reloaded_at": datetime.now().isoformat(timespec="seconds"),
+            "server": {"host": host, "port": port},
+        }
+
+    def _restart_runtime(self, dry_run=False):
+        managed_by = str(os.environ.get("TAFFY_MANAGED_BY", "")).strip().lower()
+        if managed_by != "electron":
+            return None, HTTPStatus.CONFLICT, {
+                "ok": False,
+                "error": "当前不是 Electron 托管模式，无法自动重启，请手动重启桌宠。",
+            }
+        if dry_run:
+            snapshot = self._reload_runtime_config()
+            return None, HTTPStatus.OK, {
+                "ok": True,
+                "message": "重启接口可用（检测模式）",
+                "dry_run": True,
+                "server": snapshot.get("server", {}),
+            }
+        snapshot = self._reload_runtime_config()
+        schedule_runtime_restart()
+        return None, HTTPStatus.OK, {
+            "ok": True,
+            "message": "已收到重启指令，后台即将重启",
+            "restarting": True,
+            "restart_exit_code": RUNTIME_RESTART_EXIT_CODE,
+            "restarted_at": datetime.now().isoformat(timespec="seconds"),
+            "server": snapshot.get("server", {}),
+        }
+
+    def do_OPTIONS(self):
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_GET(self):
         path_only = self.path.split("?", 1)[0]
         if path_only == "/config.json":
             config = load_config()
             self._send_json(sanitize_client_config(config))
+            return
+        if path_only == "/api/config/reload":
+            try:
+                self._send_json(self._reload_runtime_config())
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/runtime/restart":
+            self._send_json(
+                {"ok": False, "error": "Method not allowed. Please use POST."},
+                status=HTTPStatus.METHOD_NOT_ALLOWED,
+            )
             return
         if path_only == "/api/persona_card":
             self._send_json(load_manual_persona_card())
@@ -2063,6 +2399,46 @@ class PetHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path_only = self.path.split("?", 1)[0]
+        if path_only == "/api/config/reload":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b""
+            if raw_body.strip():
+                try:
+                    json.loads(raw_body.decode("utf-8"))
+                except Exception:
+                    self._send_json(
+                        {"ok": False, "error": "Invalid JSON body."},
+                        status=HTTPStatus.BAD_REQUEST,
+                    )
+                    return
+            try:
+                self._send_json(self._reload_runtime_config())
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/runtime/restart":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b""
+            body = {}
+            if raw_body.strip():
+                try:
+                    body = json.loads(raw_body.decode("utf-8"))
+                except Exception:
+                    self._send_json(
+                        {"ok": False, "error": "Invalid JSON body."},
+                        status=HTTPStatus.BAD_REQUEST,
+                    )
+                    return
+            if not isinstance(body, dict):
+                body = {}
+            _, status, payload = self._restart_runtime(
+                dry_run=bool(body.get("dry_run", False))
+            )
+            self._send_json(payload, status=status)
+            return
         if path_only not in {
             "/api/chat",
             "/api/chat_stream",

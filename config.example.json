@@ -1,0 +1,188 @@
+{
+  "assistant_name": "Mochi",
+  "model_path": "/models/your_model/model3.json",
+  "model": {
+    "scale": 1.0,
+    "x_ratio": 0.26,
+    "y_ratio": 0.96
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8123,
+    "open_browser": false
+  },
+  "desktop": {
+    "transparent": true,
+    "frameless": true,
+    "always_on_top": false,
+    "resizable": true,
+    "width": 520,
+    "height": 900,
+    "min_width": 420,
+    "min_height": 700
+  },
+  "llm": {
+    "provider": "openai-compatible",
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "model": "qwen-plus",
+    "temperature": 0.42,
+    "frequency_penalty": 0.55,
+    "presence_penalty": 0.35,
+    "api_key_env": "DASHSCOPE_API_KEY",
+    "api_key": "",
+    "max_output_tokens": 72,
+    "verbosity": "low",
+    "reasoning_effort": ""
+  },
+  "tts": {
+    "provider": "gpt_sovits",
+    "voice": "default",
+    "voices": [
+      "default"
+    ],
+    "gpt_sovits_api_url": "http://127.0.0.1:9880/tts",
+    "gpt_sovits_method": "POST",
+    "gpt_sovits_timeout_sec": 60,
+    "gpt_sovits_format": "wav",
+    "gpt_sovits_media_type": "wav",
+    "gpt_sovits_streaming_mode": 0,
+    "gpt_sovits_text_split_method": "cut0",
+    "gpt_sovits_voice": "default",
+    "gpt_sovits_text_lang": "zh",
+    "gpt_sovits_prompt_lang": "zh",
+    "gpt_sovits_prompt_text": "",
+    "gpt_sovits_ref_audio_path": "",
+    "gpt_sovits_fallback_ref_audio_path": "D:/AI/ai_desktop_pet/tts_ref/taffy_ref.wav",
+    "gpt_sovits_top_k": 15,
+    "gpt_sovits_top_p": 0.8,
+    "gpt_sovits_temperature": 0.45,
+    "gpt_sovits_speed": 1.08,
+    "stream_mode": "final_only",
+    "speed_ratio": 1.04,
+    "volume_ratio": 1.0,
+    "pitch_ratio": 1.0,
+    "gpt_sovits_realtime_tts": false
+  },
+  "assistant_prompt": "你是桌宠 Taffy。像真人朋友一样用自然中文短句聊天。默认只回复1到2句，尽量不超过60个中文字。优先直接回答，不要长篇抒情，不要鸡汤，不要模板化，不要提自己是AI。",
+  "memory": {
+    "enabled": true,
+    "max_items": 600,
+    "inject_recent": 2,
+    "inject_relevant": 2,
+    "summary_trigger_every": 10,
+    "mem0_enabled": true,
+    "mem0_top_k": 5,
+    "mem0_threshold": 0.5,
+    "mem0_user_id": "taffy-user",
+    "mem0_collection": "taffy_memory",
+    "mem0_qdrant_path": "D:/AI/ai_desktop_pet/.mem0/qdrant",
+    "mem0_history_db_path": "D:/AI/ai_desktop_pet/.mem0/history.db",
+    "mem0_embedding_model": "text-embedding-v3",
+    "mem0_embedding_dims": 1024
+  },
+  "history_summary": {
+    "enabled": true,
+    "trigger_messages": 14,
+    "keep_recent_messages": 8,
+    "max_summary_chars": 900
+  },
+  "asr": {
+    "show_mic_meter": true,
+    "keep_listening": true,
+    "transcribe_on_close": true,
+    "min_speech_ms": 180,
+    "silence_trigger_ms": 380,
+    "max_speech_ms": 2400,
+    "speech_threshold": 0.009,
+    "processor_buffer_size": 2048,
+    "wake_word_enabled": true,
+    "wake_words": [
+      "塔菲",
+      "taffy",
+      "tafi"
+    ],
+    "hotword_replacements": {
+      "塔菲": "Taffy",
+      "taffy": "Taffy",
+      "neuro": "Neuro",
+      "fifa": "FIFA"
+    }
+  },
+  "observe": {
+    "attach_mode": "always",
+    "allow_auto_chat": false,
+    "daily_greeting_enabled": false,
+    "daily_greeting_hour": 8,
+    "daily_greeting_minute": 0,
+    "daily_greeting_prompt": "请你像桌宠一样主动向我说早安，简短自然地问好，再给我一句鼓励今天认真努力的暖心鸡汤。控制在两三句内，不要太像模板。"
+  },
+  "motion": {
+    "enabled": true,
+    "cooldown_ms": 1200,
+    "speaking_cooldown_ms": 1600,
+    "idle_enabled": true,
+    "idle_min_ms": 12000,
+    "idle_max_ms": 24000,
+    "intensity": "normal",
+    "combo_enabled": true,
+    "expression_enabled": true,
+    "expression_strength": 1.0
+  },
+  "tools": {
+    "enabled": true,
+    "workspace_root": "D:/AI/ai_desktop_pet",
+    "allow_shell": true,
+    "shell_timeout_sec": 25,
+    "max_file_read_chars": 24000,
+    "max_command_output_chars": 14000,
+    "image_enabled": true,
+    "image_model": "gpt-image-1",
+    "image_size": "1024x1024",
+    "allowed_command_prefixes": [
+      "python",
+      "py",
+      "pip",
+      "pip3",
+      "pytest",
+      "node",
+      "npm",
+      "npx",
+      "pnpm",
+      "yarn",
+      "git",
+      "go",
+      "cargo",
+      "dotnet",
+      "java",
+      "javac",
+      "where",
+      "dir",
+      "type",
+      "echo",
+      "findstr",
+      "get-childitem",
+      "get-content",
+      "select-string",
+      "ls",
+      "cat",
+      "pwd",
+      "whoami",
+      "tree"
+    ]
+  },
+  "style": {
+    "auto": true,
+    "manual": "neutral"
+  },
+  "humanize": {
+    "enabled": true,
+    "strip_fillers": true,
+    "refine_enabled": false,
+    "refine_max_chars": 120,
+    "refine_timeout_sec": 12,
+    "refine_min_chars": 36
+  },
+  "personality": {
+    "state_inject_prob": 0.0
+  }
+}

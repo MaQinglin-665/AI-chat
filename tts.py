@@ -418,69 +418,55 @@ def _wav_duration_seconds(audio_bytes):
         return None
 
 
-def _split_gpt_sovits_text(text, max_len=18):
+def _split_gpt_sovits_text(text, max_len=200):
+    """Split text only when it exceeds max_len."""
     src = " ".join(str(text or "").split()).strip()
     if not src:
         return []
-
-    max_len = max(8, int(max_len or 18))
+    max_len = max(60, int(max_len or 200))
+    if len(src) <= max_len:
+        return [src]
     strong_breaks = {"\u3002", "\uff01", "\uff1f", "!", "?", "\n"}
-    soft_breaks = {"\uff0c", "\u3001", "\uff1b", "\uff1a", ",", ";", ":"}
-    break_chars = strong_breaks | soft_breaks
-
     pieces = []
     current = ""
-
-    def flush(chunk):
-        safe = str(chunk or "").strip()
-        if safe:
-            pieces.append(safe)
-
     for ch in src:
         current += ch
-        cur = current.strip()
-        if not cur:
-            continue
-
-        if ch in strong_breaks:
-            flush(cur)
+        if ch in strong_breaks and len(current.strip()) >= 10:
+            pieces.append(current.strip())
             current = ""
-            continue
-
-        if ch in soft_breaks and len(cur) >= 3:
-            flush(cur)
-            current = ""
-            continue
-
-        if len(cur) < max_len:
-            continue
-
-        split_at = -1
-        for idx in range(len(cur) - 1, -1, -1):
-            if cur[idx] in break_chars:
-                split_at = idx + 1
-                break
-        if 0 < split_at < len(cur):
-            flush(cur[:split_at])
-            current = cur[split_at:].lstrip()
+    if current.strip():
+        if pieces and len(current.strip()) < 15:
+            pieces[-1] += current.strip()
         else:
-            flush(cur)
-            current = ""
+            pieces.append(current.strip())
+    return pieces if pieces else [src]
 
-    flush(current)
 
-    merged = []
-    for piece in pieces:
-        if (
-            merged
-            and len(merged[-1]) < 5
-            and len(merged[-1]) + len(piece) <= max_len + 2
-            and merged[-1][-1] not in strong_breaks
-        ):
-            merged[-1] = f"{merged[-1]}{piece}"
-        else:
-            merged.append(piece)
-    return merged
+def _trim_wav_silence(raw_pcm, sample_width=2, threshold=200):
+    """Trim leading and trailing near-silence from raw PCM bytes."""
+    if not raw_pcm or len(raw_pcm) < 200 or sample_width not in (1, 2):
+        return raw_pcm
+    import struct
+
+    fmt = "<h" if sample_width == 2 else "<b"
+    n_samples = len(raw_pcm) // sample_width
+    # Find first non-silent sample
+    start = 0
+    for i in range(n_samples):
+        val = struct.unpack_from(fmt, raw_pcm, i * sample_width)[0]
+        if abs(val) > threshold:
+            start = max(0, i - 80)  # keep 80 samples (~2ms) of lead-in
+            break
+    # Find last non-silent sample
+    end = n_samples
+    for i in range(n_samples - 1, -1, -1):
+        val = struct.unpack_from(fmt, raw_pcm, i * sample_width)[0]
+        if abs(val) > threshold:
+            end = min(n_samples, i + 80)  # keep 80 samples of tail
+            break
+    if start >= end:
+        return raw_pcm
+    return raw_pcm[start * sample_width : end * sample_width]
 
 
 def _concat_wav_audio_bytes(chunks):
@@ -501,7 +487,9 @@ def _concat_wav_audio_bytes(chunks):
                 wf.getcomptype(),
                 wf.getcompname(),
             )
+            sample_width = wf.getsampwidth()
             frames = wf.readframes(wf.getnframes())
+            frames = _trim_wav_silence(frames, sample_width)
         if params is None:
             params = cur
         parts.append((cur, frames))
@@ -686,6 +674,20 @@ def _looks_too_long_for_text(audio_bytes, text):
     return dur > upper
 
 
+def _detect_text_lang(text):
+    """Detect text language. Use 'auto' for any Chinese+English mix."""
+    s = str(text or "").strip()
+    if not s:
+        return "zh"
+    cn_chars = sum(1 for c in s if "\u4e00" <= c <= "\u9fff")
+    en_chars = sum(1 for c in s if c.isascii() and c.isalpha())
+    if cn_chars == 0 and en_chars > 0:
+        return "en"
+    if cn_chars > 0 and en_chars > 0:
+        return "auto"
+    return "zh"
+
+
 def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=None):
     text = _normalize_gpt_sovits_spoken_text(text)
     if not text:
@@ -720,6 +722,12 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         prosody.get("speed_ratio", tts_cfg.get("gpt_sovits_speed", 1.0)),
         1.0,
     )
+    _dominant = str(prosody.get("_dominant", "neutral")).strip().lower()
+    _arousal = _safe_float(prosody.get("_arousal", 0.5), 0.5)
+    if _dominant == "happy" and _arousal > 0.5:
+        speed = min(1.5, speed * 1.12)
+    elif _dominant in ("sad", "anxious"):
+        speed = max(0.7, speed * 0.9)
     speed = max(0.6, min(1.8, speed))
     stable_top_k = max(1, int(_safe_float(tts_cfg.get("gpt_sovits_top_k", 8), 8)))
     stable_top_p = max(0.5, min(0.98, _safe_float(tts_cfg.get("gpt_sovits_top_p", 0.78), 0.78)))
@@ -768,6 +776,15 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
             if not value:
                 continue
         payload[out_key] = value
+    detected_lang = _detect_text_lang(text)
+    if detected_lang == "auto":
+        payload["text_lang"] = "auto"
+    elif detected_lang == "en":
+        payload["text_lang"] = "en"
+    else:
+        current = str(payload.get("text_lang", "")).strip().lower()
+        if not current or current == "auto":
+            payload["text_lang"] = "zh"
     if tts_cfg.get("gpt_sovits_use_prompt_text"):
         prompt_text = str(tts_cfg.get("gpt_sovits_prompt_text") or "").strip()
         if prompt_text:
@@ -873,7 +890,10 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
             return _download_audio_bytes(audio_url, timeout=call_timeout)
         raise RuntimeError("GPT-SoVITS response has no audio data.")
 
-    text_chunks = _split_gpt_sovits_text(text, 18)
+    chunk_char_limit = max(
+        10, min(300, _safe_int(tts_cfg.get("gpt_sovits_chunk_chars", 200), 200))
+    )
+    text_chunks = _split_gpt_sovits_text(text, chunk_char_limit)
     fallback_ref = str(
         tts_cfg.get("gpt_sovits_fallback_ref_audio_path")
         or (ROOT_DIR / "tts_ref" / "taffy_ref.wav")
@@ -1051,7 +1071,7 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         except Exception:
             return parts[0]
 
-    prefer_chunked = True
+    prefer_chunked = len(text) > chunk_char_limit
     audio = _request_text_chunks(payload, text_chunks or [text]) if prefer_chunked else _request_once(payload)
     degraded = _looks_too_short_for_text(audio, text) or _looks_too_quiet_for_text(audio, text)
     if degraded and enable_global_retry:
@@ -1099,11 +1119,59 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
     return audio
 
 
+_EN_TO_CN_PHONETIC = {
+    "ai": "诶爱",
+    "ok": "欧凯",
+    "emo": "一某",
+    "cpu": "西皮优",
+    "gpu": "吉皮优",
+    "bug": "巴格",
+    "app": "艾普",
+    "ip": "爱皮",
+    "id": "爱迪",
+    "pc": "皮西",
+    "vip": "微爱皮",
+    "diy": "迪爱歪",
+    "wifi": "歪发",
+    "gpt": "吉皮提",
+    "pdf": "皮迪艾弗",
+    "url": "优阿尔艾尔",
+    "api": "诶皮爱",
+    "npc": "恩皮西",
+    "rpg": "阿皮吉",
+    "fps": "艾弗皮艾斯",
+    "bgm": "必吉艾姆",
+    "pvp": "皮微皮",
+    "pve": "皮微伊",
+}
+
+
+def _replace_en_words_for_tts(text):
+    """Replace common short English words with Chinese phonetic equivalents."""
+    import re
+    result = str(text or "")
+    for en, cn in _EN_TO_CN_PHONETIC.items():
+        pattern = re.compile(r'(?<![a-zA-Z])' + re.escape(en) + r'(?![a-zA-Z])', re.IGNORECASE)
+        result = pattern.sub(cn, result)
+    return result
+
+
 def synthesize_tts_audio(text, voice_override=None, prosody=None):
     config = load_config()
     tts_cfg = config.get("tts", {})
     provider = str(tts_cfg.get("provider", TTS_DEFAULT_PROVIDER)).strip().lower()
+    if provider in ("gpt_sovits",):
+        text = _replace_en_words_for_tts(text)
     safe_text = normalize_tts_text(text)
+    prosody = prosody if isinstance(prosody, dict) else {}
+    try:
+        from app import load_emotion_state
+        _emo = load_emotion_state()
+        _dominant = _emo.get("dominant", "neutral") if isinstance(_emo, dict) else "neutral"
+        _arousal = float(_emo.get("arousal", 0.5)) if isinstance(_emo, dict) else 0.5
+    except Exception:
+        _dominant = "neutral"
+        _arousal = 0.5
     if not safe_text:
         raise RuntimeError("TTS text is empty.")
 
@@ -1121,7 +1189,7 @@ def synthesize_tts_audio(text, voice_override=None, prosody=None):
             text=safe_text,
             tts_cfg=tts_cfg,
             voice_override=voice_override,
-            prosody=prosody,
+            prosody={**prosody, "_dominant": _dominant, "_arousal": _arousal},
         )
 
     if provider in {"volcengine_tts", "volcengine"}:
@@ -1136,8 +1204,16 @@ def synthesize_tts_audio(text, voice_override=None, prosody=None):
         raise RuntimeError("edge-tts is not installed. Run: pip install edge-tts")
 
     voice = str(voice_override or tts_cfg.get("voice") or TTS_DEFAULT_VOICE)
-    prosody = prosody if isinstance(prosody, dict) else {}
+    # prosody already normalized above
     rate = str(prosody.get("rate", tts_cfg.get("rate", "+0%")))
+    _rate_match = re.match(r"^\s*([+-]?\d+(?:\.\d+)?)%?\s*$", rate)
+    _rate_percent = _safe_float(_rate_match.group(1), 0.0) if _rate_match else 0.0
+    _rate_factor = 1.0 + (_rate_percent / 100.0)
+    if _dominant == "happy" and _arousal > 0.5:
+        _rate_factor = min(1.5, _rate_factor * 1.12)
+    elif _dominant in ("sad", "anxious"):
+        _rate_factor = max(0.7, _rate_factor * 0.9)
+    rate = f"{int(round((_rate_factor - 1.0) * 100.0)):+d}%"
     volume = str(prosody.get("volume", tts_cfg.get("volume", "+0%")))
     pitch = str(prosody.get("pitch", tts_cfg.get("pitch", "+0Hz")))
 

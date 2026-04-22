@@ -1,0 +1,510 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Taffy（塔菲）是一只会聊天、会说话、有记忆的 AI 桌宠。">
+  <title>Taffy · AI 桌宠</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header" id="top">
+    <nav class="navbar container" aria-label="主导航">
+      <a class="logo" href="#hero">🎀 Taffy</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="navMenu" aria-label="切换导航菜单">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="nav-menu" id="navMenu">
+        <li><a class="nav-link" href="#hero">首页</a></li>
+        <li><a class="nav-link" href="#features">功能</a></li>
+        <li><a class="nav-link" href="#demo">演示</a></li>
+        <li><a class="nav-link" href="#quickstart">快速开始</a></li>
+        <li><a class="nav-link" href="config.html">配置</a></li>
+        <li><a class="nav-link" href="#changelog">更新日志</a></li>
+        <li><button class="nav-link nav-link-btn version-history-trigger" type="button" aria-haspopup="dialog">版本历史</button></li>
+        <li><a class="nav-link" href="#faq">FAQ</a></li>
+        <li><a class="nav-link" href="#download">下载</a></li>
+      </ul>
+      <button id="themeToggleBtn" class="theme-toggle" type="button" aria-pressed="false" aria-label="切换暗色模式">🌙 暗色</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="hero" class="hero section">
+      <div class="container hero-inner">
+        <div class="hero-content fade-in-up">
+          <h1 class="hero-title">Taffy · AI 桌宠</h1>
+          <p class="hero-subtitle">一只会聊天、会说话、有记忆的桌面小伙伴 ✨</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#download">✨ 立即下载</a>
+            <a class="btn btn-outline" href="#features">💡 了解更多</a>
+          </div>
+        </div>
+        <div class="demo-placeholder fade-in-up" role="img" aria-label="演示动图占位图">演示动图</div>
+      </div>
+    </section>
+
+    <div class="wave-divider" aria-hidden="true">
+      <svg viewBox="0 0 1440 160" preserveAspectRatio="none" role="img" aria-label="分隔波浪">
+        <defs>
+          <linearGradient id="waveGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#e8dff5" />
+            <stop offset="50%" stop-color="#d4e4ff" />
+            <stop offset="100%" stop-color="#fce4ec" />
+          </linearGradient>
+        </defs>
+        <path fill="url(#waveGradient1)" d="M0,64L48,80C96,96,192,128,288,128C384,128,480,96,576,85.3C672,75,768,85,864,101.3C960,117,1056,139,1152,138.7C1248,139,1344,117,1392,106.7L1440,96L1440,160L1392,160C1344,160,1248,160,1152,160C1056,160,960,160,864,160C768,160,672,160,576,160C480,160,384,160,288,160C192,160,96,160,48,160L0,160Z"></path>
+      </svg>
+    </div>
+
+    <section id="features" class="section">
+      <div class="container">
+        <h2 class="section-title fade-in-up">✨ 核心功能</h2>
+        <div class="features-grid">
+          <article class="feature-card fade-in-up">
+            <div class="feature-icon">💬</div>
+            <h3>智能对话</h3>
+            <p>接入大语言模型，像真人朋友一样自然聊天，支持通义千问、DeepSeek、Ollama 等。</p>
+          </article>
+          <article class="feature-card fade-in-up">
+            <div class="feature-icon">🎙️</div>
+            <h3>语音交互</h3>
+            <p>说出“塔菲”即可唤醒，支持语音输入和 GPT-SoVITS 拟声回复。</p>
+          </article>
+          <article class="feature-card fade-in-up">
+            <div class="feature-icon">🧠</div>
+            <h3>长期记忆</h3>
+            <p>基于向量检索的记忆系统，记住你们的每一次对话。</p>
+          </article>
+          <article class="feature-card fade-in-up">
+            <div class="feature-icon">👀</div>
+            <h3>桌面感知</h3>
+            <p>实时观察你的屏幕内容，理解你正在做什么并主动关心。</p>
+          </article>
+          <article class="feature-card fade-in-up">
+            <div class="feature-icon">😊</div>
+            <h3>情感表达</h3>
+            <p>根据对话情绪切换表情和动作，让互动更加生动。</p>
+          </article>
+          <article class="feature-card fade-in-up">
+            <div class="feature-icon">⏰</div>
+            <h3>日程提醒</h3>
+            <p>输入 /提醒 10m 喝水，到时间主动语音提醒你。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <div class="wave-divider" aria-hidden="true">
+      <svg viewBox="0 0 1440 160" preserveAspectRatio="none" role="img" aria-label="分隔波浪">
+        <defs>
+          <linearGradient id="waveGradientDemo" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#e8dff5" />
+            <stop offset="50%" stop-color="#fce4ec" />
+            <stop offset="100%" stop-color="#d4e4ff" />
+          </linearGradient>
+        </defs>
+        <path fill="url(#waveGradientDemo)" d="M0,80L48,74.7C96,69,192,59,288,69.3C384,80,480,112,576,122.7C672,133,768,123,864,112C960,101,1056,91,1152,90.7C1248,91,1344,101,1392,106.7L1440,112L1440,160L1392,160C1344,160,1248,160,1152,160C1056,160,960,160,864,160C768,160,672,160,576,160C480,160,384,160,288,160C192,160,96,160,48,160L0,160Z"></path>
+      </svg>
+    </div>
+
+    <section id="demo" class="section">
+      <div class="container">
+        <h2 class="section-title fade-in-up">🎬 对话与语音演示</h2>
+        <div class="demo-lab-grid">
+          <article class="demo-lab-card demo-media-card fade-in-up">
+            <h3>🖼️ 真实演示素材</h3>
+            <p class="demo-media-tip">把录屏文件放进 <code>docs/assets/</code> 后，这里会自动展示效果。</p>
+            <div class="media-showcase">
+              <figure class="media-tile" data-media-tile>
+                <figcaption>桌宠待机与跟随（assets/demo-idle.mp4）</figcaption>
+                <video class="media-video" controls muted loop playsinline preload="metadata">
+                  <source src="assets/demo-idle.mp4" type="video/mp4">
+                </video>
+                <div class="media-placeholder">未检测到素材：assets/demo-idle.mp4</div>
+              </figure>
+              <figure class="media-tile" data-media-tile>
+                <figcaption>语音回复演示（assets/demo-voice.mp4）</figcaption>
+                <video class="media-video" controls muted loop playsinline preload="metadata">
+                  <source src="assets/demo-voice.mp4" type="video/mp4">
+                </video>
+                <div class="media-placeholder">未检测到素材：assets/demo-voice.mp4</div>
+              </figure>
+              <figure class="media-tile" data-media-tile>
+                <figcaption>配置中心操作（assets/demo-config.mp4）</figcaption>
+                <video class="media-video" controls muted loop playsinline preload="metadata">
+                  <source src="assets/demo-config.mp4" type="video/mp4">
+                </video>
+                <div class="media-placeholder">未检测到素材：assets/demo-config.mp4</div>
+              </figure>
+            </div>
+          </article>
+
+          <article class="demo-lab-card demo-chat-card fade-in-up">
+            <h3>💬 对话演示</h3>
+            <div id="chatDemoLog" class="chat-demo-log" aria-live="polite">
+              <p class="chat-demo-placeholder">点击“开始演示”，看看 Taffy 的聊天风格。</p>
+            </div>
+            <div class="demo-lab-actions">
+              <button id="chatDemoStartBtn" class="btn btn-primary" type="button">▶ 开始演示</button>
+              <button id="chatDemoNextBtn" class="btn btn-outline" type="button">⏭ 下一句</button>
+              <button id="chatDemoResetBtn" class="btn btn-outline" type="button">↺ 重置</button>
+            </div>
+          </article>
+          <article class="demo-lab-card demo-voice-card fade-in-up">
+            <h3>🎙️ 语音试听</h3>
+            <label class="demo-field" for="voiceDemoText">试听文本</label>
+            <textarea id="voiceDemoText" class="voice-demo-text" rows="4">嗨，我是塔菲。今天也一起加油吧！</textarea>
+            <label class="demo-field" for="voiceDemoEndpoint">后端 TTS 地址（可选）</label>
+            <input id="voiceDemoEndpoint" type="text" value="http://127.0.0.1:8123/api/tts" placeholder="http://127.0.0.1:8123/api/tts">
+            <div class="demo-control-grid">
+              <label class="demo-field control-item" for="voiceDemoVoice">音色
+                <select id="voiceDemoVoice">
+                  <option value="auto">自动选择（中文优先）</option>
+                </select>
+              </label>
+              <label class="demo-field control-item" for="voiceDemoRate">语速 <span id="voiceDemoRateValue">1.00</span>
+                <input id="voiceDemoRate" type="range" min="0.6" max="1.8" step="0.01" value="1.00">
+              </label>
+              <label class="demo-field control-item" for="voiceDemoVolume">音量 <span id="voiceDemoVolumeValue">0.90</span>
+                <input id="voiceDemoVolume" type="range" min="0" max="1" step="0.01" value="0.90">
+              </label>
+            </div>
+            <div class="demo-lab-actions">
+              <button id="voiceDemoPlayBackendBtn" class="btn btn-primary" type="button">🎧 后端试听</button>
+              <button id="voiceDemoPlayBrowserBtn" class="btn btn-outline" type="button">🌐 浏览器试听</button>
+              <button id="voiceDemoStopBtn" class="btn btn-outline" type="button">⏹ 停止</button>
+            </div>
+            <p id="voiceDemoStatus" class="write-status">未播放语音</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <div class="wave-divider" aria-hidden="true">
+      <svg viewBox="0 0 1440 160" preserveAspectRatio="none" role="img" aria-label="分隔波浪">
+        <defs>
+          <linearGradient id="waveGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#fce4ec" />
+            <stop offset="50%" stop-color="#e8dff5" />
+            <stop offset="100%" stop-color="#d4e4ff" />
+          </linearGradient>
+        </defs>
+        <path fill="url(#waveGradient2)" d="M0,96L48,101.3C96,107,192,117,288,106.7C384,96,480,64,576,58.7C672,53,768,75,864,85.3C960,96,1056,96,1152,90.7C1248,85,1344,75,1392,69.3L1440,64L1440,160L1392,160C1344,160,1248,160,1152,160C1056,160,960,160,864,160C768,160,672,160,576,160C480,160,384,160,288,160C192,160,96,160,48,160L0,160Z"></path>
+      </svg>
+    </div>
+
+    <section id="quickstart" class="section">
+      <div class="container">
+        <h2 class="section-title fade-in-up">🚀 快速开始</h2>
+        <div class="steps-grid">
+          <article class="step-card fade-in-up">
+            <span class="step-badge">1</span>
+            <h3>📥 下载安装包</h3>
+            <p>从 GitHub Releases 下载最新版，解压到任意目录。</p>
+          </article>
+          <article class="step-card fade-in-up">
+            <span class="step-badge">2</span>
+            <h3>🔑 配置 API Key</h3>
+            <p>注册阿里云 DashScope，获取 API Key 填入 .env 文件。</p>
+          </article>
+          <article class="step-card fade-in-up">
+            <span class="step-badge">3</span>
+            <h3>🚀 启动运行</h3>
+            <p>双击“一键启动桌宠.vbs”，Taffy 就会出现在你的桌面上。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <div class="wave-divider" aria-hidden="true">
+      <svg viewBox="0 0 1440 160" preserveAspectRatio="none" role="img" aria-label="分隔波浪">
+        <defs>
+          <linearGradient id="waveGradient3" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#d4e4ff" />
+            <stop offset="50%" stop-color="#fce4ec" />
+            <stop offset="100%" stop-color="#e8dff5" />
+          </linearGradient>
+        </defs>
+        <path fill="url(#waveGradient3)" d="M0,32L48,53.3C96,75,192,117,288,128C384,139,480,117,576,101.3C672,85,768,75,864,80C960,85,1056,107,1152,112C1248,117,1344,107,1392,101.3L1440,96L1440,160L1392,160C1344,160,1248,160,1152,160C1056,160,960,160,864,160C768,160,672,160,576,160C480,160,384,160,288,160C192,160,96,160,48,160L0,160Z"></path>
+      </svg>
+    </div>
+
+    <section id="config" class="section">
+      <div class="container">
+        <h2 class="section-title fade-in-up">⚙️ 在线配置预览</h2>
+        <p class="center-actions fade-in-up">
+          <a class="btn btn-outline" href="config.html">🧩 打开完整配置中心</a>
+        </p>
+        <div class="config-layout">
+          <article class="config-panel fade-in-up">
+            <h3>参数设置</h3>
+            <form id="configForm">
+              <div class="form-row">
+                <label for="petName">桌宠名称</label>
+                <input id="petName" name="petName" type="text" value="Taffy">
+              </div>
+              <div class="form-row">
+                <label for="modelName">对话模型</label>
+                <select id="modelName" name="modelName">
+                  <option value="qwen-plus" selected>qwen-plus</option>
+                  <option value="qwen-turbo">qwen-turbo</option>
+                  <option value="deepseek-chat">deepseek-chat</option>
+                  <option value="gpt-4o-mini">gpt-4o-mini</option>
+                  <option value="custom">自定义模型</option>
+                </select>
+              </div>
+              <div class="form-row custom-model-row" id="customModelRow">
+                <label for="customModelName">自定义模型名称</label>
+                <input id="customModelName" name="customModelName" type="text" value="qwen-max-latest" placeholder="例如：qwen-max-latest">
+              </div>
+              <div class="form-row">
+                <label for="temperature">回复温度 <span id="temperatureValue">0.42</span></label>
+                <input id="temperature" name="temperature" type="range" min="0" max="1" step="0.01" value="0.42">
+              </div>
+              <div class="form-row">
+                <label for="voiceEngine">语音引擎</label>
+                <select id="voiceEngine" name="voiceEngine">
+                  <option value="gpt_sovits" selected>gpt_sovits</option>
+                  <option value="edge_tts">edge_tts</option>
+                  <option value="browser">browser</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label for="speechRate">语速 <span id="speechRateValue">1.08</span></label>
+                <input id="speechRate" name="speechRate" type="range" min="0.6" max="1.8" step="0.01" value="1.08">
+              </div>
+              <div class="form-row">
+                <label for="wakeWord">唤醒词</label>
+                <input id="wakeWord" name="wakeWord" type="text" value="塔菲">
+              </div>
+              <div class="form-row toggle-row">
+                <label for="memoryEnabled">记忆功能</label>
+                <label class="switch" for="memoryEnabled">
+                  <input id="memoryEnabled" name="memoryEnabled" type="checkbox" checked>
+                  <span class="slider" aria-hidden="true"></span>
+                </label>
+              </div>
+              <div class="form-row">
+                <label for="emotionIntensity">表情强度 <span id="emotionIntensityValue">1.0</span></label>
+                <input id="emotionIntensity" name="emotionIntensity" type="range" min="0" max="2" step="0.1" value="1.0">
+              </div>
+            </form>
+          </article>
+          <article class="config-panel fade-in-up">
+            <h3>配置预览</h3>
+            <pre id="configPreview" class="config-preview"><code>{
+  "pet": {
+    "name": "Taffy",
+    "wake_word": "塔菲"
+  },
+  "llm": {
+    "model": "qwen-plus",
+    "temperature": 0.42
+  },
+  "voice": {
+    "engine": "gpt_sovits",
+    "rate": 1.08
+  },
+  "memory": {
+    "enabled": true
+  },
+  "emotion": {
+    "intensity": 1.0
+  }
+}</code></pre>
+            <button id="copyConfigBtn" class="btn btn-primary copy-btn" type="button">📋 复制配置</button>
+            <noscript>
+              <p class="noscript-note">未启用 JavaScript 时，请手动复制上方配置内容。</p>
+            </noscript>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <div class="wave-divider" aria-hidden="true">
+      <svg viewBox="0 0 1440 160" preserveAspectRatio="none" role="img" aria-label="分隔波浪">
+        <defs>
+          <linearGradient id="waveGradient4" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#fce4ec" />
+            <stop offset="50%" stop-color="#d4e4ff" />
+            <stop offset="100%" stop-color="#e8dff5" />
+          </linearGradient>
+        </defs>
+        <path fill="url(#waveGradient4)" d="M0,112L48,106.7C96,101,192,91,288,90.7C384,91,480,101,576,96C672,91,768,69,864,64C960,59,1056,69,1152,85.3C1248,101,1344,123,1392,133.3L1440,144L1440,160L1392,160C1344,160,1248,160,1152,160C1056,160,960,160,864,160C768,160,672,160,576,160C480,160,384,160,288,160C192,160,96,160,48,160L0,160Z"></path>
+      </svg>
+    </div>
+
+    <section id="changelog" class="section">
+      <div class="container">
+        <h2 class="section-title fade-in-up">📋 更新日志 &amp; 开发计划</h2>
+        <div class="changelog-layout">
+          <article class="changelog-panel fade-in-up">
+            <h3>更新日志</h3>
+            <ol class="timeline">
+              <li>
+                <h4>v1.1.0（2026-04）— 🧩 配置中心与站点体验升级</h4>
+                <p>· 新增独立“配置中心”页面与侧边分组导航</p>
+                <p>· 支持 LLM 预设模型 + 自定义模型输入</p>
+                <p>· 新增本地写入 config.json（自动备份旧配置）</p>
+                <p>· 增加配置校验、差异预览与错误提示</p>
+                <p>· 支持“一键应用到运行中桌宠”（/api/config/reload）</p>
+                <p>· 新增“重启运行中桌宠”按钮（Electron 托管模式）</p>
+                <p>· 新增配置连通性自检（LLM/TTS/重载/重启）</p>
+                <p>· 新增一键应用流程（校验→写入→重载，失败可重启）</p>
+                <p>· 自检结果新增可点击修复建议按钮</p>
+                <p>· 新增“回滚到最近备份”按钮（支持快速恢复 config.json）</p>
+                <p>· 首页/配置页/README 统一发布流程说明</p>
+                <p>· 新增日常聊天/低延迟/本地模型三套配置模板</p>
+              </li>
+              <li>
+                <h4>v1.0.0（2025-04）— 🎉 首个完整版本发布</h4>
+                <p>· Live2D 模型渲染与桌面交互</p>
+                <p>· LLM 对话与语音回复</p>
+                <p>· 长期记忆与情感系统</p>
+              </li>
+              <li>
+                <h4>v0.9.0（2025-03）— 🔧 核心功能完善</h4>
+                <p>· 桌面截图观察功能</p>
+                <p>· GPT-SoVITS 语音合成</p>
+                <p>· 日程提醒命令</p>
+              </li>
+            </ol>
+          </article>
+          <article class="changelog-panel fade-in-up">
+            <h3>开发计划</h3>
+            <div class="plan-list">
+              <p class="plan-card">☑ 基础对话与语音</p>
+              <p class="plan-card">☑ 长期记忆系统</p>
+              <p class="plan-card">☑ 桌面感知</p>
+              <p class="plan-card">☑ 独立配置中心与在线预览</p>
+              <p class="plan-card">☑ 配置文件一键写入与自动备份</p>
+              <p class="plan-card">☑ 一键应用配置（校验→写入→重载）</p>
+              <p class="plan-card">☑ 连通性检测与修复建议</p>
+              <p class="plan-card">☑ 一键回滚到最近备份</p>
+              <p class="plan-card">⬜ 打包为独立安装包</p>
+              <p class="plan-card">⬜ 多角色切换支持</p>
+              <p class="plan-card">⬜ 移动端适配</p>
+              <p class="plan-card">⬜ 插件系统</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <div class="wave-divider" aria-hidden="true">
+      <svg viewBox="0 0 1440 160" preserveAspectRatio="none" role="img" aria-label="分隔波浪">
+        <defs>
+          <linearGradient id="waveGradientFaq" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#e8dff5" />
+            <stop offset="50%" stop-color="#d4e4ff" />
+            <stop offset="100%" stop-color="#fce4ec" />
+          </linearGradient>
+        </defs>
+        <path fill="url(#waveGradientFaq)" d="M0,64L48,74.7C96,85,192,107,288,112C384,117,480,107,576,90.7C672,75,768,53,864,53.3C960,53,1056,75,1152,90.7C1248,107,1344,117,1392,122.7L1440,128L1440,160L1392,160C1344,160,1248,160,1152,160C1056,160,960,160,864,160C768,160,672,160,576,160C480,160,384,160,288,160C192,160,96,160,48,160L0,160Z"></path>
+      </svg>
+    </div>
+
+    <section id="faq" class="section">
+      <div class="container">
+        <h2 class="section-title fade-in-up">❓ 常见问题</h2>
+        <div class="faq-list">
+          <article class="faq-item card-like fade-in-up">
+            <button class="faq-question" type="button" aria-expanded="false">需要一直联网吗？</button>
+            <div class="faq-answer">
+              <p>不一定哦。你可以接云端模型（通义千问、DeepSeek 等），也可以切到本地 Ollama 模式。本地模式下，核心聊天能力可以离线使用。</p>
+            </div>
+          </article>
+          <article class="faq-item card-like fade-in-up">
+            <button class="faq-question" type="button" aria-expanded="false">配置中心改动会立即生效吗？</button>
+            <div class="faq-answer">
+              <p>建议走“校验 → 写入 → 重载”这条安全流程。先看 JSON 预览确认，再一键应用到运行中的桌宠；如果个别模块没刷新，再点一次重启即可。</p>
+            </div>
+          </article>
+          <article class="faq-item card-like fade-in-up">
+            <button class="faq-question" type="button" aria-expanded="false">语音试听没有声音怎么办？</button>
+            <div class="faq-answer">
+              <p>先点“浏览器试听”确认本机扬声器正常，再检查后端 TTS 地址和服务状态。也可以换一个音色，并调整语速/音量后再试一遍。</p>
+            </div>
+          </article>
+          <article class="faq-item card-like fade-in-up">
+            <button class="faq-question" type="button" aria-expanded="false">Live2D 模型加载失败怎么排查？</button>
+            <div class="faq-answer">
+              <p>优先用 HTTP 方式访问页面，先确认 CubismCore 脚本可访问；再检查 `model3.json` 与纹理路径是否按 `autoload.js` 的基准目录解析。</p>
+            </div>
+          </article>
+          <article class="faq-item card-like fade-in-up">
+            <button class="faq-question" type="button" aria-expanded="false">支持哪些系统与启动方式？</button>
+            <div class="faq-answer">
+              <p>当前优先支持 Windows 10/11。首次启动会自动准备运行环境，之后你可以用一键脚本启动，或走 Electron 桌面方式运行。</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="download" class="section download-section">
+      <div class="container download-inner fade-in-up">
+        <h2 class="section-title">📥 开始使用 Taffy</h2>
+        <p class="download-subtitle">支持 Windows 10/11 · 首次启动自动安装运行环境</p>
+        <a id="downloadGithubBtn" class="btn btn-primary btn-large" href="https://github.com/MaQinglin-665/AI-chat/releases" target="_blank" rel="noopener noreferrer">🎀 前往 GitHub 下载</a>
+        <p class="download-note release-version">
+          最新版本：<strong id="latestReleaseText">v1.1.0（以 Release 为准）</strong>
+          <span id="latestReleaseDate" class="release-date">发布时间：2026-04</span>
+        </p>
+        <p class="download-note">先到 <a href="config.html">配置中心</a> 完成自检与一键应用，再启动桌宠体验最佳。</p>
+        <p class="download-note">发布流程统一为：配置自检 → 一键应用验证 → 创建 Release → 更新下载说明。</p>
+        <p class="download-note">或查看 <a id="sourceCodeLink" href="https://github.com/MaQinglin-665/AI-chat" target="_blank" rel="noopener noreferrer">源代码</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <p>Taffy · AI 桌宠 © 2025</p>
+      <div class="footer-links">
+        <a id="footerGithubLink" href="https://github.com/MaQinglin-665/AI-chat" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a id="footerIssuesLink" href="https://github.com/MaQinglin-665/AI-chat/issues" target="_blank" rel="noopener noreferrer">反馈问题</a>
+        <a id="footerContactLink" href="https://github.com/MaQinglin-665" target="_blank" rel="noopener noreferrer">联系作者</a>
+      </div>
+      <p>Made with 💜 by Taffy Team</p>
+    </div>
+  </footer>
+
+  <div id="versionPanelBackdrop" class="version-panel-backdrop" hidden></div>
+  <aside id="versionPanel" class="version-panel" role="dialog" aria-modal="true" aria-labelledby="versionPanelTitle" aria-hidden="true" tabindex="-1">
+    <div class="version-panel-head">
+      <h3 id="versionPanelTitle">📚 版本历史</h3>
+      <button id="versionPanelCloseBtn" class="version-panel-close" type="button" aria-label="关闭版本历史">✕</button>
+    </div>
+    <p class="version-panel-desc">这里是最近版本的关键变化，便于快速回顾升级内容。</p>
+    <ol class="version-panel-list">
+      <li>
+        <h4>v1.1.0（2026-04）</h4>
+        <p>配置中心上线，一键校验/写入/重载，支持模板、回滚和连通性自检。</p>
+      </li>
+      <li>
+        <h4>v1.0.0（2025-04）</h4>
+        <p>首个完整版本发布，包含 Live2D 桌宠、LLM 对话、语音与记忆系统。</p>
+      </li>
+      <li>
+        <h4>v0.9.0（2025-03）</h4>
+        <p>补齐核心能力：桌面观察、GPT-SoVITS 语音和提醒命令。</p>
+      </li>
+    </ol>
+    <p class="version-panel-foot">
+      查看完整条目可前往 <a href="#changelog">更新日志</a>。
+    </p>
+  </aside>
+
+  <button id="backToTop" class="back-to-top" type="button" aria-label="返回顶部">↑</button>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/main.js" defer></script>
+  <script src="js/particles.js" defer></script>
+  <script src="js/config-preview.js" defer></script>
+  <script src="live2d/autoload.js" defer></script>
+</body>
+</html>

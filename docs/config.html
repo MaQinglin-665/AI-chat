@@ -1,0 +1,716 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Taffy 配置中心：集中管理桌宠模型、LLM、语音、记忆和系统参数。">
+  <title>Taffy 配置中心</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header scrolled" id="top">
+    <nav class="navbar container" aria-label="主导航">
+      <a class="logo" href="index.html">🎀 Taffy</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="navMenu" aria-label="切换导航菜单">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <ul class="nav-menu" id="navMenu">
+        <li><a class="nav-link" href="index.html#hero">首页</a></li>
+        <li><a class="nav-link" href="index.html#features">功能</a></li>
+        <li><a class="nav-link" href="index.html#demo">演示</a></li>
+        <li><a class="nav-link" href="index.html#quickstart">快速开始</a></li>
+        <li><a class="nav-link active" href="config.html">配置</a></li>
+        <li><a class="nav-link" href="index.html#changelog">更新日志</a></li>
+        <li><button class="nav-link nav-link-btn version-history-trigger" type="button" aria-haspopup="dialog">版本历史</button></li>
+        <li><a class="nav-link" href="index.html#faq">FAQ</a></li>
+        <li><a class="nav-link" href="index.html#download">下载</a></li>
+      </ul>
+      <button id="themeToggleBtn" class="theme-toggle" type="button" aria-pressed="false" aria-label="切换暗色模式">🌙 暗色</button>
+    </nav>
+  </header>
+
+  <main class="config-page-main section">
+    <div class="container config-page-shell">
+      <section class="config-page-hero fade-in-up">
+        <h1 class="section-title">🧩 Taffy 配置中心</h1>
+        <p class="config-page-subtitle">单独页面管理更多参数：模型、LLM、语音、记忆、观察、动作与工具权限。</p>
+        <p class="center-actions">
+          <a class="btn btn-outline" href="index.html#config">↩ 返回首页预览</a>
+        </p>
+      </section>
+
+      <div class="config-workspace">
+        <aside class="config-sidebar fade-in-up card-like" aria-label="配置分组导航">
+          <p class="config-sidebar-title">配置导航</p>
+          <nav class="config-sidebar-nav">
+            <details class="sidebar-group" open>
+              <summary>🧩 核心配置</summary>
+              <ul class="config-side-list">
+                <li><a class="config-side-link" href="#cfg-basic">基础信息</a></li>
+                <li><a class="config-side-link" href="#cfg-desktop">服务与桌面窗口</a></li>
+                <li><a class="config-side-link" href="#cfg-llm">LLM 参数</a></li>
+                <li><a class="config-side-link" href="#cfg-tts">语音 TTS</a></li>
+              </ul>
+            </details>
+            <details class="sidebar-group">
+              <summary>🧠 行为与记忆</summary>
+              <ul class="config-side-list">
+                <li><a class="config-side-link" href="#cfg-memory">记忆与摘要</a></li>
+                <li><a class="config-side-link" href="#cfg-asr">ASR 与桌面观察</a></li>
+                <li><a class="config-side-link" href="#cfg-tools">动作、工具与风格</a></li>
+              </ul>
+            </details>
+            <details class="sidebar-group">
+              <summary>🛠 操作区</summary>
+              <ul class="config-side-list">
+                <li><a class="config-side-link" href="#cfg-preview">实时 JSON 预览</a></li>
+                <li><a class="config-side-link" href="#cfg-templates">配置模板</a></li>
+                <li><a class="config-side-link" href="#cfg-apply">一键应用</a></li>
+                <li><a class="config-side-link" href="#cfg-health">连通性自检</a></li>
+                <li><a class="config-side-link" href="#cfg-runtime">运行中应用</a></li>
+                <li><a class="config-side-link" href="#cfg-release">发布指引</a></li>
+              </ul>
+            </details>
+          </nav>
+        </aside>
+
+        <div class="config-main">
+          <div class="config-center-layout">
+            <section class="config-center-form fade-in-up">
+              <form id="advancedConfigForm" novalidate>
+            <article id="cfg-basic" class="config-group card-like">
+              <h2>基础信息</h2>
+              <div class="field-grid two-col">
+                <label class="field">
+                  <span>桌宠名称</span>
+                  <input type="text" data-path="assistant_name" value="Taffy">
+                </label>
+                <label class="field">
+                  <span>Python 路径</span>
+                  <input type="text" data-path="pythonPath" value="C:/Users/MQL/AppData/Local/Programs/Python/Python312/python.exe">
+                </label>
+                <label class="field col-span-2">
+                  <span>Live2D 模型路径</span>
+                  <input type="text" data-path="model_path" value="/models/hiyori_pro_t11/hiyori_pro_t11.model3.json">
+                </label>
+                <label class="field">
+                  <span>模型缩放 <em id="v_model_scale">1.10</em></span>
+                  <input id="model_scale" type="range" min="0.5" max="2" step="0.01" data-path="model.scale" value="1.1" data-value-target="v_model_scale">
+                </label>
+                <label class="field">
+                  <span>X 比例 <em id="v_model_x">0.26</em></span>
+                  <input id="model_x" type="range" min="0" max="1" step="0.01" data-path="model.x_ratio" value="0.26" data-value-target="v_model_x">
+                </label>
+                <label class="field">
+                  <span>Y 比例 <em id="v_model_y">0.96</em></span>
+                  <input id="model_y" type="range" min="0" max="1" step="0.01" data-path="model.y_ratio" value="0.96" data-value-target="v_model_y">
+                </label>
+              </div>
+            </article>
+
+            <article id="cfg-desktop" class="config-group card-like">
+              <h2>服务与桌面窗口</h2>
+              <div class="field-grid three-col">
+                <label class="field">
+                  <span>服务 Host</span>
+                  <input type="text" data-path="server.host" value="127.0.0.1">
+                </label>
+                <label class="field">
+                  <span>服务 Port</span>
+                  <input type="number" min="1" max="65535" data-path="server.port" value="8123">
+                </label>
+                <label class="field switch-field">
+                  <span>启动后打开浏览器</span>
+                  <input type="checkbox" data-path="server.open_browser">
+                </label>
+                <label class="field switch-field">
+                  <span>透明窗口</span>
+                  <input type="checkbox" data-path="desktop.transparent" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>无边框</span>
+                  <input type="checkbox" data-path="desktop.frameless" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>窗口置顶</span>
+                  <input type="checkbox" data-path="desktop.always_on_top">
+                </label>
+                <label class="field switch-field">
+                  <span>允许缩放窗口</span>
+                  <input type="checkbox" data-path="desktop.resizable" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>关闭硬件加速</span>
+                  <input type="checkbox" data-path="desktop.disable_hardware_acceleration" checked>
+                </label>
+                <label class="field">
+                  <span>宽度</span>
+                  <input type="number" min="300" data-path="desktop.width" value="520">
+                </label>
+                <label class="field">
+                  <span>高度</span>
+                  <input type="number" min="300" data-path="desktop.height" value="900">
+                </label>
+                <label class="field">
+                  <span>最小宽度</span>
+                  <input type="number" min="200" data-path="desktop.min_width" value="420">
+                </label>
+                <label class="field">
+                  <span>最小高度</span>
+                  <input type="number" min="200" data-path="desktop.min_height" value="700">
+                </label>
+              </div>
+            </article>
+
+            <article id="cfg-llm" class="config-group card-like">
+              <h2>LLM 参数</h2>
+              <div class="field-grid two-col">
+                <label class="field">
+                  <span>Provider</span>
+                  <select data-path="llm.provider">
+                    <option value="openai-compatible" selected>openai-compatible</option>
+                    <option value="openai">openai</option>
+                    <option value="ollama">ollama</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>模型选项</span>
+                  <select id="llmModelPreset">
+                    <option value="qwen-plus" selected>qwen-plus</option>
+                    <option value="qwen-turbo">qwen-turbo</option>
+                    <option value="deepseek-chat">deepseek-chat</option>
+                    <option value="gpt-4o-mini">gpt-4o-mini</option>
+                    <option value="custom">自定义模型</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>模型名称</span>
+                  <input id="llmModelInput" type="text" data-path="llm.model" value="qwen-plus">
+                </label>
+                <label class="field col-span-2">
+                  <span>Base URL</span>
+                  <input type="text" data-path="llm.base_url" value="https://dashscope.aliyuncs.com/compatible-mode/v1">
+                </label>
+                <label class="field">
+                  <span>温度 <em id="v_llm_temp">0.65</em></span>
+                  <input id="llm_temp" type="range" min="0" max="2" step="0.01" data-path="llm.temperature" value="0.65" data-value-target="v_llm_temp">
+                </label>
+                <label class="field">
+                  <span>frequency_penalty <em id="v_llm_freq">0.40</em></span>
+                  <input id="llm_freq" type="range" min="-2" max="2" step="0.01" data-path="llm.frequency_penalty" value="0.4" data-value-target="v_llm_freq">
+                </label>
+                <label class="field">
+                  <span>presence_penalty <em id="v_llm_pre">0.25</em></span>
+                  <input id="llm_pre" type="range" min="-2" max="2" step="0.01" data-path="llm.presence_penalty" value="0.25" data-value-target="v_llm_pre">
+                </label>
+                <label class="field">
+                  <span>最大输出 Token</span>
+                  <input type="number" min="1" data-path="llm.max_output_tokens" value="300">
+                </label>
+                <label class="field">
+                  <span>verbosity</span>
+                  <select data-path="llm.verbosity">
+                    <option value="low" selected>low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>reasoning_effort</span>
+                  <select data-path="llm.reasoning_effort">
+                    <option value="" selected>空</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>API Key 环境变量名</span>
+                  <input type="text" data-path="llm.api_key_env" value="DASHSCOPE_API_KEY">
+                </label>
+              </div>
+            </article>
+
+            <article id="cfg-tts" class="config-group card-like">
+              <h2>语音 TTS</h2>
+              <div class="field-grid two-col">
+                <label class="field">
+                  <span>语音 Provider</span>
+                  <select data-path="tts.provider">
+                    <option value="gpt_sovits" selected>gpt_sovits</option>
+                    <option value="edge_tts">edge_tts</option>
+                    <option value="browser">browser</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>voice</span>
+                  <input type="text" data-path="tts.voice" value="default">
+                </label>
+                <label class="field col-span-2">
+                  <span>GPT-SoVITS API URL</span>
+                  <input type="text" data-path="tts.gpt_sovits_api_url" value="http://127.0.0.1:9880/tts">
+                </label>
+                <label class="field">
+                  <span>请求方式</span>
+                  <select data-path="tts.gpt_sovits_method">
+                    <option value="POST" selected>POST</option>
+                    <option value="GET">GET</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>超时（秒）</span>
+                  <input type="number" min="1" data-path="tts.gpt_sovits_timeout_sec" value="60">
+                </label>
+                <label class="field">
+                  <span>音频格式</span>
+                  <select data-path="tts.gpt_sovits_format">
+                    <option value="wav" selected>wav</option>
+                    <option value="mp3">mp3</option>
+                    <option value="ogg">ogg</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>text_lang</span>
+                  <select data-path="tts.gpt_sovits_text_lang">
+                    <option value="zh" selected>zh</option>
+                    <option value="en">en</option>
+                    <option value="ja">ja</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>speed_ratio <em id="v_tts_speed">0.95</em></span>
+                  <input id="tts_speed" type="range" min="0.5" max="2" step="0.01" data-path="tts.speed_ratio" value="0.95" data-value-target="v_tts_speed">
+                </label>
+                <label class="field">
+                  <span>volume_ratio <em id="v_tts_volume">1.00</em></span>
+                  <input id="tts_volume" type="range" min="0" max="2" step="0.01" data-path="tts.volume_ratio" value="1" data-value-target="v_tts_volume">
+                </label>
+                <label class="field">
+                  <span>pitch_ratio <em id="v_tts_pitch">1.00</em></span>
+                  <input id="tts_pitch" type="range" min="0.5" max="2" step="0.01" data-path="tts.pitch_ratio" value="1" data-value-target="v_tts_pitch">
+                </label>
+                <label class="field switch-field">
+                  <span>实时 TTS</span>
+                  <input type="checkbox" data-path="tts.gpt_sovits_realtime_tts">
+                </label>
+                <label class="field switch-field">
+                  <span>允许浏览器兜底</span>
+                  <input type="checkbox" data-path="tts.allow_browser_fallback">
+                </label>
+                <label class="field col-span-2">
+                  <span>Prompt 文本</span>
+                  <textarea rows="2" data-path="tts.gpt_sovits_prompt_text">你好呀，今天也要元气满满。</textarea>
+                </label>
+              </div>
+            </article>
+
+            <article id="cfg-memory" class="config-group card-like">
+              <h2>记忆与摘要</h2>
+              <div class="field-grid three-col">
+                <label class="field switch-field">
+                  <span>启用记忆</span>
+                  <input type="checkbox" data-path="memory.enabled" checked>
+                </label>
+                <label class="field">
+                  <span>max_items</span>
+                  <input type="number" min="1" data-path="memory.max_items" value="600">
+                </label>
+                <label class="field">
+                  <span>inject_recent</span>
+                  <input type="number" min="0" data-path="memory.inject_recent" value="2">
+                </label>
+                <label class="field">
+                  <span>inject_relevant</span>
+                  <input type="number" min="0" data-path="memory.inject_relevant" value="2">
+                </label>
+                <label class="field">
+                  <span>summary_trigger_every</span>
+                  <input type="number" min="1" data-path="memory.summary_trigger_every" value="10">
+                </label>
+                <label class="field switch-field">
+                  <span>启用 mem0</span>
+                  <input type="checkbox" data-path="memory.mem0_enabled">
+                </label>
+                <label class="field">
+                  <span>mem0_top_k</span>
+                  <input type="number" min="1" data-path="memory.mem0_top_k" value="5">
+                </label>
+                <label class="field">
+                  <span>mem0_threshold <em id="v_mem_threshold">0.50</em></span>
+                  <input id="mem_threshold" type="range" min="0" max="1" step="0.01" data-path="memory.mem0_threshold" value="0.5" data-value-target="v_mem_threshold">
+                </label>
+                <label class="field">
+                  <span>mem0_embedding_model</span>
+                  <input type="text" data-path="memory.mem0_embedding_model" value="text-embedding-v3">
+                </label>
+                <label class="field switch-field">
+                  <span>启用历史摘要</span>
+                  <input type="checkbox" data-path="history_summary.enabled" checked>
+                </label>
+                <label class="field">
+                  <span>触发消息数</span>
+                  <input type="number" min="1" data-path="history_summary.trigger_messages" value="14">
+                </label>
+                <label class="field">
+                  <span>保留最近消息</span>
+                  <input type="number" min="1" data-path="history_summary.keep_recent_messages" value="8">
+                </label>
+              </div>
+            </article>
+
+            <article id="cfg-asr" class="config-group card-like">
+              <h2>ASR 与桌面观察</h2>
+              <div class="field-grid three-col">
+                <label class="field switch-field">
+                  <span>显示麦克风电平</span>
+                  <input type="checkbox" data-path="asr.show_mic_meter" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>持续监听</span>
+                  <input type="checkbox" data-path="asr.keep_listening" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>关闭麦克风时转写</span>
+                  <input type="checkbox" data-path="asr.transcribe_on_close" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>唤醒词开关</span>
+                  <input type="checkbox" data-path="asr.wake_word_enabled" checked>
+                </label>
+                <label class="field">
+                  <span>min_speech_ms</span>
+                  <input type="number" min="1" data-path="asr.min_speech_ms" value="150">
+                </label>
+                <label class="field">
+                  <span>silence_trigger_ms</span>
+                  <input type="number" min="1" data-path="asr.silence_trigger_ms" value="320">
+                </label>
+                <label class="field">
+                  <span>max_speech_ms</span>
+                  <input type="number" min="1" data-path="asr.max_speech_ms" value="2200">
+                </label>
+                <label class="field">
+                  <span>speech_threshold <em id="v_asr_threshold">0.0085</em></span>
+                  <input id="asr_threshold" type="range" min="0" max="0.05" step="0.0001" data-path="asr.speech_threshold" value="0.0085" data-value-target="v_asr_threshold">
+                </label>
+                <label class="field">
+                  <span>processor_buffer_size</span>
+                  <input type="number" min="256" step="256" data-path="asr.processor_buffer_size" value="2048">
+                </label>
+                <label class="field col-span-3">
+                  <span>唤醒词（逗号或换行分隔）</span>
+                  <textarea rows="2" data-path="asr.wake_words" data-kind="list">塔菲
+taffy
+tafi</textarea>
+                </label>
+                <label class="field">
+                  <span>attach_mode</span>
+                  <select data-path="observe.attach_mode">
+                    <option value="always" selected>always</option>
+                    <option value="manual">manual</option>
+                    <option value="auto">auto</option>
+                  </select>
+                </label>
+                <label class="field switch-field">
+                  <span>允许自动对话使用观察</span>
+                  <input type="checkbox" data-path="observe.allow_auto_chat" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>自动对话开关</span>
+                  <input type="checkbox" data-path="observe.auto_chat_enabled" checked>
+                </label>
+                <label class="field">
+                  <span>auto_chat_min_ms</span>
+                  <input type="number" min="1000" data-path="observe.auto_chat_min_ms" value="180000">
+                </label>
+                <label class="field">
+                  <span>auto_chat_max_ms</span>
+                  <input type="number" min="1000" data-path="observe.auto_chat_max_ms" value="480000">
+                </label>
+                <label class="field switch-field">
+                  <span>每日问候</span>
+                  <input type="checkbox" data-path="observe.daily_greeting_enabled" checked>
+                </label>
+                <label class="field">
+                  <span>问候小时</span>
+                  <input type="number" min="0" max="23" data-path="observe.daily_greeting_hour" value="8">
+                </label>
+                <label class="field">
+                  <span>问候分钟</span>
+                  <input type="number" min="0" max="59" data-path="observe.daily_greeting_minute" value="0">
+                </label>
+                <label class="field col-span-3">
+                  <span>问候 Prompt</span>
+                  <textarea rows="2" data-path="observe.daily_greeting_prompt">请你像桌宠一样主动向我说早安，简短自然地问好，再给我一句鼓励的话，控制在两三句内，不要模板化。</textarea>
+                </label>
+              </div>
+            </article>
+
+            <article id="cfg-tools" class="config-group card-like">
+              <h2>动作、工具与风格</h2>
+              <div class="field-grid three-col">
+                <label class="field switch-field">
+                  <span>启用动作系统</span>
+                  <input type="checkbox" data-path="motion.enabled" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>启用空闲动作</span>
+                  <input type="checkbox" data-path="motion.idle_enabled" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>启用动作连招</span>
+                  <input type="checkbox" data-path="motion.combo_enabled" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>启用表情</span>
+                  <input type="checkbox" data-path="motion.expression_enabled" checked>
+                </label>
+                <label class="field">
+                  <span>expression_strength <em id="v_motion_expr">1.00</em></span>
+                  <input id="motion_expr" type="range" min="0" max="2" step="0.01" data-path="motion.expression_strength" value="1" data-value-target="v_motion_expr">
+                </label>
+                <label class="field">
+                  <span>motion.intensity</span>
+                  <select data-path="motion.intensity">
+                    <option value="low">low</option>
+                    <option value="normal" selected>normal</option>
+                    <option value="high">high</option>
+                  </select>
+                </label>
+                <label class="field switch-field">
+                  <span>启用工具调用</span>
+                  <input type="checkbox" data-path="tools.enabled" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>允许 Shell</span>
+                  <input type="checkbox" data-path="tools.allow_shell" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>允许图像工具</span>
+                  <input type="checkbox" data-path="tools.image_enabled" checked>
+                </label>
+                <label class="field">
+                  <span>shell_timeout_sec</span>
+                  <input type="number" min="1" data-path="tools.shell_timeout_sec" value="25">
+                </label>
+                <label class="field">
+                  <span>max_file_read_chars</span>
+                  <input type="number" min="100" data-path="tools.max_file_read_chars" value="24000">
+                </label>
+                <label class="field">
+                  <span>max_command_output_chars</span>
+                  <input type="number" min="100" data-path="tools.max_command_output_chars" value="14000">
+                </label>
+                <label class="field">
+                  <span>image_model</span>
+                  <input type="text" data-path="tools.image_model" value="gpt-image-1">
+                </label>
+                <label class="field">
+                  <span>image_size</span>
+                  <select data-path="tools.image_size">
+                    <option value="512x512">512x512</option>
+                    <option value="1024x1024" selected>1024x1024</option>
+                    <option value="1536x1024">1536x1024</option>
+                  </select>
+                </label>
+                <label class="field switch-field">
+                  <span>style.auto</span>
+                  <input type="checkbox" data-path="style.auto" checked>
+                </label>
+                <label class="field">
+                  <span>style.manual</span>
+                  <select data-path="style.manual">
+                    <option value="neutral" selected>neutral</option>
+                    <option value="comfort">comfort</option>
+                    <option value="clear">clear</option>
+                    <option value="playful">playful</option>
+                    <option value="steady">steady</option>
+                  </select>
+                </label>
+                <label class="field switch-field">
+                  <span>humanize.enabled</span>
+                  <input type="checkbox" data-path="humanize.enabled" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>strip_fillers</span>
+                  <input type="checkbox" data-path="humanize.strip_fillers" checked>
+                </label>
+                <label class="field">
+                  <span>refine_min_chars</span>
+                  <input type="number" min="1" data-path="humanize.refine_min_chars" value="36">
+                </label>
+                <label class="field">
+                  <span>state_inject_prob <em id="v_personality">0.00</em></span>
+                  <input id="personality_prob" type="range" min="0" max="1" step="0.01" data-path="personality.state_inject_prob" value="0" data-value-target="v_personality">
+                </label>
+              </div>
+            </article>
+              </form>
+            </section>
+
+            <aside id="cfg-preview" class="config-center-preview fade-in-up card-like">
+              <h2>实时 JSON 预览</h2>
+              <pre id="advancedConfigPreview" class="config-preview"><code>{
+  "assistant_name": "Taffy"
+}</code></pre>
+              <div class="config-actions">
+                <button id="copyAdvancedConfigBtn" class="btn btn-primary" type="button">📋 复制配置</button>
+                <button id="downloadAdvancedConfigBtn" class="btn btn-outline" type="button">💾 下载 config.json</button>
+                <button id="resetAdvancedConfigBtn" class="btn btn-outline" type="button">♻️ 恢复默认</button>
+              </div>
+
+              <h3 id="cfg-templates">配置模板</h3>
+              <p class="write-note">可一键套用常见场景，再按需微调字段。</p>
+              <div class="template-actions">
+                <button class="btn btn-outline" type="button" data-template="daily_chat">🌤 日常聊天模式</button>
+                <button class="btn btn-outline" type="button" data-template="low_latency">⚡ 低延迟模式</button>
+                <button class="btn btn-outline" type="button" data-template="local_model">🖥 本地模型模式</button>
+              </div>
+              <p id="templateStatus" class="write-status">未应用模板</p>
+
+              <h3>写入项目配置（本地）</h3>
+              <p class="write-note">选择项目配置目录后，可一键写入 <code>config.json</code>，并自动生成备份文件。</p>
+              <div class="project-write-actions">
+                <button id="pickConfigDirBtn" class="btn btn-outline" type="button">📁 选择配置目录</button>
+                <button id="useLastConfigDirBtn" class="btn btn-outline" type="button">⚡ 使用上次目录</button>
+                <button id="previewConfigDiffBtn" class="btn btn-outline" type="button">🔍 预览写入差异</button>
+                <button id="writeConfigToProjectBtn" class="btn btn-primary" type="button" disabled>📝 确认写入 config.json（自动备份）</button>
+                <button id="rollbackConfigFromBackupBtn" class="btn btn-outline" type="button">↩ 回滚到最近备份</button>
+              </div>
+              <p id="configDirStatus" class="write-status">未选择目录（浏览器内仅本次会话记住）</p>
+              <div id="configDiffPanel" class="diff-panel" hidden>
+                <p id="configDiffSummary" class="diff-summary">尚未生成差异</p>
+                <ul id="configDiffList" class="diff-list"></ul>
+              </div>
+
+              <h3 id="cfg-apply">一键应用</h3>
+              <p class="write-note">自动执行：校验 → 预览差异 → 写入并备份 → 触发重载；若重载失败可选择重启。</p>
+              <div class="project-write-actions">
+                <button id="oneClickApplyBtn" class="btn btn-primary" type="button">✅ 一键应用配置</button>
+              </div>
+              <p id="oneClickApplyStatus" class="write-status">未执行一键应用</p>
+
+              <h3 id="cfg-health">配置连通性自检</h3>
+              <p class="write-note">一键检查关键地址是否可达，并给出修复建议。</p>
+              <div class="project-write-actions">
+                <button id="checkConnectivityBtn" class="btn btn-outline" type="button">🧪 检测配置连通性</button>
+              </div>
+              <p id="connectivityStatus" class="write-status">未执行连通性检测</p>
+              <ul id="connectivityList" class="health-check-list">
+                <li class="health-item" data-health-id="llm">
+                  <p class="health-head">LLM 接口</p>
+                  <p class="health-state">待检测</p>
+                  <p class="health-detail">将检测 <code>llm.base_url</code> 是否可达。</p>
+                  <div class="health-actions"></div>
+                </li>
+                <li class="health-item" data-health-id="tts">
+                  <p class="health-head">TTS 接口</p>
+                  <p class="health-state">待检测</p>
+                  <p class="health-detail">将检测 <code>tts.gpt_sovits_api_url</code> 是否可达。</p>
+                  <div class="health-actions"></div>
+                </li>
+                <li class="health-item" data-health-id="reload">
+                  <p class="health-head">配置重载接口</p>
+                  <p class="health-state">待检测</p>
+                  <p class="health-detail">将检测 <code>/api/config/reload</code> 可用性。</p>
+                  <div class="health-actions"></div>
+                </li>
+                <li class="health-item" data-health-id="restart">
+                  <p class="health-head">运行中重启接口</p>
+                  <p class="health-state">待检测</p>
+                  <p class="health-detail">将检测 <code>/api/runtime/restart</code>（仅检测，不触发重启）。</p>
+                  <div class="health-actions"></div>
+                </li>
+              </ul>
+
+              <h3 id="cfg-runtime">应用到运行中的桌宠</h3>
+              <p class="write-note">写入后可尝试调用本地重载接口，若桌宠支持热更新将立即生效。</p>
+              <label class="field runtime-endpoint-field">
+                <span>重载接口 URL</span>
+                <input id="runtimeReloadUrl" type="text" value="http://127.0.0.1:8123/api/config/reload" placeholder="例如：http://127.0.0.1:8123/api/config/reload">
+              </label>
+              <div class="project-write-actions">
+                <button id="applyConfigToRuntimeBtn" class="btn btn-primary" type="button">🚀 一键应用到运行中桌宠</button>
+              </div>
+              <p id="runtimeApplyStatus" class="write-status">未执行运行中应用</p>
+              <p class="write-note">如修改了 Python 路径、端口或底层能力，可再执行一次后端重启（需 Electron 托管模式）。</p>
+              <label class="field runtime-endpoint-field">
+                <span>重启接口 URL</span>
+                <input id="runtimeRestartUrl" type="text" value="http://127.0.0.1:8123/api/runtime/restart" placeholder="例如：http://127.0.0.1:8123/api/runtime/restart">
+              </label>
+              <div class="project-write-actions">
+                <button id="restartRuntimeBtn" class="btn btn-outline" type="button">🔄 重启运行中桌宠</button>
+              </div>
+              <p id="runtimeRestartStatus" class="write-status">未执行运行中重启</p>
+
+              <h3 id="cfg-release">发布指引</h3>
+              <ol class="release-guide-list">
+                <li>先在本页执行一次“配置连通性自检”，确保关键接口状态正常。</li>
+                <li>将首页下载链接与仓库地址指向当前 GitHub 仓库与 Releases。</li>
+                <li>发布前在本地运行桌宠并验证“一键应用配置”流程可走通。</li>
+                <li>如验证中配置异常，可用“回滚到最近备份”快速恢复后再继续。</li>
+                <li>在 GitHub 创建新版本 Release，并上传安装包与更新说明。</li>
+              </ol>
+
+              <h3>导入 JSON（可选）</h3>
+              <textarea id="importConfigJson" class="import-json" rows="8" placeholder="将已有 config.json 内容粘贴到这里"></textarea>
+              <button id="applyImportConfigBtn" class="btn btn-outline import-btn" type="button">🧪 应用导入内容</button>
+
+              <noscript>
+                <p class="noscript-note">未启用 JavaScript 时，可手动复制上方 JSON 模板并编辑。</p>
+              </noscript>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <p>Taffy · AI 桌宠 © 2025</p>
+      <div class="footer-links">
+        <a id="footerGithubLink" href="https://github.com/MaQinglin-665/AI-chat" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a id="footerIssuesLink" href="https://github.com/MaQinglin-665/AI-chat/issues" target="_blank" rel="noopener noreferrer">反馈问题</a>
+        <a id="footerContactLink" href="https://github.com/MaQinglin-665" target="_blank" rel="noopener noreferrer">联系作者</a>
+      </div>
+      <p>Made with 💜 by Taffy Team</p>
+    </div>
+  </footer>
+
+  <div id="versionPanelBackdrop" class="version-panel-backdrop" hidden></div>
+  <aside id="versionPanel" class="version-panel" role="dialog" aria-modal="true" aria-labelledby="versionPanelTitle" aria-hidden="true" tabindex="-1">
+    <div class="version-panel-head">
+      <h3 id="versionPanelTitle">📚 版本历史</h3>
+      <button id="versionPanelCloseBtn" class="version-panel-close" type="button" aria-label="关闭版本历史">✕</button>
+    </div>
+    <p class="version-panel-desc">这里是最近版本的关键变化，便于快速回顾升级内容。</p>
+    <ol class="version-panel-list">
+      <li>
+        <h4>v1.1.0（2026-04）</h4>
+        <p>配置中心上线，一键校验/写入/重载，支持模板、回滚和连通性自检。</p>
+      </li>
+      <li>
+        <h4>v1.0.0（2025-04）</h4>
+        <p>首个完整版本发布，包含 Live2D 桌宠、LLM 对话、语音与记忆系统。</p>
+      </li>
+      <li>
+        <h4>v0.9.0（2025-03）</h4>
+        <p>补齐核心能力：桌面观察、GPT-SoVITS 语音和提醒命令。</p>
+      </li>
+    </ol>
+    <p class="version-panel-foot">
+      查看完整条目可前往 <a href="index.html#changelog">更新日志</a>。
+    </p>
+  </aside>
+
+  <button id="backToTop" class="back-to-top" type="button" aria-label="返回顶部">↑</button>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/main.js" defer></script>
+  <script src="live2d/autoload.js" defer></script>
+  <script src="js/config-page.js" defer></script>
+</body>
+</html>

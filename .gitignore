@@ -9,3 +9,37 @@ desktop_run.log
 node_modules/
 web/generated_images/
 .mem0/
+
+# Temporary audio files
+tmp_*.wav
+debug_*.wav
+*.bin
+
+# Temporary directories
+tmp_browsercheck/
+tmp_npm/
+tmp_voice_preview/
+
+# Runtime logs
+server_out.log
+server_err.log
+server_test_err.log
+server_test_out.log
+api_out.log
+api_err.log
+
+# Memory backups
+memory_backups/
+memory.bak
+
+# Emotion state (runtime generated)
+emotion_state.json
+
+# Python cache
+*.pyc
+
+# Build output
+unpackage/
+
+# Editor files
+.editorconfig
