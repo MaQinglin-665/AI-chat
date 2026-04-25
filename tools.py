@@ -23,6 +23,7 @@ WORK_INTENT_RE = re.compile(
     re.IGNORECASE,
 )
 GENERATED_IMAGE_DIR = WEB_DIR / "generated_images"
+WINDOWS_ABS_PATH_RE = re.compile(r"^(?:[a-zA-Z]:[\\/]|\\\\)")
 WORK_TOOL_DEFS = [
     {
         "type": "function",
@@ -202,6 +203,10 @@ def _resolve_in_workspace(workspace_root, raw_path):
     if not path_text:
         target = root
     else:
+        # On non-Windows systems, Windows drive/UNC paths are not absolute to pathlib.
+        # Treat them as out-of-workspace inputs.
+        if os.name != "nt" and WINDOWS_ABS_PATH_RE.match(path_text):
+            raise RuntimeError(f"Path outside workspace is not allowed: {path_text}")
         cand = Path(path_text).expanduser()
         if cand.is_absolute():
             target = cand.resolve()
