@@ -1,0 +1,164 @@
+{
+  "updated_at": "2026-04-25",
+  "versions": [
+    {
+      "tag": "v1.1.8",
+      "date": "2026-04",
+      "log_anchor": "log-v118",
+      "title": "双语字幕与会话翻译可折叠",
+      "panel_summary": "新增双语字幕全链路与聊天翻译显示开关，补齐翻译缓存、分页滚动与延迟隐藏稳定性策略。",
+      "release_summary": "双语字幕链路上线，支持翻译折叠、长文本分页与更稳定的显示时序。",
+      "highlights": [
+        "后端新增 POST /api/translate，复用现有 LLM 做英译中，失败自动降级不打断主流程。",
+        "Electron 新增 subtitle-show / subtitle-hide IPC 转发，并支持 modelWindow 未就绪时的单槽缓存回放。",
+        "preload 桥接新增字幕 API，前端新增英文行+中文行字幕 DOM 结构。",
+        "字幕触发点统一挂到 TTS 生命周期：onstart/onplay 显示，onend/onerror 隐藏。",
+        "稳定性增强：subtitleId 防误清、翻译请求可取消、翻译缓存复用、语音结束延迟隐藏与兜底清理。",
+        "长文本修复：文本截断上限 60→320、中英文行数上限提升到 6，并支持自动分页滚动显示。",
+        "聊天区新增“译”开关：可收起/展开中文翻译，状态本地持久化并在启动时恢复。",
+        "样式优化：白字黑描边、半透明底板、平滑淡入淡出、移动端适配与 pointer-events 安全处理。"
+      ]
+    },
+    {
+      "tag": "v1.1.7",
+      "date": "2026-04",
+      "log_anchor": "log-v117",
+      "title": "低风险重构：去重与无效赋值清理",
+      "panel_summary": "完成 5 项低风险重构，重点清理重复实现与死赋值，不引入新功能逻辑。",
+      "release_summary": "完成去重与结构清理，保持行为一致并通过导入回归验证。",
+      "highlights": [
+        "修复 generate_inner_thought 中的死赋值：移除 payload 字典里的 temperature: 0.7，保留后续温度与惩罚参数设置。",
+        "新增 utils.py，统一沉淀 _clamp_int、_clamp_float、_truncate_text 三个通用函数。",
+        "app.py / memory.py / tools.py 删除重复工具函数定义，统一改为从 utils.py 导入，消除多处重复实现。",
+        "提取时间段映射逻辑为 _hour_to_period_hint(hour)，替换 generate_inner_thought 与 call_llm 内重复 if/elif。",
+        "提取工具提示注入逻辑：新增 _TOOL_INTRO 常量与 _inject_tool_intro(messages)，替换两个 OpenAI tools 调用函数内重复代码。",
+        "提取 prompt 构建公共逻辑：新增 _build_base_prompt(...)，统一 call_llm 与 call_llm_stream 重复流程，并保留 call_llm 中 should_reply() 原位置与行为。",
+        "完成导入回归验证：import app、import app; import memory; import tools 均通过（仅保留既有 deprecation warning）。"
+      ]
+    },
+    {
+      "tag": "v1.1.6",
+      "date": "2026-04",
+      "log_anchor": "log-v116",
+      "title": "记忆治理与 Live2D 交互链路增强",
+      "panel_summary": "完成 memory.py 静默异常治理、tools.py 安全测试补齐、Live2D 口型情绪链路修复与模型交互增强，并接入 Electron 鼠标注视驱动。",
+      "release_summary": "静默异常可观测、Live2D 表达与交互增强、Electron 注视驱动接入。",
+      "highlights": [
+        "memory.py：将 except Exception: pass 全部替换为 logger.debug(..., exc_info=True)，并新增 logging/logger，不改变原控制流。",
+        "新增 tests/test_tools_security.py：覆盖危险 shell 语法、命令前缀白名单、危险命令拦截、工作区路径解析 4 类安全函数，并用参数化覆盖阻断/放行场景。",
+        "web/app.js：将不稳定的 beforeModelUpdate 监听替换为 patch coreModel.update，确保每帧注入口型/表情参数。",
+        "情绪链路优化：文本到达即生效、平滑速度提升、语音结束后情绪保持 1.5 秒再淡出。",
+        "TTS 兜底增强：加入启动看门狗、metadata 重试与 AudioContext fallback，并增加可观测状态字段便于排障。",
+        "模型交互增强：浏览器模式支持滚轮缩放（8% 步进，passive:false，同步 baseTransform.scale）。",
+        "新增二次运动弹簧阻尼（头发/丝带/裙摆 6 个参数），动作更自然，减少“硬停”感。",
+        "Electron 注视驱动：新增 IPC 获取全局鼠标与窗口边界，约每 33ms 轮询映射 gaze target，并以 0.65/0.35 融合鼠标注视与随机扫视。"
+      ]
+    },
+    {
+      "tag": "v1.1.5",
+      "date": "2026-04",
+      "log_anchor": "log-v115",
+      "title": "浏览器交互稳定化与站点收尾",
+      "panel_summary": "浏览器模式下的 Live2D 拖动体验完成稳定化，站点版本信息同步到最新迭代。",
+      "release_summary": "浏览器交互稳定化，版本信息同步完成。",
+      "highlights": [
+        "浏览器模式 Live2D 拖动体验完成稳定化，交互手感更自然",
+        "点击与拖动链路保持一致，互动行为更可预期",
+        "网站版本信息同步到最新迭代，首页与配置页“查看变更”可直接定位"
+      ]
+    },
+    {
+      "tag": "v1.1.4",
+      "date": "2026-04",
+      "log_anchor": "log-v114",
+      "title": "站点可观测性与交互完善",
+      "panel_summary": "新增运行时控制台与错误可观测能力，优化配置页挂件避让和版本日志锚点跳转体验。",
+      "release_summary": "新增运行时控制台，并优化挂件与面板避让。",
+      "highlights": [
+        "新增网站运行时控制台，补齐基础可观测能力",
+        "控制台支持展开/收起、清空、复制与状态持久化",
+        "配置页布局避让优化：Live2D 挂件与气泡右下角停靠，减少与侧栏、列表重叠",
+        "版本历史补充“查看变更”锚点跳转，首页与配置页可直接定位到日志条目"
+      ]
+    },
+    {
+      "tag": "v1.1.3",
+      "date": "2026-04",
+      "log_anchor": "log-v113",
+      "title": "TTS / 回复策略 / 记忆策略联合优化",
+      "panel_summary": "完成 TTS 混合语言与切分修复、回复多样性增强、记忆策略更新与工程清理。",
+      "release_summary": "完成 TTS 混合语言修复与回复多样性增强。",
+      "highlights": [
+        "TTS 混合语言与切分策略完成优化，语音表现更稳定",
+        "回复策略增强多样性，减少模板化表达",
+        "记忆策略与工程依赖同步整理，整体体验更平滑"
+      ]
+    },
+    {
+      "tag": "v1.1.2",
+      "date": "2026-04",
+      "log_anchor": "log-v112",
+      "title": "稳定性与可观测性补强",
+      "panel_summary": "补齐记忆异常日志与工具安全测试，修复 GPT-SoVITS 英文异常发音，并提升 Live2D 口型/情绪稳定性。",
+      "release_summary": "补强异常日志与安全测试，提升 Live2D 口型情绪稳定性。",
+      "highlights": [
+        "记忆模块可观测性增强，异常排查链路更清晰",
+        "工具安全测试集补齐，关键边界场景覆盖更完整",
+        "Live2D 口型与情绪链路优化，互动表现更自然"
+      ]
+    },
+    {
+      "tag": "v1.1.1",
+      "date": "2026-04",
+      "log_anchor": "log-v111",
+      "title": "交互稳定性与演示体验优化",
+      "panel_summary": "修复浏览器拖动失效与漂移问题，并补齐演示区、FAQ、版本历史面板和暗色模式体验。",
+      "release_summary": "修复拖动失效与漂移，补齐演示区和暗色模式体验。",
+      "highlights": [
+        "浏览器端核心交互稳定性提升，拖动与操作更连贯",
+        "新增“对话演示 + 语音试听”体验区，支持音色/语速/音量调节",
+        "新增暗色模式、FAQ 与版本历史面板，站点信息结构更完整"
+      ]
+    },
+    {
+      "tag": "v1.1.0",
+      "date": "2026-04",
+      "log_anchor": "log-v110",
+      "title": "配置中心与站点体验升级",
+      "panel_summary": "配置中心上线，一键校验/写入/重载，支持模板、回滚和连通性自检。",
+      "release_summary": "配置中心上线，支持一键校验、写入、重载和模板应用。",
+      "highlights": [
+        "新增独立“配置中心”页面与侧边分组导航",
+        "支持配置校验、差异预览、写入备份与一键应用",
+        "新增连通性自检、回滚与模板能力",
+        "首页/配置页/README 发布流程说明完成统一"
+      ]
+    },
+    {
+      "tag": "v1.0.0",
+      "date": "2025-04",
+      "log_anchor": "log-v100",
+      "title": "首个完整版本发布",
+      "panel_summary": "首个完整版本发布，包含 Live2D 桌宠、LLM 对话、语音与记忆系统。",
+      "release_summary": "首个完整版本发布。",
+      "highlights": [
+        "Live2D 模型渲染与桌面交互",
+        "LLM 对话与语音回复",
+        "长期记忆与情感系统"
+      ]
+    },
+    {
+      "tag": "v0.9.0",
+      "date": "2025-03",
+      "log_anchor": "log-v090",
+      "title": "核心功能完善",
+      "panel_summary": "补齐核心能力：桌面观察、GPT-SoVITS 语音和提醒命令。",
+      "release_summary": "补齐桌面观察、语音和提醒命令。",
+      "highlights": [
+        "桌面截图观察功能",
+        "GPT-SoVITS 语音合成",
+        "日程提醒命令"
+      ]
+    }
+  ]
+}
