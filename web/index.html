@@ -1,0 +1,252 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI桌宠</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <canvas id="live2d-canvas"></canvas>
+
+  <section class="panel">
+    <div class="row top">
+      <strong id="assistant-name">Taffy</strong>
+      <div class="top-actions">
+        <button
+          id="translation-toggle-btn"
+          class="mini-toggle-btn"
+          type="button"
+          aria-pressed="true"
+          title="隐藏中文翻译"
+        >译</button>
+        <span id="status">待机</span>
+      </div>
+    </div>
+
+    <div id="mic-meter-wrap" class="mic-meter-wrap" aria-live="off">
+      <span class="mic-label">Mic</span>
+      <div class="mic-meter-track">
+        <div id="mic-meter-fill" class="mic-meter-fill"></div>
+      </div>
+      <span id="mic-meter-text" class="mic-meter-text">未开麦</span>
+    </div>
+
+    <div id="chat-log" class="chat-log" aria-live="polite"></div>
+
+    <div id="attachment-preview" class="attachment-preview" hidden></div>
+
+    <div class="row controls">
+      <button id="attach-btn" type="button" title="添加图片或文件" aria-label="添加图片或文件">+</button>
+      <input id="chat-input" type="text" placeholder="和我说点什么..." />
+      <button id="send-btn" type="button">发送</button>
+    </div>
+    <input
+      id="attach-input"
+      type="file"
+      hidden
+      multiple
+      accept="image/*,.txt,.md,.json,.csv,.tsv,.yaml,.yml,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.h,.hpp,.go,.rs,.sh,.ps1,.bat,.sql,.log,.ini,.toml,.pdf,.doc,.docx"
+    />
+
+    <div class="row controls action-buttons">
+      <button id="mic-btn" type="button">语音输入</button>
+      <button id="speak-btn" type="button">语音开</button>
+      <button id="schedule-btn" type="button">日程</button>
+      <button id="persona-btn" type="button">人设卡</button>
+      <button id="learning-review-btn" type="button">学习审核</button>
+      <button id="lock-btn" type="button">桌面锁定: 关</button>
+      <button id="observe-btn" type="button">观察桌面: 开</button>
+      <button id="auto-chat-btn" type="button">自动对话: 关</button>
+    </div>
+  </section>
+
+  <div id="schedule-modal" class="schedule-modal" hidden>
+    <div class="schedule-dialog">
+      <div class="schedule-head">
+        <strong>日程安排</strong>
+        <button id="schedule-close-btn" class="schedule-close-btn" type="button" aria-label="关闭">关闭</button>
+      </div>
+
+      <div class="schedule-form">
+        <label class="schedule-field">
+          <span>执行时间</span>
+          <input id="schedule-datetime" type="datetime-local" />
+        </label>
+
+        <div class="schedule-grid">
+          <label class="schedule-field">
+            <span>重复方式</span>
+            <select id="schedule-repeat">
+              <option value="once">只执行一次</option>
+              <option value="daily">每天重复</option>
+            </select>
+          </label>
+
+          <label class="schedule-field">
+            <span>执行类型</span>
+            <select id="schedule-mode">
+              <option value="assistant">让 Taffy 主动完成</option>
+              <option value="tool">工具任务</option>
+              <option value="reminder">普通提醒</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="schedule-field">
+          <span>要做的事</span>
+          <textarea
+            id="schedule-task"
+            rows="4"
+            placeholder="例如：早上八点时，先向我问好，再提醒我今天把手头最重要的事先做完。"
+          ></textarea>
+        </label>
+
+        <div class="schedule-actions">
+          <button id="schedule-save-btn" type="button">添加日程</button>
+        </div>
+      </div>
+
+      <div class="schedule-list-wrap">
+        <div class="schedule-list-title">已设置日程</div>
+        <div id="schedule-list" class="schedule-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="persona-modal" class="persona-modal" hidden>
+    <div class="persona-dialog">
+      <div class="persona-head">
+        <strong>人设卡</strong>
+        <button id="persona-close-btn" class="persona-close-btn" type="button" aria-label="关闭">关闭</button>
+      </div>
+
+      <div class="persona-form">
+        <label class="persona-field">
+          <span>称呼与身份</span>
+          <textarea id="persona-identity" rows="2" placeholder="例如：你是 Taffy，是我熟悉的搭子，叫我小Q。"></textarea>
+        </label>
+
+        <label class="persona-field">
+          <span>我的偏好</span>
+          <textarea id="persona-preferences" rows="3" placeholder="例如：喜欢简短直给、喜欢被鼓励、喜欢二次元梗。"></textarea>
+        </label>
+
+        <label class="persona-field">
+          <span>我不喜欢</span>
+          <textarea id="persona-dislikes" rows="3" placeholder="例如：不喜欢太官话、长篇大论、机械重复。"></textarea>
+        </label>
+
+        <label class="persona-field">
+          <span>常聊话题</span>
+          <textarea id="persona-topics" rows="3" placeholder="例如：开发、游戏、学习计划、日常吐槽。"></textarea>
+        </label>
+
+        <label class="persona-field">
+          <span>希望 Taffy 怎么说话</span>
+          <textarea id="persona-reply-style" rows="3" placeholder="例如：像真人朋友，语气自然，有温度，别太模板化。"></textarea>
+        </label>
+
+        <label class="persona-field">
+          <span>希望 Taffy 怎么陪我</span>
+          <textarea id="persona-companionship-style" rows="3" placeholder="例如：情绪低落时先安抚，再给建议；高效场景直接给步骤。"></textarea>
+        </label>
+
+        <div class="persona-actions">
+          <button id="persona-save-btn" type="button">保存人设卡</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="learning-review-backdrop" class="learning-review-backdrop" hidden></div>
+  <aside id="learning-review-drawer" class="learning-review-drawer" hidden aria-label="学习审核侧栏">
+    <div class="learning-review-head">
+      <strong>学习审核</strong>
+      <div class="learning-review-head-actions">
+        <button id="learning-review-undo-btn" type="button">撤销上一步</button>
+        <button id="learning-review-close-btn" type="button" aria-label="关闭学习审核">关闭</button>
+      </div>
+    </div>
+
+    <div class="learning-review-toolbar">
+      <div class="learning-review-quick">
+        <label class="learning-field">
+          <span>inject_count</span>
+          <select id="learning-quick-inject">
+            <option value="0">0</option>
+            <option value="1">1</option>
+          </select>
+        </label>
+        <label class="learning-field">
+          <span>promotion_min_support</span>
+          <select id="learning-quick-support">
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </label>
+        <button id="learning-quick-apply-btn" type="button">应用开关</button>
+      </div>
+
+      <div class="learning-review-tabs" role="tablist" aria-label="学习池切换">
+        <button id="learning-tab-candidates" class="learning-tab is-active" type="button" role="tab" aria-selected="true">候选池</button>
+        <button id="learning-tab-samples" class="learning-tab" type="button" role="tab" aria-selected="false">正式池</button>
+        <button id="learning-reload-btn" class="learning-reload-btn" type="button">重读</button>
+      </div>
+
+      <div class="learning-review-filters">
+        <label class="learning-field">
+          <span>score ≥</span>
+          <input id="learning-filter-score" type="number" min="0" max="1" step="0.01" value="0">
+        </label>
+        <label class="learning-field">
+          <span>confidence ≥</span>
+          <input id="learning-filter-confidence" type="number" min="0" max="1" step="0.01" value="0">
+        </label>
+        <label class="learning-field learning-field-keyword">
+          <span>关键词</span>
+          <input id="learning-filter-keyword" type="text" placeholder="搜索 assistant/compressed">
+        </label>
+        <div class="learning-filter-tools">
+          <label class="learning-field">
+            <span>排序</span>
+            <select id="learning-sort-mode">
+              <option value="score_desc">评分从高到低</option>
+              <option value="confidence_desc">置信从高到低</option>
+              <option value="support_desc">支持数从高到低</option>
+              <option value="updated_desc">最近更新优先</option>
+            </select>
+          </label>
+          <div class="learning-filter-actions">
+            <button id="learning-filter-high-btn" type="button">仅看高分</button>
+            <button id="learning-filter-reset-btn" type="button">重置筛选</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="learning-review-batch">
+        <label class="learning-select-all">
+          <input id="learning-select-all" type="checkbox">
+          <span id="learning-selected-count">已选 0</span>
+        </label>
+        <div class="learning-batch-actions">
+          <button id="learning-batch-delete-btn" type="button">批量删除</button>
+          <button id="learning-batch-up-btn" type="button">批量升权</button>
+          <button id="learning-batch-down-btn" type="button">批量降权</button>
+          <button id="learning-batch-promote-btn" type="button">批量晋升</button>
+        </div>
+      </div>
+
+      <div id="learning-review-summary" class="learning-review-summary">加载中...</div>
+    </div>
+    <div id="learning-review-list" class="learning-review-list"></div>
+  </aside>
+
+  <script src="./app.js"></script>
+  <div id="subtitle-layer" class="subtitle-layer" aria-live="polite"
+       aria-atomic="true">
+    <span class="subtitle-en"></span>
+    <span class="subtitle-zh"></span>
+  </div>
+</body>
+</html>
