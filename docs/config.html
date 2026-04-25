@@ -4,10 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Taffy 配置中心：集中管理桌宠模型、LLM、语音、记忆和系统参数。">
+  <meta name="robots" content="index,follow">
+  <meta name="theme-color" content="#7c5cbf">
+  <link rel="canonical" href="https://maqinglin-665.github.io/AI-chat/config.html">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="apple-touch-icon" href="assets/og-cover.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Taffy · AI 桌宠">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="Taffy 配置中心">
+  <meta property="og:description" content="集中管理桌宠模型、LLM、语音、记忆、工具权限与运行时配置。">
+  <meta property="og:url" content="https://maqinglin-665.github.io/AI-chat/config.html">
+  <meta property="og:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Taffy 配置中心">
+  <meta name="twitter:description" content="管理 LLM、语音、记忆和运行参数的一站式配置页面。">
+  <meta name="twitter:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
   <title>Taffy 配置中心</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20260423-rc14">
 </head>
-<body>
+<body class="config-page">
   <header class="site-header scrolled" id="top">
     <nav class="navbar container" aria-label="主导航">
       <a class="logo" href="index.html">🎀 Taffy</a>
@@ -89,7 +105,7 @@
                 </label>
                 <label class="field">
                   <span>Python 路径</span>
-                  <input type="text" data-path="pythonPath" value="C:/Users/MQL/AppData/Local/Programs/Python/Python312/python.exe">
+                  <input type="text" data-path="pythonPath" value="python">
                 </label>
                 <label class="field col-span-2">
                   <span>Live2D 模型路径</span>
@@ -124,6 +140,18 @@
                 <label class="field switch-field">
                   <span>启动后打开浏览器</span>
                   <input type="checkbox" data-path="server.open_browser">
+                </label>
+                <label class="field switch-field">
+                  <span>仅允许本机来源 (CORS)</span>
+                  <input type="checkbox" data-path="server.cors_allow_loopback" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>启用 API Token 校验</span>
+                  <input type="checkbox" data-path="server.require_api_token">
+                </label>
+                <label class="field col-span-2">
+                  <span>API Token 环境变量</span>
+                  <input type="text" data-path="server.api_token_env" value="TAFFY_API_TOKEN">
                 </label>
                 <label class="field switch-field">
                   <span>透明窗口</span>
@@ -485,7 +513,7 @@ tafi</textarea>
                 </label>
                 <label class="field switch-field">
                   <span>允许 Shell</span>
-                  <input type="checkbox" data-path="tools.allow_shell" checked>
+                  <input type="checkbox" data-path="tools.allow_shell">
                 </label>
                 <label class="field switch-field">
                   <span>允许图像工具</span>
@@ -689,16 +717,44 @@ tafi</textarea>
     <p class="version-panel-desc">这里是最近版本的关键变化，便于快速回顾升级内容。</p>
     <ol class="version-panel-list">
       <li>
+        <h4>v1.1.5（2026-04）</h4>
+        <p>修复浏览器模式 Live2D 拖动坐标系错误，解决模型拖动飞屏与起点跳位问题。</p>
+        <p><a class="version-view-link" href="index.html#log-v115">查看变更</a></p>
+      </li>
+      <li>
+        <h4>v1.1.4（2026-04）</h4>
+        <p>新增运行时控制台与错误可观测能力，优化配置页挂件避让和版本日志锚点跳转体验。</p>
+        <p><a class="version-view-link" href="index.html#log-v114">查看变更</a></p>
+      </li>
+      <li>
+        <h4>v1.1.3（2026-04）</h4>
+        <p>完成 TTS 混合语言与切分修复、回复多样性增强、记忆策略更新与工程清理。</p>
+        <p><a class="version-view-link" href="index.html#log-v113">查看变更</a></p>
+      </li>
+      <li>
+        <h4>v1.1.2（2026-04）</h4>
+        <p>补齐记忆异常日志与工具安全测试，修复 GPT-SoVITS 英文异常发音，并提升 Live2D 口型/情绪稳定性。</p>
+        <p><a class="version-view-link" href="index.html#log-v112">查看变更</a></p>
+      </li>
+      <li>
+        <h4>v1.1.1（2026-04）</h4>
+        <p>修复浏览器拖动失效与漂移问题，并补齐演示区、FAQ、版本历史面板和暗色模式体验。</p>
+        <p><a class="version-view-link" href="index.html#log-v111">查看变更</a></p>
+      </li>
+      <li>
         <h4>v1.1.0（2026-04）</h4>
         <p>配置中心上线，一键校验/写入/重载，支持模板、回滚和连通性自检。</p>
+        <p><a class="version-view-link" href="index.html#log-v110">查看变更</a></p>
       </li>
       <li>
         <h4>v1.0.0（2025-04）</h4>
         <p>首个完整版本发布，包含 Live2D 桌宠、LLM 对话、语音与记忆系统。</p>
+        <p><a class="version-view-link" href="index.html#log-v100">查看变更</a></p>
       </li>
       <li>
         <h4>v0.9.0（2025-03）</h4>
         <p>补齐核心能力：桌面观察、GPT-SoVITS 语音和提醒命令。</p>
+        <p><a class="version-view-link" href="index.html#log-v090">查看变更</a></p>
       </li>
     </ol>
     <p class="version-panel-foot">
@@ -709,8 +765,8 @@ tafi</textarea>
   <button id="backToTop" class="back-to-top" type="button" aria-label="返回顶部">↑</button>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script src="js/main.js" defer></script>
-  <script src="live2d/autoload.js" defer></script>
+  <script src="js/main.js?v=20260423-rc14" defer></script>
+  <script data-live2d-autoload="live2d/autoload.js"></script>
   <script src="js/config-page.js" defer></script>
 </body>
 </html>

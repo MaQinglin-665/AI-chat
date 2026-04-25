@@ -45,6 +45,47 @@
     });
   };
 
+  const setupLazyLive2D = () => {
+    const placeholder = document.querySelector('script[data-live2d-autoload]');
+    if (!placeholder) {
+      return;
+    }
+
+    const src = String(placeholder.getAttribute('data-live2d-autoload') || '').trim();
+    if (!src) {
+      return;
+    }
+
+    let loaded = false;
+    const loadLive2D = () => {
+      if (loaded) {
+        return;
+      }
+      loaded = true;
+      const script = document.createElement('script');
+      script.src = src;
+      script.defer = true;
+      script.setAttribute('data-live2d-loaded', 'true');
+      document.body.appendChild(script);
+    };
+
+    const triggerLoad = () => {
+      loadLive2D();
+    };
+
+    window.addEventListener('pointerdown', triggerLoad, { once: true, passive: true });
+    window.addEventListener('touchstart', triggerLoad, { once: true, passive: true });
+    window.addEventListener('keydown', triggerLoad, { once: true });
+
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(() => {
+        loadLive2D();
+      }, { timeout: 3000 });
+    } else {
+      window.setTimeout(loadLive2D, 1400);
+    }
+  };
+
   const setupGithubLinks = () => {
     const downloadBtn = document.getElementById('downloadGithubBtn');
     const sourceCodeLink = document.getElementById('sourceCodeLink');
@@ -120,6 +161,296 @@
     }
   };
 
+  const VERSIONS_DATA_URL = 'data/versions.json';
+  let versionsDataPromise = null;
+
+  const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+  const asNonEmptyString = (value) => {
+    const text = String(value || '').trim();
+    return text || '';
+  };
+
+  const normalizeVersionItem = (item, index) => {
+    if (!isPlainObject(item)) {
+      throw new Error(`versions[${index}] 不是对象`);
+    }
+
+    const tag = asNonEmptyString(item.tag);
+    const date = asNonEmptyString(item.date);
+    const logAnchor = asNonEmptyString(item.log_anchor);
+    const title = asNonEmptyString(item.title);
+    const panelSummary = asNonEmptyString(item.panel_summary || item.summary);
+    const releaseSummary = asNonEmptyString(item.release_summary);
+    const highlights = Array.isArray(item.highlights)
+      ? item.highlights.map((line) => asNonEmptyString(line)).filter(Boolean)
+      : [];
+
+    if (!tag) {
+      throw new Error(`versions[${index}].tag 不能为空`);
+    }
+    if (!date) {
+      throw new Error(`versions[${index}].date 不能为空`);
+    }
+    if (!logAnchor) {
+      throw new Error(`versions[${index}].log_anchor 不能为空`);
+    }
+    if (!/^log-[a-z0-9-]+$/i.test(logAnchor)) {
+      throw new Error(`versions[${index}].log_anchor 格式非法: ${logAnchor}`);
+    }
+
+    const finalPanelSummary = panelSummary || highlights[0] || '';
+    if (!finalPanelSummary) {
+      throw new Error(`versions[${index}] 缺少 panel_summary/summary/highlights`);
+    }
+    const finalHighlights = highlights.length ? highlights : [finalPanelSummary];
+
+    return {
+      tag,
+      date,
+      logAnchor,
+      title: title || finalPanelSummary,
+      panelSummary: finalPanelSummary,
+      releaseSummary: releaseSummary || '',
+      highlights: finalHighlights
+    };
+  };
+
+  const validateVersionsPayload = (payload) => {
+    if (!isPlainObject(payload)) {
+      throw new Error('versions.json 顶层必须是对象');
+    }
+
+    const versions = Array.isArray(payload.versions) ? payload.versions : [];
+    if (!versions.length) {
+      throw new Error('versions.json 缺少 versions 列表');
+    }
+
+    const normalizedVersions = versions.map((item, index) => normalizeVersionItem(item, index));
+    return {
+      updatedAt: asNonEmptyString(payload.updated_at),
+      versions: normalizedVersions
+    };
+  };
+
+  const CONTENT_DATA_URL = 'data/content.json';
+  let contentDataPromise = null;
+
+  const loadVersionsData = () => {
+    if (versionsDataPromise) {
+      return versionsDataPromise;
+    }
+
+    versionsDataPromise = fetch(VERSIONS_DATA_URL, {
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json'
+      }
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((payload) => validateVersionsPayload(payload))
+      .catch((error) => {
+        versionsDataPromise = null;
+        throw error;
+      });
+
+    return versionsDataPromise;
+  };
+
+  const getCopyModeFromUrl = () => {
+    const params = new URLSearchParams(window.location.search || '');
+    const releaseModeEnabled = params.get('mode') === 'release' || params.get('copy') === 'release' || params.get('release') === '1';
+    return releaseModeEnabled ? 'release' : 'default';
+  };
+
+  const setCopyMode = (mode) => {
+    const normalized = mode === 'release' ? 'release' : 'default';
+    document.documentElement.setAttribute('data-copy-mode', normalized);
+    if (!document.body) {
+      return normalized;
+    }
+    document.body.classList.toggle('release-mode', normalized === 'release');
+    return normalized;
+  };
+
+  const isReleaseModeActive = () => document.body.classList.contains('release-mode');
+
+  const normalizeContentMode = (modeName, modeData) => {
+    if (!isPlainObject(modeData)) {
+      throw new Error(`content.${modeName} 必须是对象`);
+    }
+
+    const selectorsRaw = isPlainObject(modeData.selectors) ? modeData.selectors : {};
+    const selectors = {};
+    Object.entries(selectorsRaw).forEach(([selector, text]) => {
+      const key = asNonEmptyString(selector);
+      const value = asNonEmptyString(text);
+      if (key && value) {
+        selectors[key] = value;
+      }
+    });
+
+    const features = Array.isArray(modeData.features)
+      ? modeData.features.map((line) => asNonEmptyString(line)).filter(Boolean)
+      : [];
+    const steps = Array.isArray(modeData.steps)
+      ? modeData.steps.map((line) => asNonEmptyString(line)).filter(Boolean)
+      : [];
+
+    const noteRaw = isPlainObject(modeData.download_notes) ? modeData.download_notes : {};
+    const downloadNotes = {};
+    Object.entries(noteRaw).forEach(([indexText, note]) => {
+      const idx = Number.parseInt(String(indexText), 10);
+      const value = asNonEmptyString(note);
+      if (Number.isInteger(idx) && idx >= 0 && idx <= 8 && value) {
+        downloadNotes[String(idx)] = value;
+      }
+    });
+
+    return {
+      selectors,
+      features,
+      steps,
+      downloadNotes
+    };
+  };
+
+  const validateContentPayload = (payload) => {
+    if (!isPlainObject(payload)) {
+      throw new Error('content.json 顶层必须是对象');
+    }
+    const defaultMode = normalizeContentMode('default', payload.default);
+    const releaseMode = payload.release ? normalizeContentMode('release', payload.release) : {
+      selectors: {},
+      features: [],
+      steps: [],
+      downloadNotes: {}
+    };
+    return {
+      default: defaultMode,
+      release: releaseMode
+    };
+  };
+
+  const loadContentData = () => {
+    if (contentDataPromise) {
+      return contentDataPromise;
+    }
+
+    contentDataPromise = fetch(CONTENT_DATA_URL, {
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json'
+      }
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((payload) => validateContentPayload(payload))
+      .catch((error) => {
+        contentDataPromise = null;
+        throw error;
+      });
+
+    return contentDataPromise;
+  };
+
+  const applyContentMode = (modeData) => {
+    if (!modeData || !isPlainObject(modeData)) {
+      return;
+    }
+
+    const selectors = isPlainObject(modeData.selectors) ? modeData.selectors : {};
+    Object.entries(selectors).forEach(([selector, text]) => {
+      const node = document.querySelector(selector);
+      if (node && text) {
+        node.textContent = text;
+      }
+    });
+
+    if (Array.isArray(modeData.features) && modeData.features.length) {
+      const featureNodes = Array.from(document.querySelectorAll('.feature-card p'));
+      featureNodes.forEach((node, index) => {
+        if (modeData.features[index]) {
+          node.textContent = modeData.features[index];
+        }
+      });
+    }
+
+    if (Array.isArray(modeData.steps) && modeData.steps.length) {
+      const stepNodes = Array.from(document.querySelectorAll('.step-card p'));
+      stepNodes.forEach((node, index) => {
+        if (modeData.steps[index]) {
+          node.textContent = modeData.steps[index];
+        }
+      });
+    }
+
+    const noteMap = isPlainObject(modeData.downloadNotes) ? modeData.downloadNotes : {};
+    const downloadNotes = Array.from(document.querySelectorAll('#download .download-note'));
+    Object.entries(noteMap).forEach(([key, note]) => {
+      const idx = Number.parseInt(key, 10);
+      if (Number.isInteger(idx) && downloadNotes[idx] && note) {
+        downloadNotes[idx].textContent = note;
+      }
+    });
+  };
+
+  const applyReleaseCopyFallback = () => {
+    applyContentMode({
+      selectors: {
+        '.hero-subtitle': '会聊天、会说话、会记忆的 AI 桌宠。',
+        '#demo .section-title': '🎬 快速演示',
+        '.demo-media-tip': '将演示素材放入 docs/assets/ 后可自动展示。',
+        '.config-page-subtitle': '集中完成关键参数配置与运行检查。',
+        '.version-panel-desc': '最近版本重点更新一览。'
+      },
+      features: [
+        '接入主流大模型，日常聊天自然流畅。',
+        '支持唤醒词、语音输入与拟声回复。',
+        '向量记忆机制，长期保留关键对话。',
+        '可感知桌面上下文并给出主动反馈。',
+        '根据语气切换表情与动作状态。',
+        '支持提醒指令，到点主动提示。'
+      ],
+      steps: [
+        '下载并解压最新版安装包。',
+        '填写 API Key 完成基础配置。',
+        '双击启动脚本即可运行。'
+      ],
+      downloadNotes: {
+        '1': '推荐流程：配置自检 → 一键应用 → 启动桌宠。',
+        '2': '发布前建议先本地完整验证一次。'
+      }
+    });
+  };
+
+  const setupContentCopy = () => {
+    const copyMode = setCopyMode(getCopyModeFromUrl());
+
+    loadContentData()
+      .then((contentData) => {
+        applyContentMode(contentData.default);
+        if (copyMode === 'release') {
+          applyContentMode(contentData.release);
+        }
+      })
+      .catch((error) => {
+        console.warn('[Taffy] content.json 校验失败，已使用页面静态文案。', error);
+        if (copyMode === 'release') {
+          applyReleaseCopyFallback();
+        }
+      });
+  };
+
   const setupReleaseInfo = () => {
     const releaseText = document.getElementById('latestReleaseText');
     const releaseDate = document.getElementById('latestReleaseDate');
@@ -192,6 +523,27 @@
       .finally(() => {
         window.clearTimeout(timer);
       });
+  };
+
+  const setupScrollProgress = () => {
+    const existing = document.querySelector('.scroll-progress');
+    const progressBar = existing || document.createElement('div');
+    if (!existing) {
+      progressBar.className = 'scroll-progress';
+      progressBar.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(progressBar);
+    }
+
+    const updateProgress = () => {
+      const doc = document.documentElement;
+      const total = Math.max(0, doc.scrollHeight - doc.clientHeight);
+      const ratio = total > 0 ? Math.min(1, Math.max(0, window.scrollY / total)) : 0;
+      progressBar.style.setProperty('--scroll-progress', String(ratio));
+    };
+
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    window.addEventListener('resize', updateProgress);
+    updateProgress();
   };
 
   const setupSmoothScroll = () => {
@@ -291,6 +643,32 @@
       return;
     }
 
+    const staggerGroups = [
+      '.features-grid',
+      '.steps-grid',
+      '.demo-lab-grid',
+      '.media-showcase',
+      '.config-layout',
+      '.changelog-layout',
+      '.faq-list',
+      '.plan-list'
+    ];
+
+    staggerGroups.forEach((selector) => {
+      const groups = Array.from(document.querySelectorAll(selector));
+      groups.forEach((group) => {
+        const nodes = Array.from(group.querySelectorAll('.fade-in-up'));
+        nodes.forEach((node, index) => {
+          if (!(node instanceof HTMLElement) || node.dataset.revealDelayApplied === '1') {
+            return;
+          }
+          const delay = Math.min(index * 75, 360);
+          node.style.transitionDelay = `${delay}ms`;
+          node.dataset.revealDelayApplied = '1';
+        });
+      });
+    });
+
     if (!('IntersectionObserver' in window)) {
       revealItems.forEach((item) => item.classList.add('visible'));
       return;
@@ -313,6 +691,45 @@
     );
 
     revealItems.forEach((item) => observer.observe(item));
+  };
+
+  const setupCardSpotlight = () => {
+    const targets = Array.from(document.querySelectorAll(
+      '.feature-card, .step-card, .demo-lab-card, .plan-card, .faq-item, .media-tile'
+    ));
+    if (!targets.length) {
+      return;
+    }
+
+    const updateSpotlight = (event) => {
+      const card = event.currentTarget;
+      if (!(card instanceof HTMLElement)) {
+        return;
+      }
+      const rect = card.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) {
+        return;
+      }
+      const x = ((event.clientX - rect.left) / rect.width) * 100;
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+      card.style.setProperty('--spotlight-x', `${Math.min(100, Math.max(0, x)).toFixed(2)}%`);
+      card.style.setProperty('--spotlight-y', `${Math.min(100, Math.max(0, y)).toFixed(2)}%`);
+    };
+
+    const resetSpotlight = (event) => {
+      const card = event.currentTarget;
+      if (!(card instanceof HTMLElement)) {
+        return;
+      }
+      card.style.removeProperty('--spotlight-x');
+      card.style.removeProperty('--spotlight-y');
+    };
+
+    targets.forEach((card) => {
+      card.addEventListener('pointermove', updateSpotlight);
+      card.addEventListener('pointerleave', resetSpotlight);
+      card.addEventListener('pointercancel', resetSpotlight);
+    });
   };
 
   const setupVersionPanel = () => {
@@ -400,6 +817,164 @@
         closePanel();
       }
     });
+  };
+
+  const setupVersionHistoryData = () => {
+    const lists = Array.from(document.querySelectorAll('.version-panel-list'));
+    if (!lists.length) {
+      return;
+    }
+
+    const isConfigPage = document.body && document.body.classList.contains('config-page');
+    const linkPrefix = isConfigPage ? 'index.html#' : '#';
+    const releaseText = document.getElementById('latestReleaseText');
+    const releaseDate = document.getElementById('latestReleaseDate');
+
+    loadVersionsData()
+      .then((payload) => {
+        const versions = payload.versions || [];
+        if (!versions.length) {
+          return;
+        }
+
+        const releaseMode = isReleaseModeActive();
+        lists.forEach((list) => {
+          const fragment = document.createDocumentFragment();
+
+          versions.forEach((item) => {
+            const li = document.createElement('li');
+            const title = document.createElement('h4');
+            title.textContent = `${item.tag}（${item.date}）`;
+
+            const desc = document.createElement('p');
+            desc.textContent = releaseMode && item.releaseSummary ? item.releaseSummary : item.panelSummary;
+
+            const wrap = document.createElement('p');
+            const link = document.createElement('a');
+            link.className = 'version-view-link';
+            link.href = `${linkPrefix}${item.logAnchor}`;
+            link.textContent = '查看变更';
+            wrap.appendChild(link);
+
+            li.appendChild(title);
+            li.appendChild(desc);
+            li.appendChild(wrap);
+            fragment.appendChild(li);
+          });
+
+          if (fragment.childNodes.length) {
+            list.innerHTML = '';
+            list.appendChild(fragment);
+          }
+        });
+
+        if (releaseText && versions[0] && versions[0].tag) {
+          releaseText.textContent = `${versions[0].tag}（以 Release 为准）`;
+        }
+        if (releaseDate && payload.updatedAt) {
+          releaseDate.textContent = `发布时间：${payload.updatedAt}`;
+        }
+      })
+      .catch((error) => {
+        console.warn('[Taffy] versions.json 校验失败，已使用静态版本列表。', error);
+      });
+  };
+
+  const setupChangelogData = () => {
+    const timeline = document.querySelector('#changelog .timeline');
+    if (!timeline) {
+      return;
+    }
+    let latestVersions = [];
+    const COLLAPSE_AFTER_LINES = 4;
+
+    const buildLines = (item) => {
+      const lines = Array.isArray(item.highlights)
+        ? item.highlights.filter((line) => typeof line === 'string' && line.trim().length > 0)
+        : [];
+      if (lines.length) {
+        return lines;
+      }
+      if (item.panelSummary) {
+        return [item.panelSummary];
+      }
+      if (item.summary) {
+        return [item.summary];
+      }
+      return [];
+    };
+
+    const renderTimeline = () => {
+      if (!latestVersions.length) {
+        return;
+      }
+
+      const createLine = (line, animationDelay) => {
+        const p = document.createElement('p');
+        p.className = 'timeline-line';
+        p.style.animationDelay = `${animationDelay}s`;
+        p.textContent = `· ${line}`;
+        return p;
+      };
+
+      const fragment = document.createDocumentFragment();
+      latestVersions.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.id = item.logAnchor;
+        li.className = 'timeline-item';
+
+        const title = document.createElement('h4');
+        const tag = document.createElement('span');
+        tag.className = 'timeline-version';
+        tag.textContent = item.tag;
+        const date = document.createElement('span');
+        date.className = 'timeline-date';
+        date.textContent = item.date;
+        const titleText = document.createElement('span');
+        titleText.className = 'timeline-title';
+        titleText.textContent = item.title;
+        title.appendChild(tag);
+        title.appendChild(date);
+        title.appendChild(titleText);
+        li.appendChild(title);
+
+        const lines = buildLines(item);
+        const visibleLines = lines.slice(0, COLLAPSE_AFTER_LINES);
+        visibleLines.forEach((line, lineIndex) => {
+          li.appendChild(createLine(line, Math.min(0.08 * (index + lineIndex), 0.54)));
+        });
+
+        if (lines.length > COLLAPSE_AFTER_LINES) {
+          const details = document.createElement('details');
+          details.className = 'timeline-more';
+          const summary = document.createElement('summary');
+          summary.textContent = `查看该版本更多变更（${lines.length - COLLAPSE_AFTER_LINES}）`;
+          details.appendChild(summary);
+          lines.slice(COLLAPSE_AFTER_LINES).forEach((line, extraIndex) => {
+            details.appendChild(createLine(line, Math.min(0.08 * (index + visibleLines.length + extraIndex), 0.54)));
+          });
+          li.appendChild(details);
+        }
+
+        fragment.appendChild(li);
+      });
+
+      timeline.innerHTML = '';
+      timeline.appendChild(fragment);
+    };
+
+    loadVersionsData()
+      .then((payload) => {
+        const versions = payload.versions || [];
+        if (!versions.length) {
+          return;
+        }
+        latestVersions = versions;
+        renderTimeline();
+      })
+      .catch((error) => {
+        console.warn('[Taffy] 更新日志渲染失败，已使用静态日志。', error);
+      });
   };
 
   const setupFAQAccordion = () => {
@@ -632,7 +1207,12 @@
       return;
     }
 
-    mediaTiles.forEach((tile) => {
+    const initMediaTile = (tile) => {
+      if (!tile || tile.dataset.mediaInitialized === '1') {
+        return;
+      }
+      tile.dataset.mediaInitialized = '1';
+
       const video = tile.querySelector('.media-video');
       const placeholder = tile.querySelector('.media-placeholder');
       if (!video || !placeholder) {
@@ -672,8 +1252,29 @@
         } else {
           showMissing();
         }
-      }, 1000);
-    });
+      }, 1200);
+    };
+
+    if (typeof window.IntersectionObserver === 'function') {
+      const observer = new window.IntersectionObserver((entries, io) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) {
+            return;
+          }
+          initMediaTile(entry.target);
+          io.unobserve(entry.target);
+        });
+      }, {
+        root: null,
+        rootMargin: '260px 0px',
+        threshold: 0.01
+      });
+
+      mediaTiles.forEach((tile) => observer.observe(tile));
+      return;
+    }
+
+    mediaTiles.forEach((tile) => initMediaTile(tile));
   };
 
   const setupVoiceDemo = () => {
@@ -993,15 +1594,339 @@
     window.addEventListener('beforeunload', stopPlayback);
   };
 
+  const setupRuntimeConsole = () => {
+    if (!document.body || document.querySelector('.runtime-console-root')) {
+      return;
+    }
+
+    const STORAGE_KEY = 'taffy-runtime-console-open';
+    const MAX_LOGS = 260;
+    const records = [];
+
+    const root = document.createElement('div');
+    root.className = 'runtime-console-root';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'runtime-console-toggle';
+    toggleBtn.setAttribute('aria-expanded', 'false');
+    toggleBtn.setAttribute('aria-controls', 'runtimeConsolePanel');
+
+    const toggleLabel = document.createElement('span');
+    toggleLabel.className = 'runtime-console-toggle-label';
+    toggleLabel.textContent = '🧭 控制台';
+
+    const toggleBadge = document.createElement('span');
+    toggleBadge.className = 'runtime-console-toggle-badge';
+    toggleBadge.textContent = '0';
+
+    toggleBtn.appendChild(toggleLabel);
+    toggleBtn.appendChild(toggleBadge);
+
+    const panel = document.createElement('section');
+    panel.className = 'runtime-console-panel';
+    panel.id = 'runtimeConsolePanel';
+    panel.hidden = true;
+
+    const header = document.createElement('div');
+    header.className = 'runtime-console-header';
+
+    const title = document.createElement('h3');
+    title.className = 'runtime-console-title';
+    title.textContent = '运行时控制台';
+
+    const actions = document.createElement('div');
+    actions.className = 'runtime-console-actions';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'runtime-console-btn';
+    copyBtn.textContent = '复制';
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'runtime-console-btn';
+    clearBtn.textContent = '清空';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'runtime-console-btn';
+    closeBtn.textContent = '收起';
+
+    actions.appendChild(copyBtn);
+    actions.appendChild(clearBtn);
+    actions.appendChild(closeBtn);
+    header.appendChild(title);
+    header.appendChild(actions);
+
+    const logBox = document.createElement('div');
+    logBox.className = 'runtime-console-log';
+    logBox.setAttribute('role', 'log');
+    logBox.setAttribute('aria-live', 'polite');
+
+    const status = document.createElement('p');
+    status.className = 'runtime-console-status';
+    status.textContent = '等待日志...';
+
+    panel.appendChild(header);
+    panel.appendChild(logBox);
+    panel.appendChild(status);
+
+    root.appendChild(toggleBtn);
+    root.appendChild(panel);
+    document.body.appendChild(root);
+
+    const setOpen = (nextOpen) => {
+      const isOpen = Boolean(nextOpen);
+      root.classList.toggle('open', isOpen);
+      panel.hidden = !isOpen;
+      toggleBtn.setAttribute('aria-expanded', String(isOpen));
+      try {
+        window.localStorage.setItem(STORAGE_KEY, isOpen ? '1' : '0');
+      } catch (error) {
+        // ignore storage error
+      }
+      if (isOpen) {
+        logBox.scrollTop = logBox.scrollHeight;
+      }
+    };
+
+    const updateStatus = () => {
+      const warnCount = records.filter((item) => item.level === 'warn').length;
+      const errorCount = records.filter((item) => item.level === 'error').length;
+      const alertCount = warnCount + errorCount;
+      toggleBadge.textContent = String(alertCount);
+      toggleBadge.classList.toggle('has-alert', alertCount > 0);
+      status.textContent = `共 ${records.length} 条日志，警告 ${warnCount}，错误 ${errorCount}`;
+    };
+
+    const formatArg = (arg) => {
+      if (arg instanceof Error) {
+        return `${arg.name}: ${arg.message}${arg.stack ? `\n${arg.stack}` : ''}`;
+      }
+      const valueType = typeof arg;
+      if (valueType === 'string') {
+        return arg;
+      }
+      if (arg === null) {
+        return 'null';
+      }
+      if (typeof arg === 'undefined') {
+        return 'undefined';
+      }
+      if (valueType === 'number' || valueType === 'boolean' || valueType === 'bigint' || valueType === 'symbol') {
+        return String(arg);
+      }
+      if (valueType === 'function') {
+        return `[Function ${arg.name || 'anonymous'}]`;
+      }
+      try {
+        return JSON.stringify(arg);
+      } catch (error) {
+        try {
+          return String(arg);
+        } catch (stringError) {
+          return '[Unserializable Value]';
+        }
+      }
+    };
+
+    const appendRecord = (level, message) => {
+      const now = new Date();
+      const stamp = now.toTimeString().slice(0, 8);
+      const line = `[${stamp}] [${String(level || 'log').toUpperCase()}] ${String(message || '')}`;
+
+      records.push({ level, line });
+      if (records.length > MAX_LOGS) {
+        records.shift();
+      }
+
+      const shouldAutoScroll = (logBox.scrollTop + logBox.clientHeight) >= (logBox.scrollHeight - 24);
+      const row = document.createElement('div');
+      row.className = `runtime-console-entry ${level}`;
+      row.textContent = line;
+      logBox.appendChild(row);
+      while (logBox.childElementCount > MAX_LOGS) {
+        logBox.removeChild(logBox.firstChild);
+      }
+      if (shouldAutoScroll) {
+        logBox.scrollTop = logBox.scrollHeight;
+      }
+      updateStatus();
+    };
+
+    const writeLog = (level, args) => {
+      const text = Array.isArray(args) ? args.map((item) => formatArg(item)).join(' ') : formatArg(args);
+      appendRecord(level, text);
+    };
+
+    const copyText = async (text) => {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', 'readonly');
+      textarea.style.position = 'absolute';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    };
+
+    toggleBtn.addEventListener('click', () => {
+      const opened = root.classList.contains('open');
+      setOpen(!opened);
+    });
+    const runConsoleAction = async (action) => {
+      if (action === 'close') {
+        setOpen(false);
+        return;
+      }
+      if (action === 'clear') {
+        records.length = 0;
+        logBox.innerHTML = '';
+        updateStatus();
+        status.textContent = '日志已清空。';
+        return;
+      }
+      if (action === 'copy') {
+        const text = records.map((item) => item.line).join('\n');
+        if (!text.trim()) {
+          appendRecord('log', '没有可复制的日志。');
+          return;
+        }
+        try {
+          await copyText(text);
+          appendRecord('log', '日志已复制到剪贴板。');
+        } catch (error) {
+          appendRecord('error', `复制失败：${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    };
+
+    const bindConsoleAction = (button, action) => {
+      if (!button) {
+        return;
+      }
+      let lastTriggerAt = 0;
+      const handler = (event) => {
+        const now = Date.now();
+        if (now - lastTriggerAt < 180) {
+          return;
+        }
+        lastTriggerAt = now;
+        event.preventDefault();
+        event.stopPropagation();
+        const originalText = button.textContent || '';
+        void runConsoleAction(action);
+        if (action === 'copy') {
+          button.textContent = '已复制';
+          window.setTimeout(() => {
+            button.textContent = originalText;
+          }, 900);
+        } else if (action === 'clear') {
+          button.textContent = '已清空';
+          window.setTimeout(() => {
+            button.textContent = originalText;
+          }, 900);
+        }
+      };
+      button.addEventListener('click', handler);
+      button.addEventListener('pointerup', handler);
+      button.addEventListener('touchend', handler, { passive: false });
+      button.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+          return;
+        }
+        handler(event);
+      });
+    };
+
+    bindConsoleAction(closeBtn, 'close');
+    bindConsoleAction(clearBtn, 'clear');
+    bindConsoleAction(copyBtn, 'copy');
+
+    if (!window.__taffyConsoleSinks) {
+      window.__taffyConsoleSinks = [];
+    }
+    const sink = (level, args) => writeLog(level, args);
+    window.__taffyConsoleSinks.push(sink);
+
+    if (!window.__taffyConsolePatched) {
+      const levelMap = {
+        log: 'log',
+        info: 'log',
+        debug: 'log',
+        warn: 'warn',
+        error: 'error'
+      };
+      const originals = {};
+      Object.keys(levelMap).forEach((method) => {
+        if (typeof console[method] === 'function') {
+          originals[method] = console[method].bind(console);
+          console[method] = (...args) => {
+            if (Array.isArray(window.__taffyConsoleSinks)) {
+              window.__taffyConsoleSinks.forEach((fn) => {
+                try {
+                  fn(levelMap[method], args);
+                } catch (error) {
+                  // ignore sink error
+                }
+              });
+            }
+            originals[method](...args);
+          };
+        }
+      });
+      window.__taffyConsolePatched = true;
+      window.__taffyConsoleOriginals = originals;
+    }
+
+    window.addEventListener('error', (event) => {
+      const head = `${event.message || '未知错误'} @ ${event.filename || 'unknown'}:${event.lineno || 0}:${event.colno || 0}`;
+      const stack = event.error && event.error.stack ? `\n${event.error.stack}` : '';
+      appendRecord('error', `${head}${stack}`);
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = event.reason;
+      if (reason instanceof Error) {
+        appendRecord('error', `Promise 未处理异常: ${reason.message}\n${reason.stack || ''}`);
+        return;
+      }
+      appendRecord('error', `Promise 未处理异常: ${formatArg(reason)}`);
+    });
+
+    let defaultOpen = false;
+    try {
+      defaultOpen = window.localStorage.getItem(STORAGE_KEY) === '1';
+    } catch (error) {
+      defaultOpen = false;
+    }
+    setOpen(defaultOpen);
+    updateStatus();
+    appendRecord('log', '控制台已就绪。');
+  };
+
   document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('js-enabled');
+    setupScrollProgress();
+    setupLazyLive2D();
+    setupRuntimeConsole();
     setupThemeToggle();
+    setupContentCopy();
     setupGithubLinks();
+    setupVersionHistoryData();
+    setupChangelogData();
     setupReleaseInfo();
     setupSmoothScroll();
     setupNavbar();
     setupVersionPanel();
     setupRevealAnimations();
+    setupCardSpotlight();
     setupFAQAccordion();
     setupBackToTop();
     setupCopyConfig();
