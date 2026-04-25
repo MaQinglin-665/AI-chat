@@ -1852,6 +1852,40 @@ class PetHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(audio_bytes)
 
+    def _build_health_payload(self, detailed=False):
+        config_ok = True
+        config_error = ""
+        try:
+            cfg = load_config()
+        except Exception as exc:
+            cfg = DEFAULT_CONFIG
+            config_ok = False
+            config_error = str(exc)
+
+        payload = {
+            "ok": config_ok,
+            "status": "ok" if config_ok else "degraded",
+            "server_time": datetime.now().isoformat(timespec="seconds"),
+        }
+        if not detailed:
+            return payload
+
+        security = _get_server_security_settings(cfg)
+        payload["checks"] = {
+            "config_load": {
+                "ok": config_ok,
+                "error": config_error if not config_ok else "",
+            }
+        }
+        payload["security"] = {
+            "require_api_token": bool(security.get("require_api_token", False)),
+            "api_token_env": str(security.get("api_token_env", API_TOKEN_ENV_DEFAULT) or API_TOKEN_ENV_DEFAULT),
+            "api_token_configured": bool(str(security.get("expected_api_token", "") or "").strip()),
+            "cors_allow_loopback": bool(security.get("allow_loopback", True)),
+            "cors_allowed_origins": sorted(security.get("allowed_origins", set())),
+        }
+        return payload
+
     def _send_sse(self, data):
         payload = f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode("utf-8")
         self.wfile.write(payload)
@@ -1914,9 +1948,15 @@ class PetHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path_only = self.path.split("?", 1)[0]
+        if path_only == "/healthz":
+            self._send_json(self._build_health_payload(detailed=False))
+            return
         if self._reject_disallowed_origin(path_only):
             return
         if self._reject_invalid_api_token(path_only):
+            return
+        if path_only == "/api/health":
+            self._send_json(self._build_health_payload(detailed=True))
             return
         if path_only == "/config.json":
             config = load_config()
@@ -2337,6 +2377,37 @@ def ensure_config_hint():
     )
 
 
+def run_startup_self_check(config):
+    findings = []
+    safe_cfg = config if isinstance(config, dict) else {}
+    server_cfg = safe_cfg.get("server", {}) if isinstance(safe_cfg.get("server", {}), dict) else {}
+    tools_cfg = safe_cfg.get("tools", {}) if isinstance(safe_cfg.get("tools", {}), dict) else {}
+    llm_cfg = safe_cfg.get("llm", {}) if isinstance(safe_cfg.get("llm", {}), dict) else {}
+
+    require_token = bool(server_cfg.get("require_api_token", False))
+    token_env = str(server_cfg.get("api_token_env", API_TOKEN_ENV_DEFAULT) or API_TOKEN_ENV_DEFAULT).strip() or API_TOKEN_ENV_DEFAULT
+    configured_token = str(server_cfg.get("api_token", "") or "").strip() or str(os.environ.get(token_env, "") or "").strip()
+    if require_token and not configured_token:
+        findings.append(
+            f"[startup][warn] server.require_api_token=true but token is empty. Set env {token_env}."
+        )
+
+    if bool(tools_cfg.get("allow_shell", False)):
+        findings.append(
+            "[startup][warn] tools.allow_shell=true. Consider disabling it for production/public releases."
+        )
+
+    llm_provider = str(llm_cfg.get("provider", "") or "").strip().lower()
+    if llm_provider in {"openai", "openai_compatible"}:
+        key_env = str(llm_cfg.get("api_key_env", OPENAI_DEFAULT_KEY_ENV) or OPENAI_DEFAULT_KEY_ENV).strip() or OPENAI_DEFAULT_KEY_ENV
+        key_value = str(llm_cfg.get("api_key", "") or "").strip() or str(os.environ.get(key_env, "") or "").strip()
+        if not key_value:
+            findings.append(
+                f"[startup][warn] llm provider is {llm_provider} but no API key found in env {key_env}."
+            )
+    return findings
+
+
 def build_server():
     config = load_config()
     server_cfg = config.get("server", {})
@@ -2345,6 +2416,8 @@ def build_server():
     open_browser = bool(server_cfg.get("open_browser", False))
 
     ensure_config_hint()
+    for finding in run_startup_self_check(config):
+        print(finding)
     httpd = ThreadingHTTPServer((host, port), PetHandler)
     url = f"http://{host}:{port}"
     return httpd, url, open_browser
