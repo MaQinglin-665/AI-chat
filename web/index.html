@@ -12,7 +12,16 @@
   <section class="panel">
     <div class="row top">
       <strong id="assistant-name">Taffy</strong>
-      <span id="status">待机</span>
+      <div class="top-actions">
+        <button
+          id="translation-toggle-btn"
+          class="mini-toggle-btn"
+          type="button"
+          aria-pressed="true"
+          title="隐藏中文翻译"
+        >译</button>
+        <span id="status">待机</span>
+      </div>
     </div>
 
     <div id="mic-meter-wrap" class="mic-meter-wrap" aria-live="off">
@@ -45,6 +54,7 @@
       <button id="speak-btn" type="button">语音开</button>
       <button id="schedule-btn" type="button">日程</button>
       <button id="persona-btn" type="button">人设卡</button>
+      <button id="learning-review-btn" type="button">学习审核</button>
       <button id="lock-btn" type="button">桌面锁定: 关</button>
       <button id="observe-btn" type="button">观察桌面: 开</button>
       <button id="auto-chat-btn" type="button">自动对话: 关</button>
@@ -149,6 +159,94 @@
     </div>
   </div>
 
+  <div id="learning-review-backdrop" class="learning-review-backdrop" hidden></div>
+  <aside id="learning-review-drawer" class="learning-review-drawer" hidden aria-label="学习审核侧栏">
+    <div class="learning-review-head">
+      <strong>学习审核</strong>
+      <div class="learning-review-head-actions">
+        <button id="learning-review-undo-btn" type="button">撤销上一步</button>
+        <button id="learning-review-close-btn" type="button" aria-label="关闭学习审核">关闭</button>
+      </div>
+    </div>
+
+    <div class="learning-review-toolbar">
+      <div class="learning-review-quick">
+        <label class="learning-field">
+          <span>inject_count</span>
+          <select id="learning-quick-inject">
+            <option value="0">0</option>
+            <option value="1">1</option>
+          </select>
+        </label>
+        <label class="learning-field">
+          <span>promotion_min_support</span>
+          <select id="learning-quick-support">
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </label>
+        <button id="learning-quick-apply-btn" type="button">应用开关</button>
+      </div>
+
+      <div class="learning-review-tabs" role="tablist" aria-label="学习池切换">
+        <button id="learning-tab-candidates" class="learning-tab is-active" type="button" role="tab" aria-selected="true">候选池</button>
+        <button id="learning-tab-samples" class="learning-tab" type="button" role="tab" aria-selected="false">正式池</button>
+        <button id="learning-reload-btn" class="learning-reload-btn" type="button">重读</button>
+      </div>
+
+      <div class="learning-review-filters">
+        <label class="learning-field">
+          <span>score ≥</span>
+          <input id="learning-filter-score" type="number" min="0" max="1" step="0.01" value="0">
+        </label>
+        <label class="learning-field">
+          <span>confidence ≥</span>
+          <input id="learning-filter-confidence" type="number" min="0" max="1" step="0.01" value="0">
+        </label>
+        <label class="learning-field learning-field-keyword">
+          <span>关键词</span>
+          <input id="learning-filter-keyword" type="text" placeholder="搜索 assistant/compressed">
+        </label>
+        <div class="learning-filter-tools">
+          <label class="learning-field">
+            <span>排序</span>
+            <select id="learning-sort-mode">
+              <option value="score_desc">评分从高到低</option>
+              <option value="confidence_desc">置信从高到低</option>
+              <option value="support_desc">支持数从高到低</option>
+              <option value="updated_desc">最近更新优先</option>
+            </select>
+          </label>
+          <div class="learning-filter-actions">
+            <button id="learning-filter-high-btn" type="button">仅看高分</button>
+            <button id="learning-filter-reset-btn" type="button">重置筛选</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="learning-review-batch">
+        <label class="learning-select-all">
+          <input id="learning-select-all" type="checkbox">
+          <span id="learning-selected-count">已选 0</span>
+        </label>
+        <div class="learning-batch-actions">
+          <button id="learning-batch-delete-btn" type="button">批量删除</button>
+          <button id="learning-batch-up-btn" type="button">批量升权</button>
+          <button id="learning-batch-down-btn" type="button">批量降权</button>
+          <button id="learning-batch-promote-btn" type="button">批量晋升</button>
+        </div>
+      </div>
+
+      <div id="learning-review-summary" class="learning-review-summary">加载中...</div>
+    </div>
+    <div id="learning-review-list" class="learning-review-list"></div>
+  </aside>
+
   <script src="./app.js"></script>
+  <div id="subtitle-layer" class="subtitle-layer" aria-live="polite"
+       aria-atomic="true">
+    <span class="subtitle-en"></span>
+    <span class="subtitle-zh"></span>
+  </div>
 </body>
 </html>

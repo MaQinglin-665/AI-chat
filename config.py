@@ -17,6 +17,7 @@ VOSK_MODEL_LARGE_ROOT = ROOT_DIR / "models" / "vosk" / "vosk-model-cn-0.22"
 OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
 OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
 OPENAI_DEFAULT_KEY_ENV = "OPENAI_API_KEY"
+API_TOKEN_DEFAULT_ENV = "TAFFY_API_TOKEN"
 VOLCENGINE_APP_ID_ENV = "VOLCENGINE_APP_ID"
 VOLCENGINE_ACCESS_TOKEN_ENV = "VOLCENGINE_ACCESS_TOKEN"
 VOLCENGINE_SECRET_KEY_ENV = "VOLCENGINE_SECRET_KEY"
@@ -78,7 +79,15 @@ DEFAULT_CONFIG = {
         "x_ratio": 0.26,
         "y_ratio": 0.96,
     },
-    "server": {"host": "127.0.0.1", "port": 8123, "open_browser": True},
+    "server": {
+        "host": "127.0.0.1",
+        "port": 8123,
+        "open_browser": True,
+        "cors_allow_loopback": True,
+        "cors_allowed_origins": [],
+        "require_api_token": False,
+        "api_token_env": API_TOKEN_DEFAULT_ENV,
+    },
     "desktop": {
         "transparent": True,
         "frameless": True,
@@ -223,7 +232,7 @@ DEFAULT_CONFIG = {
     "tools": {
         "enabled": True,
         "workspace_root": DEFAULT_WORKSPACE_ROOT,
-        "allow_shell": True,
+        "allow_shell": False,
         "allowed_command_prefixes": DEFAULT_ALLOWED_COMMAND_PREFIXES,
         "shell_timeout_sec": 25,
         "max_file_read_chars": 24000,
@@ -532,7 +541,7 @@ def sanitize_client_config(config):
         "tools": {
             "enabled": bool(tools_cfg.get("enabled", True)),
             "workspace_root": str(tools_cfg.get("workspace_root", DEFAULT_WORKSPACE_ROOT)),
-            "allow_shell": bool(tools_cfg.get("allow_shell", True)),
+            "allow_shell": bool(tools_cfg.get("allow_shell", False)),
             "image_enabled": bool(tools_cfg.get("image_enabled", True)),
         },
     }

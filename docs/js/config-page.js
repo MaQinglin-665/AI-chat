@@ -170,6 +170,90 @@
     URL.revokeObjectURL(objectUrl);
   };
 
+  const API_TOKEN_STORAGE_KEYS = ['taffy_api_token', 'TAFFY_API_TOKEN'];
+  let apiTokenPromise = null;
+
+  const readApiTokenFromStorage = () => {
+    try {
+      const query = new URLSearchParams(window.location.search || '');
+      const queryToken = String(query.get('api_token') || '').trim();
+      if (queryToken) {
+        try {
+          localStorage.setItem(API_TOKEN_STORAGE_KEYS[0], queryToken);
+        } catch (_) {
+          // ignore storage failures
+        }
+        return queryToken;
+      }
+    } catch (_) {
+      // ignore
+    }
+
+    for (const key of API_TOKEN_STORAGE_KEYS) {
+      try {
+        const value = String(localStorage.getItem(key) || '').trim();
+        if (value) {
+          return value;
+        }
+      } catch (_) {
+        // ignore storage failures
+      }
+    }
+    return '';
+  };
+
+  const resolveApiToken = async () => {
+    if (apiTokenPromise) {
+      return apiTokenPromise;
+    }
+    apiTokenPromise = (async () => {
+      let token = readApiTokenFromStorage();
+      if (!token && window.electronAPI && typeof window.electronAPI.getApiToken === 'function') {
+        try {
+          token = String(await window.electronAPI.getApiToken() || '').trim();
+        } catch (_) {
+          token = '';
+        }
+      }
+      if (token) {
+        try {
+          localStorage.setItem(API_TOKEN_STORAGE_KEYS[0], token);
+        } catch (_) {
+          // ignore storage failures
+        }
+      }
+      return token;
+    })();
+    return apiTokenPromise;
+  };
+
+  const isApiUrl = (url) => {
+    try {
+      const target = new URL(String(url || ''), window.location.href);
+      return target.pathname.startsWith('/api/');
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const buildAuthHeaders = async (url, baseHeaders = {}, requestMode = '') => {
+    const headers = new Headers(baseHeaders || {});
+    if (String(requestMode || '').toLowerCase() === 'no-cors') {
+      return headers;
+    }
+    if (!isApiUrl(url)) {
+      return headers;
+    }
+    if (headers.has('X-Taffy-Token') || headers.has('Authorization')) {
+      return headers;
+    }
+    const token = await resolveApiToken();
+    if (token) {
+      headers.set('X-Taffy-Token', token);
+    }
+    return headers;
+  };
+
   const initLlmModelPreset = (onModelChange) => {
     const presetSelect = getElement('llmModelPreset');
     const modelInput = getElement('llmModelInput');
@@ -1477,7 +1561,7 @@
             auto_chat_enabled: false
           },
           tools: {
-            allow_shell: true
+            allow_shell: false
           }
         }
       }
@@ -1588,11 +1672,16 @@
           : null;
 
         try {
-          const response = await fetch(endpoint, {
-            method: attempt.method,
-            headers: attempt.method === 'GET'
+          const headers = await buildAuthHeaders(
+            endpoint,
+            attempt.method === 'GET'
               ? {}
               : { 'Content-Type': 'application/json' },
+            ''
+          );
+          const response = await fetch(endpoint, {
+            method: attempt.method,
+            headers,
             body: attempt.method === 'GET' ? undefined : attempt.body,
             cache: 'no-store',
             signal: controller ? controller.signal : undefined
@@ -1698,9 +1787,12 @@
         : null;
 
       try {
+        const requestMode = String(options?.mode || '').toLowerCase();
+        const headers = await buildAuthHeaders(url, options?.headers || {}, requestMode);
         const response = await fetch(url, {
           cache: 'no-store',
           ...options,
+          headers,
           signal: controller ? controller.signal : undefined
         });
         return response;
