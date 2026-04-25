@@ -15,6 +15,7 @@ from config import (
     OPENAI_DEFAULT_KEY_ENV,
     WEB_DIR,
 )
+from utils import _clamp_int, _truncate_text
 
 
 WORK_INTENT_RE = re.compile(
@@ -140,22 +141,6 @@ WORK_TOOL_DEFS = [
 ]
 
 
-def _clamp_int(value, default, min_value, max_value):
-    try:
-        ivalue = int(value)
-    except (TypeError, ValueError):
-        ivalue = int(default)
-    return max(min_value, min(max_value, ivalue))
-
-
-def _truncate_text(text, max_chars):
-    safe = str(text or "")
-    limit = max(128, int(max_chars))
-    if len(safe) <= limit:
-        return safe
-    return safe[:limit] + "\n...[truncated]"
-
-
 def get_tools_settings(config):
     raw = config.get("tools", {}) if isinstance(config, dict) else {}
     root_raw = str(raw.get("workspace_root", DEFAULT_WORKSPACE_ROOT) or "").strip()
@@ -182,7 +167,8 @@ def get_tools_settings(config):
     return {
         "enabled": bool(raw.get("enabled", True)),
         "workspace_root": workspace_root,
-        "allow_shell": bool(raw.get("allow_shell", True)),
+        # Keep shell execution opt-in by default for safer public releases.
+        "allow_shell": bool(raw.get("allow_shell", False)),
         "allowed_command_prefixes": allowed,
         "shell_timeout_sec": _clamp_int(raw.get("shell_timeout_sec", 25), 25, 3, 180),
         "max_file_read_chars": _clamp_int(

@@ -35,6 +35,15 @@ memory.bak
 # Emotion state (runtime generated)
 emotion_state.json
 
+# Local privacy/runtime artifacts
+*cookies*.txt
+learning_*.jsonl
+learning_state.json
+learning_candidates.json
+learning_samples.json
+__tts_*.wav
+__tts_*.bin
+
 # Python cache
 *.pyc
 

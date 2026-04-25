@@ -1,0 +1,14 @@
+{
+  "name": "taffy-site-docs",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Taffy GitHub Pages docs tooling",
+  "scripts": {
+    "check:publish": "node tools/publish-check.mjs",
+    "test:smoke": "playwright test -c tests/playwright.config.ts",
+    "check:all": "npm run check:publish && npm run test:smoke"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
+  }
+}

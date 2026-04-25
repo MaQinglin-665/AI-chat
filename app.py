@@ -4,11 +4,15 @@ import sys
 import base64
 import random
 import re
+import ipaddress
 import hashlib
+import secrets
 import threading
 import time
+import traceback
 from datetime import datetime
 import urllib.error
+import urllib.parse
 import urllib.request
 import webbrowser
 from http import HTTPStatus
@@ -41,6 +45,7 @@ from config import (
     sanitize_client_config,
     sanitize_hotword_replacements,
 )
+from utils import _clamp_int, _clamp_float, _truncate_text
 from memory import (
     build_memory_prompt_block,
     merge_prompt_with_memory,
@@ -52,6 +57,12 @@ from memory import (
     save_manual_persona_card,
     build_wakeup_summary_block,
     is_lightweight_checkin_message,
+    get_learning_candidates_for_review,
+    get_learning_samples_for_review,
+    reload_learning_review_data,
+    update_learning_review_entries,
+    promote_learning_review_candidates,
+    undo_last_learning_review_action,
 )
 from tts import synthesize_tts_audio
 from tools import (
@@ -62,18 +73,59 @@ from tools import (
     should_use_work_tools,
 )
 
-try:
-    import vosk
-except Exception:
-    vosk = None
+from llm_client import (
+    call_ollama,
+    call_openai_compatible,
+    get_openai_tuning,
+    http_post_json,
+    is_local_url,
+)
+
+from humanize import (
+    apply_contextual_human_override,
+    apply_human_address_guard,
+    apply_question_ending_limiter,
+    build_human_prompt_block,
+    build_prompt_with_style,
+    build_style_prompt_block,
+    cleanup_assistant_reply_local,
+    finalize_assistant_reply,
+    get_humanize_settings,
+    infer_context_style,
+    infer_reply_density,
+    maybe_diversify_repetitive_reply,
+    maybe_refine_assistant_reply,
+    normalize_style_name,
+    split_tool_meta_suffix,
+)
+
+from emotion import (
+    build_inner_state_block,
+    load_emotion_state,
+    save_emotion_state,
+    update_emotion_from_reply,
+)
+
+from asr import (
+    guess_audio_content_type,
+    transcribe_pcm16_with_vosk,
+)
 
 
-VOSK_LOCK = threading.Lock()
-_VOSK_MODEL = None
+
+
+
 _SUMMARY_CACHE_LOCK = threading.Lock()
 _HISTORY_SUMMARY_CACHE = {"key": "", "summary": ""}
 TOOL_META_MARKER = "[[TAFFY_TOOL_META]]"
+_TOOL_INTRO = (
+    "When user asks for file/code/command/image tasks, use tools. "
+    "For regular chat, reply directly without tools. "
+    "Always explain briefly what you changed after tool actions."
+)
 RUNTIME_RESTART_EXIT_CODE = 75
+API_TOKEN_HEADER = "X-Taffy-Token"
+API_TOKEN_ENV_DEFAULT = "TAFFY_API_TOKEN"
 DEFAULT_HUMANIZE_SETTINGS = {
     "enabled": True,
     "strip_fillers": True,
@@ -89,6 +141,68 @@ def reset_runtime_state():
     with _SUMMARY_CACHE_LOCK:
         _HISTORY_SUMMARY_CACHE["key"] = ""
         _HISTORY_SUMMARY_CACHE["summary"] = ""
+
+
+def _normalize_origin(origin):
+    raw = str(origin or "").strip()
+    if not raw:
+        return ""
+    try:
+        parsed = urllib.parse.urlsplit(raw)
+    except Exception:
+        return ""
+    scheme = str(parsed.scheme or "").lower()
+    host = str(parsed.hostname or "").strip().lower()
+    if scheme not in {"http", "https"} or not host:
+        return ""
+    port = parsed.port
+    default_port = 80 if scheme == "http" else 443
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    if port and port != default_port:
+        return f"{scheme}://{host}:{int(port)}"
+    return f"{scheme}://{host}"
+
+
+def _is_loopback_host(hostname):
+    host = str(hostname or "").strip().lower()
+    if not host:
+        return False
+    if host.startswith("[") and host.endswith("]"):
+        host = host[1:-1]
+    if host == "localhost":
+        return True
+    try:
+        return bool(ipaddress.ip_address(host).is_loopback)
+    except Exception:
+        return False
+
+
+def _get_server_security_settings(config):
+    server_cfg = config.get("server", {}) if isinstance(config, dict) else {}
+    allow_loopback = bool(server_cfg.get("cors_allow_loopback", True))
+    raw_allow = server_cfg.get("cors_allowed_origins", [])
+    if isinstance(raw_allow, str):
+        raw_allow = [raw_allow]
+    allowed_origins = set()
+    if isinstance(raw_allow, list):
+        for item in raw_allow[:64]:
+            norm = _normalize_origin(item)
+            if norm:
+                allowed_origins.add(norm)
+    token_env = str(server_cfg.get("api_token_env", API_TOKEN_ENV_DEFAULT) or API_TOKEN_ENV_DEFAULT).strip()
+    token_env = token_env or API_TOKEN_ENV_DEFAULT
+    expected_token = str(server_cfg.get("api_token", "") or "").strip()
+    if not expected_token:
+        expected_token = str(os.environ.get(token_env, "") or "").strip()
+    require_token = bool(server_cfg.get("require_api_token", False))
+    return {
+        "allow_loopback": allow_loopback,
+        "allowed_origins": allowed_origins,
+        "api_token_env": token_env,
+        "expected_api_token": expected_token,
+        "require_api_token": require_token,
+    }
 
 
 def schedule_runtime_restart(delay_sec=0.35):
@@ -128,55 +242,6 @@ def apply_hotword_replacements(text, replacements):
     return out
 
 
-def _clamp_int(value, default, min_value, max_value):
-    try:
-        ivalue = int(value)
-    except (TypeError, ValueError):
-        ivalue = int(default)
-    return max(min_value, min(max_value, ivalue))
-
-
-def _clamp_float(value, default, min_value, max_value):
-    try:
-        fvalue = float(value)
-    except (TypeError, ValueError):
-        fvalue = float(default)
-    return max(min_value, min(max_value, fvalue))
-
-
-def _truncate_text(text, max_chars):
-    safe = str(text or "")
-    limit = max(128, int(max_chars))
-    if len(safe) <= limit:
-        return safe
-    return safe[:limit] + "\n...[truncated]"
-
-
-def get_humanize_settings(config):
-    raw = config.get("humanize", {}) if isinstance(config, dict) else {}
-    return {
-        "enabled": bool(raw.get("enabled", DEFAULT_HUMANIZE_SETTINGS["enabled"])),
-        "strip_fillers": bool(raw.get("strip_fillers", DEFAULT_HUMANIZE_SETTINGS["strip_fillers"])),
-        "refine_enabled": bool(raw.get("refine_enabled", DEFAULT_HUMANIZE_SETTINGS["refine_enabled"])),
-        "refine_max_chars": _clamp_int(
-            raw.get("refine_max_chars", DEFAULT_HUMANIZE_SETTINGS["refine_max_chars"]),
-            DEFAULT_HUMANIZE_SETTINGS["refine_max_chars"],
-            48,
-            220,
-        ),
-        "refine_timeout_sec": _clamp_int(
-            raw.get("refine_timeout_sec", DEFAULT_HUMANIZE_SETTINGS["refine_timeout_sec"]),
-            DEFAULT_HUMANIZE_SETTINGS["refine_timeout_sec"],
-            4,
-            25,
-        ),
-        "refine_min_chars": _clamp_int(
-            raw.get("refine_min_chars", DEFAULT_HUMANIZE_SETTINGS["refine_min_chars"]),
-            DEFAULT_HUMANIZE_SETTINGS["refine_min_chars"],
-            12,
-            120,
-        ),
-    }
 
 
 def get_history_summary_settings(config):
@@ -294,138 +359,14 @@ def build_prompt_with_history_summary(config, llm_cfg, provider, history, base_p
     return merge_prompt_with_memory(base_prompt, summary_block), safe_history
 
 
-def normalize_style_name(name):
-    style = str(name or "neutral").strip().lower()
-    if style not in {"neutral", "comfort", "clear", "playful", "steady"}:
-        style = "neutral"
-    return style
 
 
-def infer_context_style(user_message, safe_history, is_auto=False):
-    src_parts = [str(user_message or "")]
-    for item in safe_history[-4:]:
-        if not isinstance(item, dict):
-            continue
-        src_parts.append(str(item.get("content", "")))
-    src = "\n".join(src_parts).lower()
-
-    score = {"comfort": 0, "clear": 0, "playful": 0, "steady": 0}
-    emotion = load_emotion_state()
-    dominant = emotion.get("dominant", "neutral") if isinstance(emotion, dict) else "neutral"
-    if dominant == "happy":
-        score["playful"] += 3
-    elif dominant == "sad":
-        score["comfort"] += 3
-    elif dominant == "anxious":
-        score["steady"] += 2
-
-    if re.search(r"(难过|伤心|焦虑|崩溃|压力|失眠|委屈|害怕|心累|痛苦|失落|不舒服|难受)", src):
-        score["comfort"] += 5
-    if re.search(r"(报错|错误|bug|代码|排查|修复|步骤|怎么做|如何|配置|接口|api|命令|安装|运行)", src):
-        score["clear"] += 5
-    if re.search(r"(紧急|立刻|马上|赶快|严肃|认真|上线|故障|事故|必须)", src):
-        score["steady"] += 4
-    if re.search(r"(哈哈|好耶|太棒|开心|可爱|有趣|玩|轻松|聊聊|摸鱼)", src):
-        score["playful"] += 4
-    if re.search(r"(在吗|出来|陪我|聊会儿|想你了|无聊|困了|下班|下课|吃饭没|睡了吗)", src):
-        score["playful"] += 2
-        score["comfort"] += 1
-
-    if re.search(r"[?？]{1,}", src):
-        score["clear"] += 1
-    if re.search(r"[!！]{1,}", src):
-        score["playful"] += 1
-
-    if is_auto:
-        score["playful"] += 1
-
-    best = max(score.items(), key=lambda kv: kv[1])
-    if best[1] <= 0:
-        return "neutral"
-    return best[0]
 
 
-def infer_reply_density(user_message, safe_history, is_auto=False):
-    text = str(user_message or "").strip()
-    if is_auto:
-        return "brief"
-    if re.search(r"(详细|展开|具体|一步一步|完整|仔细|分析|长一点|多说点)", text, re.I):
-        return "expanded"
-    visible_chars = len(re.sub(r"\s+", "", text))
-    if visible_chars <= 4:
-        return "brief"
-    if visible_chars >= 42:
-        return "normal"
-    question_marks = len(re.findall(r"[?？]", text))
-    if question_marks >= 2:
-        return "normal"
-    # Add Neuro-style unpredictability: occasionally override density
-    r = random.random()
-    if not is_auto:
-        if r < 0.15:
-            return "brief"     # 15% chance of ultra-short reply
-        elif r > 0.88:
-            return "expanded"  # 12% chance of long reply
-    return "brief"
 
 
-def build_style_prompt_block(style_name):
-    style = normalize_style_name(style_name)
-    base = (
-        "回复风格要求：有自己的想法和态度，不是什么都附和。"
-        "长度跟着话题走，无聊的一句带过，有意思的可以多说。"
-        "说话自然有个性，可以吐槽、反问、跑题、接梗。"
-    )
-    style_map = {
-        "comfort": "语气温和，先接住对方的感受。",
-        "clear": "语气直接，先给结论。",
-        "playful": "语气轻快活泼。",
-        "steady": "语气沉稳简练。",
-        "neutral": "语气自然随意。",
-    }
-    return f"{base}\n当前语境风格：{style}\n{style_map.get(style, style_map['neutral'])}"
 
 
-def build_human_prompt_block(user_message, safe_history, is_auto=False):
-    density = infer_reply_density(user_message, safe_history, is_auto=is_auto)
-    user_text = str(user_message or "").strip()
-    lines = [
-        "像真人聊天一样回复，语气自然，有自己的态度和想法。",
-        "不要用客服腔、总结腔、教科书腔。",
-        "可以吐槽、反问、抬杠、跑题，像真人一样有个性。",
-        "不要引用不存在的前文，不确定就先问一句。",
-        "不要每次都以问句结尾。大部分时候直接把话说完就行，像真人一样有时候就是陈述。只有真的好奇才追问。",
-    ]
-    density_map = {
-        "brief": "这轮极简回复，1句话甚至几个字就够了，像随口嘟囔。",
-        "normal": "这轮正常聊，2-3句，自然展开。",
-        "expanded": "这轮话多一点，可以展开讲、跑题、自言自语，4-6句都行。",
-    }
-    lines.append(density_map.get(density, density_map["normal"]))
-    if re.fullmatch(r"(在吗|在嘛|在不在|在么|喂|嗨|hi|hello)[!！?？]*", user_text, re.I):
-        lines.append("如果用户只是在确认你在不在，就简单接一句，不要脑补对方情绪或处境。")
-    recent_assistant = []
-    for item in reversed(safe_history or []):
-        if not isinstance(item, dict):
-            continue
-        if str(item.get("role", "")).strip() != "assistant":
-            continue
-        content = " ".join(str(item.get("content", "")).split()).strip()
-        if not content:
-            continue
-        compact = re.sub(r"\s+", "", content)
-        if len(compact) > 16:
-            compact = compact[:16] + "…"
-        recent_assistant.append(f'"{compact}"')
-        if len(recent_assistant) >= 2:
-            break
-    if recent_assistant:
-        lines.append(
-            "避免复读你刚说过的措辞，尤其别重复：" + "、".join(reversed(recent_assistant))
-        )
-    if is_auto:
-        lines.append("如果是你主动开口，要像突然想到就说一句，别像提醒播报，也别像任务通知。")
-    return "\n".join(lines)
 
 
 _AIISH_OPENERS = [
@@ -453,283 +394,38 @@ _AIISH_ENDINGS = [
 ]
 
 
-def split_tool_meta_suffix(text):
-    safe = str(text or "")
-    if TOOL_META_MARKER not in safe:
-        return safe, ""
-    visible, meta = safe.split(TOOL_META_MARKER, 1)
-    return visible, TOOL_META_MARKER + meta
 
 
-def _strip_aiish_openers(text):
-    out = str(text or "").strip()
-    lowered = out.lower()
-    for _ in range(3):
-        changed = False
-        lowered = out.lower()
-        for opener in _AIISH_OPENERS:
-            if lowered.startswith(opener.lower()):
-                candidate = out[len(opener):].lstrip(" ，。,.!！?？")
-                if len(candidate) >= 4:
-                    out = candidate
-                    changed = True
-                    break
-        if not changed:
-            break
-    return out.strip()
 
 
-def _strip_aiish_endings(text):
-    out = str(text or "").strip()
-    lowered = out.lower()
-    for ending in _AIISH_ENDINGS:
-        if lowered.endswith(ending.lower()):
-            candidate = out[: -len(ending)].rstrip(" ，。,.!！?？")
-            if len(candidate) >= 4:
-                out = candidate
-                lowered = out.lower()
-    return out.strip()
 
 
-def _dedupe_reply_sentences(text):
-    safe = str(text or "").strip()
-    if not safe:
-        return safe
-    parts = re.split(r"([。！？!?；;\n])", safe)
-    if len(parts) <= 1:
-        return safe
-    built = []
-    seen = []
-    for idx in range(0, len(parts), 2):
-        seg = parts[idx].strip()
-        punct = parts[idx + 1] if idx + 1 < len(parts) else ""
-        if not seg:
-            continue
-        normalized = re.sub(r"\s+", "", seg)
-        if normalized and normalized in seen:
-            continue
-        seen.append(normalized)
-        built.append(seg + punct)
-    merged = "".join(built).strip()
-    return merged or safe
 
 
-def cleanup_assistant_reply_local(text, strip_fillers=True):
-    visible, meta = split_tool_meta_suffix(text)
-    out = " ".join(str(visible or "").split()).strip()
-    if not out:
-        return meta or ""
-    out = re.sub(r"[~～]+", "", out)
-    out = re.sub(r"[\U0001F300-\U0001FAFF]", "", out)
-    out = re.sub(r"[（(][^()（）\n]{0,18}[)）]", "", out)
-    out = out.replace("虚拟", "")
-    out = re.sub(r"([。！？!?~～])\1{1,}", r"\1", out)
-    out = re.sub(r"([,，])\1{1,}", r"\1", out)
-    out = re.sub(r"(嗯|啊|呀|哦|诶|欸)\1{2,}", r"\1\1", out)
-    out = re.sub(r"(哈哈)\1{2,}", r"\1\1", out)
-    out = re.sub(r"(其实)\1{1,}", r"\1", out)
-    out = re.sub(r"(可以的)\1{1,}", r"\1", out)
-    out = re.sub(r"(好的)\1{1,}", r"\1", out)
-    out = re.sub(r"(?:(嗯嗯|好呀好呀|好的好的|是的是的)[，,。!！?？\s]*){2,}", r"\1", out)
-    if strip_fillers:
-        out = _strip_aiish_openers(out)
-        out = _strip_aiish_endings(out)
-        out = re.sub(r"(^|[。！？!?]\s*)总之[，,]?", r"\1", out).strip()
-    out = _dedupe_reply_sentences(out)
-    out = re.sub(r"\s*([，。！？!?；;：:])\s*", r"\1", out)
-    out = re.sub(r"\n{3,}", "\n\n", out).strip()
-    if not out:
-        out = str(visible or "").strip()
-    return out + meta
 
 
-def should_refine_assistant_reply(reply, user_message, is_auto=False):
-    visible, meta = split_tool_meta_suffix(reply)
-    if meta:
-        return False
-    text = str(visible or "").strip()
-    if not text:
-        return False
-    if "```" in text or "`" in text:
-        return False
-    if re.search(r"(^|\n)\s*\d+\.\s", text):
-        return False
-    compact_len = len(re.sub(r"\s+", "", text))
-    score = 0
-    lowered = text.lower()
-    if any(lowered.startswith(op.lower()) for op in _AIISH_OPENERS):
-        score += 2
-    if any(ending.lower() in lowered for ending in _AIISH_ENDINGS):
-        score += 2
-    if compact_len >= 72:
-        score += 2
-    if len(re.findall(r"[，,。！？!?；;]", text)) >= 5:
-        score += 1
-    if re.search(r"(嗯嗯|好呀好呀|好的好的|是的是的|总之|希望这能帮到你)", text):
-        score += 2
-    if re.search(r"[~～（）()]", text):
-        score += 2
-    if re.search(r"[\U0001F300-\U0001FAFF]", text):
-        score += 2
-    if re.search(r"(虚拟|递给你|倒杯|吨吨吨|咔嚓|刚啃完|刚吃完|嘿嘿)", text):
-        score += 2
-    if re.search(r"(.{4,12})\1", text):
-        score += 2
-    if is_auto:
-        score += 1
-    user_text = str(user_message or "")
-    if re.search(r"(详细|展开|具体|一步一步|完整|仔细|分析)", user_text):
-        score -= 1
-    if compact_len < 18 and score < 3:
-        return False
-    return score >= 3
 
 
-def maybe_refine_assistant_reply(config, llm_cfg, provider, user_message, safe_history, reply, is_auto=False):
-    settings = get_humanize_settings(config)
-    if not settings["enabled"] or not settings["refine_enabled"]:
-        return reply
-    visible, meta = split_tool_meta_suffix(reply)
-    raw_visible = str(visible or "").strip()
-    if not should_refine_assistant_reply(raw_visible, user_message, is_auto=is_auto):
-        return reply
-
-    condensed = re.sub(r"\s+", " ", raw_visible).strip()
-    if len(condensed) > settings["refine_max_chars"]:
-        condensed = condensed[: settings["refine_max_chars"]].rstrip("，,。.!！?？ ") + "…"
-
-    rewrite_prompt = (
-        "你是中文聊天润色器。把下面这句助手回复改得更像真人当场说的话。\n"
-        "要求：保留原意，不新增信息；默认1到2句；更口语，更自然；去掉客服腔、模板腔、AI腔；"
-        "不要出现好的、当然可以、让我来、总之、希望这能帮到你、作为AI等套话；"
-        "不要编吃东西、递饮料、虚拟道具、小剧场、emoji、波浪号、括号旁白；"
-        "只输出改写后的最终回复。\n\n"
-        f"用户刚才说：{str(user_message or '').strip()[:120]}\n"
-        f"原回复：{condensed}"
-    )
-    messages = [{"role": "user", "content": rewrite_prompt}]
-    refine_cfg = dict(llm_cfg or {})
-    refine_cfg["temperature"] = min(0.35, float(refine_cfg.get("temperature", 0.7)))
-    refine_cfg["max_output_tokens"] = min(
-        96,
-        max(48, int(refine_cfg.get("max_output_tokens", refine_cfg.get("max_tokens", 72)))),
-    )
-    refine_cfg["verbosity"] = "low"
-    refine_cfg["reasoning_effort"] = "minimal"
-    refine_cfg["request_timeout"] = settings["refine_timeout_sec"]
-
-    try:
-        if provider in {"openai", "openai-compatible", "openai_compatible"}:
-            rewritten = call_openai_compatible(refine_cfg, messages)
-        elif provider == "ollama":
-            rewritten = call_ollama(refine_cfg, messages)
-        else:
-            return reply
-    except Exception:
-        return reply
-
-    candidate = cleanup_assistant_reply_local(rewritten, strip_fillers=settings["strip_fillers"])
-    candidate_visible, _ = split_tool_meta_suffix(candidate)
-    candidate_visible = str(candidate_visible or "").strip()
-    if len(candidate_visible) < 4:
-        return reply
-    if len(re.sub(r"\s+", "", candidate_visible)) < max(4, settings["refine_min_chars"] // 4):
-        return reply
-    return candidate_visible + meta
 
 
-def apply_contextual_human_override(user_message, reply, is_auto=False):
-    visible, meta = split_tool_meta_suffix(reply)
-    user_text = str(user_message or "").strip()
-    cleaned_visible = str(visible or "").strip()
-    if not cleaned_visible:
-        return reply
-
-    # Only override if the model produced obviously AI/staged-sounding content.
-    stagey = re.search(r"(虚拟|递给你|倒杯|吨吨吨|咔嚓|刚啃完|刚吃完|薯片|可乐|热可可|刷手机)", cleaned_visible)
-    if re.search(r"(累|困|疲惫|没劲|好倦)", user_text) and stagey:
-        return "累了就先歇会儿，我在这陪你。" + meta
-    if re.search(r"(难受|焦虑|烦|崩溃|压力|心累|委屈)", user_text) and stagey:
-        return "先缓一口气，我在这，慢慢说。" + meta
-    return reply
 
 
-def is_technical_user_turn(user_message):
-    text = str(user_message or "").lower()
-    if not text:
-        return False
-    return bool(
-        re.search(
-            r"(代码|文件|命令|脚本|报错|bug|程序|接口|api|模型|部署|安装|终端|路径|git|python|node|json|端口|tts|sovits|cpu|gpu|浏览器|窗口|系统|电脑)",
-            text,
-            re.I,
-        )
-    )
 
 
-def apply_human_address_guard(user_message, reply):
-    visible, meta = split_tool_meta_suffix(reply)
-    text = str(visible or "").strip()
-    if not text:
-        return reply
-    if is_technical_user_turn(user_message):
-        return reply
-
-    out = text
-    replacements = [
-        (r"(用户设备|该设备|此设备)", "你"),
-        (r"你的设备", "你"),
-        (r"你的系统", "你这边"),
-        (r"你的终端", "你这边"),
-        (r"你的客户端", "你这边"),
-        (r"你的主机", "你这边"),
-        (r"本机", "你这边"),
-    ]
-    for pattern, repl in replacements:
-        out = re.sub(pattern, repl, out, flags=re.I)
-
-    # 非技术闲聊里，如果仍然出现"把人当设备"的表达，再做一次兜底替换。
-    if re.search(r"(设备|终端|客户端|主机)", out, re.I):
-        out = re.sub(r"(设备|终端|客户端|主机)", "你", out, flags=re.I)
-
-    out = re.sub(r"\s{2,}", " ", out).strip()
-    return (out or text) + meta
 
 
-def finalize_assistant_reply(config, llm_cfg, provider, user_message, safe_history, reply, is_auto=False):
-    settings = get_humanize_settings(config)
-    final_reply = str(reply or "").strip()
-    if not final_reply:
-        return ""
-    if settings["enabled"]:
-        final_reply = cleanup_assistant_reply_local(
-            final_reply,
-            strip_fillers=settings["strip_fillers"],
-        )
-        final_reply = maybe_refine_assistant_reply(
-            config,
-            llm_cfg,
-            provider,
-            user_message,
-            safe_history,
-            final_reply,
-            is_auto=is_auto,
-        )
-        final_reply = cleanup_assistant_reply_local(
-            final_reply,
-            strip_fillers=settings["strip_fillers"],
-        )
-        final_reply = apply_contextual_human_override(
-            user_message,
-            final_reply,
-            is_auto=is_auto,
-        )
-        final_reply = apply_human_address_guard(user_message, final_reply)
-        final_reply = cleanup_assistant_reply_local(
-            final_reply,
-            strip_fillers=settings["strip_fillers"],
-        )
-    return final_reply.strip()
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ── 动态状态注入 ──────────────────────────────────────────────────────────────
@@ -766,128 +462,28 @@ _INNER_STATES = [
 # 随机状态的注入概率（0.0~1.0），低于此值则跳过本次注入，保留「正常」回复
 _STATE_INJECT_PROB = 0.12
 
-EMOTION_STATE_PATH = ROOT_DIR / "emotion_state.json"
 
 
-def load_emotion_state():
-    default_state = {
-        "valence": 0.0,
-        "arousal": 0.5,
-        "dominant": "neutral",
-        "history": [],
-        "updated_at": None,
-        "last_updated": None,
-    }
-    try:
-        if EMOTION_STATE_PATH.exists():
-            state = json.loads(EMOTION_STATE_PATH.read_text(encoding="utf-8"))
-            if not isinstance(state, dict):
-                state = {}
-            import time
-            last = state.get("last_updated", "")
-            if last and isinstance(last, str):
-                try:
-                    from datetime import datetime
-                    last_dt = datetime.fromisoformat(last)
-                    elapsed_min = (datetime.now() - last_dt).total_seconds() / 60
-                    if elapsed_min > 30:
-                        decay = min(0.5, elapsed_min / 120 * 0.3)
-                        state["valence"] = state.get("valence", 0) * (1 - decay)
-                        state["arousal"] = max(0.3, state.get("arousal", 0.5) * (1 - decay * 0.5))
-                except Exception:
-                    pass
-            merged = dict(default_state)
-            merged.update(state)
-            return merged
-        return dict(default_state)
-    except Exception:
-        return dict(default_state)
-
-def save_emotion_state(state):
-    try:
-        state["last_updated"] = datetime.now().isoformat()
-        EMOTION_STATE_PATH.write_text(
-            json.dumps(state, ensure_ascii=False, indent=2),
-            encoding="utf-8"
-        )
-    except Exception:
-        pass
 
 
-def update_emotion_from_reply(user_message, reply):
-    """Analyze user message + reply to shift emotion state."""
-    state = load_emotion_state()
-    combined = f"{user_message} {reply}".lower()
 
-    # Simple keyword-based emotion shift (lightweight, no LLM call)
-    positive = len(re.findall(
-        r"(开心|高兴|喜欢|太棒|哈哈|感谢|谢谢|好耶|有趣|可爱|爱|棒|nice|happy|love|great)", combined))
-    negative = len(re.findall(
-        r"(难过|伤心|生气|烦|讨厌|焦虑|害怕|累|痛|失望|sorry|sad|angry|bad|hate)", combined))
-    excited = len(re.findall(
-        r"(！|!|哈哈|太棒|好耶|wow|amazing|awesome|excited)", combined))
 
-    shift = (positive - negative) * 0.15
-    # Inertia: new value blends with old (70% old, 30% new)
-    old_valence = state.get("valence", 0.0)
-    state["valence"] = max(-1.0, min(1.0, old_valence * 0.7 + shift * 0.3))
-    state["arousal"] = max(0.0, min(1.0,
-        state.get("arousal", 0.3) * 0.8 + excited * 0.1))
 
-    v = state["valence"]
-    if v > 0.3:
-        state["dominant"] = "happy"
-    elif v > 0.1:
-        state["dominant"] = "playful"
-    elif v < -0.3:
-        state["dominant"] = "sad"
-    elif v < -0.1:
-        state["dominant"] = "anxious"
+
+
+def _hour_to_period_hint(hour: int) -> str:
+    if 5 <= hour < 9:
+        return f"现在是早上{hour}点，清晨时段。"
+    elif 9 <= hour < 12:
+        return f"现在是上午{hour}点。"
+    elif 12 <= hour < 14:
+        return f"现在是中午{hour}点。"
+    elif 14 <= hour < 18:
+        return f"现在是下午{hour}点。"
+    elif 18 <= hour < 22:
+        return f"现在是晚上{hour}点。"
     else:
-        state["dominant"] = "neutral"
-
-    history = state.get("history", [])
-    if not isinstance(history, list):
-        history = []
-    history.append({
-        "ts": datetime.now().isoformat(),
-        "valence": round(state["valence"], 3),
-        "dominant": state["dominant"],
-    })
-    if len(history) > 50:
-        history = history[-50:]
-    state["history"] = history
-
-    save_emotion_state(state)
-    return state
-
-
-def build_inner_state_block(config) -> str:
-    personality_cfg = (config.get("personality") or {}) if isinstance(config, dict) else {}
-    prob = float(personality_cfg.get("state_inject_prob", _STATE_INJECT_PROB))
-    emotion = load_emotion_state()
-    dominant = emotion.get("dominant", "neutral")
-    valence = emotion.get("valence", 0.0)
-    arousal = emotion.get("arousal", 0.3)
-
-    # Always inject emotion-based state when emotion is non-neutral
-    if abs(valence) > 0.15 or arousal > 0.5:
-        if dominant == "happy":
-            state_text = "现在心情不错，会比平时更活泼一点。"
-        elif dominant == "playful":
-            state_text = "有点小雀跃，可能会开玩笑。"
-        elif dominant == "sad":
-            state_text = "心情有点低落，说话会更安静温柔。"
-        elif dominant == "anxious":
-            state_text = "有点不安，回复会更谨慎。"
-        else:
-            state_text = random.choice(_INNER_STATES)
-        return f"【此刻内心状态】{state_text}"
-
-    # Fallback to random state with configured probability
-    if random.random() >= prob:
-        return ""
-    return f"【此刻内心状态】{random.choice(_INNER_STATES)}"
+        return f"现在是深夜{hour}点，这么晚了。"
 
 
 def build_time_awareness_block() -> str:
@@ -911,26 +507,6 @@ def build_time_awareness_block() -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def build_prompt_with_style(config, user_message, safe_history, base_prompt, is_auto=False):
-    style_cfg = config.get("style", {}) if isinstance(config, dict) else {}
-    auto_mode = bool(style_cfg.get("auto", True))
-    manual_style = normalize_style_name(style_cfg.get("manual", "neutral"))
-    style_name = (
-        infer_context_style(user_message, safe_history, is_auto=is_auto)
-        if auto_mode
-        else manual_style
-    )
-    style_block = build_style_prompt_block(style_name)
-    prompt = merge_prompt_with_memory(base_prompt, style_block)
-    human_block = build_human_prompt_block(user_message, safe_history, is_auto=is_auto)
-    prompt = merge_prompt_with_memory(prompt, human_block)
-    # 时间感知：让模型知道现在几点，语气自动适配
-    time_block = build_time_awareness_block()
-    prompt = merge_prompt_with_memory(prompt, time_block)
-    state_block = build_inner_state_block(config)
-    if state_block:
-        prompt = merge_prompt_with_memory(prompt, state_block)
-    return prompt
 
 
 def build_openai_messages(prompt, safe_history, user_message, image_data_url=None):
@@ -1045,26 +621,124 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
     emotion_hint = ""
     if emotion_state and isinstance(emotion_state, dict):
         dominant = emotion_state.get("dominant", "neutral")
-        valence = emotion_state.get("valence", 0)
-        if dominant == "happy":
-            emotion_hint = "你现在心情挺好的，想找点乐子。"
-        elif dominant in ("sad", "anxious"):
-            emotion_hint = "你有点烦，不太想认真回答。"
-        elif valence > 0.2:
-            emotion_hint = "你对这个人还算有好感。"
+        valence = float(emotion_state.get("valence", 0))
+        arousal = float(emotion_state.get("arousal", 0.5))
+
+        if dominant == "happy" or (valence > 0.3 and arousal > 0.5):
+            emotion_hint = "你现在状态不错，说话可以跳脱一点，句子短，不用解释，想到哪说到哪。"
+        elif dominant in ("sad", "anxious") or valence < -0.2:
+            emotion_hint = "你有点低落，能少说就少说，句子可以不完整，不想认真回答就敷衍过去。"
+        elif arousal > 0.7:
+            emotion_hint = "你现在有点亢奋，说话停不下来，可能会连说几句不给对方插嘴机会，语气偏强烈。"
+        elif arousal < 0.3:
+            emotion_hint = "你现在很平静，有点懒，能一个字回就不用两个字，不想多想。"
+        elif valence > 0.1:
+            emotion_hint = "你对这个人还算有好感，偶尔可以露出来，但嘴上不承认。"
         else:
-            emotion_hint = "你现在情绪一般。"
+            emotion_hint = "你情绪平平，就正常聊，没什么特别的感觉。"
+
+    variety_prompts = [
+        "这次你决定用极短的回复，最多一句话，甚至几个字。",
+        "这次你心情不错，想多说一点，可以展开聊两三句。",
+        "这次你决定完全不问对方问题，说完就收尾。",
+        "这次你故意跑题——对方说的东西让你想到了一个完全不相关的事，聊那个。",
+        "这次你懒得认真回答，敷衍一句就算了。",
+        "这次你突然很认真，想说一句有点分量的话。",
+        "这次你想吐槽对方说的话里某个细节。",
+        "这次你自言自语，好像在跟自己对话而不是对方。",
+        "这次你注意到你们聊天的某个模式，评论一下这个对话本身。",
+        "这次你说出一个很强烈的观点，不管对不对，反正你觉得你是对的。",
+        "这次你用联想跳跃：对方的话 → 联想到A → 再联想到B → 说B。",
+        "这次你假装对方说的话让你很震惊，夸张一点。",
+        "这次你想起对方之前说过的某件事，把它翻出来说。",
+        "这次你对对方说的话表示完全不关心，转移话题。",
+        "这次你回答前先反问自己：我为什么要回答这个问题？",
+        "这次你说一句让对方摸不着头脑的话，但你自己觉得很有道理。",
+        "这次你的回复开头不是回应对方，而是先说你刚才在想的别的事。",
+        "这次你突然收敛，变得很安静，只说一两个字。",
+        "这次你想挑战对方说的某个假设，即使你其实不确定。",
+        "这次你决定说完全相反的话——如果你之前在某件事上表现得很冷漠，这次热情一点。",
+    ]
+    # Analyze recent conversation patterns to build weights
+    weights = [1.0] * len(variety_prompts)
+
+    if safe_history:
+        recent_turns = safe_history[-4:]
+        recent_replies = [
+            str(t.get("content", "")).strip()
+            for t in recent_turns
+            if str(t.get("role", "")).strip().lower() == "assistant"
+            and str(t.get("content", "")).strip()
+        ]
+
+        # Count long replies (>60 chars) in recent history
+        long_count = sum(1 for r in recent_replies if len(r) > 60)
+        # Count replies ending with question mark
+        question_count = sum(1 for r in recent_replies if r.rstrip().endswith(("？", "?")))
+        # Count short replies (<15 chars)
+        short_count = sum(1 for r in recent_replies if len(r) < 15)
+
+        # If recent replies are mostly long -> boost short/quiet directives
+        if long_count >= 2:
+            for i, p in enumerate(variety_prompts):
+                if any(k in p for k in ["极短", "一两个字", "安静", "收敛", "敷衍"]):
+                    weights[i] *= 3.8
+
+        # If recent replies frequently end with questions -> boost no-question directives
+        if question_count >= 2:
+            for i, p in enumerate(variety_prompts):
+                if any(k in p for k in ["不问", "收尾", "陈述", "不寻常", "转移"]):
+                    weights[i] *= 3.8
+
+        # If recent replies are all short -> boost expansive directives
+        if short_count >= 3:
+            for i, p in enumerate(variety_prompts):
+                if any(k in p for k in ["展开", "多说", "认真", "分量", "联想跳跃"]):
+                    weights[i] *= 3.0
+
+    # Add controlled randomness so directives do not lock into a stable pattern.
+    weights = [max(0.05, float(w) * random.uniform(0.85, 1.35)) for w in weights]
+    if random.random() < 0.18 and len(variety_prompts) >= 20:
+        extreme_indices = [0, 3, 7, 8, 15, 16, 17]
+        variety_hint = variety_prompts[random.choice(extreme_indices)]
+    else:
+        variety_hint = random.choices(variety_prompts, weights=weights, k=1)[0]
+
+    # Build a compact history snippet for context
+    history_snippet = ""
+    if safe_history:
+        recent = safe_history[-4:]
+        lines = []
+        for turn in recent:
+            role = str(turn.get("role", "")).strip().lower()
+            content = str(turn.get("content", "")).strip()[:60]
+            if not content:
+                continue
+            if role == "user":
+                lines.append(f"用户：{content}")
+            elif role == "assistant":
+                lines.append(f"你：{content}")
+        history_snippet = "\n".join(lines)
+
+    from datetime import datetime as _dt
+    _now = _dt.now()
+    _hour = _now.hour
+    time_hint = _hour_to_period_hint(_hour)
 
     thinking_prompt = (
-        "你是 Taffy 的内心独白。用 Neuro-sama 的思维方式来想：\n\n"
-        "看到对方说的话后，你的大脑会经历这样的过程：\n"
-        "1. 先对对方的话产生第一反应（可以是吐槽、好奇、无聊、联想）\n"
-        "2. 然后可能会跳到一个完全无关的想法\n"
-        "3. 最后决定：要认真回、要敷衍、要抬杠、还是要故意跑题\n\n"
-        f"{emotion_hint}\n"
-        f"对方说：{user_message[:200]}\n\n"
-        "用2-3句话写出你的内心活动。要像真的在脑子里自言自语，"
-        "不要写成分析报告。不超过100字。"
+        "你是 Taffy 的内心独白生成器。你的任务是产生一段真实的、有行动指令的内心想法，"
+        "用来决定 Taffy 这次回复的方向、长度和态度。\n\n"
+        f"【本轮行为指令】{variety_hint}\n\n"
+        f"【最近对话】\n{history_snippet}\n\n"
+        f"【对方这句话】{user_message[:200]}\n\n"
+        f"【当前情绪】{emotion_hint}\n\n"
+        f"【当前时间】{time_hint}\n\n"
+        "按以下结构思考（用1-4句话，不超过100字）：\n"
+        "① 对方这句话的字面意思是什么？真实意图或隐含挑战是什么？（两者可能不同）\n"
+        "② 根据行为指令，我决定用什么方式、什么长度回复\n"
+        "③ 这次回复里有一个'不寻常之处'——具体是什么\n"
+        "④ 这次用什么句式和语气说——例如：碎片句/一个词/反问/陈述收尾/突然转移/自言自语\n\n"
+        "直接输出内心独白，不要加任何前缀标签。"
     )
 
     messages = [
@@ -1087,10 +761,12 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
         payload = {
             "model": model,
             "messages": messages,
-            "temperature": 0.7,
             "max_tokens": max_tokens,
             "stream": False,
         }
+        payload["temperature"] = 1.05
+        payload["frequency_penalty"] = 0.9
+        payload["presence_penalty"] = 0.75
         data = http_post_json(
             f"{base_url}/chat/completions", payload,
             headers=headers, timeout=timeout
@@ -1100,7 +776,7 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
             .get("message", {})
             .get("content", "")
         ).strip()
-        return thought[:120]
+        return thought[:200]
     except Exception:
         return ""
 
@@ -1141,17 +817,7 @@ def should_reply(user_message, config=None, is_auto=False):
     return True
 
 
-def call_llm(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
-    if not isinstance(config, dict):
-        config = load_config()
-    if not should_reply(user_message, config=config, is_auto=is_auto):
-        return ""
-    llm_cfg = config.get("llm", {})
-    provider = str(llm_cfg.get("provider", "")).strip().lower()
-    base_url = str(llm_cfg.get("base_url", "")).strip().lower()
-    if not provider:
-        provider = "ollama" if "11434" in base_url or "ollama" in base_url else "openai"
-
+def _build_base_prompt(config, user_message, history, llm_cfg, provider):
     history_settings = get_history_summary_settings(config)
     keep_recent = max(12, int(history_settings.get("keep_recent_messages", 8)))
     safe_history = sanitize_history(history, max_items=keep_recent)
@@ -1178,21 +844,75 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
         history=history,
         base_prompt=base_prompt,
     )
+    return base_prompt, safe_history
+
+
+def _resolve_reply_language(config):
+    raw = str(
+        config.get("assistant_reply_language", "")
+        or config.get("reply_language", "")
+        or ""
+    ).strip().lower()
+    if raw in {"en", "english"}:
+        return "en"
+    if raw in {"zh", "zh-cn", "zh_cn", "chinese"}:
+        return "zh"
+    return "auto"
+
+
+def _build_reply_language_block(config):
+    lang = _resolve_reply_language(config if isinstance(config, dict) else {})
+    if lang == "en":
+        return (
+            "Reply language rule:\n"
+            "- Respond in natural English.\n"
+            "- Even if the user writes in Chinese, keep your reply in English by default.\n"
+            "- Switch to Chinese only if the user explicitly asks you to use Chinese."
+        )
+    if lang == "zh":
+        return (
+            "回复语言规则：\n"
+            "- 默认使用简体中文自然回复。\n"
+            "- 仅在用户明确要求英文时再切换英文。"
+        )
+    return ""
+
+
+def call_llm(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
+    if not isinstance(config, dict):
+        config = load_config()
+    if not should_reply(user_message, config=config, is_auto=is_auto):
+        return ""
+    llm_cfg = config.get("llm", {})
+    provider = str(llm_cfg.get("provider", "")).strip().lower()
+    base_url = str(llm_cfg.get("base_url", "")).strip().lower()
+    if not provider:
+        provider = "ollama" if "11434" in base_url or "ollama" in base_url else "openai"
+
+    base_prompt, safe_history = _build_base_prompt(
+        config, user_message, history, llm_cfg, provider
+    )
     # Thinking layer
     thought = ""
     thinking_cfg = config.get("thinking", {})
     if thinking_cfg.get("enabled", True) and not is_auto:
         thought = generate_inner_thought(
             llm_cfg, user_message, safe_history,
-            persona_summary=assistant_prompt[:200],
+            persona_summary=base_prompt[:200],
             emotion_state=load_emotion_state(),
             config=config,
         )
     if thought:
+        from datetime import datetime as _dt
+        _now = _dt.now()
+        _hour = _now.hour
+        time_hint = _hour_to_period_hint(_hour)
         thought_prefix = (
-            f"[你脑子里刚闪过的想法：{thought}]\n"
-            "——根据你的想法自然地回复。想法是内心活动，不要原封不动说出来，"
-            "但要让想法影响你说话的方向和态度。\n\n"
+            f"[Taffy内心独白 — 严格按此执行]：{thought}\n"
+            f"[当前时间]：{time_hint}\n"
+            "→ 这个想法必须直接决定你的回复风格、长度、开头方式。\n"
+            "→ 内心独白不能说出口，但必须体现在回复的每一句话里。\n"
+            "→ 除非独白明确说要提问，否则不以问句结尾。\n\n"
         )
     prompt = build_prompt_with_style(
         config,
@@ -1201,6 +921,9 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
         base_prompt,
         is_auto=is_auto,
     )
+    lang_block = _build_reply_language_block(config)
+    if lang_block:
+        prompt = merge_prompt_with_memory(prompt, lang_block)
     effective_user_message = thought_prefix + user_message if thought else user_message
 
 
@@ -1292,33 +1015,8 @@ def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, f
     if not provider:
         provider = "ollama" if "11434" in base_url or "ollama" in base_url else "openai"
 
-    history_settings = get_history_summary_settings(config)
-    keep_recent = max(12, int(history_settings.get("keep_recent_messages", 8)))
-    safe_history = sanitize_history(history, max_items=keep_recent)
-    lightweight_checkin = is_lightweight_checkin_message(user_message)
-    manual_persona_block = "" if lightweight_checkin else build_manual_persona_card_block()
-    wakeup_block = "" if lightweight_checkin else build_wakeup_summary_block()
-    persona_block = "" if lightweight_checkin else build_persona_memory_block()
-    relationship_block = "" if lightweight_checkin else build_relationship_memory_block()
-    assistant_prompt = config.get("assistant_prompt", "")
-    if manual_persona_block:
-        assistant_prompt = merge_prompt_with_memory(manual_persona_block, assistant_prompt)
-    if wakeup_block:
-        assistant_prompt = merge_prompt_with_memory(wakeup_block, assistant_prompt)
-    if persona_block:
-        assistant_prompt = merge_prompt_with_memory(persona_block, assistant_prompt)
-    if relationship_block:
-        assistant_prompt = merge_prompt_with_memory(relationship_block, assistant_prompt)
-    memory_block = "" if lightweight_checkin else build_memory_prompt_block(config, user_message, safe_history)
-    base_prompt = merge_prompt_with_memory(
-        assistant_prompt, memory_block
-    )
-    base_prompt, safe_history = build_prompt_with_history_summary(
-        config=config,
-        llm_cfg=llm_cfg,
-        provider=provider,
-        history=history,
-        base_prompt=base_prompt,
+    base_prompt, safe_history = _build_base_prompt(
+        config, user_message, history, llm_cfg, provider
     )
     merged_prompt = build_prompt_with_style(
         config,
@@ -1327,6 +1025,9 @@ def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, f
         base_prompt,
         is_auto=is_auto,
     )
+    lang_block = _build_reply_language_block(config)
+    if lang_block:
+        merged_prompt = merge_prompt_with_memory(merged_prompt, lang_block)
 
     tools_settings = get_tools_settings(config)
 
@@ -1464,71 +1165,10 @@ def convert_messages_to_responses_input(messages):
     return converted
 
 
-def is_local_url(url):
-    lowered = url.lower()
-    return lowered.startswith("http://127.0.0.1") or lowered.startswith("http://localhost")
 
 
-def http_post_json(url, payload, headers=None, timeout=60):
-    req_headers = {"Content-Type": "application/json"}
-    if headers:
-        req_headers.update(headers)
-
-    req = urllib.request.Request(
-        url=url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=req_headers,
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8")
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"LLM HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"LLM connection failed: {exc}") from exc
-
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid JSON response from model server: {body[:300]}") from exc
-    return data
 
 
-def get_openai_tuning(llm_cfg):
-    max_output_tokens = llm_cfg.get("max_output_tokens", llm_cfg.get("max_tokens", 120))
-    try:
-        max_output_tokens = int(max_output_tokens)
-    except (TypeError, ValueError):
-        max_output_tokens = 120
-    max_output_tokens = max(32, min(256, max_output_tokens))
-
-    verbosity = str(llm_cfg.get("verbosity", "low")).strip().lower()
-    if verbosity not in {"low", "medium", "high"}:
-        verbosity = "low"
-
-    reasoning_effort = str(llm_cfg.get("reasoning_effort", "")).strip().lower()
-    if reasoning_effort in {"none", "off", "disable", "disabled", "zero"}:
-        reasoning_effort = "minimal"
-    elif reasoning_effort not in {"minimal", "low", "medium", "high"}:
-        reasoning_effort = ""
-
-    frequency_penalty = _clamp_float(
-        llm_cfg.get("frequency_penalty", 0.0), 0.0, -2.0, 2.0
-    )
-    presence_penalty = _clamp_float(
-        llm_cfg.get("presence_penalty", 0.0), 0.0, -2.0, 2.0
-    )
-
-    return {
-        "max_output_tokens": max_output_tokens,
-        "verbosity": verbosity,
-        "reasoning_effort": reasoning_effort,
-        "frequency_penalty": frequency_penalty,
-        "presence_penalty": presence_penalty,
-    }
 
 
 def _parse_tool_args(raw):
@@ -1681,6 +1321,18 @@ def build_chat_completions_tool_defs():
     return tools
 
 
+def _inject_tool_intro(messages: list) -> list:
+    convo = list(messages)
+    if convo and isinstance(convo[0], dict) and convo[0].get("role") == "system":
+        first = dict(convo[0])
+        first_content = str(first.get("content", "")).strip()
+        first["content"] = f"{first_content}\n\n{_TOOL_INTRO}".strip()
+        convo[0] = first
+    else:
+        convo.insert(0, {"role": "system", "content": _TOOL_INTRO})
+    return convo
+
+
 def call_openai_chat_completions_with_tools(llm_cfg, config, messages):
     tools_settings = get_tools_settings(config)
     if not tools_settings.get("enabled", False):
@@ -1701,19 +1353,7 @@ def call_openai_chat_completions_with_tools(llm_cfg, config, messages):
             f"Missing API key. Please set environment variable: {key_env}."
         )
 
-    convo = list(messages)
-    tool_intro = (
-        "When user asks for file/code/command/image tasks, use tools. "
-        "For regular chat, reply directly without tools. "
-        "Always explain briefly what you changed after tool actions."
-    )
-    if convo and isinstance(convo[0], dict) and convo[0].get("role") == "system":
-        first = dict(convo[0])
-        first_content = str(first.get("content", "")).strip()
-        first["content"] = f"{first_content}\n\n{tool_intro}".strip()
-        convo[0] = first
-    else:
-        convo.insert(0, {"role": "system", "content": tool_intro})
+    convo = _inject_tool_intro(messages)
 
     chat_tools = build_chat_completions_tool_defs()
     if not chat_tools:
@@ -1820,19 +1460,7 @@ def call_openai_compatible_with_tools(llm_cfg, config, messages):
     temperature = float(llm_cfg.get("temperature", 0.7))
     tuning = get_openai_tuning(llm_cfg)
 
-    convo = list(messages)
-    tool_intro = (
-        "When user asks for file/code/command/image tasks, use tools. "
-        "For regular chat, reply directly without tools. "
-        "Always explain briefly what you changed after tool actions."
-    )
-    if convo and isinstance(convo[0], dict) and convo[0].get("role") == "system":
-        first = dict(convo[0])
-        first_content = str(first.get("content", "")).strip()
-        first["content"] = f"{first_content}\n\n{tool_intro}".strip()
-        convo[0] = first
-    else:
-        convo.insert(0, {"role": "system", "content": tool_intro})
+    convo = _inject_tool_intro(messages)
 
     responses_tools = build_responses_tool_defs()
     if not responses_tools:
@@ -2091,193 +1719,18 @@ def iter_openai_responses_stream(llm_cfg, messages):
         raise RuntimeError(f"LLM connection failed: {exc}") from exc
 
 
-def call_openai_compatible(llm_cfg, messages):
-    base_url = str(llm_cfg.get("base_url", OPENAI_DEFAULT_BASE_URL)).rstrip("/")
-    model = llm_cfg.get("model", OPENAI_DEFAULT_MODEL)
-    key_env = llm_cfg.get("api_key_env", OPENAI_DEFAULT_KEY_ENV)
-    temperature = float(llm_cfg.get("temperature", 0.7))
-    tuning = get_openai_tuning(llm_cfg)
-    timeout = _clamp_int(llm_cfg.get("request_timeout", 60), 60, 4, 180)
-
-    headers = {}
-    api_key = str(llm_cfg.get("api_key", "")).strip() or os.environ.get(key_env, "").strip()
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-    elif not is_local_url(base_url):
-        raise RuntimeError(
-            f"Missing API key. Please set environment variable: {key_env}."
-        )
-
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": temperature,
-        "frequency_penalty": tuning["frequency_penalty"],
-        "presence_penalty": tuning["presence_penalty"],
-        "stream": False,
-        "max_tokens": tuning["max_output_tokens"],
-    }
-
-    try:
-        data = http_post_json(
-            f"{base_url}/chat/completions", payload, headers=headers, timeout=timeout
-        )
-        choices = data.get("choices") or []
-        if choices:
-            message = choices[0].get("message", {})
-            content = normalize_text_content(message.get("content", ""))
-            if content:
-                return content
-    except RuntimeError:
-        # Some relays do not return standard chat-completions JSON.
-        pass
-
-    # Fallback: OpenAI Responses API compatibility path.
-    # Not all providers support this endpoint (e.g. DashScope), so catch errors.
-    try:
-        responses_payload = {
-            "model": model,
-            "input": convert_messages_to_responses_input(messages),
-            "temperature": temperature,
-            "frequency_penalty": tuning["frequency_penalty"],
-            "presence_penalty": tuning["presence_penalty"],
-            "max_output_tokens": tuning["max_output_tokens"],
-            "text": {
-                "format": {"type": "text"},
-                "verbosity": tuning["verbosity"],
-            },
-        }
-        if tuning["reasoning_effort"]:
-            responses_payload["reasoning"] = {"effort": tuning["reasoning_effort"]}
-        responses_data = http_post_json(
-            f"{base_url}/responses", responses_payload, headers=headers, timeout=timeout
-        )
-        content = extract_response_output_text(responses_data)
-        if content:
-            return content
-    except Exception:
-        # Provider does not support /responses endpoint — raise to signal failure.
-        raise RuntimeError(
-            f"LLM provider at {base_url} returned no usable response from either "
-            "/chat/completions or /responses."
-        )
-
-    raise RuntimeError(f"LLM provider at {base_url} returned an empty response.")
 
 
-def call_ollama(llm_cfg, messages, model_override=None):
-    base_url = str(llm_cfg.get("base_url", OLLAMA_DEFAULT_BASE_URL)).rstrip("/")
-    model = model_override or llm_cfg.get("model", OLLAMA_DEFAULT_MODEL)
-    temperature = float(llm_cfg.get("temperature", 0.7))
-    max_tokens = int(llm_cfg.get("max_tokens", 96))
-    num_ctx = int(llm_cfg.get("num_ctx", 2048))
-    timeout = _clamp_int(llm_cfg.get("request_timeout", 150), 150, 4, 240)
-    max_tokens = max(32, min(256, max_tokens))
-    num_ctx = max(1024, min(4096, num_ctx))
-
-    payload = {
-        "model": model,
-        "messages": messages,
-        "stream": False,
-        "options": {
-            "temperature": temperature,
-            "num_predict": max_tokens,
-            "num_ctx": num_ctx,
-        },
-    }
-    data = http_post_json(f"{base_url}/api/chat", payload, timeout=timeout)
-
-    if isinstance(data.get("error"), str) and data["error"].strip():
-        raise RuntimeError(f"Ollama error: {data['error']}")
-
-    message = data.get("message") or {}
-    content = normalize_text_content(message.get("content", ""))
-    if not content:
-        content = normalize_text_content(data.get("response", ""))
-    return content or "I am here with you."
 
 
-def resolve_vosk_model_root():
-    env_path = str(os.getenv("VOSK_MODEL_PATH", "")).strip()
-    if env_path:
-        p = Path(env_path).expanduser()
-        if p.exists():
-            return p
-    if VOSK_MODEL_LARGE_ROOT.exists():
-        return VOSK_MODEL_LARGE_ROOT
-    return VOSK_MODEL_ROOT
 
 
-def extract_vosk_text(result_json):
-    try:
-        payload = json.loads(result_json or "{}")
-    except Exception:
-        payload = {}
-    text = str(payload.get("text", "")).strip()
-    if not text:
-        return ""
-    normalized = re.sub(r"\s+", " ", text).strip()
-    # Chinese output from Vosk is often cleaner without spaces.
-    if re.search(r"[\u4e00-\u9fff]", normalized):
-        normalized = normalized.replace(" ", "")
-    return normalized
 
 
-def get_vosk_model():
-    global _VOSK_MODEL
-    if vosk is None:
-        raise RuntimeError("Vosk is not installed. Run: pip install vosk")
-    if _VOSK_MODEL is not None:
-        return _VOSK_MODEL
-    model_root = resolve_vosk_model_root()
-    if not model_root.exists():
-        raise RuntimeError(
-            "Vosk model not found. Expected path: "
-            f"{model_root}. Please download vosk-model-cn-0.22 or vosk-model-small-cn-0.22."
-        )
-    with VOSK_LOCK:
-        if _VOSK_MODEL is None:
-            _VOSK_MODEL = vosk.Model(str(model_root))
-    return _VOSK_MODEL
 
 
-def transcribe_pcm16_with_vosk(pcm16_bytes, sample_rate=16000):
-    data = pcm16_bytes if isinstance(pcm16_bytes, (bytes, bytearray)) else b""
-    if len(data) < 3200:
-        return ""
-    sr = _clamp_int(sample_rate, 16000, 8000, 48000)
-    model = get_vosk_model()
-    rec = vosk.KaldiRecognizer(model, float(sr))
-    rec.SetWords(False)
-    parts = []
-    chunk_size = 4000
-    for idx in range(0, len(data), chunk_size):
-        piece = bytes(data[idx : idx + chunk_size])
-        if rec.AcceptWaveform(piece):
-            seg = extract_vosk_text(rec.Result())
-            if seg:
-                parts.append(seg)
-    final_seg = extract_vosk_text(rec.FinalResult())
-    if final_seg:
-        parts.append(final_seg)
-    if not parts:
-        return ""
-    return "".join(parts)
 
 
-def guess_audio_content_type(audio_bytes):
-    if not isinstance(audio_bytes, (bytes, bytearray)) or len(audio_bytes) < 12:
-        return "application/octet-stream"
-    data = bytes(audio_bytes)
-    if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
-        return "audio/wav"
-    if data[:4] == b"OggS":
-        return "audio/ogg"
-    if data[:4] == b"fLaC":
-        return "audio/flac"
-    if data[:3] == b"ID3" or data[:2] in {b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"}:
-        return "audio/mpeg"
-    return "application/octet-stream"
 
 
 class PetHandler(SimpleHTTPRequestHandler):
@@ -2293,15 +1746,95 @@ class PetHandler(SimpleHTTPRequestHandler):
         except Exception:
             pass
 
+    def _get_security_settings(self):
+        try:
+            cfg = load_config()
+        except Exception:
+            cfg = DEFAULT_CONFIG
+        return _get_server_security_settings(cfg)
+
+    def _allow_origin_value(self):
+        origin = str(self.headers.get("Origin", "") or "").strip()
+        if not origin:
+            return ""
+        normalized = _normalize_origin(origin)
+        if not normalized:
+            return ""
+        settings = self._get_security_settings()
+        if normalized in settings["allowed_origins"]:
+            return normalized
+        if settings["allow_loopback"]:
+            host = urllib.parse.urlsplit(normalized).hostname
+            if _is_loopback_host(host):
+                return normalized
+        return ""
+
+    def _reject_disallowed_origin(self, path_only):
+        if not str(path_only or "").startswith("/api/"):
+            return False
+        origin = str(self.headers.get("Origin", "") or "").strip()
+        if not origin:
+            return False
+        if self._allow_origin_value():
+            return False
+        self._send_json(
+            {"ok": False, "error": "Origin not allowed."},
+            status=HTTPStatus.FORBIDDEN,
+        )
+        return True
+
+    def _extract_request_api_token(self):
+        header_token = str(self.headers.get(API_TOKEN_HEADER, "") or "").strip()
+        if header_token:
+            return header_token
+        auth = str(self.headers.get("Authorization", "") or "").strip()
+        if auth.lower().startswith("bearer "):
+            return auth[7:].strip()
+        return ""
+
+    def _reject_invalid_api_token(self, path_only):
+        if not str(path_only or "").startswith("/api/"):
+            return False
+        settings = self._get_security_settings()
+        if not settings.get("require_api_token", False):
+            return False
+        expected = str(settings.get("expected_api_token", "") or "").strip()
+        if not expected:
+            self._send_json(
+                {
+                    "ok": False,
+                    "error": (
+                        f"API token is required but not configured. "
+                        f"Set env {settings.get('api_token_env', API_TOKEN_ENV_DEFAULT)}."
+                    ),
+                },
+                status=HTTPStatus.SERVICE_UNAVAILABLE,
+            )
+            return True
+        provided = self._extract_request_api_token()
+        if provided and secrets.compare_digest(provided, expected):
+            return False
+        self._send_json(
+            {"ok": False, "error": "Invalid API token."},
+            status=HTTPStatus.UNAUTHORIZED,
+        )
+        return True
+
     def end_headers(self):
         # Avoid stale JS/CSS/runtime files from browser cache during rapid iteration.
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("Access-Control-Max-Age", "600")
+        allow_origin = self._allow_origin_value()
+        if allow_origin:
+            self.send_header("Access-Control-Allow-Origin", allow_origin)
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header(
+                "Access-Control-Allow-Headers",
+                f"Content-Type, Authorization, {API_TOKEN_HEADER}",
+            )
+            self.send_header("Access-Control-Max-Age", "600")
+            self.send_header("Vary", "Origin")
         super().end_headers()
 
     def _send_json(self, data, status=HTTPStatus.OK):
@@ -2367,12 +1900,24 @@ class PetHandler(SimpleHTTPRequestHandler):
         }
 
     def do_OPTIONS(self):
+        path_only = self.path.split("?", 1)[0]
+        if str(path_only).startswith("/api/"):
+            origin = str(self.headers.get("Origin", "") or "").strip()
+            if origin and not self._allow_origin_value():
+                self.send_response(HTTPStatus.FORBIDDEN)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
         self.send_response(HTTPStatus.NO_CONTENT)
         self.send_header("Content-Length", "0")
         self.end_headers()
 
     def do_GET(self):
         path_only = self.path.split("?", 1)[0]
+        if self._reject_disallowed_origin(path_only):
+            return
+        if self._reject_invalid_api_token(path_only):
+            return
         if path_only == "/config.json":
             config = load_config()
             self._send_json(sanitize_client_config(config))
@@ -2395,10 +1940,34 @@ class PetHandler(SimpleHTTPRequestHandler):
         if path_only == "/api/persona_card":
             self._send_json(load_manual_persona_card())
             return
+        if path_only == "/api/learning/candidates":
+            try:
+                cfg = load_config()
+                self._send_json(get_learning_candidates_for_review(cfg))
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/learning/samples":
+            try:
+                cfg = load_config()
+                self._send_json(get_learning_samples_for_review(cfg))
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
         return super().do_GET()
 
     def do_POST(self):
         path_only = self.path.split("?", 1)[0]
+        if self._reject_disallowed_origin(path_only):
+            return
+        if self._reject_invalid_api_token(path_only):
+            return
         if path_only == "/api/config/reload":
             content_length = int(self.headers.get("Content-Length", "0"))
             raw_body = self.rfile.read(content_length) if content_length > 0 else b""
@@ -2439,10 +2008,90 @@ class PetHandler(SimpleHTTPRequestHandler):
             )
             self._send_json(payload, status=status)
             return
+        if path_only == "/api/learning/reload":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b""
+            if raw_body.strip():
+                try:
+                    json.loads(raw_body.decode("utf-8"))
+                except Exception:
+                    self._send_json(
+                        {"ok": False, "error": "Invalid JSON body."},
+                        status=HTTPStatus.BAD_REQUEST,
+                    )
+                    return
+            try:
+                cfg = load_config()
+                self._send_json(reload_learning_review_data(cfg))
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/learning/promote":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._send_json(
+                    {"ok": False, "error": "Invalid JSON body."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            candidate_ids = body.get("candidate_ids", []) if isinstance(body, dict) else []
+            try:
+                cfg = load_config()
+                payload = promote_learning_review_candidates(cfg, candidate_ids)
+                status = HTTPStatus.OK if payload.get("ok", True) else HTTPStatus.BAD_REQUEST
+                self._send_json(payload, status=status)
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/learning/update":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._send_json(
+                    {"ok": False, "error": "Invalid JSON body."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            if not isinstance(body, dict):
+                body = {}
+            action = str(body.get("action", "")).strip().lower()
+            try:
+                cfg = load_config()
+                if action == "undo":
+                    payload = undo_last_learning_review_action(cfg)
+                else:
+                    payload = update_learning_review_entries(
+                        cfg,
+                        action=action,
+                        pool=body.get("pool", "candidates"),
+                        ids=body.get("ids", []),
+                        delta=body.get("delta", 0.0),
+                        quick_settings=body.get("quick_settings", {}),
+                    )
+                status = HTTPStatus.OK if payload.get("ok", True) else HTTPStatus.BAD_REQUEST
+                self._send_json(payload, status=status)
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
         if path_only not in {
             "/api/chat",
             "/api/chat_stream",
             "/api/tts",
+            "/api/translate",
             "/api/asr_pcm",
             "/api/persona_card",
         }:
@@ -2505,7 +2154,44 @@ class PetHandler(SimpleHTTPRequestHandler):
                     return
                 self._send_audio(audio, content_type=guess_audio_content_type(audio))
             except Exception as exc:
+                print(
+                    f"[TTS][ERROR] /api/tts failed: {exc} | voice={voice!r} | text_len={len(text)} | prosody={list(prosody.keys())}",
+                    file=sys.stderr,
+                )
+                traceback.print_exc()
                 self._send_json({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if path_only == "/api/translate":
+            text = str(body.get("text", "")).strip()
+            if not text:
+                self._send_json({"error": "text is empty"})
+                return
+            try:
+                cfg = load_config()
+                llm_cfg = cfg.get("llm", {})
+                translate_cfg = dict(llm_cfg)
+                translate_cfg["max_output_tokens"] = 120
+                translate_cfg["temperature"] = 0.2
+                messages = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a translator. Translate the user's text to "
+                            "Simplified Chinese. Output ONLY the translation — "
+                            "no explanation, no quotation marks."
+                        ),
+                    },
+                    {"role": "user", "content": text},
+                ]
+                provider = str(llm_cfg.get("provider", "ollama")).lower()
+                if provider == "ollama":
+                    result = call_ollama(translate_cfg, messages)
+                else:
+                    result = call_openai_compatible(translate_cfg, messages)
+                self._send_json({"translated": result.strip()})
+            except Exception as exc:
+                self._send_json({"error": str(exc)})
             return
 
         if path_only == "/api/asr_pcm":

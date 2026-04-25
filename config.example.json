@@ -9,7 +9,11 @@
   "server": {
     "host": "127.0.0.1",
     "port": 8123,
-    "open_browser": false
+    "open_browser": false,
+    "cors_allow_loopback": true,
+    "cors_allowed_origins": [],
+    "require_api_token": false,
+    "api_token_env": "TAFFY_API_TOKEN"
   },
   "desktop": {
     "transparent": true,
@@ -131,7 +135,7 @@
   "tools": {
     "enabled": true,
     "workspace_root": "D:/AI/ai_desktop_pet",
-    "allow_shell": true,
+    "allow_shell": false,
     "shell_timeout_sec": 25,
     "max_file_read_chars": 24000,
     "max_command_output_chars": 14000,

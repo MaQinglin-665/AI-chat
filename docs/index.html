@@ -4,10 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Taffy（塔菲）是一只会聊天、会说话、有记忆的 AI 桌宠。">
+  <meta name="robots" content="index,follow">
+  <meta name="theme-color" content="#7c5cbf">
+  <link rel="canonical" href="https://maqinglin-665.github.io/AI-chat/">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="apple-touch-icon" href="assets/og-cover.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Taffy · AI 桌宠">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="Taffy · AI 桌宠">
+  <meta property="og:description" content="一只会聊天、会说话、有记忆的桌面小伙伴。支持语音、记忆、桌面感知与情绪表达。">
+  <meta property="og:url" content="https://maqinglin-665.github.io/AI-chat/">
+  <meta property="og:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Taffy · AI 桌宠">
+  <meta name="twitter:description" content="会聊天、会说话、有记忆的 AI 桌宠。">
+  <meta name="twitter:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
   <title>Taffy · AI 桌宠</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20260423-rc14">
 </head>
-<body>
+<body class="home-page">
   <header class="site-header" id="top">
     <nav class="navbar container" aria-label="主导航">
       <a class="logo" href="#hero">🎀 Taffy</a>
@@ -33,6 +49,11 @@
 
   <main>
     <section id="hero" class="hero section">
+      <div class="hero-orbits" aria-hidden="true">
+        <span class="orbit orbit-1"></span>
+        <span class="orbit orbit-2"></span>
+        <span class="orbit orbit-3"></span>
+      </div>
       <div class="container hero-inner">
         <div class="hero-content fade-in-up">
           <h1 class="hero-title">Taffy · AI 桌宠</h1>
@@ -41,8 +62,17 @@
             <a class="btn btn-primary" href="#download">✨ 立即下载</a>
             <a class="btn btn-outline" href="#features">💡 了解更多</a>
           </div>
+          <ul class="hero-chips" aria-label="能力标签">
+            <li>Live2D 情绪表情</li>
+            <li>语音唤醒与拟声</li>
+            <li>长期记忆陪伴</li>
+            <li>桌面上下文感知</li>
+          </ul>
         </div>
-        <div class="demo-placeholder fade-in-up" role="img" aria-label="演示动图占位图">演示动图</div>
+        <div class="demo-placeholder fade-in-up" role="img" aria-label="演示动图占位图">
+          <span class="demo-label">演示动图</span>
+          <span class="demo-sub">支持替换为你的真实录屏素材</span>
+        </div>
       </div>
     </section>
 
@@ -116,25 +146,25 @@
         <div class="demo-lab-grid">
           <article class="demo-lab-card demo-media-card fade-in-up">
             <h3>🖼️ 真实演示素材</h3>
-            <p class="demo-media-tip">把录屏文件放进 <code>docs/assets/</code> 后，这里会自动展示效果。</p>
+            <p class="demo-media-tip">已内置默认演示素材，可直接预览；替换 <code>docs/assets/</code> 下同名文件即可展示你的真实录屏。</p>
             <div class="media-showcase">
               <figure class="media-tile" data-media-tile>
                 <figcaption>桌宠待机与跟随（assets/demo-idle.mp4）</figcaption>
-                <video class="media-video" controls muted loop playsinline preload="metadata">
+                <video class="media-video" controls muted loop playsinline preload="none">
                   <source src="assets/demo-idle.mp4" type="video/mp4">
                 </video>
                 <div class="media-placeholder">未检测到素材：assets/demo-idle.mp4</div>
               </figure>
               <figure class="media-tile" data-media-tile>
                 <figcaption>语音回复演示（assets/demo-voice.mp4）</figcaption>
-                <video class="media-video" controls muted loop playsinline preload="metadata">
+                <video class="media-video" controls muted loop playsinline preload="none">
                   <source src="assets/demo-voice.mp4" type="video/mp4">
                 </video>
                 <div class="media-placeholder">未检测到素材：assets/demo-voice.mp4</div>
               </figure>
               <figure class="media-tile" data-media-tile>
                 <figcaption>配置中心操作（assets/demo-config.mp4）</figcaption>
-                <video class="media-video" controls muted loop playsinline preload="metadata">
+                <video class="media-video" controls muted loop playsinline preload="none">
                   <source src="assets/demo-config.mp4" type="video/mp4">
                 </video>
                 <div class="media-placeholder">未检测到素材：assets/demo-config.mp4</div>
@@ -340,11 +370,79 @@
     <section id="changelog" class="section">
       <div class="container">
         <h2 class="section-title fade-in-up">📋 更新日志 &amp; 开发计划</h2>
+        <div class="changelog-pattern fade-in-up" aria-hidden="true">
+          <span class="petal p1"></span>
+          <span class="petal p2"></span>
+          <span class="petal p3"></span>
+          <span class="petal p4"></span>
+          <span class="spark s1"></span>
+          <span class="spark s2"></span>
+          <span class="spark s3"></span>
+        </div>
         <div class="changelog-layout">
           <article class="changelog-panel fade-in-up">
-            <h3>更新日志</h3>
+            <div class="changelog-head">
+              <h3>更新日志</h3>
+              <a
+                id="openLearningReviewDocBtn"
+                class="changelog-open-review"
+                href="http://127.0.0.1:8123/web/index.html"
+                target="_blank"
+                rel="noopener noreferrer"
+              >🧪 打开学习审核</a>
+            </div>
+            <p class="changelog-review-tip">提示：请先运行 <code>python app.py</code>，再打开学习审核页面。</p>
             <ol class="timeline">
-              <li>
+              <li id="log-v118">
+                <h4>v1.1.8（2026-04）— 🈶 双语字幕与会话翻译可折叠</h4>
+                <p>· 新增双语字幕基础链路：后端翻译接口、Electron 字幕 IPC、前端字幕层与预加载桥接全部打通</p>
+                <p>· 字幕触发点统一挂到 TTS 生命周期：播放开始显示，结束/异常自动隐藏，失败降级不打断主流程</p>
+                <p>· 稳定性增强：新增 subtitleId 防误清、翻译请求可取消、翻译缓存复用、结束延迟隐藏与兜底清理</p>
+                <p>· 长文本修复：截断上限提升到 320，中英文最多 6 行，支持按句自动分页滚动显示</p>
+                <p>· 新增聊天页“译”开关：支持收起/展开中文翻译，状态本地持久化并在启动时恢复</p>
+                <p>· 样式优化：字幕白字描边+半透明底板+平滑淡入淡出，移动端适配与 pointer-events 安全处理</p>
+              </li>
+              <li id="log-v115">
+                <h4>v1.1.5（2026-04）— 🎯 浏览器拖动坐标修复与站点交互收尾</h4>
+                <p>· 修复浏览器模式 Live2D 拖动坐标系错误：去除重复缩放，解决拖动瞬间飞出画面问题</p>
+                <p>· 拖动起点偏移修正：抓取位置与模型移动保持一致，避免“点住就跳位”</p>
+                <p>· 点击与拖动行为分离保持稳定：拖动后模型停在目标位置，点击仍可触发 tap 动作</p>
+                <p>· 网站版本信息同步到最新迭代，首页与配置页“查看变更”可直接定位</p>
+              </li>
+              <li id="log-v114">
+                <h4>v1.1.4（2026-04）— 🧭 站点可观测性与布局细节修正</h4>
+                <p>· 新增网站运行时控制台：支持捕获 log/info/debug/warn/error、全局 error 与未处理 Promise 异常</p>
+                <p>· 控制台支持展开/收起、清空、复制日志与警告/错误计数徽标，状态本地持久化</p>
+                <p>· 配置页布局避让优化：Live2D 挂件与气泡右下角停靠，减少与侧栏、列表重叠</p>
+                <p>· 版本历史补充“查看变更”锚点跳转，首页与配置页可直接定位到日志条目</p>
+              </li>
+              <li id="log-v113">
+                <h4>v1.1.3（2026-04）— 🔧 TTS / 回复策略 / 记忆策略联合优化</h4>
+                <p>· TTS 稳定性增强：修复 GPT-SoVITS 切分、语言检测与 text_lang 回填，减少音色断裂</p>
+                <p>· 混合语言修复：新增英文短词音译映射，仅在 gpt_sovits 路径生效，避免英文词被静默丢弃</p>
+                <p>· 回复多样性增强：回复密度与思维层提示改为随机扰动，降低“固定长度+问句收尾”模式化</p>
+                <p>· 人设与记忆策略更新：强化避免重复追问/无故回拉旧话题，启用向量记忆并提升注入量</p>
+                <p>· 记忆去偏置清理：下调“音乐”主题权重，清理 7 条不符合用户语境的历史记录</p>
+                <p>· 工程清理与依赖整理：清除临时产物，完善 .gitignore 与 requirements.txt</p>
+              </li>
+              <li id="log-v112">
+                <h4>v1.1.2（2026-04）— 🧪 稳定性与可观测性补强</h4>
+                <p>· 记忆模块补齐异常可观测性：静默异常改为 debug 日志输出（不改变控制流）</p>
+                <p>· 补齐工具安全测试集：覆盖命令语法/前缀策略/危险命令/路径越界，共 50 项通过</p>
+                <p>· 修复 GPT-SoVITS 英文“鬼叫”：恢复 token 归一化逻辑，中文语境更稳定</p>
+                <p>· 重构 Live2D 口型与情绪链路：改为 coreModel.update patch，情绪更早触发且可见性更好</p>
+                <p>· 配置项状态确认：memory.mem0_enabled=true、memory.inject_relevant=5（无需改动）</p>
+              </li>
+              <li id="log-v111">
+                <h4>v1.1.1（2026-04）— 🛠 交互稳定性与演示体验优化</h4>
+                <p>· 修复浏览器模式 Live2D 拖动失效（移出模型区域后仍可连续拖动）</p>
+                <p>· 修复拖动时模型 Y 轴被浮动动画覆盖导致“拉不动 / 漂移”问题</p>
+                <p>· 新增“对话演示 + 语音试听”体验区，支持音色/语速/音量调节</p>
+                <p>· 新增演示素材位（video）与缺失资源占位提示</p>
+                <p>· 新增暗色模式全站切换与本地持久化</p>
+                <p>· 新增 FAQ 区块与“版本历史”导航弹出面板</p>
+              </li>
+              <li id="log-v110">
                 <h4>v1.1.0（2026-04）— 🧩 配置中心与站点体验升级</h4>
                 <p>· 新增独立“配置中心”页面与侧边分组导航</p>
                 <p>· 支持 LLM 预设模型 + 自定义模型输入</p>
@@ -359,13 +457,13 @@
                 <p>· 首页/配置页/README 统一发布流程说明</p>
                 <p>· 新增日常聊天/低延迟/本地模型三套配置模板</p>
               </li>
-              <li>
+              <li id="log-v100">
                 <h4>v1.0.0（2025-04）— 🎉 首个完整版本发布</h4>
                 <p>· Live2D 模型渲染与桌面交互</p>
                 <p>· LLM 对话与语音回复</p>
                 <p>· 长期记忆与情感系统</p>
               </li>
-              <li>
+              <li id="log-v090">
                 <h4>v0.9.0（2025-03）— 🔧 核心功能完善</h4>
                 <p>· 桌面截图观察功能</p>
                 <p>· GPT-SoVITS 语音合成</p>
@@ -384,6 +482,16 @@
               <p class="plan-card">☑ 一键应用配置（校验→写入→重载）</p>
               <p class="plan-card">☑ 连通性检测与修复建议</p>
               <p class="plan-card">☑ 一键回滚到最近备份</p>
+              <p class="plan-card">☑ 浏览器模式 Live2D 拖动稳定性修复</p>
+              <p class="plan-card">☑ 对话演示 / 语音试听 / 暗色模式体验升级</p>
+              <p class="plan-card">☑ FAQ 与版本历史面板完善</p>
+              <p class="plan-card">☑ 运行时控制台（日志/错误/异常可观测）</p>
+              <p class="plan-card">☑ 浏览器模式 Live2D 拖动坐标系修复（防飞出画面）</p>
+              <p class="plan-card">☑ GPT-SoVITS 混合语言与切分稳定性修复</p>
+              <p class="plan-card">☑ 回复多样性与思维层随机化增强</p>
+              <p class="plan-card">☑ 记忆策略与历史去偏置清理</p>
+              <p class="plan-card">☑ 双语字幕链路（翻译/分页/延迟隐藏）</p>
+              <p class="plan-card">☑ 会话翻译可折叠开关与状态持久化</p>
               <p class="plan-card">⬜ 打包为独立安装包</p>
               <p class="plan-card">⬜ 多角色切换支持</p>
               <p class="plan-card">⬜ 移动端适配</p>
@@ -451,8 +559,8 @@
         <p class="download-subtitle">支持 Windows 10/11 · 首次启动自动安装运行环境</p>
         <a id="downloadGithubBtn" class="btn btn-primary btn-large" href="https://github.com/MaQinglin-665/AI-chat/releases" target="_blank" rel="noopener noreferrer">🎀 前往 GitHub 下载</a>
         <p class="download-note release-version">
-          最新版本：<strong id="latestReleaseText">v1.1.0（以 Release 为准）</strong>
-          <span id="latestReleaseDate" class="release-date">发布时间：2026-04</span>
+          最新版本：<strong id="latestReleaseText">v1.1.8（以 Release 为准）</strong>
+          <span id="latestReleaseDate" class="release-date">发布时间：2026-04-25</span>
         </p>
         <p class="download-note">先到 <a href="config.html">配置中心</a> 完成自检与一键应用，再启动桌宠体验最佳。</p>
         <p class="download-note">发布流程统一为：配置自检 → 一键应用验证 → 创建 Release → 更新下载说明。</p>
@@ -482,16 +590,49 @@
     <p class="version-panel-desc">这里是最近版本的关键变化，便于快速回顾升级内容。</p>
     <ol class="version-panel-list">
       <li>
+        <h4>v1.1.8（2026-04）</h4>
+        <p>新增双语字幕链路与会话翻译可折叠开关，补齐翻译缓存、分页滚动与延迟隐藏稳定性策略。</p>
+        <p><a class="version-view-link" href="#log-v118">查看变更</a></p>
+      </li>
+      <li>
+        <h4>v1.1.5（2026-04）</h4>
+        <p>修复浏览器模式 Live2D 拖动坐标系错误，解决模型拖动飞屏与起点跳位问题。</p>
+        <p><a class="version-view-link" href="#log-v115">查看变更</a></p>
+      </li>
+      <li>
+        <h4>v1.1.4（2026-04）</h4>
+        <p>新增运行时控制台与错误可观测能力，优化配置页挂件避让和版本日志锚点跳转体验。</p>
+        <p><a class="version-view-link" href="#log-v114">查看变更</a></p>
+      </li>
+      <li>
+        <h4>v1.1.3（2026-04）</h4>
+        <p>完成 TTS 混合语言与切分修复、回复多样性增强、记忆策略更新与工程清理。</p>
+        <p><a class="version-view-link" href="#log-v113">查看变更</a></p>
+      </li>
+      <li>
+        <h4>v1.1.2（2026-04）</h4>
+        <p>补齐记忆异常日志与工具安全测试，修复 GPT-SoVITS 英文异常发音，并提升 Live2D 口型/情绪稳定性。</p>
+        <p><a class="version-view-link" href="#log-v112">查看变更</a></p>
+      </li>
+      <li>
+        <h4>v1.1.1（2026-04）</h4>
+        <p>修复浏览器拖动失效与漂移问题，并补齐演示区、FAQ、版本历史面板和暗色模式体验。</p>
+        <p><a class="version-view-link" href="#log-v111">查看变更</a></p>
+      </li>
+      <li>
         <h4>v1.1.0（2026-04）</h4>
         <p>配置中心上线，一键校验/写入/重载，支持模板、回滚和连通性自检。</p>
+        <p><a class="version-view-link" href="#log-v110">查看变更</a></p>
       </li>
       <li>
         <h4>v1.0.0（2025-04）</h4>
         <p>首个完整版本发布，包含 Live2D 桌宠、LLM 对话、语音与记忆系统。</p>
+        <p><a class="version-view-link" href="#log-v100">查看变更</a></p>
       </li>
       <li>
         <h4>v0.9.0（2025-03）</h4>
         <p>补齐核心能力：桌面观察、GPT-SoVITS 语音和提醒命令。</p>
+        <p><a class="version-view-link" href="#log-v090">查看变更</a></p>
       </li>
     </ol>
     <p class="version-panel-foot">
@@ -499,12 +640,101 @@
     </p>
   </aside>
 
+  <div id="docLearningBackdrop" class="doc-learning-backdrop" hidden></div>
+  <aside
+    id="docLearningPanel"
+    class="doc-learning-panel"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="docLearningTitle"
+    aria-hidden="true"
+    tabindex="-1"
+    hidden
+  >
+    <div class="doc-learning-head">
+      <h3 id="docLearningTitle">🧪 学习审核</h3>
+      <button id="docLearningCloseBtn" class="doc-learning-close" type="button" aria-label="关闭学习审核">✕</button>
+    </div>
+
+    <div class="doc-learning-loading" aria-hidden="true">
+      <span></span>
+    </div>
+
+    <div class="doc-learning-controls">
+      <p class="doc-learning-desc">在文档站直接审核学习样本。若接口不可达，可用“打开运行页”进入完整控制台。</p>
+
+      <div class="doc-learning-api-row">
+        <label for="docLearningApiBase">运行地址</label>
+        <input id="docLearningApiBase" type="text" value="http://127.0.0.1:8123" placeholder="http://127.0.0.1:8123">
+        <button id="docLearningReloadBtn" type="button">重读</button>
+        <a id="docLearningOpenRuntimeBtn" href="http://127.0.0.1:8123/web/index.html" target="_blank" rel="noopener noreferrer">打开运行页</a>
+      </div>
+
+      <div class="doc-learning-quick-row">
+        <label>
+          <span>inject_count</span>
+          <select id="docLearningInjectCount">
+            <option value="0">0</option>
+            <option value="1">1</option>
+          </select>
+        </label>
+        <label>
+          <span>promotion_min_support</span>
+          <select id="docLearningMinSupport">
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </label>
+        <button id="docLearningApplyQuickBtn" type="button">应用开关</button>
+        <button id="docLearningUndoBtn" type="button">撤销上一步</button>
+      </div>
+
+      <div class="doc-learning-tabs">
+        <button id="docLearningTabCandidates" class="is-active" type="button">候选池</button>
+        <button id="docLearningTabSamples" type="button">正式池</button>
+      </div>
+
+      <div class="doc-learning-filters">
+        <label>
+          <span>score ≥</span>
+          <input id="docLearningFilterScore" type="number" min="0" max="1" step="0.01" value="0">
+        </label>
+        <label>
+          <span>confidence ≥</span>
+          <input id="docLearningFilterConfidence" type="number" min="0" max="1" step="0.01" value="0">
+        </label>
+        <label class="keyword">
+          <span>关键词</span>
+          <input id="docLearningFilterKeyword" type="text" placeholder="搜索 assistant/compressed">
+        </label>
+      </div>
+
+      <div class="doc-learning-batch">
+        <label class="check-all">
+          <input id="docLearningSelectAll" type="checkbox">
+          <span id="docLearningSelectedCount">已选 0</span>
+        </label>
+        <div class="actions">
+          <button id="docLearningBatchDeleteBtn" type="button">批量删除</button>
+          <button id="docLearningBatchUpBtn" type="button">批量升权</button>
+          <button id="docLearningBatchDownBtn" type="button">批量降权</button>
+          <button id="docLearningBatchPromoteBtn" type="button">批量晋升</button>
+        </div>
+      </div>
+
+      <p id="docLearningSummary" class="doc-learning-summary">等待加载…</p>
+    </div>
+
+    <div id="docLearningList" class="doc-learning-list"></div>
+  </aside>
+
   <button id="backToTop" class="back-to-top" type="button" aria-label="返回顶部">↑</button>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script src="js/main.js" defer></script>
+  <script src="js/main.js?v=20260423-rc14" defer></script>
   <script src="js/particles.js" defer></script>
   <script src="js/config-preview.js" defer></script>
-  <script src="live2d/autoload.js" defer></script>
+  <script src="js/learning-review.js" defer></script>
+  <script data-live2d-autoload="live2d/autoload.js"></script>
 </body>
 </html>

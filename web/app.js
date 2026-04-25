@@ -21,6 +21,9 @@ const state = {
   autoChatMinMs: 180000,
   autoChatMaxMs: 480000,
   autoChatTimer: 0,
+  lastAutoChatAt: 0,
+  lastUserMessageAt: Date.now(),
+  chatTranslationVisible: true,
   chatBusy: false,
   speakingEnabled: true,
   ttsProvider: "browser",
@@ -33,8 +36,18 @@ const state = {
   ttsServerVoiceIndex: -1,
   ttsServerVoice: null,
   ttsServerAvailable: true,
+  ttsServerFailStreak: 0,
+  ttsServerLastError: "",
+  ttsServerFallbackFailThreshold: 2,
+  ttsServerRetryCount: 1,
+  ttsServerRetryDelayMs: 220,
+  ttsServerRequestTimeoutMs: 14000,
   serverTTSFallbackToBrowser: false,
   ttsAudio: null,
+  ttsContextSpeaking: false,
+  subtitleId: 0,
+  subtitleHideTimer: 0,
+  subtitlePageTimer: 0,
   ttsLastGoodVoiceName: "",
   streamSpeakEnabled: true,
   streamSpeakMode: "realtime",
@@ -51,9 +64,25 @@ const state = {
   speechAnimSeed: 0,
   speechAnimTextLength: 0,
   speechAnimPunctuation: 0,
+  speechAnimAccentCount: 0,
   speechAnimStyle: "neutral",
   speechAnimMood: "idle",
   speechMouthOpen: 0,
+  speechMouthApplied: 0,
+  speechMouthTarget: 0,
+  speechMouthUpdatedAt: 0,
+  speechBodyEnergy: 0,
+  speechMotionBlend: 0,
+  speechPhase: "idle",
+  speechPhaseEnteredAt: 0,
+  speechPhaseWasSpeaking: false,
+  beatPrevLevel: 0,
+  beatImpulse: 0,
+  beatNodSmoothed: 0,
+  beatCooldownUntil: 0,
+  moodExpressionSmoothed: { happy: 0, sad: 0, angry: 0, surprised: 0 },
+  moodExpressionUpdatedAt: 0,
+  moodHoldUntil: 0,
   microBlinkUntil: 0,
   microNextBlinkAt: 0,
   microGazeTargetX: 0,
@@ -61,7 +90,34 @@ const state = {
   microGazeCurrentX: 0,
   microGazeCurrentY: 0,
   microNextGazeAt: 0,
+  mouseGazeTargetX: 0,
+  mouseGazeTargetY: 0,
+  mouseGazeCurrentX: 0,
+  mouseGazeCurrentY: 0,
+  mouseGazePollTimer: 0,
   microBreathSeed: 0,
+  microMotionLastAt: 0,
+  spring_hairAhoge_vel: 0,
+  spring_hairAhoge_pos: 0,
+  spring_hairFront_vel: 0,
+  spring_hairFront_pos: 0,
+  spring_hairBack_vel: 0,
+  spring_hairBack_pos: 0,
+  spring_ribbon_vel: 0,
+  spring_ribbon_pos: 0,
+  spring_skirt_vel: 0,
+  spring_skirt_pos: 0,
+  spring_skirt2_vel: 0,
+  spring_skirt2_pos: 0,
+  spring_torso_vel: 0,
+  spring_torso_pos: 0,
+  spring_head_vel: 0,
+  spring_head_pos: 0,
+  spring_body_vel: 0,
+  spring_body_pos: 0,
+  spring_body_render: 0,
+  spring_torso_render: 0,
+  spring_head_render: 0,
   ttsAudioContext: null,
   ttsDecodeContext: null,
   ttsAudioSourceNode: null,
@@ -73,9 +129,10 @@ const state = {
   styleAutoEnabled: true,
   manualTalkStyle: "neutral",
   motionEnabled: true,
+  motionQuietDuringSpeech: true,
   motionCooldownMs: 1200,
   motionCooldownUntil: 0,
-  speakingMotionCooldownMs: 1600,
+  speakingMotionCooldownMs: 2200,
   speakingMotionCooldownUntil: 0,
   idleMotionEnabled: true,
   idleMotionMinMs: 12000,
@@ -110,6 +167,7 @@ const state = {
   micQueue: [],
   micQueueWorking: false,
   micToggleBusy: false,
+  _broadcastSpeechUpdatedAt: 0,
   micKeepListening: true,
   asrTranscribeOnClose: true,
   asrMode: "local_vosk",
@@ -163,6 +221,7 @@ const state = {
   dragWindowAccumX: 0,
   dragWindowAccumY: 0,
   windowDragActive: false,
+  browserDragActive: false,
   suspendRelayoutUntil: 0,
   resizeRaf: 0,
   layoutWidth: 0,
@@ -175,6 +234,7 @@ window.__petState = state;
 const ui = {
   status: document.getElementById("status"),
   assistantName: document.getElementById("assistant-name"),
+  translationToggleBtn: document.getElementById("translation-toggle-btn"),
   chatLog: document.getElementById("chat-log"),
   attachmentPreview: document.getElementById("attachment-preview"),
   chatInput: document.getElementById("chat-input"),
@@ -209,7 +269,46 @@ const ui = {
   personaTopics: document.getElementById("persona-topics"),
   personaReplyStyle: document.getElementById("persona-reply-style"),
   personaCompanionshipStyle: document.getElementById("persona-companionship-style"),
-  personaSaveBtn: document.getElementById("persona-save-btn")
+  personaSaveBtn: document.getElementById("persona-save-btn"),
+  learningReviewBtn: document.getElementById("learning-review-btn"),
+  learningReviewBackdrop: document.getElementById("learning-review-backdrop"),
+  learningReviewDrawer: document.getElementById("learning-review-drawer"),
+  learningReviewCloseBtn: document.getElementById("learning-review-close-btn"),
+  learningReviewUndoBtn: document.getElementById("learning-review-undo-btn"),
+  learningTabCandidates: document.getElementById("learning-tab-candidates"),
+  learningTabSamples: document.getElementById("learning-tab-samples"),
+  learningReloadBtn: document.getElementById("learning-reload-btn"),
+  learningFilterScore: document.getElementById("learning-filter-score"),
+  learningFilterConfidence: document.getElementById("learning-filter-confidence"),
+  learningFilterKeyword: document.getElementById("learning-filter-keyword"),
+  learningSortMode: document.getElementById("learning-sort-mode"),
+  learningFilterHighBtn: document.getElementById("learning-filter-high-btn"),
+  learningFilterResetBtn: document.getElementById("learning-filter-reset-btn"),
+  learningSelectAll: document.getElementById("learning-select-all"),
+  learningSelectedCount: document.getElementById("learning-selected-count"),
+  learningBatchDeleteBtn: document.getElementById("learning-batch-delete-btn"),
+  learningBatchUpBtn: document.getElementById("learning-batch-up-btn"),
+  learningBatchDownBtn: document.getElementById("learning-batch-down-btn"),
+  learningBatchPromoteBtn: document.getElementById("learning-batch-promote-btn"),
+  learningReviewSummary: document.getElementById("learning-review-summary"),
+  learningReviewList: document.getElementById("learning-review-list"),
+  learningQuickInject: document.getElementById("learning-quick-inject"),
+  learningQuickSupport: document.getElementById("learning-quick-support"),
+  learningQuickApplyBtn: document.getElementById("learning-quick-apply-btn")
+};
+
+const learningReviewState = {
+  activeTab: "candidates",
+  candidates: [],
+  samples: [],
+  selectedCandidates: new Set(),
+  selectedSamples: new Set(),
+  quickSettings: {
+    inject_count: 0,
+    promotion_min_support: 1
+  },
+  sortMode: "score_desc",
+  loading: false
 };
 
 const RUNTIME_VERSION = "20260409_6";
@@ -227,8 +326,11 @@ const REMINDER_STORAGE_KEY = "taffy_reminders_v1";
 const EMOTION_STORAGE_KEY = "taffy_emotion_stats_v1";
 const DAILY_GREETING_STORAGE_KEY = "taffy_daily_greeting_v1";
 const CHAT_HISTORY_STORAGE_KEY = "taffy_chat_history_v2";
+const CHAT_TRANSLATION_VISIBILITY_STORAGE_KEY = "taffy_chat_translation_visible_v1";
 const MAX_CHAT_HISTORY_RECORDS = 240;
 const TOOL_META_MARKER = "[[TAFFY_TOOL_META]]";
+const API_TOKEN_STORAGE_KEYS = ["taffy_api_token", "TAFFY_API_TOKEN"];
+let _apiTokenPromise = null;
 const PERSONA_CARD_DEFAULT = {
   identity: "",
   user_preferences: "",
@@ -238,17 +340,100 @@ const PERSONA_CARD_DEFAULT = {
   companionship_style: "",
   updated_at: ""
 };
-const AUTO_CHAT_PROMPTS = [
-  // 无特定时间
-  "请你主动发起一句简短对话，像真人朋友那样自然开口，不要说'我来找你聊天'之类的。",
-  "请你主动说一句话，可以是感慨、问一个问题、或随口说件事，保持简短自然。",
-  "请你主动开口，可以是关心、闲聊、或提一个小话题，一两句就好。",
-  "请你主动说一句关心的话，不要太正式，像朋友随口说的那种。",
-  "请你主动提起一件最近聊过或觉得有意思的事，简短自然。",
-  "请你随口说一句话，可以是吐槽、好奇、或突然想到的事，不超过两句。",
-];
+
+function readApiTokenFromStorage() {
+  try {
+    const query = new URLSearchParams(window.location.search || "");
+    const queryToken = String(query.get("api_token") || "").trim();
+    if (queryToken) {
+      try {
+        localStorage.setItem(API_TOKEN_STORAGE_KEYS[0], queryToken);
+      } catch (_) {
+        // ignore storage failures
+      }
+      return queryToken;
+    }
+  } catch (_) {
+    // ignore
+  }
+  for (const key of API_TOKEN_STORAGE_KEYS) {
+    try {
+      const value = String(localStorage.getItem(key) || "").trim();
+      if (value) {
+        return value;
+      }
+    } catch (_) {
+      // ignore storage failures
+    }
+  }
+  const globalToken = String(window.__TAFFY_API_TOKEN || "").trim();
+  if (globalToken) {
+    return globalToken;
+  }
+  return "";
+}
+
+async function resolveApiToken() {
+  if (_apiTokenPromise) {
+    return _apiTokenPromise;
+  }
+  _apiTokenPromise = (async () => {
+    let token = readApiTokenFromStorage();
+    if (!token && window.electronAPI && typeof window.electronAPI.getApiToken === "function") {
+      try {
+        token = String(await window.electronAPI.getApiToken() || "").trim();
+      } catch (_) {
+        token = "";
+      }
+    }
+    if (token) {
+      try {
+        localStorage.setItem(API_TOKEN_STORAGE_KEYS[0], token);
+      } catch (_) {
+        // ignore storage failures
+      }
+    }
+    return token;
+  })();
+  return _apiTokenPromise;
+}
+
+function isApiRequestTarget(input) {
+  try {
+    const raw = input instanceof Request ? input.url : String(input || "");
+    const url = new URL(raw, window.location.origin);
+    return url.pathname.startsWith("/api/");
+  } catch (_) {
+    return false;
+  }
+}
+
+async function authFetch(input, init = {}) {
+  if (!isApiRequestTarget(input)) {
+    return fetch(input, init);
+  }
+  const token = await resolveApiToken();
+  if (!token) {
+    return fetch(input, init);
+  }
+  const baseInit = init && typeof init === "object" ? { ...init } : {};
+  const inheritedHeaders = input instanceof Request ? input.headers : undefined;
+  const headers = new Headers(baseInit.headers || inheritedHeaders || {});
+  if (!headers.has("X-Taffy-Token") && !headers.has("Authorization")) {
+    headers.set("X-Taffy-Token", token);
+  }
+  return fetch(input, { ...baseInit, headers });
+}
+const AUTO_CHAT_MODES = ["brainstorm", "dig_memory", "silence_comment"];
+const AUTO_CHAT_MIN_USER_GAP_MS = 90 * 1000;
+const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = 120 * 1000;
+const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = 4 * 60 * 1000;
+const AUTO_CHAT_EMO_RE = /(难受|难过|焦虑|压力|累|困|崩溃|失眠|emo|心情不好|低落)/i;
+const AUTO_CHAT_MIRROR_RE = /(你呢|那你呢|你会|你想|你觉得|那你|你自己)/i;
+const AUTO_CHAT_TOPIC_RE = /(项目|考试|工作|学习|代码|模型|部署|计划|进度|复盘|目标)/i;
+const AUTO_CHAT_ASK_RE = /[?？]\s*$/;
 const WAITING_VOICE_HINTS = [
-  "嗯，我在想，马上回你。",
+  "我在想，马上回你。",
   "我在组织一下语言，马上好。",
   "稍等一下，我这就回答你。"
 ];
@@ -426,7 +611,7 @@ const MODEL_MOTION_PROFILES = {
 const TAP_MOVE_THRESHOLD = 8;
 const TAP_MAX_DURATION_MS = 280;
 const VISION_INTENT_RE =
-  /(看|看到|看见|桌面|屏幕|画面|截图|图里|图片|界面|识别|观察|what do you see|look at|screen|desktop|screenshot|image)/i;
+  /(看到|看见|桌面|屏幕|画面|截图|图里|图片|界面|识别|观察|what do you see|look at|screen|desktop|screenshot|image)/i;
 
 function applyDisplayModeFromUrl() {
   const params = new URLSearchParams(window.location.search || "");
@@ -795,6 +980,54 @@ function saveChatHistoryToStorage() {
   }
 }
 
+function saveChatTranslationVisibilityToStorage() {
+  if (!window.localStorage) {
+    return;
+  }
+  try {
+    localStorage.setItem(
+      CHAT_TRANSLATION_VISIBILITY_STORAGE_KEY,
+      state.chatTranslationVisible ? "1" : "0"
+    );
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function updateTranslationToggleButton() {
+  if (!ui.translationToggleBtn) {
+    return;
+  }
+  const visible = state.chatTranslationVisible !== false;
+  ui.translationToggleBtn.classList.toggle("is-off", !visible);
+  ui.translationToggleBtn.setAttribute("aria-pressed", visible ? "true" : "false");
+  ui.translationToggleBtn.setAttribute("title", visible ? "隐藏中文翻译" : "显示中文翻译");
+}
+
+function applyChatTranslationVisibility() {
+  const visible = state.chatTranslationVisible !== false;
+  document.body.classList.toggle("chat-translation-collapsed", !visible);
+  updateTranslationToggleButton();
+}
+
+function loadChatTranslationVisibilityFromStorage() {
+  let visible = true;
+  if (window.localStorage) {
+    try {
+      const raw = String(localStorage.getItem(CHAT_TRANSLATION_VISIBILITY_STORAGE_KEY) || "").trim();
+      if (raw === "0") {
+        visible = false;
+      } else if (raw === "1") {
+        visible = true;
+      }
+    } catch (_) {
+      // ignore storage failures
+    }
+  }
+  state.chatTranslationVisible = visible;
+  applyChatTranslationVisibility();
+}
+
 function syncConversationHistoryFromChatRecords() {
   const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
   const convo = records
@@ -835,7 +1068,10 @@ function renderChatHistoryFromState() {
     if (shouldInsertTimeDivider(previousTs, timestamp)) {
       ui.chatLog.appendChild(createTimeDivider(timestamp));
     }
-    const row = createMessageRow(item.role, item.content, { timestamp });
+    const row = createMessageRow(item.role, item.content, {
+      timestamp,
+      enableTranslation: false
+    });
     ui.chatLog.appendChild(row);
     previousTs = timestamp;
   }
@@ -854,6 +1090,10 @@ function loadChatHistoryFromStorage() {
   state.chatRecords = trimChatRecords(
     parsed.map((item) => normalizeChatRecord(item)).filter(Boolean)
   );
+  const lastUserRecord = [...state.chatRecords].reverse().find((item) => item?.role === "user");
+  if (lastUserRecord) {
+    state.lastUserMessageAt = parseMessageTimestamp(lastUserRecord.timestamp);
+  }
   syncConversationHistoryFromChatRecords();
   renderChatHistoryFromState();
 }
@@ -982,6 +1222,9 @@ function openSchedulePanel() {
   if (ui.personaModal && !ui.personaModal.hidden) {
     closePersonaPanel();
   }
+  if (isLearningReviewOpen()) {
+    closeLearningReviewDrawer();
+  }
   ui.scheduleModal.hidden = false;
   if (ui.scheduleDatetime && !ui.scheduleDatetime.value) {
     ui.scheduleDatetime.value = buildDefaultScheduleDateTimeValue();
@@ -1039,7 +1282,7 @@ async function loadPersonaCard() {
     return state.personaCard;
   }
   try {
-    const resp = await fetch("/api/persona_card", { cache: "no-store" });
+  const resp = await authFetch("/api/persona_card", { cache: "no-store" });
     if (!resp.ok) {
       throw new Error("获取人设卡失败");
     }
@@ -1062,6 +1305,9 @@ function openPersonaPanel() {
   if (ui.scheduleModal && !ui.scheduleModal.hidden) {
     closeSchedulePanel();
   }
+  if (isLearningReviewOpen()) {
+    closeLearningReviewDrawer();
+  }
   ui.personaModal.hidden = false;
   applyPersonaCardToForm(state.personaCard || PERSONA_CARD_DEFAULT);
   if (ui.personaIdentity) {
@@ -1082,7 +1328,7 @@ async function savePersonaCardFromForm() {
   }
   const payload = readPersonaCardFromForm();
   try {
-    const resp = await fetch("/api/persona_card", {
+  const resp = await authFetch("/api/persona_card", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -1099,6 +1345,547 @@ async function savePersonaCardFromForm() {
     setStatus(`保存失败: ${err.message || err}`);
     return false;
   }
+}
+
+function isLearningReviewOpen() {
+  return !!ui.learningReviewDrawer && !ui.learningReviewDrawer.hidden;
+}
+
+function getLearningSelectedSet(tab = learningReviewState.activeTab) {
+  return tab === "samples"
+    ? learningReviewState.selectedSamples
+    : learningReviewState.selectedCandidates;
+}
+
+function normalizeLearningReviewItem(item, fallbackId) {
+  const src = item && typeof item === "object" ? item : {};
+  const itemId = String(src.id || fallbackId || "").trim();
+  if (!itemId) {
+    return null;
+  }
+  const assistantPreview = String(src.assistant_preview || "").trim();
+  const compressedPattern = String(src.compressed_pattern || "").trim();
+  if (!assistantPreview && !compressedPattern) {
+    return null;
+  }
+  const scoreRaw = Number(src.score);
+  const confRaw = Number(src.confidence);
+  const supportRaw = Number(src.support_count);
+  const score = Number.isFinite(scoreRaw) ? Math.max(0, Math.min(1, scoreRaw)) : 0;
+  const confidence = Number.isFinite(confRaw) ? Math.max(0, Math.min(1, confRaw)) : 0;
+  const supportCount = Number.isFinite(supportRaw) ? Math.max(0, Math.round(supportRaw)) : 0;
+  return {
+    id: itemId,
+    assistant_preview: assistantPreview,
+    compressed_pattern: compressedPattern,
+    score,
+    confidence,
+    support_count: supportCount,
+    status: String(src.status || "candidate").trim() || "candidate",
+    updated_at: String(src.updated_at || "").trim(),
+    created_at: String(src.created_at || "").trim()
+  };
+}
+
+function setLearningReviewLoading(loading) {
+  learningReviewState.loading = !!loading;
+  if (ui.learningReviewSummary) {
+    ui.learningReviewSummary.textContent = learningReviewState.loading
+      ? "学习审核数据加载中..."
+      : ui.learningReviewSummary.textContent;
+  }
+}
+
+function syncLearningQuickSettingsUI() {
+  if (ui.learningQuickInject) {
+    ui.learningQuickInject.value = String(
+      Number(learningReviewState.quickSettings?.inject_count) >= 1 ? 1 : 0
+    );
+  }
+  if (ui.learningQuickSupport) {
+    ui.learningQuickSupport.value = String(
+      Number(learningReviewState.quickSettings?.promotion_min_support) >= 2 ? 2 : 1
+    );
+  }
+}
+
+function applyLearningPayload(payload) {
+  const data = payload && typeof payload === "object" ? payload : {};
+  if (Array.isArray(data.candidates)) {
+    learningReviewState.candidates = data.candidates
+      .map((item, idx) => normalizeLearningReviewItem(item, `cand_${idx}`))
+      .filter(Boolean);
+  }
+  if (Array.isArray(data.samples)) {
+    learningReviewState.samples = data.samples
+      .map((item, idx) => normalizeLearningReviewItem(item, `sample_${idx}`))
+      .filter(Boolean);
+  }
+  if (data.quick_settings && typeof data.quick_settings === "object") {
+    learningReviewState.quickSettings = {
+      inject_count: Number(data.quick_settings.inject_count) >= 1 ? 1 : 0,
+      promotion_min_support: Number(data.quick_settings.promotion_min_support) >= 2 ? 2 : 1
+    };
+  }
+
+  const candidateIds = new Set(learningReviewState.candidates.map((item) => item.id));
+  const sampleIds = new Set(learningReviewState.samples.map((item) => item.id));
+  for (const id of Array.from(learningReviewState.selectedCandidates)) {
+    if (!candidateIds.has(id)) {
+      learningReviewState.selectedCandidates.delete(id);
+    }
+  }
+  for (const id of Array.from(learningReviewState.selectedSamples)) {
+    if (!sampleIds.has(id)) {
+      learningReviewState.selectedSamples.delete(id);
+    }
+  }
+  syncLearningQuickSettingsUI();
+}
+
+function parseLearningFilterNumber(input, fallback = 0) {
+  const value = Number(input?.value);
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(0, Math.min(1, value));
+}
+
+function parseLearningUpdatedTime(item) {
+  const t = Date.parse(String(item?.updated_at || item?.created_at || "").trim());
+  return Number.isFinite(t) ? t : 0;
+}
+
+function applyLearningHighScorePreset() {
+  if (ui.learningFilterScore) {
+    ui.learningFilterScore.value = "0.75";
+  }
+  if (ui.learningFilterConfidence) {
+    ui.learningFilterConfidence.value = "0.50";
+  }
+  if (ui.learningSortMode) {
+    ui.learningSortMode.value = "score_desc";
+  }
+  learningReviewState.sortMode = "score_desc";
+  renderLearningReviewList();
+}
+
+function resetLearningFilters() {
+  if (ui.learningFilterScore) {
+    ui.learningFilterScore.value = "0";
+  }
+  if (ui.learningFilterConfidence) {
+    ui.learningFilterConfidence.value = "0";
+  }
+  if (ui.learningFilterKeyword) {
+    ui.learningFilterKeyword.value = "";
+  }
+  if (ui.learningSortMode) {
+    ui.learningSortMode.value = "score_desc";
+  }
+  learningReviewState.sortMode = "score_desc";
+  renderLearningReviewList();
+}
+
+function getLearningFilteredItems() {
+  const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
+  const source = tab === "samples"
+    ? learningReviewState.samples
+    : learningReviewState.candidates;
+  const scoreMin = parseLearningFilterNumber(ui.learningFilterScore, 0);
+  const confidenceMin = parseLearningFilterNumber(ui.learningFilterConfidence, 0);
+  const keyword = String(ui.learningFilterKeyword?.value || "").trim().toLowerCase();
+  const filtered = source.filter((item) => {
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+    if (Number(item.score || 0) < scoreMin) {
+      return false;
+    }
+    if (Number(item.confidence || 0) < confidenceMin) {
+      return false;
+    }
+    if (!keyword) {
+      return true;
+    }
+    const haystack = `${item.assistant_preview || ""}\n${item.compressed_pattern || ""}`.toLowerCase();
+    return haystack.includes(keyword);
+  });
+  const sortMode = String(learningReviewState.sortMode || ui.learningSortMode?.value || "score_desc");
+  filtered.sort((a, b) => {
+    const as = Number(a?.score || 0);
+    const bs = Number(b?.score || 0);
+    const ac = Number(a?.confidence || 0);
+    const bc = Number(b?.confidence || 0);
+    const ap = Number(a?.support_count || 0);
+    const bp = Number(b?.support_count || 0);
+    const at = parseLearningUpdatedTime(a);
+    const bt = parseLearningUpdatedTime(b);
+    if (sortMode === "confidence_desc") {
+      return (bc - ac) || (bs - as) || (bp - ap) || (bt - at);
+    }
+    if (sortMode === "support_desc") {
+      return (bp - ap) || (bs - as) || (bc - ac) || (bt - at);
+    }
+    if (sortMode === "updated_desc") {
+      return (bt - at) || (bs - as) || (bc - ac) || (bp - ap);
+    }
+    return (bs - as) || (bc - ac) || (bp - ap) || (bt - at);
+  });
+  return filtered;
+}
+
+function refreshLearningSelectAllState(filteredItems) {
+  if (!ui.learningSelectAll) {
+    return;
+  }
+  const selectedSet = getLearningSelectedSet();
+  const visibleIds = filteredItems.map((item) => item.id);
+  const selectedVisible = visibleIds.filter((id) => selectedSet.has(id));
+  ui.learningSelectAll.indeterminate = selectedVisible.length > 0 && selectedVisible.length < visibleIds.length;
+  ui.learningSelectAll.checked = visibleIds.length > 0 && selectedVisible.length === visibleIds.length;
+  if (ui.learningSelectedCount) {
+    ui.learningSelectedCount.textContent = `已选 ${selectedSet.size}`;
+  }
+  const canBatch = selectedSet.size > 0;
+  if (ui.learningBatchDeleteBtn) ui.learningBatchDeleteBtn.disabled = !canBatch;
+  if (ui.learningBatchUpBtn) ui.learningBatchUpBtn.disabled = !canBatch;
+  if (ui.learningBatchDownBtn) ui.learningBatchDownBtn.disabled = !canBatch;
+  if (ui.learningBatchPromoteBtn) {
+    ui.learningBatchPromoteBtn.disabled = !canBatch || learningReviewState.activeTab !== "candidates";
+  }
+}
+
+function renderLearningReviewList() {
+  if (!ui.learningReviewList) {
+    return;
+  }
+  const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
+  const filteredItems = getLearningFilteredItems();
+  ui.learningReviewList.innerHTML = "";
+
+  if (ui.learningTabCandidates) {
+    const active = tab === "candidates";
+    ui.learningTabCandidates.classList.toggle("is-active", active);
+    ui.learningTabCandidates.setAttribute("aria-selected", String(active));
+  }
+  if (ui.learningTabSamples) {
+    const active = tab === "samples";
+    ui.learningTabSamples.classList.toggle("is-active", active);
+    ui.learningTabSamples.setAttribute("aria-selected", String(active));
+  }
+  if (ui.learningReviewSummary) {
+    ui.learningReviewSummary.textContent =
+      `候选 ${learningReviewState.candidates.length} 条 · 正式 ${learningReviewState.samples.length} 条 · 当前显示 ${filteredItems.length} 条`;
+  }
+
+  if (!filteredItems.length) {
+    const empty = document.createElement("div");
+    empty.className = "learning-empty";
+    empty.textContent = "当前筛选条件下暂无数据";
+    ui.learningReviewList.appendChild(empty);
+    refreshLearningSelectAllState(filteredItems);
+    return;
+  }
+
+  const selectedSet = getLearningSelectedSet(tab);
+  filteredItems.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "learning-item";
+    const scoreValue = Number(item.score || 0);
+    const confidenceValue = Number(item.confidence || 0);
+    const supportValue = Math.max(0, Number(item.support_count || 0));
+
+    const head = document.createElement("div");
+    head.className = "learning-item-head";
+
+    const checkLabel = document.createElement("label");
+    checkLabel.className = "learning-item-check";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "learning-check";
+    checkbox.dataset.id = item.id;
+    checkbox.checked = selectedSet.has(item.id);
+    const checkText = document.createElement("span");
+    checkText.textContent = item.id;
+    checkLabel.appendChild(checkbox);
+    checkLabel.appendChild(checkText);
+
+    const status = document.createElement("span");
+    const rawStatus = String(item.status || "candidate").trim().toLowerCase();
+    const statusClass = rawStatus.replace(/[^a-z0-9_-]/g, "") || "candidate";
+    const statusLabelMap = {
+      candidate: "候选",
+      active: "正式",
+      promoted: "已晋升",
+      archived: "已归档"
+    };
+    status.className = `learning-item-status is-${statusClass}`;
+    status.textContent = statusLabelMap[rawStatus] || String(item.status || "候选");
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "learning-item-toggle";
+    toggleBtn.textContent = "展开";
+    const headRight = document.createElement("div");
+    headRight.className = "learning-item-head-right";
+    headRight.appendChild(status);
+    headRight.appendChild(toggleBtn);
+
+    head.appendChild(checkLabel);
+    head.appendChild(headRight);
+
+    const preview = document.createElement("div");
+    preview.className = "learning-item-preview";
+    const lineA = document.createElement("p");
+    lineA.className = "learning-item-line";
+    const strongA = document.createElement("strong");
+    strongA.textContent = "原始回复：";
+    lineA.appendChild(strongA);
+    lineA.appendChild(document.createTextNode(item.assistant_preview || "-"));
+    const lineB = document.createElement("p");
+    lineB.className = "learning-item-line";
+    const strongB = document.createElement("strong");
+    strongB.textContent = "风格提炼：";
+    lineB.appendChild(strongB);
+    lineB.appendChild(document.createTextNode(item.compressed_pattern || "-"));
+    preview.appendChild(lineA);
+    preview.appendChild(lineB);
+
+    const metrics = document.createElement("div");
+    metrics.className = "learning-item-metrics";
+    const scoreTag = document.createElement("span");
+    scoreTag.className = "learning-metric metric-score";
+    scoreTag.textContent = `评分 ${scoreValue.toFixed(2)}`;
+    if (scoreValue >= 0.8) scoreTag.classList.add("is-high");
+    else if (scoreValue >= 0.6) scoreTag.classList.add("is-mid");
+    else scoreTag.classList.add("is-low");
+
+    const confTag = document.createElement("span");
+    confTag.className = "learning-metric metric-confidence";
+    confTag.textContent = `置信 ${confidenceValue.toFixed(2)}`;
+    if (confidenceValue >= 0.75) confTag.classList.add("is-high");
+    else if (confidenceValue >= 0.5) confTag.classList.add("is-mid");
+    else confTag.classList.add("is-low");
+
+    const supportTag = document.createElement("span");
+    supportTag.className = "learning-metric metric-support";
+    supportTag.textContent = `支持 ${supportValue}`;
+    if (supportValue >= 3) supportTag.classList.add("is-high");
+    else if (supportValue >= 1) supportTag.classList.add("is-mid");
+    else supportTag.classList.add("is-low");
+
+    metrics.appendChild(scoreTag);
+    metrics.appendChild(confTag);
+    metrics.appendChild(supportTag);
+
+    const actions = document.createElement("div");
+    actions.className = "learning-item-actions";
+    const makeActionButton = (label, action, extraClass = "") => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = label;
+      btn.dataset.action = action;
+      btn.dataset.id = item.id;
+      if (extraClass) {
+        String(extraClass).split(/\s+/).filter(Boolean).forEach((cls) => btn.classList.add(cls));
+      }
+      return btn;
+    };
+    actions.appendChild(makeActionButton("保留", "keep", "is-keep"));
+    actions.appendChild(makeActionButton("删除", "delete", "danger"));
+    actions.appendChild(makeActionButton("升权 +0.05", "weight_up", "is-up"));
+    actions.appendChild(makeActionButton("降权 -0.05", "weight_down", "is-down"));
+    if (tab === "candidates") {
+      actions.appendChild(makeActionButton("晋升正式池", "promote", "is-promote"));
+    }
+
+    const body = document.createElement("div");
+    body.className = "learning-item-body";
+    body.appendChild(preview);
+    body.appendChild(metrics);
+    body.appendChild(actions);
+
+    const setCollapsed = (nextCollapsed) => {
+      card.classList.toggle("is-collapsed", !!nextCollapsed);
+      toggleBtn.textContent = nextCollapsed ? "展开" : "收起";
+      toggleBtn.setAttribute("aria-expanded", String(!nextCollapsed));
+    };
+    setCollapsed(true);
+    toggleBtn.addEventListener("click", () => {
+      setCollapsed(!card.classList.contains("is-collapsed"));
+    });
+
+    card.appendChild(head);
+    card.appendChild(body);
+    ui.learningReviewList.appendChild(card);
+  });
+
+  refreshLearningSelectAllState(filteredItems);
+}
+
+async function learningFetchJson(url, options = {}) {
+  const resp = await authFetch(url, options);
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || (data && data.ok === false)) {
+    const errText = String(data?.error || data?.message || `HTTP ${resp.status}`);
+    throw new Error(errText);
+  }
+  return data;
+}
+
+async function reloadLearningReviewData() {
+  setLearningReviewLoading(true);
+  try {
+    const payload = await learningFetchJson("/api/learning/reload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+    applyLearningPayload(payload);
+    renderLearningReviewList();
+    setStatus(payload?.message || "学习审核数据已刷新");
+  } finally {
+    setLearningReviewLoading(false);
+  }
+}
+
+async function updateLearningEntries(action, extra = {}) {
+  const payload = await learningFetchJson("/api/learning/update", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action,
+      ...extra
+    })
+  });
+  applyLearningPayload(payload);
+  renderLearningReviewList();
+  if (payload?.message) {
+    setStatus(payload.message);
+  }
+  return payload;
+}
+
+async function promoteLearningEntries(candidateIds) {
+  const payload = await learningFetchJson("/api/learning/promote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      candidate_ids: Array.isArray(candidateIds) ? candidateIds : []
+    })
+  });
+  applyLearningPayload(payload);
+  renderLearningReviewList();
+  if (payload?.message) {
+    setStatus(payload.message);
+  }
+  return payload;
+}
+
+async function undoLearningLastStep() {
+  const payload = await updateLearningEntries("undo", {});
+  setStatus(payload?.message || "已撤销上一步");
+  return payload;
+}
+
+function openLearningReviewDrawer() {
+  if (!ui.learningReviewDrawer || !ui.learningReviewBackdrop) {
+    return;
+  }
+  if (ui.scheduleModal && !ui.scheduleModal.hidden) {
+    closeSchedulePanel();
+  }
+  if (ui.personaModal && !ui.personaModal.hidden) {
+    closePersonaPanel();
+  }
+  ui.learningReviewBackdrop.hidden = false;
+  ui.learningReviewDrawer.hidden = false;
+  document.body.classList.add("learning-review-open");
+  renderLearningReviewList();
+  reloadLearningReviewData().catch((err) => {
+    setStatus(`学习审核加载失败: ${err.message || err}`);
+  });
+}
+
+function closeLearningReviewDrawer() {
+  if (!ui.learningReviewDrawer || !ui.learningReviewBackdrop) {
+    return;
+  }
+  ui.learningReviewDrawer.hidden = true;
+  ui.learningReviewBackdrop.hidden = true;
+  document.body.classList.remove("learning-review-open");
+}
+
+function toggleLearningReviewDrawer() {
+  if (isLearningReviewOpen()) {
+    closeLearningReviewDrawer();
+    return;
+  }
+  openLearningReviewDrawer();
+}
+
+async function runLearningSingleAction(action, itemId) {
+  const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
+  const id = String(itemId || "").trim();
+  if (!id) {
+    return;
+  }
+  if (action === "promote") {
+    await promoteLearningEntries([id]);
+    return;
+  }
+  if (action === "weight_up") {
+    await updateLearningEntries("weight", { pool: tab, ids: [id], delta: 0.05 });
+    return;
+  }
+  if (action === "weight_down") {
+    await updateLearningEntries("weight", { pool: tab, ids: [id], delta: -0.05 });
+    return;
+  }
+  if (action === "delete") {
+    await updateLearningEntries("delete", { pool: tab, ids: [id] });
+    return;
+  }
+  if (action === "keep") {
+    await updateLearningEntries("keep", { pool: tab, ids: [id] });
+  }
+}
+
+async function runLearningBatchAction(action) {
+  const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
+  const selectedSet = getLearningSelectedSet(tab);
+  const visibleIds = new Set(getLearningFilteredItems().map((item) => String(item?.id || "").trim()).filter(Boolean));
+  const ids = Array.from(selectedSet).filter((id) => visibleIds.has(String(id || "").trim()));
+  if (!ids.length) {
+    setStatus("请先勾选当前筛选结果中的条目");
+    return;
+  }
+  if (action === "promote") {
+    if (tab !== "candidates") {
+      setStatus("只有候选池支持晋升");
+      return;
+    }
+    await promoteLearningEntries(ids);
+  } else if (action === "delete") {
+    await updateLearningEntries("delete", { pool: tab, ids });
+  } else if (action === "weight_up") {
+    await updateLearningEntries("weight", { pool: tab, ids, delta: 0.05 });
+  } else if (action === "weight_down") {
+    await updateLearningEntries("weight", { pool: tab, ids, delta: -0.05 });
+  }
+  ids.forEach((id) => selectedSet.delete(id));
+  renderLearningReviewList();
+}
+
+async function applyLearningQuickSettings() {
+  const injectCount = Number(ui.learningQuickInject?.value || 0) >= 1 ? 1 : 0;
+  const minSupport = Number(ui.learningQuickSupport?.value || 1) >= 2 ? 2 : 1;
+  await updateLearningEntries("config", {
+    quick_settings: {
+      inject_count: injectCount,
+      promotion_min_support: minSupport
+    }
+  });
 }
 
 function renderScheduleList() {
@@ -1304,7 +2091,7 @@ function buildEmotionReportText() {
   const label = {
     happy: "开心",
     sad: "低落",
-    angry: "紧绷",
+    angry: "紧张",
     surprised: "惊讶",
     idle: "平稳"
   };
@@ -1509,7 +2296,7 @@ async function handleLocalCommand(inputText) {
       return true;
     }
     const ok = removeReminderById(Number(m[1]));
-    appendMessage("assistant", ok ? "已取消提醒。" : "未找到该提醒ID。");
+    appendMessage("assistant", ok ? "已取消提醒。" : "未找到该提醒 ID。");
     return true;
   }
   if (text.startsWith("/提醒")) {
@@ -1845,7 +2632,7 @@ async function transcribeLocalPcmChunks(chunks, signal = undefined) {
   if (!audio_base64) {
     return "";
   }
-  const resp = await fetch("/api/asr_pcm", {
+  const resp = await authFetch("/api/asr_pcm", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal,
@@ -2329,6 +3116,25 @@ function shouldSkipAutoChat() {
   if (state.chatBusy) {
     return true;
   }
+  const now = Date.now();
+  if (state.lastAutoChatAt > 0 && now - state.lastAutoChatAt < AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS) {
+    return true;
+  }
+  if (state.lastUserMessageAt > 0 && now - state.lastUserMessageAt < AUTO_CHAT_MIN_USER_GAP_MS) {
+    return true;
+  }
+  const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
+  for (let i = records.length - 1; i >= 0; i -= 1) {
+    const item = records[i];
+    if (!item || item.role !== "assistant") {
+      continue;
+    }
+    const ts = parseMessageTimestamp(item.timestamp);
+    if (ts > 0 && now - ts < AUTO_CHAT_MIN_ASSISTANT_GAP_MS) {
+      return true;
+    }
+    break;
+  }
   if (!ui.chatInput) {
     return false;
   }
@@ -2347,11 +3153,159 @@ function pickLatencyHintText() {
   return WAITING_VOICE_HINTS[idx] || WAITING_VOICE_HINTS[0];
 }
 
-function buildAutoChatPrompt() {
+function analyzeAutoChatContext() {
+  const now = Date.now();
+  const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
+  const recent = records.slice(-10);
+  let lastUser = null;
+  let lastAssistant = null;
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const item = recent[i];
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    if (!lastUser && item.role === "user") {
+      lastUser = item;
+    } else if (!lastAssistant && item.role === "assistant") {
+      lastAssistant = item;
+    }
+    if (lastUser && lastAssistant) {
+      break;
+    }
+  }
+
+  const lastUserText = String(lastUser?.content || "").trim();
+  const lastAssistantText = String(lastAssistant?.content || "").trim();
+  const lastAssistantTs = parseMessageTimestamp(lastAssistant?.timestamp || 0);
+  const minsSinceAssistant = lastAssistantTs > 0 ? (now - lastAssistantTs) / 60000 : 999;
+  const silentMinutes = Math.max(0, Math.round((now - (state.lastUserMessageAt || now)) / 60000));
+
+  let score = 0;
+  const reasons = [];
+  let topicHint = "";
+
+  if (silentMinutes >= 120) {
+    score += 1.0;
+    reasons.push("long_silence");
+  } else if (silentMinutes >= 45) {
+    score += 0.6;
+    reasons.push("mid_silence");
+  }
+
+  if (lastUserText) {
+    if (AUTO_CHAT_EMO_RE.test(lastUserText)) {
+      score += 0.9;
+      reasons.push("emotion_signal");
+      topicHint = lastUserText.slice(0, 40);
+    }
+    if (AUTO_CHAT_MIRROR_RE.test(lastUserText)) {
+      score += 0.65;
+      reasons.push("mirror_question");
+      if (!topicHint) {
+        topicHint = lastUserText.slice(0, 40);
+      }
+    }
+    if (lastUserText.length >= 18 && AUTO_CHAT_TOPIC_RE.test(lastUserText)) {
+      score += 0.5;
+      reasons.push("topic_hot");
+      if (!topicHint) {
+        topicHint = lastUserText.slice(0, 40);
+      }
+    }
+  }
+
+  if (lastAssistantText) {
+    const hasPendingQuestion = AUTO_CHAT_ASK_RE.test(lastAssistantText)
+      || /(你觉得|你会|你想|要不要|可以吗|想听|要不要我)/.test(lastAssistantText);
+    if (hasPendingQuestion && silentMinutes >= 6) {
+      score += 0.55;
+      reasons.push("followup_pending");
+    }
+  }
+
+  if (minsSinceAssistant < 3) {
+    score -= 0.8;
+  }
+  if (minsSinceAssistant < 1.5) {
+    score -= 1.2;
+  }
+
+  let threshold = 1.0;
+  if (silentMinutes < 20) {
+    threshold += 0.35;
+  }
+  if (reasons.includes("emotion_signal")) {
+    threshold -= 0.1;
+  }
+
+  return {
+    shouldTrigger: score >= threshold,
+    score,
+    threshold,
+    reasons,
+    topicHint
+  };
+}
+
+function buildAutoChatPrompt(context = null) {
+  const ctx = context && typeof context === "object" ? context : analyzeAutoChatContext();
   const hour = new Date().getHours();
-  const idx = Math.floor(Math.random() * AUTO_CHAT_PROMPTS.length);
-  const base = AUTO_CHAT_PROMPTS[idx] || AUTO_CHAT_PROMPTS[0];
-  return `（现在是${hour}点）${base}`;
+  const silentMinutes = Math.round((Date.now() - (state.lastUserMessageAt || Date.now())) / 60000);
+
+  const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
+  const recentUserMsgs = records
+    .filter(m => m.role === "user" && typeof m.content === "string" && m.content.trim().length > 4)
+    .slice(-6)
+    .map(m => m.content.trim().slice(0, 40));
+
+  const mode = AUTO_CHAT_MODES[Math.floor(Math.random() * AUTO_CHAT_MODES.length)];
+
+  let timeCtx = "";
+  if (hour >= 0 && hour < 5) timeCtx = "深夜" + hour + "点，";
+  else if (hour < 9) timeCtx = "早上" + hour + "点，";
+  else if (hour < 12) timeCtx = "上午" + hour + "点，";
+  else if (hour < 14) timeCtx = "中午，";
+  else if (hour < 18) timeCtx = "下午" + hour + "点，";
+  else if (hour < 22) timeCtx = "晚上" + hour + "点，";
+  else timeCtx = "快到深夜了，";
+
+  if (ctx.reasons.includes("mirror_question") && ctx.topicHint) {
+    return `${timeCtx}你想起对方刚才说过“${ctx.topicHint}”。先直接回应这句，再顺手补一句你的态度。不要问候，不要模板，不要问句结尾。最多两句。`;
+  }
+
+  if (ctx.reasons.includes("emotion_signal")) {
+    return `${timeCtx}你察觉到对方状态不太好。用Taffy的方式说一句短安慰，再加一句轻微吐槽式打气。不要说教，不要问句结尾。最多两句。`;
+  }
+
+  if (ctx.reasons.includes("followup_pending")) {
+    return `${timeCtx}把你们上个话题顺着接下去，像自然续聊，不要重新开场。最多两句，尽量陈述收尾。`;
+  }
+
+  if (ctx.reasons.includes("topic_hot") && ctx.topicHint) {
+    return `${timeCtx}你又想到对方提过“${ctx.topicHint}”。顺着这个点说一句有态度的话，不铺垫，不模板。最多两句。`;
+  }
+
+  if (mode === "brainstorm") {
+    const triggers = [
+      "你突然想到一件跟任何话题都无关的事，直接说出来。开头绝对不能是问候语或\"我来找你\"，就像脑子里的想法自己溢出来了。最多两句。",
+      "你脑子里突然冒出一个很强烈的观点，不管对不对你都觉得你是对的，说出来。不超过两句，不解释为什么突然说这个。",
+      "你突然对某件随机的事有了看法，直接说，像自言自语一样，不需要对方配合。最多一两句。",
+      "你刚刚想到一个问题，但这个问题跟你们之前聊的任何话题都没关系，直接问出来，不要铺垫。",
+    ];
+    const t = triggers[Math.floor(Math.random() * triggers.length)];
+    return `${timeCtx}${t}`;
+  }
+
+  if (mode === "dig_memory" && recentUserMsgs.length > 0) {
+    const picked = recentUserMsgs[Math.floor(Math.random() * recentUserMsgs.length)];
+    return `${timeCtx}你想起用户之前说过的：“${picked}”。突然把这件事翻出来提一下，不解释为什么现在想到，就那么说，带一点Taffy的态度。最多两句，不要问句结尾。`;
+  }
+
+  // silence_comment (fallback if no memory)
+  const silentDesc = silentMinutes >= 60
+    ? `${Math.round(silentMinutes / 60)}小时`
+    : silentMinutes > 1 ? `${silentMinutes}分钟` : "一会儿";
+  return `${timeCtx}用户已经${silentDesc}没说话了。你注意到了这件事，用Taffy的方式随口评论一下，不是关心问候，不是催促，就是Taffy会说的那种话。最多两句，不以问句结尾。`;
 }
 
 function scheduleNextAutoChat() {
@@ -2361,15 +3315,22 @@ function scheduleNextAutoChat() {
   const delay = Math.round(minMs + Math.random() * (maxMs - minMs));
   state.autoChatTimer = setTimeout(() => {
     if (!state.autoChatEnabled) return;
-      if (!shouldSkipAutoChat()) {
-        requestAssistantReply(buildAutoChatPrompt(), {
+    const context = analyzeAutoChatContext();
+    if (!shouldSkipAutoChat() && context.shouldTrigger) {
+      requestAssistantReply(buildAutoChatPrompt(context), {
           showUser: false,
           rememberUser: false,
           rememberAssistant: false,
           auto: true,
           silentError: true
+        }).then((ok) => {
+          if (ok) {
+            state.lastAutoChatAt = Date.now();
+          }
+        }).catch(() => {
+          // ignore
         });
-      }
+    }
     // 无论是否跳过，都重新调度，保持随机间隔
     scheduleNextAutoChat();
   }, delay);
@@ -2561,7 +3522,173 @@ function renderToolMetaCards(row, meta) {
   }
 }
 
-function applyMessagePayload(row, text) {
+const _CHAT_TRANSLATE_TIMEOUT_MS = 12000;
+const _CHAT_TRANSLATE_CACHE_LIMIT = 160;
+const _chatTranslationCache = new Map();
+let _chatTranslationSeq = 0;
+
+function _readChatTranslationCache(text) {
+  const key = String(text || "").trim();
+  if (!key || !_chatTranslationCache.has(key)) {
+    return "";
+  }
+  const hit = _chatTranslationCache.get(key) || "";
+  _chatTranslationCache.delete(key);
+  _chatTranslationCache.set(key, hit);
+  return String(hit || "").trim();
+}
+
+function _writeChatTranslationCache(text, translated) {
+  const key = String(text || "").trim();
+  const value = String(translated || "").trim();
+  if (!key || !value) {
+    return;
+  }
+  if (_chatTranslationCache.has(key)) {
+    _chatTranslationCache.delete(key);
+  }
+  _chatTranslationCache.set(key, value);
+  while (_chatTranslationCache.size > _CHAT_TRANSLATE_CACHE_LIMIT) {
+    const oldestKey = _chatTranslationCache.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    _chatTranslationCache.delete(oldestKey);
+  }
+}
+
+function _isLikelyEnglishForChat(text) {
+  const safe = String(text || "").trim();
+  if (!safe) {
+    return false;
+  }
+  const latinCount = (safe.match(/[A-Za-z]/g) || []).length;
+  const cjkCount = (safe.match(/[\u4e00-\u9fff]/g) || []).length;
+  if (latinCount < 6) {
+    return false;
+  }
+  if (cjkCount > 0) {
+    return false;
+  }
+  return _isLikelyEnglish(safe);
+}
+
+function _shouldShowAssistantTranslation(text) {
+  const safe = String(text || "").trim();
+  if (!safe || safe.length < 4) {
+    return false;
+  }
+  if (safe.includes("```")) {
+    return false;
+  }
+  return _isLikelyEnglishForChat(safe);
+}
+
+function _ensureMessageTranslationEl(row) {
+  if (!row) {
+    return null;
+  }
+  let el = row.querySelector(".content-translation");
+  if (el) {
+    return el;
+  }
+  el = document.createElement("span");
+  el.className = "content-translation";
+  el.hidden = true;
+  const timeEl = row.querySelector(".message-time");
+  if (timeEl && timeEl.parentNode === row) {
+    row.insertBefore(el, timeEl);
+  } else {
+    row.appendChild(el);
+  }
+  return el;
+}
+
+function _clearMessageTranslation(row) {
+  const el = row?.querySelector(".content-translation");
+  if (!el) {
+    return;
+  }
+  el.textContent = "";
+  el.hidden = true;
+}
+
+async function _fetchChatTranslation(text) {
+  const safe = String(text || "").trim();
+  if (!safe) {
+    return "";
+  }
+  const cached = _readChatTranslationCache(safe);
+  if (cached) {
+    return cached;
+  }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    try {
+      controller.abort();
+    } catch (_) {
+      // ignore
+    }
+  }, _CHAT_TRANSLATE_TIMEOUT_MS);
+  try {
+  const resp = await authFetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: safe }),
+      signal: controller.signal
+    });
+    if (!resp.ok) {
+      return "";
+    }
+    const data = await resp.json();
+    const translated = String(data?.translated || "").trim();
+    if (!translated) {
+      return "";
+    }
+    _writeChatTranslationCache(safe, translated);
+    return translated;
+  } catch (_) {
+    return "";
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function _renderAssistantTranslation(row, visibleText, options = {}) {
+  if (!row || !row.classList.contains("assistant")) {
+    return;
+  }
+  if (options.enableTranslation === false) {
+    _clearMessageTranslation(row);
+    return;
+  }
+  const safe = String(visibleText || "").trim();
+  if (!_shouldShowAssistantTranslation(safe)) {
+    _clearMessageTranslation(row);
+    return;
+  }
+  const translationEl = _ensureMessageTranslationEl(row);
+  if (!translationEl) {
+    return;
+  }
+  const requestId = String(++_chatTranslationSeq);
+  row.dataset.translationReqId = requestId;
+  row.dataset.translationSource = safe;
+  _fetchChatTranslation(safe).then((zh) => {
+    if (!row.isConnected || row.dataset.translationReqId !== requestId) {
+      return;
+    }
+    const translated = String(zh || "").trim();
+    if (!translated || translated === safe) {
+      _clearMessageTranslation(row);
+      return;
+    }
+    translationEl.textContent = `中译：${translated}`;
+    translationEl.hidden = false;
+  });
+}
+
+function applyMessagePayload(row, text, options = {}) {
   const target = row?.querySelector(".content");
   if (!target) {
     return;
@@ -2570,6 +3697,9 @@ function applyMessagePayload(row, text) {
   target.textContent = String(payload.visibleText || "");
   if (row.classList.contains("assistant")) {
     renderToolMetaCards(row, payload.meta);
+    _renderAssistantTranslation(row, payload.visibleText, options);
+  } else {
+    _clearMessageTranslation(row);
   }
 }
 
@@ -2599,15 +3729,17 @@ function createMessageRow(role, text, options = {}) {
   row.appendChild(roleEl);
   row.appendChild(textEl);
   row.appendChild(timeEl);
-  applyMessagePayload(row, text);
+  applyMessagePayload(row, text, {
+    enableTranslation: options.enableTranslation !== false
+  });
   if (options.hideTimestamp !== true) {
     setMessageTimestamp(row, options.timestamp || Date.now());
   }
   return row;
 }
 
-function setMessageText(row, text) {
-  applyMessagePayload(row, text);
+function setMessageText(row, text, options = {}) {
+  applyMessagePayload(row, text, options);
   ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
 }
 
@@ -2635,7 +3767,8 @@ function appendMessage(role, text, options = {}) {
   const timestamp = parseMessageTimestamp(options.timestamp);
   const row = createMessageRow(role, text, {
     timestamp,
-    hideTimestamp: options.hideTimestamp === true
+    hideTimestamp: options.hideTimestamp === true,
+    enableTranslation: options.enableTranslation !== false
   });
   if (options.persist !== false) {
     commitMessageRecord(role, text, {
@@ -2660,7 +3793,9 @@ function finalizePendingMessageRow(row, role, text, options = {}) {
     return;
   }
   const timestamp = parseMessageTimestamp(options.timestamp);
-  setMessageText(row, content);
+  setMessageText(row, content, {
+    enableTranslation: options.enableTranslation !== false
+  });
   setMessageTimestamp(row, timestamp);
   if (options.persist !== false) {
     const previous = state.chatRecords.length ? state.chatRecords[state.chatRecords.length - 1] : null;
@@ -2794,8 +3929,8 @@ function renderPendingAttachments() {
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "attachment-chip-remove";
-    removeBtn.textContent = "×";
-    removeBtn.title = "移除";
+    removeBtn.textContent = "脳";
+    removeBtn.title = "绉婚櫎";
     removeBtn.addEventListener("click", () => {
       removePendingAttachment(item.id);
     });
@@ -2927,13 +4062,397 @@ function sanitizeSpeakText(text) {
   const plain = parseToolMetaFromText(text).visibleText;
   return String(plain || "")
     .replace(/https?:\/\/\S+/g, "")
-    .replace(/[【】\[\]{}<>]/g, " ")
+    .replace(/[【】《》\[\]{}<>]/g, " ")
     .replace(/^\s*[-*]\s+/gm, "")
     .replace(/^\s*\d+[.)]\s+/gm, "")
-    .replace(/([。！？!?，,、])\1+/g, "$1")
+    .replace(/([。！？!?，,])\1+/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
 }
+
+// 鈹€鈹€ Subtitle helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+const _SUBTITLE_MAX_CHARS = 320;
+const _SUBTITLE_TRANSLATE_TIMEOUT_MS = 15000;
+const _SUBTITLE_CACHE_LIMIT = 80;
+const _SUBTITLE_SPEECH_RECHECK_MS = 1400;
+const _SUBTITLE_HARD_MAX_MS = 90000;
+const _SUBTITLE_AFTER_SPEECH_HOLD_MS = 2200;
+const _SUBTITLE_PAGE_MIN_INTERVAL_MS = 1500;
+const _SUBTITLE_PAGE_MAX_INTERVAL_MS = 3600;
+const _subtitleTranslationCache = new Map();
+let _subtitleTranslationAbortController = null;
+const _subtitlePaging = {
+  id: 0,
+  enPages: [],
+  zhPages: [],
+  index: 0,
+  intervalMs: 2200,
+};
+
+function _subtitleDuration(text) {
+  const safe = String(text || "").trim();
+  const compact = safe.replace(/\s+/g, "");
+  const words = safe.split(/\s+/).filter(Boolean).length;
+  const weighted = _isLikelyEnglish(safe)
+    ? Math.max(words * 120, compact.length * 30)
+    : compact.length * 45;
+  return Math.min(Math.max(3800 + weighted, 4000), 10000);
+}
+
+function _isLikelyEnglish(text) {
+  const letters = String(text).replace(/\s/g, "");
+  if (!letters.length) return false;
+  const ascii = Array.from(letters).filter((c) => c.charCodeAt(0) < 128).length;
+  return ascii / letters.length > 0.70;
+}
+
+function _isSubtitleSpeechActive() {
+  return isSpeakingNow() || state.streamSpeakWorking || !!state.ttsContextSpeaking;
+}
+
+function _splitSubtitlePages(text) {
+  const src = String(text || "").replace(/\s+/g, " ").trim();
+  if (!src) {
+    return [];
+  }
+  const isEnglish = _isLikelyEnglish(src);
+  const limit = isEnglish ? 110 : 56;
+  const rough = src.match(/[^.!?。！？\n]+[.!?。！？]?/g) || [src];
+  const pages = [];
+  let current = "";
+
+  const pushPage = (value) => {
+    const clean = String(value || "").trim();
+    if (!clean) return;
+    pages.push(clean);
+  };
+
+  const pushWithChunking = (piece) => {
+    const clean = String(piece || "").trim();
+    if (!clean) return;
+    if (clean.length <= limit) {
+      pushPage(clean);
+      return;
+    }
+    if (isEnglish) {
+      const words = clean.split(/\s+/).filter(Boolean);
+      let chunk = "";
+      for (const w of words) {
+        const next = chunk ? `${chunk} ${w}` : w;
+        if (next.length <= limit) {
+          chunk = next;
+        } else {
+          pushPage(chunk || w.slice(0, limit));
+          chunk = w.length > limit ? w.slice(0, limit) : w;
+        }
+      }
+      pushPage(chunk);
+      return;
+    }
+    for (let i = 0; i < clean.length; i += limit) {
+      pushPage(clean.slice(i, i + limit));
+    }
+  };
+
+  for (const rawPiece of rough) {
+    const piece = String(rawPiece || "").trim();
+    if (!piece) continue;
+    if (!current) {
+      if (piece.length > limit) {
+        pushWithChunking(piece);
+        continue;
+      }
+      current = piece;
+      continue;
+    }
+    const candidate = `${current} ${piece}`.replace(/\s+/g, " ").trim();
+    if (candidate.length <= limit) {
+      current = candidate;
+      continue;
+    }
+    pushPage(current);
+    if (piece.length > limit) {
+      pushWithChunking(piece);
+      current = "";
+    } else {
+      current = piece;
+    }
+  }
+  pushPage(current);
+  return pages.length ? pages : [src];
+}
+
+function _subtitlePageCount() {
+  return Math.max(
+    1,
+    Array.isArray(_subtitlePaging.enPages) ? _subtitlePaging.enPages.length : 0,
+    Array.isArray(_subtitlePaging.zhPages) ? _subtitlePaging.zhPages.length : 0
+  );
+}
+
+function _pickSubtitlePage(pages, index) {
+  if (!Array.isArray(pages) || !pages.length) {
+    return "";
+  }
+  const safeIndex = Math.max(0, Math.min(pages.length - 1, Math.round(Number(index) || 0)));
+  return String(pages[safeIndex] || "").trim();
+}
+
+function _calcSubtitlePageInterval(fullText, pageCount) {
+  const base = _subtitleDuration(fullText) / Math.max(1, Number(pageCount) || 1);
+  return Math.max(
+    _SUBTITLE_PAGE_MIN_INTERVAL_MS,
+    Math.min(_SUBTITLE_PAGE_MAX_INTERVAL_MS, Math.round(base))
+  );
+}
+
+function _stopSubtitlePaging() {
+  if (state.subtitlePageTimer) {
+    clearTimeout(state.subtitlePageTimer);
+    state.subtitlePageTimer = 0;
+  }
+}
+
+function _scheduleSubtitleSafetyHide(id, baseDelayMs) {
+  const startedAt = Date.now();
+  const firstDelay = Math.max(3200, Math.round(Number(baseDelayMs) || 0));
+  const tick = () => {
+    if (id !== state.subtitleId) {
+      return;
+    }
+    const elapsed = Date.now() - startedAt;
+    if (_isSubtitleSpeechActive() && elapsed < _SUBTITLE_HARD_MAX_MS) {
+      state.subtitleHideTimer = setTimeout(tick, _SUBTITLE_SPEECH_RECHECK_MS);
+      return;
+    }
+    hideSubtitleText();
+  };
+  state.subtitleHideTimer = setTimeout(tick, firstDelay);
+}
+
+function _normalizeSubtitleText(rawText) {
+  let out = sanitizeSpeakText(rawText);
+  out = out.replace(/^(?:en|english|原文)\s*[:：-]\s*/i, "").trim();
+  if (!out) {
+    return "";
+  }
+  return out.slice(0, _SUBTITLE_MAX_CHARS);
+}
+
+function _readSubtitleTranslationCache(text) {
+  const key = String(text || "").trim();
+  if (!key || !_subtitleTranslationCache.has(key)) {
+    return "";
+  }
+  const hit = _subtitleTranslationCache.get(key) || "";
+  _subtitleTranslationCache.delete(key);
+  _subtitleTranslationCache.set(key, hit);
+  return String(hit || "").trim();
+}
+
+function _writeSubtitleTranslationCache(text, translated) {
+  const key = String(text || "").trim();
+  const value = String(translated || "").trim();
+  if (!key || !value) {
+    return;
+  }
+  if (_subtitleTranslationCache.has(key)) {
+    _subtitleTranslationCache.delete(key);
+  }
+  _subtitleTranslationCache.set(key, value);
+  while (_subtitleTranslationCache.size > _SUBTITLE_CACHE_LIMIT) {
+    const oldestKey = _subtitleTranslationCache.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    _subtitleTranslationCache.delete(oldestKey);
+  }
+}
+
+function _abortSubtitleTranslation() {
+  if (!_subtitleTranslationAbortController) {
+    return;
+  }
+  try {
+    _subtitleTranslationAbortController.abort();
+  } catch (_) {
+    // ignore
+  }
+  _subtitleTranslationAbortController = null;
+}
+
+async function _fetchTranslation(text, capturedId) {
+  const cached = _readSubtitleTranslationCache(text);
+  if (cached) {
+    return cached;
+  }
+
+  _abortSubtitleTranslation();
+  const controller = new AbortController();
+  _subtitleTranslationAbortController = controller;
+  const timeoutId = setTimeout(() => {
+    try {
+      controller.abort();
+    } catch (_) {
+      // ignore
+    }
+  }, _SUBTITLE_TRANSLATE_TIMEOUT_MS);
+
+  try {
+  const resp = await authFetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    });
+    if (!resp.ok || capturedId !== state.subtitleId) return "";
+    const data = await resp.json();
+    const translated = String(data.translated || "").trim();
+    if (!translated) {
+      return "";
+    }
+    _writeSubtitleTranslationCache(text, translated);
+    return translated;
+  } catch (_) {
+    return "";
+  } finally {
+    clearTimeout(timeoutId);
+    if (_subtitleTranslationAbortController === controller) {
+      _subtitleTranslationAbortController = null;
+    }
+  }
+}
+
+function _applySubtitleDOM(enText, zhText) {
+  const layer = document.getElementById("subtitle-layer");
+  if (!layer) return;
+  const spanEn = layer.querySelector(".subtitle-en");
+  const spanZh = layer.querySelector(".subtitle-zh");
+  const en = String(enText || "").trim();
+  const zh = String(zhText || "").trim();
+  if (spanEn) spanEn.textContent = en;
+  if (spanZh) spanZh.textContent = zh;
+  layer.classList.toggle("subtitle-zh-ready", !!zh);
+  layer.classList.remove("subtitle-hiding");
+  layer.classList.add("subtitle-visible");
+}
+
+function _emitSubtitleFrame(id, enText, zhText) {
+  if (window.electronAPI?.sendSubtitle) {
+    window.electronAPI.sendSubtitle({ id, en: enText, zh: zhText });
+  } else {
+    _applySubtitleDOM(enText, zhText);
+  }
+}
+
+function _renderSubtitlePage(id) {
+  if (id !== state.subtitleId || _subtitlePaging.id !== id) {
+    return false;
+  }
+  const pageIndex = _subtitlePaging.index;
+  const en = _pickSubtitlePage(_subtitlePaging.enPages, pageIndex);
+  const zh = _pickSubtitlePage(_subtitlePaging.zhPages, pageIndex);
+  _emitSubtitleFrame(id, en, zh);
+  return true;
+}
+
+function _startSubtitlePaging(id, enText, zhText = "", preserveIndex = false) {
+  _stopSubtitlePaging();
+  const enPages = _splitSubtitlePages(enText);
+  const zhPages = _splitSubtitlePages(zhText);
+  const pageCount = Math.max(1, enPages.length, zhPages.length);
+  const nextIndex = preserveIndex && _subtitlePaging.id === id
+    ? Math.max(0, Math.min(pageCount - 1, _subtitlePaging.index))
+    : 0;
+  _subtitlePaging.id = id;
+  _subtitlePaging.enPages = enPages;
+  _subtitlePaging.zhPages = zhPages;
+  _subtitlePaging.index = nextIndex;
+  _subtitlePaging.intervalMs = _calcSubtitlePageInterval(enText, pageCount);
+  _renderSubtitlePage(id);
+  if (pageCount <= 1) {
+    return;
+  }
+  const tick = () => {
+    if (id !== state.subtitleId || _subtitlePaging.id !== id) {
+      return;
+    }
+    const total = _subtitlePageCount();
+    if (_subtitlePaging.index >= total - 1) {
+      return;
+    }
+    _subtitlePaging.index += 1;
+    _renderSubtitlePage(id);
+    state.subtitlePageTimer = setTimeout(tick, _subtitlePaging.intervalMs);
+  };
+  state.subtitlePageTimer = setTimeout(tick, _subtitlePaging.intervalMs);
+}
+
+function _clearSubtitleDOM(id, force = false) {
+  if (!force && id !== state.subtitleId) return;
+  _stopSubtitlePaging();
+  state.subtitleHideTimer = 0;
+  const layer = document.getElementById("subtitle-layer");
+  if (!layer) return;
+  layer.classList.remove("subtitle-visible");
+  layer.classList.remove("subtitle-zh-ready");
+  layer.classList.add("subtitle-hiding");
+  setTimeout(() => {
+    if (!force && id !== state.subtitleId) return;
+    layer.classList.remove("subtitle-hiding");
+    layer.classList.remove("subtitle-zh-ready");
+    const spanEn = layer.querySelector(".subtitle-en");
+    const spanZh = layer.querySelector(".subtitle-zh");
+    if (spanEn) spanEn.textContent = "";
+    if (spanZh) spanZh.textContent = "";
+  }, 500);
+}
+
+function showSubtitleText(rawText) {
+  const cleaned = _normalizeSubtitleText(rawText);
+  if (!cleaned) return;
+
+  _abortSubtitleTranslation();
+  if (state.subtitleHideTimer) {
+    clearTimeout(state.subtitleHideTimer);
+    state.subtitleHideTimer = 0;
+  }
+
+  state.subtitleId++;
+  const id = state.subtitleId;
+  _startSubtitlePaging(id, cleaned, "", false);
+
+  _scheduleSubtitleSafetyHide(id, _subtitleDuration(cleaned));
+
+  if (cleaned.length >= 3) {
+    _fetchTranslation(cleaned, id).then((zh) => {
+      if (!zh || id !== state.subtitleId) return;
+      _startSubtitlePaging(id, cleaned, zh, true);
+    });
+  }
+}
+
+function hideSubtitleText() {
+  const id = state.subtitleId;
+  _abortSubtitleTranslation();
+  _stopSubtitlePaging();
+  if (state.subtitleHideTimer) clearTimeout(state.subtitleHideTimer);
+  state.subtitleHideTimer = setTimeout(() => {
+    if (id !== state.subtitleId) return;
+    if (window.electronAPI?.sendSubtitleHide) {
+      window.electronAPI.sendSubtitleHide({ id });
+    } else {
+      _clearSubtitleDOM(id, true);
+    }
+    state.subtitleHideTimer = setTimeout(() => _clearSubtitleDOM(id, true), 500);
+    if (state.subtitleId === id) {
+      state.subtitleId = id + 1;
+    }
+  }, _SUBTITLE_AFTER_SPEECH_HOLD_MS);
+}
+
+// 鈹€鈹€ End subtitle helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function hashText(text) {
   const src = String(text || "");
@@ -2957,7 +4476,7 @@ function insertNaturalPause(seg) {
   if (!src) {
     return "";
   }
-  if (src.length < 24 || /[，,、]/.test(src)) {
+  if (src.length < 24 || /[，,。！？!?]/.test(src)) {
     return src;
   }
   let pivot = Math.floor(src.length * 0.5);
@@ -2971,23 +4490,22 @@ function colloquializeSpeakText(text) {
     return "";
   }
   out = out
-    .replace(/作为AI[^，。！？!?]*[，。！？!?]?/gi, "")
-    .replace(/作为一个AI[^，。！？!?]*[，。！？!?]?/gi, "")
+    .replace(/作为(?:一个)?AI[^，。！？!?]*[，。！？!?]?/gi, "")
     .replace(/根据你的描述/g, "按你刚说的")
     .replace(/您可以/g, "你可以")
     .replace(/可以考虑/g, "可以直接")
-    .replace(/请注意[，,:：]?\s*/g, "要注意，")
+    .replace(/请注意[:：]?\s*/g, "要注意，")
     .replace(/\b您\b/g, "你")
-    .replace(/首先[，,:：]?\s*/g, "先说重点，")
-    .replace(/其次[，,:：]?\s*/g, "另外，")
-    .replace(/最后[，,:：]?\s*/g, "最后，")
-    .replace(/综上所述[，,:：]?\s*/g, "简单说，")
-    .replace(/总而言之[，,:：]?\s*/g, "简单说，")
+    .replace(/首先[:：]?\s*/g, "先说重点，")
+    .replace(/其次[:：]?\s*/g, "另外，")
+    .replace(/最后[:：]?\s*/g, "最后，")
+    .replace(/综上所述[:：]?\s*/g, "简单说，")
+    .replace(/总而言之[:：]?\s*/g, "简单说，")
     .replace(/建议你/g, "你可以")
     .replace(/建议您/g, "你可以")
-    .replace(/需要注意的是[，,:：]?\s*/g, "要注意，")
-    .replace(/与此同时[，,:：]?\s*/g, "同时，")
-    .replace(/因此[，,:：]?\s*/g, "所以，")
+    .replace(/需要注意的是[:：]?\s*/g, "要注意，")
+    .replace(/与此同时[:：]?\s*/g, "同时，")
+    .replace(/因此[:：]?\s*/g, "所以，")
     .replace(/\s+/g, " ")
     .trim();
   return out;
@@ -3000,16 +4518,16 @@ function simplifySpeechDeliveryText(text, style = "neutral", streamMode = false)
   }
   out = out
     .replace(/[~～]/g, "")
-    .replace(/[（(][^()（）\n]{0,24}[)）]/g, "")
+    .replace(/[（(][^()（）\n]{0,24}[）)]/g, "")
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
-    .replace(/^(嗯哼|嗯呢|诶|欸|啊|呃)[，,\s]+/g, "")
-    .replace(/(我给你|给你)(倒|递|拿)([^，。！？!?]{0,10})(可乐|咖啡|奶茶|热可可|水)/g, "")
-    .replace(/刚(吃|啃|喝|刷)([^，。！？!?]{0,12})/g, "")
+    .replace(/^(嗨|嘿|诶|嗯|呐)[，,\s]+/g, "")
+    .replace(/(我给你|给你)(倒|递|拿)?([^，。！？!?]{0,10})(可乐|咖啡|奶茶|热可可|水)/g, "")
+    .replace(/(别|停止|算了|不要)([^，。！？!?]{0,12})/g, "")
     .replace(/(虚拟|电子|赛博)/g, "")
-    .replace(/(嘿嘿|哼哼|呀呀|啦啦)/g, "")
-    .replace(/总之[，,、]?/g, "")
-    .replace(/简单说[，,、]?/g, "")
-    .replace(/先说重点[，,、]?/g, "")
+    .replace(/(哈哈|嘿嘿|哎呀|啦啦)/g, "")
+    .replace(/总之[，。]?/g, "")
+    .replace(/简单说[，。]?/g, "")
+    .replace(/先说重点[，。]?/g, "")
     .replace(/\s+/g, " ")
     .replace(/，{2,}/g, "，")
     .replace(/[。！？!?]{2,}/g, "。")
@@ -3017,8 +4535,8 @@ function simplifySpeechDeliveryText(text, style = "neutral", streamMode = false)
 
   if (streamMode) {
     out = out
-      .replace(/[：:]/g, "，")
-      .replace(/[；;]/g, "，");
+      .replace(/[，,]/g, "，")
+      .replace(/[；;]/g, "；");
   }
 
   if (style === "clear") {
@@ -3027,7 +4545,7 @@ function simplifySpeechDeliveryText(text, style = "neutral", streamMode = false)
       .replace(/你可以先/g, "你先");
   }
 
-  out = out.replace(/^[，,。！？!?]+|[，,。！？!?]+$/g, "").trim();
+  out = out.replace(/^[，。！？!?]+|[，。！？!?]+$/g, "").trim();
   return out;
 }
 
@@ -3070,13 +4588,13 @@ function inferContextStyle(userText = "", assistantText = "", mood = "idle", isA
     steady: 0
   };
 
-  if (/(难过|伤心|焦虑|崩溃|压力|失眠|害怕|委屈|心累|痛苦|失落|难受|不舒服)/.test(src)) {
+  if (/(难过|伤心|焦虑|崩溃|压力|失眠|委屈|心累|痛苦|失落|难受|不舒服)/.test(src)) {
     score.comfort += 5;
   }
   if (/(报错|错误|bug|代码|修复|排查|步骤|教程|配置|接口|api|命令|运行|性能|延迟|怎么做|如何)/.test(src)) {
     score.clear += 5;
   }
-  if (/(紧急|立刻|马上|严肃|认真|上线|故障|事故|必须|优先)/.test(src)) {
+  if (/(紧急|立刻|马上|严谨|认真|上线|故障|事故|必须|优先)/.test(src)) {
     score.steady += 4;
   }
   if (/(哈哈|好耶|太棒|开心|可爱|有趣|聊聊|玩|轻松|摸鱼|wow|lol|233)/.test(src)) {
@@ -3191,6 +4709,113 @@ function safeAddParamValue(core, id, delta, weight = 1) {
   }
 }
 
+function safeSetParamValue(core, id, value, weight = 1) {
+  if (!core || !id || !Number.isFinite(Number(value))) {
+    return;
+  }
+  const v = Number(value);
+  const w = Number.isFinite(Number(weight)) ? clampNumber(Number(weight), 0, 1) : 1;
+  let apiApplied = false;
+  let apiTarget = v;
+  try {
+    if (
+      typeof core.getParameterValueById === "function"
+      && typeof core.setParameterValueById === "function"
+    ) {
+      if (w >= 0.999) {
+        core.setParameterValueById(id, v, 1);
+        apiApplied = true;
+        apiTarget = v;
+      } else {
+        const cur = Number(core.getParameterValueById(id) || 0);
+        apiTarget = cur + (v - cur) * w;
+        core.setParameterValueById(id, apiTarget, 1);
+        apiApplied = true;
+      }
+    }
+  } catch (_) {
+    // ignore and fallback to raw parameter array
+  }
+  if (apiApplied) {
+    try {
+      if (typeof core.getParameterValueById === "function") {
+        const after = Number(core.getParameterValueById(id));
+        if (Number.isFinite(after) && Math.abs(after - apiTarget) <= 0.0015) {
+          return;
+        }
+      }
+    } catch (_) {
+      // ignore and fallback to raw parameter array
+    }
+  }
+  try {
+    const params = core?._model?.parameters;
+    const ids = params?.ids;
+    const vals = params?.values;
+    if (!ids || !vals) {
+      return;
+    }
+    const idx = Array.from(ids).indexOf(id);
+    if (idx < 0) {
+      return;
+    }
+    const cur = Number(vals[idx] || 0);
+    vals[idx] = cur + (v - cur) * w;
+  } catch (_) {
+    // ignore unsupported parameter ids
+  }
+}
+
+function safeGetParamValue(core, id) {
+  if (!core || !id) {
+    return NaN;
+  }
+  try {
+    if (typeof core.getParameterValueById === "function") {
+      const v = Number(core.getParameterValueById(id));
+      if (Number.isFinite(v)) {
+        return v;
+      }
+    }
+  } catch (_) {
+    // ignore and fallback to raw parameter array
+  }
+  try {
+    const params = core?._model?.parameters;
+    const ids = params?.ids;
+    const vals = params?.values;
+    if (!ids || !vals) {
+      return NaN;
+    }
+    const idx = Array.from(ids).indexOf(id);
+    if (idx < 0) {
+      return NaN;
+    }
+    const v = Number(vals[idx]);
+    return Number.isFinite(v) ? v : NaN;
+  } catch (_) {
+    return NaN;
+  }
+}
+
+function safeDriveParamValue(core, id, target, gain = 1) {
+  if (!core || !id || !Number.isFinite(Number(target))) {
+    return;
+  }
+  const t = Number(target);
+  const g = clampNumber(Number(gain) || 1, 0, 1);
+  const cur = safeGetParamValue(core, id);
+  if (!Number.isFinite(cur)) {
+    safeSetParamValue(core, id, t, g);
+    return;
+  }
+  const delta = (t - cur) * g;
+  if (Math.abs(delta) < 0.0001) {
+    return;
+  }
+  safeAddParamValue(core, id, delta, 1);
+}
+
 function triggerExpressionPulse(style = "neutral", boost = 1, durationMs = 520) {
   const now = performance.now();
   state.expressionStyle = normalizeTalkStyle(style);
@@ -3201,7 +4826,7 @@ function triggerExpressionPulse(style = "neutral", boost = 1, durationMs = 520) 
 function estimateSpeechAnimationDurationMs(text, style = "neutral") {
   const cleaned = sanitizeSpeakText(text);
   const chars = cleaned.length;
-  const punct = (cleaned.match(/[，。！？!?；;、]/g) || []).length;
+  const punct = (cleaned.match(/[，。！？!?、]/g) || []).length;
   let duration = 360 + chars * 82 + punct * 130;
   if (style === "comfort") {
     duration *= 1.06;
@@ -3228,7 +4853,8 @@ function beginSpeechAnimation(text, mood = "idle", style = "neutral", opts = {})
   state.speechAnimUntil = now + durationMs + 180;
   state.speechAnimSeed = Math.random() * Math.PI * 2;
   state.speechAnimTextLength = cleaned.length;
-  state.speechAnimPunctuation = (cleaned.match(/[，。！？!?；;、]/g) || []).length;
+  state.speechAnimPunctuation = (cleaned.match(/[，。！？!?、]/g) || []).length;
+  state.speechAnimAccentCount = (cleaned.match(/[!?\uFF01\uFF1F]/g) || []).length;
   state.speechAnimStyle = normalizeTalkStyle(style || state.currentTalkStyle || "neutral");
   state.speechAnimMood = String(mood || detectMood(cleaned) || "idle");
 }
@@ -3237,8 +4863,12 @@ function endSpeechAnimation() {
   state.speechAnimUntil = 0;
   state.speechAnimStartedAt = 0;
   state.speechAnimDurationMs = 0;
+  state.speechAnimAccentCount = 0;
   state.speechMouthOpen = 0;
+  state.speechMouthTarget = 0;
+  state.speechMouthUpdatedAt = performance.now();
   state.ttsAudioLevel = 0;
+  state.moodHoldUntil = performance.now() + 1500;
 }
 
 function ensureMicroMotionState(now = performance.now()) {
@@ -3251,6 +4881,91 @@ function ensureMicroMotionState(now = performance.now()) {
   if (!Number(state.microNextGazeAt)) {
     state.microNextGazeAt = now + 900 + Math.random() * 2200;
   }
+  if (!Number.isFinite(Number(state.microMotionLastAt)) || Number(state.microMotionLastAt) <= 0) {
+    state.microMotionLastAt = now;
+  }
+  if (!["idle", "attack", "sustain", "release"].includes(String(state.speechPhase || ""))) {
+    state.speechPhase = "idle";
+  }
+  if (!Number.isFinite(Number(state.speechPhaseEnteredAt))) {
+    state.speechPhaseEnteredAt = 0;
+  }
+  if (typeof state.speechPhaseWasSpeaking !== "boolean") {
+    state.speechPhaseWasSpeaking = false;
+  }
+  if (!Number.isFinite(Number(state.speechMotionBlend))) {
+    state.speechMotionBlend = 0;
+  }
+  if (!Number.isFinite(Number(state.beatPrevLevel))) {
+    state.beatPrevLevel = 0;
+  }
+  if (!Number.isFinite(Number(state.beatImpulse))) {
+    state.beatImpulse = 0;
+  }
+  if (!Number.isFinite(Number(state.beatNodSmoothed))) {
+    state.beatNodSmoothed = 0;
+  }
+  if (!Number.isFinite(Number(state.beatCooldownUntil))) {
+    state.beatCooldownUntil = 0;
+  }
+  if (!Number.isFinite(Number(state.mouseGazeCurrentX))) {
+    state.mouseGazeCurrentX = 0;
+  }
+  if (!Number.isFinite(Number(state.mouseGazeCurrentY))) {
+    state.mouseGazeCurrentY = 0;
+  }
+  if (!Number.isFinite(Number(state.spring_hairAhoge_vel))) state.spring_hairAhoge_vel = 0;
+  if (!Number.isFinite(Number(state.spring_hairAhoge_pos))) state.spring_hairAhoge_pos = 0;
+  if (!Number.isFinite(Number(state.spring_hairFront_vel))) state.spring_hairFront_vel = 0;
+  if (!Number.isFinite(Number(state.spring_hairFront_pos))) state.spring_hairFront_pos = 0;
+  if (!Number.isFinite(Number(state.spring_hairBack_vel))) state.spring_hairBack_vel = 0;
+  if (!Number.isFinite(Number(state.spring_hairBack_pos))) state.spring_hairBack_pos = 0;
+  if (!Number.isFinite(Number(state.spring_ribbon_vel))) state.spring_ribbon_vel = 0;
+  if (!Number.isFinite(Number(state.spring_ribbon_pos))) state.spring_ribbon_pos = 0;
+  if (!Number.isFinite(Number(state.spring_skirt_vel))) state.spring_skirt_vel = 0;
+  if (!Number.isFinite(Number(state.spring_skirt_pos))) state.spring_skirt_pos = 0;
+  if (!Number.isFinite(Number(state.spring_skirt2_vel))) state.spring_skirt2_vel = 0;
+  if (!Number.isFinite(Number(state.spring_skirt2_pos))) state.spring_skirt2_pos = 0;
+  if (!Number.isFinite(Number(state.spring_torso_vel))) state.spring_torso_vel = 0;
+  if (!Number.isFinite(Number(state.spring_torso_pos))) state.spring_torso_pos = 0;
+  if (!Number.isFinite(Number(state.spring_head_vel))) state.spring_head_vel = 0;
+  if (!Number.isFinite(Number(state.spring_head_pos))) state.spring_head_pos = 0;
+  if (!Number.isFinite(Number(state.spring_body_vel))) state.spring_body_vel = 0;
+  if (!Number.isFinite(Number(state.spring_body_pos))) state.spring_body_pos = 0;
+  if (!Number.isFinite(Number(state.spring_body_render))) state.spring_body_render = 0;
+  if (!Number.isFinite(Number(state.spring_torso_render))) state.spring_torso_render = 0;
+  if (!Number.isFinite(Number(state.spring_head_render))) state.spring_head_render = 0;
+}
+
+function getSmoothedMoodExpression(now = performance.now()) {
+  const now2 = now || performance.now();
+  const holding = now2 < Number(state.moodHoldUntil || 0);
+  const speakingNow = isSpeechMotionActive(now2);
+  const activeMood = (holding || speakingNow)
+    ? String(state.speechAnimMood || "idle")
+    : "idle";
+  const prev = state.moodExpressionSmoothed && typeof state.moodExpressionSmoothed === "object"
+    ? state.moodExpressionSmoothed
+    : { happy: 0, sad: 0, angry: 0, surprised: 0 };
+  const target = { happy: 0, sad: 0, angry: 0, surprised: 0 };
+  if (activeMood in target) {
+    target[activeMood] = 1;
+  }
+  const last = Number(state.moodExpressionUpdatedAt || 0);
+  if (last > 0 && now2 - last < 1) {
+    return prev;
+  }
+  const dtFrames = last > 0 ? clampNumber((now2 - last) / 16.6667, 0.5, 3.5) : 1;
+  const smoothing = 1 - Math.pow(1 - 0.28, dtFrames);
+  const next = {
+    happy: prev.happy + (target.happy - prev.happy) * smoothing,
+    sad: prev.sad + (target.sad - prev.sad) * smoothing,
+    angry: prev.angry + (target.angry - prev.angry) * smoothing,
+    surprised: prev.surprised + (target.surprised - prev.surprised) * smoothing
+  };
+  state.moodExpressionSmoothed = next;
+  state.moodExpressionUpdatedAt = now2;
+  return next;
 }
 
 function ensureTTSAudioAnalyser(audio) {
@@ -3274,7 +4989,7 @@ function ensureTTSAudioAnalyser(audio) {
     if (!state.ttsAudioAnalyser) {
       state.ttsAudioAnalyser = state.ttsAudioContext.createAnalyser();
       state.ttsAudioAnalyser.fftSize = 256;
-      state.ttsAudioAnalyser.smoothingTimeConstant = 0.72;
+      state.ttsAudioAnalyser.smoothingTimeConstant = 0.35;
       state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.frequencyBinCount);
       state.ttsAudioSourceNode.connect(state.ttsAudioAnalyser);
       state.ttsAudioAnalyser.connect(state.ttsAudioContext.destination);
@@ -3289,7 +5004,7 @@ function sampleTTSAudioLevel() {
   const analyser = state.ttsAudioAnalyser;
   const data = state.ttsAudioAnalyserData;
   if (!analyser || !data || !data.length) {
-    state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.24;
+    state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
     return state.ttsAudioLevel;
   }
   try {
@@ -3300,10 +5015,11 @@ function sampleTTSAudioLevel() {
       sum += centered * centered;
     }
     const rms = Math.sqrt(sum / data.length);
-    const normalized = clampNumber((rms - 0.012) / 0.16, 0, 1);
-    state.ttsAudioLevel += (normalized - state.ttsAudioLevel) * 0.45;
+    const normalized = clampNumber((rms - 0.009) / 0.125, 0, 1);
+    const smoothing = normalized > state.ttsAudioLevel ? 0.72 : 0.5;
+    state.ttsAudioLevel += (normalized - state.ttsAudioLevel) * smoothing;
   } catch (_) {
-    state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.24;
+    state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
   }
   return state.ttsAudioLevel;
 }
@@ -3318,10 +5034,135 @@ function updateMicroMotionLayer() {
   }
   const now = performance.now();
   ensureMicroMotionState(now);
+  const prevMotionAt = Number(state.microMotionLastAt) || now;
+  const rawDtFrames = (now - prevMotionAt) / 16.6667;
+  state.microMotionLastAt = now;
   const style = normalizeTalkStyle(state.currentTalkStyle || state.expressionStyle || "neutral");
-  const mood = String(state.speechAnimMood || "idle");
-  const speaking = isSpeakingNow() || state.streamSpeakWorking;
-  const blinkLength = speaking ? 110 : 150;
+  const speaking = isSpeechMotionActive(now);
+  const dtFrames = speaking
+    ? clampNumber(rawDtFrames, 0.86, 1.16)
+    : clampNumber(rawDtFrames, 0.72, 1.5);
+  const motionBlendPrev = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
+  const motionBlendFollow = speaking
+    ? (1 - Math.pow(1 - 0.42, dtFrames))
+    : (1 - Math.pow(1 - 0.18, dtFrames));
+  const motionBlend = clampNumber(
+    motionBlendPrev + ((speaking ? 1 : 0) - motionBlendPrev) * motionBlendFollow,
+    0,
+    1
+  );
+  state.speechMotionBlend = motionBlend;
+  const smoothMotionOutput = (name, target, opts = {}) => {
+    const key = `motion_smooth_${name}`;
+    let prev = Number(state[key]);
+    if (!Number.isFinite(prev)) {
+      prev = Number(target) || 0;
+    }
+    const rise = clampNumber(
+      Number.isFinite(Number(opts.rise)) ? Number(opts.rise) : 0.22,
+      0.01,
+      0.98
+    );
+    const fall = clampNumber(
+      Number.isFinite(Number(opts.fall)) ? Number(opts.fall) : 0.16,
+      0.01,
+      0.98
+    );
+    const maxStep = Math.max(
+      0.001,
+      Number.isFinite(Number(opts.maxStep)) ? Number(opts.maxStep) : 999
+    );
+    const follow = target > prev
+      ? (1 - Math.pow(1 - rise, dtFrames))
+      : (1 - Math.pow(1 - fall, dtFrames));
+    let next = prev + (target - prev) * follow;
+    const maxDelta = maxStep * dtFrames;
+    next = prev + clampNumber(next - prev, -maxDelta, maxDelta);
+    state[key] = next;
+    return next;
+  };
+  const audioEnergy = clampNumber(Number(state.ttsAudioLevel) || 0, 0, 1);
+  const priorBeat = clampNumber(Number(state.beatImpulse) || 0, 0, 1);
+  const energyInput = motionBlend > 0.02
+    ? Math.max(audioEnergy, 0.12 + priorBeat * 0.22 * motionBlend)
+    : audioEnergy;
+  const currentBodyEnergy = Number(state.speechBodyEnergy) || 0;
+  const energyAttack = 1 - Math.pow(1 - 0.24, dtFrames);
+  const energyRelease = 1 - Math.pow(1 - 0.07, dtFrames);
+  const energyFollow = energyInput > currentBodyEnergy ? energyAttack : energyRelease;
+  state.speechBodyEnergy = clampNumber(
+    currentBodyEnergy + (energyInput - currentBodyEnergy) * energyFollow,
+    0, 1
+  );
+  const rawLevel = clampNumber(Number(state.ttsAudioLevel) || 0, 0, 1);
+  const prevLevel = Number(state.beatPrevLevel) || 0;
+  const dLevel = rawLevel - prevLevel;
+  const risingLevel = Math.max(0, dLevel);
+  const fallingLevel = Math.max(0, -dLevel);
+  const beatVelocity = risingLevel + fallingLevel * 0.28;
+  const beatThreshold = 0.08;
+  state.beatPrevLevel = rawLevel;
+  const beatSoftCap = 0.32 + motionBlend * 0.5;
+  if (motionBlend > 0.06 && rawLevel > beatThreshold && beatVelocity > 0.01 && risingLevel > 0.002 && now > Number(state.beatCooldownUntil || 0)) {
+    const impulseStrength = clampNumber((beatVelocity - 0.01) / 0.085, 0.05, 0.68);
+    const slopeGain = 0.78 + clampNumber(risingLevel * 18, 0, 0.26);
+    const currentImpulse = Number(state.beatImpulse) || 0;
+    const softened = impulseStrength * 0.58 * slopeGain * (1 - currentImpulse * 0.42);
+    state.beatImpulse = clampNumber(currentImpulse + softened, 0, beatSoftCap);
+    state.beatCooldownUntil = now + 126;
+  }
+  const beatDecay = Math.pow(0.74 + motionBlend * 0.14, dtFrames);
+  state.beatImpulse = clampNumber((Number(state.beatImpulse) || 0) * beatDecay, 0, beatSoftCap);
+  if (motionBlend < 0.02) state.beatImpulse = 0;
+  const beatSmoothFollow = motionBlend > 0.05
+    ? (1 - Math.pow(1 - 0.34, dtFrames))
+    : (1 - Math.pow(1 - 0.22, dtFrames));
+  const beatSmoothPrev = Number(state.beatNodSmoothed) || 0;
+  state.beatNodSmoothed = clampNumber(
+    beatSmoothPrev + ((Number(state.beatImpulse) || 0) - beatSmoothPrev) * beatSmoothFollow,
+    0,
+    beatSoftCap
+  );
+  const beatNodRaw = Number(state.beatNodSmoothed) || 0;
+  const beatNod = smoothMotionOutput("beat_nod", beatNodRaw, {
+    rise: 0.24,
+    fall: 0.21,
+    maxStep: 0.055
+  });
+  const bodyEnergyRaw = state.speechBodyEnergy * motionBlend;
+  const bodyEnergy = smoothMotionOutput("body_energy", bodyEnergyRaw, {
+    rise: 0.22,
+    fall: 0.14,
+    maxStep: 0.08
+  });
+  const wasSpeaking = !!state.speechPhaseWasSpeaking;
+  state.speechPhaseWasSpeaking = speaking;
+
+  if (!wasSpeaking && speaking) {
+    state.speechPhase = "attack";
+    state.speechPhaseEnteredAt = now;
+  } else if (wasSpeaking && !speaking && state.speechPhase !== "idle") {
+    state.speechPhase = "release";
+    state.speechPhaseEnteredAt = now;
+  } else if (state.speechPhase === "attack" && now - Number(state.speechPhaseEnteredAt) > 300) {
+    state.speechPhase = "sustain";
+    state.speechPhaseEnteredAt = now;
+  } else if (state.speechPhase === "release" && now - Number(state.speechPhaseEnteredAt) > 600) {
+    state.speechPhase = "idle";
+    state.speechPhaseEnteredAt = 0;
+  } else if (!speaking && state.speechPhase === "idle") {
+  }
+
+  const phase = state.speechPhase || "idle";
+  const phaseAge = now - Number(state.speechPhaseEnteredAt || now);
+  const energyBoost = 1.0 + motionBlend * (0.12 + bodyEnergy * 1.2);
+  const moodBlend = getSmoothedMoodExpression(now);
+  const happyBlend = moodBlend.happy;
+  const sadBlend = moodBlend.sad;
+  const angryBlend = moodBlend.angry;
+  const surprisedBlend = moodBlend.surprised;
+  const moodGain = 0.85 + motionBlend * 0.15;
+  const blinkLength = 150 - motionBlend * 40;
   if (now >= state.microNextBlinkAt) {
     state.microBlinkUntil = now + blinkLength;
     state.microNextBlinkAt = now + 1800 + Math.random() * 3400;
@@ -3340,51 +5181,333 @@ function updateMicroMotionLayer() {
   }
   state.microGazeCurrentX += (state.microGazeTargetX - state.microGazeCurrentX) * 0.03;
   state.microGazeCurrentY += (state.microGazeTargetY - state.microGazeCurrentY) * 0.03;
+  state.mouseGazeCurrentX += (state.mouseGazeTargetX - state.mouseGazeCurrentX) * 0.06;
+  state.mouseGazeCurrentY += (state.mouseGazeTargetY - state.mouseGazeCurrentY) * 0.06;
+  const mouseWeight = state.uiView === "model" ? 0.65 : 0;
+  const saccadeWeight = 1 - mouseWeight;
+  const finalGazeX = state.mouseGazeCurrentX * mouseWeight + state.microGazeCurrentX * saccadeWeight;
+  const finalGazeY = state.mouseGazeCurrentY * mouseWeight + state.microGazeCurrentY * saccadeWeight;
   const breath = Math.sin(now / 1050 + state.microBreathSeed) * 0.5 + 0.5;
   const sway = Math.sin(now / 860 + state.microBreathSeed * 0.7);
   const ribbon = Math.sin(now / 930 + state.microBreathSeed * 1.3);
   const hair = Math.sin(now / 780 + state.microBreathSeed * 1.9);
-  const breathGain = speaking ? 0.24 : 0.46;
+  const breathGain = 0.46 - motionBlend * 0.22;
   const styleGain = style === "comfort" ? 1.08 : (style === "playful" ? 1.15 : 1);
   const breathShift = (breath - 0.5) * breathGain * styleGain;
-  const bodySway = sway * 0.18 * (speaking ? 0.75 : 1);
+  const bodySwayGain = 0.96 + motionBlend * (0.79 + bodyEnergy * 2.2);
+  const bodySway = sway * 0.22 * bodySwayGain;
+  let hairAhogeTarget = hair * (0.18 + audioEnergy * 0.18) + breath * 0.12;
+  const hairFrontTarget = hair * 0.12;
+  const hairBackTarget = -hair * 0.1;
+  let ribbonTarget = ribbon * (0.1 + bodyEnergy * 0.08);
+  const skirtTarget = -sway * 0.08;
+  const skirt2Target = sway * 0.06;
+  if (motionBlend > 0.04 && bodyEnergy > 0.02) {
+    const e = bodyEnergy;
+    hairAhogeTarget += e * 0.3;
+    ribbonTarget += e * 0.2;
+  }
+  const springK = clampNumber(
+    0.068 + motionBlend * 0.04 + bodyEnergy * 0.055 + beatNod * 0.03,
+    0.068,
+    0.19
+  );
+  const springDamping = 0.88 - motionBlend * 0.06;
+  const springStep = clampNumber(dtFrames, 0.82, 1.25);
+  const springSubsteps = Math.max(
+    2,
+    Math.min(6, Math.round((1 + motionBlend * 2.5) * springStep))
+  );
+  const springStepEach = springStep / springSubsteps;
+  const springTargetFollow = 1 - Math.pow(1 - (0.22 + motionBlend * 0.3), springStep);
+  const applySpring = (name, target) => {
+    const velKey = `spring_${name}_vel`;
+    const posKey = `spring_${name}_pos`;
+    const targetKey = `spring_${name}_target`;
+    let vel = Number(state[velKey]) || 0;
+    let pos = Number(state[posKey]) || 0;
+    let smoothedTarget = Number(state[targetKey]);
+    if (!Number.isFinite(smoothedTarget)) {
+      smoothedTarget = target;
+    }
+    smoothedTarget += (target - smoothedTarget) * springTargetFollow;
+    for (let i = 0; i < springSubsteps; i += 1) {
+      vel += (smoothedTarget - pos) * springK * springStepEach;
+      vel *= Math.pow(springDamping, springStepEach);
+      vel = clampNumber(vel, -1.9, 1.9);
+      pos += vel * springStepEach;
+      pos = clampNumber(pos, -1, 1);
+    }
+    state[targetKey] = smoothedTarget;
+    state[velKey] = vel;
+    state[posKey] = pos;
+    return pos;
+  };
+  const hairAhogeSpring = applySpring("hairAhoge", hairAhogeTarget);
+  const hairFrontSpring = applySpring("hairFront", hairFrontTarget);
+  const hairBackSpring = applySpring("hairBack", hairBackTarget);
+  const ribbonSpring = applySpring("ribbon", ribbonTarget);
+  const skirtSpring = applySpring("skirt", skirtTarget);
+  const skirt2Spring = applySpring("skirt2", skirt2Target);
+  const bodyTarget = clampNumber(
+    bodySway * (0.92 + motionBlend * 0.6) + beatNod * (0.12 + motionBlend * 0.24) + breathShift * motionBlend * 0.14,
+    -1,
+    1
+  );
+  const bodySpring = applySpring("body", bodyTarget);
+  const torsoTarget = clampNumber(
+    bodySway * (0.9 + motionBlend * 0.76) + beatNod * (0.16 + motionBlend * 0.28) + breathShift * (0.12 + motionBlend * 0.26),
+    -1,
+    1
+  );
+  const torsoSpring = applySpring("torso", torsoTarget);
+  const headTarget = clampNumber(
+    bodySway * 0.46 + beatNod * 0.24 - torsoSpring * 0.33 - finalGazeX * 0.2,
+    -1,
+    1
+  );
+  const headSpring = applySpring("head", headTarget);
+  const springRenderFollow = 1 - Math.pow(1 - (0.22 + motionBlend * 0.2), dtFrames);
+  state.spring_body_render += (bodySpring - Number(state.spring_body_render || 0)) * springRenderFollow;
+  state.spring_torso_render += (torsoSpring - Number(state.spring_torso_render || 0)) * springRenderFollow;
+  state.spring_head_render += (headSpring - Number(state.spring_head_render || 0)) * springRenderFollow;
+  const bodySpringOut = Number(state.spring_body_render) || 0;
+  const torsoSpringOut = Number(state.spring_torso_render) || 0;
+  const headSpringOut = Number(state.spring_head_render) || 0;
+  const upperSpeechEnvelopeTarget = speaking
+    ? motionBlend * (0.68 + bodyEnergy * 0.58)
+    : 0;
+  const upperSpeechEnvelope = smoothMotionOutput("speech_upper_envelope", upperSpeechEnvelopeTarget, {
+    rise: 0.14,
+    fall: 0.11,
+    maxStep: 0.055
+  });
+  const upperSpeechEnvelopeOut = smoothMotionOutput("speech_upper_envelope_out", upperSpeechEnvelope, {
+    rise: 0.12,
+    fall: 0.1,
+    maxStep: 0.045
+  });
+  const upperSpeechGain = speaking
+    ? (1 + upperSpeechEnvelopeOut * (0.34 + bodyEnergy * 0.4))
+    : 1;
+  const upperShoulderGain = speaking
+    ? (1 + upperSpeechEnvelopeOut * (0.46 + bodyEnergy * 0.5))
+    : 1;
+  const angleYSpeechTarget = (-finalGazeY * 4.4)
+    + breathShift * (1.4 * upperSpeechGain)
+    + (speaking ? (torsoSpringOut * 0.52 + beatNod * (0.62 + upperSpeechEnvelopeOut * 0.72)) : 0);
+  const angleYBase = smoothMotionOutput("param_angle_y_base", angleYSpeechTarget, {
+    rise: 0.22,
+    fall: 0.2,
+    maxStep: 0.72
+  });
+  const angleZSpeechTarget = sway * 1.2 * energyBoost * (0.9 + motionBlend * 0.35)
+    + headSpringOut * (2.2 + motionBlend * 1.1)
+    + (speaking ? beatNod * (0.82 + upperSpeechEnvelopeOut * 2.1) : 0);
+  const angleZBase = smoothMotionOutput("param_angle_z_base", angleZSpeechTarget, {
+    rise: 0.2,
+    fall: 0.19,
+    maxStep: 0.82
+  });
+  const bodyTalkGain = 1 + motionBlend * (0.26 + bodyEnergy * 0.38);
+  const bodyXBase = smoothMotionOutput("param_body_x_base", finalGazeX * 2.2 + breathShift * 1.1 + torsoSpringOut * 1.08 * bodyTalkGain, {
+    rise: 0.24,
+    fall: 0.21,
+    maxStep: 0.72
+  });
+  const bodyYBase = smoothMotionOutput("param_body_y_base", breathShift * 0.86 + torsoSpringOut * 1.28 * bodyTalkGain, {
+    rise: 0.22,
+    fall: 0.2,
+    maxStep: 0.82
+  });
+  const bodyZBase = smoothMotionOutput("param_body_z_base", bodySpringOut * 9.6 * bodyTalkGain + torsoSpringOut * 3.5 * (1 + motionBlend * 0.3), {
+    rise: 0.21,
+    fall: 0.2,
+    maxStep: 1.45
+  });
+  const shoulderSpeechPulse = speaking
+    ? (Math.sin(now / 188 + state.microBreathSeed * 0.9) * 0.5 + 0.5) * upperSpeechEnvelopeOut * (0.12 + bodyEnergy * 0.28)
+    : 0;
+  const shoulderBaseTarget = 0.08
+    + breath * (speaking ? (0.2 + audioEnergy * 0.28) * upperShoulderGain : 0.18)
+    + shoulderSpeechPulse;
+  const shoulderBase = smoothMotionOutput("param_shoulder_base", shoulderBaseTarget, {
+    rise: 0.17,
+    fall: 0.15,
+    maxStep: 0.1
+  });
+  const upperTalkWave = speaking
+    ? Math.sin(now / 192 + state.microBreathSeed * 1.1) * upperSpeechEnvelopeOut * (0.32 + bodyEnergy * 0.68)
+    : 0;
+  const upperTalkWaveSmoothed = smoothMotionOutput("param_upper_talk_wave", upperTalkWave, {
+    rise: 0.17,
+    fall: 0.15,
+    maxStep: 0.09
+  });
+  const upperShoulderLift = smoothMotionOutput(
+    "param_upper_shoulder_lift",
+    speaking ? Math.abs(upperTalkWaveSmoothed) * (0.24 + motionBlend * 0.34) : 0,
+    {
+      rise: 0.18,
+      fall: 0.16,
+      maxStep: 0.06
+    }
+  );
+  const upperTalkWaveOut = smoothMotionOutput("param_upper_talk_wave_out", upperTalkWaveSmoothed, {
+    rise: 0.16,
+    fall: 0.14,
+    maxStep: 0.07
+  });
+  const upperShoulderLiftOut = smoothMotionOutput("param_upper_shoulder_lift_out", upperShoulderLift, {
+    rise: 0.16,
+    fall: 0.14,
+    maxStep: 0.05
+  });
   safeAddParamValue(core, "ParamEyeLOpen", -blink * 0.82, 0.96);
   safeAddParamValue(core, "ParamEyeROpen", -blink * 0.82, 0.96);
-  safeAddParamValue(core, "ParamEyeBallX", state.microGazeCurrentX, 0.45);
-  safeAddParamValue(core, "ParamEyeBallY", state.microGazeCurrentY, 0.45);
-  safeAddParamValue(core, "ParamAngleX", state.microGazeCurrentX * 5.8, 0.18);
-  safeAddParamValue(core, "ParamAngleY", (-state.microGazeCurrentY * 4.4) + breathShift * 1.4, 0.18);
-  safeAddParamValue(core, "ParamAngleZ", sway * 1.2, 0.12);
-  safeAddParamValue(core, "ParamBodyAngleX", state.microGazeCurrentX * 2.2 + breathShift * 1.1, 0.12);
-  safeAddParamValue(core, "ParamBodyAngleY", breathShift * 0.8, 0.11);
-  safeAddParamValue(core, "ParamBodyAngleZ", bodySway * 5.4, 0.1);
+  safeAddParamValue(core, "ParamEyeBallX", finalGazeX, 0.45);
+  safeAddParamValue(core, "ParamEyeBallY", finalGazeY, 0.45);
+  safeAddParamValue(core, "ParamAngleX", finalGazeX * 5.8, 0.18);
+  safeAddParamValue(core, "ParamAngleY", angleYBase, 0.18);
+  safeAddParamValue(core, "ParamAngleZ", angleZBase, 0.12);
+  safeAddParamValue(core, "ParamBodyAngleX", bodyXBase, 0.13);
+  safeAddParamValue(core, "ParamBodyAngleY", bodyYBase, 0.13);
+  safeAddParamValue(core, "ParamBodyAngleZ", bodyZBase, 0.64);
   safeAddParamValue(core, "ParamBreath", 0.22 + breath * 0.42, 0.2);
-  safeAddParamValue(core, "ParamShoulder", 0.08 + breath * 0.18, 0.14);
-  safeAddParamValue(core, "ParamHairAhoge", hair * 0.18 + breath * 0.12, 0.16);
-  safeAddParamValue(core, "ParamHairFront", hair * 0.12, 0.12);
-  safeAddParamValue(core, "ParamHairBack", -hair * 0.1, 0.1);
-  safeAddParamValue(core, "ParamRibbon", ribbon * 0.1, 0.1);
-  safeAddParamValue(core, "ParamSkirt", -sway * 0.08, 0.08);
-  safeAddParamValue(core, "ParamSkirt2", sway * 0.06, 0.08);
-  if (mood === "happy") {
-    safeAddParamValue(core, "ParamCheek", 0.03 + breath * 0.01, 0.24);
-    safeAddParamValue(core, "ParamBrowLForm", 0.05, 0.24);
-    safeAddParamValue(core, "ParamBrowRForm", 0.05, 0.24);
-  } else if (mood === "sad") {
-    safeAddParamValue(core, "ParamAngleY", 0.04, 0.16);
-    safeAddParamValue(core, "ParamShoulder", -0.06, 0.14);
-    safeAddParamValue(core, "ParamBrowLX", -0.02, 0.16);
-    safeAddParamValue(core, "ParamBrowRX", 0.02, 0.16);
-    safeAddParamValue(core, "ParamBrowLForm", -0.06, 0.18);
-    safeAddParamValue(core, "ParamBrowRForm", -0.06, 0.18);
-  } else if (mood === "angry") {
-    safeAddParamValue(core, "ParamBrowLY", -0.08, 0.18);
-    safeAddParamValue(core, "ParamBrowRY", -0.08, 0.18);
-    safeAddParamValue(core, "ParamBodyAngleZ", Math.sin(now / 140) * 2.2, 0.08);
-  } else if (mood === "surprised") {
-    safeAddParamValue(core, "ParamHairAhoge", 0.12, 0.16);
-    safeAddParamValue(core, "ParamEyeLOpen", 0.06, 0.18);
-    safeAddParamValue(core, "ParamEyeROpen", 0.06, 0.18);
+  safeAddParamValue(core, "ParamShoulder", shoulderBase, 0.14);
+  if (speaking && upperSpeechEnvelopeOut > 0.04) {
+    safeAddParamValue(core, "ParamAngleY", upperTalkWaveOut * 1.9, 0.36);
+    safeAddParamValue(core, "ParamAngleZ", upperTalkWaveOut * 0.95, 0.3);
+    safeAddParamValue(core, "ParamShoulder", upperShoulderLiftOut, 0.46);
+  }
+  safeAddParamValue(core, "ParamHairAhoge", hairAhogeSpring, 0.16);
+  safeAddParamValue(core, "ParamHairFront", hairFrontSpring, 0.12);
+  safeAddParamValue(core, "ParamHairBack", hairBackSpring, 0.1);
+  safeAddParamValue(core, "ParamRibbon", ribbonSpring, 0.1);
+  safeAddParamValue(core, "ParamSkirt", skirtSpring, 0.08);
+  safeAddParamValue(core, "ParamSkirt2", skirt2Spring, 0.08);
+  if (motionBlend > 0.06 && bodyEnergy > 0.02) {
+    const e = bodyEnergy;
+    const eShaped = Math.tanh(e * 1.45) / Math.tanh(1.45);
+    const yBounceRaw = (Math.sin(now / 118 + state.microBreathSeed * 0.6) * 0.5 + 0.5) * eShaped;
+    const yBounce = smoothMotionOutput("speech_y_bounce", yBounceRaw, {
+      rise: 0.2,
+      fall: 0.18,
+      maxStep: 0.085
+    });
+    const motionGain = upperSpeechEnvelopeOut * (0.52 + upperSpeechEnvelopeOut * 0.48);
+    const bodyZEnergyAdd = smoothMotionOutput("param_body_z_energy_add", eShaped * 17.6 * motionGain, {
+      rise: 0.18,
+      fall: 0.16,
+      maxStep: 1.22
+    });
+    const bodyXEnergyAdd = smoothMotionOutput("param_body_x_energy_add", eShaped * 1.46 * motionGain, {
+      rise: 0.2,
+      fall: 0.17,
+      maxStep: 0.2
+    });
+    const angleZEnergyAdd = smoothMotionOutput("param_angle_z_energy_add", (eShaped * 9.4 + headSpringOut * 1.9) * motionGain, {
+      rise: 0.18,
+      fall: 0.16,
+      maxStep: 0.86
+    });
+    const angleYEnergyAdd = smoothMotionOutput("param_angle_y_energy_add", (-eShaped * 1.7 + yBounce * 2.7) * motionGain, {
+      rise: 0.2,
+      fall: 0.17,
+      maxStep: 0.52
+    });
+    const bodyYEnergyAdd = smoothMotionOutput("param_body_y_energy_add", (yBounce * 5.6 + torsoSpringOut * 2.3) * motionGain, {
+      rise: 0.19,
+      fall: 0.17,
+      maxStep: 0.74
+    });
+    const shoulderEnergyAdd = smoothMotionOutput("param_shoulder_energy_add", e * 0.46 * motionGain, {
+      rise: 0.19,
+      fall: 0.16,
+      maxStep: 0.08
+    });
+    safeAddParamValue(core, "ParamBodyAngleZ", bodyZEnergyAdd, 0.84);
+    safeAddParamValue(core, "ParamBodyAngleX", bodyXEnergyAdd, 0.5);
+    safeAddParamValue(core, "ParamAngleZ", angleZEnergyAdd, 0.64);
+    safeAddParamValue(core, "ParamAngleY", angleYEnergyAdd, 0.4);
+    safeAddParamValue(core, "ParamBodyAngleY", bodyYEnergyAdd, 0.6);
+    safeAddParamValue(core, "ParamShoulder", shoulderEnergyAdd, 0.52);
+    if (beatNod > 0.02) {
+      const beatAngleYAdd = smoothMotionOutput("param_angle_y_beat_add", beatNod * 4.1 * motionGain, {
+        rise: 0.22,
+        fall: 0.2,
+        maxStep: 0.42
+      });
+      const beatBodyYAdd = smoothMotionOutput("param_body_y_beat_add", beatNod * 2.8 * motionGain, {
+        rise: 0.2,
+        fall: 0.18,
+        maxStep: 0.46
+      });
+      const beatShoulderAdd = smoothMotionOutput(
+        "param_shoulder_beat_add",
+        beatNod * 0.42 * motionGain * (1 + motionBlend * 0.8),
+        {
+          rise: 0.22,
+          fall: 0.2,
+          maxStep: 0.06
+        }
+      );
+      safeAddParamValue(core, "ParamAngleY", beatAngleYAdd, 0.52);
+      safeAddParamValue(core, "ParamBodyAngleY", beatBodyYAdd, 0.54);
+      safeAddParamValue(core, "ParamShoulder", beatShoulderAdd, 0.5);
+    }
+  }
+
+  if (phase === "attack") {
+    const t = clampNumber(phaseAge / 300, 0, 1);
+    const attackCurve = Math.sin(t * Math.PI);
+    const a = attackCurve * 0.8;
+    safeAddParamValue(core, "ParamBodyAngleY", a * 2.2, 0.5);
+    safeAddParamValue(core, "ParamAngleY", -a * 1.8, 0.45);
+    safeAddParamValue(core, "ParamShoulder", a * 0.15, 0.4);
+  }
+
+  if (phase === "release") {
+    const t = clampNumber(1 - phaseAge / 600, 0, 1);
+    const r = t * 0.5;
+    safeAddParamValue(core, "ParamBodyAngleY", r * 1.2, 0.4);
+    safeAddParamValue(core, "ParamAngleY", -r * 0.8, 0.35);
+  }
+  if (happyBlend > 0.001) {
+    const g = happyBlend * moodGain;
+    safeAddParamValue(core, "ParamCheek", (0.12 + breath * 0.05) * g, 0.42);
+    safeAddParamValue(core, "ParamBrowLForm", 0.18 * g, 0.42);
+    safeAddParamValue(core, "ParamBrowRForm", 0.18 * g, 0.42);
+    safeAddParamValue(core, "ParamAngleX", 1.2 * g, 0.28);
+  }
+  if (sadBlend > 0.001) {
+    const g = sadBlend * moodGain;
+    safeAddParamValue(core, "ParamAngleY", 0.32 * g, 0.36);
+    safeAddParamValue(core, "ParamShoulder", -0.18 * g, 0.3);
+    safeAddParamValue(core, "ParamBrowLX", -0.08 * g, 0.32);
+    safeAddParamValue(core, "ParamBrowRX", 0.08 * g, 0.32);
+    safeAddParamValue(core, "ParamBrowLForm", -0.22 * g, 0.36);
+    safeAddParamValue(core, "ParamBrowRForm", -0.22 * g, 0.36);
+    safeAddParamValue(core, "ParamBodyAngleX", -0.24 * g, 0.28);
+  }
+  if (angryBlend > 0.001) {
+    const g = angryBlend * moodGain;
+    safeAddParamValue(core, "ParamBrowLY", -0.22 * g, 0.44);
+    safeAddParamValue(core, "ParamBrowRY", -0.22 * g, 0.44);
+    safeAddParamValue(core, "ParamBrowLAngle", -0.16 * g, 0.4);
+    safeAddParamValue(core, "ParamBrowRAngle", 0.16 * g, 0.4);
+    safeAddParamValue(core, "ParamEyeLOpen", 0.08 * g, 0.3);
+    safeAddParamValue(core, "ParamEyeROpen", 0.08 * g, 0.3);
+    safeAddParamValue(core, "ParamBodyAngleZ", Math.sin(now / 120) * 4 * g, 0.3);
+  }
+  if (surprisedBlend > 0.001) {
+    const g = surprisedBlend * moodGain;
+    safeAddParamValue(core, "ParamHairAhoge", 0.32 * g, 0.34);
+    safeAddParamValue(core, "ParamEyeLOpen", 0.24 * g, 0.42);
+    safeAddParamValue(core, "ParamEyeROpen", 0.24 * g, 0.42);
+    safeAddParamValue(core, "ParamBrowLY", 0.22 * g, 0.4);
+    safeAddParamValue(core, "ParamBrowRY", 0.22 * g, 0.4);
+    safeAddParamValue(core, "ParamAngleY", -0.22 * g, 0.28);
   }
   if (style === "comfort") {
     safeAddParamValue(core, "ParamHandL", 0.06 + breath * 0.04, 0.1);
@@ -3405,10 +5528,15 @@ function updateMicroMotionLayer() {
 
 function getSpeechAnimationMouthOpen() {
   const now = performance.now();
-  const speaking = isSpeakingNow() || state.streamSpeakWorking;
+  const audioPlaying = isSpeakingNow();
+  const speaking = isSpeechMotionActive(now);
   const activeUntil = Number(state.speechAnimUntil || 0);
-  if (!speaking && now >= activeUntil) {
-    state.speechMouthOpen += (0 - state.speechMouthOpen) * 0.28;
+  if (!speaking) {
+    const closeSpeed = now >= activeUntil ? 0.74 : 0.48;
+    state.speechMouthOpen += (0 - state.speechMouthOpen) * closeSpeed;
+    if (Math.abs(state.speechMouthOpen) < 0.003) {
+      state.speechMouthOpen = 0;
+    }
     return state.speechMouthOpen;
   }
   const start = Number(state.speechAnimStartedAt || now);
@@ -3416,14 +5544,16 @@ function getSpeechAnimationMouthOpen() {
   const progress = clampNumber((now - start) / duration, 0, 1.3);
   const style = normalizeTalkStyle(state.speechAnimStyle || state.currentTalkStyle || "neutral");
   const mood = String(state.speechAnimMood || "idle");
+  const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
   const chars = Math.max(1, Number(state.speechAnimTextLength) || 8);
   const punct = Math.max(0, Number(state.speechAnimPunctuation) || 0);
+  const accentCount = Math.max(0, Number(state.speechAnimAccentCount) || 0);
   const seed = Number(state.speechAnimSeed) || 0;
   const pace = style === "playful" ? 11.5 : (style === "comfort" ? 8.4 : 9.8);
   const waveA = Math.abs(Math.sin(progress * Math.PI * pace + seed));
   const waveB = Math.abs(Math.sin(progress * Math.PI * (pace * 0.53) + seed * 0.67));
   const pauseShape = 1 - Math.pow(Math.sin(clampNumber(progress, 0, 1) * Math.PI), 6) * 0.08;
-  let energy = 0.2 + waveA * 0.58 + waveB * 0.24;
+  let energy = 0.24 + waveA * 0.64 + waveB * 0.28;
   energy *= pauseShape;
   if (mood === "happy" || mood === "surprised") {
     energy += 0.06;
@@ -3434,14 +5564,48 @@ function getSpeechAnimationMouthOpen() {
   if (!speaking) {
     energy *= Math.max(0, 1 - clampNumber((now - activeUntil) / 220, 0, 1));
   }
+  const syllableRate = style === "playful" ? 2.7 : (style === "steady" ? 3.8 : 3.2);
+  const pseudoSyllables = Math.max(
+    3,
+    Math.min(26, Math.round(chars / syllableRate) + punct + accentCount * 2)
+  );
+  const visemePhase = progress * pseudoSyllables;
+  const visemeT = visemePhase - Math.floor(visemePhase);
+  const visemeOpen = Math.pow(Math.sin(visemeT * Math.PI), style === "steady" ? 1.6 : 1.28);
+  const visemeClosure = Math.pow(Math.abs(Math.cos(visemeT * Math.PI)), 4.2) * (0.18 + punct * 0.01);
+  const accentSlots = Math.max(1, Math.min(6, punct + accentCount + 1));
+  let accentPulse = 0;
+  for (let i = 0; i < accentSlots; i += 1) {
+    const center = (i + 0.5) / accentSlots + Math.sin(seed + i * 1.7) * 0.012;
+    const width = i % 3 === 1 ? 0.1 : 0.075;
+    const shape = Math.max(0, 1 - Math.abs(progress - center) / width);
+    const accentGain = [1.12, 0.78, 1.0][i % 3];
+    accentPulse = Math.max(accentPulse, shape * accentGain);
+  }
+  const visemeJitter = Math.sin(progress * Math.PI * (5.8 + punct * 0.35) + seed * 1.37) * 0.035;
+  let target = clampNumber(
+    energy * (0.46 + visemeOpen * 0.64) + accentPulse * 0.2 - visemeClosure * 0.88 + visemeJitter,
+    0,
+    1
+  );
+  if (speaking) {
+    target = Math.max(target, 0.06 + motionBlend * 0.08);
+  }
   if (speaking) {
     const liveLevel = sampleTTSAudioLevel();
-    if (liveLevel > 0.02) {
-      energy = Math.max(energy * 0.42, 0.14 + liveLevel * 0.96);
+    if (audioPlaying && (state.ttsAudioAnalyser || liveLevel > 0.01)) {
+      const liveTarget = clampNumber(liveLevel * 1.82 + 0.02, 0, 1);
+      target = clampNumber(liveTarget * 0.86 + target * 0.14 + accentPulse * 0.06, 0, 1);
+      if (liveLevel < 0.018) {
+        target *= 0.58;
+      }
+      const smoothing = target > state.speechMouthOpen ? 0.8 : 0.62;
+      state.speechMouthOpen += (target - state.speechMouthOpen) * smoothing;
+      return state.speechMouthOpen;
     }
   }
-  const target = clampNumber(energy, 0, 1);
-  state.speechMouthOpen += (target - state.speechMouthOpen) * 0.42;
+  const smoothing = target > state.speechMouthOpen ? 0.68 : 0.4;
+  state.speechMouthOpen += (target - state.speechMouthOpen) * smoothing;
   return state.speechMouthOpen;
 }
 
@@ -3456,19 +5620,49 @@ function applyStyleExpressionLayer() {
   const style = normalizeTalkStyle(state.currentTalkStyle || state.expressionStyle || "neutral");
   const profile = getStyleExpressionProfile(style);
   const now = performance.now();
-  const speaking = isSpeakingNow() || state.streamSpeakWorking;
-  const mood = String(state.speechAnimMood || "idle");
+  const speaking = isSpeechMotionActive(now);
+  const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
+  const speakingQuiet = state.motionQuietDuringSpeech && speaking;
+  const moodBlend = getSmoothedMoodExpression(now);
+  const happyMoodScale = speakingQuiet ? (0.32 + (1 - motionBlend) * 0.2) : 1;
+  const subtleMoodScale = speakingQuiet ? (0.16 + (1 - motionBlend) * 0.12) : 1;
+  const happyBlend = moodBlend.happy * happyMoodScale;
+  const sadBlend = moodBlend.sad * subtleMoodScale;
+  const angryBlend = moodBlend.angry * subtleMoodScale * (speakingQuiet ? 0.8 : 1);
+  const surprisedBlend = moodBlend.surprised * subtleMoodScale * (speakingQuiet ? 0.75 : 1);
   const pulseActive = now < Number(state.expressionPulseUntil || 0);
   const pulseWeight = pulseActive ? state.expressionPulseBoost : 0;
   const strength = clampNumber(Number(state.expressionStrength) || 1, 0.2, 2.0);
-  const speakGain = speaking ? 1.0 : 0.36;
-  const pulseGain = pulseActive ? (0.65 + pulseWeight * 0.28) : 0.0;
+  const speakGain = 0.36 + motionBlend * 0.64;
+  const pulseGain = pulseActive
+    ? (0.65 + pulseWeight * 0.28) * (speakingQuiet ? 0.34 : 1)
+    : 0.0;
   const gain = strength * (speakGain + pulseGain);
-  const mouthOpen = getSpeechAnimationMouthOpen();
+  if (state.uiView === "model" && !speaking) {
+    state.speechMouthOpen += (0 - (Number(state.speechMouthOpen) || 0)) * 0.46;
+    if (Math.abs(Number(state.speechMouthOpen) || 0) < 0.003) {
+      state.speechMouthOpen = 0;
+    }
+  }
+  const mouthOpen = state.uiView === "model"
+    ? Number(state.speechMouthOpen) || 0
+    : getSpeechAnimationMouthOpen();
 
-  // Soft semantic expression layer (additive), intentionally small to avoid fighting motions.
+  const surpriseMouthBoost = motionBlend > 0.05 && surprisedBlend > 0.001
+    ? (0.5 * surprisedBlend * gain * motionBlend)
+    : 0;
+  const mouthCarry = 0.08 + motionBlend * 0.94;
+  const mouthSpeakBoost = speaking ? (1.1 + motionBlend * 0.24) : 1.0;
+  const mouthTarget = clampNumber(
+    mouthOpen * mouthCarry * mouthSpeakBoost + surpriseMouthBoost,
+    0,
+    1
+  );
+  state.speechMouthTarget = mouthTarget;
+  state.speechMouthUpdatedAt = now;
+
   safeAddParamValue(core, "ParamMouthForm", profile.mouthForm * gain, 0.9);
-  safeAddParamValue(core, "ParamMouthOpenY", mouthOpen * (speaking ? 0.9 : 0.28), 1.0);
+  safeDriveParamValue(core, "ParamMouthOpenY", mouthTarget, 0.84 + motionBlend * 0.14);
   safeAddParamValue(core, "ParamCheek", profile.cheek * gain, 0.9);
   safeAddParamValue(core, "ParamEyeLSmile", profile.eyeSmile * gain, 0.9);
   safeAddParamValue(core, "ParamEyeRSmile", profile.eyeSmile * gain, 0.9);
@@ -3479,21 +5673,47 @@ function applyStyleExpressionLayer() {
   safeAddParamValue(core, "ParamAngleX", profile.headX * gain, 0.82);
   safeAddParamValue(core, "ParamAngleY", profile.headY * gain, 0.82);
   safeAddParamValue(core, "ParamBodyAngleX", profile.bodyX * gain, 0.76);
-  if (mood === "happy") {
-    safeAddParamValue(core, "ParamEyeBallX", 0.04 * gain, 0.6);
-    safeAddParamValue(core, "ParamEyeBallY", -0.02 * gain, 0.6);
-  } else if (mood === "sad") {
-    safeAddParamValue(core, "ParamEyeLOpen", -0.05 * gain, 0.5);
-    safeAddParamValue(core, "ParamEyeROpen", -0.05 * gain, 0.5);
-    safeAddParamValue(core, "ParamAngleY", 0.07 * gain, 0.5);
-  } else if (mood === "angry") {
-    safeAddParamValue(core, "ParamBrowLY", -0.06 * gain, 0.7);
-    safeAddParamValue(core, "ParamBrowRY", -0.06 * gain, 0.7);
-    safeAddParamValue(core, "ParamEyeBallX", 0.03 * Math.sign(Math.sin(now / 160)), 0.4);
-  } else if (mood === "surprised") {
-    safeAddParamValue(core, "ParamEyeLOpen", 0.08 * gain, 0.7);
-    safeAddParamValue(core, "ParamEyeROpen", 0.08 * gain, 0.7);
-    safeAddParamValue(core, "ParamAngleY", -0.06 * gain, 0.55);
+  if (happyBlend > 0.001) {
+    const g = happyBlend * gain;
+    safeAddParamValue(core, "ParamEyeLSmile", 0.4 * g, 0.85);
+    safeAddParamValue(core, "ParamEyeRSmile", 0.4 * g, 0.85);
+    safeAddParamValue(core, "ParamMouthForm", 0.5 * g, 0.85);
+    safeAddParamValue(core, "ParamCheek", 0.4 * g, 0.8);
+    safeAddParamValue(core, "ParamBrowLY", 0.15 * g, 0.7);
+    safeAddParamValue(core, "ParamBrowRY", 0.15 * g, 0.7);
+    safeAddParamValue(core, "ParamAngleX", 3.0 * g, 0.5);
+  }
+  if (sadBlend > 0.001) {
+    const g = sadBlend * gain;
+    safeAddParamValue(core, "ParamEyeLOpen", -0.25 * g, 0.85);
+    safeAddParamValue(core, "ParamEyeROpen", -0.25 * g, 0.85);
+    safeAddParamValue(core, "ParamBrowLY", -0.2 * g, 0.8);
+    safeAddParamValue(core, "ParamBrowRY", -0.2 * g, 0.8);
+    safeAddParamValue(core, "ParamBrowLAngle", 0.15 * g, 0.7);
+    safeAddParamValue(core, "ParamBrowRAngle", -0.15 * g, 0.7);
+    safeAddParamValue(core, "ParamMouthForm", -0.3 * g, 0.8);
+    safeAddParamValue(core, "ParamAngleY", 3.0 * g, 0.5);
+    safeAddParamValue(core, "ParamBodyAngleX", -3.0 * g, 0.4);
+  }
+  if (angryBlend > 0.001) {
+    const g = angryBlend * gain;
+    safeAddParamValue(core, "ParamBrowLY", -0.35 * g, 0.9);
+    safeAddParamValue(core, "ParamBrowRY", -0.35 * g, 0.9);
+    safeAddParamValue(core, "ParamBrowLAngle", -0.2 * g, 0.85);
+    safeAddParamValue(core, "ParamBrowRAngle", 0.2 * g, 0.85);
+    safeAddParamValue(core, "ParamEyeLOpen", 0.1 * g, 0.7);
+    safeAddParamValue(core, "ParamEyeROpen", 0.1 * g, 0.7);
+    safeAddParamValue(core, "ParamMouthForm", -0.35 * g, 0.85);
+    safeAddParamValue(core, "ParamBodyAngleZ", Math.sin(now / 120) * 4 * g, 0.3);
+  }
+  if (surprisedBlend > 0.001) {
+    const g = surprisedBlend * gain;
+    safeAddParamValue(core, "ParamEyeLOpen", 0.4 * g, 0.9);
+    safeAddParamValue(core, "ParamEyeROpen", 0.4 * g, 0.9);
+    safeAddParamValue(core, "ParamBrowLY", 0.3 * g, 0.85);
+    safeAddParamValue(core, "ParamBrowRY", 0.3 * g, 0.85);
+    safeAddParamValue(core, "ParamMouthForm", -0.1 * g, 0.7);
+    safeAddParamValue(core, "ParamAngleY", -3.0 * g, 0.5);
   }
 }
 
@@ -3708,7 +5928,10 @@ function buildActionPlan(intent, context = {}) {
   }
 
   if (intent === "talk") {
-    if (Math.random() > preset.talkChance) {
+    const emphasis = clampNumber(Number(context.emphasis) || 0, 0, 1);
+    const accentCount = Math.max(0, Math.round(Number(context.accentCount) || 0));
+    const talkChance = clampNumber((Number(preset.talkChance) || 0.82) + emphasis * 0.12, 0, 0.92);
+    if (Math.random() > talkChance) {
       return steps;
     }
     const talkMood = mood === "idle" && style === "playful" ? "happy" : mood;
@@ -3725,23 +5948,29 @@ function buildActionPlan(intent, context = {}) {
       ),
       priority: 2,
       force: true,
-      cooldownMs: 760,
+      cooldownMs: Math.max(520, Math.round(780 - emphasis * 140)),
       allowFallback: false
     });
+    const cadencePattern = emphasis > 0.45 ? [96, 270, 128] : [108, 256, 136];
+    const cadenceStride = emphasis > 0.6 ? 46 : 52;
     for (let beat = 1; beat < beats; beat += 1) {
       const beatMood = beat % 2 === 0 ? "idle" : talkMood;
+      const beatRole = (beat - 1) % 3;
+      const isAccentBeat = beatRole === 0 || (accentCount > 1 && beatRole === 2);
+      const nonlinearBeatDelay = cadencePattern[beatRole];
       steps.push({
         mood: beatMood,
-        source: "talk",
-        groups: buildPlannedMotionGroups(style, "talk", beatMood, "talk"),
-        priority: 2,
+        source: isAccentBeat ? "reply" : "talk",
+        groups: buildPlannedMotionGroups(style, isAccentBeat ? "reply" : "talk", beatMood, "talk"),
+        priority: isAccentBeat ? 2 : 1,
         force: true,
-        cooldownMs: 420,
-        delayMs: 110 + beat * 120,
+        cooldownMs: isAccentBeat ? Math.max(340, Math.round(460 - emphasis * 80)) : 460,
+        delayMs: nonlinearBeatDelay + Math.floor((beat - 1) / 3) * (cadenceStride + Math.round((1 - emphasis) * 8)),
         allowFallback: false
       });
     }
-    if (comboEnabled && Math.random() < (preset.comboChance * 0.65)) {
+    const comboChance = (Number(preset.comboChance) || 0.4) * (0.42 + emphasis * 0.55);
+    if (comboEnabled && (emphasis > 0.82 || Math.random() < comboChance)) {
       const accentMood = style === "comfort" ? "idle" : (talkMood === "idle" ? "happy" : talkMood);
       steps.push({
         mood: accentMood,
@@ -3749,8 +5978,8 @@ function buildActionPlan(intent, context = {}) {
         groups: buildPlannedMotionGroups(style, "reply", accentMood, "talk"),
         priority: 2,
         force: true,
-        cooldownMs: 520,
-        delayMs: 170 + beats * 90,
+        cooldownMs: Math.max(460, Math.round(540 - emphasis * 60)),
+        delayMs: Math.max(130, Math.round((180 + beats * 92) - emphasis * 38)),
         allowFallback: false
       });
     }
@@ -3826,6 +6055,39 @@ function buildActionPlan(intent, context = {}) {
   return steps;
 }
 
+function isTalkLikeActionStep(step) {
+  const source = String(step?.source || "").toLowerCase();
+  return source === "talk" || source === "reply";
+}
+
+function hasPendingTalkLikeAction() {
+  if (!Array.isArray(state.actionQueue) || state.actionQueue.length <= 0) {
+    return false;
+  }
+  return state.actionQueue.some((item) => isTalkLikeActionStep(item));
+}
+
+function shouldSkipActionStepForSpeech(step, now = performance.now()) {
+  if (!isTalkLikeActionStep(step)) {
+    return false;
+  }
+  const t = Number(now || performance.now());
+  const activeUntil = Number(state.speechAnimUntil || 0);
+  const speakingWindow = isSpeechMotionActive(t) || t <= activeUntil + 120;
+  if (!speakingWindow) {
+    return false;
+  }
+  if (state.motionQuietDuringSpeech) {
+    return true;
+  }
+  const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
+  const delayMs = Number(step?.delayMs) || 0;
+  if (delayMs > 0) {
+    return true;
+  }
+  return motionBlend > 0.2 && (Number(step?.priority) || 0) <= 2;
+}
+
 async function runActionQueue() {
   if (state.actionRunnerBusy) {
     return;
@@ -3840,8 +6102,14 @@ async function runActionQueue() {
       if (state.dragData || state.windowDragActive) {
         continue;
       }
+      if (shouldSkipActionStepForSpeech(step, performance.now())) {
+        continue;
+      }
       if (Number(step.delayMs) > 0) {
         await waitMs(step.delayMs);
+      }
+      if (shouldSkipActionStepForSpeech(step, performance.now())) {
+        continue;
       }
       await playEmotion(step.mood || "idle", {
         source: step.source || "emotion",
@@ -3907,7 +6175,7 @@ function buildSpeechDeliveryText(text, mood = "idle", style = "neutral", streamM
         return "";
       }
       if (streamMode) {
-        const streamSafe = safe.replace(/[：:；;]/g, "，");
+        const streamSafe = safe.replace(/[？！!?]/g, "。");
         return tightenMinorSpeechPauses(streamSafe, true);
       }
       return insertNaturalPause(safe);
@@ -3916,7 +6184,7 @@ function buildSpeechDeliveryText(text, mood = "idle", style = "neutral", streamM
   spoken = normalized.join("").trim();
 
   spoken = spoken
-    .replace(/[（(][^)）]{2,28}[)）]/g, "")
+    .replace(/[（(][^（）()]{2,28}[）)]/g, "")
     .replace(/```[\s\S]*?```/g, "")
     .replace(/\s+/g, " ")
     .replace(/，{2,}/g, "，")
@@ -3927,7 +6195,7 @@ function buildSpeechDeliveryText(text, mood = "idle", style = "neutral", streamM
     spoken = spoken
       .replace(/我建议你/g, "你直接")
       .replace(/你可以考虑/g, "你直接")
-      .replace(/一般来说[，,:：]?\s*/g, "");
+      .replace(/一般来说[:：]?\s*/g, "");
   }
 
   if (!/[。！？!?]$/.test(spoken)) {
@@ -3990,8 +6258,8 @@ function splitStreamSpeakSegments(buffer, flush = false) {
     return { segments, rest: "" };
   }
 
-  const strongTerminal = "。！？!?…\n";
-  const softTerminal = "：:";
+  const strongTerminal = "。！？!?\n";
+  const softTerminal = "，,";
   let start = 0;
 
   for (let i = 0; i < src.length; i++) {
@@ -4016,7 +6284,7 @@ function splitStreamSpeakSegments(buffer, flush = false) {
     const hardCut = Math.min(36, rest.length);
     let cut = -1;
     for (let i = hardCut - 1; i >= 18; i--) {
-      if ("，,、 ：: ".includes(rest[i])) {
+      if ("，,。！？!? ".includes(rest[i])) {
         cut = i + 1;
         break;
       }
@@ -4064,7 +6332,7 @@ function buildSpeakProsody(text, mood, streamMode = false, style = "neutral") {
   const clean = t.replace(/\s+/g, " ").trim();
   const textLen = clean.length;
   const commaCount = (clean.match(/[，,、]/g) || []).length;
-  const exclaimCount = (clean.match(/[！!]/g) || []).length;
+  const exclaimCount = (clean.match(/[!！]/g) || []).length;
 
   let speed = 1.04;
   let pitch = 0.99;
@@ -4096,7 +6364,7 @@ function buildSpeakProsody(text, mood, streamMode = false, style = "neutral") {
   if (/[?？]/.test(clean)) {
     pitch += 0.02;
   }
-  if (/！|!/.test(clean)) {
+  if (/[!！]/.test(clean)) {
     pitch += 0.02;
   }
 
@@ -4235,7 +6503,7 @@ async function runStreamSpeakQueue() {
           currentBlob = await requestServerTTSBlob(current.text, null);
         } catch (retryErr) {
           console.warn("Stream TTS retry failed:", retryErr);
-          setStatus("语音片段失败，跳过");
+          setStatus("语音片段失败，已跳过");
           current = await waitNextStreamSpeakItem(activeSession, state.chatBusy ? idleWaitMs : 60);
           continue;
         }
@@ -4424,6 +6692,7 @@ function speakOnceWithVoice(text, voice, force = false) {
     utterance.onstart = () => {
       started = true;
       beginSpeechAnimation(cleaned, detectMood(cleaned), state.currentTalkStyle || "neutral");
+      showSubtitleText(cleaned);
       setStatus("语音中...");
     };
     utterance.onend = () => {
@@ -4433,6 +6702,7 @@ function speakOnceWithVoice(text, voice, force = false) {
         state.ttsLastGoodVoiceName = voice.name;
       }
       endSpeechAnimation();
+      hideSubtitleText();
       setStatus("待机");
       resolve(true);
     };
@@ -4440,6 +6710,7 @@ function speakOnceWithVoice(text, voice, force = false) {
       if (settled) return;
       settled = true;
       endSpeechAnimation();
+      hideSubtitleText();
       setStatus("语音失败");
       resolve(false);
     };
@@ -4590,13 +6861,30 @@ async function loadConfig() {
   state.gptSovitsRealtimeTTS = ttsCfg.gpt_sovits_realtime_tts === true;
   state.streamSpeakMode = String(ttsCfg.stream_mode || "realtime").toLowerCase();
   state.serverTTSFallbackToBrowser = ttsCfg.allow_browser_fallback === true;
+  const retryCountCfg = Number(ttsCfg.server_retry_count);
+  const fallbackFailThresholdCfg = Number(ttsCfg.server_fallback_fail_threshold);
+  const retryDelayCfg = Number(ttsCfg.server_retry_delay_ms);
+  const timeoutCfg = Number(ttsCfg.server_request_timeout_ms);
+  const isSovits = state.ttsProvider === "gpt_sovits";
+  state.ttsServerRetryCount = Number.isFinite(retryCountCfg)
+    ? Math.max(0, Math.min(4, Math.round(retryCountCfg)))
+    : (isSovits ? 2 : 1);
+  state.ttsServerFallbackFailThreshold = Number.isFinite(fallbackFailThresholdCfg)
+    ? Math.max(1, Math.min(8, Math.round(fallbackFailThresholdCfg)))
+    : (isSovits ? 1 : 2);
+  state.ttsServerRetryDelayMs = Number.isFinite(retryDelayCfg)
+    ? Math.max(60, Math.min(3000, Math.round(retryDelayCfg)))
+    : 220;
+  state.ttsServerRequestTimeoutMs = Number.isFinite(timeoutCfg)
+    ? Math.max(1500, Math.min(45000, Math.round(timeoutCfg)))
+    : 14000;
+  state.ttsServerFailStreak = 0;
+  state.ttsServerLastError = "";
   if (!["final_only", "realtime"].includes(state.streamSpeakMode)) {
     state.streamSpeakMode = "realtime";
   }
   if (state.ttsProvider === "gpt_sovits" && !state.gptSovitsRealtimeTTS) {
     state.streamSpeakMode = "final_only";
-    // GPT-SoVITS mode should stay single-source to avoid browser double voice overlap.
-    state.serverTTSFallbackToBrowser = false;
   }
   if (isServerTTSProvider(state.ttsProvider)) {
     state.ttsServerAvailable = true;
@@ -4660,6 +6948,7 @@ async function loadConfig() {
   state.styleAutoEnabled = styleCfg.auto !== false;
   state.manualTalkStyle = normalizeTalkStyle(styleCfg.manual || "neutral");
   state.motionEnabled = motionCfg.enabled !== false;
+  state.motionQuietDuringSpeech = motionCfg.quiet_speech !== false;
   state.motionIntensity = normalizeMotionIntensity(
     motionCfg.intensity || motionCfg.action_intensity || "normal"
   );
@@ -4723,12 +7012,26 @@ async function initLive2D() {
     attachDrag(model);
     setupClickthroughHitTest();
     scheduleIdleMotionLoop();
+    (function patchCoreModelUpdate(m) {
+      const coreModel = m.internalModel && m.internalModel.coreModel;
+      if (!coreModel || typeof coreModel.update !== "function") {
+        return;
+      }
+      const _orig = coreModel.update.bind(coreModel);
+      coreModel.update = function () {
+        if (state.model === m && !state.dragData && !state.windowDragActive) {
+          applyStyleExpressionLayer();
+          updateMicroMotionLayer();
+        }
+        return _orig();
+      };
+    }(model));
 
     state.pixiApp.ticker.add(() => {
       if (!state.model) {
         return;
       }
-      if (!state.animating && !state.windowDragActive) {
+      if (!state.animating && !state.windowDragActive && !state.browserDragActive) {
         const t = performance.now() / 1000;
         const styleProfile = getStyleExpressionProfile(state.currentTalkStyle || "neutral");
         const cadence = getActiveModelCadence();
@@ -4743,8 +7046,6 @@ async function initLive2D() {
         state.model.rotation = Number.isFinite(floatRot) ? floatRot : 0;
         state.model.y = Number.isFinite(floatY) ? floatY : state.baseTransform.y;
       }
-      applyStyleExpressionLayer();
-      updateMicroMotionLayer();
     });
 
     const i = model.internalModel || {};
@@ -5006,6 +7307,56 @@ function attachDrag(model) {
       };
       document.addEventListener("pointerup", cleanup);
       window.addEventListener("pointerup", cleanup);
+    } else if (!state.desktopMode) {
+      // 浏览器模式：document 级监听，保证鼠标移出模型区域后拖动不中断
+      state.browserDragActive = true;
+      const canvas = state.pixiApp?.view;
+      const scaleX = canvas
+        ? (Number(state.pixiApp?.renderer?.width) || canvas.offsetWidth) /
+          (canvas.getBoundingClientRect().width || 1)
+        : 1;
+      const scaleY = canvas
+        ? (Number(state.pixiApp?.renderer?.height) || canvas.offsetHeight) /
+          (canvas.getBoundingClientRect().height || 1)
+        : 1;
+      const grabOffsetX = (Number(state.model?.x) || 0) - (Number(g.x) || 0);
+      const grabOffsetY = (Number(state.model?.y) || 0) - (Number(g.y) || 0);
+
+      const onDocMoveBrowser = (ev) => {
+        if (!state.browserDragActive || !state.model || !state.dragData) return;
+        const c = state.pixiApp?.view;
+        if (!c) return;
+        const rect = c.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        const rw = Number(state.pixiApp.renderer?.width) || rect.width;
+        const rh = Number(state.pixiApp.renderer?.height) || rect.height;
+        const px = (ev.clientX - rect.left) * (rw / rect.width) + grabOffsetX;
+        const py = (ev.clientY - rect.top) * (rh / rect.height) + grabOffsetY;
+        const dxTap = (ev.clientX - rect.left) * (rw / rect.width) -
+                      Number(state.lastPointerDownGlobal?.x || 0);
+        const dyTap = (ev.clientY - rect.top) * (rh / rect.height) -
+                      Number(state.lastPointerDownGlobal?.y || 0);
+        if ((dxTap * dxTap + dyTap * dyTap) > (TAP_MOVE_THRESHOLD * TAP_MOVE_THRESHOLD)) {
+          state.pointerDragMoved = true;
+        }
+        state.model.x = px;
+        state.model.y = py;
+        state.baseTransform.x = px;
+        state.baseTransform.y = py;
+      };
+
+      const cleanupBrowser = () => {
+        state.browserDragActive = false;
+        document.removeEventListener("pointermove", onDocMoveBrowser);
+        document.removeEventListener("pointerup", cleanupBrowser);
+        window.removeEventListener("pointerup", cleanupBrowser);
+        maybeTriggerTapAction();
+        model.cursor = "grab";
+      };
+
+      document.addEventListener("pointermove", onDocMoveBrowser);
+      document.addEventListener("pointerup", cleanupBrowser);
+      window.addEventListener("pointerup", cleanupBrowser);
     }
   });
   model.on("pointerup", () => {
@@ -5049,6 +7400,7 @@ function attachDrag(model) {
   });
 
   const releaseDrag = () => {
+    if (state.browserDragActive) return;
     if (!state.dragData) {
       return;
     }
@@ -5134,6 +7486,23 @@ function attachDrag(model) {
     state.baseTransform.x = model.x;
     state.baseTransform.y = model.y;
   });
+
+  const canvas = state.pixiApp?.view;
+  if (canvas) {
+    canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      if (!state.model) return;
+      const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+      const currentScale = Number(state.model.scale?.x) || 1;
+      const newScale = Math.max(0.05, Math.min(4.0, currentScale * factor));
+      state.model.scale.set(newScale);
+      state.baseTransform.scale = newScale;
+      const baseAuto = newScale / Math.max(0.001, Number(state.modelConfig?.scale) || 1);
+      if (Number.isFinite(baseAuto) && baseAuto > 0) {
+        state.modelConfig.scale = newScale / baseAuto;
+      }
+    }, { passive: false });
+  }
 }
 
 function isPointOverVisibleModelArea(clientX, clientY) {
@@ -5189,23 +7558,106 @@ function setupClickthroughHitTest() {
   });
 }
 
+function startModelMouseGazePolling() {
+  if (state.uiView !== "model") {
+    return;
+  }
+  if (state.mouseGazePollTimer) {
+    return;
+  }
+  if (
+    typeof window.electronAPI?.getCursorScreenPoint !== "function" ||
+    typeof window.electronAPI?.getModelWindowBounds !== "function"
+  ) {
+    return;
+  }
+  let busy = false;
+  state.mouseGazePollTimer = window.setInterval(async () => {
+    if (busy) {
+      return;
+    }
+    busy = true;
+    try {
+      const [cursor, bounds] = await Promise.all([
+        window.electronAPI.getCursorScreenPoint(),
+        window.electronAPI.getModelWindowBounds()
+      ]);
+      if (!cursor || !bounds) {
+        return;
+      }
+      const width = Math.max(1, Number(bounds.width) || 0);
+      const height = Math.max(1, Number(bounds.height) || 0);
+      const centerX = Number(bounds.x) + width / 2;
+      const centerY = Number(bounds.y) + height / 2;
+      const relX = clampNumber((Number(cursor.x) - centerX) / (width / 2), -1, 1);
+      const relY = clampNumber((Number(cursor.y) - centerY) / (height / 2), -1, 1);
+      const gazeX = relX * 0.55;
+      const gazeY = -relY * 0.38;
+      state.mouseGazeTargetX = clampNumber(gazeX, -0.55, 0.55);
+      state.mouseGazeTargetY = clampNumber(gazeY, -0.38, 0.38);
+    } catch (_) {
+    } finally {
+      busy = false;
+    }
+  }, 33);
+}
+
+const MOOD_KEYWORDS = {
+  happy: [
+    "哈哈", "嘻嘻", "笑死", "开心", "高兴", "太好了", "太棒了", "不错", "喜欢",
+    "爱你", "赞", "可爱", "有意思", "好玩", "真好", "厉害", "稳", "6", "666",
+    "yyds", "hhh", "lol", "lmao", "haha", "yay", "nice", "cool", "amazing", "wonderful",
+    "fantastic", "excited", "great", "awesome", "sweet", "happy", "love", "cheerful"
+  ],
+  sad: [
+    "唉", "哭", "难过", "伤心", "失落", "遗憾", "心疼", "无语", "累了",
+    "好累", "不想", "算了", "躺平", "寂寞", "孤独", "没意思", "无聊", "好烦", "emo",
+    "破防", "心累", "麻了", "废了", "摆烂", "低落", "委屈", "崩溃", "疲惫", "sad",
+    "sorry", "upset", "tired", "miss", "sigh", "alone", "depressed", "lonely", "blue"
+  ],
+  angry: [
+    "烦", "草", "卧槽", "我去", "气死", "火大", "烦死", "讨厌", "闭嘴",
+    "够了", "受不了", "离谱", "过分", "太过分", "可恶", "气炸", "炸了",
+    "tmd", "wtf", "damn", "shut up", "hate", "pissed", "furious", "annoyed", "angry", "mad",
+    "rage", "生气", "怒火", "暴躁"
+  ],
+  surprised: [
+    "啊", "卧槽", "我去", "天哪", "不会吧", "不可能吧", "什么鬼", "啥情况", "真的假的",
+    "牛", "nb", "离谱", "绝了", "不敢相信", "吓死", "震惊", "惊呆", "惊了", "居然",
+    "绔熺劧", "omg", "what", "seriously", "no way", "incredible", "unbelievable", "wow", "unexpected",
+    "逆天", "神了", "太夸张了", "开玩笑吧"
+  ]
+};
+
+function hasMoodKeyword(text, keywords) {
+  for (let i = 0; i < keywords.length; i += 1) {
+    const token = String(keywords[i] || "").trim().toLowerCase();
+    if (token && text.includes(token)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function detectMood(text) {
-  const s = String(text || "").toLowerCase();
-  if (/(开心|高兴|太棒|喜欢|快乐|哈哈|nice|great|awesome|happy|love)/.test(s)) {
-    return "happy";
+  const s = String(text || "").toLowerCase().trim();
+  if (!s) {
+    return "idle";
   }
-  if (/(难过|伤心|失落|遗憾|抱歉|sad|sorry|upset)/.test(s)) {
-    return "sad";
+  if (hasMoodKeyword(s, MOOD_KEYWORDS.surprised)) {
+    return "surprised";
   }
-  if (/(生气|愤怒|气死|烦死|angry|mad|annoyed)/.test(s)) {
+  if (hasMoodKeyword(s, MOOD_KEYWORDS.angry)) {
     return "angry";
   }
-  if (/(惊讶|震惊|居然|竟然|真的吗|surprise|wow)/.test(s)) {
-    return "surprised";
+  if (hasMoodKeyword(s, MOOD_KEYWORDS.sad)) {
+    return "sad";
+  }
+  if (hasMoodKeyword(s, MOOD_KEYWORDS.happy)) {
+    return "happy";
   }
   return "idle";
 }
-
 function extractMotionDefinitions(model = null) {
   const targetModel = model || state.model;
   if (!targetModel) {
@@ -5250,7 +7702,33 @@ function isSpeakingNow() {
     !!state.ttsAudio &&
     !state.ttsAudio.paused &&
     !state.ttsAudio.ended;
-  return browserSpeaking || audioSpeaking;
+  const contextSpeaking = !!state.ttsContextSpeaking;
+  return browserSpeaking || audioSpeaking || contextSpeaking;
+}
+
+function isSpeechMotionActive(now = performance.now()) {
+  if (state.uiView === "model") {
+    const t = Number(now || performance.now());
+    const updatedAt = Number(state._broadcastSpeechUpdatedAt || 0);
+    const animUntil = Number(state.speechAnimUntil || 0);
+    if (updatedAt > 0 && t - updatedAt > 900) {
+      return t <= animUntil + 180;
+    }
+    if (state._broadcastSpeaking) {
+      return true;
+    }
+    return t <= animUntil + 140;
+  }
+  if (isSpeakingNow()) {
+    return true;
+  }
+  const t = Number(now || performance.now());
+  const activeUntil = Number(state.speechAnimUntil || 0);
+  const queuePending = Array.isArray(state.streamSpeakQueue) && state.streamSpeakQueue.length > 0;
+  if (queuePending && t <= activeUntil + 260) {
+    return true;
+  }
+  return false;
 }
 
 function shouldSkipIdleMotion() {
@@ -5418,9 +7896,10 @@ function animateFallback(mood, opts = {}) {
       model.scale.set(bs * (1 + Math.abs(wave) * 0.1));
       model.rotation = wave * 0.018;
     } else if (intent === "talk") {
-      model.x = bx + wave * 6 * swayBias;
-      model.y = by - Math.abs(wave) * 10;
-      model.rotation = wave * 0.022 * tiltBias;
+      const bounce = Math.sin(p * Math.PI * 8);
+      model.x = bx + wave * 18 * swayBias;
+      model.y = by + bounce * 6 - Math.abs(wave) * 18;
+      model.rotation = wave * 0.044 * tiltBias;
     } else if (intent === "thinking") {
       model.x = bx + Math.sin(p * Math.PI * 2) * 5;
       model.y = by - pulse * 6;
@@ -5456,17 +7935,42 @@ function maybePlayTalkGesture(text, style = "neutral") {
     return;
   }
   const now = performance.now();
+  if (state.motionQuietDuringSpeech && state.speakingEnabled) {
+    state.speakingMotionCooldownUntil = Math.max(Number(state.speakingMotionCooldownUntil) || 0, now + 260);
+    return;
+  }
+  const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
+  const speakingNow = isSpeechMotionActive(now);
+  const pendingStreamSegments = Array.isArray(state.streamSpeakQueue) ? state.streamSpeakQueue.length : 0;
+  if ((speakingNow && motionBlend > 0.1) || motionBlend > 0.24) {
+    state.speakingMotionCooldownUntil = Math.max(Number(state.speakingMotionCooldownUntil) || 0, now + 220);
+    return;
+  }
+  if (pendingStreamSegments > 1 || hasPendingTalkLikeAction()) {
+    state.speakingMotionCooldownUntil = Math.max(Number(state.speakingMotionCooldownUntil) || 0, now + 180);
+    return;
+  }
   if (now < state.speakingMotionCooldownUntil) {
     return;
   }
   state.speakingMotionCooldownUntil = now + state.speakingMotionCooldownMs;
   const clean = sanitizeSpeakText(text);
-  const clauses = (clean.match(/[，。！？!?；;、]/g) || []).length + 1;
+  if (!clean) {
+    return;
+  }
+  const clauses = (clean.match(/[，。！？!?、]/g) || []).length + 1;
   const lenBeats = Math.ceil((clean.length || 0) / 20);
+  const strongPunct = (clean.match(/[!?\uFF01\uFF1F]/g) || []).length;
+  const minorPunct = (clean.match(/[,\uFF0C\u3001;\uFF1B:\uFF1A]/g) || []).length;
   const cadence = getActiveModelCadence();
   const beatScale = Math.max(0.8, Math.min(1.4, Number(cadence?.talkBeatScale) || 1));
   const beats = Math.max(1, Math.min(4, Math.round(Math.max(clauses, lenBeats) * beatScale)));
-  enqueueActionIntent("talk", { text: clean, style, combo: true, beats });
+  const emphasis = clampNumber(
+    strongPunct * 0.34 + minorPunct * 0.08 + (style === "playful" ? 0.08 : 0),
+    0,
+    1
+  );
+  enqueueActionIntent("talk", { text: clean, style, combo: true, beats, emphasis, accentCount: strongPunct });
 }
 
 async function playEmotion(text, opts = {}) {
@@ -5517,18 +8021,57 @@ function buildServerTTSPayload(cleanedText, opts = {}) {
   return payload;
 }
 
-async function requestServerTTSBlob(text, prosody = null) {
+function isRetriableTTSError(err) {
+  if (!err) {
+    return false;
+  }
+  if (err.retriable === true) {
+    return true;
+  }
+  const status = Number(err.httpStatus);
+  if (Number.isFinite(status) && (status === 408 || status === 429 || status >= 500)) {
+    return true;
+  }
+  const msg = String(err.message || "").toLowerCase();
+  return msg.includes("timeout") || msg.includes("network");
+}
+
+async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) {
   const cleaned = sanitizeSpeakText(text);
   if (!cleaned) {
     return null;
   }
 
   const payload = buildServerTTSPayload(cleaned, { prosody });
-  const resp = await fetch("/api/tts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
+  const timeoutMs = Math.max(
+    1500,
+    Math.min(45000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
+  );
+  const controller = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  let timeoutHandle = 0;
+  if (controller) {
+    timeoutHandle = window.setTimeout(() => controller.abort(), timeoutMs);
+  }
+  let resp;
+  try {
+    resp = await authFetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller ? controller.signal : undefined
+    });
+  } catch (err) {
+    const msg = err?.name === "AbortError"
+      ? `TTS request timeout (${timeoutMs}ms)`
+      : String(err?.message || "TTS request failed");
+    const wrapped = new Error(msg);
+    wrapped.retriable = true;
+    throw wrapped;
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
   if (!resp.ok) {
     let detail = `HTTP ${resp.status}`;
     try {
@@ -5537,11 +8080,16 @@ async function requestServerTTSBlob(text, prosody = null) {
     } catch (_) {
       // ignore
     }
-    throw new Error(detail);
+    const err = new Error(detail);
+    err.httpStatus = resp.status;
+    err.retriable = resp.status === 408 || resp.status === 429 || resp.status >= 500;
+    throw err;
   }
   const blob = await resp.blob();
   if (!blob || blob.size === 0) {
-    throw new Error("语音数据为空");
+    const err = new Error("TTS audio payload is empty");
+    err.retriable = true;
+    throw err;
   }
   const type = String(blob.type || "").toLowerCase();
   if (type.startsWith("audio/")) {
@@ -5566,11 +8114,42 @@ async function requestServerTTSBlob(text, prosody = null) {
   return new Blob([buf], { type: mime });
 }
 
+async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) {
+  const maxRetries = Math.max(0, Math.min(4, Math.round(Number(opts.retries) || 0)));
+  const retryDelayMs = Math.max(
+    60,
+    Math.min(3000, Math.round(Number(opts.retryDelayMs) || Number(state.ttsServerRetryDelayMs) || 220))
+  );
+  const timeoutMs = Math.max(
+    1500,
+    Math.min(45000, Math.round(Number(opts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
+  );
+  let attempt = 0;
+  while (true) {
+    try {
+      return await requestServerTTSBlob(text, prosody, { timeoutMs });
+    } catch (err) {
+      if (attempt >= maxRetries || !isRetriableTTSError(err)) {
+        throw err;
+      }
+      const wait = Math.round(retryDelayMs * (1 + attempt * 0.85));
+      console.warn("Server TTS request retry", {
+        attempt: attempt + 1,
+        nextWaitMs: wait,
+        reason: String(err?.message || err)
+      });
+      await waitMs(wait);
+      attempt += 1;
+    }
+  }
+}
+
 async function playAudioByContext(blob) {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx || !blob) {
     return false;
   }
+  let markedSpeaking = false;
   try {
     if (!state.ttsDecodeContext || state.ttsDecodeContext.state === "closed") {
       state.ttsDecodeContext = new AudioCtx();
@@ -5585,14 +8164,28 @@ async function playAudioByContext(blob) {
     const gain = ctx.createGain();
     gain.gain.value = 1.0;
     source.buffer = decoded;
-    source.connect(gain);
+    if (!state.ttsAudioAnalyser || state.ttsAudioAnalyser.context !== ctx) {
+      state.ttsAudioAnalyser = ctx.createAnalyser();
+      state.ttsAudioAnalyser.fftSize = 256;
+      state.ttsAudioAnalyser.smoothingTimeConstant = 0.35;
+      state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.frequencyBinCount);
+    }
+    source.connect(state.ttsAudioAnalyser);
+    state.ttsAudioAnalyser.connect(gain);
     gain.connect(ctx.destination);
+    state.ttsContextSpeaking = true;
+    markedSpeaking = true;
     await new Promise((resolve) => {
       source.onended = resolve;
       source.start(0);
     });
+    state.ttsContextSpeaking = false;
+    markedSpeaking = false;
     return true;
   } catch (_) {
+    if (markedSpeaking) {
+      state.ttsContextSpeaking = false;
+    }
     return false;
   }
 }
@@ -5624,6 +8217,20 @@ async function playAudioBlob(blob, opts = {}) {
   return await new Promise((resolve) => {
     let settled = false;
     let failTimer = 0;
+    let startupTimer = 0;
+    let progressTimer = 0;
+    let fallbackSpeechStarted = false;
+    const beginFallbackSpeech = () => {
+      if (fallbackSpeechStarted) {
+        return;
+      }
+      fallbackSpeechStarted = true;
+      beginSpeechAnimation(speechText, speechMood, speechStyle, {
+        durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
+          ? Math.round(audio.duration * 1000)
+          : undefined
+      });
+    };
     const armFailTimer = (ms) => {
       if (failTimer) {
         clearTimeout(failTimer);
@@ -5639,7 +8246,16 @@ async function playAudioBlob(blob, opts = {}) {
         clearTimeout(failTimer);
         failTimer = 0;
       }
+      if (startupTimer) {
+        clearTimeout(startupTimer);
+        startupTimer = 0;
+      }
+      if (progressTimer) {
+        clearTimeout(progressTimer);
+        progressTimer = 0;
+      }
       endSpeechAnimation();
+      hideSubtitleText();
       try {
         URL.revokeObjectURL(url);
       } catch (_) {
@@ -5650,6 +8266,7 @@ async function playAudioBlob(blob, opts = {}) {
     };
     audio.onended = () => done(true);
     audio.onerror = async () => {
+      beginFallbackSpeech();
       const ok = await playAudioByContext(blob);
       done(!!ok);
     };
@@ -5657,30 +8274,67 @@ async function playAudioBlob(blob, opts = {}) {
       if (state.ttsAudioContext && typeof state.ttsAudioContext.resume === "function") {
         state.ttsAudioContext.resume().catch(() => {});
       }
+      if (progressTimer) {
+        clearTimeout(progressTimer);
+        progressTimer = 0;
+      }
+      // Some environments resolve play() but never advance currentTime.
+      progressTimer = window.setTimeout(async () => {
+        if (settled) {
+          return;
+        }
+        const current = Number(audio.currentTime || 0);
+        if (current >= 0.02) {
+          return;
+        }
+        beginFallbackSpeech();
+        const ok = await playAudioByContext(blob);
+        done(!!ok);
+      }, 1200);
       beginSpeechAnimation(speechText, speechMood, speechStyle, {
         durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
           ? Math.round(audio.duration * 1000)
           : undefined
       });
+      showSubtitleText(speechText);
     };
     audio.onloadedmetadata = () => {
       if (Number.isFinite(Number(audio.duration)) && audio.duration > 0) {
-        // Add a generous buffer to prevent long GPT-SoVITS clips from being misclassified as failures.
         armFailTimer(audio.duration * 1000 + 12000);
         beginSpeechAnimation(speechText, speechMood, speechStyle, {
           durationMs: Math.round(audio.duration * 1000)
         });
+        if (audio.paused && !audio.ended) {
+          audio.play().catch(async () => {
+            beginFallbackSpeech();
+            const ok = await playAudioByContext(blob);
+            done(!!ok);
+          });
+        }
       }
     };
     audio.src = url;
     audio.play().then(() => {
-      // started
+      if (startupTimer) {
+        clearTimeout(startupTimer);
+        startupTimer = 0;
+      }
     }).catch(async () => {
+      beginFallbackSpeech();
       const ok = await playAudioByContext(blob);
       done(!!ok);
     });
-    // Metadata may arrive late on some environments; start with a conservative guard timer first.
     armFailTimer(45000);
+    startupTimer = window.setTimeout(async () => {
+      if (settled) {
+        return;
+      }
+      if (audio.paused && !audio.ended && Number(audio.currentTime || 0) === 0) {
+        beginFallbackSpeech();
+        const ok = await playAudioByContext(blob);
+        done(!!ok);
+      }
+    }, 3200);
   });
 }
 
@@ -5711,7 +8365,13 @@ async function speakByServer(text, opts = {}) {
 
   try {
     setStatus("语音中...");
-    const blob = await requestServerTTSBlob(cleaned, opts.prosody || null);
+    const blob = await requestServerTTSBlobWithRetry(cleaned, opts.prosody || null, {
+      retries: Number.isFinite(Number(opts.retries))
+        ? Number(opts.retries)
+        : Number(state.ttsServerRetryCount),
+      retryDelayMs: Number(state.ttsServerRetryDelayMs),
+      timeoutMs: Number(state.ttsServerRequestTimeoutMs)
+    });
     return await playAudioBlob(blob, {
       interrupt: !!opts.interrupt,
       text: cleaned,
@@ -5720,6 +8380,9 @@ async function speakByServer(text, opts = {}) {
     });
   } catch (err) {
     console.warn("Server TTS failed:", err);
+    state.ttsServerAvailable = false;
+    state.ttsServerFailStreak = Math.max(0, Number(state.ttsServerFailStreak) || 0) + 1;
+    state.ttsServerLastError = String(err?.message || err || "");
     setStatus("语音服务未就绪");
     return false;
   }
@@ -5727,17 +8390,59 @@ async function speakByServer(text, opts = {}) {
 
 async function speak(text, opts = {}) {
   if (isServerTTSProvider(state.ttsProvider)) {
-    // Always retry even if a previous call failed — GPT-SoVITS may have started later.
+    // Always retry even if a previous call failed - GPT-SoVITS may have started later.
     const ok = await speakByServer(text, opts);
     if (ok) {
       state.ttsServerAvailable = true;
+      state.ttsServerFailStreak = 0;
+      state.ttsServerLastError = "";
       return true;
     }
-    // Keep GPT-SoVITS single-source to avoid duplicate browser speech overlap.
-    if (!state.serverTTSFallbackToBrowser || state.ttsProvider === "gpt_sovits") {
+    if (!state.serverTTSFallbackToBrowser) {
       return false;
     }
-    // Optional fallback for other server providers when explicitly enabled.
+    const failThreshold = Math.max(
+      1,
+      Math.min(8, Math.round(Number(state.ttsServerFallbackFailThreshold) || 1))
+    );
+    const failStreak = Math.max(0, Number(state.ttsServerFailStreak) || 0);
+    const lastErr = String(state.ttsServerLastError || "");
+    const lastErrLower = lastErr.toLowerCase();
+    const immediateBrowserFallback =
+      state.ttsProvider === "gpt_sovits" ||
+      lastErrLower.includes("connection failed") ||
+      lastErrLower.includes("network") ||
+      lastErrLower.includes("timeout") ||
+      lastErrLower.includes("aborted") ||
+      lastErrLower.includes("empty audio") ||
+      /^http\s+5\d\d$/i.test(lastErr);
+    if (immediateBrowserFallback) {
+      console.warn("Server TTS immediate fallback -> browser TTS", {
+        provider: state.ttsProvider,
+        streak: failStreak,
+        reason: lastErr
+      });
+      return await speakByBrowser(text, { force: !!opts.force });
+    }
+    const nonRetriableClientError =
+      /^HTTP\s+4\d\d$/i.test(lastErr) && !/^HTTP\s+(408|429)$/i.test(lastErr);
+    if (!nonRetriableClientError && failStreak < failThreshold) {
+      console.warn("Server TTS failed but fallback is delayed", {
+        streak: failStreak,
+        threshold: failThreshold,
+        provider: state.ttsProvider,
+        reason: lastErr
+      });
+      setStatus(`TTS retrying (${failStreak}/${failThreshold})`);
+      return false;
+    }
+    // Server TTS failed: fallback to browser speech when enabled.
+    console.warn("Server TTS fallback -> browser TTS", {
+      provider: state.ttsProvider,
+      streak: failStreak,
+      threshold: failThreshold,
+      reason: lastErr
+    });
     return await speakByBrowser(text, { force: !!opts.force });
   }
   return await speakByBrowser(text, opts);
@@ -5974,7 +8679,7 @@ function setupSpeechRecognition() {
 async function streamAssistantReply(payload, onDelta) {
   const preferNonStream = state.streamSpeakMode !== "realtime";
   if (preferNonStream) {
-    const directResp = await fetch("/api/chat", {
+    const directResp = await authFetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -5988,7 +8693,7 @@ async function streamAssistantReply(payload, onDelta) {
     return text;
   }
 
-  const resp = await fetch("/api/chat_stream", {
+    const resp = await authFetch("/api/chat_stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -6007,7 +8712,7 @@ async function streamAssistantReply(payload, onDelta) {
 
   if (!resp.body || typeof resp.body.getReader !== "function") {
     // Fallback for environments without stream reader.
-    const fallbackResp = await fetch("/api/chat", {
+    const fallbackResp = await authFetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -6101,6 +8806,9 @@ async function requestAssistantReply(text, opts = {}) {
   const isAuto = !!opts.auto;
   const forceTools = opts.forceTools === true;
   const userTimestamp = Date.now();
+  if (showUser || rememberUser) {
+    state.lastUserMessageAt = Date.now();
+  }
 
   if (showUser) {
     appendMessage("user", userDisplayText, { timestamp: userTimestamp });
@@ -6188,7 +8896,7 @@ async function requestAssistantReply(text, opts = {}) {
         }
       }
       reply += delta;
-      setMessageText(assistantRow, reply);
+      setMessageText(assistantRow, reply, { enableTranslation: false });
       if (useStreamSpeak) {
         feedStreamSpeakDelta(delta, streamSpeakSession, talkStyle);
       }
@@ -6196,7 +8904,7 @@ async function requestAssistantReply(text, opts = {}) {
     });
     if (streamed && streamed !== reply) {
       reply = streamed;
-      setMessageText(assistantRow, reply);
+      setMessageText(assistantRow, reply, { enableTranslation: false });
     }
     reply = reply.trim();
     const parsedReply = parseToolMetaFromText(reply);
@@ -6216,7 +8924,12 @@ async function requestAssistantReply(text, opts = {}) {
     recordEmotion(mood);
     const finalTalkStyle = resolveTalkStyle(message, visibleReply, mood, isAuto);
     state.currentTalkStyle = finalTalkStyle;
-    enqueueActionIntent("reply", { text: visibleReply, style: finalTalkStyle, mood, combo: true });
+    state.speechAnimMood = mood;
+    if (state.motionQuietDuringSpeech && state.speakingEnabled) {
+      triggerExpressionPulse(finalTalkStyle, 0.4, 220);
+    } else {
+      enqueueActionIntent("reply", { text: visibleReply, style: finalTalkStyle, mood, combo: true });
+    }
     if (useStreamSpeak) {
       flushStreamSpeak(streamSpeakSession, finalTalkStyle);
       const hadStreamSegments = state.streamSpeakLastEnqueueSession === streamSpeakSession;
@@ -6392,7 +9105,7 @@ async function toggleMicOpen() {
       }
       stopMicLoop(true);
       if (closeSnapshot) {
-        setStatus("关麦中，处理最后一句...");
+        setStatus("关闭中，处理最后一句...");
         await transcribeSnapshotAfterMicClose(closeSnapshot);
       }
       setStatus("开麦已关闭");
@@ -6424,9 +9137,12 @@ function bindUI() {
   updateObserveButton();
   updateLockButton();
   updateAutoChatButton();
+  updateTranslationToggleButton();
   updateMicButton();
   renderScheduleList();
   renderPendingAttachments();
+  syncLearningQuickSettingsUI();
+  renderLearningReviewList();
 
   ui.sendBtn.addEventListener("click", sendChat);
   ui.chatInput.addEventListener("keydown", (event) => {
@@ -6456,6 +9172,11 @@ function bindUI() {
   });
   window.addEventListener("keydown", async (event) => {
     if (!event.ctrlKey) {
+      if (event.key === "Escape" && isLearningReviewOpen()) {
+        event.preventDefault();
+        closeLearningReviewDrawer();
+        return;
+      }
       if (event.key === "Escape" && ui.personaModal && !ui.personaModal.hidden) {
         event.preventDefault();
         closePersonaPanel();
@@ -6560,6 +9281,203 @@ function bindUI() {
     });
   }
 
+  if (ui.learningReviewBtn) {
+    ui.learningReviewBtn.addEventListener("click", () => {
+      toggleLearningReviewDrawer();
+    });
+  }
+
+  if (ui.learningReviewCloseBtn) {
+    ui.learningReviewCloseBtn.addEventListener("click", () => {
+      closeLearningReviewDrawer();
+    });
+  }
+
+  if (ui.learningReviewBackdrop) {
+    ui.learningReviewBackdrop.addEventListener("click", () => {
+      closeLearningReviewDrawer();
+    });
+  }
+
+  if (ui.learningReviewUndoBtn) {
+    ui.learningReviewUndoBtn.addEventListener("click", async () => {
+      try {
+        await undoLearningLastStep();
+      } catch (err) {
+        setStatus(`撤销失败: ${err.message || err}`);
+      }
+    });
+  }
+
+  if (ui.translationToggleBtn) {
+    ui.translationToggleBtn.addEventListener("click", () => {
+      state.chatTranslationVisible = !state.chatTranslationVisible;
+      applyChatTranslationVisibility();
+      saveChatTranslationVisibilityToStorage();
+      setStatus(state.chatTranslationVisible ? "会话翻译已显示" : "会话翻译已收起");
+    });
+  }
+
+  if (ui.learningTabCandidates) {
+    ui.learningTabCandidates.addEventListener("click", () => {
+      learningReviewState.activeTab = "candidates";
+      renderLearningReviewList();
+    });
+  }
+
+  if (ui.learningTabSamples) {
+    ui.learningTabSamples.addEventListener("click", () => {
+      learningReviewState.activeTab = "samples";
+      renderLearningReviewList();
+    });
+  }
+
+  for (const filterInput of [
+    ui.learningFilterScore,
+    ui.learningFilterConfidence,
+    ui.learningFilterKeyword
+  ]) {
+    if (!filterInput) {
+      continue;
+    }
+    filterInput.addEventListener("input", () => {
+      renderLearningReviewList();
+    });
+  }
+
+  if (ui.learningSortMode) {
+    ui.learningSortMode.value = learningReviewState.sortMode;
+    ui.learningSortMode.addEventListener("change", () => {
+      learningReviewState.sortMode = String(ui.learningSortMode?.value || "score_desc");
+      renderLearningReviewList();
+    });
+  }
+
+  if (ui.learningFilterHighBtn) {
+    ui.learningFilterHighBtn.addEventListener("click", () => {
+      applyLearningHighScorePreset();
+    });
+  }
+
+  if (ui.learningFilterResetBtn) {
+    ui.learningFilterResetBtn.addEventListener("click", () => {
+      resetLearningFilters();
+    });
+  }
+
+  if (ui.learningReloadBtn) {
+    ui.learningReloadBtn.addEventListener("click", async () => {
+      try {
+        await reloadLearningReviewData();
+      } catch (err) {
+        setStatus(`重读失败: ${err.message || err}`);
+      }
+    });
+  }
+
+  if (ui.learningQuickApplyBtn) {
+    ui.learningQuickApplyBtn.addEventListener("click", async () => {
+      try {
+        await applyLearningQuickSettings();
+      } catch (err) {
+        setStatus(`快捷开关更新失败: ${err.message || err}`);
+      }
+    });
+  }
+
+  if (ui.learningSelectAll) {
+    ui.learningSelectAll.addEventListener("change", () => {
+      const selectedSet = getLearningSelectedSet();
+      const filteredItems = getLearningFilteredItems();
+      if (ui.learningSelectAll.checked) {
+        filteredItems.forEach((item) => selectedSet.add(item.id));
+      } else {
+        filteredItems.forEach((item) => selectedSet.delete(item.id));
+      }
+      renderLearningReviewList();
+    });
+  }
+
+  if (ui.learningBatchDeleteBtn) {
+    ui.learningBatchDeleteBtn.addEventListener("click", async () => {
+      try {
+        await runLearningBatchAction("delete");
+      } catch (err) {
+        setStatus(`批量删除失败: ${err.message || err}`);
+      }
+    });
+  }
+
+  if (ui.learningBatchUpBtn) {
+    ui.learningBatchUpBtn.addEventListener("click", async () => {
+      try {
+        await runLearningBatchAction("weight_up");
+      } catch (err) {
+        setStatus(`批量升权失败: ${err.message || err}`);
+      }
+    });
+  }
+
+  if (ui.learningBatchDownBtn) {
+    ui.learningBatchDownBtn.addEventListener("click", async () => {
+      try {
+        await runLearningBatchAction("weight_down");
+      } catch (err) {
+        setStatus(`批量降权失败: ${err.message || err}`);
+      }
+    });
+  }
+
+  if (ui.learningBatchPromoteBtn) {
+    ui.learningBatchPromoteBtn.addEventListener("click", async () => {
+      try {
+        await runLearningBatchAction("promote");
+      } catch (err) {
+        setStatus(`批量晋升失败: ${err.message || err}`);
+      }
+    });
+  }
+
+  if (ui.learningReviewList) {
+    ui.learningReviewList.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) {
+        return;
+      }
+      if (!target.classList.contains("learning-check")) {
+        return;
+      }
+      const id = String(target.dataset.id || "").trim();
+      if (!id) {
+        return;
+      }
+      const selectedSet = getLearningSelectedSet();
+      if (target.checked) {
+        selectedSet.add(id);
+      } else {
+        selectedSet.delete(id);
+      }
+      renderLearningReviewList();
+    });
+
+    ui.learningReviewList.addEventListener("click", async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) {
+        return;
+      }
+      const action = String(target.dataset.action || "").trim();
+      const id = String(target.dataset.id || "").trim();
+      if (!action || !id) {
+        return;
+      }
+      try {
+        await runLearningSingleAction(action, id);
+      } catch (err) {
+        setStatus(`操作失败: ${err.message || err}`);
+      }
+    });
+  }
+
   if (ui.scheduleCloseBtn) {
     ui.scheduleCloseBtn.addEventListener("click", () => {
       closeSchedulePanel();
@@ -6635,6 +9553,17 @@ function bindUI() {
     });
   }
 }
+
+if (window.electronAPI?.onSubtitle) {
+  window.electronAPI.onSubtitle(({ id, en, zh }) => {
+    state.subtitleId = id;
+    _applySubtitleDOM(en || "", zh || "");
+  });
+  window.electronAPI.onSubtitleHide(({ id }) => {
+    _clearSubtitleDOM(id);
+  });
+}
+
 async function main() {
   setStatus("启动中...");
   try {
@@ -6646,10 +9575,26 @@ async function main() {
       setTimeout(refreshDesktopBridgeReady, 1600);
     }
     await loadConfig();
+    loadChatTranslationVisibilityFromStorage();
     await loadPersonaCard();
     if (state.uiView === "model") {
       await ensureLive2DRuntime();
       await initLive2D();
+      startModelMouseGazePolling();
+      try {
+        const ch = new BroadcastChannel("taffy-speech");
+        ch.onmessage = (e) => {
+          const d = e.data;
+          if (!d || d.type !== "speech") return;
+          state._broadcastSpeechUpdatedAt = performance.now();
+          state.speechMouthOpen = Number(d.mouthOpen) || 0;
+          state.speechAnimMood = String(d.mood || "idle");
+          state.speechAnimUntil = Number(d.animUntil) || 0;
+          state._broadcastSpeaking = !!d.speaking;
+          state.ttsAudioLevel = Number(d.audioLevel) || 0;
+          if (d.moodHoldUntil) state.moodHoldUntil = Number(d.moodHoldUntil);
+        };
+      } catch (_) {}
       setStatus("待机");
       return;
     }
@@ -6662,6 +9607,27 @@ async function main() {
       bindUI();
       startReminderLoop();
       runReminderCheck();
+      try {
+        state._speechBroadcast = new BroadcastChannel("taffy-speech");
+        (function chatSpeechBroadcastLoop() {
+          const speaking = isSpeechMotionActive();
+          const mouthOpen = getSpeechAnimationMouthOpen();
+          try {
+            state._speechBroadcast.postMessage({
+              type: "speech",
+              mouthOpen: mouthOpen,
+              mood: state.speechAnimMood || "idle",
+              speaking: speaking,
+              animUntil: state.speechAnimUntil || 0,
+              animStartedAt: state.speechAnimStartedAt || 0,
+              animDurationMs: state.speechAnimDurationMs || 0,
+              audioLevel: state.ttsAudioLevel || 0,
+              moodHoldUntil: state.moodHoldUntil || 0
+            });
+          } catch (_) {}
+          requestAnimationFrame(chatSpeechBroadcastLoop);
+        }());
+      } catch (_) {}
       setStatus("待机");
       return;
     }
@@ -6686,6 +9652,7 @@ async function main() {
 }
 
 window.addEventListener("beforeunload", () => {
+  closeLearningReviewDrawer();
   resetActionSystem();
   stopIdleMotionLoop();
   stopAutoChatLoop();
@@ -6706,3 +9673,4 @@ window.addEventListener("beforeunload", () => {
 });
 
 main();
+

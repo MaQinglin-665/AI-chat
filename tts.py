@@ -51,50 +51,16 @@ def _normalize_gpt_sovits_spoken_text(text):
     if not src:
         return ""
 
-    speak = src
-    phrase_map = [
-        ("git push", "推送"),
-        ("git pull", "拉取"),
-        ("return true", "返回成功"),
-        ("return false", "返回失败"),
-        ("true", "成功"),
-        ("false", "失败"),
-        ("pull request", "合并请求"),
-        ("live2d", "桌宠模型"),
-        ("debug", "调试"),
-        ("coding", "写代码"),
-        ("code", "代码"),
-        ("bug", "错误"),
-        ("api", "接口"),
-        ("tts", "语音"),
-        ("asr", "语音识别"),
-        ("llm", "大模型"),
-        ("ui", "界面"),
-        ("ux", "体验"),
-        ("cpu", "处理器"),
-        ("gpu", "显卡"),
-        ("fps", "帧率"),
-        ("json", "配置"),
-        ("html", "页面"),
-        ("css", "样式"),
-        ("typescript", "脚本"),
-        ("javascript", "脚本"),
-        ("python", "脚本"),
-        ("electron", "桌面程序"),
-        ("github", "代码仓库"),
-        ("git", "版本库"),
-        ("push", "推送"),
-        ("pull", "拉取"),
-        ("vscode", "编辑器"),
-        ("node", "运行环境"),
-        ("npm", "包管理"),
-        ("pr", "合并请求"),
-        ("app", "应用"),
-    ]
-    for raw, repl in phrase_map:
-        speak = re.sub(rf"(?i)\b{re.escape(raw)}\b", repl, speak)
+    # Keep English replies intact; only apply aggressive token cleanup for CJK text.
+    has_cjk = bool(re.search(r"[\u4e00-\u9fff]", src))
 
-    has_cjk = bool(re.search(r"[\u4e00-\u9fff]", speak))
+    speak = (
+        src.replace("_", " ")
+        .replace("/", " ")
+        .replace("\\", " ")
+    )
+    speak = re.sub(r"[\u2600-\u27BF\uE000-\uF8FF\U0001F300-\U0001FAFF]", " ", speak)
+
     if has_cjk:
         def _replace_ascii_token(match):
             token = match.group(0)
@@ -103,38 +69,15 @@ def _normalize_gpt_sovits_spoken_text(text):
             return " "
 
         speak = re.sub(r"[A-Za-z][A-Za-z0-9_./+-]*", _replace_ascii_token, speak)
-
-    speak = (
-        speak.replace("_", " ")
-        .replace("/", " ")
-        .replace("\\", " ")
-        .replace("-", " ")
-    )
-    speak = re.sub(r"[\u2600-\u27BF\uE000-\uF8FF\U0001F300-\U0001FAFF]", " ", speak)
-    speak = re.sub(r"\s+([，。！？、；：,.!?;:])", r"\1", speak)
-    speak = re.sub(r"([，。！？、；：,.!?;:])\s+", r"\1", speak)
-    speak = re.sub(r"\s+", " ", speak).strip()
-    speak = re.sub(r"[，,]{2,}", "，", speak)
-    speak = re.sub(r"[。.!?！？]{2,}", "。", speak)
-
-    greeting_prefixes = ("早安", "晚安", "午安", "你好", "晚上好", "早上好", "下午好")
-    for prefix in greeting_prefixes:
-        if speak.startswith(prefix):
-            rest = speak[len(prefix) :].lstrip()
-            if rest and rest[:1] not in "，,。！？!?":
-                speak = f"{prefix}呀，{rest}"
-            break
-
-    lead_match = re.match(r"^([^，,。！？!?]{2,8})([，,])(.+)$", speak)
-    if lead_match:
-        lead = lead_match.group(1).strip()
-        tail = lead_match.group(3).strip()
-        greeting_words = ("早安", "晚安", "午安", "你好", "哈喽", "嗨", "拜拜")
-        if lead and tail:
-            if any(word in lead for word in greeting_words):
-                if lead[-1] not in ("呀", "啦", "哦", "哇"):
-                    lead = f"{lead}呀"
-            speak = f"{lead}，{tail}"
+        speak = re.sub(r"\s+([\u3001\u3002\uff0c\uff01\uff1f\uff1b\uff1a,.!?;:])", r"\1", speak)
+        speak = re.sub(r"([\u3001\u3002\uff0c\uff01\uff1f\uff1b\uff1a,.!?;:])\s+", r"\1", speak)
+        speak = re.sub(r"\s+", " ", speak).strip()
+        speak = re.sub(r"[\u3001\uff0c,]{2,}", "\uff0c", speak)
+        speak = re.sub(r"[\u3002.!?\uff01\uff1f]{2,}", "\u3002", speak)
+    else:
+        speak = re.sub(r"\s+([,.!?;:])", r"\1", speak)
+        speak = re.sub(r"([,.!?;:])(?=[^\s])", r"\1 ", speak)
+        speak = re.sub(r"\s+", " ", speak).strip()
 
     return speak[:600]
 
@@ -426,19 +369,51 @@ def _split_gpt_sovits_text(text, max_len=200):
     max_len = max(60, int(max_len or 200))
     if len(src) <= max_len:
         return [src]
-    strong_breaks = {"\u3002", "\uff01", "\uff1f", "!", "?", "\n"}
+
+    strong_breaks = {"\u3002", "\uff01", "\uff1f", "!", "?", ".", "\n"}
+    soft_breaks = {"\uff0c", "\u3001", "\uff1b", "\uff1a", ",", ";", ":", " "}
+
     pieces = []
     current = ""
+
+    def _flush(buf, target):
+        s = buf.strip()
+        if not s:
+            return
+        if len(s) <= max_len:
+            target.append(s)
+            return
+        start = 0
+        n = len(s)
+        while start < n:
+            end = min(start + max_len, n)
+            if end < n:
+                cut = -1
+                for i in range(end, start, -1):
+                    if s[i - 1] in soft_breaks or s[i - 1] in strong_breaks:
+                        cut = i
+                        break
+                if cut <= start:
+                    cut = end
+            else:
+                cut = end
+            part = s[start:cut].strip()
+            if part:
+                target.append(part)
+            start = cut
+
     for ch in src:
         current += ch
-        if ch in strong_breaks and len(current.strip()) >= 10:
-            pieces.append(current.strip())
+        if ch in strong_breaks and len(current.strip()) >= 8:
+            _flush(current, pieces)
             current = ""
+        elif len(current) >= max_len * 2:
+            _flush(current, pieces)
+            current = ""
+
     if current.strip():
-        if pieces and len(current.strip()) < 15:
-            pieces[-1] += current.strip()
-        else:
-            pieces.append(current.strip())
+        _flush(current, pieces)
+
     return pieces if pieces else [src]
 
 
@@ -777,14 +752,10 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
                 continue
         payload[out_key] = value
     detected_lang = _detect_text_lang(text)
-    if detected_lang == "auto":
-        payload["text_lang"] = "auto"
-    elif detected_lang == "en":
-        payload["text_lang"] = "en"
-    else:
-        current = str(payload.get("text_lang", "")).strip().lower()
-        if not current or current == "auto":
-            payload["text_lang"] = "zh"
+    # Always follow runtime text detection to avoid language mismatch
+    # (e.g. config fixed to "en" but current reply is Chinese).
+    if detected_lang in {"auto", "en", "zh"}:
+        payload["text_lang"] = detected_lang
     if tts_cfg.get("gpt_sovits_use_prompt_text"):
         prompt_text = str(tts_cfg.get("gpt_sovits_prompt_text") or "").strip()
         if prompt_text:
@@ -955,7 +926,7 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         finer = _split_gpt_sovits_text(safe, max(6, min(10, len(safe) // 2 + 1)))
         if len(finer) > 1:
             return finer
-        punct = {"\u3002", "\uff01", "\uff1f", "!", "?", "\uff0c", "\u3001", "\uff1b", "\uff1a", ",", ";", ":"}
+        punct = {"\u3002", "\uff01", "\uff1f", "!", "?", ".", "\uff0c", "\u3001", "\uff1b", "\uff1a", ",", ";", ":"}
         mid = len(safe) // 2
         split_at = -1
         for radius in range(len(safe)):
@@ -1072,7 +1043,24 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
             return parts[0]
 
     prefer_chunked = len(text) > chunk_char_limit
-    audio = _request_text_chunks(payload, text_chunks or [text]) if prefer_chunked else _request_once(payload)
+    if prefer_chunked:
+        # For long text, prefer one-shot first. Chunking is a fallback when one-shot output is degraded.
+        try:
+            one_shot_audio = _request_once(payload)
+        except Exception:
+            one_shot_audio = b""
+        one_shot_bad = (
+            not one_shot_audio
+            or _looks_too_short_for_text(one_shot_audio, text)
+            or _looks_too_quiet_for_text(one_shot_audio, text)
+        )
+        if one_shot_bad:
+            chunk_audio = _request_text_chunks(payload, text_chunks or [text])
+            audio = chunk_audio or one_shot_audio
+        else:
+            audio = one_shot_audio
+    else:
+        audio = _request_once(payload)
     degraded = _looks_too_short_for_text(audio, text) or _looks_too_quiet_for_text(audio, text)
     if degraded and enable_global_retry:
         retry_payload = dict(payload)

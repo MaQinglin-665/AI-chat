@@ -31,6 +31,8 @@ let pythonStdoutStream = null;
 let pythonStderrStream = null;
 let modelWindow = null;
 let chatWindow = null;
+let modelWindowReady = false;
+let pendingSubtitle = null;
 let persistedWindowState = { model: null, chat: null, locked: false };
 let windowStateSaveTimer = null;
 let windowLocked = false;
@@ -120,6 +122,17 @@ function loadRuntimeConfig() {
     );
     return {};
   }
+}
+
+function resolveRuntimeApiToken() {
+  const cfg = loadRuntimeConfig();
+  const serverCfg = cfg && typeof cfg === "object" ? (cfg.server || {}) : {};
+  const envName = String(serverCfg.api_token_env || "TAFFY_API_TOKEN").trim() || "TAFFY_API_TOKEN";
+  const directToken = String(serverCfg.api_token || "").trim();
+  if (directToken) {
+    return directToken;
+  }
+  return String(process.env[envName] || "").trim();
 }
 
 function parsePythonVersion(versionOutput) {
@@ -720,9 +733,20 @@ function createModelWindow() {
     } catch (_) {
       // ignore
     }
+    modelWindowReady = true;
+    if (pendingSubtitle) {
+      const p = pendingSubtitle;
+      pendingSubtitle = null;
+      try {
+        modelWindow.webContents.send("subtitle-show", p);
+      } catch (_) {}
+    }
   });
+  modelWindow.webContents.openDevTools({ mode: "detach" });
   modelWindow.on("close", () => saveWindowStateNow());
   modelWindow.on("closed", () => {
+    modelWindowReady = false;
+    pendingSubtitle = null;
     modelWindow = null;
     if (chatWindow && !chatWindow.isDestroyed()) {
       chatWindow.close();
@@ -772,6 +796,7 @@ function createChatWindow() {
       // ignore
     }
   });
+  chatWindow.webContents.openDevTools({ mode: "detach" });
   chatWindow.on("move", () => scheduleSaveWindowState(120));
   chatWindow.on("resize", () => scheduleSaveWindowState(120));
   chatWindow.on("close", () => saveWindowStateNow());
@@ -853,10 +878,48 @@ ipcMain.on("window-lock-set", (_event, locked) => {
 });
 
 ipcMain.handle("window-lock-get", async () => !!windowLocked);
+ipcMain.handle("get-api-token", async () => resolveRuntimeApiToken());
+
+ipcMain.handle("get-cursor-screen-point", async () => {
+  const point = screen.getCursorScreenPoint();
+  return { x: point.x, y: point.y };
+});
+
+ipcMain.handle("get-model-window-bounds", async () => {
+  if (!modelWindow || modelWindow.isDestroyed()) {
+    return null;
+  }
+  const bounds = modelWindow.getBounds();
+  return {
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height
+  };
+});
 
 ipcMain.handle("capture-desktop", async (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   return await captureDesktopDataUrl(win);
+});
+
+ipcMain.on("subtitle-show", (_event, payload) => {
+  if (!modelWindow || modelWindow.isDestroyed()) return;
+  if (!modelWindowReady) {
+    pendingSubtitle = payload;
+    return;
+  }
+  pendingSubtitle = null;
+  try {
+    modelWindow.webContents.send("subtitle-show", payload);
+  } catch (_) {}
+});
+
+ipcMain.on("subtitle-hide", (_event, payload) => {
+  if (!modelWindow || modelWindow.isDestroyed()) return;
+  try {
+    modelWindow.webContents.send("subtitle-hide", payload);
+  } catch (_) {}
 });
 
 app.on("before-quit", () => {

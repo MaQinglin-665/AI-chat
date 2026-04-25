@@ -77,6 +77,23 @@ For persistent use on Windows:
 setx OPENAI_API_KEY "your_key_here"
 ```
 
+Optional (recommended for public/release builds): protect `/api/*` with token:
+
+```powershell
+setx TAFFY_API_TOKEN "your_long_random_token"
+```
+
+Then set in `config.json`:
+
+```json
+{
+  "server": {
+    "require_api_token": true,
+    "api_token_env": "TAFFY_API_TOKEN"
+  }
+}
+```
+
 
 ## 3) TTS (voice) config
 
@@ -161,7 +178,8 @@ start_desktop.bat
 - If model does not show, hard refresh with `Ctrl + F5`.
 - Never store real API tokens in `config.json`. Keep secrets in environment variables.
 - `config.json` is ignored by `.gitignore` by default.
-- Work-tool command execution uses an allowlist prefix policy and blocks chained shell syntax.
+- Work-tool command execution is disabled by default (`tools.allow_shell=false`). Enable only when needed.
+- CORS allows loopback origins by default (`localhost` / `127.0.0.1`), not arbitrary websites.
 - Window position and size are auto-saved in Electron mode and restored on next launch.
 
 ## 6) Chat Commands
