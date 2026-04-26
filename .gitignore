@@ -3,12 +3,15 @@ config.local.json
 .env
 memory.json
 __pycache__/
+.pytest_cache/
 *.log
 server_*.log
 desktop_run.log
 node_modules/
 web/generated_images/
 .mem0/
+models/
+memory_persona_card.json
 
 # Temporary audio files
 tmp_*.wav
