@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose an improvement or new feature.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What pain point are you trying to solve?
+      placeholder: Describe the current limitation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe your preferred approach.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative approaches?
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Expected impact
+      description: Who benefits and how?

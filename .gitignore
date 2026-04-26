@@ -43,6 +43,8 @@ learning_candidates.json
 learning_samples.json
 __tts_*.wav
 __tts_*.bin
+tts_ref/*
+!tts_ref/README.md
 
 # Python cache
 *.pyc
