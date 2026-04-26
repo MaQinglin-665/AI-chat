@@ -45,6 +45,7 @@ from config import (
     sanitize_client_config,
     sanitize_hotword_replacements,
 )
+import memory as _memory_module
 from utils import _clamp_int, _clamp_float, _truncate_text
 from memory import (
     build_memory_prompt_block,
@@ -57,12 +58,45 @@ from memory import (
     save_manual_persona_card,
     build_wakeup_summary_block,
     is_lightweight_checkin_message,
-    get_learning_candidates_for_review,
+)
+
+
+def _missing_learning_review_feature(*_args, **_kwargs):
+    raise RuntimeError(
+        "Learning review feature is unavailable because the current memory module "
+        "does not expose review APIs."
+    )
+
+
+get_learning_samples_for_review = getattr(
+    _memory_module,
+    "get_learning_samples_for_review",
+    _missing_learning_review_feature,
+)
+get_learning_candidates_for_review = getattr(
+    _memory_module,
+    "get_learning_candidates_for_review",
     get_learning_samples_for_review,
-    reload_learning_review_data,
-    update_learning_review_entries,
-    promote_learning_review_candidates,
-    undo_last_learning_review_action,
+)
+reload_learning_review_data = getattr(
+    _memory_module,
+    "reload_learning_review_data",
+    _missing_learning_review_feature,
+)
+update_learning_review_entries = getattr(
+    _memory_module,
+    "update_learning_review_entries",
+    _missing_learning_review_feature,
+)
+promote_learning_review_candidates = getattr(
+    _memory_module,
+    "promote_learning_review_candidates",
+    _missing_learning_review_feature,
+)
+undo_last_learning_review_action = getattr(
+    _memory_module,
+    "undo_last_learning_review_action",
+    _missing_learning_review_feature,
 )
 from tts import synthesize_tts_audio
 from tools import (
