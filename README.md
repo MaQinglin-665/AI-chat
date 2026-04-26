@@ -124,6 +124,11 @@ setx VOLCENGINE_SECRET_KEY "your_secret_key"
 You can also put these keys into `.env` (see `.env.example`).  
 The server auto-loads `.env` on startup.
 
+TTS reference audio is local-only by default:
+- put personal/sample reference files under `tts_ref/`
+- this folder is ignored by git (except `tts_ref/README.md`)
+- avoid committing private voice samples directly to the repository
+
 If you want to use Edge TTS:
 
 ```json
@@ -234,3 +239,8 @@ python -m http.server 5500
 2. 执行“一键应用配置”，确认写入、热重载（或重启）链路可用。
 3. 在 GitHub 创建新版本 Release，并上传安装包与更新说明。
 4. 更新首页下载说明与 README，确保入口指向当前仓库和 Releases。
+
+## 9) Contributing and Changelog
+
+- Contributing guide: `CONTRIBUTING.md`
+- Changelog: `CHANGELOG.md`

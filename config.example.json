@@ -56,7 +56,7 @@
     "gpt_sovits_prompt_lang": "zh",
     "gpt_sovits_prompt_text": "",
     "gpt_sovits_ref_audio_path": "",
-    "gpt_sovits_fallback_ref_audio_path": "D:/AI/ai_desktop_pet/tts_ref/taffy_ref.wav",
+    "gpt_sovits_fallback_ref_audio_path": "",
     "gpt_sovits_top_k": 15,
     "gpt_sovits_top_p": 0.8,
     "gpt_sovits_temperature": 0.45,
@@ -79,8 +79,8 @@
     "mem0_threshold": 0.5,
     "mem0_user_id": "taffy-user",
     "mem0_collection": "taffy_memory",
-    "mem0_qdrant_path": "D:/AI/ai_desktop_pet/.mem0/qdrant",
-    "mem0_history_db_path": "D:/AI/ai_desktop_pet/.mem0/history.db",
+    "mem0_qdrant_path": ".mem0/qdrant",
+    "mem0_history_db_path": ".mem0/history.db",
     "mem0_embedding_model": "text-embedding-v3",
     "mem0_embedding_dims": 1024
   },
@@ -134,7 +134,7 @@
   },
   "tools": {
     "enabled": true,
-    "workspace_root": "D:/AI/ai_desktop_pet",
+    "workspace_root": ".",
     "allow_shell": false,
     "shell_timeout_sec": 25,
     "max_file_read_chars": 24000,
