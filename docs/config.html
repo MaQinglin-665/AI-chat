@@ -899,6 +899,9 @@ tafi</textarea>
                   <span>允许图像工具</span>
                   <input type="checkbox" data-path="tools.image_enabled" checked>
                 </label>
+                <p class="field-note col-span-3">
+                  ⚠ 默认保持 <code>tools.enabled=false</code> 与 <code>tools.allow_shell=false</code>。开启后模型可能读取文件或执行命令，请仅在受信任目录按最小权限启用。
+                </p>
                 <label class="field">
                   <span>shell_timeout_sec</span>
                   <input type="number" min="1" data-path="tools.shell_timeout_sec" value="25">
