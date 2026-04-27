@@ -431,6 +431,11 @@
                 <p id="quickStartStatus" class="write-status col-span-2">请先补齐必填项，然后执行连通性检测。</p>
                 <p class="field-note col-span-2">推荐流程：1）选择语音模式 2）检测配置连通性 3）一键应用配置。</p>
                 <div class="onboarding-entry-actions col-span-2">
+                  <button id="applyBeginnerSafePresetBtn" class="btn btn-outline" type="button">🛡 套用新手安全配置</button>
+                  <span class="field-note">将设置 Browser TTS、observe.manual、tools 默认关闭。支持写入本地 config.json 时会自动备份。</span>
+                </div>
+                <p id="beginnerSafePresetStatus" class="write-status col-span-2">未套用新手安全配置。</p>
+                <div class="onboarding-entry-actions col-span-2">
                   <button id="reopenOnboardingBtn" class="btn btn-primary" type="button">🌸 重新打开首次启动向导</button>
                   <span id="onboardingConfigState" class="field-note">向导状态：未完成</span>
                 </div>
