@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const THEME_STORAGE_KEY = 'taffy-theme';
 
   const getThemePreference = () => {
@@ -444,7 +444,7 @@
         }
       })
       .catch((error) => {
-        console.warn('[Taffy] content.json 校验失败，已使用页面静态文案。', error);
+        console.warn('[馨语Ai桌宠] content.json 校验失败，已使用页面静态文案。', error);
         if (copyMode === 'release') {
           applyReleaseCopyFallback();
         }
@@ -876,7 +876,7 @@
         }
       })
       .catch((error) => {
-        console.warn('[Taffy] versions.json 校验失败，已使用静态版本列表。', error);
+        console.warn('[馨语Ai桌宠] versions.json 校验失败，已使用静态版本列表。', error);
       });
   };
 
@@ -973,7 +973,7 @@
         renderTimeline();
       })
       .catch((error) => {
-        console.warn('[Taffy] 更新日志渲染失败，已使用静态日志。', error);
+        console.warn('[馨语Ai桌宠] 更新日志渲染失败，已使用静态日志。', error);
       });
   };
 
@@ -1113,7 +1113,7 @@
     };
 
     const setPlaceholder = () => {
-      log.innerHTML = '<p class="chat-demo-placeholder">点击“开始演示”，看看 Taffy 的聊天风格。</p>';
+      log.innerHTML = '<p class="chat-demo-placeholder">点击“开始演示”，看看馨语Ai桌宠的聊天风格。</p>';
       cursor = -1;
       isStarted = false;
       clearTyping();
@@ -1130,7 +1130,7 @@
 
       const name = document.createElement('p');
       name.className = 'chat-name';
-      name.textContent = line.role === 'user' ? '你' : 'Taffy';
+      name.textContent = line.role === 'user' ? '你' : '馨语Ai桌宠';
 
       const bubble = document.createElement('p');
       bubble.className = 'chat-bubble';

@@ -2,6 +2,9 @@
 setlocal
 cd /d %~dp0
 
+set "NO_WAIT=0"
+if /I "%~1"=="--no-wait" set "NO_WAIT=1"
+
 set "GPT_SOVITS_DIR=D:\AI\GPT-SoVITS"
 set "GPT_SOVITS_PORT=9880"
 set "CONDA_EXE=C:\Users\MQL\miniconda3\Scripts\conda.exe"
@@ -32,14 +35,19 @@ if not exist "%GPT_SOVITS_DIR%\api_v2.py" (
 
 if defined ENV_PYTHON (
   echo Starting local GPT-SoVITS API on port %GPT_SOVITS_PORT% using %ENV_PYTHON%...
-  start "" /min cmd /c "cd /d ""%GPT_SOVITS_DIR%"" && ""%ENV_PYTHON%"" api_v2.py -a 127.0.0.1 -p %GPT_SOVITS_PORT% -c GPT_SoVITS/configs/tts_infer.yaml 1>>api_out.log 2>>api_err.log"
+  start "GPT-SoVITS API" /min cmd /k "cd /d ""%GPT_SOVITS_DIR%"" && ""%ENV_PYTHON%"" api_v2.py -a 127.0.0.1 -p %GPT_SOVITS_PORT% -c GPT_SoVITS/configs/tts_infer.yaml"
 ) else (
   if not exist "%CONDA_EXE%" (
     echo Warning: Python for %CONDA_ENV% not found and conda not found at %CONDA_EXE%
     exit /b 0
   )
   echo Starting local GPT-SoVITS API on port %GPT_SOVITS_PORT% via conda...
-  start "" /min "%CONDA_EXE%" run --no-capture-output -n %CONDA_ENV% python "%GPT_SOVITS_DIR%\api_v2.py" -a 127.0.0.1 -p %GPT_SOVITS_PORT% -c "%GPT_SOVITS_DIR%\GPT_SoVITS\configs\tts_infer.yaml"
+  start "GPT-SoVITS API" /min cmd /k "cd /d ""%GPT_SOVITS_DIR%"" && ""%CONDA_EXE%"" run --no-capture-output -n %CONDA_ENV% python ""%GPT_SOVITS_DIR%\api_v2.py"" -a 127.0.0.1 -p %GPT_SOVITS_PORT% -c %GPT_SOVITS_DIR%\GPT_SoVITS\configs\tts_infer.yaml"
+)
+
+if "%NO_WAIT%"=="1" (
+  echo GPT-SoVITS startup triggered in background (no-wait mode).
+  exit /b 0
 )
 
 echo Waiting for GPT-SoVITS to initialize...

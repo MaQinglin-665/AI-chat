@@ -420,6 +420,13 @@
     const checkConnectivityButton = getElement('checkConnectivityBtn');
     const connectivityStatus = getElement('connectivityStatus');
     const connectivityList = getElement('connectivityList');
+    const ttsModePreset = getElement('ttsModePreset');
+    const applyTtsModePresetButton = getElement('applyTtsModePresetBtn');
+    const ttsModePresetStatus = getElement('ttsModePresetStatus');
+    const noviceModeToggleButton = getElement('noviceModeToggleBtn');
+    const noviceModeField = getElement('noviceModeField');
+    const noviceModeStatus = getElement('noviceModeStatus');
+    const quickStartStatus = getElement('quickStartStatus');
     const toast = getElement('toast');
 
     if (!form || !preview) {
@@ -434,6 +441,11 @@
     let runRuntimeRestartAction = async () => ({ ok: false, code: 'not_ready', message: '运行中重启尚未初始化。' });
 
     let syncLlmModelPreset = () => {};
+    let syncTtsModePreset = () => {};
+    let syncTtsFieldVisibility = () => {};
+    let syncQuickStartStatus = () => {};
+    let syncNoviceMode = () => {};
+    let isNoviceMode = true;
     syncLlmModelPreset = initLlmModelPreset(() => {
       renderPreview();
     });
@@ -462,7 +474,8 @@
 
     const urlPaths = new Set([
       'llm.base_url',
-      'tts.gpt_sovits_api_url'
+      'tts.gpt_sovits_api_url',
+      'tts.api_url'
     ]);
 
     const ensureFieldErrorElement = (field) => {
@@ -525,6 +538,31 @@
       }
     };
 
+    const shouldValidateUrlPath = (path) => {
+      if (path === 'tts.gpt_sovits_api_url') {
+        const provider = String(readFieldValue(fieldByPath.get('tts.provider')) || '').trim().toLowerCase();
+        return provider === 'gpt_sovits';
+      }
+      if (path === 'tts.api_url') {
+        const provider = String(readFieldValue(fieldByPath.get('tts.provider')) || '').trim().toLowerCase();
+        return provider === 'volcengine_tts' || provider === 'volcengine';
+      }
+      return true;
+    };
+
+    const resolveLlmProvider = () => String(readFieldValue(fieldByPath.get('llm.provider')) || '').trim().toLowerCase();
+    const llmRequiresApiKey = (provider) => {
+      const resolved = String(provider || resolveLlmProvider()).trim().toLowerCase();
+      return resolved !== 'ollama';
+    };
+    const getSuggestedLlmApiKeyEnv = (provider) => {
+      const resolved = String(provider || resolveLlmProvider()).trim().toLowerCase();
+      if (resolved === 'openai') {
+        return 'OPENAI_API_KEY';
+      }
+      return 'DASHSCOPE_API_KEY';
+    };
+
     const validateField = (field, { silent = false } = {}) => {
       const path = field.dataset.path || '';
       const type = (field.type || '').toLowerCase();
@@ -543,7 +581,7 @@
         }
       }
 
-      if (!message && urlPaths.has(path)) {
+      if (!message && urlPaths.has(path) && shouldValidateUrlPath(path)) {
         const text = String(rawValue ?? '').trim();
         if (text && !isHttpUrl(text)) {
           message = '请输入合法的 URL（http 或 https）。';
@@ -579,12 +617,8 @@
         }
       }
 
-      if (!message && path === 'pythonPath') {
-        const p = String(rawValue || '').trim();
-        if (p && !(/[\\/]/.test(p) || p.includes(':'))) {
-          message = '建议填写完整可执行路径。';
-        }
-      }
+      // `python` / `python3` command names are valid in PATH and should not block
+      // onboarding or connectivity checks. Keep this field non-blocking here.
 
       if (!silent) {
         if (message) {
@@ -651,6 +685,15 @@
       const minHeight = getNumber('desktop.min_height');
       if (height !== null && minHeight !== null && minHeight > height) {
         const issue = setPathError('desktop.min_height', '最小高度不能大于窗口高度。', { silent });
+        if (issue) {
+          issues.push(issue);
+        }
+      }
+
+      const llmProvider = resolveLlmProvider();
+      const llmApiKeyEnv = String(readFieldValue(fieldByPath.get('llm.api_key_env')) || '').trim();
+      if (llmRequiresApiKey(llmProvider) && !llmApiKeyEnv) {
+        const issue = setPathError('llm.api_key_env', '当前 LLM Provider 需要 API Key 环境变量名。', { silent });
         if (issue) {
           issues.push(issue);
         }
@@ -919,6 +962,10 @@
 
     const renderPreview = (options = {}) => {
       syncLlmModelPreset();
+      syncTtsModePreset();
+      syncTtsFieldVisibility();
+      syncQuickStartStatus();
+      syncNoviceMode();
       fields.forEach((field) => updateRangeBadge(field));
       const config = collectConfig(fields);
       preview.textContent = JSON.stringify(config, null, 2);
@@ -1892,6 +1939,356 @@
       }
     };
 
+    const initTtsModePreset = () => {
+      if (!ttsModePreset || !applyTtsModePresetButton || !ttsModePresetStatus) {
+        return () => {};
+      }
+
+      const providerField = fieldByPath.get('tts.provider');
+
+      const describeMode = (modeKey) => {
+        if (modeKey === 'edge') {
+          return {
+            label: '标准语音（Edge）',
+            tip: '开箱即用，适合快速体验。'
+          };
+        }
+        if (modeKey === 'volcengine') {
+          return {
+            label: '云端定制语音（Volcengine）',
+            tip: '音色更自然，请确保已设置对应环境变量。'
+          };
+        }
+        if (modeKey === 'gpt_sovits') {
+          return {
+            label: '本地高自由度（GPT-SoVITS）',
+            tip: '适合追求音色上限，需要本地服务可用。'
+          };
+        }
+        return {
+          label: '自定义模式',
+          tip: '保持当前参数，不自动改动。'
+        };
+      };
+
+      const resolveModeByProvider = () => {
+        const provider = String(readFieldValue(providerField) || '').trim().toLowerCase();
+        if (provider === 'edge_tts') {
+          return 'edge';
+        }
+        if (provider === 'gpt_sovits') {
+          return 'gpt_sovits';
+        }
+        if (provider === 'volcengine_tts' || provider === 'volcengine') {
+          return 'volcengine';
+        }
+        return 'custom';
+      };
+
+      const sync = () => {
+        const modeKey = resolveModeByProvider();
+        const modeInfo = describeMode(modeKey);
+        ttsModePreset.value = modeKey;
+        setStatus(ttsModePresetStatus, `当前模式：${modeInfo.label}。${modeInfo.tip}`);
+      };
+
+      const applyMode = (modeKey) => {
+        if (modeKey === 'edge') {
+          applyQuickFix({
+            updates: [
+              { path: 'tts.provider', value: 'edge_tts' },
+              { path: 'tts.voice', value: 'zh-CN-XiaoxiaoNeural' },
+              { path: 'tts.gpt_sovits_realtime_tts', value: false },
+              { path: 'tts.allow_browser_fallback', value: true }
+            ],
+            focusPath: 'tts.provider',
+            message: '已切换到标准语音（Edge）'
+          });
+          setStatus(ttsModePresetStatus, '已套用标准语音。若你追求更自然音色，可改用云端定制语音。', 'ok');
+          return;
+        }
+
+        if (modeKey === 'volcengine') {
+          applyQuickFix({
+            updates: [
+              { path: 'tts.provider', value: 'volcengine_tts' },
+              { path: 'tts.voice', value: 'S_uos2AQPX1' },
+              { path: 'tts.app_id_env', value: 'VOLCENGINE_APP_ID' },
+              { path: 'tts.access_token_env', value: 'VOLCENGINE_ACCESS_TOKEN' },
+              { path: 'tts.secret_key_env', value: 'VOLCENGINE_SECRET_KEY' },
+              { path: 'tts.cluster', value: 'volcano_icl' },
+              { path: 'tts.api_url', value: 'https://openspeech.bytedance.com/api/v1/tts' },
+              { path: 'tts.allow_browser_fallback', value: true }
+            ],
+            focusPath: 'tts.voice',
+            message: '已切换到云端定制语音（Volcengine）'
+          });
+          setStatus(ttsModePresetStatus, '已套用云端定制语音。请确认环境变量已设置，再做连通性检测。', 'ok');
+          return;
+        }
+
+        if (modeKey === 'gpt_sovits') {
+          applyQuickFix({
+            updates: [
+              { path: 'tts.provider', value: 'gpt_sovits' },
+              { path: 'tts.voice', value: 'default' },
+              { path: 'tts.gpt_sovits_api_url', value: 'http://127.0.0.1:9880/tts' },
+              { path: 'tts.gpt_sovits_method', value: 'POST' },
+              { path: 'tts.gpt_sovits_timeout_sec', value: 60 },
+              { path: 'tts.gpt_sovits_format', value: 'wav' },
+              { path: 'tts.gpt_sovits_text_lang', value: 'zh' },
+              { path: 'tts.gpt_sovits_realtime_tts', value: false },
+              { path: 'tts.allow_browser_fallback', value: true }
+            ],
+            focusPath: 'tts.gpt_sovits_api_url',
+            message: '已切换到 GPT-SoVITS 模式'
+          });
+          setStatus(ttsModePresetStatus, '已套用 GPT-SoVITS。请确认本地服务已启动，再做连通性检测。', 'ok');
+          return;
+        }
+
+        setStatus(ttsModePresetStatus, '当前是自定义模式：不会自动覆盖你的参数。', 'warn');
+        showToast('自定义模式不会自动改动参数');
+      };
+
+      ttsModePreset.addEventListener('change', () => {
+        const modeInfo = describeMode(String(ttsModePreset.value || 'custom'));
+        setStatus(ttsModePresetStatus, `已选择：${modeInfo.label}。点击“一键套用”后生效。`, 'warn');
+      });
+
+      applyTtsModePresetButton.addEventListener('click', () => {
+        applyMode(String(ttsModePreset.value || 'custom'));
+      });
+
+      if (providerField) {
+        providerField.addEventListener('change', sync);
+      }
+
+      sync();
+      return sync;
+    };
+
+    const resolveTtsProvider = () => String(readFieldValue(fieldByPath.get('tts.provider')) || '').trim().toLowerCase();
+    const isVolcengineProvider = (provider) => provider === 'volcengine_tts' || provider === 'volcengine';
+
+    const initTtsFieldVisibility = () => {
+      const groupedFields = Array.from(form.querySelectorAll('#cfg-tts [data-tts-group]'));
+      if (!groupedFields.length) {
+        return () => {};
+      }
+
+      const isGroupVisible = (groupKey, provider) => {
+        if (groupKey === 'common') {
+          return true;
+        }
+        if (groupKey === 'gpt_sovits') {
+          return provider === 'gpt_sovits';
+        }
+        if (groupKey === 'volcengine') {
+          return isVolcengineProvider(provider);
+        }
+        if (groupKey === 'edge') {
+          return provider === 'edge_tts';
+        }
+        return true;
+      };
+
+      const sync = () => {
+        const provider = resolveTtsProvider();
+        groupedFields.forEach((fieldNode) => {
+          const groupKey = String(fieldNode.dataset.ttsGroup || 'common').trim().toLowerCase();
+          const level = String(fieldNode.dataset.ttsLevel || '').trim().toLowerCase();
+          const groupVisible = isGroupVisible(groupKey, provider);
+          const levelVisible = !(isNoviceMode && level === 'advanced');
+          fieldNode.hidden = !(groupVisible && levelVisible);
+        });
+      };
+
+      sync();
+      return sync;
+    };
+
+    const initQuickStartStatus = () => {
+      if (!quickStartStatus) {
+        return () => {};
+      }
+
+      const requiredByProvider = {
+        edge_tts: ['tts.voice'],
+        gpt_sovits: ['tts.voice', 'tts.gpt_sovits_api_url'],
+        volcengine_tts: ['tts.voice', 'tts.app_id_env', 'tts.access_token_env', 'tts.cluster', 'tts.api_url'],
+        volcengine: ['tts.voice', 'tts.app_id_env', 'tts.access_token_env', 'tts.cluster', 'tts.api_url'],
+        browser: ['tts.voice']
+      };
+
+      const labels = {
+        'server.host': 'server.host',
+        'server.port': 'server.port',
+        'llm.base_url': 'llm.base_url',
+        'llm.api_key_env': 'llm.api_key_env',
+        'llm.model': 'llm.model',
+        'tts.provider': 'tts.provider',
+        'tts.voice': 'tts.voice',
+        'tts.gpt_sovits_api_url': 'tts.gpt_sovits_api_url',
+        'tts.app_id_env': 'tts.app_id_env',
+        'tts.access_token_env': 'tts.access_token_env',
+        'tts.cluster': 'tts.cluster',
+        'tts.api_url': 'tts.api_url'
+      };
+
+      const hasValue = (path) => {
+        const field = fieldByPath.get(path);
+        if (!field) {
+          return true;
+        }
+        const value = readFieldValue(field);
+        if ((field.type || '').toLowerCase() === 'checkbox') {
+          return true;
+        }
+        return String(value ?? '').trim().length > 0;
+      };
+
+      const sync = () => {
+        if (!isNoviceMode) {
+          setStatus(quickStartStatus, '当前为高级模式：已显示全部可配置项。');
+          return;
+        }
+
+        const provider = resolveTtsProvider();
+        const required = ['server.host', 'server.port', 'llm.base_url', 'llm.model', 'tts.provider'];
+        const llmProvider = resolveLlmProvider();
+        if (llmRequiresApiKey(llmProvider)) {
+          required.push('llm.api_key_env');
+        }
+        required.push(...(requiredByProvider[provider] || ['tts.voice']));
+
+        const missing = Array.from(new Set(required)).filter((path) => !hasValue(path));
+        if (!missing.length) {
+          setStatus(
+            quickStartStatus,
+            '已就绪：请先检测连通性，再点击一键应用配置。',
+            'ok'
+          );
+          return;
+        }
+
+        const preview = missing.slice(0, 3).map((path) => labels[path] || path).join(', ');
+        const suffix = missing.length > 3 ? ', ...' : '';
+        setStatus(
+          quickStartStatus,
+          `仍缺少 ${missing.length} 个必填项：${preview}${suffix}`,
+          'warn'
+        );
+      };
+
+      sync();
+      return sync;
+    };
+
+    const initNoviceMode = () => {
+      const ADVANCED_SECTIONS_SELECTOR = '[data-advanced-section="true"]';
+      const storageKey = 'taffy.config.novice_mode';
+      const hiddenSections = Array.from(document.querySelectorAll(ADVANCED_SECTIONS_SELECTOR));
+      const sidebarLinks = Array.from(document.querySelectorAll('.config-side-link[href^="#"]'));
+
+      const syncSidebarVisibility = () => {
+        sidebarLinks.forEach((link) => {
+          const href = String(link.getAttribute('href') || '').trim();
+          if (!href.startsWith('#')) {
+            return;
+          }
+          const target = document.querySelector(href);
+          const item = link.closest('li');
+          if (!target || !item) {
+            return;
+          }
+          item.hidden = Boolean(target.hidden);
+        });
+
+        const sidebarGroups = Array.from(document.querySelectorAll('.sidebar-group'));
+        sidebarGroups.forEach((group) => {
+          const items = Array.from(group.querySelectorAll('.config-side-list > li'));
+          if (!items.length) {
+            return;
+          }
+          group.hidden = items.every((item) => item.hidden);
+        });
+      };
+
+      const applyNoviceState = (enabled, { persist = true } = {}) => {
+        isNoviceMode = Boolean(enabled);
+        if (noviceModeToggleButton) {
+          noviceModeToggleButton.setAttribute('aria-checked', isNoviceMode ? 'true' : 'false');
+          noviceModeToggleButton.classList.toggle('is-on', isNoviceMode);
+        }
+        if (noviceModeField) {
+          noviceModeField.classList.toggle('is-toggle-on', isNoviceMode);
+        }
+        if (document.body) {
+          document.body.classList.toggle('is-novice-view', isNoviceMode);
+        }
+        hiddenSections.forEach((section) => {
+          section.hidden = false;
+        });
+        syncSidebarVisibility();
+        syncTtsFieldVisibility();
+        syncQuickStartStatus();
+        if (noviceModeStatus) {
+          if (isNoviceMode) {
+            setStatus(noviceModeStatus, '新手模式已开启：行为/记忆/工具等高级模块已隐藏。', 'ok');
+          } else {
+            setStatus(noviceModeStatus, '当前为高级模式：全部配置模块已显示。');
+          }
+        }
+        if (persist) {
+          try {
+            window.localStorage.setItem(storageKey, isNoviceMode ? '1' : '0');
+          } catch (error) {
+            // Ignore storage exceptions.
+          }
+        }
+      };
+
+      let initialState = true;
+      try {
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved === '0') {
+          initialState = false;
+        } else if (saved === '1') {
+          initialState = true;
+        } else if (noviceModeToggleButton) {
+          initialState = String(noviceModeToggleButton.getAttribute('aria-checked') || 'true') !== 'false';
+        }
+      } catch (error) {
+        initialState = noviceModeToggleButton
+          ? String(noviceModeToggleButton.getAttribute('aria-checked') || 'true') !== 'false'
+          : true;
+      }
+
+      if (noviceModeField) {
+        noviceModeField.addEventListener('pointerdown', (event) => {
+          if (typeof event.button === 'number' && event.button !== 0) {
+            return;
+          }
+          event.preventDefault();
+          applyNoviceState(!isNoviceMode);
+        });
+      }
+      if (noviceModeToggleButton) {
+        noviceModeToggleButton.addEventListener('keydown', (event) => {
+          if (event.key === ' ' || event.key === 'Enter') {
+            event.preventDefault();
+            applyNoviceState(!isNoviceMode);
+          }
+        });
+      }
+
+      applyNoviceState(initialState, { persist: false });
+      return () => {
+        applyNoviceState(isNoviceMode, { persist: false });
+      };
+    };
+
     const initConnectivityChecker = () => {
       if (!checkConnectivityButton || !connectivityStatus || !connectivityList) {
         return;
@@ -1932,8 +2329,45 @@
         };
 
         try {
+          const llmProvider = resolveLlmProvider();
+          const llmApiKeyEnv = String(readFieldValue(fieldByPath.get('llm.api_key_env')) || '').trim();
           const llmUrl = String(readFieldValue(fieldByPath.get('llm.base_url')) || '').trim();
-          if (!isHttpUrl(llmUrl)) {
+          if (llmRequiresApiKey(llmProvider) && !llmApiKeyEnv) {
+            const suggestedEnv = getSuggestedLlmApiKeyEnv(llmProvider);
+            registerOutcome('llm', {
+              tone: 'error',
+              stateText: '缺少鉴权',
+              detailText: `当前 Provider（${llmProvider || 'unknown'}）需要 llm.api_key_env，但该项为空。`,
+              fixes: [
+                {
+                  label: `填入 ${suggestedEnv}`,
+                  onClick: () => applyQuickFix({
+                    updates: [{ path: 'llm.api_key_env', value: suggestedEnv }],
+                    focusPath: 'llm.api_key_env',
+                    message: `已填入 ${suggestedEnv}`
+                  })
+                },
+                {
+                  label: '切换到本地 Ollama',
+                  onClick: () => applyQuickFix({
+                    updates: [
+                      { path: 'llm.provider', value: 'ollama' },
+                      { path: 'llm.base_url', value: 'http://127.0.0.1:11434/v1' }
+                    ],
+                    focusPath: 'llm.base_url',
+                    message: '已切换到 Ollama 本地地址'
+                  })
+                },
+                {
+                  label: '定位到 LLM 配置',
+                  onClick: () => {
+                    window.location.hash = '#cfg-llm';
+                    focusFieldByPath('llm.api_key_env');
+                  }
+                }
+              ]
+            });
+          } else if (!isHttpUrl(llmUrl)) {
             registerOutcome('llm', {
               tone: 'error',
               stateText: 'URL 无效',
@@ -2004,76 +2438,355 @@
             registerOutcome('llm', llmOutcome);
           }
 
-          const ttsUrl = String(readFieldValue(fieldByPath.get('tts.gpt_sovits_api_url')) || '').trim();
-          if (!isHttpUrl(ttsUrl)) {
+          const ttsProvider = String(readFieldValue(fieldByPath.get('tts.provider')) || '').trim().toLowerCase();
+          if (ttsProvider === 'gpt_sovits') {
+            const ttsUrl = String(readFieldValue(fieldByPath.get('tts.gpt_sovits_api_url')) || '').trim();
+            if (!isHttpUrl(ttsUrl)) {
+              registerOutcome('tts', {
+                tone: 'error',
+                stateText: 'URL 无效',
+                detailText: '当前为 GPT-SoVITS 模式，但 tts.gpt_sovits_api_url 不是合法 http/https 地址。',
+                fixes: [
+                  {
+                    label: '回填 GPT-SoVITS 地址',
+                    onClick: () => applyQuickFix({
+                      updates: [
+                        { path: 'tts.provider', value: 'gpt_sovits' },
+                        { path: 'tts.gpt_sovits_api_url', value: 'http://127.0.0.1:9880/tts' }
+                      ],
+                      focusPath: 'tts.gpt_sovits_api_url',
+                      message: '已回填默认 GPT-SoVITS 地址'
+                    })
+                  },
+                  {
+                    label: '切到 Edge 标准语音',
+                    onClick: () => applyQuickFix({
+                      updates: [
+                        { path: 'tts.provider', value: 'edge_tts' },
+                        { path: 'tts.voice', value: 'zh-CN-XiaoxiaoNeural' }
+                      ],
+                      focusPath: 'tts.voice',
+                      message: '已切换到 Edge 标准语音'
+                    })
+                  },
+                  {
+                    label: '定位到 TTS 配置',
+                    onClick: () => {
+                      window.location.hash = '#cfg-tts';
+                      focusFieldByPath('tts.gpt_sovits_api_url');
+                    }
+                  }
+                ]
+              });
+            } else {
+              setHealthItem('tts', { tone: 'running', stateText: '检测中...', detailText: `正在访问：${ttsUrl}` });
+              const ttsProbe = await probeUrlReachability(ttsUrl);
+              const ttsOutcome = parseProbeResult(ttsProbe, 'GPT-SoVITS 接口可达');
+              if (ttsOutcome.tone !== 'ok') {
+                ttsOutcome.fixes = [
+                  {
+                    label: '回填默认地址',
+                    onClick: () => applyQuickFix({
+                      updates: [
+                        { path: 'tts.provider', value: 'gpt_sovits' },
+                        { path: 'tts.gpt_sovits_api_url', value: 'http://127.0.0.1:9880/tts' }
+                      ],
+                      focusPath: 'tts.gpt_sovits_api_url',
+                      message: '已回填默认 GPT-SoVITS 地址'
+                    })
+                  },
+                  {
+                    label: '切到 Volcengine 音色',
+                    onClick: () => applyQuickFix({
+                      updates: [
+                        { path: 'tts.provider', value: 'volcengine_tts' },
+                        { path: 'tts.voice', value: 'S_uos2AQPX1' },
+                        { path: 'tts.app_id_env', value: 'VOLCENGINE_APP_ID' },
+                        { path: 'tts.access_token_env', value: 'VOLCENGINE_ACCESS_TOKEN' },
+                        { path: 'tts.secret_key_env', value: 'VOLCENGINE_SECRET_KEY' },
+                        { path: 'tts.cluster', value: 'volcano_icl' },
+                        { path: 'tts.api_url', value: 'https://openspeech.bytedance.com/api/v1/tts' }
+                      ],
+                      focusPath: 'tts.voice',
+                      message: '已切换到 Volcengine 模式'
+                    })
+                  },
+                  {
+                    label: '定位到 TTS 配置',
+                    onClick: () => {
+                      window.location.hash = '#cfg-tts';
+                      focusFieldByPath('tts.gpt_sovits_api_url');
+                    }
+                  }
+                ];
+              }
+              registerOutcome('tts', ttsOutcome);
+            }
+          } else if (ttsProvider === 'volcengine_tts' || ttsProvider === 'volcengine') {
+            const appIdEnv = String(readFieldValue(fieldByPath.get('tts.app_id_env')) || '').trim();
+            const accessTokenEnv = String(readFieldValue(fieldByPath.get('tts.access_token_env')) || '').trim();
+            const cluster = String(readFieldValue(fieldByPath.get('tts.cluster')) || '').trim();
+            const volcApiUrl = String(readFieldValue(fieldByPath.get('tts.api_url')) || '').trim();
+            const missingPaths = [];
+            if (!appIdEnv) {
+              missingPaths.push('tts.app_id_env');
+            }
+            if (!accessTokenEnv) {
+              missingPaths.push('tts.access_token_env');
+            }
+            if (!cluster) {
+              missingPaths.push('tts.cluster');
+            }
+            if (missingPaths.length > 0) {
+              registerOutcome('tts', {
+                tone: 'error',
+                stateText: '参数缺失',
+                detailText: `当前为 Volcengine 模式，缺少：${missingPaths.join('、')}。`,
+                fixes: [
+                  {
+                    label: '回填 Volcengine 默认项',
+                    onClick: () => applyQuickFix({
+                      updates: [
+                        { path: 'tts.provider', value: 'volcengine_tts' },
+                        { path: 'tts.voice', value: 'S_uos2AQPX1' },
+                        { path: 'tts.app_id_env', value: 'VOLCENGINE_APP_ID' },
+                        { path: 'tts.access_token_env', value: 'VOLCENGINE_ACCESS_TOKEN' },
+                        { path: 'tts.secret_key_env', value: 'VOLCENGINE_SECRET_KEY' },
+                        { path: 'tts.cluster', value: 'volcano_icl' },
+                        { path: 'tts.api_url', value: 'https://openspeech.bytedance.com/api/v1/tts' }
+                      ],
+                      focusPath: 'tts.app_id_env',
+                      message: '已回填 Volcengine 默认配置'
+                    })
+                  },
+                  {
+                    label: '切到 Edge 标准语音',
+                    onClick: () => applyQuickFix({
+                      updates: [
+                        { path: 'tts.provider', value: 'edge_tts' },
+                        { path: 'tts.voice', value: 'zh-CN-XiaoxiaoNeural' }
+                      ],
+                      focusPath: 'tts.provider',
+                      message: '已切换到 Edge 标准语音'
+                    })
+                  },
+                  {
+                    label: '定位到 TTS 配置',
+                    onClick: () => {
+                      window.location.hash = '#cfg-tts';
+                      focusFieldByPath('tts.app_id_env');
+                    }
+                  }
+                ]
+              });
+            } else if (!isHttpUrl(volcApiUrl)) {
+              registerOutcome('tts', {
+                tone: 'error',
+                stateText: 'URL 无效',
+                detailText: '当前为 Volcengine 模式，但 tts.api_url 不是合法 http/https 地址。',
+                fixes: [
+                  {
+                    label: '回填 Volcengine API',
+                    onClick: () => applyQuickFix({
+                      updates: [{ path: 'tts.api_url', value: 'https://openspeech.bytedance.com/api/v1/tts' }],
+                      focusPath: 'tts.api_url',
+                      message: '已回填 Volcengine API 地址'
+                    })
+                  },
+                  {
+                    label: '切到 GPT-SoVITS',
+                    onClick: () => applyQuickFix({
+                      updates: [
+                        { path: 'tts.provider', value: 'gpt_sovits' },
+                        { path: 'tts.gpt_sovits_api_url', value: 'http://127.0.0.1:9880/tts' }
+                      ],
+                      focusPath: 'tts.gpt_sovits_api_url',
+                      message: '已切换到 GPT-SoVITS 模式'
+                    })
+                  },
+                  {
+                    label: '定位到 TTS 配置',
+                    onClick: () => {
+                      window.location.hash = '#cfg-tts';
+                      focusFieldByPath('tts.api_url');
+                    }
+                  }
+                ]
+              });
+            } else {
+              setHealthItem('tts', { tone: 'running', stateText: '检测中...', detailText: `正在访问：${volcApiUrl}` });
+              const volcProbe = await probeUrlReachability(volcApiUrl);
+              const volcOutcome = parseProbeResult(volcProbe, 'Volcengine 接口可达');
+              if (volcOutcome.tone !== 'ok') {
+                volcOutcome.fixes = [
+                  {
+                    label: '回填默认 API 地址',
+                    onClick: () => applyQuickFix({
+                      updates: [{ path: 'tts.api_url', value: 'https://openspeech.bytedance.com/api/v1/tts' }],
+                      focusPath: 'tts.api_url',
+                      message: '已回填 Volcengine API 地址'
+                    })
+                  },
+                  {
+                    label: '切到 GPT-SoVITS',
+                    onClick: () => applyQuickFix({
+                      updates: [
+                        { path: 'tts.provider', value: 'gpt_sovits' },
+                        { path: 'tts.gpt_sovits_api_url', value: 'http://127.0.0.1:9880/tts' }
+                      ],
+                      focusPath: 'tts.gpt_sovits_api_url',
+                      message: '已切换到 GPT-SoVITS 模式'
+                    })
+                  },
+                  {
+                    label: '定位到 TTS 配置',
+                    onClick: () => {
+                      window.location.hash = '#cfg-tts';
+                      focusFieldByPath('tts.api_url');
+                    }
+                  }
+                ];
+              } else {
+                const secretKeyEnv = String(readFieldValue(fieldByPath.get('tts.secret_key_env')) || '').trim();
+                if (!secretKeyEnv) {
+                  volcOutcome.tone = 'warn';
+                  volcOutcome.stateText = '可达（建议补充）';
+                  volcOutcome.detailText = 'Volcengine 接口可达，但未填写 tts.secret_key_env；若你的账号策略要求，请补齐。';
+                }
+              }
+              registerOutcome('tts', volcOutcome);
+            }
+          } else if (ttsProvider === 'edge_tts') {
+            const voice = String(readFieldValue(fieldByPath.get('tts.voice')) || '').trim();
             registerOutcome('tts', {
-              tone: 'error',
-              stateText: 'URL 无效',
-              detailText: 'tts.gpt_sovits_api_url 不是合法 http/https 地址。',
+              tone: 'ok',
+              stateText: '可用（本地）',
+              detailText: `当前为 Edge 标准语音${voice ? `（voice: ${voice}）` : ''}，无需额外 API 地址检测。`,
               fixes: [
                 {
-                  label: '填入默认 GPT-SoVITS 地址',
+                  label: '切到 Volcengine 音色',
+                  onClick: () => applyQuickFix({
+                    updates: [
+                      { path: 'tts.provider', value: 'volcengine_tts' },
+                      { path: 'tts.voice', value: 'S_uos2AQPX1' },
+                      { path: 'tts.app_id_env', value: 'VOLCENGINE_APP_ID' },
+                      { path: 'tts.access_token_env', value: 'VOLCENGINE_ACCESS_TOKEN' },
+                      { path: 'tts.secret_key_env', value: 'VOLCENGINE_SECRET_KEY' },
+                      { path: 'tts.cluster', value: 'volcano_icl' },
+                      { path: 'tts.api_url', value: 'https://openspeech.bytedance.com/api/v1/tts' }
+                    ],
+                    focusPath: 'tts.voice',
+                    message: '已切换到 Volcengine 模式'
+                  })
+                },
+                {
+                  label: '切到 GPT-SoVITS',
                   onClick: () => applyQuickFix({
                     updates: [
                       { path: 'tts.provider', value: 'gpt_sovits' },
                       { path: 'tts.gpt_sovits_api_url', value: 'http://127.0.0.1:9880/tts' }
                     ],
                     focusPath: 'tts.gpt_sovits_api_url',
-                    message: '已填入默认 GPT-SoVITS 地址'
-                  })
-                },
-                {
-                  label: '切换为浏览器语音',
-                  onClick: () => applyQuickFix({
-                    updates: [{ path: 'tts.provider', value: 'browser' }],
-                    focusPath: 'tts.provider',
-                    message: '已切换为 browser 语音'
+                    message: '已切换到 GPT-SoVITS 模式'
                   })
                 },
                 {
                   label: '定位到 TTS 配置',
                   onClick: () => {
                     window.location.hash = '#cfg-tts';
-                    focusFieldByPath('tts.gpt_sovits_api_url');
+                    focusFieldByPath('tts.provider');
+                  }
+                }
+              ]
+            });
+          } else if (ttsProvider === 'browser') {
+            registerOutcome('tts', {
+              tone: 'warn',
+              stateText: '本地语音兜底',
+              detailText: 'browser 仅本地系统语音发声，服务端 TTS 不会生成音频输出。建议切换到在线标准语音（edge_tts）、volcengine_tts 或 gpt_sovits。',
+              fixes: [
+                {
+                  label: '切到在线标准语音（Edge）',
+                  onClick: () => applyQuickFix({
+                    updates: [
+                      { path: 'tts.provider', value: 'edge_tts' },
+                      { path: 'tts.voice', value: 'zh-CN-XiaoxiaoNeural' }
+                    ],
+                    focusPath: 'tts.provider',
+                    message: '已切换到在线标准语音（Edge）'
+                  })
+                },
+                {
+                  label: '切到 Volcengine 音色',
+                  onClick: () => applyQuickFix({
+                    updates: [
+                      { path: 'tts.provider', value: 'volcengine_tts' },
+                      { path: 'tts.voice', value: 'S_uos2AQPX1' },
+                      { path: 'tts.app_id_env', value: 'VOLCENGINE_APP_ID' },
+                      { path: 'tts.access_token_env', value: 'VOLCENGINE_ACCESS_TOKEN' },
+                      { path: 'tts.secret_key_env', value: 'VOLCENGINE_SECRET_KEY' },
+                      { path: 'tts.cluster', value: 'volcano_icl' },
+                      { path: 'tts.api_url', value: 'https://openspeech.bytedance.com/api/v1/tts' }
+                    ],
+                    focusPath: 'tts.voice',
+                    message: '已切换到 Volcengine 模式'
+                  })
+                },
+                {
+                  label: '定位到 TTS 配置',
+                  onClick: () => {
+                    window.location.hash = '#cfg-tts';
+                    focusFieldByPath('tts.provider');
                   }
                 }
               ]
             });
           } else {
-            setHealthItem('tts', { tone: 'running', stateText: '检测中...', detailText: `正在访问：${ttsUrl}` });
-            const ttsProbe = await probeUrlReachability(ttsUrl);
-            const ttsOutcome = parseProbeResult(ttsProbe, 'TTS 地址可达');
-            if (ttsOutcome.tone !== 'ok') {
-              ttsOutcome.fixes = [
+            registerOutcome('tts', {
+              tone: 'error',
+              stateText: 'Provider 未支持',
+              detailText: `当前 tts.provider 为 "${ttsProvider || '(空)'}"，支持 edge_tts / volcengine_tts / gpt_sovits / browser。`,
+              fixes: [
                 {
-                  label: '用默认 GPT-SoVITS 地址',
+                  label: '切到 Edge 标准语音',
+                  onClick: () => applyQuickFix({
+                    updates: [
+                      { path: 'tts.provider', value: 'edge_tts' },
+                      { path: 'tts.voice', value: 'zh-CN-XiaoxiaoNeural' }
+                    ],
+                    focusPath: 'tts.provider',
+                    message: '已切换到 Edge 标准语音'
+                  })
+                },
+                {
+                  label: '切到 Volcengine 音色',
+                  onClick: () => applyQuickFix({
+                    updates: [
+                      { path: 'tts.provider', value: 'volcengine_tts' },
+                      { path: 'tts.voice', value: 'S_uos2AQPX1' },
+                      { path: 'tts.app_id_env', value: 'VOLCENGINE_APP_ID' },
+                      { path: 'tts.access_token_env', value: 'VOLCENGINE_ACCESS_TOKEN' },
+                      { path: 'tts.secret_key_env', value: 'VOLCENGINE_SECRET_KEY' },
+                      { path: 'tts.cluster', value: 'volcano_icl' },
+                      { path: 'tts.api_url', value: 'https://openspeech.bytedance.com/api/v1/tts' }
+                    ],
+                    focusPath: 'tts.provider',
+                    message: '已切换到 Volcengine 模式'
+                  })
+                },
+                {
+                  label: '切到 GPT-SoVITS',
                   onClick: () => applyQuickFix({
                     updates: [
                       { path: 'tts.provider', value: 'gpt_sovits' },
                       { path: 'tts.gpt_sovits_api_url', value: 'http://127.0.0.1:9880/tts' }
                     ],
-                    focusPath: 'tts.gpt_sovits_api_url',
-                    message: '已回填默认 GPT-SoVITS 地址'
-                  })
-                },
-                {
-                  label: '切换为浏览器语音',
-                  onClick: () => applyQuickFix({
-                    updates: [{ path: 'tts.provider', value: 'browser' }],
                     focusPath: 'tts.provider',
-                    message: '已切换为 browser 语音'
+                    message: '已切换到 GPT-SoVITS 模式'
                   })
-                },
-                {
-                  label: '定位到 TTS 配置',
-                  onClick: () => {
-                    window.location.hash = '#cfg-tts';
-                    focusFieldByPath('tts.gpt_sovits_api_url');
-                  }
                 }
-              ];
-            }
-            registerOutcome('tts', ttsOutcome);
+              ]
+            });
           }
 
           const reloadEndpoints = buildRuntimeReloadEndpoints();
@@ -2541,6 +3254,10 @@
     }
 
     initTemplateSystem();
+    syncTtsModePreset = initTtsModePreset();
+    syncTtsFieldVisibility = initTtsFieldVisibility();
+    syncQuickStartStatus = initQuickStartStatus();
+    syncNoviceMode = initNoviceMode();
     initConnectivityChecker();
     initRuntimeApplier();
     initRuntimeRestarter();

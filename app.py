@@ -31,6 +31,7 @@ except Exception:
 from config import (
     CONFIG_PATH,
     DEFAULT_CONFIG,
+    DiagnosticError,
     EXAMPLE_CONFIG_PATH,
     OLLAMA_DEFAULT_BASE_URL,
     OLLAMA_DEFAULT_MODEL,
@@ -41,9 +42,12 @@ from config import (
     VOSK_MODEL_LARGE_ROOT,
     VOSK_MODEL_ROOT,
     WEB_DIR,
+    redact_sensitive_text,
+    resolve_live2d_model_path,
     load_config,
     sanitize_client_config,
     sanitize_hotword_replacements,
+    validate_live2d_model_path,
 )
 import memory as _memory_module
 from utils import _clamp_int, _clamp_float, _truncate_text
@@ -168,6 +172,185 @@ DEFAULT_HUMANIZE_SETTINGS = {
     "refine_timeout_sec": 12,
     "refine_min_chars": 36,
 }
+
+
+def _diagnostic_payload(exc):
+    if isinstance(exc, DiagnosticError):
+        return exc.to_payload()
+    safe_error = redact_sensitive_text(str(exc or "").strip()) or "服务发生未知错误。"
+    return {"error": safe_error}
+
+
+def _log_backend_exception(scope, exc, extra=""):
+    safe_scope = str(scope or "runtime").strip().upper()
+    safe_extra = str(extra or "").strip()
+    detail = redact_sensitive_text(str(exc or "").strip())
+    header = f"[{safe_scope}][ERROR] {detail}"
+    if safe_extra:
+        header = f"{header} | {redact_sensitive_text(safe_extra)}"
+    print(header, file=sys.stderr)
+    trace = traceback.format_exc()
+    if trace and trace.strip() and trace.strip() != "NoneType: None":
+        print(redact_sensitive_text(trace), file=sys.stderr)
+
+
+def _looks_like_timeout_error(message):
+    text = str(message or "").strip().lower()
+    return "timed out" in text or "timeout" in text
+
+
+def _looks_like_network_error(message):
+    text = str(message or "").strip().lower()
+    markers = (
+        "getaddrinfo",
+        "name or service not known",
+        "temporary failure in name resolution",
+        "no route to host",
+        "network is unreachable",
+        "nodename nor servname",
+        "failed to resolve",
+        "dns",
+    )
+    return any(marker in text for marker in markers)
+
+
+def _looks_like_connection_refused(message):
+    text = str(message or "").strip().lower()
+    markers = (
+        "connection refused",
+        "actively refused",
+        "winerror 10061",
+        "errno 111",
+    )
+    return any(marker in text for marker in markers)
+
+
+def _resolve_llm_provider(llm_cfg):
+    cfg = llm_cfg if isinstance(llm_cfg, dict) else {}
+    provider = str(cfg.get("provider", "") or "").strip().lower()
+    if provider:
+        return provider
+    base_url = str(cfg.get("base_url", "") or "").strip().lower()
+    return "ollama" if "11434" in base_url or "ollama" in base_url else "openai"
+
+
+def _resolve_llm_api_key(llm_cfg):
+    cfg = llm_cfg if isinstance(llm_cfg, dict) else {}
+    key_env = (
+        str(cfg.get("api_key_env", OPENAI_DEFAULT_KEY_ENV) or OPENAI_DEFAULT_KEY_ENV).strip()
+        or OPENAI_DEFAULT_KEY_ENV
+    )
+    key_value = str(cfg.get("api_key", "") or "").strip() or str(
+        os.environ.get(key_env, "") or ""
+    ).strip()
+    return key_value, key_env
+
+
+def _ensure_llm_auth_ready(llm_cfg):
+    provider = _resolve_llm_provider(llm_cfg)
+    if provider not in {"openai", "openai-compatible", "openai_compatible"}:
+        return
+    base_url = str((llm_cfg or {}).get("base_url", OPENAI_DEFAULT_BASE_URL) or "").strip()
+    api_key, key_env = _resolve_llm_api_key(llm_cfg)
+    if api_key or is_local_url(base_url):
+        return
+    raise DiagnosticError(
+        code="api_key_missing",
+        reason="当前 LLM 提供方需要 API Key，但未读取到密钥。",
+        solution=f"请先在环境变量中设置 {key_env}，或切换为本地 Ollama。",
+        config_key="llm.api_key_env",
+    )
+
+
+def _diagnose_llm_exception(exc, llm_cfg):
+    if isinstance(exc, DiagnosticError):
+        return exc
+    cfg = llm_cfg if isinstance(llm_cfg, dict) else {}
+    raw = str(exc or "").strip()
+    lower = raw.lower()
+    provider = _resolve_llm_provider(cfg)
+    base_url = str(cfg.get("base_url", "") or "").strip()
+    model = str(cfg.get("model", "") or "").strip() or OLLAMA_DEFAULT_MODEL
+    _, key_env = _resolve_llm_api_key(cfg)
+
+    if "missing api key" in lower:
+        return DiagnosticError(
+            code="api_key_missing",
+            reason="当前 LLM 提供方需要 API Key，但未读取到密钥。",
+            solution=f"请先设置环境变量 {key_env}，再重试。",
+            config_key="llm.api_key_env",
+            detail=raw,
+        )
+
+    if provider == "ollama" and "model" in lower and "not found" in lower:
+        return DiagnosticError(
+            code="model_not_found",
+            reason=f"Ollama 中不存在模型：{model}",
+            solution=f"请先执行 `ollama pull {model}`，或改为已安装模型。",
+            config_key="llm.model",
+            detail=raw,
+        )
+
+    if "model" in lower and "not found" in lower:
+        return DiagnosticError(
+            code="model_not_found",
+            reason=f"模型名称不可用：{model}",
+            solution="请确认模型名称拼写正确，并且该模型已在服务端可用。",
+            config_key="llm.model",
+            detail=raw,
+        )
+
+    if _looks_like_timeout_error(lower):
+        return DiagnosticError(
+            code="llm_connection_timeout",
+            reason="连接 LLM 服务超时。",
+            solution="请检查服务负载与网络状况，必要时增大 llm.request_timeout。",
+            config_key="llm.request_timeout",
+            detail=raw,
+        )
+
+    if _looks_like_network_error(lower):
+        return DiagnosticError(
+            code="network_connection_failed",
+            reason="网络连接失败，无法访问 LLM 服务地址。",
+            solution="请检查网络、代理和 DNS 设置，确认地址可访问。",
+            config_key="llm.base_url",
+            detail=raw,
+        )
+
+    if "connection failed" in lower or "failed to connect" in lower:
+        if provider == "ollama" and _looks_like_connection_refused(lower):
+            return DiagnosticError(
+                code="ollama_not_started",
+                reason=f"无法连接 Ollama 服务：{base_url or OLLAMA_DEFAULT_BASE_URL}",
+                solution="请先启动 Ollama（或执行 `ollama serve`），再重试。",
+                config_key="llm.base_url",
+                detail=raw,
+            )
+        return DiagnosticError(
+            code="llm_connection_failed",
+            reason=f"无法连接 LLM 服务地址：{base_url or '(未设置)'}",
+            solution="请确认服务已启动，且 llm.base_url 地址与端口填写正确。",
+            config_key="llm.base_url",
+            detail=raw,
+        )
+
+    if "llm http" in lower:
+        return DiagnosticError(
+            code="llm_connection_failed",
+            reason="LLM 服务返回异常状态码。",
+            solution="请检查 llm.base_url、llm.model 与鉴权配置是否正确。",
+            config_key="llm.base_url",
+            detail=raw,
+        )
+
+    return DiagnosticError(
+        code="llm_call_failed",
+        reason="LLM 调用失败。",
+        solution="请检查 LLM 地址、模型名和鉴权配置，并查看控制台日志。",
+        config_key="llm",
+        detail=raw,
+    )
 
 
 def reset_runtime_state():
@@ -304,7 +487,7 @@ def _serialize_history_for_summary(history_items, max_messages=80):
         if not content:
             continue
         content = content[:260]
-        label = "用户" if role == "user" else "Taffy"
+        label = "用户" if role == "user" else "馨语Ai桌宠"
         lines.append(f"{label}: {content}")
     return "\n".join(lines).strip()
 
@@ -716,24 +899,24 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
         if long_count >= 2:
             for i, p in enumerate(variety_prompts):
                 if any(k in p for k in ["极短", "一两个字", "安静", "收敛", "敷衍"]):
-                    weights[i] *= 3.8
+                    weights[i] *= 2.4
 
         # If recent replies frequently end with questions -> boost no-question directives
         if question_count >= 2:
             for i, p in enumerate(variety_prompts):
                 if any(k in p for k in ["不问", "收尾", "陈述", "不寻常", "转移"]):
-                    weights[i] *= 3.8
+                    weights[i] *= 2.4
 
         # If recent replies are all short -> boost expansive directives
         if short_count >= 3:
             for i, p in enumerate(variety_prompts):
                 if any(k in p for k in ["展开", "多说", "认真", "分量", "联想跳跃"]):
-                    weights[i] *= 3.0
+                    weights[i] *= 2.0
 
     # Add controlled randomness so directives do not lock into a stable pattern.
-    weights = [max(0.05, float(w) * random.uniform(0.85, 1.35)) for w in weights]
-    if random.random() < 0.18 and len(variety_prompts) >= 20:
-        extreme_indices = [0, 3, 7, 8, 15, 16, 17]
+    weights = [max(0.05, float(w) * random.uniform(0.9, 1.15)) for w in weights]
+    if random.random() < 0.06 and len(variety_prompts) >= 20:
+        extreme_indices = [0, 7, 17]
         variety_hint = variety_prompts[random.choice(extreme_indices)]
     else:
         variety_hint = random.choices(variety_prompts, weights=weights, k=1)[0]
@@ -760,8 +943,8 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
     time_hint = _hour_to_period_hint(_hour)
 
     thinking_prompt = (
-        "你是 Taffy 的内心独白生成器。你的任务是产生一段真实的、有行动指令的内心想法，"
-        "用来决定 Taffy 这次回复的方向、长度和态度。\n\n"
+        "你是 馨语Ai桌宠 的内心独白生成器。你的任务是产生一段真实的、有行动指令的内心想法，"
+        "用来决定 馨语Ai桌宠 这次回复的方向、长度和态度。\n\n"
         f"【本轮行为指令】{variety_hint}\n\n"
         f"【最近对话】\n{history_snippet}\n\n"
         f"【对方这句话】{user_message[:200]}\n\n"
@@ -798,9 +981,9 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
             "max_tokens": max_tokens,
             "stream": False,
         }
-        payload["temperature"] = 1.05
-        payload["frequency_penalty"] = 0.9
-        payload["presence_penalty"] = 0.75
+        payload["temperature"] = 0.9
+        payload["frequency_penalty"] = 0.35
+        payload["presence_penalty"] = 0.25
         data = http_post_json(
             f"{base_url}/chat/completions", payload,
             headers=headers, timeout=timeout
@@ -810,6 +993,10 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
             .get("message", {})
             .get("content", "")
         ).strip()
+        if not thought:
+            return ""
+        if len(thought) < 4:
+            return ""
         return thought[:200]
     except Exception:
         return ""
@@ -826,8 +1013,20 @@ def should_reply(user_message, config=None, is_auto=False):
     msg = str(user_message or "").strip().lower()
 
     # Always reply to direct address or questions
-    always_keywords = decision_cfg.get("always_reply_keywords",
-        ["塔菲", "taffy", "?", "？", "帮我", "告诉我"])
+    always_keywords = decision_cfg.get(
+        "always_reply_keywords",
+        [
+            "\u99a8\u8bed",
+            "\u99a8\u8bedai",
+            "xinyu",
+            "\u5854\u83f2",
+            "taffy",
+            "?",
+            "\uff1f",
+            "\u5e2e\u6211",
+            "\u544a\u8bc9\u6211",
+        ],
+    )
     for kw in always_keywords:
         if kw.lower() in msg:
             return True
@@ -922,6 +1121,7 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
     base_url = str(llm_cfg.get("base_url", "")).strip().lower()
     if not provider:
         provider = "ollama" if "11434" in base_url or "ollama" in base_url else "openai"
+    _ensure_llm_auth_ready(llm_cfg)
 
     base_prompt, safe_history = _build_base_prompt(
         config, user_message, history, llm_cfg, provider
@@ -942,11 +1142,11 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
         _hour = _now.hour
         time_hint = _hour_to_period_hint(_hour)
         thought_prefix = (
-            f"[Taffy内心独白 — 严格按此执行]：{thought}\n"
-            f"[当前时间]：{time_hint}\n"
-            "→ 这个想法必须直接决定你的回复风格、长度、开头方式。\n"
-            "→ 内心独白不能说出口，但必须体现在回复的每一句话里。\n"
-            "→ 除非独白明确说要提问，否则不以问句结尾。\n\n"
+            f"[Inner thought for this turn]: {thought}\n"
+            f"[Current local time]: {time_hint}\n"
+            "Use this as soft guidance for direction, tone, length, and opening.\n"
+            "Do not expose the inner thought directly, and keep the reply coherent.\n"
+            "Avoid ending with a question unless it is genuinely needed.\n\n"
         )
     prompt = build_prompt_with_style(
         config,
@@ -989,8 +1189,10 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
             return final
         except Exception as exc:
             if image_data_url:
-                raise wrap_vision_error(exc) from exc
-            raise
+                wrapped = wrap_vision_error(exc)
+                if wrapped is not exc:
+                    raise wrapped from exc
+            raise _diagnose_llm_exception(exc, llm_cfg) from exc
 
     if provider == "ollama":
         vision_model = str(
@@ -1032,8 +1234,10 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
             return final
         except Exception as exc:
             if image_data_url:
-                raise wrap_vision_error(exc) from exc
-            raise
+                wrapped = wrap_vision_error(exc)
+                if wrapped is not exc:
+                    raise wrapped from exc
+            raise _diagnose_llm_exception(exc, llm_cfg) from exc
 
     raise RuntimeError(
         f"Unsupported llm.provider: {provider}. Use 'openai' or 'ollama'."
@@ -1048,6 +1252,7 @@ def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, f
     base_url = str(llm_cfg.get("base_url", "")).strip().lower()
     if not provider:
         provider = "ollama" if "11434" in base_url or "ollama" in base_url else "openai"
+    _ensure_llm_auth_ready(llm_cfg)
 
     base_prompt, safe_history = _build_base_prompt(
         config, user_message, history, llm_cfg, provider
@@ -1894,7 +2099,7 @@ class PetHandler(SimpleHTTPRequestHandler):
         except Exception as exc:
             cfg = DEFAULT_CONFIG
             config_ok = False
-            config_error = str(exc)
+            config_error = _diagnostic_payload(exc).get("error", "")
 
         payload = {
             "ok": config_ok,
@@ -1905,11 +2110,28 @@ class PetHandler(SimpleHTTPRequestHandler):
             return payload
 
         security = _get_server_security_settings(cfg)
+        live2d_ok = True
+        live2d_error = ""
+        live2d_resolved = ""
+        try:
+            model_path_value = str((cfg or {}).get("model_path", "") or "").strip()
+            resolved = resolve_live2d_model_path(model_path_value)
+            live2d_resolved = str(resolved) if resolved else ""
+            validate_live2d_model_path(cfg)
+        except Exception as exc:
+            live2d_ok = False
+            live2d_error = _diagnostic_payload(exc).get("error", "")
+
         payload["checks"] = {
             "config_load": {
                 "ok": config_ok,
                 "error": config_error if not config_ok else "",
-            }
+            },
+            "live2d_model_path": {
+                "ok": live2d_ok,
+                "error": live2d_error if not live2d_ok else "",
+                "resolved_path": live2d_resolved,
+            },
         }
         payload["security"] = {
             "require_api_token": bool(security.get("require_api_token", False)),
@@ -1927,6 +2149,7 @@ class PetHandler(SimpleHTTPRequestHandler):
 
     def _reload_runtime_config(self):
         config = load_config()
+        validate_live2d_model_path(config)
         reset_runtime_state()
         server_cfg = config.get("server", {}) if isinstance(config, dict) else {}
         host = str(server_cfg.get("host", DEFAULT_CONFIG["server"]["host"])).strip()
@@ -1993,15 +2216,23 @@ class PetHandler(SimpleHTTPRequestHandler):
             self._send_json(self._build_health_payload(detailed=True))
             return
         if path_only == "/config.json":
-            config = load_config()
-            self._send_json(sanitize_client_config(config))
+            try:
+                config = load_config()
+                self._send_json(sanitize_client_config(config))
+            except Exception as exc:
+                _log_backend_exception("CONFIG", exc, extra="GET /config.json failed")
+                self._send_json(
+                    _diagnostic_payload(exc),
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
             return
         if path_only == "/api/config/reload":
             try:
                 self._send_json(self._reload_runtime_config())
             except Exception as exc:
+                _log_backend_exception("CONFIG", exc, extra="GET /api/config/reload failed")
                 self._send_json(
-                    {"ok": False, "error": str(exc)},
+                    {"ok": False, **_diagnostic_payload(exc)},
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 )
             return
@@ -2057,8 +2288,9 @@ class PetHandler(SimpleHTTPRequestHandler):
             try:
                 self._send_json(self._reload_runtime_config())
             except Exception as exc:
+                _log_backend_exception("CONFIG", exc, extra="POST /api/config/reload failed")
                 self._send_json(
-                    {"ok": False, "error": str(exc)},
+                    {"ok": False, **_diagnostic_payload(exc)},
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 )
             return
@@ -2184,14 +2416,26 @@ class PetHandler(SimpleHTTPRequestHandler):
 
         chat_config = None
         if path_only in {"/api/chat", "/api/chat_stream"}:
-            chat_config = load_config()
+            try:
+                chat_config = load_config()
+            except Exception as exc:
+                _log_backend_exception("CONFIG", exc, extra=f"POST {path_only} load_config failed")
+                self._send_json(
+                    _diagnostic_payload(exc),
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+                return
 
         if path_only == "/api/persona_card":
             try:
                 saved = save_manual_persona_card(body if isinstance(body, dict) else {})
                 self._send_json(saved)
             except Exception as exc:
-                self._send_json({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+                _log_backend_exception("PERSONA", exc, extra="/api/persona_card failed")
+                self._send_json(
+                    _diagnostic_payload(exc),
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
             return
 
         if path_only == "/api/tts":
@@ -2228,12 +2472,18 @@ class PetHandler(SimpleHTTPRequestHandler):
                     return
                 self._send_audio(audio, content_type=guess_audio_content_type(audio))
             except Exception as exc:
-                print(
-                    f"[TTS][ERROR] /api/tts failed: {exc} | voice={voice!r} | text_len={len(text)} | prosody={list(prosody.keys())}",
-                    file=sys.stderr,
+                _log_backend_exception(
+                    "TTS",
+                    exc,
+                    extra=(
+                        f"/api/tts failed | voice={voice!r} | "
+                        f"text_len={len(text)} | prosody={list(prosody.keys())}"
+                    ),
                 )
-                traceback.print_exc()
-                self._send_json({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+                self._send_json(
+                    _diagnostic_payload(exc),
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
             return
 
         if path_only == "/api/translate":
@@ -2265,7 +2515,12 @@ class PetHandler(SimpleHTTPRequestHandler):
                     result = call_openai_compatible(translate_cfg, messages)
                 self._send_json({"translated": result.strip()})
             except Exception as exc:
-                self._send_json({"error": str(exc)})
+                diagnosed = _diagnose_llm_exception(exc, llm_cfg if "llm_cfg" in locals() else {})
+                _log_backend_exception("TRANSLATE", diagnosed, extra="/api/translate failed")
+                self._send_json(
+                    _diagnostic_payload(diagnosed),
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
             return
 
         if path_only == "/api/asr_pcm":
@@ -2298,8 +2553,9 @@ class PetHandler(SimpleHTTPRequestHandler):
                 text = apply_hotword_replacements(raw_text, replacements)
                 self._send_json({"text": text, "raw_text": raw_text})
             except Exception as exc:
+                _log_backend_exception("ASR", exc, extra="/api/asr_pcm failed")
                 self._send_json(
-                    {"error": str(exc)},
+                    _diagnostic_payload(exc),
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 )
             return
@@ -2378,7 +2634,9 @@ class PetHandler(SimpleHTTPRequestHandler):
                         pass
                 self._send_sse({"type": "done", "reply": final_reply})
             except Exception as exc:
-                self._send_sse({"type": "error", "error": str(exc)})
+                diagnosed = _diagnose_llm_exception(exc, chat_config.get("llm", {}))
+                _log_backend_exception("CHAT_STREAM", diagnosed, extra="/api/chat_stream failed")
+                self._send_sse({"type": "error", "error": _diagnostic_payload(diagnosed).get("error", "")})
             return
 
         try:
@@ -2398,7 +2656,12 @@ class PetHandler(SimpleHTTPRequestHandler):
                 pass
             self._send_json({"reply": reply})
         except Exception as exc:
-            self._send_json({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            diagnosed = _diagnose_llm_exception(exc, chat_config.get("llm", {}))
+            _log_backend_exception("CHAT", diagnosed, extra="/api/chat failed")
+            self._send_json(
+                _diagnostic_payload(diagnosed),
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
 
 
 def ensure_config_hint():
@@ -2439,6 +2702,10 @@ def run_startup_self_check(config):
             findings.append(
                 f"[startup][warn] llm provider is {llm_provider} but no API key found in env {key_env}."
             )
+    try:
+        validate_live2d_model_path(safe_cfg)
+    except Exception as exc:
+        findings.append(f"[startup][warn] {_diagnostic_payload(exc).get('error', '')}")
     return findings
 
 
@@ -2446,19 +2713,58 @@ def build_server():
     config = load_config()
     server_cfg = config.get("server", {})
     host = server_cfg.get("host", DEFAULT_CONFIG["server"]["host"])
-    port = int(server_cfg.get("port", DEFAULT_CONFIG["server"]["port"]))
+    try:
+        port = int(server_cfg.get("port", DEFAULT_CONFIG["server"]["port"]))
+    except (TypeError, ValueError) as exc:
+        raise DiagnosticError(
+            code="server_port_invalid",
+            reason="服务端口不是有效整数。",
+            solution="请将 server.port 设置为 1-65535 的整数，例如 8123。",
+            config_key="server.port",
+            detail=str(exc),
+        ) from exc
+    if port < 0 or port > 65535:
+        raise DiagnosticError(
+            code="server_port_invalid",
+            reason=f"服务端口超出有效范围：{port}",
+            solution="请将 server.port 设置为 0-65535 的整数（0 表示自动分配端口）。",
+            config_key="server.port",
+        )
     open_browser = bool(server_cfg.get("open_browser", False))
 
     ensure_config_hint()
     for finding in run_startup_self_check(config):
         print(finding)
-    httpd = ThreadingHTTPServer((host, port), PetHandler)
+    try:
+        httpd = ThreadingHTTPServer((host, port), PetHandler)
+    except OSError as exc:
+        detail = str(exc or "")
+        lower = detail.lower()
+        if (
+            "address already in use" in lower
+            or "only one usage of each socket address" in lower
+            or "winerror 10048" in lower
+        ):
+            raise DiagnosticError(
+                code="port_in_use",
+                reason=f"端口 {port} 已被占用，桌宠服务无法启动。",
+                solution="关闭占用该端口的程序，或把 server.port 改成其他未占用端口。",
+                config_key="server.port",
+                detail=detail,
+            ) from exc
+        raise
     url = f"http://{host}:{port}"
     return httpd, url, open_browser
 
 
 def run(open_browser_override=None):
-    httpd, url, open_browser = build_server()
+    try:
+        httpd, url, open_browser = build_server()
+    except Exception as exc:
+        _log_backend_exception("STARTUP", exc, extra="server bootstrap failed")
+        safe = _diagnostic_payload(exc)
+        print(safe.get("error", "服务启动失败。"), file=sys.stderr)
+        raise SystemExit(1) from exc
     if open_browser_override is not None:
         open_browser = bool(open_browser_override)
     print(f"Desktop pet server running at {url}")

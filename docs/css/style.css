@@ -404,6 +404,22 @@ body::-webkit-scrollbar-thumb {
   background-position: 100% 0%;
 }
 
+.btn:disabled,
+.btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.56;
+  box-shadow: none;
+  transform: none;
+  filter: grayscale(0.16);
+}
+
+.btn:disabled:hover,
+.btn[disabled]:hover {
+  transform: none;
+  background-position: 0% 0%;
+  box-shadow: none;
+}
+
 .btn-primary {
   color: #fff;
   border-color: transparent;
@@ -1704,6 +1720,84 @@ input[type="range"]::-moz-range-thumb {
   line-height: 1.35;
 }
 
+.field-note {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+#cfg-onboarding {
+  border: 1px solid rgba(95, 152, 220, 0.32);
+  background: linear-gradient(145deg, rgba(252, 254, 255, 0.95), rgba(240, 247, 255, 0.92));
+}
+
+#cfg-onboarding h2 {
+  color: var(--text-primary);
+}
+
+#cfg-onboarding .write-status {
+  margin: 0;
+}
+
+#cfg-onboarding .field-note {
+  color: rgba(88, 78, 114, 0.62);
+}
+
+.is-novice-view [data-advanced-section="true"] {
+  border-style: dashed;
+  border-color: rgba(124, 92, 191, 0.3);
+  background: rgba(247, 244, 255, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(124, 92, 191, 0.06);
+}
+
+.is-novice-view [data-advanced-section="true"] h2 {
+  margin-bottom: 0.35rem;
+  color: rgba(74, 61, 105, 0.88);
+}
+
+.is-novice-view [data-advanced-section="true"] .field-grid {
+  display: none !important;
+}
+
+.is-novice-view [data-advanced-section="true"]::after {
+  content: "新手模式下已折叠，关闭新手模式可查看完整高级配置。";
+  display: block;
+  margin-top: 0.15rem;
+  color: rgba(96, 84, 130, 0.76);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.is-novice-view #oneClickApplyBtn {
+  box-shadow: 0 10px 24px rgba(74, 132, 206, 0.28);
+}
+
+.is-novice-view #checkConnectivityBtn {
+  opacity: 0.9;
+}
+
+.is-novice-view .config-center-layout {
+  grid-template-columns: 1fr;
+}
+
+.is-novice-view .config-center-preview {
+  position: static;
+  top: auto;
+  margin-top: 0.95rem;
+}
+
+.tts-mode-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.56rem;
+  align-items: center;
+}
+
+.tts-mode-actions .btn {
+  white-space: nowrap;
+  padding: 0.58rem 0.9rem;
+}
+
 .field textarea {
   resize: vertical;
 }
@@ -1766,6 +1860,62 @@ input[type="range"]::-moz-range-thumb {
 .switch-field > input[type="checkbox"]:focus-visible {
   outline: 2px solid rgba(124, 92, 191, 0.28);
   outline-offset: 2px;
+}
+
+#noviceModeField {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.9rem;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+  cursor: pointer;
+  border: 1px solid rgba(124, 92, 191, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+#noviceModeField > span {
+  margin-right: 0.2rem;
+}
+
+#noviceModeToggleBtn {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 107, 123, 0.38);
+  background: rgba(110, 107, 123, 0.35);
+  cursor: pointer;
+  transition: background 0.25s ease, border-color 0.25s ease;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+#noviceModeToggleBtn::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: transform 0.25s ease;
+}
+
+#noviceModeField.is-toggle-on #noviceModeToggleBtn {
+  border-color: transparent;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+}
+
+#noviceModeField.is-toggle-on #noviceModeToggleBtn::after {
+  transform: translateX(20px);
 }
 
 .config-actions {
@@ -3234,6 +3384,14 @@ body.js-enabled .faq-item.open .faq-answer {
     grid-column: auto;
   }
 
+  .tts-mode-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .tts-mode-actions .btn {
+    width: 100%;
+  }
+
   .config-page-main {
     padding-top: 6.2rem;
   }
@@ -3664,6 +3822,7 @@ body.js-enabled .media-tile.has-media .media-placeholder {
 
 [data-theme="dark"] #cfg-basic .field,
 [data-theme="dark"] .sidebar-group,
+[data-theme="dark"] #noviceModeField,
 [data-theme="dark"] .switch-field,
 [data-theme="dark"] .runtime-endpoint-field,
 [data-theme="dark"] .health-item,
@@ -3673,6 +3832,39 @@ body.js-enabled .media-tile.has-media .media-placeholder {
 [data-theme="dark"] .write-status {
   background: rgba(35, 29, 52, 0.82);
   border-color: rgba(186, 168, 230, 0.25);
+}
+
+[data-theme="dark"] #cfg-onboarding {
+  background: linear-gradient(150deg, rgba(28, 23, 43, 0.94), rgba(37, 30, 58, 0.9));
+  border-color: rgba(186, 168, 230, 0.3);
+}
+
+[data-theme="dark"] #cfg-onboarding h2 {
+  color: #f1eaff;
+}
+
+[data-theme="dark"] #cfg-onboarding .field-note {
+  color: rgba(207, 193, 245, 0.78);
+}
+
+[data-theme="dark"] #cfg-onboarding .write-status {
+  background: rgba(47, 39, 68, 0.9);
+  border-color: rgba(186, 168, 230, 0.25);
+}
+
+[data-theme="dark"] .is-novice-view [data-advanced-section="true"] {
+  border-style: solid;
+  border-color: rgba(186, 168, 230, 0.24);
+  background: linear-gradient(140deg, rgba(36, 29, 54, 0.88), rgba(30, 24, 46, 0.84));
+  box-shadow: none;
+}
+
+[data-theme="dark"] .is-novice-view [data-advanced-section="true"] h2 {
+  color: rgba(239, 232, 255, 0.9);
+}
+
+[data-theme="dark"] .is-novice-view [data-advanced-section="true"]::after {
+  color: rgba(198, 184, 236, 0.7);
 }
 
 [data-theme="dark"] .write-note code,

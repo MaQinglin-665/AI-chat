@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 
 $projectDir = $PSScriptRoot
 $launcherVbs = Join-Path $projectDir "launch_taffy.vbs"
-$shortcutName = "Taffy Desktop Pet.lnk"
+$shortcutName = "馨语Ai桌宠.lnk"
 $wscriptExe = Join-Path $env:SystemRoot "System32\wscript.exe"
 
 if (-not (Test-Path -LiteralPath $launcherVbs)) {
@@ -25,7 +25,7 @@ $desktopShortcut = Join-Path $desktopDir $shortcutName
 $startMenuShortcut = Join-Path $programsDir $shortcutName
 $startupShortcut = Join-Path $startupDir $shortcutName
 
-function New-TaffyShortcut {
+function New-DesktopPetShortcut {
     param(
         [Parameter(Mandatory = $true)][string]$Path
     )
@@ -35,7 +35,7 @@ function New-TaffyShortcut {
     $shortcut.TargetPath = $wscriptExe
     $shortcut.Arguments = '"' + $launcherVbs + '"'
     $shortcut.WorkingDirectory = $projectDir
-    $shortcut.Description = "Launch Taffy desktop pet"
+    $shortcut.Description = "Launch 馨语Ai桌宠"
     $shortcut.IconLocation = "$wscriptExe,0"
     $shortcut.Save()
 }
@@ -51,14 +51,14 @@ function Remove-ShortcutIfExists {
 
 switch ($Action) {
     "install" {
-        New-TaffyShortcut -Path $desktopShortcut
-        New-TaffyShortcut -Path $startMenuShortcut
+        New-DesktopPetShortcut -Path $desktopShortcut
+        New-DesktopPetShortcut -Path $startMenuShortcut
         Write-Host "Shortcuts created:"
         Write-Host " - Desktop: $desktopShortcut"
         Write-Host " - Start Menu: $startMenuShortcut"
     }
     "enable_autostart" {
-        New-TaffyShortcut -Path $startupShortcut
+        New-DesktopPetShortcut -Path $startupShortcut
         Write-Host "Autostart enabled: $startupShortcut"
     }
     "disable_autostart" {

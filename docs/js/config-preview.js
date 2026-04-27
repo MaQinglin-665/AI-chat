@@ -39,7 +39,7 @@
 
     const buildConfig = () => ({
       pet: {
-        name: controls.petName.value || 'Taffy',
+        name: controls.petName.value || '馨语Ai桌宠',
         wake_word: controls.wakeWord.value || '塔菲'
       },
       llm: {

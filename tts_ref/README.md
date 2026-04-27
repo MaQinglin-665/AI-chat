@@ -3,7 +3,7 @@
 This directory is intentionally kept out of git tracking for large/private audio assets.
 
 Recommended usage:
-- Put your local GPT-SoVITS reference audio files here (for example `taffy_ref.wav`).
+- Put your local GPT-SoVITS reference audio files here (for example `xinyu_ref.wav`).
 - Keep these files local and do not commit them.
 - Configure paths in `config.json` as needed:
   - `tts.gpt_sovits_ref_audio_path`

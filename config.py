@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 
 
@@ -72,7 +73,8 @@ DEFAULT_ALLOWED_COMMAND_PREFIXES = [
 
 
 DEFAULT_CONFIG = {
-    "assistant_name": "Mochi",
+    "onboarding_completed": False,
+    "assistant_name": "馨语Ai桌宠",
     "model_path": "/models/your_model/model3.json",
     "model": {
         "scale": 1.0,
@@ -116,7 +118,17 @@ DEFAULT_CONFIG = {
         "enabled": True,
         "silence_probability": 0.15,
         "silence_keywords": ["嗯", "哦", "ok", "好的", "知道了"],
-        "always_reply_keywords": ["塔菲", "taffy", "?", "？", "帮我", "告诉我"],
+        "always_reply_keywords": [
+            "\u99a8\u8bed",
+            "\u99a8\u8bedai",
+            "xinyu",
+            "\u5854\u83f2",
+            "taffy",
+            "?",
+            "\uff1f",
+            "\u5e2e\u6211",
+            "\u544a\u8bc9\u6211",
+        ],
     },
     "tts": {
         "provider": TTS_DEFAULT_PROVIDER,
@@ -150,7 +162,7 @@ DEFAULT_CONFIG = {
         "gpt_sovits_speed": 1.0,
     },
     "assistant_prompt": (
-        "你是桌宠 Taffy。你在和一位真实人类用户聊天，不要把用户当成设备、程序或系统。"
+        "你是桌宠 馨语Ai桌宠。你在和一位真实人类用户聊天，不要把用户当成设备、程序或系统。"
         "默认短句回复，先给直接答案，再补半句自然交流；避免模板腔、客服腔和重复口头禅。"
         "信息不足先问一个关键点，不要乱猜。"
     ),
@@ -198,10 +210,10 @@ DEFAULT_CONFIG = {
         "speech_threshold": 0.009,
         "processor_buffer_size": 2048,
         "wake_word_enabled": True,
-        "wake_words": ["\u5854\u83f2", "taffy", "tafi"],
+        "wake_words": ["馨语", "馨语ai", "xinyu", "\u5854\u83f2", "taffy", "tafi"],
         "hotword_replacements": {
-            "\u5854\u83f2": "Taffy",
-            "taffy": "Taffy",
+            "\u5854\u83f2": "馨语Ai桌宠",
+            "taffy": "馨语Ai桌宠",
             "neuro": "Neuro",
             "fifa": "FIFA",
         },
@@ -209,6 +221,24 @@ DEFAULT_CONFIG = {
     "observe": {
         "attach_mode": "always",
         "allow_auto_chat": False,
+        "auto_chat_enabled": False,
+        "auto_chat_min_ms": 180000,
+        "auto_chat_max_ms": 480000,
+        "auto_chat_tuning": {
+            "trigger_base_threshold": 1.03,
+            "short_silence_penalty": 0.35,
+            "long_silence_bonus": 0.14,
+            "emotion_bonus": 0.12,
+            "repeat_reason_penalty": 0.44,
+            "repeat_topic_penalty": 0.48,
+            "burst_penalty": 0.32,
+            "recent_auto_penalty": 0.45,
+            "score_jitter": 0.12,
+            "repeat_reason_window_ms": 14 * 60 * 1000,
+            "repeat_topic_window_ms": 22 * 60 * 1000,
+            "burst_reset_window_ms": 18 * 60 * 1000,
+            "max_topic_hint_chars": 42,
+        },
         "daily_greeting_enabled": False,
         "daily_greeting_hour": 8,
         "daily_greeting_minute": 0,
@@ -245,6 +275,132 @@ DEFAULT_CONFIG = {
 
 
 _ENV_LOADED = False
+
+
+def build_diagnostic_message(reason, solution, config_key):
+    reason_text = str(reason or "").strip() or "发生未知错误。"
+    solution_text = str(solution or "").strip() or "请检查相关配置后重试。"
+    config_item = str(config_key or "").strip() or "未指定"
+    return (
+        f"问题原因：{reason_text}；"
+        f"解决方法：{solution_text}；"
+        f"对应配置项：{config_item}"
+    )
+
+
+def mask_secret(value, keep=3):
+    secret = str(value or "").strip()
+    if not secret:
+        return ""
+    if len(secret) <= max(keep * 2 + 1, 8):
+        return "*" * min(12, max(8, len(secret)))
+    return f"{secret[:keep]}***{secret[-keep:]}"
+
+
+def redact_sensitive_text(text):
+    sanitized = str(text or "")
+    if not sanitized:
+        return ""
+    sanitized = re.sub(
+        r"(?i)(authorization\s*[:=]\s*bearer\s+)([A-Za-z0-9._\-+/=]+)",
+        lambda m: f"{m.group(1)}{mask_secret(m.group(2), keep=2)}",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(?i)\b(api[_-]?key|access[_-]?token|secret[_-]?key|token)\b"
+        r"\s*[:=]\s*([\"']?)([^\"'\s,;]+)\2",
+        lambda m: f"{m.group(1)}={mask_secret(m.group(3), keep=2)}",
+        sanitized,
+    )
+    return sanitized
+
+
+class DiagnosticError(RuntimeError):
+    def __init__(self, code, reason, solution, config_key, detail=""):
+        self.code = str(code or "diagnostic_error")
+        self.reason = str(reason or "").strip()
+        self.solution = str(solution or "").strip()
+        self.config_key = str(config_key or "").strip()
+        self.detail = str(detail or "").strip()
+        self.user_message = build_diagnostic_message(
+            self.reason,
+            self.solution,
+            self.config_key,
+        )
+        super().__init__(self.user_message)
+
+    def to_payload(self):
+        payload = {
+            "error": self.user_message,
+            "code": self.code,
+            "reason": self.reason,
+            "solution": self.solution,
+            "config_key": self.config_key,
+        }
+        detail = redact_sensitive_text(self.detail)
+        if detail:
+            payload["detail"] = detail
+        return payload
+
+
+def resolve_live2d_model_path(model_path):
+    raw = str(model_path or "").strip()
+    if not raw:
+        return None
+    path_obj = Path(raw)
+    if raw.startswith(("/", "\\")):
+        path_obj = WEB_DIR / raw.lstrip("/\\")
+    elif not path_obj.is_absolute():
+        path_obj = WEB_DIR / path_obj
+    try:
+        return path_obj.resolve()
+    except Exception:
+        return path_obj
+
+
+def validate_live2d_model_path(config):
+    cfg = config if isinstance(config, dict) else {}
+    raw_model_path = str(cfg.get("model_path", "") or "").strip()
+    if not raw_model_path:
+        raise DiagnosticError(
+            code="live2d_path_empty",
+            reason="未设置 Live2D 模型路径。",
+            solution="请填写 model3.json 文件路径，例如 /models/hiyori_pro_t11/hiyori_pro_t11.model3.json。",
+            config_key="model_path",
+        )
+    normalized = raw_model_path.replace("\\", "/").lower()
+    if "your_model" in normalized:
+        raise DiagnosticError(
+            code="live2d_path_placeholder",
+            reason="Live2D 路径仍是示例占位符，尚未替换为真实模型。",
+            solution="把模型放到 web/models 下，并把 model_path 改成实际的 model3.json 路径。",
+            config_key="model_path",
+        )
+    resolved = resolve_live2d_model_path(raw_model_path)
+    if resolved is None:
+        raise DiagnosticError(
+            code="live2d_path_invalid",
+            reason="Live2D 模型路径为空或格式无效。",
+            solution="请填写可访问的 model3.json 文件路径。",
+            config_key="model_path",
+        )
+    if not resolved.exists():
+        raise DiagnosticError(
+            code="live2d_path_not_found",
+            reason=f"Live2D 模型文件不存在：{raw_model_path}",
+            solution="请确认文件已放到 web/models，并检查路径拼写是否正确。",
+            config_key="model_path",
+            detail=str(resolved),
+        )
+    if resolved.is_dir():
+        raise DiagnosticError(
+            code="live2d_path_is_dir",
+            reason=f"Live2D 路径指向了文件夹而不是模型文件：{raw_model_path}",
+            solution="请将 model_path 指向具体的 .model3.json 文件。",
+            config_key="model_path",
+            detail=str(resolved),
+        )
+    return resolved
 
 
 def deep_merge(base, update):
@@ -287,6 +443,8 @@ def load_local_env_file():
 def load_config():
     load_local_env_file()
     config = dict(DEFAULT_CONFIG)
+    user_has_onboarding_completed = False
+    local_has_onboarding_completed = False
     if EXAMPLE_CONFIG_PATH.exists():
         try:
             example_data = json.loads(EXAMPLE_CONFIG_PATH.read_text(encoding="utf-8-sig"))
@@ -297,14 +455,37 @@ def load_config():
         try:
             user_data = json.loads(CONFIG_PATH.read_text(encoding="utf-8-sig"))
             config = deep_merge(config, user_data)
+            if isinstance(user_data, dict):
+                user_has_onboarding_completed = "onboarding_completed" in user_data
         except json.JSONDecodeError as exc:
-            raise RuntimeError(f"config.json parse error: {exc}") from exc
+            raise DiagnosticError(
+                code="config_json_invalid",
+                reason=(
+                    f"config.json 第 {exc.lineno} 行第 {exc.colno} 列附近存在 JSON 语法错误。"
+                ),
+                solution="请检查逗号、引号和括号是否完整，修复后重试。",
+                config_key="config.json",
+                detail=str(exc),
+            ) from exc
     if LOCAL_CONFIG_PATH.exists():
         try:
             local_data = json.loads(LOCAL_CONFIG_PATH.read_text(encoding="utf-8-sig"))
             config = deep_merge(config, local_data)
+            if isinstance(local_data, dict):
+                local_has_onboarding_completed = "onboarding_completed" in local_data
         except json.JSONDecodeError as exc:
-            raise RuntimeError(f"config.local.json parse error: {exc}") from exc
+            raise DiagnosticError(
+                code="config_local_json_invalid",
+                reason=(
+                    f"config.local.json 第 {exc.lineno} 行第 {exc.colno} 列附近存在 JSON 语法错误。"
+                ),
+                solution="请修复 JSON 语法后重试，或暂时移走 config.local.json。",
+                config_key="config.local.json",
+                detail=str(exc),
+            ) from exc
+    if CONFIG_PATH.exists() and not user_has_onboarding_completed and not local_has_onboarding_completed:
+        # Backward-compat: existing users with old config.json should not be forced into first-run onboarding.
+        config["onboarding_completed"] = True
     return config
 
 
@@ -400,7 +581,165 @@ def sanitize_client_config(config):
     ).strip().lower()
     if observe_attach_mode not in {"keyword", "always"}:
         observe_attach_mode = "always"
-    wake_words_raw = asr_cfg.get("wake_words", ["\u5854\u83f2", "taffy", "tafi"])
+    observe_auto_chat_tuning_raw = observe_cfg.get("auto_chat_tuning", {})
+    if not isinstance(observe_auto_chat_tuning_raw, dict):
+        observe_auto_chat_tuning_raw = {}
+    observe_auto_chat_tuning = {
+        "trigger_base_threshold": max(
+            0.4,
+            min(
+                3.0,
+                _safe_float(
+                    observe_auto_chat_tuning_raw.get("trigger_base_threshold", 1.03),
+                    1.03,
+                ),
+            ),
+        ),
+        "short_silence_penalty": max(
+            0.0,
+            min(
+                1.2,
+                _safe_float(
+                    observe_auto_chat_tuning_raw.get("short_silence_penalty", 0.35),
+                    0.35,
+                ),
+            ),
+        ),
+        "long_silence_bonus": max(
+            0.0,
+            min(
+                1.0,
+                _safe_float(
+                    observe_auto_chat_tuning_raw.get("long_silence_bonus", 0.14),
+                    0.14,
+                ),
+            ),
+        ),
+        "emotion_bonus": max(
+            0.0,
+            min(
+                0.8,
+                _safe_float(
+                    observe_auto_chat_tuning_raw.get("emotion_bonus", 0.12),
+                    0.12,
+                ),
+            ),
+        ),
+        "repeat_reason_penalty": max(
+            0.0,
+            min(
+                1.2,
+                _safe_float(
+                    observe_auto_chat_tuning_raw.get("repeat_reason_penalty", 0.44),
+                    0.44,
+                ),
+            ),
+        ),
+        "repeat_topic_penalty": max(
+            0.0,
+            min(
+                1.2,
+                _safe_float(
+                    observe_auto_chat_tuning_raw.get("repeat_topic_penalty", 0.48),
+                    0.48,
+                ),
+            ),
+        ),
+        "burst_penalty": max(
+            0.0,
+            min(
+                1.2,
+                _safe_float(
+                    observe_auto_chat_tuning_raw.get("burst_penalty", 0.32),
+                    0.32,
+                ),
+            ),
+        ),
+        "recent_auto_penalty": max(
+            0.0,
+            min(
+                1.5,
+                _safe_float(
+                    observe_auto_chat_tuning_raw.get("recent_auto_penalty", 0.45),
+                    0.45,
+                ),
+            ),
+        ),
+        "score_jitter": max(
+            0.0,
+            min(
+                0.8,
+                _safe_float(
+                    observe_auto_chat_tuning_raw.get("score_jitter", 0.12),
+                    0.12,
+                ),
+            ),
+        ),
+        "repeat_reason_window_ms": max(
+            2 * 60 * 1000,
+            min(
+                120 * 60 * 1000,
+                _safe_int(
+                    observe_auto_chat_tuning_raw.get(
+                        "repeat_reason_window_ms",
+                        14 * 60 * 1000,
+                    ),
+                    14 * 60 * 1000,
+                ),
+            ),
+        ),
+        "repeat_topic_window_ms": max(
+            2 * 60 * 1000,
+            min(
+                150 * 60 * 1000,
+                _safe_int(
+                    observe_auto_chat_tuning_raw.get(
+                        "repeat_topic_window_ms",
+                        22 * 60 * 1000,
+                    ),
+                    22 * 60 * 1000,
+                ),
+            ),
+        ),
+        "burst_reset_window_ms": max(
+            3 * 60 * 1000,
+            min(
+                150 * 60 * 1000,
+                _safe_int(
+                    observe_auto_chat_tuning_raw.get(
+                        "burst_reset_window_ms",
+                        18 * 60 * 1000,
+                    ),
+                    18 * 60 * 1000,
+                ),
+            ),
+        ),
+        "max_topic_hint_chars": max(
+            12,
+            min(
+                120,
+                _safe_int(
+                    observe_auto_chat_tuning_raw.get("max_topic_hint_chars", 42),
+                    42,
+                ),
+            ),
+        ),
+    }
+    observe_auto_chat_min_ms = max(
+        60 * 1000,
+        min(
+            30 * 60 * 1000,
+            _safe_int(observe_cfg.get("auto_chat_min_ms", 180000), 180000),
+        ),
+    )
+    observe_auto_chat_max_ms = max(
+        observe_auto_chat_min_ms + 30 * 1000,
+        min(
+            60 * 60 * 1000,
+            _safe_int(observe_cfg.get("auto_chat_max_ms", 480000), 480000),
+        ),
+    )
+    wake_words_raw = asr_cfg.get("wake_words", ["馨语", "馨语ai", "xinyu", "\u5854\u83f2", "taffy", "tafi"])
     wake_words = []
     if isinstance(wake_words_raw, list):
         for item in wake_words_raw:
@@ -408,9 +747,10 @@ def sanitize_client_config(config):
             if w:
                 wake_words.append(w[:32])
     if not wake_words:
-        wake_words = ["\u5854\u83f2", "taffy", "tafi"]
+        wake_words = ["馨语", "馨语ai", "xinyu", "\u5854\u83f2", "taffy", "tafi"]
 
     return {
+        "onboarding_completed": bool(config.get("onboarding_completed", False)),
         "assistant_name": config.get("assistant_name", "Mochi"),
         "model_path": config.get("model_path", DEFAULT_CONFIG["model_path"]),
         "model": {
@@ -455,6 +795,10 @@ def sanitize_client_config(config):
         "observe": {
             "attach_mode": observe_attach_mode,
             "allow_auto_chat": bool(observe_cfg.get("allow_auto_chat", False)),
+            "auto_chat_enabled": bool(observe_cfg.get("auto_chat_enabled", False)),
+            "auto_chat_min_ms": observe_auto_chat_min_ms,
+            "auto_chat_max_ms": observe_auto_chat_max_ms,
+            "auto_chat_tuning": observe_auto_chat_tuning,
             "daily_greeting_enabled": bool(observe_cfg.get("daily_greeting_enabled", False)),
             "daily_greeting_hour": max(
                 0, min(23, _safe_int(observe_cfg.get("daily_greeting_hour", 8), 8))

@@ -31,7 +31,7 @@ MANUAL_PERSONA_CARD_PATH = MEMORY_PATH.parent / "memory_persona_card.json"
 MEM0_CLIENT = None
 MEM0_CLIENT_KEY = ""
 
-MANUAL_PERSONA_CARD_FIELDS = (
+LEGACY_MANUAL_PERSONA_CARD_FIELDS = (
     "identity",
     "user_preferences",
     "user_dislikes",
@@ -40,7 +40,29 @@ MANUAL_PERSONA_CARD_FIELDS = (
     "companionship_style",
 )
 
+MANUAL_PERSONA_CARD_FIELDS = (
+    "character_name",
+    "user_alias",
+    "personality_tags",
+    "speaking_style",
+    "catchphrases",
+    "likes",
+    "dislikes",
+    "initiative_level",
+    "relationship_role",
+    *LEGACY_MANUAL_PERSONA_CARD_FIELDS,
+)
+
 MANUAL_PERSONA_CARD_LIMITS = {
+    "character_name": 80,
+    "user_alias": 80,
+    "personality_tags": 220,
+    "speaking_style": 360,
+    "catchphrases": 220,
+    "likes": 400,
+    "dislikes": 320,
+    "initiative_level": 24,
+    "relationship_role": 24,
     "identity": 180,
     "user_preferences": 400,
     "user_dislikes": 300,
@@ -48,6 +70,20 @@ MANUAL_PERSONA_CARD_LIMITS = {
     "reply_style": 360,
     "companionship_style": 360,
 }
+
+PERSONA_RELATIONSHIP_ROLES = (
+    "\u5b66\u4e60\u642d\u5b50",
+    "\u684c\u9762\u4f19\u4f34",
+    "\u60c5\u7eea\u966a\u4f34",
+    "\u5de5\u4f5c\u52a9\u624b",
+)
+
+PERSONA_INITIATIVE_LEVELS = (
+    "\u4f4e",
+    "\u9002\u4e2d",
+    "\u9ad8",
+    "\u5f88\u9ad8",
+)
 
 
 def _close_mem0_client():
@@ -594,12 +630,186 @@ def _save_json_summary(path, payload):
     tmp_path.replace(path)
 
 
+def _normalize_persona_value(value, max_len=240):
+    if isinstance(value, (list, tuple, set)):
+        value = ", ".join(str(item).strip() for item in value if str(item).strip())
+    return normalize_memory_text(value, max_len=max_len)
+
+
+def _normalize_persona_relationship_role(value):
+    text = _normalize_persona_value(value, max_len=MANUAL_PERSONA_CARD_LIMITS["relationship_role"])
+    if not text:
+        return ""
+    if text in PERSONA_RELATIONSHIP_ROLES:
+        return text
+    if any(keyword in text for keyword in ("\u5b66\u4e60", "\u642d\u5b50")):
+        return PERSONA_RELATIONSHIP_ROLES[0]
+    if any(keyword in text for keyword in ("\u684c\u9762", "\u4f19\u4f34")):
+        return PERSONA_RELATIONSHIP_ROLES[1]
+    if any(keyword in text for keyword in ("\u60c5\u7eea", "\u966a\u4f34", "\u5b89\u6170")):
+        return PERSONA_RELATIONSHIP_ROLES[2]
+    if any(keyword in text for keyword in ("\u5de5\u4f5c", "\u52a9\u624b", "\u6548\u7387")):
+        return PERSONA_RELATIONSHIP_ROLES[3]
+    lowered = text.lower()
+    if any(keyword in lowered for keyword in ("study", "learn")):
+        return PERSONA_RELATIONSHIP_ROLES[0]
+    if any(keyword in lowered for keyword in ("desktop", "partner")):
+        return PERSONA_RELATIONSHIP_ROLES[1]
+    if any(keyword in lowered for keyword in ("emotion", "companion", "support")):
+        return PERSONA_RELATIONSHIP_ROLES[2]
+    if any(keyword in lowered for keyword in ("work", "assistant", "productivity")):
+        return PERSONA_RELATIONSHIP_ROLES[3]
+    return ""
+
+
+def _normalize_persona_initiative_level(value):
+    text = _normalize_persona_value(value, max_len=MANUAL_PERSONA_CARD_LIMITS["initiative_level"])
+    if not text:
+        return ""
+    direct_map = {
+        "\u4f4e": PERSONA_INITIATIVE_LEVELS[0],
+        "\u8f83\u4f4e": PERSONA_INITIATIVE_LEVELS[0],
+        "\u88ab\u52a8": PERSONA_INITIATIVE_LEVELS[0],
+        "\u5c11\u6253\u6270": PERSONA_INITIATIVE_LEVELS[0],
+        "\u9002\u4e2d": PERSONA_INITIATIVE_LEVELS[1],
+        "\u4e2d": PERSONA_INITIATIVE_LEVELS[1],
+        "\u5e73\u8861": PERSONA_INITIATIVE_LEVELS[1],
+        "\u4e00\u822c": PERSONA_INITIATIVE_LEVELS[1],
+        "\u9ad8": PERSONA_INITIATIVE_LEVELS[2],
+        "\u8f83\u9ad8": PERSONA_INITIATIVE_LEVELS[2],
+        "\u4e3b\u52a8": PERSONA_INITIATIVE_LEVELS[2],
+        "\u5f88\u9ad8": PERSONA_INITIATIVE_LEVELS[3],
+        "\u8d85\u9ad8": PERSONA_INITIATIVE_LEVELS[3],
+    }
+    if text in direct_map:
+        return direct_map[text]
+    lowered = text.lower()
+    if "low" in lowered:
+        return PERSONA_INITIATIVE_LEVELS[0]
+    if "very high" in lowered or "ultra" in lowered:
+        return PERSONA_INITIATIVE_LEVELS[3]
+    if "high" in lowered:
+        return PERSONA_INITIATIVE_LEVELS[2]
+    if "mid" in lowered or "medium" in lowered:
+        return PERSONA_INITIATIVE_LEVELS[1]
+    if "\u4e3b\u52a8" in text:
+        return PERSONA_INITIATIVE_LEVELS[2]
+    if "\u4f4e\u6253\u6270" in text:
+        return PERSONA_INITIATIVE_LEVELS[0]
+    return text
+
+
+def _extract_alias_from_identity(identity):
+    text = str(identity or "").strip()
+    if not text:
+        return ""
+    patterns = (
+        r"(?:\u53eb\u6211|\u79f0\u547c\u6211|\u558a\u6211)([^\s,\uFF0C\u3002\uFF1B;\u3001]{1,20})",
+        r"(?:\u7528\u6237\u79f0\u547c|\u79f0\u547c\u7528\u6237)\s*[:\uFF1A]\s*([^\s,\uFF0C\u3002\uFF1B;\u3001]{1,20})",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return normalize_memory_text(match.group(1), max_len=MANUAL_PERSONA_CARD_LIMITS["user_alias"])
+    return ""
+
+
+def _compose_legacy_identity(card):
+    parts = []
+    character_name = str(card.get("character_name", "")).strip()
+    user_alias = str(card.get("user_alias", "")).strip()
+    if character_name:
+        parts.append(f"\u89d2\u8272\u540d\uff1a{character_name}")
+    if user_alias:
+        parts.append(f"\u7528\u6237\u79f0\u547c\uff1a{user_alias}")
+    return normalize_memory_text("; ".join(parts), max_len=MANUAL_PERSONA_CARD_LIMITS["identity"])
+
+
+def _compose_legacy_reply_style(card):
+    parts = []
+    speaking_style = str(card.get("speaking_style", "")).strip()
+    catchphrases = str(card.get("catchphrases", "")).strip()
+    if speaking_style:
+        parts.append(speaking_style)
+    if catchphrases:
+        parts.append(f"\u53e3\u5934\u7985\uff1a{catchphrases}")
+    return normalize_memory_text("; ".join(parts), max_len=MANUAL_PERSONA_CARD_LIMITS["reply_style"])
+
+
+def _compose_legacy_companionship_style(card):
+    parts = []
+    personality_tags = str(card.get("personality_tags", "")).strip()
+    initiative_level = str(card.get("initiative_level", "")).strip()
+    relationship_role = str(card.get("relationship_role", "")).strip()
+    if personality_tags:
+        parts.append(f"\u6027\u683c\u6807\u7b7e\uff1a{personality_tags}")
+    if initiative_level:
+        parts.append(f"\u4e3b\u52a8\u7a0b\u5ea6\uff1a{initiative_level}")
+    if relationship_role:
+        parts.append(f"\u5173\u7cfb\u5b9a\u4f4d\uff1a{relationship_role}")
+    return normalize_memory_text("; ".join(parts), max_len=MANUAL_PERSONA_CARD_LIMITS["companionship_style"])
+
+
 def _normalize_manual_persona_card(card):
     src = card if isinstance(card, dict) else {}
     normalized = {}
     for key in MANUAL_PERSONA_CARD_FIELDS:
+        if key == "relationship_role":
+            normalized[key] = _normalize_persona_relationship_role(src.get(key, ""))
+            continue
+        if key == "initiative_level":
+            normalized[key] = _normalize_persona_initiative_level(src.get(key, ""))
+            continue
         max_len = MANUAL_PERSONA_CARD_LIMITS.get(key, 240)
-        normalized[key] = normalize_memory_text(src.get(key, ""), max_len=max_len)
+        normalized[key] = _normalize_persona_value(src.get(key, ""), max_len=max_len)
+
+    identity = str(normalized.get("identity", "")).strip()
+    companionship_style = str(normalized.get("companionship_style", "")).strip()
+
+    if not normalized.get("character_name") and identity:
+        normalized["character_name"] = normalize_memory_text(
+            identity, max_len=MANUAL_PERSONA_CARD_LIMITS["character_name"]
+        )
+    if not normalized.get("user_alias") and identity:
+        normalized["user_alias"] = _extract_alias_from_identity(identity)
+    if not normalized.get("likes"):
+        normalized["likes"] = (
+            normalized.get("user_preferences", "") or normalized.get("common_topics", "")
+        )
+    if not normalized.get("dislikes"):
+        normalized["dislikes"] = normalized.get("user_dislikes", "")
+    if not normalized.get("speaking_style"):
+        normalized["speaking_style"] = normalized.get("reply_style", "")
+    if not normalized.get("personality_tags") and companionship_style:
+        normalized["personality_tags"] = normalize_memory_text(
+            companionship_style, max_len=MANUAL_PERSONA_CARD_LIMITS["personality_tags"]
+        )
+    if not normalized.get("relationship_role") and companionship_style:
+        normalized["relationship_role"] = _normalize_persona_relationship_role(companionship_style)
+    if not normalized.get("initiative_level") and companionship_style:
+        normalized["initiative_level"] = _normalize_persona_initiative_level(companionship_style)
+    if not normalized.get("initiative_level"):
+        normalized["initiative_level"] = PERSONA_INITIATIVE_LEVELS[1]
+
+    if not normalized.get("identity"):
+        normalized["identity"] = _compose_legacy_identity(normalized)
+    if not normalized.get("user_preferences"):
+        normalized["user_preferences"] = normalize_memory_text(
+            normalized.get("likes", ""), max_len=MANUAL_PERSONA_CARD_LIMITS["user_preferences"]
+        )
+    if not normalized.get("user_dislikes"):
+        normalized["user_dislikes"] = normalize_memory_text(
+            normalized.get("dislikes", ""), max_len=MANUAL_PERSONA_CARD_LIMITS["user_dislikes"]
+        )
+    if not normalized.get("common_topics") and normalized.get("likes"):
+        normalized["common_topics"] = normalize_memory_text(
+            normalized.get("likes", ""), max_len=MANUAL_PERSONA_CARD_LIMITS["common_topics"]
+        )
+    if not normalized.get("reply_style"):
+        normalized["reply_style"] = _compose_legacy_reply_style(normalized)
+    if not normalized.get("companionship_style"):
+        normalized["companionship_style"] = _compose_legacy_companionship_style(normalized)
+
     updated_at = str(src.get("updated_at", "")).strip()
     normalized["updated_at"] = updated_at
     return normalized
@@ -630,12 +840,15 @@ def save_manual_persona_card(card):
 def build_manual_persona_card_block():
     card = load_manual_persona_card()
     mapping = [
-        ("identity", "角色与身份"),
-        ("user_preferences", "用户偏好"),
-        ("user_dislikes", "用户不喜欢"),
-        ("common_topics", "常聊话题"),
-        ("reply_style", "希望Taffy说话方式"),
-        ("companionship_style", "希望Taffy陪伴方式"),
+        ("character_name", "\u89d2\u8272\u540d"),
+        ("user_alias", "\u7528\u6237\u79f0\u547c"),
+        ("personality_tags", "\u6027\u683c\u6807\u7b7e"),
+        ("speaking_style", "\u8bf4\u8bdd\u98ce\u683c"),
+        ("catchphrases", "\u53e3\u5934\u7985"),
+        ("likes", "\u559c\u6b22\u7684\u4e8b\u7269"),
+        ("dislikes", "\u4e0d\u559c\u6b22\u7684\u4e8b\u7269"),
+        ("initiative_level", "\u4e3b\u52a8\u7a0b\u5ea6"),
+        ("relationship_role", "\u5173\u7cfb\u5b9a\u4f4d"),
     ]
     lines = []
     for key, label in mapping:

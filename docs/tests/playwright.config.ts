@@ -14,7 +14,8 @@ export default defineConfig({
   },
   reporter: [['list']],
   webServer: {
-    command: 'python -m http.server 5500',
+    // Use Node-based static server to avoid shell/python differences across runners.
+    command: 'node tests/static-server.mjs',
     cwd: '..',
     url: 'http://127.0.0.1:5500',
     reuseExistingServer: true,
