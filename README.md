@@ -27,7 +27,7 @@
 1. 准备环境：Windows、Python 3.10+、Node.js、可用的 Live2D 模型
 2. 放置模型到 `web/models/`，并在 `config.json` 设置 `model_path`
 3. 选择一个 LLM 提供方：默认 OpenAI-compatible（qwen-plus），也可切到本地 Ollama
-4. 选择一个 TTS 提供方：默认 browser TTS（首启更稳）
+4. 选择一个 TTS 提供方：新手推荐 Browser TTS 或 Edge TTS（首启更稳）
 5. 双击 `一键启动桌宠.vbs`（或已创建的桌面快捷方式）
 
 详细配置继续看下方章节：
@@ -41,7 +41,7 @@
 - 首次推荐先打开配置中心中的“首次启动向导”，按步骤完成模式选择、LLM/TTS 测试与保存
 - 必配：`model_path`（Live2D 模型路径）
 - 至少选一项 LLM：默认 `openai-compatible`（与 `config.example.json` 一致），也可改为 `ollama`
-- 至少选一项 TTS：默认 `browser`；`gpt_sovits` 作为高级高质量模式按需开启
+- 至少选一项 TTS：新手推荐 `browser` 或 `edge_tts`；`gpt_sovits` 作为高级本地音色模式按需开启
 - 推荐：把密钥放到环境变量或 `.env`，不要明文写入仓库文件
 
 向导完成后会写入：
@@ -184,7 +184,7 @@ Then set in `config.json`:
 
 ## 3) TTS (voice) config
 
-Default is Browser TTS (first-run friendly):
+New user recommendation: Browser TTS or Edge TTS.
 
 ```json
 {
@@ -195,7 +195,16 @@ Default is Browser TTS (first-run friendly):
 }
 ```
 
-Advanced high-quality mode (GPT-SoVITS):
+```json
+{
+  "tts": {
+    "provider": "edge_tts",
+    "voice": "zh-CN-XiaoxiaoNeural"
+  }
+}
+```
+
+Advanced local timbre mode (GPT-SoVITS):
 
 ```json
 {

@@ -459,6 +459,50 @@ def load_local_env_file():
             os.environ[k] = v
 
 
+def _is_legacy_default_gpt_sovits(tts_cfg):
+    if not isinstance(tts_cfg, dict):
+        return False
+    provider = str(tts_cfg.get("provider", "")).strip().lower()
+    if provider != "gpt_sovits":
+        return False
+
+    voice = str(tts_cfg.get("voice", GPT_SOVITS_DEFAULT_VOICE)).strip().lower()
+    sovits_voice = str(tts_cfg.get("gpt_sovits_voice", GPT_SOVITS_DEFAULT_VOICE)).strip().lower()
+    api_url = str(tts_cfg.get("gpt_sovits_api_url", GPT_SOVITS_DEFAULT_API_URL)).strip()
+    method = str(tts_cfg.get("gpt_sovits_method", "POST")).strip().upper()
+    output_format = str(tts_cfg.get("gpt_sovits_format", "wav")).strip().lower()
+    prompt_text = str(tts_cfg.get("gpt_sovits_prompt_text", "")).strip()
+    ref_audio_path = str(tts_cfg.get("gpt_sovits_ref_audio_path", "")).strip()
+
+    if voice and voice != GPT_SOVITS_DEFAULT_VOICE:
+        return False
+    if sovits_voice and sovits_voice != GPT_SOVITS_DEFAULT_VOICE:
+        return False
+    if api_url and api_url != GPT_SOVITS_DEFAULT_API_URL:
+        return False
+    if method and method != "POST":
+        return False
+    if output_format and output_format != "wav":
+        return False
+    if prompt_text or ref_audio_path:
+        return False
+    return True
+
+
+def _migrate_legacy_tts_default(config):
+    tts_cfg = dict(config.get("tts") or {})
+    tts_cfg["provider"] = TTS_DEFAULT_PROVIDER
+    voice = str(tts_cfg.get("voice", "")).strip().lower()
+    if not voice or voice == GPT_SOVITS_DEFAULT_VOICE:
+        tts_cfg["voice"] = TTS_DEFAULT_VOICE
+    voices = tts_cfg.get("voices")
+    if not isinstance(voices, list) or not voices:
+        tts_cfg["voices"] = list(TTS_DEFAULT_VOICES)
+    tts_cfg["allow_browser_fallback"] = True
+    config["tts"] = tts_cfg
+    return config
+
+
 def load_config():
     load_local_env_file()
     config = dict(DEFAULT_CONFIG)
@@ -502,7 +546,14 @@ def load_config():
                 config_key="config.local.json",
                 detail=str(exc),
             ) from exc
-    if CONFIG_PATH.exists() and not user_has_onboarding_completed and not local_has_onboarding_completed:
+    is_legacy_existing_user = (
+        CONFIG_PATH.exists() and not user_has_onboarding_completed and not local_has_onboarding_completed
+    )
+    if is_legacy_existing_user and _is_legacy_default_gpt_sovits(config.get("tts", {})):
+        # Legacy migration: old configs that kept the previous default GPT-SoVITS are moved
+        # to the current first-run-friendly default provider.
+        config = _migrate_legacy_tts_default(config)
+    if is_legacy_existing_user:
         # Backward-compat: existing users with old config.json should not be forced into first-run onboarding.
         config["onboarding_completed"] = True
     return config

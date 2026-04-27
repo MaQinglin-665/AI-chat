@@ -610,23 +610,24 @@
                   <span>快速语音模式</span>
                   <div class="tts-mode-actions">
                     <select id="ttsModePreset">
-                      <option value="edge">在线标准语音（Edge，免配置）</option>
+                      <option value="browser">本地系统语音（Browser，新手推荐）</option>
+                      <option value="edge">在线标准语音（Edge，新手推荐）</option>
                       <option value="volcengine">云端定制语音（音色更好）</option>
-                      <option value="gpt_sovits">本地高自由度（GPT-SoVITS）</option>
+                      <option value="gpt_sovits">高级本地音色模式（GPT-SoVITS）</option>
                       <option value="custom">自定义（保持当前参数）</option>
                     </select>
                     <button id="applyTtsModePresetBtn" class="btn btn-outline" type="button">一键套用</button>
                   </div>
-                  <small class="field-note">建议流程：先选模式并套用，再执行“检测配置连通性”，最后点击“一键应用配置”。</small>
+                  <small class="field-note">建议流程：新手优先 Browser / Edge，稳定后再尝试 GPT-SoVITS；套用后执行“检测配置连通性”，最后点击“一键应用配置”。</small>
                 </label>
                 <p id="ttsModePresetStatus" class="write-status col-span-2">当前未套用快速语音模式。</p>
                 <label class="field" data-tts-group="common">
                   <span>语音 Provider</span>
                   <select data-path="tts.provider">
-                    <option value="gpt_sovits" selected>gpt_sovits</option>
+                    <option value="gpt_sovits">gpt_sovits</option>
                     <option value="edge_tts">edge_tts</option>
                     <option value="volcengine_tts">volcengine_tts</option>
-                    <option value="browser">browser</option>
+                    <option value="browser" selected>browser</option>
                   </select>
                 </label>
                 <label class="field" data-tts-group="common">
@@ -1220,8 +1221,8 @@ tafi</textarea>
             <span>在线语音，通常无需单独 API Key（需联网），中文效果较好，部署简单。</span>
           </button>
           <button class="onboarding-choice" type="button" data-onboarding-voice="gpt_sovits">
-            <strong>GPT-SoVITS</strong>
-            <span>可玩性高，需本地服务已启动并可访问。</span>
+            <strong>GPT-SoVITS（高级模式）</strong>
+            <span>高级本地音色方案，需本地服务已启动并可访问。</span>
           </button>
         </div>
       </section>

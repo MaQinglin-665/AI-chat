@@ -1947,10 +1947,16 @@
       const providerField = fieldByPath.get('tts.provider');
 
       const describeMode = (modeKey) => {
+        if (modeKey === 'browser') {
+          return {
+            label: '本地系统语音（Browser，新手推荐）',
+            tip: '零门槛，本机直接发声，适合首次体验。'
+          };
+        }
         if (modeKey === 'edge') {
           return {
-            label: '标准语音（Edge）',
-            tip: '开箱即用，适合快速体验。'
+            label: '在线标准语音（Edge，新手推荐）',
+            tip: '通常无需单独 API Key，联网即可使用。'
           };
         }
         if (modeKey === 'volcengine') {
@@ -1961,8 +1967,8 @@
         }
         if (modeKey === 'gpt_sovits') {
           return {
-            label: '本地高自由度（GPT-SoVITS）',
-            tip: '适合追求音色上限，需要本地服务可用。'
+            label: '高级本地音色模式（GPT-SoVITS）',
+            tip: '适合进阶调音，需要本地服务可用。'
           };
         }
         return {
@@ -1973,6 +1979,9 @@
 
       const resolveModeByProvider = () => {
         const provider = String(readFieldValue(providerField) || '').trim().toLowerCase();
+        if (provider === 'browser') {
+          return 'browser';
+        }
         if (provider === 'edge_tts') {
           return 'edge';
         }
@@ -1993,6 +2002,21 @@
       };
 
       const applyMode = (modeKey) => {
+        if (modeKey === 'browser') {
+          applyQuickFix({
+            updates: [
+              { path: 'tts.provider', value: 'browser' },
+              { path: 'tts.voice', value: 'default' },
+              { path: 'tts.gpt_sovits_realtime_tts', value: false },
+              { path: 'tts.allow_browser_fallback', value: true }
+            ],
+            focusPath: 'tts.provider',
+            message: '已切换到本地系统语音（Browser）'
+          });
+          setStatus(ttsModePresetStatus, '已套用 Browser 语音。新手可直接继续做连通性检测。', 'ok');
+          return;
+        }
+
         if (modeKey === 'edge') {
           applyQuickFix({
             updates: [
@@ -2002,9 +2026,9 @@
               { path: 'tts.allow_browser_fallback', value: true }
             ],
             focusPath: 'tts.provider',
-            message: '已切换到标准语音（Edge）'
+            message: '已切换到在线标准语音（Edge）'
           });
-          setStatus(ttsModePresetStatus, '已套用标准语音。若你追求更自然音色，可改用云端定制语音。', 'ok');
+          setStatus(ttsModePresetStatus, '已套用 Edge 语音。新手可直接继续做连通性检测。', 'ok');
           return;
         }
 
@@ -2041,9 +2065,9 @@
               { path: 'tts.allow_browser_fallback', value: true }
             ],
             focusPath: 'tts.gpt_sovits_api_url',
-            message: '已切换到 GPT-SoVITS 模式'
+            message: '已切换到 GPT-SoVITS 高级模式'
           });
-          setStatus(ttsModePresetStatus, '已套用 GPT-SoVITS。请确认本地服务已启动，再做连通性检测。', 'ok');
+          setStatus(ttsModePresetStatus, '已套用 GPT-SoVITS 高级模式。请确认本地服务已启动，再做连通性检测。', 'ok');
           return;
         }
 
