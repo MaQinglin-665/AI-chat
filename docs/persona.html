@@ -303,12 +303,18 @@
     function formatImportError(err) {
       const raw = String(err?.message || "").trim();
       if (!raw) {
-        return "JSON 格式不合法，请检查逗号、引号和括号。";
+        return "导入失败：请检查 JSON 格式与文件编码。";
       }
       if (/Unexpected token|Unexpected end|JSON|position|line/i.test(raw)) {
         return "JSON 格式不合法，请检查逗号、引号和括号。";
       }
-      return raw;
+      if (/NotReadable|Failed to read|NetworkError|AbortError/i.test(raw)) {
+        return "读取文件失败，请重新选择文件后重试。";
+      }
+      if (/top-level|top level|must be object/i.test(raw)) {
+        return "JSON 顶层必须是对象（键值对）。";
+      }
+      return `导入失败：${raw}`;
     }
 
     function normalizeText(value) {

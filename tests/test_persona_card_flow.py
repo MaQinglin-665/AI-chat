@@ -60,21 +60,36 @@ def test_manual_persona_defaults_and_unknown_field_sanitization(monkeypatch, tmp
     card_path = tmp_path / "memory_persona_card.json"
     monkeypatch.setattr(memory, "MANUAL_PERSONA_CARD_PATH", card_path)
 
-    normalized = memory._normalize_manual_persona_card({"reply_style": "简洁直接"})
-    assert normalized["speaking_style"] == "简洁直接"
-    assert normalized["initiative_level"] == "适中"
-    assert normalized["relationship_role"] == "桌面伙伴"
+    saved_legacy = memory.save_manual_persona_card({"reply_style": "brief-direct"})
+    assert saved_legacy["speaking_style"] == "brief-direct"
+    assert saved_legacy["initiative_level"] == memory.PERSONA_INITIATIVE_LEVELS[1]
+    assert saved_legacy["relationship_role"] == memory.PERSONA_RELATIONSHIP_ROLES[1]
 
     saved = memory.save_manual_persona_card(
         {
-            "character_name": "塔菲",
+            "character_name": "Taffy",
             "api_key": "SECRET_VALUE_SHOULD_NOT_BE_SAVED",
         }
     )
-    assert saved["character_name"] == "塔菲"
+    assert saved["character_name"] == "Taffy"
     assert "api_key" not in saved
     raw = card_path.read_text(encoding="utf-8")
     assert "SECRET_VALUE_SHOULD_NOT_BE_SAVED" not in raw
+
+
+def test_explicit_empty_relationship_role_is_preserved(monkeypatch, tmp_path):
+    card_path = tmp_path / "memory_persona_card.json"
+    monkeypatch.setattr(memory, "MANUAL_PERSONA_CARD_PATH", card_path)
+
+    saved = memory.save_manual_persona_card(
+        {
+            "character_name": "Taffy",
+            "relationship_role": "",
+            "initiative_level": memory.PERSONA_INITIATIVE_LEVELS[2],
+        }
+    )
+    assert saved["relationship_role"] == ""
+    assert saved["initiative_level"] == memory.PERSONA_INITIATIVE_LEVELS[2]
 
 
 def test_saved_persona_affects_next_prompt_round(monkeypatch, tmp_path):
@@ -83,23 +98,33 @@ def test_saved_persona_affects_next_prompt_round(monkeypatch, tmp_path):
 
     memory.save_manual_persona_card(
         {
-            "character_name": "露米",
-            "speaking_style": "像熟悉朋友一样短句回复，直给重点",
-            "relationship_role": "桌面伙伴",
-            "initiative_level": "适中",
+            "character_name": "Lumi",
+            "speaking_style": "brief-direct",
+            "relationship_role": memory.PERSONA_RELATIONSHIP_ROLES[1],
+            "initiative_level": memory.PERSONA_INITIATIVE_LEVELS[1],
         }
     )
 
     cfg = copy.deepcopy(app.DEFAULT_CONFIG)
-    prompt, _ = app._build_base_prompt(
-        config=cfg,
-        user_message="今天先做什么？",
-        history=[],
-        llm_cfg=cfg.get("llm", {}),
-        provider=str(cfg.get("llm", {}).get("provider", "ollama")),
-    )
-    assert "角色名: 露米" in prompt
-    assert "说话风格: 像熟悉朋友一样短句回复，直给重点" in prompt
+    cfg.setdefault("thinking", {})
+    cfg["thinking"]["enabled"] = False
+    cfg.setdefault("llm", {})
+    cfg["llm"]["provider"] = "ollama"
+
+    captured = {}
+
+    def _fake_call_ollama(llm_cfg, messages, model_override=None):
+        captured["messages"] = messages
+        return "stub-reply"
+
+    monkeypatch.setattr(app, "call_ollama", _fake_call_ollama)
+    monkeypatch.setattr(app, "update_emotion_from_reply", lambda *_args, **_kwargs: None)
+
+    reply = app.call_llm("what should I do next?", history=[], config=cfg, is_auto=False)
+    assert isinstance(reply, str) and reply
+    system_prompt = str(captured.get("messages", [{}])[0].get("content", ""))
+    assert "Lumi" in system_prompt
+    assert "brief-direct" in system_prompt
 
 
 def test_persona_card_api_read_write_cycle(monkeypatch, tmp_path):
@@ -110,14 +135,14 @@ def test_persona_card_api_read_write_cycle(monkeypatch, tmp_path):
     with _run_server_with_config(monkeypatch, cfg) as base:
         status_get, payload_get = _request_json(f"{base}/api/persona_card")
         assert status_get == 200
-        assert payload_get.get("initiative_level") == "适中"
-        assert payload_get.get("relationship_role") == "桌面伙伴"
+        assert payload_get.get("initiative_level") == memory.PERSONA_INITIATIVE_LEVELS[1]
+        assert payload_get.get("relationship_role") == memory.PERSONA_RELATIONSHIP_ROLES[1]
 
         new_card = {
-            "character_name": "露米",
-            "speaking_style": "温柔但不拖沓",
-            "initiative_level": "高",
-            "relationship_role": "工作助手",
+            "character_name": "Lumi",
+            "speaking_style": "warm and concise",
+            "initiative_level": memory.PERSONA_INITIATIVE_LEVELS[2],
+            "relationship_role": memory.PERSONA_RELATIONSHIP_ROLES[3],
         }
         status_post, payload_post = _request_json(
             f"{base}/api/persona_card",
@@ -125,12 +150,12 @@ def test_persona_card_api_read_write_cycle(monkeypatch, tmp_path):
             payload=new_card,
         )
         assert status_post == 200
-        assert payload_post.get("character_name") == "露米"
-        assert payload_post.get("speaking_style") == "温柔但不拖沓"
-        assert payload_post.get("initiative_level") == "高"
-        assert payload_post.get("relationship_role") == "工作助手"
+        assert payload_post.get("character_name") == "Lumi"
+        assert payload_post.get("speaking_style") == "warm and concise"
+        assert payload_post.get("initiative_level") == memory.PERSONA_INITIATIVE_LEVELS[2]
+        assert payload_post.get("relationship_role") == memory.PERSONA_RELATIONSHIP_ROLES[3]
 
         status_reload, payload_reload = _request_json(f"{base}/api/persona_card")
         assert status_reload == 200
-        assert payload_reload.get("character_name") == "露米"
-        assert payload_reload.get("speaking_style") == "温柔但不拖沓"
+        assert payload_reload.get("character_name") == "Lumi"
+        assert payload_reload.get("speaking_style") == "warm and concise"
