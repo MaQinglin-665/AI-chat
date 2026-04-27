@@ -788,6 +788,8 @@ def _normalize_manual_persona_card(card):
         normalized["relationship_role"] = _normalize_persona_relationship_role(companionship_style)
     if not normalized.get("initiative_level") and companionship_style:
         normalized["initiative_level"] = _normalize_persona_initiative_level(companionship_style)
+    if not normalized.get("relationship_role"):
+        normalized["relationship_role"] = PERSONA_RELATIONSHIP_ROLES[1]
     if not normalized.get("initiative_level"):
         normalized["initiative_level"] = PERSONA_INITIATIVE_LEVELS[1]
 
