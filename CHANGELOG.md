@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased] - 2026-04-27
+
+### Added
+- Memory management endpoints:
+  - `GET /api/memory`
+  - `GET /api/memory/export`
+  - `POST /api/memory/toggle`
+  - `POST /api/memory/delete`
+  - `POST /api/memory/clear`
+  - `POST /api/memory/import`
+- Config recovery endpoints:
+  - `POST /api/config/recovery/reset`
+  - `POST /api/config/recovery/export_logs`
+- Support export bundle flow for recent logs (with secret masking) under `support_exports/`.
+- New memory visualization/control page: `docs/memory.html`.
+- `proactive` config block added to defaults and `config.example.json`.
+
+### Changed
+- `config.py` now sanitizes/exposes `proactive` runtime fields and maps legacy `observe` auto-chat settings for backward compatibility.
+- `web/chat.js` state now includes proactive control fields (`enabled/level/cooldown/idle/night_reminder`).
+- Docs config center now includes entry links to memory page and recovery section.
+- README docs navigation and usage notes now include memory page workflow.
+
 ## [1.1.1] - 2026-04-26
 
 ### Added
@@ -36,4 +59,3 @@ All notable changes to this project are documented in this file.
 
 ### Security
 - CORS/token hardening defaults for public/release builds.
-

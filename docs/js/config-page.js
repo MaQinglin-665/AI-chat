@@ -417,6 +417,10 @@
     const runtimeRestartStatus = getElement('runtimeRestartStatus');
     const oneClickApplyButton = getElement('oneClickApplyBtn');
     const oneClickApplyStatus = getElement('oneClickApplyStatus');
+    const resetConfigRecoveryButton = getElement('resetConfigRecoveryBtn');
+    const exportRecentLogsButton = getElement('exportRecentLogsBtn');
+    const recoveryResetStatus = getElement('recoveryResetStatus');
+    const recoveryExportStatus = getElement('recoveryExportStatus');
     const checkConnectivityButton = getElement('checkConnectivityBtn');
     const connectivityStatus = getElement('connectivityStatus');
     const connectivityList = getElement('connectivityList');
@@ -667,6 +671,20 @@
       const autoMax = getNumber('observe.auto_chat_max_ms');
       if (autoMin !== null && autoMax !== null && autoMin > autoMax) {
         const issue = setPathError('observe.auto_chat_max_ms', '最大间隔不能小于最小间隔。', { silent });
+        if (issue) {
+          issues.push(issue);
+        }
+      }
+      const proactiveCooldown = getNumber('proactive.cooldown_minutes');
+      if (proactiveCooldown !== null && proactiveCooldown < 1) {
+        const issue = setPathError('proactive.cooldown_minutes', '冷却时间至少为 1 分钟。', { silent });
+        if (issue) {
+          issues.push(issue);
+        }
+      }
+      const proactiveIdle = getNumber('proactive.idle_minutes');
+      if (proactiveIdle !== null && proactiveIdle < 1) {
+        const issue = setPathError('proactive.idle_minutes', '空闲判定至少为 1 分钟。', { silent });
         if (issue) {
           issues.push(issue);
         }
@@ -1560,9 +1578,12 @@
           asr: {
             keep_listening: true
           },
-          observe: {
-            auto_chat_enabled: true,
-            allow_auto_chat: true
+          proactive: {
+            enabled: true,
+            level: 'gentle',
+            cooldown_minutes: 18,
+            idle_minutes: 12,
+            night_reminder_enabled: false
           }
         }
       },
@@ -1583,8 +1604,9 @@
             inject_recent: 1,
             inject_relevant: 1
           },
-          observe: {
-            auto_chat_enabled: false
+          proactive: {
+            enabled: false,
+            level: 'off'
           },
           asr: {
             max_speech_ms: 1600,
@@ -1605,8 +1627,9 @@
           tts: {
             provider: 'browser'
           },
-          observe: {
-            auto_chat_enabled: false
+          proactive: {
+            enabled: false,
+            level: 'off'
           },
           tools: {
             allow_shell: false
@@ -1693,6 +1716,15 @@
       ['/api/runtime/restart', '/api/restart', '/restart', '/api/desktop/restart']
     );
 
+    const buildRecoveryActionEndpoints = (apiPath) => {
+      const normalized = String(apiPath || '').trim();
+      if (!normalized) {
+        return [];
+      }
+      const byServerConfig = buildEndpointCandidates('', normalized, []);
+      return Array.from(new Set([normalized, ...byServerConfig]));
+    };
+
     const requestRuntimeEndpoint = async (endpoint, {
       action = 'reload_config',
       allowGet = true,
@@ -1769,6 +1801,54 @@
       }
 
       return lastFailure || { ok: false, endpoint };
+    };
+
+    const requestRecoveryEndpoint = async (apiPath, payload = {}) => {
+      const endpoints = buildRecoveryActionEndpoints(apiPath);
+      let lastFailure = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetchWithTimeout(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+          });
+          let data = null;
+          try {
+            data = await response.json();
+          } catch (_) {
+            data = null;
+          }
+          if (response.ok && (!data || data.ok !== false)) {
+            return {
+              ok: true,
+              endpoint,
+              status: Number(response.status || 200),
+              payload: data || {}
+            };
+          }
+          lastFailure = {
+            ok: false,
+            endpoint,
+            status: Number(response.status || 0),
+            payload: data || {}
+          };
+        } catch (error) {
+          lastFailure = {
+            ok: false,
+            endpoint,
+            status: 0,
+            error: String(error && error.message ? error.message : error)
+          };
+        }
+      }
+
+      return lastFailure || {
+        ok: false,
+        status: 0,
+        error: '请求失败'
+      };
     };
 
     const getHealthItem = (id) => connectivityList
@@ -2725,47 +2805,59 @@
               ]
             });
           } else if (ttsProvider === 'browser') {
-            registerOutcome('tts', {
-              tone: 'ok',
-              stateText: '可用（快速体验）',
-              detailText: '当前为 browser，本机可直接发声，适合新手先跑通首轮聊天；若追求更高音色，再切换 edge_tts、volcengine_tts 或 gpt_sovits。',
-              fixes: [
-                {
-                  label: '切到在线标准语音（Edge）',
-                  onClick: () => applyQuickFix({
-                    updates: [
-                      { path: 'tts.provider', value: 'edge_tts' },
-                      { path: 'tts.voice', value: 'zh-CN-XiaoxiaoNeural' }
-                    ],
-                    focusPath: 'tts.provider',
-                    message: '已切换到在线标准语音（Edge）'
-                  })
-                },
-                {
-                  label: '切到 Volcengine 音色',
-                  onClick: () => applyQuickFix({
-                    updates: [
-                      { path: 'tts.provider', value: 'volcengine_tts' },
-                      { path: 'tts.voice', value: 'S_uos2AQPX1' },
-                      { path: 'tts.app_id_env', value: 'VOLCENGINE_APP_ID' },
-                      { path: 'tts.access_token_env', value: 'VOLCENGINE_ACCESS_TOKEN' },
-                      { path: 'tts.secret_key_env', value: 'VOLCENGINE_SECRET_KEY' },
-                      { path: 'tts.cluster', value: 'volcano_icl' },
-                      { path: 'tts.api_url', value: 'https://openspeech.bytedance.com/api/v1/tts' }
-                    ],
-                    focusPath: 'tts.voice',
-                    message: '已切换到 Volcengine 模式'
-                  })
-                },
-                {
-                  label: '定位到 TTS 配置',
-                  onClick: () => {
-                    window.location.hash = '#cfg-tts';
-                    focusFieldByPath('tts.provider');
-                  }
+            const browserFixes = [
+              {
+                label: '切到在线标准语音（Edge）',
+                onClick: () => applyQuickFix({
+                  updates: [
+                    { path: 'tts.provider', value: 'edge_tts' },
+                    { path: 'tts.voice', value: 'zh-CN-XiaoxiaoNeural' }
+                  ],
+                  focusPath: 'tts.provider',
+                  message: '已切换到在线标准语音（Edge）'
+                })
+              },
+              {
+                label: '切到 Volcengine 音色',
+                onClick: () => applyQuickFix({
+                  updates: [
+                    { path: 'tts.provider', value: 'volcengine_tts' },
+                    { path: 'tts.voice', value: 'S_uos2AQPX1' },
+                    { path: 'tts.app_id_env', value: 'VOLCENGINE_APP_ID' },
+                    { path: 'tts.access_token_env', value: 'VOLCENGINE_ACCESS_TOKEN' },
+                    { path: 'tts.secret_key_env', value: 'VOLCENGINE_SECRET_KEY' },
+                    { path: 'tts.cluster', value: 'volcano_icl' },
+                    { path: 'tts.api_url', value: 'https://openspeech.bytedance.com/api/v1/tts' }
+                  ],
+                  focusPath: 'tts.voice',
+                  message: '已切换到 Volcengine 模式'
+                })
+              },
+              {
+                label: '定位到 TTS 配置',
+                onClick: () => {
+                  window.location.hash = '#cfg-tts';
+                  focusFieldByPath('tts.provider');
                 }
-              ]
-            });
+              }
+            ];
+            const browserSpeechSupported = ('speechSynthesis' in window)
+              && typeof window.SpeechSynthesisUtterance !== 'undefined';
+            if (!browserSpeechSupported) {
+              registerOutcome('tts', {
+                tone: 'warn',
+                stateText: '受限（browser 不可用）',
+                detailText: '当前环境不支持 browser 本地语音。建议切换到 edge_tts 继续快速体验，或使用 GPT-SoVITS/Volcengine。',
+                fixes: browserFixes
+              });
+            } else {
+              registerOutcome('tts', {
+                tone: 'ok',
+                stateText: '可用（快速体验）',
+                detailText: '当前为 browser，本机可直接发声，适合新手先跑通首轮聊天；若追求更高音色，再切换 edge_tts、volcengine_tts 或 gpt_sovits。',
+                fixes: browserFixes
+              });
+            }
           } else {
             registerOutcome('tts', {
               tone: 'error',
@@ -3099,6 +3191,105 @@
       });
     };
 
+    const initRecoveryActions = () => {
+      if (!resetConfigRecoveryButton && !exportRecentLogsButton) {
+        return;
+      }
+
+      setStatus(recoveryResetStatus, '未执行配置重置');
+      setStatus(recoveryExportStatus, '未执行日志导出');
+
+      const runResetConfig = async () => {
+        const firstConfirm = window.confirm('将重置 config.json，并自动备份当前配置。是否继续？');
+        if (!firstConfirm) {
+          return;
+        }
+        const secondConfirm = window.confirm('请再次确认：重置后将重新进入首次启动向导。继续吗？');
+        if (!secondConfirm) {
+          return;
+        }
+
+        resetConfigRecoveryButton.disabled = true;
+        setStatus(recoveryResetStatus, '正在执行配置重置...', 'warn');
+
+        try {
+          const result = await requestRecoveryEndpoint('/api/config/recovery/reset', { confirmed: true });
+          if (!result.ok) {
+            const message = String(
+              result?.payload?.error
+              || result?.error
+              || '重置失败，请检查服务状态后重试。'
+            );
+            setStatus(recoveryResetStatus, `重置失败：${message}`, 'error');
+            showToast('配置重置失败');
+            return;
+          }
+
+          const payload = result.payload || {};
+          if (payload.config && typeof payload.config === 'object' && !Array.isArray(payload.config)) {
+            applyConfig(fields, payload.config);
+            resetDiffPanel();
+            renderPreview();
+            validateForm({ silent: false });
+          }
+
+          const backupPath = String(payload.backup_path || '').trim();
+          const message = backupPath
+            ? `重置成功，备份文件：${backupPath}`
+            : '重置成功，已使用 config.example.json 生成新配置。';
+          setStatus(recoveryResetStatus, message, 'ok');
+          if (oneClickApplyStatus) {
+            setStatus(oneClickApplyStatus, '配置已重置，可重新执行首次启动向导。', 'warn');
+          }
+          showToast('配置已重置');
+        } finally {
+          resetConfigRecoveryButton.disabled = false;
+        }
+      };
+
+      const runExportLogs = async () => {
+        exportRecentLogsButton.disabled = true;
+        setStatus(recoveryExportStatus, '正在打包并脱敏最近日志...', 'warn');
+
+        try {
+          const result = await requestRecoveryEndpoint('/api/config/recovery/export_logs', {});
+          if (!result.ok) {
+            const message = String(
+              result?.payload?.error
+              || result?.error
+              || '日志导出失败，请检查服务状态后重试。'
+            );
+            setStatus(recoveryExportStatus, `导出失败：${message}`, 'error');
+            showToast('日志导出失败');
+            return;
+          }
+
+          const payload = result.payload || {};
+          const exportPath = String(payload.export_path || '').trim();
+          const fileCount = Number(payload.file_count || 0);
+          const detail = exportPath
+            ? `导出成功（${fileCount} 个文件），保存路径：${exportPath}`
+            : `导出成功（${fileCount} 个文件）。`;
+          setStatus(recoveryExportStatus, detail, 'ok');
+          showToast('日志导出完成');
+        } finally {
+          exportRecentLogsButton.disabled = false;
+        }
+      };
+
+      if (resetConfigRecoveryButton) {
+        resetConfigRecoveryButton.addEventListener('click', async () => {
+          await runResetConfig();
+        });
+      }
+
+      if (exportRecentLogsButton) {
+        exportRecentLogsButton.addEventListener('click', async () => {
+          await runExportLogs();
+        });
+      }
+    };
+
     const initOneClickApply = () => {
       if (!oneClickApplyButton || !oneClickApplyStatus) {
         return;
@@ -3287,6 +3478,7 @@
     initRuntimeApplier();
     initRuntimeRestarter();
     initProjectConfigWriter();
+    initRecoveryActions();
     initOneClickApply();
     renderPreview();
     validateForm({ silent: false });

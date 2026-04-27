@@ -17,6 +17,11 @@ const state = {
   observeDesktop: false,
   observeAttachMode: "manual",
   observeAllowAutoChat: false,
+  proactiveEnabled: false,
+  proactiveLevel: "off",
+  proactiveCooldownMinutes: 20,
+  proactiveIdleMinutes: 12,
+  proactiveNightReminderEnabled: false,
   autoChatEnabled: false,
   autoChatMinMs: 180000,
   autoChatMaxMs: 480000,
@@ -604,6 +609,36 @@ async function authFetch(input, init = {}) {
 const AUTO_CHAT_MIN_USER_GAP_MS = 90 * 1000;
 const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = 120 * 1000;
 const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = 4 * 60 * 1000;
+const PROACTIVE_LEVEL_PRESETS = {
+  off: {
+    autoChatMinMs: 0,
+    autoChatMaxMs: 0,
+    idleMinutes: 12,
+    cooldownMinutes: 20
+  },
+  quiet: {
+    autoChatMinMs: 36 * 60 * 1000,
+    autoChatMaxMs: 68 * 60 * 1000,
+    idleMinutes: 24,
+    cooldownMinutes: 35
+  },
+  gentle: {
+    autoChatMinMs: 16 * 60 * 1000,
+    autoChatMaxMs: 34 * 60 * 1000,
+    idleMinutes: 12,
+    cooldownMinutes: 18
+  },
+  active: {
+    autoChatMinMs: 8 * 60 * 1000,
+    autoChatMaxMs: 18 * 60 * 1000,
+    idleMinutes: 6,
+    cooldownMinutes: 8
+  }
+};
+const PROACTIVE_NIGHT_REMINDER_HOUR = 22;
+const PROACTIVE_NIGHT_REMINDER_MINUTE = 30;
+const PROACTIVE_MORNING_GREETING_MAX_DELAY_MS = 90 * 60 * 1000;
+const PROACTIVE_NIGHT_REMINDER_MAX_DELAY_MS = 120 * 60 * 1000;
 const AUTO_CHAT_EMO_RE = /(难受|难过|焦虑|压力|累|困|崩溃|失眠|emo|心情不好|低落)/i;
 const AUTO_CHAT_MIRROR_RE = /(你呢|那你呢|你会|你想|你觉得|那你|你自己)/i;
 const AUTO_CHAT_TOPIC_RE = /(项目|考试|工作|学习|代码|模型|部署|计划|进度|复盘|目标)/i;
@@ -3821,17 +3856,71 @@ function stopAutoChatLoop() {
   state.autoChatTimer = 0;
 }
 
-function shouldSkipAutoChat() {
+function normalizeProactiveLevel(level) {
+  const safe = String(level || "").trim().toLowerCase();
+  if (safe === "quiet" || safe === "gentle" || safe === "active") {
+    return safe;
+  }
+  return "off";
+}
+
+function resolveProactivePreset(level) {
+  const normalized = normalizeProactiveLevel(level);
+  return PROACTIVE_LEVEL_PRESETS[normalized] || PROACTIVE_LEVEL_PRESETS.off;
+}
+
+function getProactiveCooldownMs() {
+  const minutes = Math.max(1, Math.round(Number(state.proactiveCooldownMinutes) || 0));
+  return Math.max(AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS, minutes * 60 * 1000);
+}
+
+function getProactiveIdleGapMs() {
+  const minutes = Math.max(1, Math.round(Number(state.proactiveIdleMinutes) || 0));
+  return Math.max(AUTO_CHAT_MIN_USER_GAP_MS, minutes * 60 * 1000);
+}
+
+function isProactiveMessageAllowed({ requireUserIdle = true } = {}) {
+  if (!state.proactiveEnabled || state.proactiveLevel === "off") {
+    return false;
+  }
   if (state.chatBusy) {
+    return false;
+  }
+  const now = Date.now();
+  if (state.lastAutoChatAt > 0 && now - state.lastAutoChatAt < getProactiveCooldownMs()) {
+    return false;
+  }
+  if (
+    requireUserIdle
+    && state.lastUserMessageAt > 0
+    && now - state.lastUserMessageAt < getProactiveIdleGapMs()
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function markProactiveMessageTriggered(reason = "", topicHint = "") {
+  const now = Date.now();
+  const previousAutoAt = Number(state.lastAutoChatAt) || 0;
+  const burstResetWindowMs = Math.max(
+    3 * 60 * 1000,
+    Number(state.autoChatTuning?.burstResetWindowMs) || AUTO_CHAT_BURST_RESET_WINDOW_MS
+  );
+  state.lastAutoChatAt = now;
+  state.autoChatLastReason = String(reason || "").trim();
+  state.autoChatLastTopicHint = normalizeAutoChatTopicHint(topicHint || "");
+  state.autoChatLastTopicAt = state.autoChatLastTopicHint ? now : 0;
+  state.autoChatBurstCount = previousAutoAt > 0 && now - previousAutoAt < burstResetWindowMs
+    ? Math.min(6, (Number(state.autoChatBurstCount) || 0) + 1)
+    : 1;
+}
+
+function shouldSkipAutoChat() {
+  if (!isProactiveMessageAllowed({ requireUserIdle: true })) {
     return true;
   }
   const now = Date.now();
-  if (state.lastAutoChatAt > 0 && now - state.lastAutoChatAt < AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS) {
-    return true;
-  }
-  if (state.lastUserMessageAt > 0 && now - state.lastUserMessageAt < AUTO_CHAT_MIN_USER_GAP_MS) {
-    return true;
-  }
   const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
   for (let i = records.length - 1; i >= 0; i -= 1) {
     const item = records[i];

@@ -391,6 +391,7 @@
               <ul class="config-side-list">
                 <li><a class="config-side-link" href="#cfg-memory">记忆与摘要</a></li>
                 <li><a class="config-side-link" href="#cfg-asr">ASR 与桌面观察</a></li>
+                <li><a class="config-side-link" href="#cfg-proactive">主动陪伴</a></li>
                 <li><a class="config-side-link" href="#cfg-tools">动作、工具与风格</a></li>
                 <li><a class="config-side-link" href="persona.html">Persona Card</a></li>
               </ul>
@@ -401,6 +402,7 @@
                 <li><a class="config-side-link" href="#cfg-preview">实时 JSON 预览</a></li>
                 <li><a class="config-side-link" href="#cfg-templates">配置模板</a></li>
                 <li><a class="config-side-link" href="#cfg-apply">一键应用</a></li>
+                <li><a class="config-side-link" href="#cfg-recovery">故障恢复</a></li>
                 <li><a class="config-side-link" href="#cfg-health">连通性自检</a></li>
                 <li><a class="config-side-link" href="#cfg-runtime">运行中应用</a></li>
                 <li><a class="config-side-link" href="#cfg-release">发布指引</a></li>
@@ -854,6 +856,53 @@ tafi</textarea>
               </div>
             </article>
 
+            <article id="cfg-proactive" class="config-group card-like">
+              <h2>主动陪伴</h2>
+              <div class="field-grid three-col">
+                <label class="field switch-field">
+                  <span>启用主动陪伴</span>
+                  <input type="checkbox" data-path="proactive.enabled">
+                </label>
+                <label class="field">
+                  <span>陪伴强度</span>
+                  <select data-path="proactive.level">
+                    <option value="off">off（完全不主动）</option>
+                    <option value="quiet">quiet（很少打扰）</option>
+                    <option value="gentle">gentle（偶尔问候）</option>
+                    <option value="active">active（更积极）</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>冷却时间（分钟）</span>
+                  <input type="number" min="1" max="180" data-path="proactive.cooldown_minutes" value="20">
+                </label>
+                <label class="field">
+                  <span>空闲判定（分钟）</span>
+                  <input type="number" min="1" max="180" data-path="proactive.idle_minutes" value="12">
+                </label>
+                <label class="field switch-field">
+                  <span>夜间休息提醒</span>
+                  <input type="checkbox" data-path="proactive.night_reminder_enabled">
+                </label>
+                <label class="field switch-field">
+                  <span>晨间问候</span>
+                  <input type="checkbox" data-path="observe.daily_greeting_enabled" checked>
+                </label>
+                <label class="field">
+                  <span>晨间问候小时</span>
+                  <input type="number" min="0" max="23" data-path="observe.daily_greeting_hour" value="8">
+                </label>
+                <label class="field">
+                  <span>晨间问候分钟</span>
+                  <input type="number" min="0" max="59" data-path="observe.daily_greeting_minute" value="0">
+                </label>
+                <label class="field col-span-3">
+                  <span>晨间问候 Prompt</span>
+                  <textarea rows="2" data-path="observe.daily_greeting_prompt">请你像桌宠一样主动向我说早安，简短自然地问好，再给我一句鼓励的话，控制在两三句内，不要模板化。</textarea>
+                </label>
+              </div>
+            </article>
+
             <article id="cfg-tools" class="config-group card-like" data-advanced-section="true">
               <h2>动作、工具与风格</h2>
               <div class="field-grid three-col">
@@ -997,6 +1046,16 @@ tafi</textarea>
                 <button id="oneClickApplyBtn" class="btn btn-primary" type="button">✅ 一键应用配置</button>
               </div>
               <p id="oneClickApplyStatus" class="write-status">未执行一键应用</p>
+
+              <h3 id="cfg-recovery">故障恢复</h3>
+              <p class="write-note">配置出错时可一键恢复到示例配置，并自动备份当前 <code>config.json</code>。</p>
+              <p class="write-note">重置只修改配置文件，不会删除用户记忆文件，也不会删除 Live2D 模型文件。</p>
+              <div class="project-write-actions">
+                <button id="resetConfigRecoveryBtn" class="btn btn-outline" type="button">🧯 一键重置配置</button>
+                <button id="exportRecentLogsBtn" class="btn btn-outline" type="button">📦 导出最近日志（自动脱敏）</button>
+              </div>
+              <p id="recoveryResetStatus" class="write-status">未执行配置重置</p>
+              <p id="recoveryExportStatus" class="write-status">未执行日志导出</p>
 
               <h3 id="cfg-health">配置连通性自检</h3>
               <p class="write-note">一键检查关键地址是否可达，并给出修复建议。</p>
@@ -1962,10 +2021,36 @@ tafi</textarea>
               return;
             }
             if (state.voice === 'browser') {
-              await playBrowserSpeech();
-              state.ttsPassed = true;
-              setStatus(elements.ttsStatus, '本地系统语音发声成功。', 'ok');
-              return;
+              try {
+                await playBrowserSpeech();
+                state.ttsPassed = true;
+                setStatus(elements.ttsStatus, '本地系统语音发声成功。', 'ok');
+                return;
+              } catch (browserError) {
+                selectVoice('edge_tts');
+                await runConnectivityCheck();
+                const edgeTone = readHealthTone('tts');
+                const edgeDetail = readHealthDetail('tts');
+                if (edgeTone === 'error') {
+                  throw new Error(
+                    `当前环境不支持本地系统语音，已自动切换 edge_tts，但连通性仍失败：${edgeDetail || '请检查网络和后端服务。'}`
+                  );
+                }
+                try {
+                  await playServerTts();
+                } catch (edgeError) {
+                  throw new Error(
+                    `当前环境不支持本地系统语音，且 edge_tts 发声失败：${edgeError.message || '未知错误'}。请检查网络后重试，或切换 GPT-SoVITS。`
+                  );
+                }
+                state.ttsPassed = true;
+                setStatus(
+                  elements.ttsStatus,
+                  `当前环境不支持 browser，已自动切换到在线标准语音（edge_tts）并发声成功。请保存配置。${edgeDetail ? `（${edgeDetail}）` : ''}`,
+                  'warn'
+                );
+                return;
+              }
             }
 
             try {

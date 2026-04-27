@@ -156,6 +156,13 @@
     "daily_greeting_minute": 0,
     "daily_greeting_prompt": "请你像桌宠一样主动向我说早安，简短自然地问好，再给我一句鼓励今天认真努力的暖心鸡汤。控制在两三句内，不要太像模板。"
   },
+  "proactive": {
+    "enabled": false,
+    "level": "off",
+    "cooldown_minutes": 20,
+    "idle_minutes": 12,
+    "night_reminder_enabled": false
+  },
   "motion": {
     "enabled": true,
     "cooldown_ms": 1200,

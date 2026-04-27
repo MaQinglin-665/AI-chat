@@ -366,6 +366,7 @@ python -m http.server 5500
 - `http://127.0.0.1:5500/config.html`
 - `http://127.0.0.1:5500/index.html`
 - `http://127.0.0.1:5500/persona.html`
+- `http://127.0.0.1:5500/memory.html`
 
 ### Persona Card
 
@@ -374,6 +375,15 @@ python -m http.server 5500
 - Supports JSON import and JSON export.
 - Saving writes to `memory_persona_card.json`, and the next chat round reads the updated persona.
 - Legacy keys remain compatible (`identity`, `user_preferences`, `user_dislikes`, `common_topics`, `reply_style`, `companionship_style`).
+
+### 塔菲的小本本（长期记忆可视化）
+
+- Page: `docs/memory.html`
+- 配置中心已提供入口（`docs/config.html` → “塔菲的小本本”）。
+- 支持查看：用户偏好、关系状态、记忆摘要、最近更新时间、记忆列表。
+- 支持操作：删除单条、清空全部、JSON 导出、JSON 导入、开启/关闭长期记忆。
+- 删除操作使用二次确认，降低误删风险。
+- 当 `memory.enabled=false` 时，不再写入新的长期记忆（普通聊天仍可继续）。
 
 统一发布流程（与首页/配置页文案一致）：
 1. 在配置中心执行“配置连通性自检”并处理告警/错误。

@@ -10,6 +10,7 @@ import secrets
 import threading
 import time
 import traceback
+import zipfile
 from datetime import datetime
 import urllib.error
 import urllib.parse
@@ -57,6 +58,11 @@ from memory import (
     build_manual_persona_card_block,
     build_persona_memory_block,
     build_relationship_memory_block,
+    clear_all_memory_items,
+    delete_memory_item,
+    export_memory_json,
+    get_memory_dashboard,
+    import_memory_json,
     load_manual_persona_card,
     remember_interaction,
     save_manual_persona_card,
@@ -172,6 +178,41 @@ DEFAULT_HUMANIZE_SETTINGS = {
     "refine_timeout_sec": 12,
     "refine_min_chars": 36,
 }
+RECOVERY_EXPORT_DIR = ROOT_DIR / "support_exports"
+RECOVERY_LOG_RECENT_DAYS = 14
+RECOVERY_LOG_MAX_FILES = 12
+RECOVERY_LOG_MAX_SCAN_FILES = 20000
+RECOVERY_LOG_MAX_BYTES_PER_FILE = 2 * 1024 * 1024
+RECOVERY_LOG_IGNORE_DIRS = {
+    ".git",
+    ".github",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+    "models",
+    "tts_ref",
+    "docs",
+    "web",
+    "electron",
+    "dist",
+    "build",
+    ".pytest_cache",
+}
+RECOVERY_LOG_EXTENSIONS = {".log", ".txt", ".jsonl", ".out", ".err"}
+RECOVERY_LOG_NAME_HINTS = ("log", "trace", "debug", "error", "stderr", "stdout")
+RECOVERY_SENSITIVE_QUERY_KEYS = (
+    "api_key",
+    "access_token",
+    "refresh_token",
+    "secret",
+    "secret_key",
+    "token",
+    "password",
+    "credential",
+    "session",
+    "signature",
+    "authorization",
+)
 
 
 def _diagnostic_payload(exc):
@@ -358,6 +399,243 @@ def reset_runtime_state():
     with _SUMMARY_CACHE_LOCK:
         _HISTORY_SUMMARY_CACHE["key"] = ""
         _HISTORY_SUMMARY_CACHE["summary"] = ""
+
+
+def _coerce_required_bool(value):
+    if isinstance(value, bool):
+        return True, value
+    if isinstance(value, (int, float)):
+        return True, bool(value)
+    text = str(value or "").strip().lower()
+    if text in {"1", "true", "yes", "on", "enable", "enabled"}:
+        return True, True
+    if text in {"0", "false", "no", "off", "disable", "disabled"}:
+        return True, False
+    return False, False
+
+
+def _format_recovery_timestamp():
+    return datetime.now().strftime("%Y%m%d-%H%M%S")
+
+
+def _load_json_object_file(path_obj, *, config_key):
+    target = Path(path_obj)
+    if not target.exists():
+        raise DiagnosticError(
+            code="file_not_found",
+            reason=f"未找到文件：{target.name}",
+            solution=f"请确认 {target.name} 存在后再重试。",
+            config_key=config_key,
+        )
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError as exc:
+        raise DiagnosticError(
+            code="json_invalid",
+            reason=f"{target.name} 的 JSON 格式无效（第 {exc.lineno} 行附近）。",
+            solution=f"请修复 {target.name} 的 JSON 语法后再重试。",
+            config_key=config_key,
+            detail=str(exc),
+        ) from exc
+    if not isinstance(payload, dict):
+        raise DiagnosticError(
+            code="json_shape_invalid",
+            reason=f"{target.name} 顶层结构必须是 JSON 对象。",
+            solution=f"请修复 {target.name} 的顶层结构后再重试。",
+            config_key=config_key,
+        )
+    return payload
+
+
+def _backup_current_config_for_recovery():
+    if not CONFIG_PATH.exists():
+        return None
+    backup_name = f"config.backup.recovery.{_format_recovery_timestamp()}.json"
+    backup_path = CONFIG_PATH.with_name(backup_name)
+    raw_text = CONFIG_PATH.read_text(encoding="utf-8-sig", errors="replace")
+    if raw_text and not raw_text.endswith("\n"):
+        raw_text = f"{raw_text}\n"
+    backup_path.write_text(raw_text, encoding="utf-8")
+    return backup_path
+
+
+def _load_user_config_json():
+    if not CONFIG_PATH.exists():
+        return {}
+    try:
+        payload = json.loads(CONFIG_PATH.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError as exc:
+        raise DiagnosticError(
+            code="config_json_invalid",
+            reason=(f"config.json 第 {exc.lineno} 行第 {exc.colno} 列附近存在 JSON 语法错误。"),
+            solution="请先修复 config.json 的语法错误，再尝试修改长期记忆开关。",
+            config_key="config.json",
+            detail=str(exc),
+        ) from exc
+    if not isinstance(payload, dict):
+        raise DiagnosticError(
+            code="config_json_invalid",
+            reason="config.json 顶层结构必须是 JSON 对象。",
+            solution="请将 config.json 修正为对象结构后再重试。",
+            config_key="config.json",
+        )
+    return payload
+
+
+def _save_user_config_json(payload):
+    safe_payload = payload if isinstance(payload, dict) else {}
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = CONFIG_PATH.with_suffix(".tmp")
+    tmp_path.write_text(
+        json.dumps(safe_payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    tmp_path.replace(CONFIG_PATH)
+
+
+def _set_long_term_memory_enabled(enabled):
+    user_cfg = _load_user_config_json()
+    memory_cfg = user_cfg.get("memory", {})
+    if not isinstance(memory_cfg, dict):
+        memory_cfg = {}
+    memory_cfg["enabled"] = bool(enabled)
+    user_cfg["memory"] = memory_cfg
+    _save_user_config_json(user_cfg)
+
+
+def _reset_config_from_example():
+    example_cfg = _load_json_object_file(
+        EXAMPLE_CONFIG_PATH,
+        config_key="config.example.json",
+    )
+    backup_path = _backup_current_config_for_recovery()
+    next_cfg = json.loads(json.dumps(example_cfg, ensure_ascii=False))
+    next_cfg["onboarding_completed"] = False
+    _save_user_config_json(next_cfg)
+    reset_runtime_state()
+    return {
+        "config": next_cfg,
+        "backup_path": str(backup_path) if backup_path else "",
+    }
+
+
+def _mask_export_secret(value, keep=2):
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if len(raw) <= max(keep * 2 + 1, 8):
+        return "*" * min(12, max(8, len(raw)))
+    return f"{raw[:keep]}***{raw[-keep:]}"
+
+
+def _redact_export_log_text(text):
+    sanitized = redact_sensitive_text(text)
+    if not sanitized:
+        return ""
+
+    key_pattern = re.compile(
+        r"(?i)"
+        r"((?:[\"'])?[A-Za-z0-9_.-]*"
+        r"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret(?:[_-]?key)?|token|password)"
+        r"(?:[\"'])?\s*[:=]\s*)"
+        r"([\"']?)([^\"'\s,;}{\]]+)"
+    )
+    sanitized = key_pattern.sub(
+        lambda m: f"{m.group(1)}{m.group(2)}{_mask_export_secret(m.group(3), keep=2)}",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(?i)([?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret(?:[_-]?key)?|token|password)=)([^&\s]+)",
+        lambda m: f"{m.group(1)}{_mask_export_secret(m.group(2), keep=2)}",
+        sanitized,
+    )
+    return sanitized
+
+
+def _collect_recent_log_paths():
+    root = Path(ROOT_DIR)
+    patterns = ("*.log", "*.log.*", "*log*.txt", "*.jsonl")
+    candidates = {}
+    search_roots = [root]
+    for name in ("logs", "log"):
+        path_obj = root / name
+        if path_obj.exists() and path_obj.is_dir():
+            search_roots.append(path_obj)
+
+    for base in search_roots:
+        is_root = base == root
+        for pattern in patterns:
+            iterator = base.glob(pattern) if is_root else base.rglob(pattern)
+            for path_obj in iterator:
+                try:
+                    if not path_obj.is_file():
+                        continue
+                    if path_obj == CONFIG_PATH:
+                        continue
+                    candidates[str(path_obj.resolve())] = path_obj.resolve()
+                except Exception:
+                    continue
+
+    files = []
+    for path_obj in candidates.values():
+        try:
+            stat = path_obj.stat()
+        except Exception:
+            continue
+        files.append((path_obj, float(stat.st_mtime)))
+
+    if not files:
+        return []
+
+    now_ts = time.time()
+    cutoff = now_ts - (RECOVERY_LOG_RECENT_DAYS * 24 * 3600)
+    recent = [item for item in files if item[1] >= cutoff]
+    pool = recent if recent else files
+    pool.sort(key=lambda item: item[1], reverse=True)
+    return [path_obj for path_obj, _ in pool[:RECOVERY_LOG_MAX_FILES]]
+
+
+def _export_recent_logs_bundle():
+    RECOVERY_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = _format_recovery_timestamp()
+    bundle_path = RECOVERY_EXPORT_DIR / f"taffy-logs-{stamp}.zip"
+    selected_logs = _collect_recent_log_paths()
+    root = Path(ROOT_DIR).resolve()
+    exported_items = []
+
+    with zipfile.ZipFile(bundle_path, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path_obj in selected_logs:
+            try:
+                raw_text = path_obj.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+            safe_text = _redact_export_log_text(raw_text)
+            try:
+                rel_path = path_obj.resolve().relative_to(root)
+                rel_text = str(rel_path).replace("\\", "/")
+            except Exception:
+                rel_text = path_obj.name
+            archive_name = f"logs/{rel_text}"
+            archive.writestr(archive_name, safe_text)
+            exported_items.append(rel_text)
+
+        manifest = {
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "root_dir": str(root),
+            "file_count": len(exported_items),
+            "files": exported_items,
+            "redaction": "api_key/token/secret values are masked before export",
+        }
+        archive.writestr(
+            "manifest.json",
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        )
+
+    return {
+        "bundle_path": str(bundle_path),
+        "file_count": len(exported_items),
+        "files": exported_items,
+    }
 
 
 def _normalize_origin(origin):
@@ -2245,6 +2523,28 @@ class PetHandler(SimpleHTTPRequestHandler):
         if path_only == "/api/persona_card":
             self._send_json(load_manual_persona_card())
             return
+        if path_only == "/api/memory":
+            try:
+                cfg = load_config()
+                self._send_json(get_memory_dashboard(cfg))
+            except Exception as exc:
+                _log_backend_exception("MEMORY", exc, extra="GET /api/memory failed")
+                self._send_json(
+                    _diagnostic_payload(exc),
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/memory/export":
+            try:
+                cfg = load_config()
+                self._send_json(export_memory_json(cfg))
+            except Exception as exc:
+                _log_backend_exception("MEMORY", exc, extra="GET /api/memory/export failed")
+                self._send_json(
+                    _diagnostic_payload(exc),
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
         if path_only == "/api/learning/candidates":
             try:
                 cfg = load_config()
@@ -2313,6 +2613,98 @@ class PetHandler(SimpleHTTPRequestHandler):
                 dry_run=bool(body.get("dry_run", False))
             )
             self._send_json(payload, status=status)
+            return
+        if path_only == "/api/config/recovery/reset":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._send_json(
+                    {"ok": False, "error": "Invalid JSON body."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            if not isinstance(body, dict):
+                body = {}
+            ok_confirmed, confirmed = _coerce_required_bool(body.get("confirmed", False))
+            if not ok_confirmed or not confirmed:
+                self._send_json(
+                    {
+                        "ok": False,
+                        "error": "请先完成二次确认后再执行重置。",
+                    },
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            try:
+                result = _reset_config_from_example()
+                safe_config = sanitize_client_config(result.get("config", {}))
+                backup_path = str(result.get("backup_path", "") or "")
+                message = "配置已重置。"
+                if backup_path:
+                    message = f"配置已重置，原配置备份到：{backup_path}"
+                self._send_json(
+                    {
+                        "ok": True,
+                        "message": message,
+                        "config_path": str(CONFIG_PATH),
+                        "backup_path": backup_path,
+                        "onboarding_completed": False,
+                        "config": safe_config,
+                    },
+                    status=HTTPStatus.OK,
+                )
+            except Exception as exc:
+                _log_backend_exception(
+                    "RECOVERY",
+                    exc,
+                    extra="POST /api/config/recovery/reset failed",
+                )
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/config/recovery/export_logs":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            if raw_body.strip():
+                try:
+                    body = json.loads(raw_body.decode("utf-8"))
+                except Exception:
+                    self._send_json(
+                        {"ok": False, "error": "Invalid JSON body."},
+                        status=HTTPStatus.BAD_REQUEST,
+                    )
+                    return
+                if not isinstance(body, dict):
+                    body = {}
+            try:
+                result = _export_recent_logs_bundle()
+                export_path = str(result.get("bundle_path", "") or "")
+                file_count = int(result.get("file_count", 0) or 0)
+                self._send_json(
+                    {
+                        "ok": True,
+                        "message": f"日志已导出，保存路径：{export_path}",
+                        "export_path": export_path,
+                        "file_count": file_count,
+                        "files": result.get("files", []),
+                        "masked": True,
+                    },
+                    status=HTTPStatus.OK,
+                )
+            except Exception as exc:
+                _log_backend_exception(
+                    "RECOVERY",
+                    exc,
+                    extra="POST /api/config/recovery/export_logs failed",
+                )
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
             return
         if path_only == "/api/learning/reload":
             content_length = int(self.headers.get("Content-Length", "0"))
@@ -2390,6 +2782,149 @@ class PetHandler(SimpleHTTPRequestHandler):
             except Exception as exc:
                 self._send_json(
                     {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/memory/toggle":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._send_json(
+                    {"ok": False, "error": "Invalid JSON body."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            if not isinstance(body, dict) or "enabled" not in body:
+                self._send_json(
+                    {"ok": False, "error": "`enabled` is required."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            valid_enabled, enabled = _coerce_required_bool(body.get("enabled"))
+            if not valid_enabled:
+                self._send_json(
+                    {"ok": False, "error": "`enabled` must be a boolean."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            try:
+                _set_long_term_memory_enabled(enabled)
+                cfg = load_config()
+                dashboard = get_memory_dashboard(cfg)
+                dashboard["message"] = (
+                    "长期记忆已开启，新的对话会继续写入记忆。"
+                    if enabled
+                    else "长期记忆已关闭，新的对话将不再写入长期记忆。"
+                )
+                self._send_json(dashboard, status=HTTPStatus.OK)
+            except Exception as exc:
+                _log_backend_exception("MEMORY", exc, extra="POST /api/memory/toggle failed")
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/memory/delete":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._send_json(
+                    {"ok": False, "error": "Invalid JSON body."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            if not isinstance(body, dict):
+                body = {}
+            item_id = str(body.get("item_id", "") or body.get("id", "")).strip()
+            if not item_id:
+                self._send_json(
+                    {"ok": False, "error": "`item_id` is required."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            try:
+                result = delete_memory_item(item_id)
+                cfg = load_config()
+                dashboard = get_memory_dashboard(cfg)
+                self._send_json(
+                    {
+                        "ok": True,
+                        "deleted": bool(result.get("deleted", False)),
+                        "item_id": item_id,
+                        "memory": dashboard,
+                    },
+                    status=HTTPStatus.OK,
+                )
+            except Exception as exc:
+                _log_backend_exception("MEMORY", exc, extra="POST /api/memory/delete failed")
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/memory/clear":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            if raw_body.strip():
+                try:
+                    json.loads(raw_body.decode("utf-8"))
+                except Exception:
+                    self._send_json(
+                        {"ok": False, "error": "Invalid JSON body."},
+                        status=HTTPStatus.BAD_REQUEST,
+                    )
+                    return
+            try:
+                clear_all_memory_items()
+                cfg = load_config()
+                dashboard = get_memory_dashboard(cfg)
+                self._send_json(
+                    {"ok": True, "cleared": True, "memory": dashboard},
+                    status=HTTPStatus.OK,
+                )
+            except Exception as exc:
+                _log_backend_exception("MEMORY", exc, extra="POST /api/memory/clear failed")
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/memory/import":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._send_json(
+                    {"ok": False, "error": "Invalid JSON body."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            if not isinstance(body, dict):
+                body = {}
+            payload = body.get("payload")
+            if payload is None:
+                payload = body
+            try:
+                imported = import_memory_json(payload)
+                cfg = load_config()
+                dashboard = get_memory_dashboard(cfg)
+                self._send_json(
+                    {
+                        "ok": True,
+                        "imported_items": int(imported.get("imported_items", 0)),
+                        "memory": dashboard,
+                    },
+                    status=HTTPStatus.OK,
+                )
+            except Exception as exc:
+                _log_backend_exception("MEMORY", exc, extra="POST /api/memory/import failed")
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 )
             return

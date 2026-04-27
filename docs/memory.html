@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>塔菲的小本本 · 长期记忆</title>
+  <style>
+    :root {
+      --bg-a: #fff8f2;
+      --bg-b: #e9f7ff;
+      --card: #ffffffd9;
+      --line: #ffd8b8;
+      --ink: #3d2e2e;
+      --sub: #7a685e;
+      --accent: #ff8f70;
+      --accent-2: #66aee8;
+      --ok: #2f9e71;
+      --warn: #c26a2c;
+      --danger: #d64f4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background:
+        radial-gradient(1300px 700px at -10% -20%, #ffe9d2 0%, transparent 60%),
+        radial-gradient(1200px 600px at 115% 5%, #d8f2ff 0%, transparent 62%),
+        linear-gradient(135deg, var(--bg-a), var(--bg-b));
+      min-height: 100vh;
+    }
+    .shell {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 26px 16px 54px;
+      display: grid;
+      gap: 14px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid #ffe7d3;
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 12px 34px #efd8bf55;
+      backdrop-filter: blur(6px);
+    }
+    .hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0.4px;
+    }
+    .hero p {
+      margin: 6px 0 0;
+      color: var(--sub);
+    }
+    .hero a {
+      text-decoration: none;
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto auto;
+      gap: 10px;
+      align-items: center;
+    }
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      outline: none;
+    }
+    .memory-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      color: #5e4b42;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .memory-toggle input { accent-color: var(--accent); }
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 9px 14px;
+      font: inherit;
+      cursor: pointer;
+      transition: transform .15s, filter .15s;
+    }
+    button:hover { transform: translateY(-1px); filter: saturate(1.08); }
+    .primary {
+      background: linear-gradient(135deg, #ff9d7b, #ff7d6b);
+      color: #fff;
+      font-weight: 700;
+    }
+    .ghost {
+      background: #fff;
+      border: 1px solid #ffd8bb;
+      color: #725f53;
+    }
+    .danger {
+      background: #fff2f2;
+      border: 1px solid #ffc7c7;
+      color: #8b2a2a;
+    }
+    .status {
+      margin: 2px 0 0;
+      font-size: 14px;
+      color: var(--sub);
+    }
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+    .grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .kpi {
+      border: 1px solid #ffe6d2;
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: #fffaf6;
+      min-height: 84px;
+    }
+    .kpi h3 {
+      margin: 0;
+      font-size: 13px;
+      color: #6f5d52;
+      font-weight: 700;
+    }
+    .kpi p {
+      margin: 8px 0 0;
+      color: #45362e;
+      font-size: 14px;
+      line-height: 1.52;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .memory-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 10px;
+    }
+    .memory-item {
+      border: 1px solid #ffe6d2;
+      background: #fffdfb;
+      border-radius: 14px;
+      padding: 12px;
+      display: grid;
+      gap: 6px;
+    }
+    .memory-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: #6f5d52;
+      font-size: 12px;
+    }
+    .memory-text {
+      color: #4f4038;
+      line-height: 1.58;
+      font-size: 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .empty {
+      color: #7f6d62;
+      font-size: 14px;
+      padding: 10px 0;
+    }
+    @media (max-width: 980px) {
+      .toolbar {
+        grid-template-columns: 1fr 1fr;
+      }
+      .toolbar > *:first-child {
+        grid-column: 1 / -1;
+      }
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 620px) {
+      .hero { flex-direction: column; align-items: flex-start; }
+      .toolbar { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="card hero">
+      <div>
+        <h1>塔菲的小本本</h1>
+        <p>查看、删除、导入导出长期记忆，也可以一键关闭长期记忆。<a href="config.html">返回配置中心</a></p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <input id="apiBase" type="text" aria-label="Memory API Base" placeholder="http://127.0.0.1:8123/api/memory">
+        <label class="memory-toggle"><input id="memoryEnabled" type="checkbox"> 开启长期记忆</label>
+        <button id="saveToggleBtn" class="ghost" type="button">保存开关</button>
+        <button id="refreshBtn" class="ghost" type="button">刷新</button>
+        <button id="testBtn" class="ghost" type="button">测试连接</button>
+      </div>
+      <p id="status" class="status">准备就绪</p>
+    </section>
+
+    <section class="card">
+      <div class="grid">
+        <article class="kpi">
+          <h3>用户偏好</h3>
+          <p id="prefSummary">暂无</p>
+        </article>
+        <article class="kpi">
+          <h3>关系状态</h3>
+          <p id="relationSummary">暂无</p>
+        </article>
+        <article class="kpi">
+          <h3>记忆摘要</h3>
+          <p id="memorySummary">暂无</p>
+        </article>
+        <article class="kpi">
+          <h3>最近更新时间</h3>
+          <p id="recentUpdated">暂无</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="actions">
+        <button id="exportBtn" class="ghost" type="button">导出 JSON</button>
+        <button id="importBtn" class="ghost" type="button">导入 JSON</button>
+        <button id="clearBtn" class="danger" type="button">清空全部</button>
+      </div>
+      <input id="importInput" type="file" accept="application/json,.json" hidden>
+    </section>
+
+    <section class="card">
+      <h2 style="margin:0 0 10px;font-size:20px;">记忆列表</h2>
+      <p id="listMeta" class="status" style="margin-top:0;">共 0 条</p>
+      <ul id="memoryList" class="memory-list"></ul>
+      <div id="emptyTip" class="empty" hidden>当前没有长期记忆。</div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      dashboard: null
+    };
+
+    const els = {
+      apiBase: document.getElementById("apiBase"),
+      memoryEnabled: document.getElementById("memoryEnabled"),
+      saveToggleBtn: document.getElementById("saveToggleBtn"),
+      refreshBtn: document.getElementById("refreshBtn"),
+      testBtn: document.getElementById("testBtn"),
+      status: document.getElementById("status"),
+      prefSummary: document.getElementById("prefSummary"),
+      relationSummary: document.getElementById("relationSummary"),
+      memorySummary: document.getElementById("memorySummary"),
+      recentUpdated: document.getElementById("recentUpdated"),
+      exportBtn: document.getElementById("exportBtn"),
+      importBtn: document.getElementById("importBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      importInput: document.getElementById("importInput"),
+      memoryList: document.getElementById("memoryList"),
+      emptyTip: document.getElementById("emptyTip"),
+      listMeta: document.getElementById("listMeta")
+    };
+
+    function defaultApiBase() {
+      return "http://127.0.0.1:8123/api/memory";
+    }
+
+    function normalizeText(value) {
+      return String(value ?? "").replace(/\s+/g, " ").trim();
+    }
+
+    function setStatus(message, kind = "") {
+      els.status.textContent = message;
+      els.status.className = `status ${kind}`.trim();
+    }
+
+    function getApiBase() {
+      const raw = normalizeText(els.apiBase.value || defaultApiBase());
+      return raw || defaultApiBase();
+    }
+
+    function apiUrl(path = "") {
+      const base = getApiBase().replace(/\/+$/, "");
+      const suffix = String(path || "").replace(/^\/+/, "");
+      return suffix ? `${base}/${suffix}` : base;
+    }
+
+    async function request(path = "", options = {}) {
+      const resp = await fetch(apiUrl(path), options);
+      let payload = {};
+      try {
+        payload = await resp.json();
+      } catch (_) {
+        payload = {};
+      }
+      if (!resp.ok) {
+        const message = normalizeText(payload.error || payload.message || `HTTP ${resp.status}`);
+        throw new Error(message);
+      }
+      return payload;
+    }
+
+    function confirmTwice(actionText) {
+      if (!window.confirm(`确定要${actionText}吗？这一步可能无法撤销。`)) return false;
+      return window.confirm(`请再次确认：真的要${actionText}吗？`);
+    }
+
+    function renderSummaryText(summaryPayload) {
+      const src = summaryPayload && typeof summaryPayload === "object" ? summaryPayload : {};
+      const summary = normalizeText(src.summary);
+      const updated = normalizeText(src.updated_at);
+      if (!summary && !updated) return "暂无";
+      if (!updated) return summary || "暂无";
+      if (!summary) return `更新时间：${updated}`;
+      return `${summary}\n更新时间：${updated}`;
+    }
+
+    function renderDashboard(payload) {
+      const data = payload && typeof payload === "object" ? payload : {};
+      state.dashboard = data;
+      els.memoryEnabled.checked = Boolean(data.memory_enabled);
+      els.prefSummary.textContent = renderSummaryText(data.user_preferences);
+      els.relationSummary.textContent = renderSummaryText(data.relationship_status);
+      els.memorySummary.textContent = renderSummaryText(data.memory_summary);
+
+      const recentAt = normalizeText(data.recent_updated_at);
+      const recentAgo = normalizeText(data.recent_updated_ago);
+      els.recentUpdated.textContent = recentAt
+        ? `${recentAt}${recentAgo ? `（${recentAgo}）` : ""}`
+        : "暂无";
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      els.memoryList.innerHTML = "";
+      if (!items.length) {
+        els.emptyTip.hidden = false;
+      } else {
+        els.emptyTip.hidden = true;
+      }
+      els.listMeta.textContent = `共 ${items.length} 条`;
+
+      items.forEach((item) => {
+        const li = document.createElement("li");
+        li.className = "memory-item";
+
+        const head = document.createElement("div");
+        head.className = "memory-head";
+        const ts = normalizeText(item.ts) || "未知时间";
+        const ago = normalizeText(item.time_ago);
+        head.innerHTML = `<span>${ts}${ago ? ` · ${ago}` : ""}</span>`;
+
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "danger";
+        delBtn.textContent = "删除单条";
+        delBtn.addEventListener("click", () => handleDeleteItem(item));
+        head.appendChild(delBtn);
+
+        const text = document.createElement("div");
+        text.className = "memory-text";
+        const user = normalizeText(item.user) || "(空)";
+        const assistant = normalizeText(item.assistant) || "(空)";
+        text.textContent = `你：${user}\n塔菲：${assistant}`;
+
+        li.appendChild(head);
+        li.appendChild(text);
+        els.memoryList.appendChild(li);
+      });
+    }
+
+    async function loadDashboard() {
+      const data = await request("", { method: "GET", cache: "no-store" });
+      renderDashboard(data);
+      return data;
+    }
+
+    async function handleToggleSave() {
+      const enabled = Boolean(els.memoryEnabled.checked);
+      const data = await request("toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled })
+      });
+      renderDashboard(data);
+      setStatus(data.message || "长期记忆开关已保存", "ok");
+    }
+
+    async function handleDeleteItem(item) {
+      const id = normalizeText(item && item.id);
+      if (!id) {
+        setStatus("删除失败：缺少记忆 ID", "warn");
+        return;
+      }
+      if (!confirmTwice("删除这条记忆")) {
+        return;
+      }
+      const result = await request("delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_id: id })
+      });
+      if (!result.deleted) {
+        setStatus("这条记忆可能已被删除或不存在。", "warn");
+      } else {
+        setStatus("记忆已删除", "ok");
+      }
+      if (result.memory) {
+        renderDashboard(result.memory);
+      } else {
+        await loadDashboard();
+      }
+    }
+
+    async function handleClearAll() {
+      if (!confirmTwice("清空全部长期记忆")) {
+        return;
+      }
+      const result = await request("clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}"
+      });
+      if (result.memory) {
+        renderDashboard(result.memory);
+      } else {
+        await loadDashboard();
+      }
+      setStatus("已清空全部长期记忆", "ok");
+    }
+
+    async function handleExport() {
+      const payload = await request("export", { method: "GET", cache: "no-store" });
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+      const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `taffy_memory_${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+      setStatus("导出完成（不包含 API Key）", "ok");
+    }
+
+    async function handleImportFile(file) {
+      const text = await file.text();
+      let data = {};
+      try {
+        data = JSON.parse(text);
+      } catch (_) {
+        throw new Error("JSON 格式无效");
+      }
+      const result = await request("import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: data })
+      });
+      if (result.memory) {
+        renderDashboard(result.memory);
+      } else {
+        await loadDashboard();
+      }
+      setStatus(`导入完成，共导入 ${result.imported_items || 0} 条记忆`, "ok");
+    }
+
+    function bindEvents() {
+      els.apiBase.addEventListener("change", () => {
+        localStorage.setItem("memory_api_base", getApiBase());
+      });
+      els.saveToggleBtn.addEventListener("click", async () => {
+        try {
+          await handleToggleSave();
+        } catch (err) {
+          setStatus(`保存失败：${err.message}`, "warn");
+        }
+      });
+      els.refreshBtn.addEventListener("click", async () => {
+        try {
+          await loadDashboard();
+          setStatus("记忆已刷新", "ok");
+        } catch (err) {
+          setStatus(`刷新失败：${err.message}`, "warn");
+        }
+      });
+      els.testBtn.addEventListener("click", async () => {
+        try {
+          await loadDashboard();
+          setStatus("连接成功", "ok");
+        } catch (err) {
+          setStatus(`连接失败：${err.message}`, "warn");
+        }
+      });
+      els.exportBtn.addEventListener("click", async () => {
+        try {
+          await handleExport();
+        } catch (err) {
+          setStatus(`导出失败：${err.message}`, "warn");
+        }
+      });
+      els.importBtn.addEventListener("click", () => els.importInput.click());
+      els.importInput.addEventListener("change", async () => {
+        try {
+          const file = els.importInput.files && els.importInput.files[0];
+          if (!file) return;
+          await handleImportFile(file);
+        } catch (err) {
+          setStatus(`导入失败：${err.message}`, "warn");
+        } finally {
+          els.importInput.value = "";
+        }
+      });
+      els.clearBtn.addEventListener("click", async () => {
+        try {
+          await handleClearAll();
+        } catch (err) {
+          setStatus(`清空失败：${err.message}`, "warn");
+        }
+      });
+    }
+
+    function boot() {
+      els.apiBase.value = localStorage.getItem("memory_api_base") || defaultApiBase();
+      bindEvents();
+      loadDashboard().then(() => {
+        setStatus("已读取当前长期记忆", "ok");
+      }).catch((err) => {
+        setStatus(`暂未连接到桌宠服务：${err.message}`, "warn");
+      });
+    }
+
+    boot();
+  </script>
+</body>
+</html>

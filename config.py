@@ -266,6 +266,13 @@ DEFAULT_CONFIG = {
             "再给我一句鼓励今天认真努力的暖心话。控制在两三句内，不要太像模板。"
         ),
     },
+    "proactive": {
+        "enabled": False,
+        "level": "off",
+        "cooldown_minutes": 20,
+        "idle_minutes": 12,
+        "night_reminder_enabled": False,
+    },
     "motion": {
         "enabled": True,
         "cooldown_ms": 1200,
@@ -464,6 +471,8 @@ def load_config():
     config = dict(DEFAULT_CONFIG)
     user_has_onboarding_completed = False
     local_has_onboarding_completed = False
+    user_has_proactive = False
+    local_has_proactive = False
     if EXAMPLE_CONFIG_PATH.exists():
         try:
             example_data = json.loads(EXAMPLE_CONFIG_PATH.read_text(encoding="utf-8-sig"))
@@ -476,6 +485,7 @@ def load_config():
             config = deep_merge(config, user_data)
             if isinstance(user_data, dict):
                 user_has_onboarding_completed = "onboarding_completed" in user_data
+                user_has_proactive = "proactive" in user_data
         except json.JSONDecodeError as exc:
             raise DiagnosticError(
                 code="config_json_invalid",
@@ -492,6 +502,7 @@ def load_config():
             config = deep_merge(config, local_data)
             if isinstance(local_data, dict):
                 local_has_onboarding_completed = "onboarding_completed" in local_data
+                local_has_proactive = "proactive" in local_data
         except json.JSONDecodeError as exc:
             raise DiagnosticError(
                 code="config_local_json_invalid",
@@ -505,6 +516,22 @@ def load_config():
     if CONFIG_PATH.exists() and not user_has_onboarding_completed and not local_has_onboarding_completed:
         # Backward-compat: existing users with old config.json should not be forced into first-run onboarding.
         config["onboarding_completed"] = True
+    if not user_has_proactive and not local_has_proactive:
+        observe_cfg = config.get("observe", {})
+        if isinstance(observe_cfg, dict):
+            legacy_auto_chat_enabled = bool(observe_cfg.get("auto_chat_enabled", False))
+            legacy_daily_greeting_enabled = bool(
+                observe_cfg.get("daily_greeting_enabled", False)
+            )
+            if legacy_auto_chat_enabled or legacy_daily_greeting_enabled:
+                proactive_cfg = config.get("proactive", {})
+                if not isinstance(proactive_cfg, dict):
+                    proactive_cfg = {}
+                proactive_cfg["enabled"] = True
+                proactive_cfg["level"] = (
+                    "gentle" if legacy_auto_chat_enabled else "quiet"
+                )
+                config["proactive"] = proactive_cfg
     return config
 
 
@@ -578,11 +605,14 @@ def sanitize_client_config(config):
 
     asr_cfg = config.get("asr", {})
     observe_cfg = config.get("observe", {})
+    proactive_cfg = config.get("proactive", {})
     summary_cfg = config.get("history_summary", {})
     style_cfg = config.get("style", {})
     humanize_cfg = config.get("humanize", {})
     motion_cfg = config.get("motion", {})
     tools_cfg = config.get("tools", {})
+    if not isinstance(proactive_cfg, dict):
+        proactive_cfg = {}
     hotword_replacements = sanitize_hotword_replacements(
         asr_cfg.get("hotword_replacements", {})
     )
@@ -760,6 +790,37 @@ def sanitize_client_config(config):
             _safe_int(observe_cfg.get("auto_chat_max_ms", 480000), 480000),
         ),
     )
+    proactive_level = str(proactive_cfg.get("level", "off") or "off").strip().lower()
+    if proactive_level not in {"off", "quiet", "gentle", "active"}:
+        proactive_level = "off"
+    proactive_enabled = bool(proactive_cfg.get("enabled", False))
+    if proactive_level == "off":
+        proactive_enabled = False
+    if proactive_enabled and proactive_level == "off":
+        proactive_level = "gentle"
+    if not proactive_enabled:
+        proactive_level = "off"
+    proactive_cooldown_minutes = max(
+        1,
+        min(
+            180,
+            _safe_int(proactive_cfg.get("cooldown_minutes", 20), 20),
+        ),
+    )
+    proactive_idle_minutes = max(
+        1,
+        min(
+            180,
+            _safe_int(proactive_cfg.get("idle_minutes", 12), 12),
+        ),
+    )
+    proactive_night_reminder_enabled = (
+        proactive_enabled and bool(proactive_cfg.get("night_reminder_enabled", False))
+    )
+    effective_auto_chat_enabled = proactive_enabled and proactive_level != "off"
+    effective_daily_greeting_enabled = (
+        effective_auto_chat_enabled and bool(observe_cfg.get("daily_greeting_enabled", False))
+    )
     wake_words_raw = asr_cfg.get("wake_words", ["馨语", "馨语ai", "xinyu", "\u5854\u83f2", "taffy", "tafi"])
     wake_words = []
     if isinstance(wake_words_raw, list):
@@ -816,11 +877,11 @@ def sanitize_client_config(config):
         "observe": {
             "attach_mode": observe_attach_mode,
             "allow_auto_chat": bool(observe_cfg.get("allow_auto_chat", False)),
-            "auto_chat_enabled": bool(observe_cfg.get("auto_chat_enabled", False)),
+            "auto_chat_enabled": effective_auto_chat_enabled,
             "auto_chat_min_ms": observe_auto_chat_min_ms,
             "auto_chat_max_ms": observe_auto_chat_max_ms,
             "auto_chat_tuning": observe_auto_chat_tuning,
-            "daily_greeting_enabled": bool(observe_cfg.get("daily_greeting_enabled", False)),
+            "daily_greeting_enabled": effective_daily_greeting_enabled,
             "daily_greeting_hour": max(
                 0, min(23, _safe_int(observe_cfg.get("daily_greeting_hour", 8), 8))
             ),
@@ -837,6 +898,13 @@ def sanitize_client_config(config):
                 )
                 or ""
             ).strip()[:240],
+        },
+        "proactive": {
+            "enabled": proactive_enabled,
+            "level": proactive_level,
+            "cooldown_minutes": proactive_cooldown_minutes,
+            "idle_minutes": proactive_idle_minutes,
+            "night_reminder_enabled": proactive_night_reminder_enabled,
         },
         "history_summary": {
             "enabled": bool(summary_cfg.get("enabled", True)),
