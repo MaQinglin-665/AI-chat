@@ -27,7 +27,7 @@
 1. 准备环境：Windows、Python 3.10+、Node.js、可用的 Live2D 模型
 2. 放置模型到 `web/models/`，并在 `config.json` 设置 `model_path`
 3. 选择一个 LLM 提供方：本地 Ollama（默认）或 OpenAI 兼容 API
-4. 选择一个 TTS 提供方：默认 GPT-SoVITS（本地）
+4. 选择一个 TTS 提供方：新手默认 Browser TTS / Edge TTS（GPT-SoVITS 为高级本地音色模式）
 5. 双击 `一键启动桌宠.vbs`（或已创建的桌面快捷方式）
 
 详细配置继续看下方章节：
@@ -41,7 +41,7 @@
 - 首次推荐先打开配置中心中的“首次启动向导”，按步骤完成模式选择、LLM/TTS 测试与保存
 - 必配：`model_path`（Live2D 模型路径）
 - 至少选一项 LLM：`ollama` 或 `openai`（若用 OpenAI 需配置 `OPENAI_API_KEY`）
-- 至少选一项 TTS：默认 `gpt_sovits`（可换 `edge_tts` / `browser`）
+- 至少选一项 TTS：新手默认 `browser` / `edge_tts`，`gpt_sovits` 作为高级本地音色模式
 - 推荐：把密钥放到环境变量或 `.env`，不要明文写入仓库文件
 
 向导完成后会写入：
@@ -68,7 +68,9 @@
 - 默认可走本地链路（本地模型 + 本地语音服务），可减少外发数据
 - `config.json` 默认被 `.gitignore` 忽略，敏感信息建议仅放环境变量
 - `tts_ref/` 用于本地参考音频，避免提交私人语音样本
-- 工具执行默认关闭（`tools.allow_shell=false`），按需开启
+- 工具执行默认关闭（`tools.enabled=false`，`tools.allow_shell=false`），按需开启
+- `server.require_api_token` 在本地开发可保持 `false`，公开发布建议改为 `true` 并配置 `TAFFY_API_TOKEN`
+- `memory_profile.json`、`memory_relationship.json`、`memory_summary.json` 是本地运行时记忆文件，不应提交到仓库（请使用对应 `*.example.json` 模板）
 
 ## 适合谁使用
 
@@ -144,7 +146,11 @@ For persistent use on Windows:
 setx OPENAI_API_KEY "your_key_here"
 ```
 
-Optional (recommended for public/release builds): protect `/api/*` with token:
+`server.require_api_token` 策略：
+- 本地开发：可保持 `false` 以减少配置成本
+- 公开发布 / 演示环境：建议改为 `true`，保护 `/api/*`
+
+Recommended for public/release builds:
 
 ```powershell
 setx TAFFY_API_TOKEN "your_long_random_token"
@@ -164,7 +170,18 @@ Then set in `config.json`:
 
 ## 3) TTS (voice) config
 
-Default is local GPT-SoVITS API:
+Beginner defaults: Browser TTS / Edge TTS
+
+```json
+{
+  "tts": {
+    "provider": "browser",
+    "voice": "zh-CN-XiaoxiaoNeural"
+  }
+}
+```
+
+Advanced local timbre mode (GPT-SoVITS):
 
 ```json
 {
@@ -207,7 +224,7 @@ If you want to use Edge TTS:
 }
 ```
 
-If server-side TTS fails, set:
+If you want to switch back to pure local system voice, set:
 
 ```json
 {
@@ -250,7 +267,7 @@ start_desktop.bat
 - If model does not show, hard refresh with `Ctrl + F5`.
 - Never store real API tokens in `config.json`. Keep secrets in environment variables.
 - `config.json` is ignored by `.gitignore` by default.
-- Work-tool command execution is disabled by default (`tools.allow_shell=false`). Enable only when needed.
+- Work-tool command execution is disabled by default (`tools.enabled=false`, `tools.allow_shell=false`). Enable only when needed.
 - CORS allows loopback origins by default (`localhost` / `127.0.0.1`), not arbitrary websites.
 - Window position and size are auto-saved in Electron mode and restored on next launch.
 

@@ -40,10 +40,11 @@
     "reasoning_effort": ""
   },
   "tts": {
-    "provider": "gpt_sovits",
-    "voice": "default",
+    "provider": "browser",
+    "voice": "zh-CN-XiaoxiaoNeural",
     "voices": [
-      "default"
+      "zh-CN-XiaoxiaoNeural",
+      "zh-CN-XiaoyiNeural"
     ],
     "gpt_sovits_api_url": "http://127.0.0.1:9880/tts",
     "gpt_sovits_method": "POST",
@@ -120,7 +121,7 @@
     }
   },
   "observe": {
-    "attach_mode": "always",
+    "attach_mode": "manual",
     "allow_auto_chat": false,
     "auto_chat_enabled": false,
     "auto_chat_min_ms": 180000,
@@ -158,7 +159,7 @@
     "expression_strength": 1
   },
   "tools": {
-    "enabled": true,
+    "enabled": false,
     "workspace_root": ".",
     "allow_shell": false,
     "shell_timeout_sec": 25,

@@ -25,6 +25,20 @@
 - 不要默认开启危险 shell 执行；涉及命令执行时必须保持最小权限与显式开关。
 - 涉及截图、记忆、语音功能时，必须优先考虑隐私与数据最小化原则。
 
+## Git 与发布规则（必须遵守）
+
+- Codex 可以在功能分支上自验收、提交、推送和创建 PR。
+- Codex 不允许直接推送 main。
+- Codex 不允许自动合并 PR。
+- Codex 不允许强推，除非用户明确要求。
+- 每次推送前必须运行：
+  - `python -m json.tool config.example.json`
+  - `python -m json.tool package.json`
+  - `python -m py_compile app.py config.py tts.py memory.py tools.py llm_client.py asr.py emotion.py humanize.py utils.py`
+- 如果存在高风险或中风险问题，必须先修复再推送。
+- 允许带着低风险建议推送到功能分支，但必须在输出中说明。
+- 不得提交 `config.json`、`.env`、`memory_*.json`、`tts_ref` 用户样本、真实 API Key、Token。
+
 ## UI 与体验风格
 
 界面与交互应保持以下方向：

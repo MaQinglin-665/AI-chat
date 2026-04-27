@@ -1947,6 +1947,12 @@
       const providerField = fieldByPath.get('tts.provider');
 
       const describeMode = (modeKey) => {
+        if (modeKey === 'browser') {
+          return {
+            label: '本地系统语音（Browser）',
+            tip: '新手默认，零额外依赖，本机即可发声。'
+          };
+        }
         if (modeKey === 'edge') {
           return {
             label: '标准语音（Edge）',
@@ -1973,6 +1979,9 @@
 
       const resolveModeByProvider = () => {
         const provider = String(readFieldValue(providerField) || '').trim().toLowerCase();
+        if (provider === 'browser') {
+          return 'browser';
+        }
         if (provider === 'edge_tts') {
           return 'edge';
         }
@@ -1993,6 +2002,21 @@
       };
 
       const applyMode = (modeKey) => {
+        if (modeKey === 'browser') {
+          applyQuickFix({
+            updates: [
+              { path: 'tts.provider', value: 'browser' },
+              { path: 'tts.voice', value: 'zh-CN-XiaoxiaoNeural' },
+              { path: 'tts.gpt_sovits_realtime_tts', value: false },
+              { path: 'tts.allow_browser_fallback', value: false }
+            ],
+            focusPath: 'tts.provider',
+            message: '已切换到本地系统语音（Browser）'
+          });
+          setStatus(ttsModePresetStatus, '已套用 Browser 默认语音。无需额外服务，适合新手快速开始。', 'ok');
+          return;
+        }
+
         if (modeKey === 'edge') {
           applyQuickFix({
             updates: [
@@ -2701,9 +2725,9 @@
             });
           } else if (ttsProvider === 'browser') {
             registerOutcome('tts', {
-              tone: 'warn',
-              stateText: '本地语音兜底',
-              detailText: 'browser 仅本地系统语音发声，服务端 TTS 不会生成音频输出。建议切换到在线标准语音（edge_tts）、volcengine_tts 或 gpt_sovits。',
+              tone: 'ok',
+              stateText: '本地系统语音（默认）',
+              detailText: 'browser 使用本地系统语音发声，不依赖云端密钥，适合新手和本地开发。若需要更高音色自由度，可切换到 edge_tts / volcengine_tts / gpt_sovits。',
               fixes: [
                 {
                   label: '切到在线标准语音（Edge）',

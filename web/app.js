@@ -15,7 +15,7 @@ const state = {
   windowLocked: false,
   windowLockUnsubscribe: null,
   observeDesktop: false,
-  observeAttachMode: "always",
+  observeAttachMode: "manual",
   observeAllowAutoChat: false,
   autoChatEnabled: false,
   autoChatMinMs: 180000,
@@ -7752,9 +7752,14 @@ async function loadConfig() {
   state.wakeWords = Array.isArray(asrCfg.wake_words) && asrCfg.wake_words.length
     ? asrCfg.wake_words.map((x) => String(x || "").trim()).filter(Boolean).slice(0, 8)
     : ["\u5854\u83f2", "taffy", "tafi"];
-  state.observeAttachMode = ["always", "keyword"].includes(String(observeCfg.attach_mode || "").toLowerCase())
-    ? String(observeCfg.attach_mode || "").toLowerCase()
-    : "always";
+  const rawObserveAttachMode = String(observeCfg.attach_mode || "").toLowerCase();
+  if (rawObserveAttachMode === "always" || rawObserveAttachMode === "auto") {
+    state.observeAttachMode = "always";
+  } else if (rawObserveAttachMode === "manual" || rawObserveAttachMode === "keyword") {
+    state.observeAttachMode = "manual";
+  } else {
+    state.observeAttachMode = "manual";
+  }
   state.observeAllowAutoChat = observeCfg.allow_auto_chat === true;
   const autoChatTuningCfg = observeCfg && typeof observeCfg.auto_chat_tuning === "object"
     ? observeCfg.auto_chat_tuning

@@ -34,6 +34,9 @@ api_err.log
 # Memory backups
 memory_backups/
 memory.bak
+memory_profile.json
+memory_relationship.json
+memory_summary.json
 
 # Emotion state (runtime generated)
 emotion_state.json
