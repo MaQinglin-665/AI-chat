@@ -1,4 +1,4 @@
-# AI Desktop Pet MVP (Live2D + Voice + Chat)
+# 馨语AI桌宠
 
 一个运行在 Windows 桌面的 AI 桌宠项目：把 `Live2D + 语音对话 + 大模型聊天 + 情绪动作` 合在一起，目标是做“能陪伴、能说话、低打扰”的本地桌面伙伴。
 
@@ -250,7 +250,7 @@ If server-side TTS fails, fallback to:
 ## 4) Run
 
 Desktop mode (recommended, transparent window):
-- Double-click desktop shortcut: `AI桌宠`
+- Double-click desktop shortcut: `馨语AI桌宠`
 - Or double-click: `一键启动桌宠.vbs`
 - First time: double-click `安装快捷方式.bat` to create `馨语AI桌宠` on desktop and Start menu
 - Optional: double-click `开启开机自启.bat` / `关闭开机自启.bat`
@@ -331,6 +331,7 @@ In chat input, you can use:
 - `/情绪日报`
 
 Wake-word defaults are in `config.json`:
+其中旧唤醒词 `塔菲` / `taffy` / `tafi` 作为“兼容旧版唤醒词”保留。
 
 ```json
 {
