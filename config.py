@@ -238,7 +238,7 @@ DEFAULT_CONFIG = {
         },
     },
     "observe": {
-        "attach_mode": "always",
+        "attach_mode": "manual",
         "allow_auto_chat": False,
         "auto_chat_enabled": False,
         "auto_chat_min_ms": 180000,
@@ -596,10 +596,12 @@ def sanitize_client_config(config):
     if stream_mode not in {"final_only", "realtime"}:
         stream_mode = "realtime"
     observe_attach_mode = str(
-        observe_cfg.get("attach_mode", "always") or "always"
+        observe_cfg.get("attach_mode", "manual") or "manual"
     ).strip().lower()
-    if observe_attach_mode not in {"keyword", "always"}:
-        observe_attach_mode = "always"
+    if observe_attach_mode == "keyword":
+        observe_attach_mode = "manual"
+    if observe_attach_mode not in {"manual", "always"}:
+        observe_attach_mode = "manual"
     observe_auto_chat_tuning_raw = observe_cfg.get("auto_chat_tuning", {})
     if not isinstance(observe_auto_chat_tuning_raw, dict):
         observe_auto_chat_tuning_raw = {}

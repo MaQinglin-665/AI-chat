@@ -5,8 +5,10 @@ const fs = require("fs");
 const path = require("path");
 const assert = require("assert");
 
+const CHAT_JS = path.resolve(__dirname, "..", "web", "chat.js");
 const APP_JS = path.resolve(__dirname, "..", "web", "app.js");
-const appSource = fs.readFileSync(APP_JS, "utf8");
+const sourcePath = fs.existsSync(CHAT_JS) ? CHAT_JS : APP_JS;
+const appSource = fs.readFileSync(sourcePath, "utf8");
 const TAP_MOVE_THRESHOLD = 10;
 
 function ensureSourceContains(pattern, label) {
