@@ -39,7 +39,7 @@ if not defined WAIT_OK (
 exit /b 0
 
 :start_backend
-start "Taffy Backend" /min cmd /c ""%PROJECT_DIR%\start.bat""
+start "馨语AI桌宠 Backend" /min cmd /c ""%PROJECT_DIR%\start.bat""
 timeout /t 1 /nobreak >nul
 exit /b 0
 

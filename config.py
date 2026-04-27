@@ -93,7 +93,7 @@ REQUIRE_API_TOKEN_DEFAULT = any(_env_flag(key, False) for key in RELEASE_MODE_EN
 
 DEFAULT_CONFIG = {
     "onboarding_completed": False,
-    "assistant_name": "馨语Ai桌宠",
+    "assistant_name": "馨语AI桌宠",
     "model_path": "/models/your_model/model3.json",
     "model": {
         "scale": 1.0,
@@ -181,7 +181,7 @@ DEFAULT_CONFIG = {
         "gpt_sovits_speed": 1.0,
     },
     "assistant_prompt": (
-        "你是桌宠 馨语Ai桌宠。你在和一位真实人类用户聊天，不要把用户当成设备、程序或系统。"
+        "你是桌宠 馨语AI桌宠。你在和一位真实人类用户聊天，不要把用户当成设备、程序或系统。"
         "默认短句回复，先给直接答案，再补半句自然交流；避免模板腔、客服腔和重复口头禅。"
         "信息不足先问一个关键点，不要乱猜。"
     ),
@@ -231,8 +231,8 @@ DEFAULT_CONFIG = {
         "wake_word_enabled": True,
         "wake_words": ["馨语", "馨语ai", "xinyu", "\u5854\u83f2", "taffy", "tafi"],
         "hotword_replacements": {
-            "\u5854\u83f2": "馨语Ai桌宠",
-            "taffy": "馨语Ai桌宠",
+            "\u5854\u83f2": "馨语AI桌宠",
+            "taffy": "馨语AI桌宠",
             "neuro": "Neuro",
             "fifa": "FIFA",
         },

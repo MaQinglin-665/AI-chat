@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 
 $projectDir = $PSScriptRoot
 $launcherVbs = Join-Path $projectDir "launch_taffy.vbs"
-$shortcutName = "馨语Ai桌宠.lnk"
+$shortcutName = "馨语AI桌宠.lnk"
 $wscriptExe = Join-Path $env:SystemRoot "System32\wscript.exe"
 
 if (-not (Test-Path -LiteralPath $launcherVbs)) {
@@ -35,7 +35,7 @@ function New-DesktopPetShortcut {
     $shortcut.TargetPath = $wscriptExe
     $shortcut.Arguments = '"' + $launcherVbs + '"'
     $shortcut.WorkingDirectory = $projectDir
-    $shortcut.Description = "Launch 馨语Ai桌宠"
+    $shortcut.Description = "Launch 馨语AI桌宠"
     $shortcut.IconLocation = "$wscriptExe,0"
     $shortcut.Save()
 }

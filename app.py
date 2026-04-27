@@ -487,7 +487,7 @@ def _serialize_history_for_summary(history_items, max_messages=80):
         if not content:
             continue
         content = content[:260]
-        label = "用户" if role == "user" else "馨语Ai桌宠"
+        label = "用户" if role == "user" else "馨语AI桌宠"
         lines.append(f"{label}: {content}")
     return "\n".join(lines).strip()
 
@@ -943,8 +943,8 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
     time_hint = _hour_to_period_hint(_hour)
 
     thinking_prompt = (
-        "你是 馨语Ai桌宠 的内心独白生成器。你的任务是产生一段真实的、有行动指令的内心想法，"
-        "用来决定 馨语Ai桌宠 这次回复的方向、长度和态度。\n\n"
+        "你是 馨语AI桌宠 的内心独白生成器。你的任务是产生一段真实的、有行动指令的内心想法，"
+        "用来决定 馨语AI桌宠 这次回复的方向、长度和态度。\n\n"
         f"【本轮行为指令】{variety_hint}\n\n"
         f"【最近对话】\n{history_snippet}\n\n"
         f"【对方这句话】{user_message[:200]}\n\n"

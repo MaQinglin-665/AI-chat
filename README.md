@@ -36,6 +36,13 @@
 - 语音：`## 3) TTS (voice) config`
 - 启动方式：`## 4) Run`
 
+## 首次启动流程（推荐）
+
+1. 聊天页引导先选“立即体验（推荐）”：默认 `tts.provider=browser`，无需 GPT-SoVITS 即可直接听到语音。
+2. 默认是低打扰安全基线：`observe.attach_mode=manual`（不会自动观察桌面）、`tools.enabled=false`、`tools.allow_shell=false`。
+3. 需要更强自定义时，再点“高级配置”进入 `docs/config.html`，逐项开启 LLM/TTS/工具能力。
+4. `memory_profile.json`、`memory_relationship.json`、`memory_summary.json` 缺失时会平滑降级，首次运行不应崩溃。
+
 ## 需要配置哪些东西
 
 - 首次推荐先打开配置中心中的“首次启动向导”，按步骤完成模式选择、LLM/TTS 测试与保存
@@ -331,7 +338,7 @@ In chat input, you can use:
 - `/情绪日报`
 
 Wake-word defaults are in `config.json`:
-其中旧唤醒词 `塔菲` / `taffy` / `tafi` 作为“兼容旧版唤醒词”保留。
+其中旧唤醒词作为“兼容旧版唤醒词”保留。
 
 ```json
 {

@@ -280,6 +280,9 @@ const ui = {
   onboardingStepTitle: document.getElementById("onboarding-step-title"),
   onboardingStepDesc: document.getElementById("onboarding-step-desc"),
   onboardingStepTip: document.getElementById("onboarding-step-tip"),
+  onboardingPathSplit: document.getElementById("onboarding-path-split"),
+  onboardingQuickBtn: document.getElementById("onboarding-quick-btn"),
+  onboardingAdvancedBtn: document.getElementById("onboarding-advanced-btn"),
   advancedActions: document.getElementById("advanced-actions"),
   chatLog: document.getElementById("chat-log"),
   attachmentPreview: document.getElementById("attachment-preview"),
@@ -407,22 +410,22 @@ const ONBOARDING_STEPS = [
   {
     title: "先打个招呼",
     desc: "在输入框里发一句话，按 Enter 就可以开始聊天。",
-    tip: "建议先聊一句简单近况，桌宠会更快进入状态。"
+    tip: "想先快速感受，点击下方“立即体验（推荐）”即可。"
   },
   {
-    title: "试试开麦",
-    desc: "点击“开麦”后直接说话，也可以用 Ctrl+M 快捷切换。",
-    tip: "如果第一次失败，先允许麦克风权限再重试。"
+    title: "语音先用轻量模式",
+    desc: "默认语音是 Browser；也支持 Edge TTS。不配置 GPT-SoVITS 也能直接体验语音。",
+    tip: "GPT-SoVITS 保留为高级本地音色模式，建议在本地服务稳定后再启用。"
   },
   {
-    title: "安排日程",
-    desc: "打开“日程”添加提醒，让桌宠在合适时间主动找你。",
-    tip: "可用于提醒休息、复盘、或定时触发工具任务。"
+    title: "默认低打扰更安全",
+    desc: "首次启动 observe.attach_mode=manual，不会自动观察桌面；工具调用默认关闭。",
+    tip: "如需启用 tools 或 allow_shell，请在高级配置中手动开启并注意风险。"
   },
   {
-    title: "完善人设",
-    desc: "到“更多 > 人设卡”补充偏好，让回复更贴近你。",
-    tip: "改完记得点击保存或应用，后续对话会逐步生效。"
+    title: "需要进阶再去配置中心",
+    desc: "想自定义 LLM、TTS、工具和人设，可进入高级配置中心继续完善。",
+    tip: "建议先体验基础对话，再逐项开启高级能力，排查问题更容易。"
   }
 ];
 
@@ -1473,6 +1476,20 @@ function openHelpModal() {
   ui.helpModal.hidden = false;
 }
 
+function openAdvancedConfigCenter() {
+  const target = "/docs/config.html";
+  try {
+    const popup = window.open(target, "_blank", "noopener,noreferrer");
+    if (popup && typeof popup.focus === "function") {
+      popup.focus();
+      return;
+    }
+  } catch (_) {
+    // ignore and fallback to same-window navigation
+  }
+  window.location.href = target;
+}
+
 function renderOnboardingStep() {
   const total = ONBOARDING_STEPS.length;
   const index = Math.max(0, Math.min(total - 1, Number(state.onboardingStepIndex) || 0));
@@ -1486,6 +1503,9 @@ function renderOnboardingStep() {
   }
   if (ui.onboardingStepTip) {
     ui.onboardingStepTip.textContent = step.tip;
+  }
+  if (ui.onboardingPathSplit) {
+    ui.onboardingPathSplit.hidden = index !== 0;
   }
   if (ui.onboardingStepIndex) {
     ui.onboardingStepIndex.textContent = `${index + 1} / ${total}`;
@@ -1906,7 +1926,7 @@ function readPersonaCardFromForm() {
 
 function applyPersonaTemplateDraft() {
   applyPersonaCardToForm({
-    identity: "你是我的桌面搭子，叫塔菲。",
+    identity: "你是我的桌面搭子，叫馨语AI桌宠。",
     user_preferences: "我喜欢简洁直接的建议，也喜欢被温柔鼓励。",
     user_dislikes: "不喜欢太官腔、太冗长、反复重复同一句话。",
     common_topics: "开发、学习计划、日常安排、效率提升。",
@@ -1918,7 +1938,7 @@ function applyPersonaTemplateDraft() {
 
 function applyRandomPersonaDraft() {
   const identities = [
-    "你是塔菲，我的桌面陪伴伙伴。",
+    "你是馨语AI桌宠，我的桌面陪伴伙伴。",
     "你是我的桌宠搭子，偏活泼，也很细心。",
     "你是我长期协作的 AI 桌面助理，兼顾陪伴和执行。"
   ];
@@ -2605,7 +2625,7 @@ function renderScheduleList() {
     title.textContent = "还没有日程";
     const desc = document.createElement("div");
     desc.className = "schedule-empty-desc";
-    desc.textContent = "你可以设置某个时间点让 Taffy 主动说话、提醒你，或直接执行工具任务。";
+    desc.textContent = "你可以设置某个时间点让馨语AI桌宠主动说话、提醒你，或直接执行工具任务。";
     empty.appendChild(title);
     empty.appendChild(desc);
     ui.scheduleList.appendChild(empty);
@@ -2705,7 +2725,7 @@ function saveScheduleFromForm() {
     return;
   }
   if (!text) {
-    setStatus("请先写下让 Taffy 做什么");
+    setStatus("请先写下让馨语AI桌宠做什么");
     ui.scheduleTask.focus();
     return;
   }
@@ -4073,7 +4093,7 @@ function buildAutoChatPrompt(context = null) {
     : "最多两句，优先一句。";
 
   return [
-    "你现在是桌宠 Taffy，要主动开口。",
+    "你现在是桌宠馨语AI桌宠，要主动开口。",
     `当前时段：${clockText}。`,
     `触发线索：${reasonHint}`,
     topicLine,
@@ -10337,6 +10357,21 @@ function bindUI() {
   if (ui.onboardingSkipBtn) {
     ui.onboardingSkipBtn.addEventListener("click", () => {
       closeOnboardingModal({ markSeen: true });
+    });
+  }
+
+  if (ui.onboardingQuickBtn) {
+    ui.onboardingQuickBtn.addEventListener("click", () => {
+      closeOnboardingModal({ markSeen: true });
+      setStatus("已进入立即体验模式");
+    });
+  }
+
+  if (ui.onboardingAdvancedBtn) {
+    ui.onboardingAdvancedBtn.addEventListener("click", () => {
+      closeOnboardingModal({ markSeen: true });
+      setStatus("正在打开高级配置中心");
+      openAdvancedConfigCenter();
     });
   }
 

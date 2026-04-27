@@ -60,7 +60,7 @@ if not errorlevel 1 (
   exit /b 0
 )
 if %RETRY% GEQ 30 (
-  echo Warning: GPT-SoVITS did not start in time. Taffy will retry voice requests later.
+  echo Warning: GPT-SoVITS did not start in time. 馨语AI桌宠 will retry voice requests later.
   exit /b 0
 )
 timeout /t 2 /nobreak >nul
