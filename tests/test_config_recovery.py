@@ -138,17 +138,22 @@ def test_recovery_export_logs_masks_secrets(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     example_path = tmp_path / "config.example.json"
     log_file = tmp_path / "server_test.log"
+    nested_log = tmp_path / "runtime" / "diagnostics" / "engine_trace.txt"
+    nested_log.parent.mkdir(parents=True, exist_ok=True)
     log_file.write_text(
         "\n".join(
             [
                 "api_key=sk-abcdef1234567890",
                 "Authorization: Bearer bearer-secret-xyz",
                 '{"token":"token-secret-value","secret":"plain-secret-value"}',
+                "sessionCredential=my-session-credential-value-123456",
+                "jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidGFmZnkiLCJyb2xlIjoiYWRtaW4ifQ.signaturepart123456",
                 "GET /api?token=url-token-123&api_key=url-key-456",
             ]
         ),
         encoding="utf-8",
     )
+    nested_log.write_text("diagnostics-secret=runtime-credential-abcdef", encoding="utf-8")
     config_path.write_text("{}", encoding="utf-8")
     example_path.write_text("{}", encoding="utf-8")
 
@@ -177,6 +182,7 @@ def test_recovery_export_logs_masks_secrets(monkeypatch, tmp_path):
         assert "manifest.json" in names
         exported_logs = [name for name in names if name.startswith("logs/")]
         assert exported_logs
+        assert any("runtime/diagnostics/engine_trace.txt" in name for name in exported_logs)
         merged_logs = "\n".join(
             archive.read(name).decode("utf-8", errors="replace")
             for name in exported_logs
@@ -186,5 +192,8 @@ def test_recovery_export_logs_masks_secrets(monkeypatch, tmp_path):
     assert "bearer-secret-xyz" not in merged_logs
     assert "token-secret-value" not in merged_logs
     assert "plain-secret-value" not in merged_logs
+    assert "my-session-credential-value-123456" not in merged_logs
+    assert "diagnostics-secret=runtime-credential-abcdef" not in merged_logs
+    assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidGFmZnkiLCJyb2xlIjoiYWRtaW4ifQ.signaturepart123456" not in merged_logs
     assert "url-token-123" not in merged_logs
     assert "url-key-456" not in merged_logs

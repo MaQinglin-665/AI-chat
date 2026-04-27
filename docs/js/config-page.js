@@ -3267,9 +3267,10 @@
           const payload = result.payload || {};
           const exportPath = String(payload.export_path || '').trim();
           const fileCount = Number(payload.file_count || 0);
+          const truncatedCount = Array.isArray(payload.truncated_files) ? payload.truncated_files.length : 0;
           const detail = exportPath
-            ? `导出成功（${fileCount} 个文件），保存路径：${exportPath}`
-            : `导出成功（${fileCount} 个文件）。`;
+            ? `导出成功（${fileCount} 个文件，截断 ${truncatedCount} 个），保存路径：${exportPath}`
+            : `导出成功（${fileCount} 个文件，截断 ${truncatedCount} 个）。`;
           setStatus(recoveryExportStatus, detail, 'ok');
           showToast('日志导出完成');
         } finally {

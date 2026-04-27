@@ -191,9 +191,6 @@ RECOVERY_LOG_IGNORE_DIRS = {
     "node_modules",
     "models",
     "tts_ref",
-    "docs",
-    "web",
-    "electron",
     "dist",
     "build",
     ".pytest_cache",
@@ -528,15 +525,63 @@ def _mask_export_secret(value, keep=2):
     return f"{raw[:keep]}***{raw[-keep:]}"
 
 
+def _looks_like_log_file(path_obj):
+    name = str(path_obj.name or "").strip().lower()
+    if not name:
+        return False
+    if name.startswith("config.backup.") and name.endswith(".json"):
+        return False
+    suffix = str(path_obj.suffix or "").strip().lower()
+    if suffix in RECOVERY_LOG_EXTENSIONS:
+        return True
+    if ".log." in name:
+        return True
+    return any(hint in name for hint in RECOVERY_LOG_NAME_HINTS)
+
+
+def _mask_jwt_like_tokens(text):
+    if not text:
+        return ""
+    pattern = re.compile(
+        r"(?i)\b(eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,})\b"
+    )
+    return pattern.sub(lambda m: _mask_export_secret(m.group(1), keep=2), text)
+
+
+def _mask_bearer_tokens(text):
+    if not text:
+        return ""
+    pattern = re.compile(r"(?i)(\bbearer\s+)([A-Za-z0-9._\-+/=]{8,})")
+    return pattern.sub(
+        lambda m: f"{m.group(1)}{_mask_export_secret(m.group(2), keep=2)}",
+        text,
+    )
+
+
+def _mask_sensitive_query_tokens(text):
+    if not text:
+        return ""
+    key_group = "|".join(re.escape(key) for key in RECOVERY_SENSITIVE_QUERY_KEYS)
+    pattern = re.compile(rf"(?i)([?&](?:{key_group})=)([^&\s]+)")
+    return pattern.sub(
+        lambda m: f"{m.group(1)}{_mask_export_secret(m.group(2), keep=2)}",
+        text,
+    )
+
+
 def _redact_export_log_text(text):
     sanitized = redact_sensitive_text(text)
     if not sanitized:
         return ""
 
+    key_group = (
+        r"api[_-]?key|access[_-]?token|refresh[_-]?token|secret(?:[_-]?key)?|"
+        r"token|password|credential|session(?:[_-]?id)?|signature|authorization|auth"
+    )
     key_pattern = re.compile(
         r"(?i)"
         r"((?:[\"'])?[A-Za-z0-9_.-]*"
-        r"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret(?:[_-]?key)?|token|password)"
+        rf"(?:{key_group})"
         r"(?:[\"'])?\s*[:=]\s*)"
         r"([\"']?)([^\"'\s,;}{\]]+)"
     )
@@ -544,37 +589,40 @@ def _redact_export_log_text(text):
         lambda m: f"{m.group(1)}{m.group(2)}{_mask_export_secret(m.group(3), keep=2)}",
         sanitized,
     )
-    sanitized = re.sub(
-        r"(?i)([?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret(?:[_-]?key)?|token|password)=)([^&\s]+)",
-        lambda m: f"{m.group(1)}{_mask_export_secret(m.group(2), keep=2)}",
-        sanitized,
-    )
+    sanitized = _mask_bearer_tokens(sanitized)
+    sanitized = _mask_jwt_like_tokens(sanitized)
+    sanitized = _mask_sensitive_query_tokens(sanitized)
     return sanitized
 
 
 def _collect_recent_log_paths():
-    root = Path(ROOT_DIR)
-    patterns = ("*.log", "*.log.*", "*log*.txt", "*.jsonl")
+    root = Path(ROOT_DIR).resolve()
     candidates = {}
-    search_roots = [root]
-    for name in ("logs", "log"):
-        path_obj = root / name
-        if path_obj.exists() and path_obj.is_dir():
-            search_roots.append(path_obj)
+    scanned = 0
+    stop_scan = False
+    config_path = Path(CONFIG_PATH).resolve()
 
-    for base in search_roots:
-        is_root = base == root
-        for pattern in patterns:
-            iterator = base.glob(pattern) if is_root else base.rglob(pattern)
-            for path_obj in iterator:
-                try:
-                    if not path_obj.is_file():
-                        continue
-                    if path_obj == CONFIG_PATH:
-                        continue
-                    candidates[str(path_obj.resolve())] = path_obj.resolve()
-                except Exception:
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if str(d or "").strip().lower() not in RECOVERY_LOG_IGNORE_DIRS]
+        for filename in filenames:
+            scanned += 1
+            if scanned > RECOVERY_LOG_MAX_SCAN_FILES:
+                stop_scan = True
+                break
+            path_obj = Path(dirpath) / filename
+            try:
+                resolved = path_obj.resolve()
+                if resolved == config_path:
                     continue
+                if not resolved.is_file():
+                    continue
+                if not _looks_like_log_file(resolved):
+                    continue
+                candidates[str(resolved)] = resolved
+            except Exception:
+                continue
+        if stop_scan:
+            break
 
     files = []
     for path_obj in candidates.values():
@@ -602,14 +650,25 @@ def _export_recent_logs_bundle():
     selected_logs = _collect_recent_log_paths()
     root = Path(ROOT_DIR).resolve()
     exported_items = []
+    truncated_files = []
 
     with zipfile.ZipFile(bundle_path, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path_obj in selected_logs:
             try:
-                raw_text = path_obj.read_text(encoding="utf-8", errors="replace")
+                raw_bytes = path_obj.read_bytes()
             except Exception:
                 continue
+            was_truncated = False
+            if len(raw_bytes) > RECOVERY_LOG_MAX_BYTES_PER_FILE:
+                raw_bytes = raw_bytes[-RECOVERY_LOG_MAX_BYTES_PER_FILE:]
+                was_truncated = True
+            raw_text = raw_bytes.decode("utf-8", errors="replace")
             safe_text = _redact_export_log_text(raw_text)
+            if was_truncated:
+                safe_text = (
+                    "[truncated] this file exceeded max export size, only the most recent bytes are included.\n"
+                    f"{safe_text}"
+                )
             try:
                 rel_path = path_obj.resolve().relative_to(root)
                 rel_text = str(rel_path).replace("\\", "/")
@@ -618,12 +677,15 @@ def _export_recent_logs_bundle():
             archive_name = f"logs/{rel_text}"
             archive.writestr(archive_name, safe_text)
             exported_items.append(rel_text)
+            if was_truncated:
+                truncated_files.append(rel_text)
 
         manifest = {
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "root_dir": str(root),
             "file_count": len(exported_items),
             "files": exported_items,
+            "truncated_files": truncated_files,
             "redaction": "api_key/token/secret values are masked before export",
         }
         archive.writestr(
@@ -635,6 +697,7 @@ def _export_recent_logs_bundle():
         "bundle_path": str(bundle_path),
         "file_count": len(exported_items),
         "files": exported_items,
+        "truncated_files": truncated_files,
     }
 
 
@@ -2684,6 +2747,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                 result = _export_recent_logs_bundle()
                 export_path = str(result.get("bundle_path", "") or "")
                 file_count = int(result.get("file_count", 0) or 0)
+                truncated_files = result.get("truncated_files", [])
                 self._send_json(
                     {
                         "ok": True,
@@ -2691,6 +2755,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                         "export_path": export_path,
                         "file_count": file_count,
                         "files": result.get("files", []),
+                        "truncated_files": truncated_files,
                         "masked": True,
                     },
                     status=HTTPStatus.OK,
