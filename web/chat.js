@@ -1926,7 +1926,7 @@ function readPersonaCardFromForm() {
 
 function applyPersonaTemplateDraft() {
   applyPersonaCardToForm({
-    identity: "你是我的桌面搭子，叫塔菲。",
+    identity: "你是我的桌面搭子，叫馨语AI桌宠。",
     user_preferences: "我喜欢简洁直接的建议，也喜欢被温柔鼓励。",
     user_dislikes: "不喜欢太官腔、太冗长、反复重复同一句话。",
     common_topics: "开发、学习计划、日常安排、效率提升。",
@@ -1938,7 +1938,7 @@ function applyPersonaTemplateDraft() {
 
 function applyRandomPersonaDraft() {
   const identities = [
-    "你是塔菲，我的桌面陪伴伙伴。",
+    "你是馨语AI桌宠，我的桌面陪伴伙伴。",
     "你是我的桌宠搭子，偏活泼，也很细心。",
     "你是我长期协作的 AI 桌面助理，兼顾陪伴和执行。"
   ];
@@ -2625,7 +2625,7 @@ function renderScheduleList() {
     title.textContent = "还没有日程";
     const desc = document.createElement("div");
     desc.className = "schedule-empty-desc";
-    desc.textContent = "你可以设置某个时间点让 Taffy 主动说话、提醒你，或直接执行工具任务。";
+    desc.textContent = "你可以设置某个时间点让馨语AI桌宠主动说话、提醒你，或直接执行工具任务。";
     empty.appendChild(title);
     empty.appendChild(desc);
     ui.scheduleList.appendChild(empty);
@@ -2725,7 +2725,7 @@ function saveScheduleFromForm() {
     return;
   }
   if (!text) {
-    setStatus("请先写下让 Taffy 做什么");
+    setStatus("请先写下让馨语AI桌宠做什么");
     ui.scheduleTask.focus();
     return;
   }
@@ -4093,7 +4093,7 @@ function buildAutoChatPrompt(context = null) {
     : "最多两句，优先一句。";
 
   return [
-    "你现在是桌宠 Taffy，要主动开口。",
+    "你现在是桌宠馨语AI桌宠，要主动开口。",
     `当前时段：${clockText}。`,
     `触发线索：${reasonHint}`,
     topicLine,

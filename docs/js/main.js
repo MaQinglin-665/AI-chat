@@ -444,7 +444,7 @@
         }
       })
       .catch((error) => {
-        console.warn('[馨语Ai桌宠] content.json 校验失败，已使用页面静态文案。', error);
+        console.warn('[馨语AI桌宠] content.json 校验失败，已使用页面静态文案。', error);
         if (copyMode === 'release') {
           applyReleaseCopyFallback();
         }
@@ -876,7 +876,7 @@
         }
       })
       .catch((error) => {
-        console.warn('[馨语Ai桌宠] versions.json 校验失败，已使用静态版本列表。', error);
+        console.warn('[馨语AI桌宠] versions.json 校验失败，已使用静态版本列表。', error);
       });
   };
 
@@ -973,7 +973,7 @@
         renderTimeline();
       })
       .catch((error) => {
-        console.warn('[馨语Ai桌宠] 更新日志渲染失败，已使用静态日志。', error);
+        console.warn('[馨语AI桌宠] 更新日志渲染失败，已使用静态日志。', error);
       });
   };
 
@@ -1084,7 +1084,7 @@
     }
 
     const dialogLines = [
-      { role: 'user', text: '塔菲，今天我有点焦虑，事情有点多。' },
+      { role: 'user', text: '馨语AI桌宠，今天我有点焦虑，事情有点多。' },
       { role: 'taffy', text: '我在哦。先一起深呼吸三次，我们把任务拆成最小步骤，一步一步来。' },
       { role: 'user', text: '那我应该先做哪件事？' },
       { role: 'taffy', text: '先做最短、最容易完成的一项，拿到第一份进度感。然后我陪你排第二项。' },
@@ -1113,7 +1113,7 @@
     };
 
     const setPlaceholder = () => {
-      log.innerHTML = '<p class="chat-demo-placeholder">点击“开始演示”，看看馨语Ai桌宠的聊天风格。</p>';
+      log.innerHTML = '<p class="chat-demo-placeholder">点击“开始演示”，看看馨语AI桌宠的聊天风格。</p>';
       cursor = -1;
       isStarted = false;
       clearTyping();
@@ -1130,7 +1130,7 @@
 
       const name = document.createElement('p');
       name.className = 'chat-name';
-      name.textContent = line.role === 'user' ? '你' : '馨语Ai桌宠';
+      name.textContent = line.role === 'user' ? '你' : '馨语AI桌宠';
 
       const bubble = document.createElement('p');
       bubble.className = 'chat-bubble';

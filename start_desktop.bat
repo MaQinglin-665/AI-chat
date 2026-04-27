@@ -9,5 +9,5 @@ if /I "%GPT_WAIT_MODE%"=="--wait-gpt" (
   call "%~dp0ensure_gpt_sovits.bat" --no-wait
 )
 
-echo Launching Taffy AI desktop pet in dual-window desktop mode...
+echo Launching 馨语AI桌宠 in dual-window desktop mode...
 call "%~dp0start_electron.bat"
