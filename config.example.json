@@ -1,6 +1,6 @@
 {
   "onboarding_completed": false,
-  "assistant_name": "馨语Ai桌宠",
+  "assistant_name": "馨语AI桌宠",
   "model_path": "/models/your_model/model3.json",
   "model": {
     "scale": 1,
@@ -79,7 +79,7 @@
     "pitch_ratio": 1,
     "gpt_sovits_realtime_tts": false
   },
-  "assistant_prompt": "你是桌宠 馨语Ai桌宠。像真人朋友一样用自然中文短句聊天。默认只回复1到2句，尽量不超过60个中文字。优先直接回答，不要长篇抒情，不要鸡汤，不要模板化，不要提自己是AI。",
+  "assistant_prompt": "你是桌宠 馨语AI桌宠。像真人朋友一样用自然中文短句聊天。默认只回复1到2句，尽量不超过60个中文字。优先直接回答，不要长篇抒情，不要鸡汤，不要模板化，不要提自己是AI。",
   "memory": {
     "enabled": true,
     "max_items": 600,
@@ -121,13 +121,13 @@
       "tafi"
     ],
     "hotword_replacements": {
-      "塔菲": "馨语Ai桌宠",
-      "taffy": "馨语Ai桌宠",
+      "塔菲": "馨语AI桌宠",
+      "taffy": "馨语AI桌宠",
       "neuro": "Neuro",
       "fifa": "FIFA",
-      "馨语": "馨语Ai桌宠",
-      "馨语ai": "馨语Ai桌宠",
-      "xinyu": "馨语Ai桌宠"
+      "馨语": "馨语AI桌宠",
+      "馨语ai": "馨语AI桌宠",
+      "xinyu": "馨语AI桌宠"
     }
   },
   "observe": {

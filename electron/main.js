@@ -433,7 +433,7 @@ function buildPythonProcessEnv(pythonExecutable) {
 
 function buildBackendCrashMessage(codeLabel, extraMessage = "") {
   let message =
-    `馨语Ai桌宠后端意外退出 (code: ${codeLabel})\n` +
+    `馨语AI桌宠后端意外退出 (code: ${codeLabel})\n` +
     "请查看 server_err.log 了解详情。\n\n" +
     "常见原因：Python 版本不匹配、缺少依赖库。";
   if (extraMessage) {
@@ -445,7 +445,7 @@ function buildBackendCrashMessage(codeLabel, extraMessage = "") {
 function reportBackendFatal(message) {
   if (!backendFailureShown) {
     backendFailureShown = true;
-    dialog.showErrorBox("馨语Ai桌宠后端错误", message);
+    dialog.showErrorBox("馨语AI桌宠后端错误", message);
   }
   if (!isAppQuitting) {
     isAppQuitting = true;
@@ -938,6 +938,7 @@ function createChatWindow() {
     height: bounds.height,
     x: bounds.x,
     y: bounds.y,
+    title: "馨语AI桌宠",
     minWidth: 380,
     minHeight: 520,
     frame: true,
