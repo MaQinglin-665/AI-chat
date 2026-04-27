@@ -2479,7 +2479,7 @@
                         { path: 'tts.gpt_sovits_api_url', value: 'http://127.0.0.1:9880/tts' }
                       ],
                       focusPath: 'tts.gpt_sovits_api_url',
-                      message: '已回填默认 GPT-SoVITS 地址'
+                      message: '已回填 GPT-SoVITS 示例地址'
                     })
                   },
                   {
@@ -2516,7 +2516,7 @@
                         { path: 'tts.gpt_sovits_api_url', value: 'http://127.0.0.1:9880/tts' }
                       ],
                       focusPath: 'tts.gpt_sovits_api_url',
-                      message: '已回填默认 GPT-SoVITS 地址'
+                      message: '已回填 GPT-SoVITS 示例地址'
                     })
                   },
                   {
