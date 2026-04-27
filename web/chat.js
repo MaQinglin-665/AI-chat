@@ -7754,7 +7754,7 @@ async function loadConfig() {
     : ["\u5854\u83f2", "taffy", "tafi"];
   {
     const rawAttachMode = String(observeCfg.attach_mode || "").toLowerCase();
-    if (rawAttachMode === "always") {
+    if (rawAttachMode === "always" || rawAttachMode === "auto") {
       state.observeAttachMode = "always";
     } else if (rawAttachMode === "keyword" || rawAttachMode === "manual") {
       state.observeAttachMode = "manual";
