@@ -491,6 +491,7 @@
                   <span>启用 API Token 校验</span>
                   <input type="checkbox" data-path="server.require_api_token">
                 </label>
+                <p class="field-note col-span-2">本地开发可关闭；公开发布建议开启，并通过环境变量 <code>TAFFY_API_TOKEN</code> 注入令牌。</p>
                 <label class="field col-span-2">
                   <span>API Token 环境变量</span>
                   <input type="text" data-path="server.api_token_env" value="TAFFY_API_TOKEN">
@@ -610,28 +611,29 @@
                   <span>快速语音模式</span>
                   <div class="tts-mode-actions">
                     <select id="ttsModePreset">
+                      <option value="browser">本地系统语音（Browser，新手默认）</option>
                       <option value="edge">在线标准语音（Edge，免配置）</option>
                       <option value="volcengine">云端定制语音（音色更好）</option>
-                      <option value="gpt_sovits">本地高自由度（GPT-SoVITS）</option>
+                      <option value="gpt_sovits">高级本地音色模式（GPT-SoVITS）</option>
                       <option value="custom">自定义（保持当前参数）</option>
                     </select>
                     <button id="applyTtsModePresetBtn" class="btn btn-outline" type="button">一键套用</button>
                   </div>
-                  <small class="field-note">建议流程：先选模式并套用，再执行“检测配置连通性”，最后点击“一键应用配置”。</small>
+                  <small class="field-note">新手建议先用 Browser / Edge；GPT-SoVITS 为高级本地音色模式。建议流程：先选模式并套用，再执行“检测配置连通性”，最后点击“一键应用配置”。</small>
                 </label>
                 <p id="ttsModePresetStatus" class="write-status col-span-2">当前未套用快速语音模式。</p>
                 <label class="field" data-tts-group="common">
                   <span>语音 Provider</span>
                   <select data-path="tts.provider">
-                    <option value="gpt_sovits" selected>gpt_sovits</option>
+                    <option value="browser" selected>browser（新手默认）</option>
+                    <option value="gpt_sovits">gpt_sovits（高级本地音色）</option>
                     <option value="edge_tts">edge_tts</option>
                     <option value="volcengine_tts">volcengine_tts</option>
-                    <option value="browser">browser</option>
                   </select>
                 </label>
                 <label class="field" data-tts-group="common">
                   <span>voice</span>
-                  <input type="text" data-path="tts.voice" value="default">
+                  <input type="text" data-path="tts.voice" value="zh-CN-XiaoxiaoNeural">
                 </label>
                 <label class="field" data-tts-group="volcengine">
                   <span>Volcengine app_id_env</span>
@@ -813,18 +815,19 @@ tafi</textarea>
                 <label class="field">
                   <span>attach_mode</span>
                   <select data-path="observe.attach_mode">
-                    <option value="always" selected>always</option>
-                    <option value="manual">manual</option>
-                    <option value="auto">auto</option>
+                    <option value="manual" selected>manual</option>
+                    <option value="always">always</option>
+                    <option value="keyword">keyword（旧版兼容）</option>
+                    <option value="auto">auto（旧版兼容）</option>
                   </select>
                 </label>
                 <label class="field switch-field">
                   <span>允许自动对话使用观察</span>
-                  <input type="checkbox" data-path="observe.allow_auto_chat" checked>
+                  <input type="checkbox" data-path="observe.allow_auto_chat">
                 </label>
                 <label class="field switch-field">
                   <span>自动对话开关</span>
-                  <input type="checkbox" data-path="observe.auto_chat_enabled" checked>
+                  <input type="checkbox" data-path="observe.auto_chat_enabled">
                 </label>
                 <label class="field">
                   <span>auto_chat_min_ms</span>
@@ -886,7 +889,7 @@ tafi</textarea>
                 </label>
                 <label class="field switch-field">
                   <span>启用工具调用</span>
-                  <input type="checkbox" data-path="tools.enabled" checked>
+                  <input type="checkbox" data-path="tools.enabled">
                 </label>
                 <label class="field switch-field">
                   <span>允许 Shell</span>
@@ -1014,7 +1017,7 @@ tafi</textarea>
                 <li class="health-item" data-health-id="tts">
                   <p class="health-head">TTS 接口</p>
                   <p class="health-state">待检测</p>
-                  <p class="health-detail">将按 <code>tts.provider</code> 检查语音配置可用性，并在失败时提示 <code>tts.gpt_sovits_api_url / tts.gpt_sovits_timeout_sec</code>。</p>
+                  <p class="health-detail">将按 <code>tts.provider</code> 检查语音配置可用性（Browser/Edge/GPT-SoVITS），并在失败时提示对应配置项。</p>
                   <div class="health-actions"></div>
                 </li>
                 <li class="health-item" data-health-id="reload">
@@ -1209,7 +1212,7 @@ tafi</textarea>
 
       <section class="onboarding-step" data-step="3">
         <h4>选择语音模式</h4>
-        <p>语音模式决定塔菲“怎么说话”。推荐先用本地系统语音；如果想要在线语音，可选在线标准语音（Edge，无需单独 API Key，仅需联网），稳定后再切 GPT-SoVITS。</p>
+        <p>语音模式决定塔菲“怎么说话”。新手推荐先用本地系统语音（Browser）或在线标准语音（Edge）；GPT-SoVITS 作为高级本地音色模式，建议在本地服务稳定后再启用。</p>
         <div class="onboarding-choice-grid">
           <button class="onboarding-choice is-selected" type="button" data-onboarding-voice="browser">
             <strong>本地系统语音</strong>
@@ -1221,7 +1224,7 @@ tafi</textarea>
           </button>
           <button class="onboarding-choice" type="button" data-onboarding-voice="gpt_sovits">
             <strong>GPT-SoVITS</strong>
-            <span>可玩性高，需本地服务已启动并可访问。</span>
+            <span>高级本地音色模式，可玩性高，需本地服务已启动并可访问。</span>
           </button>
         </div>
       </section>
@@ -1473,6 +1476,7 @@ tafi</textarea>
           return;
         }
         setPathValue('tts.provider', 'browser');
+        setPathValue('tts.voice', 'zh-CN-XiaoxiaoNeural');
       };
 
       const playBrowserSpeech = async () => {

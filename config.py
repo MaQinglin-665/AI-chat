@@ -595,12 +595,14 @@ def sanitize_client_config(config):
     stream_mode = str(tts_cfg.get("stream_mode", "realtime") or "realtime").strip().lower()
     if stream_mode not in {"final_only", "realtime"}:
         stream_mode = "realtime"
-    observe_attach_mode = str(
+    observe_attach_mode_raw = str(
         observe_cfg.get("attach_mode", "manual") or "manual"
     ).strip().lower()
-    if observe_attach_mode == "keyword":
+    if observe_attach_mode_raw in {"always", "auto"}:
+        observe_attach_mode = "always"
+    elif observe_attach_mode_raw in {"manual", "keyword"}:
         observe_attach_mode = "manual"
-    if observe_attach_mode not in {"manual", "always"}:
+    else:
         observe_attach_mode = "manual"
     observe_auto_chat_tuning_raw = observe_cfg.get("auto_chat_tuning", {})
     if not isinstance(observe_auto_chat_tuning_raw, dict):

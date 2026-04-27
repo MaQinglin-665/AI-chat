@@ -68,7 +68,7 @@
 - 默认可走本地链路（本地模型 + 本地语音服务），可减少外发数据
 - `config.json` 默认被 `.gitignore` 忽略，敏感信息建议仅放环境变量
 - `tts_ref/` 用于本地参考音频，避免提交私人语音样本
-- 工具执行默认关闭（`tools.allow_shell=false`），按需开启
+- 工具执行默认关闭（`tools.enabled=false`，`tools.allow_shell=false`），按需开启
 
 ## 适合谁使用
 
@@ -280,7 +280,7 @@ start_desktop.bat
 - If model does not show, hard refresh with `Ctrl + F5`.
 - Never store real API tokens in `config.json`. Keep secrets in environment variables.
 - `config.json` is ignored by `.gitignore` by default.
-- Work-tool command execution is disabled by default (`tools.allow_shell=false`). Enable only when needed.
+- Work-tool command execution is disabled by default (`tools.enabled=false`, `tools.allow_shell=false`). Enable only when needed.
 - CORS allows loopback origins by default (`localhost` / `127.0.0.1`), not arbitrary websites.
 - Window position and size are auto-saved in Electron mode and restored on next launch.
 
