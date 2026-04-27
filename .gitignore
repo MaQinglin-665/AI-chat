@@ -12,6 +12,9 @@ web/generated_images/
 .mem0/
 models/
 memory_persona_card.json
+memory_profile.json
+memory_relationship.json
+memory_summary.json
 
 # Temporary audio files
 tmp_*.wav
@@ -34,6 +37,9 @@ api_err.log
 # Memory backups
 memory_backups/
 memory.bak
+memory_profile.json
+memory_relationship.json
+memory_summary.json
 
 # Emotion state (runtime generated)
 emotion_state.json

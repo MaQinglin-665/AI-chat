@@ -26,8 +26,8 @@
 
 1. 准备环境：Windows、Python 3.10+、Node.js、可用的 Live2D 模型
 2. 放置模型到 `web/models/`，并在 `config.json` 设置 `model_path`
-3. 选择一个 LLM 提供方：本地 Ollama（默认）或 OpenAI 兼容 API
-4. 选择一个 TTS 提供方：默认 GPT-SoVITS（本地）
+3. 选择一个 LLM 提供方：默认 OpenAI-compatible（qwen-plus），也可切到本地 Ollama
+4. 选择一个 TTS 提供方：默认 browser TTS（首启更稳）
 5. 双击 `一键启动桌宠.vbs`（或已创建的桌面快捷方式）
 
 详细配置继续看下方章节：
@@ -40,8 +40,8 @@
 
 - 首次推荐先打开配置中心中的“首次启动向导”，按步骤完成模式选择、LLM/TTS 测试与保存
 - 必配：`model_path`（Live2D 模型路径）
-- 至少选一项 LLM：`ollama` 或 `openai`（若用 OpenAI 需配置 `OPENAI_API_KEY`）
-- 至少选一项 TTS：默认 `gpt_sovits`（可换 `edge_tts` / `browser`）
+- 至少选一项 LLM：默认 `openai-compatible`（与 `config.example.json` 一致），也可改为 `ollama`
+- 至少选一项 TTS：默认 `browser`；`gpt_sovits` 作为高级高质量模式按需开启
 - 推荐：把密钥放到环境变量或 `.env`，不要明文写入仓库文件
 
 向导完成后会写入：
@@ -68,7 +68,7 @@
 - 默认可走本地链路（本地模型 + 本地语音服务），可减少外发数据
 - `config.json` 默认被 `.gitignore` 忽略，敏感信息建议仅放环境变量
 - `tts_ref/` 用于本地参考音频，避免提交私人语音样本
-- 工具执行默认关闭（`tools.allow_shell=false`），按需开启
+- 工具执行默认关闭（`tools.enabled=false`，`tools.allow_shell=false`），按需开启
 
 ## 适合谁使用
 
@@ -97,25 +97,45 @@ Then set `config.json`:
 }
 ```
 
+### Release Defaults (aligned with `config.example.json`)
+
+- Default LLM: `openai-compatible` + `qwen-plus` (`https://dashscope.aliyuncs.com/compatible-mode/v1`)
+- Default TTS: `browser` (best first-run compatibility)
+- GPT-SoVITS is treated as an advanced high-quality mode (opt-in after basic flow is stable)
+- First launch flow is aligned with `docs/config.html`: run first-run wizard -> connectivity checks -> one-click apply config
+
 ## 2) LLM provider config
 
-### Local model (default, Ollama)
+### Default (OpenAI-compatible, aligned with `config.example.json`)
+
+```json
+{
+  "llm": {
+    "provider": "openai-compatible",
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "model": "qwen-plus",
+    "api_key_env": "DASHSCOPE_API_KEY",
+    "temperature": 0.42
+  }
+}
+```
+
+Set key in terminal:
+
+```powershell
+set DASHSCOPE_API_KEY=your_key_here
+```
+
+### Optional local model (Ollama)
 
 ```json
 {
   "llm": {
     "provider": "ollama",
     "base_url": "http://127.0.0.1:11434",
-    "model": "qwen2.5:7b",
-    "temperature": 0.7
+    "model": "qwen2.5:7b"
   }
 }
-```
-
-Make sure model exists:
-
-```powershell
-ollama list
 ```
 
 ### OpenAI / OpenAI-compatible
@@ -164,18 +184,28 @@ Then set in `config.json`:
 
 ## 3) TTS (voice) config
 
-Default is local GPT-SoVITS API:
+Default is Browser TTS (first-run friendly):
+
+```json
+{
+  "tts": {
+    "provider": "browser",
+    "voice": "zh-CN-XiaoxiaoNeural"
+  }
+}
+```
+
+Advanced high-quality mode (GPT-SoVITS):
 
 ```json
 {
   "tts": {
     "provider": "gpt_sovits",
-    "voice": "default",
-    "voices": ["default"],
     "gpt_sovits_api_url": "http://127.0.0.1:9880/tts",
-    "gpt_sovits_method": "POST",
-    "gpt_sovits_timeout_sec": 60,
-    "gpt_sovits_format": "wav"
+    "gpt_sovits_top_k": 8,
+    "gpt_sovits_top_p": 0.78,
+    "gpt_sovits_temperature": 0.36,
+    "gpt_sovits_repetition_penalty": 1.08
   }
 }
 ```
@@ -207,7 +237,7 @@ If you want to use Edge TTS:
 }
 ```
 
-If server-side TTS fails, set:
+If server-side TTS fails, fallback to:
 
 ```json
 {
@@ -250,7 +280,7 @@ start_desktop.bat
 - If model does not show, hard refresh with `Ctrl + F5`.
 - Never store real API tokens in `config.json`. Keep secrets in environment variables.
 - `config.json` is ignored by `.gitignore` by default.
-- Work-tool command execution is disabled by default (`tools.allow_shell=false`). Enable only when needed.
+- Work-tool command execution is disabled by default (`tools.enabled=false`, `tools.allow_shell=false`). Enable only when needed.
 - CORS allows loopback origins by default (`localhost` / `127.0.0.1`), not arbitrary websites.
 - Window position and size are auto-saved in Electron mode and restored on next launch.
 

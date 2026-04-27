@@ -24,7 +24,7 @@ VOLCENGINE_ACCESS_TOKEN_ENV = "VOLCENGINE_ACCESS_TOKEN"
 VOLCENGINE_SECRET_KEY_ENV = "VOLCENGINE_SECRET_KEY"
 OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 OLLAMA_DEFAULT_MODEL = "qwen2.5:7b"
-TTS_DEFAULT_PROVIDER = "edge_tts"
+TTS_DEFAULT_PROVIDER = "browser"
 TTS_DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"
 TTS_DEFAULT_VOICES = [
     "zh-CN-XiaoxiaoNeural",
@@ -71,6 +71,25 @@ DEFAULT_ALLOWED_COMMAND_PREFIXES = [
     "tree",
 ]
 
+RELEASE_MODE_ENV_KEYS = (
+    "TAFFY_RELEASE_MODE",
+    "TAFFY_PUBLIC_RELEASE",
+    "TAFFY_RELEASE",
+)
+
+
+def _env_flag(name, default=False):
+    value = os.environ.get(str(name or "").strip())
+    if value is None:
+        return bool(default)
+    text = str(value).strip().lower()
+    if not text:
+        return bool(default)
+    return text in {"1", "true", "yes", "on"}
+
+
+REQUIRE_API_TOKEN_DEFAULT = any(_env_flag(key, False) for key in RELEASE_MODE_ENV_KEYS)
+
 
 DEFAULT_CONFIG = {
     "onboarding_completed": False,
@@ -87,7 +106,7 @@ DEFAULT_CONFIG = {
         "open_browser": True,
         "cors_allow_loopback": True,
         "cors_allowed_origins": [],
-        "require_api_token": False,
+        "require_api_token": REQUIRE_API_TOKEN_DEFAULT,
         "api_token_env": API_TOKEN_DEFAULT_ENV,
     },
     "desktop": {
@@ -219,7 +238,7 @@ DEFAULT_CONFIG = {
         },
     },
     "observe": {
-        "attach_mode": "always",
+        "attach_mode": "manual",
         "allow_auto_chat": False,
         "auto_chat_enabled": False,
         "auto_chat_min_ms": 180000,
@@ -260,7 +279,7 @@ DEFAULT_CONFIG = {
         "idle_max_ms": 24000,
     },
     "tools": {
-        "enabled": True,
+        "enabled": False,
         "workspace_root": DEFAULT_WORKSPACE_ROOT,
         "allow_shell": False,
         "allowed_command_prefixes": DEFAULT_ALLOWED_COMMAND_PREFIXES,
@@ -576,11 +595,15 @@ def sanitize_client_config(config):
     stream_mode = str(tts_cfg.get("stream_mode", "realtime") or "realtime").strip().lower()
     if stream_mode not in {"final_only", "realtime"}:
         stream_mode = "realtime"
-    observe_attach_mode = str(
-        observe_cfg.get("attach_mode", "always") or "always"
+    observe_attach_mode_raw = str(
+        observe_cfg.get("attach_mode", "manual") or "manual"
     ).strip().lower()
-    if observe_attach_mode not in {"keyword", "always"}:
+    if observe_attach_mode_raw in {"always", "auto"}:
         observe_attach_mode = "always"
+    elif observe_attach_mode_raw in {"manual", "keyword"}:
+        observe_attach_mode = "manual"
+    else:
+        observe_attach_mode = "manual"
     observe_auto_chat_tuning_raw = observe_cfg.get("auto_chat_tuning", {})
     if not isinstance(observe_auto_chat_tuning_raw, dict):
         observe_auto_chat_tuning_raw = {}
@@ -883,7 +906,9 @@ def sanitize_client_config(config):
             ),
         },
         "tools": {
-            "enabled": bool(tools_cfg.get("enabled", True)),
+            "enabled": bool(
+                tools_cfg.get("enabled", DEFAULT_CONFIG["tools"]["enabled"])
+            ),
             "workspace_root": str(tools_cfg.get("workspace_root", DEFAULT_WORKSPACE_ROOT)),
             "allow_shell": bool(tools_cfg.get("allow_shell", False)),
             "image_enabled": bool(tools_cfg.get("image_enabled", True)),
