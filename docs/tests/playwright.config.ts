@@ -14,7 +14,8 @@ export default defineConfig({
   },
   reporter: [['list']],
   webServer: {
-    command: 'python -m http.server 5500',
+    // CI runners may expose only python3; keep python as fallback for local Windows setups.
+    command: 'python3 -m http.server 5500 || python -m http.server 5500',
     cwd: '..',
     url: 'http://127.0.0.1:5500',
     reuseExistingServer: true,
