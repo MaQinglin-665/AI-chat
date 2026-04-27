@@ -2948,48 +2948,85 @@ function runReminderCheck() {
   }
 }
 
-function runDailyGreetingCheck() {
-  if (!state.dailyGreetingEnabled) {
-    return;
-  }
-  if (state.chatBusy) {
-    return;
-  }
+function tryRunScheduledProactiveMessage({
+  keyPrefix = "",
+  hour = 0,
+  minute = 0,
+  maxDelayMs = 0,
+  reason = "scheduled",
+  prompt = ""
+} = {}) {
   const now = new Date();
-  const due = new Date(now.getTime());
-  due.setHours(state.dailyGreetingHour, state.dailyGreetingMinute, 0, 0);
   const dayKey = getLocalDateKey(now);
-  const runKey = `morning-${dayKey}`;
+  const runKey = `${String(keyPrefix || "").trim()}-${dayKey}`;
   if (state.dailyGreetingLastRunKey === runKey) {
     return;
   }
+  const due = new Date(now.getTime());
+  due.setHours(hour, minute, 0, 0);
   if (now.getTime() < due.getTime()) {
     return;
   }
-  const maxDelayMs = 90 * 60 * 1000;
-  if (now.getTime() - due.getTime() > maxDelayMs) {
+  if (maxDelayMs > 0 && now.getTime() - due.getTime() > maxDelayMs) {
     state.dailyGreetingLastRunKey = runKey;
     saveDailyGreetingState();
     return;
   }
-
+  if (!isProactiveMessageAllowed({ requireUserIdle: false })) {
+    return;
+  }
   state.dailyGreetingLastRunKey = runKey;
   saveDailyGreetingState();
-
-  const hh = String(state.dailyGreetingHour).padStart(2, "0");
-  const mm = String(state.dailyGreetingMinute).padStart(2, "0");
-  const prompt = String(state.dailyGreetingPrompt || "").trim()
-    || "请你主动说一句早安，再给一句鼓励今天努力的暖心鸡汤。";
-  requestAssistantReply(`（定时任务：每天 ${hh}:${mm} 早安问候）${prompt}`, {
+  requestAssistantReply(prompt, {
     showUser: false,
     rememberUser: false,
     rememberAssistant: false,
     auto: true,
     silentError: true
+  }).then((ok) => {
+    if (!ok) {
+      state.dailyGreetingLastRunKey = "";
+      saveDailyGreetingState();
+      return;
+    }
+    markProactiveMessageTriggered(reason, "");
   }).catch(() => {
     state.dailyGreetingLastRunKey = "";
     saveDailyGreetingState();
   });
+}
+
+function runDailyGreetingCheck() {
+  if (!state.proactiveEnabled || state.proactiveLevel === "off") {
+    return;
+  }
+  if (state.chatBusy) {
+    return;
+  }
+  if (state.dailyGreetingEnabled) {
+    const hh = String(state.dailyGreetingHour).padStart(2, "0");
+    const mm = String(state.dailyGreetingMinute).padStart(2, "0");
+    const prompt = String(state.dailyGreetingPrompt || "").trim()
+      || "请你主动说一句早安，再给一句鼓励今天努力的话，保持简短自然。";
+    tryRunScheduledProactiveMessage({
+      keyPrefix: "morning",
+      hour: state.dailyGreetingHour,
+      minute: state.dailyGreetingMinute,
+      maxDelayMs: PROACTIVE_MORNING_GREETING_MAX_DELAY_MS,
+      reason: "morning_greeting",
+      prompt: `（主动陪伴任务：每天 ${hh}:${mm} 早安问候）${prompt}`
+    });
+  }
+  if (state.proactiveNightReminderEnabled) {
+    tryRunScheduledProactiveMessage({
+      keyPrefix: "night",
+      hour: PROACTIVE_NIGHT_REMINDER_HOUR,
+      minute: PROACTIVE_NIGHT_REMINDER_MINUTE,
+      maxDelayMs: PROACTIVE_NIGHT_REMINDER_MAX_DELAY_MS,
+      reason: "night_reminder",
+      prompt: "（主动陪伴任务：夜间提醒）请像桌宠一样用一句到两句自然地提醒我早点休息，语气温柔，不要命令感。"
+    });
+  }
 }
 
 function startReminderLoop() {
@@ -3159,7 +3196,7 @@ function updateAutoChatButton() {
   if (!ui.autoChatBtn) {
     return;
   }
-  ui.autoChatBtn.textContent = state.autoChatEnabled ? "自动对话: 开" : "自动对话: 关";
+  ui.autoChatBtn.textContent = state.autoChatEnabled ? "主动陪伴: 开" : "主动陪伴: 关";
 }
 
 function escapeRegExp(text) {
@@ -4192,19 +4229,7 @@ function scheduleNextAutoChat() {
           silentError: true
         }).then((ok) => {
           if (ok) {
-            const now = Date.now();
-            const previousAutoAt = Number(state.lastAutoChatAt) || 0;
-            const burstResetWindowMs = Math.max(
-              3 * 60 * 1000,
-              Number(state.autoChatTuning?.burstResetWindowMs) || AUTO_CHAT_BURST_RESET_WINDOW_MS
-            );
-            state.lastAutoChatAt = now;
-            state.autoChatLastReason = triggerReason;
-            state.autoChatLastTopicHint = triggerTopic;
-            state.autoChatLastTopicAt = triggerTopic ? now : 0;
-            state.autoChatBurstCount = previousAutoAt > 0 && now - previousAutoAt < burstResetWindowMs
-              ? Math.min(6, (Number(state.autoChatBurstCount) || 0) + 1)
-              : 1;
+            markProactiveMessageTriggered(triggerReason, triggerTopic);
           }
         }).catch(() => {
           // ignore
@@ -7814,6 +7839,7 @@ async function loadConfig() {
   }
   const asrCfg = state.config?.asr || {};
   const observeCfg = state.config?.observe || {};
+  const proactiveCfg = state.config?.proactive || {};
   const historySummaryCfg = state.config?.history_summary || {};
   const styleCfg = state.config?.style || {};
   const motionCfg = state.config?.motion || {};
@@ -7930,7 +7956,33 @@ async function loadConfig() {
       )
     )
   };
-  state.dailyGreetingEnabled = observeCfg.daily_greeting_enabled === true;
+  const proactiveLevelRaw = normalizeProactiveLevel(proactiveCfg.level || "off");
+  const proactiveEnabledCfg = proactiveCfg.enabled === true;
+  const legacyAutoChatEnabled = observeCfg.auto_chat_enabled === true;
+  const legacyDailyGreetingEnabled = observeCfg.daily_greeting_enabled === true;
+  let resolvedProactiveLevel = "off";
+  if (proactiveEnabledCfg && proactiveLevelRaw === "off") {
+    resolvedProactiveLevel = "gentle";
+  } else if (proactiveEnabledCfg || proactiveLevelRaw !== "off") {
+    resolvedProactiveLevel = proactiveLevelRaw;
+  }
+  if (resolvedProactiveLevel === "off" && (legacyAutoChatEnabled || legacyDailyGreetingEnabled)) {
+    resolvedProactiveLevel = legacyAutoChatEnabled ? "gentle" : "quiet";
+  }
+  state.proactiveEnabled = resolvedProactiveLevel !== "off";
+  state.proactiveLevel = state.proactiveEnabled ? resolvedProactiveLevel : "off";
+  const proactivePreset = resolveProactivePreset(state.proactiveLevel);
+  const cooldownCfg = Number(proactiveCfg.cooldown_minutes);
+  const idleCfg = Number(proactiveCfg.idle_minutes);
+  state.proactiveCooldownMinutes = Number.isFinite(cooldownCfg)
+    ? Math.round(clampNumber(cooldownCfg, 1, 180))
+    : proactivePreset.cooldownMinutes;
+  state.proactiveIdleMinutes = Number.isFinite(idleCfg)
+    ? Math.round(clampNumber(idleCfg, 1, 180))
+    : proactivePreset.idleMinutes;
+  state.proactiveNightReminderEnabled = state.proactiveEnabled
+    && proactiveCfg.night_reminder_enabled === true;
+  state.dailyGreetingEnabled = state.proactiveEnabled && legacyDailyGreetingEnabled;
   state.dailyGreetingHour = Math.round(
     clampNumber(Number(observeCfg.daily_greeting_hour || 8), 0, 23)
   );
@@ -7941,9 +7993,14 @@ async function loadConfig() {
     || "请你像桌宠一样主动向我说早安，简短自然地问好，再给我一句鼓励今天认真努力的暖心鸡汤。控制在两三句内，不要太像模板。";
   // 主动说话：从 config 读取开关和随机间隔范围
   const prevAutoChatEnabled = state.autoChatEnabled;
-  state.autoChatEnabled = observeCfg.auto_chat_enabled === true;
-  state.autoChatMinMs = Math.max(60000, Number(observeCfg.auto_chat_min_ms || 180000));
-  state.autoChatMaxMs = Math.max(state.autoChatMinMs + 30000, Number(observeCfg.auto_chat_max_ms || 480000));
+  state.autoChatEnabled = state.proactiveEnabled;
+  if (state.autoChatEnabled) {
+    state.autoChatMinMs = proactivePreset.autoChatMinMs;
+    state.autoChatMaxMs = Math.max(state.autoChatMinMs + 30000, proactivePreset.autoChatMaxMs);
+  } else {
+    state.autoChatMinMs = Math.max(60000, Number(observeCfg.auto_chat_min_ms || 180000));
+    state.autoChatMaxMs = Math.max(state.autoChatMinMs + 30000, Number(observeCfg.auto_chat_max_ms || 480000));
+  }
   if (state.autoChatEnabled && !prevAutoChatEnabled) {
     startAutoChatLoop();
   } else if (!state.autoChatEnabled && prevAutoChatEnabled) {
@@ -10309,6 +10366,16 @@ function bindUI() {
   if (ui.autoChatBtn) {
     ui.autoChatBtn.addEventListener("click", () => {
       state.autoChatEnabled = !state.autoChatEnabled;
+      if (state.autoChatEnabled) {
+        if (!state.proactiveEnabled || state.proactiveLevel === "off") {
+          state.proactiveEnabled = true;
+          state.proactiveLevel = "gentle";
+        }
+      } else {
+        state.proactiveEnabled = false;
+        state.proactiveLevel = "off";
+        state.proactiveNightReminderEnabled = false;
+      }
       updateAutoChatButton();
       if (state.autoChatEnabled) {
         startAutoChatLoop();
