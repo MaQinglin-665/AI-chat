@@ -427,6 +427,8 @@
     const noviceModeField = getElement('noviceModeField');
     const noviceModeStatus = getElement('noviceModeStatus');
     const quickStartStatus = getElement('quickStartStatus');
+    const applyBeginnerSafePresetButton = getElement('applyBeginnerSafePresetBtn');
+    const beginnerSafePresetStatus = getElement('beginnerSafePresetStatus');
     const toast = getElement('toast');
 
     if (!form || !preview) {
@@ -2209,6 +2211,117 @@
       return sync;
     };
 
+    const initBeginnerSafePreset = () => {
+      if (!applyBeginnerSafePresetButton || !beginnerSafePresetStatus) {
+        return;
+      }
+
+      const safePresetUpdates = [
+        { path: 'tts.provider', value: 'browser' },
+        { path: 'observe.attach_mode', value: 'manual' },
+        { path: 'tools.enabled', value: false },
+        { path: 'tools.allow_shell', value: false }
+      ];
+
+      const applyPresetToForm = () => {
+        applyQuickFix({
+          updates: safePresetUpdates,
+          focusPath: 'tts.provider',
+          message: '已套用新手安全配置并刷新预览'
+        });
+        syncTtsModePreset();
+        syncTtsFieldVisibility();
+        syncQuickStartStatus();
+      };
+
+      setStatus(beginnerSafePresetStatus, '未套用新手安全配置。');
+      applyBeginnerSafePresetButton.addEventListener('click', async () => {
+        const acknowledged = window.confirm(
+          '将套用新手安全配置。若写入本地 config.json，系统会先自动备份当前 config.json（config.backup.*.json）。是否继续？'
+        );
+        if (!acknowledged) {
+          setStatus(beginnerSafePresetStatus, '已取消套用新手安全配置。', 'warn');
+          return;
+        }
+
+        applyPresetToForm();
+        setStatus(beginnerSafePresetStatus, '已套用到当前表单并更新实时 JSON 预览。', 'ok');
+
+        if (!supportsLocalWrite) {
+          setStatus(
+            beginnerSafePresetStatus,
+            '当前浏览器不支持直接写入本地 config.json。请下载配置后替换，并重载或重启桌宠。',
+            'warn'
+          );
+          return;
+        }
+
+        const shouldWriteNow = window.confirm(
+          '是否立即写入本地 config.json？写入前会自动备份当前 config.json。'
+        );
+        if (!shouldWriteNow) {
+          setStatus(
+            beginnerSafePresetStatus,
+            '已套用并更新预览。可稍后在“写入项目配置”或“一键应用配置”中落盘（自动备份），然后重载或重启。',
+            'ok'
+          );
+          return;
+        }
+
+        applyBeginnerSafePresetButton.disabled = true;
+        setStatus(beginnerSafePresetStatus, '正在写入本地 config.json（自动备份中）...', 'warn');
+        try {
+          const previewResult = await runPreviewDiffAction({
+            allowPickDirectory: true,
+            quiet: true,
+            skipValidation: true
+          });
+          if (!previewResult.ok) {
+            setStatus(
+              beginnerSafePresetStatus,
+              `写入前检查失败：${previewResult.message || '无法生成差异预览'}`,
+              'error'
+            );
+            showToast('新手安全配置写入中断');
+            return;
+          }
+
+          if (!previewResult.changed) {
+            setStatus(
+              beginnerSafePresetStatus,
+              '本地 config.json 已是新手安全配置。请点击“🚀 一键应用到运行中桌宠”或重启桌宠。',
+              'ok'
+            );
+            showToast('本地配置已是新手安全配置');
+            return;
+          }
+
+          const writeResult = await runWriteConfigAction({
+            quiet: true,
+            skipValidation: true
+          });
+          if (!writeResult.ok) {
+            setStatus(
+              beginnerSafePresetStatus,
+              `写入失败：${writeResult.message || '请检查目录权限后重试'}`,
+              'error'
+            );
+            showToast('新手安全配置写入失败');
+            return;
+          }
+
+          setStatus(
+            beginnerSafePresetStatus,
+            '已写入本地 config.json 并自动备份。请点击“🚀 一键应用到运行中桌宠”或重启桌宠。',
+            'ok'
+          );
+          showToast('新手安全配置已写入（已自动备份）');
+        } finally {
+          applyBeginnerSafePresetButton.disabled = false;
+        }
+      });
+    };
+
     const initNoviceMode = () => {
       const ADVANCED_SECTIONS_SELECTOR = '[data-advanced-section="true"]';
       const storageKey = 'taffy.config.novice_mode';
@@ -3286,6 +3399,7 @@
     initRuntimeApplier();
     initRuntimeRestarter();
     initProjectConfigWriter();
+    initBeginnerSafePreset();
     initOneClickApply();
     renderPreview();
     validateForm({ silent: false });
