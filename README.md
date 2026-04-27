@@ -77,6 +77,23 @@
 - `tts_ref/` 用于本地参考音频，避免提交私人语音样本
 - 工具执行默认关闭（`tools.enabled=false`，`tools.allow_shell=false`），按需开启
 
+## Windows 打包发布准备（当前状态）
+
+- 当前 `package.json` 已设置发布显示名：`productName = 馨语AI桌宠`
+- Electron 窗口标题、快捷方式名称已统一为“馨语AI桌宠”
+- 配置中心已包含发布前关键流程：`套用新手安全配置`、`确认写入 config.json（自动备份）`、`一键应用配置`、`一键应用到运行中桌宠`
+- 当前 npm scripts 仅有 `start:electron`，暂无 `build/pack` 类脚本；本次不强行引入复杂打包体系
+
+发布前建议确认本地运行目录不带入以下文件：
+
+- `config.json`
+- `config.local.backup.json`
+- `memory_profile.json`
+- `memory_relationship.json`
+- `memory_summary.json`
+- `__pycache__/`
+- `.pytest_cache/`
+
 ## 适合谁使用
 
 - 想搭建本地可控 AI 桌宠的开发者 / 折腾玩家
