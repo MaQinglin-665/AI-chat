@@ -12,6 +12,9 @@ web/generated_images/
 .mem0/
 models/
 memory_persona_card.json
+memory_profile.json
+memory_relationship.json
+memory_summary.json
 
 # Temporary audio files
 tmp_*.wav
