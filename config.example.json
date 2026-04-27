@@ -13,7 +13,7 @@
     "open_browser": false,
     "cors_allow_loopback": true,
     "cors_allowed_origins": [],
-    "require_api_token": false,
+    "require_api_token": true,
     "api_token_env": "TAFFY_API_TOKEN"
   },
   "desktop": {
@@ -40,10 +40,13 @@
     "reasoning_effort": ""
   },
   "tts": {
-    "provider": "gpt_sovits",
-    "voice": "default",
+    "provider": "browser",
+    "voice": "zh-CN-XiaoxiaoNeural",
     "voices": [
-      "default"
+      "zh-CN-XiaoxiaoNeural",
+      "zh-CN-XiaoyiNeural",
+      "zh-CN-YunxiNeural",
+      "zh-CN-YunjianNeural"
     ],
     "gpt_sovits_api_url": "http://127.0.0.1:9880/tts",
     "gpt_sovits_method": "POST",
@@ -58,10 +61,18 @@
     "gpt_sovits_prompt_text": "",
     "gpt_sovits_ref_audio_path": "",
     "gpt_sovits_fallback_ref_audio_path": "",
-    "gpt_sovits_top_k": 15,
-    "gpt_sovits_top_p": 0.8,
-    "gpt_sovits_temperature": 0.45,
-    "gpt_sovits_speed": 1.08,
+    "gpt_sovits_top_k": 8,
+    "gpt_sovits_top_p": 0.78,
+    "gpt_sovits_temperature": 0.36,
+    "gpt_sovits_speed": 1.02,
+    "gpt_sovits_repetition_penalty": 1.08,
+    "gpt_sovits_seed": 0,
+    "gpt_sovits_prefer_clean_prompt": true,
+    "gpt_sovits_chunk_max_candidates": 2,
+    "gpt_sovits_chunk_split_depth": 1,
+    "gpt_sovits_chunk_timeout_sec": 20,
+    "gpt_sovits_chunk_chars": 200,
+    "gpt_sovits_enable_global_retry": true,
     "stream_mode": "final_only",
     "speed_ratio": 1.04,
     "volume_ratio": 1,
@@ -158,7 +169,7 @@
     "expression_strength": 1
   },
   "tools": {
-    "enabled": true,
+    "enabled": false,
     "workspace_root": ".",
     "allow_shell": false,
     "shell_timeout_sec": 25,

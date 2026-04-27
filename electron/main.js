@@ -3,6 +3,7 @@ const { spawn, spawnSync } = require("child_process");
 const http = require("http");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const SERVER_HOST = "127.0.0.1";
@@ -361,6 +362,25 @@ function getPathEnvKey(envObject) {
 
 function buildPythonProcessEnv(pythonExecutable) {
   const env = { ...process.env };
+  const runtimeConfig = loadRuntimeConfig();
+  const serverCfg = runtimeConfig && typeof runtimeConfig === "object"
+    ? (runtimeConfig.server || {})
+    : {};
+  const apiTokenEnvName = String(serverCfg.api_token_env || "TAFFY_API_TOKEN").trim() || "TAFFY_API_TOKEN";
+  const releaseMode = !!app.isPackaged;
+  env.TAFFY_RELEASE_MODE = releaseMode ? "1" : "0";
+  if (releaseMode) {
+    const requireApiToken = serverCfg.require_api_token !== false;
+    const explicitToken = String(serverCfg.api_token || "").trim();
+    const envToken = String(env[apiTokenEnvName] || "").trim();
+    const envFileToken = String(readEnvFileVar(apiTokenEnvName) || "").trim();
+    if (requireApiToken && !explicitToken && !envToken && !envFileToken) {
+      const generatedToken = crypto.randomBytes(24).toString("hex");
+      env[apiTokenEnvName] = generatedToken;
+      process.env[apiTokenEnvName] = generatedToken;
+      logServerErr(`[Electron] Generated runtime API token for packaged mode (${apiTokenEnvName}).`);
+    }
+  }
   const pathKey = getPathEnvKey(env);
   const rawPath = String(env[pathKey] || "");
   const selected = String(pythonExecutable || "").replace(/\//g, "\\").toLowerCase();
