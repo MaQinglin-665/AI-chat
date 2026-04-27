@@ -98,6 +98,18 @@ jobs:
       - name: Run drag logic tests
         run: node tests/test_drag_logic.js
 
+      - name: Install docs dependencies
+        working-directory: docs
+        run: npm ci
+
+      - name: Install Playwright browser (Windows)
+        working-directory: docs
+        run: npx playwright install chromium
+
+      - name: Run docs smoke tests
+        working-directory: docs
+        run: npm run test:smoke
+
   docs-check:
     name: Docs Publish and Smoke
     runs-on: ubuntu-latest
@@ -118,8 +130,5 @@ jobs:
       - name: Install docs dependencies
         run: npm ci
 
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
-
-      - name: Run docs checks
-        run: npm run check:all
+      - name: Run docs publish checks
+        run: npm run check:publish
