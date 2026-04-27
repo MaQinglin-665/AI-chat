@@ -5,6 +5,10 @@
   "description": "Live2D desktop pet with local Python backend and transparent desktop window",
   "main": "electron/main.js",
   "scripts": {
+    "start": "npm run start:electron",
+    "dev": "npm run start:electron",
+    "check": "python scripts/check_python_syntax.py && python scripts/check_js_syntax.py && python scripts/check_secrets.py",
+    "test": "python -m pytest -q tests && node tests/test_drag_logic.js",
     "start:electron": "electron electron/main.js"
   },
   "devDependencies": {

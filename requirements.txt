@@ -1,5 +1,5 @@
-edge-tts
-mem0ai
-pywebview
-qdrant-client
-vosk
+edge-tts==7.2.8
+mem0ai==0.1.118
+pywebview==5.4
+qdrant-client==1.15.1
+vosk==0.3.45
