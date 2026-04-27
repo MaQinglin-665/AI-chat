@@ -14,6 +14,9 @@ const SERVER_ERR_LOG_PATH = path.join(ROOT_DIR, "server_err.log");
 const BACKEND_RESTART_EXIT_CODE = 75;
 const BACKEND_RESTART_DELAY_MS = 700;
 const BACKEND_RESTART_MAX_ATTEMPTS = 3;
+const BACKEND_DIAGNOSTIC_TAIL_LINES = 18;
+const BACKEND_DIAGNOSTIC_TAIL_CHARS = 2400;
+const AUTO_OPEN_DEVTOOLS = String(process.env.TAFFY_OPEN_DEVTOOLS || "").trim() === "1";
 
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 // Keep hardware acceleration ON by default for smoother Live2D animation.
@@ -40,6 +43,9 @@ let isAppQuitting = false;
 let backendFailureShown = false;
 let backendRestartAttempts = 0;
 let backendRestartTimer = null;
+let pythonSessionMeta = null;
+let backendRecentStdoutLines = [];
+let backendRecentStderrLines = [];
 const dragSessions = new Map();
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -108,6 +114,74 @@ function closePythonLogStreams() {
   }
 }
 
+function truncateTail(text, maxChars = BACKEND_DIAGNOSTIC_TAIL_CHARS) {
+  const safe = String(text || "");
+  if (!safe) {
+    return "";
+  }
+  if (safe.length <= maxChars) {
+    return safe;
+  }
+  return safe.slice(safe.length - maxChars);
+}
+
+function pushRecentBackendLines(target, chunk) {
+  if (!Array.isArray(target)) {
+    return;
+  }
+  const text = String(chunk || "");
+  if (!text) {
+    return;
+  }
+  const lines = text.replace(/\r/g, "").split("\n");
+  for (const rawLine of lines) {
+    const line = String(rawLine || "").trim();
+    if (!line) {
+      continue;
+    }
+    target.push(line);
+  }
+  if (target.length > BACKEND_DIAGNOSTIC_TAIL_LINES) {
+    target.splice(0, target.length - BACKEND_DIAGNOSTIC_TAIL_LINES);
+  }
+}
+
+function resetBackendRecentBuffers() {
+  backendRecentStdoutLines = [];
+  backendRecentStderrLines = [];
+}
+
+function getBackendRecentOutputSummary() {
+  const parts = [];
+  if (backendRecentStderrLines.length) {
+    parts.push(
+      `[recent stderr]\n${truncateTail(backendRecentStderrLines.join("\n"))}`
+    );
+  }
+  if (backendRecentStdoutLines.length) {
+    parts.push(
+      `[recent stdout]\n${truncateTail(backendRecentStdoutLines.join("\n"))}`
+    );
+  }
+  return parts.join("\n\n").trim();
+}
+
+function buildBackendExitDiagnostic(code, signal) {
+  const nowMs = Date.now();
+  const meta = pythonSessionMeta || {};
+  const startedAtMs = Number(meta.startedAtMs || 0);
+  const uptimeMs = startedAtMs > 0 ? Math.max(0, nowMs - startedAtMs) : 0;
+  const lines = [
+    `[Electron] Python process exited (code=${code === null ? "null" : code}, signal=${signal || "none"})`,
+    `[Electron] Backend session pid=${meta.pid || "unknown"}, started_at=${meta.startedAtIso || "unknown"}, uptime_ms=${uptimeMs}, executable=${meta.pythonExecutable || "unknown"}`,
+  ];
+  const recent = getBackendRecentOutputSummary();
+  if (recent) {
+    lines.push(recent);
+  }
+  return lines.join("\n");
+}
+
 function loadRuntimeConfig() {
   try {
     if (!fs.existsSync(CONFIG_PATH)) {
@@ -124,6 +198,49 @@ function loadRuntimeConfig() {
   }
 }
 
+function readEnvFileVar(name) {
+  const key = String(name || "").trim();
+  if (!key) {
+    return "";
+  }
+  const envPath = path.join(ROOT_DIR, ".env");
+  try {
+    if (!fs.existsSync(envPath)) {
+      return "";
+    }
+    const raw = fs.readFileSync(envPath, "utf8");
+    const lines = String(raw || "").split(/\r?\n/);
+    for (const line of lines) {
+      const text = String(line || "").trim();
+      if (!text || text.startsWith("#")) {
+        continue;
+      }
+      const normalized = text.startsWith("export ") ? text.slice(7).trim() : text;
+      const idx = normalized.indexOf("=");
+      if (idx <= 0) {
+        continue;
+      }
+      const k = normalized.slice(0, idx).trim();
+      if (k !== key) {
+        continue;
+      }
+      let value = normalized.slice(idx + 1).trim();
+      if (
+        (value.startsWith("\"") && value.endsWith("\""))
+        || (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      return value.trim();
+    }
+  } catch (err) {
+    logServerErr(
+      `[Electron] Failed to read .env for ${key}: ${err && err.stack ? err.stack : String(err)}`
+    );
+  }
+  return "";
+}
+
 function resolveRuntimeApiToken() {
   const cfg = loadRuntimeConfig();
   const serverCfg = cfg && typeof cfg === "object" ? (cfg.server || {}) : {};
@@ -132,7 +249,11 @@ function resolveRuntimeApiToken() {
   if (directToken) {
     return directToken;
   }
-  return String(process.env[envName] || "").trim();
+  const envToken = String(process.env[envName] || "").trim();
+  if (envToken) {
+    return envToken;
+  }
+  return readEnvFileVar(envName);
 }
 
 function parsePythonVersion(versionOutput) {
@@ -292,7 +413,7 @@ function buildPythonProcessEnv(pythonExecutable) {
 
 function buildBackendCrashMessage(codeLabel, extraMessage = "") {
   let message =
-    `Taffy 后端意外退出 (code: ${codeLabel})\n` +
+    `馨语Ai桌宠后端意外退出 (code: ${codeLabel})\n` +
     "请查看 server_err.log 了解详情。\n\n" +
     "常见原因：Python 版本不匹配、缺少依赖库。";
   if (extraMessage) {
@@ -304,7 +425,7 @@ function buildBackendCrashMessage(codeLabel, extraMessage = "") {
 function reportBackendFatal(message) {
   if (!backendFailureShown) {
     backendFailureShown = true;
-    dialog.showErrorBox("Taffy 后端错误", message);
+    dialog.showErrorBox("馨语Ai桌宠后端错误", message);
   }
   if (!isAppQuitting) {
     isAppQuitting = true;
@@ -324,10 +445,12 @@ function scheduleBackendRestart(reasonLabel = "runtime-restart") {
     return;
   }
   if (backendRestartAttempts >= BACKEND_RESTART_MAX_ATTEMPTS) {
+    const reasonText = `Backend restart exceeded ${BACKEND_RESTART_MAX_ATTEMPTS} attempts. Check server_err.log.`;
+    const recent = getBackendRecentOutputSummary();
     reportBackendFatal(
       buildBackendCrashMessage(
         reasonLabel,
-        `后端重启尝试超过 ${BACKEND_RESTART_MAX_ATTEMPTS} 次，请检查 server_err.log。`
+        recent ? `${reasonText}\n${recent}` : reasonText
       )
     );
     return;
@@ -350,7 +473,9 @@ function scheduleBackendRestart(reasonLabel = "runtime-restart") {
       logServerErr("[Electron] Backend restart completed.");
     } catch (err) {
       const detail = err && err.stack ? err.stack : String(err);
-      reportBackendFatal(buildBackendCrashMessage("restart-failed", detail));
+      const recent = getBackendRecentOutputSummary();
+      const merged = recent ? `${detail}\n${recent}` : detail;
+      reportBackendFatal(buildBackendCrashMessage("restart-failed", merged));
     }
   }, BACKEND_RESTART_DELAY_MS);
 }
@@ -629,6 +754,8 @@ function startPythonServer() {
   if (pythonProc) {
     return;
   }
+  resetBackendRecentBuffers();
+  pythonSessionMeta = null;
   const runtimeConfig = loadRuntimeConfig();
   const pythonExecutable = resolvePythonExecutable(runtimeConfig);
   const pythonEnv = buildPythonProcessEnv(pythonExecutable);
@@ -642,12 +769,24 @@ function startPythonServer() {
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
+  pythonSessionMeta = {
+    pid: pythonProc && typeof pythonProc.pid === "number" ? pythonProc.pid : null,
+    startedAtMs: Date.now(),
+    startedAtIso: new Date().toISOString(),
+    pythonExecutable,
+  };
 
   if (pythonProc.stdout && pythonStdoutStream) {
     pythonProc.stdout.pipe(pythonStdoutStream, { end: false });
+    pythonProc.stdout.on("data", (chunk) => {
+      pushRecentBackendLines(backendRecentStdoutLines, chunk);
+    });
   }
   if (pythonProc.stderr && pythonStderrStream) {
     pythonProc.stderr.pipe(pythonStderrStream, { end: false });
+    pythonProc.stderr.on("data", (chunk) => {
+      pushRecentBackendLines(backendRecentStderrLines, chunk);
+    });
   }
 
   pythonProc.on("error", (err) => {
@@ -662,9 +801,7 @@ function startPythonServer() {
   });
 
   pythonProc.on("exit", (code, signal) => {
-    logServerErr(
-      `[Electron] Python process exited (code=${code === null ? "null" : code}, signal=${signal || "none"})`
-    );
+    logServerErr(buildBackendExitDiagnostic(code, signal));
     pythonProc = null;
     closePythonLogStreams();
     if (isAppQuitting) {
@@ -674,10 +811,18 @@ function startPythonServer() {
       scheduleBackendRestart("runtime-restart");
       return;
     }
-    if ((typeof code === "number" && code !== 0) || signal) {
-      const codeLabel =
-        typeof code === "number" ? String(code) : signal ? `signal:${signal}` : "unknown";
-      reportBackendFatal(buildBackendCrashMessage(codeLabel));
+    if (!signal && typeof code === "number" && code !== 0) {
+      scheduleBackendRestart(`unexpected-exit-${code}`);
+      return;
+    }
+    if (signal) {
+      scheduleBackendRestart(`unexpected-signal-${signal}`);
+      return;
+    }
+    if (typeof code === "number" && code !== 0) {
+      const codeLabel = String(code);
+      const detail = getBackendRecentOutputSummary();
+      reportBackendFatal(buildBackendCrashMessage(codeLabel, detail));
     }
   });
 }
@@ -742,7 +887,9 @@ function createModelWindow() {
       } catch (_) {}
     }
   });
-  modelWindow.webContents.openDevTools({ mode: "detach" });
+  if (AUTO_OPEN_DEVTOOLS) {
+    modelWindow.webContents.openDevTools({ mode: "detach" });
+  }
   modelWindow.on("close", () => saveWindowStateNow());
   modelWindow.on("closed", () => {
     modelWindowReady = false;
@@ -796,7 +943,9 @@ function createChatWindow() {
       // ignore
     }
   });
-  chatWindow.webContents.openDevTools({ mode: "detach" });
+  if (AUTO_OPEN_DEVTOOLS) {
+    chatWindow.webContents.openDevTools({ mode: "detach" });
+  }
   chatWindow.on("move", () => scheduleSaveWindowState(120));
   chatWindow.on("resize", () => scheduleSaveWindowState(120));
   chatWindow.on("close", () => saveWindowStateNow());

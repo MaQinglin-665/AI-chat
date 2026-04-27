@@ -38,10 +38,23 @@
 
 ## 需要配置哪些东西
 
+- 首次推荐先打开配置中心中的“首次启动向导”，按步骤完成模式选择、LLM/TTS 测试与保存
 - 必配：`model_path`（Live2D 模型路径）
 - 至少选一项 LLM：`ollama` 或 `openai`（若用 OpenAI 需配置 `OPENAI_API_KEY`）
 - 至少选一项 TTS：默认 `gpt_sovits`（可换 `edge_tts` / `browser`）
 - 推荐：把密钥放到环境变量或 `.env`，不要明文写入仓库文件
+
+向导完成后会写入：
+
+```json
+{
+  "onboarding_completed": true
+}
+```
+
+该字段用于避免首次向导重复弹出；旧配置文件未包含该字段时会自动兼容，不影响原有使用。
+
+如需重新进入引导流程：打开 `docs/config.html`，在“快速开始”区域点击“重新打开首次启动向导”。
 
 ## 正在开发 / 持续优化
 
@@ -241,6 +254,41 @@ start_desktop.bat
 - CORS allows loopback origins by default (`localhost` / `127.0.0.1`), not arbitrary websites.
 - Window position and size are auto-saved in Electron mode and restored on next launch.
 
+## 常见问题排查
+
+以下错误现在会在界面中给出中文诊断（包含“问题原因 / 解决方法 / 对应配置项”），控制台保留脱敏后的详细日志：
+
+1. API Key 未填写  
+   - 对应配置项：`llm.api_key_env`
+   - 建议：先设置环境变量，再重启桌宠或触发配置重载。
+2. LLM 连接失败  
+   - 对应配置项：`llm.base_url`
+   - 建议：确认模型服务已启动，地址与端口正确。
+3. Ollama 未启动  
+   - 对应配置项：`llm.base_url`
+   - 建议：先启动 Ollama（可执行 `ollama serve`）。
+4. 模型名称不存在  
+   - 对应配置项：`llm.model`
+   - 建议：改为已安装模型，或先执行 `ollama pull <model>`。
+5. GPT-SoVITS 服务未启动  
+   - 对应配置项：`tts.gpt_sovits_api_url`
+   - 建议：确认 GPT-SoVITS 服务与端口可用。
+6. TTS 请求超时  
+   - 对应配置项：`tts.gpt_sovits_timeout_sec`
+   - 建议：提高超时配置，或降低服务负载后再试。
+7. Live2D 路径错误  
+   - 对应配置项：`model_path`
+   - 建议：指向真实的 `.model3.json` 文件，不要保留示例占位路径。
+8. `config.json` 格式错误  
+   - 对应配置项：`config.json`
+   - 建议：检查逗号、引号、括号与 JSON 顶层结构。
+9. 端口被占用  
+   - 对应配置项：`server.port`
+   - 建议：关闭占用进程或改用其他端口后重启。
+10. 网络连接失败  
+    - 对应配置项：`llm.base_url` / `tts.gpt_sovits_api_url`
+    - 建议：检查网络、代理和 DNS 配置。
+
 ## 6) Chat Commands
 
 In chat input, you can use:
@@ -287,6 +335,15 @@ python -m http.server 5500
 然后访问：
 - `http://127.0.0.1:5500/config.html`
 - `http://127.0.0.1:5500/index.html`
+- `http://127.0.0.1:5500/persona.html`
+
+### Persona Card
+
+- Page: `docs/persona.html`
+- Editable fields: character name, user alias, personality tags, speaking style, catchphrases, likes, dislikes, initiative level, relationship role.
+- Supports JSON import and JSON export.
+- Saving writes to `memory_persona_card.json`, and the next chat round reads the updated persona.
+- Legacy keys remain compatible (`identity`, `user_preferences`, `user_dislikes`, `common_topics`, `reply_style`, `companionship_style`).
 
 统一发布流程（与首页/配置页文案一致）：
 1. 在配置中心执行“配置连通性自检”并处理告警/错误。

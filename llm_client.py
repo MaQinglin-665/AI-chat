@@ -1,5 +1,8 @@
 import json
 import os
+import time
+import socket
+import http.client
 import urllib.error
 import urllib.request
 
@@ -22,21 +25,47 @@ def http_post_json(url, payload, headers=None, timeout=60):
     if headers:
         req_headers.update(headers)
 
-    req = urllib.request.Request(
-        url=url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=req_headers,
-        method="POST",
-    )
+    # Retry transient upstream/network failures to reduce visible chat errors.
+    # This is especially useful for proxy relays that occasionally close sockets.
+    attempts = 3
+    body = ""
+    last_exc = None
+    for attempt in range(1, attempts + 1):
+        req = urllib.request.Request(
+            url=url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=req_headers,
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                body = resp.read().decode("utf-8")
+                last_exc = None
+                break
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="ignore")
+            retryable = exc.code in {408, 409, 425, 429} or 500 <= int(exc.code) < 600
+            if retryable and attempt < attempts:
+                time.sleep(0.8 * attempt)
+                continue
+            raise RuntimeError(f"LLM HTTP {exc.code}: {detail}") from exc
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            socket.timeout,
+            http.client.RemoteDisconnected,
+            ConnectionResetError,
+            BrokenPipeError,
+            OSError,
+        ) as exc:
+            last_exc = exc
+            if attempt < attempts:
+                time.sleep(0.8 * attempt)
+                continue
+            raise RuntimeError(f"LLM connection failed: {exc}") from exc
 
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8")
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"LLM HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"LLM connection failed: {exc}") from exc
+    if last_exc is not None:
+        raise RuntimeError(f"LLM connection failed: {last_exc}")
 
     try:
         data = json.loads(body)

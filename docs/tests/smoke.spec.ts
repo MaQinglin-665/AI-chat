@@ -1,9 +1,9 @@
-﻿import { expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('首页核心区加载正常', async ({ page }) => {
   await page.goto('/index.html');
-  await expect(page).toHaveTitle(/Taffy/);
-  await expect(page.locator('#hero .hero-title')).toHaveText(/Taffy · AI 桌宠/);
+  await expect(page).toHaveTitle(/馨语Ai桌宠/);
+  await expect(page.locator('#hero .hero-title')).toHaveText(/馨语Ai桌宠/);
   await expect(page.locator('.feature-card')).toHaveCount(6);
   const changelogCount = await page.locator('#changelog .timeline li').count();
   expect(changelogCount).toBeGreaterThanOrEqual(8);

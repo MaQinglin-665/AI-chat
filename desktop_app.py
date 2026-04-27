@@ -180,7 +180,7 @@ def main():
         return 0
 
     main_window = webview.create_window(
-        title="AI Desktop Pet",
+        title="馨语Ai桌宠",
         url=window_url,
         js_api=bridge,
         width=options["width"],

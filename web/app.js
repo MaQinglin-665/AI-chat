@@ -22,6 +22,25 @@ const state = {
   autoChatMaxMs: 480000,
   autoChatTimer: 0,
   lastAutoChatAt: 0,
+  autoChatLastReason: "",
+  autoChatLastTopicHint: "",
+  autoChatLastTopicAt: 0,
+  autoChatBurstCount: 0,
+  autoChatTuning: {
+    triggerBaseThreshold: 1.03,
+    shortSilencePenalty: 0.35,
+    longSilenceBonus: 0.14,
+    emotionBonus: 0.12,
+    repeatReasonPenalty: 0.44,
+    repeatTopicPenalty: 0.48,
+    burstPenalty: 0.32,
+    recentAutoPenalty: 0.45,
+    scoreJitter: 0.12,
+    repeatReasonWindowMs: 14 * 60 * 1000,
+    repeatTopicWindowMs: 22 * 60 * 1000,
+    burstResetWindowMs: 18 * 60 * 1000,
+    maxTopicHintChars: 42
+  },
   lastUserMessageAt: Date.now(),
   chatTranslationVisible: true,
   chatBusy: false,
@@ -48,6 +67,11 @@ const state = {
   subtitleId: 0,
   subtitleHideTimer: 0,
   subtitlePageTimer: 0,
+  subtitleEnabled: true,
+  subtitlePositionCustom: false,
+  subtitlePositionRatioX: 0.5,
+  subtitlePositionRatioY: 0.75,
+  subtitleDragPointerId: 0,
   ttsLastGoodVoiceName: "",
   streamSpeakEnabled: true,
   streamSpeakMode: "realtime",
@@ -199,6 +223,7 @@ const state = {
   wakeRestartTimer: 0,
   wakeCooldownUntil: 0,
   personaCard: null,
+  assistantAvatarUrl: "",
   reminders: [],
   reminderSeq: 1,
   reminderTimer: 0,
@@ -227,14 +252,35 @@ const state = {
   layoutWidth: 0,
   layoutHeight: 0,
   pendingAttachments: [],
-  attachmentReadBusy: false
+  attachmentReadBusy: false,
+  onboardingStepIndex: 0,
+  onboardingSeen: false
 };
 window.__petState = state;
 
 const ui = {
   status: document.getElementById("status"),
   assistantName: document.getElementById("assistant-name"),
+  heroAvatarImg: document.getElementById("hero-avatar-img"),
+  translationChipBtn: document.getElementById("translation-chip-btn"),
   translationToggleBtn: document.getElementById("translation-toggle-btn"),
+  subtitleToggleBtn: document.getElementById("subtitle-toggle-btn"),
+  moreBtn: document.getElementById("more-btn"),
+  helpBtn: document.getElementById("help-btn"),
+  helpModal: document.getElementById("help-modal"),
+  helpCloseBtn: document.getElementById("help-close-btn"),
+  helpOpenOnboardingBtn: document.getElementById("help-open-onboarding-btn"),
+  onboardingModal: document.getElementById("onboarding-modal"),
+  onboardingSkipBtn: document.getElementById("onboarding-skip-btn"),
+  onboardingPrevBtn: document.getElementById("onboarding-prev-btn"),
+  onboardingNextBtn: document.getElementById("onboarding-next-btn"),
+  onboardingDoneBtn: document.getElementById("onboarding-done-btn"),
+  onboardingStepIndex: document.getElementById("onboarding-step-index"),
+  onboardingProgressBar: document.getElementById("onboarding-progress-bar"),
+  onboardingStepTitle: document.getElementById("onboarding-step-title"),
+  onboardingStepDesc: document.getElementById("onboarding-step-desc"),
+  onboardingStepTip: document.getElementById("onboarding-step-tip"),
+  advancedActions: document.getElementById("advanced-actions"),
   chatLog: document.getElementById("chat-log"),
   attachmentPreview: document.getElementById("attachment-preview"),
   chatInput: document.getElementById("chat-input"),
@@ -262,7 +308,13 @@ const ui = {
   scheduleSaveBtn: document.getElementById("schedule-save-btn"),
   scheduleList: document.getElementById("schedule-list"),
   personaModal: document.getElementById("persona-modal"),
+  personaPreviewBtn: document.getElementById("persona-preview-btn"),
   personaCloseBtn: document.getElementById("persona-close-btn"),
+  personaAvatarPreview: document.getElementById("persona-avatar-preview"),
+  personaAvatarInput: document.getElementById("persona-avatar-input"),
+  personaAvatarChangeBtn: document.getElementById("persona-avatar-change-btn"),
+  personaAvatarResetBtn: document.getElementById("persona-avatar-reset-btn"),
+  personaApplyBtn: document.getElementById("persona-apply-btn"),
   personaIdentity: document.getElementById("persona-identity"),
   personaPreferences: document.getElementById("persona-preferences"),
   personaDislikes: document.getElementById("persona-dislikes"),
@@ -294,7 +346,12 @@ const ui = {
   learningReviewList: document.getElementById("learning-review-list"),
   learningQuickInject: document.getElementById("learning-quick-inject"),
   learningQuickSupport: document.getElementById("learning-quick-support"),
-  learningQuickApplyBtn: document.getElementById("learning-quick-apply-btn")
+  learningQuickApplyBtn: document.getElementById("learning-quick-apply-btn"),
+  subtitleLayer: document.getElementById("subtitle-layer"),
+  subtitleDragHandle: document.getElementById("subtitle-drag-handle"),
+  personaImportTemplateBtn: document.querySelector(".persona-footer-actions .persona-ghost-btn:nth-of-type(1)"),
+  personaRandomBtn: document.querySelector(".persona-footer-actions .persona-ghost-btn:nth-of-type(2)"),
+  personaResetBtn: document.querySelector(".persona-footer-actions .persona-ghost-btn:nth-of-type(3)")
 };
 
 const learningReviewState = {
@@ -327,6 +384,9 @@ const EMOTION_STORAGE_KEY = "taffy_emotion_stats_v1";
 const DAILY_GREETING_STORAGE_KEY = "taffy_daily_greeting_v1";
 const CHAT_HISTORY_STORAGE_KEY = "taffy_chat_history_v2";
 const CHAT_TRANSLATION_VISIBILITY_STORAGE_KEY = "taffy_chat_translation_visible_v1";
+const SUBTITLE_ENABLED_STORAGE_KEY = "taffy_subtitle_enabled_v1";
+const SUBTITLE_POSITION_STORAGE_KEY = "taffy_subtitle_position_v1";
+const ONBOARDING_SEEN_STORAGE_KEY = "taffy_onboarding_seen_v1";
 const MAX_CHAT_HISTORY_RECORDS = 240;
 const TOOL_META_MARKER = "[[TAFFY_TOOL_META]]";
 const API_TOKEN_STORAGE_KEYS = ["taffy_api_token", "TAFFY_API_TOKEN"];
@@ -340,22 +400,83 @@ const PERSONA_CARD_DEFAULT = {
   companionship_style: "",
   updated_at: ""
 };
+const ASSISTANT_AVATAR_STORAGE_KEY = "taffy_assistant_avatar_v1";
+const ASSISTANT_AVATAR_DEFAULT = "./assets/assistant_avatar_ref.png?v=2";
+const ASSISTANT_AVATAR_MAX_BYTES = 4 * 1024 * 1024;
+const ONBOARDING_STEPS = [
+  {
+    title: "先打个招呼",
+    desc: "在输入框里发一句话，按 Enter 就可以开始聊天。",
+    tip: "建议先聊一句简单近况，桌宠会更快进入状态。"
+  },
+  {
+    title: "试试开麦",
+    desc: "点击“开麦”后直接说话，也可以用 Ctrl+M 快捷切换。",
+    tip: "如果第一次失败，先允许麦克风权限再重试。"
+  },
+  {
+    title: "安排日程",
+    desc: "打开“日程”添加提醒，让桌宠在合适时间主动找你。",
+    tip: "可用于提醒休息、复盘、或定时触发工具任务。"
+  },
+  {
+    title: "完善人设",
+    desc: "到“更多 > 人设卡”补充偏好，让回复更贴近你。",
+    tip: "改完记得点击保存或应用，后续对话会逐步生效。"
+  }
+];
 
-function readApiTokenFromStorage() {
+function persistApiToken(token) {
+  const safe = String(token || "").trim();
+  if (!safe) {
+    return;
+  }
+  for (const key of API_TOKEN_STORAGE_KEYS) {
+    try {
+      localStorage.setItem(key, safe);
+    } catch (_) {
+      // ignore storage failures
+    }
+  }
+  try {
+    window.__TAFFY_API_TOKEN = safe;
+  } catch (_) {
+    // ignore
+  }
+}
+
+function clearPersistedApiToken() {
+  for (const key of API_TOKEN_STORAGE_KEYS) {
+    try {
+      localStorage.removeItem(key);
+    } catch (_) {
+      // ignore storage failures
+    }
+  }
+  try {
+    if (window.__TAFFY_API_TOKEN) {
+      window.__TAFFY_API_TOKEN = "";
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+function readApiTokenFromQuery() {
   try {
     const query = new URLSearchParams(window.location.search || "");
     const queryToken = String(query.get("api_token") || "").trim();
     if (queryToken) {
-      try {
-        localStorage.setItem(API_TOKEN_STORAGE_KEYS[0], queryToken);
-      } catch (_) {
-        // ignore storage failures
-      }
+      persistApiToken(queryToken);
       return queryToken;
     }
   } catch (_) {
     // ignore
   }
+  return "";
+}
+
+function readApiTokenFromStorage() {
   for (const key of API_TOKEN_STORAGE_KEYS) {
     try {
       const value = String(localStorage.getItem(key) || "").trim();
@@ -366,34 +487,54 @@ function readApiTokenFromStorage() {
       // ignore storage failures
     }
   }
-  const globalToken = String(window.__TAFFY_API_TOKEN || "").trim();
-  if (globalToken) {
-    return globalToken;
-  }
   return "";
 }
 
-async function resolveApiToken() {
+function readApiTokenFromGlobal() {
+  return String(window.__TAFFY_API_TOKEN || "").trim();
+}
+
+async function readApiTokenFromRuntime() {
+  if (!window.electronAPI || typeof window.electronAPI.getApiToken !== "function") {
+    return "";
+  }
+  try {
+    return String(await window.electronAPI.getApiToken() || "").trim();
+  } catch (_) {
+    return "";
+  }
+}
+
+async function resolveApiToken(forceRefresh = false) {
+  if (forceRefresh) {
+    _apiTokenPromise = null;
+  }
   if (_apiTokenPromise) {
     return _apiTokenPromise;
   }
   _apiTokenPromise = (async () => {
+    const queryToken = readApiTokenFromQuery();
+    if (queryToken) {
+      return queryToken;
+    }
+    // Prefer runtime token from Electron/main process, so stale localStorage does not override it.
+    const runtimeToken = await readApiTokenFromRuntime();
+    if (runtimeToken) {
+      persistApiToken(runtimeToken);
+      return runtimeToken;
+    }
     let token = readApiTokenFromStorage();
-    if (!token && window.electronAPI && typeof window.electronAPI.getApiToken === "function") {
-      try {
-        token = String(await window.electronAPI.getApiToken() || "").trim();
-      } catch (_) {
-        token = "";
-      }
-    }
     if (token) {
-      try {
-        localStorage.setItem(API_TOKEN_STORAGE_KEYS[0], token);
-      } catch (_) {
-        // ignore storage failures
-      }
+      persistApiToken(token);
+      return token;
     }
-    return token;
+    token = readApiTokenFromGlobal();
+    if (token) {
+      persistApiToken(token);
+      return token;
+    }
+    clearPersistedApiToken();
+    return "";
   })();
   return _apiTokenPromise;
 }
@@ -412,19 +553,54 @@ async function authFetch(input, init = {}) {
   if (!isApiRequestTarget(input)) {
     return fetch(input, init);
   }
-  const token = await resolveApiToken();
-  if (!token) {
-    return fetch(input, init);
-  }
+
   const baseInit = init && typeof init === "object" ? { ...init } : {};
   const inheritedHeaders = input instanceof Request ? input.headers : undefined;
-  const headers = new Headers(baseInit.headers || inheritedHeaders || {});
-  if (!headers.has("X-Taffy-Token") && !headers.has("Authorization")) {
-    headers.set("X-Taffy-Token", token);
+  const firstToken = String(await resolveApiToken()).trim();
+  const firstHeaders = new Headers(baseInit.headers || inheritedHeaders || {});
+  if (firstToken && !firstHeaders.has("X-Taffy-Token") && !firstHeaders.has("Authorization")) {
+    firstHeaders.set("X-Taffy-Token", firstToken);
   }
-  return fetch(input, { ...baseInit, headers });
+  let retrySeedRequest = null;
+  let firstRequest = input;
+  let firstFetchInit = { ...baseInit, headers: firstHeaders };
+  if (input instanceof Request) {
+    try {
+      retrySeedRequest = input.clone();
+    } catch (_) {
+      retrySeedRequest = null;
+    }
+    firstRequest = new Request(input, firstFetchInit);
+    firstFetchInit = undefined;
+  }
+  const firstResp = await fetch(firstRequest, firstFetchInit);
+  if (firstResp.status !== 401) {
+    return firstResp;
+  }
+
+  const refreshedToken = await resolveApiToken(true);
+  const nextToken = String(refreshedToken || "").trim();
+  if (!nextToken || nextToken === firstToken) {
+    return firstResp;
+  }
+
+  const retryHeaders = new Headers(baseInit.headers || inheritedHeaders || {});
+  if (!retryHeaders.has("X-Taffy-Token") && !retryHeaders.has("Authorization")) {
+    retryHeaders.set("X-Taffy-Token", nextToken);
+  }
+  if (input instanceof Request) {
+    if (!retrySeedRequest) {
+      return firstResp;
+    }
+    try {
+      const retryRequest = new Request(retrySeedRequest, { ...baseInit, headers: retryHeaders });
+      return fetch(retryRequest);
+    } catch (_) {
+      return firstResp;
+    }
+  }
+  return fetch(input, { ...baseInit, headers: retryHeaders });
 }
-const AUTO_CHAT_MODES = ["brainstorm", "dig_memory", "silence_comment"];
 const AUTO_CHAT_MIN_USER_GAP_MS = 90 * 1000;
 const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = 120 * 1000;
 const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = 4 * 60 * 1000;
@@ -432,6 +608,40 @@ const AUTO_CHAT_EMO_RE = /(难受|难过|焦虑|压力|累|困|崩溃|失眠|emo
 const AUTO_CHAT_MIRROR_RE = /(你呢|那你呢|你会|你想|你觉得|那你|你自己)/i;
 const AUTO_CHAT_TOPIC_RE = /(项目|考试|工作|学习|代码|模型|部署|计划|进度|复盘|目标)/i;
 const AUTO_CHAT_ASK_RE = /[?？]\s*$/;
+const AUTO_CHAT_OPEN_LOOP_RE = /(待会|稍后|回头|明天|下次|之后|再聊|先这样|先不|以后)/i;
+const AUTO_CHAT_BRIEF_REPLY_RE = /^(嗯|哦|好|行|ok|收到|知道了|先这样|回头说)$/i;
+const AUTO_CHAT_REPEAT_REASON_WINDOW_MS = 14 * 60 * 1000;
+const AUTO_CHAT_REPEAT_TOPIC_WINDOW_MS = 22 * 60 * 1000;
+const AUTO_CHAT_BURST_RESET_WINDOW_MS = 18 * 60 * 1000;
+const AUTO_CHAT_REASON_PRIORITY = [
+  "emotion_signal",
+  "open_loop",
+  "followup_pending",
+  "brief_ack_drop",
+  "mirror_question",
+  "topic_hot",
+  "long_silence",
+  "mid_silence",
+  "deep_talk_pause"
+];
+const AUTO_CHAT_REASON_HINTS = {
+  emotion_signal: "用户状态看起来不太好，给一句带温度的接话。",
+  open_loop: "用户留了个没收口的话头，轻轻续一下。",
+  followup_pending: "上一轮你抛过问题，现在自然接上，不重开场。",
+  brief_ack_drop: "用户刚才只简短应了一句，把话题接回来一点点。",
+  mirror_question: "用户把问题反问给你，先给你的态度，再顺手延一句。",
+  topic_hot: "抓住刚聊过的点，补一句有观点的话。",
+  long_silence: "安静有点久了，像突然想到一样冒一句。",
+  mid_silence: "沉默了一阵，用自然口吻轻触一下。",
+  deep_talk_pause: "刚才聊得不浅，顺着停顿补一句。"
+};
+const AUTO_CHAT_STYLE_NOTES = [
+  "像突然想到就开口，轻一点，不解释。",
+  "偏口语，像真人碎碎念，不端着。",
+  "短句优先，收尾别太正式。",
+  "带一点点态度，但别像说教。",
+  "可以有轻微跳跃感，别写成任务通知。"
+];
 const WAITING_VOICE_HINTS = [
   "我在想，马上回你。",
   "我在组织一下语言，马上好。",
@@ -995,13 +1205,37 @@ function saveChatTranslationVisibilityToStorage() {
 }
 
 function updateTranslationToggleButton() {
-  if (!ui.translationToggleBtn) {
-    return;
-  }
   const visible = state.chatTranslationVisible !== false;
-  ui.translationToggleBtn.classList.toggle("is-off", !visible);
-  ui.translationToggleBtn.setAttribute("aria-pressed", visible ? "true" : "false");
-  ui.translationToggleBtn.setAttribute("title", visible ? "隐藏中文翻译" : "显示中文翻译");
+  if (ui.translationToggleBtn) {
+    ui.translationToggleBtn.classList.toggle("is-off", !visible);
+    ui.translationToggleBtn.setAttribute("aria-pressed", visible ? "true" : "false");
+    ui.translationToggleBtn.setAttribute("title", visible ? "隐藏会话翻译" : "显示会话翻译");
+    ui.translationToggleBtn.textContent = visible ? "翻译  开" : "翻译  关";
+  }
+  if (ui.translationChipBtn) {
+    ui.translationChipBtn.classList.toggle("is-off", !visible);
+    ui.translationChipBtn.setAttribute("aria-pressed", visible ? "true" : "false");
+    ui.translationChipBtn.setAttribute("title", visible ? "隐藏会话翻译" : "显示会话翻译");
+    ui.translationChipBtn.textContent = visible ? "会话翻译已显示" : "会话翻译已收起";
+  }
+}
+
+function toggleChatTranslationVisibility() {
+  state.chatTranslationVisible = !state.chatTranslationVisible;
+  applyChatTranslationVisibility();
+  saveChatTranslationVisibilityToStorage();
+  setStatus(state.chatTranslationVisible ? "会话翻译已显示" : "会话翻译已收起");
+}
+
+function setAdvancedActionsExpanded(expanded) {
+  const open = !!expanded;
+  if (ui.advancedActions) {
+    ui.advancedActions.hidden = !open;
+  }
+  if (ui.moreBtn) {
+    ui.moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    ui.moreBtn.textContent = open ? "收起" : "更多";
+  }
 }
 
 function applyChatTranslationVisibility() {
@@ -1026,6 +1260,295 @@ function loadChatTranslationVisibilityFromStorage() {
   }
   state.chatTranslationVisible = visible;
   applyChatTranslationVisibility();
+}
+
+function saveSubtitleEnabledToStorage() {
+  if (!window.localStorage) {
+    return;
+  }
+  try {
+    localStorage.setItem(SUBTITLE_ENABLED_STORAGE_KEY, state.subtitleEnabled ? "1" : "0");
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function loadSubtitleEnabledFromStorage() {
+  let enabled = true;
+  if (window.localStorage) {
+    try {
+      const raw = String(localStorage.getItem(SUBTITLE_ENABLED_STORAGE_KEY) || "").trim();
+      if (raw === "0") {
+        enabled = false;
+      } else if (raw === "1") {
+        enabled = true;
+      }
+    } catch (_) {
+      // ignore storage failures
+    }
+  }
+  state.subtitleEnabled = enabled;
+}
+
+function saveSubtitlePositionToStorage() {
+  if (!window.localStorage) {
+    return;
+  }
+  try {
+    if (!state.subtitlePositionCustom) {
+      localStorage.removeItem(SUBTITLE_POSITION_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(
+      SUBTITLE_POSITION_STORAGE_KEY,
+      JSON.stringify({
+        x: state.subtitlePositionRatioX,
+        y: state.subtitlePositionRatioY
+      })
+    );
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function loadSubtitlePositionFromStorage() {
+  state.subtitlePositionCustom = false;
+  state.subtitlePositionRatioX = 0.5;
+  state.subtitlePositionRatioY = 0.75;
+  if (!window.localStorage) {
+    return;
+  }
+  try {
+    const raw = localStorage.getItem(SUBTITLE_POSITION_STORAGE_KEY);
+    if (!raw) {
+      return;
+    }
+    const data = JSON.parse(raw);
+    const x = Number(data?.x);
+    const y = Number(data?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+    state.subtitlePositionRatioX = clampNumber(x, 0.05, 0.95);
+    state.subtitlePositionRatioY = clampNumber(y, 0.12, 0.92);
+    state.subtitlePositionCustom = true;
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function applySubtitlePositionFromState() {
+  if (!ui.subtitleLayer) {
+    return;
+  }
+  if (!state.subtitlePositionCustom) {
+    ui.subtitleLayer.classList.remove("subtitle-pos-custom");
+    ui.subtitleLayer.style.left = "";
+    ui.subtitleLayer.style.top = "";
+    ui.subtitleLayer.style.bottom = "";
+    return;
+  }
+  ui.subtitleLayer.classList.add("subtitle-pos-custom");
+  ui.subtitleLayer.style.left = `${Math.round(state.subtitlePositionRatioX * 1000) / 10}%`;
+  ui.subtitleLayer.style.top = `${Math.round(state.subtitlePositionRatioY * 1000) / 10}%`;
+  ui.subtitleLayer.style.bottom = "auto";
+}
+
+function updateSubtitleToggleButton() {
+  if (!ui.subtitleToggleBtn) {
+    return;
+  }
+  const enabled = state.subtitleEnabled !== false;
+  ui.subtitleToggleBtn.classList.toggle("is-off", !enabled);
+  ui.subtitleToggleBtn.setAttribute("aria-pressed", enabled ? "true" : "false");
+  ui.subtitleToggleBtn.textContent = enabled ? "字幕: 开" : "字幕: 关";
+}
+
+function applySubtitleEnabledState() {
+  updateSubtitleToggleButton();
+  if (state.subtitleEnabled) {
+    return;
+  }
+  hideSubtitleText();
+}
+
+function toggleSubtitleEnabled() {
+  state.subtitleEnabled = !state.subtitleEnabled;
+  applySubtitleEnabledState();
+  saveSubtitleEnabledToStorage();
+  setStatus(state.subtitleEnabled ? "字幕已开启" : "字幕已关闭");
+}
+
+function bindSubtitleDragHandle() {
+  if (!ui.subtitleLayer || !ui.subtitleDragHandle) {
+    return;
+  }
+  const onPointerMove = (event) => {
+    if (!state.subtitleDragPointerId) {
+      return;
+    }
+    if (!state.subtitleEnabled) {
+      return;
+    }
+    const vw = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
+    const vh = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
+    const x = clampNumber(Number(event.clientX || 0) / vw, 0.05, 0.95);
+    const y = clampNumber(Number(event.clientY || 0) / vh, 0.12, 0.92);
+    state.subtitlePositionRatioX = x;
+    state.subtitlePositionRatioY = y;
+    state.subtitlePositionCustom = true;
+    applySubtitlePositionFromState();
+  };
+  const endDrag = () => {
+    if (!state.subtitleDragPointerId) {
+      return;
+    }
+    state.subtitleDragPointerId = 0;
+    ui.subtitleLayer.classList.remove("subtitle-dragging");
+    saveSubtitlePositionToStorage();
+  };
+  ui.subtitleDragHandle.addEventListener("pointerdown", (event) => {
+    if (!state.subtitleEnabled) {
+      return;
+    }
+    event.preventDefault();
+    state.subtitleDragPointerId = Number(event.pointerId) || 1;
+    ui.subtitleLayer.classList.add("subtitle-dragging");
+    try {
+      ui.subtitleDragHandle.setPointerCapture(event.pointerId);
+    } catch (_) {
+      // ignore pointer capture failures
+    }
+  });
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointercancel", endDrag);
+}
+
+function saveOnboardingSeenToStorage(seen) {
+  if (!window.localStorage) {
+    return;
+  }
+  try {
+    localStorage.setItem(ONBOARDING_SEEN_STORAGE_KEY, seen ? "1" : "0");
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function loadOnboardingSeenFromStorage() {
+  let seen = false;
+  if (window.localStorage) {
+    try {
+      seen = String(localStorage.getItem(ONBOARDING_SEEN_STORAGE_KEY) || "").trim() === "1";
+    } catch (_) {
+      seen = false;
+    }
+  }
+  state.onboardingSeen = seen;
+}
+
+function isHelpOpen() {
+  return !!(ui.helpModal && !ui.helpModal.hidden);
+}
+
+function isOnboardingOpen() {
+  return !!(ui.onboardingModal && !ui.onboardingModal.hidden);
+}
+
+function closeHelpModal() {
+  if (!ui.helpModal) {
+    return;
+  }
+  ui.helpModal.hidden = true;
+}
+
+function openHelpModal() {
+  if (!ui.helpModal) {
+    return;
+  }
+  if (isOnboardingOpen()) {
+    ui.onboardingModal.hidden = true;
+  }
+  ui.helpModal.hidden = false;
+}
+
+function renderOnboardingStep() {
+  const total = ONBOARDING_STEPS.length;
+  const index = Math.max(0, Math.min(total - 1, Number(state.onboardingStepIndex) || 0));
+  state.onboardingStepIndex = index;
+  const step = ONBOARDING_STEPS[index] || ONBOARDING_STEPS[0];
+  if (ui.onboardingStepTitle) {
+    ui.onboardingStepTitle.textContent = step.title;
+  }
+  if (ui.onboardingStepDesc) {
+    ui.onboardingStepDesc.textContent = step.desc;
+  }
+  if (ui.onboardingStepTip) {
+    ui.onboardingStepTip.textContent = step.tip;
+  }
+  if (ui.onboardingStepIndex) {
+    ui.onboardingStepIndex.textContent = `${index + 1} / ${total}`;
+  }
+  if (ui.onboardingProgressBar) {
+    const ratio = total > 1 ? index / (total - 1) : 1;
+    ui.onboardingProgressBar.style.width = `${Math.round(ratio * 100)}%`;
+  }
+  const atLast = index >= total - 1;
+  if (ui.onboardingPrevBtn) {
+    ui.onboardingPrevBtn.disabled = index <= 0;
+  }
+  if (ui.onboardingNextBtn) {
+    ui.onboardingNextBtn.hidden = atLast;
+  }
+  if (ui.onboardingDoneBtn) {
+    ui.onboardingDoneBtn.hidden = !atLast;
+  }
+}
+
+function closeOnboardingModal(options = {}) {
+  if (!ui.onboardingModal) {
+    return;
+  }
+  ui.onboardingModal.hidden = true;
+  if (options.markSeen) {
+    state.onboardingSeen = true;
+    saveOnboardingSeenToStorage(true);
+  }
+}
+
+function openOnboardingModal(options = {}) {
+  if (!ui.onboardingModal) {
+    return;
+  }
+  if (ui.helpModal && !ui.helpModal.hidden) {
+    closeHelpModal();
+  }
+  if (options.resetStep) {
+    state.onboardingStepIndex = 0;
+  }
+  ui.onboardingModal.hidden = false;
+  renderOnboardingStep();
+}
+
+function moveOnboardingStep(delta) {
+  const total = ONBOARDING_STEPS.length;
+  const next = Math.max(0, Math.min(total - 1, (Number(state.onboardingStepIndex) || 0) + Number(delta || 0)));
+  if (next === state.onboardingStepIndex) {
+    return;
+  }
+  state.onboardingStepIndex = next;
+  renderOnboardingStep();
+}
+
+function maybeAutoOpenOnboarding() {
+  if (state.onboardingSeen) {
+    return;
+  }
+  if (state.uiView === "model") {
+    return;
+  }
+  openOnboardingModal({ resetStep: true });
 }
 
 function syncConversationHistoryFromChatRecords() {
@@ -1219,6 +1742,12 @@ function openSchedulePanel() {
   if (!ui.scheduleModal) {
     return;
   }
+  if (isHelpOpen()) {
+    closeHelpModal();
+  }
+  if (isOnboardingOpen()) {
+    closeOnboardingModal();
+  }
   if (ui.personaModal && !ui.personaModal.hidden) {
     closePersonaPanel();
   }
@@ -1240,6 +1769,105 @@ function closeSchedulePanel() {
     return;
   }
   ui.scheduleModal.hidden = true;
+}
+
+function normalizeAssistantAvatarUrl(raw) {
+  const value = String(raw || "").trim();
+  if (!value) {
+    return ASSISTANT_AVATAR_DEFAULT;
+  }
+  if (
+    value.startsWith("data:image/")
+    || value.startsWith("./")
+    || value.startsWith("/")
+    || value.startsWith("http://")
+    || value.startsWith("https://")
+    || value.startsWith("blob:")
+  ) {
+    return value;
+  }
+  return ASSISTANT_AVATAR_DEFAULT;
+}
+
+function readAssistantAvatarFromStorage() {
+  try {
+    const saved = localStorage.getItem(ASSISTANT_AVATAR_STORAGE_KEY);
+    return normalizeAssistantAvatarUrl(saved);
+  } catch (_) {
+    return ASSISTANT_AVATAR_DEFAULT;
+  }
+}
+
+function saveAssistantAvatarToStorage(url) {
+  try {
+    localStorage.setItem(ASSISTANT_AVATAR_STORAGE_KEY, String(url || ""));
+  } catch (_) {
+    // ignore storage failures
+  }
+}
+
+function avatarUrlToCssValue(url) {
+  const safe = String(url || ASSISTANT_AVATAR_DEFAULT)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, "\\\"");
+  return `url("${safe}")`;
+}
+
+function applyAssistantAvatar(url, options = {}) {
+  const safe = normalizeAssistantAvatarUrl(url);
+  state.assistantAvatarUrl = safe;
+  if (ui.heroAvatarImg) {
+    ui.heroAvatarImg.src = safe;
+  }
+  if (ui.personaAvatarPreview) {
+    ui.personaAvatarPreview.src = safe;
+  }
+  document.querySelectorAll(".persona-avatar-sync").forEach((img) => {
+    if (img instanceof HTMLImageElement) {
+      img.src = safe;
+    }
+  });
+  document.documentElement.style.setProperty("--assistant-avatar-url", avatarUrlToCssValue(safe));
+  if (options.persist !== false) {
+    saveAssistantAvatarToStorage(safe);
+  }
+}
+
+function initAssistantAvatar() {
+  const domDefault = String(ui.heroAvatarImg?.getAttribute("src") || "").trim();
+  const stored = readAssistantAvatarFromStorage();
+  const initial = stored || domDefault || ASSISTANT_AVATAR_DEFAULT;
+  applyAssistantAvatar(initial, { persist: false });
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("读取图片失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function setAssistantAvatarFromFile(file) {
+  if (!(file instanceof File)) {
+    return;
+  }
+  const mime = String(file.type || "").toLowerCase();
+  if (!mime.startsWith("image/")) {
+    setStatus("请选择图片文件");
+    return;
+  }
+  if (Number(file.size || 0) > ASSISTANT_AVATAR_MAX_BYTES) {
+    setStatus("头像图片不能超过 4MB");
+    return;
+  }
+  const dataUrl = await readFileAsDataUrl(file);
+  if (!dataUrl.startsWith("data:image/")) {
+    throw new Error("图片格式无效");
+  }
+  applyAssistantAvatar(dataUrl);
+  setStatus("头像已更新");
 }
 
 function normalizePersonaCardData(raw) {
@@ -1276,6 +1904,66 @@ function readPersonaCardFromForm() {
   });
 }
 
+function applyPersonaTemplateDraft() {
+  applyPersonaCardToForm({
+    identity: "你是我的桌面搭子，叫塔菲。",
+    user_preferences: "我喜欢简洁直接的建议，也喜欢被温柔鼓励。",
+    user_dislikes: "不喜欢太官腔、太冗长、反复重复同一句话。",
+    common_topics: "开发、学习计划、日常安排、效率提升。",
+    reply_style: "像熟悉的朋友，语气自然，短句优先，必要时再展开。",
+    companionship_style: "会主动关心我，但不过度打扰，关键时刻能提醒我。"
+  });
+  setStatus("已导入人设模板草稿");
+}
+
+function applyRandomPersonaDraft() {
+  const identities = [
+    "你是塔菲，我的桌面陪伴伙伴。",
+    "你是我的桌宠搭子，偏活泼，也很细心。",
+    "你是我长期协作的 AI 桌面助理，兼顾陪伴和执行。"
+  ];
+  const preferences = [
+    "我喜欢清晰分点和可执行建议。",
+    "我喜欢轻松口吻，但不想被敷衍。",
+    "我喜欢先给结论，再补充原因。"
+  ];
+  const dislikes = [
+    "不喜欢空话和模板化结尾。",
+    "不喜欢过度追问和说教。",
+    "不喜欢重复前文和无效安慰。"
+  ];
+  const topics = [
+    "代码、项目推进、复盘、日程管理",
+    "学习、计划、效率工具、习惯养成",
+    "产品灵感、开发排障、日常状态"
+  ];
+  const replyStyles = [
+    "语气自然，回复长度中等，必要时简短反问。",
+    "先给重点，再给一到两条具体建议。",
+    "多用短句，少套话，尽量贴近上下文。"
+  ];
+  const companionshipStyles = [
+    "低打扰陪伴，适时主动提醒。",
+    "对我情绪有感知，先共情再给建议。",
+    "能和我连续聊下去，不像单轮问答机器人。"
+  ];
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)] || "";
+  applyPersonaCardToForm({
+    identity: pick(identities),
+    user_preferences: pick(preferences),
+    user_dislikes: pick(dislikes),
+    common_topics: pick(topics),
+    reply_style: pick(replyStyles),
+    companionship_style: pick(companionshipStyles)
+  });
+  setStatus("已随机生成人设草稿");
+}
+
+function resetPersonaDraft() {
+  applyPersonaCardToForm(PERSONA_CARD_DEFAULT);
+  setStatus("已重置人设草稿");
+}
+
 async function loadPersonaCard() {
   if (!ui.personaModal) {
     state.personaCard = normalizePersonaCardData(PERSONA_CARD_DEFAULT);
@@ -1301,6 +1989,12 @@ async function loadPersonaCard() {
 function openPersonaPanel() {
   if (!ui.personaModal) {
     return;
+  }
+  if (isHelpOpen()) {
+    closeHelpModal();
+  }
+  if (isOnboardingOpen()) {
+    closeOnboardingModal();
   }
   if (ui.scheduleModal && !ui.scheduleModal.hidden) {
     closeSchedulePanel();
@@ -1792,6 +2486,12 @@ function openLearningReviewDrawer() {
   if (!ui.learningReviewDrawer || !ui.learningReviewBackdrop) {
     return;
   }
+  if (isHelpOpen()) {
+    closeHelpModal();
+  }
+  if (isOnboardingOpen()) {
+    closeOnboardingModal();
+  }
   if (ui.scheduleModal && !ui.scheduleModal.hidden) {
     closeSchedulePanel();
   }
@@ -1900,7 +2600,14 @@ function renderScheduleList() {
   if (!items.length) {
     const empty = document.createElement("div");
     empty.className = "schedule-empty";
-    empty.textContent = "还没有日程。你可以设置某个时间点让 Taffy 主动说话、提醒你，或直接执行工具任务。";
+    const title = document.createElement("div");
+    title.className = "schedule-empty-title";
+    title.textContent = "还没有日程";
+    const desc = document.createElement("div");
+    desc.className = "schedule-empty-desc";
+    desc.textContent = "你可以设置某个时间点让 Taffy 主动说话、提醒你，或直接执行工具任务。";
+    empty.appendChild(title);
+    empty.appendChild(desc);
     ui.scheduleList.appendChild(empty);
     return;
   }
@@ -2465,18 +3172,20 @@ function updateMicMeter(levelOverride = null) {
     level = state.micLevel;
   }
   const v = Math.max(0, Math.min(1, Number(level) || 0));
-  const pct = Math.round(v * 100);
-  ui.micMeterFill.style.width = `${pct}%`;
+  const rawPct = Math.round(v * 100);
+  const eased = Math.pow(v, 0.64);
+  const displayPct = state.micOpen ? Math.round(22 + eased * 78) : 0;
+  ui.micMeterFill.style.width = `${displayPct}%`;
 
   if (!state.micOpen) {
     ui.micMeterText.textContent = "未开麦";
   } else if (state.micSuspendDepth > 0) {
     ui.micMeterText.textContent = "暂停";
-  } else if (pct < 8) {
+  } else if (rawPct < 8) {
     ui.micMeterText.textContent = "静音";
-  } else if (pct < 28) {
+  } else if (rawPct < 28) {
     ui.micMeterText.textContent = "低";
-  } else if (pct < 60) {
+  } else if (rawPct < 60) {
     ui.micMeterText.textContent = "中";
   } else {
     ui.micMeterText.textContent = "高";
@@ -3153,74 +3862,126 @@ function pickLatencyHintText() {
   return WAITING_VOICE_HINTS[idx] || WAITING_VOICE_HINTS[0];
 }
 
-function analyzeAutoChatContext() {
-  const now = Date.now();
-  const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
-  const recent = records.slice(-10);
-  let lastUser = null;
-  let lastAssistant = null;
-  for (let i = recent.length - 1; i >= 0; i -= 1) {
-    const item = recent[i];
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-    if (!lastUser && item.role === "user") {
-      lastUser = item;
-    } else if (!lastAssistant && item.role === "assistant") {
-      lastAssistant = item;
-    }
-    if (lastUser && lastAssistant) {
-      break;
+function normalizeAutoChatTopicHint(text = "") {
+  let safe = String(text || "").replace(/\s+/g, " ").trim();
+  if (!safe) {
+    return "";
+  }
+  safe = safe.replace(/[“”"'`【】[\]（）()]/g, "").trim();
+  const maxChars = Math.max(
+    12,
+    Number(state.autoChatTuning?.maxTopicHintChars) || 42
+  );
+  if (safe.length > maxChars) {
+    safe = safe.slice(0, maxChars).trim();
+  }
+  return safe;
+}
+
+function pickAutoChatPrimaryReason(reasons = []) {
+  for (const key of AUTO_CHAT_REASON_PRIORITY) {
+    if (Array.isArray(reasons) && reasons.includes(key)) {
+      return key;
     }
   }
+  if (Array.isArray(reasons) && reasons.length > 0) {
+    return String(reasons[0] || "").trim() || "spontaneous";
+  }
+  return "spontaneous";
+}
+
+function analyzeAutoChatContext() {
+  const now = Date.now();
+  const tuning = state.autoChatTuning || {};
+  const repeatReasonWindowMs = Math.max(
+    2 * 60 * 1000,
+    Number(tuning.repeatReasonWindowMs) || AUTO_CHAT_REPEAT_REASON_WINDOW_MS
+  );
+  const repeatTopicWindowMs = Math.max(
+    2 * 60 * 1000,
+    Number(tuning.repeatTopicWindowMs) || AUTO_CHAT_REPEAT_TOPIC_WINDOW_MS
+  );
+  const burstResetWindowMs = Math.max(
+    3 * 60 * 1000,
+    Number(tuning.burstResetWindowMs) || AUTO_CHAT_BURST_RESET_WINDOW_MS
+  );
+  const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
+  const recent = records.slice(-16);
+  const recentUsers = recent
+    .filter((item) => item && item.role === "user" && typeof item.content === "string")
+    .slice(-8);
+  const lastUser = recentUsers.length ? recentUsers[recentUsers.length - 1] : null;
+  const prevUser = recentUsers.length > 1 ? recentUsers[recentUsers.length - 2] : null;
+  const lastAssistant = [...recent].reverse().find((item) => item && item.role === "assistant") || null;
 
   const lastUserText = String(lastUser?.content || "").trim();
+  const prevUserText = String(prevUser?.content || "").trim();
   const lastAssistantText = String(lastAssistant?.content || "").trim();
-  const lastAssistantTs = parseMessageTimestamp(lastAssistant?.timestamp || 0);
+  const assistantRawTs = Number(lastAssistant?.timestamp);
+  const lastAssistantTs = Number.isFinite(assistantRawTs) && assistantRawTs > 0
+    ? Math.round(assistantRawTs)
+    : 0;
   const minsSinceAssistant = lastAssistantTs > 0 ? (now - lastAssistantTs) / 60000 : 999;
   const silentMinutes = Math.max(0, Math.round((now - (state.lastUserMessageAt || now)) / 60000));
 
   let score = 0;
   const reasons = [];
-  let topicHint = "";
+  const topicSeeds = [];
 
-  if (silentMinutes >= 120) {
-    score += 1.0;
+  if (silentMinutes >= 140) {
+    score += 1.1;
     reasons.push("long_silence");
-  } else if (silentMinutes >= 45) {
-    score += 0.6;
+  } else if (silentMinutes >= 55) {
+    score += 0.68;
     reasons.push("mid_silence");
   }
 
   if (lastUserText) {
     if (AUTO_CHAT_EMO_RE.test(lastUserText)) {
-      score += 0.9;
+      score += 0.95;
       reasons.push("emotion_signal");
-      topicHint = lastUserText.slice(0, 40);
+      topicSeeds.push(lastUserText.slice(0, 40));
     }
     if (AUTO_CHAT_MIRROR_RE.test(lastUserText)) {
-      score += 0.65;
+      score += 0.62;
       reasons.push("mirror_question");
-      if (!topicHint) {
-        topicHint = lastUserText.slice(0, 40);
-      }
+      topicSeeds.push(lastUserText.slice(0, 40));
     }
-    if (lastUserText.length >= 18 && AUTO_CHAT_TOPIC_RE.test(lastUserText)) {
-      score += 0.5;
+    if (lastUserText.length >= 16 && AUTO_CHAT_TOPIC_RE.test(lastUserText)) {
+      score += 0.52;
       reasons.push("topic_hot");
-      if (!topicHint) {
-        topicHint = lastUserText.slice(0, 40);
-      }
+      topicSeeds.push(lastUserText.slice(0, 40));
     }
+    if (AUTO_CHAT_OPEN_LOOP_RE.test(lastUserText)) {
+      score += 0.62;
+      reasons.push("open_loop");
+      topicSeeds.push(lastUserText.slice(0, 40));
+    }
+  }
+
+  const longUserCount = recentUsers
+    .filter((item) => String(item?.content || "").trim().length >= 16)
+    .length;
+  if (longUserCount >= 2 && silentMinutes >= 10) {
+    score += 0.3;
+    reasons.push("deep_talk_pause");
   }
 
   if (lastAssistantText) {
     const hasPendingQuestion = AUTO_CHAT_ASK_RE.test(lastAssistantText)
       || /(你觉得|你会|你想|要不要|可以吗|想听|要不要我)/.test(lastAssistantText);
-    if (hasPendingQuestion && silentMinutes >= 6) {
-      score += 0.55;
+    if (hasPendingQuestion && silentMinutes >= 5) {
+      score += 0.56;
       reasons.push("followup_pending");
     }
+    if (hasPendingQuestion && AUTO_CHAT_BRIEF_REPLY_RE.test(lastUserText) && silentMinutes >= 3) {
+      score += 0.45;
+      reasons.push("brief_ack_drop");
+    }
+  }
+
+  if (!lastUserText && prevUserText && AUTO_CHAT_TOPIC_RE.test(prevUserText)) {
+    topicSeeds.push(prevUserText.slice(0, 40));
   }
 
   if (minsSinceAssistant < 3) {
@@ -3229,83 +3990,98 @@ function analyzeAutoChatContext() {
   if (minsSinceAssistant < 1.5) {
     score -= 1.2;
   }
-
-  let threshold = 1.0;
-  if (silentMinutes < 20) {
-    threshold += 0.35;
-  }
-  if (reasons.includes("emotion_signal")) {
-    threshold -= 0.1;
+  if (state.lastAutoChatAt > 0 && now - state.lastAutoChatAt < 7 * 60 * 1000) {
+    score -= Math.max(0, Number(tuning.recentAutoPenalty) || 0.45);
   }
 
+  const topicHint = normalizeAutoChatTopicHint(topicSeeds.find(Boolean) || "");
+  const primaryReason = pickAutoChatPrimaryReason(reasons);
+
+  let threshold = Number.isFinite(Number(tuning.triggerBaseThreshold))
+    ? Number(tuning.triggerBaseThreshold)
+    : 1.03;
+  if (silentMinutes < 15) {
+    threshold += Math.max(0, Number(tuning.shortSilencePenalty) || 0.35);
+  }
+  if (silentMinutes >= 90) {
+    threshold -= Math.max(0, Number(tuning.longSilenceBonus) || 0.14);
+  }
+  if (reasons.includes("emotion_signal") || reasons.includes("open_loop")) {
+    threshold -= Math.max(0, Number(tuning.emotionBonus) || 0.12);
+  }
+
+  const sameReasonRecent = !!state.autoChatLastReason
+    && state.autoChatLastReason === primaryReason
+    && now - (state.lastAutoChatAt || 0) < repeatReasonWindowMs;
+  if (sameReasonRecent) {
+    threshold += Math.max(0, Number(tuning.repeatReasonPenalty) || 0.44);
+  }
+
+  const lastTopic = normalizeAutoChatTopicHint(state.autoChatLastTopicHint || "");
+  const sameTopicRecent = !!topicHint
+    && !!lastTopic
+    && (topicHint.includes(lastTopic) || lastTopic.includes(topicHint))
+    && now - (state.autoChatLastTopicAt || 0) < repeatTopicWindowMs;
+  if (sameTopicRecent) {
+    threshold += Math.max(0, Number(tuning.repeatTopicPenalty) || 0.48);
+  }
+
+  if ((Number(state.autoChatBurstCount) || 0) >= 2 && now - (state.lastAutoChatAt || 0) < burstResetWindowMs) {
+    threshold += Math.max(0, Number(tuning.burstPenalty) || 0.32);
+  }
+
+  const jitterSpan = Math.max(0, Number(tuning.scoreJitter) || 0.12);
+  const jitter = (Math.random() - 0.5) * jitterSpan;
+  const finalScore = score + jitter;
   return {
-    shouldTrigger: score >= threshold,
-    score,
+    shouldTrigger: finalScore >= threshold,
+    score: finalScore,
     threshold,
     reasons,
-    topicHint
+    primaryReason,
+    topicHint,
+    silentMinutes
   };
 }
 
 function buildAutoChatPrompt(context = null) {
   const ctx = context && typeof context === "object" ? context : analyzeAutoChatContext();
   const hour = new Date().getHours();
-  const silentMinutes = Math.round((Date.now() - (state.lastUserMessageAt || Date.now())) / 60000);
+  const clockText = hour < 5
+    ? `深夜${hour}点`
+    : hour < 9
+      ? `早上${hour}点`
+      : hour < 12
+        ? `上午${hour}点`
+        : hour < 14
+          ? "中午"
+          : hour < 18
+            ? `下午${hour}点`
+            : hour < 22
+              ? `晚上${hour}点`
+              : "夜里";
+  const reason = String(ctx.primaryReason || "").trim();
+  const reasonHint = AUTO_CHAT_REASON_HINTS[reason] || "像突然想到一样自然开口。";
+  const styleNote = AUTO_CHAT_STYLE_NOTES[Math.floor(Math.random() * AUTO_CHAT_STYLE_NOTES.length)]
+    || AUTO_CHAT_STYLE_NOTES[0];
+  const topicHint = normalizeAutoChatTopicHint(ctx.topicHint || "");
+  const topicLine = topicHint
+    ? `可借用线索：「${topicHint}」。`
+    : "没有明确线索时，就用当下的一句感受开场。";
+  const brevityLine = (Number(ctx.silentMinutes) || 0) >= 90
+    ? "一句也可以，最多两句。"
+    : "最多两句，优先一句。";
 
-  const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
-  const recentUserMsgs = records
-    .filter(m => m.role === "user" && typeof m.content === "string" && m.content.trim().length > 4)
-    .slice(-6)
-    .map(m => m.content.trim().slice(0, 40));
-
-  const mode = AUTO_CHAT_MODES[Math.floor(Math.random() * AUTO_CHAT_MODES.length)];
-
-  let timeCtx = "";
-  if (hour >= 0 && hour < 5) timeCtx = "深夜" + hour + "点，";
-  else if (hour < 9) timeCtx = "早上" + hour + "点，";
-  else if (hour < 12) timeCtx = "上午" + hour + "点，";
-  else if (hour < 14) timeCtx = "中午，";
-  else if (hour < 18) timeCtx = "下午" + hour + "点，";
-  else if (hour < 22) timeCtx = "晚上" + hour + "点，";
-  else timeCtx = "快到深夜了，";
-
-  if (ctx.reasons.includes("mirror_question") && ctx.topicHint) {
-    return `${timeCtx}你想起对方刚才说过“${ctx.topicHint}”。先直接回应这句，再顺手补一句你的态度。不要问候，不要模板，不要问句结尾。最多两句。`;
-  }
-
-  if (ctx.reasons.includes("emotion_signal")) {
-    return `${timeCtx}你察觉到对方状态不太好。用Taffy的方式说一句短安慰，再加一句轻微吐槽式打气。不要说教，不要问句结尾。最多两句。`;
-  }
-
-  if (ctx.reasons.includes("followup_pending")) {
-    return `${timeCtx}把你们上个话题顺着接下去，像自然续聊，不要重新开场。最多两句，尽量陈述收尾。`;
-  }
-
-  if (ctx.reasons.includes("topic_hot") && ctx.topicHint) {
-    return `${timeCtx}你又想到对方提过“${ctx.topicHint}”。顺着这个点说一句有态度的话，不铺垫，不模板。最多两句。`;
-  }
-
-  if (mode === "brainstorm") {
-    const triggers = [
-      "你突然想到一件跟任何话题都无关的事，直接说出来。开头绝对不能是问候语或\"我来找你\"，就像脑子里的想法自己溢出来了。最多两句。",
-      "你脑子里突然冒出一个很强烈的观点，不管对不对你都觉得你是对的，说出来。不超过两句，不解释为什么突然说这个。",
-      "你突然对某件随机的事有了看法，直接说，像自言自语一样，不需要对方配合。最多一两句。",
-      "你刚刚想到一个问题，但这个问题跟你们之前聊的任何话题都没关系，直接问出来，不要铺垫。",
-    ];
-    const t = triggers[Math.floor(Math.random() * triggers.length)];
-    return `${timeCtx}${t}`;
-  }
-
-  if (mode === "dig_memory" && recentUserMsgs.length > 0) {
-    const picked = recentUserMsgs[Math.floor(Math.random() * recentUserMsgs.length)];
-    return `${timeCtx}你想起用户之前说过的：“${picked}”。突然把这件事翻出来提一下，不解释为什么现在想到，就那么说，带一点Taffy的态度。最多两句，不要问句结尾。`;
-  }
-
-  // silence_comment (fallback if no memory)
-  const silentDesc = silentMinutes >= 60
-    ? `${Math.round(silentMinutes / 60)}小时`
-    : silentMinutes > 1 ? `${silentMinutes}分钟` : "一会儿";
-  return `${timeCtx}用户已经${silentDesc}没说话了。你注意到了这件事，用Taffy的方式随口评论一下，不是关心问候，不是催促，就是Taffy会说的那种话。最多两句，不以问句结尾。`;
+  return [
+    "你现在是桌宠 Taffy，要主动开口。",
+    `当前时段：${clockText}。`,
+    `触发线索：${reasonHint}`,
+    topicLine,
+    `语气要求：${styleNote}`,
+    "直接输出你要说的话，不要解释你为什么主动开口。",
+    `${brevityLine} 尽量用陈述句收尾。`,
+    "避免问候模板（如“在吗/哈喽/早安模板”）和任务播报腔。"
+  ].join("\n");
 }
 
 function scheduleNextAutoChat() {
@@ -3317,15 +4093,29 @@ function scheduleNextAutoChat() {
     if (!state.autoChatEnabled) return;
     const context = analyzeAutoChatContext();
     if (!shouldSkipAutoChat() && context.shouldTrigger) {
+      const triggerReason = String(context.primaryReason || "").trim();
+      const triggerTopic = normalizeAutoChatTopicHint(context.topicHint || "");
       requestAssistantReply(buildAutoChatPrompt(context), {
           showUser: false,
           rememberUser: false,
-          rememberAssistant: false,
+          rememberAssistant: true,
           auto: true,
           silentError: true
         }).then((ok) => {
           if (ok) {
-            state.lastAutoChatAt = Date.now();
+            const now = Date.now();
+            const previousAutoAt = Number(state.lastAutoChatAt) || 0;
+            const burstResetWindowMs = Math.max(
+              3 * 60 * 1000,
+              Number(state.autoChatTuning?.burstResetWindowMs) || AUTO_CHAT_BURST_RESET_WINDOW_MS
+            );
+            state.lastAutoChatAt = now;
+            state.autoChatLastReason = triggerReason;
+            state.autoChatLastTopicHint = triggerTopic;
+            state.autoChatLastTopicAt = triggerTopic ? now : 0;
+            state.autoChatBurstCount = previousAutoAt > 0 && now - previousAutoAt < burstResetWindowMs
+              ? Math.min(6, (Number(state.autoChatBurstCount) || 0) + 1)
+              : 1;
           }
         }).catch(() => {
           // ignore
@@ -3930,7 +4720,7 @@ function renderPendingAttachments() {
     removeBtn.type = "button";
     removeBtn.className = "attachment-chip-remove";
     removeBtn.textContent = "脳";
-    removeBtn.title = "绉婚櫎";
+    removeBtn.title = "移除";
     removeBtn.addEventListener("click", () => {
       removePendingAttachment(item.id);
     });
@@ -4070,7 +4860,7 @@ function sanitizeSpeakText(text) {
     .trim();
 }
 
-// 鈹€鈹€ Subtitle helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// Subtitle helpers
 
 const _SUBTITLE_MAX_CHARS = 320;
 const _SUBTITLE_TRANSLATE_TIMEOUT_MS = 15000;
@@ -4339,6 +5129,10 @@ function _applySubtitleDOM(enText, zhText) {
 }
 
 function _emitSubtitleFrame(id, enText, zhText) {
+  if (!state.subtitleEnabled) {
+    _clearSubtitleDOM(id, true);
+    return;
+  }
   if (window.electronAPI?.sendSubtitle) {
     window.electronAPI.sendSubtitle({ id, en: enText, zh: zhText });
   } else {
@@ -4410,6 +5204,9 @@ function _clearSubtitleDOM(id, force = false) {
 }
 
 function showSubtitleText(rawText) {
+  if (!state.subtitleEnabled) {
+    return;
+  }
   const cleaned = _normalizeSubtitleText(rawText);
   if (!cleaned) return;
 
@@ -4452,7 +5249,7 @@ function hideSubtitleText() {
   }, _SUBTITLE_AFTER_SPEECH_HOLD_MS);
 }
 
-// 鈹€鈹€ End subtitle helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// End subtitle helpers
 
 function hashText(text) {
   const src = String(text || "");
@@ -5569,10 +6366,18 @@ function getSpeechAnimationMouthOpen() {
     3,
     Math.min(26, Math.round(chars / syllableRate) + punct + accentCount * 2)
   );
+  const durationSec = Math.max(0.24, duration / 1000);
+  const syllablesPerSec = pseudoSyllables / durationSec;
+  const fastSpeechFactor = clampNumber((syllablesPerSec - 4.8) / 4.2, 0, 1);
   const visemePhase = progress * pseudoSyllables;
   const visemeT = visemePhase - Math.floor(visemePhase);
   const visemeOpen = Math.pow(Math.sin(visemeT * Math.PI), style === "steady" ? 1.6 : 1.28);
-  const visemeClosure = Math.pow(Math.abs(Math.cos(visemeT * Math.PI)), 4.2) * (0.18 + punct * 0.01);
+  const visemeClosureRaw = Math.pow(Math.abs(Math.cos(visemeT * Math.PI)), 4.2) * (0.18 + punct * 0.01);
+  const closureGate = clampNumber(
+    visemeClosureRaw * (1.05 + fastSpeechFactor * 0.75),
+    0,
+    0.9
+  );
   const accentSlots = Math.max(1, Math.min(6, punct + accentCount + 1));
   let accentPulse = 0;
   for (let i = 0; i < accentSlots; i += 1) {
@@ -5584,27 +6389,55 @@ function getSpeechAnimationMouthOpen() {
   }
   const visemeJitter = Math.sin(progress * Math.PI * (5.8 + punct * 0.35) + seed * 1.37) * 0.035;
   let target = clampNumber(
-    energy * (0.46 + visemeOpen * 0.64) + accentPulse * 0.2 - visemeClosure * 0.88 + visemeJitter,
+    energy * (0.46 + visemeOpen * 0.64)
+      + accentPulse * 0.2
+      - visemeClosureRaw * (0.88 + fastSpeechFactor * 0.34)
+      + visemeJitter,
     0,
     1
   );
   if (speaking) {
-    target = Math.max(target, 0.06 + motionBlend * 0.08);
+    target *= (1 - closureGate * (0.22 + fastSpeechFactor * 0.18));
+    const speakingFloor = 0.02 + motionBlend * (0.05 - fastSpeechFactor * 0.03);
+    target = Math.max(target, speakingFloor);
   }
   if (speaking) {
     const liveLevel = sampleTTSAudioLevel();
     if (audioPlaying && (state.ttsAudioAnalyser || liveLevel > 0.01)) {
-      const liveTarget = clampNumber(liveLevel * 1.82 + 0.02, 0, 1);
-      target = clampNumber(liveTarget * 0.86 + target * 0.14 + accentPulse * 0.06, 0, 1);
+      const liveTarget = clampNumber(liveLevel * (1.72 + fastSpeechFactor * 0.2) + 0.015, 0, 1);
+      const liveMix = clampNumber(
+        0.8 - closureGate * (0.42 + fastSpeechFactor * 0.2),
+        0.34,
+        0.82
+      );
+      target = clampNumber(
+        liveTarget * liveMix
+          + target * (1 - liveMix)
+          + accentPulse * (0.05 - closureGate * 0.03),
+        0,
+        1
+      );
       if (liveLevel < 0.018) {
-        target *= 0.58;
+        target *= clampNumber(0.56 - closureGate * 0.2, 0.28, 0.62);
       }
-      const smoothing = target > state.speechMouthOpen ? 0.8 : 0.62;
+      const openSmooth = clampNumber(0.72 - closureGate * 0.16, 0.5, 0.76);
+      const closeSmooth = clampNumber(
+        0.72 + closureGate * 0.2 + fastSpeechFactor * 0.08,
+        0.62,
+        0.9
+      );
+      const smoothing = target > state.speechMouthOpen ? openSmooth : closeSmooth;
       state.speechMouthOpen += (target - state.speechMouthOpen) * smoothing;
       return state.speechMouthOpen;
     }
   }
-  const smoothing = target > state.speechMouthOpen ? 0.68 : 0.4;
+  const openSmooth = clampNumber(0.64 - closureGate * 0.14, 0.45, 0.68);
+  const closeSmooth = clampNumber(
+    0.56 + closureGate * 0.18 + fastSpeechFactor * 0.1,
+    0.42,
+    0.82
+  );
+  const smoothing = target > state.speechMouthOpen ? openSmooth : closeSmooth;
   state.speechMouthOpen += (target - state.speechMouthOpen) * smoothing;
   return state.speechMouthOpen;
 }
@@ -6923,6 +7756,84 @@ async function loadConfig() {
     ? String(observeCfg.attach_mode || "").toLowerCase()
     : "always";
   state.observeAllowAutoChat = observeCfg.allow_auto_chat === true;
+  const autoChatTuningCfg = observeCfg && typeof observeCfg.auto_chat_tuning === "object"
+    ? observeCfg.auto_chat_tuning
+    : {};
+  state.autoChatTuning = {
+    triggerBaseThreshold: clampNumber(
+      Number(autoChatTuningCfg.trigger_base_threshold ?? 1.03),
+      0.4,
+      3.0
+    ),
+    shortSilencePenalty: clampNumber(
+      Number(autoChatTuningCfg.short_silence_penalty ?? 0.35),
+      0,
+      1.2
+    ),
+    longSilenceBonus: clampNumber(
+      Number(autoChatTuningCfg.long_silence_bonus ?? 0.14),
+      0,
+      1.0
+    ),
+    emotionBonus: clampNumber(
+      Number(autoChatTuningCfg.emotion_bonus ?? 0.12),
+      0,
+      0.8
+    ),
+    repeatReasonPenalty: clampNumber(
+      Number(autoChatTuningCfg.repeat_reason_penalty ?? 0.44),
+      0,
+      1.2
+    ),
+    repeatTopicPenalty: clampNumber(
+      Number(autoChatTuningCfg.repeat_topic_penalty ?? 0.48),
+      0,
+      1.2
+    ),
+    burstPenalty: clampNumber(
+      Number(autoChatTuningCfg.burst_penalty ?? 0.32),
+      0,
+      1.2
+    ),
+    recentAutoPenalty: clampNumber(
+      Number(autoChatTuningCfg.recent_auto_penalty ?? 0.45),
+      0,
+      1.5
+    ),
+    scoreJitter: clampNumber(
+      Number(autoChatTuningCfg.score_jitter ?? 0.12),
+      0,
+      0.8
+    ),
+    repeatReasonWindowMs: Math.round(
+      clampNumber(
+        Number(autoChatTuningCfg.repeat_reason_window_ms ?? (14 * 60 * 1000)),
+        2 * 60 * 1000,
+        120 * 60 * 1000
+      )
+    ),
+    repeatTopicWindowMs: Math.round(
+      clampNumber(
+        Number(autoChatTuningCfg.repeat_topic_window_ms ?? (22 * 60 * 1000)),
+        2 * 60 * 1000,
+        150 * 60 * 1000
+      )
+    ),
+    burstResetWindowMs: Math.round(
+      clampNumber(
+        Number(autoChatTuningCfg.burst_reset_window_ms ?? (18 * 60 * 1000)),
+        3 * 60 * 1000,
+        150 * 60 * 1000
+      )
+    ),
+    maxTopicHintChars: Math.round(
+      clampNumber(
+        Number(autoChatTuningCfg.max_topic_hint_chars ?? 42),
+        12,
+        120
+      )
+    )
+  };
   state.dailyGreetingEnabled = observeCfg.daily_greeting_enabled === true;
   state.dailyGreetingHour = Math.round(
     clampNumber(Number(observeCfg.daily_greeting_hour || 8), 0, 23)
@@ -7624,7 +8535,7 @@ const MOOD_KEYWORDS = {
   surprised: [
     "啊", "卧槽", "我去", "天哪", "不会吧", "不可能吧", "什么鬼", "啥情况", "真的假的",
     "牛", "nb", "离谱", "绝了", "不敢相信", "吓死", "震惊", "惊呆", "惊了", "居然",
-    "绔熺劧", "omg", "what", "seriously", "no way", "incredible", "unbelievable", "wow", "unexpected",
+    "竟然", "omg", "what", "seriously", "no way", "incredible", "unbelievable", "wow", "unexpected",
     "逆天", "神了", "太夸张了", "开玩笑吧"
   ]
 };
@@ -8808,6 +9719,9 @@ async function requestAssistantReply(text, opts = {}) {
   const userTimestamp = Date.now();
   if (showUser || rememberUser) {
     state.lastUserMessageAt = Date.now();
+    if (!isAuto) {
+      state.autoChatBurstCount = 0;
+    }
   }
 
   if (showUser) {
@@ -9138,11 +10052,16 @@ function bindUI() {
   updateLockButton();
   updateAutoChatButton();
   updateTranslationToggleButton();
+  applySubtitleEnabledState();
+  setAdvancedActionsExpanded(false);
   updateMicButton();
   renderScheduleList();
   renderPendingAttachments();
   syncLearningQuickSettingsUI();
   renderLearningReviewList();
+  applySubtitlePositionFromState();
+  bindSubtitleDragHandle();
+  renderOnboardingStep();
 
   ui.sendBtn.addEventListener("click", sendChat);
   ui.chatInput.addEventListener("keydown", (event) => {
@@ -9172,6 +10091,16 @@ function bindUI() {
   });
   window.addEventListener("keydown", async (event) => {
     if (!event.ctrlKey) {
+      if (event.key === "Escape" && isOnboardingOpen()) {
+        event.preventDefault();
+        closeOnboardingModal({ markSeen: true });
+        return;
+      }
+      if (event.key === "Escape" && isHelpOpen()) {
+        event.preventDefault();
+        closeHelpModal();
+        return;
+      }
       if (event.key === "Escape" && isLearningReviewOpen()) {
         event.preventDefault();
         closeLearningReviewDrawer();
@@ -9271,6 +10200,13 @@ function bindUI() {
     });
   }
 
+  if (ui.moreBtn) {
+    ui.moreBtn.addEventListener("click", () => {
+      const expanded = ui.moreBtn.getAttribute("aria-expanded") === "true";
+      setAdvancedActionsExpanded(!expanded);
+    });
+  }
+
   if (ui.personaBtn) {
     ui.personaBtn.addEventListener("click", () => {
       if (ui.personaModal?.hidden) {
@@ -9311,10 +10247,82 @@ function bindUI() {
 
   if (ui.translationToggleBtn) {
     ui.translationToggleBtn.addEventListener("click", () => {
-      state.chatTranslationVisible = !state.chatTranslationVisible;
-      applyChatTranslationVisibility();
-      saveChatTranslationVisibilityToStorage();
-      setStatus(state.chatTranslationVisible ? "会话翻译已显示" : "会话翻译已收起");
+      toggleChatTranslationVisibility();
+    });
+  }
+
+  if (ui.subtitleToggleBtn) {
+    ui.subtitleToggleBtn.addEventListener("click", () => {
+      toggleSubtitleEnabled();
+    });
+  }
+
+  if (ui.translationChipBtn) {
+    ui.translationChipBtn.addEventListener("click", () => {
+      toggleChatTranslationVisibility();
+    });
+  }
+
+  if (ui.helpBtn) {
+    ui.helpBtn.addEventListener("click", () => {
+      if (isHelpOpen()) {
+        closeHelpModal();
+      } else {
+        openHelpModal();
+      }
+    });
+  }
+
+  if (ui.helpCloseBtn) {
+    ui.helpCloseBtn.addEventListener("click", () => {
+      closeHelpModal();
+    });
+  }
+
+  if (ui.helpModal) {
+    ui.helpModal.addEventListener("click", (event) => {
+      if (event.target === ui.helpModal) {
+        closeHelpModal();
+      }
+    });
+  }
+
+  if (ui.helpOpenOnboardingBtn) {
+    ui.helpOpenOnboardingBtn.addEventListener("click", () => {
+      openOnboardingModal({ resetStep: true });
+    });
+  }
+
+  if (ui.onboardingSkipBtn) {
+    ui.onboardingSkipBtn.addEventListener("click", () => {
+      closeOnboardingModal({ markSeen: true });
+    });
+  }
+
+  if (ui.onboardingPrevBtn) {
+    ui.onboardingPrevBtn.addEventListener("click", () => {
+      moveOnboardingStep(-1);
+    });
+  }
+
+  if (ui.onboardingNextBtn) {
+    ui.onboardingNextBtn.addEventListener("click", () => {
+      moveOnboardingStep(1);
+    });
+  }
+
+  if (ui.onboardingDoneBtn) {
+    ui.onboardingDoneBtn.addEventListener("click", () => {
+      closeOnboardingModal({ markSeen: true });
+      setStatus("新手引导已完成");
+    });
+  }
+
+  if (ui.onboardingModal) {
+    ui.onboardingModal.addEventListener("click", (event) => {
+      if (event.target === ui.onboardingModal) {
+        closeOnboardingModal({ markSeen: true });
+      }
     });
   }
 
@@ -9512,6 +10520,68 @@ function bindUI() {
     });
   }
 
+  if (ui.personaPreviewBtn) {
+    ui.personaPreviewBtn.addEventListener("click", () => {
+      setStatus("预览提示：保存后会在接下来的对话中逐步生效");
+    });
+  }
+
+  if (ui.personaAvatarChangeBtn && ui.personaAvatarInput) {
+    ui.personaAvatarChangeBtn.addEventListener("click", () => {
+      ui.personaAvatarInput.click();
+    });
+  }
+
+  if (ui.personaAvatarInput) {
+    ui.personaAvatarInput.addEventListener("change", async () => {
+      try {
+        const file = ui.personaAvatarInput.files && ui.personaAvatarInput.files[0];
+        if (!file) {
+          return;
+        }
+        await setAssistantAvatarFromFile(file);
+      } catch (err) {
+        setStatus(`头像更新失败: ${err.message || err}`);
+      } finally {
+        ui.personaAvatarInput.value = "";
+      }
+    });
+  }
+
+  if (ui.personaAvatarResetBtn) {
+    ui.personaAvatarResetBtn.addEventListener("click", () => {
+      applyAssistantAvatar(ASSISTANT_AVATAR_DEFAULT);
+      setStatus("已恢复默认头像");
+    });
+  }
+
+  if (ui.personaApplyBtn) {
+    ui.personaApplyBtn.addEventListener("click", async () => {
+      const ok = await savePersonaCardFromForm();
+      if (ok) {
+        setStatus("人设卡已应用");
+      }
+    });
+  }
+
+  if (ui.personaImportTemplateBtn) {
+    ui.personaImportTemplateBtn.addEventListener("click", () => {
+      applyPersonaTemplateDraft();
+    });
+  }
+
+  if (ui.personaRandomBtn) {
+    ui.personaRandomBtn.addEventListener("click", () => {
+      applyRandomPersonaDraft();
+    });
+  }
+
+  if (ui.personaResetBtn) {
+    ui.personaResetBtn.addEventListener("click", () => {
+      resetPersonaDraft();
+    });
+  }
+
   for (const field of [
     ui.personaIdentity,
     ui.personaPreferences,
@@ -9552,11 +10622,19 @@ function bindUI() {
       scheduleIdleMotionLoop();
     });
   }
+
+  setTimeout(() => {
+    maybeAutoOpenOnboarding();
+  }, 180);
 }
 
 if (window.electronAPI?.onSubtitle) {
   window.electronAPI.onSubtitle(({ id, en, zh }) => {
     state.subtitleId = id;
+    if (!state.subtitleEnabled) {
+      _clearSubtitleDOM(id, true);
+      return;
+    }
     _applySubtitleDOM(en || "", zh || "");
   });
   window.electronAPI.onSubtitleHide(({ id }) => {
@@ -9575,7 +10653,16 @@ async function main() {
       setTimeout(refreshDesktopBridgeReady, 1600);
     }
     await loadConfig();
+    try {
+      await resolveApiToken(true);
+    } catch (_) {
+      // ignore and let authFetch retry on first 401
+    }
+    initAssistantAvatar();
     loadChatTranslationVisibilityFromStorage();
+    loadSubtitleEnabledFromStorage();
+    loadSubtitlePositionFromStorage();
+    loadOnboardingSeenFromStorage();
     await loadPersonaCard();
     if (state.uiView === "model") {
       await ensureLive2DRuntime();
@@ -9673,4 +10760,3 @@ window.addEventListener("beforeunload", () => {
 });
 
 main();
-

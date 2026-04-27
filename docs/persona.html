@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>人设卡管理 · Taffy</title>
+  <style>
+    :root {
+      --bg-a: #fffaf3;
+      --bg-b: #e9f7ff;
+      --card: #ffffffcc;
+      --line: #ffd9b5;
+      --ink: #3c2f2f;
+      --sub: #816f64;
+      --accent: #ff8f70;
+      --accent-2: #66aee8;
+      --ok: #2f9e71;
+      --warn: #c26a2c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background:
+        radial-gradient(1300px 700px at -10% -20%, #ffe9d2 0%, transparent 60%),
+        radial-gradient(1200px 600px at 115% 5%, #d8f2ff 0%, transparent 62%),
+        linear-gradient(135deg, var(--bg-a), var(--bg-b));
+      min-height: 100vh;
+    }
+    .shell {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 28px 18px 60px;
+    }
+    .hero {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      background: var(--card);
+      border: 1px solid #ffe7d3;
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 14px 38px #f9d8bc55;
+      backdrop-filter: blur(7px);
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0.4px;
+    }
+    .hero p {
+      margin: 6px 0 0;
+      color: var(--sub);
+    }
+    .hero a {
+      text-decoration: none;
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid #ffe7d3;
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 14px 38px #e7f2ff55;
+      backdrop-filter: blur(7px);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .field { display: grid; gap: 7px; }
+    .field.full { grid-column: 1 / -1; }
+    .field span {
+      color: #5f4f45;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    input[type="text"], textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    textarea { min-height: 88px; resize: vertical; }
+    input:focus, textarea:focus, select:focus {
+      border-color: #ff9f7f;
+      box-shadow: 0 0 0 3px #ffceb455;
+      outline: none;
+    }
+    .role-group {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .role-pill {
+      border: 1px solid #ffd8bb;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #fff9f5;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 14px;
+    }
+    .role-pill input { accent-color: var(--accent); }
+    .actions {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font: inherit;
+      cursor: pointer;
+      transition: transform .15s, filter .15s;
+    }
+    button:hover { transform: translateY(-1px); filter: saturate(1.08); }
+    .primary {
+      background: linear-gradient(135deg, #ff9d7b, #ff7d6b);
+      color: #fff;
+      font-weight: 700;
+    }
+    .ghost {
+      background: #fff;
+      border: 1px solid #ffd8bb;
+      color: #725f53;
+    }
+    .api-row {
+      margin: 0 0 14px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+    .status {
+      margin: 14px 0 0;
+      font-size: 14px;
+      color: var(--sub);
+    }
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+    .preview {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px dashed #ffd8bb;
+      background: #fff9f4;
+      color: #5b4a3f;
+      line-height: 1.6;
+      font-size: 14px;
+      min-height: 48px;
+    }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+      .role-group { grid-template-columns: 1fr; }
+      .hero { flex-direction: column; align-items: flex-start; }
+      .api-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <h1>角色资料卡</h1>
+        <p>保存后，下一轮对话会直接使用新人设。<a href="config.html">返回配置中心</a></p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="api-row">
+        <input id="apiEndpoint" type="text" aria-label="API Endpoint">
+        <button id="testApiBtn" class="ghost" type="button">测试连接</button>
+      </div>
+
+      <div class="grid">
+        <label class="field">
+          <span>1. 角色名</span>
+          <input id="characterName" type="text" placeholder="例如：塔菲">
+        </label>
+        <label class="field">
+          <span>2. 用户称呼</span>
+          <input id="userAlias" type="text" placeholder="例如：小Q">
+        </label>
+        <label class="field full">
+          <span>3. 性格标签</span>
+          <input id="personalityTags" type="text" placeholder="例如：温柔, 俏皮, 可靠">
+        </label>
+        <label class="field full">
+          <span>4. 说话风格</span>
+          <textarea id="speakingStyle" placeholder="例如：像熟悉的朋友，简洁自然，少模板感。"></textarea>
+        </label>
+        <label class="field full">
+          <span>5. 口头禅</span>
+          <input id="catchphrases" type="text" placeholder="例如：一起慢慢来，先做最重要的一件事。">
+        </label>
+        <label class="field">
+          <span>6. 喜欢的事物</span>
+          <textarea id="likes" placeholder="例如：学习复盘、二次元梗、直给建议。"></textarea>
+        </label>
+        <label class="field">
+          <span>7. 不喜欢的事物</span>
+          <textarea id="dislikes" placeholder="例如：机械复读、长篇空话。"></textarea>
+        </label>
+        <label class="field">
+          <span>8. 主动程度</span>
+          <select id="initiativeLevel">
+            <option value="低">低</option>
+            <option value="适中">适中</option>
+            <option value="高">高</option>
+            <option value="很高">很高</option>
+          </select>
+        </label>
+        <fieldset class="field">
+          <span>9. 关系定位</span>
+          <div class="role-group">
+            <label class="role-pill"><input type="radio" name="relationshipRole" value="学习搭子">学习搭子</label>
+            <label class="role-pill"><input type="radio" name="relationshipRole" value="桌面伙伴">桌面伙伴</label>
+            <label class="role-pill"><input type="radio" name="relationshipRole" value="情绪陪伴">情绪陪伴</label>
+            <label class="role-pill"><input type="radio" name="relationshipRole" value="工作助手">工作助手</label>
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="actions">
+        <button id="saveBtn" class="primary" type="button">保存人设卡</button>
+        <button id="reloadBtn" class="ghost" type="button">重新读取</button>
+        <button id="importBtn" class="ghost" type="button">导入 JSON</button>
+        <button id="exportBtn" class="ghost" type="button">导出 JSON</button>
+      </div>
+      <input id="importInput" type="file" accept="application/json,.json" hidden>
+
+      <div id="status" class="status">准备就绪</div>
+      <div id="preview" class="preview">人设摘要会显示在这里。</div>
+    </section>
+  </main>
+
+  <script>
+    const DEFAULT_CARD = {
+      character_name: "",
+      user_alias: "",
+      personality_tags: "",
+      speaking_style: "",
+      catchphrases: "",
+      likes: "",
+      dislikes: "",
+      initiative_level: "适中",
+      relationship_role: "桌面伙伴",
+      identity: "",
+      user_preferences: "",
+      user_dislikes: "",
+      common_topics: "",
+      reply_style: "",
+      companionship_style: "",
+      updated_at: ""
+    };
+
+    const RELATIONSHIP_ROLES = ["学习搭子", "桌面伙伴", "情绪陪伴", "工作助手"];
+    const INITIATIVE_LEVELS = ["低", "适中", "高", "很高"];
+
+    const els = {
+      api: document.getElementById("apiEndpoint"),
+      testApiBtn: document.getElementById("testApiBtn"),
+      characterName: document.getElementById("characterName"),
+      userAlias: document.getElementById("userAlias"),
+      personalityTags: document.getElementById("personalityTags"),
+      speakingStyle: document.getElementById("speakingStyle"),
+      catchphrases: document.getElementById("catchphrases"),
+      likes: document.getElementById("likes"),
+      dislikes: document.getElementById("dislikes"),
+      initiativeLevel: document.getElementById("initiativeLevel"),
+      saveBtn: document.getElementById("saveBtn"),
+      reloadBtn: document.getElementById("reloadBtn"),
+      importBtn: document.getElementById("importBtn"),
+      exportBtn: document.getElementById("exportBtn"),
+      importInput: document.getElementById("importInput"),
+      status: document.getElementById("status"),
+      preview: document.getElementById("preview")
+    };
+
+    function defaultApiEndpoint() {
+      return "http://127.0.0.1:8123/api/persona_card";
+    }
+
+    function setStatus(message, kind = "") {
+      els.status.textContent = message;
+      els.status.className = `status ${kind}`.trim();
+    }
+
+    function normalizeText(value) {
+      return String(value ?? "").replace(/\s+/g, " ").trim();
+    }
+
+    function normalizeCard(input) {
+      const src = input && typeof input === "object" ? input : {};
+      const card = { ...DEFAULT_CARD };
+      Object.keys(DEFAULT_CARD).forEach((key) => {
+        if (key === "initiative_level" || key === "relationship_role") return;
+        card[key] = normalizeText(src[key]);
+      });
+
+      card.initiative_level = normalizeText(src.initiative_level || src.initiativeLevel || "适中");
+      card.relationship_role = normalizeText(src.relationship_role || src.relationshipRole || "");
+
+      if (!card.character_name && card.identity) card.character_name = card.identity;
+      if (!card.user_alias) {
+        const match = card.identity.match(/(?:叫我|称呼我|喊我)\s*([^\s,，。；;、]{1,20})/);
+        if (match) card.user_alias = normalizeText(match[1]);
+      }
+      if (!card.likes) card.likes = card.user_preferences || card.common_topics;
+      if (!card.dislikes) card.dislikes = card.user_dislikes;
+      if (!card.speaking_style) card.speaking_style = card.reply_style;
+      if (!card.personality_tags) card.personality_tags = card.companionship_style;
+
+      if (!INITIATIVE_LEVELS.includes(card.initiative_level)) {
+        card.initiative_level = "适中";
+      }
+      if (!RELATIONSHIP_ROLES.includes(card.relationship_role)) {
+        card.relationship_role = "桌面伙伴";
+      }
+
+      const identity = [card.character_name ? `角色名：${card.character_name}` : "", card.user_alias ? `用户称呼：${card.user_alias}` : ""]
+        .filter(Boolean).join("；");
+      const replyStyle = [card.speaking_style, card.catchphrases ? `口头禅：${card.catchphrases}` : ""]
+        .filter(Boolean).join("；");
+      const companionshipStyle = [
+        card.personality_tags ? `性格标签：${card.personality_tags}` : "",
+        card.initiative_level ? `主动程度：${card.initiative_level}` : "",
+        card.relationship_role ? `关系定位：${card.relationship_role}` : ""
+      ].filter(Boolean).join("；");
+
+      if (!card.identity) card.identity = identity;
+      if (!card.user_preferences) card.user_preferences = card.likes;
+      if (!card.user_dislikes) card.user_dislikes = card.dislikes;
+      if (!card.common_topics) card.common_topics = card.likes;
+      if (!card.reply_style) card.reply_style = replyStyle;
+      if (!card.companionship_style) card.companionship_style = companionshipStyle;
+
+      return card;
+    }
+
+    function applyToForm(cardLike) {
+      const card = normalizeCard(cardLike);
+      els.characterName.value = card.character_name;
+      els.userAlias.value = card.user_alias;
+      els.personalityTags.value = card.personality_tags;
+      els.speakingStyle.value = card.speaking_style;
+      els.catchphrases.value = card.catchphrases;
+      els.likes.value = card.likes;
+      els.dislikes.value = card.dislikes;
+      els.initiativeLevel.value = card.initiative_level;
+      document.querySelectorAll("input[name='relationshipRole']").forEach((node) => {
+        node.checked = node.value === card.relationship_role;
+      });
+      renderPreview(card);
+      return card;
+    }
+
+    function collectFromForm() {
+      const role = document.querySelector("input[name='relationshipRole']:checked")?.value || "";
+      return normalizeCard({
+        character_name: els.characterName.value,
+        user_alias: els.userAlias.value,
+        personality_tags: els.personalityTags.value,
+        speaking_style: els.speakingStyle.value,
+        catchphrases: els.catchphrases.value,
+        likes: els.likes.value,
+        dislikes: els.dislikes.value,
+        initiative_level: els.initiativeLevel.value,
+        relationship_role: role
+      });
+    }
+
+    function renderPreview(cardLike) {
+      const card = normalizeCard(cardLike);
+      const lines = [
+        card.character_name ? `角色：${card.character_name}` : "",
+        card.user_alias ? `称呼你：${card.user_alias}` : "",
+        card.personality_tags ? `性格：${card.personality_tags}` : "",
+        card.speaking_style ? `说话风格：${card.speaking_style}` : "",
+        card.catchphrases ? `口头禅：${card.catchphrases}` : "",
+        card.likes ? `喜欢：${card.likes}` : "",
+        card.dislikes ? `不喜欢：${card.dislikes}` : "",
+        `主动程度：${card.initiative_level}`,
+        `关系定位：${card.relationship_role}`
+      ].filter(Boolean);
+      els.preview.textContent = lines.join("\n");
+    }
+
+    function getApiEndpoint() {
+      const endpoint = normalizeText(els.api.value || defaultApiEndpoint());
+      return endpoint || defaultApiEndpoint();
+    }
+
+    async function loadCard() {
+      const endpoint = getApiEndpoint();
+      const resp = await fetch(endpoint, { method: "GET", cache: "no-store" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      applyToForm(data);
+      setStatus("已读取当前人设卡", "ok");
+    }
+
+    async function saveCard() {
+      const endpoint = getApiEndpoint();
+      const payload = collectFromForm();
+      const resp = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const saved = await resp.json();
+      applyToForm(saved);
+      setStatus("保存成功：下一轮对话会按新人设回复", "ok");
+    }
+
+    function exportCard() {
+      const payload = collectFromForm();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "");
+      a.href = URL.createObjectURL(blob);
+      a.download = `persona_card_${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+      setStatus("导出完成", "ok");
+    }
+
+    async function importCard(file) {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      applyToForm(data);
+      setStatus("已导入 JSON（当前为草稿，记得点击保存）", "warn");
+    }
+
+    function boot() {
+      els.api.value = localStorage.getItem("persona_api_endpoint") || defaultApiEndpoint();
+      applyToForm(DEFAULT_CARD);
+
+      els.api.addEventListener("change", () => {
+        localStorage.setItem("persona_api_endpoint", getApiEndpoint());
+      });
+      els.testApiBtn.addEventListener("click", async () => {
+        try {
+          await loadCard();
+        } catch (err) {
+          setStatus(`连接失败：${err.message}`, "warn");
+        }
+      });
+      els.saveBtn.addEventListener("click", async () => {
+        try {
+          await saveCard();
+        } catch (err) {
+          setStatus(`保存失败：${err.message}`, "warn");
+        }
+      });
+      els.reloadBtn.addEventListener("click", async () => {
+        try {
+          await loadCard();
+        } catch (err) {
+          setStatus(`读取失败：${err.message}`, "warn");
+        }
+      });
+      els.exportBtn.addEventListener("click", exportCard);
+      els.importBtn.addEventListener("click", () => els.importInput.click());
+      els.importInput.addEventListener("change", async () => {
+        try {
+          const file = els.importInput.files && els.importInput.files[0];
+          if (!file) return;
+          await importCard(file);
+        } catch (err) {
+          setStatus(`导入失败：${err.message}`, "warn");
+        } finally {
+          els.importInput.value = "";
+        }
+      });
+
+      [
+        els.characterName, els.userAlias, els.personalityTags, els.speakingStyle, els.catchphrases,
+        els.likes, els.dislikes, els.initiativeLevel
+      ].forEach((node) => {
+        node.addEventListener("input", () => renderPreview(collectFromForm()));
+      });
+      document.querySelectorAll("input[name='relationshipRole']").forEach((node) => {
+        node.addEventListener("change", () => renderPreview(collectFromForm()));
+      });
+
+      loadCard().catch(() => {
+        setStatus("暂未连接到桌宠服务，先编辑草稿也可以。", "warn");
+      });
+    }
+
+    boot();
+  </script>
+</body>
+</html>

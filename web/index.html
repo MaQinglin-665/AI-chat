@@ -1,36 +1,37 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI桌宠</title>
+  <title>塔菲AI桌宠</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <canvas id="live2d-canvas"></canvas>
 
   <section class="panel">
-    <div class="row top">
-      <strong id="assistant-name">Taffy</strong>
-      <div class="top-actions">
-        <button
-          id="translation-toggle-btn"
-          class="mini-toggle-btn"
-          type="button"
-          aria-pressed="true"
-          title="隐藏中文翻译"
-        >译</button>
-        <span id="status">待机</span>
+    <section class="hero-card">
+      <div class="hero-avatar" aria-hidden="true">
+        <img id="hero-avatar-img" src="./assets/assistant_avatar_ref.png?v=2" alt="塔菲头像" />
       </div>
-    </div>
-
-    <div id="mic-meter-wrap" class="mic-meter-wrap" aria-live="off">
-      <span class="mic-label">Mic</span>
-      <div class="mic-meter-track">
-        <div id="mic-meter-fill" class="mic-meter-fill"></div>
+      <div class="hero-main">
+        <div class="hero-head">
+          <div class="hero-meta">
+            <strong id="assistant-name">塔菲AI桌宠</strong>
+            <p class="hero-tagline">你的桌面伙伴，随时懂你 ✨</p>
+            <span id="status">待机</span>
+          </div>
+          <button id="translation-chip-btn" type="button" aria-pressed="true" title="隐藏会话翻译">会话翻译已显示</button>
+        </div>
+        <div id="mic-meter-wrap" class="mic-meter-wrap" aria-live="off">
+          <span class="mic-label">Mic</span>
+          <div class="mic-meter-track">
+            <div id="mic-meter-fill" class="mic-meter-fill"></div>
+          </div>
+          <span id="mic-meter-text" class="mic-meter-text">未开麦</span>
+        </div>
       </div>
-      <span id="mic-meter-text" class="mic-meter-text">未开麦</span>
-    </div>
+    </section>
 
     <div id="chat-log" class="chat-log" aria-live="polite"></div>
 
@@ -38,7 +39,10 @@
 
     <div class="row controls">
       <button id="attach-btn" type="button" title="添加图片或文件" aria-label="添加图片或文件">+</button>
-      <input id="chat-input" type="text" placeholder="和我说点什么..." />
+      <div class="chat-input-wrap">
+        <input id="chat-input" type="text" placeholder="和我说点什么..." />
+        <span class="chat-input-icons" aria-hidden="true">&#9786; &#10023;</span>
+      </div>
       <button id="send-btn" type="button">发送</button>
     </div>
     <input
@@ -49,204 +53,441 @@
       accept="image/*,.txt,.md,.json,.csv,.tsv,.yaml,.yml,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.h,.hpp,.go,.rs,.sh,.ps1,.bat,.sql,.log,.ini,.toml,.pdf,.doc,.docx"
     />
 
-    <div class="row controls action-buttons">
-      <button id="mic-btn" type="button">语音输入</button>
-      <button id="speak-btn" type="button">语音开</button>
+    <div class="row controls action-buttons primary-actions">
+      <button id="mic-btn" type="button">开麦: 关</button>
+      <button id="speak-btn" type="button">语音: 开</button>
+      <button id="subtitle-toggle-btn" type="button">字幕: 开</button>
+      <button id="translation-toggle-btn" type="button" aria-pressed="true" title="隐藏会话翻译">翻译: 开</button>
+    </div>
+
+    <div class="row controls action-buttons utility-actions">
       <button id="schedule-btn" type="button">日程</button>
+      <button id="help-btn" type="button">上手</button>
+      <button id="more-btn" type="button" aria-expanded="false" aria-controls="advanced-actions">更多</button>
+    </div>
+
+    <div id="advanced-actions" class="row controls action-buttons advanced-actions" hidden>
       <button id="persona-btn" type="button">人设卡</button>
       <button id="learning-review-btn" type="button">学习审核</button>
-      <button id="lock-btn" type="button">桌面锁定: 关</button>
-      <button id="observe-btn" type="button">观察桌面: 开</button>
-      <button id="auto-chat-btn" type="button">自动对话: 关</button>
+      <button id="lock-btn" type="button">锁定: 关</button>
+      <button id="observe-btn" type="button">观察: 开</button>
+      <button id="auto-chat-btn" type="button">自动聊: 关</button>
     </div>
   </section>
+
+  <div id="help-modal" class="help-modal" hidden>
+    <div class="help-dialog">
+      <div class="help-head">
+        <strong>快速上手</strong>
+        <button id="help-close-btn" class="help-close-btn" type="button" aria-label="关闭帮助">关闭</button>
+      </div>
+      <div class="help-body">
+        <p class="help-intro">30 秒入门：先聊一句，再开麦，再加一个日程提醒。</p>
+        <div class="help-section">
+          <div class="help-title">先做这 3 件事</div>
+          <ul class="help-list">
+            <li>在输入框输入一句话，按 Enter 就能开始。</li>
+            <li>点击“开麦”后直接说话，按 Ctrl+M 可快速切换。</li>
+            <li>打开“日程”添加提醒，让桌宠主动找你。</li>
+          </ul>
+        </div>
+        <div class="help-section">
+          <div class="help-title">常见情况</div>
+          <ul class="help-list">
+            <li>看不到角色：检查模型路径，必要时 Ctrl+F5 强刷。</li>
+            <li>开麦失败：先允许麦克风权限，再重试。</li>
+            <li>想更懂你：点“更多”进入人设卡。</li>
+          </ul>
+        </div>
+        <div class="help-actions">
+          <button id="help-open-onboarding-btn" type="button">重新走一遍新手引导</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="onboarding-modal" class="onboarding-modal" hidden>
+    <div class="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-step-title">
+      <div class="onboarding-head">
+        <strong>欢迎来到塔菲AI桌宠</strong>
+        <button id="onboarding-skip-btn" class="onboarding-skip-btn" type="button">稍后再说</button>
+      </div>
+      <p class="onboarding-brand-copy">让你的桌面，不止会动，也会懂你。</p>
+      <div class="onboarding-progress">
+        <span id="onboarding-progress-bar" class="onboarding-progress-bar"></span>
+      </div>
+      <div id="onboarding-step-index" class="onboarding-step-index">1 / 4</div>
+      <h3 id="onboarding-step-title" class="onboarding-step-title">先和塔菲打个招呼</h3>
+      <p id="onboarding-step-desc" class="onboarding-step-desc"></p>
+      <p id="onboarding-step-tip" class="onboarding-step-tip"></p>
+      <div class="onboarding-actions">
+        <button id="onboarding-prev-btn" type="button">上一步</button>
+        <button id="onboarding-next-btn" type="button">继续</button>
+        <button id="onboarding-done-btn" type="button" hidden>开始体验</button>
+      </div>
+    </div>
+  </div>
 
   <div id="schedule-modal" class="schedule-modal" hidden>
     <div class="schedule-dialog">
       <div class="schedule-head">
-        <strong>日程安排</strong>
-        <button id="schedule-close-btn" class="schedule-close-btn" type="button" aria-label="关闭">关闭</button>
-      </div>
-
-      <div class="schedule-form">
-        <label class="schedule-field">
-          <span>执行时间</span>
-          <input id="schedule-datetime" type="datetime-local" />
-        </label>
-
-        <div class="schedule-grid">
-          <label class="schedule-field">
-            <span>重复方式</span>
-            <select id="schedule-repeat">
-              <option value="once">只执行一次</option>
-              <option value="daily">每天重复</option>
-            </select>
-          </label>
-
-          <label class="schedule-field">
-            <span>执行类型</span>
-            <select id="schedule-mode">
-              <option value="assistant">让 Taffy 主动完成</option>
-              <option value="tool">工具任务</option>
-              <option value="reminder">普通提醒</option>
-            </select>
-          </label>
+        <div class="schedule-head-main">
+          <div class="schedule-head-icon" aria-hidden="true"></div>
+          <div class="schedule-head-text">
+            <strong>日程安排</strong>
+            <p>为桌宠设置定时任务，让它在合适的时间主动陪伴你</p>
+          </div>
         </div>
-
-        <label class="schedule-field">
-          <span>要做的事</span>
-          <textarea
-            id="schedule-task"
-            rows="4"
-            placeholder="例如：早上八点时，先向我问好，再提醒我今天把手头最重要的事先做完。"
-          ></textarea>
-        </label>
-
-        <div class="schedule-actions">
-          <button id="schedule-save-btn" type="button">添加日程</button>
+        <div class="schedule-head-actions">
+          <button id="schedule-close-btn" class="schedule-close-btn" type="button" aria-label="关闭">关闭</button>
         </div>
       </div>
 
-      <div class="schedule-list-wrap">
-        <div class="schedule-list-title">已设置日程</div>
-        <div id="schedule-list" class="schedule-list"></div>
+      <div class="schedule-toolbar">
+        <div class="schedule-form">
+          <label class="schedule-field schedule-field-time">
+            <span>执行时间</span>
+            <input id="schedule-datetime" type="datetime-local" />
+          </label>
+
+          <div class="schedule-grid">
+            <label class="schedule-field schedule-field-repeat">
+              <span>重复方式</span>
+              <select id="schedule-repeat">
+                <option value="once">只执行一次</option>
+                <option value="daily">每天重复</option>
+              </select>
+            </label>
+
+            <label class="schedule-field schedule-field-mode">
+              <span>执行类型</span>
+              <select id="schedule-mode">
+                <option value="assistant">让桌宠主动完成</option>
+                <option value="tool">工具任务</option>
+                <option value="reminder">普通提醒</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="schedule-field schedule-field-task">
+            <span>要做的事</span>
+            <textarea
+              id="schedule-task"
+              rows="4"
+              placeholder="例如：早上八点时，先向我问好，再提醒我今天把最重要的事先做完。"
+            ></textarea>
+          </label>
+
+          <div class="schedule-actions">
+            <button id="schedule-save-btn" type="button">添加日程</button>
+          </div>
+        </div>
+
+        <div class="schedule-list-wrap">
+          <div class="schedule-list-title">已设置日程</div>
+          <div id="schedule-list" class="schedule-list"></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <div id="persona-modal" class="persona-modal" hidden>
-    <div class="persona-dialog">
+    <div id="persona-modal" class="persona-modal" hidden>
+    <div class="persona-dialog" role="dialog" aria-modal="true" aria-labelledby="persona-title">
       <div class="persona-head">
-        <strong>人设卡</strong>
-        <button id="persona-close-btn" class="persona-close-btn" type="button" aria-label="关闭">关闭</button>
+        <div class="persona-head-main">
+          <span class="persona-head-icon" aria-hidden="true">✦</span>
+          <div class="persona-head-copy">
+            <strong id="persona-title">人设卡</strong>
+            <p>定义桌宠的身份、性格、说话方式与互动偏好</p>
+          </div>
+        </div>
+        <div class="persona-head-actions">
+          <button id="persona-preview-btn" class="persona-ghost-btn" type="button">预览效果</button>
+          <button id="persona-save-btn" class="persona-primary-btn" type="button">保存</button>
+          <button id="persona-close-btn" class="persona-close-btn" type="button" aria-label="关闭">关闭</button>
+        </div>
       </div>
 
-      <div class="persona-form">
-        <label class="persona-field">
-          <span>称呼与身份</span>
-          <textarea id="persona-identity" rows="2" placeholder="例如：你是 Taffy，是我熟悉的搭子，叫我小Q。"></textarea>
-        </label>
+      <div class="persona-scroll">
+        <section class="persona-section persona-basic-section">
+          <div class="persona-section-title">
+            <span class="persona-section-icon" aria-hidden="true">◌</span>
+            <span>基础信息</span>
+          </div>
+          <div class="persona-basic-grid">
+            <div class="persona-avatar-block">
+              <div class="persona-avatar-frame">
+                <img id="persona-avatar-preview" class="persona-avatar-sync" src="./assets/assistant_avatar_ref.png?v=2" alt="人设头像预览" />
+              </div>
+              <input id="persona-avatar-input" type="file" accept="image/*" hidden />
+              <div class="persona-avatar-actions">
+                <button id="persona-avatar-change-btn" class="persona-ghost-btn" type="button">更换形象</button>
+                <button id="persona-avatar-reset-btn" class="persona-ghost-btn" type="button">恢复默认</button>
+              </div>
+              <div class="persona-chip-row">
+                <span class="persona-chip">治愈系</span>
+                <span class="persona-chip">活泼</span>
+                <span class="persona-chip">高情商</span>
+                <span class="persona-chip">学习陪伴</span>
+              </div>
+            </div>
 
-        <label class="persona-field">
-          <span>我的偏好</span>
-          <textarea id="persona-preferences" rows="3" placeholder="例如：喜欢简短直给、喜欢被鼓励、喜欢二次元梗。"></textarea>
-        </label>
+            <div class="persona-form persona-form-basic">
+              <label class="persona-field">
+                <span>身份定位</span>
+                <textarea id="persona-identity" rows="2" placeholder="例如：你是塔菲，是我熟悉的搭子，叫我小Q。"></textarea>
+              </label>
+              <label class="persona-field">
+                <span>人设简介</span>
+                <textarea id="persona-companionship-style" rows="3" placeholder="例如：温柔、机灵、会陪伴，也会在你需要时认真提醒你。"></textarea>
+              </label>
+            </div>
+          </div>
+        </section>
 
-        <label class="persona-field">
-          <span>我不喜欢</span>
-          <textarea id="persona-dislikes" rows="3" placeholder="例如：不喜欢太官话、长篇大论、机械重复。"></textarea>
-        </label>
+        <section class="persona-section">
+          <div class="persona-section-title">
+            <span class="persona-section-icon" aria-hidden="true">☺</span>
+            <span>性格与说话风格</span>
+          </div>
+          <div class="persona-style-grid">
+            <div class="persona-style-item">核心性格（已选）：温柔 · 俏皮 · 主动 · 细心 · 可靠</div>
+            <div class="persona-style-item">语气：自然亲切</div>
+            <div class="persona-style-item">回复长度：适中</div>
+            <div class="persona-style-item">情绪表达：丰富</div>
+          </div>
+          <div class="persona-form">
+            <label class="persona-field">
+              <span>希望桌宠怎么说话</span>
+              <textarea id="persona-reply-style" rows="3" placeholder="例如：像真人朋友，语气自然，有温度，别太模板化。"></textarea>
+            </label>
+          </div>
+        </section>
 
-        <label class="persona-field">
-          <span>常聊话题</span>
-          <textarea id="persona-topics" rows="3" placeholder="例如：开发、游戏、学习计划、日常吐槽。"></textarea>
-        </label>
+        <section class="persona-section">
+          <div class="persona-section-title">
+            <span class="persona-section-icon" aria-hidden="true">♡</span>
+            <span>兴趣与互动偏好</span>
+          </div>
+          <div class="persona-form">
+            <label class="persona-field">
+              <span>我的偏好</span>
+              <textarea id="persona-preferences" rows="3" placeholder="例如：喜欢简短直给、喜欢被鼓励、喜欢二次元梗。"></textarea>
+            </label>
 
-        <label class="persona-field">
-          <span>希望 Taffy 怎么说话</span>
-          <textarea id="persona-reply-style" rows="3" placeholder="例如：像真人朋友，语气自然，有温度，别太模板化。"></textarea>
-        </label>
+            <label class="persona-field">
+              <span>常聊话题</span>
+              <textarea id="persona-topics" rows="3" placeholder="例如：开发、游戏、学习计划、日常吐槽。"></textarea>
+            </label>
 
-        <label class="persona-field">
-          <span>希望 Taffy 怎么陪我</span>
-          <textarea id="persona-companionship-style" rows="3" placeholder="例如：情绪低落时先安抚，再给建议；高效场景直接给步骤。"></textarea>
-        </label>
+            <label class="persona-field">
+              <span>我不喜欢</span>
+              <textarea id="persona-dislikes" rows="3" placeholder="例如：不喜欢太官话、长篇大论、机械重复。"></textarea>
+            </label>
+          </div>
+        </section>
 
-        <div class="persona-actions">
-          <button id="persona-save-btn" type="button">保存人设卡</button>
-        </div>
+        <section class="persona-section">
+          <div class="persona-section-title">
+            <span class="persona-section-icon" aria-hidden="true">✧</span>
+            <span>经典台词 / 对话示例</span>
+          </div>
+          <div class="persona-example-list">
+            <div class="persona-example-item">
+              <img class="persona-example-avatar persona-avatar-sync" src="./assets/assistant_avatar_ref.png?v=2" alt="" />
+              <span class="persona-example-text">早呀，今天也要一起加油哦。</span>
+            </div>
+            <div class="persona-example-item">
+              <img class="persona-example-avatar persona-avatar-sync" src="./assets/assistant_avatar_ref.png?v=2" alt="" />
+              <span class="persona-example-text">如果有点累了，我们先把最重要的一件事做完。</span>
+            </div>
+            <div class="persona-example-item">
+              <img class="persona-example-avatar persona-avatar-sync" src="./assets/assistant_avatar_ref.png?v=2" alt="" />
+              <span class="persona-example-text">我会一直陪着你，不用一个人硬撑。</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="persona-section persona-bottom-grid">
+          <div class="persona-mini-preview">
+            <div class="persona-mini-title">互动预览</div>
+            <div class="persona-mini-card">
+              <img class="persona-mini-avatar persona-avatar-sync" src="./assets/assistant_avatar_ref.png?v=2" alt="" />
+              <div class="persona-mini-copy">
+                <strong>塔菲</strong>
+                <p>温柔 · 俏皮 · 主动 · 细心 · 可靠</p>
+                <span>想和你一起把今天过得更好</span>
+              </div>
+            </div>
+          </div>
+          <div class="persona-mini-tips">
+            <div class="persona-mini-title">人设小贴士</div>
+            <ul>
+              <li>人设越清晰，互动越贴心。</li>
+              <li>可以随时微调，保存后会自动生效。</li>
+              <li>建议补充具体场景，陪伴效果更自然。</li>
+            </ul>
+          </div>
+        </section>
+      </div>
+
+      <div class="persona-footer-actions">
+        <button class="persona-ghost-btn" type="button">导入模板</button>
+        <button class="persona-ghost-btn" type="button">随机生成</button>
+        <button class="persona-ghost-btn" type="button">重置</button>
+        <button id="persona-apply-btn" class="persona-primary-btn" type="button">应用人设卡</button>
       </div>
     </div>
   </div>
-
   <div id="learning-review-backdrop" class="learning-review-backdrop" hidden></div>
   <aside id="learning-review-drawer" class="learning-review-drawer" hidden aria-label="学习审核侧栏">
-    <div class="learning-review-head">
-      <strong>学习审核</strong>
+    <div class="learning-review-head learning-card">
+      <div class="learning-review-title-wrap">
+        <span class="learning-title-badge" aria-hidden="true">&#10003;</span>
+        <strong>学习审核</strong>
+      </div>
       <div class="learning-review-head-actions">
-        <button id="learning-review-undo-btn" type="button">撤销上一步</button>
-        <button id="learning-review-close-btn" type="button" aria-label="关闭学习审核">关闭</button>
+        <button id="learning-review-undo-btn" class="learning-btn-with-icon" type="button">
+          <span class="learning-btn-icon" aria-hidden="true">&#8634;</span>
+          <span>撤销上一步</span>
+        </button>
+        <button id="learning-review-close-btn" class="learning-btn-with-icon" type="button" aria-label="关闭学习审核">
+          <span class="learning-btn-icon" aria-hidden="true">&times;</span>
+          <span>关闭</span>
+        </button>
       </div>
     </div>
 
     <div class="learning-review-toolbar">
-      <div class="learning-review-quick">
-        <label class="learning-field">
-          <span>inject_count</span>
-          <select id="learning-quick-inject">
-            <option value="0">0</option>
-            <option value="1">1</option>
-          </select>
-        </label>
-        <label class="learning-field">
-          <span>promotion_min_support</span>
-          <select id="learning-quick-support">
-            <option value="1">1</option>
-            <option value="2">2</option>
-          </select>
-        </label>
-        <button id="learning-quick-apply-btn" type="button">应用开关</button>
-      </div>
-
-      <div class="learning-review-tabs" role="tablist" aria-label="学习池切换">
-        <button id="learning-tab-candidates" class="learning-tab is-active" type="button" role="tab" aria-selected="true">候选池</button>
-        <button id="learning-tab-samples" class="learning-tab" type="button" role="tab" aria-selected="false">正式池</button>
-        <button id="learning-reload-btn" class="learning-reload-btn" type="button">重读</button>
-      </div>
-
-      <div class="learning-review-filters">
-        <label class="learning-field">
-          <span>score ≥</span>
-          <input id="learning-filter-score" type="number" min="0" max="1" step="0.01" value="0">
-        </label>
-        <label class="learning-field">
-          <span>confidence ≥</span>
-          <input id="learning-filter-confidence" type="number" min="0" max="1" step="0.01" value="0">
-        </label>
-        <label class="learning-field learning-field-keyword">
-          <span>关键词</span>
-          <input id="learning-filter-keyword" type="text" placeholder="搜索 assistant/compressed">
-        </label>
-        <div class="learning-filter-tools">
+      <section class="learning-card learning-section">
+        <div class="learning-review-quick">
           <label class="learning-field">
-            <span>排序</span>
-            <select id="learning-sort-mode">
-              <option value="score_desc">评分从高到低</option>
-              <option value="confidence_desc">置信从高到低</option>
-              <option value="support_desc">支持数从高到低</option>
-              <option value="updated_desc">最近更新优先</option>
+            <span class="learning-field-title">
+              <span>inject_count</span>
+              <span class="learning-help-dot" aria-hidden="true">i</span>
+            </span>
+            <select id="learning-quick-inject">
+              <option value="0">0</option>
+              <option value="1">1</option>
             </select>
           </label>
-          <div class="learning-filter-actions">
-            <button id="learning-filter-high-btn" type="button">仅看高分</button>
-            <button id="learning-filter-reset-btn" type="button">重置筛选</button>
+          <label class="learning-field">
+            <span class="learning-field-title">
+              <span>promotion_min_support</span>
+              <span class="learning-help-dot" aria-hidden="true">i</span>
+            </span>
+            <select id="learning-quick-support">
+              <option value="1">1</option>
+              <option value="2">2</option>
+            </select>
+          </label>
+          <button id="learning-quick-apply-btn" class="learning-primary-btn" type="button">应用开关</button>
+        </div>
+      </section>
+
+      <section class="learning-card learning-section">
+        <div class="learning-review-tabs" role="tablist" aria-label="学习池切换">
+          <button id="learning-tab-candidates" class="learning-tab is-active" type="button" role="tab" aria-selected="true">
+            <span class="learning-btn-icon" aria-hidden="true">&#128101;</span>
+            <span>候选池</span>
+          </button>
+          <button id="learning-tab-samples" class="learning-tab" type="button" role="tab" aria-selected="false">
+            <span class="learning-btn-icon" aria-hidden="true">&#9813;</span>
+            <span>正式池</span>
+          </button>
+        </div>
+        <button id="learning-reload-btn" class="learning-reload-btn learning-btn-with-icon" type="button">
+          <span class="learning-btn-icon" aria-hidden="true">&#8635;</span>
+          <span>重读</span>
+        </button>
+      </section>
+
+      <section class="learning-card learning-section">
+        <div class="learning-section-title">
+          <span class="learning-section-icon" aria-hidden="true">&#9661;</span>
+          <strong>筛选条件</strong>
+        </div>
+        <div class="learning-review-filters">
+          <label class="learning-field">
+            <span class="learning-field-title">score &#8805;</span>
+            <input id="learning-filter-score" type="number" min="0" max="1" step="0.01" value="0">
+          </label>
+          <label class="learning-field">
+            <span class="learning-field-title">confidence &#8805;</span>
+            <input id="learning-filter-confidence" type="number" min="0" max="1" step="0.01" value="0">
+          </label>
+          <label class="learning-field learning-field-keyword">
+            <span class="learning-field-title">关键词</span>
+            <div class="learning-input-with-icon">
+              <span class="learning-inline-icon" aria-hidden="true">&#9906;</span>
+              <input id="learning-filter-keyword" type="text" placeholder="搜索 assistant/compressed">
+            </div>
+          </label>
+          <div class="learning-filter-tools">
+            <label class="learning-field">
+              <span class="learning-field-title">排序</span>
+              <select id="learning-sort-mode">
+                <option value="score_desc">评分从高到低</option>
+                <option value="confidence_desc">置信从高到低</option>
+                <option value="support_desc">支持数从高到低</option>
+                <option value="updated_desc">最近更新优先</option>
+              </select>
+            </label>
+            <div class="learning-filter-actions">
+              <button id="learning-filter-high-btn" class="learning-btn-with-icon" type="button">
+                <span class="learning-btn-icon" aria-hidden="true">&#9734;</span>
+                <span>仅看高分</span>
+              </button>
+              <button id="learning-filter-reset-btn" class="learning-btn-with-icon" type="button">
+                <span class="learning-btn-icon" aria-hidden="true">&#8635;</span>
+                <span>重置筛选</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="learning-review-batch">
-        <label class="learning-select-all">
-          <input id="learning-select-all" type="checkbox">
-          <span id="learning-selected-count">已选 0</span>
-        </label>
-        <div class="learning-batch-actions">
-          <button id="learning-batch-delete-btn" type="button">批量删除</button>
-          <button id="learning-batch-up-btn" type="button">批量升权</button>
-          <button id="learning-batch-down-btn" type="button">批量降权</button>
-          <button id="learning-batch-promote-btn" type="button">批量晋升</button>
+      <section class="learning-card learning-section">
+        <div class="learning-section-title">
+          <span class="learning-section-icon" aria-hidden="true">&#8801;</span>
+          <strong>批量操作</strong>
         </div>
-      </div>
+        <div class="learning-review-batch">
+          <label class="learning-select-all">
+            <input id="learning-select-all" type="checkbox">
+            <span id="learning-selected-count">已选 0</span>
+          </label>
+          <div class="learning-batch-actions">
+            <button id="learning-batch-delete-btn" class="learning-btn-with-icon" type="button">
+              <span class="learning-btn-icon" aria-hidden="true">&#128465;</span>
+              <span>批量删除</span>
+            </button>
+            <button id="learning-batch-up-btn" class="learning-btn-with-icon" type="button">
+              <span class="learning-btn-icon" aria-hidden="true">&#8593;</span>
+              <span>批量升权</span>
+            </button>
+            <button id="learning-batch-down-btn" class="learning-btn-with-icon" type="button">
+              <span class="learning-btn-icon" aria-hidden="true">&#8595;</span>
+              <span>批量降权</span>
+            </button>
+            <button id="learning-batch-promote-btn" class="learning-btn-with-icon" type="button">
+              <span class="learning-btn-icon" aria-hidden="true">&#127942;</span>
+              <span>批量晋升</span>
+            </button>
+          </div>
+        </div>
+      </section>
 
-      <div id="learning-review-summary" class="learning-review-summary">加载中...</div>
+      <div id="learning-review-summary" class="learning-review-summary">学习记录为空，等你开始对话吧...</div>
     </div>
     <div id="learning-review-list" class="learning-review-list"></div>
   </aside>
 
   <script src="./app.js"></script>
-  <div id="subtitle-layer" class="subtitle-layer" aria-live="polite"
-       aria-atomic="true">
+  <div id="subtitle-layer" class="subtitle-layer" aria-live="polite" aria-atomic="true">
     <span class="subtitle-en"></span>
     <span class="subtitle-zh"></span>
+    <button id="subtitle-drag-handle" class="subtitle-drag-handle" type="button" aria-label="拖动字幕位置" title="拖动字幕位置">拖动</button>
   </div>
 </body>
 </html>

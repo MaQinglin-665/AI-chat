@@ -18,6 +18,7 @@ except ImportError:
     _audioop = None  # Python 3.13+ removed audioop; graceful degradation
 
 from config import (
+    DiagnosticError,
     GPT_SOVITS_DEFAULT_API_URL,
     GPT_SOVITS_DEFAULT_VOICE,
     ROOT_DIR,
@@ -115,6 +116,73 @@ def _safe_bool(value, default=False):
     if src in {"0", "false", "no", "off"}:
         return False
     return bool(default)
+
+
+def _is_timeout_error_text(message):
+    text = str(message or "").strip().lower()
+    return "timed out" in text or "timeout" in text
+
+
+def _is_network_error_text(message):
+    text = str(message or "").strip().lower()
+    markers = (
+        "getaddrinfo",
+        "name or service not known",
+        "temporary failure in name resolution",
+        "no route to host",
+        "network is unreachable",
+        "nodename nor servname",
+        "failed to resolve",
+        "dns",
+    )
+    return any(marker in text for marker in markers)
+
+
+def _is_connection_refused_text(message):
+    text = str(message or "").strip().lower()
+    markers = (
+        "connection refused",
+        "actively refused",
+        "winerror 10061",
+        "errno 111",
+    )
+    return any(marker in text for marker in markers)
+
+
+def _raise_gpt_sovits_connection_diagnostic(exc, api_url):
+    detail = str(getattr(exc, "reason", "") or exc).strip()
+    lower = detail.lower()
+    if _is_timeout_error_text(lower):
+        raise DiagnosticError(
+            code="tts_timeout",
+            reason="TTS 请求超时，GPT-SoVITS 未在限定时间内返回音频。",
+            solution="确认 GPT-SoVITS 服务负载正常，或调大超时时间后重试。",
+            config_key="tts.gpt_sovits_timeout_sec",
+            detail=detail,
+        ) from exc
+    if _is_connection_refused_text(lower):
+        raise DiagnosticError(
+            code="gpt_sovits_not_started",
+            reason=f"无法连接 GPT-SoVITS 服务：{api_url}",
+            solution="请先启动 GPT-SoVITS 服务，再确认地址和端口配置正确。",
+            config_key="tts.gpt_sovits_api_url",
+            detail=detail,
+        ) from exc
+    if _is_network_error_text(lower):
+        raise DiagnosticError(
+            code="network_connection_failed",
+            reason=f"网络连接失败，无法访问 GPT-SoVITS 地址：{api_url}",
+            solution="请检查网络、代理和 DNS 设置，确认该地址可访问。",
+            config_key="tts.gpt_sovits_api_url",
+            detail=detail,
+        ) from exc
+    raise DiagnosticError(
+        code="tts_connection_failed",
+        reason=f"无法连接 TTS 服务地址：{api_url}",
+        solution="请确认服务已启动，且地址与端口填写正确。",
+        config_key="tts.gpt_sovits_api_url",
+        detail=detail,
+    ) from exc
 
 
 def synthesize_volcengine_tts_bytes(text, tts_cfg, voice_override=None, prosody=None):
@@ -673,7 +741,12 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         or GPT_SOVITS_DEFAULT_API_URL
     ).strip()
     if not api_url:
-        raise RuntimeError("GPT-SoVITS api url is empty.")
+        raise DiagnosticError(
+            code="gpt_sovits_url_missing",
+            reason="GPT-SoVITS 接口地址为空，无法发起语音请求。",
+            solution="请填写可访问的 GPT-SoVITS 地址，例如 http://127.0.0.1:9880/tts。",
+            config_key="tts.gpt_sovits_api_url",
+        )
 
     method = str(tts_cfg.get("gpt_sovits_method", "POST") or "POST").strip().upper()
     if method not in {"POST", "GET"}:
@@ -798,7 +871,7 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
     ).strip()
     headers = {
         "Accept": "audio/*,application/octet-stream,application/json",
-        "User-Agent": "taffy-desktop-pet/1.0",
+        "User-Agent": "xinyu-ai-desktop-pet/1.0",
     }
     if api_key:
         token = api_key
@@ -832,9 +905,25 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
                 content_type = str(resp.headers.get("Content-Type", "")).lower()
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="ignore")
+            if int(exc.code) in {408, 504}:
+                raise DiagnosticError(
+                    code="tts_timeout",
+                    reason="TTS 请求超时，GPT-SoVITS 服务响应过慢。",
+                    solution="请确认服务负载正常，必要时调大超时时间。",
+                    config_key="tts.gpt_sovits_timeout_sec",
+                    detail=detail,
+                ) from exc
+            if int(exc.code) == 404:
+                raise DiagnosticError(
+                    code="gpt_sovits_endpoint_not_found",
+                    reason=f"GPT-SoVITS 地址返回 404：{api_url}",
+                    solution="请确认接口路径正确（常见为 /tts），并检查服务版本。",
+                    config_key="tts.gpt_sovits_api_url",
+                    detail=detail,
+                ) from exc
             raise RuntimeError(f"GPT-SoVITS HTTP {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
-            raise RuntimeError(f"GPT-SoVITS connection failed: {exc}") from exc
+            _raise_gpt_sovits_connection_diagnostic(exc, api_url)
 
         if not body:
             raise RuntimeError("GPT-SoVITS returned empty response.")
@@ -1101,8 +1190,11 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
                     if retry_audio3:
                         audio = retry_audio3
     if not audio:
-        raise RuntimeError(
-            "GPT-SoVITS 未返回音频数据。请确认语音服务（端口9880）已启动且正常运行。"
+        raise DiagnosticError(
+            code="gpt_sovits_not_started",
+            reason="GPT-SoVITS 未返回有效音频数据。",
+            solution="请确认 GPT-SoVITS 服务已启动并可正常合成语音。",
+            config_key="tts.gpt_sovits_api_url",
         )
     return audio
 
@@ -1164,12 +1256,19 @@ def synthesize_tts_audio(text, voice_override=None, prosody=None):
         raise RuntimeError("TTS text is empty.")
 
     if provider == "browser":
-        raise RuntimeError("TTS provider is 'browser'; server-side TTS is disabled.")
+        raise DiagnosticError(
+            code="tts_browser_provider",
+            reason="当前 TTS provider 为 browser，后端不会生成语音音频。",
+            solution="请改用 edge_tts、gpt_sovits 或 volcengine_tts。",
+            config_key="tts.provider",
+        )
 
     if provider not in SERVER_TTS_PROVIDERS:
-        raise RuntimeError(
-            f"Unsupported tts.provider: {provider}. "
-            "Use 'edge_tts', 'gpt_sovits', 'volcengine_tts', or 'browser'."
+        raise DiagnosticError(
+            code="tts_provider_unsupported",
+            reason=f"不支持的 TTS provider：{provider}",
+            solution="请改为 edge_tts、gpt_sovits、volcengine_tts 或 browser。",
+            config_key="tts.provider",
         )
 
     if provider == "gpt_sovits":
@@ -1189,7 +1288,12 @@ def synthesize_tts_audio(text, voice_override=None, prosody=None):
         )
 
     if edge_tts is None:
-        raise RuntimeError("edge-tts is not installed. Run: pip install edge-tts")
+        raise DiagnosticError(
+            code="edge_tts_missing_dependency",
+            reason="未安装 edge-tts 依赖，无法使用 edge_tts 语音。",
+            solution="请执行 pip install edge-tts 后重试。",
+            config_key="tts.provider",
+        )
 
     voice = str(voice_override or tts_cfg.get("voice") or TTS_DEFAULT_VOICE)
     # prosody already normalized above

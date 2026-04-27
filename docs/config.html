@@ -1,32 +1,346 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Taffy 配置中心：集中管理桌宠模型、LLM、语音、记忆和系统参数。">
+  <meta name="description" content="馨语Ai桌宠 配置中心：集中管理桌宠模型、LLM、语音、记忆和系统参数。">
   <meta name="robots" content="index,follow">
   <meta name="theme-color" content="#7c5cbf">
   <link rel="canonical" href="https://maqinglin-665.github.io/AI-chat/config.html">
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="apple-touch-icon" href="assets/og-cover.png">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Taffy · AI 桌宠">
+  <meta property="og:site_name" content="馨语Ai桌宠">
   <meta property="og:locale" content="zh_CN">
-  <meta property="og:title" content="Taffy 配置中心">
+  <meta property="og:title" content="馨语Ai桌宠 配置中心">
   <meta property="og:description" content="集中管理桌宠模型、LLM、语音、记忆、工具权限与运行时配置。">
   <meta property="og:url" content="https://maqinglin-665.github.io/AI-chat/config.html">
   <meta property="og:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Taffy 配置中心">
+  <meta name="twitter:title" content="馨语Ai桌宠 配置中心">
   <meta name="twitter:description" content="管理 LLM、语音、记忆和运行参数的一站式配置页面。">
   <meta name="twitter:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
-  <title>Taffy 配置中心</title>
+  <title>馨语Ai桌宠 配置中心</title>
   <link rel="stylesheet" href="css/style.css?v=20260423-rc14">
+  <style>
+    .onboarding-entry-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .onboarding-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1250;
+      background: rgba(255, 243, 252, 0.82);
+      backdrop-filter: blur(4px);
+    }
+
+    .onboarding-backdrop[hidden] {
+      display: none;
+    }
+
+    .onboarding-wizard {
+      position: fixed;
+      z-index: 1260;
+      top: 50%;
+      left: 50%;
+      width: min(860px, calc(100vw - 24px));
+      max-height: calc(100vh - 32px);
+      transform: translate(-50%, -50%);
+      background: linear-gradient(180deg, #fff9ff 0%, #f7fbff 100%);
+      border-radius: 26px;
+      box-shadow: 0 24px 58px rgba(208, 124, 192, 0.24);
+      border: 1px solid rgba(241, 175, 218, 0.4);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .onboarding-wizard[hidden] {
+      display: none;
+    }
+
+    .onboarding-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 22px 14px;
+      background: linear-gradient(135deg, #ffe9f8 0%, #ebf5ff 100%);
+      border-bottom: 1px solid rgba(235, 192, 225, 0.5);
+    }
+
+    .onboarding-title-wrap h3 {
+      margin: 0;
+      font-size: 1.2rem;
+      color: #5a3f84;
+    }
+
+    .onboarding-title-wrap p {
+      margin: 8px 0 0;
+      color: #6f5a8a;
+      font-size: 0.95rem;
+    }
+
+    .onboarding-close {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255, 255, 255, 0.8);
+      color: #7a5a9d;
+      cursor: pointer;
+      font-size: 1rem;
+      box-shadow: 0 6px 16px rgba(174, 128, 196, 0.22);
+    }
+
+    .onboarding-progress {
+      padding: 14px 22px 6px;
+    }
+
+    .onboarding-progress-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #7a5b95;
+      font-size: 0.88rem;
+      margin-bottom: 8px;
+    }
+
+    .onboarding-progress-bar {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(191, 201, 242, 0.32);
+      overflow: hidden;
+    }
+
+    .onboarding-progress-fill {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #f7a8d5 0%, #9bc8ff 100%);
+      transition: width 220ms ease;
+    }
+
+    .onboarding-body {
+      padding: 12px 22px 18px;
+      overflow: auto;
+    }
+
+    .onboarding-step {
+      display: none;
+    }
+
+    .onboarding-step.is-active {
+      display: block;
+    }
+
+    .onboarding-step h4 {
+      margin: 0 0 10px;
+      color: #5e447d;
+      font-size: 1.05rem;
+    }
+
+    .onboarding-step p {
+      color: #6b5a82;
+      line-height: 1.65;
+    }
+
+    .onboarding-choice-grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .onboarding-choice {
+      border: 1px solid rgba(232, 180, 217, 0.66);
+      border-radius: 16px;
+      padding: 12px;
+      background: #fff;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+      box-shadow: 0 8px 18px rgba(190, 150, 212, 0.14);
+      color: #5d476f;
+    }
+
+    .onboarding-choice:hover {
+      transform: translateY(-2px);
+      border-color: rgba(222, 138, 190, 0.84);
+      box-shadow: 0 12px 24px rgba(180, 127, 201, 0.2);
+    }
+
+    .onboarding-choice.is-selected {
+      border-color: #db7abc;
+      box-shadow: 0 14px 24px rgba(214, 122, 188, 0.24);
+      background: linear-gradient(180deg, #fff9ff 0%, #f8fcff 100%);
+    }
+
+    .onboarding-choice strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.98rem;
+    }
+
+    .onboarding-choice span {
+      display: block;
+      font-size: 0.86rem;
+      line-height: 1.45;
+      color: #6d6183;
+    }
+
+    .onboarding-choice-status {
+      margin: 10px 0 0;
+      color: #5f4f77;
+      font-size: 0.88rem;
+    }
+
+    .onboarding-inline-fields {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .onboarding-inline-fields label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: #624f7f;
+      font-size: 0.86rem;
+    }
+
+    .onboarding-inline-fields input,
+    .onboarding-inline-fields select {
+      border: 1px solid rgba(217, 175, 209, 0.68);
+      border-radius: 10px;
+      padding: 9px 10px;
+      background: rgba(255, 255, 255, 0.96);
+      color: #4f3e66;
+    }
+
+    .onboarding-inline-fields .full {
+      grid-column: 1 / -1;
+    }
+
+    .onboarding-status {
+      margin-top: 12px;
+    }
+
+    .onboarding-status strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.9rem;
+      color: #614a7b;
+    }
+
+    .onboarding-status-text {
+      margin: 0;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(246, 246, 255, 0.95);
+      border: 1px solid rgba(211, 197, 234, 0.6);
+      color: #5c4c74;
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .onboarding-status-text.is-ok {
+      background: rgba(231, 250, 242, 0.9);
+      border-color: rgba(135, 206, 173, 0.8);
+      color: #2f6d4e;
+    }
+
+    .onboarding-status-text.is-warn {
+      background: rgba(255, 246, 223, 0.94);
+      border-color: rgba(243, 197, 122, 0.78);
+      color: #825c1e;
+    }
+
+    .onboarding-status-text.is-error {
+      background: rgba(255, 236, 239, 0.95);
+      border-color: rgba(245, 156, 173, 0.8);
+      color: #8e3146;
+    }
+
+    .onboarding-inline-actions {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .onboarding-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-top: 1px solid rgba(231, 186, 220, 0.5);
+      padding: 14px 22px 18px;
+      background: #fffdfd;
+    }
+
+    .onboarding-actions-left,
+    .onboarding-actions-right {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .onboarding-next-hint {
+      margin: 6px 0 0;
+      width: 100%;
+      font-size: 0.86rem;
+      color: #825c1e;
+      line-height: 1.45;
+    }
+
+    .onboarding-actions .btn[hidden] {
+      display: none !important;
+    }
+
+    .onboarding-complete-card {
+      border: 1px solid rgba(174, 226, 197, 0.82);
+      background: linear-gradient(160deg, #f1fff8 0%, #f6fbff 100%);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 10px 22px rgba(130, 190, 162, 0.16);
+    }
+
+    @media (max-width: 860px) {
+      .onboarding-choice-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .onboarding-inline-fields {
+        grid-template-columns: 1fr;
+      }
+
+      .onboarding-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .onboarding-actions-left,
+      .onboarding-actions-right {
+        width: 100%;
+      }
+
+      .onboarding-actions .btn {
+        width: 100%;
+      }
+    }
+  </style>
 </head>
 <body class="config-page">
   <header class="site-header scrolled" id="top">
     <nav class="navbar container" aria-label="主导航">
-      <a class="logo" href="index.html">🎀 Taffy</a>
+      <a class="logo" href="index.html">🎀 馨语Ai桌宠</a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="navMenu" aria-label="切换导航菜单">
         <span></span>
         <span></span>
@@ -50,10 +364,11 @@
   <main class="config-page-main section">
     <div class="container config-page-shell">
       <section class="config-page-hero fade-in-up">
-        <h1 class="section-title">🧩 Taffy 配置中心</h1>
+        <h1 class="section-title">🧩 馨语Ai桌宠 配置中心</h1>
         <p class="config-page-subtitle">单独页面管理更多参数：模型、LLM、语音、记忆、观察、动作与工具权限。</p>
         <p class="center-actions">
           <a class="btn btn-outline" href="index.html#config">↩ 返回首页预览</a>
+          <a class="btn btn-outline" href="persona.html">Persona Card</a>
         </p>
       </section>
 
@@ -64,6 +379,7 @@
             <details class="sidebar-group" open>
               <summary>🧩 核心配置</summary>
               <ul class="config-side-list">
+                <li><a class="config-side-link" href="#cfg-onboarding">快速开始</a></li>
                 <li><a class="config-side-link" href="#cfg-basic">基础信息</a></li>
                 <li><a class="config-side-link" href="#cfg-desktop">服务与桌面窗口</a></li>
                 <li><a class="config-side-link" href="#cfg-llm">LLM 参数</a></li>
@@ -76,6 +392,7 @@
                 <li><a class="config-side-link" href="#cfg-memory">记忆与摘要</a></li>
                 <li><a class="config-side-link" href="#cfg-asr">ASR 与桌面观察</a></li>
                 <li><a class="config-side-link" href="#cfg-tools">动作、工具与风格</a></li>
+                <li><a class="config-side-link" href="persona.html">Persona Card</a></li>
               </ul>
             </details>
             <details class="sidebar-group">
@@ -94,14 +411,39 @@
 
         <div class="config-main">
           <div class="config-center-layout">
-            <section class="config-center-form fade-in-up">
+            <section class="config-center-form">
               <form id="advancedConfigForm" novalidate>
+            <article id="cfg-onboarding" class="config-group card-like">
+              <h2>快速开始</h2>
+              <div class="field-grid two-col">
+                <div id="noviceModeField" class="field novice-switch-row col-span-2">
+                  <span>新手模式（推荐）</span>
+                  <button
+                    id="noviceModeToggleBtn"
+                    class="novice-mode-switch"
+                    type="button"
+                    role="switch"
+                    aria-checked="true"
+                    aria-label="切换新手模式"
+                  ></button>
+                </div>
+                <p id="noviceModeStatus" class="write-status col-span-2">新手模式已开启：仅显示首次使用的关键项。</p>
+                <p id="quickStartStatus" class="write-status col-span-2">请先补齐必填项，然后执行连通性检测。</p>
+                <p class="field-note col-span-2">推荐流程：1）选择语音模式 2）检测配置连通性 3）一键应用配置。</p>
+                <div class="onboarding-entry-actions col-span-2">
+                  <button id="reopenOnboardingBtn" class="btn btn-primary" type="button">🌸 重新打开首次启动向导</button>
+                  <span id="onboardingConfigState" class="field-note">向导状态：未完成</span>
+                </div>
+                <input id="cfgOnboardingCompleted" type="checkbox" data-path="onboarding_completed" hidden>
+              </div>
+            </article>
+
             <article id="cfg-basic" class="config-group card-like">
               <h2>基础信息</h2>
               <div class="field-grid two-col">
                 <label class="field">
                   <span>桌宠名称</span>
-                  <input type="text" data-path="assistant_name" value="Taffy">
+                  <input type="text" data-path="assistant_name" value="馨语Ai桌宠">
                 </label>
                 <label class="field">
                   <span>Python 路径</span>
@@ -264,34 +606,69 @@
             <article id="cfg-tts" class="config-group card-like">
               <h2>语音 TTS</h2>
               <div class="field-grid two-col">
-                <label class="field">
+                <label class="field col-span-2">
+                  <span>快速语音模式</span>
+                  <div class="tts-mode-actions">
+                    <select id="ttsModePreset">
+                      <option value="edge">在线标准语音（Edge，免配置）</option>
+                      <option value="volcengine">云端定制语音（音色更好）</option>
+                      <option value="gpt_sovits">本地高自由度（GPT-SoVITS）</option>
+                      <option value="custom">自定义（保持当前参数）</option>
+                    </select>
+                    <button id="applyTtsModePresetBtn" class="btn btn-outline" type="button">一键套用</button>
+                  </div>
+                  <small class="field-note">建议流程：先选模式并套用，再执行“检测配置连通性”，最后点击“一键应用配置”。</small>
+                </label>
+                <p id="ttsModePresetStatus" class="write-status col-span-2">当前未套用快速语音模式。</p>
+                <label class="field" data-tts-group="common">
                   <span>语音 Provider</span>
                   <select data-path="tts.provider">
                     <option value="gpt_sovits" selected>gpt_sovits</option>
                     <option value="edge_tts">edge_tts</option>
+                    <option value="volcengine_tts">volcengine_tts</option>
                     <option value="browser">browser</option>
                   </select>
                 </label>
-                <label class="field">
+                <label class="field" data-tts-group="common">
                   <span>voice</span>
                   <input type="text" data-path="tts.voice" value="default">
                 </label>
-                <label class="field col-span-2">
+                <label class="field" data-tts-group="volcengine">
+                  <span>Volcengine app_id_env</span>
+                  <input type="text" data-path="tts.app_id_env" value="VOLCENGINE_APP_ID">
+                </label>
+                <label class="field" data-tts-group="volcengine">
+                  <span>Volcengine access_token_env</span>
+                  <input type="text" data-path="tts.access_token_env" value="VOLCENGINE_ACCESS_TOKEN">
+                </label>
+                <label class="field" data-tts-group="volcengine">
+                  <span>Volcengine secret_key_env</span>
+                  <input type="text" data-path="tts.secret_key_env" value="VOLCENGINE_SECRET_KEY">
+                </label>
+                <label class="field" data-tts-group="volcengine">
+                  <span>Volcengine cluster</span>
+                  <input type="text" data-path="tts.cluster" value="volcano_icl">
+                </label>
+                <label class="field col-span-2" data-tts-group="volcengine">
+                  <span>Volcengine API URL</span>
+                  <input type="text" data-path="tts.api_url" value="https://openspeech.bytedance.com/api/v1/tts">
+                </label>
+                <label class="field col-span-2" data-tts-group="gpt_sovits">
                   <span>GPT-SoVITS API URL</span>
                   <input type="text" data-path="tts.gpt_sovits_api_url" value="http://127.0.0.1:9880/tts">
                 </label>
-                <label class="field">
+                <label class="field" data-tts-group="gpt_sovits" data-tts-level="advanced">
                   <span>请求方式</span>
                   <select data-path="tts.gpt_sovits_method">
                     <option value="POST" selected>POST</option>
                     <option value="GET">GET</option>
                   </select>
                 </label>
-                <label class="field">
+                <label class="field" data-tts-group="gpt_sovits" data-tts-level="advanced">
                   <span>超时（秒）</span>
                   <input type="number" min="1" data-path="tts.gpt_sovits_timeout_sec" value="60">
                 </label>
-                <label class="field">
+                <label class="field" data-tts-group="gpt_sovits" data-tts-level="advanced">
                   <span>音频格式</span>
                   <select data-path="tts.gpt_sovits_format">
                     <option value="wav" selected>wav</option>
@@ -299,7 +676,7 @@
                     <option value="ogg">ogg</option>
                   </select>
                 </label>
-                <label class="field">
+                <label class="field" data-tts-group="gpt_sovits" data-tts-level="advanced">
                   <span>text_lang</span>
                   <select data-path="tts.gpt_sovits_text_lang">
                     <option value="zh" selected>zh</option>
@@ -307,34 +684,34 @@
                     <option value="ja">ja</option>
                   </select>
                 </label>
-                <label class="field">
+                <label class="field" data-tts-group="common" data-tts-level="advanced">
                   <span>speed_ratio <em id="v_tts_speed">0.95</em></span>
                   <input id="tts_speed" type="range" min="0.5" max="2" step="0.01" data-path="tts.speed_ratio" value="0.95" data-value-target="v_tts_speed">
                 </label>
-                <label class="field">
+                <label class="field" data-tts-group="common" data-tts-level="advanced">
                   <span>volume_ratio <em id="v_tts_volume">1.00</em></span>
                   <input id="tts_volume" type="range" min="0" max="2" step="0.01" data-path="tts.volume_ratio" value="1" data-value-target="v_tts_volume">
                 </label>
-                <label class="field">
+                <label class="field" data-tts-group="common" data-tts-level="advanced">
                   <span>pitch_ratio <em id="v_tts_pitch">1.00</em></span>
                   <input id="tts_pitch" type="range" min="0.5" max="2" step="0.01" data-path="tts.pitch_ratio" value="1" data-value-target="v_tts_pitch">
                 </label>
-                <label class="field switch-field">
+                <label class="field switch-field" data-tts-group="gpt_sovits" data-tts-level="advanced">
                   <span>实时 TTS</span>
                   <input type="checkbox" data-path="tts.gpt_sovits_realtime_tts">
                 </label>
-                <label class="field switch-field">
+                <label class="field switch-field" data-tts-group="common" data-tts-level="advanced">
                   <span>允许浏览器兜底</span>
                   <input type="checkbox" data-path="tts.allow_browser_fallback">
                 </label>
-                <label class="field col-span-2">
+                <label class="field col-span-2" data-tts-group="gpt_sovits" data-tts-level="advanced">
                   <span>Prompt 文本</span>
                   <textarea rows="2" data-path="tts.gpt_sovits_prompt_text">你好呀，今天也要元气满满。</textarea>
                 </label>
               </div>
             </article>
 
-            <article id="cfg-memory" class="config-group card-like">
+            <article id="cfg-memory" class="config-group card-like" data-advanced-section="true">
               <h2>记忆与摘要</h2>
               <div class="field-grid three-col">
                 <label class="field switch-field">
@@ -388,7 +765,7 @@
               </div>
             </article>
 
-            <article id="cfg-asr" class="config-group card-like">
+            <article id="cfg-asr" class="config-group card-like" data-advanced-section="true">
               <h2>ASR 与桌面观察</h2>
               <div class="field-grid three-col">
                 <label class="field switch-field">
@@ -476,7 +853,7 @@ tafi</textarea>
               </div>
             </article>
 
-            <article id="cfg-tools" class="config-group card-like">
+            <article id="cfg-tools" class="config-group card-like" data-advanced-section="true">
               <h2>动作、工具与风格</h2>
               <div class="field-grid three-col">
                 <label class="field switch-field">
@@ -581,7 +958,7 @@ tafi</textarea>
             <aside id="cfg-preview" class="config-center-preview fade-in-up card-like">
               <h2>实时 JSON 预览</h2>
               <pre id="advancedConfigPreview" class="config-preview"><code>{
-  "assistant_name": "Taffy"
+  "assistant_name": "馨语Ai桌宠"
 }</code></pre>
               <div class="config-actions">
                 <button id="copyAdvancedConfigBtn" class="btn btn-primary" type="button">📋 复制配置</button>
@@ -622,6 +999,7 @@ tafi</textarea>
 
               <h3 id="cfg-health">配置连通性自检</h3>
               <p class="write-note">一键检查关键地址是否可达，并给出修复建议。</p>
+              <p class="write-note">检测失败时会显示：问题原因、解决方法、对应配置项，便于新手快速修复。</p>
               <div class="project-write-actions">
                 <button id="checkConnectivityBtn" class="btn btn-outline" type="button">🧪 检测配置连通性</button>
               </div>
@@ -630,19 +1008,19 @@ tafi</textarea>
                 <li class="health-item" data-health-id="llm">
                   <p class="health-head">LLM 接口</p>
                   <p class="health-state">待检测</p>
-                  <p class="health-detail">将检测 <code>llm.base_url</code> 是否可达。</p>
+                  <p class="health-detail">将检测 <code>llm.base_url</code> 是否可达，并在失败时提示 <code>llm.base_url / llm.model / llm.api_key_env</code>。</p>
                   <div class="health-actions"></div>
                 </li>
                 <li class="health-item" data-health-id="tts">
                   <p class="health-head">TTS 接口</p>
                   <p class="health-state">待检测</p>
-                  <p class="health-detail">将检测 <code>tts.gpt_sovits_api_url</code> 是否可达。</p>
+                  <p class="health-detail">将按 <code>tts.provider</code> 检查语音配置可用性，并在失败时提示 <code>tts.gpt_sovits_api_url / tts.gpt_sovits_timeout_sec</code>。</p>
                   <div class="health-actions"></div>
                 </li>
                 <li class="health-item" data-health-id="reload">
                   <p class="health-head">配置重载接口</p>
                   <p class="health-state">待检测</p>
-                  <p class="health-detail">将检测 <code>/api/config/reload</code> 可用性。</p>
+                  <p class="health-detail">将检测 <code>/api/config/reload</code> 可用性，并返回 <code>model_path / config.json</code> 相关诊断。</p>
                   <div class="health-actions"></div>
                 </li>
                 <li class="health-item" data-health-id="restart">
@@ -698,13 +1076,13 @@ tafi</textarea>
 
   <footer class="site-footer">
     <div class="container footer-content">
-      <p>Taffy · AI 桌宠 © 2025</p>
+      <p>馨语Ai桌宠 © 2025</p>
       <div class="footer-links">
         <a id="footerGithubLink" href="https://github.com/MaQinglin-665/AI-chat" target="_blank" rel="noopener noreferrer">GitHub</a>
         <a id="footerIssuesLink" href="https://github.com/MaQinglin-665/AI-chat/issues" target="_blank" rel="noopener noreferrer">反馈问题</a>
         <a id="footerContactLink" href="https://github.com/MaQinglin-665" target="_blank" rel="noopener noreferrer">联系作者</a>
       </div>
-      <p>Made with 💜 by Taffy Team</p>
+      <p>Made with 💜 by 馨语Ai桌宠 Team</p>
     </div>
   </footer>
 
@@ -762,11 +1140,979 @@ tafi</textarea>
     </p>
   </aside>
 
+  <div id="onboardingBackdrop" class="onboarding-backdrop" hidden></div>
+  <aside id="onboardingWizard" class="onboarding-wizard" role="dialog" aria-modal="true" aria-labelledby="onboardingWizardTitle" aria-hidden="true" tabindex="-1" hidden>
+    <div class="onboarding-header">
+      <div class="onboarding-title-wrap">
+        <h3 id="onboardingWizardTitle">✨ Taffy 首次启动向导</h3>
+        <p>一步一步完成基础配置，几分钟就能开始和塔菲聊天。</p>
+      </div>
+      <button id="onboardingCloseBtn" class="onboarding-close" type="button" aria-label="关闭向导">✕</button>
+    </div>
+    <div class="onboarding-progress">
+      <div class="onboarding-progress-top">
+        <span id="onboardingStepBadge">步骤 1 / 7</span>
+        <span id="onboardingStepHint">欢迎</span>
+      </div>
+      <div class="onboarding-progress-bar">
+        <span id="onboardingProgressFill" class="onboarding-progress-fill"></span>
+      </div>
+    </div>
+    <div class="onboarding-body">
+      <section class="onboarding-step is-active" data-step="1">
+        <h4>欢迎来到 Taffy AI 桌宠</h4>
+        <p>这个向导会帮你完成最关键的配置：选择模式、语音方式、连通性测试，以及保存配置。你随时可以从配置中心重新打开它。</p>
+        <p class="field-note">目标是让你尽快进入“可聊天、可发声、可长期陪伴”的状态。</p>
+      </section>
+
+      <section class="onboarding-step" data-step="2">
+        <h4>选择使用模式</h4>
+        <p>先决定你想怎么接入大模型。后续都可以再改。</p>
+        <div class="onboarding-choice-grid">
+          <button class="onboarding-choice is-selected" type="button" data-onboarding-mode="quick">
+            <strong>快速体验</strong>
+            <span>默认用 OpenAI 兼容接口模板，适合先跑通流程。</span>
+          </button>
+          <button class="onboarding-choice" type="button" data-onboarding-mode="custom">
+            <strong>自定义 API</strong>
+            <span>自己填写 Provider / Base URL / 模型名，更灵活。</span>
+          </button>
+          <button class="onboarding-choice" type="button" data-onboarding-mode="ollama">
+            <strong>本地 Ollama</strong>
+            <span>优先本地运行，隐私友好，不依赖云端 Key。</span>
+          </button>
+        </div>
+        <p id="onboardingModeStatus" class="onboarding-choice-status">当前模式：快速体验</p>
+        <div id="onboardingCustomApiFields" class="onboarding-inline-fields" hidden>
+          <label>
+            Provider
+            <select id="onboardingCustomProvider">
+              <option value="openai-compatible" selected>openai-compatible</option>
+              <option value="openai">openai</option>
+              <option value="ollama">ollama</option>
+            </select>
+          </label>
+          <label>
+            API Key 环境变量名
+            <input id="onboardingCustomApiEnv" type="text" value="OPENAI_API_KEY" placeholder="例如 OPENAI_API_KEY">
+          </label>
+          <label class="full">
+            Base URL
+            <input id="onboardingCustomBaseUrl" type="text" value="https://api.openai.com/v1" placeholder="https://api.openai.com/v1">
+          </label>
+          <label class="full">
+            模型名
+            <input id="onboardingCustomModel" type="text" value="gpt-4o-mini" placeholder="例如 gpt-4o-mini">
+          </label>
+        </div>
+      </section>
+
+      <section class="onboarding-step" data-step="3">
+        <h4>选择语音模式</h4>
+        <p>语音模式决定塔菲“怎么说话”。推荐先用本地系统语音；如果想要在线语音，可选在线标准语音（Edge，无需单独 API Key，仅需联网），稳定后再切 GPT-SoVITS。</p>
+        <div class="onboarding-choice-grid">
+          <button class="onboarding-choice is-selected" type="button" data-onboarding-voice="browser">
+            <strong>本地系统语音</strong>
+            <span>零门槛，本机直接发声，不依赖云端密钥，适合首次体验。</span>
+          </button>
+          <button class="onboarding-choice" type="button" data-onboarding-voice="edge_tts">
+            <strong>在线标准语音（Edge）</strong>
+            <span>在线语音，通常无需单独 API Key（需联网），中文效果较好，部署简单。</span>
+          </button>
+          <button class="onboarding-choice" type="button" data-onboarding-voice="gpt_sovits">
+            <strong>GPT-SoVITS</strong>
+            <span>可玩性高，需本地服务已启动并可访问。</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="onboarding-step" data-step="4">
+        <h4>测试 LLM 连接</h4>
+        <p>将调用“配置连通性检测”中的 LLM 检查项。失败时会给你中文修复建议。</p>
+        <div class="onboarding-inline-actions">
+          <button id="onboardingTestLlmBtn" class="btn btn-outline" type="button">🧪 开始测试 LLM</button>
+        </div>
+        <div class="onboarding-status">
+          <strong>测试结果</strong>
+          <p id="onboardingLlmStatus" class="onboarding-status-text">尚未测试。</p>
+        </div>
+      </section>
+
+      <section class="onboarding-step" data-step="5">
+        <h4>测试 TTS 发声</h4>
+        <p>先检测 TTS 配置，再尝试实际播放测试语音。若服务端失败，会提示你如何修复。</p>
+        <div class="onboarding-inline-actions">
+          <button id="onboardingTestTtsBtn" class="btn btn-outline" type="button">🔊 开始测试 TTS</button>
+        </div>
+        <div class="onboarding-status">
+          <strong>测试结果</strong>
+          <p id="onboardingTtsStatus" class="onboarding-status-text">尚未测试。</p>
+        </div>
+      </section>
+
+      <section class="onboarding-step" data-step="6">
+        <h4>保存配置</h4>
+        <p>将执行“一键应用配置”（校验 → 预览差异 → 写入并备份 → 重载）。完成后会自动写入 <code>onboarding_completed=true</code>。</p>
+        <p class="field-note">首次保存时会要求选择项目配置目录，请选择桌宠项目根目录（包含 <code>config.json</code> 的目录）。</p>
+        <div class="onboarding-inline-actions">
+          <button id="onboardingSaveBtn" class="btn btn-primary" type="button">💾 保存并应用配置</button>
+        </div>
+        <div class="onboarding-status">
+          <strong>保存状态</strong>
+          <p id="onboardingSaveStatus" class="onboarding-status-text">尚未保存。</p>
+        </div>
+      </section>
+
+      <section class="onboarding-step" data-step="7">
+        <div class="onboarding-complete-card">
+          <h4>配置完成，可以启动塔菲 🎉</h4>
+          <p>你已经完成首次基础配置。后续可在配置中心继续微调参数（模型、语音、记忆、主动对话等）。</p>
+          <p class="field-note">如需再次引导，点击“重新打开首次启动向导”即可。</p>
+        </div>
+      </section>
+    </div>
+    <div class="onboarding-actions">
+      <div class="onboarding-actions-left">
+        <button id="onboardingPrevBtn" class="btn btn-outline" type="button">上一步</button>
+        <button id="onboardingSkipBtn" class="btn btn-outline" type="button">稍后再说</button>
+      </div>
+      <div class="onboarding-actions-right">
+        <button id="onboardingNextBtn" class="btn btn-primary" type="button">下一步</button>
+        <button id="onboardingFinishBtn" class="btn btn-primary" type="button" hidden>完成</button>
+      </div>
+    </div>
+    <p id="onboardingNextHint" class="onboarding-next-hint" hidden></p>
+  </aside>
+
   <button id="backToTop" class="back-to-top" type="button" aria-label="返回顶部">↑</button>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="js/main.js?v=20260423-rc14" defer></script>
   <script data-live2d-autoload="live2d/autoload.js"></script>
-  <script src="js/config-page.js" defer></script>
+  <script src="js/config-page.js?v=20260427-rc3" defer></script>
+  <script>
+    (() => {
+      const STORAGE_KEY = 'taffy_onboarding_completed';
+      const SAMPLE_TTS_TEXT = '你好呀，我是塔菲。语音测试通过啦。';
+      const TOTAL_STEPS = 7;
+
+      const getById = (id) => document.getElementById(id);
+      const getFieldByPath = (path) => document.querySelector(`[data-path="${path}"]`);
+
+      const setStatus = (element, message, tone = 'neutral') => {
+        if (!element) {
+          return;
+        }
+        element.textContent = message;
+        element.classList.remove('is-ok', 'is-error', 'is-warn');
+        if (tone === 'ok') {
+          element.classList.add('is-ok');
+        } else if (tone === 'error') {
+          element.classList.add('is-error');
+        } else if (tone === 'warn') {
+          element.classList.add('is-warn');
+        }
+      };
+
+      const safeReadStorage = (key) => {
+        try {
+          return window.localStorage.getItem(key);
+        } catch (_) {
+          return null;
+        }
+      };
+
+      const safeWriteStorage = (key, value) => {
+        try {
+          window.localStorage.setItem(key, value);
+        } catch (_) {
+          // ignore storage errors to keep onboarding flow usable
+        }
+      };
+
+      const readApiToken = async () => {
+        const fromQuery = (() => {
+          try {
+            const value = String(new URLSearchParams(window.location.search || '').get('api_token') || '').trim();
+            return value;
+          } catch (_) {
+            return '';
+          }
+        })();
+        if (fromQuery) {
+          return fromQuery;
+        }
+        const keys = ['taffy_api_token', 'TAFFY_API_TOKEN'];
+        for (const key of keys) {
+          const value = String(safeReadStorage(key) || '').trim();
+          if (value) {
+            return value;
+          }
+        }
+        if (window.electronAPI && typeof window.electronAPI.getApiToken === 'function') {
+          try {
+            const token = String(await window.electronAPI.getApiToken() || '').trim();
+            if (token) {
+              safeWriteStorage('taffy_api_token', token);
+              return token;
+            }
+          } catch (_) {
+            // ignore bridge read errors
+          }
+        }
+        return '';
+      };
+
+      const dispatchFieldEvents = (field) => {
+        if (!field) {
+          return;
+        }
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+
+      const setPathValue = (path, value) => {
+        const field = getFieldByPath(path);
+        if (!field) {
+          return;
+        }
+        const type = (field.type || '').toLowerCase();
+        if (type === 'checkbox') {
+          field.checked = Boolean(value);
+        } else {
+          field.value = String(value ?? '');
+        }
+        dispatchFieldEvents(field);
+      };
+
+      const waitFor = (checker, { timeoutMs = 30000, intervalMs = 160 } = {}) => new Promise((resolve, reject) => {
+        const start = Date.now();
+        const timer = window.setInterval(() => {
+          if (checker()) {
+            window.clearInterval(timer);
+            resolve();
+            return;
+          }
+          if (Date.now() - start > timeoutMs) {
+            window.clearInterval(timer);
+            reject(new Error('TIMEOUT'));
+          }
+        }, intervalMs);
+      });
+
+      const readHealthTone = (id) => {
+        const item = document.querySelector(`#connectivityList [data-health-id="${id}"]`);
+        if (!item) {
+          return 'error';
+        }
+        if (item.classList.contains('is-ok')) {
+          return 'ok';
+        }
+        if (item.classList.contains('is-warn')) {
+          return 'warn';
+        }
+        if (item.classList.contains('is-error')) {
+          return 'error';
+        }
+        if (item.classList.contains('is-running')) {
+          return 'running';
+        }
+        return 'idle';
+      };
+
+      const readHealthDetail = (id) => {
+        const item = document.querySelector(`#connectivityList [data-health-id="${id}"]`);
+        if (!item) {
+          return '';
+        }
+        const state = item.querySelector('.health-state')?.textContent?.trim() || '';
+        const detail = item.querySelector('.health-detail')?.textContent?.trim() || '';
+        return [state, detail].filter(Boolean).join('；');
+      };
+
+      const applyModePreset = (mode, customFields) => {
+        if (mode === 'ollama') {
+          setPathValue('llm.provider', 'ollama');
+          setPathValue('llm.base_url', 'http://127.0.0.1:11434/v1');
+          setPathValue('llm.model', 'qwen2.5:7b');
+          return;
+        }
+        if (mode === 'custom') {
+          const provider = String(customFields.provider?.value || 'openai-compatible').trim() || 'openai-compatible';
+          const baseUrl = String(customFields.baseUrl?.value || '').trim();
+          const model = String(customFields.model?.value || '').trim();
+          const apiEnv = String(customFields.apiEnv?.value || '').trim();
+          setPathValue('llm.provider', provider);
+          if (baseUrl) {
+            setPathValue('llm.base_url', baseUrl);
+          }
+          if (model) {
+            setPathValue('llm.model', model);
+          }
+          if (apiEnv) {
+            setPathValue('llm.api_key_env', apiEnv);
+          }
+          return;
+        }
+        setPathValue('llm.provider', 'openai-compatible');
+        setPathValue('llm.base_url', 'https://dashscope.aliyuncs.com/compatible-mode/v1');
+        setPathValue('llm.model', 'qwen-plus');
+        setPathValue('llm.api_key_env', 'DASHSCOPE_API_KEY');
+      };
+
+      const applyVoicePreset = (voice) => {
+        if (voice === 'edge_tts') {
+          setPathValue('tts.provider', 'edge_tts');
+          setPathValue('tts.voice', 'zh-CN-XiaoxiaoNeural');
+          return;
+        }
+        if (voice === 'gpt_sovits') {
+          setPathValue('tts.provider', 'gpt_sovits');
+          setPathValue('tts.voice', 'default');
+          setPathValue('tts.gpt_sovits_api_url', 'http://127.0.0.1:9880/tts');
+          return;
+        }
+        setPathValue('tts.provider', 'browser');
+      };
+
+      const playBrowserSpeech = async () => {
+        if (!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance === 'undefined') {
+          throw new Error('当前环境不支持本地系统语音，请改用在线标准语音（Edge）或 GPT-SoVITS。');
+        }
+        await new Promise((resolve, reject) => {
+          const utterance = new window.SpeechSynthesisUtterance(SAMPLE_TTS_TEXT);
+          utterance.lang = 'zh-CN';
+          utterance.rate = 1;
+          utterance.pitch = 1;
+          utterance.volume = 1;
+          utterance.onend = () => resolve();
+          utterance.onerror = () => reject(new Error('本地系统语音播放失败，请检查系统语音组件。'));
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(utterance);
+        });
+      };
+
+      const playServerTts = async () => {
+        const host = String(getFieldByPath('server.host')?.value || '127.0.0.1').trim() || '127.0.0.1';
+        const port = String(getFieldByPath('server.port')?.value || '8123').trim() || '8123';
+        const baseHost = host === '0.0.0.0' || host === '::' || host === '[::]' ? '127.0.0.1' : host;
+        const endpoint = `http://${baseHost}:${port}/api/tts`;
+        const headers = { 'Content-Type': 'application/json' };
+        const token = await readApiToken();
+        if (token) {
+          headers['X-Taffy-Token'] = token;
+        }
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ text: SAMPLE_TTS_TEXT })
+        });
+
+        if (!response.ok) {
+          let reason = '';
+          try {
+            const payload = await response.json();
+            reason = String(payload?.error || payload?.message || '').trim();
+          } catch (_) {
+            reason = '';
+          }
+          throw new Error(reason || `服务端返回状态码 ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        if (!(blob instanceof Blob) || blob.size < 120) {
+          throw new Error('收到的音频数据异常，请检查 TTS 配置。');
+        }
+
+        const objectUrl = URL.createObjectURL(blob);
+        try {
+          await new Promise((resolve, reject) => {
+            const audio = new Audio(objectUrl);
+            audio.addEventListener('ended', resolve, { once: true });
+            audio.addEventListener('error', () => reject(new Error('音频播放失败，请检查系统音频设备。')), { once: true });
+            audio.play().catch(() => reject(new Error('浏览器阻止自动播放，请再次点击测试按钮重试。')));
+          });
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      };
+
+      const runConnectivityCheck = async () => {
+        const checkBtn = getById('checkConnectivityBtn');
+        const listNode = getById('connectivityList');
+        const statusNode = getById('connectivityStatus');
+        if (!checkBtn || !listNode) {
+          throw new Error('未找到连通性检测按钮，请刷新页面后重试。');
+        }
+        if (checkBtn.disabled) {
+          throw new Error('连通性检测正在运行，请稍后再试。');
+        }
+        ['llm', 'tts', 'reload', 'restart'].forEach((id) => {
+          const item = listNode.querySelector(`[data-health-id="${id}"]`);
+          if (!item) {
+            return;
+          }
+          item.classList.remove('is-running', 'is-ok', 'is-warn', 'is-error');
+          const stateNode = item.querySelector('.health-state');
+          const detailNode = item.querySelector('.health-detail');
+          if (stateNode) {
+            stateNode.textContent = '待检测';
+          }
+          if (detailNode) {
+            detailNode.textContent = '向导正在重新检测该项，请稍候。';
+          }
+        });
+        checkBtn.click();
+        await waitFor(
+          () => !checkBtn.disabled && !listNode.querySelector('.health-item.is-running'),
+          { timeoutMs: 40000, intervalMs: 180 }
+        );
+        const statusText = String(statusNode?.textContent || '').trim();
+        if (statusText.includes('配置错误')) {
+          const invalidFields = Array.from(document.querySelectorAll('[data-path][aria-invalid="true"]'));
+          const details = invalidFields.slice(0, 3).map((field) => {
+            const path = String(field.getAttribute('data-path') || '').trim();
+            const message = String(field.closest('.field')?.querySelector('.field-error')?.textContent || '').trim();
+            if (path && message) {
+              return `${path}：${message}`;
+            }
+            return path || message;
+          }).filter(Boolean);
+          if (details.length) {
+            throw new Error(`配置项校验未通过（${details.join('；')}）。请先修正后再测试。`);
+          }
+          throw new Error('当前配置有必填项错误，请先按提示修正后再测试。');
+        }
+      };
+
+      const readSavedOnboardingFromBackend = async () => {
+        const portRaw = String(getFieldByPath('server.port')?.value || '8123').trim() || '8123';
+        const hostRaw = String(getFieldByPath('server.host')?.value || '127.0.0.1').trim() || '127.0.0.1';
+        const host = hostRaw === '0.0.0.0' || hostRaw === '::' || hostRaw === '[::]' ? '127.0.0.1' : hostRaw;
+        const candidates = [
+          `${window.location.origin}/config.json`,
+          `http://${host}:${portRaw}/config.json`,
+          `http://127.0.0.1:${portRaw}/config.json`,
+          'http://127.0.0.1:8123/config.json'
+        ];
+        const unique = Array.from(new Set(candidates.filter((url) => /^https?:\/\//i.test(url))));
+        for (const url of unique) {
+          try {
+            const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+            if (!response.ok) {
+              continue;
+            }
+            const payload = await response.json();
+            if (payload && typeof payload.onboarding_completed === 'boolean') {
+              return payload.onboarding_completed;
+            }
+          } catch (_) {
+            // ignore candidate failures and continue
+          }
+        }
+        return null;
+      };
+
+      const readSavedOnboardingFromProjectConfig = async () => {
+        if (!window.indexedDB) {
+          return null;
+        }
+
+        const HANDLE_DB_NAME = 'taffy-config-handle-db';
+        const HANDLE_STORE = 'handles';
+        const HANDLE_KEY = 'project-config-dir';
+
+        const openDb = () => new Promise((resolve, reject) => {
+          const request = window.indexedDB.open(HANDLE_DB_NAME, 1);
+          request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(HANDLE_STORE)) {
+              db.createObjectStore(HANDLE_STORE);
+            }
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+
+        let db = null;
+        try {
+          db = await openDb();
+          const handle = await new Promise((resolve, reject) => {
+            const tx = db.transaction(HANDLE_STORE, 'readonly');
+            const req = tx.objectStore(HANDLE_STORE).get(HANDLE_KEY);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+          });
+
+          if (!handle) {
+            return null;
+          }
+
+          const permission = await handle.queryPermission({ mode: 'read' });
+          if (permission !== 'granted') {
+            return null;
+          }
+
+          const fileHandle = await handle.getFileHandle('config.json');
+          const rawText = await (await fileHandle.getFile()).text();
+          const parsed = JSON.parse(String(rawText || '{}'));
+          if (parsed && typeof parsed.onboarding_completed === 'boolean') {
+            return parsed.onboarding_completed;
+          }
+          return null;
+        } catch (_) {
+          return null;
+        } finally {
+          if (db && typeof db.close === 'function') {
+            db.close();
+          }
+        }
+      };
+
+      window.addEventListener('load', async () => {
+        const elements = {
+          backdrop: getById('onboardingBackdrop'),
+          panel: getById('onboardingWizard'),
+          reopenButton: getById('reopenOnboardingBtn'),
+          onboardingState: getById('onboardingConfigState'),
+          closeBtn: getById('onboardingCloseBtn'),
+          prevBtn: getById('onboardingPrevBtn'),
+          nextBtn: getById('onboardingNextBtn'),
+          finishBtn: getById('onboardingFinishBtn'),
+          nextHint: getById('onboardingNextHint'),
+          skipBtn: getById('onboardingSkipBtn'),
+          stepBadge: getById('onboardingStepBadge'),
+          stepHint: getById('onboardingStepHint'),
+          progressFill: getById('onboardingProgressFill'),
+          llmTestBtn: getById('onboardingTestLlmBtn'),
+          ttsTestBtn: getById('onboardingTestTtsBtn'),
+          saveBtn: getById('onboardingSaveBtn'),
+          llmStatus: getById('onboardingLlmStatus'),
+          ttsStatus: getById('onboardingTtsStatus'),
+          saveStatus: getById('onboardingSaveStatus'),
+          oneClickStatus: getById('oneClickApplyStatus'),
+          oneClickButton: getById('oneClickApplyBtn'),
+          completedField: getById('cfgOnboardingCompleted'),
+          modeStatus: getById('onboardingModeStatus'),
+          customBlock: getById('onboardingCustomApiFields'),
+          customProvider: getById('onboardingCustomProvider'),
+          customBaseUrl: getById('onboardingCustomBaseUrl'),
+          customModel: getById('onboardingCustomModel'),
+          customApiEnv: getById('onboardingCustomApiEnv')
+        };
+
+        if (!elements.panel || !elements.backdrop || !elements.completedField) {
+          return;
+        }
+
+        const stepTitles = ['欢迎', '选择模式', '语音模式', '测试 LLM', '测试 TTS', '保存配置', '完成'];
+        const steps = Array.from(elements.panel.querySelectorAll('.onboarding-step'));
+        const modeButtons = Array.from(elements.panel.querySelectorAll('[data-onboarding-mode]'));
+        const voiceButtons = Array.from(elements.panel.querySelectorAll('[data-onboarding-voice]'));
+
+        const state = {
+          currentStep: 1,
+          mode: 'quick',
+          voice: 'browser',
+          llmPassed: false,
+          ttsPassed: false,
+          saved: false,
+          visible: false
+        };
+
+        const updateOnboardingStateText = (completed) => {
+          if (!elements.onboardingState) {
+            return;
+          }
+          elements.onboardingState.textContent = completed
+            ? '向导状态：已完成（默认不再自动弹出）'
+            : '向导状态：未完成（首次会自动弹出）';
+        };
+
+        const setCompleted = (completed) => {
+          elements.completedField.checked = Boolean(completed);
+          dispatchFieldEvents(elements.completedField);
+          updateOnboardingStateText(Boolean(completed));
+        };
+
+        const syncCustomFieldsFromMain = () => {
+          if (!elements.customProvider || !elements.customBaseUrl || !elements.customModel || !elements.customApiEnv) {
+            return;
+          }
+          const provider = String(getFieldByPath('llm.provider')?.value || '').trim();
+          const baseUrl = String(getFieldByPath('llm.base_url')?.value || '').trim();
+          const model = String(getFieldByPath('llm.model')?.value || '').trim();
+          const apiEnv = String(getFieldByPath('llm.api_key_env')?.value || '').trim();
+
+          if (provider) {
+            const hasOption = Array.from(elements.customProvider.options || [])
+              .some((option) => String(option.value || '').trim() === provider);
+            if (hasOption) {
+              elements.customProvider.value = provider;
+            }
+          }
+          if (baseUrl) {
+            elements.customBaseUrl.value = baseUrl;
+          }
+          if (model) {
+            elements.customModel.value = model;
+          }
+          if (apiEnv) {
+            elements.customApiEnv.value = apiEnv;
+          }
+        };
+
+        const resolveMode = (mode) => {
+          if (mode === 'custom' || mode === 'ollama' || mode === 'quick') {
+            return mode;
+          }
+          return 'quick';
+        };
+
+        const updateModeStatus = (mode) => {
+          if (!elements.modeStatus) {
+            return;
+          }
+          const modeLabel = mode === 'custom'
+            ? '自定义 API'
+            : mode === 'ollama'
+              ? '本地 Ollama'
+              : '快速体验';
+          const provider = String(getFieldByPath('llm.provider')?.value || '').trim();
+          const baseUrl = String(getFieldByPath('llm.base_url')?.value || '').trim();
+          const model = String(getFieldByPath('llm.model')?.value || '').trim();
+          const detailParts = [
+            provider ? `Provider: ${provider}` : '',
+            model ? `模型: ${model}` : '',
+            baseUrl ? `地址: ${baseUrl}` : ''
+          ].filter(Boolean);
+          const details = detailParts.length ? `（${detailParts.join(' ｜ ')}）` : '';
+          elements.modeStatus.textContent = `当前模式：${modeLabel}${details}`;
+        };
+
+        const closeWizard = () => {
+          state.visible = false;
+          elements.backdrop.hidden = true;
+          elements.panel.hidden = true;
+          elements.panel.setAttribute('aria-hidden', 'true');
+          document.body.style.removeProperty('overflow');
+        };
+
+        const openWizard = () => {
+          state.visible = true;
+          elements.backdrop.hidden = false;
+          elements.panel.hidden = false;
+          elements.panel.setAttribute('aria-hidden', 'false');
+          document.body.style.overflow = 'hidden';
+          elements.panel.focus();
+        };
+
+        const selectMode = (mode, { applyPreset = true } = {}) => {
+          const resolvedMode = resolveMode(mode);
+          if (applyPreset && resolvedMode === 'custom') {
+            syncCustomFieldsFromMain();
+          }
+          state.mode = resolvedMode;
+          modeButtons.forEach((button) => {
+            const selected = button.dataset.onboardingMode === resolvedMode;
+            button.classList.toggle('is-selected', selected);
+            button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+          });
+          if (elements.customBlock) {
+            elements.customBlock.hidden = resolvedMode !== 'custom';
+          }
+          if (applyPreset) {
+            applyModePreset(resolvedMode, {
+              provider: elements.customProvider,
+              baseUrl: elements.customBaseUrl,
+              model: elements.customModel,
+              apiEnv: elements.customApiEnv
+            });
+            state.llmPassed = false;
+            setStatus(elements.llmStatus, '模式已更新，请重新测试 LLM。');
+          }
+          updateModeStatus(resolvedMode);
+          if (state.currentStep === 4) {
+            goStep(4);
+          }
+        };
+
+        const selectVoice = (voice, { applyPreset = true } = {}) => {
+          state.voice = voice;
+          voiceButtons.forEach((button) => {
+            button.classList.toggle('is-selected', button.dataset.onboardingVoice === voice);
+          });
+          if (applyPreset) {
+            applyVoicePreset(voice);
+            state.ttsPassed = false;
+            setStatus(elements.ttsStatus, '语音模式已更新，请重新测试 TTS。');
+          }
+          if (state.currentStep === 5) {
+            goStep(5);
+          }
+        };
+
+        const updateNextHint = (step) => {
+          if (!elements.nextHint) {
+            return;
+          }
+          let message = '';
+          if (step === 4 && !state.llmPassed) {
+            message = '请先点击“开始测试 LLM”，测试通过后才能进入下一步。';
+          } else if (step === 5 && !state.ttsPassed) {
+            message = '请先点击“开始测试 TTS”，测试通过后才能进入下一步。';
+          } else if (step === 6 && !state.saved) {
+            message = '请先点击“保存并应用配置”，成功后才能完成向导。';
+          }
+          elements.nextHint.hidden = !message;
+          elements.nextHint.textContent = message;
+        };
+
+        const goStep = (step) => {
+          const nextStep = Math.max(1, Math.min(TOTAL_STEPS, step));
+          state.currentStep = nextStep;
+          steps.forEach((section) => {
+            const sectionStep = Number(section.dataset.step || 0);
+            section.classList.toggle('is-active', sectionStep === nextStep);
+          });
+          if (elements.stepBadge) {
+            elements.stepBadge.textContent = `步骤 ${nextStep} / ${TOTAL_STEPS}`;
+          }
+          if (elements.stepHint) {
+            elements.stepHint.textContent = stepTitles[nextStep - 1] || '';
+          }
+          if (elements.progressFill) {
+            const progressPercent = Math.round((nextStep / TOTAL_STEPS) * 100);
+            elements.progressFill.style.width = `${progressPercent}%`;
+          }
+
+          if (elements.prevBtn) {
+            elements.prevBtn.disabled = nextStep <= 1;
+          }
+
+          if (elements.nextBtn) {
+            if (nextStep === 4) {
+              elements.nextBtn.disabled = !state.llmPassed;
+            } else if (nextStep === 5) {
+              elements.nextBtn.disabled = !state.ttsPassed;
+            } else if (nextStep === 6) {
+              elements.nextBtn.disabled = !state.saved;
+            } else if (nextStep >= 7) {
+              elements.nextBtn.disabled = true;
+            } else {
+              elements.nextBtn.disabled = false;
+            }
+            elements.nextBtn.hidden = nextStep >= 7;
+          }
+
+          if (elements.finishBtn) {
+            elements.finishBtn.hidden = nextStep < 7;
+          }
+          updateNextHint(nextStep);
+        };
+
+        const runLlmTest = async () => {
+          if (!elements.llmTestBtn) {
+            return;
+          }
+          elements.llmTestBtn.disabled = true;
+          state.llmPassed = false;
+          setStatus(elements.llmStatus, '正在检测 LLM 连接，请稍候...', 'warn');
+          try {
+            await runConnectivityCheck();
+            const tone = readHealthTone('llm');
+            const detail = readHealthDetail('llm');
+            if (tone === 'ok') {
+              state.llmPassed = true;
+              setStatus(elements.llmStatus, `LLM 连接测试通过。${detail ? `（${detail}）` : ''}`, 'ok');
+            } else if (tone === 'warn') {
+              state.llmPassed = true;
+              setStatus(elements.llmStatus, `LLM 检测有注意项，但可继续。${detail ? `（${detail}）` : ''}`, 'warn');
+            } else {
+              setStatus(elements.llmStatus, `LLM 连接测试失败。${detail || '请检查 Base URL、模型名与网络。'}`, 'error');
+            }
+          } catch (error) {
+            setStatus(elements.llmStatus, `LLM 测试失败：${error.message || '请检查网络与后端服务是否启动。'}`, 'error');
+          } finally {
+            elements.llmTestBtn.disabled = false;
+            if (state.currentStep === 4 && elements.nextBtn) {
+              elements.nextBtn.disabled = !state.llmPassed;
+            }
+            if (state.currentStep === 4) {
+              updateNextHint(4);
+            }
+          }
+        };
+
+        const runTtsTest = async () => {
+          if (!elements.ttsTestBtn) {
+            return;
+          }
+          elements.ttsTestBtn.disabled = true;
+          state.ttsPassed = false;
+          setStatus(elements.ttsStatus, '正在检测并尝试发声，请稍候...', 'warn');
+          try {
+            await runConnectivityCheck();
+            const tone = readHealthTone('tts');
+            const detail = readHealthDetail('tts');
+            if (tone === 'error') {
+              setStatus(elements.ttsStatus, `TTS 连通性失败：${detail || '请检查语音模式参数。'}`, 'error');
+              return;
+            }
+            if (state.voice === 'browser') {
+              await playBrowserSpeech();
+              state.ttsPassed = true;
+              setStatus(elements.ttsStatus, '本地系统语音发声成功。', 'ok');
+              return;
+            }
+
+            try {
+              await playServerTts();
+              state.ttsPassed = true;
+              setStatus(elements.ttsStatus, '服务端 TTS 发声成功。', tone === 'warn' ? 'warn' : 'ok');
+            } catch (serverError) {
+              await playBrowserSpeech();
+              state.ttsPassed = true;
+              setStatus(
+                elements.ttsStatus,
+                `服务端 TTS 发声失败，已用本地系统语音兜底。请保存配置后再重试。原因：${serverError.message || '未知错误'}`,
+                'warn'
+              );
+            }
+          } catch (error) {
+            setStatus(elements.ttsStatus, `TTS 测试失败：${error.message || '请检查语音配置与系统音频设备。'}`, 'error');
+          } finally {
+            elements.ttsTestBtn.disabled = false;
+            if (state.currentStep === 5 && elements.nextBtn) {
+              elements.nextBtn.disabled = !state.ttsPassed;
+            }
+            if (state.currentStep === 5) {
+              updateNextHint(5);
+            }
+          }
+        };
+
+        const runSaveAndApply = async () => {
+          if (!elements.saveBtn || !elements.oneClickButton || !elements.oneClickStatus) {
+            return;
+          }
+          elements.saveBtn.disabled = true;
+          state.saved = false;
+          setStatus(elements.saveStatus, '正在保存并应用配置，请按提示选择目录...', 'warn');
+          setPathValue('onboarding_completed', true);
+
+          const beforeText = String(elements.oneClickStatus.textContent || '').trim();
+          elements.oneClickButton.click();
+          try {
+            await waitFor(
+              () => !elements.oneClickButton.disabled && String(elements.oneClickStatus.textContent || '').trim() !== beforeText,
+              { timeoutMs: 120000, intervalMs: 220 }
+            );
+          } catch (_) {
+            // continue and inspect current status text for best effort
+          }
+
+          const resultText = String(elements.oneClickStatus.textContent || '').trim();
+          const isOk = elements.oneClickStatus.classList.contains('is-ok');
+          const isWarn = elements.oneClickStatus.classList.contains('is-warn');
+          const savedByText = /已写入|写入成功|一键应用完成/.test(resultText);
+          if (isOk || (isWarn && savedByText) || savedByText) {
+            state.saved = true;
+            safeWriteStorage(STORAGE_KEY, '1');
+            setStatus(elements.saveStatus, `保存完成：${resultText || '配置已应用。'}`, isWarn ? 'warn' : 'ok');
+            setCompleted(true);
+            goStep(7);
+          } else {
+            state.saved = false;
+            setPathValue('onboarding_completed', false);
+            setStatus(
+              elements.saveStatus,
+              `保存失败：${resultText || '请检查配置后重试。'}`,
+              'error'
+            );
+          }
+          elements.saveBtn.disabled = false;
+          if (state.currentStep === 6) {
+            updateNextHint(6);
+          }
+        };
+
+        modeButtons.forEach((button) => {
+          button.addEventListener('click', () => selectMode(button.dataset.onboardingMode || 'quick'));
+        });
+        voiceButtons.forEach((button) => {
+          button.addEventListener('click', () => selectVoice(button.dataset.onboardingVoice || 'browser'));
+        });
+
+        [elements.customProvider, elements.customBaseUrl, elements.customModel, elements.customApiEnv]
+          .filter(Boolean)
+          .forEach((input) => {
+            input.addEventListener('input', () => {
+              if (state.mode === 'custom') {
+                selectMode('custom');
+              }
+            });
+          });
+
+        elements.llmTestBtn?.addEventListener('click', runLlmTest);
+        elements.ttsTestBtn?.addEventListener('click', runTtsTest);
+        elements.saveBtn?.addEventListener('click', runSaveAndApply);
+
+        elements.prevBtn?.addEventListener('click', () => goStep(state.currentStep - 1));
+        elements.nextBtn?.addEventListener('click', () => goStep(state.currentStep + 1));
+        elements.finishBtn?.addEventListener('click', closeWizard);
+        elements.skipBtn?.addEventListener('click', closeWizard);
+        elements.closeBtn?.addEventListener('click', closeWizard);
+        elements.backdrop.addEventListener('click', closeWizard);
+
+        elements.reopenButton?.addEventListener('click', () => {
+          openWizard();
+          goStep(1);
+        });
+
+        let storageCompleted = false;
+        try {
+          storageCompleted = safeReadStorage(STORAGE_KEY) === '1';
+        } catch (_) {
+          storageCompleted = false;
+        }
+
+        const projectCompleted = await readSavedOnboardingFromProjectConfig();
+        const backendCompleted = await readSavedOnboardingFromBackend();
+        const resolvedCompleted = projectCompleted === true || backendCompleted === true;
+        if (resolvedCompleted) {
+          storageCompleted = true;
+          safeWriteStorage(STORAGE_KEY, '1');
+          setCompleted(true);
+        } else {
+          setCompleted(storageCompleted);
+        }
+
+        const forceOpen = new URLSearchParams(window.location.search || '').get('wizard') === '1';
+        const shouldOpen = forceOpen || !storageCompleted;
+        updateOnboardingStateText(storageCompleted);
+
+        selectMode('quick', { applyPreset: false });
+        selectVoice('browser', { applyPreset: false });
+        goStep(1);
+
+        if (shouldOpen) {
+          applyModePreset('quick', {
+            provider: elements.customProvider,
+            baseUrl: elements.customBaseUrl,
+            model: elements.customModel,
+            apiEnv: elements.customApiEnv
+          });
+          updateModeStatus('quick');
+          applyVoicePreset('browser');
+          setStatus(elements.llmStatus, '请选择模式后测试 LLM。');
+          setStatus(elements.ttsStatus, '请选择语音模式后测试 TTS。');
+          openWizard();
+        } else {
+          closeWizard();
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

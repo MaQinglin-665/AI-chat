@@ -1,8 +1,9 @@
 {
-  "assistant_name": "Mochi",
+  "onboarding_completed": false,
+  "assistant_name": "馨语Ai桌宠",
   "model_path": "/models/your_model/model3.json",
   "model": {
-    "scale": 1.0,
+    "scale": 1,
     "x_ratio": 0.26,
     "y_ratio": 0.96
   },
@@ -63,11 +64,11 @@
     "gpt_sovits_speed": 1.08,
     "stream_mode": "final_only",
     "speed_ratio": 1.04,
-    "volume_ratio": 1.0,
-    "pitch_ratio": 1.0,
+    "volume_ratio": 1,
+    "pitch_ratio": 1,
     "gpt_sovits_realtime_tts": false
   },
-  "assistant_prompt": "你是桌宠 Taffy。像真人朋友一样用自然中文短句聊天。默认只回复1到2句，尽量不超过60个中文字。优先直接回答，不要长篇抒情，不要鸡汤，不要模板化，不要提自己是AI。",
+  "assistant_prompt": "你是桌宠 馨语Ai桌宠。像真人朋友一样用自然中文短句聊天。默认只回复1到2句，尽量不超过60个中文字。优先直接回答，不要长篇抒情，不要鸡汤，不要模板化，不要提自己是AI。",
   "memory": {
     "enabled": true,
     "max_items": 600,
@@ -101,20 +102,44 @@
     "processor_buffer_size": 2048,
     "wake_word_enabled": true,
     "wake_words": [
+      "馨语",
+      "馨语ai",
+      "xinyu",
       "塔菲",
       "taffy",
       "tafi"
     ],
     "hotword_replacements": {
-      "塔菲": "Taffy",
-      "taffy": "Taffy",
+      "塔菲": "馨语Ai桌宠",
+      "taffy": "馨语Ai桌宠",
       "neuro": "Neuro",
-      "fifa": "FIFA"
+      "fifa": "FIFA",
+      "馨语": "馨语Ai桌宠",
+      "馨语ai": "馨语Ai桌宠",
+      "xinyu": "馨语Ai桌宠"
     }
   },
   "observe": {
     "attach_mode": "always",
     "allow_auto_chat": false,
+    "auto_chat_enabled": false,
+    "auto_chat_min_ms": 180000,
+    "auto_chat_max_ms": 480000,
+    "auto_chat_tuning": {
+      "trigger_base_threshold": 1.03,
+      "short_silence_penalty": 0.35,
+      "long_silence_bonus": 0.14,
+      "emotion_bonus": 0.12,
+      "repeat_reason_penalty": 0.44,
+      "repeat_topic_penalty": 0.48,
+      "burst_penalty": 0.32,
+      "recent_auto_penalty": 0.45,
+      "score_jitter": 0.12,
+      "repeat_reason_window_ms": 840000,
+      "repeat_topic_window_ms": 1320000,
+      "burst_reset_window_ms": 1080000,
+      "max_topic_hint_chars": 42
+    },
     "daily_greeting_enabled": false,
     "daily_greeting_hour": 8,
     "daily_greeting_minute": 0,
@@ -130,7 +155,7 @@
     "intensity": "normal",
     "combo_enabled": true,
     "expression_enabled": true,
-    "expression_strength": 1.0
+    "expression_strength": 1
   },
   "tools": {
     "enabled": true,
@@ -187,6 +212,19 @@
     "refine_min_chars": 36
   },
   "personality": {
-    "state_inject_prob": 0.0
+    "state_inject_prob": 0
+  },
+  "decision": {
+    "always_reply_keywords": [
+      "馨语",
+      "馨语ai",
+      "xinyu",
+      "塔菲",
+      "taffy",
+      "?",
+      "？",
+      "帮我",
+      "告诉我"
+    ]
   }
 }

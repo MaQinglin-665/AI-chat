@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const IS_FILE_PROTOCOL = window.location.protocol === 'file:';
 
   const LIVE2D_BASE = (() => {
@@ -142,7 +142,7 @@
 
     const bubble = document.createElement('div');
     bubble.className = 'live2d-bubble';
-    bubble.textContent = '欢迎来到 Taffy 的主页！';
+    bubble.textContent = '欢迎来到馨语Ai桌宠主页！';
 
     widget.appendChild(canvas);
     widget.appendChild(fallback);
@@ -183,7 +183,7 @@
         const used = await loadFirstAvailableScript(item.name, item.urls);
         loadedScripts.push(`${item.name}: ${used}`);
       }
-      console.info('[Taffy Live2D] 脚本来源:', loadedScripts.join(' | '));
+      console.info('[馨语Ai桌宠 Live2D] 脚本来源:', loadedScripts.join(' | '));
 
       const tips = await loadTips();
 
@@ -206,7 +206,7 @@
 
       const { model, usedUrl } = await loadModelWithFallback(Live2DModel);
       app.stage.addChild(model);
-      console.info('[Taffy Live2D] 模型来源:', usedUrl);
+      console.info('[馨语Ai桌宠 Live2D] 模型来源:', usedUrl);
 
       const fitScale = Math.min((app.renderer.height * 0.88) / model.height, (app.renderer.width * 0.9) / model.width);
       model.scale.set(fitScale);
@@ -238,7 +238,7 @@
       };
 
       const showRandomTip = () => {
-        const text = tips.length ? randomPick(tips) : '欢迎来到 Taffy 的主页！';
+        const text = tips.length ? randomPick(tips) : '欢迎来到馨语Ai桌宠主页！';
         showBubble(text);
       };
 
@@ -261,7 +261,7 @@
         const message = String(error?.message || '未知错误').slice(0, 260);
         fallback.innerHTML = `<span class="emoji">⚠️</span><p>模型加载失败</p><small>${message}</small>`;
       }
-      console.warn('[Taffy Live2D] 初始化失败', error);
+      console.warn('[馨语Ai桌宠 Live2D] 初始化失败', error);
     }
   };
 
