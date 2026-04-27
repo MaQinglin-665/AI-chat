@@ -1,4 +1,5 @@
 import atexit
+import hashlib
 import json
 import logging
 import os
@@ -323,6 +324,212 @@ def _human_time_ago(ts_str):
         return "去年" if years <= 1 else f"{years}年前"
     except Exception:
         return "之前"
+
+
+def _memory_item_id(item):
+    if not isinstance(item, dict):
+        return ""
+    raw = (
+        str(item.get("ts", "")).strip()
+        + "\n"
+        + str(item.get("user", "")).strip()
+        + "\n"
+        + str(item.get("assistant", "")).strip()
+    )
+    if not raw.strip():
+        return ""
+    return hashlib.sha1(raw.encode("utf-8", errors="ignore")).hexdigest()[:16]
+
+
+def _safe_summary_payload(raw, max_len=520):
+    src = raw if isinstance(raw, dict) else {}
+    summary = normalize_memory_text(src.get("summary", ""), max_len=max_len)
+    updated_at = str(src.get("updated_at", "")).strip()
+    try:
+        item_count = int(src.get("item_count", 0))
+    except (TypeError, ValueError):
+        item_count = 0
+    if item_count < 0:
+        item_count = 0
+    return {
+        "summary": summary,
+        "updated_at": updated_at,
+        "item_count": item_count,
+    }
+
+
+def _extract_iso_datetime(ts_str):
+    text = str(ts_str or "").strip()
+    if not text:
+        return None
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _resolve_recent_updated_at(items, summary_payloads):
+    candidates = []
+    for item in items or []:
+        ts = str((item or {}).get("ts", "")).strip()
+        dt = _extract_iso_datetime(ts)
+        if dt is not None:
+            candidates.append((dt, ts))
+    for payload in summary_payloads or []:
+        ts = str((payload or {}).get("updated_at", "")).strip()
+        dt = _extract_iso_datetime(ts)
+        if dt is not None:
+            candidates.append((dt, ts))
+    if not candidates:
+        return ""
+    candidates.sort(key=lambda pair: pair[0], reverse=True)
+    return str(candidates[0][1]).strip()
+
+
+def get_memory_dashboard(config):
+    settings = get_memory_settings(config if isinstance(config, dict) else {})
+    with MEMORY_LOCK:
+        items = load_memory_items()
+    wakeup_summary = _safe_summary_payload(_load_json_summary(MEMORY_SUMMARY_PATH))
+    profile_summary = _safe_summary_payload(_load_json_summary(PROFILE_MEMORY_PATH))
+    relationship_summary = _safe_summary_payload(_load_json_summary(RELATIONSHIP_MEMORY_PATH))
+
+    view_items = []
+    for item in reversed(items):
+        safe_item = {
+            "id": _memory_item_id(item),
+            "ts": str(item.get("ts", "")).strip(),
+            "time_ago": _human_time_ago(item.get("ts", "")),
+            "user": normalize_memory_text(item.get("user", ""), max_len=240),
+            "assistant": normalize_memory_text(item.get("assistant", ""), max_len=280),
+        }
+        if not safe_item["user"] or not safe_item["assistant"] or not safe_item["id"]:
+            continue
+        view_items.append(safe_item)
+
+    recent_updated_at = _resolve_recent_updated_at(
+        items,
+        [wakeup_summary, profile_summary, relationship_summary],
+    )
+    return {
+        "ok": True,
+        "memory_enabled": bool(settings.get("enabled", True)),
+        "total_items": len(items),
+        "recent_updated_at": recent_updated_at,
+        "recent_updated_ago": _human_time_ago(recent_updated_at),
+        "user_preferences": profile_summary,
+        "relationship_status": relationship_summary,
+        "memory_summary": wakeup_summary,
+        "items": view_items,
+    }
+
+
+def delete_memory_item(item_id):
+    safe_item_id = str(item_id or "").strip()
+    if not safe_item_id:
+        return {"ok": False, "error": "item_id is required.", "deleted": False}
+
+    deleted = False
+    removed_item = {}
+    with MEMORY_LOCK:
+        items = load_memory_items()
+        kept = []
+        for item in items:
+            if not deleted and _memory_item_id(item) == safe_item_id:
+                deleted = True
+                removed_item = item if isinstance(item, dict) else {}
+                continue
+            kept.append(item)
+        if deleted:
+            save_memory_items(kept)
+            total_items = len(kept)
+        else:
+            total_items = len(items)
+
+    return {
+        "ok": True,
+        "deleted": deleted,
+        "item_id": safe_item_id,
+        "total_items": total_items,
+        "removed_item": {
+            "ts": str(removed_item.get("ts", "")).strip(),
+            "user": normalize_memory_text(removed_item.get("user", ""), max_len=240),
+            "assistant": normalize_memory_text(removed_item.get("assistant", ""), max_len=280),
+        } if deleted else {},
+    }
+
+
+def clear_all_memory_items():
+    with MEMORY_LOCK:
+        save_memory_items([])
+    with SUMMARY_LOCK:
+        _save_json_summary(MEMORY_SUMMARY_PATH, {})
+        _save_json_summary(PROFILE_MEMORY_PATH, {})
+        _save_json_summary(RELATIONSHIP_MEMORY_PATH, {})
+    return {"ok": True, "cleared": True, "total_items": 0}
+
+
+def export_memory_json(config):
+    settings = get_memory_settings(config if isinstance(config, dict) else {})
+    with MEMORY_LOCK:
+        items = load_memory_items()
+    wakeup_summary = _safe_summary_payload(_load_json_summary(MEMORY_SUMMARY_PATH), max_len=1200)
+    profile_summary = _safe_summary_payload(_load_json_summary(PROFILE_MEMORY_PATH), max_len=1200)
+    relationship_summary = _safe_summary_payload(_load_json_summary(RELATIONSHIP_MEMORY_PATH), max_len=1200)
+    return {
+        "schema_version": 1,
+        "exported_at": datetime.now().isoformat(timespec="seconds"),
+        "memory_enabled": bool(settings.get("enabled", True)),
+        "items": items,
+        "summaries": {
+            "memory_summary": wakeup_summary,
+            "user_preferences": profile_summary,
+            "relationship_status": relationship_summary,
+        },
+    }
+
+
+def _coalesce_summary_payload(import_payload, key):
+    src = import_payload if isinstance(import_payload, dict) else {}
+    summaries = src.get("summaries", {})
+    if isinstance(summaries, dict):
+        raw = summaries.get(key)
+        if isinstance(raw, dict):
+            return _safe_summary_payload(raw, max_len=1200)
+    top_level = src.get(key)
+    if isinstance(top_level, dict):
+        return _safe_summary_payload(top_level, max_len=1200)
+    return {}
+
+
+def import_memory_json(payload):
+    src = payload if isinstance(payload, dict) else {}
+    raw_items = src.get("items", [])
+    if not isinstance(raw_items, list):
+        raw_items = []
+
+    with MEMORY_LOCK:
+        save_memory_items(raw_items)
+        imported_items = load_memory_items()
+
+    imported_count = len(imported_items)
+    memory_summary_payload = _coalesce_summary_payload(src, "memory_summary")
+    user_preferences_payload = _coalesce_summary_payload(src, "user_preferences")
+    relationship_payload = _coalesce_summary_payload(src, "relationship_status")
+
+    with SUMMARY_LOCK:
+        _save_json_summary(MEMORY_SUMMARY_PATH, memory_summary_payload)
+        _save_json_summary(PROFILE_MEMORY_PATH, user_preferences_payload)
+        _save_json_summary(RELATIONSHIP_MEMORY_PATH, relationship_payload)
+
+    return {
+        "ok": True,
+        "imported_items": imported_count,
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }
 
 
 def _resolve_llm_api_key(config):
@@ -788,6 +995,8 @@ def _normalize_manual_persona_card(card):
         normalized["relationship_role"] = _normalize_persona_relationship_role(companionship_style)
     if not normalized.get("initiative_level") and companionship_style:
         normalized["initiative_level"] = _normalize_persona_initiative_level(companionship_style)
+    if not normalized.get("relationship_role"):
+        normalized["relationship_role"] = PERSONA_RELATIONSHIP_ROLES[1]
     if not normalized.get("initiative_level"):
         normalized["initiative_level"] = PERSONA_INITIATIVE_LEVELS[1]
 

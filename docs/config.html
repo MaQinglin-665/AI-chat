@@ -610,28 +610,29 @@
                   <span>快速语音模式</span>
                   <div class="tts-mode-actions">
                     <select id="ttsModePreset">
-                      <option value="edge">在线标准语音（Edge，免配置）</option>
-                      <option value="volcengine">云端定制语音（音色更好）</option>
-                      <option value="gpt_sovits">本地高自由度（GPT-SoVITS）</option>
+                      <option value="browser">快速体验（Browser，本机发声）</option>
+                      <option value="edge">快速体验（Edge，在线标准语音）</option>
+                      <option value="volcengine">云端定制语音（Volcengine）</option>
+                      <option value="gpt_sovits">高级本地音色（GPT-SoVITS）</option>
                       <option value="custom">自定义（保持当前参数）</option>
                     </select>
                     <button id="applyTtsModePresetBtn" class="btn btn-outline" type="button">一键套用</button>
                   </div>
                   <small class="field-note">建议流程：先选模式并套用，再执行“检测配置连通性”，最后点击“一键应用配置”。</small>
                 </label>
-                <p id="ttsModePresetStatus" class="write-status col-span-2">当前未套用快速语音模式。</p>
+                <p id="ttsModePresetStatus" class="write-status col-span-2">当前未套用语音模式。</p>
                 <label class="field" data-tts-group="common">
                   <span>语音 Provider</span>
                   <select data-path="tts.provider">
-                    <option value="gpt_sovits" selected>gpt_sovits</option>
+                    <option value="browser" selected>browser</option>
                     <option value="edge_tts">edge_tts</option>
                     <option value="volcengine_tts">volcengine_tts</option>
-                    <option value="browser">browser</option>
+                    <option value="gpt_sovits">gpt_sovits</option>
                   </select>
                 </label>
                 <label class="field" data-tts-group="common">
                   <span>voice</span>
-                  <input type="text" data-path="tts.voice" value="default">
+                  <input type="text" data-path="tts.voice" value="zh-CN-XiaoxiaoNeural">
                 </label>
                 <label class="field" data-tts-group="volcengine">
                   <span>Volcengine app_id_env</span>
@@ -1209,7 +1210,7 @@ tafi</textarea>
 
       <section class="onboarding-step" data-step="3">
         <h4>选择语音模式</h4>
-        <p>语音模式决定塔菲“怎么说话”。推荐先用本地系统语音；如果想要在线语音，可选在线标准语音（Edge，无需单独 API Key，仅需联网），稳定后再切 GPT-SoVITS。</p>
+        <p>语音模式决定塔菲“怎么说话”。快速体验建议先用本地系统语音（browser）或在线标准语音（edge_tts）；想要更高可玩性和音色上限，再切到高级本地音色 GPT-SoVITS。</p>
         <div class="onboarding-choice-grid">
           <button class="onboarding-choice is-selected" type="button" data-onboarding-voice="browser">
             <strong>本地系统语音</strong>
@@ -1220,8 +1221,8 @@ tafi</textarea>
             <span>在线语音，通常无需单独 API Key（需联网），中文效果较好，部署简单。</span>
           </button>
           <button class="onboarding-choice" type="button" data-onboarding-voice="gpt_sovits">
-            <strong>GPT-SoVITS</strong>
-            <span>可玩性高，需本地服务已启动并可访问。</span>
+            <strong>高级本地音色（GPT-SoVITS）</strong>
+            <span>可玩性高，需本地 GPT-SoVITS 服务已启动并可访问。</span>
           </button>
         </div>
       </section>
@@ -1289,7 +1290,7 @@ tafi</textarea>
 
   <script src="js/main.js?v=20260423-rc14" defer></script>
   <script data-live2d-autoload="live2d/autoload.js"></script>
-  <script src="js/config-page.js?v=20260427-rc3" defer></script>
+  <script src="js/config-page.js?v=20260427-rc4" defer></script>
   <script>
     (() => {
       const STORAGE_KEY = 'taffy_onboarding_completed';
@@ -1473,6 +1474,7 @@ tafi</textarea>
           return;
         }
         setPathValue('tts.provider', 'browser');
+        setPathValue('tts.voice', 'zh-CN-XiaoxiaoNeural');
       };
 
       const playBrowserSpeech = async () => {

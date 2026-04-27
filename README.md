@@ -27,7 +27,7 @@
 1. 准备环境：Windows、Python 3.10+、Node.js、可用的 Live2D 模型
 2. 放置模型到 `web/models/`，并在 `config.json` 设置 `model_path`
 3. 选择一个 LLM 提供方：默认 OpenAI-compatible（qwen-plus），也可切到本地 Ollama
-4. 选择一个 TTS 提供方：默认 browser TTS（首启更稳）
+4. 选择一个 TTS 提供方：新手先用 browser（本机发声）或 edge_tts（在线标准语音）
 5. 双击 `一键启动桌宠.vbs`（或已创建的桌面快捷方式）
 
 详细配置继续看下方章节：
@@ -41,7 +41,7 @@
 - 首次推荐先打开配置中心中的“首次启动向导”，按步骤完成模式选择、LLM/TTS 测试与保存
 - 必配：`model_path`（Live2D 模型路径）
 - 至少选一项 LLM：默认 `openai-compatible`（与 `config.example.json` 一致），也可改为 `ollama`
-- 至少选一项 TTS：默认 `browser`；`gpt_sovits` 作为高级高质量模式按需开启
+- 至少选一项 TTS：新手建议 `browser` / `edge_tts`；`gpt_sovits` 作为“高级本地音色”按需开启
 - 推荐：把密钥放到环境变量或 `.env`，不要明文写入仓库文件
 
 向导完成后会写入：
@@ -100,8 +100,8 @@ Then set `config.json`:
 ### Release Defaults (aligned with `config.example.json`)
 
 - Default LLM: `openai-compatible` + `qwen-plus` (`https://dashscope.aliyuncs.com/compatible-mode/v1`)
-- Default TTS: `browser` (best first-run compatibility)
-- GPT-SoVITS is treated as an advanced high-quality mode (opt-in after basic flow is stable)
+- Default TTS: `browser` (or `edge_tts` for quick online voice)
+- GPT-SoVITS is treated as an advanced local high-quality mode (opt-in after basic flow is stable)
 - First launch flow is aligned with `docs/config.html`: run first-run wizard -> connectivity checks -> one-click apply config
 
 ## 2) LLM provider config
@@ -184,7 +184,7 @@ Then set in `config.json`:
 
 ## 3) TTS (voice) config
 
-Default is Browser TTS (first-run friendly):
+For new users, start with Browser TTS (first-run friendly):
 
 ```json
 {
@@ -195,7 +195,7 @@ Default is Browser TTS (first-run friendly):
 }
 ```
 
-Advanced high-quality mode (GPT-SoVITS):
+Advanced local high-quality mode (GPT-SoVITS, optional):
 
 ```json
 {
@@ -226,7 +226,7 @@ TTS reference audio is local-only by default:
 - this folder is ignored by git (except `tts_ref/README.md`)
 - avoid committing private voice samples directly to the repository
 
-If you want to use Edge TTS:
+If browser is unavailable, use Edge TTS (also beginner-friendly):
 
 ```json
 {

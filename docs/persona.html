@@ -300,6 +300,17 @@
       els.status.className = `status ${kind}`.trim();
     }
 
+    function formatImportError(err) {
+      const raw = String(err?.message || "").trim();
+      if (!raw) {
+        return "JSON 格式不合法，请检查逗号、引号和括号。";
+      }
+      if (/Unexpected token|Unexpected end|JSON|position|line/i.test(raw)) {
+        return "JSON 格式不合法，请检查逗号、引号和括号。";
+      }
+      return raw;
+    }
+
     function normalizeText(value) {
       return String(value ?? "").replace(/\s+/g, " ").trim();
     }
@@ -444,7 +455,15 @@
 
     async function importCard(file) {
       const text = await file.text();
-      const data = JSON.parse(text);
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (_err) {
+        throw new Error("JSON 格式不合法，请检查逗号、引号和括号。");
+      }
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error("JSON 顶层必须是对象（键值对）。");
+      }
       applyToForm(data);
       setStatus("已导入 JSON（当前为草稿，记得点击保存）", "warn");
     }
@@ -485,7 +504,7 @@
           if (!file) return;
           await importCard(file);
         } catch (err) {
-          setStatus(`导入失败：${err.message}`, "warn");
+          setStatus(`导入失败：${formatImportError(err)}`, "warn");
         } finally {
           els.importInput.value = "";
         }
