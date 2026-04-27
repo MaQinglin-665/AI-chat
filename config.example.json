@@ -131,7 +131,7 @@
     }
   },
   "observe": {
-    "attach_mode": "always",
+    "attach_mode": "manual",
     "allow_auto_chat": false,
     "auto_chat_enabled": false,
     "auto_chat_min_ms": 180000,
