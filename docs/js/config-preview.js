@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const toFixedText = (value, digits) => Number(value).toFixed(digits);
 
   const initConfigPreview = () => {
@@ -39,7 +39,7 @@
 
     const buildConfig = () => ({
       pet: {
-        name: controls.petName.value || '馨语Ai桌宠',
+        name: controls.petName.value || '馨语AI桌宠',
         wake_word: controls.wakeWord.value || '塔菲'
       },
       llm: {

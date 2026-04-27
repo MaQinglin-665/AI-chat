@@ -938,7 +938,7 @@ body.view-chat .action-buttons button:hover {
 }
 
 .onboarding-step-tip::before {
-  content: "塔菲小贴士";
+  content: "馨语AI桌宠小贴士";
   display: block;
   margin-bottom: 4px;
   font-size: 11px;

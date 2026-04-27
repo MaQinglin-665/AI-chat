@@ -2,7 +2,7 @@
   "name": "xinyu-ai-desktop-pet-docs",
   "private": true,
   "version": "1.0.0",
-  "description": "馨语Ai桌宠 GitHub Pages docs tooling",
+  "description": "馨语AI桌宠 GitHub Pages docs tooling",
   "scripts": {
     "check:publish": "node tools/publish-check.mjs",
     "test:smoke": "playwright test -c tests/playwright.config.ts",

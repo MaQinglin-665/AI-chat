@@ -259,7 +259,7 @@ If server-side TTS fails, fallback to:
 Desktop mode (recommended, transparent window):
 - Double-click desktop shortcut: `AI桌宠`
 - Or double-click: `一键启动桌宠.vbs`
-- First time: double-click `安装快捷方式.bat` to create `Taffy桌宠` on desktop and Start menu
+- First time: double-click `安装快捷方式.bat` to create `馨语AI桌宠` on desktop and Start menu
 - Optional: double-click `开启开机自启.bat` / `关闭开机自启.bat`
 - First launch auto-installs Electron runtime
 - In desktop mode, drag the model to move the whole pet window
