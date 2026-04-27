@@ -338,7 +338,7 @@ In chat input, you can use:
 - `/情绪日报`
 
 Wake-word defaults are in `config.json`:
-其中旧唤醒词 `塔菲` / `taffy` / `tafi` 作为“兼容旧版唤醒词”保留。
+其中旧唤醒词作为“兼容旧版唤醒词”保留。
 
 ```json
 {
