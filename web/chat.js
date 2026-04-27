@@ -7894,6 +7894,27 @@ async function loadConfig() {
 
 async function initLive2D() {
   const canvas = document.getElementById("live2d-canvas");
+  const rawModelPath = String(state.config?.model_path || "").trim();
+  const normalizedModelPath = rawModelPath.replace(/\\/g, "/").toLowerCase();
+  const live2dPathMissing = !rawModelPath || normalizedModelPath.includes("your_model");
+
+  const showLive2DSetupGuide = (statusText, guideText) => {
+    setStatus(statusText);
+    if (state.live2dGuideShown) {
+      return;
+    }
+    state.live2dGuideShown = true;
+    appendMessage("assistant", guideText);
+  };
+
+  if (live2dPathMissing) {
+    showLive2DSetupGuide(
+      "未配置 Live2D 模型",
+      "还没有检测到可用的 Live2D 模型。你可以先直接聊天体验；随后把模型放到 web/models 目录，并在 config.json 设置 model_path（示例：/models/hiyori/hiyori.model3.json）。"
+    );
+    return;
+  }
+
   if (!window.Live2DCubismCore) {
     setStatus("CubismCore 缺失");
     appendMessage("assistant", "Cubism 核心未加载，请强制刷新（Ctrl+F5）。");
@@ -8002,7 +8023,20 @@ async function initLive2D() {
   } catch (err) {
     console.error(err);
     stopIdleMotionLoop();
-    setStatus("模型加载失败，请检查 model_path");
+    const detail = String(err?.message || err || "").trim();
+    const missingFile = /not\s*found|failed\s*to\s*fetch|404|enoent/i.test(detail);
+    if (missingFile) {
+      showLive2DSetupGuide(
+        "未找到 Live2D 模型",
+        `未找到 Live2D 模型文件：${rawModelPath || "(空)"}。请确认模型文件已放在 web/models 下，并把 config.json 的 model_path 指向 .model3.json 文件。`
+      );
+      return;
+    }
+    showLive2DSetupGuide(
+      "模型加载失败，请检查 model_path",
+      "Live2D 初始化失败。你可以先继续使用聊天功能，再检查 model_path 是否指向可访问的 .model3.json 文件。"
+    );
+    return;
   }
 
   window.addEventListener("resize", handleWindowResize);
