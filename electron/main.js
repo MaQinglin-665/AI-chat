@@ -49,6 +49,57 @@ let backendRecentStdoutLines = [];
 let backendRecentStderrLines = [];
 const dragSessions = new Map();
 
+function getDragSessionKeyFromSender(sender) {
+  if (!sender || sender.isDestroyed?.()) {
+    return null;
+  }
+  const senderId = Number(sender.id);
+  if (!Number.isFinite(senderId) || senderId <= 0) {
+    return null;
+  }
+  return senderId;
+}
+
+function beginDragSessionForSender(sender) {
+  const senderId = getDragSessionKeyFromSender(sender);
+  if (!senderId) {
+    return false;
+  }
+  const win = BrowserWindow.fromWebContents(sender);
+  if (!win || win.isDestroyed()) {
+    return false;
+  }
+  dragSessions.set(senderId, {
+    senderId,
+    windowId: win.id,
+    startedAtMs: Date.now(),
+  });
+  return true;
+}
+
+function endDragSessionForSender(sender) {
+  const senderId = getDragSessionKeyFromSender(sender);
+  if (!senderId) {
+    return false;
+  }
+  return dragSessions.delete(senderId);
+}
+
+function clearDragSessionsForWindow(win) {
+  if (!win) {
+    return;
+  }
+  const winId = Number(win.id);
+  if (!Number.isFinite(winId) || winId <= 0 || dragSessions.size <= 0) {
+    return;
+  }
+  for (const [senderId, session] of dragSessions.entries()) {
+    if (Number(session?.windowId) === winId) {
+      dragSessions.delete(senderId);
+    }
+  }
+}
+
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
@@ -910,7 +961,10 @@ function createModelWindow() {
   if (AUTO_OPEN_DEVTOOLS) {
     modelWindow.webContents.openDevTools({ mode: "detach" });
   }
-  modelWindow.on("close", () => saveWindowStateNow());
+  modelWindow.on("close", () => {
+    clearDragSessionsForWindow(modelWindow);
+    saveWindowStateNow();
+  });
   modelWindow.on("closed", () => {
     modelWindowReady = false;
     pendingSubtitle = null;
@@ -968,7 +1022,10 @@ function createChatWindow() {
   }
   chatWindow.on("move", () => scheduleSaveWindowState(120));
   chatWindow.on("resize", () => scheduleSaveWindowState(120));
-  chatWindow.on("close", () => saveWindowStateNow());
+  chatWindow.on("close", () => {
+    clearDragSessionsForWindow(chatWindow);
+    saveWindowStateNow();
+  });
   chatWindow.on("closed", () => {
     chatWindow = null;
     if (modelWindow && !modelWindow.isDestroyed()) {
@@ -1010,6 +1067,17 @@ ipcMain.on("window-move-by", (event, dx, dy) => {
   const nx = clampNumber(nextBounds.x, work.x, maxX);
   const ny = clampNumber(nextBounds.y, work.y, maxY);
   win.setPosition(nx, ny, false);
+});
+
+ipcMain.on("window-drag-begin", (event) => {
+  if (windowLocked) {
+    return;
+  }
+  beginDragSessionForSender(event?.sender);
+});
+
+ipcMain.on("window-drag-end", (event) => {
+  endDragSessionForSender(event?.sender);
 });
 
 ipcMain.on("window-set-clickthrough", (event, ignore) => {

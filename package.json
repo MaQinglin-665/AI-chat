@@ -12,6 +12,6 @@
     "start:electron": "electron electron/main.js"
   },
   "devDependencies": {
-    "electron": "^28.2.0"
+    "electron": "^41.3.0"
   }
 }
