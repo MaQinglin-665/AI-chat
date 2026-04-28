@@ -1,47 +1,74 @@
 ﻿# AGENTS.md
 
-## 项目定位
+## Project Context
 
-本项目是一个 **AI 桌宠**（Electron + Live2D + LLM + TTS）。
+This repository is a Windows desktop AI pet / desktop AI VTuber experiment.
 
-长期目标：打造一个**低打扰、可长期陪伴、可配置、可扩展**的桌面伙伴。
+The project combines:
 
-## 主要文件与目录说明
+- Electron desktop UI
+- Python local service
+- Live2D character rendering
+- LLM conversation
+- TTS / ASR voice interaction
+- Emotion and motion feedback
+- Low-interruption companionship
 
-- `app.py`：后端主入口，负责 HTTP API、静态资源服务、对话/语音/配置相关路由。
-- `config.py`：配置加载与合并、默认值、兼容与清洗逻辑。
-- `tts.py`：TTS 语音合成调度与多 Provider 适配（含重试、降级、音频结果处理）。
-- `memory.py`：记忆系统（读写、过滤、摘要、关系/画像、长期记忆接入）。
-- `tools.py`：工具调用与安全限制（含 shell 工具开关、白名单与风险控制）。
-- `docs/config.html`：配置中心页面入口，用于可视化编辑与应用配置。
-- `web/`：前端聊天与桌宠交互层（UI、状态管理、Live2D 联动、主动对话等）。
-- `electron/`：Electron 主进程与桥接层，负责应用窗口、进程编排与桌面集成。
+The long-term goal is not to build another generic chat window, but to explore an AI character that lives on the user's desktop: it can talk, react, express emotions, and later gain safe desktop-awareness features.
 
-## 开发规则（必须遵守）
+The project is currently in MVP / open-source incubation stage. Keep all documentation honest and avoid claiming the project is already a mature commercial product.
 
-- 不要提交真实 API Key、Token、密钥或任何私密凭据。
-- 不要提交用户语音样本、私人音频素材或可识别个人身份的数据。
-- 不要破坏启动脚本与启动流程（含 Electron 启动、Python 后端拉起、前后端联动）。
-- 不要默认开启危险 shell 执行；涉及命令执行时必须保持最小权限与显式开关。
-- 涉及截图、记忆、语音功能时，必须优先考虑隐私与数据最小化原则。
+It is acceptable to mention that the project is inspired by AI VTuber directions and Neuro-sama-like interaction patterns, but do not describe the project as a direct clone or replica.
 
-## UI 与体验风格
+---
 
-界面与交互应保持以下方向：
+## Working Principles
 
-- 二次元
-- 治愈
-- 浅色渐变
-- 圆角卡片
-- 柔和阴影
-- 不要像后台管理系统
+When modifying this repository:
 
-## 任务完成后的固定输出
+1. Prefer small, focused changes.
+2. Avoid unrelated refactors.
+3. Do not introduce new dependencies unless the task explicitly asks for them.
+4. Do not change security defaults unless the task explicitly asks for it.
+5. Do not remove existing important documentation without preserving the information elsewhere.
+6. Keep Chinese documentation clear, practical, and friendly to open-source contributors.
+7. Keep roadmap language realistic and executable.
+8. When editing README, prioritize first impression, quick start clarity, and project positioning.
 
-每次完成开发任务后，必须输出以下内容：
+---
 
-- 修改文件列表
-- 实现内容
-- 验证方式
-- 风险点
-- 后续建议
+## Security Principles
+
+Be especially careful with changes involving:
+
+- Automatic desktop observation
+- Screenshot capture
+- Tool calling
+- Shell execution
+- File system access
+- API keys
+- User privacy data
+- Logs containing secrets
+- CORS / local service exposure
+- Permission prompts
+
+Default principles:
+
+- Do not automatically observe the desktop by default.
+- Do not execute shell commands by default.
+- Do not read user files by default.
+- Tool calling must be optional and configurable.
+- High-risk operations must require user confirmation.
+- Documentation must not encourage unsafe usage.
+
+---
+
+## Output Requirements
+
+After completing a task, always summarize:
+
+1. Files changed
+2. What changed in each file
+3. How to verify the change
+4. Any risks or manual checks needed
+5. Whether unrelated files were modified
