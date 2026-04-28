@@ -148,7 +148,7 @@ from asr import (
     guess_audio_content_type,
     transcribe_pcm16_with_vosk,
 )
-from character_runtime import normalize_runtime_payload
+from character_runtime import emotion_to_live2d_hint, normalize_runtime_payload
 
 
 
@@ -223,12 +223,14 @@ def _apply_character_runtime_reply(config, raw_reply):
             voice_style = (
                 str(normalized.get("voice_style", "neutral") or "neutral").strip().lower() or "neutral"
             )
+            action = str(normalized.get("action", "none") or "none").strip().lower() or "none"
+            intensity = str(normalized.get("intensity", "normal") or "normal").strip().lower() or "normal"
             runtime_meta = {
                 "emotion": emotion,
-                "expression": "none",
-                "motion": "none",
+                "action": action,
+                "intensity": intensity,
+                "live2d_hint": str(normalized.get("live2d_hint") or emotion_to_live2d_hint(emotion)),
                 "voice_style": voice_style,
-                "safety_level": "default_safe",
             }
         return reply_text, runtime_meta
     except Exception as exc:
@@ -2705,7 +2707,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                         pass
                 done_payload = {"type": "done", "reply": final_reply}
                 if runtime_meta is not None:
-                    done_payload["runtime"] = runtime_meta
+                    done_payload["character_runtime"] = runtime_meta
                 self._send_sse(done_payload)
             except Exception as exc:
                 diagnosed = _diagnose_llm_exception(exc, chat_config.get("llm", {}))
@@ -2731,7 +2733,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                 pass
             payload = {"reply": reply}
             if runtime_meta is not None:
-                payload["runtime"] = runtime_meta
+                payload["character_runtime"] = runtime_meta
             self._send_json(payload)
         except Exception as exc:
             diagnosed = _diagnose_llm_exception(exc, chat_config.get("llm", {}))
