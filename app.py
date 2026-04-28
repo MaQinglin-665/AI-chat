@@ -148,6 +148,7 @@ from asr import (
     guess_audio_content_type,
     transcribe_pcm16_with_vosk,
 )
+from character_runtime import normalize_runtime_payload
 
 
 
@@ -172,6 +173,71 @@ DEFAULT_HUMANIZE_SETTINGS = {
     "refine_timeout_sec": 12,
     "refine_min_chars": 36,
 }
+
+
+def _parse_bool_flag(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value or "").strip().lower()
+    if not text:
+        return bool(default)
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return bool(default)
+
+
+def _get_character_runtime_settings(config):
+    default_settings = {"enabled": False, "return_metadata": False}
+    try:
+        if not isinstance(config, dict):
+            return dict(default_settings)
+        raw = config.get("character_runtime", {})
+        if not isinstance(raw, dict):
+            return dict(default_settings)
+        enabled = _parse_bool_flag(raw.get("enabled", False), False)
+        return_metadata = _parse_bool_flag(raw.get("return_metadata", False), False)
+        if not enabled:
+            return dict(default_settings)
+        return {"enabled": True, "return_metadata": return_metadata}
+    except Exception:
+        return dict(default_settings)
+
+
+def _apply_character_runtime_reply(config, raw_reply):
+    settings = _get_character_runtime_settings(config)
+    if not settings.get("enabled", False):
+        return raw_reply, None
+
+    fallback_text = raw_reply if isinstance(raw_reply, str) else str(raw_reply or "")
+    try:
+        normalized = normalize_runtime_payload(raw_reply)
+        normalized_text = str(normalized.get("text", "") or "").strip()
+        reply_text = normalized_text if normalized_text else fallback_text
+        runtime_meta = None
+        if settings.get("return_metadata", False):
+            emotion = str(normalized.get("emotion", "neutral") or "neutral").strip().lower() or "neutral"
+            voice_style = (
+                str(normalized.get("voice_style", "neutral") or "neutral").strip().lower() or "neutral"
+            )
+            runtime_meta = {
+                "emotion": emotion,
+                "expression": "none",
+                "motion": "none",
+                "voice_style": voice_style,
+                "safety_level": "default_safe",
+            }
+        return reply_text, runtime_meta
+    except Exception as exc:
+        _log_backend_exception(
+            "CHAR_RUNTIME",
+            exc,
+            extra="normalize runtime payload failed; fallback to raw reply",
+        )
+        return fallback_text, None
 
 
 def _diagnostic_payload(exc):
@@ -2611,6 +2677,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                     full_parts.append(chunk)
                     self._send_sse({"type": "delta", "text": chunk})
                 final_reply = "".join(full_parts).strip()
+                runtime_meta = None
                 if final_reply and not already_finalized:
                     final_reply = finalize_assistant_reply(
                         chat_config,
@@ -2623,6 +2690,10 @@ class PetHandler(SimpleHTTPRequestHandler):
                         is_auto=is_auto,
                     )
                 if final_reply:
+                    final_reply, runtime_meta = _apply_character_runtime_reply(
+                        chat_config,
+                        final_reply,
+                    )
                     try:
                         remember_interaction(
                             chat_config,
@@ -2632,7 +2703,10 @@ class PetHandler(SimpleHTTPRequestHandler):
                         )
                     except Exception:
                         pass
-                self._send_sse({"type": "done", "reply": final_reply})
+                done_payload = {"type": "done", "reply": final_reply}
+                if runtime_meta is not None:
+                    done_payload["runtime"] = runtime_meta
+                self._send_sse(done_payload)
             except Exception as exc:
                 diagnosed = _diagnose_llm_exception(exc, chat_config.get("llm", {}))
                 _log_backend_exception("CHAT_STREAM", diagnosed, extra="/api/chat_stream failed")
@@ -2648,13 +2722,17 @@ class PetHandler(SimpleHTTPRequestHandler):
                 force_tools=force_tools,
                 config=chat_config,
             )
+            reply, runtime_meta = _apply_character_runtime_reply(chat_config, reply)
             try:
                 remember_interaction(
                     chat_config, user_message, reply, is_auto=is_auto
                 )
             except Exception:
                 pass
-            self._send_json({"reply": reply})
+            payload = {"reply": reply}
+            if runtime_meta is not None:
+                payload["runtime"] = runtime_meta
+            self._send_json(payload)
         except Exception as exc:
             diagnosed = _diagnose_llm_exception(exc, chat_config.get("llm", {}))
             _log_backend_exception("CHAT", diagnosed, extra="/api/chat failed")
