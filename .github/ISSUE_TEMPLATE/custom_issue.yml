@@ -1,0 +1,41 @@
+﻿name: Custom Issue
+description: Create a custom issue when other templates do not fit.
+title: "[Custom]: "
+labels:
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template only if Bug/Feature/Docs templates do not match your case.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What is this issue about?
+      placeholder: Provide background and current status.
+    validations:
+      required: true
+
+  - type: textarea
+    id: request
+    attributes:
+      label: Request / Problem
+      description: What do you need from maintainers?
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional Details
+      description: Add logs, links, screenshots, or references. Remove sensitive data.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-check
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true

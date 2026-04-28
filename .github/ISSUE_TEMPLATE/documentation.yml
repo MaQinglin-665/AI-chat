@@ -1,0 +1,44 @@
+﻿name: Documentation Update
+description: Report missing, unclear, or outdated documentation.
+title: "[Docs]: "
+labels:
+  - documentation
+body:
+  - type: textarea
+    id: doc_location
+    attributes:
+      label: Affected Doc Location
+      description: Which file/page is affected?
+      placeholder: README.md, docs/setup.md, docs/troubleshooting.md ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is unclear or incorrect?
+      description: Describe the problem in the current docs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested Improvement
+      description: What should be changed?
+      placeholder: Proposed wording, structure, or examples.
+
+  - type: textarea
+    id: audience
+    attributes:
+      label: Target Audience
+      description: Who is affected?
+      placeholder: New user, contributor, maintainer, etc.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-check
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
