@@ -135,3 +135,12 @@
 - 开启行为：调用 `normalize_runtime_payload(llm_reply)`，仅将 `normalized["text"]` 写回最终 `reply` 文本；不接入 Live2D、TTS voice_style、主动互动、记忆系统。
 - 兼容性：关闭时保持原 response shape；开启且 `return_metadata=true` 时才附加可选 `runtime` 字段，旧前端可无感运行。
 - 失败回退：归一化异常时回退原始回复文本，不抛出 500。
+
+## Task 006 落地补充（metadata opt-in）
+
+- metadata 字段名统一为 `character_runtime`（仅在 `enabled=true` 且 `return_metadata=true` 时返回）。
+- 默认仍不返回 metadata，默认行为与 Task 005 保持一致。
+- metadata 结构以 `normalize_runtime_payload` 结果为基础，且不包含 `text`，避免与 `reply` 重复。
+- 当前稳定返回字段：`emotion`、`action`、`intensity`、`live2d_hint`、`voice_style`。
+- `/api/chat` 与 `/api/chat_stream` done payload 均已支持 `character_runtime` opt-in 返回。
+- 本任务未改前端、未接入 Live2D 动作执行、未接入 TTS voice_style 控制、未接入主动互动与记忆系统。
