@@ -144,3 +144,13 @@
 - 当前稳定返回字段：`emotion`、`action`、`intensity`、`live2d_hint`、`voice_style`。
 - `/api/chat` 与 `/api/chat_stream` done payload 均已支持 `character_runtime` opt-in 返回。
 - 本任务未改前端、未接入 Live2D 动作执行、未接入 TTS voice_style 控制、未接入主动互动与记忆系统。
+
+## Task 007 落地补充（structured LLM output prompt）
+- 仅在 `character_runtime.enabled=true` 时启用结构化输出提示；默认关闭时不改 prompt、不改 LLM 输入、不改 response shape。
+- 在 `app.py` 中新增最小 helper：
+  - `_build_character_runtime_prompt_contract()`
+  - `_apply_character_runtime_prompt_contract(config, prompt)`
+- 接入点：`call_llm` 与 `call_llm_stream` 的 prompt 组装阶段，在语言规则合并后追加 contract（仅 enabled=true）。
+- contract 要求模型尽量返回单个 JSON object（无 Markdown 代码块、无 JSON 外解释），字段包含 `text/emotion/action/intensity/voice_style`。
+- 运行时仍通过 `normalize_runtime_payload` 兜底：即使模型返回普通文本或坏 JSON，也不会导致聊天崩溃。
+- 本任务不改前端，不接 Live2D，不接 TTS voice_style，不接主动互动，不接记忆系统，不新增依赖。
