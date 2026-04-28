@@ -207,6 +207,36 @@ def _get_character_runtime_settings(config):
         return dict(default_settings)
 
 
+def _build_character_runtime_prompt_contract():
+    return (
+        "Character Runtime output contract:\n"
+        "- Respond with a single JSON object only.\n"
+        "- Do not wrap JSON in Markdown code blocks.\n"
+        "- Do not add explanations outside JSON.\n"
+        "- Keep the reply natural, concise, and in character.\n"
+        "Schema:\n"
+        "{\n"
+        '  "text": "final user-facing reply",\n'
+        '  "emotion": "neutral|happy|sad|angry|surprised|annoyed|thinking",\n'
+        '  "action": "none|wave|nod|shake_head|think|happy_idle|surprised",\n'
+        '  "intensity": "low|normal|high",\n'
+        '  "voice_style": "neutral|cheerful|teasing|soft|serious"\n'
+        "}\n"
+        'The "text" field is the only text shown to the user.'
+    )
+
+
+def _apply_character_runtime_prompt_contract(config, prompt):
+    settings = _get_character_runtime_settings(config)
+    if not settings.get("enabled", False):
+        return prompt
+    contract = _build_character_runtime_prompt_contract()
+    safe_prompt = str(prompt or "")
+    if not safe_prompt:
+        return contract
+    return merge_prompt_with_memory(safe_prompt, contract)
+
+
 def _apply_character_runtime_reply(config, raw_reply):
     settings = _get_character_runtime_settings(config)
     if not settings.get("enabled", False):
@@ -1226,6 +1256,7 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
     lang_block = _build_reply_language_block(config)
     if lang_block:
         prompt = merge_prompt_with_memory(prompt, lang_block)
+    prompt = _apply_character_runtime_prompt_contract(config, prompt)
     effective_user_message = thought_prefix + user_message if thought else user_message
 
 
@@ -1335,6 +1366,7 @@ def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, f
     lang_block = _build_reply_language_block(config)
     if lang_block:
         merged_prompt = merge_prompt_with_memory(merged_prompt, lang_block)
+    merged_prompt = _apply_character_runtime_prompt_contract(config, merged_prompt)
 
     tools_settings = get_tools_settings(config)
 

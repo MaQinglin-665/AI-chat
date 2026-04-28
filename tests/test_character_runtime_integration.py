@@ -81,6 +81,60 @@ def _post_stream_events(url, payload):
         return int(resp.status), events
 
 
+def _capture_openai_prompt_in_call_llm(monkeypatch, cfg, raw_reply="plain reply"):
+    captured = {}
+    cfg.setdefault("llm", {})
+    cfg["llm"]["provider"] = "openai"
+    cfg.setdefault("thinking", {})
+    cfg["thinking"]["enabled"] = False
+
+    monkeypatch.setattr(app, "should_reply", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(app, "_ensure_llm_auth_ready", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(app, "_build_base_prompt", lambda *_args, **_kwargs: ("base prompt", []))
+    monkeypatch.setattr(app, "build_prompt_with_style", lambda *_args, **_kwargs: "BASE_PROMPT")
+    monkeypatch.setattr(app, "_build_reply_language_block", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(app, "get_tools_settings", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(app, "should_use_work_tools", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(app, "update_emotion_from_reply", lambda *_args, **_kwargs: None)
+
+    def _fake_build_openai_messages(prompt, safe_history, user_message, image_data_url=None):
+        captured["prompt"] = prompt
+        captured["user_message"] = user_message
+        return [{"role": "system", "content": prompt}, {"role": "user", "content": user_message}]
+
+    monkeypatch.setattr(app, "build_openai_messages", _fake_build_openai_messages)
+    monkeypatch.setattr(app, "call_openai_compatible", lambda *_args, **_kwargs: raw_reply)
+    monkeypatch.setattr(
+        app,
+        "finalize_assistant_reply",
+        lambda *_args, **_kwargs: raw_reply,
+    )
+    return captured
+
+
+def _capture_openai_prompt_in_call_llm_stream(monkeypatch, cfg):
+    captured = {}
+    cfg.setdefault("llm", {})
+    cfg["llm"]["provider"] = "openai"
+
+    monkeypatch.setattr(app, "_ensure_llm_auth_ready", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(app, "_build_base_prompt", lambda *_args, **_kwargs: ("base prompt", []))
+    monkeypatch.setattr(app, "build_prompt_with_style", lambda *_args, **_kwargs: "BASE_STREAM_PROMPT")
+    monkeypatch.setattr(app, "_build_reply_language_block", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(app, "get_tools_settings", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(app, "should_use_work_tools", lambda *_args, **_kwargs: False)
+
+    def _fake_build_openai_messages(prompt, safe_history, user_message, image_data_url=None):
+        captured["prompt"] = prompt
+        captured["user_message"] = user_message
+        return [{"role": "system", "content": prompt}, {"role": "user", "content": user_message}]
+
+    monkeypatch.setattr(app, "build_openai_messages", _fake_build_openai_messages)
+    monkeypatch.setattr(app, "iter_openai_chat_stream", lambda *_args, **_kwargs: iter(["chunk-1"]))
+    monkeypatch.setattr(app, "iter_openai_responses_stream", lambda *_args, **_kwargs: iter([]))
+    return captured
+
+
 def test_default_runtime_off_keeps_original_reply(monkeypatch):
     cfg = _build_test_config()
     monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: "plain reply")
@@ -111,6 +165,51 @@ def test_enabled_false_never_returns_metadata(monkeypatch):
     assert status == 200
     assert payload.get("reply") == "plain reply"
     assert "character_runtime" not in payload
+
+
+def test_call_llm_prompt_unchanged_when_runtime_disabled(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": False}
+    captured = _capture_openai_prompt_in_call_llm(monkeypatch, cfg, raw_reply="plain reply")
+
+    result = app.call_llm("hi", [], config=cfg)
+
+    assert result == "plain reply"
+    assert captured.get("prompt") == "BASE_PROMPT"
+    assert "single JSON object" not in captured.get("prompt", "")
+
+
+def test_call_llm_prompt_contract_added_when_runtime_enabled(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True}
+    captured = _capture_openai_prompt_in_call_llm(
+        monkeypatch,
+        cfg,
+        raw_reply='{"text":"ok","emotion":"happy","action":"wave","intensity":"normal","voice_style":"cheerful"}',
+    )
+
+    result = app.call_llm("hi", [], config=cfg)
+
+    assert isinstance(result, str)
+    prompt = captured.get("prompt", "")
+    assert prompt.startswith("BASE_PROMPT")
+    assert "single JSON object only" in prompt
+    assert '"text": "final user-facing reply"' in prompt
+    assert '"emotion": "neutral|happy|sad|angry|surprised|annoyed|thinking"' in prompt
+
+
+def test_call_llm_stream_prompt_contract_added_when_runtime_enabled(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True}
+    captured = _capture_openai_prompt_in_call_llm_stream(monkeypatch, cfg)
+
+    chunks = list(app.call_llm_stream("hi", [], config=cfg))
+
+    assert chunks == ["chunk-1"]
+    prompt = captured.get("prompt", "")
+    assert prompt.startswith("BASE_STREAM_PROMPT")
+    assert "single JSON object only" in prompt
+    assert '"action": "none|wave|nod|shake_head|think|happy_idle|surprised"' in prompt
 
 
 def test_runtime_enabled_plain_text_remains_plain_text(monkeypatch):
