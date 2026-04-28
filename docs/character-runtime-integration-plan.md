@@ -127,3 +127,11 @@
 - 开启 runtime 后，`user_message -> assistant_reply -> tts_finished` 状态闭环可观测。
 - `/api/chat` 与 `/api/chat_stream` 均可稳定运行，无新增 5xx。
 - 不新增依赖，不放宽安全默认值，不引入自动桌面观察。
+
+## Task 005 落地补充（最小安全接入）
+
+- 接入位置：`app.py` 的 `PetHandler.do_POST`，仅在 `/api/chat` 与 `/api/chat_stream` 的最终回复出口接入。
+- 默认策略：`character_runtime.enabled=false`、`character_runtime.return_metadata=false`，缺失或异常配置均按关闭处理。
+- 开启行为：调用 `normalize_runtime_payload(llm_reply)`，仅将 `normalized["text"]` 写回最终 `reply` 文本；不接入 Live2D、TTS voice_style、主动互动、记忆系统。
+- 兼容性：关闭时保持原 response shape；开启且 `return_metadata=true` 时才附加可选 `runtime` 字段，旧前端可无感运行。
+- 失败回退：归一化异常时回退原始回复文本，不抛出 500。
