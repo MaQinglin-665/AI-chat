@@ -1,0 +1,101 @@
+﻿name: Create Issue Templates
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  ensure-templates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure issue template files exist
+        run: |
+          mkdir -p .github/ISSUE_TEMPLATE
+
+          if [ ! -f .github/ISSUE_TEMPLATE/bug_report.yml ]; then
+            cat > .github/ISSUE_TEMPLATE/bug_report.yml <<'EOF'
+          name: Bug Report
+          description: Report a reproducible bug in the desktop pet app.
+          title: "[Bug]: "
+          labels:
+            - bug
+          body:
+            - type: textarea
+              id: summary
+              attributes:
+                label: Summary
+              validations:
+                required: true
+            EOF
+          fi
+
+          if [ ! -f .github/ISSUE_TEMPLATE/feature_request.yml ]; then
+            cat > .github/ISSUE_TEMPLATE/feature_request.yml <<'EOF'
+          name: Feature Request
+          description: Propose a new feature or improvement.
+          title: "[Feature]: "
+          labels:
+            - enhancement
+          body:
+            - type: textarea
+              id: proposal
+              attributes:
+                label: Proposed solution
+              validations:
+                required: true
+            EOF
+          fi
+
+          if [ ! -f .github/ISSUE_TEMPLATE/documentation.yml ]; then
+            cat > .github/ISSUE_TEMPLATE/documentation.yml <<'EOF'
+          name: Documentation Update
+          description: Report missing, unclear, or outdated documentation.
+          title: "[Docs]: "
+          labels:
+            - documentation
+          body:
+            - type: textarea
+              id: issue
+              attributes:
+                label: Documentation problem
+              validations:
+                required: true
+            EOF
+          fi
+
+          if [ ! -f .github/ISSUE_TEMPLATE/custom_issue.yml ]; then
+            cat > .github/ISSUE_TEMPLATE/custom_issue.yml <<'EOF'
+          name: Custom Issue
+          description: Create a custom issue when other templates do not fit.
+          title: "[Custom]: "
+          labels:
+            - triage
+          body:
+            - type: textarea
+              id: context
+              attributes:
+                label: Context
+              validations:
+                required: true
+            EOF
+          fi
+
+      - name: Commit template updates if needed
+        run: |
+          if git diff --quiet; then
+            echo "No template changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/ISSUE_TEMPLATE
+            git commit -m "chore: ensure issue templates"
+            git push
+          fi
