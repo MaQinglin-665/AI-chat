@@ -1,0 +1,33 @@
+﻿name: Auto PR on Main Push
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update automation marker
+        run: |
+          mkdir -p .github/.automation
+          echo "last_run_utc=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > .github/.automation/auto-pr-marker.txt
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: automated PR marker update"
+          title: "Automated PR"
+          body: "Automated PR created by GitHub Actions."
+          branch: "automation/auto-pr"
+          base: "main"
+          delete-branch: true
