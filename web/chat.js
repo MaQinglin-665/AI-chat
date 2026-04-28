@@ -4199,6 +4199,39 @@ function parseToolMetaFromText(text) {
   }
 }
 
+function normalizeCharacterRuntimeMetadataForFrontend(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+  const out = {};
+  const safeKeys = ["emotion", "action", "intensity", "live2d_hint", "voice_style"];
+  for (const key of safeKeys) {
+    if (typeof raw[key] !== "string") {
+      continue;
+    }
+    const value = String(raw[key] || "").trim();
+    if (!value) {
+      continue;
+    }
+    out[key] = value;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+function handleCharacterRuntimeMetadata(raw) {
+  const normalized = normalizeCharacterRuntimeMetadataForFrontend(raw);
+  if (!normalized) {
+    return null;
+  }
+  try {
+    window.__AI_CHAT_LAST_CHARACTER_RUNTIME__ = normalized;
+    window.dispatchEvent(new CustomEvent("character-runtime:update", { detail: normalized }));
+  } catch (_) {
+    // Keep bridge side-effect safe; metadata is optional.
+  }
+  return normalized;
+}
+
 function getToolCardTitle(item) {
   const tool = String(item?.tool || "").trim();
   if (tool === "write_file") return "已写入文件";
@@ -9660,6 +9693,7 @@ async function streamAssistantReply(payload, onDelta) {
     if (!directResp.ok) {
       throw new Error(directData.error || `HTTP ${directResp.status}`);
     }
+    handleCharacterRuntimeMetadata(directData?.character_runtime);
     const text = String(directData.reply || "");
     if (text) onDelta(text);
     return text;
@@ -9693,6 +9727,7 @@ async function streamAssistantReply(payload, onDelta) {
     if (!fallbackResp.ok) {
       throw new Error(fallbackData.error || `HTTP ${fallbackResp.status}`);
     }
+    handleCharacterRuntimeMetadata(fallbackData?.character_runtime);
     const text = String(fallbackData.reply || "");
     if (text) onDelta(text);
     return text;
@@ -9730,6 +9765,9 @@ async function streamAssistantReply(payload, onDelta) {
     }
     if (evt.type === "done" && typeof evt.reply === "string" && evt.reply.trim()) {
       doneReply = evt.reply.trim();
+    }
+    if (evt.type === "done") {
+      handleCharacterRuntimeMetadata(evt.character_runtime);
     }
     return evt.type === "done";
   };
