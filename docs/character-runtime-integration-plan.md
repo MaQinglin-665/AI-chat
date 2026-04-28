@@ -154,3 +154,20 @@
 - contract 要求模型尽量返回单个 JSON object（无 Markdown 代码块、无 JSON 外解释），字段包含 `text/emotion/action/intensity/voice_style`。
 - 运行时仍通过 `normalize_runtime_payload` 兜底：即使模型返回普通文本或坏 JSON，也不会导致聊天崩溃。
 - 本任务不改前端，不接 Live2D，不接 TTS voice_style，不接主动互动，不接记忆系统，不新增依赖。
+
+## Task 008 落地补充（frontend metadata bridge）
+- 本任务仅在前端建立 Character Runtime metadata bridge，不改后端 Character Runtime 行为，不改 LLM prompt，不改 TTS。
+- 接入点位于 `web/chat.js` 的聊天响应接收链路：
+  - `/api/chat` 非流式返回路径
+  - `/api/chat_stream` done 事件路径
+- 新增 helper：
+  - `normalizeCharacterRuntimeMetadataForFrontend(raw)`
+  - `handleCharacterRuntimeMetadata(raw)`
+- helper 只做安全处理：
+  - 仅接受 object（忽略 null/string/number/array）
+  - 只提取 `emotion/action/intensity/live2d_hint/voice_style` 字段
+  - 通过 `window.__AI_CHAT_LAST_CHARACTER_RUNTIME__` 暂存最新 metadata
+  - 通过 `window.dispatchEvent(new CustomEvent("character-runtime:update", { detail }))` 分发无害事件
+- 当响应中没有 `character_runtime` 时，前端行为完全不变。
+- 本任务不驱动 Live2D、不改变 TTS、不改变聊天文本显示与默认 UI 行为。
+- 后续 Task 009 再接 emotion -> Live2D 表情/动作映射。
