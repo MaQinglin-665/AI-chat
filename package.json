@@ -1,7 +1,7 @@
 {
   "name": "xinyu-ai-desktop-pet",
   "productName": "馨语AI桌宠",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": true,
   "description": "馨语AI桌宠: Live2D desktop pet with local Python backend and transparent desktop window",
   "main": "electron/main.js",
