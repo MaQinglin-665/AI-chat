@@ -4218,6 +4218,43 @@ function normalizeCharacterRuntimeMetadataForFrontend(raw) {
   return Object.keys(out).length ? out : null;
 }
 
+function normalizeRuntimeEmotionForLive2D(emotion) {
+  if (typeof emotion !== "string") {
+    return "idle";
+  }
+  const key = String(emotion || "").trim().toLowerCase();
+  if (!key) {
+    return "idle";
+  }
+  if (key === "happy") return "happy";
+  if (key === "sad") return "sad";
+  if (key === "angry") return "angry";
+  if (key === "surprised") return "surprised";
+  if (key === "annoyed") return "angry";
+  if (key === "thinking") return "idle";
+  if (key === "neutral") return "idle";
+  return "idle";
+}
+
+function applyCharacterRuntimeEmotionToLive2D(metadata) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return false;
+  }
+  if (!state.model || !state.expressionEnabled) {
+    return false;
+  }
+  try {
+    const mood = normalizeRuntimeEmotionForLive2D(metadata.emotion);
+    state.speechAnimMood = mood;
+    state.moodHoldUntil = performance.now() + 1400;
+    triggerExpressionPulse(state.currentTalkStyle || "neutral", 0.55, 320);
+    return true;
+  } catch (err) {
+    console.debug("[character-runtime] apply emotion failed:", err);
+    return false;
+  }
+}
+
 function handleCharacterRuntimeMetadata(raw) {
   const normalized = normalizeCharacterRuntimeMetadataForFrontend(raw);
   if (!normalized) {
@@ -10755,6 +10792,14 @@ if (window.electronAPI?.onSubtitle) {
     _clearSubtitleDOM(id);
   });
 }
+
+window.addEventListener("character-runtime:update", (event) => {
+  try {
+    applyCharacterRuntimeEmotionToLive2D(event?.detail || null);
+  } catch (_) {
+    // Keep runtime bridge isolated from chat main flow.
+  }
+});
 
 async function main() {
   setStatus("启动中...");
