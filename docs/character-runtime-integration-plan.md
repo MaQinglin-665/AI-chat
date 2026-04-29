@@ -293,3 +293,14 @@
 - 文档包含 chatWindow DevTools 手动命令与预期结果，便于开发回归验证。
 - 已知限制已注明：暂无前端自动化命令、Live2D 表现依赖模型资源、motion 缺失时安全降级、LLM provider 故障与 frontend bridge 问题边界。
 - 本任务不改后端 response shape，不改前端 UI/Live2D/TTS，不接记忆/主动互动，不新增依赖。
+
+## Task 016 Landing Notes (Character Runtime demo enablement docs)
+- Added `docs/character-runtime-demo.md` as a developer-facing entry for enabling and validating the Character Runtime demo path.
+- The guide documents that Character Runtime remains disabled by default, with config loaded from `config.example.json -> config.json -> config.local.json`.
+- The guide shows the minimal demo config using `character_runtime.enabled=true` and `character_runtime.return_metadata=true`.
+- The guide explains that the structured JSON prompt contract is only injected when runtime is enabled.
+- The guide explains that `/api/chat` and `/api/chat_stream` may include optional `character_runtime` metadata only when metadata return is enabled.
+- The guide documents the frontend boundary: `chatWindow` forwards runtime metadata to `modelWindow` through `BroadcastChannel("taffy-character-runtime")`; this channel only forwards metadata and does not replace the backend or TTS pipeline.
+- The guide includes DevTools validation commands for `testEmotion`, `testAction`, and `emit`, and links to the Task 015 E2E validation document.
+- The guide documents troubleshooting boundaries: missing Live2D motion resources can degrade safely, `/api/chat` 500 is usually an LLM provider/config/network issue, and an undefined debug bridge often means the wrong DevTools window or stale frontend code.
+- This task does not change backend response defaults, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, or dependencies.
