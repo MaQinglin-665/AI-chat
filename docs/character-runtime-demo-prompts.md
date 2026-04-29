@@ -163,3 +163,5 @@ Recording notes:
 - for primary promo assets, prioritize natural chat clips over DevTools clips
 - keep at least one baseline normal-chat clip
 - avoid showing failure states in public-facing materials
+- align clip order and naming with:
+  - [Release Demo Capture Plan](./release-demo-capture-plan.md)

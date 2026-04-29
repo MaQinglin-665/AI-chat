@@ -14,6 +14,7 @@ Before recording, review:
 - [Character Runtime Demo Smoke Test Checklist](./character-runtime-smoke-test.md)
 - [Character Runtime Demo Enablement](./character-runtime-demo.md)
 - [Character Runtime Demo Prompt Examples](./character-runtime-demo-prompts.md)
+- [Release Demo Capture Plan](./release-demo-capture-plan.md)
 
 Preparation checklist:
 - confirm current branch

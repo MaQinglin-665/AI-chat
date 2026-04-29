@@ -339,3 +339,10 @@
 - Clarified public demo prompt boundaries and recording safety guidance to avoid sensitive content and over-claim messaging.
 - Linked prompt examples from the release demo recording checklist for a consistent recording workflow.
 - No behavior changes and no code-path changes (backend response shape, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, dependencies all unchanged).
+
+## Task 021 Landing Notes (Release demo capture plan)
+- Added `docs/release-demo-capture-plan.md` as an execution-oriented shot plan for release/demo capture workflows.
+- Defined clip naming convention, audience/use mapping, config state, suggested input, and pass criteria in a reusable capture table.
+- Clarified public-safe versus developer-only material boundaries and post-capture acceptance checks.
+- Linked the capture plan from recording checklist and prompt examples to form a consistent recording workflow.
+- No behavior changes and no code-path changes (backend response shape, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, dependencies all unchanged).
