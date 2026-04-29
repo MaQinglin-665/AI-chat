@@ -12,11 +12,29 @@ Character Profile 是角色人格与风格配置骨架，用于让 Character Run
 - `persona`
 - `tone`
 - `style_notes`
+- `response_guidelines`
+- `style_boundaries`
+- `interaction_examples`
 - `default_emotion`
 - `default_action`
 - `allowed_emotions`
 - `allowed_actions`
 - `allowed_voice_styles`
+
+## 默认风格目标
+- natural
+- concise
+- expressive
+- lightly playful
+- supportive
+- occasionally teasing
+
+## 风格边界
+- 不要像通用客服话术那样机械。
+- 不要过度戏剧化、过度可爱化、过度二次元 roleplay。
+- 不要每句话都强行调侃；轻微玩笑应是可选调味，不影响任务完成。
+- 不要引入敏感/成人/操控性或依赖关系暗示。
+- 始终优先可用性：先给出有帮助的答案，再附加轻量角色风格。
 
 ## 安全兜底
 后端会在以下情况自动回退内置默认 profile：

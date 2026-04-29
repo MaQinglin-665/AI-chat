@@ -260,3 +260,21 @@
   - `allowed_emotions/allowed_actions/allowed_voice_styles`
 - 本任务不改前端 UI，不改 Live2D，不改 TTS，不接记忆，不接主动互动，不新增依赖。
 - 后续任务再扩展 profile UI、多角色与角色市场。
+
+## Task 014 落地补充（Character Profile prompt polish and style tuning）
+- 本任务聚焦 Character Profile 与 runtime structured prompt wording 优化，不改后端 response shape，不改前端 UI、Live2D、TTS。
+- 默认行为保持不变：仅当 `character_runtime.enabled=true` 时注入 profile 风格 guidance；disabled 路径 prompt 与主流程不变。
+- `config/character_profile.json` 新增轻量字段：
+  - `response_guidelines`
+  - `style_boundaries`
+  - `interaction_examples`
+- 后端 `app.py` 扩展 profile 归一化兜底：
+  - 字段缺失 -> 默认值
+  - 类型异常 -> 默认值
+- runtime prompt 规则更清晰：
+  - 保持 natural/concise/expressive，轻微 playful/teasing，但以任务可用性为先。
+  - 避免 generic assistant 口吻，同时避免过度戏剧化、过度可爱或强 roleplay。
+  - 禁止强制每句调侃与不当依赖暗示。
+  - 继续要求 JSON-only 输出（无 Markdown code block、无 JSON 外解释）。
+  - emotion/action/voice_style 仅可从 allowed 列表选择，不确定时回退 neutral/none/neutral。
+- 本任务不接记忆、不接主动互动、不新增依赖。
