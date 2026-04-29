@@ -4387,6 +4387,74 @@ function handleCharacterRuntimeMetadata(raw) {
   return normalized;
 }
 
+function installCharacterRuntimeDebugBridge() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const key = "__AI_CHAT_DEBUG_CHARACTER_RUNTIME__";
+  if (window[key] && typeof window[key] === "object") {
+    return window[key];
+  }
+
+  const samples = {
+    happyWave: {
+      emotion: "happy",
+      action: "wave",
+      intensity: "normal",
+      live2d_hint: "happy",
+      voice_style: "cheerful"
+    },
+    annoyed: {
+      emotion: "annoyed",
+      action: "shake_head",
+      intensity: "normal",
+      live2d_hint: "angry",
+      voice_style: "serious"
+    },
+    thinking: {
+      emotion: "thinking",
+      action: "think",
+      intensity: "low",
+      live2d_hint: "neutral",
+      voice_style: "neutral"
+    },
+    surprised: {
+      emotion: "surprised",
+      action: "surprised",
+      intensity: "high",
+      live2d_hint: "surprised",
+      voice_style: "cheerful"
+    }
+  };
+
+  const emit = (metadata) => {
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      return null;
+    }
+    try {
+      return handleCharacterRuntimeMetadata(metadata);
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const testEmotion = (emotion) => emit({ emotion: String(emotion || "") });
+  const testAction = (action) => emit({ action: String(action || "") });
+
+  const bridge = {
+    emit,
+    testEmotion,
+    testAction,
+    samples
+  };
+  try {
+    window[key] = bridge;
+  } catch (_) {
+    return null;
+  }
+  return bridge;
+}
+
 function getToolCardTitle(item) {
   const tool = String(item?.tool || "").trim();
   if (tool === "write_file") return "已写入文件";
@@ -10919,6 +10987,7 @@ window.addEventListener("character-runtime:update", (event) => {
     // Keep runtime bridge isolated from chat main flow.
   }
 });
+installCharacterRuntimeDebugBridge();
 
 async function main() {
   setStatus("启动中...");

@@ -212,3 +212,21 @@
   - Live2D 未初始化或 motion 关闭时直接跳过
   - 异常仅 `console.debug`，不影响聊天文本、表情主链路、TTS
 - 本任务不处理 `voice_style`，不改变默认聊天显示，不新增依赖。
+
+## Task 011 落地补充（Character Runtime frontend debug bridge）
+- 本任务新增开发期 debug bridge，用于在前端手动验证 `character_runtime metadata -> character-runtime:update -> emotion/action Live2D bridge` 链路。
+- 实现位置：`web/chat.js`，挂载 `window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__`。
+- 提供方法：
+  - `emit(metadata)`：安全派发 metadata（复用 `handleCharacterRuntimeMetadata` 和既有 `character-runtime:update` 事件）
+  - `testEmotion(emotion)`：仅构造 emotion metadata
+  - `testAction(action)`：仅构造 action metadata
+  - `samples`：仅提供样例数据，不自动执行
+- 设计原则：
+  - 默认无害，不改默认聊天 UI
+  - 不调用后端，不改 LLM prompt，不改 TTS
+  - 非法输入（null/string/number/array）安全忽略
+  - 不替代正式测试，仅辅助开发调试
+- Console 示例：
+  - `window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.testEmotion("happy")`
+  - `window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.testAction("wave")`
+  - `window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.emit({ emotion: "annoyed", action: "shake_head" })`
