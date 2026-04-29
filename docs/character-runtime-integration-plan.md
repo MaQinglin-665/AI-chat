@@ -325,3 +325,10 @@
 - Added explicit preparation and cleanup checklists for recording/demo workflows, including baseline restore and commit-safety checks.
 - Linked the new guide from demo and smoke-test docs for a consistent setup path.
 - This task introduces no behavior changes and no code-path changes (backend response shape, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, dependencies all unchanged).
+
+## Task 019 Landing Notes (Release demo recording checklist)
+- Added `docs/release-demo-recording-checklist.md` for pre-release recording workflows across README, Release page, social clips, and internal demo materials.
+- Clarified required recording scenarios, per-clip verification intent, and post-recording baseline recovery checks.
+- Clarified public messaging boundaries and exclusion rules for sensitive information and failure-state footage.
+- Linked the release recording checklist from the safe local config guide as the main recording workflow entry point.
+- No behavior changes and no code-path changes (backend response shape, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, dependencies all unchanged).
