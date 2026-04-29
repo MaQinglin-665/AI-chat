@@ -171,3 +171,19 @@
 - 当响应中没有 `character_runtime` 时，前端行为完全不变。
 - 本任务不驱动 Live2D、不改变 TTS、不改变聊天文本显示与默认 UI 行为。
 - 后续 Task 009 再接 emotion -> Live2D 表情/动作映射。
+
+## Task 009 落地补充（Live2D emotion expression bridge）
+- 本任务只接 emotion -> Live2D expression bridge，不改后端 Character Runtime，不改 LLM prompt，不改 TTS。
+- 复用 Task 008 的 `character-runtime:update` 事件，在前端新增监听并调用安全适配器。
+- 新增 helper：
+  - `normalizeRuntimeEmotionForLive2D(emotion)`
+  - `applyCharacterRuntimeEmotionToLive2D(metadata)`
+- 映射策略（保守）：
+  - `happy/sad/angry/surprised` 直连
+  - `annoyed -> angry`
+  - `neutral/thinking/unknown -> idle`
+- 适配方式：不调用动作系统，不处理 `action`，不处理 `voice_style`；仅更新现有表情层使用的 `speechAnimMood/moodHoldUntil`，并触发轻量 `triggerExpressionPulse`。
+- 安全策略：
+  - Live2D 未初始化（`state.model` 不可用）或 expression 关闭时直接跳过
+  - 异常仅 `console.debug`，不影响聊天文本与 TTS 主链路
+- 后续如模型资源提供稳定 expression API，可在该 bridge 内替换为显式 expression 调用。
