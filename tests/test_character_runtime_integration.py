@@ -739,7 +739,7 @@ def test_runtime_enabled_bad_json_fallback_does_not_crash(monkeypatch):
     with _run_server_with_config(monkeypatch, cfg) as base:
         status, payload = _post_json(f"{base}/api/chat", _chat_payload("hi"))
     assert status == 200
-    assert payload.get("reply") == '{"text":"broken"'
+    assert payload.get("reply") == "broken"
     assert isinstance(payload.get("reply"), str)
 
 
@@ -756,6 +756,25 @@ def test_runtime_enabled_dict_reply_is_converted_to_text(monkeypatch):
     assert status == 200
     assert payload.get("reply") == "dict text"
     assert isinstance(payload.get("reply"), str)
+
+
+def test_runtime_enabled_json_like_with_trailing_comma_does_not_leak_raw_json(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True, "return_metadata": True}
+    monkeypatch.setattr(
+        app,
+        "call_llm",
+        lambda *args, **kwargs: '{"text":"normalized hi","emotion":"thinking","action":"think",}',
+    )
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(f"{base}/api/chat", _chat_payload("hi"))
+    assert status == 200
+    assert payload.get("reply") == "normalized hi"
+    assert payload.get("reply", "").lstrip().startswith("{") is False
+    runtime = payload.get("character_runtime")
+    assert isinstance(runtime, dict)
+    assert runtime.get("emotion") == "thinking"
+    assert runtime.get("action") == "think"
 
 
 def test_runtime_metadata_is_not_returned_by_default(monkeypatch):
@@ -827,3 +846,29 @@ def test_chat_stream_done_payload_returns_character_runtime_when_opt_in(monkeypa
     assert runtime.get("live2d_hint") == "smile_soft"
     assert runtime.get("voice_style") == "warm"
     assert "text" not in runtime
+
+
+def test_chat_stream_done_payload_does_not_leak_json_like_reply(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True, "return_metadata": True}
+
+    def _fake_stream(*_args, **_kwargs):
+        yield '{"text":"stream normalized","emotion":"thinking","action":"think",}'
+
+    monkeypatch.setattr(app, "call_llm_stream", _fake_stream)
+    monkeypatch.setattr(
+        app,
+        "finalize_assistant_reply",
+        lambda *_args, **_kwargs: '{"text":"stream normalized","emotion":"thinking","action":"think",}',
+    )
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, events = _post_stream_events(f"{base}/api/chat_stream", _chat_payload("hi"))
+    assert status == 200
+    done = next((evt for evt in events if evt.get("type") == "done"), {})
+    assert done.get("reply") == "stream normalized"
+    assert done.get("reply", "").lstrip().startswith("{") is False
+    runtime = done.get("character_runtime")
+    assert isinstance(runtime, dict)
+    assert runtime.get("emotion") == "thinking"
+    assert runtime.get("action") == "think"
