@@ -68,6 +68,8 @@ After disabling:
 - confirm LLM provider is reachable
 - confirm Electron/Live2D starts correctly
 - confirm `chatWindow` DevTools debug bridge is available
+- for public release material workflow, run:
+  - [Release Demo Recording Checklist](./release-demo-recording-checklist.md)
 - run smoke checklist:
   - [Character Runtime Demo Smoke Test Checklist](./character-runtime-smoke-test.md)
 
@@ -87,4 +89,5 @@ After disabling:
 ## Related Docs
 - [Character Runtime Demo Enablement](./character-runtime-demo.md)
 - [Character Runtime Demo Smoke Test Checklist](./character-runtime-smoke-test.md)
+- [Release Demo Recording Checklist](./release-demo-recording-checklist.md)
 - [Character Runtime End-to-End Validation](./character-runtime-e2e-validation.md)
