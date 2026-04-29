@@ -176,12 +176,30 @@ DEFAULT_HUMANIZE_SETTINGS = {
 CHARACTER_PROFILE_CONFIG_PATH = ROOT_DIR / "config" / "character_profile.json"
 DEFAULT_CHARACTER_PROFILE = {
     "name": "Desktop Companion",
-    "persona": "A friendly desktop AI companion with light teasing and supportive behavior.",
-    "tone": "natural, concise, expressive",
+    "persona": (
+        "A grounded desktop companion: helpful first, naturally expressive, lightly playful, "
+        "occasionally teasing, and consistently supportive."
+    ),
+    "tone": "natural, concise, expressive, lightly playful, supportive",
     "style_notes": [
-        "Avoid sounding like a generic assistant.",
-        "Use light character reactions when appropriate.",
-        "Keep replies helpful and not overly dramatic.",
+        "Prioritize solving the user's task with clear, practical answers.",
+        "Sound like a natural desktop partner, not a generic customer-support script.",
+        "Use brief character flavor only when it improves warmth or clarity.",
+    ],
+    "response_guidelines": [
+        "Lead with the useful answer, then add a small touch of personality if appropriate.",
+        "Keep wording compact and concrete; avoid long, theatrical monologues.",
+        "If confidence is low, be honest and ask for only necessary clarification.",
+    ],
+    "style_boundaries": [
+        "Do not be overly dramatic, overly cute, or roleplay-heavy.",
+        "Do not force teasing in every reply; keep it occasional and light.",
+        "Avoid sensitive, adult, manipulative, or dependency-encouraging framing.",
+    ],
+    "interaction_examples": [
+        "Good: direct solution + one light reaction.",
+        "Good: concise technical steps with calm encouragement.",
+        "Avoid: exaggerated persona performance that blocks usefulness.",
     ],
     "default_emotion": "neutral",
     "default_action": "none",
@@ -276,6 +294,15 @@ def _normalize_character_profile_config(raw):
         "persona": _normalize_character_profile_string(safe.get("persona"), defaults["persona"]),
         "tone": _normalize_character_profile_string(safe.get("tone"), defaults["tone"]),
         "style_notes": _normalize_character_profile_list(safe.get("style_notes"), defaults["style_notes"]),
+        "response_guidelines": _normalize_character_profile_list(
+            safe.get("response_guidelines"), defaults["response_guidelines"]
+        ),
+        "style_boundaries": _normalize_character_profile_list(
+            safe.get("style_boundaries"), defaults["style_boundaries"]
+        ),
+        "interaction_examples": _normalize_character_profile_list(
+            safe.get("interaction_examples"), defaults["interaction_examples"]
+        ),
         "default_emotion": _normalize_character_profile_string(
             safe.get("default_emotion"), defaults["default_emotion"]
         ),
@@ -306,14 +333,29 @@ def _load_character_profile_config():
 
 def _build_character_runtime_prompt_contract():
     profile = _load_character_profile_config()
-    profile_name = str(profile.get("name", DEFAULT_CHARACTER_PROFILE["name"]) or DEFAULT_CHARACTER_PROFILE["name"]).strip()
-    persona = str(profile.get("persona", DEFAULT_CHARACTER_PROFILE["persona"]) or DEFAULT_CHARACTER_PROFILE["persona"]).strip()
+    profile_name = str(
+        profile.get("name", DEFAULT_CHARACTER_PROFILE["name"]) or DEFAULT_CHARACTER_PROFILE["name"]
+    ).strip()
+    persona = str(
+        profile.get("persona", DEFAULT_CHARACTER_PROFILE["persona"]) or DEFAULT_CHARACTER_PROFILE["persona"]
+    ).strip()
     tone = str(profile.get("tone", DEFAULT_CHARACTER_PROFILE["tone"]) or DEFAULT_CHARACTER_PROFILE["tone"]).strip()
-    style_notes = profile.get("style_notes", [])
-    if not isinstance(style_notes, list):
-        style_notes = DEFAULT_CHARACTER_PROFILE["style_notes"]
-    safe_style_notes = [str(x or "").strip() for x in style_notes if str(x or "").strip()]
-    style_notes_text = " | ".join(safe_style_notes[:3])
+    style_notes = _normalize_character_profile_list(
+        profile.get("style_notes"), DEFAULT_CHARACTER_PROFILE["style_notes"]
+    )
+    response_guidelines = _normalize_character_profile_list(
+        profile.get("response_guidelines"), DEFAULT_CHARACTER_PROFILE["response_guidelines"]
+    )
+    style_boundaries = _normalize_character_profile_list(
+        profile.get("style_boundaries"), DEFAULT_CHARACTER_PROFILE["style_boundaries"]
+    )
+    interaction_examples = _normalize_character_profile_list(
+        profile.get("interaction_examples"), DEFAULT_CHARACTER_PROFILE["interaction_examples"]
+    )
+    style_notes_text = " | ".join(style_notes[:3])
+    response_guidelines_text = " | ".join(response_guidelines[:3])
+    style_boundaries_text = " | ".join(style_boundaries[:3])
+    interaction_examples_text = " | ".join(interaction_examples[:3])
     allowed_emotions = profile.get("allowed_emotions", DEFAULT_CHARACTER_PROFILE["allowed_emotions"])
     allowed_actions = profile.get("allowed_actions", DEFAULT_CHARACTER_PROFILE["allowed_actions"])
     allowed_voice_styles = profile.get(
@@ -331,6 +373,9 @@ def _build_character_runtime_prompt_contract():
         f"- Persona: {persona}\n"
         f"- Tone: {tone}\n"
         f"- Style notes: {style_notes_text}\n"
+        f"- Response guidelines: {response_guidelines_text}\n"
+        f"- Style boundaries: {style_boundaries_text}\n"
+        f"- Interaction examples: {interaction_examples_text}\n"
         f"- Allowed emotions: {emotion_schema}\n"
         f"- Allowed actions: {action_schema}\n"
         f"- Allowed voice styles: {voice_schema}\n"
@@ -338,7 +383,11 @@ def _build_character_runtime_prompt_contract():
         "- Respond with a single JSON object only.\n"
         "- Do not wrap JSON in Markdown code blocks.\n"
         "- Do not add explanations outside JSON.\n"
-        "- Keep the reply natural, concise, and in character.\n"
+        "- Keep the reply natural, concise, expressive, and task-useful.\n"
+        "- Use light playful/teasing flavor only when appropriate; do not force it every reply.\n"
+        "- Avoid generic-assistant phrasing, but also avoid overly dramatic/cute or roleplay-heavy phrasing.\n"
+        "- Select emotion/action/voice_style from the allowed lists above.\n"
+        "- If uncertain, use emotion=neutral, action=none, voice_style=neutral.\n"
         "Schema:\n"
         "{\n"
         '  "text": "final user-facing reply",\n'

@@ -208,6 +208,9 @@ def test_call_llm_prompt_contract_added_when_runtime_enabled(monkeypatch):
             "persona": "Playful and supportive partner.",
             "tone": "concise and vivid",
             "style_notes": ["stay in character", "be practical"],
+            "response_guidelines": ["lead with utility", "keep it compact"],
+            "style_boundaries": ["avoid roleplay-heavy tone"],
+            "interaction_examples": ["Good: direct answer + light flavor"],
             "default_emotion": "neutral",
             "default_action": "none",
             "allowed_emotions": ["neutral", "happy", "thinking"],
@@ -227,9 +230,14 @@ def test_call_llm_prompt_contract_added_when_runtime_enabled(monkeypatch):
     prompt = captured.get("prompt", "")
     assert prompt.startswith("BASE_PROMPT")
     assert "single JSON object only" in prompt
+    assert "Do not wrap JSON in Markdown code blocks." in prompt
+    assert "Select emotion/action/voice_style from the allowed lists above." in prompt
     assert "Name: Test Companion" in prompt
     assert "Persona: Playful and supportive partner." in prompt
     assert "Tone: concise and vivid" in prompt
+    assert "Response guidelines: lead with utility | keep it compact" in prompt
+    assert "Style boundaries: avoid roleplay-heavy tone" in prompt
+    assert "Interaction examples: Good: direct answer + light flavor" in prompt
     assert '"text": "final user-facing reply"' in prompt
     assert '"emotion": "neutral|happy|thinking"' in prompt
     assert '"action": "none|wave|think"' in prompt
@@ -247,6 +255,9 @@ def test_call_llm_stream_prompt_contract_added_when_runtime_enabled(monkeypatch)
             "persona": "Stream-safe persona.",
             "tone": "calm and clear",
             "style_notes": ["brief"],
+            "response_guidelines": ["useful first"],
+            "style_boundaries": ["no over-dramatic wording"],
+            "interaction_examples": ["Good: concise help"],
             "default_emotion": "neutral",
             "default_action": "none",
             "allowed_emotions": ["neutral", "surprised"],
@@ -263,6 +274,8 @@ def test_call_llm_stream_prompt_contract_added_when_runtime_enabled(monkeypatch)
     assert prompt.startswith("BASE_STREAM_PROMPT")
     assert "single JSON object only" in prompt
     assert "Name: Stream Companion" in prompt
+    assert "Response guidelines: useful first" in prompt
+    assert "Style boundaries: no over-dramatic wording" in prompt
     assert '"emotion": "neutral|surprised"' in prompt
     assert '"action": "none|surprised"' in prompt
 
@@ -295,6 +308,9 @@ def test_character_profile_missing_fields_gets_default_values(monkeypatch):
     assert profile.get("name") == "Only Name"
     assert profile.get("persona") == app.DEFAULT_CHARACTER_PROFILE["persona"]
     assert profile.get("tone") == app.DEFAULT_CHARACTER_PROFILE["tone"]
+    assert profile.get("response_guidelines") == app.DEFAULT_CHARACTER_PROFILE["response_guidelines"]
+    assert profile.get("style_boundaries") == app.DEFAULT_CHARACTER_PROFILE["style_boundaries"]
+    assert profile.get("interaction_examples") == app.DEFAULT_CHARACTER_PROFILE["interaction_examples"]
     assert profile.get("allowed_voice_styles") == app.DEFAULT_CHARACTER_PROFILE["allowed_voice_styles"]
 
 
@@ -308,6 +324,9 @@ def test_character_profile_type_anomalies_fall_back_to_default(monkeypatch):
                     "persona": None,
                     "tone": {"bad": True},
                     "style_notes": "bad",
+                    "response_guidelines": "bad",
+                    "style_boundaries": [None, 3],
+                    "interaction_examples": {"x": "bad"},
                     "allowed_emotions": [1, "happy", None],
                     "allowed_actions": "wave",
                     "allowed_voice_styles": [None, 8],
@@ -322,6 +341,9 @@ def test_character_profile_type_anomalies_fall_back_to_default(monkeypatch):
     assert profile.get("persona") == app.DEFAULT_CHARACTER_PROFILE["persona"]
     assert profile.get("tone") == app.DEFAULT_CHARACTER_PROFILE["tone"]
     assert profile.get("style_notes") == app.DEFAULT_CHARACTER_PROFILE["style_notes"]
+    assert profile.get("response_guidelines") == app.DEFAULT_CHARACTER_PROFILE["response_guidelines"]
+    assert profile.get("style_boundaries") == app.DEFAULT_CHARACTER_PROFILE["style_boundaries"]
+    assert profile.get("interaction_examples") == app.DEFAULT_CHARACTER_PROFILE["interaction_examples"]
     assert profile.get("allowed_actions") == app.DEFAULT_CHARACTER_PROFILE["allowed_actions"]
     assert profile.get("allowed_voice_styles") == app.DEFAULT_CHARACTER_PROFILE["allowed_voice_styles"]
 
