@@ -128,6 +128,11 @@ DEFAULT_CONFIG = {
         "presence_penalty": 0.35,
         "api_key_env": OPENAI_DEFAULT_KEY_ENV,
     },
+    "character_runtime": {
+        "enabled": False,
+        "return_metadata": False,
+        "demo_stable": False,
+    },
     "thinking": {
         "enabled": True,
         "max_tokens": 100,
@@ -583,6 +588,19 @@ def sanitize_client_config(config):
     humanize_cfg = config.get("humanize", {})
     motion_cfg = config.get("motion", {})
     tools_cfg = config.get("tools", {})
+    character_runtime_cfg = config.get("character_runtime", {})
+    if not isinstance(character_runtime_cfg, dict):
+        character_runtime_cfg = {}
+    runtime_enabled = bool(character_runtime_cfg.get("enabled", False))
+    runtime_return_metadata = bool(character_runtime_cfg.get("return_metadata", False))
+    runtime_demo_stable = bool(character_runtime_cfg.get("demo_stable", False))
+    persona_override_cfg = character_runtime_cfg.get("persona_override", {})
+    if not isinstance(persona_override_cfg, dict):
+        persona_override_cfg = {}
+    persona_override_name = str(persona_override_cfg.get("name", "") or "").strip()
+    if len(persona_override_name) > 80:
+        persona_override_name = persona_override_name[:80].strip()
+    persona_override_enabled = bool(persona_override_cfg.get("enabled", False) and persona_override_name)
     hotword_replacements = sanitize_hotword_replacements(
         asr_cfg.get("hotword_replacements", {})
     )
@@ -912,5 +930,14 @@ def sanitize_client_config(config):
             "workspace_root": str(tools_cfg.get("workspace_root", DEFAULT_WORKSPACE_ROOT)),
             "allow_shell": bool(tools_cfg.get("allow_shell", False)),
             "image_enabled": bool(tools_cfg.get("image_enabled", True)),
+        },
+        "character_runtime": {
+            "enabled": runtime_enabled,
+            "return_metadata": runtime_return_metadata,
+            "demo_stable": runtime_demo_stable,
+            "persona_override": {
+                "enabled": persona_override_enabled,
+                "name": persona_override_name if persona_override_enabled else "",
+            },
         },
     }

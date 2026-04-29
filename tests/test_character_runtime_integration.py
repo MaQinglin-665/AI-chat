@@ -169,6 +169,119 @@ def test_enabled_false_never_returns_metadata(monkeypatch):
     assert "character_runtime" not in payload
 
 
+def test_character_runtime_settings_default_demo_stable_off():
+    settings = app._get_character_runtime_settings({})
+    assert settings.get("enabled") is False
+    assert settings.get("return_metadata") is False
+    assert settings.get("demo_stable") is False
+    override = settings.get("persona_override", {})
+    assert isinstance(override, dict)
+    assert override.get("enabled") is False
+    assert override.get("name") == ""
+    assert override.get("style") == ""
+
+
+def test_character_runtime_settings_demo_stable_requires_runtime_enabled():
+    settings = app._get_character_runtime_settings(
+        {"character_runtime": {"enabled": False, "demo_stable": True}}
+    )
+    assert settings.get("enabled") is False
+    assert settings.get("demo_stable") is False
+
+    settings = app._get_character_runtime_settings(
+        {"character_runtime": {"enabled": True, "demo_stable": True}}
+    )
+    assert settings.get("enabled") is True
+    assert settings.get("demo_stable") is True
+
+
+def test_character_runtime_settings_persona_override_parsing():
+    settings = app._get_character_runtime_settings(
+        {
+            "character_runtime": {
+                "enabled": True,
+                "demo_stable": True,
+                "persona_override": {"enabled": True, "name": "Local Name", "style": "quick and witty"},
+            }
+        }
+    )
+    override = settings.get("persona_override", {})
+    assert override.get("enabled") is True
+    assert override.get("name") == "Local Name"
+    assert override.get("style") == "quick and witty"
+
+
+def test_reply_llm_cfg_stable_budget_is_at_least_600():
+    cfg = _build_test_config()
+    cfg["llm"]["max_output_tokens"] = 220
+    cfg["character_runtime"] = {"enabled": True, "demo_stable": True}
+    tuned = app._build_reply_llm_cfg(cfg, cfg["llm"])
+    assert int(tuned.get("max_output_tokens", 0)) >= 600
+    assert tuned.get("allow_high_output_tokens") is True
+    assert tuned.get("retry_on_length") is True
+    assert int(tuned.get("length_retry_max_output_tokens", 0)) >= int(
+        tuned.get("max_output_tokens", 0)
+    )
+
+
+def test_reply_llm_cfg_stable_preserves_higher_user_budget():
+    cfg = _build_test_config()
+    cfg["llm"]["max_output_tokens"] = 900
+    cfg["character_runtime"] = {"enabled": True, "demo_stable": True}
+    tuned = app._build_reply_llm_cfg(cfg, cfg["llm"])
+    assert int(tuned.get("max_output_tokens", 0)) == 900
+
+
+def test_reply_llm_cfg_non_stable_keeps_original_budget_and_flags():
+    cfg = _build_test_config()
+    cfg["llm"]["max_output_tokens"] = 220
+    cfg["character_runtime"] = {"enabled": True, "demo_stable": False}
+    tuned = app._build_reply_llm_cfg(cfg, cfg["llm"])
+    assert int(tuned.get("max_output_tokens", 0)) == 220
+    assert "allow_high_output_tokens" not in tuned
+    assert "retry_on_length" not in tuned
+    assert "length_retry_max_output_tokens" not in tuned
+
+
+def test_call_llm_stable_passes_boosted_budget_to_final_reply(monkeypatch):
+    cfg = _build_test_config()
+    cfg.setdefault("llm", {})
+    cfg["llm"]["provider"] = "openai"
+    cfg["llm"]["max_output_tokens"] = 220
+    cfg["character_runtime"] = {"enabled": True, "demo_stable": True}
+    cfg.setdefault("thinking", {})
+    cfg["thinking"]["enabled"] = False
+    captured = {}
+
+    monkeypatch.setattr(app, "should_reply", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(app, "_ensure_llm_auth_ready", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(app, "_build_base_prompt", lambda *_args, **_kwargs: ("base prompt", []))
+    monkeypatch.setattr(app, "build_prompt_with_style", lambda *_args, **_kwargs: "BASE_PROMPT")
+    monkeypatch.setattr(app, "_build_reply_language_block", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(app, "get_tools_settings", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(app, "should_use_work_tools", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(app, "update_emotion_from_reply", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        app,
+        "build_openai_messages",
+        lambda **_kwargs: [{"role": "system", "content": "BASE_PROMPT"}, {"role": "user", "content": "hi"}],
+    )
+
+    def _fake_call_openai_compatible(local_cfg, _messages):
+        captured["llm_cfg"] = dict(local_cfg)
+        return "ok"
+
+    monkeypatch.setattr(app, "call_openai_compatible", _fake_call_openai_compatible)
+    monkeypatch.setattr(app, "finalize_assistant_reply", lambda *_args, **_kwargs: "ok")
+
+    result = app.call_llm("hi", [], config=cfg)
+    assert result == "ok"
+    tuned = captured.get("llm_cfg", {})
+    assert int(tuned.get("max_output_tokens", 0)) >= 600
+    assert tuned.get("allow_high_output_tokens") is True
+    assert tuned.get("retry_on_length") is True
+
+
 def test_call_llm_prompt_unchanged_when_runtime_disabled(monkeypatch):
     cfg = _build_test_config()
     cfg["character_runtime"] = {"enabled": False}
@@ -179,6 +292,249 @@ def test_call_llm_prompt_unchanged_when_runtime_disabled(monkeypatch):
     assert result == "plain reply"
     assert captured.get("prompt") == "BASE_PROMPT"
     assert "single JSON object" not in captured.get("prompt", "")
+
+
+def test_call_llm_demo_stable_persona_override_enabled_injects_identity_rules(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "demo_stable": True,
+        "persona_override": {
+            "enabled": True,
+            "name": "ConfiguredPersona",
+            "style": "playful, cheeky, lightly teasing, reliable",
+        },
+    }
+    captured = _capture_openai_prompt_in_call_llm(monkeypatch, cfg, raw_reply="plain reply")
+
+    result = app.call_llm("who are you?", [], config=cfg)
+
+    assert result == "plain reply"
+    prompt = captured.get("prompt", "")
+    assert "Your current name is: ConfiguredPersona." in prompt
+    assert "When the user asks who you are, introduce yourself using this name." in prompt
+    assert "Do not use any other character name." in prompt
+    assert "Keep this local persona style: playful, cheeky, lightly teasing, reliable." in prompt
+    assert "Even when the user writes in Chinese, reply primarily in natural spoken English." in prompt
+    assert "Usually keep replies to 2 to 3 short sentences." in prompt
+    assert "Do not call yourself ChatGPT." in prompt
+    assert "发布演示" not in prompt
+    assert "稳定模式" not in prompt
+    assert "demo_stable" not in prompt
+    assert "内部模式" not in prompt
+    assert "系统提示" not in prompt
+    assert "nerous-sama" not in prompt.lower()
+    assert "neuro-sama" not in prompt.lower()
+
+
+def test_call_llm_demo_stable_persona_override_disabled_does_not_inject_identity_rules(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "demo_stable": True,
+        "persona_override": {
+            "enabled": False,
+            "name": "ConfiguredPersona",
+            "style": "should not appear",
+        },
+    }
+    captured = _capture_openai_prompt_in_call_llm(monkeypatch, cfg, raw_reply="plain reply")
+
+    result = app.call_llm("who are you?", [], config=cfg)
+
+    assert result == "plain reply"
+    prompt = captured.get("prompt", "")
+    assert "Your current name is: ConfiguredPersona." not in prompt
+    assert "When the user asks who you are, introduce yourself using this name." not in prompt
+    assert "Do not use any other character name." not in prompt
+    assert "Keep this local persona style: should not appear." not in prompt
+
+
+def test_generate_inner_thought_demo_stable_skips_random_injection(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True, "demo_stable": True}
+    cfg.setdefault("thinking", {})
+    cfg["thinking"]["enabled"] = True
+    captured = {}
+
+    def _fake_http_post_json(_url, payload, headers=None, timeout=60):
+        captured["payload"] = payload
+        return {"choices": [{"message": {"content": "稳定内心独白"}}]}
+
+    monkeypatch.setattr(app, "http_post_json", _fake_http_post_json)
+    monkeypatch.setattr(app.random, "choices", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("random.choices should not be called")))
+    monkeypatch.setattr(app.random, "uniform", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("random.uniform should not be called")))
+    monkeypatch.setattr(app.random, "random", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("random.random should not be called")))
+
+    thought = app.generate_inner_thought(
+        llm_cfg={"base_url": "http://127.0.0.1:11434", "model": "test"},
+        user_message="今天要录制演示，给我一句状态提醒。",
+        safe_history=[],
+        emotion_state={"dominant": "neutral", "valence": 0.0, "arousal": 0.5},
+        config=cfg,
+    )
+
+    assert thought == "稳定内心独白"
+    prompt = captured.get("payload", {}).get("messages", [{}])[0].get("content", "")
+    assert "Even when the user writes in Chinese, reply primarily in natural spoken English" in prompt
+    assert "the main reply should stay English-first" in prompt
+    assert "Reply must end with complete sentences, not half sentences." in prompt
+    assert "Usually keep it to 2 to 3 short sentences." in prompt
+    assert "desktop AI companion / light supervisor vibe" in prompt
+    assert "playful, cheeky, lightly teasing, energetic, witty, reliable." in prompt
+    assert "Do not call yourself ChatGPT." in prompt
+    assert "Do not claim long-term memory, learning pipelines, plugin marketplace, or other unshipped capabilities." in prompt
+    assert "clone" not in prompt.lower()
+    assert "external vtuber" not in prompt.lower()
+    assert "这次你用联想跳跃" not in prompt
+    assert "发布演示" not in prompt
+    assert "稳定模式" not in prompt
+    assert "demo_stable" not in prompt
+    assert "内部模式" not in prompt
+    assert "系统提示" not in prompt
+    assert "prompt" not in prompt.lower()
+    assert captured.get("payload", {}).get("temperature") == 0.35
+    assert captured.get("payload", {}).get("frequency_penalty") == 0.1
+    assert captured.get("payload", {}).get("presence_penalty") == 0.05
+
+
+def test_generate_inner_thought_demo_stable_persona_override_enabled_injects_name_and_style(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "demo_stable": True,
+        "persona_override": {
+            "enabled": True,
+            "name": "Local Companion",
+            "style": "snappy, playful, lightly teasing",
+        },
+    }
+    cfg.setdefault("thinking", {})
+    cfg["thinking"]["enabled"] = True
+    captured = {}
+
+    def _fake_http_post_json(_url, payload, headers=None, timeout=60):
+        captured["payload"] = payload
+        return {"choices": [{"message": {"content": "稳定内心独白"}}]}
+
+    monkeypatch.setattr(app, "http_post_json", _fake_http_post_json)
+    monkeypatch.setattr(app.random, "choices", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("random.choices should not be called")))
+    monkeypatch.setattr(app.random, "uniform", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("random.uniform should not be called")))
+    monkeypatch.setattr(app.random, "random", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("random.random should not be called")))
+
+    thought = app.generate_inner_thought(
+        llm_cfg={"base_url": "http://127.0.0.1:11434", "model": "test"},
+        user_message="status?",
+        safe_history=[],
+        emotion_state={"dominant": "neutral", "valence": 0.0, "arousal": 0.5},
+        config=cfg,
+    )
+    assert thought == "稳定内心独白"
+    prompt = captured.get("payload", {}).get("messages", [{}])[0].get("content", "")
+    assert "Your current name is: Local Companion." in prompt
+    assert "When the user asks who you are, introduce yourself using this name." in prompt
+    assert "Do not use any other character name." in prompt
+    assert "Keep this local persona style: snappy, playful, lightly teasing." in prompt
+
+
+def test_generate_inner_thought_demo_stable_persona_override_disabled_not_injected(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "demo_stable": True,
+        "persona_override": {
+            "enabled": False,
+            "name": "Should Not Appear",
+            "style": "should not appear",
+        },
+    }
+    cfg.setdefault("thinking", {})
+    cfg["thinking"]["enabled"] = True
+    captured = {}
+
+    def _fake_http_post_json(_url, payload, headers=None, timeout=60):
+        captured["payload"] = payload
+        return {"choices": [{"message": {"content": "稳定内心独白"}}]}
+
+    monkeypatch.setattr(app, "http_post_json", _fake_http_post_json)
+    monkeypatch.setattr(app.random, "choices", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("random.choices should not be called")))
+    monkeypatch.setattr(app.random, "uniform", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("random.uniform should not be called")))
+    monkeypatch.setattr(app.random, "random", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("random.random should not be called")))
+
+    thought = app.generate_inner_thought(
+        llm_cfg={"base_url": "http://127.0.0.1:11434", "model": "test"},
+        user_message="status?",
+        safe_history=[],
+        emotion_state={"dominant": "neutral", "valence": 0.0, "arousal": 0.5},
+        config=cfg,
+    )
+    assert thought == "稳定内心独白"
+    prompt = captured.get("payload", {}).get("messages", [{}])[0].get("content", "")
+    assert "Should Not Appear" not in prompt
+    assert "Keep this local persona style: should not appear." not in prompt
+
+
+def test_generate_inner_thought_non_stable_keeps_random_variety_path(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True, "demo_stable": False}
+    cfg.setdefault("thinking", {})
+    cfg["thinking"]["enabled"] = True
+    captured = {}
+
+    def _fake_http_post_json(_url, payload, headers=None, timeout=60):
+        captured["payload"] = payload
+        return {"choices": [{"message": {"content": "普通内心独白"}}]}
+
+    monkeypatch.setattr(app, "http_post_json", _fake_http_post_json)
+    monkeypatch.setattr(app.random, "uniform", lambda *_args, **_kwargs: 1.0)
+    monkeypatch.setattr(app.random, "random", lambda *_args, **_kwargs: 0.5)
+    monkeypatch.setattr(app.random, "choices", lambda *_args, **_kwargs: ["随机路径命中"])
+
+    thought = app.generate_inner_thought(
+        llm_cfg={"base_url": "http://127.0.0.1:11434", "model": "test"},
+        user_message="你在吗",
+        safe_history=[],
+        emotion_state={"dominant": "neutral", "valence": 0.0, "arousal": 0.5},
+        config=cfg,
+    )
+
+    assert thought == "普通内心独白"
+    prompt = captured.get("payload", {}).get("messages", [{}])[0].get("content", "")
+    assert "随机路径命中" in prompt
+    assert "English-first reply policy" not in prompt
+
+
+def test_generate_inner_thought_non_stable_ignores_persona_override(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "demo_stable": False,
+        "persona_override": {"enabled": True, "name": "Ignored Name", "style": "ignored style"},
+    }
+    cfg.setdefault("thinking", {})
+    cfg["thinking"]["enabled"] = True
+    captured = {}
+
+    def _fake_http_post_json(_url, payload, headers=None, timeout=60):
+        captured["payload"] = payload
+        return {"choices": [{"message": {"content": "普通内心独白"}}]}
+
+    monkeypatch.setattr(app, "http_post_json", _fake_http_post_json)
+    monkeypatch.setattr(app.random, "uniform", lambda *_args, **_kwargs: 1.0)
+    monkeypatch.setattr(app.random, "random", lambda *_args, **_kwargs: 0.5)
+    monkeypatch.setattr(app.random, "choices", lambda *_args, **_kwargs: ["随机路径命中"])
+
+    thought = app.generate_inner_thought(
+        llm_cfg={"base_url": "http://127.0.0.1:11434", "model": "test"},
+        user_message="你在吗",
+        safe_history=[],
+        emotion_state={"dominant": "neutral", "valence": 0.0, "arousal": 0.5},
+        config=cfg,
+    )
+    assert thought == "普通内心独白"
+    prompt = captured.get("payload", {}).get("messages", [{}])[0].get("content", "")
+    assert "Ignored Name" not in prompt
+    assert "ignored style" not in prompt
 
 
 def test_call_llm_prompt_disabled_does_not_load_profile(monkeypatch):

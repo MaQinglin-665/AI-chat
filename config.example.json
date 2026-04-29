@@ -39,6 +39,11 @@
     "verbosity": "low",
     "reasoning_effort": ""
   },
+  "character_runtime": {
+    "enabled": false,
+    "return_metadata": false,
+    "demo_stable": false
+  },
   "tts": {
     "provider": "browser",
     "voice": "zh-CN-XiaoxiaoNeural",

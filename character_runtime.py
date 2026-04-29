@@ -49,7 +49,22 @@ SUPPORTED_EMOTIONS = {
     "sad",
     "anxious",
     "angry",
+    "surprised",
+    "annoyed",
+    "thinking",
 }
+
+SUPPORTED_ACTIONS = {
+    "none",
+    "wave",
+    "nod",
+    "shake_head",
+    "think",
+    "happy_idle",
+    "surprised",
+}
+
+SUPPORTED_INTENSITY = {"low", "normal", "high"}
 
 EMOTION_TO_LIVE2D_HINT = {
     "neutral": "idle_relaxed",
@@ -58,12 +73,27 @@ EMOTION_TO_LIVE2D_HINT = {
     "sad": "eyes_down",
     "anxious": "brow_worried",
     "angry": "brow_tense",
+    "surprised": "eyes_wide",
+    "annoyed": "brow_tense",
+    "thinking": "idle_relaxed",
 }
 
 
 def normalize_emotion(emotion: Any) -> str:
     safe = str(emotion or "").strip().lower()
     return safe if safe in SUPPORTED_EMOTIONS else "neutral"
+
+
+def normalize_action(action: Any) -> str:
+    safe = str(action or "").strip().lower()
+    if safe == "shake-head":
+        safe = "shake_head"
+    return safe if safe in SUPPORTED_ACTIONS else "none"
+
+
+def normalize_intensity(level: Any) -> str:
+    safe = str(level or "").strip().lower()
+    return safe if safe in SUPPORTED_INTENSITY else "normal"
 
 
 def emotion_to_live2d_hint(emotion: Any) -> str:
@@ -80,7 +110,13 @@ def normalize_runtime_payload(payload: Any) -> Dict[str, Any]:
     - dict
     - None / empty / malformed JSON (safe fallback)
     """
-    normalized: Dict[str, Any] = {"text": "", "emotion": "neutral", "voice_style": "neutral"}
+    normalized: Dict[str, Any] = {
+        "text": "",
+        "emotion": "neutral",
+        "action": "none",
+        "intensity": "normal",
+        "voice_style": "neutral",
+    }
 
     if payload is None:
         return normalized
@@ -102,9 +138,13 @@ def normalize_runtime_payload(payload: Any) -> Dict[str, Any]:
     if isinstance(raw, dict):
         text = str(raw.get("text", "") or "").strip()
         emotion = normalize_emotion(raw.get("emotion", "neutral"))
+        action = normalize_action(raw.get("action", "none"))
+        intensity = normalize_intensity(raw.get("intensity", "normal"))
         voice_style = str(raw.get("voice_style", "") or "").strip().lower() or emotion
         normalized["text"] = text
         normalized["emotion"] = emotion
+        normalized["action"] = action
+        normalized["intensity"] = intensity
         normalized["voice_style"] = voice_style
         return normalized
 

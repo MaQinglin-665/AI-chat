@@ -247,7 +247,12 @@ def _parse_bool_flag(value, default=False):
 
 
 def _get_character_runtime_settings(config):
-    default_settings = {"enabled": False, "return_metadata": False}
+    default_settings = {
+        "enabled": False,
+        "return_metadata": False,
+        "demo_stable": False,
+        "persona_override": {"enabled": False, "name": "", "style": ""},
+    }
     try:
         if not isinstance(config, dict):
             return dict(default_settings)
@@ -256,9 +261,33 @@ def _get_character_runtime_settings(config):
             return dict(default_settings)
         enabled = _parse_bool_flag(raw.get("enabled", False), False)
         return_metadata = _parse_bool_flag(raw.get("return_metadata", False), False)
+        demo_stable = _parse_bool_flag(raw.get("demo_stable", False), False)
+        override_raw = raw.get("persona_override", {})
+        override_enabled = False
+        override_name = ""
+        override_style = ""
+        if isinstance(override_raw, dict):
+            override_enabled = _parse_bool_flag(override_raw.get("enabled", False), False)
+            override_name = str(override_raw.get("name", "") or "").strip()
+            override_style = str(override_raw.get("style", "") or "").strip()
+            if len(override_name) > 80:
+                override_name = override_name[:80].strip()
+            if len(override_style) > 280:
+                override_style = override_style[:280].strip()
+            if not override_name and not override_style:
+                override_enabled = False
         if not enabled:
             return dict(default_settings)
-        return {"enabled": True, "return_metadata": return_metadata}
+        return {
+            "enabled": True,
+            "return_metadata": return_metadata,
+            "demo_stable": demo_stable,
+            "persona_override": {
+                "enabled": bool(override_enabled),
+                "name": override_name,
+                "style": override_style,
+            },
+        }
     except Exception:
         return dict(default_settings)
 
@@ -1126,72 +1155,107 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
         else:
             emotion_hint = "你情绪平平，就正常聊，没什么特别的感觉。"
 
-    variety_prompts = [
-        "这次你决定用极短的回复，最多一句话，甚至几个字。",
-        "这次你心情不错，想多说一点，可以展开聊两三句。",
-        "这次你决定完全不问对方问题，说完就收尾。",
-        "这次你故意跑题——对方说的东西让你想到了一个完全不相关的事，聊那个。",
-        "这次你懒得认真回答，敷衍一句就算了。",
-        "这次你突然很认真，想说一句有点分量的话。",
-        "这次你想吐槽对方说的话里某个细节。",
-        "这次你自言自语，好像在跟自己对话而不是对方。",
-        "这次你注意到你们聊天的某个模式，评论一下这个对话本身。",
-        "这次你说出一个很强烈的观点，不管对不对，反正你觉得你是对的。",
-        "这次你用联想跳跃：对方的话 → 联想到A → 再联想到B → 说B。",
-        "这次你假装对方说的话让你很震惊，夸张一点。",
-        "这次你想起对方之前说过的某件事，把它翻出来说。",
-        "这次你对对方说的话表示完全不关心，转移话题。",
-        "这次你回答前先反问自己：我为什么要回答这个问题？",
-        "这次你说一句让对方摸不着头脑的话，但你自己觉得很有道理。",
-        "这次你的回复开头不是回应对方，而是先说你刚才在想的别的事。",
-        "这次你突然收敛，变得很安静，只说一两个字。",
-        "这次你想挑战对方说的某个假设，即使你其实不确定。",
-        "这次你决定说完全相反的话——如果你之前在某件事上表现得很冷漠，这次热情一点。",
-    ]
-    # Analyze recent conversation patterns to build weights
-    weights = [1.0] * len(variety_prompts)
+    runtime_settings = _get_character_runtime_settings(config if isinstance(config, dict) else {})
+    demo_stable = bool(runtime_settings.get("enabled", False) and runtime_settings.get("demo_stable", False))
 
-    if safe_history:
-        recent_turns = safe_history[-4:]
-        recent_replies = [
-            str(t.get("content", "")).strip()
-            for t in recent_turns
-            if str(t.get("role", "")).strip().lower() == "assistant"
-            and str(t.get("content", "")).strip()
-        ]
+    if demo_stable:
+        persona_override = runtime_settings.get("persona_override", {})
+        override_enabled = bool(isinstance(persona_override, dict) and persona_override.get("enabled", False))
+        override_name = ""
+        override_style = ""
+        if override_enabled and isinstance(persona_override, dict):
+            override_name = str(persona_override.get("name", "") or "").strip()
+            override_style = str(persona_override.get("style", "") or "").strip()
 
-        # Count long replies (>60 chars) in recent history
-        long_count = sum(1 for r in recent_replies if len(r) > 60)
-        # Count replies ending with question mark
-        question_count = sum(1 for r in recent_replies if r.rstrip().endswith(("？", "?")))
-        # Count short replies (<15 chars)
-        short_count = sum(1 for r in recent_replies if len(r) < 15)
+        override_hint_parts = []
+        if override_name:
+            override_hint_parts.extend(
+                [
+                    f"Your current name is: {override_name}.",
+                    "When the user asks who you are, introduce yourself using this name.",
+                    "Do not use any other character name.",
+                ]
+            )
+        if override_style:
+            override_hint_parts.append(f"Keep this local persona style: {override_style}.")
+        override_hint = (" " + " ".join(override_hint_parts)) if override_hint_parts else ""
 
-        # If recent replies are mostly long -> boost short/quiet directives
-        if long_count >= 2:
-            for i, p in enumerate(variety_prompts):
-                if any(k in p for k in ["极短", "一两个字", "安静", "收敛", "敷衍"]):
-                    weights[i] *= 2.4
-
-        # If recent replies frequently end with questions -> boost no-question directives
-        if question_count >= 2:
-            for i, p in enumerate(variety_prompts):
-                if any(k in p for k in ["不问", "收尾", "陈述", "不寻常", "转移"]):
-                    weights[i] *= 2.4
-
-        # If recent replies are all short -> boost expansive directives
-        if short_count >= 3:
-            for i, p in enumerate(variety_prompts):
-                if any(k in p for k in ["展开", "多说", "认真", "分量", "联想跳跃"]):
-                    weights[i] *= 2.0
-
-    # Add controlled randomness so directives do not lock into a stable pattern.
-    weights = [max(0.05, float(w) * random.uniform(0.9, 1.15)) for w in weights]
-    if random.random() < 0.06 and len(variety_prompts) >= 20:
-        extreme_indices = [0, 7, 17]
-        variety_hint = variety_prompts[random.choice(extreme_indices)]
+        variety_hint = (
+            "English-first reply policy: Even when the user writes in Chinese, reply primarily in natural spoken English; "
+            "the Chinese translation layer may explain it separately, so the main reply should stay English-first. "
+            "Reply must end with complete sentences, not half sentences. Usually keep it to 2 to 3 short sentences. "
+            "Keep an original desktop AI companion / light supervisor vibe: playful, cheeky, lightly teasing, energetic, witty, reliable. "
+            "You may lightly tease or nudge the user, but do not attack the user. "
+            "Do not claim long-term memory, learning pipelines, plugin marketplace, or other unshipped capabilities. "
+            "Do not call yourself ChatGPT."
+        ) + override_hint
     else:
-        variety_hint = random.choices(variety_prompts, weights=weights, k=1)[0]
+        variety_prompts = [
+            "这次你决定用极短的回复，最多一句话，甚至几个字。",
+            "这次你心情不错，想多说一点，可以展开聊两三句。",
+            "这次你决定完全不问对方问题，说完就收尾。",
+            "这次你故意跑题——对方说的东西让你想到了一个完全不相关的事，聊那个。",
+            "这次你懒得认真回答，敷衍一句就算了。",
+            "这次你突然很认真，想说一句有点分量的话。",
+            "这次你想吐槽对方说的话里某个细节。",
+            "这次你自言自语，好像在跟自己对话而不是对方。",
+            "这次你注意到你们聊天的某个模式，评论一下这个对话本身。",
+            "这次你说出一个很强烈的观点，不管对不对，反正你觉得你是对的。",
+            "这次你用联想跳跃：对方的话 → 联想到A → 再联想到B → 说B。",
+            "这次你假装对方说的话让你很震惊，夸张一点。",
+            "这次你想起对方之前说过的某件事，把它翻出来说。",
+            "这次你对对方说的话表示完全不关心，转移话题。",
+            "这次你回答前先反问自己：我为什么要回答这个问题？",
+            "这次你说一句让对方摸不着头脑的话，但你自己觉得很有道理。",
+            "这次你的回复开头不是回应对方，而是先说你刚才在想的别的事。",
+            "这次你突然收敛，变得很安静，只说一两个字。",
+            "这次你想挑战对方说的某个假设，即使你其实不确定。",
+            "这次你决定说完全相反的话——如果你之前在某件事上表现得很冷漠，这次热情一点。",
+        ]
+        # Analyze recent conversation patterns to build weights
+        weights = [1.0] * len(variety_prompts)
+
+        if safe_history:
+            recent_turns = safe_history[-4:]
+            recent_replies = [
+                str(t.get("content", "")).strip()
+                for t in recent_turns
+                if str(t.get("role", "")).strip().lower() == "assistant"
+                and str(t.get("content", "")).strip()
+            ]
+
+            # Count long replies (>60 chars) in recent history
+            long_count = sum(1 for r in recent_replies if len(r) > 60)
+            # Count replies ending with question mark
+            question_count = sum(1 for r in recent_replies if r.rstrip().endswith(("？", "?")))
+            # Count short replies (<15 chars)
+            short_count = sum(1 for r in recent_replies if len(r) < 15)
+
+            # If recent replies are mostly long -> boost short/quiet directives
+            if long_count >= 2:
+                for i, p in enumerate(variety_prompts):
+                    if any(k in p for k in ["极短", "一两个字", "安静", "收敛", "敷衍"]):
+                        weights[i] *= 2.4
+
+            # If recent replies frequently end with questions -> boost no-question directives
+            if question_count >= 2:
+                for i, p in enumerate(variety_prompts):
+                    if any(k in p for k in ["不问", "收尾", "陈述", "不寻常", "转移"]):
+                        weights[i] *= 2.4
+
+            # If recent replies are all short -> boost expansive directives
+            if short_count >= 3:
+                for i, p in enumerate(variety_prompts):
+                    if any(k in p for k in ["展开", "多说", "认真", "分量", "联想跳跃"]):
+                        weights[i] *= 2.0
+
+        # Add controlled randomness so directives do not lock into a stable pattern.
+        weights = [max(0.05, float(w) * random.uniform(0.9, 1.15)) for w in weights]
+        if random.random() < 0.06 and len(variety_prompts) >= 20:
+            extreme_indices = [0, 7, 17]
+            variety_hint = variety_prompts[random.choice(extreme_indices)]
+        else:
+            variety_hint = random.choices(variety_prompts, weights=weights, k=1)[0]
 
     # Build a compact history snippet for context
     history_snippet = ""
@@ -1214,21 +1278,37 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
     _hour = _now.hour
     time_hint = _hour_to_period_hint(_hour)
 
-    thinking_prompt = (
-        "你是 馨语AI桌宠 的内心独白生成器。你的任务是产生一段真实的、有行动指令的内心想法，"
-        "用来决定 馨语AI桌宠 这次回复的方向、长度和态度。\n\n"
-        f"【本轮行为指令】{variety_hint}\n\n"
-        f"【最近对话】\n{history_snippet}\n\n"
-        f"【对方这句话】{user_message[:200]}\n\n"
-        f"【当前情绪】{emotion_hint}\n\n"
-        f"【当前时间】{time_hint}\n\n"
-        "按以下结构思考（用1-4句话，不超过100字）：\n"
-        "① 对方这句话的字面意思是什么？真实意图或隐含挑战是什么？（两者可能不同）\n"
-        "② 根据行为指令，我决定用什么方式、什么长度回复\n"
-        "③ 这次回复里有一个'不寻常之处'——具体是什么\n"
-        "④ 这次用什么句式和语气说——例如：碎片句/一个词/反问/陈述收尾/突然转移/自言自语\n\n"
-        "直接输出内心独白，不要加任何前缀标签。"
-    )
+    if demo_stable:
+        thinking_prompt = (
+            "你是 馨语AI桌宠 的内心独白生成器。"
+            "目标是让回复短、稳、有角色感。\n\n"
+            f"【本轮行为指令】{variety_hint}\n\n"
+            f"【最近对话】\n{history_snippet}\n\n"
+            f"【对方这句话】{user_message[:200]}\n\n"
+            f"【当前情绪】{emotion_hint}\n\n"
+            f"【当前时间】{time_hint}\n\n"
+            "按以下结构思考（用1-3句话，不超过80字）：\n"
+            "① 对方意图是什么，给出最直接回应方向\n"
+            "② 保持桌宠角色感：可爱但嘴硬、轻微监督，不攻击\n"
+            "③ 控制节奏：短句收尾，不长篇解释，不承诺未完成能力\n\n"
+            "直接输出内心独白，不要加任何前缀标签。"
+        )
+    else:
+        thinking_prompt = (
+            "你是 馨语AI桌宠 的内心独白生成器。你的任务是产生一段真实的、有行动指令的内心想法，"
+            "用来决定 馨语AI桌宠 这次回复的方向、长度和态度。\n\n"
+            f"【本轮行为指令】{variety_hint}\n\n"
+            f"【最近对话】\n{history_snippet}\n\n"
+            f"【对方这句话】{user_message[:200]}\n\n"
+            f"【当前情绪】{emotion_hint}\n\n"
+            f"【当前时间】{time_hint}\n\n"
+            "按以下结构思考（用1-4句话，不超过100字）：\n"
+            "① 对方这句话的字面意思是什么？真实意图或隐含挑战是什么？（两者可能不同）\n"
+            "② 根据行为指令，我决定用什么方式、什么长度回复\n"
+            "③ 这次回复里有一个'不寻常之处'——具体是什么\n"
+            "④ 这次用什么句式和语气说——例如：碎片句/一个词/反问/陈述收尾/突然转移/自言自语\n\n"
+            "直接输出内心独白，不要加任何前缀标签。"
+        )
 
     messages = [
         {"role": "system", "content": thinking_prompt},
@@ -1253,9 +1333,14 @@ def generate_inner_thought(llm_cfg, user_message, safe_history,
             "max_tokens": max_tokens,
             "stream": False,
         }
-        payload["temperature"] = 0.9
-        payload["frequency_penalty"] = 0.35
-        payload["presence_penalty"] = 0.25
+        if demo_stable:
+            payload["temperature"] = 0.35
+            payload["frequency_penalty"] = 0.1
+            payload["presence_penalty"] = 0.05
+        else:
+            payload["temperature"] = 0.9
+            payload["frequency_penalty"] = 0.35
+            payload["presence_penalty"] = 0.25
         data = http_post_json(
             f"{base_url}/chat/completions", payload,
             headers=headers, timeout=timeout
@@ -1383,20 +1468,80 @@ def _build_reply_language_block(config):
     return ""
 
 
+def _is_demo_stable_enabled(config):
+    settings = _get_character_runtime_settings(config if isinstance(config, dict) else {})
+    return bool(settings.get("enabled", False) and settings.get("demo_stable", False))
+
+
+def _build_demo_stable_reply_behavior_block(config):
+    settings = _get_character_runtime_settings(config if isinstance(config, dict) else {})
+    if not bool(settings.get("enabled", False) and settings.get("demo_stable", False)):
+        return ""
+
+    rules = [
+        "Keep the main reply English-first in natural spoken English.",
+        "Even when the user writes in Chinese, reply primarily in natural spoken English.",
+        "The Chinese translation layer may explain it separately; the main reply should stay English-first.",
+        "Use complete sentences only, and never end with a cut-off half sentence.",
+        "Usually keep replies to 2 to 3 short sentences.",
+        "Keep an original desktop companion / light supervisor vibe: playful, cheeky, lightly teasing, energetic, witty, reliable.",
+        "You may lightly tease or nudge the user, but do not attack the user.",
+        "Do not call yourself ChatGPT.",
+        "Do not claim long-term memory, learning pipelines, plugin marketplace, or other unshipped capabilities.",
+    ]
+
+    persona_override = settings.get("persona_override", {})
+    if isinstance(persona_override, dict) and persona_override.get("enabled", False):
+        override_name = str(persona_override.get("name", "") or "").strip()
+        override_style = str(persona_override.get("style", "") or "").strip()
+        if override_name:
+            rules.extend(
+                [
+                    f"Your current name is: {override_name}.",
+                    "When the user asks who you are, introduce yourself using this name.",
+                    "Do not use any other character name.",
+                ]
+            )
+        if override_style:
+            rules.append(f"Keep this local persona style: {override_style}.")
+
+    return "Reply behavior rules:\n" + "\n".join(f"- {rule}" for rule in rules)
+
+
+def _build_reply_llm_cfg(config, llm_cfg):
+    safe_cfg = dict(llm_cfg or {})
+    if not _is_demo_stable_enabled(config):
+        return safe_cfg
+
+    raw_budget = safe_cfg.get("max_output_tokens", safe_cfg.get("max_tokens", 120))
+    try:
+        base_budget = int(raw_budget)
+    except (TypeError, ValueError):
+        base_budget = 120
+    boosted_budget = max(600, base_budget)
+
+    safe_cfg["max_output_tokens"] = boosted_budget
+    safe_cfg["allow_high_output_tokens"] = True
+    safe_cfg["retry_on_length"] = True
+    safe_cfg["length_retry_max_output_tokens"] = max(boosted_budget, 900)
+    return safe_cfg
+
+
 def call_llm(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
     if not isinstance(config, dict):
         config = load_config()
     if not should_reply(user_message, config=config, is_auto=is_auto):
         return ""
-    llm_cfg = config.get("llm", {})
-    provider = str(llm_cfg.get("provider", "")).strip().lower()
-    base_url = str(llm_cfg.get("base_url", "")).strip().lower()
+    llm_cfg_raw = config.get("llm", {})
+    llm_cfg = _build_reply_llm_cfg(config, llm_cfg_raw)
+    provider = str(llm_cfg_raw.get("provider", "")).strip().lower()
+    base_url = str(llm_cfg_raw.get("base_url", "")).strip().lower()
     if not provider:
         provider = "ollama" if "11434" in base_url or "ollama" in base_url else "openai"
     _ensure_llm_auth_ready(llm_cfg)
 
     base_prompt, safe_history = _build_base_prompt(
-        config, user_message, history, llm_cfg, provider
+        config, user_message, history, llm_cfg_raw, provider
     )
     # Thinking layer
     thought = ""
@@ -1430,6 +1575,9 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
     lang_block = _build_reply_language_block(config)
     if lang_block:
         prompt = merge_prompt_with_memory(prompt, lang_block)
+    stable_behavior_block = _build_demo_stable_reply_behavior_block(config)
+    if stable_behavior_block:
+        prompt = merge_prompt_with_memory(prompt, stable_behavior_block)
     prompt = _apply_character_runtime_prompt_contract(config, prompt)
     effective_user_message = thought_prefix + user_message if thought else user_message
 
@@ -1520,15 +1668,16 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
 def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
     if not isinstance(config, dict):
         config = load_config()
-    llm_cfg = config.get("llm", {})
-    provider = str(llm_cfg.get("provider", "")).strip().lower()
-    base_url = str(llm_cfg.get("base_url", "")).strip().lower()
+    llm_cfg_raw = config.get("llm", {})
+    llm_cfg = _build_reply_llm_cfg(config, llm_cfg_raw)
+    provider = str(llm_cfg_raw.get("provider", "")).strip().lower()
+    base_url = str(llm_cfg_raw.get("base_url", "")).strip().lower()
     if not provider:
         provider = "ollama" if "11434" in base_url or "ollama" in base_url else "openai"
     _ensure_llm_auth_ready(llm_cfg)
 
     base_prompt, safe_history = _build_base_prompt(
-        config, user_message, history, llm_cfg, provider
+        config, user_message, history, llm_cfg_raw, provider
     )
     merged_prompt = build_prompt_with_style(
         config,
@@ -1540,6 +1689,9 @@ def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, f
     lang_block = _build_reply_language_block(config)
     if lang_block:
         merged_prompt = merge_prompt_with_memory(merged_prompt, lang_block)
+    stable_behavior_block = _build_demo_stable_reply_behavior_block(config)
+    if stable_behavior_block:
+        merged_prompt = merge_prompt_with_memory(merged_prompt, stable_behavior_block)
     merged_prompt = _apply_character_runtime_prompt_contract(config, merged_prompt)
 
     tools_settings = get_tools_settings(config)
