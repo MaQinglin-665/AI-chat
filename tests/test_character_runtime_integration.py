@@ -1,9 +1,11 @@
 import copy
 import json
+import tempfile
 import threading
 import urllib.error
 import urllib.request
 from contextlib import contextmanager
+from pathlib import Path
 
 import app
 
@@ -179,9 +181,40 @@ def test_call_llm_prompt_unchanged_when_runtime_disabled(monkeypatch):
     assert "single JSON object" not in captured.get("prompt", "")
 
 
+def test_call_llm_prompt_disabled_does_not_load_profile(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": False}
+    captured = _capture_openai_prompt_in_call_llm(monkeypatch, cfg, raw_reply="plain reply")
+    monkeypatch.setattr(
+        app,
+        "_load_character_profile_config",
+        lambda: (_ for _ in ()).throw(RuntimeError("profile loader should not be called")),
+    )
+
+    result = app.call_llm("hi", [], config=cfg)
+
+    assert result == "plain reply"
+    assert captured.get("prompt") == "BASE_PROMPT"
+
+
 def test_call_llm_prompt_contract_added_when_runtime_enabled(monkeypatch):
     cfg = _build_test_config()
     cfg["character_runtime"] = {"enabled": True}
+    monkeypatch.setattr(
+        app,
+        "_load_character_profile_config",
+        lambda: {
+            "name": "Test Companion",
+            "persona": "Playful and supportive partner.",
+            "tone": "concise and vivid",
+            "style_notes": ["stay in character", "be practical"],
+            "default_emotion": "neutral",
+            "default_action": "none",
+            "allowed_emotions": ["neutral", "happy", "thinking"],
+            "allowed_actions": ["none", "wave", "think"],
+            "allowed_voice_styles": ["neutral", "cheerful"],
+        },
+    )
     captured = _capture_openai_prompt_in_call_llm(
         monkeypatch,
         cfg,
@@ -194,13 +227,33 @@ def test_call_llm_prompt_contract_added_when_runtime_enabled(monkeypatch):
     prompt = captured.get("prompt", "")
     assert prompt.startswith("BASE_PROMPT")
     assert "single JSON object only" in prompt
+    assert "Name: Test Companion" in prompt
+    assert "Persona: Playful and supportive partner." in prompt
+    assert "Tone: concise and vivid" in prompt
     assert '"text": "final user-facing reply"' in prompt
-    assert '"emotion": "neutral|happy|sad|angry|surprised|annoyed|thinking"' in prompt
+    assert '"emotion": "neutral|happy|thinking"' in prompt
+    assert '"action": "none|wave|think"' in prompt
+    assert '"voice_style": "neutral|cheerful"' in prompt
 
 
 def test_call_llm_stream_prompt_contract_added_when_runtime_enabled(monkeypatch):
     cfg = _build_test_config()
     cfg["character_runtime"] = {"enabled": True}
+    monkeypatch.setattr(
+        app,
+        "_load_character_profile_config",
+        lambda: {
+            "name": "Stream Companion",
+            "persona": "Stream-safe persona.",
+            "tone": "calm and clear",
+            "style_notes": ["brief"],
+            "default_emotion": "neutral",
+            "default_action": "none",
+            "allowed_emotions": ["neutral", "surprised"],
+            "allowed_actions": ["none", "surprised"],
+            "allowed_voice_styles": ["neutral", "soft"],
+        },
+    )
     captured = _capture_openai_prompt_in_call_llm_stream(monkeypatch, cfg)
 
     chunks = list(app.call_llm_stream("hi", [], config=cfg))
@@ -209,7 +262,68 @@ def test_call_llm_stream_prompt_contract_added_when_runtime_enabled(monkeypatch)
     prompt = captured.get("prompt", "")
     assert prompt.startswith("BASE_STREAM_PROMPT")
     assert "single JSON object only" in prompt
-    assert '"action": "none|wave|nod|shake_head|think|happy_idle|surprised"' in prompt
+    assert "Name: Stream Companion" in prompt
+    assert '"emotion": "neutral|surprised"' in prompt
+    assert '"action": "none|surprised"' in prompt
+
+
+def test_character_profile_missing_file_falls_back_to_default(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        missing = Path(tmp) / "missing_character_profile.json"
+        monkeypatch.setattr(app, "CHARACTER_PROFILE_CONFIG_PATH", missing)
+        profile = app._load_character_profile_config()
+    assert profile.get("name") == app.DEFAULT_CHARACTER_PROFILE["name"]
+    assert profile.get("persona") == app.DEFAULT_CHARACTER_PROFILE["persona"]
+
+
+def test_character_profile_bad_json_falls_back_to_default(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "character_profile.json"
+        path.write_text("{bad", encoding="utf-8")
+        monkeypatch.setattr(app, "CHARACTER_PROFILE_CONFIG_PATH", path)
+        profile = app._load_character_profile_config()
+    assert profile.get("name") == app.DEFAULT_CHARACTER_PROFILE["name"]
+    assert profile.get("allowed_actions") == app.DEFAULT_CHARACTER_PROFILE["allowed_actions"]
+
+
+def test_character_profile_missing_fields_gets_default_values(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "character_profile.json"
+        path.write_text(json.dumps({"name": "Only Name"}, ensure_ascii=False), encoding="utf-8")
+        monkeypatch.setattr(app, "CHARACTER_PROFILE_CONFIG_PATH", path)
+        profile = app._load_character_profile_config()
+    assert profile.get("name") == "Only Name"
+    assert profile.get("persona") == app.DEFAULT_CHARACTER_PROFILE["persona"]
+    assert profile.get("tone") == app.DEFAULT_CHARACTER_PROFILE["tone"]
+    assert profile.get("allowed_voice_styles") == app.DEFAULT_CHARACTER_PROFILE["allowed_voice_styles"]
+
+
+def test_character_profile_type_anomalies_fall_back_to_default(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "character_profile.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "name": 123,
+                    "persona": None,
+                    "tone": {"bad": True},
+                    "style_notes": "bad",
+                    "allowed_emotions": [1, "happy", None],
+                    "allowed_actions": "wave",
+                    "allowed_voice_styles": [None, 8],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(app, "CHARACTER_PROFILE_CONFIG_PATH", path)
+        profile = app._load_character_profile_config()
+    assert profile.get("name") == app.DEFAULT_CHARACTER_PROFILE["name"]
+    assert profile.get("persona") == app.DEFAULT_CHARACTER_PROFILE["persona"]
+    assert profile.get("tone") == app.DEFAULT_CHARACTER_PROFILE["tone"]
+    assert profile.get("style_notes") == app.DEFAULT_CHARACTER_PROFILE["style_notes"]
+    assert profile.get("allowed_actions") == app.DEFAULT_CHARACTER_PROFILE["allowed_actions"]
+    assert profile.get("allowed_voice_styles") == app.DEFAULT_CHARACTER_PROFILE["allowed_voice_styles"]
 
 
 def test_runtime_enabled_plain_text_remains_plain_text(monkeypatch):
