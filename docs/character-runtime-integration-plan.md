@@ -187,3 +187,28 @@
   - Live2D 未初始化（`state.model` 不可用）或 expression 关闭时直接跳过
   - 异常仅 `console.debug`，不影响聊天文本与 TTS 主链路
 - 后续如模型资源提供稳定 expression API，可在该 bridge 内替换为显式 expression 调用。
+
+## Task 010 落地补充（Live2D action motion bridge）
+- 本任务仅接 `action -> Live2D motion/feedback`，不改后端 Character Runtime，不改 LLM prompt，不改 TTS，不处理 `voice_style`。
+- 复用 `character-runtime:update` 事件，在前端新增 action 适配器，与 emotion 适配器并行执行，互不阻塞。
+- 新增 helper：
+  - `normalizeRuntimeActionForLive2D(action)`
+  - `getLive2DMotionForAction(action)`
+  - `applyCharacterRuntimeActionToLive2D(metadata)`
+- action 映射（保守）：
+  - `none` -> skip
+  - `wave` -> 尝试 `Tap/FlickUp/Idle`
+  - `nod` -> 尝试 `FlickDown/Idle`
+  - `shake_head` -> 尝试 `Flick@Body/Flick/Idle`
+  - `think` -> 尝试 `FlickDown/Idle`
+  - `happy_idle` -> 尝试 `Idle/Tap`
+  - `surprised` -> 尝试 `FlickUp/Tap/Idle`
+  - unknown -> `none`
+- 适配策略：
+  - 优先调用现有 `tryBuiltInMotion(...)`
+  - motion 不可用/失败时降级为轻量 `triggerExpressionPulse(...)`（若可用）
+- 安全策略：
+  - metadata/action 非法时直接跳过
+  - Live2D 未初始化或 motion 关闭时直接跳过
+  - 异常仅 `console.debug`，不影响聊天文本、表情主链路、TTS
+- 本任务不处理 `voice_style`，不改变默认聊天显示，不新增依赖。

@@ -4236,6 +4236,67 @@ function normalizeRuntimeEmotionForLive2D(emotion) {
   return "idle";
 }
 
+function normalizeRuntimeActionForLive2D(action) {
+  if (typeof action !== "string") {
+    return "none";
+  }
+  const key = String(action || "").trim().toLowerCase();
+  if (!key) {
+    return "none";
+  }
+  if (key === "none") return "none";
+  if (key === "wave") return "wave";
+  if (key === "nod") return "nod";
+  if (key === "shake_head") return "shake_head";
+  if (key === "think") return "think";
+  if (key === "happy_idle") return "happy_idle";
+  if (key === "surprised") return "surprised";
+  return "none";
+}
+
+function getLive2DMotionForAction(action) {
+  const normalized = normalizeRuntimeActionForLive2D(action);
+  const plan = {
+    wave: {
+      mood: "happy",
+      groups: ["Tap", "FlickUp", "Idle"],
+      pulseBoost: 0.88,
+      pulseDurationMs: 420
+    },
+    nod: {
+      mood: "idle",
+      groups: ["FlickDown", "Idle"],
+      pulseBoost: 0.52,
+      pulseDurationMs: 260
+    },
+    shake_head: {
+      mood: "angry",
+      groups: ["Flick@Body", "Flick", "Idle"],
+      pulseBoost: 0.62,
+      pulseDurationMs: 300
+    },
+    think: {
+      mood: "idle",
+      groups: ["FlickDown", "Idle"],
+      pulseBoost: 0.5,
+      pulseDurationMs: 280
+    },
+    happy_idle: {
+      mood: "happy",
+      groups: ["Idle", "Tap"],
+      pulseBoost: 0.58,
+      pulseDurationMs: 300
+    },
+    surprised: {
+      mood: "surprised",
+      groups: ["FlickUp", "Tap", "Idle"],
+      pulseBoost: 0.9,
+      pulseDurationMs: 340
+    }
+  };
+  return plan[normalized] || null;
+}
+
 function applyCharacterRuntimeEmotionToLive2D(metadata) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return false;
@@ -4252,6 +4313,63 @@ function applyCharacterRuntimeEmotionToLive2D(metadata) {
   } catch (err) {
     console.debug("[character-runtime] apply emotion failed:", err);
     return false;
+  }
+}
+
+function applyCharacterRuntimeActionToLive2D(metadata) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return false;
+  }
+  const motionPlan = getLive2DMotionForAction(metadata.action);
+  if (!motionPlan) {
+    return false;
+  }
+  if (!state.model || !state.motionEnabled) {
+    return false;
+  }
+
+  const applyPulseFallback = () => {
+    if (!state.model || !state.expressionEnabled) {
+      return false;
+    }
+    try {
+      triggerExpressionPulse(
+        state.currentTalkStyle || "neutral",
+        Number(motionPlan.pulseBoost) || 0.6,
+        Number(motionPlan.pulseDurationMs) || 280
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  try {
+    if (typeof tryBuiltInMotion !== "function") {
+      return applyPulseFallback();
+    }
+    Promise.resolve(
+      tryBuiltInMotion(motionPlan.mood, {
+        source: "emotion",
+        allowFallback: false,
+        priority: 3,
+        cooldownMs: Math.max(220, Math.round((Number(state.motionCooldownMs) || 1200) * 0.45)),
+        groups: motionPlan.groups
+      })
+    )
+      .then((played) => {
+        if (!played) {
+          applyPulseFallback();
+        }
+      })
+      .catch((err) => {
+        console.debug("[character-runtime] apply action failed:", err);
+        applyPulseFallback();
+      });
+    return true;
+  } catch (err) {
+    console.debug("[character-runtime] apply action setup failed:", err);
+    return applyPulseFallback();
   }
 }
 
@@ -10796,6 +10914,7 @@ if (window.electronAPI?.onSubtitle) {
 window.addEventListener("character-runtime:update", (event) => {
   try {
     applyCharacterRuntimeEmotionToLive2D(event?.detail || null);
+    applyCharacterRuntimeActionToLive2D(event?.detail || null);
   } catch (_) {
     // Keep runtime bridge isolated from chat main flow.
   }
