@@ -304,3 +304,16 @@
 - The guide includes DevTools validation commands for `testEmotion`, `testAction`, and `emit`, and links to the Task 015 E2E validation document.
 - The guide documents troubleshooting boundaries: missing Live2D motion resources can degrade safely, `/api/chat` 500 is usually an LLM provider/config/network issue, and an undefined debug bridge often means the wrong DevTools window or stale frontend code.
 - This task does not change backend response defaults, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, or dependencies.
+
+## Task 017 Landing Notes (Runtime demo smoke test checklist)
+- Added `docs/character-runtime-smoke-test.md` as a manual smoke test checklist for release/demo readiness and runtime-related regression checks.
+- The checklist explicitly covers scope boundaries: it is a manual quick-check aid, not an automated suite and not a full E2E replacement.
+- Added prerequisite checks for backend/frontend startup, provider readiness, Live2D model load, and `chatWindow` DevTools access.
+- Added baseline disabled-path checks for `character_runtime.enabled=false` and `character_runtime.return_metadata=false` to confirm default compatibility.
+- Added enabled-path checks for `enabled=true` and `return_metadata=true`, including metadata field expectations and fallback stability on non-JSON/bad-JSON model outputs.
+- Added debug bridge command checks (`testEmotion`, `testAction`, `emit`) and cross-window forwarding checks through `BroadcastChannel("taffy-character-runtime")`.
+- Added Live2D behavior expectations and safe-degradation notes for missing motion/expression resources.
+- Added TTS/chat-text regression checks to ensure runtime metadata does not alter TTS behavior or pollute chat UI.
+- Added common failure attribution guidance and a pass/fail recording table for repeatable manual verification.
+- Updated `docs/character-runtime-demo.md` with a short link to the smoke checklist.
+- This task does not change backend response defaults, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, or dependencies.

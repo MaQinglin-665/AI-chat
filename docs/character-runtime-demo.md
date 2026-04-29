@@ -42,6 +42,7 @@ When `character_runtime.return_metadata=true`:
 
 ## Quick Verification
 Detailed E2E checklist: [Character Runtime End-to-End Validation](./character-runtime-e2e-validation.md)
+Quick smoke checklist: [Character Runtime Demo Smoke Test Checklist](./character-runtime-smoke-test.md)
 
 In `chatWindow` DevTools:
 
