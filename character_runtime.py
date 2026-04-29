@@ -6,6 +6,8 @@ from typing import Any, Callable, Deque, Dict, List, Optional
 import threading
 import time
 import json
+import ast
+import re
 
 
 @dataclass(frozen=True)
@@ -88,6 +90,8 @@ def normalize_action(action: Any) -> str:
     safe = str(action or "").strip().lower()
     if safe == "shake-head":
         safe = "shake_head"
+    elif safe in {"thinking", "ponder", "pondering"}:
+        safe = "think"
     return safe if safe in SUPPORTED_ACTIONS else "none"
 
 
@@ -133,10 +137,18 @@ def normalize_runtime_payload(payload: Any) -> Dict[str, Any]:
             else:
                 raw = {"text": safe}
         except Exception:
-            raw = {"text": safe}
+            # Best-effort: tolerate JSON-like dict strings with trailing commas/single quotes.
+            try:
+                parsed = ast.literal_eval(safe)
+                if isinstance(parsed, dict):
+                    raw = parsed
+                else:
+                    raw = {"text": _extract_text_from_json_like(safe) or safe}
+            except Exception:
+                raw = {"text": _extract_text_from_json_like(safe) or safe}
 
     if isinstance(raw, dict):
-        text = str(raw.get("text", "") or "").strip()
+        text = _extract_visible_text_from_dict(raw)
         emotion = normalize_emotion(raw.get("emotion", "neutral"))
         action = normalize_action(raw.get("action", "none"))
         intensity = normalize_intensity(raw.get("intensity", "normal"))
@@ -150,6 +162,72 @@ def normalize_runtime_payload(payload: Any) -> Dict[str, Any]:
 
     normalized["text"] = str(raw).strip()
     return normalized
+
+
+def _extract_text_from_json_like(safe: str) -> str:
+    src = str(safe or "").strip()
+    if not src:
+        return ""
+    keys = ("text", "message", "content")
+    for key in keys:
+        # "text": "..."
+        m = re.search(rf'"{key}"\s*:\s*"((?:\\.|[^"\\])*)"', src, flags=re.IGNORECASE)
+        if m:
+            raw = m.group(1)
+            try:
+                return str(json.loads(f"\"{raw}\"") or "").strip()
+            except Exception:
+                return raw.strip()
+        # 'text': '...'
+        m = re.search(rf"'{key}'\s*:\s*'((?:\\.|[^'\\])*)'", src, flags=re.IGNORECASE)
+        if m:
+            raw = m.group(1)
+            try:
+                return str(raw.encode("utf-8").decode("unicode_escape") or "").strip()
+            except Exception:
+                return raw.strip()
+    return ""
+
+
+def _extract_visible_text_from_dict(raw: Dict[str, Any]) -> str:
+    for key in ("text", "message", "content", "output_text"):
+        value = raw.get(key)
+        text = _coerce_text_value(value)
+        if text:
+            return text
+
+    # Responses-style payloads: {"output":[{"content":[{"text":"..."}]}]}
+    output = raw.get("output")
+    if isinstance(output, list):
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            content = item.get("content")
+            text = _coerce_text_value(content)
+            if text:
+                return text
+    return ""
+
+
+def _coerce_text_value(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float, bool)):
+        return str(value).strip()
+    if isinstance(value, dict):
+        for key in ("text", "content", "message"):
+            nested = _coerce_text_value(value.get(key))
+            if nested:
+                return nested
+        return ""
+    if isinstance(value, list):
+        parts: List[str] = []
+        for item in value:
+            text = _coerce_text_value(item)
+            if text:
+                parts.append(text)
+        return " ".join(parts).strip()
+    return ""
 
 
 class CharacterRuntime:

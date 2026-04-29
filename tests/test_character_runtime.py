@@ -46,7 +46,7 @@ def test_unknown_emotion_falls_back_to_neutral():
 
 def test_malformed_json_fallback_is_safe_text():
     payload = normalize_runtime_payload('{"text":"broken"')
-    assert payload["text"] == '{"text":"broken"'
+    assert payload["text"] == "broken"
     assert payload["emotion"] == "neutral"
     assert payload["voice_style"] == "neutral"
 
@@ -83,6 +83,19 @@ def test_runtime_action_and_intensity_fallbacks_are_safe():
     payload = normalize_runtime_payload({"text": "ok", "emotion": "happy", "action": "missing", "intensity": "x"})
     assert payload["action"] == "none"
     assert payload["intensity"] == "normal"
+
+
+def test_runtime_action_alias_thinking_normalizes_to_think():
+    payload = normalize_runtime_payload({"text": "ok", "emotion": "thinking", "action": "thinking"})
+    assert payload["action"] == "think"
+
+
+def test_runtime_payload_uses_message_or_content_when_text_missing():
+    payload = normalize_runtime_payload({"message": "message fallback", "emotion": "happy"})
+    assert payload["text"] == "message fallback"
+
+    payload = normalize_runtime_payload({"content": [{"text": "nested content"}], "emotion": "happy"})
+    assert payload["text"] == "nested content"
 
 
 def test_emotion_to_live2d_hint_mapping():
