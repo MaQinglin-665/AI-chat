@@ -53,7 +53,36 @@ def test_malformed_json_fallback_is_safe_text():
 
 def test_empty_input_fallback_is_safe_defaults():
     payload = normalize_runtime_payload("")
-    assert payload == {"text": "", "emotion": "neutral", "voice_style": "neutral"}
+    assert payload == {
+        "text": "",
+        "emotion": "neutral",
+        "action": "none",
+        "intensity": "normal",
+        "voice_style": "neutral",
+    }
+
+
+def test_contract_emotions_are_supported_and_not_forced_to_neutral():
+    payload = normalize_runtime_payload(
+        {"text": "ok", "emotion": "surprised", "action": "surprised", "intensity": "high"}
+    )
+    assert payload["emotion"] == "surprised"
+    assert payload["action"] == "surprised"
+    assert payload["intensity"] == "high"
+
+    payload = normalize_runtime_payload({"text": "ok", "emotion": "annoyed", "action": "shake_head"})
+    assert payload["emotion"] == "annoyed"
+    assert payload["action"] == "shake_head"
+
+    payload = normalize_runtime_payload({"text": "ok", "emotion": "thinking", "action": "think"})
+    assert payload["emotion"] == "thinking"
+    assert payload["action"] == "think"
+
+
+def test_runtime_action_and_intensity_fallbacks_are_safe():
+    payload = normalize_runtime_payload({"text": "ok", "emotion": "happy", "action": "missing", "intensity": "x"})
+    assert payload["action"] == "none"
+    assert payload["intensity"] == "normal"
 
 
 def test_emotion_to_live2d_hint_mapping():

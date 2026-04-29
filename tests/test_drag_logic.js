@@ -18,8 +18,16 @@ function ensureSourceContains(pattern, label) {
 
 function staticChecks() {
   ensureSourceContains(
-    "if (state.windowDragActive && state.desktopBridge === \"electron\") {",
-    "Electron pointerdown branch exists"
+    "model.on(\"pointerdown\", (e) => {",
+    "Model pointerdown handler exists"
+  );
+  ensureSourceContains(
+    "state.desktopMode && state.desktopBridge === \"electron\"",
+    "Electron desktop bridge condition exists in pointerdown flow"
+  );
+  ensureSourceContains(
+    "isPointOverVisibleModelArea(cx, cy)",
+    "Electron pointerdown path still uses visible-area hit test"
   );
   ensureSourceContains(
     "const onDocMove = (ev) => {",
@@ -34,16 +42,24 @@ function staticChecks() {
     "Electron branch removes document pointermove listener on cleanup"
   );
   ensureSourceContains(
-    "// Handled by document-level pointermove listener.",
-    "Model pointermove returns early for electron desktop drag"
+    "state.modelPosX = nextX;",
+    "Electron doc-move branch updates model X position"
+  );
+  ensureSourceContains(
+    "state.baseTransform.y = state.modelPosY;",
+    "Electron doc-move branch keeps base transform in sync"
   );
   ensureSourceContains(
     "state.suspendRelayoutUntil = performance.now() + 240;",
-    "Desktop non-electron drag keeps relayout suspension"
+    "Electron desktop drag keeps relayout suspension"
   );
   ensureSourceContains(
-    "state.suspendRelayoutUntil = performance.now() + 140;",
-    "Overlay drag path keeps relayout suspension"
+    "const onDocMoveBrowser = (ev) => {",
+    "Browser/non-desktop drag path keeps document-level pointermove handler"
+  );
+  ensureSourceContains(
+    "state.model.x = px;",
+    "Browser/non-desktop doc-move branch updates model X"
   );
   ensureSourceContains(
     "moveDesktopWindowBy(dx, dy);",

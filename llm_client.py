@@ -79,7 +79,8 @@ def get_openai_tuning(llm_cfg):
         max_output_tokens = int(max_output_tokens)
     except (TypeError, ValueError):
         max_output_tokens = 120
-    max_output_tokens = max(32, min(256, max_output_tokens))
+    max_cap = 2048 if bool(llm_cfg.get("allow_high_output_tokens", False)) else 256
+    max_output_tokens = max(32, min(max_cap, max_output_tokens))
 
     verbosity = str(llm_cfg.get("verbosity", "low")).strip().lower()
     if verbosity not in {"low", "medium", "high"}:
@@ -141,8 +142,35 @@ def call_openai_compatible(llm_cfg, messages):
         if choices:
             message = choices[0].get("message", {})
             content = normalize_text_content(message.get("content", ""))
-            if content:
+            finish_reason = str(choices[0].get("finish_reason", "") or "").strip().lower()
+            if content and finish_reason != "length":
                 return content
+
+            # Stable demo fallback: if reply is clipped by token budget, retry once with a larger budget.
+            if content and finish_reason == "length" and bool(llm_cfg.get("retry_on_length", False)):
+                retry_payload = dict(payload)
+                try:
+                    current_max = int(retry_payload.get("max_tokens", tuning["max_output_tokens"]))
+                except (TypeError, ValueError):
+                    current_max = int(tuning["max_output_tokens"])
+                desired = llm_cfg.get("length_retry_max_output_tokens", llm_cfg.get("max_output_tokens", current_max))
+                try:
+                    desired_max = int(desired)
+                except (TypeError, ValueError):
+                    desired_max = current_max
+                retry_cap = 2048 if bool(llm_cfg.get("allow_high_output_tokens", False)) else 512
+                retry_max = max(current_max + 64, desired_max, current_max * 2)
+                retry_payload["max_tokens"] = max(64, min(retry_cap, retry_max))
+
+                retry_data = http_post_json(
+                    f"{base_url}/chat/completions", retry_payload, headers=headers, timeout=timeout
+                )
+                retry_choices = retry_data.get("choices") or []
+                if retry_choices:
+                    retry_message = retry_choices[0].get("message", {})
+                    retry_content = normalize_text_content(retry_message.get("content", ""))
+                    if retry_content:
+                        return retry_content
     except RuntimeError:
         # Some relays do not return standard chat-completions JSON.
         pass

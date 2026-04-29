@@ -4853,10 +4853,23 @@ function setMessageTimestamp(row, timestamp) {
   target.hidden = false;
 }
 
+function resolveAssistantDisplayName(fallbackName = "Mochi") {
+  const runtimeCfg = state.config?.character_runtime;
+  if (runtimeCfg?.enabled === true) {
+    const overrideCfg = runtimeCfg?.persona_override;
+    const overrideName = String(overrideCfg?.name || "").trim();
+    if (overrideCfg?.enabled === true && overrideName) {
+      return overrideName;
+    }
+  }
+  const configuredName = String(state.config?.assistant_name || "").trim();
+  return configuredName || fallbackName;
+}
+
 function createMessageRow(role, text, options = {}) {
   const row = document.createElement("div");
   row.className = `message ${role}`;
-  const assistantName = state.config?.assistant_name || "Hiyori";
+  const assistantName = resolveAssistantDisplayName("Hiyori");
   const roleEl = document.createElement("span");
   roleEl.className = "role";
   roleEl.textContent = role === "user" ? "你" : assistantName;
@@ -8243,7 +8256,7 @@ async function loadConfig() {
   loadRemindersFromStorage();
   loadDailyGreetingState();
   loadEmotionStats();
-  ui.assistantName.textContent = state.config.assistant_name || "Mochi";
+  ui.assistantName.textContent = resolveAssistantDisplayName("Mochi");
   updateObserveButton();
   updateMicMeter(0);
 }
