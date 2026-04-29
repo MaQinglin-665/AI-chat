@@ -8548,18 +8548,29 @@ function attachDrag(model) {
   };
 
   model.on("pointerdown", (e) => {
+    if (state.desktopMode && state.desktopBridge === "electron") {
+      const ev = e?.data?.originalEvent || null;
+      const cx = Number(ev?.clientX);
+      const cy = Number(ev?.clientY);
+      if (!Number.isFinite(cx) || !Number.isFinite(cy)) {
+        return;
+      }
+      if (!isPointOverVisibleModelArea(cx, cy)) {
+        return;
+      }
+    }
     const g = e.data?.global || { x: 0, y: 0 };
     state.lastPointerDownAt = performance.now();
     state.lastPointerDownGlobal = { x: Number(g.x) || 0, y: Number(g.y) || 0 };
     state.pointerDragMoved = false;
-    state.windowDragActive = !!(state.desktopMode && state.desktopCanMoveWindow);
+    state.windowDragActive = false;
     state.dragWindowAccumX = 0;
     state.dragWindowAccumY = 0;
     state.dragData = {
       data: e.data,
       lastGlobal: { x: g.x, y: g.y }
     };
-    if (state.windowDragActive) {
+    if (state.desktopMode) {
       document.body.classList.add("dragging-window");
       document.documentElement.classList.add("dragging-window");
       if (state.model) {
@@ -8569,12 +8580,12 @@ function attachDrag(model) {
     }
     // Fullscreen overlay: no window drag session needed.
     model.cursor = "grabbing";
-    if (state.windowDragActive && state.desktopBridge === "electron") {
+    if (state.desktopMode && state.desktopBridge === "electron") {
       const start = state.dragData?.lastGlobal || { x: Number(g.x) || 0, y: Number(g.y) || 0 };
       const grabOffsetX = (Number(state.modelPosX) || Number(state.model?.x) || 0) - Number(start.x || 0);
       const grabOffsetY = (Number(state.modelPosY) || Number(state.model?.y) || 0) - Number(start.y || 0);
       const onDocMove = (ev) => {
-        if (!state.windowDragActive || !state.model) {
+        if (!state.dragData || !state.model) {
           document.removeEventListener("pointermove", onDocMove);
           return;
         }
@@ -8587,18 +8598,27 @@ function attachDrag(model) {
         const rh = Number(renderer?.height) || rect.height;
         const gx = (ev.clientX - rect.left) * (rw / rect.width);
         const gy = (ev.clientY - rect.top) * (rh / rect.height);
+        if (!Number.isFinite(gx) || !Number.isFinite(gy)) {
+          return;
+        }
         state.dragData.lastGlobal = { x: gx, y: gy };
         const dxTap = Number(gx) - Number(state.lastPointerDownGlobal?.x || 0);
         const dyTap = Number(gy) - Number(state.lastPointerDownGlobal?.y || 0);
         if ((dxTap * dxTap + dyTap * dyTap) > (TAP_MOVE_THRESHOLD * TAP_MOVE_THRESHOLD)) {
           state.pointerDragMoved = true;
         }
-        state.modelPosX = gx + grabOffsetX;
-        state.modelPosY = gy + grabOffsetY;
+        const nextX = gx + grabOffsetX;
+        const nextY = gy + grabOffsetY;
+        if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
+          return;
+        }
+        state.modelPosX = nextX;
+        state.modelPosY = nextY;
         state.model.x = state.modelPosX;
         state.model.y = state.modelPosY;
         state.baseTransform.x = state.modelPosX;
         state.baseTransform.y = state.modelPosY;
+        state.suspendRelayoutUntil = performance.now() + 240;
       };
       document.addEventListener("pointermove", onDocMove);
       const cleanup = () => {
@@ -8735,55 +8755,27 @@ function attachDrag(model) {
       }
     }
 
-    if (state.desktopMode) {
-      if (state.desktopCanMoveWindow && state.windowDragActive) {
-        if (state.desktopBridge === "electron") {
-          // Handled by document-level pointermove listener.
-          return;
-        } else {
-          const g = e.data?.global || state.dragData.data?.global;
-          if (g) {
-            const last = state.dragData.lastGlobal || g;
-            const dx = g.x - last.x;
-            const dy = g.y - last.y;
-            state.dragData.lastGlobal = { x: g.x, y: g.y };
-            if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
-              return;
-            }
-            state.suspendRelayoutUntil = performance.now() + 240;
-            moveDesktopWindowBy(dx, dy);
-            state.dragWindowAccumX = 0;
-            state.dragWindowAccumY = 0;
-          }
-        }
-      }
-      // In desktop mode never move model itself to avoid drift/flicker.
-      return;
-    }
-
-    if (state.desktopCanMoveWindow && state.windowDragActive) {
-      const g = e.data?.global || state.dragData.data?.global;
-      if (g) {
-        const last = state.dragData.lastGlobal || g;
-        const dx = g.x - last.x;
-        const dy = g.y - last.y;
-        state.dragData.lastGlobal = { x: g.x, y: g.y };
-        if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
-          return;
-        }
-        // Live move native window so drag path and destination are consistent.
-        state.suspendRelayoutUntil = performance.now() + 140;
-        moveDesktopWindowBy(dx, dy);
-        // Clear deferred accumulator to avoid double-moving on release.
-        state.dragWindowAccumX = 0;
-        state.dragWindowAccumY = 0;
-      }
+    if (state.desktopMode && state.desktopBridge === "electron") {
+      // Electron desktop mode uses document-level pointermove for stable drag tracking.
       return;
     }
 
     const pos = state.dragData.data.getLocalPosition(state.pixiApp.stage);
-    model.x = pos.x;
-    model.y = pos.y;
+    const px = Number(pos?.x);
+    const py = Number(pos?.y);
+    if (!Number.isFinite(px) || !Number.isFinite(py)) {
+      return;
+    }
+    model.x = px;
+    model.y = py;
+    if (state.desktopMode) {
+      state.modelPosX = px;
+      state.modelPosY = py;
+      clampModelVisibleInViewport(model);
+      state.modelPosX = Number(model.x) || state.modelPosX;
+      state.modelPosY = Number(model.y) || state.modelPosY;
+      state.suspendRelayoutUntil = performance.now() + 180;
+    }
     state.baseTransform.x = model.x;
     state.baseTransform.y = model.y;
   });
@@ -8806,13 +8798,13 @@ function attachDrag(model) {
   }
 }
 
-function isPointOverVisibleModelArea(clientX, clientY) {
-  if (!state.model || !state.pixiApp) return false;
+function getModelInteractiveBounds() {
+  if (!state.model || !state.pixiApp) return null;
   let bounds = state._stableModelBounds;
   if (!bounds) {
     const mw = Number(state.model.width) || 0;
     const mh = Number(state.model.height) || 0;
-    if (mw <= 0 || mh <= 0) return false;
+    if (mw <= 0 || mh <= 0) return null;
     bounds = {
       left: Number(state.model.x) - mw * 0.5,
       right: Number(state.model.x) + mw * 0.5,
@@ -8820,6 +8812,45 @@ function isPointOverVisibleModelArea(clientX, clientY) {
       bottom: Number(state.model.y)
     };
   }
+  const left = Number(bounds.left);
+  const right = Number(bounds.right);
+  const top = Number(bounds.top);
+  const bottom = Number(bounds.bottom);
+  if (
+    !Number.isFinite(left) || !Number.isFinite(right) ||
+    !Number.isFinite(top) || !Number.isFinite(bottom)
+  ) {
+    return null;
+  }
+  const width = right - left;
+  const height = bottom - top;
+  if (width < 20 || height < 20) {
+    return null;
+  }
+  // Keep a conservative center zone for drag/click-through hit test.
+  // Horizontal stays narrow; vertical is widened to include head/body/legs.
+  const insetX = clampNumber(width * 0.30, 20, 180);
+  const insetTop = clampNumber(height * 0.10, 8, 72);
+  const insetBottom = clampNumber(height * 0.08, 6, 64);
+  const hitLeft = left + insetX;
+  const hitRight = right - insetX;
+  const hitTop = top + insetTop;
+  const hitBottom = bottom - insetBottom;
+  if (hitRight - hitLeft < 20 || hitBottom - hitTop < 20) {
+    return null;
+  }
+  return {
+    left: hitLeft,
+    right: hitRight,
+    top: hitTop,
+    bottom: hitBottom
+  };
+}
+
+function isPointOverVisibleModelArea(clientX, clientY) {
+  if (!state.model || !state.pixiApp) return false;
+  const bounds = getModelInteractiveBounds();
+  if (!bounds) return false;
   const canvas = state.pixiApp.view;
   const rect = canvas.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return false;
@@ -8829,13 +8860,41 @@ function isPointOverVisibleModelArea(clientX, clientY) {
   if (rw <= 0 || rh <= 0) return false;
   const x = (clientX - rect.left) * (rw / rect.width);
   const y = (clientY - rect.top) * (rh / rect.height);
-  const pad = 30;
-  return (
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const pad = 2;
+  const inStrictBounds = (
     x >= bounds.left - pad &&
     x <= bounds.right + pad &&
     y >= bounds.top - pad &&
     y <= bounds.bottom + pad
   );
+  if (!inStrictBounds) return false;
+  // Prefer runtime hit areas when available, but do not hard-reject when
+  // hit areas miss while still inside strict conservative bounds.
+  try {
+    const hitFn = state.model && typeof state.model.hitTest === "function"
+      ? state.model.hitTest.bind(state.model)
+      : null;
+    if (!hitFn) {
+      return true;
+    }
+    const hit = hitFn(x, y);
+    if (Array.isArray(hit)) {
+      if (hit.length > 0) {
+        return true;
+      }
+      return true;
+    }
+    if (typeof hit === "boolean") {
+      if (hit) {
+        return true;
+      }
+      return true;
+    }
+  } catch (_) {
+    // Fallback to strict bounds only.
+  }
+  return true;
 }
 
 function setupClickthroughHitTest() {
