@@ -30,6 +30,18 @@ function staticChecks() {
     "Electron pointerdown path still uses visible-area hit test"
   );
   ensureSourceContains(
+    "isPointInModelDragHotzone(x, y, bounds)",
+    "Visible-area hit test uses segmented drag hotzone"
+  );
+  ensureSourceContains(
+    "if (yRatio < 0.22)",
+    "Drag hotzone keeps dedicated head-band rule"
+  );
+  ensureSourceContains(
+    "} else if (yRatio < 0.64)",
+    "Drag hotzone keeps dedicated torso-band rule"
+  );
+  ensureSourceContains(
     "const onDocMove = (ev) => {",
     "Document-level electron pointermove handler exists"
   );
@@ -80,6 +92,37 @@ function assertApproxEqual(actual, expected, epsilon = 1e-9) {
     Math.abs(Number(actual) - Number(expected)) <= epsilon,
     `Expected ${actual} ~= ${expected} (epsilon=${epsilon})`
   );
+}
+
+function isPointInModelDragHotzoneHarness(x, y, bounds) {
+  if (!bounds) return false;
+  const left = Number(bounds.left);
+  const right = Number(bounds.right);
+  const top = Number(bounds.top);
+  const bottom = Number(bounds.bottom);
+  if (
+    !Number.isFinite(left) || !Number.isFinite(right) ||
+    !Number.isFinite(top) || !Number.isFinite(bottom) ||
+    !Number.isFinite(x) || !Number.isFinite(y)
+  ) {
+    return false;
+  }
+  const width = right - left;
+  const height = bottom - top;
+  if (width <= 0 || height <= 0) return false;
+  const centerX = (left + right) * 0.5;
+  const rawRatio = (y - top) / height;
+  const yRatio = Math.max(0, Math.min(1, rawRatio));
+  let halfWidthRatio = 0.22;
+  if (yRatio < 0.22) {
+    halfWidthRatio = 0.20 + (yRatio / 0.22) * 0.03;
+  } else if (yRatio < 0.64) {
+    halfWidthRatio = 0.23 + ((yRatio - 0.22) / 0.42) * 0.13;
+  } else {
+    halfWidthRatio = 0.24 - ((yRatio - 0.64) / 0.36) * 0.05;
+  }
+  const halfWidth = Math.max(10, Math.min(width * 0.48, width * halfWidthRatio));
+  return Math.abs(x - centerX) <= halfWidth;
 }
 
 function createHarness() {
@@ -303,6 +346,21 @@ test("stopDesktopWindowDrag resets drag flags and accumulators", () => {
   assert.strictEqual(h.state.windowDragDy, 0);
   assert.strictEqual(h.state.dragWindowAccumX, 0);
   assert.strictEqual(h.state.dragWindowAccumY, 0);
+});
+
+test("segmented drag hotzone allows head/body/leg center points", () => {
+  const b = { left: 100, right: 300, top: 100, bottom: 500 };
+  assert.strictEqual(isPointInModelDragHotzoneHarness(200, 130, b), true, "head center should be draggable");
+  assert.strictEqual(isPointInModelDragHotzoneHarness(200, 280, b), true, "torso center should be draggable");
+  assert.strictEqual(isPointInModelDragHotzoneHarness(200, 450, b), true, "leg center should be draggable");
+});
+
+test("segmented drag hotzone rejects near-body transparent side zones", () => {
+  const b = { left: 100, right: 300, top: 100, bottom: 500 };
+  assert.strictEqual(isPointInModelDragHotzoneHarness(140, 130, b), false, "head-side transparent zone should click-through");
+  assert.strictEqual(isPointInModelDragHotzoneHarness(260, 450, b), false, "leg-side transparent zone should click-through");
+  assert.strictEqual(isPointInModelDragHotzoneHarness(125, 280, b), false, "left near-body transparent zone should click-through");
+  assert.strictEqual(isPointInModelDragHotzoneHarness(275, 280, b), false, "right near-body transparent zone should click-through");
 });
 
 function run() {

@@ -8860,6 +8860,41 @@ function getModelInteractiveBounds() {
   };
 }
 
+function isPointInModelDragHotzone(x, y, bounds) {
+  if (!bounds) return false;
+  const left = Number(bounds.left);
+  const right = Number(bounds.right);
+  const top = Number(bounds.top);
+  const bottom = Number(bounds.bottom);
+  if (
+    !Number.isFinite(left) || !Number.isFinite(right) ||
+    !Number.isFinite(top) || !Number.isFinite(bottom) ||
+    !Number.isFinite(x) || !Number.isFinite(y)
+  ) {
+    return false;
+  }
+  const width = right - left;
+  const height = bottom - top;
+  if (width <= 0 || height <= 0) {
+    return false;
+  }
+  const centerX = (left + right) * 0.5;
+  const yRatio = clampNumber((y - top) / height, 0, 1);
+  let halfWidthRatio = 0.22;
+  if (yRatio < 0.22) {
+    // Head: narrower center band to preserve lateral click-through.
+    halfWidthRatio = 0.20 + (yRatio / 0.22) * 0.03;
+  } else if (yRatio < 0.64) {
+    // Torso: widest draggable region.
+    halfWidthRatio = 0.23 + ((yRatio - 0.22) / 0.42) * 0.13;
+  } else {
+    // Legs: taper back to a narrow center strip.
+    halfWidthRatio = 0.24 - ((yRatio - 0.64) / 0.36) * 0.05;
+  }
+  const halfWidth = clampNumber(width * halfWidthRatio, 10, width * 0.48);
+  return Math.abs(x - centerX) <= halfWidth;
+}
+
 function isPointOverVisibleModelArea(clientX, clientY) {
   if (!state.model || !state.pixiApp) return false;
   const bounds = getModelInteractiveBounds();
@@ -8882,6 +8917,9 @@ function isPointOverVisibleModelArea(clientX, clientY) {
     y <= bounds.bottom + pad
   );
   if (!inStrictBounds) return false;
+  if (!isPointInModelDragHotzone(x, y, bounds)) {
+    return false;
+  }
   // Prefer runtime hit areas when available, but do not hard-reject when
   // hit areas miss while still inside strict conservative bounds.
   try {
