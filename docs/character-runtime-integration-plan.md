@@ -317,3 +317,11 @@
 - Added common failure attribution guidance and a pass/fail recording table for repeatable manual verification.
 - Updated `docs/character-runtime-demo.md` with a short link to the smoke checklist.
 - This task does not change backend response defaults, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, or dependencies.
+
+## Task 018 Landing Notes (Character Runtime safe local demo config guide)
+- Added `docs/character-runtime-safe-local-config.md` as a safety-focused local demo config guide for repeatable runtime demonstrations and pre-release validation.
+- Clarified local/demo/release boundaries: runtime demo switches are local verification settings and must not be treated as default release behavior.
+- Documented real config layering and override order (`config.example.json -> config.json -> config.local.json`) and highlighted local override hygiene.
+- Added explicit preparation and cleanup checklists for recording/demo workflows, including baseline restore and commit-safety checks.
+- Linked the new guide from demo and smoke-test docs for a consistent setup path.
+- This task introduces no behavior changes and no code-path changes (backend response shape, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, dependencies all unchanged).

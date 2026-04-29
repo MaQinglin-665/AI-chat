@@ -21,6 +21,8 @@ For deeper chain validation, also run:
 - `chatWindow` DevTools can be opened.
 - Character Runtime demo enablement follows:
   - [Character Runtime Demo Enablement](./character-runtime-demo.md)
+- Safe local override and cleanup workflow follows:
+  - [Character Runtime Safe Local Demo Config Guide](./character-runtime-safe-local-config.md)
 
 ## Baseline Check (Runtime Disabled)
 Use:
