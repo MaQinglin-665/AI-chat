@@ -241,3 +241,22 @@
 - BroadcastChannel 不可用时安全降级为本地行为，不影响聊天文本、TTS 与主流程稳定性。
 - 本任务不改后端 Character Runtime、不改 LLM prompt、不改 TTS、不改默认聊天 UI。
 - Character Profile 配置基础工作顺延到 Task 013。
+
+## Task 013 落地补充（Character Profile config foundation）
+- 本任务新增 Character Profile 配置骨架：`config/character_profile.json`。
+- 后端新增 profile 读取与默认兜底 helper：
+  - `_normalize_character_profile_string(...)`
+  - `_normalize_character_profile_list(...)`
+  - `_normalize_character_profile_config(...)`
+  - `_load_character_profile_config(...)`
+- 兜底策略：
+  - 文件不存在 -> 默认 profile
+  - JSON 损坏 -> 默认 profile
+  - 字段缺失 -> 默认值补齐
+  - 类型异常 -> 默认值补齐
+- 仅当 `character_runtime.enabled=true` 时，profile 轻量信息参与 runtime structured prompt contract；disabled 路径保持不变。
+- runtime prompt 可注入字段：
+  - `name/persona/tone/style_notes`
+  - `allowed_emotions/allowed_actions/allowed_voice_styles`
+- 本任务不改前端 UI，不改 Live2D，不改 TTS，不接记忆，不接主动互动，不新增依赖。
+- 后续任务再扩展 profile UI、多角色与角色市场。

@@ -173,6 +173,44 @@ DEFAULT_HUMANIZE_SETTINGS = {
     "refine_timeout_sec": 12,
     "refine_min_chars": 36,
 }
+CHARACTER_PROFILE_CONFIG_PATH = ROOT_DIR / "config" / "character_profile.json"
+DEFAULT_CHARACTER_PROFILE = {
+    "name": "Desktop Companion",
+    "persona": "A friendly desktop AI companion with light teasing and supportive behavior.",
+    "tone": "natural, concise, expressive",
+    "style_notes": [
+        "Avoid sounding like a generic assistant.",
+        "Use light character reactions when appropriate.",
+        "Keep replies helpful and not overly dramatic.",
+    ],
+    "default_emotion": "neutral",
+    "default_action": "none",
+    "allowed_emotions": [
+        "neutral",
+        "happy",
+        "sad",
+        "angry",
+        "surprised",
+        "annoyed",
+        "thinking",
+    ],
+    "allowed_actions": [
+        "none",
+        "wave",
+        "nod",
+        "shake_head",
+        "think",
+        "happy_idle",
+        "surprised",
+    ],
+    "allowed_voice_styles": [
+        "neutral",
+        "cheerful",
+        "teasing",
+        "soft",
+        "serious",
+    ],
+}
 
 
 def _parse_bool_flag(value, default=False):
@@ -207,8 +245,95 @@ def _get_character_runtime_settings(config):
         return dict(default_settings)
 
 
+def _normalize_character_profile_string(value, fallback):
+    if isinstance(value, str):
+        text = value.strip()
+        if text:
+            return text
+    return str(fallback or "").strip()
+
+
+def _normalize_character_profile_list(value, fallback):
+    fallback_items = [str(x or "").strip() for x in (fallback or []) if isinstance(x, str) and str(x or "").strip()]
+    if not isinstance(value, list):
+        return fallback_items
+    out = []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        text = item.strip()
+        if not text:
+            continue
+        out.append(text)
+    return out or fallback_items
+
+
+def _normalize_character_profile_config(raw):
+    safe = raw if isinstance(raw, dict) else {}
+    defaults = DEFAULT_CHARACTER_PROFILE
+    return {
+        "name": _normalize_character_profile_string(safe.get("name"), defaults["name"]),
+        "persona": _normalize_character_profile_string(safe.get("persona"), defaults["persona"]),
+        "tone": _normalize_character_profile_string(safe.get("tone"), defaults["tone"]),
+        "style_notes": _normalize_character_profile_list(safe.get("style_notes"), defaults["style_notes"]),
+        "default_emotion": _normalize_character_profile_string(
+            safe.get("default_emotion"), defaults["default_emotion"]
+        ),
+        "default_action": _normalize_character_profile_string(safe.get("default_action"), defaults["default_action"]),
+        "allowed_emotions": _normalize_character_profile_list(
+            safe.get("allowed_emotions"), defaults["allowed_emotions"]
+        ),
+        "allowed_actions": _normalize_character_profile_list(
+            safe.get("allowed_actions"), defaults["allowed_actions"]
+        ),
+        "allowed_voice_styles": _normalize_character_profile_list(
+            safe.get("allowed_voice_styles"), defaults["allowed_voice_styles"]
+        ),
+    }
+
+
+def _load_character_profile_config():
+    safe_default = _normalize_character_profile_config(DEFAULT_CHARACTER_PROFILE)
+    try:
+        path = CHARACTER_PROFILE_CONFIG_PATH
+        if not path.exists():
+            return safe_default
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+        return _normalize_character_profile_config(parsed)
+    except Exception:
+        return safe_default
+
+
 def _build_character_runtime_prompt_contract():
+    profile = _load_character_profile_config()
+    profile_name = str(profile.get("name", DEFAULT_CHARACTER_PROFILE["name"]) or DEFAULT_CHARACTER_PROFILE["name"]).strip()
+    persona = str(profile.get("persona", DEFAULT_CHARACTER_PROFILE["persona"]) or DEFAULT_CHARACTER_PROFILE["persona"]).strip()
+    tone = str(profile.get("tone", DEFAULT_CHARACTER_PROFILE["tone"]) or DEFAULT_CHARACTER_PROFILE["tone"]).strip()
+    style_notes = profile.get("style_notes", [])
+    if not isinstance(style_notes, list):
+        style_notes = DEFAULT_CHARACTER_PROFILE["style_notes"]
+    safe_style_notes = [str(x or "").strip() for x in style_notes if str(x or "").strip()]
+    style_notes_text = " | ".join(safe_style_notes[:3])
+    allowed_emotions = profile.get("allowed_emotions", DEFAULT_CHARACTER_PROFILE["allowed_emotions"])
+    allowed_actions = profile.get("allowed_actions", DEFAULT_CHARACTER_PROFILE["allowed_actions"])
+    allowed_voice_styles = profile.get(
+        "allowed_voice_styles", DEFAULT_CHARACTER_PROFILE["allowed_voice_styles"]
+    )
+    emotion_schema = "|".join([str(x or "").strip() for x in allowed_emotions if str(x or "").strip()])
+    action_schema = "|".join([str(x or "").strip() for x in allowed_actions if str(x or "").strip()])
+    voice_schema = "|".join([str(x or "").strip() for x in allowed_voice_styles if str(x or "").strip()])
+    emotion_schema = emotion_schema or "|".join(DEFAULT_CHARACTER_PROFILE["allowed_emotions"])
+    action_schema = action_schema or "|".join(DEFAULT_CHARACTER_PROFILE["allowed_actions"])
+    voice_schema = voice_schema or "|".join(DEFAULT_CHARACTER_PROFILE["allowed_voice_styles"])
     return (
+        "Character profile:\n"
+        f"- Name: {profile_name}\n"
+        f"- Persona: {persona}\n"
+        f"- Tone: {tone}\n"
+        f"- Style notes: {style_notes_text}\n"
+        f"- Allowed emotions: {emotion_schema}\n"
+        f"- Allowed actions: {action_schema}\n"
+        f"- Allowed voice styles: {voice_schema}\n"
         "Character Runtime output contract:\n"
         "- Respond with a single JSON object only.\n"
         "- Do not wrap JSON in Markdown code blocks.\n"
@@ -217,10 +342,10 @@ def _build_character_runtime_prompt_contract():
         "Schema:\n"
         "{\n"
         '  "text": "final user-facing reply",\n'
-        '  "emotion": "neutral|happy|sad|angry|surprised|annoyed|thinking",\n'
-        '  "action": "none|wave|nod|shake_head|think|happy_idle|surprised",\n'
+        f'  "emotion": "{emotion_schema}",\n'
+        f'  "action": "{action_schema}",\n'
         '  "intensity": "low|normal|high",\n'
-        '  "voice_style": "neutral|cheerful|teasing|soft|serious"\n'
+        f'  "voice_style": "{voice_schema}"\n'
         "}\n"
         'The "text" field is the only text shown to the user.'
     )
