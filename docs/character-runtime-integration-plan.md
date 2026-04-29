@@ -230,3 +230,14 @@
   - `window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.testEmotion("happy")`
   - `window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.testAction("wave")`
   - `window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.emit({ emotion: "annoyed", action: "shake_head" })`
+
+## Task 012 落地补充（Character Runtime metadata cross-window bridge）
+- 架构确认：`chatWindow` 与 `modelWindow` 为两个独立 `BrowserWindow` / renderer，`window.dispatchEvent("character-runtime:update")` 仅在当前窗口生效。
+- 本任务在 `web/chat.js` 新增最小 BroadcastChannel 跨窗桥，channel 为 `taffy-character-runtime`。
+- chat 窗口在 `handleCharacterRuntimeMetadata(...)` 正常本地处理后，额外广播：
+  - `{ type: "character-runtime:update", metadata }`
+- model 窗口安装 `installCharacterRuntimeWindowBridge()` 监听广播，收到后执行本地 `handleCharacterRuntimeMetadata(metadata, { broadcast: false })`，从而复用既有 emotion/action 事件链路并避免循环广播。
+- 复用已有 metadata 安全裁剪逻辑：仅接受 object，忽略 null/string/number/array，仅透传 `emotion/action/intensity/live2d_hint/voice_style`。
+- BroadcastChannel 不可用时安全降级为本地行为，不影响聊天文本、TTS 与主流程稳定性。
+- 本任务不改后端 Character Runtime、不改 LLM prompt、不改 TTS、不改默认聊天 UI。
+- Character Profile 配置基础工作顺延到 Task 013。

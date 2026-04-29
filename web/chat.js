@@ -4218,6 +4218,59 @@ function normalizeCharacterRuntimeMetadataForFrontend(raw) {
   return Object.keys(out).length ? out : null;
 }
 
+const CHARACTER_RUNTIME_BROADCAST_CHANNEL = "taffy-character-runtime";
+let characterRuntimeBroadcastChannel = null;
+
+function getCharacterRuntimeBroadcastChannel() {
+  if (typeof BroadcastChannel !== "function") {
+    return null;
+  }
+  if (characterRuntimeBroadcastChannel) {
+    return characterRuntimeBroadcastChannel;
+  }
+  try {
+    characterRuntimeBroadcastChannel = new BroadcastChannel(CHARACTER_RUNTIME_BROADCAST_CHANNEL);
+  } catch (_) {
+    characterRuntimeBroadcastChannel = null;
+  }
+  return characterRuntimeBroadcastChannel;
+}
+
+function dispatchCharacterRuntimeMetadataLocally(normalized) {
+  if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
+    return null;
+  }
+  try {
+    window.__AI_CHAT_LAST_CHARACTER_RUNTIME__ = normalized;
+    window.dispatchEvent(new CustomEvent("character-runtime:update", { detail: normalized }));
+  } catch (_) {
+    // Keep bridge side-effect safe; metadata is optional.
+  }
+  return normalized;
+}
+
+function broadcastCharacterRuntimeMetadataToModel(normalized) {
+  if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
+    return false;
+  }
+  if (state.uiView !== "chat") {
+    return false;
+  }
+  const channel = getCharacterRuntimeBroadcastChannel();
+  if (!channel) {
+    return false;
+  }
+  try {
+    channel.postMessage({
+      type: "character-runtime:update",
+      metadata: normalized
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 function normalizeRuntimeEmotionForLive2D(emotion) {
   if (typeof emotion !== "string") {
     return "idle";
@@ -4373,18 +4426,38 @@ function applyCharacterRuntimeActionToLive2D(metadata) {
   }
 }
 
-function handleCharacterRuntimeMetadata(raw) {
+function handleCharacterRuntimeMetadata(raw, options = {}) {
   const normalized = normalizeCharacterRuntimeMetadataForFrontend(raw);
   if (!normalized) {
     return null;
   }
-  try {
-    window.__AI_CHAT_LAST_CHARACTER_RUNTIME__ = normalized;
-    window.dispatchEvent(new CustomEvent("character-runtime:update", { detail: normalized }));
-  } catch (_) {
-    // Keep bridge side-effect safe; metadata is optional.
+  dispatchCharacterRuntimeMetadataLocally(normalized);
+  if (options.broadcast !== false) {
+    broadcastCharacterRuntimeMetadataToModel(normalized);
   }
   return normalized;
+}
+
+function installCharacterRuntimeWindowBridge() {
+  if (state.uiView !== "model") {
+    return null;
+  }
+  if (state._characterRuntimeBridgeInstalled) {
+    return state._characterRuntimeBridgeInstalled;
+  }
+  const channel = getCharacterRuntimeBroadcastChannel();
+  if (!channel) {
+    return null;
+  }
+  channel.onmessage = (event) => {
+    const data = event?.data;
+    if (!data || data.type !== "character-runtime:update") {
+      return;
+    }
+    handleCharacterRuntimeMetadata(data.metadata, { broadcast: false });
+  };
+  state._characterRuntimeBridgeInstalled = channel;
+  return channel;
 }
 
 function installCharacterRuntimeDebugBridge() {
@@ -10987,6 +11060,7 @@ window.addEventListener("character-runtime:update", (event) => {
     // Keep runtime bridge isolated from chat main flow.
   }
 });
+installCharacterRuntimeWindowBridge();
 installCharacterRuntimeDebugBridge();
 
 async function main() {
