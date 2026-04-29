@@ -47,6 +47,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 
 - 安装依赖与启动方式：`docs/setup.md`
 - 安装与运行、Live2D、LLM、TTS/ASR：`docs/setup.md`
+- Character Runtime demo 启用与验证：`docs/character-runtime-demo.md`
 - 常见问题与排障：`docs/troubleshooting.md`
 - 路线图（v1.2 -> v2.0）：`docs/ROADMAP.md`
 
