@@ -13,6 +13,7 @@ Before recording, review:
 - [Character Runtime Safe Local Demo Config Guide](./character-runtime-safe-local-config.md)
 - [Character Runtime Demo Smoke Test Checklist](./character-runtime-smoke-test.md)
 - [Character Runtime Demo Enablement](./character-runtime-demo.md)
+- [Character Runtime Demo Prompt Examples](./character-runtime-demo-prompts.md)
 
 Preparation checklist:
 - confirm current branch

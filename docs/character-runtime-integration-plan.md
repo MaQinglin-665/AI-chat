@@ -332,3 +332,10 @@
 - Clarified public messaging boundaries and exclusion rules for sensitive information and failure-state footage.
 - Linked the release recording checklist from the safe local config guide as the main recording workflow entry point.
 - No behavior changes and no code-path changes (backend response shape, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, dependencies all unchanged).
+
+## Task 020 Landing Notes (Runtime demo prompt examples)
+- Added `docs/character-runtime-demo-prompts.md` as a reusable prompt reference for local demo, recording, smoke support, and runtime-related manual validation.
+- Clarified prompt groups for emotion/action demo coverage, including happy, surprised, annoyed-safe, thinking, wave, shake_head, and mixed prompts.
+- Clarified public demo prompt boundaries and recording safety guidance to avoid sensitive content and over-claim messaging.
+- Linked prompt examples from the release demo recording checklist for a consistent recording workflow.
+- No behavior changes and no code-path changes (backend response shape, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, dependencies all unchanged).
