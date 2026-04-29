@@ -278,3 +278,18 @@
   - 继续要求 JSON-only 输出（无 Markdown code block、无 JSON 外解释）。
   - emotion/action/voice_style 仅可从 allowed 列表选择，不确定时回退 neutral/none/neutral。
 - 本任务不接记忆、不接主动互动、不新增依赖。
+
+## Task 015 落地补充（Character Runtime end-to-end validation）
+- 本任务新增端到端验证文档：`docs/character-runtime-e2e-validation.md`，覆盖从 LLM 输出到 Live2D emotion/action 反馈的完整链路检查。
+- 验证重点包括：
+  - runtime 默认关闭兼容性（聊天/TTS/response shape 不变）
+  - runtime enabled 时 structured JSON prompt 注入
+  - `return_metadata=true` 时 metadata opt-in 返回
+  - chatWindow metadata 接收
+  - BroadcastChannel (`taffy-character-runtime`) 跨窗转发到 modelWindow
+  - modelWindow emotion/action bridge 触发与安全降级
+  - debug bridge 手动触发链路
+  - 关闭 runtime 后恢复旧行为
+- 文档包含 chatWindow DevTools 手动命令与预期结果，便于开发回归验证。
+- 已知限制已注明：暂无前端自动化命令、Live2D 表现依赖模型资源、motion 缺失时安全降级、LLM provider 故障与 frontend bridge 问题边界。
+- 本任务不改后端 response shape，不改前端 UI/Live2D/TTS，不接记忆/主动互动，不新增依赖。
