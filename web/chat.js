@@ -254,9 +254,24 @@ const state = {
   pendingAttachments: [],
   attachmentReadBusy: false,
   onboardingStepIndex: 0,
-  onboardingSeen: false
+  onboardingSeen: false,
+  activePerfTraceId: "",
+  perfTtsSeq: 0
 };
 window.__petState = state;
+
+function createPerfTraceId(prefix = "chat") {
+  const safePrefix = String(prefix || "chat").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 12) || "chat";
+  return `${safePrefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function perfLog(scope, stage, payload = {}) {
+  try {
+    console.info(`[perf][${scope}][${stage}]`, payload);
+  } catch (_) {
+    // ignore logging errors
+  }
+}
 
 const ui = {
   status: document.getElementById("status"),
@@ -4663,8 +4678,38 @@ function renderToolMetaCards(row, meta) {
 
 const _CHAT_TRANSLATE_TIMEOUT_MS = 12000;
 const _CHAT_TRANSLATE_CACHE_LIMIT = 160;
+const _TRANSLATE_CIRCUIT_FAILURE_THRESHOLD = 3;
+const _TRANSLATE_CIRCUIT_BASE_COOLDOWN_MS = 12000;
+const _TRANSLATE_CIRCUIT_MAX_COOLDOWN_MS = 90000;
 const _chatTranslationCache = new Map();
 let _chatTranslationSeq = 0;
+const _translationCircuitState = {
+  failures: 0,
+  cooldownUntil: 0
+};
+
+function _isTranslationCircuitOpen() {
+  return Date.now() < Number(_translationCircuitState.cooldownUntil || 0);
+}
+
+function _markTranslationFailure() {
+  _translationCircuitState.failures += 1;
+  if (_translationCircuitState.failures < _TRANSLATE_CIRCUIT_FAILURE_THRESHOLD) {
+    return;
+  }
+  const over = _translationCircuitState.failures - _TRANSLATE_CIRCUIT_FAILURE_THRESHOLD;
+  const factor = Math.min(6, Math.max(0, over));
+  const cooldownMs = Math.min(
+    _TRANSLATE_CIRCUIT_MAX_COOLDOWN_MS,
+    _TRANSLATE_CIRCUIT_BASE_COOLDOWN_MS * Math.pow(2, factor)
+  );
+  _translationCircuitState.cooldownUntil = Date.now() + cooldownMs;
+}
+
+function _markTranslationSuccess() {
+  _translationCircuitState.failures = 0;
+  _translationCircuitState.cooldownUntil = 0;
+}
 
 function _readChatTranslationCache(text) {
   const key = String(text || "").trim();
@@ -4757,6 +4802,9 @@ async function _fetchChatTranslation(text) {
   if (!safe) {
     return "";
   }
+  if (_isTranslationCircuitOpen()) {
+    return "";
+  }
   const cached = _readChatTranslationCache(safe);
   if (cached) {
     return cached;
@@ -4777,16 +4825,27 @@ async function _fetchChatTranslation(text) {
       signal: controller.signal
     });
     if (!resp.ok) {
+      _markTranslationFailure();
       return "";
     }
     const data = await resp.json();
-    const translated = String(data?.translated || "").trim();
+    const translated = String(data?.translated || data?.translated_text || "").trim();
+    const degraded = data?.degraded === true || data?.fallback === true;
+    if (degraded) {
+      _markTranslationFailure();
+      return translated;
+    }
     if (!translated) {
+      _markTranslationFailure();
       return "";
     }
+    _markTranslationSuccess();
     _writeChatTranslationCache(safe, translated);
     return translated;
-  } catch (_) {
+  } catch (err) {
+    if (!controller.signal.aborted || Date.now() >= _translationCircuitState.cooldownUntil) {
+      _markTranslationFailure();
+    }
     return "";
   } finally {
     clearTimeout(timeoutId);
@@ -5435,6 +5494,9 @@ function _abortSubtitleTranslation() {
 }
 
 async function _fetchTranslation(text, capturedId) {
+  if (_isTranslationCircuitOpen()) {
+    return "";
+  }
   const cached = _readSubtitleTranslationCache(text);
   if (cached) {
     return cached;
@@ -5458,15 +5520,31 @@ async function _fetchTranslation(text, capturedId) {
       body: JSON.stringify({ text }),
       signal: controller.signal,
     });
-    if (!resp.ok || capturedId !== state.subtitleId) return "";
-    const data = await resp.json();
-    const translated = String(data.translated || "").trim();
-    if (!translated) {
+    if (!resp.ok || capturedId !== state.subtitleId) {
+      if (capturedId === state.subtitleId) {
+        _markTranslationFailure();
+      }
       return "";
     }
+    const data = await resp.json();
+    const translated = String(data?.translated || data?.translated_text || "").trim();
+    const degraded = data?.degraded === true || data?.fallback === true;
+    if (degraded) {
+      _markTranslationFailure();
+      return translated;
+    }
+    if (!translated) {
+      _markTranslationFailure();
+      return "";
+    }
+    _markTranslationSuccess();
     _writeSubtitleTranslationCache(text, translated);
     return translated;
-  } catch (_) {
+  } catch (err) {
+    const aborted = !!(controller.signal && controller.signal.aborted);
+    if (!aborted && capturedId === state.subtitleId) {
+      _markTranslationFailure();
+    }
     return "";
   } finally {
     clearTimeout(timeoutId);
@@ -8917,9 +8995,7 @@ function isPointOverVisibleModelArea(clientX, clientY) {
     y <= bounds.bottom + pad
   );
   if (!inStrictBounds) return false;
-  if (!isPointInModelDragHotzone(x, y, bounds)) {
-    return false;
-  }
+  if (!isPointInModelDragHotzone(x, y, bounds)) return false;
   // Prefer runtime hit areas when available, but do not hard-reject when
   // hit areas miss while still inside strict conservative bounds.
   try {
@@ -8946,6 +9022,37 @@ function isPointOverVisibleModelArea(clientX, clientY) {
     // Fallback to strict bounds only.
   }
   return true;
+}
+
+function isPointInModelDragHotzone(x, y, bounds) {
+  if (!bounds) return false;
+  const left = Number(bounds.left);
+  const right = Number(bounds.right);
+  const top = Number(bounds.top);
+  const bottom = Number(bounds.bottom);
+  if (
+    !Number.isFinite(left) || !Number.isFinite(right) ||
+    !Number.isFinite(top) || !Number.isFinite(bottom) ||
+    !Number.isFinite(x) || !Number.isFinite(y)
+  ) {
+    return false;
+  }
+  const width = right - left;
+  const height = bottom - top;
+  if (width <= 0 || height <= 0) return false;
+  const centerX = (left + right) * 0.5;
+  const rawRatio = (y - top) / height;
+  const yRatio = Math.max(0, Math.min(1, rawRatio));
+  let halfWidthRatio = 0.22;
+  if (yRatio < 0.22) {
+    halfWidthRatio = 0.20 + (yRatio / 0.22) * 0.03;
+  } else if (yRatio < 0.64) {
+    halfWidthRatio = 0.23 + ((yRatio - 0.22) / 0.42) * 0.13;
+  } else {
+    halfWidthRatio = 0.24 - ((yRatio - 0.64) / 0.36) * 0.05;
+  }
+  const halfWidth = Math.max(10, Math.min(width * 0.48, width * halfWidthRatio));
+  return Math.abs(x - centerX) <= halfWidth;
 }
 
 function setupClickthroughHitTest() {
@@ -9454,6 +9561,17 @@ async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) {
   }
 
   const payload = buildServerTTSPayload(cleaned, { prosody });
+  const perfTraceId = String(requestOpts.traceId || state.activePerfTraceId || "").trim();
+  const ttsReqStartedPerfMs = performance.now();
+  const ttsReqStartedWallMs = Date.now();
+  if (perfTraceId) {
+    payload._perf_trace_id = perfTraceId;
+    payload._perf_client_send_ts_ms = ttsReqStartedWallMs;
+  }
+  perfLog("tts", "request_start", {
+    traceId: perfTraceId || "(none)",
+    textChars: cleaned.length
+  });
   const timeoutMs = Math.max(
     1500,
     Math.min(45000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
@@ -9475,6 +9593,11 @@ async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) {
     const msg = err?.name === "AbortError"
       ? `TTS request timeout (${timeoutMs}ms)`
       : String(err?.message || "TTS request failed");
+    perfLog("tts", "request_fail", {
+      traceId: perfTraceId || "(none)",
+      elapsedMs: Math.round(performance.now() - ttsReqStartedPerfMs),
+      error: msg
+    });
     const wrapped = new Error(msg);
     wrapped.retriable = true;
     throw wrapped;
@@ -9494,6 +9617,12 @@ async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) {
     const err = new Error(detail);
     err.httpStatus = resp.status;
     err.retriable = resp.status === 408 || resp.status === 429 || resp.status >= 500;
+    perfLog("tts", "request_fail", {
+      traceId: perfTraceId || "(none)",
+      elapsedMs: Math.round(performance.now() - ttsReqStartedPerfMs),
+      status: Number(resp.status) || 0,
+      error: detail
+    });
     throw err;
   }
   const blob = await resp.blob();
@@ -9504,6 +9633,13 @@ async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) {
   }
   const type = String(blob.type || "").toLowerCase();
   if (type.startsWith("audio/")) {
+    perfLog("tts", "response_ok", {
+      traceId: perfTraceId || "(none)",
+      elapsedMs: Math.round(performance.now() - ttsReqStartedPerfMs),
+      status: Number(resp.status) || 0,
+      bytes: Number(blob.size) || 0,
+      mime: type
+    });
     return blob;
   }
   // Some providers may return octet-stream with valid audio bytes.
@@ -9522,7 +9658,15 @@ async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) {
   ) {
     mime = "audio/mpeg";
   }
-  return new Blob([buf], { type: mime });
+  const fixedBlob = new Blob([buf], { type: mime });
+  perfLog("tts", "response_ok", {
+    traceId: perfTraceId || "(none)",
+    elapsedMs: Math.round(performance.now() - ttsReqStartedPerfMs),
+    status: Number(resp.status) || 0,
+    bytes: Number(fixedBlob.size) || 0,
+    mime
+  });
+  return fixedBlob;
 }
 
 async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) {
@@ -9538,7 +9682,10 @@ async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) {
   let attempt = 0;
   while (true) {
     try {
-      return await requestServerTTSBlob(text, prosody, { timeoutMs });
+      return await requestServerTTSBlob(text, prosody, {
+        timeoutMs,
+        traceId: opts.traceId
+      });
     } catch (err) {
       if (attempt >= maxRetries || !isRetriableTTSError(err)) {
         throw err;
@@ -9605,6 +9752,9 @@ async function playAudioBlob(blob, opts = {}) {
   if (!blob) {
     return false;
   }
+  const perfTraceId = String(opts.perfTraceId || state.activePerfTraceId || "").trim();
+  const perfBlobReadyPerfMs = Number(opts.perfBlobReadyPerfMs) || 0;
+  const perfSpeakStartedPerfMs = Number(opts.perfSpeakStartedPerfMs) || 0;
   if (!state.ttsAudio) {
     state.ttsAudio = new Audio();
     state.ttsAudio.preload = "auto";
@@ -9682,6 +9832,13 @@ async function playAudioBlob(blob, opts = {}) {
       done(!!ok);
     };
     audio.onplay = () => {
+      if (perfTraceId) {
+        perfLog("tts", "audio_play_start", {
+          traceId: perfTraceId,
+          fromBlobReadyMs: perfBlobReadyPerfMs ? Math.round(performance.now() - perfBlobReadyPerfMs) : -1,
+          fromSpeakStartMs: perfSpeakStartedPerfMs ? Math.round(performance.now() - perfSpeakStartedPerfMs) : -1
+        });
+      }
       if (state.ttsAudioContext && typeof state.ttsAudioContext.resume === "function") {
         state.ttsAudioContext.resume().catch(() => {});
       }
@@ -9751,6 +9908,8 @@ async function playAudioBlob(blob, opts = {}) {
 
 async function speakByServer(text, opts = {}) {
   const force = !!opts.force;
+  const perfTraceId = String(opts.perfTraceId || state.activePerfTraceId || "").trim();
+  const speakStartedPerfMs = performance.now();
   if (!force && !state.speakingEnabled) {
     return false;
   }
@@ -9776,20 +9935,33 @@ async function speakByServer(text, opts = {}) {
 
   try {
     setStatus("语音中...");
+    perfLog("tts", "speak_start", {
+      traceId: perfTraceId || "(none)",
+      textChars: cleaned.length
+    });
     const blob = await requestServerTTSBlobWithRetry(cleaned, opts.prosody || null, {
       retries: Number.isFinite(Number(opts.retries))
         ? Number(opts.retries)
         : Number(state.ttsServerRetryCount),
       retryDelayMs: Number(state.ttsServerRetryDelayMs),
-      timeoutMs: Number(state.ttsServerRequestTimeoutMs)
+      timeoutMs: Number(state.ttsServerRequestTimeoutMs),
+      traceId: perfTraceId
     });
     return await playAudioBlob(blob, {
       interrupt: !!opts.interrupt,
       text: cleaned,
       mood: opts.mood || detectMood(cleaned),
-      style: opts.style || state.currentTalkStyle || "neutral"
+      style: opts.style || state.currentTalkStyle || "neutral",
+      perfTraceId,
+      perfBlobReadyPerfMs: performance.now(),
+      perfSpeakStartedPerfMs: speakStartedPerfMs
     });
   } catch (err) {
+    perfLog("tts", "speak_fail", {
+      traceId: perfTraceId || "(none)",
+      elapsedMs: Math.round(performance.now() - speakStartedPerfMs),
+      error: String(err?.message || err || "")
+    });
     console.warn("Server TTS failed:", err);
     state.ttsServerAvailable = false;
     state.ttsServerFailStreak = Math.max(0, Number(state.ttsServerFailStreak) || 0) + 1;
@@ -10087,14 +10259,22 @@ function setupSpeechRecognition() {
   updateMicButton();
 }
 
-async function streamAssistantReply(payload, onDelta) {
-  const preferNonStream = state.streamSpeakMode !== "realtime";
-  if (preferNonStream) {
-    const directResp = await authFetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+async function streamAssistantReply(payload, onDelta, perfHooks = null) {
+  const requestInit = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  };
+
+  const fetchDirectChat = async (fallbackReason = "") => {
+    const directResp = await authFetch("/api/chat", requestInit);
+    if (perfHooks && typeof perfHooks.onApiHeaders === "function") {
+      perfHooks.onApiHeaders({
+        mode: fallbackReason ? `chat_fallback:${fallbackReason}` : "chat",
+        status: Number(directResp.status) || 0,
+        atPerfMs: performance.now()
+      });
+    }
     const directData = await directResp.json();
     if (!directResp.ok) {
       throw new Error(directData.error || `HTTP ${directResp.status}`);
@@ -10103,13 +10283,26 @@ async function streamAssistantReply(payload, onDelta) {
     const text = String(directData.reply || "");
     if (text) onDelta(text);
     return text;
+  };
+
+  let resp;
+  try {
+    resp = await authFetch("/api/chat_stream", requestInit);
+  } catch (err) {
+    perfLog("chat", "stream_fallback", {
+      reason: "stream_fetch_error",
+      error: String(err?.message || err || "")
+    });
+    return await fetchDirectChat("stream_fetch_error");
   }
 
-    const resp = await authFetch("/api/chat_stream", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
+  if (perfHooks && typeof perfHooks.onApiHeaders === "function") {
+    perfHooks.onApiHeaders({
+      mode: "chat_stream",
+      status: Number(resp.status) || 0,
+      atPerfMs: performance.now()
+    });
+  }
 
   if (!resp.ok) {
     let detail = `HTTP ${resp.status}`;
@@ -10119,24 +10312,23 @@ async function streamAssistantReply(payload, onDelta) {
     } catch (_) {
       // ignore
     }
-    throw new Error(detail);
+    perfLog("chat", "stream_fallback", {
+      reason: "stream_http_error",
+      status: Number(resp.status) || 0
+    });
+    try {
+      return await fetchDirectChat(`stream_http_${Number(resp.status) || 0}`);
+    } catch (_) {
+      throw new Error(detail);
+    }
   }
 
   if (!resp.body || typeof resp.body.getReader !== "function") {
     // Fallback for environments without stream reader.
-    const fallbackResp = await authFetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+    perfLog("chat", "stream_fallback", {
+      reason: "stream_reader_unavailable"
     });
-    const fallbackData = await fallbackResp.json();
-    if (!fallbackResp.ok) {
-      throw new Error(fallbackData.error || `HTTP ${fallbackResp.status}`);
-    }
-    handleCharacterRuntimeMetadata(fallbackData?.character_runtime);
-    const text = String(fallbackData.reply || "");
-    if (text) onDelta(text);
-    return text;
+    return await fetchDirectChat("stream_reader_unavailable");
   }
 
   const reader = resp.body.getReader();
@@ -10145,6 +10337,7 @@ async function streamAssistantReply(payload, onDelta) {
   let fullText = "";
   let doneReply = "";
 
+  let seenFirstDelta = false;
   const handleDataLine = (line) => {
     if (!line || !line.startsWith("data:")) {
       return false;
@@ -10163,9 +10356,15 @@ async function streamAssistantReply(payload, onDelta) {
       return false;
     }
     if (evt.type === "error") {
-      throw new Error(evt.error || "流式请求失败");
+      throw new Error(evt.error || "连接有点挤，请稍后再试。");
     }
     if (evt.type === "delta" && typeof evt.text === "string" && evt.text) {
+      if (!seenFirstDelta) {
+        seenFirstDelta = true;
+        if (perfHooks && typeof perfHooks.onFirstDelta === "function") {
+          perfHooks.onFirstDelta({ atPerfMs: performance.now() });
+        }
+      }
       fullText += evt.text;
       onDelta(evt.text);
     }
@@ -10178,30 +10377,41 @@ async function streamAssistantReply(payload, onDelta) {
     return evt.type === "done";
   };
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) {
-      break;
-    }
-    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-
-    let lineIndex = buffer.indexOf("\n");
-    while (lineIndex >= 0) {
-      const line = buffer.slice(0, lineIndex).trim();
-      buffer = buffer.slice(lineIndex + 1);
-      const isDone = handleDataLine(line);
-      if (isDone) {
-        return doneReply || fullText;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
       }
-      lineIndex = buffer.indexOf("\n");
-    }
-  }
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
 
-  const tail = buffer.trim();
-  if (tail) {
-    handleDataLine(tail);
+      let lineIndex = buffer.indexOf("\n");
+      while (lineIndex >= 0) {
+        const line = buffer.slice(0, lineIndex).trim();
+        buffer = buffer.slice(lineIndex + 1);
+        const isDone = handleDataLine(line);
+        if (isDone) {
+          return doneReply || fullText;
+        }
+        lineIndex = buffer.indexOf("\n");
+      }
+    }
+
+    const tail = buffer.trim();
+    if (tail) {
+      handleDataLine(tail);
+    }
+    return doneReply || fullText;
+  } catch (err) {
+    if (!seenFirstDelta) {
+      perfLog("chat", "stream_fallback", {
+        reason: "stream_read_error_before_delta",
+        error: String(err?.message || err || "")
+      });
+      return await fetchDirectChat("stream_read_error_before_delta");
+    }
+    throw err;
   }
-  return doneReply || fullText;
 }
 
 async function requestAssistantReply(text, opts = {}) {
@@ -10221,6 +10431,18 @@ async function requestAssistantReply(text, opts = {}) {
   const silentError = !!opts.silentError;
   const isAuto = !!opts.auto;
   const forceTools = opts.forceTools === true;
+  const chatPerfTraceId = createPerfTraceId("chat");
+  const chatPerfStartPerfMs = performance.now();
+  const chatPerfStartWallMs = Date.now();
+  let chatPerfApiHeaderPerfMs = 0;
+  let chatPerfFirstDeltaPerfMs = 0;
+  state.activePerfTraceId = chatPerfTraceId;
+  perfLog("chat", "send_click", {
+    traceId: chatPerfTraceId,
+    mode: String(state.streamSpeakMode || ""),
+    ttsProvider: String(state.ttsProvider || ""),
+    messageChars: message.length
+  });
   const userTimestamp = Date.now();
   if (showUser || rememberUser) {
     state.lastUserMessageAt = Date.now();
@@ -10266,7 +10488,7 @@ async function requestAssistantReply(text, opts = {}) {
       }
       const hint = pickLatencyHintText();
       const prosody = buildSpeakProsody(hint, "idle", false, talkStyle);
-      await speak(hint, { force: true, interrupt: true, prosody });
+        await speak(hint, { force: true, interrupt: true, prosody });
       if (state.chatBusy && !gotFirstDelta) {
         setStatus(isAuto ? "自动对话中..." : "思考中...");
       }
@@ -10295,7 +10517,9 @@ async function requestAssistantReply(text, opts = {}) {
         content: item.content
       })),
       auto: isAuto,
-      force_tools: forceTools
+      force_tools: forceTools,
+      _perf_trace_id: chatPerfTraceId,
+      _perf_client_send_ts_ms: chatPerfStartWallMs
     };
     if (imageDataUrl) {
       payload.image_data_url = imageDataUrl;
@@ -10308,6 +10532,16 @@ async function requestAssistantReply(text, opts = {}) {
     const streamed = await streamAssistantReply(payload, (delta) => {
       if (!gotFirstDelta) {
         gotFirstDelta = true;
+        if (!chatPerfFirstDeltaPerfMs) {
+          chatPerfFirstDeltaPerfMs = performance.now();
+        }
+        perfLog("chat", "first_text_render", {
+          traceId: chatPerfTraceId,
+          elapsedMs: Math.round(chatPerfFirstDeltaPerfMs - chatPerfStartPerfMs),
+          fromApiHeadersMs: chatPerfApiHeaderPerfMs
+            ? Math.round(chatPerfFirstDeltaPerfMs - chatPerfApiHeaderPerfMs)
+            : -1
+        });
         clearThinkingMotionTimer();
         if (latencyHintTimer) {
           clearTimeout(latencyHintTimer);
@@ -10320,6 +10554,19 @@ async function requestAssistantReply(text, opts = {}) {
         feedStreamSpeakDelta(delta, streamSpeakSession, talkStyle);
       }
       setStatus(isAuto ? "自动对话中..." : "思考中...");
+    }, {
+      onApiHeaders: ({ mode, status, atPerfMs }) => {
+        chatPerfApiHeaderPerfMs = Number(atPerfMs) || performance.now();
+        perfLog("chat", "api_headers", {
+          traceId: chatPerfTraceId,
+          mode: String(mode || ""),
+          status: Number(status) || 0,
+          elapsedMs: Math.round(chatPerfApiHeaderPerfMs - chatPerfStartPerfMs)
+        });
+      },
+      onFirstDelta: ({ atPerfMs }) => {
+        chatPerfFirstDeltaPerfMs = Number(atPerfMs) || performance.now();
+      }
     });
     if (streamed && streamed !== reply) {
       reply = streamed;
@@ -10335,6 +10582,14 @@ async function requestAssistantReply(text, opts = {}) {
     finalizePendingMessageRow(assistantRow, "assistant", visibleReply, {
       timestamp: assistantTimestamp,
       persist: true
+    });
+    perfLog("chat", "reply_ready", {
+      traceId: chatPerfTraceId,
+      elapsedMs: Math.round(performance.now() - chatPerfStartPerfMs),
+      replyChars: visibleReply.length,
+      apiToRenderMs: chatPerfApiHeaderPerfMs
+        ? Math.round((chatPerfFirstDeltaPerfMs || performance.now()) - chatPerfApiHeaderPerfMs)
+        : -1
     });
     if (rememberAssistant) {
       rememberMessage("assistant", visibleReply, { timestamp: assistantTimestamp });
@@ -10360,7 +10615,8 @@ async function requestAssistantReply(text, opts = {}) {
           prosody,
           interrupt: true,
           mood,
-          style: finalTalkStyle
+          style: finalTalkStyle,
+          perfTraceId: chatPerfTraceId
         });
       }
     } else {
@@ -10371,12 +10627,18 @@ async function requestAssistantReply(text, opts = {}) {
         prosody,
         interrupt: false,
         mood,
-        style: finalTalkStyle
+        style: finalTalkStyle,
+        perfTraceId: chatPerfTraceId
       });
     }
     setStatus("待机");
     return true;
   } catch (err) {
+    perfLog("chat", "fail", {
+      traceId: chatPerfTraceId,
+      elapsedMs: Math.round(performance.now() - chatPerfStartPerfMs),
+      error: String(err?.message || err || "")
+    });
     clearThinkingMotionTimer();
     if (latencyHintTimer) {
       clearTimeout(latencyHintTimer);
@@ -10400,6 +10662,11 @@ async function requestAssistantReply(text, opts = {}) {
     setStatus("请求失败");
     return false;
   } finally {
+    perfLog("chat", "done", {
+      traceId: chatPerfTraceId,
+      elapsedMs: Math.round(performance.now() - chatPerfStartPerfMs)
+    });
+    state.activePerfTraceId = "";
     clearThinkingMotionTimer();
     if (latencyHintTimer) {
       clearTimeout(latencyHintTimer);

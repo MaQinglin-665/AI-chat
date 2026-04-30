@@ -16,6 +16,19 @@ from config import (
 from utils import _clamp_int
 from utils import _clamp_float
 
+DEFAULT_LLM_HTTP_USER_AGENT = "curl/8.6.0"
+
+
+def get_llm_user_agent(llm_cfg=None):
+    cfg = llm_cfg if isinstance(llm_cfg, dict) else {}
+    value = (
+        str(cfg.get("http_user_agent", "")).strip()
+        or os.environ.get("LLM_HTTP_USER_AGENT", "").strip()
+        or DEFAULT_LLM_HTTP_USER_AGENT
+    )
+    return value[:256]
+
+
 def is_local_url(url):
     lowered = url.lower()
     return lowered.startswith("http://127.0.0.1") or lowered.startswith("http://localhost")
@@ -24,6 +37,8 @@ def http_post_json(url, payload, headers=None, timeout=60):
     req_headers = {"Content-Type": "application/json"}
     if headers:
         req_headers.update(headers)
+    if not str(req_headers.get("User-Agent", "")).strip():
+        req_headers["User-Agent"] = get_llm_user_agent()
 
     # Retry transient upstream/network failures to reduce visible chat errors.
     # This is especially useful for proxy relays that occasionally close sockets.
