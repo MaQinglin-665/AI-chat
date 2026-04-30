@@ -8995,9 +8995,7 @@ function isPointOverVisibleModelArea(clientX, clientY) {
     y <= bounds.bottom + pad
   );
   if (!inStrictBounds) return false;
-  if (!isPointInModelDragHotzone(x, y, bounds)) {
-    return false;
-  }
+  if (!isPointInModelDragHotzone(x, y, bounds)) return false;
   // Prefer runtime hit areas when available, but do not hard-reject when
   // hit areas miss while still inside strict conservative bounds.
   try {
@@ -9024,6 +9022,37 @@ function isPointOverVisibleModelArea(clientX, clientY) {
     // Fallback to strict bounds only.
   }
   return true;
+}
+
+function isPointInModelDragHotzone(x, y, bounds) {
+  if (!bounds) return false;
+  const left = Number(bounds.left);
+  const right = Number(bounds.right);
+  const top = Number(bounds.top);
+  const bottom = Number(bounds.bottom);
+  if (
+    !Number.isFinite(left) || !Number.isFinite(right) ||
+    !Number.isFinite(top) || !Number.isFinite(bottom) ||
+    !Number.isFinite(x) || !Number.isFinite(y)
+  ) {
+    return false;
+  }
+  const width = right - left;
+  const height = bottom - top;
+  if (width <= 0 || height <= 0) return false;
+  const centerX = (left + right) * 0.5;
+  const rawRatio = (y - top) / height;
+  const yRatio = Math.max(0, Math.min(1, rawRatio));
+  let halfWidthRatio = 0.22;
+  if (yRatio < 0.22) {
+    halfWidthRatio = 0.20 + (yRatio / 0.22) * 0.03;
+  } else if (yRatio < 0.64) {
+    halfWidthRatio = 0.23 + ((yRatio - 0.22) / 0.42) * 0.13;
+  } else {
+    halfWidthRatio = 0.24 - ((yRatio - 0.64) / 0.36) * 0.05;
+  }
+  const halfWidth = Math.max(10, Math.min(width * 0.48, width * halfWidthRatio));
+  return Math.abs(x - centerX) <= halfWidth;
 }
 
 function setupClickthroughHitTest() {
