@@ -114,6 +114,7 @@ from tools import (
 from llm_client import (
     call_ollama,
     call_openai_compatible,
+    get_llm_user_agent,
     get_openai_tuning,
     http_post_json,
     is_local_url,
@@ -493,6 +494,67 @@ def _log_backend_exception(scope, exc, extra=""):
     trace = traceback.format_exc()
     if trace and trace.strip() and trace.strip() != "NoneType: None":
         print(redact_sensitive_text(trace), file=sys.stderr)
+
+
+def _log_backend_notice(scope, message, extra=""):
+    safe_scope = str(scope or "runtime").strip().upper()
+    safe_message = redact_sensitive_text(str(message or "").strip()) or "runtime notice"
+    safe_extra = str(extra or "").strip()
+    header = f"[{safe_scope}][WARN] {safe_message}"
+    if safe_extra:
+        header = f"{header} | {redact_sensitive_text(safe_extra)}"
+    print(header, file=sys.stderr)
+
+
+def _perf_now_ms():
+    return int(time.perf_counter() * 1000)
+
+
+def _wall_now_ms():
+    return int(time.time() * 1000)
+
+
+def _safe_int_value(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _sanitize_trace_id(raw, default_prefix="req"):
+    source = str(raw or "").strip()
+    if source:
+        source = re.sub(r"[^a-zA-Z0-9._:-]", "", source)[:64]
+    if source:
+        return source
+    return f"{default_prefix}_{secrets.token_hex(4)}"
+
+
+def _resolve_perf_trace_id(body, default_prefix="req"):
+    if not isinstance(body, dict):
+        return _sanitize_trace_id("", default_prefix=default_prefix)
+    return _sanitize_trace_id(body.get("_perf_trace_id", ""), default_prefix=default_prefix)
+
+
+def _log_backend_perf(scope, trace_id, **metrics):
+    safe_scope = str(scope or "perf").strip().upper()
+    safe_trace = _sanitize_trace_id(trace_id, default_prefix="req")
+    parts = [f"trace={safe_trace}"]
+    for key, value in metrics.items():
+        k = re.sub(r"[^a-zA-Z0-9_:-]", "", str(key or "").strip().lower())
+        if not k:
+            continue
+        if isinstance(value, bool):
+            parts.append(f"{k}={1 if value else 0}")
+            continue
+        if isinstance(value, (int, float)):
+            parts.append(f"{k}={value}")
+            continue
+        safe_value = redact_sensitive_text(str(value or "").strip()).replace(" ", "_")
+        if len(safe_value) > 120:
+            safe_value = safe_value[:120]
+        parts.append(f"{k}={safe_value}")
+    print(f"[{safe_scope}][PERF] {' | '.join(parts)}", file=sys.stderr)
 
 
 def _looks_like_timeout_error(message):
@@ -1508,6 +1570,49 @@ def _build_demo_stable_reply_behavior_block(config):
     return "Reply behavior rules:\n" + "\n".join(f"- {rule}" for rule in rules)
 
 
+def _is_identity_question(text):
+    safe = str(text or "").strip().lower()
+    if not safe:
+        return False
+    normalized = re.sub(r"\s+", " ", safe)
+    zh_hits = (
+        "你是谁" in safe
+        or "妳是谁" in safe
+        or "你叫" in safe
+        or "你是哪个" in safe
+    )
+    en_markers = (
+        "who are you",
+        "what are you",
+        "what's your name",
+        "what is your name",
+        "your name",
+        "who am i talking to",
+    )
+    en_hits = any(marker in normalized for marker in en_markers)
+    return bool(zh_hits or en_hits)
+
+
+def _apply_demo_stable_identity_fallback(config, user_message, reply_text):
+    safe_reply = str(reply_text or "").strip()
+    if not safe_reply:
+        return safe_reply
+    settings = _get_character_runtime_settings(config if isinstance(config, dict) else {})
+    if not bool(settings.get("enabled", False) and settings.get("demo_stable", False)):
+        return safe_reply
+    persona_override = settings.get("persona_override", {})
+    if not isinstance(persona_override, dict) or not bool(persona_override.get("enabled", False)):
+        return safe_reply
+    override_name = str(persona_override.get("name", "") or "").strip()
+    if not override_name:
+        return safe_reply
+    if not _is_identity_question(user_message):
+        return safe_reply
+    if override_name.lower() in safe_reply.lower():
+        return safe_reply
+    return f"I'm {override_name}, your desktop companion."
+
+
 def _build_reply_llm_cfg(config, llm_cfg):
     safe_cfg = dict(llm_cfg or {})
     if not _is_demo_stable_enabled(config):
@@ -2249,7 +2354,10 @@ def iter_openai_chat_stream(llm_cfg, messages):
     temperature = float(llm_cfg.get("temperature", 0.7))
     tuning = get_openai_tuning(llm_cfg)
 
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": get_llm_user_agent(llm_cfg),
+    }
     api_key = str(llm_cfg.get("api_key", "")).strip() or os.environ.get(key_env, "").strip()
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -2315,7 +2423,10 @@ def iter_openai_responses_stream(llm_cfg, messages):
     temperature = float(llm_cfg.get("temperature", 0.7))
     tuning = get_openai_tuning(llm_cfg)
 
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": get_llm_user_agent(llm_cfg),
+    }
     api_key = str(llm_cfg.get("api_key", "")).strip() or os.environ.get(key_env, "").strip()
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -2502,18 +2613,30 @@ class PetHandler(SimpleHTTPRequestHandler):
             self.send_header("Vary", "Origin")
         super().end_headers()
 
-    def _send_json(self, data, status=HTTPStatus.OK):
+    def _send_json(self, data, status=HTTPStatus.OK, extra_headers=None):
         encoded = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
+        if isinstance(extra_headers, dict):
+            for key, value in extra_headers.items():
+                k = str(key or "").strip()
+                if not k:
+                    continue
+                self.send_header(k, str(value or ""))
         self.end_headers()
         self.wfile.write(encoded)
 
-    def _send_audio(self, audio_bytes, content_type="audio/mpeg", status=HTTPStatus.OK):
+    def _send_audio(self, audio_bytes, content_type="audio/mpeg", status=HTTPStatus.OK, extra_headers=None):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(audio_bytes)))
+        if isinstance(extra_headers, dict):
+            for key, value in extra_headers.items():
+                k = str(key or "").strip()
+                if not k:
+                    continue
+                self.send_header(k, str(value or ""))
         self.end_headers()
         self.wfile.write(audio_bytes)
 
@@ -2840,6 +2963,20 @@ class PetHandler(SimpleHTTPRequestHandler):
             )
             return
 
+        perf_started_ms = _perf_now_ms()
+        if path_only in {"/api/chat", "/api/chat_stream"}:
+            perf_trace_id = _resolve_perf_trace_id(body, default_prefix="chat")
+        elif path_only == "/api/tts":
+            perf_trace_id = _resolve_perf_trace_id(body, default_prefix="tts")
+        else:
+            perf_trace_id = _resolve_perf_trace_id(body, default_prefix="req")
+        perf_headers = {"X-Perf-Trace-Id": perf_trace_id}
+        client_send_wall_ms = _safe_int_value(
+            body.get("_perf_client_send_ts_ms", 0) if isinstance(body, dict) else 0,
+            0,
+        )
+        client_to_server_ms = _wall_now_ms() - client_send_wall_ms if client_send_wall_ms > 0 else -1
+
         chat_config = None
         if path_only in {"/api/chat", "/api/chat_stream"}:
             try:
@@ -2878,26 +3015,59 @@ class PetHandler(SimpleHTTPRequestHandler):
             ):
                 if key in body:
                     prosody[key] = body.get(key)
+            _log_backend_perf(
+                "TTS",
+                perf_trace_id,
+                stage="request_received",
+                client_to_server_ms=client_to_server_ms,
+                text_chars=len(text),
+                has_voice=bool(str(voice or "").strip()),
+                prosody_keys=len(prosody),
+            )
             if not text:
                 self._send_json(
                     {"error": "text cannot be empty."},
                     status=HTTPStatus.BAD_REQUEST,
+                    extra_headers=perf_headers,
                 )
                 return
             try:
+                tts_synth_started_ms = _perf_now_ms()
                 audio = synthesize_tts_audio(
                     text,
                     voice_override=voice,
                     prosody=prosody,
+                    perf_trace_id=perf_trace_id,
                 )
+                tts_synth_ms = _perf_now_ms() - tts_synth_started_ms
                 if not audio:
                     self._send_json(
                         {"error": "TTS 返回空音频，请检查语音服务是否正常运行。"},
                         status=HTTPStatus.SERVICE_UNAVAILABLE,
+                        extra_headers=perf_headers,
                     )
                     return
-                self._send_audio(audio, content_type=guess_audio_content_type(audio))
+                self._send_audio(
+                    audio,
+                    content_type=guess_audio_content_type(audio),
+                    extra_headers=perf_headers,
+                )
+                _log_backend_perf(
+                    "TTS",
+                    perf_trace_id,
+                    stage="response_sent",
+                    synth_ms=tts_synth_ms,
+                    total_ms=_perf_now_ms() - perf_started_ms,
+                    audio_bytes=len(audio),
+                )
             except Exception as exc:
+                _log_backend_perf(
+                    "TTS",
+                    perf_trace_id,
+                    stage="fail",
+                    total_ms=_perf_now_ms() - perf_started_ms,
+                    error_type=type(exc).__name__,
+                )
                 _log_backend_exception(
                     "TTS",
                     exc,
@@ -2909,6 +3079,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                 self._send_json(
                     _diagnostic_payload(exc),
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                    extra_headers=perf_headers,
                 )
             return
 
@@ -2939,13 +3110,31 @@ class PetHandler(SimpleHTTPRequestHandler):
                     result = call_ollama(translate_cfg, messages)
                 else:
                     result = call_openai_compatible(translate_cfg, messages)
-                self._send_json({"translated": result.strip()})
+                translated = str(result or "").strip() or text
+                self._send_json(
+                    {
+                        "translated": translated,
+                        "translated_text": translated,
+                        "degraded": False,
+                        "fallback": False,
+                    }
+                )
             except Exception as exc:
                 diagnosed = _diagnose_llm_exception(exc, llm_cfg if "llm_cfg" in locals() else {})
-                _log_backend_exception("TRANSLATE", diagnosed, extra="/api/translate failed")
+                _log_backend_notice(
+                    "TRANSLATE",
+                    diagnosed,
+                    extra="/api/translate degraded to passthrough",
+                )
+                safe_error = str(_diagnostic_payload(diagnosed).get("error", "") or "").strip()
                 self._send_json(
-                    _diagnostic_payload(diagnosed),
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {
+                        "translated": text,
+                        "translated_text": text,
+                        "degraded": True,
+                        "fallback": True,
+                        "error": safe_error or "translate unavailable",
+                    }
                 )
             return
 
@@ -2996,6 +3185,7 @@ class PetHandler(SimpleHTTPRequestHandler):
             self._send_json(
                 {"error": "message cannot be empty."},
                 status=HTTPStatus.BAD_REQUEST,
+                extra_headers=perf_headers,
             )
             return
 
@@ -3007,8 +3197,21 @@ class PetHandler(SimpleHTTPRequestHandler):
             self._send_json(
                 {"error": "image_data_url must be a string."},
                 status=HTTPStatus.BAD_REQUEST,
+                extra_headers=perf_headers,
             )
             return
+
+        _log_backend_perf(
+            "CHAT",
+            perf_trace_id,
+            stage="request_received",
+            route="chat_stream" if path_only == "/api/chat_stream" else "chat",
+            client_to_server_ms=client_to_server_ms,
+            user_chars=len(user_message),
+            history_items=len(history),
+            has_image=bool(image_data_url),
+            is_auto=is_auto,
+        )
 
         if path_only == "/api/chat_stream":
             self.send_response(HTTPStatus.OK)
@@ -3016,10 +3219,15 @@ class PetHandler(SimpleHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "keep-alive")
             self.send_header("X-Accel-Buffering", "no")
+            self.send_header("X-Perf-Trace-Id", perf_trace_id)
             self.end_headers()
 
             full_parts = []
             already_finalized = False
+            first_delta_ms = -1
+            delta_chunks = 0
+            delta_chars = 0
+            llm_started_ms = _perf_now_ms()
             try:
                 for chunk in call_llm_stream(
                     user_message,
@@ -3035,9 +3243,14 @@ class PetHandler(SimpleHTTPRequestHandler):
                         already_finalized = True
                         continue
                     full_parts.append(chunk)
+                    delta_chunks += 1
+                    delta_chars += len(chunk)
+                    if first_delta_ms < 0:
+                        first_delta_ms = _perf_now_ms() - llm_started_ms
                     self._send_sse({"type": "delta", "text": chunk})
                 final_reply = "".join(full_parts).strip()
                 runtime_meta = None
+                finalize_started_ms = _perf_now_ms()
                 if final_reply and not already_finalized:
                     final_reply = finalize_assistant_reply(
                         chat_config,
@@ -3049,6 +3262,11 @@ class PetHandler(SimpleHTTPRequestHandler):
                         final_reply,
                         is_auto=is_auto,
                     )
+                final_reply = _apply_demo_stable_identity_fallback(
+                    chat_config, user_message, final_reply
+                )
+                finalize_ms = _perf_now_ms() - finalize_started_ms
+                runtime_started_ms = _perf_now_ms()
                 if final_reply:
                     final_reply, runtime_meta = _apply_character_runtime_reply(
                         chat_config,
@@ -3063,17 +3281,40 @@ class PetHandler(SimpleHTTPRequestHandler):
                         )
                     except Exception:
                         pass
+                runtime_ms = _perf_now_ms() - runtime_started_ms
                 done_payload = {"type": "done", "reply": final_reply}
                 if runtime_meta is not None:
                     done_payload["character_runtime"] = runtime_meta
                 self._send_sse(done_payload)
+                _log_backend_perf(
+                    "CHAT_STREAM",
+                    perf_trace_id,
+                    stage="response_sent",
+                    first_delta_ms=first_delta_ms,
+                    llm_ms=_perf_now_ms() - llm_started_ms,
+                    finalize_ms=finalize_ms,
+                    runtime_ms=runtime_ms,
+                    delta_chunks=delta_chunks,
+                    delta_chars=delta_chars,
+                    reply_chars=len(final_reply or ""),
+                    total_ms=_perf_now_ms() - perf_started_ms,
+                    pre_finalized=already_finalized,
+                )
             except Exception as exc:
                 diagnosed = _diagnose_llm_exception(exc, chat_config.get("llm", {}))
                 _log_backend_exception("CHAT_STREAM", diagnosed, extra="/api/chat_stream failed")
+                _log_backend_perf(
+                    "CHAT_STREAM",
+                    perf_trace_id,
+                    stage="fail",
+                    total_ms=_perf_now_ms() - perf_started_ms,
+                    error_type=type(exc).__name__,
+                )
                 self._send_sse({"type": "error", "error": _diagnostic_payload(diagnosed).get("error", "")})
             return
 
         try:
+            llm_started_ms = _perf_now_ms()
             reply = call_llm(
                 user_message,
                 history,
@@ -3082,7 +3323,13 @@ class PetHandler(SimpleHTTPRequestHandler):
                 force_tools=force_tools,
                 config=chat_config,
             )
+            reply = _apply_demo_stable_identity_fallback(
+                chat_config, user_message, reply
+            )
+            llm_ms = _perf_now_ms() - llm_started_ms
+            runtime_started_ms = _perf_now_ms()
             reply, runtime_meta = _apply_character_runtime_reply(chat_config, reply)
+            runtime_ms = _perf_now_ms() - runtime_started_ms
             try:
                 remember_interaction(
                     chat_config, user_message, reply, is_auto=is_auto
@@ -3092,13 +3339,30 @@ class PetHandler(SimpleHTTPRequestHandler):
             payload = {"reply": reply}
             if runtime_meta is not None:
                 payload["character_runtime"] = runtime_meta
-            self._send_json(payload)
+            self._send_json(payload, extra_headers=perf_headers)
+            _log_backend_perf(
+                "CHAT",
+                perf_trace_id,
+                stage="response_sent",
+                llm_ms=llm_ms,
+                runtime_ms=runtime_ms,
+                total_ms=_perf_now_ms() - perf_started_ms,
+                reply_chars=len(str(reply or "")),
+            )
         except Exception as exc:
             diagnosed = _diagnose_llm_exception(exc, chat_config.get("llm", {}))
             _log_backend_exception("CHAT", diagnosed, extra="/api/chat failed")
+            _log_backend_perf(
+                "CHAT",
+                perf_trace_id,
+                stage="fail",
+                total_ms=_perf_now_ms() - perf_started_ms,
+                error_type=type(exc).__name__,
+            )
             self._send_json(
                 _diagnostic_payload(diagnosed),
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                extra_headers=perf_headers,
             )
 
 

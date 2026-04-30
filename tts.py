@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -45,6 +46,33 @@ def normalize_tts_text(text):
     if not safe:
         return ""
     return safe[:600]
+
+
+def _perf_now_ms():
+    return int(time.perf_counter() * 1000)
+
+
+def _sanitize_perf_trace_id(raw):
+    safe = re.sub(r"[^a-zA-Z0-9._:-]", "", str(raw or "").strip())[:64]
+    return safe or "tts_unknown"
+
+
+def _log_tts_perf(scope, trace_id, **metrics):
+    parts = [f"trace={_sanitize_perf_trace_id(trace_id)}"]
+    for key, value in metrics.items():
+        k = re.sub(r"[^a-zA-Z0-9_:-]", "", str(key or "").strip().lower())
+        if not k:
+            continue
+        if isinstance(value, bool):
+            parts.append(f"{k}={1 if value else 0}")
+        elif isinstance(value, (int, float)):
+            parts.append(f"{k}={value}")
+        else:
+            text = str(value or "").strip().replace(" ", "_")
+            if len(text) > 120:
+                text = text[:120]
+            parts.append(f"{k}={text}")
+    print(f"[{str(scope or 'TTS').upper()}][PERF] {' | '.join(parts)}", file=sys.stderr)
 
 
 def _normalize_gpt_sovits_spoken_text(text):
@@ -1236,7 +1264,9 @@ def _replace_en_words_for_tts(text):
     return result
 
 
-def synthesize_tts_audio(text, voice_override=None, prosody=None):
+def synthesize_tts_audio(text, voice_override=None, prosody=None, perf_trace_id=""):
+    perf_trace = _sanitize_perf_trace_id(perf_trace_id)
+    total_started_ms = _perf_now_ms()
     config = load_config()
     tts_cfg = config.get("tts", {})
     provider = str(tts_cfg.get("provider", TTS_DEFAULT_PROVIDER)).strip().lower()
@@ -1272,20 +1302,42 @@ def synthesize_tts_audio(text, voice_override=None, prosody=None):
         )
 
     if provider == "gpt_sovits":
-        return synthesize_gpt_sovits_tts_bytes(
+        gpt_started_ms = _perf_now_ms()
+        audio = synthesize_gpt_sovits_tts_bytes(
             text=safe_text,
             tts_cfg=tts_cfg,
             voice_override=voice_override,
             prosody={**prosody, "_dominant": _dominant, "_arousal": _arousal},
         )
+        _log_tts_perf(
+            "TTS_GPT_SOVITS",
+            perf_trace,
+            stage="done",
+            gpt_sovits_ms=_perf_now_ms() - gpt_started_ms,
+            total_ms=_perf_now_ms() - total_started_ms,
+            text_chars=len(safe_text),
+            audio_bytes=len(audio or b""),
+        )
+        return audio
 
     if provider in {"volcengine_tts", "volcengine"}:
-        return synthesize_volcengine_tts_bytes(
+        volc_started_ms = _perf_now_ms()
+        audio = synthesize_volcengine_tts_bytes(
             text=safe_text,
             tts_cfg=tts_cfg,
             voice_override=voice_override,
             prosody=prosody,
         )
+        _log_tts_perf(
+            "TTS_VOLCENGINE",
+            perf_trace,
+            stage="done",
+            provider_ms=_perf_now_ms() - volc_started_ms,
+            total_ms=_perf_now_ms() - total_started_ms,
+            text_chars=len(safe_text),
+            audio_bytes=len(audio or b""),
+        )
+        return audio
 
     if edge_tts is None:
         raise DiagnosticError(
@@ -1336,4 +1388,12 @@ def synthesize_tts_audio(text, voice_override=None, prosody=None):
 
     if not audio:
         raise RuntimeError("TTS returned empty audio.")
+    _log_tts_perf(
+        "TTS_EDGE",
+        perf_trace,
+        stage="done",
+        total_ms=_perf_now_ms() - total_started_ms,
+        text_chars=len(safe_text),
+        audio_bytes=len(audio or b""),
+    )
     return audio

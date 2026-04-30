@@ -872,3 +872,91 @@ def test_chat_stream_done_payload_does_not_leak_json_like_reply(monkeypatch):
     assert isinstance(runtime, dict)
     assert runtime.get("emotion") == "thinking"
     assert runtime.get("action") == "think"
+def test_translate_route_returns_fallback_payload_when_llm_unavailable(monkeypatch):
+    cfg = _build_test_config()
+    cfg.setdefault("llm", {})
+    cfg["llm"]["provider"] = "openai"
+    monkeypatch.setattr(
+        app,
+        "call_openai_compatible",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("LLM HTTP 500: convert_request_failed not implemented")
+        ),
+    )
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(f"{base}/api/translate", {"text": "hello"})
+    assert status == 200
+    assert payload.get("translated") == "hello"
+    assert payload.get("translated_text") == "hello"
+    assert payload.get("degraded") is True
+    assert payload.get("fallback") is True
+    assert isinstance(payload.get("error"), str)
+    assert payload.get("error")
+
+
+def test_translate_route_success_payload_keeps_non_degraded_flags(monkeypatch):
+    cfg = _build_test_config()
+    cfg.setdefault("llm", {})
+    cfg["llm"]["provider"] = "openai"
+    monkeypatch.setattr(app, "call_openai_compatible", lambda *_args, **_kwargs: "你好")
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(f"{base}/api/translate", {"text": "hello"})
+    assert status == 200
+    assert payload.get("translated") == "你好"
+    assert payload.get("translated_text") == "你好"
+    assert payload.get("degraded") is False
+    assert payload.get("fallback") is False
+
+
+def test_demo_stable_identity_fallback_applies_for_chat_identity_question(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "demo_stable": True,
+        "persona_override": {"enabled": True, "name": "Neuro-sama"},
+    }
+    monkeypatch.setattr(app, "call_llm", lambda *_args, **_kwargs: "I am your assistant.")
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(f"{base}/api/chat", _chat_payload("你是谁？"))
+    assert status == 200
+    reply = str(payload.get("reply", ""))
+    assert "Neuro-sama" in reply
+
+
+def test_demo_stable_identity_fallback_skips_non_identity_questions(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "demo_stable": True,
+        "persona_override": {"enabled": True, "name": "Neuro-sama"},
+    }
+    monkeypatch.setattr(app, "call_llm", lambda *_args, **_kwargs: "I am your assistant.")
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(f"{base}/api/chat", _chat_payload("Tell me a short tip."))
+    assert status == 200
+    assert payload.get("reply") == "I am your assistant."
+
+
+def test_demo_stable_identity_fallback_applies_for_chat_stream_done_reply(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "demo_stable": True,
+        "persona_override": {"enabled": True, "name": "Neuro-sama"},
+    }
+
+    def _fake_stream(*_args, **_kwargs):
+        yield "I can help with that."
+
+    monkeypatch.setattr(app, "call_llm_stream", _fake_stream)
+    monkeypatch.setattr(app, "finalize_assistant_reply", lambda *_args, **_kwargs: "I can help with that.")
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, events = _post_stream_events(
+            f"{base}/api/chat_stream",
+            _chat_payload("who are you?"),
+        )
+    assert status == 200
+    done = next((evt for evt in events if evt.get("type") == "done"), {})
+    reply = str(done.get("reply", ""))
+    assert "Neuro-sama" in reply
