@@ -26,6 +26,7 @@ def main() -> int:
     checks = [
         ("Python tests", [sys.executable, "-m", "pytest"]),
         ("Frontend runtime metadata checks", ["node", "tests/test_character_runtime_frontend.js"]),
+        ("Frontend API client checks", ["node", "tests/test_api_client_frontend.js"]),
         ("Python syntax", [sys.executable, "scripts/check_python_syntax.py"]),
         ("JavaScript syntax", [sys.executable, "scripts/check_js_syntax.py"]),
         ("Secret scan", [sys.executable, "scripts/check_secrets.py"]),

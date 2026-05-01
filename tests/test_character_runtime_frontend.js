@@ -3,55 +3,30 @@
 
 const fs = require("fs");
 const path = require("path");
-const vm = require("vm");
 const assert = require("assert");
 
 const CHAT_JS = path.resolve(__dirname, "..", "web", "chat.js");
+const CHARACTER_RUNTIME_JS = path.resolve(__dirname, "..", "web", "characterRuntime.js");
 const source = fs.readFileSync(CHAT_JS, "utf8");
-
-function loadRuntimeMetadataHarness() {
-  const startMarker = "const CHARACTER_RUNTIME_SUPPORTED_EMOTIONS";
-  const endMarker = "const CHARACTER_RUNTIME_BROADCAST_CHANNEL";
-  const start = source.indexOf(startMarker);
-  const end = source.indexOf(endMarker);
-  assert.ok(start >= 0, "Missing character runtime metadata constants");
-  assert.ok(end > start, "Missing character runtime broadcast marker");
-
-  const sandbox = {};
-  const snippet = source.slice(start, end);
-  vm.runInNewContext(
-    `${snippet}
-globalThis.__runtimeHarness = {
-  normalizeCharacterRuntimeMetadataForFrontend,
-  normalizeCharacterRuntimeEmotionValue,
-  normalizeCharacterRuntimeActionValue,
-  normalizeCharacterRuntimeIntensityValue
-};`,
-    sandbox,
-    { filename: "character-runtime-metadata-harness.js" }
-  );
-  return sandbox.__runtimeHarness;
-}
-
-const harness = loadRuntimeMetadataHarness();
+const runtime = require(CHARACTER_RUNTIME_JS);
 
 function toPlainObject(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
 assert.strictEqual(
-  harness.normalizeCharacterRuntimeMetadataForFrontend(null),
+  runtime.normalizeMetadataForFrontend(null),
   null,
   "null metadata should be ignored"
 );
 assert.strictEqual(
-  harness.normalizeCharacterRuntimeMetadataForFrontend({ unrelated: "value" }),
+  runtime.normalizeMetadataForFrontend({ unrelated: "value" }),
   null,
   "objects without runtime fields should be ignored"
 );
 
 assert.deepStrictEqual(
-  toPlainObject(harness.normalizeCharacterRuntimeMetadataForFrontend({
+  toPlainObject(runtime.normalizeMetadataForFrontend({
     emotion: "mysterious",
     action: "dance",
     intensity: "extreme"
@@ -65,7 +40,7 @@ assert.deepStrictEqual(
 );
 
 assert.deepStrictEqual(
-  toPlainObject(harness.normalizeCharacterRuntimeMetadataForFrontend({
+  toPlainObject(runtime.normalizeMetadataForFrontend({
     emotion: " HAPPY ",
     action: "shake-head",
     intensity: "HIGH",
@@ -83,7 +58,7 @@ assert.deepStrictEqual(
 );
 
 assert.deepStrictEqual(
-  toPlainObject(harness.normalizeCharacterRuntimeMetadataForFrontend({
+  toPlainObject(runtime.normalizeMetadataForFrontend({
     emotion: 42,
     action: null,
     intensity: {}
@@ -96,6 +71,10 @@ assert.deepStrictEqual(
   "non-string runtime fields should not leak raw values"
 );
 
+assert.ok(
+  source.includes("window.TaffyCharacterRuntime"),
+  "chat.js should use the extracted Character Runtime helper"
+);
 assert.ok(
   source.includes("function finishSpeechAnimation()"),
   "natural speech completion should keep a release helper"

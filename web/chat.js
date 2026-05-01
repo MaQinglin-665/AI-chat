@@ -408,8 +408,7 @@ const SUBTITLE_POSITION_STORAGE_KEY = "taffy_subtitle_position_v1";
 const ONBOARDING_SEEN_STORAGE_KEY = "taffy_onboarding_seen_v1";
 const MAX_CHAT_HISTORY_RECORDS = 240;
 const TOOL_META_MARKER = "[[TAFFY_TOOL_META]]";
-const API_TOKEN_STORAGE_KEYS = ["taffy_api_token", "TAFFY_API_TOKEN"];
-let _apiTokenPromise = null;
+const API_CLIENT = window.TaffyModules?.apiClient || {};
 const PERSONA_CARD_DEFAULT = {
   identity: "",
   user_preferences: "",
@@ -445,180 +444,50 @@ const ONBOARDING_STEPS = [
   }
 ];
 
-function persistApiToken(token) {
-  const safe = String(token || "").trim();
-  if (!safe) {
-    return;
-  }
-  for (const key of API_TOKEN_STORAGE_KEYS) {
-    try {
-      localStorage.setItem(key, safe);
-    } catch (_) {
-      // ignore storage failures
-    }
-  }
-  try {
-    window.__TAFFY_API_TOKEN = safe;
-  } catch (_) {
-    // ignore
-  }
-}
-
 function clearPersistedApiToken() {
-  for (const key of API_TOKEN_STORAGE_KEYS) {
-    try {
-      localStorage.removeItem(key);
-    } catch (_) {
-      // ignore storage failures
-    }
+  if (typeof API_CLIENT.clearPersistedApiToken === "function") {
+    return API_CLIENT.clearPersistedApiToken();
   }
-  try {
-    if (window.__TAFFY_API_TOKEN) {
-      window.__TAFFY_API_TOKEN = "";
-    }
-  } catch (_) {
-    // ignore
-  }
-}
-
-function readApiTokenFromQuery() {
-  try {
-    const query = new URLSearchParams(window.location.search || "");
-    const queryToken = String(query.get("api_token") || "").trim();
-    if (queryToken) {
-      persistApiToken(queryToken);
-      return queryToken;
-    }
-  } catch (_) {
-    // ignore
-  }
-  return "";
-}
-
-function readApiTokenFromStorage() {
-  for (const key of API_TOKEN_STORAGE_KEYS) {
-    try {
-      const value = String(localStorage.getItem(key) || "").trim();
-      if (value) {
-        return value;
-      }
-    } catch (_) {
-      // ignore storage failures
-    }
-  }
-  return "";
-}
-
-function readApiTokenFromGlobal() {
-  return String(window.__TAFFY_API_TOKEN || "").trim();
-}
-
-async function readApiTokenFromRuntime() {
-  if (!window.electronAPI || typeof window.electronAPI.getApiToken !== "function") {
-    return "";
-  }
-  try {
-    return String(await window.electronAPI.getApiToken() || "").trim();
-  } catch (_) {
-    return "";
+  if (typeof window.clearPersistedApiToken === "function" && window.clearPersistedApiToken !== clearPersistedApiToken) {
+    return window.clearPersistedApiToken();
   }
 }
 
 async function resolveApiToken(forceRefresh = false) {
-  if (forceRefresh) {
-    _apiTokenPromise = null;
+  if (typeof API_CLIENT.resolveApiToken === "function") {
+    return API_CLIENT.resolveApiToken(forceRefresh);
   }
-  if (_apiTokenPromise) {
-    return _apiTokenPromise;
+  if (typeof window.resolveApiToken === "function" && window.resolveApiToken !== resolveApiToken) {
+    return window.resolveApiToken(forceRefresh);
   }
-  _apiTokenPromise = (async () => {
-    const queryToken = readApiTokenFromQuery();
-    if (queryToken) {
-      return queryToken;
-    }
-    // Prefer runtime token from Electron/main process, so stale localStorage does not override it.
-    const runtimeToken = await readApiTokenFromRuntime();
-    if (runtimeToken) {
-      persistApiToken(runtimeToken);
-      return runtimeToken;
-    }
-    let token = readApiTokenFromStorage();
-    if (token) {
-      persistApiToken(token);
-      return token;
-    }
-    token = readApiTokenFromGlobal();
-    if (token) {
-      persistApiToken(token);
-      return token;
-    }
-    clearPersistedApiToken();
-    return "";
-  })();
-  return _apiTokenPromise;
+  return "";
+}
+
+async function authFetch(input, init = {}) {
+  if (typeof API_CLIENT.authFetch === "function") {
+    return API_CLIENT.authFetch(input, init);
+  }
+  if (typeof window.authFetch === "function" && window.authFetch !== authFetch) {
+    return window.authFetch(input, init);
+  }
+  return fetch(input, init);
 }
 
 function isApiRequestTarget(input) {
+  if (typeof API_CLIENT.isApiRequestTarget === "function") {
+    return API_CLIENT.isApiRequestTarget(input);
+  }
+  if (typeof window.isApiRequestTarget === "function" && window.isApiRequestTarget !== isApiRequestTarget) {
+    return window.isApiRequestTarget(input);
+  }
   try {
-    const raw = input instanceof Request ? input.url : String(input || "");
+    const isRequest = typeof Request !== "undefined" && input instanceof Request;
+    const raw = isRequest ? input.url : String(input || "");
     const url = new URL(raw, window.location.origin);
     return url.pathname.startsWith("/api/");
   } catch (_) {
     return false;
   }
-}
-
-async function authFetch(input, init = {}) {
-  if (!isApiRequestTarget(input)) {
-    return fetch(input, init);
-  }
-
-  const baseInit = init && typeof init === "object" ? { ...init } : {};
-  const inheritedHeaders = input instanceof Request ? input.headers : undefined;
-  const firstToken = String(await resolveApiToken()).trim();
-  const firstHeaders = new Headers(baseInit.headers || inheritedHeaders || {});
-  if (firstToken && !firstHeaders.has("X-Taffy-Token") && !firstHeaders.has("Authorization")) {
-    firstHeaders.set("X-Taffy-Token", firstToken);
-  }
-  let retrySeedRequest = null;
-  let firstRequest = input;
-  let firstFetchInit = { ...baseInit, headers: firstHeaders };
-  if (input instanceof Request) {
-    try {
-      retrySeedRequest = input.clone();
-    } catch (_) {
-      retrySeedRequest = null;
-    }
-    firstRequest = new Request(input, firstFetchInit);
-    firstFetchInit = undefined;
-  }
-  const firstResp = await fetch(firstRequest, firstFetchInit);
-  if (firstResp.status !== 401) {
-    return firstResp;
-  }
-
-  const refreshedToken = await resolveApiToken(true);
-  const nextToken = String(refreshedToken || "").trim();
-  if (!nextToken || nextToken === firstToken) {
-    return firstResp;
-  }
-
-  const retryHeaders = new Headers(baseInit.headers || inheritedHeaders || {});
-  if (!retryHeaders.has("X-Taffy-Token") && !retryHeaders.has("Authorization")) {
-    retryHeaders.set("X-Taffy-Token", nextToken);
-  }
-  if (input instanceof Request) {
-    if (!retrySeedRequest) {
-      return firstResp;
-    }
-    try {
-      const retryRequest = new Request(retrySeedRequest, { ...baseInit, headers: retryHeaders });
-      return fetch(retryRequest);
-    } catch (_) {
-      return firstResp;
-    }
-  }
-  return fetch(input, { ...baseInit, headers: retryHeaders });
 }
 const AUTO_CHAT_MIN_USER_GAP_MS = 90 * 1000;
 const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = 120 * 1000;
@@ -4212,81 +4081,13 @@ function parseToolMetaFromText(text) {
   }
 }
 
-const CHARACTER_RUNTIME_SUPPORTED_EMOTIONS = new Set([
-  "neutral",
-  "happy",
-  "playful",
-  "sad",
-  "anxious",
-  "angry",
-  "surprised",
-  "annoyed",
-  "thinking"
-]);
-const CHARACTER_RUNTIME_SUPPORTED_ACTIONS = new Set([
-  "none",
-  "wave",
-  "nod",
-  "shake_head",
-  "think",
-  "happy_idle",
-  "surprised"
-]);
-const CHARACTER_RUNTIME_SUPPORTED_INTENSITY = new Set(["low", "normal", "high"]);
-
-function normalizeCharacterRuntimeEmotionValue(value) {
-  const key = String(value || "").trim().toLowerCase();
-  return CHARACTER_RUNTIME_SUPPORTED_EMOTIONS.has(key) ? key : "neutral";
-}
-
-function normalizeCharacterRuntimeActionValue(value) {
-  let key = String(value || "").trim().toLowerCase();
-  if (key === "shake-head") {
-    key = "shake_head";
-  } else if (key === "thinking" || key === "ponder" || key === "pondering") {
-    key = "think";
-  }
-  return CHARACTER_RUNTIME_SUPPORTED_ACTIONS.has(key) ? key : "none";
-}
-
-function normalizeCharacterRuntimeIntensityValue(value) {
-  const key = String(value || "").trim().toLowerCase();
-  return CHARACTER_RUNTIME_SUPPORTED_INTENSITY.has(key) ? key : "normal";
-}
-
-function normalizeCharacterRuntimeSafeString(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  return String(value || "").trim().toLowerCase();
-}
+const CHARACTER_RUNTIME = window.TaffyCharacterRuntime || {};
 
 function normalizeCharacterRuntimeMetadataForFrontend(raw) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+  if (typeof CHARACTER_RUNTIME.normalizeMetadataForFrontend !== "function") {
     return null;
   }
-  const out = {};
-  let hasRuntimeField = false;
-  if (Object.prototype.hasOwnProperty.call(raw, "emotion")) {
-    hasRuntimeField = true;
-    out.emotion = normalizeCharacterRuntimeEmotionValue(raw.emotion);
-  }
-  if (Object.prototype.hasOwnProperty.call(raw, "action")) {
-    hasRuntimeField = true;
-    out.action = normalizeCharacterRuntimeActionValue(raw.action);
-  }
-  if (Object.prototype.hasOwnProperty.call(raw, "intensity")) {
-    hasRuntimeField = true;
-    out.intensity = normalizeCharacterRuntimeIntensityValue(raw.intensity);
-  }
-  for (const key of ["live2d_hint", "voice_style"]) {
-    const value = normalizeCharacterRuntimeSafeString(raw[key]);
-    if (value) {
-      hasRuntimeField = true;
-      out[key] = value;
-    }
-  }
-  return hasRuntimeField ? out : null;
+  return CHARACTER_RUNTIME.normalizeMetadataForFrontend(raw);
 }
 
 const CHARACTER_RUNTIME_BROADCAST_CHANNEL = "taffy-character-runtime";
