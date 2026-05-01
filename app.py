@@ -293,6 +293,23 @@ def _get_character_runtime_settings(config):
         return dict(default_settings)
 
 
+def _build_character_runtime_health_summary(config):
+    settings = _get_character_runtime_settings(config if isinstance(config, dict) else {})
+    persona_override = settings.get("persona_override", {})
+    persona_override_enabled = False
+    if isinstance(persona_override, dict):
+        persona_override_enabled = _parse_bool_flag(
+            persona_override.get("enabled", False),
+            False,
+        )
+    return {
+        "enabled": bool(settings.get("enabled", False)),
+        "return_metadata": bool(settings.get("return_metadata", False)),
+        "demo_stable": bool(settings.get("demo_stable", False)),
+        "persona_override_enabled": bool(persona_override_enabled),
+    }
+
+
 def _normalize_character_profile_string(value, fallback):
     if isinstance(value, str):
         text = value.strip()
@@ -2689,6 +2706,7 @@ class PetHandler(SimpleHTTPRequestHandler):
             "cors_allow_loopback": bool(security.get("allow_loopback", True)),
             "cors_allowed_origins": sorted(security.get("allowed_origins", set())),
         }
+        payload["character_runtime"] = _build_character_runtime_health_summary(cfg)
         return payload
 
     def _send_sse(self, data):
@@ -3395,6 +3413,15 @@ def run_startup_self_check(config):
         findings.append(
             "[startup][warn] tools.allow_shell=true. Consider disabling it for production/public releases."
         )
+
+    runtime_summary = _build_character_runtime_health_summary(safe_cfg)
+    findings.append(
+        "[startup][info] character_runtime "
+        f"enabled={str(runtime_summary['enabled']).lower()} "
+        f"return_metadata={str(runtime_summary['return_metadata']).lower()} "
+        f"demo_stable={str(runtime_summary['demo_stable']).lower()} "
+        f"persona_override_enabled={str(runtime_summary['persona_override_enabled']).lower()}"
+    )
 
     llm_provider = str(llm_cfg.get("provider", "") or "").strip().lower()
     if llm_provider in {"openai", "openai_compatible"}:

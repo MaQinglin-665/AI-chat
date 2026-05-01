@@ -4212,23 +4212,81 @@ function parseToolMetaFromText(text) {
   }
 }
 
+const CHARACTER_RUNTIME_SUPPORTED_EMOTIONS = new Set([
+  "neutral",
+  "happy",
+  "playful",
+  "sad",
+  "anxious",
+  "angry",
+  "surprised",
+  "annoyed",
+  "thinking"
+]);
+const CHARACTER_RUNTIME_SUPPORTED_ACTIONS = new Set([
+  "none",
+  "wave",
+  "nod",
+  "shake_head",
+  "think",
+  "happy_idle",
+  "surprised"
+]);
+const CHARACTER_RUNTIME_SUPPORTED_INTENSITY = new Set(["low", "normal", "high"]);
+
+function normalizeCharacterRuntimeEmotionValue(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return CHARACTER_RUNTIME_SUPPORTED_EMOTIONS.has(key) ? key : "neutral";
+}
+
+function normalizeCharacterRuntimeActionValue(value) {
+  let key = String(value || "").trim().toLowerCase();
+  if (key === "shake-head") {
+    key = "shake_head";
+  } else if (key === "thinking" || key === "ponder" || key === "pondering") {
+    key = "think";
+  }
+  return CHARACTER_RUNTIME_SUPPORTED_ACTIONS.has(key) ? key : "none";
+}
+
+function normalizeCharacterRuntimeIntensityValue(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return CHARACTER_RUNTIME_SUPPORTED_INTENSITY.has(key) ? key : "normal";
+}
+
+function normalizeCharacterRuntimeSafeString(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return String(value || "").trim().toLowerCase();
+}
+
 function normalizeCharacterRuntimeMetadataForFrontend(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return null;
   }
   const out = {};
-  const safeKeys = ["emotion", "action", "intensity", "live2d_hint", "voice_style"];
-  for (const key of safeKeys) {
-    if (typeof raw[key] !== "string") {
-      continue;
-    }
-    const value = String(raw[key] || "").trim();
-    if (!value) {
-      continue;
-    }
-    out[key] = value;
+  let hasRuntimeField = false;
+  if (Object.prototype.hasOwnProperty.call(raw, "emotion")) {
+    hasRuntimeField = true;
+    out.emotion = normalizeCharacterRuntimeEmotionValue(raw.emotion);
   }
-  return Object.keys(out).length ? out : null;
+  if (Object.prototype.hasOwnProperty.call(raw, "action")) {
+    hasRuntimeField = true;
+    out.action = normalizeCharacterRuntimeActionValue(raw.action);
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, "intensity")) {
+    hasRuntimeField = true;
+    out.intensity = normalizeCharacterRuntimeIntensityValue(raw.intensity);
+  }
+  for (const key of ["live2d_hint", "voice_style"]) {
+    const value = normalizeCharacterRuntimeSafeString(raw[key]);
+    if (value) {
+      hasRuntimeField = true;
+      out[key] = value;
+    }
+  }
+  return hasRuntimeField ? out : null;
 }
 
 const CHARACTER_RUNTIME_BROADCAST_CHANNEL = "taffy-character-runtime";
@@ -6104,6 +6162,17 @@ function endSpeechAnimation() {
   state.speechMouthUpdatedAt = performance.now();
   state.ttsAudioLevel = 0;
   state.moodHoldUntil = performance.now() + 1500;
+}
+
+function finishSpeechAnimation() {
+  const now = performance.now();
+  const releaseMs = 260;
+  const holdMs = 900;
+  state.speechAnimUntil = Math.max(Number(state.speechAnimUntil || 0), now + releaseMs);
+  state.speechMouthTarget = 0;
+  state.speechMouthUpdatedAt = now;
+  state.ttsAudioLevel = 0;
+  state.moodHoldUntil = Math.max(Number(state.moodHoldUntil || 0), now + holdMs);
 }
 
 function ensureMicroMotionState(now = performance.now()) {
@@ -7986,7 +8055,7 @@ function speakOnceWithVoice(text, voice, force = false) {
       if (voice?.name) {
         state.ttsLastGoodVoiceName = voice.name;
       }
-      endSpeechAnimation();
+      finishSpeechAnimation();
       hideSubtitleText();
       setStatus("待机");
       resolve(true);
@@ -9832,7 +9901,11 @@ async function playAudioBlob(blob, opts = {}) {
         clearTimeout(progressTimer);
         progressTimer = 0;
       }
-      endSpeechAnimation();
+      if (ok) {
+        finishSpeechAnimation();
+      } else {
+        endSpeechAnimation();
+      }
       hideSubtitleText();
       try {
         URL.revokeObjectURL(url);

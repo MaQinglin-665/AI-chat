@@ -9,6 +9,12 @@ This validation is development-time only:
 - no Live2D behavior logic changes
 - no TTS behavior changes
 
+For supported emotion/action values and fallback behavior, see:
+- [Character Runtime Live2D Mapping](./character-runtime-live2d-mapping.md)
+
+For repeatable PR/release notes, record results with:
+- [Character Runtime Validation Log Template](./character-runtime-validation-log.md)
+
 ## Prerequisites
 1. Run backend and Electron app normally.
 2. Keep two windows visible:
@@ -147,13 +153,20 @@ Expected:
 - no residual dependency on runtime metadata.
 
 ## Known Limitations
-- No dedicated frontend automated test command currently.
 - Live2D visible effect depends on model assets and available motions/expressions.
 - Missing motion resources should safely degrade to lightweight fallback behavior.
 - Provider/network errors that make `/api/chat` fail are backend LLM issues, separate from the runtime frontend bridge.
 
 ## Recommended Regression Commands
 ```bash
-python -m pytest tests/test_character_runtime.py -q
-python -m pytest tests/test_character_runtime_integration.py -q
+python scripts/check_character_runtime_v1_3.py
+```
+
+Equivalent individual commands:
+
+```bash
+python -m pytest
+node tests/test_character_runtime_frontend.js
+python scripts/check_js_syntax.py
+python scripts/check_secrets.py
 ```

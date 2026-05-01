@@ -14,6 +14,7 @@ SKIP_DIRS = {
     ".pytest_cache",
     "__pycache__",
     "node_modules",
+    "dist",
     "models",
     "tts_ref",
     "memory_backups",

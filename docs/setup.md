@@ -11,16 +11,40 @@
 
 ## 2. Install Dependencies
 
+如果你下载的是 Release 附件中的 `windows-source-test.zip`，请先阅读根目录的 `README-FIRST-RUN.txt`。它不是免安装包，仍需要本机安装 Python 和 Node.js。
+
 在仓库根目录执行：
 
 ```powershell
-cd D:\AI\ai_desktop_pet
+powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
+powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
+```
+
+`doctor.ps1` 会先检查项目目录是否完整、Python / Node.js / npm / Git 是否可用，并提示常见环境问题。
+
+如果你不想使用脚本，也可以手动安装：
+
+```powershell
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
 npm install
 ```
 
 `requirements-dev.txt` is only needed when you want to run the local test suite.
+
+本地验证建议使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1
+```
+
+启动前建议再运行首跑预检：
+
+```powershell
+python scripts\first_run_check.py
+```
+
+它会检查配置能否加载、Live2D 路径是否有效、LLM key 是否已配置、端口是否占用、TTS 是否适合首跑，以及桌面观察/工具调用等安全默认值。
 
 ## 3. Place Live2D Model
 
@@ -112,10 +136,18 @@ $env:DASHSCOPE_API_KEY = "your_key_here"
 
 ## 6. Run the App
 
+启动前如果不确定配置是否完整，先运行：
+
+```powershell
+python scripts\first_run_check.py
+```
+
 ### Desktop mode (recommended)
 
 - 双击 `一键启动桌宠.vbs`
 - 或双击 `start_electron.bat`
+
+`start_electron.bat` 会在启动前自动运行 `python scripts\first_run_check.py`。如果启动失败或双击 VBS 没有明显反应，请直接运行 `start_electron.bat` 查看诊断输出。
 
 ### Web debug mode
 

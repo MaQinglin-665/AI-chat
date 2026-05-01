@@ -40,8 +40,11 @@ class CharacterState:
     last_user_text: str = ""
     last_reply_text: str = ""
     last_event_type: str = ""
+    last_user_at: Optional[float] = None
+    last_reply_at: Optional[float] = None
     last_spoken_at: Optional[float] = None
     next_proactive_at: Optional[float] = None
+    proactive_block_reason: str = "proactive_disabled"
 
 
 SUPPORTED_EMOTIONS = {
@@ -246,13 +249,19 @@ class CharacterRuntime:
         self,
         *,
         low_interruption: bool = True,
+        proactive_enabled: bool = False,
         proactive_cooldown_sec: float = 300.0,
+        proactive_user_idle_sec: float = 120.0,
+        proactive_assistant_idle_sec: float = 180.0,
         max_queue_size: int = 128,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._state = CharacterState()
         self._low_interruption = bool(low_interruption)
+        self._proactive_enabled = bool(proactive_enabled)
         self._proactive_cooldown_sec = max(5.0, float(proactive_cooldown_sec))
+        self._proactive_user_idle_sec = max(5.0, float(proactive_user_idle_sec))
+        self._proactive_assistant_idle_sec = max(5.0, float(proactive_assistant_idle_sec))
         self._queue: Deque[RuntimeEvent] = deque(maxlen=max(8, int(max_queue_size)))
         self._hooks: Dict[str, List[Callable[[RuntimeDirective], None]]] = {}
         self._clock = clock
@@ -261,6 +270,12 @@ class CharacterRuntime:
     def set_low_interruption(self, enabled: bool) -> None:
         with self._lock:
             self._low_interruption = bool(enabled)
+
+    def set_proactive_enabled(self, enabled: bool) -> None:
+        with self._lock:
+            self._proactive_enabled = bool(enabled)
+            if not self._proactive_enabled:
+                self._state.proactive_block_reason = "proactive_disabled"
 
     def enqueue(self, event_type: str, payload: Optional[Dict[str, Any]] = None, source: str = "system") -> None:
         event = RuntimeEvent(event_type=event_type, payload=dict(payload or {}), source=source)
@@ -284,9 +299,13 @@ class CharacterRuntime:
                 "last_user_text": self._state.last_user_text,
                 "last_reply_text": self._state.last_reply_text,
                 "last_event_type": self._state.last_event_type,
+                "last_user_at": self._state.last_user_at,
+                "last_reply_at": self._state.last_reply_at,
                 "last_spoken_at": self._state.last_spoken_at,
                 "next_proactive_at": self._state.next_proactive_at,
                 "low_interruption": self._low_interruption,
+                "proactive_enabled": self._proactive_enabled,
+                "proactive_block_reason": self._state.proactive_block_reason,
                 "pending_events": len(self._queue),
             }
 
@@ -317,8 +336,10 @@ class CharacterRuntime:
         if name == "user_message":
             text = str(event.payload.get("text", "")).strip()
             self._state.last_user_text = text
+            self._state.last_user_at = now
             self._state.phase = "thinking"
             self._state.motion_state = "listening"
+            self._state.proactive_block_reason = "recent_user_activity"
             return [RuntimeDirective("motion", "listen_ack", {"intensity": 0.3})]
 
         if name == "assistant_reply":
@@ -328,10 +349,12 @@ class CharacterRuntime:
             voice_style = normalized["voice_style"]
 
             self._state.last_reply_text = text
+            self._state.last_reply_at = now
             self._state.phase = "speaking"
             self._state.emotion = emotion
             self._state.voice_style = voice_style
             self._state.motion_state = "talking"
+            self._state.proactive_block_reason = "phase_not_idle"
             return [
                 RuntimeDirective("voice", "set_style", {"style": voice_style}),
                 RuntimeDirective(
@@ -346,6 +369,7 @@ class CharacterRuntime:
             self._state.motion_state = "idle"
             self._state.last_spoken_at = now
             self._state.next_proactive_at = now + self._proactive_cooldown_sec
+            self._state.proactive_block_reason = "cooldown_active"
             return [RuntimeDirective("motion", "return_idle", {})]
 
         if name == "emotion_hint":
@@ -362,14 +386,34 @@ class CharacterRuntime:
             return []
 
         if name == "tick":
-            if self._low_interruption:
-                return []
-            if self._state.phase != "idle":
+            block_reason = self._get_proactive_block_reason(now)
+            if block_reason:
+                self._state.proactive_block_reason = block_reason
                 return []
             next_at = self._state.next_proactive_at
             if next_at is not None and now < next_at:
+                self._state.proactive_block_reason = "cooldown_active"
                 return []
             self._state.next_proactive_at = now + self._proactive_cooldown_sec
+            self._state.proactive_block_reason = ""
             return [RuntimeDirective("initiative", "proactive_checkin", {"reason": "cooldown_elapsed"})]
 
         return []
+
+    def _get_proactive_block_reason(self, now: float) -> str:
+        if not self._proactive_enabled:
+            return "proactive_disabled"
+        if self._low_interruption:
+            return "low_interruption_enabled"
+        if self._state.phase != "idle":
+            return "phase_not_idle"
+        last_user_at = self._state.last_user_at
+        if last_user_at is not None and now - last_user_at < self._proactive_user_idle_sec:
+            return "recent_user_activity"
+        last_reply_at = self._state.last_reply_at
+        if last_reply_at is not None and now - last_reply_at < self._proactive_assistant_idle_sec:
+            return "recent_assistant_activity"
+        next_at = self._state.next_proactive_at
+        if next_at is not None and now < next_at:
+            return "cooldown_active"
+        return ""

@@ -14,6 +14,7 @@ SKIP_DIRS = {
     ".mem0",
     "__pycache__",
     "node_modules",
+    "dist",
     "docs/node_modules",
     "docs/test-results",
 }
