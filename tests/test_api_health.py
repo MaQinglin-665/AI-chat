@@ -54,6 +54,7 @@ def test_healthz_is_public_even_when_api_token_required(monkeypatch):
         assert status == 200
         assert payload.get("ok") is True
         assert "security" not in payload
+        assert "character_runtime" not in payload
 
         status_api, payload_api = _request_json(f"{base}/api/health")
         assert status_api == 401
@@ -73,6 +74,46 @@ def test_api_health_requires_valid_token_when_enabled(monkeypatch):
         assert payload.get("ok") is True
         assert payload.get("security", {}).get("require_api_token") is True
         assert payload.get("security", {}).get("api_token_configured") is True
+
+
+def test_api_health_includes_safe_character_runtime_summary(monkeypatch):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = True
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "return_metadata": True,
+        "demo_stable": True,
+        "persona_override": {
+            "enabled": True,
+            "name": "SecretPersonaName",
+            "style": "secret style phrase for prompt only",
+        },
+    }
+    monkeypatch.setenv("TAFFY_API_TOKEN_TEST", "token-runtime-789")
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _request_json(
+            f"{base}/api/health",
+            headers={"X-Taffy-Token": "token-runtime-789"},
+        )
+
+    assert status == 200
+    runtime = payload.get("character_runtime")
+    assert runtime == {
+        "enabled": True,
+        "return_metadata": True,
+        "demo_stable": True,
+        "persona_override_enabled": True,
+    }
+    assert set(runtime.keys()) == {
+        "enabled",
+        "return_metadata",
+        "demo_stable",
+        "persona_override_enabled",
+    }
+    serialized = json.dumps(payload, ensure_ascii=False)
+    assert "SecretPersonaName" not in serialized
+    assert "secret style phrase" not in serialized
 
 
 def test_api_health_returns_503_when_token_required_but_missing(monkeypatch):
@@ -99,3 +140,27 @@ def test_startup_self_check_reports_risks(monkeypatch):
     assert any("require_api_token=true" in line for line in findings)
     assert any("tools.allow_shell=true" in line for line in findings)
     assert any("no API key found" in line for line in findings)
+
+
+def test_startup_self_check_reports_safe_character_runtime_summary():
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "return_metadata": False,
+        "demo_stable": True,
+        "persona_override": {
+            "enabled": True,
+            "name": "SecretStartupPersona",
+            "style": "startup secret style",
+        },
+    }
+
+    findings = app.run_startup_self_check(cfg)
+    summary_lines = [line for line in findings if "character_runtime" in line]
+    assert summary_lines == [
+        "[startup][info] character_runtime enabled=true return_metadata=false "
+        "demo_stable=true persona_override_enabled=true"
+    ]
+    serialized = "\n".join(findings)
+    assert "SecretStartupPersona" not in serialized
+    assert "startup secret style" not in serialized

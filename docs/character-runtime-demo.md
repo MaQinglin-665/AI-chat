@@ -44,6 +44,8 @@ When `character_runtime.return_metadata=true`:
 Detailed E2E checklist: [Character Runtime End-to-End Validation](./character-runtime-e2e-validation.md)
 Quick smoke checklist: [Character Runtime Demo Smoke Test Checklist](./character-runtime-smoke-test.md)
 Safe local config guide: [Character Runtime Safe Local Demo Config Guide](./character-runtime-safe-local-config.md)
+Supported Live2D mapping reference: [Character Runtime Live2D Mapping](./character-runtime-live2d-mapping.md)
+Validation log template: [Character Runtime Validation Log Template](./character-runtime-validation-log.md)
 
 In `chatWindow` DevTools:
 
@@ -63,6 +65,12 @@ window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.emit({
 - `unknown`/`none` values are safely skipped.
 - TTS behavior stays unchanged.
 - Chat text behavior stays unchanged.
+
+## TTS Notes
+- Browser TTS remains the recommended first-run path because it has the lowest setup cost.
+- GPT-SoVITS can be used for local demos or recordings when you already have the service configured.
+- Character Runtime `voice_style` is currently descriptive metadata only; it does not automatically select a GPT-SoVITS voice, prompt, or prosody.
+- TTS failure should not block text chat. If server TTS fails, switch back to browser TTS for baseline verification.
 
 ## Rollback (Back to Default)
 Set runtime block back to:

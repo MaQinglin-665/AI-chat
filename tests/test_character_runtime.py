@@ -8,6 +8,8 @@ def test_runtime_initial_snapshot():
     assert snap["emotion"] == "neutral"
     assert snap["pending_events"] == 0
     assert snap["low_interruption"] is True
+    assert snap["proactive_enabled"] is False
+    assert snap["proactive_block_reason"] == "proactive_disabled"
 
 
 def test_normalize_payload_with_plain_text():
@@ -140,9 +142,18 @@ def test_tts_finished_sets_cooldown():
 
 def test_low_interruption_blocks_proactive_tick():
     now = {"t": 0.0}
-    runtime = CharacterRuntime(clock=lambda: now["t"], low_interruption=True)
+    runtime = CharacterRuntime(clock=lambda: now["t"], low_interruption=True, proactive_enabled=True)
     directives = runtime.run_once()
     assert directives == []
+    assert runtime.snapshot()["proactive_block_reason"] == "low_interruption_enabled"
+
+
+def test_proactive_tick_requires_explicit_enable_switch():
+    now = {"t": 10.0}
+    runtime = CharacterRuntime(clock=lambda: now["t"], low_interruption=False)
+    directives = runtime.run_once()
+    assert directives == []
+    assert runtime.snapshot()["proactive_block_reason"] == "proactive_disabled"
 
 
 def test_proactive_tick_with_cooldown_when_low_interruption_off():
@@ -150,6 +161,7 @@ def test_proactive_tick_with_cooldown_when_low_interruption_off():
     runtime = CharacterRuntime(
         clock=lambda: now["t"],
         low_interruption=False,
+        proactive_enabled=True,
         proactive_cooldown_sec=20.0,
     )
 
@@ -161,9 +173,66 @@ def test_proactive_tick_with_cooldown_when_low_interruption_off():
     # Before cooldown elapsed, no repeated proactive trigger.
     now["t"] = 25.0
     assert runtime.run_once() == []
+    assert runtime.snapshot()["proactive_block_reason"] == "cooldown_active"
 
     # After cooldown elapsed, proactive can trigger again.
     now["t"] = 31.0
     directives = runtime.run_once()
     assert len(directives) == 1
     assert directives[0].name == "proactive_checkin"
+
+
+def test_recent_user_activity_blocks_proactive_tick_until_idle_window():
+    now = {"t": 100.0}
+    runtime = CharacterRuntime(
+        clock=lambda: now["t"],
+        low_interruption=False,
+        proactive_enabled=True,
+        proactive_cooldown_sec=5.0,
+        proactive_user_idle_sec=30.0,
+    )
+
+    runtime.enqueue("user_message", {"text": "hello"}, source="chat")
+    runtime.run_once()
+    assert runtime.snapshot()["last_user_at"] == 100.0
+
+    now["t"] = 120.0
+    assert runtime.run_once() == []
+    assert runtime.snapshot()["proactive_block_reason"] == "phase_not_idle"
+
+    runtime.enqueue("tts_finished")
+    runtime.run_once()
+    now["t"] = 126.0
+    assert runtime.run_once() == []
+    assert runtime.snapshot()["proactive_block_reason"] == "recent_user_activity"
+
+    now["t"] = 131.0
+    directives = runtime.run_once()
+    assert len(directives) == 1
+    assert directives[0].name == "proactive_checkin"
+
+
+def test_recent_assistant_activity_blocks_proactive_tick_after_cooldown():
+    now = {"t": 200.0}
+    runtime = CharacterRuntime(
+        clock=lambda: now["t"],
+        low_interruption=False,
+        proactive_enabled=True,
+        proactive_cooldown_sec=5.0,
+        proactive_user_idle_sec=5.0,
+        proactive_assistant_idle_sec=30.0,
+    )
+
+    runtime.enqueue("assistant_reply", {"text": "hi"}, source="llm")
+    runtime.run_once()
+    runtime.enqueue("tts_finished")
+    runtime.run_once()
+
+    now["t"] = 206.0
+    assert runtime.run_once() == []
+    assert runtime.snapshot()["proactive_block_reason"] == "recent_assistant_activity"
+
+    now["t"] = 231.0
+    directives = runtime.run_once()
+    assert len(directives) == 1
+    assert directives[0].payload["reason"] == "cooldown_elapsed"

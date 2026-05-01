@@ -12,6 +12,9 @@ This checklist is not:
 
 For deeper chain validation, also run:
 - [Character Runtime End-to-End Validation](./character-runtime-e2e-validation.md)
+- [Character Runtime Live2D Mapping](./character-runtime-live2d-mapping.md)
+- [Character Runtime Validation Log Template](./character-runtime-validation-log.md)
+- [Character Runtime Proactive Safety](./character-runtime-proactive-safety.md)
 
 ## Prerequisites
 - Backend can start normally.
@@ -41,6 +44,7 @@ Verify:
 - response path does not require `character_runtime` metadata
 - TTS behavior is unchanged
 - Live2D is not triggered by runtime metadata path
+- no proactive message appears during normal startup
 
 ## Demo Enabled Check
 Use:
@@ -90,6 +94,8 @@ window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.emit({
   - Live2D model resources
 
 ## Live2D Expression/Motion Expectations
+Detailed mapping table: [Character Runtime Live2D Mapping](./character-runtime-live2d-mapping.md)
+
 - `happy`: attempts happy/positive expression
 - `annoyed`: attempts angry/annoyed-safe feedback
 - `surprised`: attempts surprised expression
@@ -100,6 +106,10 @@ window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.emit({
 
 ## TTS and Chat Text Checks
 - TTS behavior should not change because of `voice_style`
+- browser TTS should remain the easiest baseline voice path
+- GPT-SoVITS/server TTS may be used for local demos, but it should remain optional
+- successful TTS playback should return mouth/motion feedback to idle smoothly
+- failed TTS playback should not block visible chat text
 - chat text should not display raw JSON structure
 - chat text should remain normal user-readable reply text
 - runtime metadata should not pollute chat UI
@@ -119,6 +129,9 @@ window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.emit({
   - not always a runtime chain failure
 
 ## Pass/Fail Recording Template
+For release candidates or PR evidence, prefer the full template:
+- [Character Runtime Validation Log Template](./character-runtime-validation-log.md)
+
 | Check item | Expected result | Actual result | Pass/Fail | Notes |
 | --- | --- | --- | --- | --- |
 | Runtime disabled baseline | Baseline behavior unchanged |  |  |  |
@@ -126,3 +139,4 @@ window.__AI_CHAT_DEBUG_CHARACTER_RUNTIME__.emit({
 | Debug bridge commands | No crash, expected feedback attempts |  |  |  |
 | Cross-window forwarding | Metadata reaches `modelWindow` |  |  |  |
 | TTS and chat text | No regression in TTS/text UI |  |  |  |
+| Proactive default-off | No surprise proactive message |  |  |  |

@@ -44,6 +44,7 @@
 - 同一会话中角色状态变化自然且可追踪。
 - 主动交互不会高频打断用户，且可一键关闭。
 - 记忆变更有清晰边界，不出现明显错误注入。
+- v1.3 开工计划见 `docs/v1.3-character-runtime-plan.md`。
 
 ## v1.4 AI VTuber Feeling
 
