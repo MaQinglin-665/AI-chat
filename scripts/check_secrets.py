@@ -31,6 +31,7 @@ SKIP_DIRS = {
     ".mem0",
     "__pycache__",
     "node_modules",
+    "dist",
     "models",
     "tts_ref",
     "docs/assets",

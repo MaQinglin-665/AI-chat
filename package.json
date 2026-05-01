@@ -6,7 +6,9 @@
   "description": "馨语AI桌宠: Live2D desktop pet with local Python backend and transparent desktop window",
   "main": "electron/main.js",
   "scripts": {
-    "start:electron": "electron electron/main.js"
+    "start:electron": "electron electron/main.js",
+    "start:docs": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-docs.ps1",
+    "check:docs": "npm --prefix docs run check:all"
   },
   "devDependencies": {
     "electron": "^28.2.0"

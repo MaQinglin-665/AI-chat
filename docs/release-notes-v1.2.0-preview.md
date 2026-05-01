@@ -43,17 +43,45 @@ Manual smoke test on 2026-05-01:
 
 ## First-Run Notes
 
+This preview does not include a finished packaged installer. For early source-based testing, prefer the source test package when it is attached to the Release:
+
+```text
+Taffy-AI-Desktop-Pet-v*-windows-source-test.zip
+```
+
+That package still requires Python and Node.js on the target machine. It is meant to make the first development/test run clearer, not to behave like a consumer installer.
+
+If no source test package is attached, download the current `main` branch instead of an older Release source archive:
+
+```text
+https://github.com/MaQinglin-665/AI-chat/archive/refs/heads/main.zip
+```
+
+After extracting the source, confirm these paths exist before installing dependencies:
+
+- `electron/`
+- `web/`
+- `tests/`
+- `scripts/`
+- `package.json`
+- `requirements.txt`
+- `requirements-dev.txt`
+
+If those paths are missing, the downloaded or extracted source is not the expected developer/tester package.
+
 Recommended first-run path:
 
-1. Install dependencies:
-   - `pip install -r requirements.txt`
-   - `npm install`
-2. Optional test dependencies:
-   - `pip install -r requirements-dev.txt`
-3. Place a Live2D model under `web/models/`.
-4. Set `model_path` in `config.json`.
-5. Configure an LLM provider through environment-variable-based API keys.
-6. Keep TTS provider as `browser` for the first run.
+0. Read `README-FIRST-RUN.txt` if present.
+1. Run the environment doctor:
+   - `powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1`
+2. Install development dependencies:
+   - `powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1`
+3. Run local validation:
+   - `powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1`
+4. Place a Live2D model under `web/models/`.
+5. Set `model_path` in `config.json`.
+6. Configure an LLM provider through environment-variable-based API keys.
+7. Keep TTS provider as `browser` for the first run.
 
 Do not commit real API keys, provider tokens, private endpoint screenshots, or local TTS reference audio.
 
