@@ -4,7 +4,6 @@ import sys
 import base64
 import random
 import re
-import ipaddress
 import hashlib
 import secrets
 import threading
@@ -157,6 +156,11 @@ from app_health import (
     parse_bool_flag as _parse_bool_flag,
     reload_runtime_config as _reload_runtime_config,
     run_startup_self_check as _run_startup_self_check,
+)
+from app_security import (
+    get_server_security_settings as _get_server_security_settings,
+    is_loopback_host as _is_loopback_host,
+    normalize_origin as _normalize_origin,
 )
 
 
@@ -668,68 +672,6 @@ def reset_runtime_state():
     with _SUMMARY_CACHE_LOCK:
         _HISTORY_SUMMARY_CACHE["key"] = ""
         _HISTORY_SUMMARY_CACHE["summary"] = ""
-
-
-def _normalize_origin(origin):
-    raw = str(origin or "").strip()
-    if not raw:
-        return ""
-    try:
-        parsed = urllib.parse.urlsplit(raw)
-    except Exception:
-        return ""
-    scheme = str(parsed.scheme or "").lower()
-    host = str(parsed.hostname or "").strip().lower()
-    if scheme not in {"http", "https"} or not host:
-        return ""
-    port = parsed.port
-    default_port = 80 if scheme == "http" else 443
-    if ":" in host and not host.startswith("["):
-        host = f"[{host}]"
-    if port and port != default_port:
-        return f"{scheme}://{host}:{int(port)}"
-    return f"{scheme}://{host}"
-
-
-def _is_loopback_host(hostname):
-    host = str(hostname or "").strip().lower()
-    if not host:
-        return False
-    if host.startswith("[") and host.endswith("]"):
-        host = host[1:-1]
-    if host == "localhost":
-        return True
-    try:
-        return bool(ipaddress.ip_address(host).is_loopback)
-    except Exception:
-        return False
-
-
-def _get_server_security_settings(config):
-    server_cfg = config.get("server", {}) if isinstance(config, dict) else {}
-    allow_loopback = bool(server_cfg.get("cors_allow_loopback", True))
-    raw_allow = server_cfg.get("cors_allowed_origins", [])
-    if isinstance(raw_allow, str):
-        raw_allow = [raw_allow]
-    allowed_origins = set()
-    if isinstance(raw_allow, list):
-        for item in raw_allow[:64]:
-            norm = _normalize_origin(item)
-            if norm:
-                allowed_origins.add(norm)
-    token_env = str(server_cfg.get("api_token_env", API_TOKEN_ENV_DEFAULT) or API_TOKEN_ENV_DEFAULT).strip()
-    token_env = token_env or API_TOKEN_ENV_DEFAULT
-    expected_token = str(server_cfg.get("api_token", "") or "").strip()
-    if not expected_token:
-        expected_token = str(os.environ.get(token_env, "") or "").strip()
-    require_token = bool(server_cfg.get("require_api_token", False))
-    return {
-        "allow_loopback": allow_loopback,
-        "allowed_origins": allowed_origins,
-        "api_token_env": token_env,
-        "expected_api_token": expected_token,
-        "require_api_token": require_token,
-    }
 
 
 def schedule_runtime_restart(delay_sec=0.35):
