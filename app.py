@@ -150,6 +150,14 @@ from asr import (
     transcribe_pcm16_with_vosk,
 )
 from character_runtime import emotion_to_live2d_hint, normalize_runtime_payload
+from app_health import (
+    build_character_runtime_health_summary as _build_character_runtime_health_summary,
+    build_health_payload as _build_health_payload,
+    get_character_runtime_settings as _get_character_runtime_settings,
+    parse_bool_flag as _parse_bool_flag,
+    reload_runtime_config as _reload_runtime_config,
+    run_startup_self_check as _run_startup_self_check,
+)
 
 
 
@@ -230,84 +238,6 @@ DEFAULT_CHARACTER_PROFILE = {
         "serious",
     ],
 }
-
-
-def _parse_bool_flag(value, default=False):
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return bool(value)
-    text = str(value or "").strip().lower()
-    if not text:
-        return bool(default)
-    if text in {"1", "true", "yes", "on"}:
-        return True
-    if text in {"0", "false", "no", "off"}:
-        return False
-    return bool(default)
-
-
-def _get_character_runtime_settings(config):
-    default_settings = {
-        "enabled": False,
-        "return_metadata": False,
-        "demo_stable": False,
-        "persona_override": {"enabled": False, "name": "", "style": ""},
-    }
-    try:
-        if not isinstance(config, dict):
-            return dict(default_settings)
-        raw = config.get("character_runtime", {})
-        if not isinstance(raw, dict):
-            return dict(default_settings)
-        enabled = _parse_bool_flag(raw.get("enabled", False), False)
-        return_metadata = _parse_bool_flag(raw.get("return_metadata", False), False)
-        demo_stable = _parse_bool_flag(raw.get("demo_stable", False), False)
-        override_raw = raw.get("persona_override", {})
-        override_enabled = False
-        override_name = ""
-        override_style = ""
-        if isinstance(override_raw, dict):
-            override_enabled = _parse_bool_flag(override_raw.get("enabled", False), False)
-            override_name = str(override_raw.get("name", "") or "").strip()
-            override_style = str(override_raw.get("style", "") or "").strip()
-            if len(override_name) > 80:
-                override_name = override_name[:80].strip()
-            if len(override_style) > 280:
-                override_style = override_style[:280].strip()
-            if not override_name and not override_style:
-                override_enabled = False
-        if not enabled:
-            return dict(default_settings)
-        return {
-            "enabled": True,
-            "return_metadata": return_metadata,
-            "demo_stable": demo_stable,
-            "persona_override": {
-                "enabled": bool(override_enabled),
-                "name": override_name,
-                "style": override_style,
-            },
-        }
-    except Exception:
-        return dict(default_settings)
-
-
-def _build_character_runtime_health_summary(config):
-    settings = _get_character_runtime_settings(config if isinstance(config, dict) else {})
-    persona_override = settings.get("persona_override", {})
-    persona_override_enabled = False
-    if isinstance(persona_override, dict):
-        persona_override_enabled = _parse_bool_flag(
-            persona_override.get("enabled", False),
-            False,
-        )
-    return {
-        "enabled": bool(settings.get("enabled", False)),
-        "return_metadata": bool(settings.get("return_metadata", False)),
-        "demo_stable": bool(settings.get("demo_stable", False)),
-        "persona_override_enabled": bool(persona_override_enabled),
-    }
 
 
 def _normalize_character_profile_string(value, fallback):
@@ -2658,56 +2588,16 @@ class PetHandler(SimpleHTTPRequestHandler):
         self.wfile.write(audio_bytes)
 
     def _build_health_payload(self, detailed=False):
-        config_ok = True
-        config_error = ""
-        try:
-            cfg = load_config()
-        except Exception as exc:
-            cfg = DEFAULT_CONFIG
-            config_ok = False
-            config_error = _diagnostic_payload(exc).get("error", "")
-
-        payload = {
-            "ok": config_ok,
-            "status": "ok" if config_ok else "degraded",
-            "server_time": datetime.now().isoformat(timespec="seconds"),
-        }
-        if not detailed:
-            return payload
-
-        security = _get_server_security_settings(cfg)
-        live2d_ok = True
-        live2d_error = ""
-        live2d_resolved = ""
-        try:
-            model_path_value = str((cfg or {}).get("model_path", "") or "").strip()
-            resolved = resolve_live2d_model_path(model_path_value)
-            live2d_resolved = str(resolved) if resolved else ""
-            validate_live2d_model_path(cfg)
-        except Exception as exc:
-            live2d_ok = False
-            live2d_error = _diagnostic_payload(exc).get("error", "")
-
-        payload["checks"] = {
-            "config_load": {
-                "ok": config_ok,
-                "error": config_error if not config_ok else "",
-            },
-            "live2d_model_path": {
-                "ok": live2d_ok,
-                "error": live2d_error if not live2d_ok else "",
-                "resolved_path": live2d_resolved,
-            },
-        }
-        payload["security"] = {
-            "require_api_token": bool(security.get("require_api_token", False)),
-            "api_token_env": str(security.get("api_token_env", API_TOKEN_ENV_DEFAULT) or API_TOKEN_ENV_DEFAULT),
-            "api_token_configured": bool(str(security.get("expected_api_token", "") or "").strip()),
-            "cors_allow_loopback": bool(security.get("allow_loopback", True)),
-            "cors_allowed_origins": sorted(security.get("allowed_origins", set())),
-        }
-        payload["character_runtime"] = _build_character_runtime_health_summary(cfg)
-        return payload
+        return _build_health_payload(
+            detailed=detailed,
+            load_config_func=load_config,
+            default_config=DEFAULT_CONFIG,
+            diagnostic_payload_func=_diagnostic_payload,
+            get_server_security_settings_func=_get_server_security_settings,
+            resolve_live2d_model_path_func=resolve_live2d_model_path,
+            validate_live2d_model_path_func=validate_live2d_model_path,
+            api_token_env_default=API_TOKEN_ENV_DEFAULT,
+        )
 
     def _send_sse(self, data):
         payload = f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode("utf-8")
@@ -2715,21 +2605,12 @@ class PetHandler(SimpleHTTPRequestHandler):
         self.wfile.flush()
 
     def _reload_runtime_config(self):
-        config = load_config()
-        validate_live2d_model_path(config)
-        reset_runtime_state()
-        server_cfg = config.get("server", {}) if isinstance(config, dict) else {}
-        host = str(server_cfg.get("host", DEFAULT_CONFIG["server"]["host"])).strip()
-        try:
-            port = int(server_cfg.get("port", DEFAULT_CONFIG["server"]["port"]))
-        except (TypeError, ValueError):
-            port = int(DEFAULT_CONFIG["server"]["port"])
-        return {
-            "ok": True,
-            "message": "配置已重载",
-            "reloaded_at": datetime.now().isoformat(timespec="seconds"),
-            "server": {"host": host, "port": port},
-        }
+        return _reload_runtime_config(
+            load_config_func=load_config,
+            validate_live2d_model_path_func=validate_live2d_model_path,
+            reset_runtime_state_func=reset_runtime_state,
+            default_config=DEFAULT_CONFIG,
+        )
 
     def _restart_runtime(self, dry_run=False):
         managed_by = str(os.environ.get("TAFFY_MANAGED_BY", "")).strip().lower()
@@ -3395,47 +3276,12 @@ def ensure_config_hint():
 
 
 def run_startup_self_check(config):
-    findings = []
-    safe_cfg = config if isinstance(config, dict) else {}
-    server_cfg = safe_cfg.get("server", {}) if isinstance(safe_cfg.get("server", {}), dict) else {}
-    tools_cfg = safe_cfg.get("tools", {}) if isinstance(safe_cfg.get("tools", {}), dict) else {}
-    llm_cfg = safe_cfg.get("llm", {}) if isinstance(safe_cfg.get("llm", {}), dict) else {}
-
-    require_token = bool(server_cfg.get("require_api_token", False))
-    token_env = str(server_cfg.get("api_token_env", API_TOKEN_ENV_DEFAULT) or API_TOKEN_ENV_DEFAULT).strip() or API_TOKEN_ENV_DEFAULT
-    configured_token = str(server_cfg.get("api_token", "") or "").strip() or str(os.environ.get(token_env, "") or "").strip()
-    if require_token and not configured_token:
-        findings.append(
-            f"[startup][warn] server.require_api_token=true but token is empty. Set env {token_env}."
-        )
-
-    if bool(tools_cfg.get("allow_shell", False)):
-        findings.append(
-            "[startup][warn] tools.allow_shell=true. Consider disabling it for production/public releases."
-        )
-
-    runtime_summary = _build_character_runtime_health_summary(safe_cfg)
-    findings.append(
-        "[startup][info] character_runtime "
-        f"enabled={str(runtime_summary['enabled']).lower()} "
-        f"return_metadata={str(runtime_summary['return_metadata']).lower()} "
-        f"demo_stable={str(runtime_summary['demo_stable']).lower()} "
-        f"persona_override_enabled={str(runtime_summary['persona_override_enabled']).lower()}"
+    return _run_startup_self_check(
+        config,
+        validate_live2d_model_path_func=validate_live2d_model_path,
+        diagnostic_payload_func=_diagnostic_payload,
+        api_token_env_default=API_TOKEN_ENV_DEFAULT,
     )
-
-    llm_provider = str(llm_cfg.get("provider", "") or "").strip().lower()
-    if llm_provider in {"openai", "openai_compatible"}:
-        key_env = str(llm_cfg.get("api_key_env", OPENAI_DEFAULT_KEY_ENV) or OPENAI_DEFAULT_KEY_ENV).strip() or OPENAI_DEFAULT_KEY_ENV
-        key_value = str(llm_cfg.get("api_key", "") or "").strip() or str(os.environ.get(key_env, "") or "").strip()
-        if not key_value:
-            findings.append(
-                f"[startup][warn] llm provider is {llm_provider} but no API key found in env {key_env}."
-            )
-    try:
-        validate_live2d_model_path(safe_cfg)
-    except Exception as exc:
-        findings.append(f"[startup][warn] {_diagnostic_payload(exc).get('error', '')}")
-    return findings
 
 
 def build_server():
