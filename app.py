@@ -4,7 +4,6 @@ import sys
 import base64
 import random
 import re
-import hashlib
 import secrets
 import threading
 import time
@@ -47,7 +46,7 @@ from config import (
     validate_live2d_model_path,
 )
 import memory as _memory_module
-from utils import _clamp_int, _clamp_float, _truncate_text
+from utils import _truncate_text
 from memory import (
     build_memory_prompt_block,
     merge_prompt_with_memory,
@@ -175,6 +174,14 @@ from llm_diagnostics import (
     ensure_llm_auth_ready as _ensure_llm_auth_ready_impl,
     resolve_llm_api_key as _resolve_llm_api_key,
     resolve_llm_provider as _resolve_llm_provider,
+)
+from history_summary import (
+    build_history_summary_prompt as _build_history_summary_prompt,
+    build_prompt_with_history_summary as _build_prompt_with_history_summary_impl,
+    get_history_summary_settings,
+    sanitize_history,
+    serialize_history_for_summary as _serialize_history_for_summary,
+    summarize_older_history as _summarize_older_history_impl,
 )
 
 
@@ -465,17 +472,6 @@ def schedule_runtime_restart(delay_sec=0.35):
     thread.start()
 
 
-def sanitize_history(history, max_items=12):
-    safe_history = []
-    keep = max(1, int(max_items))
-    for item in (history or [])[-keep:]:
-        role = item.get("role")
-        content = item.get("content")
-        if role in {"user", "assistant"} and isinstance(content, str) and content.strip():
-            safe_history.append({"role": role, "content": content.strip()})
-    return safe_history
-
-
 def apply_hotword_replacements(text, replacements):
     safe = str(text or "")
     if not safe or not isinstance(replacements, dict) or not replacements:
@@ -495,119 +491,29 @@ def apply_hotword_replacements(text, replacements):
 
 
 
-def get_history_summary_settings(config):
-    raw = config.get("history_summary", {}) if isinstance(config, dict) else {}
-    enabled = bool(raw.get("enabled", True))
-    trigger_messages = _clamp_int(raw.get("trigger_messages", 14), 14, 8, 80)
-    keep_recent_messages = _clamp_int(raw.get("keep_recent_messages", 8), 8, 4, 40)
-    max_summary_chars = _clamp_int(raw.get("max_summary_chars", 900), 900, 240, 3000)
-    return {
-        "enabled": enabled,
-        "trigger_messages": trigger_messages,
-        "keep_recent_messages": keep_recent_messages,
-        "max_summary_chars": max_summary_chars,
-    }
-
-
-def _serialize_history_for_summary(history_items, max_messages=80):
-    lines = []
-    for item in (history_items or [])[-max_messages:]:
-        if not isinstance(item, dict):
-            continue
-        role = str(item.get("role", "")).strip().lower()
-        if role not in {"user", "assistant"}:
-            continue
-        content = " ".join(str(item.get("content", "")).split()).strip()
-        if not content:
-            continue
-        content = content[:260]
-        label = "用户" if role == "user" else "馨语AI桌宠"
-        lines.append(f"{label}: {content}")
-    return "\n".join(lines).strip()
-
-
-def _build_history_summary_prompt(raw_dialogue, max_summary_chars=900):
-    limit = max(240, min(3000, int(max_summary_chars)))
-    return (
-        "请将以下较早的多轮对话压缩成可供后续继续聊天使用的摘要。\n"
-        "要求：\n"
-        "1) 中文输出，简洁自然；\n"
-        "2) 只保留事实、偏好、未完成事项、用户当前目标；\n"
-        "3) 不要编造，不要加入建议；\n"
-        f"4) 总长度不超过 {limit} 个中文字符。\n\n"
-        "对话：\n"
-        f"{raw_dialogue}"
-    )
-
-
 def summarize_older_history(llm_cfg, provider, older_history, max_summary_chars=900):
-    raw_dialogue = _serialize_history_for_summary(older_history, max_messages=96)
-    if not raw_dialogue:
-        return ""
-
-    cache_key = hashlib.sha1(raw_dialogue.encode("utf-8", errors="ignore")).hexdigest()
-    with _SUMMARY_CACHE_LOCK:
-        if _HISTORY_SUMMARY_CACHE.get("key") == cache_key:
-            return str(_HISTORY_SUMMARY_CACHE.get("summary", ""))
-
-    prompt = _build_history_summary_prompt(raw_dialogue, max_summary_chars=max_summary_chars)
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You summarize conversation history for memory compression. "
-                "Be accurate, concise, and avoid adding new facts."
-            ),
-        },
-        {"role": "user", "content": prompt},
-    ]
-
-    summary = ""
-    try:
-        if provider in {"openai", "openai-compatible", "openai_compatible"}:
-            summary = call_openai_compatible(llm_cfg, messages)
-        elif provider == "ollama":
-            summary = call_ollama(llm_cfg, messages)
-    except Exception:
-        summary = ""
-
-    safe = " ".join(str(summary or "").split()).strip()
-    if not safe:
-        safe = _truncate_text(raw_dialogue, max_summary_chars).replace("\n", " | ")
-    safe = safe[: max(240, min(3000, int(max_summary_chars)))]
-
-    with _SUMMARY_CACHE_LOCK:
-        _HISTORY_SUMMARY_CACHE["key"] = cache_key
-        _HISTORY_SUMMARY_CACHE["summary"] = safe
-    return safe
+    return _summarize_older_history_impl(
+        llm_cfg,
+        provider,
+        older_history,
+        max_summary_chars=max_summary_chars,
+        cache_lock=_SUMMARY_CACHE_LOCK,
+        summary_cache=_HISTORY_SUMMARY_CACHE,
+        call_openai_compatible_func=call_openai_compatible,
+        call_ollama_func=call_ollama,
+    )
 
 
 def build_prompt_with_history_summary(config, llm_cfg, provider, history, base_prompt):
-    settings = get_history_summary_settings(config)
-    keep_recent = max(12, int(settings["keep_recent_messages"]))
-    safe_history = sanitize_history(history, max_items=keep_recent)
-
-    if not settings["enabled"]:
-        return base_prompt, safe_history
-
-    raw_items = [x for x in (history or []) if isinstance(x, dict)]
-    if len(raw_items) <= settings["trigger_messages"]:
-        return base_prompt, safe_history
-
-    older_history = raw_items[:-keep_recent]
-    summary = summarize_older_history(
-        llm_cfg=llm_cfg,
-        provider=provider,
-        older_history=older_history,
-        max_summary_chars=settings["max_summary_chars"],
+    return _build_prompt_with_history_summary_impl(
+        config,
+        llm_cfg,
+        provider,
+        history,
+        base_prompt,
+        summarize_older_history_func=summarize_older_history,
+        merge_prompt_with_memory_func=merge_prompt_with_memory,
     )
-    if not summary:
-        return base_prompt, safe_history
-    summary_block = (
-        "以下是更早对话的压缩摘要，请把它当作长期上下文使用，不要逐条复述：\n"
-        + summary
-    )
-    return merge_prompt_with_memory(base_prompt, summary_block), safe_history
 
 
 
