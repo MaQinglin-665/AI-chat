@@ -4,6 +4,35 @@
 
 ## Common Startup / Runtime Issues
 
+### 0) Downloaded source looks incomplete
+
+- 现象：`dir tests` 报错，或找不到 `web/`、`electron/`、`scripts/`
+- 原因：下载了旧 Release 源码包、浏览器缓存中的旧 ZIP，或 GitHub 下载/解压不完整
+- 建议：重新下载 `main` 分支源码：`https://github.com/MaQinglin-665/AI-chat/archive/refs/heads/main.zip`
+- 检查项：项目根目录应包含 `electron/`、`web/`、`tests/`、`scripts/`、`package.json`
+
+### 0.1) Not sure what to run first
+
+- 现象：源码已下载，但不确定依赖、测试、启动顺序
+- 建议：先运行 `powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1`
+- 下一步：诊断通过后运行 `powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1`
+- 验证：安装完成后运行 `powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1`
+- 启动前：运行 `python scripts\first_run_check.py`，确认配置、Live2D、LLM、TTS 和安全默认值
+
+### 0.2) Double-click start fails or the window closes
+
+- 现象：双击 `start_electron.bat` 后窗口关闭，或 Electron 启动失败
+- 建议：在 PowerShell 中运行 `.\start_electron.bat` 查看完整提示
+- 检查项：`python scripts\first_run_check.py` 是否通过、`npm install` 是否成功、Node.js 是否为 20/22 LTS
+- 备用验证：运行 `powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1`
+
+### 0.3) Double-click VBS has no visible output
+
+- 现象：双击 `一键启动桌宠.vbs` 后没有明显反应
+- 原因：VBS 启动入口会隐藏命令行窗口，诊断输出可能不可见
+- 建议：改用 `start_electron.bat`，它会自动运行首跑预检并显示阻塞原因
+- 手动检查：`python scripts\first_run_check.py`
+
 ### 1) API Key missing
 
 - 现象：调用 LLM 时鉴权失败

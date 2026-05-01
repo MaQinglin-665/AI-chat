@@ -21,13 +21,35 @@
 - Python 3.10+
 - Node.js
 
+### Get The Source
+
+推荐使用 Git 克隆当前 `main` 分支：
+
+```powershell
+cd D:\Hbuildrx
+git clone https://github.com/MaQinglin-665/AI-chat.git AI-chat-main
+cd AI-chat-main
+```
+
+如果 GitHub 连接不稳定，可以在项目首页使用 `Code` -> `Download ZIP` 下载 `main` 分支源码。不要把旧 Release 的源码包当作最新开发源码。
+
+下载或解压后，先做完整性检查：
+
+```powershell
+dir electron
+dir web
+dir tests
+dir scripts
+dir package.json
+```
+
+如果 `tests`、`web` 或 `electron` 不存在，请重新下载 `main` 分支源码后再继续。
+
 ### Setup
 
 ```powershell
-cd D:\AI\ai_desktop_pet
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-npm install
+powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
+powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
 ```
 
 ### Run (Desktop)
@@ -47,12 +69,10 @@ start.bat
 ## Local Validation Before PR
 
 ```powershell
-python -m pytest -q
-node tests/test_drag_logic.js
-python scripts/check_python_syntax.py
-python scripts/check_js_syntax.py
-python scripts/check_secrets.py
+powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1
 ```
+
+`test-local.ps1` 会依次运行 Python 测试、拖拽逻辑 JS 测试、Python/JS 语法检查和 secret 扫描。
 
 如果改动了 docs：
 
