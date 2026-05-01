@@ -10151,158 +10151,17 @@ function setupSpeechRecognition() {
 }
 
 async function streamAssistantReply(payload, onDelta, perfHooks = null) {
-  const requestInit = {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  };
-
-  const fetchDirectChat = async (fallbackReason = "") => {
-    const directResp = await authFetch("/api/chat", requestInit);
-    if (perfHooks && typeof perfHooks.onApiHeaders === "function") {
-      perfHooks.onApiHeaders({
-        mode: fallbackReason ? `chat_fallback:${fallbackReason}` : "chat",
-        status: Number(directResp.status) || 0,
-        atPerfMs: performance.now()
-      });
-    }
-    const directData = await directResp.json();
-    if (!directResp.ok) {
-      throw new Error(directData.error || `HTTP ${directResp.status}`);
-    }
-    handleCharacterRuntimeMetadata(directData?.character_runtime);
-    const text = String(directData.reply || "");
-    if (text) onDelta(text);
-    return text;
-  };
-
-  let resp;
-  try {
-    resp = await authFetch("/api/chat_stream", requestInit);
-  } catch (err) {
-    perfLog("chat", "stream_fallback", {
-      reason: "stream_fetch_error",
-      error: String(err?.message || err || "")
-    });
-    return await fetchDirectChat("stream_fetch_error");
+  const chatApi = window.TaffyModules?.chatApi || {};
+  if (typeof chatApi.streamAssistantReply !== "function") {
+    throw new Error("chatApi stream helper is not available");
   }
-
-  if (perfHooks && typeof perfHooks.onApiHeaders === "function") {
-    perfHooks.onApiHeaders({
-      mode: "chat_stream",
-      status: Number(resp.status) || 0,
-      atPerfMs: performance.now()
-    });
-  }
-
-  if (!resp.ok) {
-    let detail = `HTTP ${resp.status}`;
-    try {
-      const data = await resp.json();
-      if (data?.error) detail = data.error;
-    } catch (_) {
-      // ignore
-    }
-    perfLog("chat", "stream_fallback", {
-      reason: "stream_http_error",
-      status: Number(resp.status) || 0
-    });
-    try {
-      return await fetchDirectChat(`stream_http_${Number(resp.status) || 0}`);
-    } catch (_) {
-      throw new Error(detail);
-    }
-  }
-
-  if (!resp.body || typeof resp.body.getReader !== "function") {
-    // Fallback for environments without stream reader.
-    perfLog("chat", "stream_fallback", {
-      reason: "stream_reader_unavailable"
-    });
-    return await fetchDirectChat("stream_reader_unavailable");
-  }
-
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
-  let fullText = "";
-  let doneReply = "";
-
-  let seenFirstDelta = false;
-  const handleDataLine = (line) => {
-    if (!line || !line.startsWith("data:")) {
-      return false;
-    }
-    const raw = line.slice(5).trim();
-    if (!raw) {
-      return false;
-    }
-    if (raw === "[DONE]") {
-      return true;
-    }
-    let evt = null;
-    try {
-      evt = JSON.parse(raw);
-    } catch (_) {
-      return false;
-    }
-    if (evt.type === "error") {
-      throw new Error(evt.error || "连接有点挤，请稍后再试。");
-    }
-    if (evt.type === "delta" && typeof evt.text === "string" && evt.text) {
-      if (!seenFirstDelta) {
-        seenFirstDelta = true;
-        if (perfHooks && typeof perfHooks.onFirstDelta === "function") {
-          perfHooks.onFirstDelta({ atPerfMs: performance.now() });
-        }
-      }
-      fullText += evt.text;
-      onDelta(evt.text);
-    }
-    if (evt.type === "done" && typeof evt.reply === "string" && evt.reply.trim()) {
-      doneReply = evt.reply.trim();
-    }
-    if (evt.type === "done") {
-      handleCharacterRuntimeMetadata(evt.character_runtime);
-    }
-    return evt.type === "done";
-  };
-
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        break;
-      }
-      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-
-      let lineIndex = buffer.indexOf("\n");
-      while (lineIndex >= 0) {
-        const line = buffer.slice(0, lineIndex).trim();
-        buffer = buffer.slice(lineIndex + 1);
-        const isDone = handleDataLine(line);
-        if (isDone) {
-          return doneReply || fullText;
-        }
-        lineIndex = buffer.indexOf("\n");
-      }
-    }
-
-    const tail = buffer.trim();
-    if (tail) {
-      handleDataLine(tail);
-    }
-    return doneReply || fullText;
-  } catch (err) {
-    if (!seenFirstDelta) {
-      perfLog("chat", "stream_fallback", {
-        reason: "stream_read_error_before_delta",
-        error: String(err?.message || err || "")
-      });
-      return await fetchDirectChat("stream_read_error_before_delta");
-    }
-    throw err;
-  }
+  return chatApi.streamAssistantReply(payload, onDelta, {
+    authFetch,
+    onCharacterRuntimeMetadata: handleCharacterRuntimeMetadata,
+    perfHooks,
+    perfLog,
+    now: () => performance.now()
+  });
 }
 
 async function requestAssistantReply(text, opts = {}) {
