@@ -32,7 +32,7 @@ if errorlevel 1 (
 %PYTHON_CMD% scripts\first_run_check.py
 if errorlevel 1 (
   echo.
-  echo Startup preflight found blocker(s). Fix the issue above, then run start_electron.bat again.
+  echo Startup preflight found blockers. Fix the issue above, then run start_electron.bat again.
   pause
   exit /b 1
 )

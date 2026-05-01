@@ -15,6 +15,8 @@ import shutil
 import socket
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -246,7 +248,24 @@ def check_server(r: Reporter, cfg: dict[str, Any]) -> None:
                 sock.bind((host, port))
                 r.pass_("Configured server port is available")
             except OSError:
-                r.fail(f"Configured server port is already in use: {host}:{port}")
+                health_url = f"http://{host}:{port}/healthz"
+                try:
+                    with urllib.request.urlopen(health_url, timeout=1.5) as resp:
+                        if int(resp.status) == 200:
+                            r.warn(
+                                f"Configured server port is already in use, but {health_url} is healthy. "
+                                "An existing backend/app may already be running."
+                            )
+                        else:
+                            r.fail(
+                                f"Configured server port is already in use and health check returned HTTP {resp.status}: "
+                                f"{host}:{port}"
+                            )
+                except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                    r.fail(
+                        f"Configured server port is already in use and health check failed: "
+                        f"{host}:{port} ({redact_sensitive_text(str(exc))})"
+                    )
 
     require_token = bool(server_cfg.get("require_api_token", False))
     token_env = str(server_cfg.get("api_token_env", API_TOKEN_DEFAULT_ENV) or API_TOKEN_DEFAULT_ENV).strip()
