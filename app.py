@@ -192,6 +192,14 @@ from llm_messages import (
     normalize_vision_error,
     wrap_vision_error,
 )
+from character_profile import (
+    apply_character_runtime_prompt_contract as _apply_character_runtime_prompt_contract_impl,
+    build_character_runtime_prompt_contract as _build_character_runtime_prompt_contract_impl,
+    load_character_profile_config as _load_character_profile_config_impl,
+    normalize_character_profile_config as _normalize_character_profile_config_impl,
+    normalize_character_profile_list as _normalize_character_profile_list,
+    normalize_character_profile_string as _normalize_character_profile_string,
+)
 
 
 
@@ -274,152 +282,32 @@ DEFAULT_CHARACTER_PROFILE = {
 }
 
 
-def _normalize_character_profile_string(value, fallback):
-    if isinstance(value, str):
-        text = value.strip()
-        if text:
-            return text
-    return str(fallback or "").strip()
-
-
-def _normalize_character_profile_list(value, fallback):
-    fallback_items = [str(x or "").strip() for x in (fallback or []) if isinstance(x, str) and str(x or "").strip()]
-    if not isinstance(value, list):
-        return fallback_items
-    out = []
-    for item in value:
-        if not isinstance(item, str):
-            continue
-        text = item.strip()
-        if not text:
-            continue
-        out.append(text)
-    return out or fallback_items
-
-
 def _normalize_character_profile_config(raw):
-    safe = raw if isinstance(raw, dict) else {}
-    defaults = DEFAULT_CHARACTER_PROFILE
-    return {
-        "name": _normalize_character_profile_string(safe.get("name"), defaults["name"]),
-        "persona": _normalize_character_profile_string(safe.get("persona"), defaults["persona"]),
-        "tone": _normalize_character_profile_string(safe.get("tone"), defaults["tone"]),
-        "style_notes": _normalize_character_profile_list(safe.get("style_notes"), defaults["style_notes"]),
-        "response_guidelines": _normalize_character_profile_list(
-            safe.get("response_guidelines"), defaults["response_guidelines"]
-        ),
-        "style_boundaries": _normalize_character_profile_list(
-            safe.get("style_boundaries"), defaults["style_boundaries"]
-        ),
-        "interaction_examples": _normalize_character_profile_list(
-            safe.get("interaction_examples"), defaults["interaction_examples"]
-        ),
-        "default_emotion": _normalize_character_profile_string(
-            safe.get("default_emotion"), defaults["default_emotion"]
-        ),
-        "default_action": _normalize_character_profile_string(safe.get("default_action"), defaults["default_action"]),
-        "allowed_emotions": _normalize_character_profile_list(
-            safe.get("allowed_emotions"), defaults["allowed_emotions"]
-        ),
-        "allowed_actions": _normalize_character_profile_list(
-            safe.get("allowed_actions"), defaults["allowed_actions"]
-        ),
-        "allowed_voice_styles": _normalize_character_profile_list(
-            safe.get("allowed_voice_styles"), defaults["allowed_voice_styles"]
-        ),
-    }
+    return _normalize_character_profile_config_impl(raw, DEFAULT_CHARACTER_PROFILE)
 
 
 def _load_character_profile_config():
-    safe_default = _normalize_character_profile_config(DEFAULT_CHARACTER_PROFILE)
-    try:
-        path = CHARACTER_PROFILE_CONFIG_PATH
-        if not path.exists():
-            return safe_default
-        parsed = json.loads(path.read_text(encoding="utf-8"))
-        return _normalize_character_profile_config(parsed)
-    except Exception:
-        return safe_default
+    return _load_character_profile_config_impl(
+        CHARACTER_PROFILE_CONFIG_PATH,
+        DEFAULT_CHARACTER_PROFILE,
+    )
 
 
 def _build_character_runtime_prompt_contract():
-    profile = _load_character_profile_config()
-    profile_name = str(
-        profile.get("name", DEFAULT_CHARACTER_PROFILE["name"]) or DEFAULT_CHARACTER_PROFILE["name"]
-    ).strip()
-    persona = str(
-        profile.get("persona", DEFAULT_CHARACTER_PROFILE["persona"]) or DEFAULT_CHARACTER_PROFILE["persona"]
-    ).strip()
-    tone = str(profile.get("tone", DEFAULT_CHARACTER_PROFILE["tone"]) or DEFAULT_CHARACTER_PROFILE["tone"]).strip()
-    style_notes = _normalize_character_profile_list(
-        profile.get("style_notes"), DEFAULT_CHARACTER_PROFILE["style_notes"]
-    )
-    response_guidelines = _normalize_character_profile_list(
-        profile.get("response_guidelines"), DEFAULT_CHARACTER_PROFILE["response_guidelines"]
-    )
-    style_boundaries = _normalize_character_profile_list(
-        profile.get("style_boundaries"), DEFAULT_CHARACTER_PROFILE["style_boundaries"]
-    )
-    interaction_examples = _normalize_character_profile_list(
-        profile.get("interaction_examples"), DEFAULT_CHARACTER_PROFILE["interaction_examples"]
-    )
-    style_notes_text = " | ".join(style_notes[:3])
-    response_guidelines_text = " | ".join(response_guidelines[:3])
-    style_boundaries_text = " | ".join(style_boundaries[:3])
-    interaction_examples_text = " | ".join(interaction_examples[:3])
-    allowed_emotions = profile.get("allowed_emotions", DEFAULT_CHARACTER_PROFILE["allowed_emotions"])
-    allowed_actions = profile.get("allowed_actions", DEFAULT_CHARACTER_PROFILE["allowed_actions"])
-    allowed_voice_styles = profile.get(
-        "allowed_voice_styles", DEFAULT_CHARACTER_PROFILE["allowed_voice_styles"]
-    )
-    emotion_schema = "|".join([str(x or "").strip() for x in allowed_emotions if str(x or "").strip()])
-    action_schema = "|".join([str(x or "").strip() for x in allowed_actions if str(x or "").strip()])
-    voice_schema = "|".join([str(x or "").strip() for x in allowed_voice_styles if str(x or "").strip()])
-    emotion_schema = emotion_schema or "|".join(DEFAULT_CHARACTER_PROFILE["allowed_emotions"])
-    action_schema = action_schema or "|".join(DEFAULT_CHARACTER_PROFILE["allowed_actions"])
-    voice_schema = voice_schema or "|".join(DEFAULT_CHARACTER_PROFILE["allowed_voice_styles"])
-    return (
-        "Character profile:\n"
-        f"- Name: {profile_name}\n"
-        f"- Persona: {persona}\n"
-        f"- Tone: {tone}\n"
-        f"- Style notes: {style_notes_text}\n"
-        f"- Response guidelines: {response_guidelines_text}\n"
-        f"- Style boundaries: {style_boundaries_text}\n"
-        f"- Interaction examples: {interaction_examples_text}\n"
-        f"- Allowed emotions: {emotion_schema}\n"
-        f"- Allowed actions: {action_schema}\n"
-        f"- Allowed voice styles: {voice_schema}\n"
-        "Character Runtime output contract:\n"
-        "- Respond with a single JSON object only.\n"
-        "- Do not wrap JSON in Markdown code blocks.\n"
-        "- Do not add explanations outside JSON.\n"
-        "- Keep the reply natural, concise, expressive, and task-useful.\n"
-        "- Use light playful/teasing flavor only when appropriate; do not force it every reply.\n"
-        "- Avoid generic-assistant phrasing, but also avoid overly dramatic/cute or roleplay-heavy phrasing.\n"
-        "- Select emotion/action/voice_style from the allowed lists above.\n"
-        "- If uncertain, use emotion=neutral, action=none, voice_style=neutral.\n"
-        "Schema:\n"
-        "{\n"
-        '  "text": "final user-facing reply",\n'
-        f'  "emotion": "{emotion_schema}",\n'
-        f'  "action": "{action_schema}",\n'
-        '  "intensity": "low|normal|high",\n'
-        f'  "voice_style": "{voice_schema}"\n'
-        "}\n"
-        'The "text" field is the only text shown to the user.'
+    return _build_character_runtime_prompt_contract_impl(
+        _load_character_profile_config(),
+        DEFAULT_CHARACTER_PROFILE,
     )
 
 
 def _apply_character_runtime_prompt_contract(config, prompt):
-    settings = _get_character_runtime_settings(config)
-    if not settings.get("enabled", False):
-        return prompt
-    contract = _build_character_runtime_prompt_contract()
-    safe_prompt = str(prompt or "")
-    if not safe_prompt:
-        return contract
-    return merge_prompt_with_memory(safe_prompt, contract)
+    return _apply_character_runtime_prompt_contract_impl(
+        config,
+        prompt,
+        get_character_runtime_settings_func=_get_character_runtime_settings,
+        build_contract_func=_build_character_runtime_prompt_contract,
+        merge_prompt_with_memory_func=merge_prompt_with_memory,
+    )
 
 
 def _apply_character_runtime_reply(config, raw_reply):
