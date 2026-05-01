@@ -200,6 +200,15 @@ from character_profile import (
     normalize_character_profile_list as _normalize_character_profile_list,
     normalize_character_profile_string as _normalize_character_profile_string,
 )
+from reply_behavior import (
+    apply_demo_stable_identity_fallback as _apply_demo_stable_identity_fallback_impl,
+    build_demo_stable_reply_behavior_block as _build_demo_stable_reply_behavior_block_impl,
+    build_reply_language_block as _build_reply_language_block,
+    build_reply_llm_cfg as _build_reply_llm_cfg_impl,
+    is_demo_stable_enabled as _is_demo_stable_enabled_impl,
+    is_identity_question as _is_identity_question,
+    resolve_reply_language as _resolve_reply_language,
+)
 
 
 
@@ -872,137 +881,28 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider):
     return base_prompt, safe_history
 
 
-def _resolve_reply_language(config):
-    raw = str(
-        config.get("assistant_reply_language", "")
-        or config.get("reply_language", "")
-        or ""
-    ).strip().lower()
-    if raw in {"en", "english"}:
-        return "en"
-    if raw in {"zh", "zh-cn", "zh_cn", "chinese"}:
-        return "zh"
-    return "auto"
-
-
-def _build_reply_language_block(config):
-    lang = _resolve_reply_language(config if isinstance(config, dict) else {})
-    if lang == "en":
-        return (
-            "Reply language rule:\n"
-            "- Respond in natural English.\n"
-            "- Even if the user writes in Chinese, keep your reply in English by default.\n"
-            "- Switch to Chinese only if the user explicitly asks you to use Chinese."
-        )
-    if lang == "zh":
-        return (
-            "回复语言规则：\n"
-            "- 默认使用简体中文自然回复。\n"
-            "- 仅在用户明确要求英文时再切换英文。"
-        )
-    return ""
-
-
 def _is_demo_stable_enabled(config):
-    settings = _get_character_runtime_settings(config if isinstance(config, dict) else {})
-    return bool(settings.get("enabled", False) and settings.get("demo_stable", False))
+    return _is_demo_stable_enabled_impl(config, _get_character_runtime_settings)
 
 
 def _build_demo_stable_reply_behavior_block(config):
-    settings = _get_character_runtime_settings(config if isinstance(config, dict) else {})
-    if not bool(settings.get("enabled", False) and settings.get("demo_stable", False)):
-        return ""
-
-    rules = [
-        "Keep the main reply English-first in natural spoken English.",
-        "Even when the user writes in Chinese, reply primarily in natural spoken English.",
-        "The Chinese translation layer may explain it separately; the main reply should stay English-first.",
-        "Use complete sentences only, and never end with a cut-off half sentence.",
-        "Usually keep replies to 2 to 3 short sentences.",
-        "Keep an original desktop companion / light supervisor vibe: playful, cheeky, lightly teasing, energetic, witty, reliable.",
-        "You may lightly tease or nudge the user, but do not attack the user.",
-        "Do not call yourself ChatGPT.",
-        "Do not claim long-term memory, learning pipelines, plugin marketplace, or other unshipped capabilities.",
-    ]
-
-    persona_override = settings.get("persona_override", {})
-    if isinstance(persona_override, dict) and persona_override.get("enabled", False):
-        override_name = str(persona_override.get("name", "") or "").strip()
-        override_style = str(persona_override.get("style", "") or "").strip()
-        if override_name:
-            rules.extend(
-                [
-                    f"Your current name is: {override_name}.",
-                    "When the user asks who you are, introduce yourself using this name.",
-                    "Do not use any other character name.",
-                ]
-            )
-        if override_style:
-            rules.append(f"Keep this local persona style: {override_style}.")
-
-    return "Reply behavior rules:\n" + "\n".join(f"- {rule}" for rule in rules)
-
-
-def _is_identity_question(text):
-    safe = str(text or "").strip().lower()
-    if not safe:
-        return False
-    normalized = re.sub(r"\s+", " ", safe)
-    zh_hits = (
-        "你是谁" in safe
-        or "妳是谁" in safe
-        or "你叫" in safe
-        or "你是哪个" in safe
+    return _build_demo_stable_reply_behavior_block_impl(
+        config,
+        _get_character_runtime_settings,
     )
-    en_markers = (
-        "who are you",
-        "what are you",
-        "what's your name",
-        "what is your name",
-        "your name",
-        "who am i talking to",
-    )
-    en_hits = any(marker in normalized for marker in en_markers)
-    return bool(zh_hits or en_hits)
 
 
 def _apply_demo_stable_identity_fallback(config, user_message, reply_text):
-    safe_reply = str(reply_text or "").strip()
-    if not safe_reply:
-        return safe_reply
-    settings = _get_character_runtime_settings(config if isinstance(config, dict) else {})
-    if not bool(settings.get("enabled", False) and settings.get("demo_stable", False)):
-        return safe_reply
-    persona_override = settings.get("persona_override", {})
-    if not isinstance(persona_override, dict) or not bool(persona_override.get("enabled", False)):
-        return safe_reply
-    override_name = str(persona_override.get("name", "") or "").strip()
-    if not override_name:
-        return safe_reply
-    if not _is_identity_question(user_message):
-        return safe_reply
-    if override_name.lower() in safe_reply.lower():
-        return safe_reply
-    return f"I'm {override_name}, your desktop companion."
+    return _apply_demo_stable_identity_fallback_impl(
+        config,
+        user_message,
+        reply_text,
+        _get_character_runtime_settings,
+    )
 
 
 def _build_reply_llm_cfg(config, llm_cfg):
-    safe_cfg = dict(llm_cfg or {})
-    if not _is_demo_stable_enabled(config):
-        return safe_cfg
-
-    raw_budget = safe_cfg.get("max_output_tokens", safe_cfg.get("max_tokens", 120))
-    try:
-        base_budget = int(raw_budget)
-    except (TypeError, ValueError):
-        base_budget = 120
-    boosted_budget = max(600, base_budget)
-
-    safe_cfg["max_output_tokens"] = boosted_budget
-    safe_cfg["allow_high_output_tokens"] = True
-    safe_cfg["retry_on_length"] = True
-    safe_cfg["length_retry_max_output_tokens"] = max(boosted_budget, 900)
-    return safe_cfg
+    return _build_reply_llm_cfg_impl(config, llm_cfg, _get_character_runtime_settings)
 
 
 def call_llm(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
