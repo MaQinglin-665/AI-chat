@@ -16,8 +16,11 @@
 ```powershell
 cd D:\AI\ai_desktop_pet
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 npm install
 ```
+
+`requirements-dev.txt` is only needed when you want to run the local test suite.
 
 ## 3. Place Live2D Model
 
@@ -57,7 +60,7 @@ npm install
 设置环境变量（临时）：
 
 ```powershell
-set DASHSCOPE_API_KEY=your_key_here
+$env:DASHSCOPE_API_KEY = "your_key_here"
 ```
 
 ### Optional local model (Ollama)

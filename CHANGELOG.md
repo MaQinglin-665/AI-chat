@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.1.2] - 2026-05-01
+
+### Changed
+- Aligned README version metadata with `package.json`.
+- Documented development test dependency installation.
+- Ignored local TTS/API smoke-test artifacts generated during diagnostics.
+- Fixed PowerShell environment variable setup guidance.
+
+### Security
+- Local API keys should be stored through environment variables referenced by `api_key_env`, not inline in local config files.
+
 ## [1.1.1] - 2026-04-26
 
 ### Added
@@ -36,4 +47,3 @@ All notable changes to this project are documented in this file.
 
 ### Security
 - CORS/token hardening defaults for public/release builds.
-

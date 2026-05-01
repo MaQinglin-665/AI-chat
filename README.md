@@ -15,7 +15,7 @@
 ## Current Status & Version
 
 - 当前阶段：`MVP / 开源孵化`
-- 当前仓库版本：`1.1.1`（与 `CHANGELOG.md` 对齐）
+- 当前仓库版本：`1.1.2`（与 `package.json` / `CHANGELOG.md` 对齐）
 
 ## Current Capabilities
 
@@ -36,6 +36,7 @@
 
 1. 安装依赖：
    - `pip install -r requirements.txt`
+   - 开发/测试依赖：`pip install -r requirements-dev.txt`
    - `npm install`
 2. 放置 Live2D 模型到 `web/models/` 并设置 `config.json` 的 `model_path`。
 3. 配置 LLM 与 TTS（建议首跑使用 OpenAI-compatible + browser TTS）。
@@ -50,6 +51,9 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - Character Runtime demo 启用与验证：`docs/character-runtime-demo.md`
 - 常见问题与排障：`docs/troubleshooting.md`
 - 路线图（v1.2 -> v2.0）：`docs/ROADMAP.md`
+- v1.2 发布验收清单：`docs/release-v1.2-checklist.md`
+- v1.2 当前缺口：`docs/v1.2-current-gaps.md`
+- v1.2 preview 发布说明草稿：`docs/release-notes-v1.2.0-preview.md`
 
 ## LLM / TTS / ASR / Live2D (Where to Configure)
 

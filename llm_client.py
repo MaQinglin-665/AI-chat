@@ -149,6 +149,7 @@ def call_openai_compatible(llm_cfg, messages):
         "max_tokens": tuning["max_output_tokens"],
     }
 
+    chat_error = None
     try:
         data = http_post_json(
             f"{base_url}/chat/completions", payload, headers=headers, timeout=timeout
@@ -186,9 +187,9 @@ def call_openai_compatible(llm_cfg, messages):
                     retry_content = normalize_text_content(retry_message.get("content", ""))
                     if retry_content:
                         return retry_content
-    except RuntimeError:
+    except RuntimeError as exc:
         # Some relays do not return standard chat-completions JSON.
-        pass
+        chat_error = exc
 
     # Fallback: OpenAI Responses API compatibility path.
     # Not all providers support this endpoint (e.g. DashScope), so catch errors.
@@ -213,8 +214,12 @@ def call_openai_compatible(llm_cfg, messages):
         content = extract_response_output_text(responses_data)
         if content:
             return content
-    except Exception:
-        # Provider does not support /responses endpoint — raise to signal failure.
+    except Exception as exc:
+        # Provider does not support /responses endpoint. Preserve the primary
+        # chat-completions error when fallback also fails, because it usually
+        # contains the actionable provider reason (quota, model, auth, etc.).
+        if chat_error is not None:
+            raise chat_error from exc
         raise RuntimeError(
             f"LLM provider at {base_url} returned no usable response from either "
             "/chat/completions or /responses."

@@ -275,6 +275,7 @@ DEFAULT_CONFIG = {
         "enabled": True,
         "cooldown_ms": 1200,
         "speaking_cooldown_ms": 1600,
+        "speech_motion_strength": 1.35,
         "intensity": "normal",
         "combo_enabled": True,
         "expression_enabled": True,
@@ -900,6 +901,19 @@ def sanitize_client_config(config):
                     _safe_int(
                         motion_cfg.get("speaking_cooldown_ms", 1600),
                         1600,
+                    ),
+                ),
+            ),
+            "speech_motion_strength": max(
+                0.6,
+                min(
+                    2.2,
+                    _safe_float(
+                        motion_cfg.get(
+                            "speech_motion_strength",
+                            motion_cfg.get("speech_body_motion_strength", 1.35),
+                        ),
+                        1.35,
                     ),
                 ),
             ),

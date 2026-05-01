@@ -166,6 +166,7 @@ const state = {
   availableMotionGroups: [],
   lastMotionGroup: "",
   motionIntensity: "normal",
+  speechMotionStrength: 1.35,
   motionComboEnabled: true,
   actionQueue: [],
   actionRunnerBusy: false,
@@ -902,9 +903,6 @@ function refreshDesktopBridgeReady() {
   document.documentElement.classList.toggle("native-window-drag", !!state.useNativeWindowDrag);
   if (state.windowLocked && state.windowDragActive) {
     stopDesktopWindowDrag();
-  }
-  if (state.desktopCanCapture && !state.observeDesktop) {
-    state.observeDesktop = true;
   }
   updateObserveButton();
   updateLockButton();
@@ -6133,6 +6131,9 @@ function ensureMicroMotionState(now = performance.now()) {
   if (!Number.isFinite(Number(state.speechMotionBlend))) {
     state.speechMotionBlend = 0;
   }
+  if (!Number.isFinite(Number(state.speechMotionStrength))) {
+    state.speechMotionStrength = 1.35;
+  }
   if (!Number.isFinite(Number(state.beatPrevLevel))) {
     state.beatPrevLevel = 0;
   }
@@ -6318,10 +6319,17 @@ function updateMicroMotionLayer() {
     state[key] = next;
     return next;
   };
-  const audioEnergy = clampNumber(Number(state.ttsAudioLevel) || 0, 0, 1);
+  const speechMotionStrength = clampNumber(Number(state.speechMotionStrength) || 1.35, 0.6, 2.2);
+  const speechMotionBoost = 0.82 + speechMotionStrength * 0.28;
+  const mouthEnergy = speaking ? clampNumber(Number(state.speechMouthOpen) || 0, 0, 1) : 0;
+  const audioEnergy = clampNumber(
+    Math.max(Number(state.ttsAudioLevel) || 0, mouthEnergy * 0.56),
+    0,
+    1
+  );
   const priorBeat = clampNumber(Number(state.beatImpulse) || 0, 0, 1);
   const energyInput = motionBlend > 0.02
-    ? Math.max(audioEnergy, 0.12 + priorBeat * 0.22 * motionBlend)
+    ? Math.max(audioEnergy, (0.16 + priorBeat * 0.24 * motionBlend) * speechMotionBoost)
     : audioEnergy;
   const currentBodyEnergy = Number(state.speechBodyEnergy) || 0;
   const energyAttack = 1 - Math.pow(1 - 0.24, dtFrames);
@@ -6431,7 +6439,7 @@ function updateMicroMotionLayer() {
   const breathGain = 0.46 - motionBlend * 0.22;
   const styleGain = style === "comfort" ? 1.08 : (style === "playful" ? 1.15 : 1);
   const breathShift = (breath - 0.5) * breathGain * styleGain;
-  const bodySwayGain = 0.96 + motionBlend * (0.79 + bodyEnergy * 2.2);
+  const bodySwayGain = 0.96 + motionBlend * (0.79 + bodyEnergy * 2.2) * speechMotionBoost;
   const bodySway = sway * 0.22 * bodySwayGain;
   let hairAhogeTarget = hair * (0.18 + audioEnergy * 0.18) + breath * 0.12;
   const hairFrontTarget = hair * 0.12;
@@ -6440,7 +6448,7 @@ function updateMicroMotionLayer() {
   const skirtTarget = -sway * 0.08;
   const skirt2Target = sway * 0.06;
   if (motionBlend > 0.04 && bodyEnergy > 0.02) {
-    const e = bodyEnergy;
+    const e = bodyEnergy * speechMotionBoost;
     hairAhogeTarget += e * 0.3;
     ribbonTarget += e * 0.2;
   }
@@ -6512,7 +6520,7 @@ function updateMicroMotionLayer() {
   const torsoSpringOut = Number(state.spring_torso_render) || 0;
   const headSpringOut = Number(state.spring_head_render) || 0;
   const upperSpeechEnvelopeTarget = speaking
-    ? motionBlend * (0.68 + bodyEnergy * 0.58)
+    ? motionBlend * (0.74 + bodyEnergy * 0.7) * speechMotionBoost
     : 0;
   const upperSpeechEnvelope = smoothMotionOutput("speech_upper_envelope", upperSpeechEnvelopeTarget, {
     rise: 0.14,
@@ -6546,7 +6554,7 @@ function updateMicroMotionLayer() {
     fall: 0.19,
     maxStep: 0.82
   });
-  const bodyTalkGain = 1 + motionBlend * (0.26 + bodyEnergy * 0.38);
+  const bodyTalkGain = 1 + motionBlend * (0.32 + bodyEnergy * 0.48) * speechMotionBoost;
   const bodyXBase = smoothMotionOutput("param_body_x_base", finalGazeX * 2.2 + breathShift * 1.1 + torsoSpringOut * 1.08 * bodyTalkGain, {
     rise: 0.24,
     fall: 0.21,
@@ -6632,7 +6640,11 @@ function updateMicroMotionLayer() {
       fall: 0.18,
       maxStep: 0.085
     });
-    const motionGain = upperSpeechEnvelopeOut * (0.52 + upperSpeechEnvelopeOut * 0.48);
+    const motionGain = clampNumber(
+      upperSpeechEnvelopeOut * (0.58 + upperSpeechEnvelopeOut * 0.52) * speechMotionBoost,
+      0,
+      1.55
+    );
     const bodyZEnergyAdd = smoothMotionOutput("param_body_z_energy_add", eShaped * 17.6 * motionGain, {
       rise: 0.18,
       fall: 0.16,
@@ -8309,6 +8321,11 @@ async function loadConfig() {
   state.motionQuietDuringSpeech = motionCfg.quiet_speech !== false;
   state.motionIntensity = normalizeMotionIntensity(
     motionCfg.intensity || motionCfg.action_intensity || "normal"
+  );
+  state.speechMotionStrength = clampNumber(
+    Number(motionCfg.speech_motion_strength ?? motionCfg.speech_body_motion_strength ?? 1.35),
+    0.6,
+    2.2
   );
   state.motionComboEnabled = motionCfg.combo_enabled !== false;
   state.expressionEnabled = motionCfg.expression_enabled !== false;

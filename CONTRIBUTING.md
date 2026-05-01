@@ -26,6 +26,7 @@
 ```powershell
 cd D:\AI\ai_desktop_pet
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
 npm install
 ```
 

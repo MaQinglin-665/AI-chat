@@ -21,6 +21,15 @@ tmp_*.wav
 debug_*.wav
 *.bin
 
+# Local diagnostic smoke-test artifacts
+api_tts_*.txt
+api_tts_*.json
+api_tts_*.wav
+direct_tts_*.txt
+direct_tts_*.json
+direct_tts_*.wav
+health_headers_*.txt
+
 # Temporary directories
 tmp_browsercheck/
 tmp_npm/
