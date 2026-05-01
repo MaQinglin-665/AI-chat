@@ -1,7 +1,5 @@
-# v1.3.0-preview Release Notes Draft
+# v1.3.0-preview Release Notes
 
-> Draft for GitHub Release.
->
 > This is a preview release for early testers and contributors. It is not a finished installer, mature AI VTuber product, or commercial desktop agent.
 
 ## Summary
