@@ -140,6 +140,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - v1.2 当前缺口：`docs/v1.2-current-gaps.md`
 - v1.2 preview 发布说明草稿：`docs/release-notes-v1.2.0-preview.md`
 - v1.3 Character Runtime 计划：`docs/v1.3-character-runtime-plan.md`
+- v1.3 preview 发布说明草稿：`docs/release-notes-v1.3.0-preview.md`
 - v1.3 Character Runtime 检查脚本：`python scripts/check_character_runtime_v1_3.py`
 
 ## LLM / TTS / ASR / Live2D (Where to Configure)
