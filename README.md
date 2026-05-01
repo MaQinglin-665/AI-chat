@@ -16,6 +16,8 @@
 
 - 当前阶段：`MVP / 开源孵化`
 - 当前仓库版本：`1.1.2`（与 `package.json` / `CHANGELOG.md` 对齐）
+- 最新预览版：[`v1.2.0-preview`](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.2.0-preview)
+- Demo 素材：见 `v1.2.0-preview` Release assets
 
 ## Current Capabilities
 
