@@ -4212,81 +4212,13 @@ function parseToolMetaFromText(text) {
   }
 }
 
-const CHARACTER_RUNTIME_SUPPORTED_EMOTIONS = new Set([
-  "neutral",
-  "happy",
-  "playful",
-  "sad",
-  "anxious",
-  "angry",
-  "surprised",
-  "annoyed",
-  "thinking"
-]);
-const CHARACTER_RUNTIME_SUPPORTED_ACTIONS = new Set([
-  "none",
-  "wave",
-  "nod",
-  "shake_head",
-  "think",
-  "happy_idle",
-  "surprised"
-]);
-const CHARACTER_RUNTIME_SUPPORTED_INTENSITY = new Set(["low", "normal", "high"]);
-
-function normalizeCharacterRuntimeEmotionValue(value) {
-  const key = String(value || "").trim().toLowerCase();
-  return CHARACTER_RUNTIME_SUPPORTED_EMOTIONS.has(key) ? key : "neutral";
-}
-
-function normalizeCharacterRuntimeActionValue(value) {
-  let key = String(value || "").trim().toLowerCase();
-  if (key === "shake-head") {
-    key = "shake_head";
-  } else if (key === "thinking" || key === "ponder" || key === "pondering") {
-    key = "think";
-  }
-  return CHARACTER_RUNTIME_SUPPORTED_ACTIONS.has(key) ? key : "none";
-}
-
-function normalizeCharacterRuntimeIntensityValue(value) {
-  const key = String(value || "").trim().toLowerCase();
-  return CHARACTER_RUNTIME_SUPPORTED_INTENSITY.has(key) ? key : "normal";
-}
-
-function normalizeCharacterRuntimeSafeString(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  return String(value || "").trim().toLowerCase();
-}
+const CHARACTER_RUNTIME = window.TaffyCharacterRuntime || {};
 
 function normalizeCharacterRuntimeMetadataForFrontend(raw) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+  if (typeof CHARACTER_RUNTIME.normalizeMetadataForFrontend !== "function") {
     return null;
   }
-  const out = {};
-  let hasRuntimeField = false;
-  if (Object.prototype.hasOwnProperty.call(raw, "emotion")) {
-    hasRuntimeField = true;
-    out.emotion = normalizeCharacterRuntimeEmotionValue(raw.emotion);
-  }
-  if (Object.prototype.hasOwnProperty.call(raw, "action")) {
-    hasRuntimeField = true;
-    out.action = normalizeCharacterRuntimeActionValue(raw.action);
-  }
-  if (Object.prototype.hasOwnProperty.call(raw, "intensity")) {
-    hasRuntimeField = true;
-    out.intensity = normalizeCharacterRuntimeIntensityValue(raw.intensity);
-  }
-  for (const key of ["live2d_hint", "voice_style"]) {
-    const value = normalizeCharacterRuntimeSafeString(raw[key]);
-    if (value) {
-      hasRuntimeField = true;
-      out[key] = value;
-    }
-  }
-  return hasRuntimeField ? out : null;
+  return CHARACTER_RUNTIME.normalizeMetadataForFrontend(raw);
 }
 
 const CHARACTER_RUNTIME_BROADCAST_CHANNEL = "taffy-character-runtime";
