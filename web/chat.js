@@ -410,6 +410,7 @@ const MAX_CHAT_HISTORY_RECORDS = 240;
 const TOOL_META_MARKER = "[[TAFFY_TOOL_META]]";
 const API_CLIENT = window.TaffyModules?.apiClient || {};
 const SPEECH_TEXT = window.TaffyModules?.speechText || {};
+const TTS_API = window.TaffyModules?.ttsApi || {};
 const PERSONA_CARD_DEFAULT = {
   identity: "",
   user_preferences: "",
@@ -9166,183 +9167,71 @@ async function speakByBrowser(text, opts = {}) {
 }
 
 function buildServerTTSPayload(cleanedText, opts = {}) {
-  const payload = { text: String(cleanedText || "") };
-  if (state.ttsServerVoice) {
-    payload.voice = state.ttsServerVoice;
+  if (typeof TTS_API.buildServerTTSPayload === "function") {
+    return TTS_API.buildServerTTSPayload(cleanedText, {
+      ...opts,
+      voice: state.ttsServerVoice
+    });
   }
-  if (opts.prosody && typeof opts.prosody === "object") {
-    const p = opts.prosody;
-    if (Number.isFinite(Number(p.speed_ratio))) payload.speed_ratio = Number(p.speed_ratio);
-    if (Number.isFinite(Number(p.pitch_ratio))) payload.pitch_ratio = Number(p.pitch_ratio);
-    if (Number.isFinite(Number(p.volume_ratio))) payload.volume_ratio = Number(p.volume_ratio);
-    if (typeof p.rate === "string" && p.rate.trim()) payload.rate = p.rate.trim();
-    if (typeof p.pitch === "string" && p.pitch.trim()) payload.pitch = p.pitch.trim();
-    if (typeof p.volume === "string" && p.volume.trim()) payload.volume = p.volume.trim();
-  }
-  return payload;
+  return { text: String(cleanedText || "") };
 }
 
 function isRetriableTTSError(err) {
-  if (!err) {
-    return false;
+  if (typeof TTS_API.isRetriableTTSError === "function") {
+    return TTS_API.isRetriableTTSError(err);
   }
-  if (err.retriable === true) {
-    return true;
-  }
-  const status = Number(err.httpStatus);
-  if (Number.isFinite(status) && (status === 408 || status === 429 || status >= 500)) {
-    return true;
-  }
-  const msg = String(err.message || "").toLowerCase();
-  return msg.includes("timeout") || msg.includes("network");
+  return false;
 }
 
 async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) {
-  const cleaned = sanitizeSpeakText(text);
-  if (!cleaned) {
-    return null;
+  if (typeof TTS_API.requestServerTTSBlob !== "function") {
+    throw new Error("ttsApi request helper is not available");
   }
-
-  const payload = buildServerTTSPayload(cleaned, { prosody });
-  const perfTraceId = String(requestOpts.traceId || state.activePerfTraceId || "").trim();
-  const ttsReqStartedPerfMs = performance.now();
-  const ttsReqStartedWallMs = Date.now();
-  if (perfTraceId) {
-    payload._perf_trace_id = perfTraceId;
-    payload._perf_client_send_ts_ms = ttsReqStartedWallMs;
-  }
-  perfLog("tts", "request_start", {
-    traceId: perfTraceId || "(none)",
-    textChars: cleaned.length
+  return TTS_API.requestServerTTSBlob(text, prosody, {
+    authFetch,
+    sanitizeSpeakText,
+    perfLog,
+    traceId: String(requestOpts.traceId || state.activePerfTraceId || "").trim(),
+    timeoutMs: Math.max(
+      1500,
+      Math.min(45000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
+    ),
+    voice: state.ttsServerVoice,
+    now: () => performance.now(),
+    wallNow: () => Date.now()
   });
-  const timeoutMs = Math.max(
-    1500,
-    Math.min(45000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
-  );
-  const controller = (typeof AbortController !== "undefined") ? new AbortController() : null;
-  let timeoutHandle = 0;
-  if (controller) {
-    timeoutHandle = window.setTimeout(() => controller.abort(), timeoutMs);
-  }
-  let resp;
-  try {
-    resp = await authFetch("/api/tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller ? controller.signal : undefined
-    });
-  } catch (err) {
-    const msg = err?.name === "AbortError"
-      ? `TTS request timeout (${timeoutMs}ms)`
-      : String(err?.message || "TTS request failed");
-    perfLog("tts", "request_fail", {
-      traceId: perfTraceId || "(none)",
-      elapsedMs: Math.round(performance.now() - ttsReqStartedPerfMs),
-      error: msg
-    });
-    const wrapped = new Error(msg);
-    wrapped.retriable = true;
-    throw wrapped;
-  } finally {
-    if (timeoutHandle) {
-      clearTimeout(timeoutHandle);
-    }
-  }
-  if (!resp.ok) {
-    let detail = `HTTP ${resp.status}`;
-    try {
-      const data = await resp.json();
-      if (data?.error) detail = data.error;
-    } catch (_) {
-      // ignore
-    }
-    const err = new Error(detail);
-    err.httpStatus = resp.status;
-    err.retriable = resp.status === 408 || resp.status === 429 || resp.status >= 500;
-    perfLog("tts", "request_fail", {
-      traceId: perfTraceId || "(none)",
-      elapsedMs: Math.round(performance.now() - ttsReqStartedPerfMs),
-      status: Number(resp.status) || 0,
-      error: detail
-    });
-    throw err;
-  }
-  const blob = await resp.blob();
-  if (!blob || blob.size === 0) {
-    const err = new Error("TTS audio payload is empty");
-    err.retriable = true;
-    throw err;
-  }
-  const type = String(blob.type || "").toLowerCase();
-  if (type.startsWith("audio/")) {
-    perfLog("tts", "response_ok", {
-      traceId: perfTraceId || "(none)",
-      elapsedMs: Math.round(performance.now() - ttsReqStartedPerfMs),
-      status: Number(resp.status) || 0,
-      bytes: Number(blob.size) || 0,
-      mime: type
-    });
-    return blob;
-  }
-  // Some providers may return octet-stream with valid audio bytes.
-  const buf = await blob.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let mime = "application/octet-stream";
-  if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45) {
-    mime = "audio/wav";
-  } else if (bytes.length >= 4 && bytes[0] === 0x4f && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
-    mime = "audio/ogg";
-  } else if (bytes.length >= 4 && bytes[0] === 0x66 && bytes[1] === 0x4c && bytes[2] === 0x61 && bytes[3] === 0x43) {
-    mime = "audio/flac";
-  } else if (
-    (bytes.length >= 3 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) ||
-    (bytes.length >= 2 && bytes[0] === 0xff && (bytes[1] === 0xfb || bytes[1] === 0xf3 || bytes[1] === 0xf2))
-  ) {
-    mime = "audio/mpeg";
-  }
-  const fixedBlob = new Blob([buf], { type: mime });
-  perfLog("tts", "response_ok", {
-    traceId: perfTraceId || "(none)",
-    elapsedMs: Math.round(performance.now() - ttsReqStartedPerfMs),
-    status: Number(resp.status) || 0,
-    bytes: Number(fixedBlob.size) || 0,
-    mime
-  });
-  return fixedBlob;
 }
 
 async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) {
-  const maxRetries = Math.max(0, Math.min(4, Math.round(Number(opts.retries) || 0)));
-  const retryDelayMs = Math.max(
-    60,
-    Math.min(3000, Math.round(Number(opts.retryDelayMs) || Number(state.ttsServerRetryDelayMs) || 220))
-  );
-  const timeoutMs = Math.max(
-    1500,
-    Math.min(45000, Math.round(Number(opts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
-  );
-  let attempt = 0;
-  while (true) {
-    try {
-      return await requestServerTTSBlob(text, prosody, {
-        timeoutMs,
-        traceId: opts.traceId
-      });
-    } catch (err) {
-      if (attempt >= maxRetries || !isRetriableTTSError(err)) {
-        throw err;
-      }
-      const wait = Math.round(retryDelayMs * (1 + attempt * 0.85));
-      console.warn("Server TTS request retry", {
-        attempt: attempt + 1,
-        nextWaitMs: wait,
-        reason: String(err?.message || err)
-      });
-      await waitMs(wait);
-      attempt += 1;
-    }
+  if (typeof TTS_API.requestServerTTSBlobWithRetry !== "function") {
+    throw new Error("ttsApi retry helper is not available");
   }
+  return TTS_API.requestServerTTSBlobWithRetry(text, prosody, {
+    authFetch,
+    sanitizeSpeakText,
+    perfLog,
+    traceId: opts.traceId,
+    retries: Math.max(0, Math.min(4, Math.round(Number(opts.retries) || 0))),
+    retryDelayMs: Math.max(
+      60,
+      Math.min(3000, Math.round(Number(opts.retryDelayMs) || Number(state.ttsServerRetryDelayMs) || 220))
+    ),
+    timeoutMs: Math.max(
+      1500,
+      Math.min(45000, Math.round(Number(opts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
+    ),
+    voice: state.ttsServerVoice,
+    now: () => performance.now(),
+    wallNow: () => Date.now(),
+    wait: waitMs,
+    onRetry: ({ attempt, nextWaitMs, error }) => {
+      console.warn("Server TTS request retry", {
+        attempt,
+        nextWaitMs,
+        reason: String(error?.message || error)
+      });
+    }
+  });
 }
 
 async function playAudioByContext(blob) {

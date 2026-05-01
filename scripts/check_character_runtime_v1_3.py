@@ -29,6 +29,7 @@ def main() -> int:
         ("Frontend API client checks", ["node", "tests/test_api_client_frontend.js"]),
         ("Frontend chat API checks", ["node", "tests/test_chat_api_frontend.js"]),
         ("Frontend speech text checks", ["node", "tests/test_speech_text_frontend.js"]),
+        ("Frontend TTS API checks", ["node", "tests/test_tts_api_frontend.js"]),
         ("Python syntax", [sys.executable, "scripts/check_python_syntax.py"]),
         ("JavaScript syntax", [sys.executable, "scripts/check_js_syntax.py"]),
         ("Secret scan", [sys.executable, "scripts/check_secrets.py"]),
