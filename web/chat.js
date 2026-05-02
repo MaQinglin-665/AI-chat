@@ -202,6 +202,12 @@ const state = {
   localAsrContext: null,
   localAsrSource: null,
   localAsrProcessor: null,
+  localAsrAnalyser: null,
+  localAsrMeterRaf: 0,
+  localAsrMeterBuffer: null,
+  localAsrLastFrameAt: 0,
+  localAsrWatchdogTimer: 0,
+  localAsrNoFrameWarned: false,
   localAsrSpeeching: false,
   localAsrSpeechMs: 0,
   localAsrSilenceMs: 0,
@@ -3283,6 +3289,122 @@ function cancelLocalAsrRequest() {
   state.localAsrSending = false;
 }
 
+function updateLocalAsrMicLevelFromRms(rms) {
+  const displayNoiseFloor = clampNumber(
+    state.localAsrNoiseFloor * 1.6 + 0.0015,
+    0.0015,
+    0.035
+  );
+  const normalizedLevel = clampNumber((rms - displayNoiseFloor) / 0.07, 0, 1);
+  const smoothing = normalizedLevel > state.micLevel ? 0.38 : 0.24;
+  state.micLevel += (normalizedLevel - state.micLevel) * smoothing;
+  if (state.micLevel < 0.01 && normalizedLevel <= 0.001) {
+    state.micLevel = 0;
+  }
+  updateMicMeter(state.micLevel);
+}
+
+async function ensureAudioContextRunning(ctx) {
+  if (!ctx || ctx.state !== "suspended" || typeof ctx.resume !== "function") {
+    return true;
+  }
+  try {
+    await ctx.resume();
+  } catch (_) {
+    // ignore; the caller will check the final state.
+  }
+  return ctx.state !== "suspended";
+}
+
+function stopLocalAsrMeter() {
+  if (state.localAsrMeterRaf) {
+    try {
+      window.cancelAnimationFrame(state.localAsrMeterRaf);
+    } catch (_) {
+      // ignore
+    }
+    try {
+      clearTimeout(state.localAsrMeterRaf);
+    } catch (_) {
+      // ignore
+    }
+  }
+  state.localAsrMeterRaf = 0;
+  state.localAsrMeterBuffer = null;
+}
+
+function startLocalAsrMeter(sessionId = null) {
+  stopLocalAsrMeter();
+  const token = sessionId == null ? state.micSession : Number(sessionId);
+  const analyser = state.localAsrAnalyser;
+  if (!analyser) {
+    return;
+  }
+  const size = Math.max(32, Number(analyser.fftSize) || 512);
+  state.localAsrMeterBuffer = new Uint8Array(size);
+  const schedule =
+    typeof window.requestAnimationFrame === "function"
+      ? (fn) => window.requestAnimationFrame(fn)
+      : (fn) => window.setTimeout(fn, 60);
+
+  const tick = () => {
+    if (token !== state.micSession || !state.micOpen || !state.localAsrAnalyser) {
+      state.localAsrMeterRaf = 0;
+      return;
+    }
+    const buffer = state.localAsrMeterBuffer;
+    if (buffer && state.micSuspendDepth <= 0) {
+      try {
+        state.localAsrAnalyser.getByteTimeDomainData(buffer);
+        let energy = 0;
+        for (let i = 0; i < buffer.length; i++) {
+          const n = (buffer[i] - 128) / 128;
+          energy += n * n;
+        }
+        updateLocalAsrMicLevelFromRms(Math.sqrt(energy / buffer.length));
+      } catch (_) {
+        // ignore; the ASR frame path can still update the meter.
+      }
+    }
+    state.localAsrMeterRaf = schedule(tick);
+  };
+  state.localAsrMeterRaf = schedule(tick);
+}
+
+function stopLocalAsrWatchdog() {
+  if (state.localAsrWatchdogTimer) {
+    clearInterval(state.localAsrWatchdogTimer);
+  }
+  state.localAsrWatchdogTimer = 0;
+  state.localAsrNoFrameWarned = false;
+}
+
+function startLocalAsrWatchdog(sessionId = null) {
+  stopLocalAsrWatchdog();
+  const token = sessionId == null ? state.micSession : Number(sessionId);
+  state.localAsrLastFrameAt = performance.now();
+  state.localAsrNoFrameWarned = false;
+  state.localAsrWatchdogTimer = window.setInterval(() => {
+    if (token !== state.micSession || !state.micOpen || !state.localAsrRunning) {
+      stopLocalAsrWatchdog();
+      return;
+    }
+    if (state.micSuspendDepth > 0) {
+      return;
+    }
+    const ctx = state.localAsrContext;
+    if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
+      ctx.resume().catch(() => {});
+      return;
+    }
+    const lastFrameAt = Number(state.localAsrLastFrameAt) || 0;
+    if (!state.localAsrNoFrameWarned && performance.now() - lastFrameAt > 2200) {
+      state.localAsrNoFrameWarned = true;
+      setStatus("麦克风已开启，但没有收到音频，请检查系统输入设备");
+    }
+  }, 1200);
+}
+
 async function flushLocalAsrUtterance(force = false, sessionId = null) {
   const token = sessionId == null ? state.micSession : Number(sessionId);
   if (token !== state.micSession) {
@@ -3343,18 +3465,7 @@ function handleLocalAsrFrame(floatData, inputSampleRate, sessionId = null) {
   }
   const rms = Math.sqrt(energy / pcm16.length);
   const frameMs = (pcm16.length / 16000) * 1000;
-  const displayNoiseFloor = clampNumber(
-    state.localAsrNoiseFloor * 1.6 + 0.0015,
-    0.0015,
-    0.035
-  );
-  const normalizedLevel = clampNumber((rms - displayNoiseFloor) / 0.07, 0, 1);
-  const smoothing = normalizedLevel > state.micLevel ? 0.38 : 0.24;
-  state.micLevel += (normalizedLevel - state.micLevel) * smoothing;
-  if (state.micLevel < 0.01 && normalizedLevel <= 0.001) {
-    state.micLevel = 0;
-  }
-  updateMicMeter(state.micLevel);
+  updateLocalAsrMicLevelFromRms(rms);
 
   const baseThreshold = clampNumber(state.localAsrSpeechThreshold || 0.009, 0.003, 0.05);
   const adaptiveThreshold = Math.max(
@@ -3391,9 +3502,18 @@ function handleLocalAsrFrame(floatData, inputSampleRate, sessionId = null) {
 }
 
 function clearLocalAsrGraph() {
+  stopLocalAsrMeter();
+  stopLocalAsrWatchdog();
   if (state.localAsrProcessor) {
     try {
       state.localAsrProcessor.disconnect();
+    } catch (_) {
+      // ignore
+    }
+  }
+  if (state.localAsrAnalyser) {
+    try {
+      state.localAsrAnalyser.disconnect();
     } catch (_) {
       // ignore
     }
@@ -3425,6 +3545,8 @@ function clearLocalAsrGraph() {
   state.localAsrContext = null;
   state.localAsrSource = null;
   state.localAsrProcessor = null;
+  state.localAsrAnalyser = null;
+  state.localAsrLastFrameAt = 0;
   state.localAsrRunning = false;
   state.localAsrSpeeching = false;
   state.localAsrSpeechMs = 0;
@@ -3480,7 +3602,28 @@ async function startLocalAsrLoop(sessionId = null) {
   }
 
   const ctx = new AudioCtx();
+  const contextReady = await ensureAudioContextRunning(ctx);
+  if (!contextReady) {
+    setStatus("麦克风音频未启动，请再点一次开麦");
+    try {
+      ctx.close();
+    } catch (_) {
+      // ignore
+    }
+    for (const track of stream.getTracks()) {
+      try {
+        track.stop();
+      } catch (_) {
+        // ignore
+      }
+    }
+    return false;
+  }
+
   const source = ctx.createMediaStreamSource(stream);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 512;
+  analyser.smoothingTimeConstant = 0.65;
   const processor = ctx.createScriptProcessor(state.localAsrProcessorBufferSize || 2048, 1, 1);
   const sessionToken = token;
   processor.onaudioprocess = (evt) => {
@@ -3490,14 +3633,22 @@ async function startLocalAsrLoop(sessionId = null) {
     if (!state.micOpen || state.micSuspendDepth > 0) {
       return;
     }
+    state.localAsrLastFrameAt = performance.now();
+    state.localAsrNoFrameWarned = false;
     const input = evt.inputBuffer.getChannelData(0);
     handleLocalAsrFrame(input, ctx.sampleRate, sessionToken);
   };
+  source.connect(analyser);
   source.connect(processor);
   processor.connect(ctx.destination);
   if (sessionToken !== state.micSession || !state.micOpen) {
     try {
       processor.disconnect();
+    } catch (_) {
+      // ignore
+    }
+    try {
+      analyser.disconnect();
     } catch (_) {
       // ignore
     }
@@ -3525,12 +3676,17 @@ async function startLocalAsrLoop(sessionId = null) {
   state.localAsrContext = ctx;
   state.localAsrSource = source;
   state.localAsrProcessor = processor;
+  state.localAsrAnalyser = analyser;
   state.localAsrRunning = true;
   state.localAsrSpeeching = false;
   state.localAsrSpeechMs = 0;
   state.localAsrSilenceMs = 0;
   state.localAsrBuffers = [];
   state.localAsrNoiseFloor = 0.004;
+  state.localAsrLastFrameAt = performance.now();
+  state.localAsrNoFrameWarned = false;
+  startLocalAsrMeter(sessionToken);
+  startLocalAsrWatchdog(sessionToken);
   return true;
 }
 
