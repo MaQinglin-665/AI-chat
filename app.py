@@ -28,7 +28,6 @@ from config import (
     DiagnosticError,
     EXAMPLE_CONFIG_PATH,
     OLLAMA_DEFAULT_BASE_URL,
-    OLLAMA_DEFAULT_MODEL,
     ROOT_DIR,
     VOSK_MODEL_LARGE_ROOT,
     VOSK_MODEL_ROOT,
@@ -199,6 +198,7 @@ from reply_behavior import (
 )
 from llm_response_utils import split_text_for_stream
 from inner_thought import generate_inner_thought_impl
+from llm_runtime import call_llm_impl, call_llm_stream_impl
 from llm_tool_calls import (
     build_chat_completions_tool_defs as _build_chat_completions_tool_defs_impl,
     build_responses_tool_defs as _build_responses_tool_defs_impl,
@@ -597,237 +597,67 @@ def _build_reply_llm_cfg(config, llm_cfg):
 
 
 def call_llm(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
-    if not isinstance(config, dict):
-        config = load_config()
-    if not should_reply(user_message, config=config, is_auto=is_auto):
-        return ""
-    llm_cfg_raw = config.get("llm", {})
-    llm_cfg = _build_reply_llm_cfg(config, llm_cfg_raw)
-    provider = str(llm_cfg_raw.get("provider", "")).strip().lower()
-    base_url = str(llm_cfg_raw.get("base_url", "")).strip().lower()
-    if not provider:
-        provider = "ollama" if "11434" in base_url or "ollama" in base_url else "openai"
-    _ensure_llm_auth_ready(llm_cfg)
-
-    base_prompt, safe_history = _build_base_prompt(
-        config, user_message, history, llm_cfg_raw, provider
-    )
-    # Thinking layer
-    thought = ""
-    thinking_cfg = config.get("thinking", {})
-    if thinking_cfg.get("enabled", True) and not is_auto:
-        thought = generate_inner_thought(
-            llm_cfg, user_message, safe_history,
-            persona_summary=base_prompt[:200],
-            emotion_state=load_emotion_state(),
-            config=config,
-        )
-    if thought:
-        from datetime import datetime as _dt
-        _now = _dt.now()
-        _hour = _now.hour
-        time_hint = _hour_to_period_hint(_hour)
-        thought_prefix = (
-            f"[Inner thought for this turn]: {thought}\n"
-            f"[Current local time]: {time_hint}\n"
-            "Use this as soft guidance for direction, tone, length, and opening.\n"
-            "Do not expose the inner thought directly, and keep the reply coherent.\n"
-            "Avoid ending with a question unless it is genuinely needed.\n\n"
-        )
-    prompt = build_prompt_with_style(
-        config,
-        user_message,
-        safe_history,
-        base_prompt,
-        is_auto=is_auto,
-    )
-    lang_block = _build_reply_language_block(config)
-    if lang_block:
-        prompt = merge_prompt_with_memory(prompt, lang_block)
-    stable_behavior_block = _build_demo_stable_reply_behavior_block(config)
-    if stable_behavior_block:
-        prompt = merge_prompt_with_memory(prompt, stable_behavior_block)
-    prompt = _apply_character_runtime_prompt_contract(config, prompt)
-    effective_user_message = thought_prefix + user_message if thought else user_message
-
-
-    tools_settings = get_tools_settings(config)
-
-    if provider in {"openai", "openai-compatible", "openai_compatible"}:
-        messages = build_openai_messages(
-            prompt=prompt,
-            safe_history=safe_history,
-            user_message=effective_user_message,
-            image_data_url=image_data_url,
-        )
-        try:
-            if force_tools or should_use_work_tools(user_message, tools_settings, image_data_url=image_data_url):
-                raw_reply = call_openai_compatible_with_tools(llm_cfg, config, messages)
-            else:
-                raw_reply = call_openai_compatible(llm_cfg, messages)
-            final = finalize_assistant_reply(
-                config,
-                llm_cfg,
-                provider,
-                user_message,
-                safe_history,
-                raw_reply,
-                is_auto=is_auto,
-            )
-            if final and not is_auto:
-                update_emotion_from_reply(user_message, final)
-            return final
-        except Exception as exc:
-            if image_data_url:
-                wrapped = wrap_vision_error(exc)
-                if wrapped is not exc:
-                    raise wrapped from exc
-            raise _diagnose_llm_exception(exc, llm_cfg) from exc
-
-    if provider == "ollama":
-        vision_model = str(
-            llm_cfg.get("vision_model")
-            or llm_cfg.get("model")
-            or OLLAMA_DEFAULT_MODEL
-        ).strip()
-        text_model = str(
-            llm_cfg.get("text_model")
-            or llm_cfg.get("model")
-            or OLLAMA_DEFAULT_MODEL
-        ).strip()
-        selected_model = vision_model if image_data_url else text_model
-
-        if image_data_url and not is_likely_ollama_vision_model(selected_model):
-            raise RuntimeError(
-                "Current Ollama model is text-only. Please switch to a vision model (for example: qwen2.5vl:7b)."
-            )
-        image_base64 = extract_base64_from_data_url(image_data_url)
-        messages = build_ollama_messages(
-            prompt=prompt,
-            safe_history=safe_history,
-            user_message=effective_user_message,
-            image_base64=image_base64,
-        )
-        try:
-            raw_reply = call_ollama(llm_cfg, messages, model_override=selected_model)
-            final = finalize_assistant_reply(
-                config,
-                llm_cfg,
-                provider,
-                user_message,
-                safe_history,
-                raw_reply,
-                is_auto=is_auto,
-            )
-            if final and not is_auto:
-                update_emotion_from_reply(user_message, final)
-            return final
-        except Exception as exc:
-            if image_data_url:
-                wrapped = wrap_vision_error(exc)
-                if wrapped is not exc:
-                    raise wrapped from exc
-            raise _diagnose_llm_exception(exc, llm_cfg) from exc
-
-    raise RuntimeError(
-        f"Unsupported llm.provider: {provider}. Use 'openai' or 'ollama'."
-    )
-
-
-def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
-    if not isinstance(config, dict):
-        config = load_config()
-    llm_cfg_raw = config.get("llm", {})
-    llm_cfg = _build_reply_llm_cfg(config, llm_cfg_raw)
-    provider = str(llm_cfg_raw.get("provider", "")).strip().lower()
-    base_url = str(llm_cfg_raw.get("base_url", "")).strip().lower()
-    if not provider:
-        provider = "ollama" if "11434" in base_url or "ollama" in base_url else "openai"
-    _ensure_llm_auth_ready(llm_cfg)
-
-    base_prompt, safe_history = _build_base_prompt(
-        config, user_message, history, llm_cfg_raw, provider
-    )
-    merged_prompt = build_prompt_with_style(
-        config,
-        user_message,
-        safe_history,
-        base_prompt,
-        is_auto=is_auto,
-    )
-    lang_block = _build_reply_language_block(config)
-    if lang_block:
-        merged_prompt = merge_prompt_with_memory(merged_prompt, lang_block)
-    stable_behavior_block = _build_demo_stable_reply_behavior_block(config)
-    if stable_behavior_block:
-        merged_prompt = merge_prompt_with_memory(merged_prompt, stable_behavior_block)
-    merged_prompt = _apply_character_runtime_prompt_contract(config, merged_prompt)
-
-    tools_settings = get_tools_settings(config)
-
-    if (
-        provider in {"openai", "openai-compatible", "openai_compatible"}
-        and (force_tools or should_use_work_tools(user_message, tools_settings, image_data_url=image_data_url))
-    ):
-        # Tool workflow is step-based; return chunked final text for SSE compatibility.
-        reply = call_llm(
-            user_message,
-            history,
-            image_data_url=image_data_url,
-            is_auto=is_auto,
-            force_tools=force_tools,
-            config=config,
-        )
-        for chunk in split_text_for_stream(reply):
-            yield chunk
-        return
-
-    if provider in {"openai", "openai-compatible", "openai_compatible"}:
-        messages = build_openai_messages(
-            prompt=merged_prompt,
-            safe_history=safe_history,
-            user_message=user_message,
-            image_data_url=image_data_url,
-        )
-        streamed = False
-
-        # Try Chat Completions stream first for lower time-to-first-token on many relays.
-        try:
-            for chunk in iter_openai_chat_stream(llm_cfg, messages):
-                if isinstance(chunk, str) and chunk:
-                    streamed = True
-                    yield chunk
-        except Exception:
-            streamed = False
-        if streamed:
-            return
-
-        # Fallback to Responses API stream for relay compatibility.
-        try:
-            for chunk in iter_openai_responses_stream(llm_cfg, messages):
-                if isinstance(chunk, str) and chunk:
-                    streamed = True
-                    yield chunk
-        except Exception:
-            # Fallback to non-stream call below.
-            streamed = False
-        if streamed:
-            return
-
-    # Fallback path: fetch full answer then chunk locally.
-    # call_llm already runs finalize_assistant_reply internally, so mark it as pre-finalized.
-    reply = call_llm(
+    return call_llm_impl(
         user_message,
         history,
         image_data_url=image_data_url,
         is_auto=is_auto,
         force_tools=force_tools,
         config=config,
+        load_config_fn=load_config,
+        should_reply_fn=should_reply,
+        build_reply_llm_cfg_fn=_build_reply_llm_cfg,
+        ensure_llm_auth_ready_fn=_ensure_llm_auth_ready,
+        build_base_prompt_fn=_build_base_prompt,
+        generate_inner_thought_fn=generate_inner_thought,
+        load_emotion_state_fn=load_emotion_state,
+        hour_to_period_hint_fn=_hour_to_period_hint,
+        build_prompt_with_style_fn=build_prompt_with_style,
+        build_reply_language_block_fn=_build_reply_language_block,
+        merge_prompt_with_memory_fn=merge_prompt_with_memory,
+        build_demo_stable_reply_behavior_block_fn=_build_demo_stable_reply_behavior_block,
+        apply_character_runtime_prompt_contract_fn=_apply_character_runtime_prompt_contract,
+        get_tools_settings_fn=get_tools_settings,
+        build_openai_messages_fn=build_openai_messages,
+        should_use_work_tools_fn=should_use_work_tools,
+        call_openai_compatible_with_tools_fn=call_openai_compatible_with_tools,
+        call_openai_compatible_fn=call_openai_compatible,
+        finalize_assistant_reply_fn=finalize_assistant_reply,
+        update_emotion_from_reply_fn=update_emotion_from_reply,
+        wrap_vision_error_fn=wrap_vision_error,
+        diagnose_llm_exception_fn=_diagnose_llm_exception,
+        is_likely_ollama_vision_model_fn=is_likely_ollama_vision_model,
+        extract_base64_from_data_url_fn=extract_base64_from_data_url,
+        build_ollama_messages_fn=build_ollama_messages,
+        call_ollama_fn=call_ollama,
     )
-    # Yield a sentinel so the SSE handler knows not to re-finalize.
-    yield "\x00PRE_FINALIZED\x00"
-    for chunk in split_text_for_stream(reply):
-        yield chunk
+
+
+def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
+    yield from call_llm_stream_impl(
+        user_message,
+        history,
+        image_data_url=image_data_url,
+        is_auto=is_auto,
+        force_tools=force_tools,
+        config=config,
+        load_config_fn=load_config,
+        build_reply_llm_cfg_fn=_build_reply_llm_cfg,
+        ensure_llm_auth_ready_fn=_ensure_llm_auth_ready,
+        build_base_prompt_fn=_build_base_prompt,
+        build_prompt_with_style_fn=build_prompt_with_style,
+        build_reply_language_block_fn=_build_reply_language_block,
+        merge_prompt_with_memory_fn=merge_prompt_with_memory,
+        build_demo_stable_reply_behavior_block_fn=_build_demo_stable_reply_behavior_block,
+        apply_character_runtime_prompt_contract_fn=_apply_character_runtime_prompt_contract,
+        get_tools_settings_fn=get_tools_settings,
+        should_use_work_tools_fn=should_use_work_tools,
+        call_llm_fn=call_llm,
+        split_text_for_stream_fn=split_text_for_stream,
+        build_openai_messages_fn=build_openai_messages,
+        iter_openai_chat_stream_fn=iter_openai_chat_stream,
+        iter_openai_responses_stream_fn=iter_openai_responses_stream,
+    )
 
 
 def render_tool_execution_summary(tool_payloads, max_chars=1800):
