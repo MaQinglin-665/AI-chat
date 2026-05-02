@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-import base64
 import random
 import secrets
 import threading
@@ -156,6 +155,7 @@ from app_diagnostics import (
     safe_int_value as _safe_int_value,
     wall_now_ms as _wall_now_ms,
 )
+from app_asr_route import handle_asr_pcm_request
 from app_translate_route import handle_translate_request
 from app_tts_route import handle_tts_request
 from llm_diagnostics import (
@@ -1178,40 +1178,16 @@ class PetHandler(SimpleHTTPRequestHandler):
             return
 
         if path_only == "/api/asr_pcm":
-            audio_base64 = str(body.get("audio_base64", "")).strip()
-            sample_rate = body.get("sample_rate", 16000)
-            if not audio_base64:
-                self._send_json(
-                    {"error": "audio_base64 cannot be empty."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-                return
-            try:
-                pcm_data = base64.b64decode(audio_base64, validate=True)
-            except Exception:
-                self._send_json(
-                    {"error": "audio_base64 decode failed."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-                return
-            try:
-                raw_text = transcribe_pcm16_with_vosk(
-                    pcm_data,
-                    sample_rate=sample_rate,
-                )
-                cfg = load_config()
-                asr_cfg = cfg.get("asr", {}) if isinstance(cfg, dict) else {}
-                replacements = sanitize_hotword_replacements(
-                    asr_cfg.get("hotword_replacements", {})
-                )
-                text = apply_hotword_replacements(raw_text, replacements)
-                self._send_json({"text": text, "raw_text": raw_text})
-            except Exception as exc:
-                _log_backend_exception("ASR", exc, extra="/api/asr_pcm failed")
-                self._send_json(
-                    _diagnostic_payload(exc),
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
+            handle_asr_pcm_request(
+                body,
+                send_json_func=self._send_json,
+                load_config_func=load_config,
+                transcribe_pcm16_func=transcribe_pcm16_with_vosk,
+                sanitize_hotword_replacements_func=sanitize_hotword_replacements,
+                apply_hotword_replacements_func=apply_hotword_replacements,
+                log_backend_exception_func=_log_backend_exception,
+                diagnostic_payload_func=_diagnostic_payload,
+            )
             return
 
         user_message = str(body.get("message", "")).strip()
