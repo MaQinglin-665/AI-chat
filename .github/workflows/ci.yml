@@ -54,7 +54,7 @@ jobs:
         run: python -m pytest -q tests
 
   node-tests:
-    name: Node Drag Tests
+    name: Node Frontend Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -65,8 +65,8 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Run drag logic tests
-        run: node tests/test_drag_logic.js
+      - name: Run Node frontend tests
+        run: node scripts/run_node_tests.js
 
   windows-compat:
     name: Windows Compatibility
@@ -95,8 +95,8 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: python -m pytest -q tests
 
-      - name: Run drag logic tests
-        run: node tests/test_drag_logic.js
+      - name: Run Node frontend tests
+        run: node scripts/run_node_tests.js
 
       - name: Install docs dependencies
         working-directory: docs

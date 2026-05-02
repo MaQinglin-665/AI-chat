@@ -20,6 +20,19 @@
     };
   }
 
+  function describeError(err) {
+    return String(err?.message || err || "").trim();
+  }
+
+  function buildFallbackFailureError(primaryErr, fallbackErr) {
+    const primary = describeError(primaryErr);
+    const fallback = describeError(fallbackErr);
+    if (primary && fallback && primary !== fallback) {
+      return new Error(`流式聊天失败：${primary}；普通请求兜底也失败：${fallback}`);
+    }
+    return new Error(primary || fallback || "聊天请求失败");
+  }
+
   function createStreamLineHandler(context) {
     const onDelta = typeof context.onDelta === "function" ? context.onDelta : () => {};
     const onCharacterRuntimeMetadata = typeof context.onCharacterRuntimeMetadata === "function"
@@ -161,6 +174,14 @@
       return text;
     };
 
+    const fetchDirectChatOrThrowCombined = async (fallbackReason, primaryErr) => {
+      try {
+        return await fetchDirectChat(fallbackReason);
+      } catch (fallbackErr) {
+        throw buildFallbackFailureError(primaryErr, fallbackErr);
+      }
+    };
+
     let resp;
     try {
       resp = await authFetch("/api/chat_stream", requestInit);
@@ -169,7 +190,7 @@
         reason: "stream_fetch_error",
         error: String(err?.message || err || "")
       });
-      return await fetchDirectChat("stream_fetch_error");
+      return await fetchDirectChatOrThrowCombined("stream_fetch_error", err);
     }
 
     if (perfHooks && typeof perfHooks.onApiHeaders === "function") {
@@ -196,8 +217,8 @@
       });
       try {
         return await fetchDirectChat(`stream_http_${Number(resp.status) || 0}`);
-      } catch (_) {
-        throw new Error(detail);
+      } catch (fallbackErr) {
+        throw buildFallbackFailureError(new Error(detail), fallbackErr);
       }
     }
 
@@ -205,7 +226,10 @@
       perfLog("chat", "stream_fallback", {
         reason: "stream_reader_unavailable"
       });
-      return await fetchDirectChat("stream_reader_unavailable");
+      return await fetchDirectChatOrThrowCombined(
+        "stream_reader_unavailable",
+        new Error("stream reader unavailable")
+      );
     }
 
     try {
@@ -222,7 +246,7 @@
           reason: "stream_read_error_before_delta",
           error: String(err?.message || err || "")
         });
-        return await fetchDirectChat("stream_read_error_before_delta");
+        return await fetchDirectChatOrThrowCombined("stream_read_error_before_delta", err);
       }
       throw err;
     }

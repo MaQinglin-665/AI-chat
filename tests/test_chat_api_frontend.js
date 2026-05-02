@@ -130,11 +130,37 @@ async function testStreamReaderErrorBeforeDeltaFallback() {
   assert.strictEqual(reply, "fallback reply");
 }
 
+async function testStreamErrorFallbackFailureKeepsDiagnostic() {
+  const urls = [];
+  const authFetch = async (url) => {
+    urls.push(url);
+    if (url === "/api/chat_stream") {
+      return makeStreamResponse(['data: {"type":"error","error":"LLM diagnostic detail"}\n']);
+    }
+    throw new Error("Failed to fetch");
+  };
+
+  await assert.rejects(
+    () => chatApi.streamAssistantReply(
+      { message: "hi" },
+      () => {},
+      { authFetch, perfLog: () => {} }
+    ),
+    (err) => {
+      assert.match(err.message, /LLM diagnostic detail/);
+      assert.match(err.message, /Failed to fetch/);
+      return true;
+    }
+  );
+  assert.deepStrictEqual(urls, ["/api/chat_stream", "/api/chat"]);
+}
+
 async function main() {
   await testBuildRequestInit();
   await testStreamingReply();
   await testStreamFetchFallback();
   await testStreamReaderErrorBeforeDeltaFallback();
+  await testStreamErrorFallbackFailureKeepsDiagnostic();
   console.log("Chat API frontend checks passed.");
 }
 

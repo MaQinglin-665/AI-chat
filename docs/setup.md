@@ -194,6 +194,7 @@ start_desktop.bat
 ## 10. Related Docs
 
 - 排障：`docs/troubleshooting.md`
+- 语音输入 / 输出排障：`docs/voice-troubleshooting.md`
 - 路线图：`docs/ROADMAP.md`
 - 贡献：`CONTRIBUTING.md`
 - 安全策略：`SECURITY.md`

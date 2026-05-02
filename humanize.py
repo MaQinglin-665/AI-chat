@@ -89,6 +89,54 @@ def get_humanize_settings(config):
         ),
     }
 
+def resolve_reply_language(config):
+    raw = str(
+        (config or {}).get("assistant_reply_language", "")
+        or (config or {}).get("reply_language", "")
+        or ""
+    ).strip().lower()
+    if raw in {"en", "english"}:
+        return "en"
+    if raw in {"zh", "zh-cn", "zh_cn", "chinese"}:
+        return "zh"
+    return "auto"
+
+def _text_language_counts(text):
+    safe = str(text or "")
+    latin = len(re.findall(r"[A-Za-z]", safe))
+    cjk = len(re.findall(r"[\u4e00-\u9fff]", safe))
+    return latin, cjk
+
+def is_mostly_chinese_text(text):
+    latin, cjk = _text_language_counts(text)
+    return cjk >= 4 and cjk > latin * 0.55
+
+def is_explicit_chinese_reply_request(user_message):
+    safe = str(user_message or "").lower()
+    return bool(
+        re.search(r"(用中文|中文回答|回复中文|说中文|請用中文|请用中文|answer in chinese|reply in chinese|use chinese)", safe)
+    )
+
+def build_english_reply_fallback(reply):
+    visible, meta = split_tool_meta_suffix(reply)
+    text = str(visible or "").strip()
+    if not text:
+        return reply
+    return "I got you. I'll keep my main replies in English, and you can read the Chinese translation below." + meta
+
+def enforce_reply_language(config, user_message, reply):
+    if resolve_reply_language(config if isinstance(config, dict) else {}) != "en":
+        return reply
+    if is_explicit_chinese_reply_request(user_message):
+        return reply
+    visible, meta = split_tool_meta_suffix(reply)
+    text = str(visible or "").strip()
+    if not text:
+        return reply
+    if is_mostly_chinese_text(text):
+        return build_english_reply_fallback(text + meta)
+    return reply
+
 def normalize_style_name(name):
     style = str(name or "neutral").strip().lower()
     if style not in {"neutral", "comfort", "clear", "playful", "steady"}:
@@ -348,6 +396,8 @@ def maybe_refine_assistant_reply(config, llm_cfg, provider, user_message, safe_h
     settings = get_humanize_settings(config)
     if not settings["enabled"] or not settings["refine_enabled"]:
         return reply
+    if resolve_reply_language(config if isinstance(config, dict) else {}) == "en":
+        return reply
     visible, meta = split_tool_meta_suffix(reply)
     raw_visible = str(visible or "").strip()
     if not should_refine_assistant_reply(raw_visible, user_message, is_auto=is_auto):
@@ -527,6 +577,8 @@ def _is_reply_too_similar_to_recent(reply_text, safe_history, threshold=0.84):
 def maybe_diversify_repetitive_reply(config, llm_cfg, provider, user_message, safe_history, reply, is_auto=False):
     if is_auto:
         return reply
+    if resolve_reply_language(config if isinstance(config, dict) else {}) == "en":
+        return reply
 
     visible, meta = split_tool_meta_suffix(reply)
     current = str(visible or "").strip()
@@ -621,6 +673,7 @@ def finalize_assistant_reply(config, llm_cfg, provider, user_message, safe_histo
             final_reply,
             strip_fillers=settings["strip_fillers"],
         )
+        final_reply = enforce_reply_language(config, user_message, final_reply)
         final_reply = maybe_refine_assistant_reply(
             config,
             llm_cfg,
@@ -634,6 +687,7 @@ def finalize_assistant_reply(config, llm_cfg, provider, user_message, safe_histo
             final_reply,
             strip_fillers=settings["strip_fillers"],
         )
+        final_reply = enforce_reply_language(config, user_message, final_reply)
         final_reply = apply_contextual_human_override(
             user_message,
             final_reply,
@@ -655,6 +709,7 @@ def finalize_assistant_reply(config, llm_cfg, provider, user_message, safe_histo
             final_reply,
             strip_fillers=settings["strip_fillers"],
         )
+    final_reply = enforce_reply_language(config, user_message, final_reply)
     return final_reply.strip()
 
 def build_prompt_with_style(config, user_message, safe_history, base_prompt, is_auto=False):

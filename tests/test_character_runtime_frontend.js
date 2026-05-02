@@ -80,6 +80,50 @@ assert.ok(
   "natural speech completion should keep a release helper"
 );
 assert.ok(
+  /function finishSpeechAnimation\(\)\s*\{[\s\S]*?state\.speechAnimUntil\s*=\s*now\s*\+\s*releaseMs;/.test(source),
+  "natural speech completion should shorten the mouth animation to a release window"
+);
+assert.ok(
+  source.includes("ttsAudioRawLevel: 0"),
+  "speech animation should keep raw audio level state for audio-driven mouth shapes"
+);
+assert.ok(
+  /state\.ttsAudioAnalyser\.smoothingTimeConstant\s*=\s*0\.12;/.test(source),
+  "TTS audio analyser should react quickly enough for mouth closures"
+);
+assert.ok(
+  /const hasLiveAudio\s*=\s*audioPlaying && !!state\.ttsAudioAnalyser;/.test(source),
+  "mouth animation should prefer live audio when an analyser is available"
+);
+assert.ok(
+  /if \(hasLiveAudio\) \{[\s\S]*?const voiced = rawLevel > 0\.035[\s\S]*?target = 0;[\s\S]*?state\.speechMouthOpen = 0;[\s\S]*?return state\.speechMouthOpen;/.test(source),
+  "live audio mouth path should close quickly when voice energy drops"
+);
+assert.ok(
+  source.includes("const closureDip = clampNumber(closureGate")
+    && source.includes("const rhythmGate = clampNumber")
+    && source.includes("const closureCap = clampNumber"),
+  "live audio mouth path should add rhythmic closure dips during fast speech"
+);
+assert.ok(
+  source.includes("voiceRecent = now - Number(state.ttsAudioLastVoiceAt || 0) < 58")
+    && source.includes("0.62 + visemeOpen * 0.48 - closureDip")
+    && source.includes("0.045 + liveLevel * 0.16 + rawLevel * 0.1"),
+  "fast live audio mouth path should keep closure valleys visible"
+);
+assert.ok(
+  source.includes("const _translationInFlight = new Map();"),
+  "chat and subtitle translations should share in-flight requests"
+);
+assert.ok(
+  /async function _fetchTranslation\(text, capturedId\)\s*\{[\s\S]*?_readChatTranslationCache\(safe\)[\s\S]*?_fetchChatTranslation\(safe\)/.test(source),
+  "subtitle translation should reuse the chat translation cache/request path"
+);
+assert.ok(
+  source.includes('translationEl.textContent = "中译：翻译中...";'),
+  "assistant messages should show an immediate translation placeholder"
+);
+assert.ok(
   /utterance\.onend\s*=\s*\(\)\s*=>\s*\{[\s\S]*?finishSpeechAnimation\(\);[\s\S]*?resolve\(true\);[\s\S]*?\};/.test(source),
   "browser TTS success should use graceful speech release"
 );
@@ -90,6 +134,48 @@ assert.ok(
 assert.ok(
   /const done = \(ok\) => \{[\s\S]*?if \(ok\) \{[\s\S]*?finishSpeechAnimation\(\);[\s\S]*?\} else \{[\s\S]*?endSpeechAnimation\(\);[\s\S]*?\}[\s\S]*?resolve\(ok\);[\s\S]*?\};/.test(source),
   "server TTS completion should release on success and hard-stop on failure"
+);
+assert.ok(
+  /progressTimer\s*=\s*window\.setInterval\(async \(\) => \{[\s\S]*?performance\.now\(\) - lastProgressAt < 2800[\s\S]*?playAudioByContext\(blob,\s*debugContext\)/.test(source),
+  "server TTS should fall back when HTML audio stops advancing"
+);
+assert.ok(
+  /fallbackTimer\s*=\s*window\.setTimeout\(resolveOnce,[\s\S]*?durationMs \+ 900/.test(source),
+  "AudioContext fallback should not leave speaking state stuck if onended is missed"
+);
+assert.ok(
+  source.includes("function hasQueuedStreamSpeakItem(sessionId)"),
+  "stream speech queue should be able to detect queued tail segments"
+);
+assert.ok(
+  /current\s*=\s*next\s*\|\|\s*await waitNextStreamSpeakItem\([\s\S]*?state\.chatBusy \? idleWaitMs : 180/.test(source),
+  "stream speech queue should re-check for tail segments after each audio segment plays"
+);
+assert.ok(
+  /finally \{[\s\S]*?state\.streamSpeakWorking = false;[\s\S]*?hasQueuedStreamSpeakItem\(activeSession\)[\s\S]*?runStreamSpeakQueue\(\)/.test(source),
+  "stream speech queue should restart itself if a segment arrived while it was finishing"
+);
+assert.ok(
+  source.includes("function buildTTSDebugReport()"),
+  "chat.js should expose a TTS debug report for voice playback diagnosis"
+);
+assert.ok(
+  source.includes('text.toLowerCase() === "/ttsdebug"'),
+  "local commands should include /ttsdebug for copyable playback state"
+);
+assert.ok(
+  source.includes("function installTTSDebugBridge()"),
+  "window debug bridge should expose TTS playback state to developer tools"
+);
+assert.ok(
+  source.includes('recordTTSDebugEvent("audio_play_start"')
+    && source.includes('recordTTSDebugEvent("audio_done"'),
+  "server audio playback should record start and completion events"
+);
+assert.ok(
+  source.includes('recordTTSDebugEvent("stream_enqueue"')
+    && source.includes('recordTTSDebugEvent("stream_request_ok"'),
+  "stream speech queue should record enqueue and TTS request completion events"
 );
 
 console.log("Character runtime frontend checks passed.");

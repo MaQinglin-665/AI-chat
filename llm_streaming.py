@@ -1,11 +1,29 @@
 import json
 import os
+import socket
+import time
+import http.client
 import urllib.error
 import urllib.request
 
 from config import OPENAI_DEFAULT_BASE_URL, OPENAI_DEFAULT_KEY_ENV, OPENAI_DEFAULT_MODEL
 from llm_client import get_llm_user_agent, get_openai_tuning, is_local_url
 from llm_response_utils import convert_messages_to_responses_input
+from utils import _clamp_int
+
+
+def _resolve_stream_timeout(llm_cfg):
+    # Keep this separate from legacy llm.timeout_sec: existing configs use that
+    # value too aggressively for slow first tokens, so streaming has its own key.
+    raw = (llm_cfg or {}).get("stream_timeout_sec", (llm_cfg or {}).get("request_timeout", 45))
+    return _clamp_int(raw, 45, 8, 120)
+
+
+def _raise_if_no_stream_delta(started_at, timeout, yielded_any):
+    if yielded_any:
+        return
+    if time.monotonic() - started_at > timeout:
+        raise TimeoutError(f"LLM stream produced no text within {timeout}s")
 
 
 def _build_stream_headers(llm_cfg, base_url, key_env):
@@ -30,6 +48,7 @@ def iter_openai_chat_stream(llm_cfg, messages):
     temperature = float(llm_cfg.get("temperature", 0.7))
     tuning = get_openai_tuning(llm_cfg)
     headers = _build_stream_headers(llm_cfg, base_url, key_env)
+    timeout = _resolve_stream_timeout(llm_cfg)
 
     payload = {
         "model": model,
@@ -48,8 +67,11 @@ def iter_openai_chat_stream(llm_cfg, messages):
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
+        started_at = time.monotonic()
+        yielded_any = False
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             for raw_line in resp:
+                _raise_if_no_stream_delta(started_at, timeout, yielded_any)
                 line = raw_line.decode("utf-8", errors="ignore").strip()
                 if not line or not line.startswith("data:"):
                     continue
@@ -65,6 +87,7 @@ def iter_openai_chat_stream(llm_cfg, messages):
                     delta = choice.get("delta") or {}
                     content = delta.get("content")
                     if isinstance(content, str) and content:
+                        yielded_any = True
                         yield content
                         continue
                     if isinstance(content, list):
@@ -73,11 +96,20 @@ def iter_openai_chat_stream(llm_cfg, messages):
                                 continue
                             text = part.get("text")
                             if isinstance(text, str) and text:
+                                yielded_any = True
                                 yield text
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")
         raise RuntimeError(f"LLM HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
+    except (
+        urllib.error.URLError,
+        TimeoutError,
+        socket.timeout,
+        http.client.RemoteDisconnected,
+        ConnectionResetError,
+        BrokenPipeError,
+        OSError,
+    ) as exc:
         raise RuntimeError(f"LLM connection failed: {exc}") from exc
 
 
@@ -88,6 +120,7 @@ def iter_openai_responses_stream(llm_cfg, messages):
     temperature = float(llm_cfg.get("temperature", 0.7))
     tuning = get_openai_tuning(llm_cfg)
     headers = _build_stream_headers(llm_cfg, base_url, key_env)
+    timeout = _resolve_stream_timeout(llm_cfg)
 
     payload = {
         "model": model,
@@ -112,8 +145,11 @@ def iter_openai_responses_stream(llm_cfg, messages):
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
+        started_at = time.monotonic()
+        yielded_any = False
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             for raw_line in resp:
+                _raise_if_no_stream_delta(started_at, timeout, yielded_any)
                 line = raw_line.decode("utf-8", errors="ignore").strip()
                 if not line or not line.startswith("data:"):
                     continue
@@ -129,6 +165,7 @@ def iter_openai_responses_stream(llm_cfg, messages):
                 if evt_type == "response.output_text.delta":
                     delta = evt.get("delta")
                     if isinstance(delta, str) and delta:
+                        yielded_any = True
                         yield delta
                     continue
 
@@ -145,5 +182,13 @@ def iter_openai_responses_stream(llm_cfg, messages):
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")
         raise RuntimeError(f"LLM HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
+    except (
+        urllib.error.URLError,
+        TimeoutError,
+        socket.timeout,
+        http.client.RemoteDisconnected,
+        ConnectionResetError,
+        BrokenPipeError,
+        OSError,
+    ) as exc:
         raise RuntimeError(f"LLM connection failed: {exc}") from exc

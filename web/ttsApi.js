@@ -190,8 +190,10 @@
     }
 
     const { blob, mime } = await normalizeAudioBlob(await resp.blob(), requestOpts);
+    const responseTraceId =
+      typeof resp.headers?.get === "function" ? String(resp.headers.get("X-Perf-Trace-Id") || "") : "";
     perfLog("tts", "response_ok", {
-      traceId: perfTraceId || "(none)",
+      traceId: responseTraceId || perfTraceId || "(none)",
       elapsedMs: Math.round(getNow() - ttsReqStartedPerfMs),
       status: Number(resp.status) || 0,
       bytes: Number(blob.size) || 0,

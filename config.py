@@ -228,10 +228,10 @@ DEFAULT_CONFIG = {
         "show_mic_meter": True,
         "keep_listening": True,
         "transcribe_on_close": True,
-        "min_speech_ms": 180,
+        "min_speech_ms": 150,
         "silence_trigger_ms": 380,
-        "max_speech_ms": 2400,
-        "speech_threshold": 0.009,
+        "max_speech_ms": 2200,
+        "speech_threshold": 0.0035,
         "processor_buffer_size": 2048,
         "wake_word_enabled": True,
         "wake_words": ["馨语", "馨语ai", "xinyu", "\u5854\u83f2", "taffy", "tafi"],
@@ -816,13 +816,13 @@ def sanitize_client_config(config):
             "show_mic_meter": bool(asr_cfg.get("show_mic_meter", True)),
             "keep_listening": bool(asr_cfg.get("keep_listening", True)),
             "transcribe_on_close": bool(asr_cfg.get("transcribe_on_close", True)),
-            "min_speech_ms": max(80, min(1200, _safe_int(asr_cfg.get("min_speech_ms", 180), 180))),
+            "min_speech_ms": max(80, min(1200, _safe_int(asr_cfg.get("min_speech_ms", 150), 150))),
             "silence_trigger_ms": max(
                 180, min(1200, _safe_int(asr_cfg.get("silence_trigger_ms", 380), 380))
             ),
-            "max_speech_ms": max(1000, min(6000, _safe_int(asr_cfg.get("max_speech_ms", 2400), 2400))),
+            "max_speech_ms": max(1000, min(6000, _safe_int(asr_cfg.get("max_speech_ms", 2200), 2200))),
             "speech_threshold": max(
-                0.003, min(0.05, _safe_float(asr_cfg.get("speech_threshold", 0.009), 0.009))
+                0.0015, min(0.05, _safe_float(asr_cfg.get("speech_threshold", 0.0035), 0.0035))
             ),
             "processor_buffer_size": (
                 _safe_int(asr_cfg.get("processor_buffer_size", 2048), 2048)

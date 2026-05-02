@@ -40,8 +40,14 @@ def handle_translate_request(
         cfg = load_config_func()
         llm_cfg = cfg.get("llm", {}) if isinstance(cfg, dict) else {}
         translate_cfg = dict(llm_cfg)
-        translate_cfg["max_output_tokens"] = 120
-        translate_cfg["temperature"] = 0.2
+        translate_cfg["max_output_tokens"] = 96
+        translate_cfg["max_tokens"] = 96
+        translate_cfg["temperature"] = 0.1
+        translate_cfg["request_timeout"] = 18
+        translate_cfg["num_ctx"] = 1024
+        translate_model = str(llm_cfg.get("translate_model", "")).strip()
+        if translate_model:
+            translate_cfg["model"] = translate_model
         messages = build_translate_messages(text)
         provider = str(llm_cfg.get("provider", "ollama")).lower()
         if provider == "ollama":
