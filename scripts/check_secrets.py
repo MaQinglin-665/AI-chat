@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -80,7 +81,21 @@ def _should_skip(rel: Path) -> bool:
 
 
 def _iter_text_files(root: Path):
-    for path in root.rglob("*"):
+    try:
+        result = subprocess.run(
+            ["git", "ls-files"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        candidates = [root / line for line in result.stdout.splitlines() if line.strip()]
+    except Exception:
+        candidates = root.rglob("*")
+
+    for path in candidates:
         if not path.is_file():
             continue
         rel = path.relative_to(root)
