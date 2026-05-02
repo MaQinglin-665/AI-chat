@@ -3,7 +3,6 @@ import os
 import sys
 import base64
 import random
-import re
 import secrets
 import threading
 import time
@@ -222,6 +221,7 @@ from llm_response_utils import (
     normalize_text_content,
     split_text_for_stream,
 )
+from hotword_utils import apply_hotword_replacements
 
 
 
@@ -389,25 +389,6 @@ def schedule_runtime_restart(delay_sec=0.35):
 
     thread = threading.Thread(target=_restart_later, daemon=True, name="taffy-runtime-restart")
     thread.start()
-
-
-def apply_hotword_replacements(text, replacements):
-    safe = str(text or "")
-    if not safe or not isinstance(replacements, dict) or not replacements:
-        return safe
-    # Replace longer sources first to avoid partial replacement conflicts.
-    ordered = sorted(replacements.items(), key=lambda kv: len(str(kv[0])), reverse=True)
-    out = safe
-    for src, dst in ordered:
-        s = str(src or "")
-        d = str(dst or "")
-        if not s or not d:
-            continue
-        pattern = re.compile(re.escape(s), flags=re.IGNORECASE)
-        out = pattern.sub(d, out)
-    return out
-
-
 
 
 def summarize_older_history(llm_cfg, provider, older_history, max_summary_chars=900):
