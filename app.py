@@ -156,6 +156,7 @@ from app_diagnostics import (
     safe_int_value as _safe_int_value,
     wall_now_ms as _wall_now_ms,
 )
+from app_translate_route import handle_translate_request
 from app_tts_route import handle_tts_request
 from llm_diagnostics import (
     diagnose_llm_exception as _diagnose_llm_exception_impl,
@@ -1164,58 +1165,16 @@ class PetHandler(SimpleHTTPRequestHandler):
             return
 
         if path_only == "/api/translate":
-            text = str(body.get("text", "")).strip()
-            if not text:
-                self._send_json({"error": "text is empty"})
-                return
-            try:
-                cfg = load_config()
-                llm_cfg = cfg.get("llm", {})
-                translate_cfg = dict(llm_cfg)
-                translate_cfg["max_output_tokens"] = 120
-                translate_cfg["temperature"] = 0.2
-                messages = [
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a translator. Translate the user's text to "
-                            "Simplified Chinese. Output ONLY the translation — "
-                            "no explanation, no quotation marks."
-                        ),
-                    },
-                    {"role": "user", "content": text},
-                ]
-                provider = str(llm_cfg.get("provider", "ollama")).lower()
-                if provider == "ollama":
-                    result = call_ollama(translate_cfg, messages)
-                else:
-                    result = call_openai_compatible(translate_cfg, messages)
-                translated = str(result or "").strip() or text
-                self._send_json(
-                    {
-                        "translated": translated,
-                        "translated_text": translated,
-                        "degraded": False,
-                        "fallback": False,
-                    }
-                )
-            except Exception as exc:
-                diagnosed = _diagnose_llm_exception(exc, llm_cfg if "llm_cfg" in locals() else {})
-                _log_backend_notice(
-                    "TRANSLATE",
-                    diagnosed,
-                    extra="/api/translate degraded to passthrough",
-                )
-                safe_error = str(_diagnostic_payload(diagnosed).get("error", "") or "").strip()
-                self._send_json(
-                    {
-                        "translated": text,
-                        "translated_text": text,
-                        "degraded": True,
-                        "fallback": True,
-                        "error": safe_error or "translate unavailable",
-                    }
-                )
+            handle_translate_request(
+                body,
+                send_json_func=self._send_json,
+                load_config_func=load_config,
+                call_ollama_func=call_ollama,
+                call_openai_compatible_func=call_openai_compatible,
+                diagnose_llm_exception_func=_diagnose_llm_exception,
+                log_backend_notice_func=_log_backend_notice,
+                diagnostic_payload_func=_diagnostic_payload,
+            )
             return
 
         if path_only == "/api/asr_pcm":
