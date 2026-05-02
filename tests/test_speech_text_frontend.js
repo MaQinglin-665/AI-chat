@@ -30,6 +30,23 @@ assert.ok(
   "speech delivery text should end with punctuation"
 );
 
+assert.strictEqual(
+  speechText.buildSpeechDeliveryText("Hey there!I'm more of a night owl myself.", "happy", "playful", false),
+  "Hey there! I'm more of a night owl myself.",
+  "English speech delivery should preserve sentence-boundary spacing"
+);
+
+assert.strictEqual(
+  speechText.buildSpeechDeliveryText(
+    "This is a long English sentence without punctuation and it should not split inside a word",
+    "idle",
+    "neutral",
+    false
+  ),
+  "This is a long English sentence without punctuation and it should not split inside a word.",
+  "English speech delivery should not insert CJK pauses inside words"
+);
+
 const split = speechText.splitStreamSpeakSegments(
   "这是第一句，已经足够长可以切开。这里是第二句，还在继续",
   { flush: false, style: "neutral" }

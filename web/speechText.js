@@ -12,6 +12,40 @@
     return src.slice(0, idx).trimEnd();
   }
 
+  function isMostlyEnglishText(text) {
+    const src = String(text || "");
+    const cjk = (src.match(/[\u4e00-\u9fff]/g) || []).length;
+    const latin = (src.match(/[A-Za-z]/g) || []).length;
+    return latin >= 3 && cjk === 0;
+  }
+
+  function normalizeEnglishBoundaries(text) {
+    return String(text || "")
+      .replace(/([.!?])(?=[A-Z'"\u2018\u2019])/g, "$1 ")
+      .replace(/([,;:])(?=[A-Za-z])/g, "$1 ")
+      .replace(/\s+([.!?,;:])/g, "$1")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function joinSpeechPieces(pieces) {
+    return (Array.isArray(pieces) ? pieces : [])
+      .reduce((out, piece) => {
+        const safe = String(piece || "").trim();
+        if (!safe) {
+          return out;
+        }
+        if (!out) {
+          return safe;
+        }
+        if (/[A-Za-z0-9.!?,;:]$/.test(out) && /^[A-Za-z'"\u2018\u2019(]/.test(safe)) {
+          return `${out} ${safe}`;
+        }
+        return `${out}${safe}`;
+      }, "")
+      .trim();
+  }
+
   function sanitizeSpeakText(text) {
     const plain = parseToolMetaVisibleText(text);
     return String(plain || "")
@@ -20,6 +54,8 @@
       .replace(/^\s*[-*]\s+/gm, "")
       .replace(/^\s*\d+[.)]\s+/gm, "")
       .replace(/([。！？!?，,])\1+/g, "$1")
+      .replace(/([.!?])(?=[A-Z'"\u2018\u2019])/g, "$1 ")
+      .replace(/([,;:])(?=[A-Za-z])/g, "$1 ")
       .replace(/\s+/g, " ")
       .trim();
   }
@@ -28,6 +64,9 @@
     const src = String(seg || "").trim();
     if (!src) {
       return "";
+    }
+    if (isMostlyEnglishText(src)) {
+      return normalizeEnglishBoundaries(src);
     }
     if (src.length < 24 || /[，,。！？!?]/.test(src)) {
       return src;
@@ -129,6 +168,7 @@
     }
     spoken = colloquializeSpeakText(spoken);
     spoken = simplifySpeechDeliveryText(spoken, style, streamMode);
+    spoken = isMostlyEnglishText(spoken) ? normalizeEnglishBoundaries(spoken) : spoken;
     if (!spoken) {
       return "";
     }
@@ -147,7 +187,7 @@
         return insertNaturalPause(safe);
       })
       .filter(Boolean);
-    spoken = normalized.join("").trim();
+    spoken = joinSpeechPieces(normalized);
 
     spoken = spoken
       .replace(/[（(][^（）()]{2,28}[）)]/g, "")
@@ -162,6 +202,14 @@
         .replace(/我建议你/g, "你直接")
         .replace(/你可以考虑/g, "你直接")
         .replace(/一般来说[:：]?\s*/g, "");
+    }
+
+    if (isMostlyEnglishText(spoken)) {
+      spoken = normalizeEnglishBoundaries(spoken);
+      if (!/[.!?]$/.test(spoken)) {
+        spoken += ".";
+      }
+      return tightenMinorSpeechPauses(spoken, streamMode);
     }
 
     if (!/[。！？!?]$/.test(spoken)) {

@@ -7453,18 +7453,30 @@ function getSpeechAnimationMouthOpen() {
   }
   if (hasLiveAudio) {
     const rawLevel = clampNumber(Number(state.ttsAudioRawLevel) || liveLevel || 0, 0, 1);
-    const voiceRecent = now - Number(state.ttsAudioLastVoiceAt || 0) < 90;
+    const voiceRecent = now - Number(state.ttsAudioLastVoiceAt || 0) < 58;
     const voiced = rawLevel > 0.035 || liveLevel > 0.045 || voiceRecent;
-    const liveTarget = voiced
-      ? clampNumber(rawLevel * 2.25 + liveLevel * 0.62 + accentPulse * 0.025, 0, 1)
+    const closureDip = clampNumber(closureGate * (0.68 + fastSpeechFactor * 0.5), 0, 0.92);
+    const rhythmGate = clampNumber(0.62 + visemeOpen * 0.48 - closureDip, 0.035, 1.06);
+    const liveBase = voiced
+      ? clampNumber(rawLevel * 1.48 + liveLevel * 0.42 + accentPulse * 0.02, 0, 1)
       : 0;
-    const textHint = voiced ? clampNumber(target * 0.16, 0, 0.14) : 0;
-    target = clampNumber(liveTarget + textHint, 0, 1);
+    const textHint = voiced ? clampNumber(target * (0.07 + visemeOpen * 0.08), 0, 0.1) : 0;
+    target = clampNumber(liveBase * rhythmGate + textHint, 0, 1);
+    if (voiced && closureGate > 0.28) {
+      const closureCap = clampNumber(
+        0.045 + liveLevel * 0.16 + rawLevel * 0.1 + (1 - fastSpeechFactor) * 0.035,
+        0.045,
+        0.24
+      );
+      target = Math.min(target, closureCap);
+    }
     if (!voiced && liveLevel < 0.04) {
       target = 0;
     }
-    const openSmooth = voiced ? 0.88 : 0.22;
-    const closeSmooth = voiced ? 0.76 : 0.94;
+    const openSmooth = voiced ? clampNumber(0.78 - closureGate * 0.28, 0.46, 0.82) : 0.22;
+    const closeSmooth = voiced
+      ? clampNumber(0.86 + closureGate * 0.2 + fastSpeechFactor * 0.1, 0.84, 0.985)
+      : 0.94;
     const smoothing = target > state.speechMouthOpen ? openSmooth : closeSmooth;
     state.speechMouthOpen += (target - state.speechMouthOpen) * smoothing;
     if (!voiced && state.speechMouthOpen < 0.012) {

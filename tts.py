@@ -79,6 +79,8 @@ def _normalize_gpt_sovits_spoken_text(text):
     src = " ".join(str(text or "").replace("`", " ").split()).strip()
     if not src:
         return ""
+    src = re.sub(r"([.!?])(?=[A-Z'\"\u2018\u2019])", r"\1 ", src)
+    src = re.sub(r"([,;:])(?=[A-Za-z])", r"\1 ", src)
 
     # Keep English replies intact; only apply aggressive token cleanup for CJK text.
     has_cjk = bool(re.search(r"[\u4e00-\u9fff]", src))

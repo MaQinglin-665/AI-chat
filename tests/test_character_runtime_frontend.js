@@ -100,6 +100,18 @@ assert.ok(
   "live audio mouth path should close quickly when voice energy drops"
 );
 assert.ok(
+  source.includes("const closureDip = clampNumber(closureGate")
+    && source.includes("const rhythmGate = clampNumber")
+    && source.includes("const closureCap = clampNumber"),
+  "live audio mouth path should add rhythmic closure dips during fast speech"
+);
+assert.ok(
+  source.includes("voiceRecent = now - Number(state.ttsAudioLastVoiceAt || 0) < 58")
+    && source.includes("0.62 + visemeOpen * 0.48 - closureDip")
+    && source.includes("0.045 + liveLevel * 0.16 + rawLevel * 0.1"),
+  "fast live audio mouth path should keep closure valleys visible"
+);
+assert.ok(
   source.includes("const _translationInFlight = new Map();"),
   "chat and subtitle translations should share in-flight requests"
 );

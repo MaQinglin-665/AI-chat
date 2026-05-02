@@ -25,5 +25,9 @@ def test_gpt_sovits_normalizes_short_english_contractions_for_stability():
         _normalize_gpt_sovits_spoken_text("Hey, I've got my ways!")
         == "Hey. I have got my ways!"
     )
+    assert (
+        _normalize_gpt_sovits_spoken_text("Hey there!I'm more of a night owl.")
+        == "Hey there! I am more of a night owl."
+    )
     assert _prefer_gpt_sovits_short_english_chunks("Hey. I have got my ways!") is True
     assert _prefer_gpt_sovits_short_english_chunks("This is a plain sentence") is False
