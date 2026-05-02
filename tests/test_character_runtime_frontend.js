@@ -124,7 +124,7 @@ assert.ok(
   "server TTS completion should release on success and hard-stop on failure"
 );
 assert.ok(
-  /progressTimer\s*=\s*window\.setInterval\(async \(\) => \{[\s\S]*?performance\.now\(\) - lastProgressAt < 2800[\s\S]*?playAudioByContext\(blob\)/.test(source),
+  /progressTimer\s*=\s*window\.setInterval\(async \(\) => \{[\s\S]*?performance\.now\(\) - lastProgressAt < 2800[\s\S]*?playAudioByContext\(blob,\s*debugContext\)/.test(source),
   "server TTS should fall back when HTML audio stops advancing"
 );
 assert.ok(
@@ -142,6 +142,28 @@ assert.ok(
 assert.ok(
   /finally \{[\s\S]*?state\.streamSpeakWorking = false;[\s\S]*?hasQueuedStreamSpeakItem\(activeSession\)[\s\S]*?runStreamSpeakQueue\(\)/.test(source),
   "stream speech queue should restart itself if a segment arrived while it was finishing"
+);
+assert.ok(
+  source.includes("function buildTTSDebugReport()"),
+  "chat.js should expose a TTS debug report for voice playback diagnosis"
+);
+assert.ok(
+  source.includes('text.toLowerCase() === "/ttsdebug"'),
+  "local commands should include /ttsdebug for copyable playback state"
+);
+assert.ok(
+  source.includes("function installTTSDebugBridge()"),
+  "window debug bridge should expose TTS playback state to developer tools"
+);
+assert.ok(
+  source.includes('recordTTSDebugEvent("audio_play_start"')
+    && source.includes('recordTTSDebugEvent("audio_done"'),
+  "server audio playback should record start and completion events"
+);
+assert.ok(
+  source.includes('recordTTSDebugEvent("stream_enqueue"')
+    && source.includes('recordTTSDebugEvent("stream_request_ok"'),
+  "stream speech queue should record enqueue and TTS request completion events"
 );
 
 console.log("Character runtime frontend checks passed.");

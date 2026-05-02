@@ -788,10 +788,20 @@ def _should_replace_en_words_for_tts(text):
     return cn_chars >= en_chars
 
 
-def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=None):
+def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=None, perf_trace_id=""):
+    trace_id = _sanitize_perf_trace_id(perf_trace_id)
+    original_text = str(text or "")
     text = _normalize_gpt_sovits_spoken_text(text)
     if not text:
         raise RuntimeError("GPT-SoVITS text is empty.")
+    if original_text != text:
+        _log_tts_perf(
+            "TTS_GPT_SOVITS",
+            trace_id,
+            stage="text_normalized",
+            original_chars=len(original_text),
+            normalized_chars=len(text),
+        )
     api_url = str(
         tts_cfg.get("gpt_sovits_api_url")
         or tts_cfg.get("api_url")
@@ -1139,18 +1149,39 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
 
         best_audio = b""
         best_score = None
-        for candidate in ordered_candidates:
+        for candidate_index, candidate in enumerate(ordered_candidates, start=1):
             current_payload = dict(candidate)
             current_payload["text"] = safe
             try:
                 audio_bytes = _request_once(current_payload, timeout_override=chunk_timeout_sec)
-            except Exception:
+            except Exception as exc:
+                _log_tts_perf(
+                    "TTS_GPT_SOVITS",
+                    trace_id,
+                    stage="chunk_candidate_fail",
+                    depth=depth,
+                    candidate=candidate_index,
+                    chunk_chars=len(safe),
+                    error_type=type(exc).__name__,
+                )
                 continue
             score = _audio_score(audio_bytes, safe)
+            is_bad = _audio_bad(audio_bytes, safe)
+            _log_tts_perf(
+                "TTS_GPT_SOVITS",
+                trace_id,
+                stage="chunk_candidate",
+                depth=depth,
+                candidate=candidate_index,
+                chunk_chars=len(safe),
+                audio_bytes=len(audio_bytes or b""),
+                audio_duration_ms=int(round(float(_wav_duration_seconds(audio_bytes) or 0.0) * 1000)),
+                bad=is_bad,
+            )
             if best_score is None or score > best_score:
                 best_audio = audio_bytes
                 best_score = score
-            if not _audio_bad(audio_bytes, safe):
+            if not is_bad:
                 return audio_bytes
 
         if depth < chunk_split_depth and len(safe) >= 8:
@@ -1189,12 +1220,29 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
             return parts[0]
 
     prefer_chunked = len(text) > chunk_char_limit or _prefer_gpt_sovits_short_english_chunks(text)
+    _log_tts_perf(
+        "TTS_GPT_SOVITS",
+        trace_id,
+        stage="plan",
+        text_chars=len(text),
+        chunks=len(text_chunks or []),
+        chunk_char_limit=chunk_char_limit,
+        prefer_chunked=prefer_chunked,
+        detected_lang=detected_lang,
+    )
     if prefer_chunked:
         # For long text, prefer one-shot first. Chunking is a fallback when one-shot output is degraded.
         try:
             one_shot_audio = _request_once(payload)
         except Exception:
             one_shot_audio = b""
+        _log_tts_perf(
+            "TTS_GPT_SOVITS",
+            trace_id,
+            stage="one_shot",
+            audio_bytes=len(one_shot_audio or b""),
+            audio_duration_ms=int(round(float(_wav_duration_seconds(one_shot_audio) or 0.0) * 1000)),
+        )
         one_shot_bad = (
             not one_shot_audio
             or _looks_too_short_for_text(one_shot_audio, text)
@@ -1253,6 +1301,13 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
             solution="请确认 GPT-SoVITS 服务已启动并可正常合成语音。",
             config_key="tts.gpt_sovits_api_url",
         )
+    _log_tts_perf(
+        "TTS_GPT_SOVITS",
+        trace_id,
+        stage="selected_audio",
+        audio_bytes=len(audio or b""),
+        audio_duration_ms=int(round(float(_wav_duration_seconds(audio) or 0.0) * 1000)),
+    )
     return audio
 
 
@@ -1338,6 +1393,7 @@ def synthesize_tts_audio(text, voice_override=None, prosody=None, perf_trace_id=
             tts_cfg=tts_cfg,
             voice_override=voice_override,
             prosody={**prosody, "_dominant": _dominant, "_arousal": _arousal},
+            perf_trace_id=perf_trace,
         )
         _log_tts_perf(
             "TTS_GPT_SOVITS",

@@ -1,4 +1,6 @@
 from http import HTTPStatus
+import wave
+from io import BytesIO
 
 
 TTS_PROSODY_KEYS = (
@@ -20,6 +22,20 @@ def extract_tts_request(body):
         if key in payload:
             prosody[key] = payload.get(key)
     return text, voice, prosody
+
+
+def estimate_wav_duration_ms(audio):
+    if not isinstance(audio, (bytes, bytearray)) or len(audio) < 44:
+        return -1
+    try:
+        with wave.open(BytesIO(bytes(audio)), "rb") as wav:
+            frame_rate = wav.getframerate()
+            frames = wav.getnframes()
+            if frame_rate <= 0 or frames < 0:
+                return -1
+            return int(round(frames * 1000 / frame_rate))
+    except Exception:
+        return -1
 
 
 def handle_tts_request(
@@ -83,6 +99,7 @@ def handle_tts_request(
             synth_ms=tts_synth_ms,
             total_ms=perf_now_ms_func() - perf_started_ms,
             audio_bytes=len(audio),
+            audio_duration_ms=estimate_wav_duration_ms(audio),
         )
     except Exception as exc:
         log_backend_perf_func(
