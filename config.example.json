@@ -111,10 +111,10 @@
     "show_mic_meter": true,
     "keep_listening": true,
     "transcribe_on_close": true,
-    "min_speech_ms": 180,
+    "min_speech_ms": 150,
     "silence_trigger_ms": 380,
-    "max_speech_ms": 2400,
-    "speech_threshold": 0.009,
+    "max_speech_ms": 2200,
+    "speech_threshold": 0.0035,
     "processor_buffer_size": 2048,
     "wake_word_enabled": true,
     "wake_words": [

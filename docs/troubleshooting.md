@@ -2,6 +2,8 @@
 
 以下问题优先使用配置中心（`docs/config.html`）做连通性检查，再根据提示修复。
 
+语音输入 / 语音输出问题请优先看 `docs/voice-troubleshooting.md`。那里包含麦克风权限、`/micdebug`、Vosk 模型、ASR 错误码、TTS 回退等更细的排查步骤。
+
 ## Common Startup / Runtime Issues
 
 ### 0) Downloaded source looks incomplete
@@ -58,11 +60,13 @@
 
 - 检查项：`tts.gpt_sovits_api_url`
 - 建议：确认服务进程和端口
+- 语音专项排查：`docs/voice-troubleshooting.md`
 
 ### 6) TTS timeout
 
 - 检查项：`tts.gpt_sovits_timeout_sec`
 - 建议：提高超时或降低服务负载
+- 语音专项排查：`docs/voice-troubleshooting.md`
 
 ### 7) Live2D path invalid
 
@@ -89,6 +93,7 @@
 - `favicon.ico` 404 可忽略。
 - 模型不显示时尝试 `Ctrl + F5` 硬刷新。
 - Electron 模式窗口位置会自动保存并在下次恢复。
+- 开麦、转写、TTS 相关问题见 `docs/voice-troubleshooting.md`。
 
 ## Security Reminder
 

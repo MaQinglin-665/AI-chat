@@ -28,22 +28,38 @@ def test_handle_translate_request_rejects_empty_text():
 
 def test_handle_translate_request_returns_success_payload():
     sent = {}
+    called = {}
 
     handle_translate_request(
         {"text": "hello"},
         send_json_func=lambda data, status=200: sent.update({"data": data, "status": status}),
-        load_config_func=lambda: {"llm": {"provider": "openai"}},
+        load_config_func=lambda: {
+            "llm": {
+                "provider": "openai",
+                "model": "main-model",
+                "translate_model": "translate-model",
+            }
+        },
         call_ollama_func=lambda *_args, **_kwargs: "unused",
-        call_openai_compatible_func=lambda _cfg, _messages: "你好",
+        call_openai_compatible_func=lambda cfg, messages: called.update(
+            {"cfg": cfg, "messages": messages}
+        ) or "ni hao",
         diagnose_llm_exception_func=lambda exc, _cfg: exc,
         log_backend_notice_func=lambda *_args, **_kwargs: None,
         diagnostic_payload_func=lambda exc: {"error": str(exc)},
     )
 
-    assert sent["data"]["translated"] == "你好"
-    assert sent["data"]["translated_text"] == "你好"
+    assert sent["data"]["translated"] == "ni hao"
+    assert sent["data"]["translated_text"] == "ni hao"
     assert sent["data"]["degraded"] is False
     assert sent["data"]["fallback"] is False
+    assert called["cfg"]["max_output_tokens"] == 96
+    assert called["cfg"]["max_tokens"] == 96
+    assert called["cfg"]["temperature"] == 0.1
+    assert called["cfg"]["request_timeout"] == 18
+    assert called["cfg"]["num_ctx"] == 1024
+    assert called["cfg"]["model"] == "translate-model"
+    assert called["messages"] == build_translate_messages("hello")
 
 
 def test_handle_translate_request_falls_back_to_source_text_on_failure():

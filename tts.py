@@ -104,11 +104,28 @@ def _normalize_gpt_sovits_spoken_text(text):
         speak = re.sub(r"[\u3001\uff0c,]{2,}", "\uff0c", speak)
         speak = re.sub(r"[\u3002.!?\uff01\uff1f]{2,}", "\u3002", speak)
     else:
+        speak = re.sub(r"\bI['\u2019]m\b", "I am", speak, flags=re.I)
+        speak = re.sub(r"\bI['\u2019]ve\b", "I have", speak, flags=re.I)
+        speak = re.sub(r"\bI['\u2019]ll\b", "I will", speak, flags=re.I)
+        speak = re.sub(r"\bI['\u2019]d\b", "I would", speak, flags=re.I)
+        speak = re.sub(r"\b(can|do|does|did|is|are|was|were|has|have|had|should|could|would|will|won)['\u2019]t\b", r"\1 not", speak, flags=re.I)
+        speak = re.sub(r"\b([A-Za-z]+)['\u2019]re\b", r"\1 are", speak)
+        speak = re.sub(r"\b([A-Za-z]+)['\u2019]s\b", r"\1 is", speak)
         speak = re.sub(r"\s+([,.!?;:])", r"\1", speak)
         speak = re.sub(r"([,.!?;:])(?=[^\s])", r"\1 ", speak)
+        speak = re.sub(r"[,;:]\s+", ". ", speak)
         speak = re.sub(r"\s+", " ", speak).strip()
 
     return speak[:600]
+
+
+def _prefer_gpt_sovits_short_english_chunks(text):
+    safe = str(text or "").strip()
+    if _detect_text_lang(safe) != "en":
+        return False
+    if len(safe) > 72:
+        return False
+    return bool(re.search(r"[.!?].+|[,;:]", safe))
 
 
 async def synthesize_edge_tts_bytes_async(text, voice, rate, volume, pitch):
@@ -759,6 +776,18 @@ def _detect_text_lang(text):
     return "zh"
 
 
+def _should_replace_en_words_for_tts(text):
+    lang = _detect_text_lang(text)
+    if lang == "en":
+        return False
+    if lang == "zh":
+        return True
+    s = str(text or "")
+    cn_chars = sum(1 for c in s if "\u4e00" <= c <= "\u9fff")
+    en_chars = sum(1 for c in s if c.isascii() and c.isalpha())
+    return cn_chars >= en_chars
+
+
 def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=None):
     text = _normalize_gpt_sovits_spoken_text(text)
     if not text:
@@ -1159,7 +1188,7 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         except Exception:
             return parts[0]
 
-    prefer_chunked = len(text) > chunk_char_limit
+    prefer_chunked = len(text) > chunk_char_limit or _prefer_gpt_sovits_short_english_chunks(text)
     if prefer_chunked:
         # For long text, prefer one-shot first. Chunking is a fallback when one-shot output is degraded.
         try:
@@ -1256,7 +1285,8 @@ _EN_TO_CN_PHONETIC = {
 
 def _replace_en_words_for_tts(text):
     """Replace common short English words with Chinese phonetic equivalents."""
-    import re
+    if not _should_replace_en_words_for_tts(text):
+        return str(text or "")
     result = str(text or "")
     for en, cn in _EN_TO_CN_PHONETIC.items():
         pattern = re.compile(r'(?<![a-zA-Z])' + re.escape(en) + r'(?![a-zA-Z])', re.IGNORECASE)

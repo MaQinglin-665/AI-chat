@@ -148,6 +148,9 @@ const state = {
   ttsAudioAnalyser: null,
   ttsAudioAnalyserData: null,
   ttsAudioLevel: 0,
+  ttsAudioRawLevel: 0,
+  ttsAudioRms: 0,
+  ttsAudioLastVoiceAt: 0,
   historyMaxMessages: 64,
   currentTalkStyle: "neutral",
   styleAutoEnabled: true,
@@ -208,6 +211,15 @@ const state = {
   localAsrLastFrameAt: 0,
   localAsrWatchdogTimer: 0,
   localAsrNoFrameWarned: false,
+  localAsrPeakRms: 0,
+  localAsrStartedAt: 0,
+  localAsrLowLevelWarned: false,
+  localAsrThresholdAutoAdjusted: false,
+  localAsrInputDeviceId: "",
+  localAsrInputDeviceLabel: "",
+  localAsrInputMuted: false,
+  localAsrMutedWarned: false,
+  localAsrInputDeviceCandidates: [],
   localAsrSpeeching: false,
   localAsrSpeechMs: 0,
   localAsrSilenceMs: 0,
@@ -217,8 +229,8 @@ const state = {
   localAsrMinSpeechMs: 180,
   localAsrSilenceTriggerMs: 380,
   localAsrMaxSpeechMs: 2400,
-  localAsrSpeechThreshold: 0.009,
-  localAsrNoiseFloor: 0.004,
+  localAsrSpeechThreshold: 0.0035,
+  localAsrNoiseFloor: 0.0008,
   localAsrProcessorBufferSize: 2048,
   micLevel: 0,
   showMicMeter: true,
@@ -2877,10 +2889,79 @@ function startReminderLoop() {
   }, 1200);
 }
 
+async function buildMicDebugReport() {
+  const tracks =
+    state.localAsrStream && typeof state.localAsrStream.getAudioTracks === "function"
+      ? state.localAsrStream.getAudioTracks()
+      : [];
+  const ctx = state.localAsrContext;
+  const now = performance.now();
+  const lastFrameAt = Number(state.localAsrLastFrameAt) || 0;
+  const frameAge = lastFrameAt > 0 ? Math.round(now - lastFrameAt) : -1;
+  const peakRms = Number(state.localAsrPeakRms) || 0;
+  const lines = [
+    "Mic debug:",
+    `mode=${state.asrMode}`,
+    `micOpen=${state.micOpen}`,
+    `localRunning=${state.localAsrRunning}`,
+    `context=${ctx ? ctx.state : "none"}`,
+    `sampleRate=${ctx ? ctx.sampleRate : "n/a"}`,
+    `lastFrameAgeMs=${frameAge}`,
+    `peakRms=${peakRms.toFixed(5)}`,
+    `noiseFloor=${(Number(state.localAsrNoiseFloor) || 0).toFixed(5)}`,
+    `threshold=${(Number(state.localAsrSpeechThreshold) || 0).toFixed(5)}`,
+    `selectedInput=${state.localAsrInputDeviceLabel || "(unknown)"}`,
+    `selectedInputMuted=${state.localAsrInputMuted}`
+  ];
+  if (Array.isArray(state.localAsrInputDeviceCandidates) && state.localAsrInputDeviceCandidates.length) {
+    lines.push(`knownInputs=${state.localAsrInputDeviceCandidates.join(" | ")}`);
+  }
+  if (tracks.length) {
+    for (const track of tracks) {
+      const settings =
+        typeof track.getSettings === "function" ? track.getSettings() || {} : {};
+      lines.push(
+        `track=${track.label || "(no label)"} enabled=${track.enabled} muted=${track.muted} ready=${track.readyState} channel=${settings.channelCount || "n/a"} device=${settings.deviceId || "default"}`
+      );
+    }
+  } else {
+    lines.push("track=none");
+  }
+  try {
+    const devices =
+      navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === "function"
+        ? await navigator.mediaDevices.enumerateDevices()
+        : [];
+    const inputs = devices.filter((device) => device.kind === "audioinput");
+    if (inputs.length) {
+      lines.push(`audioInputs=${inputs.map((device) => device.label || "(hidden label)").join(" | ")}`);
+    } else {
+      lines.push("audioInputs=none");
+    }
+  } catch (err) {
+    lines.push(`audioInputsError=${err?.message || String(err)}`);
+  }
+  const hasMutedTrack = tracks.some((track) => !!track?.muted);
+  if (state.localAsrInputMuted || hasMutedTrack) {
+    lines.push("diagnosis=mic_track_muted");
+    lines.push(
+      "next=检查 Windows 设置 > 系统 > 声音 > 输入，确认当前麦克风未静音且测试条会动；再检查 隐私和安全性 > 麦克风 > 允许桌面应用"
+    );
+  } else if (state.localAsrRunning && peakRms <= 0) {
+    lines.push("diagnosis=no_audio_level");
+    lines.push("next=应用正在收音但音量为 0，请确认系统输入设备选中了真实麦克风");
+  }
+  return lines.join("\n");
+}
+
 async function handleLocalCommand(inputText) {
   const text = String(inputText || "").trim();
   if (!text.startsWith("/")) {
     return false;
+  }
+  if (text.toLowerCase() === "/micdebug") {
+    appendMessage("assistant", await buildMicDebugReport());
+    return true;
   }
   if (text === "/情绪日报") {
     const report = buildEmotionReportText();
@@ -3094,6 +3175,8 @@ function updateMicMeter(levelOverride = null) {
     ui.micMeterText.textContent = "未开麦";
   } else if (state.micSuspendDepth > 0) {
     ui.micMeterText.textContent = "暂停";
+  } else if (state.asrMode === "local_vosk" && state.localAsrInputMuted) {
+    ui.micMeterText.textContent = "系统静音";
   } else if (rawPct < 8) {
     ui.micMeterText.textContent = "静音";
   } else if (rawPct < 28) {
@@ -3128,7 +3211,12 @@ function updateMicButton() {
     return;
   }
   if (state.asrMode === "local_vosk") {
-    ui.micBtn.textContent = state.localAsrRunning ? "开麦: 开" : "开麦: 连接中";
+    ui.micBtn.textContent =
+      state.localAsrRunning && state.localAsrInputMuted
+        ? "开麦: 静音"
+        : state.localAsrRunning
+          ? "开麦: 开"
+          : "开麦: 连接中";
     updateMicMeter();
     return;
   }
@@ -3290,12 +3378,14 @@ function cancelLocalAsrRequest() {
 }
 
 function updateLocalAsrMicLevelFromRms(rms) {
+  const safeRms = Math.max(0, Number(rms) || 0);
+  state.localAsrPeakRms = Math.max(Number(state.localAsrPeakRms) || 0, safeRms);
   const displayNoiseFloor = clampNumber(
-    state.localAsrNoiseFloor * 1.6 + 0.0015,
-    0.0015,
-    0.035
+    state.localAsrNoiseFloor * 1.15 + 0.0004,
+    0.0004,
+    0.018
   );
-  const normalizedLevel = clampNumber((rms - displayNoiseFloor) / 0.07, 0, 1);
+  const normalizedLevel = clampNumber((safeRms - displayNoiseFloor) / 0.025, 0, 1);
   const smoothing = normalizedLevel > state.micLevel ? 0.38 : 0.24;
   state.micLevel += (normalizedLevel - state.micLevel) * smoothing;
   if (state.micLevel < 0.01 && normalizedLevel <= 0.001) {
@@ -3377,6 +3467,7 @@ function stopLocalAsrWatchdog() {
   }
   state.localAsrWatchdogTimer = 0;
   state.localAsrNoFrameWarned = false;
+  state.localAsrMutedWarned = false;
 }
 
 function startLocalAsrWatchdog(sessionId = null) {
@@ -3384,6 +3475,7 @@ function startLocalAsrWatchdog(sessionId = null) {
   const token = sessionId == null ? state.micSession : Number(sessionId);
   state.localAsrLastFrameAt = performance.now();
   state.localAsrNoFrameWarned = false;
+  state.localAsrMutedWarned = false;
   state.localAsrWatchdogTimer = window.setInterval(() => {
     if (token !== state.micSession || !state.micOpen || !state.localAsrRunning) {
       stopLocalAsrWatchdog();
@@ -3397,10 +3489,51 @@ function startLocalAsrWatchdog(sessionId = null) {
       ctx.resume().catch(() => {});
       return;
     }
+    const startedAt = Number(state.localAsrStartedAt) || 0;
+    const muted = isLocalAsrTrackMuted(state.localAsrStream) || state.localAsrInputMuted;
+    if (muted) {
+      state.localAsrInputMuted = true;
+      if (
+        !state.localAsrMutedWarned &&
+        startedAt > 0 &&
+        performance.now() - startedAt > 1200
+      ) {
+        state.localAsrMutedWarned = true;
+        setStatus("麦克风轨道被系统静音，请检查 Windows 输入设备、隐私权限或硬件静音键");
+        updateMicButton();
+      }
+      return;
+    }
     const lastFrameAt = Number(state.localAsrLastFrameAt) || 0;
     if (!state.localAsrNoFrameWarned && performance.now() - lastFrameAt > 2200) {
       state.localAsrNoFrameWarned = true;
       setStatus("麦克风已开启，但没有收到音频，请检查系统输入设备");
+      return;
+    }
+    const peakRms = Number(state.localAsrPeakRms) || 0;
+    const lowLevelLine = Math.max(0.0018, (Number(state.localAsrSpeechThreshold) || 0.0035) * 0.55);
+    if (
+      !state.localAsrLowLevelWarned &&
+      startedAt > 0 &&
+      performance.now() - startedAt > 5500 &&
+      peakRms > 0 &&
+      peakRms < lowLevelLine
+    ) {
+      state.localAsrLowLevelWarned = true;
+      if (!state.localAsrThresholdAutoAdjusted && state.localAsrSpeechThreshold > 0.0042) {
+        const loweredThreshold = clampNumber(
+          state.localAsrSpeechThreshold * 0.62,
+          0.0022,
+          0.0042
+        );
+        if (loweredThreshold < state.localAsrSpeechThreshold) {
+          state.localAsrSpeechThreshold = loweredThreshold;
+          state.localAsrThresholdAutoAdjusted = true;
+          setStatus("麦克风输入偏低，已自动降低识别阈值一次");
+          return;
+        }
+      }
+      setStatus("麦克风输入音量很低，请检查系统输入设备或靠近麦克风");
     }
   }, 1200);
 }
@@ -3467,10 +3600,10 @@ function handleLocalAsrFrame(floatData, inputSampleRate, sessionId = null) {
   const frameMs = (pcm16.length / 16000) * 1000;
   updateLocalAsrMicLevelFromRms(rms);
 
-  const baseThreshold = clampNumber(state.localAsrSpeechThreshold || 0.009, 0.003, 0.05);
+  const baseThreshold = clampNumber(state.localAsrSpeechThreshold || 0.0035, 0.0015, 0.05);
   const adaptiveThreshold = Math.max(
     baseThreshold,
-    clampNumber(state.localAsrNoiseFloor * 2.4 + 0.002, 0.003, 0.03)
+    clampNumber(state.localAsrNoiseFloor * 1.8 + 0.001, 0.0015, 0.02)
   );
   const isSpeech = rms >= adaptiveThreshold;
 
@@ -3547,14 +3680,185 @@ function clearLocalAsrGraph() {
   state.localAsrProcessor = null;
   state.localAsrAnalyser = null;
   state.localAsrLastFrameAt = 0;
+  state.localAsrPeakRms = 0;
+  state.localAsrStartedAt = 0;
+  state.localAsrLowLevelWarned = false;
+  state.localAsrThresholdAutoAdjusted = false;
+  state.localAsrMutedWarned = false;
+  state.localAsrInputDeviceId = "";
+  state.localAsrInputDeviceLabel = "";
+  state.localAsrInputMuted = false;
   state.localAsrRunning = false;
   state.localAsrSpeeching = false;
   state.localAsrSpeechMs = 0;
   state.localAsrSilenceMs = 0;
   state.localAsrBuffers = [];
-  state.localAsrNoiseFloor = 0.004;
+  state.localAsrNoiseFloor = 0.0008;
   state.micLevel = 0;
   updateMicMeter(0);
+}
+
+function buildLocalAsrAudioConstraints(deviceId = "") {
+  const audio = {
+    channelCount: { ideal: 1 },
+    sampleRate: { ideal: 16000 },
+    latency: { ideal: 0 },
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true
+  };
+  const safeDeviceId = String(deviceId || "").trim();
+  if (safeDeviceId) {
+    audio.deviceId = { exact: safeDeviceId };
+  }
+  return { audio, video: false };
+}
+
+function getLocalAsrAudioTrack(stream) {
+  return stream && typeof stream.getAudioTracks === "function"
+    ? (stream.getAudioTracks()[0] || null)
+    : null;
+}
+
+function getLocalAsrTrackLabel(stream) {
+  return String(getLocalAsrAudioTrack(stream)?.label || "").trim();
+}
+
+function isLocalAsrTrackMuted(stream) {
+  return !!getLocalAsrAudioTrack(stream)?.muted;
+}
+
+function isDisfavoredLocalAsrInputLabel(label) {
+  return /stereo mix|loopback|what u hear|\u7acb\u4f53\u58f0\u6df7\u97f3/i.test(
+    String(label || "")
+  );
+}
+
+function scoreLocalAsrInputDevice(device) {
+  const label = String(device?.label || "").toLowerCase();
+  if (!label) {
+    return 0;
+  }
+  let score = 0;
+  if (/microphone|mic|\u9ea6\u514b\u98ce|\u9635\u5217/.test(label)) {
+    score += 80;
+  }
+  if (/realtek|array/.test(label)) {
+    score += 12;
+  }
+  if (/default|communications/.test(label)) {
+    score -= 4;
+  }
+  if (/stereo mix|loopback|what u hear|\u7acb\u4f53\u58f0\u6df7\u97f3/.test(label)) {
+    score -= 120;
+  }
+  return score;
+}
+
+function choosePreferredLocalAsrInputDevice(devices) {
+  const inputs = Array.isArray(devices)
+    ? devices.filter((device) => device && device.kind === "audioinput")
+    : [];
+  if (!inputs.length) {
+    return null;
+  }
+  const ranked = inputs
+    .map((device, index) => ({ device, index, score: scoreLocalAsrInputDevice(device) }))
+    .sort((a, b) => (b.score - a.score) || (a.index - b.index));
+  const best = ranked[0];
+  return best && best.score > 0 ? best.device : null;
+}
+
+function rememberLocalAsrInputDevice(stream, devices = []) {
+  const track = getLocalAsrAudioTrack(stream);
+  const settings = track && typeof track.getSettings === "function" ? (track.getSettings() || {}) : {};
+  state.localAsrInputDeviceId = String(settings.deviceId || "").trim();
+  state.localAsrInputDeviceLabel = String(track?.label || "").trim();
+  state.localAsrInputMuted = !!track?.muted;
+  state.localAsrInputDeviceCandidates = Array.isArray(devices)
+    ? devices
+        .filter((device) => device && device.kind === "audioinput")
+        .map((device) => String(device.label || "(hidden label)").trim())
+        .filter(Boolean)
+        .slice(0, 12)
+    : [];
+}
+
+async function openPreferredLocalAsrStream(media) {
+  let stream = await media.getUserMedia(buildLocalAsrAudioConstraints());
+  let devices = [];
+  try {
+    devices = await media.enumerateDevices();
+  } catch (_) {
+    devices = [];
+  }
+  const currentTrack = getLocalAsrAudioTrack(stream);
+  const currentSettings =
+    currentTrack && typeof currentTrack.getSettings === "function"
+      ? (currentTrack.getSettings() || {})
+      : {};
+  const currentDeviceId = String(currentSettings.deviceId || "").trim();
+  const currentLabel = getLocalAsrTrackLabel(stream);
+  if (!isDisfavoredLocalAsrInputLabel(currentLabel) && !isLocalAsrTrackMuted(stream)) {
+    rememberLocalAsrInputDevice(stream, devices);
+    return stream;
+  }
+
+  const inputs = Array.isArray(devices)
+    ? devices.filter((device) => device && device.kind === "audioinput")
+    : [];
+  const ranked = inputs
+    .map((device, index) => ({ device, index, score: scoreLocalAsrInputDevice(device) }))
+    .sort((a, b) => (b.score - a.score) || (a.index - b.index));
+  for (const item of ranked) {
+    const candidate = item.device;
+    const candidateDeviceId = String(candidate?.deviceId || "").trim();
+    if (!candidateDeviceId || candidateDeviceId === currentDeviceId || item.score <= 0) {
+      continue;
+    }
+    let candidateStream = null;
+    try {
+      candidateStream = await media.getUserMedia(
+        buildLocalAsrAudioConstraints(candidateDeviceId)
+      );
+      if (
+        isDisfavoredLocalAsrInputLabel(getLocalAsrTrackLabel(candidateStream)) ||
+        isLocalAsrTrackMuted(candidateStream)
+      ) {
+        for (const track of candidateStream.getTracks()) {
+          try {
+            track.stop();
+          } catch (_) {
+            // ignore
+          }
+        }
+        candidateStream = null;
+        continue;
+      }
+      for (const track of stream.getTracks()) {
+        try {
+          track.stop();
+        } catch (_) {
+          // ignore
+        }
+      }
+      stream = candidateStream;
+      candidateStream = null;
+      break;
+    } catch (_) {
+      if (candidateStream) {
+        for (const track of candidateStream.getTracks()) {
+          try {
+            track.stop();
+          } catch (_) {
+            // ignore
+          }
+        }
+      }
+    }
+  }
+  rememberLocalAsrInputDevice(stream, devices);
+  return stream;
 }
 
 async function startLocalAsrLoop(sessionId = null) {
@@ -3570,17 +3874,7 @@ async function startLocalAsrLoop(sessionId = null) {
   }
   let stream = null;
   try {
-    stream = await media.getUserMedia({
-      audio: {
-        channelCount: 1,
-        sampleRate: 16000,
-        latency: 0,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      },
-      video: false
-    });
+    stream = await openPreferredLocalAsrStream(media);
   } catch (err) {
     const name = String(err?.name || "");
     if (name === "NotAllowedError" || name === "PermissionDeniedError") {
@@ -3599,6 +3893,28 @@ async function startLocalAsrLoop(sessionId = null) {
       }
     }
     return false;
+  }
+  const audioTrack = stream.getAudioTracks()[0] || null;
+  if (audioTrack) {
+    audioTrack.onmute = () => {
+      state.localAsrInputMuted = true;
+      if (token === state.micSession && state.micOpen) {
+        setStatus("麦克风轨道被系统静音，请检查 Windows 输入设备、隐私权限或硬件静音键");
+        updateMicButton();
+      }
+    };
+    audioTrack.onunmute = () => {
+      state.localAsrInputMuted = false;
+      if (token === state.micSession && state.micOpen) {
+        setStatus("开麦中...");
+        updateMicButton();
+      }
+    };
+    audioTrack.onended = () => {
+      if (token === state.micSession && state.micOpen) {
+        setStatus("麦克风输入已断开，请重新开麦");
+      }
+    };
   }
 
   const ctx = new AudioCtx();
@@ -3682,9 +3998,15 @@ async function startLocalAsrLoop(sessionId = null) {
   state.localAsrSpeechMs = 0;
   state.localAsrSilenceMs = 0;
   state.localAsrBuffers = [];
-  state.localAsrNoiseFloor = 0.004;
+  state.localAsrNoiseFloor = 0.0008;
   state.localAsrLastFrameAt = performance.now();
+  state.localAsrPeakRms = 0;
+  state.localAsrStartedAt = performance.now();
   state.localAsrNoFrameWarned = false;
+  state.localAsrLowLevelWarned = false;
+  state.localAsrThresholdAutoAdjusted = false;
+  state.localAsrMutedWarned = false;
+  state.localAsrInputMuted = !!audioTrack?.muted;
   startLocalAsrMeter(sessionToken);
   startLocalAsrWatchdog(sessionToken);
   return true;
@@ -4709,6 +5031,7 @@ const _TRANSLATE_CIRCUIT_FAILURE_THRESHOLD = 3;
 const _TRANSLATE_CIRCUIT_BASE_COOLDOWN_MS = 12000;
 const _TRANSLATE_CIRCUIT_MAX_COOLDOWN_MS = 90000;
 const _chatTranslationCache = new Map();
+const _translationInFlight = new Map();
 let _chatTranslationSeq = 0;
 const _translationCircuitState = {
   failures: 0,
@@ -4829,53 +5152,67 @@ async function _fetchChatTranslation(text) {
   if (!safe) {
     return "";
   }
-  if (_isTranslationCircuitOpen()) {
-    return "";
-  }
   const cached = _readChatTranslationCache(safe);
   if (cached) {
     return cached;
   }
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    try {
-      controller.abort();
-    } catch (_) {
-      // ignore
-    }
-  }, _CHAT_TRANSLATE_TIMEOUT_MS);
-  try {
-  const resp = await authFetch("/api/translate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: safe }),
-      signal: controller.signal
-    });
-    if (!resp.ok) {
-      _markTranslationFailure();
-      return "";
-    }
-    const data = await resp.json();
-    const translated = String(data?.translated || data?.translated_text || "").trim();
-    const degraded = data?.degraded === true || data?.fallback === true;
-    if (degraded) {
-      _markTranslationFailure();
-      return translated;
-    }
-    if (!translated) {
-      _markTranslationFailure();
-      return "";
-    }
-    _markTranslationSuccess();
-    _writeChatTranslationCache(safe, translated);
-    return translated;
-  } catch (err) {
-    if (!controller.signal.aborted || Date.now() >= _translationCircuitState.cooldownUntil) {
-      _markTranslationFailure();
-    }
+  if (_isTranslationCircuitOpen()) {
     return "";
+  }
+  const inFlight = _translationInFlight.get(safe);
+  if (inFlight) {
+    return inFlight;
+  }
+  const task = (async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      try {
+        controller.abort();
+      } catch (_) {
+        // ignore
+      }
+    }, _CHAT_TRANSLATE_TIMEOUT_MS);
+    try {
+      const resp = await authFetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: safe }),
+        signal: controller.signal
+      });
+      if (!resp.ok) {
+        _markTranslationFailure();
+        return "";
+      }
+      const data = await resp.json();
+      const translated = String(data?.translated || data?.translated_text || "").trim();
+      const degraded = data?.degraded === true || data?.fallback === true;
+      if (degraded) {
+        _markTranslationFailure();
+        return translated;
+      }
+      if (!translated) {
+        _markTranslationFailure();
+        return "";
+      }
+      _markTranslationSuccess();
+      _writeChatTranslationCache(safe, translated);
+      return translated;
+    } catch (err) {
+      if (!controller.signal.aborted || Date.now() >= _translationCircuitState.cooldownUntil) {
+        _markTranslationFailure();
+      }
+      return "";
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  })();
+  _translationInFlight.set(safe, task);
+  try {
+    return await task;
   } finally {
-    clearTimeout(timeoutId);
+    if (_translationInFlight.get(safe) === task) {
+      _translationInFlight.delete(safe);
+    }
   }
 }
 
@@ -4896,9 +5233,17 @@ function _renderAssistantTranslation(row, visibleText, options = {}) {
   if (!translationEl) {
     return;
   }
+  const cached = _readChatTranslationCache(safe);
+  if (cached && cached !== safe) {
+    translationEl.textContent = `中译：${cached}`;
+    translationEl.hidden = false;
+    return;
+  }
   const requestId = String(++_chatTranslationSeq);
   row.dataset.translationReqId = requestId;
   row.dataset.translationSource = safe;
+  translationEl.textContent = "中译：翻译中...";
+  translationEl.hidden = false;
   _fetchChatTranslation(safe).then((zh) => {
     if (!row.isConnected || row.dataset.translationReqId !== requestId) {
       return;
@@ -5516,64 +5861,27 @@ function _abortSubtitleTranslation() {
 }
 
 async function _fetchTranslation(text, capturedId) {
-  if (_isTranslationCircuitOpen()) {
+  const safe = String(text || "").trim();
+  if (!safe) {
     return "";
   }
-  const cached = _readSubtitleTranslationCache(text);
+  const cached = _readSubtitleTranslationCache(safe) || _readChatTranslationCache(safe);
   if (cached) {
+    _writeSubtitleTranslationCache(safe, cached);
     return cached;
   }
-
-  _abortSubtitleTranslation();
-  const controller = new AbortController();
-  _subtitleTranslationAbortController = controller;
-  const timeoutId = setTimeout(() => {
-    try {
-      controller.abort();
-    } catch (_) {
-      // ignore
-    }
-  }, _SUBTITLE_TRANSLATE_TIMEOUT_MS);
-
-  try {
-  const resp = await authFetch("/api/translate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-      signal: controller.signal,
-    });
-    if (!resp.ok || capturedId !== state.subtitleId) {
-      if (capturedId === state.subtitleId) {
-        _markTranslationFailure();
-      }
-      return "";
-    }
-    const data = await resp.json();
-    const translated = String(data?.translated || data?.translated_text || "").trim();
-    const degraded = data?.degraded === true || data?.fallback === true;
-    if (degraded) {
-      _markTranslationFailure();
-      return translated;
-    }
-    if (!translated) {
-      _markTranslationFailure();
-      return "";
-    }
-    _markTranslationSuccess();
-    _writeSubtitleTranslationCache(text, translated);
-    return translated;
-  } catch (err) {
-    const aborted = !!(controller.signal && controller.signal.aborted);
-    if (!aborted && capturedId === state.subtitleId) {
-      _markTranslationFailure();
-    }
+  if (_isTranslationCircuitOpen() || capturedId !== state.subtitleId) {
     return "";
-  } finally {
-    clearTimeout(timeoutId);
-    if (_subtitleTranslationAbortController === controller) {
-      _subtitleTranslationAbortController = null;
-    }
   }
+  const translated = String(await _fetchChatTranslation(safe) || "").trim();
+  if (capturedId !== state.subtitleId) {
+    return "";
+  }
+  if (!translated) {
+    return "";
+  }
+  _writeSubtitleTranslationCache(safe, translated);
+  return translated;
 }
 
 function _applySubtitleDOM(enText, zhText) {
@@ -6056,6 +6364,9 @@ function endSpeechAnimation() {
   state.speechMouthTarget = 0;
   state.speechMouthUpdatedAt = performance.now();
   state.ttsAudioLevel = 0;
+  state.ttsAudioRawLevel = 0;
+  state.ttsAudioRms = 0;
+  state.ttsAudioLastVoiceAt = 0;
   state.moodHoldUntil = performance.now() + 1500;
 }
 
@@ -6063,10 +6374,13 @@ function finishSpeechAnimation() {
   const now = performance.now();
   const releaseMs = 260;
   const holdMs = 900;
-  state.speechAnimUntil = Math.max(Number(state.speechAnimUntil || 0), now + releaseMs);
+  state.speechAnimUntil = now + releaseMs;
   state.speechMouthTarget = 0;
   state.speechMouthUpdatedAt = now;
   state.ttsAudioLevel = 0;
+  state.ttsAudioRawLevel = 0;
+  state.ttsAudioRms = 0;
+  state.ttsAudioLastVoiceAt = 0;
   state.moodHoldUntil = Math.max(Number(state.moodHoldUntil || 0), now + holdMs);
 }
 
@@ -6189,9 +6503,9 @@ function ensureTTSAudioAnalyser(audio) {
       state.ttsAudioSourceNode = state.ttsAudioContext.createMediaElementSource(audio);
     }
     if (!state.ttsAudioAnalyser) {
-      state.ttsAudioAnalyser = state.ttsAudioContext.createAnalyser();
-      state.ttsAudioAnalyser.fftSize = 256;
-      state.ttsAudioAnalyser.smoothingTimeConstant = 0.35;
+    state.ttsAudioAnalyser = state.ttsAudioContext.createAnalyser();
+    state.ttsAudioAnalyser.fftSize = 256;
+    state.ttsAudioAnalyser.smoothingTimeConstant = 0.12;
       state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.frequencyBinCount);
       state.ttsAudioSourceNode.connect(state.ttsAudioAnalyser);
       state.ttsAudioAnalyser.connect(state.ttsAudioContext.destination);
@@ -6207,6 +6521,8 @@ function sampleTTSAudioLevel() {
   const data = state.ttsAudioAnalyserData;
   if (!analyser || !data || !data.length) {
     state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
+    state.ttsAudioRawLevel = 0;
+    state.ttsAudioRms = 0;
     return state.ttsAudioLevel;
   }
   try {
@@ -6217,11 +6533,18 @@ function sampleTTSAudioLevel() {
       sum += centered * centered;
     }
     const rms = Math.sqrt(sum / data.length);
-    const normalized = clampNumber((rms - 0.009) / 0.125, 0, 1);
-    const smoothing = normalized > state.ttsAudioLevel ? 0.72 : 0.5;
+    const normalized = clampNumber((rms - 0.006) / 0.095, 0, 1);
+    const smoothing = normalized > state.ttsAudioLevel ? 0.88 : 0.78;
+    state.ttsAudioRawLevel = normalized;
+    state.ttsAudioRms = rms;
+    if (normalized > 0.035) {
+      state.ttsAudioLastVoiceAt = performance.now();
+    }
     state.ttsAudioLevel += (normalized - state.ttsAudioLevel) * smoothing;
   } catch (_) {
     state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
+    state.ttsAudioRawLevel = 0;
+    state.ttsAudioRms = 0;
   }
   return state.ttsAudioLevel;
 }
@@ -6752,6 +7075,8 @@ function getSpeechAnimationMouthOpen() {
     }
     return state.speechMouthOpen;
   }
+  const liveLevel = sampleTTSAudioLevel();
+  const hasLiveAudio = audioPlaying && !!state.ttsAudioAnalyser;
   const start = Number(state.speechAnimStartedAt || now);
   const duration = Math.max(260, Number(state.speechAnimDurationMs) || 1000);
   const progress = clampNumber((now - start) / duration, 0, 1.3);
@@ -6817,35 +7142,26 @@ function getSpeechAnimationMouthOpen() {
     const speakingFloor = 0.02 + motionBlend * (0.05 - fastSpeechFactor * 0.03);
     target = Math.max(target, speakingFloor);
   }
-  if (speaking) {
-    const liveLevel = sampleTTSAudioLevel();
-    if (audioPlaying && (state.ttsAudioAnalyser || liveLevel > 0.01)) {
-      const liveTarget = clampNumber(liveLevel * (1.72 + fastSpeechFactor * 0.2) + 0.015, 0, 1);
-      const liveMix = clampNumber(
-        0.8 - closureGate * (0.42 + fastSpeechFactor * 0.2),
-        0.34,
-        0.82
-      );
-      target = clampNumber(
-        liveTarget * liveMix
-          + target * (1 - liveMix)
-          + accentPulse * (0.05 - closureGate * 0.03),
-        0,
-        1
-      );
-      if (liveLevel < 0.018) {
-        target *= clampNumber(0.56 - closureGate * 0.2, 0.28, 0.62);
-      }
-      const openSmooth = clampNumber(0.72 - closureGate * 0.16, 0.5, 0.76);
-      const closeSmooth = clampNumber(
-        0.72 + closureGate * 0.2 + fastSpeechFactor * 0.08,
-        0.62,
-        0.9
-      );
-      const smoothing = target > state.speechMouthOpen ? openSmooth : closeSmooth;
-      state.speechMouthOpen += (target - state.speechMouthOpen) * smoothing;
-      return state.speechMouthOpen;
+  if (hasLiveAudio) {
+    const rawLevel = clampNumber(Number(state.ttsAudioRawLevel) || liveLevel || 0, 0, 1);
+    const voiceRecent = now - Number(state.ttsAudioLastVoiceAt || 0) < 90;
+    const voiced = rawLevel > 0.035 || liveLevel > 0.045 || voiceRecent;
+    const liveTarget = voiced
+      ? clampNumber(rawLevel * 2.25 + liveLevel * 0.62 + accentPulse * 0.025, 0, 1)
+      : 0;
+    const textHint = voiced ? clampNumber(target * 0.16, 0, 0.14) : 0;
+    target = clampNumber(liveTarget + textHint, 0, 1);
+    if (!voiced && liveLevel < 0.04) {
+      target = 0;
     }
+    const openSmooth = voiced ? 0.88 : 0.22;
+    const closeSmooth = voiced ? 0.76 : 0.94;
+    const smoothing = target > state.speechMouthOpen ? openSmooth : closeSmooth;
+    state.speechMouthOpen += (target - state.speechMouthOpen) * smoothing;
+    if (!voiced && state.speechMouthOpen < 0.012) {
+      state.speechMouthOpen = 0;
+    }
+    return state.speechMouthOpen;
   }
   const openSmooth = clampNumber(0.64 - closureGate * 0.14, 0.45, 0.68);
   const closeSmooth = clampNumber(
@@ -7533,6 +7849,11 @@ function dequeueStreamSpeakItem(sessionId) {
   return null;
 }
 
+function hasQueuedStreamSpeakItem(sessionId) {
+  return Array.isArray(state.streamSpeakQueue)
+    && state.streamSpeakQueue.some((item) => item && item.sessionId === sessionId);
+}
+
 async function waitNextStreamSpeakItem(sessionId, waitMs = 0) {
   let item = dequeueStreamSpeakItem(sessionId);
   if (item || waitMs <= 0) {
@@ -7556,13 +7877,13 @@ async function runStreamSpeakQueue() {
   if (state.streamSpeakWorking) {
     return;
   }
+  const activeSession = state.streamSpeakSession;
   state.streamSpeakWorking = true;
   try {
     if (!state.speakingEnabled || !isServerTTSProvider(state.ttsProvider)) {
       return;
     }
 
-    const activeSession = state.streamSpeakSession;
     const idleWaitMs = Math.max(50, Math.min(280, Number(state.streamSpeakIdleWaitMs) || 150));
     let current = await waitNextStreamSpeakItem(activeSession, state.chatBusy ? idleWaitMs : 60);
     if (!current) {
@@ -7606,13 +7927,23 @@ async function runStreamSpeakQueue() {
         mood: detectMood(current.text),
         style: current.style || state.currentTalkStyle || "neutral"
       });
-      current = next;
+      current = next || await waitNextStreamSpeakItem(
+        activeSession,
+        state.chatBusy ? idleWaitMs : 180
+      );
     }
     state.ttsServerAvailable = true;
   } catch (err) {
     console.warn("Stream speak queue failed:", err);
   } finally {
     state.streamSpeakWorking = false;
+    if (
+      activeSession === state.streamSpeakSession
+      && shouldUseStreamSpeak()
+      && hasQueuedStreamSpeakItem(activeSession)
+    ) {
+      window.setTimeout(() => runStreamSpeakQueue(), 0);
+    }
   }
 }
 
@@ -7988,8 +8319,8 @@ async function loadConfig() {
     clampNumber(Number(asrCfg.max_speech_ms || 2400), 1000, 6000)
   );
   state.localAsrSpeechThreshold = clampNumber(
-    Number(asrCfg.speech_threshold || 0.009),
-    0.003,
+    Number(asrCfg.speech_threshold || 0.0035),
+    0.0015,
     0.05
   );
   const buf = Math.round(Number(asrCfg.processor_buffer_size || 2048));
@@ -9408,6 +9739,7 @@ async function playAudioByContext(blob) {
     return false;
   }
   let markedSpeaking = false;
+  let fallbackTimer = 0;
   try {
     if (!state.ttsDecodeContext || state.ttsDecodeContext.state === "closed") {
       state.ttsDecodeContext = new AudioCtx();
@@ -9425,7 +9757,7 @@ async function playAudioByContext(blob) {
     if (!state.ttsAudioAnalyser || state.ttsAudioAnalyser.context !== ctx) {
       state.ttsAudioAnalyser = ctx.createAnalyser();
       state.ttsAudioAnalyser.fftSize = 256;
-      state.ttsAudioAnalyser.smoothingTimeConstant = 0.35;
+      state.ttsAudioAnalyser.smoothingTimeConstant = 0.12;
       state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.frequencyBinCount);
     }
     source.connect(state.ttsAudioAnalyser);
@@ -9434,16 +9766,42 @@ async function playAudioByContext(blob) {
     state.ttsContextSpeaking = true;
     markedSpeaking = true;
     await new Promise((resolve) => {
-      source.onended = resolve;
+      let resolved = false;
+      const resolveOnce = () => {
+        if (resolved) {
+          return;
+        }
+        resolved = true;
+        resolve();
+      };
+      source.onended = resolveOnce;
+      const durationMs = Number.isFinite(Number(decoded.duration)) && decoded.duration > 0
+        ? Math.round(decoded.duration * 1000)
+        : 45000;
+      fallbackTimer = window.setTimeout(resolveOnce, Math.min(180000, durationMs + 900));
       source.start(0);
     });
+    if (fallbackTimer) {
+      clearTimeout(fallbackTimer);
+      fallbackTimer = 0;
+    }
     state.ttsContextSpeaking = false;
+    state.ttsAudioLevel = 0;
+    state.ttsAudioRawLevel = 0;
+    state.ttsAudioRms = 0;
     markedSpeaking = false;
     return true;
   } catch (_) {
+    if (fallbackTimer) {
+      clearTimeout(fallbackTimer);
+      fallbackTimer = 0;
+    }
     if (markedSpeaking) {
       state.ttsContextSpeaking = false;
     }
+    state.ttsAudioLevel = 0;
+    state.ttsAudioRawLevel = 0;
+    state.ttsAudioRms = 0;
     return false;
   }
 }
@@ -9481,6 +9839,14 @@ async function playAudioBlob(blob, opts = {}) {
     let startupTimer = 0;
     let progressTimer = 0;
     let fallbackSpeechStarted = false;
+    const stopHtmlAudio = () => {
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+      } catch (_) {
+        // ignore
+      }
+    };
     const beginFallbackSpeech = () => {
       if (fallbackSpeechStarted) {
         return;
@@ -9512,12 +9878,17 @@ async function playAudioBlob(blob, opts = {}) {
         startupTimer = 0;
       }
       if (progressTimer) {
-        clearTimeout(progressTimer);
+        clearInterval(progressTimer);
         progressTimer = 0;
       }
+      state.ttsContextSpeaking = false;
+      state.ttsAudioLevel = 0;
+      state.ttsAudioRawLevel = 0;
+      state.ttsAudioRms = 0;
       if (ok) {
         finishSpeechAnimation();
       } else {
+        stopHtmlAudio();
         endSpeechAnimation();
       }
       hideSubtitleText();
@@ -9531,6 +9902,7 @@ async function playAudioBlob(blob, opts = {}) {
     };
     audio.onended = () => done(true);
     audio.onerror = async () => {
+      stopHtmlAudio();
       beginFallbackSpeech();
       const ok = await playAudioByContext(blob);
       done(!!ok);
@@ -9547,22 +9919,33 @@ async function playAudioBlob(blob, opts = {}) {
         state.ttsAudioContext.resume().catch(() => {});
       }
       if (progressTimer) {
-        clearTimeout(progressTimer);
+        clearInterval(progressTimer);
         progressTimer = 0;
       }
       // Some environments resolve play() but never advance currentTime.
-      progressTimer = window.setTimeout(async () => {
+      let lastProgressAt = performance.now();
+      let lastCurrentTime = Number(audio.currentTime || 0);
+      progressTimer = window.setInterval(async () => {
         if (settled) {
           return;
         }
         const current = Number(audio.currentTime || 0);
-        if (current >= 0.02) {
+        if (current > lastCurrentTime + 0.01) {
+          lastCurrentTime = current;
+          lastProgressAt = performance.now();
           return;
         }
+        if (audio.paused || audio.ended) {
+          return;
+        }
+        if (performance.now() - lastProgressAt < 2800) {
+          return;
+        }
+        stopHtmlAudio();
         beginFallbackSpeech();
         const ok = await playAudioByContext(blob);
         done(!!ok);
-      }, 1200);
+      }, 650);
       beginSpeechAnimation(speechText, speechMood, speechStyle, {
         durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
           ? Math.round(audio.duration * 1000)
@@ -9592,6 +9975,7 @@ async function playAudioBlob(blob, opts = {}) {
         startupTimer = 0;
       }
     }).catch(async () => {
+      stopHtmlAudio();
       beginFallbackSpeech();
       const ok = await playAudioByContext(blob);
       done(!!ok);
@@ -9602,6 +9986,7 @@ async function playAudioBlob(blob, opts = {}) {
         return;
       }
       if (audio.paused && !audio.ended && Number(audio.currentTime || 0) === 0) {
+        stopHtmlAudio();
         beginFallbackSpeech();
         const ok = await playAudioByContext(blob);
         done(!!ok);
@@ -10362,7 +10747,11 @@ async function toggleMicOpen() {
     }
     await startMicLoop();
     if (state.micOpen) {
-      setStatus(state.micKeepListening ? "开麦已开启（通话模式）" : "开麦已开启");
+      if (state.asrMode === "local_vosk" && state.localAsrInputMuted) {
+        setStatus("麦克风轨道被系统静音，请检查 Windows 输入设备、隐私权限或硬件静音键");
+      } else {
+        setStatus(state.micKeepListening ? "开麦已开启（通话模式）" : "开麦已开启");
+      }
     }
   } finally {
     state.micToggleBusy = false;

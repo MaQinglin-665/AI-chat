@@ -1,6 +1,7 @@
 param(
     [switch]$SkipPytest,
-    [switch]$SkipNodeDragTest
+    [Alias("SkipNodeDragTest")]
+    [switch]$SkipNodeTests
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,8 +41,8 @@ if (-not $SkipPytest) {
     Invoke-Step "Run Python tests" (@($python) + @("-m", "pytest", "-q"))
 }
 
-if (-not $SkipNodeDragTest) {
-    Invoke-Step "Run drag logic JavaScript test" @("node", "tests/test_drag_logic.js")
+if (-not $SkipNodeTests) {
+    Invoke-Step "Run Node frontend tests" @("node", "scripts/run_node_tests.js")
 }
 
 Invoke-Step "Check Python syntax" (@($python) + @("scripts/check_python_syntax.py"))

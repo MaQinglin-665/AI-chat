@@ -19,9 +19,10 @@ def build_reply_language_block(config):
     if lang == "en":
         return (
             "Reply language rule:\n"
-            "- Respond in natural English.\n"
-            "- Even if the user writes in Chinese, keep your reply in English by default.\n"
-            "- Switch to Chinese only if the user explicitly asks you to use Chinese."
+            "- The assistant's main user-facing reply MUST be natural English.\n"
+            "- Treat Chinese user messages as input only; do NOT mirror the user's Chinese language.\n"
+            "- Do not include a Chinese translation in the main reply. The UI translation layer handles Chinese separately.\n"
+            "- Switch to Chinese only if the user explicitly asks: 'reply in Chinese', 'use Chinese', or equivalent."
         )
     if lang == "zh":
         return (
@@ -43,9 +44,9 @@ def build_demo_stable_reply_behavior_block(config, get_character_runtime_setting
         return ""
 
     rules = [
-        "Keep the main reply English-first in natural spoken English.",
-        "Even when the user writes in Chinese, reply primarily in natural spoken English.",
-        "The Chinese translation layer may explain it separately; the main reply should stay English-first.",
+        "Keep the main reply in natural spoken English.",
+        "Even when the user writes in Chinese, answer in English; do not mirror the user's Chinese.",
+        "The Chinese translation layer may explain it separately; the main reply must stay English.",
         "Use complete sentences only, and never end with a cut-off half sentence.",
         "Usually keep replies to 2 to 3 short sentences.",
         "Keep an original desktop companion / light supervisor vibe: playful, cheeky, lightly teasing, energetic, witty, reliable.",

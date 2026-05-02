@@ -4,7 +4,7 @@
 
 ## Validation
 - [ ] `python -m pytest -q`
-- [ ] `node tests/test_drag_logic.js`
+- [ ] `node scripts/run_node_tests.js`
 - [ ] (If docs changed) `cd docs && npm run check:all`
 
 ## Risk
