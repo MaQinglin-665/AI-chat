@@ -39,6 +39,27 @@ def looks_like_connection_refused(message):
     return any(marker in text for marker in markers)
 
 
+def looks_like_auth_http_error(message):
+    text = str(message or "").strip().lower()
+    markers = (
+        "llm http 401",
+        "http error 401",
+        "401: unauthorized",
+        "401 unauthorized",
+        "unauthorized",
+        "invalid token",
+        "invalid api key",
+        "incorrect api key",
+        "api key is invalid",
+        "llm http 403",
+        "http error 403",
+        "403: forbidden",
+        "403 forbidden",
+        "forbidden",
+    )
+    return any(marker in text for marker in markers)
+
+
 def resolve_llm_provider(llm_cfg):
     cfg = llm_cfg if isinstance(llm_cfg, dict) else {}
     provider = str(cfg.get("provider", "") or "").strip().lower()
@@ -92,6 +113,18 @@ def diagnose_llm_exception(exc, llm_cfg):
             code="api_key_missing",
             reason="当前 LLM 提供方需要 API Key，但未读取到密钥。",
             solution=f"请先设置环境变量 {key_env}，再重试。",
+            config_key="llm.api_key_env",
+            detail=raw,
+        )
+
+    if looks_like_auth_http_error(lower):
+        return DiagnosticError(
+            code="api_key_invalid",
+            reason="LLM 服务拒绝了当前 API Key，可能是密钥无效、过期、额度不足或渠道无权限。",
+            solution=(
+                f"请换一个可用密钥并写入环境变量 {key_env}，"
+                "同时确认该密钥有权限使用当前 llm.model。"
+            ),
             config_key="llm.api_key_env",
             detail=raw,
         )
