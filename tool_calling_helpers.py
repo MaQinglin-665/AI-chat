@@ -65,6 +65,48 @@ def build_tool_meta_payload(tool_payloads):
     return {"items": items}
 
 
+def render_tool_execution_summary(tool_payloads, max_chars=1800, tool_meta_marker="[[TAFFY_TOOL_META]]"):
+    if not isinstance(tool_payloads, list) or not tool_payloads:
+        return ""
+    lines = ["我已经帮你执行了这次工具任务。"]
+    for idx, payload in enumerate(tool_payloads[:4], start=1):
+        if not isinstance(payload, dict):
+            continue
+        tool_name = str(payload.get("tool", "")).strip() or "unknown_tool"
+        if payload.get("ok"):
+            result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
+            if tool_name == "write_file":
+                lines.append(f"{idx}. 已写入文件：{result.get('path', '')}")
+            elif tool_name == "replace_in_file":
+                lines.append(
+                    f"{idx}. 已修改文件：{result.get('path', '')}，替换 {int(result.get('replacements', 0) or 0)} 处。"
+                )
+            elif tool_name == "read_file":
+                lines.append(f"{idx}. 已读取文件：{result.get('path', '')}")
+            elif tool_name == "list_files":
+                lines.append(f"{idx}. 已列出文件，共 {int(result.get('count', 0) or 0)} 项。")
+            elif tool_name == "search_text":
+                lines.append(f"{idx}. 已完成文本搜索，命中 {int(result.get('count', 0) or 0)} 条。")
+            elif tool_name == "run_command":
+                lines.append(
+                    f"{idx}. 已执行命令，退出码 {int(result.get('exit_code', 0) or 0)}。"
+                )
+            elif tool_name == "generate_image":
+                lines.append("{}. 已生成图片。".format(idx))
+            else:
+                result_text = json.dumps(result, ensure_ascii=False)
+                lines.append(f"{idx}. {tool_name} 成功：{result_text[:220]}")
+        else:
+            err = str(payload.get("error", "unknown error"))
+            lines.append(f"{idx}. {tool_name} 失败：{err[:260]}")
+    text = "\n".join(lines)
+    safe_text = _truncate_text(text, max_chars)
+    meta = build_tool_meta_payload(tool_payloads)
+    if not meta.get("items"):
+        return safe_text
+    return f"{safe_text}\n{tool_meta_marker}{json.dumps(meta, ensure_ascii=False, separators=(',', ':'))}"
+
+
 def build_responses_tool_defs(work_tool_defs):
     tools = []
     for item in work_tool_defs:
