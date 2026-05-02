@@ -45,7 +45,6 @@ from config import (
     validate_live2d_model_path,
 )
 import memory as _memory_module
-from utils import _truncate_text
 from memory import (
     build_memory_prompt_block,
     merge_prompt_with_memory,
@@ -211,9 +210,9 @@ from reply_behavior import (
 from tool_calling_helpers import (
     build_chat_completions_tool_defs as _build_chat_completions_tool_defs_impl,
     build_responses_tool_defs as _build_responses_tool_defs_impl,
-    build_tool_meta_payload,
     inject_tool_intro as _inject_tool_intro_impl,
     parse_tool_args as _parse_tool_args,
+    render_tool_execution_summary as _render_tool_execution_summary_impl,
 )
 from llm_response_utils import (
     convert_messages_to_responses_input,
@@ -1064,45 +1063,11 @@ def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, f
 
 
 def render_tool_execution_summary(tool_payloads, max_chars=1800):
-    if not isinstance(tool_payloads, list) or not tool_payloads:
-        return ""
-    lines = ["我已经帮你执行了这次工具任务。"]
-    for idx, payload in enumerate(tool_payloads[:4], start=1):
-        if not isinstance(payload, dict):
-            continue
-        tool_name = str(payload.get("tool", "")).strip() or "unknown_tool"
-        if payload.get("ok"):
-            result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
-            if tool_name == "write_file":
-                lines.append(f"{idx}. 已写入文件：{result.get('path', '')}")
-            elif tool_name == "replace_in_file":
-                lines.append(
-                    f"{idx}. 已修改文件：{result.get('path', '')}，替换 {int(result.get('replacements', 0) or 0)} 处。"
-                )
-            elif tool_name == "read_file":
-                lines.append(f"{idx}. 已读取文件：{result.get('path', '')}")
-            elif tool_name == "list_files":
-                lines.append(f"{idx}. 已列出文件，共 {int(result.get('count', 0) or 0)} 项。")
-            elif tool_name == "search_text":
-                lines.append(f"{idx}. 已完成文本搜索，命中 {int(result.get('count', 0) or 0)} 条。")
-            elif tool_name == "run_command":
-                lines.append(
-                    f"{idx}. 已执行命令，退出码 {int(result.get('exit_code', 0) or 0)}。"
-                )
-            elif tool_name == "generate_image":
-                lines.append("{}. 已生成图片。".format(idx))
-            else:
-                result_text = json.dumps(result, ensure_ascii=False)
-                lines.append(f"{idx}. {tool_name} 成功：{result_text[:220]}")
-        else:
-            err = str(payload.get("error", "unknown error"))
-            lines.append(f"{idx}. {tool_name} 失败：{err[:260]}")
-    text = "\n".join(lines)
-    safe_text = _truncate_text(text, max_chars)
-    meta = build_tool_meta_payload(tool_payloads)
-    if not meta.get("items"):
-        return safe_text
-    return f"{safe_text}\n{TOOL_META_MARKER}{json.dumps(meta, ensure_ascii=False, separators=(',', ':'))}"
+    return _render_tool_execution_summary_impl(
+        tool_payloads,
+        max_chars=max_chars,
+        tool_meta_marker=TOOL_META_MARKER,
+    )
 
 
 def build_responses_tool_defs():
