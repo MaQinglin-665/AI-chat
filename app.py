@@ -156,6 +156,7 @@ from app_diagnostics import (
     safe_int_value as _safe_int_value,
     wall_now_ms as _wall_now_ms,
 )
+from app_tts_route import handle_tts_request
 from llm_diagnostics import (
     diagnose_llm_exception as _diagnose_llm_exception_impl,
     ensure_llm_auth_ready as _ensure_llm_auth_ready_impl,
@@ -1145,85 +1146,21 @@ class PetHandler(SimpleHTTPRequestHandler):
             return
 
         if path_only == "/api/tts":
-            text = str(body.get("text", "")).strip()
-            voice = body.get("voice")
-            prosody = {}
-            for key in (
-                "speed_ratio",
-                "pitch_ratio",
-                "volume_ratio",
-                "rate",
-                "pitch",
-                "volume",
-            ):
-                if key in body:
-                    prosody[key] = body.get(key)
-            _log_backend_perf(
-                "TTS",
-                perf_trace_id,
-                stage="request_received",
+            handle_tts_request(
+                body,
+                perf_trace_id=perf_trace_id,
+                perf_started_ms=perf_started_ms,
                 client_to_server_ms=client_to_server_ms,
-                text_chars=len(text),
-                has_voice=bool(str(voice or "").strip()),
-                prosody_keys=len(prosody),
+                perf_headers=perf_headers,
+                send_json_func=self._send_json,
+                send_audio_func=self._send_audio,
+                synthesize_tts_audio_func=synthesize_tts_audio,
+                guess_audio_content_type_func=guess_audio_content_type,
+                log_backend_perf_func=_log_backend_perf,
+                log_backend_exception_func=_log_backend_exception,
+                diagnostic_payload_func=_diagnostic_payload,
+                perf_now_ms_func=_perf_now_ms,
             )
-            if not text:
-                self._send_json(
-                    {"error": "text cannot be empty."},
-                    status=HTTPStatus.BAD_REQUEST,
-                    extra_headers=perf_headers,
-                )
-                return
-            try:
-                tts_synth_started_ms = _perf_now_ms()
-                audio = synthesize_tts_audio(
-                    text,
-                    voice_override=voice,
-                    prosody=prosody,
-                    perf_trace_id=perf_trace_id,
-                )
-                tts_synth_ms = _perf_now_ms() - tts_synth_started_ms
-                if not audio:
-                    self._send_json(
-                        {"error": "TTS 返回空音频，请检查语音服务是否正常运行。"},
-                        status=HTTPStatus.SERVICE_UNAVAILABLE,
-                        extra_headers=perf_headers,
-                    )
-                    return
-                self._send_audio(
-                    audio,
-                    content_type=guess_audio_content_type(audio),
-                    extra_headers=perf_headers,
-                )
-                _log_backend_perf(
-                    "TTS",
-                    perf_trace_id,
-                    stage="response_sent",
-                    synth_ms=tts_synth_ms,
-                    total_ms=_perf_now_ms() - perf_started_ms,
-                    audio_bytes=len(audio),
-                )
-            except Exception as exc:
-                _log_backend_perf(
-                    "TTS",
-                    perf_trace_id,
-                    stage="fail",
-                    total_ms=_perf_now_ms() - perf_started_ms,
-                    error_type=type(exc).__name__,
-                )
-                _log_backend_exception(
-                    "TTS",
-                    exc,
-                    extra=(
-                        f"/api/tts failed | voice={voice!r} | "
-                        f"text_len={len(text)} | prosody={list(prosody.keys())}"
-                    ),
-                )
-                self._send_json(
-                    _diagnostic_payload(exc),
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                    extra_headers=perf_headers,
-                )
             return
 
         if path_only == "/api/translate":
