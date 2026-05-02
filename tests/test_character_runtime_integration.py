@@ -315,7 +315,7 @@ def test_call_llm_demo_stable_persona_override_enabled_injects_identity_rules(mo
     assert "When the user asks who you are, introduce yourself using this name." in prompt
     assert "Do not use any other character name." in prompt
     assert "Keep this local persona style: playful, cheeky, lightly teasing, reliable." in prompt
-    assert "Even when the user writes in Chinese, reply primarily in natural spoken English." in prompt
+    assert "Even when the user writes in Chinese, answer in English; do not mirror the user's Chinese." in prompt
     assert "Usually keep replies to 2 to 3 short sentences." in prompt
     assert "Do not call yourself ChatGPT." in prompt
     assert "发布演示" not in prompt
