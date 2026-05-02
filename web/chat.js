@@ -3076,10 +3076,13 @@ function updateMicMeter(levelOverride = null) {
     level = state.micLevel;
   }
   const v = Math.max(0, Math.min(1, Number(level) || 0));
-  const rawPct = Math.round(v * 100);
-  const eased = Math.pow(v, 0.64);
-  const displayPct = state.micOpen ? Math.round(22 + eased * 78) : 0;
+  const visualFloor = 0.025;
+  const visualLevel = v <= visualFloor ? 0 : Math.min(1, (v - visualFloor) / (1 - visualFloor));
+  const rawPct = Math.round(visualLevel * 100);
+  const eased = Math.pow(visualLevel, 0.72);
+  const displayPct = state.micOpen && state.micSuspendDepth <= 0 ? Math.round(eased * 100) : 0;
   ui.micMeterFill.style.width = `${displayPct}%`;
+  ui.micMeterFill.style.opacity = displayPct > 0 ? "1" : "0";
 
   if (!state.micOpen) {
     ui.micMeterText.textContent = "未开麦";
@@ -3340,8 +3343,17 @@ function handleLocalAsrFrame(floatData, inputSampleRate, sessionId = null) {
   }
   const rms = Math.sqrt(energy / pcm16.length);
   const frameMs = (pcm16.length / 16000) * 1000;
-  const normalizedLevel = Math.max(0, Math.min(1, rms / 0.07));
-  state.micLevel = state.micLevel * 0.72 + normalizedLevel * 0.28;
+  const displayNoiseFloor = clampNumber(
+    state.localAsrNoiseFloor * 1.6 + 0.0015,
+    0.0015,
+    0.035
+  );
+  const normalizedLevel = clampNumber((rms - displayNoiseFloor) / 0.07, 0, 1);
+  const smoothing = normalizedLevel > state.micLevel ? 0.38 : 0.24;
+  state.micLevel += (normalizedLevel - state.micLevel) * smoothing;
+  if (state.micLevel < 0.01 && normalizedLevel <= 0.001) {
+    state.micLevel = 0;
+  }
   updateMicMeter(state.micLevel);
 
   const baseThreshold = clampNumber(state.localAsrSpeechThreshold || 0.009, 0.003, 0.05);
