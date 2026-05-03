@@ -5680,6 +5680,22 @@ function _shouldShowAssistantTranslation(text) {
   return _isLikelyEnglishForChat(safe);
 }
 
+function normalizeAssistantVisibleText(text) {
+  const safe = String(text || "").trim();
+  if (!safe || !_isLikelyEnglishForChat(safe)) {
+    return safe;
+  }
+  if (SPEECH_TEXT && typeof SPEECH_TEXT.normalizeEnglishBoundaries === "function") {
+    return SPEECH_TEXT.normalizeEnglishBoundaries(safe);
+  }
+  return safe
+    .replace(/([.!?])(?=[A-Z'"\u2018\u2019])/g, "$1 ")
+    .replace(/([,;:])(?=[A-Za-z])/g, "$1 ")
+    .replace(/\s+([.!?,;:])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function _ensureMessageTranslationEl(row) {
   if (!row) {
     return null;
@@ -11326,7 +11342,7 @@ async function requestAssistantReply(text, opts = {}) {
     }
     reply = reply.trim();
     const parsedReply = parseToolMetaFromText(reply);
-    const visibleReply = String(parsedReply.visibleText || "").trim();
+    const visibleReply = normalizeAssistantVisibleText(parsedReply.visibleText);
     if (!visibleReply) {
       throw new Error("模型没有返回内容");
     }

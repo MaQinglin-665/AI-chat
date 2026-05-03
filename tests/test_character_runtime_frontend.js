@@ -126,6 +126,11 @@ assert.ok(
   "subtitle translation should reuse the chat translation cache/request path"
 );
 assert.ok(
+  source.includes("function normalizeAssistantVisibleText(text)")
+    && source.includes("const visibleReply = normalizeAssistantVisibleText(parsedReply.visibleText);"),
+  "final assistant text should normalize English sentence boundaries before display and translation"
+);
+assert.ok(
   source.includes('translationEl.textContent = "中译：翻译中...";'),
   "assistant messages should show an immediate translation placeholder"
 );
