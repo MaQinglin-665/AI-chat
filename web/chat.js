@@ -5229,9 +5229,9 @@ function parseToolMetaFromText(text) {
   const src = String(text || "");
   const idx = src.indexOf(TOOL_META_MARKER);
   if (idx < 0) {
-    return { visibleText: stripRuntimeMetadataSuffix(src), meta: null };
+    return { visibleText: stripAssistantPayloadNoise(src), meta: null };
   }
-  const visibleText = stripRuntimeMetadataSuffix(src.slice(0, idx)).trimEnd();
+  const visibleText = stripAssistantPayloadNoise(src.slice(0, idx)).trimEnd();
   const raw = src.slice(idx + TOOL_META_MARKER.length).trim();
   if (!raw) {
     return { visibleText, meta: null };
@@ -5249,6 +5249,107 @@ function stripRuntimeMetadataSuffix(text) {
     return SPEECH_TEXT.stripRuntimeMetadataSuffix(text);
   }
   return String(text || "");
+}
+
+function looksLikeAssistantTextWrapperFragment(text) {
+  const safe = String(text || "").trim();
+  if (!safe) {
+    return false;
+  }
+  if (!/^\s*[{[]/.test(safe)) {
+    return false;
+  }
+  return /["']?\b(?:text|message|content|output_text)\b["']?\s*:/i.test(safe);
+}
+
+function looksLikeEmptyAssistantTextWrapperFragment(text) {
+  const safe = String(text || "").trim();
+  if (!safe) {
+    return false;
+  }
+  return /^[\s{,\["'`]*\b(?:text|message|content|output_text)\b["']?\s*:?\s*["'`]*$/i.test(safe);
+}
+
+function extractAssistantTextFromJsonLike(text) {
+  const safe = String(text || "").trim();
+  if (!looksLikeAssistantTextWrapperFragment(safe)) {
+    return "";
+  }
+  for (const key of ["text", "message", "content", "output_text"]) {
+    const quoted = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "i").exec(safe);
+    if (quoted) {
+      try {
+        return String(JSON.parse(`"${quoted[1]}"`) || "").trim();
+      } catch (_) {
+        return String(quoted[1] || "").trim();
+      }
+    }
+    const singleQuoted = new RegExp(`'${key}'\\s*:\\s*'((?:\\\\.|[^'\\\\])*)'`, "i").exec(safe);
+    if (singleQuoted) {
+      return String(singleQuoted[1] || "").trim();
+    }
+  }
+  return "";
+}
+
+function coerceAssistantPayloadText(value) {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (value == null) {
+    return "";
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value).trim();
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => coerceAssistantPayloadText(item))
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+  }
+  if (typeof value === "object") {
+    for (const key of ["text", "message", "content", "output_text"]) {
+      const nested = coerceAssistantPayloadText(value[key]);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return "";
+}
+
+function extractAssistantPayloadText(text) {
+  const safe = String(text || "").trim();
+  if (!safe || !/^\s*[{[]/.test(safe)) {
+    return "";
+  }
+  try {
+    const parsed = JSON.parse(safe);
+    return coerceAssistantPayloadText(parsed);
+  } catch (_) {
+    return "";
+  }
+}
+
+function stripAssistantPayloadNoise(text) {
+  const visible = stripRuntimeMetadataSuffix(text);
+  const payloadText = extractAssistantPayloadText(visible);
+  if (payloadText) {
+    return stripRuntimeMetadataSuffix(payloadText);
+  }
+  const jsonLikeText = extractAssistantTextFromJsonLike(visible);
+  if (jsonLikeText) {
+    return stripRuntimeMetadataSuffix(jsonLikeText);
+  }
+  if (looksLikeEmptyAssistantTextWrapperFragment(visible)) {
+    return "";
+  }
+  if (looksLikeAssistantTextWrapperFragment(visible)) {
+    return "";
+  }
+  return visible;
 }
 
 const CHARACTER_RUNTIME = window.TaffyCharacterRuntime || {};

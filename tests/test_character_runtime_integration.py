@@ -771,6 +771,17 @@ def test_runtime_enabled_bad_json_fallback_does_not_crash(monkeypatch):
     assert isinstance(payload.get("reply"), str)
 
 
+def test_runtime_enabled_empty_text_wrapper_fragment_does_not_leak(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True}
+    monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: '{"text":')
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(f"{base}/api/chat", _chat_payload("hi"))
+    assert status == 200
+    assert payload.get("reply") == ""
+    assert "text" not in payload.get("reply", "")
+
+
 def test_runtime_enabled_dict_reply_is_converted_to_text(monkeypatch):
     cfg = _build_test_config()
     cfg["character_runtime"] = {"enabled": True}
@@ -1005,6 +1016,27 @@ def test_chat_stream_done_payload_does_not_leak_partial_metadata_only_fragment(m
     done = next((evt for evt in events if evt.get("type") == "done"), {})
     assert done.get("reply") == ""
     assert "emotion" not in done.get("reply", "")
+    runtime = done.get("character_runtime")
+    assert isinstance(runtime, dict)
+    assert runtime.get("emotion") == "neutral"
+
+
+def test_chat_stream_done_payload_does_not_leak_empty_text_wrapper_fragment(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True, "return_metadata": True}
+
+    def _fake_stream(*_args, **_kwargs):
+        yield '{"text":'
+
+    monkeypatch.setattr(app, "call_llm_stream", _fake_stream)
+    monkeypatch.setattr(app, "finalize_assistant_reply", lambda *_args, **_kwargs: '{"text":')
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, events = _post_stream_events(f"{base}/api/chat_stream", _chat_payload("hi"))
+    assert status == 200
+    done = next((evt for evt in events if evt.get("type") == "done"), {})
+    assert done.get("reply") == ""
+    assert "text" not in done.get("reply", "")
     runtime = done.get("character_runtime")
     assert isinstance(runtime, dict)
     assert runtime.get("emotion") == "neutral"

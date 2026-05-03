@@ -82,6 +82,10 @@ RUNTIME_METADATA_ONLY_RE = re.compile(
     r"\s*(?::|=)?\s*[\"']?[A-Za-z0-9_-]*[\"']?[\s,;|{}()\[\]\"'`:=_-]*)+$",
     flags=re.IGNORECASE,
 )
+RUNTIME_TEXT_WRAPPER_FRAGMENT_RE = re.compile(
+    r"^[\s{,\[\"'`]*\b(?:text|message|content|output_text)\b[\"']?\s*:?[\s\"'`]*$",
+    flags=re.IGNORECASE,
+)
 
 EMOTION_TO_LIVE2D_HINT = {
     "neutral": "idle_relaxed",
@@ -145,6 +149,8 @@ def normalize_runtime_payload(payload: Any) -> Dict[str, Any]:
         safe = payload.strip()
         if not safe:
             return normalized
+        if looks_like_empty_text_wrapper_fragment(safe):
+            return normalized
         try:
             parsed = json.loads(safe)
             if isinstance(parsed, dict):
@@ -204,6 +210,13 @@ def looks_like_runtime_metadata_only_text(text: str) -> bool:
         return False
     visible, meta = _split_runtime_metadata_suffix(src)
     return not visible and (bool(meta) or _find_runtime_metadata_partial_tail_start(src) == 0)
+
+
+def looks_like_empty_text_wrapper_fragment(text: str) -> bool:
+    src = str(text or "").strip()
+    if not src:
+        return False
+    return bool(RUNTIME_TEXT_WRAPPER_FRAGMENT_RE.fullmatch(src))
 
 
 def _split_runtime_metadata_suffix(text: str) -> tuple[str, Dict[str, str]]:

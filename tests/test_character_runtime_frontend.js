@@ -269,5 +269,14 @@ assert.ok(
   /const streamSpeakSession = Date\.now\(\);[\s\S]*?const useStreamSpeak = shouldUseStreamSpeak\(\);[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?state\.streamSpeakSession = streamSpeakSession;/.test(source),
   "starting a new assistant request should always invalidate previous audio playback"
 );
+assert.ok(
+  source.includes("function stripAssistantPayloadNoise(text)")
+    && source.includes("function looksLikeEmptyAssistantTextWrapperFragment(text)")
+    && source.includes("function looksLikeAssistantTextWrapperFragment(text)")
+    && source.includes("function extractAssistantPayloadText(text)")
+    && source.includes("function extractAssistantTextFromJsonLike(text)")
+    && source.includes("stripAssistantPayloadNoise(src)"),
+  "assistant message rendering should hide half-open JSON text wrappers before they reach the chat bubble"
+);
 
 console.log("Character runtime frontend checks passed.");

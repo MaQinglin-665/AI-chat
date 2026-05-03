@@ -53,6 +53,13 @@ def test_malformed_json_fallback_is_safe_text():
     assert payload["voice_style"] == "neutral"
 
 
+def test_empty_text_wrapper_fragment_is_not_visible_reply():
+    payload = normalize_runtime_payload('{"text":')
+    assert payload["text"] == ""
+    assert payload["emotion"] == "neutral"
+    assert payload["voice_style"] == "neutral"
+
+
 def test_plain_text_with_runtime_metadata_suffix_is_cleaned():
     payload = normalize_runtime_payload(
         "Got it! Feeling peppy after your lunch break?\n"

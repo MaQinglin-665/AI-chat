@@ -134,6 +134,7 @@ from asr import (
 )
 from character_runtime import (
     emotion_to_live2d_hint,
+    looks_like_empty_text_wrapper_fragment,
     looks_like_runtime_metadata_only_text,
     normalize_runtime_payload,
 )
@@ -344,7 +345,9 @@ def _apply_character_runtime_reply(config, raw_reply):
             fallback_visible_text = str(fallback_normalized.get("text", "") or "").strip()
             if fallback_visible_text:
                 reply_text = fallback_visible_text
-            elif looks_like_runtime_metadata_only_text(fallback_text):
+            elif looks_like_runtime_metadata_only_text(
+                fallback_text
+            ) or looks_like_empty_text_wrapper_fragment(fallback_text):
                 reply_text = ""
             else:
                 reply_text = fallback_text
