@@ -1,9 +1,12 @@
 from app_translate_route import (
+    TRANSLATE_LLM_LOCK,
     build_translate_messages,
     handle_translate_request,
     resolve_translate_num_ctx,
     resolve_translate_timeout_sec,
 )
+import threading
+import time
 
 
 def test_build_translate_messages_requests_simplified_chinese_only():
@@ -82,7 +85,7 @@ def test_handle_translate_request_returns_success_payload():
     assert called["messages"] == build_translate_messages("hello")
 
 
-def test_handle_translate_request_streams_when_openai_nonstream_fails():
+def test_handle_translate_request_streams_for_openai_compatible():
     sent = {}
     calls = []
 
@@ -112,11 +115,202 @@ def test_handle_translate_request_streams_when_openai_nonstream_fails():
         diagnostic_payload_func=lambda exc: {"error": str(exc)},
     )
 
-    assert calls == ["nonstream", "stream"]
+    assert calls == ["stream"]
     assert sent["data"]["translated"] == "你好"
     assert sent["data"]["translated_text"] == "你好"
     assert sent["data"]["degraded"] is False
     assert sent["data"]["fallback"] is False
+
+
+def test_handle_translate_request_prefers_stream_for_openai_compatible():
+    sent = {}
+    calls = []
+
+    def unexpected_nonstream(_cfg, _messages):
+        calls.append("nonstream")
+        return "nonstream result"
+
+    def stream_translation(_cfg, _messages):
+        calls.append("stream")
+        yield "ni "
+        yield "hao"
+
+    handle_translate_request(
+        {"text": "hello"},
+        send_json_func=lambda data, status=200: sent.update({"data": data, "status": status}),
+        load_config_func=lambda: {
+            "llm": {
+                "provider": "openai-compatible",
+                "model": "main-model",
+            }
+        },
+        call_ollama_func=lambda *_args, **_kwargs: "unused",
+        call_openai_compatible_func=unexpected_nonstream,
+        iter_openai_chat_stream_func=stream_translation,
+        diagnose_llm_exception_func=lambda exc, _cfg: exc,
+        log_backend_notice_func=lambda *_args, **_kwargs: None,
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+    )
+
+    assert calls == ["stream"]
+    assert sent["data"]["translated"] == "ni hao"
+    assert sent["data"]["degraded"] is False
+
+
+def test_handle_translate_request_falls_back_to_nonstream_when_stream_empty():
+    sent = {}
+    calls = []
+
+    def nonstream_translation(_cfg, _messages):
+        calls.append("nonstream")
+        return "ni hao"
+
+    def empty_stream(_cfg, _messages):
+        calls.append("stream")
+        if False:
+            yield ""
+
+    handle_translate_request(
+        {"text": "hello"},
+        send_json_func=lambda data, status=200: sent.update({"data": data, "status": status}),
+        load_config_func=lambda: {
+            "llm": {
+                "provider": "openai-compatible",
+                "model": "main-model",
+            }
+        },
+        call_ollama_func=lambda *_args, **_kwargs: "unused",
+        call_openai_compatible_func=nonstream_translation,
+        iter_openai_chat_stream_func=empty_stream,
+        diagnose_llm_exception_func=lambda exc, _cfg: exc,
+        log_backend_notice_func=lambda *_args, **_kwargs: None,
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+    )
+
+    assert calls == ["stream", "nonstream"]
+    assert sent["data"]["translated"] == "ni hao"
+    assert sent["data"]["degraded"] is False
+
+
+def test_handle_translate_request_degrades_when_openai_compatible_stream_fails():
+    sent = {}
+    notices = []
+    calls = []
+
+    def stream_fails(_cfg, _messages):
+        calls.append("stream")
+        raise RuntimeError("stream failed")
+        yield ""
+
+    def nonstream_should_not_run(_cfg, _messages):
+        calls.append("nonstream")
+        return "nonstream result"
+
+    handle_translate_request(
+        {"text": "hello"},
+        send_json_func=lambda data, status=200: sent.update({"data": data, "status": status}),
+        load_config_func=lambda: {
+            "llm": {
+                "provider": "openai-compatible",
+                "model": "main-model",
+            }
+        },
+        call_ollama_func=lambda *_args, **_kwargs: "unused",
+        call_openai_compatible_func=nonstream_should_not_run,
+        iter_openai_chat_stream_func=stream_fails,
+        diagnose_llm_exception_func=lambda exc, _cfg: RuntimeError(f"diagnosed: {exc}"),
+        log_backend_notice_func=lambda *args, **kwargs: notices.append((args, kwargs)),
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+    )
+
+    assert calls == ["stream"]
+    assert sent["data"]["translated"] == "hello"
+    assert sent["data"]["degraded"] is True
+    assert sent["data"]["fallback"] is True
+    assert "diagnosed" in sent["data"]["error"]
+    assert notices
+
+
+def test_handle_translate_request_accepts_openai_compatible_underscore_alias():
+    sent = {}
+    calls = []
+
+    def stream_translation(_cfg, _messages):
+        calls.append("stream")
+        yield "ni hao"
+
+    handle_translate_request(
+        {"text": "hello"},
+        send_json_func=lambda data, status=200: sent.update({"data": data, "status": status}),
+        load_config_func=lambda: {
+            "llm": {
+                "provider": "openai_compatible",
+                "model": "main-model",
+            }
+        },
+        call_ollama_func=lambda *_args, **_kwargs: "unused",
+        call_openai_compatible_func=lambda *_args, **_kwargs: "nonstream",
+        iter_openai_chat_stream_func=stream_translation,
+        diagnose_llm_exception_func=lambda exc, _cfg: exc,
+        log_backend_notice_func=lambda *_args, **_kwargs: None,
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+    )
+
+    assert calls == ["stream"]
+    assert sent["data"]["translated"] == "ni hao"
+    assert sent["data"]["degraded"] is False
+
+
+def test_handle_translate_request_serializes_translate_llm_calls():
+    active = 0
+    max_active = 0
+    entered = threading.Event()
+    lock = threading.Lock()
+    results = []
+
+    def slow_stream(_cfg, _messages):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+            entered.set()
+        time.sleep(0.03)
+        with lock:
+            active -= 1
+        yield "ok"
+
+    def worker():
+        sent = {}
+        handle_translate_request(
+            {"text": "hello"},
+            send_json_func=lambda data, status=200: sent.update({"data": data, "status": status}),
+            load_config_func=lambda: {
+                "llm": {
+                    "provider": "openai-compatible",
+                    "model": "main-model",
+                }
+            },
+            call_ollama_func=lambda *_args, **_kwargs: "unused",
+            call_openai_compatible_func=lambda *_args, **_kwargs: "nonstream",
+            iter_openai_chat_stream_func=slow_stream,
+            diagnose_llm_exception_func=lambda exc, _cfg: exc,
+            log_backend_notice_func=lambda *_args, **_kwargs: None,
+            diagnostic_payload_func=lambda exc: {"error": str(exc)},
+        )
+        results.append(sent["data"]["translated"])
+
+    first = threading.Thread(target=worker)
+    second = threading.Thread(target=worker)
+    first.start()
+    assert entered.wait(timeout=1)
+    second.start()
+    first.join(timeout=3)
+    second.join(timeout=3)
+
+    assert len(results) == 2
+    assert results == ["ok", "ok"]
+    assert max_active == 1
+    assert not TRANSLATE_LLM_LOCK.locked()
 
 
 def test_handle_translate_request_allows_translate_timeout_override():

@@ -1,4 +1,5 @@
 from http import HTTPStatus
+import threading
 
 
 TRANSLATE_SYSTEM_PROMPT = (
@@ -8,6 +9,7 @@ TRANSLATE_SYSTEM_PROMPT = (
 
 DEFAULT_TRANSLATE_TIMEOUT_SEC = 45
 DEFAULT_TRANSLATE_NUM_CTX = 512
+TRANSLATE_LLM_LOCK = threading.Lock()
 
 
 def resolve_translate_timeout_sec(llm_cfg):
@@ -45,6 +47,45 @@ def build_translate_messages(text):
         },
         {"role": "user", "content": text},
     ]
+
+
+def _collect_stream_translation(iter_openai_chat_stream_func, llm_cfg, messages):
+    chunks = []
+    for chunk in iter_openai_chat_stream_func(llm_cfg, messages):
+        if isinstance(chunk, str) and chunk:
+            chunks.append(chunk)
+    return "".join(chunks).strip()
+
+
+def _call_translate_llm(
+    provider,
+    translate_cfg,
+    messages,
+    *,
+    call_ollama_func,
+    call_openai_compatible_func,
+    iter_openai_chat_stream_func=None,
+):
+    if provider == "ollama":
+        return call_ollama_func(translate_cfg, messages)
+
+    provider_key = str(provider or "").strip().lower()
+    can_stream = callable(iter_openai_chat_stream_func)
+    if provider_key in {"openai-compatible", "openai_compatible"} and can_stream:
+        result = _collect_stream_translation(iter_openai_chat_stream_func, translate_cfg, messages)
+        if result:
+            return result
+        return call_openai_compatible_func(translate_cfg, messages)
+
+    try:
+        return call_openai_compatible_func(translate_cfg, messages)
+    except Exception:
+        if not can_stream:
+            raise
+        result = _collect_stream_translation(iter_openai_chat_stream_func, translate_cfg, messages)
+        if not result:
+            raise
+        return result
 
 
 def handle_translate_request(
@@ -114,21 +155,15 @@ def handle_translate_request(
         messages = build_translate_messages(text)
         if callable(perf_now_ms_func):
             llm_started_ms = perf_now_ms_func()
-        if provider == "ollama":
-            result = call_ollama_func(translate_cfg, messages)
-        else:
-            try:
-                result = call_openai_compatible_func(translate_cfg, messages)
-            except Exception:
-                if not callable(iter_openai_chat_stream_func):
-                    raise
-                chunks = []
-                for chunk in iter_openai_chat_stream_func(translate_cfg, messages):
-                    if isinstance(chunk, str) and chunk:
-                        chunks.append(chunk)
-                result = "".join(chunks).strip()
-                if not result:
-                    raise
+        with TRANSLATE_LLM_LOCK:
+            result = _call_translate_llm(
+                provider,
+                translate_cfg,
+                messages,
+                call_ollama_func=call_ollama_func,
+                call_openai_compatible_func=call_openai_compatible_func,
+                iter_openai_chat_stream_func=iter_openai_chat_stream_func,
+            )
         llm_ms = _elapsed_ms(perf_now_ms_func, llm_started_ms)
         translated = str(result or "").strip() or text
         response = {
