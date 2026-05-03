@@ -38,4 +38,4 @@ def test_default_gpt_sovits_values_favor_stable_voice():
     assert tts["gpt_sovits_top_p"] == 0.78
     assert tts["gpt_sovits_temperature"] == 0.36
     assert tts["gpt_sovits_normalize_loudness"] is True
-    assert tts["gpt_sovits_target_rms"] == 900
+    assert tts["gpt_sovits_target_rms"] == 1400

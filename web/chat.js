@@ -8940,6 +8940,17 @@ function hasQueuedStreamSpeakItem(sessionId) {
     && state.streamSpeakQueue.some((item) => item && item.sessionId === sessionId);
 }
 
+function discardQueuedStreamSpeakItems(sessionId) {
+  if (!Array.isArray(state.streamSpeakQueue) || state.streamSpeakQueue.length <= 0) {
+    return 0;
+  }
+  const before = state.streamSpeakQueue.length;
+  state.streamSpeakQueue = state.streamSpeakQueue.filter(
+    (item) => item && item.sessionId !== sessionId
+  );
+  return before - state.streamSpeakQueue.length;
+}
+
 function ensureStreamSpeakQueueRunning(sessionId, delayMs = 0) {
   const safeSession = Number(sessionId || 0);
   if (!safeSession || safeSession !== state.streamSpeakSession || !shouldUseStreamSpeak()) {
@@ -11961,6 +11972,7 @@ async function requestAssistantReply(text, opts = {}) {
   state.streamSpeakSession = streamSpeakSession;
   state.streamSpeakQueue = [];
   state.streamSpeakBuffer = "";
+  state.streamSpeakLastEnqueueSession = 0;
   if (shouldPlayLatencyHint(isAuto, useStreamSpeak)) {
     latencyHintTimer = window.setTimeout(async () => {
       if (!state.chatBusy || gotFirstDelta) {
@@ -12096,23 +12108,41 @@ async function requestAssistantReply(text, opts = {}) {
     if (useStreamSpeak) {
       flushStreamSpeak(streamSpeakSession, finalTalkStyle);
       const hadStreamSegments = state.streamSpeakLastEnqueueSession === streamSpeakSession;
-      scheduleFinalSpeechWatchdog({
-        sessionId: streamSpeakSession,
-        text: visibleReply,
-        mood,
-        style: finalTalkStyle,
-        traceId: chatPerfTraceId
-      });
-      if (!hadStreamSegments) {
+      if (hadStreamSegments && state.streamSpeakPlayedSession === streamSpeakSession) {
+        scheduleFinalSpeechWatchdog({
+          sessionId: streamSpeakSession,
+          text: visibleReply,
+          mood,
+          style: finalTalkStyle,
+          traceId: chatPerfTraceId
+        });
+      } else if (!hadStreamSegments || !state.streamSpeakWorking) {
         const speechText = buildStableSpeakText(visibleReply) || visibleReply;
         const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalTalkStyle);
         maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
+        const discardedSegments = discardQueuedStreamSpeakItems(streamSpeakSession);
+        recordTTSDebugEvent("final_direct_tts", {
+          traceId: chatPerfTraceId,
+          sessionId: streamSpeakSession,
+          text: speechText || visibleReply,
+          result: hadStreamSegments ? "no_stream_playback_yet" : "no_stream_segments",
+          blobBytes: discardedSegments
+        });
         await speak(speechText || visibleReply, {
           prosody,
           interrupt: true,
           mood,
           style: finalTalkStyle,
-          perfTraceId: chatPerfTraceId
+          perfTraceId: chatPerfTraceId,
+          playbackGeneration: Number(state.ttsPlaybackGeneration || 0)
+        });
+      } else {
+        scheduleFinalSpeechWatchdog({
+          sessionId: streamSpeakSession,
+          text: visibleReply,
+          mood,
+          style: finalTalkStyle,
+          traceId: chatPerfTraceId
         });
       }
     } else {

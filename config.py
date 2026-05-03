@@ -187,7 +187,7 @@ DEFAULT_CONFIG = {
         "gpt_sovits_repetition_penalty": 1.08,
         "gpt_sovits_seed": 0,
         "gpt_sovits_normalize_loudness": True,
-        "gpt_sovits_target_rms": 900,
+        "gpt_sovits_target_rms": 1400,
         "gpt_sovits_max_loudness_gain": 3.2,
         "gpt_sovits_prefer_clean_prompt": True,
         "gpt_sovits_chunk_max_candidates": 2,

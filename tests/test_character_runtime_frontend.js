@@ -209,6 +209,13 @@ assert.ok(
   "final replies should have a watchdog fallback if realtime stream speech never starts playback"
 );
 assert.ok(
+  source.includes("function discardQueuedStreamSpeakItems(sessionId)")
+    && source.includes('recordTTSDebugEvent("final_direct_tts"')
+    && source.includes("no_stream_playback_yet")
+    && source.includes("state.streamSpeakLastEnqueueSession = 0;"),
+  "short final replies should use direct TTS if no realtime stream segment has started playback"
+);
+assert.ok(
   source.includes("function buildTTSDebugReport()"),
   "chat.js should expose a TTS debug report for voice playback diagnosis"
 );
