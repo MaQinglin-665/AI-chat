@@ -154,8 +154,30 @@
     return "";
   }
 
+  function normalizeAssistantWrapperSource(text) {
+    let safe = String(text || "").trim();
+    if (!safe) {
+      return "";
+    }
+    safe = safe
+      .replace(/^\uFEFF/, "")
+      .replace(/^```(?:json|javascript|js)?\s*/i, "")
+      .replace(/\s*```\s*$/i, "")
+      .trim();
+    if (/^["']?json["']?\s*[,:\-]?\s*/i.test(safe)) {
+      const withoutLabel = safe.replace(/^["']?json["']?\s*[,:\-]?\s*/i, "").trim();
+      if (
+        /^[{[]/.test(withoutLabel)
+        || /^(?:"text"|'text'|text|"message"|'message'|message|"content"|'content'|content|"output_text"|'output_text'|output_text)\s*:/i.test(withoutLabel)
+      ) {
+        safe = withoutLabel;
+      }
+    }
+    return safe;
+  }
+
   function looksLikeAssistantTextWrapperFragment(text) {
-    const safe = String(text || "").trim();
+    const safe = normalizeAssistantWrapperSource(text);
     if (!safe || !/^\s*[{[]/.test(safe)) {
       return false;
     }
@@ -163,7 +185,7 @@
   }
 
   function looksLikeEmptyAssistantTextWrapperFragment(text) {
-    const safe = String(text || "").trim();
+    const safe = normalizeAssistantWrapperSource(text);
     if (!safe) {
       return false;
     }
@@ -171,7 +193,7 @@
   }
 
   function extractAssistantPayloadText(text) {
-    const safe = String(text || "").trim();
+    const safe = normalizeAssistantWrapperSource(text);
     if (!safe || !/^\s*[{[]/.test(safe)) {
       return "";
     }
@@ -184,8 +206,11 @@
   }
 
   function extractAssistantTextFromJsonLike(text) {
-    const safe = String(text || "").trim();
-    if (!looksLikeAssistantTextWrapperFragment(safe)) {
+    const safe = normalizeAssistantWrapperSource(text);
+    const hasContainer = looksLikeAssistantTextWrapperFragment(safe);
+    const hasLooseTextField =
+      /^(?:"text"|'text'|text|"message"|'message'|message|"content"|'content'|content|"output_text"|'output_text'|output_text)\s*:/i.test(safe);
+    if (!hasContainer && !hasLooseTextField) {
       return "";
     }
     for (const key of ["text", "message", "content", "output_text"]) {

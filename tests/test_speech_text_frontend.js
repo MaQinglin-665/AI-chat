@@ -34,6 +34,18 @@ assert.strictEqual(
 );
 
 assert.strictEqual(
+  speechText.sanitizeSpeakText('"json"\n"text": "Told ya. Less is more sometimes."'),
+  "Told ya. Less is more sometimes.",
+  "speech sanitization should extract text from bare json-labelled wrapper fragments"
+);
+
+assert.strictEqual(
+  speechText.sanitizeSpeakText('```json\n{"text": "Told ya. Less is more sometimes.", "emotion": "happy"}\n```'),
+  "Told ya. Less is more sometimes.",
+  "speech sanitization should extract text from json fenced reply wrappers"
+);
+
+assert.strictEqual(
   speechText.sanitizeSpeakText('{"text":'),
   "",
   "speech sanitization should hide half-open JSON reply wrappers"
@@ -71,6 +83,16 @@ assert.deepStrictEqual(
   }).segments,
   ["Oh， my bad"],
   "stream speech should segment extracted visible text instead of JSON wrapper fields"
+);
+
+assert.deepStrictEqual(
+  speechText.splitStreamSpeakSegments('"json"\n"text": "Told ya. Less is more sometimes."', {
+    flush: true,
+    style: "playful",
+    provider: "gpt_sovits"
+  }).segments,
+  ["Told ya. Less is more sometimes."],
+  "stream speech should not segment json labels or text field names"
 );
 
 assert.deepStrictEqual(
