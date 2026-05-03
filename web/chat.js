@@ -5070,9 +5070,9 @@ function parseToolMetaFromText(text) {
   const src = String(text || "");
   const idx = src.indexOf(TOOL_META_MARKER);
   if (idx < 0) {
-    return { visibleText: src, meta: null };
+    return { visibleText: stripRuntimeMetadataSuffix(src), meta: null };
   }
-  const visibleText = src.slice(0, idx).trimEnd();
+  const visibleText = stripRuntimeMetadataSuffix(src.slice(0, idx)).trimEnd();
   const raw = src.slice(idx + TOOL_META_MARKER.length).trim();
   if (!raw) {
     return { visibleText, meta: null };
@@ -5083,6 +5083,13 @@ function parseToolMetaFromText(text) {
   } catch (_) {
     return { visibleText, meta: null };
   }
+}
+
+function stripRuntimeMetadataSuffix(text) {
+  if (SPEECH_TEXT && typeof SPEECH_TEXT.stripRuntimeMetadataSuffix === "function") {
+    return SPEECH_TEXT.stripRuntimeMetadataSuffix(text);
+  }
+  return String(text || "");
 }
 
 const CHARACTER_RUNTIME = window.TaffyCharacterRuntime || {};
@@ -11275,6 +11282,7 @@ async function requestAssistantReply(text, opts = {}) {
   setStatus(isAuto ? "自动对话中..." : "思考中...");
   let assistantRow = null;
   let reply = "";
+  let visibleStreamReply = "";
   let gotFirstDelta = false;
   let latencyHintTimer = 0;
   const streamSpeakSession = Date.now();
@@ -11356,9 +11364,14 @@ async function requestAssistantReply(text, opts = {}) {
         }
       }
       reply += delta;
-      setMessageText(assistantRow, reply, { enableTranslation: false });
+      const nextVisibleStreamReply = parseToolMetaFromText(reply).visibleText;
+      const visibleDelta = nextVisibleStreamReply.startsWith(visibleStreamReply)
+        ? nextVisibleStreamReply.slice(visibleStreamReply.length)
+        : "";
+      visibleStreamReply = nextVisibleStreamReply;
+      setMessageText(assistantRow, visibleStreamReply, { enableTranslation: false });
       if (useStreamSpeak) {
-        feedStreamSpeakDelta(delta, streamSpeakSession, talkStyle);
+        feedStreamSpeakDelta(visibleDelta, streamSpeakSession, talkStyle);
       }
       setStatus(isAuto ? "自动对话中..." : "思考中...");
     }, {
@@ -11377,7 +11390,8 @@ async function requestAssistantReply(text, opts = {}) {
     });
     if (streamed && streamed !== reply) {
       reply = streamed;
-      setMessageText(assistantRow, reply, { enableTranslation: false });
+      visibleStreamReply = parseToolMetaFromText(reply).visibleText;
+      setMessageText(assistantRow, visibleStreamReply, { enableTranslation: false });
     }
     reply = reply.trim();
     const parsedReply = parseToolMetaFromText(reply);

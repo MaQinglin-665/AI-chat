@@ -20,6 +20,22 @@ assert.strictEqual(
 );
 
 assert.strictEqual(
+  speechText.sanitizeSpeakText(
+    "Got it! Feeling peppy after your lunch break?\nemotion: happy\naction: nod\nvoice_style: cheerful"
+  ),
+  "Got it! Feeling peppy after your lunch break?",
+  "speech sanitization should remove runtime metadata suffixes"
+);
+
+assert.strictEqual(
+  speechText.sanitizeSpeakText(
+    "Ah, you're still going strong. Take a quick stretch if you can.\nemotion: thinking action:"
+  ),
+  "Ah, you're still going strong. Take a quick stretch if you can.",
+  "speech sanitization should remove partial runtime metadata suffixes"
+);
+
+assert.strictEqual(
   speechText.sanitizeSpeakText("1. 你好！！ https://example.com [[TAFFY_TOOL_META]]{}"),
   "你好！",
   "speech sanitization should remove list markers, urls, duplicate punctuation, and tool metadata"

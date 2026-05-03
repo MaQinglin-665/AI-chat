@@ -112,7 +112,8 @@
     "enabled": true,
     "trigger_messages": 14,
     "keep_recent_messages": 8,
-    "max_summary_chars": 900
+    "max_summary_chars": 900,
+    "sync_summarize_on_chat": false
   },
   "asr": {
     "show_mic_meter": true,

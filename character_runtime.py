@@ -71,6 +71,12 @@ SUPPORTED_ACTIONS = {
 
 SUPPORTED_INTENSITY = {"low", "normal", "high"}
 
+RUNTIME_METADATA_KEYS = ("emotion", "action", "intensity", "voice_style", "live2d_hint")
+RUNTIME_METADATA_PAIR_RE = re.compile(
+    r"\b(emotion|action|intensity|voice_style|live2d_hint)\s*[:=]\s*([A-Za-z][A-Za-z0-9_-]*)",
+    flags=re.IGNORECASE,
+)
+
 EMOTION_TO_LIVE2D_HINT = {
     "neutral": "idle_relaxed",
     "happy": "smile_soft",
@@ -152,10 +158,21 @@ def normalize_runtime_payload(payload: Any) -> Dict[str, Any]:
 
     if isinstance(raw, dict):
         text = _extract_visible_text_from_dict(raw)
+        text, inline_meta = _split_runtime_metadata_suffix(text)
         emotion = normalize_emotion(raw.get("emotion", "neutral"))
         action = normalize_action(raw.get("action", "none"))
         intensity = normalize_intensity(raw.get("intensity", "normal"))
         voice_style = str(raw.get("voice_style", "") or "").strip().lower() or emotion
+        if inline_meta:
+            emotion = normalize_emotion(raw.get("emotion", inline_meta.get("emotion", emotion)))
+            if not raw.get("emotion"):
+                emotion = normalize_emotion(inline_meta.get("emotion", emotion))
+            if not raw.get("action"):
+                action = normalize_action(inline_meta.get("action", action))
+            if not raw.get("intensity"):
+                intensity = normalize_intensity(inline_meta.get("intensity", intensity))
+            if not raw.get("voice_style"):
+                voice_style = str(inline_meta.get("voice_style", voice_style) or voice_style).strip().lower()
         normalized["text"] = text
         normalized["emotion"] = emotion
         normalized["action"] = action
@@ -163,8 +180,58 @@ def normalize_runtime_payload(payload: Any) -> Dict[str, Any]:
         normalized["voice_style"] = voice_style
         return normalized
 
-    normalized["text"] = str(raw).strip()
+    text, inline_meta = _split_runtime_metadata_suffix(str(raw).strip())
+    normalized["text"] = text
+    if inline_meta:
+        normalized["emotion"] = normalize_emotion(inline_meta.get("emotion", "neutral"))
+        normalized["action"] = normalize_action(inline_meta.get("action", "none"))
+        normalized["intensity"] = normalize_intensity(inline_meta.get("intensity", "normal"))
+        normalized["voice_style"] = str(
+            inline_meta.get("voice_style") or normalized["emotion"] or "neutral"
+        ).strip().lower()
     return normalized
+
+
+def _split_runtime_metadata_suffix(text: str) -> tuple[str, Dict[str, str]]:
+    src = str(text or "").strip()
+    if not src:
+        return "", {}
+
+    matches = list(RUNTIME_METADATA_PAIR_RE.finditer(src))
+    if not matches:
+        return src, {}
+
+    for first in matches:
+        tail = src[first.start():].strip()
+        tail_pairs = list(RUNTIME_METADATA_PAIR_RE.finditer(tail))
+        if not tail_pairs:
+            continue
+        remainder = RUNTIME_METADATA_PAIR_RE.sub("", tail)
+        remainder = re.sub(
+            r"\b(emotion|action|intensity|voice_style|live2d_hint)\b",
+            "",
+            remainder,
+            flags=re.IGNORECASE,
+        )
+        remainder = re.sub(r"[\s,;|{}()\[\]\"'`。.!?！？:=-]+", "", remainder)
+        if remainder:
+            continue
+
+        before = src[: first.start()]
+        starts_line = first.start() == 0 or bool(re.search(r"[\r\n]\s*$", before))
+        follows_sentence = bool(re.search(r"[.!?。！？]\s*$", before))
+        if len(tail_pairs) < 2 and not starts_line and not follows_sentence:
+            continue
+
+        meta: Dict[str, str] = {}
+        for pair in tail_pairs:
+            key = str(pair.group(1) or "").strip().lower()
+            value = str(pair.group(2) or "").strip().lower().replace("-", "_")
+            if key in RUNTIME_METADATA_KEYS and value:
+                meta[key] = value
+        return before.strip(), meta
+
+    return src, {}
 
 
 def _extract_text_from_json_like(safe: str) -> str:

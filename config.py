@@ -234,6 +234,7 @@ DEFAULT_CONFIG = {
         "trigger_messages": 14,
         "keep_recent_messages": 8,
         "max_summary_chars": 900,
+        "sync_summarize_on_chat": False,
     },
     "asr": {
         "show_mic_meter": True,
@@ -881,6 +882,7 @@ def sanitize_client_config(config):
             "max_summary_chars": max(
                 240, min(3000, _safe_int(summary_cfg.get("max_summary_chars", 900), 900))
             ),
+            "sync_summarize_on_chat": bool(summary_cfg.get("sync_summarize_on_chat", False)),
         },
         "style": {
             "auto": bool(style_cfg.get("auto", True)),

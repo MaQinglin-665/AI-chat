@@ -53,6 +53,31 @@ def test_malformed_json_fallback_is_safe_text():
     assert payload["voice_style"] == "neutral"
 
 
+def test_plain_text_with_runtime_metadata_suffix_is_cleaned():
+    payload = normalize_runtime_payload(
+        "Got it! Feeling peppy after your lunch break?\n"
+        "emotion: happy\n"
+        "action: nod\n"
+        "voice_style: cheerful"
+    )
+
+    assert payload["text"] == "Got it! Feeling peppy after your lunch break?"
+    assert payload["emotion"] == "happy"
+    assert payload["action"] == "nod"
+    assert payload["voice_style"] == "cheerful"
+
+
+def test_plain_text_with_partial_runtime_metadata_suffix_is_cleaned():
+    payload = normalize_runtime_payload(
+        "Ah, you're still going strong. Take a quick stretch if you can.\n"
+        "emotion: thinking action:"
+    )
+
+    assert payload["text"] == "Ah, you're still going strong. Take a quick stretch if you can."
+    assert payload["emotion"] == "thinking"
+    assert payload["action"] == "none"
+
+
 def test_empty_input_fallback_is_safe_defaults():
     payload = normalize_runtime_payload("")
     assert payload == {
