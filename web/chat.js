@@ -11679,7 +11679,7 @@ async function speak(text, opts = {}) {
         provider: state.ttsProvider,
         streak: failStreak,
         threshold: failThreshold,
-        reason: lastErr,
+        error: lastErr,
         timeoutMs: Number(state.ttsServerRequestTimeoutMs || 0)
       });
       return await speakByBrowser(text, { force: !!speakOpts.force, playbackGeneration: speakOpts.playbackGeneration });

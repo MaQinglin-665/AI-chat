@@ -626,6 +626,34 @@ def sanitize_client_config(config):
     stream_mode = str(tts_cfg.get("stream_mode", "realtime") or "realtime").strip().lower()
     if stream_mode not in {"final_only", "realtime"}:
         stream_mode = "realtime"
+    server_request_timeout_ms = max(
+        1500,
+        min(
+            90000,
+            _safe_int(tts_cfg.get("server_request_timeout_ms", 0), 0)
+            or _safe_int(tts_cfg.get("gpt_sovits_timeout_sec", 60), 60) * 1000,
+        ),
+    )
+    gpt_sovits_timeout_sec = max(
+        1,
+        min(180, _safe_int(tts_cfg.get("gpt_sovits_timeout_sec", 60), 60)),
+    )
+    server_retry_count = max(
+        0,
+        min(4, _safe_int(tts_cfg.get("server_retry_count", 2 if provider == "gpt_sovits" else 1), 1)),
+    )
+    server_retry_delay_ms = max(
+        60,
+        min(3000, _safe_int(tts_cfg.get("server_retry_delay_ms", 220), 220)),
+    )
+    server_fallback_fail_threshold = max(
+        1,
+        min(8, _safe_int(tts_cfg.get("server_fallback_fail_threshold", 1 if provider == "gpt_sovits" else 2), 1)),
+    )
+    stream_speak_idle_wait_ms = max(
+        30,
+        min(220, _safe_int(tts_cfg.get("stream_speak_idle_wait_ms", 90), 90)),
+    )
     observe_attach_mode_raw = str(
         observe_cfg.get("attach_mode", "manual") or "manual"
     ).strip().lower()
@@ -820,6 +848,12 @@ def sanitize_client_config(config):
             "gpt_sovits_realtime_tts": bool(
                 tts_cfg.get("gpt_sovits_realtime_tts", False)
             ),
+            "gpt_sovits_timeout_sec": gpt_sovits_timeout_sec,
+            "server_request_timeout_ms": server_request_timeout_ms,
+            "server_retry_count": server_retry_count,
+            "server_retry_delay_ms": server_retry_delay_ms,
+            "server_fallback_fail_threshold": server_fallback_fail_threshold,
+            "stream_speak_idle_wait_ms": stream_speak_idle_wait_ms,
             "allow_browser_fallback": bool(
                 tts_cfg.get("allow_browser_fallback", False)
             ),
