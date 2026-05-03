@@ -8914,14 +8914,20 @@ function enqueueStreamSpeakSegment(text, sessionId, prosody = null, style = "neu
 }
 
 function dequeueStreamSpeakItem(sessionId) {
-  while (state.streamSpeakQueue.length > 0) {
-    const item = state.streamSpeakQueue.shift();
+  if (!Array.isArray(state.streamSpeakQueue) || state.streamSpeakQueue.length <= 0) {
+    return null;
+  }
+  for (let i = 0; i < state.streamSpeakQueue.length; i += 1) {
+    const item = state.streamSpeakQueue[i];
     if (!item) {
+      state.streamSpeakQueue.splice(i, 1);
+      i -= 1;
       continue;
     }
     if (item.sessionId !== sessionId) {
       continue;
     }
+    state.streamSpeakQueue.splice(i, 1);
     return item;
   }
   return null;

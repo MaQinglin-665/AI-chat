@@ -177,6 +177,10 @@ assert.ok(
   "stream speech queue should hand off to a newer session after an older runner exits"
 );
 assert.ok(
+  /function dequeueStreamSpeakItem\(sessionId\)\s*\{[\s\S]*?for \(let i = 0; i < state\.streamSpeakQueue\.length; i \+= 1\)[\s\S]*?item\.sessionId !== sessionId[\s\S]*?continue;[\s\S]*?state\.streamSpeakQueue\.splice\(i, 1\);[\s\S]*?return item;/.test(source),
+  "stream speech dequeue should not drop queued items from newer sessions"
+);
+assert.ok(
   source.includes("function shouldSerializeStreamTTSRequests()")
     && source.includes('state.ttsProvider === "gpt_sovits"')
     && source.includes("if (!shouldSerializeStreamTTSRequests())")
