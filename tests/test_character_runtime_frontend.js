@@ -116,6 +116,12 @@ assert.ok(
   "chat and subtitle translations should share in-flight requests"
 );
 assert.ok(
+  source.includes("function _normalizeChatTranslationKey(text)")
+    && source.includes("_translationInFlight.get(cacheKey)")
+    && source.includes("_translationInFlight.set(cacheKey, task)"),
+  "chat translation cache/in-flight keys should normalize punctuation spacing variants"
+);
+assert.ok(
   /async function _fetchTranslation\(text, capturedId\)\s*\{[\s\S]*?_readChatTranslationCache\(safe\)[\s\S]*?_fetchChatTranslation\(safe\)/.test(source),
   "subtitle translation should reuse the chat translation cache/request path"
 );
@@ -179,6 +185,11 @@ assert.ok(
   source.includes("function buildTranslateDebugReport()")
     && source.includes('text.toLowerCase() === "/translatedebug"'),
   "chat.js should expose /translatedebug for copyable translation timing state"
+);
+assert.ok(
+  source.includes('appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false })')
+    && source.includes('appendMessage("assistant", "Translation debug panel enabled.", { enableTranslation: false })'),
+  "translation debug command responses should not recursively trigger assistant translation"
 );
 assert.ok(
   source.includes("function installTranslateDebugBridge()")

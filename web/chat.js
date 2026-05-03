@@ -3433,35 +3433,35 @@ async function handleLocalCommand(inputText) {
     return false;
   }
   if (text.toLowerCase() === "/micdebug") {
-    appendMessage("assistant", await buildMicDebugReport());
+    appendMessage("assistant", await buildMicDebugReport(), { enableTranslation: false });
     return true;
   }
   if (text.toLowerCase() === "/ttsdebug") {
-    appendMessage("assistant", buildTTSDebugReport());
+    appendMessage("assistant", buildTTSDebugReport(), { enableTranslation: false });
     return true;
   }
   if (text.toLowerCase() === "/ttsdebug on") {
     toggleTTSDebugPanel(true);
-    appendMessage("assistant", "TTS debug panel enabled.");
+    appendMessage("assistant", "TTS debug panel enabled.", { enableTranslation: false });
     return true;
   }
   if (text.toLowerCase() === "/ttsdebug off") {
     toggleTTSDebugPanel(false);
-    appendMessage("assistant", "TTS debug panel disabled.");
+    appendMessage("assistant", "TTS debug panel disabled.", { enableTranslation: false });
     return true;
   }
   if (text.toLowerCase() === "/translatedebug") {
-    appendMessage("assistant", buildTranslateDebugReport());
+    appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false });
     return true;
   }
   if (text.toLowerCase() === "/translatedebug on") {
     toggleTranslateDebugPanel(true);
-    appendMessage("assistant", "Translation debug panel enabled.");
+    appendMessage("assistant", "Translation debug panel enabled.", { enableTranslation: false });
     return true;
   }
   if (text.toLowerCase() === "/translatedebug off") {
     toggleTranslateDebugPanel(false);
-    appendMessage("assistant", "Translation debug panel disabled.");
+    appendMessage("assistant", "Translation debug panel disabled.", { enableTranslation: false });
     return true;
   }
   if (text === "/情绪日报") {
@@ -5610,8 +5610,21 @@ function _markTranslationSuccess() {
   _translationCircuitState.cooldownUntil = 0;
 }
 
+function _normalizeChatTranslationKey(text) {
+  const safe = String(text || "").replace(/\s+/g, " ").trim();
+  if (!safe) {
+    return "";
+  }
+  return safe
+    .replace(/([A-Za-z0-9])([.!?])(?=[A-Za-z0-9])/g, "$1$2 ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/([,.;:!?])\s+/g, "$1 ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function _readChatTranslationCache(text) {
-  const key = String(text || "").trim();
+  const key = _normalizeChatTranslationKey(text);
   if (!key || !_chatTranslationCache.has(key)) {
     return "";
   }
@@ -5622,7 +5635,7 @@ function _readChatTranslationCache(text) {
 }
 
 function _writeChatTranslationCache(text, translated) {
-  const key = String(text || "").trim();
+  const key = _normalizeChatTranslationKey(text);
   const value = String(translated || "").trim();
   if (!key || !value) {
     return;
@@ -5701,6 +5714,7 @@ async function _fetchChatTranslation(text) {
   if (!safe) {
     return "";
   }
+  const cacheKey = _normalizeChatTranslationKey(safe);
   const cached = _readChatTranslationCache(safe);
   if (cached) {
     recordTranslateDebugEvent("cache_hit", {
@@ -5721,7 +5735,7 @@ async function _fetchChatTranslation(text) {
     });
     return "";
   }
-  const inFlight = _translationInFlight.get(safe);
+  const inFlight = _translationInFlight.get(cacheKey);
   if (inFlight) {
     recordTranslateDebugEvent("inflight_reuse", {
       text: safe,
@@ -5844,12 +5858,12 @@ async function _fetchChatTranslation(text) {
       clearTimeout(timeoutId);
     }
   })();
-  _translationInFlight.set(safe, task);
+  _translationInFlight.set(cacheKey, task);
   try {
     return await task;
   } finally {
-    if (_translationInFlight.get(safe) === task) {
-      _translationInFlight.delete(safe);
+    if (_translationInFlight.get(cacheKey) === task) {
+      _translationInFlight.delete(cacheKey);
     }
   }
 }
