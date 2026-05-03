@@ -262,6 +262,15 @@ v1.3 preview quality gate passed. Runtime text/metadata/TTS/translation/memory-l
 | Expression feedback | Expression changes are visible or safely subtle | Maintainer reported expression response exists but is not obvious | Pass | Low-priority polish follow-up, not a release blocker. |
 | Speech end / idle return | State and mouth return to idle after speech | Maintainer reported it returned to idle | Pass | Confirms recent TTS changes did not leave speech motion stuck. |
 
+## Source Package Rehearsal
+
+| Check item | Expected result | Actual result | Pass/Fail | Notes |
+| --- | --- | --- | --- | --- |
+| Source test package generation | Release zip and SHA256 summary are created | `Taffy-AI-Desktop-Pet-v1.3.0-preview-windows-source-test.zip` generated | Pass | Package remains a source test package, not an installer. |
+| Package sensitive-file check | Local config, env files, logs, memory data, and `node_modules` are not included | Zip scan found no matching sensitive/runtime entries | Pass | `config.example.json` is included as intended. |
+| Clean-package preflight | First-run diagnostics report missing user setup clearly | Preflight failed with expected blockers for placeholder Live2D model path and missing LLM API key | Pass | This is expected before a tester configures their own model and provider credentials. |
+| Clean-package defaults | Browser TTS and safety defaults remain conservative | Browser TTS default passed; runtime metadata, auto chat, and tool calling were off | Pass | Warnings also noted missing `node_modules`, Node LTS recommendation, and already-running local backend on the developer machine. |
+
 ## Final Result
 
 Overall result: pass
@@ -269,5 +278,5 @@ Overall result: pass
 Short summary:
 
 ```text
-GPT-SoVITS demo playback and Live2D speech feedback are stable at the current checkpoint. Expression response is present but subtle, so model-specific expression tuning remains a low-priority polish follow-up after the v1.3 preview.
+GPT-SoVITS demo playback, Live2D speech feedback, and source package generation are stable at the current checkpoint. The clean source package correctly requires tester-provided Live2D and LLM configuration before first launch. Expression response is present but subtle, so model-specific expression tuning remains a low-priority polish follow-up after the v1.3 preview.
 ```
