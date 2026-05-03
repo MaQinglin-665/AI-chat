@@ -83,6 +83,7 @@ const state = {
   streamSpeakWorking: false,
   streamSpeakBuffer: "",
   streamSpeakSession: 0,
+  streamSpeakWorkingSession: 0,
   streamSpeakLastEnqueueSession: 0,
   streamSpeakPlayedSession: 0,
   speechAnimUntil: 0,
@@ -8745,6 +8746,14 @@ function buildStableSpeakText(text) {
 function stopAllAudioPlayback() {
   state.ttsPlaybackGeneration = Number(state.ttsPlaybackGeneration || 0) + 1;
   state.streamSpeakPlayedSession = 0;
+  if (
+    state.streamSpeakWorking
+    && Number(state.streamSpeakWorkingSession || 0)
+    && Number(state.streamSpeakWorkingSession || 0) !== Number(state.streamSpeakSession || 0)
+  ) {
+    state.streamSpeakWorking = false;
+    state.streamSpeakWorkingSession = 0;
+  }
   if ("speechSynthesis" in window) {
     try {
       window.speechSynthesis.cancel();
@@ -8964,9 +8973,24 @@ function ensureStreamSpeakQueueRunning(sessionId, delayMs = 0) {
     if (!hasQueuedStreamSpeakItem(safeSession)) {
       return;
     }
-    if (state.streamSpeakWorking) {
+    if (
+      state.streamSpeakWorking
+      && Number(state.streamSpeakWorkingSession || 0) === safeSession
+    ) {
       ensureStreamSpeakQueueRunning(safeSession, 80);
       return;
+    }
+    if (
+      state.streamSpeakWorking
+      && Number(state.streamSpeakWorkingSession || 0) !== safeSession
+    ) {
+      recordTTSDebugEvent("stream_run_clear_stale_busy", {
+        sessionId: safeSession,
+        result: "stale_busy",
+        error: String(state.streamSpeakWorkingSession || "")
+      });
+      state.streamSpeakWorking = false;
+      state.streamSpeakWorkingSession = 0;
     }
     runStreamSpeakQueue();
   }, delay);
@@ -8998,6 +9022,7 @@ async function runStreamSpeakQueue() {
   }
   const activeSession = state.streamSpeakSession;
   state.streamSpeakWorking = true;
+  state.streamSpeakWorkingSession = activeSession;
   recordTTSDebugEvent("stream_run_start", { sessionId: activeSession });
   try {
     if (!state.speakingEnabled || !isServerTTSProvider(state.ttsProvider)) {
@@ -9105,7 +9130,10 @@ async function runStreamSpeakQueue() {
       error: String(err?.message || err || "")
     });
   } finally {
-    state.streamSpeakWorking = false;
+    if (Number(state.streamSpeakWorkingSession || 0) === Number(activeSession || 0)) {
+      state.streamSpeakWorking = false;
+      state.streamSpeakWorkingSession = 0;
+    }
     recordTTSDebugEvent("stream_run_done", { sessionId: activeSession });
     if (
       activeSession === state.streamSpeakSession
@@ -9551,9 +9579,13 @@ async function loadConfig() {
   state.ttsServerRetryDelayMs = Number.isFinite(retryDelayCfg)
     ? Math.max(60, Math.min(3000, Math.round(retryDelayCfg)))
     : 220;
-  state.ttsServerRequestTimeoutMs = Number.isFinite(timeoutCfg)
-    ? Math.max(1500, Math.min(45000, Math.round(timeoutCfg)))
-    : 14000;
+  const sovitsTimeoutMs = isSovits && Number.isFinite(Number(ttsCfg.gpt_sovits_timeout_sec))
+    ? Math.round(Number(ttsCfg.gpt_sovits_timeout_sec) * 1000)
+    : 0;
+  const resolvedTimeoutMs = Number.isFinite(timeoutCfg)
+    ? timeoutCfg
+    : (sovitsTimeoutMs || 14000);
+  state.ttsServerRequestTimeoutMs = Math.max(1500, Math.min(90000, Math.round(resolvedTimeoutMs)));
   state.streamSpeakIdleWaitMs = Number.isFinite(streamIdleWaitCfg)
     ? Math.max(30, Math.min(220, Math.round(streamIdleWaitCfg)))
     : 90;
@@ -10970,7 +11002,7 @@ async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) {
     traceId: String(requestOpts.traceId || state.activePerfTraceId || "").trim(),
     timeoutMs: Math.max(
       1500,
-      Math.min(45000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
+      Math.min(90000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
     ),
     voice: state.ttsServerVoice,
     now: () => performance.now(),
@@ -10994,7 +11026,7 @@ async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) {
     ),
     timeoutMs: Math.max(
       1500,
-      Math.min(45000, Math.round(Number(opts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
+      Math.min(90000, Math.round(Number(opts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
     ),
     voice: state.ttsServerVoice,
     now: () => performance.now(),
@@ -11640,6 +11672,15 @@ async function speak(text, opts = {}) {
         provider: state.ttsProvider,
         streak: failStreak,
         reason: lastErr
+      });
+      recordTTSDebugEvent("browser_fallback_start", {
+        traceId: String(speakOpts.perfTraceId || state.activePerfTraceId || "(none)"),
+        text,
+        provider: state.ttsProvider,
+        streak: failStreak,
+        threshold: failThreshold,
+        reason: lastErr,
+        timeoutMs: Number(state.ttsServerRequestTimeoutMs || 0)
       });
       return await speakByBrowser(text, { force: !!speakOpts.force, playbackGeneration: speakOpts.playbackGeneration });
     }

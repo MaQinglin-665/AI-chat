@@ -22,6 +22,13 @@
     });
   }
 
+  function normalizeTTSRequestTimeoutMs(value) {
+    return Math.max(
+      1500,
+      Math.min(90000, Math.round(Number(value) || 14000))
+    );
+  }
+
   function buildServerTTSPayload(cleanedText, opts = {}) {
     const payload = { text: String(cleanedText || "") };
     if (opts.voice) {
@@ -132,10 +139,7 @@
       textChars: cleaned.length
     });
 
-    const timeoutMs = Math.max(
-      1500,
-      Math.min(45000, Math.round(Number(requestOpts.timeoutMs) || 14000))
-    );
+    const timeoutMs = normalizeTTSRequestTimeoutMs(requestOpts.timeoutMs);
     const AbortControllerImpl = requestOpts.AbortController || root.AbortController;
     const controller = (typeof AbortControllerImpl !== "undefined") ? new AbortControllerImpl() : null;
     let timeoutHandle = 0;
@@ -208,10 +212,7 @@
       60,
       Math.min(3000, Math.round(Number(opts.retryDelayMs) || 220))
     );
-    const timeoutMs = Math.max(
-      1500,
-      Math.min(45000, Math.round(Number(opts.timeoutMs) || 14000))
-    );
+    const timeoutMs = normalizeTTSRequestTimeoutMs(opts.timeoutMs);
     const wait = typeof opts.wait === "function" ? opts.wait : waitMs;
     let attempt = 0;
     while (true) {
@@ -243,6 +244,7 @@
     buildServerTTSPayload,
     inferAudioMime,
     isRetriableTTSError,
+    normalizeTTSRequestTimeoutMs,
     normalizeAudioBlob,
     requestServerTTSBlob,
     requestServerTTSBlobWithRetry

@@ -194,6 +194,19 @@ assert.ok(
   "stream speech queue should support a shorter configurable idle wait"
 );
 assert.ok(
+  source.includes("gpt_sovits_timeout_sec")
+    && source.includes("sovitsTimeoutMs")
+    && source.includes("Math.min(90000")
+    && source.includes("state.ttsServerRequestTimeoutMs"),
+  "GPT-SoVITS frontend request timeout should follow backend timeout config"
+);
+assert.ok(
+  source.includes("streamSpeakWorkingSession: 0")
+    && source.includes("stream_run_clear_stale_busy")
+    && source.includes("state.streamSpeakWorkingSession = activeSession"),
+  "new realtime TTS sessions should not be blocked by stale stream runners"
+);
+assert.ok(
   /current\s*=\s*next\s*\|\|\s*await waitNextStreamSpeakItem\([\s\S]*?state\.chatBusy \? idleWaitMs : 180/.test(source),
   "stream speech queue should re-check for tail segments after each audio segment plays"
 );
