@@ -176,6 +176,22 @@ assert.ok(
   "window debug bridge should expose TTS playback state to developer tools"
 );
 assert.ok(
+  source.includes("function buildTranslateDebugReport()")
+    && source.includes('text.toLowerCase() === "/translatedebug"'),
+  "chat.js should expose /translatedebug for copyable translation timing state"
+);
+assert.ok(
+  source.includes("function installTranslateDebugBridge()")
+    && source.includes("__AI_CHAT_DEBUG_TRANSLATE__"),
+  "window debug bridge should expose translation timing state to developer tools"
+);
+assert.ok(
+  source.includes('recordTranslateDebugEvent("request_start"')
+    && source.includes('recordTranslateDebugEvent("request_ok"')
+    && source.includes('recordTranslateDebugEvent("cache_hit"'),
+  "translation requests should record start, completion, and cache-hit events"
+);
+assert.ok(
   source.includes('recordTTSDebugEvent("audio_play_start"')
     && source.includes('recordTTSDebugEvent("audio_done"'),
   "server audio playback should record start and completion events"

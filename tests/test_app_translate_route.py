@@ -95,6 +95,45 @@ def test_handle_translate_request_allows_translate_timeout_override():
     assert called["cfg"]["request_timeout"] == 72
 
 
+def test_handle_translate_request_logs_perf_events():
+    sent = {}
+    perf_events = []
+    now_values = iter([1000, 1042, 1075])
+
+    handle_translate_request(
+        {"text": "hello"},
+        send_json_func=lambda data, status=200: sent.update({"data": data, "status": status}),
+        load_config_func=lambda: {
+            "llm": {
+                "provider": "openai",
+                "model": "main-model",
+            }
+        },
+        call_ollama_func=lambda *_args, **_kwargs: "unused",
+        call_openai_compatible_func=lambda _cfg, _messages: "你好",
+        diagnose_llm_exception_func=lambda exc, _cfg: exc,
+        log_backend_notice_func=lambda *_args, **_kwargs: None,
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+        perf_trace_id="translate_test",
+        perf_started_ms=900,
+        client_to_server_ms=12,
+        log_backend_perf_func=lambda *args, **kwargs: perf_events.append((args, kwargs)),
+        perf_now_ms_func=lambda: next(now_values),
+    )
+
+    assert sent["data"]["translated"] == "你好"
+    stages = [kwargs.get("stage") for _args, kwargs in perf_events]
+    assert stages == ["request_received", "response_sent"]
+    response = perf_events[-1][1]
+    assert response["llm_ms"] == 42
+    assert response["total_ms"] == 175
+    assert response["provider"] == "openai"
+    assert response["model"] == "main-model"
+    assert response["text_chars"] == 5
+    assert response["translated_chars"] == 2
+    assert response["degraded"] is False
+
+
 def test_handle_translate_request_falls_back_to_source_text_on_failure():
     sent = {}
     notices = []
