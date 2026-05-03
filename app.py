@@ -1113,6 +1113,8 @@ class PetHandler(SimpleHTTPRequestHandler):
             perf_trace_id = _resolve_perf_trace_id(body, default_prefix="chat")
         elif path_only == "/api/tts":
             perf_trace_id = _resolve_perf_trace_id(body, default_prefix="tts")
+        elif path_only == "/api/translate":
+            perf_trace_id = _resolve_perf_trace_id(body, default_prefix="translate")
         else:
             perf_trace_id = _resolve_perf_trace_id(body, default_prefix="req")
         perf_headers = {"X-Perf-Trace-Id": perf_trace_id}
@@ -1167,13 +1169,22 @@ class PetHandler(SimpleHTTPRequestHandler):
         if path_only == "/api/translate":
             handle_translate_request(
                 body,
-                send_json_func=self._send_json,
+                send_json_func=lambda data, status=HTTPStatus.OK: self._send_json(
+                    data,
+                    status=status,
+                    extra_headers=perf_headers,
+                ),
                 load_config_func=load_config,
                 call_ollama_func=call_ollama,
                 call_openai_compatible_func=call_openai_compatible,
                 diagnose_llm_exception_func=_diagnose_llm_exception,
                 log_backend_notice_func=_log_backend_notice,
                 diagnostic_payload_func=_diagnostic_payload,
+                perf_trace_id=perf_trace_id,
+                perf_started_ms=perf_started_ms,
+                client_to_server_ms=client_to_server_ms,
+                log_backend_perf_func=_log_backend_perf,
+                perf_now_ms_func=_perf_now_ms,
             )
             return
 

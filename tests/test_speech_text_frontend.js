@@ -8,6 +8,18 @@ const SPEECH_TEXT_JS = path.resolve(__dirname, "..", "web", "speechText.js");
 const speechText = require(SPEECH_TEXT_JS);
 
 assert.strictEqual(
+  typeof speechText.normalizeEnglishBoundaries,
+  "function",
+  "speech text helper should export English boundary normalization"
+);
+
+assert.strictEqual(
+  speechText.normalizeEnglishBoundaries("Hey there!I'm more of a night owl myself.But sure."),
+  "Hey there! I'm more of a night owl myself. But sure.",
+  "English boundary normalization should insert missing sentence spaces"
+);
+
+assert.strictEqual(
   speechText.sanitizeSpeakText("1. 你好！！ https://example.com [[TAFFY_TOOL_META]]{}"),
   "你好！",
   "speech sanitization should remove list markers, urls, duplicate punctuation, and tool metadata"

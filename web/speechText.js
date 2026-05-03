@@ -396,6 +396,7 @@
     buildStableSpeakText,
     colloquializeSpeakText,
     insertNaturalPause,
+    normalizeEnglishBoundaries,
     sanitizeSpeakText,
     simplifySpeechDeliveryText,
     splitStreamSpeakSegments,

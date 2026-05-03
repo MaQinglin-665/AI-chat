@@ -237,6 +237,17 @@ const state = {
   ttsDebugAudioEndedAt: 0,
   ttsDebugLastResult: "",
   ttsDebugLastError: "",
+  translateDebugVisible: false,
+  translateDebugEvents: [],
+  translateDebugSeq: 0,
+  translateDebugPanel: null,
+  translateDebugBody: null,
+  translateDebugRefreshTimer: 0,
+  translateDebugLastEventAt: 0,
+  translateDebugCurrentTraceId: "",
+  translateDebugCurrentText: "",
+  translateDebugLastResult: "",
+  translateDebugLastError: "",
   localAsrMutedWarned: false,
   localAsrInputDeviceCandidates: [],
   localAsrSpeeching: false,
@@ -561,6 +572,197 @@ function toggleTTSDebugPanel(force = null) {
   state.ttsDebugVisible = force === null ? !state.ttsDebugVisible : !!force;
   updateTTSDebugPanel();
   return state.ttsDebugVisible;
+}
+
+function sanitizeTranslateDebugText(text, maxLen = 96) {
+  return sanitizeTTSDebugText(text, maxLen);
+}
+
+function recordTranslateDebugEvent(stage, payload = {}) {
+  const now = performance.now();
+  const entry = {
+    seq: ++state.translateDebugSeq,
+    atMs: Math.round(now),
+    stage: String(stage || "event"),
+    traceId: String(payload.traceId || state.translateDebugCurrentTraceId || ""),
+    text: sanitizeTranslateDebugText(payload.text || ""),
+    sourceChars: Number(payload.sourceChars || 0),
+    translatedChars: Number(payload.translatedChars || 0),
+    elapsedMs: Number(payload.elapsedMs || -1),
+    status: Number(payload.status || 0),
+    degraded: payload.degraded === true,
+    fallback: payload.fallback === true,
+    cache: String(payload.cache || ""),
+    result: String(payload.result || ""),
+    error: String(payload.error || "")
+  };
+  state.translateDebugLastEventAt = now;
+  if (entry.traceId) {
+    state.translateDebugCurrentTraceId = entry.traceId;
+  }
+  if (entry.text) {
+    state.translateDebugCurrentText = entry.text;
+  }
+  if (entry.result) {
+    state.translateDebugLastResult = entry.result;
+  }
+  if (entry.error) {
+    state.translateDebugLastError = entry.error;
+  }
+  state.translateDebugEvents.push(entry);
+  if (state.translateDebugEvents.length > 80) {
+    state.translateDebugEvents.splice(0, state.translateDebugEvents.length - 80);
+  }
+  updateTranslateDebugPanel();
+  return entry;
+}
+
+function getTranslateDebugSnapshot() {
+  return {
+    timeoutMs: _CHAT_TRANSLATE_TIMEOUT_MS,
+    cacheSize: _chatTranslationCache.size,
+    inFlight: _translationInFlight.size,
+    circuitOpen: _isTranslationCircuitOpen(),
+    circuitFailures: Number(_translationCircuitState.failures || 0),
+    circuitCooldownMs: Math.max(0, Math.round(Number(_translationCircuitState.cooldownUntil || 0) - Date.now())),
+    lastTraceId: state.translateDebugCurrentTraceId || "",
+    lastText: state.translateDebugCurrentText || "",
+    lastResult: state.translateDebugLastResult || "",
+    lastError: state.translateDebugLastError || "",
+    events: state.translateDebugEvents.slice()
+  };
+}
+
+function buildTranslateDebugReport() {
+  const s = getTranslateDebugSnapshot();
+  const lines = [
+    "Translation debug:",
+    `timeoutMs=${s.timeoutMs}`,
+    `cacheSize=${s.cacheSize}`,
+    `inFlight=${s.inFlight}`,
+    `circuitOpen=${s.circuitOpen}`,
+    `circuitFailures=${s.circuitFailures}`,
+    `circuitCooldownMs=${s.circuitCooldownMs}`,
+    `lastTrace=${s.lastTraceId || "(none)"}`,
+    `lastResult=${s.lastResult || "(none)"}`,
+    `lastError=${s.lastError || "(none)"}`,
+    `lastText=${s.lastText || "(none)"}`
+  ];
+  const recent = s.events.slice(-12).map((event) => {
+    const ageMs = Math.round(performance.now() - Number(event.atMs || 0));
+    const bits = [
+      `#${event.seq}`,
+      `${event.stage}`,
+      `ageMs=${ageMs}`,
+      event.traceId ? `trace=${event.traceId}` : "",
+      event.elapsedMs >= 0 ? `elapsedMs=${event.elapsedMs}` : "",
+      event.status ? `status=${event.status}` : "",
+      event.sourceChars ? `sourceChars=${event.sourceChars}` : "",
+      event.translatedChars ? `translatedChars=${event.translatedChars}` : "",
+      event.cache ? `cache=${event.cache}` : "",
+      event.degraded ? "degraded=true" : "",
+      event.fallback ? "fallback=true" : "",
+      event.result ? `result=${event.result}` : "",
+      event.error ? `error=${event.error}` : "",
+      event.text ? `text=${event.text}` : ""
+    ].filter(Boolean);
+    return bits.join(" ");
+  });
+  if (recent.length) {
+    lines.push("recentEvents=");
+    lines.push(...recent);
+  } else {
+    lines.push("recentEvents=none");
+  }
+  return lines.join("\n");
+}
+
+function ensureTranslateDebugPanel() {
+  if (state.translateDebugPanel || typeof document === "undefined") {
+    return state.translateDebugPanel;
+  }
+  const panel = document.createElement("div");
+  panel.id = "translate-debug-panel";
+  panel.style.cssText = [
+    "position:fixed",
+    "right:14px",
+    "bottom:14px",
+    "z-index:99999",
+    "width:min(430px,calc(100vw - 28px))",
+    "max-height:52vh",
+    "overflow:auto",
+    "padding:12px",
+    "border:1px solid rgba(120,150,170,.45)",
+    "border-radius:14px",
+    "background:rgba(8,18,26,.88)",
+    "color:#d8f3ff",
+    "font:12px/1.45 Consolas,Menlo,monospace",
+    "box-shadow:0 18px 45px rgba(0,0,0,.28)",
+    "backdrop-filter:blur(10px)",
+    "white-space:pre-wrap",
+    "display:none"
+  ].join(";");
+  const head = document.createElement("div");
+  head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;";
+  const title = document.createElement("strong");
+  title.textContent = "Translation Debug";
+  title.style.cssText = "font-size:13px;color:#ffffff;";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.textContent = "Hide";
+  close.style.cssText = "border:0;border-radius:999px;padding:4px 9px;background:#d8f3ff;color:#10202a;cursor:pointer;";
+  close.addEventListener("click", () => {
+    state.translateDebugVisible = false;
+    updateTranslateDebugPanel();
+  });
+  head.appendChild(title);
+  head.appendChild(close);
+  const body = document.createElement("pre");
+  body.style.cssText = "margin:0;white-space:pre-wrap;";
+  panel.appendChild(head);
+  panel.appendChild(body);
+  document.body.appendChild(panel);
+  state.translateDebugPanel = panel;
+  state.translateDebugBody = body;
+  return panel;
+}
+
+function updateTranslateDebugPanel() {
+  if (!state.translateDebugVisible) {
+    if (state.translateDebugPanel) {
+      state.translateDebugPanel.style.display = "none";
+    }
+    if (state.translateDebugRefreshTimer) {
+      clearInterval(state.translateDebugRefreshTimer);
+      state.translateDebugRefreshTimer = 0;
+    }
+    return;
+  }
+  const panel = ensureTranslateDebugPanel();
+  if (!panel) {
+    return;
+  }
+  if (!state.translateDebugRefreshTimer) {
+    state.translateDebugRefreshTimer = window.setInterval(() => {
+      if (!state.translateDebugVisible) {
+        updateTranslateDebugPanel();
+        return;
+      }
+      if (state.translateDebugBody) {
+        state.translateDebugBody.textContent = buildTranslateDebugReport();
+      }
+    }, 1000);
+  }
+  panel.style.display = "block";
+  if (state.translateDebugBody) {
+    state.translateDebugBody.textContent = buildTranslateDebugReport();
+  }
+}
+
+function toggleTranslateDebugPanel(force = null) {
+  state.translateDebugVisible = force === null ? !state.translateDebugVisible : !!force;
+  updateTranslateDebugPanel();
+  return state.translateDebugVisible;
 }
 
 const ui = {
@@ -3231,21 +3433,35 @@ async function handleLocalCommand(inputText) {
     return false;
   }
   if (text.toLowerCase() === "/micdebug") {
-    appendMessage("assistant", await buildMicDebugReport());
+    appendMessage("assistant", await buildMicDebugReport(), { enableTranslation: false });
     return true;
   }
   if (text.toLowerCase() === "/ttsdebug") {
-    appendMessage("assistant", buildTTSDebugReport());
+    appendMessage("assistant", buildTTSDebugReport(), { enableTranslation: false });
     return true;
   }
   if (text.toLowerCase() === "/ttsdebug on") {
     toggleTTSDebugPanel(true);
-    appendMessage("assistant", "TTS debug panel enabled.");
+    appendMessage("assistant", "TTS debug panel enabled.", { enableTranslation: false });
     return true;
   }
   if (text.toLowerCase() === "/ttsdebug off") {
     toggleTTSDebugPanel(false);
-    appendMessage("assistant", "TTS debug panel disabled.");
+    appendMessage("assistant", "TTS debug panel disabled.", { enableTranslation: false });
+    return true;
+  }
+  if (text.toLowerCase() === "/translatedebug") {
+    appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false });
+    return true;
+  }
+  if (text.toLowerCase() === "/translatedebug on") {
+    toggleTranslateDebugPanel(true);
+    appendMessage("assistant", "Translation debug panel enabled.", { enableTranslation: false });
+    return true;
+  }
+  if (text.toLowerCase() === "/translatedebug off") {
+    toggleTranslateDebugPanel(false);
+    appendMessage("assistant", "Translation debug panel disabled.", { enableTranslation: false });
     return true;
   }
   if (text === "/情绪日报") {
@@ -5201,6 +5417,30 @@ function installTTSDebugBridge() {
   return bridge;
 }
 
+function installTranslateDebugBridge() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const key = "__AI_CHAT_DEBUG_TRANSLATE__";
+  if (window[key] && typeof window[key] === "object") {
+    return window[key];
+  }
+  const bridge = {
+    report: buildTranslateDebugReport,
+    snapshot: getTranslateDebugSnapshot,
+    events: () => state.translateDebugEvents.slice(),
+    show: () => toggleTranslateDebugPanel(true),
+    hide: () => toggleTranslateDebugPanel(false),
+    toggle: () => toggleTranslateDebugPanel()
+  };
+  try {
+    window[key] = bridge;
+  } catch (_) {
+    return null;
+  }
+  return bridge;
+}
+
 function getToolCardTitle(item) {
   const tool = String(item?.tool || "").trim();
   if (tool === "write_file") return "已写入文件";
@@ -5370,8 +5610,21 @@ function _markTranslationSuccess() {
   _translationCircuitState.cooldownUntil = 0;
 }
 
+function _normalizeChatTranslationKey(text) {
+  const safe = String(text || "").replace(/\s+/g, " ").trim();
+  if (!safe) {
+    return "";
+  }
+  return safe
+    .replace(/([A-Za-z0-9])([.!?])(?=[A-Za-z0-9])/g, "$1$2 ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/([,.;:!?])\s+/g, "$1 ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function _readChatTranslationCache(text) {
-  const key = String(text || "").trim();
+  const key = _normalizeChatTranslationKey(text);
   if (!key || !_chatTranslationCache.has(key)) {
     return "";
   }
@@ -5382,7 +5635,7 @@ function _readChatTranslationCache(text) {
 }
 
 function _writeChatTranslationCache(text, translated) {
-  const key = String(text || "").trim();
+  const key = _normalizeChatTranslationKey(text);
   const value = String(translated || "").trim();
   if (!key || !value) {
     return;
@@ -5427,6 +5680,22 @@ function _shouldShowAssistantTranslation(text) {
   return _isLikelyEnglishForChat(safe);
 }
 
+function normalizeAssistantVisibleText(text) {
+  const safe = String(text || "").trim();
+  if (!safe || !_isLikelyEnglishForChat(safe)) {
+    return safe;
+  }
+  if (SPEECH_TEXT && typeof SPEECH_TEXT.normalizeEnglishBoundaries === "function") {
+    return SPEECH_TEXT.normalizeEnglishBoundaries(safe);
+  }
+  return safe
+    .replace(/([.!?])(?=[A-Z'"\u2018\u2019])/g, "$1 ")
+    .replace(/([,;:])(?=[A-Za-z])/g, "$1 ")
+    .replace(/\s+([.!?,;:])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function _ensureMessageTranslationEl(row) {
   if (!row) {
     return null;
@@ -5461,19 +5730,47 @@ async function _fetchChatTranslation(text) {
   if (!safe) {
     return "";
   }
+  const cacheKey = _normalizeChatTranslationKey(safe);
   const cached = _readChatTranslationCache(safe);
   if (cached) {
+    recordTranslateDebugEvent("cache_hit", {
+      text: safe,
+      sourceChars: safe.length,
+      translatedChars: cached.length,
+      cache: "hit",
+      result: "ok"
+    });
     return cached;
   }
   if (_isTranslationCircuitOpen()) {
+    recordTranslateDebugEvent("circuit_open", {
+      text: safe,
+      sourceChars: safe.length,
+      result: "skipped",
+      error: "translation circuit cooldown"
+    });
     return "";
   }
-  const inFlight = _translationInFlight.get(safe);
+  const inFlight = _translationInFlight.get(cacheKey);
   if (inFlight) {
+    recordTranslateDebugEvent("inflight_reuse", {
+      text: safe,
+      sourceChars: safe.length,
+      result: "pending"
+    });
     return inFlight;
   }
   const task = (async () => {
     const controller = new AbortController();
+    const traceId = createPerfTraceId("translate");
+    const startedPerfMs = performance.now();
+    const startedWallMs = Date.now();
+    recordTranslateDebugEvent("request_start", {
+      traceId,
+      text: safe,
+      sourceChars: safe.length,
+      cache: "miss"
+    });
     const timeoutId = setTimeout(() => {
       try {
         controller.abort();
@@ -5485,11 +5782,34 @@ async function _fetchChatTranslation(text) {
       const resp = await authFetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: safe }),
+        body: JSON.stringify({
+          text: safe,
+          _perf_trace_id: traceId,
+          _perf_client_send_ts_ms: startedWallMs
+        }),
         signal: controller.signal
       });
+      const elapsedMs = Math.round(performance.now() - startedPerfMs);
+      const responseTraceId =
+        typeof resp.headers?.get === "function" ? String(resp.headers.get("X-Perf-Trace-Id") || "") : "";
       if (!resp.ok) {
         _markTranslationFailure();
+        let errorText = `HTTP ${resp.status}`;
+        try {
+          const errData = await resp.json();
+          errorText = String(errData?.error || errorText);
+        } catch (_) {
+          // ignore
+        }
+        recordTranslateDebugEvent("request_fail", {
+          traceId: responseTraceId || traceId,
+          text: safe,
+          sourceChars: safe.length,
+          elapsedMs,
+          status: Number(resp.status) || 0,
+          result: "http_error",
+          error: errorText
+        });
         return "";
       }
       const data = await resp.json();
@@ -5497,30 +5817,69 @@ async function _fetchChatTranslation(text) {
       const degraded = data?.degraded === true || data?.fallback === true;
       if (degraded) {
         _markTranslationFailure();
+        recordTranslateDebugEvent("request_degraded", {
+          traceId: responseTraceId || traceId,
+          text: safe,
+          sourceChars: safe.length,
+          translatedChars: translated.length,
+          elapsedMs,
+          status: Number(resp.status) || 0,
+          degraded: true,
+          fallback: data?.fallback === true,
+          result: "degraded",
+          error: String(data?.error || "")
+        });
         return translated;
       }
       if (!translated) {
         _markTranslationFailure();
+        recordTranslateDebugEvent("request_empty", {
+          traceId: responseTraceId || traceId,
+          text: safe,
+          sourceChars: safe.length,
+          elapsedMs,
+          status: Number(resp.status) || 0,
+          result: "empty"
+        });
         return "";
       }
       _markTranslationSuccess();
       _writeChatTranslationCache(safe, translated);
+      recordTranslateDebugEvent("request_ok", {
+        traceId: responseTraceId || traceId,
+        text: safe,
+        sourceChars: safe.length,
+        translatedChars: translated.length,
+        elapsedMs,
+        status: Number(resp.status) || 0,
+        result: "ok"
+      });
       return translated;
     } catch (err) {
       if (!controller.signal.aborted || Date.now() >= _translationCircuitState.cooldownUntil) {
         _markTranslationFailure();
       }
+      recordTranslateDebugEvent("request_error", {
+        traceId,
+        text: safe,
+        sourceChars: safe.length,
+        elapsedMs: Math.round(performance.now() - startedPerfMs),
+        result: controller.signal.aborted ? "timeout" : "error",
+        error: controller.signal.aborted
+          ? `timeout ${_CHAT_TRANSLATE_TIMEOUT_MS}ms`
+          : String(err?.message || err || "")
+      });
       return "";
     } finally {
       clearTimeout(timeoutId);
     }
   })();
-  _translationInFlight.set(safe, task);
+  _translationInFlight.set(cacheKey, task);
   try {
     return await task;
   } finally {
-    if (_translationInFlight.get(safe) === task) {
-      _translationInFlight.delete(safe);
+    if (_translationInFlight.get(cacheKey) === task) {
+      _translationInFlight.delete(cacheKey);
     }
   }
 }
@@ -10983,7 +11342,7 @@ async function requestAssistantReply(text, opts = {}) {
     }
     reply = reply.trim();
     const parsedReply = parseToolMetaFromText(reply);
-    const visibleReply = String(parsedReply.visibleText || "").trim();
+    const visibleReply = normalizeAssistantVisibleText(parsedReply.visibleText);
     if (!visibleReply) {
       throw new Error("模型没有返回内容");
     }
@@ -11853,6 +12212,7 @@ window.addEventListener("character-runtime:update", (event) => {
 installCharacterRuntimeWindowBridge();
 installCharacterRuntimeDebugBridge();
 installTTSDebugBridge();
+installTranslateDebugBridge();
 
 async function main() {
   setStatus("启动中...");

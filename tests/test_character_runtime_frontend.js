@@ -116,8 +116,19 @@ assert.ok(
   "chat and subtitle translations should share in-flight requests"
 );
 assert.ok(
+  source.includes("function _normalizeChatTranslationKey(text)")
+    && source.includes("_translationInFlight.get(cacheKey)")
+    && source.includes("_translationInFlight.set(cacheKey, task)"),
+  "chat translation cache/in-flight keys should normalize punctuation spacing variants"
+);
+assert.ok(
   /async function _fetchTranslation\(text, capturedId\)\s*\{[\s\S]*?_readChatTranslationCache\(safe\)[\s\S]*?_fetchChatTranslation\(safe\)/.test(source),
   "subtitle translation should reuse the chat translation cache/request path"
+);
+assert.ok(
+  source.includes("function normalizeAssistantVisibleText(text)")
+    && source.includes("const visibleReply = normalizeAssistantVisibleText(parsedReply.visibleText);"),
+  "final assistant text should normalize English sentence boundaries before display and translation"
 );
 assert.ok(
   source.includes('translationEl.textContent = "中译：翻译中...";'),
@@ -174,6 +185,27 @@ assert.ok(
 assert.ok(
   source.includes("function installTTSDebugBridge()"),
   "window debug bridge should expose TTS playback state to developer tools"
+);
+assert.ok(
+  source.includes("function buildTranslateDebugReport()")
+    && source.includes('text.toLowerCase() === "/translatedebug"'),
+  "chat.js should expose /translatedebug for copyable translation timing state"
+);
+assert.ok(
+  source.includes('appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false })')
+    && source.includes('appendMessage("assistant", "Translation debug panel enabled.", { enableTranslation: false })'),
+  "translation debug command responses should not recursively trigger assistant translation"
+);
+assert.ok(
+  source.includes("function installTranslateDebugBridge()")
+    && source.includes("__AI_CHAT_DEBUG_TRANSLATE__"),
+  "window debug bridge should expose translation timing state to developer tools"
+);
+assert.ok(
+  source.includes('recordTranslateDebugEvent("request_start"')
+    && source.includes('recordTranslateDebugEvent("request_ok"')
+    && source.includes('recordTranslateDebugEvent("cache_hit"'),
+  "translation requests should record start, completion, and cache-hit events"
 );
 assert.ok(
   source.includes('recordTTSDebugEvent("audio_play_start"')
