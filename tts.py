@@ -709,12 +709,13 @@ def _normalize_wav_loudness(
         safe_max_gain = max(1.0, min(8.0, float(max_gain)))
         safe_peak_limit = max(4000.0, min(32000.0, float(peak_limit)))
         safe_max_rms = max(safe_target, min(9000.0, float(max_rms)))
+        gain = 1.0
         if rms_before > safe_max_rms:
-            gain = safe_max_rms / rms_before
-        else:
-            gain = 1.0
+            gain = min(gain, safe_max_rms / rms_before)
         desired_gain = safe_target / rms_before
         peak_limited_gain = safe_peak_limit / float(peak_before)
+        if peak_before > safe_peak_limit:
+            gain = min(gain, peak_limited_gain)
         if gain >= 1.0:
             gain = max(1.0, min(safe_max_gain, desired_gain, peak_limited_gain))
         if 0.97 <= gain <= 1.03:

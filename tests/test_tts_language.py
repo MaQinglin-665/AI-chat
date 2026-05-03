@@ -22,6 +22,23 @@ def _make_constant_wav(sample_value=120, frames=8000):
     return buf.getvalue()
 
 
+def _make_spiky_wav(base_sample=1800, spike_sample=30000, frames=8000, every=400):
+    import io
+    import struct
+    import wave
+
+    samples = []
+    for idx in range(frames):
+        samples.append(spike_sample if idx % every == 0 else base_sample)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(16000)
+        wav.writeframes(b"".join(struct.pack("<h", int(sample)) for sample in samples))
+    return buf.getvalue()
+
+
 def test_gpt_sovits_language_detection_keeps_english_role_lines():
     assert _detect_text_lang("Hey, API and AI are not the same thing.") == "en"
     assert (
@@ -87,3 +104,22 @@ def test_gpt_sovits_loudness_normalizer_reduces_overly_loud_wav():
     assert meta["changed"] is True
     assert after["rms"] < before["rms"]
     assert after["rms"] <= 4200
+
+
+def test_gpt_sovits_loudness_normalizer_limits_hot_peaks_without_high_rms():
+    audio = _make_spiky_wav(base_sample=1800, spike_sample=30000)
+    reduced, meta = _normalize_wav_loudness(
+        audio,
+        target_rms=1400,
+        max_gain=3.2,
+        peak_limit=26000,
+        max_rms=5000,
+    )
+
+    before = _wav_amplitude_stats(audio)
+    after = _wav_amplitude_stats(reduced)
+
+    assert meta is not None
+    assert meta["changed"] is True
+    assert after["peak"] < before["peak"]
+    assert after["peak"] <= 26000
