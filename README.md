@@ -136,6 +136,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - Character Runtime 主动行为安全边界：`docs/character-runtime-proactive-safety.md`
 - 常见问题与排障：`docs/troubleshooting.md`
 - 语音输入 / 输出排障：`docs/voice-troubleshooting.md`
+- 语音与 Character Runtime 回归清单：`docs/voice-runtime-regression-checklist.md`
 - 路线图（v1.2 -> v2.0）：`docs/ROADMAP.md`
 - v1.2 发布验收清单：`docs/release-v1.2-checklist.md`
 - v1.2 当前缺口：`docs/v1.2-current-gaps.md`
