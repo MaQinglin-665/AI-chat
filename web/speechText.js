@@ -233,6 +233,8 @@
   function splitStreamSpeakSegments(buffer, options = {}) {
     const flush = options.flush === true;
     const style = String(options.style || "neutral");
+    const provider = String(options.provider || "").toLowerCase();
+    const isGptSovits = provider === "gpt_sovits";
     const raw = parseToolMetaVisibleText(buffer);
     const src = simplifySpeechDeliveryText(raw, style, true);
     const segments = [];
@@ -243,7 +245,7 @@
     const strongTerminal = "。！？!?\n";
     const softTerminal = "，,";
     const englishStream = isMostlyEnglishText(src);
-    const minEnglishFirstSegmentLen = 18;
+    const minEnglishFirstSegmentLen = isGptSovits ? 30 : 18;
     let start = 0;
 
     for (let i = 0; i < src.length; i++) {
@@ -255,7 +257,7 @@
       }
 
       const piece = src.slice(start, i + 1).trim();
-      const minLen = isStrong ? 6 : 28;
+      const minLen = isStrong ? (isGptSovits ? 10 : 6) : (isGptSovits ? 44 : 28);
       if (!flush && englishStream && start === 0 && piece.length < minEnglishFirstSegmentLen) {
         continue;
       }
@@ -266,10 +268,12 @@
     }
 
     let rest = src.slice(start);
-    if (!flush && rest.length > 56) {
-      const hardCut = Math.min(36, rest.length);
+    const hardCutThreshold = isGptSovits ? 96 : 56;
+    if (!flush && rest.length > hardCutThreshold) {
+      const hardCut = Math.min(isGptSovits ? 72 : 36, rest.length);
       let cut = -1;
-      for (let i = hardCut - 1; i >= 18; i--) {
+      const minCut = isGptSovits ? 36 : 18;
+      for (let i = hardCut - 1; i >= minCut; i--) {
         if ("，,。！？!? ".includes(rest[i])) {
           cut = i + 1;
           break;
@@ -279,7 +283,7 @@
         cut = hardCut;
       }
       const chunk = rest.slice(0, cut).trim();
-      if (chunk.length >= 14) {
+      if (chunk.length >= (isGptSovits ? 28 : 14)) {
         segments.push(chunk);
         rest = rest.slice(cut);
       }

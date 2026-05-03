@@ -167,6 +167,13 @@ assert.ok(
   "stream speech queue should be able to detect queued tail segments"
 );
 assert.ok(
+  source.includes("function shouldSerializeStreamTTSRequests()")
+    && source.includes('state.ttsProvider === "gpt_sovits"')
+    && source.includes("if (!shouldSerializeStreamTTSRequests())")
+    && source.includes("provider: state.ttsProvider || \"\""),
+  "GPT-SoVITS realtime stream speech should serialize eager requests and use provider-aware segmentation"
+);
+assert.ok(
   source.includes("stream_speak_idle_wait_ms")
     && source.includes("state.streamSpeakIdleWaitMs = Number.isFinite(streamIdleWaitCfg)")
     && source.includes("Math.max(30, Math.min(220, Number(state.streamSpeakIdleWaitMs) || 90))"),

@@ -117,12 +117,83 @@ def is_explicit_chinese_reply_request(user_message):
         re.search(r"(用中文|中文回答|回复中文|说中文|請用中文|请用中文|answer in chinese|reply in chinese|use chinese)", safe)
     )
 
-def build_english_reply_fallback(reply):
+def _compact_user_text(text):
+    return re.sub(r"\s+", "", str(text or "").strip().lower())
+
+def _contains_any(text, needles):
+    return any(str(needle or "") in text for needle in needles)
+
+def _is_question_or_task_like(text):
+    return _contains_any(
+        text,
+        (
+            "?",
+            "\uff1f",
+            "\u5417",
+            "\u4ec0\u4e48",
+            "\u600e\u4e48",
+            "\u4e3a\u4ec0\u4e48",
+            "\u54ea",
+            "\u5e2e\u6211",
+            "\u4fee\u590d",
+            "\u95ee\u9898",
+            "\u9879\u76ee",
+            "bug",
+            "tts",
+            "asr",
+            "api",
+            "github",
+        ),
+    )
+
+def _meal_name_from_user_text(text):
+    if _contains_any(text, ("\u65e9\u9910", "\u65e9\u996d")):
+        return "breakfast"
+    if _contains_any(text, ("\u5348\u9910", "\u5348\u996d")):
+        return "lunch"
+    if _contains_any(text, ("\u665a\u9910", "\u665a\u996d")):
+        return "dinner"
+    if _contains_any(text, ("\u5403\u996d", "\u53bb\u5403", "\u5403\u70b9")):
+        return "meal"
+    return ""
+
+def _build_status_english_fallback(user_message):
+    compact = _compact_user_text(user_message)
+    if not compact or len(compact) > 24:
+        return ""
+    if _is_question_or_task_like(compact):
+        return ""
+
+    meal = _meal_name_from_user_text(compact)
+    if meal:
+        return f"Enjoy your {meal}. I'll keep watch here while you refuel."
+    if _contains_any(compact, ("\u665a\u5b89", "\u7761\u89c9", "\u7761\u4e86")):
+        return "Sleep well. I'll keep the desktop under control while you recharge."
+    if _contains_any(compact, ("\u51fa\u95e8", "\u8d70\u4e86", "\u51fa\u53bb")):
+        return "Have a smooth trip out. I'll keep the little desk kingdom intact."
+    if _contains_any(compact, ("\u4e0a\u73ed", "\u5de5\u4f5c")):
+        return "Good luck with work. I'll keep the chaos neatly contained here."
+    if _contains_any(compact, ("\u4e0a\u8bfe", "\u4e0b\u8bfe")):
+        return "Good luck with class. I'll behave myself here, probably."
+    return ""
+
+def _build_contextual_english_reply_fallback(user_message):
+    status_reply = _build_status_english_fallback(user_message)
+    if status_reply:
+        return status_reply
+    compact = _compact_user_text(user_message)
+    if _contains_any(compact, ("\u4ecb\u7ecd", "\u81ea\u5df1", "\u4f60\u662f\u8c01", "\u4f60\u53eb\u4ec0\u4e48")):
+        return "Hi, I'm your desktop companion. I can chat, react to your voice, and keep your screen a little less lonely."
+    if _contains_any(compact, ("\u4f60\u597d", "hello", "hi")):
+        return "Hey, I'm here. What's the next little mission?"
+    return "I hear you. I'll keep this short and focused."
+
+def build_english_reply_fallback(reply, user_message=None):
     visible, meta = split_tool_meta_suffix(reply)
     text = str(visible or "").strip()
     if not text:
         return reply
-    return "I got you. I'll keep my main replies in English, and you can read the Chinese translation below." + meta
+    return _build_contextual_english_reply_fallback(user_message) + meta
 
 def enforce_reply_language(config, user_message, reply):
     if resolve_reply_language(config if isinstance(config, dict) else {}) != "en":
@@ -134,7 +205,7 @@ def enforce_reply_language(config, user_message, reply):
     if not text:
         return reply
     if is_mostly_chinese_text(text):
-        return build_english_reply_fallback(text + meta)
+        return build_english_reply_fallback(text + meta, user_message=user_message)
     return reply
 
 def normalize_style_name(name):

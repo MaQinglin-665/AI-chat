@@ -636,6 +636,34 @@ def test_call_llm_stream_prompt_contract_added_when_runtime_enabled(monkeypatch)
     assert '"action": "none|surprised"' in prompt
 
 
+def test_daily_status_message_still_reaches_llm(monkeypatch):
+    cfg = _build_test_config()
+    cfg["assistant_reply_language"] = "en"
+    user_message = "\u6211\u8981\u53bb\u5403\u5348\u9910\u4e86"
+    captured = _capture_openai_prompt_in_call_llm(
+        monkeypatch,
+        cfg,
+        raw_reply="model-made lunch reply",
+    )
+
+    result = app.call_llm(user_message, [], config=cfg)
+
+    assert result == "model-made lunch reply"
+    assert captured.get("user_message") == user_message
+
+
+def test_daily_status_stream_message_still_reaches_llm(monkeypatch):
+    cfg = _build_test_config()
+    cfg["assistant_reply_language"] = "en"
+    user_message = "\u6211\u8981\u53bb\u5403\u5348\u9910\u4e86"
+    captured = _capture_openai_prompt_in_call_llm_stream(monkeypatch, cfg)
+
+    chunks = list(app.call_llm_stream(user_message, [], config=cfg))
+
+    assert chunks == ["chunk-1"]
+    assert captured.get("user_message") == user_message
+
+
 def test_character_profile_missing_file_falls_back_to_default(monkeypatch):
     with tempfile.TemporaryDirectory() as tmp:
         missing = Path(tmp) / "missing_character_profile.json"

@@ -89,6 +89,19 @@ assert.strictEqual(
   "English stream speech should preserve the remaining tail"
 );
 
+const gptSovitsEnglishSplit = speechText.splitStreamSpeakSegments(
+  "Start with a quick check of your emails catching up on anything that needs attention can set a productive tone for the rest of the day.",
+  { flush: false, style: "playful", provider: "gpt_sovits" }
+);
+assert.ok(
+  gptSovitsEnglishSplit.segments.length <= 2,
+  "GPT-SoVITS stream segmentation should use fewer, larger chunks for steadier voice quality"
+);
+assert.ok(
+  gptSovitsEnglishSplit.segments.every((seg) => seg.length >= 28),
+  "GPT-SoVITS stream segmentation should avoid tiny standalone chunks"
+);
+
 const prosody = speechText.buildSpeakProsody("太好了！", "happy", true, "playful");
 assert.strictEqual(typeof prosody.speed_ratio, "number");
 assert.strictEqual(typeof prosody.pitch_ratio, "number");

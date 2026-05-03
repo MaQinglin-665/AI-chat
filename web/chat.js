@@ -8457,11 +8457,16 @@ function shouldUseStreamSpeak() {
   );
 }
 
+function shouldSerializeStreamTTSRequests() {
+  return state.ttsProvider === "gpt_sovits";
+}
+
 function splitStreamSpeakSegments(buffer, flush = false) {
   if (typeof SPEECH_TEXT.splitStreamSpeakSegments === "function") {
     return SPEECH_TEXT.splitStreamSpeakSegments(buffer, {
       flush,
-      style: state.currentTalkStyle || "neutral"
+      style: state.currentTalkStyle || "neutral",
+      provider: state.ttsProvider || ""
     });
   }
   return { segments: [], rest: String(buffer || "") };
@@ -8505,12 +8510,14 @@ function ensureStreamSpeakBlobPromise(item) {
   if (item.blobPromise) {
     return item.blobPromise;
   }
-  const prosody = item.prosody || buildSpeakProsody(
-    item.text,
-    detectMood(item.text),
-    true,
-    item.style || state.currentTalkStyle || "neutral"
-  );
+  const prosody = shouldSerializeStreamTTSRequests()
+    ? null
+    : item.prosody || buildSpeakProsody(
+      item.text,
+      detectMood(item.text),
+      true,
+      item.style || state.currentTalkStyle || "neutral"
+    );
   item.prosody = prosody;
   recordTTSDebugEvent("stream_request_start", {
     traceId: item.traceId,
@@ -8564,7 +8571,9 @@ function enqueueStreamSpeakSegment(text, sessionId, prosody = null, style = "neu
     segmentId: item.segmentId,
     text: cleaned
   });
-  ensureStreamSpeakBlobPromise(item);
+  if (!shouldSerializeStreamTTSRequests()) {
+    ensureStreamSpeakBlobPromise(item);
+  }
 }
 
 function dequeueStreamSpeakItem(sessionId) {

@@ -209,7 +209,11 @@ from llm_tool_calls import (
     inject_tool_intro as _inject_tool_intro_impl,
     render_tool_execution_summary as _render_tool_execution_summary_impl,
 )
-from llm_streaming import iter_openai_chat_stream, iter_openai_responses_stream
+from llm_streaming import (
+    iter_ollama_chat_stream,
+    iter_openai_chat_stream,
+    iter_openai_responses_stream,
+)
 from hotword_utils import apply_hotword_replacements
 from reply_decision import should_reply as _should_reply_impl
 from time_awareness import (
@@ -659,6 +663,7 @@ def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, f
         build_openai_messages_fn=build_openai_messages,
         iter_openai_chat_stream_fn=iter_openai_chat_stream,
         iter_openai_responses_stream_fn=iter_openai_responses_stream,
+        iter_ollama_chat_stream_fn=iter_ollama_chat_stream,
     )
 
 

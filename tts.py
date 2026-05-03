@@ -671,6 +671,69 @@ def _wav_amplitude_stats(audio_bytes):
         return None
 
 
+def _normalize_wav_loudness(audio_bytes, target_rms=900.0, max_gain=3.2, peak_limit=26000):
+    if _audioop is None:
+        return audio_bytes, None
+    if not isinstance(audio_bytes, (bytes, bytearray)) or len(audio_bytes) < 44:
+        return audio_bytes, None
+    data = bytes(audio_bytes)
+    if not (data[:4] == b"RIFF" and data[8:12] == b"WAVE"):
+        return audio_bytes, None
+    try:
+        with wave.open(io.BytesIO(data), "rb") as wf:
+            params = wf.getparams()
+            sample_width = wf.getsampwidth()
+            frames = wf.readframes(wf.getnframes())
+        if sample_width != 2 or not frames:
+            return audio_bytes, None
+
+        peak_before = int(_audioop.max(frames, sample_width) or 0)
+        rms_before = float(_audioop.rms(frames, sample_width) or 0.0)
+        if peak_before <= 0 or rms_before <= 0:
+            return audio_bytes, {
+                "changed": False,
+                "gain": 1.0,
+                "peak_before": peak_before,
+                "rms_before": rms_before,
+                "peak_after": peak_before,
+                "rms_after": rms_before,
+            }
+
+        safe_target = max(120.0, min(2400.0, float(target_rms)))
+        safe_max_gain = max(1.0, min(8.0, float(max_gain)))
+        safe_peak_limit = max(4000.0, min(32000.0, float(peak_limit)))
+        desired_gain = safe_target / rms_before
+        peak_limited_gain = safe_peak_limit / float(peak_before)
+        gain = max(1.0, min(safe_max_gain, desired_gain, peak_limited_gain))
+        if gain <= 1.03:
+            return audio_bytes, {
+                "changed": False,
+                "gain": 1.0,
+                "peak_before": peak_before,
+                "rms_before": rms_before,
+                "peak_after": peak_before,
+                "rms_after": rms_before,
+            }
+
+        boosted = _audioop.mul(frames, sample_width, gain)
+        peak_after = int(_audioop.max(boosted, sample_width) or 0)
+        rms_after = float(_audioop.rms(boosted, sample_width) or 0.0)
+        out = io.BytesIO()
+        with wave.open(out, "wb") as wf_out:
+            wf_out.setparams(params)
+            wf_out.writeframes(boosted)
+        return out.getvalue(), {
+            "changed": True,
+            "gain": gain,
+            "peak_before": peak_before,
+            "rms_before": rms_before,
+            "peak_after": peak_after,
+            "rms_after": rms_after,
+        }
+    except Exception:
+        return audio_bytes, None
+
+
 def _looks_too_quiet_for_text(audio_bytes, text):
     stats = _wav_amplitude_stats(audio_bytes)
     if not stats:
@@ -854,6 +917,13 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         min(1.35, _safe_float(tts_cfg.get("gpt_sovits_repetition_penalty", 1.08), 1.08)),
     )
     stable_seed = int(_safe_float(tts_cfg.get("gpt_sovits_seed", 0), 0))
+    normalize_loudness = _safe_bool(
+        tts_cfg.get("gpt_sovits_normalize_loudness", True), True
+    )
+    target_rms = _safe_float(tts_cfg.get("gpt_sovits_target_rms", 900), 900)
+    max_loudness_gain = _safe_float(
+        tts_cfg.get("gpt_sovits_max_loudness_gain", 3.2), 3.2
+    )
     prefer_clean_prompt = _safe_bool(tts_cfg.get("gpt_sovits_prefer_clean_prompt", True), True)
     chunk_max_candidates = max(
         1, min(4, _safe_int(tts_cfg.get("gpt_sovits_chunk_max_candidates", 2), 2))
@@ -1310,6 +1380,23 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         audio_bytes=len(audio or b""),
         audio_duration_ms=int(round(float(_wav_duration_seconds(audio) or 0.0) * 1000)),
     )
+    if normalize_loudness:
+        audio, loudness_meta = _normalize_wav_loudness(
+            audio,
+            target_rms=target_rms,
+            max_gain=max_loudness_gain,
+        )
+        if loudness_meta and loudness_meta.get("changed"):
+            _log_tts_perf(
+                "TTS_GPT_SOVITS",
+                trace_id,
+                stage="loudness_normalized",
+                gain=round(float(loudness_meta.get("gain", 1.0)), 3),
+                rms_before=int(round(float(loudness_meta.get("rms_before", 0.0)))),
+                rms_after=int(round(float(loudness_meta.get("rms_after", 0.0)))),
+                peak_before=int(loudness_meta.get("peak_before", 0) or 0),
+                peak_after=int(loudness_meta.get("peak_after", 0) or 0),
+            )
     return audio
 
 

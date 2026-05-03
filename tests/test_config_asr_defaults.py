@@ -29,3 +29,13 @@ def test_sanitized_client_config_clamps_too_low_asr_threshold():
     sanitized = config.sanitize_client_config(cfg)
 
     assert sanitized["asr"]["speech_threshold"] == 0.0015
+
+
+def test_default_gpt_sovits_values_favor_stable_voice():
+    tts = config.DEFAULT_CONFIG["tts"]
+
+    assert tts["gpt_sovits_top_k"] == 8
+    assert tts["gpt_sovits_top_p"] == 0.78
+    assert tts["gpt_sovits_temperature"] == 0.36
+    assert tts["gpt_sovits_normalize_loudness"] is True
+    assert tts["gpt_sovits_target_rms"] == 900
