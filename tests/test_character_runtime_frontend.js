@@ -233,5 +233,31 @@ assert.ok(
     && source.includes('recordTTSDebugEvent("stream_request_ok"'),
   "stream speech queue should record enqueue and TTS request completion events"
 );
+assert.ok(
+  source.includes("ttsPlaybackGeneration: 0")
+    && source.includes("function isCurrentTTSPlaybackGeneration(generation)")
+    && source.includes('recordTTSDebugEvent("audio_stale_skip"')
+    && source.includes('recordTTSDebugEvent("browser_stale_skip"')
+    && source.includes('recordTTSDebugEvent("speak_fallback_stale_skip"')
+    && source.includes("ttsContextBufferSource: null")
+    && source.includes("state.ttsContextBufferSource.stop(0)"),
+  "TTS playback should ignore stale audio and fallback from earlier chat turns"
+);
+assert.ok(
+  /const requestedGeneration = Number\(opts\.playbackGeneration \|\| state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?if \(!isCurrentTTSPlaybackGeneration\(requestedGeneration\)\)[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?const playbackGeneration = Number\(state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?speakOnceWithVoice\(text, v, \{ force, playbackGeneration \}\)/.test(source),
+  "browser TTS fallback should reject stale generations before starting a fresh browser utterance"
+);
+assert.ok(
+  source.includes("ttsAudioPlaybackToken: 0")
+    && source.includes("const audioPlaybackToken = Number(state.ttsAudioPlaybackToken || 0) + 1")
+    && source.includes("function speakOnceWithVoice(text, voice, opts = {})")
+    && source.includes("const force = typeof opts === \"object\" ? !!opts.force : !!opts")
+    && source.includes("const isCurrentHtmlAudioPlayback = () => ("),
+  "HTMLAudio and browser TTS paths should keep per-playback ownership guards"
+);
+assert.ok(
+  /const streamSpeakSession = Date\.now\(\);[\s\S]*?const useStreamSpeak = shouldUseStreamSpeak\(\);[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?state\.streamSpeakSession = streamSpeakSession;/.test(source),
+  "starting a new assistant request should always invalidate previous audio playback"
+);
 
 console.log("Character runtime frontend checks passed.");

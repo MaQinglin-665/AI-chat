@@ -203,6 +203,62 @@ def is_lightweight_checkin_message(text):
     )
 
 
+LOW_SIGNAL_MEMORY_QUERIES = {
+    "ok",
+    "okay",
+    "yes",
+    "yep",
+    "sure",
+    "good",
+    "continue",
+    "goon",
+    "next",
+    "nextstep",
+    "\u597d",
+    "\u597d\u7684",
+    "\u53ef\u4ee5",
+    "\u884c",
+    "\u55ef",
+    "\u55ef\u55ef",
+    "\u662f\u7684",
+    "\u7ee7\u7eed",
+    "\u4e0b\u4e00\u6b65",
+    "\u7136\u540e\u5462",
+}
+
+
+def has_explicit_memory_intent(text):
+    safe = str(text or "").strip().lower()
+    if not safe:
+        return False
+    return bool(
+        re.search(
+            r"(remember|recall|memory|memories|previously|earlier|last time|\u8bb0\u5f97|\u8bb0\u5fc6|\u4e4b\u524d|\u4ee5\u524d|\u4e0a\u6b21)",
+            safe,
+        )
+    )
+
+
+def is_specific_memory_query(text):
+    raw = str(text or "").strip()
+    if not raw:
+        return False
+    compact = re.sub(r"[\s\u3000，。！？!?.,;:、~～'\"]+", "", raw.lower())
+    if compact in LOW_SIGNAL_MEMORY_QUERIES:
+        return False
+    if has_explicit_memory_intent(raw):
+        return True
+
+    alpha_terms = re.findall(r"[A-Za-z0-9_]{3,}", raw.lower())
+    cjk_terms = [ch for ch in raw if "\u4e00" <= ch <= "\u9fff" and ch not in CN_CHAR_STOPWORDS]
+    tokens = tokenize_memory_text(raw)
+    if len(alpha_terms) >= 2:
+        return True
+    if len(cjk_terms) >= 6 and len(tokens) >= 2:
+        return True
+    return len(tokens) >= 3 and len(compact) >= 8
+
+
 def tokenize_memory_text(text):
     src = str(text or "")
     tokens = set()
@@ -511,6 +567,9 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
         return []
     if is_lightweight_checkin_message(user_message):
         return []
+    explicit_memory_intent = has_explicit_memory_intent(user_message)
+    if not explicit_memory_intent and not is_specific_memory_query(user_message):
+        return []
 
     with MEMORY_LOCK:
         fallback_items = load_memory_items()
@@ -549,7 +608,7 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
             if _append_unique_memory_item(chosen, seen, item) and len(chosen) >= relevant_target:
                 break
 
-    recent_n = settings["inject_recent"]
+    recent_n = settings["inject_recent"] if explicit_memory_intent else 0
     if recent_n > 0 and len(chosen) < total_target:
         recent_items = fallback_items[-recent_n:]
         for item in recent_items:
