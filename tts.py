@@ -671,7 +671,13 @@ def _wav_amplitude_stats(audio_bytes):
         return None
 
 
-def _normalize_wav_loudness(audio_bytes, target_rms=900.0, max_gain=3.2, peak_limit=26000):
+def _normalize_wav_loudness(
+    audio_bytes,
+    target_rms=900.0,
+    max_gain=3.2,
+    peak_limit=26000,
+    max_rms=4200.0,
+):
     if _audioop is None:
         return audio_bytes, None
     if not isinstance(audio_bytes, (bytes, bytearray)) or len(audio_bytes) < 44:
@@ -702,10 +708,16 @@ def _normalize_wav_loudness(audio_bytes, target_rms=900.0, max_gain=3.2, peak_li
         safe_target = max(120.0, min(2400.0, float(target_rms)))
         safe_max_gain = max(1.0, min(8.0, float(max_gain)))
         safe_peak_limit = max(4000.0, min(32000.0, float(peak_limit)))
+        safe_max_rms = max(safe_target, min(9000.0, float(max_rms)))
+        if rms_before > safe_max_rms:
+            gain = safe_max_rms / rms_before
+        else:
+            gain = 1.0
         desired_gain = safe_target / rms_before
         peak_limited_gain = safe_peak_limit / float(peak_before)
-        gain = max(1.0, min(safe_max_gain, desired_gain, peak_limited_gain))
-        if gain <= 1.03:
+        if gain >= 1.0:
+            gain = max(1.0, min(safe_max_gain, desired_gain, peak_limited_gain))
+        if 0.97 <= gain <= 1.03:
             return audio_bytes, {
                 "changed": False,
                 "gain": 1.0,
@@ -924,6 +936,7 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
     max_loudness_gain = _safe_float(
         tts_cfg.get("gpt_sovits_max_loudness_gain", 3.2), 3.2
     )
+    max_rms = _safe_float(tts_cfg.get("gpt_sovits_max_rms", 4200), 4200)
     prefer_clean_prompt = _safe_bool(tts_cfg.get("gpt_sovits_prefer_clean_prompt", True), True)
     chunk_max_candidates = max(
         1, min(4, _safe_int(tts_cfg.get("gpt_sovits_chunk_max_candidates", 2), 2))
@@ -1385,6 +1398,7 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
             audio,
             target_rms=target_rms,
             max_gain=max_loudness_gain,
+            max_rms=max_rms,
         )
         if loudness_meta:
             _log_tts_perf(

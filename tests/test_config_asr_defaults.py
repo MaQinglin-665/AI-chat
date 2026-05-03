@@ -39,6 +39,7 @@ def test_default_gpt_sovits_values_favor_stable_voice():
     assert tts["gpt_sovits_temperature"] == 0.36
     assert tts["gpt_sovits_normalize_loudness"] is True
     assert tts["gpt_sovits_target_rms"] == 1400
+    assert tts["gpt_sovits_max_rms"] == 4200
 
 
 def test_sanitized_client_config_preserves_safe_tts_timing_fields():

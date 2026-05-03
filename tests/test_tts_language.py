@@ -69,3 +69,21 @@ def test_gpt_sovits_loudness_normalizer_reports_unchanged_audio():
     assert meta is not None
     assert meta["changed"] is False
     assert meta["rms_before"] == meta["rms_after"]
+
+
+def test_gpt_sovits_loudness_normalizer_reduces_overly_loud_wav():
+    audio = _make_constant_wav(sample_value=6200)
+    reduced, meta = _normalize_wav_loudness(
+        audio,
+        target_rms=1400,
+        max_gain=3.2,
+        max_rms=4200,
+    )
+
+    before = _wav_amplitude_stats(audio)
+    after = _wav_amplitude_stats(reduced)
+
+    assert meta is not None
+    assert meta["changed"] is True
+    assert after["rms"] < before["rms"]
+    assert after["rms"] <= 4200
