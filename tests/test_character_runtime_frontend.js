@@ -202,6 +202,13 @@ assert.ok(
   "stream speech queue should restart itself if a segment arrived while it was finishing"
 );
 assert.ok(
+  source.includes("streamSpeakPlayedSession: 0")
+    && source.includes("function scheduleFinalSpeechWatchdog")
+    && source.includes("final_watchdog_tts")
+    && source.includes("scheduleFinalSpeechWatchdog({"),
+  "final replies should have a watchdog fallback if realtime stream speech never starts playback"
+);
+assert.ok(
   source.includes("function buildTTSDebugReport()"),
   "chat.js should expose a TTS debug report for voice playback diagnosis"
 );

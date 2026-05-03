@@ -84,6 +84,7 @@ const state = {
   streamSpeakBuffer: "",
   streamSpeakSession: 0,
   streamSpeakLastEnqueueSession: 0,
+  streamSpeakPlayedSession: 0,
   speechAnimUntil: 0,
   speechAnimStartedAt: 0,
   speechAnimDurationMs: 0,
@@ -8743,6 +8744,7 @@ function buildStableSpeakText(text) {
 
 function stopAllAudioPlayback() {
   state.ttsPlaybackGeneration = Number(state.ttsPlaybackGeneration || 0) + 1;
+  state.streamSpeakPlayedSession = 0;
   if ("speechSynthesis" in window) {
     try {
       window.speechSynthesis.cancel();
@@ -9148,6 +9150,63 @@ function flushStreamSpeak(sessionId, style = "neutral") {
   if (parsed.segments.length) {
     ensureStreamSpeakQueueRunning(sessionId, 0);
   }
+}
+
+function scheduleFinalSpeechWatchdog({
+  sessionId,
+  text,
+  mood = "idle",
+  style = "neutral",
+  traceId = ""
+} = {}) {
+  const safeSession = Number(sessionId || 0);
+  const safeText = buildStableSpeakText(text) || sanitizeSpeakText(text);
+  if (!safeSession || !safeText || !shouldUseStreamSpeak()) {
+    return;
+  }
+  const generation = Number(state.ttsPlaybackGeneration || 0);
+  const startedAt = Number(state.ttsDebugAudioStartedAt || 0);
+  window.setTimeout(async () => {
+    if (
+      safeSession !== state.streamSpeakSession
+      || !isCurrentTTSPlaybackGeneration(generation)
+      || state.streamSpeakPlayedSession === safeSession
+    ) {
+      return;
+    }
+    if (hasQueuedStreamSpeakItem(safeSession) || state.streamSpeakWorking) {
+      ensureStreamSpeakQueueRunning(safeSession, 0);
+      window.setTimeout(async () => {
+        if (
+          safeSession !== state.streamSpeakSession
+          || !isCurrentTTSPlaybackGeneration(generation)
+          || state.streamSpeakPlayedSession === safeSession
+        ) {
+          return;
+        }
+        recordTTSDebugEvent("final_watchdog_tts", {
+          traceId,
+          sessionId: safeSession,
+          text: safeText,
+          result: "fallback_after_queue_wait"
+        });
+        const prosody = buildSpeakProsody(safeText, mood, false, style);
+        await speak(safeText, { prosody, interrupt: true, mood, style, perfTraceId: traceId, playbackGeneration: generation });
+      }, 2200);
+      return;
+    }
+    if (Number(state.ttsDebugAudioStartedAt || 0) > startedAt) {
+      return;
+    }
+    recordTTSDebugEvent("final_watchdog_tts", {
+      traceId,
+      sessionId: safeSession,
+      text: safeText,
+      result: "fallback"
+    });
+    const prosody = buildSpeakProsody(safeText, mood, false, style);
+    await speak(safeText, { prosody, interrupt: true, mood, style, perfTraceId: traceId, playbackGeneration: generation });
+  }, 2600);
 }
 
 function initServerTTSVoices() {
@@ -10982,13 +11041,17 @@ async function playAudioByContext(blob, debugContext = {}) {
       });
       return false;
     }
-    recordTTSDebugEvent("context_play_start", {
-      ...debugContext,
-      blobBytes: Number(blob?.size || arrayBuf.byteLength || 0),
-      durationMs: Number.isFinite(Number(decoded.duration)) && decoded.duration > 0
-        ? Math.round(decoded.duration * 1000)
-        : -1
-    });
+      recordTTSDebugEvent("context_play_start", {
+        ...debugContext,
+        blobBytes: Number(blob?.size || arrayBuf.byteLength || 0),
+        durationMs: Number.isFinite(Number(decoded.duration)) && decoded.duration > 0
+          ? Math.round(decoded.duration * 1000)
+          : -1
+      });
+      state.ttsDebugAudioStartedAt = performance.now();
+      if (debugContext.sessionId) {
+        state.streamSpeakPlayedSession = Number(debugContext.sessionId || 0);
+      }
     source = ctx.createBufferSource();
     const gain = ctx.createGain();
     gain.gain.value = 1.0;
@@ -11304,6 +11367,9 @@ async function playAudioBlob(blob, opts = {}) {
       }
       state.ttsDebugAudioStartedAt = performance.now();
       state.ttsDebugAudioEndedAt = 0;
+      if (debugContext.sessionId) {
+        state.streamSpeakPlayedSession = Number(debugContext.sessionId || 0);
+      }
       recordTTSDebugEvent("audio_play_start", {
         ...debugContext,
         durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
@@ -12030,6 +12096,13 @@ async function requestAssistantReply(text, opts = {}) {
     if (useStreamSpeak) {
       flushStreamSpeak(streamSpeakSession, finalTalkStyle);
       const hadStreamSegments = state.streamSpeakLastEnqueueSession === streamSpeakSession;
+      scheduleFinalSpeechWatchdog({
+        sessionId: streamSpeakSession,
+        text: visibleReply,
+        mood,
+        style: finalTalkStyle,
+        traceId: chatPerfTraceId
+      });
       if (!hadStreamSegments) {
         const speechText = buildStableSpeakText(visibleReply) || visibleReply;
         const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalTalkStyle);
