@@ -12,6 +12,7 @@
 - First-run preflight checks before desktop startup.
 - Source test package and local docs helper scripts for contributors.
 - Clearer troubleshooting guidance for common startup and packaging issues.
+- Safer GPT-SoVITS demo playback with peak limiting for hot generated audio.
 
 ## What Changed
 
@@ -57,6 +58,15 @@
   - `docs/troubleshooting.md`
   - `CONTRIBUTING.md`
 
+### Voice and TTS Stability
+
+- Kept GPT-SoVITS as an advanced optional TTS path, not the first-run default.
+- Added GPT-SoVITS loudness protection for hot generated WAV output:
+  - `gpt_sovits_max_rms` now defaults to `5000`
+  - generated peaks above the safe peak limit are reduced even when RMS is otherwise acceptable
+- Added regression coverage for low-RMS audio with high transient peaks.
+- Local manual listening on 2026-05-03 confirmed the current balance avoids the earlier "far away" voice while reducing the electric-noise artifact observed with hotter output.
+
 ### Source Package / Docs Tooling
 
 - Added source test package helper:
@@ -71,7 +81,7 @@ The Pages workflow is intentionally manual-only. It should not auto-deploy on ev
 
 ## Verified Before Drafting
 
-Automated validation on 2026-05-01:
+Automated validation on 2026-05-03:
 
 ```text
 python scripts\check_character_runtime_v1_3.py
@@ -79,8 +89,9 @@ python scripts\check_character_runtime_v1_3.py
 
 Result:
 
-- `117 passed`
+- `208 passed`
 - frontend runtime metadata checks passed
+- frontend API/chat/speech/TTS API checks passed
 - Python syntax check passed
 - JavaScript syntax check passed
 - secret scan passed
@@ -93,10 +104,11 @@ python scripts\first_run_check.py
 
 Result:
 
-- passed with expected warnings
+- passed with 4 expected local demo warnings
 - Node.js 20 or 22 LTS is recommended for Electron projects
 - GPT-SoVITS requires its service to be running when selected
 - demo/local runtime settings should not be treated as release defaults
+- an already-running healthy backend may hold the configured local port during validation
 
 ## First-Run Notes
 

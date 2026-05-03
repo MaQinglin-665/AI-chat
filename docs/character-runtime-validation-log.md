@@ -221,3 +221,44 @@ Short summary:
 ```text
 v1.3 preview quality gate passed. Runtime text/metadata/TTS/translation/memory-learning regressions are covered by automated checks and local API smoke tests. Build is suitable for a demo rehearsal, with one remaining manual visual Live2D check recommended before public recording.
 ```
+
+---
+
+# Validation Update - 2026-05-03 GPT-SoVITS TTS Stability
+
+## Run Metadata
+
+| Item | Value |
+| --- | --- |
+| Date | 2026-05-03 |
+| Tester | Codex + maintainer listening check |
+| Branch / commit | `codex/memory-learning-audit` / `0289b23` |
+| OS | Windows |
+| Python version | 3.11.9 |
+| Node version | v25.2.1 |
+| Electron mode | desktop |
+| TTS provider | GPT-SoVITS configured |
+
+## Automated Checks
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `python scripts/check_character_runtime_v1_3.py` | pass | Quality gate passed with `208 passed`, frontend checks, syntax checks, and secret scan. |
+| `python scripts/first_run_check.py` | pass | 4 expected local demo warnings: Node LTS recommendation, existing healthy backend on configured port, GPT-SoVITS service reminder, runtime enabled for demo. |
+
+## TTS Manual Check
+
+| Check item | Expected result | Actual result | Pass/Fail | Notes |
+| --- | --- | --- | --- | --- |
+| GPT-SoVITS electric-noise regression | No electric-noise artifact during normal demo speech | Maintainer reported current playback is stable | Pass | Peak limiter now reduces hot transient peaks even when RMS is acceptable. |
+| GPT-SoVITS "far away" regression | Voice should not sound overly distant or quiet | Maintainer reported current balance is stable | Pass | `gpt_sovits_max_rms` is now `5000`, avoiding the earlier overly conservative `4200` cap. |
+
+## Final Result
+
+Overall result: pass
+
+Short summary:
+
+```text
+GPT-SoVITS demo playback is stable at the current checkpoint. The release candidate keeps GPT-SoVITS optional while documenting the manual listening dependency for local demos.
+```

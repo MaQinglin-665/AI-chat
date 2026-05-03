@@ -85,6 +85,15 @@ python -m pytest -q tests/test_app_asr_route.py
 - 建议：降低单次回复长度，或使用 browser TTS 作为回退。
 - 目标行为：TTS 失败不应阻塞文本聊天主流程。
 
+### GPT-SoVITS sounds distorted, electric, or far away
+
+- 现象：声音有电流音、尖锐爆点，或为了压制爆音后听起来像在远处。
+- 检查：`server_err.log` 中的 `TTS_GPT_SOVITS` loudness 行，重点看 `rms_before`、`rms_after`、`peak_before`、`peak_after`。
+- 当前推荐：默认 `gpt_sovits_max_rms` 为 `5000`，并且热峰值会被限制到安全峰值附近。
+- 如果仍有电流音：优先检查 GPT-SoVITS 采样参数和 `gpt_sovits_ref_audio_path` 指向的 ref audio 是否本身峰值过高、噪声过重或接近削波。
+- 如果声音过远：不要先改前端播放；先确认后端日志是否把 RMS 压得过低，再小幅调整 `gpt_sovits_max_rms`。
+- 风险：`gpt_sovits_max_rms` 调太高可能放出热峰值和刺耳伪影；调太低会让声音变小、变远。
+
 ## Recommended ASR Defaults
 
 推荐先使用这组相对保守的 ASR 默认值，再根据实际麦克风调节：
