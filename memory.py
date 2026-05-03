@@ -721,6 +721,15 @@ def _safe_load_json_file(path, fallback):
         return fallback
 
 
+def _safe_save_json_file(path, payload):
+    tmp_path = path.with_suffix(".tmp")
+    tmp_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    tmp_path.replace(path)
+
+
 def _tail_jsonl(path, limit=5):
     try:
         if not path.exists():
@@ -864,6 +873,380 @@ def _rate_positive_field(items, key):
         except (TypeError, ValueError):
             continue
     return round(positives / len(valid), 4)
+
+
+def _learning_now_iso():
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def _normalize_learning_review_item(item, fallback_id=""):
+    safe = item if isinstance(item, dict) else {}
+    item_id = str(safe.get("id") or fallback_id or "").strip()
+    assistant_preview = normalize_memory_text(safe.get("assistant_preview", ""), max_len=220)
+    user_preview = normalize_memory_text(safe.get("user_preview", ""), max_len=220)
+    compressed_pattern = normalize_memory_text(safe.get("compressed_pattern", ""), max_len=260)
+    if not item_id or (not assistant_preview and not compressed_pattern):
+        return None
+    out = dict(safe)
+    out["id"] = item_id
+    out["assistant_preview"] = assistant_preview
+    out["user_preview"] = user_preview
+    out["compressed_pattern"] = compressed_pattern
+    try:
+        out["score"] = max(0.0, min(1.0, float(safe.get("score", 0) or 0)))
+    except (TypeError, ValueError):
+        out["score"] = 0.0
+    try:
+        out["confidence"] = max(0.0, min(1.0, float(safe.get("confidence", 0) or 0)))
+    except (TypeError, ValueError):
+        out["confidence"] = 0.0
+    try:
+        out["support_count"] = max(0, int(safe.get("support_count", 0) or 0))
+    except (TypeError, ValueError):
+        out["support_count"] = 0
+    out["status"] = str(safe.get("status", "candidate") or "candidate").strip() or "candidate"
+    out["created_at"] = str(safe.get("created_at", "")).strip()
+    out["updated_at"] = str(safe.get("updated_at", "")).strip()
+    return out
+
+
+def _load_learning_review_store():
+    candidates_raw = _safe_load_json_file(LEARNING_CANDIDATES_PATH, [])
+    samples_raw = _safe_load_json_file(LEARNING_SAMPLES_PATH, [])
+    state = _safe_load_json_file(LEARNING_STATE_PATH, {})
+    if not isinstance(candidates_raw, list):
+        candidates_raw = []
+    if not isinstance(samples_raw, list):
+        samples_raw = []
+    if not isinstance(state, dict):
+        state = {}
+    candidates = [
+        item
+        for idx, raw in enumerate(candidates_raw)
+        for item in [_normalize_learning_review_item(raw, f"cand_{idx}")]
+        if item is not None
+    ]
+    samples = [
+        item
+        for idx, raw in enumerate(samples_raw)
+        for item in [_normalize_learning_review_item(raw, f"sample_{idx}")]
+        if item is not None
+    ]
+    return candidates, samples, state
+
+
+def _save_learning_review_store(candidates, samples, state=None):
+    _safe_save_json_file(LEARNING_CANDIDATES_PATH, candidates if isinstance(candidates, list) else [])
+    _safe_save_json_file(LEARNING_SAMPLES_PATH, samples if isinstance(samples, list) else [])
+    if isinstance(state, dict):
+        _safe_save_json_file(LEARNING_STATE_PATH, state)
+
+
+def _learning_quick_settings(state):
+    raw = state.get("quick_settings", {}) if isinstance(state, dict) else {}
+    if not isinstance(raw, dict):
+        raw = {}
+    try:
+        inject_count = int(raw.get("inject_count", 1) or 0)
+    except (TypeError, ValueError):
+        inject_count = 1
+    try:
+        promotion_min_support = int(raw.get("promotion_min_support", 1) or 1)
+    except (TypeError, ValueError):
+        promotion_min_support = 1
+    return {
+        "inject_count": 1 if inject_count >= 1 else 0,
+        "promotion_min_support": 2 if promotion_min_support >= 2 else 1,
+    }
+
+
+def _build_learning_review_payload(candidates, samples, state, message=""):
+    return {
+        "ok": True,
+        "message": str(message or "").strip(),
+        "candidates": candidates,
+        "samples": samples,
+        "quick_settings": _learning_quick_settings(state),
+        "state": {
+            "degraded_mode": bool((state or {}).get("degraded_mode", False)),
+            "turn_count": int((state or {}).get("turn_count", 0) or 0),
+        },
+    }
+
+
+def _append_learning_audit(action, before, after, detail=None):
+    event = {
+        "id": f"audit_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+        "ts": datetime.now().isoformat(timespec="microseconds"),
+        "action": str(action or "").strip(),
+        "before": before,
+        "after": after,
+        "detail": detail if isinstance(detail, dict) else {},
+    }
+    with LEARNING_AUDIT_LOG_PATH.open("a", encoding="utf-8") as fp:
+        fp.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+
+def _snapshot_learning_review(candidates, samples, state):
+    try:
+        safe_candidates = json.loads(json.dumps(candidates, ensure_ascii=False))
+        safe_samples = json.loads(json.dumps(samples, ensure_ascii=False))
+    except Exception:
+        safe_candidates = []
+        safe_samples = []
+    return {
+        "candidates": safe_candidates if isinstance(safe_candidates, list) else [],
+        "samples": safe_samples if isinstance(safe_samples, list) else [],
+        "quick_settings": _learning_quick_settings(state),
+        "degraded_mode": bool((state or {}).get("degraded_mode", False)),
+    }
+
+
+def _last_learning_shadow_observation_at():
+    for item in reversed(_tail_jsonl(LEARNING_SHADOW_LOG_PATH, limit=20)):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("type", "")).strip() != "learning_observation":
+            continue
+        ts = str(item.get("ts", "")).strip()
+        if ts:
+            return ts
+    return ""
+
+
+def _parse_learning_observed_datetime(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _maybe_recover_stale_learning_state(state):
+    safe = state if isinstance(state, dict) else {}
+    if not safe.get("degraded_mode", False):
+        return safe, False
+    last_observed = str(safe.get("last_observed_at", "") or "").strip()
+    if not last_observed:
+        last_observed = _last_learning_shadow_observation_at()
+    # The old scorer pipeline is no longer active in this build. If no scorer
+    # observation has landed recently, recover from stale degraded state so the
+    # review UI does not look permanently broken.
+    observed_dt = _parse_learning_observed_datetime(last_observed)
+    if observed_dt is None:
+        return safe, False
+    if observed_dt.tzinfo is not None:
+        age_days = (datetime.now(observed_dt.tzinfo) - observed_dt).total_seconds() / 86400
+    else:
+        age_days = (datetime.now() - observed_dt).total_seconds() / 86400
+    if age_days < 3:
+        return safe, False
+
+    recovered = dict(safe)
+    recovered["degraded_mode"] = False
+    recovered["recovered_from_degraded_at"] = _learning_now_iso()
+    recovered["recovered_reason"] = "stale_scorer_state"
+    events = recovered.get("events", [])
+    if not isinstance(events, list):
+        events = []
+    events.append(
+        {
+            "ts": recovered["recovered_from_degraded_at"],
+            "event": "SCORER_RECOVERED",
+            "reason": "stale_scorer_state",
+        }
+    )
+    recovered["events"] = events[-20:]
+    return recovered, True
+
+
+def get_learning_candidates_for_review(config=None):
+    candidates, samples, state = _load_learning_review_store()
+    return _build_learning_review_payload(candidates, samples, state)
+
+
+def get_learning_samples_for_review(config=None):
+    return get_learning_candidates_for_review(config)
+
+
+def reload_learning_review_data(config=None):
+    candidates, samples, state = _load_learning_review_store()
+    state, recovered = _maybe_recover_stale_learning_state(state)
+    if recovered:
+        _save_learning_review_store(candidates, samples, state)
+    message = "Learning review data reloaded."
+    if recovered:
+        message = "Learning review data reloaded; stale degraded state recovered."
+    return _build_learning_review_payload(candidates, samples, state, message=message)
+
+
+def _find_learning_items_by_ids(items, ids):
+    wanted = {str(item_id or "").strip() for item_id in ids if str(item_id or "").strip()}
+    return [item for item in items if str(item.get("id", "")).strip() in wanted]
+
+
+def promote_learning_review_candidates(config, candidate_ids):
+    ids = [str(item_id or "").strip() for item_id in candidate_ids if str(item_id or "").strip()]
+    candidates, samples, state = _load_learning_review_store()
+    before = _snapshot_learning_review(candidates, samples, state)
+    selected = _find_learning_items_by_ids(candidates, ids)
+    existing_sample_ids = {str(item.get("id", "")).strip() for item in samples}
+    promoted = 0
+    now = _learning_now_iso()
+    for item in selected:
+        sample = dict(item)
+        sample["id"] = f"learned_{item['id']}" if not str(item["id"]).startswith(("learned_", "manual_")) else item["id"]
+        sample["source"] = str(sample.get("source", "") or "learned")
+        sample["updated_at"] = now
+        if not sample.get("created_at"):
+            sample["created_at"] = now
+        if sample["id"] in existing_sample_ids:
+            continue
+        samples.append(sample)
+        existing_sample_ids.add(sample["id"])
+        item["status"] = "promoted"
+        item["updated_at"] = now
+        promoted += 1
+    after = _snapshot_learning_review(candidates, samples, state)
+    _append_learning_audit(
+        "promote",
+        before,
+        after,
+        {"candidate_ids": ids, "promoted": promoted, "skipped": max(0, len(ids) - promoted)},
+    )
+    _save_learning_review_store(candidates, samples, state)
+    return _build_learning_review_payload(
+        candidates,
+        samples,
+        state,
+        message=f"Promoted {promoted} learning candidate(s).",
+    )
+
+
+def update_learning_review_entries(
+    config,
+    *,
+    action,
+    pool="candidates",
+    ids=None,
+    delta=0.0,
+    quick_settings=None,
+):
+    action_key = str(action or "").strip().lower()
+    candidates, samples, state = _load_learning_review_store()
+    before = _snapshot_learning_review(candidates, samples, state)
+    target = samples if str(pool or "").strip().lower() == "samples" else candidates
+    ids = [str(item_id or "").strip() for item_id in (ids or []) if str(item_id or "").strip()]
+    changed = 0
+    now = _learning_now_iso()
+
+    if action_key == "config":
+        quick = _learning_quick_settings({"quick_settings": quick_settings or {}})
+        state["quick_settings"] = quick
+        changed = 1
+    elif action_key == "delete":
+        wanted = set(ids)
+        kept = [item for item in target if str(item.get("id", "")).strip() not in wanted]
+        changed = len(target) - len(kept)
+        if target is samples:
+            samples = kept
+        else:
+            candidates = kept
+    elif action_key == "weight":
+        try:
+            step = float(delta)
+        except (TypeError, ValueError):
+            step = 0.0
+        wanted = set(ids)
+        for item in target:
+            if str(item.get("id", "")).strip() not in wanted:
+                continue
+            try:
+                score = float(item.get("score", 0) or 0)
+            except (TypeError, ValueError):
+                score = 0.0
+            item["score"] = round(max(0.0, min(1.0, score + step)), 4)
+            item["updated_at"] = now
+            changed += 1
+    elif action_key == "keep":
+        wanted = set(ids)
+        for item in target:
+            if str(item.get("id", "")).strip() not in wanted:
+                continue
+            item["status"] = "active" if target is samples else "candidate"
+            item["updated_at"] = now
+            changed += 1
+    else:
+        return {"ok": False, "error": f"Unsupported learning action: {action_key}"}
+
+    after = _snapshot_learning_review(candidates, samples, state)
+    _append_learning_audit(
+        action_key,
+        before,
+        after,
+        {"pool": pool, "ids": ids, "delta": delta, "changed": changed},
+    )
+    _save_learning_review_store(candidates, samples, state)
+    return _build_learning_review_payload(
+        candidates,
+        samples,
+        state,
+        message=f"Learning review action '{action_key}' changed {changed} item(s).",
+    )
+
+
+def undo_last_learning_review_action(config=None):
+    audits = _tail_jsonl(LEARNING_AUDIT_LOG_PATH, limit=80)
+    if not audits:
+        candidates, samples, state = _load_learning_review_store()
+        return _build_learning_review_payload(candidates, samples, state, message="No learning action to undo.")
+    undone_ids = {
+        str((item.get("detail") or {}).get("undone", "")).strip()
+        for item in audits
+        if isinstance(item, dict)
+        and str(item.get("action", "")).strip().lower() == "undo"
+        and isinstance(item.get("detail"), dict)
+    }
+    last = None
+    for item in reversed(audits):
+        if not isinstance(item, dict):
+            continue
+        action = str(item.get("action", "")).strip().lower()
+        audit_id = str(item.get("id", "")).strip()
+        if action == "undo" or not audit_id or audit_id in undone_ids:
+            continue
+        if isinstance(item.get("before"), dict):
+            last = item
+            break
+    if last is None:
+        candidates, samples, state = _load_learning_review_store()
+        return _build_learning_review_payload(candidates, samples, state, message="No learning action to undo.")
+    before = last.get("before") if isinstance(last, dict) else None
+    if not isinstance(before, dict):
+        candidates, samples, state = _load_learning_review_store()
+        return {"ok": False, "error": "Last learning audit entry cannot be undone."}
+    candidates = before.get("candidates", [])
+    samples = before.get("samples", [])
+    state = _safe_load_json_file(LEARNING_STATE_PATH, {})
+    if not isinstance(candidates, list):
+        candidates = []
+    if not isinstance(samples, list):
+        samples = []
+    if not isinstance(state, dict):
+        state = {}
+    if isinstance(before.get("quick_settings"), dict):
+        state["quick_settings"] = before["quick_settings"]
+    undo_before = _snapshot_learning_review(*_load_learning_review_store())
+    _save_learning_review_store(candidates, samples, state)
+    _append_learning_audit(
+        "undo",
+        undo_before,
+        _snapshot_learning_review(candidates, samples, state),
+        {"undone": last.get("id", "")},
+    )
+    return _build_learning_review_payload(candidates, samples, state, message="Undid the last learning review action.")
 
 
 def get_memory_debug_snapshot(config):

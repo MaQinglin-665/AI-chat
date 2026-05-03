@@ -251,3 +251,126 @@ def test_learning_diagnostics_handles_malformed_state_shape():
     assert diagnostics["current_window_size"] == 0
     assert diagnostics["current_window_avg_confidence"] == 0
     assert diagnostics["current_window_signal_coverage"] == 0
+
+
+def test_reload_learning_review_data_recovers_stale_degraded_state(monkeypatch, tmp_path):
+    candidates_path = tmp_path / "learning_candidates.json"
+    samples_path = tmp_path / "learning_samples.json"
+    state_path = tmp_path / "learning_state.json"
+    shadow_path = tmp_path / "learning_shadow_log.jsonl"
+    candidates_path.write_text("[]", encoding="utf-8")
+    samples_path.write_text("[]", encoding="utf-8")
+    shadow_path.write_text("", encoding="utf-8")
+    state_path.write_text(
+        """
+{
+  "turn_count": 10,
+  "degraded_mode": true,
+  "last_observed_at": "2026-01-01T00:00:00",
+  "events": [
+    {"ts": "2026-01-01T00:00:00", "event": "SCORER_DEGRADED", "reason": "low_confidence"}
+  ]
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(memory, "LEARNING_CANDIDATES_PATH", candidates_path)
+    monkeypatch.setattr(memory, "LEARNING_SAMPLES_PATH", samples_path)
+    monkeypatch.setattr(memory, "LEARNING_STATE_PATH", state_path)
+    monkeypatch.setattr(memory, "LEARNING_SHADOW_LOG_PATH", shadow_path)
+
+    payload = memory.reload_learning_review_data(_config())
+    state = memory._safe_load_json_file(state_path, {})
+
+    assert payload["ok"] is True
+    assert payload["state"]["degraded_mode"] is False
+    assert state["degraded_mode"] is False
+    assert state["recovered_reason"] == "stale_scorer_state"
+    assert state["events"][-1]["event"] == "SCORER_RECOVERED"
+
+
+def test_reload_learning_review_data_keeps_recent_or_malformed_degraded_state(monkeypatch, tmp_path):
+    candidates_path = tmp_path / "learning_candidates.json"
+    samples_path = tmp_path / "learning_samples.json"
+    state_path = tmp_path / "learning_state.json"
+    candidates_path.write_text("[]", encoding="utf-8")
+    samples_path.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(memory, "LEARNING_CANDIDATES_PATH", candidates_path)
+    monkeypatch.setattr(memory, "LEARNING_SAMPLES_PATH", samples_path)
+    monkeypatch.setattr(memory, "LEARNING_STATE_PATH", state_path)
+
+    state_path.write_text(
+        """
+{
+  "degraded_mode": true,
+  "last_observed_at": "not-a-date"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    malformed = memory.reload_learning_review_data(_config())
+    assert malformed["state"]["degraded_mode"] is True
+
+    state_path.write_text(
+        f"""
+{{
+  "degraded_mode": true,
+  "last_observed_at": "{memory._learning_now_iso()}"
+}}
+""".strip(),
+        encoding="utf-8",
+    )
+    recent = memory.reload_learning_review_data(_config())
+    assert recent["state"]["degraded_mode"] is True
+
+
+def test_learning_review_promote_update_and_undo(monkeypatch, tmp_path):
+    candidates_path = tmp_path / "learning_candidates.json"
+    samples_path = tmp_path / "learning_samples.json"
+    state_path = tmp_path / "learning_state.json"
+    audit_path = tmp_path / "learning_audit_log.jsonl"
+    candidates_path.write_text(
+        """
+[
+  {
+    "id": "cand_1",
+    "assistant_preview": "short reply",
+    "compressed_pattern": "keep it short",
+    "score": 0.5,
+    "confidence": 0.6,
+    "support_count": 1
+  }
+]
+""".strip(),
+        encoding="utf-8",
+    )
+    samples_path.write_text("[]", encoding="utf-8")
+    state_path.write_text("{}", encoding="utf-8")
+    audit_path.write_text("", encoding="utf-8")
+    monkeypatch.setattr(memory, "LEARNING_CANDIDATES_PATH", candidates_path)
+    monkeypatch.setattr(memory, "LEARNING_SAMPLES_PATH", samples_path)
+    monkeypatch.setattr(memory, "LEARNING_STATE_PATH", state_path)
+    monkeypatch.setattr(memory, "LEARNING_AUDIT_LOG_PATH", audit_path)
+
+    promoted = memory.promote_learning_review_candidates(_config(), ["cand_1"])
+    assert promoted["ok"] is True
+    assert promoted["samples"][0]["id"] == "learned_cand_1"
+    assert promoted["candidates"][0]["status"] == "promoted"
+
+    weighted = memory.update_learning_review_entries(
+        _config(),
+        action="weight",
+        pool="samples",
+        ids=["learned_cand_1"],
+        delta=0.1,
+    )
+    assert weighted["samples"][0]["score"] == 0.6
+
+    undone = memory.undo_last_learning_review_action(_config())
+    assert undone["ok"] is True
+    assert undone["samples"][0]["score"] == 0.5
+
+    second_undo = memory.undo_last_learning_review_action(_config())
+    assert second_undo["ok"] is True
+    assert second_undo["samples"] == []
+    assert second_undo["candidates"][0]["status"] == "candidate"
