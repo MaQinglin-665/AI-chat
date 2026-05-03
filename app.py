@@ -383,12 +383,19 @@ def schedule_runtime_restart(delay_sec=0.35):
     thread.start()
 
 
-def summarize_older_history(llm_cfg, provider, older_history, max_summary_chars=900):
+def summarize_older_history(
+    llm_cfg,
+    provider,
+    older_history,
+    max_summary_chars=900,
+    allow_create=True,
+):
     return _summarize_older_history_impl(
         llm_cfg,
         provider,
         older_history,
         max_summary_chars=max_summary_chars,
+        allow_create=allow_create,
         cache_lock=_SUMMARY_CACHE_LOCK,
         summary_cache=_HISTORY_SUMMARY_CACHE,
         call_openai_compatible_func=call_openai_compatible,
@@ -550,7 +557,7 @@ def should_reply(user_message, config=None, is_auto=False):
 
 def _build_base_prompt(config, user_message, history, llm_cfg, provider):
     history_settings = get_history_summary_settings(config)
-    keep_recent = max(12, int(history_settings.get("keep_recent_messages", 8)))
+    keep_recent = int(history_settings.get("keep_recent_messages", 8))
     safe_history = sanitize_history(history, max_items=keep_recent)
     lightweight_checkin = is_lightweight_checkin_message(user_message)
     manual_persona_block = "" if lightweight_checkin else build_manual_persona_card_block()
@@ -1289,7 +1296,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                         str(chat_config.get("llm", {}).get("provider", "") or "").strip().lower()
                         or ("ollama" if "11434" in str(chat_config.get("llm", {}).get("base_url", "")).strip().lower() else "openai"),
                         user_message,
-                        sanitize_history(history, max_items=max(12, int(get_history_summary_settings(chat_config).get("keep_recent_messages", 8)))),
+                        sanitize_history(history, max_items=int(get_history_summary_settings(chat_config).get("keep_recent_messages", 8))),
                         final_reply,
                         is_auto=is_auto,
                     )

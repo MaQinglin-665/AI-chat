@@ -900,6 +900,35 @@ def test_chat_stream_done_payload_does_not_leak_json_like_reply(monkeypatch):
     assert isinstance(runtime, dict)
     assert runtime.get("emotion") == "thinking"
     assert runtime.get("action") == "think"
+
+
+def test_chat_stream_done_payload_does_not_leak_runtime_metadata_suffix(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True, "return_metadata": True}
+    raw = (
+        "Got it! Feeling peppy after your lunch break?\n"
+        "emotion: happy\n"
+        "action: nod\n"
+        "voice_style: cheerful"
+    )
+
+    def _fake_stream(*_args, **_kwargs):
+        yield raw
+
+    monkeypatch.setattr(app, "call_llm_stream", _fake_stream)
+    monkeypatch.setattr(app, "finalize_assistant_reply", lambda *_args, **_kwargs: raw)
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, events = _post_stream_events(f"{base}/api/chat_stream", _chat_payload("hi"))
+    assert status == 200
+    done = next((evt for evt in events if evt.get("type") == "done"), {})
+    assert done.get("reply") == "Got it! Feeling peppy after your lunch break?"
+    assert "emotion:" not in done.get("reply", "")
+    runtime = done.get("character_runtime")
+    assert isinstance(runtime, dict)
+    assert runtime.get("emotion") == "happy"
+    assert runtime.get("action") == "nod"
+    assert runtime.get("voice_style") == "cheerful"
 def test_translate_route_returns_fallback_payload_when_llm_unavailable(monkeypatch):
     cfg = _build_test_config()
     cfg.setdefault("llm", {})

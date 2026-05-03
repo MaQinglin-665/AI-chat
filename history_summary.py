@@ -20,11 +20,13 @@ def get_history_summary_settings(config):
     trigger_messages = _clamp_int(raw.get("trigger_messages", 14), 14, 8, 80)
     keep_recent_messages = _clamp_int(raw.get("keep_recent_messages", 8), 8, 4, 40)
     max_summary_chars = _clamp_int(raw.get("max_summary_chars", 900), 900, 240, 3000)
+    sync_summarize_on_chat = bool(raw.get("sync_summarize_on_chat", False))
     return {
         "enabled": enabled,
         "trigger_messages": trigger_messages,
         "keep_recent_messages": keep_recent_messages,
         "max_summary_chars": max_summary_chars,
+        "sync_summarize_on_chat": sync_summarize_on_chat,
     }
 
 
@@ -65,6 +67,7 @@ def summarize_older_history(
     older_history,
     *,
     max_summary_chars=900,
+    allow_create=True,
     cache_lock,
     summary_cache,
     call_openai_compatible_func,
@@ -78,6 +81,9 @@ def summarize_older_history(
     with cache_lock:
         if summary_cache.get("key") == cache_key:
             return str(summary_cache.get("summary", ""))
+
+    if not allow_create:
+        return ""
 
     prompt = build_history_summary_prompt(raw_dialogue, max_summary_chars=max_summary_chars)
     messages = [
@@ -122,7 +128,7 @@ def build_prompt_with_history_summary(
     merge_prompt_with_memory_func,
 ):
     settings = get_history_summary_settings(config)
-    keep_recent = max(12, int(settings["keep_recent_messages"]))
+    keep_recent = int(settings["keep_recent_messages"])
     safe_history = sanitize_history(history, max_items=keep_recent)
 
     if not settings["enabled"]:
@@ -138,6 +144,7 @@ def build_prompt_with_history_summary(
         provider=provider,
         older_history=older_history,
         max_summary_chars=settings["max_summary_chars"],
+        allow_create=settings["sync_summarize_on_chat"],
     )
     if not summary:
         return base_prompt, safe_history

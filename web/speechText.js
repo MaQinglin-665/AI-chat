@@ -2,14 +2,52 @@
   "use strict";
 
   const TOOL_META_MARKER = "[[TAFFY_TOOL_META]]";
+  const RUNTIME_METADATA_PAIR_RE = /\b(emotion|action|intensity|voice_style|live2d_hint)\s*[:=]\s*([A-Za-z][A-Za-z0-9_-]*)/gi;
 
   function parseToolMetaVisibleText(text) {
     const src = String(text || "");
     const idx = src.indexOf(TOOL_META_MARKER);
     if (idx < 0) {
+      return stripRuntimeMetadataSuffix(src);
+    }
+    return stripRuntimeMetadataSuffix(src.slice(0, idx)).trimEnd();
+  }
+
+  function stripRuntimeMetadataSuffix(text) {
+    const src = String(text || "").trim();
+    if (!src) {
+      return "";
+    }
+    const matches = Array.from(src.matchAll(RUNTIME_METADATA_PAIR_RE));
+    RUNTIME_METADATA_PAIR_RE.lastIndex = 0;
+    if (!matches.length) {
       return src;
     }
-    return src.slice(0, idx).trimEnd();
+    for (const first of matches) {
+      const start = Number(first.index || 0);
+      const tail = src.slice(start).trim();
+      const tailPairs = Array.from(tail.matchAll(RUNTIME_METADATA_PAIR_RE));
+      RUNTIME_METADATA_PAIR_RE.lastIndex = 0;
+      if (!tailPairs.length) {
+        continue;
+      }
+      const remainder = tail
+        .replace(RUNTIME_METADATA_PAIR_RE, "")
+        .replace(/\b(emotion|action|intensity|voice_style|live2d_hint)\b/gi, "")
+        .replace(/[\s,;|{}()[\]"'`。.!?！？:=-]+/g, "");
+      RUNTIME_METADATA_PAIR_RE.lastIndex = 0;
+      if (remainder) {
+        continue;
+      }
+      const before = src.slice(0, start);
+      const startsLine = start === 0 || /[\r\n]\s*$/.test(before);
+      const followsSentence = /[.!?。！？]\s*$/.test(before);
+      if (tailPairs.length < 2 && !startsLine && !followsSentence) {
+        continue;
+      }
+      return before.trim();
+    }
+    return src;
   }
 
   function isMostlyEnglishText(text) {
@@ -409,6 +447,7 @@
     sanitizeSpeakText,
     simplifySpeechDeliveryText,
     splitStreamSpeakSegments,
+    stripRuntimeMetadataSuffix,
     tightenMinorSpeechPauses
   };
 
