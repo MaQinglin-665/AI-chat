@@ -171,6 +171,12 @@ assert.ok(
   "stream speech queue should be able to detect queued tail segments"
 );
 assert.ok(
+  source.includes("function ensureStreamSpeakQueueRunning(sessionId")
+    && source.includes("stream_run_handoff")
+    && source.includes("ensureStreamSpeakQueueRunning(sessionId, 0);"),
+  "stream speech queue should hand off to a newer session after an older runner exits"
+);
+assert.ok(
   source.includes("function shouldSerializeStreamTTSRequests()")
     && source.includes('state.ttsProvider === "gpt_sovits"')
     && source.includes("if (!shouldSerializeStreamTTSRequests())")
@@ -287,6 +293,10 @@ assert.ok(
     && source.includes("invalid_translation")
     && source.includes("_looksLikeBadChatTranslation(text, value)"),
   "assistant translation should reject model answers before caching or rendering them as translations"
+);
+assert.ok(
+  /if \(degraded \|\| badTranslation\) \{[\s\S]*?if \(!badTranslation\) \{[\s\S]*?_markTranslationFailure\(\);/.test(source),
+  "invalid model-answer translations should not open the frontend translation circuit"
 );
 
 console.log("Character runtime frontend checks passed.");

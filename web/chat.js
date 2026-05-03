@@ -6139,7 +6139,9 @@ async function _fetchChatTranslation(text) {
       const degraded = data?.degraded === true || data?.fallback === true;
       const badTranslation = _looksLikeBadChatTranslation(safe, translated);
       if (degraded || badTranslation) {
-        _markTranslationFailure();
+        if (!badTranslation) {
+          _markTranslationFailure();
+        }
         recordTranslateDebugEvent("request_degraded", {
           traceId: responseTraceId || traceId,
           text: safe,
@@ -8930,6 +8932,27 @@ function hasQueuedStreamSpeakItem(sessionId) {
     && state.streamSpeakQueue.some((item) => item && item.sessionId === sessionId);
 }
 
+function ensureStreamSpeakQueueRunning(sessionId, delayMs = 0) {
+  const safeSession = Number(sessionId || 0);
+  if (!safeSession || safeSession !== state.streamSpeakSession || !shouldUseStreamSpeak()) {
+    return;
+  }
+  const delay = Math.max(0, Math.min(360, Math.round(Number(delayMs) || 0)));
+  window.setTimeout(() => {
+    if (safeSession !== state.streamSpeakSession || !shouldUseStreamSpeak()) {
+      return;
+    }
+    if (!hasQueuedStreamSpeakItem(safeSession)) {
+      return;
+    }
+    if (state.streamSpeakWorking) {
+      ensureStreamSpeakQueueRunning(safeSession, 80);
+      return;
+    }
+    runStreamSpeakQueue();
+  }, delay);
+}
+
 async function waitNextStreamSpeakItem(sessionId, waitMs = 0) {
   let item = dequeueStreamSpeakItem(sessionId);
   if (item || waitMs <= 0) {
@@ -9072,6 +9095,13 @@ async function runStreamSpeakQueue() {
     ) {
       recordTTSDebugEvent("stream_run_restart", { sessionId: activeSession });
       window.setTimeout(() => runStreamSpeakQueue(), 0);
+    } else if (
+      activeSession !== state.streamSpeakSession
+      && shouldUseStreamSpeak()
+      && hasQueuedStreamSpeakItem(state.streamSpeakSession)
+    ) {
+      recordTTSDebugEvent("stream_run_handoff", { sessionId: state.streamSpeakSession });
+      ensureStreamSpeakQueueRunning(state.streamSpeakSession, 0);
     }
   }
 }
@@ -9093,7 +9123,7 @@ function feedStreamSpeakDelta(delta, sessionId, style = "neutral") {
     maybePlayTalkGesture(seg, style);
   }
   if (parsed.segments.length) {
-    runStreamSpeakQueue();
+    ensureStreamSpeakQueueRunning(sessionId, 0);
   }
 }
 
@@ -9110,7 +9140,7 @@ function flushStreamSpeak(sessionId, style = "neutral") {
     maybePlayTalkGesture(seg, style);
   }
   if (parsed.segments.length) {
-    runStreamSpeakQueue();
+    ensureStreamSpeakQueueRunning(sessionId, 0);
   }
 }
 
