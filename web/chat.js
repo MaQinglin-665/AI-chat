@@ -5334,7 +5334,7 @@ function renderToolMetaCards(row, meta) {
   }
 }
 
-const _CHAT_TRANSLATE_TIMEOUT_MS = 12000;
+const _CHAT_TRANSLATE_TIMEOUT_MS = 60000;
 const _CHAT_TRANSLATE_CACHE_LIMIT = 160;
 const _TRANSLATE_CIRCUIT_FAILURE_THRESHOLD = 3;
 const _TRANSLATE_CIRCUIT_BASE_COOLDOWN_MS = 12000;
@@ -5559,7 +5559,8 @@ function _renderAssistantTranslation(row, visibleText, options = {}) {
     }
     const translated = String(zh || "").trim();
     if (!translated || translated === safe) {
-      _clearMessageTranslation(row);
+      translationEl.textContent = "中译：翻译暂时不可用";
+      translationEl.hidden = false;
       return;
     }
     translationEl.textContent = `中译：${translated}`;
