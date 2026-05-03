@@ -40,6 +40,7 @@ from config import (
 import memory as _memory_module
 from memory import (
     build_memory_prompt_block,
+    get_memory_debug_snapshot,
     merge_prompt_with_memory,
     build_manual_persona_card_block,
     build_persona_memory_block,
@@ -965,6 +966,16 @@ class PetHandler(SimpleHTTPRequestHandler):
             try:
                 cfg = load_config()
                 self._send_json(get_learning_samples_for_review(cfg))
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/memory/debug":
+            try:
+                cfg = load_config()
+                self._send_json(get_memory_debug_snapshot(cfg))
             except Exception as exc:
                 self._send_json(
                     {"ok": False, "error": str(exc)},

@@ -853,6 +853,7 @@ const ui = {
   learningReviewUndoBtn: document.getElementById("learning-review-undo-btn"),
   learningTabCandidates: document.getElementById("learning-tab-candidates"),
   learningTabSamples: document.getElementById("learning-tab-samples"),
+  learningTabDebug: document.getElementById("learning-tab-debug"),
   learningReloadBtn: document.getElementById("learning-reload-btn"),
   learningFilterScore: document.getElementById("learning-filter-score"),
   learningFilterConfidence: document.getElementById("learning-filter-confidence"),
@@ -868,6 +869,7 @@ const ui = {
   learningBatchPromoteBtn: document.getElementById("learning-batch-promote-btn"),
   learningReviewSummary: document.getElementById("learning-review-summary"),
   learningReviewList: document.getElementById("learning-review-list"),
+  learningDebugPanel: document.getElementById("learning-debug-panel"),
   learningQuickInject: document.getElementById("learning-quick-inject"),
   learningQuickSupport: document.getElementById("learning-quick-support"),
   learningQuickApplyBtn: document.getElementById("learning-quick-apply-btn"),
@@ -880,6 +882,7 @@ const ui = {
 
 const learningReviewState = {
   activeTab: "candidates",
+  debugSnapshot: null,
   candidates: [],
   samples: [],
   selectedCandidates: new Set(),
@@ -2546,6 +2549,10 @@ function applyLearningPayload(payload) {
   syncLearningQuickSettingsUI();
 }
 
+function applyMemoryDebugPayload(payload) {
+  learningReviewState.debugSnapshot = payload && typeof payload === "object" ? payload : null;
+}
+
 function parseLearningFilterNumber(input, fallback = 0) {
   const value = Number(input?.value);
   if (!Number.isFinite(value)) {
@@ -2638,8 +2645,84 @@ function getLearningFilteredItems() {
   return filtered;
 }
 
+function buildMemoryDebugReport(snapshot = learningReviewState.debugSnapshot) {
+  const data = snapshot && typeof snapshot === "object" ? snapshot : {};
+  const memory = data.memory && typeof data.memory === "object" ? data.memory : {};
+  const learning = data.learning && typeof data.learning === "object" ? data.learning : {};
+  const last = memory.last_selection && typeof memory.last_selection === "object" ? memory.last_selection : {};
+  const lines = [
+    "Memory/Learning Debug:",
+    `memory.enabled=${memory.enabled === true}`,
+    `memory.mem0=${memory.mem0_enabled === true}`,
+    `memory.count=${Number(memory.memory_count || 0)}`,
+    `last.reason=${String(last.reason || "(none)")}`,
+    `last.message=${String(last.message || "")}`,
+    `last.explicit=${last.explicit_memory_intent === true}`,
+    `last.specific=${last.is_specific_memory_query === true}`,
+    `last.lightweight=${last.is_lightweight_checkin === true}`,
+    `last.candidates=${Number(last.candidate_count || 0)}`,
+    `last.selected=${Array.isArray(last.selected) ? last.selected.length : 0}`,
+    `learning.candidates=${Number(learning.candidates_count || 0)}`,
+    `learning.samples=${Number(learning.samples_count || 0)}`,
+    `learning.degraded=${learning.degraded_mode === true}`,
+    `learning.turns=${Number(learning.turn_count || 0)}`,
+  ];
+  const selected = Array.isArray(last.selected) ? last.selected.slice(0, 5) : [];
+  if (selected.length) {
+    lines.push("Selected memory:");
+    selected.forEach((item, idx) => {
+      lines.push(`${idx + 1}. [${item.source || "selected"}] ${item.user || ""} => ${item.assistant || ""}`);
+    });
+  }
+  const relevant = Array.isArray(last.relevant_candidates) ? last.relevant_candidates.slice(0, 5) : [];
+  if (relevant.length) {
+    lines.push("Relevant candidates:");
+    relevant.forEach((item, idx) => {
+      lines.push(`${idx + 1}. score=${Number(item.score || 0)} ${item.user || ""}`);
+    });
+  }
+  const recentAudit = Array.isArray(learning.recent_audit) ? learning.recent_audit.slice(-3) : [];
+  if (recentAudit.length) {
+    lines.push("Recent learning audit:");
+    recentAudit.forEach((item, idx) => {
+      lines.push(`${idx + 1}. ${item.action || item.event || item.id || "(event)"}`);
+    });
+  }
+  return lines.join("\n");
+}
+
+function renderLearningDebugPanel() {
+  if (!ui.learningDebugPanel) {
+    return;
+  }
+  const isDebug = learningReviewState.activeTab === "debug";
+  ui.learningDebugPanel.hidden = !isDebug;
+  if (ui.learningReviewList) {
+    ui.learningReviewList.hidden = isDebug;
+  }
+  if (!isDebug) {
+    return;
+  }
+  ui.learningDebugPanel.textContent = buildMemoryDebugReport();
+  if (ui.learningReviewSummary) {
+    ui.learningReviewSummary.textContent = "Memory and learning chain debug snapshot";
+  }
+}
+
 function refreshLearningSelectAllState(filteredItems) {
   if (!ui.learningSelectAll) {
+    return;
+  }
+  if (learningReviewState.activeTab === "debug") {
+    ui.learningSelectAll.indeterminate = false;
+    ui.learningSelectAll.checked = false;
+    if (ui.learningSelectedCount) {
+      ui.learningSelectedCount.textContent = "宸查€?0";
+    }
+    if (ui.learningBatchDeleteBtn) ui.learningBatchDeleteBtn.disabled = true;
+    if (ui.learningBatchUpBtn) ui.learningBatchUpBtn.disabled = true;
+    if (ui.learningBatchDownBtn) ui.learningBatchDownBtn.disabled = true;
+    if (ui.learningBatchPromoteBtn) ui.learningBatchPromoteBtn.disabled = true;
     return;
   }
   const selectedSet = getLearningSelectedSet();
@@ -2663,9 +2746,30 @@ function renderLearningReviewList() {
   if (!ui.learningReviewList) {
     return;
   }
+  if (learningReviewState.activeTab === "debug") {
+    if (ui.learningTabCandidates) {
+      ui.learningTabCandidates.classList.remove("is-active");
+      ui.learningTabCandidates.setAttribute("aria-selected", "false");
+    }
+    if (ui.learningTabSamples) {
+      ui.learningTabSamples.classList.remove("is-active");
+      ui.learningTabSamples.setAttribute("aria-selected", "false");
+    }
+    if (ui.learningTabDebug) {
+      ui.learningTabDebug.classList.add("is-active");
+      ui.learningTabDebug.setAttribute("aria-selected", "true");
+    }
+    refreshLearningSelectAllState([]);
+    renderLearningDebugPanel();
+    return;
+  }
   const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
   const filteredItems = getLearningFilteredItems();
   ui.learningReviewList.innerHTML = "";
+  ui.learningReviewList.hidden = false;
+  if (ui.learningDebugPanel) {
+    ui.learningDebugPanel.hidden = true;
+  }
 
   if (ui.learningTabCandidates) {
     const active = tab === "candidates";
@@ -2676,6 +2780,10 @@ function renderLearningReviewList() {
     const active = tab === "samples";
     ui.learningTabSamples.classList.toggle("is-active", active);
     ui.learningTabSamples.setAttribute("aria-selected", String(active));
+  }
+  if (ui.learningTabDebug) {
+    ui.learningTabDebug.classList.remove("is-active");
+    ui.learningTabDebug.setAttribute("aria-selected", "false");
   }
   if (ui.learningReviewSummary) {
     ui.learningReviewSummary.textContent =
@@ -2839,17 +2947,28 @@ async function learningFetchJson(url, options = {}) {
 async function reloadLearningReviewData() {
   setLearningReviewLoading(true);
   try {
-    const payload = await learningFetchJson("/api/learning/reload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({})
-    });
+    const [payload, debugPayload] = await Promise.all([
+      learningFetchJson("/api/learning/reload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      }),
+      learningFetchJson("/api/memory/debug")
+    ]);
     applyLearningPayload(payload);
+    applyMemoryDebugPayload(debugPayload);
     renderLearningReviewList();
     setStatus(payload?.message || "学习审核数据已刷新");
   } finally {
     setLearningReviewLoading(false);
   }
+}
+
+async function reloadMemoryDebugData() {
+  const payload = await learningFetchJson("/api/memory/debug");
+  applyMemoryDebugPayload(payload);
+  renderLearningDebugPanel();
+  return payload;
 }
 
 async function updateLearningEntries(action, extra = {}) {
@@ -3476,6 +3595,15 @@ async function handleLocalCommand(inputText) {
   if (text.toLowerCase() === "/translatedebug off") {
     toggleTranslateDebugPanel(false);
     appendMessage("assistant", "Translation debug panel disabled.", { enableTranslation: false });
+    return true;
+  }
+  if (text.toLowerCase() === "/memorydebug") {
+    try {
+      const snapshot = await reloadMemoryDebugData();
+      appendMessage("assistant", buildMemoryDebugReport(snapshot), { enableTranslation: false });
+    } catch (err) {
+      appendMessage("assistant", `Memory debug unavailable: ${err.message || err}`, { enableTranslation: false });
+    }
     return true;
   }
   if (text === "/情绪日报") {
@@ -12213,6 +12341,18 @@ function bindUI() {
     ui.learningTabSamples.addEventListener("click", () => {
       learningReviewState.activeTab = "samples";
       renderLearningReviewList();
+    });
+  }
+
+  if (ui.learningTabDebug) {
+    ui.learningTabDebug.addEventListener("click", async () => {
+      learningReviewState.activeTab = "debug";
+      renderLearningReviewList();
+      try {
+        await reloadMemoryDebugData();
+      } catch (err) {
+        setStatus(`Memory debug failed: ${err.message || err}`);
+      }
     });
   }
 

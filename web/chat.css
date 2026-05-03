@@ -1,1 +1,13 @@
 /* Chat-specific styles are progressively moved from base.css. */
+.learning-debug-panel {
+  white-space: pre-wrap;
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 12px;
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  overflow: auto;
+}

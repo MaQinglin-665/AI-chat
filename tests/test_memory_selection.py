@@ -95,3 +95,34 @@ def test_just_now_feedback_is_not_treated_as_memory_request(monkeypatch):
     )
 
     assert selected == []
+
+
+def test_memory_debug_records_low_signal_skip(monkeypatch):
+    monkeypatch.setattr(memory, "load_memory_items", lambda: [])
+    monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [])
+
+    selected = memory.select_memory_items_for_prompt(_config(), "好的", [])
+
+    assert selected == []
+    assert memory.LAST_MEMORY_DEBUG["reason"] == "low_signal_or_unspecific"
+    assert memory.LAST_MEMORY_DEBUG["explicit_memory_intent"] is False
+    assert memory.LAST_MEMORY_DEBUG["is_specific_memory_query"] is False
+
+
+def test_memory_debug_snapshot_includes_last_selection(monkeypatch):
+    recent = _item("2026-01-01T10:01:00", "old topic about cookies", "assistant cookie reply")
+    monkeypatch.setattr(memory, "load_memory_items", lambda: [recent])
+    monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [])
+
+    selected = memory.select_memory_items_for_prompt(
+        _config(inject_recent=1, inject_relevant=1),
+        "What do you remember?",
+        [],
+    )
+    snapshot = memory.get_memory_debug_snapshot(_config())
+
+    assert selected == [recent]
+    assert snapshot["ok"] is True
+    assert snapshot["memory"]["memory_count"] == 1
+    assert snapshot["memory"]["last_selection"]["reason"] == "selected"
+    assert snapshot["memory"]["last_selection"]["selected"][0]["user"] == "old topic about cookies"

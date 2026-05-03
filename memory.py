@@ -27,8 +27,14 @@ MEM0_HISTORY_DB_PATH = MEM0_DIR / "history.db"
 PROFILE_MEMORY_PATH = MEMORY_PATH.parent / "memory_profile.json"
 RELATIONSHIP_MEMORY_PATH = MEMORY_PATH.parent / "memory_relationship.json"
 MANUAL_PERSONA_CARD_PATH = MEMORY_PATH.parent / "memory_persona_card.json"
+LEARNING_CANDIDATES_PATH = MEMORY_PATH.parent / "learning_candidates.json"
+LEARNING_SAMPLES_PATH = MEMORY_PATH.parent / "learning_samples.json"
+LEARNING_STATE_PATH = MEMORY_PATH.parent / "learning_state.json"
+LEARNING_AUDIT_LOG_PATH = MEMORY_PATH.parent / "learning_audit_log.jsonl"
+LEARNING_SHADOW_LOG_PATH = MEMORY_PATH.parent / "learning_shadow_log.jsonl"
 
 MEM0_CLIENT = None
+LAST_MEMORY_DEBUG = {}
 MEM0_CLIENT_KEY = ""
 
 LEGACY_MANUAL_PERSONA_CARD_FIELDS = (
@@ -561,18 +567,60 @@ def _append_unique_memory_item(chosen, seen, item):
     return True
 
 
+def _compact_memory_debug_item(item, source="", score=None):
+    safe = item if isinstance(item, dict) else {}
+    out = {
+        "ts": str(safe.get("ts", ""))[:32],
+        "user": normalize_memory_text(safe.get("user", ""), max_len=90),
+        "assistant": normalize_memory_text(safe.get("assistant", ""), max_len=110),
+        "source": str(source or "").strip(),
+    }
+    if score is not None:
+        try:
+            out["score"] = int(score)
+        except (TypeError, ValueError):
+            out["score"] = 0
+    return out
+
+
+def _set_last_memory_debug(snapshot):
+    global LAST_MEMORY_DEBUG
+    LAST_MEMORY_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+
+
 def select_memory_items_for_prompt(config, user_message, safe_history):
     settings = get_memory_settings(config)
+    explicit_memory_intent = has_explicit_memory_intent(user_message)
+    specific_memory_query = is_specific_memory_query(user_message)
+    debug = {
+        "message": normalize_memory_text(user_message, max_len=160),
+        "enabled": bool(settings["enabled"]),
+        "mem0_enabled": bool(settings["mem0_enabled"]),
+        "is_lightweight_checkin": is_lightweight_checkin_message(user_message),
+        "explicit_memory_intent": explicit_memory_intent,
+        "is_specific_memory_query": specific_memory_query,
+        "reason": "",
+        "selected": [],
+        "candidate_count": 0,
+        "relevant_candidates": [],
+        "recent_considered": 0,
+    }
     if not settings["enabled"]:
+        debug["reason"] = "memory_disabled"
+        _set_last_memory_debug(debug)
         return []
     if is_lightweight_checkin_message(user_message):
+        debug["reason"] = "lightweight_checkin"
+        _set_last_memory_debug(debug)
         return []
-    explicit_memory_intent = has_explicit_memory_intent(user_message)
-    if not explicit_memory_intent and not is_specific_memory_query(user_message):
+    if not explicit_memory_intent and not specific_memory_query:
+        debug["reason"] = "low_signal_or_unspecific"
+        _set_last_memory_debug(debug)
         return []
 
     with MEMORY_LOCK:
         fallback_items = load_memory_items()
+    debug["candidate_count"] = len(fallback_items)
 
     chosen = []
     seen = set()
@@ -581,7 +629,14 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
 
     for item in _search_mem0_items(config, user_message, safe_history):
         if _append_unique_memory_item(chosen, seen, item) and len(chosen) >= relevant_target:
-            return chosen[:total_target] if total_target else []
+            result = chosen[:total_target] if total_target else []
+            debug["selected"] = [
+                _compact_memory_debug_item(item, source="mem0")
+                for item in result
+            ]
+            debug["reason"] = "selected" if result else "no_match"
+            _set_last_memory_debug(debug)
+            return result
 
     query_parts = [str(user_message or "")]
     query_parts.extend(
@@ -601,6 +656,10 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
             if score > 0:
                 scored.append((score, idx, item))
         scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
+        debug["relevant_candidates"] = [
+            _compact_memory_debug_item(item, source="keyword", score=score)
+            for score, _idx, item in scored[:8]
+        ]
 
         for score, _, item in scored:
             if score <= 0:
@@ -609,13 +668,21 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
                 break
 
     recent_n = settings["inject_recent"] if explicit_memory_intent else 0
+    debug["recent_considered"] = recent_n
     if recent_n > 0 and len(chosen) < total_target:
         recent_items = fallback_items[-recent_n:]
         for item in recent_items:
             if _append_unique_memory_item(chosen, seen, item) and len(chosen) >= total_target:
                 break
 
-    return chosen[:total_target] if total_target else []
+    result = chosen[:total_target] if total_target else []
+    debug["selected"] = [
+        _compact_memory_debug_item(item, source="selected")
+        for item in result
+    ]
+    debug["reason"] = "selected" if result else "no_match"
+    _set_last_memory_debug(debug)
+    return result
 
 
 def build_memory_prompt_block(config, user_message, safe_history):
@@ -642,6 +709,84 @@ def merge_prompt_with_memory(prompt, memory_block):
     if base and memory:
         return f"{base}\n\n{memory}"
     return base or memory
+
+
+def _safe_load_json_file(path, fallback):
+    try:
+        if not path.exists():
+            return fallback
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+        return data if data is not None else fallback
+    except Exception:
+        return fallback
+
+
+def _tail_jsonl(path, limit=5):
+    try:
+        if not path.exists():
+            return []
+        lines = path.read_text(encoding="utf-8-sig").splitlines()[-max(0, int(limit)):]
+    except Exception:
+        return []
+    out = []
+    for line in lines:
+        line = str(line or "").strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+        except Exception:
+            data = {"raw": line[:300]}
+        out.append(data if isinstance(data, dict) else {"raw": str(data)[:300]})
+    return out
+
+
+def _compact_learning_item(item):
+    safe = item if isinstance(item, dict) else {}
+    return {
+        "id": str(safe.get("id", "")).strip(),
+        "status": str(safe.get("status", "")).strip(),
+        "score": safe.get("score", 0),
+        "confidence": safe.get("confidence", 0),
+        "support_count": safe.get("support_count", 0),
+        "assistant_preview": normalize_memory_text(safe.get("assistant_preview", ""), max_len=90),
+        "compressed_pattern": normalize_memory_text(safe.get("compressed_pattern", ""), max_len=110),
+    }
+
+
+def get_memory_debug_snapshot(config):
+    settings = get_memory_settings(config)
+    with MEMORY_LOCK:
+        memory_count = len(load_memory_items())
+        last_memory_debug = dict(LAST_MEMORY_DEBUG) if isinstance(LAST_MEMORY_DEBUG, dict) else {}
+    candidates = _safe_load_json_file(LEARNING_CANDIDATES_PATH, [])
+    samples = _safe_load_json_file(LEARNING_SAMPLES_PATH, [])
+    state = _safe_load_json_file(LEARNING_STATE_PATH, {})
+    if not isinstance(candidates, list):
+        candidates = []
+    if not isinstance(samples, list):
+        samples = []
+    if not isinstance(state, dict):
+        state = {}
+    return {
+        "ok": True,
+        "memory": {
+            "enabled": bool(settings["enabled"]),
+            "mem0_enabled": bool(settings["mem0_enabled"]),
+            "memory_count": memory_count,
+            "last_selection": last_memory_debug,
+        },
+        "learning": {
+            "candidates_count": len(candidates),
+            "samples_count": len(samples),
+            "degraded_mode": bool(state.get("degraded_mode", False)),
+            "turn_count": int(state.get("turn_count", 0) or 0),
+            "recent_candidates": [_compact_learning_item(item) for item in candidates[-5:]],
+            "recent_samples": [_compact_learning_item(item) for item in samples[-5:]],
+            "recent_audit": _tail_jsonl(LEARNING_AUDIT_LOG_PATH, limit=5),
+            "recent_shadow": _tail_jsonl(LEARNING_SHADOW_LOG_PATH, limit=5),
+        },
+    }
 
 
 def _load_wakeup_summary():

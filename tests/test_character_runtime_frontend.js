@@ -205,6 +205,14 @@ assert.ok(
   "chat.js should expose /translatedebug for copyable translation timing state"
 );
 assert.ok(
+  source.includes("function buildMemoryDebugReport(")
+    && source.includes('text.toLowerCase() === "/memorydebug"')
+    && source.includes('learningFetchJson("/api/memory/debug")')
+    && source.includes("learningTabDebug")
+    && source.includes("learningDebugPanel"),
+  "chat.js should expose memory/learning chain debug state"
+);
+assert.ok(
   source.includes('appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false })')
     && source.includes('appendMessage("assistant", "Translation debug panel enabled.", { enableTranslation: false })'),
   "translation debug command responses should not recursively trigger assistant translation"
