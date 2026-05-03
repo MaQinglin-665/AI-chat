@@ -74,6 +74,21 @@ const flushed = speechText.splitStreamSpeakSegments(split.rest, { flush: true, s
 assert.ok(flushed.segments.length >= 1, "flush should emit remaining usable tail");
 assert.strictEqual(flushed.rest, "", "flush should clear remaining buffer");
 
+const englishSplit = speechText.splitStreamSpeakSegments(
+  "Hey there! I am testing this voice path. It should speak earlier now.",
+  { flush: false, style: "playful" }
+);
+assert.deepStrictEqual(
+  englishSplit.segments,
+  ["Hey there! I am testing this voice path.", "It should speak earlier now."],
+  "English stream speech should avoid sending a too-short first TTS segment"
+);
+assert.strictEqual(
+  englishSplit.rest,
+  "",
+  "English stream speech should preserve the remaining tail"
+);
+
 const prosody = speechText.buildSpeakProsody("太好了！", "happy", true, "playful");
 assert.strictEqual(typeof prosody.speed_ratio, "number");
 assert.strictEqual(typeof prosody.pitch_ratio, "number");

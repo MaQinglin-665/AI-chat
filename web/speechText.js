@@ -242,11 +242,13 @@
 
     const strongTerminal = "。！？!?\n";
     const softTerminal = "，,";
+    const englishStream = isMostlyEnglishText(src);
+    const minEnglishFirstSegmentLen = 18;
     let start = 0;
 
     for (let i = 0; i < src.length; i++) {
       const ch = src[i];
-      const isStrong = strongTerminal.includes(ch);
+      const isStrong = strongTerminal.includes(ch) || (englishStream && ch === ".");
       const isSoft = softTerminal.includes(ch);
       if (!isStrong && !isSoft) {
         continue;
@@ -254,6 +256,9 @@
 
       const piece = src.slice(start, i + 1).trim();
       const minLen = isStrong ? 6 : 28;
+      if (!flush && englishStream && start === 0 && piece.length < minEnglishFirstSegmentLen) {
+        continue;
+      }
       if (piece.length >= minLen) {
         segments.push(piece);
         start = i + 1;

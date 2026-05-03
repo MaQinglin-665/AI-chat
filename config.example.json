@@ -82,6 +82,7 @@
     "gpt_sovits_chunk_chars": 200,
     "gpt_sovits_enable_global_retry": true,
     "stream_mode": "final_only",
+    "stream_speak_idle_wait_ms": 90,
     "speed_ratio": 1.04,
     "volume_ratio": 1,
     "pitch_ratio": 1,

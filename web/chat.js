@@ -76,7 +76,7 @@ const state = {
   streamSpeakEnabled: true,
   streamSpeakMode: "realtime",
   gptSovitsRealtimeTTS: false,
-  streamSpeakIdleWaitMs: 150,
+  streamSpeakIdleWaitMs: 90,
   streamSpeakQueue: [],
   streamSpeakWorking: false,
   streamSpeakBuffer: "",
@@ -382,6 +382,17 @@ function recordTTSDebugEvent(stage, payload = {}) {
   }
   updateTTSDebugPanel();
   return entry;
+}
+
+function recordTTSAudioEvent(stage, audio, debugContext = {}, extra = {}) {
+  recordTTSDebugEvent(stage, {
+    ...debugContext,
+    ...extra,
+    durationMs: Number.isFinite(Number(audio?.duration)) && Number(audio.duration) > 0
+      ? Math.round(Number(audio.duration) * 1000)
+      : Number(extra.durationMs ?? -1),
+    currentMs: Math.round(Number(audio?.currentTime || 0) * 1000)
+  });
 }
 
 function formatTTSDebugNumber(value, digits = 0) {
@@ -8608,7 +8619,7 @@ async function runStreamSpeakQueue() {
       return;
     }
 
-    const idleWaitMs = Math.max(50, Math.min(280, Number(state.streamSpeakIdleWaitMs) || 150));
+    const idleWaitMs = Math.max(30, Math.min(220, Number(state.streamSpeakIdleWaitMs) || 90));
     let current = await waitNextStreamSpeakItem(activeSession, state.chatBusy ? idleWaitMs : 60);
     if (!current) {
       recordTTSDebugEvent("stream_run_empty", { sessionId: activeSession });
@@ -9036,6 +9047,7 @@ async function loadConfig() {
   const fallbackFailThresholdCfg = Number(ttsCfg.server_fallback_fail_threshold);
   const retryDelayCfg = Number(ttsCfg.server_retry_delay_ms);
   const timeoutCfg = Number(ttsCfg.server_request_timeout_ms);
+  const streamIdleWaitCfg = Number(ttsCfg.stream_speak_idle_wait_ms);
   const isSovits = state.ttsProvider === "gpt_sovits";
   state.ttsServerRetryCount = Number.isFinite(retryCountCfg)
     ? Math.max(0, Math.min(4, Math.round(retryCountCfg)))
@@ -9049,6 +9061,9 @@ async function loadConfig() {
   state.ttsServerRequestTimeoutMs = Number.isFinite(timeoutCfg)
     ? Math.max(1500, Math.min(45000, Math.round(timeoutCfg)))
     : 14000;
+  state.streamSpeakIdleWaitMs = Number.isFinite(streamIdleWaitCfg)
+    ? Math.max(30, Math.min(220, Math.round(streamIdleWaitCfg)))
+    : 90;
   state.ttsServerFailStreak = 0;
   state.ttsServerLastError = "";
   if (!["final_only", "realtime"].includes(state.streamSpeakMode)) {
@@ -10703,14 +10718,29 @@ async function playAudioBlob(blob, opts = {}) {
       setStatus(ok ? "待机" : "语音失败");
       resolve(ok);
     };
-    audio.onended = () => done(true);
+    audio.onended = () => {
+      recordTTSAudioEvent("audio_ended_event", audio, debugContext);
+      done(true);
+    };
     audio.onerror = async () => {
-      recordTTSDebugEvent("audio_error", debugContext);
+      recordTTSAudioEvent("audio_error", audio, debugContext, {
+        error: String(audio.error?.message || audio.error?.code || "")
+      });
       stopHtmlAudio();
       beginFallbackSpeech();
       const ok = await playAudioByContext(blob, debugContext);
       done(!!ok);
     };
+    audio.oncanplay = () => recordTTSAudioEvent("audio_canplay", audio, debugContext);
+    audio.onplaying = () => recordTTSAudioEvent("audio_playing", audio, debugContext);
+    audio.onpause = () => {
+      if (!settled && !audio.ended) {
+        recordTTSAudioEvent("audio_pause", audio, debugContext);
+      }
+    };
+    audio.onwaiting = () => recordTTSAudioEvent("audio_waiting", audio, debugContext);
+    audio.onstalled = () => recordTTSAudioEvent("audio_stalled", audio, debugContext);
+    audio.onsuspend = () => recordTTSAudioEvent("audio_suspend", audio, debugContext);
     audio.onplay = () => {
       state.ttsDebugAudioStartedAt = performance.now();
       state.ttsDebugAudioEndedAt = 0;
