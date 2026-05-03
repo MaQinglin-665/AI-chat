@@ -233,9 +233,10 @@ def call_ollama(llm_cfg, messages, model_override=None):
     temperature = float(llm_cfg.get("temperature", 0.7))
     max_tokens = int(llm_cfg.get("max_tokens", 96))
     num_ctx = int(llm_cfg.get("num_ctx", 2048))
+    min_num_ctx = _clamp_int(llm_cfg.get("min_num_ctx", 1024), 1024, 256, 1024)
     timeout = _clamp_int(llm_cfg.get("request_timeout", 150), 150, 4, 240)
     max_tokens = max(32, min(256, max_tokens))
-    num_ctx = max(1024, min(4096, num_ctx))
+    num_ctx = max(min_num_ctx, min(4096, num_ctx))
 
     payload = {
         "model": model,
