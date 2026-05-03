@@ -210,7 +210,7 @@ Short summary:
 | Finding | Severity | Owner | Follow-up issue/PR |
 | --- | --- | --- | --- |
 | Learning review writes candidates/samples/state as separate files, not a cross-file transaction. | low | future v1.6 | Consider revisioned or transactional persistence if the learning store grows. |
-| Manual Live2D visual bridge was not re-recorded in this run. | low | demo owner | Verify visually during final demo rehearsal. |
+| Live2D expression response is present but subtle in the current private model. | low | future polish | Consider model-specific expression/motion tuning after v1.3 preview. |
 
 ## Final Result
 
@@ -253,6 +253,15 @@ v1.3 preview quality gate passed. Runtime text/metadata/TTS/translation/memory-l
 | GPT-SoVITS electric-noise regression | No electric-noise artifact during normal demo speech | Maintainer reported current playback is stable | Pass | Peak limiter now reduces hot transient peaks even when RMS is acceptable. |
 | GPT-SoVITS "far away" regression | Voice should not sound overly distant or quiet | Maintainer reported current balance is stable | Pass | `gpt_sovits_max_rms` is now `5000`, avoiding the earlier overly conservative `4200` cap. |
 
+## Live2D Visual Manual Check
+
+| Check item | Expected result | Actual result | Pass/Fail | Notes |
+| --- | --- | --- | --- | --- |
+| Live2D model render | Character is visible and not blank | Character rendered normally in the desktop app | Pass | Private local model family, no screenshot retained in repo. |
+| TTS mouth feedback | Mouth moves during speech | Maintainer reported mouth movement is OK | Pass | Checked after restarting the desktop app. |
+| Expression feedback | Expression changes are visible or safely subtle | Maintainer reported expression response exists but is not obvious | Pass | Low-priority polish follow-up, not a release blocker. |
+| Speech end / idle return | State and mouth return to idle after speech | Maintainer reported it returned to idle | Pass | Confirms recent TTS changes did not leave speech motion stuck. |
+
 ## Final Result
 
 Overall result: pass
@@ -260,5 +269,5 @@ Overall result: pass
 Short summary:
 
 ```text
-GPT-SoVITS demo playback is stable at the current checkpoint. The release candidate keeps GPT-SoVITS optional while documenting the manual listening dependency for local demos.
+GPT-SoVITS demo playback and Live2D speech feedback are stable at the current checkpoint. Expression response is present but subtle, so model-specific expression tuning remains a low-priority polish follow-up after the v1.3 preview.
 ```
