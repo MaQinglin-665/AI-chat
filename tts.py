@@ -920,7 +920,7 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
     normalize_loudness = _safe_bool(
         tts_cfg.get("gpt_sovits_normalize_loudness", True), True
     )
-    target_rms = _safe_float(tts_cfg.get("gpt_sovits_target_rms", 900), 900)
+    target_rms = _safe_float(tts_cfg.get("gpt_sovits_target_rms", 1400), 1400)
     max_loudness_gain = _safe_float(
         tts_cfg.get("gpt_sovits_max_loudness_gain", 3.2), 3.2
     )
@@ -1386,16 +1386,21 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
             target_rms=target_rms,
             max_gain=max_loudness_gain,
         )
-        if loudness_meta and loudness_meta.get("changed"):
+        if loudness_meta:
             _log_tts_perf(
                 "TTS_GPT_SOVITS",
                 trace_id,
-                stage="loudness_normalized",
+                stage=(
+                    "loudness_normalized"
+                    if loudness_meta.get("changed")
+                    else "loudness_checked"
+                ),
                 gain=round(float(loudness_meta.get("gain", 1.0)), 3),
                 rms_before=int(round(float(loudness_meta.get("rms_before", 0.0)))),
                 rms_after=int(round(float(loudness_meta.get("rms_after", 0.0)))),
                 peak_before=int(loudness_meta.get("peak_before", 0) or 0),
                 peak_after=int(loudness_meta.get("peak_after", 0) or 0),
+                target_rms=int(round(float(target_rms))),
             )
     return audio
 

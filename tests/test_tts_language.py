@@ -51,7 +51,7 @@ def test_gpt_sovits_normalizes_short_english_contractions_for_stability():
 
 def test_gpt_sovits_loudness_normalizer_boosts_quiet_wav():
     audio = _make_constant_wav(sample_value=120)
-    boosted, meta = _normalize_wav_loudness(audio, target_rms=900, max_gain=3.2)
+    boosted, meta = _normalize_wav_loudness(audio, target_rms=1400, max_gain=3.2)
 
     before = _wav_amplitude_stats(audio)
     after = _wav_amplitude_stats(boosted)
@@ -59,3 +59,13 @@ def test_gpt_sovits_loudness_normalizer_boosts_quiet_wav():
     assert meta is not None
     assert after["rms"] > before["rms"]
     assert after["peak"] <= 26000
+
+
+def test_gpt_sovits_loudness_normalizer_reports_unchanged_audio():
+    audio = _make_constant_wav(sample_value=1600)
+    unchanged, meta = _normalize_wav_loudness(audio, target_rms=1400, max_gain=3.2)
+
+    assert unchanged == audio
+    assert meta is not None
+    assert meta["changed"] is False
+    assert meta["rms_before"] == meta["rms_after"]
