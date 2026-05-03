@@ -124,6 +124,14 @@ assert.ok(
   "assistant messages should show an immediate translation placeholder"
 );
 assert.ok(
+  source.includes("const _CHAT_TRANSLATE_TIMEOUT_MS = 60000;"),
+  "assistant translation should allow slow local LLM translation to finish"
+);
+assert.ok(
+  source.includes('translationEl.textContent = "中译：翻译暂时不可用";'),
+  "assistant messages should show a visible translation failure instead of disappearing"
+);
+assert.ok(
   /utterance\.onend\s*=\s*\(\)\s*=>\s*\{[\s\S]*?finishSpeechAnimation\(\);[\s\S]*?resolve\(true\);[\s\S]*?\};/.test(source),
   "browser TTS success should use graceful speech release"
 );

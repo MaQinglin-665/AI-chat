@@ -7,6 +7,17 @@ TRANSLATE_SYSTEM_PROMPT = (
     "no explanation, no quotation marks."
 )
 
+DEFAULT_TRANSLATE_TIMEOUT_SEC = 45
+
+
+def resolve_translate_timeout_sec(llm_cfg):
+    raw = (llm_cfg or {}).get("translate_timeout_sec", DEFAULT_TRANSLATE_TIMEOUT_SEC)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = DEFAULT_TRANSLATE_TIMEOUT_SEC
+    return max(10, min(120, value))
+
 
 def build_translate_messages(text):
     return [
@@ -36,6 +47,7 @@ def handle_translate_request(
         return
 
     llm_cfg = {}
+    status = HTTPStatus.OK
     try:
         cfg = load_config_func()
         llm_cfg = cfg.get("llm", {}) if isinstance(cfg, dict) else {}
@@ -43,7 +55,7 @@ def handle_translate_request(
         translate_cfg["max_output_tokens"] = 96
         translate_cfg["max_tokens"] = 96
         translate_cfg["temperature"] = 0.1
-        translate_cfg["request_timeout"] = 18
+        translate_cfg["request_timeout"] = resolve_translate_timeout_sec(llm_cfg)
         translate_cfg["num_ctx"] = 1024
         translate_model = str(llm_cfg.get("translate_model", "")).strip()
         if translate_model:
@@ -55,14 +67,12 @@ def handle_translate_request(
         else:
             result = call_openai_compatible_func(translate_cfg, messages)
         translated = str(result or "").strip() or text
-        send_json_func(
-            {
-                "translated": translated,
-                "translated_text": translated,
-                "degraded": False,
-                "fallback": False,
-            }
-        )
+        response = {
+            "translated": translated,
+            "translated_text": translated,
+            "degraded": False,
+            "fallback": False,
+        }
     except Exception as exc:
         diagnosed = diagnose_llm_exception_func(exc, llm_cfg)
         log_backend_notice_func(
@@ -71,13 +81,12 @@ def handle_translate_request(
             extra="/api/translate degraded to passthrough",
         )
         safe_error = str(diagnostic_payload_func(diagnosed).get("error", "") or "").strip()
-        send_json_func(
-            {
-                "translated": text,
-                "translated_text": text,
-                "degraded": True,
-                "fallback": True,
-                "error": safe_error or "translate unavailable",
-            },
-            status=HTTPStatus.OK,
-        )
+        response = {
+            "translated": text,
+            "translated_text": text,
+            "degraded": True,
+            "fallback": True,
+            "error": safe_error or "translate unavailable",
+        }
+
+    send_json_func(response, status=status)
