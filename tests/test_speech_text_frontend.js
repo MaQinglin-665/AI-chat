@@ -28,6 +28,30 @@ assert.strictEqual(
 );
 
 assert.strictEqual(
+  speechText.sanitizeSpeakText('{"text":"Oh, my bad!","emotion":"happy","action":"nod"}'),
+  "Oh, my bad!",
+  "speech sanitization should extract visible text from JSON reply wrappers"
+);
+
+assert.strictEqual(
+  speechText.sanitizeSpeakText('{"text":'),
+  "",
+  "speech sanitization should hide half-open JSON reply wrappers"
+);
+
+assert.strictEqual(
+  speechText.sanitizeSpeakText("Oh, my bad!\n\u52a8\u4f5c\uff1a\u70b9\u5934\n\u60c5\u7eea\uff1a\u5f00\u5fc3"),
+  "Oh, my bad!",
+  "speech sanitization should remove localized runtime metadata suffixes"
+);
+
+assert.strictEqual(
+  speechText.sanitizeSpeakText("\u52a8\u4f5c\uff1a\u70b9\u5934\uff0c\u60c5\u7eea\uff1a\u5f00\u5fc3"),
+  "",
+  "speech sanitization should drop pure localized runtime metadata"
+);
+
+assert.strictEqual(
   speechText.stripRuntimeMetadataSuffix('Nice, I can do that.\n{"emotion"'),
   "Nice, I can do that.",
   "stream text should hide partial quoted runtime metadata before it completes"
@@ -37,6 +61,26 @@ assert.strictEqual(
   speechText.sanitizeSpeakText('"emotion": "happy", "action": "wave", "intensity": "normal", "voice_style": "cheerful"'),
   "",
   "speech sanitization should drop pure runtime metadata fragments"
+);
+
+assert.deepStrictEqual(
+  speechText.splitStreamSpeakSegments('{"text":"Oh, my bad!","emotion":"happy","action":"nod"}', {
+    flush: true,
+    style: "playful",
+    provider: "gpt_sovits"
+  }).segments,
+  ["Oh， my bad"],
+  "stream speech should segment extracted visible text instead of JSON wrapper fields"
+);
+
+assert.deepStrictEqual(
+  speechText.splitStreamSpeakSegments("Oh, my bad!\n\u52a8\u4f5c\uff1a\u70b9\u5934\n\u60c5\u7eea\uff1a\u5f00\u5fc3", {
+    flush: true,
+    style: "playful",
+    provider: "gpt_sovits"
+  }).segments,
+  ["Oh， my bad"],
+  "stream speech should not segment localized runtime metadata"
 );
 
 assert.strictEqual(

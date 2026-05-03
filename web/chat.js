@@ -5334,15 +5334,19 @@ function extractAssistantPayloadText(text) {
 }
 
 function stripAssistantPayloadNoise(text) {
-  const visible = stripRuntimeMetadataSuffix(text);
-  const payloadText = extractAssistantPayloadText(visible);
+  if (SPEECH_TEXT && typeof SPEECH_TEXT.stripAssistantPayloadNoise === "function") {
+    return SPEECH_TEXT.stripAssistantPayloadNoise(text);
+  }
+  const raw = String(text || "");
+  const payloadText = extractAssistantPayloadText(raw);
   if (payloadText) {
     return stripRuntimeMetadataSuffix(payloadText);
   }
-  const jsonLikeText = extractAssistantTextFromJsonLike(visible);
+  const jsonLikeText = extractAssistantTextFromJsonLike(raw);
   if (jsonLikeText) {
     return stripRuntimeMetadataSuffix(jsonLikeText);
   }
+  const visible = stripRuntimeMetadataSuffix(raw);
   if (looksLikeEmptyAssistantTextWrapperFragment(visible)) {
     return "";
   }
@@ -5918,6 +5922,9 @@ function _writeChatTranslationCache(text, translated) {
   if (!key || !value) {
     return;
   }
+  if (_looksLikeBadChatTranslation(text, value)) {
+    return;
+  }
   if (_chatTranslationCache.has(key)) {
     _chatTranslationCache.delete(key);
   }
@@ -5945,6 +5952,43 @@ function _isLikelyEnglishForChat(text) {
     return false;
   }
   return _isLikelyEnglish(safe);
+}
+
+function _countCjkChars(text) {
+  return (String(text || "").match(/[\u4e00-\u9fff]/g) || []).length;
+}
+
+function _countLatinChars(text) {
+  return (String(text || "").match(/[A-Za-z]/g) || []).length;
+}
+
+function _looksLikeBadChatTranslation(source, translated) {
+  const src = String(source || "").trim();
+  const out = String(translated || "").trim();
+  if (!out) {
+    return true;
+  }
+  if (!_isLikelyEnglishForChat(src)) {
+    return false;
+  }
+  const lower = out.toLowerCase();
+  if (
+    lower.includes("i'm mimo")
+    || lower.includes("i am mimo")
+    || lower.includes("xiaomi")
+    || lower.includes("hyperos")
+    || lower.includes("official ai assistant")
+    || lower.includes("here to help")
+    || lower.includes("i'll do my best")
+    || lower.includes("i'm sorry")
+  ) {
+    return true;
+  }
+  const cjkCount = _countCjkChars(out);
+  if (cjkCount <= 0) {
+    return true;
+  }
+  return _countLatinChars(out) > Math.max(12, cjkCount * 2);
 }
 
 function _shouldShowAssistantTranslation(text) {
@@ -6093,7 +6137,8 @@ async function _fetchChatTranslation(text) {
       const data = await resp.json();
       const translated = String(data?.translated || data?.translated_text || "").trim();
       const degraded = data?.degraded === true || data?.fallback === true;
-      if (degraded) {
+      const badTranslation = _looksLikeBadChatTranslation(safe, translated);
+      if (degraded || badTranslation) {
         _markTranslationFailure();
         recordTranslateDebugEvent("request_degraded", {
           traceId: responseTraceId || traceId,
@@ -6104,10 +6149,10 @@ async function _fetchChatTranslation(text) {
           status: Number(resp.status) || 0,
           degraded: true,
           fallback: data?.fallback === true,
-          result: "degraded",
-          error: String(data?.error || "")
+          result: badTranslation ? "invalid_translation" : "degraded",
+          error: badTranslation ? "invalid translation result" : String(data?.error || "")
         });
-        return translated;
+        return "";
       }
       if (!translated) {
         _markTranslationFailure();

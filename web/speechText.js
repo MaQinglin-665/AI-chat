@@ -11,14 +11,32 @@
     `^[\\s,;|{}()[\\]"'\`:=_-]*(?:["']?\\b(?:${RUNTIME_METADATA_KEYS})\\b["']?\\s*(?:[:=]\\s*["']?[A-Za-z0-9_-]*)?[\\s,;|{}()[\\]"'\`:=_-]*)+$`,
     "i"
   );
+  const LOCALIZED_RUNTIME_METADATA_KEYS = [
+    "\\u60c5\\u7eea",
+    "\\u52a8\\u4f5c",
+    "\\u5f3a\\u5ea6",
+    "\\u8bed\\u97f3\\u98ce\\u683c",
+    "\\u8bed\\u6c14",
+    "\\u8868\\u60c5",
+    "live2d\\s*\\u63d0\\u793a"
+  ].join("|");
+  const LOCALIZED_RUNTIME_METADATA_PAIR_RE = new RegExp(
+    `(?:${LOCALIZED_RUNTIME_METADATA_KEYS})\\s*[:\\uFF1A=]\\s*([^,\\uFF0C;\\uFF1B\\u3002\\uFF01\\uFF1F!?\\n\\r{}()[\\]"'\`]+)`,
+    "gi"
+  );
+  const LOCALIZED_RUNTIME_METADATA_ONLY_RE = new RegExp(
+    `^[\\s,\\uFF0C;\\uFF1B|{}()[\\]"'\`:=\\uFF1A_-]*(?:(?:${LOCALIZED_RUNTIME_METADATA_KEYS})\\s*(?:[:\\uFF1A=]\\s*[^,\\uFF0C;\\uFF1B\\u3002\\uFF01\\uFF1F!?\\n\\r{}()[\\]"'\`]*)?[\\s,\\uFF0C;\\uFF1B|{}()[\\]"'\`:=\\uFF1A_-]*)+$`,
+    "i"
+  );
+  const LOCALIZED_RUNTIME_METADATA_KEY_RE = new RegExp(`(?:${LOCALIZED_RUNTIME_METADATA_KEYS})`, "gi");
 
   function parseToolMetaVisibleText(text) {
     const src = String(text || "");
     const idx = src.indexOf(TOOL_META_MARKER);
     if (idx < 0) {
-      return stripRuntimeMetadataSuffix(src);
+      return stripAssistantPayloadNoise(src);
     }
-    return stripRuntimeMetadataSuffix(src.slice(0, idx)).trimEnd();
+    return stripAssistantPayloadNoise(src.slice(0, idx)).trimEnd();
   }
 
   function stripRuntimeMetadataSuffix(text) {
@@ -29,6 +47,10 @@
     const matches = Array.from(src.matchAll(RUNTIME_METADATA_PAIR_RE));
     RUNTIME_METADATA_PAIR_RE.lastIndex = 0;
     if (!matches.length) {
+      const localized = stripLocalizedRuntimeMetadataSuffix(src);
+      if (localized !== src) {
+        return localized;
+      }
       const partialStart = findRuntimeMetadataPartialTailStart(src);
       if (partialStart >= 0) {
         return src.slice(0, partialStart).trim();
@@ -59,7 +81,148 @@
       }
       return before.trim();
     }
+    return stripLocalizedRuntimeMetadataSuffix(src);
+  }
+
+  function stripLocalizedRuntimeMetadataSuffix(text) {
+    const src = String(text || "").trim();
+    if (!src) {
+      return "";
+    }
+    const matches = Array.from(src.matchAll(LOCALIZED_RUNTIME_METADATA_PAIR_RE));
+    LOCALIZED_RUNTIME_METADATA_PAIR_RE.lastIndex = 0;
+    if (!matches.length) {
+      const partialStart = findLocalizedRuntimeMetadataPartialTailStart(src);
+      if (partialStart >= 0) {
+        return src.slice(0, partialStart).trim();
+      }
+      return src;
+    }
+    for (const first of matches) {
+      const start = findRuntimeMetadataTailStart(src, Number(first.index || 0));
+      const tail = src.slice(start).trim();
+      const tailPairs = Array.from(tail.matchAll(LOCALIZED_RUNTIME_METADATA_PAIR_RE));
+      LOCALIZED_RUNTIME_METADATA_PAIR_RE.lastIndex = 0;
+      if (!tailPairs.length) {
+        continue;
+      }
+      const remainder = tail
+        .replace(LOCALIZED_RUNTIME_METADATA_PAIR_RE, "")
+        .replace(LOCALIZED_RUNTIME_METADATA_KEY_RE, "")
+        .replace(/[\s,\uFF0C;\uFF1B|{}()[\]"'`\uFF1A:=_\-\u3002\uFF01\uFF1F!?]+/g, "");
+      LOCALIZED_RUNTIME_METADATA_PAIR_RE.lastIndex = 0;
+      LOCALIZED_RUNTIME_METADATA_KEY_RE.lastIndex = 0;
+      if (remainder) {
+        continue;
+      }
+      const before = src.slice(0, start);
+      const startsLine = start === 0 || /[\r\n]\s*$/.test(before);
+      const followsSentence = /[.!?\u3002\uff01\uff1f]\s*$/.test(before);
+      if (tailPairs.length < 2 && !startsLine && !followsSentence) {
+        continue;
+      }
+      return before.trim();
+    }
     return src;
+  }
+
+  function coerceAssistantPayloadText(value) {
+    if (typeof value === "string") {
+      return value.trim();
+    }
+    if (value == null) {
+      return "";
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value).trim();
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => coerceAssistantPayloadText(item))
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+    }
+    if (typeof value === "object") {
+      for (const key of ["text", "message", "content", "output_text"]) {
+        const nested = coerceAssistantPayloadText(value[key]);
+        if (nested) {
+          return nested;
+        }
+      }
+    }
+    return "";
+  }
+
+  function looksLikeAssistantTextWrapperFragment(text) {
+    const safe = String(text || "").trim();
+    if (!safe || !/^\s*[{[]/.test(safe)) {
+      return false;
+    }
+    return /["']?\b(?:text|message|content|output_text)\b["']?\s*:/i.test(safe);
+  }
+
+  function looksLikeEmptyAssistantTextWrapperFragment(text) {
+    const safe = String(text || "").trim();
+    if (!safe) {
+      return false;
+    }
+    return /^[\s{,\["'`]*\b(?:text|message|content|output_text)\b["']?\s*:?\s*["'`]*$/i.test(safe);
+  }
+
+  function extractAssistantPayloadText(text) {
+    const safe = String(text || "").trim();
+    if (!safe || !/^\s*[{[]/.test(safe)) {
+      return "";
+    }
+    try {
+      const parsed = JSON.parse(safe);
+      return coerceAssistantPayloadText(parsed);
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function extractAssistantTextFromJsonLike(text) {
+    const safe = String(text || "").trim();
+    if (!looksLikeAssistantTextWrapperFragment(safe)) {
+      return "";
+    }
+    for (const key of ["text", "message", "content", "output_text"]) {
+      const quoted = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "i").exec(safe);
+      if (quoted) {
+        try {
+          return String(JSON.parse(`"${quoted[1]}"`) || "").trim();
+        } catch (_) {
+          return String(quoted[1] || "").trim();
+        }
+      }
+      const singleQuoted = new RegExp(`'${key}'\\s*:\\s*'((?:\\\\.|[^'\\\\])*)'`, "i").exec(safe);
+      if (singleQuoted) {
+        return String(singleQuoted[1] || "").trim();
+      }
+    }
+    return "";
+  }
+
+  function stripAssistantPayloadNoise(text) {
+    const raw = String(text || "");
+    const payloadText = extractAssistantPayloadText(raw);
+    if (payloadText) {
+      return stripRuntimeMetadataSuffix(payloadText);
+    }
+    const jsonLikeText = extractAssistantTextFromJsonLike(raw);
+    if (jsonLikeText) {
+      return stripRuntimeMetadataSuffix(jsonLikeText);
+    }
+    const visible = stripRuntimeMetadataSuffix(raw);
+    if (
+      looksLikeEmptyAssistantTextWrapperFragment(visible)
+      || looksLikeAssistantTextWrapperFragment(visible)
+    ) {
+      return "";
+    }
+    return visible;
   }
 
   function findRuntimeMetadataTailStart(src, pairStart) {
@@ -93,6 +256,28 @@
       }
       const tail = src.slice(start).trim();
       if (RUNTIME_METADATA_ONLY_RE.test(tail)) {
+        return start;
+      }
+    }
+    return -1;
+  }
+
+  function findLocalizedRuntimeMetadataPartialTailStart(src) {
+    const matches = Array.from(src.matchAll(LOCALIZED_RUNTIME_METADATA_KEY_RE));
+    LOCALIZED_RUNTIME_METADATA_KEY_RE.lastIndex = 0;
+    if (!matches.length) {
+      return -1;
+    }
+    for (const match of matches) {
+      const start = findRuntimeMetadataTailStart(src, Number(match.index || 0));
+      const before = src.slice(0, start);
+      const startsLine = start === 0 || /[\r\n]\s*$/.test(before);
+      const followsSentence = /[.!?\u3002\uff01\uff1f]\s*$/.test(before);
+      if (!startsLine && !followsSentence) {
+        continue;
+      }
+      const tail = src.slice(start).trim();
+      if (LOCALIZED_RUNTIME_METADATA_ONLY_RE.test(tail)) {
         return start;
       }
     }
@@ -496,6 +681,7 @@
     sanitizeSpeakText,
     simplifySpeechDeliveryText,
     splitStreamSpeakSegments,
+    stripAssistantPayloadNoise,
     stripRuntimeMetadataSuffix,
     tightenMinorSpeechPauses
   };

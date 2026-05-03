@@ -131,6 +131,10 @@ assert.ok(
   "final assistant text should normalize English sentence boundaries before display and translation"
 );
 assert.ok(
+  /function stripAssistantPayloadNoise\(text\)\s*\{[\s\S]*?SPEECH_TEXT\.stripAssistantPayloadNoise/.test(source),
+  "chat visible text cleanup should reuse the shared speech metadata guard"
+);
+assert.ok(
   source.includes('translationEl.textContent = "中译：翻译中...";'),
   "assistant messages should show an immediate translation placeholder"
 );
@@ -277,6 +281,12 @@ assert.ok(
     && source.includes("function extractAssistantTextFromJsonLike(text)")
     && source.includes("stripAssistantPayloadNoise(src)"),
   "assistant message rendering should hide half-open JSON text wrappers before they reach the chat bubble"
+);
+assert.ok(
+  source.includes("function _looksLikeBadChatTranslation(source, translated)")
+    && source.includes("invalid_translation")
+    && source.includes("_looksLikeBadChatTranslation(text, value)"),
+  "assistant translation should reject model answers before caching or rendering them as translations"
 );
 
 console.log("Character runtime frontend checks passed.");

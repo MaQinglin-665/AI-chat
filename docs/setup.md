@@ -75,7 +75,10 @@ python scripts\first_run_check.py
     "provider": "openai-compatible",
     "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "model": "qwen-plus",
+    "translate_provider": "",
+    "translate_base_url": "",
     "translate_model": "",
+    "translate_api_key_env": "",
     "translate_timeout_sec": 45,
     "api_key_env": "DASHSCOPE_API_KEY",
     "temperature": 0.42
@@ -103,7 +106,7 @@ $env:DASHSCOPE_API_KEY = "your_key_here"
 }
 ```
 
-`translate_model` 是可选项。如果聊天主模型较大、中文翻译出现较慢，可以把它设为一个已经安装的更小模型，同时保留 `model` 作为主聊天模型。`translate_num_ctx` 用于让本地 Ollama 的短翻译请求更轻量；如果指定的翻译模型还没安装，Ollama 会返回错误，请先选择本地已有模型，或执行 `ollama pull <model>`。
+`translate_model` 是可选项。如果聊天主模型较大、中文翻译出现较慢，可以把它设为一个已经安装的更小模型，同时保留 `model` 作为主聊天模型。`translate_provider`、`translate_base_url`、`translate_api_key_env` 也是可选项；当聊天模型容易把翻译请求当成普通对话回答时，可以把翻译切到另一个 OpenAI-compatible 服务或本地 Ollama。`translate_num_ctx` 用于让本地 Ollama 的短翻译请求更轻量；如果指定的翻译模型还没安装，Ollama 会返回错误，请先选择本地已有模型，或执行 `ollama pull <model>`。
 
 ## 5. Configure TTS / ASR
 

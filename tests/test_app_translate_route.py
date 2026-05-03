@@ -6,6 +6,7 @@ from app_translate_route import (
     resolve_translate_num_ctx,
     resolve_translate_timeout_sec,
     should_use_translate_max_completion_tokens,
+    validate_translation_result,
 )
 import threading
 import time
@@ -16,7 +17,28 @@ def test_build_translate_messages_requests_simplified_chinese_only():
 
     assert messages[0]["role"] == "system"
     assert "Simplified Chinese" in messages[0]["content"]
-    assert messages[1] == {"role": "user", "content": "hello"}
+    assert messages[1]["role"] == "user"
+    assert "Translate only the text" in messages[1]["content"]
+    assert "<source>\nhello\n</source>" in messages[1]["content"]
+
+
+def test_validate_translation_result_rejects_model_self_intro():
+    ok, reason = validate_translation_result(
+        "Hmm, you keep typing that like it's a secret cheat code.",
+        "I'm sorry if I seemed confused earlier! I'm MiMo, Xiaomi's official AI assistant.",
+    )
+    assert ok is False
+    assert reason == "model_answer_not_translation"
+
+
+def test_validate_translation_result_requires_chinese_for_english_source():
+    ok, reason = validate_translation_result("hello there", "hello there")
+    assert ok is False
+    assert reason == "translation_missing_chinese"
+
+    ok, reason = validate_translation_result("hello there", "你好呀")
+    assert ok is True
+    assert reason == ""
 
 
 def test_resolve_translate_timeout_sec_defaults_and_clamps():
@@ -114,6 +136,30 @@ def test_handle_translate_request_returns_success_payload():
     assert called["cfg"]["min_num_ctx"] == 512
     assert called["cfg"]["model"] == "translate-model"
     assert called["messages"] == build_translate_messages("hello")
+
+
+def test_handle_translate_request_degrades_when_model_answers_instead_of_translating():
+    sent = {}
+    notices = []
+
+    handle_translate_request(
+        {"text": "Hmm, you keep typing that like it's a secret cheat code."},
+        send_json_func=lambda data, status=200: sent.update({"data": data, "status": status}),
+        load_config_func=lambda: {"llm": {"provider": "openai-compatible", "model": "mimo-v2.5-pro"}},
+        call_ollama_func=lambda *_args, **_kwargs: "unused",
+        call_openai_compatible_func=lambda *_args, **_kwargs: (
+            "I'm sorry if I seemed confused earlier! I'm MiMo, Xiaomi's official AI assistant."
+        ),
+        diagnose_llm_exception_func=lambda exc, _cfg: RuntimeError(str(exc)),
+        log_backend_notice_func=lambda *args, **kwargs: notices.append((args, kwargs)),
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+    )
+
+    assert sent["data"]["translated"] == "Hmm, you keep typing that like it's a secret cheat code."
+    assert sent["data"]["degraded"] is True
+    assert sent["data"]["fallback"] is True
+    assert "model_answer_not_translation" in sent["data"]["error"]
+    assert notices
 
 
 def test_handle_translate_request_streams_for_openai_compatible():
@@ -413,6 +459,39 @@ def test_handle_translate_request_allows_translate_max_tokens_override():
     assert called["cfg"]["max_completion_tokens"] == 256
     assert called["cfg"]["use_max_completion_tokens"] is False
     assert called["cfg"]["allow_high_output_tokens"] is False
+
+
+def test_handle_translate_request_allows_dedicated_translate_provider_overrides():
+    called = {}
+
+    handle_translate_request(
+        {"text": "hello"},
+        send_json_func=lambda _data, status=200: None,
+        load_config_func=lambda: {
+            "llm": {
+                "provider": "openai-compatible",
+                "base_url": "https://chat.example/v1",
+                "model": "chat-model",
+                "api_key_env": "CHAT_KEY",
+                "translate_provider": "openai-compatible",
+                "translate_base_url": "https://translate.example/v1",
+                "translate_model": "translate-model",
+                "translate_api_key_env": "TRANSLATE_KEY",
+                "translate_api_key": "secret",
+            }
+        },
+        call_ollama_func=lambda *_args, **_kwargs: "unused",
+        call_openai_compatible_func=lambda cfg, _messages: called.update({"cfg": cfg}) or "你好",
+        diagnose_llm_exception_func=lambda exc, _cfg: exc,
+        log_backend_notice_func=lambda *_args, **_kwargs: None,
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+    )
+
+    assert called["cfg"]["provider"] == "openai-compatible"
+    assert called["cfg"]["base_url"] == "https://translate.example/v1"
+    assert called["cfg"]["model"] == "translate-model"
+    assert called["cfg"]["api_key_env"] == "TRANSLATE_KEY"
+    assert called["cfg"]["api_key"] == "secret"
 
 
 def test_handle_translate_request_enables_max_completion_tokens_for_mimo():

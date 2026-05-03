@@ -5,8 +5,9 @@ from utils import _safe_bool
 
 
 TRANSLATE_SYSTEM_PROMPT = (
-    "Translate the user's text into natural Simplified Chinese. "
-    "Return only the translation."
+    "You are a translation engine. Translate the user's source text into natural Simplified Chinese. "
+    "Return only the translated text. Do not answer the source text, apologize, introduce yourself, "
+    "mention your model/provider/company, or add explanations."
 )
 
 DEFAULT_TRANSLATE_TIMEOUT_SEC = 45
@@ -64,13 +65,73 @@ def _elapsed_ms(perf_now_ms_func, started_ms):
 
 
 def build_translate_messages(text):
+    source = str(text or "")
     return [
         {
             "role": "system",
             "content": TRANSLATE_SYSTEM_PROMPT,
         },
-        {"role": "user", "content": text},
+        {
+            "role": "user",
+            "content": (
+                "Translate only the text between <source> and </source> into Simplified Chinese.\n"
+                "Return only the translation.\n"
+                "<source>\n"
+                f"{source}\n"
+                "</source>"
+            ),
+        },
     ]
+
+
+def _count_cjk(text):
+    return sum(1 for ch in str(text or "") if "\u4e00" <= ch <= "\u9fff")
+
+
+def _count_latin(text):
+    return sum(1 for ch in str(text or "") if ("a" <= ch.lower() <= "z"))
+
+
+def _looks_like_english_source(text):
+    safe = str(text or "").strip()
+    if not safe:
+        return False
+    return _count_latin(safe) >= 6 and _count_cjk(safe) == 0
+
+
+def _looks_like_model_answer_not_translation(text):
+    safe = str(text or "").strip().lower()
+    if not safe:
+        return False
+    bad_markers = (
+        "i'm mimo",
+        "i am mimo",
+        "xiaomi",
+        "hyperos",
+        "official ai assistant",
+        "here to help",
+        "i'll do my best",
+        "i am an ai",
+        "as an ai",
+        "i'm sorry",
+        "i apologize",
+    )
+    return any(marker in safe for marker in bad_markers)
+
+
+def validate_translation_result(source, translated):
+    src = str(source or "").strip()
+    out = str(translated or "").strip()
+    if not out:
+        return False, "empty_translation"
+    if _looks_like_model_answer_not_translation(out):
+        return False, "model_answer_not_translation"
+    if _looks_like_english_source(src):
+        if _count_cjk(out) <= 0:
+            return False, "translation_missing_chinese"
+        if _count_latin(out) > max(12, _count_cjk(out) * 2):
+            return False, "translation_mostly_non_chinese"
+    return True, ""
 
 
 def _collect_stream_translation(iter_openai_chat_stream_func, llm_cfg, messages):
@@ -148,7 +209,11 @@ def handle_translate_request(
         cfg = load_config_func()
         llm_cfg = cfg.get("llm", {}) if isinstance(cfg, dict) else {}
         translate_cfg = dict(llm_cfg)
-        provider = str(llm_cfg.get("provider", "ollama")).lower()
+        translate_provider = str(llm_cfg.get("translate_provider", "") or "").strip()
+        translate_base_url = str(llm_cfg.get("translate_base_url", "") or "").strip()
+        translate_api_key_env = str(llm_cfg.get("translate_api_key_env", "") or "").strip()
+        translate_api_key = str(llm_cfg.get("translate_api_key", "") or "").strip()
+        provider = str(translate_provider or llm_cfg.get("provider", "ollama")).lower()
         selected_model = str(
             llm_cfg.get("translate_model")
             or llm_cfg.get("model")
@@ -179,6 +244,14 @@ def handle_translate_request(
         translate_cfg["request_timeout"] = timeout_sec
         translate_cfg["num_ctx"] = num_ctx
         translate_cfg["min_num_ctx"] = min(num_ctx, 1024)
+        if translate_provider:
+            translate_cfg["provider"] = translate_provider
+        if translate_base_url:
+            translate_cfg["base_url"] = translate_base_url
+        if translate_api_key_env:
+            translate_cfg["api_key_env"] = translate_api_key_env
+        if translate_api_key:
+            translate_cfg["api_key"] = translate_api_key
         translate_model = str(llm_cfg.get("translate_model", "")).strip()
         if translate_model:
             translate_cfg["model"] = translate_model
@@ -196,6 +269,9 @@ def handle_translate_request(
             )
         llm_ms = _elapsed_ms(perf_now_ms_func, llm_started_ms)
         translated = str(result or "").strip() or text
+        is_valid, invalid_reason = validate_translation_result(text, translated)
+        if not is_valid:
+            raise RuntimeError(f"invalid translation result: {invalid_reason}")
         response = {
             "translated": translated,
             "translated_text": translated,
