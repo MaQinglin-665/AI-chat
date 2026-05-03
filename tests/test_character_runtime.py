@@ -67,6 +67,34 @@ def test_plain_text_with_runtime_metadata_suffix_is_cleaned():
     assert payload["voice_style"] == "cheerful"
 
 
+def test_plain_text_with_json_like_runtime_metadata_suffix_is_cleaned():
+    payload = normalize_runtime_payload(
+        'Nice, I can do that.\n'
+        '{"emotion": "happy", "action": "wave", "intensity": "normal", "voice_style": "cheerful"}'
+    )
+
+    assert payload["text"] == "Nice, I can do that."
+    assert payload["emotion"] == "happy"
+    assert payload["action"] == "wave"
+    assert payload["intensity"] == "normal"
+    assert payload["voice_style"] == "cheerful"
+
+
+def test_plain_text_with_partial_json_like_runtime_metadata_suffix_is_cleaned():
+    payload = normalize_runtime_payload('Nice, I can do that.\n{"emotion"')
+
+    assert payload["text"] == "Nice, I can do that."
+    assert payload["emotion"] == "neutral"
+    assert payload["action"] == "none"
+
+
+def test_plain_text_trailing_runtime_keyword_is_not_stripped():
+    payload = normalize_runtime_payload("Let's name the feeling emotion")
+
+    assert payload["text"] == "Let's name the feeling emotion"
+    assert payload["emotion"] == "neutral"
+
+
 def test_plain_text_with_partial_runtime_metadata_suffix_is_cleaned():
     payload = normalize_runtime_payload(
         "Ah, you're still going strong. Take a quick stretch if you can.\n"

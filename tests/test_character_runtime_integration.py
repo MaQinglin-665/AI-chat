@@ -805,6 +805,37 @@ def test_runtime_enabled_json_like_with_trailing_comma_does_not_leak_raw_json(mo
     assert runtime.get("action") == "think"
 
 
+def test_runtime_enabled_metadata_only_json_fragment_does_not_leak_as_reply(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True, "return_metadata": True}
+    raw = '"emotion": "happy", "action": "wave", "intensity": "normal", "voice_style": "cheerful"'
+    monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: raw)
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(f"{base}/api/chat", _chat_payload("hi"))
+    assert status == 200
+    assert payload.get("reply") == ""
+    assert "emotion" not in payload.get("reply", "")
+    runtime = payload.get("character_runtime")
+    assert isinstance(runtime, dict)
+    assert runtime.get("emotion") == "happy"
+    assert runtime.get("action") == "wave"
+    assert runtime.get("voice_style") == "cheerful"
+
+
+def test_runtime_enabled_partial_metadata_only_fragment_does_not_leak_as_reply(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True, "return_metadata": True}
+    monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: '{"emotion"')
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(f"{base}/api/chat", _chat_payload("hi"))
+    assert status == 200
+    assert payload.get("reply") == ""
+    assert "emotion" not in payload.get("reply", "")
+    runtime = payload.get("character_runtime")
+    assert isinstance(runtime, dict)
+    assert runtime.get("emotion") == "neutral"
+
+
 def test_runtime_metadata_is_not_returned_by_default(monkeypatch):
     cfg = _build_test_config()
     cfg["character_runtime"] = {"enabled": True, "return_metadata": False}
@@ -929,6 +960,56 @@ def test_chat_stream_done_payload_does_not_leak_runtime_metadata_suffix(monkeypa
     assert runtime.get("emotion") == "happy"
     assert runtime.get("action") == "nod"
     assert runtime.get("voice_style") == "cheerful"
+
+
+def test_chat_stream_done_payload_does_not_leak_json_like_runtime_metadata_suffix(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True, "return_metadata": True}
+    raw = (
+        "Nice, I can do that.\n"
+        '{"emotion": "happy", "action": "wave", "intensity": "normal", "voice_style": "cheerful"}'
+    )
+
+    def _fake_stream(*_args, **_kwargs):
+        yield raw
+
+    monkeypatch.setattr(app, "call_llm_stream", _fake_stream)
+    monkeypatch.setattr(app, "finalize_assistant_reply", lambda *_args, **_kwargs: raw)
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, events = _post_stream_events(f"{base}/api/chat_stream", _chat_payload("hi"))
+    assert status == 200
+    done = next((evt for evt in events if evt.get("type") == "done"), {})
+    assert done.get("reply") == "Nice, I can do that."
+    assert "emotion" not in done.get("reply", "")
+    runtime = done.get("character_runtime")
+    assert isinstance(runtime, dict)
+    assert runtime.get("emotion") == "happy"
+    assert runtime.get("action") == "wave"
+    assert runtime.get("voice_style") == "cheerful"
+
+
+def test_chat_stream_done_payload_does_not_leak_partial_metadata_only_fragment(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"enabled": True, "return_metadata": True}
+
+    def _fake_stream(*_args, **_kwargs):
+        yield '{"emotion"'
+
+    monkeypatch.setattr(app, "call_llm_stream", _fake_stream)
+    monkeypatch.setattr(app, "finalize_assistant_reply", lambda *_args, **_kwargs: '{"emotion"')
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, events = _post_stream_events(f"{base}/api/chat_stream", _chat_payload("hi"))
+    assert status == 200
+    done = next((evt for evt in events if evt.get("type") == "done"), {})
+    assert done.get("reply") == ""
+    assert "emotion" not in done.get("reply", "")
+    runtime = done.get("character_runtime")
+    assert isinstance(runtime, dict)
+    assert runtime.get("emotion") == "neutral"
+
+
 def test_translate_route_returns_fallback_payload_when_llm_unavailable(monkeypatch):
     cfg = _build_test_config()
     cfg.setdefault("llm", {})

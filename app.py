@@ -132,7 +132,11 @@ from asr import (
     guess_audio_content_type,
     transcribe_pcm16_with_vosk,
 )
-from character_runtime import emotion_to_live2d_hint, normalize_runtime_payload
+from character_runtime import (
+    emotion_to_live2d_hint,
+    looks_like_runtime_metadata_only_text,
+    normalize_runtime_payload,
+)
 from app_health import (
     build_character_runtime_health_summary as _build_character_runtime_health_summary,
     build_health_payload as _build_health_payload,
@@ -334,7 +338,16 @@ def _apply_character_runtime_reply(config, raw_reply):
     try:
         normalized = normalize_runtime_payload(raw_reply)
         normalized_text = str(normalized.get("text", "") or "").strip()
-        reply_text = normalized_text if normalized_text else fallback_text
+        reply_text = normalized_text
+        if not reply_text:
+            fallback_normalized = normalize_runtime_payload(fallback_text)
+            fallback_visible_text = str(fallback_normalized.get("text", "") or "").strip()
+            if fallback_visible_text:
+                reply_text = fallback_visible_text
+            elif looks_like_runtime_metadata_only_text(fallback_text):
+                reply_text = ""
+            else:
+                reply_text = fallback_text
         runtime_meta = None
         if settings.get("return_metadata", False):
             emotion = str(normalized.get("emotion", "neutral") or "neutral").strip().lower() or "neutral"
@@ -1317,11 +1330,12 @@ class PetHandler(SimpleHTTPRequestHandler):
                 )
                 finalize_ms = _perf_now_ms() - finalize_started_ms
                 runtime_started_ms = _perf_now_ms()
+                final_reply, runtime_meta = _apply_character_runtime_reply(
+                    chat_config,
+                    final_reply,
+                )
+                final_reply = str(final_reply or "")
                 if final_reply:
-                    final_reply, runtime_meta = _apply_character_runtime_reply(
-                        chat_config,
-                        final_reply,
-                    )
                     try:
                         remember_interaction(
                             chat_config,
@@ -1386,7 +1400,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                 )
             except Exception:
                 pass
-            payload = {"reply": reply}
+            payload = {"reply": str(reply or "")}
             if runtime_meta is not None:
                 payload["character_runtime"] = runtime_meta
             self._send_json(payload, extra_headers=perf_headers)

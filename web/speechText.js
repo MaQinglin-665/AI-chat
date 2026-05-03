@@ -2,7 +2,15 @@
   "use strict";
 
   const TOOL_META_MARKER = "[[TAFFY_TOOL_META]]";
-  const RUNTIME_METADATA_PAIR_RE = /\b(emotion|action|intensity|voice_style|live2d_hint)\s*[:=]\s*([A-Za-z][A-Za-z0-9_-]*)/gi;
+  const RUNTIME_METADATA_KEYS = "emotion|action|intensity|voice_style|live2d_hint";
+  const RUNTIME_METADATA_PAIR_RE = new RegExp(
+    `["']?\\b(${RUNTIME_METADATA_KEYS})\\b["']?\\s*[:=]\\s*["']?([A-Za-z][A-Za-z0-9_-]*)["']?`,
+    "gi"
+  );
+  const RUNTIME_METADATA_ONLY_RE = new RegExp(
+    `^[\\s,;|{}()[\\]"'\`:=_-]*(?:["']?\\b(?:${RUNTIME_METADATA_KEYS})\\b["']?\\s*(?:[:=]\\s*["']?[A-Za-z0-9_-]*)?[\\s,;|{}()[\\]"'\`:=_-]*)+$`,
+    "i"
+  );
 
   function parseToolMetaVisibleText(text) {
     const src = String(text || "");
@@ -21,10 +29,14 @@
     const matches = Array.from(src.matchAll(RUNTIME_METADATA_PAIR_RE));
     RUNTIME_METADATA_PAIR_RE.lastIndex = 0;
     if (!matches.length) {
+      const partialStart = findRuntimeMetadataPartialTailStart(src);
+      if (partialStart >= 0) {
+        return src.slice(0, partialStart).trim();
+      }
       return src;
     }
     for (const first of matches) {
-      const start = Number(first.index || 0);
+      const start = findRuntimeMetadataTailStart(src, Number(first.index || 0));
       const tail = src.slice(start).trim();
       const tailPairs = Array.from(tail.matchAll(RUNTIME_METADATA_PAIR_RE));
       RUNTIME_METADATA_PAIR_RE.lastIndex = 0;
@@ -48,6 +60,43 @@
       return before.trim();
     }
     return src;
+  }
+
+  function findRuntimeMetadataTailStart(src, pairStart) {
+    const safeStart = Math.max(0, Number(pairStart) || 0);
+    const prevNewline = Math.max(src.lastIndexOf("\n", safeStart - 1), src.lastIndexOf("\r", safeStart - 1));
+    const lineStart = prevNewline >= 0 ? prevNewline + 1 : 0;
+    if (/^[\s,;|{}()[\]"'`:=_-]*$/.test(src.slice(lineStart, safeStart))) {
+      return lineStart;
+    }
+    const before = src.slice(0, safeStart);
+    const sentenceTail = before.match(/([.!?\u3002\uff01\uff1f])[\s,;|{}()[\]"'`:=_-]*$/);
+    if (sentenceTail) {
+      return safeStart - sentenceTail[0].length + sentenceTail[1].length;
+    }
+    return safeStart;
+  }
+
+  function findRuntimeMetadataPartialTailStart(src) {
+    const keyRe = new RegExp(`["']?\\b(?:${RUNTIME_METADATA_KEYS})\\b`, "ig");
+    const matches = Array.from(src.matchAll(keyRe));
+    if (!matches.length) {
+      return -1;
+    }
+    for (const match of matches) {
+      const start = findRuntimeMetadataTailStart(src, Number(match.index || 0));
+      const before = src.slice(0, start);
+      const startsLine = start === 0 || /[\r\n]\s*$/.test(before);
+      const followsSentence = /[.!?\u3002\uff01\uff1f]\s*$/.test(before);
+      if (!startsLine && !followsSentence) {
+        continue;
+      }
+      const tail = src.slice(start).trim();
+      if (RUNTIME_METADATA_ONLY_RE.test(tail)) {
+        return start;
+      }
+    }
+    return -1;
   }
 
   function isMostlyEnglishText(text) {

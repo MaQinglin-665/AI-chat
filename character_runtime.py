@@ -73,7 +73,13 @@ SUPPORTED_INTENSITY = {"low", "normal", "high"}
 
 RUNTIME_METADATA_KEYS = ("emotion", "action", "intensity", "voice_style", "live2d_hint")
 RUNTIME_METADATA_PAIR_RE = re.compile(
-    r"\b(emotion|action|intensity|voice_style|live2d_hint)\s*[:=]\s*([A-Za-z][A-Za-z0-9_-]*)",
+    r"[\"']?\b(emotion|action|intensity|voice_style|live2d_hint)\b[\"']?\s*[:=]\s*[\"']?([A-Za-z][A-Za-z0-9_-]*)[\"']?",
+    flags=re.IGNORECASE,
+)
+RUNTIME_METADATA_ONLY_RE = re.compile(
+    r"^[\s,;|{}()\[\]\"'`:=_-]*"
+    r"(?:[\"']?\b(?:emotion|action|intensity|voice_style|live2d_hint)\b[\"']?"
+    r"\s*(?::|=)?\s*[\"']?[A-Za-z0-9_-]*[\"']?[\s,;|{}()\[\]\"'`:=_-]*)+$",
     flags=re.IGNORECASE,
 )
 
@@ -192,6 +198,14 @@ def normalize_runtime_payload(payload: Any) -> Dict[str, Any]:
     return normalized
 
 
+def looks_like_runtime_metadata_only_text(text: str) -> bool:
+    src = str(text or "").strip()
+    if not src:
+        return False
+    visible, meta = _split_runtime_metadata_suffix(src)
+    return not visible and (bool(meta) or _find_runtime_metadata_partial_tail_start(src) == 0)
+
+
 def _split_runtime_metadata_suffix(text: str) -> tuple[str, Dict[str, str]]:
     src = str(text or "").strip()
     if not src:
@@ -199,10 +213,14 @@ def _split_runtime_metadata_suffix(text: str) -> tuple[str, Dict[str, str]]:
 
     matches = list(RUNTIME_METADATA_PAIR_RE.finditer(src))
     if not matches:
+        partial_start = _find_runtime_metadata_partial_tail_start(src)
+        if partial_start >= 0:
+            return src[:partial_start].strip(), {}
         return src, {}
 
     for first in matches:
-        tail = src[first.start():].strip()
+        start = _find_runtime_metadata_tail_start(src, first.start())
+        tail = src[start:].strip()
         tail_pairs = list(RUNTIME_METADATA_PAIR_RE.finditer(tail))
         if not tail_pairs:
             continue
@@ -217,8 +235,8 @@ def _split_runtime_metadata_suffix(text: str) -> tuple[str, Dict[str, str]]:
         if remainder:
             continue
 
-        before = src[: first.start()]
-        starts_line = first.start() == 0 or bool(re.search(r"[\r\n]\s*$", before))
+        before = src[:start]
+        starts_line = start == 0 or bool(re.search(r"[\r\n]\s*$", before))
         follows_sentence = bool(re.search(r"[.!?。！？]\s*$", before))
         if len(tail_pairs) < 2 and not starts_line and not follows_sentence:
             continue
@@ -232,6 +250,38 @@ def _split_runtime_metadata_suffix(text: str) -> tuple[str, Dict[str, str]]:
         return before.strip(), meta
 
     return src, {}
+
+
+def _find_runtime_metadata_tail_start(src: str, pair_start: int) -> int:
+    safe_start = max(0, int(pair_start or 0))
+    prev_newline = max(src.rfind("\n", 0, safe_start), src.rfind("\r", 0, safe_start))
+    line_start = prev_newline + 1 if prev_newline >= 0 else 0
+    if re.fullmatch(r"[\s,;|{}()\[\]\"'`:=_-]*", src[line_start:safe_start] or ""):
+        return line_start
+
+    before = src[:safe_start]
+    sentence_tail = re.search(r"([.!?\u3002\uff01\uff1f])[\s,;|{}()\[\]\"'`:=_-]*$", before)
+    if sentence_tail:
+        return safe_start - len(sentence_tail.group(0)) + len(sentence_tail.group(1))
+    return safe_start
+
+
+def _find_runtime_metadata_partial_tail_start(src: str) -> int:
+    key_re = re.compile(
+        r"[\"']?\b(?:emotion|action|intensity|voice_style|live2d_hint)\b",
+        flags=re.IGNORECASE,
+    )
+    for match in key_re.finditer(src):
+        start = _find_runtime_metadata_tail_start(src, match.start())
+        before = src[:start]
+        starts_line = start == 0 or bool(re.search(r"[\r\n]\s*$", before))
+        follows_sentence = bool(re.search(r"[.!?\u3002\uff01\uff1f]\s*$", before))
+        if not starts_line and not follows_sentence:
+            continue
+        tail = src[start:].strip()
+        if RUNTIME_METADATA_ONLY_RE.fullmatch(tail):
+            return start
+    return -1
 
 
 def _extract_text_from_json_like(safe: str) -> str:

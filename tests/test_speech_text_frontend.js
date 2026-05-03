@@ -21,6 +21,32 @@ assert.strictEqual(
 
 assert.strictEqual(
   speechText.sanitizeSpeakText(
+    'Nice, I can do that.\n{"emotion": "happy", "action": "wave", "intensity": "normal", "voice_style": "cheerful"}'
+  ),
+  "Nice, I can do that.",
+  "speech sanitization should remove quoted JSON-like runtime metadata suffixes"
+);
+
+assert.strictEqual(
+  speechText.stripRuntimeMetadataSuffix('Nice, I can do that.\n{"emotion"'),
+  "Nice, I can do that.",
+  "stream text should hide partial quoted runtime metadata before it completes"
+);
+
+assert.strictEqual(
+  speechText.sanitizeSpeakText('"emotion": "happy", "action": "wave", "intensity": "normal", "voice_style": "cheerful"'),
+  "",
+  "speech sanitization should drop pure runtime metadata fragments"
+);
+
+assert.strictEqual(
+  speechText.stripRuntimeMetadataSuffix("Let's name the feeling emotion"),
+  "Let's name the feeling emotion",
+  "runtime metadata guard should not strip a normal trailing keyword"
+);
+
+assert.strictEqual(
+  speechText.sanitizeSpeakText(
     "Got it! Feeling peppy after your lunch break?\nemotion: happy\naction: nod\nvoice_style: cheerful"
   ),
   "Got it! Feeling peppy after your lunch break?",
