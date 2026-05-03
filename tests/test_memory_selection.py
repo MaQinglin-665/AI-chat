@@ -126,3 +126,128 @@ def test_memory_debug_snapshot_includes_last_selection(monkeypatch):
     assert snapshot["memory"]["memory_count"] == 1
     assert snapshot["memory"]["last_selection"]["reason"] == "selected"
     assert snapshot["memory"]["last_selection"]["selected"][0]["user"] == "old topic about cookies"
+
+
+def test_memory_debug_snapshot_includes_learning_diagnostics(monkeypatch, tmp_path):
+    monkeypatch.setattr(memory, "load_memory_items", lambda: [])
+    candidates_path = tmp_path / "learning_candidates.json"
+    samples_path = tmp_path / "learning_samples.json"
+    state_path = tmp_path / "learning_state.json"
+    audit_path = tmp_path / "learning_audit_log.jsonl"
+    candidates_path.write_text(
+        """
+[
+  {
+    "id": "cand_1",
+    "user_preview": "hello",
+    "assistant_preview": "world",
+    "compressed_pattern": "short pattern",
+    "score": 0.8,
+    "confidence": 0.7
+  }
+]
+""".strip(),
+        encoding="utf-8",
+    )
+    samples_path.write_text("[]", encoding="utf-8")
+    state_path.write_text(
+        """
+{
+  "turn_count": 101,
+  "degraded_mode": true,
+  "current_window": [
+    {"candidate": false, "confidence": 0.4, "score": 0.5, "signal_count": 0},
+    {"candidate": true, "confidence": 0.6, "score": 0.8, "signal_count": 2}
+  ],
+  "health_windows": [
+    {
+      "window_ended_at": "2026-01-01T00:00:00+08:00",
+      "window_size": 100,
+      "candidate_in_rate": 0.02,
+      "avg_confidence": 0.42,
+      "signal_coverage": 0.5
+    }
+  ],
+  "events": [
+    {
+      "ts": "2026-01-01T00:00:00+08:00",
+      "event": "SCORER_DEGRADED",
+      "reason": "low_confidence",
+      "window_count": 2
+    }
+  ]
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    audit_path.write_text(
+        """
+{"id":"audit_1","ts":"2026-01-01T00:00:01+08:00","action":"promote","before":{"large":true},"after":{"large":true},"detail":{"candidate_ids":["cand_1"],"promoted":1,"skipped":0}}
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(memory, "LEARNING_CANDIDATES_PATH", candidates_path)
+    monkeypatch.setattr(memory, "LEARNING_SAMPLES_PATH", samples_path)
+    monkeypatch.setattr(memory, "LEARNING_STATE_PATH", state_path)
+    monkeypatch.setattr(memory, "LEARNING_AUDIT_LOG_PATH", audit_path)
+
+    snapshot = memory.get_memory_debug_snapshot(_config())
+
+    diagnostics = snapshot["learning"]["diagnostics"]
+    assert snapshot["learning"]["degraded_mode"] is True
+    assert diagnostics["degraded_reason"] == "low_confidence"
+    assert diagnostics["latest_event"]["event"] == "SCORER_DEGRADED"
+    assert diagnostics["health_windows"][0]["avg_confidence"] == 0.42
+    assert diagnostics["current_window_size"] == 2
+    assert diagnostics["current_window_avg_confidence"] == 0.5
+    assert diagnostics["current_window_signal_coverage"] == 0.5
+    assert snapshot["learning"]["recent_audit"] == [
+        {
+            "id": "audit_1",
+            "ts": "2026-01-01T00:00:01+08:00",
+            "action": "promote",
+            "event": "",
+            "detail": {"candidate_ids": ["cand_1"], "promoted": 1, "skipped": 0},
+        }
+    ]
+
+
+def test_learning_garbled_diagnostics_do_not_flag_normal_chinese():
+    diagnostics = memory._build_learning_diagnostics(
+        [
+            {
+                "id": "cand_normal",
+                "user_preview": "我在想未来编程会怎么样，现在 vibe coding",
+                "assistant_preview": "未来的编程就像是一场没有终点的马拉松。",
+                "compressed_pattern": "未来编程似无尽马拉松。",
+            }
+        ],
+        [
+            {
+                "id": "sample_normal",
+                "user_preview": "早上好",
+                "assistant_preview": "就是刚好看到你了，顺手说一句早上好。",
+                "compressed_pattern": "轻松接梗再温和回应。",
+            }
+        ],
+        {"events": [], "health_windows": [], "current_window": []},
+    )
+
+    assert diagnostics["garbled_count"] == 0
+    assert diagnostics["garbled_candidates_count"] == 0
+    assert diagnostics["garbled_samples_count"] == 0
+
+
+def test_learning_diagnostics_handles_malformed_state_shape():
+    diagnostics = memory._build_learning_diagnostics(
+        [{"id": "cand", "assistant_preview": "hello"}],
+        [],
+        {"events": "bad", "health_windows": {"bad": True}, "current_window": None},
+    )
+
+    assert diagnostics["degraded_reason"] == ""
+    assert diagnostics["latest_event"] == {}
+    assert diagnostics["health_windows"] == []
+    assert diagnostics["current_window_size"] == 0
+    assert diagnostics["current_window_avg_confidence"] == 0
+    assert diagnostics["current_window_signal_coverage"] == 0

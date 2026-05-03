@@ -209,7 +209,9 @@ assert.ok(
     && source.includes('text.toLowerCase() === "/memorydebug"')
     && source.includes('learningFetchJson("/api/memory/debug")')
     && source.includes("learningTabDebug")
-    && source.includes("learningDebugPanel"),
+    && source.includes("learningDebugPanel")
+    && source.includes("learning.degradedReason=")
+    && source.includes("Learning health windows:"),
   "chat.js should expose memory/learning chain debug state"
 );
 assert.ok(

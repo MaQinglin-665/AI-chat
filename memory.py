@@ -741,6 +741,22 @@ def _tail_jsonl(path, limit=5):
     return out
 
 
+def _compact_learning_audit_item(item):
+    safe = item if isinstance(item, dict) else {}
+    detail = safe.get("detail") if isinstance(safe.get("detail"), dict) else {}
+    compact_detail = {}
+    for key in ("candidate_ids", "promoted", "skipped", "pool", "ids", "delta", "changed"):
+        if key in detail:
+            compact_detail[key] = detail.get(key)
+    return {
+        "id": str(safe.get("id", ""))[:64],
+        "ts": str(safe.get("ts", ""))[:40],
+        "action": str(safe.get("action", safe.get("event", "")))[:48],
+        "event": str(safe.get("event", ""))[:48],
+        "detail": compact_detail,
+    }
+
+
 def _compact_learning_item(item):
     safe = item if isinstance(item, dict) else {}
     return {
@@ -752,6 +768,102 @@ def _compact_learning_item(item):
         "assistant_preview": normalize_memory_text(safe.get("assistant_preview", ""), max_len=90),
         "compressed_pattern": normalize_memory_text(safe.get("compressed_pattern", ""), max_len=110),
     }
+
+
+def _is_learning_text_garbled(item):
+    safe = item if isinstance(item, dict) else {}
+    return any(
+        looks_garbled_text(safe.get(key, ""))
+        for key in ("assistant_preview", "user_preview", "compressed_pattern")
+    )
+
+
+def _compact_learning_health_window(window):
+    safe = window if isinstance(window, dict) else {}
+    return {
+        "window_ended_at": str(safe.get("window_ended_at", "")).strip(),
+        "window_size": safe.get("window_size", 0),
+        "candidate_in_rate": safe.get("candidate_in_rate", 0),
+        "avg_confidence": safe.get("avg_confidence", 0),
+        "signal_coverage": safe.get("signal_coverage", 0),
+    }
+
+
+def _compact_learning_event(event):
+    safe = event if isinstance(event, dict) else {}
+    return {
+        "ts": str(safe.get("ts", "")).strip(),
+        "event": str(safe.get("event", "")).strip(),
+        "reason": str(safe.get("reason", "")).strip(),
+        "window_count": safe.get("window_count", 0),
+    }
+
+
+def _build_learning_diagnostics(candidates, samples, state):
+    candidate_items = [item for item in candidates if isinstance(item, dict)]
+    sample_items = [item for item in samples if isinstance(item, dict)]
+    all_items = candidate_items + sample_items
+    garbled_items = [item for item in all_items if _is_learning_text_garbled(item)]
+    events = state.get("events", []) if isinstance(state, dict) else []
+    if not isinstance(events, list):
+        events = []
+    health_windows = state.get("health_windows", []) if isinstance(state, dict) else []
+    if not isinstance(health_windows, list):
+        health_windows = []
+    current_window = state.get("current_window", []) if isinstance(state, dict) else []
+    if not isinstance(current_window, list):
+        current_window = []
+
+    degraded_events = [
+        _compact_learning_event(item)
+        for item in events
+        if isinstance(item, dict) and str(item.get("event", "")).strip()
+    ]
+    latest_degraded = degraded_events[-1] if degraded_events else {}
+    return {
+        "degraded_reason": latest_degraded.get("reason", ""),
+        "latest_event": latest_degraded,
+        "health_windows": [
+            _compact_learning_health_window(item)
+            for item in health_windows[-3:]
+            if isinstance(item, dict)
+        ],
+        "current_window_size": len(current_window),
+        "current_window_avg_confidence": _avg_numeric_field(current_window, "confidence"),
+        "current_window_signal_coverage": _rate_positive_field(current_window, "signal_count"),
+        "garbled_count": len(garbled_items),
+        "garbled_candidates_count": sum(1 for item in candidate_items if _is_learning_text_garbled(item)),
+        "garbled_samples_count": sum(1 for item in sample_items if _is_learning_text_garbled(item)),
+        "garbled_examples": [_compact_learning_item(item) for item in garbled_items[:3]],
+    }
+
+
+def _avg_numeric_field(items, key):
+    values = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            values.append(float(item.get(key, 0) or 0))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return 0
+    return round(sum(values) / len(values), 4)
+
+
+def _rate_positive_field(items, key):
+    valid = [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
+    if not valid:
+        return 0
+    positives = 0
+    for item in valid:
+        try:
+            if float(item.get(key, 0) or 0) > 0:
+                positives += 1
+        except (TypeError, ValueError):
+            continue
+    return round(positives / len(valid), 4)
 
 
 def get_memory_debug_snapshot(config):
@@ -781,9 +893,13 @@ def get_memory_debug_snapshot(config):
             "samples_count": len(samples),
             "degraded_mode": bool(state.get("degraded_mode", False)),
             "turn_count": int(state.get("turn_count", 0) or 0),
+            "diagnostics": _build_learning_diagnostics(candidates, samples, state),
             "recent_candidates": [_compact_learning_item(item) for item in candidates[-5:]],
             "recent_samples": [_compact_learning_item(item) for item in samples[-5:]],
-            "recent_audit": _tail_jsonl(LEARNING_AUDIT_LOG_PATH, limit=5),
+            "recent_audit": [
+                _compact_learning_audit_item(item)
+                for item in _tail_jsonl(LEARNING_AUDIT_LOG_PATH, limit=5)
+            ],
             "recent_shadow": _tail_jsonl(LEARNING_SHADOW_LOG_PATH, limit=5),
         },
     }
