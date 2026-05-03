@@ -1,6 +1,8 @@
 from http import HTTPStatus
 import threading
 
+from utils import _safe_bool
+
 
 TRANSLATE_SYSTEM_PROMPT = (
     "Translate the user's text into natural Simplified Chinese. "
@@ -9,6 +11,7 @@ TRANSLATE_SYSTEM_PROMPT = (
 
 DEFAULT_TRANSLATE_TIMEOUT_SEC = 45
 DEFAULT_TRANSLATE_NUM_CTX = 512
+DEFAULT_TRANSLATE_MAX_TOKENS = 384
 TRANSLATE_LLM_LOCK = threading.Lock()
 
 
@@ -28,6 +31,27 @@ def resolve_translate_num_ctx(llm_cfg):
     except (TypeError, ValueError):
         value = DEFAULT_TRANSLATE_NUM_CTX
     return max(256, min(2048, value))
+
+
+def resolve_translate_max_tokens(llm_cfg):
+    raw = (llm_cfg or {}).get("translate_max_tokens", DEFAULT_TRANSLATE_MAX_TOKENS)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = DEFAULT_TRANSLATE_MAX_TOKENS
+    return max(64, min(1024, value))
+
+
+def should_use_translate_max_completion_tokens(llm_cfg):
+    cfg = llm_cfg if isinstance(llm_cfg, dict) else {}
+    if "translate_use_max_completion_tokens" in cfg:
+        return _safe_bool(cfg.get("translate_use_max_completion_tokens"), False)
+    if "use_max_completion_tokens" in cfg:
+        return _safe_bool(cfg.get("use_max_completion_tokens"), False)
+
+    model = str(cfg.get("translate_model") or cfg.get("model") or "").strip().lower()
+    base_url = str(cfg.get("base_url") or "").strip().lower()
+    return model.startswith("mimo-") or "xiaomimimo.com" in base_url
 
 
 def _elapsed_ms(perf_now_ms_func, started_ms):
@@ -117,6 +141,7 @@ def handle_translate_request(
     selected_model = ""
     timeout_sec = DEFAULT_TRANSLATE_TIMEOUT_SEC
     num_ctx = DEFAULT_TRANSLATE_NUM_CTX
+    max_tokens = DEFAULT_TRANSLATE_MAX_TOKENS
     llm_started_ms = None
     llm_ms = -1
     try:
@@ -131,6 +156,7 @@ def handle_translate_request(
         ).strip()
         timeout_sec = resolve_translate_timeout_sec(llm_cfg)
         num_ctx = resolve_translate_num_ctx(llm_cfg)
+        max_tokens = resolve_translate_max_tokens(llm_cfg)
         if callable(log_backend_perf_func):
             log_backend_perf_func(
                 "TRANSLATE",
@@ -142,9 +168,13 @@ def handle_translate_request(
                 text_chars=len(text),
                 timeout_sec=timeout_sec,
                 num_ctx=num_ctx,
+                max_tokens=max_tokens,
             )
-        translate_cfg["max_output_tokens"] = 96
-        translate_cfg["max_tokens"] = 96
+        translate_cfg["max_output_tokens"] = max_tokens
+        translate_cfg["max_tokens"] = max_tokens
+        translate_cfg["max_completion_tokens"] = max_tokens
+        translate_cfg["use_max_completion_tokens"] = should_use_translate_max_completion_tokens(llm_cfg)
+        translate_cfg["allow_high_output_tokens"] = max_tokens > 256
         translate_cfg["temperature"] = 0.1
         translate_cfg["request_timeout"] = timeout_sec
         translate_cfg["num_ctx"] = num_ctx
@@ -203,5 +233,6 @@ def handle_translate_request(
             fallback=response.get("fallback") is True,
             timeout_sec=timeout_sec,
             num_ctx=num_ctx,
+            max_tokens=max_tokens,
         )
     send_json_func(response, status=status)

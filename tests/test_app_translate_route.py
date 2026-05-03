@@ -2,8 +2,10 @@ from app_translate_route import (
     TRANSLATE_LLM_LOCK,
     build_translate_messages,
     handle_translate_request,
+    resolve_translate_max_tokens,
     resolve_translate_num_ctx,
     resolve_translate_timeout_sec,
+    should_use_translate_max_completion_tokens,
 )
 import threading
 import time
@@ -29,6 +31,32 @@ def test_resolve_translate_num_ctx_defaults_and_clamps():
     assert resolve_translate_num_ctx({"translate_num_ctx": "bad"}) == 512
     assert resolve_translate_num_ctx({"translate_num_ctx": 128}) == 256
     assert resolve_translate_num_ctx({"translate_num_ctx": 9999}) == 2048
+
+
+def test_resolve_translate_max_tokens_defaults_and_clamps():
+    assert resolve_translate_max_tokens({}) == 384
+    assert resolve_translate_max_tokens({"translate_max_tokens": "bad"}) == 384
+    assert resolve_translate_max_tokens({"translate_max_tokens": 32}) == 64
+    assert resolve_translate_max_tokens({"translate_max_tokens": 9999}) == 1024
+
+
+def test_should_use_translate_max_completion_tokens_for_mimo_or_explicit_config():
+    assert should_use_translate_max_completion_tokens({"model": "mimo-v2.5-pro"}) is True
+    assert should_use_translate_max_completion_tokens(
+        {"base_url": "https://api.xiaomimimo.com/v1", "model": "other"}
+    ) is True
+    assert should_use_translate_max_completion_tokens(
+        {"model": "mimo-v2.5-pro", "translate_use_max_completion_tokens": False}
+    ) is False
+    assert should_use_translate_max_completion_tokens(
+        {"model": "mimo-v2.5-pro", "translate_use_max_completion_tokens": "false"}
+    ) is False
+    assert should_use_translate_max_completion_tokens(
+        {"translate_use_max_completion_tokens": "true"}
+    ) is True
+    assert should_use_translate_max_completion_tokens({"use_max_completion_tokens": True}) is True
+    assert should_use_translate_max_completion_tokens({"use_max_completion_tokens": "false"}) is False
+    assert should_use_translate_max_completion_tokens({"model": "gpt-compatible"}) is False
 
 
 def test_handle_translate_request_rejects_empty_text():
@@ -75,8 +103,11 @@ def test_handle_translate_request_returns_success_payload():
     assert sent["data"]["translated_text"] == "ni hao"
     assert sent["data"]["degraded"] is False
     assert sent["data"]["fallback"] is False
-    assert called["cfg"]["max_output_tokens"] == 96
-    assert called["cfg"]["max_tokens"] == 96
+    assert called["cfg"]["max_output_tokens"] == 384
+    assert called["cfg"]["max_tokens"] == 384
+    assert called["cfg"]["max_completion_tokens"] == 384
+    assert called["cfg"]["use_max_completion_tokens"] is False
+    assert called["cfg"]["allow_high_output_tokens"] is True
     assert called["cfg"]["temperature"] == 0.1
     assert called["cfg"]["request_timeout"] == 45
     assert called["cfg"]["num_ctx"] == 512
@@ -358,6 +389,57 @@ def test_handle_translate_request_allows_translate_num_ctx_override():
     assert called["cfg"]["min_num_ctx"] == 768
 
 
+def test_handle_translate_request_allows_translate_max_tokens_override():
+    called = {}
+
+    handle_translate_request(
+        {"text": "hello"},
+        send_json_func=lambda _data, status=200: None,
+        load_config_func=lambda: {
+            "llm": {
+                "provider": "openai",
+                "translate_max_tokens": 256,
+            }
+        },
+        call_ollama_func=lambda *_args, **_kwargs: "unused",
+        call_openai_compatible_func=lambda cfg, _messages: called.update({"cfg": cfg}) or "ni hao",
+        diagnose_llm_exception_func=lambda exc, _cfg: exc,
+        log_backend_notice_func=lambda *_args, **_kwargs: None,
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+    )
+
+    assert called["cfg"]["max_output_tokens"] == 256
+    assert called["cfg"]["max_tokens"] == 256
+    assert called["cfg"]["max_completion_tokens"] == 256
+    assert called["cfg"]["use_max_completion_tokens"] is False
+    assert called["cfg"]["allow_high_output_tokens"] is False
+
+
+def test_handle_translate_request_enables_max_completion_tokens_for_mimo():
+    called = {}
+
+    handle_translate_request(
+        {"text": "hello"},
+        send_json_func=lambda _data, status=200: None,
+        load_config_func=lambda: {
+            "llm": {
+                "provider": "openai-compatible",
+                "base_url": "https://api.xiaomimimo.com/v1",
+                "model": "mimo-v2.5-pro",
+            }
+        },
+        call_ollama_func=lambda *_args, **_kwargs: "unused",
+        call_openai_compatible_func=lambda cfg, _messages: called.update({"cfg": cfg}) or "ni hao",
+        diagnose_llm_exception_func=lambda exc, _cfg: exc,
+        log_backend_notice_func=lambda *_args, **_kwargs: None,
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+    )
+
+    assert called["cfg"]["max_output_tokens"] == 384
+    assert called["cfg"]["max_completion_tokens"] == 384
+    assert called["cfg"]["use_max_completion_tokens"] is True
+
+
 def test_handle_translate_request_logs_perf_events():
     sent = {}
     perf_events = []
@@ -396,6 +478,7 @@ def test_handle_translate_request_logs_perf_events():
     assert response["translated_chars"] == 2
     assert response["degraded"] is False
     assert response["num_ctx"] == 512
+    assert response["max_tokens"] == 384
 
 
 def test_handle_translate_request_falls_back_to_source_text_on_failure():
