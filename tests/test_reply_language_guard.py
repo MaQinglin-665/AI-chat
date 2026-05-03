@@ -8,6 +8,8 @@ def test_english_reply_language_block_is_strict_about_chinese_input():
     assert "MUST be natural English" in block
     assert "do NOT mirror the user's Chinese" in block
     assert "UI translation layer handles Chinese separately" in block
+    assert "Answer the user's latest message directly" in block
+    assert "Do not explain language or translation rules" in block
 
 
 def test_english_mode_skips_chinese_refine_rewrite(monkeypatch):
@@ -51,8 +53,23 @@ def test_finalize_english_mode_replaces_obvious_chinese_reply():
         "当然可以，我是你的桌面伙伴。",
     )
 
-    assert out.startswith("I got you.")
-    assert "English" in out
+    assert out.startswith("Hi, I'm your desktop companion.")
+    assert "translation" not in out.lower()
+
+
+def test_finalize_english_mode_uses_contextual_lunch_fallback():
+    out = humanize.finalize_assistant_reply(
+        {"assistant_reply_language": "en", "humanize": {"enabled": False}},
+        {},
+        "ollama",
+        "\u6211\u8981\u53bb\u5403\u5348\u9910\u4e86",
+        [],
+        "\u597d\u7684\uff0c\u53bb\u5403\u5348\u9910\u5427\u3002",
+    )
+
+    assert "lunch" in out.lower()
+    assert "translation" not in out.lower()
+    assert "English" not in out
 
 
 def test_finalize_english_mode_allows_explicit_chinese_request():

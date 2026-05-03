@@ -234,6 +234,7 @@ def call_llm_stream_impl(
     build_openai_messages_fn,
     iter_openai_chat_stream_fn,
     iter_openai_responses_stream_fn,
+    iter_ollama_chat_stream_fn=None,
 ):
     if not isinstance(config, dict):
         config = load_config_fn()
@@ -297,6 +298,30 @@ def call_llm_stream_impl(
 
         try:
             for chunk in iter_openai_responses_stream_fn(llm_cfg, messages):
+                if isinstance(chunk, str) and chunk:
+                    streamed = True
+                    yield chunk
+        except Exception:
+            streamed = False
+        if streamed:
+            return
+
+    if provider == "ollama" and not image_data_url and callable(iter_ollama_chat_stream_fn):
+        text_model = str(
+            llm_cfg.get("text_model")
+            or llm_cfg.get("model")
+            or OLLAMA_DEFAULT_MODEL
+        ).strip()
+        messages = [{"role": "system", "content": merged_prompt}]
+        messages.extend(safe_history)
+        messages.append({"role": "user", "content": user_message})
+        streamed = False
+        try:
+            for chunk in iter_ollama_chat_stream_fn(
+                llm_cfg,
+                messages,
+                model_override=text_model,
+            ):
                 if isinstance(chunk, str) and chunk:
                     streamed = True
                     yield chunk

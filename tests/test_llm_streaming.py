@@ -67,3 +67,36 @@ def test_stream_timeout_ignores_legacy_timeout_sec(monkeypatch):
 
     assert captured["timeout"] == 45
     assert chunks == ["ok"]
+
+
+def test_ollama_chat_stream_yields_message_chunks(monkeypatch):
+    captured = {}
+
+    def fake_urlopen(req, timeout):
+        captured["url"] = req.full_url
+        captured["timeout"] = timeout
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        return _FakeStreamResponse(
+            [
+                json.dumps({"message": {"content": "Enjoy "}, "done": False}) + "\n",
+                json.dumps({"message": {"content": "lunch."}, "done": False}) + "\n",
+                json.dumps({"done": True}) + "\n",
+            ]
+        )
+
+    monkeypatch.setattr(llm_streaming.urllib.request, "urlopen", fake_urlopen)
+    chunks = list(
+        llm_streaming.iter_ollama_chat_stream(
+            {
+                "base_url": "http://127.0.0.1:11434",
+                "model": "qwen2.5:7b",
+                "stream_timeout_sec": 22,
+            },
+            [{"role": "user", "content": "test"}],
+        )
+    )
+
+    assert captured["url"] == "http://127.0.0.1:11434/api/chat"
+    assert captured["timeout"] == 22
+    assert captured["payload"]["stream"] is True
+    assert chunks == ["Enjoy ", "lunch."]

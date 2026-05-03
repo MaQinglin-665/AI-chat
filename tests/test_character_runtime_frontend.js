@@ -167,6 +167,19 @@ assert.ok(
   "stream speech queue should be able to detect queued tail segments"
 );
 assert.ok(
+  source.includes("function shouldSerializeStreamTTSRequests()")
+    && source.includes('state.ttsProvider === "gpt_sovits"')
+    && source.includes("if (!shouldSerializeStreamTTSRequests())")
+    && source.includes("provider: state.ttsProvider || \"\""),
+  "GPT-SoVITS realtime stream speech should serialize eager requests and use provider-aware segmentation"
+);
+assert.ok(
+  source.includes("stream_speak_idle_wait_ms")
+    && source.includes("state.streamSpeakIdleWaitMs = Number.isFinite(streamIdleWaitCfg)")
+    && source.includes("Math.max(30, Math.min(220, Number(state.streamSpeakIdleWaitMs) || 90))"),
+  "stream speech queue should support a shorter configurable idle wait"
+);
+assert.ok(
   /current\s*=\s*next\s*\|\|\s*await waitNextStreamSpeakItem\([\s\S]*?state\.chatBusy \? idleWaitMs : 180/.test(source),
   "stream speech queue should re-check for tail segments after each audio segment plays"
 );
@@ -209,8 +222,11 @@ assert.ok(
 );
 assert.ok(
   source.includes('recordTTSDebugEvent("audio_play_start"')
-    && source.includes('recordTTSDebugEvent("audio_done"'),
-  "server audio playback should record start and completion events"
+    && source.includes('recordTTSDebugEvent("audio_done"')
+    && source.includes('function recordTTSAudioEvent(stage, audio, debugContext = {}, extra = {})')
+    && source.includes('recordTTSAudioEvent("audio_waiting"')
+    && source.includes('recordTTSAudioEvent("audio_stalled"'),
+  "server audio playback should record start, completion, and HTMLAudioElement lifecycle events"
 );
 assert.ok(
   source.includes('recordTTSDebugEvent("stream_enqueue"')
