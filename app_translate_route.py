@@ -62,6 +62,7 @@ def handle_translate_request(
     client_to_server_ms=-1,
     log_backend_perf_func=None,
     perf_now_ms_func=None,
+    iter_openai_chat_stream_func=None,
 ):
     payload = body if isinstance(body, dict) else {}
     text = str(payload.get("text", "")).strip()
@@ -116,7 +117,18 @@ def handle_translate_request(
         if provider == "ollama":
             result = call_ollama_func(translate_cfg, messages)
         else:
-            result = call_openai_compatible_func(translate_cfg, messages)
+            try:
+                result = call_openai_compatible_func(translate_cfg, messages)
+            except Exception:
+                if not callable(iter_openai_chat_stream_func):
+                    raise
+                chunks = []
+                for chunk in iter_openai_chat_stream_func(translate_cfg, messages):
+                    if isinstance(chunk, str) and chunk:
+                        chunks.append(chunk)
+                result = "".join(chunks).strip()
+                if not result:
+                    raise
         llm_ms = _elapsed_ms(perf_now_ms_func, llm_started_ms)
         translated = str(result or "").strip() or text
         response = {

@@ -1189,6 +1189,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                 load_config_func=load_config,
                 call_ollama_func=call_ollama,
                 call_openai_compatible_func=call_openai_compatible,
+                iter_openai_chat_stream_func=iter_openai_chat_stream,
                 diagnose_llm_exception_func=_diagnose_llm_exception,
                 log_backend_notice_func=_log_backend_notice,
                 diagnostic_payload_func=_diagnostic_payload,

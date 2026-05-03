@@ -82,6 +82,43 @@ def test_handle_translate_request_returns_success_payload():
     assert called["messages"] == build_translate_messages("hello")
 
 
+def test_handle_translate_request_streams_when_openai_nonstream_fails():
+    sent = {}
+    calls = []
+
+    def fail_nonstream(_cfg, _messages):
+        calls.append("nonstream")
+        raise RuntimeError("nonstream failed")
+
+    def stream_translation(_cfg, _messages):
+        calls.append("stream")
+        yield "你"
+        yield "好"
+
+    handle_translate_request(
+        {"text": "hello"},
+        send_json_func=lambda data, status=200: sent.update({"data": data, "status": status}),
+        load_config_func=lambda: {
+            "llm": {
+                "provider": "openai-compatible",
+                "model": "main-model",
+            }
+        },
+        call_ollama_func=lambda *_args, **_kwargs: "unused",
+        call_openai_compatible_func=fail_nonstream,
+        iter_openai_chat_stream_func=stream_translation,
+        diagnose_llm_exception_func=lambda exc, _cfg: exc,
+        log_backend_notice_func=lambda *_args, **_kwargs: None,
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+    )
+
+    assert calls == ["nonstream", "stream"]
+    assert sent["data"]["translated"] == "你好"
+    assert sent["data"]["translated_text"] == "你好"
+    assert sent["data"]["degraded"] is False
+    assert sent["data"]["fallback"] is False
+
+
 def test_handle_translate_request_allows_translate_timeout_override():
     called = {}
 
