@@ -262,3 +262,14 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - 不调用 speak/TTS
   - 不 dispatch event
   - 不启动 timer
+
+## 19. Task 033 Landing Notes
+
+- Task 033 在 `conversationFollowup()` 返回对象中新增 `promptDraft`，用于手动调试“若可续话时的 prompt seed 草稿”。
+- `promptDraft` 仅基于本地 planner state 生成，不调用 LLM，不接入 `requestAssistantReply`。
+- 仅当 `eligible=true` 时返回非空 draft；否则返回空字符串。
+- draft 文本保持克制，明确低打扰续话边界：
+  - 只要求一句短回应/轻追问
+  - 不读取桌面/文件/隐私数据
+  - 不调用工具
+  - 不做长篇解释

@@ -535,6 +535,28 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
   };
 }
 
+function buildConversationFollowupPromptDraft(plan) {
+  const safePlan = plan && typeof plan === "object" ? plan : {};
+  if (safePlan.eligible !== true) {
+    return "";
+  }
+  const reason = String(safePlan.reason || "").trim() || "followup_pending";
+  let topicHint = String(safePlan.topicHint || "").replace(/\s+/g, " ").trim();
+  if (!topicHint) {
+    return "";
+  }
+  if (topicHint.length > 80) {
+    topicHint = topicHint.slice(0, 80).trim();
+  }
+  return [
+    "你正在进行低打扰续话。",
+    "请基于上一轮未收口的话题，仅输出一句简短、可忽略的自然续话（或轻追问），不要长篇解释。",
+    "不要读取桌面、文件或隐私数据，不要调用工具。",
+    `续话原因: ${reason}`,
+    `话题线索: ${topicHint}`
+  ].join("\n");
+}
+
 function buildTTSDebugReport() {
   const s = getTTSDebugSnapshot();
   const lines = [
@@ -5839,7 +5861,13 @@ function installTTSDebugBridge() {
   const bridge = {
     report: buildTTSDebugReport,
     snapshot: getTTSDebugSnapshot,
-    conversationFollowup: () => buildConversationFollowupDebugPlan(Date.now()),
+    conversationFollowup: () => {
+      const plan = buildConversationFollowupDebugPlan(Date.now());
+      return {
+        ...plan,
+        promptDraft: buildConversationFollowupPromptDraft(plan)
+      };
+    },
     events: () => state.ttsDebugEvents.slice(),
     show: () => toggleTTSDebugPanel(true),
     hide: () => toggleTTSDebugPanel(false),
