@@ -381,3 +381,48 @@ Regression checks:
 3. No config default changes.
 4. No scheduler gate, cooldown, window limit, kill-switch, or fail-closed behavior changes.
 5. No automatic screenshot, tool call, shell execution, file read, or direct assistant request path is added.
+
+## 20. Proactive Follow-up Policy Preview (Task 058)
+
+Purpose:
+
+1. Validate Task 057 policy decisions without mutating runtime follow-up state.
+2. Confirm preview remains read-only and non-executing.
+
+Commands:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.previewConversationFollowupPolicy({
+  reason: "question_tail",
+  topicHint: "你觉得这个方向怎么样？"
+})
+
+window.__AI_CHAT_DEBUG_TTS__.previewConversationFollowupPolicy({
+  reason: "keyword_hint",
+  topicHint: "要不要我继续讲这个思路"
+})
+
+window.__AI_CHAT_DEBUG_TTS__.previewConversationFollowupPolicy({
+  reason: "followup_pending",
+  topicHint: "我们刚才聊到主动续话策略"
+})
+
+window.__AI_CHAT_DEBUG_TTS__.previewConversationFollowupPolicy({
+  reason: "followup_pending",
+  topicHint: "先这样，晚安"
+})
+```
+
+Expected:
+
+1. `question_tail` returns `followupPolicy="light_question"` and a non-empty `promptDraft`.
+2. `keyword_hint` returns `followupPolicy="soft_checkin"` and a non-empty `promptDraft`.
+3. `followup_pending` returns `followupPolicy="gentle_continue"` and a non-empty `promptDraft`.
+4. Closed-topic input returns `followupPolicy="do_not_followup"`, includes `policy_do_not_followup`, and keeps `promptDraft=""`.
+
+Regression checks:
+
+1. Preview does not call `runConversationFollowup()`.
+2. Preview does not call `requestAssistantReply`.
+3. Preview does not mutate pending follow-up state.
+4. Preview does not trigger screenshots, tools, shell execution, file reads, TTS, fetch, or LLM calls.

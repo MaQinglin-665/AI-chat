@@ -504,3 +504,12 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `followupPolicyNote`
 - `do_not_followup` adds `policy_do_not_followup` to `blockedReasons`, so the existing manual/scheduler guard path remains the enforcement point.
 - This task does not add new triggers, config flags, UI, backend APIs, dependencies, screenshot behavior, tool calls, or file reads.
+
+## 37. Task 058 Landing Notes
+
+- Task 058 adds a DevTools-only policy preview helper:
+  - `window.__AI_CHAT_DEBUG_TTS__.previewConversationFollowupPolicy(input)`
+- The helper builds a simulated follow-up plan and returns the selected policy, blocked reasons, and prompt draft.
+- It is intended for manual smoke checks of Task 057 policy presets without mutating real runtime state.
+- It does not execute follow-up, call `requestAssistantReply`, call LLM/fetch/TTS/tools, capture screenshots, read files, or add timers/listeners/config.
+- The production scheduler/manual guard path remains unchanged.

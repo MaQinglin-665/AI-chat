@@ -844,6 +844,36 @@ function buildConversationFollowupPromptDraft(plan) {
   ].join("\n");
 }
 
+function previewConversationFollowupPolicy(input = {}) {
+  const safeInput = input && typeof input === "object" ? input : {};
+  const reason = String(safeInput.reason || "followup_pending").trim() || "followup_pending";
+  const topicHint = String(safeInput.topicHint || safeInput.text || "").replace(/\s+/g, " ").trim();
+  const policy = buildConversationFollowupPolicy({ reason, topicHint });
+  const blockedReasons = [];
+  if (!topicHint) {
+    blockedReasons.push("empty_topic_hint");
+  }
+  if (policy.type === "do_not_followup") {
+    blockedReasons.push(policy.blockedReason || "policy_do_not_followup");
+  }
+  const plan = {
+    eligible: blockedReasons.length === 0,
+    reason,
+    topicHint,
+    followupPolicy: policy.type,
+    followupPolicyNote: policy.note,
+    updatedAgeMs: 0,
+    conversationEnabled: true,
+    proactiveEnabled: true,
+    silenceFollowupMinMs: 0,
+    blockedReasons
+  };
+  return {
+    ...plan,
+    promptDraft: buildConversationFollowupPromptDraft(plan)
+  };
+}
+
 function snapshotConversationFollowupPending() {
   return {
     pending: state.followupPending === true,
@@ -6658,6 +6688,7 @@ function installTTSDebugBridge() {
     report: buildTTSDebugReport,
     snapshot: getTTSDebugSnapshot,
     conversationFollowup: () => buildConversationFollowupDebugView(Date.now()),
+    previewConversationFollowupPolicy: (input) => previewConversationFollowupPolicy(input),
     runConversationFollowup: () => runConversationFollowupDebug(),
     dryRunSilenceFollowup: () => runConversationSilenceFollowupDryRun(),
     manualProactiveSchedulerTick: () => runProactiveSchedulerManualTick(),
