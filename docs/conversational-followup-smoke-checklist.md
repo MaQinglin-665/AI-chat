@@ -324,3 +324,31 @@ Expected:
 4. If the timer was active, `proactive_scheduler_poll_stop` appears with `poll_exception_fail_closed`.
 5. Injection state becomes inactive.
 6. No automatic screenshot, tool call, file read, or direct assistant reply behavior occurs.
+
+## 18. Proactive Follow-up Content Polish (Task 056)
+
+Purpose:
+
+1. Confirm the follow-up prompt seed stays gentle, optional, and character-like.
+2. Confirm content polish did not expand scheduler behavior or permissions.
+
+Command:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.conversationFollowup().promptDraft
+```
+
+Expected prompt draft traits:
+
+1. Describes the follow-up as low-interruption proactive continuation, not a system notification.
+2. Requests only one short natural continuation or light follow-up question.
+3. Tells the assistant not to pressure the user, not to repeatedly ask, and not to explain at length.
+4. Explicitly forbids desktop/screen/file/private-data access and tool calls.
+5. Keeps `续话原因` and `话题线索` as diagnostic context only.
+
+Regression checks:
+
+1. No new timer/listener/API/dependency is added.
+2. No config default changes.
+3. No new direct `requestAssistantReply` call path.
+4. No automatic screenshot, tool call, shell execution, or file read behavior.

@@ -256,3 +256,14 @@
   - `proactive_scheduler_poll_failed`
   - `poll_exception_fail_closed`
 - No backend API, config flag, automatic screenshot, tool call, shell execution, file read, or direct `requestAssistantReply` path is added.
+
+## 21. Task 056 Landing Notes
+
+- Task 056 keeps the proactive scheduler guard unchanged and only polishes the content seed used after existing guards pass.
+- The prompt seed now frames proactive output as a gentle character continuation instead of a system notification.
+- It continues to require short, optional, low-pressure output and explicitly avoids repeated questioning or long explanations.
+- The safety wording remains conservative:
+  - no desktop/screen observation
+  - no file/private-data access
+  - no tool calls
+- No scheduler gate, polling interval, kill-switch, fail-closed path, config default, backend API, or direct assistant request path is changed.
