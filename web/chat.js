@@ -577,6 +577,7 @@ function getTTSDebugSnapshot() {
     ? state.conversationMode
     : {};
   const followupUpdatedAt = Number(state.followupUpdatedAt || 0);
+  const followupPlan = buildConversationFollowupDebugPlan(Date.now());
   const followupPolicy = buildConversationFollowupPolicy({
     reason: String(state.followupReason || ""),
     topicHint: String(state.followupTopicHint || "")
@@ -638,6 +639,8 @@ function getTTSDebugSnapshot() {
       pending: state.followupPending === true,
       reason: String(state.followupReason || ""),
       topicHint: String(state.followupTopicHint || ""),
+      eligible: followupPlan.eligible === true,
+      blockedReasons: Array.isArray(followupPlan.blockedReasons) ? followupPlan.blockedReasons.slice() : [],
       policy: followupPolicy.type,
       policyNote: followupPolicy.note,
       policyBlockedReason: String(followupPolicy.blockedReason || ""),

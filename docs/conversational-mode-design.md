@@ -532,3 +532,11 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `conversation_silence_followup_*`
   - `proactive_scheduler_poll_*`
 - This improves event timeline review without adding triggers, changing scheduler gates, calling new request paths, or expanding permissions.
+
+## 40. Task 062 Landing Notes
+
+- Task 062 exposes follow-up plan readiness in the existing TTS debug snapshot:
+  - `snapshot().followup.eligible`
+  - `snapshot().followup.blockedReasons`
+- The values reuse the existing `buildConversationFollowupDebugPlan(...)` helper.
+- This is a read-only visibility improvement and does not change follow-up execution, scheduler gates, polling, config defaults, request paths, tools, screenshots, file access, or UI.
