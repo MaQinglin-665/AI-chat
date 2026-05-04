@@ -723,3 +723,34 @@ Conclusion:
 ```text
 The exception fail-closed live event ordering is now captured. The one-shot hook was injected, consumed on the next polling check, stopped polling with poll_exception_fail_closed, and recorded proactive_scheduler_poll_failed. No unsafe assistant reply, screenshot, tool call, shell execution, or file read path was triggered.
 ```
+
+---
+
+# Proactive Follow-up Policy Preview Smoke - 2026-05-04 (Task 059)
+
+Task 059 validates the Task 058 read-only policy preview helper against the four Task 057 policy presets.
+
+Method:
+
+```text
+Extracted the pure preview block from web/chat.js and executed it with Node.
+Chinese sample strings were passed with Unicode escapes to avoid PowerShell pipeline encoding loss.
+No runtime follow-up state was mutated.
+```
+
+Observed results:
+
+| Case | Input summary | Expected Policy | Actual Policy | Eligible | Blocked Reasons | Prompt Draft |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | `question_tail` / `你觉得这个方向怎么样？` | `light_question` | `light_question` | true | none | non-empty; safety wording present |
+| B | `keyword_hint` / `要不要我继续讲这个思路` | `soft_checkin` | `soft_checkin` | true | none | non-empty; safety wording present |
+| C | `followup_pending` / `我们刚才聊到主动续话策略` | `gentle_continue` | `gentle_continue` | true | none | non-empty; safety wording present |
+| D | `followup_pending` / `先这样，晚安` | `do_not_followup` | `do_not_followup` | false | `policy_do_not_followup` | empty |
+
+Result: pass
+
+Safety confirmation:
+
+```text
+The preview path returned diagnostics only. It did not call requestAssistantReply, LLM, fetch, TTS, screenshot capture, tools, shell execution, or file access. Closed-topic input failed quiet with policy_do_not_followup and an empty promptDraft.
+```
