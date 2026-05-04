@@ -340,3 +340,18 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `conversation_silence_followup_blocked`
   - `conversation_silence_followup_manual_start`
 - Task 038 仍保持 manual-only，不引入自动 proactive 触发循环。
+
+## 25. Task 039 Landing Notes
+
+- Task 039 仅新增 proactive scheduler 设计护栏文档，不改任何 JS/Python 运行行为。
+- 护栏文档：
+  - `docs/proactive-scheduler-guard.md`
+- 本次先明确自动 proactive 触发前的边界与验收口径：
+  - 默认关闭、双开关门控、fail-closed
+  - 不读取桌面/文件/隐私数据，不调用工具/不执行 shell
+  - 不绕过 `skipDesktopAttach`
+  - speaking/chatBusy/用户输入中不触发
+  - 基于 pending/topicHint/silence/cooldown/in-flight 的全量 eligibility
+  - 成功与失败分流冷却，避免连续循环自说自话
+  - debug snapshot/events 可观测，且不记录长 prompt 与隐私内容
+- 分阶段建议已落地到文档（Task 040~044），用于后续小步推进自动触发能力。
