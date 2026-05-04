@@ -205,3 +205,15 @@
 - 运行边界保持不变：
   - `skipDesktopAttach` 仍由既有 manual follow-up guard 路径保证
   - 不新增桌面截图、工具调用、文件读取默认行为
+
+## 17. Task 045 Landing Notes
+
+- Task 045 增加回滚与紧急停用（kill-switch）smoke 校验，目标是“安全收口”。
+- 运行时若任一关键开关关闭（`enabled/proactive_enabled/proactive_scheduler_enabled`），polling 会快速停用：
+  - 立即 `stop` timer
+  - 标记 `pollLastResult=disabled`
+  - 记录可识别 stop/blocked 原因事件
+- 异常路径保持 fail closed：
+  - 仅记录失败事件
+  - 不继续轮询失控重试
+  - 不绕过既有 guard 触发不安全行为

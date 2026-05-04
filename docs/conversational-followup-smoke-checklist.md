@@ -197,3 +197,17 @@ window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler
    - `proactive_scheduler_poll_trigger_blocked`。
 3. 任意 blocked/异常都不应绕过 guard，不应直接触发不安全行为。
 4. 不应自动截图，不应自动工具调用，不应读取用户文件。
+
+## 13. Kill-Switch Smoke（Task 045）
+
+执行前置：
+1. 先开启三层开关并确认 polling 已 active。
+2. 确认 `events()` 已出现 `proactive_scheduler_poll_start`。
+
+操作与期望：
+1. 运行中关闭任一开关（例如 `proactive_scheduler_enabled=false`）并 reload 配置后：
+   - `snapshot().proactiveScheduler.pollTimerActive=false`
+   - `pollLastResult=disabled`
+   - `events()` 可见 `proactive_scheduler_poll_stop` 与带原因的 `proactive_scheduler_poll_blocked`
+2. 重新开启三层开关后可恢复 polling（仍受既有 guard）。
+3. 异常场景下仅记录 `proactive_scheduler_poll_failed`/stop 事件，不应出现不安全自动行为。

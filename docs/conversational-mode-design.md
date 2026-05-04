@@ -432,3 +432,13 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - 遇到 blocked/异常时 fail closed，仅记录 debug events
 - 默认行为不变：
   - 默认开关关闭时不会启动 polling，也不会主动发言
+
+## 31. Task 045 Landing Notes
+
+- Task 045 强化 polling lifecycle 的 kill-switch 语义：
+  - 运行中关闭任一关键开关会快速停用 polling timer
+  - stop/blocked 事件包含可诊断原因，便于回滚排查
+- 异常路径采用 fail closed：
+  - 只记录 `poll_failed` / stop 事件
+  - 不进入失控重试
+  - 不绕过 scheduler/manual guard 路径

@@ -446,12 +446,28 @@ function formatTTSDebugNumber(value, digits = 0) {
 }
 
 function shouldEnableProactiveSchedulerPolling() {
+  const status = getProactiveSchedulerPollingGateStatus();
+  return status.enabled;
+}
+
+function getProactiveSchedulerPollingGateStatus() {
   const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
     ? state.conversationMode
     : {};
-  return conversationMode.enabled === true
-    && conversationMode.proactiveEnabled === true
-    && conversationMode.proactiveSchedulerEnabled === true;
+  const blockedReasons = [];
+  if (conversationMode.enabled !== true) {
+    blockedReasons.push("conversation_disabled");
+  }
+  if (conversationMode.proactiveEnabled !== true) {
+    blockedReasons.push("proactive_disabled");
+  }
+  if (conversationMode.proactiveSchedulerEnabled !== true) {
+    blockedReasons.push("scheduler_disabled");
+  }
+  return {
+    enabled: blockedReasons.length === 0,
+    blockedReasons
+  };
 }
 
 function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
@@ -1073,8 +1089,16 @@ async function runProactiveSchedulerManualTick() {
 
 async function runProactiveSchedulerPollingCheck() {
   try {
-    if (!shouldEnableProactiveSchedulerPolling()) {
+    const gateStatus = getProactiveSchedulerPollingGateStatus();
+    if (!gateStatus.enabled) {
+      const gateReason = gateStatus.blockedReasons.join(",") || "polling_disabled";
       state.proactivePollLastResult = "disabled";
+      if (state.proactivePollTimerId) {
+        stopProactiveSchedulerPolling(`runtime_gate_off:${gateReason}`);
+      }
+      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+        result: gateReason
+      });
       return;
     }
     const startedAt = Date.now();
@@ -1107,6 +1131,17 @@ async function runProactiveSchedulerPollingCheck() {
       text: String(followupView?.topicHint || ""),
       result: "silence_ready"
     });
+    if (!shouldEnableProactiveSchedulerPolling()) {
+      state.proactivePollLastResult = "disabled";
+      if (state.proactivePollTimerId) {
+        stopProactiveSchedulerPolling("runtime_gate_off:before_trigger");
+      }
+      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+        text: String(followupView?.topicHint || ""),
+        result: "runtime_gate_off_before_trigger"
+      });
+      return;
+    }
     const triggerResult = await runProactiveSchedulerManualTick();
     if (triggerResult?.ok === true) {
       state.proactivePollLastResult = "triggered";
@@ -1123,6 +1158,9 @@ async function runProactiveSchedulerPollingCheck() {
     });
   } catch (err) {
     state.proactivePollLastResult = "failed";
+    if (state.proactivePollTimerId) {
+      stopProactiveSchedulerPolling("poll_exception_fail_closed");
+    }
     recordTTSDebugEvent("proactive_scheduler_poll_failed", {
       result: "poll_exception",
       error: String(err?.message || err || "poll_exception")
@@ -1131,6 +1169,7 @@ async function runProactiveSchedulerPollingCheck() {
 }
 
 function stopProactiveSchedulerPolling(reason = "stop") {
+  const wasActive = !!state.proactivePollTimerId;
   if (state.proactivePollTimerId) {
     clearInterval(state.proactivePollTimerId);
     state.proactivePollTimerId = 0;
@@ -1138,14 +1177,20 @@ function stopProactiveSchedulerPolling(reason = "stop") {
   state.proactivePollActive = false;
   state.proactivePollActiveIntervalMs = 0;
   state.proactivePollLastResult = "disabled";
-  recordTTSDebugEvent("proactive_scheduler_poll_stop", {
-    result: String(reason || "stop")
-  });
+  if (wasActive || String(reason || "") === "beforeunload") {
+    recordTTSDebugEvent("proactive_scheduler_poll_stop", {
+      result: String(reason || "stop")
+    });
+  }
 }
 
 function startProactiveSchedulerPolling() {
-  if (!shouldEnableProactiveSchedulerPolling()) {
-    stopProactiveSchedulerPolling("gated_off");
+  const gateStatus = getProactiveSchedulerPollingGateStatus();
+  if (!gateStatus.enabled) {
+    stopProactiveSchedulerPolling(`gated_off:${gateStatus.blockedReasons.join(",") || "disabled"}`);
+    recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+      result: gateStatus.blockedReasons.join(",") || "polling_disabled"
+    });
     return;
   }
   if (state.proactivePollTimerId) {
@@ -1166,8 +1211,12 @@ function startProactiveSchedulerPolling() {
 }
 
 function syncProactiveSchedulerPolling() {
-  if (!shouldEnableProactiveSchedulerPolling()) {
-    stopProactiveSchedulerPolling("sync_disabled");
+  const gateStatus = getProactiveSchedulerPollingGateStatus();
+  if (!gateStatus.enabled) {
+    stopProactiveSchedulerPolling(`sync_disabled:${gateStatus.blockedReasons.join(",") || "disabled"}`);
+    recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+      result: gateStatus.blockedReasons.join(",") || "polling_disabled"
+    });
     return;
   }
   const desiredIntervalMs = Number.isFinite(Number(state.conversationMode?.proactivePollIntervalMs))
