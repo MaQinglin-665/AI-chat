@@ -63,6 +63,8 @@ const state = {
   ttsServerRequestTimeoutMs: 14000,
   serverTTSFallbackToBrowser: false,
   ttsAudio: null,
+  ttsAudioPlaybackToken: 0,
+  ttsPlaybackGeneration: 0,
   ttsContextSpeaking: false,
   subtitleId: 0,
   subtitleHideTimer: 0,
@@ -81,7 +83,9 @@ const state = {
   streamSpeakWorking: false,
   streamSpeakBuffer: "",
   streamSpeakSession: 0,
+  streamSpeakWorkingSession: 0,
   streamSpeakLastEnqueueSession: 0,
+  streamSpeakPlayedSession: 0,
   speechAnimUntil: 0,
   speechAnimStartedAt: 0,
   speechAnimDurationMs: 0,
@@ -107,6 +111,10 @@ const state = {
   moodExpressionSmoothed: { happy: 0, sad: 0, angry: 0, surprised: 0 },
   moodExpressionUpdatedAt: 0,
   moodHoldUntil: 0,
+  moodExpressionWeight: 1,
+  moodExpressionWeightUntil: 0,
+  moodExpressionWeightMood: "idle",
+  moodExpressionRuntimeMood: "idle",
   microBlinkUntil: 0,
   microNextBlinkAt: 0,
   microGazeTargetX: 0,
@@ -145,6 +153,7 @@ const state = {
   ttsAudioContext: null,
   ttsDecodeContext: null,
   ttsAudioSourceNode: null,
+  ttsContextBufferSource: null,
   ttsAudioAnalyser: null,
   ttsAudioAnalyserData: null,
   ttsAudioLevel: 0,
@@ -850,6 +859,7 @@ const ui = {
   learningReviewUndoBtn: document.getElementById("learning-review-undo-btn"),
   learningTabCandidates: document.getElementById("learning-tab-candidates"),
   learningTabSamples: document.getElementById("learning-tab-samples"),
+  learningTabDebug: document.getElementById("learning-tab-debug"),
   learningReloadBtn: document.getElementById("learning-reload-btn"),
   learningFilterScore: document.getElementById("learning-filter-score"),
   learningFilterConfidence: document.getElementById("learning-filter-confidence"),
@@ -865,6 +875,7 @@ const ui = {
   learningBatchPromoteBtn: document.getElementById("learning-batch-promote-btn"),
   learningReviewSummary: document.getElementById("learning-review-summary"),
   learningReviewList: document.getElementById("learning-review-list"),
+  learningDebugPanel: document.getElementById("learning-debug-panel"),
   learningQuickInject: document.getElementById("learning-quick-inject"),
   learningQuickSupport: document.getElementById("learning-quick-support"),
   learningQuickApplyBtn: document.getElementById("learning-quick-apply-btn"),
@@ -877,6 +888,7 @@ const ui = {
 
 const learningReviewState = {
   activeTab: "candidates",
+  debugSnapshot: null,
   candidates: [],
   samples: [],
   selectedCandidates: new Set(),
@@ -1116,51 +1128,8 @@ const STYLE_MOTION_BLUEPRINT = {
     idle: ["Idle", "Tap", "FlickUp", "FlickDown"]
   }
 };
-const STYLE_EXPRESSION_PROFILE = {
-  comfort: {
-    mouthForm: 0.14,
-    cheek: 0.18,
-    eyeSmile: 0.16,
-    browY: 0.05,
-    browAngle: 0.03,
-    headX: -0.35,
-    headY: 0.2,
-    bodyX: -0.25,
-    floatScale: 0.92
-  },
-  clear: {
-    mouthForm: -0.05,
-    cheek: 0.03,
-    eyeSmile: 0.02,
-    browY: 0.08,
-    browAngle: -0.06,
-    headX: 0.18,
-    headY: -0.14,
-    bodyX: 0.24,
-    floatScale: 0.82
-  },
-  playful: {
-    mouthForm: 0.28,
-    cheek: 0.32,
-    eyeSmile: 0.26,
-    browY: 0.02,
-    browAngle: 0.06,
-    headX: 0.56,
-    headY: -0.1,
-    bodyX: 0.36,
-    floatScale: 1.18
-  },
-  steady: {
-    mouthForm: -0.12,
-    cheek: -0.02,
-    eyeSmile: 0.0,
-    browY: -0.05,
-    browAngle: -0.12,
-    headX: -0.08,
-    headY: -0.18,
-    bodyX: -0.24,
-    floatScale: 0.74
-  },
+const LIVE2D_EXPRESSION_TUNING = window.TaffyLive2DExpressionTuning || {};
+const STYLE_EXPRESSION_PROFILE = LIVE2D_EXPRESSION_TUNING.STYLE_EXPRESSION_PROFILE || {
   neutral: {
     mouthForm: 0.04,
     cheek: 0.06,
@@ -1171,6 +1140,14 @@ const STYLE_EXPRESSION_PROFILE = {
     headY: 0.0,
     bodyX: 0.0,
     floatScale: 1.0
+  }
+};
+const RUNTIME_EMOTION_EXPRESSION_TUNING = LIVE2D_EXPRESSION_TUNING.RUNTIME_EMOTION_EXPRESSION_TUNING || {
+  idle: {
+    pulseBoost: 0.36,
+    pulseDurationMs: 240,
+    holdMs: 900,
+    weight: 1.0
   }
 };
 const MOTION_SEMANTIC_TOKENS = {
@@ -2543,6 +2520,10 @@ function applyLearningPayload(payload) {
   syncLearningQuickSettingsUI();
 }
 
+function applyMemoryDebugPayload(payload) {
+  learningReviewState.debugSnapshot = payload && typeof payload === "object" ? payload : null;
+}
+
 function parseLearningFilterNumber(input, fallback = 0) {
   const value = Number(input?.value);
   if (!Number.isFinite(value)) {
@@ -2635,8 +2616,112 @@ function getLearningFilteredItems() {
   return filtered;
 }
 
+function buildMemoryDebugReport(snapshot = learningReviewState.debugSnapshot) {
+  const data = snapshot && typeof snapshot === "object" ? snapshot : {};
+  const memory = data.memory && typeof data.memory === "object" ? data.memory : {};
+  const learning = data.learning && typeof data.learning === "object" ? data.learning : {};
+  const diagnostics = learning.diagnostics && typeof learning.diagnostics === "object" ? learning.diagnostics : {};
+  const last = memory.last_selection && typeof memory.last_selection === "object" ? memory.last_selection : {};
+  const lines = [
+    "Memory/Learning Debug:",
+    `memory.enabled=${memory.enabled === true}`,
+    `memory.mem0=${memory.mem0_enabled === true}`,
+    `memory.count=${Number(memory.memory_count || 0)}`,
+    `last.reason=${String(last.reason || "(none)")}`,
+    `last.message=${String(last.message || "")}`,
+    `last.explicit=${last.explicit_memory_intent === true}`,
+    `last.specific=${last.is_specific_memory_query === true}`,
+    `last.lightweight=${last.is_lightweight_checkin === true}`,
+    `last.candidates=${Number(last.candidate_count || 0)}`,
+    `last.selected=${Array.isArray(last.selected) ? last.selected.length : 0}`,
+    `learning.candidates=${Number(learning.candidates_count || 0)}`,
+    `learning.samples=${Number(learning.samples_count || 0)}`,
+    `learning.degraded=${learning.degraded_mode === true}`,
+    `learning.degradedReason=${String(diagnostics.degraded_reason || "(none)")}`,
+    `learning.turns=${Number(learning.turn_count || 0)}`,
+    `learning.currentWindow=${Number(diagnostics.current_window_size || 0)}`,
+    `learning.currentAvgConfidence=${Number(diagnostics.current_window_avg_confidence || 0)}`,
+    `learning.currentSignalCoverage=${Number(diagnostics.current_window_signal_coverage || 0)}`,
+    `learning.suspectedGarbled=${Number(diagnostics.garbled_count || 0)}`,
+  ];
+  const selected = Array.isArray(last.selected) ? last.selected.slice(0, 5) : [];
+  if (selected.length) {
+    lines.push("Selected memory:");
+    selected.forEach((item, idx) => {
+      lines.push(`${idx + 1}. [${item.source || "selected"}] ${item.user || ""} => ${item.assistant || ""}`);
+    });
+  }
+  const relevant = Array.isArray(last.relevant_candidates) ? last.relevant_candidates.slice(0, 5) : [];
+  if (relevant.length) {
+    lines.push("Relevant candidates:");
+    relevant.forEach((item, idx) => {
+      lines.push(`${idx + 1}. score=${Number(item.score || 0)} ${item.user || ""}`);
+    });
+  }
+  const recentAudit = Array.isArray(learning.recent_audit) ? learning.recent_audit.slice(-3) : [];
+  if (recentAudit.length) {
+    lines.push("Recent learning audit:");
+    recentAudit.forEach((item, idx) => {
+      lines.push(`${idx + 1}. ${item.action || item.event || item.id || "(event)"}`);
+    });
+  }
+  const healthWindows = Array.isArray(diagnostics.health_windows) ? diagnostics.health_windows.slice(-3) : [];
+  if (healthWindows.length) {
+    lines.push("Learning health windows:");
+    healthWindows.forEach((item, idx) => {
+      lines.push(
+        `${idx + 1}. avgConfidence=${Number(item.avg_confidence || 0)} candidateRate=${Number(item.candidate_in_rate || 0)} signalCoverage=${Number(item.signal_coverage || 0)} ended=${String(item.window_ended_at || "")}`
+      );
+    });
+  }
+  const latestEvent = diagnostics.latest_event && typeof diagnostics.latest_event === "object" ? diagnostics.latest_event : {};
+  if (latestEvent.event || latestEvent.reason) {
+    lines.push(
+      `Latest learning event: ${String(latestEvent.event || "(event)")} reason=${String(latestEvent.reason || "(none)")} at=${String(latestEvent.ts || "")}`
+    );
+  }
+  const garbledExamples = Array.isArray(diagnostics.garbled_examples) ? diagnostics.garbled_examples.slice(0, 3) : [];
+  if (garbledExamples.length) {
+    lines.push("Suspected garbled learning examples:");
+    garbledExamples.forEach((item, idx) => {
+      lines.push(`${idx + 1}. ${item.user_preview || item.assistant_preview || item.compressed_pattern || item.id || "(item)"}`);
+    });
+  }
+  return lines.join("\n");
+}
+
+function renderLearningDebugPanel() {
+  if (!ui.learningDebugPanel) {
+    return;
+  }
+  const isDebug = learningReviewState.activeTab === "debug";
+  ui.learningDebugPanel.hidden = !isDebug;
+  if (ui.learningReviewList) {
+    ui.learningReviewList.hidden = isDebug;
+  }
+  if (!isDebug) {
+    return;
+  }
+  ui.learningDebugPanel.textContent = buildMemoryDebugReport();
+  if (ui.learningReviewSummary) {
+    ui.learningReviewSummary.textContent = "Memory and learning chain debug snapshot";
+  }
+}
+
 function refreshLearningSelectAllState(filteredItems) {
   if (!ui.learningSelectAll) {
+    return;
+  }
+  if (learningReviewState.activeTab === "debug") {
+    ui.learningSelectAll.indeterminate = false;
+    ui.learningSelectAll.checked = false;
+    if (ui.learningSelectedCount) {
+      ui.learningSelectedCount.textContent = "宸查€?0";
+    }
+    if (ui.learningBatchDeleteBtn) ui.learningBatchDeleteBtn.disabled = true;
+    if (ui.learningBatchUpBtn) ui.learningBatchUpBtn.disabled = true;
+    if (ui.learningBatchDownBtn) ui.learningBatchDownBtn.disabled = true;
+    if (ui.learningBatchPromoteBtn) ui.learningBatchPromoteBtn.disabled = true;
     return;
   }
   const selectedSet = getLearningSelectedSet();
@@ -2660,9 +2745,30 @@ function renderLearningReviewList() {
   if (!ui.learningReviewList) {
     return;
   }
+  if (learningReviewState.activeTab === "debug") {
+    if (ui.learningTabCandidates) {
+      ui.learningTabCandidates.classList.remove("is-active");
+      ui.learningTabCandidates.setAttribute("aria-selected", "false");
+    }
+    if (ui.learningTabSamples) {
+      ui.learningTabSamples.classList.remove("is-active");
+      ui.learningTabSamples.setAttribute("aria-selected", "false");
+    }
+    if (ui.learningTabDebug) {
+      ui.learningTabDebug.classList.add("is-active");
+      ui.learningTabDebug.setAttribute("aria-selected", "true");
+    }
+    refreshLearningSelectAllState([]);
+    renderLearningDebugPanel();
+    return;
+  }
   const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
   const filteredItems = getLearningFilteredItems();
   ui.learningReviewList.innerHTML = "";
+  ui.learningReviewList.hidden = false;
+  if (ui.learningDebugPanel) {
+    ui.learningDebugPanel.hidden = true;
+  }
 
   if (ui.learningTabCandidates) {
     const active = tab === "candidates";
@@ -2673,6 +2779,10 @@ function renderLearningReviewList() {
     const active = tab === "samples";
     ui.learningTabSamples.classList.toggle("is-active", active);
     ui.learningTabSamples.setAttribute("aria-selected", String(active));
+  }
+  if (ui.learningTabDebug) {
+    ui.learningTabDebug.classList.remove("is-active");
+    ui.learningTabDebug.setAttribute("aria-selected", "false");
   }
   if (ui.learningReviewSummary) {
     ui.learningReviewSummary.textContent =
@@ -2836,17 +2946,28 @@ async function learningFetchJson(url, options = {}) {
 async function reloadLearningReviewData() {
   setLearningReviewLoading(true);
   try {
-    const payload = await learningFetchJson("/api/learning/reload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({})
-    });
+    const [payload, debugPayload] = await Promise.all([
+      learningFetchJson("/api/learning/reload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      }),
+      learningFetchJson("/api/memory/debug")
+    ]);
     applyLearningPayload(payload);
+    applyMemoryDebugPayload(debugPayload);
     renderLearningReviewList();
     setStatus(payload?.message || "学习审核数据已刷新");
   } finally {
     setLearningReviewLoading(false);
   }
+}
+
+async function reloadMemoryDebugData() {
+  const payload = await learningFetchJson("/api/memory/debug");
+  applyMemoryDebugPayload(payload);
+  renderLearningDebugPanel();
+  return payload;
 }
 
 async function updateLearningEntries(action, extra = {}) {
@@ -3473,6 +3594,15 @@ async function handleLocalCommand(inputText) {
   if (text.toLowerCase() === "/translatedebug off") {
     toggleTranslateDebugPanel(false);
     appendMessage("assistant", "Translation debug panel disabled.", { enableTranslation: false });
+    return true;
+  }
+  if (text.toLowerCase() === "/memorydebug") {
+    try {
+      const snapshot = await reloadMemoryDebugData();
+      appendMessage("assistant", buildMemoryDebugReport(snapshot), { enableTranslation: false });
+    } catch (err) {
+      appendMessage("assistant", `Memory debug unavailable: ${err.message || err}`, { enableTranslation: false });
+    }
     return true;
   }
   if (text === "/情绪日报") {
@@ -5070,9 +5200,9 @@ function parseToolMetaFromText(text) {
   const src = String(text || "");
   const idx = src.indexOf(TOOL_META_MARKER);
   if (idx < 0) {
-    return { visibleText: stripRuntimeMetadataSuffix(src), meta: null };
+    return { visibleText: stripAssistantPayloadNoise(src), meta: null };
   }
-  const visibleText = stripRuntimeMetadataSuffix(src.slice(0, idx)).trimEnd();
+  const visibleText = stripAssistantPayloadNoise(src.slice(0, idx)).trimEnd();
   const raw = src.slice(idx + TOOL_META_MARKER.length).trim();
   if (!raw) {
     return { visibleText, meta: null };
@@ -5092,16 +5222,129 @@ function stripRuntimeMetadataSuffix(text) {
   return String(text || "");
 }
 
+function looksLikeAssistantTextWrapperFragment(text) {
+  const safe = String(text || "").trim();
+  if (!safe) {
+    return false;
+  }
+  if (!/^\s*[{[]/.test(safe)) {
+    return false;
+  }
+  return /["']?\b(?:text|message|content|output_text)\b["']?\s*:/i.test(safe);
+}
+
+function looksLikeEmptyAssistantTextWrapperFragment(text) {
+  const safe = String(text || "").trim();
+  if (!safe) {
+    return false;
+  }
+  return /^[\s{,\["'`]*\b(?:text|message|content|output_text)\b["']?\s*:?\s*["'`]*$/i.test(safe);
+}
+
+function extractAssistantTextFromJsonLike(text) {
+  const safe = String(text || "").trim();
+  if (!looksLikeAssistantTextWrapperFragment(safe)) {
+    return "";
+  }
+  for (const key of ["text", "message", "content", "output_text"]) {
+    const quoted = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "i").exec(safe);
+    if (quoted) {
+      try {
+        return String(JSON.parse(`"${quoted[1]}"`) || "").trim();
+      } catch (_) {
+        return String(quoted[1] || "").trim();
+      }
+    }
+    const singleQuoted = new RegExp(`'${key}'\\s*:\\s*'((?:\\\\.|[^'\\\\])*)'`, "i").exec(safe);
+    if (singleQuoted) {
+      return String(singleQuoted[1] || "").trim();
+    }
+  }
+  return "";
+}
+
+function coerceAssistantPayloadText(value) {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (value == null) {
+    return "";
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value).trim();
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => coerceAssistantPayloadText(item))
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+  }
+  if (typeof value === "object") {
+    for (const key of ["text", "message", "content", "output_text"]) {
+      const nested = coerceAssistantPayloadText(value[key]);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return "";
+}
+
+function extractAssistantPayloadText(text) {
+  const safe = String(text || "").trim();
+  if (!safe || !/^\s*[{[]/.test(safe)) {
+    return "";
+  }
+  try {
+    const parsed = JSON.parse(safe);
+    return coerceAssistantPayloadText(parsed);
+  } catch (_) {
+    return "";
+  }
+}
+
+function stripAssistantPayloadNoise(text) {
+  if (SPEECH_TEXT && typeof SPEECH_TEXT.stripAssistantPayloadNoise === "function") {
+    return SPEECH_TEXT.stripAssistantPayloadNoise(text);
+  }
+  const raw = String(text || "");
+  const payloadText = extractAssistantPayloadText(raw);
+  if (payloadText) {
+    return stripRuntimeMetadataSuffix(payloadText);
+  }
+  const jsonLikeText = extractAssistantTextFromJsonLike(raw);
+  if (jsonLikeText) {
+    return stripRuntimeMetadataSuffix(jsonLikeText);
+  }
+  const visible = stripRuntimeMetadataSuffix(raw);
+  if (looksLikeEmptyAssistantTextWrapperFragment(visible)) {
+    return "";
+  }
+  if (looksLikeAssistantTextWrapperFragment(visible)) {
+    return "";
+  }
+  return visible;
+}
+
 const CHARACTER_RUNTIME = window.TaffyCharacterRuntime || {};
+const CHARACTER_RUNTIME_BRIDGE = window.TaffyCharacterRuntimeBridge || {};
+const CHARACTER_RUNTIME_DEBUG_BRIDGE = window.TaffyCharacterRuntimeDebugBridge || {};
 
 function normalizeCharacterRuntimeMetadataForFrontend(raw) {
+  const filtered = typeof CHARACTER_RUNTIME_BRIDGE.copyAllowedMetadataFields === "function"
+    ? CHARACTER_RUNTIME_BRIDGE.copyAllowedMetadataFields(raw)
+    : raw;
+  if (typeof CHARACTER_RUNTIME_BRIDGE.normalizeMetadataForFrontend === "function") {
+    return CHARACTER_RUNTIME_BRIDGE.normalizeMetadataForFrontend(filtered, CHARACTER_RUNTIME);
+  }
   if (typeof CHARACTER_RUNTIME.normalizeMetadataForFrontend !== "function") {
     return null;
   }
-  return CHARACTER_RUNTIME.normalizeMetadataForFrontend(raw);
+  return CHARACTER_RUNTIME.normalizeMetadataForFrontend(filtered);
 }
 
-const CHARACTER_RUNTIME_BROADCAST_CHANNEL = "taffy-character-runtime";
+const CHARACTER_RUNTIME_BROADCAST_CHANNEL = CHARACTER_RUNTIME_BRIDGE.BROADCAST_CHANNEL || "taffy-character-runtime";
 let characterRuntimeBroadcastChannel = null;
 
 function getCharacterRuntimeBroadcastChannel() {
@@ -5120,12 +5363,16 @@ function getCharacterRuntimeBroadcastChannel() {
 }
 
 function dispatchCharacterRuntimeMetadataLocally(normalized) {
-  if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
+  const isNormalized = typeof CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata === "function"
+    ? CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata(normalized)
+    : (!!normalized && typeof normalized === "object" && !Array.isArray(normalized));
+  if (!isNormalized) {
     return null;
   }
   try {
     window.__AI_CHAT_LAST_CHARACTER_RUNTIME__ = normalized;
-    window.dispatchEvent(new CustomEvent("character-runtime:update", { detail: normalized }));
+    const evtName = CHARACTER_RUNTIME_BRIDGE.UPDATE_EVENT || "character-runtime:update";
+    window.dispatchEvent(new CustomEvent(evtName, { detail: normalized }));
   } catch (_) {
     // Keep bridge side-effect safe; metadata is optional.
   }
@@ -5133,7 +5380,10 @@ function dispatchCharacterRuntimeMetadataLocally(normalized) {
 }
 
 function broadcastCharacterRuntimeMetadataToModel(normalized) {
-  if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
+  const isNormalized = typeof CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata === "function"
+    ? CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata(normalized)
+    : (!!normalized && typeof normalized === "object" && !Array.isArray(normalized));
+  if (!isNormalized) {
     return false;
   }
   if (state.uiView !== "chat") {
@@ -5144,10 +5394,13 @@ function broadcastCharacterRuntimeMetadataToModel(normalized) {
     return false;
   }
   try {
-    channel.postMessage({
-      type: "character-runtime:update",
-      metadata: normalized
-    });
+    const msg = typeof CHARACTER_RUNTIME_BRIDGE.createRuntimeUpdateMessage === "function"
+      ? CHARACTER_RUNTIME_BRIDGE.createRuntimeUpdateMessage(normalized)
+      : { type: "character-runtime:update", metadata: normalized };
+    if (!msg) {
+      return false;
+    }
+    channel.postMessage(msg);
     return true;
   } catch (_) {
     return false;
@@ -5170,6 +5423,14 @@ function normalizeRuntimeEmotionForLive2D(emotion) {
   if (key === "thinking") return "idle";
   if (key === "neutral") return "idle";
   return "idle";
+}
+
+function getRuntimeEmotionExpressionTuning(mood) {
+  if (typeof LIVE2D_EXPRESSION_TUNING.getRuntimeEmotionExpressionTuning === "function") {
+    return LIVE2D_EXPRESSION_TUNING.getRuntimeEmotionExpressionTuning(mood);
+  }
+  const key = String(mood || "idle");
+  return RUNTIME_EMOTION_EXPRESSION_TUNING[key] || RUNTIME_EMOTION_EXPRESSION_TUNING.idle;
 }
 
 function normalizeRuntimeActionForLive2D(action) {
@@ -5242,9 +5503,19 @@ function applyCharacterRuntimeEmotionToLive2D(metadata) {
   }
   try {
     const mood = normalizeRuntimeEmotionForLive2D(metadata.emotion);
+    const tuning = getRuntimeEmotionExpressionTuning(mood);
+    const now = performance.now();
     state.speechAnimMood = mood;
-    state.moodHoldUntil = performance.now() + 1400;
-    triggerExpressionPulse(state.currentTalkStyle || "neutral", 0.55, 320);
+    state.moodHoldUntil = now + Math.max(300, Number(tuning.holdMs) || 1400);
+    state.moodExpressionWeight = clampNumber(Number(tuning.weight) || 1, 0.7, 1.45);
+    state.moodExpressionWeightUntil = state.moodHoldUntil;
+    state.moodExpressionWeightMood = mood;
+    state.moodExpressionRuntimeMood = mood;
+    triggerExpressionPulse(
+      state.currentTalkStyle || "neutral",
+      Number(tuning.pulseBoost) || 0.55,
+      Number(tuning.pulseDurationMs) || 320
+    );
     return true;
   } catch (err) {
     console.debug("[character-runtime] apply emotion failed:", err);
@@ -5347,12 +5618,12 @@ function installCharacterRuntimeDebugBridge() {
   if (typeof window === "undefined") {
     return null;
   }
-  const key = "__AI_CHAT_DEBUG_CHARACTER_RUNTIME__";
+  const key = CHARACTER_RUNTIME_DEBUG_BRIDGE.DEBUG_BRIDGE_KEY || "__AI_CHAT_DEBUG_CHARACTER_RUNTIME__";
   if (window[key] && typeof window[key] === "object") {
     return window[key];
   }
 
-  const samples = {
+  const samples = CHARACTER_RUNTIME_DEBUG_BRIDGE.DEBUG_SAMPLES || {
     happyWave: {
       emotion: "happy",
       action: "wave",
@@ -5394,8 +5665,16 @@ function installCharacterRuntimeDebugBridge() {
     }
   };
 
-  const testEmotion = (emotion) => emit({ emotion: String(emotion || "") });
-  const testAction = (action) => emit({ action: String(action || "") });
+  const testEmotion = (emotion) => emit(
+    typeof CHARACTER_RUNTIME_DEBUG_BRIDGE.createEmotionMetadata === "function"
+      ? CHARACTER_RUNTIME_DEBUG_BRIDGE.createEmotionMetadata(emotion)
+      : { emotion: String(emotion || "") }
+  );
+  const testAction = (action) => emit(
+    typeof CHARACTER_RUNTIME_DEBUG_BRIDGE.createActionMetadata === "function"
+      ? CHARACTER_RUNTIME_DEBUG_BRIDGE.createActionMetadata(action)
+      : { action: String(action || "") }
+  );
 
   const bridge = {
     emit,
@@ -5658,6 +5937,9 @@ function _writeChatTranslationCache(text, translated) {
   if (!key || !value) {
     return;
   }
+  if (_looksLikeBadChatTranslation(text, value)) {
+    return;
+  }
   if (_chatTranslationCache.has(key)) {
     _chatTranslationCache.delete(key);
   }
@@ -5685,6 +5967,43 @@ function _isLikelyEnglishForChat(text) {
     return false;
   }
   return _isLikelyEnglish(safe);
+}
+
+function _countCjkChars(text) {
+  return (String(text || "").match(/[\u4e00-\u9fff]/g) || []).length;
+}
+
+function _countLatinChars(text) {
+  return (String(text || "").match(/[A-Za-z]/g) || []).length;
+}
+
+function _looksLikeBadChatTranslation(source, translated) {
+  const src = String(source || "").trim();
+  const out = String(translated || "").trim();
+  if (!out) {
+    return true;
+  }
+  if (!_isLikelyEnglishForChat(src)) {
+    return false;
+  }
+  const lower = out.toLowerCase();
+  if (
+    lower.includes("i'm mimo")
+    || lower.includes("i am mimo")
+    || lower.includes("xiaomi")
+    || lower.includes("hyperos")
+    || lower.includes("official ai assistant")
+    || lower.includes("here to help")
+    || lower.includes("i'll do my best")
+    || lower.includes("i'm sorry")
+  ) {
+    return true;
+  }
+  const cjkCount = _countCjkChars(out);
+  if (cjkCount <= 0) {
+    return true;
+  }
+  return _countLatinChars(out) > Math.max(12, cjkCount * 2);
 }
 
 function _shouldShowAssistantTranslation(text) {
@@ -5833,8 +6152,11 @@ async function _fetchChatTranslation(text) {
       const data = await resp.json();
       const translated = String(data?.translated || data?.translated_text || "").trim();
       const degraded = data?.degraded === true || data?.fallback === true;
-      if (degraded) {
-        _markTranslationFailure();
+      const badTranslation = _looksLikeBadChatTranslation(safe, translated);
+      if (degraded || badTranslation) {
+        if (!badTranslation) {
+          _markTranslationFailure();
+        }
         recordTranslateDebugEvent("request_degraded", {
           traceId: responseTraceId || traceId,
           text: safe,
@@ -5844,10 +6166,10 @@ async function _fetchChatTranslation(text) {
           status: Number(resp.status) || 0,
           degraded: true,
           fallback: data?.fallback === true,
-          result: "degraded",
-          error: String(data?.error || "")
+          result: badTranslation ? "invalid_translation" : "degraded",
+          error: badTranslation ? "invalid translation result" : String(data?.error || "")
         });
-        return translated;
+        return "";
       }
       if (!translated) {
         _markTranslationFailure();
@@ -6839,6 +7161,9 @@ function getMotionIntensityPreset() {
 }
 
 function getStyleExpressionProfile(style) {
+  if (typeof LIVE2D_EXPRESSION_TUNING.getStyleExpressionProfile === "function") {
+    return LIVE2D_EXPRESSION_TUNING.getStyleExpressionProfile(style);
+  }
   const s = normalizeTalkStyle(style);
   return STYLE_EXPRESSION_PROFILE[s] || STYLE_EXPRESSION_PROFILE.neutral;
 }
@@ -7888,12 +8213,21 @@ function applyStyleExpressionLayer() {
   const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
   const speakingQuiet = state.motionQuietDuringSpeech && speaking;
   const moodBlend = getSmoothedMoodExpression(now);
+  const weightedMood = String(state.moodExpressionWeightMood || "idle");
+  const runtimeMoodActive = now < Number(state.moodExpressionWeightUntil || 0)
+    && weightedMood === String(state.moodExpressionRuntimeMood || "idle");
+  const runtimeMoodWeight = runtimeMoodActive
+    ? clampNumber(Number(state.moodExpressionWeight) || 1, 0.7, 1.45)
+    : 1;
+  const runtimeMoodBlend = runtimeMoodActive && weightedMood in moodBlend
+    ? { ...moodBlend, [weightedMood]: Math.max(Number(moodBlend[weightedMood]) || 0, 1) }
+    : moodBlend;
   const happyMoodScale = speakingQuiet ? (0.32 + (1 - motionBlend) * 0.2) : 1;
   const subtleMoodScale = speakingQuiet ? (0.16 + (1 - motionBlend) * 0.12) : 1;
-  const happyBlend = moodBlend.happy * happyMoodScale;
-  const sadBlend = moodBlend.sad * subtleMoodScale;
-  const angryBlend = moodBlend.angry * subtleMoodScale * (speakingQuiet ? 0.8 : 1);
-  const surprisedBlend = moodBlend.surprised * subtleMoodScale * (speakingQuiet ? 0.75 : 1);
+  const happyBlend = clampNumber(runtimeMoodBlend.happy * (weightedMood === "happy" ? runtimeMoodWeight : 1), 0, 1.35) * happyMoodScale;
+  const sadBlend = clampNumber(runtimeMoodBlend.sad * (weightedMood === "sad" ? runtimeMoodWeight : 1), 0, 1.35) * subtleMoodScale;
+  const angryBlend = clampNumber(runtimeMoodBlend.angry * (weightedMood === "angry" ? runtimeMoodWeight : 1), 0, 1.35) * subtleMoodScale * (speakingQuiet ? 0.8 : 1);
+  const surprisedBlend = clampNumber(runtimeMoodBlend.surprised * (weightedMood === "surprised" ? runtimeMoodWeight : 1), 0, 1.35) * subtleMoodScale * (speakingQuiet ? 0.75 : 1);
   const pulseActive = now < Number(state.expressionPulseUntil || 0);
   const pulseWeight = pulseActive ? state.expressionPulseBoost : 0;
   const strength = clampNumber(Number(state.expressionStrength) || 1, 0.2, 2.0);
@@ -7912,13 +8246,16 @@ function applyStyleExpressionLayer() {
     ? Number(state.speechMouthOpen) || 0
     : getSpeechAnimationMouthOpen();
 
-  const surpriseMouthBoost = motionBlend > 0.05 && surprisedBlend > 0.001
-    ? (0.5 * surprisedBlend * gain * motionBlend)
+  const surpriseMouthBoost = surprisedBlend > 0.001
+    ? (0.34 + 0.38 * motionBlend) * surprisedBlend * gain
+    : 0;
+  const sadMouthDip = sadBlend > 0.001
+    ? 0.16 * sadBlend * gain
     : 0;
   const mouthCarry = 0.08 + motionBlend * 0.94;
   const mouthSpeakBoost = speaking ? (1.1 + motionBlend * 0.24) : 1.0;
   const mouthTarget = clampNumber(
-    mouthOpen * mouthCarry * mouthSpeakBoost + surpriseMouthBoost,
+    mouthOpen * mouthCarry * mouthSpeakBoost + surpriseMouthBoost - sadMouthDip,
     0,
     1
   );
@@ -7949,15 +8286,18 @@ function applyStyleExpressionLayer() {
   }
   if (sadBlend > 0.001) {
     const g = sadBlend * gain;
-    safeAddParamValue(core, "ParamEyeLOpen", -0.25 * g, 0.85);
-    safeAddParamValue(core, "ParamEyeROpen", -0.25 * g, 0.85);
-    safeAddParamValue(core, "ParamBrowLY", -0.2 * g, 0.8);
-    safeAddParamValue(core, "ParamBrowRY", -0.2 * g, 0.8);
-    safeAddParamValue(core, "ParamBrowLAngle", 0.15 * g, 0.7);
-    safeAddParamValue(core, "ParamBrowRAngle", -0.15 * g, 0.7);
-    safeAddParamValue(core, "ParamMouthForm", -0.3 * g, 0.8);
-    safeAddParamValue(core, "ParamAngleY", 3.0 * g, 0.5);
-    safeAddParamValue(core, "ParamBodyAngleX", -3.0 * g, 0.4);
+    safeAddParamValue(core, "ParamEyeLOpen", -0.34 * g, 0.85);
+    safeAddParamValue(core, "ParamEyeROpen", -0.34 * g, 0.85);
+    safeAddParamValue(core, "ParamBrowLY", -0.3 * g, 0.82);
+    safeAddParamValue(core, "ParamBrowRY", -0.3 * g, 0.82);
+    safeAddParamValue(core, "ParamBrowLForm", -0.32 * g, 0.76);
+    safeAddParamValue(core, "ParamBrowRForm", -0.32 * g, 0.76);
+    safeAddParamValue(core, "ParamBrowLAngle", 0.22 * g, 0.72);
+    safeAddParamValue(core, "ParamBrowRAngle", -0.22 * g, 0.72);
+    safeAddParamValue(core, "ParamMouthForm", -0.68 * g, 0.86);
+    safeDriveParamValue(core, "ParamMouthOpenY", 0.02, 0.5);
+    safeAddParamValue(core, "ParamAngleY", 4.8 * g, 0.54);
+    safeAddParamValue(core, "ParamBodyAngleX", -3.4 * g, 0.42);
   }
   if (angryBlend > 0.001) {
     const g = angryBlend * gain;
@@ -7972,12 +8312,15 @@ function applyStyleExpressionLayer() {
   }
   if (surprisedBlend > 0.001) {
     const g = surprisedBlend * gain;
-    safeAddParamValue(core, "ParamEyeLOpen", 0.4 * g, 0.9);
-    safeAddParamValue(core, "ParamEyeROpen", 0.4 * g, 0.9);
-    safeAddParamValue(core, "ParamBrowLY", 0.3 * g, 0.85);
-    safeAddParamValue(core, "ParamBrowRY", 0.3 * g, 0.85);
-    safeAddParamValue(core, "ParamMouthForm", -0.1 * g, 0.7);
-    safeAddParamValue(core, "ParamAngleY", -3.0 * g, 0.5);
+    safeAddParamValue(core, "ParamEyeLOpen", 0.55 * g, 0.92);
+    safeAddParamValue(core, "ParamEyeROpen", 0.55 * g, 0.92);
+    safeAddParamValue(core, "ParamBrowLY", 0.42 * g, 0.88);
+    safeAddParamValue(core, "ParamBrowRY", 0.42 * g, 0.88);
+    safeAddParamValue(core, "ParamBrowLForm", 0.26 * g, 0.72);
+    safeAddParamValue(core, "ParamBrowRForm", 0.26 * g, 0.72);
+    safeAddParamValue(core, "ParamMouthForm", -0.34 * g, 0.78);
+    safeDriveParamValue(core, "ParamMouthOpenY", clampNumber(0.28 * g, 0, 0.55), 0.62);
+    safeAddParamValue(core, "ParamAngleY", -3.8 * g, 0.52);
   }
 }
 
@@ -8435,6 +8778,16 @@ function buildStableSpeakText(text) {
 }
 
 function stopAllAudioPlayback() {
+  state.ttsPlaybackGeneration = Number(state.ttsPlaybackGeneration || 0) + 1;
+  state.streamSpeakPlayedSession = 0;
+  if (
+    state.streamSpeakWorking
+    && Number(state.streamSpeakWorkingSession || 0)
+    && Number(state.streamSpeakWorkingSession || 0) !== Number(state.streamSpeakSession || 0)
+  ) {
+    state.streamSpeakWorking = false;
+    state.streamSpeakWorkingSession = 0;
+  }
   if ("speechSynthesis" in window) {
     try {
       window.speechSynthesis.cancel();
@@ -8450,8 +8803,29 @@ function stopAllAudioPlayback() {
       // ignore
     }
   }
+  if (state.ttsContextBufferSource) {
+    try {
+      state.ttsContextBufferSource.onended = null;
+      state.ttsContextBufferSource.stop(0);
+    } catch (_) {
+      // ignore
+    }
+    try {
+      state.ttsContextBufferSource.disconnect();
+    } catch (_) {
+      // ignore
+    }
+    state.ttsContextBufferSource = null;
+  }
   endSpeechAnimation();
   state.ttsAudioLevel = 0;
+  state.ttsAudioRawLevel = 0;
+  state.ttsAudioRms = 0;
+  state.ttsContextSpeaking = false;
+}
+
+function isCurrentTTSPlaybackGeneration(generation) {
+  return Number(generation || 0) === Number(state.ttsPlaybackGeneration || 0);
 }
 
 function shouldUseStreamSpeak() {
@@ -8566,6 +8940,7 @@ function enqueueStreamSpeakSegment(text, sessionId, prosody = null, style = "neu
     sessionId,
     prosody,
     style,
+    playbackGeneration: Number(state.ttsPlaybackGeneration || 0),
     blobPromise: null,
     segmentId: ++state.perfTtsSeq,
     traceId: state.activePerfTraceId || ""
@@ -8584,14 +8959,20 @@ function enqueueStreamSpeakSegment(text, sessionId, prosody = null, style = "neu
 }
 
 function dequeueStreamSpeakItem(sessionId) {
-  while (state.streamSpeakQueue.length > 0) {
-    const item = state.streamSpeakQueue.shift();
+  if (!Array.isArray(state.streamSpeakQueue) || state.streamSpeakQueue.length <= 0) {
+    return null;
+  }
+  for (let i = 0; i < state.streamSpeakQueue.length; i += 1) {
+    const item = state.streamSpeakQueue[i];
     if (!item) {
+      state.streamSpeakQueue.splice(i, 1);
+      i -= 1;
       continue;
     }
     if (item.sessionId !== sessionId) {
       continue;
     }
+    state.streamSpeakQueue.splice(i, 1);
     return item;
   }
   return null;
@@ -8600,6 +8981,53 @@ function dequeueStreamSpeakItem(sessionId) {
 function hasQueuedStreamSpeakItem(sessionId) {
   return Array.isArray(state.streamSpeakQueue)
     && state.streamSpeakQueue.some((item) => item && item.sessionId === sessionId);
+}
+
+function discardQueuedStreamSpeakItems(sessionId) {
+  if (!Array.isArray(state.streamSpeakQueue) || state.streamSpeakQueue.length <= 0) {
+    return 0;
+  }
+  const before = state.streamSpeakQueue.length;
+  state.streamSpeakQueue = state.streamSpeakQueue.filter(
+    (item) => item && item.sessionId !== sessionId
+  );
+  return before - state.streamSpeakQueue.length;
+}
+
+function ensureStreamSpeakQueueRunning(sessionId, delayMs = 0) {
+  const safeSession = Number(sessionId || 0);
+  if (!safeSession || safeSession !== state.streamSpeakSession || !shouldUseStreamSpeak()) {
+    return;
+  }
+  const delay = Math.max(0, Math.min(360, Math.round(Number(delayMs) || 0)));
+  window.setTimeout(() => {
+    if (safeSession !== state.streamSpeakSession || !shouldUseStreamSpeak()) {
+      return;
+    }
+    if (!hasQueuedStreamSpeakItem(safeSession)) {
+      return;
+    }
+    if (
+      state.streamSpeakWorking
+      && Number(state.streamSpeakWorkingSession || 0) === safeSession
+    ) {
+      ensureStreamSpeakQueueRunning(safeSession, 80);
+      return;
+    }
+    if (
+      state.streamSpeakWorking
+      && Number(state.streamSpeakWorkingSession || 0) !== safeSession
+    ) {
+      recordTTSDebugEvent("stream_run_clear_stale_busy", {
+        sessionId: safeSession,
+        result: "stale_busy",
+        error: String(state.streamSpeakWorkingSession || "")
+      });
+      state.streamSpeakWorking = false;
+      state.streamSpeakWorkingSession = 0;
+    }
+    runStreamSpeakQueue();
+  }, delay);
 }
 
 async function waitNextStreamSpeakItem(sessionId, waitMs = 0) {
@@ -8628,6 +9056,7 @@ async function runStreamSpeakQueue() {
   }
   const activeSession = state.streamSpeakSession;
   state.streamSpeakWorking = true;
+  state.streamSpeakWorkingSession = activeSession;
   recordTTSDebugEvent("stream_run_start", { sessionId: activeSession });
   try {
     if (!state.speakingEnabled || !isServerTTSProvider(state.ttsProvider)) {
@@ -8691,6 +9120,19 @@ async function runStreamSpeakQueue() {
         current = await waitNextStreamSpeakItem(activeSession, 20);
         continue;
       }
+      if (
+        activeSession !== state.streamSpeakSession ||
+        !isCurrentTTSPlaybackGeneration(current.playbackGeneration)
+      ) {
+        recordTTSDebugEvent("stream_stale_skip", {
+          traceId: current.traceId,
+          sessionId: activeSession,
+          segmentId: current.segmentId,
+          text: current.text,
+          result: "stale"
+        });
+        break;
+      }
       let next = dequeueStreamSpeakItem(activeSession);
       if (!next) {
         next = await waitNextStreamSpeakItem(activeSession, state.chatBusy ? idleWaitMs : 80);
@@ -8706,7 +9148,8 @@ async function runStreamSpeakQueue() {
         style: current.style || state.currentTalkStyle || "neutral",
         perfTraceId: current.traceId || state.activePerfTraceId || "",
         segmentId: current.segmentId,
-        sessionId: activeSession
+        sessionId: activeSession,
+        playbackGeneration: current.playbackGeneration
       });
       current = next || await waitNextStreamSpeakItem(
         activeSession,
@@ -8721,7 +9164,10 @@ async function runStreamSpeakQueue() {
       error: String(err?.message || err || "")
     });
   } finally {
-    state.streamSpeakWorking = false;
+    if (Number(state.streamSpeakWorkingSession || 0) === Number(activeSession || 0)) {
+      state.streamSpeakWorking = false;
+      state.streamSpeakWorkingSession = 0;
+    }
     recordTTSDebugEvent("stream_run_done", { sessionId: activeSession });
     if (
       activeSession === state.streamSpeakSession
@@ -8730,6 +9176,13 @@ async function runStreamSpeakQueue() {
     ) {
       recordTTSDebugEvent("stream_run_restart", { sessionId: activeSession });
       window.setTimeout(() => runStreamSpeakQueue(), 0);
+    } else if (
+      activeSession !== state.streamSpeakSession
+      && shouldUseStreamSpeak()
+      && hasQueuedStreamSpeakItem(state.streamSpeakSession)
+    ) {
+      recordTTSDebugEvent("stream_run_handoff", { sessionId: state.streamSpeakSession });
+      ensureStreamSpeakQueueRunning(state.streamSpeakSession, 0);
     }
   }
 }
@@ -8751,7 +9204,7 @@ function feedStreamSpeakDelta(delta, sessionId, style = "neutral") {
     maybePlayTalkGesture(seg, style);
   }
   if (parsed.segments.length) {
-    runStreamSpeakQueue();
+    ensureStreamSpeakQueueRunning(sessionId, 0);
   }
 }
 
@@ -8768,8 +9221,65 @@ function flushStreamSpeak(sessionId, style = "neutral") {
     maybePlayTalkGesture(seg, style);
   }
   if (parsed.segments.length) {
-    runStreamSpeakQueue();
+    ensureStreamSpeakQueueRunning(sessionId, 0);
   }
+}
+
+function scheduleFinalSpeechWatchdog({
+  sessionId,
+  text,
+  mood = "idle",
+  style = "neutral",
+  traceId = ""
+} = {}) {
+  const safeSession = Number(sessionId || 0);
+  const safeText = buildStableSpeakText(text) || sanitizeSpeakText(text);
+  if (!safeSession || !safeText || !shouldUseStreamSpeak()) {
+    return;
+  }
+  const generation = Number(state.ttsPlaybackGeneration || 0);
+  const startedAt = Number(state.ttsDebugAudioStartedAt || 0);
+  window.setTimeout(async () => {
+    if (
+      safeSession !== state.streamSpeakSession
+      || !isCurrentTTSPlaybackGeneration(generation)
+      || state.streamSpeakPlayedSession === safeSession
+    ) {
+      return;
+    }
+    if (hasQueuedStreamSpeakItem(safeSession) || state.streamSpeakWorking) {
+      ensureStreamSpeakQueueRunning(safeSession, 0);
+      window.setTimeout(async () => {
+        if (
+          safeSession !== state.streamSpeakSession
+          || !isCurrentTTSPlaybackGeneration(generation)
+          || state.streamSpeakPlayedSession === safeSession
+        ) {
+          return;
+        }
+        recordTTSDebugEvent("final_watchdog_tts", {
+          traceId,
+          sessionId: safeSession,
+          text: safeText,
+          result: "fallback_after_queue_wait"
+        });
+        const prosody = buildSpeakProsody(safeText, mood, false, style);
+        await speak(safeText, { prosody, interrupt: true, mood, style, perfTraceId: traceId, playbackGeneration: generation });
+      }, 2200);
+      return;
+    }
+    if (Number(state.ttsDebugAudioStartedAt || 0) > startedAt) {
+      return;
+    }
+    recordTTSDebugEvent("final_watchdog_tts", {
+      traceId,
+      sessionId: safeSession,
+      text: safeText,
+      result: "fallback"
+    });
+    const prosody = buildSpeakProsody(safeText, mood, false, style);
+    await speak(safeText, { prosody, interrupt: true, mood, style, perfTraceId: traceId, playbackGeneration: generation });
+  }, 2600);
 }
 
 function initServerTTSVoices() {
@@ -8856,8 +9366,12 @@ function buildVoiceCandidates() {
   return candidates;
 }
 
-function speakOnceWithVoice(text, voice, force = false) {
+function speakOnceWithVoice(text, voice, opts = {}) {
   return new Promise((resolve) => {
+    const force = typeof opts === "object" ? !!opts.force : !!opts;
+    const playbackGeneration = Number(
+      (typeof opts === "object" ? opts.playbackGeneration : 0) || state.ttsPlaybackGeneration || 0
+    );
     if (!("speechSynthesis" in window)) {
       resolve(false);
       return;
@@ -8888,6 +9402,14 @@ function speakOnceWithVoice(text, voice, force = false) {
     let started = false;
     let settled = false;
     utterance.onstart = () => {
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch (_) {
+          // ignore
+        }
+        return;
+      }
       started = true;
       beginSpeechAnimation(cleaned, detectMood(cleaned), state.currentTalkStyle || "neutral");
       showSubtitleText(cleaned);
@@ -8896,6 +9418,10 @@ function speakOnceWithVoice(text, voice, force = false) {
     utterance.onend = () => {
       if (settled) return;
       settled = true;
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+        resolve(false);
+        return;
+      }
       if (voice?.name) {
         state.ttsLastGoodVoiceName = voice.name;
       }
@@ -8907,6 +9433,10 @@ function speakOnceWithVoice(text, voice, force = false) {
     utterance.onerror = () => {
       if (settled) return;
       settled = true;
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+        resolve(false);
+        return;
+      }
       endSpeechAnimation();
       hideSubtitleText();
       setStatus("语音失败");
@@ -8914,11 +9444,20 @@ function speakOnceWithVoice(text, voice, force = false) {
     };
 
     try {
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+        resolve(false);
+        return;
+      }
       window.speechSynthesis.resume();
       window.speechSynthesis.speak(utterance);
       // Guard against engines that fail silently (no onstart fired).
       setTimeout(() => {
         if (settled) return;
+        if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+          settled = true;
+          resolve(false);
+          return;
+        }
         if (!started) {
           settled = true;
           endSpeechAnimation();
@@ -9074,9 +9613,13 @@ async function loadConfig() {
   state.ttsServerRetryDelayMs = Number.isFinite(retryDelayCfg)
     ? Math.max(60, Math.min(3000, Math.round(retryDelayCfg)))
     : 220;
-  state.ttsServerRequestTimeoutMs = Number.isFinite(timeoutCfg)
-    ? Math.max(1500, Math.min(45000, Math.round(timeoutCfg)))
-    : 14000;
+  const sovitsTimeoutMs = isSovits && Number.isFinite(Number(ttsCfg.gpt_sovits_timeout_sec))
+    ? Math.round(Number(ttsCfg.gpt_sovits_timeout_sec) * 1000)
+    : 0;
+  const resolvedTimeoutMs = Number.isFinite(timeoutCfg)
+    ? timeoutCfg
+    : (sovitsTimeoutMs || 14000);
+  state.ttsServerRequestTimeoutMs = Math.max(1500, Math.min(90000, Math.round(resolvedTimeoutMs)));
   state.streamSpeakIdleWaitMs = Number.isFinite(streamIdleWaitCfg)
     ? Math.max(30, Math.min(220, Math.round(streamIdleWaitCfg)))
     : 90;
@@ -10435,6 +10978,7 @@ async function playEmotion(text, opts = {}) {
 
 async function speakByBrowser(text, opts = {}) {
   const force = !!opts.force;
+  const requestedGeneration = Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0);
   if (!force && !state.speakingEnabled) {
     return false;
   }
@@ -10445,10 +10989,18 @@ async function speakByBrowser(text, opts = {}) {
     initTTS();
   }
 
+  if (!isCurrentTTSPlaybackGeneration(requestedGeneration)) {
+    recordTTSDebugEvent("browser_stale_skip", {
+      text,
+      result: "stale"
+    });
+    return false;
+  }
   stopAllAudioPlayback();
+  const playbackGeneration = Number(state.ttsPlaybackGeneration || 0);
   const candidates = buildVoiceCandidates();
   for (const v of candidates) {
-    const ok = await speakOnceWithVoice(text, v, force);
+    const ok = await speakOnceWithVoice(text, v, { force, playbackGeneration });
     if (ok) {
       return true;
     }
@@ -10484,7 +11036,7 @@ async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) {
     traceId: String(requestOpts.traceId || state.activePerfTraceId || "").trim(),
     timeoutMs: Math.max(
       1500,
-      Math.min(45000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
+      Math.min(90000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
     ),
     voice: state.ttsServerVoice,
     now: () => performance.now(),
@@ -10508,7 +11060,7 @@ async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) {
     ),
     timeoutMs: Math.max(
       1500,
-      Math.min(45000, Math.round(Number(opts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
+      Math.min(90000, Math.round(Number(opts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
     ),
     voice: state.ttsServerVoice,
     now: () => performance.now(),
@@ -10530,8 +11082,18 @@ async function playAudioByContext(blob, debugContext = {}) {
     recordTTSDebugEvent("context_unavailable", debugContext);
     return false;
   }
+  const playbackGeneration = Number(debugContext.playbackGeneration || state.ttsPlaybackGeneration || 0);
+  if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+    recordTTSDebugEvent("context_stale_skip", {
+      ...debugContext,
+      result: "stale"
+    });
+    return false;
+  }
   let markedSpeaking = false;
   let fallbackTimer = 0;
+  let source = null;
+  let contextPlaybackStarted = false;
   try {
     if (!state.ttsDecodeContext || state.ttsDecodeContext.state === "closed") {
       state.ttsDecodeContext = new AudioCtx();
@@ -10540,19 +11102,38 @@ async function playAudioByContext(blob, debugContext = {}) {
     if (ctx.state === "suspended") {
       await ctx.resume();
     }
+    if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+      recordTTSDebugEvent("context_stale_skip", {
+        ...debugContext,
+        result: "stale"
+      });
+      return false;
+    }
     const arrayBuf = await blob.arrayBuffer();
     const decoded = await ctx.decodeAudioData(arrayBuf.slice(0));
-    recordTTSDebugEvent("context_play_start", {
-      ...debugContext,
-      blobBytes: Number(blob?.size || arrayBuf.byteLength || 0),
-      durationMs: Number.isFinite(Number(decoded.duration)) && decoded.duration > 0
-        ? Math.round(decoded.duration * 1000)
-        : -1
-    });
-    const source = ctx.createBufferSource();
+    if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+      recordTTSDebugEvent("context_stale_skip", {
+        ...debugContext,
+        result: "stale"
+      });
+      return false;
+    }
+      recordTTSDebugEvent("context_play_start", {
+        ...debugContext,
+        blobBytes: Number(blob?.size || arrayBuf.byteLength || 0),
+        durationMs: Number.isFinite(Number(decoded.duration)) && decoded.duration > 0
+          ? Math.round(decoded.duration * 1000)
+          : -1
+      });
+      state.ttsDebugAudioStartedAt = performance.now();
+      if (debugContext.sessionId) {
+        state.streamSpeakPlayedSession = Number(debugContext.sessionId || 0);
+      }
+    source = ctx.createBufferSource();
     const gain = ctx.createGain();
     gain.gain.value = 1.0;
     source.buffer = decoded;
+    state.ttsContextBufferSource = source;
     if (!state.ttsAudioAnalyser || state.ttsAudioAnalyser.context !== ctx) {
       state.ttsAudioAnalyser = ctx.createAnalyser();
       state.ttsAudioAnalyser.fftSize = 256;
@@ -10578,11 +11159,35 @@ async function playAudioByContext(blob, debugContext = {}) {
         ? Math.round(decoded.duration * 1000)
         : 45000;
       fallbackTimer = window.setTimeout(resolveOnce, Math.min(180000, durationMs + 900));
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+        recordTTSDebugEvent("context_stale_skip", {
+          ...debugContext,
+          result: "stale"
+        });
+        resolveOnce();
+        return;
+      }
       source.start(0);
+      contextPlaybackStarted = true;
     });
+    if (state.ttsContextBufferSource === source) {
+      state.ttsContextBufferSource = null;
+    }
     if (fallbackTimer) {
       clearTimeout(fallbackTimer);
       fallbackTimer = 0;
+    }
+    try {
+      source.disconnect();
+    } catch (_) {
+      // ignore
+    }
+    if (!contextPlaybackStarted || !isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+      recordTTSDebugEvent("context_stale_skip", {
+        ...debugContext,
+        result: "stale"
+      });
+      return false;
     }
     state.ttsContextSpeaking = false;
     state.ttsAudioLevel = 0;
@@ -10599,12 +11204,29 @@ async function playAudioByContext(blob, debugContext = {}) {
       clearTimeout(fallbackTimer);
       fallbackTimer = 0;
     }
-    if (markedSpeaking) {
+    if (markedSpeaking && isCurrentTTSPlaybackGeneration(playbackGeneration)) {
       state.ttsContextSpeaking = false;
     }
-    state.ttsAudioLevel = 0;
-    state.ttsAudioRawLevel = 0;
-    state.ttsAudioRms = 0;
+    if (source) {
+      try {
+        source.stop(0);
+      } catch (_) {
+        // ignore
+      }
+      try {
+        source.disconnect();
+      } catch (_) {
+        // ignore
+      }
+    }
+    if (state.ttsContextBufferSource === source) {
+      state.ttsContextBufferSource = null;
+    }
+    if (isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+      state.ttsAudioLevel = 0;
+      state.ttsAudioRawLevel = 0;
+      state.ttsAudioRms = 0;
+    }
     recordTTSDebugEvent("context_play_fail", {
       ...debugContext,
       result: "fail",
@@ -10618,6 +11240,18 @@ async function playAudioBlob(blob, opts = {}) {
   if (!blob) {
     return false;
   }
+  const playbackGeneration = Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0);
+  if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+    recordTTSDebugEvent("audio_stale_skip", {
+      traceId: String(opts.perfTraceId || state.activePerfTraceId || "").trim(),
+      sessionId: Number(opts.sessionId || state.streamSpeakSession || 0),
+      segmentId: Number(opts.segmentId || 0),
+      text: opts.text || "",
+      blobBytes: Number(blob?.size || 0),
+      result: "stale"
+    });
+    return false;
+  }
   const perfTraceId = String(opts.perfTraceId || state.activePerfTraceId || "").trim();
   const perfBlobReadyPerfMs = Number(opts.perfBlobReadyPerfMs) || 0;
   const perfSpeakStartedPerfMs = Number(opts.perfSpeakStartedPerfMs) || 0;
@@ -10626,9 +11260,17 @@ async function playAudioBlob(blob, opts = {}) {
     sessionId: Number(opts.sessionId || state.streamSpeakSession || 0),
     segmentId: Number(opts.segmentId || 0),
     text: opts.text || "",
-    blobBytes: Number(blob?.size || 0)
+    blobBytes: Number(blob?.size || 0),
+    playbackGeneration
   };
   recordTTSDebugEvent("audio_blob_ready", debugContext);
+  if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+    recordTTSDebugEvent("audio_stale_skip", {
+      ...debugContext,
+      result: "stale"
+    });
+    return false;
+  }
   if (!state.ttsAudio) {
     state.ttsAudio = new Audio();
     state.ttsAudio.preload = "auto";
@@ -10641,6 +11283,8 @@ async function playAudioBlob(blob, opts = {}) {
   const speechMood = String(opts.mood || detectMood(speechText) || "idle");
   const speechStyle = normalizeTalkStyle(opts.style || state.currentTalkStyle || "neutral");
   const url = URL.createObjectURL(blob);
+  const audioPlaybackToken = Number(state.ttsAudioPlaybackToken || 0) + 1;
+  state.ttsAudioPlaybackToken = audioPlaybackToken;
   if (opts.interrupt) {
     recordTTSDebugEvent("audio_interrupt", debugContext);
     try {
@@ -10656,7 +11300,14 @@ async function playAudioBlob(blob, opts = {}) {
     let startupTimer = 0;
     let progressTimer = 0;
     let fallbackSpeechStarted = false;
+    const isCurrentHtmlAudioPlayback = () => (
+      Number(state.ttsAudioPlaybackToken || 0) === audioPlaybackToken
+      && audio.src === url
+    );
     const stopHtmlAudio = () => {
+      if (!isCurrentHtmlAudioPlayback()) {
+        return;
+      }
       try {
         audio.pause();
         audio.currentTime = 0;
@@ -10665,6 +11316,9 @@ async function playAudioBlob(blob, opts = {}) {
       }
     };
     const beginFallbackSpeech = () => {
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+        return;
+      }
       if (fallbackSpeechStarted) {
         return;
       }
@@ -10705,6 +11359,19 @@ async function playAudioBlob(blob, opts = {}) {
         clearInterval(progressTimer);
         progressTimer = 0;
       }
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration) || !isCurrentHtmlAudioPlayback()) {
+        recordTTSDebugEvent("audio_stale_skip", {
+          ...debugContext,
+          result: "stale"
+        });
+        try {
+          URL.revokeObjectURL(url);
+        } catch (_) {
+          // ignore
+        }
+        resolve(false);
+        return;
+      }
       state.ttsContextSpeaking = false;
       state.ttsAudioLevel = 0;
       state.ttsAudioRawLevel = 0;
@@ -10735,14 +11402,26 @@ async function playAudioBlob(blob, opts = {}) {
       resolve(ok);
     };
     audio.onended = () => {
+      if (!isCurrentHtmlAudioPlayback()) {
+        done(false);
+        return;
+      }
       recordTTSAudioEvent("audio_ended_event", audio, debugContext);
       done(true);
     };
     audio.onerror = async () => {
+      if (!isCurrentHtmlAudioPlayback()) {
+        done(false);
+        return;
+      }
       recordTTSAudioEvent("audio_error", audio, debugContext, {
         error: String(audio.error?.message || audio.error?.code || "")
       });
       stopHtmlAudio();
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+        done(false);
+        return;
+      }
       beginFallbackSpeech();
       const ok = await playAudioByContext(blob, debugContext);
       done(!!ok);
@@ -10758,8 +11437,16 @@ async function playAudioBlob(blob, opts = {}) {
     audio.onstalled = () => recordTTSAudioEvent("audio_stalled", audio, debugContext);
     audio.onsuspend = () => recordTTSAudioEvent("audio_suspend", audio, debugContext);
     audio.onplay = () => {
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration) || !isCurrentHtmlAudioPlayback()) {
+        stopHtmlAudio();
+        done(false);
+        return;
+      }
       state.ttsDebugAudioStartedAt = performance.now();
       state.ttsDebugAudioEndedAt = 0;
+      if (debugContext.sessionId) {
+        state.streamSpeakPlayedSession = Number(debugContext.sessionId || 0);
+      }
       recordTTSDebugEvent("audio_play_start", {
         ...debugContext,
         durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
@@ -10788,6 +11475,10 @@ async function playAudioBlob(blob, opts = {}) {
         if (settled) {
           return;
         }
+        if (!isCurrentHtmlAudioPlayback()) {
+          done(false);
+          return;
+        }
         const current = Number(audio.currentTime || 0);
         if (current > lastCurrentTime + 0.01) {
           lastCurrentTime = current;
@@ -10801,6 +11492,10 @@ async function playAudioBlob(blob, opts = {}) {
           return;
         }
         stopHtmlAudio();
+        if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+          done(false);
+          return;
+        }
         beginFallbackSpeech();
         const ok = await playAudioByContext(blob, debugContext);
         done(!!ok);
@@ -10813,6 +11508,11 @@ async function playAudioBlob(blob, opts = {}) {
       showSubtitleText(speechText);
     };
     audio.onloadedmetadata = () => {
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration) || !isCurrentHtmlAudioPlayback()) {
+        stopHtmlAudio();
+        done(false);
+        return;
+      }
       if (Number.isFinite(Number(audio.duration)) && audio.duration > 0) {
         state.ttsDebugAudioDurationMs = Math.round(audio.duration * 1000);
         recordTTSDebugEvent("audio_metadata", {
@@ -10825,6 +11525,10 @@ async function playAudioBlob(blob, opts = {}) {
         });
         if (audio.paused && !audio.ended) {
           audio.play().catch(async () => {
+            if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+              done(false);
+              return;
+            }
             beginFallbackSpeech();
             const ok = await playAudioByContext(blob, debugContext);
             done(!!ok);
@@ -10832,6 +11536,10 @@ async function playAudioBlob(blob, opts = {}) {
         }
       }
     };
+    if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+      done(false);
+      return;
+    }
     audio.src = url;
     audio.play().then(() => {
       if (startupTimer) {
@@ -10841,6 +11549,10 @@ async function playAudioBlob(blob, opts = {}) {
     }).catch(async () => {
       recordTTSDebugEvent("audio_play_rejected", debugContext);
       stopHtmlAudio();
+      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+        done(false);
+        return;
+      }
       beginFallbackSpeech();
       const ok = await playAudioByContext(blob, debugContext);
       done(!!ok);
@@ -10853,6 +11565,10 @@ async function playAudioBlob(blob, opts = {}) {
       if (audio.paused && !audio.ended && Number(audio.currentTime || 0) === 0) {
         recordTTSDebugEvent("audio_startup_stalled", debugContext);
         stopHtmlAudio();
+        if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+          done(false);
+          return;
+        }
         beginFallbackSpeech();
         const ok = await playAudioByContext(blob, debugContext);
         done(!!ok);
@@ -10865,6 +11581,7 @@ async function speakByServer(text, opts = {}) {
   const force = !!opts.force;
   const perfTraceId = String(opts.perfTraceId || state.activePerfTraceId || "").trim();
   const speakStartedPerfMs = performance.now();
+  const playbackGeneration = Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0);
   if (!force && !state.speakingEnabled) {
     return false;
   }
@@ -10902,6 +11619,14 @@ async function speakByServer(text, opts = {}) {
       timeoutMs: Number(state.ttsServerRequestTimeoutMs),
       traceId: perfTraceId
     });
+    if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+      recordTTSDebugEvent("speak_stale_skip", {
+        traceId: perfTraceId || "(none)",
+        text: cleaned,
+        result: "stale"
+      });
+      return false;
+    }
     return await playAudioBlob(blob, {
       interrupt: !!opts.interrupt,
       text: cleaned,
@@ -10909,9 +11634,19 @@ async function speakByServer(text, opts = {}) {
       style: opts.style || state.currentTalkStyle || "neutral",
       perfTraceId,
       perfBlobReadyPerfMs: performance.now(),
-      perfSpeakStartedPerfMs: speakStartedPerfMs
+      perfSpeakStartedPerfMs: speakStartedPerfMs,
+      playbackGeneration
     });
   } catch (err) {
+    if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+      recordTTSDebugEvent("speak_stale_skip", {
+        traceId: perfTraceId || "(none)",
+        text: cleaned,
+        result: "stale",
+        error: String(err?.message || err || "")
+      });
+      return false;
+    }
     perfLog("tts", "speak_fail", {
       traceId: perfTraceId || "(none)",
       elapsedMs: Math.round(performance.now() - speakStartedPerfMs),
@@ -10927,14 +11662,26 @@ async function speakByServer(text, opts = {}) {
 }
 
 async function speak(text, opts = {}) {
+  const speakOpts = {
+    ...opts,
+    playbackGeneration: Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0)
+  };
   if (isServerTTSProvider(state.ttsProvider)) {
     // Always retry even if a previous call failed - GPT-SoVITS may have started later.
-    const ok = await speakByServer(text, opts);
+    const ok = await speakByServer(text, speakOpts);
     if (ok) {
       state.ttsServerAvailable = true;
       state.ttsServerFailStreak = 0;
       state.ttsServerLastError = "";
       return true;
+    }
+    if (!isCurrentTTSPlaybackGeneration(speakOpts.playbackGeneration)) {
+      recordTTSDebugEvent("speak_fallback_stale_skip", {
+        traceId: String(speakOpts.perfTraceId || state.activePerfTraceId || "(none)"),
+        text,
+        result: "stale"
+      });
+      return false;
     }
     if (!state.serverTTSFallbackToBrowser) {
       return false;
@@ -10960,7 +11707,16 @@ async function speak(text, opts = {}) {
         streak: failStreak,
         reason: lastErr
       });
-      return await speakByBrowser(text, { force: !!opts.force });
+      recordTTSDebugEvent("browser_fallback_start", {
+        traceId: String(speakOpts.perfTraceId || state.activePerfTraceId || "(none)"),
+        text,
+        provider: state.ttsProvider,
+        streak: failStreak,
+        threshold: failThreshold,
+        error: lastErr,
+        timeoutMs: Number(state.ttsServerRequestTimeoutMs || 0)
+      });
+      return await speakByBrowser(text, { force: !!speakOpts.force, playbackGeneration: speakOpts.playbackGeneration });
     }
     const nonRetriableClientError =
       /^HTTP\s+4\d\d$/i.test(lastErr) && !/^HTTP\s+(408|429)$/i.test(lastErr);
@@ -10981,9 +11737,9 @@ async function speak(text, opts = {}) {
       threshold: failThreshold,
       reason: lastErr
     });
-    return await speakByBrowser(text, { force: !!opts.force });
+    return await speakByBrowser(text, { force: !!speakOpts.force, playbackGeneration: speakOpts.playbackGeneration });
   }
-  return await speakByBrowser(text, opts);
+  return await speakByBrowser(text, speakOpts);
 }
 
 function switchVoice() {
@@ -11287,12 +12043,11 @@ async function requestAssistantReply(text, opts = {}) {
   let latencyHintTimer = 0;
   const streamSpeakSession = Date.now();
   const useStreamSpeak = shouldUseStreamSpeak();
+  stopAllAudioPlayback();
   state.streamSpeakSession = streamSpeakSession;
   state.streamSpeakQueue = [];
   state.streamSpeakBuffer = "";
-  if (useStreamSpeak) {
-    stopAllAudioPlayback();
-  }
+  state.streamSpeakLastEnqueueSession = 0;
   if (shouldPlayLatencyHint(isAuto, useStreamSpeak)) {
     latencyHintTimer = window.setTimeout(async () => {
       if (!state.chatBusy || gotFirstDelta) {
@@ -11428,16 +12183,41 @@ async function requestAssistantReply(text, opts = {}) {
     if (useStreamSpeak) {
       flushStreamSpeak(streamSpeakSession, finalTalkStyle);
       const hadStreamSegments = state.streamSpeakLastEnqueueSession === streamSpeakSession;
-      if (!hadStreamSegments) {
+      if (hadStreamSegments && state.streamSpeakPlayedSession === streamSpeakSession) {
+        scheduleFinalSpeechWatchdog({
+          sessionId: streamSpeakSession,
+          text: visibleReply,
+          mood,
+          style: finalTalkStyle,
+          traceId: chatPerfTraceId
+        });
+      } else if (!hadStreamSegments || !state.streamSpeakWorking) {
         const speechText = buildStableSpeakText(visibleReply) || visibleReply;
         const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalTalkStyle);
         maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
+        const discardedSegments = discardQueuedStreamSpeakItems(streamSpeakSession);
+        recordTTSDebugEvent("final_direct_tts", {
+          traceId: chatPerfTraceId,
+          sessionId: streamSpeakSession,
+          text: speechText || visibleReply,
+          result: hadStreamSegments ? "no_stream_playback_yet" : "no_stream_segments",
+          blobBytes: discardedSegments
+        });
         await speak(speechText || visibleReply, {
           prosody,
           interrupt: true,
           mood,
           style: finalTalkStyle,
-          perfTraceId: chatPerfTraceId
+          perfTraceId: chatPerfTraceId,
+          playbackGeneration: Number(state.ttsPlaybackGeneration || 0)
+        });
+      } else {
+        scheduleFinalSpeechWatchdog({
+          sessionId: streamSpeakSession,
+          text: visibleReply,
+          mood,
+          style: finalTalkStyle,
+          traceId: chatPerfTraceId
         });
       }
     } else {
@@ -11949,6 +12729,18 @@ function bindUI() {
     ui.learningTabSamples.addEventListener("click", () => {
       learningReviewState.activeTab = "samples";
       renderLearningReviewList();
+    });
+  }
+
+  if (ui.learningTabDebug) {
+    ui.learningTabDebug.addEventListener("click", async () => {
+      learningReviewState.activeTab = "debug";
+      renderLearningReviewList();
+      try {
+        await reloadMemoryDebugData();
+      } catch (err) {
+        setStatus(`Memory debug failed: ${err.message || err}`);
+      }
     });
   }
 

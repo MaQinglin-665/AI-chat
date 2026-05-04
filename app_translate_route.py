@@ -1,13 +1,19 @@
 from http import HTTPStatus
+import threading
+
+from utils import _safe_bool
 
 
 TRANSLATE_SYSTEM_PROMPT = (
-    "Translate the user's text into natural Simplified Chinese. "
-    "Return only the translation."
+    "You are a translation engine. Translate the user's source text into natural Simplified Chinese. "
+    "Return only the translated text. Do not answer the source text, apologize, introduce yourself, "
+    "mention your model/provider/company, or add explanations."
 )
 
 DEFAULT_TRANSLATE_TIMEOUT_SEC = 45
 DEFAULT_TRANSLATE_NUM_CTX = 512
+DEFAULT_TRANSLATE_MAX_TOKENS = 384
+TRANSLATE_LLM_LOCK = threading.Lock()
 
 
 def resolve_translate_timeout_sec(llm_cfg):
@@ -28,6 +34,27 @@ def resolve_translate_num_ctx(llm_cfg):
     return max(256, min(2048, value))
 
 
+def resolve_translate_max_tokens(llm_cfg):
+    raw = (llm_cfg or {}).get("translate_max_tokens", DEFAULT_TRANSLATE_MAX_TOKENS)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = DEFAULT_TRANSLATE_MAX_TOKENS
+    return max(64, min(1024, value))
+
+
+def should_use_translate_max_completion_tokens(llm_cfg):
+    cfg = llm_cfg if isinstance(llm_cfg, dict) else {}
+    if "translate_use_max_completion_tokens" in cfg:
+        return _safe_bool(cfg.get("translate_use_max_completion_tokens"), False)
+    if "use_max_completion_tokens" in cfg:
+        return _safe_bool(cfg.get("use_max_completion_tokens"), False)
+
+    model = str(cfg.get("translate_model") or cfg.get("model") or "").strip().lower()
+    base_url = str(cfg.get("base_url") or "").strip().lower()
+    return model.startswith("mimo-") or "xiaomimimo.com" in base_url
+
+
 def _elapsed_ms(perf_now_ms_func, started_ms):
     if not callable(perf_now_ms_func) or started_ms is None:
         return -1
@@ -38,13 +65,112 @@ def _elapsed_ms(perf_now_ms_func, started_ms):
 
 
 def build_translate_messages(text):
+    source = str(text or "")
     return [
         {
             "role": "system",
             "content": TRANSLATE_SYSTEM_PROMPT,
         },
-        {"role": "user", "content": text},
+        {
+            "role": "user",
+            "content": (
+                "Translate only the text between <source> and </source> into Simplified Chinese.\n"
+                "Return only the translation.\n"
+                "<source>\n"
+                f"{source}\n"
+                "</source>"
+            ),
+        },
     ]
+
+
+def _count_cjk(text):
+    return sum(1 for ch in str(text or "") if "\u4e00" <= ch <= "\u9fff")
+
+
+def _count_latin(text):
+    return sum(1 for ch in str(text or "") if ("a" <= ch.lower() <= "z"))
+
+
+def _looks_like_english_source(text):
+    safe = str(text or "").strip()
+    if not safe:
+        return False
+    return _count_latin(safe) >= 6 and _count_cjk(safe) == 0
+
+
+def _looks_like_model_answer_not_translation(text):
+    safe = str(text or "").strip().lower()
+    if not safe:
+        return False
+    bad_markers = (
+        "i'm mimo",
+        "i am mimo",
+        "xiaomi",
+        "hyperos",
+        "official ai assistant",
+        "here to help",
+        "i'll do my best",
+        "i am an ai",
+        "as an ai",
+        "i'm sorry",
+        "i apologize",
+    )
+    return any(marker in safe for marker in bad_markers)
+
+
+def validate_translation_result(source, translated):
+    src = str(source or "").strip()
+    out = str(translated or "").strip()
+    if not out:
+        return False, "empty_translation"
+    if _looks_like_model_answer_not_translation(out):
+        return False, "model_answer_not_translation"
+    if _looks_like_english_source(src):
+        if _count_cjk(out) <= 0:
+            return False, "translation_missing_chinese"
+        if _count_latin(out) > max(12, _count_cjk(out) * 2):
+            return False, "translation_mostly_non_chinese"
+    return True, ""
+
+
+def _collect_stream_translation(iter_openai_chat_stream_func, llm_cfg, messages):
+    chunks = []
+    for chunk in iter_openai_chat_stream_func(llm_cfg, messages):
+        if isinstance(chunk, str) and chunk:
+            chunks.append(chunk)
+    return "".join(chunks).strip()
+
+
+def _call_translate_llm(
+    provider,
+    translate_cfg,
+    messages,
+    *,
+    call_ollama_func,
+    call_openai_compatible_func,
+    iter_openai_chat_stream_func=None,
+):
+    if provider == "ollama":
+        return call_ollama_func(translate_cfg, messages)
+
+    provider_key = str(provider or "").strip().lower()
+    can_stream = callable(iter_openai_chat_stream_func)
+    if provider_key in {"openai-compatible", "openai_compatible"} and can_stream:
+        result = _collect_stream_translation(iter_openai_chat_stream_func, translate_cfg, messages)
+        if result:
+            return result
+        return call_openai_compatible_func(translate_cfg, messages)
+
+    try:
+        return call_openai_compatible_func(translate_cfg, messages)
+    except Exception:
+        if not can_stream:
+            raise
+        result = _collect_stream_translation(iter_openai_chat_stream_func, translate_cfg, messages)
+        if not result:
+            raise
+        return result
 
 
 def handle_translate_request(
@@ -62,6 +188,7 @@ def handle_translate_request(
     client_to_server_ms=-1,
     log_backend_perf_func=None,
     perf_now_ms_func=None,
+    iter_openai_chat_stream_func=None,
 ):
     payload = body if isinstance(body, dict) else {}
     text = str(payload.get("text", "")).strip()
@@ -75,13 +202,18 @@ def handle_translate_request(
     selected_model = ""
     timeout_sec = DEFAULT_TRANSLATE_TIMEOUT_SEC
     num_ctx = DEFAULT_TRANSLATE_NUM_CTX
+    max_tokens = DEFAULT_TRANSLATE_MAX_TOKENS
     llm_started_ms = None
     llm_ms = -1
     try:
         cfg = load_config_func()
         llm_cfg = cfg.get("llm", {}) if isinstance(cfg, dict) else {}
         translate_cfg = dict(llm_cfg)
-        provider = str(llm_cfg.get("provider", "ollama")).lower()
+        translate_provider = str(llm_cfg.get("translate_provider", "") or "").strip()
+        translate_base_url = str(llm_cfg.get("translate_base_url", "") or "").strip()
+        translate_api_key_env = str(llm_cfg.get("translate_api_key_env", "") or "").strip()
+        translate_api_key = str(llm_cfg.get("translate_api_key", "") or "").strip()
+        provider = str(translate_provider or llm_cfg.get("provider", "ollama")).lower()
         selected_model = str(
             llm_cfg.get("translate_model")
             or llm_cfg.get("model")
@@ -89,6 +221,7 @@ def handle_translate_request(
         ).strip()
         timeout_sec = resolve_translate_timeout_sec(llm_cfg)
         num_ctx = resolve_translate_num_ctx(llm_cfg)
+        max_tokens = resolve_translate_max_tokens(llm_cfg)
         if callable(log_backend_perf_func):
             log_backend_perf_func(
                 "TRANSLATE",
@@ -100,25 +233,45 @@ def handle_translate_request(
                 text_chars=len(text),
                 timeout_sec=timeout_sec,
                 num_ctx=num_ctx,
+                max_tokens=max_tokens,
             )
-        translate_cfg["max_output_tokens"] = 96
-        translate_cfg["max_tokens"] = 96
+        translate_cfg["max_output_tokens"] = max_tokens
+        translate_cfg["max_tokens"] = max_tokens
+        translate_cfg["max_completion_tokens"] = max_tokens
+        translate_cfg["use_max_completion_tokens"] = should_use_translate_max_completion_tokens(llm_cfg)
+        translate_cfg["allow_high_output_tokens"] = max_tokens > 256
         translate_cfg["temperature"] = 0.1
         translate_cfg["request_timeout"] = timeout_sec
         translate_cfg["num_ctx"] = num_ctx
         translate_cfg["min_num_ctx"] = min(num_ctx, 1024)
+        if translate_provider:
+            translate_cfg["provider"] = translate_provider
+        if translate_base_url:
+            translate_cfg["base_url"] = translate_base_url
+        if translate_api_key_env:
+            translate_cfg["api_key_env"] = translate_api_key_env
+        if translate_api_key:
+            translate_cfg["api_key"] = translate_api_key
         translate_model = str(llm_cfg.get("translate_model", "")).strip()
         if translate_model:
             translate_cfg["model"] = translate_model
         messages = build_translate_messages(text)
         if callable(perf_now_ms_func):
             llm_started_ms = perf_now_ms_func()
-        if provider == "ollama":
-            result = call_ollama_func(translate_cfg, messages)
-        else:
-            result = call_openai_compatible_func(translate_cfg, messages)
+        with TRANSLATE_LLM_LOCK:
+            result = _call_translate_llm(
+                provider,
+                translate_cfg,
+                messages,
+                call_ollama_func=call_ollama_func,
+                call_openai_compatible_func=call_openai_compatible_func,
+                iter_openai_chat_stream_func=iter_openai_chat_stream_func,
+            )
         llm_ms = _elapsed_ms(perf_now_ms_func, llm_started_ms)
         translated = str(result or "").strip() or text
+        is_valid, invalid_reason = validate_translation_result(text, translated)
+        if not is_valid:
+            raise RuntimeError(f"invalid translation result: {invalid_reason}")
         response = {
             "translated": translated,
             "translated_text": translated,
@@ -156,5 +309,6 @@ def handle_translate_request(
             fallback=response.get("fallback") is True,
             timeout_sec=timeout_sec,
             num_ctx=num_ctx,
+            max_tokens=max_tokens,
         )
     send_json_func(response, status=status)

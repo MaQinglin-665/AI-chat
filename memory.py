@@ -27,8 +27,14 @@ MEM0_HISTORY_DB_PATH = MEM0_DIR / "history.db"
 PROFILE_MEMORY_PATH = MEMORY_PATH.parent / "memory_profile.json"
 RELATIONSHIP_MEMORY_PATH = MEMORY_PATH.parent / "memory_relationship.json"
 MANUAL_PERSONA_CARD_PATH = MEMORY_PATH.parent / "memory_persona_card.json"
+LEARNING_CANDIDATES_PATH = MEMORY_PATH.parent / "learning_candidates.json"
+LEARNING_SAMPLES_PATH = MEMORY_PATH.parent / "learning_samples.json"
+LEARNING_STATE_PATH = MEMORY_PATH.parent / "learning_state.json"
+LEARNING_AUDIT_LOG_PATH = MEMORY_PATH.parent / "learning_audit_log.jsonl"
+LEARNING_SHADOW_LOG_PATH = MEMORY_PATH.parent / "learning_shadow_log.jsonl"
 
 MEM0_CLIENT = None
+LAST_MEMORY_DEBUG = {}
 MEM0_CLIENT_KEY = ""
 
 LEGACY_MANUAL_PERSONA_CARD_FIELDS = (
@@ -201,6 +207,62 @@ def is_lightweight_checkin_message(text):
             safe,
         )
     )
+
+
+LOW_SIGNAL_MEMORY_QUERIES = {
+    "ok",
+    "okay",
+    "yes",
+    "yep",
+    "sure",
+    "good",
+    "continue",
+    "goon",
+    "next",
+    "nextstep",
+    "\u597d",
+    "\u597d\u7684",
+    "\u53ef\u4ee5",
+    "\u884c",
+    "\u55ef",
+    "\u55ef\u55ef",
+    "\u662f\u7684",
+    "\u7ee7\u7eed",
+    "\u4e0b\u4e00\u6b65",
+    "\u7136\u540e\u5462",
+}
+
+
+def has_explicit_memory_intent(text):
+    safe = str(text or "").strip().lower()
+    if not safe:
+        return False
+    return bool(
+        re.search(
+            r"(remember|recall|memory|memories|previously|earlier|last time|\u8bb0\u5f97|\u8bb0\u5fc6|\u4e4b\u524d|\u4ee5\u524d|\u4e0a\u6b21)",
+            safe,
+        )
+    )
+
+
+def is_specific_memory_query(text):
+    raw = str(text or "").strip()
+    if not raw:
+        return False
+    compact = re.sub(r"[\s\u3000，。！？!?.,;:、~～'\"]+", "", raw.lower())
+    if compact in LOW_SIGNAL_MEMORY_QUERIES:
+        return False
+    if has_explicit_memory_intent(raw):
+        return True
+
+    alpha_terms = re.findall(r"[A-Za-z0-9_]{3,}", raw.lower())
+    cjk_terms = [ch for ch in raw if "\u4e00" <= ch <= "\u9fff" and ch not in CN_CHAR_STOPWORDS]
+    tokens = tokenize_memory_text(raw)
+    if len(alpha_terms) >= 2:
+        return True
+    if len(cjk_terms) >= 6 and len(tokens) >= 2:
+        return True
+    return len(tokens) >= 3 and len(compact) >= 8
 
 
 def tokenize_memory_text(text):
@@ -505,15 +567,60 @@ def _append_unique_memory_item(chosen, seen, item):
     return True
 
 
+def _compact_memory_debug_item(item, source="", score=None):
+    safe = item if isinstance(item, dict) else {}
+    out = {
+        "ts": str(safe.get("ts", ""))[:32],
+        "user": normalize_memory_text(safe.get("user", ""), max_len=90),
+        "assistant": normalize_memory_text(safe.get("assistant", ""), max_len=110),
+        "source": str(source or "").strip(),
+    }
+    if score is not None:
+        try:
+            out["score"] = int(score)
+        except (TypeError, ValueError):
+            out["score"] = 0
+    return out
+
+
+def _set_last_memory_debug(snapshot):
+    global LAST_MEMORY_DEBUG
+    LAST_MEMORY_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+
+
 def select_memory_items_for_prompt(config, user_message, safe_history):
     settings = get_memory_settings(config)
+    explicit_memory_intent = has_explicit_memory_intent(user_message)
+    specific_memory_query = is_specific_memory_query(user_message)
+    debug = {
+        "message": normalize_memory_text(user_message, max_len=160),
+        "enabled": bool(settings["enabled"]),
+        "mem0_enabled": bool(settings["mem0_enabled"]),
+        "is_lightweight_checkin": is_lightweight_checkin_message(user_message),
+        "explicit_memory_intent": explicit_memory_intent,
+        "is_specific_memory_query": specific_memory_query,
+        "reason": "",
+        "selected": [],
+        "candidate_count": 0,
+        "relevant_candidates": [],
+        "recent_considered": 0,
+    }
     if not settings["enabled"]:
+        debug["reason"] = "memory_disabled"
+        _set_last_memory_debug(debug)
         return []
     if is_lightweight_checkin_message(user_message):
+        debug["reason"] = "lightweight_checkin"
+        _set_last_memory_debug(debug)
+        return []
+    if not explicit_memory_intent and not specific_memory_query:
+        debug["reason"] = "low_signal_or_unspecific"
+        _set_last_memory_debug(debug)
         return []
 
     with MEMORY_LOCK:
         fallback_items = load_memory_items()
+    debug["candidate_count"] = len(fallback_items)
 
     chosen = []
     seen = set()
@@ -522,7 +629,14 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
 
     for item in _search_mem0_items(config, user_message, safe_history):
         if _append_unique_memory_item(chosen, seen, item) and len(chosen) >= relevant_target:
-            return chosen[:total_target] if total_target else []
+            result = chosen[:total_target] if total_target else []
+            debug["selected"] = [
+                _compact_memory_debug_item(item, source="mem0")
+                for item in result
+            ]
+            debug["reason"] = "selected" if result else "no_match"
+            _set_last_memory_debug(debug)
+            return result
 
     query_parts = [str(user_message or "")]
     query_parts.extend(
@@ -542,6 +656,10 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
             if score > 0:
                 scored.append((score, idx, item))
         scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
+        debug["relevant_candidates"] = [
+            _compact_memory_debug_item(item, source="keyword", score=score)
+            for score, _idx, item in scored[:8]
+        ]
 
         for score, _, item in scored:
             if score <= 0:
@@ -549,14 +667,22 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
             if _append_unique_memory_item(chosen, seen, item) and len(chosen) >= relevant_target:
                 break
 
-    recent_n = settings["inject_recent"]
+    recent_n = settings["inject_recent"] if explicit_memory_intent else 0
+    debug["recent_considered"] = recent_n
     if recent_n > 0 and len(chosen) < total_target:
         recent_items = fallback_items[-recent_n:]
         for item in recent_items:
             if _append_unique_memory_item(chosen, seen, item) and len(chosen) >= total_target:
                 break
 
-    return chosen[:total_target] if total_target else []
+    result = chosen[:total_target] if total_target else []
+    debug["selected"] = [
+        _compact_memory_debug_item(item, source="selected")
+        for item in result
+    ]
+    debug["reason"] = "selected" if result else "no_match"
+    _set_last_memory_debug(debug)
+    return result
 
 
 def build_memory_prompt_block(config, user_message, safe_history):
@@ -583,6 +709,583 @@ def merge_prompt_with_memory(prompt, memory_block):
     if base and memory:
         return f"{base}\n\n{memory}"
     return base or memory
+
+
+def _safe_load_json_file(path, fallback):
+    try:
+        if not path.exists():
+            return fallback
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+        return data if data is not None else fallback
+    except Exception:
+        return fallback
+
+
+def _safe_save_json_file(path, payload):
+    tmp_path = path.with_suffix(".tmp")
+    tmp_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    tmp_path.replace(path)
+
+
+def _tail_jsonl(path, limit=5):
+    try:
+        if not path.exists():
+            return []
+        lines = path.read_text(encoding="utf-8-sig").splitlines()[-max(0, int(limit)):]
+    except Exception:
+        return []
+    out = []
+    for line in lines:
+        line = str(line or "").strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+        except Exception:
+            data = {"raw": line[:300]}
+        out.append(data if isinstance(data, dict) else {"raw": str(data)[:300]})
+    return out
+
+
+def _compact_learning_audit_item(item):
+    safe = item if isinstance(item, dict) else {}
+    detail = safe.get("detail") if isinstance(safe.get("detail"), dict) else {}
+    compact_detail = {}
+    for key in ("candidate_ids", "promoted", "skipped", "pool", "ids", "delta", "changed"):
+        if key in detail:
+            compact_detail[key] = detail.get(key)
+    return {
+        "id": str(safe.get("id", ""))[:64],
+        "ts": str(safe.get("ts", ""))[:40],
+        "action": str(safe.get("action", safe.get("event", "")))[:48],
+        "event": str(safe.get("event", ""))[:48],
+        "detail": compact_detail,
+    }
+
+
+def _compact_learning_item(item):
+    safe = item if isinstance(item, dict) else {}
+    return {
+        "id": str(safe.get("id", "")).strip(),
+        "status": str(safe.get("status", "")).strip(),
+        "score": safe.get("score", 0),
+        "confidence": safe.get("confidence", 0),
+        "support_count": safe.get("support_count", 0),
+        "assistant_preview": normalize_memory_text(safe.get("assistant_preview", ""), max_len=90),
+        "compressed_pattern": normalize_memory_text(safe.get("compressed_pattern", ""), max_len=110),
+    }
+
+
+def _is_learning_text_garbled(item):
+    safe = item if isinstance(item, dict) else {}
+    return any(
+        looks_garbled_text(safe.get(key, ""))
+        for key in ("assistant_preview", "user_preview", "compressed_pattern")
+    )
+
+
+def _compact_learning_health_window(window):
+    safe = window if isinstance(window, dict) else {}
+    return {
+        "window_ended_at": str(safe.get("window_ended_at", "")).strip(),
+        "window_size": safe.get("window_size", 0),
+        "candidate_in_rate": safe.get("candidate_in_rate", 0),
+        "avg_confidence": safe.get("avg_confidence", 0),
+        "signal_coverage": safe.get("signal_coverage", 0),
+    }
+
+
+def _compact_learning_event(event):
+    safe = event if isinstance(event, dict) else {}
+    return {
+        "ts": str(safe.get("ts", "")).strip(),
+        "event": str(safe.get("event", "")).strip(),
+        "reason": str(safe.get("reason", "")).strip(),
+        "window_count": safe.get("window_count", 0),
+    }
+
+
+def _build_learning_diagnostics(candidates, samples, state):
+    candidate_items = [item for item in candidates if isinstance(item, dict)]
+    sample_items = [item for item in samples if isinstance(item, dict)]
+    all_items = candidate_items + sample_items
+    garbled_items = [item for item in all_items if _is_learning_text_garbled(item)]
+    events = state.get("events", []) if isinstance(state, dict) else []
+    if not isinstance(events, list):
+        events = []
+    health_windows = state.get("health_windows", []) if isinstance(state, dict) else []
+    if not isinstance(health_windows, list):
+        health_windows = []
+    current_window = state.get("current_window", []) if isinstance(state, dict) else []
+    if not isinstance(current_window, list):
+        current_window = []
+
+    degraded_events = [
+        _compact_learning_event(item)
+        for item in events
+        if isinstance(item, dict) and str(item.get("event", "")).strip()
+    ]
+    latest_degraded = degraded_events[-1] if degraded_events else {}
+    return {
+        "degraded_reason": latest_degraded.get("reason", ""),
+        "latest_event": latest_degraded,
+        "health_windows": [
+            _compact_learning_health_window(item)
+            for item in health_windows[-3:]
+            if isinstance(item, dict)
+        ],
+        "current_window_size": len(current_window),
+        "current_window_avg_confidence": _avg_numeric_field(current_window, "confidence"),
+        "current_window_signal_coverage": _rate_positive_field(current_window, "signal_count"),
+        "garbled_count": len(garbled_items),
+        "garbled_candidates_count": sum(1 for item in candidate_items if _is_learning_text_garbled(item)),
+        "garbled_samples_count": sum(1 for item in sample_items if _is_learning_text_garbled(item)),
+        "garbled_examples": [_compact_learning_item(item) for item in garbled_items[:3]],
+    }
+
+
+def _avg_numeric_field(items, key):
+    values = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            values.append(float(item.get(key, 0) or 0))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return 0
+    return round(sum(values) / len(values), 4)
+
+
+def _rate_positive_field(items, key):
+    valid = [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
+    if not valid:
+        return 0
+    positives = 0
+    for item in valid:
+        try:
+            if float(item.get(key, 0) or 0) > 0:
+                positives += 1
+        except (TypeError, ValueError):
+            continue
+    return round(positives / len(valid), 4)
+
+
+def _learning_now_iso():
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def _normalize_learning_review_item(item, fallback_id=""):
+    safe = item if isinstance(item, dict) else {}
+    item_id = str(safe.get("id") or fallback_id or "").strip()
+    assistant_preview = normalize_memory_text(safe.get("assistant_preview", ""), max_len=220)
+    user_preview = normalize_memory_text(safe.get("user_preview", ""), max_len=220)
+    compressed_pattern = normalize_memory_text(safe.get("compressed_pattern", ""), max_len=260)
+    if not item_id or (not assistant_preview and not compressed_pattern):
+        return None
+    out = dict(safe)
+    out["id"] = item_id
+    out["assistant_preview"] = assistant_preview
+    out["user_preview"] = user_preview
+    out["compressed_pattern"] = compressed_pattern
+    try:
+        out["score"] = max(0.0, min(1.0, float(safe.get("score", 0) or 0)))
+    except (TypeError, ValueError):
+        out["score"] = 0.0
+    try:
+        out["confidence"] = max(0.0, min(1.0, float(safe.get("confidence", 0) or 0)))
+    except (TypeError, ValueError):
+        out["confidence"] = 0.0
+    try:
+        out["support_count"] = max(0, int(safe.get("support_count", 0) or 0))
+    except (TypeError, ValueError):
+        out["support_count"] = 0
+    out["status"] = str(safe.get("status", "candidate") or "candidate").strip() or "candidate"
+    out["created_at"] = str(safe.get("created_at", "")).strip()
+    out["updated_at"] = str(safe.get("updated_at", "")).strip()
+    return out
+
+
+def _load_learning_review_store():
+    candidates_raw = _safe_load_json_file(LEARNING_CANDIDATES_PATH, [])
+    samples_raw = _safe_load_json_file(LEARNING_SAMPLES_PATH, [])
+    state = _safe_load_json_file(LEARNING_STATE_PATH, {})
+    if not isinstance(candidates_raw, list):
+        candidates_raw = []
+    if not isinstance(samples_raw, list):
+        samples_raw = []
+    if not isinstance(state, dict):
+        state = {}
+    candidates = [
+        item
+        for idx, raw in enumerate(candidates_raw)
+        for item in [_normalize_learning_review_item(raw, f"cand_{idx}")]
+        if item is not None
+    ]
+    samples = [
+        item
+        for idx, raw in enumerate(samples_raw)
+        for item in [_normalize_learning_review_item(raw, f"sample_{idx}")]
+        if item is not None
+    ]
+    return candidates, samples, state
+
+
+def _save_learning_review_store(candidates, samples, state=None):
+    _safe_save_json_file(LEARNING_CANDIDATES_PATH, candidates if isinstance(candidates, list) else [])
+    _safe_save_json_file(LEARNING_SAMPLES_PATH, samples if isinstance(samples, list) else [])
+    if isinstance(state, dict):
+        _safe_save_json_file(LEARNING_STATE_PATH, state)
+
+
+def _learning_quick_settings(state):
+    raw = state.get("quick_settings", {}) if isinstance(state, dict) else {}
+    if not isinstance(raw, dict):
+        raw = {}
+    try:
+        inject_count = int(raw.get("inject_count", 1) or 0)
+    except (TypeError, ValueError):
+        inject_count = 1
+    try:
+        promotion_min_support = int(raw.get("promotion_min_support", 1) or 1)
+    except (TypeError, ValueError):
+        promotion_min_support = 1
+    return {
+        "inject_count": 1 if inject_count >= 1 else 0,
+        "promotion_min_support": 2 if promotion_min_support >= 2 else 1,
+    }
+
+
+def _build_learning_review_payload(candidates, samples, state, message=""):
+    return {
+        "ok": True,
+        "message": str(message or "").strip(),
+        "candidates": candidates,
+        "samples": samples,
+        "quick_settings": _learning_quick_settings(state),
+        "state": {
+            "degraded_mode": bool((state or {}).get("degraded_mode", False)),
+            "turn_count": int((state or {}).get("turn_count", 0) or 0),
+        },
+    }
+
+
+def _append_learning_audit(action, before, after, detail=None):
+    event = {
+        "id": f"audit_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+        "ts": datetime.now().isoformat(timespec="microseconds"),
+        "action": str(action or "").strip(),
+        "before": before,
+        "after": after,
+        "detail": detail if isinstance(detail, dict) else {},
+    }
+    with LEARNING_AUDIT_LOG_PATH.open("a", encoding="utf-8") as fp:
+        fp.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+
+def _snapshot_learning_review(candidates, samples, state):
+    try:
+        safe_candidates = json.loads(json.dumps(candidates, ensure_ascii=False))
+        safe_samples = json.loads(json.dumps(samples, ensure_ascii=False))
+    except Exception:
+        safe_candidates = []
+        safe_samples = []
+    return {
+        "candidates": safe_candidates if isinstance(safe_candidates, list) else [],
+        "samples": safe_samples if isinstance(safe_samples, list) else [],
+        "quick_settings": _learning_quick_settings(state),
+        "degraded_mode": bool((state or {}).get("degraded_mode", False)),
+    }
+
+
+def _last_learning_shadow_observation_at():
+    for item in reversed(_tail_jsonl(LEARNING_SHADOW_LOG_PATH, limit=20)):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("type", "")).strip() != "learning_observation":
+            continue
+        ts = str(item.get("ts", "")).strip()
+        if ts:
+            return ts
+    return ""
+
+
+def _parse_learning_observed_datetime(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _maybe_recover_stale_learning_state(state):
+    safe = state if isinstance(state, dict) else {}
+    if not safe.get("degraded_mode", False):
+        return safe, False
+    last_observed = str(safe.get("last_observed_at", "") or "").strip()
+    if not last_observed:
+        last_observed = _last_learning_shadow_observation_at()
+    # The old scorer pipeline is no longer active in this build. If no scorer
+    # observation has landed recently, recover from stale degraded state so the
+    # review UI does not look permanently broken.
+    observed_dt = _parse_learning_observed_datetime(last_observed)
+    if observed_dt is None:
+        return safe, False
+    if observed_dt.tzinfo is not None:
+        age_days = (datetime.now(observed_dt.tzinfo) - observed_dt).total_seconds() / 86400
+    else:
+        age_days = (datetime.now() - observed_dt).total_seconds() / 86400
+    if age_days < 3:
+        return safe, False
+
+    recovered = dict(safe)
+    recovered["degraded_mode"] = False
+    recovered["recovered_from_degraded_at"] = _learning_now_iso()
+    recovered["recovered_reason"] = "stale_scorer_state"
+    events = recovered.get("events", [])
+    if not isinstance(events, list):
+        events = []
+    events.append(
+        {
+            "ts": recovered["recovered_from_degraded_at"],
+            "event": "SCORER_RECOVERED",
+            "reason": "stale_scorer_state",
+        }
+    )
+    recovered["events"] = events[-20:]
+    return recovered, True
+
+
+def get_learning_candidates_for_review(config=None):
+    candidates, samples, state = _load_learning_review_store()
+    return _build_learning_review_payload(candidates, samples, state)
+
+
+def get_learning_samples_for_review(config=None):
+    return get_learning_candidates_for_review(config)
+
+
+def reload_learning_review_data(config=None):
+    candidates, samples, state = _load_learning_review_store()
+    state, recovered = _maybe_recover_stale_learning_state(state)
+    if recovered:
+        _save_learning_review_store(candidates, samples, state)
+    message = "Learning review data reloaded."
+    if recovered:
+        message = "Learning review data reloaded; stale degraded state recovered."
+    return _build_learning_review_payload(candidates, samples, state, message=message)
+
+
+def _find_learning_items_by_ids(items, ids):
+    wanted = {str(item_id or "").strip() for item_id in ids if str(item_id or "").strip()}
+    return [item for item in items if str(item.get("id", "")).strip() in wanted]
+
+
+def promote_learning_review_candidates(config, candidate_ids):
+    ids = [str(item_id or "").strip() for item_id in candidate_ids if str(item_id or "").strip()]
+    candidates, samples, state = _load_learning_review_store()
+    before = _snapshot_learning_review(candidates, samples, state)
+    selected = _find_learning_items_by_ids(candidates, ids)
+    existing_sample_ids = {str(item.get("id", "")).strip() for item in samples}
+    promoted = 0
+    now = _learning_now_iso()
+    for item in selected:
+        sample = dict(item)
+        sample["id"] = f"learned_{item['id']}" if not str(item["id"]).startswith(("learned_", "manual_")) else item["id"]
+        sample["source"] = str(sample.get("source", "") or "learned")
+        sample["updated_at"] = now
+        if not sample.get("created_at"):
+            sample["created_at"] = now
+        if sample["id"] in existing_sample_ids:
+            continue
+        samples.append(sample)
+        existing_sample_ids.add(sample["id"])
+        item["status"] = "promoted"
+        item["updated_at"] = now
+        promoted += 1
+    after = _snapshot_learning_review(candidates, samples, state)
+    _append_learning_audit(
+        "promote",
+        before,
+        after,
+        {"candidate_ids": ids, "promoted": promoted, "skipped": max(0, len(ids) - promoted)},
+    )
+    _save_learning_review_store(candidates, samples, state)
+    return _build_learning_review_payload(
+        candidates,
+        samples,
+        state,
+        message=f"Promoted {promoted} learning candidate(s).",
+    )
+
+
+def update_learning_review_entries(
+    config,
+    *,
+    action,
+    pool="candidates",
+    ids=None,
+    delta=0.0,
+    quick_settings=None,
+):
+    action_key = str(action or "").strip().lower()
+    candidates, samples, state = _load_learning_review_store()
+    before = _snapshot_learning_review(candidates, samples, state)
+    target = samples if str(pool or "").strip().lower() == "samples" else candidates
+    ids = [str(item_id or "").strip() for item_id in (ids or []) if str(item_id or "").strip()]
+    changed = 0
+    now = _learning_now_iso()
+
+    if action_key == "config":
+        quick = _learning_quick_settings({"quick_settings": quick_settings or {}})
+        state["quick_settings"] = quick
+        changed = 1
+    elif action_key == "delete":
+        wanted = set(ids)
+        kept = [item for item in target if str(item.get("id", "")).strip() not in wanted]
+        changed = len(target) - len(kept)
+        if target is samples:
+            samples = kept
+        else:
+            candidates = kept
+    elif action_key == "weight":
+        try:
+            step = float(delta)
+        except (TypeError, ValueError):
+            step = 0.0
+        wanted = set(ids)
+        for item in target:
+            if str(item.get("id", "")).strip() not in wanted:
+                continue
+            try:
+                score = float(item.get("score", 0) or 0)
+            except (TypeError, ValueError):
+                score = 0.0
+            item["score"] = round(max(0.0, min(1.0, score + step)), 4)
+            item["updated_at"] = now
+            changed += 1
+    elif action_key == "keep":
+        wanted = set(ids)
+        for item in target:
+            if str(item.get("id", "")).strip() not in wanted:
+                continue
+            item["status"] = "active" if target is samples else "candidate"
+            item["updated_at"] = now
+            changed += 1
+    else:
+        return {"ok": False, "error": f"Unsupported learning action: {action_key}"}
+
+    after = _snapshot_learning_review(candidates, samples, state)
+    _append_learning_audit(
+        action_key,
+        before,
+        after,
+        {"pool": pool, "ids": ids, "delta": delta, "changed": changed},
+    )
+    _save_learning_review_store(candidates, samples, state)
+    return _build_learning_review_payload(
+        candidates,
+        samples,
+        state,
+        message=f"Learning review action '{action_key}' changed {changed} item(s).",
+    )
+
+
+def undo_last_learning_review_action(config=None):
+    audits = _tail_jsonl(LEARNING_AUDIT_LOG_PATH, limit=80)
+    if not audits:
+        candidates, samples, state = _load_learning_review_store()
+        return _build_learning_review_payload(candidates, samples, state, message="No learning action to undo.")
+    undone_ids = {
+        str((item.get("detail") or {}).get("undone", "")).strip()
+        for item in audits
+        if isinstance(item, dict)
+        and str(item.get("action", "")).strip().lower() == "undo"
+        and isinstance(item.get("detail"), dict)
+    }
+    last = None
+    for item in reversed(audits):
+        if not isinstance(item, dict):
+            continue
+        action = str(item.get("action", "")).strip().lower()
+        audit_id = str(item.get("id", "")).strip()
+        if action == "undo" or not audit_id or audit_id in undone_ids:
+            continue
+        if isinstance(item.get("before"), dict):
+            last = item
+            break
+    if last is None:
+        candidates, samples, state = _load_learning_review_store()
+        return _build_learning_review_payload(candidates, samples, state, message="No learning action to undo.")
+    before = last.get("before") if isinstance(last, dict) else None
+    if not isinstance(before, dict):
+        candidates, samples, state = _load_learning_review_store()
+        return {"ok": False, "error": "Last learning audit entry cannot be undone."}
+    candidates = before.get("candidates", [])
+    samples = before.get("samples", [])
+    state = _safe_load_json_file(LEARNING_STATE_PATH, {})
+    if not isinstance(candidates, list):
+        candidates = []
+    if not isinstance(samples, list):
+        samples = []
+    if not isinstance(state, dict):
+        state = {}
+    if isinstance(before.get("quick_settings"), dict):
+        state["quick_settings"] = before["quick_settings"]
+    undo_before = _snapshot_learning_review(*_load_learning_review_store())
+    _save_learning_review_store(candidates, samples, state)
+    _append_learning_audit(
+        "undo",
+        undo_before,
+        _snapshot_learning_review(candidates, samples, state),
+        {"undone": last.get("id", "")},
+    )
+    return _build_learning_review_payload(candidates, samples, state, message="Undid the last learning review action.")
+
+
+def get_memory_debug_snapshot(config):
+    settings = get_memory_settings(config)
+    with MEMORY_LOCK:
+        memory_count = len(load_memory_items())
+        last_memory_debug = dict(LAST_MEMORY_DEBUG) if isinstance(LAST_MEMORY_DEBUG, dict) else {}
+    candidates = _safe_load_json_file(LEARNING_CANDIDATES_PATH, [])
+    samples = _safe_load_json_file(LEARNING_SAMPLES_PATH, [])
+    state = _safe_load_json_file(LEARNING_STATE_PATH, {})
+    if not isinstance(candidates, list):
+        candidates = []
+    if not isinstance(samples, list):
+        samples = []
+    if not isinstance(state, dict):
+        state = {}
+    return {
+        "ok": True,
+        "memory": {
+            "enabled": bool(settings["enabled"]),
+            "mem0_enabled": bool(settings["mem0_enabled"]),
+            "memory_count": memory_count,
+            "last_selection": last_memory_debug,
+        },
+        "learning": {
+            "candidates_count": len(candidates),
+            "samples_count": len(samples),
+            "degraded_mode": bool(state.get("degraded_mode", False)),
+            "turn_count": int(state.get("turn_count", 0) or 0),
+            "diagnostics": _build_learning_diagnostics(candidates, samples, state),
+            "recent_candidates": [_compact_learning_item(item) for item in candidates[-5:]],
+            "recent_samples": [_compact_learning_item(item) for item in samples[-5:]],
+            "recent_audit": [
+                _compact_learning_audit_item(item)
+                for item in _tail_jsonl(LEARNING_AUDIT_LOG_PATH, limit=5)
+            ],
+            "recent_shadow": _tail_jsonl(LEARNING_SHADOW_LOG_PATH, limit=5),
+        },
+    }
 
 
 def _load_wakeup_summary():

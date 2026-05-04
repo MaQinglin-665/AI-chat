@@ -15,6 +15,7 @@ from config import (
 )
 from utils import _clamp_int
 from utils import _clamp_float
+from utils import _safe_bool
 
 DEFAULT_LLM_HTTP_USER_AGENT = "curl/8.6.0"
 
@@ -94,7 +95,7 @@ def get_openai_tuning(llm_cfg):
         max_output_tokens = int(max_output_tokens)
     except (TypeError, ValueError):
         max_output_tokens = 120
-    max_cap = 2048 if bool(llm_cfg.get("allow_high_output_tokens", False)) else 256
+    max_cap = 2048 if _safe_bool(llm_cfg.get("allow_high_output_tokens", False), False) else 256
     max_output_tokens = max(32, min(max_cap, max_output_tokens))
 
     verbosity = str(llm_cfg.get("verbosity", "low")).strip().lower()
@@ -122,6 +123,19 @@ def get_openai_tuning(llm_cfg):
         "presence_penalty": presence_penalty,
     }
 
+
+def apply_chat_completion_token_limit(payload, llm_cfg, tuning):
+    token_key = (
+        "max_completion_tokens"
+        if _safe_bool((llm_cfg or {}).get("use_max_completion_tokens", False), False)
+        else "max_tokens"
+    )
+    other_key = "max_tokens" if token_key == "max_completion_tokens" else "max_completion_tokens"
+    payload.pop(other_key, None)
+    payload[token_key] = tuning["max_output_tokens"]
+    return token_key
+
+
 def call_openai_compatible(llm_cfg, messages):
     base_url = str(llm_cfg.get("base_url", OPENAI_DEFAULT_BASE_URL)).rstrip("/")
     model = llm_cfg.get("model", OPENAI_DEFAULT_MODEL)
@@ -146,8 +160,8 @@ def call_openai_compatible(llm_cfg, messages):
         "frequency_penalty": tuning["frequency_penalty"],
         "presence_penalty": tuning["presence_penalty"],
         "stream": False,
-        "max_tokens": tuning["max_output_tokens"],
     }
+    apply_chat_completion_token_limit(payload, llm_cfg, tuning)
 
     chat_error = None
     try:
@@ -158,15 +172,24 @@ def call_openai_compatible(llm_cfg, messages):
         if choices:
             message = choices[0].get("message", {})
             content = normalize_text_content(message.get("content", ""))
+            reasoning_content = normalize_text_content(message.get("reasoning_content", ""))
             finish_reason = str(choices[0].get("finish_reason", "") or "").strip().lower()
             if content and finish_reason != "length":
                 return content
 
+            if not content and reasoning_content and finish_reason == "length":
+                chat_error = RuntimeError(
+                    "LLM chat-completions exhausted token budget in reasoning_content "
+                    "before visible content. Increase translate_max_tokens or use a "
+                    "non-reasoning translate_model."
+                )
+
             # Stable demo fallback: if reply is clipped by token budget, retry once with a larger budget.
             if content and finish_reason == "length" and bool(llm_cfg.get("retry_on_length", False)):
                 retry_payload = dict(payload)
+                token_key = apply_chat_completion_token_limit(retry_payload, llm_cfg, tuning)
                 try:
-                    current_max = int(retry_payload.get("max_tokens", tuning["max_output_tokens"]))
+                    current_max = int(retry_payload.get(token_key, tuning["max_output_tokens"]))
                 except (TypeError, ValueError):
                     current_max = int(tuning["max_output_tokens"])
                 desired = llm_cfg.get("length_retry_max_output_tokens", llm_cfg.get("max_output_tokens", current_max))
@@ -174,9 +197,9 @@ def call_openai_compatible(llm_cfg, messages):
                     desired_max = int(desired)
                 except (TypeError, ValueError):
                     desired_max = current_max
-                retry_cap = 2048 if bool(llm_cfg.get("allow_high_output_tokens", False)) else 512
+                retry_cap = 2048 if _safe_bool(llm_cfg.get("allow_high_output_tokens", False), False) else 512
                 retry_max = max(current_max + 64, desired_max, current_max * 2)
-                retry_payload["max_tokens"] = max(64, min(retry_cap, retry_max))
+                retry_payload[token_key] = max(64, min(retry_cap, retry_max))
 
                 retry_data = http_post_json(
                     f"{base_url}/chat/completions", retry_payload, headers=headers, timeout=timeout

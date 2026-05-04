@@ -131,6 +131,10 @@ assert.ok(
   "final assistant text should normalize English sentence boundaries before display and translation"
 );
 assert.ok(
+  /function stripAssistantPayloadNoise\(text\)\s*\{[\s\S]*?SPEECH_TEXT\.stripAssistantPayloadNoise/.test(source),
+  "chat visible text cleanup should reuse the shared speech metadata guard"
+);
+assert.ok(
   source.includes('translationEl.textContent = "中译：翻译中...";'),
   "assistant messages should show an immediate translation placeholder"
 );
@@ -167,6 +171,16 @@ assert.ok(
   "stream speech queue should be able to detect queued tail segments"
 );
 assert.ok(
+  source.includes("function ensureStreamSpeakQueueRunning(sessionId")
+    && source.includes("stream_run_handoff")
+    && source.includes("ensureStreamSpeakQueueRunning(sessionId, 0);"),
+  "stream speech queue should hand off to a newer session after an older runner exits"
+);
+assert.ok(
+  /function dequeueStreamSpeakItem\(sessionId\)\s*\{[\s\S]*?for \(let i = 0; i < state\.streamSpeakQueue\.length; i \+= 1\)[\s\S]*?item\.sessionId !== sessionId[\s\S]*?continue;[\s\S]*?state\.streamSpeakQueue\.splice\(i, 1\);[\s\S]*?return item;/.test(source),
+  "stream speech dequeue should not drop queued items from newer sessions"
+);
+assert.ok(
   source.includes("function shouldSerializeStreamTTSRequests()")
     && source.includes('state.ttsProvider === "gpt_sovits"')
     && source.includes("if (!shouldSerializeStreamTTSRequests())")
@@ -180,12 +194,39 @@ assert.ok(
   "stream speech queue should support a shorter configurable idle wait"
 );
 assert.ok(
+  source.includes("gpt_sovits_timeout_sec")
+    && source.includes("sovitsTimeoutMs")
+    && source.includes("Math.min(90000")
+    && source.includes("state.ttsServerRequestTimeoutMs"),
+  "GPT-SoVITS frontend request timeout should follow backend timeout config"
+);
+assert.ok(
+  source.includes("streamSpeakWorkingSession: 0")
+    && source.includes("stream_run_clear_stale_busy")
+    && source.includes("state.streamSpeakWorkingSession = activeSession"),
+  "new realtime TTS sessions should not be blocked by stale stream runners"
+);
+assert.ok(
   /current\s*=\s*next\s*\|\|\s*await waitNextStreamSpeakItem\([\s\S]*?state\.chatBusy \? idleWaitMs : 180/.test(source),
   "stream speech queue should re-check for tail segments after each audio segment plays"
 );
 assert.ok(
   /finally \{[\s\S]*?state\.streamSpeakWorking = false;[\s\S]*?hasQueuedStreamSpeakItem\(activeSession\)[\s\S]*?runStreamSpeakQueue\(\)/.test(source),
   "stream speech queue should restart itself if a segment arrived while it was finishing"
+);
+assert.ok(
+  source.includes("streamSpeakPlayedSession: 0")
+    && source.includes("function scheduleFinalSpeechWatchdog")
+    && source.includes("final_watchdog_tts")
+    && source.includes("scheduleFinalSpeechWatchdog({"),
+  "final replies should have a watchdog fallback if realtime stream speech never starts playback"
+);
+assert.ok(
+  source.includes("function discardQueuedStreamSpeakItems(sessionId)")
+    && source.includes('recordTTSDebugEvent("final_direct_tts"')
+    && source.includes("no_stream_playback_yet")
+    && source.includes("state.streamSpeakLastEnqueueSession = 0;"),
+  "short final replies should use direct TTS if no realtime stream segment has started playback"
 );
 assert.ok(
   source.includes("function buildTTSDebugReport()"),
@@ -203,6 +244,16 @@ assert.ok(
   source.includes("function buildTranslateDebugReport()")
     && source.includes('text.toLowerCase() === "/translatedebug"'),
   "chat.js should expose /translatedebug for copyable translation timing state"
+);
+assert.ok(
+  source.includes("function buildMemoryDebugReport(")
+    && source.includes('text.toLowerCase() === "/memorydebug"')
+    && source.includes('learningFetchJson("/api/memory/debug")')
+    && source.includes("learningTabDebug")
+    && source.includes("learningDebugPanel")
+    && source.includes("learning.degradedReason=")
+    && source.includes("Learning health windows:"),
+  "chat.js should expose memory/learning chain debug state"
 );
 assert.ok(
   source.includes('appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false })')
@@ -232,6 +283,51 @@ assert.ok(
   source.includes('recordTTSDebugEvent("stream_enqueue"')
     && source.includes('recordTTSDebugEvent("stream_request_ok"'),
   "stream speech queue should record enqueue and TTS request completion events"
+);
+assert.ok(
+  source.includes("ttsPlaybackGeneration: 0")
+    && source.includes("function isCurrentTTSPlaybackGeneration(generation)")
+    && source.includes('recordTTSDebugEvent("audio_stale_skip"')
+    && source.includes('recordTTSDebugEvent("browser_stale_skip"')
+    && source.includes('recordTTSDebugEvent("speak_fallback_stale_skip"')
+    && source.includes("ttsContextBufferSource: null")
+    && source.includes("state.ttsContextBufferSource.stop(0)"),
+  "TTS playback should ignore stale audio and fallback from earlier chat turns"
+);
+assert.ok(
+  /const requestedGeneration = Number\(opts\.playbackGeneration \|\| state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?if \(!isCurrentTTSPlaybackGeneration\(requestedGeneration\)\)[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?const playbackGeneration = Number\(state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?speakOnceWithVoice\(text, v, \{ force, playbackGeneration \}\)/.test(source),
+  "browser TTS fallback should reject stale generations before starting a fresh browser utterance"
+);
+assert.ok(
+  source.includes("ttsAudioPlaybackToken: 0")
+    && source.includes("const audioPlaybackToken = Number(state.ttsAudioPlaybackToken || 0) + 1")
+    && source.includes("function speakOnceWithVoice(text, voice, opts = {})")
+    && source.includes("const force = typeof opts === \"object\" ? !!opts.force : !!opts")
+    && source.includes("const isCurrentHtmlAudioPlayback = () => ("),
+  "HTMLAudio and browser TTS paths should keep per-playback ownership guards"
+);
+assert.ok(
+  /const streamSpeakSession = Date\.now\(\);[\s\S]*?const useStreamSpeak = shouldUseStreamSpeak\(\);[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?state\.streamSpeakSession = streamSpeakSession;/.test(source),
+  "starting a new assistant request should always invalidate previous audio playback"
+);
+assert.ok(
+  source.includes("function stripAssistantPayloadNoise(text)")
+    && source.includes("function looksLikeEmptyAssistantTextWrapperFragment(text)")
+    && source.includes("function looksLikeAssistantTextWrapperFragment(text)")
+    && source.includes("function extractAssistantPayloadText(text)")
+    && source.includes("function extractAssistantTextFromJsonLike(text)")
+    && source.includes("stripAssistantPayloadNoise(src)"),
+  "assistant message rendering should hide half-open JSON text wrappers before they reach the chat bubble"
+);
+assert.ok(
+  source.includes("function _looksLikeBadChatTranslation(source, translated)")
+    && source.includes("invalid_translation")
+    && source.includes("_looksLikeBadChatTranslation(text, value)"),
+  "assistant translation should reject model answers before caching or rendering them as translations"
+);
+assert.ok(
+  /if \(degraded \|\| badTranslation\) \{[\s\S]*?if \(!badTranslation\) \{[\s\S]*?_markTranslationFailure\(\);/.test(source),
+  "invalid model-answer translations should not open the frontend translation circuit"
 );
 
 console.log("Character runtime frontend checks passed.");

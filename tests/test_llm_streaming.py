@@ -69,6 +69,68 @@ def test_stream_timeout_ignores_legacy_timeout_sec(monkeypatch):
     assert chunks == ["ok"]
 
 
+def test_chat_stream_can_use_max_completion_tokens(monkeypatch):
+    captured = {}
+
+    def fake_urlopen(req, timeout):
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        return _FakeStreamResponse(
+            [
+                'data: {"choices":[{"delta":{"content":"ok"}}]}\n',
+                "data: [DONE]\n",
+            ]
+        )
+
+    monkeypatch.setattr(llm_streaming.urllib.request, "urlopen", fake_urlopen)
+    chunks = list(
+        llm_streaming.iter_openai_chat_stream(
+            {
+                "base_url": "http://127.0.0.1:9999/v1",
+                "model": "demo",
+                "max_output_tokens": 384,
+                "use_max_completion_tokens": True,
+                "allow_high_output_tokens": True,
+            },
+            [{"role": "user", "content": "test"}],
+        )
+    )
+
+    assert chunks == ["ok"]
+    assert captured["payload"]["max_completion_tokens"] == 384
+    assert "max_tokens" not in captured["payload"]
+
+
+def test_chat_stream_parses_string_bool_for_max_completion_tokens(monkeypatch):
+    captured = {}
+
+    def fake_urlopen(req, timeout):
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        return _FakeStreamResponse(
+            [
+                'data: {"choices":[{"delta":{"content":"ok"}}]}\n',
+                "data: [DONE]\n",
+            ]
+        )
+
+    monkeypatch.setattr(llm_streaming.urllib.request, "urlopen", fake_urlopen)
+    chunks = list(
+        llm_streaming.iter_openai_chat_stream(
+            {
+                "base_url": "http://127.0.0.1:9999/v1",
+                "model": "demo",
+                "max_output_tokens": 384,
+                "use_max_completion_tokens": "false",
+                "allow_high_output_tokens": "true",
+            },
+            [{"role": "user", "content": "test"}],
+        )
+    )
+
+    assert chunks == ["ok"]
+    assert captured["payload"]["max_tokens"] == 384
+    assert "max_completion_tokens" not in captured["payload"]
+
+
 def test_ollama_chat_stream_yields_message_chunks(monkeypatch):
     captured = {}
 

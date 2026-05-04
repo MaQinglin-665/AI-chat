@@ -346,3 +346,10 @@
 - Clarified public-safe versus developer-only material boundaries and post-capture acceptance checks.
 - Linked the capture plan from recording checklist and prompt examples to form a consistent recording workflow.
 - No behavior changes and no code-path changes (backend response shape, frontend UI, Live2D behavior, TTS behavior, memory, proactive interaction, dependencies all unchanged).
+
+## Task 022 Landing Notes (Live2D expression intensity tuning)
+- Added `tasks/codex/022-expression-intensity-tuning.md` as a small polish task for making runtime-driven expressions more visible.
+- The task stays inside the existing Live2D expression path and does not change backend metadata, LLM prompt, TTS, or the action bridge.
+- The intended tuning surface is limited to expression pulse strength, mood hold timing, and related local weighting.
+- Default fallback behavior remains unchanged when Live2D is unavailable or expression support is disabled.
+- This task is a polish step only and does not widen scope into asset replacement or broader UI changes.

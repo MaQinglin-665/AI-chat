@@ -13,7 +13,12 @@ from config import (
     OPENAI_DEFAULT_KEY_ENV,
     OPENAI_DEFAULT_MODEL,
 )
-from llm_client import get_llm_user_agent, get_openai_tuning, is_local_url
+from llm_client import (
+    apply_chat_completion_token_limit,
+    get_llm_user_agent,
+    get_openai_tuning,
+    is_local_url,
+)
 from llm_response_utils import convert_messages_to_responses_input
 from utils import _clamp_int
 
@@ -63,8 +68,8 @@ def iter_openai_chat_stream(llm_cfg, messages):
         "frequency_penalty": tuning["frequency_penalty"],
         "presence_penalty": tuning["presence_penalty"],
         "stream": True,
-        "max_tokens": tuning["max_output_tokens"],
     }
+    apply_chat_completion_token_limit(payload, llm_cfg, tuning)
     req = urllib.request.Request(
         url=f"{base_url}/chat/completions",
         data=json.dumps(payload).encode("utf-8"),

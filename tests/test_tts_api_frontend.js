@@ -47,6 +47,8 @@ async function testPayloadAndMime() {
     ttsApi.inferAudioMime(new Uint8Array([0x49, 0x44, 0x33])),
     "audio/mpeg"
   );
+  assert.strictEqual(ttsApi.normalizeTTSRequestTimeoutMs(60000), 60000);
+  assert.strictEqual(ttsApi.normalizeTTSRequestTimeoutMs(120000), 90000);
 }
 
 async function testRequestSuccess() {
