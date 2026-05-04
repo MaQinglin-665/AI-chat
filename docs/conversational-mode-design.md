@@ -236,3 +236,18 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - 未实现 silence tick
   - 未实现 backchannel
   - 未实现 TTS interrupt 运行逻辑
+
+## 17. Task 031 Landing Notes
+
+- Task 031 仅落地了 open-loop follow-up planner skeleton，用于判定并记录“是否存在待续话信号”。
+- 判定触发条件保持保守最小：
+  - assistant 最后句问号收尾（`?` / `？`）
+  - 或命中明确追问提示词（如“你觉得呢”“要不要”“要不要我继续”）
+- 记录仅进入前端状态与 debug snapshot（`pending/reason/topicHint/updatedAgeMs`），未接入主动行为。
+- 仅当 `conversation_mode.enabled=true` 时才会记录 pending；默认配置（`enabled=false`）下保持非 pending。
+- Task 031 未引入：
+  - proactive speech
+  - silence tick
+  - backchannel
+  - TTS interrupt 运行逻辑
+  - 主动 LLM 请求

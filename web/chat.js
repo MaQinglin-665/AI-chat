@@ -33,6 +33,10 @@ const state = {
     silenceFollowupMinMs: 180000,
     interruptTtsOnUserSpeech: false
   },
+  followupPending: false,
+  followupReason: "",
+  followupTopicHint: "",
+  followupUpdatedAt: 0,
   autoChatTuning: {
     triggerBaseThreshold: 1.03,
     shortSilencePenalty: 0.35,
@@ -425,6 +429,7 @@ function getTTSDebugSnapshot() {
   const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
     ? state.conversationMode
     : {};
+  const followupUpdatedAt = Number(state.followupUpdatedAt || 0);
   const durationMs = audio && Number.isFinite(Number(audio.duration)) && audio.duration > 0
     ? Math.round(Number(audio.duration) * 1000)
     : Number(state.ttsDebugAudioDurationMs || -1);
@@ -464,6 +469,12 @@ function getTTSDebugSnapshot() {
         ? Math.round(Number(conversationMode.silenceFollowupMinMs))
         : 180000,
       interruptTtsOnUserSpeech: conversationMode.interruptTtsOnUserSpeech === true
+    },
+    followup: {
+      pending: state.followupPending === true,
+      reason: String(state.followupReason || ""),
+      topicHint: String(state.followupTopicHint || ""),
+      updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
     },
     lastResult: state.ttsDebugLastResult || "",
     lastError: state.ttsDebugLastError || ""
@@ -4933,6 +4944,58 @@ function normalizeAutoChatTopicHint(text = "") {
     safe = safe.slice(0, maxChars).trim();
   }
   return safe;
+}
+
+function buildConversationFollowupTopicHint(text = "") {
+  let safe = String(text || "").replace(/\s+/g, " ").trim();
+  if (!safe) {
+    return "";
+  }
+  const lines = safe.split(/\r?\n/).map((line) => String(line || "").trim()).filter(Boolean);
+  safe = lines.length ? lines[lines.length - 1] : safe;
+  const tailSplit = safe.split(/[。！？!?]/).map((item) => String(item || "").trim()).filter(Boolean);
+  let hint = tailSplit.length ? tailSplit[tailSplit.length - 1] : safe;
+  if (hint.length > 80) {
+    hint = hint.slice(0, 80).trim();
+  }
+  return hint;
+}
+
+function detectOpenLoopFollowup(text = "") {
+  const safe = String(text || "").replace(/\s+/g, " ").trim();
+  if (!safe) {
+    return { pending: false, reason: "", topicHint: "" };
+  }
+  if (/[?？][”"'’）)\]]*\s*$/.test(safe)) {
+    return {
+      pending: true,
+      reason: "question_tail",
+      topicHint: buildConversationFollowupTopicHint(safe)
+    };
+  }
+  if (/(你觉得呢|要不要|要不要我继续)/i.test(safe)) {
+    return {
+      pending: true,
+      reason: "keyword_hint",
+      topicHint: buildConversationFollowupTopicHint(safe)
+    };
+  }
+  return { pending: false, reason: "", topicHint: "" };
+}
+
+function updateConversationFollowupState(assistantText = "") {
+  if (state.conversationMode?.enabled !== true) {
+    state.followupPending = false;
+    state.followupReason = "";
+    state.followupTopicHint = "";
+    state.followupUpdatedAt = 0;
+    return;
+  }
+  const result = detectOpenLoopFollowup(assistantText);
+  state.followupPending = result.pending === true;
+  state.followupReason = String(result.reason || "");
+  state.followupTopicHint = String(result.topicHint || "");
+  state.followupUpdatedAt = Date.now();
 }
 
 function pickAutoChatPrimaryReason(reasons = []) {
@@ -12203,6 +12266,7 @@ async function requestAssistantReply(text, opts = {}) {
     if (rememberAssistant) {
       rememberMessage("assistant", visibleReply, { timestamp: assistantTimestamp });
     }
+    updateConversationFollowupState(visibleReply);
     const mood = detectMood(visibleReply);
     recordEmotion(mood);
     const finalTalkStyle = resolveTalkStyle(message, visibleReply, mood, isAuto);
