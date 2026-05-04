@@ -231,3 +231,15 @@
   - 运行时 kill-switch
   - 异常 fail-closed
   - 安全边界复核
+
+## 19. Task 053 Landing Notes
+
+- Task 053 仅新增 exception fail-closed 安全测试入口设计文档，不改 JS/Python 运行行为。
+- 设计目标是补齐 live event ordering 残余风险：在安全边界内验证 `proactive_scheduler_poll_failed` 与 `poll_exception_fail_closed` 路径。
+- 推荐方案为 DevTools-only debug bridge 一次性注入：
+  - 仅当前页面内存生效
+  - 仅影响下一次 polling check
+  - 自动清除，不持久化
+  - 不暴露远程 API
+- 明确拒绝方案：默认开启、远程可触发、持久化危险状态、绕过 guard、引入截图/工具调用/读文件路径。
+- 本任务不新增自动 proactive 行为，默认 fail-closed 与三层开关边界保持不变。
