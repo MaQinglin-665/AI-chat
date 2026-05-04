@@ -530,3 +530,91 @@ If runtime anomalies appear, disable any key switch (`conversation_mode.enabled`
 3. Reproduce kill-switch runtime stop sequence and capture event order.
 4. Inject safe temporary exception in DevTools only, capture fail-closed events.
 5. Update this validation log with concrete event timestamps/order and re-evaluate pass/partial.
+
+---
+
+# Proactive Scheduler Manual DevTools Follow-up - 2026-05-04 (Task 051)
+
+## Run Metadata
+
+| Item | Value |
+| --- | --- |
+| Date | 2026-05-04 |
+| Tester | User + Codex-assisted notes |
+| Branch / commit | `codex/proactive-scheduler-polling-skeleton` / `b2dec14` |
+| Environment | Windows Electron chat window DevTools |
+| Config source | Local-only `config.local.json` override, not tracked by git |
+
+## A. Default-off Runtime Evidence
+
+| Observation | Result |
+| --- | --- |
+| `schedulerEnabled=false`, `conversationEnabled=false`, `proactiveEnabled=false` | pass |
+| `pollingEnabled=false`, `pollTimerActive=false`, `pollLastResult=disabled` | pass |
+| `blockedReasons` included `conversation_disabled`, `proactive_disabled`, `scheduler_disabled` | pass |
+| Event observed: `proactive_scheduler_poll_blocked` with default-off reasons | pass |
+
+## B. Three-switch Polling Runtime Evidence
+
+Local-only test override enabled:
+- `conversation_mode.enabled=true`
+- `conversation_mode.proactive_enabled=true`
+- `conversation_mode.proactive_scheduler_enabled=true`
+
+Observed:
+
+| Event / Snapshot | Result |
+| --- | --- |
+| `proactive_scheduler_poll_start` with `interval_ms:60000` | pass |
+| `pollingEnabled=true`, `pollTimerActive=true`, `pollLastResult=started` | pass |
+| Later blocked reasons included `warmup_active`, then `no_pending_followup`, `empty_topic_hint`, `no_tts_finished_timestamp` | expected |
+
+## C. Kill-switch Runtime Timeline
+
+Procedure:
+1. Start with all three switches enabled and polling active.
+2. Change local-only `config.local.json` so `conversation_mode.proactive_scheduler_enabled=false`.
+3. Call backend reload with `X-Taffy-Token`.
+4. Call frontend `await loadConfig()` from chat DevTools Console to sync the live page state.
+5. Inspect `snapshot().proactiveScheduler` and `events()`.
+
+Observed event order:
+
+| Seq | Stage | Result |
+| --- | --- | --- |
+| 1 | `proactive_scheduler_poll_start` | `interval_ms:60000` |
+| 2-7 | `proactive_scheduler_poll_blocked` | `warmup_active` / `no_pending_followup,empty_topic_hint,no_tts_finished_timestamp` |
+| 8 | `proactive_scheduler_poll_stop` | `sync_disabled:scheduler_disabled` |
+| 9 | `proactive_scheduler_poll_blocked` | `scheduler_disabled` |
+
+Result: pass
+
+Notes:
+- Backend `/api/config/reload` alone refreshed backend config but did not update the already-loaded frontend state.
+- Same-session frontend sync was completed by calling `await loadConfig()` from DevTools.
+- This confirms the runtime kill-switch once the frontend receives the updated config.
+
+## D. Exception Fail-closed Timeline
+
+Result: partial
+
+Notes:
+- No safe DevTools-only exception injection hook is currently exposed.
+- No unsafe monkey patch, source edit, or test-only bypass was used.
+- Static review from prior tasks still confirms the `poll_exception_fail_closed` branch, but live `poll_failed` event ordering remains uncollected.
+
+## Overall Result
+
+Overall result: partial
+
+Improvement:
+- Default-off runtime evidence, three-switch polling startup, and kill-switch runtime stop timeline are now manually captured.
+
+Remaining residual risk:
+- Exception fail-closed live event timeline remains partial because no safe DevTools-only injection hook is exposed.
+
+Rollback suggestion:
+
+```text
+Disable any key switch (`conversation_mode.enabled` / `proactive_enabled` / `proactive_scheduler_enabled`) to stop polling. For live-page kill-switch validation, backend reload must be followed by frontend config sync (`await loadConfig()`) or page reload.
+```
