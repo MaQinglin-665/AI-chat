@@ -164,3 +164,19 @@ await window.__AI_CHAT_DEBUG_TTS__.manualProactiveSchedulerTick()
 3. 开启 `conversation_mode.enabled/proactive_enabled/proactive_scheduler_enabled` 后，warmup 内 `blockedReasons` 包含 `warmup_active`。
 4. 仅当 scheduler gate eligible 时才进入 `dryRunSilenceFollowup` 路径；blocked 时不应执行 follow-up。
 5. 不应自动重复触发，不应自动截图。
+
+## 11. Proactive Scheduler Polling Skeleton（Task 043）
+
+执行：
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler
+```
+
+期望：
+1. 默认配置下 `pollTimerActive=false`，且 `schedulerEnabled=false`（或被上层开关阻塞）。
+2. 开启 `conversation_mode.enabled/proactive_enabled/proactive_scheduler_enabled` 后，reload 页面，`pollTimerActive=true`。
+3. `events()` 可见：
+   - `proactive_scheduler_poll_start`
+   - `proactive_scheduler_poll_blocked` 或 `proactive_scheduler_poll_ready`
+4. polling 仅做检查，不自动触发 follow-up，不自动说话，不自动截图。

@@ -33,6 +33,7 @@ const state = {
     proactiveCooldownMs: 600000,
     proactiveWarmupMs: 120000,
     proactiveWindowMs: 3600000,
+    proactivePollIntervalMs: 60000,
     maxFollowupsPerWindow: 1,
     silenceFollowupMinMs: 180000,
     interruptTtsOnUserSpeech: false
@@ -53,6 +54,11 @@ const state = {
   proactiveInFlight: false,
   proactiveLastBlockedReason: "",
   proactiveLastResult: "",
+  proactivePollTimerId: 0,
+  proactiveLastPollAt: 0,
+  proactivePollActive: false,
+  proactivePollLastResult: "",
+  proactivePollActiveIntervalMs: 0,
   autoChatTuning: {
     triggerBaseThreshold: 1.03,
     shortSilencePenalty: 0.35,
@@ -439,6 +445,15 @@ function formatTTSDebugNumber(value, digits = 0) {
   return digits > 0 ? n.toFixed(digits) : String(Math.round(n));
 }
 
+function shouldEnableProactiveSchedulerPolling() {
+  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
+  return conversationMode.enabled === true
+    && conversationMode.proactiveEnabled === true
+    && conversationMode.proactiveSchedulerEnabled === true;
+}
+
 function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
   const now = Number(nowMs);
   const safeNow = Number.isFinite(now) ? now : Date.now();
@@ -448,6 +463,9 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
   const conversationEnabled = conversationMode.enabled === true;
   const proactiveEnabled = conversationMode.proactiveEnabled === true;
   const schedulerEnabled = conversationMode.proactiveSchedulerEnabled === true;
+  const pollIntervalMs = Number.isFinite(Number(conversationMode.proactivePollIntervalMs))
+    ? Math.max(30000, Math.min(600000, Math.round(Number(conversationMode.proactivePollIntervalMs))))
+    : 60000;
   const warmupMs = Number.isFinite(Number(conversationMode.proactiveWarmupMs))
     ? Math.max(0, Math.round(Number(conversationMode.proactiveWarmupMs)))
     : 120000;
@@ -464,6 +482,10 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
     ? Math.max(0, Math.round(Number(state.proactiveCountInWindow)))
     : 0;
   const proactiveInFlight = state.proactiveInFlight === true;
+  const pollTimerActive = Number(state.proactivePollTimerId || 0) > 0;
+  const pollingEnabled = shouldEnableProactiveSchedulerPolling();
+  const lastPollAt = Number(state.proactiveLastPollAt || 0);
+  const lastPollAgeMs = lastPollAt > 0 ? Math.max(0, Math.round(safeNow - lastPollAt)) : -1;
   const lastAttemptAt = Number(state.proactiveLastAttemptAt || 0);
   const lastTriggeredAt = Number(state.proactiveLastTriggeredAt || 0);
 
@@ -517,6 +539,11 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
     proactiveCountInWindow,
     maxFollowupsPerWindow,
     proactiveInFlight,
+    pollingEnabled,
+    pollIntervalMs,
+    pollTimerActive,
+    lastPollAgeMs,
+    pollLastResult: String(state.proactivePollLastResult || ""),
     lastAttemptAgeMs,
     lastTriggeredAgeMs,
     lastBlockedReason: String(state.proactiveLastBlockedReason || ""),
@@ -575,6 +602,9 @@ function getTTSDebugSnapshot() {
       proactiveWindowMs: Number.isFinite(Number(conversationMode.proactiveWindowMs))
         ? Math.round(Number(conversationMode.proactiveWindowMs))
         : 3600000,
+      proactivePollIntervalMs: Number.isFinite(Number(conversationMode.proactivePollIntervalMs))
+        ? Math.round(Number(conversationMode.proactivePollIntervalMs))
+        : 60000,
       maxFollowupsPerWindow: Number.isFinite(Number(conversationMode.maxFollowupsPerWindow))
         ? Math.round(Number(conversationMode.maxFollowupsPerWindow))
         : 1,
@@ -1039,6 +1069,98 @@ async function runProactiveSchedulerManualTick() {
   } finally {
     state.proactiveInFlight = false;
   }
+}
+
+function runProactiveSchedulerPollingCheck() {
+  if (!shouldEnableProactiveSchedulerPolling()) {
+    state.proactivePollLastResult = "disabled";
+    return;
+  }
+  const startedAt = Date.now();
+  state.proactiveLastPollAt = startedAt;
+  const scheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
+  const followupView = buildConversationFollowupDebugView(startedAt);
+  if (scheduler.eligibleForSchedulerTick !== true) {
+    state.proactivePollLastResult = "blocked";
+    recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+      text: String(followupView?.topicHint || ""),
+      result: Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
+        ? scheduler.blockedReasons.join(",")
+        : "poll_blocked"
+    });
+    return;
+  }
+  const silenceBlocked = Array.isArray(followupView?.silence?.blockedReasons)
+    ? followupView.silence.blockedReasons.join(",")
+    : "";
+  if (followupView?.silence?.eligibleForSilenceFollowup !== true) {
+    state.proactivePollLastResult = "not_ready";
+    recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+      text: String(followupView?.topicHint || ""),
+      result: silenceBlocked || "silence_not_ready"
+    });
+    return;
+  }
+  state.proactivePollLastResult = "ready";
+  recordTTSDebugEvent("proactive_scheduler_poll_ready", {
+    text: String(followupView?.topicHint || ""),
+    result: "silence_ready"
+  });
+}
+
+function stopProactiveSchedulerPolling(reason = "stop") {
+  if (state.proactivePollTimerId) {
+    clearInterval(state.proactivePollTimerId);
+    state.proactivePollTimerId = 0;
+  }
+  state.proactivePollActive = false;
+  state.proactivePollActiveIntervalMs = 0;
+  state.proactivePollLastResult = "disabled";
+  recordTTSDebugEvent("proactive_scheduler_poll_stop", {
+    result: String(reason || "stop")
+  });
+}
+
+function startProactiveSchedulerPolling() {
+  if (!shouldEnableProactiveSchedulerPolling()) {
+    stopProactiveSchedulerPolling("gated_off");
+    return;
+  }
+  if (state.proactivePollTimerId) {
+    return;
+  }
+  const intervalMs = Number.isFinite(Number(state.conversationMode?.proactivePollIntervalMs))
+    ? Math.max(30000, Math.min(600000, Math.round(Number(state.conversationMode.proactivePollIntervalMs))))
+    : 60000;
+  state.proactivePollTimerId = window.setInterval(() => {
+    runProactiveSchedulerPollingCheck();
+  }, intervalMs);
+  state.proactivePollActive = true;
+  state.proactivePollActiveIntervalMs = intervalMs;
+  state.proactivePollLastResult = "started";
+  recordTTSDebugEvent("proactive_scheduler_poll_start", {
+    result: `interval_ms:${intervalMs}`
+  });
+}
+
+function syncProactiveSchedulerPolling() {
+  if (!shouldEnableProactiveSchedulerPolling()) {
+    stopProactiveSchedulerPolling("sync_disabled");
+    return;
+  }
+  const desiredIntervalMs = Number.isFinite(Number(state.conversationMode?.proactivePollIntervalMs))
+    ? Math.max(30000, Math.min(600000, Math.round(Number(state.conversationMode.proactivePollIntervalMs))))
+    : 60000;
+  const activeIntervalMs = Number.isFinite(Number(state.proactivePollActiveIntervalMs))
+    ? Math.round(Number(state.proactivePollActiveIntervalMs))
+    : 0;
+  if (state.proactivePollTimerId && activeIntervalMs === desiredIntervalMs) {
+    return;
+  }
+  if (state.proactivePollTimerId) {
+    stopProactiveSchedulerPolling("sync_interval_change");
+  }
+  startProactiveSchedulerPolling();
 }
 
 function buildTTSDebugReport() {
@@ -10343,6 +10465,9 @@ async function loadConfig() {
     proactiveWindowMs: Math.round(
       clampNumber(Number(conversationCfg.proactive_window_ms ?? 3600000), 600000, 86400000)
     ),
+    proactivePollIntervalMs: Math.round(
+      clampNumber(Number(conversationCfg.proactive_poll_interval_ms ?? 60000), 30000, 600000)
+    ),
     maxFollowupsPerWindow: Math.round(
       clampNumber(Number(conversationCfg.max_followups_per_window ?? 1), 0, 4)
     ),
@@ -10354,6 +10479,7 @@ async function loadConfig() {
   if (!(Number(state.proactiveSchedulerStartedAt || 0) > 0)) {
     state.proactiveSchedulerStartedAt = Date.now();
   }
+  syncProactiveSchedulerPolling();
   const autoChatTuningCfg = observeCfg && typeof observeCfg.auto_chat_tuning === "object"
     ? observeCfg.auto_chat_tuning
     : {};
@@ -13845,6 +13971,7 @@ window.addEventListener("beforeunload", () => {
   resetActionSystem();
   stopIdleMotionLoop();
   stopAutoChatLoop();
+  stopProactiveSchedulerPolling("beforeunload");
   stopMicLoop(true);
   stopWakeWordListener();
   if (state.reminderTimer) {

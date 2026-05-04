@@ -291,6 +291,7 @@ DEFAULT_CONFIG = {
         "proactive_cooldown_ms": 600000,
         "proactive_warmup_ms": 120000,
         "proactive_window_ms": 3600000,
+        "proactive_poll_interval_ms": 60000,
         "max_followups_per_window": 1,
         "silence_followup_min_ms": 180000,
         "interrupt_tts_on_user_speech": False,
@@ -956,6 +957,16 @@ def sanitize_client_config(config):
                     _safe_int(
                         conversation_cfg.get("proactive_window_ms", 3600000),
                         3600000,
+                    ),
+                ),
+            ),
+            "proactive_poll_interval_ms": max(
+                30 * 1000,
+                min(
+                    10 * 60 * 1000,
+                    _safe_int(
+                        conversation_cfg.get("proactive_poll_interval_ms", 60000),
+                        60000,
                     ),
                 ),
             ),

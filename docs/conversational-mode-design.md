@@ -408,3 +408,16 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - 不新增自动 proactive 触发
   - 不新增 timer/listener/scheduler tick 循环
   - 不新增后端 API 与 UI
+
+## 29. Task 043 Landing Notes
+
+- Task 043 新增 disabled-by-default proactive scheduler polling skeleton。
+- 三层开关（`enabled/proactive_enabled/proactive_scheduler_enabled`）未同时开启时，polling timer 保持 inactive。
+- 开启后仅执行 polling check：
+  - 记录 poll start/stop
+  - 记录 poll blocked/ready
+  - 更新 `proactivePollLastResult` 与最近 poll 时间
+- 本任务仍不执行 follow-up，不自动说话：
+  - polling check 不调用 `dryRunSilenceFollowup`
+  - polling check 不调用 `runConversationFollowupDebug`
+  - polling check 不调用 `manualProactiveSchedulerTick`

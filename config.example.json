@@ -180,6 +180,7 @@
     "proactive_cooldown_ms": 600000,
     "proactive_warmup_ms": 120000,
     "proactive_window_ms": 3600000,
+    "proactive_poll_interval_ms": 60000,
     "max_followups_per_window": 1,
     "silence_followup_min_ms": 180000,
     "interrupt_tts_on_user_speech": false

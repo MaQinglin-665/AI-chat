@@ -177,3 +177,17 @@
 - Task 042 仍不引入自动触发：
   - 不新增 timer/listener/scheduler polling
   - 不新增后端 API、UI、或新的 LLM/TTS 调用链
+
+## 15. Task 043 Landing Notes
+
+- Task 043 新增 disabled-by-default 的 proactive scheduler polling skeleton。
+- 配置新增 `proactive_poll_interval_ms`（默认 `60000`，clamp `30000`~`600000`）。
+- polling lifecycle 新增 start/stop/sync/check，但默认配置下不会启动。
+- 即使启用 polling，本阶段也只做 check：
+  - scheduler gate 检查
+  - silence/follow-up debug 可见性检查
+  - 记录 `proactive_scheduler_poll_start/stop/blocked/ready` 事件
+- Task 043 明确不执行 follow-up：
+  - 不调用 `runConversationSilenceFollowupDryRun`
+  - 不调用 `runConversationFollowupDebug`
+  - 不调用 `runProactiveSchedulerManualTick`
