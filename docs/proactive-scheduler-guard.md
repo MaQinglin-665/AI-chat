@@ -281,3 +281,11 @@
   - `light_question`
   - `soft_checkin`
 - No config default, polling lifecycle, cooldown/window limit, kill-switch, fail-closed hook, backend API, screenshot, tool call, shell execution, file read, or direct assistant request path is changed.
+
+## 23. Task 058 Landing Notes
+
+- Task 058 exposes a read-only DevTools preview for follow-up policy decisions.
+- The preview helper simulates the plan fields needed by prompt generation and returns diagnostic output only.
+- It does not touch the scheduler timer, polling gate, cooldown/window counters, kill-switch, or fail-closed injection state.
+- It does not mutate follow-up pending state and does not call the assistant request path.
+- No screenshot, tool call, shell execution, file read, backend API, dependency, config flag, or UI is added.
