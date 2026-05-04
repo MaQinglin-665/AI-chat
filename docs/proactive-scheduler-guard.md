@@ -267,3 +267,17 @@
   - no file/private-data access
   - no tool calls
 - No scheduler gate, polling interval, kill-switch, fail-closed path, config default, backend API, or direct assistant request path is changed.
+
+## 22. Task 057 Landing Notes
+
+- Task 057 adds a deterministic local policy classifier before prompt seed generation.
+- Scheduler safety remains unchanged because enforcement still happens through the existing plan eligibility and guard chain.
+- The new `do_not_followup` policy is conservative:
+  - it detects topic hints that look closed or explicitly ask not to continue
+  - it adds `policy_do_not_followup` to `blockedReasons`
+  - it leaves `promptDraft` empty
+- Other policies only adjust wording inside the existing prompt seed:
+  - `gentle_continue`
+  - `light_question`
+  - `soft_checkin`
+- No config default, polling lifecycle, cooldown/window limit, kill-switch, fail-closed hook, backend API, screenshot, tool call, shell execution, file read, or direct assistant request path is changed.

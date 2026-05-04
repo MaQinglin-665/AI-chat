@@ -714,6 +714,36 @@ function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
   };
 }
 
+function buildConversationFollowupPolicy(plan) {
+  const safePlan = plan && typeof plan === "object" ? plan : {};
+  const reason = String(safePlan.reason || "").trim();
+  const topicHint = String(safePlan.topicHint || "").replace(/\s+/g, " ").trim();
+  const closingRe = /(不用|算了|没事|先这样|不聊|结束|晚安|睡了|休息|不用回|别追问|不要继续)/i;
+  if (topicHint && closingRe.test(topicHint)) {
+    return {
+      type: "do_not_followup",
+      note: "话题像是已收口或不适合继续追问，保持安静。",
+      blockedReason: "policy_do_not_followup"
+    };
+  }
+  if (reason === "question_tail") {
+    return {
+      type: "light_question",
+      note: "上一轮以问题收尾，只允许轻轻补一个可忽略的小追问。"
+    };
+  }
+  if (reason === "keyword_hint") {
+    return {
+      type: "soft_checkin",
+      note: "上一轮像是在征求继续意愿，优先给低压力的可选接话。"
+    };
+  }
+  return {
+    type: "gentle_continue",
+    note: "默认以自然、短句的方式轻轻续一下话题。"
+  };
+}
+
 function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
   const now = Number(nowMs);
   const safeNow = Number.isFinite(now) ? now : Date.now();
@@ -732,6 +762,7 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
   const updatedAgeMs = followupUpdatedAt > 0
     ? Math.max(0, Math.round(safeNow - followupUpdatedAt))
     : -1;
+  const policy = buildConversationFollowupPolicy({ reason, topicHint, updatedAgeMs });
 
   const blockedReasons = [];
   if (!conversationEnabled) {
@@ -755,11 +786,16 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
   if (updatedAgeMs < 0 || updatedAgeMs < silenceFollowupMinMs) {
     blockedReasons.push("silence_window_not_reached");
   }
+  if (policy.type === "do_not_followup") {
+    blockedReasons.push(policy.blockedReason || "policy_do_not_followup");
+  }
 
   return {
     eligible: blockedReasons.length === 0,
     reason,
     topicHint,
+    followupPolicy: policy.type,
+    followupPolicyNote: policy.note,
     updatedAgeMs,
     conversationEnabled,
     proactiveEnabled,
@@ -783,6 +819,7 @@ function buildConversationFollowupPromptDraft(plan) {
     return "";
   }
   const reason = String(safePlan.reason || "").trim() || "followup_pending";
+  const policy = String(safePlan.followupPolicy || "gentle_continue").trim() || "gentle_continue";
   let topicHint = String(safePlan.topicHint || "").replace(/\s+/g, " ").trim();
   if (!topicHint) {
     return "";
@@ -790,11 +827,18 @@ function buildConversationFollowupPromptDraft(plan) {
   if (topicHint.length > 80) {
     topicHint = topicHint.slice(0, 80).trim();
   }
+  const policyInstruction = {
+    gentle_continue: "策略：轻轻续一句，不重开新话题，不扩大问题范围。",
+    light_question: "策略：如果追问，只能追一个很轻的小问题；也可以改成一句自然承接。",
+    soft_checkin: "策略：强调“想聊再聊也可以”，不要催促用户继续。"
+  }[policy] || "策略：轻轻续一句，不重开新话题，不扩大问题范围。";
   return [
     "你正在生成一次低打扰的主动续话，不是系统通知。",
     "请基于上一轮未收口的话题，用自然、温和的角色口吻仅输出一句可忽略的续话或轻追问。",
+    policyInstruction,
     "保持简短，不要催促用户立刻回复，不要连续追问，不要长篇解释。",
     "安全边界：不要读取或猜测桌面、屏幕、文件、隐私数据；不要调用工具。",
+    `续话策略: ${policy}`,
     `续话原因: ${reason}`,
     `话题线索: ${topicHint}`
   ].join("\n");
