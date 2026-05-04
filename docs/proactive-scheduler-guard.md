@@ -132,3 +132,17 @@
 2. 不引入默认开启的自动开口。
 3. 不破坏现有 manual-only 调试入口与 guard。
 4. 任意阶段都可通过配置开关快速回退到当前稳定行为。
+
+## 12. Task 040 Landing Notes
+
+- Task 040 已落地 proactive scheduler config skeleton，但仍未启用 scheduler 执行路径。
+- 当前仅新增并归一化以下配置字段：
+  - `proactive_scheduler_enabled`（默认 `false`，仅 JSON `true` 才启用）
+  - `proactive_cooldown_ms`（clamp: `60000`~`3600000`，默认 `600000`）
+  - `proactive_warmup_ms`（clamp: `30000`~`1800000`，默认 `120000`）
+  - `proactive_window_ms`（clamp: `600000`~`86400000`，默认 `3600000`）
+- 前端 debug snapshot 已可读取这些字段，用于后续只读验证。
+- Task 040 不引入自动触发：
+  - 不新增 timer/listener/scheduler/tick
+  - 不新增 `fetch`/`authFetch`/`requestAssistantReply`/`speak` 调用
+  - 不改变 desktop capture/tool calling/file access 默认行为

@@ -29,6 +29,10 @@ const state = {
   conversationMode: {
     enabled: false,
     proactiveEnabled: false,
+    proactiveSchedulerEnabled: false,
+    proactiveCooldownMs: 600000,
+    proactiveWarmupMs: 120000,
+    proactiveWindowMs: 3600000,
     maxFollowupsPerWindow: 1,
     silenceFollowupMinMs: 180000,
     interruptTtsOnUserSpeech: false
@@ -465,6 +469,16 @@ function getTTSDebugSnapshot() {
     conversationMode: {
       enabled: conversationMode.enabled === true,
       proactiveEnabled: conversationMode.proactiveEnabled === true,
+      proactiveSchedulerEnabled: conversationMode.proactiveSchedulerEnabled === true,
+      proactiveCooldownMs: Number.isFinite(Number(conversationMode.proactiveCooldownMs))
+        ? Math.round(Number(conversationMode.proactiveCooldownMs))
+        : 600000,
+      proactiveWarmupMs: Number.isFinite(Number(conversationMode.proactiveWarmupMs))
+        ? Math.round(Number(conversationMode.proactiveWarmupMs))
+        : 120000,
+      proactiveWindowMs: Number.isFinite(Number(conversationMode.proactiveWindowMs))
+        ? Math.round(Number(conversationMode.proactiveWindowMs))
+        : 3600000,
       maxFollowupsPerWindow: Number.isFinite(Number(conversationMode.maxFollowupsPerWindow))
         ? Math.round(Number(conversationMode.maxFollowupsPerWindow))
         : 1,
@@ -493,6 +507,7 @@ function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
     : {};
   const conversationEnabled = conversationMode.enabled === true;
   const proactiveEnabled = conversationMode.proactiveEnabled === true;
+  const proactiveSchedulerEnabled = conversationMode.proactiveSchedulerEnabled === true;
   const followupPending = state.followupPending === true;
   const topicHint = String(state.followupTopicHint || "").trim();
   const chatBusy = state.chatBusy === true;
@@ -546,6 +561,7 @@ function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
     silenceWindowReached,
     conversationEnabled,
     proactiveEnabled,
+    proactiveSchedulerEnabled,
     followupPending,
     chatBusy,
     speaking,
@@ -10104,6 +10120,16 @@ async function loadConfig() {
   state.conversationMode = {
     enabled: conversationCfg.enabled === true,
     proactiveEnabled: conversationCfg.proactive_enabled === true,
+    proactiveSchedulerEnabled: conversationCfg.proactive_scheduler_enabled === true,
+    proactiveCooldownMs: Math.round(
+      clampNumber(Number(conversationCfg.proactive_cooldown_ms ?? 600000), 60000, 3600000)
+    ),
+    proactiveWarmupMs: Math.round(
+      clampNumber(Number(conversationCfg.proactive_warmup_ms ?? 120000), 30000, 1800000)
+    ),
+    proactiveWindowMs: Math.round(
+      clampNumber(Number(conversationCfg.proactive_window_ms ?? 3600000), 600000, 86400000)
+    ),
     maxFollowupsPerWindow: Math.round(
       clampNumber(Number(conversationCfg.max_followups_per_window ?? 1), 0, 4)
     ),

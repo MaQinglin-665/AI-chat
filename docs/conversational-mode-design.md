@@ -355,3 +355,19 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - 成功与失败分流冷却，避免连续循环自说自话
   - debug snapshot/events 可观测，且不记录长 prompt 与隐私内容
 - 分阶段建议已落地到文档（Task 040~044），用于后续小步推进自动触发能力。
+
+## 26. Task 040 Landing Notes
+
+- Task 040 落地 proactive scheduler 配置骨架与归一化，不引入任何自动触发行为。
+- 新增配置字段（默认保守关闭/保守值）：
+  - `proactive_scheduler_enabled=false`
+  - `proactive_cooldown_ms=600000`
+  - `proactive_warmup_ms=120000`
+  - `proactive_window_ms=3600000`
+- 布尔字段保持严格门控：仅 JSON `true` 才启用。
+- 数值字段在前后端均做保守 clamp：
+  - cooldown: `60000`~`3600000`
+  - warmup: `30000`~`1800000`
+  - window: `600000`~`86400000`
+- `snapshot().conversationMode` 已可见以上字段，仅用于调试可见性，不参与自动调度执行。
+- 本任务未新增 timer/listener/scheduler/tick，未新增后端 API、UI、自动 proactive 调用链路。
