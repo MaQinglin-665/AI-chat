@@ -29,6 +29,11 @@ const state = {
   conversationMode: {
     enabled: false,
     proactiveEnabled: false,
+    proactiveSchedulerEnabled: false,
+    proactiveCooldownMs: 600000,
+    proactiveWarmupMs: 120000,
+    proactiveWindowMs: 3600000,
+    proactivePollIntervalMs: 60000,
     maxFollowupsPerWindow: 1,
     silenceFollowupMinMs: 180000,
     interruptTtsOnUserSpeech: false
@@ -40,6 +45,20 @@ const state = {
   conversationLastUserAt: 0,
   conversationLastAssistantAt: 0,
   conversationLastTtsFinishedAt: 0,
+  proactiveSchedulerStartedAt: 0,
+  proactiveLastAttemptAt: 0,
+  proactiveLastTriggeredAt: 0,
+  proactiveCooldownUntil: 0,
+  proactiveWindowStartedAt: 0,
+  proactiveCountInWindow: 0,
+  proactiveInFlight: false,
+  proactiveLastBlockedReason: "",
+  proactiveLastResult: "",
+  proactivePollTimerId: 0,
+  proactiveLastPollAt: 0,
+  proactivePollActive: false,
+  proactivePollLastResult: "",
+  proactivePollActiveIntervalMs: 0,
   autoChatTuning: {
     triggerBaseThreshold: 1.03,
     shortSilencePenalty: 0.35,
@@ -426,6 +445,130 @@ function formatTTSDebugNumber(value, digits = 0) {
   return digits > 0 ? n.toFixed(digits) : String(Math.round(n));
 }
 
+function shouldEnableProactiveSchedulerPolling() {
+  const status = getProactiveSchedulerPollingGateStatus();
+  return status.enabled;
+}
+
+function getProactiveSchedulerPollingGateStatus() {
+  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
+  const blockedReasons = [];
+  if (conversationMode.enabled !== true) {
+    blockedReasons.push("conversation_disabled");
+  }
+  if (conversationMode.proactiveEnabled !== true) {
+    blockedReasons.push("proactive_disabled");
+  }
+  if (conversationMode.proactiveSchedulerEnabled !== true) {
+    blockedReasons.push("scheduler_disabled");
+  }
+  return {
+    enabled: blockedReasons.length === 0,
+    blockedReasons
+  };
+}
+
+function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
+  const now = Number(nowMs);
+  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
+  const conversationEnabled = conversationMode.enabled === true;
+  const proactiveEnabled = conversationMode.proactiveEnabled === true;
+  const schedulerEnabled = conversationMode.proactiveSchedulerEnabled === true;
+  const pollIntervalMs = Number.isFinite(Number(conversationMode.proactivePollIntervalMs))
+    ? Math.max(30000, Math.min(600000, Math.round(Number(conversationMode.proactivePollIntervalMs))))
+    : 60000;
+  const warmupMs = Number.isFinite(Number(conversationMode.proactiveWarmupMs))
+    ? Math.max(0, Math.round(Number(conversationMode.proactiveWarmupMs)))
+    : 120000;
+  const maxFollowupsPerWindow = Number.isFinite(Number(conversationMode.maxFollowupsPerWindow))
+    ? Math.max(0, Math.round(Number(conversationMode.maxFollowupsPerWindow)))
+    : 1;
+  const proactiveWindowMs = Number.isFinite(Number(conversationMode.proactiveWindowMs))
+    ? Math.max(0, Math.round(Number(conversationMode.proactiveWindowMs)))
+    : 3600000;
+  const startedAt = Number(state.proactiveSchedulerStartedAt || 0);
+  const proactiveCooldownUntil = Number(state.proactiveCooldownUntil || 0);
+  const proactiveWindowStartedAt = Number(state.proactiveWindowStartedAt || 0);
+  const rawProactiveCountInWindow = Number.isFinite(Number(state.proactiveCountInWindow))
+    ? Math.max(0, Math.round(Number(state.proactiveCountInWindow)))
+    : 0;
+  const proactiveInFlight = state.proactiveInFlight === true;
+  const pollTimerActive = Number(state.proactivePollTimerId || 0) > 0;
+  const pollingEnabled = shouldEnableProactiveSchedulerPolling();
+  const lastPollAt = Number(state.proactiveLastPollAt || 0);
+  const lastPollAgeMs = lastPollAt > 0 ? Math.max(0, Math.round(safeNow - lastPollAt)) : -1;
+  const lastAttemptAt = Number(state.proactiveLastAttemptAt || 0);
+  const lastTriggeredAt = Number(state.proactiveLastTriggeredAt || 0);
+
+  const startedAgeMs = startedAt > 0 ? Math.max(0, Math.round(safeNow - startedAt)) : -1;
+  const warmupRemainingMs = startedAt > 0
+    ? Math.max(0, Math.round(warmupMs - (safeNow - startedAt)))
+    : warmupMs;
+  const cooldownRemainingMs = proactiveCooldownUntil > safeNow
+    ? Math.max(0, Math.round(proactiveCooldownUntil - safeNow))
+    : 0;
+  const rawWindowAgeMs = proactiveWindowStartedAt > 0
+    ? Math.max(0, Math.round(safeNow - proactiveWindowStartedAt))
+    : -1;
+  const windowActive = proactiveWindowStartedAt > 0 && rawWindowAgeMs <= proactiveWindowMs;
+  const windowAgeMs = windowActive ? rawWindowAgeMs : -1;
+  const proactiveCountInWindow = windowActive ? rawProactiveCountInWindow : 0;
+  const lastAttemptAgeMs = lastAttemptAt > 0 ? Math.max(0, Math.round(safeNow - lastAttemptAt)) : -1;
+  const lastTriggeredAgeMs = lastTriggeredAt > 0 ? Math.max(0, Math.round(safeNow - lastTriggeredAt)) : -1;
+
+  const blockedReasons = [];
+  if (!conversationEnabled) {
+    blockedReasons.push("conversation_disabled");
+  }
+  if (!proactiveEnabled) {
+    blockedReasons.push("proactive_disabled");
+  }
+  if (!schedulerEnabled) {
+    blockedReasons.push("scheduler_disabled");
+  }
+  if (warmupRemainingMs > 0) {
+    blockedReasons.push("warmup_active");
+  }
+  if (cooldownRemainingMs > 0) {
+    blockedReasons.push("cooldown_active");
+  }
+  if (proactiveInFlight) {
+    blockedReasons.push("in_flight");
+  }
+  if (proactiveCountInWindow >= maxFollowupsPerWindow) {
+    blockedReasons.push("window_limit_reached");
+  }
+
+  return {
+    schedulerEnabled,
+    conversationEnabled,
+    proactiveEnabled,
+    startedAgeMs,
+    warmupRemainingMs,
+    cooldownRemainingMs,
+    windowAgeMs,
+    proactiveCountInWindow,
+    maxFollowupsPerWindow,
+    proactiveInFlight,
+    pollingEnabled,
+    pollIntervalMs,
+    pollTimerActive,
+    lastPollAgeMs,
+    pollLastResult: String(state.proactivePollLastResult || ""),
+    lastAttemptAgeMs,
+    lastTriggeredAgeMs,
+    lastBlockedReason: String(state.proactiveLastBlockedReason || ""),
+    lastResult: String(state.proactiveLastResult || ""),
+    blockedReasons,
+    eligibleForSchedulerTick: blockedReasons.length === 0
+  };
+}
+
 function getTTSDebugSnapshot() {
   const audio = state.ttsAudio;
   const now = performance.now();
@@ -465,6 +608,19 @@ function getTTSDebugSnapshot() {
     conversationMode: {
       enabled: conversationMode.enabled === true,
       proactiveEnabled: conversationMode.proactiveEnabled === true,
+      proactiveSchedulerEnabled: conversationMode.proactiveSchedulerEnabled === true,
+      proactiveCooldownMs: Number.isFinite(Number(conversationMode.proactiveCooldownMs))
+        ? Math.round(Number(conversationMode.proactiveCooldownMs))
+        : 600000,
+      proactiveWarmupMs: Number.isFinite(Number(conversationMode.proactiveWarmupMs))
+        ? Math.round(Number(conversationMode.proactiveWarmupMs))
+        : 120000,
+      proactiveWindowMs: Number.isFinite(Number(conversationMode.proactiveWindowMs))
+        ? Math.round(Number(conversationMode.proactiveWindowMs))
+        : 3600000,
+      proactivePollIntervalMs: Number.isFinite(Number(conversationMode.proactivePollIntervalMs))
+        ? Math.round(Number(conversationMode.proactivePollIntervalMs))
+        : 60000,
       maxFollowupsPerWindow: Number.isFinite(Number(conversationMode.maxFollowupsPerWindow))
         ? Math.round(Number(conversationMode.maxFollowupsPerWindow))
         : 1,
@@ -479,6 +635,7 @@ function getTTSDebugSnapshot() {
       topicHint: String(state.followupTopicHint || ""),
       updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
     },
+    proactiveScheduler: buildProactiveSchedulerDebugSnapshot(Date.now()),
     silence: buildConversationSilenceDebugSnapshot(Date.now()),
     lastResult: state.ttsDebugLastResult || "",
     lastError: state.ttsDebugLastError || ""
@@ -493,6 +650,7 @@ function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
     : {};
   const conversationEnabled = conversationMode.enabled === true;
   const proactiveEnabled = conversationMode.proactiveEnabled === true;
+  const proactiveSchedulerEnabled = conversationMode.proactiveSchedulerEnabled === true;
   const followupPending = state.followupPending === true;
   const topicHint = String(state.followupTopicHint || "").trim();
   const chatBusy = state.chatBusy === true;
@@ -546,6 +704,7 @@ function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
     silenceWindowReached,
     conversationEnabled,
     proactiveEnabled,
+    proactiveSchedulerEnabled,
     followupPending,
     chatBusy,
     speaking,
@@ -811,6 +970,268 @@ async function runConversationSilenceFollowupDryRun() {
     silenceEligibleAtStart: true,
     silenceStartedAt: startedAt
   };
+}
+
+async function runProactiveSchedulerManualTick() {
+  const startedAt = Date.now();
+  const scheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
+  state.proactiveLastAttemptAt = startedAt;
+  const finishResult = (result) => {
+    const endedAt = Date.now();
+    return {
+      ...result,
+      schedulerManualTick: true,
+      schedulerStartedAt: startedAt,
+      scheduler,
+      startedAt,
+      endedAt,
+      elapsedMs: Math.max(0, endedAt - startedAt)
+    };
+  };
+
+  if (scheduler.eligibleForSchedulerTick !== true) {
+    const blockedReason = Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
+      ? scheduler.blockedReasons.join(",")
+      : "scheduler_not_eligible";
+    state.proactiveLastBlockedReason = blockedReason;
+    state.proactiveLastResult = "blocked";
+    recordTTSDebugEvent("proactive_scheduler_manual_blocked", {
+      result: blockedReason
+    });
+    return finishResult({
+      ok: false,
+      reason: "scheduler_not_eligible",
+      schedulerEligibleAtStart: false
+    });
+  }
+
+  recordTTSDebugEvent("proactive_scheduler_manual_start", {
+    result: "scheduler_eligible"
+  });
+  state.proactiveInFlight = true;
+  try {
+    const dryRunResult = await runConversationSilenceFollowupDryRun();
+    const finishedAt = Date.now();
+    const proactiveCooldownMs = Number.isFinite(Number(state.conversationMode?.proactiveCooldownMs))
+      ? Math.max(0, Math.round(Number(state.conversationMode.proactiveCooldownMs)))
+      : 600000;
+    const proactiveWindowMs = Number.isFinite(Number(state.conversationMode?.proactiveWindowMs))
+      ? Math.max(0, Math.round(Number(state.conversationMode.proactiveWindowMs)))
+      : 3600000;
+
+    if (dryRunResult?.ok === true) {
+      const windowStart = Number(state.proactiveWindowStartedAt || 0);
+      if (!(windowStart > 0) || (finishedAt - windowStart) > proactiveWindowMs) {
+        state.proactiveWindowStartedAt = finishedAt;
+        state.proactiveCountInWindow = 0;
+      }
+      state.proactiveLastTriggeredAt = finishedAt;
+      state.proactiveCooldownUntil = finishedAt + proactiveCooldownMs;
+      state.proactiveCountInWindow = Math.max(
+        0,
+        Math.round(Number(state.proactiveCountInWindow || 0))
+      ) + 1;
+      state.proactiveLastBlockedReason = "";
+      state.proactiveLastResult = "success";
+      recordTTSDebugEvent("proactive_scheduler_manual_success", {
+        result: "success",
+        durationMs: Number(dryRunResult?.elapsedMs || 0)
+      });
+      return finishResult({
+        ...dryRunResult,
+        ok: true,
+        schedulerEligibleAtStart: true
+      });
+    }
+
+    const silenceBlockedReasons = Array.isArray(dryRunResult?.view?.silence?.blockedReasons)
+      ? dryRunResult.view.silence.blockedReasons.join(",")
+      : "";
+    const blockedReason = String(dryRunResult?.reason || silenceBlockedReasons || "manual_tick_failed");
+    state.proactiveLastBlockedReason = blockedReason;
+    const failedReasons = new Set(["request_failed", "request_exception", "no_safe_entrypoint"]);
+    state.proactiveLastResult = failedReasons.has(String(dryRunResult?.reason || "")) ? "failed" : "blocked";
+    const shortCooldownMs = Math.min(proactiveCooldownMs, 60000);
+    state.proactiveCooldownUntil = finishedAt + shortCooldownMs;
+    recordTTSDebugEvent("proactive_scheduler_manual_failed", {
+      result: blockedReason,
+      error: String(dryRunResult?.reason || "")
+    });
+    return finishResult({
+      ...dryRunResult,
+      ok: false,
+      schedulerEligibleAtStart: true
+    });
+  } catch (err) {
+    const finishedAt = Date.now();
+    const proactiveCooldownMs = Number.isFinite(Number(state.conversationMode?.proactiveCooldownMs))
+      ? Math.max(0, Math.round(Number(state.conversationMode.proactiveCooldownMs)))
+      : 600000;
+    const shortCooldownMs = Math.min(proactiveCooldownMs, 60000);
+    const errorText = String(err?.message || err || "manual_tick_exception");
+    state.proactiveLastBlockedReason = errorText;
+    state.proactiveLastResult = "failed";
+    state.proactiveCooldownUntil = finishedAt + shortCooldownMs;
+    recordTTSDebugEvent("proactive_scheduler_manual_failed", {
+      result: "exception",
+      error: errorText
+    });
+    return finishResult({
+      ok: false,
+      reason: "manual_tick_exception",
+      error: errorText,
+      schedulerEligibleAtStart: true
+    });
+  } finally {
+    state.proactiveInFlight = false;
+  }
+}
+
+async function runProactiveSchedulerPollingCheck() {
+  try {
+    const gateStatus = getProactiveSchedulerPollingGateStatus();
+    if (!gateStatus.enabled) {
+      const gateReason = gateStatus.blockedReasons.join(",") || "polling_disabled";
+      state.proactivePollLastResult = "disabled";
+      if (state.proactivePollTimerId) {
+        stopProactiveSchedulerPolling(`runtime_gate_off:${gateReason}`);
+      }
+      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+        result: gateReason
+      });
+      return;
+    }
+    const startedAt = Date.now();
+    state.proactiveLastPollAt = startedAt;
+    const scheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
+    const followupView = buildConversationFollowupDebugView(startedAt);
+    if (scheduler.eligibleForSchedulerTick !== true) {
+      state.proactivePollLastResult = "blocked";
+      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+        text: String(followupView?.topicHint || ""),
+        result: Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
+          ? scheduler.blockedReasons.join(",")
+          : "poll_blocked"
+      });
+      return;
+    }
+    const silenceBlocked = Array.isArray(followupView?.silence?.blockedReasons)
+      ? followupView.silence.blockedReasons.join(",")
+      : "";
+    if (followupView?.silence?.eligibleForSilenceFollowup !== true) {
+      state.proactivePollLastResult = "not_ready";
+      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+        text: String(followupView?.topicHint || ""),
+        result: silenceBlocked || "silence_not_ready"
+      });
+      return;
+    }
+    state.proactivePollLastResult = "ready";
+    recordTTSDebugEvent("proactive_scheduler_poll_ready", {
+      text: String(followupView?.topicHint || ""),
+      result: "silence_ready"
+    });
+    if (!shouldEnableProactiveSchedulerPolling()) {
+      state.proactivePollLastResult = "disabled";
+      if (state.proactivePollTimerId) {
+        stopProactiveSchedulerPolling("runtime_gate_off:before_trigger");
+      }
+      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+        text: String(followupView?.topicHint || ""),
+        result: "runtime_gate_off_before_trigger"
+      });
+      return;
+    }
+    const triggerResult = await runProactiveSchedulerManualTick();
+    if (triggerResult?.ok === true) {
+      state.proactivePollLastResult = "triggered";
+      recordTTSDebugEvent("proactive_scheduler_poll_trigger_success", {
+        text: String(followupView?.topicHint || ""),
+        result: String(triggerResult?.reason || "started")
+      });
+      return;
+    }
+    state.proactivePollLastResult = "trigger_blocked";
+    recordTTSDebugEvent("proactive_scheduler_poll_trigger_blocked", {
+      text: String(followupView?.topicHint || ""),
+      result: String(triggerResult?.reason || "trigger_not_started")
+    });
+  } catch (err) {
+    state.proactivePollLastResult = "failed";
+    if (state.proactivePollTimerId) {
+      stopProactiveSchedulerPolling("poll_exception_fail_closed");
+    }
+    recordTTSDebugEvent("proactive_scheduler_poll_failed", {
+      result: "poll_exception",
+      error: String(err?.message || err || "poll_exception")
+    });
+  }
+}
+
+function stopProactiveSchedulerPolling(reason = "stop") {
+  const wasActive = !!state.proactivePollTimerId;
+  if (state.proactivePollTimerId) {
+    clearInterval(state.proactivePollTimerId);
+    state.proactivePollTimerId = 0;
+  }
+  state.proactivePollActive = false;
+  state.proactivePollActiveIntervalMs = 0;
+  state.proactivePollLastResult = "disabled";
+  if (wasActive || String(reason || "") === "beforeunload") {
+    recordTTSDebugEvent("proactive_scheduler_poll_stop", {
+      result: String(reason || "stop")
+    });
+  }
+}
+
+function startProactiveSchedulerPolling() {
+  const gateStatus = getProactiveSchedulerPollingGateStatus();
+  if (!gateStatus.enabled) {
+    stopProactiveSchedulerPolling(`gated_off:${gateStatus.blockedReasons.join(",") || "disabled"}`);
+    recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+      result: gateStatus.blockedReasons.join(",") || "polling_disabled"
+    });
+    return;
+  }
+  if (state.proactivePollTimerId) {
+    return;
+  }
+  const intervalMs = Number.isFinite(Number(state.conversationMode?.proactivePollIntervalMs))
+    ? Math.max(30000, Math.min(600000, Math.round(Number(state.conversationMode.proactivePollIntervalMs))))
+    : 60000;
+  state.proactivePollTimerId = window.setInterval(() => {
+    void runProactiveSchedulerPollingCheck();
+  }, intervalMs);
+  state.proactivePollActive = true;
+  state.proactivePollActiveIntervalMs = intervalMs;
+  state.proactivePollLastResult = "started";
+  recordTTSDebugEvent("proactive_scheduler_poll_start", {
+    result: `interval_ms:${intervalMs}`
+  });
+}
+
+function syncProactiveSchedulerPolling() {
+  const gateStatus = getProactiveSchedulerPollingGateStatus();
+  if (!gateStatus.enabled) {
+    stopProactiveSchedulerPolling(`sync_disabled:${gateStatus.blockedReasons.join(",") || "disabled"}`);
+    recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+      result: gateStatus.blockedReasons.join(",") || "polling_disabled"
+    });
+    return;
+  }
+  const desiredIntervalMs = Number.isFinite(Number(state.conversationMode?.proactivePollIntervalMs))
+    ? Math.max(30000, Math.min(600000, Math.round(Number(state.conversationMode.proactivePollIntervalMs))))
+    : 60000;
+  const activeIntervalMs = Number.isFinite(Number(state.proactivePollActiveIntervalMs))
+    ? Math.round(Number(state.proactivePollActiveIntervalMs))
+    : 0;
+  if (state.proactivePollTimerId && activeIntervalMs === desiredIntervalMs) {
+    return;
+  }
+  if (state.proactivePollTimerId) {
+    stopProactiveSchedulerPolling("sync_interval_change");
+  }
+  startProactiveSchedulerPolling();
 }
 
 function buildTTSDebugReport() {
@@ -6126,6 +6547,7 @@ function installTTSDebugBridge() {
     conversationFollowup: () => buildConversationFollowupDebugView(Date.now()),
     runConversationFollowup: () => runConversationFollowupDebug(),
     dryRunSilenceFollowup: () => runConversationSilenceFollowupDryRun(),
+    manualProactiveSchedulerTick: () => runProactiveSchedulerManualTick(),
     events: () => state.ttsDebugEvents.slice(),
     show: () => toggleTTSDebugPanel(true),
     hide: () => toggleTTSDebugPanel(false),
@@ -10104,6 +10526,19 @@ async function loadConfig() {
   state.conversationMode = {
     enabled: conversationCfg.enabled === true,
     proactiveEnabled: conversationCfg.proactive_enabled === true,
+    proactiveSchedulerEnabled: conversationCfg.proactive_scheduler_enabled === true,
+    proactiveCooldownMs: Math.round(
+      clampNumber(Number(conversationCfg.proactive_cooldown_ms ?? 600000), 60000, 3600000)
+    ),
+    proactiveWarmupMs: Math.round(
+      clampNumber(Number(conversationCfg.proactive_warmup_ms ?? 120000), 30000, 1800000)
+    ),
+    proactiveWindowMs: Math.round(
+      clampNumber(Number(conversationCfg.proactive_window_ms ?? 3600000), 600000, 86400000)
+    ),
+    proactivePollIntervalMs: Math.round(
+      clampNumber(Number(conversationCfg.proactive_poll_interval_ms ?? 60000), 30000, 600000)
+    ),
     maxFollowupsPerWindow: Math.round(
       clampNumber(Number(conversationCfg.max_followups_per_window ?? 1), 0, 4)
     ),
@@ -10112,6 +10547,10 @@ async function loadConfig() {
     ),
     interruptTtsOnUserSpeech: conversationCfg.interrupt_tts_on_user_speech === true
   };
+  if (!(Number(state.proactiveSchedulerStartedAt || 0) > 0)) {
+    state.proactiveSchedulerStartedAt = Date.now();
+  }
+  syncProactiveSchedulerPolling();
   const autoChatTuningCfg = observeCfg && typeof observeCfg.auto_chat_tuning === "object"
     ? observeCfg.auto_chat_tuning
     : {};
@@ -13603,6 +14042,7 @@ window.addEventListener("beforeunload", () => {
   resetActionSystem();
   stopIdleMotionLoop();
   stopAutoChatLoop();
+  stopProactiveSchedulerPolling("beforeunload");
   stopMicLoop(true);
   stopWakeWordListener();
   if (state.reminderTimer) {

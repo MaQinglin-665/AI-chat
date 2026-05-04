@@ -149,3 +149,129 @@ Commit：
 
 异常备注：
 ```
+
+## 10. Manual Proactive Scheduler Tick（Task 042）
+
+执行：
+
+```js
+await window.__AI_CHAT_DEBUG_TTS__.manualProactiveSchedulerTick()
+```
+
+期望：
+1. 默认配置下返回 `ok=false`、`reason="scheduler_not_eligible"`。
+2. `snapshot().proactiveScheduler.lastResult` 更新为 `blocked`。
+3. 开启 `conversation_mode.enabled/proactive_enabled/proactive_scheduler_enabled` 后，warmup 内 `blockedReasons` 包含 `warmup_active`。
+4. 仅当 scheduler gate eligible 时才进入 `dryRunSilenceFollowup` 路径；blocked 时不应执行 follow-up。
+5. 不应自动重复触发，不应自动截图。
+
+## 11. Proactive Scheduler Polling Skeleton（Task 043）
+
+执行：
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler
+```
+
+期望：
+1. 默认配置下 `pollTimerActive=false`，且 `schedulerEnabled=false`（或被上层开关阻塞）。
+2. 开启 `conversation_mode.enabled/proactive_enabled/proactive_scheduler_enabled` 后，reload 页面，`pollTimerActive=true`。
+3. `events()` 可见：
+   - `proactive_scheduler_poll_start`
+   - `proactive_scheduler_poll_blocked` 或 `proactive_scheduler_poll_ready`
+4. polling 仅做检查，不自动触发 follow-up，不自动说话，不自动截图。
+
+## 12. Limited Auto Trigger Smoke（Task 044）
+
+执行前置（仅本地测试）：
+1. 开启三层开关：
+   - `conversation_mode.enabled=true`
+   - `conversation_mode.proactive_enabled=true`
+   - `conversation_mode.proactive_scheduler_enabled=true`
+2. 构造可通过 scheduler gate 与 silence eligibility 的场景。
+
+观察点：
+1. `events()` 中先出现 `proactive_scheduler_poll_ready`。
+2. 随后出现：
+   - `proactive_scheduler_poll_trigger_success` 或
+   - `proactive_scheduler_poll_trigger_blocked`。
+3. 任意 blocked/异常都不应绕过 guard，不应直接触发不安全行为。
+4. 不应自动截图，不应自动工具调用，不应读取用户文件。
+
+## 13. Kill-Switch Smoke（Task 045）
+
+执行前置：
+1. 先开启三层开关并确认 polling 已 active。
+2. 确认 `events()` 已出现 `proactive_scheduler_poll_start`。
+
+操作与期望：
+1. 运行中关闭任一开关（例如 `proactive_scheduler_enabled=false`）并 reload 配置后：
+   - `snapshot().proactiveScheduler.pollTimerActive=false`
+   - `pollLastResult=disabled`
+   - `events()` 可见 `proactive_scheduler_poll_stop` 与带原因的 `proactive_scheduler_poll_blocked`
+2. 重新开启三层开关后可恢复 polling（仍受既有 guard）。
+3. 异常场景下仅记录 `proactive_scheduler_poll_failed`/stop 事件，不应出现不安全自动行为。
+
+## 14. Controlled Integration Checkpoint（Task 046）
+
+目的：
+1. 固化 Task 044/045 的受控联调步骤，形成可复用验收记录。
+2. 明确每一步的配置条件、事件名、预期与实际结果。
+
+记录模板：
+
+```md
+日期：
+分支：
+Commit：
+测试人：
+
+配置快照（仅安全字段）：
+- conversation_mode.enabled:
+- conversation_mode.proactive_enabled:
+- conversation_mode.proactive_scheduler_enabled:
+- conversation_mode.proactive_poll_interval_ms:
+- conversation_mode.proactive_cooldown_ms:
+- conversation_mode.proactive_warmup_ms:
+- conversation_mode.proactive_window_ms:
+
+执行结果：
+A. 默认关闭回归（通过/未通过）：
+- 观察：pollTimerActive / pollLastResult / events
+- 事件：proactive_scheduler_poll_blocked 或 disabled 相关 stop
+- 备注：
+
+B. 三层开关联调（通过/未通过）：
+- 观察：poll_start -> poll_blocked/poll_ready
+- 事件：proactive_scheduler_poll_start, proactive_scheduler_poll_blocked, proactive_scheduler_poll_ready
+- 备注：
+
+C. Kill-switch 运行时验证（通过/未通过）：
+- 观察：运行中关开关后 timer 停止、pollLastResult=disabled
+- 事件：proactive_scheduler_poll_stop + 带原因 proactive_scheduler_poll_blocked
+- 备注：
+
+D. 异常 fail-closed 验证（通过/未通过）：
+- 观察：仅失败/stop 事件，无失控重试
+- 事件：proactive_scheduler_poll_failed（必要时）+ proactive_scheduler_poll_stop
+- 备注：
+
+E. 安全边界复核（通过/未通过）：
+- skipDesktopAttach 路径仍生效
+- 无 direct requestAssistantReply 新增调用点
+- 无自动截图/工具调用/读文件新增路径
+- 备注：
+
+最终结论（通过/未通过/部分通过）：
+残余风险：
+回滚建议：
+```
+
+事件最小观察集：
+1. `proactive_scheduler_poll_start`
+2. `proactive_scheduler_poll_blocked`
+3. `proactive_scheduler_poll_ready`
+4. `proactive_scheduler_poll_trigger_success`
+5. `proactive_scheduler_poll_trigger_blocked`
+6. `proactive_scheduler_poll_failed`
+7. `proactive_scheduler_poll_stop`

@@ -138,6 +138,27 @@ Short summary:
 
 ```
 
+## Proactive Scheduler Controlled Checkpoint Addendum（Task 046）
+
+Use this addendum when validating Task 044/045 on a controlled branch.
+Keep records concise, reproducible, and free of private desktop content.
+
+| Checkpoint Item | Config Conditions | Expected Events | Actual | Pass/Fail | Notes |
+| --- | --- | --- | --- | --- | --- |
+| A. 默认关闭回归 | 任一关键开关为 false | `proactive_scheduler_poll_blocked` / disabled stop |  |  |  |
+| B. 三层开关联调 | 三层开关均为 true | `poll_start` + `poll_blocked/poll_ready` |  |  |  |
+| C. Kill-switch 运行时验证 | polling active 后关闭任一开关 | `poll_stop` + reasoned `poll_blocked` |  |  |  |
+| D. 异常 fail-closed | 注入 trigger 异常场景 | `poll_failed`（必要时）+ `poll_stop` |  |  |  |
+| E. 安全边界复核 | 全程 | 无不安全新增路径 |  |  |  |
+
+结论模板：
+
+```text
+Overall result: pass / fail / partial
+Residual risks:
+Rollback suggestion:
+```
+
 ---
 
 # Validation Run - 2026-05-03 v1.3 Preview
@@ -279,4 +300,321 @@ Short summary:
 
 ```text
 GPT-SoVITS demo playback, Live2D speech feedback, and source package generation are stable at the current checkpoint. The clean source package correctly requires tester-provided Live2D and LLM configuration before first launch. Expression response is present but subtle, so model-specific expression tuning remains a low-priority polish follow-up after the v1.3 preview.
+```
+
+---
+
+# Proactive Scheduler Controlled Integration Run - 2026-05-04 (Task 047)
+
+## Run Metadata
+
+| Item | Value |
+| --- | --- |
+| Date | 2026-05-04 |
+| Tester | Codex |
+| Branch / commit | `codex/proactive-scheduler-polling-skeleton` / `f2d741b` |
+| OS | Windows |
+| Python version | 3.11.9 |
+| Node version | v25.2.1 |
+| Electron mode | 未启动（本次以静态联调审计为主） |
+
+## Safe Config Snapshot
+
+| Flag | Value |
+| --- | --- |
+| `conversation_mode.enabled` | 默认 false |
+| `conversation_mode.proactive_enabled` | 默认 false |
+| `conversation_mode.proactive_scheduler_enabled` | 默认 false |
+| `conversation_mode.proactive_poll_interval_ms` | 60000（clamp: 30000..600000） |
+| `conversation_mode.proactive_cooldown_ms` | 600000 |
+| `conversation_mode.proactive_warmup_ms` | 120000 |
+| `conversation_mode.proactive_window_ms` | 3600000 |
+
+## A~E Controlled Checkpoint
+
+| Checkpoint Item | Operation (简要) | Observed Key Events / Evidence | Actual Result | Pass/Fail | Notes |
+| --- | --- | --- | --- | --- | --- |
+| A. 默认关闭回归 | 静态检查默认配置与 gate 条件 | 默认三层开关均为 false；polling gate 需三层全开才可用 | 默认 fail-closed | Pass | 本轮未启动 Electron，未采集运行态 events。 |
+| B. 三层开关联调 | 静态检查 polling 触发链路 | `poll_start/poll_blocked/poll_ready/poll_trigger_*` 事件定义存在；仅 `poll_ready` 后触发 `runProactiveSchedulerManualTick()` | 触发路径符合设计 | Pass | 事件名与调用顺序可审计。 |
+| C. Kill-switch 运行时验证 | 静态检查 runtime gate-off 与 stop 分支 | `runtime_gate_off:*`、`poll_stop`、`poll_blocked` 原因事件路径存在 | 逻辑具备快速停用能力 | Pass | 运行态时序建议人工桌面复测补录。 |
+| D. 异常 fail-closed 验证 | 静态检查 polling check 异常分支 | `proactive_scheduler_poll_failed` + `poll_exception_fail_closed` stop 路径存在 | 异常不继续失控重试 | Pass | 需人工注入异常复核事件顺序。 |
+| E. 安全边界复核 | 静态审计关键调用点 | 新增 trigger 复用 `runProactiveSchedulerManualTick -> runConversationSilenceFollowupDryRun -> runConversationFollowupDebug`；manual follow-up 含 `skipDesktopAttach: true`；未新增 direct `requestAssistantReply` 调用点 | 边界保持 | Pass | 未发现自动截图/工具调用/读文件新增路径。 |
+
+## Automated Commands
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `git status --short --branch` | pass | 当前分支与工作区可见。 |
+| `node --check web/chat.js` | pass | JS 语法通过。 |
+| `python -m py_compile config.py` | pass | Python 语法通过。 |
+| `python -m json.tool config.example.json` | pass | JSON 结构有效。 |
+| `git diff --check` | pass | 无格式错误。 |
+
+## Final Result
+
+Overall result: partial
+
+Residual risks:
+
+```text
+本次完成了可审计的静态联调检查与结果落库；但 Electron/DevTools 运行态事件序列（尤其 C/D 场景）尚未做一轮人工实机补录。建议在同一机器按 Task 046 模板跑一次桌面联调并补充实际事件时间线，以消除运行时时序风险。
+```
+
+Rollback suggestion:
+
+```text
+若发现运行态异常，优先关闭任一关键开关（conversation_mode.enabled / proactive_enabled / proactive_scheduler_enabled）快速停用 polling；必要时整体回退到 Task 043/044 前状态，保持默认 fail-closed。
+```
+
+---
+
+# Proactive Scheduler Runtime Event Capture - 2026-05-04 (Task 049)
+
+## Run Metadata
+
+| Item | Value |
+| --- | --- |
+| Date | 2026-05-04 |
+| Tester | Codex |
+| Branch / commit | `codex/proactive-scheduler-polling-skeleton` / `2cf51bd` |
+| OS | Windows |
+| Python version | 3.11.9 |
+| Node version | v25.2.1 |
+| Electron mode | desktop (process started), DevTools timeline capture blocked in current terminal-only run |
+
+## Safe Config Snapshot
+
+| Flag | Value |
+| --- | --- |
+| `conversation_mode.enabled` | default false |
+| `conversation_mode.proactive_enabled` | default false |
+| `conversation_mode.proactive_scheduler_enabled` | default false |
+| `conversation_mode.proactive_poll_interval_ms` | 60000 (clamp 30000..600000) |
+| `conversation_mode.proactive_cooldown_ms` | 600000 |
+| `conversation_mode.proactive_warmup_ms` | 120000 |
+| `conversation_mode.proactive_window_ms` | 3600000 |
+
+## Runtime Capture Scope (Task 049)
+
+| Checkpoint Item | Operation (brief) | Observed Key Events / Evidence | Actual Result | Pass/Fail | Notes |
+| --- | --- | --- | --- | --- | --- |
+| B. Electron startup | Run `npm run start:electron`, then verify process list | Electron main command returned successfully; multiple `electron` processes observed | Electron launched | Pass | Confirms real app startup, not mock. |
+| C. DevTools event capture | Planned to read `snapshot().proactiveScheduler` and `events()` in chatWindow DevTools | DevTools interactive console could not be driven from current terminal-only automation context | Runtime timeline not captured | Partial | No new dependencies were added; no fabricated event log was recorded. |
+| D. Kill-switch runtime timeline | Planned: enable all three switches, confirm polling active, then disable one switch and record stop/blocked events | Runtime interaction step blocked by C | Missing live event sequence (`poll_stop`, reasoned `poll_blocked`) | Partial | Static path remains audited in Task 047/048. |
+| E. Exception fail-closed timeline | Planned: safe debug-path exception injection and record `poll_failed` / `poll_stop` | Runtime interaction step blocked by C | Missing live event sequence for exception path | Partial | Static fail-closed branch remains audited. |
+
+## Automated Command Checks
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `git status --short --branch` | pass | Working tree clean on target branch. |
+| `git log --oneline -n 5` | pass | Commit chain matches Task 049 baseline expectation. |
+| `node --check web/chat.js` | pass | JS syntax valid. |
+| `python -m py_compile config.py` | pass | Python syntax valid. |
+| `python -m json.tool config.example.json` | pass | JSON structure valid. |
+| `git diff --check` | pass | No whitespace/conflict format issues. |
+
+## Final Result
+
+Overall result: partial
+
+Short summary:
+
+```text
+Task 049 completed real Electron startup verification and all baseline command checks, but did not complete live DevTools event timeline capture for kill-switch and exception fail-closed scenarios in this terminal-only run. No unsafe capability expansion was introduced, and no runtime evidence was fabricated. Manual same-session DevTools replay is still required to close the remaining risk.
+```
+
+## Residual Risks
+
+- Live event ordering evidence for runtime kill-switch and injected exception path is still pending.
+
+## Rollback Suggestion
+
+```text
+If any runtime instability appears, immediately disable one of the key switches (conversation_mode.enabled / proactive_enabled / proactive_scheduler_enabled) to stop polling. If broader rollback is needed, revert to Task 043 polling-only behavior and keep fail-closed defaults.
+```
+
+---
+
+# Proactive Scheduler DevTools Event Timeline Capture - 2026-05-04 (Task 050)
+
+## Run Metadata
+
+| Item | Value |
+| --- | --- |
+| Date | 2026-05-04 |
+| Tester | Codex |
+| Branch / commit | `codex/proactive-scheduler-polling-skeleton` / `21a0b2a` |
+| OS | Windows |
+| Python version | 3.11.9 |
+| Node version | v25.2.1 |
+| Electron mode | desktop started |
+| DevTools timeline capture | blocked in current terminal-only automation context |
+
+## A. Baseline Checks
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `git status --short --branch` | pass | Clean branch state before Task 050 changes. |
+| `git log --oneline -n 5` | pass | Baseline commit chain matches task input. |
+| `node --check web/chat.js` | pass | JS syntax valid. |
+| `python -m py_compile config.py` | pass | Python syntax valid. |
+| `python -m json.tool config.example.json` | pass | JSON structure valid. |
+| `git diff --check` | pass | No whitespace/conflict format issues. |
+
+## B. Electron Startup
+
+| Step | Observation | Result |
+| --- | --- | --- |
+| Run `npm run start:electron` | Command returned successfully and launched app process tree | pass |
+| Run `Get-Process -Name electron` | Multiple `electron` processes observed | pass |
+
+## C. DevTools Capture
+
+Planned commands:
+- `window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler`
+- `window.__AI_CHAT_DEBUG_TTS__.events()`
+
+Actual:
+- Electron could be started, but this terminal-only automation context cannot directly operate desktop DevTools Console input/output.
+- No new dependency or unsafe bypass was introduced to force collection.
+- Runtime timeline data is therefore not recorded in this run.
+
+Result: partial
+
+## D. Kill-switch Runtime Timeline
+
+Expected evidence:
+- Snapshot fields: `pollTimerActive`, `pollLastResult`, `pollingEnabled`, `blockedReasons`
+- Events: `proactive_scheduler_poll_stop`, `proactive_scheduler_poll_blocked`
+
+Actual:
+- Blocked by item C (no direct DevTools interaction channel).
+- Runtime timeline remains uncollected in this run.
+
+Result: partial
+
+## E. Exception Fail-closed Timeline
+
+Expected evidence:
+- Events: `proactive_scheduler_poll_failed` and (if present) `proactive_scheduler_poll_stop`
+- Confirmation: no uncontrolled retry, no guard bypass, no auto screenshot/tool-calling/file-reading path
+
+Actual:
+- Blocked by item C (no direct DevTools interaction channel).
+- Runtime timeline remains uncollected in this run.
+
+Result: partial
+
+## Overall Result
+
+Overall result: partial
+
+- Task 049 residual risk is not closed in this run.
+- Improvement from this run: verified real Electron startup again under current baseline.
+
+## Residual Risks
+
+- Missing same-session DevTools runtime event timeline for kill-switch and exception fail-closed scenarios.
+
+## Rollback Suggestion
+
+```text
+If runtime anomalies appear, disable any key switch (`conversation_mode.enabled` / `proactive_enabled` / `proactive_scheduler_enabled`) to stop polling quickly. If broader rollback is needed, revert to Task 043 polling-only behavior and keep fail-closed defaults.
+```
+
+## Manual Next-step Procedure
+
+1. Open chat window DevTools Console on the same machine/session.
+2. Run snapshot/events commands and save concise timeline notes.
+3. Reproduce kill-switch runtime stop sequence and capture event order.
+4. Inject safe temporary exception in DevTools only, capture fail-closed events.
+5. Update this validation log with concrete event timestamps/order and re-evaluate pass/partial.
+
+---
+
+# Proactive Scheduler Manual DevTools Follow-up - 2026-05-04 (Task 051)
+
+## Run Metadata
+
+| Item | Value |
+| --- | --- |
+| Date | 2026-05-04 |
+| Tester | User + Codex-assisted notes |
+| Branch / commit | `codex/proactive-scheduler-polling-skeleton` / `b2dec14` |
+| Environment | Windows Electron chat window DevTools |
+| Config source | Local-only `config.local.json` override, not tracked by git |
+
+## A. Default-off Runtime Evidence
+
+| Observation | Result |
+| --- | --- |
+| `schedulerEnabled=false`, `conversationEnabled=false`, `proactiveEnabled=false` | pass |
+| `pollingEnabled=false`, `pollTimerActive=false`, `pollLastResult=disabled` | pass |
+| `blockedReasons` included `conversation_disabled`, `proactive_disabled`, `scheduler_disabled` | pass |
+| Event observed: `proactive_scheduler_poll_blocked` with default-off reasons | pass |
+
+## B. Three-switch Polling Runtime Evidence
+
+Local-only test override enabled:
+- `conversation_mode.enabled=true`
+- `conversation_mode.proactive_enabled=true`
+- `conversation_mode.proactive_scheduler_enabled=true`
+
+Observed:
+
+| Event / Snapshot | Result |
+| --- | --- |
+| `proactive_scheduler_poll_start` with `interval_ms:60000` | pass |
+| `pollingEnabled=true`, `pollTimerActive=true`, `pollLastResult=started` | pass |
+| Later blocked reasons included `warmup_active`, then `no_pending_followup`, `empty_topic_hint`, `no_tts_finished_timestamp` | expected |
+
+## C. Kill-switch Runtime Timeline
+
+Procedure:
+1. Start with all three switches enabled and polling active.
+2. Change local-only `config.local.json` so `conversation_mode.proactive_scheduler_enabled=false`.
+3. Call backend reload with `X-Taffy-Token`.
+4. Call frontend `await loadConfig()` from chat DevTools Console to sync the live page state.
+5. Inspect `snapshot().proactiveScheduler` and `events()`.
+
+Observed event order:
+
+| Seq | Stage | Result |
+| --- | --- | --- |
+| 1 | `proactive_scheduler_poll_start` | `interval_ms:60000` |
+| 2-7 | `proactive_scheduler_poll_blocked` | `warmup_active` / `no_pending_followup,empty_topic_hint,no_tts_finished_timestamp` |
+| 8 | `proactive_scheduler_poll_stop` | `sync_disabled:scheduler_disabled` |
+| 9 | `proactive_scheduler_poll_blocked` | `scheduler_disabled` |
+
+Result: pass
+
+Notes:
+- Backend `/api/config/reload` alone refreshed backend config but did not update the already-loaded frontend state.
+- Same-session frontend sync was completed by calling `await loadConfig()` from DevTools.
+- This confirms the runtime kill-switch once the frontend receives the updated config.
+
+## D. Exception Fail-closed Timeline
+
+Result: partial
+
+Notes:
+- No safe DevTools-only exception injection hook is currently exposed.
+- No unsafe monkey patch, source edit, or test-only bypass was used.
+- Static review from prior tasks still confirms the `poll_exception_fail_closed` branch, but live `poll_failed` event ordering remains uncollected.
+
+## Overall Result
+
+Overall result: partial
+
+Improvement:
+- Default-off runtime evidence, three-switch polling startup, and kill-switch runtime stop timeline are now manually captured.
+
+Remaining residual risk:
+- Exception fail-closed live event timeline remains partial because no safe DevTools-only injection hook is exposed.
+
+Rollback suggestion:
+
+```text
+Disable any key switch (`conversation_mode.enabled` / `proactive_enabled` / `proactive_scheduler_enabled`) to stop polling. For live-page kill-switch validation, backend reload must be followed by frontend config sync (`await loadConfig()`) or page reload.
 ```

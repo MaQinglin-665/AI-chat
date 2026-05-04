@@ -132,3 +132,102 @@
 2. 不引入默认开启的自动开口。
 3. 不破坏现有 manual-only 调试入口与 guard。
 4. 任意阶段都可通过配置开关快速回退到当前稳定行为。
+
+## 12. Task 040 Landing Notes
+
+- Task 040 已落地 proactive scheduler config skeleton，但仍未启用 scheduler 执行路径。
+- 当前仅新增并归一化以下配置字段：
+  - `proactive_scheduler_enabled`（默认 `false`，仅 JSON `true` 才启用）
+  - `proactive_cooldown_ms`（clamp: `60000`~`3600000`，默认 `600000`）
+  - `proactive_warmup_ms`（clamp: `30000`~`1800000`，默认 `120000`）
+  - `proactive_window_ms`（clamp: `600000`~`86400000`，默认 `3600000`）
+- 前端 debug snapshot 已可读取这些字段，用于后续只读验证。
+- Task 040 不引入自动触发：
+  - 不新增 timer/listener/scheduler/tick
+  - 不新增 `fetch`/`authFetch`/`requestAssistantReply`/`speak` 调用
+  - 不改变 desktop capture/tool calling/file access 默认行为
+
+## 13. Task 041 Landing Notes
+
+- Task 041 已新增 proactive scheduler state 字段与只读 debug snapshot 可见性。
+- 新增的是“状态观测”而非“状态执行”：
+  - 增加 `proactiveSchedulerStartedAt`、`proactiveLastAttemptAt`、`proactiveLastTriggeredAt`、`proactiveCooldownUntil`、`proactiveWindowStartedAt`、`proactiveCountInWindow`、`proactiveInFlight`、`proactiveLastBlockedReason`、`proactiveLastResult`
+  - 新增 `buildProactiveSchedulerDebugSnapshot()` 并挂到 `snapshot().proactiveScheduler`
+- `eligibleForSchedulerTick` 仅表示 scheduler 自身 gate 是否放行，不等于 silence follow-up eligibility。
+- Task 041 仍不引入自动执行：
+  - 不新增 timer/listener/scheduler tick
+  - 不新增 follow-up 触发
+  - 不新增 `fetch`/`authFetch`/`requestAssistantReply`/`speak` 调用
+
+## 14. Task 042 Landing Notes
+
+- Task 042 新增 DevTools-only 手动入口：
+  - `window.__AI_CHAT_DEBUG_TTS__.manualProactiveSchedulerTick()`
+- 手动 tick 只用于联调路径验证：
+  - scheduler gate（`buildProactiveSchedulerDebugSnapshot`）
+  - silence eligibility（`runConversationSilenceFollowupDryRun`）
+  - manual follow-up guard（`runConversationFollowupDebug`）
+- blocked 行为保持严格：
+  - 当 scheduler gate 不通过时，直接返回 `scheduler_not_eligible`
+  - 不执行 `dryRunSilenceFollowup`，不触发 follow-up
+- eligible 行为：
+  - 复用现有 `runConversationSilenceFollowupDryRun()`
+  - 成功时写入 `lastTriggered/cooldown/windowCount/lastResult`
+  - 失败或 blocked 时写入 `lastBlockedReason/lastResult`，并进入短 cooldown
+- Task 042 仍不引入自动触发：
+  - 不新增 timer/listener/scheduler polling
+  - 不新增后端 API、UI、或新的 LLM/TTS 调用链
+
+## 15. Task 043 Landing Notes
+
+- Task 043 新增 disabled-by-default 的 proactive scheduler polling skeleton。
+- 配置新增 `proactive_poll_interval_ms`（默认 `60000`，clamp `30000`~`600000`）。
+- polling lifecycle 新增 start/stop/sync/check，但默认配置下不会启动。
+- 即使启用 polling，本阶段也只做 check：
+  - scheduler gate 检查
+  - silence/follow-up debug 可见性检查
+  - 记录 `proactive_scheduler_poll_start/stop/blocked/ready` 事件
+- Task 043 明确不执行 follow-up：
+  - 不调用 `runConversationSilenceFollowupDryRun`
+  - 不调用 `runConversationFollowupDebug`
+  - 不调用 `runProactiveSchedulerManualTick`
+
+## 16. Task 044 Landing Notes
+
+- Task 044 在 polling skeleton 基础上新增 limited auto trigger smoke。
+- 自动触发仍保持严格门控：
+  - 仅在 `poll_ready`（scheduler gate + silence eligibility 均通过）时尝试触发
+  - 复用 `runProactiveSchedulerManualTick()` 既有 guard 路径
+  - 不直接调用 `requestAssistantReply`
+- 默认仍 fail closed：
+  - 三层开关未同时开启时 polling 不可用
+  - 任意异常路径仅记录 debug event，并保持不触发主动发言
+- 运行边界保持不变：
+  - `skipDesktopAttach` 仍由既有 manual follow-up guard 路径保证
+  - 不新增桌面截图、工具调用、文件读取默认行为
+
+## 17. Task 045 Landing Notes
+
+- Task 045 增加回滚与紧急停用（kill-switch）smoke 校验，目标是“安全收口”。
+- 运行时若任一关键开关关闭（`enabled/proactive_enabled/proactive_scheduler_enabled`），polling 会快速停用：
+  - 立即 `stop` timer
+  - 标记 `pollLastResult=disabled`
+  - 记录可识别 stop/blocked 原因事件
+- 异常路径保持 fail closed：
+  - 仅记录失败事件
+  - 不继续轮询失控重试
+  - 不绕过既有 guard 触发不安全行为
+
+## 18. Task 046 Landing Notes
+
+- Task 046 不扩功能，重点是受控联调与验收记录固化。
+- 验收记录要求：
+  - 可复现：每条结论都带配置条件与操作步骤
+  - 可回滚：明确 kill-switch 操作与预期停用行为
+  - 可审计：事件名、观察点、结论与残余风险可追溯
+- 建议以五类场景形成固定检查面：
+  - 默认关闭回归
+  - 三层开关联调
+  - 运行时 kill-switch
+  - 异常 fail-closed
+  - 安全边界复核

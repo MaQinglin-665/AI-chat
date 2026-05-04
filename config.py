@@ -287,6 +287,11 @@ DEFAULT_CONFIG = {
     "conversation_mode": {
         "enabled": False,
         "proactive_enabled": False,
+        "proactive_scheduler_enabled": False,
+        "proactive_cooldown_ms": 600000,
+        "proactive_warmup_ms": 120000,
+        "proactive_window_ms": 3600000,
+        "proactive_poll_interval_ms": 60000,
         "max_followups_per_window": 1,
         "silence_followup_min_ms": 180000,
         "interrupt_tts_on_user_speech": False,
@@ -922,6 +927,49 @@ def sanitize_client_config(config):
         "conversation_mode": {
             "enabled": _safe_bool_true(conversation_cfg.get("enabled", False)),
             "proactive_enabled": _safe_bool_true(conversation_cfg.get("proactive_enabled", False)),
+            "proactive_scheduler_enabled": _safe_bool_true(
+                conversation_cfg.get("proactive_scheduler_enabled", False)
+            ),
+            "proactive_cooldown_ms": max(
+                60 * 1000,
+                min(
+                    60 * 60 * 1000,
+                    _safe_int(
+                        conversation_cfg.get("proactive_cooldown_ms", 600000),
+                        600000,
+                    ),
+                ),
+            ),
+            "proactive_warmup_ms": max(
+                30 * 1000,
+                min(
+                    30 * 60 * 1000,
+                    _safe_int(
+                        conversation_cfg.get("proactive_warmup_ms", 120000),
+                        120000,
+                    ),
+                ),
+            ),
+            "proactive_window_ms": max(
+                10 * 60 * 1000,
+                min(
+                    24 * 60 * 60 * 1000,
+                    _safe_int(
+                        conversation_cfg.get("proactive_window_ms", 3600000),
+                        3600000,
+                    ),
+                ),
+            ),
+            "proactive_poll_interval_ms": max(
+                30 * 1000,
+                min(
+                    10 * 60 * 1000,
+                    _safe_int(
+                        conversation_cfg.get("proactive_poll_interval_ms", 60000),
+                        60000,
+                    ),
+                ),
+            ),
             "max_followups_per_window": max(
                 0,
                 min(
