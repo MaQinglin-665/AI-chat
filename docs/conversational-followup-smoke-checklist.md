@@ -487,3 +487,35 @@ Regression checks:
 
 1. No scheduler gate, polling lifecycle, cooldown/window limit, kill-switch, or fail-closed behavior changes.
 2. No screenshot, tool, shell, file, TTS, fetch, LLM, config, API, dependency, or UI behavior changes.
+
+## 23. Follow-up Plan Debug Snapshot (Task 062)
+
+Purpose:
+
+1. Confirm current follow-up plan eligibility is visible in the existing debug snapshot.
+2. Reduce the need to call `conversationFollowup()` only to inspect blocked reasons.
+
+Command:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.snapshot().followup
+```
+
+Expected:
+
+1. Existing fields remain available.
+2. New fields are available:
+   - `eligible`
+   - `blockedReasons`
+3. Default-off or not-ready states include readable blocked reasons such as:
+   - `conversation_disabled`
+   - `proactive_disabled`
+   - `no_pending_followup`
+   - `empty_topic_hint`
+   - `silence_window_not_reached`
+
+Regression checks:
+
+1. Snapshot remains read-only.
+2. No follow-up execution is triggered.
+3. No scheduler, polling, request, screenshot, tool, shell, file, TTS, fetch, LLM, config, API, dependency, or UI behavior changes.
