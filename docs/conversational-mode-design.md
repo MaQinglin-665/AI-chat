@@ -284,3 +284,22 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - 不基于 silence tick 自动触发
   - 不新增 timer/listener
   - 不新增后端接口
+
+## 21. Task 035 Landing Notes
+
+- Task 035 强化了 manual follow-up execution 的 guard 与失败恢复：
+  - 执行前保存 pending 快照
+  - 请求失败（返回 false 或抛异常）时恢复 pending
+  - 请求成功时保持 pending 已消费
+- `runConversationFollowup()` 返回对象新增：
+  - `restoredPending`
+  - `consumedPending`
+  - `endedAt`
+  - `elapsedMs`
+- 增加调试事件阶段：
+  - `conversation_followup_not_eligible`
+  - `conversation_followup_start`
+  - `conversation_followup_success`
+  - `conversation_followup_failed`
+  - `conversation_followup_restore_pending`
+- 该任务仍保持 manual-only，不引入任何自动触发循环。

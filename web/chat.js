@@ -557,6 +557,25 @@ function buildConversationFollowupPromptDraft(plan) {
   ].join("\n");
 }
 
+function snapshotConversationFollowupPending() {
+  return {
+    pending: state.followupPending === true,
+    reason: String(state.followupReason || ""),
+    topicHint: String(state.followupTopicHint || ""),
+    updatedAt: Number(state.followupUpdatedAt || 0)
+  };
+}
+
+function restoreConversationFollowupPending(snapshot) {
+  const safe = snapshot && typeof snapshot === "object" ? snapshot : {};
+  state.followupPending = safe.pending === true;
+  state.followupReason = String(safe.reason || "");
+  state.followupTopicHint = String(safe.topicHint || "");
+  state.followupUpdatedAt = Number.isFinite(Number(safe.updatedAt))
+    ? Math.max(0, Math.round(Number(safe.updatedAt)))
+    : 0;
+}
+
 function clearConversationFollowupPending(nowMs = Date.now()) {
   const now = Number(nowMs);
   state.followupPending = false;
@@ -572,28 +591,113 @@ async function runConversationFollowupDebug() {
     ...basePlan,
     promptDraft: buildConversationFollowupPromptDraft(basePlan)
   };
+  const blockedSummary = Array.isArray(plan.blockedReasons) ? plan.blockedReasons.join(",") : "";
+  const reasonText = String(plan.reason || "");
+  const topicHintText = String(plan.topicHint || "");
+  const finishResult = (result) => {
+    const endedAt = Date.now();
+    return {
+      ...result,
+      plan,
+      startedAt,
+      endedAt,
+      elapsedMs: Math.max(0, endedAt - startedAt)
+    };
+  };
+
   if (!plan.eligible || !plan.promptDraft) {
-    return { ok: false, reason: "not_eligible", plan, startedAt };
+    recordTTSDebugEvent("conversation_followup_not_eligible", {
+      text: topicHintText,
+      result: blockedSummary || "not_eligible",
+      error: reasonText
+    });
+    return finishResult({
+      ok: false,
+      reason: "not_eligible",
+      consumedPending: false,
+      restoredPending: false
+    });
   }
   if (typeof requestAssistantReply !== "function") {
-    return { ok: false, reason: "no_safe_entrypoint", plan, startedAt };
+    recordTTSDebugEvent("conversation_followup_failed", {
+      text: topicHintText,
+      result: "no_safe_entrypoint",
+      error: reasonText
+    });
+    return finishResult({
+      ok: false,
+      reason: "no_safe_entrypoint",
+      consumedPending: false,
+      restoredPending: false
+    });
   }
 
+  const pendingSnapshot = snapshotConversationFollowupPending();
+  recordTTSDebugEvent("conversation_followup_start", {
+    text: topicHintText,
+    result: reasonText || "followup_pending"
+  });
   clearConversationFollowupPending(startedAt);
   const followupInput = `（debug/manual follow-up）\n${plan.promptDraft}`;
-  const ok = await requestAssistantReply(followupInput, {
-    showUser: false,
-    rememberUser: false,
-    rememberAssistant: true,
-    auto: true,
-    skipDesktopAttach: true,
-    silentError: true,
-    userDisplayText: "[debug/manual follow-up]"
-  });
+  try {
+    const ok = await requestAssistantReply(followupInput, {
+      showUser: false,
+      rememberUser: false,
+      rememberAssistant: true,
+      auto: true,
+      skipDesktopAttach: true,
+      silentError: true,
+      userDisplayText: "[debug/manual follow-up]"
+    });
 
-  return ok
-    ? { ok: true, reason: "started", plan, startedAt }
-    : { ok: false, reason: "request_failed", plan, startedAt };
+    if (ok) {
+      recordTTSDebugEvent("conversation_followup_success", {
+        text: topicHintText,
+        result: reasonText || "followup_pending"
+      });
+      return finishResult({
+        ok: true,
+        reason: "started",
+        consumedPending: true,
+        restoredPending: false
+      });
+    }
+
+    restoreConversationFollowupPending(pendingSnapshot);
+    recordTTSDebugEvent("conversation_followup_restore_pending", {
+      text: sanitizeTTSDebugText(pendingSnapshot.topicHint || topicHintText),
+      result: pendingSnapshot.reason || reasonText || "restore"
+    });
+    recordTTSDebugEvent("conversation_followup_failed", {
+      text: topicHintText,
+      result: "request_failed",
+      error: reasonText
+    });
+    return finishResult({
+      ok: false,
+      reason: "request_failed",
+      consumedPending: false,
+      restoredPending: true
+    });
+  } catch (err) {
+    restoreConversationFollowupPending(pendingSnapshot);
+    const errorText = String(err?.message || err || "request_exception");
+    recordTTSDebugEvent("conversation_followup_restore_pending", {
+      text: sanitizeTTSDebugText(pendingSnapshot.topicHint || topicHintText),
+      result: pendingSnapshot.reason || reasonText || "restore"
+    });
+    recordTTSDebugEvent("conversation_followup_failed", {
+      text: topicHintText,
+      result: "request_exception",
+      error: errorText
+    });
+    return finishResult({
+      ok: false,
+      reason: "request_exception",
+      consumedPending: false,
+      restoredPending: true
+    });
+  }
 }
 
 function buildTTSDebugReport() {
