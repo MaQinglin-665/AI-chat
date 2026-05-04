@@ -371,3 +371,26 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - window: `600000`~`86400000`
 - `snapshot().conversationMode` 已可见以上字段，仅用于调试可见性，不参与自动调度执行。
 - 本任务未新增 timer/listener/scheduler/tick，未新增后端 API、UI、自动 proactive 调用链路。
+
+## 27. Task 041 Landing Notes
+
+- Task 041 新增 proactive scheduler 的运行态 state 与只读 debug snapshot，可用于后续 scheduler 开发前的可观测性校准。
+- `snapshot().proactiveScheduler` 现可读取：
+  - `schedulerEnabled`
+  - `conversationEnabled`
+  - `proactiveEnabled`
+  - `startedAgeMs`
+  - `warmupRemainingMs`
+  - `cooldownRemainingMs`
+  - `windowAgeMs`
+  - `proactiveCountInWindow`
+  - `maxFollowupsPerWindow`
+  - `proactiveInFlight`
+  - `lastAttemptAgeMs`
+  - `lastTriggeredAgeMs`
+  - `lastBlockedReason`
+  - `lastResult`
+  - `blockedReasons`
+  - `eligibleForSchedulerTick`
+- `eligibleForSchedulerTick` 仅代表 scheduler gate，不包含 silence follow-up 条件，也不会触发任何执行。
+- 本任务未新增 timer/listener/scheduler tick、未新增自动 proactive 触发、未修改 manual follow-up 行为。

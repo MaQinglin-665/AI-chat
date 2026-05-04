@@ -146,3 +146,15 @@
   - 不新增 timer/listener/scheduler/tick
   - 不新增 `fetch`/`authFetch`/`requestAssistantReply`/`speak` 调用
   - 不改变 desktop capture/tool calling/file access 默认行为
+
+## 13. Task 041 Landing Notes
+
+- Task 041 已新增 proactive scheduler state 字段与只读 debug snapshot 可见性。
+- 新增的是“状态观测”而非“状态执行”：
+  - 增加 `proactiveSchedulerStartedAt`、`proactiveLastAttemptAt`、`proactiveLastTriggeredAt`、`proactiveCooldownUntil`、`proactiveWindowStartedAt`、`proactiveCountInWindow`、`proactiveInFlight`、`proactiveLastBlockedReason`、`proactiveLastResult`
+  - 新增 `buildProactiveSchedulerDebugSnapshot()` 并挂到 `snapshot().proactiveScheduler`
+- `eligibleForSchedulerTick` 仅表示 scheduler 自身 gate 是否放行，不等于 silence follow-up eligibility。
+- Task 041 仍不引入自动执行：
+  - 不新增 timer/listener/scheduler tick
+  - 不新增 follow-up 触发
+  - 不新增 `fetch`/`authFetch`/`requestAssistantReply`/`speak` 调用

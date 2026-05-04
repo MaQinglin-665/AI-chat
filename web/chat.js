@@ -44,6 +44,15 @@ const state = {
   conversationLastUserAt: 0,
   conversationLastAssistantAt: 0,
   conversationLastTtsFinishedAt: 0,
+  proactiveSchedulerStartedAt: 0,
+  proactiveLastAttemptAt: 0,
+  proactiveLastTriggeredAt: 0,
+  proactiveCooldownUntil: 0,
+  proactiveWindowStartedAt: 0,
+  proactiveCountInWindow: 0,
+  proactiveInFlight: false,
+  proactiveLastBlockedReason: "",
+  proactiveLastResult: "",
   autoChatTuning: {
     triggerBaseThreshold: 1.03,
     shortSilencePenalty: 0.35,
@@ -430,6 +439,87 @@ function formatTTSDebugNumber(value, digits = 0) {
   return digits > 0 ? n.toFixed(digits) : String(Math.round(n));
 }
 
+function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
+  const now = Number(nowMs);
+  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
+  const conversationEnabled = conversationMode.enabled === true;
+  const proactiveEnabled = conversationMode.proactiveEnabled === true;
+  const schedulerEnabled = conversationMode.proactiveSchedulerEnabled === true;
+  const warmupMs = Number.isFinite(Number(conversationMode.proactiveWarmupMs))
+    ? Math.max(0, Math.round(Number(conversationMode.proactiveWarmupMs)))
+    : 120000;
+  const maxFollowupsPerWindow = Number.isFinite(Number(conversationMode.maxFollowupsPerWindow))
+    ? Math.max(0, Math.round(Number(conversationMode.maxFollowupsPerWindow)))
+    : 1;
+  const startedAt = Number(state.proactiveSchedulerStartedAt || 0);
+  const proactiveCooldownUntil = Number(state.proactiveCooldownUntil || 0);
+  const proactiveWindowStartedAt = Number(state.proactiveWindowStartedAt || 0);
+  const proactiveCountInWindow = Number.isFinite(Number(state.proactiveCountInWindow))
+    ? Math.max(0, Math.round(Number(state.proactiveCountInWindow)))
+    : 0;
+  const proactiveInFlight = state.proactiveInFlight === true;
+  const lastAttemptAt = Number(state.proactiveLastAttemptAt || 0);
+  const lastTriggeredAt = Number(state.proactiveLastTriggeredAt || 0);
+
+  const startedAgeMs = startedAt > 0 ? Math.max(0, Math.round(safeNow - startedAt)) : -1;
+  const warmupRemainingMs = startedAt > 0
+    ? Math.max(0, Math.round(warmupMs - (safeNow - startedAt)))
+    : warmupMs;
+  const cooldownRemainingMs = proactiveCooldownUntil > safeNow
+    ? Math.max(0, Math.round(proactiveCooldownUntil - safeNow))
+    : 0;
+  const windowAgeMs = proactiveWindowStartedAt > 0
+    ? Math.max(0, Math.round(safeNow - proactiveWindowStartedAt))
+    : -1;
+  const lastAttemptAgeMs = lastAttemptAt > 0 ? Math.max(0, Math.round(safeNow - lastAttemptAt)) : -1;
+  const lastTriggeredAgeMs = lastTriggeredAt > 0 ? Math.max(0, Math.round(safeNow - lastTriggeredAt)) : -1;
+
+  const blockedReasons = [];
+  if (!conversationEnabled) {
+    blockedReasons.push("conversation_disabled");
+  }
+  if (!proactiveEnabled) {
+    blockedReasons.push("proactive_disabled");
+  }
+  if (!schedulerEnabled) {
+    blockedReasons.push("scheduler_disabled");
+  }
+  if (warmupRemainingMs > 0) {
+    blockedReasons.push("warmup_active");
+  }
+  if (cooldownRemainingMs > 0) {
+    blockedReasons.push("cooldown_active");
+  }
+  if (proactiveInFlight) {
+    blockedReasons.push("in_flight");
+  }
+  if (proactiveCountInWindow >= maxFollowupsPerWindow) {
+    blockedReasons.push("window_limit_reached");
+  }
+
+  return {
+    schedulerEnabled,
+    conversationEnabled,
+    proactiveEnabled,
+    startedAgeMs,
+    warmupRemainingMs,
+    cooldownRemainingMs,
+    windowAgeMs,
+    proactiveCountInWindow,
+    maxFollowupsPerWindow,
+    proactiveInFlight,
+    lastAttemptAgeMs,
+    lastTriggeredAgeMs,
+    lastBlockedReason: String(state.proactiveLastBlockedReason || ""),
+    lastResult: String(state.proactiveLastResult || ""),
+    blockedReasons,
+    eligibleForSchedulerTick: blockedReasons.length === 0
+  };
+}
+
 function getTTSDebugSnapshot() {
   const audio = state.ttsAudio;
   const now = performance.now();
@@ -493,6 +583,7 @@ function getTTSDebugSnapshot() {
       topicHint: String(state.followupTopicHint || ""),
       updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
     },
+    proactiveScheduler: buildProactiveSchedulerDebugSnapshot(Date.now()),
     silence: buildConversationSilenceDebugSnapshot(Date.now()),
     lastResult: state.ttsDebugLastResult || "",
     lastError: state.ttsDebugLastError || ""
@@ -10138,6 +10229,9 @@ async function loadConfig() {
     ),
     interruptTtsOnUserSpeech: conversationCfg.interrupt_tts_on_user_speech === true
   };
+  if (!(Number(state.proactiveSchedulerStartedAt || 0) > 0)) {
+    state.proactiveSchedulerStartedAt = Date.now();
+  }
   const autoChatTuningCfg = observeCfg && typeof observeCfg.auto_chat_tuning === "object"
     ? observeCfg.auto_chat_tuning
     : {};
