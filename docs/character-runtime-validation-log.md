@@ -618,3 +618,35 @@ Rollback suggestion:
 ```text
 Disable any key switch (`conversation_mode.enabled` / `proactive_enabled` / `proactive_scheduler_enabled`) to stop polling. For live-page kill-switch validation, backend reload must be followed by frontend config sync (`await loadConfig()`) or page reload.
 ```
+
+---
+
+# Proactive Scheduler Residual Risk Follow-up Note - 2026-05-04 (Task 053)
+
+## Purpose
+
+- Keep the remaining exception fail-closed runtime risk explicit until a safe injection hook is implemented and validated.
+- Avoid unsafe temporary approaches (source edits in-place, remote trigger API, persistent debug flags).
+
+## Current Status
+
+- Default-off runtime posture: covered.
+- Three-switch polling runtime behavior: covered.
+- Kill-switch runtime stop timeline: covered.
+- Exception fail-closed live event ordering: still pending (`partial`).
+
+## Design Decision (Task 053)
+
+- Preferred future test hook: DevTools-only, local-only, default-off, one-shot failure injection in frontend debug bridge.
+- Safety constraints:
+  - No remote API trigger
+  - No persistent dangerous state
+  - No direct `requestAssistantReply` path addition
+  - No screenshot/tool-calling/file-reading side effects
+
+## Exit Criteria to Close This Residual Risk
+
+1. Implement the approved one-shot DevTools injection hook.
+2. Capture live event ordering for exception path in same-session Electron/DevTools run.
+3. Confirm `proactive_scheduler_poll_failed` + fail-closed stop behavior and no uncontrolled retry.
+4. Re-run smoke checks and update this log from `partial` to `pass` for exception timeline evidence.

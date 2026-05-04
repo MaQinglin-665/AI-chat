@@ -456,3 +456,15 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - 运行时 kill-switch
   - 异常 fail-closed
   - 安全边界复核
+
+## 33. Task 053 Landing Notes
+
+- Task 053 明确了 exception fail-closed 的测试入口先做“安全设计”，不先做功能实现。
+- 推荐入口是 DevTools-only / local-only / default-off 的一次性注入 hook，用于验证 polling 异常分支事件顺序。
+- 该设计强调：
+  - 不改正常对话行为
+  - 不暴露远程 API
+  - 不持久化危险状态
+  - 不新增 direct `requestAssistantReply` 路径
+  - 不新增截图/工具调用/读文件路径
+- 该设计将用于后续把 exception runtime 证据从 `partial` 推进到 `pass`。

@@ -275,3 +275,22 @@ E. 安全边界复核（通过/未通过）：
 5. `proactive_scheduler_poll_trigger_blocked`
 6. `proactive_scheduler_poll_failed`
 7. `proactive_scheduler_poll_stop`
+
+## 15. Exception Fail-closed Hook Design Review (Task 053)
+
+目的：
+1. 在实现前先评审“异常注入入口”是否满足安全边界。
+2. 防止为追求测试便利而引入高风险调试后门。
+
+必查项：
+1. 入口默认关闭，且仅 DevTools/debug bridge 可用。
+2. 注入仅影响下一次 polling check，消费后自动清除。
+3. 页面 reload 后注入状态失效（不持久化到配置/后端）。
+4. 不暴露远程 API，不允许 HTTP 直接触发。
+5. 异常路径只产生 fail-closed 事件，不触发自动截图/工具调用/读文件。
+6. 不新增 direct `requestAssistantReply` 调用点。
+
+不可接受实现：
+1. `config` 持久化 debug fail flag 且默认可被误启用。
+2. query/env 隐式入口无法审计，或会跨会话遗留。
+3. 可绕过 scheduler/manual guard 链的异常触发路径。
