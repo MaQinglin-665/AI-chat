@@ -475,3 +475,18 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - The hook is available only through the existing TTS debug bridge and is inactive unless manually called in DevTools.
 - The next scheduler polling check consumes the hook and routes through the existing `poll_exception_fail_closed` catch path.
 - The hook does not alter normal conversation mode behavior, config defaults, or proactive scheduler eligibility rules.
+
+## 35. Task 056 Landing Notes
+
+- Task 056 only polishes the follow-up prompt seed used by the existing guarded path.
+- The updated wording asks the assistant to behave like a gentle character continuation, not a system notification.
+- The expected response remains:
+  - one short sentence
+  - optional and easy to ignore
+  - no pressure for the user to reply immediately
+  - no repeated questioning or long explanation
+- Safety boundaries are restated in the prompt seed:
+  - no desktop/screen observation
+  - no file or private data access
+  - no tool calls
+- No scheduler gates, polling lifecycle, config defaults, APIs, dependencies, or request paths are changed.
