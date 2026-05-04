@@ -522,3 +522,13 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `snapshot().followup.policyBlockedReason`
 - The values reuse the same deterministic policy helper as Task 057/058.
 - This is a read-only visibility improvement and does not change follow-up execution, scheduler gates, polling, config defaults, request paths, tools, screenshots, file access, or UI.
+
+## 39. Task 061 Landing Notes
+
+- Task 061 adds compact follow-up policy context to existing debug event payloads.
+- Event names and `result` semantics stay unchanged; policy context is attached through the existing `error` field.
+- Covered event families:
+  - `conversation_followup_*`
+  - `conversation_silence_followup_*`
+  - `proactive_scheduler_poll_*`
+- This improves event timeline review without adding triggers, changing scheduler gates, calling new request paths, or expanding permissions.
