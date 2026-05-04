@@ -513,3 +513,12 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - It is intended for manual smoke checks of Task 057 policy presets without mutating real runtime state.
 - It does not execute follow-up, call `requestAssistantReply`, call LLM/fetch/TTS/tools, capture screenshots, read files, or add timers/listeners/config.
 - The production scheduler/manual guard path remains unchanged.
+
+## 38. Task 060 Landing Notes
+
+- Task 060 exposes follow-up policy diagnostics in the existing TTS debug snapshot:
+  - `snapshot().followup.policy`
+  - `snapshot().followup.policyNote`
+  - `snapshot().followup.policyBlockedReason`
+- The values reuse the same deterministic policy helper as Task 057/058.
+- This is a read-only visibility improvement and does not change follow-up execution, scheduler gates, polling, config defaults, request paths, tools, screenshots, file access, or UI.

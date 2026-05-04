@@ -426,3 +426,35 @@ Regression checks:
 2. Preview does not call `requestAssistantReply`.
 3. Preview does not mutate pending follow-up state.
 4. Preview does not trigger screenshots, tools, shell execution, file reads, TTS, fetch, or LLM calls.
+
+## 21. Follow-up Policy Debug Snapshot (Task 060)
+
+Purpose:
+
+1. Confirm the current pending follow-up policy is visible in the existing debug snapshot.
+2. Avoid requiring a separate preview call for normal state inspection.
+
+Command:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.snapshot().followup
+```
+
+Expected:
+
+1. Existing fields remain available:
+   - `pending`
+   - `reason`
+   - `topicHint`
+   - `updatedAgeMs`
+2. New fields are available:
+   - `policy`
+   - `policyNote`
+   - `policyBlockedReason`
+3. Closed-topic pending hints report `policy="do_not_followup"` and `policyBlockedReason="policy_do_not_followup"`.
+
+Regression checks:
+
+1. Snapshot remains read-only.
+2. No follow-up execution is triggered.
+3. No scheduler, polling, request, screenshot, tool, shell, file, TTS, fetch, LLM, config, API, dependency, or UI behavior changes.
