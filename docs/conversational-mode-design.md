@@ -303,3 +303,15 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `conversation_followup_failed`
   - `conversation_followup_restore_pending`
 - 该任务仍保持 manual-only，不引入任何自动触发循环。
+
+## 22. Task 036 Landing Notes
+
+- Task 036 新增了 manual follow-up 手测清单文档，用于后续改动时做固定回归。
+- 清单文档：
+  - `docs/conversational-followup-smoke-checklist.md`
+- 覆盖项包括：
+  - 默认禁用验证
+  - pending/eligible 构造
+  - 成功执行与失败恢复
+  - 隐私/安全检查（不自动截图、不工具调用）
+  - debug events 与回归记录模板
