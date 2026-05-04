@@ -315,3 +315,16 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - 成功执行与失败恢复
   - 隐私/安全检查（不自动截图、不工具调用）
   - debug events 与回归记录模板
+
+## 23. Task 037 Landing Notes
+
+- Task 037 增加了 silence eligibility 的只读 debug 可见性，用于观察“是否满足沉默窗口触发条件”。
+- 新增时间维度观测：
+  - 距离上次用户输入
+  - 距离上次 assistant 回复
+  - 距离上次 TTS 结束
+- 在 `__AI_CHAT_DEBUG_TTS__.snapshot()` 与 `conversationFollowup()` 中新增 `silence` 字段，包含：
+  - `eligibleForSilenceFollowup`
+  - `blockedReasons`
+  - 以及对应 age/min-window 字段
+- Task 037 不引入自动触发，不调用 LLM/TTS，不新增 timer/listener。

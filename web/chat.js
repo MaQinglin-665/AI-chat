@@ -37,6 +37,9 @@ const state = {
   followupReason: "",
   followupTopicHint: "",
   followupUpdatedAt: 0,
+  conversationLastUserAt: 0,
+  conversationLastAssistantAt: 0,
+  conversationLastTtsFinishedAt: 0,
   autoChatTuning: {
     triggerBaseThreshold: 1.03,
     shortSilencePenalty: 0.35,
@@ -476,8 +479,78 @@ function getTTSDebugSnapshot() {
       topicHint: String(state.followupTopicHint || ""),
       updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
     },
+    silence: buildConversationSilenceDebugSnapshot(Date.now()),
     lastResult: state.ttsDebugLastResult || "",
     lastError: state.ttsDebugLastError || ""
+  };
+}
+
+function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
+  const now = Number(nowMs);
+  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
+  const conversationEnabled = conversationMode.enabled === true;
+  const proactiveEnabled = conversationMode.proactiveEnabled === true;
+  const followupPending = state.followupPending === true;
+  const topicHint = String(state.followupTopicHint || "").trim();
+  const chatBusy = state.chatBusy === true;
+  const speaking = isSpeakingNow();
+  const silenceFollowupMinMs = Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
+    ? Math.max(0, Math.round(Number(conversationMode.silenceFollowupMinMs)))
+    : 180000;
+  const lastUserAt = Number(state.conversationLastUserAt || 0);
+  const lastAssistantAt = Number(state.conversationLastAssistantAt || 0);
+  const lastTtsFinishedAt = Number(state.conversationLastTtsFinishedAt || 0);
+  const lastUserAgeMs = lastUserAt > 0 ? Math.max(0, Math.round(safeNow - lastUserAt)) : -1;
+  const lastAssistantAgeMs = lastAssistantAt > 0 ? Math.max(0, Math.round(safeNow - lastAssistantAt)) : -1;
+  const lastTtsFinishedAgeMs = lastTtsFinishedAt > 0 ? Math.max(0, Math.round(safeNow - lastTtsFinishedAt)) : -1;
+  const silenceWindowReached = lastTtsFinishedAgeMs >= 0 && lastTtsFinishedAgeMs >= silenceFollowupMinMs;
+
+  const blockedReasons = [];
+  if (!conversationEnabled) {
+    blockedReasons.push("conversation_disabled");
+  }
+  if (!proactiveEnabled) {
+    blockedReasons.push("proactive_disabled");
+  }
+  if (!followupPending) {
+    blockedReasons.push("no_pending_followup");
+  }
+  if (!topicHint) {
+    blockedReasons.push("empty_topic_hint");
+  }
+  if (chatBusy) {
+    blockedReasons.push("chat_busy");
+  }
+  if (speaking) {
+    blockedReasons.push("speaking");
+  }
+  if (lastUserAgeMs < 0) {
+    blockedReasons.push("no_user_activity_timestamp");
+  } else if (lastUserAgeMs < silenceFollowupMinMs) {
+    blockedReasons.push("user_silence_window_not_reached");
+  }
+  if (lastTtsFinishedAgeMs < 0) {
+    blockedReasons.push("no_tts_finished_timestamp");
+  } else if (lastTtsFinishedAgeMs < silenceFollowupMinMs) {
+    blockedReasons.push("tts_silence_window_not_reached");
+  }
+
+  return {
+    lastUserAgeMs,
+    lastAssistantAgeMs,
+    lastTtsFinishedAgeMs,
+    silenceFollowupMinMs,
+    silenceWindowReached,
+    conversationEnabled,
+    proactiveEnabled,
+    followupPending,
+    chatBusy,
+    speaking,
+    eligibleForSilenceFollowup: blockedReasons.length === 0,
+    blockedReasons
   };
 }
 
@@ -535,6 +608,15 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
   };
 }
 
+function buildConversationFollowupDebugView(nowMs = Date.now()) {
+  const plan = buildConversationFollowupDebugPlan(nowMs);
+  return {
+    ...plan,
+    promptDraft: buildConversationFollowupPromptDraft(plan),
+    silence: buildConversationSilenceDebugSnapshot(nowMs)
+  };
+}
+
 function buildConversationFollowupPromptDraft(plan) {
   const safePlan = plan && typeof plan === "object" ? plan : {};
   if (safePlan.eligible !== true) {
@@ -586,11 +668,7 @@ function clearConversationFollowupPending(nowMs = Date.now()) {
 
 async function runConversationFollowupDebug() {
   const startedAt = Date.now();
-  const basePlan = buildConversationFollowupDebugPlan(startedAt);
-  const plan = {
-    ...basePlan,
-    promptDraft: buildConversationFollowupPromptDraft(basePlan)
-  };
+  const plan = buildConversationFollowupDebugView(startedAt);
   const blockedSummary = Array.isArray(plan.blockedReasons) ? plan.blockedReasons.join(",") : "";
   const reasonText = String(plan.reason || "");
   const topicHintText = String(plan.topicHint || "");
@@ -2249,7 +2327,13 @@ function loadChatHistoryFromStorage() {
   );
   const lastUserRecord = [...state.chatRecords].reverse().find((item) => item?.role === "user");
   if (lastUserRecord) {
-    state.lastUserMessageAt = parseMessageTimestamp(lastUserRecord.timestamp);
+    const ts = parseMessageTimestamp(lastUserRecord.timestamp);
+    state.lastUserMessageAt = ts;
+    state.conversationLastUserAt = ts;
+  }
+  const lastAssistantRecord = [...state.chatRecords].reverse().find((item) => item?.role === "assistant");
+  if (lastAssistantRecord) {
+    state.conversationLastAssistantAt = parseMessageTimestamp(lastAssistantRecord.timestamp);
   }
   syncConversationHistoryFromChatRecords();
   renderChatHistoryFromState();
@@ -6004,13 +6088,7 @@ function installTTSDebugBridge() {
   const bridge = {
     report: buildTTSDebugReport,
     snapshot: getTTSDebugSnapshot,
-    conversationFollowup: () => {
-      const plan = buildConversationFollowupDebugPlan(Date.now());
-      return {
-        ...plan,
-        promptDraft: buildConversationFollowupPromptDraft(plan)
-      };
-    },
+    conversationFollowup: () => buildConversationFollowupDebugView(Date.now()),
     runConversationFollowup: () => runConversationFollowupDebug(),
     events: () => state.ttsDebugEvents.slice(),
     show: () => toggleTTSDebugPanel(true),
@@ -11516,6 +11594,7 @@ async function playAudioByContext(blob, debugContext = {}) {
     state.ttsAudioLevel = 0;
     state.ttsAudioRawLevel = 0;
     state.ttsAudioRms = 0;
+    state.conversationLastTtsFinishedAt = Date.now();
     markedSpeaking = false;
     recordTTSDebugEvent("context_play_end", {
       ...debugContext,
@@ -11700,6 +11779,7 @@ async function playAudioBlob(blob, opts = {}) {
       state.ttsAudioRawLevel = 0;
       state.ttsAudioRms = 0;
       state.ttsDebugAudioEndedAt = performance.now();
+      state.conversationLastTtsFinishedAt = Date.now();
       state.ttsDebugAudioCurrentMs = Math.round(Number(audio.currentTime || 0) * 1000);
       if (ok) {
         finishSpeechAnimation();
@@ -12339,7 +12419,8 @@ async function requestAssistantReply(text, opts = {}) {
   });
   const userTimestamp = Date.now();
   if (showUser || rememberUser) {
-    state.lastUserMessageAt = Date.now();
+    state.lastUserMessageAt = userTimestamp;
+    state.conversationLastUserAt = userTimestamp;
     if (!isAuto) {
       state.autoChatBurstCount = 0;
     }
@@ -12494,6 +12575,7 @@ async function requestAssistantReply(text, opts = {}) {
     if (rememberAssistant) {
       rememberMessage("assistant", visibleReply, { timestamp: assistantTimestamp });
     }
+    state.conversationLastAssistantAt = assistantTimestamp;
     updateConversationFollowupState(visibleReply);
     const mood = detectMood(visibleReply);
     recordEmotion(mood);
