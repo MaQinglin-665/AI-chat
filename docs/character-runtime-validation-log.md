@@ -301,3 +301,67 @@ Short summary:
 ```text
 GPT-SoVITS demo playback, Live2D speech feedback, and source package generation are stable at the current checkpoint. The clean source package correctly requires tester-provided Live2D and LLM configuration before first launch. Expression response is present but subtle, so model-specific expression tuning remains a low-priority polish follow-up after the v1.3 preview.
 ```
+
+---
+
+# Proactive Scheduler Controlled Integration Run - 2026-05-04 (Task 047)
+
+## Run Metadata
+
+| Item | Value |
+| --- | --- |
+| Date | 2026-05-04 |
+| Tester | Codex |
+| Branch / commit | `codex/proactive-scheduler-polling-skeleton` / `f2d741b` |
+| OS | Windows |
+| Python version | 3.11.9 |
+| Node version | v25.2.1 |
+| Electron mode | 未启动（本次以静态联调审计为主） |
+
+## Safe Config Snapshot
+
+| Flag | Value |
+| --- | --- |
+| `conversation_mode.enabled` | 默认 false |
+| `conversation_mode.proactive_enabled` | 默认 false |
+| `conversation_mode.proactive_scheduler_enabled` | 默认 false |
+| `conversation_mode.proactive_poll_interval_ms` | 60000（clamp: 30000..600000） |
+| `conversation_mode.proactive_cooldown_ms` | 600000 |
+| `conversation_mode.proactive_warmup_ms` | 120000 |
+| `conversation_mode.proactive_window_ms` | 3600000 |
+
+## A~E Controlled Checkpoint
+
+| Checkpoint Item | Operation (简要) | Observed Key Events / Evidence | Actual Result | Pass/Fail | Notes |
+| --- | --- | --- | --- | --- | --- |
+| A. 默认关闭回归 | 静态检查默认配置与 gate 条件 | 默认三层开关均为 false；polling gate 需三层全开才可用 | 默认 fail-closed | Pass | 本轮未启动 Electron，未采集运行态 events。 |
+| B. 三层开关联调 | 静态检查 polling 触发链路 | `poll_start/poll_blocked/poll_ready/poll_trigger_*` 事件定义存在；仅 `poll_ready` 后触发 `runProactiveSchedulerManualTick()` | 触发路径符合设计 | Pass | 事件名与调用顺序可审计。 |
+| C. Kill-switch 运行时验证 | 静态检查 runtime gate-off 与 stop 分支 | `runtime_gate_off:*`、`poll_stop`、`poll_blocked` 原因事件路径存在 | 逻辑具备快速停用能力 | Pass | 运行态时序建议人工桌面复测补录。 |
+| D. 异常 fail-closed 验证 | 静态检查 polling check 异常分支 | `proactive_scheduler_poll_failed` + `poll_exception_fail_closed` stop 路径存在 | 异常不继续失控重试 | Pass | 需人工注入异常复核事件顺序。 |
+| E. 安全边界复核 | 静态审计关键调用点 | 新增 trigger 复用 `runProactiveSchedulerManualTick -> runConversationSilenceFollowupDryRun -> runConversationFollowupDebug`；manual follow-up 含 `skipDesktopAttach: true`；未新增 direct `requestAssistantReply` 调用点 | 边界保持 | Pass | 未发现自动截图/工具调用/读文件新增路径。 |
+
+## Automated Commands
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `git status --short --branch` | pass | 当前分支与工作区可见。 |
+| `node --check web/chat.js` | pass | JS 语法通过。 |
+| `python -m py_compile config.py` | pass | Python 语法通过。 |
+| `python -m json.tool config.example.json` | pass | JSON 结构有效。 |
+| `git diff --check` | pass | 无格式错误。 |
+
+## Final Result
+
+Overall result: partial
+
+Residual risks:
+
+```text
+本次完成了可审计的静态联调检查与结果落库；但 Electron/DevTools 运行态事件序列（尤其 C/D 场景）尚未做一轮人工实机补录。建议在同一机器按 Task 046 模板跑一次桌面联调并补充实际事件时间线，以消除运行时时序风险。
+```
+
+Rollback suggestion:
+
+```text
+若发现运行态异常，优先关闭任一关键开关（conversation_mode.enabled / proactive_enabled / proactive_scheduler_enabled）快速停用 polling；必要时整体回退到 Task 043/044 前状态，保持默认 fail-closed。
+```
