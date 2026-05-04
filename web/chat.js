@@ -111,6 +111,10 @@ const state = {
   moodExpressionSmoothed: { happy: 0, sad: 0, angry: 0, surprised: 0 },
   moodExpressionUpdatedAt: 0,
   moodHoldUntil: 0,
+  moodExpressionWeight: 1,
+  moodExpressionWeightUntil: 0,
+  moodExpressionWeightMood: "idle",
+  moodExpressionRuntimeMood: "idle",
   microBlinkUntil: 0,
   microNextBlinkAt: 0,
   microGazeTargetX: 0,
@@ -1179,6 +1183,38 @@ const STYLE_EXPRESSION_PROFILE = {
     headY: 0.0,
     bodyX: 0.0,
     floatScale: 1.0
+  }
+};
+const RUNTIME_EMOTION_EXPRESSION_TUNING = {
+  happy: {
+    pulseBoost: 0.72,
+    pulseDurationMs: 420,
+    holdMs: 1900,
+    weight: 1.18
+  },
+  sad: {
+    pulseBoost: 1.02,
+    pulseDurationMs: 680,
+    holdMs: 2600,
+    weight: 1.42
+  },
+  angry: {
+    pulseBoost: 0.7,
+    pulseDurationMs: 400,
+    holdMs: 1800,
+    weight: 1.16
+  },
+  surprised: {
+    pulseBoost: 1.12,
+    pulseDurationMs: 560,
+    holdMs: 2100,
+    weight: 1.42
+  },
+  idle: {
+    pulseBoost: 0.36,
+    pulseDurationMs: 240,
+    holdMs: 900,
+    weight: 1.0
   }
 };
 const MOTION_SEMANTIC_TOKENS = {
@@ -5438,6 +5474,11 @@ function normalizeRuntimeEmotionForLive2D(emotion) {
   return "idle";
 }
 
+function getRuntimeEmotionExpressionTuning(mood) {
+  const key = String(mood || "idle");
+  return RUNTIME_EMOTION_EXPRESSION_TUNING[key] || RUNTIME_EMOTION_EXPRESSION_TUNING.idle;
+}
+
 function normalizeRuntimeActionForLive2D(action) {
   if (typeof action !== "string") {
     return "none";
@@ -5508,9 +5549,19 @@ function applyCharacterRuntimeEmotionToLive2D(metadata) {
   }
   try {
     const mood = normalizeRuntimeEmotionForLive2D(metadata.emotion);
+    const tuning = getRuntimeEmotionExpressionTuning(mood);
+    const now = performance.now();
     state.speechAnimMood = mood;
-    state.moodHoldUntil = performance.now() + 1400;
-    triggerExpressionPulse(state.currentTalkStyle || "neutral", 0.55, 320);
+    state.moodHoldUntil = now + Math.max(300, Number(tuning.holdMs) || 1400);
+    state.moodExpressionWeight = clampNumber(Number(tuning.weight) || 1, 0.7, 1.45);
+    state.moodExpressionWeightUntil = state.moodHoldUntil;
+    state.moodExpressionWeightMood = mood;
+    state.moodExpressionRuntimeMood = mood;
+    triggerExpressionPulse(
+      state.currentTalkStyle || "neutral",
+      Number(tuning.pulseBoost) || 0.55,
+      Number(tuning.pulseDurationMs) || 320
+    );
     return true;
   } catch (err) {
     console.debug("[character-runtime] apply emotion failed:", err);
@@ -8197,12 +8248,21 @@ function applyStyleExpressionLayer() {
   const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
   const speakingQuiet = state.motionQuietDuringSpeech && speaking;
   const moodBlend = getSmoothedMoodExpression(now);
+  const weightedMood = String(state.moodExpressionWeightMood || "idle");
+  const runtimeMoodActive = now < Number(state.moodExpressionWeightUntil || 0)
+    && weightedMood === String(state.moodExpressionRuntimeMood || "idle");
+  const runtimeMoodWeight = runtimeMoodActive
+    ? clampNumber(Number(state.moodExpressionWeight) || 1, 0.7, 1.45)
+    : 1;
+  const runtimeMoodBlend = runtimeMoodActive && weightedMood in moodBlend
+    ? { ...moodBlend, [weightedMood]: Math.max(Number(moodBlend[weightedMood]) || 0, 1) }
+    : moodBlend;
   const happyMoodScale = speakingQuiet ? (0.32 + (1 - motionBlend) * 0.2) : 1;
   const subtleMoodScale = speakingQuiet ? (0.16 + (1 - motionBlend) * 0.12) : 1;
-  const happyBlend = moodBlend.happy * happyMoodScale;
-  const sadBlend = moodBlend.sad * subtleMoodScale;
-  const angryBlend = moodBlend.angry * subtleMoodScale * (speakingQuiet ? 0.8 : 1);
-  const surprisedBlend = moodBlend.surprised * subtleMoodScale * (speakingQuiet ? 0.75 : 1);
+  const happyBlend = clampNumber(runtimeMoodBlend.happy * (weightedMood === "happy" ? runtimeMoodWeight : 1), 0, 1.35) * happyMoodScale;
+  const sadBlend = clampNumber(runtimeMoodBlend.sad * (weightedMood === "sad" ? runtimeMoodWeight : 1), 0, 1.35) * subtleMoodScale;
+  const angryBlend = clampNumber(runtimeMoodBlend.angry * (weightedMood === "angry" ? runtimeMoodWeight : 1), 0, 1.35) * subtleMoodScale * (speakingQuiet ? 0.8 : 1);
+  const surprisedBlend = clampNumber(runtimeMoodBlend.surprised * (weightedMood === "surprised" ? runtimeMoodWeight : 1), 0, 1.35) * subtleMoodScale * (speakingQuiet ? 0.75 : 1);
   const pulseActive = now < Number(state.expressionPulseUntil || 0);
   const pulseWeight = pulseActive ? state.expressionPulseBoost : 0;
   const strength = clampNumber(Number(state.expressionStrength) || 1, 0.2, 2.0);
@@ -8221,13 +8281,16 @@ function applyStyleExpressionLayer() {
     ? Number(state.speechMouthOpen) || 0
     : getSpeechAnimationMouthOpen();
 
-  const surpriseMouthBoost = motionBlend > 0.05 && surprisedBlend > 0.001
-    ? (0.5 * surprisedBlend * gain * motionBlend)
+  const surpriseMouthBoost = surprisedBlend > 0.001
+    ? (0.34 + 0.38 * motionBlend) * surprisedBlend * gain
+    : 0;
+  const sadMouthDip = sadBlend > 0.001
+    ? 0.16 * sadBlend * gain
     : 0;
   const mouthCarry = 0.08 + motionBlend * 0.94;
   const mouthSpeakBoost = speaking ? (1.1 + motionBlend * 0.24) : 1.0;
   const mouthTarget = clampNumber(
-    mouthOpen * mouthCarry * mouthSpeakBoost + surpriseMouthBoost,
+    mouthOpen * mouthCarry * mouthSpeakBoost + surpriseMouthBoost - sadMouthDip,
     0,
     1
   );
@@ -8258,15 +8321,18 @@ function applyStyleExpressionLayer() {
   }
   if (sadBlend > 0.001) {
     const g = sadBlend * gain;
-    safeAddParamValue(core, "ParamEyeLOpen", -0.25 * g, 0.85);
-    safeAddParamValue(core, "ParamEyeROpen", -0.25 * g, 0.85);
-    safeAddParamValue(core, "ParamBrowLY", -0.2 * g, 0.8);
-    safeAddParamValue(core, "ParamBrowRY", -0.2 * g, 0.8);
-    safeAddParamValue(core, "ParamBrowLAngle", 0.15 * g, 0.7);
-    safeAddParamValue(core, "ParamBrowRAngle", -0.15 * g, 0.7);
-    safeAddParamValue(core, "ParamMouthForm", -0.3 * g, 0.8);
-    safeAddParamValue(core, "ParamAngleY", 3.0 * g, 0.5);
-    safeAddParamValue(core, "ParamBodyAngleX", -3.0 * g, 0.4);
+    safeAddParamValue(core, "ParamEyeLOpen", -0.34 * g, 0.85);
+    safeAddParamValue(core, "ParamEyeROpen", -0.34 * g, 0.85);
+    safeAddParamValue(core, "ParamBrowLY", -0.3 * g, 0.82);
+    safeAddParamValue(core, "ParamBrowRY", -0.3 * g, 0.82);
+    safeAddParamValue(core, "ParamBrowLForm", -0.32 * g, 0.76);
+    safeAddParamValue(core, "ParamBrowRForm", -0.32 * g, 0.76);
+    safeAddParamValue(core, "ParamBrowLAngle", 0.22 * g, 0.72);
+    safeAddParamValue(core, "ParamBrowRAngle", -0.22 * g, 0.72);
+    safeAddParamValue(core, "ParamMouthForm", -0.68 * g, 0.86);
+    safeDriveParamValue(core, "ParamMouthOpenY", 0.02, 0.5);
+    safeAddParamValue(core, "ParamAngleY", 4.8 * g, 0.54);
+    safeAddParamValue(core, "ParamBodyAngleX", -3.4 * g, 0.42);
   }
   if (angryBlend > 0.001) {
     const g = angryBlend * gain;
@@ -8281,12 +8347,15 @@ function applyStyleExpressionLayer() {
   }
   if (surprisedBlend > 0.001) {
     const g = surprisedBlend * gain;
-    safeAddParamValue(core, "ParamEyeLOpen", 0.4 * g, 0.9);
-    safeAddParamValue(core, "ParamEyeROpen", 0.4 * g, 0.9);
-    safeAddParamValue(core, "ParamBrowLY", 0.3 * g, 0.85);
-    safeAddParamValue(core, "ParamBrowRY", 0.3 * g, 0.85);
-    safeAddParamValue(core, "ParamMouthForm", -0.1 * g, 0.7);
-    safeAddParamValue(core, "ParamAngleY", -3.0 * g, 0.5);
+    safeAddParamValue(core, "ParamEyeLOpen", 0.55 * g, 0.92);
+    safeAddParamValue(core, "ParamEyeROpen", 0.55 * g, 0.92);
+    safeAddParamValue(core, "ParamBrowLY", 0.42 * g, 0.88);
+    safeAddParamValue(core, "ParamBrowRY", 0.42 * g, 0.88);
+    safeAddParamValue(core, "ParamBrowLForm", 0.26 * g, 0.72);
+    safeAddParamValue(core, "ParamBrowRForm", 0.26 * g, 0.72);
+    safeAddParamValue(core, "ParamMouthForm", -0.34 * g, 0.78);
+    safeDriveParamValue(core, "ParamMouthOpenY", clampNumber(0.28 * g, 0, 0.55), 0.62);
+    safeAddParamValue(core, "ParamAngleY", -3.8 * g, 0.52);
   }
 }
 
