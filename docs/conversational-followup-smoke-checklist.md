@@ -1,6 +1,6 @@
 # Conversational Follow-up Manual Smoke Checklist
 
-适用范围：Task 031~035 之后的 manual follow-up 链路回归。  
+适用范围：Task 031~035 之后的 manual follow-up 链路回归。
 目标：验证 planner/debug/manual execution/guard 在不引入自动 proactive 的前提下可用且安全。
 
 ## 1. 前置条件

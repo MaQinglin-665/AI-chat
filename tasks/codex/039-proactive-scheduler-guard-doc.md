@@ -38,4 +38,3 @@
 1. `git status --short` 仅出现 `docs/` 与 `tasks/codex/` 下文档改动。
 2. `git diff --check` 无格式错误。
 3. 人工阅读确认 guard 文档已覆盖 A~J 全部条目。
-
