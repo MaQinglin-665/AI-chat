@@ -158,3 +158,22 @@
   - 不新增 timer/listener/scheduler tick
   - 不新增 follow-up 触发
   - 不新增 `fetch`/`authFetch`/`requestAssistantReply`/`speak` 调用
+
+## 14. Task 042 Landing Notes
+
+- Task 042 新增 DevTools-only 手动入口：
+  - `window.__AI_CHAT_DEBUG_TTS__.manualProactiveSchedulerTick()`
+- 手动 tick 只用于联调路径验证：
+  - scheduler gate（`buildProactiveSchedulerDebugSnapshot`）
+  - silence eligibility（`runConversationSilenceFollowupDryRun`）
+  - manual follow-up guard（`runConversationFollowupDebug`）
+- blocked 行为保持严格：
+  - 当 scheduler gate 不通过时，直接返回 `scheduler_not_eligible`
+  - 不执行 `dryRunSilenceFollowup`，不触发 follow-up
+- eligible 行为：
+  - 复用现有 `runConversationSilenceFollowupDryRun()`
+  - 成功时写入 `lastTriggered/cooldown/windowCount/lastResult`
+  - 失败或 blocked 时写入 `lastBlockedReason/lastResult`，并进入短 cooldown
+- Task 042 仍不引入自动触发：
+  - 不新增 timer/listener/scheduler polling
+  - 不新增后端 API、UI、或新的 LLM/TTS 调用链

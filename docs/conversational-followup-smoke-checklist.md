@@ -149,3 +149,18 @@ Commit：
 
 异常备注：
 ```
+
+## 10. Manual Proactive Scheduler Tick（Task 042）
+
+执行：
+
+```js
+await window.__AI_CHAT_DEBUG_TTS__.manualProactiveSchedulerTick()
+```
+
+期望：
+1. 默认配置下返回 `ok=false`、`reason="scheduler_not_eligible"`。
+2. `snapshot().proactiveScheduler.lastResult` 更新为 `blocked`。
+3. 开启 `conversation_mode.enabled/proactive_enabled/proactive_scheduler_enabled` 后，warmup 内 `blockedReasons` 包含 `warmup_active`。
+4. 仅当 scheduler gate eligible 时才进入 `dryRunSilenceFollowup` 路径；blocked 时不应执行 follow-up。
+5. 不应自动重复触发，不应自动截图。

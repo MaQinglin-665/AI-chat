@@ -454,10 +454,13 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
   const maxFollowupsPerWindow = Number.isFinite(Number(conversationMode.maxFollowupsPerWindow))
     ? Math.max(0, Math.round(Number(conversationMode.maxFollowupsPerWindow)))
     : 1;
+  const proactiveWindowMs = Number.isFinite(Number(conversationMode.proactiveWindowMs))
+    ? Math.max(0, Math.round(Number(conversationMode.proactiveWindowMs)))
+    : 3600000;
   const startedAt = Number(state.proactiveSchedulerStartedAt || 0);
   const proactiveCooldownUntil = Number(state.proactiveCooldownUntil || 0);
   const proactiveWindowStartedAt = Number(state.proactiveWindowStartedAt || 0);
-  const proactiveCountInWindow = Number.isFinite(Number(state.proactiveCountInWindow))
+  const rawProactiveCountInWindow = Number.isFinite(Number(state.proactiveCountInWindow))
     ? Math.max(0, Math.round(Number(state.proactiveCountInWindow)))
     : 0;
   const proactiveInFlight = state.proactiveInFlight === true;
@@ -471,9 +474,12 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
   const cooldownRemainingMs = proactiveCooldownUntil > safeNow
     ? Math.max(0, Math.round(proactiveCooldownUntil - safeNow))
     : 0;
-  const windowAgeMs = proactiveWindowStartedAt > 0
+  const rawWindowAgeMs = proactiveWindowStartedAt > 0
     ? Math.max(0, Math.round(safeNow - proactiveWindowStartedAt))
     : -1;
+  const windowActive = proactiveWindowStartedAt > 0 && rawWindowAgeMs <= proactiveWindowMs;
+  const windowAgeMs = windowActive ? rawWindowAgeMs : -1;
+  const proactiveCountInWindow = windowActive ? rawProactiveCountInWindow : 0;
   const lastAttemptAgeMs = lastAttemptAt > 0 ? Math.max(0, Math.round(safeNow - lastAttemptAt)) : -1;
   const lastTriggeredAgeMs = lastTriggeredAt > 0 ? Math.max(0, Math.round(safeNow - lastTriggeredAt)) : -1;
 
@@ -918,6 +924,121 @@ async function runConversationSilenceFollowupDryRun() {
     silenceEligibleAtStart: true,
     silenceStartedAt: startedAt
   };
+}
+
+async function runProactiveSchedulerManualTick() {
+  const startedAt = Date.now();
+  const scheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
+  state.proactiveLastAttemptAt = startedAt;
+  const finishResult = (result) => {
+    const endedAt = Date.now();
+    return {
+      ...result,
+      schedulerManualTick: true,
+      schedulerStartedAt: startedAt,
+      scheduler,
+      startedAt,
+      endedAt,
+      elapsedMs: Math.max(0, endedAt - startedAt)
+    };
+  };
+
+  if (scheduler.eligibleForSchedulerTick !== true) {
+    const blockedReason = Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
+      ? scheduler.blockedReasons.join(",")
+      : "scheduler_not_eligible";
+    state.proactiveLastBlockedReason = blockedReason;
+    state.proactiveLastResult = "blocked";
+    recordTTSDebugEvent("proactive_scheduler_manual_blocked", {
+      result: blockedReason
+    });
+    return finishResult({
+      ok: false,
+      reason: "scheduler_not_eligible",
+      schedulerEligibleAtStart: false
+    });
+  }
+
+  recordTTSDebugEvent("proactive_scheduler_manual_start", {
+    result: "scheduler_eligible"
+  });
+  state.proactiveInFlight = true;
+  try {
+    const dryRunResult = await runConversationSilenceFollowupDryRun();
+    const finishedAt = Date.now();
+    const proactiveCooldownMs = Number.isFinite(Number(state.conversationMode?.proactiveCooldownMs))
+      ? Math.max(0, Math.round(Number(state.conversationMode.proactiveCooldownMs)))
+      : 600000;
+    const proactiveWindowMs = Number.isFinite(Number(state.conversationMode?.proactiveWindowMs))
+      ? Math.max(0, Math.round(Number(state.conversationMode.proactiveWindowMs)))
+      : 3600000;
+
+    if (dryRunResult?.ok === true) {
+      const windowStart = Number(state.proactiveWindowStartedAt || 0);
+      if (!(windowStart > 0) || (finishedAt - windowStart) > proactiveWindowMs) {
+        state.proactiveWindowStartedAt = finishedAt;
+        state.proactiveCountInWindow = 0;
+      }
+      state.proactiveLastTriggeredAt = finishedAt;
+      state.proactiveCooldownUntil = finishedAt + proactiveCooldownMs;
+      state.proactiveCountInWindow = Math.max(
+        0,
+        Math.round(Number(state.proactiveCountInWindow || 0))
+      ) + 1;
+      state.proactiveLastBlockedReason = "";
+      state.proactiveLastResult = "success";
+      recordTTSDebugEvent("proactive_scheduler_manual_success", {
+        result: "success",
+        durationMs: Number(dryRunResult?.elapsedMs || 0)
+      });
+      return finishResult({
+        ...dryRunResult,
+        ok: true,
+        schedulerEligibleAtStart: true
+      });
+    }
+
+    const silenceBlockedReasons = Array.isArray(dryRunResult?.view?.silence?.blockedReasons)
+      ? dryRunResult.view.silence.blockedReasons.join(",")
+      : "";
+    const blockedReason = String(dryRunResult?.reason || silenceBlockedReasons || "manual_tick_failed");
+    state.proactiveLastBlockedReason = blockedReason;
+    const failedReasons = new Set(["request_failed", "request_exception", "no_safe_entrypoint"]);
+    state.proactiveLastResult = failedReasons.has(String(dryRunResult?.reason || "")) ? "failed" : "blocked";
+    const shortCooldownMs = Math.min(proactiveCooldownMs, 60000);
+    state.proactiveCooldownUntil = finishedAt + shortCooldownMs;
+    recordTTSDebugEvent("proactive_scheduler_manual_failed", {
+      result: blockedReason,
+      error: String(dryRunResult?.reason || "")
+    });
+    return finishResult({
+      ...dryRunResult,
+      ok: false,
+      schedulerEligibleAtStart: true
+    });
+  } catch (err) {
+    const finishedAt = Date.now();
+    const proactiveCooldownMs = Number.isFinite(Number(state.conversationMode?.proactiveCooldownMs))
+      ? Math.max(0, Math.round(Number(state.conversationMode.proactiveCooldownMs)))
+      : 600000;
+    const shortCooldownMs = Math.min(proactiveCooldownMs, 60000);
+    const errorText = String(err?.message || err || "manual_tick_exception");
+    state.proactiveLastBlockedReason = errorText;
+    state.proactiveLastResult = "failed";
+    state.proactiveCooldownUntil = finishedAt + shortCooldownMs;
+    recordTTSDebugEvent("proactive_scheduler_manual_failed", {
+      result: "exception",
+      error: errorText
+    });
+    return finishResult({
+      ok: false,
+      reason: "manual_tick_exception",
+      error: errorText,
+      schedulerEligibleAtStart: true
+    });
+  } finally {
+    state.proactiveInFlight = false;
+  }
 }
 
 function buildTTSDebugReport() {
@@ -6233,6 +6354,7 @@ function installTTSDebugBridge() {
     conversationFollowup: () => buildConversationFollowupDebugView(Date.now()),
     runConversationFollowup: () => runConversationFollowupDebug(),
     dryRunSilenceFollowup: () => runConversationSilenceFollowupDryRun(),
+    manualProactiveSchedulerTick: () => runProactiveSchedulerManualTick(),
     events: () => state.ttsDebugEvents.slice(),
     show: () => toggleTTSDebugPanel(true),
     hide: () => toggleTTSDebugPanel(false),

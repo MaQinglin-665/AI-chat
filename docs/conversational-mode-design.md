@@ -394,3 +394,17 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `eligibleForSchedulerTick`
 - `eligibleForSchedulerTick` 仅代表 scheduler gate，不包含 silence follow-up 条件，也不会触发任何执行。
 - 本任务未新增 timer/listener/scheduler tick、未新增自动 proactive 触发、未修改 manual follow-up 行为。
+
+## 28. Task 042 Landing Notes
+
+- Task 042 新增 DevTools-only 手动入口：`manualProactiveSchedulerTick()`。
+- 该入口按顺序复用既有 guard 路径：
+  - scheduler gate（`buildProactiveSchedulerDebugSnapshot`）
+  - silence dry-run（`runConversationSilenceFollowupDryRun`）
+  - manual follow-up 执行（`runConversationFollowupDebug`）
+- 当 scheduler blocked 时，直接返回 `scheduler_not_eligible`，不会执行 dry-run/follow-up。
+- 当 scheduler eligible 时，才会进入 silence dry-run；成功后写入 `lastTriggered/cooldown/windowCount`，失败时写入 `lastBlockedReason/lastResult` 并设置短 cooldown。
+- Task 042 仍是 manual-only：
+  - 不新增自动 proactive 触发
+  - 不新增 timer/listener/scheduler tick 循环
+  - 不新增后端 API 与 UI
