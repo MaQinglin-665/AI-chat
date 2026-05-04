@@ -422,6 +422,9 @@ function formatTTSDebugNumber(value, digits = 0) {
 function getTTSDebugSnapshot() {
   const audio = state.ttsAudio;
   const now = performance.now();
+  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
   const durationMs = audio && Number.isFinite(Number(audio.duration)) && audio.duration > 0
     ? Math.round(Number(audio.duration) * 1000)
     : Number(state.ttsDebugAudioDurationMs || -1);
@@ -451,6 +454,17 @@ function getTTSDebugSnapshot() {
     animDurationMs: Number(state.speechAnimDurationMs || 0),
     mood: state.speechAnimMood || "idle",
     style: state.speechAnimStyle || state.currentTalkStyle || "neutral",
+    conversationMode: {
+      enabled: conversationMode.enabled === true,
+      proactiveEnabled: conversationMode.proactiveEnabled === true,
+      maxFollowupsPerWindow: Number.isFinite(Number(conversationMode.maxFollowupsPerWindow))
+        ? Math.round(Number(conversationMode.maxFollowupsPerWindow))
+        : 1,
+      silenceFollowupMinMs: Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
+        ? Math.round(Number(conversationMode.silenceFollowupMinMs))
+        : 180000,
+      interruptTtsOnUserSpeech: conversationMode.interruptTtsOnUserSpeech === true
+    },
     lastResult: state.ttsDebugLastResult || "",
     lastError: state.ttsDebugLastError || ""
   };

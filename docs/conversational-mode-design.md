@@ -220,3 +220,19 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `conversation_mode.max_followups_per_window=1`
   - `conversation_mode.silence_followup_min_ms=180000`
   - `conversation_mode.interrupt_tts_on_user_speech=false`
+
+## 16. Task 030 Landing Notes
+
+- Task 030 只增加了开发期 debug 可见性，用于确认 `conversation_mode` 是否已被前端正确读取。
+- 复用了现有 debug/diagnostics 路径，在前端 `snapshot` 输出中新增 `conversationMode` 只读字段：
+  - `enabled`
+  - `proactiveEnabled`
+  - `maxFollowupsPerWindow`
+  - `silenceFollowupMinMs`
+  - `interruptTtsOnUserSpeech`
+- Task 030 未引入任何行为变更：
+  - 未实现 follow-up
+  - 未实现 proactive speech
+  - 未实现 silence tick
+  - 未实现 backchannel
+  - 未实现 TTS interrupt 运行逻辑
