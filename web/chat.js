@@ -5329,6 +5329,7 @@ function stripAssistantPayloadNoise(text) {
 
 const CHARACTER_RUNTIME = window.TaffyCharacterRuntime || {};
 const CHARACTER_RUNTIME_BRIDGE = window.TaffyCharacterRuntimeBridge || {};
+const CHARACTER_RUNTIME_DEBUG_BRIDGE = window.TaffyCharacterRuntimeDebugBridge || {};
 
 function normalizeCharacterRuntimeMetadataForFrontend(raw) {
   const filtered = typeof CHARACTER_RUNTIME_BRIDGE.copyAllowedMetadataFields === "function"
@@ -5617,12 +5618,12 @@ function installCharacterRuntimeDebugBridge() {
   if (typeof window === "undefined") {
     return null;
   }
-  const key = "__AI_CHAT_DEBUG_CHARACTER_RUNTIME__";
+  const key = CHARACTER_RUNTIME_DEBUG_BRIDGE.DEBUG_BRIDGE_KEY || "__AI_CHAT_DEBUG_CHARACTER_RUNTIME__";
   if (window[key] && typeof window[key] === "object") {
     return window[key];
   }
 
-  const samples = {
+  const samples = CHARACTER_RUNTIME_DEBUG_BRIDGE.DEBUG_SAMPLES || {
     happyWave: {
       emotion: "happy",
       action: "wave",
@@ -5664,8 +5665,16 @@ function installCharacterRuntimeDebugBridge() {
     }
   };
 
-  const testEmotion = (emotion) => emit({ emotion: String(emotion || "") });
-  const testAction = (action) => emit({ action: String(action || "") });
+  const testEmotion = (emotion) => emit(
+    typeof CHARACTER_RUNTIME_DEBUG_BRIDGE.createEmotionMetadata === "function"
+      ? CHARACTER_RUNTIME_DEBUG_BRIDGE.createEmotionMetadata(emotion)
+      : { emotion: String(emotion || "") }
+  );
+  const testAction = (action) => emit(
+    typeof CHARACTER_RUNTIME_DEBUG_BRIDGE.createActionMetadata === "function"
+      ? CHARACTER_RUNTIME_DEBUG_BRIDGE.createActionMetadata(action)
+      : { action: String(action || "") }
+  );
 
   const bridge = {
     emit,
