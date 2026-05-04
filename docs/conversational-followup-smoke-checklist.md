@@ -352,3 +352,32 @@ Regression checks:
 2. No config default changes.
 3. No new direct `requestAssistantReply` call path.
 4. No automatic screenshot, tool call, shell execution, or file read behavior.
+
+## 19. Proactive Follow-up Policy Presets (Task 057)
+
+Purpose:
+
+1. Confirm the local policy helper selects conservative follow-up styles.
+2. Confirm closed topics fail quiet instead of triggering proactive speech.
+
+Command:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.conversationFollowup()
+```
+
+Expected policy behavior:
+
+1. `question_tail` plans include `followupPolicy="light_question"`.
+2. `keyword_hint` plans include `followupPolicy="soft_checkin"`.
+3. Other eligible plans default to `followupPolicy="gentle_continue"`.
+4. Topic hints like `不用`, `算了`, `先这样`, `晚安`, or `不用回` produce `followupPolicy="do_not_followup"`.
+5. `do_not_followup` plans include `policy_do_not_followup` in `blockedReasons` and keep `promptDraft=""`.
+
+Regression checks:
+
+1. No new LLM classifier is introduced.
+2. No new timer/listener/API/UI/dependency is added.
+3. No config default changes.
+4. No scheduler gate, cooldown, window limit, kill-switch, or fail-closed behavior changes.
+5. No automatic screenshot, tool call, shell execution, file read, or direct assistant request path is added.

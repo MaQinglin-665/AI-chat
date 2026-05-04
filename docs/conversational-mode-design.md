@@ -490,3 +490,17 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - no file or private data access
   - no tool calls
 - No scheduler gates, polling lifecycle, config defaults, APIs, dependencies, or request paths are changed.
+
+## 36. Task 057 Landing Notes
+
+- Task 057 adds a small local policy layer for proactive follow-up prompt seeds.
+- The policy layer is deterministic and does not call an LLM:
+  - `gentle_continue`: default short continuation
+  - `light_question`: one light optional follow-up question at most
+  - `soft_checkin`: low-pressure "continue if you want" style
+  - `do_not_followup`: fail quiet when the topic looks closed
+- `buildConversationFollowupDebugPlan()` now exposes:
+  - `followupPolicy`
+  - `followupPolicyNote`
+- `do_not_followup` adds `policy_do_not_followup` to `blockedReasons`, so the existing manual/scheduler guard path remains the enforcement point.
+- This task does not add new triggers, config flags, UI, backend APIs, dependencies, screenshot behavior, tool calls, or file reads.
