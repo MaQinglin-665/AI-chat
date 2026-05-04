@@ -676,3 +676,50 @@ Expected runtime evidence to collect:
 | After consumption | injection state inactive |
 
 Current result: implementation ready for manual DevTools smoke.
+
+---
+
+# Proactive Scheduler Fail-closed Runtime Smoke - 2026-05-04 (Task 055)
+
+Task 055 validates the Task 054 DevTools-only one-shot failure hook in a same-session Electron/DevTools run.
+
+Runtime setup:
+
+```text
+conversation_mode.enabled=true
+conversation_mode.proactive_enabled=true
+conversation_mode.proactive_scheduler_enabled=true
+conversation_mode.proactive_poll_interval_ms=30000
+```
+
+Observed event order:
+
+| Seq | Stage | Result / Error |
+| --- | --- | --- |
+| 1 | `proactive_scheduler_poll_start` | `interval_ms:30000` |
+| 2-4 | `proactive_scheduler_poll_blocked` | `warmup_active` |
+| 5 | `proactive_scheduler_poll_blocked` | `no_pending_followup,empty_topic_hint,no_tts_finished_timestamp` |
+| 6 | `proactive_scheduler_poll_failure_injected` | `manual_task_055` |
+| 7 | `proactive_scheduler_poll_failure_injection_consumed` | `manual_task_055` |
+| 8 | `proactive_scheduler_poll_stop` | `poll_exception_fail_closed` |
+| 9 | `proactive_scheduler_poll_failed` | `poll_exception` / `manual_task_055` |
+
+Observed snapshot after fail-closed stop:
+
+```text
+schedulerEnabled=true
+conversationEnabled=true
+proactiveEnabled=true
+pollingEnabled=true
+pollIntervalMs=30000
+pollTimerActive=false
+eligibleForSchedulerTick=true
+```
+
+Result: pass
+
+Conclusion:
+
+```text
+The exception fail-closed live event ordering is now captured. The one-shot hook was injected, consumed on the next polling check, stopped polling with poll_exception_fail_closed, and recorded proactive_scheduler_poll_failed. No unsafe assistant reply, screenshot, tool call, shell execution, or file read path was triggered.
+```
