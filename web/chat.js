@@ -577,6 +577,10 @@ function getTTSDebugSnapshot() {
     ? state.conversationMode
     : {};
   const followupUpdatedAt = Number(state.followupUpdatedAt || 0);
+  const followupPolicy = buildConversationFollowupPolicy({
+    reason: String(state.followupReason || ""),
+    topicHint: String(state.followupTopicHint || "")
+  });
   const durationMs = audio && Number.isFinite(Number(audio.duration)) && audio.duration > 0
     ? Math.round(Number(audio.duration) * 1000)
     : Number(state.ttsDebugAudioDurationMs || -1);
@@ -634,6 +638,9 @@ function getTTSDebugSnapshot() {
       pending: state.followupPending === true,
       reason: String(state.followupReason || ""),
       topicHint: String(state.followupTopicHint || ""),
+      policy: followupPolicy.type,
+      policyNote: followupPolicy.note,
+      policyBlockedReason: String(followupPolicy.blockedReason || ""),
       updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
     },
     proactiveScheduler: buildProactiveSchedulerDebugSnapshot(Date.now()),
