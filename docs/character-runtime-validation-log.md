@@ -138,6 +138,27 @@ Short summary:
 
 ```
 
+## Proactive Scheduler Controlled Checkpoint Addendum（Task 046）
+
+Use this addendum when validating Task 044/045 on a controlled branch.
+Keep records concise, reproducible, and free of private desktop content.
+
+| Checkpoint Item | Config Conditions | Expected Events | Actual | Pass/Fail | Notes |
+| --- | --- | --- | --- | --- | --- |
+| A. 默认关闭回归 | 任一关键开关为 false | `proactive_scheduler_poll_blocked` / disabled stop |  |  |  |
+| B. 三层开关联调 | 三层开关均为 true | `poll_start` + `poll_blocked/poll_ready` |  |  |  |
+| C. Kill-switch 运行时验证 | polling active 后关闭任一开关 | `poll_stop` + reasoned `poll_blocked` |  |  |  |
+| D. 异常 fail-closed | 注入 trigger 异常场景 | `poll_failed`（必要时）+ `poll_stop` |  |  |  |
+| E. 安全边界复核 | 全程 | 无不安全新增路径 |  |  |  |
+
+结论模板：
+
+```text
+Overall result: pass / fail / partial
+Residual risks:
+Rollback suggestion:
+```
+
 ---
 
 # Validation Run - 2026-05-03 v1.3 Preview
