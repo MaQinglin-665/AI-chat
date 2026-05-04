@@ -243,3 +243,16 @@
   - 不暴露远程 API
 - 明确拒绝方案：默认开启、远程可触发、持久化危险状态、绕过 guard、引入截图/工具调用/读文件路径。
 - 本任务不新增自动 proactive 行为，默认 fail-closed 与三层开关边界保持不变。
+
+## 20. Task 054 Landing Notes
+
+- Task 054 implements the Task 053 recommended DevTools-only one-shot failure injection hook.
+- The hook is exposed only through `window.__AI_CHAT_DEBUG_TTS__`:
+  - `injectProactiveSchedulerPollFailureOnce(reason)`
+  - `getProactiveSchedulerFailureInjectionState()`
+  - `clearProactiveSchedulerFailureInjection()`
+- The hook stores state only in current page memory and auto-clears after the next polling check consumes it.
+- Injected failure uses the existing polling catch/fail-closed path:
+  - `proactive_scheduler_poll_failed`
+  - `poll_exception_fail_closed`
+- No backend API, config flag, automatic screenshot, tool call, shell execution, file read, or direct `requestAssistantReply` path is added.

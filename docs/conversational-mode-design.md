@@ -468,3 +468,10 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - 不新增 direct `requestAssistantReply` 路径
   - 不新增截图/工具调用/读文件路径
 - 该设计将用于后续把 exception runtime 证据从 `partial` 推进到 `pass`。
+
+## 34. Task 054 Landing Notes
+
+- Task 054 adds the DevTools-only one-shot fail-closed test hook from Task 053.
+- The hook is available only through the existing TTS debug bridge and is inactive unless manually called in DevTools.
+- The next scheduler polling check consumes the hook and routes through the existing `poll_exception_fail_closed` catch path.
+- The hook does not alter normal conversation mode behavior, config defaults, or proactive scheduler eligibility rules.
