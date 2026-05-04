@@ -519,3 +519,28 @@ Regression checks:
 1. Snapshot remains read-only.
 2. No follow-up execution is triggered.
 3. No scheduler, polling, request, screenshot, tool, shell, file, TTS, fetch, LLM, config, API, dependency, or UI behavior changes.
+
+## 24. Follow-up Policy Silence Eligibility (Task 063)
+
+Purpose:
+
+1. Confirm closed-topic policy blocks silence eligibility before polling can report ready.
+2. Confirm the policy block is fail-closed and does not expand proactive behavior.
+
+Command:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.conversationFollowup().silence
+```
+
+Expected for closed-topic pending hints such as `先这样，晚安`:
+
+1. `eligibleForSilenceFollowup=false`
+2. `blockedReasons` includes `policy_do_not_followup`
+3. `followupPolicy="do_not_followup"`
+4. Polling should remain blocked/not ready instead of reporting `poll_ready`.
+
+Regression checks:
+
+1. Normal non-closed pending hints keep existing silence eligibility behavior.
+2. No scheduler gate, polling lifecycle, cooldown/window limit, kill-switch, request, screenshot, tool, shell, file, TTS, fetch, LLM, config, API, dependency, or UI behavior changes.
