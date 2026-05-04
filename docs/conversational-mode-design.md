@@ -204,3 +204,154 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - 小步迭代：一阶段一目标，一次只加一类能力
 - 明确边界：对话节奏层不越权到隐私数据层
 - 可回退：任何阶段都能回退到当前稳定单轮模式
+
+## 15. Task 029 Landing Notes
+
+- Task 029 只落地了 `conversation_mode` 配置骨架与读取归一化。
+- 当前版本未接入任何新行为触发：
+  - 未实现 follow-up
+  - 未实现 proactive speech
+  - 未实现 silence tick 驱动
+  - 未实现 backchannel
+  - 未实现用户语音打断 TTS 的实际逻辑
+- 默认值保持保守关闭：
+  - `conversation_mode.enabled=false`
+  - `conversation_mode.proactive_enabled=false`
+  - `conversation_mode.max_followups_per_window=1`
+  - `conversation_mode.silence_followup_min_ms=180000`
+  - `conversation_mode.interrupt_tts_on_user_speech=false`
+
+## 16. Task 030 Landing Notes
+
+- Task 030 只增加了开发期 debug 可见性，用于确认 `conversation_mode` 是否已被前端正确读取。
+- 复用了现有 debug/diagnostics 路径，在前端 `snapshot` 输出中新增 `conversationMode` 只读字段：
+  - `enabled`
+  - `proactiveEnabled`
+  - `maxFollowupsPerWindow`
+  - `silenceFollowupMinMs`
+  - `interruptTtsOnUserSpeech`
+- Task 030 未引入任何行为变更：
+  - 未实现 follow-up
+  - 未实现 proactive speech
+  - 未实现 silence tick
+  - 未实现 backchannel
+  - 未实现 TTS interrupt 运行逻辑
+
+## 17. Task 031 Landing Notes
+
+- Task 031 仅落地了 open-loop follow-up planner skeleton，用于判定并记录“是否存在待续话信号”。
+- 判定触发条件保持保守最小：
+  - assistant 最后句问号收尾（`?` / `？`）
+  - 或命中明确追问提示词（如“你觉得呢”“要不要”“要不要我继续”）
+- 记录仅进入前端状态与 debug snapshot（`pending/reason/topicHint/updatedAgeMs`），未接入主动行为。
+- 仅当 `conversation_mode.enabled=true` 时才会记录 pending；默认配置（`enabled=false`）下保持非 pending。
+- Task 031 未引入：
+  - proactive speech
+  - silence tick
+  - backchannel
+  - TTS interrupt 运行逻辑
+  - 主动 LLM 请求
+
+## 18. Task 032 Landing Notes
+
+- Task 032 增加了 DevTools-only 手动 debug helper：`window.__AI_CHAT_DEBUG_TTS__.conversationFollowup()`。
+- helper 仅做“当前 follow-up 是否具备触发资格”的只读判定，返回 plan 对象（含 `eligible`、`blockedReasons` 等）。
+- 判定条件使用保守门控：`conversation enabled`、`proactive enabled`、`followup pending`、`topicHint` 非空、非 speaking/chatBusy、并满足 silence 窗口。
+- Task 032 不会触发主动行为：
+  - 不发起 LLM 请求
+  - 不调用 speak/TTS
+  - 不 dispatch event
+  - 不启动 timer
+
+## 19. Task 033 Landing Notes
+
+- Task 033 在 `conversationFollowup()` 返回对象中新增 `promptDraft`，用于手动调试“若可续话时的 prompt seed 草稿”。
+- `promptDraft` 仅基于本地 planner state 生成，不调用 LLM，不接入 `requestAssistantReply`。
+- 仅当 `eligible=true` 时返回非空 draft；否则返回空字符串。
+- draft 文本保持克制，明确低打扰续话边界：
+  - 只要求一句短回应/轻追问
+  - 不读取桌面/文件/隐私数据
+  - 不调用工具
+  - 不做长篇解释
+
+## 20. Task 034 Landing Notes
+
+- Task 034 增加了 DevTools manual-only 执行入口：`window.__AI_CHAT_DEBUG_TTS__.runConversationFollowup()`。
+- 该入口仅在 `eligible=true` 且 `promptDraft` 非空时，复用现有 `requestAssistantReply` 发起一次 follow-up；否则返回 `not_eligible`。
+- 执行输入明确标记为 debug/manual follow-up，不作为真实用户输入展示或记忆。
+- 执行前会消费当前 follow-up pending，避免同一条被重复手动触发。
+- Task 034 仍不是自动 proactive：
+  - 不基于 silence tick 自动触发
+  - 不新增 timer/listener
+  - 不新增后端接口
+
+## 21. Task 035 Landing Notes
+
+- Task 035 强化了 manual follow-up execution 的 guard 与失败恢复：
+  - 执行前保存 pending 快照
+  - 请求失败（返回 false 或抛异常）时恢复 pending
+  - 请求成功时保持 pending 已消费
+- `runConversationFollowup()` 返回对象新增：
+  - `restoredPending`
+  - `consumedPending`
+  - `endedAt`
+  - `elapsedMs`
+- 增加调试事件阶段：
+  - `conversation_followup_not_eligible`
+  - `conversation_followup_start`
+  - `conversation_followup_success`
+  - `conversation_followup_failed`
+  - `conversation_followup_restore_pending`
+- 该任务仍保持 manual-only，不引入任何自动触发循环。
+
+## 22. Task 036 Landing Notes
+
+- Task 036 新增了 manual follow-up 手测清单文档，用于后续改动时做固定回归。
+- 清单文档：
+  - `docs/conversational-followup-smoke-checklist.md`
+- 覆盖项包括：
+  - 默认禁用验证
+  - pending/eligible 构造
+  - 成功执行与失败恢复
+  - 隐私/安全检查（不自动截图、不工具调用）
+  - debug events 与回归记录模板
+
+## 23. Task 037 Landing Notes
+
+- Task 037 增加了 silence eligibility 的只读 debug 可见性，用于观察“是否满足沉默窗口触发条件”。
+- 新增时间维度观测：
+  - 距离上次用户输入
+  - 距离上次 assistant 回复
+  - 距离上次 TTS 结束
+- 在 `__AI_CHAT_DEBUG_TTS__.snapshot()` 与 `conversationFollowup()` 中新增 `silence` 字段，包含：
+  - `eligibleForSilenceFollowup`
+  - `blockedReasons`
+  - 以及对应 age/min-window 字段
+- Task 037 不引入自动触发，不调用 LLM/TTS，不新增 timer/listener。
+
+## 24. Task 038 Landing Notes
+
+- Task 038 新增 DevTools-only 手动入口：
+  - `window.__AI_CHAT_DEBUG_TTS__.dryRunSilenceFollowup()`
+- dry-run 行为：
+  - 当 `silence.eligibleForSilenceFollowup !== true` 时，仅返回 blocked 结果，不执行 follow-up
+  - 当 silence eligible 时，复用现有 `runConversationFollowupDebug()` 执行
+- 事件可见性：
+  - `conversation_silence_followup_blocked`
+  - `conversation_silence_followup_manual_start`
+- Task 038 仍保持 manual-only，不引入自动 proactive 触发循环。
+
+## 25. Task 039 Landing Notes
+
+- Task 039 仅新增 proactive scheduler 设计护栏文档，不改任何 JS/Python 运行行为。
+- 护栏文档：
+  - `docs/proactive-scheduler-guard.md`
+- 本次先明确自动 proactive 触发前的边界与验收口径：
+  - 默认关闭、双开关门控、fail-closed
+  - 不读取桌面/文件/隐私数据，不调用工具/不执行 shell
+  - 不绕过 `skipDesktopAttach`
+  - speaking/chatBusy/用户输入中不触发
+  - 基于 pending/topicHint/silence/cooldown/in-flight 的全量 eligibility
+  - 成功与失败分流冷却，避免连续循环自说自话
+  - debug snapshot/events 可观测，且不记录长 prompt 与隐私内容
+- 分阶段建议已落地到文档（Task 040~044），用于后续小步推进自动触发能力。

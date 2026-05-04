@@ -26,6 +26,20 @@ const state = {
   autoChatLastTopicHint: "",
   autoChatLastTopicAt: 0,
   autoChatBurstCount: 0,
+  conversationMode: {
+    enabled: false,
+    proactiveEnabled: false,
+    maxFollowupsPerWindow: 1,
+    silenceFollowupMinMs: 180000,
+    interruptTtsOnUserSpeech: false
+  },
+  followupPending: false,
+  followupReason: "",
+  followupTopicHint: "",
+  followupUpdatedAt: 0,
+  conversationLastUserAt: 0,
+  conversationLastAssistantAt: 0,
+  conversationLastTtsFinishedAt: 0,
   autoChatTuning: {
     triggerBaseThreshold: 1.03,
     shortSilencePenalty: 0.35,
@@ -415,6 +429,10 @@ function formatTTSDebugNumber(value, digits = 0) {
 function getTTSDebugSnapshot() {
   const audio = state.ttsAudio;
   const now = performance.now();
+  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
+  const followupUpdatedAt = Number(state.followupUpdatedAt || 0);
   const durationMs = audio && Number.isFinite(Number(audio.duration)) && audio.duration > 0
     ? Math.round(Number(audio.duration) * 1000)
     : Number(state.ttsDebugAudioDurationMs || -1);
@@ -444,8 +462,354 @@ function getTTSDebugSnapshot() {
     animDurationMs: Number(state.speechAnimDurationMs || 0),
     mood: state.speechAnimMood || "idle",
     style: state.speechAnimStyle || state.currentTalkStyle || "neutral",
+    conversationMode: {
+      enabled: conversationMode.enabled === true,
+      proactiveEnabled: conversationMode.proactiveEnabled === true,
+      maxFollowupsPerWindow: Number.isFinite(Number(conversationMode.maxFollowupsPerWindow))
+        ? Math.round(Number(conversationMode.maxFollowupsPerWindow))
+        : 1,
+      silenceFollowupMinMs: Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
+        ? Math.round(Number(conversationMode.silenceFollowupMinMs))
+        : 180000,
+      interruptTtsOnUserSpeech: conversationMode.interruptTtsOnUserSpeech === true
+    },
+    followup: {
+      pending: state.followupPending === true,
+      reason: String(state.followupReason || ""),
+      topicHint: String(state.followupTopicHint || ""),
+      updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
+    },
+    silence: buildConversationSilenceDebugSnapshot(Date.now()),
     lastResult: state.ttsDebugLastResult || "",
     lastError: state.ttsDebugLastError || ""
+  };
+}
+
+function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
+  const now = Number(nowMs);
+  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
+  const conversationEnabled = conversationMode.enabled === true;
+  const proactiveEnabled = conversationMode.proactiveEnabled === true;
+  const followupPending = state.followupPending === true;
+  const topicHint = String(state.followupTopicHint || "").trim();
+  const chatBusy = state.chatBusy === true;
+  const speaking = isSpeakingNow();
+  const silenceFollowupMinMs = Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
+    ? Math.max(0, Math.round(Number(conversationMode.silenceFollowupMinMs)))
+    : 180000;
+  const lastUserAt = Number(state.conversationLastUserAt || 0);
+  const lastAssistantAt = Number(state.conversationLastAssistantAt || 0);
+  const lastTtsFinishedAt = Number(state.conversationLastTtsFinishedAt || 0);
+  const lastUserAgeMs = lastUserAt > 0 ? Math.max(0, Math.round(safeNow - lastUserAt)) : -1;
+  const lastAssistantAgeMs = lastAssistantAt > 0 ? Math.max(0, Math.round(safeNow - lastAssistantAt)) : -1;
+  const lastTtsFinishedAgeMs = lastTtsFinishedAt > 0 ? Math.max(0, Math.round(safeNow - lastTtsFinishedAt)) : -1;
+  const silenceWindowReached = lastTtsFinishedAgeMs >= 0 && lastTtsFinishedAgeMs >= silenceFollowupMinMs;
+
+  const blockedReasons = [];
+  if (!conversationEnabled) {
+    blockedReasons.push("conversation_disabled");
+  }
+  if (!proactiveEnabled) {
+    blockedReasons.push("proactive_disabled");
+  }
+  if (!followupPending) {
+    blockedReasons.push("no_pending_followup");
+  }
+  if (!topicHint) {
+    blockedReasons.push("empty_topic_hint");
+  }
+  if (chatBusy) {
+    blockedReasons.push("chat_busy");
+  }
+  if (speaking) {
+    blockedReasons.push("speaking");
+  }
+  if (lastUserAgeMs < 0) {
+    blockedReasons.push("no_user_activity_timestamp");
+  } else if (lastUserAgeMs < silenceFollowupMinMs) {
+    blockedReasons.push("user_silence_window_not_reached");
+  }
+  if (lastTtsFinishedAgeMs < 0) {
+    blockedReasons.push("no_tts_finished_timestamp");
+  } else if (lastTtsFinishedAgeMs < silenceFollowupMinMs) {
+    blockedReasons.push("tts_silence_window_not_reached");
+  }
+
+  return {
+    lastUserAgeMs,
+    lastAssistantAgeMs,
+    lastTtsFinishedAgeMs,
+    silenceFollowupMinMs,
+    silenceWindowReached,
+    conversationEnabled,
+    proactiveEnabled,
+    followupPending,
+    chatBusy,
+    speaking,
+    eligibleForSilenceFollowup: blockedReasons.length === 0,
+    blockedReasons
+  };
+}
+
+function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
+  const now = Number(nowMs);
+  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
+  const conversationEnabled = conversationMode.enabled === true;
+  const proactiveEnabled = conversationMode.proactiveEnabled === true;
+  const silenceFollowupMinMs = Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
+    ? Math.max(0, Math.round(Number(conversationMode.silenceFollowupMinMs)))
+    : 180000;
+  const followupPending = state.followupPending === true;
+  const topicHint = String(state.followupTopicHint || "").trim();
+  const reason = String(state.followupReason || "").trim();
+  const followupUpdatedAt = Number(state.followupUpdatedAt || 0);
+  const updatedAgeMs = followupUpdatedAt > 0
+    ? Math.max(0, Math.round(safeNow - followupUpdatedAt))
+    : -1;
+
+  const blockedReasons = [];
+  if (!conversationEnabled) {
+    blockedReasons.push("conversation_disabled");
+  }
+  if (!proactiveEnabled) {
+    blockedReasons.push("proactive_disabled");
+  }
+  if (!followupPending) {
+    blockedReasons.push("no_pending_followup");
+  }
+  if (!topicHint) {
+    blockedReasons.push("empty_topic_hint");
+  }
+  if (state.chatBusy) {
+    blockedReasons.push("chat_busy");
+  }
+  if (isSpeakingNow()) {
+    blockedReasons.push("speaking");
+  }
+  if (updatedAgeMs < 0 || updatedAgeMs < silenceFollowupMinMs) {
+    blockedReasons.push("silence_window_not_reached");
+  }
+
+  return {
+    eligible: blockedReasons.length === 0,
+    reason,
+    topicHint,
+    updatedAgeMs,
+    conversationEnabled,
+    proactiveEnabled,
+    silenceFollowupMinMs,
+    blockedReasons
+  };
+}
+
+function buildConversationFollowupDebugView(nowMs = Date.now()) {
+  const plan = buildConversationFollowupDebugPlan(nowMs);
+  return {
+    ...plan,
+    promptDraft: buildConversationFollowupPromptDraft(plan),
+    silence: buildConversationSilenceDebugSnapshot(nowMs)
+  };
+}
+
+function buildConversationFollowupPromptDraft(plan) {
+  const safePlan = plan && typeof plan === "object" ? plan : {};
+  if (safePlan.eligible !== true) {
+    return "";
+  }
+  const reason = String(safePlan.reason || "").trim() || "followup_pending";
+  let topicHint = String(safePlan.topicHint || "").replace(/\s+/g, " ").trim();
+  if (!topicHint) {
+    return "";
+  }
+  if (topicHint.length > 80) {
+    topicHint = topicHint.slice(0, 80).trim();
+  }
+  return [
+    "你正在进行低打扰续话。",
+    "请基于上一轮未收口的话题，仅输出一句简短、可忽略的自然续话（或轻追问），不要长篇解释。",
+    "不要读取桌面、文件或隐私数据，不要调用工具。",
+    `续话原因: ${reason}`,
+    `话题线索: ${topicHint}`
+  ].join("\n");
+}
+
+function snapshotConversationFollowupPending() {
+  return {
+    pending: state.followupPending === true,
+    reason: String(state.followupReason || ""),
+    topicHint: String(state.followupTopicHint || ""),
+    updatedAt: Number(state.followupUpdatedAt || 0)
+  };
+}
+
+function restoreConversationFollowupPending(snapshot) {
+  const safe = snapshot && typeof snapshot === "object" ? snapshot : {};
+  state.followupPending = safe.pending === true;
+  state.followupReason = String(safe.reason || "");
+  state.followupTopicHint = String(safe.topicHint || "");
+  state.followupUpdatedAt = Number.isFinite(Number(safe.updatedAt))
+    ? Math.max(0, Math.round(Number(safe.updatedAt)))
+    : 0;
+}
+
+function clearConversationFollowupPending(nowMs = Date.now()) {
+  const now = Number(nowMs);
+  state.followupPending = false;
+  state.followupReason = "";
+  state.followupTopicHint = "";
+  state.followupUpdatedAt = Number.isFinite(now) ? Math.max(0, Math.round(now)) : 0;
+}
+
+async function runConversationFollowupDebug() {
+  const startedAt = Date.now();
+  const plan = buildConversationFollowupDebugView(startedAt);
+  const blockedSummary = Array.isArray(plan.blockedReasons) ? plan.blockedReasons.join(",") : "";
+  const reasonText = String(plan.reason || "");
+  const topicHintText = String(plan.topicHint || "");
+  const finishResult = (result) => {
+    const endedAt = Date.now();
+    return {
+      ...result,
+      plan,
+      startedAt,
+      endedAt,
+      elapsedMs: Math.max(0, endedAt - startedAt)
+    };
+  };
+
+  if (!plan.eligible || !plan.promptDraft) {
+    recordTTSDebugEvent("conversation_followup_not_eligible", {
+      text: topicHintText,
+      result: blockedSummary || "not_eligible",
+      error: reasonText
+    });
+    return finishResult({
+      ok: false,
+      reason: "not_eligible",
+      consumedPending: false,
+      restoredPending: false
+    });
+  }
+  if (typeof requestAssistantReply !== "function") {
+    recordTTSDebugEvent("conversation_followup_failed", {
+      text: topicHintText,
+      result: "no_safe_entrypoint",
+      error: reasonText
+    });
+    return finishResult({
+      ok: false,
+      reason: "no_safe_entrypoint",
+      consumedPending: false,
+      restoredPending: false
+    });
+  }
+
+  const pendingSnapshot = snapshotConversationFollowupPending();
+  recordTTSDebugEvent("conversation_followup_start", {
+    text: topicHintText,
+    result: reasonText || "followup_pending"
+  });
+  clearConversationFollowupPending(startedAt);
+  const followupInput = `（debug/manual follow-up）\n${plan.promptDraft}`;
+  try {
+    const ok = await requestAssistantReply(followupInput, {
+      showUser: false,
+      rememberUser: false,
+      rememberAssistant: true,
+      auto: true,
+      skipDesktopAttach: true,
+      silentError: true,
+      userDisplayText: "[debug/manual follow-up]"
+    });
+
+    if (ok) {
+      recordTTSDebugEvent("conversation_followup_success", {
+        text: topicHintText,
+        result: reasonText || "followup_pending"
+      });
+      return finishResult({
+        ok: true,
+        reason: "started",
+        consumedPending: true,
+        restoredPending: false
+      });
+    }
+
+    restoreConversationFollowupPending(pendingSnapshot);
+    recordTTSDebugEvent("conversation_followup_restore_pending", {
+      text: sanitizeTTSDebugText(pendingSnapshot.topicHint || topicHintText),
+      result: pendingSnapshot.reason || reasonText || "restore"
+    });
+    recordTTSDebugEvent("conversation_followup_failed", {
+      text: topicHintText,
+      result: "request_failed",
+      error: reasonText
+    });
+    return finishResult({
+      ok: false,
+      reason: "request_failed",
+      consumedPending: false,
+      restoredPending: true
+    });
+  } catch (err) {
+    restoreConversationFollowupPending(pendingSnapshot);
+    const errorText = String(err?.message || err || "request_exception");
+    recordTTSDebugEvent("conversation_followup_restore_pending", {
+      text: sanitizeTTSDebugText(pendingSnapshot.topicHint || topicHintText),
+      result: pendingSnapshot.reason || reasonText || "restore"
+    });
+    recordTTSDebugEvent("conversation_followup_failed", {
+      text: topicHintText,
+      result: "request_exception",
+      error: errorText
+    });
+    return finishResult({
+      ok: false,
+      reason: "request_exception",
+      consumedPending: false,
+      restoredPending: true
+    });
+  }
+}
+
+async function runConversationSilenceFollowupDryRun() {
+  const startedAt = Date.now();
+  const view = buildConversationFollowupDebugView(startedAt);
+  if (view?.silence?.eligibleForSilenceFollowup !== true) {
+    const endedAt = Date.now();
+    recordTTSDebugEvent("conversation_silence_followup_blocked", {
+      text: String(view?.topicHint || ""),
+      result: Array.isArray(view?.silence?.blockedReasons)
+        ? view.silence.blockedReasons.join(",")
+        : "silence_not_eligible",
+      error: String(view?.reason || "")
+    });
+    return {
+      ok: false,
+      reason: "silence_not_eligible",
+      view,
+      startedAt,
+      endedAt,
+      elapsedMs: Math.max(0, endedAt - startedAt)
+    };
+  }
+
+  recordTTSDebugEvent("conversation_silence_followup_manual_start", {
+    text: String(view?.topicHint || ""),
+    result: String(view?.reason || "silence_eligible")
+  });
+  const result = await runConversationFollowupDebug();
+  return {
+    ...result,
+    silenceDryRun: true,
+    silenceEligibleAtStart: true,
+    silenceStartedAt: startedAt
   };
 }
 
@@ -1998,7 +2362,13 @@ function loadChatHistoryFromStorage() {
   );
   const lastUserRecord = [...state.chatRecords].reverse().find((item) => item?.role === "user");
   if (lastUserRecord) {
-    state.lastUserMessageAt = parseMessageTimestamp(lastUserRecord.timestamp);
+    const ts = parseMessageTimestamp(lastUserRecord.timestamp);
+    state.lastUserMessageAt = ts;
+    state.conversationLastUserAt = ts;
+  }
+  const lastAssistantRecord = [...state.chatRecords].reverse().find((item) => item?.role === "assistant");
+  if (lastAssistantRecord) {
+    state.conversationLastAssistantAt = parseMessageTimestamp(lastAssistantRecord.timestamp);
   }
   syncConversationHistoryFromChatRecords();
   renderChatHistoryFromState();
@@ -4914,6 +5284,58 @@ function normalizeAutoChatTopicHint(text = "") {
   return safe;
 }
 
+function buildConversationFollowupTopicHint(text = "") {
+  let safe = String(text || "").replace(/\s+/g, " ").trim();
+  if (!safe) {
+    return "";
+  }
+  const lines = safe.split(/\r?\n/).map((line) => String(line || "").trim()).filter(Boolean);
+  safe = lines.length ? lines[lines.length - 1] : safe;
+  const tailSplit = safe.split(/[。！？!?]/).map((item) => String(item || "").trim()).filter(Boolean);
+  let hint = tailSplit.length ? tailSplit[tailSplit.length - 1] : safe;
+  if (hint.length > 80) {
+    hint = hint.slice(0, 80).trim();
+  }
+  return hint;
+}
+
+function detectOpenLoopFollowup(text = "") {
+  const safe = String(text || "").replace(/\s+/g, " ").trim();
+  if (!safe) {
+    return { pending: false, reason: "", topicHint: "" };
+  }
+  if (/[?？][”"'’）)\]]*\s*$/.test(safe)) {
+    return {
+      pending: true,
+      reason: "question_tail",
+      topicHint: buildConversationFollowupTopicHint(safe)
+    };
+  }
+  if (/(你觉得呢|要不要|要不要我继续)/i.test(safe)) {
+    return {
+      pending: true,
+      reason: "keyword_hint",
+      topicHint: buildConversationFollowupTopicHint(safe)
+    };
+  }
+  return { pending: false, reason: "", topicHint: "" };
+}
+
+function updateConversationFollowupState(assistantText = "") {
+  if (state.conversationMode?.enabled !== true) {
+    state.followupPending = false;
+    state.followupReason = "";
+    state.followupTopicHint = "";
+    state.followupUpdatedAt = 0;
+    return;
+  }
+  const result = detectOpenLoopFollowup(assistantText);
+  state.followupPending = result.pending === true;
+  state.followupReason = String(result.reason || "");
+  state.followupTopicHint = String(result.topicHint || "");
+  state.followupUpdatedAt = Date.now();
+}
+
 function pickAutoChatPrimaryReason(reasons = []) {
   for (const key of AUTO_CHAT_REASON_PRIORITY) {
     if (Array.isArray(reasons) && reasons.includes(key)) {
@@ -5701,6 +6123,9 @@ function installTTSDebugBridge() {
   const bridge = {
     report: buildTTSDebugReport,
     snapshot: getTTSDebugSnapshot,
+    conversationFollowup: () => buildConversationFollowupDebugView(Date.now()),
+    runConversationFollowup: () => runConversationFollowupDebug(),
+    dryRunSilenceFollowup: () => runConversationSilenceFollowupDryRun(),
     events: () => state.ttsDebugEvents.slice(),
     show: () => toggleTTSDebugPanel(true),
     hide: () => toggleTTSDebugPanel(false),
@@ -9637,6 +10062,7 @@ async function loadConfig() {
   }
   const asrCfg = state.config?.asr || {};
   const observeCfg = state.config?.observe || {};
+  const conversationCfg = state.config?.conversation_mode || {};
   const historySummaryCfg = state.config?.history_summary || {};
   const styleCfg = state.config?.style || {};
   const motionCfg = state.config?.motion || {};
@@ -9675,6 +10101,17 @@ async function loadConfig() {
     }
   }
   state.observeAllowAutoChat = observeCfg.allow_auto_chat === true;
+  state.conversationMode = {
+    enabled: conversationCfg.enabled === true,
+    proactiveEnabled: conversationCfg.proactive_enabled === true,
+    maxFollowupsPerWindow: Math.round(
+      clampNumber(Number(conversationCfg.max_followups_per_window ?? 1), 0, 4)
+    ),
+    silenceFollowupMinMs: Math.round(
+      clampNumber(Number(conversationCfg.silence_followup_min_ms ?? 180000), 30000, 1800000)
+    ),
+    interruptTtsOnUserSpeech: conversationCfg.interrupt_tts_on_user_speech === true
+  };
   const autoChatTuningCfg = observeCfg && typeof observeCfg.auto_chat_tuning === "object"
     ? observeCfg.auto_chat_tuning
     : {};
@@ -11193,6 +11630,7 @@ async function playAudioByContext(blob, debugContext = {}) {
     state.ttsAudioLevel = 0;
     state.ttsAudioRawLevel = 0;
     state.ttsAudioRms = 0;
+    state.conversationLastTtsFinishedAt = Date.now();
     markedSpeaking = false;
     recordTTSDebugEvent("context_play_end", {
       ...debugContext,
@@ -11377,6 +11815,7 @@ async function playAudioBlob(blob, opts = {}) {
       state.ttsAudioRawLevel = 0;
       state.ttsAudioRms = 0;
       state.ttsDebugAudioEndedAt = performance.now();
+      state.conversationLastTtsFinishedAt = Date.now();
       state.ttsDebugAudioCurrentMs = Math.round(Number(audio.currentTime || 0) * 1000);
       if (ok) {
         finishSpeechAnimation();
@@ -12000,6 +12439,7 @@ async function requestAssistantReply(text, opts = {}) {
   const rememberAssistant = opts.rememberAssistant !== false;
   const silentError = !!opts.silentError;
   const isAuto = !!opts.auto;
+  const skipDesktopAttach = opts.skipDesktopAttach === true;
   const forceTools = opts.forceTools === true;
   const chatPerfTraceId = createPerfTraceId("chat");
   const chatPerfStartPerfMs = performance.now();
@@ -12015,7 +12455,8 @@ async function requestAssistantReply(text, opts = {}) {
   });
   const userTimestamp = Date.now();
   if (showUser || rememberUser) {
-    state.lastUserMessageAt = Date.now();
+    state.lastUserMessageAt = userTimestamp;
+    state.conversationLastUserAt = userTimestamp;
     if (!isAuto) {
       state.autoChatBurstCount = 0;
     }
@@ -12074,7 +12515,7 @@ async function requestAssistantReply(text, opts = {}) {
 
   try {
     let imageDataUrl = imageDataUrlOverride;
-    if (!imageDataUrl && shouldAttachDesktopImage(message, isAuto)) {
+    if (!skipDesktopAttach && !imageDataUrl && shouldAttachDesktopImage(message, isAuto)) {
       setStatus("正在观察桌面...");
       imageDataUrl = await captureDesktopSnapshot();
       setStatus(isAuto ? "自动对话中..." : "思考中...");
@@ -12170,6 +12611,8 @@ async function requestAssistantReply(text, opts = {}) {
     if (rememberAssistant) {
       rememberMessage("assistant", visibleReply, { timestamp: assistantTimestamp });
     }
+    state.conversationLastAssistantAt = assistantTimestamp;
+    updateConversationFollowupState(visibleReply);
     const mood = detectMood(visibleReply);
     recordEmotion(mood);
     const finalTalkStyle = resolveTalkStyle(message, visibleReply, mood, isAuto);

@@ -173,6 +173,13 @@
     "daily_greeting_minute": 0,
     "daily_greeting_prompt": "请你像桌宠一样主动向我说早安，简短自然地问好，再给我一句鼓励今天认真努力的暖心鸡汤。控制在两三句内，不要太像模板。"
   },
+  "conversation_mode": {
+    "enabled": false,
+    "proactive_enabled": false,
+    "max_followups_per_window": 1,
+    "silence_followup_min_ms": 180000,
+    "interrupt_tts_on_user_speech": false
+  },
   "motion": {
     "enabled": true,
     "cooldown_ms": 1200,
