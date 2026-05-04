@@ -273,3 +273,14 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - 不读取桌面/文件/隐私数据
   - 不调用工具
   - 不做长篇解释
+
+## 20. Task 034 Landing Notes
+
+- Task 034 增加了 DevTools manual-only 执行入口：`window.__AI_CHAT_DEBUG_TTS__.runConversationFollowup()`。
+- 该入口仅在 `eligible=true` 且 `promptDraft` 非空时，复用现有 `requestAssistantReply` 发起一次 follow-up；否则返回 `not_eligible`。
+- 执行输入明确标记为 debug/manual follow-up，不作为真实用户输入展示或记忆。
+- 执行前会消费当前 follow-up pending，避免同一条被重复手动触发。
+- Task 034 仍不是自动 proactive：
+  - 不基于 silence tick 自动触发
+  - 不新增 timer/listener
+  - 不新增后端接口

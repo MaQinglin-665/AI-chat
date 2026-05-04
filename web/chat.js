@@ -557,6 +557,45 @@ function buildConversationFollowupPromptDraft(plan) {
   ].join("\n");
 }
 
+function clearConversationFollowupPending(nowMs = Date.now()) {
+  const now = Number(nowMs);
+  state.followupPending = false;
+  state.followupReason = "";
+  state.followupTopicHint = "";
+  state.followupUpdatedAt = Number.isFinite(now) ? Math.max(0, Math.round(now)) : 0;
+}
+
+async function runConversationFollowupDebug() {
+  const startedAt = Date.now();
+  const basePlan = buildConversationFollowupDebugPlan(startedAt);
+  const plan = {
+    ...basePlan,
+    promptDraft: buildConversationFollowupPromptDraft(basePlan)
+  };
+  if (!plan.eligible || !plan.promptDraft) {
+    return { ok: false, reason: "not_eligible", plan, startedAt };
+  }
+  if (typeof requestAssistantReply !== "function") {
+    return { ok: false, reason: "no_safe_entrypoint", plan, startedAt };
+  }
+
+  clearConversationFollowupPending(startedAt);
+  const followupInput = `（debug/manual follow-up）\n${plan.promptDraft}`;
+  const ok = await requestAssistantReply(followupInput, {
+    showUser: false,
+    rememberUser: false,
+    rememberAssistant: true,
+    auto: true,
+    skipDesktopAttach: true,
+    silentError: true,
+    userDisplayText: "[debug/manual follow-up]"
+  });
+
+  return ok
+    ? { ok: true, reason: "started", plan, startedAt }
+    : { ok: false, reason: "request_failed", plan, startedAt };
+}
+
 function buildTTSDebugReport() {
   const s = getTTSDebugSnapshot();
   const lines = [
@@ -5868,6 +5907,7 @@ function installTTSDebugBridge() {
         promptDraft: buildConversationFollowupPromptDraft(plan)
       };
     },
+    runConversationFollowup: () => runConversationFollowupDebug(),
     events: () => state.ttsDebugEvents.slice(),
     show: () => toggleTTSDebugPanel(true),
     hide: () => toggleTTSDebugPanel(false),
@@ -12179,6 +12219,7 @@ async function requestAssistantReply(text, opts = {}) {
   const rememberAssistant = opts.rememberAssistant !== false;
   const silentError = !!opts.silentError;
   const isAuto = !!opts.auto;
+  const skipDesktopAttach = opts.skipDesktopAttach === true;
   const forceTools = opts.forceTools === true;
   const chatPerfTraceId = createPerfTraceId("chat");
   const chatPerfStartPerfMs = performance.now();
@@ -12253,7 +12294,7 @@ async function requestAssistantReply(text, opts = {}) {
 
   try {
     let imageDataUrl = imageDataUrlOverride;
-    if (!imageDataUrl && shouldAttachDesktopImage(message, isAuto)) {
+    if (!skipDesktopAttach && !imageDataUrl && shouldAttachDesktopImage(message, isAuto)) {
       setStatus("正在观察桌面...");
       imageDataUrl = await captureDesktopSnapshot();
       setStatus(isAuto ? "自动对话中..." : "思考中...");
