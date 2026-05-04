@@ -11,6 +11,6 @@
     "check:docs": "npm --prefix docs run check:all"
   },
   "devDependencies": {
-    "electron": "^28.2.0"
+    "electron": "^41.5.0"
   }
 }
