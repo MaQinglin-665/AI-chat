@@ -481,6 +481,60 @@ function getTTSDebugSnapshot() {
   };
 }
 
+function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
+  const now = Number(nowMs);
+  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
+  const conversationEnabled = conversationMode.enabled === true;
+  const proactiveEnabled = conversationMode.proactiveEnabled === true;
+  const silenceFollowupMinMs = Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
+    ? Math.max(0, Math.round(Number(conversationMode.silenceFollowupMinMs)))
+    : 180000;
+  const followupPending = state.followupPending === true;
+  const topicHint = String(state.followupTopicHint || "").trim();
+  const reason = String(state.followupReason || "").trim();
+  const followupUpdatedAt = Number(state.followupUpdatedAt || 0);
+  const updatedAgeMs = followupUpdatedAt > 0
+    ? Math.max(0, Math.round(safeNow - followupUpdatedAt))
+    : -1;
+
+  const blockedReasons = [];
+  if (!conversationEnabled) {
+    blockedReasons.push("conversation_disabled");
+  }
+  if (!proactiveEnabled) {
+    blockedReasons.push("proactive_disabled");
+  }
+  if (!followupPending) {
+    blockedReasons.push("no_pending_followup");
+  }
+  if (!topicHint) {
+    blockedReasons.push("empty_topic_hint");
+  }
+  if (state.chatBusy) {
+    blockedReasons.push("chat_busy");
+  }
+  if (isSpeakingNow()) {
+    blockedReasons.push("speaking");
+  }
+  if (updatedAgeMs < 0 || updatedAgeMs < silenceFollowupMinMs) {
+    blockedReasons.push("silence_window_not_reached");
+  }
+
+  return {
+    eligible: blockedReasons.length === 0,
+    reason,
+    topicHint,
+    updatedAgeMs,
+    conversationEnabled,
+    proactiveEnabled,
+    silenceFollowupMinMs,
+    blockedReasons
+  };
+}
+
 function buildTTSDebugReport() {
   const s = getTTSDebugSnapshot();
   const lines = [
@@ -5785,6 +5839,7 @@ function installTTSDebugBridge() {
   const bridge = {
     report: buildTTSDebugReport,
     snapshot: getTTSDebugSnapshot,
+    conversationFollowup: () => buildConversationFollowupDebugPlan(Date.now()),
     events: () => state.ttsDebugEvents.slice(),
     show: () => toggleTTSDebugPanel(true),
     hide: () => toggleTTSDebugPanel(false),

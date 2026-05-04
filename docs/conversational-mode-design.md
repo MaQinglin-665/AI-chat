@@ -251,3 +251,14 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - backchannel
   - TTS interrupt 运行逻辑
   - 主动 LLM 请求
+
+## 18. Task 032 Landing Notes
+
+- Task 032 增加了 DevTools-only 手动 debug helper：`window.__AI_CHAT_DEBUG_TTS__.conversationFollowup()`。
+- helper 仅做“当前 follow-up 是否具备触发资格”的只读判定，返回 plan 对象（含 `eligible`、`blockedReasons` 等）。
+- 判定条件使用保守门控：`conversation enabled`、`proactive enabled`、`followup pending`、`topicHint` 非空、非 speaking/chatBusy、并满足 silence 窗口。
+- Task 032 不会触发主动行为：
+  - 不发起 LLM 请求
+  - 不调用 speak/TTS
+  - 不 dispatch event
+  - 不启动 timer
