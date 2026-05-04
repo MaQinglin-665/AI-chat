@@ -5395,15 +5395,22 @@ function stripAssistantPayloadNoise(text) {
 }
 
 const CHARACTER_RUNTIME = window.TaffyCharacterRuntime || {};
+const CHARACTER_RUNTIME_BRIDGE = window.TaffyCharacterRuntimeBridge || {};
 
 function normalizeCharacterRuntimeMetadataForFrontend(raw) {
+  const filtered = typeof CHARACTER_RUNTIME_BRIDGE.copyAllowedMetadataFields === "function"
+    ? CHARACTER_RUNTIME_BRIDGE.copyAllowedMetadataFields(raw)
+    : raw;
+  if (typeof CHARACTER_RUNTIME_BRIDGE.normalizeMetadataForFrontend === "function") {
+    return CHARACTER_RUNTIME_BRIDGE.normalizeMetadataForFrontend(filtered, CHARACTER_RUNTIME);
+  }
   if (typeof CHARACTER_RUNTIME.normalizeMetadataForFrontend !== "function") {
     return null;
   }
-  return CHARACTER_RUNTIME.normalizeMetadataForFrontend(raw);
+  return CHARACTER_RUNTIME.normalizeMetadataForFrontend(filtered);
 }
 
-const CHARACTER_RUNTIME_BROADCAST_CHANNEL = "taffy-character-runtime";
+const CHARACTER_RUNTIME_BROADCAST_CHANNEL = CHARACTER_RUNTIME_BRIDGE.BROADCAST_CHANNEL || "taffy-character-runtime";
 let characterRuntimeBroadcastChannel = null;
 
 function getCharacterRuntimeBroadcastChannel() {
@@ -5422,12 +5429,16 @@ function getCharacterRuntimeBroadcastChannel() {
 }
 
 function dispatchCharacterRuntimeMetadataLocally(normalized) {
-  if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
+  const isNormalized = typeof CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata === "function"
+    ? CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata(normalized)
+    : (!!normalized && typeof normalized === "object" && !Array.isArray(normalized));
+  if (!isNormalized) {
     return null;
   }
   try {
     window.__AI_CHAT_LAST_CHARACTER_RUNTIME__ = normalized;
-    window.dispatchEvent(new CustomEvent("character-runtime:update", { detail: normalized }));
+    const evtName = CHARACTER_RUNTIME_BRIDGE.UPDATE_EVENT || "character-runtime:update";
+    window.dispatchEvent(new CustomEvent(evtName, { detail: normalized }));
   } catch (_) {
     // Keep bridge side-effect safe; metadata is optional.
   }
@@ -5435,7 +5446,10 @@ function dispatchCharacterRuntimeMetadataLocally(normalized) {
 }
 
 function broadcastCharacterRuntimeMetadataToModel(normalized) {
-  if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
+  const isNormalized = typeof CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata === "function"
+    ? CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata(normalized)
+    : (!!normalized && typeof normalized === "object" && !Array.isArray(normalized));
+  if (!isNormalized) {
     return false;
   }
   if (state.uiView !== "chat") {
@@ -5446,10 +5460,13 @@ function broadcastCharacterRuntimeMetadataToModel(normalized) {
     return false;
   }
   try {
-    channel.postMessage({
-      type: "character-runtime:update",
-      metadata: normalized
-    });
+    const msg = typeof CHARACTER_RUNTIME_BRIDGE.createRuntimeUpdateMessage === "function"
+      ? CHARACTER_RUNTIME_BRIDGE.createRuntimeUpdateMessage(normalized)
+      : { type: "character-runtime:update", metadata: normalized };
+    if (!msg) {
+      return false;
+    }
+    channel.postMessage(msg);
     return true;
   } catch (_) {
     return false;
