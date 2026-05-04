@@ -778,6 +778,41 @@ async function runConversationFollowupDebug() {
   }
 }
 
+async function runConversationSilenceFollowupDryRun() {
+  const startedAt = Date.now();
+  const view = buildConversationFollowupDebugView(startedAt);
+  if (view?.silence?.eligibleForSilenceFollowup !== true) {
+    const endedAt = Date.now();
+    recordTTSDebugEvent("conversation_silence_followup_blocked", {
+      text: String(view?.topicHint || ""),
+      result: Array.isArray(view?.silence?.blockedReasons)
+        ? view.silence.blockedReasons.join(",")
+        : "silence_not_eligible",
+      error: String(view?.reason || "")
+    });
+    return {
+      ok: false,
+      reason: "silence_not_eligible",
+      view,
+      startedAt,
+      endedAt,
+      elapsedMs: Math.max(0, endedAt - startedAt)
+    };
+  }
+
+  recordTTSDebugEvent("conversation_silence_followup_manual_start", {
+    text: String(view?.topicHint || ""),
+    result: String(view?.reason || "silence_eligible")
+  });
+  const result = await runConversationFollowupDebug();
+  return {
+    ...result,
+    silenceDryRun: true,
+    silenceEligibleAtStart: true,
+    silenceStartedAt: startedAt
+  };
+}
+
 function buildTTSDebugReport() {
   const s = getTTSDebugSnapshot();
   const lines = [
@@ -6090,6 +6125,7 @@ function installTTSDebugBridge() {
     snapshot: getTTSDebugSnapshot,
     conversationFollowup: () => buildConversationFollowupDebugView(Date.now()),
     runConversationFollowup: () => runConversationFollowupDebug(),
+    dryRunSilenceFollowup: () => runConversationSilenceFollowupDryRun(),
     events: () => state.ttsDebugEvents.slice(),
     show: () => toggleTTSDebugPanel(true),
     hide: () => toggleTTSDebugPanel(false),

@@ -106,10 +106,29 @@ window.__AI_CHAT_DEBUG_TTS__.events().slice(-30)
 3. `conversation_followup_success`
 4. `conversation_followup_failed`
 5. `conversation_followup_restore_pending`
+6. `conversation_silence_followup_blocked`（Task 038）
+7. `conversation_silence_followup_manual_start`（Task 038）
 
 说明：事件里不应塞入完整长 prompt，重点看 reason/topicHint 摘要与阶段是否正确。
 
-## 8. 回归记录模板
+## 8. Silence Dry-Run 验证（Task 038）
+
+执行：
+
+```js
+await window.__AI_CHAT_DEBUG_TTS__.dryRunSilenceFollowup()
+```
+
+期望：
+1. 默认配置下返回 `ok=false`、`reason="silence_not_eligible"`。
+2. 当 `silence window` 未达成时，仍为 blocked，且 `events()` 中出现 `conversation_silence_followup_blocked`。
+3. 当 silence eligible 达成后，dry-run 会复用现有 manual follow-up 执行路径，返回结果包含：
+   - `silenceDryRun=true`
+   - `silenceEligibleAtStart=true`
+   - `silenceStartedAt`
+4. 不应自动重复触发，不应自动截图。
+
+## 9. 回归记录模板
 
 ```md
 日期：

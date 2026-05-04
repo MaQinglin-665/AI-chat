@@ -328,3 +328,15 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `blockedReasons`
   - 以及对应 age/min-window 字段
 - Task 037 不引入自动触发，不调用 LLM/TTS，不新增 timer/listener。
+
+## 24. Task 038 Landing Notes
+
+- Task 038 新增 DevTools-only 手动入口：
+  - `window.__AI_CHAT_DEBUG_TTS__.dryRunSilenceFollowup()`
+- dry-run 行为：
+  - 当 `silence.eligibleForSilenceFollowup !== true` 时，仅返回 blocked 结果，不执行 follow-up
+  - 当 silence eligible 时，复用现有 `runConversationFollowupDebug()` 执行
+- 事件可见性：
+  - `conversation_silence_followup_blocked`
+  - `conversation_silence_followup_manual_start`
+- Task 038 仍保持 manual-only，不引入自动 proactive 触发循环。
