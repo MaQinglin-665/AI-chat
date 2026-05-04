@@ -294,3 +294,33 @@ E. 安全边界复核（通过/未通过）：
 1. `config` 持久化 debug fail flag 且默认可被误启用。
 2. query/env 隐式入口无法审计，或会跨会话遗留。
 3. 可绕过 scheduler/manual guard 链的异常触发路径。
+
+## 17. Exception Fail-closed Hook Runtime Smoke (Task 054)
+
+Preconditions:
+
+1. Run only from local DevTools Console.
+2. Enable the three proactive scheduler switches and confirm polling is active.
+
+Commands:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.injectProactiveSchedulerPollFailureOnce("manual_task_054")
+window.__AI_CHAT_DEBUG_TTS__.getProactiveSchedulerFailureInjectionState()
+```
+
+After the next polling check:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler
+window.__AI_CHAT_DEBUG_TTS__.events().slice(-30)
+```
+
+Expected:
+
+1. `proactive_scheduler_poll_failure_injected` appears.
+2. `proactive_scheduler_poll_failure_injection_consumed` appears on the next poll.
+3. `proactive_scheduler_poll_failed` appears.
+4. If the timer was active, `proactive_scheduler_poll_stop` appears with `poll_exception_fail_closed`.
+5. Injection state becomes inactive.
+6. No automatic screenshot, tool call, file read, or direct assistant reply behavior occurs.

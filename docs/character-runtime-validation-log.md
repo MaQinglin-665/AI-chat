@@ -650,3 +650,29 @@ Disable any key switch (`conversation_mode.enabled` / `proactive_enabled` / `pro
 2. Capture live event ordering for exception path in same-session Electron/DevTools run.
 3. Confirm `proactive_scheduler_poll_failed` + fail-closed stop behavior and no uncontrolled retry.
 4. Re-run smoke checks and update this log from `partial` to `pass` for exception timeline evidence.
+
+---
+
+# Proactive Scheduler Fail-closed Hook Implementation Note - 2026-05-04 (Task 054)
+
+Task 054 implements the Task 053 recommended DevTools-only one-shot hook.
+
+Implementation summary:
+
+```text
+window.__AI_CHAT_DEBUG_TTS__.injectProactiveSchedulerPollFailureOnce(reason)
+window.__AI_CHAT_DEBUG_TTS__.getProactiveSchedulerFailureInjectionState()
+window.__AI_CHAT_DEBUG_TTS__.clearProactiveSchedulerFailureInjection()
+```
+
+Expected runtime evidence to collect:
+
+| Step | Expected Event / State |
+| --- | --- |
+| Inject once | `proactive_scheduler_poll_failure_injected` |
+| Next polling check | `proactive_scheduler_poll_failure_injection_consumed` |
+| Fail-closed catch path | `proactive_scheduler_poll_failed` |
+| Timer active | `proactive_scheduler_poll_stop` with `poll_exception_fail_closed` |
+| After consumption | injection state inactive |
+
+Current result: implementation ready for manual DevTools smoke.

@@ -59,6 +59,7 @@ const state = {
   proactivePollActive: false,
   proactivePollLastResult: "",
   proactivePollActiveIntervalMs: 0,
+  proactivePollFailureInjection: null,
   autoChatTuning: {
     triggerBaseThreshold: 1.03,
     shortSilencePenalty: 0.35,
@@ -1089,6 +1090,10 @@ async function runProactiveSchedulerManualTick() {
 
 async function runProactiveSchedulerPollingCheck() {
   try {
+    const injectedFailure = consumeProactiveSchedulerPollFailureInjection();
+    if (injectedFailure) {
+      throw new Error(injectedFailure.reason || "manual_debug_injection");
+    }
     const gateStatus = getProactiveSchedulerPollingGateStatus();
     if (!gateStatus.enabled) {
       const gateReason = gateStatus.blockedReasons.join(",") || "polling_disabled";
@@ -1161,11 +1166,74 @@ async function runProactiveSchedulerPollingCheck() {
     if (state.proactivePollTimerId) {
       stopProactiveSchedulerPolling("poll_exception_fail_closed");
     }
+    state.proactivePollLastResult = "failed";
     recordTTSDebugEvent("proactive_scheduler_poll_failed", {
       result: "poll_exception",
       error: String(err?.message || err || "poll_exception")
     });
   }
+}
+
+function normalizeProactiveSchedulerPollFailureReason(reason) {
+  const text = String(reason || "manual_debug_injection")
+    .replace(/[\r\n\t]+/g, " ")
+    .trim()
+    .slice(0, 80);
+  return text || "manual_debug_injection";
+}
+
+function injectProactiveSchedulerPollFailureOnce(reason = "manual_debug_injection") {
+  const normalizedReason = normalizeProactiveSchedulerPollFailureReason(reason);
+  state.proactivePollFailureInjection = {
+    reason: normalizedReason,
+    createdAt: Date.now()
+  };
+  recordTTSDebugEvent("proactive_scheduler_poll_failure_injected", {
+    result: normalizedReason
+  });
+  return getProactiveSchedulerFailureInjectionState();
+}
+
+function getProactiveSchedulerFailureInjectionState() {
+  const injection = state.proactivePollFailureInjection;
+  if (!injection || typeof injection !== "object") {
+    return {
+      active: false,
+      reason: "",
+      ageMs: -1
+    };
+  }
+  const createdAt = Number(injection.createdAt || 0);
+  return {
+    active: true,
+    reason: String(injection.reason || "manual_debug_injection"),
+    ageMs: createdAt > 0 ? Math.max(0, Date.now() - createdAt) : -1
+  };
+}
+
+function clearProactiveSchedulerFailureInjection() {
+  const previous = getProactiveSchedulerFailureInjectionState();
+  state.proactivePollFailureInjection = null;
+  recordTTSDebugEvent("proactive_scheduler_poll_failure_injection_cleared", {
+    result: previous.active ? previous.reason : "none"
+  });
+  return getProactiveSchedulerFailureInjectionState();
+}
+
+function consumeProactiveSchedulerPollFailureInjection() {
+  const injection = state.proactivePollFailureInjection;
+  if (!injection || typeof injection !== "object") {
+    return null;
+  }
+  state.proactivePollFailureInjection = null;
+  const consumed = {
+    reason: normalizeProactiveSchedulerPollFailureReason(injection.reason),
+    createdAt: Number(injection.createdAt || 0) || 0
+  };
+  recordTTSDebugEvent("proactive_scheduler_poll_failure_injection_consumed", {
+    result: consumed.reason
+  });
+  return consumed;
 }
 
 function stopProactiveSchedulerPolling(reason = "stop") {
@@ -6548,6 +6616,9 @@ function installTTSDebugBridge() {
     runConversationFollowup: () => runConversationFollowupDebug(),
     dryRunSilenceFollowup: () => runConversationSilenceFollowupDryRun(),
     manualProactiveSchedulerTick: () => runProactiveSchedulerManualTick(),
+    injectProactiveSchedulerPollFailureOnce: (reason) => injectProactiveSchedulerPollFailureOnce(reason),
+    getProactiveSchedulerFailureInjectionState: () => getProactiveSchedulerFailureInjectionState(),
+    clearProactiveSchedulerFailureInjection: () => clearProactiveSchedulerFailureInjection(),
     events: () => state.ttsDebugEvents.slice(),
     show: () => toggleTTSDebugPanel(true),
     hide: () => toggleTTSDebugPanel(false),
