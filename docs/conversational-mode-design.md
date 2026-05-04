@@ -204,3 +204,19 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - 小步迭代：一阶段一目标，一次只加一类能力
 - 明确边界：对话节奏层不越权到隐私数据层
 - 可回退：任何阶段都能回退到当前稳定单轮模式
+
+## 15. Task 029 Landing Notes
+
+- Task 029 只落地了 `conversation_mode` 配置骨架与读取归一化。
+- 当前版本未接入任何新行为触发：
+  - 未实现 follow-up
+  - 未实现 proactive speech
+  - 未实现 silence tick 驱动
+  - 未实现 backchannel
+  - 未实现用户语音打断 TTS 的实际逻辑
+- 默认值保持保守关闭：
+  - `conversation_mode.enabled=false`
+  - `conversation_mode.proactive_enabled=false`
+  - `conversation_mode.max_followups_per_window=1`
+  - `conversation_mode.silence_followup_min_ms=180000`
+  - `conversation_mode.interrupt_tts_on_user_speech=false`

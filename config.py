@@ -284,6 +284,13 @@ DEFAULT_CONFIG = {
             "再给我一句鼓励今天认真努力的暖心话。控制在两三句内，不要太像模板。"
         ),
     },
+    "conversation_mode": {
+        "enabled": False,
+        "proactive_enabled": False,
+        "max_followups_per_window": 1,
+        "silence_followup_min_ms": 180000,
+        "interrupt_tts_on_user_speech": False,
+    },
     "motion": {
         "enabled": True,
         "cooldown_ms": 1200,
@@ -591,6 +598,9 @@ def sanitize_client_config(config):
         except (TypeError, ValueError):
             return int(default)
 
+    def _safe_bool_true(value):
+        return value is True
+
     model_scale = max(0.1, min(3.0, _safe_float(model_cfg.get("scale", 1.0), 1.0)))
     x_ratio = max(0.0, min(1.0, _safe_float(model_cfg.get("x_ratio", 0.26), 0.26)))
     y_ratio = max(0.0, min(1.0, _safe_float(model_cfg.get("y_ratio", 0.96), 0.96)))
@@ -602,6 +612,9 @@ def sanitize_client_config(config):
     humanize_cfg = config.get("humanize", {})
     motion_cfg = config.get("motion", {})
     tools_cfg = config.get("tools", {})
+    conversation_cfg = config.get("conversation_mode", {})
+    if not isinstance(conversation_cfg, dict):
+        conversation_cfg = {}
     character_runtime_cfg = config.get("character_runtime", {})
     if not isinstance(character_runtime_cfg, dict):
         character_runtime_cfg = {}
@@ -905,6 +918,33 @@ def sanitize_client_config(config):
                 )
                 or ""
             ).strip()[:240],
+        },
+        "conversation_mode": {
+            "enabled": _safe_bool_true(conversation_cfg.get("enabled", False)),
+            "proactive_enabled": _safe_bool_true(conversation_cfg.get("proactive_enabled", False)),
+            "max_followups_per_window": max(
+                0,
+                min(
+                    4,
+                    _safe_int(
+                        conversation_cfg.get("max_followups_per_window", 1),
+                        1,
+                    ),
+                ),
+            ),
+            "silence_followup_min_ms": max(
+                30 * 1000,
+                min(
+                    30 * 60 * 1000,
+                    _safe_int(
+                        conversation_cfg.get("silence_followup_min_ms", 180000),
+                        180000,
+                    ),
+                ),
+            ),
+            "interrupt_tts_on_user_speech": _safe_bool_true(
+                conversation_cfg.get("interrupt_tts_on_user_speech", False)
+            ),
         },
         "history_summary": {
             "enabled": bool(summary_cfg.get("enabled", True)),

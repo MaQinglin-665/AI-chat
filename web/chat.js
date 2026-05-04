@@ -26,6 +26,13 @@ const state = {
   autoChatLastTopicHint: "",
   autoChatLastTopicAt: 0,
   autoChatBurstCount: 0,
+  conversationMode: {
+    enabled: false,
+    proactiveEnabled: false,
+    maxFollowupsPerWindow: 1,
+    silenceFollowupMinMs: 180000,
+    interruptTtsOnUserSpeech: false
+  },
   autoChatTuning: {
     triggerBaseThreshold: 1.03,
     shortSilencePenalty: 0.35,
@@ -9637,6 +9644,7 @@ async function loadConfig() {
   }
   const asrCfg = state.config?.asr || {};
   const observeCfg = state.config?.observe || {};
+  const conversationCfg = state.config?.conversation_mode || {};
   const historySummaryCfg = state.config?.history_summary || {};
   const styleCfg = state.config?.style || {};
   const motionCfg = state.config?.motion || {};
@@ -9675,6 +9683,17 @@ async function loadConfig() {
     }
   }
   state.observeAllowAutoChat = observeCfg.allow_auto_chat === true;
+  state.conversationMode = {
+    enabled: conversationCfg.enabled === true,
+    proactiveEnabled: conversationCfg.proactive_enabled === true,
+    maxFollowupsPerWindow: Math.round(
+      clampNumber(Number(conversationCfg.max_followups_per_window ?? 1), 0, 4)
+    ),
+    silenceFollowupMinMs: Math.round(
+      clampNumber(Number(conversationCfg.silence_followup_min_ms ?? 180000), 30000, 1800000)
+    ),
+    interruptTtsOnUserSpeech: conversationCfg.interrupt_tts_on_user_speech === true
+  };
   const autoChatTuningCfg = observeCfg && typeof observeCfg.auto_chat_tuning === "object"
     ? observeCfg.auto_chat_tuning
     : {};
