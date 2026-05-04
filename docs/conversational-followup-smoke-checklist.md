@@ -458,3 +458,32 @@ Regression checks:
 1. Snapshot remains read-only.
 2. No follow-up execution is triggered.
 3. No scheduler, polling, request, screenshot, tool, shell, file, TTS, fetch, LLM, config, API, dependency, or UI behavior changes.
+
+## 22. Follow-up Policy Debug Events (Task 061)
+
+Purpose:
+
+1. Confirm follow-up policy context is visible in existing debug event timelines.
+2. Confirm event names and `result` semantics remain unchanged.
+
+Command:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.events().slice(-30)
+```
+
+Expected:
+
+1. Existing follow-up and proactive scheduler event names remain unchanged.
+2. `result` still carries blocked/ready/trigger status.
+3. `error` may include compact policy context:
+   - `gentle_continue:...`
+   - `light_question:...`
+   - `soft_checkin:...`
+   - `do_not_followup:...`
+4. No new automatic follow-up execution path is introduced.
+
+Regression checks:
+
+1. No scheduler gate, polling lifecycle, cooldown/window limit, kill-switch, or fail-closed behavior changes.
+2. No screenshot, tool, shell, file, TTS, fetch, LLM, config, API, dependency, or UI behavior changes.

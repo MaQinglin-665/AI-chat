@@ -881,6 +881,22 @@ function previewConversationFollowupPolicy(input = {}) {
   };
 }
 
+function getConversationFollowupPolicyDebugText(view) {
+  const policy = String(view?.followupPolicy || "").trim();
+  const topicHint = String(view?.topicHint || "").trim();
+  if (!policy || !topicHint) {
+    return "";
+  }
+  if (policy === "do_not_followup") {
+    return "do_not_followup:policy_do_not_followup";
+  }
+  const blockedReason = String(view?.followupPolicy === "do_not_followup"
+    ? (view?.followupPolicyNote || "policy_do_not_followup")
+    : (view?.followupPolicyNote || "")
+  ).trim();
+  return blockedReason ? `${policy}:${blockedReason}` : policy;
+}
+
 function snapshotConversationFollowupPending() {
   return {
     pending: state.followupPending === true,
@@ -914,6 +930,7 @@ async function runConversationFollowupDebug() {
   const blockedSummary = Array.isArray(plan.blockedReasons) ? plan.blockedReasons.join(",") : "";
   const reasonText = String(plan.reason || "");
   const topicHintText = String(plan.topicHint || "");
+  const policyText = getConversationFollowupPolicyDebugText(plan);
   const finishResult = (result) => {
     const endedAt = Date.now();
     return {
@@ -929,7 +946,7 @@ async function runConversationFollowupDebug() {
     recordTTSDebugEvent("conversation_followup_not_eligible", {
       text: topicHintText,
       result: blockedSummary || "not_eligible",
-      error: reasonText
+      error: policyText || reasonText
     });
     return finishResult({
       ok: false,
@@ -942,7 +959,7 @@ async function runConversationFollowupDebug() {
     recordTTSDebugEvent("conversation_followup_failed", {
       text: topicHintText,
       result: "no_safe_entrypoint",
-      error: reasonText
+      error: policyText || reasonText
     });
     return finishResult({
       ok: false,
@@ -955,7 +972,8 @@ async function runConversationFollowupDebug() {
   const pendingSnapshot = snapshotConversationFollowupPending();
   recordTTSDebugEvent("conversation_followup_start", {
     text: topicHintText,
-    result: reasonText || "followup_pending"
+    result: reasonText || "followup_pending",
+    error: policyText
   });
   clearConversationFollowupPending(startedAt);
   const followupInput = `（debug/manual follow-up）\n${plan.promptDraft}`;
@@ -973,7 +991,8 @@ async function runConversationFollowupDebug() {
     if (ok) {
       recordTTSDebugEvent("conversation_followup_success", {
         text: topicHintText,
-        result: reasonText || "followup_pending"
+        result: reasonText || "followup_pending",
+        error: policyText
       });
       return finishResult({
         ok: true,
@@ -991,7 +1010,7 @@ async function runConversationFollowupDebug() {
     recordTTSDebugEvent("conversation_followup_failed", {
       text: topicHintText,
       result: "request_failed",
-      error: reasonText
+      error: policyText || reasonText
     });
     return finishResult({
       ok: false,
@@ -1009,7 +1028,7 @@ async function runConversationFollowupDebug() {
     recordTTSDebugEvent("conversation_followup_failed", {
       text: topicHintText,
       result: "request_exception",
-      error: errorText
+      error: policyText ? `${policyText};${errorText}` : errorText
     });
     return finishResult({
       ok: false,
@@ -1030,7 +1049,7 @@ async function runConversationSilenceFollowupDryRun() {
       result: Array.isArray(view?.silence?.blockedReasons)
         ? view.silence.blockedReasons.join(",")
         : "silence_not_eligible",
-      error: String(view?.reason || "")
+      error: getConversationFollowupPolicyDebugText(view) || String(view?.reason || "")
     });
     return {
       ok: false,
@@ -1044,7 +1063,8 @@ async function runConversationSilenceFollowupDryRun() {
 
   recordTTSDebugEvent("conversation_silence_followup_manual_start", {
     text: String(view?.topicHint || ""),
-    result: String(view?.reason || "silence_eligible")
+    result: String(view?.reason || "silence_eligible"),
+    error: getConversationFollowupPolicyDebugText(view)
   });
   const result = await runConversationFollowupDebug();
   return {
@@ -1192,13 +1212,15 @@ async function runProactiveSchedulerPollingCheck() {
     state.proactiveLastPollAt = startedAt;
     const scheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
     const followupView = buildConversationFollowupDebugView(startedAt);
+    const followupPolicyText = getConversationFollowupPolicyDebugText(followupView);
     if (scheduler.eligibleForSchedulerTick !== true) {
       state.proactivePollLastResult = "blocked";
       recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
         text: String(followupView?.topicHint || ""),
         result: Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
           ? scheduler.blockedReasons.join(",")
-          : "poll_blocked"
+          : "poll_blocked",
+        error: followupPolicyText
       });
       return;
     }
@@ -1209,14 +1231,16 @@ async function runProactiveSchedulerPollingCheck() {
       state.proactivePollLastResult = "not_ready";
       recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
         text: String(followupView?.topicHint || ""),
-        result: silenceBlocked || "silence_not_ready"
+        result: silenceBlocked || "silence_not_ready",
+        error: followupPolicyText
       });
       return;
     }
     state.proactivePollLastResult = "ready";
     recordTTSDebugEvent("proactive_scheduler_poll_ready", {
       text: String(followupView?.topicHint || ""),
-      result: "silence_ready"
+      result: "silence_ready",
+      error: followupPolicyText
     });
     if (!shouldEnableProactiveSchedulerPolling()) {
       state.proactivePollLastResult = "disabled";
@@ -1225,7 +1249,8 @@ async function runProactiveSchedulerPollingCheck() {
       }
       recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
         text: String(followupView?.topicHint || ""),
-        result: "runtime_gate_off_before_trigger"
+        result: "runtime_gate_off_before_trigger",
+        error: followupPolicyText
       });
       return;
     }
@@ -1234,14 +1259,16 @@ async function runProactiveSchedulerPollingCheck() {
       state.proactivePollLastResult = "triggered";
       recordTTSDebugEvent("proactive_scheduler_poll_trigger_success", {
         text: String(followupView?.topicHint || ""),
-        result: String(triggerResult?.reason || "started")
+        result: String(triggerResult?.reason || "started"),
+        error: followupPolicyText
       });
       return;
     }
     state.proactivePollLastResult = "trigger_blocked";
     recordTTSDebugEvent("proactive_scheduler_poll_trigger_blocked", {
       text: String(followupView?.topicHint || ""),
-      result: String(triggerResult?.reason || "trigger_not_started")
+      result: String(triggerResult?.reason || "trigger_not_started"),
+      error: followupPolicyText
     });
   } catch (err) {
     state.proactivePollLastResult = "failed";
