@@ -433,3 +433,100 @@ Task 049 completed real Electron startup verification and all baseline command c
 ```text
 If any runtime instability appears, immediately disable one of the key switches (conversation_mode.enabled / proactive_enabled / proactive_scheduler_enabled) to stop polling. If broader rollback is needed, revert to Task 043 polling-only behavior and keep fail-closed defaults.
 ```
+
+---
+
+# Proactive Scheduler DevTools Event Timeline Capture - 2026-05-04 (Task 050)
+
+## Run Metadata
+
+| Item | Value |
+| --- | --- |
+| Date | 2026-05-04 |
+| Tester | Codex |
+| Branch / commit | `codex/proactive-scheduler-polling-skeleton` / `21a0b2a` |
+| OS | Windows |
+| Python version | 3.11.9 |
+| Node version | v25.2.1 |
+| Electron mode | desktop started |
+| DevTools timeline capture | blocked in current terminal-only automation context |
+
+## A. Baseline Checks
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `git status --short --branch` | pass | Clean branch state before Task 050 changes. |
+| `git log --oneline -n 5` | pass | Baseline commit chain matches task input. |
+| `node --check web/chat.js` | pass | JS syntax valid. |
+| `python -m py_compile config.py` | pass | Python syntax valid. |
+| `python -m json.tool config.example.json` | pass | JSON structure valid. |
+| `git diff --check` | pass | No whitespace/conflict format issues. |
+
+## B. Electron Startup
+
+| Step | Observation | Result |
+| --- | --- | --- |
+| Run `npm run start:electron` | Command returned successfully and launched app process tree | pass |
+| Run `Get-Process -Name electron` | Multiple `electron` processes observed | pass |
+
+## C. DevTools Capture
+
+Planned commands:
+- `window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler`
+- `window.__AI_CHAT_DEBUG_TTS__.events()`
+
+Actual:
+- Electron could be started, but this terminal-only automation context cannot directly operate desktop DevTools Console input/output.
+- No new dependency or unsafe bypass was introduced to force collection.
+- Runtime timeline data is therefore not recorded in this run.
+
+Result: partial
+
+## D. Kill-switch Runtime Timeline
+
+Expected evidence:
+- Snapshot fields: `pollTimerActive`, `pollLastResult`, `pollingEnabled`, `blockedReasons`
+- Events: `proactive_scheduler_poll_stop`, `proactive_scheduler_poll_blocked`
+
+Actual:
+- Blocked by item C (no direct DevTools interaction channel).
+- Runtime timeline remains uncollected in this run.
+
+Result: partial
+
+## E. Exception Fail-closed Timeline
+
+Expected evidence:
+- Events: `proactive_scheduler_poll_failed` and (if present) `proactive_scheduler_poll_stop`
+- Confirmation: no uncontrolled retry, no guard bypass, no auto screenshot/tool-calling/file-reading path
+
+Actual:
+- Blocked by item C (no direct DevTools interaction channel).
+- Runtime timeline remains uncollected in this run.
+
+Result: partial
+
+## Overall Result
+
+Overall result: partial
+
+- Task 049 residual risk is not closed in this run.
+- Improvement from this run: verified real Electron startup again under current baseline.
+
+## Residual Risks
+
+- Missing same-session DevTools runtime event timeline for kill-switch and exception fail-closed scenarios.
+
+## Rollback Suggestion
+
+```text
+If runtime anomalies appear, disable any key switch (`conversation_mode.enabled` / `proactive_enabled` / `proactive_scheduler_enabled`) to stop polling quickly. If broader rollback is needed, revert to Task 043 polling-only behavior and keep fail-closed defaults.
+```
+
+## Manual Next-step Procedure
+
+1. Open chat window DevTools Console on the same machine/session.
+2. Run snapshot/events commands and save concise timeline notes.
+3. Reproduce kill-switch runtime stop sequence and capture event order.
+4. Inject safe temporary exception in DevTools only, capture fail-closed events.
+5. Update this validation log with concrete event timestamps/order and re-evaluate pass/partial.
