@@ -180,3 +180,20 @@ window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler
    - `proactive_scheduler_poll_start`
    - `proactive_scheduler_poll_blocked` 或 `proactive_scheduler_poll_ready`
 4. polling 仅做检查，不自动触发 follow-up，不自动说话，不自动截图。
+
+## 12. Limited Auto Trigger Smoke（Task 044）
+
+执行前置（仅本地测试）：
+1. 开启三层开关：
+   - `conversation_mode.enabled=true`
+   - `conversation_mode.proactive_enabled=true`
+   - `conversation_mode.proactive_scheduler_enabled=true`
+2. 构造可通过 scheduler gate 与 silence eligibility 的场景。
+
+观察点：
+1. `events()` 中先出现 `proactive_scheduler_poll_ready`。
+2. 随后出现：
+   - `proactive_scheduler_poll_trigger_success` 或
+   - `proactive_scheduler_poll_trigger_blocked`。
+3. 任意 blocked/异常都不应绕过 guard，不应直接触发不安全行为。
+4. 不应自动截图，不应自动工具调用，不应读取用户文件。

@@ -191,3 +191,17 @@
   - 不调用 `runConversationSilenceFollowupDryRun`
   - 不调用 `runConversationFollowupDebug`
   - 不调用 `runProactiveSchedulerManualTick`
+
+## 16. Task 044 Landing Notes
+
+- Task 044 在 polling skeleton 基础上新增 limited auto trigger smoke。
+- 自动触发仍保持严格门控：
+  - 仅在 `poll_ready`（scheduler gate + silence eligibility 均通过）时尝试触发
+  - 复用 `runProactiveSchedulerManualTick()` 既有 guard 路径
+  - 不直接调用 `requestAssistantReply`
+- 默认仍 fail closed：
+  - 三层开关未同时开启时 polling 不可用
+  - 任意异常路径仅记录 debug event，并保持不触发主动发言
+- 运行边界保持不变：
+  - `skipDesktopAttach` 仍由既有 manual follow-up guard 路径保证
+  - 不新增桌面截图、工具调用、文件读取默认行为

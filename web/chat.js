@@ -1071,41 +1071,63 @@ async function runProactiveSchedulerManualTick() {
   }
 }
 
-function runProactiveSchedulerPollingCheck() {
-  if (!shouldEnableProactiveSchedulerPolling()) {
-    state.proactivePollLastResult = "disabled";
-    return;
-  }
-  const startedAt = Date.now();
-  state.proactiveLastPollAt = startedAt;
-  const scheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
-  const followupView = buildConversationFollowupDebugView(startedAt);
-  if (scheduler.eligibleForSchedulerTick !== true) {
-    state.proactivePollLastResult = "blocked";
-    recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+async function runProactiveSchedulerPollingCheck() {
+  try {
+    if (!shouldEnableProactiveSchedulerPolling()) {
+      state.proactivePollLastResult = "disabled";
+      return;
+    }
+    const startedAt = Date.now();
+    state.proactiveLastPollAt = startedAt;
+    const scheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
+    const followupView = buildConversationFollowupDebugView(startedAt);
+    if (scheduler.eligibleForSchedulerTick !== true) {
+      state.proactivePollLastResult = "blocked";
+      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+        text: String(followupView?.topicHint || ""),
+        result: Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
+          ? scheduler.blockedReasons.join(",")
+          : "poll_blocked"
+      });
+      return;
+    }
+    const silenceBlocked = Array.isArray(followupView?.silence?.blockedReasons)
+      ? followupView.silence.blockedReasons.join(",")
+      : "";
+    if (followupView?.silence?.eligibleForSilenceFollowup !== true) {
+      state.proactivePollLastResult = "not_ready";
+      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+        text: String(followupView?.topicHint || ""),
+        result: silenceBlocked || "silence_not_ready"
+      });
+      return;
+    }
+    state.proactivePollLastResult = "ready";
+    recordTTSDebugEvent("proactive_scheduler_poll_ready", {
       text: String(followupView?.topicHint || ""),
-      result: Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
-        ? scheduler.blockedReasons.join(",")
-        : "poll_blocked"
+      result: "silence_ready"
     });
-    return;
-  }
-  const silenceBlocked = Array.isArray(followupView?.silence?.blockedReasons)
-    ? followupView.silence.blockedReasons.join(",")
-    : "";
-  if (followupView?.silence?.eligibleForSilenceFollowup !== true) {
-    state.proactivePollLastResult = "not_ready";
-    recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
+    const triggerResult = await runProactiveSchedulerManualTick();
+    if (triggerResult?.ok === true) {
+      state.proactivePollLastResult = "triggered";
+      recordTTSDebugEvent("proactive_scheduler_poll_trigger_success", {
+        text: String(followupView?.topicHint || ""),
+        result: String(triggerResult?.reason || "started")
+      });
+      return;
+    }
+    state.proactivePollLastResult = "trigger_blocked";
+    recordTTSDebugEvent("proactive_scheduler_poll_trigger_blocked", {
       text: String(followupView?.topicHint || ""),
-      result: silenceBlocked || "silence_not_ready"
+      result: String(triggerResult?.reason || "trigger_not_started")
     });
-    return;
+  } catch (err) {
+    state.proactivePollLastResult = "failed";
+    recordTTSDebugEvent("proactive_scheduler_poll_failed", {
+      result: "poll_exception",
+      error: String(err?.message || err || "poll_exception")
+    });
   }
-  state.proactivePollLastResult = "ready";
-  recordTTSDebugEvent("proactive_scheduler_poll_ready", {
-    text: String(followupView?.topicHint || ""),
-    result: "silence_ready"
-  });
 }
 
 function stopProactiveSchedulerPolling(reason = "stop") {
@@ -1133,7 +1155,7 @@ function startProactiveSchedulerPolling() {
     ? Math.max(30000, Math.min(600000, Math.round(Number(state.conversationMode.proactivePollIntervalMs))))
     : 60000;
   state.proactivePollTimerId = window.setInterval(() => {
-    runProactiveSchedulerPollingCheck();
+    void runProactiveSchedulerPollingCheck();
   }, intervalMs);
   state.proactivePollActive = true;
   state.proactivePollActiveIntervalMs = intervalMs;

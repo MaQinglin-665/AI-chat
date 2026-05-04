@@ -421,3 +421,14 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - polling check 不调用 `dryRunSilenceFollowup`
   - polling check 不调用 `runConversationFollowupDebug`
   - polling check 不调用 `manualProactiveSchedulerTick`
+
+## 30. Task 044 Landing Notes
+
+- Task 044 新增 limited auto trigger smoke：
+  - 仅当 polling 判定 `poll_ready` 时，才通过 `runProactiveSchedulerManualTick()` 尝试触发
+  - 继续复用既有 scheduler/silence/follow-up guard
+- 触发链路仍保持安全边界：
+  - 不直接调用 `requestAssistantReply`
+  - 遇到 blocked/异常时 fail closed，仅记录 debug events
+- 默认行为不变：
+  - 默认开关关闭时不会启动 polling，也不会主动发言
