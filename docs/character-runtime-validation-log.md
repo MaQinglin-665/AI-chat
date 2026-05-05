@@ -847,3 +847,20 @@ Safety confirmation:
 ```text
 No config file was modified. config.local.json was observed but not committed or changed. No app screenshot, tool call, shell execution, file read path, or broader proactive behavior was added.
 ```
+
+Manual DevTools result template for follow-up:
+
+````md
+Date:
+Branch / commit:
+Electron launched: yes/no
+
+DevTools command result:
+
+```json
+PASTE_RESULT_HERE
+```
+
+Conclusion: pass / partial / fail
+Residual risk:
+````
