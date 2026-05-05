@@ -2084,6 +2084,25 @@ function startFollowupCharacterChipRefresh() {
   }, 2000);
 }
 
+function buildFollowupAwareIdleMotionContext() {
+  try {
+    const view = getFollowupCharacterStateDebugView();
+    const label = String(view?.label || "");
+    if (label === "有点想接话") {
+      return { combo: false, idleIntent: "thinking", idleMood: "idle", style: "clear" };
+    }
+    if (label === "观察气氛" || label === "等你缓一会儿") {
+      return { combo: false, idleIntent: "thinking", idleMood: "idle", style: "comfort" };
+    }
+    if (label === "识趣闭麦" || label === "冷却中" || label === "今天先收一收") {
+      return { combo: false, idleIntent: "idle", idleMood: "idle", style: "steady" };
+    }
+  } catch (_) {
+    // Idle motion should never affect the main chat or scheduler flow.
+  }
+  return { combo: false, idleIntent: "idle", idleMood: "idle" };
+}
+
 function buildFollowupReadinessReport() {
   const snapshot = getTTSDebugSnapshot();
   const mode = snapshot.conversationMode || {};
@@ -7504,6 +7523,7 @@ function installTTSDebugBridge() {
       lastHintAt: Number(state.followupCharacterRuntimeLastHintAt || 0),
       lastHint: state.followupCharacterRuntimeLastHint || null
     }),
+    followupAwareIdleMotionContext: () => buildFollowupAwareIdleMotionContext(),
     showFollowupReadiness: () => toggleFollowupReadinessPanel(true),
     hideFollowupReadiness: () => toggleFollowupReadinessPanel(false),
     runConversationFollowup: () => runConversationFollowupDebug(),
@@ -10259,6 +10279,12 @@ function buildActionPlan(intent, context = {}) {
   const preset = getMotionIntensityPreset();
   const style = normalizeTalkStyle(context.style || state.currentTalkStyle || "neutral");
   const mood = detectMood(context.text || context.mood || "");
+  const idleMood = ["happy", "sad", "angry", "surprised", "idle"].includes(String(context.idleMood || ""))
+    ? String(context.idleMood || "")
+    : "idle";
+  const idleIntent = ["idle", "thinking", "listen"].includes(String(context.idleIntent || ""))
+    ? String(context.idleIntent || "")
+    : "idle";
   const comboEnabled = state.motionComboEnabled && context.combo !== false;
   const requestedBeats = Math.max(1, Math.min(4, Math.round(Number(context.beats) || 1)));
   const steps = [];
@@ -10450,9 +10476,9 @@ function buildActionPlan(intent, context = {}) {
 
   // idle/default
   steps.push({
-    mood: "idle",
+    mood: idleMood,
     source: "idle",
-    groups: buildPlannedMotionGroups(style, "idle", "idle", "idle"),
+    groups: buildPlannedMotionGroups(style, idleIntent, idleMood, "idle"),
     priority: 2,
     force: false,
     cooldownMs: 1000,
@@ -12593,7 +12619,7 @@ function scheduleIdleMotionLoop() {
   state.idleMotionTimer = window.setTimeout(async () => {
     state.idleMotionTimer = 0;
     if (!shouldSkipIdleMotion()) {
-      enqueueActionIntent("idle", { combo: false });
+      enqueueActionIntent("idle", buildFollowupAwareIdleMotionContext());
     }
     scheduleIdleMotionLoop();
   }, delay);

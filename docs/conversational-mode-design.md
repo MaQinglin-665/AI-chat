@@ -731,3 +731,10 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Hints reuse the existing runtime metadata bridge and are rate-limited to tone changes with a 30 second minimum interval.
 - DevTools can inspect `window.__AI_CHAT_DEBUG_TTS__.followupCharacterRuntimeHint()` and compact `followup_character_runtime_hint` events.
 - This remains local/low-frequency and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
+
+## 58. Task 088 Landing Notes
+
+- Task 088 makes the existing idle motion loop follow the local follow-up character state slightly by passing a safe idle motion context into `enqueueActionIntent("idle")`.
+- This reuses existing idle timing and skip guards; it does not add a new timer or execute follow-up.
+- State mappings are intentionally subtle: ready/watching/waiting states lean toward thinking-style idle motion, while cooldown/quiet states stay steady.
+- This remains local motion selection only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.

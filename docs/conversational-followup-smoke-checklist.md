@@ -760,3 +760,19 @@ Expected checks:
 3. Events are compact and do not include long prompt/private content.
 4. The feature does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 5. The feature does not mutate pending follow-up state or scheduler state.
+
+## 36. Follow-up-aware Idle Motion v1
+
+Purpose: confirm existing idle motion can lightly reflect follow-up character state without adding proactive behavior.
+
+Manual checks:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.followupAwareIdleMotionContext()
+```
+
+1. Start the app with Live2D enabled.
+2. Confirm idle motion still uses the existing idle motion interval.
+3. Confirm busy/speaking/dragging states still skip idle motion.
+4. Confirm the feature does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+5. Confirm the feature does not mutate pending follow-up state or scheduler state.
