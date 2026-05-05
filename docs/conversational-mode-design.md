@@ -944,3 +944,43 @@ Safety boundaries:
 - Task 109 documents an end-to-end manual confirmation smoke runbook before any gray automatic follow-up work.
 - The runbook connects empty state, local rehearsal candidate, available confirmation, blocked confirmation, dismiss/reopen behavior, guarded execution, lifecycle events, and safety boundaries into one review path.
 - This task is documentation-only and does not change runtime behavior, scheduler gates, cooldowns, pending state, config, backend APIs, desktop observation, screenshots, file access, shell execution, tool calls, model calls, or speech.
+
+## 82. Task 110 Landing Notes
+
+- Task 110 closes the manual confirmation phase with a checkpoint before gray automatic follow-up preparation.
+- The checkpoint treats Tasks 104-109 as the required manual-confirmation baseline: preview, controls, guarded execution, lifecycle events, and end-to-end smoke coverage.
+- Future gray automatic follow-up work must remain default-off, opt-in, policy-gated, cooldown-gated, scheduler-gated, and observable through existing debug surfaces before any user-facing rollout.
+- This task is documentation-only and does not enable automatic follow-up, change runtime behavior, scheduler gates, cooldowns, pending state, config, backend APIs, desktop observation, screenshots, file access, shell execution, tool calls, model calls, or speech.
+
+## 83. Gray Automatic Follow-up Preparation Checkpoint
+
+Manual confirmation baseline now includes:
+
+- A local preview card that explains the proposed follow-up and current guard state.
+- Explicit `确认 / 忽略 / 查看详情` actions.
+- Guarded approval that re-checks follow-up, silence, and scheduler state immediately before execution.
+- Fail-closed behavior when guards change or execution cannot proceed.
+- Lifecycle debug events for preview visibility, dismiss, detail review, approval start, blocked attempts, approval, and execution result.
+- An end-to-end smoke runbook for empty, available, blocked, dismiss, execution, event, and safety paths.
+
+Required sign-off before gray automatic follow-up tasks:
+
+- The manual confirmation smoke runbook has been exercised at least once on a clean app session.
+- Blocked candidates cannot trigger model requests, TTS, scheduler ticks, or pending-state consumption.
+- Failed guarded execution restores pending state through the existing follow-up path.
+- Debug event payloads remain compact and do not include prompts, secrets, screenshots, files, or unrelated private data.
+- Automatic proactive follow-up remains disabled by default and is not presented as mature product behavior.
+
+Allowed next-stage work:
+
+- Add a default-off gray mode flag or UI copy that clearly communicates opt-in status.
+- Add read-only status surfaces for gray-mode readiness and why it is blocked.
+- Add dry-run scheduler checks that reuse existing guards and do not execute follow-up.
+- Add additional manual smoke checks for gray mode before any automatic trigger can speak.
+
+Still out of scope:
+
+- Enabling automatic follow-up by default.
+- Bypassing manual confirmation, policy, cooldown, scheduler, busy, speaking, closed-topic, or window-limit guards.
+- Adding desktop observation, screenshot capture, file access, shell execution, tool calls, backend APIs, config writes, or new dependencies.
+- Making commercial or mature-product claims about proactive companionship behavior.

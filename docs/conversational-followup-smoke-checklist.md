@@ -1151,3 +1151,20 @@ Safety sign-off:
 3. Confirm event payloads stay compact and do not include full prompts, secrets, user files, screenshots, or unrelated private data.
 4. Confirm failed execution restores pending state through the existing guarded follow-up path.
 5. Confirm the manual confirmation experience is ready for a checkpoint before gray automatic follow-up work.
+
+## 58. Gray Automatic Follow-up Preparation Checkpoint
+
+Purpose: confirm the project is ready to plan default-off gray automatic follow-up work without enabling automatic behavior yet.
+
+Review checks:
+
+1. Confirm Tasks 104-109 are present in the design notes, smoke checklist, and task docs.
+2. Confirm the manual confirmation baseline includes preview, explicit actions, guarded execution, lifecycle events, and an end-to-end smoke runbook.
+3. Confirm the manual confirmation smoke runbook has been exercised or is ready to be exercised on a clean app session.
+4. Confirm automatic proactive follow-up is still disabled by default.
+5. Confirm no automatic trigger can bypass manual confirmation, policy, cooldown, scheduler, busy, speaking, closed-topic, or window-limit guards.
+6. Confirm blocked candidates cannot trigger model requests, TTS, scheduler ticks, or pending-state consumption.
+7. Confirm failed guarded execution restores pending state through the existing follow-up path.
+8. Confirm debug event payloads remain compact and do not include full prompts, secrets, screenshots, files, or unrelated private data.
+9. Confirm next-stage work is limited to default-off gray-mode flags, read-only status surfaces, dry-run scheduler checks, and additional smoke checks.
+10. Confirm next-stage work does not add desktop observation, screenshots, tool calls, shell execution, file access, config writes, backend APIs, new dependencies, or mature-product claims.
