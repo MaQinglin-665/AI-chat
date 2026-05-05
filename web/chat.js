@@ -2099,11 +2099,30 @@ function getFollowupCharacterStateDebugView() {
       policy: followup.followupPolicy,
       eligible: followup.eligible === true,
       characterCue: followup.characterCue || null,
-      characterPreview: followup.characterPreview || ""
+      characterPreview: followup.characterPreview || "",
+      selectedReaction: followup.selectedReaction || null
     },
     followup.silence || {},
     buildProactiveSchedulerDebugSnapshot(Date.now())
   );
+}
+
+function buildFollowupCharacterChipTitle(view) {
+  const description = String(view?.description || "").trim();
+  const selected = view?.selectedReaction && typeof view.selectedReaction === "object"
+    ? view.selectedReaction
+    : null;
+  const selectedText = String(selected?.candidate?.text || "").trim();
+  if (!selectedText) {
+    return description || "\u5f53\u524d\u7eed\u8bdd\u89d2\u8272\u72b6\u6001";
+  }
+  const reason = String(selected?.reason || "").trim() || "n/a";
+  const tone = String(selected?.preferredTone || selected?.candidate?.tone || "").trim() || "n/a";
+  return [
+    description || "\u5f53\u524d\u7eed\u8bdd\u89d2\u8272\u72b6\u6001",
+    `\u60f3\u63a5\u7684\u4e00\u53e5\uff1a${selectedText}`,
+    `\u9009\u62e9\uff1a${reason} / tone=${tone}`
+  ].join("\n");
 }
 
 function updateFollowupCharacterChip() {
@@ -2119,6 +2138,9 @@ function updateFollowupCharacterChip() {
   const label = String(view.label || "安静陪伴");
   const mood = String(view.mood || "idle");
   const description = String(view.description || "");
+  const selectedReaction = view.selectedReaction && typeof view.selectedReaction === "object"
+    ? view.selectedReaction
+    : null;
   const tone = {
     "有点想接话": "ready",
     "冷却中": "cooldown",
@@ -2128,11 +2150,17 @@ function updateFollowupCharacterChip() {
     "观察气氛": "watching",
     "安静陪伴": "idle"
   }[label] || "idle";
+  const chipTitle = buildFollowupCharacterChipTitle(view);
   ui.followupCharacterChip.textContent = `${label} · ${mood}`;
-  ui.followupCharacterChip.title = description || "当前续话角色状态";
+  ui.followupCharacterChip.title = chipTitle;
+  ui.followupCharacterChip.setAttribute("aria-label", chipTitle);
   ui.followupCharacterChip.dataset.state = label;
   ui.followupCharacterChip.dataset.mood = mood;
   ui.followupCharacterChip.dataset.tone = tone;
+  ui.followupCharacterChip.dataset.selectedTone = String(selectedReaction?.preferredTone || selectedReaction?.candidate?.tone || "");
+  ui.followupCharacterChip.dataset.selectedIndex = Number.isFinite(Number(selectedReaction?.index))
+    ? String(Number(selectedReaction.index))
+    : "-1";
   maybeEmitFollowupCharacterRuntimeHint({ label, mood, tone });
 }
 
