@@ -2470,6 +2470,16 @@ function buildFollowupReadinessReport() {
 }
 
 function buildFollowupReadinessPreviewCardText() {
+  const data = buildFollowupReadinessPreviewCardData();
+  return [
+    `\u573a\u666f\uff1a${data.scenarioLabel}  \u72b6\u6001\uff1a${data.characterLabel} / ${data.characterMood}`,
+    `policy=${data.policy}  tone=${data.tone}  selected=${data.selectedIndex}`,
+    `\u60f3\u63a5\u7684\u4e00\u53e5\uff1a${data.candidateText}`,
+    `\u963b\u585e\uff1a${data.blocked}  \u5b89\u5168\uff1a\u4ec5\u672c\u5730\u9884\u6f14\uff0c\u4e0d\u8bf7\u6c42\u6a21\u578b/\u8bed\u97f3`
+  ].join("\n");
+}
+
+function buildFollowupReadinessPreviewCardData() {
   const snapshot = getTTSDebugSnapshot();
   const followup = snapshot.followup || {};
   const silence = snapshot.silence || {};
@@ -2485,12 +2495,16 @@ function buildFollowupReadinessPreviewCardText() {
   const blocked = Array.isArray(followup.blockedReasons) && followup.blockedReasons.length
     ? followup.blockedReasons.join(",")
     : "none";
-  return [
-    `\u573a\u666f\uff1a${scenarioLabel}  \u72b6\u6001\uff1a${characterState.label} / ${characterState.mood}`,
-    `policy=${policy}  tone=${tone}  selected=${Number.isFinite(Number(selected?.index)) ? Number(selected.index) : -1}`,
-    `\u60f3\u63a5\u7684\u4e00\u53e5\uff1a${candidateText}`,
-    `\u963b\u585e\uff1a${blocked}  \u5b89\u5168\uff1a\u4ec5\u672c\u5730\u9884\u6f14\uff0c\u4e0d\u8bf7\u6c42\u6a21\u578b/\u8bed\u97f3`
-  ].join("\n");
+  return {
+    scenarioLabel,
+    characterLabel: String(characterState.label || "n/a"),
+    characterMood: String(characterState.mood || "n/a"),
+    policy,
+    tone,
+    selectedIndex: Number.isFinite(Number(selected?.index)) ? Number(selected.index) : -1,
+    candidateText,
+    blocked
+  };
 }
 
 function updateFollowupReadinessPreviewCard() {
@@ -2539,6 +2553,22 @@ function ensureFollowupReadinessPanel() {
   copy.addEventListener("click", () => {
     copyFollowupReadinessReportToClipboard(copy);
   });
+  const copySelected = document.createElement("button");
+  copySelected.type = "button";
+  copySelected.textContent = "\u590d\u5236\u77ed\u53e5";
+  copySelected.title = "\u590d\u5236\u5f53\u524d\u9009\u4e2d\u7684\u672c\u5730\u7eed\u8bdd\u77ed\u53e5";
+  copySelected.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eafaf2;color:#18583f;cursor:pointer;";
+  copySelected.addEventListener("click", () => {
+    copyFollowupReadinessSelectedTextToClipboard(copySelected);
+  });
+  const copySummary = document.createElement("button");
+  copySummary.type = "button";
+  copySummary.textContent = "\u590d\u5236\u6458\u8981";
+  copySummary.title = "\u590d\u5236\u9884\u6f14\u5361\u7247\u4e2d\u7684\u7b80\u8981\u8c03\u8bd5\u4fe1\u606f";
+  copySummary.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef4ff;color:#263d70;cursor:pointer;";
+  copySummary.addEventListener("click", () => {
+    copyFollowupReadinessPreviewSummaryToClipboard(copySummary);
+  });
   const copyTemplate = document.createElement("button");
   copyTemplate.type = "button";
   copyTemplate.textContent = "复制模板";
@@ -2577,6 +2607,8 @@ function ensureFollowupReadinessPanel() {
   head.appendChild(title);
   rehearsalButtons.forEach((button) => actions.appendChild(button));
   actions.appendChild(clearRehearsal);
+  actions.appendChild(copySelected);
+  actions.appendChild(copySummary);
   actions.appendChild(copy);
   actions.appendChild(copyTemplate);
   actions.appendChild(close);
@@ -2692,6 +2724,43 @@ async function copyFollowupReadinessReportToClipboard(button = null) {
     return true;
   } catch (err) {
     setStatus("复制失败，可手动选择面板文字复制");
+    return false;
+  }
+}
+
+async function copyFollowupReadinessSelectedTextToClipboard(button = null) {
+  const data = buildFollowupReadinessPreviewCardData();
+  try {
+    await writeTextToClipboard(data.candidateText === "n/a" ? "" : data.candidateText);
+    setStatus("\u5df2\u590d\u5236\u7eed\u8bdd\u77ed\u53e5");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u77ed\u53e5";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u77ed\u53e5\u5931\u8d25");
+    return false;
+  }
+}
+
+async function copyFollowupReadinessPreviewSummaryToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildFollowupReadinessPreviewCardText());
+    setStatus("\u5df2\u590d\u5236\u7eed\u8bdd\u9884\u6f14\u6458\u8981");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u6458\u8981";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u9884\u6f14\u6458\u8981\u5931\u8d25");
     return false;
   }
 }
