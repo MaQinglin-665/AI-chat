@@ -916,3 +916,11 @@ Safety boundaries:
 - Task 105 adds the first local manual confirmation preview card to the follow-up readiness panel.
 - The card shows the proposed short sentence, topic hint, policy, tone/index, guard explanation, raw blocked reasons, and a safety note.
 - This is preview-only: it does not add approve/dismiss controls, execute follow-up, call LLM/fetch/TTS, change scheduler behavior, write config, or add desktop/file/tool access.
+
+## 78. Task 106 Landing Notes
+
+- Task 106 adds UI-only `确认 / 忽略 / 查看详情` controls to the follow-up readiness panel manual confirmation preview card.
+- `确认` is a no-op placeholder in this task: available state enables the button, blocked state disables it and keeps execution fail-closed.
+- `忽略` only hides the current confirmation preview card in local memory using a dismissed key (`topic/policy/candidate`), without mutating scheduler gates, pending state, or config.
+- `查看详情` reuses the existing follow-up readiness panel report area by opening/focusing and refreshing current diagnostics.
+- This task does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, does not trigger follow-up, does not change scheduler/cooldown/window behavior, and does not add desktop/file/shell/tool/backend API access.

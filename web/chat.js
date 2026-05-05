@@ -300,6 +300,12 @@ const state = {
   followupReadinessConfirmationCard: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
+  followupReadinessManualActions: null,
+  followupReadinessManualStatus: null,
+  followupReadinessManualConfirmBtn: null,
+  followupReadinessManualDismissBtn: null,
+  followupReadinessManualReviewBtn: null,
+  followupManualConfirmationDismissedKeys: new Set(),
   followupReadinessRefreshTimer: 0,
   followupCharacterChipRefreshTimer: 0,
   followupCharacterRuntimeLastTone: "",
@@ -2594,8 +2600,10 @@ function buildFollowupReadinessPreviewOneLineText() {
   ].join(" | ");
 }
 
-function buildFollowupReadinessPreviewCardData() {
-  const snapshot = getTTSDebugSnapshot();
+function buildFollowupReadinessPreviewCardData(snapshotInput = null) {
+  const snapshot = snapshotInput && typeof snapshotInput === "object"
+    ? snapshotInput
+    : getTTSDebugSnapshot();
   const followup = snapshot.followup || {};
   const silence = snapshot.silence || {};
   const scheduler = snapshot.proactiveScheduler || {};
@@ -2614,6 +2622,10 @@ function buildFollowupReadinessPreviewCardData() {
     scenarioLabel,
     characterLabel: String(characterState.label || "n/a"),
     characterMood: String(characterState.mood || "n/a"),
+    pending: followup.pending === true,
+    topicHint: String(followup.topicHint || "").trim(),
+    eligible: followup.eligible === true,
+    blockedReasons: Array.isArray(followup.blockedReasons) ? followup.blockedReasons.slice() : [],
     policy,
     tone,
     selectedIndex: Number.isFinite(Number(selected?.index)) ? Number(selected.index) : -1,
@@ -2622,10 +2634,157 @@ function buildFollowupReadinessPreviewCardData() {
   };
 }
 
+function normalizeFollowupManualConfirmationToken(value = "") {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function buildFollowupManualConfirmationKey(input = {}) {
+  const topic = normalizeFollowupManualConfirmationToken(input.topicHint || input.reason || "");
+  const policy = normalizeFollowupManualConfirmationToken(input.policy || "");
+  const candidate = normalizeFollowupManualConfirmationToken(input.candidateText || "");
+  if (!topic || !policy || !candidate) {
+    return "";
+  }
+  return `${topic}::${policy}::${candidate}`;
+}
+
+function buildFollowupManualConfirmationData() {
+  const data = buildFollowupReadinessPreviewCardData();
+  const candidateText = data.candidateText === "n/a"
+    ? ""
+    : normalizeFollowupManualConfirmationToken(data.candidateText);
+  const hasCandidate = !!candidateText;
+  const blockedReasons = Array.isArray(data.blockedReasons) ? data.blockedReasons.slice() : [];
+  const key = buildFollowupManualConfirmationKey({
+    topicHint: data.topicHint,
+    policy: data.policy,
+    candidateText
+  });
+  const dismissed = !!key
+    && state.followupManualConfirmationDismissedKeys instanceof Set
+    && state.followupManualConfirmationDismissedKeys.has(key);
+  const hidden = data.pending !== true || !hasCandidate;
+  const available = hidden !== true && data.eligible === true && blockedReasons.length === 0;
+  const blocked = hidden !== true && !available;
+  const status = hidden
+    ? "hidden"
+    : dismissed
+      ? "dismissed"
+      : available
+        ? "available"
+        : "blocked";
+  return {
+    ...data,
+    candidateText,
+    hasCandidate,
+    blockedReasons,
+    key,
+    dismissed,
+    hidden,
+    available,
+    blocked,
+    status
+  };
+}
+
+function getFollowupManualConfirmationStatusLabel(status = "hidden") {
+  switch (String(status || "")) {
+    case "available":
+      return "\u53ef\u786e\u8ba4";
+    case "blocked":
+      return "\u4e0d\u53ef\u786e\u8ba4";
+    case "dismissed":
+      return "\u5df2\u5ffd\u7565";
+    default:
+      return "\u9690\u85cf";
+  }
+}
+
+function updateFollowupManualConfirmationControls() {
+  const actions = state.followupReadinessManualActions;
+  const statusNode = state.followupReadinessManualStatus;
+  const confirmBtn = state.followupReadinessManualConfirmBtn;
+  const dismissBtn = state.followupReadinessManualDismissBtn;
+  const reviewBtn = state.followupReadinessManualReviewBtn;
+  if (!actions || !statusNode || !confirmBtn || !dismissBtn || !reviewBtn) {
+    return;
+  }
+  const confirmation = buildFollowupManualConfirmationData();
+  const visible = confirmation.hidden !== true && confirmation.dismissed !== true;
+  actions.style.display = visible ? "flex" : "none";
+  statusNode.style.display = visible ? "block" : "none";
+  if (!visible) {
+    return;
+  }
+  const blockedSummary = explainReadinessReasons(confirmation.blockedReasons);
+  confirmBtn.disabled = confirmation.available !== true;
+  confirmBtn.textContent = confirmation.available === true ? "\u786e\u8ba4" : "\u4e0d\u53ef\u786e\u8ba4";
+  confirmBtn.title = confirmation.available === true
+    ? "\u4ec5\u4e3a UI \u5360\u4f4d\uff0c\u6682\u4e0d\u6267\u884c\u7eed\u8bdd"
+    : `\u5f53\u524d\u4e0d\u6ee1\u8db3\u786e\u8ba4\u6761\u4ef6\uff1a${blockedSummary}`;
+  dismissBtn.disabled = !confirmation.key;
+  dismissBtn.title = "\u4ec5\u672c\u5730\u9690\u85cf\u5f53\u524d\u786e\u8ba4\u5361\u7247\uff0c\u4e0d\u4f1a\u6539\u52a8 scheduler/pending/config";
+  reviewBtn.disabled = false;
+  reviewBtn.title = "\u6253\u5f00\u6216\u805a\u7126\u7eed\u8bdd\u8be6\u60c5\u62a5\u544a";
+  statusNode.textContent = `\u786e\u8ba4\u72b6\u6001\uff1a${getFollowupManualConfirmationStatusLabel(confirmation.status)}  guard\uff1a${confirmation.available === true ? "\u5df2\u901a\u8fc7\uff08UI-only\uff09" : blockedSummary}`;
+}
+
+function handleFollowupManualConfirmClick(button = null) {
+  const confirmation = buildFollowupManualConfirmationData();
+  if (confirmation.available !== true) {
+    const blockedSummary = explainReadinessReasons(confirmation.blockedReasons);
+    setStatus(`\u5f53\u524d\u4e0d\u53ef\u786e\u8ba4\uff1a${blockedSummary}`);
+    return false;
+  }
+  setStatus("\u786e\u8ba4\u70b9\u51fb\u5df2\u8bb0\u5f55\uff08UI-only \u5360\u4f4d\uff0c\u672a\u6267\u884c\u7eed\u8bdd\uff09");
+  if (button) {
+    const previous = button.textContent;
+    button.textContent = "\u5df2\u8bb0\u5f55";
+    window.setTimeout(() => {
+      button.textContent = previous || "\u786e\u8ba4";
+    }, 1200);
+  }
+  return true;
+}
+
+function dismissFollowupManualConfirmation(button = null) {
+  const confirmation = buildFollowupManualConfirmationData();
+  if (!confirmation.key) {
+    setStatus("\u5f53\u524d\u6ca1\u6709\u53ef\u5ffd\u7565\u7684\u786e\u8ba4\u9879");
+    return false;
+  }
+  state.followupManualConfirmationDismissedKeys.add(confirmation.key);
+  if (button) {
+    const previous = button.textContent;
+    button.textContent = "\u5df2\u5ffd\u7565";
+    window.setTimeout(() => {
+      button.textContent = previous || "\u5ffd\u7565";
+    }, 1200);
+  }
+  updateFollowupReadinessPanel();
+  setStatus("\u5df2\u5ffd\u7565\u5f53\u524d\u786e\u8ba4\u9884\u89c8\uff08\u4ec5\u672c\u5730\u5185\u5b58\uff09");
+  return true;
+}
+
+function reviewFollowupManualConfirmationDetails() {
+  toggleFollowupReadinessPanel(true);
+  updateFollowupReadinessPanel();
+  if (state.followupReadinessBody && typeof state.followupReadinessBody.scrollIntoView === "function") {
+    state.followupReadinessBody.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+  setStatus("\u5df2\u805a\u7126\u7eed\u8bdd\u8be6\u60c5\u533a\u57df");
+}
+
 function updateFollowupReadinessPreviewCard() {
   if (!state.followupReadinessCard) {
     return;
   }
+  const confirmation = buildFollowupManualConfirmationData();
+  if (confirmation.hidden === true || confirmation.dismissed === true) {
+    state.followupReadinessCard.style.display = "none";
+    return;
+  }
+  state.followupReadinessCard.style.display = "block";
   state.followupReadinessCard.textContent = buildFollowupReadinessPreviewCardText();
 }
 
@@ -2822,6 +2981,42 @@ function ensureFollowupReadinessPanel() {
   clearRehearsal.addEventListener("click", () => {
     clearFollowupReadinessPanelRehearsal(clearRehearsal);
   });
+  const manualConfirm = document.createElement("button");
+  manualConfirm.type = "button";
+  manualConfirm.textContent = "\u786e\u8ba4";
+  manualConfirm.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e8fff3;color:#18583f;cursor:pointer;";
+  manualConfirm.addEventListener("click", () => {
+    handleFollowupManualConfirmClick(manualConfirm);
+  });
+  const manualDismiss = document.createElement("button");
+  manualDismiss.type = "button";
+  manualDismiss.textContent = "\u5ffd\u7565";
+  manualDismiss.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1f4fb;color:#33415f;cursor:pointer;";
+  manualDismiss.addEventListener("click", () => {
+    dismissFollowupManualConfirmation(manualDismiss);
+  });
+  const manualReview = document.createElement("button");
+  manualReview.type = "button";
+  manualReview.textContent = "\u67e5\u770b\u8be6\u60c5";
+  manualReview.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e9f2ff;color:#1f4378;cursor:pointer;";
+  manualReview.addEventListener("click", () => {
+    reviewFollowupManualConfirmationDetails();
+  });
+  const manualActions = createFollowupReadinessActionGroup("\u786e\u8ba4", [
+    manualConfirm,
+    manualDismiss,
+    manualReview
+  ]);
+  const manualStatus = document.createElement("div");
+  manualStatus.style.cssText = [
+    "margin:0 0 10px",
+    "padding:8px 10px",
+    "border:1px solid rgba(93,128,195,.2)",
+    "border-radius:12px",
+    "background:rgba(255,255,255,.58)",
+    "font:12px/1.45 system-ui,sans-serif",
+    "color:#2a416f"
+  ].join(";");
   const close = document.createElement("button");
   close.type = "button";
   close.textContent = "隐藏";
@@ -2832,6 +3027,7 @@ function ensureFollowupReadinessPanel() {
   });
   head.appendChild(title);
   head.appendChild(close);
+  actionBar.appendChild(manualActions);
   actionBar.appendChild(createFollowupReadinessActionGroup("\u9884\u6f14", rehearsalButtons.concat(clearRehearsal)));
   actionBar.appendChild(createFollowupReadinessActionGroup("\u590d\u5236", [
     copySelected,
@@ -2879,6 +3075,7 @@ function ensureFollowupReadinessPanel() {
   ].join(";");
   panel.appendChild(head);
   panel.appendChild(actionBar);
+  panel.appendChild(manualStatus);
   panel.appendChild(card);
   panel.appendChild(confirmationCard);
   panel.appendChild(compare);
@@ -2889,6 +3086,11 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessConfirmationCard = confirmationCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
+  state.followupReadinessManualActions = manualActions;
+  state.followupReadinessManualStatus = manualStatus;
+  state.followupReadinessManualConfirmBtn = manualConfirm;
+  state.followupReadinessManualDismissBtn = manualDismiss;
+  state.followupReadinessManualReviewBtn = manualReview;
   return panel;
 }
 
@@ -2915,6 +3117,7 @@ function updateFollowupReadinessPanel() {
       }
       updateFollowupReadinessPreviewCard();
       updateFollowupManualConfirmationPreviewCard();
+      updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
       if (state.followupReadinessBody) {
         state.followupReadinessBody.textContent = buildFollowupReadinessReport();
@@ -2924,6 +3127,7 @@ function updateFollowupReadinessPanel() {
   panel.style.display = "block";
   updateFollowupReadinessPreviewCard();
   updateFollowupManualConfirmationPreviewCard();
+  updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
   if (state.followupReadinessBody) {
     state.followupReadinessBody.textContent = buildFollowupReadinessReport();
