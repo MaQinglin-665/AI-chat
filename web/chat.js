@@ -2183,6 +2183,58 @@ function explainReadinessReasons(reasons) {
   return list.length ? list.map(explainReadinessReason).join("；") : "没有阻塞原因";
 }
 
+function buildGrayAutoFollowupReadinessStatus(snapshotInput = null) {
+  const snapshot = snapshotInput && typeof snapshotInput === "object"
+    ? snapshotInput
+    : getTTSDebugSnapshot();
+  const mode = snapshot.conversationMode || {};
+  const followup = snapshot.followup || {};
+  const silence = snapshot.silence || {};
+  const scheduler = snapshot.proactiveScheduler || {};
+  const blockedSet = new Set();
+  if (mode.enabled !== true) {
+    blockedSet.add("conversation_disabled");
+  }
+  if (mode.proactiveEnabled !== true) {
+    blockedSet.add("proactive_disabled");
+  }
+  if (mode.proactiveSchedulerEnabled !== true) {
+    blockedSet.add("scheduler_disabled");
+  }
+  if (mode.grayAutoEnabled !== true) {
+    blockedSet.add("gray_auto_disabled");
+  }
+  [
+    scheduler.pollingBlockedReasons,
+    followup.blockedReasons,
+    silence.blockedReasons,
+    scheduler.blockedReasons
+  ].forEach((reasons) => {
+    if (Array.isArray(reasons)) {
+      reasons.filter(Boolean).forEach((reason) => blockedSet.add(String(reason)));
+    }
+  });
+  if (followup.pending !== true) {
+    blockedSet.add("no_pending_followup");
+  }
+  const pollingReady = scheduler.pollingEnabled === true;
+  const candidateReady = followup.eligible === true
+    && silence.eligibleForSilenceFollowup === true
+    && scheduler.eligibleForSchedulerTick === true;
+  const ready = pollingReady && candidateReady && mode.grayAutoEnabled === true;
+  const status = ready
+    ? "ready"
+    : mode.grayAutoEnabled === true ? "blocked" : "default_off";
+  return {
+    status,
+    ready,
+    pollingReady,
+    candidateReady,
+    grayAutoEnabled: mode.grayAutoEnabled === true,
+    blockedReasons: Array.from(blockedSet)
+  };
+}
+
 function buildFollowupReadinessFriendlySummary(followup, silence, scheduler) {
   if (followup?.eligible === true && silence?.eligibleForSilenceFollowup === true && scheduler?.eligibleForSchedulerTick === true) {
     return "可以续话：续话、安静窗口和调度器都已满足。";
@@ -2432,6 +2484,7 @@ function buildFollowupReadinessReport() {
   const silence = snapshot.silence || {};
   const scheduler = snapshot.proactiveScheduler || {};
   const characterState = buildFollowupCharacterState(followup, silence, scheduler);
+  const grayReadiness = buildGrayAutoFollowupReadinessStatus(snapshot);
   const switchesReady = mode.enabled === true
     && mode.proactiveEnabled === true
     && mode.proactiveSchedulerEnabled === true;
@@ -2443,6 +2496,7 @@ function buildFollowupReadinessReport() {
     "",
     "\u6458\u8981",
     buildFollowupReadinessFriendlySummary(followup, silence, scheduler),
+    `\u7070\u5ea6\u51c6\u5907\uff1a${grayReadiness.ready === true ? "\u53ef\u89c2\u5bdf\u5230\u81ea\u52a8\u89e6\u53d1\u6761\u4ef6\u5df2\u6ee1\u8db3" : "\u6682\u4e0d\u53ef\u81ea\u52a8\u89e6\u53d1"}  \u72b6\u6001\uff1a${grayReadiness.status}`,
     `\u89d2\u8272\u72b6\u6001\uff1a${characterState.label}  \u5fc3\u60c5\uff1a${characterState.mood}`,
     `\u72b6\u6001\u8bf4\u660e\uff1a${characterState.description}`,
     `\u9762\u677f\u9884\u6f14\uff1a${state.followupRehearsalActive === true ? "\u5df2\u5f00\u542f" : "\u672a\u5f00\u542f"}${rehearsalScenarioLabel ? `  \u573a\u666f\uff1a${rehearsalScenarioLabel}` : ""}  \u53ef\u9884\u6f14\uff1a${rehearsalBlockedReason ? "\u5426" : "\u662f"}${rehearsalBlockedReason ? `  \u539f\u56e0\uff1a${rehearsalBlockedReason}` : ""}`,
@@ -2456,6 +2510,8 @@ function buildFollowupReadinessReport() {
     `\u4e3b\u52a8\u7eed\u8bdd\uff1a${formatReadinessBool(mode.proactiveEnabled)}`,
     `\u8c03\u5ea6\u5668\uff1a${formatReadinessBool(mode.proactiveSchedulerEnabled)}`,
     `\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\uff1a${formatReadinessBool(mode.grayAutoEnabled)}  \u8f6e\u8be2\u95e8\u7981\uff1a${joinReadinessReasons(scheduler.pollingBlockedReasons)}`,
+    `\u7070\u5ea6 readiness\uff1a${grayReadiness.ready === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u5019\u9009\uff1a${grayReadiness.candidateReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u8f6e\u8be2\uff1a${grayReadiness.pollingReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}`,
+    `\u7070\u5ea6\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(grayReadiness.blockedReasons)}`,
     "",
     "\u5982\u4f55\u8c03\u6574",
     "1. \u6253\u5f00 config.local.json\u3002",
@@ -8590,6 +8646,7 @@ function installTTSDebugBridge() {
     checkConversationFollowupPendingFixture: (input) => runConversationFollowupPendingFixture(input),
     rehearseConversationFollowupPending: (input) => rehearseConversationFollowupPending(input),
     clearConversationFollowupRehearsal: () => clearConversationFollowupRehearsal(),
+    grayAutoFollowupReadiness: () => buildGrayAutoFollowupReadinessStatus(),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({
