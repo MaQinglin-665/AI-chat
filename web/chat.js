@@ -586,6 +586,7 @@ function getTTSDebugSnapshot() {
     reason: String(state.followupReason || ""),
     topicHint: String(state.followupTopicHint || "")
   });
+  const followupCharacterCue = buildConversationFollowupCharacterCue(followupPlan);
   const durationMs = audio && Number.isFinite(Number(audio.duration)) && audio.duration > 0
     ? Math.round(Number(audio.duration) * 1000)
     : Number(state.ttsDebugAudioDurationMs || -1);
@@ -648,6 +649,7 @@ function getTTSDebugSnapshot() {
       policy: followupPolicy.type,
       policyNote: followupPolicy.note,
       policyBlockedReason: String(followupPolicy.blockedReason || ""),
+      characterCue: followupCharacterCue,
       updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
     },
     proactiveScheduler: buildProactiveSchedulerDebugSnapshot(Date.now()),
@@ -765,6 +767,53 @@ function buildConversationFollowupPolicy(plan) {
   };
 }
 
+function buildConversationFollowupCharacterCue(plan) {
+  const safePlan = plan && typeof plan === "object" ? plan : {};
+  const policy = String(safePlan.followupPolicy || "gentle_continue").trim() || "gentle_continue";
+  const reason = String(safePlan.reason || "followup_pending").trim() || "followup_pending";
+  const cueByPolicy = {
+    gentle_continue: {
+      persona: "温和、好奇、有一点桌宠式陪伴感",
+      tone: "像轻轻探头接一句，不像客服提醒",
+      emotion: "thinking",
+      action: "think",
+      intensity: "low",
+      voiceStyle: "soft",
+      sample: "刚才那个点我还在想，要不要先轻轻放在这里？"
+    },
+    light_question: {
+      persona: "好奇但不追着人问的小伙伴",
+      tone: "只问一个可以不回答的小问题",
+      emotion: "thinking",
+      action: "think",
+      intensity: "low",
+      voiceStyle: "soft",
+      sample: "我有点好奇这个点，不过你想先放着也完全可以。"
+    },
+    soft_checkin: {
+      persona: "低压力、会看气氛的陪伴型角色",
+      tone: "把选择权交给用户，不催促继续聊",
+      emotion: "happy",
+      action: "nod",
+      intensity: "low",
+      voiceStyle: "soft",
+      sample: "如果你还想聊这个，我在这边慢慢听。"
+    }
+  };
+  const cue = cueByPolicy[policy] || cueByPolicy.gentle_continue;
+  return {
+    ...cue,
+    policy,
+    reason,
+    runtimeMetadataHint: {
+      emotion: cue.emotion,
+      action: cue.action,
+      intensity: cue.intensity,
+      voice_style: cue.voiceStyle
+    }
+  };
+}
+
 function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
   const now = Number(nowMs);
   const safeNow = Number.isFinite(now) ? now : Date.now();
@@ -784,6 +833,12 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
     ? Math.max(0, Math.round(safeNow - followupUpdatedAt))
     : -1;
   const policy = buildConversationFollowupPolicy({ reason, topicHint, updatedAgeMs });
+  const characterCue = buildConversationFollowupCharacterCue({
+    reason,
+    topicHint,
+    followupPolicy: policy.type,
+    updatedAgeMs
+  });
 
   const blockedReasons = [];
   if (!conversationEnabled) {
@@ -817,6 +872,7 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
     topicHint,
     followupPolicy: policy.type,
     followupPolicyNote: policy.note,
+    characterCue,
     updatedAgeMs,
     conversationEnabled,
     proactiveEnabled,
@@ -830,6 +886,7 @@ function buildConversationFollowupDebugView(nowMs = Date.now()) {
   return {
     ...plan,
     promptDraft: buildConversationFollowupPromptDraft(plan),
+    characterCue: plan.characterCue || buildConversationFollowupCharacterCue(plan),
     silence: buildConversationSilenceDebugSnapshot(nowMs)
   };
 }
@@ -841,6 +898,9 @@ function buildConversationFollowupPromptDraft(plan) {
   }
   const reason = String(safePlan.reason || "").trim() || "followup_pending";
   const policy = String(safePlan.followupPolicy || "gentle_continue").trim() || "gentle_continue";
+  const cue = safePlan.characterCue && typeof safePlan.characterCue === "object"
+    ? safePlan.characterCue
+    : buildConversationFollowupCharacterCue(safePlan);
   let topicHint = String(safePlan.topicHint || "").replace(/\s+/g, " ").trim();
   if (!topicHint) {
     return "";
@@ -856,9 +916,15 @@ function buildConversationFollowupPromptDraft(plan) {
   return [
     "你正在生成一次低打扰的主动续话，不是系统通知。",
     "请基于上一轮未收口的话题，用自然、温和的角色口吻仅输出一句可忽略的续话或轻追问。",
+    "角色方向：像住在桌面边上的小伙伴，轻轻冒泡，有一点性格，但不要夸张表演。",
+    `语气建议: ${cue.tone || "温和、短句、低压力"}`,
+    `情绪建议: emotion=${cue.emotion || "thinking"}, action=${cue.action || "think"}, intensity=${cue.intensity || "low"}, voice_style=${cue.voiceStyle || "soft"}`,
+    `参考感觉: ${cue.sample || "我刚才还在想那个点，要不要轻轻接一下？"}`,
     policyInstruction,
     "保持简短，不要催促用户立刻回复，不要连续追问，不要长篇解释。",
     "安全边界：不要读取或猜测桌面、屏幕、文件、隐私数据；不要调用工具。",
+    "如果 character_runtime 要求返回元信息，只能使用允许字段 emotion/action/intensity/voice_style/live2d_hint，并把正文保持为自然中文。",
+    `角色线索: ${cue.persona || "低打扰陪伴型角色"}`,
     `续话策略: ${policy}`,
     `续话原因: ${reason}`,
     `话题线索: ${topicHint}`
@@ -870,6 +936,12 @@ function previewConversationFollowupPolicy(input = {}) {
   const reason = String(safeInput.reason || "followup_pending").trim() || "followup_pending";
   const topicHint = String(safeInput.topicHint || safeInput.text || "").replace(/\s+/g, " ").trim();
   const policy = buildConversationFollowupPolicy({ reason, topicHint });
+  const characterCue = buildConversationFollowupCharacterCue({
+    reason,
+    topicHint,
+    followupPolicy: policy.type,
+    updatedAgeMs: 0
+  });
   const blockedReasons = [];
   if (!topicHint) {
     blockedReasons.push("empty_topic_hint");
@@ -883,6 +955,7 @@ function previewConversationFollowupPolicy(input = {}) {
     topicHint,
     followupPolicy: policy.type,
     followupPolicyNote: policy.note,
+    characterCue,
     updatedAgeMs: 0,
     conversationEnabled: true,
     proactiveEnabled: true,
@@ -1846,6 +1919,7 @@ function buildFollowupReadinessReport() {
     "\u7eed\u8bdd\u8be6\u60c5",
     `\u5f85\u5904\u7406\uff1a${followup.pending === true ? "\u662f" : "\u5426"}  \u7b56\u7565\uff1a${followup.policy || "n/a"}  \u53ef\u89e6\u53d1\uff1a${followup.eligible === true ? "\u662f" : "\u5426"}`,
     `\u8bdd\u9898\uff1a${followup.topicHint || "\uff08\u7a7a\uff09"}`,
+    `\u89d2\u8272\u8bed\u6c14\uff1a${followup.characterCue?.tone || "n/a"}  \u60c5\u7eea\uff1a${followup.characterCue?.emotion || "n/a"} / ${followup.characterCue?.action || "n/a"}`,
     `\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(followup.blockedReasons)}`,
     `\u539f\u59cb\u539f\u56e0\uff1a${joinReadinessReasons(followup.blockedReasons)}`,
     `\u66f4\u65b0\u65f6\u95f4\uff1a${formatReadinessMs(followup.updatedAgeMs)}  \u5b89\u9759\u9608\u503c\uff1a${formatReadinessMs(mode.silenceFollowupMinMs)}`,
