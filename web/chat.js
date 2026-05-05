@@ -2564,6 +2564,26 @@ function updateFollowupReadinessPreviewCard() {
   state.followupReadinessCard.textContent = buildFollowupReadinessPreviewCardText();
 }
 
+function createFollowupReadinessActionGroup(labelText, buttons = []) {
+  const group = document.createElement("div");
+  group.style.cssText = [
+    "display:flex",
+    "align-items:center",
+    "gap:6px",
+    "flex-wrap:wrap",
+    "padding:6px 8px",
+    "border:1px solid rgba(93,128,195,.18)",
+    "border-radius:12px",
+    "background:rgba(255,255,255,.44)"
+  ].join(";");
+  const label = document.createElement("span");
+  label.textContent = labelText;
+  label.style.cssText = "font:700 11px/1.2 system-ui,sans-serif;color:#54688f;margin-right:2px;";
+  group.appendChild(label);
+  buttons.forEach((button) => group.appendChild(button));
+  return group;
+}
+
 function ensureFollowupReadinessPanel() {
   if (state.followupReadinessPanel || typeof document === "undefined") {
     return state.followupReadinessPanel;
@@ -2594,8 +2614,14 @@ function ensureFollowupReadinessPanel() {
   const title = document.createElement("strong");
   title.textContent = "续话状态";
   title.style.cssText = "font:700 14px/1.2 system-ui,sans-serif;color:#1f3768;";
-  const actions = document.createElement("div");
-  actions.style.cssText = "display:flex;align-items:center;gap:6px;";
+  const actionBar = document.createElement("div");
+  actionBar.style.cssText = [
+    "display:flex",
+    "flex-direction:column",
+    "align-items:stretch",
+    "gap:8px",
+    "margin:0 0 10px"
+  ].join(";");
   const copy = document.createElement("button");
   copy.type = "button";
   copy.textContent = "复制";
@@ -2679,17 +2705,17 @@ function ensureFollowupReadinessPanel() {
     updateFollowupReadinessPanel();
   });
   head.appendChild(title);
-  rehearsalButtons.forEach((button) => actions.appendChild(button));
-  actions.appendChild(clearRehearsal);
-  actions.appendChild(copySelected);
-  actions.appendChild(copySummary);
-  actions.appendChild(copyBundle);
-  actions.appendChild(copyJson);
-  actions.appendChild(copyOneLine);
-  actions.appendChild(copy);
-  actions.appendChild(copyTemplate);
-  actions.appendChild(close);
-  head.appendChild(actions);
+  head.appendChild(close);
+  actionBar.appendChild(createFollowupReadinessActionGroup("\u9884\u6f14", rehearsalButtons.concat(clearRehearsal)));
+  actionBar.appendChild(createFollowupReadinessActionGroup("\u590d\u5236", [
+    copySelected,
+    copySummary,
+    copyBundle,
+    copyJson,
+    copyOneLine,
+    copy,
+    copyTemplate
+  ]));
   const card = document.createElement("pre");
   card.style.cssText = [
     "margin:0 0 10px",
@@ -2704,6 +2730,7 @@ function ensureFollowupReadinessPanel() {
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   panel.appendChild(head);
+  panel.appendChild(actionBar);
   panel.appendChild(card);
   panel.appendChild(body);
   document.body.appendChild(panel);
