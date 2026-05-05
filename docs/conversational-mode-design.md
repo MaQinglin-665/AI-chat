@@ -774,3 +774,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 094 upgrades the follow-up readiness panel rehearsal control into three local scenarios: `好奇追问`, `温柔接话`, and `收口安静`.
 - The panel records the active rehearsal scenario in memory and shows the scenario label in the readiness report, making chip/tooltip/reaction tuning faster.
 - This remains manual UI/debug tooling only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
+
+## 65. Task 095 Landing Notes
+
+- Task 095 adds a compact preview card above the follow-up readiness report.
+- The card summarizes scenario, character state, policy, selected tone/index, selected local reaction, blocked reasons, and safety posture so rehearsal tuning is faster.
+- This remains read-only UI/debug display only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
