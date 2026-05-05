@@ -306,6 +306,7 @@ const state = {
   followupReadinessManualDismissBtn: null,
   followupReadinessManualReviewBtn: null,
   followupManualConfirmationDismissedKeys: new Set(),
+  followupManualConfirmationApproving: false,
   followupReadinessRefreshTimer: 0,
   followupCharacterChipRefreshTimer: 0,
   followupCharacterRuntimeLastTone: "",
@@ -2487,33 +2488,6 @@ function buildFollowupReadinessPreviewCardText() {
   ].join("\n");
 }
 
-function buildFollowupManualConfirmationPreviewData() {
-  const snapshot = getTTSDebugSnapshot();
-  const followup = snapshot.followup || {};
-  const silence = snapshot.silence || {};
-  const scheduler = snapshot.proactiveScheduler || {};
-  const candidateText = String(followup.selectedReaction?.candidate?.text || followup.characterPreview || "").trim();
-  const blockedReasons = []
-    .concat(Array.isArray(followup.blockedReasons) ? followup.blockedReasons : [])
-    .concat(Array.isArray(silence.blockedReasons) ? silence.blockedReasons : [])
-    .concat(Array.isArray(scheduler.blockedReasons) ? scheduler.blockedReasons : []);
-  const hasCandidate = followup.pending === true && candidateText;
-  const available = hasCandidate
-    && followup.eligible === true
-    && silence.eligibleForSilenceFollowup === true
-    && scheduler.eligibleForSchedulerTick === true;
-  return {
-    state: hasCandidate ? (available ? "available" : "blocked") : "hidden",
-    candidateText: candidateText || "n/a",
-    topicHint: String(followup.topicHint || ""),
-    policy: String(followup.policy || "n/a"),
-    tone: String(followup.selectedReaction?.preferredTone || followup.characterCue?.tone || "n/a"),
-    selectedIndex: Number.isFinite(Number(followup.selectedReaction?.index)) ? Number(followup.selectedReaction.index) : -1,
-    guardExplanation: available ? "当前守卫允许手动确认前预览。" : explainReadinessReasons(blockedReasons),
-    rawBlockedReasons: joinReadinessReasons(blockedReasons)
-  };
-}
-
 function buildFollowupRehearsalScenarioCompareRows() {
   return FOLLOWUP_REHEARSAL_SCENARIOS.map((scenario) => {
     const policy = buildConversationFollowupPolicy({
@@ -2649,12 +2623,18 @@ function buildFollowupManualConfirmationKey(input = {}) {
 }
 
 function buildFollowupManualConfirmationData() {
-  const data = buildFollowupReadinessPreviewCardData();
+  const snapshot = getTTSDebugSnapshot();
+  const data = buildFollowupReadinessPreviewCardData(snapshot);
+  const silence = snapshot.silence || {};
+  const scheduler = snapshot.proactiveScheduler || {};
   const candidateText = data.candidateText === "n/a"
     ? ""
     : normalizeFollowupManualConfirmationToken(data.candidateText);
   const hasCandidate = !!candidateText;
-  const blockedReasons = Array.isArray(data.blockedReasons) ? data.blockedReasons.slice() : [];
+  const blockedReasons = []
+    .concat(Array.isArray(data.blockedReasons) ? data.blockedReasons : [])
+    .concat(Array.isArray(silence.blockedReasons) ? silence.blockedReasons : [])
+    .concat(Array.isArray(scheduler.blockedReasons) ? scheduler.blockedReasons : []);
   const key = buildFollowupManualConfirmationKey({
     topicHint: data.topicHint,
     policy: data.policy,
@@ -2664,7 +2644,11 @@ function buildFollowupManualConfirmationData() {
     && state.followupManualConfirmationDismissedKeys instanceof Set
     && state.followupManualConfirmationDismissedKeys.has(key);
   const hidden = data.pending !== true || !hasCandidate;
-  const available = hidden !== true && data.eligible === true && blockedReasons.length === 0;
+  const available = hidden !== true
+    && data.eligible === true
+    && silence.eligibleForSilenceFollowup === true
+    && scheduler.eligibleForSchedulerTick === true
+    && blockedReasons.length === 0;
   const blocked = hidden !== true && !available;
   const status = hidden
     ? "hidden"
@@ -2683,7 +2667,9 @@ function buildFollowupManualConfirmationData() {
     hidden,
     available,
     blocked,
-    status
+    status,
+    silenceEligible: silence.eligibleForSilenceFollowup === true,
+    schedulerEligible: scheduler.eligibleForSchedulerTick === true
   };
 }
 
@@ -2717,34 +2703,73 @@ function updateFollowupManualConfirmationControls() {
     return;
   }
   const blockedSummary = explainReadinessReasons(confirmation.blockedReasons);
+  const approving = state.followupManualConfirmationApproving === true;
   confirmBtn.disabled = confirmation.available !== true;
-  confirmBtn.textContent = confirmation.available === true ? "\u786e\u8ba4" : "\u4e0d\u53ef\u786e\u8ba4";
+  if (approving) {
+    confirmBtn.disabled = true;
+  }
+  confirmBtn.textContent = approving
+    ? "\u6267\u884c\u4e2d"
+    : confirmation.available === true ? "\u786e\u8ba4" : "\u4e0d\u53ef\u786e\u8ba4";
   confirmBtn.title = confirmation.available === true
-    ? "\u4ec5\u4e3a UI \u5360\u4f4d\uff0c\u6682\u4e0d\u6267\u884c\u7eed\u8bdd"
+    ? "\u91cd\u65b0\u68c0\u67e5\u5b88\u536b\u540e\u624b\u52a8\u6267\u884c\u7eed\u8bdd"
     : `\u5f53\u524d\u4e0d\u6ee1\u8db3\u786e\u8ba4\u6761\u4ef6\uff1a${blockedSummary}`;
   dismissBtn.disabled = !confirmation.key;
   dismissBtn.title = "\u4ec5\u672c\u5730\u9690\u85cf\u5f53\u524d\u786e\u8ba4\u5361\u7247\uff0c\u4e0d\u4f1a\u6539\u52a8 scheduler/pending/config";
   reviewBtn.disabled = false;
   reviewBtn.title = "\u6253\u5f00\u6216\u805a\u7126\u7eed\u8bdd\u8be6\u60c5\u62a5\u544a";
-  statusNode.textContent = `\u786e\u8ba4\u72b6\u6001\uff1a${getFollowupManualConfirmationStatusLabel(confirmation.status)}  guard\uff1a${confirmation.available === true ? "\u5df2\u901a\u8fc7\uff08UI-only\uff09" : blockedSummary}`;
+  statusNode.textContent = `\u786e\u8ba4\u72b6\u6001\uff1a${getFollowupManualConfirmationStatusLabel(confirmation.status)}  guard\uff1a${confirmation.available === true ? "\u5df2\u901a\u8fc7\uff08\u53ef\u624b\u52a8\u6267\u884c\uff09" : blockedSummary}`;
 }
 
-function handleFollowupManualConfirmClick(button = null) {
+async function handleFollowupManualConfirmClick(button = null) {
+  if (state.followupManualConfirmationApproving === true) {
+    setStatus("\u7eed\u8bdd\u786e\u8ba4\u6b63\u5728\u6267\u884c\u4e2d");
+    return false;
+  }
   const confirmation = buildFollowupManualConfirmationData();
   if (confirmation.available !== true) {
     const blockedSummary = explainReadinessReasons(confirmation.blockedReasons);
     setStatus(`\u5f53\u524d\u4e0d\u53ef\u786e\u8ba4\uff1a${blockedSummary}`);
+    updateFollowupReadinessPanel();
     return false;
   }
-  setStatus("\u786e\u8ba4\u70b9\u51fb\u5df2\u8bb0\u5f55\uff08UI-only \u5360\u4f4d\uff0c\u672a\u6267\u884c\u7eed\u8bdd\uff09");
-  if (button) {
-    const previous = button.textContent;
-    button.textContent = "\u5df2\u8bb0\u5f55";
-    window.setTimeout(() => {
-      button.textContent = previous || "\u786e\u8ba4";
-    }, 1200);
+  state.followupManualConfirmationApproving = true;
+  updateFollowupManualConfirmationControls();
+  setStatus("\u6b63\u5728\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd...");
+  try {
+    const freshConfirmation = buildFollowupManualConfirmationData();
+    if (freshConfirmation.available !== true) {
+      const blockedSummary = explainReadinessReasons(freshConfirmation.blockedReasons);
+      setStatus(`\u786e\u8ba4\u524d\u5b88\u536b\u5df2\u963b\u6b62\uff1a${blockedSummary}`);
+      recordTTSDebugEvent("conversation_followup_manual_confirmation_blocked", {
+        text: String(freshConfirmation.topicHint || ""),
+        result: freshConfirmation.blockedReasons.join(",") || "guard_blocked",
+        error: String(freshConfirmation.policy || "")
+      });
+      return false;
+    }
+    recordTTSDebugEvent("conversation_followup_manual_confirmation_approved", {
+      text: String(freshConfirmation.topicHint || ""),
+      result: String(freshConfirmation.policy || ""),
+      error: String(freshConfirmation.tone || "")
+    });
+    const result = await runConversationFollowupDebug();
+    if (result?.ok === true) {
+      if (freshConfirmation.key && state.followupManualConfirmationDismissedKeys instanceof Set) {
+        state.followupManualConfirmationDismissedKeys.delete(freshConfirmation.key);
+      }
+      setStatus("\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd\u5df2\u6267\u884c");
+      return true;
+    }
+    setStatus(`\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd\u672a\u6267\u884c\uff1a${result?.reason || "unknown"}`);
+    return false;
+  } catch (err) {
+    setStatus(`\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd\u5931\u8d25\uff1a${err?.message || err}`);
+    return false;
+  } finally {
+    state.followupManualConfirmationApproving = false;
+    updateFollowupReadinessPanel();
   }
-  return true;
 }
 
 function dismissFollowupManualConfirmation(button = null) {
@@ -2792,19 +2817,19 @@ function updateFollowupManualConfirmationPreviewCard() {
   if (!state.followupReadinessConfirmationCard) {
     return;
   }
-  const data = buildFollowupManualConfirmationPreviewData();
-  state.followupReadinessConfirmationCard.style.display = data.state === "hidden" ? "none" : "block";
-  if (data.state === "hidden") {
+  const data = buildFollowupManualConfirmationData();
+  state.followupReadinessConfirmationCard.style.display = data.hidden === true || data.dismissed === true ? "none" : "block";
+  if (data.hidden === true || data.dismissed === true) {
     state.followupReadinessConfirmationCard.textContent = "";
     return;
   }
   state.followupReadinessConfirmationCard.textContent = [
-    `手动确认预览：${data.state === "available" ? "可确认" : "暂不可确认"}`,
+    `手动确认预览：${data.available === true ? "可确认" : "暂不可确认"}`,
     `想接的一句：${data.candidateText}`,
     `话题：${data.topicHint || "n/a"}`,
     `policy=${data.policy}  tone=${data.tone}  selected=${data.selectedIndex}`,
-    `守卫说明：${data.guardExplanation}`,
-    `原始阻塞：${data.rawBlockedReasons}`,
+    `守卫说明：${data.available === true ? "当前守卫允许手动确认执行。" : explainReadinessReasons(data.blockedReasons)}`,
+    `原始阻塞：${joinReadinessReasons(data.blockedReasons)}`,
     "安全：未点击确认前不会请求模型、不会发语音、不会执行续话。"
   ].join("\n");
 }

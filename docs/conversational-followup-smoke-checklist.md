@@ -1069,3 +1069,20 @@ Manual checks:
 8. Confirm `忽略` does not mutate scheduler gates, polling, cooldown, window limits, pending state, or config.
 9. Click `查看详情` and confirm the existing readiness full report area opens/focuses/refreshes.
 10. Confirm these controls do not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, file access, or backend APIs.
+
+## 55. Manual Confirmation Guarded Execution v1
+
+Purpose: confirm manual confirmation approval executes only through existing guarded follow-up execution and fails closed when guards change.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `more -> follow-up status`.
+3. Ensure there is a pending follow-up candidate that passes follow-up, silence, and scheduler guards.
+4. Click `确认` and confirm the status enters an executing state.
+5. Confirm the execution uses the existing guarded manual follow-up path and does not create a new request path.
+6. Confirm pending follow-up is consumed only when execution succeeds; if request execution fails, pending state is restored by the existing path.
+7. Create or wait for a blocked state, then click/attempt `确认` and confirm it fails closed with a guard explanation.
+8. Confirm `确认` records local debug events for approved or blocked confirmation attempts.
+9. Confirm `忽略` and `查看详情` still do not mutate scheduler gates, polling, cooldown, window limits, pending state, or config.
+10. Confirm this task does not add automatic follow-up, screenshots, tools, shell, file access, backend APIs, desktop observation, or config writes.
