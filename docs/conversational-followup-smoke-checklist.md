@@ -995,3 +995,17 @@ Manual checks:
 5. Click each rehearsal scenario and confirm the comparison block remains visible and does not require repeated clicks to compare all scenarios.
 6. Confirm the comparison block does not write pending state, call `runConversationFollowup`, call `requestAssistantReply`, trigger LLM/fetch/TTS, screenshots, tools, shell, or file access.
 7. Confirm the comparison block does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.
+
+## 50. Follow-up Rehearsal Compare Table v1
+
+Purpose: confirm the rehearsal scenario comparison is easier to scan while staying read-only and local.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `more -> follow-up status`.
+3. Confirm the comparison block renders as separated rows rather than one dense text paragraph.
+4. Confirm each row separates scenario label, policy, tone/index, and selected local short sentence.
+5. Click each rehearsal scenario and confirm the active scenario is marked inline in the comparison.
+6. Confirm the comparison table does not write pending state, call `runConversationFollowup`, call `requestAssistantReply`, trigger LLM/fetch/TTS, screenshots, tools, shell, or file access.
+7. Confirm the comparison table does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.

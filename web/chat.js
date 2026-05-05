@@ -2480,8 +2480,8 @@ function buildFollowupReadinessPreviewCardText() {
   ].join("\n");
 }
 
-function buildFollowupRehearsalScenarioCompareText() {
-  const rows = FOLLOWUP_REHEARSAL_SCENARIOS.map((scenario) => {
+function buildFollowupRehearsalScenarioCompareRows() {
+  return FOLLOWUP_REHEARSAL_SCENARIOS.map((scenario) => {
     const policy = buildConversationFollowupPolicy({
       reason: scenario.reason,
       topicHint: scenario.topicHint
@@ -2495,7 +2495,20 @@ function buildFollowupRehearsalScenarioCompareText() {
     const candidates = buildConversationFollowupReactionCandidates(plan);
     const selected = selectConversationFollowupReactionCandidate(plan, candidates);
     const candidate = String(selected.candidate?.text || "n/a").replace(/\s+/g, " ").trim();
-    return `${scenario.label} | policy=${policy.type} | tone=${selected.preferredTone || "n/a"} | selected=${selected.index} | ${candidate}`;
+    return {
+      id: scenario.id,
+      label: scenario.label,
+      policy: policy.type,
+      tone: selected.preferredTone || "n/a",
+      selectedIndex: selected.index,
+      candidateText: candidate
+    };
+  });
+}
+
+function buildFollowupRehearsalScenarioCompareText() {
+  const rows = buildFollowupRehearsalScenarioCompareRows().map((row) => {
+    return `${row.label} | policy=${row.policy} | tone=${row.tone} | selected=${row.selectedIndex} | ${row.candidateText}`;
   });
   return [
     "场景对比（本地预演，不写入状态）",
@@ -2592,7 +2605,40 @@ function updateFollowupReadinessScenarioCompare() {
   if (!state.followupReadinessCompare) {
     return;
   }
-  state.followupReadinessCompare.textContent = buildFollowupRehearsalScenarioCompareText();
+  state.followupReadinessCompare.textContent = "";
+  const title = document.createElement("div");
+  title.textContent = "\u573a\u666f\u5bf9\u6bd4\uff08\u672c\u5730\u9884\u6f14\uff0c\u4e0d\u5199\u5165\u72b6\u6001\uff09";
+  title.style.cssText = "font:700 12px/1.3 system-ui,sans-serif;color:#1f3768;margin-bottom:8px;";
+  state.followupReadinessCompare.appendChild(title);
+  buildFollowupRehearsalScenarioCompareRows().forEach((row) => {
+    const item = document.createElement("div");
+    item.style.cssText = [
+      "display:grid",
+      "grid-template-columns:minmax(72px,.8fr) minmax(88px,.9fr) minmax(72px,.7fr) minmax(0,2.4fr)",
+      "gap:8px",
+      "align-items:start",
+      "padding:7px 0",
+      "border-top:1px solid rgba(93,128,195,.16)"
+    ].join(";");
+    if (row.id === state.followupRehearsalScenarioId) {
+      item.style.background = "rgba(232,255,243,.42)";
+    }
+    const cells = [
+      row.id === state.followupRehearsalScenarioId ? `${row.label} *` : row.label,
+      `policy=${row.policy}`,
+      `tone=${row.tone} #${row.selectedIndex}`,
+      row.candidateText
+    ];
+    cells.forEach((text, index) => {
+      const cell = document.createElement("span");
+      cell.textContent = text;
+      cell.style.cssText = index === 3
+        ? "white-space:normal;color:#263d70;"
+        : "white-space:normal;color:#465b84;";
+      item.appendChild(cell);
+    });
+    state.followupReadinessCompare.appendChild(item);
+  });
 }
 
 function createFollowupReadinessActionGroup(labelText, buttons = []) {
@@ -2760,14 +2806,13 @@ function ensureFollowupReadinessPanel() {
   ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
-  const compare = document.createElement("pre");
+  const compare = document.createElement("div");
   compare.style.cssText = [
     "margin:0 0 10px",
     "padding:10px 12px",
     "border:1px solid rgba(93,128,195,.18)",
     "border-radius:14px",
     "background:rgba(255,255,255,.46)",
-    "white-space:pre-wrap",
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#263d70"
   ].join(";");
