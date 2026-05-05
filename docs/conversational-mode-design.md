@@ -1006,3 +1006,10 @@ Still out of scope:
 - The new helper `grayAutoFollowupDryRun()` reports whether a hypothetical polling check would remain blocked or would attempt a trigger, while returning compact follow-up, silence, scheduler, and readiness snapshots.
 - The follow-up readiness panel now shows the dry-run outcome alongside gray readiness.
 - This task does not start polling, does not execute follow-up, does not mutate pending state, does not call `runProactiveSchedulerManualTick()`, model/TTS/fetch, does not write config, and does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or dependencies.
+
+## 87. Task 114 Landing Notes
+
+- Task 114 records a compact debug event when `grayAutoFollowupDryRun()` is explicitly called from DevTools.
+- The event is `conversation_followup_gray_auto_dry_run_checked` and includes only topic hint, dry-run status, `would_poll`, `would_trigger`, and compact blocked reasons.
+- The pure dry-run builder remains read-only and the follow-up readiness panel does not emit events on refresh.
+- This task does not start polling, does not execute follow-up, does not mutate pending state, does not call `runProactiveSchedulerManualTick()`, model/TTS/fetch, does not write config, and does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or dependencies.

@@ -1217,3 +1217,16 @@ Manual checks:
 5. With a blocked pending candidate, confirm the dry-run shows compact follow-up/silence/scheduler blocked reasons.
 6. Confirm reading the dry-run does not start polling, does not call `runProactiveSchedulerManualTick`, does not call `runConversationFollowup`, and does not consume or restore pending state.
 7. Confirm no model request, TTS, fetch, screenshot, tool call, shell execution, file access, backend API, config write, or new dependency is introduced.
+
+## 62. Gray Automatic Follow-up Dry-run Event v1
+
+Purpose: confirm explicit dry-run checks leave a compact audit trail without making the readiness panel noisy.
+
+Manual checks:
+
+1. Open `more -> follow-up status` and let the panel refresh for a few seconds.
+2. Confirm panel refresh alone does not repeatedly emit `conversation_followup_gray_auto_dry_run_checked`.
+3. In DevTools Console, run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupDryRun()`.
+4. Inspect `window.__AI_CHAT_DEBUG_TTS__.events().slice(-10)` and confirm one `conversation_followup_gray_auto_dry_run_checked` event appears.
+5. Confirm the event contains compact status values such as `status`, `would_poll`, `would_trigger`, and blocked reason summary, not full prompts or private data.
+6. Confirm the event does not correspond to polling start, scheduler tick, model request, TTS, fetch, screenshot, tool call, shell execution, file access, backend API, config write, pending mutation, or new dependency.

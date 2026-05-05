@@ -2275,6 +2275,23 @@ function buildGrayAutoFollowupDryRunStatus(snapshotInput = null) {
   };
 }
 
+function runGrayAutoFollowupDryRunDebug() {
+  const result = buildGrayAutoFollowupDryRunStatus();
+  const blockedReasons = Array.isArray(result.readiness?.blockedReasons)
+    ? result.readiness.blockedReasons.join(",")
+    : "";
+  recordTTSDebugEvent("conversation_followup_gray_auto_dry_run_checked", {
+    text: String(result.followup?.topicHint || ""),
+    result: [
+      `status:${result.status}`,
+      `would_poll:${result.wouldPollCheck === true ? "true" : "false"}`,
+      `would_trigger:${result.wouldAttemptTrigger === true ? "true" : "false"}`
+    ].join(";"),
+    error: sanitizeTTSDebugText(blockedReasons, 140)
+  });
+  return result;
+}
+
 function buildFollowupReadinessFriendlySummary(followup, silence, scheduler) {
   if (followup?.eligible === true && silence?.eligibleForSilenceFollowup === true && scheduler?.eligibleForSchedulerTick === true) {
     return "可以续话：续话、安静窗口和调度器都已满足。";
@@ -8689,7 +8706,7 @@ function installTTSDebugBridge() {
     rehearseConversationFollowupPending: (input) => rehearseConversationFollowupPending(input),
     clearConversationFollowupRehearsal: () => clearConversationFollowupRehearsal(),
     grayAutoFollowupReadiness: () => buildGrayAutoFollowupReadinessStatus(),
-    grayAutoFollowupDryRun: () => buildGrayAutoFollowupDryRunStatus(),
+    grayAutoFollowupDryRun: () => runGrayAutoFollowupDryRunDebug(),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({
