@@ -544,3 +544,74 @@ Regression checks:
 
 1. Normal non-closed pending hints keep existing silence eligibility behavior.
 2. No scheduler gate, polling lifecycle, cooldown/window limit, kill-switch, request, screenshot, tool, shell, file, TTS, fetch, LLM, config, API, dependency, or UI behavior changes.
+
+## 25. Manual DevTools Runtime Capture (Task 067)
+
+Purpose:
+
+1. Close the remaining Task 066 runtime evidence gap.
+2. Capture policy/silence/event fields from the real chat window DevTools Console.
+
+Preconditions:
+
+1. Start Electron locally.
+2. Open chat window DevTools Console.
+3. Do not enable screenshot/tool/file access for this check.
+
+Command:
+
+```js
+(() => {
+  const debug = window.__AI_CHAT_DEBUG_TTS__;
+  if (!debug) return { ok: false, reason: "debug_bridge_missing" };
+  const preview = debug.previewConversationFollowupPolicy({
+    reason: "followup_pending",
+    topicHint: "先这样，晚安"
+  });
+  const snapshotFollowup = debug.snapshot().followup;
+  const conversationFollowup = debug.conversationFollowup();
+  return {
+    ok: true,
+    preview: {
+      followupPolicy: preview.followupPolicy,
+      eligible: preview.eligible,
+      blockedReasons: preview.blockedReasons,
+      promptDraftEmpty: !String(preview.promptDraft || "").trim()
+    },
+    snapshotFollowup: {
+      pending: snapshotFollowup.pending,
+      eligible: snapshotFollowup.eligible,
+      blockedReasons: snapshotFollowup.blockedReasons,
+      policy: snapshotFollowup.policy,
+      policyBlockedReason: snapshotFollowup.policyBlockedReason
+    },
+    conversationFollowup: {
+      eligible: conversationFollowup.eligible,
+      blockedReasons: conversationFollowup.blockedReasons,
+      followupPolicy: conversationFollowup.followupPolicy,
+      promptDraftEmpty: !String(conversationFollowup.promptDraft || "").trim(),
+      silence: {
+        eligibleForSilenceFollowup: conversationFollowup.silence?.eligibleForSilenceFollowup,
+        blockedReasons: conversationFollowup.silence?.blockedReasons,
+        followupPolicy: conversationFollowup.silence?.followupPolicy
+      }
+    },
+    recentEvents: debug.events().slice(-30).map((event) => ({
+      type: event.type,
+      text: event.text,
+      result: event.result,
+      error: event.error
+    }))
+  };
+})()
+```
+
+Expected:
+
+1. `preview.followupPolicy="do_not_followup"`
+2. `preview.eligible=false`
+3. `preview.blockedReasons` includes `policy_do_not_followup`
+4. `preview.promptDraftEmpty=true`
+5. `conversationFollowup.silence.eligibleForSilenceFollowup=false`
+6. `conversationFollowup.silence.blockedReasons` includes `policy_do_not_followup`
+7. No new `proactive_scheduler_poll_ready` event for the closed-topic case.
