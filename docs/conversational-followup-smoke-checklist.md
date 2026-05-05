@@ -855,3 +855,18 @@ Expected checks:
 3. If polling is active or all scheduler switches are enabled together, rehearsal returns a blocked result.
 4. The helper does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 5. The helper does not change scheduler gates, polling, cooldown, window limits, config, or backend APIs.
+
+## 41. Follow-up Rehearsal Panel Controls v1
+
+Purpose: confirm the follow-up readiness panel can start and clear a local rehearsal state without DevTools commands or automatic speech.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `更多 -> 续话状态`.
+3. Click `预演` and confirm the panel reports rehearsal active.
+4. Confirm the chip/tooltip and selected reaction update for the rehearsal topic.
+5. Click `清除预演` and confirm the previous local pending state is restored.
+6. If polling is active or all scheduler switches are enabled together, confirm `预演` is blocked fail-closed.
+7. Confirm the buttons do not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+8. Confirm the buttons do not change scheduler gates, polling, cooldown, window limits, config, or backend APIs.
