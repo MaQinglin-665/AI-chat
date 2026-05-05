@@ -729,3 +729,15 @@ Manual checks:
 3. Open `更多 -> 续话状态` and confirm the chip remains visible and read-only.
 4. Confirm the chip does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 5. Confirm the chip does not mutate pending follow-up state or scheduler state.
+
+## 34. Follow-up Character Chip Visual State v1
+
+Purpose: confirm the main chat header chip uses subtle visual tones while remaining read-only.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Confirm the chip still shows a label like `安静陪伴 · idle`.
+3. Inspect the chip and confirm `data-tone` is present.
+4. Confirm visual tone changes are CSS-only.
+5. Confirm the chip does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.

@@ -718,3 +718,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 085 adds a local-only follow-up character status chip to the chat header.
 - The chip shows the current character state such as `安静陪伴 · idle` or `有点想接话 · thinking` without opening the readiness panel.
 - It refreshes from existing local guard/debug state and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
+
+## 56. Task 086 Landing Notes
+
+- Task 086 adds subtle visual tones to the local follow-up character status chip.
+- The chip now maps state labels to stable `data-tone` values for CSS styling, so states like ready/cooldown/quiet/watching are easier to scan.
+- This remains read-only UI and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
