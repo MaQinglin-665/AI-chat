@@ -603,3 +603,18 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - This is visibility only. It does not change config, toggle proactive behavior, trigger follow-up,
   start polling, call LLM/fetch/TTS, capture screenshots, call tools, execute shell commands, or
   read files.
+
+## 46. Task 074 Landing Notes
+
+- Task 074 improves the read-only readiness panel wording.
+- The panel now includes:
+  - a `Summary` section with a short human-readable state
+  - `meaning=` lines that explain common blocked reasons such as `warmup_active`,
+    `no_pending_followup`, and `policy_do_not_followup`
+- Raw blocked reason keys remain visible for debugging.
+- This is a presentation-only change:
+  - no config changes
+  - no scheduler gate changes
+  - no policy changes
+  - no follow-up trigger changes
+  - no LLM/fetch/TTS, screenshot, tool, shell, or file access

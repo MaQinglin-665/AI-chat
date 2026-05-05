@@ -1764,6 +1764,54 @@ function joinReadinessReasons(reasons) {
   return list.length ? list.join(", ") : "none";
 }
 
+function explainReadinessReason(reason) {
+  const key = String(reason || "").trim();
+  const labels = {
+    conversation_disabled: "conversation mode is off",
+    proactive_disabled: "proactive follow-up is off",
+    scheduler_disabled: "scheduler is off",
+    no_pending_followup: "there is no pending follow-up",
+    empty_topic_hint: "there is no topic to continue",
+    silence_window_not_reached: "the quiet window has not been reached",
+    user_silence_window_not_reached: "the user has not been quiet long enough",
+    tts_silence_window_not_reached: "speech audio has not been quiet long enough",
+    no_user_activity_timestamp: "no recent user timestamp is available",
+    no_tts_finished_timestamp: "no finished speech timestamp is available",
+    policy_do_not_followup: "the topic looks closed, so follow-up is blocked",
+    chat_busy: "chat is busy",
+    speaking: "the assistant is speaking",
+    in_flight: "a proactive follow-up is already running",
+    cooldown_active: "cooldown is active",
+    window_limit_reached: "the follow-up limit for this window was reached",
+    warmup_active: "scheduler warmup is still active"
+  };
+  return labels[key] || key || "unknown";
+}
+
+function explainReadinessReasons(reasons) {
+  const list = Array.isArray(reasons) ? reasons.filter(Boolean) : [];
+  return list.length ? list.map(explainReadinessReason).join("; ") : "no blocker";
+}
+
+function buildFollowupReadinessFriendlySummary(followup, silence, scheduler) {
+  if (followup?.eligible === true && silence?.eligibleForSilenceFollowup === true && scheduler?.eligibleForSchedulerTick === true) {
+    return "Ready: follow-up, silence, and scheduler gates are all open.";
+  }
+  if (followup?.pending !== true) {
+    return "Idle: no pending follow-up is waiting right now.";
+  }
+  if (String(followup?.policy || "") === "do_not_followup") {
+    return "Quiet: the current topic looks closed, so the assistant should not continue.";
+  }
+  if (silence?.eligibleForSilenceFollowup !== true) {
+    return `Waiting: ${explainReadinessReasons(silence?.blockedReasons)}.`;
+  }
+  if (scheduler?.eligibleForSchedulerTick !== true) {
+    return `Blocked: ${explainReadinessReasons(scheduler?.blockedReasons)}.`;
+  }
+  return `Blocked: ${explainReadinessReasons(followup?.blockedReasons)}.`;
+}
+
 function buildFollowupReadinessReport() {
   const snapshot = getTTSDebugSnapshot();
   const mode = snapshot.conversationMode || {};
@@ -1772,20 +1820,27 @@ function buildFollowupReadinessReport() {
   const scheduler = snapshot.proactiveScheduler || {};
   const lines = [
     "Follow-up readiness",
+    "",
+    "Summary",
+    buildFollowupReadinessFriendlySummary(followup, silence, scheduler),
+    "",
     `conversation=${formatReadinessBool(mode.enabled)} proactive=${formatReadinessBool(mode.proactiveEnabled)} scheduler=${formatReadinessBool(mode.proactiveSchedulerEnabled)}`,
     `pending=${followup.pending === true} policy=${followup.policy || "n/a"} eligible=${followup.eligible === true}`,
     `topic=${followup.topicHint || "(empty)"}`,
     `followupBlocked=${joinReadinessReasons(followup.blockedReasons)}`,
+    `followupMeaning=${explainReadinessReasons(followup.blockedReasons)}`,
     `updatedAge=${formatReadinessMs(followup.updatedAgeMs)} silenceMin=${formatReadinessMs(mode.silenceFollowupMinMs)}`,
     "",
     "Silence gate",
     `eligible=${silence.eligibleForSilenceFollowup === true} policy=${silence.followupPolicy || "n/a"}`,
     `blocked=${joinReadinessReasons(silence.blockedReasons)}`,
+    `meaning=${explainReadinessReasons(silence.blockedReasons)}`,
     `lastUserAge=${formatReadinessMs(silence.lastUserAgeMs)} lastTtsAge=${formatReadinessMs(silence.lastTtsFinishedAgeMs)}`,
     "",
     "Scheduler gate",
     `eligible=${scheduler.eligibleForSchedulerTick === true} polling=${scheduler.pollTimerActive === true} lastPoll=${scheduler.pollLastResult || "n/a"}`,
     `blocked=${joinReadinessReasons(scheduler.blockedReasons)}`,
+    `meaning=${explainReadinessReasons(scheduler.blockedReasons)}`,
     `cooldown=${formatReadinessMs(scheduler.cooldownRemainingMs)} count=${Number(scheduler.proactiveCountInWindow || 0)}/${Number(scheduler.maxFollowupsPerWindow || 0)}`,
     "",
     "Safety",

@@ -1199,3 +1199,33 @@ This checkpoint only records the visible UI state. No code, config, scheduler be
 path, screenshot capture path, tool call path, shell execution path, file read path, TTS path,
 fetch path, or LLM path was changed.
 ```
+
+---
+
+# Follow-up Readiness Friendly Summary Added - 2026-05-05 (Task 074)
+
+Task 074 makes the Task 072 readiness panel easier to understand without changing behavior.
+
+New presentation details:
+
+1. A `Summary` section explains the current state in one sentence.
+2. `meaning=` lines translate common blocked reasons into human-readable text.
+3. Raw blocked reason keys remain visible for debugging and support.
+
+Examples:
+
+| Raw reason | Friendly meaning |
+| --- | --- |
+| `no_pending_followup` | there is no pending follow-up |
+| `empty_topic_hint` | there is no topic to continue |
+| `silence_window_not_reached` | the quiet window has not been reached |
+| `policy_do_not_followup` | the topic looks closed, so follow-up is blocked |
+| `warmup_active` | scheduler warmup is still active |
+
+Safety confirmation:
+
+```text
+The change only formats existing readiness snapshot data. It does not change config, scheduler
+gates, policy decisions, follow-up triggers, polling, requestAssistantReply, LLM/fetch/TTS,
+screenshot capture, tools, shell execution, file access, backend APIs, or dependencies.
+```
