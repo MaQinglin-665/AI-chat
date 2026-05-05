@@ -928,3 +928,20 @@ Manual checks:
    - the compact preview summary block
 5. Confirm the copy action is user-click-only and does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 6. Confirm the copy action does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.
+
+## 46. Follow-up Rehearsal Copy JSON v1
+
+Purpose: confirm the follow-up readiness panel can copy a local structured JSON snapshot for rehearsal tuning without speaking automatically or changing scheduler state.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `more -> follow-up status`.
+3. Click a rehearsal scenario such as `curious follow-up` or `gentle continue`.
+4. Click `copy JSON` and confirm the clipboard contains JSON with:
+   - `scenario`
+   - `character.label` and `character.mood`
+   - `followup.policy`, `followup.tone`, `followup.selectedIndex`, `followup.candidateText`
+   - `followup.blockedReasons`
+5. Confirm the copy action is user-click-only and does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+6. Confirm the copy action does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.

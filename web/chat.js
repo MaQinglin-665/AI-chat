@@ -2492,6 +2492,28 @@ function buildFollowupReadinessPreviewCopyBundleText() {
   ].join("\n");
 }
 
+function buildFollowupReadinessPreviewJsonText() {
+  const data = buildFollowupReadinessPreviewCardData();
+  const snapshot = {
+    scenario: data.scenarioLabel,
+    character: {
+      label: data.characterLabel,
+      mood: data.characterMood
+    },
+    followup: {
+      policy: data.policy,
+      tone: data.tone,
+      selectedIndex: data.selectedIndex,
+      candidateText: data.candidateText === "n/a" ? "" : data.candidateText,
+      blockedReasons: data.blocked === "none"
+        ? []
+        : String(data.blocked || "").split(",").map((item) => item.trim()).filter(Boolean)
+    },
+    safety: "local_preview_only_no_model_or_voice_requests"
+  };
+  return JSON.stringify(snapshot, null, 2);
+}
+
 function buildFollowupReadinessPreviewCardData() {
   const snapshot = getTTSDebugSnapshot();
   const followup = snapshot.followup || {};
@@ -2590,6 +2612,14 @@ function ensureFollowupReadinessPanel() {
   copyBundle.addEventListener("click", () => {
     copyFollowupReadinessPreviewCopyBundleToClipboard(copyBundle);
   });
+  const copyJson = document.createElement("button");
+  copyJson.type = "button";
+  copyJson.textContent = "\u590d\u5236JSON";
+  copyJson.title = "\u590d\u5236\u5f53\u524d\u9884\u6f14\u5361\u7247\u7684\u7ed3\u6784\u5316 JSON \u5feb\u7167";
+  copyJson.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#edf1ff;color:#2d3f7e;cursor:pointer;";
+  copyJson.addEventListener("click", () => {
+    copyFollowupReadinessPreviewJsonToClipboard(copyJson);
+  });
   const copyTemplate = document.createElement("button");
   copyTemplate.type = "button";
   copyTemplate.textContent = "复制模板";
@@ -2631,6 +2661,7 @@ function ensureFollowupReadinessPanel() {
   actions.appendChild(copySelected);
   actions.appendChild(copySummary);
   actions.appendChild(copyBundle);
+  actions.appendChild(copyJson);
   actions.appendChild(copy);
   actions.appendChild(copyTemplate);
   actions.appendChild(close);
@@ -2801,6 +2832,24 @@ async function copyFollowupReadinessPreviewCopyBundleToClipboard(button = null) 
     return true;
   } catch (_) {
     setStatus("复制续话对比包失败");
+    return false;
+  }
+}
+
+async function copyFollowupReadinessPreviewJsonToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildFollowupReadinessPreviewJsonText());
+    setStatus("已复制续话预演JSON");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "已复制";
+      window.setTimeout(() => {
+        button.textContent = previous || "复制JSON";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("复制续话预演JSON失败");
     return false;
   }
 }

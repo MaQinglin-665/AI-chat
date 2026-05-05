@@ -792,3 +792,8 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 097 adds a `copy bundle` action to the follow-up rehearsal preview panel.
 - The action copies one local text bundle that includes both the selected follow-up short sentence and the compact preview summary, so manual review notes are faster to prepare.
 - This remains user-click-only clipboard write behavior and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
+## 68. Task 098 Landing Notes
+
+- Task 098 adds a `复制JSON` action to the follow-up rehearsal preview panel.
+- The action copies a structured local snapshot (scenario, character state, policy/tone/index, selected short sentence, blocked reasons) for easier issue/PR comparison.
+- This remains user-click-only clipboard write behavior and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
