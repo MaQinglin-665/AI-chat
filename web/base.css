@@ -3658,6 +3658,62 @@ body.view-chat .followup-character-chip::before {
   box-shadow: 0 0 0 4px rgba(124, 164, 255, 0.16);
 }
 
+body.view-chat .followup-character-chip[data-tone="ready"] {
+  border-color: rgba(60, 172, 126, 0.32);
+  background:
+    radial-gradient(130% 130% at 0% 0%, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0)),
+    rgba(236, 253, 245, 0.92);
+  color: #24735c;
+}
+
+body.view-chat .followup-character-chip[data-tone="ready"]::before {
+  background: #34c38f;
+  box-shadow: 0 0 0 4px rgba(52, 195, 143, 0.18);
+}
+
+body.view-chat .followup-character-chip[data-tone="cooldown"],
+body.view-chat .followup-character-chip[data-tone="limit"],
+body.view-chat .followup-character-chip[data-tone="waiting"] {
+  border-color: rgba(202, 151, 49, 0.3);
+  background:
+    radial-gradient(130% 130% at 0% 0%, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0)),
+    rgba(255, 248, 224, 0.92);
+  color: #7c5a16;
+}
+
+body.view-chat .followup-character-chip[data-tone="cooldown"]::before,
+body.view-chat .followup-character-chip[data-tone="limit"]::before,
+body.view-chat .followup-character-chip[data-tone="waiting"]::before {
+  background: #d8a72f;
+  box-shadow: 0 0 0 4px rgba(216, 167, 47, 0.16);
+}
+
+body.view-chat .followup-character-chip[data-tone="quiet"] {
+  border-color: rgba(129, 139, 158, 0.28);
+  background:
+    radial-gradient(130% 130% at 0% 0%, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0)),
+    rgba(242, 245, 249, 0.92);
+  color: #5f6b7d;
+}
+
+body.view-chat .followup-character-chip[data-tone="quiet"]::before {
+  background: #8f9aae;
+  box-shadow: 0 0 0 4px rgba(143, 154, 174, 0.16);
+}
+
+body.view-chat .followup-character-chip[data-tone="watching"] {
+  border-color: rgba(110, 126, 214, 0.3);
+  background:
+    radial-gradient(130% 130% at 0% 0%, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0)),
+    rgba(242, 245, 255, 0.92);
+  color: #5861a6;
+}
+
+body.view-chat .followup-character-chip[data-tone="watching"]::before {
+  background: #8a8ff0;
+  box-shadow: 0 0 0 4px rgba(138, 143, 240, 0.16);
+}
+
 body.view-chat #translation-chip-btn {
   height: 50px;
   padding: 0 22px;

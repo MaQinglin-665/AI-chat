@@ -2004,10 +2004,20 @@ function updateFollowupCharacterChip() {
   const label = String(view.label || "安静陪伴");
   const mood = String(view.mood || "idle");
   const description = String(view.description || "");
+  const tone = {
+    "有点想接话": "ready",
+    "冷却中": "cooldown",
+    "今天先收一收": "limit",
+    "识趣闭麦": "quiet",
+    "等你缓一会儿": "waiting",
+    "观察气氛": "watching",
+    "安静陪伴": "idle"
+  }[label] || "idle";
   ui.followupCharacterChip.textContent = `${label} · ${mood}`;
   ui.followupCharacterChip.title = description || "当前续话角色状态";
   ui.followupCharacterChip.dataset.state = label;
   ui.followupCharacterChip.dataset.mood = mood;
+  ui.followupCharacterChip.dataset.tone = tone;
 }
 
 function startFollowupCharacterChipRefresh() {
