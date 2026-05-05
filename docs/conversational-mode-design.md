@@ -762,3 +762,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 092 adds a DevTools-only pending follow-up rehearsal helper for observing chip, tooltip, selected reaction, and idle-motion behavior without waiting for a natural conversation.
 - `rehearseConversationFollowupPending(input)` stores a temporary in-memory pending state, and `clearConversationFollowupRehearsal()` restores the previous pending state.
 - The helper fails closed when polling is active or all automatic scheduler switches are enabled, and it does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
+
+## 63. Task 093 Landing Notes
+
+- Task 093 adds manual rehearsal controls to the existing follow-up readiness panel.
+- The panel now has `预演` and `清除预演` buttons that reuse the Task 092 local in-memory rehearsal path, plus a report line showing rehearsal active/allowed/blocked status.
+- This is manual UI/debug tooling only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.

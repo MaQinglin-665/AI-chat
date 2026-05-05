@@ -1238,6 +1238,38 @@ function clearConversationFollowupRehearsal() {
   };
 }
 
+function runFollowupReadinessPanelRehearsal(button = null) {
+  const result = rehearseConversationFollowupPending({
+    reason: "question_tail",
+    topicHint: "\u6211\u4eec\u521a\u624d\u804a\u5230\u684c\u5ba0\u4e3b\u52a8\u7eed\u8bdd"
+  });
+  updateFollowupReadinessPanel();
+  const ok = result?.ok === true;
+  setStatus(ok ? "\u7eed\u8bdd\u9884\u6f14\u5df2\u5f00\u542f" : `\u7eed\u8bdd\u9884\u6f14\u5df2\u963b\u6b62: ${result?.reason || "unknown"}`);
+  if (button && typeof window !== "undefined") {
+    const previous = button.textContent;
+    button.textContent = ok ? "\u9884\u6f14\u4e2d" : "\u5df2\u963b\u6b62";
+    window.setTimeout(() => {
+      button.textContent = previous || "\u9884\u6f14";
+    }, 1200);
+  }
+  return result;
+}
+
+function clearFollowupReadinessPanelRehearsal(button = null) {
+  const result = clearConversationFollowupRehearsal();
+  updateFollowupReadinessPanel();
+  setStatus("\u7eed\u8bdd\u9884\u6f14\u5df2\u6e05\u9664");
+  if (button && typeof window !== "undefined") {
+    const previous = button.textContent;
+    button.textContent = "\u5df2\u6e05\u9664";
+    window.setTimeout(() => {
+      button.textContent = previous || "\u6e05\u9664\u9884\u6f14";
+    }, 1200);
+  }
+  return result;
+}
+
 function snapshotConversationFollowupPendingFixtureState() {
   const mode = state.conversationMode && typeof state.conversationMode === "object"
     ? { ...state.conversationMode }
@@ -2343,6 +2375,7 @@ function buildFollowupReadinessReport() {
   const scheduler = snapshot.proactiveScheduler || {};
   const characterState = buildFollowupCharacterState(followup, silence, scheduler);
   const switchesReady = mode.enabled === true && mode.proactiveEnabled === true && mode.proactiveSchedulerEnabled === true;
+  const rehearsalBlockedReason = getConversationFollowupRehearsalBlockedReason();
   const lines = [
     "\u7eed\u8bdd\u72b6\u6001",
     "",
@@ -2350,6 +2383,7 @@ function buildFollowupReadinessReport() {
     buildFollowupReadinessFriendlySummary(followup, silence, scheduler),
     `\u89d2\u8272\u72b6\u6001\uff1a${characterState.label}  \u5fc3\u60c5\uff1a${characterState.mood}`,
     `\u72b6\u6001\u8bf4\u660e\uff1a${characterState.description}`,
+    `\u9762\u677f\u9884\u6f14\uff1a${state.followupRehearsalActive === true ? "\u5df2\u5f00\u542f" : "\u672a\u5f00\u542f"}  \u53ef\u9884\u6f14\uff1a${rehearsalBlockedReason ? "\u5426" : "\u662f"}${rehearsalBlockedReason ? `  \u539f\u56e0\uff1a${rehearsalBlockedReason}` : ""}`,
     switchesReady
       ? "\u4e09\u5c42\u5f00\u5173\u90fd\u5df2\u5f00\u542f\uff0c\u4f46\u4ecd\u4f1a\u7ee7\u7eed\u53d7\u5b89\u9759\u7a97\u53e3\u3001\u51b7\u5374\u3001\u6b21\u6570\u4e0a\u9650\u548c\u7b56\u7565\u4fdd\u62a4\u3002"
       : "\u5f53\u524d\u4ecd\u6709\u5f00\u5173\u672a\u5f00\u542f\uff0c\u6240\u4ee5\u4e0d\u4f1a\u81ea\u52a8\u7eed\u8bdd\u3002",
@@ -2444,6 +2478,22 @@ function ensureFollowupReadinessPanel() {
   copyTemplate.addEventListener("click", () => {
     copyFollowupConfigTemplateToClipboard(copyTemplate);
   });
+  const rehearse = document.createElement("button");
+  rehearse.type = "button";
+  rehearse.textContent = "\u9884\u6f14";
+  rehearse.title = "\u4ec5\u8bbe\u7f6e\u672c\u5730\u5185\u5b58\u7eed\u8bdd\u72b6\u6001\uff0c\u4e0d\u8bf7\u6c42\u6a21\u578b\u6216\u8bed\u97f3";
+  rehearse.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e8fff3;color:#18583f;cursor:pointer;";
+  rehearse.addEventListener("click", () => {
+    runFollowupReadinessPanelRehearsal(rehearse);
+  });
+  const clearRehearsal = document.createElement("button");
+  clearRehearsal.type = "button";
+  clearRehearsal.textContent = "\u6e05\u9664\u9884\u6f14";
+  clearRehearsal.title = "\u6062\u590d\u9884\u6f14\u524d\u7684\u672c\u5730 pending \u72b6\u6001";
+  clearRehearsal.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1f4fb;color:#33415f;cursor:pointer;";
+  clearRehearsal.addEventListener("click", () => {
+    clearFollowupReadinessPanelRehearsal(clearRehearsal);
+  });
   const close = document.createElement("button");
   close.type = "button";
   close.textContent = "隐藏";
@@ -2453,6 +2503,8 @@ function ensureFollowupReadinessPanel() {
     updateFollowupReadinessPanel();
   });
   head.appendChild(title);
+  actions.appendChild(rehearse);
+  actions.appendChild(clearRehearsal);
   actions.appendChild(copy);
   actions.appendChild(copyTemplate);
   actions.appendChild(close);
