@@ -981,3 +981,17 @@ Manual checks:
 7. Click each copy/export action and confirm it still writes only visible/local debug text to the clipboard.
 8. Confirm the UI organization does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 9. Confirm the UI organization does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.
+
+## 49. Follow-up Rehearsal Scenario Compare v1
+
+Purpose: confirm the follow-up readiness panel can compare all local rehearsal scenarios at once without mutating pending follow-up state.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `more -> follow-up status`.
+3. Confirm a scenario comparison block appears below the active preview card.
+4. Confirm each rehearsal scenario appears with policy, tone, selected index, and selected local short sentence.
+5. Click each rehearsal scenario and confirm the comparison block remains visible and does not require repeated clicks to compare all scenarios.
+6. Confirm the comparison block does not write pending state, call `runConversationFollowup`, call `requestAssistantReply`, trigger LLM/fetch/TTS, screenshots, tools, shell, or file access.
+7. Confirm the comparison block does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.

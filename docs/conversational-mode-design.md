@@ -808,3 +808,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 100 reorganizes the follow-up rehearsal panel actions into two compact groups: `预演` and `复制`.
 - The title row now stays focused on the panel title and hide action, while scenario controls and copy/export controls wrap cleanly below it.
 - This is UI organization only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
+
+## 71. Task 101 Landing Notes
+
+- Task 101 adds a local scenario comparison block to the follow-up rehearsal panel.
+- The block shows each rehearsal scenario's policy, preferred tone, selected index, and selected local short sentence without requiring repeated scenario clicks.
+- The comparison is computed from existing local policy/reaction helpers and does not write pending state, call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
