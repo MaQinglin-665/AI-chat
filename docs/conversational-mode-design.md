@@ -999,3 +999,10 @@ Still out of scope:
 - The new helper `grayAutoFollowupReadiness()` reports whether gray automatic follow-up is `default_off`, `blocked`, or `ready`, and separates polling readiness from candidate readiness.
 - The follow-up readiness panel now shows gray readiness status, candidate readiness, polling readiness, and compact blocked reasons.
 - This task does not start polling, does not execute follow-up, does not call model/TTS/fetch, does not write config, and does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or dependencies.
+
+## 86. Task 113 Landing Notes
+
+- Task 113 adds a read-only gray automatic follow-up dry-run summary.
+- The new helper `grayAutoFollowupDryRun()` reports whether a hypothetical polling check would remain blocked or would attempt a trigger, while returning compact follow-up, silence, scheduler, and readiness snapshots.
+- The follow-up readiness panel now shows the dry-run outcome alongside gray readiness.
+- This task does not start polling, does not execute follow-up, does not mutate pending state, does not call `runProactiveSchedulerManualTick()`, model/TTS/fetch, does not write config, and does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or dependencies.
