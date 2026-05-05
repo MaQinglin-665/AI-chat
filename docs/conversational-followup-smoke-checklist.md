@@ -831,3 +831,27 @@ Manual checks:
 4. Confirm the compact chip text remains short and does not show a long sentence inline.
 5. Confirm the chip does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 6. Confirm the chip does not mutate pending follow-up state or scheduler state.
+
+## 40. Follow-up Pending Rehearsal v1
+
+Purpose: confirm DevTools can hold a local pending follow-up rehearsal state long enough to inspect character UI without speaking automatically.
+
+DevTools check:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.rehearseConversationFollowupPending({
+  reason: "question_tail",
+  topicHint: "我们刚才聊到桌宠主动续话"
+})
+window.__AI_CHAT_DEBUG_TTS__.conversationFollowup()
+window.__AI_CHAT_DEBUG_TTS__.followupCharacterState()
+window.__AI_CHAT_DEBUG_TTS__.clearConversationFollowupRehearsal()
+```
+
+Expected checks:
+
+1. Rehearsal sets pending state in memory and updates the character chip.
+2. Clearing rehearsal restores the previous pending state.
+3. If polling is active or all scheduler switches are enabled together, rehearsal returns a blocked result.
+4. The helper does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+5. The helper does not change scheduler gates, polling, cooldown, window limits, config, or backend APIs.

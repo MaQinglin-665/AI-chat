@@ -756,3 +756,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 091 surfaces the selected local follow-up reaction through the existing character status chip tooltip and accessibility label.
 - The compact chip text stays short, while `title`, `aria-label`, `data-selected-tone`, and `data-selected-index` expose the selected reaction for manual tuning.
 - This is read-only UI/debug visibility only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
+
+## 62. Task 092 Landing Notes
+
+- Task 092 adds a DevTools-only pending follow-up rehearsal helper for observing chip, tooltip, selected reaction, and idle-motion behavior without waiting for a natural conversation.
+- `rehearseConversationFollowupPending(input)` stores a temporary in-memory pending state, and `clearConversationFollowupRehearsal()` restores the previous pending state.
+- The helper fails closed when polling is active or all automatic scheduler switches are enabled, and it does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
