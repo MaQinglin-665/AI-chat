@@ -297,6 +297,7 @@ const state = {
   followupReadinessVisible: false,
   followupReadinessPanel: null,
   followupReadinessCard: null,
+  followupReadinessCompare: null,
   followupReadinessBody: null,
   followupReadinessRefreshTimer: 0,
   followupCharacterChipRefreshTimer: 0,
@@ -2479,6 +2480,29 @@ function buildFollowupReadinessPreviewCardText() {
   ].join("\n");
 }
 
+function buildFollowupRehearsalScenarioCompareText() {
+  const rows = FOLLOWUP_REHEARSAL_SCENARIOS.map((scenario) => {
+    const policy = buildConversationFollowupPolicy({
+      reason: scenario.reason,
+      topicHint: scenario.topicHint
+    });
+    const plan = {
+      reason: scenario.reason,
+      topicHint: scenario.topicHint,
+      followupPolicy: policy.type,
+      updatedAgeMs: state.conversationMode?.silenceFollowupMinMs || 180000
+    };
+    const candidates = buildConversationFollowupReactionCandidates(plan);
+    const selected = selectConversationFollowupReactionCandidate(plan, candidates);
+    const candidate = String(selected.candidate?.text || "n/a").replace(/\s+/g, " ").trim();
+    return `${scenario.label} | policy=${policy.type} | tone=${selected.preferredTone || "n/a"} | selected=${selected.index} | ${candidate}`;
+  });
+  return [
+    "场景对比（本地预演，不写入状态）",
+    ...rows
+  ].join("\n");
+}
+
 function buildFollowupReadinessPreviewCopyBundleText() {
   const data = buildFollowupReadinessPreviewCardData();
   const candidateText = data.candidateText === "n/a" ? "" : data.candidateText;
@@ -2562,6 +2586,13 @@ function updateFollowupReadinessPreviewCard() {
     return;
   }
   state.followupReadinessCard.textContent = buildFollowupReadinessPreviewCardText();
+}
+
+function updateFollowupReadinessScenarioCompare() {
+  if (!state.followupReadinessCompare) {
+    return;
+  }
+  state.followupReadinessCompare.textContent = buildFollowupRehearsalScenarioCompareText();
 }
 
 function createFollowupReadinessActionGroup(labelText, buttons = []) {
@@ -2729,13 +2760,26 @@ function ensureFollowupReadinessPanel() {
   ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
+  const compare = document.createElement("pre");
+  compare.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(93,128,195,.18)",
+    "border-radius:14px",
+    "background:rgba(255,255,255,.46)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#263d70"
+  ].join(";");
   panel.appendChild(head);
   panel.appendChild(actionBar);
   panel.appendChild(card);
+  panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
   state.followupReadinessPanel = panel;
   state.followupReadinessCard = card;
+  state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   return panel;
 }
@@ -2762,6 +2806,7 @@ function updateFollowupReadinessPanel() {
         return;
       }
       updateFollowupReadinessPreviewCard();
+      updateFollowupReadinessScenarioCompare();
       if (state.followupReadinessBody) {
         state.followupReadinessBody.textContent = buildFollowupReadinessReport();
       }
@@ -2769,6 +2814,7 @@ function updateFollowupReadinessPanel() {
   }
   panel.style.display = "block";
   updateFollowupReadinessPreviewCard();
+  updateFollowupReadinessScenarioCompare();
   if (state.followupReadinessBody) {
     state.followupReadinessBody.textContent = buildFollowupReadinessReport();
   }
