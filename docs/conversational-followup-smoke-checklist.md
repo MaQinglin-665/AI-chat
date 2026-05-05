@@ -1103,3 +1103,51 @@ Manual checks:
 8. For a blocked candidate or changed guard state, confirm `conversation_followup_manual_confirmation_blocked` appears and execution fails closed.
 9. Confirm event payloads remain compact: topic/status/policy/guard summary only, not full prompts or unrelated private data.
 10. Confirm this task does not add automatic follow-up, screenshots, tools, shell, file access, backend APIs, desktop observation, config writes, or new dependencies.
+
+## 57. Manual Confirmation End-to-End Smoke Runbook
+
+Purpose: provide one practical acceptance path for the whole manual confirmation experience before gray automatic follow-up preparation begins.
+
+Preconditions:
+
+1. Start from a clean app session in chat view.
+2. Keep automatic proactive follow-up disabled unless a specific later task says otherwise.
+3. Keep desktop observation, screenshots, tools, shell execution, file access, and config writes out of scope.
+4. Open `more -> follow-up status`; open the TTS/debug event panel when checking lifecycle events.
+
+Happy path:
+
+1. Confirm no manual confirmation card appears when there is no pending follow-up candidate.
+2. Start a local rehearsal scenario or create a natural pending candidate.
+3. Confirm the manual confirmation card shows the proposed short sentence, topic/reason, policy, tone/index, guard explanation, raw blocked reasons, and safety note.
+4. Confirm the action group shows `确认`, `忽略`, and `查看详情`.
+5. Confirm `conversation_followup_manual_confirmation_preview_shown` appears once for the current key/status and does not repeat on every panel refresh.
+6. When the candidate is available, click `查看详情` and confirm the readiness report opens/focuses without changing pending state.
+7. Click `确认` and confirm the UI enters an executing state.
+8. Confirm approval re-checks follow-up, silence, and scheduler guards immediately before execution.
+9. Confirm execution uses the existing `runConversationFollowupDebug()` path and does not create a new request path.
+10. Confirm debug events appear in order: approval started, approved, then execution succeeded or execution failed.
+
+Blocked path:
+
+1. Select or wait for a candidate whose guards are blocked.
+2. Confirm `确认` is disabled or shown as not confirmable.
+3. Attempt confirmation if the UI allows it and confirm execution fails closed.
+4. Confirm `conversation_followup_manual_confirmation_blocked` appears with a compact guard summary.
+5. Confirm no automatic model request, TTS, scheduler tick, or pending-state consumption happens from the blocked attempt.
+
+Dismiss path:
+
+1. With a visible confirmation card, click `忽略`.
+2. Confirm `conversation_followup_manual_confirmation_dismissed` appears.
+3. Confirm the card hides only for the current `topic/policy/candidate` key in local memory.
+4. Confirm scheduler gates, polling, cooldown, window limits, pending state, config, and backend APIs are unchanged.
+5. Confirm a different pending candidate can show a new confirmation card.
+
+Safety sign-off:
+
+1. Confirm no step adds automatic follow-up.
+2. Confirm no step adds desktop observation, screenshots, tool calls, shell execution, file access, config writes, backend APIs, or new dependencies.
+3. Confirm event payloads stay compact and do not include full prompts, secrets, user files, screenshots, or unrelated private data.
+4. Confirm failed execution restores pending state through the existing guarded follow-up path.
+5. Confirm the manual confirmation experience is ready for a checkpoint before gray automatic follow-up work.

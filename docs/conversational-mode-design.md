@@ -938,3 +938,9 @@ Safety boundaries:
 - The readiness panel now records preview visibility transitions, dismiss clicks, detail-review clicks, approval start, guard-blocked attempts, and execution success/failure through the existing TTS debug event stream.
 - Preview visibility events are de-duplicated by current confirmation key and status so panel refreshes do not spam debug logs.
 - Event payloads stay compact and sanitized: topic/status/policy/guard summary only, with no new model calls, speech, scheduler behavior, config writes, backend APIs, desktop observation, screenshots, file access, shell execution, or tool calls.
+
+## 81. Task 109 Landing Notes
+
+- Task 109 documents an end-to-end manual confirmation smoke runbook before any gray automatic follow-up work.
+- The runbook connects empty state, local rehearsal candidate, available confirmation, blocked confirmation, dismiss/reopen behavior, guarded execution, lifecycle events, and safety boundaries into one review path.
+- This task is documentation-only and does not change runtime behavior, scheduler gates, cooldowns, pending state, config, backend APIs, desktop observation, screenshots, file access, shell execution, tool calls, model calls, or speech.
