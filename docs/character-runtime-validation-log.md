@@ -1138,3 +1138,64 @@ The panel reads existing debug snapshot data only. It does not change configurat
 trigger follow-up, call requestAssistantReply, call LLM/fetch/TTS, capture screenshots, call tools,
 execute shell commands, read files, or persist new settings.
 ```
+
+---
+
+# Follow-up Readiness Panel Runtime Result - 2026-05-05 (Task 073)
+
+Task 073 records the real Electron UI result for the Task 072 follow-up readiness panel.
+
+Evidence source:
+
+```text
+Manual screenshot from the running Electron window after Task 072 was merged into main and Electron
+was restarted.
+```
+
+Observed panel output:
+
+| Area | Observed |
+| --- | --- |
+| Panel title | `Follow-up readiness` |
+| Visible close control | `Hide` |
+| conversation switch | `on` |
+| proactive switch | `on` |
+| scheduler switch | `on` |
+| follow-up pending | `false` |
+| follow-up policy | `gentle_continue` |
+| follow-up eligible | `false` |
+| topic | `(empty)` |
+| follow-up blocked reasons | `no_pending_followup`, `empty_topic_hint`, `silence_window_not_reached` |
+| updated age | `n/a` |
+| silence minimum | `3m` |
+| silence eligible | `false` |
+| silence policy | `gentle_continue` |
+| silence blocked reasons | `no_pending_followup`, `empty_topic_hint`, `no_tts_finished_timestamp` |
+| last user age | `2286m` |
+| last TTS age | `n/a` |
+| scheduler eligible | `false` |
+| polling active | `true` |
+| last poll | `blocked` |
+| scheduler blocked reasons | `warmup_active` |
+| cooldown | `0ms` |
+| window count | `0/1` |
+| safety text | visible |
+
+Interpretation:
+
+```text
+The panel is visible and reporting the expected read-only readiness information from the real UI.
+The current runtime state is safely blocked: no pending follow-up exists, silence readiness is not
+eligible, and the scheduler gate is blocked by warmup_active. Polling being active did not imply
+ready or triggered behavior.
+```
+
+Result: pass
+
+Safety confirmation:
+
+```text
+This checkpoint only records the visible UI state. No code, config, scheduler behavior, request
+path, screenshot capture path, tool call path, shell execution path, file read path, TTS path,
+fetch path, or LLM path was changed.
+```
