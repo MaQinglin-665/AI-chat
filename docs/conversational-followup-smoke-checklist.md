@@ -678,3 +678,24 @@ Expected checks:
 3. The prompt uses low-pressure desktop-pet wording rather than system-notification wording.
 4. The prompt still forbids desktop/screen/file/privacy guessing and tool calls.
 5. No scheduler, polling, or follow-up execution is triggered by preview alone.
+
+## 31. Follow-up Character Preview v1
+
+Purpose: confirm the local preview line helps tune proactive follow-up copy without triggering the LLM or scheduler.
+
+DevTools preview:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.previewConversationFollowupPolicy({
+  reason: "question_tail",
+  topicHint: "我们刚才聊到桌宠主动续话"
+})
+```
+
+Expected checks:
+
+1. The result includes `characterPreview`.
+2. `characterPreview` is short, Chinese-first, and low-pressure.
+3. `characterCue` remains present.
+4. Preview does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+5. Preview does not mutate pending follow-up state or scheduler state.
