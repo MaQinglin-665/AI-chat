@@ -618,3 +618,22 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - no policy changes
   - no follow-up trigger changes
   - no LLM/fetch/TTS, screenshot, tool, shell, or file access
+
+## 47. Task 075 Landing Notes
+
+- Task 075 changes the follow-up readiness panel from English-first to Chinese-first copy.
+- The panel now uses Chinese labels and explanations for:
+  - title
+  - summary
+  - switch states
+  - follow-up state
+  - silence gate
+  - scheduler gate
+  - safety note
+- Raw blocked reason keys are still shown under `原始原因` for debugging.
+- This is still presentation-only:
+  - no config changes
+  - no scheduler gate changes
+  - no policy changes
+  - no follow-up trigger changes
+  - no LLM/fetch/TTS, screenshot, tool, shell, or file access
