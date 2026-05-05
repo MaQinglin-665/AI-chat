@@ -42,6 +42,8 @@ const state = {
   followupReason: "",
   followupTopicHint: "",
   followupUpdatedAt: 0,
+  followupRehearsalActive: false,
+  followupRehearsalSnapshot: null,
   conversationLastUserAt: 0,
   conversationLastAssistantAt: 0,
   conversationLastTtsFinishedAt: 0,
@@ -1144,6 +1146,96 @@ function clearConversationFollowupPending(nowMs = Date.now()) {
   state.followupReason = "";
   state.followupTopicHint = "";
   state.followupUpdatedAt = Number.isFinite(now) ? Math.max(0, Math.round(now)) : 0;
+}
+
+function getConversationFollowupRehearsalBlockedReason() {
+  const mode = state.conversationMode && typeof state.conversationMode === "object"
+    ? state.conversationMode
+    : {};
+  if (state.proactivePollTimerId) {
+    return "polling_active";
+  }
+  if (mode.enabled === true && mode.proactiveEnabled === true && mode.proactiveSchedulerEnabled === true) {
+    return "auto_scheduler_enabled";
+  }
+  return "";
+}
+
+function rehearseConversationFollowupPending(input = {}) {
+  const blockedReason = getConversationFollowupRehearsalBlockedReason();
+  if (blockedReason) {
+    recordTTSDebugEvent("conversation_followup_rehearsal_blocked", {
+      text: "",
+      result: blockedReason,
+      error: "fail_closed"
+    });
+    return {
+      ok: false,
+      reason: blockedReason,
+      followup: buildConversationFollowupDebugView(Date.now())
+    };
+  }
+
+  const safeInput = input && typeof input === "object" ? input : {};
+  const reason = String(safeInput.reason || "followup_pending").trim() || "followup_pending";
+  const topicHint = String(
+    safeInput.topicHint || safeInput.text || "我们刚才聊到桌宠主动续话"
+  ).replace(/\s+/g, " ").trim();
+  if (!topicHint) {
+    return {
+      ok: false,
+      reason: "empty_topic_hint",
+      followup: buildConversationFollowupDebugView(Date.now())
+    };
+  }
+
+  if (state.followupRehearsalActive !== true) {
+    state.followupRehearsalSnapshot = snapshotConversationFollowupPending();
+  }
+  state.followupRehearsalActive = true;
+  state.followupPending = true;
+  state.followupReason = reason;
+  state.followupTopicHint = topicHint;
+  state.followupUpdatedAt = Date.now();
+
+  updateFollowupCharacterChip();
+  const followup = buildConversationFollowupDebugView(Date.now());
+  recordTTSDebugEvent("conversation_followup_rehearsal_set", {
+    text: topicHint,
+    result: reason,
+    error: followup.followupPolicy || ""
+  });
+  return {
+    ok: true,
+    reason: "rehearsal_set",
+    followup,
+    characterState: getFollowupCharacterStateDebugView()
+  };
+}
+
+function clearConversationFollowupRehearsal() {
+  if (state.followupRehearsalActive !== true) {
+    return {
+      ok: true,
+      reason: "no_active_rehearsal",
+      followup: buildConversationFollowupDebugView(Date.now())
+    };
+  }
+  const snapshot = state.followupRehearsalSnapshot || { pending: false, reason: "", topicHint: "", updatedAt: 0 };
+  restoreConversationFollowupPending(snapshot);
+  state.followupRehearsalActive = false;
+  state.followupRehearsalSnapshot = null;
+  updateFollowupCharacterChip();
+  recordTTSDebugEvent("conversation_followup_rehearsal_cleared", {
+    text: String(snapshot.topicHint || ""),
+    result: "restored"
+  });
+  return {
+    ok: true,
+    reason: "rehearsal_cleared",
+    followup: buildConversationFollowupDebugView(Date.now()),
+    characterState: getFollowupCharacterStateDebugView()
+  };
 }
 
 function snapshotConversationFollowupPendingFixtureState() {
@@ -7659,6 +7751,8 @@ function installTTSDebugBridge() {
     previewConversationFollowupPolicy: (input) => previewConversationFollowupPolicy(input),
     previewConversationFollowupReactions: (input) => previewConversationFollowupReactions(input),
     checkConversationFollowupPendingFixture: (input) => runConversationFollowupPendingFixture(input),
+    rehearseConversationFollowupPending: (input) => rehearseConversationFollowupPending(input),
+    clearConversationFollowupRehearsal: () => clearConversationFollowupRehearsal(),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({
