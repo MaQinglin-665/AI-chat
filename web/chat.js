@@ -30,6 +30,7 @@ const state = {
     enabled: false,
     proactiveEnabled: false,
     proactiveSchedulerEnabled: false,
+    grayAutoEnabled: false,
     proactiveCooldownMs: 600000,
     proactiveWarmupMs: 120000,
     proactiveWindowMs: 3600000,
@@ -487,6 +488,9 @@ function getProactiveSchedulerPollingGateStatus() {
   if (conversationMode.proactiveSchedulerEnabled !== true) {
     blockedReasons.push("scheduler_disabled");
   }
+  if (conversationMode.grayAutoEnabled !== true) {
+    blockedReasons.push("gray_auto_disabled");
+  }
   return {
     enabled: blockedReasons.length === 0,
     blockedReasons
@@ -502,6 +506,8 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
   const conversationEnabled = conversationMode.enabled === true;
   const proactiveEnabled = conversationMode.proactiveEnabled === true;
   const schedulerEnabled = conversationMode.proactiveSchedulerEnabled === true;
+  const grayAutoEnabled = conversationMode.grayAutoEnabled === true;
+  const pollingGate = getProactiveSchedulerPollingGateStatus();
   const pollIntervalMs = Number.isFinite(Number(conversationMode.proactivePollIntervalMs))
     ? Math.max(30000, Math.min(600000, Math.round(Number(conversationMode.proactivePollIntervalMs))))
     : 60000;
@@ -522,7 +528,7 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
     : 0;
   const proactiveInFlight = state.proactiveInFlight === true;
   const pollTimerActive = Number(state.proactivePollTimerId || 0) > 0;
-  const pollingEnabled = shouldEnableProactiveSchedulerPolling();
+  const pollingEnabled = pollingGate.enabled === true;
   const lastPollAt = Number(state.proactiveLastPollAt || 0);
   const lastPollAgeMs = lastPollAt > 0 ? Math.max(0, Math.round(safeNow - lastPollAt)) : -1;
   const lastAttemptAt = Number(state.proactiveLastAttemptAt || 0);
@@ -571,6 +577,7 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
     schedulerEnabled,
     conversationEnabled,
     proactiveEnabled,
+    grayAutoEnabled,
     startedAgeMs,
     warmupRemainingMs,
     cooldownRemainingMs,
@@ -579,6 +586,9 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
     maxFollowupsPerWindow,
     proactiveInFlight,
     pollingEnabled,
+    pollingBlockedReasons: Array.isArray(pollingGate.blockedReasons)
+      ? pollingGate.blockedReasons.slice()
+      : [],
     pollIntervalMs,
     pollTimerActive,
     lastPollAgeMs,
@@ -641,6 +651,7 @@ function getTTSDebugSnapshot() {
       enabled: conversationMode.enabled === true,
       proactiveEnabled: conversationMode.proactiveEnabled === true,
       proactiveSchedulerEnabled: conversationMode.proactiveSchedulerEnabled === true,
+      grayAutoEnabled: conversationMode.grayAutoEnabled === true,
       proactiveCooldownMs: Number.isFinite(Number(conversationMode.proactiveCooldownMs))
         ? Math.round(Number(conversationMode.proactiveCooldownMs))
         : 600000,
@@ -2148,6 +2159,7 @@ function explainReadinessReason(reason) {
     conversation_disabled: "会话模式未开启",
     proactive_disabled: "主动续话未开启",
     scheduler_disabled: "主动调度未开启",
+    gray_auto_disabled: "灰度自动续话未显式启用",
     no_pending_followup: "当前没有待续接的话题",
     empty_topic_hint: "没有可继续的话题线索",
     silence_window_not_reached: "安静时间还不够",
@@ -2420,7 +2432,10 @@ function buildFollowupReadinessReport() {
   const silence = snapshot.silence || {};
   const scheduler = snapshot.proactiveScheduler || {};
   const characterState = buildFollowupCharacterState(followup, silence, scheduler);
-  const switchesReady = mode.enabled === true && mode.proactiveEnabled === true && mode.proactiveSchedulerEnabled === true;
+  const switchesReady = mode.enabled === true
+    && mode.proactiveEnabled === true
+    && mode.proactiveSchedulerEnabled === true;
+  const grayAutoEnabled = mode.grayAutoEnabled === true;
   const rehearsalBlockedReason = getConversationFollowupRehearsalBlockedReason();
   const rehearsalScenarioLabel = getFollowupRehearsalScenarioLabel(state.followupRehearsalScenarioId);
   const lines = [
@@ -2431,6 +2446,7 @@ function buildFollowupReadinessReport() {
     `\u89d2\u8272\u72b6\u6001\uff1a${characterState.label}  \u5fc3\u60c5\uff1a${characterState.mood}`,
     `\u72b6\u6001\u8bf4\u660e\uff1a${characterState.description}`,
     `\u9762\u677f\u9884\u6f14\uff1a${state.followupRehearsalActive === true ? "\u5df2\u5f00\u542f" : "\u672a\u5f00\u542f"}${rehearsalScenarioLabel ? `  \u573a\u666f\uff1a${rehearsalScenarioLabel}` : ""}  \u53ef\u9884\u6f14\uff1a${rehearsalBlockedReason ? "\u5426" : "\u662f"}${rehearsalBlockedReason ? `  \u539f\u56e0\uff1a${rehearsalBlockedReason}` : ""}`,
+    `\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\uff1a${grayAutoEnabled ? "\u5df2\u663e\u5f0f\u542f\u7528" : "\u672a\u542f\u7528\uff08\u9ed8\u8ba4\u5173\u95ed\uff09"}${grayAutoEnabled ? "" : "  \u81ea\u52a8\u8f6e\u8be2\u4f1a\u4fdd\u6301\u5173\u95ed"}`,
     switchesReady
       ? "\u4e09\u5c42\u5f00\u5173\u90fd\u5df2\u5f00\u542f\uff0c\u4f46\u4ecd\u4f1a\u7ee7\u7eed\u53d7\u5b89\u9759\u7a97\u53e3\u3001\u51b7\u5374\u3001\u6b21\u6570\u4e0a\u9650\u548c\u7b56\u7565\u4fdd\u62a4\u3002"
       : "\u5f53\u524d\u4ecd\u6709\u5f00\u5173\u672a\u5f00\u542f\uff0c\u6240\u4ee5\u4e0d\u4f1a\u81ea\u52a8\u7eed\u8bdd\u3002",
@@ -2439,16 +2455,17 @@ function buildFollowupReadinessReport() {
     `\u4f1a\u8bdd\u6a21\u5f0f\uff1a${formatReadinessBool(mode.enabled)}`,
     `\u4e3b\u52a8\u7eed\u8bdd\uff1a${formatReadinessBool(mode.proactiveEnabled)}`,
     `\u8c03\u5ea6\u5668\uff1a${formatReadinessBool(mode.proactiveSchedulerEnabled)}`,
+    `\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\uff1a${formatReadinessBool(mode.grayAutoEnabled)}  \u8f6e\u8be2\u95e8\u7981\uff1a${joinReadinessReasons(scheduler.pollingBlockedReasons)}`,
     "",
     "\u5982\u4f55\u8c03\u6574",
     "1. \u6253\u5f00 config.local.json\u3002",
-    "2. \u4fee\u6539 conversation_mode \u91cc\u7684 enabled / proactive_enabled / proactive_scheduler_enabled\u3002",
+    "2. \u4fee\u6539 conversation_mode \u91cc\u7684 enabled / proactive_enabled / proactive_scheduler_enabled / gray_auto_enabled\u3002",
     "3. \u4fdd\u5b58\u540e\u91cd\u542f\u5e94\u7528\u751f\u6548\u3002",
-    "4. \u5982\u679c\u60f3\u7acb\u523b\u505c\u7528\uff0c\u5173\u95ed\u4efb\u610f\u4e00\u4e2a\u5f00\u5173\u5373\u53ef\u3002",
+    "4. \u5982\u679c\u60f3\u7acb\u523b\u505c\u7528\u81ea\u52a8\u7eed\u8bdd\uff0c\u5173\u95ed\u4efb\u610f\u4e00\u4e2a\u5f00\u5173\u5373\u53ef\uff1bgray_auto_enabled \u9ed8\u8ba4\u4e3a false\u3002",
     "",
     "\u5b89\u5168\u9ed8\u8ba4",
     "\u9ed8\u8ba4\u4e0d\u4e3b\u52a8\u89c2\u5bdf\u684c\u9762\uff0c\u4e0d\u8bfb\u6587\u4ef6\uff0c\u4e0d\u8c03\u7528\u5de5\u5177\uff0c\u4e0d\u6267\u884c\u547d\u4ee4\u3002",
-    "\u81ea\u52a8\u7eed\u8bdd\u53ea\u4f1a\u5728\u591a\u5c42 guard \u5168\u90e8\u901a\u8fc7\u540e\u5c1d\u8bd5\uff0c\u5e76\u4e14\u4f1a\u907f\u5f00\u5df2\u6536\u53e3\u7684\u8bdd\u9898\u3002",
+    "\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\u9700\u8981\u663e\u5f0f\u6253\u5f00 gray_auto_enabled\uff0c\u5e76\u4e14\u53ea\u4f1a\u5728\u591a\u5c42 guard \u5168\u90e8\u901a\u8fc7\u540e\u5c1d\u8bd5\uff0c\u4f1a\u907f\u5f00\u5df2\u6536\u53e3\u7684\u8bdd\u9898\u3002",
     "",
     "\u7eed\u8bdd\u8be6\u60c5",
     `\u5f85\u5904\u7406\uff1a${followup.pending === true ? "\u662f" : "\u5426"}  \u7b56\u7565\uff1a${followup.policy || "n/a"}  \u53ef\u89e6\u53d1\uff1a${followup.eligible === true ? "\u662f" : "\u5426"}`,
@@ -3240,6 +3257,7 @@ function buildFollowupConfigTemplate() {
     '    "enabled": true,',
     '    "proactive_enabled": true,',
     '    "proactive_scheduler_enabled": true,',
+    '    "gray_auto_enabled": false,',
     '    "proactive_cooldown_ms": 600000,',
     '    "proactive_warmup_ms": 120000,',
     '    "proactive_poll_interval_ms": 60000,',
@@ -12573,6 +12591,7 @@ async function loadConfig() {
     enabled: conversationCfg.enabled === true,
     proactiveEnabled: conversationCfg.proactive_enabled === true,
     proactiveSchedulerEnabled: conversationCfg.proactive_scheduler_enabled === true,
+    grayAutoEnabled: conversationCfg.gray_auto_enabled === true,
     proactiveCooldownMs: Math.round(
       clampNumber(Number(conversationCfg.proactive_cooldown_ms ?? 600000), 60000, 3600000)
     ),

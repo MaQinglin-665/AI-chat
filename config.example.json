@@ -177,6 +177,7 @@
     "enabled": false,
     "proactive_enabled": false,
     "proactive_scheduler_enabled": false,
+    "gray_auto_enabled": false,
     "proactive_cooldown_ms": 600000,
     "proactive_warmup_ms": 120000,
     "proactive_window_ms": 3600000,

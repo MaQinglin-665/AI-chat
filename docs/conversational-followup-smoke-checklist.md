@@ -175,19 +175,21 @@ window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler
 
 期望：
 1. 默认配置下 `pollTimerActive=false`，且 `schedulerEnabled=false`（或被上层开关阻塞）。
-2. 开启 `conversation_mode.enabled/proactive_enabled/proactive_scheduler_enabled` 后，reload 页面，`pollTimerActive=true`。
-3. `events()` 可见：
+2. 仅开启 `conversation_mode.enabled/proactive_enabled/proactive_scheduler_enabled` 且保持 `gray_auto_enabled=false` 时，reload 页面后 `pollTimerActive=false`，`pollingBlockedReasons` 包含 `gray_auto_disabled`。
+3. 显式开启 `conversation_mode.gray_auto_enabled=true` 后，reload 页面，`pollTimerActive=true`。
+4. `events()` 可见：
    - `proactive_scheduler_poll_start`
    - `proactive_scheduler_poll_blocked` 或 `proactive_scheduler_poll_ready`
-4. polling 仅做检查，不自动触发 follow-up，不自动说话，不自动截图。
+5. polling 仅做检查，不自动截图、不自动工具调用、不读取用户文件；是否触发 follow-up 仍受后续 guard 保护。
 
 ## 12. Limited Auto Trigger Smoke（Task 044）
 
 执行前置（仅本地测试）：
-1. 开启三层开关：
+1. 开启四层开关：
    - `conversation_mode.enabled=true`
    - `conversation_mode.proactive_enabled=true`
    - `conversation_mode.proactive_scheduler_enabled=true`
+   - `conversation_mode.gray_auto_enabled=true`
 2. 构造可通过 scheduler gate 与 silence eligibility 的场景。
 
 观察点：
@@ -201,7 +203,7 @@ window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler
 ## 13. Kill-Switch Smoke（Task 045）
 
 执行前置：
-1. 先开启三层开关并确认 polling 已 active。
+1. 先开启四层开关并确认 polling 已 active。
 2. 确认 `events()` 已出现 `proactive_scheduler_poll_start`。
 
 操作与期望：
@@ -209,7 +211,7 @@ window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler
    - `snapshot().proactiveScheduler.pollTimerActive=false`
    - `pollLastResult=disabled`
    - `events()` 可见 `proactive_scheduler_poll_stop` 与带原因的 `proactive_scheduler_poll_blocked`
-2. 重新开启三层开关后可恢复 polling（仍受既有 guard）。
+2. 重新开启四层开关后可恢复 polling（仍受既有 guard）。
 3. 异常场景下仅记录 `proactive_scheduler_poll_failed`/stop 事件，不应出现不安全自动行为。
 
 ## 14. Controlled Integration Checkpoint（Task 046）
@@ -230,6 +232,7 @@ Commit：
 - conversation_mode.enabled:
 - conversation_mode.proactive_enabled:
 - conversation_mode.proactive_scheduler_enabled:
+- conversation_mode.gray_auto_enabled:
 - conversation_mode.proactive_poll_interval_ms:
 - conversation_mode.proactive_cooldown_ms:
 - conversation_mode.proactive_warmup_ms:
@@ -241,7 +244,7 @@ A. 默认关闭回归（通过/未通过）：
 - 事件：proactive_scheduler_poll_blocked 或 disabled 相关 stop
 - 备注：
 
-B. 三层开关联调（通过/未通过）：
+B. 四层开关联调（通过/未通过）：
 - 观察：poll_start -> poll_blocked/poll_ready
 - 事件：proactive_scheduler_poll_start, proactive_scheduler_poll_blocked, proactive_scheduler_poll_ready
 - 备注：
@@ -1168,3 +1171,20 @@ Review checks:
 8. Confirm debug event payloads remain compact and do not include full prompts, secrets, screenshots, files, or unrelated private data.
 9. Confirm next-stage work is limited to default-off gray-mode flags, read-only status surfaces, dry-run scheduler checks, and additional smoke checks.
 10. Confirm next-stage work does not add desktop observation, screenshots, tool calls, shell execution, file access, config writes, backend APIs, new dependencies, or mature-product claims.
+
+## 59. Gray Automatic Follow-up Default-off Gate v1
+
+Purpose: confirm `conversation_mode.gray_auto_enabled` gates automatic polling while preserving manual confirmation.
+
+Manual checks:
+
+1. Confirm `config.example.json` contains `conversation_mode.gray_auto_enabled=false`.
+2. Start with `enabled=true`, `proactive_enabled=true`, `proactive_scheduler_enabled=true`, and `gray_auto_enabled=false`.
+3. Reload the app and confirm `window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler.pollTimerActive=false`.
+4. Confirm `window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler.pollingBlockedReasons` includes `gray_auto_disabled`.
+5. Open `more -> follow-up status` and confirm the readiness report shows gray automatic follow-up as disabled/default-off.
+6. Confirm manual confirmation preview, `确认`, `忽略`, and `查看详情` remain usable for explicit user-confirmed follow-up.
+7. Copy the config template and confirm it includes `gray_auto_enabled=false`.
+8. Set `gray_auto_enabled=true` only in a local test config, reload, and confirm polling can start only if the other three switches are also true.
+9. Confirm turning any one of the four switches off stops automatic polling.
+10. Confirm this task does not add desktop observation, screenshots, tool calls, shell execution, file access, config writes, backend APIs, model calls, speech, or new dependencies.
