@@ -854,3 +854,59 @@ Next stage: manual confirmation experience.
 - Task 108: add confirmation lifecycle debug events.
 - Task 109: document manual confirmation smoke checks.
 - Task 110: prepare a checkpoint before gray automatic follow-up work.
+
+## 75. Task 104 Landing Notes
+
+- Task 104 defines the manual confirmation flow that sits between local rehearsal/debug tooling and any future automatic follow-up behavior.
+- The flow requires the app to show a proposed follow-up, explain guard/policy state, and wait for explicit user approval before execution.
+- This task is design-only and does not change runtime behavior, execute follow-up, call LLM/fetch/TTS, change scheduler behavior, write config, or add desktop/file/tool access.
+
+## 76. Manual Confirmation Flow Design
+
+Goal:
+
+- Let the desktop pet gently surface that it has a possible follow-up.
+- Keep the user in control by requiring explicit approval before any follow-up execution.
+- Reuse the existing follow-up policy, selected local reaction, and guard diagnostics before wiring execution.
+
+Entry conditions:
+
+- A pending follow-up exists or a rehearsal/debug state provides a candidate.
+- Existing guard and policy snapshots are available.
+- The UI can show whether the candidate is currently allowed or blocked.
+
+Confirmation card states:
+
+- `hidden`: no pending follow-up or user dismissed the prompt.
+- `available`: a candidate exists and guards are currently passable.
+- `blocked`: a candidate exists but policy/guard state says it should not execute.
+- `approved_pending`: user clicked approve and guarded execution is about to run.
+- `dismissed`: user explicitly ignored the prompt for the current pending item.
+
+Card content:
+
+- Proposed short sentence from the selected local follow-up reaction.
+- Topic hint or compact reason for why the pet wants to continue.
+- Policy label and selected tone/index.
+- Friendly guard explanation: allowed, blocked, cooldown, speaking, busy, closed topic, or disabled.
+- Safety note that nothing will be spoken until the user approves.
+
+User actions:
+
+- `approve`: only enabled in the `available` state; later tasks wire this to existing guarded manual execution.
+- `dismiss`: hides the confirmation for the current pending item without executing follow-up.
+- `review details`: opens or focuses the existing readiness panel for deeper diagnostics.
+
+Execution rules:
+
+- Approval must re-check guards immediately before execution.
+- If guards fail during approval, fail closed and switch the card to `blocked`.
+- Approval must not bypass scheduler, policy, cooldown, speaking, busy, or closed-topic checks.
+- Dismissal must not change scheduler gates, cooldown, window limits, or config.
+
+Safety boundaries:
+
+- Default behavior remains no automatic follow-up.
+- No approval means no model request and no speech.
+- No desktop observation, screenshot capture, file access, shell execution, tool call, or config write.
+- The first implementation tasks should build preview and controls before wiring approve to execution.
