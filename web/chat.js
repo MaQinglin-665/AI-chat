@@ -44,6 +44,7 @@ const state = {
   followupUpdatedAt: 0,
   followupRehearsalActive: false,
   followupRehearsalSnapshot: null,
+  followupRehearsalScenarioId: "",
   conversationLastUserAt: 0,
   conversationLastAssistantAt: 0,
   conversationLastTtsFinishedAt: 0,
@@ -1225,6 +1226,7 @@ function clearConversationFollowupRehearsal() {
   restoreConversationFollowupPending(snapshot);
   state.followupRehearsalActive = false;
   state.followupRehearsalSnapshot = null;
+  state.followupRehearsalScenarioId = "";
   updateFollowupCharacterChip();
   recordTTSDebugEvent("conversation_followup_rehearsal_cleared", {
     text: String(snapshot.topicHint || ""),
@@ -1238,19 +1240,52 @@ function clearConversationFollowupRehearsal() {
   };
 }
 
-function runFollowupReadinessPanelRehearsal(button = null) {
-  const result = rehearseConversationFollowupPending({
+const FOLLOWUP_REHEARSAL_SCENARIOS = [
+  {
+    id: "curious_question",
+    label: "\u597d\u5947\u8ffd\u95ee",
     reason: "question_tail",
     topicHint: "\u6211\u4eec\u521a\u624d\u804a\u5230\u684c\u5ba0\u4e3b\u52a8\u7eed\u8bdd"
-  });
+  },
+  {
+    id: "soft_checkin",
+    label: "\u6e29\u67d4\u63a5\u8bdd",
+    reason: "soft_checkin",
+    topicHint: "\u6211\u4eec\u521a\u624d\u804a\u5230\u8ba9\u89d2\u8272\u66f4\u50cf\u966a\u4f34"
+  },
+  {
+    id: "quiet_close",
+    label: "\u6536\u53e3\u5b89\u9759",
+    reason: "followup_pending",
+    topicHint: "\u5148\u8fd9\u6837\uff0c\u665a\u5b89"
+  }
+];
+
+function getFollowupRehearsalScenario(id = "") {
+  const key = String(id || "").trim();
+  return FOLLOWUP_REHEARSAL_SCENARIOS.find((item) => item.id === key) || FOLLOWUP_REHEARSAL_SCENARIOS[0];
+}
+
+function getFollowupRehearsalScenarioLabel(id = "") {
+  const key = String(id || "").trim();
+  const scenario = FOLLOWUP_REHEARSAL_SCENARIOS.find((item) => item.id === key);
+  return scenario ? scenario.label : "";
+}
+
+function runFollowupReadinessPanelRehearsal(button = null, scenarioId = "") {
+  const scenario = getFollowupRehearsalScenario(scenarioId);
+  const result = rehearseConversationFollowupPending(scenario);
+  if (result?.ok === true) {
+    state.followupRehearsalScenarioId = scenario.id;
+  }
   updateFollowupReadinessPanel();
   const ok = result?.ok === true;
-  setStatus(ok ? "\u7eed\u8bdd\u9884\u6f14\u5df2\u5f00\u542f" : `\u7eed\u8bdd\u9884\u6f14\u5df2\u963b\u6b62: ${result?.reason || "unknown"}`);
+  setStatus(ok ? `\u7eed\u8bdd\u9884\u6f14\u5df2\u5f00\u542f: ${scenario.label}` : `\u7eed\u8bdd\u9884\u6f14\u5df2\u963b\u6b62: ${result?.reason || "unknown"}`);
   if (button && typeof window !== "undefined") {
     const previous = button.textContent;
     button.textContent = ok ? "\u9884\u6f14\u4e2d" : "\u5df2\u963b\u6b62";
     window.setTimeout(() => {
-      button.textContent = previous || "\u9884\u6f14";
+      button.textContent = previous || scenario.label || "\u9884\u6f14";
     }, 1200);
   }
   return result;
@@ -2376,6 +2411,7 @@ function buildFollowupReadinessReport() {
   const characterState = buildFollowupCharacterState(followup, silence, scheduler);
   const switchesReady = mode.enabled === true && mode.proactiveEnabled === true && mode.proactiveSchedulerEnabled === true;
   const rehearsalBlockedReason = getConversationFollowupRehearsalBlockedReason();
+  const rehearsalScenarioLabel = getFollowupRehearsalScenarioLabel(state.followupRehearsalScenarioId);
   const lines = [
     "\u7eed\u8bdd\u72b6\u6001",
     "",
@@ -2383,7 +2419,7 @@ function buildFollowupReadinessReport() {
     buildFollowupReadinessFriendlySummary(followup, silence, scheduler),
     `\u89d2\u8272\u72b6\u6001\uff1a${characterState.label}  \u5fc3\u60c5\uff1a${characterState.mood}`,
     `\u72b6\u6001\u8bf4\u660e\uff1a${characterState.description}`,
-    `\u9762\u677f\u9884\u6f14\uff1a${state.followupRehearsalActive === true ? "\u5df2\u5f00\u542f" : "\u672a\u5f00\u542f"}  \u53ef\u9884\u6f14\uff1a${rehearsalBlockedReason ? "\u5426" : "\u662f"}${rehearsalBlockedReason ? `  \u539f\u56e0\uff1a${rehearsalBlockedReason}` : ""}`,
+    `\u9762\u677f\u9884\u6f14\uff1a${state.followupRehearsalActive === true ? "\u5df2\u5f00\u542f" : "\u672a\u5f00\u542f"}${rehearsalScenarioLabel ? `  \u573a\u666f\uff1a${rehearsalScenarioLabel}` : ""}  \u53ef\u9884\u6f14\uff1a${rehearsalBlockedReason ? "\u5426" : "\u662f"}${rehearsalBlockedReason ? `  \u539f\u56e0\uff1a${rehearsalBlockedReason}` : ""}`,
     switchesReady
       ? "\u4e09\u5c42\u5f00\u5173\u90fd\u5df2\u5f00\u542f\uff0c\u4f46\u4ecd\u4f1a\u7ee7\u7eed\u53d7\u5b89\u9759\u7a97\u53e3\u3001\u51b7\u5374\u3001\u6b21\u6570\u4e0a\u9650\u548c\u7b56\u7565\u4fdd\u62a4\u3002"
       : "\u5f53\u524d\u4ecd\u6709\u5f00\u5173\u672a\u5f00\u542f\uff0c\u6240\u4ee5\u4e0d\u4f1a\u81ea\u52a8\u7eed\u8bdd\u3002",
@@ -2478,13 +2514,17 @@ function ensureFollowupReadinessPanel() {
   copyTemplate.addEventListener("click", () => {
     copyFollowupConfigTemplateToClipboard(copyTemplate);
   });
-  const rehearse = document.createElement("button");
-  rehearse.type = "button";
-  rehearse.textContent = "\u9884\u6f14";
-  rehearse.title = "\u4ec5\u8bbe\u7f6e\u672c\u5730\u5185\u5b58\u7eed\u8bdd\u72b6\u6001\uff0c\u4e0d\u8bf7\u6c42\u6a21\u578b\u6216\u8bed\u97f3";
-  rehearse.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e8fff3;color:#18583f;cursor:pointer;";
-  rehearse.addEventListener("click", () => {
-    runFollowupReadinessPanelRehearsal(rehearse);
+  const rehearsalButtons = FOLLOWUP_REHEARSAL_SCENARIOS.map((scenario) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = scenario.label;
+    button.title = "\u4ec5\u8bbe\u7f6e\u672c\u5730\u5185\u5b58\u7eed\u8bdd\u72b6\u6001\uff0c\u4e0d\u8bf7\u6c42\u6a21\u578b\u6216\u8bed\u97f3";
+    button.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e8fff3;color:#18583f;cursor:pointer;";
+    button.dataset.scenario = scenario.id;
+    button.addEventListener("click", () => {
+      runFollowupReadinessPanelRehearsal(button, scenario.id);
+    });
+    return button;
   });
   const clearRehearsal = document.createElement("button");
   clearRehearsal.type = "button";
@@ -2503,7 +2543,7 @@ function ensureFollowupReadinessPanel() {
     updateFollowupReadinessPanel();
   });
   head.appendChild(title);
-  actions.appendChild(rehearse);
+  rehearsalButtons.forEach((button) => actions.appendChild(button));
   actions.appendChild(clearRehearsal);
   actions.appendChild(copy);
   actions.appendChild(copyTemplate);
