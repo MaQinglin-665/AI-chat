@@ -296,6 +296,7 @@ const state = {
   translateDebugLastError: "",
   followupReadinessVisible: false,
   followupReadinessPanel: null,
+  followupReadinessCard: null,
   followupReadinessBody: null,
   followupReadinessRefreshTimer: 0,
   followupCharacterChipRefreshTimer: 0,
@@ -2468,6 +2469,37 @@ function buildFollowupReadinessReport() {
   return lines.join("\n");
 }
 
+function buildFollowupReadinessPreviewCardText() {
+  const snapshot = getTTSDebugSnapshot();
+  const followup = snapshot.followup || {};
+  const silence = snapshot.silence || {};
+  const scheduler = snapshot.proactiveScheduler || {};
+  const characterState = buildFollowupCharacterState(followup, silence, scheduler);
+  const selected = followup.selectedReaction && typeof followup.selectedReaction === "object"
+    ? followup.selectedReaction
+    : null;
+  const scenarioLabel = getFollowupRehearsalScenarioLabel(state.followupRehearsalScenarioId) || "\u672a\u9009\u62e9";
+  const candidateText = String(selected?.candidate?.text || followup.characterPreview || "").trim() || "n/a";
+  const tone = String(selected?.preferredTone || selected?.candidate?.tone || followup.characterCue?.tone || "n/a");
+  const policy = String(followup.policy || "n/a");
+  const blocked = Array.isArray(followup.blockedReasons) && followup.blockedReasons.length
+    ? followup.blockedReasons.join(",")
+    : "none";
+  return [
+    `\u573a\u666f\uff1a${scenarioLabel}  \u72b6\u6001\uff1a${characterState.label} / ${characterState.mood}`,
+    `policy=${policy}  tone=${tone}  selected=${Number.isFinite(Number(selected?.index)) ? Number(selected.index) : -1}`,
+    `\u60f3\u63a5\u7684\u4e00\u53e5\uff1a${candidateText}`,
+    `\u963b\u585e\uff1a${blocked}  \u5b89\u5168\uff1a\u4ec5\u672c\u5730\u9884\u6f14\uff0c\u4e0d\u8bf7\u6c42\u6a21\u578b/\u8bed\u97f3`
+  ].join("\n");
+}
+
+function updateFollowupReadinessPreviewCard() {
+  if (!state.followupReadinessCard) {
+    return;
+  }
+  state.followupReadinessCard.textContent = buildFollowupReadinessPreviewCardText();
+}
+
 function ensureFollowupReadinessPanel() {
   if (state.followupReadinessPanel || typeof document === "undefined") {
     return state.followupReadinessPanel;
@@ -2549,12 +2581,25 @@ function ensureFollowupReadinessPanel() {
   actions.appendChild(copyTemplate);
   actions.appendChild(close);
   head.appendChild(actions);
+  const card = document.createElement("pre");
+  card.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(93,128,195,.24)",
+    "border-radius:14px",
+    "background:rgba(255,255,255,.62)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#20345d"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   panel.appendChild(head);
+  panel.appendChild(card);
   panel.appendChild(body);
   document.body.appendChild(panel);
   state.followupReadinessPanel = panel;
+  state.followupReadinessCard = card;
   state.followupReadinessBody = body;
   return panel;
 }
@@ -2580,12 +2625,14 @@ function updateFollowupReadinessPanel() {
         updateFollowupReadinessPanel();
         return;
       }
+      updateFollowupReadinessPreviewCard();
       if (state.followupReadinessBody) {
         state.followupReadinessBody.textContent = buildFollowupReadinessReport();
       }
     }, 1000);
   }
   panel.style.display = "block";
+  updateFollowupReadinessPreviewCard();
   if (state.followupReadinessBody) {
     state.followupReadinessBody.textContent = buildFollowupReadinessReport();
   }

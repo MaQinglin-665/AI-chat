@@ -885,3 +885,17 @@ Manual checks:
 6. Confirm `清除预演` restores the previous local pending state and clears the scenario label.
 7. Confirm scenario buttons do not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 8. Confirm scenario buttons do not change scheduler gates, polling, cooldown, window limits, config, or backend APIs.
+
+## 43. Follow-up Rehearsal Preview Card v1
+
+Purpose: confirm the follow-up readiness panel exposes a compact rehearsal preview card for faster character tuning.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `更多 -> 续话状态`.
+3. Confirm a compact preview card appears above the full report.
+4. Click `好奇追问`, `温柔接话`, and `收口安静`; confirm the card updates scenario, policy, tone/index, and selected sentence.
+5. Click `清除预演` and confirm the card returns to the non-rehearsal state.
+6. Confirm the card does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+7. Confirm the card does not change scheduler gates, polling, cooldown, window limits, config, or backend APIs.
