@@ -1266,3 +1266,40 @@ scheduler gates, policy decisions, follow-up triggers, polling, requestAssistant
 LLM/fetch/TTS, screenshot capture, tools, shell execution, file access, backend APIs, or
 dependencies.
 ```
+
+---
+
+# Follow-up Readiness Chinese Runtime Result - 2026-05-05 (Task 076)
+
+Task 076 records the runtime confirmation for the Task 075 Chinese-first readiness panel.
+
+Evidence source:
+
+```text
+Electron was restarted after Task 075 merged into main. The user opened More -> Follow-up and
+confirmed that the Chinese readiness panel was visible.
+```
+
+Observed result:
+
+| Check | Result |
+| --- | --- |
+| Electron restarted after merge | pass |
+| Follow-up panel opens from UI | pass |
+| Chinese-first panel copy is visible | pass |
+| Raw reason keys remain available for debugging | expected from Task 075 |
+| Panel remains read-only | expected from Task 072/075 |
+
+Conclusion:
+
+```text
+pass
+```
+
+Safety confirmation:
+
+```text
+This task records runtime confirmation only. No code, config, scheduler behavior, request path,
+screenshot capture path, tool call path, shell execution path, file read path, TTS path, fetch path,
+or LLM path was changed.
+```
