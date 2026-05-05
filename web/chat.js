@@ -1879,16 +1879,27 @@ function ensureFollowupReadinessPanel() {
   const title = document.createElement("strong");
   title.textContent = "续话状态";
   title.style.cssText = "font:700 14px/1.2 system-ui,sans-serif;color:#1f3768;";
+  const actions = document.createElement("div");
+  actions.style.cssText = "display:flex;align-items:center;gap:6px;";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.textContent = "复制";
+  copy.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef4ff;color:#263d70;cursor:pointer;";
+  copy.addEventListener("click", () => {
+    copyFollowupReadinessReportToClipboard(copy);
+  });
   const close = document.createElement("button");
   close.type = "button";
-  close.textContent = "Hide";
+  close.textContent = "隐藏";
   close.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#dce8ff;color:#263d70;cursor:pointer;";
   close.addEventListener("click", () => {
     state.followupReadinessVisible = false;
     updateFollowupReadinessPanel();
   });
   head.appendChild(title);
-  head.appendChild(close);
+  actions.appendChild(copy);
+  actions.appendChild(close);
+  head.appendChild(actions);
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   panel.appendChild(head);
@@ -1935,6 +1946,36 @@ function toggleFollowupReadinessPanel(force = null) {
   state.followupReadinessVisible = force === null ? !state.followupReadinessVisible : !!force;
   updateFollowupReadinessPanel();
   return state.followupReadinessVisible;
+}
+
+async function copyFollowupReadinessReportToClipboard(button = null) {
+  const report = buildFollowupReadinessReport();
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(report);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = report;
+      textarea.setAttribute("readonly", "true");
+      textarea.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    setStatus("续话状态已复制");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "已复制";
+      window.setTimeout(() => {
+        button.textContent = previous || "复制";
+      }, 1200);
+    }
+    return true;
+  } catch (err) {
+    setStatus("复制失败，可手动选择面板文字复制");
+    return false;
+  }
 }
 
 function sanitizeTranslateDebugText(text, maxLen = 96) {

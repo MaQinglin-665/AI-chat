@@ -647,3 +647,17 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - no config changes
   - no scheduler/policy/trigger changes
   - no LLM/fetch/TTS, screenshot, tool, shell, or file access
+
+## 49. Task 079 Landing Notes
+
+- Task 079 adds a `复制` button to the read-only follow-up readiness panel.
+- The button copies the current readiness report text so users can paste diagnostics into issues or
+  validation notes without screenshots.
+- The panel close button is also localized from `Hide` to `隐藏`.
+- Safety boundaries:
+  - user-click only
+  - writes the current panel report to clipboard
+  - does not read clipboard content
+  - does not read files or collect desktop data
+  - does not change config, scheduler gates, policy, polling, or follow-up triggers
+  - does not call requestAssistantReply, LLM/fetch/TTS, screenshots, tools, or shell
