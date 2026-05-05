@@ -657,3 +657,24 @@ Regression checks:
 2. It temporarily mutates in-memory follow-up state only during the synchronous diagnostic call and restores state before returning.
 3. It does not call `runConversationFollowup`, `manualProactiveSchedulerTick`, `requestAssistantReply`, LLM, fetch, TTS, screenshots, tools, shell, or file access.
 4. It does not persist config, add timers, or change default-off behavior.
+
+## 30. Character Proactive Follow-up Copy v1
+
+Purpose: confirm proactive follow-up prompt drafts feel more like a desktop character while staying low-interruption and safe.
+
+DevTools preview:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.previewConversationFollowupPolicy({
+  reason: "question_tail",
+  topicHint: "我们刚才聊到桌宠主动续话"
+})
+```
+
+Expected checks:
+
+1. The result includes `characterCue`.
+2. `promptDraft` asks for one short Chinese follow-up, not a long explanation.
+3. The prompt uses low-pressure desktop-pet wording rather than system-notification wording.
+4. The prompt still forbids desktop/screen/file/privacy guessing and tool calls.
+5. No scheduler, polling, or follow-up execution is triggered by preview alone.
