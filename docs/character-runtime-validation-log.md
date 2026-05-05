@@ -864,3 +864,77 @@ PASTE_RESULT_HERE
 Conclusion: pass / partial / fail
 Residual risk:
 ````
+
+---
+
+# Follow-up Policy DevTools Screenshot Record - 2026-05-05 (Task 068)
+
+Task 068 records the first real chat-window DevTools observation for the Task 067 manual
+checklist.
+
+Evidence source:
+
+```text
+Manual DevTools Console screenshot provided in the project thread.
+The screenshot shows the returned object from the Task 067 copy/paste command, with expanded
+preview, snapshotFollowup, conversationFollowup, and recentEvents fields.
+```
+
+Observed fields from the screenshot:
+
+| Area | Field | Observed |
+| --- | --- | --- |
+| top-level | `ok` | `true` |
+| `preview` | `followupPolicy` | `do_not_followup` |
+| `preview` | `eligible` | `false` |
+| `preview` | `blockedReasons` | includes `policy_do_not_followup` |
+| `preview` | `promptDraftEmpty` | `true` |
+| `snapshotFollowup` | `pending` | `false` |
+| `snapshotFollowup` | `eligible` | `false` |
+| `snapshotFollowup` | `blockedReasons` | `no_pending_followup`, `empty_topic_hint`, `silence_window_not_reached` |
+| `snapshotFollowup` | `policy` | `gentle_continue` |
+| `conversationFollowup` | `eligible` | `false` |
+| `conversationFollowup` | `blockedReasons` | `no_pending_followup`, `empty_topic_hint`, `silence_window_not_reached` |
+| `conversationFollowup` | `followupPolicy` | `gentle_continue` |
+| `conversationFollowup` | `promptDraftEmpty` | `true` |
+| `conversationFollowup.silence` | `eligibleForSilenceFollowup` | `false` |
+| `conversationFollowup.silence` | `blockedReasons` | 3 blocked reasons visible |
+| `conversationFollowup.silence` | `followupPolicy` | `gentle_continue` |
+| `recentEvents` | length | 3 |
+| `recentEvents` | results | `interval_ms:30000`, `warmup_active`, `warmup_active` |
+
+Interpretation:
+
+```text
+The closed-topic preview path is confirmed in a real DevTools session:
+preview.followupPolicy=do_not_followup, preview.eligible=false, and preview.promptDraftEmpty=true.
+
+The live follow-up snapshot was not in a pending closed-topic state at capture time, so
+snapshotFollowup/conversationFollowup reflect the current idle runtime state rather than a
+pending "good night" follow-up. This is still safe: the runtime remained ineligible and did not
+show a ready/trigger event in the visible recentEvents list.
+```
+
+Result: partial-pass
+
+```text
+Pass for the pure closed-topic preview evidence in the real renderer.
+Partial for the full Task 067 runtime checklist, because the screenshot is not a pasted JSON
+payload and the live follow-up state was idle rather than pending the closed-topic hint.
+```
+
+Residual risk:
+
+```text
+To fully close the runtime evidence gap, capture the Task 067 command output as text/JSON after
+creating a real pending closed-topic follow-up state, or add a narrowly scoped debug-only fixture
+in a future task. Do not expand automatic follow-up behavior for this purpose.
+```
+
+Safety confirmation:
+
+```text
+No runtime code, config file, scheduler behavior, screenshot capture path, tool call path, shell
+execution path, file-read path, TTS path, fetch path, or LLM request path was changed for this
+record.
+```
