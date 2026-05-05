@@ -1306,6 +1306,34 @@ or LLM path was changed.
 
 ---
 
+# Follow-up Readiness Copy Report Added - 2026-05-05 (Task 079)
+
+Task 079 adds a small usability improvement to the Chinese-first readiness panel.
+
+Changes:
+
+1. Add a `复制` button to copy the current readiness report text.
+2. Localize the close button from `Hide` to `隐藏`.
+
+Purpose:
+
+```text
+Users can paste the readiness report into issue reports or validation notes without relying on
+screenshots or manual transcription.
+```
+
+Safety confirmation:
+
+```text
+The copy action is user-click only and writes the current read-only readiness report to the
+clipboard. It does not read clipboard content, read files, observe the desktop, change config,
+change scheduler gates, change policy decisions, trigger follow-up, start polling, call
+requestAssistantReply, call LLM/fetch/TTS, capture screenshots, call tools, execute shell commands,
+or add dependencies.
+```
+
+---
+
 # Follow-up Readiness Entry Copy Localized - 2026-05-05 (Task 077)
 
 Task 077 localizes the advanced action entry button for the Chinese-first readiness panel.
