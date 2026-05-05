@@ -910,3 +910,9 @@ Safety boundaries:
 - No approval means no model request and no speech.
 - No desktop observation, screenshot capture, file access, shell execution, tool call, or config write.
 - The first implementation tasks should build preview and controls before wiring approve to execution.
+
+## 77. Task 105 Landing Notes
+
+- Task 105 adds the first local manual confirmation preview card to the follow-up readiness panel.
+- The card shows the proposed short sentence, topic hint, policy, tone/index, guard explanation, raw blocked reasons, and a safety note.
+- This is preview-only: it does not add approve/dismiss controls, execute follow-up, call LLM/fetch/TTS, change scheduler behavior, write config, or add desktop/file/tool access.

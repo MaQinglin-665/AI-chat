@@ -1036,3 +1036,19 @@ Review checks:
 5. Confirm `review details` routes users toward existing readiness diagnostics.
 6. Confirm no approval means no model request, no TTS, and no follow-up execution.
 7. Confirm the design does not add automatic desktop observation, screenshots, tools, shell execution, file access, or config writes.
+
+## 53. Manual Confirmation Preview Card v1
+
+Purpose: confirm the readiness panel can show a local manual confirmation preview without adding execution controls.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `more -> follow-up status`.
+3. Confirm no confirmation preview card appears when there is no pending follow-up candidate.
+4. Start a local rehearsal scenario and confirm the confirmation preview card appears.
+5. Confirm the card shows proposed short sentence, topic, policy, tone/index, guard explanation, raw blocked reasons, and safety note.
+6. Confirm blocked scenarios show `temporarily unavailable` style state rather than an executable approval.
+7. Confirm the card does not add approve/dismiss controls yet.
+8. Confirm the card does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+9. Confirm the card does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.

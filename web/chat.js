@@ -297,6 +297,7 @@ const state = {
   followupReadinessVisible: false,
   followupReadinessPanel: null,
   followupReadinessCard: null,
+  followupReadinessConfirmationCard: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
   followupReadinessRefreshTimer: 0,
@@ -2480,6 +2481,33 @@ function buildFollowupReadinessPreviewCardText() {
   ].join("\n");
 }
 
+function buildFollowupManualConfirmationPreviewData() {
+  const snapshot = getTTSDebugSnapshot();
+  const followup = snapshot.followup || {};
+  const silence = snapshot.silence || {};
+  const scheduler = snapshot.proactiveScheduler || {};
+  const candidateText = String(followup.selectedReaction?.candidate?.text || followup.characterPreview || "").trim();
+  const blockedReasons = []
+    .concat(Array.isArray(followup.blockedReasons) ? followup.blockedReasons : [])
+    .concat(Array.isArray(silence.blockedReasons) ? silence.blockedReasons : [])
+    .concat(Array.isArray(scheduler.blockedReasons) ? scheduler.blockedReasons : []);
+  const hasCandidate = followup.pending === true && candidateText;
+  const available = hasCandidate
+    && followup.eligible === true
+    && silence.eligibleForSilenceFollowup === true
+    && scheduler.eligibleForSchedulerTick === true;
+  return {
+    state: hasCandidate ? (available ? "available" : "blocked") : "hidden",
+    candidateText: candidateText || "n/a",
+    topicHint: String(followup.topicHint || ""),
+    policy: String(followup.policy || "n/a"),
+    tone: String(followup.selectedReaction?.preferredTone || followup.characterCue?.tone || "n/a"),
+    selectedIndex: Number.isFinite(Number(followup.selectedReaction?.index)) ? Number(followup.selectedReaction.index) : -1,
+    guardExplanation: available ? "当前守卫允许手动确认前预览。" : explainReadinessReasons(blockedReasons),
+    rawBlockedReasons: joinReadinessReasons(blockedReasons)
+  };
+}
+
 function buildFollowupRehearsalScenarioCompareRows() {
   return FOLLOWUP_REHEARSAL_SCENARIOS.map((scenario) => {
     const policy = buildConversationFollowupPolicy({
@@ -2599,6 +2627,27 @@ function updateFollowupReadinessPreviewCard() {
     return;
   }
   state.followupReadinessCard.textContent = buildFollowupReadinessPreviewCardText();
+}
+
+function updateFollowupManualConfirmationPreviewCard() {
+  if (!state.followupReadinessConfirmationCard) {
+    return;
+  }
+  const data = buildFollowupManualConfirmationPreviewData();
+  state.followupReadinessConfirmationCard.style.display = data.state === "hidden" ? "none" : "block";
+  if (data.state === "hidden") {
+    state.followupReadinessConfirmationCard.textContent = "";
+    return;
+  }
+  state.followupReadinessConfirmationCard.textContent = [
+    `手动确认预览：${data.state === "available" ? "可确认" : "暂不可确认"}`,
+    `想接的一句：${data.candidateText}`,
+    `话题：${data.topicHint || "n/a"}`,
+    `policy=${data.policy}  tone=${data.tone}  selected=${data.selectedIndex}`,
+    `守卫说明：${data.guardExplanation}`,
+    `原始阻塞：${data.rawBlockedReasons}`,
+    "安全：未点击确认前不会请求模型、不会发语音、不会执行续话。"
+  ].join("\n");
 }
 
 function updateFollowupReadinessScenarioCompare() {
@@ -2804,6 +2853,18 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#20345d"
   ].join(";");
+  const confirmationCard = document.createElement("pre");
+  confirmationCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(88,137,111,.28)",
+    "border-radius:14px",
+    "background:rgba(238,255,246,.58)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#1f4c39",
+    "display:none"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -2819,11 +2880,13 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(head);
   panel.appendChild(actionBar);
   panel.appendChild(card);
+  panel.appendChild(confirmationCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
   state.followupReadinessPanel = panel;
   state.followupReadinessCard = card;
+  state.followupReadinessConfirmationCard = confirmationCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   return panel;
@@ -2851,6 +2914,7 @@ function updateFollowupReadinessPanel() {
         return;
       }
       updateFollowupReadinessPreviewCard();
+      updateFollowupManualConfirmationPreviewCard();
       updateFollowupReadinessScenarioCompare();
       if (state.followupReadinessBody) {
         state.followupReadinessBody.textContent = buildFollowupReadinessReport();
@@ -2859,6 +2923,7 @@ function updateFollowupReadinessPanel() {
   }
   panel.style.display = "block";
   updateFollowupReadinessPreviewCard();
+  updateFollowupManualConfirmationPreviewCard();
   updateFollowupReadinessScenarioCompare();
   if (state.followupReadinessBody) {
     state.followupReadinessBody.textContent = buildFollowupReadinessReport();
