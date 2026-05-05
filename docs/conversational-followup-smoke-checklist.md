@@ -818,3 +818,16 @@ Expected checks:
 3. The readiness panel shows the selected strategy line.
 4. The helper does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 5. The helper does not mutate pending follow-up state or scheduler state.
+
+## 39. Follow-up Selected Reaction Chip Hint v1
+
+Purpose: confirm the header chip can reveal the selected local follow-up reaction without speaking automatically.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Hover the follow-up character chip and confirm the tooltip can include the selected reaction when one exists.
+3. Inspect the chip and confirm `data-selected-tone` and `data-selected-index` are present.
+4. Confirm the compact chip text remains short and does not show a long sentence inline.
+5. Confirm the chip does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+6. Confirm the chip does not mutate pending follow-up state or scheduler state.
