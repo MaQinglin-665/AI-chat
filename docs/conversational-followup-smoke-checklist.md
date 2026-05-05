@@ -776,3 +776,24 @@ window.__AI_CHAT_DEBUG_TTS__.followupAwareIdleMotionContext()
 3. Confirm busy/speaking/dragging states still skip idle motion.
 4. Confirm the feature does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 5. Confirm the feature does not mutate pending follow-up state or scheduler state.
+
+## 37. Follow-up Reaction Candidates v1
+
+Purpose: confirm local follow-up reaction candidates are useful for tuning character copy without speaking automatically.
+
+DevTools check:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.previewConversationFollowupReactions({
+  reason: "question_tail",
+  topicHint: "我们刚才聊到桌宠主动续话"
+})
+```
+
+Expected checks:
+
+1. The result includes several short Chinese candidates.
+2. `characterPreview` remains aligned with the first candidate.
+3. The readiness panel shows a compact candidate summary.
+4. The helper does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+5. The helper does not mutate pending follow-up state or scheduler state.
