@@ -1362,6 +1362,45 @@ execute shell commands, observe the desktop, expose backend APIs, or add depende
 
 ---
 
+# Follow-up Config Template Copy Added - 2026-05-05 (Task 081)
+
+Task 081 adds a user-click copy helper for follow-up configuration.
+
+New UI action:
+
+```text
+复制模板
+```
+
+Copied template:
+
+```json
+{
+  "conversation_mode": {
+    "enabled": true,
+    "proactive_enabled": true,
+    "proactive_scheduler_enabled": true,
+    "proactive_cooldown_ms": 600000,
+    "proactive_warmup_ms": 120000,
+    "proactive_poll_interval_ms": 60000,
+    "max_followups_per_window": 1,
+    "silence_followup_min_ms": 180000
+  }
+}
+```
+
+Safety confirmation:
+
+```text
+The button only writes the static template text to clipboard after an explicit user click. It does
+not read clipboard content, write config, read files, observe the desktop, change runtime config,
+change scheduler gates, change policy decisions, trigger follow-up, start polling, call
+requestAssistantReply, call LLM/fetch/TTS, capture screenshots, call tools, execute shell commands,
+expose backend APIs, or add dependencies.
+```
+
+---
+
 # Follow-up Readiness Entry Copy Localized - 2026-05-05 (Task 077)
 
 Task 077 localizes the advanced action entry button for the Chinese-first readiness panel.

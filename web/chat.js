@@ -1907,6 +1907,13 @@ function ensureFollowupReadinessPanel() {
   copy.addEventListener("click", () => {
     copyFollowupReadinessReportToClipboard(copy);
   });
+  const copyTemplate = document.createElement("button");
+  copyTemplate.type = "button";
+  copyTemplate.textContent = "复制模板";
+  copyTemplate.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff7d6;color:#5b4211;cursor:pointer;";
+  copyTemplate.addEventListener("click", () => {
+    copyFollowupConfigTemplateToClipboard(copyTemplate);
+  });
   const close = document.createElement("button");
   close.type = "button";
   close.textContent = "隐藏";
@@ -1917,6 +1924,7 @@ function ensureFollowupReadinessPanel() {
   });
   head.appendChild(title);
   actions.appendChild(copy);
+  actions.appendChild(copyTemplate);
   actions.appendChild(close);
   head.appendChild(actions);
   const body = document.createElement("pre");
@@ -1967,21 +1975,43 @@ function toggleFollowupReadinessPanel(force = null) {
   return state.followupReadinessVisible;
 }
 
+function buildFollowupConfigTemplate() {
+  return [
+    "{",
+    '  "conversation_mode": {',
+    '    "enabled": true,',
+    '    "proactive_enabled": true,',
+    '    "proactive_scheduler_enabled": true,',
+    '    "proactive_cooldown_ms": 600000,',
+    '    "proactive_warmup_ms": 120000,',
+    '    "proactive_poll_interval_ms": 60000,',
+    '    "max_followups_per_window": 1,',
+    '    "silence_followup_min_ms": 180000',
+    "  }",
+    "}"
+  ].join("\n");
+}
+
+async function writeTextToClipboard(text) {
+  const value = String(text || "");
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
+
 async function copyFollowupReadinessReportToClipboard(button = null) {
   const report = buildFollowupReadinessReport();
   try {
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-      await navigator.clipboard.writeText(report);
-    } else {
-      const textarea = document.createElement("textarea");
-      textarea.value = report;
-      textarea.setAttribute("readonly", "true");
-      textarea.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      textarea.remove();
-    }
+    await writeTextToClipboard(report);
     setStatus("续话状态已复制");
     if (button) {
       const previous = button.textContent;
@@ -1993,6 +2023,24 @@ async function copyFollowupReadinessReportToClipboard(button = null) {
     return true;
   } catch (err) {
     setStatus("复制失败，可手动选择面板文字复制");
+    return false;
+  }
+}
+
+async function copyFollowupConfigTemplateToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildFollowupConfigTemplate());
+    setStatus("续话配置模板已复制");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "已复制";
+      window.setTimeout(() => {
+        button.textContent = previous || "复制模板";
+      }, 1200);
+    }
+    return true;
+  } catch (err) {
+    setStatus("复制模板失败，可手动查看面板说明");
     return false;
   }
 }
