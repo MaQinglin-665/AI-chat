@@ -870,3 +870,18 @@ Manual checks:
 6. If polling is active or all scheduler switches are enabled together, confirm `预演` is blocked fail-closed.
 7. Confirm the buttons do not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 8. Confirm the buttons do not change scheduler gates, polling, cooldown, window limits, config, or backend APIs.
+
+## 42. Follow-up Rehearsal Scenarios v1
+
+Purpose: confirm the follow-up readiness panel can compare multiple local rehearsal moods quickly while staying safe.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `更多 -> 续话状态`.
+3. Click `好奇追问`, `温柔接话`, and `收口安静` one by one.
+4. Confirm the panel shows the active scenario label.
+5. Confirm chip/tooltip/selected reaction update for each scenario.
+6. Confirm `清除预演` restores the previous local pending state and clears the scenario label.
+7. Confirm scenario buttons do not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+8. Confirm scenario buttons do not change scheduler gates, polling, cooldown, window limits, config, or backend APIs.
