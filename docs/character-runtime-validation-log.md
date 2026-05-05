@@ -1064,3 +1064,46 @@ No runtime behavior changed in this task. No config file was modified. No reques
 LLM, fetch, TTS, screenshot capture, tool call, shell execution, file read, scheduler tick, or
 polling trigger path was invoked by this record.
 ```
+
+---
+
+# Follow-up Policy Readiness Checkpoint - 2026-05-05 (Task 071)
+
+Task 071 summarizes the follow-up policy and proactive scheduler safety line after Task 070.
+
+Status:
+
+| Area | Result | Notes |
+| --- | --- | --- |
+| Prompt wording polish | pass | Follow-up prompt seed is short, optional, and low-pressure. |
+| Deterministic policy layer | pass | `do_not_followup`, `gentle_continue`, `light_question`, and `soft_checkin` are local rules. |
+| DevTools policy preview | pass | Preview helper is diagnostic-only and does not mutate runtime state. |
+| Snapshot/event visibility | pass | Policy and readiness fields are visible in existing debug surfaces. |
+| Silence eligibility policy block | pass | Closed-topic hints block before silence readiness can report ready. |
+| Real renderer idle screenshot | partial-pass | Confirmed preview path; runtime state was idle. |
+| Real renderer pending fixture | pass | Pending closed-topic state stayed ineligible and restored state. |
+| Default-off posture | pass | No default proactive expansion was introduced. |
+| Scheduler guard boundary | pass | No direct unsafe request path was added. |
+
+Current conclusion:
+
+```text
+The closed-topic pending follow-up path is ready for the next controlled feature step. The system
+now has enough evidence to avoid accidental "good night" / closed-topic follow-up in the guarded
+path.
+```
+
+Remaining caveat:
+
+```text
+Recent runtime evidence is still screenshot-based. Future manual runtime checkpoints should prefer
+copy/pasted JSON text so the exact arrays and event names are easier to archive and review.
+```
+
+Recommended next step:
+
+```text
+Move from internal safety hardening toward a small user-facing follow-up/proactive settings surface
+or readiness panel. Keep behavior opt-in and do not expand automatic desktop observation, tool
+calling, file access, shell execution, or direct assistant request paths.
+```
