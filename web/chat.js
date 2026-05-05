@@ -307,6 +307,7 @@ const state = {
   followupReadinessManualReviewBtn: null,
   followupManualConfirmationDismissedKeys: new Set(),
   followupManualConfirmationApproving: false,
+  followupManualConfirmationLastVisibleEventKey: "",
   followupReadinessRefreshTimer: 0,
   followupCharacterChipRefreshTimer: 0,
   followupCharacterRuntimeLastTone: "",
@@ -2686,6 +2687,39 @@ function getFollowupManualConfirmationStatusLabel(status = "hidden") {
   }
 }
 
+function buildFollowupManualConfirmationDebugPayload(confirmation = {}, result = "") {
+  const blockedSummary = Array.isArray(confirmation.blockedReasons)
+    ? confirmation.blockedReasons.join(",")
+    : "";
+  const policy = String(confirmation.policy || "");
+  const error = [policy, blockedSummary].filter(Boolean).join(";");
+  return {
+    text: String(confirmation.topicHint || ""),
+    result: sanitizeTTSDebugText(result || confirmation.status || "", 80),
+    error: sanitizeTTSDebugText(error, 140)
+  };
+}
+
+function recordFollowupManualConfirmationVisibleEvent(confirmation = {}) {
+  const visible = confirmation.hidden !== true && confirmation.dismissed !== true;
+  if (!visible) {
+    state.followupManualConfirmationLastVisibleEventKey = "";
+    return;
+  }
+  const eventKey = [
+    confirmation.key || "manual_confirmation",
+    confirmation.status || "unknown"
+  ].join("::");
+  if (state.followupManualConfirmationLastVisibleEventKey === eventKey) {
+    return;
+  }
+  state.followupManualConfirmationLastVisibleEventKey = eventKey;
+  recordTTSDebugEvent(
+    "conversation_followup_manual_confirmation_preview_shown",
+    buildFollowupManualConfirmationDebugPayload(confirmation)
+  );
+}
+
 function updateFollowupManualConfirmationControls() {
   const actions = state.followupReadinessManualActions;
   const statusNode = state.followupReadinessManualStatus;
@@ -2730,9 +2764,20 @@ async function handleFollowupManualConfirmClick(button = null) {
   if (confirmation.available !== true) {
     const blockedSummary = explainReadinessReasons(confirmation.blockedReasons);
     setStatus(`\u5f53\u524d\u4e0d\u53ef\u786e\u8ba4\uff1a${blockedSummary}`);
+    recordTTSDebugEvent(
+      "conversation_followup_manual_confirmation_blocked",
+      buildFollowupManualConfirmationDebugPayload(
+        confirmation,
+        confirmation.blockedReasons.join(",") || "guard_blocked"
+      )
+    );
     updateFollowupReadinessPanel();
     return false;
   }
+  recordTTSDebugEvent(
+    "conversation_followup_manual_confirmation_approval_started",
+    buildFollowupManualConfirmationDebugPayload(confirmation, "approval_started")
+  );
   state.followupManualConfirmationApproving = true;
   updateFollowupManualConfirmationControls();
   setStatus("\u6b63\u5728\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd...");
@@ -2741,29 +2786,42 @@ async function handleFollowupManualConfirmClick(button = null) {
     if (freshConfirmation.available !== true) {
       const blockedSummary = explainReadinessReasons(freshConfirmation.blockedReasons);
       setStatus(`\u786e\u8ba4\u524d\u5b88\u536b\u5df2\u963b\u6b62\uff1a${blockedSummary}`);
-      recordTTSDebugEvent("conversation_followup_manual_confirmation_blocked", {
-        text: String(freshConfirmation.topicHint || ""),
-        result: freshConfirmation.blockedReasons.join(",") || "guard_blocked",
-        error: String(freshConfirmation.policy || "")
-      });
+      recordTTSDebugEvent(
+        "conversation_followup_manual_confirmation_blocked",
+        buildFollowupManualConfirmationDebugPayload(
+          freshConfirmation,
+          freshConfirmation.blockedReasons.join(",") || "guard_blocked"
+        )
+      );
       return false;
     }
-    recordTTSDebugEvent("conversation_followup_manual_confirmation_approved", {
-      text: String(freshConfirmation.topicHint || ""),
-      result: String(freshConfirmation.policy || ""),
-      error: String(freshConfirmation.tone || "")
-    });
+    recordTTSDebugEvent(
+      "conversation_followup_manual_confirmation_approved",
+      buildFollowupManualConfirmationDebugPayload(freshConfirmation, "guard_passed")
+    );
     const result = await runConversationFollowupDebug();
     if (result?.ok === true) {
       if (freshConfirmation.key && state.followupManualConfirmationDismissedKeys instanceof Set) {
         state.followupManualConfirmationDismissedKeys.delete(freshConfirmation.key);
       }
+      recordTTSDebugEvent(
+        "conversation_followup_manual_confirmation_execution_succeeded",
+        buildFollowupManualConfirmationDebugPayload(freshConfirmation, result?.reason || "executed")
+      );
       setStatus("\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd\u5df2\u6267\u884c");
       return true;
     }
+    recordTTSDebugEvent(
+      "conversation_followup_manual_confirmation_execution_failed",
+      buildFollowupManualConfirmationDebugPayload(freshConfirmation, result?.reason || "not_executed")
+    );
     setStatus(`\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd\u672a\u6267\u884c\uff1a${result?.reason || "unknown"}`);
     return false;
   } catch (err) {
+    recordTTSDebugEvent(
+      "conversation_followup_manual_confirmation_execution_failed",
+      buildFollowupManualConfirmationDebugPayload(confirmation, "exception")
+    );
     setStatus(`\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd\u5931\u8d25\uff1a${err?.message || err}`);
     return false;
   } finally {
@@ -2779,6 +2837,10 @@ function dismissFollowupManualConfirmation(button = null) {
     return false;
   }
   state.followupManualConfirmationDismissedKeys.add(confirmation.key);
+  recordTTSDebugEvent(
+    "conversation_followup_manual_confirmation_dismissed",
+    buildFollowupManualConfirmationDebugPayload(confirmation, "dismissed")
+  );
   if (button) {
     const previous = button.textContent;
     button.textContent = "\u5df2\u5ffd\u7565";
@@ -2792,6 +2854,11 @@ function dismissFollowupManualConfirmation(button = null) {
 }
 
 function reviewFollowupManualConfirmationDetails() {
+  const confirmation = buildFollowupManualConfirmationData();
+  recordTTSDebugEvent(
+    "conversation_followup_manual_confirmation_review_details",
+    buildFollowupManualConfirmationDebugPayload(confirmation, confirmation.status || "review")
+  );
   toggleFollowupReadinessPanel(true);
   updateFollowupReadinessPanel();
   if (state.followupReadinessBody && typeof state.followupReadinessBody.scrollIntoView === "function") {
@@ -2818,6 +2885,7 @@ function updateFollowupManualConfirmationPreviewCard() {
     return;
   }
   const data = buildFollowupManualConfirmationData();
+  recordFollowupManualConfirmationVisibleEvent(data);
   state.followupReadinessConfirmationCard.style.display = data.hidden === true || data.dismissed === true ? "none" : "block";
   if (data.hidden === true || data.dismissed === true) {
     state.followupReadinessConfirmationCard.textContent = "";

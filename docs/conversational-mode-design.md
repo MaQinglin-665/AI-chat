@@ -931,3 +931,10 @@ Safety boundaries:
 - Clicking `确认` now re-checks follow-up, silence, and scheduler guards immediately before execution; if any guard blocks, the action fails closed and only updates local UI/status/debug events.
 - When all guards pass, `确认` calls the existing `runConversationFollowupDebug()` path instead of introducing a new execution path.
 - `忽略` and `查看详情` remain local UI actions, and this task does not add automatic follow-up, desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or config writes.
+
+## 80. Task 108 Landing Notes
+
+- Task 108 adds compact lifecycle debug events for the manual confirmation experience.
+- The readiness panel now records preview visibility transitions, dismiss clicks, detail-review clicks, approval start, guard-blocked attempts, and execution success/failure through the existing TTS debug event stream.
+- Preview visibility events are de-duplicated by current confirmation key and status so panel refreshes do not spam debug logs.
+- Event payloads stay compact and sanitized: topic/status/policy/guard summary only, with no new model calls, speech, scheduler behavior, config writes, backend APIs, desktop observation, screenshots, file access, shell execution, or tool calls.

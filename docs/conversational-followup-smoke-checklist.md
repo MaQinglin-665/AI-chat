@@ -1086,3 +1086,20 @@ Manual checks:
 8. Confirm `确认` records local debug events for approved or blocked confirmation attempts.
 9. Confirm `忽略` and `查看详情` still do not mutate scheduler gates, polling, cooldown, window limits, pending state, or config.
 10. Confirm this task does not add automatic follow-up, screenshots, tools, shell, file access, backend APIs, desktop observation, or config writes.
+
+## 56. Manual Confirmation Lifecycle Events v1
+
+Purpose: confirm manual confirmation lifecycle events make the experience inspectable without changing execution behavior.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `more -> follow-up status`, then open the TTS/debug event panel.
+3. Ensure there is a pending follow-up candidate and confirm one `conversation_followup_manual_confirmation_preview_shown` event appears for the current key/status.
+4. Let the readiness panel refresh and confirm preview events do not repeat on every refresh tick.
+5. Click `查看详情` and confirm `conversation_followup_manual_confirmation_review_details` appears without changing pending state or scheduler gates.
+6. Click `忽略` and confirm `conversation_followup_manual_confirmation_dismissed` appears and the card hides only in local memory for the current item.
+7. For an available candidate, click `确认` and confirm `conversation_followup_manual_confirmation_approval_started`, `conversation_followup_manual_confirmation_approved`, and an execution success/failure event appear in order.
+8. For a blocked candidate or changed guard state, confirm `conversation_followup_manual_confirmation_blocked` appears and execution fails closed.
+9. Confirm event payloads remain compact: topic/status/policy/guard summary only, not full prompts or unrelated private data.
+10. Confirm this task does not add automatic follow-up, screenshots, tools, shell, file access, backend APIs, desktop observation, config writes, or new dependencies.
