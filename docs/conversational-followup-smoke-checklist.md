@@ -1052,3 +1052,20 @@ Manual checks:
 7. Confirm the card does not add approve/dismiss controls yet.
 8. Confirm the card does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 9. Confirm the card does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.
+
+## 54. Manual Confirmation Controls v1
+
+Purpose: confirm manual confirmation preview controls stay UI-only and local before guarded execution wiring.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `more -> follow-up status`.
+3. Ensure there is a pending follow-up candidate (natural pending state or local rehearsal state).
+4. Confirm the manual confirmation action group shows `确认`, `忽略`, and `查看详情`.
+5. When guard state is passable (`available`), confirm `确认` is enabled; click it and confirm only UI/status feedback appears (no follow-up execution).
+6. When guard state is blocked (`blocked`), confirm `确认` is disabled or shown as not confirmable.
+7. Click `忽略` and confirm the current confirmation preview card hides locally for the same `topic/policy/candidate` item.
+8. Confirm `忽略` does not mutate scheduler gates, polling, cooldown, window limits, pending state, or config.
+9. Click `查看详情` and confirm the existing readiness full report area opens/focuses/refreshes.
+10. Confirm these controls do not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, file access, or backend APIs.
