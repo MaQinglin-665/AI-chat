@@ -1334,6 +1334,34 @@ or add dependencies.
 
 ---
 
+# Follow-up Settings Guide Added - 2026-05-05 (Task 080)
+
+Task 080 adds a guidance section to the read-only follow-up readiness panel.
+
+What changed:
+
+1. The panel now shows a current switch summary for conversation mode, proactive follow-up, and the
+   scheduler.
+2. The panel explains that users can edit `config.local.json`.
+3. The panel names the relevant `conversation_mode` keys:
+   - `enabled`
+   - `proactive_enabled`
+   - `proactive_scheduler_enabled`
+4. The panel reminds users to restart the app after saving config.
+5. The panel explains that closing any one of the three switches quickly stops automatic follow-up.
+6. The panel restates conservative safety defaults.
+
+Safety confirmation:
+
+```text
+This is guidance-only UI copy inside an existing read-only panel. It does not write config, read
+files, add settings controls, change scheduler gates, change policy decisions, trigger follow-up,
+start polling, call requestAssistantReply, call LLM/fetch/TTS, capture screenshots, call tools,
+execute shell commands, observe the desktop, expose backend APIs, or add dependencies.
+```
+
+---
+
 # Follow-up Readiness Entry Copy Localized - 2026-05-05 (Task 077)
 
 Task 077 localizes the advanced action entry button for the Chinese-first readiness panel.

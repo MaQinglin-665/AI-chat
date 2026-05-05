@@ -661,3 +661,20 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - does not read files or collect desktop data
   - does not change config, scheduler gates, policy, polling, or follow-up triggers
   - does not call requestAssistantReply, LLM/fetch/TTS, screenshots, tools, or shell
+
+## 50. Task 080 Landing Notes
+
+- Task 080 upgrades the read-only readiness panel into a small settings guide v1.
+- The panel now explains:
+  - current conversation/proactive/scheduler switch states
+  - what file to edit: `config.local.json`
+  - which keys matter under `conversation_mode`
+  - that saving config requires app restart
+  - that closing any one of the three switches stops automatic follow-up quickly
+  - why safety defaults remain conservative
+- This is guidance-only:
+  - no config writes
+  - no file reads
+  - no new settings controls
+  - no scheduler/policy/trigger behavior changes
+  - no LLM/fetch/TTS, screenshot, tool, shell, or desktop observation
