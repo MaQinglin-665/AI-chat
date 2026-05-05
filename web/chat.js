@@ -592,6 +592,7 @@ function getTTSDebugSnapshot() {
   });
   const followupCharacterCue = buildConversationFollowupCharacterCue(followupPlan);
   const followupCharacterPreview = buildConversationFollowupCharacterPreview(followupPlan);
+  const followupReactionCandidates = buildConversationFollowupReactionCandidates(followupPlan);
   const durationMs = audio && Number.isFinite(Number(audio.duration)) && audio.duration > 0
     ? Math.round(Number(audio.duration) * 1000)
     : Number(state.ttsDebugAudioDurationMs || -1);
@@ -656,6 +657,7 @@ function getTTSDebugSnapshot() {
       policyBlockedReason: String(followupPolicy.blockedReason || ""),
       characterCue: followupCharacterCue,
       characterPreview: followupCharacterPreview,
+      reactionCandidates: followupReactionCandidates,
       updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
     },
     proactiveScheduler: buildProactiveSchedulerDebugSnapshot(Date.now()),
@@ -821,6 +823,11 @@ function buildConversationFollowupCharacterCue(plan) {
 }
 
 function buildConversationFollowupCharacterPreview(plan) {
+  const candidates = buildConversationFollowupReactionCandidates(plan);
+  return candidates.length ? candidates[0].text : "";
+}
+
+function buildConversationFollowupReactionCandidates(plan) {
   const safePlan = plan && typeof plan === "object" ? plan : {};
   const policy = String(safePlan.followupPolicy || "gentle_continue").trim() || "gentle_continue";
   let topicHint = String(safePlan.topicHint || "").replace(/\s+/g, " ").trim();
@@ -828,18 +835,34 @@ function buildConversationFollowupCharacterPreview(plan) {
     topicHint = `${topicHint.slice(0, 28).trim()}...`;
   }
   if (policy === "do_not_followup") {
-    return "这个话题像是已经收口了，我先安静待着。";
+    return [
+      { text: "这个话题像是已经收口了，我先安静待着。", tone: "quiet", emotion: "neutral" },
+      { text: "收到，我不追问啦，就在旁边待机。", tone: "quiet", emotion: "neutral" },
+      { text: "那我先闭麦一下，有需要你再叫我。", tone: "quiet", emotion: "neutral" }
+    ];
   }
   if (!topicHint) {
-    return "";
+    return [];
   }
   if (policy === "light_question") {
-    return `我有点好奇「${topicHint}」，不过你想先放着也完全可以。`;
+    return [
+      { text: `我有点好奇「${topicHint}」，不过你想先放着也完全可以。`, tone: "curious", emotion: "thinking" },
+      { text: `刚才「${topicHint}」那里，我可以只问一个很小的问题吗？`, tone: "curious", emotion: "thinking" },
+      { text: `「${topicHint}」这个点有点勾我，但不急，想聊再聊。`, tone: "soft", emotion: "thinking" }
+    ];
   }
   if (policy === "soft_checkin") {
-    return `如果你还想聊「${topicHint}」，我在这边慢慢听。`;
+    return [
+      { text: `如果你还想聊「${topicHint}」，我在这边慢慢听。`, tone: "soft", emotion: "happy" },
+      { text: `「${topicHint}」可以先放着，我会记得这个线头。`, tone: "soft", emotion: "thinking" },
+      { text: `想继续的话，我可以陪你把「${topicHint}」轻轻接下去。`, tone: "soft", emotion: "happy" }
+    ];
   }
-  return `刚才「${topicHint}」这个点我还在想，要不要先轻轻放在这里？`;
+  return [
+    { text: `刚才「${topicHint}」这个点我还在想，要不要先轻轻放在这里？`, tone: "gentle", emotion: "thinking" },
+    { text: `我把「${topicHint}」这根线先捏在手里，你想接的时候我还在。`, tone: "gentle", emotion: "thinking" },
+    { text: `关于「${topicHint}」，我有个很轻的小想法，不过不打扰你。`, tone: "gentle", emotion: "thinking" }
+  ];
 }
 
 function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
@@ -868,6 +891,12 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
     updatedAgeMs
   });
   const characterPreview = buildConversationFollowupCharacterPreview({
+    reason,
+    topicHint,
+    followupPolicy: policy.type,
+    updatedAgeMs
+  });
+  const reactionCandidates = buildConversationFollowupReactionCandidates({
     reason,
     topicHint,
     followupPolicy: policy.type,
@@ -908,6 +937,7 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
     followupPolicyNote: policy.note,
     characterCue,
     characterPreview,
+    reactionCandidates,
     updatedAgeMs,
     conversationEnabled,
     proactiveEnabled,
@@ -983,6 +1013,12 @@ function previewConversationFollowupPolicy(input = {}) {
     followupPolicy: policy.type,
     updatedAgeMs: 0
   });
+  const reactionCandidates = buildConversationFollowupReactionCandidates({
+    reason,
+    topicHint,
+    followupPolicy: policy.type,
+    updatedAgeMs: 0
+  });
   const blockedReasons = [];
   if (!topicHint) {
     blockedReasons.push("empty_topic_hint");
@@ -998,6 +1034,7 @@ function previewConversationFollowupPolicy(input = {}) {
     followupPolicyNote: policy.note,
     characterCue,
     characterPreview,
+    reactionCandidates,
     updatedAgeMs: 0,
     conversationEnabled: true,
     proactiveEnabled: true,
@@ -1979,6 +2016,24 @@ function buildFollowupCharacterState(followup, silence, scheduler) {
   };
 }
 
+function formatFollowupReactionCandidateSummary(candidates) {
+  const list = Array.isArray(candidates) ? candidates.filter((item) => item && item.text) : [];
+  if (!list.length) {
+    return "n/a";
+  }
+  return list.slice(0, 2).map((item, index) => `${index + 1}. ${item.text}`).join(" / ");
+}
+
+function previewConversationFollowupReactions(input = {}) {
+  const preview = previewConversationFollowupPolicy(input);
+  return {
+    policy: preview.followupPolicy,
+    topicHint: preview.topicHint,
+    candidates: Array.isArray(preview.reactionCandidates) ? preview.reactionCandidates.slice() : [],
+    preview: preview.characterPreview || ""
+  };
+}
+
 function getFollowupCharacterStateDebugView() {
   const followup = buildConversationFollowupDebugView(Date.now());
   return buildFollowupCharacterState(
@@ -2142,6 +2197,7 @@ function buildFollowupReadinessReport() {
     `\u8bdd\u9898\uff1a${followup.topicHint || "\uff08\u7a7a\uff09"}`,
     `\u89d2\u8272\u8bed\u6c14\uff1a${followup.characterCue?.tone || "n/a"}  \u60c5\u7eea\uff1a${followup.characterCue?.emotion || "n/a"} / ${followup.characterCue?.action || "n/a"}`,
     `\u672c\u5730\u9884\u89c8\uff1a${followup.characterPreview || "n/a"}`,
+    `\u5019\u9009\u77ed\u53e5\uff1a${formatFollowupReactionCandidateSummary(followup.reactionCandidates)}`,
     `\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(followup.blockedReasons)}`,
     `\u539f\u59cb\u539f\u56e0\uff1a${joinReadinessReasons(followup.blockedReasons)}`,
     `\u66f4\u65b0\u65f6\u95f4\uff1a${formatReadinessMs(followup.updatedAgeMs)}  \u5b89\u9759\u9608\u503c\uff1a${formatReadinessMs(mode.silenceFollowupMinMs)}`,
@@ -7515,6 +7571,7 @@ function installTTSDebugBridge() {
     snapshot: getTTSDebugSnapshot,
     conversationFollowup: () => buildConversationFollowupDebugView(Date.now()),
     previewConversationFollowupPolicy: (input) => previewConversationFollowupPolicy(input),
+    previewConversationFollowupReactions: (input) => previewConversationFollowupReactions(input),
     checkConversationFollowupPendingFixture: (input) => runConversationFollowupPendingFixture(input),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),

@@ -738,3 +738,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - This reuses existing idle timing and skip guards; it does not add a new timer or execute follow-up.
 - State mappings are intentionally subtle: ready/watching/waiting states lean toward thinking-style idle motion, while cooldown/quiet states stay steady.
 - This remains local motion selection only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
+
+## 59. Task 089 Landing Notes
+
+- Task 089 adds a local-only reaction candidate pool for follow-up copy tuning.
+- `characterPreview` now comes from the first candidate, and the full candidate list is visible through DevTools and the read-only readiness report.
+- This is preview/debug content only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
