@@ -724,3 +724,10 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 086 adds subtle visual tones to the local follow-up character status chip.
 - The chip now maps state labels to stable `data-tone` values for CSS styling, so states like ready/cooldown/quiet/watching are easier to scan.
 - This remains read-only UI and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
+
+## 57. Task 087 Landing Notes
+
+- Task 087 emits a guarded local character runtime hint when the follow-up character status tone changes.
+- Hints reuse the existing runtime metadata bridge and are rate-limited to tone changes with a 30 second minimum interval.
+- DevTools can inspect `window.__AI_CHAT_DEBUG_TTS__.followupCharacterRuntimeHint()` and compact `followup_character_runtime_hint` events.
+- This remains local/low-frequency and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
