@@ -1022,3 +1022,17 @@ Review checks:
 4. Confirm rehearsal and comparison UI do not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 5. Confirm the next documented stage is manual confirmation before any automatic follow-up expansion.
 6. Confirm automatic follow-up remains default-off and guarded by existing policy, cooldown, scheduler, and window-limit checks.
+
+## 52. Manual Confirmation Flow Design
+
+Purpose: confirm the next follow-up stage requires user approval before execution and keeps automatic behavior out of scope.
+
+Review checks:
+
+1. Confirm the design defines `hidden`, `available`, `blocked`, `approved_pending`, and `dismissed` card states.
+2. Confirm the card content includes proposed short sentence, topic/reason, policy, tone/index, guard explanation, and a safety note.
+3. Confirm `approve` requires a fresh guard check immediately before execution.
+4. Confirm `dismiss` hides the prompt without changing scheduler gates, cooldown, window limits, or config.
+5. Confirm `review details` routes users toward existing readiness diagnostics.
+6. Confirm no approval means no model request, no TTS, and no follow-up execution.
+7. Confirm the design does not add automatic desktop observation, screenshots, tools, shell execution, file access, or config writes.
