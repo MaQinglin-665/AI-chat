@@ -712,3 +712,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - The readiness report now shows a state such as `安静陪伴`, `有点想接话`, `冷却中`, or `等你缓一会儿`.
 - DevTools can inspect the same local view through `window.__AI_CHAT_DEBUG_TTS__.followupCharacterState()`.
 - This is visibility only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
+
+## 55. Task 085 Landing Notes
+
+- Task 085 adds a local-only follow-up character status chip to the chat header.
+- The chip shows the current character state such as `安静陪伴 · idle` or `有点想接话 · thinking` without opening the readiness panel.
+- It refreshes from existing local guard/debug state and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.

@@ -3624,6 +3624,40 @@ body.view-chat #status {
   display: none;
 }
 
+body.view-chat .followup-character-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: min(100%, 360px);
+  margin-top: 10px;
+  padding: 7px 12px;
+  border: 1px solid rgba(117, 143, 204, 0.28);
+  border-radius: 999px;
+  background:
+    radial-gradient(130% 130% at 0% 0%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0)),
+    rgba(247, 250, 255, 0.9);
+  color: #51699c;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow:
+    0 7px 18px rgba(89, 111, 166, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+body.view-chat .followup-character-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: #7ca4ff;
+  box-shadow: 0 0 0 4px rgba(124, 164, 255, 0.16);
+}
+
 body.view-chat #translation-chip-btn {
   height: 50px;
   padding: 0 22px;
@@ -3876,6 +3910,13 @@ body.view-chat .action-buttons button::before {
 
   body.view-chat .hero-tagline {
     font-size: 14px;
+  }
+
+  body.view-chat .followup-character-chip {
+    max-width: 260px;
+    margin-top: 7px;
+    padding: 6px 10px;
+    font-size: 12px;
   }
 
   body.view-chat #translation-chip-btn {
