@@ -1203,3 +1203,17 @@ Manual checks:
 6. With a pending candidate that is blocked by silence/cooldown/policy, confirm blocked reasons remain compact and readable.
 7. Confirm the helper does not call `runConversationFollowup`, `runProactiveSchedulerManualTick`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, file access, backend APIs, or config writes.
 8. Confirm manual confirmation controls remain the explicit user-confirmed execution path.
+
+## 61. Gray Automatic Follow-up Dry-run Status v1
+
+Purpose: confirm a hypothetical gray automatic polling check can be inspected without starting polling or triggering follow-up.
+
+Manual checks:
+
+1. Open `more -> follow-up status` and confirm the report includes a gray dry-run outcome.
+2. In DevTools Console, run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupDryRun()`.
+3. With default config, confirm `dryRun=true`, `wouldPollCheck=false`, `wouldAttemptTrigger=false`, and readiness includes `gray_auto_disabled`.
+4. With all four gray-mode gates enabled but no pending follow-up, confirm `wouldPollCheck=true` and `wouldAttemptTrigger=false`.
+5. With a blocked pending candidate, confirm the dry-run shows compact follow-up/silence/scheduler blocked reasons.
+6. Confirm reading the dry-run does not start polling, does not call `runProactiveSchedulerManualTick`, does not call `runConversationFollowup`, and does not consume or restore pending state.
+7. Confirm no model request, TTS, fetch, screenshot, tool call, shell execution, file access, backend API, config write, or new dependency is introduced.

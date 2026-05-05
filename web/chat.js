@@ -2235,6 +2235,46 @@ function buildGrayAutoFollowupReadinessStatus(snapshotInput = null) {
   };
 }
 
+function buildGrayAutoFollowupDryRunStatus(snapshotInput = null) {
+  const snapshot = snapshotInput && typeof snapshotInput === "object"
+    ? snapshotInput
+    : getTTSDebugSnapshot();
+  const readiness = buildGrayAutoFollowupReadinessStatus(snapshot);
+  const followup = snapshot.followup || {};
+  const silence = snapshot.silence || {};
+  const scheduler = snapshot.proactiveScheduler || {};
+  const wouldPollCheck = readiness.pollingReady === true;
+  const wouldAttemptTrigger = readiness.ready === true;
+  return {
+    dryRun: true,
+    ok: wouldAttemptTrigger,
+    status: wouldAttemptTrigger ? "would_trigger" : readiness.status,
+    wouldPollCheck,
+    wouldAttemptTrigger,
+    readiness,
+    followup: {
+      pending: followup.pending === true,
+      eligible: followup.eligible === true,
+      policy: String(followup.policy || ""),
+      topicHint: String(followup.topicHint || ""),
+      blockedReasons: Array.isArray(followup.blockedReasons) ? followup.blockedReasons.slice() : []
+    },
+    silence: {
+      eligibleForSilenceFollowup: silence.eligibleForSilenceFollowup === true,
+      blockedReasons: Array.isArray(silence.blockedReasons) ? silence.blockedReasons.slice() : []
+    },
+    scheduler: {
+      pollingEnabled: scheduler.pollingEnabled === true,
+      eligibleForSchedulerTick: scheduler.eligibleForSchedulerTick === true,
+      pollTimerActive: scheduler.pollTimerActive === true,
+      blockedReasons: Array.isArray(scheduler.blockedReasons) ? scheduler.blockedReasons.slice() : [],
+      pollingBlockedReasons: Array.isArray(scheduler.pollingBlockedReasons)
+        ? scheduler.pollingBlockedReasons.slice()
+        : []
+    }
+  };
+}
+
 function buildFollowupReadinessFriendlySummary(followup, silence, scheduler) {
   if (followup?.eligible === true && silence?.eligibleForSilenceFollowup === true && scheduler?.eligibleForSchedulerTick === true) {
     return "可以续话：续话、安静窗口和调度器都已满足。";
@@ -2485,6 +2525,7 @@ function buildFollowupReadinessReport() {
   const scheduler = snapshot.proactiveScheduler || {};
   const characterState = buildFollowupCharacterState(followup, silence, scheduler);
   const grayReadiness = buildGrayAutoFollowupReadinessStatus(snapshot);
+  const grayDryRun = buildGrayAutoFollowupDryRunStatus(snapshot);
   const switchesReady = mode.enabled === true
     && mode.proactiveEnabled === true
     && mode.proactiveSchedulerEnabled === true;
@@ -2512,6 +2553,7 @@ function buildFollowupReadinessReport() {
     `\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\uff1a${formatReadinessBool(mode.grayAutoEnabled)}  \u8f6e\u8be2\u95e8\u7981\uff1a${joinReadinessReasons(scheduler.pollingBlockedReasons)}`,
     `\u7070\u5ea6 readiness\uff1a${grayReadiness.ready === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u5019\u9009\uff1a${grayReadiness.candidateReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u8f6e\u8be2\uff1a${grayReadiness.pollingReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}`,
     `\u7070\u5ea6\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(grayReadiness.blockedReasons)}`,
+    `\u7070\u5ea6 dry-run\uff1a${grayDryRun.wouldAttemptTrigger === true ? "\u82e5\u8f6e\u8be2\u68c0\u67e5\u53d1\u751f\uff0c\u4f1a\u5c1d\u8bd5\u89e6\u53d1" : "\u82e5\u8f6e\u8be2\u68c0\u67e5\u53d1\u751f\uff0c\u4ecd\u4f1a\u963b\u6b62"}  wouldPoll=${grayDryRun.wouldPollCheck === true ? "true" : "false"}`,
     "",
     "\u5982\u4f55\u8c03\u6574",
     "1. \u6253\u5f00 config.local.json\u3002",
@@ -8647,6 +8689,7 @@ function installTTSDebugBridge() {
     rehearseConversationFollowupPending: (input) => rehearseConversationFollowupPending(input),
     clearConversationFollowupRehearsal: () => clearConversationFollowupRehearsal(),
     grayAutoFollowupReadiness: () => buildGrayAutoFollowupReadinessStatus(),
+    grayAutoFollowupDryRun: () => buildGrayAutoFollowupDryRunStatus(),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({
