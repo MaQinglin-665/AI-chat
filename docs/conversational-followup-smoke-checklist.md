@@ -699,3 +699,21 @@ Expected checks:
 3. `characterCue` remains present.
 4. Preview does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 5. Preview does not mutate pending follow-up state or scheduler state.
+
+## 32. Follow-up Character State v1
+
+Purpose: confirm the readiness panel can explain the current follow-up state as a character-like status without triggering behavior.
+
+DevTools check:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.followupCharacterState()
+```
+
+Expected checks:
+
+1. The result includes `label`, `mood`, and `description`.
+2. Labels are Chinese-first and understandable without reading raw guard keys.
+3. The helper does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+4. The helper does not mutate pending follow-up state or scheduler state.
+5. The readiness panel shows the same kind of character state summary.

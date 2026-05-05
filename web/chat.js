@@ -1923,18 +1923,88 @@ function buildFollowupReadinessFriendlySummary(followup, silence, scheduler) {
   return `暂不触发：${explainReadinessReasons(followup?.blockedReasons)}。`;
 }
 
+function buildFollowupCharacterState(followup, silence, scheduler) {
+  if (followup?.pending !== true) {
+    return {
+      label: "安静陪伴",
+      mood: "idle",
+      description: "现在没有待续接的话题，适合安静待在桌面边上。"
+    };
+  }
+  if (String(followup?.policy || "") === "do_not_followup") {
+    return {
+      label: "识趣闭麦",
+      mood: "neutral",
+      description: "话题像是已经收口，角色应该保持安静，不追问。"
+    };
+  }
+  if (scheduler?.eligibleForSchedulerTick === true && silence?.eligibleForSilenceFollowup === true && followup?.eligible === true) {
+    return {
+      label: "有点想接话",
+      mood: followup.characterCue?.emotion || "thinking",
+      description: followup.characterPreview || "条件已满足，可以低打扰地轻轻续一句。"
+    };
+  }
+  const schedulerReasons = Array.isArray(scheduler?.blockedReasons) ? scheduler.blockedReasons : [];
+  if (schedulerReasons.includes("cooldown_active")) {
+    return {
+      label: "冷却中",
+      mood: "neutral",
+      description: "刚刚已经主动过一次，先让用户休息一下。"
+    };
+  }
+  if (schedulerReasons.includes("window_limit_reached")) {
+    return {
+      label: "今天先收一收",
+      mood: "neutral",
+      description: "当前时间窗口里的主动续话次数已达上限。"
+    };
+  }
+  const silenceReasons = Array.isArray(silence?.blockedReasons) ? silence.blockedReasons : [];
+  if (silenceReasons.includes("user_silence_window_not_reached") || silenceReasons.includes("tts_silence_window_not_reached")) {
+    return {
+      label: "等你缓一会儿",
+      mood: "thinking",
+      description: "安静时间还不够，先不打断用户。"
+    };
+  }
+  return {
+    label: "观察气氛",
+    mood: followup.characterCue?.emotion || "thinking",
+    description: "有待续接的话题，但还有 guard 未满足。"
+  };
+}
+
+function getFollowupCharacterStateDebugView() {
+  const followup = buildConversationFollowupDebugView(Date.now());
+  return buildFollowupCharacterState(
+    {
+      pending: state.followupPending === true,
+      policy: followup.followupPolicy,
+      eligible: followup.eligible === true,
+      characterCue: followup.characterCue || null,
+      characterPreview: followup.characterPreview || ""
+    },
+    followup.silence || {},
+    buildProactiveSchedulerDebugSnapshot(Date.now())
+  );
+}
+
 function buildFollowupReadinessReport() {
   const snapshot = getTTSDebugSnapshot();
   const mode = snapshot.conversationMode || {};
   const followup = snapshot.followup || {};
   const silence = snapshot.silence || {};
   const scheduler = snapshot.proactiveScheduler || {};
+  const characterState = buildFollowupCharacterState(followup, silence, scheduler);
   const switchesReady = mode.enabled === true && mode.proactiveEnabled === true && mode.proactiveSchedulerEnabled === true;
   const lines = [
     "\u7eed\u8bdd\u72b6\u6001",
     "",
     "\u6458\u8981",
     buildFollowupReadinessFriendlySummary(followup, silence, scheduler),
+    `\u89d2\u8272\u72b6\u6001\uff1a${characterState.label}  \u5fc3\u60c5\uff1a${characterState.mood}`,
+    `\u72b6\u6001\u8bf4\u660e\uff1a${characterState.description}`,
     switchesReady
       ? "\u4e09\u5c42\u5f00\u5173\u90fd\u5df2\u5f00\u542f\uff0c\u4f46\u4ecd\u4f1a\u7ee7\u7eed\u53d7\u5b89\u9759\u7a97\u53e3\u3001\u51b7\u5374\u3001\u6b21\u6570\u4e0a\u9650\u548c\u7b56\u7565\u4fdd\u62a4\u3002"
       : "\u5f53\u524d\u4ecd\u6709\u5f00\u5173\u672a\u5f00\u542f\uff0c\u6240\u4ee5\u4e0d\u4f1a\u81ea\u52a8\u7eed\u8bdd\u3002",
@@ -7333,6 +7403,7 @@ function installTTSDebugBridge() {
     previewConversationFollowupPolicy: (input) => previewConversationFollowupPolicy(input),
     checkConversationFollowupPendingFixture: (input) => runConversationFollowupPendingFixture(input),
     followupReadiness: () => buildFollowupReadinessReport(),
+    followupCharacterState: () => getFollowupCharacterStateDebugView(),
     showFollowupReadiness: () => toggleFollowupReadinessPanel(true),
     hideFollowupReadiness: () => toggleFollowupReadinessPanel(false),
     runConversationFollowup: () => runConversationFollowupDebug(),
