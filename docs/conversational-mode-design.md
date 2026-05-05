@@ -820,3 +820,37 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 102 upgrades the rehearsal scenario comparison from a plain text block into a structured table-like view.
 - Each scenario row now separates label, policy, tone/index, and selected short sentence, and the active rehearsal scenario is marked inline.
 - This remains read-only local UI and does not write pending state, call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
+
+## 73. Task 103 Landing Notes
+
+- Task 103 closes the follow-up rehearsal/debug milestone and redirects the roadmap toward manual confirmation before any automatic follow-up expansion.
+- Tasks 092-102 are now treated as a local rehearsal baseline: they make pending follow-up state, scenario selection, selected reaction copy, and scenario comparison inspectable without executing follow-up.
+- The next stage should build a user-facing manual confirmation flow: show the proposed follow-up, explain why it is allowed or blocked, and require an explicit user action before any execution.
+
+## 74. Follow-up Rehearsal Milestone Checkpoint
+
+Completed rehearsal/debug baseline:
+
+- DevTools can create and clear temporary pending follow-up rehearsal state.
+- The readiness panel can start/clear rehearsal from UI controls.
+- The panel supports multiple local rehearsal scenarios.
+- The active preview card shows scenario, character state, policy, tone/index, selected sentence, blocked reasons, and safety posture.
+- Copy actions can export selected sentence, preview summary, comparison bundle, JSON, and one-line summary.
+- The scenario comparison view shows all rehearsal scenarios without writing pending state.
+
+What remains intentionally out of scope for the rehearsal milestone:
+
+- No automatic follow-up execution.
+- No model, fetch, or TTS call from rehearsal or comparison UI.
+- No scheduler gate, cooldown, polling, or window-limit changes.
+- No desktop observation, screenshot capture, file access, shell execution, tool calls, or config writes.
+
+Next stage: manual confirmation experience.
+
+- Task 104: design the manual confirmation flow and UI states.
+- Task 105: add a local confirmation preview card that reuses the selected reaction and guard explanation.
+- Task 106: add approve/dismiss controls that remain no-op until wired to guarded execution.
+- Task 107: integrate approve with existing guarded manual follow-up execution.
+- Task 108: add confirmation lifecycle debug events.
+- Task 109: document manual confirmation smoke checks.
+- Task 110: prepare a checkpoint before gray automatic follow-up work.
