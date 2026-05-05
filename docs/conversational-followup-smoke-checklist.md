@@ -797,3 +797,24 @@ Expected checks:
 3. The readiness panel shows a compact candidate summary.
 4. The helper does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 5. The helper does not mutate pending follow-up state or scheduler state.
+
+## 38. Follow-up Reaction Selection v1
+
+Purpose: confirm local follow-up reaction selection is inspectable and still does not speak automatically.
+
+DevTools check:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.previewConversationFollowupReactions({
+  reason: "question_tail",
+  topicHint: "我们刚才聊到桌宠主动续话"
+})
+```
+
+Expected checks:
+
+1. The result includes `selected.reason`, `selected.preferredTone`, and `selected.index`.
+2. `preview` matches `selected.candidate.text`.
+3. The readiness panel shows the selected strategy line.
+4. The helper does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+5. The helper does not mutate pending follow-up state or scheduler state.
