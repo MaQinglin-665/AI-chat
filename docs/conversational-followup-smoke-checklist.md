@@ -1188,3 +1188,18 @@ Manual checks:
 8. Set `gray_auto_enabled=true` only in a local test config, reload, and confirm polling can start only if the other three switches are also true.
 9. Confirm turning any one of the four switches off stops automatic polling.
 10. Confirm this task does not add desktop observation, screenshots, tool calls, shell execution, file access, config writes, backend APIs, model calls, speech, or new dependencies.
+
+## 60. Gray Automatic Follow-up Readiness Status v1
+
+Purpose: confirm gray automatic follow-up readiness is inspectable without starting polling or executing follow-up.
+
+Manual checks:
+
+1. Open `more -> follow-up status`.
+2. Confirm the report includes gray readiness status, candidate readiness, polling readiness, and blocked reasons.
+3. In DevTools Console, run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupReadiness()`.
+4. With default config, confirm `status="default_off"`, `ready=false`, and `blockedReasons` includes `gray_auto_disabled`.
+5. With `gray_auto_enabled=true` but no pending follow-up, confirm readiness is still blocked and includes `no_pending_followup`.
+6. With a pending candidate that is blocked by silence/cooldown/policy, confirm blocked reasons remain compact and readable.
+7. Confirm the helper does not call `runConversationFollowup`, `runProactiveSchedulerManualTick`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, file access, backend APIs, or config writes.
+8. Confirm manual confirmation controls remain the explicit user-confirmed execution path.

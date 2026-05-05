@@ -992,3 +992,10 @@ Still out of scope:
 - Manual confirmation and local debug/manual execution paths are not blocked by this gray-mode flag, so the current explicit user-confirmation experience remains usable.
 - The follow-up readiness panel now shows gray-mode opt-in status and polling gate reasons, and the copied config template keeps `gray_auto_enabled=false` by default.
 - This task does not enable automatic follow-up by default, does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, model calls, speech, config writes, or new dependencies.
+
+## 85. Task 112 Landing Notes
+
+- Task 112 adds a read-only gray automatic follow-up readiness summary.
+- The new helper `grayAutoFollowupReadiness()` reports whether gray automatic follow-up is `default_off`, `blocked`, or `ready`, and separates polling readiness from candidate readiness.
+- The follow-up readiness panel now shows gray readiness status, candidate readiness, polling readiness, and compact blocked reasons.
+- This task does not start polling, does not execute follow-up, does not call model/TTS/fetch, does not write config, and does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or dependencies.
