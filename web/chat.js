@@ -591,8 +591,9 @@ function getTTSDebugSnapshot() {
     topicHint: String(state.followupTopicHint || "")
   });
   const followupCharacterCue = buildConversationFollowupCharacterCue(followupPlan);
-  const followupCharacterPreview = buildConversationFollowupCharacterPreview(followupPlan);
   const followupReactionCandidates = buildConversationFollowupReactionCandidates(followupPlan);
+  const followupSelectedReaction = selectConversationFollowupReactionCandidate(followupPlan, followupReactionCandidates);
+  const followupCharacterPreview = followupSelectedReaction.candidate?.text || "";
   const durationMs = audio && Number.isFinite(Number(audio.duration)) && audio.duration > 0
     ? Math.round(Number(audio.duration) * 1000)
     : Number(state.ttsDebugAudioDurationMs || -1);
@@ -658,6 +659,7 @@ function getTTSDebugSnapshot() {
       characterCue: followupCharacterCue,
       characterPreview: followupCharacterPreview,
       reactionCandidates: followupReactionCandidates,
+      selectedReaction: followupSelectedReaction,
       updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
     },
     proactiveScheduler: buildProactiveSchedulerDebugSnapshot(Date.now()),
@@ -824,7 +826,7 @@ function buildConversationFollowupCharacterCue(plan) {
 
 function buildConversationFollowupCharacterPreview(plan) {
   const candidates = buildConversationFollowupReactionCandidates(plan);
-  return candidates.length ? candidates[0].text : "";
+  return selectConversationFollowupReactionCandidate(plan, candidates).candidate?.text || "";
 }
 
 function buildConversationFollowupReactionCandidates(plan) {
@@ -865,6 +867,56 @@ function buildConversationFollowupReactionCandidates(plan) {
   ];
 }
 
+function selectConversationFollowupReactionCandidate(plan, candidatesInput) {
+  const safePlan = plan && typeof plan === "object" ? plan : {};
+  const candidates = Array.isArray(candidatesInput)
+    ? candidatesInput.filter((item) => item && typeof item === "object" && String(item.text || "").trim())
+    : buildConversationFollowupReactionCandidates(safePlan);
+  if (!candidates.length) {
+    return {
+      candidate: null,
+      index: -1,
+      reason: "no_candidates",
+      preferredTone: "",
+      candidateCount: 0
+    };
+  }
+
+  const policy = String(safePlan.followupPolicy || "gentle_continue").trim() || "gentle_continue";
+  const reason = String(safePlan.reason || "").trim().toLowerCase();
+  const updatedAgeMs = Number(safePlan.updatedAgeMs);
+  let preferredTone = "gentle";
+  let selectionReason = "default_gentle";
+
+  if (policy === "do_not_followup") {
+    preferredTone = "quiet";
+    selectionReason = "policy_quiet";
+  } else if (policy === "light_question" || reason.includes("question")) {
+    preferredTone = "curious";
+    selectionReason = "question_context";
+  } else if (policy === "soft_checkin") {
+    preferredTone = "soft";
+    selectionReason = "soft_checkin_policy";
+  } else if (Number.isFinite(updatedAgeMs) && updatedAgeMs >= 10 * 60 * 1000) {
+    preferredTone = "soft";
+    selectionReason = "long_silence_soften";
+  }
+
+  let index = candidates.findIndex((item) => String(item.tone || "") === preferredTone);
+  if (index < 0) {
+    index = 0;
+    selectionReason = selectionReason + "_fallback_first";
+  }
+
+  return {
+    candidate: candidates[index],
+    index,
+    reason: selectionReason,
+    preferredTone,
+    candidateCount: candidates.length
+  };
+}
+
 function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
   const now = Number(nowMs);
   const safeNow = Number.isFinite(now) ? now : Date.now();
@@ -890,18 +942,19 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
     followupPolicy: policy.type,
     updatedAgeMs
   });
-  const characterPreview = buildConversationFollowupCharacterPreview({
-    reason,
-    topicHint,
-    followupPolicy: policy.type,
-    updatedAgeMs
-  });
   const reactionCandidates = buildConversationFollowupReactionCandidates({
     reason,
     topicHint,
     followupPolicy: policy.type,
     updatedAgeMs
   });
+  const selectedReaction = selectConversationFollowupReactionCandidate({
+    reason,
+    topicHint,
+    followupPolicy: policy.type,
+    updatedAgeMs
+  }, reactionCandidates);
+  const characterPreview = selectedReaction.candidate?.text || "";
 
   const blockedReasons = [];
   if (!conversationEnabled) {
@@ -938,6 +991,7 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
     characterCue,
     characterPreview,
     reactionCandidates,
+    selectedReaction,
     updatedAgeMs,
     conversationEnabled,
     proactiveEnabled,
@@ -1007,18 +1061,19 @@ function previewConversationFollowupPolicy(input = {}) {
     followupPolicy: policy.type,
     updatedAgeMs: 0
   });
-  const characterPreview = buildConversationFollowupCharacterPreview({
-    reason,
-    topicHint,
-    followupPolicy: policy.type,
-    updatedAgeMs: 0
-  });
   const reactionCandidates = buildConversationFollowupReactionCandidates({
     reason,
     topicHint,
     followupPolicy: policy.type,
     updatedAgeMs: 0
   });
+  const selectedReaction = selectConversationFollowupReactionCandidate({
+    reason,
+    topicHint,
+    followupPolicy: policy.type,
+    updatedAgeMs: 0
+  }, reactionCandidates);
+  const characterPreview = selectedReaction.candidate?.text || "";
   const blockedReasons = [];
   if (!topicHint) {
     blockedReasons.push("empty_topic_hint");
@@ -1035,6 +1090,7 @@ function previewConversationFollowupPolicy(input = {}) {
     characterCue,
     characterPreview,
     reactionCandidates,
+    selectedReaction,
     updatedAgeMs: 0,
     conversationEnabled: true,
     proactiveEnabled: true,
@@ -2029,6 +2085,7 @@ function previewConversationFollowupReactions(input = {}) {
   return {
     policy: preview.followupPolicy,
     topicHint: preview.topicHint,
+    selected: preview.selectedReaction || null,
     candidates: Array.isArray(preview.reactionCandidates) ? preview.reactionCandidates.slice() : [],
     preview: preview.characterPreview || ""
   };
@@ -2197,6 +2254,7 @@ function buildFollowupReadinessReport() {
     `\u8bdd\u9898\uff1a${followup.topicHint || "\uff08\u7a7a\uff09"}`,
     `\u89d2\u8272\u8bed\u6c14\uff1a${followup.characterCue?.tone || "n/a"}  \u60c5\u7eea\uff1a${followup.characterCue?.emotion || "n/a"} / ${followup.characterCue?.action || "n/a"}`,
     `\u672c\u5730\u9884\u89c8\uff1a${followup.characterPreview || "n/a"}`,
+    `\u9009\u62e9\u7b56\u7565\uff1a${followup.selectedReaction?.reason || "n/a"}  tone=${followup.selectedReaction?.preferredTone || "n/a"}  index=${Number.isFinite(Number(followup.selectedReaction?.index)) ? Number(followup.selectedReaction.index) : -1}`,
     `\u5019\u9009\u77ed\u53e5\uff1a${formatFollowupReactionCandidateSummary(followup.reactionCandidates)}`,
     `\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(followup.blockedReasons)}`,
     `\u539f\u59cb\u539f\u56e0\uff1a${joinReadinessReasons(followup.blockedReasons)}`,

@@ -744,3 +744,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 089 adds a local-only reaction candidate pool for follow-up copy tuning.
 - `characterPreview` now comes from the first candidate, and the full candidate list is visible through DevTools and the read-only readiness report.
 - This is preview/debug content only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
+
+## 60. Task 090 Landing Notes
+
+- Task 090 adds a local-only selection layer for follow-up reaction candidates.
+- `characterPreview` now comes from the selected candidate, and selection metadata is visible through DevTools, snapshot follow-up state, and the read-only readiness report.
+- Selection is deterministic and tuneable by policy/reason/silence age; it does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
