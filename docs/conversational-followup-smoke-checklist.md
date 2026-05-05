@@ -899,3 +899,17 @@ Manual checks:
 5. Click `清除预演` and confirm the card returns to the non-rehearsal state.
 6. Confirm the card does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 7. Confirm the card does not change scheduler gates, polling, cooldown, window limits, config, or backend APIs.
+
+## 44. Follow-up Rehearsal Copy Actions v1
+
+Purpose: confirm the follow-up readiness panel can copy local rehearsal text without speaking automatically or changing scheduler state.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `更多 -> 续话状态`.
+3. Click a rehearsal scenario such as `好奇追问` or `温柔接话`.
+4. Click `复制短句` and confirm the clipboard contains the selected local follow-up candidate sentence.
+5. Click `复制摘要` and confirm the clipboard contains the compact preview card summary.
+6. Confirm copy buttons are user-click-only and do not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+7. Confirm copy buttons do not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.

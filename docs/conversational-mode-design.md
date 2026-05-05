@@ -780,3 +780,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 095 adds a compact preview card above the follow-up readiness report.
 - The card summarizes scenario, character state, policy, selected tone/index, selected local reaction, blocked reasons, and safety posture so rehearsal tuning is faster.
 - This remains read-only UI/debug display only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
+
+## 66. Task 096 Landing Notes
+
+- Task 096 adds `复制短句` and `复制摘要` actions to the follow-up rehearsal preview panel.
+- `复制短句` copies the currently selected local reaction candidate, while `复制摘要` copies the compact preview card text for quick comparison and review.
+- These actions are user-click-only clipboard writes and do not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
