@@ -1107,3 +1107,34 @@ Move from internal safety hardening toward a small user-facing follow-up/proacti
 or readiness panel. Keep behavior opt-in and do not expand automatic desktop observation, tool
 calling, file access, shell execution, or direct assistant request paths.
 ```
+
+---
+
+# Follow-up Readiness Panel Added - 2026-05-05 (Task 072)
+
+Task 072 implements the first small user-facing readiness surface recommended by Task 071.
+
+New read-only entry points:
+
+| Entry | Behavior |
+| --- | --- |
+| Advanced action button `Follow-up` | Toggles the readiness panel. |
+| `/followupstatus` | Opens the panel and prints the same report into chat. |
+| `window.__AI_CHAT_DEBUG_TTS__.followupReadiness()` | Returns the report text for DevTools. |
+| `showFollowupReadiness()` / `hideFollowupReadiness()` | DevTools-only panel visibility helpers. |
+
+Displayed information:
+
+1. Conversation/proactive/scheduler switch states.
+2. Pending follow-up state, topic, policy, and blocked reasons.
+3. Silence gate eligibility and blocked reasons.
+4. Scheduler gate eligibility, polling state, cooldown, and window count.
+5. A safety note that the panel is read-only.
+
+Safety confirmation:
+
+```text
+The panel reads existing debug snapshot data only. It does not change configuration, start polling,
+trigger follow-up, call requestAssistantReply, call LLM/fetch/TTS, capture screenshots, call tools,
+execute shell commands, read files, or persist new settings.
+```

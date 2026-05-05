@@ -291,6 +291,10 @@ const state = {
   translateDebugCurrentText: "",
   translateDebugLastResult: "",
   translateDebugLastError: "",
+  followupReadinessVisible: false,
+  followupReadinessPanel: null,
+  followupReadinessBody: null,
+  followupReadinessRefreshTimer: 0,
   localAsrMutedWarned: false,
   localAsrInputDeviceCandidates: [],
   localAsrSpeeching: false,
@@ -1737,6 +1741,147 @@ function toggleTTSDebugPanel(force = null) {
   return state.ttsDebugVisible;
 }
 
+function formatReadinessBool(value) {
+  return value === true ? "on" : "off";
+}
+
+function formatReadinessMs(value) {
+  const ms = Number(value);
+  if (!Number.isFinite(ms) || ms < 0) {
+    return "n/a";
+  }
+  if (ms < 1000) {
+    return `${Math.round(ms)}ms`;
+  }
+  if (ms < 60000) {
+    return `${Math.round(ms / 1000)}s`;
+  }
+  return `${Math.round(ms / 60000)}m`;
+}
+
+function joinReadinessReasons(reasons) {
+  const list = Array.isArray(reasons) ? reasons.filter(Boolean) : [];
+  return list.length ? list.join(", ") : "none";
+}
+
+function buildFollowupReadinessReport() {
+  const snapshot = getTTSDebugSnapshot();
+  const mode = snapshot.conversationMode || {};
+  const followup = snapshot.followup || {};
+  const silence = snapshot.silence || {};
+  const scheduler = snapshot.proactiveScheduler || {};
+  const lines = [
+    "Follow-up readiness",
+    `conversation=${formatReadinessBool(mode.enabled)} proactive=${formatReadinessBool(mode.proactiveEnabled)} scheduler=${formatReadinessBool(mode.proactiveSchedulerEnabled)}`,
+    `pending=${followup.pending === true} policy=${followup.policy || "n/a"} eligible=${followup.eligible === true}`,
+    `topic=${followup.topicHint || "(empty)"}`,
+    `followupBlocked=${joinReadinessReasons(followup.blockedReasons)}`,
+    `updatedAge=${formatReadinessMs(followup.updatedAgeMs)} silenceMin=${formatReadinessMs(mode.silenceFollowupMinMs)}`,
+    "",
+    "Silence gate",
+    `eligible=${silence.eligibleForSilenceFollowup === true} policy=${silence.followupPolicy || "n/a"}`,
+    `blocked=${joinReadinessReasons(silence.blockedReasons)}`,
+    `lastUserAge=${formatReadinessMs(silence.lastUserAgeMs)} lastTtsAge=${formatReadinessMs(silence.lastTtsFinishedAgeMs)}`,
+    "",
+    "Scheduler gate",
+    `eligible=${scheduler.eligibleForSchedulerTick === true} polling=${scheduler.pollTimerActive === true} lastPoll=${scheduler.pollLastResult || "n/a"}`,
+    `blocked=${joinReadinessReasons(scheduler.blockedReasons)}`,
+    `cooldown=${formatReadinessMs(scheduler.cooldownRemainingMs)} count=${Number(scheduler.proactiveCountInWindow || 0)}/${Number(scheduler.maxFollowupsPerWindow || 0)}`,
+    "",
+    "Safety",
+    "This panel is read-only. It does not trigger follow-up, polling, screenshots, tools, file access, TTS, fetch, or LLM calls."
+  ];
+  return lines.join("\n");
+}
+
+function ensureFollowupReadinessPanel() {
+  if (state.followupReadinessPanel || typeof document === "undefined") {
+    return state.followupReadinessPanel;
+  }
+  const panel = document.createElement("div");
+  panel.id = "followup-readiness-panel";
+  panel.style.cssText = [
+    "position:fixed",
+    "left:14px",
+    "bottom:14px",
+    "z-index:99998",
+    "width:min(460px,calc(100vw - 28px))",
+    "max-height:56vh",
+    "overflow:auto",
+    "padding:14px",
+    "border:1px solid rgba(88,117,170,.36)",
+    "border-radius:18px",
+    "background:rgba(244,248,255,.94)",
+    "color:#24385f",
+    "font:12px/1.5 Consolas,Menlo,monospace",
+    "box-shadow:0 18px 45px rgba(54,70,110,.22)",
+    "backdrop-filter:blur(12px)",
+    "white-space:pre-wrap",
+    "display:none"
+  ].join(";");
+  const head = document.createElement("div");
+  head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;";
+  const title = document.createElement("strong");
+  title.textContent = "Follow-up readiness";
+  title.style.cssText = "font:700 14px/1.2 system-ui,sans-serif;color:#1f3768;";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.textContent = "Hide";
+  close.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#dce8ff;color:#263d70;cursor:pointer;";
+  close.addEventListener("click", () => {
+    state.followupReadinessVisible = false;
+    updateFollowupReadinessPanel();
+  });
+  head.appendChild(title);
+  head.appendChild(close);
+  const body = document.createElement("pre");
+  body.style.cssText = "margin:0;white-space:pre-wrap;";
+  panel.appendChild(head);
+  panel.appendChild(body);
+  document.body.appendChild(panel);
+  state.followupReadinessPanel = panel;
+  state.followupReadinessBody = body;
+  return panel;
+}
+
+function updateFollowupReadinessPanel() {
+  if (!state.followupReadinessVisible) {
+    if (state.followupReadinessPanel) {
+      state.followupReadinessPanel.style.display = "none";
+    }
+    if (state.followupReadinessRefreshTimer) {
+      clearInterval(state.followupReadinessRefreshTimer);
+      state.followupReadinessRefreshTimer = 0;
+    }
+    return;
+  }
+  const panel = ensureFollowupReadinessPanel();
+  if (!panel) {
+    return;
+  }
+  if (!state.followupReadinessRefreshTimer) {
+    state.followupReadinessRefreshTimer = window.setInterval(() => {
+      if (!state.followupReadinessVisible) {
+        updateFollowupReadinessPanel();
+        return;
+      }
+      if (state.followupReadinessBody) {
+        state.followupReadinessBody.textContent = buildFollowupReadinessReport();
+      }
+    }, 1000);
+  }
+  panel.style.display = "block";
+  if (state.followupReadinessBody) {
+    state.followupReadinessBody.textContent = buildFollowupReadinessReport();
+  }
+}
+
+function toggleFollowupReadinessPanel(force = null) {
+  state.followupReadinessVisible = force === null ? !state.followupReadinessVisible : !!force;
+  updateFollowupReadinessPanel();
+  return state.followupReadinessVisible;
+}
+
 function sanitizeTranslateDebugText(text, maxLen = 96) {
   return sanitizeTTSDebugText(text, maxLen);
 }
@@ -1996,6 +2141,7 @@ const ui = {
   personaCompanionshipStyle: document.getElementById("persona-companionship-style"),
   personaSaveBtn: document.getElementById("persona-save-btn"),
   learningReviewBtn: document.getElementById("learning-review-btn"),
+  followupReadinessBtn: document.getElementById("followup-readiness-btn"),
   learningReviewBackdrop: document.getElementById("learning-review-backdrop"),
   learningReviewDrawer: document.getElementById("learning-review-drawer"),
   learningReviewCloseBtn: document.getElementById("learning-review-close-btn"),
@@ -4731,6 +4877,11 @@ async function handleLocalCommand(inputText) {
     appendMessage("assistant", "TTS debug panel disabled.", { enableTranslation: false });
     return true;
   }
+  if (text.toLowerCase() === "/followupstatus") {
+    toggleFollowupReadinessPanel(true);
+    appendMessage("assistant", buildFollowupReadinessReport(), { enableTranslation: false });
+    return true;
+  }
   if (text.toLowerCase() === "/translatedebug") {
     appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false });
     return true;
@@ -6905,6 +7056,9 @@ function installTTSDebugBridge() {
     conversationFollowup: () => buildConversationFollowupDebugView(Date.now()),
     previewConversationFollowupPolicy: (input) => previewConversationFollowupPolicy(input),
     checkConversationFollowupPendingFixture: (input) => runConversationFollowupPendingFixture(input),
+    followupReadiness: () => buildFollowupReadinessReport(),
+    showFollowupReadiness: () => toggleFollowupReadinessPanel(true),
+    hideFollowupReadiness: () => toggleFollowupReadinessPanel(false),
     runConversationFollowup: () => runConversationFollowupDebug(),
     dryRunSilenceFollowup: () => runConversationSilenceFollowupDryRun(),
     manualProactiveSchedulerTick: () => runProactiveSchedulerManualTick(),
@@ -13842,6 +13996,13 @@ function bindUI() {
   if (ui.learningReviewBtn) {
     ui.learningReviewBtn.addEventListener("click", () => {
       toggleLearningReviewDrawer();
+    });
+  }
+
+  if (ui.followupReadinessBtn) {
+    ui.followupReadinessBtn.addEventListener("click", () => {
+      const visible = toggleFollowupReadinessPanel();
+      setStatus(visible ? "Follow-up readiness panel opened" : "Follow-up readiness panel hidden");
     });
   }
 
