@@ -289,3 +289,18 @@
 - It does not touch the scheduler timer, polling gate, cooldown/window counters, kill-switch, or fail-closed injection state.
 - It does not mutate follow-up pending state and does not call the assistant request path.
 - No screenshot, tool call, shell execution, file read, backend API, dependency, config flag, or UI is added.
+
+## 24. Task 069 Landing Notes
+
+- Task 069 adds a DevTools-only pending follow-up fixture for closed-topic policy verification.
+- The helper temporarily enables only the in-memory diagnostic gates needed to make a pending follow-up state inspectable, then restores the previous state before returning.
+- The scheduler guard remains the enforcement boundary:
+  - no scheduler tick is called
+  - no polling trigger is called
+  - no direct `requestAssistantReply` path is added
+- Expected closed-topic result remains fail-closed:
+  - `snapshotFollowup.pending=true`
+  - `eligible=false`
+  - `blockedReasons` includes `policy_do_not_followup`
+  - `silence.eligibleForSilenceFollowup=false`
+- No config default, backend API, screenshot, tool call, shell execution, file read, TTS/fetch/LLM path, dependency, timer, or listener is added.

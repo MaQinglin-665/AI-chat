@@ -938,3 +938,44 @@ No runtime code, config file, scheduler behavior, screenshot capture path, tool 
 execution path, file-read path, TTS path, fetch path, or LLM request path was changed for this
 record.
 ```
+
+---
+
+# Follow-up Policy Pending Fixture Added - 2026-05-05 (Task 069)
+
+Task 069 adds a DevTools-only fixture to close the remaining evidence gap from Task 068.
+
+New manual command:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.checkConversationFollowupPendingFixture({
+  reason: "followup_pending",
+  topicHint: "先这样，晚安"
+})
+```
+
+Expected result:
+
+| Area | Expected |
+| --- | --- |
+| top-level | `ok=true` |
+| `preview` | `followupPolicy=do_not_followup`, `eligible=false`, `promptDraftEmpty=true` |
+| `snapshotFollowup` | `pending=true`, `eligible=false`, `blockedReasons` includes `policy_do_not_followup` |
+| `conversationFollowup` | `eligible=false`, `blockedReasons` includes `policy_do_not_followup`, `promptDraftEmpty=true` |
+| `conversationFollowup.silence` | `eligibleForSilenceFollowup=false`, `blockedReasons` includes `policy_do_not_followup` |
+| restore | `restored=true` |
+
+Result:
+
+```text
+pending real-renderer capture still needed after merge.
+```
+
+Safety confirmation:
+
+```text
+The helper is exposed only through the existing DevTools TTS debug bridge. It temporarily mutates
+current-page memory for a synchronous diagnostic read and restores the previous state before
+returning. It does not call scheduler tick, polling trigger, requestAssistantReply, LLM, fetch,
+TTS, screenshot capture, tools, shell execution, file access, backend APIs, or persistent config.
+```

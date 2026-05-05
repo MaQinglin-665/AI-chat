@@ -934,6 +934,177 @@ function clearConversationFollowupPending(nowMs = Date.now()) {
   state.followupUpdatedAt = Number.isFinite(now) ? Math.max(0, Math.round(now)) : 0;
 }
 
+function snapshotConversationFollowupPendingFixtureState() {
+  const mode = state.conversationMode && typeof state.conversationMode === "object"
+    ? { ...state.conversationMode }
+    : null;
+  return {
+    pending: snapshotConversationFollowupPending(),
+    conversationMode: mode,
+    conversationLastUserAt: Number(state.conversationLastUserAt || 0),
+    conversationLastAssistantAt: Number(state.conversationLastAssistantAt || 0),
+    conversationLastTtsFinishedAt: Number(state.conversationLastTtsFinishedAt || 0)
+  };
+}
+
+function restoreConversationFollowupPendingFixtureState(snapshot) {
+  const safe = snapshot && typeof snapshot === "object" ? snapshot : {};
+  restoreConversationFollowupPending(safe.pending);
+  if (safe.conversationMode && typeof safe.conversationMode === "object") {
+    state.conversationMode = { ...safe.conversationMode };
+  }
+  state.conversationLastUserAt = Number.isFinite(Number(safe.conversationLastUserAt))
+    ? Math.max(0, Math.round(Number(safe.conversationLastUserAt)))
+    : 0;
+  state.conversationLastAssistantAt = Number.isFinite(Number(safe.conversationLastAssistantAt))
+    ? Math.max(0, Math.round(Number(safe.conversationLastAssistantAt)))
+    : 0;
+  state.conversationLastTtsFinishedAt = Number.isFinite(Number(safe.conversationLastTtsFinishedAt))
+    ? Math.max(0, Math.round(Number(safe.conversationLastTtsFinishedAt)))
+    : 0;
+}
+
+function runConversationFollowupPendingFixture(input = {}) {
+  const startedAt = Date.now();
+  const previous = snapshotConversationFollowupPendingFixtureState();
+  const safeInput = input && typeof input === "object" ? input : {};
+  const reason = String(safeInput.reason || "followup_pending").trim() || "followup_pending";
+  const topicHint = String(
+    safeInput.topicHint || safeInput.text || "\u5148\u8fd9\u6837\uff0c\u665a\u5b89"
+  ).replace(/\s+/g, " ").trim();
+  let result = null;
+
+  try {
+    if (!state.conversationMode || typeof state.conversationMode !== "object") {
+      state.conversationMode = {
+        enabled: false,
+        proactiveEnabled: false,
+        proactiveSchedulerEnabled: false,
+        proactiveCooldownMs: 600000,
+        proactiveWarmupMs: 120000,
+        proactiveWindowMs: 3600000,
+        proactivePollIntervalMs: 60000,
+        maxFollowupsPerWindow: 1,
+        silenceFollowupMinMs: 180000,
+        interruptTtsOnUserSpeech: false
+      };
+    }
+    const silenceFollowupMinMs = Number.isFinite(Number(state.conversationMode.silenceFollowupMinMs))
+      ? Math.max(0, Math.round(Number(state.conversationMode.silenceFollowupMinMs)))
+      : 180000;
+    const oldEnoughAt = Math.max(0, startedAt - Math.max(silenceFollowupMinMs + 1000, 30000));
+
+    state.conversationMode.enabled = true;
+    state.conversationMode.proactiveEnabled = true;
+    state.conversationMode.proactiveSchedulerEnabled = true;
+    state.followupPending = true;
+    state.followupReason = reason;
+    state.followupTopicHint = topicHint;
+    state.followupUpdatedAt = oldEnoughAt;
+    state.conversationLastUserAt = oldEnoughAt;
+    state.conversationLastAssistantAt = oldEnoughAt;
+    state.conversationLastTtsFinishedAt = oldEnoughAt;
+
+    const preview = previewConversationFollowupPolicy({ reason, topicHint });
+    const snapshotFollowup = getTTSDebugSnapshot().followup;
+    const conversationFollowup = buildConversationFollowupDebugView(startedAt);
+    const proactiveScheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
+    const policyText = getConversationFollowupPolicyDebugText(conversationFollowup);
+    const silenceBlockedReasons = Array.isArray(conversationFollowup?.silence?.blockedReasons)
+      ? conversationFollowup.silence.blockedReasons.slice()
+      : [];
+
+    recordTTSDebugEvent("conversation_followup_pending_fixture_checked", {
+      text: topicHint,
+      result: silenceBlockedReasons.join(",") || "silence_checked",
+      error: policyText || reason
+    });
+
+    result = {
+      ok: true,
+      fixture: {
+        reason,
+        topicHint,
+        silenceAgeMs: Math.max(0, startedAt - oldEnoughAt),
+        temporaryGatesEnabled: true
+      },
+      preview: {
+        followupPolicy: preview.followupPolicy,
+        eligible: preview.eligible,
+        blockedReasons: Array.isArray(preview.blockedReasons) ? preview.blockedReasons.slice() : [],
+        promptDraftEmpty: !String(preview.promptDraft || "").trim()
+      },
+      snapshotFollowup: {
+        pending: snapshotFollowup.pending,
+        eligible: snapshotFollowup.eligible,
+        blockedReasons: Array.isArray(snapshotFollowup.blockedReasons)
+          ? snapshotFollowup.blockedReasons.slice()
+          : [],
+        policy: snapshotFollowup.policy,
+        policyBlockedReason: snapshotFollowup.policyBlockedReason
+      },
+      conversationFollowup: {
+        eligible: conversationFollowup.eligible,
+        blockedReasons: Array.isArray(conversationFollowup.blockedReasons)
+          ? conversationFollowup.blockedReasons.slice()
+          : [],
+        followupPolicy: conversationFollowup.followupPolicy,
+        promptDraftEmpty: !String(conversationFollowup.promptDraft || "").trim(),
+        silence: {
+          eligibleForSilenceFollowup: conversationFollowup.silence?.eligibleForSilenceFollowup,
+          blockedReasons: silenceBlockedReasons,
+          followupPolicy: conversationFollowup.silence?.followupPolicy
+        }
+      },
+      proactiveScheduler: {
+        eligibleForSchedulerTick: proactiveScheduler.eligibleForSchedulerTick,
+        blockedReasons: Array.isArray(proactiveScheduler.blockedReasons)
+          ? proactiveScheduler.blockedReasons.slice()
+          : [],
+        pollTimerActive: proactiveScheduler.pollTimerActive,
+        lastResult: proactiveScheduler.lastResult
+      }
+    };
+  } catch (err) {
+    const errorText = String(err?.message || err || "fixture_error");
+    recordTTSDebugEvent("conversation_followup_pending_fixture_failed", {
+      text: topicHint,
+      result: "fixture_error",
+      error: errorText
+    });
+    result = {
+      ok: false,
+      reason: "fixture_error",
+      error: errorText
+    };
+  } finally {
+    restoreConversationFollowupPendingFixtureState(previous);
+  }
+
+  const endedAt = Date.now();
+  return {
+    ...result,
+    restored: true,
+    afterRestore: {
+      pending: state.followupPending === true,
+      reason: String(state.followupReason || ""),
+      topicHint: String(state.followupTopicHint || ""),
+      conversationEnabled: state.conversationMode?.enabled === true,
+      proactiveEnabled: state.conversationMode?.proactiveEnabled === true,
+      proactiveSchedulerEnabled: state.conversationMode?.proactiveSchedulerEnabled === true
+    },
+    recentEvents: state.ttsDebugEvents.slice(-30).map((event) => ({
+      type: event.type,
+      text: event.text,
+      result: event.result,
+      error: event.error
+    })),
+    startedAt,
+    endedAt,
+    elapsedMs: Math.max(0, endedAt - startedAt)
+  };
+}
+
 async function runConversationFollowupDebug() {
   const startedAt = Date.now();
   const plan = buildConversationFollowupDebugView(startedAt);
@@ -6733,6 +6904,7 @@ function installTTSDebugBridge() {
     snapshot: getTTSDebugSnapshot,
     conversationFollowup: () => buildConversationFollowupDebugView(Date.now()),
     previewConversationFollowupPolicy: (input) => previewConversationFollowupPolicy(input),
+    checkConversationFollowupPendingFixture: (input) => runConversationFollowupPendingFixture(input),
     runConversationFollowup: () => runConversationFollowupDebug(),
     dryRunSilenceFollowup: () => runConversationSilenceFollowupDryRun(),
     manualProactiveSchedulerTick: () => runProactiveSchedulerManualTick(),

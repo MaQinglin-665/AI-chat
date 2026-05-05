@@ -615,3 +615,45 @@ Expected:
 5. `conversationFollowup.silence.eligibleForSilenceFollowup=false`
 6. `conversationFollowup.silence.blockedReasons` includes `policy_do_not_followup`
 7. No new `proactive_scheduler_poll_ready` event for the closed-topic case.
+
+## 26. DevTools Pending Follow-up Fixture (Task 069)
+
+Purpose:
+
+1. Confirm a real pending closed-topic follow-up state still fails closed.
+2. Avoid needing a natural conversation to land in the exact pending state.
+3. Keep the check DevTools-only and diagnostic-only.
+
+Command:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.checkConversationFollowupPendingFixture({
+  reason: "followup_pending",
+  topicHint: "先这样，晚安"
+})
+```
+
+Expected:
+
+1. `ok=true`
+2. `preview.followupPolicy="do_not_followup"`
+3. `snapshotFollowup.pending=true`
+4. `snapshotFollowup.eligible=false`
+5. `snapshotFollowup.blockedReasons` includes `policy_do_not_followup`
+6. `conversationFollowup.eligible=false`
+7. `conversationFollowup.blockedReasons` includes `policy_do_not_followup`
+8. `conversationFollowup.silence.eligibleForSilenceFollowup=false`
+9. `conversationFollowup.silence.blockedReasons` includes `policy_do_not_followup`
+10. `conversationFollowup.promptDraftEmpty=true`
+11. `restored=true`
+12. `afterRestore.pending` matches the pre-check state, usually `false` in a clean idle session.
+13. `afterRestore.conversationEnabled`, `afterRestore.proactiveEnabled`, and `afterRestore.proactiveSchedulerEnabled` match the pre-check config state.
+14. `recentEvents` contains `conversation_followup_pending_fixture_checked`
+15. `recentEvents` does not contain a new `conversation_followup_start`, `conversation_followup_success`, or `proactive_scheduler_poll_ready` caused by this check.
+
+Regression checks:
+
+1. The helper is exposed only through `window.__AI_CHAT_DEBUG_TTS__`.
+2. It temporarily mutates in-memory follow-up state only during the synchronous diagnostic call and restores state before returning.
+3. It does not call `runConversationFollowup`, `manualProactiveSchedulerTick`, `requestAssistantReply`, LLM, fetch, TTS, screenshots, tools, shell, or file access.
+4. It does not persist config, add timers, or change default-off behavior.
