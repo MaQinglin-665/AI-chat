@@ -678,3 +678,17 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - no new settings controls
   - no scheduler/policy/trigger behavior changes
   - no LLM/fetch/TTS, screenshot, tool, shell, or desktop observation
+
+## 51. Task 081 Landing Notes
+
+- Task 081 adds a `复制模板` button to the follow-up readiness panel.
+- The button copies a minimal `conversation_mode` JSON snippet for `config.local.json`.
+- This reduces manual setup friction while keeping the app from writing local config automatically.
+- Safety boundaries:
+  - user-click only
+  - writes template text to clipboard only
+  - does not read clipboard content
+  - does not write or read files
+  - does not change config at runtime
+  - does not change scheduler/policy/trigger behavior
+  - does not call requestAssistantReply, LLM/fetch/TTS, screenshots, tools, shell, or desktop observation
