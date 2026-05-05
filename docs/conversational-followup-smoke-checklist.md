@@ -913,3 +913,18 @@ Manual checks:
 5. Click `复制摘要` and confirm the clipboard contains the compact preview card summary.
 6. Confirm copy buttons are user-click-only and do not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 7. Confirm copy buttons do not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.
+
+## 45. Follow-up Rehearsal Copy Bundle v1
+
+Purpose: confirm the follow-up readiness panel can copy one local rehearsal comparison bundle (short sentence + summary) without speaking automatically or changing scheduler state.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `more -> follow-up status`.
+3. Click a rehearsal scenario such as `curious follow-up` or `gentle continue`.
+4. Click `copy bundle` and confirm the clipboard text includes both:
+   - the selected local follow-up short sentence
+   - the compact preview summary block
+5. Confirm the copy action is user-click-only and does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+6. Confirm the copy action does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.
