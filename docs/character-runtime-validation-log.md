@@ -1303,3 +1303,30 @@ This task records runtime confirmation only. No code, config, scheduler behavior
 screenshot capture path, tool call path, shell execution path, file read path, TTS path, fetch path,
 or LLM path was changed.
 ```
+
+---
+
+# Follow-up Readiness Entry Copy Localized - 2026-05-05 (Task 077)
+
+Task 077 localizes the advanced action entry button for the Chinese-first readiness panel.
+
+Change:
+
+```text
+Follow-up -> 续话状态
+```
+
+Reason:
+
+```text
+The panel itself was localized in Task 075, but the advanced action button still used English copy.
+This task makes the entry point match the Chinese user experience.
+```
+
+Safety confirmation:
+
+```text
+This is a text-only UI copy change. It does not change JavaScript behavior, config, scheduler
+gates, policy decisions, follow-up triggers, polling, requestAssistantReply, LLM/fetch/TTS,
+screenshot capture, tools, shell execution, file access, backend APIs, or dependencies.
+```
