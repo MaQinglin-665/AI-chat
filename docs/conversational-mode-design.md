@@ -786,3 +786,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 096 adds `复制短句` and `复制摘要` actions to the follow-up rehearsal preview panel.
 - `复制短句` copies the currently selected local reaction candidate, while `复制摘要` copies the compact preview card text for quick comparison and review.
 - These actions are user-click-only clipboard writes and do not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
+
+## 67. Task 097 Landing Notes
+
+- Task 097 adds a `copy bundle` action to the follow-up rehearsal preview panel.
+- The action copies one local text bundle that includes both the selected follow-up short sentence and the compact preview summary, so manual review notes are faster to prepare.
+- This remains user-click-only clipboard write behavior and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.

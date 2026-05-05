@@ -2479,6 +2479,19 @@ function buildFollowupReadinessPreviewCardText() {
   ].join("\n");
 }
 
+function buildFollowupReadinessPreviewCopyBundleText() {
+  const data = buildFollowupReadinessPreviewCardData();
+  const candidateText = data.candidateText === "n/a" ? "" : data.candidateText;
+  const summary = buildFollowupReadinessPreviewCardText();
+  return [
+    "续话预演对比包",
+    candidateText ? `短句：${candidateText}` : "短句：(空)",
+    "",
+    "摘要：",
+    summary
+  ].join("\n");
+}
+
 function buildFollowupReadinessPreviewCardData() {
   const snapshot = getTTSDebugSnapshot();
   const followup = snapshot.followup || {};
@@ -2569,6 +2582,14 @@ function ensureFollowupReadinessPanel() {
   copySummary.addEventListener("click", () => {
     copyFollowupReadinessPreviewSummaryToClipboard(copySummary);
   });
+  const copyBundle = document.createElement("button");
+  copyBundle.type = "button";
+  copyBundle.textContent = "\u590d\u5236\u5bf9\u6bd4\u5305";
+  copyBundle.title = "\u4e00\u6b21\u590d\u5236\u5f53\u524d\u77ed\u53e5\u4e0e\u9884\u6f14\u6458\u8981";
+  copyBundle.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e9f2ff;color:#1f4378;cursor:pointer;";
+  copyBundle.addEventListener("click", () => {
+    copyFollowupReadinessPreviewCopyBundleToClipboard(copyBundle);
+  });
   const copyTemplate = document.createElement("button");
   copyTemplate.type = "button";
   copyTemplate.textContent = "复制模板";
@@ -2609,6 +2630,7 @@ function ensureFollowupReadinessPanel() {
   actions.appendChild(clearRehearsal);
   actions.appendChild(copySelected);
   actions.appendChild(copySummary);
+  actions.appendChild(copyBundle);
   actions.appendChild(copy);
   actions.appendChild(copyTemplate);
   actions.appendChild(close);
@@ -2761,6 +2783,24 @@ async function copyFollowupReadinessPreviewSummaryToClipboard(button = null) {
     return true;
   } catch (_) {
     setStatus("\u590d\u5236\u9884\u6f14\u6458\u8981\u5931\u8d25");
+    return false;
+  }
+}
+
+async function copyFollowupReadinessPreviewCopyBundleToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildFollowupReadinessPreviewCopyBundleText());
+    setStatus("已复制续话对比包");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "已复制";
+      window.setTimeout(() => {
+        button.textContent = previous || "复制对比包";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("复制续话对比包失败");
     return false;
   }
 }
