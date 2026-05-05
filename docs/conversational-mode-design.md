@@ -561,3 +561,13 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `do_not_followup` fail-closed behavior in plan and silence eligibility
   - local smoke records for preview and silence policy blocking
 - Recommendation: do not expand proactive behavior yet. Prefer one real Electron/DevTools runtime checkpoint before adding new user-facing controls or broader automation.
+
+## 43. Task 069 Landing Notes
+
+- Task 069 adds a DevTools-only pending follow-up fixture:
+  - `window.__AI_CHAT_DEBUG_TTS__.checkConversationFollowupPendingFixture(input)`
+- The helper is diagnostic-only. It temporarily sets an in-memory pending follow-up state, reads the existing preview/snapshot/conversation diagnostics, records one debug event, and restores the previous state before returning.
+- The default fixture topic is the closed-topic phrase `先这样，晚安`, so the expected policy is `do_not_followup`.
+- This closes the gap between pure preview evidence and a real pending-state policy check without adding automatic proactive behavior.
+- It does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, file access, scheduler tick, or polling trigger paths.
+- It does not persist config, add dependencies, expose a backend API, or change default-off settings.
