@@ -965,3 +965,19 @@ Manual checks:
    - `line=...`
 5. Confirm the copy action is user-click-only and does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 6. Confirm the copy action does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.
+
+## 48. Follow-up Rehearsal Panel Organization v1
+
+Purpose: confirm the follow-up readiness panel action area is easier to scan without changing rehearsal or scheduler behavior.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Open `more -> follow-up status`.
+3. Confirm the title row only contains the panel title and hide action.
+4. Confirm rehearsal scenario controls appear under a `preview` group.
+5. Confirm copy/export controls appear under a `copy` group and wrap cleanly on narrow windows.
+6. Click each rehearsal scenario and confirm the existing local preview behavior still works.
+7. Click each copy/export action and confirm it still writes only visible/local debug text to the clipboard.
+8. Confirm the UI organization does not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+9. Confirm the UI organization does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.
