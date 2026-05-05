@@ -664,6 +664,8 @@ function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
   const proactiveSchedulerEnabled = conversationMode.proactiveSchedulerEnabled === true;
   const followupPending = state.followupPending === true;
   const topicHint = String(state.followupTopicHint || "").trim();
+  const reason = String(state.followupReason || "").trim();
+  const policy = buildConversationFollowupPolicy({ reason, topicHint });
   const chatBusy = state.chatBusy === true;
   const speaking = isSpeakingNow();
   const silenceFollowupMinMs = Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
@@ -689,6 +691,9 @@ function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
   }
   if (!topicHint) {
     blockedReasons.push("empty_topic_hint");
+  }
+  if (policy.type === "do_not_followup") {
+    blockedReasons.push(policy.blockedReason || "policy_do_not_followup");
   }
   if (chatBusy) {
     blockedReasons.push("chat_busy");
@@ -717,6 +722,8 @@ function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
     proactiveEnabled,
     proactiveSchedulerEnabled,
     followupPending,
+    followupPolicy: policy.type,
+    followupPolicyNote: policy.note,
     chatBusy,
     speaking,
     eligibleForSilenceFollowup: blockedReasons.length === 0,

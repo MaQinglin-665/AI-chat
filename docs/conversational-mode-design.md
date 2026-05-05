@@ -540,3 +540,12 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `snapshot().followup.blockedReasons`
 - The values reuse the existing `buildConversationFollowupDebugPlan(...)` helper.
 - This is a read-only visibility improvement and does not change follow-up execution, scheduler gates, polling, config defaults, request paths, tools, screenshots, file access, or UI.
+
+## 41. Task 063 Landing Notes
+
+- Task 063 applies the existing follow-up policy to silence eligibility.
+- Closed-topic hints that produce `do_not_followup` now add `policy_do_not_followup` to `silence.blockedReasons`.
+- `conversationFollowup().silence` also exposes:
+  - `followupPolicy`
+  - `followupPolicyNote`
+- This is a conservative tightening: it prevents `poll_ready` from appearing for topics that should fail quiet, without adding triggers or expanding permissions.
