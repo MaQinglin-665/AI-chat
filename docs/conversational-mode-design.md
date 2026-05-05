@@ -571,3 +571,18 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - This closes the gap between pure preview evidence and a real pending-state policy check without adding automatic proactive behavior.
 - It does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, file access, scheduler tick, or polling trigger paths.
 - It does not persist config, add dependencies, expose a backend API, or change default-off settings.
+
+## 44. Task 071 Landing Notes
+
+- Task 071 is a readiness checkpoint for the follow-up policy and proactive scheduler safety line.
+- Current status:
+  - closed-topic preview policy is verified
+  - closed-topic silence eligibility blocking is verified
+  - real renderer pending-state fixture result is `pass`
+  - default-off and guard-chain boundaries remain unchanged
+- Remaining evidence caveat:
+  - recent runtime evidence is screenshot-based; future manual checks should prefer copy/pasted JSON.
+- Recommended next functional direction:
+  - add a small user-facing settings/readiness surface before expanding proactive behavior
+  - keep automatic triggers conservative and opt-in
+  - do not add desktop observation, file access, tools, or shell execution to follow-up behavior
