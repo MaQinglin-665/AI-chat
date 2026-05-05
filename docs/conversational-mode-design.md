@@ -705,3 +705,10 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 083 adds a local-only `characterPreview` line for proactive follow-up tuning.
 - The preview is derived from current follow-up policy and topic hint, and appears in `conversationFollowup()`, `previewConversationFollowupPolicy()`, `snapshot().followup`, and the read-only readiness report.
 - This is diagnostic/UX visibility only: it does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
+
+## 54. Task 084 Landing Notes
+
+- Task 084 adds a local-only follow-up character state label to explain what the character is doing in user-friendly Chinese.
+- The readiness report now shows a state such as `安静陪伴`, `有点想接话`, `冷却中`, or `等你缓一会儿`.
+- DevTools can inspect the same local view through `window.__AI_CHAT_DEBUG_TTS__.followupCharacterState()`.
+- This is visibility only and does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
