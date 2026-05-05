@@ -788,3 +788,62 @@ Safety confirmation:
 ```text
 The local smoke executed helper logic only. It did not call requestAssistantReply, LLM, fetch, TTS, screenshot capture, tools, shell execution, or file access. Closed-topic input now fails closed before silence eligibility can report ready.
 ```
+
+---
+
+# Follow-up Policy Runtime Checkpoint - 2026-05-05 (Task 066)
+
+Task 066 attempts a real Electron runtime checkpoint for the follow-up policy path.
+
+Runtime command shape:
+
+```powershell
+$env:TAFFY_OPEN_DEVTOOLS='1'
+node node_modules/electron/cli.js electron/main.js
+```
+
+Observed runtime evidence:
+
+| Evidence | Result |
+| --- | --- |
+| Electron processes | present |
+| Node launcher process | present |
+| Python backend process | present |
+| Backend listener | `127.0.0.1:8123` |
+| `/config.json` | 200 |
+| model window URL | 200 |
+| chat window URL | 200 |
+| `/chat.js` and `/app.js` | 200 |
+| persona/model assets | 200 |
+
+DevTools automation boundary:
+
+```text
+TAFFY_OPEN_DEVTOOLS=1 can open DevTools windows, but this runtime does not expose a CDP remote debugging port by default.
+Checked /json/version on 9222, 9223, and 8315: unavailable.
+Checked /json/version on 8123: 404.
+```
+
+Result: partial
+
+```text
+Electron/backend startup and renderer asset loading are confirmed. Direct terminal capture of window.__AI_CHAT_DEBUG_TTS__ output is not available in this run, so closed-topic policy fields still need one manual DevTools copy/paste checkpoint.
+```
+
+Manual DevTools commands still needed:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.snapshot().followup
+window.__AI_CHAT_DEBUG_TTS__.conversationFollowup()
+window.__AI_CHAT_DEBUG_TTS__.previewConversationFollowupPolicy({
+  reason: "followup_pending",
+  topicHint: "先这样，晚安"
+})
+window.__AI_CHAT_DEBUG_TTS__.events().slice(-30)
+```
+
+Safety confirmation:
+
+```text
+No config file was modified. config.local.json was observed but not committed or changed. No app screenshot, tool call, shell execution, file read path, or broader proactive behavior was added.
+```
