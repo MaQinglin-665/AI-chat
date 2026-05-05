@@ -1009,3 +1009,16 @@ Manual checks:
 5. Click each rehearsal scenario and confirm the active scenario is marked inline in the comparison.
 6. Confirm the comparison table does not write pending state, call `runConversationFollowup`, call `requestAssistantReply`, trigger LLM/fetch/TTS, screenshots, tools, shell, or file access.
 7. Confirm the comparison table does not change scheduler gates, polling, cooldown, window limits, config, backend APIs, or pending rehearsal safety gates.
+
+## 51. Follow-up Rehearsal Milestone Checkpoint
+
+Purpose: confirm the rehearsal/debug stage is stable enough to stop expanding debug controls and move toward a manual confirmation experience.
+
+Review checks:
+
+1. Confirm Tasks 092-102 are documented as local rehearsal/debug capabilities.
+2. Confirm rehearsal helpers and panel controls remain explicit user or DevTools actions.
+3. Confirm scenario comparison and copy/export actions do not write pending state except when the user clicks a rehearsal scenario.
+4. Confirm rehearsal and comparison UI do not call `runConversationFollowup`, `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+5. Confirm the next documented stage is manual confirmation before any automatic follow-up expansion.
+6. Confirm automatic follow-up remains default-off and guarded by existing policy, cooldown, scheduler, and window-limit checks.
