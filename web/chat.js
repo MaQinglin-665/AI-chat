@@ -295,6 +295,7 @@ const state = {
   followupReadinessPanel: null,
   followupReadinessBody: null,
   followupReadinessRefreshTimer: 0,
+  followupCharacterChipRefreshTimer: 0,
   localAsrMutedWarned: false,
   localAsrInputDeviceCandidates: [],
   localAsrSpeeching: false,
@@ -1990,6 +1991,35 @@ function getFollowupCharacterStateDebugView() {
   );
 }
 
+function updateFollowupCharacterChip() {
+  if (!ui.followupCharacterChip) {
+    return;
+  }
+  let view = null;
+  try {
+    view = getFollowupCharacterStateDebugView();
+  } catch (_) {
+    view = { label: "安静陪伴", mood: "idle", description: "当前续话角色状态暂不可用。" };
+  }
+  const label = String(view.label || "安静陪伴");
+  const mood = String(view.mood || "idle");
+  const description = String(view.description || "");
+  ui.followupCharacterChip.textContent = `${label} · ${mood}`;
+  ui.followupCharacterChip.title = description || "当前续话角色状态";
+  ui.followupCharacterChip.dataset.state = label;
+  ui.followupCharacterChip.dataset.mood = mood;
+}
+
+function startFollowupCharacterChipRefresh() {
+  updateFollowupCharacterChip();
+  if (state.followupCharacterChipRefreshTimer || typeof window === "undefined") {
+    return;
+  }
+  state.followupCharacterChipRefreshTimer = window.setInterval(() => {
+    updateFollowupCharacterChip();
+  }, 2000);
+}
+
 function buildFollowupReadinessReport() {
   const snapshot = getTTSDebugSnapshot();
   const mode = snapshot.conversationMode || {};
@@ -2488,6 +2518,7 @@ const ui = {
   personaSaveBtn: document.getElementById("persona-save-btn"),
   learningReviewBtn: document.getElementById("learning-review-btn"),
   followupReadinessBtn: document.getElementById("followup-readiness-btn"),
+  followupCharacterChip: document.getElementById("followup-character-chip"),
   learningReviewBackdrop: document.getElementById("learning-review-backdrop"),
   learningReviewDrawer: document.getElementById("learning-review-drawer"),
   learningReviewCloseBtn: document.getElementById("learning-review-close-btn"),
@@ -14349,6 +14380,7 @@ function bindUI() {
   if (ui.followupReadinessBtn) {
     ui.followupReadinessBtn.addEventListener("click", () => {
       const visible = toggleFollowupReadinessPanel();
+      updateFollowupCharacterChip();
       setStatus(visible ? "续话状态面板已打开" : "续话状态面板已隐藏");
     });
   }
@@ -14862,6 +14894,7 @@ async function main() {
       }
       setupSpeechRecognition();
       bindUI();
+      startFollowupCharacterChipRefresh();
       startReminderLoop();
       runReminderCheck();
       try {
@@ -14896,6 +14929,7 @@ async function main() {
     }
     setupSpeechRecognition();
     bindUI();
+    startFollowupCharacterChipRefresh();
     startReminderLoop();
     runReminderCheck();
     if (state.model) {
@@ -14912,6 +14946,10 @@ window.addEventListener("beforeunload", () => {
   closeLearningReviewDrawer();
   resetActionSystem();
   stopIdleMotionLoop();
+  if (state.followupCharacterChipRefreshTimer) {
+    clearInterval(state.followupCharacterChipRefreshTimer);
+    state.followupCharacterChipRefreshTimer = 0;
+  }
   stopAutoChatLoop();
   stopProactiveSchedulerPolling("beforeunload");
   stopMicLoop(true);

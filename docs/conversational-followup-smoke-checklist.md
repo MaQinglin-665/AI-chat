@@ -717,3 +717,15 @@ Expected checks:
 3. The helper does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
 4. The helper does not mutate pending follow-up state or scheduler state.
 5. The readiness panel shows the same kind of character state summary.
+
+## 33. Follow-up Character Status Chip v1
+
+Purpose: confirm the main chat header can show a small local character state chip without triggering any proactive behavior.
+
+Manual checks:
+
+1. Start the app in chat view.
+2. Confirm the header shows a chip like `安静陪伴 · idle`.
+3. Open `更多 -> 续话状态` and confirm the chip remains visible and read-only.
+4. Confirm the chip does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+5. Confirm the chip does not mutate pending follow-up state or scheduler state.
