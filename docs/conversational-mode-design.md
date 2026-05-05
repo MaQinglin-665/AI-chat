@@ -637,3 +637,13 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - no policy changes
   - no follow-up trigger changes
   - no LLM/fetch/TTS, screenshot, tool, shell, or file access
+
+## 48. Task 077 Landing Notes
+
+- Task 077 localizes the advanced action entry button from `Follow-up` to `续话状态`.
+- This aligns the entry point with the Chinese-first panel copy from Task 075.
+- This is text-only:
+  - no JavaScript behavior changes
+  - no config changes
+  - no scheduler/policy/trigger changes
+  - no LLM/fetch/TTS, screenshot, tool, shell, or file access
