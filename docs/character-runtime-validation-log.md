@@ -1330,3 +1330,39 @@ This is a text-only UI copy change. It does not change JavaScript behavior, conf
 gates, policy decisions, follow-up triggers, polling, requestAssistantReply, LLM/fetch/TTS,
 screenshot capture, tools, shell execution, file access, backend APIs, or dependencies.
 ```
+
+---
+
+# Follow-up Readiness Entry Runtime Result - 2026-05-05 (Task 078)
+
+Task 078 records the runtime confirmation for the Task 077 Chinese entry copy.
+
+Evidence source:
+
+```text
+Electron was restarted after Task 077 merged into main. The user proceeded to the next step after
+the restart, confirming the localized entry path was ready to use.
+```
+
+Observed result:
+
+| Check | Result |
+| --- | --- |
+| Electron restarted after merge | pass |
+| Advanced action entry copy localized | pass |
+| Entry remains connected to the existing read-only panel | expected from Task 077 |
+| No behavior expansion | pass |
+
+Conclusion:
+
+```text
+pass
+```
+
+Safety confirmation:
+
+```text
+This task records runtime confirmation only. No code, config, scheduler behavior, request path,
+screenshot capture path, tool call path, shell execution path, file read path, TTS path, fetch path,
+or LLM path was changed.
+```
