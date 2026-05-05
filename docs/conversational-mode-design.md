@@ -586,3 +586,20 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - add a small user-facing settings/readiness surface before expanding proactive behavior
   - keep automatic triggers conservative and opt-in
   - do not add desktop observation, file access, tools, or shell execution to follow-up behavior
+
+## 45. Task 072 Landing Notes
+
+- Task 072 adds a read-only follow-up readiness surface.
+- Entry points:
+  - advanced action button: `Follow-up`
+  - local command: `/followupstatus`
+  - DevTools bridge: `window.__AI_CHAT_DEBUG_TTS__.followupReadiness()`
+- The panel summarizes existing snapshot data:
+  - conversation/proactive/scheduler switches
+  - pending follow-up state and policy
+  - silence gate readiness
+  - scheduler gate readiness
+  - blocked reasons and timing ages
+- This is visibility only. It does not change config, toggle proactive behavior, trigger follow-up,
+  start polling, call LLM/fetch/TTS, capture screenshots, call tools, execute shell commands, or
+  read files.
