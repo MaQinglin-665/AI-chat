@@ -587,6 +587,7 @@ function getTTSDebugSnapshot() {
     topicHint: String(state.followupTopicHint || "")
   });
   const followupCharacterCue = buildConversationFollowupCharacterCue(followupPlan);
+  const followupCharacterPreview = buildConversationFollowupCharacterPreview(followupPlan);
   const durationMs = audio && Number.isFinite(Number(audio.duration)) && audio.duration > 0
     ? Math.round(Number(audio.duration) * 1000)
     : Number(state.ttsDebugAudioDurationMs || -1);
@@ -650,6 +651,7 @@ function getTTSDebugSnapshot() {
       policyNote: followupPolicy.note,
       policyBlockedReason: String(followupPolicy.blockedReason || ""),
       characterCue: followupCharacterCue,
+      characterPreview: followupCharacterPreview,
       updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
     },
     proactiveScheduler: buildProactiveSchedulerDebugSnapshot(Date.now()),
@@ -814,6 +816,28 @@ function buildConversationFollowupCharacterCue(plan) {
   };
 }
 
+function buildConversationFollowupCharacterPreview(plan) {
+  const safePlan = plan && typeof plan === "object" ? plan : {};
+  const policy = String(safePlan.followupPolicy || "gentle_continue").trim() || "gentle_continue";
+  let topicHint = String(safePlan.topicHint || "").replace(/\s+/g, " ").trim();
+  if (topicHint.length > 28) {
+    topicHint = `${topicHint.slice(0, 28).trim()}...`;
+  }
+  if (policy === "do_not_followup") {
+    return "这个话题像是已经收口了，我先安静待着。";
+  }
+  if (!topicHint) {
+    return "";
+  }
+  if (policy === "light_question") {
+    return `我有点好奇「${topicHint}」，不过你想先放着也完全可以。`;
+  }
+  if (policy === "soft_checkin") {
+    return `如果你还想聊「${topicHint}」，我在这边慢慢听。`;
+  }
+  return `刚才「${topicHint}」这个点我还在想，要不要先轻轻放在这里？`;
+}
+
 function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
   const now = Number(nowMs);
   const safeNow = Number.isFinite(now) ? now : Date.now();
@@ -834,6 +858,12 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
     : -1;
   const policy = buildConversationFollowupPolicy({ reason, topicHint, updatedAgeMs });
   const characterCue = buildConversationFollowupCharacterCue({
+    reason,
+    topicHint,
+    followupPolicy: policy.type,
+    updatedAgeMs
+  });
+  const characterPreview = buildConversationFollowupCharacterPreview({
     reason,
     topicHint,
     followupPolicy: policy.type,
@@ -873,6 +903,7 @@ function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
     followupPolicy: policy.type,
     followupPolicyNote: policy.note,
     characterCue,
+    characterPreview,
     updatedAgeMs,
     conversationEnabled,
     proactiveEnabled,
@@ -942,6 +973,12 @@ function previewConversationFollowupPolicy(input = {}) {
     followupPolicy: policy.type,
     updatedAgeMs: 0
   });
+  const characterPreview = buildConversationFollowupCharacterPreview({
+    reason,
+    topicHint,
+    followupPolicy: policy.type,
+    updatedAgeMs: 0
+  });
   const blockedReasons = [];
   if (!topicHint) {
     blockedReasons.push("empty_topic_hint");
@@ -956,6 +993,7 @@ function previewConversationFollowupPolicy(input = {}) {
     followupPolicy: policy.type,
     followupPolicyNote: policy.note,
     characterCue,
+    characterPreview,
     updatedAgeMs: 0,
     conversationEnabled: true,
     proactiveEnabled: true,
@@ -1920,6 +1958,7 @@ function buildFollowupReadinessReport() {
     `\u5f85\u5904\u7406\uff1a${followup.pending === true ? "\u662f" : "\u5426"}  \u7b56\u7565\uff1a${followup.policy || "n/a"}  \u53ef\u89e6\u53d1\uff1a${followup.eligible === true ? "\u662f" : "\u5426"}`,
     `\u8bdd\u9898\uff1a${followup.topicHint || "\uff08\u7a7a\uff09"}`,
     `\u89d2\u8272\u8bed\u6c14\uff1a${followup.characterCue?.tone || "n/a"}  \u60c5\u7eea\uff1a${followup.characterCue?.emotion || "n/a"} / ${followup.characterCue?.action || "n/a"}`,
+    `\u672c\u5730\u9884\u89c8\uff1a${followup.characterPreview || "n/a"}`,
     `\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(followup.blockedReasons)}`,
     `\u539f\u59cb\u539f\u56e0\uff1a${joinReadinessReasons(followup.blockedReasons)}`,
     `\u66f4\u65b0\u65f6\u95f4\uff1a${formatReadinessMs(followup.updatedAgeMs)}  \u5b89\u9759\u9608\u503c\uff1a${formatReadinessMs(mode.silenceFollowupMinMs)}`,

@@ -699,3 +699,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - The cue maps follow-up policy to a Chinese-first, low-interruption desktop-pet tone, plus optional runtime metadata hints such as emotion/action/intensity/voice_style.
 - `conversationFollowup()`, `previewConversationFollowupPolicy()`, `snapshot().followup`, and the read-only readiness report can now expose the current cue for debugging.
 - This does not change default-off posture, scheduler gates, cooldown, window limits, polling lifecycle, desktop observation, file access, tool calls, or config writes.
+
+## 53. Task 083 Landing Notes
+
+- Task 083 adds a local-only `characterPreview` line for proactive follow-up tuning.
+- The preview is derived from current follow-up policy and topic hint, and appears in `conversationFollowup()`, `previewConversationFollowupPolicy()`, `snapshot().followup`, and the read-only readiness report.
+- This is diagnostic/UX visibility only: it does not call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, or add desktop/file/tool access.
