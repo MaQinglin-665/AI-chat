@@ -814,3 +814,9 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
 - Task 101 adds a local scenario comparison block to the follow-up rehearsal panel.
 - The block shows each rehearsal scenario's policy, preferred tone, selected index, and selected local short sentence without requiring repeated scenario clicks.
 - The comparison is computed from existing local policy/reaction helpers and does not write pending state, call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
+
+## 72. Task 102 Landing Notes
+
+- Task 102 upgrades the rehearsal scenario comparison from a plain text block into a structured table-like view.
+- Each scenario row now separates label, policy, tone/index, and selected short sentence, and the active rehearsal scenario is marked inline.
+- This remains read-only local UI and does not write pending state, call LLM/fetch/TTS, trigger follow-up, change scheduler behavior, write config, or add desktop/file/tool access.
