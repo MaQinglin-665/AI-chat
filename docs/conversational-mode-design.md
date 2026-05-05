@@ -549,3 +549,15 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `followupPolicy`
   - `followupPolicyNote`
 - This is a conservative tightening: it prevents `poll_ready` from appearing for topics that should fail quiet, without adding triggers or expanding permissions.
+
+## 42. Task 065 Landing Notes
+
+- Task 065 is a checkpoint for the follow-up policy line from Task 056 to Task 064.
+- Current closed items:
+  - prompt wording polish
+  - deterministic policy presets
+  - DevTools-only policy preview
+  - policy and readiness visibility in snapshots/events
+  - `do_not_followup` fail-closed behavior in plan and silence eligibility
+  - local smoke records for preview and silence policy blocking
+- Recommendation: do not expand proactive behavior yet. Prefer one real Electron/DevTools runtime checkpoint before adding new user-facing controls or broader automation.
