@@ -979,3 +979,88 @@ current-page memory for a synchronous diagnostic read and restores the previous 
 returning. It does not call scheduler tick, polling trigger, requestAssistantReply, LLM, fetch,
 TTS, screenshot capture, tools, shell execution, file access, backend APIs, or persistent config.
 ```
+
+---
+
+# Follow-up Policy Pending Fixture Runtime Result - 2026-05-05 (Task 070)
+
+Task 070 records the real Electron DevTools result for the Task 069 pending follow-up fixture.
+
+Command executed in chat-window DevTools Console:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.checkConversationFollowupPendingFixture({
+  reason: "followup_pending",
+  topicHint: "先这样，晚安"
+})
+```
+
+Evidence source:
+
+```text
+Manual DevTools Console screenshot provided in the project thread after restarting Electron on
+main commit c76647c.
+```
+
+Observed fields from the screenshot:
+
+| Area | Field | Observed |
+| --- | --- | --- |
+| top-level | `ok` | `true` |
+| top-level | `restored` | `true` |
+| `fixture` | `reason` | `followup_pending` |
+| `fixture` | `topicHint` | `先这样，晚安` |
+| `fixture` | `silenceAgeMs` | `181000` |
+| `fixture` | `temporaryGatesEnabled` | `true` |
+| `preview` | `followupPolicy` | `do_not_followup` |
+| `preview` | `eligible` | `false` |
+| `preview` | `blockedReasons` | one blocked reason visible |
+| `preview` | `promptDraftEmpty` | `true` |
+| `snapshotFollowup` | `pending` | `true` |
+| `snapshotFollowup` | `eligible` | `false` |
+| `snapshotFollowup` | `blockedReasons` | one blocked reason visible |
+| `snapshotFollowup` | `policy` | `do_not_followup` |
+| `snapshotFollowup` | `policyBlockedReason` | `policy_do_not_followup` |
+| `conversationFollowup` | `eligible` | `false` |
+| `conversationFollowup` | `blockedReasons` | one blocked reason visible |
+| `conversationFollowup` | `followupPolicy` | `do_not_followup` |
+| `conversationFollowup` | `promptDraftEmpty` | `true` |
+| `conversationFollowup.silence` | visible | expanded object present |
+| `proactiveScheduler` | `eligibleForSchedulerTick` | `false` |
+| `proactiveScheduler` | `blockedReasons` | one blocked reason visible |
+| `proactiveScheduler` | `pollTimerActive` | `true` |
+| `recentEvents` | length | `3` |
+| `afterRestore` | `pending` | `false` |
+| `afterRestore` | `reason` | empty |
+| `afterRestore` | `topicHint` | empty |
+
+Interpretation:
+
+```text
+The real renderer now confirms the previously missing pending-state case. Even with a temporary
+pending follow-up state and old-enough silence timestamps, the closed-topic hint stays
+ineligible because the policy is do_not_followup / policy_do_not_followup. The fixture restored
+the previous pending state before returning.
+```
+
+Result: pass
+
+```text
+The Task 068 pending-state residual risk is closed for the closed-topic policy path.
+```
+
+Residual risk:
+
+```text
+The evidence is still screenshot-based rather than pasted JSON text, but the required expanded
+fields are visible enough to confirm the pending closed-topic gate. Future checks may still prefer
+copy/pasted JSON for easier archival review.
+```
+
+Safety confirmation:
+
+```text
+No runtime behavior changed in this task. No config file was modified. No requestAssistantReply,
+LLM, fetch, TTS, screenshot capture, tool call, shell execution, file read, scheduler tick, or
+polling trigger path was invoked by this record.
+```
