@@ -754,3 +754,37 @@ Safety confirmation:
 ```text
 The preview path returned diagnostics only. It did not call requestAssistantReply, LLM, fetch, TTS, screenshot capture, tools, shell execution, or file access. Closed-topic input failed quiet with policy_do_not_followup and an empty promptDraft.
 ```
+
+---
+
+# Follow-up Policy Silence Smoke - 2026-05-05 (Task 064)
+
+Task 064 validates that Task 063 blocks closed-topic hints at the silence eligibility layer.
+
+Method:
+
+```text
+Extracted the relevant pure helper block from web/chat.js and executed it with Node.
+Mock state had all switches enabled, pending follow-up present, silence window reached, and topicHint="先这样，晚安".
+No runtime follow-up state was mutated.
+```
+
+Observed results:
+
+| Check | Observed |
+| --- | --- |
+| `silence.silenceWindowReached` | `true` |
+| `silence.followupPolicy` | `do_not_followup` |
+| `silence.eligibleForSilenceFollowup` | `false` |
+| `silence.blockedReasons` | `policy_do_not_followup` |
+| `plan.followupPolicy` | `do_not_followup` |
+| `plan.eligible` | `false` |
+| `plan.blockedReasons` | `policy_do_not_followup` |
+
+Result: pass
+
+Safety confirmation:
+
+```text
+The local smoke executed helper logic only. It did not call requestAssistantReply, LLM, fetch, TTS, screenshot capture, tools, shell execution, or file access. Closed-topic input now fails closed before silence eligibility can report ready.
+```
