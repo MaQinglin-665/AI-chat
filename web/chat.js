@@ -1742,7 +1742,7 @@ function toggleTTSDebugPanel(force = null) {
 }
 
 function formatReadinessBool(value) {
-  return value === true ? "on" : "off";
+  return value === true ? "开" : "关";
 }
 
 function formatReadinessMs(value) {
@@ -1767,49 +1767,49 @@ function joinReadinessReasons(reasons) {
 function explainReadinessReason(reason) {
   const key = String(reason || "").trim();
   const labels = {
-    conversation_disabled: "conversation mode is off",
-    proactive_disabled: "proactive follow-up is off",
-    scheduler_disabled: "scheduler is off",
-    no_pending_followup: "there is no pending follow-up",
-    empty_topic_hint: "there is no topic to continue",
-    silence_window_not_reached: "the quiet window has not been reached",
-    user_silence_window_not_reached: "the user has not been quiet long enough",
-    tts_silence_window_not_reached: "speech audio has not been quiet long enough",
-    no_user_activity_timestamp: "no recent user timestamp is available",
-    no_tts_finished_timestamp: "no finished speech timestamp is available",
-    policy_do_not_followup: "the topic looks closed, so follow-up is blocked",
-    chat_busy: "chat is busy",
-    speaking: "the assistant is speaking",
-    in_flight: "a proactive follow-up is already running",
-    cooldown_active: "cooldown is active",
-    window_limit_reached: "the follow-up limit for this window was reached",
-    warmup_active: "scheduler warmup is still active"
+    conversation_disabled: "会话模式未开启",
+    proactive_disabled: "主动续话未开启",
+    scheduler_disabled: "主动调度未开启",
+    no_pending_followup: "当前没有待续接的话题",
+    empty_topic_hint: "没有可继续的话题线索",
+    silence_window_not_reached: "安静时间还不够",
+    user_silence_window_not_reached: "用户刚刚还在互动，需要再等一会儿",
+    tts_silence_window_not_reached: "语音刚结束或还没有结束记录",
+    no_user_activity_timestamp: "还没有用户活动时间记录",
+    no_tts_finished_timestamp: "还没有语音结束时间记录",
+    policy_do_not_followup: "话题像是已经收口，所以不继续追问",
+    chat_busy: "当前正在处理对话",
+    speaking: "角色正在说话",
+    in_flight: "已有一次主动续话正在执行",
+    cooldown_active: "仍在冷却时间内",
+    window_limit_reached: "当前时间窗口内续话次数已达上限",
+    warmup_active: "调度器还在预热中"
   };
-  return labels[key] || key || "unknown";
+  return labels[key] || key || "未知原因";
 }
 
 function explainReadinessReasons(reasons) {
   const list = Array.isArray(reasons) ? reasons.filter(Boolean) : [];
-  return list.length ? list.map(explainReadinessReason).join("; ") : "no blocker";
+  return list.length ? list.map(explainReadinessReason).join("；") : "没有阻塞原因";
 }
 
 function buildFollowupReadinessFriendlySummary(followup, silence, scheduler) {
   if (followup?.eligible === true && silence?.eligibleForSilenceFollowup === true && scheduler?.eligibleForSchedulerTick === true) {
-    return "Ready: follow-up, silence, and scheduler gates are all open.";
+    return "可以续话：续话、安静窗口和调度器都已满足。";
   }
   if (followup?.pending !== true) {
-    return "Idle: no pending follow-up is waiting right now.";
+    return "空闲：当前没有待续接的话题。";
   }
   if (String(followup?.policy || "") === "do_not_followup") {
-    return "Quiet: the current topic looks closed, so the assistant should not continue.";
+    return "保持安静：当前话题像是已经收口，不应该继续追问。";
   }
   if (silence?.eligibleForSilenceFollowup !== true) {
-    return `Waiting: ${explainReadinessReasons(silence?.blockedReasons)}.`;
+    return `等待中：${explainReadinessReasons(silence?.blockedReasons)}。`;
   }
   if (scheduler?.eligibleForSchedulerTick !== true) {
-    return `Blocked: ${explainReadinessReasons(scheduler?.blockedReasons)}.`;
+    return `暂不触发：${explainReadinessReasons(scheduler?.blockedReasons)}。`;
   }
-  return `Blocked: ${explainReadinessReasons(followup?.blockedReasons)}.`;
+  return `暂不触发：${explainReadinessReasons(followup?.blockedReasons)}。`;
 }
 
 function buildFollowupReadinessReport() {
@@ -1819,32 +1819,32 @@ function buildFollowupReadinessReport() {
   const silence = snapshot.silence || {};
   const scheduler = snapshot.proactiveScheduler || {};
   const lines = [
-    "Follow-up readiness",
+    "续话状态",
     "",
-    "Summary",
+    "摘要",
     buildFollowupReadinessFriendlySummary(followup, silence, scheduler),
     "",
-    `conversation=${formatReadinessBool(mode.enabled)} proactive=${formatReadinessBool(mode.proactiveEnabled)} scheduler=${formatReadinessBool(mode.proactiveSchedulerEnabled)}`,
-    `pending=${followup.pending === true} policy=${followup.policy || "n/a"} eligible=${followup.eligible === true}`,
-    `topic=${followup.topicHint || "(empty)"}`,
-    `followupBlocked=${joinReadinessReasons(followup.blockedReasons)}`,
-    `followupMeaning=${explainReadinessReasons(followup.blockedReasons)}`,
-    `updatedAge=${formatReadinessMs(followup.updatedAgeMs)} silenceMin=${formatReadinessMs(mode.silenceFollowupMinMs)}`,
+    `开关：会话=${formatReadinessBool(mode.enabled)} 主动续话=${formatReadinessBool(mode.proactiveEnabled)} 调度器=${formatReadinessBool(mode.proactiveSchedulerEnabled)}`,
+    `续话：待处理=${followup.pending === true ? "是" : "否"} 策略=${followup.policy || "n/a"} 可触发=${followup.eligible === true ? "是" : "否"}`,
+    `话题：${followup.topicHint || "（空）"}`,
+    `阻塞原因：${explainReadinessReasons(followup.blockedReasons)}`,
+    `原始原因：${joinReadinessReasons(followup.blockedReasons)}`,
+    `更新时间：${formatReadinessMs(followup.updatedAgeMs)} 安静阈值：${formatReadinessMs(mode.silenceFollowupMinMs)}`,
     "",
-    "Silence gate",
-    `eligible=${silence.eligibleForSilenceFollowup === true} policy=${silence.followupPolicy || "n/a"}`,
-    `blocked=${joinReadinessReasons(silence.blockedReasons)}`,
-    `meaning=${explainReadinessReasons(silence.blockedReasons)}`,
-    `lastUserAge=${formatReadinessMs(silence.lastUserAgeMs)} lastTtsAge=${formatReadinessMs(silence.lastTtsFinishedAgeMs)}`,
+    "安静窗口",
+    `可触发=${silence.eligibleForSilenceFollowup === true ? "是" : "否"} 策略=${silence.followupPolicy || "n/a"}`,
+    `阻塞原因：${explainReadinessReasons(silence.blockedReasons)}`,
+    `原始原因：${joinReadinessReasons(silence.blockedReasons)}`,
+    `距离用户发言：${formatReadinessMs(silence.lastUserAgeMs)} 距离语音结束：${formatReadinessMs(silence.lastTtsFinishedAgeMs)}`,
     "",
-    "Scheduler gate",
-    `eligible=${scheduler.eligibleForSchedulerTick === true} polling=${scheduler.pollTimerActive === true} lastPoll=${scheduler.pollLastResult || "n/a"}`,
-    `blocked=${joinReadinessReasons(scheduler.blockedReasons)}`,
-    `meaning=${explainReadinessReasons(scheduler.blockedReasons)}`,
-    `cooldown=${formatReadinessMs(scheduler.cooldownRemainingMs)} count=${Number(scheduler.proactiveCountInWindow || 0)}/${Number(scheduler.maxFollowupsPerWindow || 0)}`,
+    "调度器",
+    `可触发=${scheduler.eligibleForSchedulerTick === true ? "是" : "否"} 轮询=${scheduler.pollTimerActive === true ? "开" : "关"} 上次轮询=${scheduler.pollLastResult || "n/a"}`,
+    `阻塞原因：${explainReadinessReasons(scheduler.blockedReasons)}`,
+    `原始原因：${joinReadinessReasons(scheduler.blockedReasons)}`,
+    `冷却剩余：${formatReadinessMs(scheduler.cooldownRemainingMs)} 次数：${Number(scheduler.proactiveCountInWindow || 0)}/${Number(scheduler.maxFollowupsPerWindow || 0)}`,
     "",
-    "Safety",
-    "This panel is read-only. It does not trigger follow-up, polling, screenshots, tools, file access, TTS, fetch, or LLM calls."
+    "安全说明",
+    "这个面板只读：不会触发续话、轮询、截图、工具调用、文件访问、TTS、fetch 或 LLM。"
   ];
   return lines.join("\n");
 }
@@ -1877,7 +1877,7 @@ function ensureFollowupReadinessPanel() {
   const head = document.createElement("div");
   head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;";
   const title = document.createElement("strong");
-  title.textContent = "Follow-up readiness";
+  title.textContent = "续话状态";
   title.style.cssText = "font:700 14px/1.2 system-ui,sans-serif;color:#1f3768;";
   const close = document.createElement("button");
   close.type = "button";
@@ -14057,7 +14057,7 @@ function bindUI() {
   if (ui.followupReadinessBtn) {
     ui.followupReadinessBtn.addEventListener("click", () => {
       const visible = toggleFollowupReadinessPanel();
-      setStatus(visible ? "Follow-up readiness panel opened" : "Follow-up readiness panel hidden");
+      setStatus(visible ? "续话状态面板已打开" : "续话状态面板已隐藏");
     });
   }
 

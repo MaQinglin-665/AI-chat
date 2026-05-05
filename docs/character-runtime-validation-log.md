@@ -1229,3 +1229,40 @@ The change only formats existing readiness snapshot data. It does not change con
 gates, policy decisions, follow-up triggers, polling, requestAssistantReply, LLM/fetch/TTS,
 screenshot capture, tools, shell execution, file access, backend APIs, or dependencies.
 ```
+
+---
+
+# Follow-up Readiness Chinese Copy Added - 2026-05-05 (Task 075)
+
+Task 075 makes the follow-up readiness panel understandable for Chinese users.
+
+What changed:
+
+1. Panel title becomes `续话状态`.
+2. `Summary` becomes `摘要`.
+3. English state phrases are replaced with Chinese explanations.
+4. Switches display `开` / `关`.
+5. Follow-up, silence, scheduler, and safety sections use Chinese labels.
+6. Raw reason keys remain visible under `原始原因` for debugging.
+
+Example expected copy:
+
+```text
+续话状态
+
+摘要
+空闲：当前没有待续接的话题。
+
+开关：会话=开 主动续话=开 调度器=开
+阻塞原因：当前没有待续接的话题；没有可继续的话题线索；安静时间还不够
+原始原因：no_pending_followup, empty_topic_hint, silence_window_not_reached
+```
+
+Safety confirmation:
+
+```text
+This is a copy/localization change for an existing read-only panel. It does not change config,
+scheduler gates, policy decisions, follow-up triggers, polling, requestAssistantReply,
+LLM/fetch/TTS, screenshot capture, tools, shell execution, file access, backend APIs, or
+dependencies.
+```
