@@ -2514,6 +2514,21 @@ function buildFollowupReadinessPreviewJsonText() {
   return JSON.stringify(snapshot, null, 2);
 }
 
+function buildFollowupReadinessPreviewOneLineText() {
+  const data = buildFollowupReadinessPreviewCardData();
+  const candidateText = (data.candidateText === "n/a" ? "" : data.candidateText).replace(/\s+/g, " ").trim();
+  const safeCandidate = candidateText || "(empty)";
+  return [
+    `scenario=${data.scenarioLabel}`,
+    `state=${data.characterLabel}/${data.characterMood}`,
+    `policy=${data.policy}`,
+    `tone=${data.tone}`,
+    `selected=${data.selectedIndex}`,
+    `blocked=${data.blocked}`,
+    `line=${safeCandidate}`
+  ].join(" | ");
+}
+
 function buildFollowupReadinessPreviewCardData() {
   const snapshot = getTTSDebugSnapshot();
   const followup = snapshot.followup || {};
@@ -2620,6 +2635,14 @@ function ensureFollowupReadinessPanel() {
   copyJson.addEventListener("click", () => {
     copyFollowupReadinessPreviewJsonToClipboard(copyJson);
   });
+  const copyOneLine = document.createElement("button");
+  copyOneLine.type = "button";
+  copyOneLine.textContent = "\u590d\u5236\u4e00\u884c";
+  copyOneLine.title = "\u590d\u5236\u5f53\u524d\u9884\u6f14\u7b80\u8981\u7684\u5355\u884c\u6587\u672c";
+  copyOneLine.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1f6ff;color:#32497f;cursor:pointer;";
+  copyOneLine.addEventListener("click", () => {
+    copyFollowupReadinessPreviewOneLineToClipboard(copyOneLine);
+  });
   const copyTemplate = document.createElement("button");
   copyTemplate.type = "button";
   copyTemplate.textContent = "复制模板";
@@ -2662,6 +2685,7 @@ function ensureFollowupReadinessPanel() {
   actions.appendChild(copySummary);
   actions.appendChild(copyBundle);
   actions.appendChild(copyJson);
+  actions.appendChild(copyOneLine);
   actions.appendChild(copy);
   actions.appendChild(copyTemplate);
   actions.appendChild(close);
@@ -2850,6 +2874,24 @@ async function copyFollowupReadinessPreviewJsonToClipboard(button = null) {
     return true;
   } catch (_) {
     setStatus("复制续话预演JSON失败");
+    return false;
+  }
+}
+
+async function copyFollowupReadinessPreviewOneLineToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildFollowupReadinessPreviewOneLineText());
+    setStatus("已复制续话一行摘要");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "已复制";
+      window.setTimeout(() => {
+        button.textContent = previous || "复制一行";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("复制续话一行摘要失败");
     return false;
   }
 }
