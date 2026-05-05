@@ -304,3 +304,15 @@
   - `blockedReasons` includes `policy_do_not_followup`
   - `silence.eligibleForSilenceFollowup=false`
 - No config default, backend API, screenshot, tool call, shell execution, file read, TTS/fetch/LLM path, dependency, timer, or listener is added.
+
+## 25. Task 111 Gray-mode Gate Note
+
+- Task 111 adds `conversation_mode.gray_auto_enabled=false` as an explicit gray automatic follow-up opt-in gate.
+- Automatic scheduler polling now requires four config gates before it can start:
+  - `conversation_mode.enabled=true`
+  - `conversation_mode.proactive_enabled=true`
+  - `conversation_mode.proactive_scheduler_enabled=true`
+  - `conversation_mode.gray_auto_enabled=true`
+- When `gray_auto_enabled` is false, polling remains stopped and reports `gray_auto_disabled`.
+- The gray-mode gate applies only to automatic polling startup; manual confirmation and DevTools/manual debug paths remain separately guarded by their existing checks.
+- This keeps automatic follow-up default-off before any gray rollout and does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, model calls, speech, config writes, or dependencies.

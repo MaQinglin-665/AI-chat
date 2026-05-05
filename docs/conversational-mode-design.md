@@ -984,3 +984,11 @@ Still out of scope:
 - Bypassing manual confirmation, policy, cooldown, scheduler, busy, speaking, closed-topic, or window-limit guards.
 - Adding desktop observation, screenshot capture, file access, shell execution, tool calls, backend APIs, config writes, or new dependencies.
 - Making commercial or mature-product claims about proactive companionship behavior.
+
+## 84. Task 111 Landing Notes
+
+- Task 111 adds a default-off `conversation_mode.gray_auto_enabled` flag for gray automatic follow-up preparation.
+- The frontend treats this flag as an automatic polling gate only: when it is false, proactive scheduler polling stays stopped with `gray_auto_disabled`, even if the older conversation/proactive/scheduler switches are true.
+- Manual confirmation and local debug/manual execution paths are not blocked by this gray-mode flag, so the current explicit user-confirmation experience remains usable.
+- The follow-up readiness panel now shows gray-mode opt-in status and polling gate reasons, and the copied config template keeps `gray_auto_enabled=false` by default.
+- This task does not enable automatic follow-up by default, does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, model calls, speech, config writes, or new dependencies.
