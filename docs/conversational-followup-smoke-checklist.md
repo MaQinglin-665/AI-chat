@@ -741,3 +741,22 @@ Manual checks:
 3. Inspect the chip and confirm `data-tone` is present.
 4. Confirm visual tone changes are CSS-only.
 5. Confirm the chip does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+
+## 35. Follow-up Character Runtime Hint v1
+
+Purpose: confirm follow-up character status changes can emit a low-frequency local runtime hint without triggering proactive behavior.
+
+DevTools checks:
+
+```js
+window.__AI_CHAT_DEBUG_TTS__.followupCharacterRuntimeHint()
+window.__AI_CHAT_DEBUG_TTS__.events().filter(e => e.type === "followup_character_runtime_hint")
+```
+
+Expected checks:
+
+1. Runtime hint state is visible.
+2. Hints only emit on tone changes and are rate-limited.
+3. Events are compact and do not include long prompt/private content.
+4. The feature does not call `requestAssistantReply`, LLM/fetch/TTS, screenshots, tools, shell, or file access.
+5. The feature does not mutate pending follow-up state or scheduler state.

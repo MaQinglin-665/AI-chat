@@ -296,6 +296,9 @@ const state = {
   followupReadinessBody: null,
   followupReadinessRefreshTimer: 0,
   followupCharacterChipRefreshTimer: 0,
+  followupCharacterRuntimeLastTone: "",
+  followupCharacterRuntimeLastHintAt: 0,
+  followupCharacterRuntimeLastHint: null,
   localAsrMutedWarned: false,
   localAsrInputDeviceCandidates: [],
   localAsrSpeeching: false,
@@ -2018,6 +2021,57 @@ function updateFollowupCharacterChip() {
   ui.followupCharacterChip.dataset.state = label;
   ui.followupCharacterChip.dataset.mood = mood;
   ui.followupCharacterChip.dataset.tone = tone;
+  maybeEmitFollowupCharacterRuntimeHint({ label, mood, tone });
+}
+
+function buildFollowupCharacterRuntimeHint(input = {}) {
+  const tone = String(input.tone || "idle");
+  const label = String(input.label || "");
+  const map = {
+    ready: { emotion: "thinking", action: "think", intensity: "low", voice_style: "soft" },
+    waiting: { emotion: "thinking", action: "none", intensity: "low", voice_style: "soft" },
+    watching: { emotion: "thinking", action: "none", intensity: "low", voice_style: "neutral" },
+    cooldown: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral" },
+    limit: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral" },
+    quiet: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral" },
+    idle: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral" }
+  };
+  return {
+    ...(map[tone] || map.idle),
+    live2d_hint: tone,
+    source: "followup_character_state",
+    label
+  };
+}
+
+function maybeEmitFollowupCharacterRuntimeHint(input = {}) {
+  if (state.uiView !== "chat") {
+    return null;
+  }
+  const tone = String(input.tone || "idle");
+  const now = Date.now();
+  const changed = tone !== state.followupCharacterRuntimeLastTone;
+  if (!changed) {
+    return null;
+  }
+  const lastHintAt = Number(state.followupCharacterRuntimeLastHintAt || 0);
+  if (lastHintAt > 0 && now - lastHintAt < 30000) {
+    return null;
+  }
+  const hint = buildFollowupCharacterRuntimeHint(input);
+  state.followupCharacterRuntimeLastTone = tone;
+  state.followupCharacterRuntimeLastHintAt = now;
+  state.followupCharacterRuntimeLastHint = hint;
+  recordTTSDebugEvent("followup_character_runtime_hint", {
+    text: String(input.label || ""),
+    result: tone,
+    error: String(hint.emotion || "")
+  });
+  try {
+    return handleCharacterRuntimeMetadata(hint);
+  } catch (_) {
+    return null;
+  }
 }
 
 function startFollowupCharacterChipRefresh() {
@@ -7445,6 +7499,11 @@ function installTTSDebugBridge() {
     checkConversationFollowupPendingFixture: (input) => runConversationFollowupPendingFixture(input),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
+    followupCharacterRuntimeHint: () => ({
+      lastTone: String(state.followupCharacterRuntimeLastTone || ""),
+      lastHintAt: Number(state.followupCharacterRuntimeLastHintAt || 0),
+      lastHint: state.followupCharacterRuntimeLastHint || null
+    }),
     showFollowupReadiness: () => toggleFollowupReadinessPanel(true),
     hideFollowupReadiness: () => toggleFollowupReadinessPanel(false),
     runConversationFollowup: () => runConversationFollowupDebug(),
