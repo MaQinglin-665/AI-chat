@@ -303,6 +303,8 @@ const state = {
   followupReadinessCard: null,
   followupReadinessConfirmationCard: null,
   followupReadinessTrialCard: null,
+  followupReadinessTrialChecklistCard: null,
+  followupReadinessTrialTimelineCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -310,6 +312,7 @@ const state = {
   followupReadinessTrialDisarmBtn: null,
   followupReadinessTrialResetBtn: null,
   followupReadinessTrialCopyAuditBtn: null,
+  followupReadinessTrialCopyTimelineBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
   followupReadinessManualActions: null,
@@ -648,6 +651,8 @@ function buildGrayAutoTrialRunbook() {
       disarm: "window.__AI_CHAT_DEBUG_TTS__.disarmGrayAutoFollowupTrial(\"manual_disarm\")",
       reset: "window.__AI_CHAT_DEBUG_TTS__.resetGrayAutoFollowupTrialSession()",
       audit: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialAuditSummary()",
+      checklist: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialPreRunChecklist()",
+      timeline: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialTimeline()",
       statusReport: "window.__AI_CHAT_DEBUG_TTS__.followupReadiness()"
     },
     steps: [
@@ -3608,6 +3613,202 @@ function buildGrayAutoTrialAuditSummaryText(limit = 24) {
   ].join("\n");
 }
 
+function buildGrayAutoTrialPreRunChecklist(snapshotInput = null) {
+  const snapshot = snapshotInput && typeof snapshotInput === "object"
+    ? snapshotInput
+    : getTTSDebugSnapshot();
+  const mode = snapshot.conversationMode || {};
+  const scheduler = snapshot.proactiveScheduler || {};
+  const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
+  const session = buildGrayAutoTrialSessionState();
+  const armed = mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true;
+  const polling = scheduler.pollTimerActive === true;
+  const blockedReasons = Array.isArray(preflight.dryRun?.blockedReasons)
+    ? preflight.dryRun.blockedReasons.slice()
+    : Array.isArray(preflight.gateBlockedReasons) ? preflight.gateBlockedReasons.slice() : [];
+  const items = [
+    {
+      key: "runbook_visible",
+      label: "Runbook and panel guidance are available",
+      ok: true,
+      required: true,
+      note: "Use the runbook before a real controlled trial."
+    },
+    {
+      key: "explicit_arm",
+      label: "Trial is explicitly armed",
+      ok: armed,
+      required: true,
+      note: armed ? "In-memory gray trial gates are open." : "Use Arm only after typing the confirmation phrase."
+    },
+    {
+      key: "polling_observable",
+      label: "Polling state is visible",
+      ok: true,
+      required: true,
+      note: polling ? "Polling timer is active." : "Polling timer is currently off."
+    },
+    {
+      key: "session_cap",
+      label: "Session cap still allows a trial",
+      ok: session.reached !== true && Number(session.max || 0) > 0,
+      required: true,
+      note: `session=${session.count}/${session.max}; remaining=${session.remaining}`
+    },
+    {
+      key: "emergency_stop",
+      label: "Emergency stop is available",
+      ok: true,
+      required: true,
+      note: "Use Emergency Stop first if anything feels wrong."
+    },
+    {
+      key: "disarm",
+      label: "Disarm is available",
+      ok: true,
+      required: true,
+      note: "Disarm closes in-memory gray gates and stops polling."
+    },
+    {
+      key: "runtime_guards",
+      label: "Runtime guards allow trigger observation",
+      ok: preflight.status === "ready_for_local_trial",
+      required: false,
+      note: preflight.status === "ready_for_local_trial"
+        ? "A poll would be allowed to attempt a trigger if it runs."
+        : explainReadinessReasons(blockedReasons)
+    },
+    {
+      key: "manual_watch",
+      label: "Manual watch is required",
+      ok: true,
+      required: true,
+      note: "Keep the trial watched; automatic follow-up is not promoted to normal use."
+    }
+  ];
+  const requiredReady = items
+    .filter((item) => item.required === true)
+    .every((item) => item.ok === true);
+  return {
+    readOnly: true,
+    status: preflight.status,
+    readyForWatchedTrial: requiredReady,
+    readyForTriggerObservation: preflight.status === "ready_for_local_trial",
+    armed,
+    polling,
+    session,
+    blockedReasons,
+    items,
+    nextAction: requiredReady
+      ? preflight.status === "ready_for_local_trial"
+        ? "Watch the trial; keep Emergency Stop and Disarm ready."
+        : "The control surface is ready, but runtime guards still block an automatic trigger."
+      : "Complete required checklist items before a real controlled trial."
+  };
+}
+
+function buildGrayAutoTrialPreRunChecklistText() {
+  const checklist = buildGrayAutoTrialPreRunChecklist();
+  const lines = checklist.items.map((item) => {
+    const mark = item.ok === true ? "OK" : "WAIT";
+    const required = item.required === true ? "required" : "observe";
+    return `${mark} [${required}] ${item.label} - ${item.note}`;
+  });
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u524d\u68c0\u67e5\uff08\u53ea\u8bfb\uff09",
+    `readyForWatchedTrial=${checklist.readyForWatchedTrial ? "true" : "false"}  readyForTriggerObservation=${checklist.readyForTriggerObservation ? "true" : "false"}`,
+    `status=${checklist.status}  armed=${checklist.armed ? "true" : "false"}  polling=${checklist.polling ? "true" : "false"}  session=${checklist.session.count}/${checklist.session.max}`,
+    ...lines,
+    `next=${checklist.nextAction}`,
+    "\u5b89\u5168\uff1a\u672c\u68c0\u67e5\u4e0d arm\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
+  ].join("\n");
+}
+
+function buildGrayAutoTrialTimeline(limit = 32) {
+  const safeLimit = Number.isFinite(Number(limit))
+    ? Math.max(6, Math.min(100, Math.round(Number(limit))))
+    : 32;
+  const events = Array.isArray(state.ttsDebugEvents) ? state.ttsDebugEvents : [];
+  const relevant = events
+    .filter((event) => {
+      const stage = String(event?.stage || "");
+      return stage.startsWith("conversation_followup_gray_auto_trial_")
+        || stage === "conversation_followup_gray_auto_dry_run_checked"
+        || stage.startsWith("proactive_scheduler_poll_");
+    })
+    .slice(-safeLimit);
+  const entries = relevant.map((event) => {
+    const stage = String(event?.stage || "");
+    const parsed = parseGrayTrialPollEventResult(event?.result || "");
+    const category = stage.startsWith("proactive_scheduler_poll_")
+      ? "poll"
+      : stage === "conversation_followup_gray_auto_dry_run_checked" ? "dry_run" : "control";
+    return {
+      seq: Number(event?.seq || 0),
+      ageMs: Number(event?.ageMs || 0),
+      stage,
+      category,
+      result: parsed.base || sanitizeTTSDebugText(event?.result || "", 160),
+      trialStatus: parsed.trialStatus || "",
+      gates: parsed.gates || "",
+      wouldPoll: parsed.wouldPoll,
+      wouldTrigger: parsed.wouldTrigger,
+      blocked: sanitizeTTSDebugText(event?.error || "", 180),
+      text: sanitizeTTSDebugText(event?.text || "", 120)
+    };
+  });
+  const last = entries.length ? entries[entries.length - 1] : null;
+  return {
+    readOnly: true,
+    limit: safeLimit,
+    total: entries.length,
+    last,
+    hasArm: entries.some((entry) => entry.stage === "conversation_followup_gray_auto_trial_armed"),
+    hasStop: entries.some((entry) => entry.stage === "conversation_followup_gray_auto_trial_emergency_stop"),
+    hasDisarm: entries.some((entry) => entry.stage === "conversation_followup_gray_auto_trial_disarmed"),
+    hasTriggerSuccess: entries.some((entry) => entry.stage === "proactive_scheduler_poll_trigger_success"),
+    hasTriggerBlocked: entries.some((entry) => entry.stage === "proactive_scheduler_poll_trigger_blocked"),
+    entries
+  };
+}
+
+function buildGrayAutoTrialTimelineText(limit = 32) {
+  const timeline = buildGrayAutoTrialTimeline(limit);
+  const lines = timeline.entries.length
+    ? timeline.entries.map((entry) => [
+      `#${entry.seq}`,
+      entry.category,
+      entry.stage,
+      entry.trialStatus ? `trial=${entry.trialStatus}` : "",
+      entry.gates ? `gates=${entry.gates}` : "",
+      `wouldPoll=${entry.wouldPoll ? "true" : "false"}`,
+      `wouldTrigger=${entry.wouldTrigger ? "true" : "false"}`,
+      entry.blocked ? `blocked=${entry.blocked}` : "",
+      entry.result ? `result=${entry.result}` : ""
+    ].filter(Boolean).join(" | "))
+    : ["none"];
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u65f6\u95f4\u7ebf\uff08\u53ea\u8bfb\uff09",
+    `events=${timeline.total}  arm=${timeline.hasArm ? "yes" : "no"}  triggerSuccess=${timeline.hasTriggerSuccess ? "yes" : "no"}  stop=${timeline.hasStop ? "yes" : "no"}  disarm=${timeline.hasDisarm ? "yes" : "no"}`,
+    ...lines,
+    "\u5b89\u5168\uff1a\u65f6\u95f4\u7ebf\u53ea\u8bfb\uff0c\u4e0d\u4f1a\u53d1\u51fa\u65b0\u4e8b\u4ef6\u6216\u89e6\u53d1\u7eed\u8bdd\u3002"
+  ].join("\n");
+}
+
+function updateGrayAutoTrialPreRunChecklistCard() {
+  if (!state.followupReadinessTrialChecklistCard) {
+    return;
+  }
+  state.followupReadinessTrialChecklistCard.textContent = buildGrayAutoTrialPreRunChecklistText();
+}
+
+function updateGrayAutoTrialTimelineCard() {
+  if (!state.followupReadinessTrialTimelineCard) {
+    return;
+  }
+  state.followupReadinessTrialTimelineCard.textContent = buildGrayAutoTrialTimelineText(18);
+}
+
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
   if (typeof window === "undefined" || typeof window.prompt !== "function") {
     return false;
@@ -3708,6 +3909,24 @@ async function copyGrayAutoTrialAuditSummaryToClipboard(button = null) {
     return true;
   } catch (_) {
     setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u5ba1\u8ba1\u6458\u8981\u5931\u8d25");
+    return false;
+  }
+}
+
+async function copyGrayAutoTrialTimelineToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialTimelineText(40));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u65f6\u95f4\u7ebf\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u65f6\u95f4\u7ebf";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u65f6\u95f4\u7ebf\u5931\u8d25");
     return false;
   }
 }
@@ -3924,6 +4143,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyAudit.addEventListener("click", () => {
     copyGrayAutoTrialAuditSummaryToClipboard(trialCopyAudit);
   });
+  const trialCopyTimeline = document.createElement("button");
+  trialCopyTimeline.type = "button";
+  trialCopyTimeline.textContent = "\u590d\u5236\u65f6\u95f4\u7ebf";
+  trialCopyTimeline.title = "\u590d\u5236\u672c\u6b21\u7070\u5ea6\u8bd5\u8fd0\u884c\u63a7\u5236\u548c polling \u4e8b\u4ef6\u65f6\u95f4\u7ebf";
+  trialCopyTimeline.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#edf1ff;color:#2d3f7e;cursor:pointer;";
+  trialCopyTimeline.addEventListener("click", () => {
+    copyGrayAutoTrialTimelineToClipboard(trialCopyTimeline);
+  });
   const manualConfirm = document.createElement("button");
   manualConfirm.type = "button";
   manualConfirm.textContent = "\u786e\u8ba4";
@@ -3955,7 +4182,8 @@ function ensureFollowupReadinessPanel() {
     trialStop,
     trialDisarm,
     trialReset,
-    trialCopyAudit
+    trialCopyAudit,
+    trialCopyTimeline
   ]);
   const manualStatus = document.createElement("div");
   manualStatus.style.cssText = [
@@ -4034,6 +4262,28 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#263d70"
   ].join(";");
+  const checklistCard = document.createElement("pre");
+  checklistCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(87,143,112,.28)",
+    "border-radius:14px",
+    "background:rgba(240,255,247,.62)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#1f4c39"
+  ].join(";");
+  const timelineCard = document.createElement("pre");
+  timelineCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(116,127,155,.24)",
+    "border-radius:14px",
+    "background:rgba(255,255,255,.54)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#2f3f61"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -4053,6 +4303,8 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(card);
   panel.appendChild(confirmationCard);
   panel.appendChild(trialCard);
+  panel.appendChild(checklistCard);
+  panel.appendChild(timelineCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -4060,6 +4312,8 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessCard = card;
   state.followupReadinessConfirmationCard = confirmationCard;
   state.followupReadinessTrialCard = trialCard;
+  state.followupReadinessTrialChecklistCard = checklistCard;
+  state.followupReadinessTrialTimelineCard = timelineCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -4074,6 +4328,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialDisarmBtn = trialDisarm;
   state.followupReadinessTrialResetBtn = trialReset;
   state.followupReadinessTrialCopyAuditBtn = trialCopyAudit;
+  state.followupReadinessTrialCopyTimelineBtn = trialCopyTimeline;
   return panel;
 }
 
@@ -4101,6 +4356,8 @@ function updateFollowupReadinessPanel() {
       updateFollowupReadinessPreviewCard();
       updateFollowupManualConfirmationPreviewCard();
       updateGrayAutoTrialStatusCard();
+      updateGrayAutoTrialPreRunChecklistCard();
+      updateGrayAutoTrialTimelineCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -4113,6 +4370,8 @@ function updateFollowupReadinessPanel() {
   updateFollowupReadinessPreviewCard();
   updateFollowupManualConfirmationPreviewCard();
   updateGrayAutoTrialStatusCard();
+  updateGrayAutoTrialPreRunChecklistCard();
+  updateGrayAutoTrialTimelineCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -9480,6 +9739,8 @@ function installTTSDebugBridge() {
     disarmGrayAutoFollowupTrial: (reason) => disarmGrayAutoTrialSession(reason),
     grayAutoFollowupTrialRunbook: () => buildGrayAutoTrialRunbook(),
     grayAutoFollowupTrialAuditSummary: (limit) => buildGrayAutoTrialAuditSummary(limit),
+    grayAutoFollowupTrialPreRunChecklist: () => buildGrayAutoTrialPreRunChecklist(),
+    grayAutoFollowupTrialTimeline: (limit) => buildGrayAutoTrialTimeline(limit),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({
