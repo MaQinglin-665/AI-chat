@@ -1052,3 +1052,27 @@ Still out of scope:
 - Bypassing manual confirmation, policy, cooldown, scheduler, busy, speaking, closed-topic, or window-limit guards.
 - Adding desktop observation, screenshot capture, file access, shell execution, tool calls, backend APIs, config writes, or new dependencies.
 - Presenting proactive companionship as complete or production-ready.
+
+## 90. Task 116 Landing Notes
+
+- Task 116 adds a second default-off gray automatic follow-up gate: `conversation_mode.gray_auto_trial_enabled=false`.
+- Automatic scheduler polling now requires five explicit gates before it can start: `enabled`, `proactive_enabled`, `proactive_scheduler_enabled`, `gray_auto_enabled`, and `gray_auto_trial_enabled`.
+- When the trial gate is false, polling stays stopped with `gray_auto_trial_disabled`, even if the earlier four gates are true.
+- Readiness, dry-run, scheduler debug snapshots, and the follow-up status panel now surface the trial gate so local testers can see whether the controlled automatic trial is intentionally still blocked.
+- Manual confirmation remains the primary user-facing execution path; this task does not call scheduler ticks, execute follow-up, request a model reply, play TTS, write config, or add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or dependencies.
+
+## 91. Controlled Gray Trial Gate
+
+The controlled automatic trial is intentionally behind two gray gates:
+
+- `gray_auto_enabled` means the build is allowed to enter gray automatic follow-up preparation.
+- `gray_auto_trial_enabled` means a local tester explicitly opted into the automatic polling trial layer.
+
+Default posture:
+
+- Both gray gates remain `false` in default config and example config.
+- Turning off any one of the five gates stops automatic polling.
+- Readiness and dry-run helpers remain read-only diagnostic surfaces.
+- Manual confirmation remains available separately through its existing guarded path.
+
+This keeps the project moving toward automatic follow-up while preserving the open-source safety line: no default-on proactive speech, no hidden observation, and no automatic desktop/file/tool capabilities.

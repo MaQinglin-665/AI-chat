@@ -289,6 +289,7 @@ DEFAULT_CONFIG = {
         "proactive_enabled": False,
         "proactive_scheduler_enabled": False,
         "gray_auto_enabled": False,
+        "gray_auto_trial_enabled": False,
         "proactive_cooldown_ms": 600000,
         "proactive_warmup_ms": 120000,
         "proactive_window_ms": 3600000,
@@ -933,6 +934,9 @@ def sanitize_client_config(config):
             ),
             "gray_auto_enabled": _safe_bool_true(
                 conversation_cfg.get("gray_auto_enabled", False)
+            ),
+            "gray_auto_trial_enabled": _safe_bool_true(
+                conversation_cfg.get("gray_auto_trial_enabled", False)
             ),
             "proactive_cooldown_ms": max(
                 60 * 1000,

@@ -316,3 +316,16 @@
 - When `gray_auto_enabled` is false, polling remains stopped and reports `gray_auto_disabled`.
 - The gray-mode gate applies only to automatic polling startup; manual confirmation and DevTools/manual debug paths remain separately guarded by their existing checks.
 - This keeps automatic follow-up default-off before any gray rollout and does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, model calls, speech, config writes, or dependencies.
+
+## 26. Task 116 Gray Trial Gate Note
+
+- Task 116 adds `conversation_mode.gray_auto_trial_enabled=false` as an extra controlled-trial gate.
+- Automatic scheduler polling now requires five config gates before it can start:
+  - `conversation_mode.enabled=true`
+  - `conversation_mode.proactive_enabled=true`
+  - `conversation_mode.proactive_scheduler_enabled=true`
+  - `conversation_mode.gray_auto_enabled=true`
+  - `conversation_mode.gray_auto_trial_enabled=true`
+- When `gray_auto_trial_enabled` is false, polling remains stopped and reports `gray_auto_trial_disabled`.
+- The trial gate applies only to automatic polling startup; manual confirmation and DevTools/manual debug paths remain separately guarded by their existing checks.
+- This keeps controlled automatic follow-up local/test-only, explicit, reversible, and default-off.
