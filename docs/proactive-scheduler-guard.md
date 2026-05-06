@@ -405,3 +405,18 @@
 - It displays status, armed/polling state, session count, would-poll/would-trigger hints, blocked reasons, latest event, and next safe step.
 - It does not add action buttons or new scheduler entry points.
 - It does not arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 37. Task 127 Gray Trial Control Panel Note
+
+- Task 127 adds panel controls for the existing gray trial arm, emergency stop, disarm, and session reset helpers.
+- Arm requires `ARM_GRAY_AUTO_TRIAL`; reset requires `RESET_GRAY_AUTO_TRIAL_SESSION`.
+- Emergency stop and disarm remain safety收口 actions and stop polling through the existing helpers.
+- The panel does not add a new scheduler execution path; it calls the same guarded helpers already exposed for local testing.
+- It does not write config, bypass guards, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 38. Task 128 Gray Trial Audit Summary Note
+
+- Task 128 adds `grayAutoFollowupTrialAuditSummary(limit)` as a read-only DevTools helper.
+- The readiness panel can copy a compact audit summary for local trial review.
+- The audit summary reuses existing preflight, session, dry-run, scheduler snapshot, and poll event summary data.
+- It does not emit new trial events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.

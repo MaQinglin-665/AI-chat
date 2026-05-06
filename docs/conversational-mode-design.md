@@ -1206,3 +1206,18 @@ The reset helper exists to speed up local trial verification without restarting 
 - The card summarizes preflight status, armed/polling state, session count, dry-run intent, blocked reasons, latest poll event, and the next safe step.
 - It is panel observability only and refreshes with existing readiness updates.
 - The card does not add action buttons and does not arm, disarm, stop, reset, start polling, execute follow-up, call model/TTS/fetch, write config, or mutate pending state.
+
+## 107. Task 127 Landing Notes
+
+- Task 127 adds a controlled gray trial operation area to the follow-up readiness panel.
+- `Arm 试运行` requires the exact `ARM_GRAY_AUTO_TRIAL` phrase before opening the in-memory gray trial gates.
+- `Reset Session` requires the exact `RESET_GRAY_AUTO_TRIAL_SESSION` phrase and does not start polling.
+- `Emergency Stop` and `Disarm` are safety收口 actions exposed from the panel.
+- The panel actions do not write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 108. Task 128 Landing Notes
+
+- Task 128 adds a compact gray trial audit summary for local testing review.
+- DevTools exposes `grayAutoFollowupTrialAuditSummary(limit)` as a read-only helper.
+- The readiness panel adds `复制审计` for copying status, session count, dry-run hints, blocked reasons, and recent poll events.
+- The audit path does not emit new trial events, arm/disarm/stop/reset, start polling, execute follow-up, call model/TTS/fetch, write config, or mutate pending state.

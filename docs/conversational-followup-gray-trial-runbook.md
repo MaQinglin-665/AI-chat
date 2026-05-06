@@ -18,6 +18,7 @@ d.grayAutoFollowupTrialPreflight();
 d.grayAutoFollowupTrialSession();
 d.grayAutoFollowupTrialEvents();
 d.grayAutoFollowupTrialRunbook();
+d.grayAutoFollowupTrialAuditSummary();
 d.followupReadiness();
 ```
 
@@ -30,6 +31,18 @@ The follow-up readiness panel also includes a gray automatic trial status card.
 - It summarizes preflight status, armed/polling state, session count, dry-run intent, blocked reasons, recent poll events, and the next safe step.
 - It is read-only and refreshes with the rest of the readiness panel.
 - It does not arm, disarm, stop, reset, start polling, trigger follow-up, or write config.
+
+## Readiness Panel Control Area
+
+The follow-up readiness panel now includes a controlled gray trial operation area.
+
+- `Arm 试运行` requires the exact `ARM_GRAY_AUTO_TRIAL` phrase.
+- `Emergency Stop` seals the current renderer session and stops polling.
+- `Disarm` closes the in-memory gray trial gates and stops polling.
+- `Reset Session` requires the exact `RESET_GRAY_AUTO_TRIAL_SESSION` phrase and does not start polling.
+- `复制审计` copies a compact read-only audit summary.
+
+Use the panel controls only during a local controlled test. `Arm 试运行` can open the existing in-memory trial gates, so keep the app watched and use `Emergency Stop` first if anything feels wrong. The buttons do not write config, add desktop observation, capture screenshots, read files, execute shell commands, call tools, or call backend APIs.
 
 Arm only during a local controlled test:
 

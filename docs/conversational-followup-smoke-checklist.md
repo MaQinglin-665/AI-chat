@@ -1407,3 +1407,31 @@ Manual checks:
 4. Confirm the card includes session count, wouldPoll/wouldTrigger, blocked reasons, latest event summary, and a next-step hint.
 5. Confirm the card refreshes with the rest of the readiness panel without emitting new events.
 6. Confirm the card has no arm/disarm/stop/reset buttons and does not start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 75. Gray Automatic Follow-up Trial Control Panel v1
+
+Purpose: confirm local testers can operate the gray trial from the readiness panel with explicit confirmation and fast safety exits.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `试运行` action group is visible with `Arm 试运行`, `Emergency Stop`, `Disarm`, `Reset Session`, and `复制审计`.
+3. Click `Arm 试运行`, cancel or enter a wrong phrase, and confirm nothing is armed.
+4. Click `Arm 试运行`, enter `ARM_GRAY_AUTO_TRIAL`, and confirm the result matches the existing DevTools arm behavior.
+5. Click `Emergency Stop` and confirm the session reports `gray_auto_trial_session_limit_reached`.
+6. Click `Disarm` and confirm `armed=false` and polling is off.
+7. Click `Reset Session`, cancel or enter a wrong phrase, and confirm the count is unchanged.
+8. Click `Reset Session`, enter `RESET_GRAY_AUTO_TRIAL_SESSION`, and confirm the count resets without starting polling.
+9. Confirm panel controls do not write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, add dependencies, or bypass existing cooldown, silence, policy, busy/speaking, window-limit, session-cap, emergency-stop, or disarm guards.
+
+## 76. Gray Automatic Follow-up Trial Audit Summary v1
+
+Purpose: confirm local testers can copy a compact read-only audit summary after a trial.
+
+Manual checks:
+
+1. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialAuditSummary()`.
+2. Confirm the result has `readOnly=true`, status, armed/polling state, session, dryRun, blockedReasons, events, and safety fields.
+3. Open the readiness panel and click `复制审计`.
+4. Paste the clipboard into a scratch note and confirm it includes status, session count, wouldPoll/wouldTrigger, blocked reasons, latest event, and recent event lines.
+5. Confirm audit copy does not emit new trial events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
