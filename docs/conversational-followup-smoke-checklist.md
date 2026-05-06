@@ -1462,3 +1462,18 @@ Manual checks:
 4. Confirm the result has `readOnly=true`, `entries`, `hasArm`, `hasStop`, `hasDisarm`, `hasTriggerSuccess`, and `hasTriggerBlocked`.
 5. Click `复制时间线`, paste into a scratch note, and confirm it includes recent control/dry-run/poll events.
 6. Confirm timeline rendering and copy do not emit new events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 79. Gray Automatic Follow-up Trial Outcome v1
+
+Purpose: confirm local testers can classify the visible controlled-trial result without manually reading every event.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行结果判定（只读）` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialOutcome()`.
+4. Confirm the result has `readOnly=true`, `outcome`, `severity`, `summary`, `nextAction`, `timeline`, `rootCauses`, and `safety`.
+5. With no visible trial events, confirm `outcome="not_started"`.
+6. After `Emergency Stop`, confirm the outcome prefers `stopped`.
+7. After `Disarm`, confirm the outcome can report `disarmed`.
+8. Confirm outcome rendering does not emit new events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

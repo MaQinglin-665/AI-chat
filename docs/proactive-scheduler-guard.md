@@ -434,3 +434,11 @@
 - The readiness panel renders recent gray trial control, dry-run, and polling events as a compact timeline.
 - The panel can copy the timeline after an explicit user click.
 - Timeline rendering and copy do not emit new events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 41. Task 131 Gray Trial Outcome Note
+
+- Task 131 adds `grayAutoFollowupTrialOutcome(limit)` as a read-only DevTools helper.
+- The readiness panel renders a compact outcome classification for the visible gray trial.
+- The classifier uses existing preflight, checklist, session, and timeline data.
+- It can report not started, setup incomplete, armed waiting, blocked, ready observed, trigger blocked, success, stopped, or disarmed.
+- It does not emit events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
