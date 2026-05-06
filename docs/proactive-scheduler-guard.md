@@ -344,3 +344,10 @@
 - Event `result` can include `trial:<status>`, `gates:<summary>`, `would_poll:<bool>`, and `would_trigger:<bool>`.
 - Event `error` may include compact blocked reasons, capped to a short string.
 - This is observability only: no polling start condition, scheduler guard, cooldown/window limit, pending mutation, model/TTS/fetch path, backend API, config default, or automatic trigger behavior is changed.
+
+## 29. Task 119 Gray Trial Event Summary Note
+
+- Task 119 adds `grayAutoFollowupTrialEvents(limit)` as a read-only DevTools helper.
+- The helper summarizes recent `proactive_scheduler_poll_*` events and parses trial status, gate summary, `would_poll`, and `would_trigger`.
+- The follow-up status report includes a one-line latest trial event summary.
+- This is observability only and does not emit events, start polling, call scheduler ticks, execute follow-up, mutate pending state, call model/TTS/fetch, write config, or change scheduler guards.

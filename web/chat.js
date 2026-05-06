@@ -2419,6 +2419,84 @@ function mergeProactiveSchedulerPollEventError(error, trialContext = null) {
   return [base, extra].filter(Boolean).join(";").slice(0, 220);
 }
 
+
+function parseGrayTrialPollEventResult(result) {
+  const parts = String(result || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const parsed = {
+    raw: String(result || ""),
+    base: parts.filter((part) => !/^(trial|gates|would_poll|would_trigger):/.test(part)).join(";"),
+    trialStatus: "",
+    gates: "",
+    wouldPoll: false,
+    wouldTrigger: false
+  };
+  parts.forEach((part) => {
+    const index = part.indexOf(":");
+    if (index <= 0) {
+      return;
+    }
+    const key = part.slice(0, index);
+    const value = part.slice(index + 1);
+    if (key === "trial") {
+      parsed.trialStatus = value;
+    } else if (key === "gates") {
+      parsed.gates = value;
+    } else if (key === "would_poll") {
+      parsed.wouldPoll = value === "true";
+    } else if (key === "would_trigger") {
+      parsed.wouldTrigger = value === "true";
+    }
+  });
+  return parsed;
+}
+
+function buildGrayAutoFollowupTrialEventSummary(limit = 20) {
+  const rawLimit = Number(limit);
+  const safeLimit = Number.isFinite(rawLimit)
+    ? Math.max(1, Math.min(80, Math.round(rawLimit)))
+    : 20;
+  const events = Array.isArray(state.ttsDebugEvents) ? state.ttsDebugEvents : [];
+  const pollEvents = events
+    .filter((event) => String(event?.stage || "").startsWith("proactive_scheduler_poll_"))
+    .slice(-safeLimit);
+  const counts = {};
+  const recent = pollEvents.map((event) => {
+    const parsed = parseGrayTrialPollEventResult(event?.result || "");
+    const stage = String(event?.stage || "");
+    counts[stage] = Number(counts[stage] || 0) + 1;
+    return {
+      seq: Number(event?.seq || 0),
+      ageMs: Number(event?.ageMs || 0),
+      stage,
+      result: parsed.base,
+      trialStatus: parsed.trialStatus,
+      gates: parsed.gates,
+      wouldPoll: parsed.wouldPoll,
+      wouldTrigger: parsed.wouldTrigger,
+      blocked: sanitizeTTSDebugText(event?.error || "", 180)
+    };
+  });
+  const last = recent.length ? recent[recent.length - 1] : null;
+  return {
+    readOnly: true,
+    limit: safeLimit,
+    totalPollEvents: pollEvents.length,
+    counts,
+    last,
+    hasPollStart: recent.some((event) => event.stage === "proactive_scheduler_poll_start"),
+    hasReady: recent.some((event) => event.stage === "proactive_scheduler_poll_ready"),
+    hasTriggerAttempt: recent.some((event) =>
+      event.stage === "proactive_scheduler_poll_trigger_success"
+      || event.stage === "proactive_scheduler_poll_trigger_blocked"
+    ),
+    lastTrialStatus: last?.trialStatus || "none",
+    recent
+  };
+}
+
 function runGrayAutoFollowupDryRunDebug() {
   const result = buildGrayAutoFollowupDryRunStatus();
   const blockedReasons = Array.isArray(result.readiness?.blockedReasons)
@@ -2688,6 +2766,7 @@ function buildFollowupReadinessReport() {
   const grayReadiness = buildGrayAutoFollowupReadinessStatus(snapshot);
   const grayDryRun = buildGrayAutoFollowupDryRunStatus(snapshot);
   const grayPreflight = buildGrayAutoFollowupTrialPreflight(snapshot);
+  const grayEventSummary = buildGrayAutoFollowupTrialEventSummary(12);
   const switchesReady = mode.enabled === true
     && mode.proactiveEnabled === true
     && mode.proactiveSchedulerEnabled === true;
@@ -2721,6 +2800,7 @@ function buildFollowupReadinessReport() {
     `\u7070\u5ea6\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(grayReadiness.blockedReasons)}`,
     `\u7070\u5ea6 dry-run\uff1a${grayDryRun.wouldAttemptTrigger === true ? "\u82e5\u8f6e\u8be2\u68c0\u67e5\u53d1\u751f\uff0c\u4f1a\u5c1d\u8bd5\u89e6\u53d1" : "\u82e5\u8f6e\u8be2\u68c0\u67e5\u53d1\u751f\uff0c\u4ecd\u4f1a\u963b\u6b62"}  wouldPoll=${grayDryRun.wouldPollCheck === true ? "true" : "false"}`,
     `\u8bd5\u8fd0\u884c preflight\uff1a${grayPreflight.status}  gates=${grayPreflight.gatesReady === true ? "pass" : joinReadinessReasons(grayPreflight.gateBlockedReasons)}`,
+    `\u8bd5\u8fd0\u884c\u4e8b\u4ef6\uff1a${grayEventSummary.totalPollEvents} \u6761  last=${grayEventSummary.last?.stage || "none"}/${grayEventSummary.lastTrialStatus}`,
     "",
     "\u5982\u4f55\u8c03\u6574",
     "1. \u6253\u5f00 config.local.json\u3002",
@@ -8859,6 +8939,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupReadiness: () => buildGrayAutoFollowupReadinessStatus(),
     grayAutoFollowupDryRun: () => runGrayAutoFollowupDryRunDebug(),
     grayAutoFollowupTrialPreflight: () => buildGrayAutoFollowupTrialPreflight(),
+    grayAutoFollowupTrialEvents: (limit) => buildGrayAutoFollowupTrialEventSummary(limit),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({
