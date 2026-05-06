@@ -31,6 +31,7 @@ d.grayAutoFollowupTrialCharacterCueManualEmitRecap();
 d.grayAutoFollowupTrialCharacterExpressionStrategyDraft();
 d.grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage();
 d.grayAutoFollowupTrialCharacterAutoRuntimeSafetyPlan();
+d.grayAutoFollowupTrialCharacterAutoRuntimeDryRun();
 d.emitGrayAutoFollowupTrialCharacterCue({ confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE" });
 d.followupReadiness();
 ```
@@ -61,6 +62,7 @@ The follow-up readiness panel now includes a controlled gray trial operation are
 - `复制策略` copies the read-only character expression strategy draft after an explicit user click.
 - `复制评审` copies the read-only character expression strategy review package after an explicit user click.
 - `复制计划` copies the read-only automatic character runtime safety plan after an explicit user click.
+- `复制 dry-run` copies the read-only automatic character runtime dry-run after an explicit user click.
 - `试发角色cue` requires the exact `EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE` phrase and emits the current preview runtime cue once.
 
 Use the panel controls only during a local controlled test. `Arm 试运行` can open the existing in-memory trial gates, so keep the app watched and use `Emergency Stop` first if anything feels wrong. `试发角色cue` can send one character runtime metadata update after confirmation, so use it only when you are watching the character. The buttons do not write config, add desktop observation, capture screenshots, read files, execute shell commands, call tools, call backend APIs, request LLM output, play TTS, start polling, or trigger follow-up.
@@ -91,6 +93,8 @@ The expression strategy draft is read-only. It maps visible trial decisions and 
 The strategy review package is read-only. It summarizes the draft strategy, manual emit recap, handoff checklist, missing review items, and Go/No-Go for a separate implementation task. It never approves automatic runtime by itself.
 
 The automatic runtime safety plan is read-only. It lists gates, rollout stages, and the next planning action for a later separate implementation task, while keeping automatic runtime disabled.
+
+The automatic runtime dry-run is read-only. It shows whether the current state would select a strategy rule and which blockers would prevent automatic emission. It always keeps `wouldEmit=false`.
 
 Arm only during a local controlled test:
 

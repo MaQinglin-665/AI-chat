@@ -1605,3 +1605,17 @@ Manual checks:
 5. Confirm at least one required gate blocks automatic runtime until an explicit enable flag and separate implementation task exist.
 6. Click `复制计划`, paste into a scratch note, and confirm it includes gates, rollout stages, blocking items, and next action.
 7. Confirm plan rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 89. Gray Automatic Follow-up Trial Character Auto Runtime Dry-run v1
+
+Purpose: confirm local testers can inspect what automatic character runtime would select without emitting a runtime cue.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行自动角色表现 dry-run` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterAutoRuntimeDryRun()`.
+4. Confirm the result has `readOnly=true`, `status`, `wouldEmit=false`, `wouldSelectRule`, `selectedRuleKey`, `runtimeHint`, `blockedReasons`, `planStatus`, `goNoGo`, `nextAction`, and `safety`.
+5. Confirm blocked states list why automatic emission would not happen.
+6. Click `复制 dry-run`, paste into a scratch note, and confirm it includes selected rule, plan status, Go/No-Go, runtime hint, blockers, and next action.
+7. Confirm dry-run rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

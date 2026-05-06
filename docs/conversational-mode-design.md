@@ -1324,3 +1324,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The panel adds `复制计划` for user-click clipboard export.
 - The plan can say whether rollout planning is safe, but it keeps `readyForAutomaticRuntime=false` and does not implement automatic runtime.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 121. Task 141 Landing Notes
+
+- Task 141 adds a read-only automatic character runtime dry-run.
+- DevTools exposes `grayAutoFollowupTrialCharacterAutoRuntimeDryRun(limit)`.
+- The readiness panel shows `灰度试运行自动角色表现 dry-run`, including selected rule, plan status, Go/No-Go, runtime-hint-shaped data, blockers, and next action.
+- The panel adds `复制 dry-run` for user-click clipboard export.
+- The dry-run can show which rule would be selected, but it always keeps `wouldEmit=false`.
+- It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
