@@ -1013,3 +1013,42 @@ Still out of scope:
 - The event is `conversation_followup_gray_auto_dry_run_checked` and includes only topic hint, dry-run status, `would_poll`, `would_trigger`, and compact blocked reasons.
 - The pure dry-run builder remains read-only and the follow-up readiness panel does not emit events on refresh.
 - This task does not start polling, does not execute follow-up, does not mutate pending state, does not call `runProactiveSchedulerManualTick()`, model/TTS/fetch, does not write config, and does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or dependencies.
+
+## 88. Task 115 Landing Notes
+
+- Task 115 closes the gray automatic follow-up preparation slice with a checkpoint before any controlled automatic trial.
+- The checkpoint treats Tasks 111-114 as the required dry-run baseline: four-gate default-off opt-in, read-only readiness, read-only dry-run, and explicit dry-run audit event.
+- Future controlled automatic trial work must remain local/test-only, opt-in, fail-closed, observable, rate-limited, and reversible before any user-facing rollout.
+- This task is documentation-only and does not start polling, execute follow-up, mutate pending state, call model/TTS/fetch, write config, or add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or dependencies.
+
+## 89. Gray Automatic Follow-up Dry-run Checkpoint
+
+Completed gray preparation baseline:
+
+- `conversation_mode.gray_auto_enabled=false` keeps automatic polling default-off even when older proactive switches are true.
+- `grayAutoFollowupReadiness()` explains `default_off`, `blocked`, or `ready` without starting polling or executing follow-up.
+- `grayAutoFollowupDryRun()` explains whether a hypothetical polling check would remain blocked or would attempt a trigger.
+- Explicit dry-run calls record `conversation_followup_gray_auto_dry_run_checked`; passive panel refresh remains quiet.
+- The readiness panel surfaces gray status, candidate readiness, polling readiness, dry-run outcome, and compact blocked reasons.
+
+Required sign-off before controlled automatic trial tasks:
+
+- Default config keeps `gray_auto_enabled=false`.
+- Four gates are required before automatic polling can start: `enabled`, `proactive_enabled`, `proactive_scheduler_enabled`, and `gray_auto_enabled`.
+- Reading readiness or dry-run status does not start polling, call scheduler tick, execute follow-up, request a model reply, play TTS, or mutate pending state.
+- Dry-run events stay compact and do not include full prompts, secrets, screenshots, files, or unrelated private data.
+- Manual confirmation remains the primary user-facing execution path.
+
+Allowed next-stage work:
+
+- Add a local/test-only controlled trial checklist for automatic polling with all four gates enabled.
+- Add extra fail-closed instrumentation around automatic polling attempts.
+- Add rollback notes for disabling any one of the four gates.
+- Keep any automatic trial clearly labeled as experimental, opt-in, and not mature product behavior.
+
+Still out of scope:
+
+- Enabling automatic follow-up by default.
+- Bypassing manual confirmation, policy, cooldown, scheduler, busy, speaking, closed-topic, or window-limit guards.
+- Adding desktop observation, screenshot capture, file access, shell execution, tool calls, backend APIs, config writes, or new dependencies.
+- Presenting proactive companionship as complete or production-ready.
