@@ -488,3 +488,11 @@
 - The readiness panel renders the latest manual character cue emit recap and exposes `复制回看`.
 - The recap reads in-memory manual emit status and existing `conversation_followup_gray_auto_trial_character_cue_manual_emit` debug events.
 - It does not emit another runtime cue, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 48. Task 138 Gray Trial Character Expression Strategy Draft Note
+
+- Task 138 adds `grayAutoFollowupTrialCharacterExpressionStrategyDraft(limit)` as a read-only DevTools helper.
+- The readiness panel renders a candidate role-expression strategy and exposes `复制策略`.
+- The draft maps visible gray trial decision/outcome states and manual emit review state to low-interruption expression candidates.
+- It keeps `readyForAutomaticRuntime=false` and does not connect the rules to automatic runtime behavior.
+- It does not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
