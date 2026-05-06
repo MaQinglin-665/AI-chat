@@ -373,3 +373,11 @@
 - It stops polling and seals the current renderer session by setting the trial counter to the configured max.
 - It records `conversation_followup_gray_auto_trial_emergency_stop`.
 - It does not change config, enable gates, restart polling, execute follow-up, mutate pending state, or call model/TTS/fetch.
+
+## 33. Task 123 Gray Trial DevTools Arm Note
+
+- Task 123 exposes `armGrayAutoFollowupTrial({ confirm: "ARM_GRAY_AUTO_TRIAL" })`.
+- The helper requires the exact confirmation phrase and otherwise returns `confirmation_required`.
+- Arming is renderer-memory only: it opens the five gates, resets the session counter, syncs existing polling, and records `conversation_followup_gray_auto_trial_armed`.
+- Existing scheduler guards, session cap, and emergency stop remain the safety boundary.
+- It does not write config or add desktop/file/tool/shell/backend capabilities.
