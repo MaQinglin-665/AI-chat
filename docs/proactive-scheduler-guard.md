@@ -359,3 +359,10 @@
 - When automatic polling succeeds and the cap is reached, polling is stopped with `gray_auto_trial_session_limit_reached`.
 - A value of `0` blocks controlled automatic trigger execution even if all five gates are enabled.
 - Manual confirmation remains separately guarded and is not blocked by this automatic trial cap.
+
+## 31. Task 121 Gray Trial Session Reset Note
+
+- Task 121 exposes `grayAutoFollowupTrialSession()` and `resetGrayAutoFollowupTrialSession()` through the DevTools bridge.
+- The read-only helper reports current automatic trial session count, max, remaining, and cap state.
+- The reset helper only resets the renderer-memory counter and records `conversation_followup_gray_auto_trial_session_reset`.
+- Reset does not restart polling, enable gates, call scheduler ticks, execute follow-up, mutate pending state, call model/TTS/fetch, write config, or change scheduler guards.

@@ -1328,3 +1328,17 @@ Manual checks:
 7. Set `gray_auto_trial_max_triggers_per_session=0` in local test config only and confirm automatic trigger execution remains blocked.
 8. Confirm manual confirmation controls remain usable through their explicit guarded path.
 9. Confirm this task does not enable automatic follow-up by default, start polling by itself, change desktop observation, capture screenshots, call tools, execute shell, access files, write config, call backend APIs, request model output, play TTS, fetch, mutate pending outside existing automatic success accounting, or add dependencies.
+
+## 69. Gray Automatic Follow-up Trial Session Reset v1
+
+Purpose: confirm local testers can inspect and reset the gray trial session counter without restarting the app or starting polling.
+
+Manual checks:
+
+1. Open DevTools Console and run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialSession()`.
+2. Confirm the result includes `readOnly=true`, `count`, `max`, `remaining`, `reached`, and `blockedReason`.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.resetGrayAutoFollowupTrialSession()` after an explicit local test decision.
+4. Confirm the result includes `reset=true`, `previousCount`, `count=0`, and `pollingRestarted=false`.
+5. Confirm one compact `conversation_followup_gray_auto_trial_session_reset` event is recorded.
+6. Confirm reset does not start polling, enable gates, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+7. Confirm manual confirmation controls remain separately guarded and usable.

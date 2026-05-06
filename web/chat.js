@@ -494,6 +494,35 @@ function incrementGrayAutoTrialSessionTriggerCount() {
   return state.grayAutoTrialSessionTriggerCount;
 }
 
+function buildGrayAutoTrialSessionState() {
+  const maxTriggers = getGrayAutoTrialMaxTriggersPerSession();
+  const count = getGrayAutoTrialSessionTriggerCount();
+  return {
+    readOnly: true,
+    count,
+    max: maxTriggers,
+    remaining: Math.max(0, maxTriggers - count),
+    reached: count >= maxTriggers,
+    blockedReason: count >= maxTriggers ? "gray_auto_trial_session_limit_reached" : ""
+  };
+}
+
+function resetGrayAutoTrialSessionTriggerCount() {
+  const previous = getGrayAutoTrialSessionTriggerCount();
+  state.grayAutoTrialSessionTriggerCount = 0;
+  const current = buildGrayAutoTrialSessionState();
+  recordTTSDebugEvent("conversation_followup_gray_auto_trial_session_reset", {
+    result: `from:${previous};max:${current.max}`,
+    error: current.blockedReason
+  });
+  return {
+    ...current,
+    reset: true,
+    previousCount: previous,
+    pollingRestarted: false
+  };
+}
+
 function shouldEnableProactiveSchedulerPolling() {
   const status = getProactiveSchedulerPollingGateStatus();
   return status.enabled;
@@ -9000,6 +9029,8 @@ function installTTSDebugBridge() {
     grayAutoFollowupDryRun: () => runGrayAutoFollowupDryRunDebug(),
     grayAutoFollowupTrialPreflight: () => buildGrayAutoFollowupTrialPreflight(),
     grayAutoFollowupTrialEvents: (limit) => buildGrayAutoFollowupTrialEventSummary(limit),
+    grayAutoFollowupTrialSession: () => buildGrayAutoTrialSessionState(),
+    resetGrayAutoFollowupTrialSession: () => resetGrayAutoTrialSessionTriggerCount(),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({
