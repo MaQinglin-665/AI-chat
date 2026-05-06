@@ -1185,3 +1185,10 @@ The reset helper exists to speed up local trial verification without restarting 
 - The confirmation phrase is required; calls without it return `confirmation_required` and do nothing.
 - Trial arming remains guarded by session cap, emergency stop, cooldown, silence, policy, busy/speaking, window limits, and existing scheduler checks.
 - It does not write config, add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, dependencies, or product maturity claims.
+
+## 104. Task 124 Landing Notes
+
+- Task 124 adds `disarmGrayAutoFollowupTrial(reason)` as the counterpart to DevTools arming.
+- Disarm closes the in-memory gray automatic gates, stops proactive scheduler polling, and records `conversation_followup_gray_auto_trial_disarmed`.
+- The follow-up readiness report now shows a compact armed/polling status so local testers can see whether the trial is currently armed.
+- Disarm does not write config, reset session count, execute follow-up, call model/TTS/fetch, mutate pending state, or restart polling.
