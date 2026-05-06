@@ -520,3 +520,17 @@
 - The dry-run summarizes which strategy rule would be selected, the runtime-hint-shaped data, plan status, Go/No-Go, blockers, and next action.
 - It always keeps `wouldEmit=false` and does not connect automatic runtime behavior.
 - It does not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 90. Gray Automatic Follow-up Trial Character Auto Runtime Explicit Switch Plan v1
+
+Purpose: confirm local testers can review the explicit switch requirements before any automatic character runtime implementation exists.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `鐏板害璇曡繍琛岃嚜鍔ㄨ鑹茶〃鐜版樉寮忓紑鍏宠鍒` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterAutoRuntimeExplicitSwitchPlan()`.
+4. Confirm the result has `readOnly=true`, `status`, `proposedSwitchKey`, `proposedDefault=false`, `switchExists=false`, `wouldEnable=false`, `automaticRuntimeConnected=false`, `wouldEmit=false`, `requirements`, `blockingRequired`, `proposedRuntimeStates`, `nextAction`, and `safety`.
+5. Confirm at least one required item blocks the switch plan while the actual switch remains unimplemented.
+6. Click `澶嶅埗寮€鍏宠鍒`, paste into a scratch note, and confirm it includes proposed switch key, baseline, requirements, blocking items, runtime states, and next action.
+7. Confirm switch-plan rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
