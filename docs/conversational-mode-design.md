@@ -1315,3 +1315,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The review package can report `READY_FOR_SEPARATE_IMPLEMENTATION_TASK` only when strategy coverage, handoff checklist, manual emit recap, and manual signoff boundary are all acceptable.
 - The review package never approves automatic runtime directly and keeps `readyForAutomaticRuntime=false`.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 120. Task 140 Landing Notes
+
+- Task 140 adds a read-only automatic character runtime safety plan.
+- DevTools exposes `grayAutoFollowupTrialCharacterAutoRuntimeSafetyPlan(limit)`.
+- The readiness panel shows `灰度试运行自动角色表现接入计划`, including default-off gates, explicit enable requirements, review-package dependency, manual validation dependency, safety stop requirement, rollout stages, blocking items, and next action.
+- The panel adds `复制计划` for user-click clipboard export.
+- The plan can say whether rollout planning is safe, but it keeps `readyForAutomaticRuntime=false` and does not implement automatic runtime.
+- It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.

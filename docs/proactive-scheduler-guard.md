@@ -504,3 +504,11 @@
 - The package summarizes active expression rule, rule coverage, manual emit recap state, handoff checklist state, missing review items, and Go/No-Go for a later separate implementation task.
 - It keeps `readyForAutomaticRuntime=false` and never approves automatic role-expression runtime directly.
 - It does not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 50. Task 140 Gray Trial Character Auto Runtime Safety Plan Note
+
+- Task 140 adds `grayAutoFollowupTrialCharacterAutoRuntimeSafetyPlan(limit)` as a read-only DevTools helper.
+- The readiness panel renders an automatic character runtime safety plan and exposes `复制计划`.
+- The plan summarizes default-off gates, explicit enable requirements, review-package dependency, manual validation dependency, safety stop requirement, rollout stages, blocking items, and next action.
+- It keeps `readyForAutomaticRuntime=false` and does not implement automatic character runtime behavior.
+- It does not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.

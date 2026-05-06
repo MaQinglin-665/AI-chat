@@ -313,6 +313,7 @@ const state = {
   followupReadinessTrialCharacterRecapCard: null,
   followupReadinessTrialCharacterStrategyCard: null,
   followupReadinessTrialCharacterReviewCard: null,
+  followupReadinessTrialCharacterAutoPlanCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -328,6 +329,7 @@ const state = {
   followupReadinessTrialCopyCharacterRecapBtn: null,
   followupReadinessTrialCopyCharacterStrategyBtn: null,
   followupReadinessTrialCopyCharacterReviewBtn: null,
+  followupReadinessTrialCopyCharacterAutoPlanBtn: null,
   followupReadinessTrialEmitCharacterBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
@@ -4626,6 +4628,116 @@ function buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(limit = 
   ].join("\n");
 }
 
+function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit = 24) {
+  const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
+  const strategy = buildGrayAutoTrialCharacterExpressionStrategyDraft(limit);
+  const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
+  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
+  const gates = [
+    {
+      key: "default_off",
+      label: "默认关闭自动角色表现",
+      ok: true,
+      required: true,
+      note: "自动 runtime 默认仍为 false。"
+    },
+    {
+      key: "explicit_enable_flag",
+      label: "需要显式启用开关",
+      ok: false,
+      required: true,
+      note: "必须有独立配置或显式运行时开关，不允许隐式打开。"
+    },
+    {
+      key: "separate_task_gate",
+      label: "必须通过独立任务与审查",
+      ok: review.goNoGo === "READY_FOR_SEPARATE_IMPLEMENTATION_TASK",
+      required: true,
+      note: "当前评审包只能给出建议，不直接接自动 runtime。"
+    },
+    {
+      key: "manual_validation",
+      label: "先手动验证 cue 与回看",
+      ok: recap.accepted === true,
+      required: true,
+      note: "至少确认一次手动试发与回看，再考虑自动路径。"
+    },
+    {
+      key: "handoff_check",
+      label: "接入前检查必须通过",
+      ok: checklist.readyForImplementationPlanning === true,
+      required: true,
+      note: "handoff checklist 仍然是自动接入前提。"
+    },
+    {
+      key: "safety_stop",
+      label: "必须有可用的安全停止",
+      ok: true,
+      required: true,
+      note: "Emergency Stop 与 Disarm 必须继续存在。"
+    }
+  ];
+  const blockingRequired = gates.filter((gate) => gate.required === true && gate.ok !== true);
+  const canPlanRollout = blockingRequired.length === 0;
+  return {
+    readOnly: true,
+    status: canPlanRollout ? "safe_to_plan" : "blocked_for_auto_runtime",
+    canPlanRollout,
+    goNoGo: review.goNoGo,
+    decision: review.decision,
+    outcome: review.outcome,
+    strategyStatus: strategy.status,
+    ruleCount: strategy.rules.length,
+    manualEmitAccepted: recap.accepted === true,
+    checklistReady: checklist.readyForImplementationPlanning === true,
+    gates,
+    blockingRequired,
+    rolloutStages: [
+      "stage_0_review_only",
+      "stage_1_explicit_flag",
+      "stage_2_single_session_guard",
+      "stage_3_manual_validation",
+      "stage_4_limited_gray_rollout",
+      "stage_5_observed_runtime_hardening"
+    ],
+    nextAction: canPlanRollout
+      ? "Draft the separate automatic runtime implementation plan and keep default-off behavior."
+      : "Keep reviewing the draft, recap, and handoff checklist before planning any automatic runtime path.",
+    safety: {
+      noRuntimeHintEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noModelCall: true,
+      noFetch: true,
+      noPollingStart: true,
+      noFollowupExecution: true,
+      noConfigWrites: true,
+      readyForAutomaticRuntime: false
+    }
+  };
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText(limit = 24) {
+  const plan = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
+  const gateLines = plan.gates.map((gate) => {
+    const mark = gate.ok === true ? "OK" : "WAIT";
+    const required = gate.required === true ? "required" : "observe";
+    return `- [${mark}] ${gate.key} (${required}): ${gate.label} - ${gate.note}`;
+  });
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u63a5\u5165\u8ba1\u5212\uff08\u53ea\u8bfb\uff09",
+    `status=${plan.status}  canPlanRollout=${plan.canPlanRollout ? "true" : "false"}  readyForAutomaticRuntime=false`,
+    `goNoGo=${plan.goNoGo}  decision=${plan.decision}  outcome=${plan.outcome}`,
+    `strategyStatus=${plan.strategyStatus}  ruleCount=${plan.ruleCount}  manualEmitAccepted=${plan.manualEmitAccepted ? "true" : "false"}  checklistReady=${plan.checklistReady ? "true" : "false"}`,
+    "gates:",
+    ...gateLines,
+    "rolloutStages:",
+    ...plan.rolloutStages.map((stage, index) => `- ${index + 1}. ${stage}`),
+    `next=${plan.nextAction}`,
+    "\u5b89\u5168\uff1a\u8ba1\u5212\u53ea\u8bfb\uff0c\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
+  ].join("\n");
+}
+
 function emitGrayAutoTrialCharacterCueManually(input = {}) {
   const safeInput = input && typeof input === "object" ? input : {};
   const confirm = String(safeInput.confirm || "").trim();
@@ -4779,6 +4891,13 @@ function updateGrayAutoTrialCharacterReviewCard() {
     return;
   }
   state.followupReadinessTrialCharacterReviewCard.textContent = buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(24);
+}
+
+function updateGrayAutoTrialCharacterAutoPlanCard() {
+  if (!state.followupReadinessTrialCharacterAutoPlanCard) {
+    return;
+  }
+  state.followupReadinessTrialCharacterAutoPlanCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText(24);
 }
 
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
@@ -5043,6 +5162,24 @@ async function copyGrayAutoTrialCharacterExpressionStrategyReviewPackageToClipbo
     return true;
   } catch (_) {
     setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8bc4\u5ba1\u5305\u5931\u8d25");
+    return false;
+  }
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeSafetyPlanToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText(24));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u63a5\u5165\u8ba1\u5212\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u8ba1\u5212";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u63a5\u5165\u8ba1\u5212\u5931\u8d25");
     return false;
   }
 }
@@ -5323,6 +5460,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyCharacterReview.addEventListener("click", () => {
     copyGrayAutoTrialCharacterExpressionStrategyReviewPackageToClipboard(trialCopyCharacterReview);
   });
+  const trialCopyCharacterAutoPlan = document.createElement("button");
+  trialCopyCharacterAutoPlan.type = "button";
+  trialCopyCharacterAutoPlan.textContent = "\u590d\u5236\u8ba1\u5212";
+  trialCopyCharacterAutoPlan.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u63a5\u5165\u8ba1\u5212";
+  trialCopyCharacterAutoPlan.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef0ff;color:#303b74;cursor:pointer;";
+  trialCopyCharacterAutoPlan.addEventListener("click", () => {
+    copyGrayAutoTrialCharacterAutoRuntimeSafetyPlanToClipboard(trialCopyCharacterAutoPlan);
+  });
   const trialEmitCharacter = document.createElement("button");
   trialEmitCharacter.type = "button";
   trialEmitCharacter.textContent = "\u8bd5\u53d1\u89d2\u8272cue";
@@ -5371,6 +5516,7 @@ function ensureFollowupReadinessPanel() {
     trialCopyCharacterRecap,
     trialCopyCharacterStrategy,
     trialCopyCharacterReview,
+    trialCopyCharacterAutoPlan,
     trialEmitCharacter
   ]);
   const manualStatus = document.createElement("div");
@@ -5560,6 +5706,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#4f3d1f"
   ].join(";");
+  const characterAutoPlanCard = document.createElement("pre");
+  characterAutoPlanCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(95,103,171,.24)",
+    "border-radius:14px",
+    "background:rgba(242,244,255,.76)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#2f3969"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -5589,6 +5746,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(characterRecapCard);
   panel.appendChild(characterStrategyCard);
   panel.appendChild(characterReviewCard);
+  panel.appendChild(characterAutoPlanCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -5606,6 +5764,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCharacterRecapCard = characterRecapCard;
   state.followupReadinessTrialCharacterStrategyCard = characterStrategyCard;
   state.followupReadinessTrialCharacterReviewCard = characterReviewCard;
+  state.followupReadinessTrialCharacterAutoPlanCard = characterAutoPlanCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -5628,6 +5787,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCopyCharacterRecapBtn = trialCopyCharacterRecap;
   state.followupReadinessTrialCopyCharacterStrategyBtn = trialCopyCharacterStrategy;
   state.followupReadinessTrialCopyCharacterReviewBtn = trialCopyCharacterReview;
+  state.followupReadinessTrialCopyCharacterAutoPlanBtn = trialCopyCharacterAutoPlan;
   state.followupReadinessTrialEmitCharacterBtn = trialEmitCharacter;
   return panel;
 }
@@ -5666,6 +5826,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialCharacterRecapCard();
       updateGrayAutoTrialCharacterStrategyCard();
       updateGrayAutoTrialCharacterReviewCard();
+      updateGrayAutoTrialCharacterAutoPlanCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -5688,6 +5849,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialCharacterRecapCard();
   updateGrayAutoTrialCharacterStrategyCard();
   updateGrayAutoTrialCharacterReviewCard();
+  updateGrayAutoTrialCharacterAutoPlanCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -11066,6 +11228,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterCueManualEmitRecap: (limit) => buildGrayAutoTrialCharacterCueManualEmitRecap(limit),
     grayAutoFollowupTrialCharacterExpressionStrategyDraft: (limit) => buildGrayAutoTrialCharacterExpressionStrategyDraft(limit),
     grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage: (limit) => buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit),
+    grayAutoFollowupTrialCharacterAutoRuntimeSafetyPlan: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit),
     emitGrayAutoFollowupTrialCharacterCue: (input) => emitGrayAutoTrialCharacterCueManually(input),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
