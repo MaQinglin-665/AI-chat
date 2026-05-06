@@ -1577,3 +1577,17 @@ Manual checks:
 5. Confirm rules cover no-go quiet, watch-only observe, watched-trial ready, post-success cooldown, and manual emit review.
 6. Click `复制策略`, paste into a scratch note, and confirm it includes each rule key, status, condition, label, tone, emotion/action, risk, sample, and next action.
 7. Confirm strategy rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 87. Gray Automatic Follow-up Trial Character Expression Strategy Review Package v1
+
+Purpose: confirm local testers can review Go/No-Go for a separate role-expression implementation task without enabling automatic runtime.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行角色表现策略评审包` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage()`.
+4. Confirm the result has `readOnly=true`, `goNoGo`, `activeRule`, `ruleCount`, `manualEmitAccepted`, `checklistReady`, `approvedForNextPhase=false`, `missing`, `nextAction`, and `safety`.
+5. With no accepted manual emit recap, confirm `goNoGo="NO_GO_FOR_AUTOMATIC_RUNTIME"` and a `manual_emit_recap` missing item is present.
+6. Click `复制评审`, paste into a scratch note, and confirm it includes Go/No-Go, active rule, active hint, missing items, and next action.
+7. Confirm review rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

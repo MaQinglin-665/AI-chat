@@ -1305,3 +1305,13 @@ The reset helper exists to speed up local trial verification without restarting 
 - The draft maps `NO_GO`, `WATCH_ONLY`, `GO_FOR_WATCHED_TRIAL`, `REVIEW_AFTER_SUCCESS`, `success`, and manual emit review states to low-interruption expression candidates.
 - The draft is review-only and keeps `readyForAutomaticRuntime=false`.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 119. Task 139 Landing Notes
+
+- Task 139 adds a read-only gray trial character expression strategy review package.
+- DevTools exposes `grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage(limit)`.
+- The readiness panel shows `灰度试运行角色表现策略评审包`, including Go/No-Go, active rule, rule count, manual emit recap state, handoff checklist state, missing review items, and next action.
+- The panel adds `复制评审` for user-click clipboard export.
+- The review package can report `READY_FOR_SEPARATE_IMPLEMENTATION_TASK` only when strategy coverage, handoff checklist, manual emit recap, and manual signoff boundary are all acceptable.
+- The review package never approves automatic runtime directly and keeps `readyForAutomaticRuntime=false`.
+- It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.

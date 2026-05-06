@@ -312,6 +312,7 @@ const state = {
   followupReadinessTrialCharacterHandoffCard: null,
   followupReadinessTrialCharacterRecapCard: null,
   followupReadinessTrialCharacterStrategyCard: null,
+  followupReadinessTrialCharacterReviewCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -326,6 +327,7 @@ const state = {
   followupReadinessTrialCopyCharacterHandoffBtn: null,
   followupReadinessTrialCopyCharacterRecapBtn: null,
   followupReadinessTrialCopyCharacterStrategyBtn: null,
+  followupReadinessTrialCopyCharacterReviewBtn: null,
   followupReadinessTrialEmitCharacterBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
@@ -4541,6 +4543,89 @@ function buildGrayAutoTrialCharacterExpressionStrategyDraftText(limit = 24) {
   ].join("\n");
 }
 
+function buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit = 24) {
+  const strategy = buildGrayAutoTrialCharacterExpressionStrategyDraft(limit);
+  const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
+  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
+  const signoff = buildGrayAutoTrialSignoffPackage(limit);
+  const activeRule = strategy.activeRule || {};
+  const missing = [];
+  if (strategy.rules.length < 5) {
+    missing.push({
+      key: "rule_coverage",
+      reason: "strategy draft should cover the five minimum expression states"
+    });
+  }
+  if (checklist.readyForImplementationPlanning !== true) {
+    missing.push({
+      key: "handoff_checklist",
+      reason: "handoff checklist is not ready for implementation planning"
+    });
+  }
+  if (recap.accepted !== true) {
+    missing.push({
+      key: "manual_emit_recap",
+      reason: "no accepted manual cue emit has been reviewed in this renderer session"
+    });
+  }
+  if (signoff.signoff?.approvedForNextPhase !== false) {
+    missing.push({
+      key: "manual_signoff_boundary",
+      reason: "manual signoff boundary must remain false before automatic runtime"
+    });
+  }
+  const goNoGo = missing.length === 0
+    ? "READY_FOR_SEPARATE_IMPLEMENTATION_TASK"
+    : "NO_GO_FOR_AUTOMATIC_RUNTIME";
+  return {
+    readOnly: true,
+    status: "review_package",
+    goNoGo,
+    decision: strategy.decision,
+    outcome: strategy.outcome,
+    activeRuleKey: strategy.activeRuleKey,
+    activeRule,
+    ruleCount: strategy.rules.length,
+    manualEmitAccepted: recap.accepted === true,
+    checklistReady: checklist.readyForImplementationPlanning === true,
+    approvedForNextPhase: false,
+    missing,
+    nextAction: goNoGo === "READY_FOR_SEPARATE_IMPLEMENTATION_TASK"
+      ? "Create a separate, explicitly gated implementation task; keep automatic runtime disabled by default."
+      : "Keep reviewing with manual emit and recap before implementing automatic role-expression behavior.",
+    safety: {
+      noRuntimeHintEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noModelCall: true,
+      noFetch: true,
+      noPollingStart: true,
+      noFollowupExecution: true,
+      noConfigWrites: true,
+      readyForAutomaticRuntime: false
+    }
+  };
+}
+
+function buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(limit = 24) {
+  const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
+  const missingLines = review.missing.length
+    ? review.missing.map((item) => `- ${item.key}: ${item.reason}`)
+    : ["- none"];
+  const hint = review.activeRule?.runtimeHint || {};
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8bc4\u5ba1\u5305\uff08\u53ea\u8bfb\uff09",
+    `goNoGo=${review.goNoGo}  status=${review.status}`,
+    `decision=${review.decision}  outcome=${review.outcome}  activeRule=${review.activeRuleKey}`,
+    `ruleCount=${review.ruleCount}  manualEmitAccepted=${review.manualEmitAccepted ? "true" : "false"}  checklistReady=${review.checklistReady ? "true" : "false"}  approvedForNextPhase=false`,
+    `activeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} voice_style:${hint.voice_style || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
+    "missing:",
+    ...missingLines,
+    `next=${review.nextAction}`,
+    "\u5b89\u5168\uff1a\u8bc4\u5ba1\u5305\u53ea\u8bfb\uff0c\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
+  ].join("\n");
+}
+
 function emitGrayAutoTrialCharacterCueManually(input = {}) {
   const safeInput = input && typeof input === "object" ? input : {};
   const confirm = String(safeInput.confirm || "").trim();
@@ -4687,6 +4772,13 @@ function updateGrayAutoTrialCharacterStrategyCard() {
     return;
   }
   state.followupReadinessTrialCharacterStrategyCard.textContent = buildGrayAutoTrialCharacterExpressionStrategyDraftText(24);
+}
+
+function updateGrayAutoTrialCharacterReviewCard() {
+  if (!state.followupReadinessTrialCharacterReviewCard) {
+    return;
+  }
+  state.followupReadinessTrialCharacterReviewCard.textContent = buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(24);
 }
 
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
@@ -4933,6 +5025,24 @@ async function copyGrayAutoTrialCharacterExpressionStrategyDraftToClipboard(butt
     return true;
   } catch (_) {
     setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8349\u6848\u5931\u8d25");
+    return false;
+  }
+}
+
+async function copyGrayAutoTrialCharacterExpressionStrategyReviewPackageToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(24));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8bc4\u5ba1\u5305\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u8bc4\u5ba1";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8bc4\u5ba1\u5305\u5931\u8d25");
     return false;
   }
 }
@@ -5205,6 +5315,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyCharacterStrategy.addEventListener("click", () => {
     copyGrayAutoTrialCharacterExpressionStrategyDraftToClipboard(trialCopyCharacterStrategy);
   });
+  const trialCopyCharacterReview = document.createElement("button");
+  trialCopyCharacterReview.type = "button";
+  trialCopyCharacterReview.textContent = "\u590d\u5236\u8bc4\u5ba1";
+  trialCopyCharacterReview.title = "\u590d\u5236\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8bc4\u5ba1\u5305";
+  trialCopyCharacterReview.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff7ea;color:#614517;cursor:pointer;";
+  trialCopyCharacterReview.addEventListener("click", () => {
+    copyGrayAutoTrialCharacterExpressionStrategyReviewPackageToClipboard(trialCopyCharacterReview);
+  });
   const trialEmitCharacter = document.createElement("button");
   trialEmitCharacter.type = "button";
   trialEmitCharacter.textContent = "\u8bd5\u53d1\u89d2\u8272cue";
@@ -5252,6 +5370,7 @@ function ensureFollowupReadinessPanel() {
     trialCopyCharacterHandoff,
     trialCopyCharacterRecap,
     trialCopyCharacterStrategy,
+    trialCopyCharacterReview,
     trialEmitCharacter
   ]);
   const manualStatus = document.createElement("div");
@@ -5430,6 +5549,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#303865"
   ].join(";");
+  const characterReviewCard = document.createElement("pre");
+  characterReviewCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(156,116,54,.24)",
+    "border-radius:14px",
+    "background:rgba(255,250,241,.76)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#4f3d1f"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -5458,6 +5588,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(characterHandoffCard);
   panel.appendChild(characterRecapCard);
   panel.appendChild(characterStrategyCard);
+  panel.appendChild(characterReviewCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -5474,6 +5605,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCharacterHandoffCard = characterHandoffCard;
   state.followupReadinessTrialCharacterRecapCard = characterRecapCard;
   state.followupReadinessTrialCharacterStrategyCard = characterStrategyCard;
+  state.followupReadinessTrialCharacterReviewCard = characterReviewCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -5495,6 +5627,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCopyCharacterHandoffBtn = trialCopyCharacterHandoff;
   state.followupReadinessTrialCopyCharacterRecapBtn = trialCopyCharacterRecap;
   state.followupReadinessTrialCopyCharacterStrategyBtn = trialCopyCharacterStrategy;
+  state.followupReadinessTrialCopyCharacterReviewBtn = trialCopyCharacterReview;
   state.followupReadinessTrialEmitCharacterBtn = trialEmitCharacter;
   return panel;
 }
@@ -5532,6 +5665,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialCharacterHandoffCard();
       updateGrayAutoTrialCharacterRecapCard();
       updateGrayAutoTrialCharacterStrategyCard();
+      updateGrayAutoTrialCharacterReviewCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -5553,6 +5687,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialCharacterHandoffCard();
   updateGrayAutoTrialCharacterRecapCard();
   updateGrayAutoTrialCharacterStrategyCard();
+  updateGrayAutoTrialCharacterReviewCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -10930,6 +11065,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterCueManualEmitStatus: () => getGrayAutoTrialCharacterCueManualEmitStatus(),
     grayAutoFollowupTrialCharacterCueManualEmitRecap: (limit) => buildGrayAutoTrialCharacterCueManualEmitRecap(limit),
     grayAutoFollowupTrialCharacterExpressionStrategyDraft: (limit) => buildGrayAutoTrialCharacterExpressionStrategyDraft(limit),
+    grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage: (limit) => buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit),
     emitGrayAutoFollowupTrialCharacterCue: (input) => emitGrayAutoTrialCharacterCueManually(input),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),

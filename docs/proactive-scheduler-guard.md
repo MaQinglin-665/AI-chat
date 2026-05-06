@@ -496,3 +496,11 @@
 - The draft maps visible gray trial decision/outcome states and manual emit review state to low-interruption expression candidates.
 - It keeps `readyForAutomaticRuntime=false` and does not connect the rules to automatic runtime behavior.
 - It does not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 49. Task 139 Gray Trial Character Expression Strategy Review Note
+
+- Task 139 adds `grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage(limit)` as a read-only DevTools helper.
+- The readiness panel renders a strategy review package and exposes `复制评审`.
+- The package summarizes active expression rule, rule coverage, manual emit recap state, handoff checklist state, missing review items, and Go/No-Go for a later separate implementation task.
+- It keeps `readyForAutomaticRuntime=false` and never approves automatic role-expression runtime directly.
+- It does not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.

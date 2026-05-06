@@ -29,6 +29,7 @@ d.grayAutoFollowupTrialCharacterCueHandoffChecklist();
 d.grayAutoFollowupTrialCharacterCueManualEmitStatus();
 d.grayAutoFollowupTrialCharacterCueManualEmitRecap();
 d.grayAutoFollowupTrialCharacterExpressionStrategyDraft();
+d.grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage();
 d.emitGrayAutoFollowupTrialCharacterCue({ confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE" });
 d.followupReadiness();
 ```
@@ -57,6 +58,7 @@ The follow-up readiness panel now includes a controlled gray trial operation are
 - `复制接入检查` copies the read-only character cue handoff checklist after an explicit user click.
 - `复制回看` copies the latest manual character cue emit recap after an explicit user click.
 - `复制策略` copies the read-only character expression strategy draft after an explicit user click.
+- `复制评审` copies the read-only character expression strategy review package after an explicit user click.
 - `试发角色cue` requires the exact `EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE` phrase and emits the current preview runtime cue once.
 
 Use the panel controls only during a local controlled test. `Arm 试运行` can open the existing in-memory trial gates, so keep the app watched and use `Emergency Stop` first if anything feels wrong. `试发角色cue` can send one character runtime metadata update after confirmation, so use it only when you are watching the character. The buttons do not write config, add desktop observation, capture screenshots, read files, execute shell commands, call tools, call backend APIs, request LLM output, play TTS, start polling, or trigger follow-up.
@@ -83,6 +85,8 @@ The manual emit gate is the first controlled bridge from preview data into real 
 The manual emit recap is read-only. It summarizes the in-memory emit count, latest cue metadata, recent manual emit events, and the next review step, but it does not emit another cue.
 
 The expression strategy draft is read-only. It maps visible trial decisions and outcomes to candidate low-interruption character expressions for review, but it does not emit runtime cues or enable automatic role behavior.
+
+The strategy review package is read-only. It summarizes the draft strategy, manual emit recap, handoff checklist, missing review items, and Go/No-Go for a separate implementation task. It never approves automatic runtime by itself.
 
 Arm only during a local controlled test:
 
