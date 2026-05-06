@@ -152,3 +152,5 @@ The switch acceptance package is read-only. It turns the explicit switch review 
 The explicit switch control skeleton is also read-only from the perspective of runtime behavior. It only holds a local flag for future implementation work and still keeps automatic runtime disconnected.
 
 The explicit switch diagnostics package is read-only. It explains why the local switch control is blocked and what to check next, but it does not change the local switch flag and still keeps automatic runtime disconnected.
+
+The explicit switch rollback package is local-only. It provides a safe path back to default-off and records rollbackAt/Reason in renderer memory only. If the local switch was enabled, use the rollback action to clear it; if you only need a blank in-memory slate, restart the app. The rollback path does not write config, does not touch scheduler state, and does not connect automatic runtime.

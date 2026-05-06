@@ -71,6 +71,8 @@ const state = {
   grayAutoTrialCharacterAutoRuntimeExplicitSwitchUpdatedAt: 0,
   grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastAction: "",
   grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastReason: "",
+  grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackAt: 0,
+  grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackReason: "",
   autoChatTuning: {
     triggerBaseThreshold: 1.03,
     shortSilencePenalty: 0.35,
@@ -324,6 +326,7 @@ const state = {
   followupReadinessTrialCharacterSwitchAcceptanceCard: null,
   followupReadinessTrialCharacterSwitchControlCard: null,
   followupReadinessTrialCharacterSwitchDiagnosticsCard: null,
+  followupReadinessTrialCharacterSwitchRollbackCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -346,8 +349,10 @@ const state = {
   followupReadinessTrialCopyCharacterSwitchAcceptanceBtn: null,
   followupReadinessTrialCopyCharacterSwitchControlBtn: null,
   followupReadinessTrialCopyCharacterSwitchDiagnosticsBtn: null,
+  followupReadinessTrialCopyCharacterSwitchRollbackBtn: null,
   followupReadinessTrialCharacterSwitchEnableBtn: null,
   followupReadinessTrialCharacterSwitchDisableBtn: null,
+  followupReadinessTrialCharacterSwitchRollbackBtn: null,
   followupReadinessTrialEmitCharacterBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
@@ -5185,8 +5190,11 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit = 24)
     lastAction: String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastAction || ""),
     lastReason: String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastReason || ""),
     updatedAt: Number(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchUpdatedAt || 0),
+    rollbackAt: Number(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackAt || 0),
+    rollbackReason: String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackReason || ""),
+    defaultOffBaseline: true,
     nextAction: enabled
-      ? "Use the Disable control to clear the local switch flag; automatic runtime remains disconnected."
+      ? "Use the Rollback control to return to default-off, or the Disable control to clear the local switch flag; automatic runtime remains disconnected."
       : "Keep the switch off until the acceptance package becomes ready; the control only changes local state.",
     safety: {
       noRuntimeHintEmission: true,
@@ -5213,6 +5221,7 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText(limit =
     `switchKey=${control.switchKey}  requiredConfirm=${control.requiredConfirm}  disabledReason=${control.disabledReason}`,
     `acceptanceStatus=${control.acceptanceStatus}  acceptanceGoNoGo=${control.acceptanceGoNoGo}  acceptanceReady=${control.acceptanceReady ? "true" : "false"}  manualVerificationRequired=${control.manualVerificationRequired ? "true" : "false"}`,
     `lastAction=${control.lastAction || "none"}  lastReason=${control.lastReason || "none"}  updatedAt=${control.updatedAt || 0}`,
+    `rollbackAt=${control.rollbackAt || 0}  rollbackReason=${control.rollbackReason || "none"}  defaultOffBaseline=${control.defaultOffBaseline ? "true" : "false"}`,
     "blockedReasons:",
     ...blockedLines,
     `next=${control.nextAction}`,
@@ -5303,6 +5312,68 @@ function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(limi
   ].join("\n");
 }
 
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit = 24) {
+  const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
+  const diagnostics = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit);
+  const rollbackAt = Number(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackAt || 0);
+  const rollbackReason = String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackReason || "");
+  const rollbackRecorded = rollbackAt > 0;
+  const enabled = control.enabled === true;
+  const canRollback = enabled === true;
+  return {
+    readOnly: true,
+    ok: true,
+    status: enabled ? "rollback_ready" : rollbackRecorded ? "default_off_restored" : "default_off",
+    enabled,
+    canRollback,
+    defaultOffBaseline: true,
+    switchKey: control.switchKey,
+    controlStatus: control.status,
+    diagnosticsStatus: diagnostics.status,
+    rollbackAt,
+    rollbackReason,
+    rollbackRecorded,
+    lastAction: String(control.lastAction || ""),
+    lastReason: String(control.lastReason || ""),
+    nextAction: enabled
+      ? "Click the rollback button to clear the local switch flag and keep scheduler/config untouched."
+      : rollbackRecorded
+        ? "The switch is already back to default-off; restart the app if you want a blank renderer-memory slate."
+        : "The switch is already default-off; keep the rollback action available for later local reset use.",
+    steps: [
+      "Clear the local explicit switch flag.",
+      "Leave scheduler, config, and automatic runtime disconnected.",
+      "Restart the app only if you want to clear renderer-memory trial history."
+    ],
+    safety: {
+      noRuntimeHintEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noModelCall: true,
+      noFetch: true,
+      noPollingStart: true,
+      noFollowupExecution: true,
+      noConfigWrites: true,
+      readyForAutomaticRuntime: false
+    }
+  };
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(limit = 24) {
+  const rollback = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit);
+  return [
+    "灰度试运行自动角色表现显式开关回滚包（只读）",
+    `status=${rollback.status}  ok=${rollback.ok ? "true" : "false"}  enabled=${rollback.enabled ? "true" : "false"}  canRollback=${rollback.canRollback ? "true" : "false"}  defaultOffBaseline=${rollback.defaultOffBaseline ? "true" : "false"}`,
+    `switchKey=${rollback.switchKey}  controlStatus=${rollback.controlStatus}  diagnosticsStatus=${rollback.diagnosticsStatus}`,
+    `rollbackAt=${rollback.rollbackAt || 0}  rollbackReason=${rollback.rollbackReason || "none"}  rollbackRecorded=${rollback.rollbackRecorded ? "true" : "false"}`,
+    `lastAction=${rollback.lastAction || "none"}  lastReason=${rollback.lastReason || "none"}`,
+    "steps:",
+    ...rollback.steps.map((step, index) => `- ${index + 1}. ${step}`),
+    `next=${rollback.nextAction}`,
+    "\u5b89\u5168\uff1a\u56de\u6536/\u6062\u590d\u9ed8\u8ba4\u5173\u95ed\u53ea\u5f71\u54cd\u672c\u5730\u5185\u5b58\uff0c\u4e0d\u5199 config\uff0c\u4e0d\u6539 scheduler\uff0c\u4e0d\u63a5 automatic runtime\u3002"
+  ].join("\n");
+}
+
 function enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(input = {}) {
   const safeInput = input && typeof input === "object" ? input : {};
   const confirm = String(safeInput.confirm || "").trim();
@@ -5374,6 +5445,39 @@ function disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason = "manual
     ok: true,
     enabled: false,
     switchKey: "gray_auto_followup_character_runtime_enabled",
+    safety: {
+      noRuntimeHintEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noConfigWrites: true,
+      noSchedulerChange: true,
+      noFollowupExecution: true,
+      noPollingStart: true
+    }
+  };
+}
+
+function rollbackGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason = "manual_rollback") {
+  const rollbackReason = String(reason || "manual_rollback");
+  const now = Date.now();
+  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled = false;
+  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchUpdatedAt = now;
+  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastAction = "rollback";
+  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastReason = rollbackReason;
+  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackAt = now;
+  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackReason = rollbackReason;
+  recordTTSDebugEvent("conversation_followup_gray_auto_trial_explicit_switch_rollback", {
+    enabled: false,
+    reason: rollbackReason,
+    switchKey: "gray_auto_followup_character_runtime_enabled"
+  });
+  updateFollowupReadinessPanel();
+  return {
+    ok: true,
+    enabled: false,
+    switchKey: "gray_auto_followup_character_runtime_enabled",
+    rollbackAt: now,
+    rollbackReason,
     safety: {
       noRuntimeHintEmission: true,
       noLive2DMove: true,
@@ -5592,6 +5696,12 @@ function updateGrayAutoTrialCharacterSwitchControlCard() {
     state.followupReadinessTrialCharacterSwitchDisableBtn.disabled = control.enabled !== true;
     state.followupReadinessTrialCharacterSwitchDisableBtn.title = "\u5173\u95ed\u672c\u5730\u663e\u5f0f\u5f00\u5173\u6807\u8bb0\uff0c\u4e0d\u6539 scheduler/config";
   }
+  if (state.followupReadinessTrialCharacterSwitchRollbackBtn) {
+    state.followupReadinessTrialCharacterSwitchRollbackBtn.disabled = control.enabled !== true;
+    state.followupReadinessTrialCharacterSwitchRollbackBtn.title = control.enabled === true
+      ? "\u6062\u590d\u672c\u5730\u663e\u5f0f\u5f00\u5173\u5230\u9ed8\u8ba4\u5173\u95ed\uff0c\u4e0d\u6539 scheduler/config"
+      : "\u5f53\u524d\u5df2\u662f\u9ed8\u8ba4\u5173\u95ed";
+  }
 }
 
 function updateGrayAutoTrialCharacterSwitchDiagnosticsCard() {
@@ -5599,6 +5709,13 @@ function updateGrayAutoTrialCharacterSwitchDiagnosticsCard() {
     return;
   }
   state.followupReadinessTrialCharacterSwitchDiagnosticsCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(24);
+}
+
+function updateGrayAutoTrialCharacterSwitchRollbackCard() {
+  if (!state.followupReadinessTrialCharacterSwitchRollbackCard) {
+    return;
+  }
+  state.followupReadinessTrialCharacterSwitchRollbackCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(24);
 }
 
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
@@ -5645,6 +5762,12 @@ function updateGrayAutoTrialControlPanel() {
   if (state.followupReadinessTrialCharacterSwitchDisableBtn) {
     state.followupReadinessTrialCharacterSwitchDisableBtn.disabled = switchControl.enabled !== true;
     state.followupReadinessTrialCharacterSwitchDisableBtn.title = "\u5173\u95ed\u672c\u5730\u663e\u5f0f\u5f00\u5173\u6807\u8bb0\uff1b\u4e0d\u6539 scheduler/config";
+  }
+  if (state.followupReadinessTrialCharacterSwitchRollbackBtn) {
+    state.followupReadinessTrialCharacterSwitchRollbackBtn.disabled = switchControl.enabled !== true;
+    state.followupReadinessTrialCharacterSwitchRollbackBtn.title = switchControl.enabled === true
+      ? "\u6062\u590d\u672c\u5730\u663e\u5f0f\u5f00\u5173\u5230\u9ed8\u8ba4\u5173\u95ed\uff1b\u4e0d\u6539 scheduler/config"
+      : "\u5f53\u524d\u5df2\u662f\u9ed8\u8ba4\u5173\u95ed";
   }
 }
 
@@ -5736,6 +5859,17 @@ function handleGrayAutoTrialCharacterAutoRuntimeSwitchEnableClick(button = null)
 function handleGrayAutoTrialCharacterAutoRuntimeSwitchDisableClick(button = null) {
   const result = disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch("panel_disable");
   setStatus("\u663e\u5f0f\u5f00\u5173\u672c\u5730\u6807\u8bb0\u5df2\u5173\u95ed");
+  if (button) {
+    button.blur();
+  }
+  return result?.ok === true;
+}
+
+function handleGrayAutoTrialCharacterAutoRuntimeSwitchRollbackClick(button = null) {
+  const result = rollbackGrayAutoTrialCharacterAutoRuntimeExplicitSwitch("panel_rollback");
+  setStatus(result?.ok === true
+    ? "\u5df2\u56de\u6536\u5230\u9ed8\u8ba4\u5173\u95ed\uff08\u4ec5\u672c\u5730\u5185\u5b58\uff09"
+    : `\u56de\u6536\u5931\u8d25\uff1a${result?.reason || "unknown"}`);
   if (button) {
     button.blur();
   }
@@ -6026,6 +6160,24 @@ async function copyGrayAutoTrialCharacterAutoRuntimeSwitchDiagnosticsToClipboard
     return true;
   } catch (_) {
     setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bca\u65ad\u5931\u8d25");
+    return false;
+  }
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeSwitchRollbackToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(24));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u56de\u6536\u5305\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u56de\u6536";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u56de\u6536\u5305\u5931\u8d25");
     return false;
   }
 }
@@ -6362,6 +6514,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyCharacterSwitchDiagnostics.addEventListener("click", () => {
     copyGrayAutoTrialCharacterAutoRuntimeSwitchDiagnosticsToClipboard(trialCopyCharacterSwitchDiagnostics);
   });
+  const trialCopyCharacterSwitchRollback = document.createElement("button");
+  trialCopyCharacterSwitchRollback.type = "button";
+  trialCopyCharacterSwitchRollback.textContent = "\u590d\u5236\u56de\u6536";
+  trialCopyCharacterSwitchRollback.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u56de\u6536\u5305";
+  trialCopyCharacterSwitchRollback.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#ffeedd;color:#6a3f1b;cursor:pointer;";
+  trialCopyCharacterSwitchRollback.addEventListener("click", () => {
+    copyGrayAutoTrialCharacterAutoRuntimeSwitchRollbackToClipboard(trialCopyCharacterSwitchRollback);
+  });
   const trialEnableCharacterSwitch = document.createElement("button");
   trialEnableCharacterSwitch.type = "button";
   trialEnableCharacterSwitch.textContent = "\u542f\u7528\u5f00\u5173";
@@ -6377,6 +6537,14 @@ function ensureFollowupReadinessPanel() {
   trialDisableCharacterSwitch.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1f4fb;color:#33415f;cursor:pointer;";
   trialDisableCharacterSwitch.addEventListener("click", () => {
     handleGrayAutoTrialCharacterAutoRuntimeSwitchDisableClick(trialDisableCharacterSwitch);
+  });
+  const trialRollbackCharacterSwitch = document.createElement("button");
+  trialRollbackCharacterSwitch.type = "button";
+  trialRollbackCharacterSwitch.textContent = "\u56de\u5230\u9ed8\u8ba4\u5173\u95ed";
+  trialRollbackCharacterSwitch.title = "\u6062\u590d\u672c\u5730\u663e\u5f0f\u5f00\u5173\u5230\u9ed8\u8ba4\u5173\u95ed\uff0c\u4e0d\u6539 scheduler/config";
+  trialRollbackCharacterSwitch.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#ffe4d3;color:#6f3b17;cursor:pointer;";
+  trialRollbackCharacterSwitch.addEventListener("click", () => {
+    handleGrayAutoTrialCharacterAutoRuntimeSwitchRollbackClick(trialRollbackCharacterSwitch);
   });
   const trialEmitCharacter = document.createElement("button");
   trialEmitCharacter.type = "button";
@@ -6433,8 +6601,10 @@ function ensureFollowupReadinessPanel() {
     trialCopyCharacterSwitchAcceptance,
     trialCopyCharacterSwitchControl,
     trialCopyCharacterSwitchDiagnostics,
+    trialCopyCharacterSwitchRollback,
     trialEnableCharacterSwitch,
     trialDisableCharacterSwitch,
+    trialRollbackCharacterSwitch,
     trialEmitCharacter
   ]);
   const manualStatus = document.createElement("div");
@@ -6701,6 +6871,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#5f4615"
   ].join(";");
+  const characterSwitchRollbackCard = document.createElement("pre");
+  characterSwitchRollbackCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(190,112,62,.24)",
+    "border-radius:14px",
+    "background:rgba(255,242,232,.82)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#653b1c"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -6737,6 +6918,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(characterSwitchAcceptanceCard);
   panel.appendChild(characterSwitchControlCard);
   panel.appendChild(characterSwitchDiagnosticsCard);
+  panel.appendChild(characterSwitchRollbackCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -6761,6 +6943,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCharacterSwitchAcceptanceCard = characterSwitchAcceptanceCard;
   state.followupReadinessTrialCharacterSwitchControlCard = characterSwitchControlCard;
   state.followupReadinessTrialCharacterSwitchDiagnosticsCard = characterSwitchDiagnosticsCard;
+  state.followupReadinessTrialCharacterSwitchRollbackCard = characterSwitchRollbackCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -6790,8 +6973,10 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCopyCharacterSwitchAcceptanceBtn = trialCopyCharacterSwitchAcceptance;
   state.followupReadinessTrialCopyCharacterSwitchControlBtn = trialCopyCharacterSwitchControl;
   state.followupReadinessTrialCopyCharacterSwitchDiagnosticsBtn = trialCopyCharacterSwitchDiagnostics;
+  state.followupReadinessTrialCopyCharacterSwitchRollbackBtn = trialCopyCharacterSwitchRollback;
   state.followupReadinessTrialCharacterSwitchEnableBtn = trialEnableCharacterSwitch;
   state.followupReadinessTrialCharacterSwitchDisableBtn = trialDisableCharacterSwitch;
+  state.followupReadinessTrialCharacterSwitchRollbackBtn = trialRollbackCharacterSwitch;
   state.followupReadinessTrialEmitCharacterBtn = trialEmitCharacter;
   return panel;
 }
@@ -6837,6 +7022,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialCharacterSwitchAcceptanceCard();
       updateGrayAutoTrialCharacterSwitchControlCard();
       updateGrayAutoTrialCharacterSwitchDiagnosticsCard();
+      updateGrayAutoTrialCharacterSwitchRollbackCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -6866,6 +7052,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialCharacterSwitchAcceptanceCard();
   updateGrayAutoTrialCharacterSwitchControlCard();
   updateGrayAutoTrialCharacterSwitchDiagnosticsCard();
+  updateGrayAutoTrialCharacterSwitchRollbackCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -12251,8 +12438,10 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterAutoRuntimeSwitchAcceptancePackage: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeSwitchControl: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeSwitchControlDiagnostics: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit),
+    grayAutoFollowupTrialCharacterAutoRuntimeSwitchRollbackPackage: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit),
     enableGrayAutoFollowupTrialCharacterAutoRuntimeSwitch: (input) => enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(input),
     disableGrayAutoFollowupTrialCharacterAutoRuntimeSwitch: (reason) => disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason),
+    rollbackGrayAutoFollowupTrialCharacterAutoRuntimeSwitch: (reason) => rollbackGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason),
     emitGrayAutoFollowupTrialCharacterCue: (input) => emitGrayAutoTrialCharacterCueManually(input),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),

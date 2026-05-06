@@ -542,3 +542,7 @@ The switch acceptance package is read-only. It documents future acceptance crite
 The explicit switch control skeleton is local-only. It does not change scheduler behavior, does not write config, and does not enable automatic runtime.
 
 The explicit switch diagnostics package is read-only. It explains switch-control blockers, but it does not change scheduler behavior, does not write config, does not change the switch flag, and does not enable automatic runtime.
+
+- Task 147 adds a local-only rollback/default-off path for the explicit switch.
+- The rollback path only clears the renderer-memory switch flag and records rollback metadata; it does not change scheduler state, start polling, or connect automatic runtime.
+- The safest recovery remains default-off plus a restart if you want to clear all renderer-memory trial state.

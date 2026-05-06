@@ -1689,3 +1689,17 @@ Manual checks:
 5. Confirm `acceptance_not_ready` and `manual_verification_required` are explained with readable impact and next action when present.
 6. Click `复制诊断`, paste into a scratch note, and confirm it includes blocker details, acceptance blockers, operator checklist, and next action.
 7. Confirm diagnostics rendering and copy do not change the local switch flag, emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 95. Gray Automatic Follow-up Trial Character Auto Runtime Explicit Switch Rollback Package v1
+
+Purpose: confirm local testers can inspect and use the safe default-off rollback path without changing scheduler behavior or connecting automatic character runtime.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行自动角色表现显式开关回滚包` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterAutoRuntimeSwitchRollbackPackage()`.
+4. Confirm the result has `readOnly=true`, `ok`, `status`, `enabled`, `canRollback`, `defaultOffBaseline`, `switchKey`, `controlStatus`, `diagnosticsStatus`, `rollbackAt`, `rollbackReason`, `rollbackRecorded`, `steps`, `nextAction`, and `safety`.
+5. Confirm the package explains how to clear the local explicit switch flag and return to default-off safely.
+6. Click `复制回滚`, paste into a scratch note, and confirm it includes rollback status, rollback history, steps, and next action.
+7. Confirm rollback rendering, copy, and the local rollback action do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
