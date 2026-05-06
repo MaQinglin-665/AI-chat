@@ -536,3 +536,5 @@ Manual checks:
 7. Confirm switch-plan rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
 
 The explicit switch review package is read-only. It summarizes whether the explicit switch plan is ready for a separate implementation task, but it does not change scheduler behavior, does not write config, and does not enable automatic runtime.
+
+The switch acceptance package is read-only. It documents future acceptance criteria for a separate explicit switch implementation task, but it does not change scheduler behavior, does not write config, and does not enable automatic runtime.

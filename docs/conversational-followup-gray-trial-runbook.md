@@ -146,3 +146,5 @@ Restart the app if you want to clear all renderer-memory trial state.
 The explicit switch plan is also read-only. It stays one step before any actual automatic runtime implementation and only documents the required gates for a later explicit task. It does not change scheduler behavior, does not write config, and does not enable runtime.
 
 The explicit switch review package is also read-only. It sits one step after the explicit switch plan and only packages the current blockers and next action for a later separate task. It does not connect automatic runtime, does not write config, and does not enable runtime.
+
+The switch acceptance package is read-only. It turns the explicit switch review into future implementation acceptance criteria, but it does not implement the switch, does not connect automatic runtime, does not write config, and does not enable runtime.
