@@ -337,3 +337,10 @@
 - It does not call polling start, scheduler manual tick, follow-up execution, model/TTS/fetch, backend APIs, config writes, screenshots, file access, shell execution, or tool calls.
 - The follow-up status panel includes a one-line preflight result for local trial observation.
 - No scheduler guard, config default, cooldown/window limit, pending mutation, or automatic trigger behavior is changed.
+
+## 28. Task 118 Gray Trial Poll Event Context Note
+
+- Task 118 appends compact gray trial preflight context to existing `proactive_scheduler_poll_*` events.
+- Event `result` can include `trial:<status>`, `gates:<summary>`, `would_poll:<bool>`, and `would_trigger:<bool>`.
+- Event `error` may include compact blocked reasons, capped to a short string.
+- This is observability only: no polling start condition, scheduler guard, cooldown/window limit, pending mutation, model/TTS/fetch path, backend API, config default, or automatic trigger behavior is changed.

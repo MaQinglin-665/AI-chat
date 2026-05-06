@@ -1281,3 +1281,20 @@ Manual checks:
 6. Open `more -> follow-up status` and confirm the report includes one `试运行 preflight` line.
 7. Confirm calling preflight does not emit `conversation_followup_gray_auto_dry_run_checked`; that event should still only appear after explicit `grayAutoFollowupDryRun()`.
 8. Confirm calling preflight does not start polling, call `runProactiveSchedulerManualTick()`, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 66. Gray Automatic Follow-up Poll Event Context v1
+
+Purpose: confirm existing scheduler polling events carry compact gray trial context for local controlled trial audits.
+
+Manual checks:
+
+1. Start with default-off gray gates and reload the app.
+2. Inspect `window.__AI_CHAT_DEBUG_TTS__.events().slice(-10)`.
+3. Confirm `proactive_scheduler_poll_blocked` events include `trial:gated_off` in `result`.
+4. Confirm the same event result includes `gates:` and `would_poll:false`.
+5. Confirm the event error includes compact disabled reasons such as `gray_auto_disabled` or `gray_auto_trial_disabled`.
+6. In a local test config only, enable all five gates and reload.
+7. Confirm `proactive_scheduler_poll_start` includes `trial:runtime_guards_blocked` or `trial:ready_for_local_trial`, plus `gates:pass`.
+8. Confirm subsequent `proactive_scheduler_poll_blocked`, `proactive_scheduler_poll_ready`, `proactive_scheduler_poll_trigger_success`, or `proactive_scheduler_poll_trigger_blocked` events include `would_poll` and `would_trigger`.
+9. Confirm the event payload remains compact and does not include full prompts, secrets, screenshots, files, or unrelated private data.
+10. Confirm this task does not add new polling events, start polling by itself, change scheduler gates, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

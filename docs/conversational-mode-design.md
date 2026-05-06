@@ -1098,3 +1098,22 @@ The output remains compact and local:
 - Gate entries show config key, pass/fail state, and the matching blocked reason.
 - Readiness and dry-run sections reuse existing read-only builders.
 - Safety notes explicitly state that manual confirmation is still primary and that preflight does not require desktop observation, file access, tool calls, config writes, model calls, or TTS.
+
+## 94. Task 118 Landing Notes
+
+- Task 118 adds compact gray trial context to existing `proactive_scheduler_poll_*` debug events.
+- Poll start, blocked, ready, trigger success/block, stop, and failed events now include a compact `trial:<status>` summary plus gate and dry-run booleans in the existing event payload fields.
+- The summary is built from the read-only preflight path and is meant to make local controlled trials easier to audit after the fact.
+- This task does not add new polling events, does not start polling, does not change scheduler gates, does not execute follow-up, and does not call model/TTS/fetch.
+- No config default, pending state, cooldown/window limit, desktop observation, screenshot, file access, shell execution, tool call, backend API, config write, dependency, or product maturity claim is changed.
+
+## 95. Gray Trial Poll Event Context
+
+Gray trial poll event context is intentionally compact:
+
+- `trial:gated_off`, `trial:runtime_guards_blocked`, or `trial:ready_for_local_trial`
+- `gates:pass` or the pipe-separated disabled gate reasons
+- `would_poll:true|false`
+- `would_trigger:true|false`
+
+Blocked reasons may be appended to the event `error` field, capped to a short string. This keeps DevTools event history useful during local trials without adding prompts, secrets, screenshots, files, or unrelated private data.
