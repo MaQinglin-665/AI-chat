@@ -1134,3 +1134,20 @@ The event summary is intended for local trial review:
 - `last` shows the most recent poll event with parsed `trialStatus`, `gates`, `wouldPoll`, and `wouldTrigger`.
 - `hasPollStart`, `hasReady`, and `hasTriggerAttempt` make it easier to spot whether a local trial progressed past gated/blocking states.
 - `recent` returns sanitized compact rows and does not include full prompts, secrets, screenshots, files, or unrelated private data.
+
+## 98. Task 120 Landing Notes
+
+- Task 120 adds `conversation_mode.gray_auto_trial_max_triggers_per_session` as an extra controlled-trial safety cap.
+- The default is `1`, so even after all five gray automatic gates are enabled locally, the renderer session stops automatic polling after the first successful automatic trigger.
+- A value of `0` means the local trial is armed but automatic trigger execution is still blocked by `gray_auto_trial_session_limit_reached`.
+- The cap is tracked only in current renderer memory and resets on app/page restart; manual confirmation remains separate and is not blocked by this cap.
+- This task does not enable automatic follow-up by default, does not add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, model/TTS/fetch paths, config writes, dependencies, or mature-product claims.
+
+## 99. Gray Trial Session Cap
+
+The session cap is a safety rail for the first controlled automatic trials:
+
+- `gray_auto_trial_max_triggers_per_session=1` allows at most one successful automatic polling trigger per renderer session.
+- After a successful automatic trigger, the session counter increments and polling is stopped with `gray_auto_trial_session_limit_reached` when the limit is reached.
+- Readiness, scheduler snapshots, preflight, poll event context, and the follow-up status report surface the current count and max.
+- Turning off any one of the five gates still disables automatic polling immediately.
