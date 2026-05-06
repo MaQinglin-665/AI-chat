@@ -1386,3 +1386,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The panel adds `复制诊断` for user-click clipboard export.
 - The diagnostics package is read-only and does not change the local switch flag.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 127. Task 147 Landing Notes
+
+- Task 147 adds a local-only automatic character runtime explicit switch rollback package.
+- DevTools exposes `grayAutoFollowupTrialCharacterAutoRuntimeSwitchRollbackPackage(limit)` and `rollbackGrayAutoFollowupTrialCharacterAutoRuntimeSwitch(reason)`.
+- The readiness panel shows `灰度试运行自动角色表现显式开关回滚包`, including default-off baseline, rollback status, rollbackAt/reason, control status, diagnostics status, steps, and next action.
+- The panel adds `复制回滚` and `回到默认关闭`.
+- The rollback action only clears the local switch flag and records rollback metadata in renderer memory.
+- It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
