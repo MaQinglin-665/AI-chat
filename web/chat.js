@@ -308,6 +308,7 @@ const state = {
   followupReadinessTrialOutcomeCard: null,
   followupReadinessTrialDecisionCard: null,
   followupReadinessTrialSignoffCard: null,
+  followupReadinessTrialCharacterCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -318,6 +319,7 @@ const state = {
   followupReadinessTrialCopyTimelineBtn: null,
   followupReadinessTrialCopyDecisionBtn: null,
   followupReadinessTrialCopySignoffBtn: null,
+  followupReadinessTrialCopyCharacterBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
   followupReadinessManualActions: null,
@@ -4094,6 +4096,112 @@ function buildGrayAutoTrialSignoffPackageText(limit = 48) {
   ].join("\n");
 }
 
+function buildGrayAutoTrialCharacterCuePreview(limit = 48) {
+  const signoff = buildGrayAutoTrialSignoffPackage(limit);
+  const outcome = buildGrayAutoTrialOutcome(limit);
+  const decision = String(signoff.decision || "NO_GO");
+  const outcomeName = String(outcome.outcome || "not_started");
+  const presetByDecision = {
+    REVIEW_AFTER_SUCCESS: {
+      label: "轻轻收尾",
+      mood: "happy",
+      tone: "cooldown",
+      description: "试跑已经有明确结果，角色以低打扰方式收尾和复盘。",
+      sample: "这次结果已经很清楚了，我把它收个尾。"
+    },
+    GO_FOR_WATCHED_TRIAL: {
+      label: "准备接话",
+      mood: "thinking",
+      tone: "ready",
+      description: "如果进入 watched trial，角色会保持低打扰、随时准备轻轻接一句。",
+      sample: "我先在旁边看着，你一声我就接。"
+    },
+    WATCH_ONLY: {
+      label: "观察气氛",
+      mood: "thinking",
+      tone: "watching",
+      description: "当前适合继续观察和整理，不主动推进试运行。",
+      sample: "我先看着，不抢你的节奏。"
+    },
+    NO_GO: {
+      label: "先安静待着",
+      mood: "idle",
+      tone: "quiet",
+      description: "当前不适合进入试跑，角色保持安静与待命。",
+      sample: "我先安静待着，等你准备好了再说。"
+    }
+  };
+  const presetByOutcome = {
+    success: {
+      label: "轻轻庆祝",
+      mood: "happy",
+      tone: "ready",
+      description: "试跑成功后，角色以轻快但不夸张的方式庆祝一下。",
+      sample: "这次跑通了，我轻轻开心一下就好。"
+    },
+    stopped: {
+      label: "安静收口",
+      mood: "neutral",
+      tone: "quiet",
+      description: "Emergency Stop 后角色收口，保持安静待命。",
+      sample: "我先收口，等你确认下一步。"
+    },
+    disarmed: {
+      label: "安静待机",
+      mood: "idle",
+      tone: "idle",
+      description: "Disarm 后角色回到安静待机，不继续推试跑。",
+      sample: "我先回到待机状态。"
+    }
+  };
+  const preset = presetByOutcome[outcomeName]
+    || presetByDecision[decision]
+    || presetByDecision.NO_GO;
+  const runtimeHint = buildFollowupCharacterRuntimeHint({
+    label: preset.label,
+    tone: preset.tone
+  });
+  return {
+    readOnly: true,
+    decision,
+    outcome: outcomeName,
+    label: preset.label,
+    mood: preset.mood,
+    tone: preset.tone,
+    description: preset.description,
+    sample: preset.sample,
+    runtimeHint,
+    stageRecommendation: signoff.stageRecommendation,
+    nextAction: signoff.nextAction,
+    safety: {
+      noEventEmission: true,
+      noRuntimeHintEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noModelCall: true,
+      noFetch: true,
+      noPollingStart: true,
+      noFollowupExecution: true,
+      noConfigWrites: true
+    }
+  };
+}
+
+function buildGrayAutoTrialCharacterCuePreviewText(limit = 48) {
+  const preview = buildGrayAutoTrialCharacterCuePreview(limit);
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u9884\u89c8\uff08\u53ea\u8bfb\uff09",
+    `decision=${preview.decision}  outcome=${preview.outcome}`,
+    `label=${preview.label}  mood=${preview.mood}  tone=${preview.tone}`,
+    `description=${preview.description}`,
+    `sample=${preview.sample}`,
+    `runtimeHint=emotion:${preview.runtimeHint.emotion} action:${preview.runtimeHint.action} intensity:${preview.runtimeHint.intensity} voice_style:${preview.runtimeHint.voice_style} live2d_hint:${preview.runtimeHint.live2d_hint}`,
+    `stageRecommendation=${preview.stageRecommendation}`,
+    `next=${preview.nextAction}`,
+    "\u5b89\u5168\uff1a\u9884\u89c8\u53ea\u8bfb\uff0c\u4e0d\u53d1\u751f\u771f\u5b9e runtime hint\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
+  ].join("\n");
+}
+
 function updateGrayAutoTrialPreRunChecklistCard() {
   if (!state.followupReadinessTrialChecklistCard) {
     return;
@@ -4127,6 +4235,13 @@ function updateGrayAutoTrialSignoffCard() {
     return;
   }
   state.followupReadinessTrialSignoffCard.textContent = buildGrayAutoTrialSignoffPackageText(48);
+}
+
+function updateGrayAutoTrialCharacterCard() {
+  if (!state.followupReadinessTrialCharacterCard) {
+    return;
+  }
+  state.followupReadinessTrialCharacterCard.textContent = buildGrayAutoTrialCharacterCuePreviewText(48);
 }
 
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
@@ -4283,6 +4398,24 @@ async function copyGrayAutoTrialSignoffToClipboard(button = null) {
     return true;
   } catch (_) {
     setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u7b7e\u6536\u5305\u5931\u8d25");
+    return false;
+  }
+}
+
+async function copyGrayAutoTrialCharacterCuePreviewToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialCharacterCuePreviewText(48));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u9884\u89c8\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u89d2\u8272\u9884\u89c8";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u9884\u89c8\u5931\u8d25");
     return false;
   }
 }
@@ -4523,6 +4656,14 @@ function ensureFollowupReadinessPanel() {
   trialCopySignoff.addEventListener("click", () => {
     copyGrayAutoTrialSignoffToClipboard(trialCopySignoff);
   });
+  const trialCopyCharacter = document.createElement("button");
+  trialCopyCharacter.type = "button";
+  trialCopyCharacter.textContent = "\u590d\u5236\u89d2\u8272\u9884\u89c8";
+  trialCopyCharacter.title = "\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u540e\u7684\u53ea\u8bfb\u89d2\u8272\u8868\u73b0\u9884\u89c8";
+  trialCopyCharacter.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef8f2;color:#20513a;cursor:pointer;";
+  trialCopyCharacter.addEventListener("click", () => {
+    copyGrayAutoTrialCharacterCuePreviewToClipboard(trialCopyCharacter);
+  });
   const manualConfirm = document.createElement("button");
   manualConfirm.type = "button";
   manualConfirm.textContent = "\u786e\u8ba4";
@@ -4557,7 +4698,8 @@ function ensureFollowupReadinessPanel() {
     trialCopyAudit,
     trialCopyTimeline,
     trialCopyDecision,
-    trialCopySignoff
+    trialCopySignoff,
+    trialCopyCharacter
   ]);
   const manualStatus = document.createElement("div");
   manualStatus.style.cssText = [
@@ -4691,6 +4833,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#594520"
   ].join(";");
+  const characterCard = document.createElement("pre");
+  characterCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(88,137,111,.26)",
+    "border-radius:14px",
+    "background:rgba(240,255,247,.66)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#1f4c39"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -4715,6 +4868,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(outcomeCard);
   panel.appendChild(decisionCard);
   panel.appendChild(signoffCard);
+  panel.appendChild(characterCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -4727,6 +4881,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialOutcomeCard = outcomeCard;
   state.followupReadinessTrialDecisionCard = decisionCard;
   state.followupReadinessTrialSignoffCard = signoffCard;
+  state.followupReadinessTrialCharacterCard = characterCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -4744,6 +4899,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCopyTimelineBtn = trialCopyTimeline;
   state.followupReadinessTrialCopyDecisionBtn = trialCopyDecision;
   state.followupReadinessTrialCopySignoffBtn = trialCopySignoff;
+  state.followupReadinessTrialCopyCharacterBtn = trialCopyCharacter;
   return panel;
 }
 
@@ -4776,6 +4932,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialOutcomeCard();
       updateGrayAutoTrialDecisionCard();
       updateGrayAutoTrialSignoffCard();
+      updateGrayAutoTrialCharacterCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -4793,6 +4950,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialOutcomeCard();
   updateGrayAutoTrialDecisionCard();
   updateGrayAutoTrialSignoffCard();
+  updateGrayAutoTrialCharacterCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -10165,6 +10323,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialOutcome: (limit) => buildGrayAutoTrialOutcome(limit),
     grayAutoFollowupTrialGoNoGoDecision: (limit) => buildGrayAutoTrialGoNoGoDecision(limit),
     grayAutoFollowupTrialSignoffPackage: (limit) => buildGrayAutoTrialSignoffPackage(limit),
+    grayAutoFollowupTrialCharacterCuePreview: (limit) => buildGrayAutoTrialCharacterCuePreview(limit),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({

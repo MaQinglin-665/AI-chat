@@ -1505,3 +1505,17 @@ Manual checks:
 5. Confirm `approvedForNextPhase=false` by default.
 6. Click `复制签收`, paste into a scratch note, and confirm it includes manual checklist items and sign-off placeholders.
 7. Confirm sign-off rendering and copy do not emit new events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 82. Gray Automatic Follow-up Trial Character Cue Preview v1
+
+Purpose: confirm local testers can preview the role-expression cue that would match the visible gray trial result without emitting real role behavior.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行角色表现预览` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterCuePreview()`.
+4. Confirm the result has `readOnly=true`, `decision`, `outcome`, `label`, `mood`, `tone`, `sample`, `runtimeHint`, and `safety`.
+5. With default/no trial state, confirm it recommends a quiet/watch-only cue rather than approving automatic behavior.
+6. Click `复制角色预览`, paste into a scratch note, and confirm it includes the preview label, mood/tone, sample line, runtime-hint-shaped fields, stage recommendation, and next action.
+7. Confirm preview rendering and copy do not call `maybeEmitFollowupCharacterRuntimeHint()`, emit new events, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

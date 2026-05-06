@@ -1259,3 +1259,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The readiness panel shows `灰度试运行签收包`, including trial id, decision, outcome, stage recommendation, missing required items, root causes, manual sign-off checklist, and notes placeholders.
 - The sign-off package is read-only and does not approve the next phase automatically.
 - Clipboard export requires a user click and does not emit events, arm/disarm/stop/reset, start polling, execute follow-up, call model/TTS/fetch, write config, mutate pending state, or change scheduler behavior.
+
+## 114. Task 134 Landing Notes
+
+- Task 134 adds a read-only gray trial character cue preview.
+- DevTools exposes `grayAutoFollowupTrialCharacterCuePreview(limit)`.
+- The readiness panel shows `灰度试运行角色表现预览`, including decision, outcome, label, mood, tone, sample line, and runtime-hint-shaped preview data.
+- The preview uses existing sign-off and outcome data to describe what role expression would be appropriate after the visible trial state.
+- The preview intentionally does not call `maybeEmitFollowupCharacterRuntimeHint()`, move Live2D, send TTS, arm/disarm/stop/reset, start polling, execute follow-up, call model/fetch, write config, mutate pending state, or change scheduler behavior.
+- Clipboard export requires a user click and only copies the preview text.
