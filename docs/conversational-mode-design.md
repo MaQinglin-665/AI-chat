@@ -1286,3 +1286,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The helper reuses existing `handleCharacterRuntimeMetadata()` so the test follows the same character runtime metadata path as normal metadata updates.
 - Each successful manual emit records `conversation_followup_gray_auto_trial_character_cue_manual_emit` and updates in-memory manual emit status.
 - This task can cause a visible character runtime update after explicit confirmation, but it does not request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 117. Task 137 Landing Notes
+
+- Task 137 adds a read-only manual character cue emit recap.
+- DevTools exposes `grayAutoFollowupTrialCharacterCueManualEmitRecap(limit)`.
+- The readiness panel shows `灰度试运行角色 cue 试发回看`, including emit status, count, latest cue metadata, recent manual emit events, summary, and next action.
+- The panel adds `复制回看` for user-click clipboard export.
+- The recap only reads current renderer memory and existing debug events; it does not emit a new runtime cue.
+- It does not request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.

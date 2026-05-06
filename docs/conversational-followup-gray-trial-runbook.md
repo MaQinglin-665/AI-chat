@@ -27,6 +27,7 @@ d.grayAutoFollowupTrialSignoffPackage();
 d.grayAutoFollowupTrialCharacterCuePreview();
 d.grayAutoFollowupTrialCharacterCueHandoffChecklist();
 d.grayAutoFollowupTrialCharacterCueManualEmitStatus();
+d.grayAutoFollowupTrialCharacterCueManualEmitRecap();
 d.emitGrayAutoFollowupTrialCharacterCue({ confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE" });
 d.followupReadiness();
 ```
@@ -53,6 +54,7 @@ The follow-up readiness panel now includes a controlled gray trial operation are
 - `复制时间线` copies the recent gray trial control and polling event timeline.
 - `复制角色预览` copies the read-only character cue preview after an explicit user click.
 - `复制接入检查` copies the read-only character cue handoff checklist after an explicit user click.
+- `复制回看` copies the latest manual character cue emit recap after an explicit user click.
 - `试发角色cue` requires the exact `EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE` phrase and emits the current preview runtime cue once.
 
 Use the panel controls only during a local controlled test. `Arm 试运行` can open the existing in-memory trial gates, so keep the app watched and use `Emergency Stop` first if anything feels wrong. `试发角色cue` can send one character runtime metadata update after confirmation, so use it only when you are watching the character. The buttons do not write config, add desktop observation, capture screenshots, read files, execute shell commands, call tools, call backend APIs, request LLM output, play TTS, start polling, or trigger follow-up.
@@ -75,6 +77,8 @@ The character cue preview is intentionally one step before real role behavior. I
 The handoff checklist is also preview-only. It checks read-only boundaries, metadata shape, Go/No-Go visibility, manual sign-off state, and scheduler isolation, but it always keeps `readyForRuntimeEmission=false`.
 
 The manual emit gate is the first controlled bridge from preview data into real character runtime metadata. It requires the exact confirmation phrase every time, records one audit event, and keeps automatic emission closed.
+
+The manual emit recap is read-only. It summarizes the in-memory emit count, latest cue metadata, recent manual emit events, and the next review step, but it does not emit another cue.
 
 Arm only during a local controlled test:
 
