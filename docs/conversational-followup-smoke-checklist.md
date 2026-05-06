@@ -1230,3 +1230,20 @@ Manual checks:
 4. Inspect `window.__AI_CHAT_DEBUG_TTS__.events().slice(-10)` and confirm one `conversation_followup_gray_auto_dry_run_checked` event appears.
 5. Confirm the event contains compact status values such as `status`, `would_poll`, `would_trigger`, and blocked reason summary, not full prompts or private data.
 6. Confirm the event does not correspond to polling start, scheduler tick, model request, TTS, fetch, screenshot, tool call, shell execution, file access, backend API, config write, pending mutation, or new dependency.
+
+## 63. Gray Automatic Follow-up Dry-run Checkpoint
+
+Purpose: confirm the gray preparation slice is complete before any controlled automatic trial work.
+
+Review checks:
+
+1. Confirm Tasks 111-114 are documented and present in task docs.
+2. Confirm `conversation_mode.gray_auto_enabled=false` remains the default.
+3. Confirm automatic polling requires all four gates: `enabled`, `proactive_enabled`, `proactive_scheduler_enabled`, and `gray_auto_enabled`.
+4. Confirm `grayAutoFollowupReadiness()` is read-only and does not start polling or execute follow-up.
+5. Confirm `grayAutoFollowupDryRun()` is read-only and does not call `runProactiveSchedulerManualTick()` or `runConversationFollowup`.
+6. Confirm explicit dry-run calls emit `conversation_followup_gray_auto_dry_run_checked`, while panel refresh does not spam events.
+7. Confirm dry-run event payloads stay compact and do not include full prompts, secrets, screenshots, files, or unrelated private data.
+8. Confirm manual confirmation remains the primary user-facing execution path.
+9. Confirm next-stage controlled automatic trial work is local/test-only, opt-in, fail-closed, observable, rate-limited, and reversible.
+10. Confirm next-stage work still excludes default-on behavior, desktop observation, screenshots, tool calls, shell execution, file access, config writes, backend APIs, new dependencies, and mature-product claims.
