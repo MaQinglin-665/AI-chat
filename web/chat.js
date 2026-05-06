@@ -303,6 +303,13 @@ const state = {
   followupReadinessCard: null,
   followupReadinessConfirmationCard: null,
   followupReadinessTrialCard: null,
+  followupReadinessTrialActions: null,
+  followupReadinessTrialStatus: null,
+  followupReadinessTrialArmBtn: null,
+  followupReadinessTrialStopBtn: null,
+  followupReadinessTrialDisarmBtn: null,
+  followupReadinessTrialResetBtn: null,
+  followupReadinessTrialCopyAuditBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
   followupReadinessManualActions: null,
@@ -640,6 +647,7 @@ function buildGrayAutoTrialRunbook() {
       stop: "window.__AI_CHAT_DEBUG_TTS__.stopGrayAutoFollowupTrial(\"manual_stop\")",
       disarm: "window.__AI_CHAT_DEBUG_TTS__.disarmGrayAutoFollowupTrial(\"manual_disarm\")",
       reset: "window.__AI_CHAT_DEBUG_TTS__.resetGrayAutoFollowupTrialSession()",
+      audit: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialAuditSummary()",
       statusReport: "window.__AI_CHAT_DEBUG_TTS__.followupReadiness()"
     },
     steps: [
@@ -3535,6 +3543,175 @@ function updateGrayAutoTrialStatusCard() {
   state.followupReadinessTrialCard.textContent = buildGrayAutoTrialStatusCardText();
 }
 
+function buildGrayAutoTrialAuditSummary(limit = 24) {
+  const snapshot = getTTSDebugSnapshot();
+  const mode = snapshot.conversationMode || {};
+  const scheduler = snapshot.proactiveScheduler || {};
+  const safeLimit = Number.isFinite(Number(limit))
+    ? Math.max(4, Math.min(80, Math.round(Number(limit))))
+    : 24;
+  const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
+  const session = buildGrayAutoTrialSessionState();
+  const events = buildGrayAutoFollowupTrialEventSummary(safeLimit);
+  return {
+    readOnly: true,
+    generatedAt: Date.now(),
+    status: preflight.status,
+    armed: mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true,
+    polling: scheduler.pollTimerActive === true,
+    session,
+    dryRun: preflight.dryRun,
+    blockedReasons: Array.isArray(preflight.dryRun?.blockedReasons)
+      ? preflight.dryRun.blockedReasons.slice()
+      : [],
+    events,
+    safety: {
+      defaultOffRequired: true,
+      explicitArmConfirmationRequired: true,
+      resetConfirmationRequired: true,
+      emergencyStopAvailable: true,
+      noDesktopObservation: true,
+      noFileAccess: true,
+      noToolCalls: true,
+      noConfigWrites: true,
+      noModelOrTtsCall: true
+    }
+  };
+}
+
+function buildGrayAutoTrialAuditSummaryText(limit = 24) {
+  const audit = buildGrayAutoTrialAuditSummary(limit);
+  const recent = Array.isArray(audit.events?.recent) ? audit.events.recent.slice(-12) : [];
+  const eventLines = recent.length
+    ? recent.map((event) => [
+      `#${event.seq}`,
+      event.stage,
+      `trial=${event.trialStatus || "none"}`,
+      `wouldPoll=${event.wouldPoll ? "true" : "false"}`,
+      `wouldTrigger=${event.wouldTrigger ? "true" : "false"}`,
+      event.blocked ? `blocked=${event.blocked}` : ""
+    ].filter(Boolean).join(" | "))
+    : ["none"];
+  return [
+    "\u7070\u5ea6\u81ea\u52a8\u8bd5\u8fd0\u884c\u5ba1\u8ba1\u6458\u8981\uff08\u53ea\u8bfb\uff09",
+    `status=${audit.status}  armed=${audit.armed ? "true" : "false"}  polling=${audit.polling ? "true" : "false"}`,
+    `session=${audit.session.count}/${audit.session.max}  remaining=${audit.session.remaining}  reached=${audit.session.reached ? "true" : "false"}`,
+    `wouldPoll=${audit.dryRun?.wouldPollCheck === true ? "true" : "false"}  wouldTrigger=${audit.dryRun?.wouldAttemptTrigger === true ? "true" : "false"}`,
+    `blocked=${joinReadinessReasons(audit.blockedReasons)}`,
+    `events=${audit.events?.totalPollEvents || 0}  last=${audit.events?.last?.stage || "none"}/${audit.events?.lastTrialStatus || "none"}`,
+    "",
+    "\u6700\u8fd1\u4e8b\u4ef6",
+    ...eventLines,
+    "",
+    "\u5b89\u5168\u8fb9\u754c",
+    "\u9ed8\u8ba4\u5173\u95ed\uff1bArm/Reset \u9700\u8981\u786e\u8ba4\u77ed\u8bed\uff1b\u4e0d\u5199\u914d\u7f6e\u3001\u4e0d\u622a\u56fe\u3001\u4e0d\u8bfb\u6587\u4ef6\u3001\u4e0d\u8c03\u5de5\u5177\u3001\u4e0d\u6267\u884c\u547d\u4ee4\u3002"
+  ].join("\n");
+}
+
+function promptGrayAutoTrialPhrase(phrase, actionLabel) {
+  if (typeof window === "undefined" || typeof window.prompt !== "function") {
+    return false;
+  }
+  const input = window.prompt(`${actionLabel}\n\nType ${phrase} to continue.`, "");
+  return String(input || "").trim() === phrase;
+}
+
+function updateGrayAutoTrialControlPanel() {
+  const statusNode = state.followupReadinessTrialStatus;
+  if (!statusNode) {
+    return;
+  }
+  const snapshot = getTTSDebugSnapshot();
+  const mode = snapshot.conversationMode || {};
+  const scheduler = snapshot.proactiveScheduler || {};
+  const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
+  const session = buildGrayAutoTrialSessionState();
+  const armed = mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true;
+  const polling = scheduler.pollTimerActive === true;
+  statusNode.textContent = [
+    `\u8bd5\u8fd0\u884c\u63a7\u5236\uff1astatus=${preflight.status} armed=${armed ? "true" : "false"} polling=${polling ? "true" : "false"}`,
+    `session=${session.count}/${session.max} remaining=${session.remaining} blocked=${explainReadinessReasons(preflight.dryRun?.blockedReasons || preflight.gateBlockedReasons)}`,
+    "\u63d0\u793a\uff1aArm \u548c Reset \u9700\u8981\u8f93\u5165\u786e\u8ba4\u77ed\u8bed\uff1bStop/Disarm \u662f\u5b89\u5168\u6536\u53e3\u52a8\u4f5c\u3002"
+  ].join("\n");
+  if (state.followupReadinessTrialArmBtn) {
+    state.followupReadinessTrialArmBtn.disabled = armed;
+  }
+  if (state.followupReadinessTrialDisarmBtn) {
+    state.followupReadinessTrialDisarmBtn.disabled = !armed && !polling;
+  }
+  if (state.followupReadinessTrialResetBtn) {
+    state.followupReadinessTrialResetBtn.disabled = session.count <= 0 && session.reached !== true;
+  }
+}
+
+function handleGrayAutoTrialArmClick(button = null) {
+  if (!promptGrayAutoTrialPhrase("ARM_GRAY_AUTO_TRIAL", "\u542f\u52a8\u672c\u5730\u53d7\u63a7\u7070\u5ea6\u81ea\u52a8\u8bd5\u8fd0\u884c")) {
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c Arm \u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
+    return false;
+  }
+  const result = armGrayAutoTrialSession({ confirm: "ARM_GRAY_AUTO_TRIAL" });
+  updateFollowupReadinessPanel();
+  setStatus(result?.ok === true
+    ? "\u7070\u5ea6\u8bd5\u8fd0\u884c\u5df2 Arm\uff08\u4ec5\u672c\u5730\u5185\u5b58\uff09"
+    : `\u7070\u5ea6\u8bd5\u8fd0\u884c Arm \u5931\u8d25\uff1a${result?.reason || "unknown"}`);
+  if (button) {
+    button.blur();
+  }
+  return result?.ok === true;
+}
+
+function handleGrayAutoTrialStopClick(button = null) {
+  const result = stopGrayAutoTrialSession("panel_emergency_stop");
+  updateFollowupReadinessPanel();
+  setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u5df2 Emergency Stop\uff0c\u672c\u6b21 session \u5df2\u5c01\u53e3");
+  if (button) {
+    button.blur();
+  }
+  return result;
+}
+
+function handleGrayAutoTrialDisarmClick(button = null) {
+  const result = disarmGrayAutoTrialSession("panel_disarm");
+  updateFollowupReadinessPanel();
+  setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u5df2 Disarm\uff0c\u5185\u5b58\u95e8\u7981\u5df2\u5173\u95ed");
+  if (button) {
+    button.blur();
+  }
+  return result;
+}
+
+function handleGrayAutoTrialResetClick(button = null) {
+  if (!promptGrayAutoTrialPhrase("RESET_GRAY_AUTO_TRIAL_SESSION", "\u91cd\u7f6e\u672c\u6b21\u7070\u5ea6\u8bd5\u8fd0\u884c\u8ba1\u6570")) {
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c Reset \u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
+    return false;
+  }
+  const result = resetGrayAutoTrialSessionTriggerCount();
+  updateFollowupReadinessPanel();
+  setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c session \u8ba1\u6570\u5df2\u91cd\u7f6e\uff08\u4e0d\u542f\u52a8 polling\uff09");
+  if (button) {
+    button.blur();
+  }
+  return result?.reset === true;
+}
+
+async function copyGrayAutoTrialAuditSummaryToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialAuditSummaryText(30));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u5ba1\u8ba1\u6458\u8981\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u5ba1\u8ba1";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u5ba1\u8ba1\u6458\u8981\u5931\u8d25");
+    return false;
+  }
+}
+
 function updateFollowupReadinessScenarioCompare() {
   if (!state.followupReadinessCompare) {
     return;
@@ -3707,6 +3884,46 @@ function ensureFollowupReadinessPanel() {
   clearRehearsal.addEventListener("click", () => {
     clearFollowupReadinessPanelRehearsal(clearRehearsal);
   });
+  const trialArm = document.createElement("button");
+  trialArm.type = "button";
+  trialArm.textContent = "Arm \u8bd5\u8fd0\u884c";
+  trialArm.title = "\u9700\u8981\u8f93\u5165 ARM_GRAY_AUTO_TRIAL\uff1b\u53ea\u4fee\u6539\u672c\u5730\u5185\u5b58\u95e8\u7981";
+  trialArm.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff3d8;color:#694411;cursor:pointer;";
+  trialArm.addEventListener("click", () => {
+    handleGrayAutoTrialArmClick(trialArm);
+  });
+  const trialStop = document.createElement("button");
+  trialStop.type = "button";
+  trialStop.textContent = "Emergency Stop";
+  trialStop.title = "\u7acb\u523b\u5c01\u53e3\u672c\u6b21\u8bd5\u8fd0\u884c session";
+  trialStop.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#ffe6e3;color:#7b221d;cursor:pointer;";
+  trialStop.addEventListener("click", () => {
+    handleGrayAutoTrialStopClick(trialStop);
+  });
+  const trialDisarm = document.createElement("button");
+  trialDisarm.type = "button";
+  trialDisarm.textContent = "Disarm";
+  trialDisarm.title = "\u5173\u95ed\u672c\u5730\u5185\u5b58\u7070\u5ea6\u95e8\u7981\u5e76\u505c\u6b62 polling";
+  trialDisarm.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e9f2ff;color:#1f4378;cursor:pointer;";
+  trialDisarm.addEventListener("click", () => {
+    handleGrayAutoTrialDisarmClick(trialDisarm);
+  });
+  const trialReset = document.createElement("button");
+  trialReset.type = "button";
+  trialReset.textContent = "Reset Session";
+  trialReset.title = "\u9700\u8981\u8f93\u5165 RESET_GRAY_AUTO_TRIAL_SESSION\uff1b\u4e0d\u542f\u52a8 polling";
+  trialReset.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1f4fb;color:#33415f;cursor:pointer;";
+  trialReset.addEventListener("click", () => {
+    handleGrayAutoTrialResetClick(trialReset);
+  });
+  const trialCopyAudit = document.createElement("button");
+  trialCopyAudit.type = "button";
+  trialCopyAudit.textContent = "\u590d\u5236\u5ba1\u8ba1";
+  trialCopyAudit.title = "\u590d\u5236\u672c\u6b21\u7070\u5ea6\u8bd5\u8fd0\u884c\u7684\u7b80\u8981\u5ba1\u8ba1\u6458\u8981";
+  trialCopyAudit.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef4ff;color:#263d70;cursor:pointer;";
+  trialCopyAudit.addEventListener("click", () => {
+    copyGrayAutoTrialAuditSummaryToClipboard(trialCopyAudit);
+  });
   const manualConfirm = document.createElement("button");
   manualConfirm.type = "button";
   manualConfirm.textContent = "\u786e\u8ba4";
@@ -3733,6 +3950,13 @@ function ensureFollowupReadinessPanel() {
     manualDismiss,
     manualReview
   ]);
+  const trialActions = createFollowupReadinessActionGroup("\u8bd5\u8fd0\u884c", [
+    trialArm,
+    trialStop,
+    trialDisarm,
+    trialReset,
+    trialCopyAudit
+  ]);
   const manualStatus = document.createElement("div");
   manualStatus.style.cssText = [
     "margin:0 0 10px",
@@ -3742,6 +3966,17 @@ function ensureFollowupReadinessPanel() {
     "background:rgba(255,255,255,.58)",
     "font:12px/1.45 system-ui,sans-serif",
     "color:#2a416f"
+  ].join(";");
+  const trialStatus = document.createElement("div");
+  trialStatus.style.cssText = [
+    "margin:0 0 10px",
+    "padding:8px 10px",
+    "border:1px solid rgba(116,127,155,.22)",
+    "border-radius:12px",
+    "background:rgba(248,251,255,.66)",
+    "font:12px/1.45 system-ui,sans-serif",
+    "color:#30466f",
+    "white-space:pre-wrap"
   ].join(";");
   const close = document.createElement("button");
   close.type = "button";
@@ -3754,6 +3989,7 @@ function ensureFollowupReadinessPanel() {
   head.appendChild(title);
   head.appendChild(close);
   actionBar.appendChild(manualActions);
+  actionBar.appendChild(trialActions);
   actionBar.appendChild(createFollowupReadinessActionGroup("\u9884\u6f14", rehearsalButtons.concat(clearRehearsal)));
   actionBar.appendChild(createFollowupReadinessActionGroup("\u590d\u5236", [
     copySelected,
@@ -3813,6 +4049,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(head);
   panel.appendChild(actionBar);
   panel.appendChild(manualStatus);
+  panel.appendChild(trialStatus);
   panel.appendChild(card);
   panel.appendChild(confirmationCard);
   panel.appendChild(trialCard);
@@ -3830,6 +4067,13 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessManualConfirmBtn = manualConfirm;
   state.followupReadinessManualDismissBtn = manualDismiss;
   state.followupReadinessManualReviewBtn = manualReview;
+  state.followupReadinessTrialActions = trialActions;
+  state.followupReadinessTrialStatus = trialStatus;
+  state.followupReadinessTrialArmBtn = trialArm;
+  state.followupReadinessTrialStopBtn = trialStop;
+  state.followupReadinessTrialDisarmBtn = trialDisarm;
+  state.followupReadinessTrialResetBtn = trialReset;
+  state.followupReadinessTrialCopyAuditBtn = trialCopyAudit;
   return panel;
 }
 
@@ -3857,6 +4101,7 @@ function updateFollowupReadinessPanel() {
       updateFollowupReadinessPreviewCard();
       updateFollowupManualConfirmationPreviewCard();
       updateGrayAutoTrialStatusCard();
+      updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
       if (state.followupReadinessBody) {
@@ -3868,6 +4113,7 @@ function updateFollowupReadinessPanel() {
   updateFollowupReadinessPreviewCard();
   updateFollowupManualConfirmationPreviewCard();
   updateGrayAutoTrialStatusCard();
+  updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
   if (state.followupReadinessBody) {
@@ -9233,6 +9479,7 @@ function installTTSDebugBridge() {
     armGrayAutoFollowupTrial: (input) => armGrayAutoTrialSession(input),
     disarmGrayAutoFollowupTrial: (reason) => disarmGrayAutoTrialSession(reason),
     grayAutoFollowupTrialRunbook: () => buildGrayAutoTrialRunbook(),
+    grayAutoFollowupTrialAuditSummary: (limit) => buildGrayAutoTrialAuditSummary(limit),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({
