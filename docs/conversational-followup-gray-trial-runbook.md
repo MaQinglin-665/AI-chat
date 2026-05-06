@@ -154,3 +154,14 @@ The explicit switch control skeleton is also read-only from the perspective of r
 The explicit switch diagnostics package is read-only. It explains why the local switch control is blocked and what to check next, but it does not change the local switch flag and still keeps automatic runtime disconnected.
 
 The explicit switch rollback package is local-only. It provides a safe path back to default-off and records rollbackAt/Reason in renderer memory only. If the local switch was enabled, use the rollback action to clear it; if you only need a blank in-memory slate, restart the app. The rollback path does not write config, does not touch scheduler state, and does not connect automatic runtime.
+
+## Separate Implementation Draft Addendum
+
+The follow-up readiness panel now also exposes `grayAutoFollowupTrialCharacterAutoRuntimeSeparateImplementationDraft()` as a read-only handoff skeleton for the later automatic character runtime task.
+
+```js
+const d = window.__AI_CHAT_DEBUG_TTS__;
+d.grayAutoFollowupTrialCharacterAutoRuntimeSeparateImplementationDraft();
+```
+
+`复制草案` copies the skeleton after an explicit user click. The draft stays one step before actual implementation: it names later touch points, preserves the default-off boundary, and does not connect automatic runtime, write config, change scheduler defaults, emit runtime cues, move Live2D, or play TTS.

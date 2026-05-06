@@ -1395,3 +1395,11 @@ The reset helper exists to speed up local trial verification without restarting 
 - The panel adds `复制回滚` and `回到默认关闭`.
 - The rollback action only clears the local switch flag and records rollback metadata in renderer memory.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 128. Task 149 Landing Notes
+
+- Task 149 adds a read-only separate implementation draft for the future automatic character runtime task.
+- DevTools exposes `grayAutoFollowupTrialCharacterAutoRuntimeSeparateImplementationDraft(limit)`.
+- The readiness panel shows `灰度试运行自动角色表现实现草案`, including later touch points (`web/chat.js`, `app.py`, `character_runtime.py`, `config.py`, `config.example.json`), hard safety boundaries, and a future verification checklist.
+- The panel adds `复制草案` for user-click clipboard export.
+- The draft keeps default-off, does not write config, does not connect automatic runtime, does not change scheduler defaults, and does not emit runtime cues, move Live2D, or play TTS.
