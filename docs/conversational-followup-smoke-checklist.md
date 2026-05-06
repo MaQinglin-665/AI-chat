@@ -1661,3 +1661,17 @@ Manual checks:
 5. Confirm the package lists default-off, wrong-confirm no-op, explicit switch-only, single-session cap, Emergency Stop/Disarm, scheduler/config non-mutation, privacy boundary, and runtime-emission-not-connected checks.
 6. Click `复制验收`, paste into a scratch note, and confirm it includes acceptance checks, blockers, and next action.
 7. Confirm acceptance rendering and copy do not implement a switch, emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 93. Gray Automatic Follow-up Trial Character Auto Runtime Explicit Switch Control Skeleton v1
+
+Purpose: confirm local testers can inspect and toggle the explicit switch local flag without connecting automatic character runtime.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行自动角色表现显式开关控制` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterAutoRuntimeSwitchControl()`.
+4. Confirm the result has `readOnly=true`, `status`, `enabled`, `canEnable`, `canDisable`, `switchKey`, `requiredConfirm`, `blockedReasons`, `acceptanceStatus`, `acceptanceGoNoGo`, `manualVerificationRequired`, `autoRuntimeConnected=false`, `nextAction`, and `safety`.
+5. Confirm the enable path requires `ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH` and remains blocked until the acceptance package is ready.
+6. Click `复制状态`, paste into a scratch note, and confirm it includes current local flag state, blockers, and next action.
+7. Confirm control rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
