@@ -465,3 +465,11 @@
 - The readiness panel renders a role-expression preview for the visible gray trial decision and outcome.
 - The preview builds a runtime-hint-shaped object only for inspection and copy.
 - It does not call `maybeEmitFollowupCharacterRuntimeHint()`, emit events, move Live2D, play TTS, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 45. Task 135 Gray Trial Character Cue Handoff Checklist Note
+
+- Task 135 adds `grayAutoFollowupTrialCharacterCueHandoffChecklist(limit)` as a read-only DevTools helper.
+- The readiness panel renders a pre-handoff checklist for a later explicit role-expression implementation task.
+- The checklist inspects preview read-only boundaries, runtime metadata shape, Go/No-Go visibility, manual sign-off state, recent runtime hint pressure, and scheduler isolation.
+- It may mark implementation planning as ready, but it always keeps `readyForRuntimeEmission=false`.
+- It does not call `maybeEmitFollowupCharacterRuntimeHint()`, emit events, move Live2D, play TTS, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
