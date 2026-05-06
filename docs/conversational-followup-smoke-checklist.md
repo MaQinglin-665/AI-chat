@@ -1633,3 +1633,17 @@ Manual checks:
 5. Confirm at least one required item blocks the switch plan while the actual switch remains unimplemented.
 6. Click `澶嶅埗寮€鍏宠鍒`, paste into a scratch note, and confirm it includes proposed switch key, baseline, requirements, blocking items, runtime states, and next action.
 7. Confirm switch-plan rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 91. Gray Automatic Follow-up Trial Character Auto Runtime Explicit Switch Review Package v1
+
+Purpose: confirm local testers can review whether the explicit switch plan is ready for a separate implementation task without enabling automatic character runtime.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行自动角色表现显式开关评审包` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterAutoRuntimeExplicitSwitchReviewPackage()`.
+4. Confirm the result has `readOnly=true`, `status`, `goNoGo`, `switchPlanStatus`, `switchPlanDefault`, `strategyGoNoGo`, `dryRunStatus`, `dryRunWouldSelectRule`, `planStatus`, `requirements`, `blockingRequired`, `missing`, `nextAction`, and `safety`.
+5. Confirm the package reports blockers until the explicit switch remains a separate, read-only task.
+6. Click `复制评审`, paste into a scratch note, and confirm it includes switch plan status, Go/No-Go, blocking items, missing items, and next action.
+7. Confirm review rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
