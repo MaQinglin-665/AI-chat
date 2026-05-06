@@ -1151,3 +1151,22 @@ The session cap is a safety rail for the first controlled automatic trials:
 - After a successful automatic trigger, the session counter increments and polling is stopped with `gray_auto_trial_session_limit_reached` when the limit is reached.
 - Readiness, scheduler snapshots, preflight, poll event context, and the follow-up status report surface the current count and max.
 - Turning off any one of the five gates still disables automatic polling immediately.
+
+## 100. Task 121 Landing Notes
+
+- Task 121 adds DevTools helpers for the gray trial session cap:
+  - `grayAutoFollowupTrialSession()`
+  - `resetGrayAutoFollowupTrialSession()`
+- The session helper reports current count, max, remaining triggers, and whether `gray_auto_trial_session_limit_reached` is active.
+- The reset helper only resets the in-memory renderer session counter and records one compact `conversation_followup_gray_auto_trial_session_reset` event.
+- Reset does not restart polling, enable gates, execute follow-up, call model/TTS/fetch, write config, or mutate pending state.
+- Manual confirmation remains separately guarded and is not affected by the automatic trial session cap.
+
+## 101. Gray Trial Session Reset
+
+The reset helper exists to speed up local trial verification without restarting the whole app:
+
+- Use it only after an explicit local test decision.
+- It resets the renderer-memory count from the previous value to `0`.
+- It returns `pollingRestarted=false` to make clear it does not arm or start automatic polling.
+- If testers want polling to run again, the normal five gates and existing scheduler lifecycle still control that separately.
