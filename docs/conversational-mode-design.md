@@ -1350,3 +1350,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The plan summarizes the proposed switch key, default-off baseline, explicit config gate requirement, separate runtime task requirement, review readiness, dry-run selection status, single-session cap expectation, emergency stop/disarm availability, and next action.
 - It keeps automatic runtime disabled and never implements the actual switch.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 123. Task 143 Landing Notes
+
+- Task 143 adds a read-only automatic character runtime explicit switch review package.
+- DevTools exposes `grayAutoFollowupTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit)`.
+- The readiness panel shows `灰度试运行自动角色表现显式开关评审包`, including explicit switch plan status, Go/No-Go, default-off baseline, strategy review readiness, dry-run selection status, safety plan readiness, blockers, and next action.
+- The panel adds `复制评审` for user-click clipboard export.
+- The review package stays read-only and does not implement the actual automatic switch.
+- It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
