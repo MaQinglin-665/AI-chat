@@ -142,3 +142,5 @@ d.disarmGrayAutoFollowupTrial("rollback");
 ```
 
 Restart the app if you want to clear all renderer-memory trial state.
+
+The explicit switch plan is also read-only. It stays one step before any actual automatic runtime implementation and only documents the required gates for a later explicit task. It does not change scheduler behavior, does not write config, and does not enable runtime.

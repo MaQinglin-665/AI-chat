@@ -315,6 +315,7 @@ const state = {
   followupReadinessTrialCharacterReviewCard: null,
   followupReadinessTrialCharacterAutoPlanCard: null,
   followupReadinessTrialCharacterDryRunCard: null,
+  followupReadinessTrialCharacterSwitchPlanCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -332,6 +333,7 @@ const state = {
   followupReadinessTrialCopyCharacterReviewBtn: null,
   followupReadinessTrialCopyCharacterAutoPlanBtn: null,
   followupReadinessTrialCopyCharacterDryRunBtn: null,
+  followupReadinessTrialCopyCharacterSwitchPlanBtn: null,
   followupReadinessTrialEmitCharacterBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
@@ -4804,6 +4806,127 @@ function buildGrayAutoTrialCharacterAutoRuntimeDryRunText(limit = 24) {
   ].join("\n");
 }
 
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit = 24) {
+  const plan = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
+  const dryRun = buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit);
+  const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
+  const session = buildGrayAutoTrialSessionState();
+  const requirements = [
+    {
+      key: "default_off_baseline",
+      label: "\u9ed8\u8ba4\u5173\u95ed\u57fa\u7ebf",
+      ok: true,
+      required: true,
+      note: "\u5f53\u524d\u4efb\u52a1\u4e0d\u65b0\u589e\u914d\u7f6e\u5f00\u5173\uff0c\u4e5f\u4e0d\u6539\u4efb\u4f55\u9ed8\u8ba4\u503c\u3002"
+    },
+    {
+      key: "explicit_config_switch",
+      label: "\u9700\u8981\u663e\u5f0f\u914d\u7f6e\u5f00\u5173",
+      ok: false,
+      required: true,
+      note: "\u672a\u6765\u5fc5\u987b\u6709\u72ec\u7acb\u914d\u7f6e\u9879\u6216\u540c\u7b49\u663e\u5f0f\u5f00\u5173\uff0c\u4e0d\u5141\u8bb8\u968f\u7070\u5ea6\u8bd5\u8fd0\u884c\u9690\u5f0f\u5f00\u542f\u3002"
+    },
+    {
+      key: "separate_runtime_task",
+      label: "\u9700\u8981\u72ec\u7acb runtime \u63a5\u5165\u4efb\u52a1",
+      ok: false,
+      required: true,
+      note: "\u6b64\u5904\u53ea\u5b9a\u4e49\u5f00\u5173\u95e8\u7981\uff0c\u4e0d\u628a dry-run \u63a5\u5230\u81ea\u52a8\u53d1\u5c04\u8def\u5f84\u3002"
+    },
+    {
+      key: "review_package_ready",
+      label: "\u7b56\u7565\u8bc4\u5ba1\u5305\u5148\u8fbe\u5230 Go",
+      ok: review.goNoGo === "READY_FOR_SEPARATE_IMPLEMENTATION_TASK",
+      required: true,
+      note: "\u53ea\u6709\u8bc4\u5ba1\u5305\u8ba4\u4e3a\u53ef\u4ee5\u8fdb\u5165\u72ec\u7acb\u5b9e\u73b0\u4efb\u52a1\u65f6\uff0c\u624d\u80fd\u7ee7\u7eed\u8003\u8651\u5f00\u5173\u63a5\u5165\u3002"
+    },
+    {
+      key: "dry_run_selects_rule",
+      label: "dry-run \u80fd\u9009\u4e2d\u89c4\u5219",
+      ok: dryRun.wouldSelectRule === true,
+      required: true,
+      note: "\u5148\u8bc1\u660e\u53ea\u8bfb dry-run \u53ef\u7a33\u5b9a\u9009\u89c4\u5219\uff1b\u5373\u4f7f\u901a\u8fc7\uff0c\u672c\u4efb\u52a1\u4ecd\u4fdd\u6301 wouldEmit=false\u3002"
+    },
+    {
+      key: "single_session_cap",
+      label: "\u5355\u4f1a\u8bdd\u4e0a\u9650\u7ee7\u7eed\u751f\u6548",
+      ok: Number(session.max || 0) === 1,
+      required: true,
+      note: "\u9996\u6b21\u771f\u6b63\u63a5\u5165\u65f6\u5fc5\u987b\u7ee7\u7eed\u53d7\u5355\u4f1a\u8bdd\u4e0a\u9650\u4fdd\u62a4\u3002"
+    },
+    {
+      key: "manual_stop_available",
+      label: "Emergency Stop / Disarm \u4fdd\u6301\u53ef\u7528",
+      ok: true,
+      required: true,
+      note: "\u4efb\u4f55\u8bd5\u9a8c\u6001\u90fd\u5fc5\u987b\u80fd\u7acb\u5373 stop/disarm\uff0c\u4e0d\u80fd\u7ed5\u8fc7\u73b0\u6709\u5b89\u5168\u94fe\u8def\u3002"
+    }
+  ];
+  const blockingRequired = requirements.filter((item) => item.required === true && item.ok !== true);
+  return {
+    readOnly: true,
+    status: blockingRequired.length ? "blocked_until_explicit_switch_task" : "ready_to_design_switch_task",
+    proposedSwitchKey: "gray_auto_followup_character_runtime_enabled",
+    proposedDefault: false,
+    switchExists: false,
+    wouldEnable: false,
+    automaticRuntimeConnected: false,
+    wouldEmit: false,
+    planStatus: plan.status,
+    dryRunStatus: dryRun.status,
+    goNoGo: review.goNoGo,
+    requirements,
+    blockingRequired,
+    proposedRuntimeStates: [
+      "off",
+      "preview_only",
+      "explicit_switch_on",
+      "single_session_runtime",
+      "stopped_or_disarmed"
+    ],
+    nextAction: blockingRequired.length
+      ? "Keep automatic character runtime disabled; resolve required switch gates in a separate task before implementation."
+      : "Create a separate explicit-switch implementation task; keep default-off and preserve emergency stop/disarm behavior.",
+    safety: {
+      noRuntimeHintEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noModelCall: true,
+      noFetch: true,
+      noPollingStart: true,
+      noFollowupExecution: true,
+      noConfigWrites: true,
+      readyForAutomaticRuntime: false
+    }
+  };
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(limit = 24) {
+  const switchPlan = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
+  const requirementLines = switchPlan.requirements.map((item) => {
+    const mark = item.ok === true ? "OK" : "WAIT";
+    const required = item.required === true ? "required" : "observe";
+    return `- [${mark}] ${item.key} (${required}): ${item.label} - ${item.note}`;
+  });
+  const blockingLines = switchPlan.blockingRequired.length
+    ? switchPlan.blockingRequired.map((item) => `- ${item.key}: ${item.note}`)
+    : ["- none"];
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8ba1\u5212\uff08\u53ea\u8bfb\uff09",
+    `status=${switchPlan.status}  proposedSwitch=${switchPlan.proposedSwitchKey}  proposedDefault=false`,
+    `switchExists=false  wouldEnable=false  automaticRuntimeConnected=false  wouldEmit=false`,
+    `planStatus=${switchPlan.planStatus}  dryRunStatus=${switchPlan.dryRunStatus}  goNoGo=${switchPlan.goNoGo}`,
+    "requirements:",
+    ...requirementLines,
+    "blockingRequired:",
+    ...blockingLines,
+    "proposedRuntimeStates:",
+    ...switchPlan.proposedRuntimeStates.map((stateName, index) => `- ${index + 1}. ${stateName}`),
+    `next=${switchPlan.nextAction}`,
+    "\u5b89\u5168\uff1a\u5f00\u5173\u8ba1\u5212\u53ea\u8bfb\uff0c\u4e0d\u65b0\u589e\u914d\u7f6e\u3001\u4e0d\u5199\u914d\u7f6e\u3001\u4e0d\u63a5\u81ea\u52a8 runtime\u3001\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3002"
+  ].join("\n");
+}
+
 function emitGrayAutoTrialCharacterCueManually(input = {}) {
   const safeInput = input && typeof input === "object" ? input : {};
   const confirm = String(safeInput.confirm || "").trim();
@@ -4971,6 +5094,13 @@ function updateGrayAutoTrialCharacterDryRunCard() {
     return;
   }
   state.followupReadinessTrialCharacterDryRunCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeDryRunText(24);
+}
+
+function updateGrayAutoTrialCharacterSwitchPlanCard() {
+  if (!state.followupReadinessTrialCharacterSwitchPlanCard) {
+    return;
+  }
+  state.followupReadinessTrialCharacterSwitchPlanCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(24);
 }
 
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
@@ -5275,6 +5405,24 @@ async function copyGrayAutoTrialCharacterAutoRuntimeDryRunToClipboard(button = n
   }
 }
 
+async function copyGrayAutoTrialCharacterAutoRuntimeSwitchPlanToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(24));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8ba1\u5212\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u5f00\u5173\u8ba1\u5212";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8ba1\u5212\u5931\u8d25");
+    return false;
+  }
+}
+
 function updateFollowupReadinessScenarioCompare() {
   if (!state.followupReadinessCompare) {
     return;
@@ -5567,6 +5715,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyCharacterDryRun.addEventListener("click", () => {
     copyGrayAutoTrialCharacterAutoRuntimeDryRunToClipboard(trialCopyCharacterDryRun);
   });
+  const trialCopyCharacterSwitchPlan = document.createElement("button");
+  trialCopyCharacterSwitchPlan.type = "button";
+  trialCopyCharacterSwitchPlan.textContent = "\u590d\u5236\u5f00\u5173\u8ba1\u5212";
+  trialCopyCharacterSwitchPlan.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8ba1\u5212";
+  trialCopyCharacterSwitchPlan.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff3e8;color:#68401f;cursor:pointer;";
+  trialCopyCharacterSwitchPlan.addEventListener("click", () => {
+    copyGrayAutoTrialCharacterAutoRuntimeSwitchPlanToClipboard(trialCopyCharacterSwitchPlan);
+  });
   const trialEmitCharacter = document.createElement("button");
   trialEmitCharacter.type = "button";
   trialEmitCharacter.textContent = "\u8bd5\u53d1\u89d2\u8272cue";
@@ -5617,6 +5773,7 @@ function ensureFollowupReadinessPanel() {
     trialCopyCharacterReview,
     trialCopyCharacterAutoPlan,
     trialCopyCharacterDryRun,
+    trialCopyCharacterSwitchPlan,
     trialEmitCharacter
   ]);
   const manualStatus = document.createElement("div");
@@ -5828,6 +5985,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#24485f"
   ].join(";");
+  const characterSwitchPlanCard = document.createElement("pre");
+  characterSwitchPlanCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(169,116,58,.24)",
+    "border-radius:14px",
+    "background:rgba(255,247,239,.78)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#5d3a1d"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -5859,6 +6027,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(characterReviewCard);
   panel.appendChild(characterAutoPlanCard);
   panel.appendChild(characterDryRunCard);
+  panel.appendChild(characterSwitchPlanCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -5878,6 +6047,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCharacterReviewCard = characterReviewCard;
   state.followupReadinessTrialCharacterAutoPlanCard = characterAutoPlanCard;
   state.followupReadinessTrialCharacterDryRunCard = characterDryRunCard;
+  state.followupReadinessTrialCharacterSwitchPlanCard = characterSwitchPlanCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -5902,6 +6072,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCopyCharacterReviewBtn = trialCopyCharacterReview;
   state.followupReadinessTrialCopyCharacterAutoPlanBtn = trialCopyCharacterAutoPlan;
   state.followupReadinessTrialCopyCharacterDryRunBtn = trialCopyCharacterDryRun;
+  state.followupReadinessTrialCopyCharacterSwitchPlanBtn = trialCopyCharacterSwitchPlan;
   state.followupReadinessTrialEmitCharacterBtn = trialEmitCharacter;
   return panel;
 }
@@ -5942,6 +6113,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialCharacterReviewCard();
       updateGrayAutoTrialCharacterAutoPlanCard();
       updateGrayAutoTrialCharacterDryRunCard();
+      updateGrayAutoTrialCharacterSwitchPlanCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -5966,6 +6138,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialCharacterReviewCard();
   updateGrayAutoTrialCharacterAutoPlanCard();
   updateGrayAutoTrialCharacterDryRunCard();
+  updateGrayAutoTrialCharacterSwitchPlanCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -11346,6 +11519,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage: (limit) => buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeSafetyPlan: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeDryRun: (limit) => buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit),
+    grayAutoFollowupTrialCharacterAutoRuntimeExplicitSwitchPlan: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit),
     emitGrayAutoFollowupTrialCharacterCue: (input) => emitGrayAutoTrialCharacterCueManually(input),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
