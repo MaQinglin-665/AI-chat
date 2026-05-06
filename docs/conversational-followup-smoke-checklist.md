@@ -1533,3 +1533,19 @@ Manual checks:
 5. Confirm one required item keeps real runtime emission blocked until a separate task adds explicit confirmation.
 6. Click `复制接入检查`, paste into a scratch note, and confirm it includes preview boundary checks, runtime hint shape, manual sign-off state, scheduler isolation, and next action.
 7. Confirm checklist rendering and copy do not call `maybeEmitFollowupCharacterRuntimeHint()`, emit new events, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 84. Gray Automatic Follow-up Trial Character Cue Manual Emit Gate v1
+
+Purpose: confirm local testers can manually emit the current character cue preview once after explicit confirmation, without connecting it to automatic follow-up.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `试发角色cue` button is visible.
+3. Click `试发角色cue`, cancel or enter a wrong phrase, and confirm no character runtime update is emitted.
+4. Click `试发角色cue`, enter `EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE`, and confirm one character runtime metadata update is emitted.
+5. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterCueManualEmitStatus()` and confirm `count` increased.
+6. Run `window.__AI_CHAT_DEBUG_TTS__.emitGrayAutoFollowupTrialCharacterCue({ confirm: "bad" })` and confirm it returns `confirmation_required`.
+7. Run `window.__AI_CHAT_DEBUG_TTS__.emitGrayAutoFollowupTrialCharacterCue({ confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE" })` only during a watched local test and confirm it returns `ok=true`.
+8. Confirm successful emits record `conversation_followup_gray_auto_trial_character_cue_manual_emit`.
+9. Confirm the manual emit gate does not request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

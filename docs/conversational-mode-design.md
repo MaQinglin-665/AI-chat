@@ -1277,3 +1277,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The checklist may report `readyForImplementationPlanning=true` when preview data is shaped well enough to plan a separate implementation task, but it always keeps `readyForRuntimeEmission=false`.
 - The checklist does not call `maybeEmitFollowupCharacterRuntimeHint()`, move Live2D, send TTS, arm/disarm/stop/reset, start polling, execute follow-up, call model/fetch, write config, mutate pending state, or change scheduler behavior.
 - Clipboard export requires a user click and only copies the checklist text.
+
+## 116. Task 136 Landing Notes
+
+- Task 136 adds a manual character cue emit gate for the gray trial path.
+- DevTools exposes `emitGrayAutoFollowupTrialCharacterCue({ confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE" })` and `grayAutoFollowupTrialCharacterCueManualEmitStatus()`.
+- The readiness panel adds `试发角色cue`, which requires the exact confirmation phrase before emitting the current preview runtime cue once.
+- The helper reuses existing `handleCharacterRuntimeMetadata()` so the test follows the same character runtime metadata path as normal metadata updates.
+- Each successful manual emit records `conversation_followup_gray_auto_trial_character_cue_manual_emit` and updates in-memory manual emit status.
+- This task can cause a visible character runtime update after explicit confirmation, but it does not request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
