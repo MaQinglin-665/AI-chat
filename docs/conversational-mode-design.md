@@ -1251,3 +1251,11 @@ The reset helper exists to speed up local trial verification without restarting 
 - The readiness panel shows `灰度试运行 Go/No-Go`, including decision, reason, missing required items, root causes, guardrails, and next action.
 - Decision values include `NO_GO`, `WATCH_ONLY`, `GO_FOR_WATCHED_TRIAL`, and `REVIEW_AFTER_SUCCESS`.
 - The decision package does not emit events, arm/disarm/stop/reset, start polling, execute follow-up, call model/TTS/fetch, write config, mutate pending state, or change scheduler behavior.
+
+## 113. Task 133 Landing Notes
+
+- Task 133 adds a copyable gray trial sign-off package.
+- DevTools exposes `grayAutoFollowupTrialSignoffPackage(limit)`.
+- The readiness panel shows `灰度试运行签收包`, including trial id, decision, outcome, stage recommendation, missing required items, root causes, manual sign-off checklist, and notes placeholders.
+- The sign-off package is read-only and does not approve the next phase automatically.
+- Clipboard export requires a user click and does not emit events, arm/disarm/stop/reset, start polling, execute follow-up, call model/TTS/fetch, write config, mutate pending state, or change scheduler behavior.

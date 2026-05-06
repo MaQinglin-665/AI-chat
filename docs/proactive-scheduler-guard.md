@@ -450,3 +450,11 @@
 - The decision package uses existing checklist, outcome, timeline, and guard data.
 - It can report `NO_GO`, `WATCH_ONLY`, `GO_FOR_WATCHED_TRIAL`, or `REVIEW_AFTER_SUCCESS`.
 - It does not emit events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 43. Task 133 Gray Trial Sign-off Package Note
+
+- Task 133 adds `grayAutoFollowupTrialSignoffPackage(limit)` as a read-only DevTools helper.
+- The readiness panel renders a copyable sign-off template for controlled gray trial review.
+- The sign-off package uses existing decision, outcome, checklist, and timeline data.
+- It includes manual checklist items and keeps `approvedForNextPhase=false` by default.
+- It does not approve next-phase rollout automatically and does not emit events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
