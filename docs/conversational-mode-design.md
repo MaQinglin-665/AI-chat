@@ -1295,3 +1295,13 @@ The reset helper exists to speed up local trial verification without restarting 
 - The panel adds `复制回看` for user-click clipboard export.
 - The recap only reads current renderer memory and existing debug events; it does not emit a new runtime cue.
 - It does not request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 118. Task 138 Landing Notes
+
+- Task 138 adds a read-only gray trial character expression strategy draft.
+- DevTools exposes `grayAutoFollowupTrialCharacterExpressionStrategyDraft(limit)`.
+- The readiness panel shows `灰度试运行角色表现策略草案`, including active rule, decision/outcome context, candidate rules, runtime-hint-shaped data, sample lines, risk labels, and next action.
+- The panel adds `复制策略` for user-click clipboard export.
+- The draft maps `NO_GO`, `WATCH_ONLY`, `GO_FOR_WATCHED_TRIAL`, `REVIEW_AFTER_SUCCESS`, `success`, and manual emit review states to low-interruption expression candidates.
+- The draft is review-only and keeps `readyForAutomaticRuntime=false`.
+- It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.

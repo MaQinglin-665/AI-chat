@@ -1563,3 +1563,17 @@ Manual checks:
 5. After one successful manual emit, confirm the recap reports `status="emitted"`, `accepted=true`, and includes the latest label, tone, runtime hint, and recent manual emit event.
 6. Click `复制回看`, paste into a scratch note, and confirm it includes status, count, last cue metadata, recent events, summary, and next action.
 7. Confirm recap rendering and copy do not emit a new runtime cue, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 86. Gray Automatic Follow-up Trial Character Expression Strategy Draft v1
+
+Purpose: confirm local testers can review a candidate role-expression strategy before any automatic role behavior is connected.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行角色表现策略草案` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterExpressionStrategyDraft()`.
+4. Confirm the result has `readOnly=true`, `status="draft_only"`, `rules`, `activeRule`, `activeRuleKey`, `manualEmitAccepted`, `readyForAutomaticRuntime=false`, and `safety`.
+5. Confirm rules cover no-go quiet, watch-only observe, watched-trial ready, post-success cooldown, and manual emit review.
+6. Click `复制策略`, paste into a scratch note, and confirm it includes each rule key, status, condition, label, tone, emotion/action, risk, sample, and next action.
+7. Confirm strategy rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
