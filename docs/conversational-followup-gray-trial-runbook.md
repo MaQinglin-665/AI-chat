@@ -22,6 +22,7 @@ d.grayAutoFollowupTrialAuditSummary();
 d.grayAutoFollowupTrialPreRunChecklist();
 d.grayAutoFollowupTrialTimeline();
 d.grayAutoFollowupTrialOutcome();
+d.grayAutoFollowupTrialGoNoGoDecision();
 d.followupReadiness();
 ```
 
@@ -55,6 +56,7 @@ Before a real controlled trial, check the readiness panel sections:
 - `灰度试运行前检查` shows required items such as explicit arm, visible polling state, session cap, emergency stop, disarm, and manual watch.
 - `灰度试运行时间线` summarizes recent arm, poll, trigger, stop, disarm, reset, and dry-run events.
 - `灰度试运行结果判定` summarizes whether the latest visible trial looks not started, blocked, trigger blocked, successful, stopped, or disarmed.
+- `灰度试运行 Go/No-Go` summarizes whether the visible state is safe to watch, blocked, no-go, or ready for post-success review.
 - These sections are read-only and do not emit new events, arm, reset, start polling, trigger follow-up, or write config.
 
 Arm only during a local controlled test:

@@ -1477,3 +1477,17 @@ Manual checks:
 6. After `Emergency Stop`, confirm the outcome prefers `stopped`.
 7. After `Disarm`, confirm the outcome can report `disarmed`.
 8. Confirm outcome rendering does not emit new events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 80. Gray Automatic Follow-up Trial Go/No-Go v1
+
+Purpose: confirm local testers get a compact decision package before or after a watched gray trial.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行 Go/No-Go（只读）` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialGoNoGoDecision()`.
+4. Confirm the result has `readOnly=true`, `decision`, `reason`, `nextAction`, `missingRequired`, `rootCauses`, `timeline`, and `guardrails`.
+5. With default/no trial state, confirm the decision is `NO_GO` or `WATCH_ONLY`, not an automatic approval.
+6. Click `复制决策`, paste into a scratch note, and confirm it includes decision, reason, missing required items, root causes, and next action.
+7. Confirm decision rendering and copy do not emit new events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
