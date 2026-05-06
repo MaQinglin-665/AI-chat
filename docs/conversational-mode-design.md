@@ -1395,3 +1395,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The panel adds `复制回滚` and `回到默认关闭`.
 - The rollback action only clears the local switch flag and records rollback metadata in renderer memory.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 128. Task 148 Landing Notes
+
+- Task 148 adds a read-only final preflight package for the automatic character runtime preparation chain.
+- DevTools exposes `grayAutoFollowupTrialCharacterAutoRuntimeFinalPreflight(limit)`.
+- The readiness panel shows `灰度试运行自动角色表现最终预检`, including the plan, review, acceptance, control, diagnostics, rollback chain, final gates, blocking items, and next action.
+- The panel adds `复制预检` for user-click clipboard export.
+- The final preflight stays read-only and keeps automatic runtime disconnected.
+- It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
