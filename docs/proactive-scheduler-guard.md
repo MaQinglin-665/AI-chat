@@ -512,3 +512,11 @@
 - The plan summarizes default-off gates, explicit enable requirements, review-package dependency, manual validation dependency, safety stop requirement, rollout stages, blocking items, and next action.
 - It keeps `readyForAutomaticRuntime=false` and does not implement automatic character runtime behavior.
 - It does not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 51. Task 141 Gray Trial Character Auto Runtime Dry-run Note
+
+- Task 141 adds `grayAutoFollowupTrialCharacterAutoRuntimeDryRun(limit)` as a read-only DevTools helper.
+- The readiness panel renders an automatic character runtime dry-run and exposes `复制 dry-run`.
+- The dry-run summarizes which strategy rule would be selected, the runtime-hint-shaped data, plan status, Go/No-Go, blockers, and next action.
+- It always keeps `wouldEmit=false` and does not connect automatic runtime behavior.
+- It does not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
