@@ -1647,3 +1647,17 @@ Manual checks:
 5. Confirm the package reports blockers until the explicit switch remains a separate, read-only task.
 6. Click `复制评审`, paste into a scratch note, and confirm it includes switch plan status, Go/No-Go, blocking items, missing items, and next action.
 7. Confirm review rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 92. Gray Automatic Follow-up Trial Character Auto Runtime Switch Acceptance Package v1
+
+Purpose: confirm local testers can review acceptance criteria for a future explicit switch implementation task without enabling automatic character runtime.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行自动角色表现显式开关验收包` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterAutoRuntimeSwitchAcceptancePackage()`.
+4. Confirm the result has `readOnly=true`, `status`, `goNoGo="NO_GO_FOR_AUTOMATIC_RUNTIME"`, `implementationReady=false`, `approvedForNextPhase=false`, `acceptanceChecks`, `blockingRequired`, `manualVerificationRequired=true`, `nextAction`, and `safety`.
+5. Confirm the package lists default-off, wrong-confirm no-op, explicit switch-only, single-session cap, Emergency Stop/Disarm, scheduler/config non-mutation, privacy boundary, and runtime-emission-not-connected checks.
+6. Click `复制验收`, paste into a scratch note, and confirm it includes acceptance checks, blockers, and next action.
+7. Confirm acceptance rendering and copy do not implement a switch, emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

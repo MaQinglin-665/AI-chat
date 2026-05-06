@@ -1359,3 +1359,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The panel adds `复制评审` for user-click clipboard export.
 - The review package stays read-only and does not implement the actual automatic switch.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 124. Task 144 Landing Notes
+
+- Task 144 adds a read-only automatic character runtime switch acceptance package.
+- DevTools exposes `grayAutoFollowupTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit)`.
+- The readiness panel shows `灰度试运行自动角色表现显式开关验收包`, including default-off after restart, wrong-confirmation no-op, explicit switch-only path, single-session cap, Emergency Stop/Disarm, scheduler/config non-mutation, privacy-surface limits, runtime emission boundary, and next action.
+- The panel adds `复制验收` for user-click clipboard export.
+- The acceptance package is for a later separate implementation task and does not implement the switch.
+- It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
