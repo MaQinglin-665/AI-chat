@@ -1591,3 +1591,17 @@ Manual checks:
 5. With no accepted manual emit recap, confirm `goNoGo="NO_GO_FOR_AUTOMATIC_RUNTIME"` and a `manual_emit_recap` missing item is present.
 6. Click `复制评审`, paste into a scratch note, and confirm it includes Go/No-Go, active rule, active hint, missing items, and next action.
 7. Confirm review rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 88. Gray Automatic Follow-up Trial Character Auto Runtime Safety Plan v1
+
+Purpose: confirm local testers can review the automatic character runtime safety gates before any implementation task connects automatic runtime behavior.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行自动角色表现接入计划` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterAutoRuntimeSafetyPlan()`.
+4. Confirm the result has `readOnly=true`, `status`, `canPlanRollout`, `goNoGo`, `gates`, `blockingRequired`, `rolloutStages`, `nextAction`, and `safety`.
+5. Confirm at least one required gate blocks automatic runtime until an explicit enable flag and separate implementation task exist.
+6. Click `复制计划`, paste into a scratch note, and confirm it includes gates, rollout stages, blocking items, and next action.
+7. Confirm plan rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
