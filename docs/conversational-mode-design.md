@@ -1377,3 +1377,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The panel adds `启用开关`, `关闭开关`, and `复制状态`.
 - The control only changes a local in-memory flag and keeps automatic runtime disconnected.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
+
+## 126. Task 146 Landing Notes
+
+- Task 146 adds a read-only automatic character runtime switch control diagnostics package.
+- DevTools exposes `grayAutoFollowupTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit)`.
+- The readiness panel shows `灰度试运行自动角色表现显式开关诊断`, including enabled state, canEnable/canDisable, disabled reason, blocker details, acceptance blockers, operator checklist, and next action.
+- The panel adds `复制诊断` for user-click clipboard export.
+- The diagnostics package is read-only and does not change the local switch flag.
+- It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.

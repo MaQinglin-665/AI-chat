@@ -1675,3 +1675,17 @@ Manual checks:
 5. Confirm the enable path requires `ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH` and remains blocked until the acceptance package is ready.
 6. Click `复制状态`, paste into a scratch note, and confirm it includes current local flag state, blockers, and next action.
 7. Confirm control rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 94. Gray Automatic Follow-up Trial Character Auto Runtime Switch Control Diagnostics v1
+
+Purpose: confirm local testers can understand why the explicit switch cannot be enabled without changing switch state or connecting automatic character runtime.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行自动角色表现显式开关诊断` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterAutoRuntimeSwitchControlDiagnostics()`.
+4. Confirm the result has `readOnly=true`, `status`, `enabled`, `canEnable`, `canDisable`, `disabledReason`, `blockedReasons`, `blockerDetails`, `acceptanceBlocking`, `operatorChecklist`, `nextAction`, and `safety`.
+5. Confirm `acceptance_not_ready` and `manual_verification_required` are explained with readable impact and next action when present.
+6. Click `复制诊断`, paste into a scratch note, and confirm it includes blocker details, acceptance blockers, operator checklist, and next action.
+7. Confirm diagnostics rendering and copy do not change the local switch flag, emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

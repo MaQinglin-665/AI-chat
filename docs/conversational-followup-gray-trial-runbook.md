@@ -150,3 +150,5 @@ The explicit switch review package is also read-only. It sits one step after the
 The switch acceptance package is read-only. It turns the explicit switch review into future implementation acceptance criteria, but it does not implement the switch, does not connect automatic runtime, does not write config, and does not enable runtime.
 
 The explicit switch control skeleton is also read-only from the perspective of runtime behavior. It only holds a local flag for future implementation work and still keeps automatic runtime disconnected.
+
+The explicit switch diagnostics package is read-only. It explains why the local switch control is blocked and what to check next, but it does not change the local switch flag and still keeps automatic runtime disconnected.

@@ -323,6 +323,7 @@ const state = {
   followupReadinessTrialCharacterSwitchReviewCard: null,
   followupReadinessTrialCharacterSwitchAcceptanceCard: null,
   followupReadinessTrialCharacterSwitchControlCard: null,
+  followupReadinessTrialCharacterSwitchDiagnosticsCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -344,6 +345,7 @@ const state = {
   followupReadinessTrialCopyCharacterSwitchReviewBtn: null,
   followupReadinessTrialCopyCharacterSwitchAcceptanceBtn: null,
   followupReadinessTrialCopyCharacterSwitchControlBtn: null,
+  followupReadinessTrialCopyCharacterSwitchDiagnosticsBtn: null,
   followupReadinessTrialCharacterSwitchEnableBtn: null,
   followupReadinessTrialCharacterSwitchDisableBtn: null,
   followupReadinessTrialEmitCharacterBtn: null,
@@ -5218,6 +5220,89 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText(limit =
   ].join("\n");
 }
 
+function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit = 24) {
+  const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
+  const acceptance = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
+  const blockerDetails = [];
+  if (control.blockedReasons.includes("acceptance_not_ready")) {
+    blockerDetails.push({
+      key: "acceptance_not_ready",
+      label: "\u663e\u5f0f\u5f00\u5173\u9a8c\u6536\u5c1a\u672a\u5c31\u7eea",
+      impact: "\u542f\u7528\u5f00\u5173\u4f1a\u88ab\u963b\u6b62\uff0c\u672c\u5730\u6807\u8bb0\u4fdd\u6301\u5173\u95ed\u3002",
+      nextAction: "\u5148\u590d\u6838\u9a8c\u6536\u5305\u4e2d\u7684\u9ed8\u8ba4\u5173\u95ed\u3001\u9519\u8bef\u786e\u8ba4 no-op\u3001stop/disarm \u548c\u4e0d\u5199\u914d\u7f6e\u6761\u4ef6\u3002"
+    });
+  }
+  if (control.blockedReasons.includes("manual_verification_required")) {
+    blockerDetails.push({
+      key: "manual_verification_required",
+      label: "\u9700\u8981\u4eba\u5de5\u9a8c\u6536",
+      impact: "\u5373\u4f7f\u4ee3\u7801\u9759\u6001\u68c0\u67e5\u901a\u8fc7\uff0c\u4e5f\u4e0d\u5e94\u81ea\u52a8\u8ba4\u5b9a\u53ef\u542f\u7528\u3002",
+      nextAction: "\u7531\u672c\u5730\u89c2\u5bdf\u8005\u6309 smoke checklist \u624b\u52a8\u786e\u8ba4\u540e\uff0c\u518d\u5355\u72ec\u63a8\u8fdb\u5f00\u5173\u5b9e\u73b0\u4efb\u52a1\u3002"
+    });
+  }
+  const acceptanceBlocking = acceptance.blockingRequired.map((item) => ({
+    key: item.key,
+    label: item.label,
+    impact: "\u8be5\u9a8c\u6536\u9879\u672a\u51c6\u5907\u597d\uff0c\u4e0d\u80fd\u4f5c\u4e3a\u81ea\u52a8 runtime \u5f00\u5173\u7684\u901a\u884c\u6761\u4ef6\u3002",
+    nextAction: item.verify
+  }));
+  const operatorChecklist = [
+    "\u786e\u8ba4\u6253\u5f00 readiness \u9762\u677f\u4e0d\u4f1a arm/reset/start polling\u3002",
+    "\u786e\u8ba4\u590d\u5236\u72b6\u6001\u548c\u590d\u5236\u8bca\u65ad\u4ec5\u5199\u526a\u8d34\u677f\u3002",
+    "\u786e\u8ba4\u542f\u7528\u5f00\u5173\u5728\u9a8c\u6536\u672a\u5c31\u7eea\u65f6\u4fdd\u6301\u7981\u7528\u6216\u8fd4\u56de\u963b\u6b62\u3002",
+    "\u786e\u8ba4\u5173\u95ed\u5f00\u5173\u53ea\u6e05\u9664\u672c\u5730\u6807\u8bb0\uff0c\u4e0d\u5199 config\u3002"
+  ];
+  return {
+    readOnly: true,
+    status: control.canEnable ? "ready_to_confirm_local_flag" : "blocked_explained",
+    enabled: control.enabled,
+    canEnable: control.canEnable,
+    canDisable: control.canDisable,
+    disabledReason: control.disabledReason,
+    blockedReasons: control.blockedReasons,
+    blockerDetails,
+    acceptanceBlocking,
+    operatorChecklist,
+    nextAction: control.canEnable
+      ? "Only enable after explicit local confirmation; automatic runtime still remains disconnected."
+      : "Keep the switch off and review blocker details before any further implementation step.",
+    safety: {
+      noRuntimeHintEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noModelCall: true,
+      noFetch: true,
+      noPollingStart: true,
+      noFollowupExecution: true,
+      noConfigWrites: true,
+      readyForAutomaticRuntime: false
+    }
+  };
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(limit = 24) {
+  const diagnostics = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit);
+  const blockerLines = diagnostics.blockerDetails.length
+    ? diagnostics.blockerDetails.map((item) => `- ${item.key}: ${item.label} | impact=${item.impact} | next=${item.nextAction}`)
+    : ["- none"];
+  const acceptanceLines = diagnostics.acceptanceBlocking.length
+    ? diagnostics.acceptanceBlocking.map((item) => `- ${item.key}: ${item.label} | next=${item.nextAction}`)
+    : ["- none"];
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bca\u65ad\uff08\u53ea\u8bfb\uff09",
+    `status=${diagnostics.status}  enabled=${diagnostics.enabled ? "true" : "false"}  canEnable=${diagnostics.canEnable ? "true" : "false"}  canDisable=${diagnostics.canDisable ? "true" : "false"}`,
+    `disabledReason=${diagnostics.disabledReason}  readyForAutomaticRuntime=false`,
+    "blockerDetails:",
+    ...blockerLines,
+    "acceptanceBlocking:",
+    ...acceptanceLines,
+    "operatorChecklist:",
+    ...diagnostics.operatorChecklist.map((item, index) => `- ${index + 1}. ${item}`),
+    `next=${diagnostics.nextAction}`,
+    "\u5b89\u5168\uff1a\u8bca\u65ad\u53ea\u8bfb\uff0c\u4e0d\u6539\u5f00\u5173\u6807\u8bb0\u3001\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
+  ].join("\n");
+}
+
 function enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(input = {}) {
   const safeInput = input && typeof input === "object" ? input : {};
   const confirm = String(safeInput.confirm || "").trim();
@@ -5507,6 +5592,13 @@ function updateGrayAutoTrialCharacterSwitchControlCard() {
     state.followupReadinessTrialCharacterSwitchDisableBtn.disabled = control.enabled !== true;
     state.followupReadinessTrialCharacterSwitchDisableBtn.title = "\u5173\u95ed\u672c\u5730\u663e\u5f0f\u5f00\u5173\u6807\u8bb0\uff0c\u4e0d\u6539 scheduler/config";
   }
+}
+
+function updateGrayAutoTrialCharacterSwitchDiagnosticsCard() {
+  if (!state.followupReadinessTrialCharacterSwitchDiagnosticsCard) {
+    return;
+  }
+  state.followupReadinessTrialCharacterSwitchDiagnosticsCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(24);
 }
 
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
@@ -5920,6 +6012,24 @@ async function copyGrayAutoTrialCharacterAutoRuntimeSwitchControlToClipboard(but
   }
 }
 
+async function copyGrayAutoTrialCharacterAutoRuntimeSwitchDiagnosticsToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(24));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bca\u65ad\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u8bca\u65ad";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bca\u65ad\u5931\u8d25");
+    return false;
+  }
+}
+
 function updateFollowupReadinessScenarioCompare() {
   if (!state.followupReadinessCompare) {
     return;
@@ -6244,6 +6354,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyCharacterSwitchControl.addEventListener("click", () => {
     copyGrayAutoTrialCharacterAutoRuntimeSwitchControlToClipboard(trialCopyCharacterSwitchControl);
   });
+  const trialCopyCharacterSwitchDiagnostics = document.createElement("button");
+  trialCopyCharacterSwitchDiagnostics.type = "button";
+  trialCopyCharacterSwitchDiagnostics.textContent = "\u590d\u5236\u8bca\u65ad";
+  trialCopyCharacterSwitchDiagnostics.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bca\u65ad";
+  trialCopyCharacterSwitchDiagnostics.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff4d2;color:#6b4814;cursor:pointer;";
+  trialCopyCharacterSwitchDiagnostics.addEventListener("click", () => {
+    copyGrayAutoTrialCharacterAutoRuntimeSwitchDiagnosticsToClipboard(trialCopyCharacterSwitchDiagnostics);
+  });
   const trialEnableCharacterSwitch = document.createElement("button");
   trialEnableCharacterSwitch.type = "button";
   trialEnableCharacterSwitch.textContent = "\u542f\u7528\u5f00\u5173";
@@ -6314,6 +6432,7 @@ function ensureFollowupReadinessPanel() {
     trialCopyCharacterSwitchReview,
     trialCopyCharacterSwitchAcceptance,
     trialCopyCharacterSwitchControl,
+    trialCopyCharacterSwitchDiagnostics,
     trialEnableCharacterSwitch,
     trialDisableCharacterSwitch,
     trialEmitCharacter
@@ -6571,6 +6690,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#5e4518"
   ].join(";");
+  const characterSwitchDiagnosticsCard = document.createElement("pre");
+  characterSwitchDiagnosticsCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(172,132,45,.24)",
+    "border-radius:14px",
+    "background:rgba(255,248,220,.82)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#5f4615"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -6606,6 +6736,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(characterSwitchReviewCard);
   panel.appendChild(characterSwitchAcceptanceCard);
   panel.appendChild(characterSwitchControlCard);
+  panel.appendChild(characterSwitchDiagnosticsCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -6629,6 +6760,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCharacterSwitchReviewCard = characterSwitchReviewCard;
   state.followupReadinessTrialCharacterSwitchAcceptanceCard = characterSwitchAcceptanceCard;
   state.followupReadinessTrialCharacterSwitchControlCard = characterSwitchControlCard;
+  state.followupReadinessTrialCharacterSwitchDiagnosticsCard = characterSwitchDiagnosticsCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -6657,6 +6789,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCopyCharacterSwitchReviewBtn = trialCopyCharacterSwitchReview;
   state.followupReadinessTrialCopyCharacterSwitchAcceptanceBtn = trialCopyCharacterSwitchAcceptance;
   state.followupReadinessTrialCopyCharacterSwitchControlBtn = trialCopyCharacterSwitchControl;
+  state.followupReadinessTrialCopyCharacterSwitchDiagnosticsBtn = trialCopyCharacterSwitchDiagnostics;
   state.followupReadinessTrialCharacterSwitchEnableBtn = trialEnableCharacterSwitch;
   state.followupReadinessTrialCharacterSwitchDisableBtn = trialDisableCharacterSwitch;
   state.followupReadinessTrialEmitCharacterBtn = trialEmitCharacter;
@@ -6703,6 +6836,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialCharacterSwitchReviewCard();
       updateGrayAutoTrialCharacterSwitchAcceptanceCard();
       updateGrayAutoTrialCharacterSwitchControlCard();
+      updateGrayAutoTrialCharacterSwitchDiagnosticsCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -6731,6 +6865,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialCharacterSwitchReviewCard();
   updateGrayAutoTrialCharacterSwitchAcceptanceCard();
   updateGrayAutoTrialCharacterSwitchControlCard();
+  updateGrayAutoTrialCharacterSwitchDiagnosticsCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -12115,6 +12250,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterAutoRuntimeExplicitSwitchReviewPackage: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeSwitchAcceptancePackage: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeSwitchControl: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit),
+    grayAutoFollowupTrialCharacterAutoRuntimeSwitchControlDiagnostics: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit),
     enableGrayAutoFollowupTrialCharacterAutoRuntimeSwitch: (input) => enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(input),
     disableGrayAutoFollowupTrialCharacterAutoRuntimeSwitch: (reason) => disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason),
     emitGrayAutoFollowupTrialCharacterCue: (input) => emitGrayAutoTrialCharacterCueManually(input),
