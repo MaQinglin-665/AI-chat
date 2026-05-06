@@ -310,6 +310,7 @@ const state = {
   followupReadinessTrialSignoffCard: null,
   followupReadinessTrialCharacterCard: null,
   followupReadinessTrialCharacterHandoffCard: null,
+  followupReadinessTrialCharacterRecapCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -322,6 +323,7 @@ const state = {
   followupReadinessTrialCopySignoffBtn: null,
   followupReadinessTrialCopyCharacterBtn: null,
   followupReadinessTrialCopyCharacterHandoffBtn: null,
+  followupReadinessTrialCopyCharacterRecapBtn: null,
   followupReadinessTrialEmitCharacterBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
@@ -4366,6 +4368,71 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
   ].join("\n");
 }
 
+function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
+  const safeLimit = Number.isFinite(Number(limit))
+    ? Math.max(1, Math.min(80, Math.round(Number(limit))))
+    : 24;
+  const status = getGrayAutoTrialCharacterCueManualEmitStatus();
+  const events = state.ttsDebugEvents
+    .filter((event) => event && event.stage === "conversation_followup_gray_auto_trial_character_cue_manual_emit")
+    .slice(-safeLimit);
+  const lastEvent = events.length ? events[events.length - 1] : null;
+  const lastEmit = status.lastEmit || null;
+  const normalized = lastEmit?.runtimeHint || null;
+  const accepted = !!lastEmit && !!normalized && status.count > 0;
+  return {
+    readOnly: true,
+    status: accepted ? "emitted" : "not_emitted",
+    count: status.count,
+    lastEmitAt: status.lastEmitAt,
+    lastEmit,
+    lastEvent,
+    recentEvents: events,
+    accepted,
+    summary: accepted
+      ? `Last manual cue emitted: ${lastEmit.label || "n/a"} / ${lastEmit.tone || "n/a"}.`
+      : "No confirmed gray trial character cue manual emit has been recorded in this renderer session.",
+    nextAction: accepted
+      ? "Review the visible character response before deciding whether to refine the role-expression strategy."
+      : "Use the manual emit gate only during a watched local test if you need a real character runtime cue.",
+    safety: {
+      noNewRuntimeHintEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noModelCall: true,
+      noFetch: true,
+      noPollingStart: true,
+      noFollowupExecution: true,
+      noConfigWrites: true
+    }
+  };
+}
+
+function buildGrayAutoTrialCharacterCueManualEmitRecapText(limit = 24) {
+  const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
+  const hint = recap.lastEmit?.runtimeHint || {};
+  const eventLines = recap.recentEvents.length
+    ? recap.recentEvents.map((event) => [
+      `#${event.seq || "?"}`,
+      `atMs=${event.atMs || ""}`,
+      `result=${event.result || ""}`,
+      `error=${event.error || ""}`
+    ].join(" "))
+    : ["- none"];
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272 cue \u8bd5\u53d1\u56de\u770b\uff08\u53ea\u8bfb\uff09",
+    `status=${recap.status}  accepted=${recap.accepted ? "true" : "false"}  count=${recap.count}`,
+    `lastEmitAt=${recap.lastEmitAt}`,
+    `last=decision:${recap.lastEmit?.decision || "n/a"} outcome:${recap.lastEmit?.outcome || "n/a"} label:${recap.lastEmit?.label || "n/a"} tone:${recap.lastEmit?.tone || "n/a"}`,
+    `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} voice_style:${hint.voice_style || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
+    `summary=${recap.summary}`,
+    "recentEvents:",
+    ...eventLines,
+    `next=${recap.nextAction}`,
+    "\u5b89\u5168\uff1a\u56de\u770b\u53ea\u8bfb\uff0c\u4e0d\u53d1\u65b0 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
+  ].join("\n");
+}
+
 function emitGrayAutoTrialCharacterCueManually(input = {}) {
   const safeInput = input && typeof input === "object" ? input : {};
   const confirm = String(safeInput.confirm || "").trim();
@@ -4498,6 +4565,13 @@ function updateGrayAutoTrialCharacterHandoffCard() {
     return;
   }
   state.followupReadinessTrialCharacterHandoffCard.textContent = buildGrayAutoTrialCharacterCueHandoffChecklistText(48);
+}
+
+function updateGrayAutoTrialCharacterRecapCard() {
+  if (!state.followupReadinessTrialCharacterRecapCard) {
+    return;
+  }
+  state.followupReadinessTrialCharacterRecapCard.textContent = buildGrayAutoTrialCharacterCueManualEmitRecapText(24);
 }
 
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
@@ -4708,6 +4782,24 @@ async function copyGrayAutoTrialCharacterCueHandoffChecklistToClipboard(button =
     return true;
   } catch (_) {
     setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u63a5\u5165\u68c0\u67e5\u5931\u8d25");
+    return false;
+  }
+}
+
+async function copyGrayAutoTrialCharacterCueManualEmitRecapToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialCharacterCueManualEmitRecapText(24));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272 cue \u8bd5\u53d1\u56de\u770b\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u56de\u770b";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272 cue \u8bd5\u53d1\u56de\u770b\u5931\u8d25");
     return false;
   }
 }
@@ -4964,6 +5056,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyCharacterHandoff.addEventListener("click", () => {
     copyGrayAutoTrialCharacterCueHandoffChecklistToClipboard(trialCopyCharacterHandoff);
   });
+  const trialCopyCharacterRecap = document.createElement("button");
+  trialCopyCharacterRecap.type = "button";
+  trialCopyCharacterRecap.textContent = "\u590d\u5236\u56de\u770b";
+  trialCopyCharacterRecap.title = "\u590d\u5236\u6700\u8fd1\u4e00\u6b21\u89d2\u8272 cue \u624b\u52a8\u8bd5\u53d1\u56de\u770b";
+  trialCopyCharacterRecap.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef9ff;color:#1d4b64;cursor:pointer;";
+  trialCopyCharacterRecap.addEventListener("click", () => {
+    copyGrayAutoTrialCharacterCueManualEmitRecapToClipboard(trialCopyCharacterRecap);
+  });
   const trialEmitCharacter = document.createElement("button");
   trialEmitCharacter.type = "button";
   trialEmitCharacter.textContent = "\u8bd5\u53d1\u89d2\u8272cue";
@@ -5009,6 +5109,7 @@ function ensureFollowupReadinessPanel() {
     trialCopySignoff,
     trialCopyCharacter,
     trialCopyCharacterHandoff,
+    trialCopyCharacterRecap,
     trialEmitCharacter
   ]);
   const manualStatus = document.createElement("div");
@@ -5165,6 +5266,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#254d39"
   ].join(";");
+  const characterRecapCard = document.createElement("pre");
+  characterRecapCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(77,132,158,.22)",
+    "border-radius:14px",
+    "background:rgba(241,251,255,.72)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#244b5f"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -5191,6 +5303,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(signoffCard);
   panel.appendChild(characterCard);
   panel.appendChild(characterHandoffCard);
+  panel.appendChild(characterRecapCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -5205,6 +5318,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialSignoffCard = signoffCard;
   state.followupReadinessTrialCharacterCard = characterCard;
   state.followupReadinessTrialCharacterHandoffCard = characterHandoffCard;
+  state.followupReadinessTrialCharacterRecapCard = characterRecapCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -5224,6 +5338,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCopySignoffBtn = trialCopySignoff;
   state.followupReadinessTrialCopyCharacterBtn = trialCopyCharacter;
   state.followupReadinessTrialCopyCharacterHandoffBtn = trialCopyCharacterHandoff;
+  state.followupReadinessTrialCopyCharacterRecapBtn = trialCopyCharacterRecap;
   state.followupReadinessTrialEmitCharacterBtn = trialEmitCharacter;
   return panel;
 }
@@ -5259,6 +5374,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialSignoffCard();
       updateGrayAutoTrialCharacterCard();
       updateGrayAutoTrialCharacterHandoffCard();
+      updateGrayAutoTrialCharacterRecapCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -5278,6 +5394,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialSignoffCard();
   updateGrayAutoTrialCharacterCard();
   updateGrayAutoTrialCharacterHandoffCard();
+  updateGrayAutoTrialCharacterRecapCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -10653,6 +10770,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterCuePreview: (limit) => buildGrayAutoTrialCharacterCuePreview(limit),
     grayAutoFollowupTrialCharacterCueHandoffChecklist: (limit) => buildGrayAutoTrialCharacterCueHandoffChecklist(limit),
     grayAutoFollowupTrialCharacterCueManualEmitStatus: () => getGrayAutoTrialCharacterCueManualEmitStatus(),
+    grayAutoFollowupTrialCharacterCueManualEmitRecap: (limit) => buildGrayAutoTrialCharacterCueManualEmitRecap(limit),
     emitGrayAutoFollowupTrialCharacterCue: (input) => emitGrayAutoTrialCharacterCueManually(input),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),

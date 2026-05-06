@@ -481,3 +481,10 @@
 - The helper emits the current preview runtime cue through existing character runtime metadata handling only after the exact confirmation phrase.
 - Successful emits record `conversation_followup_gray_auto_trial_character_cue_manual_emit` and update in-memory manual emit status.
 - This can produce a visible character runtime update during a watched local test, but it does not request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 47. Task 137 Gray Trial Character Cue Manual Emit Recap Note
+
+- Task 137 adds `grayAutoFollowupTrialCharacterCueManualEmitRecap(limit)` as a read-only DevTools helper.
+- The readiness panel renders the latest manual character cue emit recap and exposes `复制回看`.
+- The recap reads in-memory manual emit status and existing `conversation_followup_gray_auto_trial_character_cue_manual_emit` debug events.
+- It does not emit another runtime cue, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.

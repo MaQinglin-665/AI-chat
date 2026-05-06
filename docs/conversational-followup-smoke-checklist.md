@@ -1549,3 +1549,17 @@ Manual checks:
 7. Run `window.__AI_CHAT_DEBUG_TTS__.emitGrayAutoFollowupTrialCharacterCue({ confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE" })` only during a watched local test and confirm it returns `ok=true`.
 8. Confirm successful emits record `conversation_followup_gray_auto_trial_character_cue_manual_emit`.
 9. Confirm the manual emit gate does not request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 85. Gray Automatic Follow-up Trial Character Cue Manual Emit Recap v1
+
+Purpose: confirm local testers can review the latest manually emitted character cue without emitting another cue.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行角色 cue 试发回看` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterCueManualEmitRecap()`.
+4. Before any successful manual emit, confirm the recap reports `status="not_emitted"` and `count=0`.
+5. After one successful manual emit, confirm the recap reports `status="emitted"`, `accepted=true`, and includes the latest label, tone, runtime hint, and recent manual emit event.
+6. Click `复制回看`, paste into a scratch note, and confirm it includes status, count, last cue metadata, recent events, summary, and next action.
+7. Confirm recap rendering and copy do not emit a new runtime cue, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
