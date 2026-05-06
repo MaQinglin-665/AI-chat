@@ -1247,3 +1247,22 @@ Review checks:
 8. Confirm manual confirmation remains the primary user-facing execution path.
 9. Confirm next-stage controlled automatic trial work is local/test-only, opt-in, fail-closed, observable, rate-limited, and reversible.
 10. Confirm next-stage work still excludes default-on behavior, desktop observation, screenshots, tool calls, shell execution, file access, config writes, backend APIs, new dependencies, and mature-product claims.
+
+## 64. Gray Automatic Follow-up Trial Gate v1
+
+Purpose: confirm the controlled automatic trial has an extra default-off gate before polling can start.
+
+Manual checks:
+
+1. Confirm `config.example.json` contains `conversation_mode.gray_auto_trial_enabled=false`.
+2. Start with `enabled=true`, `proactive_enabled=true`, `proactive_scheduler_enabled=true`, `gray_auto_enabled=true`, and `gray_auto_trial_enabled=false`.
+3. Reload the app and confirm `window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler.pollTimerActive=false`.
+4. Confirm `window.__AI_CHAT_DEBUG_TTS__.snapshot().proactiveScheduler.pollingBlockedReasons` includes `gray_auto_trial_disabled`.
+5. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupReadiness()` and confirm `ready=false`, `status="default_off"`, and `blockedReasons` includes `gray_auto_trial_disabled`.
+6. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupDryRun()` and confirm `dryRun=true`, `wouldPollCheck=false`, and `wouldAttemptTrigger=false`.
+7. Open `more -> follow-up status` and confirm the report shows the trial gate as disabled/default-off.
+8. Copy the config template and confirm it includes `gray_auto_trial_enabled=false`.
+9. Set `gray_auto_trial_enabled=true` only in a local test config, reload, and confirm polling can start only if the other four gates are also true and all runtime guards pass.
+10. Confirm turning off any one of the five gates stops automatic polling.
+11. Confirm manual confirmation preview and controls remain usable through the explicit user-confirmed path.
+12. Confirm this task does not add desktop observation, screenshots, tool calls, shell execution, file access, config writes, backend APIs, model calls, speech, or new dependencies.
