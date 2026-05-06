@@ -305,6 +305,7 @@ const state = {
   followupReadinessTrialCard: null,
   followupReadinessTrialChecklistCard: null,
   followupReadinessTrialTimelineCard: null,
+  followupReadinessTrialOutcomeCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -653,6 +654,7 @@ function buildGrayAutoTrialRunbook() {
       audit: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialAuditSummary()",
       checklist: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialPreRunChecklist()",
       timeline: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialTimeline()",
+      outcome: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialOutcome()",
       statusReport: "window.__AI_CHAT_DEBUG_TTS__.followupReadiness()"
     },
     steps: [
@@ -3795,6 +3797,118 @@ function buildGrayAutoTrialTimelineText(limit = 32) {
   ].join("\n");
 }
 
+function buildGrayAutoTrialOutcome(limit = 48) {
+  const timeline = buildGrayAutoTrialTimeline(limit);
+  const checklist = buildGrayAutoTrialPreRunChecklist();
+  const snapshot = getTTSDebugSnapshot();
+  const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
+  const session = buildGrayAutoTrialSessionState();
+  const entries = Array.isArray(timeline.entries) ? timeline.entries : [];
+  const last = timeline.last || null;
+  let outcome = "not_started";
+  let severity = "info";
+  let summary = "No gray trial control or polling events are visible yet.";
+  let nextAction = "Open the readiness panel, review the runbook, then arm only during a watched local test.";
+  if (timeline.hasTriggerSuccess) {
+    outcome = "success";
+    severity = "success";
+    summary = "A controlled automatic follow-up trigger succeeded.";
+    nextAction = "Confirm the session cap stopped further triggers, then Disarm after review.";
+  } else if (timeline.hasStop) {
+    outcome = "stopped";
+    severity = "safe";
+    summary = "Emergency Stop sealed the current trial session.";
+    nextAction = "Review the timeline, then Disarm if the trial is still armed.";
+  } else if (timeline.hasDisarm) {
+    outcome = "disarmed";
+    severity = "safe";
+    summary = "The gray trial was disarmed and polling should be off.";
+    nextAction = "Review audit/timeline output before deciding whether another watched trial is needed.";
+  } else if (timeline.hasTriggerBlocked) {
+    outcome = "trigger_blocked";
+    severity = "warn";
+    summary = "A poll attempted to trigger, but the trigger path was blocked.";
+    nextAction = "Inspect the latest blocked reason and keep the session watched before retrying.";
+  } else if (entries.some((entry) => entry.stage === "proactive_scheduler_poll_ready")) {
+    outcome = "ready_observed";
+    severity = "warn";
+    summary = "Polling observed a ready state, but no trigger success is recorded yet.";
+    nextAction = "Keep Emergency Stop visible and continue watching for trigger success or blocked events.";
+  } else if (entries.some((entry) => entry.stage === "proactive_scheduler_poll_blocked")) {
+    outcome = "blocked";
+    severity = "info";
+    summary = "Polling is visible but currently blocked by gates or runtime guards.";
+    nextAction = "Use the root-cause suggestions before retrying; do not bypass guards.";
+  } else if (timeline.hasArm && checklist.readyForWatchedTrial !== true) {
+    outcome = "setup_incomplete";
+    severity = "warn";
+    summary = "The trial was armed, but required pre-run checklist items are not all satisfied.";
+    nextAction = "Fix required checklist items or Disarm before continuing.";
+  } else if (timeline.hasArm) {
+    outcome = "armed_waiting";
+    severity = "info";
+    summary = "The trial is armed and waiting for polling/runtime guard progress.";
+    nextAction = "Watch the timeline and use Emergency Stop if anything feels wrong.";
+  }
+  const blockedReasons = Array.from(new Set([
+    ...(Array.isArray(checklist.blockedReasons) ? checklist.blockedReasons : []),
+    ...(Array.isArray(preflight.dryRun?.blockedReasons) ? preflight.dryRun.blockedReasons : []),
+    ...(last?.blocked ? String(last.blocked).split(",").map((item) => item.trim()).filter(Boolean) : [])
+  ]));
+  const rootCauses = blockedReasons.length
+    ? blockedReasons.slice(0, 8).map((reason) => ({
+      reason,
+      explanation: explainReadinessReason(reason)
+    }))
+    : [];
+  return {
+    readOnly: true,
+    outcome,
+    severity,
+    summary,
+    nextAction,
+    status: preflight.status,
+    armed: checklist.armed === true,
+    polling: checklist.polling === true,
+    session,
+    timeline: {
+      total: timeline.total,
+      lastStage: last?.stage || "none",
+      hasArm: timeline.hasArm,
+      hasStop: timeline.hasStop,
+      hasDisarm: timeline.hasDisarm,
+      hasTriggerSuccess: timeline.hasTriggerSuccess,
+      hasTriggerBlocked: timeline.hasTriggerBlocked
+    },
+    rootCauses,
+    safety: {
+      readOnly: true,
+      noEventEmission: true,
+      noPollingStart: true,
+      noFollowupExecution: true,
+      noConfigWrites: true
+    }
+  };
+}
+
+function buildGrayAutoTrialOutcomeText(limit = 48) {
+  const result = buildGrayAutoTrialOutcome(limit);
+  const rootCauseLines = result.rootCauses.length
+    ? result.rootCauses.map((item) => `- ${item.reason}: ${item.explanation}`)
+    : ["- none"];
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u7ed3\u679c\u5224\u5b9a\uff08\u53ea\u8bfb\uff09",
+    `outcome=${result.outcome}  severity=${result.severity}  status=${result.status}`,
+    `armed=${result.armed ? "true" : "false"}  polling=${result.polling ? "true" : "false"}  session=${result.session.count}/${result.session.max}`,
+    `timelineEvents=${result.timeline.total}  last=${result.timeline.lastStage}  triggerSuccess=${result.timeline.hasTriggerSuccess ? "true" : "false"}  triggerBlocked=${result.timeline.hasTriggerBlocked ? "true" : "false"}`,
+    `summary=${result.summary}`,
+    "\u5f52\u56e0",
+    ...rootCauseLines,
+    `next=${result.nextAction}`,
+    "\u5b89\u5168\uff1a\u7ed3\u679c\u5224\u5b9a\u53ea\u8bfb\uff0c\u4e0d\u53d1\u4e8b\u4ef6\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3002"
+  ].join("\n");
+}
+
 function updateGrayAutoTrialPreRunChecklistCard() {
   if (!state.followupReadinessTrialChecklistCard) {
     return;
@@ -3807,6 +3921,13 @@ function updateGrayAutoTrialTimelineCard() {
     return;
   }
   state.followupReadinessTrialTimelineCard.textContent = buildGrayAutoTrialTimelineText(18);
+}
+
+function updateGrayAutoTrialOutcomeCard() {
+  if (!state.followupReadinessTrialOutcomeCard) {
+    return;
+  }
+  state.followupReadinessTrialOutcomeCard.textContent = buildGrayAutoTrialOutcomeText(48);
 }
 
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
@@ -4284,6 +4405,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#2f3f61"
   ].join(";");
+  const outcomeCard = document.createElement("pre");
+  outcomeCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(139,116,78,.26)",
+    "border-radius:14px",
+    "background:rgba(255,250,238,.72)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#4f3d22"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -4305,6 +4437,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(trialCard);
   panel.appendChild(checklistCard);
   panel.appendChild(timelineCard);
+  panel.appendChild(outcomeCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -4314,6 +4447,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCard = trialCard;
   state.followupReadinessTrialChecklistCard = checklistCard;
   state.followupReadinessTrialTimelineCard = timelineCard;
+  state.followupReadinessTrialOutcomeCard = outcomeCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -4358,6 +4492,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialStatusCard();
       updateGrayAutoTrialPreRunChecklistCard();
       updateGrayAutoTrialTimelineCard();
+      updateGrayAutoTrialOutcomeCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -4372,6 +4507,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialStatusCard();
   updateGrayAutoTrialPreRunChecklistCard();
   updateGrayAutoTrialTimelineCard();
+  updateGrayAutoTrialOutcomeCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -9741,6 +9877,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialAuditSummary: (limit) => buildGrayAutoTrialAuditSummary(limit),
     grayAutoFollowupTrialPreRunChecklist: () => buildGrayAutoTrialPreRunChecklist(),
     grayAutoFollowupTrialTimeline: (limit) => buildGrayAutoTrialTimeline(limit),
+    grayAutoFollowupTrialOutcome: (limit) => buildGrayAutoTrialOutcome(limit),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({
