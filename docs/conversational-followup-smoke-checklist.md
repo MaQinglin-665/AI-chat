@@ -1704,7 +1704,21 @@ Manual checks:
 6. Click `复制回滚`, paste into a scratch note, and confirm it includes rollback status, rollback history, steps, and next action.
 7. Confirm rollback rendering, copy, and the local rollback action do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
 
-## 96. Gray Automatic Follow-up Trial Character Auto Runtime Separate Implementation Draft v1
+## 96. Gray Automatic Follow-up Trial Character Auto Runtime Final Preflight v1
+
+Purpose: confirm local testers can inspect the full preflight chain before any separate implementation task is drafted.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行自动角色表现最终预检` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterAutoRuntimeFinalPreflight()`.
+4. Confirm the result has `readOnly=true`, `ok`, `status`, `goNoGo`, `implementationReady`, `separateImplementationTaskReady`, `defaultOffBaseline`, `automaticRuntimeConnected`, `manualVerificationRequired`, `chain`, `gates`, `blockingRequired`, `nextAction`, and `safety`.
+5. Confirm the chain summarizes plan, review, acceptance, control, diagnostics, and rollback outputs in one place.
+6. Click `复制预检`, paste into a scratch note, and confirm it includes gate status, blocking items, chain summary, and next action.
+7. Confirm final preflight rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 97. Gray Automatic Follow-up Trial Character Auto Runtime Separate Implementation Draft v1
 
 Purpose: confirm local testers can review a concrete implementation skeleton for the later automatic character runtime task without connecting automatic runtime.
 

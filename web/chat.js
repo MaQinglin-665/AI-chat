@@ -327,6 +327,7 @@ const state = {
   followupReadinessTrialCharacterSwitchControlCard: null,
   followupReadinessTrialCharacterSwitchDiagnosticsCard: null,
   followupReadinessTrialCharacterSwitchRollbackCard: null,
+  followupReadinessTrialCharacterSwitchFinalPreflightCard: null,
   followupReadinessTrialCharacterImplementationDraftCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
@@ -351,6 +352,7 @@ const state = {
   followupReadinessTrialCopyCharacterSwitchControlBtn: null,
   followupReadinessTrialCopyCharacterSwitchDiagnosticsBtn: null,
   followupReadinessTrialCopyCharacterSwitchRollbackBtn: null,
+  followupReadinessTrialCopyCharacterSwitchFinalPreflightBtn: null,
   followupReadinessTrialCopyCharacterImplementationDraftBtn: null,
   followupReadinessTrialCharacterSwitchEnableBtn: null,
   followupReadinessTrialCharacterSwitchDisableBtn: null,
@@ -5376,17 +5378,169 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText
   ].join("\n");
 }
 
-function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit = 24) {
+function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit = 24) {
   const plan = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
   const review = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit);
   const acceptance = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
   const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
   const diagnostics = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit);
   const rollback = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit);
+  const gates = [
+    {
+      key: "plan_read_only",
+      label: "显式开关计划保持只读",
+      ok: plan.readOnly === true,
+      required: true,
+      note: "计划仍只提供读-only 参考，不开启自动 runtime。"
+    },
+    {
+      key: "review_read_only",
+      label: "显式开关评审保持只读",
+      ok: review.readOnly === true,
+      required: true,
+      note: "评审包仍只提供 blockers 与 nextAction，不直接实施。"
+    },
+    {
+      key: "acceptance_read_only",
+      label: "显式开关验收保持只读",
+      ok: acceptance.readOnly === true,
+      required: true,
+      note: "验收包仍只做 acceptance criteria，不接自动 runtime。"
+    },
+    {
+      key: "control_local_only",
+      label: "显式开关控制仍是本地态",
+      ok: control.readOnly === true && control.autoRuntimeConnected === false,
+      required: true,
+      note: "控制层只能改本地标记，不能连接自动 runtime。"
+    },
+    {
+      key: "diagnostics_read_only",
+      label: "显式开关诊断保持只读",
+      ok: diagnostics.readOnly === true,
+      required: true,
+      note: "诊断包只解释 blocker，不改变控制状态。"
+    },
+    {
+      key: "rollback_local_only",
+      label: "回滚保持本地恢复",
+      ok: rollback.readOnly === true && rollback.defaultOffBaseline === true,
+      required: true,
+      note: "回滚只恢复默认关闭，不写 config，不改 scheduler。"
+    },
+    {
+      key: "default_off_kept",
+      label: "默认关闭基线仍保持",
+      ok: control.enabled !== true && control.defaultOffBaseline === true && rollback.defaultOffBaseline === true,
+      required: true,
+      note: "默认关闭仍是当前安全基线。"
+    },
+    {
+      key: "runtime_disconnected",
+      label: "自动 runtime 仍未接入",
+      ok: control.autoRuntimeConnected === false && acceptance.safety?.readyForAutomaticRuntime === false,
+      required: true,
+      note: "当前链条仍不连接自动 runtime。"
+    },
+    {
+      key: "separate_task_required",
+      label: "后续仍需独立实现任务",
+      ok: review.goNoGo === "READY_FOR_SEPARATE_IMPLEMENTATION_TASK" && acceptance.goNoGo === "NO_GO_FOR_AUTOMATIC_RUNTIME",
+      required: true,
+      note: "这里只是准备收口，不是实际接入。"
+    }
+  ];
+  const blockingRequired = gates.filter((gate) => gate.required === true && gate.ok !== true);
+  const handoffReady = blockingRequired.length === 0;
+  return {
+    readOnly: true,
+    ok: handoffReady,
+    status: handoffReady ? "ready_for_separate_implementation_task" : "blocked_for_handoff",
+    goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME",
+    implementationReady: false,
+    separateImplementationTaskReady: handoffReady,
+    defaultOffBaseline: true,
+    automaticRuntimeConnected: false,
+    manualVerificationRequired: acceptance.manualVerificationRequired === true || control.manualVerificationRequired === true,
+    chain: {
+      plan: {
+        status: plan.status,
+        readOnly: plan.readOnly === true
+      },
+      review: {
+        status: review.status,
+        goNoGo: review.goNoGo,
+        readOnly: review.readOnly === true
+      },
+      acceptance: {
+        status: acceptance.status,
+        goNoGo: acceptance.goNoGo,
+        readOnly: acceptance.readOnly === true
+      },
+      control: {
+        status: control.status,
+        enabled: control.enabled === true,
+        autoRuntimeConnected: control.autoRuntimeConnected === true,
+        readOnly: control.readOnly === true
+      },
+      diagnostics: {
+        status: diagnostics.status,
+        readOnly: diagnostics.readOnly === true
+      },
+      rollback: {
+        status: rollback.status,
+        readOnly: rollback.readOnly === true
+      }
+    },
+    gates,
+    blockingRequired,
+    nextAction: handoffReady
+      ? "Draft the separate explicit switch implementation task; keep automatic runtime disabled and default-off."
+      : "Keep the chain read-only and resolve the blocking gates before drafting any separate implementation task.",
+    safety: {
+      noRuntimeHintEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noModelCall: true,
+      noFetch: true,
+      noPollingStart: true,
+      noFollowupExecution: true,
+      noConfigWrites: true,
+      readyForAutomaticRuntime: false
+    }
+  };
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(limit = 24) {
+  const preflight = buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit);
+  const gateLines = preflight.gates.map((gate) => {
+    const mark = gate.ok === true ? "OK" : "WAIT";
+    const required = gate.required === true ? "required" : "observe";
+    return `- [${mark}] ${gate.key} (${required}): ${gate.label} - ${gate.note}`;
+  });
+  return [
+    "灰度试运行自动角色表现最终预检（只读）",
+    `status=${preflight.status}  ok=${preflight.ok ? "true" : "false"}  goNoGo=${preflight.goNoGo}  separateImplementationTaskReady=${preflight.separateImplementationTaskReady ? "true" : "false"}`,
+    `implementationReady=false  automaticRuntimeConnected=${preflight.automaticRuntimeConnected ? "true" : "false"}  manualVerificationRequired=${preflight.manualVerificationRequired ? "true" : "false"}`,
+    `plan=${preflight.chain.plan.status}  review=${preflight.chain.review.status}/${preflight.chain.review.goNoGo}  acceptance=${preflight.chain.acceptance.status}/${preflight.chain.acceptance.goNoGo}`,
+    `control=${preflight.chain.control.status}  diagnostics=${preflight.chain.diagnostics.status}  rollback=${preflight.chain.rollback.status}`,
+    "gates:",
+    ...gateLines,
+    "blockingRequired:",
+    ...(preflight.blockingRequired.length
+      ? preflight.blockingRequired.map((item) => `- ${item.key}: ${item.label}`)
+      : ["- none"]),
+    `next=${preflight.nextAction}`,
+    "\u5b89\u5168\uff1a\u6700\u7ec8\u9884\u68c0\u53ea\u8bfb\uff0c\u4e0d\u63a5 automatic runtime\u3001\u4e0d\u5199 config\uff0c\u4e0d\u6539 scheduler\u3001\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset/start polling/\u7ee7\u7eed\u7eed\u8bdd\u3002"
+  ].join("\n");
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit = 24) {
+  const preflight = buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit);
   const implementationModules = [
     {
       file: "web/chat.js",
-      role: "Keep the readiness panel draft, copy action, and future UI wiring local-only until the separate implementation task is approved."
+      role: "Keep the readiness panel draft and its copy action local-only until the later runtime implementation task is created."
     },
     {
       file: "app.py",
@@ -5394,7 +5548,7 @@ function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit
     },
     {
       file: "character_runtime.py",
-      role: "Keep the runtime metadata and prompt-contract changes behind the same safety boundary."
+      role: "Keep runtime metadata and prompt-contract changes behind the same safety boundary."
     },
     {
       file: "config.py",
@@ -5422,21 +5576,18 @@ function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit
     "Confirm the panel draft still reads as read-only and can be copied only by explicit user click.",
     "Confirm the later implementation task keeps the same default-off, scheduler, and runtime boundaries."
   ];
-  const chainReady = [plan, review, acceptance, control, diagnostics, rollback].every((item) => item && item.ok === true);
   return {
     readOnly: true,
-    ok: true,
-    status: "separate_implementation_draft_ready",
+    ok: preflight.ok === true && preflight.separateImplementationTaskReady === true,
+    status: preflight.ok === true && preflight.separateImplementationTaskReady === true
+      ? "separate_implementation_draft_ready"
+      : "blocked_for_draft",
     defaultOffBaseline: true,
     automaticRuntimeConnected: false,
     implementationStarted: false,
-    chainReady,
-    planStatus: plan.status,
-    reviewStatus: review.status,
-    acceptanceStatus: acceptance.status,
-    controlStatus: control.status,
-    diagnosticsStatus: diagnostics.status,
-    rollbackStatus: rollback.status,
+    chainReady: preflight.ok === true && preflight.separateImplementationTaskReady === true,
+    preflightStatus: preflight.status,
+    preflightReady: preflight.separateImplementationTaskReady === true,
     implementationModules,
     safetyBoundaries,
     verificationPlan,
@@ -5445,6 +5596,8 @@ function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit
       noRuntimeHintEmission: true,
       noLive2DMove: true,
       noTts: true,
+      noModelCall: true,
+      noFetch: true,
       noConfigWrites: true,
       noSchedulerDefaultChange: true,
       noPollingStart: true,
@@ -5460,9 +5613,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftText(l
   const boundaryLines = draft.safetyBoundaries.map((item) => `- ${item}`);
   const verificationLines = draft.verificationPlan.map((item) => `- ${item}`);
   return [
-    "鐏板害璇曡繍琛岃嚜鍔ㄨ鑹茶〃鐜版樉寮忓垎绂绘潵瀹炵幇（鍙）",
+    "灰度试运行自动角色表现实现草案（只读）",
     `status=${draft.status}  ok=${draft.ok ? "true" : "false"}  defaultOffBaseline=${draft.defaultOffBaseline ? "true" : "false"}  automaticRuntimeConnected=${draft.automaticRuntimeConnected ? "true" : "false"}`,
-    `chainReady=${draft.chainReady ? "true" : "false"}  planStatus=${draft.planStatus}  reviewStatus=${draft.reviewStatus}  acceptanceStatus=${draft.acceptanceStatus}  controlStatus=${draft.controlStatus}  diagnosticsStatus=${draft.diagnosticsStatus}  rollbackStatus=${draft.rollbackStatus}`,
+    `chainReady=${draft.chainReady ? "true" : "false"}  preflightStatus=${draft.preflightStatus}  preflightReady=${draft.preflightReady ? "true" : "false"}`,
     "implementationModules:",
     ...moduleLines,
     "safetyBoundaries:",
@@ -5816,6 +5969,13 @@ function updateGrayAutoTrialCharacterSwitchRollbackCard() {
     return;
   }
   state.followupReadinessTrialCharacterSwitchRollbackCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(24);
+}
+
+function updateGrayAutoTrialCharacterSwitchFinalPreflightCard() {
+  if (!state.followupReadinessTrialCharacterSwitchFinalPreflightCard) {
+    return;
+  }
+  state.followupReadinessTrialCharacterSwitchFinalPreflightCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(24);
 }
 
 function updateGrayAutoTrialCharacterImplementationDraftCard() {
@@ -6289,6 +6449,24 @@ async function copyGrayAutoTrialCharacterAutoRuntimeSwitchRollbackToClipboard(bu
   }
 }
 
+async function copyGrayAutoTrialCharacterAutoRuntimeFinalPreflightToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(24));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u6700\u7ec8\u9884\u68c0\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u9884\u68c0";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u6700\u7ec8\u9884\u68c0\u5931\u8d25");
+    return false;
+  }
+}
+
 async function copyGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftToClipboard(button = null) {
   try {
     await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftText(24));
@@ -6647,6 +6825,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyCharacterSwitchRollback.addEventListener("click", () => {
     copyGrayAutoTrialCharacterAutoRuntimeSwitchRollbackToClipboard(trialCopyCharacterSwitchRollback);
   });
+  const trialCopyCharacterFinalPreflight = document.createElement("button");
+  trialCopyCharacterFinalPreflight.type = "button";
+  trialCopyCharacterFinalPreflight.textContent = "\u590d\u5236\u9884\u68c0";
+  trialCopyCharacterFinalPreflight.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u6700\u7ec8\u9884\u68c0\u5305";
+  trialCopyCharacterFinalPreflight.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#ffe9cf;color:#704117;cursor:pointer;";
+  trialCopyCharacterFinalPreflight.addEventListener("click", () => {
+    copyGrayAutoTrialCharacterAutoRuntimeFinalPreflightToClipboard(trialCopyCharacterFinalPreflight);
+  });
   const trialCopyCharacterImplementationDraft = document.createElement("button");
   trialCopyCharacterImplementationDraft.type = "button";
   trialCopyCharacterImplementationDraft.textContent = "\u590d\u5236\u8349\u6848";
@@ -6735,6 +6921,7 @@ function ensureFollowupReadinessPanel() {
     trialCopyCharacterSwitchControl,
     trialCopyCharacterSwitchDiagnostics,
     trialCopyCharacterSwitchRollback,
+    trialCopyCharacterFinalPreflight,
     trialCopyCharacterImplementationDraft,
     trialEnableCharacterSwitch,
     trialDisableCharacterSwitch,
@@ -7016,6 +7203,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#653b1c"
   ].join(";");
+  const characterSwitchFinalPreflightCard = document.createElement("pre");
+  characterSwitchFinalPreflightCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(194,132,52,.26)",
+    "border-radius:14px",
+    "background:rgba(255,246,234,.84)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#694219"
+  ].join(";");
   const characterImplementationDraftCard = document.createElement("pre");
   characterImplementationDraftCard.style.cssText = [
     "margin:0 0 10px",
@@ -7064,6 +7262,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(characterSwitchControlCard);
   panel.appendChild(characterSwitchDiagnosticsCard);
   panel.appendChild(characterSwitchRollbackCard);
+  panel.appendChild(characterSwitchFinalPreflightCard);
   panel.appendChild(characterImplementationDraftCard);
   panel.appendChild(compare);
   panel.appendChild(body);
@@ -7090,6 +7289,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCharacterSwitchControlCard = characterSwitchControlCard;
   state.followupReadinessTrialCharacterSwitchDiagnosticsCard = characterSwitchDiagnosticsCard;
   state.followupReadinessTrialCharacterSwitchRollbackCard = characterSwitchRollbackCard;
+  state.followupReadinessTrialCharacterSwitchFinalPreflightCard = characterSwitchFinalPreflightCard;
   state.followupReadinessTrialCharacterImplementationDraftCard = characterImplementationDraftCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
@@ -7121,6 +7321,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCopyCharacterSwitchControlBtn = trialCopyCharacterSwitchControl;
   state.followupReadinessTrialCopyCharacterSwitchDiagnosticsBtn = trialCopyCharacterSwitchDiagnostics;
   state.followupReadinessTrialCopyCharacterSwitchRollbackBtn = trialCopyCharacterSwitchRollback;
+  state.followupReadinessTrialCopyCharacterSwitchFinalPreflightBtn = trialCopyCharacterFinalPreflight;
   state.followupReadinessTrialCopyCharacterImplementationDraftBtn = trialCopyCharacterImplementationDraft;
   state.followupReadinessTrialCharacterSwitchEnableBtn = trialEnableCharacterSwitch;
   state.followupReadinessTrialCharacterSwitchDisableBtn = trialDisableCharacterSwitch;
@@ -7171,6 +7372,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialCharacterSwitchControlCard();
       updateGrayAutoTrialCharacterSwitchDiagnosticsCard();
       updateGrayAutoTrialCharacterSwitchRollbackCard();
+      updateGrayAutoTrialCharacterSwitchFinalPreflightCard();
       updateGrayAutoTrialCharacterImplementationDraftCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
@@ -7202,6 +7404,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialCharacterSwitchControlCard();
   updateGrayAutoTrialCharacterSwitchDiagnosticsCard();
   updateGrayAutoTrialCharacterSwitchRollbackCard();
+  updateGrayAutoTrialCharacterSwitchFinalPreflightCard();
   updateGrayAutoTrialCharacterImplementationDraftCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
@@ -12589,6 +12792,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterAutoRuntimeSwitchControl: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeSwitchControlDiagnostics: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeSwitchRollbackPackage: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit),
+    grayAutoFollowupTrialCharacterAutoRuntimeFinalPreflight: (limit) => buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeSeparateImplementationDraft: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit),
     enableGrayAutoFollowupTrialCharacterAutoRuntimeSwitch: (input) => enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(input),
     disableGrayAutoFollowupTrialCharacterAutoRuntimeSwitch: (reason) => disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason),

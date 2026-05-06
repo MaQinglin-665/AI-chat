@@ -547,9 +547,10 @@ The explicit switch diagnostics package is read-only. It explains switch-control
 - The rollback path only clears the renderer-memory switch flag and records rollback metadata; it does not change scheduler state, start polling, or connect automatic runtime.
 - The safest recovery remains default-off plus a restart if you want to clear all renderer-memory trial state.
 
-## 52. Task 149 Separate Implementation Draft Note
+- Task 148 adds a final read-only preflight package that composes the existing plan, review, acceptance, control, diagnostics, and rollback packages.
+- The final preflight is useful for handoff, but it does not connect automatic runtime, does not change scheduler state, and does not write config.
+- If the preflight is ready, the next safe step is to draft a separate implementation task while keeping default-off as the baseline.
 
-- Task 149 adds `grayAutoFollowupTrialCharacterAutoRuntimeSeparateImplementationDraft(limit)` as a read-only DevTools helper.
-- The readiness panel renders a separate-implementation draft and exposes `复制草案`.
-- The draft only maps later touch points and safety boundaries; it does not connect automatic runtime, write config, change scheduler defaults, or emit runtime cues.
-- It does not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, or add dependencies.
+- Task 149 adds a separate read-only implementation draft for the automatic character runtime handoff.
+- The draft keeps the final preflight chain as the last read-only handoff layer and only names the later implementation touch points.
+- It does not connect automatic runtime, write config, change scheduler state, or emit runtime cues.
