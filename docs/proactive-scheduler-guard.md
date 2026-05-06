@@ -550,3 +550,7 @@ The explicit switch diagnostics package is read-only. It explains switch-control
 - Task 148 adds a final read-only preflight package that composes the existing plan, review, acceptance, control, diagnostics, and rollback packages.
 - The final preflight is useful for handoff, but it does not connect automatic runtime, does not change scheduler state, and does not write config.
 - If the preflight is ready, the next safe step is to draft a separate implementation task while keeping default-off as the baseline.
+
+- Task 149 adds a separate read-only implementation draft for the automatic character runtime handoff.
+- The draft keeps the final preflight chain as the last read-only handoff layer and only names the later implementation touch points.
+- It does not connect automatic runtime, write config, change scheduler state, or emit runtime cues.
