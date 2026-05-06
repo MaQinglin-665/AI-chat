@@ -329,3 +329,11 @@
 - When `gray_auto_trial_enabled` is false, polling remains stopped and reports `gray_auto_trial_disabled`.
 - The trial gate applies only to automatic polling startup; manual confirmation and DevTools/manual debug paths remain separately guarded by their existing checks.
 - This keeps controlled automatic follow-up local/test-only, explicit, reversible, and default-off.
+
+## 27. Task 117 Gray Trial Preflight Note
+
+- Task 117 adds `grayAutoFollowupTrialPreflight()` as a read-only DevTools helper.
+- The helper summarizes five gate status, gray readiness, dry-run outcome, and compact safety notes.
+- It does not call polling start, scheduler manual tick, follow-up execution, model/TTS/fetch, backend APIs, config writes, screenshots, file access, shell execution, or tool calls.
+- The follow-up status panel includes a one-line preflight result for local trial observation.
+- No scheduler guard, config default, cooldown/window limit, pending mutation, or automatic trigger behavior is changed.

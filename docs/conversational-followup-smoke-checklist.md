@@ -1266,3 +1266,18 @@ Manual checks:
 10. Confirm turning off any one of the five gates stops automatic polling.
 11. Confirm manual confirmation preview and controls remain usable through the explicit user-confirmed path.
 12. Confirm this task does not add desktop observation, screenshots, tool calls, shell execution, file access, config writes, backend APIs, model calls, speech, or new dependencies.
+
+## 65. Gray Automatic Follow-up Trial Preflight v1
+
+Purpose: confirm local testers can inspect controlled trial readiness without starting polling or triggering follow-up.
+
+Manual checks:
+
+1. Open DevTools Console and run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialPreflight()`.
+2. With default config, confirm `preflight=true`, `readOnly=true`, `ok=false`, `status="gated_off"`, and `gateBlockedReasons` includes the disabled gates.
+3. Confirm the returned `gates` list contains all five config keys, including `conversation_mode.gray_auto_trial_enabled`.
+4. With all five gates true but no pending follow-up, confirm `status="runtime_guards_blocked"` and `ok=false`.
+5. Confirm the preflight result includes compact readiness and dry-run summaries without full prompts, secrets, screenshots, files, or unrelated private data.
+6. Open `more -> follow-up status` and confirm the report includes one `试运行 preflight` line.
+7. Confirm calling preflight does not emit `conversation_followup_gray_auto_dry_run_checked`; that event should still only appear after explicit `grayAutoFollowupDryRun()`.
+8. Confirm calling preflight does not start polling, call `runProactiveSchedulerManualTick()`, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
