@@ -1298,3 +1298,17 @@ Manual checks:
 8. Confirm subsequent `proactive_scheduler_poll_blocked`, `proactive_scheduler_poll_ready`, `proactive_scheduler_poll_trigger_success`, or `proactive_scheduler_poll_trigger_blocked` events include `would_poll` and `would_trigger`.
 9. Confirm the event payload remains compact and does not include full prompts, secrets, screenshots, files, or unrelated private data.
 10. Confirm this task does not add new polling events, start polling by itself, change scheduler gates, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 67. Gray Automatic Follow-up Trial Event Summary v1
+
+Purpose: confirm local testers can summarize recent gray trial polling events without scanning raw debug history.
+
+Manual checks:
+
+1. Open DevTools Console and run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialEvents()`.
+2. Confirm the result has `readOnly=true`, `counts`, `last`, `lastTrialStatus`, and `recent`.
+3. With default-off gray gates, confirm the latest blocked event summary shows `trialStatus="gated_off"` when a poll blocked event exists.
+4. Confirm `recent` entries include parsed `gates`, `wouldPoll`, and `wouldTrigger`.
+5. Confirm the follow-up readiness report contains one `试运行事件` summary line.
+6. Confirm calling the summary does not emit new debug events.
+7. Confirm the helper does not start polling, call scheduler ticks, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

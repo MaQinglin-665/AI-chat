@@ -1117,3 +1117,20 @@ Gray trial poll event context is intentionally compact:
 - `would_trigger:true|false`
 
 Blocked reasons may be appended to the event `error` field, capped to a short string. This keeps DevTools event history useful during local trials without adding prompts, secrets, screenshots, files, or unrelated private data.
+
+## 96. Task 119 Landing Notes
+
+- Task 119 adds a read-only gray trial poll event summary helper: `grayAutoFollowupTrialEvents(limit)`.
+- The helper filters recent `proactive_scheduler_poll_*` debug events, parses compact trial context, and returns counts, last event, trigger-attempt flags, and sanitized recent entries.
+- The follow-up status report now includes a one-line trial event summary so local testers can see the latest poll stage and trial status without manually scanning the raw event list.
+- This task does not emit events, start polling, call scheduler ticks, execute follow-up, call model/TTS/fetch, mutate pending state, write config, or add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or dependencies.
+
+## 97. Gray Trial Event Summary
+
+The event summary is intended for local trial review:
+
+- `totalPollEvents` counts recent scheduler polling events within the requested limit.
+- `counts` groups recent events by stage.
+- `last` shows the most recent poll event with parsed `trialStatus`, `gates`, `wouldPoll`, and `wouldTrigger`.
+- `hasPollStart`, `hasReady`, and `hasTriggerAttempt` make it easier to spot whether a local trial progressed past gated/blocking states.
+- `recent` returns sanitized compact rows and does not include full prompts, secrets, screenshots, files, or unrelated private data.
