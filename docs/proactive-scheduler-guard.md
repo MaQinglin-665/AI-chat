@@ -540,3 +540,5 @@ The explicit switch review package is read-only. It summarizes whether the expli
 The switch acceptance package is read-only. It documents future acceptance criteria for a separate explicit switch implementation task, but it does not change scheduler behavior, does not write config, and does not enable automatic runtime.
 
 The explicit switch control skeleton is local-only. It does not change scheduler behavior, does not write config, and does not enable automatic runtime.
+
+The explicit switch diagnostics package is read-only. It explains switch-control blockers, but it does not change scheduler behavior, does not write config, does not change the switch flag, and does not enable automatic runtime.
