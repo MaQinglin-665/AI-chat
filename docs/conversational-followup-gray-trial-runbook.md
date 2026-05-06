@@ -24,6 +24,7 @@ d.grayAutoFollowupTrialTimeline();
 d.grayAutoFollowupTrialOutcome();
 d.grayAutoFollowupTrialGoNoGoDecision();
 d.grayAutoFollowupTrialSignoffPackage();
+d.grayAutoFollowupTrialCharacterCuePreview();
 d.followupReadiness();
 ```
 
@@ -47,6 +48,7 @@ The follow-up readiness panel now includes a controlled gray trial operation are
 - `Reset Session` requires the exact `RESET_GRAY_AUTO_TRIAL_SESSION` phrase and does not start polling.
 - `复制审计` copies a compact read-only audit summary.
 - `复制时间线` copies the recent gray trial control and polling event timeline.
+- `复制角色预览` copies the read-only character cue preview after an explicit user click.
 
 Use the panel controls only during a local controlled test. `Arm 试运行` can open the existing in-memory trial gates, so keep the app watched and use `Emergency Stop` first if anything feels wrong. The buttons do not write config, add desktop observation, capture screenshots, read files, execute shell commands, call tools, or call backend APIs.
 
@@ -59,7 +61,10 @@ Before a real controlled trial, check the readiness panel sections:
 - `灰度试运行结果判定` summarizes whether the latest visible trial looks not started, blocked, trigger blocked, successful, stopped, or disarmed.
 - `灰度试运行 Go/No-Go` summarizes whether the visible state is safe to watch, blocked, no-go, or ready for post-success review.
 - `灰度试运行签收包` provides a copyable manual review template for deciding whether the trial result can advance to the next phase.
+- `灰度试运行角色表现预览` shows the expected low-interruption character cue after the current visible trial state.
 - These sections are read-only and do not emit new events, arm, reset, start polling, trigger follow-up, or write config.
+
+The character cue preview is intentionally one step before real role behavior. It calls the pure preview builder for a runtime-hint-shaped object, but it does not call `maybeEmitFollowupCharacterRuntimeHint()`, does not send TTS, does not move Live2D, does not start automatic follow-up, and does not write config.
 
 Arm only during a local controlled test:
 

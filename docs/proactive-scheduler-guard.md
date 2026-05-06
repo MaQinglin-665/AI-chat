@@ -458,3 +458,10 @@
 - The sign-off package uses existing decision, outcome, checklist, and timeline data.
 - It includes manual checklist items and keeps `approvedForNextPhase=false` by default.
 - It does not approve next-phase rollout automatically and does not emit events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 44. Task 134 Gray Trial Character Cue Preview Note
+
+- Task 134 adds `grayAutoFollowupTrialCharacterCuePreview(limit)` as a read-only DevTools helper.
+- The readiness panel renders a role-expression preview for the visible gray trial decision and outcome.
+- The preview builds a runtime-hint-shaped object only for inspection and copy.
+- It does not call `maybeEmitFollowupCharacterRuntimeHint()`, emit events, move Live2D, play TTS, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
