@@ -309,6 +309,7 @@ const state = {
   followupReadinessTrialDecisionCard: null,
   followupReadinessTrialSignoffCard: null,
   followupReadinessTrialCharacterCard: null,
+  followupReadinessTrialCharacterHandoffCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -320,6 +321,7 @@ const state = {
   followupReadinessTrialCopyDecisionBtn: null,
   followupReadinessTrialCopySignoffBtn: null,
   followupReadinessTrialCopyCharacterBtn: null,
+  followupReadinessTrialCopyCharacterHandoffBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
   followupReadinessManualActions: null,
@@ -4202,6 +4204,134 @@ function buildGrayAutoTrialCharacterCuePreviewText(limit = 48) {
   ].join("\n");
 }
 
+function buildGrayAutoTrialCharacterCueHandoffChecklist(limit = 48) {
+  const preview = buildGrayAutoTrialCharacterCuePreview(limit);
+  const signoff = buildGrayAutoTrialSignoffPackage(limit);
+  const now = Date.now();
+  let normalizedRuntimeHint = null;
+  let runtimeHintValid = false;
+  try {
+    normalizedRuntimeHint = normalizeCharacterRuntimeMetadataForFrontend(preview.runtimeHint);
+    runtimeHintValid = !!normalizedRuntimeHint;
+  } catch (_) {
+    normalizedRuntimeHint = null;
+  }
+  const lastHintAt = Number(state.followupCharacterRuntimeLastHintAt || 0);
+  const recentRuntimeEmission = lastHintAt > 0 && now - lastHintAt < 30000;
+  const safety = preview.safety || {};
+  const allowedDecisions = ["NO_GO", "WATCH_ONLY", "GO_FOR_WATCHED_TRIAL", "REVIEW_AFTER_SUCCESS"];
+  const items = [
+    {
+      key: "preview_read_only",
+      label: "角色预览仍是只读",
+      required: true,
+      ok: preview.readOnly === true
+        && safety.noRuntimeHintEmission === true
+        && safety.noLive2DMove === true
+        && safety.noTts === true,
+      note: "预览只能描述角色表现，不能发出真实 runtime hint。"
+    },
+    {
+      key: "runtime_hint_shape",
+      label: "runtime hint 形状可被前端规范化",
+      required: true,
+      ok: runtimeHintValid,
+      note: runtimeHintValid
+        ? `emotion=${normalizedRuntimeHint.emotion || "n/a"} action=${normalizedRuntimeHint.action || "n/a"} live2d_hint=${normalizedRuntimeHint.live2d_hint || "n/a"}`
+        : "当前 runtime metadata normalizer 不可用，或预览 hint 被拒绝。"
+    },
+    {
+      key: "decision_boundary_visible",
+      label: "Go/No-Go 边界可见",
+      required: true,
+      ok: allowedDecisions.includes(preview.decision),
+      note: `decision=${preview.decision} outcome=${preview.outcome}`
+    },
+    {
+      key: "manual_signoff_required",
+      label: "人工签收仍未自动批准",
+      required: true,
+      ok: signoff.signoff?.approvedForNextPhase === false,
+      note: "approvedForNextPhase=false，不能自动进入真实角色动作。"
+    },
+    {
+      key: "no_recent_runtime_emission",
+      label: "最近没有新的真实角色 hint 压力",
+      required: false,
+      ok: !recentRuntimeEmission,
+      note: recentRuntimeEmission
+        ? `lastHintAgeMs=${Math.max(0, now - lastHintAt)}`
+        : "没有 30 秒内的新 followup_character_runtime_hint。"
+    },
+    {
+      key: "scheduler_unchanged",
+      label: "scheduler 与续话执行未被接入",
+      required: true,
+      ok: safety.noPollingStart === true
+        && safety.noFollowupExecution === true
+        && safety.noModelCall === true
+        && safety.noFetch === true
+        && safety.noConfigWrites === true,
+      note: "接入前检查不 arm/reset、不启动 polling、不触发续话、不写配置。"
+    },
+    {
+      key: "runtime_emission_gate",
+      label: "真实角色动作仍需要单独任务和显式确认",
+      required: true,
+      ok: false,
+      note: "本任务只输出接入前检查，不开放真实 emission。"
+    }
+  ];
+  const blockingRequired = items.filter((item) => item.required === true && item.ok !== true);
+  const readyForImplementationPlanning = blockingRequired.every((item) => item.key === "runtime_emission_gate");
+  return {
+    readOnly: true,
+    status: blockingRequired.length > 0 ? "preview_only" : "ready_for_explicit_handoff",
+    readyForImplementationPlanning,
+    readyForRuntimeEmission: false,
+    decision: preview.decision,
+    outcome: preview.outcome,
+    label: preview.label,
+    tone: preview.tone,
+    runtimeHint: preview.runtimeHint,
+    normalizedRuntimeHint,
+    items,
+    blockingRequired,
+    nextAction: readyForImplementationPlanning
+      ? "Ready to plan a separate implementation task with an explicit user-confirmed emission gate."
+      : "Keep this as preview-only; resolve required checklist items before adding any real character emission path.",
+    safety: {
+      noEventEmission: true,
+      noRuntimeHintEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noModelCall: true,
+      noFetch: true,
+      noPollingStart: true,
+      noFollowupExecution: true,
+      noConfigWrites: true
+    }
+  };
+}
+
+function buildGrayAutoTrialCharacterCueHandoffChecklistText(limit = 48) {
+  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
+  const itemLines = checklist.items.map((item) => {
+    const mark = item.ok === true ? "OK" : "WAIT";
+    const required = item.required === true ? "required" : "observe";
+    return `- [${mark}] ${item.key} (${required}): ${item.label} - ${item.note}`;
+  });
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u63a5\u5165\u524d\u68c0\u67e5\uff08\u53ea\u8bfb\uff09",
+    `status=${checklist.status}  readyForImplementationPlanning=${checklist.readyForImplementationPlanning ? "true" : "false"}  readyForRuntimeEmission=false`,
+    `decision=${checklist.decision}  outcome=${checklist.outcome}  label=${checklist.label}  tone=${checklist.tone}`,
+    `runtimeHint=emotion:${checklist.runtimeHint.emotion} action:${checklist.runtimeHint.action} intensity:${checklist.runtimeHint.intensity} voice_style:${checklist.runtimeHint.voice_style} live2d_hint:${checklist.runtimeHint.live2d_hint}`,
+    ...itemLines,
+    `next=${checklist.nextAction}`,
+    "\u5b89\u5168\uff1a\u68c0\u67e5\u53ea\u8bfb\uff0c\u4e0d\u53d1\u751f\u771f\u5b9e runtime hint\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
+  ].join("\n");
+}
+
 function updateGrayAutoTrialPreRunChecklistCard() {
   if (!state.followupReadinessTrialChecklistCard) {
     return;
@@ -4242,6 +4372,13 @@ function updateGrayAutoTrialCharacterCard() {
     return;
   }
   state.followupReadinessTrialCharacterCard.textContent = buildGrayAutoTrialCharacterCuePreviewText(48);
+}
+
+function updateGrayAutoTrialCharacterHandoffCard() {
+  if (!state.followupReadinessTrialCharacterHandoffCard) {
+    return;
+  }
+  state.followupReadinessTrialCharacterHandoffCard.textContent = buildGrayAutoTrialCharacterCueHandoffChecklistText(48);
 }
 
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
@@ -4416,6 +4553,24 @@ async function copyGrayAutoTrialCharacterCuePreviewToClipboard(button = null) {
     return true;
   } catch (_) {
     setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u9884\u89c8\u5931\u8d25");
+    return false;
+  }
+}
+
+async function copyGrayAutoTrialCharacterCueHandoffChecklistToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialCharacterCueHandoffChecklistText(48));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u63a5\u5165\u68c0\u67e5\u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u63a5\u5165\u68c0\u67e5";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u63a5\u5165\u68c0\u67e5\u5931\u8d25");
     return false;
   }
 }
@@ -4664,6 +4819,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyCharacter.addEventListener("click", () => {
     copyGrayAutoTrialCharacterCuePreviewToClipboard(trialCopyCharacter);
   });
+  const trialCopyCharacterHandoff = document.createElement("button");
+  trialCopyCharacterHandoff.type = "button";
+  trialCopyCharacterHandoff.textContent = "\u590d\u5236\u63a5\u5165\u68c0\u67e5";
+  trialCopyCharacterHandoff.title = "\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u63a5\u5165\u524d\u53ea\u8bfb\u68c0\u67e5";
+  trialCopyCharacterHandoff.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1fff6;color:#22513a;cursor:pointer;";
+  trialCopyCharacterHandoff.addEventListener("click", () => {
+    copyGrayAutoTrialCharacterCueHandoffChecklistToClipboard(trialCopyCharacterHandoff);
+  });
   const manualConfirm = document.createElement("button");
   manualConfirm.type = "button";
   manualConfirm.textContent = "\u786e\u8ba4";
@@ -4699,7 +4862,8 @@ function ensureFollowupReadinessPanel() {
     trialCopyTimeline,
     trialCopyDecision,
     trialCopySignoff,
-    trialCopyCharacter
+    trialCopyCharacter,
+    trialCopyCharacterHandoff
   ]);
   const manualStatus = document.createElement("div");
   manualStatus.style.cssText = [
@@ -4844,6 +5008,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#1f4c39"
   ].join(";");
+  const characterHandoffCard = document.createElement("pre");
+  characterHandoffCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(88,137,111,.22)",
+    "border-radius:14px",
+    "background:rgba(247,255,250,.7)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#254d39"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -4869,6 +5044,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(decisionCard);
   panel.appendChild(signoffCard);
   panel.appendChild(characterCard);
+  panel.appendChild(characterHandoffCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -4882,6 +5058,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialDecisionCard = decisionCard;
   state.followupReadinessTrialSignoffCard = signoffCard;
   state.followupReadinessTrialCharacterCard = characterCard;
+  state.followupReadinessTrialCharacterHandoffCard = characterHandoffCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -4900,6 +5077,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCopyDecisionBtn = trialCopyDecision;
   state.followupReadinessTrialCopySignoffBtn = trialCopySignoff;
   state.followupReadinessTrialCopyCharacterBtn = trialCopyCharacter;
+  state.followupReadinessTrialCopyCharacterHandoffBtn = trialCopyCharacterHandoff;
   return panel;
 }
 
@@ -4933,6 +5111,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialDecisionCard();
       updateGrayAutoTrialSignoffCard();
       updateGrayAutoTrialCharacterCard();
+      updateGrayAutoTrialCharacterHandoffCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -4951,6 +5130,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialDecisionCard();
   updateGrayAutoTrialSignoffCard();
   updateGrayAutoTrialCharacterCard();
+  updateGrayAutoTrialCharacterHandoffCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -10324,6 +10504,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialGoNoGoDecision: (limit) => buildGrayAutoTrialGoNoGoDecision(limit),
     grayAutoFollowupTrialSignoffPackage: (limit) => buildGrayAutoTrialSignoffPackage(limit),
     grayAutoFollowupTrialCharacterCuePreview: (limit) => buildGrayAutoTrialCharacterCuePreview(limit),
+    grayAutoFollowupTrialCharacterCueHandoffChecklist: (limit) => buildGrayAutoTrialCharacterCueHandoffChecklist(limit),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({

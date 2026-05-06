@@ -1519,3 +1519,17 @@ Manual checks:
 5. With default/no trial state, confirm it recommends a quiet/watch-only cue rather than approving automatic behavior.
 6. Click `复制角色预览`, paste into a scratch note, and confirm it includes the preview label, mood/tone, sample line, runtime-hint-shaped fields, stage recommendation, and next action.
 7. Confirm preview rendering and copy do not call `maybeEmitFollowupCharacterRuntimeHint()`, emit new events, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 83. Gray Automatic Follow-up Trial Character Cue Handoff Checklist v1
+
+Purpose: confirm local testers can inspect whether the character cue preview is ready for a later explicit implementation task, without enabling real role behavior.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行角色接入前检查` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterCueHandoffChecklist()`.
+4. Confirm the result has `readOnly=true`, `status`, `readyForImplementationPlanning`, `readyForRuntimeEmission=false`, `items`, `blockingRequired`, `runtimeHint`, `normalizedRuntimeHint`, and `safety`.
+5. Confirm one required item keeps real runtime emission blocked until a separate task adds explicit confirmation.
+6. Click `复制接入检查`, paste into a scratch note, and confirm it includes preview boundary checks, runtime hint shape, manual sign-off state, scheduler isolation, and next action.
+7. Confirm checklist rendering and copy do not call `maybeEmitFollowupCharacterRuntimeHint()`, emit new events, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

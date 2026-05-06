@@ -1268,3 +1268,12 @@ The reset helper exists to speed up local trial verification without restarting 
 - The preview uses existing sign-off and outcome data to describe what role expression would be appropriate after the visible trial state.
 - The preview intentionally does not call `maybeEmitFollowupCharacterRuntimeHint()`, move Live2D, send TTS, arm/disarm/stop/reset, start polling, execute follow-up, call model/fetch, write config, mutate pending state, or change scheduler behavior.
 - Clipboard export requires a user click and only copies the preview text.
+
+## 115. Task 135 Landing Notes
+
+- Task 135 adds a read-only character cue handoff checklist for the gray trial path.
+- DevTools exposes `grayAutoFollowupTrialCharacterCueHandoffChecklist(limit)`.
+- The readiness panel shows `灰度试运行角色接入前检查`, including preview boundary checks, runtime metadata shape, Go/No-Go visibility, manual sign-off state, recent runtime hint pressure, and scheduler isolation.
+- The checklist may report `readyForImplementationPlanning=true` when preview data is shaped well enough to plan a separate implementation task, but it always keeps `readyForRuntimeEmission=false`.
+- The checklist does not call `maybeEmitFollowupCharacterRuntimeHint()`, move Live2D, send TTS, arm/disarm/stop/reset, start polling, execute follow-up, call model/fetch, write config, mutate pending state, or change scheduler behavior.
+- Clipboard export requires a user click and only copies the checklist text.
