@@ -1780,6 +1780,7 @@ async function runProactiveSchedulerPollingCheck() {
       throw new Error(injectedFailure.reason || "manual_debug_injection");
     }
     const gateStatus = getProactiveSchedulerPollingGateStatus();
+    const gateTrialContext = buildGrayAutoFollowupTrialEventContext();
     if (!gateStatus.enabled) {
       const gateReason = gateStatus.blockedReasons.join(",") || "polling_disabled";
       state.proactivePollLastResult = "disabled";
@@ -1787,23 +1788,28 @@ async function runProactiveSchedulerPollingCheck() {
         stopProactiveSchedulerPolling(`runtime_gate_off:${gateReason}`);
       }
       recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
-        result: gateReason
+        result: mergeProactiveSchedulerPollEventResult(gateReason, gateTrialContext),
+        error: mergeProactiveSchedulerPollEventError("", gateTrialContext)
       });
       return;
     }
     const startedAt = Date.now();
     state.proactiveLastPollAt = startedAt;
     const scheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
+    const pollTrialContext = buildGrayAutoFollowupTrialEventContext(getTTSDebugSnapshot());
     const followupView = buildConversationFollowupDebugView(startedAt);
     const followupPolicyText = getConversationFollowupPolicyDebugText(followupView);
     if (scheduler.eligibleForSchedulerTick !== true) {
       state.proactivePollLastResult = "blocked";
       recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
         text: String(followupView?.topicHint || ""),
-        result: Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
-          ? scheduler.blockedReasons.join(",")
-          : "poll_blocked",
-        error: followupPolicyText
+        result: mergeProactiveSchedulerPollEventResult(
+          Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
+            ? scheduler.blockedReasons.join(",")
+            : "poll_blocked",
+          pollTrialContext
+        ),
+        error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
       });
       return;
     }
@@ -1814,16 +1820,16 @@ async function runProactiveSchedulerPollingCheck() {
       state.proactivePollLastResult = "not_ready";
       recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
         text: String(followupView?.topicHint || ""),
-        result: silenceBlocked || "silence_not_ready",
-        error: followupPolicyText
+        result: mergeProactiveSchedulerPollEventResult(silenceBlocked || "silence_not_ready", pollTrialContext),
+        error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
       });
       return;
     }
     state.proactivePollLastResult = "ready";
     recordTTSDebugEvent("proactive_scheduler_poll_ready", {
       text: String(followupView?.topicHint || ""),
-      result: "silence_ready",
-      error: followupPolicyText
+      result: mergeProactiveSchedulerPollEventResult("silence_ready", pollTrialContext),
+      error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
     });
     if (!shouldEnableProactiveSchedulerPolling()) {
       state.proactivePollLastResult = "disabled";
@@ -1832,8 +1838,8 @@ async function runProactiveSchedulerPollingCheck() {
       }
       recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
         text: String(followupView?.topicHint || ""),
-        result: "runtime_gate_off_before_trigger",
-        error: followupPolicyText
+        result: mergeProactiveSchedulerPollEventResult("runtime_gate_off_before_trigger", pollTrialContext),
+        error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
       });
       return;
     }
@@ -1842,16 +1848,16 @@ async function runProactiveSchedulerPollingCheck() {
       state.proactivePollLastResult = "triggered";
       recordTTSDebugEvent("proactive_scheduler_poll_trigger_success", {
         text: String(followupView?.topicHint || ""),
-        result: String(triggerResult?.reason || "started"),
-        error: followupPolicyText
+        result: mergeProactiveSchedulerPollEventResult(String(triggerResult?.reason || "started"), pollTrialContext),
+        error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
       });
       return;
     }
     state.proactivePollLastResult = "trigger_blocked";
     recordTTSDebugEvent("proactive_scheduler_poll_trigger_blocked", {
       text: String(followupView?.topicHint || ""),
-      result: String(triggerResult?.reason || "trigger_not_started"),
-      error: followupPolicyText
+      result: mergeProactiveSchedulerPollEventResult(String(triggerResult?.reason || "trigger_not_started"), pollTrialContext),
+      error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
     });
   } catch (err) {
     state.proactivePollLastResult = "failed";
@@ -1859,9 +1865,10 @@ async function runProactiveSchedulerPollingCheck() {
       stopProactiveSchedulerPolling("poll_exception_fail_closed");
     }
     state.proactivePollLastResult = "failed";
+    const failureTrialContext = buildGrayAutoFollowupTrialEventContext();
     recordTTSDebugEvent("proactive_scheduler_poll_failed", {
-      result: "poll_exception",
-      error: String(err?.message || err || "poll_exception")
+      result: mergeProactiveSchedulerPollEventResult("poll_exception", failureTrialContext),
+      error: mergeProactiveSchedulerPollEventError(String(err?.message || err || "poll_exception"), failureTrialContext)
     });
   }
 }
@@ -1929,6 +1936,7 @@ function consumeProactiveSchedulerPollFailureInjection() {
 }
 
 function stopProactiveSchedulerPolling(reason = "stop") {
+  const trialContext = buildGrayAutoFollowupTrialEventContext();
   const wasActive = !!state.proactivePollTimerId;
   if (state.proactivePollTimerId) {
     clearInterval(state.proactivePollTimerId);
@@ -1939,17 +1947,20 @@ function stopProactiveSchedulerPolling(reason = "stop") {
   state.proactivePollLastResult = "disabled";
   if (wasActive || String(reason || "") === "beforeunload") {
     recordTTSDebugEvent("proactive_scheduler_poll_stop", {
-      result: String(reason || "stop")
+      result: mergeProactiveSchedulerPollEventResult(String(reason || "stop"), trialContext),
+      error: mergeProactiveSchedulerPollEventError("", trialContext)
     });
   }
 }
 
 function startProactiveSchedulerPolling() {
   const gateStatus = getProactiveSchedulerPollingGateStatus();
+  const trialContext = buildGrayAutoFollowupTrialEventContext();
   if (!gateStatus.enabled) {
     stopProactiveSchedulerPolling(`gated_off:${gateStatus.blockedReasons.join(",") || "disabled"}`);
     recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
-      result: gateStatus.blockedReasons.join(",") || "polling_disabled"
+      result: mergeProactiveSchedulerPollEventResult(gateStatus.blockedReasons.join(",") || "polling_disabled", trialContext),
+      error: mergeProactiveSchedulerPollEventError("", trialContext)
     });
     return;
   }
@@ -1966,16 +1977,19 @@ function startProactiveSchedulerPolling() {
   state.proactivePollActiveIntervalMs = intervalMs;
   state.proactivePollLastResult = "started";
   recordTTSDebugEvent("proactive_scheduler_poll_start", {
-    result: `interval_ms:${intervalMs}`
+    result: mergeProactiveSchedulerPollEventResult(`interval_ms:${intervalMs}`, trialContext),
+    error: mergeProactiveSchedulerPollEventError("", trialContext)
   });
 }
 
 function syncProactiveSchedulerPolling() {
   const gateStatus = getProactiveSchedulerPollingGateStatus();
+  const trialContext = buildGrayAutoFollowupTrialEventContext();
   if (!gateStatus.enabled) {
     stopProactiveSchedulerPolling(`sync_disabled:${gateStatus.blockedReasons.join(",") || "disabled"}`);
     recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
-      result: gateStatus.blockedReasons.join(",") || "polling_disabled"
+      result: mergeProactiveSchedulerPollEventResult(gateStatus.blockedReasons.join(",") || "polling_disabled", trialContext),
+      error: mergeProactiveSchedulerPollEventError("", trialContext)
     });
     return;
   }
@@ -2370,6 +2384,39 @@ function buildGrayAutoFollowupTrialPreflight(snapshotInput = null) {
     },
     nextAction
   };
+}
+
+
+function buildGrayAutoFollowupTrialEventContext(snapshotInput = null) {
+  const preflight = buildGrayAutoFollowupTrialPreflight(snapshotInput);
+  const gateSummary = preflight.gatesReady === true
+    ? "pass"
+    : preflight.gateBlockedReasons.join("|") || "none";
+  const blockedReasons = Array.from(new Set([].concat(
+    Array.isArray(preflight.gateBlockedReasons) ? preflight.gateBlockedReasons : [],
+    Array.isArray(preflight.dryRun?.blockedReasons) ? preflight.dryRun.blockedReasons : []
+  ).filter(Boolean).map((reason) => String(reason))));
+  return {
+    result: [
+      `trial:${preflight.status}`,
+      `gates:${gateSummary}`,
+      `would_poll:${preflight.dryRun?.wouldPollCheck === true ? "true" : "false"}`,
+      `would_trigger:${preflight.dryRun?.wouldAttemptTrigger === true ? "true" : "false"}`
+    ].join(";"),
+    blocked: blockedReasons.join(",")
+  };
+}
+
+function mergeProactiveSchedulerPollEventResult(result, trialContext = null) {
+  const base = String(result || "").trim();
+  const extra = String(trialContext?.result || "").trim();
+  return [base, extra].filter(Boolean).join(";");
+}
+
+function mergeProactiveSchedulerPollEventError(error, trialContext = null) {
+  const base = String(error || "").trim();
+  const extra = String(trialContext?.blocked || "").trim();
+  return [base, extra].filter(Boolean).join(";").slice(0, 220);
 }
 
 function runGrayAutoFollowupDryRunDebug() {
