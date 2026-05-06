@@ -546,3 +546,7 @@ The explicit switch diagnostics package is read-only. It explains switch-control
 - Task 147 adds a local-only rollback/default-off path for the explicit switch.
 - The rollback path only clears the renderer-memory switch flag and records rollback metadata; it does not change scheduler state, start polling, or connect automatic runtime.
 - The safest recovery remains default-off plus a restart if you want to clear all renderer-memory trial state.
+
+- Task 148 adds a final read-only preflight package that composes the existing plan, review, acceptance, control, diagnostics, and rollback packages.
+- The final preflight is useful for handoff, but it does not connect automatic runtime, does not change scheduler state, and does not write config.
+- If the preflight is ready, the next safe step is to draft a separate implementation task while keeping default-off as the baseline.
