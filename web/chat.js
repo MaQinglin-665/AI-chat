@@ -302,6 +302,7 @@ const state = {
   followupReadinessPanel: null,
   followupReadinessCard: null,
   followupReadinessConfirmationCard: null,
+  followupReadinessTrialCard: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
   followupReadinessManualActions: null,
@@ -3496,6 +3497,44 @@ function updateFollowupManualConfirmationPreviewCard() {
   ].join("\n");
 }
 
+function buildGrayAutoTrialStatusCardText() {
+  const snapshot = getTTSDebugSnapshot();
+  const mode = snapshot.conversationMode || {};
+  const scheduler = snapshot.proactiveScheduler || {};
+  const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
+  const session = buildGrayAutoTrialSessionState();
+  const events = buildGrayAutoFollowupTrialEventSummary(8);
+  const armed = mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true;
+  const polling = scheduler.pollTimerActive === true;
+  const latest = events.last
+    ? `${events.last.stage}/${events.lastTrialStatus}`
+    : "none";
+  const nextStep = preflight.status === "ready_for_local_trial"
+    ? "\u53ef\u4ee5\u8fdb\u5165\u672c\u5730\u53d7\u63a7\u89c2\u5bdf\uff1b\u7ee7\u7eed\u4fdd\u6301\u4eba\u5de5\u76d1\u770b\uff0c\u5f02\u5e38\u65f6\u5148 stop \u518d disarm\u3002"
+    : preflight.status === "runtime_guards_blocked"
+      ? "\u4e94\u5c42\u95e8\u7981\u5df2\u6253\u5f00\uff0c\u4f46\u5019\u9009\u7eed\u8bdd\u3001\u5b89\u9759\u7a97\u53e3\u3001\u51b7\u5374\u6216\u7b56\u7565 guard \u8fd8\u5728\u963b\u585e\u3002"
+      : preflight.status === "session_limit_reached"
+        ? "\u672c\u6b21 renderer session \u5df2\u5230\u8fbe\u8bd5\u8fd0\u884c\u4e0a\u9650\uff1b\u5982\u9700\u518d\u8bd5\uff0c\u5148\u786e\u8ba4\u540e\u518d\u91cd\u7f6e\u8ba1\u6570\u3002"
+        : "\u4fdd\u6301\u9ed8\u8ba4\u5173\u95ed\uff1b\u82e5\u8981\u672c\u5730\u8bd5\u8fd0\u884c\uff0c\u5148\u9605\u8bfb runbook\uff0c\u518d\u7528\u786e\u8ba4\u77ed\u8bed arm\u3002";
+  return [
+    "\u7070\u5ea6\u81ea\u52a8\u8bd5\u8fd0\u884c\u72b6\u6001\u5361\uff08\u53ea\u8bfb\uff09",
+    `status=${preflight.status}  armed=${armed ? "true" : "false"}  polling=${polling ? "true" : "false"}`,
+    `session=${session.count}/${session.max}  remaining=${session.remaining}  reached=${session.reached ? "true" : "false"}`,
+    `wouldPoll=${preflight.dryRun?.wouldPollCheck === true ? "true" : "false"}  wouldTrigger=${preflight.dryRun?.wouldAttemptTrigger === true ? "true" : "false"}`,
+    `blocked=${explainReadinessReasons(preflight.dryRun?.blockedReasons || preflight.gateBlockedReasons)}`,
+    `events=${events.totalPollEvents}  last=${latest}`,
+    `next=${nextStep}`,
+    "\u5b89\u5168\uff1a\u672c\u5361\u4e0d arm\u3001\u4e0d disarm\u3001\u4e0d stop/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
+  ].join("\n");
+}
+
+function updateGrayAutoTrialStatusCard() {
+  if (!state.followupReadinessTrialCard) {
+    return;
+  }
+  state.followupReadinessTrialCard.textContent = buildGrayAutoTrialStatusCardText();
+}
+
 function updateFollowupReadinessScenarioCompare() {
   if (!state.followupReadinessCompare) {
     return;
@@ -3748,6 +3787,17 @@ function ensureFollowupReadinessPanel() {
     "color:#1f4c39",
     "display:none"
   ].join(";");
+  const trialCard = document.createElement("pre");
+  trialCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(108,126,164,.26)",
+    "border-radius:14px",
+    "background:rgba(248,251,255,.74)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#263d70"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -3765,12 +3815,14 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(manualStatus);
   panel.appendChild(card);
   panel.appendChild(confirmationCard);
+  panel.appendChild(trialCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
   state.followupReadinessPanel = panel;
   state.followupReadinessCard = card;
   state.followupReadinessConfirmationCard = confirmationCard;
+  state.followupReadinessTrialCard = trialCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -3804,6 +3856,7 @@ function updateFollowupReadinessPanel() {
       }
       updateFollowupReadinessPreviewCard();
       updateFollowupManualConfirmationPreviewCard();
+      updateGrayAutoTrialStatusCard();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
       if (state.followupReadinessBody) {
@@ -3814,6 +3867,7 @@ function updateFollowupReadinessPanel() {
   panel.style.display = "block";
   updateFollowupReadinessPreviewCard();
   updateFollowupManualConfirmationPreviewCard();
+  updateGrayAutoTrialStatusCard();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
   if (state.followupReadinessBody) {

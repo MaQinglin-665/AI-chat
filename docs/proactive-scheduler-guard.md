@@ -397,3 +397,11 @@
 - The runbook keeps automatic follow-up default-off and requires explicit local arming with the exact confirmation phrase.
 - The guide points testers to preflight, event summary, session cap, emergency stop, disarm, reset, and readiness status checks.
 - The helper does not arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 36. Task 126 Gray Trial Status Card Note
+
+- Task 126 adds a read-only gray automatic trial status card to the follow-up readiness panel.
+- The card reuses existing preflight, session, dry-run, scheduler snapshot, and poll event summary data.
+- It displays status, armed/polling state, session count, would-poll/would-trigger hints, blocked reasons, latest event, and next safe step.
+- It does not add action buttons or new scheduler entry points.
+- It does not arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.

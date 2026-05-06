@@ -23,6 +23,14 @@ d.followupReadiness();
 
 `grayAutoFollowupTrialRunbook()` is read-only. It returns this command list and the safety checklist, but it does not arm, disarm, stop, reset, start polling, or trigger follow-up.
 
+## Readiness Panel Status Card
+
+The follow-up readiness panel also includes a gray automatic trial status card.
+
+- It summarizes preflight status, armed/polling state, session count, dry-run intent, blocked reasons, recent poll events, and the next safe step.
+- It is read-only and refreshes with the rest of the readiness panel.
+- It does not arm, disarm, stop, reset, start polling, trigger follow-up, or write config.
+
 Arm only during a local controlled test:
 
 ```js

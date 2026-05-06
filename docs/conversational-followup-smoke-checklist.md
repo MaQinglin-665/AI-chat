@@ -1394,3 +1394,16 @@ Manual checks:
 4. Confirm the result has `readOnly=true`, command guidance, trial steps, success criteria, and rollback steps.
 5. Confirm the helper only returns strings/lists and does not arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
 6. Confirm the runbook still instructs testers to use exact confirmation for arm, emergency stop if anything feels wrong, and disarm after the trial.
+
+## 74. Gray Automatic Follow-up Trial Status Card v1
+
+Purpose: confirm the readiness panel shows a safe, read-only trial status card before controlled automatic testing.
+
+Manual checks:
+
+1. Open the follow-up readiness panel from the UI or run `window.__AI_CHAT_DEBUG_TTS__.showFollowupReadiness()`.
+2. Confirm a `灰度自动试运行状态卡（只读）` section is visible.
+3. With default config, confirm the card shows `status=gated_off`, `armed=false`, and `polling=false`.
+4. Confirm the card includes session count, wouldPoll/wouldTrigger, blocked reasons, latest event summary, and a next-step hint.
+5. Confirm the card refreshes with the rest of the readiness panel without emitting new events.
+6. Confirm the card has no arm/disarm/stop/reset buttons and does not start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
