@@ -442,3 +442,11 @@
 - The classifier uses existing preflight, checklist, session, and timeline data.
 - It can report not started, setup incomplete, armed waiting, blocked, ready observed, trigger blocked, success, stopped, or disarmed.
 - It does not emit events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 42. Task 132 Gray Trial Go/No-Go Note
+
+- Task 132 adds `grayAutoFollowupTrialGoNoGoDecision(limit)` as a read-only DevTools helper.
+- The readiness panel renders a compact Go/No-Go decision package.
+- The decision package uses existing checklist, outcome, timeline, and guard data.
+- It can report `NO_GO`, `WATCH_ONLY`, `GO_FOR_WATCHED_TRIAL`, or `REVIEW_AFTER_SUCCESS`.
+- It does not emit events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.

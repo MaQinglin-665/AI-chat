@@ -306,6 +306,7 @@ const state = {
   followupReadinessTrialChecklistCard: null,
   followupReadinessTrialTimelineCard: null,
   followupReadinessTrialOutcomeCard: null,
+  followupReadinessTrialDecisionCard: null,
   followupReadinessTrialActions: null,
   followupReadinessTrialStatus: null,
   followupReadinessTrialArmBtn: null,
@@ -314,6 +315,7 @@ const state = {
   followupReadinessTrialResetBtn: null,
   followupReadinessTrialCopyAuditBtn: null,
   followupReadinessTrialCopyTimelineBtn: null,
+  followupReadinessTrialCopyDecisionBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
   followupReadinessManualActions: null,
@@ -655,6 +657,7 @@ function buildGrayAutoTrialRunbook() {
       checklist: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialPreRunChecklist()",
       timeline: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialTimeline()",
       outcome: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialOutcome()",
+      decision: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialGoNoGoDecision()",
       statusReport: "window.__AI_CHAT_DEBUG_TTS__.followupReadiness()"
     },
     steps: [
@@ -3909,6 +3912,99 @@ function buildGrayAutoTrialOutcomeText(limit = 48) {
   ].join("\n");
 }
 
+function buildGrayAutoTrialGoNoGoDecision(limit = 48) {
+  const outcome = buildGrayAutoTrialOutcome(limit);
+  const checklist = buildGrayAutoTrialPreRunChecklist();
+  const timeline = buildGrayAutoTrialTimeline(limit);
+  const requiredItems = Array.isArray(checklist.items)
+    ? checklist.items.filter((item) => item.required === true)
+    : [];
+  const missingRequired = requiredItems.filter((item) => item.ok !== true);
+  let decision = "NO_GO";
+  let reason = "Required pre-run checklist items are not complete.";
+  let nextAction = "Do not run a real controlled trial yet; complete the checklist or Disarm.";
+  if (outcome.outcome === "success") {
+    decision = "REVIEW_AFTER_SUCCESS";
+    reason = "A successful trigger is visible; review cap, timeline, and disarm state before another attempt.";
+    nextAction = "Copy audit/timeline, confirm session cap, then Disarm if still armed.";
+  } else if (outcome.outcome === "stopped" || outcome.outcome === "disarmed") {
+    decision = "NO_GO";
+    reason = `Trial is ${outcome.outcome}; do not continue without a fresh explicit decision.`;
+    nextAction = "Review the timeline and only reset/arm again during a watched local test.";
+  } else if (missingRequired.length === 0 && outcome.outcome === "armed_waiting") {
+    decision = "GO_FOR_WATCHED_TRIAL";
+    reason = "Required safety controls are visible and the trial is armed, but it still needs manual watch.";
+    nextAction = "Keep Emergency Stop and Disarm visible while watching the timeline.";
+  } else if (missingRequired.length === 0 && outcome.outcome === "ready_observed") {
+    decision = "GO_FOR_WATCHED_TRIAL";
+    reason = "A ready poll state was observed, but no trigger success is recorded yet.";
+    nextAction = "Continue watching for trigger success or blocked events; stop immediately if behavior feels wrong.";
+  } else if (missingRequired.length === 0 && (outcome.outcome === "blocked" || outcome.outcome === "trigger_blocked")) {
+    decision = "WATCH_ONLY";
+    reason = "The trial surface is safe, but guards or trigger checks are blocking.";
+    nextAction = "Do not bypass guards; inspect root causes before retrying.";
+  } else if (missingRequired.length === 0 && outcome.outcome === "not_started") {
+    decision = "WATCH_ONLY";
+    reason = "The panel is ready for review, but no trial has been explicitly armed.";
+    nextAction = "Arm only after a fresh human decision and confirmation phrase.";
+  }
+  return {
+    readOnly: true,
+    decision,
+    reason,
+    nextAction,
+    outcome: outcome.outcome,
+    severity: outcome.severity,
+    status: outcome.status,
+    readyForWatchedTrial: checklist.readyForWatchedTrial === true,
+    readyForTriggerObservation: checklist.readyForTriggerObservation === true,
+    missingRequired: missingRequired.map((item) => ({
+      key: item.key,
+      label: item.label,
+      note: item.note
+    })),
+    rootCauses: outcome.rootCauses,
+    timeline: {
+      total: timeline.total,
+      lastStage: timeline.last?.stage || "none",
+      hasTriggerSuccess: timeline.hasTriggerSuccess,
+      hasTriggerBlocked: timeline.hasTriggerBlocked,
+      hasStop: timeline.hasStop,
+      hasDisarm: timeline.hasDisarm
+    },
+    guardrails: [
+      "Keep automatic follow-up default-off outside local controlled testing.",
+      "Arm only with explicit human confirmation.",
+      "Keep Emergency Stop and Disarm visible during a watched trial.",
+      "Do not bypass cooldown, silence, policy, busy/speaking, window, or session-cap guards.",
+      "No desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or config writes."
+    ]
+  };
+}
+
+function buildGrayAutoTrialGoNoGoDecisionText(limit = 48) {
+  const decision = buildGrayAutoTrialGoNoGoDecision(limit);
+  const missingLines = decision.missingRequired.length
+    ? decision.missingRequired.map((item) => `- ${item.key}: ${item.label} (${item.note})`)
+    : ["- none"];
+  const rootCauseLines = decision.rootCauses.length
+    ? decision.rootCauses.map((item) => `- ${item.reason}: ${item.explanation}`)
+    : ["- none"];
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c Go/No-Go\uff08\u53ea\u8bfb\uff09",
+    `decision=${decision.decision}  outcome=${decision.outcome}  severity=${decision.severity}  status=${decision.status}`,
+    `readyForWatchedTrial=${decision.readyForWatchedTrial ? "true" : "false"}  readyForTriggerObservation=${decision.readyForTriggerObservation ? "true" : "false"}`,
+    `timelineEvents=${decision.timeline.total}  last=${decision.timeline.lastStage}  triggerSuccess=${decision.timeline.hasTriggerSuccess ? "true" : "false"}  triggerBlocked=${decision.timeline.hasTriggerBlocked ? "true" : "false"}`,
+    `reason=${decision.reason}`,
+    "\u7f3a\u5931\u5fc5\u9700\u9879",
+    ...missingLines,
+    "\u5f52\u56e0",
+    ...rootCauseLines,
+    `next=${decision.nextAction}`,
+    "\u5b89\u5168\uff1aGo/No-Go \u53ea\u8bfb\uff0c\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
+  ].join("\n");
+}
+
 function updateGrayAutoTrialPreRunChecklistCard() {
   if (!state.followupReadinessTrialChecklistCard) {
     return;
@@ -3928,6 +4024,13 @@ function updateGrayAutoTrialOutcomeCard() {
     return;
   }
   state.followupReadinessTrialOutcomeCard.textContent = buildGrayAutoTrialOutcomeText(48);
+}
+
+function updateGrayAutoTrialDecisionCard() {
+  if (!state.followupReadinessTrialDecisionCard) {
+    return;
+  }
+  state.followupReadinessTrialDecisionCard.textContent = buildGrayAutoTrialGoNoGoDecisionText(48);
 }
 
 function promptGrayAutoTrialPhrase(phrase, actionLabel) {
@@ -4048,6 +4151,24 @@ async function copyGrayAutoTrialTimelineToClipboard(button = null) {
     return true;
   } catch (_) {
     setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u65f6\u95f4\u7ebf\u5931\u8d25");
+    return false;
+  }
+}
+
+async function copyGrayAutoTrialDecisionToClipboard(button = null) {
+  try {
+    await writeTextToClipboard(buildGrayAutoTrialGoNoGoDecisionText(48));
+    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c Go/No-Go \u5df2\u590d\u5236");
+    if (button) {
+      const previous = button.textContent;
+      button.textContent = "\u5df2\u590d\u5236";
+      window.setTimeout(() => {
+        button.textContent = previous || "\u590d\u5236\u51b3\u7b56";
+      }, 1200);
+    }
+    return true;
+  } catch (_) {
+    setStatus("\u590d\u5236 Go/No-Go \u51b3\u7b56\u5931\u8d25");
     return false;
   }
 }
@@ -4272,6 +4393,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyTimeline.addEventListener("click", () => {
     copyGrayAutoTrialTimelineToClipboard(trialCopyTimeline);
   });
+  const trialCopyDecision = document.createElement("button");
+  trialCopyDecision.type = "button";
+  trialCopyDecision.textContent = "\u590d\u5236\u51b3\u7b56";
+  trialCopyDecision.title = "\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c Go/No-Go \u51b3\u7b56\u5305";
+  trialCopyDecision.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff6dd;color:#684914;cursor:pointer;";
+  trialCopyDecision.addEventListener("click", () => {
+    copyGrayAutoTrialDecisionToClipboard(trialCopyDecision);
+  });
   const manualConfirm = document.createElement("button");
   manualConfirm.type = "button";
   manualConfirm.textContent = "\u786e\u8ba4";
@@ -4304,7 +4433,8 @@ function ensureFollowupReadinessPanel() {
     trialDisarm,
     trialReset,
     trialCopyAudit,
-    trialCopyTimeline
+    trialCopyTimeline,
+    trialCopyDecision
   ]);
   const manualStatus = document.createElement("div");
   manualStatus.style.cssText = [
@@ -4416,6 +4546,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#4f3d22"
   ].join(";");
+  const decisionCard = document.createElement("pre");
+  decisionCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(160,128,64,.28)",
+    "border-radius:14px",
+    "background:rgba(255,252,241,.78)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#53401f"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -4438,6 +4579,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(checklistCard);
   panel.appendChild(timelineCard);
   panel.appendChild(outcomeCard);
+  panel.appendChild(decisionCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -4448,6 +4590,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialChecklistCard = checklistCard;
   state.followupReadinessTrialTimelineCard = timelineCard;
   state.followupReadinessTrialOutcomeCard = outcomeCard;
+  state.followupReadinessTrialDecisionCard = decisionCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -4463,6 +4606,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialResetBtn = trialReset;
   state.followupReadinessTrialCopyAuditBtn = trialCopyAudit;
   state.followupReadinessTrialCopyTimelineBtn = trialCopyTimeline;
+  state.followupReadinessTrialCopyDecisionBtn = trialCopyDecision;
   return panel;
 }
 
@@ -4493,6 +4637,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialPreRunChecklistCard();
       updateGrayAutoTrialTimelineCard();
       updateGrayAutoTrialOutcomeCard();
+      updateGrayAutoTrialDecisionCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -4508,6 +4653,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialPreRunChecklistCard();
   updateGrayAutoTrialTimelineCard();
   updateGrayAutoTrialOutcomeCard();
+  updateGrayAutoTrialDecisionCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();
@@ -9878,6 +10024,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialPreRunChecklist: () => buildGrayAutoTrialPreRunChecklist(),
     grayAutoFollowupTrialTimeline: (limit) => buildGrayAutoTrialTimeline(limit),
     grayAutoFollowupTrialOutcome: (limit) => buildGrayAutoTrialOutcome(limit),
+    grayAutoFollowupTrialGoNoGoDecision: (limit) => buildGrayAutoTrialGoNoGoDecision(limit),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({

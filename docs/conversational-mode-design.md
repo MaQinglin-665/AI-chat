@@ -1243,3 +1243,11 @@ The reset helper exists to speed up local trial verification without restarting 
 - The readiness panel shows `灰度试运行结果判定`, including outcome, severity, trigger status, root causes, and next action.
 - Outcome values include `not_started`, `setup_incomplete`, `armed_waiting`, `blocked`, `ready_observed`, `trigger_blocked`, `success`, `stopped`, and `disarmed`.
 - The classifier reads existing checklist, preflight, session, and timeline data only; it does not emit events, arm/disarm/stop/reset, start polling, execute follow-up, call model/TTS/fetch, write config, or mutate pending state.
+
+## 112. Task 132 Landing Notes
+
+- Task 132 adds a read-only Go/No-Go decision package for controlled gray automatic follow-up trials.
+- DevTools exposes `grayAutoFollowupTrialGoNoGoDecision(limit)`.
+- The readiness panel shows `灰度试运行 Go/No-Go`, including decision, reason, missing required items, root causes, guardrails, and next action.
+- Decision values include `NO_GO`, `WATCH_ONLY`, `GO_FOR_WATCHED_TRIAL`, and `REVIEW_AFTER_SUCCESS`.
+- The decision package does not emit events, arm/disarm/stop/reset, start polling, execute follow-up, call model/TTS/fetch, write config, mutate pending state, or change scheduler behavior.
