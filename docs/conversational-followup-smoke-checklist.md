@@ -1381,3 +1381,16 @@ Manual checks:
 5. Confirm one compact `conversation_followup_gray_auto_trial_disarmed` event is recorded.
 6. Confirm the follow-up readiness report shows `armed=false` and polling off.
 7. Confirm disarm does not write config, reset session count, execute follow-up, request model output, play TTS, fetch, mutate pending state, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 73. Gray Automatic Follow-up Controlled Trial Runbook v1
+
+Purpose: confirm local testers have one safe runbook before any controlled automatic follow-up trial.
+
+Manual checks:
+
+1. Open `docs/conversational-followup-gray-trial-runbook.md`.
+2. Confirm it starts from safety rules and states automatic follow-up remains default-off.
+3. Open DevTools Console and run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialRunbook()`.
+4. Confirm the result has `readOnly=true`, command guidance, trial steps, success criteria, and rollback steps.
+5. Confirm the helper only returns strings/lists and does not arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+6. Confirm the runbook still instructs testers to use exact confirmation for arm, emergency stop if anything feels wrong, and disarm after the trial.

@@ -621,6 +621,49 @@ function disarmGrayAutoTrialSession(reason = "manual_disarm") {
   };
 }
 
+function buildGrayAutoTrialRunbook() {
+  return {
+    readOnly: true,
+    title: "Gray automatic follow-up controlled trial runbook",
+    safety: [
+      "Default config stays off.",
+      "Use DevTools only in a local controlled test.",
+      "Session cap, emergency stop, disarm, cooldown, silence, policy, busy/speaking, and window limits still apply.",
+      "No desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or config writes are required."
+    ],
+    commands: {
+      preflight: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialPreflight()",
+      events: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialEvents()",
+      session: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialSession()",
+      arm: "window.__AI_CHAT_DEBUG_TTS__.armGrayAutoFollowupTrial({ confirm: \"ARM_GRAY_AUTO_TRIAL\" })",
+      stop: "window.__AI_CHAT_DEBUG_TTS__.stopGrayAutoFollowupTrial(\"manual_stop\")",
+      disarm: "window.__AI_CHAT_DEBUG_TTS__.disarmGrayAutoFollowupTrial(\"manual_disarm\")",
+      reset: "window.__AI_CHAT_DEBUG_TTS__.resetGrayAutoFollowupTrialSession()",
+      statusReport: "window.__AI_CHAT_DEBUG_TTS__.followupReadiness()"
+    },
+    steps: [
+      "Run preflight and confirm whether the trial is gated_off, runtime_guards_blocked, or ready_for_local_trial.",
+      "Run arm only with the exact confirmation phrase during a local controlled test.",
+      "Watch grayAutoFollowupTrialEvents() for poll_start, poll_blocked, poll_ready, and trigger events.",
+      "If anything feels wrong, run stopGrayAutoFollowupTrial() immediately.",
+      "After the test, run disarmGrayAutoFollowupTrial() to close in-memory gates.",
+      "Use resetGrayAutoFollowupTrialSession() only when you intentionally want another capped local attempt."
+    ],
+    successCriteria: [
+      "No automatic behavior happens before explicit arm.",
+      "Poll events include trial status, gates, would_poll, and would_trigger.",
+      "At most one successful automatic trigger happens with the default session cap.",
+      "Emergency stop seals the session until reset.",
+      "Disarm turns gray gates off and leaves config unchanged."
+    ],
+    rollback: [
+      "Run stopGrayAutoFollowupTrial(\"rollback\").",
+      "Run disarmGrayAutoFollowupTrial(\"rollback\").",
+      "Restart the app if you want to clear all renderer-memory trial state."
+    ]
+  };
+}
+
 function shouldEnableProactiveSchedulerPolling() {
   const status = getProactiveSchedulerPollingGateStatus();
   return status.enabled;
@@ -9135,6 +9178,7 @@ function installTTSDebugBridge() {
     stopGrayAutoFollowupTrial: (reason) => stopGrayAutoTrialSession(reason),
     armGrayAutoFollowupTrial: (input) => armGrayAutoTrialSession(input),
     disarmGrayAutoFollowupTrial: (reason) => disarmGrayAutoTrialSession(reason),
+    grayAutoFollowupTrialRunbook: () => buildGrayAutoTrialRunbook(),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({

@@ -389,3 +389,11 @@
 - It records `conversation_followup_gray_auto_trial_disarmed`.
 - The readiness report shows compact armed/polling state.
 - It does not write config, reset session count, execute follow-up, mutate pending state, or call model/TTS/fetch.
+
+## 35. Task 125 Gray Trial Runbook Note
+
+- Task 125 adds `docs/conversational-followup-gray-trial-runbook.md` as the controlled local trial procedure.
+- DevTools exposes `grayAutoFollowupTrialRunbook()` as a read-only command guide.
+- The runbook keeps automatic follow-up default-off and requires explicit local arming with the exact confirmation phrase.
+- The guide points testers to preflight, event summary, session cap, emergency stop, disarm, reset, and readiness status checks.
+- The helper does not arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.

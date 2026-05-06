@@ -1192,3 +1192,10 @@ The reset helper exists to speed up local trial verification without restarting 
 - Disarm closes the in-memory gray automatic gates, stops proactive scheduler polling, and records `conversation_followup_gray_auto_trial_disarmed`.
 - The follow-up readiness report now shows a compact armed/polling status so local testers can see whether the trial is currently armed.
 - Disarm does not write config, reset session count, execute follow-up, call model/TTS/fetch, mutate pending state, or restart polling.
+
+## 105. Task 125 Landing Notes
+
+- Task 125 adds a controlled gray automatic follow-up trial runbook.
+- The runbook is available as `docs/conversational-followup-gray-trial-runbook.md`.
+- DevTools also exposes `grayAutoFollowupTrialRunbook()` as a read-only command guide.
+- The helper does not arm, disarm, stop, reset, start polling, execute follow-up, call model/TTS/fetch, write config, or mutate pending state.
