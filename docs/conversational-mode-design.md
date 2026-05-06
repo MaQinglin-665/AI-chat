@@ -1199,3 +1199,10 @@ The reset helper exists to speed up local trial verification without restarting 
 - The runbook is available as `docs/conversational-followup-gray-trial-runbook.md`.
 - DevTools also exposes `grayAutoFollowupTrialRunbook()` as a read-only command guide.
 - The helper does not arm, disarm, stop, reset, start polling, execute follow-up, call model/TTS/fetch, write config, or mutate pending state.
+
+## 106. Task 126 Landing Notes
+
+- Task 126 adds a gray automatic trial status card to the follow-up readiness panel.
+- The card summarizes preflight status, armed/polling state, session count, dry-run intent, blocked reasons, latest poll event, and the next safe step.
+- It is panel observability only and refreshes with existing readiness updates.
+- The card does not add action buttons and does not arm, disarm, stop, reset, start polling, execute follow-up, call model/TTS/fetch, write config, or mutate pending state.
