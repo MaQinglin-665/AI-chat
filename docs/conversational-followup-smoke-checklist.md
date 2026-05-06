@@ -1342,3 +1342,15 @@ Manual checks:
 5. Confirm one compact `conversation_followup_gray_auto_trial_session_reset` event is recorded.
 6. Confirm reset does not start polling, enable gates, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
 7. Confirm manual confirmation controls remain separately guarded and usable.
+
+## 70. Gray Automatic Follow-up Trial Emergency Stop v1
+
+Purpose: confirm local testers can stop and seal the current gray trial session without changing config.
+
+Manual checks:
+
+1. Run `window.__AI_CHAT_DEBUG_TTS__.stopGrayAutoFollowupTrial("manual_check")`.
+2. Confirm the result has `stopped=true`, `pollingRestarted=false`, and `reached=true`.
+3. Confirm `grayAutoFollowupTrialSession()` reports `gray_auto_trial_session_limit_reached`.
+4. Confirm one compact `conversation_followup_gray_auto_trial_emergency_stop` event is recorded.
+5. Confirm stop does not enable gates, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

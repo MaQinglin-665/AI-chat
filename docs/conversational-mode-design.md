@@ -1170,3 +1170,10 @@ The reset helper exists to speed up local trial verification without restarting 
 - It resets the renderer-memory count from the previous value to `0`.
 - It returns `pollingRestarted=false` to make clear it does not arm or start automatic polling.
 - If testers want polling to run again, the normal five gates and existing scheduler lifecycle still control that separately.
+
+## 102. Task 122 Landing Notes
+
+- Task 122 adds `stopGrayAutoFollowupTrial(reason)` as a DevTools emergency stop helper for local gray automatic trials.
+- The helper stops proactive scheduler polling, sets the in-memory trial counter to the configured session max, and records `conversation_followup_gray_auto_trial_emergency_stop`.
+- After stop, automatic polling remains blocked by `gray_auto_trial_session_limit_reached` until the tester explicitly resets the session counter.
+- The helper does not change config, enable gates, execute follow-up, call model/TTS/fetch, mutate pending state, or restart polling.
