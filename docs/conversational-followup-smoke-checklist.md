@@ -1354,3 +1354,16 @@ Manual checks:
 3. Confirm `grayAutoFollowupTrialSession()` reports `gray_auto_trial_session_limit_reached`.
 4. Confirm one compact `conversation_followup_gray_auto_trial_emergency_stop` event is recorded.
 5. Confirm stop does not enable gates, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 71. Gray Automatic Follow-up DevTools Arm v1
+
+Purpose: confirm local trial arming is explicit, in-memory, and still guarded.
+
+Manual checks:
+
+1. Run `window.__AI_CHAT_DEBUG_TTS__.armGrayAutoFollowupTrial({})`.
+2. Confirm it returns `ok=false`, `reason="confirmation_required"`, and does not start polling.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.armGrayAutoFollowupTrial({ confirm: "ARM_GRAY_AUTO_TRIAL" })` only during local controlled testing.
+4. Confirm it records `conversation_followup_gray_auto_trial_armed`.
+5. Confirm session cap, emergency stop, cooldown, silence, policy, busy/speaking, and window-limit guards still apply.
+6. Confirm it does not write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

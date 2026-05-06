@@ -543,6 +543,53 @@ function stopGrayAutoTrialSession(reason = "manual_emergency_stop") {
   };
 }
 
+function armGrayAutoTrialSession(input = {}) {
+  const safeInput = input && typeof input === "object" ? input : {};
+  const confirm = String(safeInput.confirm || "").trim();
+  if (confirm !== "ARM_GRAY_AUTO_TRIAL") {
+    return {
+      ok: false,
+      armed: false,
+      reason: "confirmation_required",
+      requiredConfirm: "ARM_GRAY_AUTO_TRIAL",
+      pollingRestarted: false
+    };
+  }
+  if (!state.conversationMode || typeof state.conversationMode !== "object") {
+    state.conversationMode = {};
+  }
+  state.conversationMode.enabled = true;
+  state.conversationMode.proactiveEnabled = true;
+  state.conversationMode.proactiveSchedulerEnabled = true;
+  state.conversationMode.grayAutoEnabled = true;
+  state.conversationMode.grayAutoTrialEnabled = true;
+  if (!Number.isFinite(Number(state.conversationMode.grayAutoTrialMaxTriggersPerSession))) {
+    state.conversationMode.grayAutoTrialMaxTriggersPerSession = 1;
+  }
+  resetGrayAutoTrialSessionTriggerCount();
+  syncProactiveSchedulerPolling();
+  const preflight = buildGrayAutoFollowupTrialPreflight();
+  const scheduler = buildProactiveSchedulerDebugSnapshot(Date.now());
+  recordTTSDebugEvent("conversation_followup_gray_auto_trial_armed", {
+    result: [
+      `status:${preflight.status}`,
+      `polling:${scheduler.pollTimerActive === true ? "active" : "inactive"}`,
+      `max:${getGrayAutoTrialMaxTriggersPerSession()}`
+    ].join(";"),
+    error: Array.isArray(preflight.blockedReasons) ? preflight.blockedReasons.join(",") : ""
+  });
+  return {
+    ok: true,
+    armed: true,
+    pollingRestarted: scheduler.pollTimerActive === true,
+    preflight,
+    scheduler: {
+      pollTimerActive: scheduler.pollTimerActive === true,
+      pollingBlockedReasons: Array.isArray(scheduler.pollingBlockedReasons) ? scheduler.pollingBlockedReasons.slice() : []
+    }
+  };
+}
+
 function shouldEnableProactiveSchedulerPolling() {
   const status = getProactiveSchedulerPollingGateStatus();
   return status.enabled;
@@ -9052,6 +9099,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialSession: () => buildGrayAutoTrialSessionState(),
     resetGrayAutoFollowupTrialSession: () => resetGrayAutoTrialSessionTriggerCount(),
     stopGrayAutoFollowupTrial: (reason) => stopGrayAutoTrialSession(reason),
+    armGrayAutoFollowupTrial: (input) => armGrayAutoTrialSession(input),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({

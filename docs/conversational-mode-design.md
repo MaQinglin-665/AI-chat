@@ -1177,3 +1177,11 @@ The reset helper exists to speed up local trial verification without restarting 
 - The helper stops proactive scheduler polling, sets the in-memory trial counter to the configured session max, and records `conversation_followup_gray_auto_trial_emergency_stop`.
 - After stop, automatic polling remains blocked by `gray_auto_trial_session_limit_reached` until the tester explicitly resets the session counter.
 - The helper does not change config, enable gates, execute follow-up, call model/TTS/fetch, mutate pending state, or restart polling.
+
+## 103. Task 123 Landing Notes
+
+- Task 123 adds `armGrayAutoFollowupTrial({ confirm: "ARM_GRAY_AUTO_TRIAL" })` for explicit DevTools-only local trial arming.
+- The helper only changes current renderer memory, opens the five automatic follow-up gates, resets the session counter, syncs existing scheduler polling, and records `conversation_followup_gray_auto_trial_armed`.
+- The confirmation phrase is required; calls without it return `confirmation_required` and do nothing.
+- Trial arming remains guarded by session cap, emergency stop, cooldown, silence, policy, busy/speaking, window limits, and existing scheduler checks.
+- It does not write config, add desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, dependencies, or product maturity claims.
