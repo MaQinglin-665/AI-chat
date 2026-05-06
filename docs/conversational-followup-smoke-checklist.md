@@ -1312,3 +1312,19 @@ Manual checks:
 5. Confirm the follow-up readiness report contains one `试运行事件` summary line.
 6. Confirm calling the summary does not emit new debug events.
 7. Confirm the helper does not start polling, call scheduler ticks, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 68. Gray Automatic Follow-up Trial Session Cap v1
+
+Purpose: confirm controlled automatic trial execution is capped per renderer session.
+
+Manual checks:
+
+1. Confirm `config.example.json` contains `conversation_mode.gray_auto_trial_max_triggers_per_session=1`.
+2. With default config, confirm automatic polling remains stopped because gray gates are still false.
+3. In local test config only, set all five gray automatic gates true and keep `gray_auto_trial_max_triggers_per_session=1`.
+4. After one successful automatic polling trigger, confirm polling stops with `gray_auto_trial_session_limit_reached`.
+5. Confirm `window.__AI_CHAT_DEBUG_TTS__.snapshot().conversationMode.grayAutoTrialSessionTriggerCount` increments after automatic trigger success.
+6. Confirm readiness/preflight/poll event context includes `gray_auto_trial_session_limit_reached` after the cap is reached.
+7. Set `gray_auto_trial_max_triggers_per_session=0` in local test config only and confirm automatic trigger execution remains blocked.
+8. Confirm manual confirmation controls remain usable through their explicit guarded path.
+9. Confirm this task does not enable automatic follow-up by default, start polling by itself, change desktop observation, capture screenshots, call tools, execute shell, access files, write config, call backend APIs, request model output, play TTS, fetch, mutate pending outside existing automatic success accounting, or add dependencies.

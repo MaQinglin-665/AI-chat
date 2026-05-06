@@ -351,3 +351,11 @@
 - The helper summarizes recent `proactive_scheduler_poll_*` events and parses trial status, gate summary, `would_poll`, and `would_trigger`.
 - The follow-up status report includes a one-line latest trial event summary.
 - This is observability only and does not emit events, start polling, call scheduler ticks, execute follow-up, mutate pending state, call model/TTS/fetch, write config, or change scheduler guards.
+
+## 30. Task 120 Gray Trial Session Cap Note
+
+- Task 120 adds `conversation_mode.gray_auto_trial_max_triggers_per_session` with default `1`.
+- The cap is tracked in renderer memory as a current-session counter.
+- When automatic polling succeeds and the cap is reached, polling is stopped with `gray_auto_trial_session_limit_reached`.
+- A value of `0` blocks controlled automatic trigger execution even if all five gates are enabled.
+- Manual confirmation remains separately guarded and is not blocked by this automatic trial cap.

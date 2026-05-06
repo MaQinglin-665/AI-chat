@@ -32,6 +32,7 @@ const state = {
     proactiveSchedulerEnabled: false,
     grayAutoEnabled: false,
     grayAutoTrialEnabled: false,
+    grayAutoTrialMaxTriggersPerSession: 1,
     proactiveCooldownMs: 600000,
     proactiveWarmupMs: 120000,
     proactiveWindowMs: 3600000,
@@ -65,6 +66,7 @@ const state = {
   proactivePollLastResult: "",
   proactivePollActiveIntervalMs: 0,
   proactivePollFailureInjection: null,
+  grayAutoTrialSessionTriggerCount: 0,
   autoChatTuning: {
     triggerBaseThreshold: 1.03,
     shortSilencePenalty: 0.35,
@@ -470,6 +472,28 @@ function formatTTSDebugNumber(value, digits = 0) {
   return digits > 0 ? n.toFixed(digits) : String(Math.round(n));
 }
 
+function getGrayAutoTrialMaxTriggersPerSession(conversationMode = null) {
+  const mode = conversationMode && typeof conversationMode === "object"
+    ? conversationMode
+    : state.conversationMode;
+  const value = Number(mode?.grayAutoTrialMaxTriggersPerSession);
+  return Number.isFinite(value) ? Math.max(0, Math.min(4, Math.round(value))) : 1;
+}
+
+function getGrayAutoTrialSessionTriggerCount() {
+  const value = Number(state.grayAutoTrialSessionTriggerCount || 0);
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function isGrayAutoTrialSessionLimitReached(conversationMode = null) {
+  return getGrayAutoTrialSessionTriggerCount() >= getGrayAutoTrialMaxTriggersPerSession(conversationMode);
+}
+
+function incrementGrayAutoTrialSessionTriggerCount() {
+  state.grayAutoTrialSessionTriggerCount = getGrayAutoTrialSessionTriggerCount() + 1;
+  return state.grayAutoTrialSessionTriggerCount;
+}
+
 function shouldEnableProactiveSchedulerPolling() {
   const status = getProactiveSchedulerPollingGateStatus();
   return status.enabled;
@@ -495,6 +519,9 @@ function getProactiveSchedulerPollingGateStatus() {
   if (conversationMode.grayAutoTrialEnabled !== true) {
     blockedReasons.push("gray_auto_trial_disabled");
   }
+  if (isGrayAutoTrialSessionLimitReached(conversationMode)) {
+    blockedReasons.push("gray_auto_trial_session_limit_reached");
+  }
   return {
     enabled: blockedReasons.length === 0,
     blockedReasons
@@ -512,6 +539,8 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
   const schedulerEnabled = conversationMode.proactiveSchedulerEnabled === true;
   const grayAutoEnabled = conversationMode.grayAutoEnabled === true;
   const grayAutoTrialEnabled = conversationMode.grayAutoTrialEnabled === true;
+  const grayAutoTrialSessionTriggerCount = getGrayAutoTrialSessionTriggerCount();
+  const grayAutoTrialMaxTriggersPerSession = getGrayAutoTrialMaxTriggersPerSession(conversationMode);
   const pollingGate = getProactiveSchedulerPollingGateStatus();
   const pollIntervalMs = Number.isFinite(Number(conversationMode.proactivePollIntervalMs))
     ? Math.max(30000, Math.min(600000, Math.round(Number(conversationMode.proactivePollIntervalMs))))
@@ -577,6 +606,9 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
   if (proactiveCountInWindow >= maxFollowupsPerWindow) {
     blockedReasons.push("window_limit_reached");
   }
+  if (grayAutoTrialSessionTriggerCount >= grayAutoTrialMaxTriggersPerSession) {
+    blockedReasons.push("gray_auto_trial_session_limit_reached");
+  }
 
   return {
     schedulerEnabled,
@@ -584,6 +616,8 @@ function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
     proactiveEnabled,
     grayAutoEnabled,
     grayAutoTrialEnabled,
+    grayAutoTrialSessionTriggerCount,
+    grayAutoTrialMaxTriggersPerSession,
     startedAgeMs,
     warmupRemainingMs,
     cooldownRemainingMs,
@@ -659,6 +693,8 @@ function getTTSDebugSnapshot() {
       proactiveSchedulerEnabled: conversationMode.proactiveSchedulerEnabled === true,
       grayAutoEnabled: conversationMode.grayAutoEnabled === true,
       grayAutoTrialEnabled: conversationMode.grayAutoTrialEnabled === true,
+      grayAutoTrialSessionTriggerCount: getGrayAutoTrialSessionTriggerCount(),
+      grayAutoTrialMaxTriggersPerSession: getGrayAutoTrialMaxTriggersPerSession(conversationMode),
       proactiveCooldownMs: Number.isFinite(Number(conversationMode.proactiveCooldownMs))
         ? Math.round(Number(conversationMode.proactiveCooldownMs))
         : 600000,
@@ -1382,6 +1418,7 @@ function runConversationFollowupPendingFixture(input = {}) {
         proactiveSchedulerEnabled: false,
         grayAutoEnabled: false,
         grayAutoTrialEnabled: false,
+        grayAutoTrialMaxTriggersPerSession: 1,
         proactiveCooldownMs: 600000,
         proactiveWarmupMs: 120000,
         proactiveWindowMs: 3600000,
@@ -1845,12 +1882,17 @@ async function runProactiveSchedulerPollingCheck() {
     }
     const triggerResult = await runProactiveSchedulerManualTick();
     if (triggerResult?.ok === true) {
+      incrementGrayAutoTrialSessionTriggerCount();
       state.proactivePollLastResult = "triggered";
+      const postTriggerTrialContext = buildGrayAutoFollowupTrialEventContext(getTTSDebugSnapshot());
       recordTTSDebugEvent("proactive_scheduler_poll_trigger_success", {
         text: String(followupView?.topicHint || ""),
-        result: mergeProactiveSchedulerPollEventResult(String(triggerResult?.reason || "started"), pollTrialContext),
-        error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
+        result: mergeProactiveSchedulerPollEventResult(String(triggerResult?.reason || "started"), postTriggerTrialContext),
+        error: mergeProactiveSchedulerPollEventError(followupPolicyText, postTriggerTrialContext)
       });
+      if (isGrayAutoTrialSessionLimitReached()) {
+        stopProactiveSchedulerPolling("gray_auto_trial_session_limit_reached");
+      }
       return;
     }
     state.proactivePollLastResult = "trigger_blocked";
@@ -2184,6 +2226,7 @@ function explainReadinessReason(reason) {
     scheduler_disabled: "主动调度未开启",
     gray_auto_disabled: "灰度自动续话未显式启用",
     gray_auto_trial_disabled: "灰度自动试运行未显式启用",
+    gray_auto_trial_session_limit_reached: "\u7070\u5ea6\u81ea\u52a8\u8bd5\u8fd0\u884c\u672c\u6b21\u4f1a\u8bdd\u6b21\u6570\u5df2\u8fbe\u4e0a\u9650",
     no_pending_followup: "当前没有待续接的话题",
     empty_topic_hint: "没有可继续的话题线索",
     silence_window_not_reached: "安静时间还不够",
@@ -2231,6 +2274,9 @@ function buildGrayAutoFollowupReadinessStatus(snapshotInput = null) {
   if (mode.grayAutoTrialEnabled !== true) {
     blockedSet.add("gray_auto_trial_disabled");
   }
+  if (Number(mode.grayAutoTrialSessionTriggerCount || 0) >= Number(mode.grayAutoTrialMaxTriggersPerSession ?? 1)) {
+    blockedSet.add("gray_auto_trial_session_limit_reached");
+  }
   [
     scheduler.pollingBlockedReasons,
     followup.blockedReasons,
@@ -2260,6 +2306,8 @@ function buildGrayAutoFollowupReadinessStatus(snapshotInput = null) {
     candidateReady,
     grayAutoEnabled: mode.grayAutoEnabled === true,
     grayAutoTrialEnabled: trialEnabled,
+    grayAutoTrialSessionTriggerCount: Number(mode.grayAutoTrialSessionTriggerCount || 0),
+    grayAutoTrialMaxTriggersPerSession: Number(mode.grayAutoTrialMaxTriggersPerSession ?? 1),
     blockedReasons: Array.from(blockedSet)
   };
 }
@@ -2346,11 +2394,16 @@ function buildGrayAutoFollowupTrialPreflight(snapshotInput = null) {
   const gateBlockedReasons = gates
     .filter((gate) => gate.enabled !== true)
     .map((gate) => gate.blockedReason);
+  const sessionTriggerCount = Number(mode.grayAutoTrialSessionTriggerCount || 0);
+  const sessionMaxTriggers = Number(mode.grayAutoTrialMaxTriggersPerSession ?? 1);
+  const sessionLimitReached = sessionTriggerCount >= sessionMaxTriggers;
   const gatesReady = gateBlockedReasons.length === 0;
-  const localTrialReady = gatesReady && readiness.ready === true && dryRun.wouldAttemptTrigger === true;
-  const status = localTrialReady
-    ? "ready_for_local_trial"
-    : gatesReady ? "runtime_guards_blocked" : "gated_off";
+  const localTrialReady = !sessionLimitReached && gatesReady && readiness.ready === true && dryRun.wouldAttemptTrigger === true;
+  const status = sessionLimitReached
+    ? "session_limit_reached"
+    : localTrialReady
+      ? "ready_for_local_trial"
+      : gatesReady ? "runtime_guards_blocked" : "gated_off";
   const nextAction = localTrialReady
     ? "Local trial may be observed; keep it opt-in, reversible, and watched."
     : gatesReady
@@ -2364,6 +2417,11 @@ function buildGrayAutoFollowupTrialPreflight(snapshotInput = null) {
     gatesReady,
     gates,
     gateBlockedReasons,
+    sessionLimit: {
+      count: sessionTriggerCount,
+      max: sessionMaxTriggers,
+      reached: sessionLimitReached
+    },
     readiness,
     dryRun: {
       dryRun: true,
@@ -2796,6 +2854,7 @@ function buildFollowupReadinessReport() {
     `\u8c03\u5ea6\u5668\uff1a${formatReadinessBool(mode.proactiveSchedulerEnabled)}`,
     `\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\uff1a${formatReadinessBool(mode.grayAutoEnabled)}  \u8f6e\u8be2\u95e8\u7981\uff1a${joinReadinessReasons(scheduler.pollingBlockedReasons)}`,
     `\u8bd5\u8fd0\u884c\u603b\u95f8\uff1a${formatReadinessBool(mode.grayAutoTrialEnabled)}`,
+    `\u8bd5\u8fd0\u884c\u6b21\u6570\uff1a${Number(mode.grayAutoTrialSessionTriggerCount || 0)}/${Number(mode.grayAutoTrialMaxTriggersPerSession ?? 1)}`,
     `\u7070\u5ea6 readiness\uff1a${grayReadiness.ready === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u5019\u9009\uff1a${grayReadiness.candidateReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u8f6e\u8be2\uff1a${grayReadiness.pollingReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}`,
     `\u7070\u5ea6\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(grayReadiness.blockedReasons)}`,
     `\u7070\u5ea6 dry-run\uff1a${grayDryRun.wouldAttemptTrigger === true ? "\u82e5\u8f6e\u8be2\u68c0\u67e5\u53d1\u751f\uff0c\u4f1a\u5c1d\u8bd5\u89e6\u53d1" : "\u82e5\u8f6e\u8be2\u68c0\u67e5\u53d1\u751f\uff0c\u4ecd\u4f1a\u963b\u6b62"}  wouldPoll=${grayDryRun.wouldPollCheck === true ? "true" : "false"}`,
@@ -3604,6 +3663,7 @@ function buildFollowupConfigTemplate() {
     '    "proactive_scheduler_enabled": true,',
     '    "gray_auto_enabled": false,',
     '    "gray_auto_trial_enabled": false,',
+    '    "gray_auto_trial_max_triggers_per_session": 1,',
     '    "proactive_cooldown_ms": 600000,',
     '    "proactive_warmup_ms": 120000,',
     '    "proactive_poll_interval_ms": 60000,',
@@ -12943,6 +13003,9 @@ async function loadConfig() {
     proactiveSchedulerEnabled: conversationCfg.proactive_scheduler_enabled === true,
     grayAutoEnabled: conversationCfg.gray_auto_enabled === true,
     grayAutoTrialEnabled: conversationCfg.gray_auto_trial_enabled === true,
+    grayAutoTrialMaxTriggersPerSession: Math.round(
+      clampNumber(Number(conversationCfg.gray_auto_trial_max_triggers_per_session ?? 1), 0, 4)
+    ),
     proactiveCooldownMs: Math.round(
       clampNumber(Number(conversationCfg.proactive_cooldown_ms ?? 600000), 60000, 3600000)
     ),
