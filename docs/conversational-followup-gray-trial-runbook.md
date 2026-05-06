@@ -19,6 +19,8 @@ d.grayAutoFollowupTrialSession();
 d.grayAutoFollowupTrialEvents();
 d.grayAutoFollowupTrialRunbook();
 d.grayAutoFollowupTrialAuditSummary();
+d.grayAutoFollowupTrialPreRunChecklist();
+d.grayAutoFollowupTrialTimeline();
 d.followupReadiness();
 ```
 
@@ -41,8 +43,17 @@ The follow-up readiness panel now includes a controlled gray trial operation are
 - `Disarm` closes the in-memory gray trial gates and stops polling.
 - `Reset Session` requires the exact `RESET_GRAY_AUTO_TRIAL_SESSION` phrase and does not start polling.
 - `复制审计` copies a compact read-only audit summary.
+- `复制时间线` copies the recent gray trial control and polling event timeline.
 
 Use the panel controls only during a local controlled test. `Arm 试运行` can open the existing in-memory trial gates, so keep the app watched and use `Emergency Stop` first if anything feels wrong. The buttons do not write config, add desktop observation, capture screenshots, read files, execute shell commands, call tools, or call backend APIs.
+
+## Pre-run Checklist And Timeline
+
+Before a real controlled trial, check the readiness panel sections:
+
+- `灰度试运行前检查` shows required items such as explicit arm, visible polling state, session cap, emergency stop, disarm, and manual watch.
+- `灰度试运行时间线` summarizes recent arm, poll, trigger, stop, disarm, reset, and dry-run events.
+- Both sections are read-only and do not emit new events, arm, reset, start polling, trigger follow-up, or write config.
 
 Arm only during a local controlled test:
 

@@ -1221,3 +1221,17 @@ The reset helper exists to speed up local trial verification without restarting 
 - DevTools exposes `grayAutoFollowupTrialAuditSummary(limit)` as a read-only helper.
 - The readiness panel adds `复制审计` for copying status, session count, dry-run hints, blocked reasons, and recent poll events.
 - The audit path does not emit new trial events, arm/disarm/stop/reset, start polling, execute follow-up, call model/TTS/fetch, write config, or mutate pending state.
+
+## 109. Task 129 Landing Notes
+
+- Task 129 adds a gray trial pre-run checklist to the follow-up readiness panel.
+- DevTools exposes `grayAutoFollowupTrialPreRunChecklist()` as a read-only helper.
+- The checklist summarizes explicit arm state, polling visibility, session cap, emergency stop, disarm, runtime guards, and manual watch requirements.
+- It is observability only and does not arm, reset, start polling, execute follow-up, call model/TTS/fetch, write config, emit events, or mutate pending state.
+
+## 110. Task 130 Prep Landing Notes
+
+- Task 130 prep adds a gray trial timeline view before the first real controlled trial.
+- DevTools exposes `grayAutoFollowupTrialTimeline(limit)` as a read-only helper.
+- The readiness panel shows recent gray trial control, dry-run, and polling events, plus a `复制时间线` button.
+- The timeline path does not emit new events, arm/disarm/stop/reset, start polling, execute follow-up, call model/TTS/fetch, write config, or mutate pending state.

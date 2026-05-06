@@ -1435,3 +1435,30 @@ Manual checks:
 3. Open the readiness panel and click `复制审计`.
 4. Paste the clipboard into a scratch note and confirm it includes status, session count, wouldPoll/wouldTrigger, blocked reasons, latest event, and recent event lines.
 5. Confirm audit copy does not emit new trial events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 77. Gray Automatic Follow-up Trial Pre-run Checklist v1
+
+Purpose: confirm local testers can see whether a real controlled trial is ready before letting polling attempt anything.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行前检查（只读）` section is visible.
+3. With default config, confirm the checklist shows explicit arm as waiting and explains that arm requires the confirmation phrase.
+4. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialPreRunChecklist()`.
+5. Confirm the result has `readOnly=true`, `readyForWatchedTrial`, `readyForTriggerObservation`, `items`, `blockedReasons`, and `nextAction`.
+6. Confirm required items include visible polling state, session cap, emergency stop, disarm, and manual watch.
+7. Confirm the checklist does not emit events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 78. Gray Automatic Follow-up Trial Timeline v1
+
+Purpose: confirm local testers can inspect the recent controlled-trial event path before and after a real trial.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行时间线（只读）` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialTimeline()`.
+4. Confirm the result has `readOnly=true`, `entries`, `hasArm`, `hasStop`, `hasDisarm`, `hasTriggerSuccess`, and `hasTriggerBlocked`.
+5. Click `复制时间线`, paste into a scratch note, and confirm it includes recent control/dry-run/poll events.
+6. Confirm timeline rendering and copy do not emit new events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.

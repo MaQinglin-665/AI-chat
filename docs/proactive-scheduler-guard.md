@@ -420,3 +420,17 @@
 - The readiness panel can copy a compact audit summary for local trial review.
 - The audit summary reuses existing preflight, session, dry-run, scheduler snapshot, and poll event summary data.
 - It does not emit new trial events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 39. Task 129 Gray Trial Pre-run Checklist Note
+
+- Task 129 adds `grayAutoFollowupTrialPreRunChecklist()` as a read-only DevTools helper.
+- The readiness panel shows a pre-run checklist before a real controlled trial.
+- The checklist summarizes explicit arm state, polling visibility, session cap, emergency stop, disarm, runtime guards, and manual watch requirements.
+- It does not emit events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 40. Task 130 Prep Gray Trial Timeline Note
+
+- Task 130 prep adds `grayAutoFollowupTrialTimeline(limit)` as a read-only DevTools helper.
+- The readiness panel renders recent gray trial control, dry-run, and polling events as a compact timeline.
+- The panel can copy the timeline after an explicit user click.
+- Timeline rendering and copy do not emit new events, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/TTS/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
