@@ -473,3 +473,11 @@
 - The checklist inspects preview read-only boundaries, runtime metadata shape, Go/No-Go visibility, manual sign-off state, recent runtime hint pressure, and scheduler isolation.
 - It may mark implementation planning as ready, but it always keeps `readyForRuntimeEmission=false`.
 - It does not call `maybeEmitFollowupCharacterRuntimeHint()`, emit events, move Live2D, play TTS, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, call model/fetch, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.
+
+## 46. Task 136 Gray Trial Character Cue Manual Emit Gate Note
+
+- Task 136 adds `emitGrayAutoFollowupTrialCharacterCue({ confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE" })` as a manually confirmed DevTools helper.
+- The readiness panel exposes the same path through `试发角色cue`.
+- The helper emits the current preview runtime cue through existing character runtime metadata handling only after the exact confirmation phrase.
+- Successful emits record `conversation_followup_gray_auto_trial_character_cue_manual_emit` and update in-memory manual emit status.
+- This can produce a visible character runtime update during a watched local test, but it does not request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, access files, execute shell, call tools, call backend APIs, or add dependencies.

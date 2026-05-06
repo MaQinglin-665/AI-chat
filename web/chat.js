@@ -322,6 +322,7 @@ const state = {
   followupReadinessTrialCopySignoffBtn: null,
   followupReadinessTrialCopyCharacterBtn: null,
   followupReadinessTrialCopyCharacterHandoffBtn: null,
+  followupReadinessTrialEmitCharacterBtn: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
   followupReadinessManualActions: null,
@@ -337,6 +338,9 @@ const state = {
   followupCharacterRuntimeLastTone: "",
   followupCharacterRuntimeLastHintAt: 0,
   followupCharacterRuntimeLastHint: null,
+  grayAutoTrialCharacterCueManualEmitCount: 0,
+  grayAutoTrialCharacterCueLastManualEmitAt: 0,
+  grayAutoTrialCharacterCueLastManualEmit: null,
   localAsrMutedWarned: false,
   localAsrInputDeviceCandidates: [],
   localAsrSpeeching: false,
@@ -4276,10 +4280,10 @@ function buildGrayAutoTrialCharacterCueHandoffChecklist(limit = 48) {
     },
     {
       key: "runtime_emission_gate",
-      label: "真实角色动作仍需要单独任务和显式确认",
+      label: "真实角色动作只允许显式确认试发",
       required: true,
       ok: false,
-      note: "本任务只输出接入前检查，不开放真实 emission。"
+      note: "自动 emission 仍关闭；真实 cue 只能走手动确认试发闸门。"
     }
   ];
   const blockingRequired = items.filter((item) => item.required === true && item.ok !== true);
@@ -4288,6 +4292,7 @@ function buildGrayAutoTrialCharacterCueHandoffChecklist(limit = 48) {
     readOnly: true,
     status: blockingRequired.length > 0 ? "preview_only" : "ready_for_explicit_handoff",
     readyForImplementationPlanning,
+    manualEmitGateAvailable: true,
     readyForRuntimeEmission: false,
     decision: preview.decision,
     outcome: preview.outcome,
@@ -4298,7 +4303,7 @@ function buildGrayAutoTrialCharacterCueHandoffChecklist(limit = 48) {
     items,
     blockingRequired,
     nextAction: readyForImplementationPlanning
-      ? "Ready to plan a separate implementation task with an explicit user-confirmed emission gate."
+      ? "Use the manual emit gate only with the exact confirmation phrase; keep automatic emission closed."
       : "Keep this as preview-only; resolve required checklist items before adding any real character emission path.",
     safety: {
       noEventEmission: true,
@@ -4316,6 +4321,7 @@ function buildGrayAutoTrialCharacterCueHandoffChecklist(limit = 48) {
 
 function buildGrayAutoTrialCharacterCueHandoffChecklistText(limit = 48) {
   const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
+  const manualEmitStatus = getGrayAutoTrialCharacterCueManualEmitStatus();
   const itemLines = checklist.items.map((item) => {
     const mark = item.ok === true ? "OK" : "WAIT";
     const required = item.required === true ? "required" : "observe";
@@ -4323,13 +4329,126 @@ function buildGrayAutoTrialCharacterCueHandoffChecklistText(limit = 48) {
   });
   return [
     "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u63a5\u5165\u524d\u68c0\u67e5\uff08\u53ea\u8bfb\uff09",
-    `status=${checklist.status}  readyForImplementationPlanning=${checklist.readyForImplementationPlanning ? "true" : "false"}  readyForRuntimeEmission=false`,
+    `status=${checklist.status}  readyForImplementationPlanning=${checklist.readyForImplementationPlanning ? "true" : "false"}  manualEmitGateAvailable=${checklist.manualEmitGateAvailable ? "true" : "false"}  readyForRuntimeEmission=false`,
     `decision=${checklist.decision}  outcome=${checklist.outcome}  label=${checklist.label}  tone=${checklist.tone}`,
     `runtimeHint=emotion:${checklist.runtimeHint.emotion} action:${checklist.runtimeHint.action} intensity:${checklist.runtimeHint.intensity} voice_style:${checklist.runtimeHint.voice_style} live2d_hint:${checklist.runtimeHint.live2d_hint}`,
     ...itemLines,
+    `manualEmitCount=${manualEmitStatus.count}  lastManualEmitAt=${manualEmitStatus.lastEmitAt}`,
     `next=${checklist.nextAction}`,
     "\u5b89\u5168\uff1a\u68c0\u67e5\u53ea\u8bfb\uff0c\u4e0d\u53d1\u751f\u771f\u5b9e runtime hint\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
   ].join("\n");
+}
+
+function getGrayAutoTrialCharacterCueManualEmitStatus() {
+  const count = Number(state.grayAutoTrialCharacterCueManualEmitCount || 0);
+  const lastEmitAt = Number(state.grayAutoTrialCharacterCueLastManualEmitAt || 0);
+  const lastEmit = state.grayAutoTrialCharacterCueLastManualEmit || null;
+  return {
+    readOnly: true,
+    count: Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0,
+    lastEmitAt,
+    lastEmit
+  };
+}
+
+function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
+  const status = getGrayAutoTrialCharacterCueManualEmitStatus();
+  const lastEmit = status.lastEmit || null;
+  const lastEmitText = lastEmit
+    ? `decision=${lastEmit.decision || ""} outcome=${lastEmit.outcome || ""} label=${lastEmit.label || ""} tone=${lastEmit.tone || ""}`
+    : "none";
+  return [
+    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8bd5\u53d1\u72b6\u6001\uff08\u53ea\u8bfb\uff09",
+    `count=${status.count}`,
+    `lastEmitAt=${status.lastEmitAt}`,
+    `lastEmit=${lastEmitText}`,
+    "\u5b89\u5168\uff1a\u53ea\u662f\u8bb0\u5f55\u72b6\u6001\uff0c\u4e0d\u4f1a\u81ea\u52a8\u53d1\u9001\u65b0\u7684 runtime cue\u3002"
+  ].join("\n");
+}
+
+function emitGrayAutoTrialCharacterCueManually(input = {}) {
+  const safeInput = input && typeof input === "object" ? input : {};
+  const confirm = String(safeInput.confirm || "").trim();
+  const requiredConfirm = "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE";
+  if (confirm !== requiredConfirm) {
+    return {
+      ok: false,
+      reason: "confirmation_required",
+      requiredConfirm,
+      safety: {
+        noEventEmission: true,
+        noSchedulerChange: true,
+        noFollowupExecution: true,
+        noConfigWrites: true
+      }
+    };
+  }
+  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist();
+  if (checklist.readyForImplementationPlanning !== true) {
+    return {
+      ok: false,
+      reason: "handoff_checklist_not_ready",
+      checklistStatus: checklist.status,
+      blockingRequired: Array.isArray(checklist.blockingRequired) ? checklist.blockingRequired.slice() : [],
+      safety: {
+        noEventEmission: true,
+        noSchedulerChange: true,
+        noFollowupExecution: true,
+        noConfigWrites: true
+      }
+    };
+  }
+  let normalized = null;
+  try {
+    normalized = handleCharacterRuntimeMetadata(checklist.runtimeHint);
+  } catch (_) {
+    normalized = null;
+  }
+  if (!normalized) {
+    return {
+      ok: false,
+      reason: "runtime_hint_rejected",
+      checklistStatus: checklist.status,
+      safety: {
+        noSchedulerChange: true,
+        noFollowupExecution: true,
+        noConfigWrites: true
+      }
+    };
+  }
+  const count = getGrayAutoTrialCharacterCueManualEmitStatus().count + 1;
+  state.grayAutoTrialCharacterCueManualEmitCount = count;
+  state.grayAutoTrialCharacterCueLastManualEmitAt = Date.now();
+  state.grayAutoTrialCharacterCueLastManualEmit = {
+    decision: checklist.decision,
+    outcome: checklist.outcome,
+    label: checklist.label,
+    tone: checklist.tone,
+    runtimeHint: normalized
+  };
+  recordTTSDebugEvent("conversation_followup_gray_auto_trial_character_cue_manual_emit", {
+    text: String(checklist.label || ""),
+    result: [`count:${count}`, `decision:${checklist.decision}`, `outcome:${checklist.outcome}`].join(";"),
+    error: String(normalized.emotion || "")
+  });
+  updateFollowupReadinessPanel();
+  return {
+    ok: true,
+    count,
+    decision: checklist.decision,
+    outcome: checklist.outcome,
+    label: checklist.label,
+    tone: checklist.tone,
+    runtimeHint: normalized,
+    checklistStatus: checklist.status,
+    safety: {
+      readOnly: false,
+      explicitConfirmationRequired: true,
+      noSchedulerChange: true,
+      noFollowupExecution: true,
+      noConfigWrites: true
+    }
+  };
 }
 
 function updateGrayAutoTrialPreRunChecklistCard() {
@@ -4465,6 +4584,24 @@ function handleGrayAutoTrialResetClick(button = null) {
     button.blur();
   }
   return result?.reset === true;
+}
+
+function handleGrayAutoTrialCharacterCueManualEmitClick(button = null) {
+  if (!promptGrayAutoTrialPhrase("EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE", "\u624b\u52a8\u8bd5\u53d1\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272 runtime cue")) {
+    setStatus("\u89d2\u8272 cue \u8bd5\u53d1\u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
+    return false;
+  }
+  const result = emitGrayAutoTrialCharacterCueManually({
+    confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE"
+  });
+  updateFollowupReadinessPanel();
+  setStatus(result?.ok === true
+    ? `\u89d2\u8272 cue \u5df2\u624b\u52a8\u8bd5\u53d1\uff08count=${result.count}\uff09`
+    : `\u89d2\u8272 cue \u8bd5\u53d1\u5931\u8d25\uff1a${result?.reason || "unknown"}`);
+  if (button) {
+    button.blur();
+  }
+  return result?.ok === true;
 }
 
 async function copyGrayAutoTrialAuditSummaryToClipboard(button = null) {
@@ -4827,6 +4964,14 @@ function ensureFollowupReadinessPanel() {
   trialCopyCharacterHandoff.addEventListener("click", () => {
     copyGrayAutoTrialCharacterCueHandoffChecklistToClipboard(trialCopyCharacterHandoff);
   });
+  const trialEmitCharacter = document.createElement("button");
+  trialEmitCharacter.type = "button";
+  trialEmitCharacter.textContent = "\u8bd5\u53d1\u89d2\u8272cue";
+  trialEmitCharacter.title = "\u9700\u8981\u8f93\u5165 EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE\uff1b\u53ea\u8bd5\u53d1\u5f53\u524d\u9884\u89c8 runtime cue \u4e00\u6b21";
+  trialEmitCharacter.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e7fff1;color:#174d35;cursor:pointer;";
+  trialEmitCharacter.addEventListener("click", () => {
+    handleGrayAutoTrialCharacterCueManualEmitClick(trialEmitCharacter);
+  });
   const manualConfirm = document.createElement("button");
   manualConfirm.type = "button";
   manualConfirm.textContent = "\u786e\u8ba4";
@@ -4863,7 +5008,8 @@ function ensureFollowupReadinessPanel() {
     trialCopyDecision,
     trialCopySignoff,
     trialCopyCharacter,
-    trialCopyCharacterHandoff
+    trialCopyCharacterHandoff,
+    trialEmitCharacter
   ]);
   const manualStatus = document.createElement("div");
   manualStatus.style.cssText = [
@@ -5078,6 +5224,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCopySignoffBtn = trialCopySignoff;
   state.followupReadinessTrialCopyCharacterBtn = trialCopyCharacter;
   state.followupReadinessTrialCopyCharacterHandoffBtn = trialCopyCharacterHandoff;
+  state.followupReadinessTrialEmitCharacterBtn = trialEmitCharacter;
   return panel;
 }
 
@@ -10505,6 +10652,8 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialSignoffPackage: (limit) => buildGrayAutoTrialSignoffPackage(limit),
     grayAutoFollowupTrialCharacterCuePreview: (limit) => buildGrayAutoTrialCharacterCuePreview(limit),
     grayAutoFollowupTrialCharacterCueHandoffChecklist: (limit) => buildGrayAutoTrialCharacterCueHandoffChecklist(limit),
+    grayAutoFollowupTrialCharacterCueManualEmitStatus: () => getGrayAutoTrialCharacterCueManualEmitStatus(),
+    emitGrayAutoFollowupTrialCharacterCue: (input) => emitGrayAutoTrialCharacterCueManually(input),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({
