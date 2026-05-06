@@ -1491,3 +1491,17 @@ Manual checks:
 5. With default/no trial state, confirm the decision is `NO_GO` or `WATCH_ONLY`, not an automatic approval.
 6. Click `复制决策`, paste into a scratch note, and confirm it includes decision, reason, missing required items, root causes, and next action.
 7. Confirm decision rendering and copy do not emit new events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 81. Gray Automatic Follow-up Trial Sign-off Package v1
+
+Purpose: confirm local testers can copy a manual sign-off template after a controlled gray trial.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm a `灰度试运行签收包（只读模板）` section is visible.
+3. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialSignoffPackage()`.
+4. Confirm the result has `readOnly=true`, `trialId`, `decision`, `outcome`, `stageRecommendation`, `manualChecks`, `signoff`, and `safety`.
+5. Confirm `approvedForNextPhase=false` by default.
+6. Click `复制签收`, paste into a scratch note, and confirm it includes manual checklist items and sign-off placeholders.
+7. Confirm sign-off rendering and copy do not emit new events, arm, disarm, stop, reset, start polling, execute follow-up, request model output, play TTS, fetch, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
