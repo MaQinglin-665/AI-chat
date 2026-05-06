@@ -2290,6 +2290,88 @@ function buildGrayAutoFollowupDryRunStatus(snapshotInput = null) {
   };
 }
 
+function buildGrayAutoFollowupTrialPreflight(snapshotInput = null) {
+  const snapshot = snapshotInput && typeof snapshotInput === "object"
+    ? snapshotInput
+    : getTTSDebugSnapshot();
+  const mode = snapshot.conversationMode || {};
+  const readiness = buildGrayAutoFollowupReadinessStatus(snapshot);
+  const dryRun = buildGrayAutoFollowupDryRunStatus(snapshot);
+  const gates = [
+    {
+      key: "enabled",
+      configKey: "conversation_mode.enabled",
+      enabled: mode.enabled === true,
+      blockedReason: "conversation_disabled"
+    },
+    {
+      key: "proactive_enabled",
+      configKey: "conversation_mode.proactive_enabled",
+      enabled: mode.proactiveEnabled === true,
+      blockedReason: "proactive_disabled"
+    },
+    {
+      key: "proactive_scheduler_enabled",
+      configKey: "conversation_mode.proactive_scheduler_enabled",
+      enabled: mode.proactiveSchedulerEnabled === true,
+      blockedReason: "scheduler_disabled"
+    },
+    {
+      key: "gray_auto_enabled",
+      configKey: "conversation_mode.gray_auto_enabled",
+      enabled: mode.grayAutoEnabled === true,
+      blockedReason: "gray_auto_disabled"
+    },
+    {
+      key: "gray_auto_trial_enabled",
+      configKey: "conversation_mode.gray_auto_trial_enabled",
+      enabled: mode.grayAutoTrialEnabled === true,
+      blockedReason: "gray_auto_trial_disabled"
+    }
+  ];
+  const gateBlockedReasons = gates
+    .filter((gate) => gate.enabled !== true)
+    .map((gate) => gate.blockedReason);
+  const gatesReady = gateBlockedReasons.length === 0;
+  const localTrialReady = gatesReady && readiness.ready === true && dryRun.wouldAttemptTrigger === true;
+  const status = localTrialReady
+    ? "ready_for_local_trial"
+    : gatesReady ? "runtime_guards_blocked" : "gated_off";
+  const nextAction = localTrialReady
+    ? "Local trial may be observed; keep it opt-in, reversible, and watched."
+    : gatesReady
+      ? "Wait for candidate, silence window, cooldown, policy, and scheduler guards to pass."
+      : "Enable all five gates only in a local test config when ready for controlled trial.";
+  return {
+    preflight: true,
+    readOnly: true,
+    ok: localTrialReady,
+    status,
+    gatesReady,
+    gates,
+    gateBlockedReasons,
+    readiness,
+    dryRun: {
+      dryRun: true,
+      status: dryRun.status,
+      wouldPollCheck: dryRun.wouldPollCheck === true,
+      wouldAttemptTrigger: dryRun.wouldAttemptTrigger === true,
+      blockedReasons: Array.isArray(readiness.blockedReasons) ? readiness.blockedReasons.slice() : []
+    },
+    safety: {
+      defaultOffRequired: true,
+      explicitGrayTrialOptInRequired: true,
+      manualConfirmationPrimary: true,
+      noDesktopObservationRequired: true,
+      noFileAccess: true,
+      noToolCalls: true,
+      noConfigWrites: true,
+      noModelOrTtsCall: true
+    },
+    nextAction
+  };
+}
+
 function runGrayAutoFollowupDryRunDebug() {
   const result = buildGrayAutoFollowupDryRunStatus();
   const blockedReasons = Array.isArray(result.readiness?.blockedReasons)
@@ -2558,6 +2640,7 @@ function buildFollowupReadinessReport() {
   const characterState = buildFollowupCharacterState(followup, silence, scheduler);
   const grayReadiness = buildGrayAutoFollowupReadinessStatus(snapshot);
   const grayDryRun = buildGrayAutoFollowupDryRunStatus(snapshot);
+  const grayPreflight = buildGrayAutoFollowupTrialPreflight(snapshot);
   const switchesReady = mode.enabled === true
     && mode.proactiveEnabled === true
     && mode.proactiveSchedulerEnabled === true;
@@ -2590,6 +2673,7 @@ function buildFollowupReadinessReport() {
     `\u7070\u5ea6 readiness\uff1a${grayReadiness.ready === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u5019\u9009\uff1a${grayReadiness.candidateReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u8f6e\u8be2\uff1a${grayReadiness.pollingReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}`,
     `\u7070\u5ea6\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(grayReadiness.blockedReasons)}`,
     `\u7070\u5ea6 dry-run\uff1a${grayDryRun.wouldAttemptTrigger === true ? "\u82e5\u8f6e\u8be2\u68c0\u67e5\u53d1\u751f\uff0c\u4f1a\u5c1d\u8bd5\u89e6\u53d1" : "\u82e5\u8f6e\u8be2\u68c0\u67e5\u53d1\u751f\uff0c\u4ecd\u4f1a\u963b\u6b62"}  wouldPoll=${grayDryRun.wouldPollCheck === true ? "true" : "false"}`,
+    `\u8bd5\u8fd0\u884c preflight\uff1a${grayPreflight.status}  gates=${grayPreflight.gatesReady === true ? "pass" : joinReadinessReasons(grayPreflight.gateBlockedReasons)}`,
     "",
     "\u5982\u4f55\u8c03\u6574",
     "1. \u6253\u5f00 config.local.json\u3002",
@@ -8727,6 +8811,7 @@ function installTTSDebugBridge() {
     clearConversationFollowupRehearsal: () => clearConversationFollowupRehearsal(),
     grayAutoFollowupReadiness: () => buildGrayAutoFollowupReadinessStatus(),
     grayAutoFollowupDryRun: () => runGrayAutoFollowupDryRunDebug(),
+    grayAutoFollowupTrialPreflight: () => buildGrayAutoFollowupTrialPreflight(),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({

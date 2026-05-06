@@ -1076,3 +1076,25 @@ Default posture:
 - Manual confirmation remains available separately through its existing guarded path.
 
 This keeps the project moving toward automatic follow-up while preserving the open-source safety line: no default-on proactive speech, no hidden observation, and no automatic desktop/file/tool capabilities.
+
+## 92. Task 117 Landing Notes
+
+- Task 117 adds a read-only controlled trial preflight helper: `grayAutoFollowupTrialPreflight()`.
+- The helper summarizes the five automatic polling gates, current gray readiness, dry-run outcome, and compact safety posture without starting polling or executing follow-up.
+- The follow-up status panel now includes a one-line preflight result so local testers can quickly see whether the trial is still gated off, blocked by runtime guards, or ready for local observation.
+- The helper does not emit debug events; explicit dry-run audit remains limited to `grayAutoFollowupDryRun()`.
+- This task does not change config defaults, scheduler execution, pending state, model/TTS/fetch behavior, desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, config writes, or dependencies.
+
+## 93. Controlled Trial Preflight
+
+The preflight status is intentionally diagnostic rather than executable:
+
+- `gated_off`: at least one of the five explicit automatic polling gates is false.
+- `runtime_guards_blocked`: all five gates are true, but candidate, silence, cooldown, policy, busy, speaking, or window-limit guards still block a trial attempt.
+- `ready_for_local_trial`: all five gates and current runtime guards indicate that a polling check would attempt a trigger.
+
+The output remains compact and local:
+
+- Gate entries show config key, pass/fail state, and the matching blocked reason.
+- Readiness and dry-run sections reuse existing read-only builders.
+- Safety notes explicitly state that manual confirmation is still primary and that preflight does not require desktop observation, file access, tool calls, config writes, model calls, or TTS.
