@@ -381,3 +381,11 @@
 - Arming is renderer-memory only: it opens the five gates, resets the session counter, syncs existing polling, and records `conversation_followup_gray_auto_trial_armed`.
 - Existing scheduler guards, session cap, and emergency stop remain the safety boundary.
 - It does not write config or add desktop/file/tool/shell/backend capabilities.
+
+## 34. Task 124 Gray Trial DevTools Disarm Note
+
+- Task 124 exposes `disarmGrayAutoFollowupTrial(reason)` through the DevTools bridge.
+- Disarm closes the in-memory gray automatic gates and stops proactive scheduler polling.
+- It records `conversation_followup_gray_auto_trial_disarmed`.
+- The readiness report shows compact armed/polling state.
+- It does not write config, reset session count, execute follow-up, mutate pending state, or call model/TTS/fetch.

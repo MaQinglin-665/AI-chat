@@ -590,6 +590,37 @@ function armGrayAutoTrialSession(input = {}) {
   };
 }
 
+function disarmGrayAutoTrialSession(reason = "manual_disarm") {
+  const normalizedReason = sanitizeTTSDebugText(reason || "manual_disarm", 80) || "manual_disarm";
+  if (!state.conversationMode || typeof state.conversationMode !== "object") {
+    state.conversationMode = {};
+  }
+  state.conversationMode.grayAutoEnabled = false;
+  state.conversationMode.grayAutoTrialEnabled = false;
+  stopProactiveSchedulerPolling("gray_auto_trial_disarmed");
+  const scheduler = buildProactiveSchedulerDebugSnapshot(Date.now());
+  recordTTSDebugEvent("conversation_followup_gray_auto_trial_disarmed", {
+    result: [
+      `reason:${normalizedReason}`,
+      `polling:${scheduler.pollTimerActive === true ? "active" : "inactive"}`,
+      `count:${getGrayAutoTrialSessionTriggerCount()}`,
+      `max:${getGrayAutoTrialMaxTriggersPerSession()}`
+    ].join(";"),
+    error: Array.isArray(scheduler.pollingBlockedReasons) ? scheduler.pollingBlockedReasons.join(",") : ""
+  });
+  return {
+    ok: true,
+    armed: false,
+    reason: normalizedReason,
+    pollingRestarted: false,
+    scheduler: {
+      pollTimerActive: scheduler.pollTimerActive === true,
+      pollingBlockedReasons: Array.isArray(scheduler.pollingBlockedReasons) ? scheduler.pollingBlockedReasons.slice() : []
+    },
+    session: buildGrayAutoTrialSessionState()
+  };
+}
+
 function shouldEnableProactiveSchedulerPolling() {
   const status = getProactiveSchedulerPollingGateStatus();
   return status.enabled;
@@ -2927,6 +2958,7 @@ function buildFollowupReadinessReport() {
   const grayAutoEnabled = mode.grayAutoEnabled === true;
   const grayAutoTrialEnabled = mode.grayAutoTrialEnabled === true;
   const automaticGatesReady = switchesReady && grayAutoEnabled && grayAutoTrialEnabled;
+  const grayTrialArmed = grayAutoEnabled && grayAutoTrialEnabled;
   const rehearsalBlockedReason = getConversationFollowupRehearsalBlockedReason();
   const rehearsalScenarioLabel = getFollowupRehearsalScenarioLabel(state.followupRehearsalScenarioId);
   const lines = [
@@ -2940,6 +2972,7 @@ function buildFollowupReadinessReport() {
     `\u9762\u677f\u9884\u6f14\uff1a${state.followupRehearsalActive === true ? "\u5df2\u5f00\u542f" : "\u672a\u5f00\u542f"}${rehearsalScenarioLabel ? `  \u573a\u666f\uff1a${rehearsalScenarioLabel}` : ""}  \u53ef\u9884\u6f14\uff1a${rehearsalBlockedReason ? "\u5426" : "\u662f"}${rehearsalBlockedReason ? `  \u539f\u56e0\uff1a${rehearsalBlockedReason}` : ""}`,
     `\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\uff1a${grayAutoEnabled ? "\u5df2\u663e\u5f0f\u542f\u7528" : "\u672a\u542f\u7528\uff08\u9ed8\u8ba4\u5173\u95ed\uff09"}${grayAutoEnabled ? "" : "  \u81ea\u52a8\u8f6e\u8be2\u4f1a\u4fdd\u6301\u5173\u95ed"}`,
     `\u8bd5\u8fd0\u884c\u603b\u95f8\uff1a${grayAutoTrialEnabled ? "\u5df2\u663e\u5f0f\u542f\u7528" : "\u672a\u542f\u7528\uff08\u9ed8\u8ba4\u5173\u95ed\uff09"}${grayAutoTrialEnabled ? "" : "  \u81ea\u52a8\u8f6e\u8be2\u4f1a\u4fdd\u6301\u5173\u95ed"}`,
+    `\u8bd5\u8fd0\u884c armed\uff1a${grayTrialArmed ? "\u662f" : "\u5426"}  polling=${scheduler.pollTimerActive === true ? "on" : "off"}`,
     automaticGatesReady
       ? "\u4e94\u5c42\u81ea\u52a8\u8f6e\u8be2\u5f00\u5173\u90fd\u5df2\u5f00\u542f\uff0c\u4f46\u4ecd\u4f1a\u7ee7\u7eed\u53d7\u5b89\u9759\u7a97\u53e3\u3001\u51b7\u5374\u3001\u6b21\u6570\u4e0a\u9650\u548c\u7b56\u7565\u4fdd\u62a4\u3002"
       : "\u5f53\u524d\u4ecd\u6709\u81ea\u52a8\u8f6e\u8be2\u5f00\u5173\u672a\u5f00\u542f\uff0c\u6240\u4ee5\u4e0d\u4f1a\u81ea\u52a8\u7eed\u8bdd\u3002",
@@ -2950,6 +2983,7 @@ function buildFollowupReadinessReport() {
     `\u8c03\u5ea6\u5668\uff1a${formatReadinessBool(mode.proactiveSchedulerEnabled)}`,
     `\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\uff1a${formatReadinessBool(mode.grayAutoEnabled)}  \u8f6e\u8be2\u95e8\u7981\uff1a${joinReadinessReasons(scheduler.pollingBlockedReasons)}`,
     `\u8bd5\u8fd0\u884c\u603b\u95f8\uff1a${formatReadinessBool(mode.grayAutoTrialEnabled)}`,
+    `\u8bd5\u8fd0\u884c armed\uff1a${grayTrialArmed ? "true" : "false"}  polling=${scheduler.pollTimerActive === true ? "true" : "false"}`,
     `\u8bd5\u8fd0\u884c\u6b21\u6570\uff1a${Number(mode.grayAutoTrialSessionTriggerCount || 0)}/${Number(mode.grayAutoTrialMaxTriggersPerSession ?? 1)}`,
     `\u7070\u5ea6 readiness\uff1a${grayReadiness.ready === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u5019\u9009\uff1a${grayReadiness.candidateReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u8f6e\u8be2\uff1a${grayReadiness.pollingReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}`,
     `\u7070\u5ea6\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(grayReadiness.blockedReasons)}`,
@@ -9100,6 +9134,7 @@ function installTTSDebugBridge() {
     resetGrayAutoFollowupTrialSession: () => resetGrayAutoTrialSessionTriggerCount(),
     stopGrayAutoFollowupTrial: (reason) => stopGrayAutoTrialSession(reason),
     armGrayAutoFollowupTrial: (input) => armGrayAutoTrialSession(input),
+    disarmGrayAutoFollowupTrial: (reason) => disarmGrayAutoTrialSession(reason),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({

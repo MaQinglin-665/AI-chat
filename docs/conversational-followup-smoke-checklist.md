@@ -1367,3 +1367,17 @@ Manual checks:
 4. Confirm it records `conversation_followup_gray_auto_trial_armed`.
 5. Confirm session cap, emergency stop, cooldown, silence, policy, busy/speaking, and window-limit guards still apply.
 6. Confirm it does not write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 72. Gray Automatic Follow-up DevTools Disarm v1
+
+Purpose: confirm local trial arming has a symmetric in-memory disarm path.
+
+Manual checks:
+
+1. After arming a local trial, run `window.__AI_CHAT_DEBUG_TTS__.disarmGrayAutoFollowupTrial("manual_check")`.
+2. Confirm the result has `ok=true`, `armed=false`, and `pollingRestarted=false`.
+3. Confirm `snapshot().conversationMode.grayAutoEnabled=false` and `grayAutoTrialEnabled=false`.
+4. Confirm `snapshot().proactiveScheduler.pollTimerActive=false`.
+5. Confirm one compact `conversation_followup_gray_auto_trial_disarmed` event is recorded.
+6. Confirm the follow-up readiness report shows `armed=false` and polling off.
+7. Confirm disarm does not write config, reset session count, execute follow-up, request model output, play TTS, fetch, mutate pending state, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
