@@ -523,6 +523,26 @@ function resetGrayAutoTrialSessionTriggerCount() {
   };
 }
 
+
+function stopGrayAutoTrialSession(reason = "manual_emergency_stop") {
+  const normalizedReason = sanitizeTTSDebugText(reason || "manual_emergency_stop", 80) || "manual_emergency_stop";
+  const previous = buildGrayAutoTrialSessionState();
+  state.grayAutoTrialSessionTriggerCount = getGrayAutoTrialMaxTriggersPerSession();
+  stopProactiveSchedulerPolling("gray_auto_trial_emergency_stop");
+  const current = buildGrayAutoTrialSessionState();
+  recordTTSDebugEvent("conversation_followup_gray_auto_trial_emergency_stop", {
+    result: ["reason:" + normalizedReason, "from:" + previous.count, "to:" + current.count, "max:" + current.max].join(";"),
+    error: current.blockedReason
+  });
+  return {
+    ...current,
+    stopped: true,
+    reason: normalizedReason,
+    previousCount: previous.count,
+    pollingRestarted: false
+  };
+}
+
 function shouldEnableProactiveSchedulerPolling() {
   const status = getProactiveSchedulerPollingGateStatus();
   return status.enabled;
@@ -9031,6 +9051,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialEvents: (limit) => buildGrayAutoFollowupTrialEventSummary(limit),
     grayAutoFollowupTrialSession: () => buildGrayAutoTrialSessionState(),
     resetGrayAutoFollowupTrialSession: () => resetGrayAutoTrialSessionTriggerCount(),
+    stopGrayAutoFollowupTrial: (reason) => stopGrayAutoTrialSession(reason),
     followupReadiness: () => buildFollowupReadinessReport(),
     followupCharacterState: () => getFollowupCharacterStateDebugView(),
     followupCharacterRuntimeHint: () => ({

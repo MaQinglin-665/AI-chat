@@ -366,3 +366,10 @@
 - The read-only helper reports current automatic trial session count, max, remaining, and cap state.
 - The reset helper only resets the renderer-memory counter and records `conversation_followup_gray_auto_trial_session_reset`.
 - Reset does not restart polling, enable gates, call scheduler ticks, execute follow-up, mutate pending state, call model/TTS/fetch, write config, or change scheduler guards.
+
+## 32. Task 122 Gray Trial Emergency Stop Note
+
+- Task 122 exposes `stopGrayAutoFollowupTrial(reason)` through the DevTools bridge.
+- It stops polling and seals the current renderer session by setting the trial counter to the configured max.
+- It records `conversation_followup_gray_auto_trial_emergency_stop`.
+- It does not change config, enable gates, restart polling, execute follow-up, mutate pending state, or call model/TTS/fetch.
