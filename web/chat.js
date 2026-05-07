@@ -384,6 +384,7 @@ const state = {
   followupCharacterRuntimeLastHint: null,
   followupCharacterRuntimeLastDispatch: null,
   followupCharacterRuntimeLastApply: null,
+  followupCharacterRuntimeLastReplyCandidate: null,
   grayAutoTrialCharacterCueManualEmitCount: 0,
   grayAutoTrialCharacterCueLastManualEmitAt: 0,
   grayAutoTrialCharacterCueLastManualEmit: null,
@@ -3068,6 +3069,69 @@ function resolveGrayAutoTrialCharacterCuePreset(input = {}, checklist = null) {
   };
 }
 
+function buildAssistantReplyCharacterCueCandidate(input = {}) {
+  const safe = input && typeof input === "object" ? input : {};
+  const text = String(safe.text || "").trim();
+  const mood = String(safe.mood || "idle").trim().toLowerCase();
+  const style = String(safe.style || "neutral").trim().toLowerCase();
+  const auto = safe.auto === true;
+  const lower = text.toLowerCase();
+  let tone = "idle";
+  if (mood === "happy" || /[!！]$/.test(text)) {
+    tone = "ready";
+  } else if (mood === "surprised" || lower.includes("?") || text.includes("？")) {
+    tone = "watching";
+  } else if (mood === "sad" || mood === "anxious") {
+    tone = "quiet";
+  } else if (style === "playful") {
+    tone = "ready";
+  } else if (style === "brief" || auto) {
+    tone = "cooldown";
+  }
+  const base = buildFollowupCharacterRuntimeHint({
+    label: text.slice(0, 48),
+    tone
+  });
+  const runtimeHint = normalizeCharacterRuntimeMetadataForFrontend({
+    ...base,
+    source: "assistant_reply_candidate",
+    action: tone === "watching" ? "think" : base.action
+  });
+  return {
+    readOnly: true,
+    source: "assistant_reply",
+    generatedAt: Date.now(),
+    eligibleForManualSend: !!runtimeHint,
+    autoTriggered: false,
+    auto,
+    mood,
+    style,
+    tone,
+    textPreview: text.slice(0, 80),
+    runtimeHint,
+    safety: {
+      noRuntimeCueEmission: true,
+      noLive2DMove: true,
+      noTts: true,
+      noSchedulerChange: true,
+      noFollowupExecution: true,
+      noConfigWrites: true
+    }
+  };
+}
+
+function previewAssistantReplyCharacterCueCandidate(input = {}) {
+  const candidate = buildAssistantReplyCharacterCueCandidate(input);
+  state.followupCharacterRuntimeLastReplyCandidate = candidate;
+  recordTTSDebugEvent("conversation_followup_character_reply_cue_candidate", {
+    text: String(candidate.textPreview || ""),
+    result: `tone:${candidate.tone};mood:${candidate.mood};style:${candidate.style}`,
+    error: candidate.runtimeHint ? String(candidate.runtimeHint.emotion || "") : "no_runtime_hint"
+  });
+  updateGrayAutoTrialCharacterManualCueStatusCard();
+  return candidate;
+}
+
 function maybeEmitFollowupCharacterRuntimeHint(input = {}) {
   if (state.uiView !== "chat") {
     return null;
@@ -4606,6 +4670,7 @@ function getGrayAutoTrialCharacterCueManualEmitStatus() {
   const lastBackendBridge = state.grayAutoTrialCharacterCueLastBackendBridge || null;
   const lastRuntimeDispatch = state.followupCharacterRuntimeLastDispatch || null;
   const lastRuntimeApply = state.followupCharacterRuntimeLastApply || null;
+  const lastReplyCandidate = state.followupCharacterRuntimeLastReplyCandidate || null;
   return {
     readOnly: true,
     count: Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0,
@@ -4613,7 +4678,8 @@ function getGrayAutoTrialCharacterCueManualEmitStatus() {
     lastEmit,
     lastBackendBridge,
     lastRuntimeDispatch,
-    lastRuntimeApply
+    lastRuntimeApply,
+    lastReplyCandidate
   };
 }
 
@@ -4623,6 +4689,7 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
   const bridge = status.lastBackendBridge || null;
   const dispatch = status.lastRuntimeDispatch || null;
   const apply = status.lastRuntimeApply || null;
+  const candidate = status.lastReplyCandidate || null;
   const lastEmitText = lastEmit
     ? `decision=${lastEmit.decision || ""} outcome=${lastEmit.outcome || ""} label=${lastEmit.label || ""} tone=${lastEmit.tone || ""}`
     : "none";
@@ -4638,6 +4705,9 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
   const applyText = apply
     ? `emotion=${apply.appliedEmotion ? "true" : "false"} action=${apply.appliedAction ? "true" : "false"} modelReady=${apply.modelReady ? "true" : "false"}`
     : "none";
+  const candidateText = candidate
+    ? `tone=${candidate.tone || "n/a"} mood=${candidate.mood || "n/a"} eligible=${candidate.eligibleForManualSend ? "true" : "false"} emitted=false`
+    : "none";
   return [
     "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8bd5\u53d1\u72b6\u6001\uff08\u53ea\u8bfb\uff09",
     `count=${status.count}`,
@@ -4647,6 +4717,7 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
     `backendBridge=${bridgeText}`,
     `runtimeDispatch=${dispatchText}`,
     `runtimeApply=${applyText}`,
+    `replyCueCandidate=${candidateText}`,
     "\u5b89\u5168\uff1a\u53ea\u662f\u8bb0\u5f55\u72b6\u6001\uff0c\u4e0d\u4f1a\u81ea\u52a8\u53d1\u9001\u65b0\u7684 runtime cue\u3002"
   ].join("\n");
 }
@@ -4657,6 +4728,7 @@ function buildGrayAutoTrialCharacterManualCueStatusCardText() {
   const bridge = status.lastBackendBridge || null;
   const dispatch = status.lastRuntimeDispatch || null;
   const apply = status.lastRuntimeApply || null;
+  const candidate = status.lastReplyCandidate || null;
   const selectedPreset = getSelectedGrayAutoTrialCharacterCuePresetKey();
   const preset = GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS[selectedPreset] || GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS.auto;
   const hint = lastEmit?.runtimeHint || {};
@@ -4670,6 +4742,7 @@ function buildGrayAutoTrialCharacterManualCueStatusCardText() {
     `lastPreset=${lastEmit?.presetKey || "none"}  lastLabel=${lastEmit?.label || "none"}  lastTone=${lastEmit?.tone || "none"}`,
     `backendPreview=${bridge ? (bridgeOk ? "noop_confirmed" : bridge.reason || "blocked") : "not_checked"}  backendWouldExecute=${bridge?.wouldExecute === true ? "true" : "false"}`,
     `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
+    `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} emitted:false` : "none"}`,
     `dispatch=${dispatch ? (dispatchOk ? "local_dispatched" : "not_dispatched") : "none"}  broadcast=${dispatch?.broadcasted ? "true" : "false"}  ui=${dispatch?.uiView || "n/a"}`,
     `live2dApply=${applyKnown ? `emotion:${apply.appliedEmotion ? "true" : "false"} action:${apply.appliedAction ? "true" : "false"} modelReady:${apply.modelReady ? "true" : "false"}` : "none"}`,
     "\u5b89\u5168\uff1a\u624b\u52a8\u786e\u8ba4\u540e\u624d\u4f1a\u8bd5\u53d1\uff1b\u4e0d\u63a5 scheduler\u3001\u4e0d\u81ea\u52a8\u89e6\u53d1\u3001\u4e0d\u53d1 TTS\u3001\u4e0d\u5199 config\u3002"
@@ -13331,6 +13404,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterCueManualEmitStatus: () => getGrayAutoTrialCharacterCueManualEmitStatus(),
     grayAutoFollowupTrialCharacterCueManualEmitRecap: (limit) => buildGrayAutoTrialCharacterCueManualEmitRecap(limit),
     grayAutoFollowupTrialCharacterCuePresets: () => listGrayAutoTrialCharacterCuePresets(),
+    grayAutoFollowupTrialCharacterReplyCueCandidate: (input) => buildAssistantReplyCharacterCueCandidate(input),
     grayAutoFollowupTrialCharacterCueBackendBridgePreview: () => previewGrayAutoTrialCharacterCueBackendBridge(),
     emitGrayAutoFollowupTrialCharacterCueViaManualBridge: (input) => emitGrayAutoTrialCharacterCueViaManualBridge(input),
     grayAutoFollowupTrialCharacterExpressionStrategyDraft: (limit) => buildGrayAutoTrialCharacterExpressionStrategyDraft(limit),
@@ -19884,6 +19958,12 @@ async function requestAssistantReply(text, opts = {}) {
     recordEmotion(mood);
     const finalTalkStyle = resolveTalkStyle(message, visibleReply, mood, isAuto);
     state.currentTalkStyle = finalTalkStyle;
+    previewAssistantReplyCharacterCueCandidate({
+      text: visibleReply,
+      mood,
+      style: finalTalkStyle,
+      auto: isAuto
+    });
     state.speechAnimMood = mood;
     if (state.motionQuietDuringSpeech && state.speakingEnabled) {
       triggerExpressionPulse(finalTalkStyle, 0.4, 220);
