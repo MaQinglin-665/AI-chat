@@ -365,6 +365,7 @@ const state = {
   followupReadinessTrialCharacterSwitchDisableBtn: null,
   followupReadinessTrialCharacterSwitchRollbackBtn: null,
   followupReadinessTrialEmitCharacterBtn: null,
+  followupReadinessTrialCharacterCuePresetSelect: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
   followupReadinessManualActions: null,
@@ -3000,6 +3001,72 @@ function buildFollowupCharacterRuntimeHint(input = {}) {
   };
 }
 
+const GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS = {
+  auto: {
+    label: "\u5f53\u524d\u9884\u89c8",
+    tone: "auto",
+    description: "\u4f7f\u7528\u5f53\u524d\u7eed\u8bdd\u9884\u89c8\u63a8\u5bfc\u7684\u89d2\u8272 cue",
+    runtimeHint: null
+  },
+  happy_wave: {
+    label: "\u5f00\u5fc3\u6325\u624b",
+    tone: "ready",
+    description: "\u624b\u52a8\u6d4b\u8bd5\u53cb\u597d\u6253\u62db\u547c",
+    runtimeHint: { emotion: "happy", action: "wave", intensity: "normal", voice_style: "cheerful", live2d_hint: "happy" }
+  },
+  thinking: {
+    label: "\u601d\u8003\u4e00\u4e0b",
+    tone: "watching",
+    description: "\u624b\u52a8\u6d4b\u8bd5\u601d\u8003\u72b6\u6001",
+    runtimeHint: { emotion: "thinking", action: "think", intensity: "low", voice_style: "neutral", live2d_hint: "thinking" }
+  },
+  surprised: {
+    label: "\u8f7b\u5fae\u60ca\u8bb6",
+    tone: "ready",
+    description: "\u624b\u52a8\u6d4b\u8bd5\u60ca\u8bb6\u53cd\u5e94",
+    runtimeHint: { emotion: "surprised", action: "surprised", intensity: "normal", voice_style: "cheerful", live2d_hint: "surprised" }
+  },
+  calm_idle: {
+    label: "\u5b89\u9759\u5f85\u673a",
+    tone: "quiet",
+    description: "\u624b\u52a8\u6d4b\u8bd5\u4f4e\u6253\u6270\u5f85\u673a",
+    runtimeHint: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral", live2d_hint: "idle" }
+  }
+};
+
+function normalizeGrayAutoTrialCharacterCuePresetKey(value) {
+  const key = String(value || "auto").trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS, key) ? key : "auto";
+}
+
+function listGrayAutoTrialCharacterCuePresets() {
+  return Object.entries(GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS).map(([key, preset]) => ({
+    key,
+    label: String(preset.label || key),
+    tone: String(preset.tone || ""),
+    description: String(preset.description || "")
+  }));
+}
+
+function resolveGrayAutoTrialCharacterCuePreset(input = {}, checklist = null) {
+  const safeInput = input && typeof input === "object" ? input : {};
+  const safeChecklist = checklist && typeof checklist === "object"
+    ? checklist
+    : buildGrayAutoTrialCharacterCueHandoffChecklist();
+  const key = normalizeGrayAutoTrialCharacterCuePresetKey(safeInput.presetKey || safeInput.preset || safeInput.cuePreset);
+  const preset = GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS[key] || GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS.auto;
+  const runtimeHint = preset.runtimeHint && typeof preset.runtimeHint === "object"
+    ? { ...preset.runtimeHint }
+    : { ...(safeChecklist.runtimeHint || {}) };
+  return {
+    key,
+    label: key === "auto" ? String(safeChecklist.label || preset.label || "") : String(preset.label || key),
+    tone: key === "auto" ? String(safeChecklist.tone || preset.tone || "") : String(preset.tone || ""),
+    description: String(preset.description || ""),
+    runtimeHint
+  };
+}
+
 function maybeEmitFollowupCharacterRuntimeHint(input = {}) {
   if (state.uiView !== "chat") {
     return null;
@@ -4561,6 +4628,9 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
   const bridgeText = bridge
     ? `ok=${bridge.ok === true ? "true" : "false"} backendNoop=${bridge.backendNoop === true ? "true" : "false"} wouldExecute=${bridge.wouldExecute === true ? "true" : "false"} dispatched=${bridge.dispatched === true ? "true" : "false"}`
     : "none";
+  const presetText = lastEmit
+    ? `preset=${lastEmit.presetKey || "auto"} source=${lastEmit.presetDescription || "n/a"}`
+    : "preset=auto source=n/a";
   const dispatchText = dispatch
     ? `local=${dispatch.localDispatched ? "true" : "false"} broadcast=${dispatch.broadcasted ? "true" : "false"} emotion=${dispatch.emotion || "n/a"} action=${dispatch.action || "n/a"}`
     : "none";
@@ -4572,6 +4642,7 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
     `count=${status.count}`,
     `lastEmitAt=${status.lastEmitAt}`,
     `lastEmit=${lastEmitText}`,
+    `manualCuePreset=${presetText}`,
     `backendBridge=${bridgeText}`,
     `runtimeDispatch=${dispatchText}`,
     `runtimeApply=${applyText}`,
@@ -4639,6 +4710,7 @@ function buildGrayAutoTrialCharacterCueManualEmitRecapText(limit = 24) {
     `status=${recap.status}  accepted=${recap.accepted ? "true" : "false"}  count=${recap.count}`,
     `lastEmitAt=${recap.lastEmitAt}`,
     `last=decision:${recap.lastEmit?.decision || "n/a"} outcome:${recap.lastEmit?.outcome || "n/a"} label:${recap.lastEmit?.label || "n/a"} tone:${recap.lastEmit?.tone || "n/a"}`,
+    `manualCuePreset=${recap.lastEmit?.presetKey || "auto"} description:${recap.lastEmit?.presetDescription || "n/a"}`,
     `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} voice_style:${hint.voice_style || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
     `runtimeDispatch=local:${recap.lastRuntimeDispatch?.localDispatched ? "true" : "false"} broadcast:${recap.lastRuntimeDispatch?.broadcasted ? "true" : "false"} ui:${recap.lastRuntimeDispatch?.uiView || "n/a"}`,
     `runtimeApply=emotion:${recap.lastRuntimeApply?.appliedEmotion ? "true" : "false"} action:${recap.lastRuntimeApply?.appliedAction ? "true" : "false"} modelReady:${recap.lastRuntimeApply?.modelReady ? "true" : "false"}`,
@@ -5959,9 +6031,10 @@ function emitGrayAutoTrialCharacterCueManually(input = {}) {
       }
     };
   }
+  const cuePreset = resolveGrayAutoTrialCharacterCuePreset(safeInput, checklist);
   let normalized = null;
   try {
-    normalized = handleCharacterRuntimeMetadata(checklist.runtimeHint);
+    normalized = handleCharacterRuntimeMetadata(cuePreset.runtimeHint);
   } catch (_) {
     normalized = null;
   }
@@ -5983,15 +6056,17 @@ function emitGrayAutoTrialCharacterCueManually(input = {}) {
   state.grayAutoTrialCharacterCueLastManualEmit = {
     decision: checklist.decision,
     outcome: checklist.outcome,
-    label: checklist.label,
-    tone: checklist.tone,
+    label: cuePreset.label,
+    tone: cuePreset.tone,
+    presetKey: cuePreset.key,
+    presetDescription: cuePreset.description,
     runtimeHint: normalized,
     runtimeDispatch: state.followupCharacterRuntimeLastDispatch || null,
     runtimeApply: state.followupCharacterRuntimeLastApply || null
   };
   recordTTSDebugEvent("conversation_followup_gray_auto_trial_character_cue_manual_emit", {
-    text: String(checklist.label || ""),
-    result: [`count:${count}`, `decision:${checklist.decision}`, `outcome:${checklist.outcome}`].join(";"),
+    text: String(cuePreset.label || ""),
+    result: [`count:${count}`, `preset:${cuePreset.key}`, `decision:${checklist.decision}`, `outcome:${checklist.outcome}`].join(";"),
     error: String(normalized.emotion || "")
   });
   updateFollowupReadinessPanel();
@@ -6000,8 +6075,10 @@ function emitGrayAutoTrialCharacterCueManually(input = {}) {
     count,
     decision: checklist.decision,
     outcome: checklist.outcome,
-    label: checklist.label,
-    tone: checklist.tone,
+    label: cuePreset.label,
+    tone: cuePreset.tone,
+    presetKey: cuePreset.key,
+    presetDescription: cuePreset.description,
     runtimeHint: normalized,
     checklistStatus: checklist.status,
     safety: {
@@ -6102,6 +6179,11 @@ async function previewGrayAutoTrialCharacterCueBackendBridge(checklist = null) {
   return bridge;
 }
 
+function getSelectedGrayAutoTrialCharacterCuePresetKey() {
+  const select = state.followupReadinessTrialCharacterCuePresetSelect;
+  return normalizeGrayAutoTrialCharacterCuePresetKey(select && typeof select.value === "string" ? select.value : "auto");
+}
+
 async function emitGrayAutoTrialCharacterCueViaManualBridge(input = {}) {
   const safeInput = input && typeof input === "object" ? input : {};
   const confirm = String(safeInput.confirm || "").trim();
@@ -6120,6 +6202,7 @@ async function emitGrayAutoTrialCharacterCueViaManualBridge(input = {}) {
     };
   }
   const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist();
+  const cuePreset = resolveGrayAutoTrialCharacterCuePreset(safeInput, checklist);
   const backendBridge = await previewGrayAutoTrialCharacterCueBackendBridge(checklist);
   if (backendBridge.ok !== true) {
     return {
@@ -6136,7 +6219,10 @@ async function emitGrayAutoTrialCharacterCueViaManualBridge(input = {}) {
       }
     };
   }
-  const result = emitGrayAutoTrialCharacterCueManually(safeInput);
+  const result = emitGrayAutoTrialCharacterCueManually({
+    ...safeInput,
+    presetKey: cuePreset.key
+  });
   if (result && typeof result === "object") {
     result.backendBridge = backendBridge;
   }
@@ -6417,7 +6503,8 @@ async function handleGrayAutoTrialCharacterCueManualEmitClick(button = null) {
   setStatus("\u89d2\u8272 cue \u540e\u7aef\u9884\u68c0\u4e2d\uff1a\u53ea\u8d70 preview/no-op adapter");
   try {
     const result = await emitGrayAutoTrialCharacterCueViaManualBridge({
-      confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE"
+      confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE",
+      presetKey: getSelectedGrayAutoTrialCharacterCuePresetKey()
     });
     updateFollowupReadinessPanel();
     setStatus(result?.ok === true
@@ -7222,10 +7309,27 @@ function ensureFollowupReadinessPanel() {
   const trialEmitCharacter = document.createElement("button");
   trialEmitCharacter.type = "button";
   trialEmitCharacter.textContent = "\u8bd5\u53d1\u89d2\u8272cue";
-  trialEmitCharacter.title = "\u9700\u8981\u8f93\u5165 EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE\uff1b\u53ea\u8bd5\u53d1\u5f53\u524d\u9884\u89c8 runtime cue \u4e00\u6b21";
+  trialEmitCharacter.title = "\u9700\u8981\u8f93\u5165 EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE\uff1b\u53ea\u6309\u624b\u52a8\u9884\u8bbe\u8bd5\u53d1 runtime cue \u4e00\u6b21";
   trialEmitCharacter.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e7fff1;color:#174d35;cursor:pointer;";
   trialEmitCharacter.addEventListener("click", () => {
     handleGrayAutoTrialCharacterCueManualEmitClick(trialEmitCharacter);
+  });
+  const trialCharacterCuePreset = document.createElement("select");
+  trialCharacterCuePreset.title = "\u624b\u52a8\u89d2\u8272 cue \u9884\u8bbe\uff1b\u4ec5\u5f71\u54cd\u786e\u8ba4\u540e\u7684\u672c\u5730\u8bd5\u53d1";
+  trialCharacterCuePreset.style.cssText = [
+    "border:1px solid rgba(74,121,93,.24)",
+    "border-radius:999px",
+    "padding:5px 8px",
+    "background:#f8fffb",
+    "color:#174d35",
+    "font:12px/1.2 system-ui,sans-serif"
+  ].join(";");
+  listGrayAutoTrialCharacterCuePresets().forEach((preset) => {
+    const option = document.createElement("option");
+    option.value = preset.key;
+    option.textContent = preset.label;
+    option.title = preset.description;
+    trialCharacterCuePreset.appendChild(option);
   });
   const manualConfirm = document.createElement("button");
   manualConfirm.type = "button";
@@ -7293,6 +7397,7 @@ function ensureFollowupReadinessPanel() {
   ]);
   const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup("\u9ad8\u98ce\u9669\u672c\u5730\u5165\u53e3", [
     trialEnableCharacterSwitch,
+    trialCharacterCuePreset,
     trialEmitCharacter
   ]);
   advancedLocalActions.title = "\u9ed8\u8ba4\u6536\u8d77\uff1b\u4ec5\u7528\u4e8e\u672c\u5730\u4e13\u9879\u8bd5\u9a8c\uff0c\u4e0d\u8fde\u63a5 automatic runtime";
@@ -7702,6 +7807,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCharacterSwitchDisableBtn = trialDisableCharacterSwitch;
   state.followupReadinessTrialCharacterSwitchRollbackBtn = trialRollbackCharacterSwitch;
   state.followupReadinessTrialEmitCharacterBtn = trialEmitCharacter;
+  state.followupReadinessTrialCharacterCuePresetSelect = trialCharacterCuePreset;
   return panel;
 }
 
@@ -13176,6 +13282,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterCueHandoffChecklist: (limit) => buildGrayAutoTrialCharacterCueHandoffChecklist(limit),
     grayAutoFollowupTrialCharacterCueManualEmitStatus: () => getGrayAutoTrialCharacterCueManualEmitStatus(),
     grayAutoFollowupTrialCharacterCueManualEmitRecap: (limit) => buildGrayAutoTrialCharacterCueManualEmitRecap(limit),
+    grayAutoFollowupTrialCharacterCuePresets: () => listGrayAutoTrialCharacterCuePresets(),
     grayAutoFollowupTrialCharacterCueBackendBridgePreview: () => previewGrayAutoTrialCharacterCueBackendBridge(),
     emitGrayAutoFollowupTrialCharacterCueViaManualBridge: (input) => emitGrayAutoTrialCharacterCueViaManualBridge(input),
     grayAutoFollowupTrialCharacterExpressionStrategyDraft: (limit) => buildGrayAutoTrialCharacterExpressionStrategyDraft(limit),

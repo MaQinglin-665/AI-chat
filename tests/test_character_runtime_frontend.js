@@ -83,9 +83,22 @@ assert.ok(
 );
 assert.ok(
   source.includes("async function emitGrayAutoTrialCharacterCueViaManualBridge")
-    && source.includes("emitGrayAutoTrialCharacterCueManually(safeInput)")
+    && source.includes("emitGrayAutoTrialCharacterCueManually({")
     && source.includes("grayAutoFollowupTrialCharacterCueBackendBridgePreview"),
   "manual character cue bridge should keep an explicit debug entry point and reuse the existing manual emit path"
+);
+assert.ok(
+  source.includes("const GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS")
+    && source.includes("happy_wave")
+    && source.includes("trialCharacterCuePreset")
+    && source.includes("grayAutoFollowupTrialCharacterCuePresets"),
+  "manual character cue bridge should expose explicit safe presets without automatic runtime scheduling"
+);
+assert.ok(
+  source.includes("resolveGrayAutoTrialCharacterCuePreset")
+    && source.includes("presetKey: getSelectedGrayAutoTrialCharacterCuePresetKey()")
+    && source.includes("manualCuePreset="),
+  "manual character cue emits should record the selected preset in status and recap"
 );
 assert.ok(
   source.includes("followupCharacterRuntimeLastDispatch")
