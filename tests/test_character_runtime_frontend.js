@@ -122,6 +122,17 @@ assert.ok(
   "reply cue candidate debug API should stay preview-only and safe"
 );
 assert.ok(
+  source.includes("async function emitLastReplyCharacterCueCandidateViaManualBridge")
+    && source.includes("SEND_REPLY_CHARACTER_CUE_CANDIDATE")
+    && source.includes("conversation_followup_character_reply_cue_candidate_manual_emit")
+    && source.includes("emitGrayAutoFollowupTrialCharacterReplyCueCandidateViaManualBridge"),
+  "reply cue candidates should have a separate manual-only bridge with an explicit confirmation phrase"
+);
+assert.ok(
+  /async function emitLastReplyCharacterCueCandidateViaManualBridge[\s\S]*?previewGrayAutoTrialCharacterCueBackendBridge[\s\S]*?handleCharacterRuntimeMetadata\(candidate\.runtimeHint\)/.test(source),
+  "reply cue candidate manual sends should pass backend preview/no-op before using the local runtime cue path"
+);
+assert.ok(
   source.includes("followupCharacterRuntimeLastDispatch")
     && source.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_DISPATCH__")
     && source.includes("runtimeDispatch=local:"),
@@ -134,8 +145,8 @@ assert.ok(
   "manual character cue feedback should expose Live2D apply diagnostics without adding automatic triggers"
 );
 assert.ok(
-  /const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup[\s\S]*trialEmitCharacter[\s\S]*\]\);/.test(source),
-  "manual character cue button should remain inside the collapsed high-risk local action group"
+  /const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup[\s\S]*trialEmitCharacter[\s\S]*trialSendReplyCueCandidate[\s\S]*\]\);/.test(source),
+  "manual character cue buttons should remain inside the collapsed high-risk local action group"
 );
 assert.ok(
   source.includes("function finishSpeechAnimation()"),
