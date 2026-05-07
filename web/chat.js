@@ -2495,6 +2495,8 @@ async function runVoiceTestAndAppendReport() {
 
 const CHARACTER_TUNING = window.TaffyCharacterTuning || {};
 const CHARACTER_REPLY_CUE = window.TaffyCharacterReplyCue || {};
+const FOLLOWUP_READINESS_VIEW = window.TaffyFollowupReadinessView || {};
+const GRAY_TRIAL_CHARACTER_VIEW = window.TaffyGrayTrialCharacterView || {};
 const CHARACTER_REHEARSAL_PRESETS = CHARACTER_TUNING.CHARACTER_REHEARSAL_PRESETS || [];
 
 function getNextCharacterRehearsalPreset() {
@@ -3602,29 +3604,9 @@ function buildFollowupReadinessBackendEntryView() {
 
 function buildFollowupReadinessBackendEntryCardText() {
   const view = buildFollowupReadinessBackendEntryView();
-  const statusText = view.loading
-    ? "加载中"
-    : view.loaded
-      ? "已获取"
-      : "未获取";
-  const loadedText = view.loaded ? "是" : "否";
-  const errorText = view.error ? `\n获取错误：${view.error}` : "";
-  return [
-    "后端入口摘要（只读）",
-    `状态：${statusText}  读取方式：authFetch(\"/api/character_runtime/backend_entry\")`,
-    `已拉取：${loadedText}  只读：${view.loaded ? "是" : "未确认"}  骨架：${view.skeletonOnly ? "是" : "未确认"}`,
-    `默认关闭：${view.loaded ? (view.defaultOffBaseline ? "是" : "否") : "未确认"}  显式启用要求：${view.loaded ? (view.explicitEnableRequired ? "是" : "否") : "未确认"}`,
-    `自动 runtime 连接：${view.loaded ? (view.automaticRuntimeConnected ? "是" : "否") : "未确认"}  scheduler 默认行为：${view.loaded ? (view.schedulerDefaultChanged ? "已改" : "未改") : "未确认"}`,
-    `config 写入：${view.loaded ? (view.configWriteEnabled ? "是" : "否") : "未确认"}  runtime cue：${view.loaded ? (view.runtimeCueEnabled ? "是" : "否") : "未确认"}  Live2D：${view.loaded ? (view.live2dEnabled ? "是" : "否") : "未确认"}  TTS：${view.loaded ? (view.ttsEnabled ? "是" : "否") : "未确认"}`,
-    `配置快照：enabled=${view.loaded ? (view.configuredEnabled ? "是" : "否") : "n/a"}  return_metadata=${view.loaded ? (view.configuredReturnMetadata ? "是" : "否") : "n/a"}  demo_stable=${view.loaded ? (view.configuredDemoStable ? "是" : "否") : "n/a"}  persona_override=${view.loaded ? (view.configuredPersonaOverrideEnabled ? "是" : "否") : "n/a"}`,
-    `可用性：${view.loaded ? (view.entryReady ? "就绪" : "未就绪") : (view.loading ? "加载中" : "未获取")}  阻塞原因：${view.loaded ? joinReadinessReasons(view.blockedReasons) : "n/a"}`,
-    `守卫合约：${view.loaded ? (view.guardContractReadOnly ? "只读" : "非只读") : "未确认"} / ${view.loaded ? (view.guardContractFailClosed ? "fail-closed" : "未确认 fail-closed") : "未确认"}  required=${view.loaded ? view.guardContractRequiredChecks.length : 0}  disallowed=${view.loaded ? view.guardContractDisallowedActions.length : 0}`,
-    `守卫确认：${view.loaded ? (view.guardContractOperatorConfirmation || "n/a") : "n/a"}  回退=${view.loaded ? joinReadinessReasons(view.guardContractRollbackSteps) : "n/a"}`,
-    `执行预检：${view.loaded ? (view.previewDryRun ? "dry-run" : "n/a") : "未确认"}  accepted=${view.loaded ? (view.previewAccepted ? "是" : "否") : "n/a"}  would_execute=${view.loaded ? (view.previewWouldExecute ? "是" : "否") : "n/a"}  action=${view.loaded ? (view.previewRequestedAction || "n/a") : "n/a"}`,
-    `预检阻塞：${view.loaded ? joinReadinessReasons(view.previewBlockedReasons) : "n/a"}`,
-    `下一步：${view.loaded ? (view.nextAction || "n/a") : "先只读拉取 backend_entry 摘要，不改变任何状态"}`,
-    `刷新：${view.lastRefreshAt > 0 ? "已尝试" : "未尝试"}  成功：${view.lastSuccessAt > 0 ? "已成功" : "未成功"}${errorText}`
-  ].join("\n");
+  return typeof FOLLOWUP_READINESS_VIEW.buildBackendEntryCardText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildBackendEntryCardText(view, { joinReasons: joinReadinessReasons })
+    : "后端入口摘要（只读）\n状态：未获取";
 }
 
 async function refreshFollowupReadinessBackendEntrySummary(force = false) {
@@ -3775,12 +3757,9 @@ function buildFollowupReadinessReport() {
 
 function buildFollowupReadinessPreviewCardText() {
   const data = buildFollowupReadinessPreviewCardData();
-  return [
-    `\u573a\u666f\uff1a${data.scenarioLabel}  \u72b6\u6001\uff1a${data.characterLabel} / ${data.characterMood}`,
-    `policy=${data.policy}  tone=${data.tone}  selected=${data.selectedIndex}`,
-    `\u60f3\u63a5\u7684\u4e00\u53e5\uff1a${data.candidateText}`,
-    `\u963b\u585e\uff1a${data.blocked}  \u5b89\u5168\uff1a\u4ec5\u672c\u5730\u9884\u6f14\uff0c\u4e0d\u8bf7\u6c42\u6a21\u578b/\u8bed\u97f3`
-  ].join("\n");
+  return typeof FOLLOWUP_READINESS_VIEW.buildPreviewCardText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildPreviewCardText(data)
+    : "";
 }
 
 function buildFollowupRehearsalScenarioCompareRows() {
@@ -3810,63 +3789,31 @@ function buildFollowupRehearsalScenarioCompareRows() {
 }
 
 function buildFollowupRehearsalScenarioCompareText() {
-  const rows = buildFollowupRehearsalScenarioCompareRows().map((row) => {
-    return `${row.label} | policy=${row.policy} | tone=${row.tone} | selected=${row.selectedIndex} | ${row.candidateText}`;
-  });
-  return [
-    "场景对比（本地预演，不写入状态）",
-    ...rows
-  ].join("\n");
+  const rows = buildFollowupRehearsalScenarioCompareRows();
+  return typeof FOLLOWUP_READINESS_VIEW.buildScenarioCompareText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildScenarioCompareText(rows)
+    : "";
 }
 
 function buildFollowupReadinessPreviewCopyBundleText() {
   const data = buildFollowupReadinessPreviewCardData();
-  const candidateText = data.candidateText === "n/a" ? "" : data.candidateText;
-  const summary = buildFollowupReadinessPreviewCardText();
-  return [
-    "续话预演对比包",
-    candidateText ? `短句：${candidateText}` : "短句：(空)",
-    "",
-    "摘要：",
-    summary
-  ].join("\n");
+  return typeof FOLLOWUP_READINESS_VIEW.buildPreviewCopyBundleText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildPreviewCopyBundleText(data)
+    : "";
 }
 
 function buildFollowupReadinessPreviewJsonText() {
   const data = buildFollowupReadinessPreviewCardData();
-  const snapshot = {
-    scenario: data.scenarioLabel,
-    character: {
-      label: data.characterLabel,
-      mood: data.characterMood
-    },
-    followup: {
-      policy: data.policy,
-      tone: data.tone,
-      selectedIndex: data.selectedIndex,
-      candidateText: data.candidateText === "n/a" ? "" : data.candidateText,
-      blockedReasons: data.blocked === "none"
-        ? []
-        : String(data.blocked || "").split(",").map((item) => item.trim()).filter(Boolean)
-    },
-    safety: "local_preview_only_no_model_or_voice_requests"
-  };
-  return JSON.stringify(snapshot, null, 2);
+  return typeof FOLLOWUP_READINESS_VIEW.buildPreviewJsonText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildPreviewJsonText(data)
+    : "{}";
 }
 
 function buildFollowupReadinessPreviewOneLineText() {
   const data = buildFollowupReadinessPreviewCardData();
-  const candidateText = (data.candidateText === "n/a" ? "" : data.candidateText).replace(/\s+/g, " ").trim();
-  const safeCandidate = candidateText || "(empty)";
-  return [
-    `scenario=${data.scenarioLabel}`,
-    `state=${data.characterLabel}/${data.characterMood}`,
-    `policy=${data.policy}`,
-    `tone=${data.tone}`,
-    `selected=${data.selectedIndex}`,
-    `blocked=${data.blocked}`,
-    `line=${safeCandidate}`
-  ].join(" | ");
+  return typeof FOLLOWUP_READINESS_VIEW.buildPreviewOneLineText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildPreviewOneLineText(data)
+    : "";
 }
 
 function buildFollowupReadinessPreviewCardData(snapshotInput = null) {
@@ -3904,17 +3851,15 @@ function buildFollowupReadinessPreviewCardData(snapshotInput = null) {
 }
 
 function normalizeFollowupManualConfirmationToken(value = "") {
-  return String(value || "").replace(/\s+/g, " ").trim();
+  return typeof FOLLOWUP_READINESS_VIEW.normalizeManualConfirmationToken === "function"
+    ? FOLLOWUP_READINESS_VIEW.normalizeManualConfirmationToken(value)
+    : String(value || "").replace(/\s+/g, " ").trim();
 }
 
 function buildFollowupManualConfirmationKey(input = {}) {
-  const topic = normalizeFollowupManualConfirmationToken(input.topicHint || input.reason || "");
-  const policy = normalizeFollowupManualConfirmationToken(input.policy || "");
-  const candidate = normalizeFollowupManualConfirmationToken(input.candidateText || "");
-  if (!topic || !policy || !candidate) {
-    return "";
-  }
-  return `${topic}::${policy}::${candidate}`;
+  return typeof FOLLOWUP_READINESS_VIEW.buildManualConfirmationKey === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildManualConfirmationKey(input)
+    : "";
 }
 
 function buildFollowupManualConfirmationData() {
@@ -3969,16 +3914,9 @@ function buildFollowupManualConfirmationData() {
 }
 
 function getFollowupManualConfirmationStatusLabel(status = "hidden") {
-  switch (String(status || "")) {
-    case "available":
-      return "\u53ef\u786e\u8ba4";
-    case "blocked":
-      return "\u4e0d\u53ef\u786e\u8ba4";
-    case "dismissed":
-      return "\u5df2\u5ffd\u7565";
-    default:
-      return "\u9690\u85cf";
-  }
+  return typeof FOLLOWUP_READINESS_VIEW.getManualConfirmationStatusLabel === "function"
+    ? FOLLOWUP_READINESS_VIEW.getManualConfirmationStatusLabel(status)
+    : "隐藏";
 }
 
 function buildFollowupManualConfirmationDebugPayload(confirmation = {}, result = "") {
@@ -4185,15 +4123,12 @@ function updateFollowupManualConfirmationPreviewCard() {
     state.followupReadinessConfirmationCard.textContent = "";
     return;
   }
-  state.followupReadinessConfirmationCard.textContent = [
-    `手动确认预览：${data.available === true ? "可确认" : "暂不可确认"}`,
-    `想接的一句：${data.candidateText}`,
-    `话题：${data.topicHint || "n/a"}`,
-    `policy=${data.policy}  tone=${data.tone}  selected=${data.selectedIndex}`,
-    `守卫说明：${data.available === true ? "当前守卫允许手动确认执行。" : explainReadinessReasons(data.blockedReasons)}`,
-    `原始阻塞：${joinReadinessReasons(data.blockedReasons)}`,
-    "安全：未点击确认前不会请求模型、不会发语音、不会执行续话。"
-  ].join("\n");
+  state.followupReadinessConfirmationCard.textContent = typeof FOLLOWUP_READINESS_VIEW.buildManualConfirmationPreviewText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildManualConfirmationPreviewText(data, {
+      explainReasons: explainReadinessReasons,
+      joinReasons: joinReadinessReasons
+    })
+    : "";
 }
 
 function buildGrayAutoTrialStatusCardText() {
@@ -4205,26 +4140,12 @@ function buildGrayAutoTrialStatusCardText() {
   const events = buildGrayAutoFollowupTrialEventSummary(8);
   const armed = mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true;
   const polling = scheduler.pollTimerActive === true;
-  const latest = events.last
-    ? `${events.last.stage}/${events.lastTrialStatus}`
-    : "none";
-  const nextStep = preflight.status === "ready_for_local_trial"
-    ? "\u53ef\u4ee5\u8fdb\u5165\u672c\u5730\u53d7\u63a7\u89c2\u5bdf\uff1b\u7ee7\u7eed\u4fdd\u6301\u4eba\u5de5\u76d1\u770b\uff0c\u5f02\u5e38\u65f6\u5148 stop \u518d disarm\u3002"
-    : preflight.status === "runtime_guards_blocked"
-      ? "\u4e94\u5c42\u95e8\u7981\u5df2\u6253\u5f00\uff0c\u4f46\u5019\u9009\u7eed\u8bdd\u3001\u5b89\u9759\u7a97\u53e3\u3001\u51b7\u5374\u6216\u7b56\u7565 guard \u8fd8\u5728\u963b\u585e\u3002"
-      : preflight.status === "session_limit_reached"
-        ? "\u672c\u6b21 renderer session \u5df2\u5230\u8fbe\u8bd5\u8fd0\u884c\u4e0a\u9650\uff1b\u5982\u9700\u518d\u8bd5\uff0c\u5148\u786e\u8ba4\u540e\u518d\u91cd\u7f6e\u8ba1\u6570\u3002"
-        : "\u4fdd\u6301\u9ed8\u8ba4\u5173\u95ed\uff1b\u82e5\u8981\u672c\u5730\u8bd5\u8fd0\u884c\uff0c\u5148\u9605\u8bfb runbook\uff0c\u518d\u7528\u786e\u8ba4\u77ed\u8bed arm\u3002";
-  return [
-    "\u7070\u5ea6\u81ea\u52a8\u8bd5\u8fd0\u884c\u72b6\u6001\u5361\uff08\u53ea\u8bfb\uff09",
-    `status=${preflight.status}  armed=${armed ? "true" : "false"}  polling=${polling ? "true" : "false"}`,
-    `session=${session.count}/${session.max}  remaining=${session.remaining}  reached=${session.reached ? "true" : "false"}`,
-    `wouldPoll=${preflight.dryRun?.wouldPollCheck === true ? "true" : "false"}  wouldTrigger=${preflight.dryRun?.wouldAttemptTrigger === true ? "true" : "false"}`,
-    `blocked=${explainReadinessReasons(preflight.dryRun?.blockedReasons || preflight.gateBlockedReasons)}`,
-    `events=${events.totalPollEvents}  last=${latest}`,
-    `next=${nextStep}`,
-    "\u5b89\u5168\uff1a\u672c\u5361\u4e0d arm\u3001\u4e0d disarm\u3001\u4e0d stop/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialStatusCardText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialStatusCardText(
+      { preflight, session, events, armed, polling },
+      { explainReasons: explainReadinessReasons }
+    )
+    : "";
 }
 
 function updateGrayAutoTrialStatusCard() {
@@ -4272,31 +4193,9 @@ function buildGrayAutoTrialAuditSummary(limit = 24) {
 
 function buildGrayAutoTrialAuditSummaryText(limit = 24) {
   const audit = buildGrayAutoTrialAuditSummary(limit);
-  const recent = Array.isArray(audit.events?.recent) ? audit.events.recent.slice(-12) : [];
-  const eventLines = recent.length
-    ? recent.map((event) => [
-      `#${event.seq}`,
-      event.stage,
-      `trial=${event.trialStatus || "none"}`,
-      `wouldPoll=${event.wouldPoll ? "true" : "false"}`,
-      `wouldTrigger=${event.wouldTrigger ? "true" : "false"}`,
-      event.blocked ? `blocked=${event.blocked}` : ""
-    ].filter(Boolean).join(" | "))
-    : ["none"];
-  return [
-    "\u7070\u5ea6\u81ea\u52a8\u8bd5\u8fd0\u884c\u5ba1\u8ba1\u6458\u8981\uff08\u53ea\u8bfb\uff09",
-    `status=${audit.status}  armed=${audit.armed ? "true" : "false"}  polling=${audit.polling ? "true" : "false"}`,
-    `session=${audit.session.count}/${audit.session.max}  remaining=${audit.session.remaining}  reached=${audit.session.reached ? "true" : "false"}`,
-    `wouldPoll=${audit.dryRun?.wouldPollCheck === true ? "true" : "false"}  wouldTrigger=${audit.dryRun?.wouldAttemptTrigger === true ? "true" : "false"}`,
-    `blocked=${joinReadinessReasons(audit.blockedReasons)}`,
-    `events=${audit.events?.totalPollEvents || 0}  last=${audit.events?.last?.stage || "none"}/${audit.events?.lastTrialStatus || "none"}`,
-    "",
-    "\u6700\u8fd1\u4e8b\u4ef6",
-    ...eventLines,
-    "",
-    "\u5b89\u5168\u8fb9\u754c",
-    "\u9ed8\u8ba4\u5173\u95ed\uff1bArm/Reset \u9700\u8981\u786e\u8ba4\u77ed\u8bed\uff1b\u4e0d\u5199\u914d\u7f6e\u3001\u4e0d\u622a\u56fe\u3001\u4e0d\u8bfb\u6587\u4ef6\u3001\u4e0d\u8c03\u5de5\u5177\u3001\u4e0d\u6267\u884c\u547d\u4ee4\u3002"
-  ].join("\n");
+  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialAuditSummaryText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialAuditSummaryText(audit, { joinReasons: joinReadinessReasons })
+    : "";
 }
 
 function buildGrayAutoTrialPreRunChecklist(snapshotInput = null) {
@@ -4395,19 +4294,9 @@ function buildGrayAutoTrialPreRunChecklist(snapshotInput = null) {
 
 function buildGrayAutoTrialPreRunChecklistText() {
   const checklist = buildGrayAutoTrialPreRunChecklist();
-  const lines = checklist.items.map((item) => {
-    const mark = item.ok === true ? "OK" : "WAIT";
-    const required = item.required === true ? "required" : "observe";
-    return `${mark} [${required}] ${item.label} - ${item.note}`;
-  });
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u524d\u68c0\u67e5\uff08\u53ea\u8bfb\uff09",
-    `readyForWatchedTrial=${checklist.readyForWatchedTrial ? "true" : "false"}  readyForTriggerObservation=${checklist.readyForTriggerObservation ? "true" : "false"}`,
-    `status=${checklist.status}  armed=${checklist.armed ? "true" : "false"}  polling=${checklist.polling ? "true" : "false"}  session=${checklist.session.count}/${checklist.session.max}`,
-    ...lines,
-    `next=${checklist.nextAction}`,
-    "\u5b89\u5168\uff1a\u672c\u68c0\u67e5\u4e0d arm\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialPreRunChecklistText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialPreRunChecklistText(checklist)
+    : "";
 }
 
 function buildGrayAutoTrialTimeline(limit = 32) {
@@ -4460,25 +4349,9 @@ function buildGrayAutoTrialTimeline(limit = 32) {
 
 function buildGrayAutoTrialTimelineText(limit = 32) {
   const timeline = buildGrayAutoTrialTimeline(limit);
-  const lines = timeline.entries.length
-    ? timeline.entries.map((entry) => [
-      `#${entry.seq}`,
-      entry.category,
-      entry.stage,
-      entry.trialStatus ? `trial=${entry.trialStatus}` : "",
-      entry.gates ? `gates=${entry.gates}` : "",
-      `wouldPoll=${entry.wouldPoll ? "true" : "false"}`,
-      `wouldTrigger=${entry.wouldTrigger ? "true" : "false"}`,
-      entry.blocked ? `blocked=${entry.blocked}` : "",
-      entry.result ? `result=${entry.result}` : ""
-    ].filter(Boolean).join(" | "))
-    : ["none"];
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u65f6\u95f4\u7ebf\uff08\u53ea\u8bfb\uff09",
-    `events=${timeline.total}  arm=${timeline.hasArm ? "yes" : "no"}  triggerSuccess=${timeline.hasTriggerSuccess ? "yes" : "no"}  stop=${timeline.hasStop ? "yes" : "no"}  disarm=${timeline.hasDisarm ? "yes" : "no"}`,
-    ...lines,
-    "\u5b89\u5168\uff1a\u65f6\u95f4\u7ebf\u53ea\u8bfb\uff0c\u4e0d\u4f1a\u53d1\u51fa\u65b0\u4e8b\u4ef6\u6216\u89e6\u53d1\u7eed\u8bdd\u3002"
-  ].join("\n");
+  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialTimelineText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialTimelineText(timeline)
+    : "";
 }
 
 function buildGrayAutoTrialOutcome(limit = 48) {
@@ -4577,20 +4450,9 @@ function buildGrayAutoTrialOutcome(limit = 48) {
 
 function buildGrayAutoTrialOutcomeText(limit = 48) {
   const result = buildGrayAutoTrialOutcome(limit);
-  const rootCauseLines = result.rootCauses.length
-    ? result.rootCauses.map((item) => `- ${item.reason}: ${item.explanation}`)
-    : ["- none"];
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u7ed3\u679c\u5224\u5b9a\uff08\u53ea\u8bfb\uff09",
-    `outcome=${result.outcome}  severity=${result.severity}  status=${result.status}`,
-    `armed=${result.armed ? "true" : "false"}  polling=${result.polling ? "true" : "false"}  session=${result.session.count}/${result.session.max}`,
-    `timelineEvents=${result.timeline.total}  last=${result.timeline.lastStage}  triggerSuccess=${result.timeline.hasTriggerSuccess ? "true" : "false"}  triggerBlocked=${result.timeline.hasTriggerBlocked ? "true" : "false"}`,
-    `summary=${result.summary}`,
-    "\u5f52\u56e0",
-    ...rootCauseLines,
-    `next=${result.nextAction}`,
-    "\u5b89\u5168\uff1a\u7ed3\u679c\u5224\u5b9a\u53ea\u8bfb\uff0c\u4e0d\u53d1\u4e8b\u4ef6\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3002"
-  ].join("\n");
+  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialOutcomeText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialOutcomeText(result)
+    : "";
 }
 
 function buildGrayAutoTrialGoNoGoDecision(limit = 48) {
@@ -4665,25 +4527,9 @@ function buildGrayAutoTrialGoNoGoDecision(limit = 48) {
 
 function buildGrayAutoTrialGoNoGoDecisionText(limit = 48) {
   const decision = buildGrayAutoTrialGoNoGoDecision(limit);
-  const missingLines = decision.missingRequired.length
-    ? decision.missingRequired.map((item) => `- ${item.key}: ${item.label} (${item.note})`)
-    : ["- none"];
-  const rootCauseLines = decision.rootCauses.length
-    ? decision.rootCauses.map((item) => `- ${item.reason}: ${item.explanation}`)
-    : ["- none"];
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c Go/No-Go\uff08\u53ea\u8bfb\uff09",
-    `decision=${decision.decision}  outcome=${decision.outcome}  severity=${decision.severity}  status=${decision.status}`,
-    `readyForWatchedTrial=${decision.readyForWatchedTrial ? "true" : "false"}  readyForTriggerObservation=${decision.readyForTriggerObservation ? "true" : "false"}`,
-    `timelineEvents=${decision.timeline.total}  last=${decision.timeline.lastStage}  triggerSuccess=${decision.timeline.hasTriggerSuccess ? "true" : "false"}  triggerBlocked=${decision.timeline.hasTriggerBlocked ? "true" : "false"}`,
-    `reason=${decision.reason}`,
-    "\u7f3a\u5931\u5fc5\u9700\u9879",
-    ...missingLines,
-    "\u5f52\u56e0",
-    ...rootCauseLines,
-    `next=${decision.nextAction}`,
-    "\u5b89\u5168\uff1aGo/No-Go \u53ea\u8bfb\uff0c\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialGoNoGoDecisionText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialGoNoGoDecisionText(decision)
+    : "";
 }
 
 function buildGrayAutoTrialSignoffPackage(limit = 48) {
@@ -4743,33 +4589,9 @@ function buildGrayAutoTrialSignoffPackage(limit = 48) {
 
 function buildGrayAutoTrialSignoffPackageText(limit = 48) {
   const pkg = buildGrayAutoTrialSignoffPackage(limit);
-  const missingLines = pkg.missingRequired.length
-    ? pkg.missingRequired.map((item) => `- ${item.key}: ${item.label} (${item.note})`)
-    : ["- none"];
-  const rootCauseLines = pkg.rootCauses.length
-    ? pkg.rootCauses.map((item) => `- ${item.reason}: ${item.explanation}`)
-    : ["- none"];
-  const checkLines = pkg.manualChecks.map((item) => `- [ ] ${item}`);
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u7b7e\u6536\u5305\uff08\u53ea\u8bfb\u6a21\u677f\uff09",
-    `trialId=${pkg.trialId}`,
-    `decision=${pkg.decision}  outcome=${pkg.outcome}  severity=${pkg.severity}`,
-    `stageRecommendation=${pkg.stageRecommendation}`,
-    `summary=${pkg.summary}`,
-    `timelineEvents=${pkg.timeline.total}  last=${pkg.timeline.lastStage}  triggerSuccess=${pkg.timeline.hasTriggerSuccess ? "true" : "false"}  triggerBlocked=${pkg.timeline.hasTriggerBlocked ? "true" : "false"}`,
-    "\u7f3a\u5931\u5fc5\u9700\u9879",
-    ...missingLines,
-    "\u5f52\u56e0",
-    ...rootCauseLines,
-    "\u4eba\u5de5\u7b7e\u6536\u9879",
-    ...checkLines,
-    "tester=",
-    "reviewedAt=",
-    "approvedForNextPhase=false",
-    "notes=",
-    `next=${pkg.nextAction}`,
-    "\u5b89\u5168\uff1a\u7b7e\u6536\u5305\u53ea\u8bfb\uff0c\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialSignoffPackageText === "function"
+    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialSignoffPackageText(pkg)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterCuePreview(limit = 48) {
@@ -4865,17 +4687,9 @@ function buildGrayAutoTrialCharacterCuePreview(limit = 48) {
 
 function buildGrayAutoTrialCharacterCuePreviewText(limit = 48) {
   const preview = buildGrayAutoTrialCharacterCuePreview(limit);
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u9884\u89c8\uff08\u53ea\u8bfb\uff09",
-    `decision=${preview.decision}  outcome=${preview.outcome}`,
-    `label=${preview.label}  mood=${preview.mood}  tone=${preview.tone}`,
-    `description=${preview.description}`,
-    `sample=${preview.sample}`,
-    `runtimeHint=emotion:${preview.runtimeHint.emotion} action:${preview.runtimeHint.action} intensity:${preview.runtimeHint.intensity} voice_style:${preview.runtimeHint.voice_style} live2d_hint:${preview.runtimeHint.live2d_hint}`,
-    `stageRecommendation=${preview.stageRecommendation}`,
-    `next=${preview.nextAction}`,
-    "\u5b89\u5168\uff1a\u9884\u89c8\u53ea\u8bfb\uff0c\u4e0d\u53d1\u751f\u771f\u5b9e runtime hint\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCuePreviewText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCuePreviewText(preview)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterCueHandoffChecklist(limit = 48) {
@@ -4992,21 +4806,9 @@ function buildGrayAutoTrialCharacterCueHandoffChecklist(limit = 48) {
 function buildGrayAutoTrialCharacterCueHandoffChecklistText(limit = 48) {
   const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
   const manualEmitStatus = getGrayAutoTrialCharacterCueManualEmitStatus();
-  const itemLines = checklist.items.map((item) => {
-    const mark = item.ok === true ? "OK" : "WAIT";
-    const required = item.required === true ? "required" : "observe";
-    return `- [${mark}] ${item.key} (${required}): ${item.label} - ${item.note}`;
-  });
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u63a5\u5165\u524d\u68c0\u67e5\uff08\u53ea\u8bfb\uff09",
-    `status=${checklist.status}  readyForImplementationPlanning=${checklist.readyForImplementationPlanning ? "true" : "false"}  manualEmitGateAvailable=${checklist.manualEmitGateAvailable ? "true" : "false"}  readyForRuntimeEmission=false`,
-    `decision=${checklist.decision}  outcome=${checklist.outcome}  label=${checklist.label}  tone=${checklist.tone}`,
-    `runtimeHint=emotion:${checklist.runtimeHint.emotion} action:${checklist.runtimeHint.action} intensity:${checklist.runtimeHint.intensity} voice_style:${checklist.runtimeHint.voice_style} live2d_hint:${checklist.runtimeHint.live2d_hint}`,
-    ...itemLines,
-    `manualEmitCount=${manualEmitStatus.count}  lastManualEmitAt=${manualEmitStatus.lastEmitAt}`,
-    `next=${checklist.nextAction}`,
-    "\u5b89\u5168\uff1a\u68c0\u67e5\u53ea\u8bfb\uff0c\u4e0d\u53d1\u751f\u771f\u5b9e runtime hint\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueHandoffChecklistText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueHandoffChecklistText(checklist, manualEmitStatus)
+    : "";
 }
 
 function getGrayAutoTrialCharacterCueManualEmitStatus() {
@@ -5031,50 +4833,13 @@ function getGrayAutoTrialCharacterCueManualEmitStatus() {
 
 function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
   const status = getGrayAutoTrialCharacterCueManualEmitStatus();
-  const lastEmit = status.lastEmit || null;
-  const bridge = status.lastBackendBridge || null;
-  const dispatch = status.lastRuntimeDispatch || null;
-  const apply = status.lastRuntimeApply || null;
-  const candidate = status.lastReplyCandidate || null;
-  const lastEmitText = lastEmit
-    ? `decision=${lastEmit.decision || ""} outcome=${lastEmit.outcome || ""} label=${lastEmit.label || ""} tone=${lastEmit.tone || ""}`
-    : "none";
-  const bridgeText = bridge
-    ? `ok=${bridge.ok === true ? "true" : "false"} backendNoop=${bridge.backendNoop === true ? "true" : "false"} wouldExecute=${bridge.wouldExecute === true ? "true" : "false"} dispatched=${bridge.dispatched === true ? "true" : "false"}`
-    : "none";
-  const presetText = lastEmit
-    ? `preset=${lastEmit.presetKey || "auto"} source=${lastEmit.presetDescription || "n/a"}`
-    : "preset=auto source=n/a";
-  const dispatchText = dispatch
-    ? `local=${dispatch.localDispatched ? "true" : "false"} broadcast=${dispatch.broadcasted ? "true" : "false"} emotion=${dispatch.emotion || "n/a"} action=${dispatch.action || "n/a"}`
-    : "none";
-  const applyText = apply
-    ? `emotion=${apply.appliedEmotion ? "true" : "false"} action=${apply.appliedAction ? "true" : "false"} modelReady=${apply.modelReady ? "true" : "false"}`
-    : "none";
-  const candidateText = candidate
-    ? `tone=${candidate.tone || "n/a"} mood=${candidate.mood || "n/a"} emotion=${candidate.runtimeHint?.emotion || "n/a"} action=${candidate.runtimeHint?.action || "n/a"} eligible=${candidate.eligibleForManualSend ? "true" : "false"} emitted=${lastEmit?.source === "assistant_reply_candidate" && lastEmit?.replyCandidateGeneratedAt === candidate.generatedAt ? "true" : "false"}`
-    : "none";
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8bd5\u53d1\u72b6\u6001\uff08\u53ea\u8bfb\uff09",
-    `count=${status.count}`,
-    `lastEmitAt=${status.lastEmitAt}`,
-    `lastEmit=${lastEmitText}`,
-    `manualCuePreset=${presetText}`,
-    `backendBridge=${bridgeText}`,
-    `runtimeDispatch=${dispatchText}`,
-    `runtimeApply=${applyText}`,
-    `replyCueCandidate=${candidateText}`,
-    "\u5b89\u5168\uff1a\u53ea\u662f\u8bb0\u5f55\u72b6\u6001\uff0c\u4e0d\u4f1a\u81ea\u52a8\u53d1\u9001\u65b0\u7684 runtime cue\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitStatusText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitStatusText(status)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterManualCueStatusCardText() {
   const status = getGrayAutoTrialCharacterCueManualEmitStatus();
-  const lastEmit = status.lastEmit || null;
-  const bridge = status.lastBackendBridge || null;
-  const dispatch = status.lastRuntimeDispatch || null;
-  const apply = status.lastRuntimeApply || null;
-  const candidate = status.lastReplyCandidate || null;
   const autoApply = state.followupCharacterRuntimeLastReplyAutoApply || null;
   const selectedPreset = getSelectedGrayAutoTrialCharacterCuePresetKey();
   const preset = resolveGrayAutoTrialCharacterCuePreset({ presetKey: selectedPreset }, {
@@ -5082,26 +4847,15 @@ function buildGrayAutoTrialCharacterManualCueStatusCardText() {
     tone: "",
     runtimeHint: {}
   });
-  const hint = lastEmit?.runtimeHint || {};
-  const bridgeOk = bridge?.ok === true && bridge?.backendNoop === true && bridge?.wouldExecute !== true;
-  const dispatchOk = dispatch?.localDispatched === true;
-  const applyKnown = !!apply;
-  const candidateEmitted = candidate
-    && lastEmit?.source === "assistant_reply_candidate"
-    && lastEmit?.replyCandidateGeneratedAt === candidate.generatedAt;
-  return [
-    "\u624b\u52a8\u89d2\u8272 cue \u72b6\u6001\uff08\u53ea\u8bfb\uff09",
-    `selectedPreset=${selectedPreset}  label=${preset.label || selectedPreset}  manualOnly=true`,
-    `lastCount=${status.count}  lastEmitAt=${status.lastEmitAt || 0}`,
-    `lastPreset=${lastEmit?.presetKey || "none"}  lastLabel=${lastEmit?.label || "none"}  lastTone=${lastEmit?.tone || "none"}`,
-    `backendPreview=${bridge ? (bridgeOk ? "noop_confirmed" : bridge.reason || "blocked") : "not_checked"}  backendWouldExecute=${bridge?.wouldExecute === true ? "true" : "false"}`,
-    `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
-    `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} emotion:${candidate.runtimeHint?.emotion || "n/a"} action:${candidate.runtimeHint?.action || "n/a"} emitted:${candidateEmitted ? "true" : "false"}` : "none"}`,
-    `autoApplyReplyCue=${state.characterRuntimeAutoApplyReplyCue ? "true" : "false"} lastAutoApply=${autoApply ? `${autoApply.applied ? "applied" : "skipped"}:${autoApply.reason || "n/a"} voice:${autoApply.voiceStyle || "n/a"} speechStyle:${autoApply.speechStyle || "n/a"}` : "none"}`,
-    `dispatch=${dispatch ? (dispatchOk ? "local_dispatched" : "not_dispatched") : "none"}  broadcast=${dispatch?.broadcasted ? "true" : "false"}  ui=${dispatch?.uiView || "n/a"}`,
-    `live2dApply=${applyKnown ? `emotion:${apply.appliedEmotion ? "true" : "false"} action:${apply.appliedAction ? "true" : "false"} modelReady:${apply.modelReady ? "true" : "false"}` : "none"}`,
-    "\u5b89\u5168\uff1a\u9ed8\u8ba4\u5173\u95ed\uff1b\u624b\u52a8\u8bd5\u53d1\u4ecd\u9700\u786e\u8ba4\uff1bauto_apply_reply_cue=true \u65f6\u4ec5\u505a\u672c\u5730 Live2D/TTS prosody \u5e94\u7528\uff0c\u4e0d\u63a5 scheduler\u3001\u4e0d\u5199 config\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildCharacterManualCueStatusCardText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildCharacterManualCueStatusCardText({
+      status,
+      autoApply,
+      autoApplyReplyCueEnabled: state.characterRuntimeAutoApplyReplyCue === true,
+      selectedPreset,
+      preset
+    })
+    : "";
 }
 
 function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
@@ -5164,35 +4918,9 @@ function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
 
 function buildGrayAutoTrialCharacterCueManualEmitRecapText(limit = 24) {
   const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
-  const hint = recap.lastEmit?.runtimeHint || {};
-  const bridge = recap.lastBackendBridge || {};
-  const candidate = recap.replyCandidate || null;
-  const eventLines = recap.recentEvents.length
-    ? recap.recentEvents.map((event) => [
-      `#${event.seq || "?"}`,
-      `stage=${event.stage || ""}`,
-      `atMs=${event.atMs || ""}`,
-      `result=${event.result || ""}`,
-      `error=${event.error || ""}`
-    ].join(" "))
-    : ["- none"];
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272 cue \u8bd5\u53d1\u56de\u770b\uff08\u53ea\u8bfb\uff09",
-    `status=${recap.status}  accepted=${recap.accepted ? "true" : "false"}  count=${recap.count}`,
-    `lastEmitAt=${recap.lastEmitAt}`,
-    `last=source:${recap.source || "n/a"} decision:${recap.lastEmit?.decision || "n/a"} outcome:${recap.lastEmit?.outcome || "n/a"} label:${recap.lastEmit?.label || "n/a"} tone:${recap.lastEmit?.tone || "n/a"}`,
-    `manualCuePreset=${recap.lastEmit?.presetKey || "auto"} description:${recap.lastEmit?.presetDescription || "n/a"}`,
-    `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} emotion:${candidate.runtimeHint?.emotion || "n/a"} action:${candidate.runtimeHint?.action || "n/a"} sent:${recap.replyCandidateSent ? "true" : "false"}` : "none"}`,
-    `backendBridge=ok:${bridge.ok === true ? "true" : "false"} backendNoop:${bridge.backendNoop === true ? "true" : "false"} wouldExecute:${bridge.wouldExecute === true ? "true" : "false"} dispatched:${bridge.dispatched === true ? "true" : "false"}`,
-    `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} voice_style:${hint.voice_style || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
-    `runtimeDispatch=local:${recap.lastRuntimeDispatch?.localDispatched ? "true" : "false"} broadcast:${recap.lastRuntimeDispatch?.broadcasted ? "true" : "false"} ui:${recap.lastRuntimeDispatch?.uiView || "n/a"}`,
-    `runtimeApply=emotion:${recap.lastRuntimeApply?.appliedEmotion ? "true" : "false"} action:${recap.lastRuntimeApply?.appliedAction ? "true" : "false"} modelReady:${recap.lastRuntimeApply?.modelReady ? "true" : "false"}`,
-    `summary=${recap.summary}`,
-    "recentEvents:",
-    ...eventLines,
-    `next=${recap.nextAction}`,
-    "\u5b89\u5168\uff1a\u56de\u770b\u53ea\u8bfb\uff0c\u4e0d\u53d1\u65b0 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitRecapText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitRecapText(recap)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterExpressionStrategyDraft(limit = 24) {
@@ -5279,26 +5007,9 @@ function buildGrayAutoTrialCharacterExpressionStrategyDraft(limit = 24) {
 
 function buildGrayAutoTrialCharacterExpressionStrategyDraftText(limit = 24) {
   const draft = buildGrayAutoTrialCharacterExpressionStrategyDraft(limit);
-  const ruleLines = draft.rules.map((rule) => [
-    `- ${rule.key}`,
-    `status=${rule.status}`,
-    `when=${rule.when}`,
-    `label=${rule.label}`,
-    `tone=${rule.tone}`,
-    `emotion=${rule.runtimeHint.emotion}`,
-    `action=${rule.runtimeHint.action}`,
-    `risk=${rule.risk}`,
-    `sample=${rule.sample}`
-  ].join(" | "));
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8349\u6848\uff08\u53ea\u8bfb\uff09",
-    `status=${draft.status}  decision=${draft.decision}  outcome=${draft.outcome}`,
-    `activeRule=${draft.activeRuleKey}  manualEmitAccepted=${draft.manualEmitAccepted ? "true" : "false"}  readyForAutomaticRuntime=false`,
-    "rules:",
-    ...ruleLines,
-    `next=${draft.nextAction}`,
-    "\u5b89\u5168\uff1a\u7b56\u7565\u8349\u6848\u53ea\u8bfb\uff0c\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExpressionStrategyDraftText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildExpressionStrategyDraftText(draft)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit = 24) {
@@ -5367,21 +5078,9 @@ function buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit = 24) 
 
 function buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(limit = 24) {
   const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
-  const missingLines = review.missing.length
-    ? review.missing.map((item) => `- ${item.key}: ${item.reason}`)
-    : ["- none"];
-  const hint = review.activeRule?.runtimeHint || {};
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8bc4\u5ba1\u5305\uff08\u53ea\u8bfb\uff09",
-    `goNoGo=${review.goNoGo}  status=${review.status}`,
-    `decision=${review.decision}  outcome=${review.outcome}  activeRule=${review.activeRuleKey}`,
-    `ruleCount=${review.ruleCount}  manualEmitAccepted=${review.manualEmitAccepted ? "true" : "false"}  checklistReady=${review.checklistReady ? "true" : "false"}  approvedForNextPhase=false`,
-    `activeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} voice_style:${hint.voice_style || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
-    "missing:",
-    ...missingLines,
-    `next=${review.nextAction}`,
-    "\u5b89\u5168\uff1a\u8bc4\u5ba1\u5305\u53ea\u8bfb\uff0c\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExpressionStrategyReviewPackageText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildExpressionStrategyReviewPackageText(review)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit = 24) {
@@ -5475,23 +5174,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit = 24) {
 
 function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText(limit = 24) {
   const plan = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
-  const gateLines = plan.gates.map((gate) => {
-    const mark = gate.ok === true ? "OK" : "WAIT";
-    const required = gate.required === true ? "required" : "observe";
-    return `- [${mark}] ${gate.key} (${required}): ${gate.label} - ${gate.note}`;
-  });
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u63a5\u5165\u8ba1\u5212\uff08\u53ea\u8bfb\uff09",
-    `status=${plan.status}  canPlanRollout=${plan.canPlanRollout ? "true" : "false"}  readyForAutomaticRuntime=false`,
-    `goNoGo=${plan.goNoGo}  decision=${plan.decision}  outcome=${plan.outcome}`,
-    `strategyStatus=${plan.strategyStatus}  ruleCount=${plan.ruleCount}  manualEmitAccepted=${plan.manualEmitAccepted ? "true" : "false"}  checklistReady=${plan.checklistReady ? "true" : "false"}`,
-    "gates:",
-    ...gateLines,
-    "rolloutStages:",
-    ...plan.rolloutStages.map((stage, index) => `- ${index + 1}. ${stage}`),
-    `next=${plan.nextAction}`,
-    "\u5b89\u5168\uff1a\u8ba1\u5212\u53ea\u8bfb\uff0c\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeSafetyPlanText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeSafetyPlanText(plan)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit = 24) {
@@ -5542,20 +5227,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit = 24) {
 
 function buildGrayAutoTrialCharacterAutoRuntimeDryRunText(limit = 24) {
   const dryRun = buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit);
-  const hint = dryRun.runtimeHint || {};
-  const blockedLines = dryRun.blockedReasons.length
-    ? dryRun.blockedReasons.map((reason) => `- ${reason}`)
-    : ["- none"];
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0 dry-run\uff08\u53ea\u8bfb\uff09",
-    `status=${dryRun.status}  wouldEmit=false  wouldSelectRule=${dryRun.wouldSelectRule ? "true" : "false"}`,
-    `selectedRule=${dryRun.selectedRuleKey || "n/a"}  planStatus=${dryRun.planStatus}  goNoGo=${dryRun.goNoGo}`,
-    `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} voice_style:${hint.voice_style || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
-    "blockedReasons:",
-    ...blockedLines,
-    `next=${dryRun.nextAction}`,
-    "\u5b89\u5168\uff1adry-run \u53ea\u8bfb\uff0c\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeDryRunText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeDryRunText(dryRun)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit = 24) {
@@ -5655,28 +5329,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit = 24) {
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(limit = 24) {
   const switchPlan = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
-  const requirementLines = switchPlan.requirements.map((item) => {
-    const mark = item.ok === true ? "OK" : "WAIT";
-    const required = item.required === true ? "required" : "observe";
-    return `- [${mark}] ${item.key} (${required}): ${item.label} - ${item.note}`;
-  });
-  const blockingLines = switchPlan.blockingRequired.length
-    ? switchPlan.blockingRequired.map((item) => `- ${item.key}: ${item.note}`)
-    : ["- none"];
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8ba1\u5212\uff08\u53ea\u8bfb\uff09",
-    `status=${switchPlan.status}  proposedSwitch=${switchPlan.proposedSwitchKey}  proposedDefault=false`,
-    `switchExists=false  wouldEnable=false  automaticRuntimeConnected=false  wouldEmit=false`,
-    `planStatus=${switchPlan.planStatus}  dryRunStatus=${switchPlan.dryRunStatus}  goNoGo=${switchPlan.goNoGo}`,
-    "requirements:",
-    ...requirementLines,
-    "blockingRequired:",
-    ...blockingLines,
-    "proposedRuntimeStates:",
-    ...switchPlan.proposedRuntimeStates.map((stateName, index) => `- ${index + 1}. ${stateName}`),
-    `next=${switchPlan.nextAction}`,
-    "\u5b89\u5168\uff1a\u5f00\u5173\u8ba1\u5212\u53ea\u8bfb\uff0c\u4e0d\u65b0\u589e\u914d\u7f6e\u3001\u4e0d\u5199\u914d\u7f6e\u3001\u4e0d\u63a5\u81ea\u52a8 runtime\u3001\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchPlanText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchPlanText(switchPlan)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit = 24) {
@@ -5745,29 +5400,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackageText(limit = 24) {
   const reviewPackage = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit);
-  const missingLines = reviewPackage.missing.length
-    ? reviewPackage.missing.map((item) => `- ${item.key}: ${item.reason}`)
-    : ["- none"];
-  const requirementLines = reviewPackage.requirements.map((item) => {
-    const mark = item.ok === true ? "OK" : "WAIT";
-    return `- [${mark}] ${item.key}: ${item.label}`;
-  });
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bc4\u5ba1\u5305\uff08\u53ea\u8bfb\uff09",
-    `status=${reviewPackage.status}  goNoGo=${reviewPackage.goNoGo}  approvedForNextPhase=false`,
-    `switchPlanStatus=${reviewPackage.switchPlanStatus}  switchPlanDefault=${reviewPackage.switchPlanDefault ? "true" : "false"}  strategyGoNoGo=${reviewPackage.strategyGoNoGo}`,
-    `dryRunStatus=${reviewPackage.dryRunStatus}  dryRunWouldSelectRule=${reviewPackage.dryRunWouldSelectRule ? "true" : "false"}  planStatus=${reviewPackage.planStatus}`,
-    "requirements:",
-    ...requirementLines,
-    "blockingRequired:",
-    ...(reviewPackage.blockingRequired.length
-      ? reviewPackage.blockingRequired.map((item) => `- ${item.key}: ${item.note}`)
-      : ["- none"]),
-    "missing:",
-    ...missingLines,
-    `next=${reviewPackage.nextAction}`,
-    "\u5b89\u5168\uff1a\u8bc4\u5ba1\u5305\u53ea\u8bfb\uff0c\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchReviewPackageText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchReviewPackageText(reviewPackage)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit = 24) {
@@ -5869,26 +5504,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit = 2
 
 function buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackageText(limit = 24) {
   const acceptance = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
-  const checkLines = acceptance.acceptanceChecks.map((item) => {
-    const mark = item.ready === true ? "OK" : "WAIT";
-    const required = item.required === true ? "required" : "observe";
-    return `- [${mark}] ${item.key} (${required}): ${item.label} - ${item.verify}`;
-  });
-  const blockingLines = acceptance.blockingRequired.length
-    ? acceptance.blockingRequired.map((item) => `- ${item.key}: ${item.verify}`)
-    : ["- none"];
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u9a8c\u6536\u5305\uff08\u53ea\u8bfb\uff09",
-    `status=${acceptance.status}  goNoGo=${acceptance.goNoGo}  implementationReady=false  approvedForNextPhase=false`,
-    `reviewGoNoGo=${acceptance.reviewGoNoGo}  switchPlanStatus=${acceptance.switchPlanStatus}  dryRunStatus=${acceptance.dryRunStatus}`,
-    `manualVerificationRequired=${acceptance.manualVerificationRequired ? "true" : "false"}  readyForAutomaticRuntime=false`,
-    "acceptanceChecks:",
-    ...checkLines,
-    "blockingRequired:",
-    ...blockingLines,
-    `next=${acceptance.nextAction}`,
-    "\u5b89\u5168\uff1a\u9a8c\u6536\u5305\u53ea\u8bfb\uff0c\u4e0d\u5b9e\u73b0\u5f00\u5173\u3001\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildSwitchAcceptancePackageText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildSwitchAcceptancePackageText(acceptance)
+    : "";
 }
 
 function getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled() {
@@ -5945,21 +5563,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit = 24)
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText(limit = 24) {
   const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
-  const blockedLines = control.blockedReasons.length
-    ? control.blockedReasons.map((reason) => `- ${reason}`)
-    : ["- none"];
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u63a7\u5236\uff08\u672c\u5730\u6807\u8bb0\uff09",
-    `status=${control.status}  enabled=${control.enabled ? "true" : "false"}  canEnable=${control.canEnable ? "true" : "false"}  canDisable=${control.canDisable ? "true" : "false"}`,
-    `switchKey=${control.switchKey}  requiredConfirm=${control.requiredConfirm}  disabledReason=${control.disabledReason}`,
-    `acceptanceStatus=${control.acceptanceStatus}  acceptanceGoNoGo=${control.acceptanceGoNoGo}  acceptanceReady=${control.acceptanceReady ? "true" : "false"}  manualVerificationRequired=${control.manualVerificationRequired ? "true" : "false"}`,
-    `lastAction=${control.lastAction || "none"}  lastReason=${control.lastReason || "none"}  updatedAt=${control.updatedAt || 0}`,
-    `rollbackAt=${control.rollbackAt || 0}  rollbackReason=${control.rollbackReason || "none"}  defaultOffBaseline=${control.defaultOffBaseline ? "true" : "false"}`,
-    "blockedReasons:",
-    ...blockedLines,
-    `next=${control.nextAction}`,
-    "\u5b89\u5168\uff1a\u63a7\u5236\u53ea\u6539\u672c\u5730\u6807\u8bb0\uff0c\u4e0d\u63a5 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchControlText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchControlText(control)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit = 24) {
@@ -6024,25 +5630,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit = 
 
 function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(limit = 24) {
   const diagnostics = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit);
-  const blockerLines = diagnostics.blockerDetails.length
-    ? diagnostics.blockerDetails.map((item) => `- ${item.key}: ${item.label} | impact=${item.impact} | next=${item.nextAction}`)
-    : ["- none"];
-  const acceptanceLines = diagnostics.acceptanceBlocking.length
-    ? diagnostics.acceptanceBlocking.map((item) => `- ${item.key}: ${item.label} | next=${item.nextAction}`)
-    : ["- none"];
-  return [
-    "\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bca\u65ad\uff08\u53ea\u8bfb\uff09",
-    `status=${diagnostics.status}  enabled=${diagnostics.enabled ? "true" : "false"}  canEnable=${diagnostics.canEnable ? "true" : "false"}  canDisable=${diagnostics.canDisable ? "true" : "false"}`,
-    `disabledReason=${diagnostics.disabledReason}  readyForAutomaticRuntime=false`,
-    "blockerDetails:",
-    ...blockerLines,
-    "acceptanceBlocking:",
-    ...acceptanceLines,
-    "operatorChecklist:",
-    ...diagnostics.operatorChecklist.map((item, index) => `- ${index + 1}. ${item}`),
-    `next=${diagnostics.nextAction}`,
-    "\u5b89\u5168\uff1a\u8bca\u65ad\u53ea\u8bfb\uff0c\u4e0d\u6539\u5f00\u5173\u6807\u8bb0\u3001\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset\u3001\u4e0d\u542f\u52a8 polling\u3001\u4e0d\u89e6\u53d1\u7eed\u8bdd\u3001\u4e0d\u5199\u914d\u7f6e\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildSwitchControlDiagnosticsText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildSwitchControlDiagnosticsText(diagnostics)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit = 24) {
@@ -6094,17 +5684,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(lim
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(limit = 24) {
   const rollback = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit);
-  return [
-    "灰度试运行自动角色表现显式开关回滚包（只读）",
-    `status=${rollback.status}  ok=${rollback.ok ? "true" : "false"}  enabled=${rollback.enabled ? "true" : "false"}  canRollback=${rollback.canRollback ? "true" : "false"}  defaultOffBaseline=${rollback.defaultOffBaseline ? "true" : "false"}`,
-    `switchKey=${rollback.switchKey}  controlStatus=${rollback.controlStatus}  diagnosticsStatus=${rollback.diagnosticsStatus}`,
-    `rollbackAt=${rollback.rollbackAt || 0}  rollbackReason=${rollback.rollbackReason || "none"}  rollbackRecorded=${rollback.rollbackRecorded ? "true" : "false"}`,
-    `lastAction=${rollback.lastAction || "none"}  lastReason=${rollback.lastReason || "none"}`,
-    "steps:",
-    ...rollback.steps.map((step, index) => `- ${index + 1}. ${step}`),
-    `next=${rollback.nextAction}`,
-    "\u5b89\u5168\uff1a\u56de\u6536/\u6062\u590d\u9ed8\u8ba4\u5173\u95ed\u53ea\u5f71\u54cd\u672c\u5730\u5185\u5b58\uff0c\u4e0d\u5199 config\uff0c\u4e0d\u6539 scheduler\uff0c\u4e0d\u63a5 automatic runtime\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchRollbackPackageText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchRollbackPackageText(rollback)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit = 24) {
@@ -6242,26 +5824,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit = 24) {
 
 function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(limit = 24) {
   const preflight = buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit);
-  const gateLines = preflight.gates.map((gate) => {
-    const mark = gate.ok === true ? "OK" : "WAIT";
-    const required = gate.required === true ? "required" : "observe";
-    return `- [${mark}] ${gate.key} (${required}): ${gate.label} - ${gate.note}`;
-  });
-  return [
-    "灰度试运行自动角色表现最终预检（只读）",
-    `status=${preflight.status}  ok=${preflight.ok ? "true" : "false"}  goNoGo=${preflight.goNoGo}  separateImplementationTaskReady=${preflight.separateImplementationTaskReady ? "true" : "false"}`,
-    `implementationReady=false  automaticRuntimeConnected=${preflight.automaticRuntimeConnected ? "true" : "false"}  manualVerificationRequired=${preflight.manualVerificationRequired ? "true" : "false"}`,
-    `plan=${preflight.chain.plan.status}  review=${preflight.chain.review.status}/${preflight.chain.review.goNoGo}  acceptance=${preflight.chain.acceptance.status}/${preflight.chain.acceptance.goNoGo}`,
-    `control=${preflight.chain.control.status}  diagnostics=${preflight.chain.diagnostics.status}  rollback=${preflight.chain.rollback.status}`,
-    "gates:",
-    ...gateLines,
-    "blockingRequired:",
-    ...(preflight.blockingRequired.length
-      ? preflight.blockingRequired.map((item) => `- ${item.key}: ${item.label}`)
-      : ["- none"]),
-    `next=${preflight.nextAction}`,
-    "\u5b89\u5168\uff1a\u6700\u7ec8\u9884\u68c0\u53ea\u8bfb\uff0c\u4e0d\u63a5 automatic runtime\u3001\u4e0d\u5199 config\uff0c\u4e0d\u6539 scheduler\u3001\u4e0d\u53d1 runtime cue\u3001\u4e0d\u79fb\u52a8 Live2D\u3001\u4e0d\u53d1 TTS\u3001\u4e0d arm/reset/start polling/\u7ee7\u7eed\u7eed\u8bdd\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildFinalPreflightText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildFinalPreflightText(preflight)
+    : "";
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit = 24) {
@@ -6338,22 +5903,9 @@ function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit
 
 function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftText(limit = 24) {
   const draft = buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit);
-  const moduleLines = draft.implementationModules.map((item) => `- ${item.file}: ${item.role}`);
-  const boundaryLines = draft.safetyBoundaries.map((item) => `- ${item}`);
-  const verificationLines = draft.verificationPlan.map((item) => `- ${item}`);
-  return [
-    "灰度试运行自动角色表现实现草案（只读）",
-    `status=${draft.status}  ok=${draft.ok ? "true" : "false"}  defaultOffBaseline=${draft.defaultOffBaseline ? "true" : "false"}  automaticRuntimeConnected=${draft.automaticRuntimeConnected ? "true" : "false"}`,
-    `chainReady=${draft.chainReady ? "true" : "false"}  preflightStatus=${draft.preflightStatus}  preflightReady=${draft.preflightReady ? "true" : "false"}`,
-    "implementationModules:",
-    ...moduleLines,
-    "safetyBoundaries:",
-    ...boundaryLines,
-    "verificationPlan:",
-    ...verificationLines,
-    `next=${draft.nextAction}`,
-    "\u5b89\u5168\uff1a\u8fd9\u53ea\u662f\u540e\u7eed\u5b9e\u73b0\u9aa8\u67b6\uff0c\u4e0d\u63a5 automatic runtime\uff0c\u4e0d\u6539 scheduler \u9ed8\u8ba4\u884c\u4e3a\uff0c\u4e0d\u53d1 runtime cue\uff0c\u4e0d\u52a8 Live2D\uff0c\u4e0d\u53d1 TTS\uff0c\u4e0d\u5199 config\u3002"
-  ].join("\n");
+  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildSeparateImplementationDraftText === "function"
+    ? GRAY_TRIAL_CHARACTER_VIEW.buildSeparateImplementationDraftText(draft)
+    : "";
 }
 
 function enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(input = {}) {

@@ -13,6 +13,8 @@ const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTunin
 const DOCTOR_DIAGNOSTICS_JS = path.resolve(__dirname, "..", "web", "doctorDiagnostics.js");
 const CHARACTER_REPLY_CUE_JS = path.resolve(__dirname, "..", "web", "characterReplyCue.js");
 const TTS_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "ttsDebugReport.js");
+const FOLLOWUP_READINESS_VIEW_JS = path.resolve(__dirname, "..", "web", "followupReadinessView.js");
+const GRAY_TRIAL_CHARACTER_VIEW_JS = path.resolve(__dirname, "..", "web", "grayTrialCharacterView.js");
 const source = fs.readFileSync(CHAT_JS, "utf8");
 const indexSource = fs.readFileSync(INDEX_HTML, "utf8");
 const baseCssSource = fs.readFileSync(BASE_CSS, "utf8");
@@ -20,11 +22,15 @@ const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
 const doctorSource = fs.readFileSync(DOCTOR_DIAGNOSTICS_JS, "utf8");
 const replyCueSource = fs.readFileSync(CHARACTER_REPLY_CUE_JS, "utf8");
 const ttsDebugSource = fs.readFileSync(TTS_DEBUG_REPORT_JS, "utf8");
+const followupReadinessViewSource = fs.readFileSync(FOLLOWUP_READINESS_VIEW_JS, "utf8");
+const grayTrialCharacterViewSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_VIEW_JS, "utf8");
 const runtime = require(CHARACTER_RUNTIME_JS);
 const tuning = require(CHARACTER_TUNING_JS);
 const doctorDiagnostics = require(DOCTOR_DIAGNOSTICS_JS);
 const replyCue = require(CHARACTER_REPLY_CUE_JS);
 const ttsDebugReport = require(TTS_DEBUG_REPORT_JS);
+const followupReadinessView = require(FOLLOWUP_READINESS_VIEW_JS);
+const grayTrialCharacterView = require(GRAY_TRIAL_CHARACTER_VIEW_JS);
 
 function toPlainObject(value) {
   return JSON.parse(JSON.stringify(value));
@@ -98,6 +104,87 @@ assert.ok(
     25
   ).includes("recentEvents="),
   "tts debug helper should build a readable event report"
+);
+assert.ok(
+  followupReadinessView.buildBackendEntryCardText({
+    loaded: true,
+    readOnly: true,
+    skeletonOnly: true,
+    defaultOffBaseline: true,
+    explicitEnableRequired: true,
+    blockedReasons: [],
+    guardContractRequiredChecks: [],
+    guardContractDisallowedActions: [],
+    guardContractRollbackSteps: [],
+    previewBlockedReasons: []
+  }).includes("后端入口摘要（只读）"),
+  "follow-up readiness helper should build backend entry card text"
+);
+assert.strictEqual(
+  followupReadinessView.getManualConfirmationStatusLabel("available"),
+  "可确认",
+  "follow-up readiness helper should localize manual confirmation state"
+);
+assert.ok(
+  followupReadinessView.buildPreviewOneLineText({
+    scenarioLabel: "测试",
+    characterLabel: "刚聊完",
+    characterMood: "calm",
+    policy: "soft",
+    tone: "idle",
+    selectedIndex: 0,
+    blocked: "none",
+    candidateText: "我在。"
+  }).includes("line=我在。"),
+  "follow-up readiness helper should build copyable one-line previews"
+);
+assert.strictEqual(
+  followupReadinessView.buildManualConfirmationKey({
+    topicHint: " topic ",
+    policy: "soft",
+    candidateText: " hello "
+  }),
+  "topic::soft::hello",
+  "follow-up readiness helper should build stable manual confirmation keys"
+);
+assert.ok(
+  followupReadinessView.buildGrayAutoTrialTimelineText({
+    total: 1,
+    hasArm: true,
+    hasTriggerSuccess: false,
+    hasStop: false,
+    hasDisarm: false,
+    entries: [{ seq: 1, category: "control", stage: "conversation_followup_gray_auto_trial_armed" }]
+  }).includes("灰度试运行时间线（只读）"),
+  "follow-up readiness helper should build gray trial timeline text"
+);
+assert.ok(
+  grayTrialCharacterView.buildCharacterCuePreviewText({
+    decision: "NO_GO",
+    outcome: "not_started",
+    label: "先安静待着",
+    mood: "idle",
+    tone: "quiet",
+    description: "保持安静",
+    sample: "我先安静待着。",
+    runtimeHint: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral", live2d_hint: "quiet" },
+    stageRecommendation: "Not ready",
+    nextAction: "Keep preview-only"
+  }).includes("灰度试运行角色表现预览（只读）"),
+  "gray trial character helper should build character cue preview text"
+);
+assert.ok(
+  grayTrialCharacterView.buildAutoRuntimeDryRunText({
+    status: "blocked",
+    wouldSelectRule: true,
+    selectedRuleKey: "watch_only_observe",
+    planStatus: "blocked_for_auto_runtime",
+    goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME",
+    runtimeHint: { emotion: "thinking", action: "think", intensity: "low", voice_style: "neutral", live2d_hint: "thinking" },
+    blockedReasons: ["strategy_review_not_ready"],
+    nextAction: "Keep disabled"
+  }).includes("自动角色表现 dry-run"),
+  "gray trial character helper should build automatic runtime dry-run text"
 );
 
 assert.strictEqual(
@@ -184,15 +271,15 @@ assert.ok(
 assert.ok(
   source.includes("resolveGrayAutoTrialCharacterCuePreset")
     && source.includes("presetKey: getSelectedGrayAutoTrialCharacterCuePresetKey()")
-    && source.includes("manualCuePreset="),
+    && grayTrialCharacterViewSource.includes("manualCuePreset="),
   "manual character cue emits should record the selected preset in status and recap"
 );
 assert.ok(
   source.includes("function buildGrayAutoTrialCharacterManualCueStatusCardText")
     && source.includes("followupReadinessTrialCharacterManualCueStatusCard")
     && source.includes("updateGrayAutoTrialCharacterManualCueStatusCard()")
-    && source.includes("backendPreview=")
-    && source.includes("live2dApply="),
+    && grayTrialCharacterViewSource.includes("backendPreview=")
+    && grayTrialCharacterViewSource.includes("live2dApply="),
   "manual character cue panel should expose a dedicated read-only status card"
 );
 assert.ok(
@@ -200,7 +287,7 @@ assert.ok(
     && replyCueSource.includes("function buildAssistantReplyCharacterCueCandidate")
     && source.includes("previewAssistantReplyCharacterCueCandidate({")
     && source.includes("conversation_followup_character_reply_cue_candidate")
-    && source.includes("replyCueCandidate="),
+    && grayTrialCharacterViewSource.includes("replyCueCandidate="),
   "assistant replies should create a read-only character cue candidate without emitting it"
 );
 assert.ok(
@@ -366,21 +453,21 @@ assert.ok(
 );
 assert.ok(
   /function buildGrayAutoTrialCharacterCueManualEmitRecap[\s\S]*?conversation_followup_character_reply_cue_candidate_manual_emit[\s\S]*?replyCandidateSent/.test(source)
-    && source.includes("replyCueCandidate=")
-    && source.includes("emotion:${candidate.runtimeHint?.emotion")
-    && source.includes("backendBridge=ok:"),
+    && grayTrialCharacterViewSource.includes("replyCueCandidate=")
+    && grayTrialCharacterViewSource.includes("emotion:${candidate.runtimeHint?.emotion")
+    && grayTrialCharacterViewSource.includes("backendBridge=ok:"),
   "manual cue recap should include reply candidate sends, backend no-op status, and candidate sent state"
 );
 assert.ok(
   source.includes("followupCharacterRuntimeLastDispatch")
     && source.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_DISPATCH__")
-    && source.includes("runtimeDispatch=local:"),
+    && grayTrialCharacterViewSource.includes("runtimeDispatch=local:"),
   "manual character cue feedback should expose local dispatch and model broadcast status"
 );
 assert.ok(
   source.includes("followupCharacterRuntimeLastApply")
     && source.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_APPLY__")
-    && source.includes("runtimeApply=emotion:"),
+    && grayTrialCharacterViewSource.includes("runtimeApply=emotion:"),
   "manual character cue feedback should expose Live2D apply diagnostics without adding automatic triggers"
 );
 assert.ok(
@@ -560,6 +647,31 @@ assert.ok(
     && ttsDebugSource.includes("recentEvents=")
     && indexSource.includes('<script src="./ttsDebugReport.js"></script>'),
   "chat.js should expose a TTS debug report for voice playback diagnosis"
+);
+assert.ok(
+  source.includes("const FOLLOWUP_READINESS_VIEW = window.TaffyFollowupReadinessView")
+    && source.includes("FOLLOWUP_READINESS_VIEW.buildBackendEntryCardText")
+    && source.includes("FOLLOWUP_READINESS_VIEW.buildPreviewOneLineText")
+    && followupReadinessViewSource.includes("function buildGrayAutoTrialStatusCardText")
+    && followupReadinessViewSource.includes("function buildGrayAutoTrialSignoffPackageText")
+    && followupReadinessViewSource.includes("灰度自动试运行状态卡（只读）")
+    && indexSource.includes('<script src="./followupReadinessView.js"></script>'),
+  "follow-up readiness cards should delegate pure text rendering into the extracted view helper"
+);
+assert.ok(
+  source.includes("const GRAY_TRIAL_CHARACTER_VIEW = window.TaffyGrayTrialCharacterView")
+    && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCuePreviewText")
+    && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitRecapText")
+    && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeDryRunText")
+    && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildSwitchControlDiagnosticsText")
+    && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildSeparateImplementationDraftText")
+    && grayTrialCharacterViewSource.includes("function buildCharacterManualCueStatusCardText")
+    && grayTrialCharacterViewSource.includes("function buildExplicitSwitchPlanText")
+    && grayTrialCharacterViewSource.includes("function buildSwitchAcceptancePackageText")
+    && grayTrialCharacterViewSource.includes("function buildFinalPreflightText")
+    && grayTrialCharacterViewSource.includes("灰度试运行角色表现预览（只读）")
+    && indexSource.includes('<script src="./grayTrialCharacterView.js"></script>'),
+  "gray trial character cue cards should delegate pure text rendering into the extracted view helper"
 );
 assert.ok(
   source.includes('text.toLowerCase() === "/ttsdebug"'),
