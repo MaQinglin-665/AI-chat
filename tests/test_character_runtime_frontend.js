@@ -165,6 +165,14 @@ assert.ok(
   "manual character cue buttons should remain inside the collapsed high-risk local action group"
 );
 assert.ok(
+  source.includes("function updateReplyCharacterCueCandidateManualSendButton")
+    && source.includes("followupReadinessTrialSendReplyCueCandidateBtn")
+    && source.includes("button.disabled = !available")
+    && source.includes("candidate tone=${candidate.tone")
+    && source.includes("updateReplyCharacterCueCandidateManualSendButton();"),
+  "reply cue candidate send button should stay disabled until a concrete candidate is available"
+);
+assert.ok(
   source.includes("function finishSpeechAnimation()"),
   "natural speech completion should keep a release helper"
 );

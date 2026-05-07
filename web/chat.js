@@ -366,6 +366,7 @@ const state = {
   followupReadinessTrialCharacterSwitchDisableBtn: null,
   followupReadinessTrialCharacterSwitchRollbackBtn: null,
   followupReadinessTrialEmitCharacterBtn: null,
+  followupReadinessTrialSendReplyCueCandidateBtn: null,
   followupReadinessTrialCharacterCuePresetSelect: null,
   followupReadinessCompare: null,
   followupReadinessBody: null,
@@ -3180,6 +3181,7 @@ function previewAssistantReplyCharacterCueCandidate(input = {}) {
     error: candidate.runtimeHint ? String(candidate.runtimeHint.emotion || "") : "no_runtime_hint"
   });
   updateGrayAutoTrialCharacterManualCueStatusCard();
+  updateReplyCharacterCueCandidateManualSendButton();
   return candidate;
 }
 
@@ -6579,6 +6581,24 @@ function updateGrayAutoTrialCharacterManualCueStatusCard() {
   state.followupReadinessTrialCharacterManualCueStatusCard.textContent = buildGrayAutoTrialCharacterManualCueStatusCardText();
 }
 
+function updateReplyCharacterCueCandidateManualSendButton() {
+  const button = state.followupReadinessTrialSendReplyCueCandidateBtn;
+  if (!button) {
+    return;
+  }
+  const candidate = state.followupCharacterRuntimeLastReplyCandidate || null;
+  const hint = candidate?.runtimeHint || null;
+  const available = candidate?.eligibleForManualSend === true && !!hint;
+  button.disabled = !available;
+  button.textContent = available ? "\u53d1\u9001\u56de\u590dcue" : "\u65e0\u56de\u590dcue";
+  button.title = available
+    ? [
+      "\u9700\u8981\u8f93\u5165 SEND_REPLY_CHARACTER_CUE_CANDIDATE\uff1b\u53ea\u624b\u52a8\u53d1\u9001\u4e0a\u4e00\u6761\u52a9\u624b\u56de\u590d\u7684\u5019\u9009 runtime cue",
+      `candidate tone=${candidate.tone || "n/a"} mood=${candidate.mood || "n/a"} emotion=${hint.emotion || "n/a"} action=${hint.action || "n/a"}`
+    ].join("\n")
+    : "\u6682\u65e0\u52a9\u624b\u56de\u590d\u5019\u9009 cue\uff1b\u5148\u5b8c\u6210\u4e00\u6b21\u52a9\u624b\u56de\u590d\u540e\u518d\u624b\u52a8\u53d1\u9001\u3002";
+}
+
 function updateGrayAutoTrialCharacterStrategyCard() {
   if (!state.followupReadinessTrialCharacterStrategyCard) {
     return;
@@ -6815,6 +6835,7 @@ async function handleReplyCharacterCueCandidateManualSendClick(button = null) {
     setStatus("\u56de\u590d\u5019\u9009 cue \u624b\u52a8\u53d1\u9001\u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
     return false;
   }
+  updateReplyCharacterCueCandidateManualSendButton();
   if (button) {
     button.disabled = true;
   }
@@ -8146,6 +8167,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCharacterSwitchDisableBtn = trialDisableCharacterSwitch;
   state.followupReadinessTrialCharacterSwitchRollbackBtn = trialRollbackCharacterSwitch;
   state.followupReadinessTrialEmitCharacterBtn = trialEmitCharacter;
+  state.followupReadinessTrialSendReplyCueCandidateBtn = trialSendReplyCueCandidate;
   state.followupReadinessTrialCharacterCuePresetSelect = trialCharacterCuePreset;
   return panel;
 }
@@ -8195,6 +8217,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialCharacterSwitchRollbackCard();
       updateGrayAutoTrialCharacterSwitchFinalPreflightCard();
       updateGrayAutoTrialCharacterImplementationDraftCard();
+      updateReplyCharacterCueCandidateManualSendButton();
       updateFollowupReadinessBackendEntryCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
@@ -8229,6 +8252,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialCharacterSwitchRollbackCard();
   updateGrayAutoTrialCharacterSwitchFinalPreflightCard();
   updateGrayAutoTrialCharacterImplementationDraftCard();
+  updateReplyCharacterCueCandidateManualSendButton();
   updateFollowupReadinessBackendEntryCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
