@@ -76,6 +76,22 @@ assert.ok(
   "chat.js should use the extracted Character Runtime helper"
 );
 assert.ok(
+  source.includes("async function previewGrayAutoTrialCharacterCueBackendBridge")
+    && source.includes('authFetch("/api/character_runtime/backend_entry/preview"')
+    && source.includes("backend_preview_noop_confirmed"),
+  "manual character cue bridge should run through the backend preview/no-op adapter before emitting"
+);
+assert.ok(
+  source.includes("async function emitGrayAutoTrialCharacterCueViaManualBridge")
+    && source.includes("emitGrayAutoTrialCharacterCueManually(safeInput)")
+    && source.includes("grayAutoFollowupTrialCharacterCueBackendBridgePreview"),
+  "manual character cue bridge should keep an explicit debug entry point and reuse the existing manual emit path"
+);
+assert.ok(
+  /const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup[\s\S]*trialEmitCharacter[\s\S]*\]\);/.test(source),
+  "manual character cue button should remain inside the collapsed high-risk local action group"
+);
+assert.ok(
   source.includes("function finishSpeechAnimation()"),
   "natural speech completion should keep a release helper"
 );
