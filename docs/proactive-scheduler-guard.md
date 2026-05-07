@@ -554,3 +554,55 @@ The explicit switch diagnostics package is read-only. It explains switch-control
 - Task 149 adds a separate read-only implementation draft for the automatic character runtime handoff.
 - The draft keeps the final preflight chain as the last read-only handoff layer and only names the later implementation touch points.
 - It does not connect automatic runtime, write config, change scheduler state, or emit runtime cues.
+
+## 91. Task 153 Validation and Rollback Note
+
+- Task 153 closes the handoff with a skeleton-era validation and rollback note.
+- Validation remains limited to `node --check web/chat.js`, `python -m pytest tests/test_api_health.py -q`, `git diff --check`, and a manual read-only panel inspection.
+- The new backend-entry card is read-only and should continue to report skeleton-only / default-off / disconnected until a later implementation task changes the backend entry itself.
+- Rollback stays simple: hide the panel if needed, keep the backend summary guarded, keep automatic runtime disconnected, keep scheduler defaults unchanged, and keep config writes disabled.
+- This note does not change scheduler behavior, config defaults, runtime cues, Live2D, TTS, backend entry behavior, or any automatic runtime gate.
+
+## 92. Task 154 Backend Guard Contract Note
+
+- Task 154 adds a read-only `guard_contract` to the backend-entry summary.
+- The contract names required checks and disallowed actions for a later automatic character runtime implementation.
+- It keeps scheduler behavior unchanged: no scheduler default change, no polling start, no automatic runtime connection, and no follow-up execution.
+- It keeps role-expression behavior disconnected: no runtime cue, no Live2D movement, and no TTS.
+- The readiness panel only summarizes the contract; it does not add execution controls.
+
+## 93. Task 155 Backend Guard Evaluator Note
+
+- Task 155 moves the backend-entry guard contract into `character_runtime.py` as a reusable status evaluator.
+- `app_health.py` uses the evaluator for the backend-entry API summary.
+- The evaluator is fail-closed and keeps `entry_ready=false` for the skeleton stage.
+- It does not start polling, change scheduler defaults, connect automatic runtime, emit runtime cues, move Live2D, play TTS, write config, or execute follow-up.
+
+## 94. Task 156 Entry Preview Rejection Note
+
+- Task 156 adds a preview-only backend-entry request rejection helper.
+- The preview always reports `accepted=false` and `would_execute=false` in the skeleton stage.
+- The backend-entry API and readiness panel only display the preview result.
+- It does not add a POST execution route, start polling, change scheduler defaults, connect automatic runtime, emit runtime cues, move Live2D, play TTS, write config, or execute follow-up.
+
+## 95. Task 157 Preview POST Dry-run Route Note
+
+- Task 157 adds `POST /api/character_runtime/backend_entry/preview` as a token-protected dry-run rehearsal route.
+- The route parses JSON and returns `character_runtime_backend_entry_preview` from the existing fail-closed preview helper.
+- The preview route always reports `accepted=false` and `would_execute=false` in the skeleton stage.
+- It is not an execution route and does not start polling, change scheduler defaults, connect automatic runtime, emit runtime cues, move Live2D, play TTS, write config, or execute follow-up.
+
+## 96. Task 158 Preview Request Schema Allowlist Note
+
+- Task 158 adds a narrow read-only schema for backend-entry preview requests.
+- The schema currently allows only `type` and `action`.
+- Unknown fields are listed in `ignored_fields`; unsupported values are listed in `validation_errors`.
+- The schema does not pass file paths, shell hints, tool-call-like data, scheduler input, runtime cue input, Live2D input, or TTS input into an execution path.
+- It does not start polling, change scheduler defaults, connect automatic runtime, emit runtime cues, move Live2D, play TTS, write config, read files, execute shell, call tools, or execute follow-up.
+
+## 97. Task 159 No-op Adapter Skeleton Note
+
+- Task 159 adds a backend no-op adapter preview boundary.
+- The adapter consumes the guarded request preview but reports `adapter_ready=false`, `executed=false`, `dispatched=false`, and `dispatch_target="none"`.
+- All side-effect flags remain false, including config writes, automatic runtime connection, scheduler changes, runtime cue emission, Live2D movement, TTS playback, polling, follow-up execution, desktop observation, screenshots, file reads, shell execution, and tool calls.
+- It does not start polling, change scheduler defaults, connect automatic runtime, emit runtime cues, move Live2D, play TTS, write config, or execute follow-up.

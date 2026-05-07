@@ -137,9 +137,12 @@ from character_runtime import (
     looks_like_empty_text_wrapper_fragment,
     looks_like_runtime_metadata_only_text,
     normalize_runtime_payload,
+    preview_backend_entry_noop_adapter,
+    preview_backend_entry_request,
 )
 from app_health import (
     build_character_runtime_health_summary as _build_character_runtime_health_summary,
+    build_character_runtime_backend_entry_summary as _build_character_runtime_backend_entry_summary,
     build_health_payload as _build_health_payload,
     get_character_runtime_settings as _get_character_runtime_settings,
     parse_bool_flag as _parse_bool_flag,
@@ -874,6 +877,34 @@ class PetHandler(SimpleHTTPRequestHandler):
             api_token_env_default=API_TOKEN_ENV_DEFAULT,
         )
 
+    def _build_character_runtime_backend_entry_payload(self):
+        config = load_config()
+        return {
+            "ok": True,
+            "server_time": datetime.now().isoformat(timespec="seconds"),
+            "character_runtime_backend_entry": _build_character_runtime_backend_entry_summary(config),
+        }
+
+    def _build_character_runtime_backend_entry_preview_payload(self, request_body):
+        config = load_config()
+        backend_entry = _build_character_runtime_backend_entry_summary(config)
+        guard = {
+            "entry_ready": bool(backend_entry.get("entry_ready", False)),
+            "blocked_reasons": list(backend_entry.get("blocked_reasons", [])),
+        }
+        return {
+            "ok": True,
+            "server_time": datetime.now().isoformat(timespec="seconds"),
+            "character_runtime_backend_entry_preview": preview_backend_entry_request(
+                request_body if isinstance(request_body, dict) else {},
+                guard=guard,
+            ),
+            "character_runtime_backend_entry_adapter_preview": preview_backend_entry_noop_adapter(
+                request_body if isinstance(request_body, dict) else {},
+                guard=guard,
+            ),
+        }
+
     def _send_sse(self, data):
         payload = f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode("utf-8")
         self.wfile.write(payload)
@@ -937,6 +968,16 @@ class PetHandler(SimpleHTTPRequestHandler):
             return
         if path_only == "/api/health":
             self._send_json(self._build_health_payload(detailed=True))
+            return
+        if path_only == "/api/character_runtime/backend_entry":
+            try:
+                self._send_json(self._build_character_runtime_backend_entry_payload())
+            except Exception as exc:
+                _log_backend_exception("CONFIG", exc, extra="GET /api/character_runtime/backend_entry failed")
+                self._send_json(
+                    _diagnostic_payload(exc),
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
             return
         if path_only == "/config.json":
             try:
@@ -1046,6 +1087,28 @@ class PetHandler(SimpleHTTPRequestHandler):
                 dry_run=bool(body.get("dry_run", False))
             )
             self._send_json(payload, status=status)
+            return
+        if path_only == "/api/character_runtime/backend_entry/preview":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._send_json(
+                    {"ok": False, "error": "Invalid JSON body."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            if not isinstance(body, dict):
+                body = {}
+            try:
+                self._send_json(self._build_character_runtime_backend_entry_preview_payload(body))
+            except Exception as exc:
+                _log_backend_exception("CONFIG", exc, extra="POST /api/character_runtime/backend_entry/preview failed")
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
             return
         if path_only == "/api/learning/reload":
             content_length = int(self.headers.get("Content-Length", "0"))

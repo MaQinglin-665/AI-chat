@@ -87,6 +87,51 @@ RUNTIME_TEXT_WRAPPER_FRAGMENT_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+BACKEND_ENTRY_REQUIRED_CHECKS = (
+    "explicit_enable_flag",
+    "backend_entry_wired",
+    "automatic_runtime_connected",
+    "scheduler_opt_in_unchanged_by_default",
+    "config_write_disabled",
+    "runtime_cue_disabled_until_later_task",
+    "live2d_disabled_until_later_task",
+    "tts_disabled_until_later_task",
+)
+
+BACKEND_ENTRY_DISALLOWED_ACTIONS = (
+    "write_config",
+    "change_scheduler_defaults",
+    "connect_automatic_runtime",
+    "emit_runtime_cue",
+    "move_live2d",
+    "play_tts",
+    "start_polling",
+    "execute_followup",
+)
+
+BACKEND_ENTRY_ROLLBACK_STEPS = (
+    "keep_default_off",
+    "disconnect_automatic_runtime",
+    "leave_scheduler_defaults_unchanged",
+    "keep_config_writes_disabled",
+)
+
+BACKEND_ENTRY_PREVIEW_ALLOWED_FIELDS = (
+    "type",
+    "action",
+)
+
+BACKEND_ENTRY_PREVIEW_ALLOWED_TYPES = (
+    "automatic_character_runtime",
+)
+
+BACKEND_ENTRY_PREVIEW_ALLOWED_ACTIONS = (
+    "none",
+    "emit_runtime_cue",
+)
+
+BACKEND_ENTRY_PREVIEW_MAX_TEXT_LENGTH = 80
+
 EMOTION_TO_LIVE2D_HINT = {
     "neutral": "idle_relaxed",
     "happy": "smile_soft",
@@ -98,6 +143,151 @@ EMOTION_TO_LIVE2D_HINT = {
     "annoyed": "brow_tense",
     "thinking": "idle_relaxed",
 }
+
+
+def build_backend_entry_guard_contract() -> Dict[str, Any]:
+    return {
+        "read_only": True,
+        "fail_closed": True,
+        "required_checks": list(BACKEND_ENTRY_REQUIRED_CHECKS),
+        "disallowed_actions": list(BACKEND_ENTRY_DISALLOWED_ACTIONS),
+        "operator_confirmation": "required_in_later_implementation_task",
+        "rollback": list(BACKEND_ENTRY_ROLLBACK_STEPS),
+    }
+
+
+def build_backend_entry_preview_request_schema() -> Dict[str, Any]:
+    return {
+        "read_only": True,
+        "fail_closed": True,
+        "allowed_fields": list(BACKEND_ENTRY_PREVIEW_ALLOWED_FIELDS),
+        "allowed_types": list(BACKEND_ENTRY_PREVIEW_ALLOWED_TYPES),
+        "allowed_actions": list(BACKEND_ENTRY_PREVIEW_ALLOWED_ACTIONS),
+        "max_text_length": BACKEND_ENTRY_PREVIEW_MAX_TEXT_LENGTH,
+        "unknown_fields": "ignored_and_reported",
+    }
+
+
+def evaluate_backend_entry_guard(
+    *,
+    configured_enabled: bool = False,
+    backend_entry_wired: bool = False,
+    automatic_runtime_connected: bool = False,
+    scheduler_default_changed: bool = False,
+    config_write_enabled: bool = False,
+    runtime_cue_enabled: bool = False,
+    live2d_enabled: bool = False,
+    tts_enabled: bool = False,
+) -> Dict[str, Any]:
+    blocked_reasons: List[str] = []
+    if not bool(backend_entry_wired):
+        blocked_reasons.append("backend_entry_not_wired")
+    if not bool(automatic_runtime_connected):
+        blocked_reasons.append("automatic_runtime_disconnected")
+    if not bool(scheduler_default_changed):
+        blocked_reasons.append("scheduler_default_unchanged")
+    if not bool(config_write_enabled):
+        blocked_reasons.append("config_write_disabled")
+    if not bool(runtime_cue_enabled):
+        blocked_reasons.append("runtime_cue_disabled")
+
+    return {
+        "read_only": True,
+        "fail_closed": True,
+        "entry_ready": False,
+        "blocked_reasons": blocked_reasons,
+        "guard_contract": build_backend_entry_guard_contract(),
+        "runtime_states": {
+            "configured_enabled": bool(configured_enabled),
+            "backend_entry_wired": bool(backend_entry_wired),
+            "automatic_runtime_connected": bool(automatic_runtime_connected),
+            "scheduler_default_changed": bool(scheduler_default_changed),
+            "config_write_enabled": bool(config_write_enabled),
+            "runtime_cue_enabled": bool(runtime_cue_enabled),
+            "live2d_enabled": bool(live2d_enabled),
+            "tts_enabled": bool(tts_enabled),
+        },
+        "next_action": (
+            "Keep this backend entry as a guarded skeleton until the later implementation task wires a real runtime entry point."
+        ),
+    }
+
+
+def preview_backend_entry_request(
+    request: Optional[Dict[str, Any]] = None,
+    *,
+    guard: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    safe_request = request if isinstance(request, dict) else {}
+    allowed_fields = set(BACKEND_ENTRY_PREVIEW_ALLOWED_FIELDS)
+    ignored_fields = sorted(str(key)[:BACKEND_ENTRY_PREVIEW_MAX_TEXT_LENGTH] for key in safe_request.keys() if key not in allowed_fields)
+    request_type = str(safe_request.get("type", "automatic_character_runtime") or "").strip().lower()
+    if not request_type:
+        request_type = "automatic_character_runtime"
+    requested_action = str(safe_request.get("action", "none") or "").strip().lower() or "none"
+    request_type = request_type[:BACKEND_ENTRY_PREVIEW_MAX_TEXT_LENGTH]
+    requested_action = requested_action[:BACKEND_ENTRY_PREVIEW_MAX_TEXT_LENGTH]
+    validation_errors: List[str] = []
+    if request_type not in BACKEND_ENTRY_PREVIEW_ALLOWED_TYPES:
+        validation_errors.append("unsupported_request_type")
+    if requested_action not in BACKEND_ENTRY_PREVIEW_ALLOWED_ACTIONS:
+        validation_errors.append("unsupported_requested_action")
+    if ignored_fields:
+        validation_errors.append("ignored_unknown_fields")
+    safe_guard = guard if isinstance(guard, dict) else evaluate_backend_entry_guard()
+    blocked_reasons = list(safe_guard.get("blocked_reasons", []))
+    return {
+        "read_only": True,
+        "dry_run": True,
+        "accepted": False,
+        "would_execute": False,
+        "request_schema": build_backend_entry_preview_request_schema(),
+        "request_type": request_type,
+        "requested_action": requested_action,
+        "ignored_fields": ignored_fields,
+        "validation_errors": validation_errors,
+        "blocked_reasons": blocked_reasons,
+        "guard_entry_ready": bool(safe_guard.get("entry_ready", False)),
+        "next_action": "Keep this as a preview-only rejection until a later task wires a real runtime entry.",
+    }
+
+
+def preview_backend_entry_noop_adapter(
+    request: Optional[Dict[str, Any]] = None,
+    *,
+    guard: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    request_preview = preview_backend_entry_request(request, guard=guard)
+    return {
+        "read_only": True,
+        "noop": True,
+        "adapter_name": "character_runtime_noop_adapter",
+        "adapter_ready": False,
+        "default_off": True,
+        "accepted": False,
+        "would_execute": False,
+        "executed": False,
+        "dispatched": False,
+        "dispatch_target": "none",
+        "request_preview": request_preview,
+        "blocked_reasons": list(request_preview.get("blocked_reasons", [])),
+        "side_effects": {
+            "config_written": False,
+            "automatic_runtime_connected": False,
+            "scheduler_default_changed": False,
+            "runtime_cue_emitted": False,
+            "live2d_moved": False,
+            "tts_played": False,
+            "polling_started": False,
+            "followup_executed": False,
+            "desktop_observed": False,
+            "screenshot_captured": False,
+            "files_read": False,
+            "shell_executed": False,
+            "tools_called": False,
+        },
+        "next_action": "Keep this adapter as no-op until a later task adds an explicit manual execution gate.",
+    }
 
 
 def normalize_emotion(emotion: Any) -> str:

@@ -1,6 +1,11 @@
 import os
 from datetime import datetime
 
+from character_runtime import (
+    evaluate_backend_entry_guard,
+    preview_backend_entry_noop_adapter,
+    preview_backend_entry_request,
+)
 from config import OPENAI_DEFAULT_KEY_ENV
 
 
@@ -82,6 +87,52 @@ def build_character_runtime_health_summary(config):
     }
 
 
+def build_character_runtime_backend_entry_summary(config):
+    settings = get_character_runtime_settings(config if isinstance(config, dict) else {})
+    persona_override = settings.get("persona_override", {})
+    persona_override_enabled = False
+    if isinstance(persona_override, dict):
+        persona_override_enabled = parse_bool_flag(
+            persona_override.get("enabled", False),
+            False,
+        )
+    guard = evaluate_backend_entry_guard(
+        configured_enabled=bool(settings.get("enabled", False)),
+        backend_entry_wired=False,
+        automatic_runtime_connected=False,
+        scheduler_default_changed=False,
+        config_write_enabled=False,
+        runtime_cue_enabled=False,
+        live2d_enabled=False,
+        tts_enabled=False,
+    )
+    entry_preview = preview_backend_entry_request(guard=guard)
+    adapter_preview = preview_backend_entry_noop_adapter(guard=guard)
+    return {
+        "read_only": True,
+        "skeleton_only": True,
+        "default_off_baseline": True,
+        "configured_enabled": bool(settings.get("enabled", False)),
+        "configured_return_metadata": bool(settings.get("return_metadata", False)),
+        "configured_demo_stable": bool(settings.get("demo_stable", False)),
+        "configured_persona_override_enabled": bool(persona_override_enabled),
+        "explicit_enable_required": True,
+        "automatic_runtime_connected": False,
+        "scheduler_default_changed": False,
+        "config_write_enabled": False,
+        "runtime_cue_enabled": False,
+        "live2d_enabled": False,
+        "tts_enabled": False,
+        "entry_ready": bool(guard.get("entry_ready", False)),
+        "blocked_reasons": list(guard.get("blocked_reasons", [])),
+        "guard_contract": guard.get("guard_contract", {}),
+        "guard_runtime_states": guard.get("runtime_states", {}),
+        "entry_execution_preview": entry_preview,
+        "entry_adapter_preview": adapter_preview,
+        "next_action": str(guard.get("next_action", "")),
+    }
+
+
 def build_health_payload(
     *,
     detailed=False,
@@ -142,6 +193,7 @@ def build_health_payload(
         "cors_allowed_origins": sorted(security.get("allowed_origins", set())),
     }
     payload["character_runtime"] = build_character_runtime_health_summary(cfg)
+    payload["character_runtime_backend_entry"] = build_character_runtime_backend_entry_summary(cfg)
     return payload
 
 
