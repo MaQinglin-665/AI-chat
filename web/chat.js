@@ -2502,6 +2502,8 @@ const GRAY_TRIAL_CHARACTER_MODEL = window.TaffyGrayTrialCharacterModel || {};
 const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL = window.TaffyGrayTrialAutoRuntimeSwitchModel || {};
 const TOOL_META_VIEW = window.TaffyToolMetaView || {};
 const LOCAL_COMMAND_REGISTRY = window.TaffyLocalCommandRegistry || {};
+const LOCAL_COMMAND_EXECUTOR = window.TaffyLocalCommandExecutor || {};
+const REMINDER_UTILS = window.TaffyReminderUtils || {};
 const CHARACTER_REHEARSAL_PRESETS = CHARACTER_TUNING.CHARACTER_REHEARSAL_PRESETS || [];
 
 function getNextCharacterRehearsalPreset() {
@@ -8828,108 +8830,60 @@ function getLocalDateKey(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+
 function parseReminderWhen(rawWhen) {
-  const src = String(rawWhen || "").trim().toLowerCase();
-  if (!src) {
-    return 0;
-  }
-  const now = Date.now();
-  const rel = src.match(/^(\d{1,4})\s*(s|sec|secs|second|seconds|秒|m|min|mins|minute|minutes|分|h|hr|hrs|hour|hours|小时)$/i);
-  if (rel) {
-    const amount = Math.max(1, Number(rel[1]) || 0);
-    const unit = String(rel[2] || "").toLowerCase();
-    let ms = 0;
-    if (/^(s|sec|secs|second|seconds|秒)$/.test(unit)) {
-      ms = amount * 1000;
-    } else if (/^(m|min|mins|minute|minutes|分)$/.test(unit)) {
-      ms = amount * 60000;
-    } else {
-      ms = amount * 3600000;
-    }
-    return now + ms;
-  }
-  const hm = src.match(/^(\d{1,2}):(\d{2})$/);
-  if (hm) {
-    const hh = Math.max(0, Math.min(23, Number(hm[1]) || 0));
-    const mm = Math.max(0, Math.min(59, Number(hm[2]) || 0));
-    const dt = new Date();
-    dt.setHours(hh, mm, 0, 0);
-    if (dt.getTime() <= now) {
-      dt.setDate(dt.getDate() + 1);
-    }
-    return dt.getTime();
-  }
-  const full = src.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})$/);
-  if (full) {
-    const y = Number(full[1]) || 0;
-    const mo = Math.max(1, Math.min(12, Number(full[2]) || 1)) - 1;
-    const d = Math.max(1, Math.min(31, Number(full[3]) || 1));
-    const hh = Math.max(0, Math.min(23, Number(full[4]) || 0));
-    const mm = Math.max(0, Math.min(59, Number(full[5]) || 0));
-    const dt = new Date(y, mo, d, hh, mm, 0, 0);
-    return dt.getTime();
-  }
-  return 0;
+  return typeof REMINDER_UTILS.parseReminderWhen === "function"
+    ? REMINDER_UTILS.parseReminderWhen(rawWhen)
+    : 0;
 }
+
 
 function formatReminderTime(ts) {
-  const d = new Date(Number(ts) || Date.now());
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getMonth() + 1}-${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return typeof REMINDER_UTILS.formatReminderTime === "function"
+    ? REMINDER_UTILS.formatReminderTime(ts)
+    : "";
 }
+
 
 function normalizeReminderMode(mode) {
-  const safe = String(mode || "").toLowerCase();
-  if (safe === "assistant") {
-    return "assistant";
-  }
-  if (safe === "tool") {
-    return "tool";
-  }
-  return "reminder";
+  return typeof REMINDER_UTILS.normalizeReminderMode === "function"
+    ? REMINDER_UTILS.normalizeReminderMode(mode)
+    : "reminder";
 }
+
 
 function normalizeReminderRepeat(repeat) {
-  return String(repeat || "").toLowerCase() === "daily" ? "daily" : "once";
+  return typeof REMINDER_UTILS.normalizeReminderRepeat === "function"
+    ? REMINDER_UTILS.normalizeReminderRepeat(repeat)
+    : "once";
 }
+
 
 function normalizeDailyReminderDueAt(dueAt, now = Date.now()) {
-  const ts = Number(dueAt) || 0;
-  if (!ts) {
-    return 0;
-  }
-  if (ts > now) {
-    return ts;
-  }
-  const src = new Date(ts);
-  const today = new Date(now);
-  today.setHours(src.getHours(), src.getMinutes(), 0, 0);
-  return today.getTime();
+  return typeof REMINDER_UTILS.normalizeDailyReminderDueAt === "function"
+    ? REMINDER_UTILS.normalizeDailyReminderDueAt(dueAt, now)
+    : 0;
 }
+
 
 function shiftReminderToNextDay(dueAt) {
-  const next = new Date(Number(dueAt) || Date.now());
-  next.setDate(next.getDate() + 1);
-  return next.getTime();
+  return typeof REMINDER_UTILS.shiftReminderToNextDay === "function"
+    ? REMINDER_UTILS.shiftReminderToNextDay(dueAt)
+    : Number(dueAt) || Date.now();
 }
+
 
 function buildReminderDisplayTime(item) {
-  const repeat = normalizeReminderRepeat(item?.repeat);
-  const d = new Date(Number(item?.dueAt) || Date.now());
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return repeat === "daily" ? `每天 ${hh}:${mm}` : `单次 · ${formatReminderTime(item?.dueAt)}`;
+  return typeof REMINDER_UTILS.buildReminderDisplayTime === "function"
+    ? REMINDER_UTILS.buildReminderDisplayTime(item)
+    : formatReminderTime(item?.dueAt);
 }
 
+
 function buildReminderTypeLabel(item) {
-  const mode = normalizeReminderMode(item?.mode);
-  if (mode === "assistant") {
-    return "AI执行";
-  }
-  if (mode === "tool") {
-    return "工具任务";
-  }
-  return "普通提醒";
+  return typeof REMINDER_UTILS.buildReminderTypeLabel === "function"
+    ? REMINDER_UTILS.buildReminderTypeLabel(item)
+    : "????";
 }
 
 function buildDefaultScheduleDateTimeValue() {
@@ -10308,6 +10262,46 @@ async function buildMicDebugReport() {
   return lines.join("\n");
 }
 
+
+
+
+
+
+
+
+
+
+function getLocalCommandHandlers() {
+  return typeof LOCAL_COMMAND_EXECUTOR.createLocalCommandHandlers === "function"
+    ? LOCAL_COMMAND_EXECUTOR.createLocalCommandHandlers({
+      appendMessage,
+      buildMicDebugReport,
+      buildTTSDebugReport,
+      runDoctorAndAppendReport,
+      toggleTTSDebugPanel,
+      toggleFollowupReadinessPanel,
+      buildFollowupReadinessReport,
+      buildTranslateDebugReport,
+      toggleTranslateDebugPanel,
+      reloadMemoryDebugData,
+      buildMemoryDebugReport,
+      buildEmotionReportText,
+      buildSpeakProsody,
+      speak,
+      runVoiceTestAndAppendReport,
+      runCharacterRehearsalAndAppendReport,
+      runCharacterTuningAndAppendReport,
+      recordCharacterPerformanceFeedback,
+      appendCharacterWorkflowGuide,
+      listPendingReminders,
+      formatReminderTime,
+      removeReminderById,
+      parseReminderWhen,
+      addReminder
+    })
+    : {};
+}
+
 async function handleLocalCommand(inputText) {
   const command = typeof LOCAL_COMMAND_REGISTRY.matchLocalCommand === "function"
     ? LOCAL_COMMAND_REGISTRY.matchLocalCommand(inputText)
@@ -10316,113 +10310,12 @@ async function handleLocalCommand(inputText) {
   if (!text.startsWith("/")) {
     return false;
   }
-  switch (command.kind) {
-    case "mic_debug":
-      appendMessage("assistant", await buildMicDebugReport(), { enableTranslation: false });
-      return true;
-    case "tts_debug":
-      appendMessage("assistant", buildTTSDebugReport(), { enableTranslation: false });
-      return true;
-    case "doctor":
-      await runDoctorAndAppendReport();
-      return true;
-    case "tts_debug_on":
-      toggleTTSDebugPanel(true);
-      appendMessage("assistant", "TTS debug panel enabled.", { enableTranslation: false });
-      return true;
-    case "tts_debug_off":
-      toggleTTSDebugPanel(false);
-      appendMessage("assistant", "TTS debug panel disabled.", { enableTranslation: false });
-      return true;
-    case "followup_status":
-      toggleFollowupReadinessPanel(true);
-      appendMessage("assistant", buildFollowupReadinessReport(), { enableTranslation: false });
-      return true;
-    case "translate_debug":
-      appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false });
-      return true;
-    case "translate_debug_on":
-      toggleTranslateDebugPanel(true);
-      appendMessage("assistant", "Translation debug panel enabled.", { enableTranslation: false });
-      return true;
-    case "translate_debug_off":
-      toggleTranslateDebugPanel(false);
-      appendMessage("assistant", "Translation debug panel disabled.", { enableTranslation: false });
-      return true;
-    case "memory_debug":
-      try {
-        const snapshot = await reloadMemoryDebugData();
-        appendMessage("assistant", buildMemoryDebugReport(snapshot), { enableTranslation: false });
-      } catch (err) {
-        appendMessage("assistant", `Memory debug unavailable: ${err.message || err}`, { enableTranslation: false });
-      }
-      return true;
-    case "emotion_report": {
-      const report = buildEmotionReportText();
-      appendMessage("assistant", report);
-      const prosody = buildSpeakProsody(report, "idle", false, "steady");
-      await speak(report, { force: true, interrupt: true, prosody });
-      return true;
-    }
-    case "voice_test":
-      await runVoiceTestAndAppendReport();
-      return true;
-    case "character_rehearsal":
-      await runCharacterRehearsalAndAppendReport();
-      return true;
-    case "character_tuning":
-      runCharacterTuningAndAppendReport();
-      return true;
-    case "character_feedback_good":
-      recordCharacterPerformanceFeedback("good");
-      return true;
-    case "character_feedback_bad":
-      recordCharacterPerformanceFeedback("bad");
-      return true;
-    case "character_workflow":
-      appendCharacterWorkflowGuide();
-      return true;
-    case "reminder_list": {
-      const items = listPendingReminders();
-      if (!items.length) {
-        appendMessage("assistant", "\u5f53\u524d\u6ca1\u6709\u5f85\u63d0\u9192\u4e8b\u9879\u3002");
-        return true;
-      }
-      const lines = items.slice(0, 12).map((x) => `#${x.id} ${formatReminderTime(x.dueAt)} ${x.text}`);
-      appendMessage("assistant", `\u5f85\u63d0\u9192\u4e8b\u9879\uff1a\n${lines.join("\n")}`);
-      return true;
-    }
-    case "reminder_cancel": {
-      const rest = text.slice(String(command.alias || "").length).trim();
-      const m = rest.match(/^(\d{1,8})$/);
-      if (!m) {
-        appendMessage("assistant", "\u683c\u5f0f\uff1a/\u53d6\u6d88\u63d0\u9192 123");
-        return true;
-      }
-      const ok = removeReminderById(Number(m[1]));
-      appendMessage("assistant", ok ? "\u5df2\u53d6\u6d88\u63d0\u9192\u3002" : "\u672a\u627e\u5230\u8be5\u63d0\u9192 ID\u3002");
-      return true;
-    }
-    case "reminder_add": {
-      const rest = text.slice(String(command.alias || "").length).trim();
-      const m = rest.match(/^(\S+)\s+(.+)$/);
-      if (!m) {
-        appendMessage("assistant", "\u683c\u5f0f\u793a\u4f8b\uff1a/\u63d0\u9192 10m \u5f00\u4f1a  \u6216  /\u63d0\u9192 21:30 \u559d\u6c34");
-        return true;
-      }
-      const dueAt = parseReminderWhen(m[1]);
-      const remindText = String(m[2] || "").trim();
-      if (!dueAt || !remindText) {
-        appendMessage("assistant", "\u63d0\u9192\u65f6\u95f4\u683c\u5f0f\u65e0\u6548\u3002\u652f\u6301 10m / 30s / 21:30 / 2026-04-12 09:00");
-        return true;
-      }
-      const id = addReminder(remindText, dueAt);
-      appendMessage("assistant", `\u597d\u7684\uff0c\u5df2\u8bbe\u7f6e\u63d0\u9192 #${id}\uff08${formatReminderTime(dueAt)}\uff09\uff1a${remindText}`);
-      return true;
-    }
-    default:
-      return false;
+  const handler = getLocalCommandHandlers()[command.kind];
+  if (typeof handler !== "function") {
+    return false;
   }
+  await handler(command);
+  return true;
 }
 
 function updateObserveButton() {

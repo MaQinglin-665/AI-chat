@@ -17,6 +17,8 @@ const TRANSLATE_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "translat
 const MEMORY_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "memoryDebugReport.js");
 const TOOL_META_VIEW_JS = path.resolve(__dirname, "..", "web", "toolMetaView.js");
 const LOCAL_COMMAND_REGISTRY_JS = path.resolve(__dirname, "..", "web", "localCommandRegistry.js");
+const LOCAL_COMMAND_EXECUTOR_JS = path.resolve(__dirname, "..", "web", "localCommandExecutor.js");
+const REMINDER_UTILS_JS = path.resolve(__dirname, "..", "web", "reminderUtils.js");
 const GRAY_TRIAL_READINESS_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialReadinessModel.js");
 const GRAY_TRIAL_CHARACTER_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialCharacterModel.js");
 const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialAutoRuntimeSwitchModel.js");
@@ -33,6 +35,8 @@ const translateDebugSource = fs.readFileSync(TRANSLATE_DEBUG_REPORT_JS, "utf8");
 const memoryDebugSource = fs.readFileSync(MEMORY_DEBUG_REPORT_JS, "utf8");
 const toolMetaViewSource = fs.readFileSync(TOOL_META_VIEW_JS, "utf8");
 const localCommandRegistrySource = fs.readFileSync(LOCAL_COMMAND_REGISTRY_JS, "utf8");
+const localCommandExecutorSource = fs.readFileSync(LOCAL_COMMAND_EXECUTOR_JS, "utf8");
+const reminderUtilsSource = fs.readFileSync(REMINDER_UTILS_JS, "utf8");
 const grayTrialReadinessModelSource = fs.readFileSync(GRAY_TRIAL_READINESS_MODEL_JS, "utf8");
 const grayTrialCharacterModelSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_MODEL_JS, "utf8");
 const grayTrialAutoRuntimeSwitchModelSource = fs.readFileSync(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS, "utf8");
@@ -47,6 +51,8 @@ const translateDebugReport = require(TRANSLATE_DEBUG_REPORT_JS);
 const memoryDebugReport = require(MEMORY_DEBUG_REPORT_JS);
 const toolMetaView = require(TOOL_META_VIEW_JS);
 const localCommandRegistry = require(LOCAL_COMMAND_REGISTRY_JS);
+const localCommandExecutor = require(LOCAL_COMMAND_EXECUTOR_JS);
+const reminderUtils = require(REMINDER_UTILS_JS);
 const grayTrialReadinessModel = require(GRAY_TRIAL_READINESS_MODEL_JS);
 const grayTrialCharacterModel = require(GRAY_TRIAL_CHARACTER_MODEL_JS);
 const grayTrialAutoRuntimeSwitchModel = require(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS);
@@ -194,6 +200,35 @@ assert.strictEqual(
   "reminder_add",
   "local command registry should match reminder prefix commands"
 );
+assert.strictEqual(
+  reminderUtils.parseReminderWhen("10m", { now: () => 1000 }),
+  601000,
+  "reminder utils should parse relative minute reminders"
+);
+assert.strictEqual(
+  reminderUtils.normalizeReminderMode("tool"),
+  "tool",
+  "reminder utils should normalize reminder modes"
+);
+assert.strictEqual(
+  reminderUtils.buildReminderTypeLabel({ mode: "assistant" }),
+  "AI执行",
+  "reminder utils should build readable reminder type labels"
+);
+{
+  const messages = [];
+  const handlers = localCommandExecutor.createLocalCommandHandlers({
+    appendMessage: (role, text) => messages.push({ role, text }),
+    listPendingReminders: () => [],
+    formatReminderTime: () => "10:00"
+  });
+  handlers.reminder_list({ text: "/提醒列表", alias: "/提醒列表" });
+  assert.strictEqual(
+    messages[0]?.text,
+    "当前没有待提醒事项。",
+    "local command executor should handle reminder list output through injected dependencies"
+  );
+}
 assert.ok(
   followupReadinessView.buildBackendEntryCardText({
     loaded: true,
@@ -908,10 +943,20 @@ assert.ok(
 );
 assert.ok(
   source.includes("const LOCAL_COMMAND_REGISTRY = window.TaffyLocalCommandRegistry")
+    && source.includes("const LOCAL_COMMAND_EXECUTOR = window.TaffyLocalCommandExecutor")
     && source.includes("LOCAL_COMMAND_REGISTRY.matchLocalCommand")
+    && source.includes("LOCAL_COMMAND_EXECUTOR.createLocalCommandHandlers")
+    && source.includes("function getLocalCommandHandlers()")
+    && source.includes("const handler = getLocalCommandHandlers()[command.kind]")
+    && source.includes("const REMINDER_UTILS = window.TaffyReminderUtils")
+    && source.includes("REMINDER_UTILS.parseReminderWhen")
     && localCommandRegistry.matchLocalCommand("/ttsdebug").kind === "tts_debug"
     && localCommandRegistrySource.includes('kind: "tts_debug"')
-    && indexSource.includes('<script src="./localCommandRegistry.js"></script>'),
+    && localCommandExecutorSource.includes("function createLocalCommandHandlers")
+    && reminderUtilsSource.includes("function parseReminderWhen")
+    && indexSource.includes('<script src="./localCommandRegistry.js"></script>')
+    && indexSource.includes('<script src="./localCommandExecutor.js"></script>')
+    && indexSource.includes('<script src="./reminderUtils.js"></script>'),
   "local commands should include /ttsdebug for copyable playback state"
 );
 assert.ok(
@@ -934,8 +979,8 @@ assert.ok(
   "chat.js should expose memory/learning chain debug state"
 );
 assert.ok(
-  source.includes('appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false })')
-    && source.includes('appendMessage("assistant", "Translation debug panel enabled.", { enableTranslation: false })'),
+  localCommandExecutorSource.includes('append(deps, deps.buildTranslateDebugReport(), { enableTranslation: false })')
+    && localCommandExecutorSource.includes('append(deps, "Translation debug panel enabled.", { enableTranslation: false })'),
   "translation debug command responses should not recursively trigger assistant translation"
 );
 assert.ok(
