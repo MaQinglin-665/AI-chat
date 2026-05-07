@@ -383,6 +383,7 @@ const state = {
   grayAutoTrialCharacterCueManualEmitCount: 0,
   grayAutoTrialCharacterCueLastManualEmitAt: 0,
   grayAutoTrialCharacterCueLastManualEmit: null,
+  grayAutoTrialCharacterCueLastBackendBridge: null,
   localAsrMutedWarned: false,
   localAsrInputDeviceCandidates: [],
   localAsrSpeeching: false,
@@ -4532,25 +4533,32 @@ function getGrayAutoTrialCharacterCueManualEmitStatus() {
   const count = Number(state.grayAutoTrialCharacterCueManualEmitCount || 0);
   const lastEmitAt = Number(state.grayAutoTrialCharacterCueLastManualEmitAt || 0);
   const lastEmit = state.grayAutoTrialCharacterCueLastManualEmit || null;
+  const lastBackendBridge = state.grayAutoTrialCharacterCueLastBackendBridge || null;
   return {
     readOnly: true,
     count: Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0,
     lastEmitAt,
-    lastEmit
+    lastEmit,
+    lastBackendBridge
   };
 }
 
 function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
   const status = getGrayAutoTrialCharacterCueManualEmitStatus();
   const lastEmit = status.lastEmit || null;
+  const bridge = status.lastBackendBridge || null;
   const lastEmitText = lastEmit
     ? `decision=${lastEmit.decision || ""} outcome=${lastEmit.outcome || ""} label=${lastEmit.label || ""} tone=${lastEmit.tone || ""}`
+    : "none";
+  const bridgeText = bridge
+    ? `ok=${bridge.ok === true ? "true" : "false"} backendNoop=${bridge.backendNoop === true ? "true" : "false"} wouldExecute=${bridge.wouldExecute === true ? "true" : "false"} dispatched=${bridge.dispatched === true ? "true" : "false"}`
     : "none";
   return [
     "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8bd5\u53d1\u72b6\u6001\uff08\u53ea\u8bfb\uff09",
     `count=${status.count}`,
     `lastEmitAt=${status.lastEmitAt}`,
     `lastEmit=${lastEmitText}`,
+    `backendBridge=${bridgeText}`,
     "\u5b89\u5168\uff1a\u53ea\u662f\u8bb0\u5f55\u72b6\u6001\uff0c\u4e0d\u4f1a\u81ea\u52a8\u53d1\u9001\u65b0\u7684 runtime cue\u3002"
   ].join("\n");
 }
@@ -5982,6 +5990,138 @@ function emitGrayAutoTrialCharacterCueManually(input = {}) {
   };
 }
 
+async function previewGrayAutoTrialCharacterCueBackendBridge(checklist = null) {
+  const safeChecklist = checklist && typeof checklist === "object"
+    ? checklist
+    : buildGrayAutoTrialCharacterCueHandoffChecklist();
+  const requestBody = {
+    type: "automatic_character_runtime",
+    action: "emit_runtime_cue"
+  };
+  let payload = null;
+  try {
+    const resp = await authFetch("/api/character_runtime/backend_entry/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+      cache: "no-store"
+    });
+    payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(payload?.error || `HTTP ${resp.status}`);
+    }
+  } catch (error) {
+    const failed = {
+      ok: false,
+      reason: "backend_preview_failed",
+      error: String(error?.message || error || "unknown"),
+      requestBody,
+      label: safeChecklist.label || "",
+      tone: safeChecklist.tone || "",
+      backendNoop: false,
+      wouldExecute: false,
+      dispatched: false,
+      safety: {
+        noSchedulerChange: true,
+        noFollowupExecution: true,
+        noConfigWrites: true,
+        noTts: true
+      }
+    };
+    state.grayAutoTrialCharacterCueLastBackendBridge = failed;
+    recordTTSDebugEvent("conversation_followup_gray_auto_trial_character_cue_backend_bridge", {
+      text: String(safeChecklist.label || ""),
+      result: "failed",
+      error: failed.error
+    });
+    return failed;
+  }
+  const preview = payload && typeof payload.character_runtime_backend_entry_preview === "object"
+    ? payload.character_runtime_backend_entry_preview
+    : {};
+  const adapter = payload && typeof payload.character_runtime_backend_entry_adapter_preview === "object"
+    ? payload.character_runtime_backend_entry_adapter_preview
+    : {};
+  const backendNoop = adapter.noop === true
+    && adapter.adapter_ready === false
+    && adapter.executed === false
+    && adapter.dispatched === false
+    && adapter.dispatch_target === "none";
+  const wouldExecute = preview.would_execute === true || adapter.would_execute === true;
+  const bridge = {
+    ok: backendNoop && !wouldExecute,
+    reason: backendNoop && !wouldExecute ? "backend_preview_noop_confirmed" : "backend_preview_not_safe",
+    requestBody,
+    label: safeChecklist.label || "",
+    tone: safeChecklist.tone || "",
+    backendNoop,
+    accepted: preview.accepted === true || adapter.accepted === true,
+    wouldExecute,
+    dispatched: adapter.dispatched === true,
+    preview,
+    adapter,
+    safety: {
+      backendExecutionDisabled: adapter.executed !== true,
+      backendDispatchDisabled: adapter.dispatched !== true,
+      noSchedulerChange: true,
+      noFollowupExecution: true,
+      noConfigWrites: true,
+      noTts: true
+    }
+  };
+  state.grayAutoTrialCharacterCueLastBackendBridge = bridge;
+  recordTTSDebugEvent("conversation_followup_gray_auto_trial_character_cue_backend_bridge", {
+    text: String(safeChecklist.label || ""),
+    result: bridge.reason,
+    error: bridge.ok ? "" : "blocked"
+  });
+  return bridge;
+}
+
+async function emitGrayAutoTrialCharacterCueViaManualBridge(input = {}) {
+  const safeInput = input && typeof input === "object" ? input : {};
+  const confirm = String(safeInput.confirm || "").trim();
+  const requiredConfirm = "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE";
+  if (confirm !== requiredConfirm) {
+    return {
+      ok: false,
+      reason: "confirmation_required",
+      requiredConfirm,
+      safety: {
+        noEventEmission: true,
+        noSchedulerChange: true,
+        noFollowupExecution: true,
+        noConfigWrites: true
+      }
+    };
+  }
+  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist();
+  const backendBridge = await previewGrayAutoTrialCharacterCueBackendBridge(checklist);
+  if (backendBridge.ok !== true) {
+    return {
+      ok: false,
+      reason: backendBridge.reason || "backend_bridge_blocked",
+      backendBridge,
+      checklistStatus: checklist.status,
+      safety: {
+        noEventEmission: true,
+        noSchedulerChange: true,
+        noFollowupExecution: true,
+        noConfigWrites: true,
+        noTts: true
+      }
+    };
+  }
+  const result = emitGrayAutoTrialCharacterCueManually(safeInput);
+  if (result && typeof result === "object") {
+    result.backendBridge = backendBridge;
+  }
+  if (result?.ok === true && state.grayAutoTrialCharacterCueLastManualEmit) {
+    state.grayAutoTrialCharacterCueLastManualEmit.backendBridge = backendBridge;
+  }
+  return result;
+}
+
 function updateGrayAutoTrialPreRunChecklistCard() {
   if (!state.followupReadinessTrialChecklistCard) {
     return;
@@ -6242,22 +6382,30 @@ function handleGrayAutoTrialResetClick(button = null) {
   return result?.reset === true;
 }
 
-function handleGrayAutoTrialCharacterCueManualEmitClick(button = null) {
+async function handleGrayAutoTrialCharacterCueManualEmitClick(button = null) {
   if (!promptGrayAutoTrialPhrase("EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE", "\u624b\u52a8\u8bd5\u53d1\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272 runtime cue")) {
     setStatus("\u89d2\u8272 cue \u8bd5\u53d1\u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
     return false;
   }
-  const result = emitGrayAutoTrialCharacterCueManually({
-    confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE"
-  });
-  updateFollowupReadinessPanel();
-  setStatus(result?.ok === true
-    ? `\u89d2\u8272 cue \u5df2\u624b\u52a8\u8bd5\u53d1\uff08count=${result.count}\uff09`
-    : `\u89d2\u8272 cue \u8bd5\u53d1\u5931\u8d25\uff1a${result?.reason || "unknown"}`);
   if (button) {
-    button.blur();
+    button.disabled = true;
   }
-  return result?.ok === true;
+  setStatus("\u89d2\u8272 cue \u540e\u7aef\u9884\u68c0\u4e2d\uff1a\u53ea\u8d70 preview/no-op adapter");
+  try {
+    const result = await emitGrayAutoTrialCharacterCueViaManualBridge({
+      confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE"
+    });
+    updateFollowupReadinessPanel();
+    setStatus(result?.ok === true
+      ? `\u89d2\u8272 cue \u5df2\u624b\u52a8\u8bd5\u53d1\uff08count=${result.count}\uff0cbackend=no-op confirmed\uff09`
+      : `\u89d2\u8272 cue \u8bd5\u53d1\u5931\u8d25\uff1a${result?.reason || "unknown"}`);
+    return result?.ok === true;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.blur();
+    }
+  }
 }
 
 function handleGrayAutoTrialCharacterAutoRuntimeSwitchEnableClick(button = null) {
@@ -12987,6 +13135,8 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterCueHandoffChecklist: (limit) => buildGrayAutoTrialCharacterCueHandoffChecklist(limit),
     grayAutoFollowupTrialCharacterCueManualEmitStatus: () => getGrayAutoTrialCharacterCueManualEmitStatus(),
     grayAutoFollowupTrialCharacterCueManualEmitRecap: (limit) => buildGrayAutoTrialCharacterCueManualEmitRecap(limit),
+    grayAutoFollowupTrialCharacterCueBackendBridgePreview: () => previewGrayAutoTrialCharacterCueBackendBridge(),
+    emitGrayAutoFollowupTrialCharacterCueViaManualBridge: (input) => emitGrayAutoTrialCharacterCueViaManualBridge(input),
     grayAutoFollowupTrialCharacterExpressionStrategyDraft: (limit) => buildGrayAutoTrialCharacterExpressionStrategyDraft(limit),
     grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage: (limit) => buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeSafetyPlan: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit),
