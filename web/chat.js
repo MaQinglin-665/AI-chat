@@ -4757,8 +4757,12 @@ function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
     ? Math.max(1, Math.min(80, Math.round(Number(limit))))
     : 24;
   const status = getGrayAutoTrialCharacterCueManualEmitStatus();
+  const manualEmitStages = new Set([
+    "conversation_followup_gray_auto_trial_character_cue_manual_emit",
+    "conversation_followup_character_reply_cue_candidate_manual_emit"
+  ]);
   const events = state.ttsDebugEvents
-    .filter((event) => event && event.stage === "conversation_followup_gray_auto_trial_character_cue_manual_emit")
+    .filter((event) => event && manualEmitStages.has(event.stage))
     .slice(-safeLimit);
   const lastEvent = events.length ? events[events.length - 1] : null;
   const lastEmit = status.lastEmit || null;
@@ -4766,19 +4770,29 @@ function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
   const lastRuntimeDispatch = status.lastRuntimeDispatch || lastEmit?.runtimeDispatch || null;
   const lastRuntimeApply = status.lastRuntimeApply || lastEmit?.runtimeApply || null;
   const accepted = !!lastEmit && !!normalized && status.count > 0;
+  const source = String(lastEmit?.source || (lastEmit?.presetKey === "reply_candidate" ? "assistant_reply_candidate" : "manual_preset"));
+  const lastBackendBridge = status.lastBackendBridge || lastEmit?.backendBridge || null;
+  const replyCandidate = status.lastReplyCandidate || null;
+  const replyCandidateSent = source === "assistant_reply_candidate"
+    && !!replyCandidate
+    && lastEmit?.replyCandidateGeneratedAt === replyCandidate.generatedAt;
   return {
     readOnly: true,
     status: accepted ? "emitted" : "not_emitted",
     count: status.count,
     lastEmitAt: status.lastEmitAt,
     lastEmit,
+    source,
+    lastBackendBridge,
     lastRuntimeDispatch,
     lastRuntimeApply,
+    replyCandidate,
+    replyCandidateSent,
     lastEvent,
     recentEvents: events,
     accepted,
     summary: accepted
-      ? `Last manual cue emitted: ${lastEmit.label || "n/a"} / ${lastEmit.tone || "n/a"}.`
+      ? `Last manual cue emitted from ${source}: ${lastEmit.label || "n/a"} / ${lastEmit.tone || "n/a"}.`
       : "No confirmed gray trial character cue manual emit has been recorded in this renderer session.",
     nextAction: accepted
       ? "Review the visible character response before deciding whether to refine the role-expression strategy."
@@ -4799,9 +4813,12 @@ function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
 function buildGrayAutoTrialCharacterCueManualEmitRecapText(limit = 24) {
   const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
   const hint = recap.lastEmit?.runtimeHint || {};
+  const bridge = recap.lastBackendBridge || {};
+  const candidate = recap.replyCandidate || null;
   const eventLines = recap.recentEvents.length
     ? recap.recentEvents.map((event) => [
       `#${event.seq || "?"}`,
+      `stage=${event.stage || ""}`,
       `atMs=${event.atMs || ""}`,
       `result=${event.result || ""}`,
       `error=${event.error || ""}`
@@ -4811,8 +4828,10 @@ function buildGrayAutoTrialCharacterCueManualEmitRecapText(limit = 24) {
     "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272 cue \u8bd5\u53d1\u56de\u770b\uff08\u53ea\u8bfb\uff09",
     `status=${recap.status}  accepted=${recap.accepted ? "true" : "false"}  count=${recap.count}`,
     `lastEmitAt=${recap.lastEmitAt}`,
-    `last=decision:${recap.lastEmit?.decision || "n/a"} outcome:${recap.lastEmit?.outcome || "n/a"} label:${recap.lastEmit?.label || "n/a"} tone:${recap.lastEmit?.tone || "n/a"}`,
+    `last=source:${recap.source || "n/a"} decision:${recap.lastEmit?.decision || "n/a"} outcome:${recap.lastEmit?.outcome || "n/a"} label:${recap.lastEmit?.label || "n/a"} tone:${recap.lastEmit?.tone || "n/a"}`,
     `manualCuePreset=${recap.lastEmit?.presetKey || "auto"} description:${recap.lastEmit?.presetDescription || "n/a"}`,
+    `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} sent:${recap.replyCandidateSent ? "true" : "false"}` : "none"}`,
+    `backendBridge=ok:${bridge.ok === true ? "true" : "false"} backendNoop:${bridge.backendNoop === true ? "true" : "false"} wouldExecute:${bridge.wouldExecute === true ? "true" : "false"} dispatched:${bridge.dispatched === true ? "true" : "false"}`,
     `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} voice_style:${hint.voice_style || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
     `runtimeDispatch=local:${recap.lastRuntimeDispatch?.localDispatched ? "true" : "false"} broadcast:${recap.lastRuntimeDispatch?.broadcasted ? "true" : "false"} ui:${recap.lastRuntimeDispatch?.uiView || "n/a"}`,
     `runtimeApply=emotion:${recap.lastRuntimeApply?.appliedEmotion ? "true" : "false"} action:${recap.lastRuntimeApply?.appliedAction ? "true" : "false"} modelReady:${recap.lastRuntimeApply?.modelReady ? "true" : "false"}`,
