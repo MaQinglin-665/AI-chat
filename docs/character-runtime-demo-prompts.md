@@ -19,7 +19,7 @@ Important notes:
 - runtime demo must be enabled according to the safe local config guide
 - these prompts help trigger emotion/action tendencies; they do not guarantee strong visible feedback for every model resource set
 - motion/expression strength depends on Live2D model resources and mappings
-- `voice_style` currently does not change TTS behavior
+- `voice_style` only nudges TTS prosody when `character_runtime.auto_apply_reply_cue=true`; it does not select a voice model
 - these prompts are for manual verification and recording support, not formal automated testing
 
 ## Prompt Groups
@@ -36,7 +36,7 @@ Expected runtime tendency:
 
 Expected visual/audio notes:
 - Live2D may show positive expression
-- TTS should remain normal; no voice-style behavior change expected
+- TTS should remain normal unless reply cue auto-apply is explicitly enabled
 
 Recording notes:
 - good candidate for intro clips

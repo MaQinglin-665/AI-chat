@@ -3648,6 +3648,76 @@ body.view-chat .followup-character-chip {
     inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
 
+body.view-chat .reply-character-chip {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  max-width: min(100%, 520px);
+  margin-top: 8px;
+  padding: 7px 12px;
+  border: 1px solid rgba(81, 126, 172, 0.24);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(239, 250, 255, 0.96), rgba(248, 251, 255, 0.92));
+  color: #47617f;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow:
+    0 7px 18px rgba(76, 113, 148, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+body.view-chat .reply-character-chip::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: #58b3c3;
+  box-shadow: 0 0 0 4px rgba(88, 179, 195, 0.15);
+}
+
+body.view-chat .reply-character-chip[data-tone="applied"] {
+  border-color: rgba(55, 157, 130, 0.3);
+  background:
+    linear-gradient(90deg, rgba(236, 253, 245, 0.98), rgba(248, 252, 255, 0.92));
+  color: #276d61;
+}
+
+body.view-chat .reply-character-chip[data-tone="applied"]::before {
+  background: #35bd8f;
+  box-shadow: 0 0 0 4px rgba(53, 189, 143, 0.16);
+}
+
+body.view-chat .reply-character-chip[data-tone="waiting"] {
+  border-color: rgba(129, 139, 158, 0.24);
+  background:
+    linear-gradient(90deg, rgba(244, 247, 251, 0.96), rgba(249, 251, 255, 0.92));
+  color: #657386;
+}
+
+body.view-chat .reply-character-chip[data-tone="waiting"]::before {
+  background: #96a3b6;
+  box-shadow: 0 0 0 4px rgba(150, 163, 182, 0.14);
+}
+
+body.view-chat .reply-character-chip[data-tone="blocked"] {
+  border-color: rgba(202, 151, 49, 0.3);
+  background:
+    linear-gradient(90deg, rgba(255, 248, 224, 0.96), rgba(249, 251, 255, 0.92));
+  color: #75561b;
+}
+
+body.view-chat .reply-character-chip[data-tone="blocked"]::before {
+  background: #d8a72f;
+  box-shadow: 0 0 0 4px rgba(216, 167, 47, 0.16);
+}
+
 body.view-chat .followup-character-chip::before {
   content: "";
   width: 7px;
@@ -3832,6 +3902,16 @@ body.view-chat .message.assistant .content {
   background: rgba(253, 254, 255, 0.97);
 }
 
+body.view-chat .message .content {
+  white-space: pre-wrap;
+}
+
+body.view-chat .message.assistant.doctor-report .content {
+  max-width: min(92%, 720px);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
 body.view-chat .message .message-time {
   font-size: 15px;
   color: #8293b7;
@@ -3973,6 +4053,14 @@ body.view-chat .action-buttons button::before {
     margin-top: 7px;
     padding: 6px 10px;
     font-size: 12px;
+  }
+
+  body.view-chat .reply-character-chip {
+    max-width: 260px;
+    margin-top: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: normal;
   }
 
   body.view-chat #translation-chip-btn {

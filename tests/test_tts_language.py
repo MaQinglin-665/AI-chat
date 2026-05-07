@@ -5,6 +5,7 @@ from tts import (
     _prefer_gpt_sovits_short_english_chunks,
     _replace_en_words_for_tts,
     _wav_amplitude_stats,
+    synthesize_gpt_sovits_tts_bytes,
 )
 
 
@@ -123,3 +124,67 @@ def test_gpt_sovits_loudness_normalizer_limits_hot_peaks_without_high_rms():
     assert meta["changed"] is True
     assert after["peak"] < before["peak"]
     assert after["peak"] <= 26000
+
+
+def test_gpt_sovits_long_text_prefers_chunk_requests(monkeypatch):
+    import json
+
+    calls = []
+
+    class FakeHeaders:
+        def get(self, key, default=None):
+            if str(key).lower() == "content-type":
+                return "audio/wav"
+            return default
+
+    class FakeResponse:
+        headers = FakeHeaders()
+
+        def __init__(self, body):
+            self._body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return self._body
+
+    def fake_urlopen(req, timeout=0):
+        payload = json.loads(req.data.decode("utf-8"))
+        chunk_text = str(payload.get("text") or "")
+        calls.append(chunk_text)
+        frames = max(12000, len(chunk_text) * 1200)
+        return FakeResponse(_make_constant_wav(sample_value=1600, frames=frames))
+
+    monkeypatch.setattr("tts.urllib.request.urlopen", fake_urlopen)
+
+    text = (
+        "Long replies should still speak clearly. "
+        "The TTS service works better when the paragraph is divided into smaller spoken chunks. "
+        "After that, the chunks can be joined back into one wav for playback."
+    )
+    audio = synthesize_gpt_sovits_tts_bytes(
+        text,
+        {
+            "gpt_sovits_api_url": "http://127.0.0.1:9880/tts",
+            "gpt_sovits_method": "POST",
+            "gpt_sovits_timeout_sec": 60,
+            "gpt_sovits_text_lang": "en",
+            "gpt_sovits_prompt_lang": "en",
+            "gpt_sovits_ref_audio_path": "ref.wav",
+            "gpt_sovits_text_split_method": "cut0",
+            "gpt_sovits_chunk_chars": 70,
+            "gpt_sovits_chunk_max_candidates": 1,
+            "gpt_sovits_chunk_split_depth": 0,
+            "gpt_sovits_enable_global_retry": False,
+            "gpt_sovits_normalize_loudness": False,
+        },
+    )
+
+    assert audio.startswith(b"RIFF")
+    assert len(calls) >= 2
+    assert calls[0] != text
+    assert all(len(call) <= 90 for call in calls)

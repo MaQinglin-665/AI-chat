@@ -26,6 +26,7 @@
             <p class="hero-tagline">你的桌面伙伴，随时懂你 ✨</p>
             <span id="status">待机</span>
             <div id="followup-character-chip" class="followup-character-chip" title="当前续话角色状态">安静陪伴 · idle</div>
+            <div id="reply-character-chip" class="reply-character-chip" title="上一句回复的角色表现">上一句角色表现 · 待回复</div>
           </div>
           <button id="translation-chip-btn" type="button" aria-pressed="true" title="隐藏会话翻译">会话翻译已显示</button>
         </div>
@@ -76,6 +77,12 @@
       <button id="persona-btn" type="button">人设卡</button>
       <button id="learning-review-btn" type="button">学习审核</button>
       <button id="followup-readiness-btn" type="button">续话状态</button>
+      <button id="doctor-btn" type="button">链路自检</button>
+      <button id="voice-test-btn" type="button">测试语音</button>
+      <button id="character-rehearsal-btn" type="button">角色试演</button>
+      <button id="character-tuning-btn" type="button">角色调优</button>
+      <button id="character-feedback-good-btn" type="button">表现不错</button>
+      <button id="character-feedback-bad-btn" type="button">需要调整</button>
       <button id="lock-btn" type="button">锁定: 关</button>
       <button id="observe-btn" type="button">观察: 开</button>
       <button id="auto-chat-btn" type="button">自动聊: 关</button>
@@ -89,21 +96,29 @@
         <button id="help-close-btn" class="help-close-btn" type="button" aria-label="关闭帮助">关闭</button>
       </div>
       <div class="help-body">
-        <p class="help-intro">30 秒入门：先聊一句，再开麦，再加一个日程提醒。</p>
+        <p class="help-intro">30 秒入门：先做链路自检，再聊一句，最后测试语音和开麦。</p>
         <div class="help-section">
           <div class="help-title">先做这 3 件事</div>
           <ul class="help-list">
-            <li>在输入框输入一句话，按 Enter 就能开始。</li>
-            <li>点击“开麦”后直接说话，按 Ctrl+M 可快速切换。</li>
-            <li>打开“日程”添加提醒，让桌宠主动找你。</li>
+            <li>点“更多 → 链路自检”，确认聊天模型、语音服务和角色接入都正常。</li>
+            <li>在输入框输入一句话，按 Enter 测试正常聊天。</li>
+            <li>点“更多 → 测试语音”确认能听到回复；再点“开麦”测试语音输入。</li>
           </ul>
         </div>
         <div class="help-section">
           <div class="help-title">常见情况</div>
           <ul class="help-list">
-            <li>看不到角色：检查模型路径，必要时 Ctrl+F5 强刷。</li>
-            <li>开麦失败：先允许麦克风权限，再重试。</li>
-            <li>想更懂你：点“更多”进入人设卡。</li>
+            <li>聊天或语音报错：先点“链路自检”，报告会告诉你该查 LLM、TTS 还是配置。</li>
+            <li>没有声音：点“测试语音”；还不行再输入 /ttsdebug 查看最近一次语音状态。</li>
+            <li>想更像你的桌面伙伴：点“更多 → 人设卡”调整名字、说话方式和偏好。</li>
+          </ul>
+        </div>
+        <div class="help-section">
+          <div class="help-title">调角色味道</div>
+          <ul class="help-list">
+            <li>点“更多 → 角色试演”，先不经过 LLM，单独测试表情、动作和语音风格。</li>
+            <li>听完后点“表现不错”或“需要调整”，记录你对上一句表现的判断。</li>
+            <li>点“角色调优”查看下一步该改人设、回复长度、参考音频还是动作强度。</li>
           </ul>
         </div>
         <div class="help-actions">

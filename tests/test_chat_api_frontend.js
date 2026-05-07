@@ -36,6 +36,25 @@ function makeStreamResponse(lines) {
   };
 }
 
+function makeHangingStreamResponse(cancelled) {
+  return {
+    ok: true,
+    status: 200,
+    body: {
+      getReader() {
+        return {
+          async read() {
+            return await new Promise(() => {});
+          },
+          async cancel() {
+            cancelled.value = true;
+          }
+        };
+      }
+    }
+  };
+}
+
 async function testBuildRequestInit() {
   const init = chatApi.buildChatRequestInit({ message: "hi" });
   assert.strictEqual(init.method, "POST");
@@ -110,6 +129,37 @@ async function testStreamFetchFallback() {
   assert.deepStrictEqual(metadata, [{ action: "wave" }]);
 }
 
+async function testStreamDisabledUsesDirectChat() {
+  const urls = [];
+  const deltas = [];
+  const metadata = [];
+  const logs = [];
+  const authFetch = async (url) => {
+    urls.push(url);
+    return makeJsonResponse(200, {
+      reply: "direct only",
+      character_runtime: { emotion: "happy" }
+    });
+  };
+
+  const reply = await chatApi.streamAssistantReply(
+    { message: "hi" },
+    (delta) => deltas.push(delta),
+    {
+      authFetch,
+      preferStream: false,
+      onCharacterRuntimeMetadata: (value) => metadata.push(value),
+      perfLog: (scope, event, data) => logs.push({ scope, event, data })
+    }
+  );
+
+  assert.deepStrictEqual(urls, ["/api/chat"]);
+  assert.strictEqual(reply, "direct only");
+  assert.deepStrictEqual(deltas, ["direct only"]);
+  assert.deepStrictEqual(metadata, [{ emotion: "happy" }]);
+  assert.strictEqual(logs[0].event, "stream_disabled");
+}
+
 async function testStreamReaderErrorBeforeDeltaFallback() {
   const urls = [];
   const authFetch = async (url) => {
@@ -128,6 +178,34 @@ async function testStreamReaderErrorBeforeDeltaFallback() {
 
   assert.deepStrictEqual(urls, ["/api/chat_stream", "/api/chat"]);
   assert.strictEqual(reply, "fallback reply");
+}
+
+async function testStreamFirstDeltaTimeoutFallback() {
+  const urls = [];
+  const cancelled = { value: false };
+  const deltas = [];
+  const authFetch = async (url) => {
+    urls.push(url);
+    if (url === "/api/chat_stream") {
+      return makeHangingStreamResponse(cancelled);
+    }
+    return makeJsonResponse(200, { reply: "fallback after timeout" });
+  };
+
+  const reply = await chatApi.streamAssistantReply(
+    { message: "hi" },
+    (delta) => deltas.push(delta),
+    {
+      authFetch,
+      firstDeltaTimeoutMs: 5,
+      perfLog: () => {}
+    }
+  );
+
+  assert.deepStrictEqual(urls, ["/api/chat_stream", "/api/chat"]);
+  assert.strictEqual(reply, "fallback after timeout");
+  assert.deepStrictEqual(deltas, ["fallback after timeout"]);
+  assert.strictEqual(cancelled.value, true);
 }
 
 async function testStreamErrorFallbackFailureKeepsDiagnostic() {
@@ -159,7 +237,9 @@ async function main() {
   await testBuildRequestInit();
   await testStreamingReply();
   await testStreamFetchFallback();
+  await testStreamDisabledUsesDirectChat();
   await testStreamReaderErrorBeforeDeltaFallback();
+  await testStreamFirstDeltaTimeoutFallback();
   await testStreamErrorFallbackFailureKeepsDiagnostic();
   console.log("Chat API frontend checks passed.");
 }

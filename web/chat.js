@@ -28,6 +28,7 @@ const state = {
   autoChatBurstCount: 0,
   conversationMode: {
     enabled: false,
+    chatStreamEnabled: true,
     proactiveEnabled: false,
     proactiveSchedulerEnabled: false,
     grayAutoEnabled: false,
@@ -386,6 +387,11 @@ const state = {
   followupCharacterRuntimeLastDispatch: null,
   followupCharacterRuntimeLastApply: null,
   followupCharacterRuntimeLastReplyCandidate: null,
+  followupCharacterRuntimeLastReplyAutoApply: null,
+  characterRuntimeAutoApplyReplyCue: false,
+  characterRehearsalIndex: 0,
+  characterPerformanceFeedbacks: [],
+  characterPerformanceLastFeedback: null,
   grayAutoTrialCharacterCueManualEmitCount: 0,
   grayAutoTrialCharacterCueLastManualEmitAt: 0,
   grayAutoTrialCharacterCueLastManualEmit: null,
@@ -2356,6 +2362,563 @@ function buildTTSDebugReport() {
   return lines.join("\n");
 }
 
+function formatDoctorDuration(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value) || value < 0) {
+    return "n/a";
+  }
+  return `${Math.round(value)}ms`;
+}
+
+function formatDoctorCheckLine(label, check) {
+  const ok = check?.ok === true;
+  const status = ok ? "正常" : "异常";
+  const duration = formatDoctorDuration(check?.elapsedMs);
+  const detail = String(check?.detail || "").trim();
+  const error = String(check?.error || "").trim();
+  const suffix = error || detail || "无更多信息";
+  return `${label}：${status}，用时 ${duration}。${suffix}`;
+}
+
+function formatDoctorBytes(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) {
+    return "";
+  }
+  if (value < 1024) {
+    return `${Math.round(value)} B`;
+  }
+  if (value < 1024 * 1024) {
+    return `${Math.round(value / 1024)} KB`;
+  }
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function addUniqueDoctorAdvice(items, text) {
+  const normalized = String(text || "").trim();
+  if (normalized && !items.includes(normalized)) {
+    items.push(normalized);
+  }
+}
+
+function buildDoctorAdvice(checks, context = {}) {
+  const advice = [];
+  const failed = Array.isArray(checks) ? checks.filter((check) => check?.ok !== true) : [];
+  if (!failed.length) {
+    addUniqueDoctorAdvice(advice, "核心链路都正常。可以继续测试正常对话和语音效果；如果角色味道还不对，下一步再调人设、回复长度和语音风格。");
+  }
+  for (const check of failed) {
+    const label = String(check?.label || "");
+    const message = `${check?.error || ""} ${check?.detail || ""}`.toLowerCase();
+    if (message.includes("invalid api token") || message.includes("401")) {
+      addUniqueDoctorAdvice(advice, "鉴权失败。先刷新或重启应用；如果还失败，检查 server.require_api_token 和本地 token 环境变量。");
+      continue;
+    }
+    if (message.includes("timeout")) {
+      addUniqueDoctorAdvice(advice, `${label}超时。先确认对应服务没有卡住，必要时重启这一层，然后再点一次链路自检。`);
+      continue;
+    }
+    if (label.includes("LLM")) {
+      addUniqueDoctorAdvice(advice, "聊天模型异常。先检查 LLM 地址、模型名、API key 和后端控制台日志，再继续调角色效果。");
+      continue;
+    }
+    if (label.includes("TTS")) {
+      if (String(context.ttsProvider || "").toLowerCase() === "gpt_sovits") {
+        addUniqueDoctorAdvice(advice, "GPT-SoVITS 异常。确认 GPT-SoVITS API 已启动，并且地址和端口与配置一致，然后再点一次链路自检。");
+      } else {
+        addUniqueDoctorAdvice(advice, "语音异常。检查当前音色和 TTS provider 是否可用。");
+      }
+      continue;
+    }
+    if (label.includes("后端")) {
+      addUniqueDoctorAdvice(advice, "后端异常。重启 Python 服务，并检查 config.json / config.local.json 是否有语法或路径问题。");
+      continue;
+    }
+    addUniqueDoctorAdvice(advice, `${label}异常。先修这一层，再点一次链路自检。`);
+  }
+  if (context.streamEnabled === false) {
+    addUniqueDoctorAdvice(advice, "当前已关闭流式聊天，会直接走普通聊天请求。这是为了避开某些模型流式接口长时间不返回内容的问题。");
+  }
+  if (context.speakingEnabled === false) {
+    addUniqueDoctorAdvice(advice, "界面里的语音开关是关闭状态，因此现在只能检查请求，不能判断实际播放效果。");
+  }
+  return advice;
+}
+
+async function runDoctorTimed(label, fn) {
+  const started = performance.now();
+  try {
+    const result = await fn();
+    return {
+      label,
+      ok: result?.ok !== false,
+      elapsedMs: performance.now() - started,
+      detail: result?.detail || "",
+      error: ""
+    };
+  } catch (err) {
+    return {
+      label,
+      ok: false,
+      elapsedMs: performance.now() - started,
+      detail: "",
+      error: String(err?.message || err || "")
+    };
+  }
+}
+
+async function runDoctorJsonFetch(url, init = {}, timeoutMs = 12000) {
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  let timer = 0;
+  if (controller) {
+    timer = window.setTimeout(() => controller.abort(), Math.max(1000, Math.round(Number(timeoutMs) || 12000)));
+  }
+  try {
+    const resp = await authFetch(url, {
+      ...init,
+      signal: controller ? controller.signal : init.signal
+    });
+    let data = {};
+    try {
+      data = await resp.json();
+    } catch (_) {
+      data = {};
+    }
+    if (!resp.ok) {
+      throw new Error(data?.error || `HTTP ${resp.status}`);
+    }
+    return data;
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      throw new Error(`timeout after ${Math.round(Number(timeoutMs) || 12000)}ms`);
+    }
+    throw err;
+  } finally {
+    if (timer) {
+      window.clearTimeout(timer);
+    }
+  }
+}
+
+async function runDoctorDiagnostics() {
+  const cfg = state.config || {};
+  const conversationCfg = cfg.conversation_mode || {};
+  const runtimeCfg = cfg.character_runtime || {};
+  const ttsCfg = cfg.tts || {};
+  const checks = [];
+
+  checks.push(await runDoctorTimed("后端健康", async () => {
+    const payload = await runDoctorJsonFetch("/api/health", { cache: "no-store" }, 8000);
+    return {
+      ok: payload?.ok === true,
+      detail: payload?.ok === true ? "本地服务响应正常。" : "本地服务状态异常。"
+    };
+  }));
+
+  checks.push(await runDoctorTimed("聊天模型", async () => {
+    const payload = await runDoctorJsonFetch(
+      "/api/chat",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Reply with OK only.",
+          history: [],
+          auto: false,
+          force_tools: false
+        })
+      },
+      22000
+    );
+    const reply = String(payload?.reply || "").trim();
+    return {
+      ok: !!reply,
+      detail: reply ? "模型已经返回文本。" : "模型没有返回文本。"
+    };
+  }));
+
+  checks.push(await runDoctorTimed("语音服务", async () => {
+    if (!state.speakingEnabled) {
+      return { ok: true, detail: "语音开关关闭，已跳过真实语音请求。" };
+    }
+    if (!isServerTTSProvider(state.ttsProvider)) {
+      const available = typeof speechSynthesis !== "undefined";
+      return {
+        ok: available,
+        detail: available ? "浏览器语音可用。" : "浏览器语音不可用。"
+      };
+    }
+    const sample = "Doctor voice check.";
+    const blob = await requestServerTTSBlob(
+      sample,
+      buildSpeakProsody(sample, "idle", false, "steady"),
+      {
+        timeoutMs: Math.min(22000, Math.max(2500, Number(state.ttsServerRequestTimeoutMs) || 14000)),
+        traceId: createPerfTraceId("doctor-tts")
+      }
+    );
+    const bytes = Number(blob?.size || 0);
+    return {
+      ok: bytes > 0,
+      detail: bytes > 0
+        ? `${state.ttsProvider} 已返回音频（约 ${formatDoctorBytes(bytes)}）。`
+        : `${state.ttsProvider} 没有返回有效音频。`
+    };
+  }));
+
+  const streamEnabled = conversationCfg.chat_stream_enabled !== false;
+  const streamLine = streamEnabled
+    ? "聊天模式：流式聊天已开启。"
+    : "聊天模式：流式聊天已关闭，当前直接走普通聊天请求。";
+  const runtimeLine = runtimeCfg.enabled === true
+    ? `角色接入：已开启；情绪/动作元信息${runtimeCfg.return_metadata === true ? "会返回" : "不返回"}；回复 cue ${runtimeCfg.auto_apply_reply_cue === true ? "会自动应用" : "不会自动应用"}。`
+    : "角色接入：未开启。";
+  const okCount = checks.filter((item) => item.ok === true).length;
+  const allOk = okCount === checks.length;
+  const advice = buildDoctorAdvice(checks, {
+    ttsProvider: ttsCfg.provider || state.ttsProvider || "",
+    streamEnabled,
+    speakingEnabled: state.speakingEnabled === true
+  });
+
+  return [
+    allOk ? "链路自检完成：核心功能正常。" : `链路自检完成：${checks.length - okCount} 项需要处理。`,
+    "",
+    "检查结果",
+    ...checks.map((check) => formatDoctorCheckLine(check.label, check)),
+    "",
+    "当前配置",
+    `语音服务：${String(ttsCfg.provider || state.ttsProvider || "unknown")}`,
+    streamLine,
+    runtimeLine,
+    "",
+    "下一步建议",
+    ...advice.map((item, index) => `${index + 1}. ${item}`)
+  ].join("\n");
+}
+
+async function runDoctorAndAppendReport() {
+  appendMessage("assistant", "正在自检聊天、语音和角色接入状态...", { enableTranslation: false });
+  setStatus("链路自检中...");
+  const row = appendMessage("assistant", await runDoctorDiagnostics(), { enableTranslation: false });
+  row?.classList?.add("doctor-report");
+}
+
+function buildChatFailureDoctorHint(err) {
+  const message = String(err?.message || err || "").trim() || "未知错误";
+  const lower = message.toLowerCase();
+  const likelyLayer = lower.includes("tts")
+    ? "TTS"
+    : lower.includes("token") || lower.includes("401")
+      ? "鉴权"
+      : lower.includes("stream")
+        ? "LLM 流式"
+        : "LLM";
+  return [
+    `错误: ${message}`,
+    "",
+    `建议: 这次看起来可能卡在 ${likelyLayer} 链路。`,
+    "你可以点「更多 → 链路自检」，或输入 /doctor，让我自动检查 LLM、TTS、配置和角色接入状态。"
+  ].join("\n");
+}
+
+async function runVoiceTestAndAppendReport() {
+  const sample = "这是语音测试，如果你听到我说话，说明语音链路正常。";
+  appendMessage("assistant", sample);
+  setStatus("语音测试中...");
+  const prosody = buildSpeakProsody(sample, "idle", false, "steady");
+  const ok = await speak(sample, { force: true, interrupt: true, prosody });
+  if (!ok) {
+    appendMessage("assistant", "语音测试没有成功。请点“更多 → 链路自检”，或输入 /ttsdebug 查看最近一次语音状态。", { enableTranslation: false });
+    setStatus("语音测试失败");
+  }
+  return ok;
+}
+
+const CHARACTER_REHEARSAL_PRESETS = [
+  {
+    label: "开心",
+    sample: "好，开心模式上线！我会更轻快一点，但不会吵你。",
+    mood: "happy",
+    style: "playful",
+    runtimeHint: { emotion: "happy", action: "happy_idle", intensity: "normal", voice_style: "cheerful", live2d_hint: "happy" }
+  },
+  {
+    label: "思考",
+    sample: "我先想一下，这个点可能有两种走法。",
+    mood: "thinking",
+    style: "clear",
+    runtimeHint: { emotion: "thinking", action: "think", intensity: "low", voice_style: "curious", live2d_hint: "thinking" }
+  },
+  {
+    label: "轻柔",
+    sample: "没关系，先慢一点，我在这边陪你把它理顺。",
+    mood: "sad",
+    style: "comfort",
+    runtimeHint: { emotion: "sad", action: "none", intensity: "low", voice_style: "soft", live2d_hint: "quiet" }
+  },
+  {
+    label: "认真",
+    sample: "收到，我会把话说清楚一点，先处理最关键的问题。",
+    mood: "idle",
+    style: "steady",
+    runtimeHint: { emotion: "neutral", action: "nod", intensity: "normal", voice_style: "serious", live2d_hint: "idle" }
+  }
+];
+
+function getNextCharacterRehearsalPreset() {
+  const presets = CHARACTER_REHEARSAL_PRESETS;
+  const index = Math.abs(Math.round(Number(state.characterRehearsalIndex || 0))) % presets.length;
+  state.characterRehearsalIndex = index + 1;
+  return presets[index];
+}
+
+async function runCharacterRehearsalAndAppendReport() {
+  const preset = getNextCharacterRehearsalPreset();
+  const normalized = handleCharacterRuntimeMetadata(preset.runtimeHint);
+  const voiceStyle = normalizeRuntimeVoiceStyle(preset.runtimeHint.voice_style);
+  const speechStyle = runtimeVoiceStyleToTalkStyle(voiceStyle, preset.style);
+  const candidate = {
+    textPreview: preset.sample,
+    mood: preset.mood,
+    style: preset.style,
+    runtimeHint: normalized || preset.runtimeHint
+  };
+  const apply = {
+    at: Date.now(),
+    applied: !!normalized,
+    reason: normalized ? "applied" : "runtime_unavailable",
+    voiceStyle,
+    speechStyle,
+    runtimeHint: normalized || preset.runtimeHint,
+    source: "character_rehearsal"
+  };
+  state.followupCharacterRuntimeLastReplyCandidate = candidate;
+  state.followupCharacterRuntimeLastReplyAutoApply = apply;
+  updateReplyCharacterChip(candidate, apply);
+  appendMessage("assistant", `角色试演：${preset.label}\n${preset.sample}`, { enableTranslation: false });
+  setStatus(`角色试演：${preset.label}`);
+  if (!state.speakingEnabled) {
+    appendMessage("assistant", "语音开关当前是关闭状态，这次只测试了表情和动作。", { enableTranslation: false });
+    return true;
+  }
+  const prosody = buildSpeakProsody(preset.sample, preset.mood, false, voiceStyle);
+  const ok = await speak(preset.sample, {
+    force: true,
+    interrupt: true,
+    prosody,
+    mood: preset.mood,
+    style: speechStyle,
+    voiceStyle
+  });
+  if (!ok) {
+    appendMessage("assistant", "角色试演的语音没有成功。可以先点“测试语音”或“链路自检”确认语音服务。", { enableTranslation: false });
+    setStatus("角色试演语音失败");
+  }
+  return ok;
+}
+
+function formatCharacterTuningNumber(value, fallback = "未配置") {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return fallback;
+  }
+  return String(Math.round(n * 100) / 100);
+}
+
+function addUniqueCharacterTuningAdvice(items, text) {
+  const normalized = String(text || "").trim();
+  if (normalized && !items.includes(normalized)) {
+    items.push(normalized);
+  }
+}
+
+function addUniqueCharacterTuningConfigKey(items, key, reason = "") {
+  const normalizedKey = String(key || "").trim();
+  if (!normalizedKey) {
+    return;
+  }
+  const normalizedReason = String(reason || "").trim();
+  const line = normalizedReason ? `${normalizedKey}：${normalizedReason}` : normalizedKey;
+  if (!items.includes(line)) {
+    items.push(line);
+  }
+}
+
+function getLatestCharacterPerformanceSummary() {
+  const candidate = state.followupCharacterRuntimeLastReplyCandidate || null;
+  const autoApply = state.followupCharacterRuntimeLastReplyAutoApply || null;
+  const runtimeHint = autoApply?.runtimeHint || candidate?.runtimeHint || null;
+  if (!candidate && !runtimeHint) {
+    return null;
+  }
+  return {
+    at: Date.now(),
+    textPreview: String(candidate?.textPreview || "").slice(0, 80),
+    emotion: String(runtimeHint?.emotion || candidate?.mood || "neutral"),
+    action: String(runtimeHint?.action || "none"),
+    voiceStyle: String(autoApply?.voiceStyle || runtimeHint?.voice_style || "neutral"),
+    applied: autoApply?.applied === true,
+    source: String(autoApply?.source || candidate?.source || "assistant_reply")
+  };
+}
+
+function recordCharacterPerformanceFeedback(rating = "good", note = "") {
+  const summary = getLatestCharacterPerformanceSummary();
+  if (!summary) {
+    appendMessage("assistant", "还没有可评价的角色表现。先发一句聊天，或点“角色试演”再反馈。", { enableTranslation: false });
+    setStatus("暂无角色表现可反馈");
+    return null;
+  }
+  const normalizedRating = rating === "bad" ? "bad" : "good";
+  const feedback = {
+    ...summary,
+    rating: normalizedRating,
+    label: normalizedRating === "good" ? "表现不错" : "需要调整",
+    note: String(note || "").trim()
+  };
+  state.characterPerformanceLastFeedback = feedback;
+  state.characterPerformanceFeedbacks.unshift(feedback);
+  if (state.characterPerformanceFeedbacks.length > 8) {
+    state.characterPerformanceFeedbacks.length = 8;
+  }
+  const emotion = localizeReplyCharacterValue("emotion", feedback.emotion);
+  const action = localizeReplyCharacterValue("action", feedback.action);
+  const voice = localizeReplyCharacterValue("voice", feedback.voiceStyle);
+  appendMessage(
+    "assistant",
+    `已记录反馈：${feedback.label}\n对象：${emotion} / ${action} / ${voice}\n下一步可以点“角色调优”看建议。`,
+    { enableTranslation: false }
+  );
+  setStatus(`已记录：${feedback.label}`);
+  return feedback;
+}
+
+function buildCharacterTuningReport() {
+  const cfg = state.config || {};
+  const runtimeCfg = cfg.character_runtime || {};
+  const ttsCfg = cfg.tts || {};
+  const motionCfg = cfg.motion || {};
+  const llmCfg = cfg.llm || {};
+  const candidate = state.followupCharacterRuntimeLastReplyCandidate || null;
+  const autoApply = state.followupCharacterRuntimeLastReplyAutoApply || null;
+  const runtimeHint = autoApply?.runtimeHint || candidate?.runtimeHint || null;
+  const feedback = state.characterPerformanceLastFeedback || null;
+  const assistantPrompt = String(cfg.assistant_prompt || "");
+  const advice = [];
+  const configKeys = [];
+
+  if (runtimeCfg.enabled !== true) {
+    addUniqueCharacterTuningAdvice(advice, "先开启 character_runtime.enabled，否则回复不会进入角色表现层。");
+    addUniqueCharacterTuningConfigKey(configKeys, "character_runtime.enabled", "控制角色接入层是否启用");
+  }
+  if (runtimeCfg.return_metadata !== true) {
+    addUniqueCharacterTuningAdvice(advice, "开启 character_runtime.return_metadata，方便后端返回情绪、动作和语音风格。");
+    addUniqueCharacterTuningConfigKey(configKeys, "character_runtime.return_metadata", "让回复返回情绪、动作和语音风格元信息");
+  }
+  if (runtimeCfg.auto_apply_reply_cue !== true) {
+    addUniqueCharacterTuningAdvice(advice, "如果你正在本地测试角色味道，可以临时开启 auto_apply_reply_cue；确认效果后再决定是否默认打开。");
+    addUniqueCharacterTuningConfigKey(configKeys, "character_runtime.auto_apply_reply_cue", "控制上一句回复 cue 是否自动应用到本地表现层");
+  }
+  if (!candidate) {
+    addUniqueCharacterTuningAdvice(advice, "先发一句正常聊天，或点“角色试演”，再看这里的调优建议会更准。");
+  } else if (autoApply?.applied !== true) {
+    addUniqueCharacterTuningAdvice(advice, "上一句只生成了候选表现，没有真正应用。优先检查角色接入开关和顶部“上一句角色表现”卡片。");
+    addUniqueCharacterTuningConfigKey(configKeys, "character_runtime.auto_apply_reply_cue", "候选表现未应用时优先检查这个开关");
+  }
+  if (feedback?.rating === "bad") {
+    addUniqueCharacterTuningAdvice(advice, "你刚标记“需要调整”。先用“角色试演”复现是哪种情绪不对，再分别判断是声音差异小、动作太弱，还是回复文本不像角色。");
+    addUniqueCharacterTuningConfigKey(configKeys, "assistant_prompt", "如果文本不像角色，先改这里的人设和说话规则");
+    addUniqueCharacterTuningConfigKey(configKeys, "motion.speech_motion_strength", "如果说话动作太弱，调这里");
+    addUniqueCharacterTuningConfigKey(configKeys, "tts.gpt_sovits_fallback_ref_audio_path", "如果声线味道不对，优先检查参考音频");
+  } else if (feedback?.rating === "good") {
+    addUniqueCharacterTuningAdvice(advice, "你刚标记“表现不错”。先保留这组情绪/动作/语音映射，下一步重点优化 LLM 回复文本的口吻和长度。");
+    addUniqueCharacterTuningConfigKey(configKeys, "assistant_prompt", "表现层可用后，优先把文本口吻调稳定");
+  }
+  if (String(ttsCfg.provider || state.ttsProvider || "").toLowerCase() === "gpt_sovits") {
+    addUniqueCharacterTuningAdvice(advice, "GPT-SoVITS 对 prosody 参数不一定明显。若开心/轻柔/认真听起来差不多，优先换参考音频或拆分不同情绪音色。");
+    addUniqueCharacterTuningConfigKey(configKeys, "tts.gpt_sovits_ref_audio_path", "主参考音频会明显影响声线味道");
+    addUniqueCharacterTuningConfigKey(configKeys, "tts.gpt_sovits_fallback_ref_audio_path", "主参考不可用时会落到这里");
+    if (ttsCfg.gpt_sovits_realtime_tts !== false) {
+      addUniqueCharacterTuningAdvice(advice, "建议 GPT-SoVITS 保持 final_only / 非实时模式，先保证长句稳定出声，再追求低延迟。");
+      addUniqueCharacterTuningConfigKey(configKeys, "tts.gpt_sovits_realtime_tts", "长句稳定性优先时建议关闭实时模式");
+      addUniqueCharacterTuningConfigKey(configKeys, "tts.stream_mode", "长句测试阶段优先 final_only");
+    }
+  }
+  const maxTokens = Number(llmCfg.max_tokens || runtimeCfg.max_tokens || 0);
+  if (Number.isFinite(maxTokens) && maxTokens > 180) {
+    addUniqueCharacterTuningAdvice(advice, "回复长度偏长时角色感会被稀释。先把单轮回复控制到 1 到 3 句，再测试语音表现。");
+    addUniqueCharacterTuningConfigKey(configKeys, "llm.max_tokens", "控制普通聊天回复长度上限");
+    addUniqueCharacterTuningConfigKey(configKeys, "character_runtime.max_tokens", "控制角色续话/角色层回复长度上限");
+  }
+  if (!/不要|不使用|禁止/.test(assistantPrompt) || !/markdown|编号|列表|项目符号|标题/i.test(assistantPrompt)) {
+    addUniqueCharacterTuningAdvice(advice, "提示词里建议明确禁止 Markdown、编号列表和长段解释，桌宠说话会更像在聊天。");
+    addUniqueCharacterTuningConfigKey(configKeys, "assistant_prompt", "加入短句、口语化、禁止 Markdown/编号列表等规则");
+  }
+  const speechMotionStrength = Number(motionCfg.speech_motion_strength ?? motionCfg.speech_body_motion_strength ?? state.speechMotionStrength);
+  if (Number.isFinite(speechMotionStrength) && speechMotionStrength < 1.1) {
+    addUniqueCharacterTuningAdvice(advice, "说话时身体动作偏弱。可以把 motion.speech_motion_strength 提到 1.2 到 1.5 再试。");
+    addUniqueCharacterTuningConfigKey(configKeys, "motion.speech_motion_strength", "控制说话时身体动作强度");
+  }
+  const expressionStrength = Number(motionCfg.expression_strength ?? state.expressionStrength);
+  if (Number.isFinite(expressionStrength) && expressionStrength < 0.9) {
+    addUniqueCharacterTuningAdvice(advice, "表情强度偏低。可以把 motion.expression_strength 调到 1.0 左右。");
+    addUniqueCharacterTuningConfigKey(configKeys, "motion.expression_strength", "控制表情幅度");
+  }
+  if (!advice.length) {
+    addUniqueCharacterTuningAdvice(advice, "基础配置看起来可以。下一步重点调人设语气样例、参考音频和四个试演预设的差异。");
+    addUniqueCharacterTuningConfigKey(configKeys, "assistant_prompt", "继续调角色口吻样例");
+    addUniqueCharacterTuningConfigKey(configKeys, "tts.gpt_sovits_ref_audio_path", "继续调参考音频");
+  }
+
+  const lastLine = runtimeHint
+    ? `上一句表现：情绪=${localizeReplyCharacterValue("emotion", runtimeHint.emotion)}；动作=${localizeReplyCharacterValue("action", runtimeHint.action)}；语音=${localizeReplyCharacterValue("voice", autoApply?.voiceStyle || runtimeHint.voice_style)}；状态=${autoApply?.applied === true ? "已应用" : "未应用"}`
+    : "上一句表现：还没有可用记录。";
+  const feedbackLine = feedback
+    ? `最近反馈：${feedback.label}（${localizeReplyCharacterValue("emotion", feedback.emotion)} / ${localizeReplyCharacterValue("action", feedback.action)} / ${localizeReplyCharacterValue("voice", feedback.voiceStyle)}）`
+    : "最近反馈：还没有记录。";
+  return [
+    "角色调优建议",
+    "",
+    "当前观察",
+    lastLine,
+    feedbackLine,
+    `角色接入：${runtimeCfg.enabled === true ? "已开启" : "未开启"}；元信息=${runtimeCfg.return_metadata === true ? "开启" : "关闭"}；自动应用=${runtimeCfg.auto_apply_reply_cue === true ? "开启" : "关闭"}`,
+    `语音：${String(ttsCfg.provider || state.ttsProvider || "unknown")}；浏览器兜底=${ttsCfg.allow_browser_fallback === true ? "开启" : "关闭"}`,
+    `动作：说话强度=${formatCharacterTuningNumber(speechMotionStrength)}；表情强度=${formatCharacterTuningNumber(expressionStrength)}`,
+    "",
+    "建议顺序",
+    ...advice.map((item, index) => `${index + 1}. ${item}`),
+    "",
+    "可检查配置项",
+    ...(configKeys.length ? configKeys.map((item, index) => `${index + 1}. ${item}`) : ["1. 暂时没有必须改的配置项。"])
+  ].join("\n");
+}
+
+function runCharacterTuningAndAppendReport() {
+  const row = appendMessage("assistant", buildCharacterTuningReport(), { enableTranslation: false });
+  row?.classList?.add("doctor-report");
+  setStatus("角色调优建议已生成");
+}
+
+function buildCharacterWorkflowGuide() {
+  return [
+    "角色闭环测试流程",
+    "",
+    "1. 点“更多 → 链路自检”，先确认 LLM、TTS 和角色接入都正常。",
+    "2. 点“更多 → 角色试演”，不经过 LLM，单独听表情、动作和语音风格。",
+    "3. 听完点“表现不错”或“需要调整”，把你的主观判断记到本次会话。",
+    "4. 点“角色调优”，看下一步该改人设、回复长度、参考音频还是动作强度。",
+    "5. 再发一句真实聊天，看顶部“上一句角色表现”是否符合预期。"
+  ].join("\n");
+}
+
+function appendCharacterWorkflowGuide() {
+  const row = appendMessage("assistant", buildCharacterWorkflowGuide(), { enableTranslation: false });
+  row?.classList?.add("doctor-report");
+  setStatus("角色流程已显示");
+}
+
 function ensureTTSDebugPanel() {
   if (state.ttsDebugPanel || typeof document === "undefined") {
     return state.ttsDebugPanel;
@@ -2880,9 +3443,9 @@ function buildFollowupCharacterState(followup, silence, scheduler) {
   const silenceReasons = Array.isArray(silence?.blockedReasons) ? silence.blockedReasons : [];
   if (silenceReasons.includes("user_silence_window_not_reached") || silenceReasons.includes("tts_silence_window_not_reached")) {
     return {
-      label: "等你缓一会儿",
-      mood: "thinking",
-      description: "安静时间还不够，先不打断用户。"
+      label: "刚聊完",
+      mood: "idle",
+      description: "刚刚完成一轮对话，先安静待机，不打断用户。"
     };
   }
   return {
@@ -2966,6 +3529,7 @@ function updateFollowupCharacterChip() {
     "冷却中": "cooldown",
     "今天先收一收": "limit",
     "识趣闭麦": "quiet",
+    "刚聊完": "idle",
     "等你缓一会儿": "waiting",
     "观察气氛": "watching",
     "安静陪伴": "idle"
@@ -2982,6 +3546,102 @@ function updateFollowupCharacterChip() {
     ? String(Number(selectedReaction.index))
     : "-1";
   maybeEmitFollowupCharacterRuntimeHint({ label, mood, tone });
+}
+
+function localizeReplyCharacterValue(kind, value) {
+  const key = String(value || "").trim().toLowerCase();
+  if (!key) {
+    return "未定";
+  }
+  const maps = {
+    emotion: {
+      neutral: "平静",
+      idle: "待机",
+      happy: "开心",
+      playful: "调皮",
+      thinking: "思考",
+      surprised: "惊讶",
+      sad: "低落",
+      anxious: "紧张",
+      angry: "生气",
+      annoyed: "小不爽"
+    },
+    action: {
+      none: "轻待机",
+      nod: "点头",
+      think: "思考动作",
+      happy_idle: "开心待机",
+      wave: "挥手",
+      shake_head: "摇头",
+      surprised: "惊讶动作"
+    },
+    voice: {
+      neutral: "自然声线",
+      soft: "轻柔声线",
+      warm: "温暖声线",
+      cheerful: "明亮声线",
+      teasing: "调皮声线",
+      serious: "认真声线",
+      curious: "好奇声线"
+    }
+  };
+  return maps[kind]?.[key] || key.replace(/_/g, " ");
+}
+
+function buildReplyCharacterChipView(candidate = null, autoApply = null) {
+  const safeCandidate = candidate && typeof candidate === "object"
+    ? candidate
+    : state.followupCharacterRuntimeLastReplyCandidate;
+  const safeAutoApply = autoApply && typeof autoApply === "object"
+    ? autoApply
+    : state.followupCharacterRuntimeLastReplyAutoApply;
+  if (!safeCandidate) {
+    return {
+      text: "上一句角色表现 · 待回复",
+      title: "发送一条消息后，这里会显示上一句回复触发的情绪、动作和语音风格。",
+      tone: "waiting"
+    };
+  }
+  const runtimeHint = safeAutoApply?.runtimeHint && typeof safeAutoApply.runtimeHint === "object"
+    ? safeAutoApply.runtimeHint
+    : (safeCandidate.runtimeHint || {});
+  const emotion = localizeReplyCharacterValue("emotion", runtimeHint.emotion || safeCandidate.mood || "neutral");
+  const action = localizeReplyCharacterValue("action", runtimeHint.action || "none");
+  const voice = localizeReplyCharacterValue("voice", safeAutoApply?.voiceStyle || runtimeHint.voice_style || "neutral");
+  const applied = safeAutoApply?.applied === true;
+  const reason = String(safeAutoApply?.reason || "").trim();
+  const statusText = applied
+    ? "已应用"
+    : reason === "disabled"
+      ? "仅预览"
+      : reason
+        ? "未应用"
+        : "候选已生成";
+  const tone = applied ? "applied" : (reason === "disabled" ? "blocked" : "waiting");
+  const preview = String(safeCandidate.textPreview || "").trim();
+  const title = [
+    `情绪：${emotion}`,
+    `动作：${action}`,
+    `语音：${voice}`,
+    `状态：${statusText}${reason && !applied ? `（${reason}）` : ""}`,
+    preview ? `回复片段：${preview}` : ""
+  ].filter(Boolean).join("\n");
+  return {
+    text: `上一句：${emotion} / ${action} / ${voice} · ${statusText}`,
+    title,
+    tone
+  };
+}
+
+function updateReplyCharacterChip(candidate = null, autoApply = null) {
+  if (!ui.replyCharacterChip) {
+    return;
+  }
+  const view = buildReplyCharacterChipView(candidate, autoApply);
+  ui.replyCharacterChip.textContent = view.text;
+  ui.replyCharacterChip.title = view.title;
+  ui.replyCharacterChip.setAttribute("aria-label", view.title);
+  ui.replyCharacterChip.dataset.tone = view.tone;
 }
 
 function buildFollowupCharacterRuntimeHint(input = {}) {
@@ -3180,9 +3840,124 @@ function previewAssistantReplyCharacterCueCandidate(input = {}) {
     result: `tone:${candidate.tone};mood:${candidate.mood};style:${candidate.style}`,
     error: candidate.runtimeHint ? String(candidate.runtimeHint.emotion || "") : "no_runtime_hint"
   });
+  updateReplyCharacterChip(candidate);
   updateGrayAutoTrialCharacterManualCueStatusCard();
   updateReplyCharacterCueCandidateManualSendButton();
   return candidate;
+}
+
+function normalizeRuntimeVoiceStyle(style) {
+  const key = String(style || "neutral").trim().toLowerCase().replace(/-/g, "_");
+  const aliases = {
+    happy: "cheerful",
+    playful: "teasing",
+    sad: "soft",
+    anxious: "soft",
+    angry: "serious",
+    annoyed: "serious",
+    thinking: "curious",
+    comfort: "warm",
+    clear: "curious",
+    steady: "serious"
+  };
+  const normalized = aliases[key] || key;
+  if (["neutral", "soft", "cheerful", "teasing", "serious", "curious", "warm"].includes(normalized)) {
+    return normalized;
+  }
+  return "neutral";
+}
+
+function runtimeVoiceStyleToTalkStyle(style, fallback = "neutral") {
+  const voiceStyle = normalizeRuntimeVoiceStyle(style);
+  const fallbackStyle = normalizeTalkStyle(fallback);
+  if (voiceStyle === "soft" || voiceStyle === "warm") {
+    return "comfort";
+  }
+  if (voiceStyle === "cheerful" || voiceStyle === "teasing") {
+    return "playful";
+  }
+  if (voiceStyle === "serious") {
+    return "steady";
+  }
+  if (voiceStyle === "curious") {
+    return "clear";
+  }
+  return fallbackStyle;
+}
+
+function isReplyCueAutoApplyEnabled() {
+  const runtimeCfg = state.config?.character_runtime || {};
+  return state.characterRuntimeAutoApplyReplyCue === true
+    || (runtimeCfg.enabled === true && runtimeCfg.auto_apply_reply_cue === true);
+}
+
+function maybeAutoApplyAssistantReplyCharacterCueCandidate(candidate, context = {}) {
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+  if (!isReplyCueAutoApplyEnabled()) {
+    state.followupCharacterRuntimeLastReplyAutoApply = {
+      at: Date.now(),
+      applied: false,
+      reason: "disabled"
+    };
+    updateReplyCharacterChip(candidate, state.followupCharacterRuntimeLastReplyAutoApply);
+    return null;
+  }
+  const runtimeHint = candidate.runtimeHint && typeof candidate.runtimeHint === "object"
+    ? candidate.runtimeHint
+    : null;
+  if (!runtimeHint) {
+    const skipped = {
+      at: Date.now(),
+      applied: false,
+      reason: "missing_runtime_hint",
+      speechStyle: normalizeTalkStyle(context.style || candidate.style || "neutral"),
+      voiceStyle: "neutral"
+    };
+    state.followupCharacterRuntimeLastReplyAutoApply = skipped;
+    updateReplyCharacterChip(candidate, skipped);
+    return skipped;
+  }
+
+  let normalized = null;
+  let reason = "applied";
+  try {
+    normalized = handleCharacterRuntimeMetadata(runtimeHint);
+  } catch (error) {
+    reason = String(error?.message || error || "dispatch_failed") || "dispatch_failed";
+  }
+  const voiceStyle = normalizeRuntimeVoiceStyle(
+    normalized?.voice_style || runtimeHint.voice_style || candidate.mood || context.mood || "neutral"
+  );
+  const speechStyle = runtimeVoiceStyleToTalkStyle(voiceStyle, context.style || candidate.style || "neutral");
+  const result = {
+    at: Date.now(),
+    applied: !!normalized,
+    reason: normalized ? "applied" : reason,
+    voiceStyle,
+    speechStyle,
+    runtimeHint: normalized,
+    source: "assistant_reply_candidate"
+  };
+  candidate.autoTriggered = !!normalized;
+  state.followupCharacterRuntimeLastReplyAutoApply = result;
+  try {
+    window.__AI_CHAT_LAST_CHARACTER_RUNTIME_REPLY_AUTO_APPLY__ = result;
+  } catch (_) {
+    // Diagnostics are optional.
+  }
+  recordTTSDebugEvent("conversation_followup_character_reply_cue_candidate_auto_apply", {
+    text: String(candidate.textPreview || ""),
+    result: result.applied
+      ? `voice:${voiceStyle};speechStyle:${speechStyle}`
+      : `skipped:${result.reason}`,
+    error: String(normalized?.emotion || runtimeHint.emotion || "")
+  });
+  updateReplyCharacterChip(candidate, result);
+  updateGrayAutoTrialCharacterManualCueStatusCard();
+  updateReplyCharacterCueCandidateManualSendButton();
+  return result;
 }
 
 function maybeEmitFollowupCharacterRuntimeHint(input = {}) {
@@ -3217,11 +3992,13 @@ function maybeEmitFollowupCharacterRuntimeHint(input = {}) {
 
 function startFollowupCharacterChipRefresh() {
   updateFollowupCharacterChip();
+  updateReplyCharacterChip();
   if (state.followupCharacterChipRefreshTimer || typeof window === "undefined") {
     return;
   }
   state.followupCharacterChipRefreshTimer = window.setInterval(() => {
     updateFollowupCharacterChip();
+    updateReplyCharacterChip();
   }, 2000);
 }
 
@@ -4657,10 +5434,10 @@ function buildGrayAutoTrialCharacterCueHandoffChecklist(limit = 48) {
     },
     {
       key: "runtime_emission_gate",
-      label: "真实角色动作只允许显式确认试发",
+      label: "灰度续话自动角色动作仍需显式开关",
       required: true,
       ok: false,
-      note: "自动 emission 仍关闭；真实 cue 只能走手动确认试发闸门。"
+      note: "灰度续话 automatic emission 仍关闭；助手回复 cue 自动应用只受 auto_apply_reply_cue 显式开关控制。"
     }
   ];
   const blockingRequired = items.filter((item) => item.required === true && item.ok !== true);
@@ -4782,6 +5559,7 @@ function buildGrayAutoTrialCharacterManualCueStatusCardText() {
   const dispatch = status.lastRuntimeDispatch || null;
   const apply = status.lastRuntimeApply || null;
   const candidate = status.lastReplyCandidate || null;
+  const autoApply = state.followupCharacterRuntimeLastReplyAutoApply || null;
   const selectedPreset = getSelectedGrayAutoTrialCharacterCuePresetKey();
   const preset = GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS[selectedPreset] || GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS.auto;
   const hint = lastEmit?.runtimeHint || {};
@@ -4799,9 +5577,10 @@ function buildGrayAutoTrialCharacterManualCueStatusCardText() {
     `backendPreview=${bridge ? (bridgeOk ? "noop_confirmed" : bridge.reason || "blocked") : "not_checked"}  backendWouldExecute=${bridge?.wouldExecute === true ? "true" : "false"}`,
     `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
     `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} emotion:${candidate.runtimeHint?.emotion || "n/a"} action:${candidate.runtimeHint?.action || "n/a"} emitted:${candidateEmitted ? "true" : "false"}` : "none"}`,
+    `autoApplyReplyCue=${state.characterRuntimeAutoApplyReplyCue ? "true" : "false"} lastAutoApply=${autoApply ? `${autoApply.applied ? "applied" : "skipped"}:${autoApply.reason || "n/a"} voice:${autoApply.voiceStyle || "n/a"} speechStyle:${autoApply.speechStyle || "n/a"}` : "none"}`,
     `dispatch=${dispatch ? (dispatchOk ? "local_dispatched" : "not_dispatched") : "none"}  broadcast=${dispatch?.broadcasted ? "true" : "false"}  ui=${dispatch?.uiView || "n/a"}`,
     `live2dApply=${applyKnown ? `emotion:${apply.appliedEmotion ? "true" : "false"} action:${apply.appliedAction ? "true" : "false"} modelReady:${apply.modelReady ? "true" : "false"}` : "none"}`,
-    "\u5b89\u5168\uff1a\u624b\u52a8\u786e\u8ba4\u540e\u624d\u4f1a\u8bd5\u53d1\uff1b\u4e0d\u63a5 scheduler\u3001\u4e0d\u81ea\u52a8\u89e6\u53d1\u3001\u4e0d\u53d1 TTS\u3001\u4e0d\u5199 config\u3002"
+    "\u5b89\u5168\uff1a\u9ed8\u8ba4\u5173\u95ed\uff1b\u624b\u52a8\u8bd5\u53d1\u4ecd\u9700\u786e\u8ba4\uff1bauto_apply_reply_cue=true \u65f6\u4ec5\u505a\u672c\u5730 Live2D/TTS prosody \u5e94\u7528\uff0c\u4e0d\u63a5 scheduler\u3001\u4e0d\u5199 config\u3002"
   ].join("\n");
 }
 
@@ -6850,8 +7629,8 @@ async function handleReplyCharacterCueCandidateManualSendClick(button = null) {
       : `\u56de\u590d\u5019\u9009 cue \u624b\u52a8\u53d1\u9001\u5931\u8d25\uff1a${result?.reason || "unknown"}`);
     return result?.ok === true;
   } finally {
+    updateReplyCharacterCueCandidateManualSendButton();
     if (button) {
-      button.disabled = false;
       button.blur();
     }
   }
@@ -8692,7 +9471,14 @@ const ui = {
   personaSaveBtn: document.getElementById("persona-save-btn"),
   learningReviewBtn: document.getElementById("learning-review-btn"),
   followupReadinessBtn: document.getElementById("followup-readiness-btn"),
+  doctorBtn: document.getElementById("doctor-btn"),
+  voiceTestBtn: document.getElementById("voice-test-btn"),
+  characterRehearsalBtn: document.getElementById("character-rehearsal-btn"),
+  characterTuningBtn: document.getElementById("character-tuning-btn"),
+  characterFeedbackGoodBtn: document.getElementById("character-feedback-good-btn"),
+  characterFeedbackBadBtn: document.getElementById("character-feedback-bad-btn"),
   followupCharacterChip: document.getElementById("followup-character-chip"),
+  replyCharacterChip: document.getElementById("reply-character-chip"),
   learningReviewBackdrop: document.getElementById("learning-review-backdrop"),
   learningReviewDrawer: document.getElementById("learning-review-drawer"),
   learningReviewCloseBtn: document.getElementById("learning-review-close-btn"),
@@ -11418,6 +12204,10 @@ async function handleLocalCommand(inputText) {
     appendMessage("assistant", buildTTSDebugReport(), { enableTranslation: false });
     return true;
   }
+  if (text.toLowerCase() === "/doctor" || text === "/自检") {
+    await runDoctorAndAppendReport();
+    return true;
+  }
   if (text.toLowerCase() === "/ttsdebug on") {
     toggleTTSDebugPanel(true);
     appendMessage("assistant", "TTS debug panel enabled.", { enableTranslation: false });
@@ -11464,10 +12254,27 @@ async function handleLocalCommand(inputText) {
     return true;
   }
   if (text === "/测试语音" || text.toLowerCase() === "/testvoice") {
-    const sample = "这是语音测试，如果你听到我说话，说明语音链路正常。";
-    appendMessage("assistant", sample);
-    const prosody = buildSpeakProsody(sample, "idle", false, "steady");
-    await speak(sample, { force: true, interrupt: true, prosody });
+    await runVoiceTestAndAppendReport();
+    return true;
+  }
+  if (text === "/角色试演" || text.toLowerCase() === "/roletest" || text.toLowerCase() === "/rehearse") {
+    await runCharacterRehearsalAndAppendReport();
+    return true;
+  }
+  if (text === "/角色调优" || text.toLowerCase() === "/tune" || text.toLowerCase() === "/tuning" || text.toLowerCase() === "/tunecue") {
+    runCharacterTuningAndAppendReport();
+    return true;
+  }
+  if (text === "/表现不错" || text.toLowerCase() === "/goodcue") {
+    recordCharacterPerformanceFeedback("good");
+    return true;
+  }
+  if (text === "/需要调整" || text.toLowerCase() === "/badcue") {
+    recordCharacterPerformanceFeedback("bad");
+    return true;
+  }
+  if (text === "/角色流程" || text.toLowerCase() === "/roleflow") {
+    appendCharacterWorkflowGuide();
     return true;
   }
   if (text === "/提醒列表") {
@@ -17378,6 +18185,15 @@ function speakOnceWithVoice(text, voice, opts = {}) {
       return;
     }
 
+    const speechStyle = normalizeTalkStyle(opts.style || state.currentTalkStyle || "neutral");
+    const speechMood = String(opts.mood || detectMood(cleaned) || "idle");
+    const prosodyStyle = opts.voiceStyle || speechStyle;
+    const prosody = opts.prosody && typeof opts.prosody === "object"
+      ? opts.prosody
+      : buildSpeakProsody(cleaned, speechMood, false, prosodyStyle);
+    const speedRatio = Number(prosody.speed_ratio);
+    const pitchRatio = Number(prosody.pitch_ratio);
+    const volumeRatio = Number(prosody.volume_ratio);
     const utterance = new SpeechSynthesisUtterance(cleaned);
     if (voice) {
       utterance.voice = voice;
@@ -17385,9 +18201,15 @@ function speakOnceWithVoice(text, voice, opts = {}) {
     } else {
       utterance.lang = "zh-CN";
     }
-    utterance.rate = 0.96;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
+    utterance.rate = Number.isFinite(speedRatio)
+      ? clampNumber(0.96 * speedRatio, 0.72, 1.32)
+      : 0.96;
+    utterance.pitch = Number.isFinite(pitchRatio)
+      ? clampNumber(pitchRatio, 0.72, 1.35)
+      : 1.0;
+    utterance.volume = Number.isFinite(volumeRatio)
+      ? clampNumber(volumeRatio, 0.45, 1.0)
+      : 1.0;
     let started = false;
     let settled = false;
     utterance.onstart = () => {
@@ -17400,7 +18222,7 @@ function speakOnceWithVoice(text, voice, opts = {}) {
         return;
       }
       started = true;
-      beginSpeechAnimation(cleaned, detectMood(cleaned), state.currentTalkStyle || "neutral");
+      beginSpeechAnimation(cleaned, speechMood, speechStyle);
       showSubtitleText(cleaned);
       setStatus("语音中...");
     };
@@ -17630,6 +18452,9 @@ async function loadConfig() {
   const historySummaryCfg = state.config?.history_summary || {};
   const styleCfg = state.config?.style || {};
   const motionCfg = state.config?.motion || {};
+  const runtimeCfg = state.config?.character_runtime || {};
+  state.characterRuntimeAutoApplyReplyCue =
+    runtimeCfg.enabled === true && runtimeCfg.auto_apply_reply_cue === true;
   state.showMicMeter = asrCfg.show_mic_meter !== false;
   state.micKeepListening = asrCfg.keep_listening !== false;
   state.asrTranscribeOnClose = asrCfg.transcribe_on_close !== false;
@@ -17667,6 +18492,7 @@ async function loadConfig() {
   state.observeAllowAutoChat = observeCfg.allow_auto_chat === true;
   state.conversationMode = {
     enabled: conversationCfg.enabled === true,
+    chatStreamEnabled: conversationCfg.chat_stream_enabled !== false,
     proactiveEnabled: conversationCfg.proactive_enabled === true,
     proactiveSchedulerEnabled: conversationCfg.proactive_scheduler_enabled === true,
     grayAutoEnabled: conversationCfg.gray_auto_enabled === true,
@@ -19022,8 +19848,16 @@ async function speakByBrowser(text, opts = {}) {
   stopAllAudioPlayback();
   const playbackGeneration = Number(state.ttsPlaybackGeneration || 0);
   const candidates = buildVoiceCandidates();
+  const browserTTSOptions = {
+    force,
+    playbackGeneration,
+    prosody: opts.prosody || null,
+    mood: opts.mood || "",
+    style: opts.style || state.currentTalkStyle || "neutral",
+    voiceStyle: opts.voiceStyle || ""
+  };
   for (const v of candidates) {
-    const ok = await speakOnceWithVoice(text, v, { force, playbackGeneration });
+    const ok = await speakOnceWithVoice(text, v, browserTTSOptions);
     if (ok) {
       return true;
     }
@@ -19741,7 +20575,11 @@ async function speak(text, opts = {}) {
         error: lastErr,
         timeoutMs: Number(state.ttsServerRequestTimeoutMs || 0)
       });
-      return await speakByBrowser(text, { force: !!speakOpts.force, playbackGeneration: speakOpts.playbackGeneration });
+      return await speakByBrowser(text, {
+        ...speakOpts,
+        force: !!speakOpts.force,
+        playbackGeneration: speakOpts.playbackGeneration
+      });
     }
     const nonRetriableClientError =
       /^HTTP\s+4\d\d$/i.test(lastErr) && !/^HTTP\s+(408|429)$/i.test(lastErr);
@@ -19762,7 +20600,11 @@ async function speak(text, opts = {}) {
       threshold: failThreshold,
       reason: lastErr
     });
-    return await speakByBrowser(text, { force: !!speakOpts.force, playbackGeneration: speakOpts.playbackGeneration });
+    return await speakByBrowser(text, {
+      ...speakOpts,
+      force: !!speakOpts.force,
+      playbackGeneration: speakOpts.playbackGeneration
+    });
   }
   return await speakByBrowser(text, speakOpts);
 }
@@ -20003,6 +20845,7 @@ async function streamAssistantReply(payload, onDelta, perfHooks = null) {
   return chatApi.streamAssistantReply(payload, onDelta, {
     authFetch,
     onCharacterRuntimeMetadata: handleCharacterRuntimeMetadata,
+    preferStream: state.conversationMode.chatStreamEnabled !== false,
     perfHooks,
     perfLog,
     now: () => performance.now()
@@ -20201,14 +21044,22 @@ async function requestAssistantReply(text, opts = {}) {
     updateConversationFollowupState(visibleReply);
     const mood = detectMood(visibleReply);
     recordEmotion(mood);
-    const finalTalkStyle = resolveTalkStyle(message, visibleReply, mood, isAuto);
-    state.currentTalkStyle = finalTalkStyle;
-    previewAssistantReplyCharacterCueCandidate({
+    const baseTalkStyle = resolveTalkStyle(message, visibleReply, mood, isAuto);
+    const replyCueCandidate = previewAssistantReplyCharacterCueCandidate({
       text: visibleReply,
       mood,
-      style: finalTalkStyle,
+      style: baseTalkStyle,
       auto: isAuto
     });
+    const replyCueApply = maybeAutoApplyAssistantReplyCharacterCueCandidate(replyCueCandidate, {
+      text: visibleReply,
+      mood,
+      style: baseTalkStyle,
+      auto: isAuto
+    });
+    const finalTalkStyle = normalizeTalkStyle(replyCueApply?.speechStyle || baseTalkStyle);
+    const finalProsodyStyle = replyCueApply?.voiceStyle || finalTalkStyle;
+    state.currentTalkStyle = finalTalkStyle;
     state.speechAnimMood = mood;
     if (state.motionQuietDuringSpeech && state.speakingEnabled) {
       triggerExpressionPulse(finalTalkStyle, 0.4, 220);
@@ -20228,7 +21079,7 @@ async function requestAssistantReply(text, opts = {}) {
         });
       } else if (!hadStreamSegments || !state.streamSpeakWorking) {
         const speechText = buildStableSpeakText(visibleReply) || visibleReply;
-        const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalTalkStyle);
+        const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle);
         maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
         const discardedSegments = discardQueuedStreamSpeakItems(streamSpeakSession);
         recordTTSDebugEvent("final_direct_tts", {
@@ -20243,6 +21094,7 @@ async function requestAssistantReply(text, opts = {}) {
           interrupt: true,
           mood,
           style: finalTalkStyle,
+          voiceStyle: finalProsodyStyle,
           perfTraceId: chatPerfTraceId,
           playbackGeneration: Number(state.ttsPlaybackGeneration || 0)
         });
@@ -20257,13 +21109,14 @@ async function requestAssistantReply(text, opts = {}) {
       }
     } else {
       const speechText = buildStableSpeakText(visibleReply) || visibleReply;
-      const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalTalkStyle);
+      const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle);
       maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
       await speak(speechText || visibleReply, {
         prosody,
         interrupt: false,
         mood,
         style: finalTalkStyle,
+        voiceStyle: finalProsodyStyle,
         perfTraceId: chatPerfTraceId
       });
     }
@@ -20292,7 +21145,7 @@ async function requestAssistantReply(text, opts = {}) {
       }
     }
     if (!silentError) {
-      const msg = `错误: ${err.message}`;
+      const msg = buildChatFailureDoctorHint(err);
       appendMessage("assistant", msg);
     }
     setStatus("请求失败");
@@ -20640,6 +21493,75 @@ function bindUI() {
       const visible = toggleFollowupReadinessPanel();
       updateFollowupCharacterChip();
       setStatus(visible ? "续话状态面板已打开" : "续话状态面板已隐藏");
+    });
+  }
+
+  if (ui.doctorBtn) {
+    ui.doctorBtn.addEventListener("click", async () => {
+      ui.doctorBtn.disabled = true;
+      const previousText = ui.doctorBtn.textContent || "链路自检";
+      ui.doctorBtn.textContent = "自检中";
+      try {
+        await runDoctorAndAppendReport();
+      } catch (err) {
+        appendMessage("assistant", `Doctor failed: ${err.message || err}`, { enableTranslation: false });
+        setStatus("链路自检失败");
+      } finally {
+        ui.doctorBtn.disabled = false;
+        ui.doctorBtn.textContent = previousText;
+      }
+    });
+  }
+
+  if (ui.voiceTestBtn) {
+    ui.voiceTestBtn.addEventListener("click", async () => {
+      ui.voiceTestBtn.disabled = true;
+      const previousText = ui.voiceTestBtn.textContent || "测试语音";
+      ui.voiceTestBtn.textContent = "测试中";
+      try {
+        await runVoiceTestAndAppendReport();
+      } catch (err) {
+        appendMessage("assistant", `语音测试失败: ${err.message || err}`, { enableTranslation: false });
+        setStatus("语音测试失败");
+      } finally {
+        ui.voiceTestBtn.disabled = false;
+        ui.voiceTestBtn.textContent = previousText;
+      }
+    });
+  }
+
+  if (ui.characterRehearsalBtn) {
+    ui.characterRehearsalBtn.addEventListener("click", async () => {
+      ui.characterRehearsalBtn.disabled = true;
+      const previousText = ui.characterRehearsalBtn.textContent || "角色试演";
+      ui.characterRehearsalBtn.textContent = "试演中";
+      try {
+        await runCharacterRehearsalAndAppendReport();
+      } catch (err) {
+        appendMessage("assistant", `角色试演失败: ${err.message || err}`, { enableTranslation: false });
+        setStatus("角色试演失败");
+      } finally {
+        ui.characterRehearsalBtn.disabled = false;
+        ui.characterRehearsalBtn.textContent = previousText;
+      }
+    });
+  }
+
+  if (ui.characterTuningBtn) {
+    ui.characterTuningBtn.addEventListener("click", () => {
+      runCharacterTuningAndAppendReport();
+    });
+  }
+
+  if (ui.characterFeedbackGoodBtn) {
+    ui.characterFeedbackGoodBtn.addEventListener("click", () => {
+      recordCharacterPerformanceFeedback("good");
+    });
+  }
+
+  if (ui.characterFeedbackBadBtn) {
+    ui.characterFeedbackBadBtn.addEventListener("click", () => {
+      recordCharacterPerformanceFeedback("bad");
     });
   }
 
@@ -21106,6 +22028,7 @@ window.addEventListener("character-runtime:update", (event) => {
       motionEnabled: !!state.motionEnabled
     };
     state.followupCharacterRuntimeLastApply = applyFeedback;
+    updateReplyCharacterChip();
     try {
       window.__AI_CHAT_LAST_CHARACTER_RUNTIME_APPLY__ = applyFeedback;
     } catch (_) {

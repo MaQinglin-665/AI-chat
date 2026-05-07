@@ -158,6 +158,15 @@ python scripts\first_run_check.py
 
 `start_electron.bat` 会在启动前自动运行 `python scripts\first_run_check.py`。如果启动失败或双击 VBS 没有明显反应，请直接运行 `start_electron.bat` 查看诊断输出。
 
+## 6.1 Recommended Local Experience Templates
+
+如果你想复现当前推荐的本地体验，可以使用：
+
+- 稳定首跑模板：`docs/recommended-local-config.md` 的 Template A
+- 本地角色闭环模板：`docs/recommended-local-config.md` 的 Template B
+
+建议把模板复制到 `config.local.json`，不要改成发布默认值。角色闭环模板会显式打开 `character_runtime.auto_apply_reply_cue`，只适合本地验证角色表现。
+
 ### Web debug mode
 
 ```powershell
@@ -204,6 +213,7 @@ start_desktop.bat
 
 - 排障：`docs/troubleshooting.md`
 - 语音输入 / 输出排障：`docs/voice-troubleshooting.md`
+- 推荐本地配置模板：`docs/recommended-local-config.md`
 - 路线图：`docs/ROADMAP.md`
 - 贡献：`CONTRIBUTING.md`
 - 安全策略：`SECURITY.md`

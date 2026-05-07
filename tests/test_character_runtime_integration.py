@@ -174,6 +174,7 @@ def test_character_runtime_settings_default_demo_stable_off():
     assert settings.get("enabled") is False
     assert settings.get("return_metadata") is False
     assert settings.get("demo_stable") is False
+    assert settings.get("auto_apply_reply_cue") is False
     override = settings.get("persona_override", {})
     assert isinstance(override, dict)
     assert override.get("enabled") is False
@@ -187,12 +188,14 @@ def test_character_runtime_settings_demo_stable_requires_runtime_enabled():
     )
     assert settings.get("enabled") is False
     assert settings.get("demo_stable") is False
+    assert settings.get("auto_apply_reply_cue") is False
 
     settings = app._get_character_runtime_settings(
-        {"character_runtime": {"enabled": True, "demo_stable": True}}
+        {"character_runtime": {"enabled": True, "demo_stable": True, "auto_apply_reply_cue": True}}
     )
     assert settings.get("enabled") is True
     assert settings.get("demo_stable") is True
+    assert settings.get("auto_apply_reply_cue") is True
 
 
 def test_character_runtime_settings_persona_override_parsing():

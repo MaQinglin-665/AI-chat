@@ -29,6 +29,7 @@ def get_character_runtime_settings(config):
         "enabled": False,
         "return_metadata": False,
         "demo_stable": False,
+        "auto_apply_reply_cue": False,
         "persona_override": {"enabled": False, "name": "", "style": ""},
     }
     try:
@@ -40,6 +41,7 @@ def get_character_runtime_settings(config):
         enabled = parse_bool_flag(raw.get("enabled", False), False)
         return_metadata = parse_bool_flag(raw.get("return_metadata", False), False)
         demo_stable = parse_bool_flag(raw.get("demo_stable", False), False)
+        auto_apply_reply_cue = parse_bool_flag(raw.get("auto_apply_reply_cue", False), False)
         override_raw = raw.get("persona_override", {})
         override_enabled = False
         override_name = ""
@@ -60,6 +62,7 @@ def get_character_runtime_settings(config):
             "enabled": True,
             "return_metadata": return_metadata,
             "demo_stable": demo_stable,
+            "auto_apply_reply_cue": auto_apply_reply_cue,
             "persona_override": {
                 "enabled": bool(override_enabled),
                 "name": override_name,
@@ -83,6 +86,7 @@ def build_character_runtime_health_summary(config):
         "enabled": bool(settings.get("enabled", False)),
         "return_metadata": bool(settings.get("return_metadata", False)),
         "demo_stable": bool(settings.get("demo_stable", False)),
+        "auto_apply_reply_cue": bool(settings.get("auto_apply_reply_cue", False)),
         "persona_override_enabled": bool(persona_override_enabled),
     }
 
@@ -254,6 +258,7 @@ def run_startup_self_check(
         f"enabled={str(runtime_summary['enabled']).lower()} "
         f"return_metadata={str(runtime_summary['return_metadata']).lower()} "
         f"demo_stable={str(runtime_summary['demo_stable']).lower()} "
+        f"auto_apply_reply_cue={str(runtime_summary['auto_apply_reply_cue']).lower()} "
         f"persona_override_enabled={str(runtime_summary['persona_override_enabled']).lower()}"
     )
 

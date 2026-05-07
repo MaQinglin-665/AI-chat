@@ -132,6 +132,7 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "return_metadata": False,
         "demo_stable": False,
+        "auto_apply_reply_cue": False,
     },
     "thinking": {
         "enabled": True,
@@ -286,6 +287,7 @@ DEFAULT_CONFIG = {
     },
     "conversation_mode": {
         "enabled": False,
+        "chat_stream_enabled": True,
         "proactive_enabled": False,
         "proactive_scheduler_enabled": False,
         "gray_auto_enabled": False,
@@ -629,6 +631,9 @@ def sanitize_client_config(config):
     runtime_enabled = bool(character_runtime_cfg.get("enabled", False))
     runtime_return_metadata = bool(character_runtime_cfg.get("return_metadata", False))
     runtime_demo_stable = bool(character_runtime_cfg.get("demo_stable", False))
+    runtime_auto_apply_reply_cue = bool(
+        runtime_enabled and character_runtime_cfg.get("auto_apply_reply_cue", False)
+    )
     persona_override_cfg = character_runtime_cfg.get("persona_override", {})
     if not isinstance(persona_override_cfg, dict):
         persona_override_cfg = {}
@@ -929,6 +934,7 @@ def sanitize_client_config(config):
         },
         "conversation_mode": {
             "enabled": _safe_bool_true(conversation_cfg.get("enabled", False)),
+            "chat_stream_enabled": conversation_cfg.get("chat_stream_enabled", True) is not False,
             "proactive_enabled": _safe_bool_true(conversation_cfg.get("proactive_enabled", False)),
             "proactive_scheduler_enabled": _safe_bool_true(
                 conversation_cfg.get("proactive_scheduler_enabled", False)
@@ -1104,6 +1110,7 @@ def sanitize_client_config(config):
             "enabled": runtime_enabled,
             "return_metadata": runtime_return_metadata,
             "demo_stable": runtime_demo_stable,
+            "auto_apply_reply_cue": runtime_auto_apply_reply_cue,
             "persona_override": {
                 "enabled": persona_override_enabled,
                 "name": persona_override_name if persona_override_enabled else "",

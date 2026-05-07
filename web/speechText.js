@@ -654,18 +654,28 @@
       pitch += 0.02;
     }
 
-    if (style === "comfort") {
+    const styleKey = String(style || "neutral").trim().toLowerCase().replace(/-/g, "_");
+    if (styleKey === "comfort" || styleKey === "soft" || styleKey === "warm") {
       speed -= 0.02;
       pitch -= 0.01;
       volume -= 0.02;
-    } else if (style === "clear") {
+      if (styleKey === "soft" || styleKey === "warm") {
+        speed -= 0.01;
+      }
+    } else if (styleKey === "clear" || styleKey === "curious") {
       speed += 0.02;
       pitch -= 0.02;
-    } else if (style === "playful") {
+      if (styleKey === "curious") {
+        pitch += 0.03;
+      }
+    } else if (styleKey === "playful" || styleKey === "cheerful" || styleKey === "teasing") {
       speed += 0.02;
       pitch += 0.02;
       volume += 0.01;
-    } else if (style === "steady") {
+      if (styleKey === "cheerful" || styleKey === "teasing") {
+        speed += 0.01;
+      }
+    } else if (styleKey === "steady" || styleKey === "serious") {
       speed -= 0.01;
       pitch -= 0.02;
       volume += 0.02;

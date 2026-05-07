@@ -350,6 +350,11 @@ def check_safety_defaults(r: Reporter, cfg: dict[str, Any]) -> None:
     else:
         r.pass_("Character Runtime metadata is opt-in/off")
 
+    if bool(runtime_cfg.get("auto_apply_reply_cue", False)):
+        r.warn("character_runtime.auto_apply_reply_cue=true. Keep automatic reply cue application local and opt-in.")
+    else:
+        r.pass_("Character Runtime reply cue auto-apply is opt-in/off")
+
     attach_mode = str(observe_cfg.get("attach_mode", "manual") or "manual").strip().lower()
     if attach_mode == "always":
         r.warn("observe.attach_mode=always. Desktop screenshots may attach automatically.")

@@ -27,7 +27,7 @@ Notes:
 - `text` is intentionally removed from returned metadata.
 - Unknown or malformed values are normalized before use.
 - Metadata is optional. Chat and TTS must keep working without it.
-- `voice_style` is currently descriptive metadata only; it does not select a TTS voice or prosody yet.
+- `voice_style` can nudge TTS prosody only when `character_runtime.auto_apply_reply_cue=true`; it does not select a TTS voice/model.
 
 ## Supported Emotions
 

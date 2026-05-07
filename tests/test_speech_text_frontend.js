@@ -218,4 +218,17 @@ assert.match(prosody.rate, /^[+-]\d+%$/);
 assert.match(prosody.pitch, /^[+-]\d+Hz$/);
 assert.match(prosody.volume, /^[+-]\d+%$/);
 
+const softProsody = speechText.buildSpeakProsody("I hear you.", "idle", false, "soft");
+const cheerfulProsody = speechText.buildSpeakProsody("I hear you!", "happy", false, "cheerful");
+const seriousProsody = speechText.buildSpeakProsody("Let's keep it steady.", "idle", false, "serious");
+const neutralProsody = speechText.buildSpeakProsody("Let's keep it steady.", "idle", false, "neutral");
+assert.ok(
+  softProsody.speed_ratio < cheerfulProsody.speed_ratio,
+  "runtime soft voice style should produce calmer prosody than cheerful"
+);
+assert.ok(
+  seriousProsody.pitch_ratio <= neutralProsody.pitch_ratio,
+  "runtime serious voice style should keep pitch at or below neutral"
+);
+
 console.log("Speech text frontend checks passed.");

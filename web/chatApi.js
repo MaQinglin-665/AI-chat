@@ -96,11 +96,33 @@
     const reader = resp.body.getReader();
     const decoder = new TextDecoder("utf-8");
     const lineHandler = createStreamLineHandler(context);
+    const firstDeltaTimeoutMs = Math.max(0, Math.round(Number(context.firstDeltaTimeoutMs) || 0));
     let buffer = "";
+
+    const readNextChunk = async () => {
+      if (!firstDeltaTimeoutMs || lineHandler.hasSeenFirstDelta()) {
+        return await reader.read();
+      }
+      let timer = 0;
+      try {
+        return await Promise.race([
+          reader.read(),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => {
+              reject(new Error(`LLM stream produced no text within ${firstDeltaTimeoutMs}ms`));
+            }, firstDeltaTimeoutMs);
+          })
+        ]);
+      } finally {
+        if (timer) {
+          clearTimeout(timer);
+        }
+      }
+    };
 
     try {
       while (true) {
-        const { value, done } = await reader.read();
+        const { value, done } = await readNextChunk();
         if (done) {
           break;
         }
@@ -131,6 +153,13 @@
       } catch (_) {
         // ignore
       }
+      if (!err.seenFirstDelta && typeof reader.cancel === "function") {
+        try {
+          await reader.cancel();
+        } catch (_) {
+          // ignore
+        }
+      }
       throw err;
     }
     return {
@@ -148,6 +177,10 @@
     const perfHooks = options.perfHooks || null;
     const perfLog = typeof options.perfLog === "function" ? options.perfLog : defaultPerfLog;
     const getNow = typeof options.now === "function" ? options.now : nowMs;
+    const firstDeltaTimeoutMs = Math.max(
+      1500,
+      Math.min(45000, Math.round(Number(options.firstDeltaTimeoutMs) || 12000))
+    );
     const onCharacterRuntimeMetadata = typeof options.onCharacterRuntimeMetadata === "function"
       ? options.onCharacterRuntimeMetadata
       : () => {};
@@ -181,6 +214,13 @@
         throw buildFallbackFailureError(primaryErr, fallbackErr);
       }
     };
+
+    if (options.preferStream === false) {
+      perfLog("chat", "stream_disabled", {
+        reason: "config"
+      });
+      return await fetchDirectChat("stream_disabled");
+    }
 
     let resp;
     try {
@@ -237,7 +277,8 @@
         onDelta,
         onCharacterRuntimeMetadata,
         perfHooks,
-        now: getNow
+        now: getNow,
+        firstDeltaTimeoutMs
       });
       return result.reply;
     } catch (err) {

@@ -170,6 +170,7 @@ def test_api_health_includes_safe_character_runtime_summary(monkeypatch):
         "enabled": True,
         "return_metadata": True,
         "demo_stable": True,
+        "auto_apply_reply_cue": True,
         "persona_override": {
             "enabled": True,
             "name": "SecretPersonaName",
@@ -190,12 +191,14 @@ def test_api_health_includes_safe_character_runtime_summary(monkeypatch):
         "enabled": True,
         "return_metadata": True,
         "demo_stable": True,
+        "auto_apply_reply_cue": True,
         "persona_override_enabled": True,
     }
     assert set(runtime.keys()) == {
         "enabled",
         "return_metadata",
         "demo_stable",
+        "auto_apply_reply_cue",
         "persona_override_enabled",
     }
     serialized = json.dumps(payload, ensure_ascii=False)
@@ -511,7 +514,7 @@ def test_startup_self_check_reports_safe_character_runtime_summary():
     summary_lines = [line for line in findings if "character_runtime" in line]
     assert summary_lines == [
         "[startup][info] character_runtime enabled=true return_metadata=false "
-        "demo_stable=true persona_override_enabled=true"
+        "demo_stable=true auto_apply_reply_cue=false persona_override_enabled=true"
     ]
     serialized = "\n".join(findings)
     assert "SecretStartupPersona" not in serialized

@@ -32,7 +32,8 @@ Put this in local config (prefer `config.local.json`):
 {
   "character_runtime": {
     "enabled": true,
-    "return_metadata": true
+    "return_metadata": true,
+    "auto_apply_reply_cue": false
   }
 }
 ```
@@ -40,9 +41,12 @@ Put this in local config (prefer `config.local.json`):
 Notes:
 - `enabled=true` is required for runtime structured prompt contract injection.
 - `return_metadata=true` is required for optional `character_runtime` metadata in response payloads.
+- `auto_apply_reply_cue=true` is an additional local-only opt-in for applying assistant reply cue candidates to Live2D/TTS prosody.
 - `character_runtime` metadata should not include `text`.
-- `voice_style` currently does not change TTS behavior.
+- `voice_style` only changes TTS prosody when `auto_apply_reply_cue=true`; it does not select a voice model.
 - This is demo/validation config, not a release default.
+
+For a fuller local experience template that also covers LLM length, GPT-SoVITS long sentence stability, and the in-app character tuning flow, see [Recommended Local Config Templates](./recommended-local-config.md).
 
 ## Restore Baseline (Default-Off)
 Set:
@@ -51,7 +55,8 @@ Set:
 {
   "character_runtime": {
     "enabled": false,
-    "return_metadata": false
+    "return_metadata": false,
+    "auto_apply_reply_cue": false
   }
 }
 ```
@@ -60,7 +65,7 @@ After disabling:
 - normal chat path should return to baseline
 - response shape should not require `character_runtime` metadata
 - Live2D should not be triggered by runtime metadata path
-- TTS behavior should remain unchanged
+- TTS prosody should remain unchanged by runtime metadata path
 
 ## Before Recording Materials
 - confirm current branch
@@ -81,13 +86,14 @@ After disabling:
 
 ## Common Risks and Misreads
 - Demo-enabled config accidentally committed.
-- Assuming `voice_style` already drives TTS behavior.
+- Assuming `voice_style` selects a TTS voice/model. It only nudges prosody when explicit auto-apply is enabled.
 - Assuming weak motion visibility always means runtime failure.
 - Assuming `/api/chat` 500 is runtime-bridge failure (often provider/config/network).
 - Checking debug bridge in `modelWindow` instead of `chatWindow`.
 
 ## Related Docs
 - [Character Runtime Demo Enablement](./character-runtime-demo.md)
+- [Recommended Local Config Templates](./recommended-local-config.md)
 - [Character Runtime Demo Smoke Test Checklist](./character-runtime-smoke-test.md)
 - [Release Demo Recording Checklist](./release-demo-recording-checklist.md)
 - [Character Runtime End-to-End Validation](./character-runtime-e2e-validation.md)

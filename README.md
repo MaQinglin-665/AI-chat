@@ -131,6 +131,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - 安装依赖与启动方式：`docs/setup.md`
 - 安装与运行、Live2D、LLM、TTS/ASR：`docs/setup.md`
 - Character Runtime demo 启用与验证：`docs/character-runtime-demo.md`
+- 推荐本地体验模板：`docs/recommended-local-config.md`
 - Character Runtime Live2D 映射：`docs/character-runtime-live2d-mapping.md`
 - Character Runtime 验证记录模板：`docs/character-runtime-validation-log.md`
 - Character Runtime 主动行为安全边界：`docs/character-runtime-proactive-safety.md`

@@ -72,3 +72,14 @@ def test_sanitized_client_config_derives_tts_request_timeout_from_gpt_sovits_tim
     sanitized = config.sanitize_client_config(cfg)
 
     assert sanitized["tts"]["server_request_timeout_ms"] == 60000
+
+
+def test_sanitized_client_config_preserves_chat_stream_switch():
+    cfg = copy.deepcopy(config.DEFAULT_CONFIG)
+
+    assert config.sanitize_client_config(cfg)["conversation_mode"]["chat_stream_enabled"] is True
+
+    cfg["conversation_mode"]["chat_stream_enabled"] = False
+    sanitized = config.sanitize_client_config(cfg)
+
+    assert sanitized["conversation_mode"]["chat_stream_enabled"] is False

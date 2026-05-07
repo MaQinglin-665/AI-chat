@@ -1317,28 +1317,36 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         detected_lang=detected_lang,
     )
     if prefer_chunked:
-        # For long text, prefer one-shot first. Chunking is a fallback when one-shot output is degraded.
-        try:
-            one_shot_audio = _request_once(payload)
-        except Exception:
-            one_shot_audio = b""
+        # Long GPT-SoVITS requests are much less stable than several small spoken chunks.
+        # Prefer chunking first so long replies still produce audible output.
+        chunk_audio = _request_text_chunks(payload, text_chunks or [text])
         _log_tts_perf(
             "TTS_GPT_SOVITS",
             trace_id,
-            stage="one_shot",
-            audio_bytes=len(one_shot_audio or b""),
-            audio_duration_ms=int(round(float(_wav_duration_seconds(one_shot_audio) or 0.0) * 1000)),
+            stage="chunk_first",
+            audio_bytes=len(chunk_audio or b""),
+            audio_duration_ms=int(round(float(_wav_duration_seconds(chunk_audio) or 0.0) * 1000)),
         )
-        one_shot_bad = (
-            not one_shot_audio
-            or _looks_too_short_for_text(one_shot_audio, text)
-            or _looks_too_quiet_for_text(one_shot_audio, text)
+        chunk_bad = (
+            not chunk_audio
+            or _looks_too_short_for_text(chunk_audio, text)
+            or _looks_too_quiet_for_text(chunk_audio, text)
         )
-        if one_shot_bad:
-            chunk_audio = _request_text_chunks(payload, text_chunks or [text])
-            audio = chunk_audio or one_shot_audio
+        if chunk_bad:
+            try:
+                one_shot_audio = _request_once(payload)
+            except Exception:
+                one_shot_audio = b""
+            _log_tts_perf(
+                "TTS_GPT_SOVITS",
+                trace_id,
+                stage="one_shot_fallback",
+                audio_bytes=len(one_shot_audio or b""),
+                audio_duration_ms=int(round(float(_wav_duration_seconds(one_shot_audio) or 0.0) * 1000)),
+            )
+            audio = one_shot_audio or chunk_audio
         else:
-            audio = one_shot_audio
+            audio = chunk_audio
     else:
         audio = _request_once(payload)
     degraded = _looks_too_short_for_text(audio, text) or _looks_too_quiet_for_text(audio, text)

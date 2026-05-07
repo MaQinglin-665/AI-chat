@@ -6,8 +6,12 @@ const path = require("path");
 const assert = require("assert");
 
 const CHAT_JS = path.resolve(__dirname, "..", "web", "chat.js");
+const INDEX_HTML = path.resolve(__dirname, "..", "web", "index.html");
+const BASE_CSS = path.resolve(__dirname, "..", "web", "base.css");
 const CHARACTER_RUNTIME_JS = path.resolve(__dirname, "..", "web", "characterRuntime.js");
 const source = fs.readFileSync(CHAT_JS, "utf8");
+const indexSource = fs.readFileSync(INDEX_HTML, "utf8");
+const baseCssSource = fs.readFileSync(BASE_CSS, "utf8");
 const runtime = require(CHARACTER_RUNTIME_JS);
 
 function toPlainObject(value) {
@@ -116,6 +120,131 @@ assert.ok(
   "assistant replies should create a read-only character cue candidate without emitting it"
 );
 assert.ok(
+  source.includes("characterRuntimeAutoApplyReplyCue")
+    && source.includes("auto_apply_reply_cue")
+    && source.includes("function maybeAutoApplyAssistantReplyCharacterCueCandidate")
+    && source.includes("conversation_followup_character_reply_cue_candidate_auto_apply")
+    && source.includes("runtimeVoiceStyleToTalkStyle")
+    && source.includes("speechStyle"),
+  "assistant reply cue candidates should support an explicit default-off auto-apply path into runtime dispatch and TTS style"
+);
+assert.ok(
+  source.includes("function buildReplyCharacterChipView")
+    && source.includes("function updateReplyCharacterChip")
+    && source.includes("localizeReplyCharacterValue")
+    && source.includes("上一句角色表现 · 待回复")
+    && source.includes("updateReplyCharacterChip(candidate, result)")
+    && source.includes("ui.replyCharacterChip")
+    && indexSource.includes('id="reply-character-chip"')
+    && baseCssSource.includes(".reply-character-chip[data-tone=\"applied\"]"),
+  "assistant reply runtime cue should surface a readable last-reply character chip in the chat header"
+);
+assert.ok(
+  source.includes("chatStreamEnabled")
+    && source.includes("chat_stream_enabled")
+    && source.includes("preferStream: state.conversationMode.chatStreamEnabled !== false"),
+  "chat requests should support a frontend-visible switch for disabling unstable LLM streaming"
+);
+assert.ok(
+  source.includes('label: "刚聊完"')
+    && source.includes('description: "刚刚完成一轮对话，先安静待机，不打断用户。"')
+    && source.includes('"刚聊完": "idle"'),
+  "follow-up chip should show a calm idle state after normal replies instead of looking stuck in thinking"
+);
+assert.ok(
+  source.includes("async function runDoctorDiagnostics()")
+    && source.includes('text.toLowerCase() === "/doctor"')
+    && source.includes('text === "/自检"')
+    && source.includes('runDoctorJsonFetch("/api/health"')
+    && source.includes('"聊天模型"')
+    && source.includes('"语音服务"')
+    && source.includes("requestServerTTSBlob(")
+    && source.includes("function buildDoctorAdvice(checks, context = {})")
+    && source.includes("链路自检完成：核心功能正常。")
+    && source.includes("下一步建议")
+    && source.includes("GPT-SoVITS 异常")
+    && source.includes("当前已关闭流式聊天")
+    && source.includes("runDoctorAndAppendReport()")
+    && source.includes('row?.classList?.add("doctor-report")')
+    && source.includes("ui.doctorBtn")
+    && indexSource.includes('id="doctor-btn"')
+    && source.includes("ui.voiceTestBtn")
+    && indexSource.includes('id="voice-test-btn"')
+    && baseCssSource.includes(".message.assistant.doctor-report .content"),
+  "chat.js should expose a local /doctor self-check for LLM, TTS, config, and character runtime diagnostics"
+);
+assert.ok(
+  indexSource.includes("先做链路自检，再聊一句，最后测试语音和开麦。")
+    && indexSource.includes("更多 → 链路自检")
+    && indexSource.includes("更多 → 测试语音")
+    && indexSource.includes("调角色味道")
+    && indexSource.includes("更多 → 角色试演")
+    && indexSource.includes("表现不错")
+    && indexSource.includes("角色调优")
+    && indexSource.includes("/ttsdebug")
+    && indexSource.includes("更多 → 人设卡"),
+  "help modal should guide non-technical users through self-check, chat, voice, persona setup, and character tuning"
+);
+assert.ok(
+  source.includes("async function runVoiceTestAndAppendReport()")
+    && source.includes('text === "/测试语音"')
+    && source.includes('text.toLowerCase() === "/testvoice"')
+    && source.includes("ui.voiceTestBtn")
+    && source.includes("语音测试没有成功"),
+  "voice test should be available both as a visible button and as a local command"
+);
+assert.ok(
+  source.includes("CHARACTER_REHEARSAL_PRESETS")
+    && source.includes("async function runCharacterRehearsalAndAppendReport()")
+    && source.includes('text === "/角色试演"')
+    && source.includes('text.toLowerCase() === "/roletest"')
+    && source.includes("ui.characterRehearsalBtn")
+    && indexSource.includes('id="character-rehearsal-btn"')
+    && source.includes("角色试演的语音没有成功"),
+  "character rehearsal should be available as a visible button and local command to test runtime expression and voice styles without LLM"
+);
+assert.ok(
+  source.includes("function buildCharacterTuningReport()")
+    && source.includes("function runCharacterTuningAndAppendReport()")
+    && source.includes("function addUniqueCharacterTuningConfigKey")
+    && source.includes('text === "/角色调优"')
+    && source.includes('text.toLowerCase() === "/tuning"')
+    && source.includes("ui.characterTuningBtn")
+    && indexSource.includes('id="character-tuning-btn"')
+    && source.includes("角色调优建议")
+    && source.includes("可检查配置项")
+    && source.includes("tts.gpt_sovits_ref_audio_path")
+    && source.includes("motion.speech_motion_strength"),
+  "character tuning should expose readable next-step advice and concrete config keys based on the latest runtime cue"
+);
+assert.ok(
+  source.includes("function recordCharacterPerformanceFeedback")
+    && source.includes("characterPerformanceLastFeedback")
+    && source.includes('text === "/表现不错"')
+    && source.includes('text === "/需要调整"')
+    && source.includes("ui.characterFeedbackGoodBtn")
+    && source.includes("ui.characterFeedbackBadBtn")
+    && indexSource.includes('id="character-feedback-good-btn"')
+    && indexSource.includes('id="character-feedback-bad-btn"')
+    && source.includes("最近反馈"),
+  "character tuning should include lightweight local feedback for the latest runtime performance"
+);
+assert.ok(
+  source.includes("function buildCharacterWorkflowGuide()")
+    && source.includes("function appendCharacterWorkflowGuide()")
+    && source.includes('text === "/角色流程"')
+    && source.includes('text.toLowerCase() === "/roleflow"')
+    && source.includes("角色闭环测试流程"),
+  "chat should expose a readable local character workflow guide"
+);
+assert.ok(
+  source.includes("function buildChatFailureDoctorHint(err)")
+    && source.includes("更多 → 链路自检")
+    && source.includes("输入 /doctor")
+    && source.includes("const msg = buildChatFailureDoctorHint(err);"),
+  "chat failures should point users to the visible Doctor self-check instead of leaving raw errors alone"
+);
+assert.ok(
   source.includes("function buildAssistantReplyCharacterExpressionCue")
     && source.includes('reason: "warm_or_playful"')
     && source.includes('action: "happy_idle"')
@@ -171,6 +300,11 @@ assert.ok(
     && source.includes("candidate tone=${candidate.tone")
     && source.includes("updateReplyCharacterCueCandidateManualSendButton();"),
   "reply cue candidate send button should stay disabled until a concrete candidate is available"
+);
+assert.ok(
+  /async function handleReplyCharacterCueCandidateManualSendClick[\s\S]*?finally \{[\s\S]*?updateReplyCharacterCueCandidateManualSendButton\(\);[\s\S]*?button\.blur\(\);/.test(source)
+    && !/async function handleReplyCharacterCueCandidateManualSendClick[\s\S]*?finally \{[\s\S]*?button\.disabled = false;/.test(source),
+  "reply cue candidate manual send should restore button state through the availability guard"
 );
 assert.ok(
   source.includes("function finishSpeechAnimation()"),
@@ -392,8 +526,8 @@ assert.ok(
   "TTS playback should ignore stale audio and fallback from earlier chat turns"
 );
 assert.ok(
-  /const requestedGeneration = Number\(opts\.playbackGeneration \|\| state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?if \(!isCurrentTTSPlaybackGeneration\(requestedGeneration\)\)[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?const playbackGeneration = Number\(state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?speakOnceWithVoice\(text, v, \{ force, playbackGeneration \}\)/.test(source),
-  "browser TTS fallback should reject stale generations before starting a fresh browser utterance"
+  /const requestedGeneration = Number\(opts\.playbackGeneration \|\| state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?if \(!isCurrentTTSPlaybackGeneration\(requestedGeneration\)\)[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?const playbackGeneration = Number\(state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?const browserTTSOptions = \{[\s\S]*?prosody: opts\.prosody \|\| null,[\s\S]*?voiceStyle: opts\.voiceStyle \|\| ""[\s\S]*?speakOnceWithVoice\(text, v, browserTTSOptions\)/.test(source),
+  "browser TTS fallback should reject stale generations and carry prosody/style into each browser utterance"
 );
 assert.ok(
   source.includes("ttsAudioPlaybackToken: 0")

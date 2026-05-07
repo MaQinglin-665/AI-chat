@@ -48,7 +48,8 @@
   "character_runtime": {
     "enabled": false,
     "return_metadata": false,
-    "demo_stable": false
+    "demo_stable": false,
+    "auto_apply_reply_cue": false
   },
   "tts": {
     "provider": "browser",
@@ -175,6 +176,7 @@
   },
   "conversation_mode": {
     "enabled": false,
+    "chat_stream_enabled": true,
     "proactive_enabled": false,
     "proactive_scheduler_enabled": false,
     "gray_auto_enabled": false,
