@@ -116,6 +116,15 @@ assert.ok(
   "assistant replies should create a read-only character cue candidate without emitting it"
 );
 assert.ok(
+  source.includes("function buildAssistantReplyCharacterExpressionCue")
+    && source.includes('reason: "warm_or_playful"')
+    && source.includes('action: "happy_idle"')
+    && source.includes('reason: "question_or_surprise"')
+    && source.includes('action: "think"')
+    && source.includes("expressionReason"),
+  "assistant reply cue candidates should map reply mood/style into concrete allowlisted expression metadata"
+);
+assert.ok(
   source.includes("grayAutoFollowupTrialCharacterReplyCueCandidate")
     && source.includes("noRuntimeCueEmission: true")
     && source.includes("noLive2DMove: true"),
@@ -135,6 +144,7 @@ assert.ok(
 assert.ok(
   /function buildGrayAutoTrialCharacterCueManualEmitRecap[\s\S]*?conversation_followup_character_reply_cue_candidate_manual_emit[\s\S]*?replyCandidateSent/.test(source)
     && source.includes("replyCueCandidate=")
+    && source.includes("emotion:${candidate.runtimeHint?.emotion")
     && source.includes("backendBridge=ok:"),
   "manual cue recap should include reply candidate sends, backend no-op status, and candidate sent state"
 );
