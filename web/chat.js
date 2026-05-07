@@ -3069,6 +3069,57 @@ function resolveGrayAutoTrialCharacterCuePreset(input = {}, checklist = null) {
   };
 }
 
+function buildAssistantReplyCharacterExpressionCue(input = {}) {
+  const safe = input && typeof input === "object" ? input : {};
+  const text = String(safe.text || "").trim();
+  const lower = text.toLowerCase();
+  const mood = String(safe.mood || "idle").trim().toLowerCase();
+  const style = String(safe.style || "neutral").trim().toLowerCase();
+  const tone = String(safe.tone || "idle").trim().toLowerCase();
+  const hasQuestion = lower.includes("?") || text.includes("\uff1f");
+  const hasExclaim = lower.includes("!") || text.includes("\uff01");
+  if (mood === "surprised" || hasQuestion) {
+    return {
+      reason: "question_or_surprise",
+      runtimeHint: { emotion: "thinking", action: "think", intensity: "low", voice_style: "curious", live2d_hint: "thinking" }
+    };
+  }
+  if (mood === "happy" || mood === "playful" || style === "playful" || hasExclaim) {
+    return {
+      reason: "warm_or_playful",
+      runtimeHint: { emotion: "happy", action: "happy_idle", intensity: "normal", voice_style: "cheerful", live2d_hint: "happy" }
+    };
+  }
+  if (mood === "sad" || mood === "anxious") {
+    return {
+      reason: "soft_low_interrupt",
+      runtimeHint: { emotion: mood === "anxious" ? "anxious" : "sad", action: "none", intensity: "low", voice_style: "soft", live2d_hint: "quiet" }
+    };
+  }
+  if (mood === "angry" || mood === "annoyed") {
+    return {
+      reason: "restrained_negative",
+      runtimeHint: { emotion: mood, action: "none", intensity: "low", voice_style: "neutral", live2d_hint: "quiet" }
+    };
+  }
+  if (tone === "cooldown" || style === "brief" || safe.auto === true) {
+    return {
+      reason: "cooldown",
+      runtimeHint: { emotion: "neutral", action: "nod", intensity: "low", voice_style: "neutral", live2d_hint: "cooldown" }
+    };
+  }
+  if (tone === "watching") {
+    return {
+      reason: "watching",
+      runtimeHint: { emotion: "thinking", action: "think", intensity: "low", voice_style: "neutral", live2d_hint: "thinking" }
+    };
+  }
+  return {
+    reason: "neutral_idle",
+    runtimeHint: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral", live2d_hint: "idle" }
+  };
+}
+
 function buildAssistantReplyCharacterCueCandidate(input = {}) {
   const safe = input && typeof input === "object" ? input : {};
   const text = String(safe.text || "").trim();
@@ -3088,15 +3139,14 @@ function buildAssistantReplyCharacterCueCandidate(input = {}) {
   } else if (style === "brief" || auto) {
     tone = "cooldown";
   }
-  const base = buildFollowupCharacterRuntimeHint({
-    label: text.slice(0, 48),
+  const expressionCue = buildAssistantReplyCharacterExpressionCue({
+    text,
+    mood,
+    style,
+    auto,
     tone
   });
-  const runtimeHint = normalizeCharacterRuntimeMetadataForFrontend({
-    ...base,
-    source: "assistant_reply_candidate",
-    action: tone === "watching" ? "think" : base.action
-  });
+  const runtimeHint = normalizeCharacterRuntimeMetadataForFrontend(expressionCue.runtimeHint);
   return {
     readOnly: true,
     source: "assistant_reply",
@@ -3107,6 +3157,7 @@ function buildAssistantReplyCharacterCueCandidate(input = {}) {
     mood,
     style,
     tone,
+    expressionReason: expressionCue.reason,
     textPreview: text.slice(0, 80),
     runtimeHint,
     safety: {
@@ -4706,7 +4757,7 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
     ? `emotion=${apply.appliedEmotion ? "true" : "false"} action=${apply.appliedAction ? "true" : "false"} modelReady=${apply.modelReady ? "true" : "false"}`
     : "none";
   const candidateText = candidate
-    ? `tone=${candidate.tone || "n/a"} mood=${candidate.mood || "n/a"} eligible=${candidate.eligibleForManualSend ? "true" : "false"} emitted=${lastEmit?.source === "assistant_reply_candidate" && lastEmit?.replyCandidateGeneratedAt === candidate.generatedAt ? "true" : "false"}`
+    ? `tone=${candidate.tone || "n/a"} mood=${candidate.mood || "n/a"} emotion=${candidate.runtimeHint?.emotion || "n/a"} action=${candidate.runtimeHint?.action || "n/a"} eligible=${candidate.eligibleForManualSend ? "true" : "false"} emitted=${lastEmit?.source === "assistant_reply_candidate" && lastEmit?.replyCandidateGeneratedAt === candidate.generatedAt ? "true" : "false"}`
     : "none";
   return [
     "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8bd5\u53d1\u72b6\u6001\uff08\u53ea\u8bfb\uff09",
@@ -4745,7 +4796,7 @@ function buildGrayAutoTrialCharacterManualCueStatusCardText() {
     `lastPreset=${lastEmit?.presetKey || "none"}  lastLabel=${lastEmit?.label || "none"}  lastTone=${lastEmit?.tone || "none"}`,
     `backendPreview=${bridge ? (bridgeOk ? "noop_confirmed" : bridge.reason || "blocked") : "not_checked"}  backendWouldExecute=${bridge?.wouldExecute === true ? "true" : "false"}`,
     `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
-    `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} emitted:${candidateEmitted ? "true" : "false"}` : "none"}`,
+    `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} emotion:${candidate.runtimeHint?.emotion || "n/a"} action:${candidate.runtimeHint?.action || "n/a"} emitted:${candidateEmitted ? "true" : "false"}` : "none"}`,
     `dispatch=${dispatch ? (dispatchOk ? "local_dispatched" : "not_dispatched") : "none"}  broadcast=${dispatch?.broadcasted ? "true" : "false"}  ui=${dispatch?.uiView || "n/a"}`,
     `live2dApply=${applyKnown ? `emotion:${apply.appliedEmotion ? "true" : "false"} action:${apply.appliedAction ? "true" : "false"} modelReady:${apply.modelReady ? "true" : "false"}` : "none"}`,
     "\u5b89\u5168\uff1a\u624b\u52a8\u786e\u8ba4\u540e\u624d\u4f1a\u8bd5\u53d1\uff1b\u4e0d\u63a5 scheduler\u3001\u4e0d\u81ea\u52a8\u89e6\u53d1\u3001\u4e0d\u53d1 TTS\u3001\u4e0d\u5199 config\u3002"
@@ -4830,7 +4881,7 @@ function buildGrayAutoTrialCharacterCueManualEmitRecapText(limit = 24) {
     `lastEmitAt=${recap.lastEmitAt}`,
     `last=source:${recap.source || "n/a"} decision:${recap.lastEmit?.decision || "n/a"} outcome:${recap.lastEmit?.outcome || "n/a"} label:${recap.lastEmit?.label || "n/a"} tone:${recap.lastEmit?.tone || "n/a"}`,
     `manualCuePreset=${recap.lastEmit?.presetKey || "auto"} description:${recap.lastEmit?.presetDescription || "n/a"}`,
-    `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} sent:${recap.replyCandidateSent ? "true" : "false"}` : "none"}`,
+    `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} emotion:${candidate.runtimeHint?.emotion || "n/a"} action:${candidate.runtimeHint?.action || "n/a"} sent:${recap.replyCandidateSent ? "true" : "false"}` : "none"}`,
     `backendBridge=ok:${bridge.ok === true ? "true" : "false"} backendNoop:${bridge.backendNoop === true ? "true" : "false"} wouldExecute:${bridge.wouldExecute === true ? "true" : "false"} dispatched:${bridge.dispatched === true ? "true" : "false"}`,
     `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} voice_style:${hint.voice_style || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
     `runtimeDispatch=local:${recap.lastRuntimeDispatch?.localDispatched ? "true" : "false"} broadcast:${recap.lastRuntimeDispatch?.broadcasted ? "true" : "false"} ui:${recap.lastRuntimeDispatch?.uiView || "n/a"}`,
