@@ -4706,7 +4706,7 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
     ? `emotion=${apply.appliedEmotion ? "true" : "false"} action=${apply.appliedAction ? "true" : "false"} modelReady=${apply.modelReady ? "true" : "false"}`
     : "none";
   const candidateText = candidate
-    ? `tone=${candidate.tone || "n/a"} mood=${candidate.mood || "n/a"} eligible=${candidate.eligibleForManualSend ? "true" : "false"} emitted=false`
+    ? `tone=${candidate.tone || "n/a"} mood=${candidate.mood || "n/a"} eligible=${candidate.eligibleForManualSend ? "true" : "false"} emitted=${lastEmit?.source === "assistant_reply_candidate" && lastEmit?.replyCandidateGeneratedAt === candidate.generatedAt ? "true" : "false"}`
     : "none";
   return [
     "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8bd5\u53d1\u72b6\u6001\uff08\u53ea\u8bfb\uff09",
@@ -4735,6 +4735,9 @@ function buildGrayAutoTrialCharacterManualCueStatusCardText() {
   const bridgeOk = bridge?.ok === true && bridge?.backendNoop === true && bridge?.wouldExecute !== true;
   const dispatchOk = dispatch?.localDispatched === true;
   const applyKnown = !!apply;
+  const candidateEmitted = candidate
+    && lastEmit?.source === "assistant_reply_candidate"
+    && lastEmit?.replyCandidateGeneratedAt === candidate.generatedAt;
   return [
     "\u624b\u52a8\u89d2\u8272 cue \u72b6\u6001\uff08\u53ea\u8bfb\uff09",
     `selectedPreset=${selectedPreset}  label=${preset.label || selectedPreset}  manualOnly=true`,
@@ -4742,7 +4745,7 @@ function buildGrayAutoTrialCharacterManualCueStatusCardText() {
     `lastPreset=${lastEmit?.presetKey || "none"}  lastLabel=${lastEmit?.label || "none"}  lastTone=${lastEmit?.tone || "none"}`,
     `backendPreview=${bridge ? (bridgeOk ? "noop_confirmed" : bridge.reason || "blocked") : "not_checked"}  backendWouldExecute=${bridge?.wouldExecute === true ? "true" : "false"}`,
     `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
-    `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} emitted:false` : "none"}`,
+    `replyCueCandidate=${candidate ? `tone:${candidate.tone || "n/a"} mood:${candidate.mood || "n/a"} emitted:${candidateEmitted ? "true" : "false"}` : "none"}`,
     `dispatch=${dispatch ? (dispatchOk ? "local_dispatched" : "not_dispatched") : "none"}  broadcast=${dispatch?.broadcasted ? "true" : "false"}  ui=${dispatch?.uiView || "n/a"}`,
     `live2dApply=${applyKnown ? `emotion:${apply.appliedEmotion ? "true" : "false"} action:${apply.appliedAction ? "true" : "false"} modelReady:${apply.modelReady ? "true" : "false"}` : "none"}`,
     "\u5b89\u5168\uff1a\u624b\u52a8\u786e\u8ba4\u540e\u624d\u4f1a\u8bd5\u53d1\uff1b\u4e0d\u63a5 scheduler\u3001\u4e0d\u81ea\u52a8\u89e6\u53d1\u3001\u4e0d\u53d1 TTS\u3001\u4e0d\u5199 config\u3002"
@@ -6331,6 +6334,118 @@ async function emitGrayAutoTrialCharacterCueViaManualBridge(input = {}) {
   return result;
 }
 
+async function emitLastReplyCharacterCueCandidateViaManualBridge(input = {}) {
+  const safeInput = input && typeof input === "object" ? input : {};
+  const confirm = String(safeInput.confirm || "").trim();
+  const requiredConfirm = "SEND_REPLY_CHARACTER_CUE_CANDIDATE";
+  if (confirm !== requiredConfirm) {
+    return {
+      ok: false,
+      reason: "confirmation_required",
+      requiredConfirm,
+      safety: {
+        noEventEmission: true,
+        noSchedulerChange: true,
+        noFollowupExecution: true,
+        noConfigWrites: true,
+        noTts: true
+      }
+    };
+  }
+  const candidate = state.followupCharacterRuntimeLastReplyCandidate || null;
+  if (!candidate || candidate.eligibleForManualSend !== true || !candidate.runtimeHint) {
+    return {
+      ok: false,
+      reason: "no_reply_candidate",
+      safety: {
+        noEventEmission: true,
+        noSchedulerChange: true,
+        noFollowupExecution: true,
+        noConfigWrites: true,
+        noTts: true
+      }
+    };
+  }
+  const backendBridge = await previewGrayAutoTrialCharacterCueBackendBridge({
+    label: candidate.textPreview || "assistant_reply_candidate",
+    tone: candidate.tone || "idle"
+  });
+  if (backendBridge.ok !== true) {
+    return {
+      ok: false,
+      reason: backendBridge.reason || "backend_bridge_blocked",
+      backendBridge,
+      safety: {
+        noEventEmission: true,
+        noSchedulerChange: true,
+        noFollowupExecution: true,
+        noConfigWrites: true,
+        noTts: true
+      }
+    };
+  }
+  let normalized = null;
+  try {
+    normalized = handleCharacterRuntimeMetadata(candidate.runtimeHint);
+  } catch (_) {
+    normalized = null;
+  }
+  if (!normalized) {
+    return {
+      ok: false,
+      reason: "runtime_hint_rejected",
+      backendBridge,
+      safety: {
+        noSchedulerChange: true,
+        noFollowupExecution: true,
+        noConfigWrites: true,
+        noTts: true
+      }
+    };
+  }
+  const count = getGrayAutoTrialCharacterCueManualEmitStatus().count + 1;
+  state.grayAutoTrialCharacterCueManualEmitCount = count;
+  state.grayAutoTrialCharacterCueLastManualEmitAt = Date.now();
+  state.grayAutoTrialCharacterCueLastManualEmit = {
+    source: "assistant_reply_candidate",
+    decision: "MANUAL_REPLY_CANDIDATE_SEND",
+    outcome: "MANUAL_ONLY",
+    label: candidate.textPreview || "",
+    tone: candidate.tone || "",
+    presetKey: "reply_candidate",
+    presetDescription: "assistant_reply_candidate",
+    replyCandidateGeneratedAt: candidate.generatedAt || 0,
+    runtimeHint: normalized,
+    runtimeDispatch: state.followupCharacterRuntimeLastDispatch || null,
+    runtimeApply: state.followupCharacterRuntimeLastApply || null,
+    backendBridge
+  };
+  recordTTSDebugEvent("conversation_followup_character_reply_cue_candidate_manual_emit", {
+    text: String(candidate.textPreview || ""),
+    result: [`count:${count}`, `tone:${candidate.tone || ""}`, "source:assistant_reply_candidate"].join(";"),
+    error: String(normalized.emotion || "")
+  });
+  updateFollowupReadinessPanel();
+  return {
+    ok: true,
+    count,
+    label: candidate.textPreview || "",
+    tone: candidate.tone || "",
+    source: "assistant_reply_candidate",
+    runtimeHint: normalized,
+    backendBridge,
+    safety: {
+      readOnly: false,
+      explicitConfirmationRequired: true,
+      manualOnly: true,
+      noSchedulerChange: true,
+      noFollowupExecution: true,
+      noConfigWrites: true,
+      noTts: true
+    }
+  };
+}
+
 function updateGrayAutoTrialPreRunChecklistCard() {
   if (!state.followupReadinessTrialChecklistCard) {
     return;
@@ -6616,6 +6731,32 @@ async function handleGrayAutoTrialCharacterCueManualEmitClick(button = null) {
     setStatus(result?.ok === true
       ? `\u89d2\u8272 cue \u5df2\u624b\u52a8\u8bd5\u53d1\uff08count=${result.count}\uff0cbackend=no-op confirmed\uff09`
       : `\u89d2\u8272 cue \u8bd5\u53d1\u5931\u8d25\uff1a${result?.reason || "unknown"}`);
+    return result?.ok === true;
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.blur();
+    }
+  }
+}
+
+async function handleReplyCharacterCueCandidateManualSendClick(button = null) {
+  if (!promptGrayAutoTrialPhrase("SEND_REPLY_CHARACTER_CUE_CANDIDATE", "\u624b\u52a8\u53d1\u9001\u4e0a\u4e00\u6761\u52a9\u624b\u56de\u590d\u5019\u9009\u89d2\u8272 cue")) {
+    setStatus("\u56de\u590d\u5019\u9009 cue \u624b\u52a8\u53d1\u9001\u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
+    return false;
+  }
+  if (button) {
+    button.disabled = true;
+  }
+  setStatus("\u56de\u590d\u5019\u9009 cue \u540e\u7aef\u9884\u68c0\u4e2d\uff1a\u53ea\u8d70 preview/no-op adapter");
+  try {
+    const result = await emitLastReplyCharacterCueCandidateViaManualBridge({
+      confirm: "SEND_REPLY_CHARACTER_CUE_CANDIDATE"
+    });
+    updateFollowupReadinessPanel();
+    setStatus(result?.ok === true
+      ? `\u56de\u590d\u5019\u9009 cue \u5df2\u624b\u52a8\u53d1\u9001\uff08count=${result.count}\uff0cbackend=no-op confirmed\uff09`
+      : `\u56de\u590d\u5019\u9009 cue \u624b\u52a8\u53d1\u9001\u5931\u8d25\uff1a${result?.reason || "unknown"}`);
     return result?.ok === true;
   } finally {
     if (button) {
@@ -7420,6 +7561,14 @@ function ensureFollowupReadinessPanel() {
   trialEmitCharacter.addEventListener("click", () => {
     handleGrayAutoTrialCharacterCueManualEmitClick(trialEmitCharacter);
   });
+  const trialSendReplyCueCandidate = document.createElement("button");
+  trialSendReplyCueCandidate.type = "button";
+  trialSendReplyCueCandidate.textContent = "\u53d1\u9001\u56de\u590dcue";
+  trialSendReplyCueCandidate.title = "\u9700\u8981\u8f93\u5165 SEND_REPLY_CHARACTER_CUE_CANDIDATE\uff1b\u53ea\u624b\u52a8\u53d1\u9001\u4e0a\u4e00\u6761\u52a9\u624b\u56de\u590d\u7684\u5019\u9009 runtime cue";
+  trialSendReplyCueCandidate.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff5d7;color:#6a4514;cursor:pointer;";
+  trialSendReplyCueCandidate.addEventListener("click", () => {
+    handleReplyCharacterCueCandidateManualSendClick(trialSendReplyCueCandidate);
+  });
   const trialCharacterCuePreset = document.createElement("select");
   trialCharacterCuePreset.title = "\u624b\u52a8\u89d2\u8272 cue \u9884\u8bbe\uff1b\u4ec5\u5f71\u54cd\u786e\u8ba4\u540e\u7684\u672c\u5730\u8bd5\u53d1";
   trialCharacterCuePreset.style.cssText = [
@@ -7504,7 +7653,8 @@ function ensureFollowupReadinessPanel() {
   const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup("\u9ad8\u98ce\u9669\u672c\u5730\u5165\u53e3", [
     trialEnableCharacterSwitch,
     trialCharacterCuePreset,
-    trialEmitCharacter
+    trialEmitCharacter,
+    trialSendReplyCueCandidate
   ]);
   advancedLocalActions.title = "\u9ed8\u8ba4\u6536\u8d77\uff1b\u4ec5\u7528\u4e8e\u672c\u5730\u4e13\u9879\u8bd5\u9a8c\uff0c\u4e0d\u8fde\u63a5 automatic runtime";
   const manualStatus = document.createElement("div");
@@ -13407,6 +13557,7 @@ function installTTSDebugBridge() {
     grayAutoFollowupTrialCharacterReplyCueCandidate: (input) => buildAssistantReplyCharacterCueCandidate(input),
     grayAutoFollowupTrialCharacterCueBackendBridgePreview: () => previewGrayAutoTrialCharacterCueBackendBridge(),
     emitGrayAutoFollowupTrialCharacterCueViaManualBridge: (input) => emitGrayAutoTrialCharacterCueViaManualBridge(input),
+    emitGrayAutoFollowupTrialCharacterReplyCueCandidateViaManualBridge: (input) => emitLastReplyCharacterCueCandidateViaManualBridge(input),
     grayAutoFollowupTrialCharacterExpressionStrategyDraft: (limit) => buildGrayAutoTrialCharacterExpressionStrategyDraft(limit),
     grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage: (limit) => buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit),
     grayAutoFollowupTrialCharacterAutoRuntimeSafetyPlan: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit),
