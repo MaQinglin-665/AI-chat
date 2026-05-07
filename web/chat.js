@@ -544,11 +544,9 @@ function recordTTSAudioEvent(stage, audio, debugContext = {}, extra = {}) {
 }
 
 function formatTTSDebugNumber(value, digits = 0) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    return "n/a";
-  }
-  return digits > 0 ? n.toFixed(digits) : String(Math.round(n));
+  return typeof window.TaffyTTSDebugReport?.formatNumber === "function"
+    ? window.TaffyTTSDebugReport.formatNumber(value, digits)
+    : "n/a";
 }
 
 function getGrayAutoTrialMaxTriggersPerSession(conversationMode = null) {
@@ -2306,143 +2304,37 @@ function syncProactiveSchedulerPolling() {
 }
 
 function buildTTSDebugReport() {
-  const s = getTTSDebugSnapshot();
-  const lines = [
-    "TTS debug:",
-    `provider=${s.provider}`,
-    `speakingEnabled=${s.speakingEnabled}`,
-    `streamMode=${s.streamMode}`,
-    `streamWorking=${s.streamWorking}`,
-    `queueLen=${s.queueLen}`,
-    `bufferChars=${s.bufferChars}`,
-    `session=${s.sessionId}`,
-    `trace=${s.traceId || "(none)"}`,
-    `audioPaused=${s.audioPaused}`,
-    `audioEnded=${s.audioEnded}`,
-    `audioReadyState=${s.audioReadyState}`,
-    `audioCurrentMs=${formatTTSDebugNumber(s.currentMs)}`,
-    `audioDurationMs=${formatTTSDebugNumber(s.durationMs)}`,
-    `contextSpeaking=${s.contextSpeaking}`,
-    `mouthOpen=${formatTTSDebugNumber(s.mouthOpen, 3)}`,
-    `audioLevel=${formatTTSDebugNumber(s.audioLevel, 3)}`,
-    `rawLevel=${formatTTSDebugNumber(s.rawLevel, 3)}`,
-    `rms=${formatTTSDebugNumber(s.rms, 5)}`,
-    `lastVoiceAgeMs=${s.lastVoiceAgeMs}`,
-    `animUntilMs=${s.animUntilMs}`,
-    `animDurationMs=${s.animDurationMs}`,
-    `mood=${s.mood}`,
-    `style=${s.style}`,
-    `lastResult=${s.lastResult || "(none)"}`,
-    `lastError=${s.lastError || "(none)"}`,
-    `currentText=${s.currentText || "(none)"}`
-  ];
-  const recent = state.ttsDebugEvents.slice(-12).map((event) => {
-    const ageMs = Math.round(performance.now() - Number(event.atMs || 0));
-    const bits = [
-      `#${event.seq}`,
-      `${event.stage}`,
-      `ageMs=${ageMs}`,
-      event.traceId ? `trace=${event.traceId}` : "",
-      event.segmentId ? `seg=${event.segmentId}` : "",
-      event.blobBytes ? `bytes=${event.blobBytes}` : "",
-      event.durationMs >= 0 ? `durMs=${event.durationMs}` : "",
-      event.currentMs ? `curMs=${event.currentMs}` : "",
-      event.result ? `result=${event.result}` : "",
-      event.error ? `error=${event.error}` : "",
-      event.text ? `text=${event.text}` : ""
-    ].filter(Boolean);
-    return bits.join(" ");
-  });
-  if (recent.length) {
-    lines.push("recentEvents=");
-    lines.push(...recent);
-  } else {
-    lines.push("recentEvents=none");
-  }
-  return lines.join("\n");
+  return typeof window.TaffyTTSDebugReport?.buildReport === "function"
+    ? window.TaffyTTSDebugReport.buildReport(
+      getTTSDebugSnapshot(),
+      state.ttsDebugEvents,
+      performance.now()
+    )
+    : "TTS debug:\nrecentEvents=none";
 }
 
 function formatDoctorDuration(ms) {
-  const value = Number(ms);
-  if (!Number.isFinite(value) || value < 0) {
-    return "n/a";
-  }
-  return `${Math.round(value)}ms`;
+  return typeof window.TaffyDoctorDiagnostics?.formatDuration === "function"
+    ? window.TaffyDoctorDiagnostics.formatDuration(ms)
+    : "n/a";
 }
 
 function formatDoctorCheckLine(label, check) {
-  const ok = check?.ok === true;
-  const status = ok ? "正常" : "异常";
-  const duration = formatDoctorDuration(check?.elapsedMs);
-  const detail = String(check?.detail || "").trim();
-  const error = String(check?.error || "").trim();
-  const suffix = error || detail || "无更多信息";
-  return `${label}：${status}，用时 ${duration}。${suffix}`;
+  return typeof window.TaffyDoctorDiagnostics?.formatCheckLine === "function"
+    ? window.TaffyDoctorDiagnostics.formatCheckLine(label, check)
+    : `${label}：${check?.ok === true ? "正常" : "异常"}。`;
 }
 
 function formatDoctorBytes(bytes) {
-  const value = Number(bytes);
-  if (!Number.isFinite(value) || value <= 0) {
-    return "";
-  }
-  if (value < 1024) {
-    return `${Math.round(value)} B`;
-  }
-  if (value < 1024 * 1024) {
-    return `${Math.round(value / 1024)} KB`;
-  }
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function addUniqueDoctorAdvice(items, text) {
-  const normalized = String(text || "").trim();
-  if (normalized && !items.includes(normalized)) {
-    items.push(normalized);
-  }
+  return typeof window.TaffyDoctorDiagnostics?.formatBytes === "function"
+    ? window.TaffyDoctorDiagnostics.formatBytes(bytes)
+    : "";
 }
 
 function buildDoctorAdvice(checks, context = {}) {
-  const advice = [];
-  const failed = Array.isArray(checks) ? checks.filter((check) => check?.ok !== true) : [];
-  if (!failed.length) {
-    addUniqueDoctorAdvice(advice, "核心链路都正常。可以继续测试正常对话和语音效果；如果角色味道还不对，下一步再调人设、回复长度和语音风格。");
-  }
-  for (const check of failed) {
-    const label = String(check?.label || "");
-    const message = `${check?.error || ""} ${check?.detail || ""}`.toLowerCase();
-    if (message.includes("invalid api token") || message.includes("401")) {
-      addUniqueDoctorAdvice(advice, "鉴权失败。先刷新或重启应用；如果还失败，检查 server.require_api_token 和本地 token 环境变量。");
-      continue;
-    }
-    if (message.includes("timeout")) {
-      addUniqueDoctorAdvice(advice, `${label}超时。先确认对应服务没有卡住，必要时重启这一层，然后再点一次链路自检。`);
-      continue;
-    }
-    if (label.includes("LLM")) {
-      addUniqueDoctorAdvice(advice, "聊天模型异常。先检查 LLM 地址、模型名、API key 和后端控制台日志，再继续调角色效果。");
-      continue;
-    }
-    if (label.includes("TTS")) {
-      if (String(context.ttsProvider || "").toLowerCase() === "gpt_sovits") {
-        addUniqueDoctorAdvice(advice, "GPT-SoVITS 异常。确认 GPT-SoVITS API 已启动，并且地址和端口与配置一致，然后再点一次链路自检。");
-      } else {
-        addUniqueDoctorAdvice(advice, "语音异常。检查当前音色和 TTS provider 是否可用。");
-      }
-      continue;
-    }
-    if (label.includes("后端")) {
-      addUniqueDoctorAdvice(advice, "后端异常。重启 Python 服务，并检查 config.json / config.local.json 是否有语法或路径问题。");
-      continue;
-    }
-    addUniqueDoctorAdvice(advice, `${label}异常。先修这一层，再点一次链路自检。`);
-  }
-  if (context.streamEnabled === false) {
-    addUniqueDoctorAdvice(advice, "当前已关闭流式聊天，会直接走普通聊天请求。这是为了避开某些模型流式接口长时间不返回内容的问题。");
-  }
-  if (context.speakingEnabled === false) {
-    addUniqueDoctorAdvice(advice, "界面里的语音开关是关闭状态，因此现在只能检查请求，不能判断实际播放效果。");
-  }
-  return advice;
+  return typeof window.TaffyDoctorDiagnostics?.buildAdvice === "function"
+    ? window.TaffyDoctorDiagnostics.buildAdvice(checks, context)
+    : [];
 }
 
 async function runDoctorTimed(label, fn) {
@@ -2566,35 +2458,13 @@ async function runDoctorDiagnostics() {
     };
   }));
 
-  const streamEnabled = conversationCfg.chat_stream_enabled !== false;
-  const streamLine = streamEnabled
-    ? "聊天模式：流式聊天已开启。"
-    : "聊天模式：流式聊天已关闭，当前直接走普通聊天请求。";
-  const runtimeLine = runtimeCfg.enabled === true
-    ? `角色接入：已开启；情绪/动作元信息${runtimeCfg.return_metadata === true ? "会返回" : "不返回"}；回复 cue ${runtimeCfg.auto_apply_reply_cue === true ? "会自动应用" : "不会自动应用"}。`
-    : "角色接入：未开启。";
-  const okCount = checks.filter((item) => item.ok === true).length;
-  const allOk = okCount === checks.length;
-  const advice = buildDoctorAdvice(checks, {
+  return window.TaffyDoctorDiagnostics.buildReport({
+    checks,
+    runtimeConfig: runtimeCfg,
     ttsProvider: ttsCfg.provider || state.ttsProvider || "",
-    streamEnabled,
+    streamEnabled: conversationCfg.chat_stream_enabled !== false,
     speakingEnabled: state.speakingEnabled === true
   });
-
-  return [
-    allOk ? "链路自检完成：核心功能正常。" : `链路自检完成：${checks.length - okCount} 项需要处理。`,
-    "",
-    "检查结果",
-    ...checks.map((check) => formatDoctorCheckLine(check.label, check)),
-    "",
-    "当前配置",
-    `语音服务：${String(ttsCfg.provider || state.ttsProvider || "unknown")}`,
-    streamLine,
-    runtimeLine,
-    "",
-    "下一步建议",
-    ...advice.map((item, index) => `${index + 1}. ${item}`)
-  ].join("\n");
 }
 
 async function runDoctorAndAppendReport() {
@@ -2605,21 +2475,9 @@ async function runDoctorAndAppendReport() {
 }
 
 function buildChatFailureDoctorHint(err) {
-  const message = String(err?.message || err || "").trim() || "未知错误";
-  const lower = message.toLowerCase();
-  const likelyLayer = lower.includes("tts")
-    ? "TTS"
-    : lower.includes("token") || lower.includes("401")
-      ? "鉴权"
-      : lower.includes("stream")
-        ? "LLM 流式"
-        : "LLM";
-  return [
-    `错误: ${message}`,
-    "",
-    `建议: 这次看起来可能卡在 ${likelyLayer} 链路。`,
-    "你可以点「更多 → 链路自检」，或输入 /doctor，让我自动检查 LLM、TTS、配置和角色接入状态。"
-  ].join("\n");
+  return typeof window.TaffyDoctorDiagnostics?.buildChatFailureHint === "function"
+    ? window.TaffyDoctorDiagnostics.buildChatFailureHint(err)
+    : `错误: ${err?.message || err || "未知错误"}`;
 }
 
 async function runVoiceTestAndAppendReport() {
@@ -2635,42 +2493,23 @@ async function runVoiceTestAndAppendReport() {
   return ok;
 }
 
-const CHARACTER_REHEARSAL_PRESETS = [
-  {
-    label: "开心",
-    sample: "好，开心模式上线！我会更轻快一点，但不会吵你。",
-    mood: "happy",
-    style: "playful",
-    runtimeHint: { emotion: "happy", action: "happy_idle", intensity: "normal", voice_style: "cheerful", live2d_hint: "happy" }
-  },
-  {
-    label: "思考",
-    sample: "我先想一下，这个点可能有两种走法。",
-    mood: "thinking",
-    style: "clear",
-    runtimeHint: { emotion: "thinking", action: "think", intensity: "low", voice_style: "curious", live2d_hint: "thinking" }
-  },
-  {
-    label: "轻柔",
-    sample: "没关系，先慢一点，我在这边陪你把它理顺。",
-    mood: "sad",
-    style: "comfort",
-    runtimeHint: { emotion: "sad", action: "none", intensity: "low", voice_style: "soft", live2d_hint: "quiet" }
-  },
-  {
-    label: "认真",
-    sample: "收到，我会把话说清楚一点，先处理最关键的问题。",
+const CHARACTER_TUNING = window.TaffyCharacterTuning || {};
+const CHARACTER_REPLY_CUE = window.TaffyCharacterReplyCue || {};
+const CHARACTER_REHEARSAL_PRESETS = CHARACTER_TUNING.CHARACTER_REHEARSAL_PRESETS || [];
+
+function getNextCharacterRehearsalPreset() {
+  const index = Math.abs(Math.round(Number(state.characterRehearsalIndex || 0)));
+  const preset = typeof CHARACTER_TUNING.getRehearsalPreset === "function"
+    ? CHARACTER_TUNING.getRehearsalPreset(index)
+    : null;
+  state.characterRehearsalIndex = index + 1;
+  return preset || {
+    label: "默认",
+    sample: "角色试演准备好了。",
     mood: "idle",
     style: "steady",
     runtimeHint: { emotion: "neutral", action: "nod", intensity: "normal", voice_style: "serious", live2d_hint: "idle" }
-  }
-];
-
-function getNextCharacterRehearsalPreset() {
-  const presets = CHARACTER_REHEARSAL_PRESETS;
-  const index = Math.abs(Math.round(Number(state.characterRehearsalIndex || 0))) % presets.length;
-  state.characterRehearsalIndex = index + 1;
-  return presets[index];
+  };
 }
 
 async function runCharacterRehearsalAndAppendReport() {
@@ -2719,48 +2558,21 @@ async function runCharacterRehearsalAndAppendReport() {
 }
 
 function formatCharacterTuningNumber(value, fallback = "未配置") {
+  if (typeof CHARACTER_TUNING.formatNumber === "function") {
+    return CHARACTER_TUNING.formatNumber(value, fallback);
+  }
   const n = Number(value);
-  if (!Number.isFinite(n)) {
-    return fallback;
-  }
-  return String(Math.round(n * 100) / 100);
-}
-
-function addUniqueCharacterTuningAdvice(items, text) {
-  const normalized = String(text || "").trim();
-  if (normalized && !items.includes(normalized)) {
-    items.push(normalized);
-  }
-}
-
-function addUniqueCharacterTuningConfigKey(items, key, reason = "") {
-  const normalizedKey = String(key || "").trim();
-  if (!normalizedKey) {
-    return;
-  }
-  const normalizedReason = String(reason || "").trim();
-  const line = normalizedReason ? `${normalizedKey}：${normalizedReason}` : normalizedKey;
-  if (!items.includes(line)) {
-    items.push(line);
-  }
+  return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : fallback;
 }
 
 function getLatestCharacterPerformanceSummary() {
-  const candidate = state.followupCharacterRuntimeLastReplyCandidate || null;
-  const autoApply = state.followupCharacterRuntimeLastReplyAutoApply || null;
-  const runtimeHint = autoApply?.runtimeHint || candidate?.runtimeHint || null;
-  if (!candidate && !runtimeHint) {
+  if (typeof CHARACTER_TUNING.buildLatestPerformanceSummary !== "function") {
     return null;
   }
-  return {
-    at: Date.now(),
-    textPreview: String(candidate?.textPreview || "").slice(0, 80),
-    emotion: String(runtimeHint?.emotion || candidate?.mood || "neutral"),
-    action: String(runtimeHint?.action || "none"),
-    voiceStyle: String(autoApply?.voiceStyle || runtimeHint?.voice_style || "neutral"),
-    applied: autoApply?.applied === true,
-    source: String(autoApply?.source || candidate?.source || "assistant_reply")
-  };
+  return CHARACTER_TUNING.buildLatestPerformanceSummary(
+    state.followupCharacterRuntimeLastReplyCandidate || null,
+    state.followupCharacterRuntimeLastReplyAutoApply || null
+  );
 }
 
 function recordCharacterPerformanceFeedback(rating = "good", note = "") {
@@ -2782,12 +2594,11 @@ function recordCharacterPerformanceFeedback(rating = "good", note = "") {
   if (state.characterPerformanceFeedbacks.length > 8) {
     state.characterPerformanceFeedbacks.length = 8;
   }
-  const emotion = localizeReplyCharacterValue("emotion", feedback.emotion);
-  const action = localizeReplyCharacterValue("action", feedback.action);
-  const voice = localizeReplyCharacterValue("voice", feedback.voiceStyle);
   appendMessage(
     "assistant",
-    `已记录反馈：${feedback.label}\n对象：${emotion} / ${action} / ${voice}\n下一步可以点“角色调优”看建议。`,
+    typeof CHARACTER_TUNING.buildFeedbackMessage === "function"
+      ? CHARACTER_TUNING.buildFeedbackMessage(feedback)
+      : `已记录反馈：${feedback.label}`,
     { enableTranslation: false }
   );
   setStatus(`已记录：${feedback.label}`);
@@ -2795,104 +2606,18 @@ function recordCharacterPerformanceFeedback(rating = "good", note = "") {
 }
 
 function buildCharacterTuningReport() {
-  const cfg = state.config || {};
-  const runtimeCfg = cfg.character_runtime || {};
-  const ttsCfg = cfg.tts || {};
-  const motionCfg = cfg.motion || {};
-  const llmCfg = cfg.llm || {};
-  const candidate = state.followupCharacterRuntimeLastReplyCandidate || null;
-  const autoApply = state.followupCharacterRuntimeLastReplyAutoApply || null;
-  const runtimeHint = autoApply?.runtimeHint || candidate?.runtimeHint || null;
-  const feedback = state.characterPerformanceLastFeedback || null;
-  const assistantPrompt = String(cfg.assistant_prompt || "");
-  const advice = [];
-  const configKeys = [];
-
-  if (runtimeCfg.enabled !== true) {
-    addUniqueCharacterTuningAdvice(advice, "先开启 character_runtime.enabled，否则回复不会进入角色表现层。");
-    addUniqueCharacterTuningConfigKey(configKeys, "character_runtime.enabled", "控制角色接入层是否启用");
+  if (typeof CHARACTER_TUNING.buildTuningReport !== "function") {
+    return "角色调优建议\n\n角色调优模块暂不可用。";
   }
-  if (runtimeCfg.return_metadata !== true) {
-    addUniqueCharacterTuningAdvice(advice, "开启 character_runtime.return_metadata，方便后端返回情绪、动作和语音风格。");
-    addUniqueCharacterTuningConfigKey(configKeys, "character_runtime.return_metadata", "让回复返回情绪、动作和语音风格元信息");
-  }
-  if (runtimeCfg.auto_apply_reply_cue !== true) {
-    addUniqueCharacterTuningAdvice(advice, "如果你正在本地测试角色味道，可以临时开启 auto_apply_reply_cue；确认效果后再决定是否默认打开。");
-    addUniqueCharacterTuningConfigKey(configKeys, "character_runtime.auto_apply_reply_cue", "控制上一句回复 cue 是否自动应用到本地表现层");
-  }
-  if (!candidate) {
-    addUniqueCharacterTuningAdvice(advice, "先发一句正常聊天，或点“角色试演”，再看这里的调优建议会更准。");
-  } else if (autoApply?.applied !== true) {
-    addUniqueCharacterTuningAdvice(advice, "上一句只生成了候选表现，没有真正应用。优先检查角色接入开关和顶部“上一句角色表现”卡片。");
-    addUniqueCharacterTuningConfigKey(configKeys, "character_runtime.auto_apply_reply_cue", "候选表现未应用时优先检查这个开关");
-  }
-  if (feedback?.rating === "bad") {
-    addUniqueCharacterTuningAdvice(advice, "你刚标记“需要调整”。先用“角色试演”复现是哪种情绪不对，再分别判断是声音差异小、动作太弱，还是回复文本不像角色。");
-    addUniqueCharacterTuningConfigKey(configKeys, "assistant_prompt", "如果文本不像角色，先改这里的人设和说话规则");
-    addUniqueCharacterTuningConfigKey(configKeys, "motion.speech_motion_strength", "如果说话动作太弱，调这里");
-    addUniqueCharacterTuningConfigKey(configKeys, "tts.gpt_sovits_fallback_ref_audio_path", "如果声线味道不对，优先检查参考音频");
-  } else if (feedback?.rating === "good") {
-    addUniqueCharacterTuningAdvice(advice, "你刚标记“表现不错”。先保留这组情绪/动作/语音映射，下一步重点优化 LLM 回复文本的口吻和长度。");
-    addUniqueCharacterTuningConfigKey(configKeys, "assistant_prompt", "表现层可用后，优先把文本口吻调稳定");
-  }
-  if (String(ttsCfg.provider || state.ttsProvider || "").toLowerCase() === "gpt_sovits") {
-    addUniqueCharacterTuningAdvice(advice, "GPT-SoVITS 对 prosody 参数不一定明显。若开心/轻柔/认真听起来差不多，优先换参考音频或拆分不同情绪音色。");
-    addUniqueCharacterTuningConfigKey(configKeys, "tts.gpt_sovits_ref_audio_path", "主参考音频会明显影响声线味道");
-    addUniqueCharacterTuningConfigKey(configKeys, "tts.gpt_sovits_fallback_ref_audio_path", "主参考不可用时会落到这里");
-    if (ttsCfg.gpt_sovits_realtime_tts !== false) {
-      addUniqueCharacterTuningAdvice(advice, "建议 GPT-SoVITS 保持 final_only / 非实时模式，先保证长句稳定出声，再追求低延迟。");
-      addUniqueCharacterTuningConfigKey(configKeys, "tts.gpt_sovits_realtime_tts", "长句稳定性优先时建议关闭实时模式");
-      addUniqueCharacterTuningConfigKey(configKeys, "tts.stream_mode", "长句测试阶段优先 final_only");
-    }
-  }
-  const maxTokens = Number(llmCfg.max_tokens || runtimeCfg.max_tokens || 0);
-  if (Number.isFinite(maxTokens) && maxTokens > 180) {
-    addUniqueCharacterTuningAdvice(advice, "回复长度偏长时角色感会被稀释。先把单轮回复控制到 1 到 3 句，再测试语音表现。");
-    addUniqueCharacterTuningConfigKey(configKeys, "llm.max_tokens", "控制普通聊天回复长度上限");
-    addUniqueCharacterTuningConfigKey(configKeys, "character_runtime.max_tokens", "控制角色续话/角色层回复长度上限");
-  }
-  if (!/不要|不使用|禁止/.test(assistantPrompt) || !/markdown|编号|列表|项目符号|标题/i.test(assistantPrompt)) {
-    addUniqueCharacterTuningAdvice(advice, "提示词里建议明确禁止 Markdown、编号列表和长段解释，桌宠说话会更像在聊天。");
-    addUniqueCharacterTuningConfigKey(configKeys, "assistant_prompt", "加入短句、口语化、禁止 Markdown/编号列表等规则");
-  }
-  const speechMotionStrength = Number(motionCfg.speech_motion_strength ?? motionCfg.speech_body_motion_strength ?? state.speechMotionStrength);
-  if (Number.isFinite(speechMotionStrength) && speechMotionStrength < 1.1) {
-    addUniqueCharacterTuningAdvice(advice, "说话时身体动作偏弱。可以把 motion.speech_motion_strength 提到 1.2 到 1.5 再试。");
-    addUniqueCharacterTuningConfigKey(configKeys, "motion.speech_motion_strength", "控制说话时身体动作强度");
-  }
-  const expressionStrength = Number(motionCfg.expression_strength ?? state.expressionStrength);
-  if (Number.isFinite(expressionStrength) && expressionStrength < 0.9) {
-    addUniqueCharacterTuningAdvice(advice, "表情强度偏低。可以把 motion.expression_strength 调到 1.0 左右。");
-    addUniqueCharacterTuningConfigKey(configKeys, "motion.expression_strength", "控制表情幅度");
-  }
-  if (!advice.length) {
-    addUniqueCharacterTuningAdvice(advice, "基础配置看起来可以。下一步重点调人设语气样例、参考音频和四个试演预设的差异。");
-    addUniqueCharacterTuningConfigKey(configKeys, "assistant_prompt", "继续调角色口吻样例");
-    addUniqueCharacterTuningConfigKey(configKeys, "tts.gpt_sovits_ref_audio_path", "继续调参考音频");
-  }
-
-  const lastLine = runtimeHint
-    ? `上一句表现：情绪=${localizeReplyCharacterValue("emotion", runtimeHint.emotion)}；动作=${localizeReplyCharacterValue("action", runtimeHint.action)}；语音=${localizeReplyCharacterValue("voice", autoApply?.voiceStyle || runtimeHint.voice_style)}；状态=${autoApply?.applied === true ? "已应用" : "未应用"}`
-    : "上一句表现：还没有可用记录。";
-  const feedbackLine = feedback
-    ? `最近反馈：${feedback.label}（${localizeReplyCharacterValue("emotion", feedback.emotion)} / ${localizeReplyCharacterValue("action", feedback.action)} / ${localizeReplyCharacterValue("voice", feedback.voiceStyle)}）`
-    : "最近反馈：还没有记录。";
-  return [
-    "角色调优建议",
-    "",
-    "当前观察",
-    lastLine,
-    feedbackLine,
-    `角色接入：${runtimeCfg.enabled === true ? "已开启" : "未开启"}；元信息=${runtimeCfg.return_metadata === true ? "开启" : "关闭"}；自动应用=${runtimeCfg.auto_apply_reply_cue === true ? "开启" : "关闭"}`,
-    `语音：${String(ttsCfg.provider || state.ttsProvider || "unknown")}；浏览器兜底=${ttsCfg.allow_browser_fallback === true ? "开启" : "关闭"}`,
-    `动作：说话强度=${formatCharacterTuningNumber(speechMotionStrength)}；表情强度=${formatCharacterTuningNumber(expressionStrength)}`,
-    "",
-    "建议顺序",
-    ...advice.map((item, index) => `${index + 1}. ${item}`),
-    "",
-    "可检查配置项",
-    ...(configKeys.length ? configKeys.map((item, index) => `${index + 1}. ${item}`) : ["1. 暂时没有必须改的配置项。"])
-  ].join("\n");
+  return CHARACTER_TUNING.buildTuningReport({
+    config: state.config || {},
+    candidate: state.followupCharacterRuntimeLastReplyCandidate || null,
+    autoApply: state.followupCharacterRuntimeLastReplyAutoApply || null,
+    feedback: state.characterPerformanceLastFeedback || null,
+    ttsProvider: state.ttsProvider || "",
+    speechMotionStrength: state.speechMotionStrength,
+    expressionStrength: state.expressionStrength
+  });
 }
 
 function runCharacterTuningAndAppendReport() {
@@ -2902,15 +2627,9 @@ function runCharacterTuningAndAppendReport() {
 }
 
 function buildCharacterWorkflowGuide() {
-  return [
-    "角色闭环测试流程",
-    "",
-    "1. 点“更多 → 链路自检”，先确认 LLM、TTS 和角色接入都正常。",
-    "2. 点“更多 → 角色试演”，不经过 LLM，单独听表情、动作和语音风格。",
-    "3. 听完点“表现不错”或“需要调整”，把你的主观判断记到本次会话。",
-    "4. 点“角色调优”，看下一步该改人设、回复长度、参考音频还是动作强度。",
-    "5. 再发一句真实聊天，看顶部“上一句角色表现”是否符合预期。"
-  ].join("\n");
+  return typeof CHARACTER_TUNING.buildWorkflowGuide === "function"
+    ? CHARACTER_TUNING.buildWorkflowGuide()
+    : "角色闭环测试流程\n\n角色流程模块暂不可用。";
 }
 
 function appendCharacterWorkflowGuide() {
@@ -3549,43 +3268,11 @@ function updateFollowupCharacterChip() {
 }
 
 function localizeReplyCharacterValue(kind, value) {
-  const key = String(value || "").trim().toLowerCase();
-  if (!key) {
-    return "未定";
-  }
-  const maps = {
-    emotion: {
-      neutral: "平静",
-      idle: "待机",
-      happy: "开心",
-      playful: "调皮",
-      thinking: "思考",
-      surprised: "惊讶",
-      sad: "低落",
-      anxious: "紧张",
-      angry: "生气",
-      annoyed: "小不爽"
-    },
-    action: {
-      none: "轻待机",
-      nod: "点头",
-      think: "思考动作",
-      happy_idle: "开心待机",
-      wave: "挥手",
-      shake_head: "摇头",
-      surprised: "惊讶动作"
-    },
-    voice: {
-      neutral: "自然声线",
-      soft: "轻柔声线",
-      warm: "温暖声线",
-      cheerful: "明亮声线",
-      teasing: "调皮声线",
-      serious: "认真声线",
-      curious: "好奇声线"
-    }
-  };
-  return maps[kind]?.[key] || key.replace(/_/g, " ");
+  return typeof CHARACTER_REPLY_CUE.localizeValue === "function"
+    ? CHARACTER_REPLY_CUE.localizeValue(kind, value)
+    : (typeof CHARACTER_TUNING.localizeValue === "function"
+      ? CHARACTER_TUNING.localizeValue(kind, value)
+      : String(value || "").trim().toLowerCase().replace(/_/g, " ") || "未定");
 }
 
 function buildReplyCharacterChipView(candidate = null, autoApply = null) {
@@ -3595,42 +3282,13 @@ function buildReplyCharacterChipView(candidate = null, autoApply = null) {
   const safeAutoApply = autoApply && typeof autoApply === "object"
     ? autoApply
     : state.followupCharacterRuntimeLastReplyAutoApply;
-  if (!safeCandidate) {
-    return {
+  return typeof CHARACTER_REPLY_CUE.buildReplyCharacterChipView === "function"
+    ? CHARACTER_REPLY_CUE.buildReplyCharacterChipView(safeCandidate, safeAutoApply)
+    : {
       text: "上一句角色表现 · 待回复",
       title: "发送一条消息后，这里会显示上一句回复触发的情绪、动作和语音风格。",
       tone: "waiting"
     };
-  }
-  const runtimeHint = safeAutoApply?.runtimeHint && typeof safeAutoApply.runtimeHint === "object"
-    ? safeAutoApply.runtimeHint
-    : (safeCandidate.runtimeHint || {});
-  const emotion = localizeReplyCharacterValue("emotion", runtimeHint.emotion || safeCandidate.mood || "neutral");
-  const action = localizeReplyCharacterValue("action", runtimeHint.action || "none");
-  const voice = localizeReplyCharacterValue("voice", safeAutoApply?.voiceStyle || runtimeHint.voice_style || "neutral");
-  const applied = safeAutoApply?.applied === true;
-  const reason = String(safeAutoApply?.reason || "").trim();
-  const statusText = applied
-    ? "已应用"
-    : reason === "disabled"
-      ? "仅预览"
-      : reason
-        ? "未应用"
-        : "候选已生成";
-  const tone = applied ? "applied" : (reason === "disabled" ? "blocked" : "waiting");
-  const preview = String(safeCandidate.textPreview || "").trim();
-  const title = [
-    `情绪：${emotion}`,
-    `动作：${action}`,
-    `语音：${voice}`,
-    `状态：${statusText}${reason && !applied ? `（${reason}）` : ""}`,
-    preview ? `回复片段：${preview}` : ""
-  ].filter(Boolean).join("\n");
-  return {
-    text: `上一句：${emotion} / ${action} / ${voice} · ${statusText}`,
-    title,
-    tone
-  };
 }
 
 function updateReplyCharacterChip(candidate = null, autoApply = null) {
@@ -3645,191 +3303,76 @@ function updateReplyCharacterChip(candidate = null, autoApply = null) {
 }
 
 function buildFollowupCharacterRuntimeHint(input = {}) {
-  const tone = String(input.tone || "idle");
-  const label = String(input.label || "");
-  const map = {
-    ready: { emotion: "thinking", action: "think", intensity: "low", voice_style: "soft" },
-    waiting: { emotion: "thinking", action: "none", intensity: "low", voice_style: "soft" },
-    watching: { emotion: "thinking", action: "none", intensity: "low", voice_style: "neutral" },
-    cooldown: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral" },
-    limit: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral" },
-    quiet: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral" },
-    idle: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral" }
-  };
-  return {
-    ...(map[tone] || map.idle),
-    live2d_hint: tone,
-    source: "followup_character_state",
-    label
-  };
+  return typeof CHARACTER_REPLY_CUE.buildFollowupCharacterRuntimeHint === "function"
+    ? CHARACTER_REPLY_CUE.buildFollowupCharacterRuntimeHint(input)
+    : {
+      emotion: "neutral",
+      action: "none",
+      intensity: "low",
+      voice_style: "neutral",
+      live2d_hint: String(input.tone || "idle"),
+      source: "followup_character_state",
+      label: String(input.label || "")
+    };
 }
 
-const GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS = {
-  auto: {
-    label: "\u5f53\u524d\u9884\u89c8",
-    tone: "auto",
-    description: "\u4f7f\u7528\u5f53\u524d\u7eed\u8bdd\u9884\u89c8\u63a8\u5bfc\u7684\u89d2\u8272 cue",
-    runtimeHint: null
-  },
-  happy_wave: {
-    label: "\u5f00\u5fc3\u6325\u624b",
-    tone: "ready",
-    description: "\u624b\u52a8\u6d4b\u8bd5\u53cb\u597d\u6253\u62db\u547c",
-    runtimeHint: { emotion: "happy", action: "wave", intensity: "normal", voice_style: "cheerful", live2d_hint: "happy" }
-  },
-  thinking: {
-    label: "\u601d\u8003\u4e00\u4e0b",
-    tone: "watching",
-    description: "\u624b\u52a8\u6d4b\u8bd5\u601d\u8003\u72b6\u6001",
-    runtimeHint: { emotion: "thinking", action: "think", intensity: "low", voice_style: "neutral", live2d_hint: "thinking" }
-  },
-  surprised: {
-    label: "\u8f7b\u5fae\u60ca\u8bb6",
-    tone: "ready",
-    description: "\u624b\u52a8\u6d4b\u8bd5\u60ca\u8bb6\u53cd\u5e94",
-    runtimeHint: { emotion: "surprised", action: "surprised", intensity: "normal", voice_style: "cheerful", live2d_hint: "surprised" }
-  },
-  calm_idle: {
-    label: "\u5b89\u9759\u5f85\u673a",
-    tone: "quiet",
-    description: "\u624b\u52a8\u6d4b\u8bd5\u4f4e\u6253\u6270\u5f85\u673a",
-    runtimeHint: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral", live2d_hint: "idle" }
-  }
-};
-
 function normalizeGrayAutoTrialCharacterCuePresetKey(value) {
-  const key = String(value || "auto").trim().toLowerCase();
-  return Object.prototype.hasOwnProperty.call(GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS, key) ? key : "auto";
+  return typeof CHARACTER_REPLY_CUE.normalizeGrayAutoTrialCharacterCuePresetKey === "function"
+    ? CHARACTER_REPLY_CUE.normalizeGrayAutoTrialCharacterCuePresetKey(value)
+    : "auto";
 }
 
 function listGrayAutoTrialCharacterCuePresets() {
-  return Object.entries(GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS).map(([key, preset]) => ({
-    key,
-    label: String(preset.label || key),
-    tone: String(preset.tone || ""),
-    description: String(preset.description || "")
-  }));
+  return typeof CHARACTER_REPLY_CUE.listGrayAutoTrialCharacterCuePresets === "function"
+    ? CHARACTER_REPLY_CUE.listGrayAutoTrialCharacterCuePresets()
+    : [];
 }
 
 function resolveGrayAutoTrialCharacterCuePreset(input = {}, checklist = null) {
-  const safeInput = input && typeof input === "object" ? input : {};
   const safeChecklist = checklist && typeof checklist === "object"
     ? checklist
     : buildGrayAutoTrialCharacterCueHandoffChecklist();
-  const key = normalizeGrayAutoTrialCharacterCuePresetKey(safeInput.presetKey || safeInput.preset || safeInput.cuePreset);
-  const preset = GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS[key] || GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS.auto;
-  const runtimeHint = preset.runtimeHint && typeof preset.runtimeHint === "object"
-    ? { ...preset.runtimeHint }
-    : { ...(safeChecklist.runtimeHint || {}) };
-  return {
-    key,
-    label: key === "auto" ? String(safeChecklist.label || preset.label || "") : String(preset.label || key),
-    tone: key === "auto" ? String(safeChecklist.tone || preset.tone || "") : String(preset.tone || ""),
-    description: String(preset.description || ""),
-    runtimeHint
-  };
+  return typeof CHARACTER_REPLY_CUE.resolveGrayAutoTrialCharacterCuePreset === "function"
+    ? CHARACTER_REPLY_CUE.resolveGrayAutoTrialCharacterCuePreset(input, safeChecklist)
+    : {
+      key: "auto",
+      label: String(safeChecklist.label || ""),
+      tone: String(safeChecklist.tone || ""),
+      description: "",
+      runtimeHint: { ...(safeChecklist.runtimeHint || {}) }
+    };
 }
 
 function buildAssistantReplyCharacterExpressionCue(input = {}) {
-  const safe = input && typeof input === "object" ? input : {};
-  const text = String(safe.text || "").trim();
-  const lower = text.toLowerCase();
-  const mood = String(safe.mood || "idle").trim().toLowerCase();
-  const style = String(safe.style || "neutral").trim().toLowerCase();
-  const tone = String(safe.tone || "idle").trim().toLowerCase();
-  const hasQuestion = lower.includes("?") || text.includes("\uff1f");
-  const hasExclaim = lower.includes("!") || text.includes("\uff01");
-  if (mood === "surprised" || hasQuestion) {
-    return {
-      reason: "question_or_surprise",
-      runtimeHint: { emotion: "thinking", action: "think", intensity: "low", voice_style: "curious", live2d_hint: "thinking" }
+  return typeof CHARACTER_REPLY_CUE.buildAssistantReplyCharacterExpressionCue === "function"
+    ? CHARACTER_REPLY_CUE.buildAssistantReplyCharacterExpressionCue(input)
+    : {
+      reason: "neutral_idle",
+      runtimeHint: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral", live2d_hint: "idle" }
     };
-  }
-  if (mood === "happy" || mood === "playful" || style === "playful" || hasExclaim) {
-    return {
-      reason: "warm_or_playful",
-      runtimeHint: { emotion: "happy", action: "happy_idle", intensity: "normal", voice_style: "cheerful", live2d_hint: "happy" }
-    };
-  }
-  if (mood === "sad" || mood === "anxious") {
-    return {
-      reason: "soft_low_interrupt",
-      runtimeHint: { emotion: mood === "anxious" ? "anxious" : "sad", action: "none", intensity: "low", voice_style: "soft", live2d_hint: "quiet" }
-    };
-  }
-  if (mood === "angry" || mood === "annoyed") {
-    return {
-      reason: "restrained_negative",
-      runtimeHint: { emotion: mood, action: "none", intensity: "low", voice_style: "neutral", live2d_hint: "quiet" }
-    };
-  }
-  if (tone === "cooldown" || style === "brief" || safe.auto === true) {
-    return {
-      reason: "cooldown",
-      runtimeHint: { emotion: "neutral", action: "nod", intensity: "low", voice_style: "neutral", live2d_hint: "cooldown" }
-    };
-  }
-  if (tone === "watching") {
-    return {
-      reason: "watching",
-      runtimeHint: { emotion: "thinking", action: "think", intensity: "low", voice_style: "neutral", live2d_hint: "thinking" }
-    };
-  }
-  return {
-    reason: "neutral_idle",
-    runtimeHint: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral", live2d_hint: "idle" }
-  };
 }
 
 function buildAssistantReplyCharacterCueCandidate(input = {}) {
-  const safe = input && typeof input === "object" ? input : {};
-  const text = String(safe.text || "").trim();
-  const mood = String(safe.mood || "idle").trim().toLowerCase();
-  const style = String(safe.style || "neutral").trim().toLowerCase();
-  const auto = safe.auto === true;
-  const lower = text.toLowerCase();
-  let tone = "idle";
-  if (mood === "happy" || /[!！]$/.test(text)) {
-    tone = "ready";
-  } else if (mood === "surprised" || lower.includes("?") || text.includes("？")) {
-    tone = "watching";
-  } else if (mood === "sad" || mood === "anxious") {
-    tone = "quiet";
-  } else if (style === "playful") {
-    tone = "ready";
-  } else if (style === "brief" || auto) {
-    tone = "cooldown";
-  }
-  const expressionCue = buildAssistantReplyCharacterExpressionCue({
-    text,
-    mood,
-    style,
-    auto,
-    tone
-  });
-  const runtimeHint = normalizeCharacterRuntimeMetadataForFrontend(expressionCue.runtimeHint);
-  return {
-    readOnly: true,
-    source: "assistant_reply",
-    generatedAt: Date.now(),
-    eligibleForManualSend: !!runtimeHint,
-    autoTriggered: false,
-    auto,
-    mood,
-    style,
-    tone,
-    expressionReason: expressionCue.reason,
-    textPreview: text.slice(0, 80),
-    runtimeHint,
-    safety: {
-      noRuntimeCueEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noSchedulerChange: true,
-      noFollowupExecution: true,
-      noConfigWrites: true
-    }
-  };
+  return typeof CHARACTER_REPLY_CUE.buildAssistantReplyCharacterCueCandidate === "function"
+    ? CHARACTER_REPLY_CUE.buildAssistantReplyCharacterCueCandidate(input, {
+      normalizeMetadata: normalizeCharacterRuntimeMetadataForFrontend,
+      now: () => Date.now()
+    })
+    : {
+      readOnly: true,
+      source: "assistant_reply",
+      generatedAt: Date.now(),
+      eligibleForManualSend: false,
+      autoTriggered: false,
+      auto: input?.auto === true,
+      mood: String(input?.mood || "idle").trim().toLowerCase(),
+      style: String(input?.style || "neutral").trim().toLowerCase(),
+      tone: "idle",
+      expressionReason: "missing_helper",
+      textPreview: String(input?.text || "").trim().slice(0, 80),
+      runtimeHint: null,
+      safety: { noRuntimeCueEmission: true, noLive2DMove: true, noTts: true, noSchedulerChange: true, noFollowupExecution: true, noConfigWrites: true }
+    };
 }
 
 function previewAssistantReplyCharacterCueCandidate(input = {}) {
@@ -3847,42 +3390,15 @@ function previewAssistantReplyCharacterCueCandidate(input = {}) {
 }
 
 function normalizeRuntimeVoiceStyle(style) {
-  const key = String(style || "neutral").trim().toLowerCase().replace(/-/g, "_");
-  const aliases = {
-    happy: "cheerful",
-    playful: "teasing",
-    sad: "soft",
-    anxious: "soft",
-    angry: "serious",
-    annoyed: "serious",
-    thinking: "curious",
-    comfort: "warm",
-    clear: "curious",
-    steady: "serious"
-  };
-  const normalized = aliases[key] || key;
-  if (["neutral", "soft", "cheerful", "teasing", "serious", "curious", "warm"].includes(normalized)) {
-    return normalized;
-  }
-  return "neutral";
+  return typeof CHARACTER_REPLY_CUE.normalizeRuntimeVoiceStyle === "function"
+    ? CHARACTER_REPLY_CUE.normalizeRuntimeVoiceStyle(style)
+    : "neutral";
 }
 
 function runtimeVoiceStyleToTalkStyle(style, fallback = "neutral") {
-  const voiceStyle = normalizeRuntimeVoiceStyle(style);
-  const fallbackStyle = normalizeTalkStyle(fallback);
-  if (voiceStyle === "soft" || voiceStyle === "warm") {
-    return "comfort";
-  }
-  if (voiceStyle === "cheerful" || voiceStyle === "teasing") {
-    return "playful";
-  }
-  if (voiceStyle === "serious") {
-    return "steady";
-  }
-  if (voiceStyle === "curious") {
-    return "clear";
-  }
-  return fallbackStyle;
+  return typeof CHARACTER_REPLY_CUE.runtimeVoiceStyleToTalkStyle === "function"
+    ? CHARACTER_REPLY_CUE.runtimeVoiceStyleToTalkStyle(style, fallback, normalizeTalkStyle)
+    : normalizeTalkStyle(fallback);
 }
 
 function isReplyCueAutoApplyEnabled() {
@@ -5561,7 +5077,11 @@ function buildGrayAutoTrialCharacterManualCueStatusCardText() {
   const candidate = status.lastReplyCandidate || null;
   const autoApply = state.followupCharacterRuntimeLastReplyAutoApply || null;
   const selectedPreset = getSelectedGrayAutoTrialCharacterCuePresetKey();
-  const preset = GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS[selectedPreset] || GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS.auto;
+  const preset = resolveGrayAutoTrialCharacterCuePreset({ presetKey: selectedPreset }, {
+    label: "",
+    tone: "",
+    runtimeHint: {}
+  });
   const hint = lastEmit?.runtimeHint || {};
   const bridgeOk = bridge?.ok === true && bridge?.backendNoop === true && bridge?.wouldExecute !== true;
   const dispatchOk = dispatch?.localDispatched === true;

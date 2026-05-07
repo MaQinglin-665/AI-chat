@@ -9,14 +9,96 @@ const CHAT_JS = path.resolve(__dirname, "..", "web", "chat.js");
 const INDEX_HTML = path.resolve(__dirname, "..", "web", "index.html");
 const BASE_CSS = path.resolve(__dirname, "..", "web", "base.css");
 const CHARACTER_RUNTIME_JS = path.resolve(__dirname, "..", "web", "characterRuntime.js");
+const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTuning.js");
+const DOCTOR_DIAGNOSTICS_JS = path.resolve(__dirname, "..", "web", "doctorDiagnostics.js");
+const CHARACTER_REPLY_CUE_JS = path.resolve(__dirname, "..", "web", "characterReplyCue.js");
+const TTS_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "ttsDebugReport.js");
 const source = fs.readFileSync(CHAT_JS, "utf8");
 const indexSource = fs.readFileSync(INDEX_HTML, "utf8");
 const baseCssSource = fs.readFileSync(BASE_CSS, "utf8");
+const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
+const doctorSource = fs.readFileSync(DOCTOR_DIAGNOSTICS_JS, "utf8");
+const replyCueSource = fs.readFileSync(CHARACTER_REPLY_CUE_JS, "utf8");
+const ttsDebugSource = fs.readFileSync(TTS_DEBUG_REPORT_JS, "utf8");
 const runtime = require(CHARACTER_RUNTIME_JS);
+const tuning = require(CHARACTER_TUNING_JS);
+const doctorDiagnostics = require(DOCTOR_DIAGNOSTICS_JS);
+const replyCue = require(CHARACTER_REPLY_CUE_JS);
+const ttsDebugReport = require(TTS_DEBUG_REPORT_JS);
 
 function toPlainObject(value) {
   return JSON.parse(JSON.stringify(value));
 }
+
+assert.strictEqual(
+  tuning.getRehearsalPreset(0).label,
+  "开心",
+  "character tuning helper should expose stable rehearsal presets"
+);
+assert.ok(
+  tuning.buildTuningReport({
+    config: {
+      character_runtime: { enabled: true, return_metadata: true, auto_apply_reply_cue: true },
+      tts: { provider: "gpt_sovits", gpt_sovits_realtime_tts: false },
+      motion: { speech_motion_strength: 1.35, expression_strength: 1 },
+      llm: { max_tokens: 128 },
+      assistant_prompt: "不要使用 Markdown、编号列表、标题或项目符号。默认只回复1到3句。"
+    },
+    candidate: { textPreview: "测试", mood: "happy", runtimeHint: { emotion: "happy", action: "happy_idle", voice_style: "cheerful" } },
+    autoApply: { applied: true, voiceStyle: "cheerful", runtimeHint: { emotion: "happy", action: "happy_idle", voice_style: "cheerful" } },
+    feedback: { rating: "good", label: "表现不错", emotion: "happy", action: "happy_idle", voiceStyle: "cheerful" },
+    ttsProvider: "gpt_sovits",
+    speechMotionStrength: 1.35,
+    expressionStrength: 1
+  }).includes("可检查配置项"),
+  "character tuning helper should build a readable report with config keys"
+);
+assert.ok(
+  doctorDiagnostics.buildReport({
+    checks: [{ label: "后端健康", ok: true, elapsedMs: 10, detail: "本地服务响应正常。" }],
+    runtimeConfig: { enabled: true, return_metadata: true, auto_apply_reply_cue: true },
+    ttsProvider: "gpt_sovits",
+    streamEnabled: false,
+    speakingEnabled: true
+  }).includes("链路自检完成：核心功能正常。"),
+  "doctor diagnostics helper should build a readable self-check report"
+);
+assert.strictEqual(
+  replyCue.normalizeRuntimeVoiceStyle("happy"),
+  "cheerful",
+  "reply cue helper should normalize mood aliases into runtime voice styles"
+);
+assert.strictEqual(
+  replyCue.runtimeVoiceStyleToTalkStyle("cheerful", "neutral", (value) => value),
+  "playful",
+  "reply cue helper should map runtime voice style back to speech style"
+);
+assert.deepStrictEqual(
+  toPlainObject(replyCue.buildAssistantReplyCharacterCueCandidate({
+    text: "好！",
+    mood: "happy",
+    style: "playful"
+  }, {
+    normalizeMetadata: (metadata) => metadata,
+    now: () => 1
+  }).runtimeHint),
+  {
+    emotion: "happy",
+    action: "happy_idle",
+    intensity: "normal",
+    voice_style: "cheerful",
+    live2d_hint: "happy"
+  },
+  "reply cue helper should build read-only assistant reply runtime hints"
+);
+assert.ok(
+  ttsDebugReport.buildReport(
+    { provider: "gpt_sovits", speakingEnabled: true, currentMs: 42, rms: 0.01234 },
+    [{ seq: 1, stage: "request", atMs: 5, result: "ok" }],
+    25
+  ).includes("recentEvents="),
+  "tts debug helper should build a readable event report"
+);
 
 assert.strictEqual(
   runtime.normalizeMetadataForFrontend(null),
@@ -92,8 +174,9 @@ assert.ok(
   "manual character cue bridge should keep an explicit debug entry point and reuse the existing manual emit path"
 );
 assert.ok(
-  source.includes("const GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS")
-    && source.includes("happy_wave")
+  replyCueSource.includes("const GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS")
+    && replyCueSource.includes("happy_wave")
+    && source.includes("CHARACTER_REPLY_CUE.listGrayAutoTrialCharacterCuePresets")
     && source.includes("trialCharacterCuePreset")
     && source.includes("grayAutoFollowupTrialCharacterCuePresets"),
   "manual character cue bridge should expose explicit safe presets without automatic runtime scheduling"
@@ -114,6 +197,7 @@ assert.ok(
 );
 assert.ok(
   source.includes("function buildAssistantReplyCharacterCueCandidate")
+    && replyCueSource.includes("function buildAssistantReplyCharacterCueCandidate")
     && source.includes("previewAssistantReplyCharacterCueCandidate({")
     && source.includes("conversation_followup_character_reply_cue_candidate")
     && source.includes("replyCueCandidate="),
@@ -124,15 +208,16 @@ assert.ok(
     && source.includes("auto_apply_reply_cue")
     && source.includes("function maybeAutoApplyAssistantReplyCharacterCueCandidate")
     && source.includes("conversation_followup_character_reply_cue_candidate_auto_apply")
-    && source.includes("runtimeVoiceStyleToTalkStyle")
+    && replyCueSource.includes("runtimeVoiceStyleToTalkStyle")
     && source.includes("speechStyle"),
   "assistant reply cue candidates should support an explicit default-off auto-apply path into runtime dispatch and TTS style"
 );
 assert.ok(
   source.includes("function buildReplyCharacterChipView")
+    && replyCueSource.includes("function buildReplyCharacterChipView")
     && source.includes("function updateReplyCharacterChip")
     && source.includes("localizeReplyCharacterValue")
-    && source.includes("上一句角色表现 · 待回复")
+    && replyCueSource.includes("上一句角色表现 · 待回复")
     && source.includes("updateReplyCharacterChip(candidate, result)")
     && source.includes("ui.replyCharacterChip")
     && indexSource.includes('id="reply-character-chip"')
@@ -159,15 +244,18 @@ assert.ok(
     && source.includes('"聊天模型"')
     && source.includes('"语音服务"')
     && source.includes("requestServerTTSBlob(")
-    && source.includes("function buildDoctorAdvice(checks, context = {})")
-    && source.includes("链路自检完成：核心功能正常。")
-    && source.includes("下一步建议")
-    && source.includes("GPT-SoVITS 异常")
-    && source.includes("当前已关闭流式聊天")
+    && source.includes("window.TaffyDoctorDiagnostics.buildReport")
+    && doctorSource.includes("function buildAdvice")
+    && doctorSource.includes("链路自检完成：核心功能正常。")
+    && doctorSource.includes("下一步建议")
+    && doctorSource.includes("GPT-SoVITS 异常")
+    && doctorSource.includes("当前已关闭流式聊天")
     && source.includes("runDoctorAndAppendReport()")
     && source.includes('row?.classList?.add("doctor-report")')
     && source.includes("ui.doctorBtn")
     && indexSource.includes('id="doctor-btn"')
+    && indexSource.includes('<script src="./characterReplyCue.js"></script>')
+    && indexSource.includes('<script src="./doctorDiagnostics.js"></script>')
     && source.includes("ui.voiceTestBtn")
     && indexSource.includes('id="voice-test-btn"')
     && baseCssSource.includes(".message.assistant.doctor-report .content"),
@@ -194,7 +282,8 @@ assert.ok(
   "voice test should be available both as a visible button and as a local command"
 );
 assert.ok(
-  source.includes("CHARACTER_REHEARSAL_PRESETS")
+  tuningSource.includes("CHARACTER_REHEARSAL_PRESETS")
+    && source.includes("CHARACTER_TUNING.getRehearsalPreset")
     && source.includes("async function runCharacterRehearsalAndAppendReport()")
     && source.includes('text === "/角色试演"')
     && source.includes('text.toLowerCase() === "/roletest"')
@@ -204,21 +293,24 @@ assert.ok(
   "character rehearsal should be available as a visible button and local command to test runtime expression and voice styles without LLM"
 );
 assert.ok(
-  source.includes("function buildCharacterTuningReport()")
+  tuningSource.includes("function buildTuningReport")
+    && source.includes("function buildCharacterTuningReport()")
     && source.includes("function runCharacterTuningAndAppendReport()")
-    && source.includes("function addUniqueCharacterTuningConfigKey")
+    && tuningSource.includes("function addConfigKey")
     && source.includes('text === "/角色调优"')
     && source.includes('text.toLowerCase() === "/tuning"')
     && source.includes("ui.characterTuningBtn")
     && indexSource.includes('id="character-tuning-btn"')
-    && source.includes("角色调优建议")
-    && source.includes("可检查配置项")
-    && source.includes("tts.gpt_sovits_ref_audio_path")
-    && source.includes("motion.speech_motion_strength"),
+    && indexSource.includes('<script src="./characterTuning.js"></script>')
+    && tuningSource.includes("角色调优建议")
+    && tuningSource.includes("可检查配置项")
+    && tuningSource.includes("tts.gpt_sovits_ref_audio_path")
+    && tuningSource.includes("motion.speech_motion_strength"),
   "character tuning should expose readable next-step advice and concrete config keys based on the latest runtime cue"
 );
 assert.ok(
-  source.includes("function recordCharacterPerformanceFeedback")
+  tuningSource.includes("function buildFeedbackMessage")
+    && source.includes("function recordCharacterPerformanceFeedback")
     && source.includes("characterPerformanceLastFeedback")
     && source.includes('text === "/表现不错"')
     && source.includes('text === "/需要调整"')
@@ -226,37 +318,39 @@ assert.ok(
     && source.includes("ui.characterFeedbackBadBtn")
     && indexSource.includes('id="character-feedback-good-btn"')
     && indexSource.includes('id="character-feedback-bad-btn"')
-    && source.includes("最近反馈"),
+    && tuningSource.includes("最近反馈"),
   "character tuning should include lightweight local feedback for the latest runtime performance"
 );
 assert.ok(
-  source.includes("function buildCharacterWorkflowGuide()")
+  tuningSource.includes("function buildWorkflowGuide()")
+    && source.includes("function buildCharacterWorkflowGuide()")
     && source.includes("function appendCharacterWorkflowGuide()")
     && source.includes('text === "/角色流程"')
     && source.includes('text.toLowerCase() === "/roleflow"')
-    && source.includes("角色闭环测试流程"),
+    && tuningSource.includes("角色闭环测试流程"),
   "chat should expose a readable local character workflow guide"
 );
 assert.ok(
   source.includes("function buildChatFailureDoctorHint(err)")
-    && source.includes("更多 → 链路自检")
-    && source.includes("输入 /doctor")
+    && doctorSource.includes("更多 → 链路自检")
+    && doctorSource.includes("输入 /doctor")
     && source.includes("const msg = buildChatFailureDoctorHint(err);"),
   "chat failures should point users to the visible Doctor self-check instead of leaving raw errors alone"
 );
 assert.ok(
   source.includes("function buildAssistantReplyCharacterExpressionCue")
-    && source.includes('reason: "warm_or_playful"')
-    && source.includes('action: "happy_idle"')
-    && source.includes('reason: "question_or_surprise"')
-    && source.includes('action: "think"')
+    && replyCueSource.includes("function buildAssistantReplyCharacterExpressionCue")
+    && replyCueSource.includes('reason: "warm_or_playful"')
+    && replyCueSource.includes('action: "happy_idle"')
+    && replyCueSource.includes('reason: "question_or_surprise"')
+    && replyCueSource.includes('action: "think"')
     && source.includes("expressionReason"),
   "assistant reply cue candidates should map reply mood/style into concrete allowlisted expression metadata"
 );
 assert.ok(
   source.includes("grayAutoFollowupTrialCharacterReplyCueCandidate")
-    && source.includes("noRuntimeCueEmission: true")
-    && source.includes("noLive2DMove: true"),
+    && replyCueSource.includes("noRuntimeCueEmission: true")
+    && replyCueSource.includes("noLive2DMove: true"),
   "reply cue candidate debug API should stay preview-only and safe"
 );
 assert.ok(
@@ -460,7 +554,11 @@ assert.ok(
   "short final replies should use direct TTS if no realtime stream segment has started playback"
 );
 assert.ok(
-  source.includes("function buildTTSDebugReport()"),
+  source.includes("function buildTTSDebugReport()")
+    && source.includes("window.TaffyTTSDebugReport?.buildReport")
+    && ttsDebugSource.includes("function buildReport")
+    && ttsDebugSource.includes("recentEvents=")
+    && indexSource.includes('<script src="./ttsDebugReport.js"></script>'),
   "chat.js should expose a TTS debug report for voice playback diagnosis"
 );
 assert.ok(
