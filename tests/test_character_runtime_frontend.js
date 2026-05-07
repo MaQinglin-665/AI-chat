@@ -13,6 +13,9 @@ const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTunin
 const DOCTOR_DIAGNOSTICS_JS = path.resolve(__dirname, "..", "web", "doctorDiagnostics.js");
 const CHARACTER_REPLY_CUE_JS = path.resolve(__dirname, "..", "web", "characterReplyCue.js");
 const TTS_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "ttsDebugReport.js");
+const TRANSLATE_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "translateDebugReport.js");
+const MEMORY_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "memoryDebugReport.js");
+const TOOL_META_VIEW_JS = path.resolve(__dirname, "..", "web", "toolMetaView.js");
 const GRAY_TRIAL_READINESS_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialReadinessModel.js");
 const GRAY_TRIAL_CHARACTER_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialCharacterModel.js");
 const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialAutoRuntimeSwitchModel.js");
@@ -25,6 +28,9 @@ const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
 const doctorSource = fs.readFileSync(DOCTOR_DIAGNOSTICS_JS, "utf8");
 const replyCueSource = fs.readFileSync(CHARACTER_REPLY_CUE_JS, "utf8");
 const ttsDebugSource = fs.readFileSync(TTS_DEBUG_REPORT_JS, "utf8");
+const translateDebugSource = fs.readFileSync(TRANSLATE_DEBUG_REPORT_JS, "utf8");
+const memoryDebugSource = fs.readFileSync(MEMORY_DEBUG_REPORT_JS, "utf8");
+const toolMetaViewSource = fs.readFileSync(TOOL_META_VIEW_JS, "utf8");
 const grayTrialReadinessModelSource = fs.readFileSync(GRAY_TRIAL_READINESS_MODEL_JS, "utf8");
 const grayTrialCharacterModelSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_MODEL_JS, "utf8");
 const grayTrialAutoRuntimeSwitchModelSource = fs.readFileSync(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS, "utf8");
@@ -35,6 +41,9 @@ const tuning = require(CHARACTER_TUNING_JS);
 const doctorDiagnostics = require(DOCTOR_DIAGNOSTICS_JS);
 const replyCue = require(CHARACTER_REPLY_CUE_JS);
 const ttsDebugReport = require(TTS_DEBUG_REPORT_JS);
+const translateDebugReport = require(TRANSLATE_DEBUG_REPORT_JS);
+const memoryDebugReport = require(MEMORY_DEBUG_REPORT_JS);
+const toolMetaView = require(TOOL_META_VIEW_JS);
 const grayTrialReadinessModel = require(GRAY_TRIAL_READINESS_MODEL_JS);
 const grayTrialCharacterModel = require(GRAY_TRIAL_CHARACTER_MODEL_JS);
 const grayTrialAutoRuntimeSwitchModel = require(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS);
@@ -113,6 +122,54 @@ assert.ok(
     25
   ).includes("recentEvents="),
   "tts debug helper should build a readable event report"
+);
+assert.ok(
+  translateDebugReport.buildReport({
+    timeoutMs: 12000,
+    cacheSize: 1,
+    inFlight: 0,
+    circuitOpen: false,
+    circuitFailures: 0,
+    circuitCooldownMs: 0,
+    lastTraceId: "trace-1",
+    events: [{ seq: 1, stage: "request_ok", atMs: 5, elapsedMs: 20, status: 200 }]
+  }, 50).includes("Translation debug:"),
+  "translation debug helper should build a readable event report"
+);
+assert.ok(
+  memoryDebugReport.buildReport({
+    memory: {
+      enabled: true,
+      memory_count: 2,
+      last_selection: {
+        reason: "explicit",
+        selected: [{ source: "memory", user: "u", assistant: "a" }]
+      }
+    },
+    learning: {
+      degraded_mode: true,
+      diagnostics: {
+        degraded_reason: "low_signal",
+        health_windows: [{ avg_confidence: 0.5, candidate_in_rate: 1, signal_coverage: 0.8 }]
+      }
+    }
+  }).includes("Learning health windows:"),
+  "memory debug helper should build a readable learning health report"
+);
+assert.strictEqual(
+  toolMetaView.getToolCardSummary({
+    ok: true,
+    tool: "run_command",
+    args: { command: "node --check web/chat.js" },
+    exit_code: 0
+  }),
+  "node --check web/chat.js · 退出码 0",
+  "tool meta view helper should build readable command summaries"
+);
+assert.strictEqual(
+  toolMetaView.getToolCardTitle({ tool: "search_text" }),
+  "文本搜索",
+  "tool meta view helper should localize tool card titles"
 );
 assert.ok(
   followupReadinessView.buildBackendEntryCardText({
@@ -757,6 +814,30 @@ assert.ok(
   "chat.js should expose a TTS debug report for voice playback diagnosis"
 );
 assert.ok(
+  source.includes("function buildTranslateDebugReport()")
+    && source.includes("window.TaffyTranslateDebugReport?.buildReport")
+    && translateDebugSource.includes("function buildReport")
+    && translateDebugSource.includes("Translation debug:")
+    && indexSource.includes('<script src="./translateDebugReport.js"></script>'),
+  "chat.js should delegate translation debug report rendering into the extracted helper"
+);
+assert.ok(
+  source.includes("function buildMemoryDebugReport(")
+    && source.includes("window.TaffyMemoryDebugReport?.buildReport")
+    && memoryDebugSource.includes("function buildReport")
+    && memoryDebugSource.includes("Learning health windows:")
+    && indexSource.includes('<script src="./memoryDebugReport.js"></script>'),
+  "chat.js should delegate memory debug report rendering into the extracted helper"
+);
+assert.ok(
+  source.includes("const TOOL_META_VIEW = window.TaffyToolMetaView")
+    && source.includes("TOOL_META_VIEW.renderToolMetaCards")
+    && toolMetaViewSource.includes("function renderToolMetaCards")
+    && toolMetaViewSource.includes("function getToolCardSummary")
+    && indexSource.includes('<script src="./toolMetaView.js"></script>'),
+  "chat.js should delegate tool meta card rendering into the extracted view helper"
+);
+assert.ok(
   source.includes("const FOLLOWUP_READINESS_VIEW = window.TaffyFollowupReadinessView")
     && source.includes("FOLLOWUP_READINESS_VIEW.buildBackendEntryCardText")
     && source.includes("FOLLOWUP_READINESS_VIEW.buildPreviewOneLineText")
@@ -810,18 +891,18 @@ assert.ok(
   "window debug bridge should expose TTS playback state to developer tools"
 );
 assert.ok(
-  source.includes("function buildTranslateDebugReport()")
+  source.includes("window.TaffyTranslateDebugReport?.buildReport")
     && source.includes('text.toLowerCase() === "/translatedebug"'),
   "chat.js should expose /translatedebug for copyable translation timing state"
 );
 assert.ok(
-  source.includes("function buildMemoryDebugReport(")
+  source.includes("window.TaffyMemoryDebugReport?.buildReport")
     && source.includes('text.toLowerCase() === "/memorydebug"')
     && source.includes('learningFetchJson("/api/memory/debug")')
     && source.includes("learningTabDebug")
     && source.includes("learningDebugPanel")
-    && source.includes("learning.degradedReason=")
-    && source.includes("Learning health windows:"),
+    && memoryDebugSource.includes("learning.degradedReason=")
+    && memoryDebugSource.includes("Learning health windows:"),
   "chat.js should expose memory/learning chain debug state"
 );
 assert.ok(

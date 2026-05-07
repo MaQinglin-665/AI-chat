@@ -2500,6 +2500,7 @@ const GRAY_TRIAL_CHARACTER_VIEW = window.TaffyGrayTrialCharacterView || {};
 const GRAY_TRIAL_READINESS_MODEL = window.TaffyGrayTrialReadinessModel || {};
 const GRAY_TRIAL_CHARACTER_MODEL = window.TaffyGrayTrialCharacterModel || {};
 const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL = window.TaffyGrayTrialAutoRuntimeSwitchModel || {};
+const TOOL_META_VIEW = window.TaffyToolMetaView || {};
 const CHARACTER_REHEARSAL_PRESETS = CHARACTER_TUNING.CHARACTER_REHEARSAL_PRESETS || [];
 
 function getNextCharacterRehearsalPreset() {
@@ -7492,47 +7493,9 @@ function getTranslateDebugSnapshot() {
 }
 
 function buildTranslateDebugReport() {
-  const s = getTranslateDebugSnapshot();
-  const lines = [
-    "Translation debug:",
-    `timeoutMs=${s.timeoutMs}`,
-    `cacheSize=${s.cacheSize}`,
-    `inFlight=${s.inFlight}`,
-    `circuitOpen=${s.circuitOpen}`,
-    `circuitFailures=${s.circuitFailures}`,
-    `circuitCooldownMs=${s.circuitCooldownMs}`,
-    `lastTrace=${s.lastTraceId || "(none)"}`,
-    `lastResult=${s.lastResult || "(none)"}`,
-    `lastError=${s.lastError || "(none)"}`,
-    `lastText=${s.lastText || "(none)"}`
-  ];
-  const recent = s.events.slice(-12).map((event) => {
-    const ageMs = Math.round(performance.now() - Number(event.atMs || 0));
-    const bits = [
-      `#${event.seq}`,
-      `${event.stage}`,
-      `ageMs=${ageMs}`,
-      event.traceId ? `trace=${event.traceId}` : "",
-      event.elapsedMs >= 0 ? `elapsedMs=${event.elapsedMs}` : "",
-      event.status ? `status=${event.status}` : "",
-      event.sourceChars ? `sourceChars=${event.sourceChars}` : "",
-      event.translatedChars ? `translatedChars=${event.translatedChars}` : "",
-      event.cache ? `cache=${event.cache}` : "",
-      event.degraded ? "degraded=true" : "",
-      event.fallback ? "fallback=true" : "",
-      event.result ? `result=${event.result}` : "",
-      event.error ? `error=${event.error}` : "",
-      event.text ? `text=${event.text}` : ""
-    ].filter(Boolean);
-    return bits.join(" ");
-  });
-  if (recent.length) {
-    lines.push("recentEvents=");
-    lines.push(...recent);
-  } else {
-    lines.push("recentEvents=none");
-  }
-  return lines.join("\n");
+  return typeof window.TaffyTranslateDebugReport?.buildReport === "function"
+    ? window.TaffyTranslateDebugReport.buildReport(getTranslateDebugSnapshot(), performance.now())
+    : "Translation debug:\nrecentEvents=none";
 }
 
 function ensureTranslateDebugPanel() {
@@ -9470,77 +9433,9 @@ function getLearningFilteredItems() {
 }
 
 function buildMemoryDebugReport(snapshot = learningReviewState.debugSnapshot) {
-  const data = snapshot && typeof snapshot === "object" ? snapshot : {};
-  const memory = data.memory && typeof data.memory === "object" ? data.memory : {};
-  const learning = data.learning && typeof data.learning === "object" ? data.learning : {};
-  const diagnostics = learning.diagnostics && typeof learning.diagnostics === "object" ? learning.diagnostics : {};
-  const last = memory.last_selection && typeof memory.last_selection === "object" ? memory.last_selection : {};
-  const lines = [
-    "Memory/Learning Debug:",
-    `memory.enabled=${memory.enabled === true}`,
-    `memory.mem0=${memory.mem0_enabled === true}`,
-    `memory.count=${Number(memory.memory_count || 0)}`,
-    `last.reason=${String(last.reason || "(none)")}`,
-    `last.message=${String(last.message || "")}`,
-    `last.explicit=${last.explicit_memory_intent === true}`,
-    `last.specific=${last.is_specific_memory_query === true}`,
-    `last.lightweight=${last.is_lightweight_checkin === true}`,
-    `last.candidates=${Number(last.candidate_count || 0)}`,
-    `last.selected=${Array.isArray(last.selected) ? last.selected.length : 0}`,
-    `learning.candidates=${Number(learning.candidates_count || 0)}`,
-    `learning.samples=${Number(learning.samples_count || 0)}`,
-    `learning.degraded=${learning.degraded_mode === true}`,
-    `learning.degradedReason=${String(diagnostics.degraded_reason || "(none)")}`,
-    `learning.turns=${Number(learning.turn_count || 0)}`,
-    `learning.currentWindow=${Number(diagnostics.current_window_size || 0)}`,
-    `learning.currentAvgConfidence=${Number(diagnostics.current_window_avg_confidence || 0)}`,
-    `learning.currentSignalCoverage=${Number(diagnostics.current_window_signal_coverage || 0)}`,
-    `learning.suspectedGarbled=${Number(diagnostics.garbled_count || 0)}`,
-  ];
-  const selected = Array.isArray(last.selected) ? last.selected.slice(0, 5) : [];
-  if (selected.length) {
-    lines.push("Selected memory:");
-    selected.forEach((item, idx) => {
-      lines.push(`${idx + 1}. [${item.source || "selected"}] ${item.user || ""} => ${item.assistant || ""}`);
-    });
-  }
-  const relevant = Array.isArray(last.relevant_candidates) ? last.relevant_candidates.slice(0, 5) : [];
-  if (relevant.length) {
-    lines.push("Relevant candidates:");
-    relevant.forEach((item, idx) => {
-      lines.push(`${idx + 1}. score=${Number(item.score || 0)} ${item.user || ""}`);
-    });
-  }
-  const recentAudit = Array.isArray(learning.recent_audit) ? learning.recent_audit.slice(-3) : [];
-  if (recentAudit.length) {
-    lines.push("Recent learning audit:");
-    recentAudit.forEach((item, idx) => {
-      lines.push(`${idx + 1}. ${item.action || item.event || item.id || "(event)"}`);
-    });
-  }
-  const healthWindows = Array.isArray(diagnostics.health_windows) ? diagnostics.health_windows.slice(-3) : [];
-  if (healthWindows.length) {
-    lines.push("Learning health windows:");
-    healthWindows.forEach((item, idx) => {
-      lines.push(
-        `${idx + 1}. avgConfidence=${Number(item.avg_confidence || 0)} candidateRate=${Number(item.candidate_in_rate || 0)} signalCoverage=${Number(item.signal_coverage || 0)} ended=${String(item.window_ended_at || "")}`
-      );
-    });
-  }
-  const latestEvent = diagnostics.latest_event && typeof diagnostics.latest_event === "object" ? diagnostics.latest_event : {};
-  if (latestEvent.event || latestEvent.reason) {
-    lines.push(
-      `Latest learning event: ${String(latestEvent.event || "(event)")} reason=${String(latestEvent.reason || "(none)")} at=${String(latestEvent.ts || "")}`
-    );
-  }
-  const garbledExamples = Array.isArray(diagnostics.garbled_examples) ? diagnostics.garbled_examples.slice(0, 3) : [];
-  if (garbledExamples.length) {
-    lines.push("Suspected garbled learning examples:");
-    garbledExamples.forEach((item, idx) => {
-      lines.push(`${idx + 1}. ${item.user_preview || item.assistant_preview || item.compressed_pattern || item.id || "(item)"}`);
-    });
-  }
-  return lines.join("\n");
+  return typeof window.TaffyMemoryDebugReport?.buildReport === "function"
+    ? window.TaffyMemoryDebugReport.buildReport(snapshot)
+    : "Memory/Learning Debug:";
 }
 
 function renderLearningDebugPanel() {
@@ -12749,136 +12644,14 @@ function installTranslateDebugBridge() {
   return bridge;
 }
 
-function getToolCardTitle(item) {
-  const tool = String(item?.tool || "").trim();
-  if (tool === "write_file") return "已写入文件";
-  if (tool === "replace_in_file") return "已修改文件";
-  if (tool === "read_file") return "已读取文件";
-  if (tool === "list_files") return "文件列表";
-  if (tool === "search_text") return "文本搜索";
-  if (tool === "run_command") return "命令执行";
-  if (tool === "generate_image") return "图片生成";
-  return tool || "工具结果";
-}
 
-function getToolCardSummary(item) {
-  const tool = String(item?.tool || "").trim();
-  if (!item?.ok) {
-    return String(item?.error || "执行失败").trim() || "执行失败";
-  }
-  if (tool === "write_file") {
-    return `${String(item?.path || "").trim()}${item?.chars_written ? ` · ${item.chars_written} 字符` : ""}`;
-  }
-  if (tool === "replace_in_file") {
-    return `${String(item?.path || "").trim()} · 替换 ${Number(item?.replacements || 0)} 处`;
-  }
-  if (tool === "read_file") {
-    return String(item?.path || "").trim();
-  }
-  if (tool === "list_files") {
-    return `共 ${Number(item?.count || 0)} 项`;
-  }
-  if (tool === "search_text") {
-    return `命中 ${Number(item?.count || 0)} 条`;
-  }
-  if (tool === "run_command") {
-    const cmd = String(item?.args?.command || "").trim();
-    const code = Number(item?.exit_code || 0);
-    return `${cmd || "命令"} · 退出码 ${code}`;
-  }
-  if (tool === "generate_image") {
-    return String(item?.saved_path || item?.image_url || "").trim() || "已生成图片";
-  }
-  return "执行完成";
-}
+
+
+
 
 function renderToolMetaCards(row, meta) {
-  if (!row) {
-    return;
-  }
-  const existing = row.querySelector(".tool-meta");
-  const items = Array.isArray(meta?.items) ? meta.items : [];
-  if (!items.length) {
-    if (existing) {
-      existing.remove();
-    }
-    return;
-  }
-
-  const wrap = existing || document.createElement("div");
-  wrap.className = "tool-meta";
-  wrap.innerHTML = "";
-
-  for (const item of items.slice(0, 4)) {
-    const card = document.createElement("div");
-    card.className = `tool-card ${item?.ok === false ? "is-error" : ""}`;
-
-    const title = document.createElement("div");
-    title.className = "tool-card-title";
-    title.textContent = getToolCardTitle(item);
-
-    const summary = document.createElement("div");
-    summary.className = "tool-card-summary";
-    summary.textContent = getToolCardSummary(item);
-
-    card.appendChild(title);
-    card.appendChild(summary);
-
-    if (item?.ok && String(item?.path || "").trim() && ["read_file", "write_file", "replace_in_file"].includes(String(item?.tool || ""))) {
-      const pathEl = document.createElement("div");
-      pathEl.className = "tool-card-detail";
-      pathEl.textContent = String(item.path || "").trim();
-      card.appendChild(pathEl);
-    }
-
-    if (item?.ok && String(item?.tool || "") === "read_file" && String(item?.content_preview || "").trim()) {
-      const pre = document.createElement("pre");
-      pre.className = "tool-card-pre";
-      pre.textContent = String(item.content_preview || "").trim();
-      card.appendChild(pre);
-    }
-
-    if (item?.ok && String(item?.tool || "") === "search_text" && Array.isArray(item?.results) && item.results.length) {
-      for (const hit of item.results.slice(0, 3)) {
-        const detail = document.createElement("div");
-        detail.className = "tool-card-detail";
-        detail.textContent = `${String(hit?.path || "").trim()}:${Number(hit?.line || 0)} ${String(hit?.text || "").trim()}`;
-        card.appendChild(detail);
-      }
-    }
-
-    if (item?.ok && String(item?.tool || "") === "list_files" && Array.isArray(item?.entries) && item.entries.length) {
-      const detail = document.createElement("div");
-      detail.className = "tool-card-detail";
-      detail.textContent = item.entries.slice(0, 4).map((entry) => String(entry?.path || "").trim()).filter(Boolean).join("  |  ");
-      if (detail.textContent) {
-        card.appendChild(detail);
-      }
-    }
-
-    if (item?.ok && String(item?.tool || "") === "run_command") {
-      const out = String(item?.stdout_preview || item?.stderr_preview || "").trim();
-      if (out) {
-        const pre = document.createElement("pre");
-        pre.className = "tool-card-pre";
-        pre.textContent = out;
-        card.appendChild(pre);
-      }
-    }
-
-    if (item?.ok && String(item?.tool || "") === "generate_image" && String(item?.image_url || "").trim()) {
-      const img = document.createElement("img");
-      img.className = "tool-card-image";
-      img.src = String(item.image_url || "").trim();
-      img.alt = "生成图片";
-      card.appendChild(img);
-    }
-
-    wrap.appendChild(card);
-  }
-
-  if (!existing) {
-    row.appendChild(wrap);
+  if (typeof TOOL_META_VIEW.renderToolMetaCards === "function") {
+    TOOL_META_VIEW.renderToolMetaCards(row, meta, document);
   }
 }
 
