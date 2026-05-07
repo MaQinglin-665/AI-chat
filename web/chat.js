@@ -307,6 +307,13 @@ const state = {
   followupReadinessVisible: false,
   followupReadinessPanel: null,
   followupReadinessCard: null,
+  followupReadinessBackendEntryCard: null,
+  followupReadinessBackendEntrySummary: null,
+  followupReadinessBackendEntryLoading: false,
+  followupReadinessBackendEntryError: "",
+  followupReadinessBackendEntryLastRefreshAt: 0,
+  followupReadinessBackendEntryLastSuccessAt: 0,
+  followupReadinessBackendEntryRefreshPromise: null,
   followupReadinessConfirmationCard: null,
   followupReadinessTrialCard: null,
   followupReadinessTrialChecklistCard: null,
@@ -3049,12 +3056,157 @@ function buildFollowupAwareIdleMotionContext() {
   return { combo: false, idleIntent: "idle", idleMood: "idle" };
 }
 
+function buildFollowupReadinessBackendEntryView() {
+  const summary = state.followupReadinessBackendEntrySummary;
+  const safeSummary = summary && typeof summary === "object" ? summary : {};
+  const blockedReasons = Array.isArray(safeSummary.blocked_reasons)
+    ? safeSummary.blocked_reasons.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  const guardContract = safeSummary.guard_contract && typeof safeSummary.guard_contract === "object"
+    ? safeSummary.guard_contract
+    : {};
+  const requiredChecks = Array.isArray(guardContract.required_checks)
+    ? guardContract.required_checks.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  const disallowedActions = Array.isArray(guardContract.disallowed_actions)
+    ? guardContract.disallowed_actions.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  const rollbackSteps = Array.isArray(guardContract.rollback)
+    ? guardContract.rollback.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  const executionPreview = safeSummary.entry_execution_preview && typeof safeSummary.entry_execution_preview === "object"
+    ? safeSummary.entry_execution_preview
+    : {};
+  const previewBlockedReasons = Array.isArray(executionPreview.blocked_reasons)
+    ? executionPreview.blocked_reasons.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  return {
+    loaded: summary && typeof summary === "object",
+    loading: state.followupReadinessBackendEntryLoading === true,
+    error: String(state.followupReadinessBackendEntryError || ""),
+    readOnly: safeSummary.read_only === true,
+    skeletonOnly: safeSummary.skeleton_only === true,
+    defaultOffBaseline: safeSummary.default_off_baseline === true,
+    configuredEnabled: safeSummary.configured_enabled === true,
+    configuredReturnMetadata: safeSummary.configured_return_metadata === true,
+    configuredDemoStable: safeSummary.configured_demo_stable === true,
+    configuredPersonaOverrideEnabled: safeSummary.configured_persona_override_enabled === true,
+    explicitEnableRequired: safeSummary.explicit_enable_required === true,
+    automaticRuntimeConnected: safeSummary.automatic_runtime_connected === true,
+    schedulerDefaultChanged: safeSummary.scheduler_default_changed === true,
+    configWriteEnabled: safeSummary.config_write_enabled === true,
+    runtimeCueEnabled: safeSummary.runtime_cue_enabled === true,
+    live2dEnabled: safeSummary.live2d_enabled === true,
+    ttsEnabled: safeSummary.tts_enabled === true,
+    entryReady: safeSummary.entry_ready === true,
+    blockedReasons,
+    guardContractReadOnly: guardContract.read_only === true,
+    guardContractFailClosed: guardContract.fail_closed === true,
+    guardContractRequiredChecks: requiredChecks,
+    guardContractDisallowedActions: disallowedActions,
+    guardContractRollbackSteps: rollbackSteps,
+    guardContractOperatorConfirmation: String(guardContract.operator_confirmation || ""),
+    previewReadOnly: executionPreview.read_only === true,
+    previewDryRun: executionPreview.dry_run === true,
+    previewAccepted: executionPreview.accepted === true,
+    previewWouldExecute: executionPreview.would_execute === true,
+    previewRequestType: String(executionPreview.request_type || ""),
+    previewRequestedAction: String(executionPreview.requested_action || ""),
+    previewBlockedReasons,
+    nextAction: String(safeSummary.next_action || ""),
+    lastRefreshAt: Number(state.followupReadinessBackendEntryLastRefreshAt || 0),
+    lastSuccessAt: Number(state.followupReadinessBackendEntryLastSuccessAt || 0)
+  };
+}
+
+function buildFollowupReadinessBackendEntryCardText() {
+  const view = buildFollowupReadinessBackendEntryView();
+  const statusText = view.loading
+    ? "加载中"
+    : view.loaded
+      ? "已获取"
+      : "未获取";
+  const loadedText = view.loaded ? "是" : "否";
+  const errorText = view.error ? `\n获取错误：${view.error}` : "";
+  return [
+    "后端入口摘要（只读）",
+    `状态：${statusText}  读取方式：authFetch(\"/api/character_runtime/backend_entry\")`,
+    `已拉取：${loadedText}  只读：${view.loaded ? "是" : "未确认"}  骨架：${view.skeletonOnly ? "是" : "未确认"}`,
+    `默认关闭：${view.loaded ? (view.defaultOffBaseline ? "是" : "否") : "未确认"}  显式启用要求：${view.loaded ? (view.explicitEnableRequired ? "是" : "否") : "未确认"}`,
+    `自动 runtime 连接：${view.loaded ? (view.automaticRuntimeConnected ? "是" : "否") : "未确认"}  scheduler 默认行为：${view.loaded ? (view.schedulerDefaultChanged ? "已改" : "未改") : "未确认"}`,
+    `config 写入：${view.loaded ? (view.configWriteEnabled ? "是" : "否") : "未确认"}  runtime cue：${view.loaded ? (view.runtimeCueEnabled ? "是" : "否") : "未确认"}  Live2D：${view.loaded ? (view.live2dEnabled ? "是" : "否") : "未确认"}  TTS：${view.loaded ? (view.ttsEnabled ? "是" : "否") : "未确认"}`,
+    `配置快照：enabled=${view.loaded ? (view.configuredEnabled ? "是" : "否") : "n/a"}  return_metadata=${view.loaded ? (view.configuredReturnMetadata ? "是" : "否") : "n/a"}  demo_stable=${view.loaded ? (view.configuredDemoStable ? "是" : "否") : "n/a"}  persona_override=${view.loaded ? (view.configuredPersonaOverrideEnabled ? "是" : "否") : "n/a"}`,
+    `可用性：${view.loaded ? (view.entryReady ? "就绪" : "未就绪") : (view.loading ? "加载中" : "未获取")}  阻塞原因：${view.loaded ? joinReadinessReasons(view.blockedReasons) : "n/a"}`,
+    `守卫合约：${view.loaded ? (view.guardContractReadOnly ? "只读" : "非只读") : "未确认"} / ${view.loaded ? (view.guardContractFailClosed ? "fail-closed" : "未确认 fail-closed") : "未确认"}  required=${view.loaded ? view.guardContractRequiredChecks.length : 0}  disallowed=${view.loaded ? view.guardContractDisallowedActions.length : 0}`,
+    `守卫确认：${view.loaded ? (view.guardContractOperatorConfirmation || "n/a") : "n/a"}  回退=${view.loaded ? joinReadinessReasons(view.guardContractRollbackSteps) : "n/a"}`,
+    `执行预检：${view.loaded ? (view.previewDryRun ? "dry-run" : "n/a") : "未确认"}  accepted=${view.loaded ? (view.previewAccepted ? "是" : "否") : "n/a"}  would_execute=${view.loaded ? (view.previewWouldExecute ? "是" : "否") : "n/a"}  action=${view.loaded ? (view.previewRequestedAction || "n/a") : "n/a"}`,
+    `预检阻塞：${view.loaded ? joinReadinessReasons(view.previewBlockedReasons) : "n/a"}`,
+    `下一步：${view.loaded ? (view.nextAction || "n/a") : "先只读拉取 backend_entry 摘要，不改变任何状态"}`,
+    `刷新：${view.lastRefreshAt > 0 ? "已尝试" : "未尝试"}  成功：${view.lastSuccessAt > 0 ? "已成功" : "未成功"}${errorText}`
+  ].join("\n");
+}
+
+async function refreshFollowupReadinessBackendEntrySummary(force = false) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const existingPromise = state.followupReadinessBackendEntryRefreshPromise;
+  if (!force && existingPromise) {
+    return existingPromise;
+  }
+  const now = Date.now();
+  const lastRefreshAt = Number(state.followupReadinessBackendEntryLastRefreshAt || 0);
+  if (!force && lastRefreshAt > 0 && now - lastRefreshAt < 30000) {
+    return state.followupReadinessBackendEntrySummary;
+  }
+  state.followupReadinessBackendEntryLoading = true;
+  state.followupReadinessBackendEntryError = "";
+  state.followupReadinessBackendEntryLastRefreshAt = now;
+  const promise = (async () => {
+    try {
+      const resp = await authFetch("/api/character_runtime/backend_entry", { cache: "no-store" });
+      const payload = await resp.json().catch(() => ({}));
+      if (!resp.ok || !payload || payload.ok === false) {
+        const message = String(payload?.error || payload?.message || `HTTP ${resp.status}`);
+        throw new Error(message);
+      }
+      state.followupReadinessBackendEntrySummary = payload && typeof payload.character_runtime_backend_entry === "object"
+        ? payload.character_runtime_backend_entry
+        : null;
+      state.followupReadinessBackendEntryError = "";
+      state.followupReadinessBackendEntryLastSuccessAt = Date.now();
+      return state.followupReadinessBackendEntrySummary;
+    } catch (error) {
+      state.followupReadinessBackendEntrySummary = null;
+      state.followupReadinessBackendEntryError = String(error?.message || error || "failed to load /api/character_runtime/backend_entry");
+      return null;
+    } finally {
+      state.followupReadinessBackendEntryLoading = false;
+      state.followupReadinessBackendEntryRefreshPromise = null;
+      if (state.followupReadinessVisible) {
+        updateFollowupReadinessPanel();
+      }
+    }
+  })();
+  state.followupReadinessBackendEntryRefreshPromise = promise;
+  return promise;
+}
+
+function updateFollowupReadinessBackendEntryCard() {
+  if (!state.followupReadinessBackendEntryCard) {
+    return;
+  }
+  state.followupReadinessBackendEntryCard.textContent = buildFollowupReadinessBackendEntryCardText();
+  void refreshFollowupReadinessBackendEntrySummary();
+}
+
 function buildFollowupReadinessReport() {
   const snapshot = getTTSDebugSnapshot();
   const mode = snapshot.conversationMode || {};
   const followup = snapshot.followup || {};
   const silence = snapshot.silence || {};
   const scheduler = snapshot.proactiveScheduler || {};
+  const backendEntry = buildFollowupReadinessBackendEntryView();
   const characterState = buildFollowupCharacterState(followup, silence, scheduler);
   const grayReadiness = buildGrayAutoFollowupReadinessStatus(snapshot);
   const grayDryRun = buildGrayAutoFollowupDryRunStatus(snapshot);
@@ -3084,6 +3236,8 @@ function buildFollowupReadinessReport() {
     automaticGatesReady
       ? "\u4e94\u5c42\u81ea\u52a8\u8f6e\u8be2\u5f00\u5173\u90fd\u5df2\u5f00\u542f\uff0c\u4f46\u4ecd\u4f1a\u7ee7\u7eed\u53d7\u5b89\u9759\u7a97\u53e3\u3001\u51b7\u5374\u3001\u6b21\u6570\u4e0a\u9650\u548c\u7b56\u7565\u4fdd\u62a4\u3002"
       : "\u5f53\u524d\u4ecd\u6709\u81ea\u52a8\u8f6e\u8be2\u5f00\u5173\u672a\u5f00\u542f\uff0c\u6240\u4ee5\u4e0d\u4f1a\u81ea\u52a8\u7eed\u8bdd\u3002",
+    `\u540e\u7aef\u5165\u53e3\uff1a${backendEntry.loading ? "\u52a0\u8f7d\u4e2d" : backendEntry.loaded ? (backendEntry.entryReady === true ? "\u5df2\u63a5\u5165" : "\u9aa8\u67b6\u672a\u5c31\u7eea") : "\u672a\u83b7\u53d6"}  \u53ea\u8bfb\uff1a${backendEntry.loaded ? formatReadinessBool(backendEntry.readOnly) : "\u672a\u786e\u8ba4"}  \u9ed8\u8ba4\u5173\u95ed\uff1a${backendEntry.loaded ? formatReadinessBool(backendEntry.defaultOffBaseline) : "\u672a\u786e\u8ba4"}`,
+    `\u540e\u7aef\u963b\u585e\uff1a${backendEntry.loaded ? joinReadinessReasons(backendEntry.blockedReasons) : "n/a"}  \u7ed3\u8bba\uff1a${backendEntry.loaded ? (backendEntry.nextAction || "n/a") : "\u5148\u53ea\u8bfb\u62c9\u53d6 /api/character_runtime/backend_entry \u6458\u8981"} `,
     "",
     "\u5f53\u524d\u5f00\u5173",
     `\u4f1a\u8bdd\u6a21\u5f0f\uff1a${formatReadinessBool(mode.enabled)}`,
@@ -6545,6 +6699,34 @@ function createFollowupReadinessActionGroup(labelText, buttons = []) {
   return group;
 }
 
+function createFollowupReadinessCollapsibleActionGroup(labelText, buttons = [], open = false) {
+  const details = document.createElement("details");
+  details.open = open === true;
+  details.style.cssText = [
+    "padding:6px 8px",
+    "border:1px solid rgba(93,128,195,.16)",
+    "border-radius:12px",
+    "background:rgba(255,255,255,.34)"
+  ].join(";");
+  const summary = document.createElement("summary");
+  summary.textContent = labelText;
+  summary.style.cssText = [
+    "cursor:pointer",
+    "font:700 11px/1.2 system-ui,sans-serif",
+    "color:#54688f",
+    "list-style-position:inside"
+  ].join(";");
+  const body = createFollowupReadinessActionGroup("", buttons);
+  body.style.marginTop = "6px";
+  const label = body.querySelector("span");
+  if (label) {
+    label.remove();
+  }
+  details.appendChild(summary);
+  details.appendChild(body);
+  return details;
+}
+
 function ensureFollowupReadinessPanel() {
   if (state.followupReadinessPanel || typeof document === "undefined") {
     return state.followupReadinessPanel;
@@ -6903,7 +7085,13 @@ function ensureFollowupReadinessPanel() {
     trialArm,
     trialStop,
     trialDisarm,
-    trialReset,
+    trialReset
+  ]);
+  const recoveryActions = createFollowupReadinessActionGroup("\u6536\u53e3", [
+    trialDisableCharacterSwitch,
+    trialRollbackCharacterSwitch
+  ]);
+  const materialActions = createFollowupReadinessCollapsibleActionGroup("\u6750\u6599", [
     trialCopyAudit,
     trialCopyTimeline,
     trialCopyDecision,
@@ -6923,11 +7111,19 @@ function ensureFollowupReadinessPanel() {
     trialCopyCharacterSwitchRollback,
     trialCopyCharacterFinalPreflight,
     trialCopyCharacterImplementationDraft,
+    copySelected,
+    copySummary,
+    copyBundle,
+    copyJson,
+    copyOneLine,
+    copy,
+    copyTemplate
+  ]);
+  const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup("\u9ad8\u98ce\u9669\u672c\u5730\u5165\u53e3", [
     trialEnableCharacterSwitch,
-    trialDisableCharacterSwitch,
-    trialRollbackCharacterSwitch,
     trialEmitCharacter
   ]);
+  advancedLocalActions.title = "\u9ed8\u8ba4\u6536\u8d77\uff1b\u4ec5\u7528\u4e8e\u672c\u5730\u4e13\u9879\u8bd5\u9a8c\uff0c\u4e0d\u8fde\u63a5 automatic runtime";
   const manualStatus = document.createElement("div");
   manualStatus.style.cssText = [
     "margin:0 0 10px",
@@ -6961,16 +7157,10 @@ function ensureFollowupReadinessPanel() {
   head.appendChild(close);
   actionBar.appendChild(manualActions);
   actionBar.appendChild(trialActions);
+  actionBar.appendChild(recoveryActions);
   actionBar.appendChild(createFollowupReadinessActionGroup("\u9884\u6f14", rehearsalButtons.concat(clearRehearsal)));
-  actionBar.appendChild(createFollowupReadinessActionGroup("\u590d\u5236", [
-    copySelected,
-    copySummary,
-    copyBundle,
-    copyJson,
-    copyOneLine,
-    copy,
-    copyTemplate
-  ]));
+  actionBar.appendChild(materialActions);
+  actionBar.appendChild(advancedLocalActions);
   const card = document.createElement("pre");
   card.style.cssText = [
     "margin:0 0 10px",
@@ -7225,6 +7415,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#24425e"
   ].join(";");
+  const backendEntryCard = document.createElement("pre");
+  backendEntryCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(87,124,165,.22)",
+    "border-radius:14px",
+    "background:rgba(242,247,255,.8)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#23405f"
+  ].join(";");
   const body = document.createElement("pre");
   body.style.cssText = "margin:0;white-space:pre-wrap;";
   const compare = document.createElement("div");
@@ -7264,6 +7465,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(characterSwitchRollbackCard);
   panel.appendChild(characterSwitchFinalPreflightCard);
   panel.appendChild(characterImplementationDraftCard);
+  panel.appendChild(backendEntryCard);
   panel.appendChild(compare);
   panel.appendChild(body);
   document.body.appendChild(panel);
@@ -7291,6 +7493,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCharacterSwitchRollbackCard = characterSwitchRollbackCard;
   state.followupReadinessTrialCharacterSwitchFinalPreflightCard = characterSwitchFinalPreflightCard;
   state.followupReadinessTrialCharacterImplementationDraftCard = characterImplementationDraftCard;
+  state.followupReadinessBackendEntryCard = backendEntryCard;
   state.followupReadinessCompare = compare;
   state.followupReadinessBody = body;
   state.followupReadinessManualActions = manualActions;
@@ -7374,6 +7577,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialCharacterSwitchRollbackCard();
       updateGrayAutoTrialCharacterSwitchFinalPreflightCard();
       updateGrayAutoTrialCharacterImplementationDraftCard();
+      updateFollowupReadinessBackendEntryCard();
       updateGrayAutoTrialControlPanel();
       updateFollowupManualConfirmationControls();
       updateFollowupReadinessScenarioCompare();
@@ -7406,6 +7610,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialCharacterSwitchRollbackCard();
   updateGrayAutoTrialCharacterSwitchFinalPreflightCard();
   updateGrayAutoTrialCharacterImplementationDraftCard();
+  updateFollowupReadinessBackendEntryCard();
   updateGrayAutoTrialControlPanel();
   updateFollowupManualConfirmationControls();
   updateFollowupReadinessScenarioCompare();

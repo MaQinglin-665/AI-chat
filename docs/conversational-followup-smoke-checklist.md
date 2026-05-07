@@ -1541,14 +1541,12 @@ Purpose: confirm local testers can manually emit the current character cue previ
 Manual checks:
 
 1. Open the follow-up readiness panel.
-2. Confirm a `试发角色cue` button is visible.
-3. Click `试发角色cue`, cancel or enter a wrong phrase, and confirm no character runtime update is emitted.
-4. Click `试发角色cue`, enter `EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE`, and confirm one character runtime metadata update is emitted.
-5. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterCueManualEmitStatus()` and confirm `count` increased.
-6. Run `window.__AI_CHAT_DEBUG_TTS__.emitGrayAutoFollowupTrialCharacterCue({ confirm: "bad" })` and confirm it returns `confirmation_required`.
-7. Run `window.__AI_CHAT_DEBUG_TTS__.emitGrayAutoFollowupTrialCharacterCue({ confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE" })` only during a watched local test and confirm it returns `ok=true`.
-8. Confirm successful emits record `conversation_followup_gray_auto_trial_character_cue_manual_emit`.
-9. Confirm the manual emit gate does not request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+2. Confirm no `试发角色cue` button is visible in the default readiness panel.
+3. Confirm the default panel still says runtime cue / Live2D / TTS are not connected for the backend-entry skeleton.
+4. Run `window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialCharacterCueManualEmitStatus()` and confirm `count` does not increase from opening the panel.
+5. Run `window.__AI_CHAT_DEBUG_TTS__.emitGrayAutoFollowupTrialCharacterCue({ confirm: "bad" })` and confirm it returns `confirmation_required`.
+6. Do not run the successful emit command during Task 150-153 skeleton validation. Save `window.__AI_CHAT_DEBUG_TTS__.emitGrayAutoFollowupTrialCharacterCue({ confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE" })` for a later explicit role-expression test.
+7. Confirm the skeleton validation path does not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
 
 ## 85. Gray Automatic Follow-up Trial Character Cue Manual Emit Recap v1
 
@@ -1731,3 +1729,103 @@ Manual checks:
 5. Confirm `implementationModules` includes `web/chat.js`, `app.py`, `character_runtime.py`, `config.py`, and `config.example.json`.
 6. Click `复制草案`, paste into a scratch note, and confirm it includes module touch points, safety boundaries, verification checklist, and next action.
 7. Confirm draft rendering and copy do not emit runtime cues, move Live2D, request model output, play TTS, fetch, arm, disarm, stop, reset, start polling, execute follow-up, mutate pending state, write config, observe desktop, capture screenshots, call tools, execute shell, access files, call backend APIs, or add dependencies.
+
+## 98. Gray Automatic Follow-up Trial Character Auto Runtime Validation and Rollback v1
+
+Purpose: confirm the skeleton-era validation and rollback path are documented clearly enough for handoff and regression checks.
+
+Manual checks:
+
+1. Open the follow-up readiness panel.
+2. Confirm the new backend-entry card is visible and reads as read-only.
+3. Confirm the card says the backend entry is still skeleton-only, default-off, and not connected to automatic runtime.
+4. Confirm the card does not add an enable button, scheduler control, runtime cue action, Live2D control, or TTS control.
+5. Confirm `GET /api/character_runtime/backend_entry` remains the guarded read-only backend-entry summary used by the card.
+6. Confirm the default action area stays compact: safety controls remain visible, copy/report material is collapsed under `材料`, and high-risk local-only entries are collapsed by default.
+7. Confirm `node --check web/chat.js`, `python -m pytest tests/test_api_health.py -q`, and `git diff --check` are the expected verification commands for the current skeleton stage.
+8. Confirm rollback remains simple: hide the panel if needed, keep automatic runtime disconnected, keep scheduler defaults unchanged, and keep config writes disabled.
+9. Confirm this task does not ask for new config writes, default-on behavior, desktop observation, screenshots, tool calls, shell execution, file access, backend API side effects, or runtime cue emission.
+
+## 99. Follow-up Character Auto Runtime Backend Guard Contract v1
+
+Purpose: confirm the backend-entry skeleton exposes a reviewable guard contract before any automatic character runtime is wired.
+
+Manual checks:
+
+1. Request `GET /api/character_runtime/backend_entry` with a valid local API token.
+2. Confirm `character_runtime_backend_entry.guard_contract.read_only=true` and `fail_closed=true`.
+3. Confirm `required_checks` includes explicit enablement, backend-entry wiring, automatic runtime connection, scheduler opt-in/default isolation, config-write disablement, and later-task gates for runtime cue / Live2D / TTS.
+4. Confirm `disallowed_actions` includes config writes, scheduler default changes, automatic runtime connection, runtime cue emission, Live2D movement, TTS playback, polling start, and follow-up execution.
+5. Open the follow-up readiness panel and confirm the backend-entry card summarizes the guard contract as read-only/fail-closed without adding new action buttons.
+6. Confirm `entry_ready=false`, `automatic_runtime_connected=false`, `scheduler_default_changed=false`, `runtime_cue_enabled=false`, `live2d_enabled=false`, and `tts_enabled=false`.
+7. Confirm this task does not write config, enable runtime, change scheduler defaults, emit runtime cues, move Live2D, play TTS, start polling, execute follow-up, observe desktop, capture screenshots, read files, execute shell, call tools, or add dependencies.
+
+## 100. Follow-up Character Auto Runtime Backend Guard Evaluator v1
+
+Purpose: confirm the backend-entry guard contract is reusable from `character_runtime.py` without wiring automatic runtime execution.
+
+Manual checks:
+
+1. Run `python -m pytest tests/test_character_runtime.py tests/test_api_health.py -q`.
+2. Confirm `build_backend_entry_guard_contract()` returns `read_only=true` and `fail_closed=true`.
+3. Confirm `evaluate_backend_entry_guard()` returns `entry_ready=false` for the current skeleton state.
+4. Confirm `/api/character_runtime/backend_entry` still includes the same read-only guard contract and blocked reasons.
+5. Confirm the endpoint still reports `automatic_runtime_connected=false`, `scheduler_default_changed=false`, `config_write_enabled=false`, `runtime_cue_enabled=false`, `live2d_enabled=false`, and `tts_enabled=false`.
+6. Confirm no new action button appears in the readiness panel.
+7. Confirm this task does not write config, enable runtime, change scheduler defaults, emit runtime cues, move Live2D, play TTS, start polling, execute follow-up, observe desktop, capture screenshots, read files, execute shell, call tools, or add dependencies.
+
+## 101. Follow-up Character Auto Runtime Entry Preview Rejection v1
+
+Purpose: confirm the backend-entry path can preview a future request as a fail-closed rejection before any real runtime execution is wired.
+
+Manual checks:
+
+1. Run `python -m pytest tests/test_character_runtime.py tests/test_api_health.py -q`.
+2. Confirm `preview_backend_entry_request()` returns `read_only=true`, `dry_run=true`, `accepted=false`, and `would_execute=false`.
+3. Request `GET /api/character_runtime/backend_entry` with a valid local API token.
+4. Confirm `character_runtime_backend_entry.entry_execution_preview.accepted=false` and `would_execute=false`.
+5. Open the follow-up readiness panel and confirm the backend-entry card shows the execution preview as dry-run/rejected.
+6. Confirm no POST route, enable button, scheduler control, runtime cue action, Live2D control, or TTS control is added.
+7. Confirm this task does not write config, enable runtime, change scheduler defaults, emit runtime cues, move Live2D, play TTS, start polling, execute follow-up, observe desktop, capture screenshots, read files, execute shell, call tools, or add dependencies.
+
+## 102. Follow-up Character Auto Runtime Preview POST Dry-run Route v1
+
+Purpose: confirm a future backend-entry request can be rehearsed through a token-protected POST route without creating a runtime execution path.
+
+Manual checks:
+
+1. Run `python -m pytest tests/test_character_runtime.py tests/test_api_health.py -q`.
+2. Request `POST /api/character_runtime/backend_entry/preview` with a valid local API token and a small JSON body such as `{"type":"automatic_character_runtime","action":"emit_runtime_cue"}`.
+3. Confirm `character_runtime_backend_entry_preview.read_only=true`, `dry_run=true`, `accepted=false`, and `would_execute=false`.
+4. Confirm `requested_action` is shown for review only and no runtime cue is emitted.
+5. Confirm the same route rejects missing or invalid API tokens.
+6. Confirm invalid JSON returns HTTP 400.
+7. Confirm this task does not write config, enable runtime, change scheduler defaults, emit runtime cues, move Live2D, play TTS, start polling, execute follow-up, observe desktop, capture screenshots, read files, execute shell, call tools, or add dependencies.
+
+## 103. Follow-up Character Auto Runtime Preview Request Schema Allowlist v1
+
+Purpose: confirm the backend-entry preview route accepts only a narrow review schema before any automatic runtime adapter is connected.
+
+Manual checks:
+
+1. Run `python -m pytest tests/test_character_runtime.py tests/test_api_health.py -q`.
+2. Request `POST /api/character_runtime/backend_entry/preview` with a valid local API token and a body containing only `type` and `action`.
+3. Confirm `request_schema.allowed_fields` is exactly `["type","action"]`.
+4. Request the same route with unknown fields such as `path`, `shell`, or `tool_call`.
+5. Confirm unknown fields are listed in `ignored_fields`, unsupported values are listed in `validation_errors`, and the preview still reports `accepted=false` and `would_execute=false`.
+6. Confirm ignored fields are not echoed as executable payload, scheduler input, runtime cue input, Live2D input, TTS input, file input, shell input, or tool input.
+7. Confirm this task does not write config, enable runtime, change scheduler defaults, emit runtime cues, move Live2D, play TTS, start polling, execute follow-up, observe desktop, capture screenshots, read files, execute shell, call tools, or add dependencies.
+
+## 104. Follow-up Character Auto Runtime No-op Adapter Skeleton v1
+
+Purpose: confirm the backend has an explicit no-op adapter boundary before any automatic character runtime dispatch exists.
+
+Manual checks:
+
+1. Run `python -m pytest tests/test_character_runtime.py tests/test_api_health.py -q`.
+2. Request `GET /api/character_runtime/backend_entry` with a valid local API token.
+3. Confirm `entry_adapter_preview.noop=true`, `adapter_ready=false`, `executed=false`, `dispatched=false`, and `dispatch_target="none"`.
+4. Request `POST /api/character_runtime/backend_entry/preview` with a valid local API token.
+5. Confirm `character_runtime_backend_entry_adapter_preview` repeats the no-op adapter status and includes all side-effect flags as false.
+6. Confirm the adapter preview consumes the request preview but does not dispatch runtime cue, Live2D, TTS, scheduler, follow-up, desktop observation, screenshot, file, shell, or tool paths.
+7. Confirm this task does not write config, enable runtime, change scheduler defaults, emit runtime cues, move Live2D, play TTS, start polling, execute follow-up, observe desktop, capture screenshots, read files, execute shell, call tools, or add dependencies.

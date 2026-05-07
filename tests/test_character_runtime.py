@@ -1,4 +1,13 @@
-from character_runtime import CharacterRuntime, emotion_to_live2d_hint, normalize_runtime_payload
+from character_runtime import (
+    CharacterRuntime,
+    build_backend_entry_guard_contract,
+    build_backend_entry_preview_request_schema,
+    emotion_to_live2d_hint,
+    evaluate_backend_entry_guard,
+    normalize_runtime_payload,
+    preview_backend_entry_noop_adapter,
+    preview_backend_entry_request,
+)
 
 
 def test_runtime_initial_snapshot():
@@ -10,6 +19,125 @@ def test_runtime_initial_snapshot():
     assert snap["low_interruption"] is True
     assert snap["proactive_enabled"] is False
     assert snap["proactive_block_reason"] == "proactive_disabled"
+
+
+def test_backend_entry_guard_contract_is_read_only_and_fail_closed():
+    contract = build_backend_entry_guard_contract()
+    assert contract["read_only"] is True
+    assert contract["fail_closed"] is True
+    assert "explicit_enable_flag" in contract["required_checks"]
+    assert "emit_runtime_cue" in contract["disallowed_actions"]
+    assert "move_live2d" in contract["disallowed_actions"]
+    assert "play_tts" in contract["disallowed_actions"]
+    assert contract["operator_confirmation"] == "required_in_later_implementation_task"
+
+
+def test_backend_entry_preview_schema_is_narrow_and_read_only():
+    schema = build_backend_entry_preview_request_schema()
+    assert schema["read_only"] is True
+    assert schema["fail_closed"] is True
+    assert schema["allowed_fields"] == ["type", "action"]
+    assert schema["allowed_types"] == ["automatic_character_runtime"]
+    assert schema["allowed_actions"] == ["none", "emit_runtime_cue"]
+    assert schema["unknown_fields"] == "ignored_and_reported"
+
+
+def test_backend_entry_guard_evaluator_keeps_skeleton_not_ready():
+    guard = evaluate_backend_entry_guard(configured_enabled=True)
+    assert guard["read_only"] is True
+    assert guard["fail_closed"] is True
+    assert guard["entry_ready"] is False
+    assert guard["blocked_reasons"] == [
+        "backend_entry_not_wired",
+        "automatic_runtime_disconnected",
+        "scheduler_default_unchanged",
+        "config_write_disabled",
+        "runtime_cue_disabled",
+    ]
+    assert guard["runtime_states"] == {
+        "configured_enabled": True,
+        "backend_entry_wired": False,
+        "automatic_runtime_connected": False,
+        "scheduler_default_changed": False,
+        "config_write_enabled": False,
+        "runtime_cue_enabled": False,
+        "live2d_enabled": False,
+        "tts_enabled": False,
+    }
+
+
+def test_backend_entry_request_preview_never_executes_in_skeleton():
+    guard = evaluate_backend_entry_guard(configured_enabled=True)
+    preview = preview_backend_entry_request(
+        {"type": "automatic_character_runtime", "action": "emit_runtime_cue"},
+        guard=guard,
+    )
+    assert preview["read_only"] is True
+    assert preview["dry_run"] is True
+    assert preview["accepted"] is False
+    assert preview["would_execute"] is False
+    assert preview["request_schema"]["allowed_fields"] == ["type", "action"]
+    assert preview["request_type"] == "automatic_character_runtime"
+    assert preview["requested_action"] == "emit_runtime_cue"
+    assert preview["ignored_fields"] == []
+    assert preview["validation_errors"] == []
+    assert preview["guard_entry_ready"] is False
+    assert "backend_entry_not_wired" in preview["blocked_reasons"]
+    assert "runtime_cue_disabled" in preview["blocked_reasons"]
+
+
+def test_backend_entry_request_preview_ignores_unknown_fields():
+    preview = preview_backend_entry_request(
+        {
+            "type": "desktop_observation",
+            "action": "read_files",
+            "path": "C:/Users",
+            "tool_call": {"name": "shell"},
+        },
+    )
+    assert preview["accepted"] is False
+    assert preview["would_execute"] is False
+    assert preview["request_type"] == "desktop_observation"
+    assert preview["requested_action"] == "read_files"
+    assert preview["ignored_fields"] == ["path", "tool_call"]
+    assert preview["validation_errors"] == [
+        "unsupported_request_type",
+        "unsupported_requested_action",
+        "ignored_unknown_fields",
+    ]
+
+
+def test_backend_entry_noop_adapter_never_dispatches():
+    guard = evaluate_backend_entry_guard(configured_enabled=True)
+    adapter = preview_backend_entry_noop_adapter(
+        {"type": "automatic_character_runtime", "action": "emit_runtime_cue"},
+        guard=guard,
+    )
+    assert adapter["read_only"] is True
+    assert adapter["noop"] is True
+    assert adapter["adapter_ready"] is False
+    assert adapter["default_off"] is True
+    assert adapter["accepted"] is False
+    assert adapter["would_execute"] is False
+    assert adapter["executed"] is False
+    assert adapter["dispatched"] is False
+    assert adapter["dispatch_target"] == "none"
+    assert adapter["request_preview"]["requested_action"] == "emit_runtime_cue"
+    assert adapter["side_effects"] == {
+        "config_written": False,
+        "automatic_runtime_connected": False,
+        "scheduler_default_changed": False,
+        "runtime_cue_emitted": False,
+        "live2d_moved": False,
+        "tts_played": False,
+        "polling_started": False,
+        "followup_executed": False,
+        "desktop_observed": False,
+        "screenshot_captured": False,
+        "files_read": False,
+        "shell_executed": False,
+        "tools_called": False,
+    }
 
 
 def test_normalize_payload_with_plain_text():

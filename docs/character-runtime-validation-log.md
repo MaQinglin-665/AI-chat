@@ -1461,3 +1461,198 @@ This task records runtime confirmation only. No code, config, scheduler behavior
 screenshot capture path, tool call path, shell execution path, file read path, TTS path, fetch path,
 or LLM path was changed.
 ```
+
+---
+
+# Follow-up Character Auto Runtime Validation and Rollback - 2026-05-06 (Task 153)
+
+Task 153 closes the handoff by documenting the skeleton-era validation and rollback posture.
+
+Validation focus:
+
+1. `node --check web/chat.js`
+2. `python -m pytest tests/test_api_health.py -q`
+3. `git diff --check`
+4. Open the follow-up readiness panel and confirm the new backend-entry card stays read-only.
+5. Confirm `/api/character_runtime/backend_entry` remains a guarded read-only backend-entry summary and that the entry stays disconnected/default-off.
+6. Confirm the panel action area stays compact: visible controls are safety/rehearsal oriented, copy material is collapsed, and no default-visible button emits runtime cues.
+
+Rollback focus:
+
+1. Close the follow-up readiness panel if needed.
+2. Keep `character_runtime_backend_entry` as a guarded skeleton only.
+3. If the frontend card becomes noisy or confusing, collapse or remove only the panel linkage first and leave the backend summary unchanged.
+4. If any runtime-cue, Live2D, or TTS action appears in the default-visible panel controls, hide that control and keep the backend skeleton unchanged.
+5. If broader issues appear, return to the known baseline by keeping the automatic runtime disconnected, scheduler defaults unchanged, and config writes disabled.
+
+Safety confirmation:
+
+```text
+This note documents validation and rollback only. It does not change config, scheduler defaults,
+runtime cue paths, Live2D, TTS, backend entry behavior, or default-off safety posture.
+```
+
+---
+
+# Follow-up Character Auto Runtime Guard Contract - 2026-05-07 (Task 154)
+
+Task 154 adds a read-only guard contract to the backend-entry skeleton.
+
+Validation focus:
+
+1. `node --check web/chat.js`
+2. `python -m pytest tests/test_api_health.py -q`
+3. `git diff --check`
+4. Confirm `/api/character_runtime/backend_entry` includes `guard_contract.read_only=true` and `guard_contract.fail_closed=true`.
+5. Open the readiness panel and confirm the backend-entry card summarizes the guard contract without adding execution controls.
+
+Rollback focus:
+
+1. Remove only the `guard_contract` field from the backend summary if it becomes confusing.
+2. Keep the explicit backend-entry route in skeleton/default-off mode.
+3. Keep automatic runtime disconnected, scheduler defaults unchanged, config writes disabled, runtime cue disabled, Live2D untouched, and TTS off.
+
+Safety confirmation:
+
+```text
+The guard contract is status-only. It does not write config, connect automatic runtime,
+change scheduler defaults, emit runtime cues, move Live2D, play TTS, start polling, or execute follow-up.
+```
+
+---
+
+# Follow-up Character Auto Runtime Guard Evaluator - 2026-05-07 (Task 155)
+
+Task 155 moves the backend-entry guard contract into `character_runtime.py` as a reusable read-only evaluator.
+
+Validation focus:
+
+1. `python -m pytest tests/test_character_runtime.py tests/test_api_health.py -q`
+2. `node --check web/chat.js`
+3. `git diff --check`
+4. Confirm `/api/character_runtime/backend_entry` still reports skeleton-only / default-off / disconnected.
+
+Rollback focus:
+
+1. Revert `app_health.py` to the inline backend-entry summary if the evaluator creates confusion.
+2. Keep the evaluator status-only and do not connect it to runtime execution.
+3. Keep automatic runtime disconnected, scheduler defaults unchanged, config writes disabled, runtime cue disabled, Live2D untouched, and TTS off.
+
+Safety confirmation:
+
+```text
+The evaluator only calculates guard status. It does not write config, connect automatic runtime,
+change scheduler defaults, emit runtime cues, move Live2D, play TTS, start polling, or execute follow-up.
+```
+
+---
+
+# Follow-up Character Auto Runtime Entry Preview Rejection - 2026-05-07 (Task 156)
+
+Task 156 adds a preview-only backend-entry request rejection summary.
+
+Validation focus:
+
+1. `python -m pytest tests/test_character_runtime.py tests/test_api_health.py -q`
+2. `node --check web/chat.js`
+3. `git diff --check`
+4. Confirm `/api/character_runtime/backend_entry` includes `entry_execution_preview.accepted=false` and `would_execute=false`.
+5. Open the readiness panel and confirm the backend-entry card displays the execution preview as dry-run / rejected.
+
+Rollback focus:
+
+1. Remove only `entry_execution_preview` if the preview wording is confusing.
+2. Keep the backend-entry guard contract and evaluator fail-closed.
+3. Keep automatic runtime disconnected, scheduler defaults unchanged, config writes disabled, runtime cue disabled, Live2D untouched, and TTS off.
+
+Safety confirmation:
+
+```text
+The execution preview is a rejection-only dry-run. It does not create a POST route, write config,
+connect automatic runtime, change scheduler defaults, emit runtime cues, move Live2D, play TTS,
+start polling, or execute follow-up.
+```
+
+---
+
+# Follow-up Character Auto Runtime Preview POST Dry-run Route - 2026-05-07 (Task 157)
+
+Task 157 adds a preview-only POST route for backend-entry request rehearsal.
+
+Validation focus:
+
+1. `python -m pytest tests/test_character_runtime.py tests/test_api_health.py -q`
+2. `node --check web/chat.js`
+3. `git diff --check`
+4. Confirm `POST /api/character_runtime/backend_entry/preview` with a valid local token returns `accepted=false` and `would_execute=false`.
+5. Confirm missing token is rejected and invalid JSON returns HTTP 400.
+
+Rollback focus:
+
+1. Remove only the preview POST route and its tests if the route shape needs to change.
+2. Keep the existing GET backend-entry summary and preview helper fail-closed.
+3. Keep automatic runtime disconnected, scheduler defaults unchanged, config writes disabled, runtime cue disabled, Live2D untouched, and TTS off.
+
+Safety confirmation:
+
+```text
+The preview POST route is a guarded dry-run endpoint only. It does not write config,
+connect automatic runtime, change scheduler defaults, emit runtime cues, move Live2D,
+play TTS, start polling, or execute follow-up.
+```
+
+---
+
+# Follow-up Character Auto Runtime Preview Request Schema Allowlist - 2026-05-07 (Task 158)
+
+Task 158 narrows the backend-entry preview request schema before any runtime adapter exists.
+
+Validation focus:
+
+1. `python -m pytest tests/test_character_runtime.py tests/test_api_health.py -q`
+2. `node --check web/chat.js`
+3. `git diff --check`
+4. Confirm preview responses include `request_schema.allowed_fields=["type","action"]`.
+5. Confirm unknown fields are listed in `ignored_fields` and unsupported values are listed in `validation_errors`.
+
+Rollback focus:
+
+1. Remove only the schema metadata fields if the preview response shape needs to stay minimal.
+2. Keep preview requests rejected and dry-run only.
+3. Keep automatic runtime disconnected, scheduler defaults unchanged, config writes disabled, runtime cue disabled, Live2D untouched, and TTS off.
+
+Safety confirmation:
+
+```text
+The request schema is allowlist-only. Unknown fields are ignored and reported. This does not write config,
+connect automatic runtime, change scheduler defaults, emit runtime cues, move Live2D, play TTS,
+start polling, read files, execute shell, call tools, or execute follow-up.
+```
+
+---
+
+# Follow-up Character Auto Runtime No-op Adapter Skeleton - 2026-05-07 (Task 159)
+
+Task 159 adds a backend no-op adapter preview boundary for the future automatic character runtime.
+
+Validation focus:
+
+1. `python -m pytest tests/test_character_runtime.py tests/test_api_health.py -q`
+2. `node --check web/chat.js`
+3. `git diff --check`
+4. Confirm backend-entry summary includes `entry_adapter_preview.noop=true`, `adapter_ready=false`, `executed=false`, and `dispatched=false`.
+5. Confirm preview POST includes `character_runtime_backend_entry_adapter_preview` with all side-effect flags false.
+
+Rollback focus:
+
+1. Remove only the adapter preview field if the adapter boundary needs a different response shape.
+2. Keep request preview schema, guard evaluator, and backend-entry summary fail-closed.
+3. Keep automatic runtime disconnected, scheduler defaults unchanged, config writes disabled, runtime cue disabled, Live2D untouched, and TTS off.
+
+Safety confirmation:
+
+```text
+The adapter is no-op and preview-only. It does not write config, connect automatic runtime,
+change scheduler defaults, emit runtime cues, move Live2D, play TTS, start polling,
+execute follow-up, observe desktop, capture screenshots, read files, execute shell, or call tools.
+```
