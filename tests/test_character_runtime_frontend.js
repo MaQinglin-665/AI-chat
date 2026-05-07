@@ -133,6 +133,12 @@ assert.ok(
   "reply cue candidate manual sends should pass backend preview/no-op before using the local runtime cue path"
 );
 assert.ok(
+  /function buildGrayAutoTrialCharacterCueManualEmitRecap[\s\S]*?conversation_followup_character_reply_cue_candidate_manual_emit[\s\S]*?replyCandidateSent/.test(source)
+    && source.includes("replyCueCandidate=")
+    && source.includes("backendBridge=ok:"),
+  "manual cue recap should include reply candidate sends, backend no-op status, and candidate sent state"
+);
+assert.ok(
   source.includes("followupCharacterRuntimeLastDispatch")
     && source.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_DISPATCH__")
     && source.includes("runtimeDispatch=local:"),
