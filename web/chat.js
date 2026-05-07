@@ -2504,6 +2504,8 @@ const TOOL_META_VIEW = window.TaffyToolMetaView || {};
 const LOCAL_COMMAND_REGISTRY = window.TaffyLocalCommandRegistry || {};
 const LOCAL_COMMAND_EXECUTOR = window.TaffyLocalCommandExecutor || {};
 const REMINDER_UTILS = window.TaffyReminderUtils || {};
+const SCHEDULE_LIST_VIEW = window.TaffyScheduleListView || {};
+const SCHEDULE_FORM_MODEL = window.TaffyScheduleFormModel || {};
 const CHARACTER_REHEARSAL_PRESETS = CHARACTER_TUNING.CHARACTER_REHEARSAL_PRESETS || [];
 
 function getNextCharacterRehearsalPreset() {
@@ -7719,12 +7721,8 @@ const MAX_PENDING_ATTACHMENTS = 6;
 const MAX_TEXT_ATTACHMENT_CHARS = 12000;
 const MAX_TOTAL_ATTACHMENT_TEXT_CHARS = 24000;
 const MAX_IMAGE_ATTACHMENT_BYTES = 6 * 1024 * 1024;
-const TEXT_ATTACHMENT_EXTS = new Set([
-  "txt", "md", "markdown", "json", "csv", "tsv", "yaml", "yml",
-  "xml", "html", "htm", "css", "js", "mjs", "cjs", "ts", "tsx",
-  "jsx", "py", "java", "c", "cpp", "h", "hpp", "go", "rs",
-  "sh", "ps1", "bat", "sql", "log", "ini", "toml"
-]);
+const ATTACHMENT_MODEL = window.TaffyAttachmentModel || {};
+const TEXT_ATTACHMENT_EXTS = new Set(ATTACHMENT_MODEL.TEXT_ATTACHMENT_EXTS || []);
 const REMINDER_STORAGE_KEY = "taffy_reminders_v1";
 const EMOTION_STORAGE_KEY = "taffy_emotion_stats_v1";
 const DAILY_GREETING_STORAGE_KEY = "taffy_daily_greeting_v1";
@@ -8887,9 +8885,9 @@ function buildReminderTypeLabel(item) {
 }
 
 function buildDefaultScheduleDateTimeValue() {
-  const d = new Date(Date.now() + 10 * 60000);
-  d.setSeconds(0, 0);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return typeof SCHEDULE_FORM_MODEL.buildDefaultDateTimeValue === "function"
+    ? SCHEDULE_FORM_MODEL.buildDefaultDateTimeValue()
+    : "";
 }
 
 function openSchedulePanel() {
@@ -9818,74 +9816,25 @@ async function applyLearningQuickSettings() {
   });
 }
 
+
 function renderScheduleList() {
   if (!ui.scheduleList) {
     return;
   }
-  ui.scheduleList.innerHTML = "";
-  const items = (state.reminders || [])
-    .filter((item) => item && (!item.done || normalizeReminderRepeat(item.repeat) === "daily"))
-    .sort((a, b) => (Number(a?.dueAt) || 0) - (Number(b?.dueAt) || 0));
-
-  if (!items.length) {
-    const empty = document.createElement("div");
-    empty.className = "schedule-empty";
-    const title = document.createElement("div");
-    title.className = "schedule-empty-title";
-    title.textContent = "还没有日程";
-    const desc = document.createElement("div");
-    desc.className = "schedule-empty-desc";
-    desc.textContent = "你可以设置某个时间点让馨语AI桌宠主动说话、提醒你，或直接执行工具任务。";
-    empty.appendChild(title);
-    empty.appendChild(desc);
-    ui.scheduleList.appendChild(empty);
+  if (typeof SCHEDULE_LIST_VIEW.renderScheduleList !== "function") {
+    ui.scheduleList.innerHTML = "";
     return;
   }
-
-  for (const item of items) {
-    const row = document.createElement("div");
-    row.className = "schedule-item";
-
-    const main = document.createElement("div");
-    main.className = "schedule-item-main";
-
-    const text = document.createElement("div");
-    text.className = "schedule-item-text";
-    text.textContent = String(item.text || "").trim();
-
-    const meta = document.createElement("div");
-    meta.className = "schedule-item-meta";
-
-    const modeTag = document.createElement("span");
-    modeTag.className = `schedule-tag ${normalizeReminderMode(item.mode)}`;
-    modeTag.textContent = buildReminderTypeLabel(item);
-
-    const repeatTag = document.createElement("span");
-    repeatTag.className = "schedule-tag";
-    repeatTag.textContent = normalizeReminderRepeat(item.repeat) === "daily" ? "每天重复" : "一次";
-
-    const time = document.createElement("div");
-    time.className = "schedule-item-time";
-    time.textContent = buildReminderDisplayTime(item);
-
-    const delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.className = "schedule-delete-btn";
-    delBtn.textContent = "删除";
-    delBtn.addEventListener("click", () => {
-      const ok = removeReminderById(item.id);
-      setStatus(ok ? "日程已删除" : "未找到该日程");
-    });
-
-    meta.appendChild(modeTag);
-    meta.appendChild(repeatTag);
-    main.appendChild(text);
-    main.appendChild(meta);
-    main.appendChild(time);
-    row.appendChild(main);
-    row.appendChild(delBtn);
-    ui.scheduleList.appendChild(row);
-  }
+  SCHEDULE_LIST_VIEW.renderScheduleList(ui.scheduleList, state.reminders || [], {
+    normalizeReminderMode,
+    normalizeReminderRepeat,
+    buildReminderTypeLabel,
+    buildReminderDisplayTime,
+    onRemove: (item) => {
+      const ok = removeReminderById(item?.id);
+      setStatus(ok ? "?????" : "??????");
+    }
+  }, document);
 }
 
 function addReminder(text, dueAt, opts = {}) {
@@ -9925,43 +9874,32 @@ function saveScheduleFromForm() {
   if (!ui.scheduleDatetime || !ui.scheduleTask || !ui.scheduleRepeat || !ui.scheduleMode) {
     return;
   }
-  const rawDate = String(ui.scheduleDatetime.value || "").trim();
-  const text = String(ui.scheduleTask.value || "").trim();
-  const repeat = normalizeReminderRepeat(ui.scheduleRepeat.value);
-  const mode = normalizeReminderMode(ui.scheduleMode.value);
-  if (!rawDate) {
-    setStatus("请先选择执行时间");
-    ui.scheduleDatetime.focus();
-    return;
-  }
-  if (!text) {
-    setStatus("请先写下让馨语AI桌宠做什么");
-    ui.scheduleTask.focus();
-    return;
-  }
-
-  let dueAt = new Date(rawDate).getTime();
-  if (!Number.isFinite(dueAt)) {
-    setStatus("日程时间格式无效");
-    ui.scheduleDatetime.focus();
-    return;
-  }
-
-  const now = Date.now();
-  if (repeat === "daily") {
-    while (dueAt <= now) {
-      dueAt = shiftReminderToNextDay(dueAt);
+  const draft = typeof SCHEDULE_FORM_MODEL.buildScheduleDraft === "function"
+    ? SCHEDULE_FORM_MODEL.buildScheduleDraft({
+      rawDate: ui.scheduleDatetime.value,
+      text: ui.scheduleTask.value,
+      repeat: ui.scheduleRepeat.value,
+      mode: ui.scheduleMode.value
+    }, {
+      normalizeReminderRepeat,
+      normalizeReminderMode,
+      shiftReminderToNextDay
+    })
+    : { ok: false, message: "???????", focus: "time" };
+  if (!draft.ok) {
+    setStatus(draft.message || "??????");
+    if (draft.focus === "text") {
+      ui.scheduleTask.focus();
+    } else {
+      ui.scheduleDatetime.focus();
     }
-  } else if (dueAt <= now + 5000) {
-    setStatus("执行时间需要晚于当前");
-    ui.scheduleDatetime.focus();
     return;
   }
 
-  const id = addReminder(text, dueAt, { mode, repeat });
+  const id = addReminder(draft.text, draft.dueAt, { mode: draft.mode, repeat: draft.repeat });
   ui.scheduleTask.value = "";
   ui.scheduleDatetime.value = buildDefaultScheduleDateTimeValue();
-  setStatus(`已添加日程 #${id}`);
+  setStatus(`????? #${id}`);
 }
 
 function loadEmotionStats() {
@@ -11934,109 +11872,11 @@ function stripRuntimeMetadataSuffix(text) {
   return String(text || "");
 }
 
-function looksLikeAssistantTextWrapperFragment(text) {
-  const safe = String(text || "").trim();
-  if (!safe) {
-    return false;
-  }
-  if (!/^\s*[{[]/.test(safe)) {
-    return false;
-  }
-  return /["']?\b(?:text|message|content|output_text)\b["']?\s*:/i.test(safe);
-}
-
-function looksLikeEmptyAssistantTextWrapperFragment(text) {
-  const safe = String(text || "").trim();
-  if (!safe) {
-    return false;
-  }
-  return /^[\s{,\["'`]*\b(?:text|message|content|output_text)\b["']?\s*:?\s*["'`]*$/i.test(safe);
-}
-
-function extractAssistantTextFromJsonLike(text) {
-  const safe = String(text || "").trim();
-  if (!looksLikeAssistantTextWrapperFragment(safe)) {
-    return "";
-  }
-  for (const key of ["text", "message", "content", "output_text"]) {
-    const quoted = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "i").exec(safe);
-    if (quoted) {
-      try {
-        return String(JSON.parse(`"${quoted[1]}"`) || "").trim();
-      } catch (_) {
-        return String(quoted[1] || "").trim();
-      }
-    }
-    const singleQuoted = new RegExp(`'${key}'\\s*:\\s*'((?:\\\\.|[^'\\\\])*)'`, "i").exec(safe);
-    if (singleQuoted) {
-      return String(singleQuoted[1] || "").trim();
-    }
-  }
-  return "";
-}
-
-function coerceAssistantPayloadText(value) {
-  if (typeof value === "string") {
-    return value.trim();
-  }
-  if (value == null) {
-    return "";
-  }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value).trim();
-  }
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => coerceAssistantPayloadText(item))
-      .filter(Boolean)
-      .join(" ")
-      .trim();
-  }
-  if (typeof value === "object") {
-    for (const key of ["text", "message", "content", "output_text"]) {
-      const nested = coerceAssistantPayloadText(value[key]);
-      if (nested) {
-        return nested;
-      }
-    }
-  }
-  return "";
-}
-
-function extractAssistantPayloadText(text) {
-  const safe = String(text || "").trim();
-  if (!safe || !/^\s*[{[]/.test(safe)) {
-    return "";
-  }
-  try {
-    const parsed = JSON.parse(safe);
-    return coerceAssistantPayloadText(parsed);
-  } catch (_) {
-    return "";
-  }
-}
-
 function stripAssistantPayloadNoise(text) {
   if (SPEECH_TEXT && typeof SPEECH_TEXT.stripAssistantPayloadNoise === "function") {
     return SPEECH_TEXT.stripAssistantPayloadNoise(text);
   }
-  const raw = String(text || "");
-  const payloadText = extractAssistantPayloadText(raw);
-  if (payloadText) {
-    return stripRuntimeMetadataSuffix(payloadText);
-  }
-  const jsonLikeText = extractAssistantTextFromJsonLike(raw);
-  if (jsonLikeText) {
-    return stripRuntimeMetadataSuffix(jsonLikeText);
-  }
-  const visible = stripRuntimeMetadataSuffix(raw);
-  if (looksLikeEmptyAssistantTextWrapperFragment(visible)) {
-    return "";
-  }
-  if (looksLikeAssistantTextWrapperFragment(visible)) {
-    return "";
-  }
-  return visible;
+  return stripRuntimeMetadataSuffix(text);
 }
 
 const CHARACTER_RUNTIME = window.TaffyCharacterRuntime || {};
@@ -13084,61 +12924,33 @@ function rememberMessage(role, content, options = {}) {
 }
 
 function formatFileSize(size) {
-  const n = Math.max(0, Number(size) || 0);
-  if (n < 1024) return `${n}B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)}KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)}MB`;
+  return typeof ATTACHMENT_MODEL.formatFileSize === "function"
+    ? ATTACHMENT_MODEL.formatFileSize(size)
+    : `${Math.max(0, Number(size) || 0)}B`;
 }
 
 function getFileExt(name) {
-  const safe = String(name || "").trim().toLowerCase();
-  const idx = safe.lastIndexOf(".");
-  if (idx <= 0 || idx === safe.length - 1) {
-    return "";
-  }
-  return safe.slice(idx + 1);
+  return typeof ATTACHMENT_MODEL.getFileExt === "function"
+    ? ATTACHMENT_MODEL.getFileExt(name)
+    : "";
 }
 
 function isImageFileObj(file) {
-  const type = String(file?.type || "").toLowerCase();
-  if (type.startsWith("image/")) {
-    return true;
-  }
-  return ["png", "jpg", "jpeg", "webp", "bmp", "gif"].includes(getFileExt(file?.name));
+  return typeof ATTACHMENT_MODEL.isImageFile === "function"
+    ? ATTACHMENT_MODEL.isImageFile(file)
+    : false;
 }
 
 function isLikelyTextFileObj(file) {
-  const type = String(file?.type || "").toLowerCase();
-  if (type.startsWith("text/")) {
-    return true;
-  }
-  if (type.includes("json") || type.includes("xml")) {
-    return true;
-  }
-  return TEXT_ATTACHMENT_EXTS.has(getFileExt(file?.name));
-}
-
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("读取图片失败"));
-    reader.readAsDataURL(file);
-  });
+  return typeof ATTACHMENT_MODEL.isLikelyTextFile === "function"
+    ? ATTACHMENT_MODEL.isLikelyTextFile(file, TEXT_ATTACHMENT_EXTS)
+    : false;
 }
 
 function sanitizeAttachmentExcerpt(text, maxChars = MAX_TEXT_ATTACHMENT_CHARS) {
-  const src = String(text || "")
-    .replace(/\u0000/g, "")
-    .replace(/\r\n/g, "\n");
-  const compact = src.trim();
-  if (!compact) {
-    return "";
-  }
-  if (compact.length <= maxChars) {
-    return compact;
-  }
-  return `${compact.slice(0, maxChars)}\n...(文件内容已截断)`;
+  return typeof ATTACHMENT_MODEL.sanitizeAttachmentExcerpt === "function"
+    ? ATTACHMENT_MODEL.sanitizeAttachmentExcerpt(text, maxChars)
+    : String(text || "").trim().slice(0, maxChars);
 }
 
 function clearPendingAttachments() {
@@ -13170,7 +12982,9 @@ function renderPendingAttachments() {
 
     const icon = document.createElement("span");
     icon.className = "attachment-chip-icon";
-    icon.textContent = item.kind === "image" ? "图" : (item.kind === "text" ? "文" : "档");
+    icon.textContent = typeof ATTACHMENT_MODEL.getAttachmentIcon === "function"
+      ? ATTACHMENT_MODEL.getAttachmentIcon(item.kind)
+      : "";
     chip.appendChild(icon);
 
     const main = document.createElement("span");
@@ -13183,7 +12997,9 @@ function renderPendingAttachments() {
 
     const meta = document.createElement("span");
     meta.className = "attachment-chip-meta";
-    const kindLabel = item.kind === "image" ? "图片" : (item.kind === "text" ? "文本" : "文件");
+    const kindLabel = typeof ATTACHMENT_MODEL.getAttachmentKindLabel === "function"
+      ? ATTACHMENT_MODEL.getAttachmentKindLabel(item.kind)
+      : "";
     meta.textContent = `${kindLabel} · ${formatFileSize(item.size)}`;
     main.appendChild(meta);
     chip.appendChild(main);
@@ -13203,49 +13019,15 @@ function renderPendingAttachments() {
 }
 
 function buildAttachmentContextText(attachments) {
-  const items = Array.isArray(attachments) ? attachments : [];
-  if (!items.length) {
-    return "";
-  }
-  const lines = ["【本轮附件】"];
-  let totalChars = 0;
-  for (const item of items) {
-    const name = String(item?.name || "未命名文件").slice(0, 120);
-    const size = formatFileSize(item?.size);
-    if (item?.kind === "image") {
-      lines.push(`- 图片: ${name} (${size})`);
-      continue;
-    }
-    if (item?.kind === "text") {
-      lines.push(`- 文本文件: ${name} (${size})`);
-      const excerpt = String(item?.text || "").trim();
-      if (excerpt) {
-        const room = Math.max(0, MAX_TOTAL_ATTACHMENT_TEXT_CHARS - totalChars);
-        if (room > 0) {
-          const clip = excerpt.slice(0, room);
-          lines.push(`  内容摘录:\n${clip}`);
-          totalChars += clip.length;
-        }
-      }
-      continue;
-    }
-    lines.push(`- 文件: ${name} (${size})`);
-  }
-  return lines.join("\n");
+  return typeof ATTACHMENT_MODEL.buildAttachmentContextText === "function"
+    ? ATTACHMENT_MODEL.buildAttachmentContextText(attachments, { maxTotalTextChars: MAX_TOTAL_ATTACHMENT_TEXT_CHARS })
+    : "";
 }
 
 function buildAttachmentDisplaySuffix(attachments) {
-  const items = Array.isArray(attachments) ? attachments : [];
-  if (!items.length) {
-    return "";
-  }
-  const names = items
-    .map((x) => String(x?.name || "").trim())
-    .filter(Boolean)
-    .slice(0, 3);
-  const rest = items.length - names.length;
-  const tail = rest > 0 ? ` 等${items.length}个` : "";
-  return `（附件: ${names.join("、")}${tail}）`;
+  return typeof ATTACHMENT_MODEL.buildAttachmentDisplaySuffix === "function"
+    ? ATTACHMENT_MODEL.buildAttachmentDisplaySuffix(attachments)
+    : "";
 }
 
 async function handleAttachmentFiles(fileList) {

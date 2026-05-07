@@ -8,6 +8,8 @@ const assert = require("assert");
 const CHAT_JS = path.resolve(__dirname, "..", "web", "chat.js");
 const INDEX_HTML = path.resolve(__dirname, "..", "web", "index.html");
 const BASE_CSS = path.resolve(__dirname, "..", "web", "base.css");
+const SPEECH_TEXT_JS = path.resolve(__dirname, "..", "web", "speechText.js");
+const ATTACHMENT_MODEL_JS = path.resolve(__dirname, "..", "web", "attachmentModel.js");
 const CHARACTER_RUNTIME_JS = path.resolve(__dirname, "..", "web", "characterRuntime.js");
 const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTuning.js");
 const DOCTOR_DIAGNOSTICS_JS = path.resolve(__dirname, "..", "web", "doctorDiagnostics.js");
@@ -19,6 +21,9 @@ const TOOL_META_VIEW_JS = path.resolve(__dirname, "..", "web", "toolMetaView.js"
 const LOCAL_COMMAND_REGISTRY_JS = path.resolve(__dirname, "..", "web", "localCommandRegistry.js");
 const LOCAL_COMMAND_EXECUTOR_JS = path.resolve(__dirname, "..", "web", "localCommandExecutor.js");
 const REMINDER_UTILS_JS = path.resolve(__dirname, "..", "web", "reminderUtils.js");
+const SCHEDULE_LIST_VIEW_JS = path.resolve(__dirname, "..", "web", "scheduleListView.js");
+const SCHEDULE_FORM_MODEL_JS = path.resolve(__dirname, "..", "web", "scheduleFormModel.js");
+const DEV_FEATURE_LOADER_JS = path.resolve(__dirname, "..", "web", "devFeatureLoader.js");
 const GRAY_TRIAL_READINESS_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialReadinessModel.js");
 const GRAY_TRIAL_CHARACTER_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialCharacterModel.js");
 const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialAutoRuntimeSwitchModel.js");
@@ -27,6 +32,8 @@ const GRAY_TRIAL_CHARACTER_VIEW_JS = path.resolve(__dirname, "..", "web", "grayT
 const source = fs.readFileSync(CHAT_JS, "utf8");
 const indexSource = fs.readFileSync(INDEX_HTML, "utf8");
 const baseCssSource = fs.readFileSync(BASE_CSS, "utf8");
+const speechTextSource = fs.readFileSync(SPEECH_TEXT_JS, "utf8");
+const attachmentModelSource = fs.readFileSync(ATTACHMENT_MODEL_JS, "utf8");
 const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
 const doctorSource = fs.readFileSync(DOCTOR_DIAGNOSTICS_JS, "utf8");
 const replyCueSource = fs.readFileSync(CHARACTER_REPLY_CUE_JS, "utf8");
@@ -37,12 +44,16 @@ const toolMetaViewSource = fs.readFileSync(TOOL_META_VIEW_JS, "utf8");
 const localCommandRegistrySource = fs.readFileSync(LOCAL_COMMAND_REGISTRY_JS, "utf8");
 const localCommandExecutorSource = fs.readFileSync(LOCAL_COMMAND_EXECUTOR_JS, "utf8");
 const reminderUtilsSource = fs.readFileSync(REMINDER_UTILS_JS, "utf8");
+const scheduleListViewSource = fs.readFileSync(SCHEDULE_LIST_VIEW_JS, "utf8");
+const scheduleFormModelSource = fs.readFileSync(SCHEDULE_FORM_MODEL_JS, "utf8");
+const devFeatureLoaderSource = fs.readFileSync(DEV_FEATURE_LOADER_JS, "utf8");
 const grayTrialReadinessModelSource = fs.readFileSync(GRAY_TRIAL_READINESS_MODEL_JS, "utf8");
 const grayTrialCharacterModelSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_MODEL_JS, "utf8");
 const grayTrialAutoRuntimeSwitchModelSource = fs.readFileSync(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS, "utf8");
 const followupReadinessViewSource = fs.readFileSync(FOLLOWUP_READINESS_VIEW_JS, "utf8");
 const grayTrialCharacterViewSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_VIEW_JS, "utf8");
 const runtime = require(CHARACTER_RUNTIME_JS);
+const attachmentModel = require(ATTACHMENT_MODEL_JS);
 const tuning = require(CHARACTER_TUNING_JS);
 const doctorDiagnostics = require(DOCTOR_DIAGNOSTICS_JS);
 const replyCue = require(CHARACTER_REPLY_CUE_JS);
@@ -53,6 +64,9 @@ const toolMetaView = require(TOOL_META_VIEW_JS);
 const localCommandRegistry = require(LOCAL_COMMAND_REGISTRY_JS);
 const localCommandExecutor = require(LOCAL_COMMAND_EXECUTOR_JS);
 const reminderUtils = require(REMINDER_UTILS_JS);
+const scheduleListView = require(SCHEDULE_LIST_VIEW_JS);
+const scheduleFormModel = require(SCHEDULE_FORM_MODEL_JS);
+const devFeatureLoader = require(DEV_FEATURE_LOADER_JS);
 const grayTrialReadinessModel = require(GRAY_TRIAL_READINESS_MODEL_JS);
 const grayTrialCharacterModel = require(GRAY_TRIAL_CHARACTER_MODEL_JS);
 const grayTrialAutoRuntimeSwitchModel = require(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS);
@@ -62,6 +76,81 @@ const grayTrialCharacterView = require(GRAY_TRIAL_CHARACTER_VIEW_JS);
 function toPlainObject(value) {
   return JSON.parse(JSON.stringify(value));
 }
+
+assert.strictEqual(
+  devFeatureLoader.isDeveloperFeatureModeEnabled({ location: { search: "?dev=1" }, localStorage: null }),
+  true,
+  "developer feature loader should enable optional diagnostics through the dev query flag"
+);
+{
+  const writes = [];
+  const result = devFeatureLoader.installDeveloperFeatureScripts({
+    write: (html) => writes.push(html)
+  }, {
+    enabled: true,
+    scripts: ["./example-dev.js"]
+  });
+  assert.deepStrictEqual(
+    result,
+    { enabled: true, scripts: ["./example-dev.js"] },
+    "developer feature loader should report injected scripts"
+  );
+  assert.strictEqual(
+    writes[0],
+    '<script src="./example-dev.js"><\/script>',
+    "developer feature loader should inject parser-ordered script tags"
+  );
+}
+{
+  const elements = [
+    { hidden: false, attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; } }
+  ];
+  const count = devFeatureLoader.applyDeveloperFeatureVisibility({
+    querySelectorAll: () => elements
+  }, { enabled: false });
+  assert.strictEqual(count, 1, "developer feature loader should find marked developer controls");
+  assert.strictEqual(elements[0].hidden, true, "developer controls should be hidden by default");
+  assert.strictEqual(elements[0].attrs["aria-hidden"], "true", "hidden developer controls should be removed from accessibility flow");
+}
+assert.ok(
+  indexSource.includes('<script src="./devFeatureLoader.js"></script>')
+    && indexSource.indexOf('<script src="./devFeatureLoader.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
+    && indexSource.includes('id="followup-readiness-btn" type="button" data-dev-feature="diagnostics"')
+    && indexSource.includes('id="learning-tab-debug" class="learning-tab" type="button" role="tab" aria-selected="false" data-dev-feature="diagnostics"')
+    && !indexSource.includes('<script src="./grayTrialReadinessModel.js"></script>')
+    && !indexSource.includes('<script src="./character-runtime-debug-bridge.js"></script>')
+    && devFeatureLoaderSource.includes("DEVELOPER_FEATURE_SCRIPTS")
+    && devFeatureLoaderSource.includes('"./grayTrialReadinessModel.js"')
+    && devFeatureLoaderSource.includes('"./character-runtime-debug-bridge.js"'),
+  "developer-only diagnostics should be routed through the optional loader before chat.js starts"
+);
+assert.strictEqual(
+  attachmentModel.formatFileSize(1536),
+  "1.5KB",
+  "attachment model should format file sizes for attachment chips"
+);
+assert.strictEqual(
+  attachmentModel.isLikelyTextFile({ name: "notes.md", type: "" }),
+  true,
+  "attachment model should recognize common text attachment extensions"
+);
+assert.ok(
+  attachmentModel.buildAttachmentContextText([
+    { kind: "text", name: "notes.md", size: 12, text: "hello" }
+  ]).includes("notes.md"),
+  "attachment model should build LLM context text for text attachments"
+);
+assert.ok(
+  source.includes("const ATTACHMENT_MODEL = window.TaffyAttachmentModel")
+    && source.includes("ATTACHMENT_MODEL.buildAttachmentContextText")
+    && source.includes("ATTACHMENT_MODEL.buildAttachmentDisplaySuffix")
+    && source.includes("ATTACHMENT_MODEL.sanitizeAttachmentExcerpt")
+    && attachmentModelSource.includes("function buildAttachmentContextText")
+    && attachmentModelSource.includes("function buildAttachmentDisplaySuffix")
+    && indexSource.includes('<script src="./attachmentModel.js"></script>')
+    && indexSource.indexOf('<script src="./attachmentModel.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
+  "chat.js should delegate attachment formatting and context building into attachmentModel.js"
+);
 
 assert.strictEqual(
   tuning.getRehearsalPreset(0).label,
@@ -214,6 +303,36 @@ assert.strictEqual(
   reminderUtils.buildReminderTypeLabel({ mode: "assistant" }),
   "AI执行",
   "reminder utils should build readable reminder type labels"
+);
+assert.deepStrictEqual(
+  scheduleListView.getRenderableScheduleItems([
+    { id: 1, dueAt: 300, done: false, repeat: "once" },
+    { id: 2, dueAt: 100, done: true, repeat: "once" },
+    { id: 3, dueAt: 200, done: true, repeat: "daily" }
+  ], {
+    normalizeReminderRepeat: reminderUtils.normalizeReminderRepeat
+  }).map((item) => item.id),
+  [3, 1],
+  "schedule list view should filter completed one-shot reminders and sort visible items"
+);
+assert.strictEqual(
+  scheduleFormModel.buildScheduleDraft({ text: "喝水" }).reason,
+  "missing_time",
+  "schedule form model should report missing time before UI handling"
+);
+assert.strictEqual(
+  scheduleFormModel.buildScheduleDraft({
+    rawDate: "2026-05-08T08:00",
+    text: "喝水",
+    repeat: "daily"
+  }, {
+    normalizeReminderRepeat: reminderUtils.normalizeReminderRepeat,
+    normalizeReminderMode: reminderUtils.normalizeReminderMode,
+    shiftReminderToNextDay: reminderUtils.shiftReminderToNextDay,
+    now: () => new Date(2026, 4, 8, 9, 0).getTime()
+  }).dueAt,
+  new Date(2026, 4, 9, 8, 0).getTime(),
+  "schedule form model should advance daily reminders into the future"
 );
 {
   const messages = [];
@@ -869,7 +988,8 @@ assert.ok(
     && source.includes("window.TaffyTTSDebugReport?.buildReport")
     && ttsDebugSource.includes("function buildReport")
     && ttsDebugSource.includes("recentEvents=")
-    && indexSource.includes('<script src="./ttsDebugReport.js"></script>'),
+    && devFeatureLoaderSource.includes('"./ttsDebugReport.js"')
+    && indexSource.includes('<script src="./devFeatureLoader.js"></script>'),
   "chat.js should expose a TTS debug report for voice playback diagnosis"
 );
 assert.ok(
@@ -877,7 +997,8 @@ assert.ok(
     && source.includes("window.TaffyTranslateDebugReport?.buildReport")
     && translateDebugSource.includes("function buildReport")
     && translateDebugSource.includes("Translation debug:")
-    && indexSource.includes('<script src="./translateDebugReport.js"></script>'),
+    && devFeatureLoaderSource.includes('"./translateDebugReport.js"')
+    && indexSource.includes('<script src="./devFeatureLoader.js"></script>'),
   "chat.js should delegate translation debug report rendering into the extracted helper"
 );
 assert.ok(
@@ -885,7 +1006,8 @@ assert.ok(
     && source.includes("window.TaffyMemoryDebugReport?.buildReport")
     && memoryDebugSource.includes("function buildReport")
     && memoryDebugSource.includes("Learning health windows:")
-    && indexSource.includes('<script src="./memoryDebugReport.js"></script>'),
+    && devFeatureLoaderSource.includes('"./memoryDebugReport.js"')
+    && indexSource.includes('<script src="./devFeatureLoader.js"></script>'),
   "chat.js should delegate memory debug report rendering into the extracted helper"
 );
 assert.ok(
@@ -906,8 +1028,9 @@ assert.ok(
     && followupReadinessViewSource.includes("function buildGrayAutoTrialStatusCardText")
     && followupReadinessViewSource.includes("function buildGrayAutoTrialSignoffPackageText")
     && followupReadinessViewSource.includes("灰度自动试运行状态卡（只读）")
-    && indexSource.includes('<script src="./grayTrialReadinessModel.js"></script>')
-    && indexSource.includes('<script src="./followupReadinessView.js"></script>'),
+    && devFeatureLoaderSource.includes('"./grayTrialReadinessModel.js"')
+    && devFeatureLoaderSource.includes('"./followupReadinessView.js"')
+    && indexSource.includes('<script src="./devFeatureLoader.js"></script>'),
   "follow-up readiness cards should delegate pure text rendering into the extracted view helper"
 );
 assert.ok(
@@ -936,9 +1059,10 @@ assert.ok(
     && grayTrialCharacterViewSource.includes("function buildSwitchAcceptancePackageText")
     && grayTrialCharacterViewSource.includes("function buildFinalPreflightText")
     && grayTrialCharacterViewSource.includes("灰度试运行角色表现预览（只读）")
-    && indexSource.includes('<script src="./grayTrialCharacterModel.js"></script>')
-    && indexSource.includes('<script src="./grayTrialAutoRuntimeSwitchModel.js"></script>')
-    && indexSource.includes('<script src="./grayTrialCharacterView.js"></script>'),
+    && devFeatureLoaderSource.includes('"./grayTrialCharacterModel.js"')
+    && devFeatureLoaderSource.includes('"./grayTrialAutoRuntimeSwitchModel.js"')
+    && devFeatureLoaderSource.includes('"./grayTrialCharacterView.js"')
+    && indexSource.includes('<script src="./devFeatureLoader.js"></script>'),
   "gray trial character cue cards should delegate pure text rendering into the extracted view helper"
 );
 assert.ok(
@@ -949,14 +1073,22 @@ assert.ok(
     && source.includes("function getLocalCommandHandlers()")
     && source.includes("const handler = getLocalCommandHandlers()[command.kind]")
     && source.includes("const REMINDER_UTILS = window.TaffyReminderUtils")
+    && source.includes("const SCHEDULE_LIST_VIEW = window.TaffyScheduleListView")
+    && source.includes("const SCHEDULE_FORM_MODEL = window.TaffyScheduleFormModel")
     && source.includes("REMINDER_UTILS.parseReminderWhen")
+    && source.includes("SCHEDULE_LIST_VIEW.renderScheduleList")
+    && source.includes("SCHEDULE_FORM_MODEL.buildScheduleDraft")
     && localCommandRegistry.matchLocalCommand("/ttsdebug").kind === "tts_debug"
     && localCommandRegistrySource.includes('kind: "tts_debug"')
     && localCommandExecutorSource.includes("function createLocalCommandHandlers")
     && reminderUtilsSource.includes("function parseReminderWhen")
+    && scheduleListViewSource.includes("function renderScheduleList")
+    && scheduleFormModelSource.includes("function buildScheduleDraft")
     && indexSource.includes('<script src="./localCommandRegistry.js"></script>')
     && indexSource.includes('<script src="./localCommandExecutor.js"></script>')
-    && indexSource.includes('<script src="./reminderUtils.js"></script>'),
+    && indexSource.includes('<script src="./reminderUtils.js"></script>')
+    && indexSource.includes('<script src="./scheduleListView.js"></script>')
+    && indexSource.includes('<script src="./scheduleFormModel.js"></script>'),
   "local commands should include /ttsdebug for copyable playback state"
 );
 assert.ok(
@@ -1035,12 +1167,13 @@ assert.ok(
 );
 assert.ok(
   source.includes("function stripAssistantPayloadNoise(text)")
-    && source.includes("function looksLikeEmptyAssistantTextWrapperFragment(text)")
-    && source.includes("function looksLikeAssistantTextWrapperFragment(text)")
-    && source.includes("function extractAssistantPayloadText(text)")
-    && source.includes("function extractAssistantTextFromJsonLike(text)")
+    && source.includes("SPEECH_TEXT.stripAssistantPayloadNoise")
+    && speechTextSource.includes("function looksLikeEmptyAssistantTextWrapperFragment(text)")
+    && speechTextSource.includes("function looksLikeAssistantTextWrapperFragment(text)")
+    && speechTextSource.includes("function extractAssistantPayloadText(text)")
+    && speechTextSource.includes("function extractAssistantTextFromJsonLike(text)")
     && source.includes("stripAssistantPayloadNoise(src)"),
-  "assistant message rendering should hide half-open JSON text wrappers before they reach the chat bubble"
+  "assistant message rendering should delegate half-open JSON wrapper cleanup to the shared speech text module"
 );
 assert.ok(
   source.includes("function _looksLikeBadChatTranslation(source, translated)")
