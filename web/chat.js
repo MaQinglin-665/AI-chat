@@ -2501,6 +2501,7 @@ const GRAY_TRIAL_READINESS_MODEL = window.TaffyGrayTrialReadinessModel || {};
 const GRAY_TRIAL_CHARACTER_MODEL = window.TaffyGrayTrialCharacterModel || {};
 const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL = window.TaffyGrayTrialAutoRuntimeSwitchModel || {};
 const TOOL_META_VIEW = window.TaffyToolMetaView || {};
+const LOCAL_COMMAND_REGISTRY = window.TaffyLocalCommandRegistry || {};
 const CHARACTER_REHEARSAL_PRESETS = CHARACTER_TUNING.CHARACTER_REHEARSAL_PRESETS || [];
 
 function getNextCharacterRehearsalPreset() {
@@ -10308,128 +10309,120 @@ async function buildMicDebugReport() {
 }
 
 async function handleLocalCommand(inputText) {
-  const text = String(inputText || "").trim();
+  const command = typeof LOCAL_COMMAND_REGISTRY.matchLocalCommand === "function"
+    ? LOCAL_COMMAND_REGISTRY.matchLocalCommand(inputText)
+    : { kind: "", text: String(inputText || "").trim() };
+  const text = String(command.text || inputText || "").trim();
   if (!text.startsWith("/")) {
     return false;
   }
-  if (text.toLowerCase() === "/micdebug") {
-    appendMessage("assistant", await buildMicDebugReport(), { enableTranslation: false });
-    return true;
-  }
-  if (text.toLowerCase() === "/ttsdebug") {
-    appendMessage("assistant", buildTTSDebugReport(), { enableTranslation: false });
-    return true;
-  }
-  if (text.toLowerCase() === "/doctor" || text === "/自检") {
-    await runDoctorAndAppendReport();
-    return true;
-  }
-  if (text.toLowerCase() === "/ttsdebug on") {
-    toggleTTSDebugPanel(true);
-    appendMessage("assistant", "TTS debug panel enabled.", { enableTranslation: false });
-    return true;
-  }
-  if (text.toLowerCase() === "/ttsdebug off") {
-    toggleTTSDebugPanel(false);
-    appendMessage("assistant", "TTS debug panel disabled.", { enableTranslation: false });
-    return true;
-  }
-  if (text.toLowerCase() === "/followupstatus") {
-    toggleFollowupReadinessPanel(true);
-    appendMessage("assistant", buildFollowupReadinessReport(), { enableTranslation: false });
-    return true;
-  }
-  if (text.toLowerCase() === "/translatedebug") {
-    appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false });
-    return true;
-  }
-  if (text.toLowerCase() === "/translatedebug on") {
-    toggleTranslateDebugPanel(true);
-    appendMessage("assistant", "Translation debug panel enabled.", { enableTranslation: false });
-    return true;
-  }
-  if (text.toLowerCase() === "/translatedebug off") {
-    toggleTranslateDebugPanel(false);
-    appendMessage("assistant", "Translation debug panel disabled.", { enableTranslation: false });
-    return true;
-  }
-  if (text.toLowerCase() === "/memorydebug") {
-    try {
-      const snapshot = await reloadMemoryDebugData();
-      appendMessage("assistant", buildMemoryDebugReport(snapshot), { enableTranslation: false });
-    } catch (err) {
-      appendMessage("assistant", `Memory debug unavailable: ${err.message || err}`, { enableTranslation: false });
-    }
-    return true;
-  }
-  if (text === "/情绪日报") {
-    const report = buildEmotionReportText();
-    appendMessage("assistant", report);
-    const prosody = buildSpeakProsody(report, "idle", false, "steady");
-    await speak(report, { force: true, interrupt: true, prosody });
-    return true;
-  }
-  if (text === "/测试语音" || text.toLowerCase() === "/testvoice") {
-    await runVoiceTestAndAppendReport();
-    return true;
-  }
-  if (text === "/角色试演" || text.toLowerCase() === "/roletest" || text.toLowerCase() === "/rehearse") {
-    await runCharacterRehearsalAndAppendReport();
-    return true;
-  }
-  if (text === "/角色调优" || text.toLowerCase() === "/tune" || text.toLowerCase() === "/tuning" || text.toLowerCase() === "/tunecue") {
-    runCharacterTuningAndAppendReport();
-    return true;
-  }
-  if (text === "/表现不错" || text.toLowerCase() === "/goodcue") {
-    recordCharacterPerformanceFeedback("good");
-    return true;
-  }
-  if (text === "/需要调整" || text.toLowerCase() === "/badcue") {
-    recordCharacterPerformanceFeedback("bad");
-    return true;
-  }
-  if (text === "/角色流程" || text.toLowerCase() === "/roleflow") {
-    appendCharacterWorkflowGuide();
-    return true;
-  }
-  if (text === "/提醒列表") {
-    const items = listPendingReminders();
-    if (!items.length) {
-      appendMessage("assistant", "当前没有待提醒事项。");
+  switch (command.kind) {
+    case "mic_debug":
+      appendMessage("assistant", await buildMicDebugReport(), { enableTranslation: false });
+      return true;
+    case "tts_debug":
+      appendMessage("assistant", buildTTSDebugReport(), { enableTranslation: false });
+      return true;
+    case "doctor":
+      await runDoctorAndAppendReport();
+      return true;
+    case "tts_debug_on":
+      toggleTTSDebugPanel(true);
+      appendMessage("assistant", "TTS debug panel enabled.", { enableTranslation: false });
+      return true;
+    case "tts_debug_off":
+      toggleTTSDebugPanel(false);
+      appendMessage("assistant", "TTS debug panel disabled.", { enableTranslation: false });
+      return true;
+    case "followup_status":
+      toggleFollowupReadinessPanel(true);
+      appendMessage("assistant", buildFollowupReadinessReport(), { enableTranslation: false });
+      return true;
+    case "translate_debug":
+      appendMessage("assistant", buildTranslateDebugReport(), { enableTranslation: false });
+      return true;
+    case "translate_debug_on":
+      toggleTranslateDebugPanel(true);
+      appendMessage("assistant", "Translation debug panel enabled.", { enableTranslation: false });
+      return true;
+    case "translate_debug_off":
+      toggleTranslateDebugPanel(false);
+      appendMessage("assistant", "Translation debug panel disabled.", { enableTranslation: false });
+      return true;
+    case "memory_debug":
+      try {
+        const snapshot = await reloadMemoryDebugData();
+        appendMessage("assistant", buildMemoryDebugReport(snapshot), { enableTranslation: false });
+      } catch (err) {
+        appendMessage("assistant", `Memory debug unavailable: ${err.message || err}`, { enableTranslation: false });
+      }
+      return true;
+    case "emotion_report": {
+      const report = buildEmotionReportText();
+      appendMessage("assistant", report);
+      const prosody = buildSpeakProsody(report, "idle", false, "steady");
+      await speak(report, { force: true, interrupt: true, prosody });
       return true;
     }
-    const lines = items.slice(0, 12).map((x) => `#${x.id} ${formatReminderTime(x.dueAt)} ${x.text}`);
-    appendMessage("assistant", `待提醒事项：\n${lines.join("\n")}`);
-    return true;
-  }
-  if (text.startsWith("/取消提醒")) {
-    const m = text.match(/^\/取消提醒\s+(\d{1,8})$/);
-    if (!m) {
-      appendMessage("assistant", "格式：/取消提醒 123");
+    case "voice_test":
+      await runVoiceTestAndAppendReport();
+      return true;
+    case "character_rehearsal":
+      await runCharacterRehearsalAndAppendReport();
+      return true;
+    case "character_tuning":
+      runCharacterTuningAndAppendReport();
+      return true;
+    case "character_feedback_good":
+      recordCharacterPerformanceFeedback("good");
+      return true;
+    case "character_feedback_bad":
+      recordCharacterPerformanceFeedback("bad");
+      return true;
+    case "character_workflow":
+      appendCharacterWorkflowGuide();
+      return true;
+    case "reminder_list": {
+      const items = listPendingReminders();
+      if (!items.length) {
+        appendMessage("assistant", "\u5f53\u524d\u6ca1\u6709\u5f85\u63d0\u9192\u4e8b\u9879\u3002");
+        return true;
+      }
+      const lines = items.slice(0, 12).map((x) => `#${x.id} ${formatReminderTime(x.dueAt)} ${x.text}`);
+      appendMessage("assistant", `\u5f85\u63d0\u9192\u4e8b\u9879\uff1a\n${lines.join("\n")}`);
       return true;
     }
-    const ok = removeReminderById(Number(m[1]));
-    appendMessage("assistant", ok ? "已取消提醒。" : "未找到该提醒 ID。");
-    return true;
-  }
-  if (text.startsWith("/提醒")) {
-    const m = text.match(/^\/提醒\s+(\S+)\s+(.+)$/);
-    if (!m) {
-      appendMessage("assistant", "格式示例：/提醒 10m 开会  或  /提醒 21:30 喝水");
+    case "reminder_cancel": {
+      const rest = text.slice(String(command.alias || "").length).trim();
+      const m = rest.match(/^(\d{1,8})$/);
+      if (!m) {
+        appendMessage("assistant", "\u683c\u5f0f\uff1a/\u53d6\u6d88\u63d0\u9192 123");
+        return true;
+      }
+      const ok = removeReminderById(Number(m[1]));
+      appendMessage("assistant", ok ? "\u5df2\u53d6\u6d88\u63d0\u9192\u3002" : "\u672a\u627e\u5230\u8be5\u63d0\u9192 ID\u3002");
       return true;
     }
-    const dueAt = parseReminderWhen(m[1]);
-    const remindText = String(m[2] || "").trim();
-    if (!dueAt || !remindText) {
-      appendMessage("assistant", "提醒时间格式无效。支持 10m / 30s / 21:30 / 2026-04-12 09:00");
+    case "reminder_add": {
+      const rest = text.slice(String(command.alias || "").length).trim();
+      const m = rest.match(/^(\S+)\s+(.+)$/);
+      if (!m) {
+        appendMessage("assistant", "\u683c\u5f0f\u793a\u4f8b\uff1a/\u63d0\u9192 10m \u5f00\u4f1a  \u6216  /\u63d0\u9192 21:30 \u559d\u6c34");
+        return true;
+      }
+      const dueAt = parseReminderWhen(m[1]);
+      const remindText = String(m[2] || "").trim();
+      if (!dueAt || !remindText) {
+        appendMessage("assistant", "\u63d0\u9192\u65f6\u95f4\u683c\u5f0f\u65e0\u6548\u3002\u652f\u6301 10m / 30s / 21:30 / 2026-04-12 09:00");
+        return true;
+      }
+      const id = addReminder(remindText, dueAt);
+      appendMessage("assistant", `\u597d\u7684\uff0c\u5df2\u8bbe\u7f6e\u63d0\u9192 #${id}\uff08${formatReminderTime(dueAt)}\uff09\uff1a${remindText}`);
       return true;
     }
-    const id = addReminder(remindText, dueAt);
-    appendMessage("assistant", `好的，已设置提醒 #${id}（${formatReminderTime(dueAt)}）：${remindText}`);
-    return true;
+    default:
+      return false;
   }
-  return false;
 }
 
 function updateObserveButton() {

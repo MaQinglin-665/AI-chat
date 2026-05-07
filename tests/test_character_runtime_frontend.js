@@ -16,6 +16,7 @@ const TTS_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "ttsDebugReport
 const TRANSLATE_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "translateDebugReport.js");
 const MEMORY_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "memoryDebugReport.js");
 const TOOL_META_VIEW_JS = path.resolve(__dirname, "..", "web", "toolMetaView.js");
+const LOCAL_COMMAND_REGISTRY_JS = path.resolve(__dirname, "..", "web", "localCommandRegistry.js");
 const GRAY_TRIAL_READINESS_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialReadinessModel.js");
 const GRAY_TRIAL_CHARACTER_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialCharacterModel.js");
 const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialAutoRuntimeSwitchModel.js");
@@ -31,6 +32,7 @@ const ttsDebugSource = fs.readFileSync(TTS_DEBUG_REPORT_JS, "utf8");
 const translateDebugSource = fs.readFileSync(TRANSLATE_DEBUG_REPORT_JS, "utf8");
 const memoryDebugSource = fs.readFileSync(MEMORY_DEBUG_REPORT_JS, "utf8");
 const toolMetaViewSource = fs.readFileSync(TOOL_META_VIEW_JS, "utf8");
+const localCommandRegistrySource = fs.readFileSync(LOCAL_COMMAND_REGISTRY_JS, "utf8");
 const grayTrialReadinessModelSource = fs.readFileSync(GRAY_TRIAL_READINESS_MODEL_JS, "utf8");
 const grayTrialCharacterModelSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_MODEL_JS, "utf8");
 const grayTrialAutoRuntimeSwitchModelSource = fs.readFileSync(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS, "utf8");
@@ -44,6 +46,7 @@ const ttsDebugReport = require(TTS_DEBUG_REPORT_JS);
 const translateDebugReport = require(TRANSLATE_DEBUG_REPORT_JS);
 const memoryDebugReport = require(MEMORY_DEBUG_REPORT_JS);
 const toolMetaView = require(TOOL_META_VIEW_JS);
+const localCommandRegistry = require(LOCAL_COMMAND_REGISTRY_JS);
 const grayTrialReadinessModel = require(GRAY_TRIAL_READINESS_MODEL_JS);
 const grayTrialCharacterModel = require(GRAY_TRIAL_CHARACTER_MODEL_JS);
 const grayTrialAutoRuntimeSwitchModel = require(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS);
@@ -170,6 +173,26 @@ assert.strictEqual(
   toolMetaView.getToolCardTitle({ tool: "search_text" }),
   "文本搜索",
   "tool meta view helper should localize tool card titles"
+);
+assert.strictEqual(
+  localCommandRegistry.matchLocalCommand("/ttsdebug").kind,
+  "tts_debug",
+  "local command registry should match TTS debug commands"
+);
+assert.strictEqual(
+  localCommandRegistry.matchLocalCommand("/translatedebug on").kind,
+  "translate_debug_on",
+  "local command registry should match translation debug panel commands"
+);
+assert.strictEqual(
+  localCommandRegistry.matchLocalCommand("/testvoice").kind,
+  "voice_test",
+  "local command registry should match voice test aliases"
+);
+assert.strictEqual(
+  localCommandRegistry.matchLocalCommand("/提醒 10m 喝水").kind,
+  "reminder_add",
+  "local command registry should match reminder prefix commands"
 );
 assert.ok(
   followupReadinessView.buildBackendEntryCardText({
@@ -490,8 +513,9 @@ assert.ok(
 );
 assert.ok(
   source.includes("async function runDoctorDiagnostics()")
-    && source.includes('text.toLowerCase() === "/doctor"')
-    && source.includes('text === "/自检"')
+    && localCommandRegistrySource.includes('kind: "doctor"')
+    && localCommandRegistry.matchLocalCommand("/doctor").kind === "doctor"
+    && localCommandRegistry.matchLocalCommand("/自检").kind === "doctor"
     && source.includes('runDoctorJsonFetch("/api/health"')
     && source.includes('"聊天模型"')
     && source.includes('"语音服务"')
@@ -527,8 +551,8 @@ assert.ok(
 );
 assert.ok(
   source.includes("async function runVoiceTestAndAppendReport()")
-    && source.includes('text === "/测试语音"')
-    && source.includes('text.toLowerCase() === "/testvoice"')
+    && localCommandRegistrySource.includes('kind: "voice_test"')
+    && localCommandRegistry.matchLocalCommand("/testvoice").kind === "voice_test"
     && source.includes("ui.voiceTestBtn")
     && source.includes("语音测试没有成功"),
   "voice test should be available both as a visible button and as a local command"
@@ -537,8 +561,8 @@ assert.ok(
   tuningSource.includes("CHARACTER_REHEARSAL_PRESETS")
     && source.includes("CHARACTER_TUNING.getRehearsalPreset")
     && source.includes("async function runCharacterRehearsalAndAppendReport()")
-    && source.includes('text === "/角色试演"')
-    && source.includes('text.toLowerCase() === "/roletest"')
+    && localCommandRegistrySource.includes('kind: "character_rehearsal"')
+    && localCommandRegistry.matchLocalCommand("/roletest").kind === "character_rehearsal"
     && source.includes("ui.characterRehearsalBtn")
     && indexSource.includes('id="character-rehearsal-btn"')
     && source.includes("角色试演的语音没有成功"),
@@ -549,8 +573,8 @@ assert.ok(
     && source.includes("function buildCharacterTuningReport()")
     && source.includes("function runCharacterTuningAndAppendReport()")
     && tuningSource.includes("function addConfigKey")
-    && source.includes('text === "/角色调优"')
-    && source.includes('text.toLowerCase() === "/tuning"')
+    && localCommandRegistrySource.includes('kind: "character_tuning"')
+    && localCommandRegistry.matchLocalCommand("/tuning").kind === "character_tuning"
     && source.includes("ui.characterTuningBtn")
     && indexSource.includes('id="character-tuning-btn"')
     && indexSource.includes('<script src="./characterTuning.js"></script>')
@@ -564,8 +588,8 @@ assert.ok(
   tuningSource.includes("function buildFeedbackMessage")
     && source.includes("function recordCharacterPerformanceFeedback")
     && source.includes("characterPerformanceLastFeedback")
-    && source.includes('text === "/表现不错"')
-    && source.includes('text === "/需要调整"')
+    && localCommandRegistry.matchLocalCommand("/goodcue").kind === "character_feedback_good"
+    && localCommandRegistry.matchLocalCommand("/badcue").kind === "character_feedback_bad"
     && source.includes("ui.characterFeedbackGoodBtn")
     && source.includes("ui.characterFeedbackBadBtn")
     && indexSource.includes('id="character-feedback-good-btn"')
@@ -577,8 +601,8 @@ assert.ok(
   tuningSource.includes("function buildWorkflowGuide()")
     && source.includes("function buildCharacterWorkflowGuide()")
     && source.includes("function appendCharacterWorkflowGuide()")
-    && source.includes('text === "/角色流程"')
-    && source.includes('text.toLowerCase() === "/roleflow"')
+    && localCommandRegistrySource.includes('kind: "character_workflow"')
+    && localCommandRegistry.matchLocalCommand("/roleflow").kind === "character_workflow"
     && tuningSource.includes("角色闭环测试流程"),
   "chat should expose a readable local character workflow guide"
 );
@@ -883,7 +907,11 @@ assert.ok(
   "gray trial character cue cards should delegate pure text rendering into the extracted view helper"
 );
 assert.ok(
-  source.includes('text.toLowerCase() === "/ttsdebug"'),
+  source.includes("const LOCAL_COMMAND_REGISTRY = window.TaffyLocalCommandRegistry")
+    && source.includes("LOCAL_COMMAND_REGISTRY.matchLocalCommand")
+    && localCommandRegistry.matchLocalCommand("/ttsdebug").kind === "tts_debug"
+    && localCommandRegistrySource.includes('kind: "tts_debug"')
+    && indexSource.includes('<script src="./localCommandRegistry.js"></script>'),
   "local commands should include /ttsdebug for copyable playback state"
 );
 assert.ok(
@@ -892,12 +920,12 @@ assert.ok(
 );
 assert.ok(
   source.includes("window.TaffyTranslateDebugReport?.buildReport")
-    && source.includes('text.toLowerCase() === "/translatedebug"'),
+    && localCommandRegistry.matchLocalCommand("/translatedebug").kind === "translate_debug",
   "chat.js should expose /translatedebug for copyable translation timing state"
 );
 assert.ok(
   source.includes("window.TaffyMemoryDebugReport?.buildReport")
-    && source.includes('text.toLowerCase() === "/memorydebug"')
+    && localCommandRegistry.matchLocalCommand("/memorydebug").kind === "memory_debug"
     && source.includes('learningFetchJson("/api/memory/debug")')
     && source.includes("learningTabDebug")
     && source.includes("learningDebugPanel")
