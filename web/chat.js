@@ -324,6 +324,7 @@ const state = {
   followupReadinessTrialCharacterCard: null,
   followupReadinessTrialCharacterHandoffCard: null,
   followupReadinessTrialCharacterRecapCard: null,
+  followupReadinessTrialCharacterManualCueStatusCard: null,
   followupReadinessTrialCharacterStrategyCard: null,
   followupReadinessTrialCharacterReviewCard: null,
   followupReadinessTrialCharacterAutoPlanCard: null,
@@ -4650,6 +4651,31 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
   ].join("\n");
 }
 
+function buildGrayAutoTrialCharacterManualCueStatusCardText() {
+  const status = getGrayAutoTrialCharacterCueManualEmitStatus();
+  const lastEmit = status.lastEmit || null;
+  const bridge = status.lastBackendBridge || null;
+  const dispatch = status.lastRuntimeDispatch || null;
+  const apply = status.lastRuntimeApply || null;
+  const selectedPreset = getSelectedGrayAutoTrialCharacterCuePresetKey();
+  const preset = GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS[selectedPreset] || GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS.auto;
+  const hint = lastEmit?.runtimeHint || {};
+  const bridgeOk = bridge?.ok === true && bridge?.backendNoop === true && bridge?.wouldExecute !== true;
+  const dispatchOk = dispatch?.localDispatched === true;
+  const applyKnown = !!apply;
+  return [
+    "\u624b\u52a8\u89d2\u8272 cue \u72b6\u6001\uff08\u53ea\u8bfb\uff09",
+    `selectedPreset=${selectedPreset}  label=${preset.label || selectedPreset}  manualOnly=true`,
+    `lastCount=${status.count}  lastEmitAt=${status.lastEmitAt || 0}`,
+    `lastPreset=${lastEmit?.presetKey || "none"}  lastLabel=${lastEmit?.label || "none"}  lastTone=${lastEmit?.tone || "none"}`,
+    `backendPreview=${bridge ? (bridgeOk ? "noop_confirmed" : bridge.reason || "blocked") : "not_checked"}  backendWouldExecute=${bridge?.wouldExecute === true ? "true" : "false"}`,
+    `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
+    `dispatch=${dispatch ? (dispatchOk ? "local_dispatched" : "not_dispatched") : "none"}  broadcast=${dispatch?.broadcasted ? "true" : "false"}  ui=${dispatch?.uiView || "n/a"}`,
+    `live2dApply=${applyKnown ? `emotion:${apply.appliedEmotion ? "true" : "false"} action:${apply.appliedAction ? "true" : "false"} modelReady:${apply.modelReady ? "true" : "false"}` : "none"}`,
+    "\u5b89\u5168\uff1a\u624b\u52a8\u786e\u8ba4\u540e\u624d\u4f1a\u8bd5\u53d1\uff1b\u4e0d\u63a5 scheduler\u3001\u4e0d\u81ea\u52a8\u89e6\u53d1\u3001\u4e0d\u53d1 TTS\u3001\u4e0d\u5199 config\u3002"
+  ].join("\n");
+}
+
 function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
   const safeLimit = Number.isFinite(Number(limit))
     ? Math.max(1, Math.min(80, Math.round(Number(limit))))
@@ -6288,6 +6314,13 @@ function updateGrayAutoTrialCharacterRecapCard() {
   state.followupReadinessTrialCharacterRecapCard.textContent = buildGrayAutoTrialCharacterCueManualEmitRecapText(24);
 }
 
+function updateGrayAutoTrialCharacterManualCueStatusCard() {
+  if (!state.followupReadinessTrialCharacterManualCueStatusCard) {
+    return;
+  }
+  state.followupReadinessTrialCharacterManualCueStatusCard.textContent = buildGrayAutoTrialCharacterManualCueStatusCardText();
+}
+
 function updateGrayAutoTrialCharacterStrategyCard() {
   if (!state.followupReadinessTrialCharacterStrategyCard) {
     return;
@@ -7560,6 +7593,17 @@ function ensureFollowupReadinessPanel() {
     "font:12px/1.55 Consolas,Menlo,monospace",
     "color:#244b5f"
   ].join(";");
+  const characterManualCueStatusCard = document.createElement("pre");
+  characterManualCueStatusCard.style.cssText = [
+    "margin:0 0 10px",
+    "padding:10px 12px",
+    "border:1px solid rgba(64,145,112,.24)",
+    "border-radius:14px",
+    "background:rgba(238,255,248,.78)",
+    "white-space:pre-wrap",
+    "font:12px/1.55 Consolas,Menlo,monospace",
+    "color:#1d4f3b"
+  ].join(";");
   const characterStrategyCard = document.createElement("pre");
   characterStrategyCard.style.cssText = [
     "margin:0 0 10px",
@@ -7730,6 +7774,7 @@ function ensureFollowupReadinessPanel() {
   panel.appendChild(characterCard);
   panel.appendChild(characterHandoffCard);
   panel.appendChild(characterRecapCard);
+  panel.appendChild(characterManualCueStatusCard);
   panel.appendChild(characterStrategyCard);
   panel.appendChild(characterReviewCard);
   panel.appendChild(characterAutoPlanCard);
@@ -7758,6 +7803,7 @@ function ensureFollowupReadinessPanel() {
   state.followupReadinessTrialCharacterCard = characterCard;
   state.followupReadinessTrialCharacterHandoffCard = characterHandoffCard;
   state.followupReadinessTrialCharacterRecapCard = characterRecapCard;
+  state.followupReadinessTrialCharacterManualCueStatusCard = characterManualCueStatusCard;
   state.followupReadinessTrialCharacterStrategyCard = characterStrategyCard;
   state.followupReadinessTrialCharacterReviewCard = characterReviewCard;
   state.followupReadinessTrialCharacterAutoPlanCard = characterAutoPlanCard;
@@ -7843,6 +7889,7 @@ function updateFollowupReadinessPanel() {
       updateGrayAutoTrialCharacterCard();
       updateGrayAutoTrialCharacterHandoffCard();
       updateGrayAutoTrialCharacterRecapCard();
+      updateGrayAutoTrialCharacterManualCueStatusCard();
       updateGrayAutoTrialCharacterStrategyCard();
       updateGrayAutoTrialCharacterReviewCard();
       updateGrayAutoTrialCharacterAutoPlanCard();
@@ -7876,6 +7923,7 @@ function updateFollowupReadinessPanel() {
   updateGrayAutoTrialCharacterCard();
   updateGrayAutoTrialCharacterHandoffCard();
   updateGrayAutoTrialCharacterRecapCard();
+  updateGrayAutoTrialCharacterManualCueStatusCard();
   updateGrayAutoTrialCharacterStrategyCard();
   updateGrayAutoTrialCharacterReviewCard();
   updateGrayAutoTrialCharacterAutoPlanCard();

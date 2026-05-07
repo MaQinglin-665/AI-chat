@@ -101,6 +101,14 @@ assert.ok(
   "manual character cue emits should record the selected preset in status and recap"
 );
 assert.ok(
+  source.includes("function buildGrayAutoTrialCharacterManualCueStatusCardText")
+    && source.includes("followupReadinessTrialCharacterManualCueStatusCard")
+    && source.includes("updateGrayAutoTrialCharacterManualCueStatusCard()")
+    && source.includes("backendPreview=")
+    && source.includes("live2dApply="),
+  "manual character cue panel should expose a dedicated read-only status card"
+);
+assert.ok(
   source.includes("followupCharacterRuntimeLastDispatch")
     && source.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_DISPATCH__")
     && source.includes("runtimeDispatch=local:"),
