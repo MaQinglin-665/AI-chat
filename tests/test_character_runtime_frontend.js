@@ -109,6 +109,19 @@ assert.ok(
   "manual character cue panel should expose a dedicated read-only status card"
 );
 assert.ok(
+  source.includes("function buildAssistantReplyCharacterCueCandidate")
+    && source.includes("previewAssistantReplyCharacterCueCandidate({")
+    && source.includes("conversation_followup_character_reply_cue_candidate")
+    && source.includes("replyCueCandidate="),
+  "assistant replies should create a read-only character cue candidate without emitting it"
+);
+assert.ok(
+  source.includes("grayAutoFollowupTrialCharacterReplyCueCandidate")
+    && source.includes("noRuntimeCueEmission: true")
+    && source.includes("noLive2DMove: true"),
+  "reply cue candidate debug API should stay preview-only and safe"
+);
+assert.ok(
   source.includes("followupCharacterRuntimeLastDispatch")
     && source.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_DISPATCH__")
     && source.includes("runtimeDispatch=local:"),
