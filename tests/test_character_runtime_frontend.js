@@ -13,6 +13,9 @@ const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTunin
 const DOCTOR_DIAGNOSTICS_JS = path.resolve(__dirname, "..", "web", "doctorDiagnostics.js");
 const CHARACTER_REPLY_CUE_JS = path.resolve(__dirname, "..", "web", "characterReplyCue.js");
 const TTS_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "ttsDebugReport.js");
+const GRAY_TRIAL_READINESS_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialReadinessModel.js");
+const GRAY_TRIAL_CHARACTER_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialCharacterModel.js");
+const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS = path.resolve(__dirname, "..", "web", "grayTrialAutoRuntimeSwitchModel.js");
 const FOLLOWUP_READINESS_VIEW_JS = path.resolve(__dirname, "..", "web", "followupReadinessView.js");
 const GRAY_TRIAL_CHARACTER_VIEW_JS = path.resolve(__dirname, "..", "web", "grayTrialCharacterView.js");
 const source = fs.readFileSync(CHAT_JS, "utf8");
@@ -22,6 +25,9 @@ const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
 const doctorSource = fs.readFileSync(DOCTOR_DIAGNOSTICS_JS, "utf8");
 const replyCueSource = fs.readFileSync(CHARACTER_REPLY_CUE_JS, "utf8");
 const ttsDebugSource = fs.readFileSync(TTS_DEBUG_REPORT_JS, "utf8");
+const grayTrialReadinessModelSource = fs.readFileSync(GRAY_TRIAL_READINESS_MODEL_JS, "utf8");
+const grayTrialCharacterModelSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_MODEL_JS, "utf8");
+const grayTrialAutoRuntimeSwitchModelSource = fs.readFileSync(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS, "utf8");
 const followupReadinessViewSource = fs.readFileSync(FOLLOWUP_READINESS_VIEW_JS, "utf8");
 const grayTrialCharacterViewSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_VIEW_JS, "utf8");
 const runtime = require(CHARACTER_RUNTIME_JS);
@@ -29,6 +35,9 @@ const tuning = require(CHARACTER_TUNING_JS);
 const doctorDiagnostics = require(DOCTOR_DIAGNOSTICS_JS);
 const replyCue = require(CHARACTER_REPLY_CUE_JS);
 const ttsDebugReport = require(TTS_DEBUG_REPORT_JS);
+const grayTrialReadinessModel = require(GRAY_TRIAL_READINESS_MODEL_JS);
+const grayTrialCharacterModel = require(GRAY_TRIAL_CHARACTER_MODEL_JS);
+const grayTrialAutoRuntimeSwitchModel = require(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS);
 const followupReadinessView = require(FOLLOWUP_READINESS_VIEW_JS);
 const grayTrialCharacterView = require(GRAY_TRIAL_CHARACTER_VIEW_JS);
 
@@ -157,6 +166,105 @@ assert.ok(
     entries: [{ seq: 1, category: "control", stage: "conversation_followup_gray_auto_trial_armed" }]
   }).includes("灰度试运行时间线（只读）"),
   "follow-up readiness helper should build gray trial timeline text"
+);
+const grayTrialTimeline = grayTrialReadinessModel.buildTimeline([
+  { seq: 1, stage: "conversation_followup_gray_auto_trial_armed", result: "armed" },
+  { seq: 2, stage: "proactive_scheduler_poll_trigger_success", result: "triggered" }
+], {
+  parseResult: (value) => ({ base: String(value || "") }),
+  sanitizeText: (value) => String(value || "")
+});
+assert.strictEqual(
+  grayTrialTimeline.hasTriggerSuccess,
+  true,
+  "gray trial readiness model should detect trigger success events"
+);
+assert.strictEqual(
+  grayTrialReadinessModel.buildOutcome({
+    timeline: grayTrialTimeline,
+    checklist: { readyForWatchedTrial: true, armed: true, polling: true, blockedReasons: [] },
+    preflight: { status: "ready_for_local_trial", dryRun: { blockedReasons: [] } },
+    session: { count: 0, max: 1 }
+  }).outcome,
+  "success",
+  "gray trial readiness model should derive outcome from timeline events"
+);
+assert.ok(
+  grayTrialReadinessModel.buildSignoffPackage({
+    decision: { decision: "REVIEW_AFTER_SUCCESS", outcome: "success", nextAction: "Review", missingRequired: [], rootCauses: [], timeline: { total: 2 } },
+    outcome: { outcome: "success", severity: "success", summary: "ok" },
+    checklist: { readyForWatchedTrial: true },
+    timeline: grayTrialTimeline
+  }, { now: () => 123 }).trialId.includes("gray-trial-success"),
+  "gray trial readiness model should build stable signoff packages"
+);
+assert.strictEqual(
+  grayTrialCharacterModel.buildCharacterCuePreview({
+    signoff: { decision: "WATCH_ONLY", stageRecommendation: "Watch", nextAction: "Next" },
+    outcome: { outcome: "not_started" }
+  }, {
+    buildRuntimeHint: ({ tone }) => ({
+      emotion: "neutral",
+      action: "none",
+      intensity: "low",
+      voice_style: "neutral",
+      live2d_hint: tone
+    })
+  }).tone,
+  "watching",
+  "gray trial character model should choose cue presets from decision and outcome"
+);
+assert.strictEqual(
+  grayTrialCharacterModel.buildExpressionStrategyDraft({
+    preview: { decision: "WATCH_ONLY", outcome: "not_started" },
+    checklist: { readyForImplementationPlanning: true },
+    recap: { accepted: false }
+  }, {
+    buildRuntimeHint: ({ tone }) => ({
+      emotion: "neutral",
+      action: "none",
+      intensity: "low",
+      voice_style: "neutral",
+      live2d_hint: tone
+    })
+  }).activeRuleKey,
+  "watch_only_observe",
+  "gray trial character model should select the active strategy rule"
+);
+assert.strictEqual(
+  grayTrialCharacterModel.buildAutoRuntimeDryRun({
+    plan: { canPlanRollout: false, status: "blocked_for_auto_runtime" },
+    strategy: { activeRule: { key: "watch_only_observe", runtimeHint: { emotion: "thinking" } } },
+    review: { goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME" }
+  }).wouldEmit,
+  false,
+  "gray trial character model dry-run must never emit runtime hints"
+);
+const grayTrialSwitchPlan = grayTrialAutoRuntimeSwitchModel.buildExplicitSwitchPlan({
+  plan: { status: "blocked_for_auto_runtime" },
+  dryRun: { status: "blocked", wouldSelectRule: true, wouldEmit: false },
+  review: { goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME" },
+  session: { max: 1 }
+});
+assert.strictEqual(
+  grayTrialSwitchPlan.automaticRuntimeConnected,
+  false,
+  "gray trial auto runtime switch model should keep automatic runtime disconnected"
+);
+assert.strictEqual(
+  grayTrialAutoRuntimeSwitchModel.buildExplicitSwitchControl({
+    acceptance: { status: "acceptance_not_ready", goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME", manualVerificationRequired: true },
+    switchState: { enabled: false }
+  }).canEnable,
+  false,
+  "gray trial auto runtime switch model should block enabling before acceptance"
+);
+assert.strictEqual(
+  grayTrialAutoRuntimeSwitchModel.buildSeparateImplementationDraft({
+    preflight: { ok: false, separateImplementationTaskReady: false, status: "blocked_for_handoff" }
+  }).automaticRuntimeConnected,
+  false,
+  "gray trial auto runtime switch implementation draft should remain read-only and disconnected"
 );
 assert.ok(
   grayTrialCharacterView.buildCharacterCuePreviewText({
@@ -652,24 +760,44 @@ assert.ok(
   source.includes("const FOLLOWUP_READINESS_VIEW = window.TaffyFollowupReadinessView")
     && source.includes("FOLLOWUP_READINESS_VIEW.buildBackendEntryCardText")
     && source.includes("FOLLOWUP_READINESS_VIEW.buildPreviewOneLineText")
+    && source.includes("const GRAY_TRIAL_READINESS_MODEL = window.TaffyGrayTrialReadinessModel")
+    && source.includes("GRAY_TRIAL_READINESS_MODEL.buildTimeline")
+    && grayTrialReadinessModelSource.includes("function buildGoNoGoDecision")
     && followupReadinessViewSource.includes("function buildGrayAutoTrialStatusCardText")
     && followupReadinessViewSource.includes("function buildGrayAutoTrialSignoffPackageText")
     && followupReadinessViewSource.includes("灰度自动试运行状态卡（只读）")
+    && indexSource.includes('<script src="./grayTrialReadinessModel.js"></script>')
     && indexSource.includes('<script src="./followupReadinessView.js"></script>'),
   "follow-up readiness cards should delegate pure text rendering into the extracted view helper"
 );
 assert.ok(
   source.includes("const GRAY_TRIAL_CHARACTER_VIEW = window.TaffyGrayTrialCharacterView")
+    && source.includes("const GRAY_TRIAL_CHARACTER_MODEL = window.TaffyGrayTrialCharacterModel")
+    && source.includes("const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL = window.TaffyGrayTrialAutoRuntimeSwitchModel")
+    && source.includes("GRAY_TRIAL_CHARACTER_MODEL.buildCharacterCuePreview")
+    && source.includes("GRAY_TRIAL_CHARACTER_MODEL.buildExpressionStrategyDraft")
+    && source.includes("GRAY_TRIAL_CHARACTER_MODEL.buildAutoRuntimeDryRun")
+    && source.includes("GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchPlan")
+    && source.includes("GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildFinalPreflight")
+    && source.includes("GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSeparateImplementationDraft")
     && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCuePreviewText")
     && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitRecapText")
     && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeDryRunText")
     && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildSwitchControlDiagnosticsText")
     && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildSeparateImplementationDraftText")
+    && grayTrialCharacterModelSource.includes("function buildCharacterCuePreview")
+    && grayTrialCharacterModelSource.includes("function buildExpressionStrategyDraft")
+    && grayTrialCharacterModelSource.includes("function buildAutoRuntimeDryRun")
+    && grayTrialAutoRuntimeSwitchModelSource.includes("function buildExplicitSwitchPlan")
+    && grayTrialAutoRuntimeSwitchModelSource.includes("function buildSwitchAcceptancePackage")
+    && grayTrialAutoRuntimeSwitchModelSource.includes("function buildFinalPreflight")
     && grayTrialCharacterViewSource.includes("function buildCharacterManualCueStatusCardText")
     && grayTrialCharacterViewSource.includes("function buildExplicitSwitchPlanText")
     && grayTrialCharacterViewSource.includes("function buildSwitchAcceptancePackageText")
     && grayTrialCharacterViewSource.includes("function buildFinalPreflightText")
     && grayTrialCharacterViewSource.includes("灰度试运行角色表现预览（只读）")
+    && indexSource.includes('<script src="./grayTrialCharacterModel.js"></script>')
+    && indexSource.includes('<script src="./grayTrialAutoRuntimeSwitchModel.js"></script>')
     && indexSource.includes('<script src="./grayTrialCharacterView.js"></script>'),
   "gray trial character cue cards should delegate pure text rendering into the extracted view helper"
 );

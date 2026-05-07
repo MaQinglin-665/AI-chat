@@ -2497,6 +2497,9 @@ const CHARACTER_TUNING = window.TaffyCharacterTuning || {};
 const CHARACTER_REPLY_CUE = window.TaffyCharacterReplyCue || {};
 const FOLLOWUP_READINESS_VIEW = window.TaffyFollowupReadinessView || {};
 const GRAY_TRIAL_CHARACTER_VIEW = window.TaffyGrayTrialCharacterView || {};
+const GRAY_TRIAL_READINESS_MODEL = window.TaffyGrayTrialReadinessModel || {};
+const GRAY_TRIAL_CHARACTER_MODEL = window.TaffyGrayTrialCharacterModel || {};
+const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL = window.TaffyGrayTrialAutoRuntimeSwitchModel || {};
 const CHARACTER_REHEARSAL_PRESETS = CHARACTER_TUNING.CHARACTER_REHEARSAL_PRESETS || [];
 
 function getNextCharacterRehearsalPreset() {
@@ -4165,30 +4168,25 @@ function buildGrayAutoTrialAuditSummary(limit = 24) {
   const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
   const session = buildGrayAutoTrialSessionState();
   const events = buildGrayAutoFollowupTrialEventSummary(safeLimit);
-  return {
-    readOnly: true,
-    generatedAt: Date.now(),
-    status: preflight.status,
-    armed: mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true,
-    polling: scheduler.pollTimerActive === true,
-    session,
-    dryRun: preflight.dryRun,
-    blockedReasons: Array.isArray(preflight.dryRun?.blockedReasons)
-      ? preflight.dryRun.blockedReasons.slice()
-      : [],
-    events,
-    safety: {
-      defaultOffRequired: true,
-      explicitArmConfirmationRequired: true,
-      resetConfirmationRequired: true,
-      emergencyStopAvailable: true,
-      noDesktopObservation: true,
-      noFileAccess: true,
-      noToolCalls: true,
-      noConfigWrites: true,
-      noModelOrTtsCall: true
-    }
-  };
+  return typeof GRAY_TRIAL_READINESS_MODEL.buildAuditSummary === "function"
+    ? GRAY_TRIAL_READINESS_MODEL.buildAuditSummary({
+      preflight,
+      session,
+      events,
+      armed: mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true,
+      polling: scheduler.pollTimerActive === true
+    }, { now: () => Date.now() })
+    : {
+      readOnly: true,
+      generatedAt: Date.now(),
+      status: preflight.status,
+      armed: mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true,
+      polling: scheduler.pollTimerActive === true,
+      session,
+      dryRun: preflight.dryRun,
+      blockedReasons: Array.isArray(preflight.dryRun?.blockedReasons) ? preflight.dryRun.blockedReasons.slice() : [],
+      events
+    };
 }
 
 function buildGrayAutoTrialAuditSummaryText(limit = 24) {
@@ -4206,90 +4204,23 @@ function buildGrayAutoTrialPreRunChecklist(snapshotInput = null) {
   const scheduler = snapshot.proactiveScheduler || {};
   const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
   const session = buildGrayAutoTrialSessionState();
-  const armed = mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true;
-  const polling = scheduler.pollTimerActive === true;
-  const blockedReasons = Array.isArray(preflight.dryRun?.blockedReasons)
-    ? preflight.dryRun.blockedReasons.slice()
-    : Array.isArray(preflight.gateBlockedReasons) ? preflight.gateBlockedReasons.slice() : [];
-  const items = [
-    {
-      key: "runbook_visible",
-      label: "Runbook and panel guidance are available",
-      ok: true,
-      required: true,
-      note: "Use the runbook before a real controlled trial."
-    },
-    {
-      key: "explicit_arm",
-      label: "Trial is explicitly armed",
-      ok: armed,
-      required: true,
-      note: armed ? "In-memory gray trial gates are open." : "Use Arm only after typing the confirmation phrase."
-    },
-    {
-      key: "polling_observable",
-      label: "Polling state is visible",
-      ok: true,
-      required: true,
-      note: polling ? "Polling timer is active." : "Polling timer is currently off."
-    },
-    {
-      key: "session_cap",
-      label: "Session cap still allows a trial",
-      ok: session.reached !== true && Number(session.max || 0) > 0,
-      required: true,
-      note: `session=${session.count}/${session.max}; remaining=${session.remaining}`
-    },
-    {
-      key: "emergency_stop",
-      label: "Emergency stop is available",
-      ok: true,
-      required: true,
-      note: "Use Emergency Stop first if anything feels wrong."
-    },
-    {
-      key: "disarm",
-      label: "Disarm is available",
-      ok: true,
-      required: true,
-      note: "Disarm closes in-memory gray gates and stops polling."
-    },
-    {
-      key: "runtime_guards",
-      label: "Runtime guards allow trigger observation",
-      ok: preflight.status === "ready_for_local_trial",
-      required: false,
-      note: preflight.status === "ready_for_local_trial"
-        ? "A poll would be allowed to attempt a trigger if it runs."
-        : explainReadinessReasons(blockedReasons)
-    },
-    {
-      key: "manual_watch",
-      label: "Manual watch is required",
-      ok: true,
-      required: true,
-      note: "Keep the trial watched; automatic follow-up is not promoted to normal use."
-    }
-  ];
-  const requiredReady = items
-    .filter((item) => item.required === true)
-    .every((item) => item.ok === true);
-  return {
-    readOnly: true,
-    status: preflight.status,
-    readyForWatchedTrial: requiredReady,
-    readyForTriggerObservation: preflight.status === "ready_for_local_trial",
-    armed,
-    polling,
-    session,
-    blockedReasons,
-    items,
-    nextAction: requiredReady
-      ? preflight.status === "ready_for_local_trial"
-        ? "Watch the trial; keep Emergency Stop and Disarm ready."
-        : "The control surface is ready, but runtime guards still block an automatic trigger."
-      : "Complete required checklist items before a real controlled trial."
-  };
+  return typeof GRAY_TRIAL_READINESS_MODEL.buildPreRunChecklist === "function"
+    ? GRAY_TRIAL_READINESS_MODEL.buildPreRunChecklist(
+      { mode, scheduler, preflight, session },
+      { explainReasons: explainReadinessReasons }
+    )
+    : {
+      readOnly: true,
+      status: preflight.status,
+      readyForWatchedTrial: false,
+      readyForTriggerObservation: preflight.status === "ready_for_local_trial",
+      armed: mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true,
+      polling: scheduler.pollTimerActive === true,
+      session,
+      blockedReasons: [],
+      items: [],
+      nextAction: "Complete required checklist items before a real controlled trial."
+    };
 }
 
 function buildGrayAutoTrialPreRunChecklistText() {
@@ -4300,51 +4231,24 @@ function buildGrayAutoTrialPreRunChecklistText() {
 }
 
 function buildGrayAutoTrialTimeline(limit = 32) {
-  const safeLimit = Number.isFinite(Number(limit))
-    ? Math.max(6, Math.min(100, Math.round(Number(limit))))
-    : 32;
-  const events = Array.isArray(state.ttsDebugEvents) ? state.ttsDebugEvents : [];
-  const relevant = events
-    .filter((event) => {
-      const stage = String(event?.stage || "");
-      return stage.startsWith("conversation_followup_gray_auto_trial_")
-        || stage === "conversation_followup_gray_auto_dry_run_checked"
-        || stage.startsWith("proactive_scheduler_poll_");
+  return typeof GRAY_TRIAL_READINESS_MODEL.buildTimeline === "function"
+    ? GRAY_TRIAL_READINESS_MODEL.buildTimeline(state.ttsDebugEvents, {
+      limit,
+      parseResult: parseGrayTrialPollEventResult,
+      sanitizeText: sanitizeTTSDebugText
     })
-    .slice(-safeLimit);
-  const entries = relevant.map((event) => {
-    const stage = String(event?.stage || "");
-    const parsed = parseGrayTrialPollEventResult(event?.result || "");
-    const category = stage.startsWith("proactive_scheduler_poll_")
-      ? "poll"
-      : stage === "conversation_followup_gray_auto_dry_run_checked" ? "dry_run" : "control";
-    return {
-      seq: Number(event?.seq || 0),
-      ageMs: Number(event?.ageMs || 0),
-      stage,
-      category,
-      result: parsed.base || sanitizeTTSDebugText(event?.result || "", 160),
-      trialStatus: parsed.trialStatus || "",
-      gates: parsed.gates || "",
-      wouldPoll: parsed.wouldPoll,
-      wouldTrigger: parsed.wouldTrigger,
-      blocked: sanitizeTTSDebugText(event?.error || "", 180),
-      text: sanitizeTTSDebugText(event?.text || "", 120)
+    : {
+      readOnly: true,
+      limit: 0,
+      total: 0,
+      last: null,
+      hasArm: false,
+      hasStop: false,
+      hasDisarm: false,
+      hasTriggerSuccess: false,
+      hasTriggerBlocked: false,
+      entries: []
     };
-  });
-  const last = entries.length ? entries[entries.length - 1] : null;
-  return {
-    readOnly: true,
-    limit: safeLimit,
-    total: entries.length,
-    last,
-    hasArm: entries.some((entry) => entry.stage === "conversation_followup_gray_auto_trial_armed"),
-    hasStop: entries.some((entry) => entry.stage === "conversation_followup_gray_auto_trial_emergency_stop"),
-    hasDisarm: entries.some((entry) => entry.stage === "conversation_followup_gray_auto_trial_disarmed"),
-    hasTriggerSuccess: entries.some((entry) => entry.stage === "proactive_scheduler_poll_trigger_success"),
-    hasTriggerBlocked: entries.some((entry) => entry.stage === "proactive_scheduler_poll_trigger_blocked"),
-    entries
-  };
 }
 
 function buildGrayAutoTrialTimelineText(limit = 32) {
@@ -4360,92 +4264,24 @@ function buildGrayAutoTrialOutcome(limit = 48) {
   const snapshot = getTTSDebugSnapshot();
   const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
   const session = buildGrayAutoTrialSessionState();
-  const entries = Array.isArray(timeline.entries) ? timeline.entries : [];
-  const last = timeline.last || null;
-  let outcome = "not_started";
-  let severity = "info";
-  let summary = "No gray trial control or polling events are visible yet.";
-  let nextAction = "Open the readiness panel, review the runbook, then arm only during a watched local test.";
-  if (timeline.hasTriggerSuccess) {
-    outcome = "success";
-    severity = "success";
-    summary = "A controlled automatic follow-up trigger succeeded.";
-    nextAction = "Confirm the session cap stopped further triggers, then Disarm after review.";
-  } else if (timeline.hasStop) {
-    outcome = "stopped";
-    severity = "safe";
-    summary = "Emergency Stop sealed the current trial session.";
-    nextAction = "Review the timeline, then Disarm if the trial is still armed.";
-  } else if (timeline.hasDisarm) {
-    outcome = "disarmed";
-    severity = "safe";
-    summary = "The gray trial was disarmed and polling should be off.";
-    nextAction = "Review audit/timeline output before deciding whether another watched trial is needed.";
-  } else if (timeline.hasTriggerBlocked) {
-    outcome = "trigger_blocked";
-    severity = "warn";
-    summary = "A poll attempted to trigger, but the trigger path was blocked.";
-    nextAction = "Inspect the latest blocked reason and keep the session watched before retrying.";
-  } else if (entries.some((entry) => entry.stage === "proactive_scheduler_poll_ready")) {
-    outcome = "ready_observed";
-    severity = "warn";
-    summary = "Polling observed a ready state, but no trigger success is recorded yet.";
-    nextAction = "Keep Emergency Stop visible and continue watching for trigger success or blocked events.";
-  } else if (entries.some((entry) => entry.stage === "proactive_scheduler_poll_blocked")) {
-    outcome = "blocked";
-    severity = "info";
-    summary = "Polling is visible but currently blocked by gates or runtime guards.";
-    nextAction = "Use the root-cause suggestions before retrying; do not bypass guards.";
-  } else if (timeline.hasArm && checklist.readyForWatchedTrial !== true) {
-    outcome = "setup_incomplete";
-    severity = "warn";
-    summary = "The trial was armed, but required pre-run checklist items are not all satisfied.";
-    nextAction = "Fix required checklist items or Disarm before continuing.";
-  } else if (timeline.hasArm) {
-    outcome = "armed_waiting";
-    severity = "info";
-    summary = "The trial is armed and waiting for polling/runtime guard progress.";
-    nextAction = "Watch the timeline and use Emergency Stop if anything feels wrong.";
-  }
-  const blockedReasons = Array.from(new Set([
-    ...(Array.isArray(checklist.blockedReasons) ? checklist.blockedReasons : []),
-    ...(Array.isArray(preflight.dryRun?.blockedReasons) ? preflight.dryRun.blockedReasons : []),
-    ...(last?.blocked ? String(last.blocked).split(",").map((item) => item.trim()).filter(Boolean) : [])
-  ]));
-  const rootCauses = blockedReasons.length
-    ? blockedReasons.slice(0, 8).map((reason) => ({
-      reason,
-      explanation: explainReadinessReason(reason)
-    }))
-    : [];
-  return {
-    readOnly: true,
-    outcome,
-    severity,
-    summary,
-    nextAction,
-    status: preflight.status,
-    armed: checklist.armed === true,
-    polling: checklist.polling === true,
-    session,
-    timeline: {
-      total: timeline.total,
-      lastStage: last?.stage || "none",
-      hasArm: timeline.hasArm,
-      hasStop: timeline.hasStop,
-      hasDisarm: timeline.hasDisarm,
-      hasTriggerSuccess: timeline.hasTriggerSuccess,
-      hasTriggerBlocked: timeline.hasTriggerBlocked
-    },
-    rootCauses,
-    safety: {
+  return typeof GRAY_TRIAL_READINESS_MODEL.buildOutcome === "function"
+    ? GRAY_TRIAL_READINESS_MODEL.buildOutcome(
+      { timeline, checklist, preflight, session },
+      { explainReason: explainReadinessReason }
+    )
+    : {
       readOnly: true,
-      noEventEmission: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true
-    }
-  };
+      outcome: "not_started",
+      severity: "info",
+      summary: "No gray trial control or polling events are visible yet.",
+      nextAction: "Open the readiness panel, review the runbook, then arm only during a watched local test.",
+      status: preflight.status,
+      armed: checklist.armed === true,
+      polling: checklist.polling === true,
+      session,
+      timeline: { total: timeline.total, lastStage: timeline.last?.stage || "none" },
+      rootCauses: []
+    };
 }
 
 function buildGrayAutoTrialOutcomeText(limit = 48) {
@@ -4459,70 +4295,23 @@ function buildGrayAutoTrialGoNoGoDecision(limit = 48) {
   const outcome = buildGrayAutoTrialOutcome(limit);
   const checklist = buildGrayAutoTrialPreRunChecklist();
   const timeline = buildGrayAutoTrialTimeline(limit);
-  const requiredItems = Array.isArray(checklist.items)
-    ? checklist.items.filter((item) => item.required === true)
-    : [];
-  const missingRequired = requiredItems.filter((item) => item.ok !== true);
-  let decision = "NO_GO";
-  let reason = "Required pre-run checklist items are not complete.";
-  let nextAction = "Do not run a real controlled trial yet; complete the checklist or Disarm.";
-  if (outcome.outcome === "success") {
-    decision = "REVIEW_AFTER_SUCCESS";
-    reason = "A successful trigger is visible; review cap, timeline, and disarm state before another attempt.";
-    nextAction = "Copy audit/timeline, confirm session cap, then Disarm if still armed.";
-  } else if (outcome.outcome === "stopped" || outcome.outcome === "disarmed") {
-    decision = "NO_GO";
-    reason = `Trial is ${outcome.outcome}; do not continue without a fresh explicit decision.`;
-    nextAction = "Review the timeline and only reset/arm again during a watched local test.";
-  } else if (missingRequired.length === 0 && outcome.outcome === "armed_waiting") {
-    decision = "GO_FOR_WATCHED_TRIAL";
-    reason = "Required safety controls are visible and the trial is armed, but it still needs manual watch.";
-    nextAction = "Keep Emergency Stop and Disarm visible while watching the timeline.";
-  } else if (missingRequired.length === 0 && outcome.outcome === "ready_observed") {
-    decision = "GO_FOR_WATCHED_TRIAL";
-    reason = "A ready poll state was observed, but no trigger success is recorded yet.";
-    nextAction = "Continue watching for trigger success or blocked events; stop immediately if behavior feels wrong.";
-  } else if (missingRequired.length === 0 && (outcome.outcome === "blocked" || outcome.outcome === "trigger_blocked")) {
-    decision = "WATCH_ONLY";
-    reason = "The trial surface is safe, but guards or trigger checks are blocking.";
-    nextAction = "Do not bypass guards; inspect root causes before retrying.";
-  } else if (missingRequired.length === 0 && outcome.outcome === "not_started") {
-    decision = "WATCH_ONLY";
-    reason = "The panel is ready for review, but no trial has been explicitly armed.";
-    nextAction = "Arm only after a fresh human decision and confirmation phrase.";
-  }
-  return {
-    readOnly: true,
-    decision,
-    reason,
-    nextAction,
-    outcome: outcome.outcome,
-    severity: outcome.severity,
-    status: outcome.status,
-    readyForWatchedTrial: checklist.readyForWatchedTrial === true,
-    readyForTriggerObservation: checklist.readyForTriggerObservation === true,
-    missingRequired: missingRequired.map((item) => ({
-      key: item.key,
-      label: item.label,
-      note: item.note
-    })),
-    rootCauses: outcome.rootCauses,
-    timeline: {
-      total: timeline.total,
-      lastStage: timeline.last?.stage || "none",
-      hasTriggerSuccess: timeline.hasTriggerSuccess,
-      hasTriggerBlocked: timeline.hasTriggerBlocked,
-      hasStop: timeline.hasStop,
-      hasDisarm: timeline.hasDisarm
-    },
-    guardrails: [
-      "Keep automatic follow-up default-off outside local controlled testing.",
-      "Arm only with explicit human confirmation.",
-      "Keep Emergency Stop and Disarm visible during a watched trial.",
-      "Do not bypass cooldown, silence, policy, busy/speaking, window, or session-cap guards.",
-      "No desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or config writes."
-    ]
-  };
+  return typeof GRAY_TRIAL_READINESS_MODEL.buildGoNoGoDecision === "function"
+    ? GRAY_TRIAL_READINESS_MODEL.buildGoNoGoDecision({ outcome, checklist, timeline })
+    : {
+      readOnly: true,
+      decision: "NO_GO",
+      reason: "Required pre-run checklist items are not complete.",
+      nextAction: "Do not run a real controlled trial yet; complete the checklist or Disarm.",
+      outcome: outcome.outcome,
+      severity: outcome.severity,
+      status: outcome.status,
+      readyForWatchedTrial: checklist.readyForWatchedTrial === true,
+      readyForTriggerObservation: checklist.readyForTriggerObservation === true,
+      missingRequired: [],
+      rootCauses: outcome.rootCauses || [],
+      timeline: { total: timeline.total, lastStage: timeline.last?.stage || "none" },
+      guardrails: []
+    };
 }
 
 function buildGrayAutoTrialGoNoGoDecisionText(limit = 48) {
@@ -4537,54 +4326,27 @@ function buildGrayAutoTrialSignoffPackage(limit = 48) {
   const outcome = buildGrayAutoTrialOutcome(limit);
   const checklist = buildGrayAutoTrialPreRunChecklist();
   const timeline = buildGrayAutoTrialTimeline(limit);
-  const trialId = [
-    "gray-trial",
-    decision.outcome,
-    timeline.last?.seq || 0,
-    Date.now()
-  ].join("-");
-  const manualChecks = [
-    "Emergency Stop button was visible during the trial.",
-    "Disarm button was visible during the trial.",
-    "No desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or config writes were introduced.",
-    "Session cap behavior was reviewed.",
-    "Timeline and audit output were copied before any retry.",
-    "A human explicitly approved any new Arm action."
-  ];
-  const stageRecommendation = decision.decision === "REVIEW_AFTER_SUCCESS"
-    ? "Ready to review for the next phase after manual sign-off."
-    : decision.decision === "GO_FOR_WATCHED_TRIAL"
-      ? "Ready only for a watched local trial, not normal use."
-      : "Not ready for the next phase.";
-  return {
-    readOnly: true,
-    trialId,
-    decision: decision.decision,
-    outcome: outcome.outcome,
-    severity: outcome.severity,
-    stageRecommendation,
-    summary: outcome.summary,
-    nextAction: decision.nextAction,
-    missingRequired: decision.missingRequired,
-    rootCauses: decision.rootCauses,
-    timeline: decision.timeline,
-    manualChecks,
-    signoff: {
-      tester: "",
-      reviewedAt: "",
-      approvedForNextPhase: false,
-      notes: ""
-    },
-    safety: {
+  return typeof GRAY_TRIAL_READINESS_MODEL.buildSignoffPackage === "function"
+    ? GRAY_TRIAL_READINESS_MODEL.buildSignoffPackage(
+      { decision, outcome, checklist, timeline },
+      { now: () => Date.now() }
+    )
+    : {
       readOnly: true,
-      clipboardOnlyAfterClick: true,
-      noEventEmission: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true
-    },
-    checklistReady: checklist.readyForWatchedTrial === true
-  };
+      trialId: ["gray-trial", decision.outcome, timeline.last?.seq || 0, Date.now()].join("-"),
+      decision: decision.decision,
+      outcome: outcome.outcome,
+      severity: outcome.severity,
+      stageRecommendation: "Not ready for the next phase.",
+      summary: outcome.summary,
+      nextAction: decision.nextAction,
+      missingRequired: decision.missingRequired,
+      rootCauses: decision.rootCauses,
+      timeline: decision.timeline,
+      manualChecks: [],
+      signoff: { tester: "", reviewedAt: "", approvedForNextPhase: false, notes: "" },
+      checklistReady: checklist.readyForWatchedTrial === true
+    };
 }
 
 function buildGrayAutoTrialSignoffPackageText(limit = 48) {
@@ -4597,92 +4359,25 @@ function buildGrayAutoTrialSignoffPackageText(limit = 48) {
 function buildGrayAutoTrialCharacterCuePreview(limit = 48) {
   const signoff = buildGrayAutoTrialSignoffPackage(limit);
   const outcome = buildGrayAutoTrialOutcome(limit);
-  const decision = String(signoff.decision || "NO_GO");
-  const outcomeName = String(outcome.outcome || "not_started");
-  const presetByDecision = {
-    REVIEW_AFTER_SUCCESS: {
-      label: "轻轻收尾",
-      mood: "happy",
-      tone: "cooldown",
-      description: "试跑已经有明确结果，角色以低打扰方式收尾和复盘。",
-      sample: "这次结果已经很清楚了，我把它收个尾。"
-    },
-    GO_FOR_WATCHED_TRIAL: {
-      label: "准备接话",
-      mood: "thinking",
-      tone: "ready",
-      description: "如果进入 watched trial，角色会保持低打扰、随时准备轻轻接一句。",
-      sample: "我先在旁边看着，你一声我就接。"
-    },
-    WATCH_ONLY: {
-      label: "观察气氛",
-      mood: "thinking",
-      tone: "watching",
-      description: "当前适合继续观察和整理，不主动推进试运行。",
-      sample: "我先看着，不抢你的节奏。"
-    },
-    NO_GO: {
+  return typeof GRAY_TRIAL_CHARACTER_MODEL.buildCharacterCuePreview === "function"
+    ? GRAY_TRIAL_CHARACTER_MODEL.buildCharacterCuePreview(
+      { signoff, outcome },
+      { buildRuntimeHint: buildFollowupCharacterRuntimeHint }
+    )
+    : {
+      readOnly: true,
+      decision: String(signoff.decision || "NO_GO"),
+      outcome: String(outcome.outcome || "not_started"),
       label: "先安静待着",
       mood: "idle",
       tone: "quiet",
       description: "当前不适合进入试跑，角色保持安静与待命。",
-      sample: "我先安静待着，等你准备好了再说。"
-    }
-  };
-  const presetByOutcome = {
-    success: {
-      label: "轻轻庆祝",
-      mood: "happy",
-      tone: "ready",
-      description: "试跑成功后，角色以轻快但不夸张的方式庆祝一下。",
-      sample: "这次跑通了，我轻轻开心一下就好。"
-    },
-    stopped: {
-      label: "安静收口",
-      mood: "neutral",
-      tone: "quiet",
-      description: "Emergency Stop 后角色收口，保持安静待命。",
-      sample: "我先收口，等你确认下一步。"
-    },
-    disarmed: {
-      label: "安静待机",
-      mood: "idle",
-      tone: "idle",
-      description: "Disarm 后角色回到安静待机，不继续推试跑。",
-      sample: "我先回到待机状态。"
-    }
-  };
-  const preset = presetByOutcome[outcomeName]
-    || presetByDecision[decision]
-    || presetByDecision.NO_GO;
-  const runtimeHint = buildFollowupCharacterRuntimeHint({
-    label: preset.label,
-    tone: preset.tone
-  });
-  return {
-    readOnly: true,
-    decision,
-    outcome: outcomeName,
-    label: preset.label,
-    mood: preset.mood,
-    tone: preset.tone,
-    description: preset.description,
-    sample: preset.sample,
-    runtimeHint,
-    stageRecommendation: signoff.stageRecommendation,
-    nextAction: signoff.nextAction,
-    safety: {
-      noEventEmission: true,
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true
-    }
-  };
+      sample: "我先安静待着，等你准备好了再说。",
+      runtimeHint: buildFollowupCharacterRuntimeHint({ label: "先安静待着", tone: "quiet" }),
+      stageRecommendation: signoff.stageRecommendation,
+      nextAction: signoff.nextAction,
+      safety: { noEventEmission: true, noRuntimeHintEmission: true, noLive2DMove: true, noTts: true, noModelCall: true, noFetch: true, noPollingStart: true, noFollowupExecution: true, noConfigWrites: true }
+    };
 }
 
 function buildGrayAutoTrialCharacterCuePreviewText(limit = 48) {
@@ -4927,82 +4622,24 @@ function buildGrayAutoTrialCharacterExpressionStrategyDraft(limit = 24) {
   const preview = buildGrayAutoTrialCharacterCuePreview(limit);
   const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
   const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
-  const baseRules = [
-    {
-      key: "no_go_quiet",
-      when: "decision=NO_GO or outcome setup is incomplete",
-      label: "先安静待着",
-      tone: "quiet",
-      runtimeHint: buildFollowupCharacterRuntimeHint({ label: "先安静待着", tone: "quiet" }),
-      sample: "我先安静待着，等你准备好了再说。",
-      risk: "lowest",
-      status: preview.decision === "NO_GO" ? "active_candidate" : "candidate"
-    },
-    {
-      key: "watch_only_observe",
-      when: "decision=WATCH_ONLY",
-      label: "观察气氛",
-      tone: "watching",
-      runtimeHint: buildFollowupCharacterRuntimeHint({ label: "观察气氛", tone: "watching" }),
-      sample: "我先看着，不抢你的节奏。",
-      risk: "low",
-      status: preview.decision === "WATCH_ONLY" ? "active_candidate" : "candidate"
-    },
-    {
-      key: "watched_trial_ready",
-      when: "decision=GO_FOR_WATCHED_TRIAL",
-      label: "准备接话",
-      tone: "ready",
-      runtimeHint: buildFollowupCharacterRuntimeHint({ label: "准备接话", tone: "ready" }),
-      sample: "我先在旁边看着，你一声我就接。",
-      risk: "medium",
-      status: preview.decision === "GO_FOR_WATCHED_TRIAL" ? "active_candidate" : "candidate"
-    },
-    {
-      key: "post_success_cooldown",
-      when: "decision=REVIEW_AFTER_SUCCESS or outcome=success",
-      label: "轻轻收尾",
-      tone: "cooldown",
-      runtimeHint: buildFollowupCharacterRuntimeHint({ label: "轻轻收尾", tone: "cooldown" }),
-      sample: "这次结果已经很清楚了，我把它收个尾。",
-      risk: "low",
-      status: preview.decision === "REVIEW_AFTER_SUCCESS" || preview.outcome === "success" ? "active_candidate" : "candidate"
-    },
-    {
-      key: "manual_emit_review",
-      when: "manual cue emit accepted",
-      label: "回看表现",
-      tone: "cooldown",
-      runtimeHint: buildFollowupCharacterRuntimeHint({ label: "回看表现", tone: "cooldown" }),
-      sample: "我先记下这次表现，看看是不是贴合场景。",
-      risk: "low",
-      status: recap.accepted === true ? "active_candidate" : "candidate"
-    }
-  ];
-  const activeRule = baseRules.find((rule) => rule.status === "active_candidate") || baseRules[0];
-  return {
-    readOnly: true,
-    status: "draft_only",
-    decision: preview.decision,
-    outcome: preview.outcome,
-    activeRuleKey: activeRule.key,
-    activeRule,
-    rules: baseRules,
-    manualEmitAccepted: recap.accepted === true,
-    readyForImplementationPlanning: checklist.readyForImplementationPlanning === true,
-    readyForAutomaticRuntime: false,
-    nextAction: "Review the draft rules and one manual emit recap before deciding whether to create a separate strategy implementation task.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true
-    }
-  };
+  return typeof GRAY_TRIAL_CHARACTER_MODEL.buildExpressionStrategyDraft === "function"
+    ? GRAY_TRIAL_CHARACTER_MODEL.buildExpressionStrategyDraft(
+      { preview, checklist, recap },
+      { buildRuntimeHint: buildFollowupCharacterRuntimeHint }
+    )
+    : {
+      readOnly: true,
+      status: "draft_only",
+      decision: preview.decision,
+      outcome: preview.outcome,
+      activeRuleKey: "",
+      activeRule: null,
+      rules: [],
+      manualEmitAccepted: recap.accepted === true,
+      readyForImplementationPlanning: checklist.readyForImplementationPlanning === true,
+      readyForAutomaticRuntime: false,
+      nextAction: "Review the draft rules and one manual emit recap before deciding whether to create a separate strategy implementation task."
+    };
 }
 
 function buildGrayAutoTrialCharacterExpressionStrategyDraftText(limit = 24) {
@@ -5083,93 +4720,30 @@ function buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(limit = 
     : "";
 }
 
+
 function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit = 24) {
   const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
   const strategy = buildGrayAutoTrialCharacterExpressionStrategyDraft(limit);
   const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
   const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
-  const gates = [
-    {
-      key: "default_off",
-      label: "默认关闭自动角色表现",
-      ok: true,
-      required: true,
-      note: "自动 runtime 默认仍为 false。"
-    },
-    {
-      key: "explicit_enable_flag",
-      label: "需要显式启用开关",
-      ok: false,
-      required: true,
-      note: "必须有独立配置或显式运行时开关，不允许隐式打开。"
-    },
-    {
-      key: "separate_task_gate",
-      label: "必须通过独立任务与审查",
-      ok: review.goNoGo === "READY_FOR_SEPARATE_IMPLEMENTATION_TASK",
-      required: true,
-      note: "当前评审包只能给出建议，不直接接自动 runtime。"
-    },
-    {
-      key: "manual_validation",
-      label: "先手动验证 cue 与回看",
-      ok: recap.accepted === true,
-      required: true,
-      note: "至少确认一次手动试发与回看，再考虑自动路径。"
-    },
-    {
-      key: "handoff_check",
-      label: "接入前检查必须通过",
-      ok: checklist.readyForImplementationPlanning === true,
-      required: true,
-      note: "handoff checklist 仍然是自动接入前提。"
-    },
-    {
-      key: "safety_stop",
-      label: "必须有可用的安全停止",
-      ok: true,
-      required: true,
-      note: "Emergency Stop 与 Disarm 必须继续存在。"
-    }
-  ];
-  const blockingRequired = gates.filter((gate) => gate.required === true && gate.ok !== true);
-  const canPlanRollout = blockingRequired.length === 0;
-  return {
-    readOnly: true,
-    status: canPlanRollout ? "safe_to_plan" : "blocked_for_auto_runtime",
-    canPlanRollout,
-    goNoGo: review.goNoGo,
-    decision: review.decision,
-    outcome: review.outcome,
-    strategyStatus: strategy.status,
-    ruleCount: strategy.rules.length,
-    manualEmitAccepted: recap.accepted === true,
-    checklistReady: checklist.readyForImplementationPlanning === true,
-    gates,
-    blockingRequired,
-    rolloutStages: [
-      "stage_0_review_only",
-      "stage_1_explicit_flag",
-      "stage_2_single_session_guard",
-      "stage_3_manual_validation",
-      "stage_4_limited_gray_rollout",
-      "stage_5_observed_runtime_hardening"
-    ],
-    nextAction: canPlanRollout
-      ? "Draft the separate automatic runtime implementation plan and keep default-off behavior."
-      : "Keep reviewing the draft, recap, and handoff checklist before planning any automatic runtime path.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      readyForAutomaticRuntime: false
-    }
-  };
+  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSafetyPlan === "function"
+    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSafetyPlan({ review, strategy, recap, checklist })
+    : {
+      readOnly: true,
+      status: "blocked_for_auto_runtime",
+      canPlanRollout: false,
+      goNoGo: review.goNoGo,
+      decision: review.decision,
+      outcome: review.outcome,
+      strategyStatus: strategy.status,
+      ruleCount: Array.isArray(strategy.rules) ? strategy.rules.length : 0,
+      manualEmitAccepted: recap.accepted === true,
+      checklistReady: checklist.readyForImplementationPlanning === true,
+      gates: [],
+      blockingRequired: [{ key: "switch_model_unavailable", note: "auto runtime switch model unavailable" }],
+      rolloutStages: [],
+      nextAction: "Keep automatic character runtime disabled."
+    };
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText(limit = 24) {
@@ -5183,46 +4757,22 @@ function buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit = 24) {
   const plan = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
   const strategy = buildGrayAutoTrialCharacterExpressionStrategyDraft(limit);
   const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
-  const activeRule = strategy.activeRule || {};
-  const runtimeHint = activeRule.runtimeHint || null;
-  const blockedReasons = [];
-  if (plan.canPlanRollout !== true) {
-    blockedReasons.push("auto_runtime_safety_plan_blocked");
-  }
-  if (review.goNoGo !== "READY_FOR_SEPARATE_IMPLEMENTATION_TASK") {
-    blockedReasons.push("strategy_review_not_ready");
-  }
-  if (!runtimeHint) {
-    blockedReasons.push("runtime_hint_missing");
-  }
-  const wouldSelectRule = !!runtimeHint;
-  return {
-    readOnly: true,
-    status: blockedReasons.length ? "blocked" : "would_select",
-    wouldEmit: false,
-    wouldSelectRule,
-    selectedRuleKey: activeRule.key || "",
-    selectedRule: activeRule,
-    runtimeHint,
-    blockedReasons,
-    planStatus: plan.status,
-    goNoGo: review.goNoGo,
-    dryRunOnly: true,
-    nextAction: blockedReasons.length
-      ? "Keep automatic runtime disabled; resolve blockers before implementation."
-      : "This would select a rule, but still requires a separate explicit implementation task before any automatic emission.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      readyForAutomaticRuntime: false
-    }
-  };
+  return typeof GRAY_TRIAL_CHARACTER_MODEL.buildAutoRuntimeDryRun === "function"
+    ? GRAY_TRIAL_CHARACTER_MODEL.buildAutoRuntimeDryRun({ plan, strategy, review })
+    : {
+      readOnly: true,
+      status: "blocked",
+      wouldEmit: false,
+      wouldSelectRule: false,
+      selectedRuleKey: "",
+      selectedRule: null,
+      runtimeHint: null,
+      blockedReasons: ["character_model_unavailable"],
+      planStatus: plan.status,
+      goNoGo: review.goNoGo,
+      dryRunOnly: true,
+      nextAction: "Keep automatic runtime disabled; resolve blockers before implementation."
+    };
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeDryRunText(limit = 24) {
@@ -5232,99 +4782,31 @@ function buildGrayAutoTrialCharacterAutoRuntimeDryRunText(limit = 24) {
     : "";
 }
 
+
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit = 24) {
   const plan = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
   const dryRun = buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit);
   const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
   const session = buildGrayAutoTrialSessionState();
-  const requirements = [
-    {
-      key: "default_off_baseline",
-      label: "\u9ed8\u8ba4\u5173\u95ed\u57fa\u7ebf",
-      ok: true,
-      required: true,
-      note: "\u5f53\u524d\u4efb\u52a1\u4e0d\u65b0\u589e\u914d\u7f6e\u5f00\u5173\uff0c\u4e5f\u4e0d\u6539\u4efb\u4f55\u9ed8\u8ba4\u503c\u3002"
-    },
-    {
-      key: "explicit_config_switch",
-      label: "\u9700\u8981\u663e\u5f0f\u914d\u7f6e\u5f00\u5173",
-      ok: false,
-      required: true,
-      note: "\u672a\u6765\u5fc5\u987b\u6709\u72ec\u7acb\u914d\u7f6e\u9879\u6216\u540c\u7b49\u663e\u5f0f\u5f00\u5173\uff0c\u4e0d\u5141\u8bb8\u968f\u7070\u5ea6\u8bd5\u8fd0\u884c\u9690\u5f0f\u5f00\u542f\u3002"
-    },
-    {
-      key: "separate_runtime_task",
-      label: "\u9700\u8981\u72ec\u7acb runtime \u63a5\u5165\u4efb\u52a1",
-      ok: false,
-      required: true,
-      note: "\u6b64\u5904\u53ea\u5b9a\u4e49\u5f00\u5173\u95e8\u7981\uff0c\u4e0d\u628a dry-run \u63a5\u5230\u81ea\u52a8\u53d1\u5c04\u8def\u5f84\u3002"
-    },
-    {
-      key: "review_package_ready",
-      label: "\u7b56\u7565\u8bc4\u5ba1\u5305\u5148\u8fbe\u5230 Go",
-      ok: review.goNoGo === "READY_FOR_SEPARATE_IMPLEMENTATION_TASK",
-      required: true,
-      note: "\u53ea\u6709\u8bc4\u5ba1\u5305\u8ba4\u4e3a\u53ef\u4ee5\u8fdb\u5165\u72ec\u7acb\u5b9e\u73b0\u4efb\u52a1\u65f6\uff0c\u624d\u80fd\u7ee7\u7eed\u8003\u8651\u5f00\u5173\u63a5\u5165\u3002"
-    },
-    {
-      key: "dry_run_selects_rule",
-      label: "dry-run \u80fd\u9009\u4e2d\u89c4\u5219",
-      ok: dryRun.wouldSelectRule === true,
-      required: true,
-      note: "\u5148\u8bc1\u660e\u53ea\u8bfb dry-run \u53ef\u7a33\u5b9a\u9009\u89c4\u5219\uff1b\u5373\u4f7f\u901a\u8fc7\uff0c\u672c\u4efb\u52a1\u4ecd\u4fdd\u6301 wouldEmit=false\u3002"
-    },
-    {
-      key: "single_session_cap",
-      label: "\u5355\u4f1a\u8bdd\u4e0a\u9650\u7ee7\u7eed\u751f\u6548",
-      ok: Number(session.max || 0) === 1,
-      required: true,
-      note: "\u9996\u6b21\u771f\u6b63\u63a5\u5165\u65f6\u5fc5\u987b\u7ee7\u7eed\u53d7\u5355\u4f1a\u8bdd\u4e0a\u9650\u4fdd\u62a4\u3002"
-    },
-    {
-      key: "manual_stop_available",
-      label: "Emergency Stop / Disarm \u4fdd\u6301\u53ef\u7528",
-      ok: true,
-      required: true,
-      note: "\u4efb\u4f55\u8bd5\u9a8c\u6001\u90fd\u5fc5\u987b\u80fd\u7acb\u5373 stop/disarm\uff0c\u4e0d\u80fd\u7ed5\u8fc7\u73b0\u6709\u5b89\u5168\u94fe\u8def\u3002"
-    }
-  ];
-  const blockingRequired = requirements.filter((item) => item.required === true && item.ok !== true);
-  return {
-    readOnly: true,
-    status: blockingRequired.length ? "blocked_until_explicit_switch_task" : "ready_to_design_switch_task",
-    proposedSwitchKey: "gray_auto_followup_character_runtime_enabled",
-    proposedDefault: false,
-    switchExists: false,
-    wouldEnable: false,
-    automaticRuntimeConnected: false,
-    wouldEmit: false,
-    planStatus: plan.status,
-    dryRunStatus: dryRun.status,
-    goNoGo: review.goNoGo,
-    requirements,
-    blockingRequired,
-    proposedRuntimeStates: [
-      "off",
-      "preview_only",
-      "explicit_switch_on",
-      "single_session_runtime",
-      "stopped_or_disarmed"
-    ],
-    nextAction: blockingRequired.length
-      ? "Keep automatic character runtime disabled; resolve required switch gates in a separate task before implementation."
-      : "Create a separate explicit-switch implementation task; keep default-off and preserve emergency stop/disarm behavior.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      readyForAutomaticRuntime: false
-    }
-  };
+  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchPlan === "function"
+    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchPlan({ plan, dryRun, review, session })
+    : {
+      readOnly: true,
+      status: "blocked_until_explicit_switch_task",
+      proposedSwitchKey: "gray_auto_followup_character_runtime_enabled",
+      proposedDefault: false,
+      switchExists: false,
+      wouldEnable: false,
+      automaticRuntimeConnected: false,
+      wouldEmit: false,
+      planStatus: plan.status,
+      dryRunStatus: dryRun.status,
+      goNoGo: review.goNoGo,
+      requirements: [],
+      blockingRequired: [{ key: "switch_model_unavailable", note: "auto runtime switch model unavailable" }],
+      proposedRuntimeStates: [],
+      nextAction: "Keep automatic character runtime disabled."
+    };
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(limit = 24) {
@@ -5334,68 +4816,30 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(limit = 24
     : "";
 }
 
+
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit = 24) {
   const switchPlan = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
   const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
   const dryRun = buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit);
   const plan = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
-  const missing = [];
-  if (switchPlan.status !== "ready_to_design_switch_task") {
-    missing.push({
-      key: "switch_plan_ready",
-      reason: "explicit switch plan is still blocked and should stay read-only"
-    });
-  }
-  if (review.goNoGo !== "READY_FOR_SEPARATE_IMPLEMENTATION_TASK") {
-    missing.push({
-      key: "strategy_review_ready",
-      reason: "strategy review has not reached separate implementation readiness"
-    });
-  }
-  if (dryRun.wouldSelectRule !== true) {
-    missing.push({
-      key: "dry_run_selection",
-      reason: "dry-run does not currently select a runtime rule"
-    });
-  }
-  if (plan.canPlanRollout !== true) {
-    missing.push({
-      key: "safety_plan_ready",
-      reason: "safety plan still blocks rollout planning"
-    });
-  }
-  const goNoGo = missing.length === 0
-    ? "READY_FOR_SEPARATE_SWITCH_IMPLEMENTATION_TASK"
-    : "NO_GO_FOR_AUTOMATIC_RUNTIME";
-  return {
-    readOnly: true,
-    status: missing.length ? "blocked_for_explicit_switch_task" : "ready_for_explicit_switch_task",
-    goNoGo,
-    switchPlanStatus: switchPlan.status,
-    switchPlanDefault: switchPlan.proposedDefault === false,
-    strategyGoNoGo: review.goNoGo,
-    dryRunStatus: dryRun.status,
-    dryRunWouldSelectRule: dryRun.wouldSelectRule === true,
-    planStatus: plan.status,
-    requirements: switchPlan.requirements,
-    blockingRequired: switchPlan.blockingRequired,
-    missing,
-    approvedForNextPhase: false,
-    nextAction: missing.length
-      ? "Keep the explicit switch read-only and resolve the blockers before any separate implementation task."
-      : "Create a separate explicit switch implementation task; keep default-off and do not connect automatic runtime yet.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      readyForAutomaticRuntime: false
-    }
-  };
+  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchReviewPackage === "function"
+    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchReviewPackage({ switchPlan, review, dryRun, plan })
+    : {
+      readOnly: true,
+      status: "blocked_for_explicit_switch_task",
+      goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME",
+      switchPlanStatus: switchPlan.status,
+      switchPlanDefault: switchPlan.proposedDefault === false,
+      strategyGoNoGo: review.goNoGo,
+      dryRunStatus: dryRun.status,
+      dryRunWouldSelectRule: dryRun.wouldSelectRule === true,
+      planStatus: plan.status,
+      requirements: switchPlan.requirements || [],
+      blockingRequired: switchPlan.blockingRequired || [],
+      missing: [{ key: "switch_model_unavailable", reason: "auto runtime switch model unavailable" }],
+      approvedForNextPhase: false,
+      nextAction: "Keep the explicit switch read-only."
+    };
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackageText(limit = 24) {
@@ -5405,101 +4849,27 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackageText(l
     : "";
 }
 
+
 function buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit = 24) {
   const reviewPackage = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit);
   const switchPlan = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
   const dryRun = buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit);
-  const acceptanceChecks = [
-    {
-      key: "default_off_after_restart",
-      label: "\u91cd\u542f\u540e\u9ed8\u8ba4\u5173\u95ed",
-      required: true,
-      ready: false,
-      verify: "\u6ca1\u6709\u663e\u5f0f\u914d\u7f6e\u6216\u786e\u8ba4\u65f6\uff0c\u81ea\u52a8\u89d2\u8272 runtime \u5fc5\u987b\u4fdd\u6301\u5173\u95ed\u3002"
-    },
-    {
-      key: "wrong_confirmation_noop",
-      label: "\u9519\u8bef\u786e\u8ba4\u77ed\u8bed\u4e0d\u751f\u6548",
-      required: true,
-      ready: false,
-      verify: "\u9519\u8bef\u6216\u7a7a\u786e\u8ba4\u4e0d\u80fd\u542f\u7528\u5f00\u5173\uff0c\u4e5f\u4e0d\u80fd\u53d1 runtime cue\u3002"
-    },
-    {
-      key: "explicit_switch_only",
-      label: "\u53ea\u5141\u8bb8\u663e\u5f0f\u5f00\u5173\u8def\u5f84",
-      required: true,
-      ready: switchPlan.proposedDefault === false,
-      verify: "\u4e0d\u5141\u8bb8\u968f arm\u3001dry-run\u3001readiness \u9762\u677f\u6216\u8bc4\u5ba1\u5305\u88ab\u9690\u5f0f\u6253\u5f00\u3002"
-    },
-    {
-      key: "single_session_cap_kept",
-      label: "\u5355\u4f1a\u8bdd\u4e0a\u9650\u4fdd\u7559",
-      required: true,
-      ready: true,
-      verify: "\u9996\u6b21\u5b9e\u73b0\u540e\u4ecd\u9700\u590d\u7528\u73b0\u6709\u5355\u4f1a\u8bdd cap\uff0c\u9632\u6b62\u8fde\u7eed\u53d1\u5c04\u3002"
-    },
-    {
-      key: "emergency_stop_disarm_kept",
-      label: "Emergency Stop / Disarm \u4fdd\u6301\u6536\u53e3",
-      required: true,
-      ready: true,
-      verify: "\u4efb\u4f55\u8bd5\u9a8c\u4e2d\u90fd\u5fc5\u987b\u80fd stop/disarm\uff0c\u5e76\u7acb\u5373\u505c\u6b62\u81ea\u52a8 runtime \u5c1d\u8bd5\u3002"
-    },
-    {
-      key: "no_scheduler_side_effect_from_review",
-      label: "\u8bc4\u5ba1\u4e0e\u9a8c\u6536\u4e0d\u6539 scheduler",
-      required: true,
-      ready: true,
-      verify: "\u6253\u5f00\u9762\u677f\u3001\u8c03\u7528 helper\u3001\u590d\u5236\u9a8c\u6536\u5305\u90fd\u4e0d\u80fd arm/reset/start polling/trigger follow-up\u3002"
-    },
-    {
-      key: "no_config_write_from_review",
-      label: "\u8bc4\u5ba1\u4e0e\u9a8c\u6536\u4e0d\u5199\u914d\u7f6e",
-      required: true,
-      ready: true,
-      verify: "\u5f53\u524d\u9a8c\u6536\u5305\u53ea\u8bfb\uff0c\u4e0d\u5199 config\u3001\u4e0d\u4fee\u6539\u9ed8\u8ba4\u503c\u3002"
-    },
-    {
-      key: "no_privacy_surface_expansion",
-      label: "\u4e0d\u6269\u5c55\u9690\u79c1\u98ce\u9669\u9762",
-      required: true,
-      ready: true,
-      verify: "\u4e0d\u89c2\u5bdf\u684c\u9762\u3001\u4e0d\u622a\u56fe\u3001\u4e0d\u8bfb\u6587\u4ef6\u3001\u4e0d\u6267\u884c shell/tool/backend \u8c03\u7528\u3002"
-    },
-    {
-      key: "runtime_emission_still_not_connected",
-      label: "\u81ea\u52a8 runtime \u53d1\u5c04\u4ecd\u672a\u63a5\u5165",
-      required: true,
-      ready: dryRun.wouldEmit === false,
-      verify: "\u672c\u9a8c\u6536\u5305\u4e0d\u63a5 maybeEmitFollowupCharacterRuntimeHint\uff0c\u4e0d\u79fb\u52a8 Live2D\uff0c\u4e0d\u64ad TTS\u3002"
-    }
-  ];
-  const blockingRequired = acceptanceChecks.filter((item) => item.required === true && item.ready !== true);
-  return {
-    readOnly: true,
-    status: blockingRequired.length ? "acceptance_not_ready" : "acceptance_ready_for_separate_task",
-    goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME",
-    implementationReady: false,
-    approvedForNextPhase: false,
-    reviewGoNoGo: reviewPackage.goNoGo,
-    switchPlanStatus: switchPlan.status,
-    dryRunStatus: dryRun.status,
-    acceptanceChecks,
-    blockingRequired,
-    manualVerificationRequired: true,
-    nextAction: "Use this package as acceptance criteria for a later separate switch implementation task; keep automatic runtime disabled now.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      readyForAutomaticRuntime: false
-    }
-  };
+  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSwitchAcceptancePackage === "function"
+    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSwitchAcceptancePackage({ reviewPackage, switchPlan, dryRun })
+    : {
+      readOnly: true,
+      status: "acceptance_not_ready",
+      goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME",
+      implementationReady: false,
+      approvedForNextPhase: false,
+      reviewGoNoGo: reviewPackage.goNoGo,
+      switchPlanStatus: switchPlan.status,
+      dryRunStatus: dryRun.status,
+      acceptanceChecks: [],
+      blockingRequired: [{ key: "switch_model_unavailable", verify: "auto runtime switch model unavailable" }],
+      manualVerificationRequired: true,
+      nextAction: "Keep automatic runtime disabled now."
+    };
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackageText(limit = 24) {
@@ -5513,52 +4883,46 @@ function getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled() {
   return state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled === true;
 }
 
-function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit = 24) {
-  const acceptance = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
-  const enabled = getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled();
-  const blockedReasons = [];
-  if (acceptance.status !== "acceptance_ready_for_separate_task") {
-    blockedReasons.push("acceptance_not_ready");
-  }
-  if (acceptance.manualVerificationRequired === true) {
-    blockedReasons.push("manual_verification_required");
-  }
+function getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchState() {
   return {
-    readOnly: true,
-    status: enabled ? "enabled_local_flag_only" : (blockedReasons.length ? "blocked" : "disabled"),
-    enabled,
-    canEnable: blockedReasons.length === 0,
-    canDisable: true,
-    switchKey: "gray_auto_followup_character_runtime_enabled",
-    requiredConfirm: "ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH",
-    disabledReason: blockedReasons.length ? "acceptance_not_ready" : "off_by_default",
-    blockedReasons,
-    acceptanceStatus: acceptance.status,
-    acceptanceGoNoGo: acceptance.goNoGo,
-    acceptanceReady: acceptance.status === "acceptance_ready_for_separate_task",
-    manualVerificationRequired: acceptance.manualVerificationRequired === true,
-    autoRuntimeConnected: false,
+    enabled: getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled(),
     lastAction: String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastAction || ""),
     lastReason: String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastReason || ""),
     updatedAt: Number(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchUpdatedAt || 0),
     rollbackAt: Number(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackAt || 0),
-    rollbackReason: String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackReason || ""),
-    defaultOffBaseline: true,
-    nextAction: enabled
-      ? "Use the Rollback control to return to default-off, or the Disable control to clear the local switch flag; automatic runtime remains disconnected."
-      : "Keep the switch off until the acceptance package becomes ready; the control only changes local state.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      readyForAutomaticRuntime: false
-    }
+    rollbackReason: String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackReason || "")
   };
+}
+
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit = 24) {
+  const acceptance = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
+  const switchState = getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchState();
+  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchControl === "function"
+    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchControl({ acceptance, switchState })
+    : {
+      readOnly: true,
+      status: switchState.enabled ? "enabled_local_flag_only" : "blocked",
+      enabled: switchState.enabled,
+      canEnable: false,
+      canDisable: true,
+      switchKey: "gray_auto_followup_character_runtime_enabled",
+      requiredConfirm: "ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH",
+      disabledReason: "acceptance_not_ready",
+      blockedReasons: ["switch_model_unavailable"],
+      acceptanceStatus: acceptance.status,
+      acceptanceGoNoGo: acceptance.goNoGo,
+      acceptanceReady: false,
+      manualVerificationRequired: true,
+      autoRuntimeConnected: false,
+      lastAction: switchState.lastAction,
+      lastReason: switchState.lastReason,
+      updatedAt: switchState.updatedAt,
+      rollbackAt: switchState.rollbackAt,
+      rollbackReason: switchState.rollbackReason,
+      defaultOffBaseline: true,
+      nextAction: "Keep the switch off."
+    };
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText(limit = 24) {
@@ -5568,64 +4932,25 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText(limit =
     : "";
 }
 
+
 function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit = 24) {
   const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
   const acceptance = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
-  const blockerDetails = [];
-  if (control.blockedReasons.includes("acceptance_not_ready")) {
-    blockerDetails.push({
-      key: "acceptance_not_ready",
-      label: "\u663e\u5f0f\u5f00\u5173\u9a8c\u6536\u5c1a\u672a\u5c31\u7eea",
-      impact: "\u542f\u7528\u5f00\u5173\u4f1a\u88ab\u963b\u6b62\uff0c\u672c\u5730\u6807\u8bb0\u4fdd\u6301\u5173\u95ed\u3002",
-      nextAction: "\u5148\u590d\u6838\u9a8c\u6536\u5305\u4e2d\u7684\u9ed8\u8ba4\u5173\u95ed\u3001\u9519\u8bef\u786e\u8ba4 no-op\u3001stop/disarm \u548c\u4e0d\u5199\u914d\u7f6e\u6761\u4ef6\u3002"
-    });
-  }
-  if (control.blockedReasons.includes("manual_verification_required")) {
-    blockerDetails.push({
-      key: "manual_verification_required",
-      label: "\u9700\u8981\u4eba\u5de5\u9a8c\u6536",
-      impact: "\u5373\u4f7f\u4ee3\u7801\u9759\u6001\u68c0\u67e5\u901a\u8fc7\uff0c\u4e5f\u4e0d\u5e94\u81ea\u52a8\u8ba4\u5b9a\u53ef\u542f\u7528\u3002",
-      nextAction: "\u7531\u672c\u5730\u89c2\u5bdf\u8005\u6309 smoke checklist \u624b\u52a8\u786e\u8ba4\u540e\uff0c\u518d\u5355\u72ec\u63a8\u8fdb\u5f00\u5173\u5b9e\u73b0\u4efb\u52a1\u3002"
-    });
-  }
-  const acceptanceBlocking = acceptance.blockingRequired.map((item) => ({
-    key: item.key,
-    label: item.label,
-    impact: "\u8be5\u9a8c\u6536\u9879\u672a\u51c6\u5907\u597d\uff0c\u4e0d\u80fd\u4f5c\u4e3a\u81ea\u52a8 runtime \u5f00\u5173\u7684\u901a\u884c\u6761\u4ef6\u3002",
-    nextAction: item.verify
-  }));
-  const operatorChecklist = [
-    "\u786e\u8ba4\u6253\u5f00 readiness \u9762\u677f\u4e0d\u4f1a arm/reset/start polling\u3002",
-    "\u786e\u8ba4\u590d\u5236\u72b6\u6001\u548c\u590d\u5236\u8bca\u65ad\u4ec5\u5199\u526a\u8d34\u677f\u3002",
-    "\u786e\u8ba4\u542f\u7528\u5f00\u5173\u5728\u9a8c\u6536\u672a\u5c31\u7eea\u65f6\u4fdd\u6301\u7981\u7528\u6216\u8fd4\u56de\u963b\u6b62\u3002",
-    "\u786e\u8ba4\u5173\u95ed\u5f00\u5173\u53ea\u6e05\u9664\u672c\u5730\u6807\u8bb0\uff0c\u4e0d\u5199 config\u3002"
-  ];
-  return {
-    readOnly: true,
-    status: control.canEnable ? "ready_to_confirm_local_flag" : "blocked_explained",
-    enabled: control.enabled,
-    canEnable: control.canEnable,
-    canDisable: control.canDisable,
-    disabledReason: control.disabledReason,
-    blockedReasons: control.blockedReasons,
-    blockerDetails,
-    acceptanceBlocking,
-    operatorChecklist,
-    nextAction: control.canEnable
-      ? "Only enable after explicit local confirmation; automatic runtime still remains disconnected."
-      : "Keep the switch off and review blocker details before any further implementation step.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      readyForAutomaticRuntime: false
-    }
-  };
+  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSwitchControlDiagnostics === "function"
+    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSwitchControlDiagnostics({ control, acceptance })
+    : {
+      readOnly: true,
+      status: "blocked_explained",
+      enabled: control.enabled,
+      canEnable: false,
+      canDisable: control.canDisable,
+      disabledReason: control.disabledReason,
+      blockedReasons: control.blockedReasons || [],
+      blockerDetails: [],
+      acceptanceBlocking: [],
+      operatorChecklist: [],
+      nextAction: "Keep the switch off."
+    };
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(limit = 24) {
@@ -5635,51 +4960,31 @@ function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(limi
     : "";
 }
 
+
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit = 24) {
   const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
   const diagnostics = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit);
-  const rollbackAt = Number(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackAt || 0);
-  const rollbackReason = String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackReason || "");
-  const rollbackRecorded = rollbackAt > 0;
-  const enabled = control.enabled === true;
-  const canRollback = enabled === true;
-  return {
-    readOnly: true,
-    ok: true,
-    status: enabled ? "rollback_ready" : rollbackRecorded ? "default_off_restored" : "default_off",
-    enabled,
-    canRollback,
-    defaultOffBaseline: true,
-    switchKey: control.switchKey,
-    controlStatus: control.status,
-    diagnosticsStatus: diagnostics.status,
-    rollbackAt,
-    rollbackReason,
-    rollbackRecorded,
-    lastAction: String(control.lastAction || ""),
-    lastReason: String(control.lastReason || ""),
-    nextAction: enabled
-      ? "Click the rollback button to clear the local switch flag and keep scheduler/config untouched."
-      : rollbackRecorded
-        ? "The switch is already back to default-off; restart the app if you want a blank renderer-memory slate."
-        : "The switch is already default-off; keep the rollback action available for later local reset use.",
-    steps: [
-      "Clear the local explicit switch flag.",
-      "Leave scheduler, config, and automatic runtime disconnected.",
-      "Restart the app only if you want to clear renderer-memory trial history."
-    ],
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      readyForAutomaticRuntime: false
-    }
-  };
+  const switchState = getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchState();
+  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchRollbackPackage === "function"
+    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchRollbackPackage({ control, diagnostics, switchState })
+    : {
+      readOnly: true,
+      ok: true,
+      status: switchState.enabled ? "rollback_ready" : "default_off",
+      enabled: switchState.enabled,
+      canRollback: switchState.enabled,
+      defaultOffBaseline: true,
+      switchKey: control.switchKey,
+      controlStatus: control.status,
+      diagnosticsStatus: diagnostics.status,
+      rollbackAt: switchState.rollbackAt,
+      rollbackReason: switchState.rollbackReason,
+      rollbackRecorded: Number(switchState.rollbackAt || 0) > 0,
+      lastAction: control.lastAction,
+      lastReason: control.lastReason,
+      nextAction: "Keep the switch default-off.",
+      steps: []
+    };
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(limit = 24) {
@@ -5689,6 +4994,7 @@ function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText
     : "";
 }
 
+
 function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit = 24) {
   const plan = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
   const review = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit);
@@ -5696,130 +5002,23 @@ function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit = 24) {
   const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
   const diagnostics = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit);
   const rollback = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit);
-  const gates = [
-    {
-      key: "plan_read_only",
-      label: "显式开关计划保持只读",
-      ok: plan.readOnly === true,
-      required: true,
-      note: "计划仍只提供读-only 参考，不开启自动 runtime。"
-    },
-    {
-      key: "review_read_only",
-      label: "显式开关评审保持只读",
-      ok: review.readOnly === true,
-      required: true,
-      note: "评审包仍只提供 blockers 与 nextAction，不直接实施。"
-    },
-    {
-      key: "acceptance_read_only",
-      label: "显式开关验收保持只读",
-      ok: acceptance.readOnly === true,
-      required: true,
-      note: "验收包仍只做 acceptance criteria，不接自动 runtime。"
-    },
-    {
-      key: "control_local_only",
-      label: "显式开关控制仍是本地态",
-      ok: control.readOnly === true && control.autoRuntimeConnected === false,
-      required: true,
-      note: "控制层只能改本地标记，不能连接自动 runtime。"
-    },
-    {
-      key: "diagnostics_read_only",
-      label: "显式开关诊断保持只读",
-      ok: diagnostics.readOnly === true,
-      required: true,
-      note: "诊断包只解释 blocker，不改变控制状态。"
-    },
-    {
-      key: "rollback_local_only",
-      label: "回滚保持本地恢复",
-      ok: rollback.readOnly === true && rollback.defaultOffBaseline === true,
-      required: true,
-      note: "回滚只恢复默认关闭，不写 config，不改 scheduler。"
-    },
-    {
-      key: "default_off_kept",
-      label: "默认关闭基线仍保持",
-      ok: control.enabled !== true && control.defaultOffBaseline === true && rollback.defaultOffBaseline === true,
-      required: true,
-      note: "默认关闭仍是当前安全基线。"
-    },
-    {
-      key: "runtime_disconnected",
-      label: "自动 runtime 仍未接入",
-      ok: control.autoRuntimeConnected === false && acceptance.safety?.readyForAutomaticRuntime === false,
-      required: true,
-      note: "当前链条仍不连接自动 runtime。"
-    },
-    {
-      key: "separate_task_required",
-      label: "后续仍需独立实现任务",
-      ok: review.goNoGo === "READY_FOR_SEPARATE_IMPLEMENTATION_TASK" && acceptance.goNoGo === "NO_GO_FOR_AUTOMATIC_RUNTIME",
-      required: true,
-      note: "这里只是准备收口，不是实际接入。"
-    }
-  ];
-  const blockingRequired = gates.filter((gate) => gate.required === true && gate.ok !== true);
-  const handoffReady = blockingRequired.length === 0;
-  return {
-    readOnly: true,
-    ok: handoffReady,
-    status: handoffReady ? "ready_for_separate_implementation_task" : "blocked_for_handoff",
-    goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME",
-    implementationReady: false,
-    separateImplementationTaskReady: handoffReady,
-    defaultOffBaseline: true,
-    automaticRuntimeConnected: false,
-    manualVerificationRequired: acceptance.manualVerificationRequired === true || control.manualVerificationRequired === true,
-    chain: {
-      plan: {
-        status: plan.status,
-        readOnly: plan.readOnly === true
-      },
-      review: {
-        status: review.status,
-        goNoGo: review.goNoGo,
-        readOnly: review.readOnly === true
-      },
-      acceptance: {
-        status: acceptance.status,
-        goNoGo: acceptance.goNoGo,
-        readOnly: acceptance.readOnly === true
-      },
-      control: {
-        status: control.status,
-        enabled: control.enabled === true,
-        autoRuntimeConnected: control.autoRuntimeConnected === true,
-        readOnly: control.readOnly === true
-      },
-      diagnostics: {
-        status: diagnostics.status,
-        readOnly: diagnostics.readOnly === true
-      },
-      rollback: {
-        status: rollback.status,
-        readOnly: rollback.readOnly === true
-      }
-    },
-    gates,
-    blockingRequired,
-    nextAction: handoffReady
-      ? "Draft the separate explicit switch implementation task; keep automatic runtime disabled and default-off."
-      : "Keep the chain read-only and resolve the blocking gates before drafting any separate implementation task.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      readyForAutomaticRuntime: false
-    }
-  };
+  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildFinalPreflight === "function"
+    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildFinalPreflight({ plan, review, acceptance, control, diagnostics, rollback })
+    : {
+      readOnly: true,
+      ok: false,
+      status: "blocked_for_handoff",
+      goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME",
+      implementationReady: false,
+      separateImplementationTaskReady: false,
+      defaultOffBaseline: true,
+      automaticRuntimeConnected: false,
+      manualVerificationRequired: true,
+      chain: {},
+      gates: [],
+      blockingRequired: [{ key: "switch_model_unavailable", note: "auto runtime switch model unavailable" }],
+      nextAction: "Keep the chain read-only."
+    };
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(limit = 24) {
@@ -5829,76 +5028,26 @@ function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(limit = 24) {
     : "";
 }
 
+
 function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit = 24) {
   const preflight = buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit);
-  const implementationModules = [
-    {
-      file: "web/chat.js",
-      role: "Keep the readiness panel draft and its copy action local-only until the later runtime implementation task is created."
-    },
-    {
-      file: "app.py",
-      role: "Later wire the real runtime execution entry point and guard checks into the backend path."
-    },
-    {
-      file: "character_runtime.py",
-      role: "Keep runtime metadata and prompt-contract changes behind the same safety boundary."
-    },
-    {
-      file: "config.py",
-      role: "Keep the gray auto gate default-off and preserve validation rules."
-    },
-    {
-      file: "config.example.json",
-      role: "Keep the example config honest and default-off."
-    }
-  ];
-  const safetyBoundaries = [
-    "default-off stays the baseline",
-    "do not write config",
-    "do not connect automatic runtime by default",
-    "do not change scheduler defaults",
-    "do not emit runtime cues",
-    "do not move Live2D",
-    "do not play TTS",
-    "do not request model output",
-    "do not start polling",
-    "do not execute follow-up"
-  ];
-  const verificationPlan = [
-    "After the later implementation task, rerun node --check, py_compile, JSON validation, and git diff --check.",
-    "Confirm the panel draft still reads as read-only and can be copied only by explicit user click.",
-    "Confirm the later implementation task keeps the same default-off, scheduler, and runtime boundaries."
-  ];
-  return {
-    readOnly: true,
-    ok: preflight.ok === true && preflight.separateImplementationTaskReady === true,
-    status: preflight.ok === true && preflight.separateImplementationTaskReady === true
-      ? "separate_implementation_draft_ready"
-      : "blocked_for_draft",
-    defaultOffBaseline: true,
-    automaticRuntimeConnected: false,
-    implementationStarted: false,
-    chainReady: preflight.ok === true && preflight.separateImplementationTaskReady === true,
-    preflightStatus: preflight.status,
-    preflightReady: preflight.separateImplementationTaskReady === true,
-    implementationModules,
-    safetyBoundaries,
-    verificationPlan,
-    nextAction: "Use this as the skeleton for a later separate implementation task; do not wire automatic runtime yet.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noConfigWrites: true,
-      noSchedulerDefaultChange: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      readyForAutomaticRuntime: false
-    }
-  };
+  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSeparateImplementationDraft === "function"
+    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSeparateImplementationDraft({ preflight })
+    : {
+      readOnly: true,
+      ok: false,
+      status: "blocked_for_draft",
+      defaultOffBaseline: true,
+      automaticRuntimeConnected: false,
+      implementationStarted: false,
+      chainReady: false,
+      preflightStatus: preflight.status,
+      preflightReady: false,
+      implementationModules: [],
+      safetyBoundaries: [],
+      verificationPlan: [],
+      nextAction: "Do not wire automatic runtime yet."
+    };
 }
 
 function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftText(limit = 24) {
