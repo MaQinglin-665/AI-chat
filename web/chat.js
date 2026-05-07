@@ -7120,7 +7120,8 @@ function ensureFollowupReadinessPanel() {
     copyTemplate
   ]);
   const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup("\u9ad8\u98ce\u9669\u672c\u5730\u5165\u53e3", [
-    trialEnableCharacterSwitch
+    trialEnableCharacterSwitch,
+    trialEmitCharacter
   ]);
   advancedLocalActions.title = "\u9ed8\u8ba4\u6536\u8d77\uff1b\u4ec5\u7528\u4e8e\u672c\u5730\u4e13\u9879\u8bd5\u9a8c\uff0c\u4e0d\u8fde\u63a5 automatic runtime";
   const manualStatus = document.createElement("div");
