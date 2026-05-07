@@ -88,6 +88,18 @@ assert.ok(
   "manual character cue bridge should keep an explicit debug entry point and reuse the existing manual emit path"
 );
 assert.ok(
+  source.includes("followupCharacterRuntimeLastDispatch")
+    && source.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_DISPATCH__")
+    && source.includes("runtimeDispatch=local:"),
+  "manual character cue feedback should expose local dispatch and model broadcast status"
+);
+assert.ok(
+  source.includes("followupCharacterRuntimeLastApply")
+    && source.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_APPLY__")
+    && source.includes("runtimeApply=emotion:"),
+  "manual character cue feedback should expose Live2D apply diagnostics without adding automatic triggers"
+);
+assert.ok(
   /const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup[\s\S]*trialEmitCharacter[\s\S]*\]\);/.test(source),
   "manual character cue button should remain inside the collapsed high-risk local action group"
 );

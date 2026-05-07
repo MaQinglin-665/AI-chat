@@ -380,6 +380,8 @@ const state = {
   followupCharacterRuntimeLastTone: "",
   followupCharacterRuntimeLastHintAt: 0,
   followupCharacterRuntimeLastHint: null,
+  followupCharacterRuntimeLastDispatch: null,
+  followupCharacterRuntimeLastApply: null,
   grayAutoTrialCharacterCueManualEmitCount: 0,
   grayAutoTrialCharacterCueLastManualEmitAt: 0,
   grayAutoTrialCharacterCueLastManualEmit: null,
@@ -4534,12 +4536,16 @@ function getGrayAutoTrialCharacterCueManualEmitStatus() {
   const lastEmitAt = Number(state.grayAutoTrialCharacterCueLastManualEmitAt || 0);
   const lastEmit = state.grayAutoTrialCharacterCueLastManualEmit || null;
   const lastBackendBridge = state.grayAutoTrialCharacterCueLastBackendBridge || null;
+  const lastRuntimeDispatch = state.followupCharacterRuntimeLastDispatch || null;
+  const lastRuntimeApply = state.followupCharacterRuntimeLastApply || null;
   return {
     readOnly: true,
     count: Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0,
     lastEmitAt,
     lastEmit,
-    lastBackendBridge
+    lastBackendBridge,
+    lastRuntimeDispatch,
+    lastRuntimeApply
   };
 }
 
@@ -4547,11 +4553,19 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
   const status = getGrayAutoTrialCharacterCueManualEmitStatus();
   const lastEmit = status.lastEmit || null;
   const bridge = status.lastBackendBridge || null;
+  const dispatch = status.lastRuntimeDispatch || null;
+  const apply = status.lastRuntimeApply || null;
   const lastEmitText = lastEmit
     ? `decision=${lastEmit.decision || ""} outcome=${lastEmit.outcome || ""} label=${lastEmit.label || ""} tone=${lastEmit.tone || ""}`
     : "none";
   const bridgeText = bridge
     ? `ok=${bridge.ok === true ? "true" : "false"} backendNoop=${bridge.backendNoop === true ? "true" : "false"} wouldExecute=${bridge.wouldExecute === true ? "true" : "false"} dispatched=${bridge.dispatched === true ? "true" : "false"}`
+    : "none";
+  const dispatchText = dispatch
+    ? `local=${dispatch.localDispatched ? "true" : "false"} broadcast=${dispatch.broadcasted ? "true" : "false"} emotion=${dispatch.emotion || "n/a"} action=${dispatch.action || "n/a"}`
+    : "none";
+  const applyText = apply
+    ? `emotion=${apply.appliedEmotion ? "true" : "false"} action=${apply.appliedAction ? "true" : "false"} modelReady=${apply.modelReady ? "true" : "false"}`
     : "none";
   return [
     "\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8bd5\u53d1\u72b6\u6001\uff08\u53ea\u8bfb\uff09",
@@ -4559,6 +4573,8 @@ function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
     `lastEmitAt=${status.lastEmitAt}`,
     `lastEmit=${lastEmitText}`,
     `backendBridge=${bridgeText}`,
+    `runtimeDispatch=${dispatchText}`,
+    `runtimeApply=${applyText}`,
     "\u5b89\u5168\uff1a\u53ea\u662f\u8bb0\u5f55\u72b6\u6001\uff0c\u4e0d\u4f1a\u81ea\u52a8\u53d1\u9001\u65b0\u7684 runtime cue\u3002"
   ].join("\n");
 }
@@ -4574,6 +4590,8 @@ function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
   const lastEvent = events.length ? events[events.length - 1] : null;
   const lastEmit = status.lastEmit || null;
   const normalized = lastEmit?.runtimeHint || null;
+  const lastRuntimeDispatch = status.lastRuntimeDispatch || lastEmit?.runtimeDispatch || null;
+  const lastRuntimeApply = status.lastRuntimeApply || lastEmit?.runtimeApply || null;
   const accepted = !!lastEmit && !!normalized && status.count > 0;
   return {
     readOnly: true,
@@ -4581,6 +4599,8 @@ function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
     count: status.count,
     lastEmitAt: status.lastEmitAt,
     lastEmit,
+    lastRuntimeDispatch,
+    lastRuntimeApply,
     lastEvent,
     recentEvents: events,
     accepted,
@@ -4620,6 +4640,8 @@ function buildGrayAutoTrialCharacterCueManualEmitRecapText(limit = 24) {
     `lastEmitAt=${recap.lastEmitAt}`,
     `last=decision:${recap.lastEmit?.decision || "n/a"} outcome:${recap.lastEmit?.outcome || "n/a"} label:${recap.lastEmit?.label || "n/a"} tone:${recap.lastEmit?.tone || "n/a"}`,
     `runtimeHint=emotion:${hint.emotion || "n/a"} action:${hint.action || "n/a"} intensity:${hint.intensity || "n/a"} voice_style:${hint.voice_style || "n/a"} live2d_hint:${hint.live2d_hint || "n/a"}`,
+    `runtimeDispatch=local:${recap.lastRuntimeDispatch?.localDispatched ? "true" : "false"} broadcast:${recap.lastRuntimeDispatch?.broadcasted ? "true" : "false"} ui:${recap.lastRuntimeDispatch?.uiView || "n/a"}`,
+    `runtimeApply=emotion:${recap.lastRuntimeApply?.appliedEmotion ? "true" : "false"} action:${recap.lastRuntimeApply?.appliedAction ? "true" : "false"} modelReady:${recap.lastRuntimeApply?.modelReady ? "true" : "false"}`,
     `summary=${recap.summary}`,
     "recentEvents:",
     ...eventLines,
@@ -5963,7 +5985,9 @@ function emitGrayAutoTrialCharacterCueManually(input = {}) {
     outcome: checklist.outcome,
     label: checklist.label,
     tone: checklist.tone,
-    runtimeHint: normalized
+    runtimeHint: normalized,
+    runtimeDispatch: state.followupCharacterRuntimeLastDispatch || null,
+    runtimeApply: state.followupCharacterRuntimeLastApply || null
   };
   recordTTSDebugEvent("conversation_followup_gray_auto_trial_character_cue_manual_emit", {
     text: String(checklist.label || ""),
@@ -12993,9 +13017,26 @@ function handleCharacterRuntimeMetadata(raw, options = {}) {
   if (!normalized) {
     return null;
   }
-  dispatchCharacterRuntimeMetadataLocally(normalized);
-  if (options.broadcast !== false) {
-    broadcastCharacterRuntimeMetadataToModel(normalized);
+  const localDispatched = !!dispatchCharacterRuntimeMetadataLocally(normalized);
+  const broadcasted = options.broadcast !== false
+    ? broadcastCharacterRuntimeMetadataToModel(normalized)
+    : false;
+  const dispatchFeedback = {
+    at: Date.now(),
+    uiView: String(state.uiView || ""),
+    emotion: String(normalized.emotion || ""),
+    action: String(normalized.action || ""),
+    intensity: String(normalized.intensity || ""),
+    live2d_hint: String(normalized.live2d_hint || ""),
+    localDispatched,
+    broadcastAllowed: options.broadcast !== false,
+    broadcasted
+  };
+  state.followupCharacterRuntimeLastDispatch = dispatchFeedback;
+  try {
+    window.__AI_CHAT_LAST_CHARACTER_RUNTIME_DISPATCH__ = dispatchFeedback;
+  } catch (_) {
+    // Diagnostics are optional.
   }
   return normalized;
 }
@@ -20570,8 +20611,26 @@ if (window.electronAPI?.onSubtitle) {
 
 window.addEventListener("character-runtime:update", (event) => {
   try {
-    applyCharacterRuntimeEmotionToLive2D(event?.detail || null);
-    applyCharacterRuntimeActionToLive2D(event?.detail || null);
+    const metadata = event?.detail || null;
+    const appliedEmotion = applyCharacterRuntimeEmotionToLive2D(metadata);
+    const appliedAction = applyCharacterRuntimeActionToLive2D(metadata);
+    const applyFeedback = {
+      at: Date.now(),
+      uiView: String(state.uiView || ""),
+      emotion: String(metadata?.emotion || ""),
+      action: String(metadata?.action || ""),
+      appliedEmotion,
+      appliedAction,
+      modelReady: !!state.model,
+      expressionEnabled: !!state.expressionEnabled,
+      motionEnabled: !!state.motionEnabled
+    };
+    state.followupCharacterRuntimeLastApply = applyFeedback;
+    try {
+      window.__AI_CHAT_LAST_CHARACTER_RUNTIME_APPLY__ = applyFeedback;
+    } catch (_) {
+      // Diagnostics are optional.
+    }
   } catch (_) {
     // Keep runtime bridge isolated from chat main flow.
   }
