@@ -40,6 +40,7 @@ def main() -> int:
                 "tests/test_character_runtime.py",
                 "tests/test_character_runtime_integration.py",
                 "tests/test_character_v14_demo_scenes.py",
+                "tests/test_reply_language_guard.py",
             ],
         ),
         ("Frontend character runtime checks", ["node", "tests/test_character_runtime_frontend.js"]),
