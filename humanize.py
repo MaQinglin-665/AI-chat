@@ -195,6 +195,36 @@ def build_english_reply_fallback(reply, user_message=None):
         return reply
     return _build_contextual_english_reply_fallback(user_message) + meta
 
+def _split_visible_sentences(text):
+    safe = str(text or "").strip()
+    if not safe:
+        return []
+    parts = re.findall(r"[^.!?\u3002\uff01\uff1f\n]+[.!?\u3002\uff01\uff1f]*", safe)
+    return [part.strip() for part in parts if part and part.strip()] or [safe]
+
+def _strip_chinese_sentences_from_english_reply(text):
+    safe = str(text or "").strip()
+    if not safe:
+        return ""
+    kept = []
+    for sentence in _split_visible_sentences(safe):
+        latin, cjk = _text_language_counts(sentence)
+        if cjk >= 2 and cjk > max(1, latin) * 0.35:
+            continue
+        kept.append(sentence)
+    out = " ".join(kept).strip()
+    if not out:
+        return ""
+    out = (
+        out.replace("\u3002", ".")
+        .replace("\uff1f", "?")
+        .replace("\uff01", "!")
+        .replace("\uff0c", ",")
+    )
+    out = re.sub(r"\s+([,.!?;:])", r"\1", out)
+    out = re.sub(r"([,.!?;:])(?=[A-Za-z0-9])", r"\1 ", out)
+    return re.sub(r"\s{2,}", " ", out).strip()
+
 def enforce_reply_language(config, user_message, reply):
     if resolve_reply_language(config if isinstance(config, dict) else {}) != "en":
         return reply
@@ -204,6 +234,11 @@ def enforce_reply_language(config, user_message, reply):
     text = str(visible or "").strip()
     if not text:
         return reply
+    latin, cjk = _text_language_counts(text)
+    if cjk > 0 and latin >= 4:
+        stripped = _strip_chinese_sentences_from_english_reply(text)
+        if stripped and stripped != text:
+            return stripped + meta
     if is_mostly_chinese_text(text):
         return build_english_reply_fallback(text + meta, user_message=user_message)
     return reply

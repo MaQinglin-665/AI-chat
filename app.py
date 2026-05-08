@@ -112,6 +112,7 @@ from humanize import (
     build_prompt_with_style,
     build_style_prompt_block,
     cleanup_assistant_reply_local,
+    enforce_reply_language,
     finalize_assistant_reply,
     get_humanize_settings,
     infer_context_style,
@@ -142,6 +143,7 @@ from character_runtime import (
     preview_backend_entry_request,
 )
 from character_brain import (
+    apply_character_brain_reply_constraints,
     build_character_brain_decision,
     build_character_brain_prompt_block,
     build_character_brain_public_snapshot,
@@ -392,6 +394,27 @@ def _apply_character_runtime_reply(config, raw_reply):
             extra="normalize runtime payload failed; fallback to raw reply",
         )
         return fallback_text, None
+
+
+def _apply_character_brain_reply_text(config, user_message, reply):
+    if not isinstance(config, dict):
+        return str(reply or "")
+    decision = config.get("_character_brain_decision") or config.get(
+        "_character_brain_response_decision"
+    )
+    constrained = apply_character_brain_reply_constraints(
+        reply,
+        decision,
+        user_message=user_message,
+    )
+    enforced = enforce_reply_language(config, user_message, constrained)
+    if enforced != constrained:
+        return apply_character_brain_reply_constraints(
+            enforced,
+            decision,
+            user_message=user_message,
+        )
+    return enforced
 
 
 def _ensure_llm_auth_ready(llm_cfg):
@@ -1636,7 +1659,11 @@ class PetHandler(SimpleHTTPRequestHandler):
                     chat_config,
                     final_reply,
                 )
-                final_reply = str(final_reply or "")
+                final_reply = _apply_character_brain_reply_text(
+                    chat_config,
+                    user_message,
+                    final_reply,
+                )
                 if final_reply:
                     try:
                         remember_interaction(
@@ -1703,6 +1730,7 @@ class PetHandler(SimpleHTTPRequestHandler):
             llm_ms = _perf_now_ms() - llm_started_ms
             runtime_started_ms = _perf_now_ms()
             reply, runtime_meta = _apply_character_runtime_reply(chat_config, reply)
+            reply = _apply_character_brain_reply_text(chat_config, user_message, reply)
             runtime_ms = _perf_now_ms() - runtime_started_ms
             try:
                 remember_interaction(

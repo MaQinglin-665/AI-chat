@@ -99,6 +99,21 @@ def test_character_brain_reminder_and_closing_have_clear_limits():
     assert closing["output_constraints"]["allow_teasing"] is False
 
 
+def test_character_brain_nice_to_see_you_is_not_closing():
+    greeting = character_brain.build_character_brain_decision(
+        user_message="Hi Taffy, nice to see you today. Keep it short.",
+        history=[],
+    )
+    closing = character_brain.build_character_brain_decision(
+        user_message="Goodbye, see you tomorrow.",
+        history=[],
+    )
+
+    assert greeting["intent"] == "greeting"
+    assert greeting["reply_style"] == "warm_brief"
+    assert closing["intent"] == "closing"
+
+
 def test_character_brain_v14_demo_scenarios_have_stable_cues():
     scenarios = {
         "welcome": character_brain.build_character_brain_decision(user_message="Hi, are you there?"),
@@ -291,6 +306,98 @@ def test_character_brain_continuing_comfort_does_not_reset():
     assert second["reply_style"] == "comfort_continuing"
     assert updated["recent_user_need"] == "reassurance"
     assert updated["same_need_turns"] == 2
+
+
+def test_character_brain_chinese_continuing_comfort_stays_comfort():
+    first = character_brain.build_character_brain_decision(
+        user_message="\u6211\u521a\u521a\u88ab\u5426\u5b9a\u4e86\uff0c\u6709\u70b9\u96be\u53d7\u3002",
+        history=[],
+    )
+    state = character_brain.update_brain_session_state(
+        None,
+        decision=first,
+        user_message="\u6211\u521a\u521a\u88ab\u5426\u5b9a\u4e86\uff0c\u6709\u70b9\u96be\u53d7\u3002",
+        now_ts=1500,
+    )
+    second = character_brain.build_character_brain_decision(
+        user_message="\u8fd8\u662f\u6709\u70b9\u7f13\u4e0d\u8fc7\u6765\u3002",
+        history=[],
+        session_state=state,
+    )
+
+    assert second["intent"] == "comfort"
+    assert second["reply_style"] == "comfort_continuing"
+    assert second["output_constraints"]["allow_followup_question"] is False
+
+
+def test_character_brain_code_encouragement_beats_task_help():
+    decision = character_brain.build_character_brain_decision(
+        user_message="\u6211\u5199\u4ee3\u7801\u5361\u4f4f\u4e86\uff0c\u7ed9\u6211\u4e00\u70b9\u9f13\u52b1\u3002",
+        history=[],
+    )
+
+    assert decision["intent"] == "encouragement"
+    assert decision["voice_style"] == "cheerful"
+    assert decision["output_constraints"]["allow_followup_question"] is False
+
+
+def test_character_brain_reply_constraints_remove_unallowed_followup_and_trim():
+    decision = character_brain.build_character_brain_decision(user_message="Hi, are you there?")
+    reply = "Hey there!Glad to see you too!Got anything fun in mind?"
+
+    constrained = character_brain.apply_character_brain_reply_constraints(reply, decision)
+
+    assert constrained == "Hey there! Glad to see you too!"
+    assert not constrained.endswith("?")
+
+
+def test_character_brain_reply_constraints_soften_preference_question_for_next_step():
+    decision = character_brain.build_character_brain_decision(user_message="What should I do next?")
+    reply = "How about trying one tiny cleanup pass?"
+
+    constrained = character_brain.apply_character_brain_reply_constraints(
+        reply,
+        decision,
+        user_message="What should I do next?",
+    )
+
+    assert constrained == "How about trying one tiny cleanup pass."
+    assert not constrained.endswith("?")
+
+
+def test_character_brain_reply_constraints_filter_intent_mismatch():
+    comfort = character_brain.build_character_brain_decision(user_message="I feel hurt.")
+    closing = character_brain.build_character_brain_decision(user_message="I am going offline, goodbye.")
+    next_step = character_brain.build_character_brain_decision(user_message="What should I do next?")
+
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Aww, that stinks! Every no brings you closer to yes. Keep going!",
+        comfort,
+        user_message="I feel hurt.",
+    ) == "Aww, that stinks!"
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Stay strong! Every line of code is progress.",
+        closing,
+        user_message="I am going offline, goodbye.",
+    ) == "Rest up. I'll be here when you come back."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Might help clear your head.",
+        next_step,
+        user_message="What should I do next?",
+    ) == "Pick one tiny next step and give it ten quiet minutes."
+    chinese_next_step = character_brain.build_character_brain_decision(
+        user_message="\u6211\u4eca\u5929\u6709\u70b9\u4e0d\u77e5\u9053\u5148\u505a\u4ec0\u4e48\u3002"
+    )
+    assert character_brain.apply_character_brain_reply_constraints(
+        "I hear you. I'll keep this short and focused.",
+        chinese_next_step,
+        user_message="\u6211\u4eca\u5929\u6709\u70b9\u4e0d\u77e5\u9053\u5148\u505a\u4ec0\u4e48\u3002",
+    ) == "Pick one tiny next step and give it ten quiet minutes."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "How about starting with something fun. Like watching a short video or checking out some cat memes.",
+        chinese_next_step,
+        user_message="\u6211\u4eca\u5929\u6709\u70b9\u4e0d\u77e5\u9053\u5148\u505a\u4ec0\u4e48\u3002",
+    ) == "Pick one tiny next step and give it ten quiet minutes."
 
 
 def test_character_brain_repeated_next_step_stays_task_help_and_concise():

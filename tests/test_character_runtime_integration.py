@@ -208,6 +208,46 @@ def test_chat_payload_includes_compact_character_brain_continuity(monkeypatch):
     assert "directive" not in brain
 
 
+def test_chat_payload_applies_brain_reply_text_constraints(monkeypatch):
+    cfg = _build_test_config()
+    cfg["assistant_reply_language"] = "en"
+    monkeypatch.setattr(
+        app,
+        "call_llm",
+        lambda *args, **kwargs: "Hey there!Glad to see you too!Got anything fun in mind?",
+    )
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(f"{base}/api/chat", _chat_payload("Hi, are you there?"))
+
+    assert status == 200
+    assert payload.get("reply") == "Hey there! Glad to see you too!"
+    assert not payload.get("reply", "").endswith("?")
+    brain = payload.get("character_brain")
+    assert brain["intent"] == "greeting"
+    assert brain["output_constraints"]["allow_followup_question"] is False
+
+
+def test_chat_payload_reapplies_brain_constraints_after_english_fallback(monkeypatch):
+    cfg = _build_test_config()
+    cfg["assistant_reply_language"] = "en"
+    monkeypatch.setattr(
+        app,
+        "call_llm",
+        lambda *args, **kwargs: "\u597d\u7684\uff0c\u5148\u653e\u677e\u4e00\u4e0b\u3002",
+    )
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(
+            f"{base}/api/chat",
+            _chat_payload("\u6211\u4eca\u5929\u6709\u70b9\u4e0d\u77e5\u9053\u5148\u505a\u4ec0\u4e48\u3002"),
+        )
+
+    assert status == 200
+    assert payload.get("reply") == "Pick one tiny next step and give it ten quiet minutes."
+    assert payload.get("character_brain", {}).get("intent") == "task_help"
+
+
 def test_missing_character_runtime_config_returns_no_metadata(monkeypatch):
     cfg = _build_test_config()
     cfg.pop("character_runtime", None)
@@ -1051,7 +1091,7 @@ def test_chat_stream_done_payload_does_not_leak_runtime_metadata_suffix(monkeypa
         status, events = _post_stream_events(f"{base}/api/chat_stream", _chat_payload("hi"))
     assert status == 200
     done = next((evt for evt in events if evt.get("type") == "done"), {})
-    assert done.get("reply") == "Got it! Feeling peppy after your lunch break?"
+    assert done.get("reply") == "Got it!"
     assert "emotion:" not in done.get("reply", "")
     runtime = done.get("character_runtime")
     assert isinstance(runtime, dict)

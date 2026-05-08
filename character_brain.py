@@ -5,6 +5,7 @@ import time
 from typing import Any, Dict, Iterable, List, Optional
 
 
+TOOL_META_MARKER = "[[TAFFY_TOOL_META]]"
 SUPPORTED_EMOTIONS = {
     "neutral",
     "happy",
@@ -190,7 +191,7 @@ def _derive_topic(user_message: str, intent: str) -> str:
         return "coding"
     if re.search(r"(nextstep|todo|plan|roadmap|priority|whatshouldidonext)", compact):
         return "planning"
-    if re.search(r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u8ba1\u5212|\u4f18\u5148)", text):
+    if re.search(r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u5148\u505a\u4ec0\u4e48|\u8be5\u505a\u4ec0\u4e48|\u8ba1\u5212|\u4f18\u5148)", text):
         return "planning"
     if re.search(r"(voice|tts|asr|live2d|motion|expression)", compact):
         return "character_runtime"
@@ -395,12 +396,12 @@ def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str,
             scores[intent] = scores.get(intent, 0) + points
 
     add_if(
-        r"(sad|tired|anxious|upset|hurt|overwhelmed|lonely|depressed|panic|scared|stress|burnedout|burntout)",
+        r"(sad|tired|anxious|upset|hurt|overwhelmed|lonely|depressed|panic|scared|stress|burnedout|burntout|stillhurts|notokay|cantshakeit|can'tshakeit|notoverit)",
         "comfort",
         120,
     )
     add_if(
-        r"(\u96be\u53d7|\u4f24\u5fc3|\u7126\u8651|\u5d29\u6e83|\u88ab\u5426\u5b9a|\u4e0d\u5f00\u5fc3|\u538b\u529b|\u7d2f|\u5bb3\u6015)",
+        r"(\u96be\u53d7|\u4f24\u5fc3|\u7126\u8651|\u5d29\u6e83|\u88ab\u5426\u5b9a|\u4e0d\u5f00\u5fc3|\u538b\u529b|\u7d2f|\u5bb3\u6015|\u7f13\u4e0d\u8fc7\u6765|\u6ca1\u7f13\u8fc7\u6765|\u8fd8\u662f\u6709\u70b9|\u5fc3\u91cc\u5835)",
         "comfort",
         120,
         text,
@@ -425,8 +426,8 @@ def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str,
     )
     add_if(r"\b(hello|hi|hey|good morning|good evening|are you there)\b", "greeting", 60, lower)
     add_if(r"(\u4f60\u597d|\u65e9\u5b89|\u665a\u5b89|\u5728\u5417)", "greeting", 60, text)
-    add_if(r"(encourage|cheerme|needapush|motivateme)", "encouragement", 55)
-    add_if(r"(\u9f13\u52b1|\u52a0\u6cb9|\u6253\u6c14|\u5938\u6211)", "encouragement", 55, text)
+    add_if(r"(encourage|encourageme|cheerme|cheermeup|needapush|motivateme|peptalk)", "encouragement", 95)
+    add_if(r"(\u9f13\u52b1|\u52a0\u6cb9|\u6253\u6c14|\u5938\u6211)", "encouragement", 95, text)
     add_if(r"(remind|timer|alarm|calendar|schedule|in\d+minutes|in\d+hours)", "reminder", 90)
     add_if(
         r"(\u63d0\u9192|\u95f9\u949f|\u65e5\u7a0b|\u5206\u949f\u540e|\u5c0f\u65f6\u540e)",
@@ -434,7 +435,12 @@ def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str,
         90,
         text,
     )
-    add_if(r"\b(goodbye|bye|sleep|sign off|signoff|wrap up|wrapup|see you|seeyou|offline)\b", "closing", 75, lower)
+    add_if(
+        r"\b(goodbye|bye|sleep|sign off|signoff|wrap up|wrapup|see you (later|soon|tomorrow|next time)|seeyoulater|seeyousoon|offline)\b",
+        "closing",
+        75,
+        lower,
+    )
     add_if(r"(\u4e0b\u7ebf|\u7761\u4e86|\u518d\u89c1|\u62dc\u62dc|\u6536\u5c3e)", "closing", 75, text)
     add_if(
         r"(code|bug|fix|implement|error|traceback|pytest|debug|refactor|plan|analy[sz]e|helpme)",
@@ -532,9 +538,14 @@ def _apply_output_constraints(decision: Dict[str, Any]) -> None:
     if constraints["voice_style"] != "neutral" and _clean_text(decision.get("voice_style"), 32).lower() in {"", "neutral"}:
         decision["voice_style"] = constraints["voice_style"]
     if constraints["clarify_only_when_needed"]:
-        decision["directive"] += " Ask a follow-up only if the reply is genuinely blocked by missing information."
+        decision["directive"] += (
+            " Ask a follow-up only if the reply is genuinely blocked by missing information; "
+            "when the user asks for a next step, choose one concrete next action instead of asking for preferences."
+        )
     elif not constraints["allow_followup_question"]:
-        decision["directive"] += " Do not add a routine follow-up question."
+        decision["directive"] += (
+            " Do not add a routine follow-up question; do not end with a question or ask the user to answer back."
+        )
     if not constraints["allow_teasing"]:
         decision["directive"] += " Avoid teasing for this intent."
 
@@ -656,7 +667,7 @@ def build_character_brain_decision(
             action="wave",
             intensity="low",
             voice_style="soft",
-            directive="Close softly as a companion; keep it short and calm.",
+            directive="Close softly as a companion; keep it short and calm. Do not add new advice or continue the task thread.",
         )
     elif intent == "task_help":
         decision.update(
@@ -667,7 +678,10 @@ def build_character_brain_decision(
             action="think",
             intensity="low",
             voice_style="serious",
-            directive="Be useful and concrete, but keep a character voice instead of becoming a generic manual.",
+            directive=(
+                "Be useful and concrete, but keep a character voice instead of becoming a generic manual. "
+                "If the request is vague, pick one small default next action rather than asking what the user prefers."
+            ),
         )
     elif intent == "question":
         decision.update(
@@ -769,10 +783,198 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Session continuity: last_intent={continuity.get('last_intent') or 'none'}, last_topic={continuity.get('last_topic') or 'none'}, mood_baseline={continuity.get('mood_baseline')}, recent_user_need={continuity.get('recent_user_need') or 'none'}, same_need_turns={continuity.get('same_need_turns')}, decay={continuity.get('decay')}",
         f"Reply style: {_clean_text(decision.get('reply_style'), 40)}, max_sentences={int(decision.get('max_sentences') or 3)}",
         f"Output constraints: {_format_output_constraints_for_prompt(decision.get('output_constraints') if isinstance(decision.get('output_constraints'), dict) else {})}",
+        "Question policy: avoid routine questions; only ask when the reply would be blocked without clarification.",
         f"Expression target: emotion={_normalize_emotion(decision.get('emotion'))}, action={_normalize_action(decision.get('action'))}, intensity={_normalize_intensity(decision.get('intensity'))}, voice_style={_clean_text(decision.get('voice_style'), 32)}",
         f"Directive: {_clean_text(decision.get('directive'), 240)}",
     ]
     return "\n".join(lines)
+
+
+def _split_tool_meta_suffix(text: str) -> tuple[str, str]:
+    safe = str(text or "")
+    if TOOL_META_MARKER not in safe:
+        return safe, ""
+    visible, meta = safe.split(TOOL_META_MARKER, 1)
+    return visible, TOOL_META_MARKER + meta
+
+
+def _normalize_reply_text_spacing(text: str) -> str:
+    out = str(text or "").strip()
+    if not out:
+        return ""
+    latin = bool(re.search(r"[A-Za-z]", out))
+    if latin:
+        out = (
+            out.replace("\u3002", ".")
+            .replace("\uff1f", "?")
+            .replace("\uff01", "!")
+            .replace("\uff0c", ",")
+        )
+    out = re.sub(r"\s+", " ", out).strip()
+    out = re.sub(r"\s+([,.!?;:])", r"\1", out)
+    out = re.sub(r"([,.!?;:])(?=[A-Za-z0-9])", r"\1 ", out)
+    out = re.sub(r"([,.!?;:])\s+", r"\1 ", out)
+    return re.sub(r"\s{2,}", " ", out).strip()
+
+
+def _split_reply_sentences(text: str) -> List[str]:
+    safe = str(text or "").strip()
+    if not safe:
+        return []
+    matches = re.findall(r"[^.!?\n]+[.!?]*", safe)
+    parts = [part.strip() for part in matches if part and part.strip()]
+    return parts or [safe]
+
+
+def _is_needed_clarification_question(sentence: str) -> bool:
+    lower = str(sentence or "").strip().lower()
+    if not lower.endswith("?"):
+        return False
+    if re.search(r"\b(error|missing|path|file|model)\b", lower):
+        return True
+    if re.search(r"^(which|what|where|when|who)\b", lower):
+        return True
+    return bool(re.search(r"^how\s+(can|should|do|does|is|are|would|will)\b", lower))
+
+
+def _remove_unwanted_questions(sentences: List[str], *, allow_followup: bool, clarify_only: bool) -> List[str]:
+    if allow_followup and not clarify_only:
+        return sentences
+    if allow_followup and clarify_only:
+        kept = [
+            sentence
+            for sentence in sentences
+            if not sentence.rstrip().endswith("?")
+            or _is_needed_clarification_question(sentence)
+        ]
+        if kept:
+            return kept
+        return [re.sub(r"\?+\s*$", ".", sentence).strip() for sentence in sentences if sentence.strip()]
+    kept = [sentence for sentence in sentences if not sentence.rstrip().endswith("?")]
+    if kept:
+        return kept
+    return [re.sub(r"\?+\s*$", ".", sentence).strip() for sentence in sentences if sentence.strip()]
+
+
+def _drop_intent_mismatched_sentences(sentences: List[str], intent: str) -> List[str]:
+    if intent == "comfort":
+        patterns = (
+            r"\bevery\s+no\b",
+            r"\bcloser\s+to\s+yes\b",
+            r"\bkeep\s+going\b",
+            r"\byou(?:'ve| have)?\s+got\s+this\b",
+            r"\bstay\s+strong\b",
+        )
+    elif intent == "closing":
+        patterns = (
+            r"\bstay\s+strong\b",
+            r"\bkeep\s+coding\b",
+            r"\bevery\s+line\s+of\s+code\b",
+            r"\bbug\b",
+            r"\bcode\b",
+            r"\bprogress\b",
+            r"\bnext\s+task\b",
+        )
+    else:
+        return sentences
+    kept = [
+        sentence
+        for sentence in sentences
+        if not any(re.search(pattern, sentence.lower()) for pattern in patterns)
+    ]
+    return kept or sentences
+
+
+def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
+    if intent == "closing":
+        return "Rest up. I'll be here when you come back."
+    if intent == "comfort":
+        return "That really stings. I'm here with you."
+    if intent == "task_help" and _derive_topic(user_message, intent) == "planning":
+        return "Pick one tiny next step and give it ten quiet minutes."
+    return ""
+
+
+def _looks_like_vague_planning_reply(text: str) -> bool:
+    lower = str(text or "").strip().lower()
+    if not lower:
+        return False
+    action_patterns = (
+        r"\bstart\b",
+        r"\bpick\b",
+        r"\bchoose\b",
+        r"\bopen\b",
+        r"\bwrite\b",
+        r"\bcheck\b",
+        r"\breview\b",
+        r"\brun\b",
+        r"\bfix\b",
+        r"\blist\b",
+        r"\buse\b",
+        r"\btake\b",
+        r"\bset\b",
+        r"\bship\b",
+        r"\btest\b",
+        r"\btry\b",
+        r"\btrying\b",
+    )
+    if any(re.search(pattern, lower) for pattern in action_patterns):
+        return False
+    vague_markers = (
+        "clear your head",
+        "new ideas",
+        "maybe",
+        "something fun",
+        "short video",
+        "funny video",
+        "cat meme",
+        "memes",
+    )
+    return len(lower) < 90 or any(marker in lower for marker in vague_markers)
+
+
+def apply_character_brain_reply_constraints(
+    reply: Any,
+    decision: Optional[Dict[str, Any]],
+    *,
+    user_message: str = "",
+) -> str:
+    visible, meta = _split_tool_meta_suffix(str(reply or ""))
+    original = _normalize_reply_text_spacing(visible)
+    if not original or not isinstance(decision, dict):
+        return (original or str(visible or "").strip()) + meta
+
+    constraints = _public_output_constraints(
+        decision.get("output_constraints") if isinstance(decision.get("output_constraints"), dict) else {}
+    )
+    max_sentences = max(1, min(8, _safe_int(decision.get("max_sentences"), constraints["max_sentences"])))
+    intent = _clean_text(decision.get("intent"), 40)
+    sentences = _split_reply_sentences(original)
+    sentences = _remove_unwanted_questions(
+        sentences,
+        allow_followup=bool(constraints.get("allow_followup_question", False)),
+        clarify_only=bool(constraints.get("clarify_only_when_needed", False)),
+    )
+    before_intent_filter = list(sentences)
+    sentences = _drop_intent_mismatched_sentences(sentences, intent)
+    if sentences == before_intent_filter and intent in {"comfort", "closing"}:
+        joined = " ".join(sentences).strip()
+        if any(
+            marker in joined.lower()
+            for marker in ("every no", "closer to yes", "keep going", "stay strong", "every line of code")
+        ):
+            fallback = _fallback_reply_for_intent(intent, user_message)
+            if fallback:
+                return _normalize_reply_text_spacing(fallback) + meta
+    constrained = " ".join(sentences[:max_sentences]).strip()
+    if intent == "task_help" and _derive_topic(user_message, intent) == "planning" and _looks_like_vague_planning_reply(constrained):
+        fallback = _fallback_reply_for_intent(intent, user_message)
+        if fallback:
+            constrained = fallback
+    if not constrained:
+        constrained = _fallback_reply_for_intent(intent, user_message) or original
+    constrained = _normalize_reply_text_spacing(constrained)
+    return constrained + meta
 
 
 def build_character_brain_public_snapshot(

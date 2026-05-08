@@ -72,6 +72,20 @@ def test_finalize_english_mode_uses_contextual_lunch_fallback():
     assert "English" not in out
 
 
+def test_finalize_english_mode_strips_mixed_chinese_tail():
+    out = humanize.finalize_assistant_reply(
+        {"assistant_reply_language": "en", "humanize": {"enabled": False}},
+        {},
+        "ollama",
+        "\u6211\u521a\u521a\u88ab\u5426\u5b9a\u4e86\uff0c\u6709\u70b9\u96be\u53d7\u3002",
+        [],
+        "Awww, that stinks. \u6709\u65f6\u5019\u503e\u8bc9\u4e00\u4e0b\u4e5f\u80fd\u611f\u89c9\u597d\u70b9\u54e6\u3002",
+    )
+
+    assert out == "Awww, that stinks."
+    assert "\u503e\u8bc9" not in out
+
+
 def test_finalize_english_mode_allows_explicit_chinese_request():
     out = humanize.finalize_assistant_reply(
         {"assistant_reply_language": "en", "humanize": {"enabled": False}},
