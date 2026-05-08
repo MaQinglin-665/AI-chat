@@ -40,6 +40,7 @@ const TTS_PLAYBACK_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "ttsPlay
 const CHAT_REPLY_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "chatReplyController.js");
 const WAKE_WORD_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "wakeWordController.js");
 const APP_CONFIG_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "appConfigController.js");
+const APP_STARTUP_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "appStartupController.js");
 const LEARNING_REVIEW_API_JS = path.resolve(__dirname, "..", "web", "learningReviewApi.js");
 const LEARNING_REVIEW_MODEL_JS = path.resolve(__dirname, "..", "web", "learningReviewModel.js");
 const LEARNING_REVIEW_VIEW_JS = path.resolve(__dirname, "..", "web", "learningReviewView.js");
@@ -109,6 +110,7 @@ const ttsPlaybackControllerSource = fs.readFileSync(TTS_PLAYBACK_CONTROLLER_JS, 
 const chatReplyControllerSource = fs.readFileSync(CHAT_REPLY_CONTROLLER_JS, "utf8");
 const wakeWordControllerSource = fs.readFileSync(WAKE_WORD_CONTROLLER_JS, "utf8");
 const appConfigControllerSource = fs.readFileSync(APP_CONFIG_CONTROLLER_JS, "utf8");
+const appStartupControllerSource = fs.readFileSync(APP_STARTUP_CONTROLLER_JS, "utf8");
 const learningReviewApiSource = fs.readFileSync(LEARNING_REVIEW_API_JS, "utf8");
 const learningReviewModelSource = fs.readFileSync(LEARNING_REVIEW_MODEL_JS, "utf8");
 const learningReviewViewSource = fs.readFileSync(LEARNING_REVIEW_VIEW_JS, "utf8");
@@ -182,6 +184,7 @@ const ttsPlaybackController = require(TTS_PLAYBACK_CONTROLLER_JS);
 const chatReplyController = require(CHAT_REPLY_CONTROLLER_JS);
 const wakeWordController = require(WAKE_WORD_CONTROLLER_JS);
 const appConfigController = require(APP_CONFIG_CONTROLLER_JS);
+const appStartupController = require(APP_STARTUP_CONTROLLER_JS);
 const learningReviewApi = require(LEARNING_REVIEW_API_JS);
 const learningReviewModel = require(LEARNING_REVIEW_MODEL_JS);
 const learningReviewView = require(LEARNING_REVIEW_VIEW_JS);
@@ -251,6 +254,7 @@ function toPlainObject(value) {
   assert.strictEqual(typeof chatReplyController.createController, "function", "chat reply controller should expose a factory");
   assert.strictEqual(typeof wakeWordController.createController, "function", "wake word controller should expose a factory");
   assert.strictEqual(typeof appConfigController.createController, "function", "app config controller should expose a factory");
+  assert.strictEqual(typeof appStartupController.createController, "function", "app startup controller should expose startup orchestration");
 }
 
 assert.strictEqual(
@@ -489,6 +493,7 @@ assert.ok(
     && source.includes("const CHAT_REPLY_CONTROLLER = window.TaffyChatReplyController")
     && source.includes("const WAKE_WORD_CONTROLLER = window.TaffyWakeWordController")
     && source.includes("const APP_CONFIG_CONTROLLER = window.TaffyAppConfigController")
+    && source.includes("const APP_STARTUP_CONTROLLER = window.TaffyAppStartupController")
     && source.includes("CHAT_MESSAGE_CONTROLLER.createController")
     && source.includes("PERSONA_AVATAR_CONTROLLER.createController")
     && source.includes("ONBOARDING_CONTROLLER.createController")
@@ -511,6 +516,7 @@ assert.ok(
     && source.includes("CHAT_REPLY_CONTROLLER.createController")
     && source.includes("WAKE_WORD_CONTROLLER.createController")
     && source.includes("APP_CONFIG_CONTROLLER.createController")
+    && source.includes("APP_STARTUP_CONTROLLER.createController")
     && diagnosticsRuntimeControllerSource.includes("debugPanelController.updateDebugPanel")
     && chatStateSource.includes("function createInitialState")
     && chatDomSource.includes("function createUI")
@@ -567,6 +573,9 @@ assert.ok(
     && wakeWordControllerSource.includes("function setupSpeechRecognition")
     && appConfigControllerSource.includes("async function loadConfig")
     && appConfigControllerSource.includes("syncProactiveSchedulerPolling")
+    && appStartupControllerSource.includes("async function main")
+    && appStartupControllerSource.includes("function handleBeforeUnload")
+    && appStartupControllerSource.includes("function bindRuntimeBridges")
     && indexSource.includes('<script src="./chatState.js"></script>')
     && indexSource.includes('<script src="./chatDom.js"></script>')
     && indexSource.includes('<script src="./storageController.js"></script>')
@@ -594,6 +603,7 @@ assert.ok(
     && indexSource.includes('<script src="./chatReplyController.js"></script>')
     && indexSource.includes('<script src="./wakeWordController.js"></script>')
     && indexSource.includes('<script src="./appConfigController.js"></script>')
+    && indexSource.includes('<script src="./appStartupController.js"></script>')
     && indexSource.indexOf('<script src="./chatState.js"></script>') < indexSource.indexOf('<script src="./chatDom.js"></script>')
     && indexSource.indexOf('<script src="./chatDom.js"></script>') < indexSource.indexOf('<script src="./debugPanelController.js"></script>')
     && indexSource.indexOf('<script src="./debugPanelController.js"></script>') < indexSource.indexOf('<script src="./storageController.js"></script>')
@@ -620,7 +630,8 @@ assert.ok(
     && indexSource.indexOf('<script src="./ttsPlaybackController.js"></script>') < indexSource.indexOf('<script src="./chatReplyController.js"></script>')
     && indexSource.indexOf('<script src="./chatReplyController.js"></script>') < indexSource.indexOf('<script src="./wakeWordController.js"></script>')
     && indexSource.indexOf('<script src="./wakeWordController.js"></script>') < indexSource.indexOf('<script src="./appConfigController.js"></script>')
-    && indexSource.indexOf('<script src="./appConfigController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
+    && indexSource.indexOf('<script src="./appConfigController.js"></script>') < indexSource.indexOf('<script src="./appStartupController.js"></script>')
+    && indexSource.indexOf('<script src="./appStartupController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
     && indexSource.indexOf('<script src="./followupReadinessPanelController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
     && indexSource.indexOf('<script src="./reminderScheduleController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
     && source.includes("const LEARNING_REVIEW_API = window.TaffyLearningReviewApi")

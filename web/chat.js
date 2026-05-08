@@ -1451,6 +1451,7 @@ const MOTION_RUNTIME_CONTROLLER = window.TaffyMotionRuntimeController || {};
 const VOICE_RUNTIME_CONTROLLER = window.TaffyVoiceRuntimeController || {};
 const WAKE_WORD_CONTROLLER = window.TaffyWakeWordController || {};
 const APP_CONFIG_CONTROLLER = window.TaffyAppConfigController || {};
+const APP_STARTUP_CONTROLLER = window.TaffyAppStartupController || {};
 const STREAM_TTS_QUEUE_CONTROLLER = window.TaffyStreamTtsQueueController || {};
 const TTS_PLAYBACK_CONTROLLER = window.TaffyTTSPlaybackController || {};
 const CHAT_REPLY_CONTROLLER = window.TaffyChatReplyController || {};
@@ -4053,134 +4054,61 @@ function bindUI() {
   }, 180);
 }
 
-bindRuntimeEvents();
-installCharacterRuntimeWindowBridge();
-installCharacterRuntimeDebugBridge();
-installTTSDebugBridge();
-installTranslateDebugBridge();
+let appStartupController = null;
 
-async function main() {
-  setStatus("启动中...");
-  try {
-    refreshDesktopBridgeReady();
-    await initWindowLockBridge();
-    if (state.desktopMode && !state.desktopCanMoveWindow && !state.windowLocked) {
-      setTimeout(refreshDesktopBridgeReady, 350);
-      setTimeout(refreshDesktopBridgeReady, 900);
-      setTimeout(refreshDesktopBridgeReady, 1600);
-    }
-    await loadConfig();
-    try {
-      await resolveApiToken(true);
-    } catch (_) {
-      // ignore and let authFetch retry on first 401
-    }
-    initAssistantAvatar();
-    loadChatTranslationVisibilityFromStorage();
-    loadSubtitleEnabledFromStorage();
-    loadSubtitlePositionFromStorage();
-    loadOnboardingSeenFromStorage();
-    await loadPersonaCard();
-    if (state.uiView === "model") {
-      await ensureLive2DRuntime();
-      await initLive2D();
-      startModelMouseGazePolling();
-      try {
-        const ch = new BroadcastChannel("taffy-speech");
-        ch.onmessage = (e) => {
-          const d = e.data;
-          if (!d || d.type !== "speech") return;
-          state._broadcastSpeechUpdatedAt = performance.now();
-          state.speechMouthOpen = Number(d.mouthOpen) || 0;
-          state.speechAnimMood = String(d.mood || "idle");
-          state.speechAnimUntil = Number(d.animUntil) || 0;
-          state._broadcastSpeaking = !!d.speaking;
-          state.ttsAudioLevel = Number(d.audioLevel) || 0;
-          if (d.moodHoldUntil) state.moodHoldUntil = Number(d.moodHoldUntil);
-        };
-      } catch (_) {}
-      setStatus("待机");
-      return;
-    }
-
-    if (state.uiView === "chat") {
-      if (!isServerTTSProvider(state.ttsProvider)) {
-        initTTS();
-      }
-      setupSpeechRecognition();
-      bindUI();
-      startFollowupCharacterChipRefresh();
-      startReminderLoop();
-      runReminderCheck();
-      try {
-        state._speechBroadcast = new BroadcastChannel("taffy-speech");
-        (function chatSpeechBroadcastLoop() {
-          const speaking = isSpeechMotionActive();
-          const mouthOpen = getSpeechAnimationMouthOpen();
-          try {
-            state._speechBroadcast.postMessage({
-              type: "speech",
-              mouthOpen: mouthOpen,
-              mood: state.speechAnimMood || "idle",
-              speaking: speaking,
-              animUntil: state.speechAnimUntil || 0,
-              animStartedAt: state.speechAnimStartedAt || 0,
-              animDurationMs: state.speechAnimDurationMs || 0,
-              audioLevel: state.ttsAudioLevel || 0,
-              moodHoldUntil: state.moodHoldUntil || 0
-            });
-          } catch (_) {}
-          requestAnimationFrame(chatSpeechBroadcastLoop);
-        }());
-      } catch (_) {}
-      setStatus("待机");
-      return;
-    }
-
-    await ensureLive2DRuntime();
-    await initLive2D();
-    if (!isServerTTSProvider(state.ttsProvider)) {
-      initTTS();
-    }
-    setupSpeechRecognition();
-    bindUI();
-    startFollowupCharacterChipRefresh();
-    startReminderLoop();
-    runReminderCheck();
-    if (state.model) {
-      setStatus("待机");
-    }
-  } catch (err) {
-    console.error(err);
-    setStatus("启动失败");
-    appendMessage("assistant", `启动错误: ${err.message}`);
+function getAppStartupController() {
+  if (!appStartupController && typeof APP_STARTUP_CONTROLLER.createController === "function") {
+    appStartupController = APP_STARTUP_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      consoleObject: console,
+      performanceObject: performance,
+      requestAnimationFrame,
+      setStatus,
+      appendMessage,
+      refreshDesktopBridgeReady,
+      initWindowLockBridge,
+      loadConfig,
+      resolveApiToken,
+      initAssistantAvatar,
+      loadChatTranslationVisibilityFromStorage,
+      loadSubtitleEnabledFromStorage,
+      loadSubtitlePositionFromStorage,
+      loadOnboardingSeenFromStorage,
+      loadPersonaCard,
+      ensureLive2DRuntime,
+      initLive2D,
+      startModelMouseGazePolling,
+      isServerTTSProvider,
+      initTTS,
+      setupSpeechRecognition,
+      bindUI,
+      startFollowupCharacterChipRefresh,
+      startReminderLoop,
+      runReminderCheck,
+      isSpeechMotionActive,
+      getSpeechAnimationMouthOpen,
+      bindRuntimeEvents,
+      installCharacterRuntimeWindowBridge,
+      installCharacterRuntimeDebugBridge,
+      installTTSDebugBridge,
+      installTranslateDebugBridge,
+      closeLearningReviewDrawer,
+      resetActionSystem,
+      stopIdleMotionLoop,
+      stopAutoChatLoop,
+      stopProactiveSchedulerPolling,
+      stopMicLoop,
+      stopWakeWordListener
+    });
   }
+  return appStartupController || APP_STARTUP_CONTROLLER;
 }
 
-window.addEventListener("beforeunload", () => {
-  closeLearningReviewDrawer();
-  resetActionSystem();
-  stopIdleMotionLoop();
-  if (state.followupCharacterChipRefreshTimer) {
-    clearInterval(state.followupCharacterChipRefreshTimer);
-    state.followupCharacterChipRefreshTimer = 0;
-  }
-  stopAutoChatLoop();
-  stopProactiveSchedulerPolling("beforeunload");
-  stopMicLoop(true);
-  stopWakeWordListener();
-  if (state.reminderTimer) {
-    clearInterval(state.reminderTimer);
-    state.reminderTimer = 0;
-  }
-  if (typeof state.windowLockUnsubscribe === "function") {
-    try {
-      state.windowLockUnsubscribe();
-    } catch (_) {
-      // ignore
-    }
-    state.windowLockUnsubscribe = null;
-  }
-});
+function bindRuntimeBridges() { return getAppStartupController().bindRuntimeBridges(); }
+async function main() { return getAppStartupController().main(); }
+function handleBeforeUnload() { return getAppStartupController().handleBeforeUnload(); }
 
+bindRuntimeBridges();
+window.addEventListener("beforeunload", handleBeforeUnload);
 main();
