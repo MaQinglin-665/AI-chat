@@ -56,6 +56,7 @@ const LIVE2D_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "live2
 const RUNTIME_EVENT_BINDER_JS = path.resolve(__dirname, "..", "web", "runtimeEventBinder.js");
 const CHARACTER_RUNTIME_JS = path.resolve(__dirname, "..", "web", "characterRuntime.js");
 const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTuning.js");
+const CHARACTER_DIAGNOSTICS_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "characterDiagnosticsController.js");
 const DOCTOR_DIAGNOSTICS_JS = path.resolve(__dirname, "..", "web", "doctorDiagnostics.js");
 const CHARACTER_REPLY_CUE_JS = path.resolve(__dirname, "..", "web", "characterReplyCue.js");
 const TTS_DEBUG_REPORT_JS = path.resolve(__dirname, "..", "web", "ttsDebugReport.js");
@@ -123,6 +124,7 @@ const live2dExpressionControllerSource = fs.readFileSync(LIVE2D_EXPRESSION_CONTR
 const live2dRuntimeControllerSource = fs.readFileSync(LIVE2D_RUNTIME_CONTROLLER_JS, "utf8");
 const runtimeEventBinderSource = fs.readFileSync(RUNTIME_EVENT_BINDER_JS, "utf8");
 const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
+const characterDiagnosticsControllerSource = fs.readFileSync(CHARACTER_DIAGNOSTICS_CONTROLLER_JS, "utf8");
 const doctorSource = fs.readFileSync(DOCTOR_DIAGNOSTICS_JS, "utf8");
 const replyCueSource = fs.readFileSync(CHARACTER_REPLY_CUE_JS, "utf8");
 const ttsDebugSource = fs.readFileSync(TTS_DEBUG_REPORT_JS, "utf8");
@@ -195,6 +197,7 @@ const live2dExpressionController = require(LIVE2D_EXPRESSION_CONTROLLER_JS);
 const live2dRuntimeController = require(LIVE2D_RUNTIME_CONTROLLER_JS);
 const runtimeEventBinder = require(RUNTIME_EVENT_BINDER_JS);
 const tuning = require(CHARACTER_TUNING_JS);
+const characterDiagnosticsController = require(CHARACTER_DIAGNOSTICS_CONTROLLER_JS);
 const doctorDiagnostics = require(DOCTOR_DIAGNOSTICS_JS);
 const replyCue = require(CHARACTER_REPLY_CUE_JS);
 const ttsDebugReport = require(TTS_DEBUG_REPORT_JS);
@@ -449,6 +452,11 @@ assert.strictEqual(
     typeof runtimeEventBinder.bindRuntimeEvents,
     "function",
     "runtime event binder should export bridge event binding"
+  );
+  assert.strictEqual(
+    typeof characterDiagnosticsController.createController,
+    "function",
+    "character diagnostics controller should expose voice test and tuning orchestration"
   );
 }
 assert.ok(
@@ -1183,6 +1191,8 @@ assert.ok(
 );
 assert.ok(
   source.includes("async function runVoiceTestAndAppendReport()")
+    && source.includes("getCharacterDiagnosticsController().runVoiceTestAndAppendReport()")
+    && characterDiagnosticsControllerSource.includes("async function runVoiceTestAndAppendReport")
     && localCommandRegistrySource.includes('kind: "voice_test"')
     && localCommandRegistry.matchLocalCommand("/testvoice").kind === "voice_test"
     && chatDomSource.includes("voiceTestBtn: documentObject.getElementById(\"voice-test-btn\")")
@@ -1192,8 +1202,9 @@ assert.ok(
 );
 assert.ok(
   tuningSource.includes("CHARACTER_REHEARSAL_PRESETS")
-    && source.includes("CHARACTER_TUNING.getRehearsalPreset")
+    && characterDiagnosticsControllerSource.includes("characterTuning.getRehearsalPreset")
     && source.includes("async function runCharacterRehearsalAndAppendReport()")
+    && characterDiagnosticsControllerSource.includes("async function runCharacterRehearsalAndAppendReport")
     && localCommandRegistrySource.includes('kind: "character_rehearsal"')
     && localCommandRegistry.matchLocalCommand("/roletest").kind === "character_rehearsal"
     && chatDomSource.includes("characterRehearsalBtn: documentObject.getElementById(\"character-rehearsal-btn\")")
@@ -1204,6 +1215,8 @@ assert.ok(
   tuningSource.includes("function buildTuningReport")
     && source.includes("function buildCharacterTuningReport()")
     && source.includes("function runCharacterTuningAndAppendReport()")
+    && characterDiagnosticsControllerSource.includes("function buildCharacterTuningReport")
+    && characterDiagnosticsControllerSource.includes("function runCharacterTuningAndAppendReport")
     && localCommandRegistrySource.includes('kind: "character_tuning"')
     && localCommandRegistry.matchLocalCommand("/tuning").kind === "character_tuning"
     && chatDomSource.includes("characterTuningBtn: documentObject.getElementById(\"character-tuning-btn\")")
@@ -1215,7 +1228,7 @@ assert.ok(
 assert.ok(
   tuningSource.includes("function buildFeedbackMessage")
     && source.includes("function recordCharacterPerformanceFeedback")
-    && source.includes("characterPerformanceLastFeedback")
+    && characterDiagnosticsControllerSource.includes("characterPerformanceLastFeedback")
     && localCommandRegistry.matchLocalCommand("/goodcue").kind === "character_feedback_good"
     && localCommandRegistry.matchLocalCommand("/badcue").kind === "character_feedback_bad"
     && chatDomSource.includes("characterFeedbackGoodBtn: documentObject.getElementById(\"character-feedback-good-btn\")")
@@ -1227,6 +1240,7 @@ assert.ok(
   tuningSource.includes("function buildWorkflowGuide()")
     && source.includes("function buildCharacterWorkflowGuide()")
     && source.includes("function appendCharacterWorkflowGuide()")
+    && characterDiagnosticsControllerSource.includes("function appendCharacterWorkflowGuide")
     && localCommandRegistrySource.includes('kind: "character_workflow"')
     && localCommandRegistry.matchLocalCommand("/roleflow").kind === "character_workflow",
   "chat should expose a readable local character workflow guide"
@@ -1568,7 +1582,10 @@ assert.ok(
     && indexSource.includes('<script src="./localCommandExecutor.js"></script>')
     && indexSource.includes('<script src="./reminderUtils.js"></script>')
     && indexSource.includes('<script src="./scheduleListView.js"></script>')
-    && indexSource.includes('<script src="./scheduleFormModel.js"></script>'),
+    && indexSource.includes('<script src="./scheduleFormModel.js"></script>')
+    && indexSource.includes('<script src="./characterDiagnosticsController.js"></script>')
+    && indexSource.indexOf('<script src="./characterTuning.js"></script>') < indexSource.indexOf('<script src="./characterDiagnosticsController.js"></script>')
+    && indexSource.indexOf('<script src="./characterDiagnosticsController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
   "local commands should include /ttsdebug for copyable playback state"
 );
 assert.ok(

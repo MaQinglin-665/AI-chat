@@ -1322,20 +1322,8 @@ async function runDoctorJsonFetch(url, init = {}, timeoutMs = 12000) { return ge
 async function runDoctorDiagnostics() { return getDiagnosticsRuntimeController().runDoctorDiagnostics(); }
 async function runDoctorAndAppendReport() { return getDiagnosticsRuntimeController().runDoctorAndAppendReport(); }
 function buildChatFailureDoctorHint(err) { return getDiagnosticsRuntimeController().buildChatFailureDoctorHint(err); }
-async function runVoiceTestAndAppendReport() {
-  const sample = "这是语音测试，如果你听到我说话，说明语音链路正常。";
-  appendMessage("assistant", sample);
-  setStatus("语音测试中...");
-  const prosody = buildSpeakProsody(sample, "idle", false, "steady");
-  const ok = await speak(sample, { force: true, interrupt: true, prosody });
-  if (!ok) {
-    appendMessage("assistant", "语音测试没有成功。请点“更多 → 链路自检”，或输入 /ttsdebug 查看最近一次语音状态。", { enableTranslation: false });
-    setStatus("语音测试失败");
-  }
-  return ok;
-}
-
 const CHARACTER_TUNING = window.TaffyCharacterTuning || {};
+const CHARACTER_DIAGNOSTICS_CONTROLLER = window.TaffyCharacterDiagnosticsController || {};
 const CHARACTER_REPLY_CUE = window.TaffyCharacterReplyCue || {};
 const FOLLOWUP_READINESS_VIEW = window.TaffyFollowupReadinessView || {};
 const GRAY_TRIAL_CHARACTER_VIEW = window.TaffyGrayTrialCharacterView || {};
@@ -1348,141 +1336,36 @@ const LOCAL_COMMAND_EXECUTOR = window.TaffyLocalCommandExecutor || {};
 const REMINDER_UTILS = window.TaffyReminderUtils || {};
 const SCHEDULE_LIST_VIEW = window.TaffyScheduleListView || {};
 const SCHEDULE_FORM_MODEL = window.TaffyScheduleFormModel || {};
-const CHARACTER_REHEARSAL_PRESETS = CHARACTER_TUNING.CHARACTER_REHEARSAL_PRESETS || [];
 
-function getNextCharacterRehearsalPreset() {
-  const index = Math.abs(Math.round(Number(state.characterRehearsalIndex || 0)));
-  const preset = typeof CHARACTER_TUNING.getRehearsalPreset === "function"
-    ? CHARACTER_TUNING.getRehearsalPreset(index)
-    : null;
-  state.characterRehearsalIndex = index + 1;
-  return preset || {
-    label: "默认",
-    sample: "角色试演准备好了。",
-    mood: "idle",
-    style: "steady",
-    runtimeHint: { emotion: "neutral", action: "nod", intensity: "normal", voice_style: "serious", live2d_hint: "idle" }
-  };
-}
+let characterDiagnosticsController = null;
 
-async function runCharacterRehearsalAndAppendReport() {
-  const preset = getNextCharacterRehearsalPreset();
-  const normalized = handleCharacterRuntimeMetadata(preset.runtimeHint);
-  const voiceStyle = normalizeRuntimeVoiceStyle(preset.runtimeHint.voice_style);
-  const speechStyle = runtimeVoiceStyleToTalkStyle(voiceStyle, preset.style);
-  const candidate = {
-    textPreview: preset.sample,
-    mood: preset.mood,
-    style: preset.style,
-    runtimeHint: normalized || preset.runtimeHint
-  };
-  const apply = {
-    at: Date.now(),
-    applied: !!normalized,
-    reason: normalized ? "applied" : "runtime_unavailable",
-    voiceStyle,
-    speechStyle,
-    runtimeHint: normalized || preset.runtimeHint,
-    source: "character_rehearsal"
-  };
-  state.followupCharacterRuntimeLastReplyCandidate = candidate;
-  state.followupCharacterRuntimeLastReplyAutoApply = apply;
-  updateReplyCharacterChip(candidate, apply);
-  appendMessage("assistant", `角色试演：${preset.label}\n${preset.sample}`, { enableTranslation: false });
-  setStatus(`角色试演：${preset.label}`);
-  if (!state.speakingEnabled) {
-    appendMessage("assistant", "语音开关当前是关闭状态，这次只测试了表情和动作。", { enableTranslation: false });
-    return true;
+function getCharacterDiagnosticsController() {
+  if (!characterDiagnosticsController && typeof CHARACTER_DIAGNOSTICS_CONTROLLER.createController === "function") {
+    characterDiagnosticsController = CHARACTER_DIAGNOSTICS_CONTROLLER.createController({
+      state,
+      characterTuning: CHARACTER_TUNING,
+      appendMessage,
+      setStatus,
+      buildSpeakProsody,
+      speak,
+      handleCharacterRuntimeMetadata,
+      normalizeRuntimeVoiceStyle,
+      runtimeVoiceStyleToTalkStyle,
+      updateReplyCharacterChip
+    });
   }
-  const prosody = buildSpeakProsody(preset.sample, preset.mood, false, voiceStyle);
-  const ok = await speak(preset.sample, {
-    force: true,
-    interrupt: true,
-    prosody,
-    mood: preset.mood,
-    style: speechStyle,
-    voiceStyle
-  });
-  if (!ok) {
-    appendMessage("assistant", "角色试演的语音没有成功。可以先点“测试语音”或“链路自检”确认语音服务。", { enableTranslation: false });
-    setStatus("角色试演语音失败");
-  }
-  return ok;
+  return characterDiagnosticsController || CHARACTER_DIAGNOSTICS_CONTROLLER;
 }
 
-function getLatestCharacterPerformanceSummary() {
-  if (typeof CHARACTER_TUNING.buildLatestPerformanceSummary !== "function") {
-    return null;
-  }
-  return CHARACTER_TUNING.buildLatestPerformanceSummary(
-    state.followupCharacterRuntimeLastReplyCandidate || null,
-    state.followupCharacterRuntimeLastReplyAutoApply || null
-  );
-}
-
-function recordCharacterPerformanceFeedback(rating = "good", note = "") {
-  const summary = getLatestCharacterPerformanceSummary();
-  if (!summary) {
-    appendMessage("assistant", "还没有可评价的角色表现。先发一句聊天，或点“角色试演”再反馈。", { enableTranslation: false });
-    setStatus("暂无角色表现可反馈");
-    return null;
-  }
-  const normalizedRating = rating === "bad" ? "bad" : "good";
-  const feedback = {
-    ...summary,
-    rating: normalizedRating,
-    label: normalizedRating === "good" ? "表现不错" : "需要调整",
-    note: String(note || "").trim()
-  };
-  state.characterPerformanceLastFeedback = feedback;
-  state.characterPerformanceFeedbacks.unshift(feedback);
-  if (state.characterPerformanceFeedbacks.length > 8) {
-    state.characterPerformanceFeedbacks.length = 8;
-  }
-  appendMessage(
-    "assistant",
-    typeof CHARACTER_TUNING.buildFeedbackMessage === "function"
-      ? CHARACTER_TUNING.buildFeedbackMessage(feedback)
-      : `已记录反馈：${feedback.label}`,
-    { enableTranslation: false }
-  );
-  setStatus(`已记录：${feedback.label}`);
-  return feedback;
-}
-
-function buildCharacterTuningReport() {
-  if (typeof CHARACTER_TUNING.buildTuningReport !== "function") {
-    return "角色调优建议\n\n角色调优模块暂不可用。";
-  }
-  return CHARACTER_TUNING.buildTuningReport({
-    config: state.config || {},
-    candidate: state.followupCharacterRuntimeLastReplyCandidate || null,
-    autoApply: state.followupCharacterRuntimeLastReplyAutoApply || null,
-    feedback: state.characterPerformanceLastFeedback || null,
-    ttsProvider: state.ttsProvider || "",
-    speechMotionStrength: state.speechMotionStrength,
-    expressionStrength: state.expressionStrength
-  });
-}
-
-function runCharacterTuningAndAppendReport() {
-  const row = appendMessage("assistant", buildCharacterTuningReport(), { enableTranslation: false });
-  row?.classList?.add("doctor-report");
-  setStatus("角色调优建议已生成");
-}
-
-function buildCharacterWorkflowGuide() {
-  return typeof CHARACTER_TUNING.buildWorkflowGuide === "function"
-    ? CHARACTER_TUNING.buildWorkflowGuide()
-    : "角色闭环测试流程\n\n角色流程模块暂不可用。";
-}
-
-function appendCharacterWorkflowGuide() {
-  const row = appendMessage("assistant", buildCharacterWorkflowGuide(), { enableTranslation: false });
-  row?.classList?.add("doctor-report");
-  setStatus("角色流程已显示");
-}
-
+async function runVoiceTestAndAppendReport() { return getCharacterDiagnosticsController().runVoiceTestAndAppendReport(); }
+function getNextCharacterRehearsalPreset() { return getCharacterDiagnosticsController().getNextCharacterRehearsalPreset(); }
+async function runCharacterRehearsalAndAppendReport() { return getCharacterDiagnosticsController().runCharacterRehearsalAndAppendReport(); }
+function getLatestCharacterPerformanceSummary() { return getCharacterDiagnosticsController().getLatestCharacterPerformanceSummary(); }
+function recordCharacterPerformanceFeedback(rating = "good", note = "") { return getCharacterDiagnosticsController().recordCharacterPerformanceFeedback(rating, note); }
+function buildCharacterTuningReport() { return getCharacterDiagnosticsController().buildCharacterTuningReport(); }
+function runCharacterTuningAndAppendReport() { return getCharacterDiagnosticsController().runCharacterTuningAndAppendReport(); }
+function buildCharacterWorkflowGuide() { return getCharacterDiagnosticsController().buildCharacterWorkflowGuide(); }
+function appendCharacterWorkflowGuide() { return getCharacterDiagnosticsController().appendCharacterWorkflowGuide(); }
 function ensureTTSDebugPanel() { return updateTTSDebugPanel(); }
 function updateTTSDebugPanel() { return getDiagnosticsRuntimeController().updateTTSDebugPanel(); }
 function toggleTTSDebugPanel(force = null) { return getDiagnosticsRuntimeController().toggleTTSDebugPanel(force); }
