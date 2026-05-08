@@ -141,6 +141,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - 启动失败样例库：`docs/startup-failure-examples.md`
 - 发布前 go/no-go 门槛：`docs/release-readiness.md`
 - Character Runtime demo 启用与验证：`docs/character-runtime-demo.md`
+- AI VTuber 长期体验目标：`docs/ai-vtuber-experience-target.md`
 - v1.4 AI VTuber Feeling 规格与 demo 场景：`docs/v1.4-ai-vtuber-feeling.md`
 - 发布前 / 打包前人工验收清单：`docs/manual-qa.md`
 - 推荐本地体验模板：`docs/recommended-local-config.md`

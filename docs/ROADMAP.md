@@ -6,6 +6,8 @@
 
 项目主线是：先把“稳定可陪伴的桌面角色”做好，再逐步扩展桌面感知与工具能力。
 
+长期体验目标见 `docs/ai-vtuber-experience-target.md`：项目可以借鉴 AI VTuber / Neuro-sama-like 的互动方向，但不做直接复刻，也不承诺当前阶段具备完整自动直播能力。
+
 当前阶段不追求全能助手，也不默认开启高风险能力。优先级是：
 
 1. 稳定首次运行、文本聊天、TTS、ASR。
@@ -90,6 +92,7 @@
 - Live2D 表情/动作触发策略精细化。
 - 关键互动场景脚本化（欢迎、提醒、鼓励、收尾）。
 - Demo 场景整理（闲聊、安慰、提醒、语音对话、动作反馈）。
+- 长期体验目标见 `docs/ai-vtuber-experience-target.md`。
 - 阶段规格、demo 场景和人工验收草案见 `docs/v1.4-ai-vtuber-feeling.md`。
 
 ### Acceptance Criteria

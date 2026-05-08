@@ -229,6 +229,7 @@ start_desktop.bat
 - 启动失败样例库：`docs/startup-failure-examples.md`
 - 发布前 go/no-go 门槛：`docs/release-readiness.md`
 - 人工验收清单：`docs/manual-qa.md`
+- AI VTuber 长期体验目标：`docs/ai-vtuber-experience-target.md`
 - v1.4 AI VTuber Feeling 规格与 demo 场景：`docs/v1.4-ai-vtuber-feeling.md`
 - 排障：`docs/troubleshooting.md`
 - 语音输入 / 输出排障：`docs/voice-troubleshooting.md`
