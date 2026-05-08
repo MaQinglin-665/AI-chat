@@ -44,6 +44,7 @@ const LEARNING_REVIEW_API_JS = path.resolve(__dirname, "..", "web", "learningRev
 const LEARNING_REVIEW_MODEL_JS = path.resolve(__dirname, "..", "web", "learningReviewModel.js");
 const LEARNING_REVIEW_VIEW_JS = path.resolve(__dirname, "..", "web", "learningReviewView.js");
 const LEARNING_REVIEW_BINDER_JS = path.resolve(__dirname, "..", "web", "learningReviewBinder.js");
+const LEARNING_REVIEW_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "learningReviewController.js");
 const PANEL_CONTROL_BINDER_JS = path.resolve(__dirname, "..", "web", "panelControlBinder.js");
 const ADVANCED_ACTION_BINDER_JS = path.resolve(__dirname, "..", "web", "advancedActionBinder.js");
 const CHAT_INPUT_BINDER_JS = path.resolve(__dirname, "..", "web", "chatInputBinder.js");
@@ -111,6 +112,7 @@ const learningReviewApiSource = fs.readFileSync(LEARNING_REVIEW_API_JS, "utf8");
 const learningReviewModelSource = fs.readFileSync(LEARNING_REVIEW_MODEL_JS, "utf8");
 const learningReviewViewSource = fs.readFileSync(LEARNING_REVIEW_VIEW_JS, "utf8");
 const learningReviewBinderSource = fs.readFileSync(LEARNING_REVIEW_BINDER_JS, "utf8");
+const learningReviewControllerSource = fs.readFileSync(LEARNING_REVIEW_CONTROLLER_JS, "utf8");
 const panelControlBinderSource = fs.readFileSync(PANEL_CONTROL_BINDER_JS, "utf8");
 const advancedActionBinderSource = fs.readFileSync(ADVANCED_ACTION_BINDER_JS, "utf8");
 const chatInputBinderSource = fs.readFileSync(CHAT_INPUT_BINDER_JS, "utf8");
@@ -182,6 +184,7 @@ const learningReviewApi = require(LEARNING_REVIEW_API_JS);
 const learningReviewModel = require(LEARNING_REVIEW_MODEL_JS);
 const learningReviewView = require(LEARNING_REVIEW_VIEW_JS);
 const learningReviewBinder = require(LEARNING_REVIEW_BINDER_JS);
+const learningReviewController = require(LEARNING_REVIEW_CONTROLLER_JS);
 const panelControlBinder = require(PANEL_CONTROL_BINDER_JS);
 const advancedActionBinder = require(ADVANCED_ACTION_BINDER_JS);
 const chatInputBinder = require(CHAT_INPUT_BINDER_JS);
@@ -398,6 +401,11 @@ assert.strictEqual(
     "learning review binder should export UI event binding"
   );
   assert.strictEqual(
+    typeof learningReviewController.createController,
+    "function",
+    "learning review controller should expose UI orchestration"
+  );
+  assert.strictEqual(
     typeof panelControlBinder.bindPanelControls,
     "function",
     "panel control binder should export grouped panel binding"
@@ -611,6 +619,7 @@ assert.ok(
     && source.includes("const LEARNING_REVIEW_MODEL = window.TaffyLearningReviewModel")
     && source.includes("const LEARNING_REVIEW_VIEW = window.TaffyLearningReviewView")
     && source.includes("const LEARNING_REVIEW_BINDER = window.TaffyLearningReviewBinder")
+    && source.includes("const LEARNING_REVIEW_CONTROLLER = window.TaffyLearningReviewController")
     && source.includes("const PANEL_CONTROL_BINDER = window.TaffyPanelControlBinder")
     && source.includes("const ADVANCED_ACTION_BINDER = window.TaffyAdvancedActionBinder")
     && source.includes("const CHAT_INPUT_BINDER = window.TaffyChatInputBinder")
@@ -621,12 +630,15 @@ assert.ok(
     && source.includes("const LIVE2D_RUNTIME_CONTROLLER = window.TaffyLive2DRuntimeController")
     && source.includes("const MOTION_RUNTIME_CONTROLLER = window.TaffyMotionRuntimeController")
     && source.includes("const RUNTIME_EVENT_BINDER = window.TaffyRuntimeEventBinder")
-    && source.includes("LEARNING_REVIEW_MODEL.applyLearningPayload")
-    && source.includes("LEARNING_REVIEW_MODEL.getLearningFilteredItems")
-    && source.includes("LEARNING_REVIEW_MODEL.buildSelectAllState")
-    && source.includes("LEARNING_REVIEW_VIEW.renderLearningReviewItems")
-    && source.includes("LEARNING_REVIEW_API.reload")
-    && source.includes("LEARNING_REVIEW_BINDER.bindLearningReviewControls")
+    && learningReviewControllerSource.includes("model.applyLearningPayload")
+    && learningReviewControllerSource.includes("model.getLearningFilteredItems")
+    && learningReviewControllerSource.includes("model.buildSelectAllState")
+    && learningReviewControllerSource.includes("view.renderLearningReviewItems")
+    && learningReviewControllerSource.includes("api.reload")
+    && source.includes("LEARNING_REVIEW_CONTROLLER.createController")
+    && source.includes("function getLearningReviewController()")
+    && source.includes("function renderLearningReviewList() { return getLearningReviewController().renderLearningReviewList(); }")
+    && source.includes("function bindLearningReviewControls() { return getLearningReviewController().bindLearningReviewControls(); }")
     && source.includes("PANEL_CONTROL_BINDER.bindPanelControls")
     && source.includes("ADVANCED_ACTION_BINDER.bindAdvancedActionControls")
     && source.includes("CHAT_INPUT_BINDER.bindChatInputControls")
@@ -654,6 +666,10 @@ assert.ok(
     && learningReviewBinderSource.includes("function bindLearningReviewControls")
     && learningReviewBinderSource.includes("runBatchAction")
     && learningReviewBinderSource.includes("runSingleAction")
+    && learningReviewControllerSource.includes("function createInitialState")
+    && learningReviewControllerSource.includes("function renderLearningReviewList")
+    && learningReviewControllerSource.includes("async function reloadLearningReviewData")
+    && learningReviewControllerSource.includes("function bindLearningReviewControls")
     && panelControlBinderSource.includes("function bindPanelControls")
     && panelControlBinderSource.includes("function bindPersonaControls")
     && panelControlBinderSource.includes("function bindScheduleControls")
@@ -689,6 +705,7 @@ assert.ok(
     && indexSource.includes('<script src="./learningReviewModel.js"></script>')
     && indexSource.includes('<script src="./learningReviewView.js"></script>')
     && indexSource.includes('<script src="./learningReviewBinder.js"></script>')
+    && indexSource.includes('<script src="./learningReviewController.js"></script>')
     && indexSource.includes('<script src="./panelControlBinder.js"></script>')
     && indexSource.includes('<script src="./advancedActionBinder.js"></script>')
     && indexSource.includes('<script src="./chatInputBinder.js"></script>')
@@ -702,7 +719,8 @@ assert.ok(
     && indexSource.indexOf('<script src="./learningReviewApi.js"></script>') < indexSource.indexOf('<script src="./learningReviewModel.js"></script>')
     && indexSource.indexOf('<script src="./learningReviewModel.js"></script>') < indexSource.indexOf('<script src="./learningReviewView.js"></script>')
     && indexSource.indexOf('<script src="./learningReviewView.js"></script>') < indexSource.indexOf('<script src="./learningReviewBinder.js"></script>')
-    && indexSource.indexOf('<script src="./learningReviewBinder.js"></script>') < indexSource.indexOf('<script src="./panelControlBinder.js"></script>')
+    && indexSource.indexOf('<script src="./learningReviewBinder.js"></script>') < indexSource.indexOf('<script src="./learningReviewController.js"></script>')
+    && indexSource.indexOf('<script src="./learningReviewController.js"></script>') < indexSource.indexOf('<script src="./panelControlBinder.js"></script>')
     && indexSource.indexOf('<script src="./panelControlBinder.js"></script>') < indexSource.indexOf('<script src="./advancedActionBinder.js"></script>')
     && indexSource.indexOf('<script src="./advancedActionBinder.js"></script>') < indexSource.indexOf('<script src="./chatInputBinder.js"></script>')
     && indexSource.indexOf('<script src="./chatInputBinder.js"></script>') < indexSource.indexOf('<script src="./desktopControlBinder.js"></script>')
@@ -1465,7 +1483,7 @@ assert.ok(
 );
 assert.ok(
   source.includes("function buildMemoryDebugReport(")
-    && source.includes("window.TaffyMemoryDebugReport?.buildReport")
+    && learningReviewControllerSource.includes("memoryDebugReport.buildReport")
     && memoryDebugSource.includes("function buildReport")
     && memoryDebugSource.includes("Learning health windows:")
     && devFeatureLoaderSource.includes('"./memoryDebugReport.js"')
@@ -1563,9 +1581,9 @@ assert.ok(
   "chat.js should expose /translatedebug for copyable translation timing state"
 );
 assert.ok(
-  source.includes("window.TaffyMemoryDebugReport?.buildReport")
+  learningReviewControllerSource.includes("memoryDebugReport.buildReport")
     && localCommandRegistry.matchLocalCommand("/memorydebug").kind === "memory_debug"
-    && source.includes("LEARNING_REVIEW_API.reloadMemoryDebug")
+    && learningReviewControllerSource.includes("api.reloadMemoryDebug")
     && learningReviewApiSource.includes('fetchJsonFn("/api/memory/debug")')
     && chatDomSource.includes("learningTabDebug")
     && chatDomSource.includes("learningDebugPanel")

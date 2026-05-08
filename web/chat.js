@@ -1498,20 +1498,23 @@ function installTranslateDebugBridge() { return getDiagnosticsRuntimeController(
 const CHAT_DOM = window.TaffyChatDom || {};
 const ui = CHAT_DOM.createUI(document);
 
-const learningReviewState = {
-  activeTab: "candidates",
-  debugSnapshot: null,
-  candidates: [],
-  samples: [],
-  selectedCandidates: new Set(),
-  selectedSamples: new Set(),
-  quickSettings: {
-    inject_count: 0,
-    promotion_min_support: 1
-  },
-  sortMode: "score_desc",
-  loading: false
-};
+const learningReviewState =
+  typeof window.TaffyLearningReviewController?.createInitialState === "function"
+    ? window.TaffyLearningReviewController.createInitialState()
+    : {
+      activeTab: "candidates",
+      debugSnapshot: null,
+      candidates: [],
+      samples: [],
+      selectedCandidates: new Set(),
+      selectedSamples: new Set(),
+      quickSettings: {
+        inject_count: 0,
+        promotion_min_support: 1
+      },
+      sortMode: "score_desc",
+      loading: false
+    };
 
 const RUNTIME_VERSION = "20260409_6";
 const MAX_PENDING_ATTACHMENTS = 6;
@@ -1523,6 +1526,7 @@ const LEARNING_REVIEW_API = window.TaffyLearningReviewApi || {};
 const LEARNING_REVIEW_MODEL = window.TaffyLearningReviewModel || {};
 const LEARNING_REVIEW_VIEW = window.TaffyLearningReviewView || {};
 const LEARNING_REVIEW_BINDER = window.TaffyLearningReviewBinder || {};
+const LEARNING_REVIEW_CONTROLLER = window.TaffyLearningReviewController || {};
 const PANEL_CONTROL_BINDER = window.TaffyPanelControlBinder || {};
 const ADVANCED_ACTION_BINDER = window.TaffyAdvancedActionBinder || {};
 const CHAT_INPUT_BINDER = window.TaffyChatInputBinder || {};
@@ -2418,386 +2422,61 @@ async function savePersonaCardFromForm() {
   return getPersonaAvatarController().savePersonaCardFromForm();
 }
 
-function isLearningReviewOpen() {
-  return !!ui.learningReviewDrawer && !ui.learningReviewDrawer.hidden;
-}
+let learningReviewController = null;
 
-function getLearningSelectedSet(tab = learningReviewState.activeTab) {
-  return tab === "samples"
-    ? learningReviewState.selectedSamples
-    : learningReviewState.selectedCandidates;
-}
-
-function normalizeLearningReviewItem(item, fallbackId) {
-  return typeof LEARNING_REVIEW_MODEL.normalizeLearningReviewItem === "function"
-    ? LEARNING_REVIEW_MODEL.normalizeLearningReviewItem(item, fallbackId)
-    : null;
-}
-
-function setLearningReviewLoading(loading) {
-  learningReviewState.loading = !!loading;
-  if (ui.learningReviewSummary) {
-    ui.learningReviewSummary.textContent = learningReviewState.loading
-      ? "学习审核数据加载中..."
-      : ui.learningReviewSummary.textContent;
-  }
-}
-
-function syncLearningQuickSettingsUI() {
-  if (ui.learningQuickInject) {
-    ui.learningQuickInject.value = String(
-      Number(learningReviewState.quickSettings?.inject_count) >= 1 ? 1 : 0
-    );
-  }
-  if (ui.learningQuickSupport) {
-    ui.learningQuickSupport.value = String(
-      Number(learningReviewState.quickSettings?.promotion_min_support) >= 2 ? 2 : 1
-    );
-  }
-}
-
-function applyLearningPayload(payload) {
-  if (typeof LEARNING_REVIEW_MODEL.applyLearningPayload === "function") {
-    LEARNING_REVIEW_MODEL.applyLearningPayload(learningReviewState, payload);
-  }
-  syncLearningQuickSettingsUI();
-}
-
-function applyMemoryDebugPayload(payload) {
-  learningReviewState.debugSnapshot = payload && typeof payload === "object" ? payload : null;
-}
-
-function parseLearningFilterNumber(input, fallback = 0) {
-  return typeof LEARNING_REVIEW_MODEL.parseLearningFilterNumber === "function"
-    ? LEARNING_REVIEW_MODEL.parseLearningFilterNumber(input, fallback)
-    : fallback;
-}
-
-function parseLearningUpdatedTime(item) {
-  return typeof LEARNING_REVIEW_MODEL.parseLearningUpdatedTime === "function"
-    ? LEARNING_REVIEW_MODEL.parseLearningUpdatedTime(item)
-    : 0;
-}
-
-function applyLearningHighScorePreset() {
-  if (ui.learningFilterScore) {
-    ui.learningFilterScore.value = "0.75";
-  }
-  if (ui.learningFilterConfidence) {
-    ui.learningFilterConfidence.value = "0.50";
-  }
-  if (ui.learningSortMode) {
-    ui.learningSortMode.value = "score_desc";
-  }
-  learningReviewState.sortMode = "score_desc";
-  renderLearningReviewList();
-}
-
-function resetLearningFilters() {
-  if (ui.learningFilterScore) {
-    ui.learningFilterScore.value = "0";
-  }
-  if (ui.learningFilterConfidence) {
-    ui.learningFilterConfidence.value = "0";
-  }
-  if (ui.learningFilterKeyword) {
-    ui.learningFilterKeyword.value = "";
-  }
-  if (ui.learningSortMode) {
-    ui.learningSortMode.value = "score_desc";
-  }
-  learningReviewState.sortMode = "score_desc";
-  renderLearningReviewList();
-}
-
-function getLearningFilteredItems() {
-  return typeof LEARNING_REVIEW_MODEL.getLearningFilteredItems === "function"
-    ? LEARNING_REVIEW_MODEL.getLearningFilteredItems(learningReviewState, {
-      scoreMin: ui.learningFilterScore,
-      confidenceMin: ui.learningFilterConfidence,
-      keyword: ui.learningFilterKeyword?.value,
-      sortMode: learningReviewState.sortMode || ui.learningSortMode?.value || "score_desc"
-    })
-    : [];
-}
-
-function buildMemoryDebugReport(snapshot = learningReviewState.debugSnapshot) {
-  return typeof window.TaffyMemoryDebugReport?.buildReport === "function"
-    ? window.TaffyMemoryDebugReport.buildReport(snapshot)
-    : "Memory/Learning Debug:";
-}
-
-function renderLearningDebugPanel() {
-  if (!ui.learningDebugPanel) {
-    return;
-  }
-  const isDebug = learningReviewState.activeTab === "debug";
-  if (typeof LEARNING_REVIEW_VIEW.showLearningDebugPanel === "function") {
-    LEARNING_REVIEW_VIEW.showLearningDebugPanel(ui, isDebug);
-  } else {
-    ui.learningDebugPanel.hidden = !isDebug;
-    if (ui.learningReviewList) {
-      ui.learningReviewList.hidden = isDebug;
-    }
-  }
-  if (!isDebug) {
-    return;
-  }
-  ui.learningDebugPanel.textContent = buildMemoryDebugReport();
-  if (ui.learningReviewSummary) {
-    ui.learningReviewSummary.textContent = "Memory and learning chain debug snapshot";
-  }
-}
-
-function refreshLearningSelectAllState(filteredItems) {
-  if (!ui.learningSelectAll) {
-    return;
-  }
-  const selectedSet = getLearningSelectedSet();
-  const view = typeof LEARNING_REVIEW_MODEL.buildSelectAllState === "function"
-    ? LEARNING_REVIEW_MODEL.buildSelectAllState(learningReviewState.activeTab, filteredItems, selectedSet)
-    : { checked: false, indeterminate: false, selectedCount: selectedSet.size, canBatch: selectedSet.size > 0, canPromote: false };
-  ui.learningSelectAll.indeterminate = view.indeterminate === true;
-  ui.learningSelectAll.checked = view.checked === true;
-  if (ui.learningSelectedCount) {
-    ui.learningSelectedCount.textContent = `已选 ${view.selectedCount}`;
-  }
-  if (ui.learningBatchDeleteBtn) ui.learningBatchDeleteBtn.disabled = !view.canBatch;
-  if (ui.learningBatchUpBtn) ui.learningBatchUpBtn.disabled = !view.canBatch;
-  if (ui.learningBatchDownBtn) ui.learningBatchDownBtn.disabled = !view.canBatch;
-  if (ui.learningBatchPromoteBtn) {
-    ui.learningBatchPromoteBtn.disabled = !view.canPromote;
-  }
-}
-
-function renderLearningReviewList() {
-  if (!ui.learningReviewList) {
-    return;
-  }
-  if (learningReviewState.activeTab === "debug") {
-    if (typeof LEARNING_REVIEW_VIEW.renderLearningTabs === "function") {
-      LEARNING_REVIEW_VIEW.renderLearningTabs(ui, "debug");
-    }
-    refreshLearningSelectAllState([]);
-    renderLearningDebugPanel();
-    return;
-  }
-  const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
-  const filteredItems = getLearningFilteredItems();
-  ui.learningReviewList.hidden = false;
-  if (ui.learningDebugPanel) {
-    ui.learningDebugPanel.hidden = true;
-  }
-
-  if (typeof LEARNING_REVIEW_VIEW.renderLearningTabs === "function") {
-    LEARNING_REVIEW_VIEW.renderLearningTabs(ui, tab);
-  }
-  if (ui.learningReviewSummary) {
-    ui.learningReviewSummary.textContent = typeof LEARNING_REVIEW_MODEL.buildLearningSummaryText === "function"
-      ? LEARNING_REVIEW_MODEL.buildLearningSummaryText(learningReviewState, filteredItems.length)
-      : "";
-  }
-
-  if (typeof LEARNING_REVIEW_VIEW.renderLearningReviewItems === "function") {
-    LEARNING_REVIEW_VIEW.renderLearningReviewItems(ui.learningReviewList, filteredItems, {
-      document,
+function getLearningReviewController() {
+  if (!learningReviewController && typeof LEARNING_REVIEW_CONTROLLER.createController === "function") {
+    learningReviewController = LEARNING_REVIEW_CONTROLLER.createController({
+      learningReviewState,
+      ui,
+      documentObject: document,
+      api: LEARNING_REVIEW_API,
       model: LEARNING_REVIEW_MODEL,
-      selectedSet: getLearningSelectedSet(tab),
-      tab
+      view: LEARNING_REVIEW_VIEW,
+      binder: LEARNING_REVIEW_BINDER,
+      memoryDebugReport: window.TaffyMemoryDebugReport || {},
+      authFetch,
+      setStatus,
+      isHelpOpen,
+      closeHelpModal,
+      isOnboardingOpen,
+      closeOnboardingModal,
+      closeSchedulePanel,
+      closePersonaPanel
     });
-  } else {
-    ui.learningReviewList.innerHTML = "";
   }
-  refreshLearningSelectAllState(filteredItems);
+  return learningReviewController || LEARNING_REVIEW_CONTROLLER;
 }
 
-async function learningFetchJson(url, options = {}) {
-  return typeof LEARNING_REVIEW_API.fetchJson === "function"
-    ? LEARNING_REVIEW_API.fetchJson(authFetch, url, options)
-    : {};
-}
-
-async function reloadLearningReviewData() {
-  setLearningReviewLoading(true);
-  try {
-    const { payload, debugPayload } = typeof LEARNING_REVIEW_API.reload === "function"
-      ? await LEARNING_REVIEW_API.reload(learningFetchJson)
-      : { payload: {}, debugPayload: {} };
-    applyLearningPayload(payload);
-    applyMemoryDebugPayload(debugPayload);
-    renderLearningReviewList();
-    setStatus(payload?.message || "学习审核数据已刷新");
-  } finally {
-    setLearningReviewLoading(false);
-  }
-}
-
-async function reloadMemoryDebugData() {
-  const payload = typeof LEARNING_REVIEW_API.reloadMemoryDebug === "function"
-    ? await LEARNING_REVIEW_API.reloadMemoryDebug(learningFetchJson)
-    : {};
-  applyMemoryDebugPayload(payload);
-  renderLearningDebugPanel();
-  return payload;
-}
-
-async function updateLearningEntries(action, extra = {}) {
-  const payload = typeof LEARNING_REVIEW_API.updateEntries === "function"
-    ? await LEARNING_REVIEW_API.updateEntries(learningFetchJson, action, extra)
-    : {};
-  applyLearningPayload(payload);
-  renderLearningReviewList();
-  if (payload?.message) {
-    setStatus(payload.message);
-  }
-  return payload;
-}
-
-async function promoteLearningEntries(candidateIds) {
-  const payload = typeof LEARNING_REVIEW_API.promoteEntries === "function"
-    ? await LEARNING_REVIEW_API.promoteEntries(learningFetchJson, candidateIds)
-    : {};
-  applyLearningPayload(payload);
-  renderLearningReviewList();
-  if (payload?.message) {
-    setStatus(payload.message);
-  }
-  return payload;
-}
-
-async function undoLearningLastStep() {
-  const payload = await updateLearningEntries("undo", {});
-  setStatus(payload?.message || "已撤销上一步");
-  return payload;
-}
-
-function openLearningReviewDrawer() {
-  if (!ui.learningReviewDrawer || !ui.learningReviewBackdrop) {
-    return;
-  }
-  if (isHelpOpen()) {
-    closeHelpModal();
-  }
-  if (isOnboardingOpen()) {
-    closeOnboardingModal();
-  }
-  if (ui.scheduleModal && !ui.scheduleModal.hidden) {
-    closeSchedulePanel();
-  }
-  if (ui.personaModal && !ui.personaModal.hidden) {
-    closePersonaPanel();
-  }
-  ui.learningReviewBackdrop.hidden = false;
-  ui.learningReviewDrawer.hidden = false;
-  document.body.classList.add("learning-review-open");
-  renderLearningReviewList();
-  reloadLearningReviewData().catch((err) => {
-    setStatus(`学习审核加载失败: ${err.message || err}`);
-  });
-}
-
-function closeLearningReviewDrawer() {
-  if (!ui.learningReviewDrawer || !ui.learningReviewBackdrop) {
-    return;
-  }
-  ui.learningReviewDrawer.hidden = true;
-  ui.learningReviewBackdrop.hidden = true;
-  document.body.classList.remove("learning-review-open");
-}
-
-function toggleLearningReviewDrawer() {
-  if (isLearningReviewOpen()) {
-    closeLearningReviewDrawer();
-    return;
-  }
-  openLearningReviewDrawer();
-}
-
-async function runLearningSingleAction(action, itemId) {
-  const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
-  const id = String(itemId || "").trim();
-  if (!id) {
-    return;
-  }
-  if (action === "promote") {
-    await promoteLearningEntries([id]);
-    return;
-  }
-  if (action === "weight_up") {
-    await updateLearningEntries("weight", { pool: tab, ids: [id], delta: 0.05 });
-    return;
-  }
-  if (action === "weight_down") {
-    await updateLearningEntries("weight", { pool: tab, ids: [id], delta: -0.05 });
-    return;
-  }
-  if (action === "delete") {
-    await updateLearningEntries("delete", { pool: tab, ids: [id] });
-    return;
-  }
-  if (action === "keep") {
-    await updateLearningEntries("keep", { pool: tab, ids: [id] });
-  }
-}
-
-async function runLearningBatchAction(action) {
-  const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
-  const selectedSet = getLearningSelectedSet(tab);
-  const visibleIds = new Set(getLearningFilteredItems().map((item) => String(item?.id || "").trim()).filter(Boolean));
-  const ids = Array.from(selectedSet).filter((id) => visibleIds.has(String(id || "").trim()));
-  if (!ids.length) {
-    setStatus("请先勾选当前筛选结果中的条目");
-    return;
-  }
-  if (action === "promote") {
-    if (tab !== "candidates") {
-      setStatus("只有候选池支持晋升");
-      return;
-    }
-    await promoteLearningEntries(ids);
-  } else if (action === "delete") {
-    await updateLearningEntries("delete", { pool: tab, ids });
-  } else if (action === "weight_up") {
-    await updateLearningEntries("weight", { pool: tab, ids, delta: 0.05 });
-  } else if (action === "weight_down") {
-    await updateLearningEntries("weight", { pool: tab, ids, delta: -0.05 });
-  }
-  ids.forEach((id) => selectedSet.delete(id));
-  renderLearningReviewList();
-}
-
-async function applyLearningQuickSettings() {
-  const injectCount = Number(ui.learningQuickInject?.value || 0) >= 1 ? 1 : 0;
-  const minSupport = Number(ui.learningQuickSupport?.value || 1) >= 2 ? 2 : 1;
-  const payload = typeof LEARNING_REVIEW_API.buildQuickSettingsPayload === "function"
-    ? LEARNING_REVIEW_API.buildQuickSettingsPayload(injectCount, minSupport)
-    : { quick_settings: { inject_count: injectCount, promotion_min_support: minSupport } };
-  await updateLearningEntries("config", payload);
-}
-
-function bindLearningReviewControls() {
-  if (typeof LEARNING_REVIEW_BINDER.bindLearningReviewControls !== "function") {
-    return;
-  }
-  LEARNING_REVIEW_BINDER.bindLearningReviewControls(ui, {
-    state: learningReviewState,
-    toggleDrawer: toggleLearningReviewDrawer,
-    closeDrawer: closeLearningReviewDrawer,
-    undoLastStep: undoLearningLastStep,
-    reload: reloadLearningReviewData,
-    reloadMemoryDebug: reloadMemoryDebugData,
-    applyQuickSettings: applyLearningQuickSettings,
-    applyHighScorePreset: applyLearningHighScorePreset,
-    resetFilters: resetLearningFilters,
-    getSelectedSet: getLearningSelectedSet,
-    getFilteredItems: getLearningFilteredItems,
-    runBatchAction: runLearningBatchAction,
-    runSingleAction: runLearningSingleAction,
-    render: renderLearningReviewList,
-    onError: setStatus
-  });
-}
-
+function isLearningReviewOpen() { return getLearningReviewController().isLearningReviewOpen(); }
+function getLearningSelectedSet(tab = learningReviewState.activeTab) { return getLearningReviewController().getLearningSelectedSet(tab); }
+function normalizeLearningReviewItem(item, fallbackId) { return getLearningReviewController().normalizeLearningReviewItem(item, fallbackId); }
+function setLearningReviewLoading(loading) { return getLearningReviewController().setLearningReviewLoading(loading); }
+function syncLearningQuickSettingsUI() { return getLearningReviewController().syncLearningQuickSettingsUI(); }
+function applyLearningPayload(payload) { return getLearningReviewController().applyLearningPayload(payload); }
+function applyMemoryDebugPayload(payload) { return getLearningReviewController().applyMemoryDebugPayload(payload); }
+function parseLearningFilterNumber(input, fallback = 0) { return getLearningReviewController().parseLearningFilterNumber(input, fallback); }
+function parseLearningUpdatedTime(item) { return getLearningReviewController().parseLearningUpdatedTime(item); }
+function applyLearningHighScorePreset() { return getLearningReviewController().applyLearningHighScorePreset(); }
+function resetLearningFilters() { return getLearningReviewController().resetLearningFilters(); }
+function getLearningFilteredItems() { return getLearningReviewController().getLearningFilteredItems(); }
+function buildMemoryDebugReport(snapshot = learningReviewState.debugSnapshot) { return getLearningReviewController().buildMemoryDebugReport(snapshot); }
+function renderLearningDebugPanel() { return getLearningReviewController().renderLearningDebugPanel(); }
+function refreshLearningSelectAllState(filteredItems) { return getLearningReviewController().refreshLearningSelectAllState(filteredItems); }
+function renderLearningReviewList() { return getLearningReviewController().renderLearningReviewList(); }
+async function learningFetchJson(url, options = {}) { return getLearningReviewController().learningFetchJson(url, options); }
+async function reloadLearningReviewData() { return getLearningReviewController().reloadLearningReviewData(); }
+async function reloadMemoryDebugData() { return getLearningReviewController().reloadMemoryDebugData(); }
+async function updateLearningEntries(action, extra = {}) { return getLearningReviewController().updateLearningEntries(action, extra); }
+async function promoteLearningEntries(candidateIds) { return getLearningReviewController().promoteLearningEntries(candidateIds); }
+async function undoLearningLastStep() { return getLearningReviewController().undoLearningLastStep(); }
+function openLearningReviewDrawer() { return getLearningReviewController().openLearningReviewDrawer(); }
+function closeLearningReviewDrawer() { return getLearningReviewController().closeLearningReviewDrawer(); }
+function toggleLearningReviewDrawer() { return getLearningReviewController().toggleLearningReviewDrawer(); }
+async function runLearningSingleAction(action, itemId) { return getLearningReviewController().runLearningSingleAction(action, itemId); }
+async function runLearningBatchAction(action) { return getLearningReviewController().runLearningBatchAction(action); }
+async function applyLearningQuickSettings() { return getLearningReviewController().applyLearningQuickSettings(); }
+function bindLearningReviewControls() { return getLearningReviewController().bindLearningReviewControls(); }
 function bindPanelControls() {
   if (typeof PANEL_CONTROL_BINDER.bindPanelControls !== "function") {
     return;
