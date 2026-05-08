@@ -99,6 +99,48 @@ def test_character_brain_reminder_and_closing_have_clear_limits():
     assert closing["output_constraints"]["allow_teasing"] is False
 
 
+def test_character_brain_v14_demo_scenarios_have_stable_cues():
+    scenarios = {
+        "welcome": character_brain.build_character_brain_decision(user_message="Hi, are you there?"),
+        "casual": character_brain.build_character_brain_decision(user_message="That rain sound is nice today."),
+        "comfort": character_brain.build_character_brain_decision(user_message="I feel awful and overwhelmed."),
+        "reminder": character_brain.build_character_brain_decision(user_message="Remind me in 10 minutes to drink water."),
+        "encouragement": character_brain.build_character_brain_decision(user_message="I finished the task and shipped it."),
+        "long_tts": character_brain.build_character_brain_decision(
+            user_message="Can you say a longer sentence to test whether TTS keeps the ending complete?"
+        ),
+        "failure": character_brain.build_character_brain_decision(
+            user_message="The voice failed again, what should I check?"
+        ),
+        "closing": character_brain.build_character_brain_decision(user_message="I am going to sleep, goodbye."),
+    }
+
+    assert scenarios["welcome"]["intent"] == "greeting"
+    assert scenarios["welcome"]["action"] == "wave"
+    assert scenarios["welcome"]["output_constraints"]["allow_followup_question"] is False
+    assert scenarios["casual"]["intent"] == "casual"
+    assert scenarios["casual"]["max_sentences"] <= 2
+    assert scenarios["casual"]["output_constraints"]["allow_followup_question"] is False
+    assert scenarios["comfort"]["intent"] == "comfort"
+    assert scenarios["comfort"]["voice_style"] == "soft"
+    assert scenarios["comfort"]["output_constraints"]["allow_motion"] is False
+    assert scenarios["reminder"]["intent"] == "reminder"
+    assert scenarios["reminder"]["action"] == "nod"
+    assert scenarios["reminder"]["output_constraints"]["allow_teasing"] is False
+    assert scenarios["encouragement"]["intent"] == "encouragement"
+    assert scenarios["encouragement"]["action"] == "happy_idle"
+    assert scenarios["encouragement"]["voice_style"] == "cheerful"
+    assert scenarios["long_tts"]["intent"] == "task_help"
+    assert scenarios["long_tts"]["max_sentences"] >= 3
+    assert scenarios["long_tts"]["output_constraints"]["clarify_only_when_needed"] is True
+    assert scenarios["failure"]["intent"] == "task_help"
+    assert scenarios["failure"]["reply_style"] == "clear"
+    assert scenarios["failure"]["voice_style"] == "serious"
+    assert scenarios["closing"]["intent"] == "closing"
+    assert scenarios["closing"]["voice_style"] == "soft"
+    assert scenarios["closing"]["output_constraints"]["allow_followup_question"] is False
+
+
 def test_character_brain_casual_turn_can_end_without_followup():
     decision = character_brain.build_character_brain_decision(
         user_message="That sounds nice.",

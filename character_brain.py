@@ -423,8 +423,8 @@ def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str,
         65,
         text,
     )
-    add_if(r"\b(hello|hi|hey|good morning|good evening)\b", "greeting", 45, lower)
-    add_if(r"(\u4f60\u597d|\u65e9\u5b89|\u665a\u5b89|\u5728\u5417)", "greeting", 45, text)
+    add_if(r"\b(hello|hi|hey|good morning|good evening|are you there)\b", "greeting", 60, lower)
+    add_if(r"(\u4f60\u597d|\u65e9\u5b89|\u665a\u5b89|\u5728\u5417)", "greeting", 60, text)
     add_if(r"(encourage|cheerme|needapush|motivateme)", "encouragement", 55)
     add_if(r"(\u9f13\u52b1|\u52a0\u6cb9|\u6253\u6c14|\u5938\u6211)", "encouragement", 55, text)
     add_if(r"(remind|timer|alarm|calendar|schedule|in\d+minutes|in\d+hours)", "reminder", 90)
@@ -446,6 +446,16 @@ def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str,
         "task_help",
         70,
         text,
+    )
+    add_if(
+        r"(testtts|ttstest|testvoice|voicetest|speechtest|longersentence|longsentence|whatshouldicheck)",
+        "task_help",
+        90,
+    )
+    add_if(
+        r"((voice|tts|asr|live2d|motion).{0,24}(failed|failure|broken|notworking|doesn.?twork))",
+        "task_help",
+        90,
     )
     if "?" in text or "\uff1f" in text:
         scores["question"] += 45
