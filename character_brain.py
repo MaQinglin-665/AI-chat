@@ -396,7 +396,7 @@ def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str,
             scores[intent] = scores.get(intent, 0) + points
 
     add_if(
-        r"(sad|tired|anxious|upset|hurt|overwhelmed|lonely|depressed|panic|scared|stress|burnedout|burntout|stillhurts|notokay|cantshakeit|can'tshakeit|notoverit)",
+        r"(sad|tired|anxious|upset|hurt|overwhelmed|lonely|depressed|panic|scared|stress|wornout|exhausted|drained|wipedout|burnedout|burntout|stillhurts|notokay|cantshakeit|can'tshakeit|notoverit|staywithme|needcompany|needcomfort)",
         "comfort",
         120,
     )

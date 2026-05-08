@@ -60,6 +60,20 @@ def test_character_brain_comfort_priority_beats_next_step_question():
     assert decision["output_constraints"]["allow_teasing"] is False
 
 
+def test_character_brain_english_worn_out_companionship_is_comfort():
+    decision = character_brain.build_character_brain_decision(
+        user_message="I'm feeling a bit worn out. Stay with me for a second.",
+        history=[],
+    )
+
+    assert decision["intent"] == "comfort"
+    assert decision["emotion"] == "sad"
+    assert decision["action"] == "none"
+    assert decision["voice_style"] == "soft"
+    assert decision["output_constraints"]["allow_followup_question"] is False
+    assert decision["output_constraints"]["allow_motion"] is False
+
+
 def test_character_brain_task_help_allows_only_needed_clarification():
     decision = character_brain.build_character_brain_decision(
         user_message="What should I do next in the roadmap?",
