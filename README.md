@@ -102,6 +102,8 @@ powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1
 python scripts\first_run_check.py
 ```
 
+预检会做只读检查：Python / Node 依赖、配置加载、Live2D 路径、本地端口、LLM Key / 模型名、本地 Ollama / GPT-SoVITS 端口、TTS / ASR 依赖，以及桌面观察和工具调用的安全默认值。
+
 预检通过后启动桌面模式：
 
 ```powershell
@@ -111,6 +113,11 @@ python scripts\first_run_check.py
 `start_electron.bat` 会在启动前自动运行首跑预检；如果有阻塞项，会停下来显示原因。
 
 也可以双击：`一键启动桌宠.vbs`。如果双击后没有明显反应，请改用 `start_electron.bat` 查看诊断输出。
+
+后端启动后可用健康接口辅助排障：
+
+- `http://127.0.0.1:8123/healthz`：轻量公开探活
+- `http://127.0.0.1:8123/api/health`：详细自检，包含 LLM / TTS / ASR / Live2D / 安全配置摘要；如果启用了 `server.require_api_token`，需要带 `X-Taffy-Token`
 
 ### Manual Commands
 
@@ -130,7 +137,11 @@ README 保留首跑关键入口，详细配置迁移到文档：
 
 - 安装依赖与启动方式：`docs/setup.md`
 - 安装与运行、Live2D、LLM、TTS/ASR：`docs/setup.md`
+- 后端健康接口契约：`docs/backend-health.md`
+- 启动失败样例库：`docs/startup-failure-examples.md`
+- 发布前 go/no-go 门槛：`docs/release-readiness.md`
 - Character Runtime demo 启用与验证：`docs/character-runtime-demo.md`
+- 发布前 / 打包前人工验收清单：`docs/manual-qa.md`
 - 推荐本地体验模板：`docs/recommended-local-config.md`
 - Character Runtime Live2D 映射：`docs/character-runtime-live2d-mapping.md`
 - Character Runtime 验证记录模板：`docs/character-runtime-validation-log.md`

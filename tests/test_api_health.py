@@ -163,6 +163,74 @@ def test_api_health_requires_valid_token_when_enabled(monkeypatch):
         assert payload.get("security", {}).get("api_token_configured") is True
 
 
+def test_api_health_includes_backend_readiness_checks_without_leaking_secrets(monkeypatch):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = False
+    cfg["llm"] = {
+        "provider": "openai-compatible",
+        "base_url": "https://user:pass@example.test/v1?api_key=secret",
+        "model": "qwen-plus",
+        "api_key_env": "DASHSCOPE_API_KEY_TEST",
+        "api_key": "sk-secret-value-123",
+    }
+    cfg["tts"] = {
+        "provider": "gpt_sovits",
+        "gpt_sovits_api_url": "http://user:pass@127.0.0.1:9880/tts?token=secret",
+        "allow_browser_fallback": False,
+    }
+    monkeypatch.delenv("DASHSCOPE_API_KEY_TEST", raising=False)
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _request_json(f"{base}/api/health")
+
+    assert status == 200
+    checks = payload.get("checks", {})
+    assert {"server", "llm", "tts", "asr"}.issubset(set(checks.keys()))
+    assert checks["llm"]["ok"] is True
+    assert checks["llm"]["api_key_configured"] is True
+    assert checks["llm"]["base_url_display"] == "https://example.test/v1"
+    assert checks["tts"]["provider"] == "gpt_sovits"
+    assert checks["tts"]["api_url_display"] == "http://127.0.0.1:9880/tts"
+    assert checks["tts"]["network_checked"] is False
+    assert payload.get("readiness", {}).get("actions")
+
+    serialized = json.dumps(payload, ensure_ascii=False)
+    assert "sk-secret-value" not in serialized
+    assert "user:pass" not in serialized
+    assert "api_key=secret" not in serialized
+    assert "token=secret" not in serialized
+
+
+def test_api_health_reports_llm_and_tts_readiness_errors(monkeypatch):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = False
+    cfg["llm"] = {
+        "provider": "openai-compatible",
+        "base_url": "https://example.test/v1",
+        "model": "qwen-plus",
+        "api_key_env": "MISSING_LLM_KEY_FOR_HEALTH_TEST",
+        "api_key": "",
+    }
+    cfg["tts"] = {"provider": "not-a-real-provider"}
+    monkeypatch.delenv("MISSING_LLM_KEY_FOR_HEALTH_TEST", raising=False)
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _request_json(f"{base}/api/health")
+
+    assert status == 200
+    checks = payload.get("checks", {})
+    assert checks["llm"]["ok"] is False
+    assert checks["llm"]["severity"] == "error"
+    assert "LLM API key is missing" in checks["llm"]["messages"][0]
+    assert checks["tts"]["ok"] is False
+    assert checks["tts"]["severity"] == "error"
+    assert "Unsupported tts.provider" in checks["tts"]["messages"][0]
+    readiness = payload.get("readiness", {})
+    assert readiness["ok"] is False
+    assert "llm" in readiness["blocking_checks"]
+    assert "tts" in readiness["blocking_checks"]
+
+
 def test_api_health_includes_safe_character_runtime_summary(monkeypatch):
     cfg = _build_test_config()
     cfg["server"]["require_api_token"] = True
@@ -495,6 +563,19 @@ def test_startup_self_check_reports_risks(monkeypatch):
     assert any("require_api_token=true" in line for line in findings)
     assert any("tools.allow_shell=true" in line for line in findings)
     assert any("no API key found" in line for line in findings)
+
+
+def test_startup_self_check_reports_openai_compatible_key_missing(monkeypatch):
+    cfg = _build_test_config()
+    cfg["llm"]["provider"] = "openai-compatible"
+    cfg["llm"]["base_url"] = "https://example.test/v1"
+    cfg["llm"]["api_key_env"] = "OPENAI_COMPATIBLE_KEY_TEST"
+
+    monkeypatch.delenv("OPENAI_COMPATIBLE_KEY_TEST", raising=False)
+
+    findings = app.run_startup_self_check(cfg)
+    assert any("llm provider is openai-compatible" in line for line in findings)
+    assert any("OPENAI_COMPATIBLE_KEY_TEST" in line for line in findings)
 
 
 def test_startup_self_check_reports_safe_character_runtime_summary():

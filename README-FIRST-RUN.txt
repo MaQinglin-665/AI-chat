@@ -32,12 +32,40 @@ Run:
     powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
     powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1
 
+Preflight before launch
+-----------------------
+
+After placing a Live2D model and setting model_path, run:
+
+    python scripts\first_run_check.py
+
+This read-only preflight checks config loading, Live2D path, Python and Node
+dependencies, server port, LLM key/model settings, optional local Ollama or
+GPT-SoVITS ports, and safety defaults.
+
 Start the desktop pet
 ---------------------
 
 Run:
 
     .\start_electron.bat
+
+start_electron.bat runs the same preflight before Electron starts. If it stops,
+read the [FAIL] lines first. Common blockers are missing Python/Node/Electron
+dependencies, a placeholder Live2D model_path, missing LLM API key, wrong model
+name, or a GPT-SoVITS URL that points to a service that is not running.
+
+Health checks
+-------------
+
+After the backend starts:
+
+    http://127.0.0.1:8123/healthz
+    http://127.0.0.1:8123/api/health
+
+/healthz is a lightweight public liveness check. /api/health is the detailed
+self-check for config, Live2D, LLM, TTS, ASR, and readiness. If
+server.require_api_token is enabled, /api/health requires X-Taffy-Token.
 
 Live2D and LLM notes
 --------------------
@@ -52,4 +80,8 @@ If you only want to inspect the project, read:
 
     README.md
     docs\setup.md
+    docs\backend-health.md
+    docs\startup-failure-examples.md
+    docs\release-readiness.md
     docs\troubleshooting.md
+    docs\manual-qa.md

@@ -45,6 +45,7 @@ python scripts\first_run_check.py
 ```
 
 它会检查配置能否加载、Live2D 路径是否有效、LLM key 是否已配置、端口是否占用、TTS 是否适合首跑，以及桌面观察/工具调用等安全默认值。
+如果选择本地 Ollama 或 GPT-SoVITS，它还会检查对应本地端口是否可连通，但不会调用外部模型接口，也不会打印密钥。
 
 ## 3. Place Live2D Model
 
@@ -151,12 +152,25 @@ $env:DASHSCOPE_API_KEY = "your_key_here"
 python scripts\first_run_check.py
 ```
 
+后端启动后可以再看健康接口：
+
+```powershell
+curl http://127.0.0.1:8123/healthz
+curl http://127.0.0.1:8123/api/health
+```
+
+`/healthz` 只适合确认服务是否活着；`/api/health` 会返回配置、Live2D、LLM、TTS、ASR 和安全配置摘要。若配置了 `server.require_api_token=true`，请求 `/api/health` 时需要带 `X-Taffy-Token`。
+
+详细字段和 readiness 判读见 `docs/backend-health.md`。
+
 ### Desktop mode (recommended)
 
 - 双击 `一键启动桌宠.vbs`
 - 或双击 `start_electron.bat`
 
 `start_electron.bat` 会在启动前自动运行 `python scripts\first_run_check.py`。如果启动失败或双击 VBS 没有明显反应，请直接运行 `start_electron.bat` 查看诊断输出。
+
+如果看到具体报错但不确定怎么处理，先看 `docs/startup-failure-examples.md`。
 
 ## 6.1 Recommended Local Experience Templates
 
@@ -211,6 +225,10 @@ start_desktop.bat
 
 ## 10. Related Docs
 
+- 后端健康接口契约：`docs/backend-health.md`
+- 启动失败样例库：`docs/startup-failure-examples.md`
+- 发布前 go/no-go 门槛：`docs/release-readiness.md`
+- 人工验收清单：`docs/manual-qa.md`
 - 排障：`docs/troubleshooting.md`
 - 语音输入 / 输出排障：`docs/voice-troubleshooting.md`
 - 推荐本地配置模板：`docs/recommended-local-config.md`

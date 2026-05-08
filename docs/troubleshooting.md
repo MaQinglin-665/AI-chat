@@ -4,6 +4,8 @@
 
 语音输入 / 语音输出问题请优先看 `docs/voice-troubleshooting.md`。那里包含麦克风权限、`/micdebug`、Vosk 模型、ASR 错误码、TTS 回退等更细的排查步骤。
 
+如果你已经看到明确的启动错误输出，也可以直接查 `docs/startup-failure-examples.md`。
+
 ## Common Startup / Runtime Issues
 
 ### 0) Downloaded source looks incomplete
@@ -35,6 +37,14 @@
 - 建议：改用 `start_electron.bat`，它会自动运行首跑预检并显示阻塞原因
 - 手动检查：`python scripts\first_run_check.py`
 
+### 0.4) Backend self-check shows degraded readiness
+
+- 现象：`/healthz` 正常，但 `/api/health` 的 `readiness.status` 不是 `ok`
+- 建议：优先看 `readiness.blocking_checks`、`readiness.warning_checks` 和 `readiness.actions`
+- 常见阻塞：`llm` 缺 API Key / 模型名、`tts` provider 不支持或 GPT-SoVITS 地址错误、`live2d_model_path` 仍是占位符、`server` token 配置不完整
+- 说明：`/api/health` 是只读摘要，不会调用外部 LLM/TTS 服务；本地服务是否真正启动仍以 `python scripts\first_run_check.py` 的端口检查和实际聊天/发声测试为准
+- 详细字段：见 `docs/backend-health.md`
+
 ### 1) API Key missing
 
 - 现象：调用 LLM 时鉴权失败
@@ -50,6 +60,7 @@
 
 - 检查项：`llm.base_url`
 - 建议：先启动 `ollama serve`
+- 快速检查：`python scripts\first_run_check.py` 会检查本地 Ollama 端口；如果模型不存在，再执行 `ollama pull <model>`
 
 ### 4) Model name not found
 
@@ -59,7 +70,8 @@
 ### 5) GPT-SoVITS service unavailable
 
 - 检查项：`tts.gpt_sovits_api_url`
-- 建议：确认服务进程和端口
+- 建议：确认服务进程和端口；本地常见地址是 `http://127.0.0.1:9880/tts`
+- 快速检查：`python scripts\first_run_check.py` 会检查本地 GPT-SoVITS 端口是否可连通
 - 语音专项排查：`docs/voice-troubleshooting.md`
 
 ### 6) TTS timeout
@@ -93,6 +105,10 @@
 - `favicon.ico` 404 可忽略。
 - 模型不显示时尝试 `Ctrl + F5` 硬刷新。
 - Electron 模式窗口位置会自动保存并在下次恢复。
+- `/healthz` 和 `/api/health` 字段说明见 `docs/backend-health.md`。
+- 具体启动错误输出示例见 `docs/startup-failure-examples.md`。
+- 发布前 go/no-go 门槛见 `docs/release-readiness.md`。
+- 发布前或打包前人工复核见 `docs/manual-qa.md`。
 - 开麦、转写、TTS 相关问题见 `docs/voice-troubleshooting.md`。
 
 ## Security Reminder

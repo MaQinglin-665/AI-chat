@@ -16,6 +16,7 @@ import socket
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,13 @@ REQUIRED_PATHS = [
     "requirements.txt",
     "requirements-dev.txt",
     "config.example.json",
+]
+
+PYTHON_MODULE_CHECKS = [
+    ("edge_tts", "edge-tts", "server-side Edge TTS"),
+    ("vosk", "vosk", "local ASR"),
+    ("mem0", "mem0ai", "long-term memory"),
+    ("qdrant_client", "qdrant-client", "local vector memory"),
 ]
 
 
@@ -126,6 +134,35 @@ def _safe_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _parse_http_endpoint(raw_url: str, default_port: int) -> tuple[bool, str, int, str]:
+    raw = str(raw_url or "").strip()
+    if not raw:
+        return False, "", 0, "URL is empty"
+    try:
+        parts = urllib.parse.urlsplit(raw)
+        port = int(parts.port or default_port)
+    except ValueError as exc:
+        return False, "", 0, f"URL port is invalid: {exc}"
+    if parts.scheme not in {"http", "https"} or not parts.hostname:
+        return False, "", 0, "URL must include http(s) scheme and host"
+    if port < 1 or port > 65535:
+        return False, "", 0, "URL port is outside 1-65535"
+    return True, str(parts.hostname), port, ""
+
+
+def _is_loopback_host(host: str) -> bool:
+    normalized = str(host or "").strip().lower()
+    return normalized in {"localhost", "::1"} or normalized == "127.0.0.1" or normalized.startswith("127.")
+
+
+def _tcp_port_reachable(host: str, port: int, timeout_sec: float = 0.7) -> tuple[bool, str]:
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout_sec):
+            return True, ""
+    except OSError as exc:
+        return False, redact_sensitive_text(str(exc))
+
+
 def _has_env_or_inline_secret(cfg: dict[str, Any], inline_key: str, env_key: str) -> bool:
     inline = str(cfg.get(inline_key, "") or "").strip()
     env_name = str(cfg.get(env_key, "") or "").strip()
@@ -188,6 +225,15 @@ def check_tools(r: Reporter) -> None:
         r.pass_("pytest is installed")
     else:
         r.warn("pytest is not installed. Run: python -m pip install -r requirements-dev.txt")
+
+    for module_name, package_name, purpose in PYTHON_MODULE_CHECKS:
+        if importlib.util.find_spec(module_name):
+            r.pass_(f"Python dependency available for {purpose}: {package_name}")
+        else:
+            r.warn(
+                f"Python dependency missing for {purpose}: {package_name}. "
+                "Run: python -m pip install -r requirements.txt"
+            )
 
     if (ROOT / "node_modules").exists():
         r.pass_("node_modules exists")
@@ -300,11 +346,38 @@ def check_llm(r: Reporter, cfg: dict[str, Any]) -> None:
     elif provider not in {"ollama"}:
         r.warn("llm.base_url is empty; provider defaults may be used.")
 
+    endpoint_ok = False
+    endpoint_host = ""
+    endpoint_port = 0
+    probe_url = base_url or ("http://127.0.0.1:11434" if provider == "ollama" else "")
+    if probe_url:
+        default_port = 443 if probe_url.lower().startswith("https://") else 80
+        if provider == "ollama" and not base_url:
+            default_port = 11434
+        endpoint_ok, endpoint_host, endpoint_port, endpoint_error = _parse_http_endpoint(
+            probe_url,
+            default_port=default_port,
+        )
+        if endpoint_ok:
+            if provider == "ollama" and _is_loopback_host(endpoint_host):
+                reachable, detail = _tcp_port_reachable(endpoint_host, endpoint_port)
+                if reachable:
+                    r.pass_(f"Ollama local endpoint is reachable: {endpoint_host}:{endpoint_port}")
+                else:
+                    r.warn(
+                        f"Ollama local endpoint is not reachable at {endpoint_host}:{endpoint_port}. "
+                        f"Start Ollama or run `ollama serve`. Detail: {detail}"
+                    )
+        else:
+            r.fail(f"llm.base_url is not a valid http(s) URL: {endpoint_error}")
+
     if provider in {"openai", "openai-compatible", "openai_compatible"}:
         env_name = str(llm_cfg.get("api_key_env", "OPENAI_API_KEY") or "OPENAI_API_KEY").strip()
         if _has_env_or_inline_secret(llm_cfg, "api_key", "api_key_env"):
             source = "inline config" if str(llm_cfg.get("api_key", "") or "").strip() else f"env {env_name}"
             r.pass_(f"LLM API key is configured via {source}")
+        elif endpoint_ok and _is_loopback_host(endpoint_host):
+            r.warn("OpenAI-compatible provider points to a local endpoint without an API key.")
         else:
             r.fail(f"LLM API key is missing. Set env {env_name} or configure a local-only key.")
     elif provider == "ollama":
@@ -326,6 +399,22 @@ def check_tts(r: Reporter, cfg: dict[str, Any]) -> None:
             url = str(tts_cfg.get("gpt_sovits_api_url", "") or "").strip()
             if url:
                 r.pass_("GPT-SoVITS API URL is configured")
+                default_port = 443 if url.lower().startswith("https://") else 80
+                endpoint_ok, host, port, endpoint_error = _parse_http_endpoint(
+                    url,
+                    default_port=default_port,
+                )
+                if not endpoint_ok:
+                    r.fail(f"tts.gpt_sovits_api_url is not a valid http(s) URL: {endpoint_error}")
+                elif _is_loopback_host(host):
+                    reachable, detail = _tcp_port_reachable(host, port)
+                    if reachable:
+                        r.pass_(f"GPT-SoVITS local endpoint port is reachable: {host}:{port}")
+                    else:
+                        r.warn(
+                            f"GPT-SoVITS local endpoint is not reachable at {host}:{port}. "
+                            f"Start GPT-SoVITS before using voice output, or switch tts.provider to browser. Detail: {detail}"
+                        )
             else:
                 r.fail("GPT-SoVITS provider selected but gpt_sovits_api_url is empty.")
             if not bool(tts_cfg.get("allow_browser_fallback", False)):
