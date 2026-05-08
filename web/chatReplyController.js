@@ -52,6 +52,10 @@
     const buildAttachmentContextText = typeof deps.buildAttachmentContextText === "function" ? deps.buildAttachmentContextText : () => "";
     const buildAttachmentDisplaySuffix = typeof deps.buildAttachmentDisplaySuffix === "function" ? deps.buildAttachmentDisplaySuffix : () => "";
     const clearPendingAttachments = typeof deps.clearPendingAttachments === "function" ? deps.clearPendingAttachments : () => {};
+    const getCharacterExperienceRequestProfile =
+      typeof deps.getCharacterExperienceRequestProfile === "function"
+        ? deps.getCharacterExperienceRequestProfile
+        : () => null;
 
     async function streamAssistantReply(payload, onDelta, perfHooks = null) {
       const chatApi = window.TaffyModules?.chatApi || {};
@@ -179,6 +183,10 @@
         };
         if (imageDataUrl) {
           payload.image_data_url = imageDataUrl;
+        }
+        const characterExperienceProfile = getCharacterExperienceRequestProfile();
+        if (characterExperienceProfile) {
+          payload.character_experience_profile = characterExperienceProfile;
         }
 
         assistantRow = appendMessage("assistant", "", {

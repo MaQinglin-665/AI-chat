@@ -87,7 +87,7 @@ def call_llm_impl(
     ensure_llm_auth_ready_fn(llm_cfg)
 
     base_prompt, safe_history = build_base_prompt_fn(
-        config, user_message, history, llm_cfg_raw, provider
+        config, user_message, history, llm_cfg_raw, provider, is_auto=is_auto
     )
 
     thought = ""
@@ -244,7 +244,7 @@ def call_llm_stream_impl(
     ensure_llm_auth_ready_fn(llm_cfg)
 
     base_prompt, safe_history = build_base_prompt_fn(
-        config, user_message, history, llm_cfg_raw, provider
+        config, user_message, history, llm_cfg_raw, provider, is_auto=is_auto
     )
     merged_prompt = build_reply_prompt(
         config=config,

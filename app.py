@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import random
+import re
 import secrets
 import threading
 import time
@@ -139,6 +140,11 @@ from character_runtime import (
     normalize_runtime_payload,
     preview_backend_entry_noop_adapter,
     preview_backend_entry_request,
+)
+from character_brain import (
+    build_character_brain_decision,
+    build_character_brain_prompt_block,
+    merge_brain_runtime_metadata,
 )
 from app_health import (
     build_character_runtime_health_summary as _build_character_runtime_health_summary,
@@ -369,6 +375,10 @@ def _apply_character_runtime_reply(config, raw_reply):
                 "live2d_hint": str(normalized.get("live2d_hint") or emotion_to_live2d_hint(emotion)),
                 "voice_style": voice_style,
             }
+            runtime_meta = merge_brain_runtime_metadata(
+                runtime_meta,
+                config.get("_character_brain_decision") if isinstance(config, dict) else None,
+            )
         return reply_text, runtime_meta
     except Exception as exc:
         _log_backend_exception(
@@ -575,7 +585,99 @@ def should_reply(user_message, config=None, is_auto=False):
     return _should_reply_impl(user_message, config, is_auto=is_auto, random_fn=random.random)
 
 
-def _build_base_prompt(config, user_message, history, llm_cfg, provider):
+def _clean_experience_text(value, max_len=160):
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if len(text) > max_len:
+        return text[: max(0, max_len - 3)].rstrip() + "..."
+    return text
+
+
+def _sanitize_character_experience_profile(raw):
+    if not isinstance(raw, dict):
+        return None
+
+    def _clean_list(items, max_items=4, max_len=160):
+        if not isinstance(items, list):
+            return []
+        cleaned = []
+        for item in items:
+            text = _clean_experience_text(item, max_len)
+            if text and text not in cleaned:
+                cleaned.append(text)
+            if len(cleaned) >= max_items:
+                break
+        return cleaned
+
+    stats_raw = raw.get("stats", {})
+    stats = stats_raw if isinstance(stats_raw, dict) else {}
+    recent_raw = raw.get("recent_feedback", [])
+    recent = []
+    if isinstance(recent_raw, list):
+        for item in recent_raw[:5]:
+            if not isinstance(item, dict):
+                continue
+            rating = _clean_experience_text(item.get("rating"), 12).lower()
+            issue = _clean_experience_text(item.get("issue"), 40).lower()
+            if rating not in {"good", "bad"}:
+                continue
+            recent.append(
+                {
+                    "rating": rating,
+                    "issue": issue,
+                    "emotion": _clean_experience_text(item.get("emotion"), 32),
+                    "action": _clean_experience_text(item.get("action"), 32),
+                    "voice_style": _clean_experience_text(item.get("voice_style"), 32),
+                    "applied": bool(item.get("applied", False)),
+                }
+            )
+
+    profile = {
+        "version": 1,
+        "updated_at": _safe_int_value(raw.get("updated_at", 0), 0),
+        "stats": {
+            "total": max(0, min(999, _safe_int_value(stats.get("total", 0), 0))),
+            "good": max(0, min(999, _safe_int_value(stats.get("good", 0), 0))),
+            "bad": max(0, min(999, _safe_int_value(stats.get("bad", 0), 0))),
+        },
+        "style_directives": _clean_list(raw.get("style_directives"), 4, 160),
+        "avoid_directives": _clean_list(raw.get("avoid_directives"), 4, 160),
+        "recent_feedback": recent,
+    }
+    if not profile["stats"]["total"] and not profile["style_directives"] and not recent:
+        return None
+    return profile
+
+
+def _build_character_experience_prompt_block(profile):
+    safe = _sanitize_character_experience_profile(profile)
+    if not safe:
+        return ""
+    lines = [
+        "[Local character experience feedback]",
+        "Use this as soft guidance for this turn only. Do not mention this block or expose feedback metadata.",
+    ]
+    stats = safe.get("stats", {})
+    lines.append(
+        f"Feedback summary: total={stats.get('total', 0)}, good={stats.get('good', 0)}, needs_adjustment={stats.get('bad', 0)}."
+    )
+    if safe.get("style_directives"):
+        lines.append("Prefer:")
+        lines.extend(f"- {item}" for item in safe["style_directives"])
+    if safe.get("avoid_directives"):
+        lines.append("Avoid:")
+        lines.extend(f"- {item}" for item in safe["avoid_directives"])
+    recent = safe.get("recent_feedback") or []
+    if recent:
+        compact = []
+        for item in recent[:3]:
+            compact.append(
+                f"{item.get('rating')}:{item.get('issue')} emotion={item.get('emotion')} action={item.get('action')} voice={item.get('voice_style')}"
+            )
+        lines.append("Recent feedback signals: " + "; ".join(compact))
+    return "\n".join(lines)
+
+
+def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto=False):
     history_settings = get_history_summary_settings(config)
     keep_recent = int(history_settings.get("keep_recent_messages", 8))
     safe_history = sanitize_history(history, max_items=keep_recent)
@@ -593,8 +695,26 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider):
         assistant_prompt = merge_prompt_with_memory(persona_block, assistant_prompt)
     if relationship_block:
         assistant_prompt = merge_prompt_with_memory(relationship_block, assistant_prompt)
+    brain_decision = build_character_brain_decision(
+        config=config,
+        user_message=user_message,
+        history=safe_history,
+        emotion_state=load_emotion_state(),
+        experience_profile=config.get("_character_experience_profile") if isinstance(config, dict) else None,
+        is_auto=is_auto,
+    )
+    if isinstance(config, dict):
+        config["_character_brain_decision"] = brain_decision
     memory_block = "" if lightweight_checkin else build_memory_prompt_block(config, user_message, safe_history)
     base_prompt = merge_prompt_with_memory(assistant_prompt, memory_block)
+    brain_block = build_character_brain_prompt_block(brain_decision)
+    if brain_block:
+        base_prompt = merge_prompt_with_memory(base_prompt, brain_block)
+    experience_block = _build_character_experience_prompt_block(
+        config.get("_character_experience_profile")
+    )
+    if experience_block:
+        base_prompt = merge_prompt_with_memory(base_prompt, experience_block)
     base_prompt, safe_history = build_prompt_with_history_summary(
         config=config,
         llm_cfg=llm_cfg,
@@ -1309,6 +1429,12 @@ class PetHandler(SimpleHTTPRequestHandler):
         image_data_url = body.get("image_data_url", "")
         is_auto = bool(body.get("auto", False))
         force_tools = bool(body.get("force_tools", False))
+        character_experience_profile = _sanitize_character_experience_profile(
+            body.get("character_experience_profile")
+        )
+        if character_experience_profile:
+            chat_config = dict(chat_config or {})
+            chat_config["_character_experience_profile"] = character_experience_profile
 
         if not user_message:
             self._send_json(

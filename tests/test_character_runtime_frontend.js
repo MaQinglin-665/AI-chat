@@ -57,6 +57,7 @@ const LIVE2D_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "live2
 const RUNTIME_EVENT_BINDER_JS = path.resolve(__dirname, "..", "web", "runtimeEventBinder.js");
 const CHARACTER_RUNTIME_JS = path.resolve(__dirname, "..", "web", "characterRuntime.js");
 const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTuning.js");
+const CHARACTER_EXPERIENCE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "characterExperienceController.js");
 const CHARACTER_DIAGNOSTICS_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "characterDiagnosticsController.js");
 const DOCTOR_DIAGNOSTICS_JS = path.resolve(__dirname, "..", "web", "doctorDiagnostics.js");
 const CHARACTER_REPLY_CUE_JS = path.resolve(__dirname, "..", "web", "characterReplyCue.js");
@@ -126,6 +127,7 @@ const live2dExpressionControllerSource = fs.readFileSync(LIVE2D_EXPRESSION_CONTR
 const live2dRuntimeControllerSource = fs.readFileSync(LIVE2D_RUNTIME_CONTROLLER_JS, "utf8");
 const runtimeEventBinderSource = fs.readFileSync(RUNTIME_EVENT_BINDER_JS, "utf8");
 const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
+const characterExperienceControllerSource = fs.readFileSync(CHARACTER_EXPERIENCE_CONTROLLER_JS, "utf8");
 const characterDiagnosticsControllerSource = fs.readFileSync(CHARACTER_DIAGNOSTICS_CONTROLLER_JS, "utf8");
 const doctorSource = fs.readFileSync(DOCTOR_DIAGNOSTICS_JS, "utf8");
 const replyCueSource = fs.readFileSync(CHARACTER_REPLY_CUE_JS, "utf8");
@@ -200,6 +202,7 @@ const live2dExpressionController = require(LIVE2D_EXPRESSION_CONTROLLER_JS);
 const live2dRuntimeController = require(LIVE2D_RUNTIME_CONTROLLER_JS);
 const runtimeEventBinder = require(RUNTIME_EVENT_BINDER_JS);
 const tuning = require(CHARACTER_TUNING_JS);
+const characterExperienceController = require(CHARACTER_EXPERIENCE_CONTROLLER_JS);
 const characterDiagnosticsController = require(CHARACTER_DIAGNOSTICS_CONTROLLER_JS);
 const doctorDiagnostics = require(DOCTOR_DIAGNOSTICS_JS);
 const replyCue = require(CHARACTER_REPLY_CUE_JS);
@@ -255,6 +258,24 @@ function toPlainObject(value) {
   assert.strictEqual(typeof wakeWordController.createController, "function", "wake word controller should expose a factory");
   assert.strictEqual(typeof appConfigController.createController, "function", "app config controller should expose a factory");
   assert.strictEqual(typeof appStartupController.createController, "function", "app startup controller should expose startup orchestration");
+}
+
+{
+  const profile = characterExperienceController.rebuildProfile([
+    { rating: "bad", note: "reply too long", emotion: "thinking", action: "think", voiceStyle: "neutral" },
+    { rating: "good", emotion: "happy", action: "happy_idle", voiceStyle: "cheerful" },
+    { rating: "bad", note: "too generic", emotion: "neutral", action: "none", voiceStyle: "neutral" }
+  ]);
+  const requestProfile = characterExperienceController.buildRequestProfile(profile);
+  assert.strictEqual(profile.stats.total, 3, "character experience profile should count recent feedback");
+  assert.ok(
+    requestProfile.style_directives.some((line) => line.includes("1-3 natural short sentences")),
+    "character experience profile should turn long-reply feedback into a next-turn style directive"
+  );
+  assert.ok(
+    requestProfile.avoid_directives.some((line) => line.includes("customer-service phrasing")),
+    "character experience profile should turn generic feedback into an avoid directive"
+  );
 }
 
 assert.strictEqual(
@@ -458,6 +479,11 @@ assert.strictEqual(
     "runtime event binder should export bridge event binding"
   );
   assert.strictEqual(
+    typeof characterExperienceController.createController,
+    "function",
+    "character experience controller should expose persistent feedback orchestration"
+  );
+  assert.strictEqual(
     typeof characterDiagnosticsController.createController,
     "function",
     "character diagnostics controller should expose voice test and tuning orchestration"
@@ -494,6 +520,7 @@ assert.ok(
     && source.includes("const WAKE_WORD_CONTROLLER = window.TaffyWakeWordController")
     && source.includes("const APP_CONFIG_CONTROLLER = window.TaffyAppConfigController")
     && source.includes("const APP_STARTUP_CONTROLLER = window.TaffyAppStartupController")
+    && source.includes("const CHARACTER_EXPERIENCE_CONTROLLER = window.TaffyCharacterExperienceController")
     && source.includes("CHAT_MESSAGE_CONTROLLER.createController")
     && source.includes("PERSONA_AVATAR_CONTROLLER.createController")
     && source.includes("ONBOARDING_CONTROLLER.createController")
@@ -517,6 +544,7 @@ assert.ok(
     && source.includes("WAKE_WORD_CONTROLLER.createController")
     && source.includes("APP_CONFIG_CONTROLLER.createController")
     && source.includes("APP_STARTUP_CONTROLLER.createController")
+    && source.includes("CHARACTER_EXPERIENCE_CONTROLLER.createController")
     && diagnosticsRuntimeControllerSource.includes("debugPanelController.updateDebugPanel")
     && chatStateSource.includes("function createInitialState")
     && chatDomSource.includes("function createUI")
@@ -1241,13 +1269,18 @@ assert.ok(
 assert.ok(
   tuningSource.includes("function buildFeedbackMessage")
     && source.includes("function recordCharacterPerformanceFeedback")
+    && source.includes("function getCharacterExperienceRequestProfile")
+    && chatReplyControllerSource.includes("payload.character_experience_profile")
+    && characterExperienceControllerSource.includes("taffy_character_experience_v1")
+    && characterExperienceControllerSource.includes("function buildRequestProfile")
+    && characterDiagnosticsControllerSource.includes("characterExperienceController.recordFeedback")
     && characterDiagnosticsControllerSource.includes("characterPerformanceLastFeedback")
     && localCommandRegistry.matchLocalCommand("/goodcue").kind === "character_feedback_good"
     && localCommandRegistry.matchLocalCommand("/badcue").kind === "character_feedback_bad"
     && chatDomSource.includes("characterFeedbackGoodBtn: documentObject.getElementById(\"character-feedback-good-btn\")")
     && chatDomSource.includes("characterFeedbackBadBtn: documentObject.getElementById(\"character-feedback-bad-btn\")")
     && advancedActionBinderSource.includes("recordCharacterPerformanceFeedback"),
-  "character tuning should include lightweight local feedback for the latest runtime performance"
+  "character tuning should include persistent lightweight feedback that can guide the next runtime reply"
 );
 assert.ok(
   tuningSource.includes("function buildWorkflowGuide()")
@@ -1596,8 +1629,10 @@ assert.ok(
     && indexSource.includes('<script src="./reminderUtils.js"></script>')
     && indexSource.includes('<script src="./scheduleListView.js"></script>')
     && indexSource.includes('<script src="./scheduleFormModel.js"></script>')
+    && indexSource.includes('<script src="./characterExperienceController.js"></script>')
     && indexSource.includes('<script src="./characterDiagnosticsController.js"></script>')
     && indexSource.indexOf('<script src="./characterTuning.js"></script>') < indexSource.indexOf('<script src="./characterDiagnosticsController.js"></script>')
+    && indexSource.indexOf('<script src="./characterExperienceController.js"></script>') < indexSource.indexOf('<script src="./characterDiagnosticsController.js"></script>')
     && indexSource.indexOf('<script src="./characterDiagnosticsController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
   "local commands should include /ttsdebug for copyable playback state"
 );

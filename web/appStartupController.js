@@ -25,6 +25,7 @@
       deps.loadSubtitleEnabledFromStorage?.();
       deps.loadSubtitlePositionFromStorage?.();
       deps.loadOnboardingSeenFromStorage?.();
+      deps.loadCharacterExperienceProfile?.();
       await deps.loadPersonaCard?.();
     }
 

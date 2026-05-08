@@ -144,6 +144,7 @@
     const autoApply = input.autoApply || null;
     const runtimeHint = autoApply?.runtimeHint || candidate?.runtimeHint || null;
     const feedback = input.feedback || null;
+    const experienceProfile = input.experienceProfile || null;
     const assistantPrompt = String(cfg.assistant_prompt || "");
     const stateTtsProvider = String(input.ttsProvider || "");
     const speechMotionStrength = Number(motionCfg.speech_motion_strength ?? motionCfg.speech_body_motion_strength ?? input.speechMotionStrength);
@@ -218,6 +219,10 @@
     const feedbackLine = feedback
       ? `最近反馈：${feedback.label}（${localizeValue("emotion", feedback.emotion)} / ${localizeValue("action", feedback.action)} / ${localizeValue("voice", feedback.voiceStyle)}）`
       : "最近反馈：还没有记录。";
+    const experienceStats = experienceProfile?.stats || {};
+    const experienceLine = Number(experienceStats.total) > 0
+      ? `体验档案：${Number(experienceStats.total) || 0} 条反馈；好=${Number(experienceStats.good) || 0}；需调整=${Number(experienceStats.bad) || 0}`
+      : "体验档案：还没有形成可用的长期反馈。";
 
     return [
       "角色调优建议",
@@ -225,6 +230,7 @@
       "当前观察",
       lastLine,
       feedbackLine,
+      experienceLine,
       `角色接入：${runtimeCfg.enabled === true ? "已开启" : "未开启"}；元信息=${runtimeCfg.return_metadata === true ? "开启" : "关闭"}；自动应用=${runtimeCfg.auto_apply_reply_cue === true ? "开启" : "关闭"}`,
       `语音：${String(ttsCfg.provider || stateTtsProvider || "unknown")}；浏览器兜底=${ttsCfg.allow_browser_fallback === true ? "开启" : "关闭"}`,
       `动作：说话强度=${formatNumber(speechMotionStrength)}；表情强度=${formatNumber(expressionStrength)}`,

@@ -396,6 +396,7 @@
   characterRehearsalIndex: 0,
   characterPerformanceFeedbacks: [],
   characterPerformanceLastFeedback: null,
+  characterExperienceProfile: null,
   grayAutoTrialCharacterCueManualEmitCount: 0,
   grayAutoTrialCharacterCueLastManualEmitAt: 0,
   grayAutoTrialCharacterCueLastManualEmit: null,

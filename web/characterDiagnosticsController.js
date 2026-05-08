@@ -4,6 +4,7 @@
   function createController(deps = {}) {
     const state = deps.state || {};
     const characterTuning = deps.characterTuning || root.TaffyCharacterTuning || {};
+    const characterExperienceController = deps.characterExperienceController || null;
     const appendMessage = typeof deps.appendMessage === "function" ? deps.appendMessage : () => null;
     const setStatus = typeof deps.setStatus === "function" ? deps.setStatus : () => {};
     const buildSpeakProsody = typeof deps.buildSpeakProsody === "function" ? deps.buildSpeakProsody : () => null;
@@ -125,11 +126,20 @@
       if (state.characterPerformanceFeedbacks.length > 8) {
         state.characterPerformanceFeedbacks.length = 8;
       }
+      const experienceResult = characterExperienceController
+        && typeof characterExperienceController.recordFeedback === "function"
+          ? characterExperienceController.recordFeedback(feedback)
+          : null;
       appendMessage(
         "assistant",
-        typeof characterTuning.buildFeedbackMessage === "function"
-          ? characterTuning.buildFeedbackMessage(feedback)
-          : `已记录反馈：${feedback.label}`,
+        [
+          typeof characterTuning.buildFeedbackMessage === "function"
+            ? characterTuning.buildFeedbackMessage(feedback)
+            : `已记录反馈：${feedback.label}`,
+          experienceResult?.requestProfile
+            ? "这条反馈已纳入下轮角色风格微调。"
+            : ""
+        ].filter(Boolean).join("\n"),
         { enableTranslation: false }
       );
       setStatus(`已记录：${feedback.label}`);
@@ -145,6 +155,7 @@
         candidate: state.followupCharacterRuntimeLastReplyCandidate || null,
         autoApply: state.followupCharacterRuntimeLastReplyAutoApply || null,
         feedback: state.characterPerformanceLastFeedback || null,
+        experienceProfile: state.characterExperienceProfile || null,
         ttsProvider: state.ttsProvider || "",
         speechMotionStrength: state.speechMotionStrength,
         expressionStrength: state.expressionStrength

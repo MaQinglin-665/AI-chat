@@ -1323,6 +1323,7 @@ async function runDoctorDiagnostics() { return getDiagnosticsRuntimeController()
 async function runDoctorAndAppendReport() { return getDiagnosticsRuntimeController().runDoctorAndAppendReport(); }
 function buildChatFailureDoctorHint(err) { return getDiagnosticsRuntimeController().buildChatFailureDoctorHint(err); }
 const CHARACTER_TUNING = window.TaffyCharacterTuning || {};
+const CHARACTER_EXPERIENCE_CONTROLLER = window.TaffyCharacterExperienceController || {};
 const CHARACTER_DIAGNOSTICS_CONTROLLER = window.TaffyCharacterDiagnosticsController || {};
 const CHARACTER_REPLY_CUE = window.TaffyCharacterReplyCue || {};
 const FOLLOWUP_READINESS_VIEW = window.TaffyFollowupReadinessView || {};
@@ -1338,12 +1339,24 @@ const SCHEDULE_LIST_VIEW = window.TaffyScheduleListView || {};
 const SCHEDULE_FORM_MODEL = window.TaffyScheduleFormModel || {};
 
 let characterDiagnosticsController = null;
+let characterExperienceController = null;
+
+function getCharacterExperienceController() {
+  if (!characterExperienceController && typeof CHARACTER_EXPERIENCE_CONTROLLER.createController === "function") {
+    characterExperienceController = CHARACTER_EXPERIENCE_CONTROLLER.createController({
+      state,
+      windowObject: window
+    });
+  }
+  return characterExperienceController || CHARACTER_EXPERIENCE_CONTROLLER;
+}
 
 function getCharacterDiagnosticsController() {
   if (!characterDiagnosticsController && typeof CHARACTER_DIAGNOSTICS_CONTROLLER.createController === "function") {
     characterDiagnosticsController = CHARACTER_DIAGNOSTICS_CONTROLLER.createController({
       state,
       characterTuning: CHARACTER_TUNING,
+      characterExperienceController: getCharacterExperienceController(),
       appendMessage,
       setStatus,
       buildSpeakProsody,
@@ -1362,6 +1375,9 @@ function getNextCharacterRehearsalPreset() { return getCharacterDiagnosticsContr
 async function runCharacterRehearsalAndAppendReport() { return getCharacterDiagnosticsController().runCharacterRehearsalAndAppendReport(); }
 function getLatestCharacterPerformanceSummary() { return getCharacterDiagnosticsController().getLatestCharacterPerformanceSummary(); }
 function recordCharacterPerformanceFeedback(rating = "good", note = "") { return getCharacterDiagnosticsController().recordCharacterPerformanceFeedback(rating, note); }
+function loadCharacterExperienceProfile() { return getCharacterExperienceController().loadProfile(); }
+function getCharacterExperienceRequestProfile() { return getCharacterExperienceController().getRequestProfile(); }
+function buildCharacterExperienceSummary() { return getCharacterExperienceController().getProfileSummary(); }
 function buildCharacterTuningReport() { return getCharacterDiagnosticsController().buildCharacterTuningReport(); }
 function runCharacterTuningAndAppendReport() { return getCharacterDiagnosticsController().runCharacterTuningAndAppendReport(); }
 function buildCharacterWorkflowGuide() { return getCharacterDiagnosticsController().buildCharacterWorkflowGuide(); }
@@ -3911,6 +3927,7 @@ function getChatReplyController() {
       discardQueuedStreamSpeakItems,
       recordTTSDebugEvent,
       buildChatFailureDoctorHint,
+      getCharacterExperienceRequestProfile,
       scheduleWakeWordStart,
       updateMicButton,
       handleLocalCommand,
@@ -4075,6 +4092,7 @@ function getAppStartupController() {
       loadSubtitleEnabledFromStorage,
       loadSubtitlePositionFromStorage,
       loadOnboardingSeenFromStorage,
+      loadCharacterExperienceProfile,
       loadPersonaCard,
       ensureLive2DRuntime,
       initLive2D,
