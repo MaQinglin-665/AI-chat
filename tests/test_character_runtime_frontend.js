@@ -20,6 +20,7 @@ const EMOTION_STATS_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "emotio
 const LOCAL_ASR_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "localAsrController.js");
 const AUTO_CHAT_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "autoChatController.js");
 const RUNTIME_METADATA_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "runtimeMetadataController.js");
+const DIAGNOSTICS_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "diagnosticsRuntimeController.js");
 const FOLLOWUP_DEBUG_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "followupDebugController.js");
 const GRAY_TRIAL_REPORT_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "grayTrialReportController.js");
 const GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "grayTrialCharacterPanelController.js");
@@ -86,6 +87,7 @@ const emotionStatsControllerSource = fs.readFileSync(EMOTION_STATS_CONTROLLER_JS
 const localAsrControllerSource = fs.readFileSync(LOCAL_ASR_CONTROLLER_JS, "utf8");
 const autoChatControllerSource = fs.readFileSync(AUTO_CHAT_CONTROLLER_JS, "utf8");
 const runtimeMetadataControllerSource = fs.readFileSync(RUNTIME_METADATA_CONTROLLER_JS, "utf8");
+const diagnosticsRuntimeControllerSource = fs.readFileSync(DIAGNOSTICS_RUNTIME_CONTROLLER_JS, "utf8");
 const followupDebugControllerSource = fs.readFileSync(FOLLOWUP_DEBUG_CONTROLLER_JS, "utf8");
 const grayTrialReportControllerSource = fs.readFileSync(GRAY_TRIAL_REPORT_CONTROLLER_JS, "utf8");
 const grayTrialCharacterPanelControllerSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER_JS, "utf8");
@@ -156,6 +158,7 @@ const emotionStatsController = require(EMOTION_STATS_CONTROLLER_JS);
 const localAsrController = require(LOCAL_ASR_CONTROLLER_JS);
 const autoChatController = require(AUTO_CHAT_CONTROLLER_JS);
 const runtimeMetadataController = require(RUNTIME_METADATA_CONTROLLER_JS);
+const diagnosticsRuntimeController = require(DIAGNOSTICS_RUNTIME_CONTROLLER_JS);
 const followupDebugController = require(FOLLOWUP_DEBUG_CONTROLLER_JS);
 const grayTrialReportController = require(GRAY_TRIAL_REPORT_CONTROLLER_JS);
 const grayTrialCharacterPanelController = require(GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER_JS);
@@ -227,6 +230,7 @@ function toPlainObject(value) {
   assert.strictEqual(typeof localAsrController.createController, "function", "local ASR controller should expose a factory");
   assert.strictEqual(typeof autoChatController.createController, "function", "auto chat controller should expose a factory");
   assert.strictEqual(typeof runtimeMetadataController.createController, "function", "runtime metadata controller should expose a factory");
+  assert.strictEqual(typeof diagnosticsRuntimeController.createController, "function", "diagnostics runtime controller should expose a factory");
   assert.strictEqual(typeof followupDebugController.createController, "function", "followup debug controller should expose a factory");
   assert.strictEqual(typeof grayTrialReportController.createController, "function", "gray trial report controller should expose a factory");
   assert.strictEqual(typeof grayTrialCharacterPanelController.createController, "function", "gray trial character panel controller should expose a factory");
@@ -454,6 +458,7 @@ assert.ok(
     && source.includes("const LOCAL_ASR_CONTROLLER = window.TaffyLocalAsrController")
     && source.includes("const AUTO_CHAT_CONTROLLER = window.TaffyAutoChatController")
     && source.includes("const RUNTIME_METADATA_CONTROLLER = window.TaffyRuntimeMetadataController")
+    && source.includes("const DIAGNOSTICS_RUNTIME_CONTROLLER = window.TaffyDiagnosticsRuntimeController")
     && source.includes("const FOLLOWUP_DEBUG_CONTROLLER = window.TaffyFollowupDebugController")
     && source.includes("const GRAY_TRIAL_REPORT_CONTROLLER = window.TaffyGrayTrialReportController")
     && source.includes("const GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER = window.TaffyGrayTrialCharacterPanelController")
@@ -476,6 +481,7 @@ assert.ok(
     && source.includes("LOCAL_ASR_CONTROLLER.createController")
     && source.includes("AUTO_CHAT_CONTROLLER.createController")
     && source.includes("RUNTIME_METADATA_CONTROLLER.createController")
+    && source.includes("DIAGNOSTICS_RUNTIME_CONTROLLER.createController")
     && source.includes("FOLLOWUP_DEBUG_CONTROLLER.createController")
     && source.includes("GRAY_TRIAL_REPORT_CONTROLLER.createController")
     && source.includes("GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER.createController")
@@ -489,7 +495,7 @@ assert.ok(
     && source.includes("CHAT_REPLY_CONTROLLER.createController")
     && source.includes("WAKE_WORD_CONTROLLER.createController")
     && source.includes("APP_CONFIG_CONTROLLER.createController")
-    && source.includes("DEBUG_PANEL_CONTROLLER.updateDebugPanel")
+    && diagnosticsRuntimeControllerSource.includes("debugPanelController.updateDebugPanel")
     && chatStateSource.includes("function createInitialState")
     && chatDomSource.includes("function createUI")
     && chatDomSource.includes("function setStatus")
@@ -511,6 +517,10 @@ assert.ok(
     && autoChatControllerSource.includes("function buildAutoChatPrompt")
     && runtimeMetadataControllerSource.includes("function handleCharacterRuntimeMetadata")
     && runtimeMetadataControllerSource.includes("function normalizeCharacterRuntimeMetadataForFrontend")
+    && diagnosticsRuntimeControllerSource.includes("function recordTTSDebugEvent")
+    && diagnosticsRuntimeControllerSource.includes("async function runDoctorDiagnostics")
+    && diagnosticsRuntimeControllerSource.includes("async function buildMicDebugReport")
+    && diagnosticsRuntimeControllerSource.includes("function installTTSDebugBridge")
     && followupDebugControllerSource.includes("function getTTSDebugSnapshot")
     && followupDebugControllerSource.includes("function runProactiveSchedulerPollingCheck")
     && grayTrialReportControllerSource.includes("function buildGrayAutoFollowupTrialPreflight")
@@ -553,6 +563,7 @@ assert.ok(
     && indexSource.includes('<script src="./localAsrController.js"></script>')
     && indexSource.includes('<script src="./autoChatController.js"></script>')
     && indexSource.includes('<script src="./runtimeMetadataController.js"></script>')
+    && indexSource.includes('<script src="./diagnosticsRuntimeController.js"></script>')
     && indexSource.includes('<script src="./followupDebugController.js"></script>')
     && indexSource.includes('<script src="./grayTrialReportController.js"></script>')
     && indexSource.includes('<script src="./grayTrialCharacterPanelController.js"></script>')
@@ -578,7 +589,8 @@ assert.ok(
     && indexSource.indexOf('<script src="./emotionStatsController.js"></script>') < indexSource.indexOf('<script src="./localAsrController.js"></script>')
     && indexSource.indexOf('<script src="./localAsrController.js"></script>') < indexSource.indexOf('<script src="./autoChatController.js"></script>')
     && indexSource.indexOf('<script src="./autoChatController.js"></script>') < indexSource.indexOf('<script src="./runtimeMetadataController.js"></script>')
-    && indexSource.indexOf('<script src="./runtimeMetadataController.js"></script>') < indexSource.indexOf('<script src="./followupDebugController.js"></script>')
+    && indexSource.indexOf('<script src="./runtimeMetadataController.js"></script>') < indexSource.indexOf('<script src="./diagnosticsRuntimeController.js"></script>')
+    && indexSource.indexOf('<script src="./diagnosticsRuntimeController.js"></script>') < indexSource.indexOf('<script src="./followupDebugController.js"></script>')
     && indexSource.indexOf('<script src="./followupDebugController.js"></script>') < indexSource.indexOf('<script src="./grayTrialReportController.js"></script>')
     && indexSource.indexOf('<script src="./grayTrialReportController.js"></script>') < indexSource.indexOf('<script src="./grayTrialCharacterPanelController.js"></script>')
     && indexSource.indexOf('<script src="./grayTrialCharacterPanelController.js"></script>') < indexSource.indexOf('<script src="./followupReadinessPanelController.js"></script>')
@@ -1124,7 +1136,7 @@ assert.ok(
 );
 assert.ok(
   chatStateSource.includes("chatStreamEnabled")
-    && source.includes("chat_stream_enabled")
+    && appConfigControllerSource.includes("chat_stream_enabled")
     && chatReplyControllerSource.includes("preferStream: state.conversationMode.chatStreamEnabled !== false"),
   "chat requests should support a frontend-visible switch for disabling unstable LLM streaming"
 );
@@ -1132,12 +1144,12 @@ assert.ok(
   source.includes("async function runDoctorDiagnostics()")
     && localCommandRegistrySource.includes('kind: "doctor"')
     && localCommandRegistry.matchLocalCommand("/doctor").kind === "doctor"
-    && source.includes('runDoctorJsonFetch("/api/health"')
-    && source.includes("requestServerTTSBlob(")
-    && source.includes("window.TaffyDoctorDiagnostics.buildReport")
+    && diagnosticsRuntimeControllerSource.includes('runDoctorJsonFetch("/api/health"')
+    && diagnosticsRuntimeControllerSource.includes("requestServerTTSBlob(")
+    && diagnosticsRuntimeControllerSource.includes("doctorDiagnostics.buildReport")
     && doctorSource.includes("function buildAdvice")
     && source.includes("runDoctorAndAppendReport()")
-    && source.includes('row?.classList?.add("doctor-report")')
+    && diagnosticsRuntimeControllerSource.includes('row?.classList?.add("doctor-report")')
     && chatDomSource.includes("doctorBtn: documentObject.getElementById(\"doctor-btn\")")
     && indexSource.includes('id="doctor-btn"')
     && indexSource.includes('<script src="./doctorDiagnostics.js"></script>')
@@ -1444,7 +1456,7 @@ assert.ok(
 );
 assert.ok(
   source.includes("function buildTranslateDebugReport()")
-    && source.includes("window.TaffyTranslateDebugReport?.buildReport")
+    && diagnosticsRuntimeControllerSource.includes("TaffyTranslateDebugReport?.buildReport")
     && translateDebugSource.includes("function buildReport")
     && translateDebugSource.includes("Translation debug:")
     && devFeatureLoaderSource.includes('"./translateDebugReport.js"')
@@ -1546,7 +1558,7 @@ assert.ok(
   "window debug bridge should expose TTS playback state to developer tools"
 );
 assert.ok(
-  source.includes("window.TaffyTranslateDebugReport?.buildReport")
+  diagnosticsRuntimeControllerSource.includes("TaffyTranslateDebugReport?.buildReport")
     && localCommandRegistry.matchLocalCommand("/translatedebug").kind === "translate_debug",
   "chat.js should expose /translatedebug for copyable translation timing state"
 );
@@ -1568,7 +1580,7 @@ assert.ok(
 );
 assert.ok(
   source.includes("function installTranslateDebugBridge()")
-    && source.includes("__AI_CHAT_DEBUG_TRANSLATE__"),
+    && diagnosticsRuntimeControllerSource.includes("__AI_CHAT_DEBUG_TRANSLATE__"),
   "window debug bridge should expose translation timing state to developer tools"
 );
 assert.ok(
