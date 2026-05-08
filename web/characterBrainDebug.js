@@ -60,10 +60,23 @@
     const timeLine = updatedAt
       ? `更新时间：${new Date(updatedAt).toLocaleTimeString()}`
       : "更新时间：刚刚";
+    const continuity = safe.continuity && typeof safe.continuity === "object" && !Array.isArray(safe.continuity)
+      ? safe.continuity
+      : null;
+    const continuityLines = continuity
+      ? [
+          "",
+          "\u8fde\u7eed\u6027\u72b6\u6001",
+          `\u4e0a\u4e00\u610f\u56fe\uff1a${clean(continuity.last_intent, "\u65e0")}\uff1b\u8bdd\u9898=${clean(continuity.last_topic, "\u65e0")}`,
+          `\u5e95\u8272\uff1a${clean(continuity.mood_baseline, "neutral")}\uff1b\u80fd\u91cf=${clean(continuity.energy, "calm")}\uff1b\u5173\u7cfb\u8bed\u6c14=${clean(continuity.relationship_tone, "steady")}`,
+          `\u8fd1\u671f\u9700\u8981\uff1a${clean(continuity.recent_user_need, "\u65e0")}\uff1b\u8fde\u7eed\u8f6e\u6570=${Number(continuity.same_need_turns) || 0}\uff1b\u8870\u51cf=${clean(continuity.decay, "fresh")}`
+        ]
+      : [];
     return [
       "角色大脑状态",
       "",
       timeLine,
+      ...continuityLines,
       `当前判断：${localize(INTENT_LABELS, safe.intent)}`,
       `回复风格：${localize(STYLE_LABELS, safe.reply_style)}；最多约 ${Number(safe.max_sentences) || 3} 句`,
       `角色状态：能量=${clean(safe.energy)}；注意力=${clean(safe.attention)}；关系=${clean(safe.relationship)}`,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 from typing import Any, Dict, Iterable, List, Optional
 
 
@@ -39,6 +40,16 @@ LIVE2D_HINTS = {
     "annoyed": "brow_tense",
     "thinking": "idle_relaxed",
 }
+
+SESSION_RESET_AFTER_SEC = 30 * 60
+SESSION_SOFT_DECAY_AFTER_SEC = 10 * 60
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
 
 
 def _clean_text(value: Any, max_len: int = 180) -> str:
@@ -83,12 +94,219 @@ def _history_tail_text(history: Iterable[Any], max_items: int = 4) -> str:
     return " | ".join(parts)
 
 
+def _derive_topic(user_message: str, intent: str) -> str:
+    text = _clean_text(user_message, 300).lower()
+    compact = re.sub(r"\s+", "", text)
+    if intent == "comfort":
+        return "emotional_support"
+    if re.search(r"(code|bug|fix|implement|error|traceback|test|pytest)", compact):
+        return "coding"
+    if re.search(r"(nextstep|todo|plan|roadmap|priority|whatshouldidonext)", compact):
+        return "planning"
+    if re.search(r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u8ba1\u5212|\u4f18\u5148)", text):
+        return "planning"
+    if re.search(r"(voice|tts|asr|live2d|motion|expression)", compact):
+        return "character_runtime"
+    if intent in {"task_help", "question"}:
+        return "task"
+    if intent == "encouragement":
+        return "progress"
+    return "casual"
+
+
+def _need_for_intent(intent: str) -> str:
+    return {
+        "comfort": "reassurance",
+        "task_help": "direction",
+        "question": "answer",
+        "encouragement": "closure",
+        "reminder": "reminder",
+        "closing": "space",
+        "greeting": "companionship",
+        "low_interrupt_checkin": "low_interrupt",
+    }.get(_clean_text(intent, 40), "companionship")
+
+
+def _baseline_for_intent(intent: str, previous: Optional[str] = None) -> str:
+    if intent == "comfort":
+        return "concerned"
+    if intent == "task_help":
+        return "focused"
+    if intent in {"greeting", "encouragement"}:
+        return "warm"
+    if intent == "closing":
+        return "calm"
+    return _clean_text(previous, 24) or "neutral"
+
+
+def _relationship_tone_for_intent(
+    intent: str,
+    *,
+    previous: Optional[str] = None,
+    experience_profile: Optional[Dict[str, Any]] = None,
+) -> str:
+    flags = _experience_flags(experience_profile)
+    if flags["avoid_generic"] or flags["prefer_short"]:
+        return "careful"
+    if intent == "comfort":
+        return "gentle"
+    if intent == "task_help":
+        return "steady_coach"
+    if intent == "encouragement":
+        return "proud"
+    if intent == "closing":
+        return "soft"
+    return _clean_text(previous, 32) or "easy"
+
+
+def _public_continuity_state(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    safe = normalize_brain_session_state(state)
+    return {
+        "last_intent": _clean_text(safe.get("last_intent"), 40),
+        "last_topic": _clean_text(safe.get("last_topic"), 48),
+        "mood_baseline": _clean_text(safe.get("mood_baseline"), 24) or "neutral",
+        "energy": _clean_text(safe.get("energy"), 24) or "calm",
+        "relationship_tone": _clean_text(safe.get("relationship_tone"), 32) or "steady",
+        "recent_user_need": _clean_text(safe.get("recent_user_need"), 40),
+        "same_need_turns": max(0, min(20, _safe_int(safe.get("same_need_turns"), 0))),
+        "updated_at": max(0, _safe_int(safe.get("updated_at"), 0)),
+        "decay": _clean_text(safe.get("decay"), 40) or "fresh",
+    }
+
+
+def normalize_brain_session_state(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    src = raw if isinstance(raw, dict) else {}
+    state = {
+        "version": 1,
+        "last_intent": _clean_text(src.get("last_intent"), 40),
+        "last_topic": _clean_text(src.get("last_topic"), 48),
+        "mood_baseline": _clean_text(src.get("mood_baseline"), 24) or "neutral",
+        "energy": _clean_text(src.get("energy"), 24) or "calm",
+        "relationship_tone": _clean_text(src.get("relationship_tone"), 32) or "steady",
+        "recent_user_need": _clean_text(src.get("recent_user_need"), 40),
+        "same_need_turns": max(0, min(20, _safe_int(src.get("same_need_turns"), 0))),
+        "updated_at": max(0, _safe_int(src.get("updated_at"), 0)),
+        "decay": _clean_text(src.get("decay"), 40) or "fresh",
+    }
+    if state["mood_baseline"] not in {
+        "neutral",
+        "calm",
+        "warm",
+        "concerned",
+        "focused",
+        "playful",
+    }:
+        state["mood_baseline"] = "neutral"
+    if state["energy"] not in {
+        "calm",
+        "quiet",
+        "low",
+        "medium",
+        "warm",
+        "focused",
+        "bright",
+        "high",
+    }:
+        state["energy"] = "calm"
+    return state
+
+
+def decay_brain_session_state(
+    raw: Optional[Dict[str, Any]],
+    *,
+    now_ts: Optional[float] = None,
+) -> Dict[str, Any]:
+    state = normalize_brain_session_state(raw)
+    now = int(now_ts if now_ts is not None else time.time())
+    updated_at = _safe_int(state.get("updated_at"), 0)
+    if updated_at <= 0:
+        state["updated_at"] = now
+        state["decay"] = "fresh"
+        return state
+    age = max(0, now - updated_at)
+    if age >= SESSION_RESET_AFTER_SEC:
+        return {
+            "version": 1,
+            "last_intent": "",
+            "last_topic": "",
+            "mood_baseline": "neutral",
+            "energy": "calm",
+            "relationship_tone": "steady",
+            "recent_user_need": "",
+            "same_need_turns": 0,
+            "updated_at": updated_at,
+            "decay": "reset_after_idle",
+        }
+    if age >= SESSION_SOFT_DECAY_AFTER_SEC:
+        if state["mood_baseline"] in {"concerned", "focused", "playful"}:
+            state["mood_baseline"] = "neutral"
+        if state["energy"] in {"bright", "high", "focused"}:
+            state["energy"] = "calm"
+        state["same_need_turns"] = min(1, state["same_need_turns"])
+        state["decay"] = "softened"
+        return state
+    state["decay"] = "fresh"
+    return state
+
+
+def update_brain_session_state(
+    previous: Optional[Dict[str, Any]],
+    *,
+    decision: Optional[Dict[str, Any]] = None,
+    user_message: str = "",
+    history: Optional[List[Dict[str, Any]]] = None,
+    experience_profile: Optional[Dict[str, Any]] = None,
+    now_ts: Optional[float] = None,
+) -> Dict[str, Any]:
+    prev = decay_brain_session_state(previous, now_ts=now_ts)
+    decision = decision if isinstance(decision, dict) else {}
+    intent = _clean_text(decision.get("intent"), 40) or classify_user_intent(user_message)
+    topic = _derive_topic(user_message, intent)
+    need = _need_for_intent(intent)
+    same_need_turns = prev.get("same_need_turns", 0) + 1 if prev.get("recent_user_need") == need else 1
+    now = int(now_ts if now_ts is not None else time.time())
+    energy = _clean_text(decision.get("energy"), 24) or prev.get("energy") or "calm"
+    if intent == "comfort":
+        energy = "calm"
+    elif intent == "task_help" and prev.get("recent_user_need") == "direction":
+        energy = "focused"
+    elif intent == "casual" and same_need_turns > 1:
+        energy = "calm"
+
+    return normalize_brain_session_state(
+        {
+            "version": 1,
+            "last_intent": intent,
+            "last_topic": topic,
+            "mood_baseline": _baseline_for_intent(intent, prev.get("mood_baseline")),
+            "energy": energy,
+            "relationship_tone": _relationship_tone_for_intent(
+                intent,
+                previous=prev.get("relationship_tone"),
+                experience_profile=experience_profile,
+            ),
+            "recent_user_need": need,
+            "same_need_turns": same_need_turns,
+            "updated_at": now,
+            "decay": "fresh",
+        }
+    )
+
+
 def classify_user_intent(user_message: str, *, is_auto: bool = False) -> str:
     text = _clean_text(user_message, 300)
     lower = text.lower()
     compact = re.sub(r"\s+", "", lower)
     if is_auto:
         return "low_interrupt_checkin"
+    if re.search(r"(nextstep|whatshouldidonext|whatnext|todo|roadmap|priority)", compact):
+        return "task_help"
+    if re.search(r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u8be5\u505a\u4ec0\u4e48|\u5148\u505a\u4ec0\u4e48|\u600e\u4e48\u63a8\u8fdb)", text):
+        return "task_help"
+    if re.search(r"(done|finished|completed|shipped|fixed|madeit|wrappedup)", compact):
+        return "encouragement"
+    if re.search(r"(\u505a\u5b8c\u4e86|\u5b8c\u6210\u4e86|\u641e\u5b9a\u4e86|\u4fee\u597d\u4e86|\u7ed3\u675f\u4e86)", text):
+        return "encouragement"
     if re.search(r"(你好|早安|晚安|hello|hi|hey|在吗)", compact):
         return "greeting"
     if re.search(r"(难受|伤心|焦虑|累|崩溃|被否定|不开心|压力|sad|tired|anxious|upset)", compact):
@@ -140,11 +358,13 @@ def build_character_brain_decision(
     history: Optional[List[Dict[str, Any]]] = None,
     emotion_state: Optional[Dict[str, Any]] = None,
     experience_profile: Optional[Dict[str, Any]] = None,
+    session_state: Optional[Dict[str, Any]] = None,
     is_auto: bool = False,
 ) -> Dict[str, Any]:
     intent = classify_user_intent(user_message, is_auto=is_auto)
     emotion_state = emotion_state if isinstance(emotion_state, dict) else {}
     flags = _experience_flags(experience_profile)
+    continuity = _public_continuity_state(session_state)
 
     decision: Dict[str, Any] = {
         "version": 1,
@@ -162,6 +382,7 @@ def build_character_brain_decision(
         "live2d_hint": "idle_relaxed",
         "directive": "Reply as the same desktop character with a natural, low-interruption tone.",
         "history_tail": _history_tail_text(history or []),
+        "continuity": continuity,
     }
 
     if intent == "greeting":
@@ -254,6 +475,41 @@ def build_character_brain_decision(
             directive="Use one optional, easy-to-ignore sentence; never pressure the user to respond.",
         )
 
+    previous_need = continuity.get("recent_user_need")
+    previous_intent = continuity.get("last_intent")
+    same_need_turns = _safe_int(continuity.get("same_need_turns"), 0)
+    if intent == "comfort" and previous_need == "reassurance":
+        decision.update(
+            relationship="trusted_desktop_companion",
+            reply_style="comfort_continuing",
+            max_sentences=min(int(decision.get("max_sentences") or 3), 3),
+            emotion="sad",
+            action="none",
+            intensity="low",
+            voice_style="soft",
+            directive=(
+                "Treat this as continuing distress, not a first report; acknowledge the ongoing thread, "
+                "stay gentle, and offer one small next step only if it fits."
+            ),
+        )
+    elif intent == "task_help" and previous_need == "direction":
+        decision.update(
+            relationship="steady_desktop_partner",
+            reply_style="clear_concise",
+            max_sentences=min(int(decision.get("max_sentences") or 4), 3),
+            emotion="thinking",
+            action="think",
+            intensity="low",
+            voice_style="serious",
+            directive=(
+                "Continue the same next-step thread; keep it concise, directional, and avoid re-explaining "
+                "the whole situation from scratch."
+            ),
+        )
+    elif intent in {"casual", "question"} and previous_intent == "casual" and same_need_turns >= 1:
+        decision["max_sentences"] = min(int(decision.get("max_sentences") or 3), 2)
+        decision["directive"] += " Do not force a follow-up question; it is fine to let the exchange rest naturally."
+
     dominant = _normalize_emotion(emotion_state.get("dominant", "neutral"))
     if dominant in {"sad", "anxious"} and intent in {"casual", "question"}:
         decision.update(emotion=dominant, voice_style="soft", action="none", intensity="low")
@@ -285,11 +541,13 @@ def build_character_brain_decision(
 def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> str:
     if not isinstance(decision, dict):
         return ""
+    continuity = _public_continuity_state(decision.get("continuity"))
     lines = [
         "[Character brain state]",
         "Use this as private guidance for the next reply. Do not mention the brain state or expose metadata.",
         f"Intent: {_clean_text(decision.get('intent'), 40)}",
         f"Character state: energy={_clean_text(decision.get('energy'), 24)}, attention={_clean_text(decision.get('attention'), 24)}, relationship={_clean_text(decision.get('relationship'), 40)}",
+        f"Session continuity: last_intent={continuity.get('last_intent') or 'none'}, last_topic={continuity.get('last_topic') or 'none'}, mood_baseline={continuity.get('mood_baseline')}, recent_user_need={continuity.get('recent_user_need') or 'none'}, same_need_turns={continuity.get('same_need_turns')}, decay={continuity.get('decay')}",
         f"Reply style: {_clean_text(decision.get('reply_style'), 40)}, max_sentences={int(decision.get('max_sentences') or 3)}",
         f"Expression target: emotion={_normalize_emotion(decision.get('emotion'))}, action={_normalize_action(decision.get('action'))}, intensity={_normalize_intensity(decision.get('intensity'))}, voice_style={_clean_text(decision.get('voice_style'), 32)}",
         f"Directive: {_clean_text(decision.get('directive'), 240)}",
@@ -301,6 +559,7 @@ def build_character_brain_public_snapshot(
     decision: Optional[Dict[str, Any]],
     *,
     experience_profile: Optional[Dict[str, Any]] = None,
+    session_state: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     if not isinstance(decision, dict):
         return None
@@ -329,6 +588,9 @@ def build_character_brain_public_snapshot(
         "intensity": _normalize_intensity(decision.get("intensity")),
         "voice_style": _clean_text(decision.get("voice_style"), 32).lower() or "neutral",
         "feedback_effects": feedback_effects[:5],
+        "continuity": _public_continuity_state(
+            session_state if isinstance(session_state, dict) else decision.get("continuity")
+        ),
     }
 
 

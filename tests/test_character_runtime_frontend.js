@@ -279,7 +279,17 @@ function toPlainObject(value) {
       action: "none",
       intensity: "low",
       voice_style: "soft",
-      feedback_effects: ["shorter_replies", "less_generic_tone"]
+      feedback_effects: ["shorter_replies", "less_generic_tone"],
+      continuity: {
+        last_intent: "comfort",
+        last_topic: "emotional_support",
+        mood_baseline: "concerned",
+        energy: "calm",
+        relationship_tone: "gentle",
+        recent_user_need: "reassurance",
+        same_need_turns: 2,
+        decay: "fresh"
+      }
     },
     { updatedAt: Date.now() }
   );
@@ -289,6 +299,10 @@ function toPlainObject(value) {
       && brainReport.includes("反馈影响")
       && brainReport.includes("不会触发语音、动作、桌面观察、工具调用或 shell"),
     "character brain debug report should be readable and clearly side-effect-free"
+  );
+  assert.ok(
+    brainReport.includes("\u8fde\u7eed\u6027\u72b6\u6001") && brainReport.includes("reassurance"),
+    "character brain debug report should include compact continuity state"
   );
 }
 

@@ -171,6 +171,43 @@ def test_chat_stream_done_payload_includes_safe_character_brain(monkeypatch):
     assert "directive" not in brain
 
 
+def test_chat_payload_includes_compact_character_brain_continuity(monkeypatch):
+    cfg = _build_test_config()
+    monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: "ok")
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status1, payload1 = _post_json(
+            f"{base}/api/chat",
+            {"message": "I feel really sad.", "history": []},
+        )
+        status2, payload2 = _post_json(
+            f"{base}/api/chat",
+            {
+                "message": "I still feel sad.",
+                "history": [
+                    {"role": "user", "content": "raw history api_key=SECRET prompt text"},
+                    {"role": "assistant", "content": "ok"},
+                ],
+            },
+        )
+
+    assert status1 == 200
+    assert status2 == 200
+    brain = payload2.get("character_brain")
+    assert isinstance(brain, dict)
+    continuity = brain.get("continuity")
+    assert isinstance(continuity, dict)
+    assert brain.get("intent") == "comfort"
+    assert continuity.get("recent_user_need") == "reassurance"
+    assert continuity.get("same_need_turns") == 2
+    raw = json.dumps(brain, ensure_ascii=False).lower()
+    assert "raw history" not in raw
+    assert "secret" not in raw
+    assert "api_key" not in raw
+    assert "prompt text" not in raw
+    assert "directive" not in brain
+
+
 def test_missing_character_runtime_config_returns_no_metadata(monkeypatch):
     cfg = _build_test_config()
     cfg.pop("character_runtime", None)

@@ -145,7 +145,9 @@ from character_brain import (
     build_character_brain_decision,
     build_character_brain_prompt_block,
     build_character_brain_public_snapshot,
+    decay_brain_session_state,
     merge_brain_runtime_metadata,
+    update_brain_session_state,
 )
 from app_health import (
     build_character_runtime_health_summary as _build_character_runtime_health_summary,
@@ -243,6 +245,8 @@ from time_awareness import (
 
 _SUMMARY_CACHE_LOCK = threading.Lock()
 _HISTORY_SUMMARY_CACHE = {"key": "", "summary": ""}
+_CHARACTER_BRAIN_SESSION_LOCK = threading.Lock()
+_CHARACTER_BRAIN_SESSION_STATE = {}
 RUNTIME_RESTART_EXIT_CODE = 75
 API_TOKEN_HEADER = "X-Taffy-Token"
 API_TOKEN_ENV_DEFAULT = "TAFFY_API_TOKEN"
@@ -403,6 +407,56 @@ def reset_runtime_state():
     with _SUMMARY_CACHE_LOCK:
         _HISTORY_SUMMARY_CACHE["key"] = ""
         _HISTORY_SUMMARY_CACHE["summary"] = ""
+    reset_character_brain_session_state()
+
+
+def reset_character_brain_session_state():
+    global _CHARACTER_BRAIN_SESSION_STATE
+    with _CHARACTER_BRAIN_SESSION_LOCK:
+        _CHARACTER_BRAIN_SESSION_STATE = {}
+
+
+def _get_character_brain_session_state():
+    global _CHARACTER_BRAIN_SESSION_STATE
+    now_ts = time.time()
+    with _CHARACTER_BRAIN_SESSION_LOCK:
+        state = decay_brain_session_state(_CHARACTER_BRAIN_SESSION_STATE, now_ts=now_ts)
+        _CHARACTER_BRAIN_SESSION_STATE = dict(state)
+        return dict(state)
+
+
+def _update_character_brain_session_state(config, user_message, history):
+    global _CHARACTER_BRAIN_SESSION_STATE
+    if not isinstance(config, dict):
+        return None
+    decision = config.get("_character_brain_decision") or config.get(
+        "_character_brain_response_decision"
+    )
+    if not isinstance(decision, dict):
+        return None
+    previous = config.get("_character_brain_session_state")
+    if not isinstance(previous, dict):
+        previous = _get_character_brain_session_state()
+    try:
+        history_settings = get_history_summary_settings(config)
+        keep_recent = int(history_settings.get("keep_recent_messages", 8))
+        safe_history = sanitize_history(history, max_items=keep_recent)
+    except Exception:
+        safe_history = []
+    state = update_brain_session_state(
+        previous,
+        decision=decision,
+        user_message=user_message,
+        history=safe_history,
+        experience_profile=config.get("_character_experience_profile"),
+        now_ts=time.time(),
+    )
+    with _CHARACTER_BRAIN_SESSION_LOCK:
+        _CHARACTER_BRAIN_SESSION_STATE = dict(state)
+    config["_character_brain_session_state"] = dict(state)
+    if isinstance(decision, dict):
+        decision["continuity"] = dict(state)
+    return dict(state)
 
 
 def schedule_runtime_restart(delay_sec=0.35):
@@ -687,6 +741,7 @@ def _build_character_brain_response_payload(config):
     return build_character_brain_public_snapshot(
         decision,
         experience_profile=config.get("_character_experience_profile"),
+        session_state=config.get("_character_brain_session_state"),
     )
 
 
@@ -702,12 +757,17 @@ def _ensure_character_brain_decision(config, user_message, history, *, is_auto=F
         history_settings = get_history_summary_settings(config)
         keep_recent = int(history_settings.get("keep_recent_messages", 8))
         safe_history = sanitize_history(history, max_items=keep_recent)
+        session_state = config.get("_character_brain_session_state")
+        if not isinstance(session_state, dict):
+            session_state = _get_character_brain_session_state()
+            config["_character_brain_session_state"] = session_state
         config["_character_brain_response_decision"] = build_character_brain_decision(
             config=config,
             user_message=user_message,
             history=safe_history,
             emotion_state=load_emotion_state(),
             experience_profile=config.get("_character_experience_profile"),
+            session_state=session_state,
             is_auto=is_auto,
         )
     except Exception:
@@ -733,12 +793,17 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto
         assistant_prompt = merge_prompt_with_memory(persona_block, assistant_prompt)
     if relationship_block:
         assistant_prompt = merge_prompt_with_memory(relationship_block, assistant_prompt)
+    session_state = config.get("_character_brain_session_state") if isinstance(config, dict) else None
+    if isinstance(config, dict) and not isinstance(session_state, dict):
+        session_state = _get_character_brain_session_state()
+        config["_character_brain_session_state"] = session_state
     brain_decision = build_character_brain_decision(
         config=config,
         user_message=user_message,
         history=safe_history,
         emotion_state=load_emotion_state(),
         experience_profile=config.get("_character_experience_profile") if isinstance(config, dict) else None,
+        session_state=session_state,
         is_auto=is_auto,
     )
     if isinstance(config, dict):
@@ -1582,6 +1647,11 @@ class PetHandler(SimpleHTTPRequestHandler):
                         )
                     except Exception:
                         pass
+                _update_character_brain_session_state(
+                    chat_config,
+                    user_message,
+                    history,
+                )
                 runtime_ms = _perf_now_ms() - runtime_started_ms
                 done_payload = {"type": "done", "reply": final_reply}
                 if runtime_meta is not None:
@@ -1640,6 +1710,11 @@ class PetHandler(SimpleHTTPRequestHandler):
                 )
             except Exception:
                 pass
+            _update_character_brain_session_state(
+                chat_config,
+                user_message,
+                history,
+            )
             payload = {"reply": str(reply or "")}
             if runtime_meta is not None:
                 payload["character_runtime"] = runtime_meta
@@ -1694,6 +1769,7 @@ def run_startup_self_check(config):
 
 def build_server():
     config = load_config()
+    reset_character_brain_session_state()
     server_cfg = config.get("server", {})
     host = server_cfg.get("host", DEFAULT_CONFIG["server"]["host"])
     try:
