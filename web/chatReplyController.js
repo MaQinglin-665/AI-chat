@@ -39,6 +39,25 @@
     const previewAssistantReplyCharacterCueCandidate = typeof deps.previewAssistantReplyCharacterCueCandidate === "function" ? deps.previewAssistantReplyCharacterCueCandidate : () => null;
     const maybeAutoApplyAssistantReplyCharacterCueCandidate = typeof deps.maybeAutoApplyAssistantReplyCharacterCueCandidate === "function" ? deps.maybeAutoApplyAssistantReplyCharacterCueCandidate : () => null;
     const normalizeTalkStyle = typeof deps.normalizeTalkStyle === "function" ? deps.normalizeTalkStyle : (style) => String(style || "neutral").trim() || "neutral";
+    const normalizeRuntimeVoiceStyle = typeof deps.normalizeRuntimeVoiceStyle === "function"
+      ? deps.normalizeRuntimeVoiceStyle
+      : (style) => {
+          const key = String(style || "neutral").trim().toLowerCase().replace(/-/g, "_");
+          if (["neutral", "soft", "cheerful", "teasing", "serious", "curious", "warm"].includes(key)) {
+            return key;
+          }
+          return "neutral";
+        };
+    const runtimeVoiceStyleToTalkStyle = typeof deps.runtimeVoiceStyleToTalkStyle === "function"
+      ? deps.runtimeVoiceStyleToTalkStyle
+      : (style, fallback = "neutral") => {
+          const voiceStyle = normalizeRuntimeVoiceStyle(style);
+          if (voiceStyle === "soft" || voiceStyle === "warm") return "comfort";
+          if (voiceStyle === "cheerful" || voiceStyle === "teasing") return "playful";
+          if (voiceStyle === "serious") return "steady";
+          if (voiceStyle === "curious") return "clear";
+          return normalizeTalkStyle(fallback);
+        };
     const triggerExpressionPulse = typeof deps.triggerExpressionPulse === "function" ? deps.triggerExpressionPulse : () => {};
     const flushStreamSpeak = typeof deps.flushStreamSpeak === "function" ? deps.flushStreamSpeak : () => {};
     const scheduleFinalSpeechWatchdog = typeof deps.scheduleFinalSpeechWatchdog === "function" ? deps.scheduleFinalSpeechWatchdog : () => {};
@@ -57,6 +76,57 @@
       typeof deps.getCharacterExperienceRequestProfile === "function"
         ? deps.getCharacterExperienceRequestProfile
         : () => null;
+    let characterRuntimeMetadataForReply = null;
+
+    function rememberCharacterRuntimeMetadataForReply(metadata) {
+      const normalized = handleCharacterRuntimeMetadata(metadata);
+      if (normalized && typeof normalized === "object" && !Array.isArray(normalized)) {
+        characterRuntimeMetadataForReply = normalized;
+      } else if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+        characterRuntimeMetadataForReply = metadata;
+      }
+      return normalized;
+    }
+
+    function normalizeRuntimeVoiceStyleForSpeech(style) {
+      const raw = String(style || "").trim();
+      if (!raw) {
+        return "";
+      }
+      const key = raw.toLowerCase().replace(/-/g, "_");
+      const allowedAliases = [
+        "neutral", "soft", "cheerful", "teasing", "serious", "curious", "warm",
+        "happy", "playful", "sad", "anxious", "angry", "annoyed", "thinking",
+        "comfort", "clear", "steady"
+      ];
+      if (!allowedAliases.includes(key)) {
+        return "";
+      }
+      return normalizeRuntimeVoiceStyle(raw);
+    }
+
+    function resolveRuntimeTalkStyleForSpeech(runtimeVoiceStyle, fallback) {
+      if (!runtimeVoiceStyle) {
+        return normalizeTalkStyle(fallback);
+      }
+      return normalizeTalkStyle(runtimeVoiceStyleToTalkStyle(runtimeVoiceStyle, fallback, normalizeTalkStyle));
+    }
+
+    function shouldSuppressGenericReplyMotion(metadata) {
+      if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+        return false;
+      }
+      const action = String(metadata.action || "").trim().toLowerCase().replace(/-/g, "_");
+      const brainIntent = String(metadata.brain_intent || "").trim().toLowerCase().replace(/-/g, "_");
+      const live2dHint = String(metadata.live2d_hint || "").trim().toLowerCase();
+      if (action !== "none") {
+        return false;
+      }
+      return brainIntent === "comfort"
+        || brainIntent === "low_interrupt_checkin"
+        || live2dHint === "quiet"
+        || live2dHint === "eyes_down";
+    }
 
     async function streamAssistantReply(payload, onDelta, perfHooks = null) {
       const chatApi = window.TaffyModules?.chatApi || {};
@@ -65,7 +135,7 @@
       }
       return chatApi.streamAssistantReply(payload, onDelta, {
         authFetch,
-        onCharacterRuntimeMetadata: handleCharacterRuntimeMetadata,
+        onCharacterRuntimeMetadata: rememberCharacterRuntimeMetadataForReply,
         onCharacterBrainDecision: handleCharacterBrainDecision,
         preferStream: state.conversationMode.chatStreamEnabled !== false,
         perfHooks,
@@ -92,6 +162,7 @@
       const isAuto = !!opts.auto;
       const skipDesktopAttach = opts.skipDesktopAttach === true;
       const forceTools = opts.forceTools === true;
+      characterRuntimeMetadataForReply = null;
       const chatPerfTraceId = createPerfTraceId("chat");
       const chatPerfStartPerfMs = performance.now();
       const chatPerfStartWallMs = Date.now();
@@ -283,12 +354,18 @@
           style: baseTalkStyle,
           auto: isAuto
         });
-        const finalTalkStyle = normalizeTalkStyle(replyCueApply?.speechStyle || baseTalkStyle);
-        const finalProsodyStyle = replyCueApply?.voiceStyle || finalTalkStyle;
+        const runtimeVoiceStyle = normalizeRuntimeVoiceStyleForSpeech(characterRuntimeMetadataForReply?.voice_style);
+        const finalTalkStyle = resolveRuntimeTalkStyleForSpeech(
+          runtimeVoiceStyle,
+          replyCueApply?.speechStyle || baseTalkStyle
+        );
+        const finalProsodyStyle = runtimeVoiceStyle || replyCueApply?.voiceStyle || finalTalkStyle;
         state.currentTalkStyle = finalTalkStyle;
         state.speechAnimMood = mood;
         if (state.motionQuietDuringSpeech && state.speakingEnabled) {
           triggerExpressionPulse(finalTalkStyle, 0.4, 220);
+        } else if (shouldSuppressGenericReplyMotion(characterRuntimeMetadataForReply)) {
+          triggerExpressionPulse(finalTalkStyle, 0.28, 180);
         } else {
           enqueueActionIntent("reply", { text: visibleReply, style: finalTalkStyle, mood, combo: true });
         }

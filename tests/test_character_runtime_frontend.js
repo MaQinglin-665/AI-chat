@@ -1521,6 +1521,17 @@ assert.ok(
   "character tuning should include persistent lightweight feedback that can guide the next runtime reply"
 );
 assert.ok(
+  chatReplyControllerSource.includes("let characterRuntimeMetadataForReply = null")
+    && chatReplyControllerSource.includes("function rememberCharacterRuntimeMetadataForReply")
+    && chatReplyControllerSource.includes("function normalizeRuntimeVoiceStyleForSpeech")
+    && chatReplyControllerSource.includes("const finalProsodyStyle = runtimeVoiceStyle || replyCueApply?.voiceStyle || finalTalkStyle;")
+    && chatReplyControllerSource.includes("function shouldSuppressGenericReplyMotion")
+    && chatReplyControllerSource.includes("shouldSuppressGenericReplyMotion(characterRuntimeMetadataForReply)")
+    && source.includes("normalizeRuntimeVoiceStyle,")
+    && source.includes("runtimeVoiceStyleToTalkStyle,"),
+  "final reply TTS and generic reply motion should prefer backend Character Brain runtime metadata"
+);
+assert.ok(
   tuningSource.includes("function buildWorkflowGuide()")
     && source.includes("function buildCharacterWorkflowGuide()")
     && source.includes("function appendCharacterWorkflowGuide()")

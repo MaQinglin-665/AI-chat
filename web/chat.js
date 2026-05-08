@@ -3957,6 +3957,8 @@ function getChatReplyController() {
       previewAssistantReplyCharacterCueCandidate,
       maybeAutoApplyAssistantReplyCharacterCueCandidate,
       normalizeTalkStyle,
+      normalizeRuntimeVoiceStyle,
+      runtimeVoiceStyleToTalkStyle,
       triggerExpressionPulse,
       flushStreamSpeak,
       scheduleFinalSpeechWatchdog,
