@@ -34,6 +34,7 @@ health_headers_*.txt
 tmp_browsercheck/
 tmp_npm/
 tmp_voice_preview/
+tmp_ui_smoke/
 
 # Runtime logs
 server_out.log

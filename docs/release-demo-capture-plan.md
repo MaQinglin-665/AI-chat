@@ -55,6 +55,7 @@ Rules:
 
 ## v1.4 AI VTuber Feeling Public Demo
 Before recording v1.4 material, run `python scripts/check_character_v1_4.py` and finish one manual smoke pass with text chat, Live2D, TTS, `/doctor`, `/braindebug`, and feedback buttons.
+If the Python backend is already running, `node node_modules\electron\cli.js scripts\electron_ui_smoke.js --chat "你好，做个 UI 冒烟测试，请简短回应。"` can capture a repeatable local Electron UI smoke snapshot into `tmp_ui_smoke/`.
 
 Recommended public clip order:
 - 30-60 seconds: app launch, Live2D visible, one natural chat turn, TTS playback, no debug panels.
