@@ -10,12 +10,18 @@
     subtitleEnabled: "taffy_subtitle_enabled_v1",
     subtitlePosition: "taffy_subtitle_position_v1",
     onboardingSeen: "taffy_onboarding_seen_v1",
-    assistantAvatar: "taffy_assistant_avatar_v1"
+    assistantAvatar: "taffy_assistant_avatar_v1",
+    characterBrainLastDecision: "taffy_character_brain_last_decision_v1"
   };
 
   function getStorage(deps = {}) {
     const windowObject = deps.windowObject || root;
     return windowObject.localStorage || null;
+  }
+
+  function getSessionStorage(deps = {}) {
+    const windowObject = deps.windowObject || root;
+    return windowObject.sessionStorage || null;
   }
 
   function safeParseJSON(raw, fallback) {
@@ -279,6 +285,100 @@
     }
   }
 
+  function cleanText(value, maxLen = 80) {
+    const text = String(value || "").replace(/\s+/g, " ").trim();
+    if (text.length > maxLen) {
+      return text.slice(0, Math.max(0, maxLen - 3)).trimEnd() + "...";
+    }
+    return text;
+  }
+
+  function cleanInt(value, fallback = 0, min = 0, max = 9999999999999) {
+    const n = Math.floor(Number(value));
+    if (!Number.isFinite(n)) {
+      return fallback;
+    }
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function sanitizeCharacterBrainSnapshot(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return null;
+    }
+    const continuityRaw = raw.continuity && typeof raw.continuity === "object" && !Array.isArray(raw.continuity)
+      ? raw.continuity
+      : {};
+    return {
+      version: 1,
+      intent: cleanText(raw.intent, 40),
+      reply_style: cleanText(raw.reply_style, 40),
+      energy: cleanText(raw.energy, 24),
+      attention: cleanText(raw.attention, 24),
+      relationship: cleanText(raw.relationship, 40),
+      max_sentences: cleanInt(raw.max_sentences, 3, 1, 8),
+      emotion: cleanText(raw.emotion, 32),
+      action: cleanText(raw.action, 32),
+      intensity: cleanText(raw.intensity, 16),
+      voice_style: cleanText(raw.voice_style, 32),
+      feedback_effects: Array.isArray(raw.feedback_effects)
+        ? raw.feedback_effects.slice(0, 5).map((item) => cleanText(item, 48)).filter(Boolean)
+        : [],
+      continuity: {
+        last_intent: cleanText(continuityRaw.last_intent, 40),
+        last_topic: cleanText(continuityRaw.last_topic, 48),
+        mood_baseline: cleanText(continuityRaw.mood_baseline, 24),
+        energy: cleanText(continuityRaw.energy, 24),
+        relationship_tone: cleanText(continuityRaw.relationship_tone, 32),
+        recent_user_need: cleanText(continuityRaw.recent_user_need, 40),
+        same_need_turns: cleanInt(continuityRaw.same_need_turns, 0, 0, 20),
+        updated_at: cleanInt(continuityRaw.updated_at, 0, 0),
+        decay: cleanText(continuityRaw.decay, 40)
+      }
+    };
+  }
+
+  function saveCharacterBrainSnapshot(state = {}, deps = {}) {
+    const storage = getSessionStorage(deps);
+    if (!storage) {
+      return;
+    }
+    const snapshot = sanitizeCharacterBrainSnapshot(state.characterBrainLastDecision);
+    if (!snapshot) {
+      try {
+        storage.removeItem(STORAGE_KEYS.characterBrainLastDecision);
+      } catch (_) {
+        // ignore storage failures
+      }
+      return;
+    }
+    try {
+      storage.setItem(
+        STORAGE_KEYS.characterBrainLastDecision,
+        JSON.stringify({
+          updated_at: cleanInt(state.characterBrainLastUpdatedAt, Date.now(), 0),
+          snapshot
+        })
+      );
+    } catch (_) {
+      // ignore storage quota failures
+    }
+  }
+
+  function loadCharacterBrainSnapshot(state = {}, deps = {}) {
+    const storage = getSessionStorage(deps);
+    const raw = storage ? storage.getItem(STORAGE_KEYS.characterBrainLastDecision) : "";
+    const parsed = safeParseJSON(raw, null);
+    const snapshot = sanitizeCharacterBrainSnapshot(parsed?.snapshot);
+    if (!snapshot) {
+      state.characterBrainLastDecision = null;
+      state.characterBrainLastUpdatedAt = 0;
+      return null;
+    }
+    state.characterBrainLastDecision = snapshot;
+    state.characterBrainLastUpdatedAt = cleanInt(parsed?.updated_at, 0, 0);
+    return snapshot;
+  }
+
   const api = {
     STORAGE_KEYS,
     safeParseJSON,
@@ -297,7 +397,10 @@
     saveOnboardingSeen,
     loadOnboardingSeen,
     readAssistantAvatar,
-    saveAssistantAvatar
+    saveAssistantAvatar,
+    sanitizeCharacterBrainSnapshot,
+    saveCharacterBrainSnapshot,
+    loadCharacterBrainSnapshot
   };
 
   root.TaffyStorageController = api;

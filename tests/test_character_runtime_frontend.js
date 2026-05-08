@@ -232,6 +232,24 @@ function toPlainObject(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function createMemoryStorage(initial = {}) {
+  const data = { ...initial };
+  return {
+    getItem(key) {
+      return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null;
+    },
+    setItem(key, value) {
+      data[key] = String(value);
+    },
+    removeItem(key) {
+      delete data[key];
+    },
+    dump() {
+      return { ...data };
+    }
+  };
+}
+
 {
   const initialState = chatState.createInitialState();
   assert.strictEqual(initialState.observeDesktop, false, "state helper should keep desktop observation disabled by default");
@@ -239,6 +257,8 @@ function toPlainObject(value) {
   assert.strictEqual(initialState.speakingEnabled, true, "state helper should preserve voice default");
   assert.strictEqual(typeof chatDom.createUI, "function", "chat DOM helper should expose UI mapping");
   assert.strictEqual(typeof storageController.loadChatHistory, "function", "storage controller should expose chat history loading");
+  assert.strictEqual(typeof storageController.saveCharacterBrainSnapshot, "function", "storage controller should save last character brain snapshot");
+  assert.strictEqual(typeof storageController.loadCharacterBrainSnapshot, "function", "storage controller should load last character brain snapshot");
   assert.strictEqual(typeof debugPanelController.updateDebugPanel, "function", "debug panel controller should expose panel updates");
   assert.strictEqual(typeof chatMessageController.createController, "function", "chat message controller should expose a factory");
   assert.strictEqual(typeof onboardingController.createController, "function", "onboarding controller should expose a factory");
@@ -264,6 +284,53 @@ function toPlainObject(value) {
   assert.strictEqual(typeof wakeWordController.createController, "function", "wake word controller should expose a factory");
   assert.strictEqual(typeof appConfigController.createController, "function", "app config controller should expose a factory");
   assert.strictEqual(typeof appStartupController.createController, "function", "app startup controller should expose startup orchestration");
+}
+
+{
+  const sessionStorage = createMemoryStorage();
+  const stateForBrainStorage = {
+    characterBrainLastUpdatedAt: 12345,
+    characterBrainLastDecision: {
+      intent: "comfort",
+      reply_style: "comfort",
+      energy: "calm",
+      attention: "focused",
+      relationship: "desktop_companion",
+      max_sentences: 3,
+      emotion: "sad",
+      action: "none",
+      intensity: "low",
+      voice_style: "soft",
+      feedback_effects: ["shorter_replies"],
+      continuity: {
+        last_intent: "comfort",
+        last_topic: "emotional_support",
+        mood_baseline: "concerned",
+        energy: "calm",
+        relationship_tone: "gentle",
+        recent_user_need: "reassurance",
+        same_need_turns: 2,
+        updated_at: 99,
+        decay: "fresh"
+      },
+      history_tail: "raw history api_key=SECRET",
+      directive: "private prompt"
+    }
+  };
+  storageController.saveCharacterBrainSnapshot(stateForBrainStorage, {
+    windowObject: { sessionStorage }
+  });
+  const stored = sessionStorage.dump()[storageController.STORAGE_KEYS.characterBrainLastDecision];
+  assert.ok(stored, "character brain snapshot should be stored in sessionStorage");
+  assert.ok(!stored.includes("history_tail") && !stored.includes("SECRET") && !stored.includes("directive"), "stored character brain snapshot should not include private fields");
+  const restored = { characterBrainLastDecision: null, characterBrainLastUpdatedAt: 0 };
+  storageController.loadCharacterBrainSnapshot(restored, {
+    windowObject: { sessionStorage }
+  });
+  assert.strictEqual(restored.characterBrainLastUpdatedAt, 12345, "character brain snapshot should restore update time");
+  assert.strictEqual(restored.characterBrainLastDecision.intent, "comfort", "character brain snapshot should restore public intent");
+  assert.strictEqual(restored.characterBrainLastDecision.continuity.recent_user_need, "reassurance", "character brain snapshot should restore compact continuity");
+  assert.strictEqual(restored.characterBrainLastDecision.history_tail, undefined, "restored character brain snapshot should stay public-only");
 }
 
 {
@@ -1323,6 +1390,8 @@ assert.ok(
   tuningSource.includes("function buildFeedbackMessage")
     && source.includes("function recordCharacterPerformanceFeedback")
     && source.includes("function handleCharacterBrainDecision")
+    && source.includes("function saveCharacterBrainSnapshotToStorage")
+    && source.includes("function loadCharacterBrainSnapshotFromStorage")
     && source.includes("function buildCharacterBrainDebugReport")
     && chatApi.streamAssistantReply
     && chatApiSource.includes("onCharacterBrainDecision")
@@ -1331,6 +1400,8 @@ assert.ok(
     && localCommandRegistry.matchLocalCommand("/braindebug").kind === "brain_debug"
     && localCommandExecutorSource.includes("brain_debug")
     && localCommandExecutorSource.includes("buildCharacterBrainDebugReport")
+    && appStartupControllerSource.includes("loadCharacterBrainSnapshotFromStorage")
+    && storageControllerSource.includes("taffy_character_brain_last_decision_v1")
     && source.includes("function getCharacterExperienceRequestProfile")
     && chatReplyControllerSource.includes("payload.character_experience_profile")
     && characterExperienceControllerSource.includes("taffy_character_experience_v1")

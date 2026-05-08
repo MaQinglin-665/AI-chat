@@ -26,6 +26,7 @@
       deps.loadSubtitlePositionFromStorage?.();
       deps.loadOnboardingSeenFromStorage?.();
       deps.loadCharacterExperienceProfile?.();
+      deps.loadCharacterBrainSnapshotFromStorage?.();
       await deps.loadPersonaCard?.();
     }
 

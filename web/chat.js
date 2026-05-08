@@ -1379,18 +1379,32 @@ function recordCharacterPerformanceFeedback(rating = "good", note = "") { return
 function loadCharacterExperienceProfile() { return getCharacterExperienceController().loadProfile(); }
 function getCharacterExperienceRequestProfile() { return getCharacterExperienceController().getRequestProfile(); }
 function buildCharacterExperienceSummary() { return getCharacterExperienceController().getProfileSummary(); }
+function saveCharacterBrainSnapshotToStorage() {
+  if (typeof STORAGE_CONTROLLER.saveCharacterBrainSnapshot === "function") {
+    STORAGE_CONTROLLER.saveCharacterBrainSnapshot(state, { windowObject: window });
+  }
+}
+function loadCharacterBrainSnapshotFromStorage() {
+  if (typeof STORAGE_CONTROLLER.loadCharacterBrainSnapshot === "function") {
+    return STORAGE_CONTROLLER.loadCharacterBrainSnapshot(state, { windowObject: window });
+  }
+  return null;
+}
 function handleCharacterBrainDecision(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
     return null;
   }
-  state.characterBrainLastDecision = snapshot;
+  state.characterBrainLastDecision = typeof STORAGE_CONTROLLER.sanitizeCharacterBrainSnapshot === "function"
+    ? STORAGE_CONTROLLER.sanitizeCharacterBrainSnapshot(snapshot)
+    : snapshot;
   state.characterBrainLastUpdatedAt = Date.now();
+  saveCharacterBrainSnapshotToStorage();
   try {
-    window.__AI_CHAT_LAST_CHARACTER_BRAIN__ = snapshot;
+    window.__AI_CHAT_LAST_CHARACTER_BRAIN__ = state.characterBrainLastDecision;
   } catch (_) {
     // Optional debug bridge only.
   }
-  return snapshot;
+  return state.characterBrainLastDecision;
 }
 function buildCharacterBrainDebugReport() {
   if (typeof CHARACTER_BRAIN_DEBUG.buildBrainDebugReport === "function") {
@@ -4117,6 +4131,7 @@ function getAppStartupController() {
       loadSubtitlePositionFromStorage,
       loadOnboardingSeenFromStorage,
       loadCharacterExperienceProfile,
+      loadCharacterBrainSnapshotFromStorage,
       loadPersonaCard,
       ensureLive2DRuntime,
       initLive2D,
