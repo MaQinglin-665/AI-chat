@@ -54,6 +54,9 @@
           append(deps, `Memory debug unavailable: ${err.message || err}`, { enableTranslation: false });
         }
       },
+      brain_debug: () => {
+        append(deps, deps.buildCharacterBrainDebugReport(), { enableTranslation: false });
+      },
       emotion_report: async () => {
         const report = deps.buildEmotionReportText();
         append(deps, report);

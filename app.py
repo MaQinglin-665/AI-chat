@@ -144,6 +144,7 @@ from character_runtime import (
 from character_brain import (
     build_character_brain_decision,
     build_character_brain_prompt_block,
+    build_character_brain_public_snapshot,
     merge_brain_runtime_metadata,
 )
 from app_health import (
@@ -675,6 +676,43 @@ def _build_character_experience_prompt_block(profile):
             )
         lines.append("Recent feedback signals: " + "; ".join(compact))
     return "\n".join(lines)
+
+
+def _build_character_brain_response_payload(config):
+    if not isinstance(config, dict):
+        return None
+    decision = config.get("_character_brain_decision") or config.get(
+        "_character_brain_response_decision"
+    )
+    return build_character_brain_public_snapshot(
+        decision,
+        experience_profile=config.get("_character_experience_profile"),
+    )
+
+
+def _ensure_character_brain_decision(config, user_message, history, *, is_auto=False):
+    if not isinstance(config, dict):
+        return config
+    if (
+        config.get("_character_brain_decision") is not None
+        or config.get("_character_brain_response_decision") is not None
+    ):
+        return config
+    try:
+        history_settings = get_history_summary_settings(config)
+        keep_recent = int(history_settings.get("keep_recent_messages", 8))
+        safe_history = sanitize_history(history, max_items=keep_recent)
+        config["_character_brain_response_decision"] = build_character_brain_decision(
+            config=config,
+            user_message=user_message,
+            history=safe_history,
+            emotion_state=load_emotion_state(),
+            experience_profile=config.get("_character_experience_profile"),
+            is_auto=is_auto,
+        )
+    except Exception:
+        pass
+    return config
 
 
 def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto=False):
@@ -1468,6 +1506,13 @@ class PetHandler(SimpleHTTPRequestHandler):
             is_auto=is_auto,
         )
 
+        chat_config = _ensure_character_brain_decision(
+            chat_config,
+            user_message,
+            history,
+            is_auto=is_auto,
+        )
+
         if path_only == "/api/chat_stream":
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -1541,6 +1586,9 @@ class PetHandler(SimpleHTTPRequestHandler):
                 done_payload = {"type": "done", "reply": final_reply}
                 if runtime_meta is not None:
                     done_payload["character_runtime"] = runtime_meta
+                brain_payload = _build_character_brain_response_payload(chat_config)
+                if brain_payload is not None:
+                    done_payload["character_brain"] = brain_payload
                 self._send_sse(done_payload)
                 _log_backend_perf(
                     "CHAT_STREAM",
@@ -1595,6 +1643,9 @@ class PetHandler(SimpleHTTPRequestHandler):
             payload = {"reply": str(reply or "")}
             if runtime_meta is not None:
                 payload["character_runtime"] = runtime_meta
+            brain_payload = _build_character_brain_response_payload(chat_config)
+            if brain_payload is not None:
+                payload["character_brain"] = brain_payload
             self._send_json(payload, extra_headers=perf_headers)
             _log_backend_perf(
                 "CHAT",

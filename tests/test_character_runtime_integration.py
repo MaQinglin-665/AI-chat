@@ -145,6 +145,30 @@ def test_default_runtime_off_keeps_original_reply(monkeypatch):
     assert status == 200
     assert payload.get("reply") == "plain reply"
     assert "character_runtime" not in payload
+    brain = payload.get("character_brain")
+    assert isinstance(brain, dict)
+    assert brain.get("intent")
+    assert "directive" not in brain
+
+
+def test_chat_stream_done_payload_includes_safe_character_brain(monkeypatch):
+    cfg = _build_test_config()
+
+    def _fake_stream(*_args, **_kwargs):
+        yield "ok"
+
+    monkeypatch.setattr(app, "call_llm_stream", _fake_stream)
+    monkeypatch.setattr(app, "finalize_assistant_reply", lambda *_args, **_kwargs: "ok")
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, events = _post_stream_events(f"{base}/api/chat_stream", _chat_payload("我刚刚被否定了，有点难受。"))
+    assert status == 200
+    done = next((evt for evt in events if evt.get("type") == "done"), {})
+    brain = done.get("character_brain")
+    assert isinstance(brain, dict)
+    assert brain.get("intent") == "comfort"
+    assert brain.get("voice_style") == "soft"
+    assert "directive" not in brain
 
 
 def test_missing_character_runtime_config_returns_no_metadata(monkeypatch):

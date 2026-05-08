@@ -10,6 +10,7 @@
     const createPerfTraceId = typeof deps.createPerfTraceId === "function" ? deps.createPerfTraceId : () => "chat-" + Date.now();
     const perfLog = typeof deps.perfLog === "function" ? deps.perfLog : () => {};
     const handleCharacterRuntimeMetadata = typeof deps.handleCharacterRuntimeMetadata === "function" ? deps.handleCharacterRuntimeMetadata : () => {};
+    const handleCharacterBrainDecision = typeof deps.handleCharacterBrainDecision === "function" ? deps.handleCharacterBrainDecision : () => {};
     const appendMessage = typeof deps.appendMessage === "function" ? deps.appendMessage : () => null;
     const rememberMessage = typeof deps.rememberMessage === "function" ? deps.rememberMessage : () => {};
     const detectMood = typeof deps.detectMood === "function" ? deps.detectMood : () => "idle";
@@ -65,6 +66,7 @@
       return chatApi.streamAssistantReply(payload, onDelta, {
         authFetch,
         onCharacterRuntimeMetadata: handleCharacterRuntimeMetadata,
+        onCharacterBrainDecision: handleCharacterBrainDecision,
         preferStream: state.conversationMode.chatStreamEnabled !== false,
         perfHooks,
         perfLog,

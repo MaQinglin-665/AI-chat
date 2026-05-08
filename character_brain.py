@@ -297,6 +297,41 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
     return "\n".join(lines)
 
 
+def build_character_brain_public_snapshot(
+    decision: Optional[Dict[str, Any]],
+    *,
+    experience_profile: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    if not isinstance(decision, dict):
+        return None
+    flags = _experience_flags(experience_profile)
+    feedback_effects = []
+    if flags["prefer_short"]:
+        feedback_effects.append("shorter_replies")
+    if flags["avoid_generic"]:
+        feedback_effects.append("less_generic_tone")
+    if flags["lower_motion"]:
+        feedback_effects.append("lower_motion_intensity")
+    if flags["raise_motion"]:
+        feedback_effects.append("more_visible_motion")
+    if flags["voice_care"]:
+        feedback_effects.append("voice_style_care")
+    return {
+        "version": 1,
+        "intent": _clean_text(decision.get("intent"), 40),
+        "reply_style": _clean_text(decision.get("reply_style"), 40),
+        "energy": _clean_text(decision.get("energy"), 24),
+        "attention": _clean_text(decision.get("attention"), 24),
+        "relationship": _clean_text(decision.get("relationship"), 40),
+        "max_sentences": max(1, min(8, int(decision.get("max_sentences") or 3))),
+        "emotion": _normalize_emotion(decision.get("emotion")),
+        "action": _normalize_action(decision.get("action")),
+        "intensity": _normalize_intensity(decision.get("intensity")),
+        "voice_style": _clean_text(decision.get("voice_style"), 32).lower() or "neutral",
+        "feedback_effects": feedback_effects[:5],
+    }
+
+
 def merge_brain_runtime_metadata(
     runtime_meta: Optional[Dict[str, Any]],
     decision: Optional[Dict[str, Any]],

@@ -38,6 +38,9 @@
     const onCharacterRuntimeMetadata = typeof context.onCharacterRuntimeMetadata === "function"
       ? context.onCharacterRuntimeMetadata
       : () => {};
+    const onCharacterBrainDecision = typeof context.onCharacterBrainDecision === "function"
+      ? context.onCharacterBrainDecision
+      : () => {};
     const perfHooks = context.perfHooks || null;
     const getNow = typeof context.now === "function" ? context.now : nowMs;
 
@@ -80,6 +83,7 @@
       }
       if (evt.type === "done") {
         onCharacterRuntimeMetadata(evt.character_runtime);
+        onCharacterBrainDecision(evt.character_brain);
       }
       return evt.type === "done";
     };
@@ -184,6 +188,9 @@
     const onCharacterRuntimeMetadata = typeof options.onCharacterRuntimeMetadata === "function"
       ? options.onCharacterRuntimeMetadata
       : () => {};
+    const onCharacterBrainDecision = typeof options.onCharacterBrainDecision === "function"
+      ? options.onCharacterBrainDecision
+      : () => {};
     const requestInit = buildChatRequestInit(payload);
 
     const fetchDirectChat = async (fallbackReason = "") => {
@@ -200,6 +207,7 @@
         throw new Error(directData.error || `HTTP ${directResp.status}`);
       }
       onCharacterRuntimeMetadata(directData?.character_runtime);
+      onCharacterBrainDecision(directData?.character_brain);
       const text = String(directData.reply || "");
       if (text) {
         onDelta(text);
@@ -276,6 +284,7 @@
       const result = await readStreamingReply(resp, {
         onDelta,
         onCharacterRuntimeMetadata,
+        onCharacterBrainDecision,
         perfHooks,
         now: getNow,
         firstDeltaTimeoutMs

@@ -1323,6 +1323,7 @@ async function runDoctorDiagnostics() { return getDiagnosticsRuntimeController()
 async function runDoctorAndAppendReport() { return getDiagnosticsRuntimeController().runDoctorAndAppendReport(); }
 function buildChatFailureDoctorHint(err) { return getDiagnosticsRuntimeController().buildChatFailureDoctorHint(err); }
 const CHARACTER_TUNING = window.TaffyCharacterTuning || {};
+const CHARACTER_BRAIN_DEBUG = window.TaffyCharacterBrainDebug || {};
 const CHARACTER_EXPERIENCE_CONTROLLER = window.TaffyCharacterExperienceController || {};
 const CHARACTER_DIAGNOSTICS_CONTROLLER = window.TaffyCharacterDiagnosticsController || {};
 const CHARACTER_REPLY_CUE = window.TaffyCharacterReplyCue || {};
@@ -1378,6 +1379,27 @@ function recordCharacterPerformanceFeedback(rating = "good", note = "") { return
 function loadCharacterExperienceProfile() { return getCharacterExperienceController().loadProfile(); }
 function getCharacterExperienceRequestProfile() { return getCharacterExperienceController().getRequestProfile(); }
 function buildCharacterExperienceSummary() { return getCharacterExperienceController().getProfileSummary(); }
+function handleCharacterBrainDecision(snapshot) {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    return null;
+  }
+  state.characterBrainLastDecision = snapshot;
+  state.characterBrainLastUpdatedAt = Date.now();
+  try {
+    window.__AI_CHAT_LAST_CHARACTER_BRAIN__ = snapshot;
+  } catch (_) {
+    // Optional debug bridge only.
+  }
+  return snapshot;
+}
+function buildCharacterBrainDebugReport() {
+  if (typeof CHARACTER_BRAIN_DEBUG.buildBrainDebugReport === "function") {
+    return CHARACTER_BRAIN_DEBUG.buildBrainDebugReport(state.characterBrainLastDecision, {
+      updatedAt: state.characterBrainLastUpdatedAt
+    });
+  }
+  return "角色大脑状态\n\n角色大脑诊断模块暂不可用。";
+}
 function buildCharacterTuningReport() { return getCharacterDiagnosticsController().buildCharacterTuningReport(); }
 function runCharacterTuningAndAppendReport() { return getCharacterDiagnosticsController().runCharacterTuningAndAppendReport(); }
 function buildCharacterWorkflowGuide() { return getCharacterDiagnosticsController().buildCharacterWorkflowGuide(); }
@@ -2578,6 +2600,7 @@ function getLocalCommandHandlers() {
       toggleTranslateDebugPanel,
       reloadMemoryDebugData,
       buildMemoryDebugReport,
+      buildCharacterBrainDebugReport,
       buildEmotionReportText,
       buildSpeakProsody,
       speak,
@@ -3891,6 +3914,7 @@ function getChatReplyController() {
       createPerfTraceId,
       perfLog,
       handleCharacterRuntimeMetadata,
+      handleCharacterBrainDecision,
       appendMessage,
       rememberMessage,
       detectMood,

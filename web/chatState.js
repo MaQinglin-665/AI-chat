@@ -397,6 +397,8 @@
   characterPerformanceFeedbacks: [],
   characterPerformanceLastFeedback: null,
   characterExperienceProfile: null,
+  characterBrainLastDecision: null,
+  characterBrainLastUpdatedAt: 0,
   grayAutoTrialCharacterCueManualEmitCount: 0,
   grayAutoTrialCharacterCueLastManualEmitAt: 0,
   grayAutoTrialCharacterCueLastManualEmit: null,

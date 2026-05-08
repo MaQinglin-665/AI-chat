@@ -37,6 +37,7 @@ const MOTION_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "motio
 const VOICE_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "voiceRuntimeController.js");
 const STREAM_TTS_QUEUE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "streamTtsQueueController.js");
 const TTS_PLAYBACK_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "ttsPlaybackController.js");
+const CHAT_API_JS = path.resolve(__dirname, "..", "web", "chatApi.js");
 const CHAT_REPLY_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "chatReplyController.js");
 const WAKE_WORD_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "wakeWordController.js");
 const APP_CONFIG_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "appConfigController.js");
@@ -57,6 +58,7 @@ const LIVE2D_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "live2
 const RUNTIME_EVENT_BINDER_JS = path.resolve(__dirname, "..", "web", "runtimeEventBinder.js");
 const CHARACTER_RUNTIME_JS = path.resolve(__dirname, "..", "web", "characterRuntime.js");
 const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTuning.js");
+const CHARACTER_BRAIN_DEBUG_JS = path.resolve(__dirname, "..", "web", "characterBrainDebug.js");
 const CHARACTER_EXPERIENCE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "characterExperienceController.js");
 const CHARACTER_DIAGNOSTICS_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "characterDiagnosticsController.js");
 const DOCTOR_DIAGNOSTICS_JS = path.resolve(__dirname, "..", "web", "doctorDiagnostics.js");
@@ -108,6 +110,7 @@ const motionRuntimeControllerSource = fs.readFileSync(MOTION_RUNTIME_CONTROLLER_
 const voiceRuntimeControllerSource = fs.readFileSync(VOICE_RUNTIME_CONTROLLER_JS, "utf8");
 const streamTtsQueueControllerSource = fs.readFileSync(STREAM_TTS_QUEUE_CONTROLLER_JS, "utf8");
 const ttsPlaybackControllerSource = fs.readFileSync(TTS_PLAYBACK_CONTROLLER_JS, "utf8");
+const chatApiSource = fs.readFileSync(CHAT_API_JS, "utf8");
 const chatReplyControllerSource = fs.readFileSync(CHAT_REPLY_CONTROLLER_JS, "utf8");
 const wakeWordControllerSource = fs.readFileSync(WAKE_WORD_CONTROLLER_JS, "utf8");
 const appConfigControllerSource = fs.readFileSync(APP_CONFIG_CONTROLLER_JS, "utf8");
@@ -127,6 +130,7 @@ const live2dExpressionControllerSource = fs.readFileSync(LIVE2D_EXPRESSION_CONTR
 const live2dRuntimeControllerSource = fs.readFileSync(LIVE2D_RUNTIME_CONTROLLER_JS, "utf8");
 const runtimeEventBinderSource = fs.readFileSync(RUNTIME_EVENT_BINDER_JS, "utf8");
 const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
+const characterBrainDebugSource = fs.readFileSync(CHARACTER_BRAIN_DEBUG_JS, "utf8");
 const characterExperienceControllerSource = fs.readFileSync(CHARACTER_EXPERIENCE_CONTROLLER_JS, "utf8");
 const characterDiagnosticsControllerSource = fs.readFileSync(CHARACTER_DIAGNOSTICS_CONTROLLER_JS, "utf8");
 const doctorSource = fs.readFileSync(DOCTOR_DIAGNOSTICS_JS, "utf8");
@@ -183,6 +187,7 @@ const motionRuntimeController = require(MOTION_RUNTIME_CONTROLLER_JS);
 const voiceRuntimeController = require(VOICE_RUNTIME_CONTROLLER_JS);
 const streamTtsQueueController = require(STREAM_TTS_QUEUE_CONTROLLER_JS);
 const ttsPlaybackController = require(TTS_PLAYBACK_CONTROLLER_JS);
+const chatApi = require(CHAT_API_JS);
 const chatReplyController = require(CHAT_REPLY_CONTROLLER_JS);
 const wakeWordController = require(WAKE_WORD_CONTROLLER_JS);
 const appConfigController = require(APP_CONFIG_CONTROLLER_JS);
@@ -202,6 +207,7 @@ const live2dExpressionController = require(LIVE2D_EXPRESSION_CONTROLLER_JS);
 const live2dRuntimeController = require(LIVE2D_RUNTIME_CONTROLLER_JS);
 const runtimeEventBinder = require(RUNTIME_EVENT_BINDER_JS);
 const tuning = require(CHARACTER_TUNING_JS);
+const characterBrainDebug = require(CHARACTER_BRAIN_DEBUG_JS);
 const characterExperienceController = require(CHARACTER_EXPERIENCE_CONTROLLER_JS);
 const characterDiagnosticsController = require(CHARACTER_DIAGNOSTICS_CONTROLLER_JS);
 const doctorDiagnostics = require(DOCTOR_DIAGNOSTICS_JS);
@@ -258,6 +264,32 @@ function toPlainObject(value) {
   assert.strictEqual(typeof wakeWordController.createController, "function", "wake word controller should expose a factory");
   assert.strictEqual(typeof appConfigController.createController, "function", "app config controller should expose a factory");
   assert.strictEqual(typeof appStartupController.createController, "function", "app startup controller should expose startup orchestration");
+}
+
+{
+  const brainReport = characterBrainDebug.buildBrainDebugReport(
+    {
+      intent: "comfort",
+      reply_style: "comfort",
+      energy: "calm",
+      attention: "focused",
+      relationship: "desktop_companion",
+      max_sentences: 3,
+      emotion: "sad",
+      action: "none",
+      intensity: "low",
+      voice_style: "soft",
+      feedback_effects: ["shorter_replies", "less_generic_tone"]
+    },
+    { updatedAt: Date.now() }
+  );
+  assert.ok(
+    brainReport.includes("角色大脑状态")
+      && brainReport.includes("当前判断：安慰")
+      && brainReport.includes("反馈影响")
+      && brainReport.includes("不会触发语音、动作、桌面观察、工具调用或 shell"),
+    "character brain debug report should be readable and clearly side-effect-free"
+  );
 }
 
 {
@@ -479,6 +511,11 @@ assert.strictEqual(
     "runtime event binder should export bridge event binding"
   );
   assert.strictEqual(
+    typeof characterBrainDebug.buildBrainDebugReport,
+    "function",
+    "character brain debug helper should build a readable report"
+  );
+  assert.strictEqual(
     typeof characterExperienceController.createController,
     "function",
     "character experience controller should expose persistent feedback orchestration"
@@ -520,6 +557,7 @@ assert.ok(
     && source.includes("const WAKE_WORD_CONTROLLER = window.TaffyWakeWordController")
     && source.includes("const APP_CONFIG_CONTROLLER = window.TaffyAppConfigController")
     && source.includes("const APP_STARTUP_CONTROLLER = window.TaffyAppStartupController")
+    && source.includes("const CHARACTER_BRAIN_DEBUG = window.TaffyCharacterBrainDebug")
     && source.includes("const CHARACTER_EXPERIENCE_CONTROLLER = window.TaffyCharacterExperienceController")
     && source.includes("CHAT_MESSAGE_CONTROLLER.createController")
     && source.includes("PERSONA_AVATAR_CONTROLLER.createController")
@@ -544,6 +582,7 @@ assert.ok(
     && source.includes("WAKE_WORD_CONTROLLER.createController")
     && source.includes("APP_CONFIG_CONTROLLER.createController")
     && source.includes("APP_STARTUP_CONTROLLER.createController")
+    && characterBrainDebugSource.includes("function buildBrainDebugReport")
     && source.includes("CHARACTER_EXPERIENCE_CONTROLLER.createController")
     && diagnosticsRuntimeControllerSource.includes("debugPanelController.updateDebugPanel")
     && chatStateSource.includes("function createInitialState")
@@ -1269,6 +1308,15 @@ assert.ok(
 assert.ok(
   tuningSource.includes("function buildFeedbackMessage")
     && source.includes("function recordCharacterPerformanceFeedback")
+    && source.includes("function handleCharacterBrainDecision")
+    && source.includes("function buildCharacterBrainDebugReport")
+    && chatApi.streamAssistantReply
+    && chatApiSource.includes("onCharacterBrainDecision")
+    && chatReplyControllerSource.includes("onCharacterBrainDecision: handleCharacterBrainDecision")
+    && chatStateSource.includes("characterBrainLastDecision")
+    && localCommandRegistry.matchLocalCommand("/braindebug").kind === "brain_debug"
+    && localCommandExecutorSource.includes("brain_debug")
+    && localCommandExecutorSource.includes("buildCharacterBrainDebugReport")
     && source.includes("function getCharacterExperienceRequestProfile")
     && chatReplyControllerSource.includes("payload.character_experience_profile")
     && characterExperienceControllerSource.includes("taffy_character_experience_v1")
@@ -1629,9 +1677,11 @@ assert.ok(
     && indexSource.includes('<script src="./reminderUtils.js"></script>')
     && indexSource.includes('<script src="./scheduleListView.js"></script>')
     && indexSource.includes('<script src="./scheduleFormModel.js"></script>')
+    && indexSource.includes('<script src="./characterBrainDebug.js"></script>')
     && indexSource.includes('<script src="./characterExperienceController.js"></script>')
     && indexSource.includes('<script src="./characterDiagnosticsController.js"></script>')
     && indexSource.indexOf('<script src="./characterTuning.js"></script>') < indexSource.indexOf('<script src="./characterDiagnosticsController.js"></script>')
+    && indexSource.indexOf('<script src="./characterBrainDebug.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
     && indexSource.indexOf('<script src="./characterExperienceController.js"></script>') < indexSource.indexOf('<script src="./characterDiagnosticsController.js"></script>')
     && indexSource.indexOf('<script src="./characterDiagnosticsController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
   "local commands should include /ttsdebug for copyable playback state"

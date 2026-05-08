@@ -65,6 +65,7 @@ async function testBuildRequestInit() {
 async function testStreamingReply() {
   const deltas = [];
   const metadata = [];
+  const brain = [];
   const headers = [];
   const firstDelta = [];
   const authFetch = async (url) => {
@@ -72,7 +73,7 @@ async function testStreamingReply() {
     return makeStreamResponse([
       'data: {"type":"delta","text":"hel"}\n',
       'data: {"type":"delta","text":"lo"}\n',
-      'data: {"type":"done","reply":"hello","character_runtime":{"emotion":"happy"}}\n'
+      'data: {"type":"done","reply":"hello","character_runtime":{"emotion":"happy"},"character_brain":{"intent":"greeting"}}\n'
     ]);
   };
 
@@ -82,6 +83,7 @@ async function testStreamingReply() {
     {
       authFetch,
       onCharacterRuntimeMetadata: (value) => metadata.push(value),
+      onCharacterBrainDecision: (value) => brain.push(value),
       perfHooks: {
         onApiHeaders: (value) => headers.push(value),
         onFirstDelta: (value) => firstDelta.push(value)
@@ -93,6 +95,7 @@ async function testStreamingReply() {
   assert.strictEqual(reply, "hello");
   assert.deepStrictEqual(deltas, ["hel", "lo"]);
   assert.deepStrictEqual(metadata, [{ emotion: "happy" }]);
+  assert.deepStrictEqual(brain, [{ intent: "greeting" }]);
   assert.strictEqual(headers[0].mode, "chat_stream");
   assert.strictEqual(firstDelta.length, 1);
 }
@@ -107,17 +110,20 @@ async function testStreamFetchFallback() {
     }
     return makeJsonResponse(200, {
       reply: "direct reply",
-      character_runtime: { action: "wave" }
+      character_runtime: { action: "wave" },
+      character_brain: { intent: "comfort" }
     });
   };
 
   const metadata = [];
+  const brain = [];
   const reply = await chatApi.streamAssistantReply(
     { message: "hi" },
     (delta) => deltas.push(delta),
     {
       authFetch,
       onCharacterRuntimeMetadata: (value) => metadata.push(value),
+      onCharacterBrainDecision: (value) => brain.push(value),
       perfLog: () => {},
       now: () => 10
     }
@@ -127,6 +133,7 @@ async function testStreamFetchFallback() {
   assert.strictEqual(reply, "direct reply");
   assert.deepStrictEqual(deltas, ["direct reply"]);
   assert.deepStrictEqual(metadata, [{ action: "wave" }]);
+  assert.deepStrictEqual(brain, [{ intent: "comfort" }]);
 }
 
 async function testStreamDisabledUsesDirectChat() {
