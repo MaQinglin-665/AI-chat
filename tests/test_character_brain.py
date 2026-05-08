@@ -153,6 +153,26 @@ def test_character_brain_casual_turn_can_end_without_followup():
     assert "routine follow-up question" in decision["directive"]
 
 
+def test_character_brain_auto_checkin_is_low_interruption_by_default():
+    decision = character_brain.build_character_brain_decision(
+        user_message="automatic quiet check-in",
+        history=[],
+        is_auto=True,
+    )
+    snapshot = character_brain.build_character_brain_public_snapshot(decision)
+
+    assert decision["intent"] == "low_interrupt_checkin"
+    assert decision["max_sentences"] == 1
+    assert decision["action"] == "none"
+    assert decision["voice_style"] == "soft"
+    assert decision["output_constraints"]["allow_followup_question"] is False
+    assert decision["output_constraints"]["allow_motion"] is False
+    assert snapshot["intent"] == "low_interrupt_checkin"
+    assert snapshot["output_constraints"]["allow_followup_question"] is False
+    assert "history_tail" not in snapshot
+    assert "directive" not in snapshot
+
+
 def test_character_brain_public_snapshot_is_safe_and_compact():
     decision = character_brain.build_character_brain_decision(
         user_message="你觉得我下一步做什么？",

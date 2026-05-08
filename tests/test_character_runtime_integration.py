@@ -243,6 +243,29 @@ def test_character_runtime_settings_default_demo_stable_off():
     assert override.get("style") == ""
 
 
+def test_v14_experience_defaults_keep_high_risk_features_off():
+    cfg = copy.deepcopy(app.DEFAULT_CONFIG)
+
+    observe = cfg.get("observe", {})
+    conversation = cfg.get("conversation_mode", {})
+    tools = cfg.get("tools", {})
+    runtime = cfg.get("character_runtime", {})
+
+    assert observe.get("attach_mode") == "manual"
+    assert observe.get("allow_auto_chat") is False
+    assert observe.get("auto_chat_enabled") is False
+    assert observe.get("daily_greeting_enabled") is False
+    assert conversation.get("proactive_enabled") is False
+    assert conversation.get("proactive_scheduler_enabled") is False
+    assert conversation.get("gray_auto_enabled") is False
+    assert conversation.get("gray_auto_trial_enabled") is False
+    assert tools.get("enabled") is False
+    assert tools.get("allow_shell") is False
+    assert runtime.get("enabled") is False
+    assert runtime.get("return_metadata") is False
+    assert runtime.get("auto_apply_reply_cue") is False
+
+
 def test_character_runtime_settings_demo_stable_requires_runtime_enabled():
     settings = app._get_character_runtime_settings(
         {"character_runtime": {"enabled": False, "demo_stable": True}}
