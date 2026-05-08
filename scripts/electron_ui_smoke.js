@@ -331,7 +331,7 @@ async function runChatSmoke(win, results) {
 
   const beforeBrain = await sendInput(win, "/braindebug");
   const brainMessages = await waitForAssistantMessage(win, beforeBrain, "角色大脑状态", 8000, "/braindebug report");
-  const brainText = brainMessages.join("\n");
+  const brainText = String(brainMessages[brainMessages.length - 1] || brainMessages.join("\n"));
   results.brainDebug = {
     ok: brainText.includes("角色大脑状态"),
     safeBoundary: brainText.includes("不会触发语音、动作、桌面观察、工具调用或 shell"),
@@ -340,9 +340,9 @@ async function runChatSmoke(win, results) {
 
   const beforeDoctor = await sendInput(win, "/doctor");
   const doctorMessages = await waitForAssistantMessage(win, beforeDoctor, "链路自检完成", 15000, "/doctor report");
-  const doctorText = doctorMessages.join("\n");
+  const doctorText = String(doctorMessages[doctorMessages.length - 1] || doctorMessages.join("\n"));
   results.doctor = {
-    ok: doctorText.includes("链路自检完成"),
+    ok: doctorText.includes("链路自检完成：核心功能正常。"),
     tokenLeak: /(?:api[_-]?key|token)\s*[:=]\s*[\w.-]{12,}/i.test(doctorText),
     reportTail: doctorText.slice(-1000)
   };

@@ -107,6 +107,7 @@ def check_branding(cfg: dict[str, Any], r: Reporter) -> None:
     risky_fields = []
     for key, value in (
         ("assistant_name", cfg.get("assistant_name")),
+        ("assistant_prompt", cfg.get("assistant_prompt")),
         ("character_runtime.persona_override.name", persona.get("name")),
         ("character_runtime.persona_override.style", persona.get("style")),
     ):
