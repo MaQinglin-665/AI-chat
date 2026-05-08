@@ -826,6 +826,12 @@ def merge_brain_runtime_metadata(
     brain_action = _normalize_action(decision.get("action"))
     brain_intensity = _normalize_intensity(decision.get("intensity"))
     brain_voice = _clean_text(decision.get("voice_style") or brain_emotion, 32).lower() or "neutral"
+    brain_intent = _clean_text(decision.get("intent"), 40)
+    constraints = _public_output_constraints(
+        decision.get("output_constraints")
+        if isinstance(decision.get("output_constraints"), dict)
+        else _constraints_for_intent(brain_intent)
+    )
 
     if _normalize_emotion(merged.get("emotion")) == "neutral" and brain_emotion != "neutral":
         merged["emotion"] = brain_emotion
@@ -835,7 +841,33 @@ def merge_brain_runtime_metadata(
         merged["intensity"] = brain_intensity
     if _clean_text(merged.get("voice_style"), 32).lower() in {"", "neutral"} and brain_voice != "neutral":
         merged["voice_style"] = brain_voice
-    if not _clean_text(merged.get("live2d_hint"), 40):
+
+    strict_live2d_refresh = False
+    if not constraints["allow_motion"]:
+        merged["action"] = "none"
+        merged["intensity"] = "low"
+        strict_live2d_refresh = True
+    if brain_intent == "comfort":
+        if brain_emotion in {"sad", "anxious"}:
+            merged["emotion"] = brain_emotion
+        merged["voice_style"] = "soft"
+        merged["action"] = "none"
+        merged["intensity"] = "low"
+        strict_live2d_refresh = True
+    elif brain_intent in {"task_help", "reminder"}:
+        if _normalize_emotion(merged.get("emotion")) in {"happy", "playful", "surprised"}:
+            merged["emotion"] = brain_emotion
+            strict_live2d_refresh = True
+        if _normalize_action(merged.get("action")) in {"happy_idle", "surprised", "wave"}:
+            merged["action"] = brain_action
+            merged["intensity"] = brain_intensity
+            strict_live2d_refresh = True
+        if brain_voice in {"serious", "neutral"}:
+            merged["voice_style"] = brain_voice
+    elif brain_intent in {"closing", "low_interrupt_checkin"} and brain_voice != "neutral":
+        merged["voice_style"] = brain_voice
+
+    if strict_live2d_refresh or not _clean_text(merged.get("live2d_hint"), 40):
         merged["live2d_hint"] = LIVE2D_HINTS.get(_normalize_emotion(merged.get("emotion")), "idle_relaxed")
-    merged["brain_intent"] = _clean_text(decision.get("intent"), 40)
+    merged["brain_intent"] = brain_intent
     return merged

@@ -197,6 +197,52 @@ def test_character_brain_fills_runtime_metadata_fallback():
     assert meta["brain_intent"] == "comfort"
 
 
+def test_character_brain_overrides_conflicting_comfort_runtime_cues():
+    decision = character_brain.build_character_brain_decision(
+        user_message="I feel sad and overwhelmed.",
+        history=[],
+    )
+    meta = character_brain.merge_brain_runtime_metadata(
+        {
+            "emotion": "happy",
+            "action": "happy_idle",
+            "intensity": "high",
+            "voice_style": "cheerful",
+            "live2d_hint": "smile_soft",
+        },
+        decision,
+    )
+
+    assert meta["emotion"] == "sad"
+    assert meta["action"] == "none"
+    assert meta["intensity"] == "low"
+    assert meta["voice_style"] == "soft"
+    assert meta["live2d_hint"] == "eyes_down"
+
+
+def test_character_brain_overrides_playful_task_runtime_cues():
+    decision = character_brain.build_character_brain_decision(
+        user_message="What should I do next?",
+        history=[],
+    )
+    meta = character_brain.merge_brain_runtime_metadata(
+        {
+            "emotion": "happy",
+            "action": "happy_idle",
+            "intensity": "high",
+            "voice_style": "cheerful",
+            "live2d_hint": "smile_soft",
+        },
+        decision,
+    )
+
+    assert meta["emotion"] == "thinking"
+    assert meta["action"] == "think"
+    assert meta["intensity"] == "low"
+    assert meta["voice_style"] == "serious"
+    assert meta["live2d_hint"] == "idle_relaxed"
+
+
 def test_character_brain_continuing_comfort_does_not_reset():
     first = character_brain.build_character_brain_decision(
         user_message="I feel really sad today.",
