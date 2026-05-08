@@ -53,6 +53,16 @@ Rules:
 - social clips: short, natural, emotion/action visible, no DevTools
 - developer demos: can include debug bridge, metadata checks, smoke process
 
+## v1.4 AI VTuber Feeling Public Demo
+Before recording v1.4 material, run `python scripts/check_character_v1_4.py` and finish one manual smoke pass with text chat, Live2D, TTS, `/doctor`, `/braindebug`, and feedback buttons.
+
+Recommended public clip order:
+- 30-60 seconds: app launch, Live2D visible, one natural chat turn, TTS playback, no debug panels.
+- 2-3 minutes: welcome, comfort, reminder, encouragement, long-sentence TTS, and closing.
+- Developer-only appendix: `/doctor`, `/braindebug`, feedback cue commands, and failure fallback.
+
+Public captions should describe this as an MVP / open-source incubation demo inspired by AI VTuber interaction patterns. Do not claim full autonomous streaming, default desktop observation, or mature commercial-agent behavior.
+
 ## Post-Capture Acceptance Checks
 - no sensitive information visible
 - no failure-state footage included

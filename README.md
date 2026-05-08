@@ -26,7 +26,7 @@
 - LLM 对话（支持 OpenAI-compatible / Ollama 等）
 - TTS / ASR 语音交互链路
 - 情绪状态与动作映射
-- 可选的桌面截图上下文辅助回复
+- 默认关闭的可选桌面截图上下文辅助回复（需用户显式启用）
 
 ## System Requirements
 
