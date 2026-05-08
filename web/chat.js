@@ -41,7 +41,7 @@ function getDiagnosticsRuntimeController() {
         getTTSDebugSnapshot,
         buildGrayAutoFollowupTrialPreflight,
         buildGrayAutoFollowupTrialEventSummary,
-        buildGrayAutoFollowupTrialAuditSummary,
+        buildGrayAutoTrialAuditSummary,
         buildGrayAutoTrialPreRunChecklist,
         buildGrayAutoTrialTimeline,
         buildGrayAutoTrialOutcome,

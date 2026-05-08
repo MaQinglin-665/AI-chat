@@ -543,6 +543,8 @@ assert.ok(
     && diagnosticsRuntimeControllerSource.includes("async function runDoctorDiagnostics")
     && diagnosticsRuntimeControllerSource.includes("async function buildMicDebugReport")
     && diagnosticsRuntimeControllerSource.includes("function installTTSDebugBridge")
+    && source.includes("buildGrayAutoTrialAuditSummary")
+    && !source.includes("buildGrayAutoFollowupTrialAuditSummary")
     && followupDebugControllerSource.includes("function getTTSDebugSnapshot")
     && followupDebugControllerSource.includes("function runProactiveSchedulerPollingCheck")
     && grayTrialReportControllerSource.includes("function buildGrayAutoFollowupTrialPreflight")
