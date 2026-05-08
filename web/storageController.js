@@ -308,6 +308,9 @@
     const continuityRaw = raw.continuity && typeof raw.continuity === "object" && !Array.isArray(raw.continuity)
       ? raw.continuity
       : {};
+    const constraintsRaw = raw.output_constraints && typeof raw.output_constraints === "object" && !Array.isArray(raw.output_constraints)
+      ? raw.output_constraints
+      : {};
     return {
       version: 1,
       intent: cleanText(raw.intent, 40),
@@ -320,6 +323,14 @@
       action: cleanText(raw.action, 32),
       intensity: cleanText(raw.intensity, 16),
       voice_style: cleanText(raw.voice_style, 32),
+      output_constraints: {
+        max_sentences: cleanInt(constraintsRaw.max_sentences, cleanInt(raw.max_sentences, 3, 1, 8), 1, 8),
+        allow_followup_question: constraintsRaw.allow_followup_question === true,
+        clarify_only_when_needed: constraintsRaw.clarify_only_when_needed === true,
+        allow_teasing: constraintsRaw.allow_teasing === true,
+        allow_motion: constraintsRaw.allow_motion === false ? false : true,
+        voice_style: cleanText(constraintsRaw.voice_style, 32)
+      },
       feedback_effects: Array.isArray(raw.feedback_effects)
         ? raw.feedback_effects.slice(0, 5).map((item) => cleanText(item, 48)).filter(Boolean)
         : [],

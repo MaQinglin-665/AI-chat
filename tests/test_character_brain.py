@@ -40,8 +40,75 @@ def test_character_brain_prompt_block_is_private_guidance():
 
     assert "Character brain state" in block
     assert "Do not mention the brain state" in block
+    assert "Output constraints:" in block
     assert "Expression target:" in block
     assert "voice_style=" in block
+
+
+def test_character_brain_comfort_priority_beats_next_step_question():
+    decision = character_brain.build_character_brain_decision(
+        user_message="I feel sad and anxious. What should I do next?",
+        history=[],
+    )
+
+    assert decision["intent"] == "comfort"
+    assert decision["intent_scores"]["comfort"] > decision["intent_scores"]["task_help"]
+    assert decision["action"] == "none"
+    assert decision["voice_style"] == "soft"
+    assert decision["output_constraints"]["allow_followup_question"] is False
+    assert decision["output_constraints"]["allow_motion"] is False
+    assert decision["output_constraints"]["allow_teasing"] is False
+
+
+def test_character_brain_task_help_allows_only_needed_clarification():
+    decision = character_brain.build_character_brain_decision(
+        user_message="What should I do next in the roadmap?",
+        history=[],
+    )
+    block = character_brain.build_character_brain_prompt_block(decision)
+
+    assert decision["intent"] == "task_help"
+    assert decision["reply_style"] == "clear"
+    assert decision["voice_style"] == "serious"
+    assert decision["output_constraints"]["allow_followup_question"] is True
+    assert decision["output_constraints"]["clarify_only_when_needed"] is True
+    assert decision["output_constraints"]["allow_teasing"] is False
+    assert "Ask a follow-up only if" in decision["directive"]
+    assert "follow_up=clarify-only" in block
+
+
+def test_character_brain_reminder_and_closing_have_clear_limits():
+    reminder = character_brain.build_character_brain_decision(
+        user_message="Remind me in 10 minutes to stretch.",
+        history=[],
+    )
+    closing = character_brain.build_character_brain_decision(
+        user_message="Goodbye, I am going offline.",
+        history=[],
+    )
+
+    assert reminder["intent"] == "reminder"
+    assert reminder["max_sentences"] <= 2
+    assert reminder["voice_style"] == "serious"
+    assert reminder["output_constraints"]["allow_followup_question"] is False
+    assert reminder["output_constraints"]["allow_teasing"] is False
+    assert closing["intent"] == "closing"
+    assert closing["max_sentences"] <= 2
+    assert closing["voice_style"] == "soft"
+    assert closing["output_constraints"]["allow_followup_question"] is False
+    assert closing["output_constraints"]["allow_teasing"] is False
+
+
+def test_character_brain_casual_turn_can_end_without_followup():
+    decision = character_brain.build_character_brain_decision(
+        user_message="That sounds nice.",
+        history=[],
+    )
+
+    assert decision["intent"] == "casual"
+    assert decision["max_sentences"] <= 2
+    assert decision["output_constraints"]["allow_followup_question"] is False
+    assert "routine follow-up question" in decision["directive"]
 
 
 def test_character_brain_public_snapshot_is_safe_and_compact():
@@ -64,8 +131,10 @@ def test_character_brain_public_snapshot_is_safe_and_compact():
 
     assert snapshot["intent"] == "task_help"
     assert snapshot["max_sentences"] <= 3
+    assert snapshot["output_constraints"]["clarify_only_when_needed"] is True
     assert "shorter_replies" in snapshot["feedback_effects"]
     assert "less_generic_tone" in snapshot["feedback_effects"]
+    assert "intent_scores" not in snapshot
     assert "directive" not in snapshot
     assert "history_tail" not in snapshot
 

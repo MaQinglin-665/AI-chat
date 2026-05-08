@@ -72,6 +72,17 @@
           `\u8fd1\u671f\u9700\u8981\uff1a${clean(continuity.recent_user_need, "\u65e0")}\uff1b\u8fde\u7eed\u8f6e\u6570=${Number(continuity.same_need_turns) || 0}\uff1b\u8870\u51cf=${clean(continuity.decay, "fresh")}`
         ]
       : [];
+    const constraints = safe.output_constraints && typeof safe.output_constraints === "object" && !Array.isArray(safe.output_constraints)
+      ? safe.output_constraints
+      : null;
+    const constraintLines = constraints
+      ? [
+          "",
+          "\u8f93\u51fa\u7ea6\u675f",
+          `\u8ffd\u95ee\uff1a${constraints.allow_followup_question ? "\u5141\u8bb8" : "\u907f\u514d"}\uff1b\u6f84\u6e05\uff1a${constraints.clarify_only_when_needed ? "\u53ea\u5728\u5fc5\u8981\u65f6" : "\u4e0d\u5f3a\u5236"}`,
+          `\u8c03\u4f83\uff1a${constraints.allow_teasing ? "\u5141\u8bb8" : "\u907f\u514d"}\uff1b\u52a8\u4f5c\uff1a${constraints.allow_motion === false ? "\u907f\u514d" : "\u5141\u8bb8"}\uff1b\u8bed\u97f3=${clean(constraints.voice_style, clean(safe.voice_style, "neutral"))}`
+        ]
+      : [];
     return [
       "角色大脑状态",
       "",
@@ -79,6 +90,7 @@
       ...continuityLines,
       `当前判断：${localize(INTENT_LABELS, safe.intent)}`,
       `回复风格：${localize(STYLE_LABELS, safe.reply_style)}；最多约 ${Number(safe.max_sentences) || 3} 句`,
+      ...constraintLines,
       `角色状态：能量=${clean(safe.energy)}；注意力=${clean(safe.attention)}；关系=${clean(safe.relationship)}`,
       `表现建议：情绪=${clean(safe.emotion)}；动作=${clean(safe.action)}；强度=${clean(safe.intensity)}；语音=${clean(safe.voice_style)}`,
       "",

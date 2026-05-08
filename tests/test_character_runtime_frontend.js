@@ -301,6 +301,14 @@ function createMemoryStorage(initial = {}) {
       action: "none",
       intensity: "low",
       voice_style: "soft",
+      output_constraints: {
+        max_sentences: 3,
+        allow_followup_question: false,
+        clarify_only_when_needed: false,
+        allow_teasing: false,
+        allow_motion: false,
+        voice_style: "soft"
+      },
       feedback_effects: ["shorter_replies"],
       continuity: {
         last_intent: "comfort",
@@ -330,6 +338,7 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastUpdatedAt, 12345, "character brain snapshot should restore update time");
   assert.strictEqual(restored.characterBrainLastDecision.intent, "comfort", "character brain snapshot should restore public intent");
   assert.strictEqual(restored.characterBrainLastDecision.continuity.recent_user_need, "reassurance", "character brain snapshot should restore compact continuity");
+  assert.strictEqual(restored.characterBrainLastDecision.output_constraints.allow_motion, false, "character brain snapshot should restore safe output constraints");
   assert.strictEqual(restored.characterBrainLastDecision.history_tail, undefined, "restored character brain snapshot should stay public-only");
 }
 
@@ -346,6 +355,14 @@ function createMemoryStorage(initial = {}) {
       action: "none",
       intensity: "low",
       voice_style: "soft",
+      output_constraints: {
+        max_sentences: 3,
+        allow_followup_question: false,
+        clarify_only_when_needed: false,
+        allow_teasing: false,
+        allow_motion: false,
+        voice_style: "soft"
+      },
       feedback_effects: ["shorter_replies", "less_generic_tone"],
       continuity: {
         last_intent: "comfort",
@@ -370,6 +387,10 @@ function createMemoryStorage(initial = {}) {
   assert.ok(
     brainReport.includes("\u8fde\u7eed\u6027\u72b6\u6001") && brainReport.includes("reassurance"),
     "character brain debug report should include compact continuity state"
+  );
+  assert.ok(
+    brainReport.includes("\u8f93\u51fa\u7ea6\u675f") && brainReport.includes("\u8ffd\u95ee\uff1a\u907f\u514d"),
+    "character brain debug report should include compact output constraints"
   );
 }
 

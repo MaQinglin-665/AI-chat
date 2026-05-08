@@ -41,6 +41,93 @@ LIVE2D_HINTS = {
     "thinking": "idle_relaxed",
 }
 
+INTENT_PRIORITIES = {
+    "comfort": 100,
+    "reminder": 90,
+    "closing": 80,
+    "task_help": 70,
+    "encouragement": 60,
+    "question": 50,
+    "greeting": 40,
+    "low_interrupt_checkin": 30,
+    "casual": 10,
+}
+
+INTENT_OUTPUT_CONSTRAINTS = {
+    "greeting": {
+        "max_sentences": 2,
+        "allow_followup_question": False,
+        "clarify_only_when_needed": False,
+        "allow_teasing": True,
+        "allow_motion": True,
+        "voice_style": "cheerful",
+    },
+    "comfort": {
+        "max_sentences": 3,
+        "allow_followup_question": False,
+        "clarify_only_when_needed": False,
+        "allow_teasing": False,
+        "allow_motion": False,
+        "voice_style": "soft",
+    },
+    "encouragement": {
+        "max_sentences": 2,
+        "allow_followup_question": False,
+        "clarify_only_when_needed": False,
+        "allow_teasing": True,
+        "allow_motion": True,
+        "voice_style": "cheerful",
+    },
+    "reminder": {
+        "max_sentences": 2,
+        "allow_followup_question": False,
+        "clarify_only_when_needed": False,
+        "allow_teasing": False,
+        "allow_motion": True,
+        "voice_style": "serious",
+    },
+    "closing": {
+        "max_sentences": 2,
+        "allow_followup_question": False,
+        "clarify_only_when_needed": False,
+        "allow_teasing": False,
+        "allow_motion": True,
+        "voice_style": "soft",
+    },
+    "task_help": {
+        "max_sentences": 4,
+        "allow_followup_question": True,
+        "clarify_only_when_needed": True,
+        "allow_teasing": False,
+        "allow_motion": True,
+        "voice_style": "serious",
+    },
+    "question": {
+        "max_sentences": 3,
+        "allow_followup_question": True,
+        "clarify_only_when_needed": True,
+        "allow_teasing": True,
+        "allow_motion": True,
+        "voice_style": "neutral",
+    },
+    "casual": {
+        "max_sentences": 2,
+        "allow_followup_question": False,
+        "clarify_only_when_needed": False,
+        "allow_teasing": True,
+        "allow_motion": True,
+        "voice_style": "neutral",
+    },
+    "low_interrupt_checkin": {
+        "max_sentences": 1,
+        "allow_followup_question": False,
+        "clarify_only_when_needed": False,
+        "allow_teasing": False,
+        "allow_motion": False,
+        "voice_style": "soft",
+    },
+}
+
 SESSION_RESET_AFTER_SEC = 30 * 60
 SESSION_SOFT_DECAY_AFTER_SEC = 10 * 60
 
@@ -293,35 +380,153 @@ def update_brain_session_state(
     )
 
 
-def classify_user_intent(user_message: str, *, is_auto: bool = False) -> str:
+def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str, int]:
     text = _clean_text(user_message, 300)
     lower = text.lower()
     compact = re.sub(r"\s+", "", lower)
+    scores = {intent: 0 for intent in INTENT_PRIORITIES}
+    scores["casual"] = 1
     if is_auto:
-        return "low_interrupt_checkin"
-    if re.search(r"(nextstep|whatshouldidonext|whatnext|todo|roadmap|priority)", compact):
-        return "task_help"
-    if re.search(r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u8be5\u505a\u4ec0\u4e48|\u5148\u505a\u4ec0\u4e48|\u600e\u4e48\u63a8\u8fdb)", text):
-        return "task_help"
-    if re.search(r"(done|finished|completed|shipped|fixed|madeit|wrappedup)", compact):
-        return "encouragement"
-    if re.search(r"(\u505a\u5b8c\u4e86|\u5b8c\u6210\u4e86|\u641e\u5b9a\u4e86|\u4fee\u597d\u4e86|\u7ed3\u675f\u4e86)", text):
-        return "encouragement"
-    if re.search(r"(你好|早安|晚安|hello|hi|hey|在吗)", compact):
-        return "greeting"
-    if re.search(r"(难受|伤心|焦虑|累|崩溃|被否定|不开心|压力|sad|tired|anxious|upset)", compact):
-        return "comfort"
-    if re.search(r"(鼓励|加油|打气|夸我|encourage)", compact):
-        return "encouragement"
-    if re.search(r"(提醒|闹钟|日程|十分钟|分钟后|小时后|remind)", compact):
-        return "reminder"
-    if re.search(r"(下线|睡了|再见|拜拜|收尾|goodbye|bye)", compact):
-        return "closing"
-    if re.search(r"(代码|报错|bug|修复|实现|怎么做|帮我|分析|plan|code|fix|implement)", compact):
-        return "task_help"
-    if "?" in text or "？" in text:
-        return "question"
-    return "casual"
+        scores["low_interrupt_checkin"] = 999
+        return scores
+
+    def add_if(pattern: str, intent: str, points: int, source: str = compact) -> None:
+        if re.search(pattern, source):
+            scores[intent] = scores.get(intent, 0) + points
+
+    add_if(
+        r"(sad|tired|anxious|upset|hurt|overwhelmed|lonely|depressed|panic|scared|stress|burnedout|burntout)",
+        "comfort",
+        120,
+    )
+    add_if(
+        r"(\u96be\u53d7|\u4f24\u5fc3|\u7126\u8651|\u5d29\u6e83|\u88ab\u5426\u5b9a|\u4e0d\u5f00\u5fc3|\u538b\u529b|\u7d2f|\u5bb3\u6015)",
+        "comfort",
+        120,
+        text,
+    )
+    add_if(
+        r"(nextstep|whatshouldidonext|whatdoidonext|whatnext|nexttodo|todo|roadmap|priority)",
+        "task_help",
+        80,
+    )
+    add_if(
+        r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u8be5\u505a\u4ec0\u4e48|\u5148\u505a\u4ec0\u4e48|\u600e\u4e48\u63a8\u8fdb)",
+        "task_help",
+        80,
+        text,
+    )
+    add_if(r"(done|finished|completed|shipped|fixed|madeit|wrappedup)", "encouragement", 65)
+    add_if(
+        r"(\u505a\u5b8c\u4e86|\u5b8c\u6210\u4e86|\u641e\u5b9a\u4e86|\u4fee\u597d\u4e86|\u7ed3\u675f\u4e86)",
+        "encouragement",
+        65,
+        text,
+    )
+    add_if(r"\b(hello|hi|hey|good morning|good evening)\b", "greeting", 45, lower)
+    add_if(r"(\u4f60\u597d|\u65e9\u5b89|\u665a\u5b89|\u5728\u5417)", "greeting", 45, text)
+    add_if(r"(encourage|cheerme|needapush|motivateme)", "encouragement", 55)
+    add_if(r"(\u9f13\u52b1|\u52a0\u6cb9|\u6253\u6c14|\u5938\u6211)", "encouragement", 55, text)
+    add_if(r"(remind|timer|alarm|calendar|schedule|in\d+minutes|in\d+hours)", "reminder", 90)
+    add_if(
+        r"(\u63d0\u9192|\u95f9\u949f|\u65e5\u7a0b|\u5206\u949f\u540e|\u5c0f\u65f6\u540e)",
+        "reminder",
+        90,
+        text,
+    )
+    add_if(r"\b(goodbye|bye|sleep|sign off|signoff|wrap up|wrapup|see you|seeyou|offline)\b", "closing", 75, lower)
+    add_if(r"(\u4e0b\u7ebf|\u7761\u4e86|\u518d\u89c1|\u62dc\u62dc|\u6536\u5c3e)", "closing", 75, text)
+    add_if(
+        r"(code|bug|fix|implement|error|traceback|pytest|debug|refactor|plan|analy[sz]e|helpme)",
+        "task_help",
+        70,
+    )
+    add_if(
+        r"(\u4ee3\u7801|\u62a5\u9519|\u4fee\u590d|\u5b9e\u73b0|\u600e\u4e48\u505a|\u5e2e\u6211|\u5206\u6790|\u8ba1\u5212)",
+        "task_help",
+        70,
+        text,
+    )
+    if "?" in text or "\uff1f" in text:
+        scores["question"] += 45
+    add_if(r"^(what|why|how|when|where|who|can|could|should|is|are|do|does)\b", "question", 35, lower)
+    add_if(r"(\u4ec0\u4e48|\u4e3a\u4ec0\u4e48|\u600e\u4e48|\u5417|\u5462)", "question", 35, text)
+    return scores
+
+
+def _select_intent_from_scores(scores: Dict[str, int]) -> str:
+    if not isinstance(scores, dict):
+        return "casual"
+    best_intent = "casual"
+    best_rank = (-1, -1)
+    for intent, score in scores.items():
+        rank = (_safe_int(score), INTENT_PRIORITIES.get(intent, 0))
+        if rank > best_rank:
+            best_intent = intent
+            best_rank = rank
+    return best_intent if best_rank[0] > 0 else "casual"
+
+
+def classify_user_intent(user_message: str, *, is_auto: bool = False) -> str:
+    return _select_intent_from_scores(score_user_intents(user_message, is_auto=is_auto))
+
+
+def _constraints_for_intent(intent: str) -> Dict[str, Any]:
+    base = INTENT_OUTPUT_CONSTRAINTS.get(_clean_text(intent, 40), INTENT_OUTPUT_CONSTRAINTS["casual"])
+    return {
+        "max_sentences": max(1, min(8, _safe_int(base.get("max_sentences"), 3))),
+        "allow_followup_question": bool(base.get("allow_followup_question", False)),
+        "clarify_only_when_needed": bool(base.get("clarify_only_when_needed", False)),
+        "allow_teasing": bool(base.get("allow_teasing", False)),
+        "allow_motion": bool(base.get("allow_motion", True)),
+        "voice_style": _clean_text(base.get("voice_style"), 32).lower() or "neutral",
+    }
+
+
+def _public_output_constraints(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    constraints = value if isinstance(value, dict) else {}
+    return {
+        "max_sentences": max(1, min(8, _safe_int(constraints.get("max_sentences"), 3))),
+        "allow_followup_question": bool(constraints.get("allow_followup_question", False)),
+        "clarify_only_when_needed": bool(constraints.get("clarify_only_when_needed", False)),
+        "allow_teasing": bool(constraints.get("allow_teasing", False)),
+        "allow_motion": bool(constraints.get("allow_motion", True)),
+        "voice_style": _clean_text(constraints.get("voice_style"), 32).lower() or "neutral",
+    }
+
+
+def _format_output_constraints_for_prompt(constraints: Dict[str, Any]) -> str:
+    public = _public_output_constraints(constraints)
+    followup = "allowed" if public["allow_followup_question"] else "avoid"
+    if public["clarify_only_when_needed"]:
+        followup = "clarify-only"
+    teasing = "allowed" if public["allow_teasing"] else "avoid"
+    motion = "allowed" if public["allow_motion"] else "avoid"
+    return (
+        f"follow_up={followup}, teasing={teasing}, motion={motion}, "
+        f"voice_style={public['voice_style']}, max_sentences={public['max_sentences']}"
+    )
+
+
+def _apply_output_constraints(decision: Dict[str, Any]) -> None:
+    constraints = _constraints_for_intent(str(decision.get("intent") or "casual"))
+    decision["output_constraints"] = constraints
+    decision["max_sentences"] = min(
+        max(1, _safe_int(decision.get("max_sentences"), constraints["max_sentences"])),
+        constraints["max_sentences"],
+    )
+    constraints["max_sentences"] = int(decision["max_sentences"])
+    if not constraints["allow_motion"]:
+        decision["action"] = "none"
+        decision["intensity"] = "low"
+    if constraints["voice_style"] != "neutral" and _clean_text(decision.get("voice_style"), 32).lower() in {"", "neutral"}:
+        decision["voice_style"] = constraints["voice_style"]
+    if constraints["clarify_only_when_needed"]:
+        decision["directive"] += " Ask a follow-up only if the reply is genuinely blocked by missing information."
+    elif not constraints["allow_followup_question"]:
+        decision["directive"] += " Do not add a routine follow-up question."
+    if not constraints["allow_teasing"]:
+        decision["directive"] += " Avoid teasing for this intent."
 
 
 def _experience_flags(profile: Optional[Dict[str, Any]]) -> Dict[str, bool]:
@@ -361,7 +566,8 @@ def build_character_brain_decision(
     session_state: Optional[Dict[str, Any]] = None,
     is_auto: bool = False,
 ) -> Dict[str, Any]:
-    intent = classify_user_intent(user_message, is_auto=is_auto)
+    intent_scores = score_user_intents(user_message, is_auto=is_auto)
+    intent = _select_intent_from_scores(intent_scores)
     emotion_state = emotion_state if isinstance(emotion_state, dict) else {}
     flags = _experience_flags(experience_profile)
     continuity = _public_continuity_state(session_state)
@@ -383,6 +589,7 @@ def build_character_brain_decision(
         "directive": "Reply as the same desktop character with a natural, low-interruption tone.",
         "history_tail": _history_tail_text(history or []),
         "continuity": continuity,
+        "intent_scores": {key: value for key, value in intent_scores.items() if value > 0},
     }
 
     if intent == "greeting":
@@ -528,6 +735,8 @@ def build_character_brain_decision(
     if flags["voice_care"] and decision["voice_style"] == "neutral" and intent in {"comfort", "closing"}:
         decision["voice_style"] = "soft"
 
+    _apply_output_constraints(decision)
+
     decision["emotion"] = _normalize_emotion(decision.get("emotion"))
     decision["action"] = _normalize_action(decision.get("action"))
     decision["intensity"] = _normalize_intensity(decision.get("intensity"))
@@ -549,6 +758,7 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Character state: energy={_clean_text(decision.get('energy'), 24)}, attention={_clean_text(decision.get('attention'), 24)}, relationship={_clean_text(decision.get('relationship'), 40)}",
         f"Session continuity: last_intent={continuity.get('last_intent') or 'none'}, last_topic={continuity.get('last_topic') or 'none'}, mood_baseline={continuity.get('mood_baseline')}, recent_user_need={continuity.get('recent_user_need') or 'none'}, same_need_turns={continuity.get('same_need_turns')}, decay={continuity.get('decay')}",
         f"Reply style: {_clean_text(decision.get('reply_style'), 40)}, max_sentences={int(decision.get('max_sentences') or 3)}",
+        f"Output constraints: {_format_output_constraints_for_prompt(decision.get('output_constraints') if isinstance(decision.get('output_constraints'), dict) else {})}",
         f"Expression target: emotion={_normalize_emotion(decision.get('emotion'))}, action={_normalize_action(decision.get('action'))}, intensity={_normalize_intensity(decision.get('intensity'))}, voice_style={_clean_text(decision.get('voice_style'), 32)}",
         f"Directive: {_clean_text(decision.get('directive'), 240)}",
     ]
@@ -587,6 +797,7 @@ def build_character_brain_public_snapshot(
         "action": _normalize_action(decision.get("action")),
         "intensity": _normalize_intensity(decision.get("intensity")),
         "voice_style": _clean_text(decision.get("voice_style"), 32).lower() or "neutral",
+        "output_constraints": _public_output_constraints(decision.get("output_constraints")),
         "feedback_effects": feedback_effects[:5],
         "continuity": _public_continuity_state(
             session_state if isinstance(session_state, dict) else decision.get("continuity")
