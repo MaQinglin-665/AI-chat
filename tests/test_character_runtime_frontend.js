@@ -412,6 +412,27 @@ function createMemoryStorage(initial = {}) {
   );
 }
 
+{
+  const profile = characterExperienceController.rebuildProfile([
+    { rating: "bad", issue: "motion_too_much", emotion: "happy", action: "happy_idle", voiceStyle: "cheerful" },
+    { rating: "bad", issue: "voice_mismatch", emotion: "neutral", action: "none", voiceStyle: "neutral" }
+  ]);
+  const requestProfile = characterExperienceController.buildRequestProfile(profile);
+  assert.ok(
+    requestProfile.style_directives.some((line) => line.includes("lower intensity action cues")),
+    "specific motion feedback should become next-turn motion guidance"
+  );
+  assert.ok(
+    requestProfile.style_directives.some((line) => line.includes("voice_style")),
+    "specific voice feedback should become next-turn voice guidance"
+  );
+  assert.deepStrictEqual(
+    requestProfile.recent_feedback.map((item) => item.issue),
+    ["motion_too_much", "voice_mismatch"],
+    "specific cue reasons should stay compact in the request profile"
+  );
+}
+
 assert.strictEqual(
   devFeatureLoader.isDeveloperFeatureModeEnabled({ location: { search: "?dev=1" }, localStorage: null }),
   true,
@@ -1024,6 +1045,19 @@ assert.ok(
 assert.strictEqual(localCommandRegistry.matchLocalCommand("/ttsdebug").kind, "tts_debug", "local command registry should match TTS debug commands");
 assert.strictEqual(localCommandRegistry.matchLocalCommand("/translatedebug on").kind, "translate_debug_on", "local command registry should match translation debug panel commands");
 assert.strictEqual(localCommandRegistry.matchLocalCommand("/testvoice").kind, "voice_test", "local command registry should match voice test aliases");
+assert.strictEqual(localCommandRegistry.matchLocalCommand("/badcue long").kind, "character_feedback_bad", "local command registry should match bad character cue reasons");
+assert.strictEqual(localCommandRegistry.matchLocalCommand("/goodcue warm").kind, "character_feedback_good", "local command registry should match good character cue notes");
+assert.strictEqual(localCommandRegistry.matchLocalCommand("/badcuex").kind, "", "local command registry should not overmatch cue prefixes");
+assert.strictEqual(
+  localCommandExecutor.normalizeFeedbackCueNote({ text: "/badcue generic", alias: "/badcue" }, "bad"),
+  "reply_too_generic",
+  "local command executor should normalize badcue generic into a feedback issue"
+);
+assert.strictEqual(
+  localCommandExecutor.normalizeFeedbackCueNote({ text: "/badcue motion low", alias: "/badcue" }, "bad"),
+  "motion_too_little",
+  "local command executor should normalize badcue motion-low into a feedback issue"
+);
 assert.strictEqual(reminderUtils.parseReminderWhen("10m", { now: () => 1000 }), 601000, "reminder utils should parse relative minute reminders");
 assert.strictEqual(reminderUtils.normalizeReminderMode("tool"), "tool", "reminder utils should normalize reminder modes");
 assert.ok(typeof reminderUtils.buildReminderTypeLabel({ mode: "assistant" }) === "string", "reminder utils should build readable reminder type labels");
@@ -1060,6 +1094,22 @@ assert.strictEqual(
   });
   handlers.reminder_list({ text: "/reminders", alias: "/reminders" });
   assert.ok(typeof messages[0]?.text === "string", "local command executor should handle reminder list output through injected dependencies");
+}
+{
+  const feedbacks = [];
+  const handlers = localCommandExecutor.createLocalCommandHandlers({
+    recordCharacterPerformanceFeedback: (rating, note) => feedbacks.push({ rating, note })
+  });
+  handlers.character_feedback_bad({ text: "/badcue long", alias: "/badcue" });
+  handlers.character_feedback_good({ text: "/goodcue warmer", alias: "/goodcue" });
+  assert.deepStrictEqual(
+    feedbacks,
+    [
+      { rating: "bad", note: "reply_too_long" },
+      { rating: "good", note: "warmer" }
+    ],
+    "local command executor should pass lightweight cue reasons into character feedback"
+  );
 }
 assert.ok(
   typeof followupReadinessView.buildBackendEntryCardText({

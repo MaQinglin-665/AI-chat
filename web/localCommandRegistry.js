@@ -24,6 +24,8 @@
   ];
 
   const PREFIX_COMMANDS = [
+    { kind: "character_feedback_good", prefix: "/goodcue" },
+    { kind: "character_feedback_bad", prefix: "/badcue" },
     { kind: "reminder_cancel", prefix: "/取消提醒" },
     { kind: "reminder_add", prefix: "/提醒" }
   ];
@@ -59,6 +61,10 @@
     const normalized = normalizeCommandText(text);
     for (const command of PREFIX_COMMANDS) {
       if (normalized.startsWith(command.prefix)) {
+        const next = normalized.slice(command.prefix.length, command.prefix.length + 1);
+        if (next && !/\s/.test(next)) {
+          continue;
+        }
         return {
           kind: command.kind,
           text: normalized,

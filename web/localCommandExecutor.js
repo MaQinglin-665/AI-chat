@@ -5,6 +5,53 @@
     return String(command?.text || "").slice(String(command?.alias || "").length).trim();
   }
 
+  const BAD_CUE_NOTES = {
+    long: "reply_too_long",
+    length: "reply_too_long",
+    too_long: "reply_too_long",
+    generic: "reply_too_generic",
+    robot: "reply_too_generic",
+    assistant: "reply_too_generic",
+    style: "style_mismatch",
+    character: "style_mismatch",
+    off_character: "style_mismatch",
+    voice: "voice_mismatch",
+    tts: "voice_mismatch",
+    motion: "motion_too_much",
+    action: "motion_too_much",
+    too_much_motion: "motion_too_much",
+    motion_too_much: "motion_too_much",
+    less_motion: "motion_too_much",
+    motion_low: "motion_too_little",
+    too_little_motion: "motion_too_little",
+    motion_too_little: "motion_too_little"
+  };
+
+  function normalizeFeedbackCueNote(command, rating = "bad") {
+    const raw = getRest(command).replace(/\s+/g, " ").trim();
+    if (!raw) {
+      return "";
+    }
+    if (rating !== "bad") {
+      return raw.slice(0, 80);
+    }
+    const key = raw
+      .toLowerCase()
+      .replace(/^--?/, "")
+      .replace(/[\s-]+/g, "_")
+      .replace(/[^a-z0-9_\u4e00-\u9fff]/g, "");
+    if (BAD_CUE_NOTES[key]) {
+      return BAD_CUE_NOTES[key];
+    }
+    if (/long|length|\u592a\u957f|\u592a\u591a/.test(key)) return "reply_too_long";
+    if (/generic|robot|assistant|\u5ba2\u670d|\u6a21\u677f/.test(key)) return "reply_too_generic";
+    if (/voice|tts|\u58f0\u97f3|\u8bed\u97f3/.test(key)) return "voice_mismatch";
+    if (/motion|action|\u52a8\u4f5c/.test(key) && /little|weak|low|few|\u5c11|\u5f31/.test(key)) return "motion_too_little";
+    if (/motion|action|\u52a8\u4f5c/.test(key)) return "motion_too_much";
+    if (/style|character|\u89d2\u8272|\u4e0d\u50cf/.test(key)) return "style_mismatch";
+    return raw.slice(0, 80);
+  }
+
   function append(deps, text, options) {
     if (typeof deps.appendMessage === "function") {
       deps.appendMessage("assistant", text, options);
@@ -72,11 +119,11 @@
       character_tuning: () => {
         deps.runCharacterTuningAndAppendReport();
       },
-      character_feedback_good: () => {
-        deps.recordCharacterPerformanceFeedback("good");
+      character_feedback_good: (command) => {
+        deps.recordCharacterPerformanceFeedback("good", normalizeFeedbackCueNote(command, "good"));
       },
-      character_feedback_bad: () => {
-        deps.recordCharacterPerformanceFeedback("bad");
+      character_feedback_bad: (command) => {
+        deps.recordCharacterPerformanceFeedback("bad", normalizeFeedbackCueNote(command, "bad"));
       },
       character_workflow: () => {
         deps.appendCharacterWorkflowGuide();
@@ -118,7 +165,8 @@
   }
 
   const api = {
-    createLocalCommandHandlers
+    createLocalCommandHandlers,
+    normalizeFeedbackCueNote
   };
 
   root.TaffyLocalCommandExecutor = api;
