@@ -10,6 +10,7 @@ const INDEX_HTML = path.resolve(__dirname, "..", "web", "index.html");
 const BASE_CSS = path.resolve(__dirname, "..", "web", "base.css");
 const SPEECH_TEXT_JS = path.resolve(__dirname, "..", "web", "speechText.js");
 const ATTACHMENT_MODEL_JS = path.resolve(__dirname, "..", "web", "attachmentModel.js");
+const LEARNING_REVIEW_MODEL_JS = path.resolve(__dirname, "..", "web", "learningReviewModel.js");
 const CHARACTER_RUNTIME_JS = path.resolve(__dirname, "..", "web", "characterRuntime.js");
 const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTuning.js");
 const DOCTOR_DIAGNOSTICS_JS = path.resolve(__dirname, "..", "web", "doctorDiagnostics.js");
@@ -34,6 +35,7 @@ const indexSource = fs.readFileSync(INDEX_HTML, "utf8");
 const baseCssSource = fs.readFileSync(BASE_CSS, "utf8");
 const speechTextSource = fs.readFileSync(SPEECH_TEXT_JS, "utf8");
 const attachmentModelSource = fs.readFileSync(ATTACHMENT_MODEL_JS, "utf8");
+const learningReviewModelSource = fs.readFileSync(LEARNING_REVIEW_MODEL_JS, "utf8");
 const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
 const doctorSource = fs.readFileSync(DOCTOR_DIAGNOSTICS_JS, "utf8");
 const replyCueSource = fs.readFileSync(CHARACTER_REPLY_CUE_JS, "utf8");
@@ -54,6 +56,7 @@ const followupReadinessViewSource = fs.readFileSync(FOLLOWUP_READINESS_VIEW_JS, 
 const grayTrialCharacterViewSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_VIEW_JS, "utf8");
 const runtime = require(CHARACTER_RUNTIME_JS);
 const attachmentModel = require(ATTACHMENT_MODEL_JS);
+const learningReviewModel = require(LEARNING_REVIEW_MODEL_JS);
 const tuning = require(CHARACTER_TUNING_JS);
 const doctorDiagnostics = require(DOCTOR_DIAGNOSTICS_JS);
 const replyCue = require(CHARACTER_REPLY_CUE_JS);
@@ -150,6 +153,67 @@ assert.ok(
     && indexSource.includes('<script src="./attachmentModel.js"></script>')
     && indexSource.indexOf('<script src="./attachmentModel.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
   "chat.js should delegate attachment formatting and context building into attachmentModel.js"
+);
+{
+  const learningState = {
+    activeTab: "candidates",
+    candidates: [],
+    samples: [],
+    selectedCandidates: new Set(["old", "a"]),
+    selectedSamples: new Set(),
+    sortMode: "score_desc"
+  };
+  learningReviewModel.applyLearningPayload(learningState, {
+    candidates: [
+      { id: "a", assistant_preview: "soft reply", compressed_pattern: "warm", score: 0.7, confidence: 0.6, support_count: 1 },
+      { id: "b", assistant_preview: "strong reply", compressed_pattern: "direct", score: 0.9, confidence: 0.8, support_count: 2 }
+    ],
+    quick_settings: { inject_count: 1, promotion_min_support: 2 }
+  });
+  assert.strictEqual(learningState.selectedCandidates.has("old"), false, "learning model should prune stale selections");
+  assert.deepStrictEqual(
+    learningReviewModel.getLearningFilteredItems(learningState, { scoreMin: 0.75 }).map((item) => item.id),
+    ["b"],
+    "learning model should filter and sort candidate items"
+  );
+  assert.deepStrictEqual(
+    learningState.quickSettings,
+    { inject_count: 1, promotion_min_support: 2 },
+    "learning model should normalize quick settings"
+  );
+  assert.strictEqual(
+    learningReviewModel.getLearningStatusView("promoted").statusClass,
+    "promoted",
+    "learning model should normalize status classes for item badges"
+  );
+  assert.strictEqual(
+    learningReviewModel.getLearningMetricViews({ score: 0.82, confidence: 0.4, support_count: 3 }).score.className,
+    "is-high",
+    "learning model should map metrics to stable visual levels"
+  );
+  assert.deepStrictEqual(
+    learningReviewModel.buildSelectAllState("candidates", learningState.candidates, new Set(["a", "b"])),
+    { checked: true, indeterminate: false, selectedCount: 2, canBatch: true, canPromote: true },
+    "learning model should derive select-all and batch action state"
+  );
+  assert.ok(
+    learningReviewModel.buildLearningSummaryText(learningState, 1).includes("1"),
+    "learning model should build a compact review summary"
+  );
+}
+assert.ok(
+  source.includes("const LEARNING_REVIEW_MODEL = window.TaffyLearningReviewModel")
+    && source.includes("LEARNING_REVIEW_MODEL.applyLearningPayload")
+    && source.includes("LEARNING_REVIEW_MODEL.getLearningFilteredItems")
+    && source.includes("LEARNING_REVIEW_MODEL.buildSelectAllState")
+    && source.includes("LEARNING_REVIEW_MODEL.getLearningMetricViews")
+    && learningReviewModelSource.includes("function normalizeLearningReviewItem")
+    && learningReviewModelSource.includes("function getLearningFilteredItems")
+    && learningReviewModelSource.includes("function buildSelectAllState")
+    && learningReviewModelSource.includes("function getLearningMetricViews")
+    && indexSource.includes('<script src="./learningReviewModel.js"></script>')
+    && indexSource.indexOf('<script src="./learningReviewModel.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
+  "chat.js should delegate learning review normalization and filtering into learningReviewModel.js"
 );
 
 assert.strictEqual(

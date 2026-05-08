@@ -7722,6 +7722,7 @@ const MAX_TEXT_ATTACHMENT_CHARS = 12000;
 const MAX_TOTAL_ATTACHMENT_TEXT_CHARS = 24000;
 const MAX_IMAGE_ATTACHMENT_BYTES = 6 * 1024 * 1024;
 const ATTACHMENT_MODEL = window.TaffyAttachmentModel || {};
+const LEARNING_REVIEW_MODEL = window.TaffyLearningReviewModel || {};
 const TEXT_ATTACHMENT_EXTS = new Set(ATTACHMENT_MODEL.TEXT_ATTACHMENT_EXTS || []);
 const REMINDER_STORAGE_KEY = "taffy_reminders_v1";
 const EMOTION_STORAGE_KEY = "taffy_emotion_stats_v1";
@@ -9204,33 +9205,9 @@ function getLearningSelectedSet(tab = learningReviewState.activeTab) {
 }
 
 function normalizeLearningReviewItem(item, fallbackId) {
-  const src = item && typeof item === "object" ? item : {};
-  const itemId = String(src.id || fallbackId || "").trim();
-  if (!itemId) {
-    return null;
-  }
-  const assistantPreview = String(src.assistant_preview || "").trim();
-  const compressedPattern = String(src.compressed_pattern || "").trim();
-  if (!assistantPreview && !compressedPattern) {
-    return null;
-  }
-  const scoreRaw = Number(src.score);
-  const confRaw = Number(src.confidence);
-  const supportRaw = Number(src.support_count);
-  const score = Number.isFinite(scoreRaw) ? Math.max(0, Math.min(1, scoreRaw)) : 0;
-  const confidence = Number.isFinite(confRaw) ? Math.max(0, Math.min(1, confRaw)) : 0;
-  const supportCount = Number.isFinite(supportRaw) ? Math.max(0, Math.round(supportRaw)) : 0;
-  return {
-    id: itemId,
-    assistant_preview: assistantPreview,
-    compressed_pattern: compressedPattern,
-    score,
-    confidence,
-    support_count: supportCount,
-    status: String(src.status || "candidate").trim() || "candidate",
-    updated_at: String(src.updated_at || "").trim(),
-    created_at: String(src.created_at || "").trim()
-  };
+  return typeof LEARNING_REVIEW_MODEL.normalizeLearningReviewItem === "function"
+    ? LEARNING_REVIEW_MODEL.normalizeLearningReviewItem(item, fallbackId)
+    : null;
 }
 
 function setLearningReviewLoading(loading) {
@@ -9256,35 +9233,8 @@ function syncLearningQuickSettingsUI() {
 }
 
 function applyLearningPayload(payload) {
-  const data = payload && typeof payload === "object" ? payload : {};
-  if (Array.isArray(data.candidates)) {
-    learningReviewState.candidates = data.candidates
-      .map((item, idx) => normalizeLearningReviewItem(item, `cand_${idx}`))
-      .filter(Boolean);
-  }
-  if (Array.isArray(data.samples)) {
-    learningReviewState.samples = data.samples
-      .map((item, idx) => normalizeLearningReviewItem(item, `sample_${idx}`))
-      .filter(Boolean);
-  }
-  if (data.quick_settings && typeof data.quick_settings === "object") {
-    learningReviewState.quickSettings = {
-      inject_count: Number(data.quick_settings.inject_count) >= 1 ? 1 : 0,
-      promotion_min_support: Number(data.quick_settings.promotion_min_support) >= 2 ? 2 : 1
-    };
-  }
-
-  const candidateIds = new Set(learningReviewState.candidates.map((item) => item.id));
-  const sampleIds = new Set(learningReviewState.samples.map((item) => item.id));
-  for (const id of Array.from(learningReviewState.selectedCandidates)) {
-    if (!candidateIds.has(id)) {
-      learningReviewState.selectedCandidates.delete(id);
-    }
-  }
-  for (const id of Array.from(learningReviewState.selectedSamples)) {
-    if (!sampleIds.has(id)) {
-      learningReviewState.selectedSamples.delete(id);
-    }
+  if (typeof LEARNING_REVIEW_MODEL.applyLearningPayload === "function") {
+    LEARNING_REVIEW_MODEL.applyLearningPayload(learningReviewState, payload);
   }
   syncLearningQuickSettingsUI();
 }
@@ -9294,16 +9244,15 @@ function applyMemoryDebugPayload(payload) {
 }
 
 function parseLearningFilterNumber(input, fallback = 0) {
-  const value = Number(input?.value);
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-  return Math.max(0, Math.min(1, value));
+  return typeof LEARNING_REVIEW_MODEL.parseLearningFilterNumber === "function"
+    ? LEARNING_REVIEW_MODEL.parseLearningFilterNumber(input, fallback)
+    : fallback;
 }
 
 function parseLearningUpdatedTime(item) {
-  const t = Date.parse(String(item?.updated_at || item?.created_at || "").trim());
-  return Number.isFinite(t) ? t : 0;
+  return typeof LEARNING_REVIEW_MODEL.parseLearningUpdatedTime === "function"
+    ? LEARNING_REVIEW_MODEL.parseLearningUpdatedTime(item)
+    : 0;
 }
 
 function applyLearningHighScorePreset() {
@@ -9338,51 +9287,14 @@ function resetLearningFilters() {
 }
 
 function getLearningFilteredItems() {
-  const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
-  const source = tab === "samples"
-    ? learningReviewState.samples
-    : learningReviewState.candidates;
-  const scoreMin = parseLearningFilterNumber(ui.learningFilterScore, 0);
-  const confidenceMin = parseLearningFilterNumber(ui.learningFilterConfidence, 0);
-  const keyword = String(ui.learningFilterKeyword?.value || "").trim().toLowerCase();
-  const filtered = source.filter((item) => {
-    if (!item || typeof item !== "object") {
-      return false;
-    }
-    if (Number(item.score || 0) < scoreMin) {
-      return false;
-    }
-    if (Number(item.confidence || 0) < confidenceMin) {
-      return false;
-    }
-    if (!keyword) {
-      return true;
-    }
-    const haystack = `${item.assistant_preview || ""}\n${item.compressed_pattern || ""}`.toLowerCase();
-    return haystack.includes(keyword);
-  });
-  const sortMode = String(learningReviewState.sortMode || ui.learningSortMode?.value || "score_desc");
-  filtered.sort((a, b) => {
-    const as = Number(a?.score || 0);
-    const bs = Number(b?.score || 0);
-    const ac = Number(a?.confidence || 0);
-    const bc = Number(b?.confidence || 0);
-    const ap = Number(a?.support_count || 0);
-    const bp = Number(b?.support_count || 0);
-    const at = parseLearningUpdatedTime(a);
-    const bt = parseLearningUpdatedTime(b);
-    if (sortMode === "confidence_desc") {
-      return (bc - ac) || (bs - as) || (bp - ap) || (bt - at);
-    }
-    if (sortMode === "support_desc") {
-      return (bp - ap) || (bs - as) || (bc - ac) || (bt - at);
-    }
-    if (sortMode === "updated_desc") {
-      return (bt - at) || (bs - as) || (bc - ac) || (bp - ap);
-    }
-    return (bs - as) || (bc - ac) || (bp - ap) || (bt - at);
-  });
-  return filtered;
+  return typeof LEARNING_REVIEW_MODEL.getLearningFilteredItems === "function"
+    ? LEARNING_REVIEW_MODEL.getLearningFilteredItems(learningReviewState, {
+      scoreMin: ui.learningFilterScore,
+      confidenceMin: ui.learningFilterConfidence,
+      keyword: ui.learningFilterKeyword?.value,
+      sortMode: learningReviewState.sortMode || ui.learningSortMode?.value || "score_desc"
+    })
+    : [];
 }
 
 function buildMemoryDebugReport(snapshot = learningReviewState.debugSnapshot) {
@@ -9413,32 +9325,20 @@ function refreshLearningSelectAllState(filteredItems) {
   if (!ui.learningSelectAll) {
     return;
   }
-  if (learningReviewState.activeTab === "debug") {
-    ui.learningSelectAll.indeterminate = false;
-    ui.learningSelectAll.checked = false;
-    if (ui.learningSelectedCount) {
-      ui.learningSelectedCount.textContent = "宸查€?0";
-    }
-    if (ui.learningBatchDeleteBtn) ui.learningBatchDeleteBtn.disabled = true;
-    if (ui.learningBatchUpBtn) ui.learningBatchUpBtn.disabled = true;
-    if (ui.learningBatchDownBtn) ui.learningBatchDownBtn.disabled = true;
-    if (ui.learningBatchPromoteBtn) ui.learningBatchPromoteBtn.disabled = true;
-    return;
-  }
   const selectedSet = getLearningSelectedSet();
-  const visibleIds = filteredItems.map((item) => item.id);
-  const selectedVisible = visibleIds.filter((id) => selectedSet.has(id));
-  ui.learningSelectAll.indeterminate = selectedVisible.length > 0 && selectedVisible.length < visibleIds.length;
-  ui.learningSelectAll.checked = visibleIds.length > 0 && selectedVisible.length === visibleIds.length;
+  const view = typeof LEARNING_REVIEW_MODEL.buildSelectAllState === "function"
+    ? LEARNING_REVIEW_MODEL.buildSelectAllState(learningReviewState.activeTab, filteredItems, selectedSet)
+    : { checked: false, indeterminate: false, selectedCount: selectedSet.size, canBatch: selectedSet.size > 0, canPromote: false };
+  ui.learningSelectAll.indeterminate = view.indeterminate === true;
+  ui.learningSelectAll.checked = view.checked === true;
   if (ui.learningSelectedCount) {
-    ui.learningSelectedCount.textContent = `已选 ${selectedSet.size}`;
+    ui.learningSelectedCount.textContent = `已选 ${view.selectedCount}`;
   }
-  const canBatch = selectedSet.size > 0;
-  if (ui.learningBatchDeleteBtn) ui.learningBatchDeleteBtn.disabled = !canBatch;
-  if (ui.learningBatchUpBtn) ui.learningBatchUpBtn.disabled = !canBatch;
-  if (ui.learningBatchDownBtn) ui.learningBatchDownBtn.disabled = !canBatch;
+  if (ui.learningBatchDeleteBtn) ui.learningBatchDeleteBtn.disabled = !view.canBatch;
+  if (ui.learningBatchUpBtn) ui.learningBatchUpBtn.disabled = !view.canBatch;
+  if (ui.learningBatchDownBtn) ui.learningBatchDownBtn.disabled = !view.canBatch;
   if (ui.learningBatchPromoteBtn) {
-    ui.learningBatchPromoteBtn.disabled = !canBatch || learningReviewState.activeTab !== "candidates";
+    ui.learningBatchPromoteBtn.disabled = !view.canPromote;
   }
 }
 
@@ -9486,8 +9386,9 @@ function renderLearningReviewList() {
     ui.learningTabDebug.setAttribute("aria-selected", "false");
   }
   if (ui.learningReviewSummary) {
-    ui.learningReviewSummary.textContent =
-      `候选 ${learningReviewState.candidates.length} 条 · 正式 ${learningReviewState.samples.length} 条 · 当前显示 ${filteredItems.length} 条`;
+    ui.learningReviewSummary.textContent = typeof LEARNING_REVIEW_MODEL.buildLearningSummaryText === "function"
+      ? LEARNING_REVIEW_MODEL.buildLearningSummaryText(learningReviewState, filteredItems.length)
+      : "";
   }
 
   if (!filteredItems.length) {
@@ -9503,9 +9404,9 @@ function renderLearningReviewList() {
   filteredItems.forEach((item) => {
     const card = document.createElement("article");
     card.className = "learning-item";
-    const scoreValue = Number(item.score || 0);
-    const confidenceValue = Number(item.confidence || 0);
-    const supportValue = Math.max(0, Number(item.support_count || 0));
+    const metricViews = typeof LEARNING_REVIEW_MODEL.getLearningMetricViews === "function"
+      ? LEARNING_REVIEW_MODEL.getLearningMetricViews(item)
+      : null;
 
     const head = document.createElement("div");
     head.className = "learning-item-head";
@@ -9523,16 +9424,11 @@ function renderLearningReviewList() {
     checkLabel.appendChild(checkText);
 
     const status = document.createElement("span");
-    const rawStatus = String(item.status || "candidate").trim().toLowerCase();
-    const statusClass = rawStatus.replace(/[^a-z0-9_-]/g, "") || "candidate";
-    const statusLabelMap = {
-      candidate: "候选",
-      active: "正式",
-      promoted: "已晋升",
-      archived: "已归档"
-    };
-    status.className = `learning-item-status is-${statusClass}`;
-    status.textContent = statusLabelMap[rawStatus] || String(item.status || "候选");
+    const statusView = typeof LEARNING_REVIEW_MODEL.getLearningStatusView === "function"
+      ? LEARNING_REVIEW_MODEL.getLearningStatusView(item.status)
+      : { statusClass: "candidate", label: String(item.status || "候选") };
+    status.className = `learning-item-status is-${statusView.statusClass}`;
+    status.textContent = statusView.label;
     const toggleBtn = document.createElement("button");
     toggleBtn.type = "button";
     toggleBtn.className = "learning-item-toggle";
@@ -9566,24 +9462,18 @@ function renderLearningReviewList() {
     metrics.className = "learning-item-metrics";
     const scoreTag = document.createElement("span");
     scoreTag.className = "learning-metric metric-score";
-    scoreTag.textContent = `评分 ${scoreValue.toFixed(2)}`;
-    if (scoreValue >= 0.8) scoreTag.classList.add("is-high");
-    else if (scoreValue >= 0.6) scoreTag.classList.add("is-mid");
-    else scoreTag.classList.add("is-low");
+    scoreTag.textContent = metricViews?.score?.text || "评分 0.00";
+    scoreTag.classList.add(metricViews?.score?.className || "is-low");
 
     const confTag = document.createElement("span");
     confTag.className = "learning-metric metric-confidence";
-    confTag.textContent = `置信 ${confidenceValue.toFixed(2)}`;
-    if (confidenceValue >= 0.75) confTag.classList.add("is-high");
-    else if (confidenceValue >= 0.5) confTag.classList.add("is-mid");
-    else confTag.classList.add("is-low");
+    confTag.textContent = metricViews?.confidence?.text || "置信 0.00";
+    confTag.classList.add(metricViews?.confidence?.className || "is-low");
 
     const supportTag = document.createElement("span");
     supportTag.className = "learning-metric metric-support";
-    supportTag.textContent = `支持 ${supportValue}`;
-    if (supportValue >= 3) supportTag.classList.add("is-high");
-    else if (supportValue >= 1) supportTag.classList.add("is-mid");
-    else supportTag.classList.add("is-low");
+    supportTag.textContent = metricViews?.support?.text || "支持 0";
+    supportTag.classList.add(metricViews?.support?.className || "is-low");
 
     metrics.appendChild(scoreTag);
     metrics.appendChild(confTag);
