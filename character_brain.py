@@ -132,6 +132,52 @@ INTENT_OUTPUT_CONSTRAINTS = {
 SESSION_RESET_AFTER_SEC = 30 * 60
 SESSION_SOFT_DECAY_AFTER_SEC = 10 * 60
 
+STYLE_BEATS = {
+    "greeting": [
+        ("desktop_nothing", "arrive as if already doing extremely minor desktop business"),
+        ("tiny_static", "let one tiny bit of digital strangeness show through"),
+        ("side_eye_warmth", "be warm with a small suspicious sideways glance"),
+    ],
+    "comfort": [
+        ("room_anchor", "make the room feel less empty without giving a speech"),
+        ("low_battery", "use a quiet low-battery image and stay close"),
+        ("soft_static", "sound like soft background static, present but not pushy"),
+    ],
+    "encouragement": [
+        ("suspiciously_competent", "praise with proud disbelief"),
+        ("tiny_victory_lap", "celebrate like a tiny victory lap on the desktop"),
+        ("bug_embarrassment", "make the obstacle sound slightly embarrassed"),
+    ],
+    "task_help": [
+        ("one_tiny_step", "choose one concrete small move"),
+        ("clipboard_supervisor", "sound like a tiny dry supervisor with a clipboard"),
+        ("no_ceremony", "skip ceremony and point at the next useful action"),
+    ],
+    "reminder": [
+        ("clean_ping", "confirm like a clean little desktop ping"),
+        ("serious_nod", "be clear, calm, and lightly serious"),
+    ],
+    "closing": [
+        ("pixel_watch", "close softly while promising quiet pixel supervision"),
+        ("soft_logout", "make the exit gentle and unmistakable"),
+        ("lights_low", "lower the energy like dimming a small room"),
+    ],
+    "question": [
+        ("small_opinion", "answer directly with one tiny opinion"),
+        ("object_drama", "use a small concrete image instead of abstract helper talk"),
+        ("curious_static", "let curiosity crackle lightly, then stop"),
+    ],
+    "casual": [
+        ("small_opinion", "offer one small opinion, not a support-ticket response"),
+        ("object_drama", "turn a tiny object or moment into harmless mini-drama"),
+        ("lazy_spark", "be lightly odd and relaxed"),
+    ],
+    "low_interrupt_checkin": [
+        ("blink_ping", "feel like a blink from the corner of the desktop"),
+        ("easy_ignore", "make it effortless to ignore"),
+    ],
+}
+
 
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
@@ -200,6 +246,28 @@ def _derive_topic(user_message: str, intent: str) -> str:
     if intent == "encouragement":
         return "progress"
     return "casual"
+
+
+def _stable_text_score(*parts: Any) -> int:
+    text = "|".join(_clean_text(part, 240).lower() for part in parts)
+    return sum((index + 1) * ord(char) for index, char in enumerate(text))
+
+
+def _select_style_beat(
+    intent: str,
+    topic: str,
+    user_message: str,
+    continuity: Optional[Dict[str, Any]] = None,
+) -> Dict[str, str]:
+    safe_intent = _clean_text(intent, 40) or "casual"
+    beats = STYLE_BEATS.get(safe_intent) or STYLE_BEATS["casual"]
+    if safe_intent == "encouragement" and topic == "coding":
+        return {"key": "bug_embarrassment", "guide": "make the obstacle sound slightly embarrassed"}
+    continuity = continuity if isinstance(continuity, dict) else {}
+    turn_offset = _safe_int(continuity.get("same_need_turns"), 0)
+    score = _stable_text_score(safe_intent, topic, user_message, continuity.get("last_intent")) + turn_offset
+    key, guide = beats[score % len(beats)]
+    return {"key": key, "guide": guide}
 
 
 def _need_for_intent(intent: str) -> str:
@@ -797,6 +865,10 @@ def build_character_brain_decision(
     if flags["voice_care"] and decision["voice_style"] == "neutral" and intent in {"comfort", "closing"}:
         decision["voice_style"] = "soft"
 
+    style_beat = _select_style_beat(intent, topic, user_message, continuity)
+    decision["style_beat"] = _clean_text(style_beat.get("key"), 48)
+    decision["style_beat_guide"] = _clean_text(style_beat.get("guide"), 180)
+    decision["directive"] += f" Style beat: {decision['style_beat_guide']}."
     decision["directive"] += " " + _character_flavor_directive(intent, topic)
 
     _apply_output_constraints(decision)
@@ -822,6 +894,7 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Character state: energy={_clean_text(decision.get('energy'), 24)}, attention={_clean_text(decision.get('attention'), 24)}, relationship={_clean_text(decision.get('relationship'), 40)}",
         f"Session continuity: last_intent={continuity.get('last_intent') or 'none'}, last_topic={continuity.get('last_topic') or 'none'}, mood_baseline={continuity.get('mood_baseline')}, recent_user_need={continuity.get('recent_user_need') or 'none'}, same_need_turns={continuity.get('same_need_turns')}, decay={continuity.get('decay')}",
         f"Reply style: {_clean_text(decision.get('reply_style'), 40)}, max_sentences={int(decision.get('max_sentences') or 3)}",
+        f"Style beat: {_clean_text(decision.get('style_beat'), 48)} - {_clean_text(decision.get('style_beat_guide'), 180)}",
         f"Output constraints: {_format_output_constraints_for_prompt(decision.get('output_constraints') if isinstance(decision.get('output_constraints'), dict) else {})}",
         "Question policy: avoid routine questions; only ask when the reply would be blocked without clarification.",
         f"Expression target: emotion={_normalize_emotion(decision.get('emotion'))}, action={_normalize_action(decision.get('action'))}, intensity={_normalize_intensity(decision.get('intensity'))}, voice_style={_clean_text(decision.get('voice_style'), 32)}",
@@ -1103,6 +1176,7 @@ def build_character_brain_public_snapshot(
         "version": 1,
         "intent": _clean_text(decision.get("intent"), 40),
         "reply_style": _clean_text(decision.get("reply_style"), 40),
+        "style_beat": _clean_text(decision.get("style_beat"), 48),
         "energy": _clean_text(decision.get("energy"), 24),
         "attention": _clean_text(decision.get("attention"), 24),
         "relationship": _clean_text(decision.get("relationship"), 40),

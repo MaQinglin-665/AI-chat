@@ -330,6 +330,8 @@ function createMemoryStorage(initial = {}) {
     characterBrainLastDecision: {
       intent: "comfort",
       reply_style: "comfort",
+      style_beat: "room_anchor",
+      style_beat_guide: "private prompt hint",
       energy: "calm",
       attention: "focused",
       relationship: "desktop_companion",
@@ -374,6 +376,8 @@ function createMemoryStorage(initial = {}) {
   });
   assert.strictEqual(restored.characterBrainLastUpdatedAt, 12345, "character brain snapshot should restore update time");
   assert.strictEqual(restored.characterBrainLastDecision.intent, "comfort", "character brain snapshot should restore public intent");
+  assert.strictEqual(restored.characterBrainLastDecision.style_beat, "room_anchor", "character brain snapshot should restore public style beat");
+  assert.strictEqual(restored.characterBrainLastDecision.style_beat_guide, undefined, "character brain snapshot should not persist private style guidance");
   assert.strictEqual(restored.characterBrainLastDecision.continuity.recent_user_need, "reassurance", "character brain snapshot should restore compact continuity");
   assert.strictEqual(restored.characterBrainLastDecision.output_constraints.allow_motion, false, "character brain snapshot should restore safe output constraints");
   assert.strictEqual(restored.characterBrainLastDecision.history_tail, undefined, "restored character brain snapshot should stay public-only");
@@ -384,6 +388,7 @@ function createMemoryStorage(initial = {}) {
     {
       intent: "comfort",
       reply_style: "comfort",
+      style_beat: "room_anchor",
       energy: "calm",
       attention: "focused",
       relationship: "desktop_companion",
@@ -428,6 +433,10 @@ function createMemoryStorage(initial = {}) {
   assert.ok(
     brainReport.includes("\u8f93\u51fa\u7ea6\u675f") && brainReport.includes("\u8ffd\u95ee\uff1a\u907f\u514d"),
     "character brain debug report should include compact output constraints"
+  );
+  assert.ok(
+    brainReport.includes("Style beat: room_anchor"),
+    "character brain debug report should include the public style beat"
   );
 }
 

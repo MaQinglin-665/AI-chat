@@ -43,8 +43,31 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert "Output constraints:" in block
     assert "Expression target:" in block
     assert "voice_style=" in block
+    assert "Style beat:" in block
     assert "slightly odd inner life" in block
     assert "empty helper phrases" in block
+    assert decision["style_beat"]
+
+
+def test_character_brain_style_beat_rotates_with_continuity():
+    first = character_brain.build_character_brain_decision(
+        user_message="What should I do next?",
+        session_state={"last_intent": "task_help", "recent_user_need": "direction", "same_need_turns": 0},
+    )
+    second = character_brain.build_character_brain_decision(
+        user_message="What should I do next?",
+        session_state={
+            "last_intent": "task_help",
+            "recent_user_need": "direction",
+            "same_need_turns": 1,
+        },
+    )
+
+    assert first["intent"] == "task_help"
+    assert second["intent"] == "task_help"
+    assert first["style_beat"] in {"one_tiny_step", "clipboard_supervisor", "no_ceremony"}
+    assert second["style_beat"] in {"one_tiny_step", "clipboard_supervisor", "no_ceremony"}
+    assert first["style_beat"] != second["style_beat"]
 
 
 def test_character_brain_comfort_priority_beats_next_step_question():
@@ -546,8 +569,10 @@ def test_character_brain_public_snapshot_continuity_is_safe_and_compact():
     )
     raw = json.dumps(snapshot, ensure_ascii=False).lower()
 
+    assert snapshot["style_beat"]
     assert snapshot["continuity"]["recent_user_need"] == "direction"
     assert snapshot["continuity"]["last_topic"] == "planning"
+    assert "style_beat_guide" not in snapshot
     assert "history_tail" not in snapshot
     assert "directive" not in snapshot
     assert "raw history" not in raw

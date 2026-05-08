@@ -136,6 +136,7 @@ def test_v14_demo_scenes_keep_english_continuity_and_no_routine_questions():
         assert not reply.endswith("?"), scene["label"]
         assert snapshot["intent"] == scene["intent"], scene["label"]
         assert snapshot["reply_style"] == scene.get("style", snapshot["reply_style"])
+        assert snapshot["style_beat"], scene["label"]
         assert runtime["brain_intent"] == scene["intent"], scene["label"]
         assert runtime["voice_style"] == scene["voice"], scene["label"]
         assert runtime["action"] == scene["action"], scene["label"]
@@ -154,6 +155,8 @@ def test_v14_demo_scene_snapshot_stays_public_and_safe():
     raw = str(snapshot).lower()
 
     assert snapshot["intent"] == "task_help"
+    assert snapshot["style_beat"]
+    assert "style_beat_guide" not in snapshot
     assert "directive" not in snapshot
     assert "history_tail" not in snapshot
     assert "secret" not in raw

@@ -315,6 +315,7 @@
       version: 1,
       intent: cleanText(raw.intent, 40),
       reply_style: cleanText(raw.reply_style, 40),
+      style_beat: cleanText(raw.style_beat, 48),
       energy: cleanText(raw.energy, 24),
       attention: cleanText(raw.attention, 24),
       relationship: cleanText(raw.relationship, 40),

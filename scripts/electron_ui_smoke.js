@@ -447,6 +447,9 @@ function buildV14DemoSceneReport(scene, reply, snapshot) {
   if (!snapshot || typeof snapshot !== "object") {
     issues.push("missing_brain_snapshot");
   }
+  if (snapshot && !normalizeSnapshotField(snapshot, "style_beat")) {
+    issues.push("missing_style_beat");
+  }
   if (scene.expectedIntent && intent !== scene.expectedIntent) {
     issues.push(`intent:${intent || "missing"}!=${scene.expectedIntent}`);
   }
@@ -471,6 +474,7 @@ function buildV14DemoSceneReport(scene, reply, snapshot) {
       ? {
           intent: snapshot.intent,
           reply_style: snapshot.reply_style,
+          style_beat: snapshot.style_beat,
           emotion: snapshot.emotion,
           action: snapshot.action,
           voice_style: snapshot.voice_style,
@@ -521,9 +525,11 @@ async function runDebugCommandSmoke(win, results) {
   const beforeDoctor = await sendInput(win, "/doctor");
   const doctorMessages = await waitForAssistantMessage(win, beforeDoctor, "链路自检完成", 45000, "/doctor report");
   const doctorText = String(doctorMessages[doctorMessages.length - 1] || doctorMessages.join("\n"));
+  const doctorTokenLeak = /(?:api[_-]?key|token)\s*[:=]\s*[\w.-]{12,}/i.test(doctorText);
   results.doctor = {
-    ok: doctorText.includes("链路自检完成：核心功能正常。"),
-    tokenLeak: /(?:api[_-]?key|token)\s*[:=]\s*[\w.-]{12,}/i.test(doctorText),
+    ok: doctorText.includes("链路自检完成") && !doctorTokenLeak,
+    coreOk: doctorText.includes("链路自检完成：核心功能正常。"),
+    tokenLeak: doctorTokenLeak,
     reportTail: doctorText.slice(-1000)
   };
 }
