@@ -1,460 +1,5 @@
-const state = {
-  config: null,
-  model: null,
-  pixiApp: null,
-  history: [],
-  chatRecords: [],
-  modelProfileName: "",
-  uiView: "full",
-  desktopMode: false,
-  desktopBridge: "",
-  alphaMode: "none",
-  desktopCanMoveWindow: false,
-  desktopCanCapture: false,
-  useNativeWindowDrag: false,
-  windowLocked: false,
-  windowLockUnsubscribe: null,
-  observeDesktop: false,
-  observeAttachMode: "manual",
-  observeAllowAutoChat: false,
-  autoChatEnabled: false,
-  autoChatMinMs: 180000,
-  autoChatMaxMs: 480000,
-  autoChatTimer: 0,
-  lastAutoChatAt: 0,
-  autoChatLastReason: "",
-  autoChatLastTopicHint: "",
-  autoChatLastTopicAt: 0,
-  autoChatBurstCount: 0,
-  conversationMode: {
-    enabled: false,
-    chatStreamEnabled: true,
-    proactiveEnabled: false,
-    proactiveSchedulerEnabled: false,
-    grayAutoEnabled: false,
-    grayAutoTrialEnabled: false,
-    grayAutoTrialMaxTriggersPerSession: 1,
-    proactiveCooldownMs: 600000,
-    proactiveWarmupMs: 120000,
-    proactiveWindowMs: 3600000,
-    proactivePollIntervalMs: 60000,
-    maxFollowupsPerWindow: 1,
-    silenceFollowupMinMs: 180000,
-    interruptTtsOnUserSpeech: false
-  },
-  followupPending: false,
-  followupReason: "",
-  followupTopicHint: "",
-  followupUpdatedAt: 0,
-  followupRehearsalActive: false,
-  followupRehearsalSnapshot: null,
-  followupRehearsalScenarioId: "",
-  conversationLastUserAt: 0,
-  conversationLastAssistantAt: 0,
-  conversationLastTtsFinishedAt: 0,
-  proactiveSchedulerStartedAt: 0,
-  proactiveLastAttemptAt: 0,
-  proactiveLastTriggeredAt: 0,
-  proactiveCooldownUntil: 0,
-  proactiveWindowStartedAt: 0,
-  proactiveCountInWindow: 0,
-  proactiveInFlight: false,
-  proactiveLastBlockedReason: "",
-  proactiveLastResult: "",
-  proactivePollTimerId: 0,
-  proactiveLastPollAt: 0,
-  proactivePollActive: false,
-  proactivePollLastResult: "",
-  proactivePollActiveIntervalMs: 0,
-  proactivePollFailureInjection: null,
-  grayAutoTrialSessionTriggerCount: 0,
-  grayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled: false,
-  grayAutoTrialCharacterAutoRuntimeExplicitSwitchUpdatedAt: 0,
-  grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastAction: "",
-  grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastReason: "",
-  grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackAt: 0,
-  grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackReason: "",
-  autoChatTuning: {
-    triggerBaseThreshold: 1.03,
-    shortSilencePenalty: 0.35,
-    longSilenceBonus: 0.14,
-    emotionBonus: 0.12,
-    repeatReasonPenalty: 0.44,
-    repeatTopicPenalty: 0.48,
-    burstPenalty: 0.32,
-    recentAutoPenalty: 0.45,
-    scoreJitter: 0.12,
-    repeatReasonWindowMs: 14 * 60 * 1000,
-    repeatTopicWindowMs: 22 * 60 * 1000,
-    burstResetWindowMs: 18 * 60 * 1000,
-    maxTopicHintChars: 42
-  },
-  lastUserMessageAt: Date.now(),
-  chatTranslationVisible: true,
-  chatBusy: false,
-  speakingEnabled: true,
-  ttsProvider: "browser",
-  modelConfig: { scale: 1, x_ratio: 0.26, y_ratio: 0.96 },
-  ttsReady: false,
-  ttsVoices: [],
-  ttsVoiceIndex: -1,
-  ttsVoice: null,
-  ttsServerVoices: [],
-  ttsServerVoiceIndex: -1,
-  ttsServerVoice: null,
-  ttsServerAvailable: true,
-  ttsServerFailStreak: 0,
-  ttsServerLastError: "",
-  ttsServerFallbackFailThreshold: 2,
-  ttsServerRetryCount: 1,
-  ttsServerRetryDelayMs: 220,
-  ttsServerRequestTimeoutMs: 14000,
-  serverTTSFallbackToBrowser: false,
-  ttsAudio: null,
-  ttsAudioPlaybackToken: 0,
-  ttsPlaybackGeneration: 0,
-  ttsContextSpeaking: false,
-  subtitleId: 0,
-  subtitleHideTimer: 0,
-  subtitlePageTimer: 0,
-  subtitleEnabled: true,
-  subtitlePositionCustom: false,
-  subtitlePositionRatioX: 0.5,
-  subtitlePositionRatioY: 0.75,
-  subtitleDragPointerId: 0,
-  ttsLastGoodVoiceName: "",
-  streamSpeakEnabled: true,
-  streamSpeakMode: "realtime",
-  gptSovitsRealtimeTTS: false,
-  streamSpeakIdleWaitMs: 90,
-  streamSpeakQueue: [],
-  streamSpeakWorking: false,
-  streamSpeakBuffer: "",
-  streamSpeakSession: 0,
-  streamSpeakWorkingSession: 0,
-  streamSpeakLastEnqueueSession: 0,
-  streamSpeakPlayedSession: 0,
-  speechAnimUntil: 0,
-  speechAnimStartedAt: 0,
-  speechAnimDurationMs: 0,
-  speechAnimSeed: 0,
-  speechAnimTextLength: 0,
-  speechAnimPunctuation: 0,
-  speechAnimAccentCount: 0,
-  speechAnimStyle: "neutral",
-  speechAnimMood: "idle",
-  speechMouthOpen: 0,
-  speechMouthApplied: 0,
-  speechMouthTarget: 0,
-  speechMouthUpdatedAt: 0,
-  speechBodyEnergy: 0,
-  speechMotionBlend: 0,
-  speechPhase: "idle",
-  speechPhaseEnteredAt: 0,
-  speechPhaseWasSpeaking: false,
-  beatPrevLevel: 0,
-  beatImpulse: 0,
-  beatNodSmoothed: 0,
-  beatCooldownUntil: 0,
-  moodExpressionSmoothed: { happy: 0, sad: 0, angry: 0, surprised: 0 },
-  moodExpressionUpdatedAt: 0,
-  moodHoldUntil: 0,
-  moodExpressionWeight: 1,
-  moodExpressionWeightUntil: 0,
-  moodExpressionWeightMood: "idle",
-  moodExpressionRuntimeMood: "idle",
-  microBlinkUntil: 0,
-  microNextBlinkAt: 0,
-  microGazeTargetX: 0,
-  microGazeTargetY: 0,
-  microGazeCurrentX: 0,
-  microGazeCurrentY: 0,
-  microNextGazeAt: 0,
-  mouseGazeTargetX: 0,
-  mouseGazeTargetY: 0,
-  mouseGazeCurrentX: 0,
-  mouseGazeCurrentY: 0,
-  mouseGazePollTimer: 0,
-  microBreathSeed: 0,
-  microMotionLastAt: 0,
-  spring_hairAhoge_vel: 0,
-  spring_hairAhoge_pos: 0,
-  spring_hairFront_vel: 0,
-  spring_hairFront_pos: 0,
-  spring_hairBack_vel: 0,
-  spring_hairBack_pos: 0,
-  spring_ribbon_vel: 0,
-  spring_ribbon_pos: 0,
-  spring_skirt_vel: 0,
-  spring_skirt_pos: 0,
-  spring_skirt2_vel: 0,
-  spring_skirt2_pos: 0,
-  spring_torso_vel: 0,
-  spring_torso_pos: 0,
-  spring_head_vel: 0,
-  spring_head_pos: 0,
-  spring_body_vel: 0,
-  spring_body_pos: 0,
-  spring_body_render: 0,
-  spring_torso_render: 0,
-  spring_head_render: 0,
-  ttsAudioContext: null,
-  ttsDecodeContext: null,
-  ttsAudioSourceNode: null,
-  ttsContextBufferSource: null,
-  ttsAudioAnalyser: null,
-  ttsAudioAnalyserData: null,
-  ttsAudioLevel: 0,
-  ttsAudioRawLevel: 0,
-  ttsAudioRms: 0,
-  ttsAudioLastVoiceAt: 0,
-  historyMaxMessages: 64,
-  currentTalkStyle: "neutral",
-  styleAutoEnabled: true,
-  manualTalkStyle: "neutral",
-  motionEnabled: true,
-  motionQuietDuringSpeech: true,
-  motionCooldownMs: 1200,
-  motionCooldownUntil: 0,
-  speakingMotionCooldownMs: 2200,
-  speakingMotionCooldownUntil: 0,
-  idleMotionEnabled: true,
-  idleMotionMinMs: 12000,
-  idleMotionMaxMs: 24000,
-  idleMotionTimer: 0,
-  motionDefinitions: {},
-  availableMotionGroups: [],
-  lastMotionGroup: "",
-  motionIntensity: "normal",
-  speechMotionStrength: 1.35,
-  motionComboEnabled: true,
-  actionQueue: [],
-  actionRunnerBusy: false,
-  actionLastAt: {},
-  thinkingMotionTimer: 0,
-  expressionEnabled: true,
-  expressionStrength: 1,
-  expressionPulseUntil: 0,
-  expressionPulseBoost: 0,
-  expressionStyle: "neutral",
-  lastPointerDownAt: 0,
-  lastPointerDownGlobal: { x: 0, y: 0 },
-  pointerDragMoved: false,
-  recognition: null,
-  recognitionAvailable: false,
-  recognitionActive: false,
-  micOpen: false,
-  micPermissionGranted: false,
-  micRestartTimer: 0,
-  micRetryCount: 0,
-  micSession: 0,
-  micSuspendDepth: 0,
-  micQueue: [],
-  micQueueWorking: false,
-  micToggleBusy: false,
-  _broadcastSpeechUpdatedAt: 0,
-  micKeepListening: true,
-  asrTranscribeOnClose: true,
-  asrMode: "local_vosk",
-  localAsrAvailable: false,
-  localAsrRunning: false,
-  localAsrStream: null,
-  localAsrContext: null,
-  localAsrSource: null,
-  localAsrProcessor: null,
-  localAsrAnalyser: null,
-  localAsrMeterRaf: 0,
-  localAsrMeterBuffer: null,
-  localAsrLastFrameAt: 0,
-  localAsrWatchdogTimer: 0,
-  localAsrNoFrameWarned: false,
-  localAsrPeakRms: 0,
-  localAsrStartedAt: 0,
-  localAsrLowLevelWarned: false,
-  localAsrThresholdAutoAdjusted: false,
-  localAsrInputDeviceId: "",
-  localAsrInputDeviceLabel: "",
-  localAsrInputMuted: false,
-  ttsDebugVisible: false,
-  ttsDebugEvents: [],
-  ttsDebugSeq: 0,
-  ttsDebugPanel: null,
-  ttsDebugBody: null,
-  ttsDebugRefreshTimer: 0,
-  ttsDebugLastEventAt: 0,
-  ttsDebugCurrentText: "",
-  ttsDebugCurrentTraceId: "",
-  ttsDebugCurrentSession: 0,
-  ttsDebugCurrentSegmentId: 0,
-  ttsDebugCurrentBlobBytes: 0,
-  ttsDebugCurrentMime: "",
-  ttsDebugAudioDurationMs: -1,
-  ttsDebugAudioCurrentMs: 0,
-  ttsDebugAudioStartedAt: 0,
-  ttsDebugAudioEndedAt: 0,
-  ttsDebugLastResult: "",
-  ttsDebugLastError: "",
-  translateDebugVisible: false,
-  translateDebugEvents: [],
-  translateDebugSeq: 0,
-  translateDebugPanel: null,
-  translateDebugBody: null,
-  translateDebugRefreshTimer: 0,
-  translateDebugLastEventAt: 0,
-  translateDebugCurrentTraceId: "",
-  translateDebugCurrentText: "",
-  translateDebugLastResult: "",
-  translateDebugLastError: "",
-  followupReadinessVisible: false,
-  followupReadinessPanel: null,
-  followupReadinessCard: null,
-  followupReadinessBackendEntryCard: null,
-  followupReadinessBackendEntrySummary: null,
-  followupReadinessBackendEntryLoading: false,
-  followupReadinessBackendEntryError: "",
-  followupReadinessBackendEntryLastRefreshAt: 0,
-  followupReadinessBackendEntryLastSuccessAt: 0,
-  followupReadinessBackendEntryRefreshPromise: null,
-  followupReadinessConfirmationCard: null,
-  followupReadinessTrialCard: null,
-  followupReadinessTrialChecklistCard: null,
-  followupReadinessTrialTimelineCard: null,
-  followupReadinessTrialOutcomeCard: null,
-  followupReadinessTrialDecisionCard: null,
-  followupReadinessTrialSignoffCard: null,
-  followupReadinessTrialCharacterCard: null,
-  followupReadinessTrialCharacterHandoffCard: null,
-  followupReadinessTrialCharacterRecapCard: null,
-  followupReadinessTrialCharacterManualCueStatusCard: null,
-  followupReadinessTrialCharacterStrategyCard: null,
-  followupReadinessTrialCharacterReviewCard: null,
-  followupReadinessTrialCharacterAutoPlanCard: null,
-  followupReadinessTrialCharacterDryRunCard: null,
-  followupReadinessTrialCharacterSwitchPlanCard: null,
-  followupReadinessTrialCharacterSwitchReviewCard: null,
-  followupReadinessTrialCharacterSwitchAcceptanceCard: null,
-  followupReadinessTrialCharacterSwitchControlCard: null,
-  followupReadinessTrialCharacterSwitchDiagnosticsCard: null,
-  followupReadinessTrialCharacterSwitchRollbackCard: null,
-  followupReadinessTrialCharacterSwitchFinalPreflightCard: null,
-  followupReadinessTrialCharacterImplementationDraftCard: null,
-  followupReadinessTrialActions: null,
-  followupReadinessTrialStatus: null,
-  followupReadinessTrialArmBtn: null,
-  followupReadinessTrialStopBtn: null,
-  followupReadinessTrialDisarmBtn: null,
-  followupReadinessTrialResetBtn: null,
-  followupReadinessTrialCopyAuditBtn: null,
-  followupReadinessTrialCopyTimelineBtn: null,
-  followupReadinessTrialCopyDecisionBtn: null,
-  followupReadinessTrialCopySignoffBtn: null,
-  followupReadinessTrialCopyCharacterBtn: null,
-  followupReadinessTrialCopyCharacterHandoffBtn: null,
-  followupReadinessTrialCopyCharacterRecapBtn: null,
-  followupReadinessTrialCopyCharacterStrategyBtn: null,
-  followupReadinessTrialCopyCharacterReviewBtn: null,
-  followupReadinessTrialCopyCharacterAutoPlanBtn: null,
-  followupReadinessTrialCopyCharacterDryRunBtn: null,
-  followupReadinessTrialCopyCharacterSwitchPlanBtn: null,
-  followupReadinessTrialCopyCharacterSwitchReviewBtn: null,
-  followupReadinessTrialCopyCharacterSwitchAcceptanceBtn: null,
-  followupReadinessTrialCopyCharacterSwitchControlBtn: null,
-  followupReadinessTrialCopyCharacterSwitchDiagnosticsBtn: null,
-  followupReadinessTrialCopyCharacterSwitchRollbackBtn: null,
-  followupReadinessTrialCopyCharacterSwitchFinalPreflightBtn: null,
-  followupReadinessTrialCopyCharacterImplementationDraftBtn: null,
-  followupReadinessTrialCharacterSwitchEnableBtn: null,
-  followupReadinessTrialCharacterSwitchDisableBtn: null,
-  followupReadinessTrialCharacterSwitchRollbackBtn: null,
-  followupReadinessTrialEmitCharacterBtn: null,
-  followupReadinessTrialSendReplyCueCandidateBtn: null,
-  followupReadinessTrialCharacterCuePresetSelect: null,
-  followupReadinessCompare: null,
-  followupReadinessBody: null,
-  followupReadinessManualActions: null,
-  followupReadinessManualStatus: null,
-  followupReadinessManualConfirmBtn: null,
-  followupReadinessManualDismissBtn: null,
-  followupReadinessManualReviewBtn: null,
-  followupManualConfirmationDismissedKeys: new Set(),
-  followupManualConfirmationApproving: false,
-  followupManualConfirmationLastVisibleEventKey: "",
-  followupReadinessRefreshTimer: 0,
-  followupCharacterChipRefreshTimer: 0,
-  followupCharacterRuntimeLastTone: "",
-  followupCharacterRuntimeLastHintAt: 0,
-  followupCharacterRuntimeLastHint: null,
-  followupCharacterRuntimeLastDispatch: null,
-  followupCharacterRuntimeLastApply: null,
-  followupCharacterRuntimeLastReplyCandidate: null,
-  followupCharacterRuntimeLastReplyAutoApply: null,
-  characterRuntimeAutoApplyReplyCue: false,
-  characterRehearsalIndex: 0,
-  characterPerformanceFeedbacks: [],
-  characterPerformanceLastFeedback: null,
-  grayAutoTrialCharacterCueManualEmitCount: 0,
-  grayAutoTrialCharacterCueLastManualEmitAt: 0,
-  grayAutoTrialCharacterCueLastManualEmit: null,
-  grayAutoTrialCharacterCueLastBackendBridge: null,
-  localAsrMutedWarned: false,
-  localAsrInputDeviceCandidates: [],
-  localAsrSpeeching: false,
-  localAsrSpeechMs: 0,
-  localAsrSilenceMs: 0,
-  localAsrBuffers: [],
-  localAsrSending: false,
-  localAsrAbortController: null,
-  localAsrMinSpeechMs: 180,
-  localAsrSilenceTriggerMs: 380,
-  localAsrMaxSpeechMs: 2400,
-  localAsrSpeechThreshold: 0.0035,
-  localAsrNoiseFloor: 0.0008,
-  localAsrProcessorBufferSize: 2048,
-  micLevel: 0,
-  showMicMeter: true,
-  asrHotwordRules: [],
-  wakeWordEnabled: true,
-  wakeWords: ["\u5854\u83f2", "taffy", "tafi"],
-  wakeRecognition: null,
-  wakeRecognitionActive: false,
-  wakeRestartTimer: 0,
-  wakeCooldownUntil: 0,
-  personaCard: null,
-  assistantAvatarUrl: "",
-  reminders: [],
-  reminderSeq: 1,
-  reminderTimer: 0,
-  dailyGreetingEnabled: false,
-  dailyGreetingHour: 8,
-  dailyGreetingMinute: 0,
-  dailyGreetingPrompt: "",
-  dailyGreetingLastRunKey: "",
-  emotionStats: [],
-  emotionDayKey: "",
-  animating: false,
-  baseTransform: { x: 0, y: 0, scale: 1, rotation: 0 },
-  modelPosX: NaN,
-  modelPosY: NaN,
-  dragData: null,
-  windowDragRaf: 0,
-  windowDragSessionRaf: 0,
-  windowDragDx: 0,
-  windowDragDy: 0,
-  dragWindowAccumX: 0,
-  dragWindowAccumY: 0,
-  windowDragActive: false,
-  browserDragActive: false,
-  suspendRelayoutUntil: 0,
-  resizeRaf: 0,
-  layoutWidth: 0,
-  layoutHeight: 0,
-  pendingAttachments: [],
-  attachmentReadBusy: false,
-  onboardingStepIndex: 0,
-  onboardingSeen: false,
-  activePerfTraceId: "",
-  perfTtsSeq: 0
-};
+const CHAT_STATE = window.TaffyChatState || {};
+const state = CHAT_STATE.createInitialState();
 window.__petState = state;
 
 function createPerfTraceId(prefix = "chat") {
@@ -543,1798 +88,1262 @@ function recordTTSAudioEvent(stage, audio, debugContext = {}, extra = {}) {
   });
 }
 
-function formatTTSDebugNumber(value, digits = 0) {
-  return typeof window.TaffyTTSDebugReport?.formatNumber === "function"
-    ? window.TaffyTTSDebugReport.formatNumber(value, digits)
-    : "n/a";
+function getFollowupControllerDeps() {
+  return {
+    state,
+    ui,
+    windowObject: window,
+    documentObject: document,
+    performanceObject: performance,
+    followupReadinessView: FOLLOWUP_READINESS_VIEW,
+    grayTrialReadinessModel: GRAY_TRIAL_READINESS_MODEL,
+    grayTrialCharacterView: GRAY_TRIAL_CHARACTER_VIEW,
+    grayTrialCharacterModel: GRAY_TRIAL_CHARACTER_MODEL,
+    grayTrialAutoRuntimeSwitchModel: GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL,
+    characterReplyCue: CHARACTER_REPLY_CUE,
+    characterTuning: CHARACTER_TUNING,
+    recordTTSDebugEvent,
+    sanitizeTTSDebugText,
+    recordTTSAudioEvent,
+    updateTTSDebugPanel,
+    requestAssistantReply,
+    setStatus,
+    appendMessage,
+    buildSpeakProsody,
+    speak,
+    updateSpeakButton,
+    authFetch,
+    recordCharacterPerformanceFeedback,
+    handleCharacterRuntimeMetadata,
+    applyCharacterRuntimeEmotionToLive2D,
+    applyCharacterRuntimeActionToLive2D,
+    updateReplyCharacterChip,
+    updateFollowupCharacterChip,
+    updateFollowupReadinessPanel,
+    syncProactiveSchedulerPolling,
+    buildGrayAutoFollowupTrialEventContext,
+    mergeProactiveSchedulerPollEventResult,
+    mergeProactiveSchedulerPollEventError,
+    getTTSDebugSnapshot,
+    buildConversationFollowupPromptDraft,
+    buildConversationFollowupDebugPlan,
+    getConversationFollowupPolicyDebugText,
+    buildConversationFollowupPolicy,
+    previewConversationFollowupPolicy,
+    buildConversationFollowupReactionCandidates,
+    selectConversationFollowupReactionCandidate,
+    buildConversationFollowupCharacterCue,
+    getGrayAutoTrialSessionTriggerCount,
+    buildGrayAutoTrialSessionState,
+    incrementGrayAutoTrialSessionTriggerCount,
+    isGrayAutoTrialSessionLimitReached,
+    shouldEnableProactiveSchedulerPolling,
+    getProactiveSchedulerPollingGateStatus,
+    stopGrayAutoTrialSession,
+    armGrayAutoTrialSession,
+    disarmGrayAutoTrialSession,
+    resetGrayAutoTrialSessionTriggerCount,
+    buildFollowupReadinessReport,
+    buildGrayAutoTrialAuditSummary,
+    buildGrayAutoTrialPreRunChecklist,
+    buildGrayAutoTrialTimeline,
+    buildGrayAutoTrialOutcome,
+    buildGrayAutoTrialGoNoGoDecision,
+    buildGrayAutoTrialSignoffPackage,
+    buildGrayAutoTrialPreRunChecklistText,
+    buildGrayAutoTrialTimelineText,
+    buildGrayAutoTrialOutcomeText,
+    buildGrayAutoTrialGoNoGoDecisionText,
+    buildGrayAutoTrialSignoffPackageText,
+    buildGrayAutoTrialCharacterCuePreviewText,
+    buildGrayAutoTrialCharacterCueHandoffChecklistText,
+    buildGrayAutoTrialCharacterCueManualEmitRecapText,
+    buildGrayAutoTrialCharacterManualCueStatusCardText,
+    buildGrayAutoTrialCharacterExpressionStrategyDraftText,
+    buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText,
+    buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText,
+    buildGrayAutoTrialCharacterAutoRuntimeDryRunText,
+    buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText,
+    buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackageText,
+    buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackageText,
+    buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText,
+    buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText,
+    buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText,
+    buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText,
+    buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftText,
+    getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchState,
+    enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch,
+    disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch,
+    rollbackGrayAutoTrialCharacterAutoRuntimeExplicitSwitch,
+    emitGrayAutoTrialCharacterCueViaManualBridge,
+    emitLastReplyCharacterCueCandidateViaManualBridge,
+    updateFollowupReadinessBackendEntryCard,
+    refreshFollowupReadinessBackendEntrySummary,
+    updateGrayAutoTrialControlPanel,
+    updateGrayAutoTrialCharacterManualCueStatusCard,
+    updateReplyCharacterCueCandidateManualSendButton,
+    buildFollowupReadinessPreviewCardData,
+    buildFollowupReadinessPreviewCardText,
+    buildFollowupReadinessPreviewCopyBundleText,
+    buildFollowupReadinessPreviewJsonText,
+    buildFollowupReadinessPreviewOneLineText,
+    buildFollowupConfigTemplate,
+    runConversationFollowupDebug,
+    runProactiveSchedulerManualTick,
+    runConversationSilenceFollowupDryRun,
+    runConversationFollowupPendingFixture,
+    rehearseConversationFollowupPending,
+    clearConversationFollowupRehearsal,
+    getFollowupRehearsalScenario,
+    getFollowupRehearsalScenarioLabel,
+    writeTextToClipboard,
+    buildGrayAutoFollowupReadinessStatus,
+    buildGrayAutoFollowupDryRunStatus,
+    buildGrayAutoFollowupTrialPreflight,
+    buildGrayAutoFollowupTrialEventSummary,
+    buildGrayAutoTrialAuditSummaryText,
+    buildFollowupReadinessBackendEntryView,
+    buildFollowupReadinessBackendEntryCardText,
+    buildFollowupReadinessFriendlySummary,
+    explainReadinessReason,
+    explainReadinessReasons,
+    joinReadinessReasons,
+    formatReadinessBool,
+    formatReadinessMs,
+    buildFollowupCharacterState,
+    previewConversationFollowupReactions,
+    buildFollowupCharacterChipTitle,
+    buildReplyCharacterChipView,
+    buildFollowupCharacterRuntimeHint,
+    normalizeGrayAutoTrialCharacterCuePresetKey,
+    listGrayAutoTrialCharacterCuePresets,
+    resolveGrayAutoTrialCharacterCuePreset,
+    previewAssistantReplyCharacterCueCandidate,
+    maybeAutoApplyAssistantReplyCharacterCueCandidate,
+    maybeEmitFollowupCharacterRuntimeHint,
+    buildFollowupAwareIdleMotionContext,
+    buildGrayAutoTrialCharacterCuePreview,
+    buildGrayAutoTrialCharacterCueHandoffChecklist,
+    getGrayAutoTrialCharacterCueManualEmitStatus,
+    buildGrayAutoTrialCharacterCueManualEmitRecap,
+    buildGrayAutoTrialCharacterExpressionStrategyDraft,
+    buildGrayAutoTrialCharacterExpressionStrategyReviewPackage,
+    buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan,
+    buildGrayAutoTrialCharacterAutoRuntimeDryRun,
+    buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan,
+    buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage,
+    buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage,
+    buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl,
+    buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics,
+    buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage,
+    buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight,
+    buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft,
+    emitGrayAutoTrialCharacterCueManually,
+    previewGrayAutoTrialCharacterCueBackendBridge,
+    getSelectedGrayAutoTrialCharacterCuePresetKey,
+    getGrayAutoTrialMaxTriggersPerSession,
+    buildGrayAutoTrialRunbook,
+    buildProactiveSchedulerDebugSnapshot,
+    buildConversationSilenceDebugSnapshot,
+    buildConversationFollowupDebugView,
+    snapshotConversationFollowupPending,
+    restoreConversationFollowupPending,
+    clearConversationFollowupPending,
+    getConversationFollowupRehearsalBlockedReason,
+    runFollowupReadinessPanelRehearsal,
+    clearFollowupReadinessPanelRehearsal,
+    snapshotConversationFollowupPendingFixtureState,
+    restoreConversationFollowupPendingFixtureState,
+    runProactiveSchedulerPollingCheck,
+    normalizeProactiveSchedulerPollFailureReason,
+    injectProactiveSchedulerPollFailureOnce,
+    getProactiveSchedulerFailureInjectionState,
+    clearProactiveSchedulerFailureInjection,
+    consumeProactiveSchedulerPollFailureInjection,
+    stopProactiveSchedulerPolling,
+    startProactiveSchedulerPolling,
+    buildTTSDebugReport,
+    parseGrayTrialPollEventResult,
+    runGrayAutoFollowupDryRunDebug,
+    formatFollowupReactionCandidateSummary,
+    getFollowupCharacterStateDebugView,
+    localizeReplyCharacterValue,
+    buildAssistantReplyCharacterExpressionCue,
+    buildAssistantReplyCharacterCueCandidate,
+    normalizeRuntimeVoiceStyle,
+    runtimeVoiceStyleToTalkStyle,
+    isReplyCueAutoApplyEnabled,
+    startFollowupCharacterChipRefresh,
+    buildFollowupRehearsalScenarioCompareRows,
+    buildFollowupRehearsalScenarioCompareText,
+    normalizeFollowupManualConfirmationToken,
+    buildFollowupManualConfirmationKey,
+    buildFollowupManualConfirmationData,
+    getFollowupManualConfirmationStatusLabel,
+    buildFollowupManualConfirmationDebugPayload,
+    recordFollowupManualConfirmationVisibleEvent,
+    updateFollowupManualConfirmationControls,
+    handleFollowupManualConfirmClick,
+    dismissFollowupManualConfirmation,
+    reviewFollowupManualConfirmationDetails,
+    updateFollowupReadinessPreviewCard,
+    updateFollowupManualConfirmationPreviewCard,
+    buildGrayAutoTrialStatusCardText,
+    updateGrayAutoTrialStatusCard,
+    buildGrayAutoTrialCharacterCueManualEmitStatusText,
+    getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled,
+    updateGrayAutoTrialPreRunChecklistCard,
+    updateGrayAutoTrialTimelineCard,
+    updateGrayAutoTrialOutcomeCard,
+    updateGrayAutoTrialDecisionCard,
+    updateGrayAutoTrialSignoffCard,
+    updateGrayAutoTrialCharacterCard,
+    updateGrayAutoTrialCharacterHandoffCard,
+    updateGrayAutoTrialCharacterRecapCard,
+    updateGrayAutoTrialCharacterStrategyCard,
+    updateGrayAutoTrialCharacterReviewCard,
+    updateGrayAutoTrialCharacterAutoPlanCard,
+    updateGrayAutoTrialCharacterDryRunCard,
+    updateGrayAutoTrialCharacterSwitchPlanCard,
+    updateGrayAutoTrialCharacterSwitchReviewCard,
+    updateGrayAutoTrialCharacterSwitchAcceptanceCard,
+    updateGrayAutoTrialCharacterSwitchControlCard,
+    updateGrayAutoTrialCharacterSwitchDiagnosticsCard,
+    updateGrayAutoTrialCharacterSwitchRollbackCard,
+    updateGrayAutoTrialCharacterSwitchFinalPreflightCard,
+    updateGrayAutoTrialCharacterImplementationDraftCard,
+    promptGrayAutoTrialPhrase,
+    handleGrayAutoTrialArmClick,
+    handleGrayAutoTrialStopClick,
+    handleGrayAutoTrialDisarmClick,
+    handleGrayAutoTrialResetClick,
+    handleGrayAutoTrialCharacterCueManualEmitClick,
+    handleReplyCharacterCueCandidateManualSendClick,
+    handleGrayAutoTrialCharacterAutoRuntimeSwitchEnableClick,
+    handleGrayAutoTrialCharacterAutoRuntimeSwitchDisableClick,
+    handleGrayAutoTrialCharacterAutoRuntimeSwitchRollbackClick,
+    copyGrayAutoTrialAuditSummaryToClipboard,
+    copyGrayAutoTrialTimelineToClipboard,
+    copyGrayAutoTrialDecisionToClipboard,
+    copyGrayAutoTrialSignoffToClipboard,
+    copyGrayAutoTrialCharacterCuePreviewToClipboard,
+    copyGrayAutoTrialCharacterCueHandoffChecklistToClipboard,
+    copyGrayAutoTrialCharacterCueManualEmitRecapToClipboard,
+    copyGrayAutoTrialCharacterExpressionStrategyDraftToClipboard,
+    copyGrayAutoTrialCharacterExpressionStrategyReviewPackageToClipboard,
+    copyGrayAutoTrialCharacterAutoRuntimeSafetyPlanToClipboard,
+    copyGrayAutoTrialCharacterAutoRuntimeDryRunToClipboard,
+    copyGrayAutoTrialCharacterAutoRuntimeSwitchPlanToClipboard,
+    copyGrayAutoTrialCharacterAutoRuntimeSwitchReviewToClipboard,
+    copyGrayAutoTrialCharacterAutoRuntimeSwitchAcceptanceToClipboard,
+    copyGrayAutoTrialCharacterAutoRuntimeSwitchControlToClipboard,
+    copyGrayAutoTrialCharacterAutoRuntimeSwitchDiagnosticsToClipboard,
+    copyGrayAutoTrialCharacterAutoRuntimeSwitchRollbackToClipboard,
+    copyGrayAutoTrialCharacterAutoRuntimeFinalPreflightToClipboard,
+    copyGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftToClipboard,
+    updateFollowupReadinessScenarioCompare,
+    createFollowupReadinessActionGroup,
+    createFollowupReadinessCollapsibleActionGroup,
+    ensureFollowupReadinessPanel,
+    toggleFollowupReadinessPanel,
+    copyFollowupReadinessReportToClipboard,
+    copyFollowupReadinessSelectedTextToClipboard,
+    copyFollowupReadinessPreviewSummaryToClipboard,
+    copyFollowupReadinessPreviewCopyBundleToClipboard,
+    copyFollowupReadinessPreviewJsonToClipboard,
+    copyFollowupReadinessPreviewOneLineToClipboard,
+    copyFollowupConfigTemplateToClipboard
+  };
+}
+
+const FOLLOWUP_DEBUG_CONTROLLER = window.TaffyFollowupDebugController || {};
+let followupDebugController = null;
+
+function getFollowupDebugController() {
+  if (!followupDebugController && typeof FOLLOWUP_DEBUG_CONTROLLER.createController === "function") {
+    followupDebugController = FOLLOWUP_DEBUG_CONTROLLER.createController(getFollowupControllerDeps());
+  }
+  return followupDebugController;
 }
 
 function getGrayAutoTrialMaxTriggersPerSession(conversationMode = null) {
-  const mode = conversationMode && typeof conversationMode === "object"
-    ? conversationMode
-    : state.conversationMode;
-  const value = Number(mode?.grayAutoTrialMaxTriggersPerSession);
-  return Number.isFinite(value) ? Math.max(0, Math.min(4, Math.round(value))) : 1;
+  return getFollowupDebugController().getGrayAutoTrialMaxTriggersPerSession(conversationMode);
 }
 
 function getGrayAutoTrialSessionTriggerCount() {
-  const value = Number(state.grayAutoTrialSessionTriggerCount || 0);
-  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+  return getFollowupDebugController().getGrayAutoTrialSessionTriggerCount();
 }
 
 function isGrayAutoTrialSessionLimitReached(conversationMode = null) {
-  return getGrayAutoTrialSessionTriggerCount() >= getGrayAutoTrialMaxTriggersPerSession(conversationMode);
+  return getFollowupDebugController().isGrayAutoTrialSessionLimitReached(conversationMode);
 }
 
 function incrementGrayAutoTrialSessionTriggerCount() {
-  state.grayAutoTrialSessionTriggerCount = getGrayAutoTrialSessionTriggerCount() + 1;
-  return state.grayAutoTrialSessionTriggerCount;
+  return getFollowupDebugController().incrementGrayAutoTrialSessionTriggerCount();
 }
 
 function buildGrayAutoTrialSessionState() {
-  const maxTriggers = getGrayAutoTrialMaxTriggersPerSession();
-  const count = getGrayAutoTrialSessionTriggerCount();
-  return {
-    readOnly: true,
-    count,
-    max: maxTriggers,
-    remaining: Math.max(0, maxTriggers - count),
-    reached: count >= maxTriggers,
-    blockedReason: count >= maxTriggers ? "gray_auto_trial_session_limit_reached" : ""
-  };
+  return getFollowupDebugController().buildGrayAutoTrialSessionState();
 }
 
 function resetGrayAutoTrialSessionTriggerCount() {
-  const previous = getGrayAutoTrialSessionTriggerCount();
-  state.grayAutoTrialSessionTriggerCount = 0;
-  const current = buildGrayAutoTrialSessionState();
-  recordTTSDebugEvent("conversation_followup_gray_auto_trial_session_reset", {
-    result: `from:${previous};max:${current.max}`,
-    error: current.blockedReason
-  });
-  return {
-    ...current,
-    reset: true,
-    previousCount: previous,
-    pollingRestarted: false
-  };
+  return getFollowupDebugController().resetGrayAutoTrialSessionTriggerCount();
 }
 
-
 function stopGrayAutoTrialSession(reason = "manual_emergency_stop") {
-  const normalizedReason = sanitizeTTSDebugText(reason || "manual_emergency_stop", 80) || "manual_emergency_stop";
-  const previous = buildGrayAutoTrialSessionState();
-  state.grayAutoTrialSessionTriggerCount = getGrayAutoTrialMaxTriggersPerSession();
-  stopProactiveSchedulerPolling("gray_auto_trial_emergency_stop");
-  const current = buildGrayAutoTrialSessionState();
-  recordTTSDebugEvent("conversation_followup_gray_auto_trial_emergency_stop", {
-    result: ["reason:" + normalizedReason, "from:" + previous.count, "to:" + current.count, "max:" + current.max].join(";"),
-    error: current.blockedReason
-  });
-  return {
-    ...current,
-    stopped: true,
-    reason: normalizedReason,
-    previousCount: previous.count,
-    pollingRestarted: false
-  };
+  return getFollowupDebugController().stopGrayAutoTrialSession(reason);
 }
 
 function armGrayAutoTrialSession(input = {}) {
-  const safeInput = input && typeof input === "object" ? input : {};
-  const confirm = String(safeInput.confirm || "").trim();
-  if (confirm !== "ARM_GRAY_AUTO_TRIAL") {
-    return {
-      ok: false,
-      armed: false,
-      reason: "confirmation_required",
-      requiredConfirm: "ARM_GRAY_AUTO_TRIAL",
-      pollingRestarted: false
-    };
-  }
-  if (!state.conversationMode || typeof state.conversationMode !== "object") {
-    state.conversationMode = {};
-  }
-  state.conversationMode.enabled = true;
-  state.conversationMode.proactiveEnabled = true;
-  state.conversationMode.proactiveSchedulerEnabled = true;
-  state.conversationMode.grayAutoEnabled = true;
-  state.conversationMode.grayAutoTrialEnabled = true;
-  if (!Number.isFinite(Number(state.conversationMode.grayAutoTrialMaxTriggersPerSession))) {
-    state.conversationMode.grayAutoTrialMaxTriggersPerSession = 1;
-  }
-  resetGrayAutoTrialSessionTriggerCount();
-  syncProactiveSchedulerPolling();
-  const preflight = buildGrayAutoFollowupTrialPreflight();
-  const scheduler = buildProactiveSchedulerDebugSnapshot(Date.now());
-  recordTTSDebugEvent("conversation_followup_gray_auto_trial_armed", {
-    result: [
-      `status:${preflight.status}`,
-      `polling:${scheduler.pollTimerActive === true ? "active" : "inactive"}`,
-      `max:${getGrayAutoTrialMaxTriggersPerSession()}`
-    ].join(";"),
-    error: Array.isArray(preflight.blockedReasons) ? preflight.blockedReasons.join(",") : ""
-  });
-  return {
-    ok: true,
-    armed: true,
-    pollingRestarted: scheduler.pollTimerActive === true,
-    preflight,
-    scheduler: {
-      pollTimerActive: scheduler.pollTimerActive === true,
-      pollingBlockedReasons: Array.isArray(scheduler.pollingBlockedReasons) ? scheduler.pollingBlockedReasons.slice() : []
-    }
-  };
+  return getFollowupDebugController().armGrayAutoTrialSession(input);
 }
 
 function disarmGrayAutoTrialSession(reason = "manual_disarm") {
-  const normalizedReason = sanitizeTTSDebugText(reason || "manual_disarm", 80) || "manual_disarm";
-  if (!state.conversationMode || typeof state.conversationMode !== "object") {
-    state.conversationMode = {};
-  }
-  state.conversationMode.grayAutoEnabled = false;
-  state.conversationMode.grayAutoTrialEnabled = false;
-  stopProactiveSchedulerPolling("gray_auto_trial_disarmed");
-  const scheduler = buildProactiveSchedulerDebugSnapshot(Date.now());
-  recordTTSDebugEvent("conversation_followup_gray_auto_trial_disarmed", {
-    result: [
-      `reason:${normalizedReason}`,
-      `polling:${scheduler.pollTimerActive === true ? "active" : "inactive"}`,
-      `count:${getGrayAutoTrialSessionTriggerCount()}`,
-      `max:${getGrayAutoTrialMaxTriggersPerSession()}`
-    ].join(";"),
-    error: Array.isArray(scheduler.pollingBlockedReasons) ? scheduler.pollingBlockedReasons.join(",") : ""
-  });
-  return {
-    ok: true,
-    armed: false,
-    reason: normalizedReason,
-    pollingRestarted: false,
-    scheduler: {
-      pollTimerActive: scheduler.pollTimerActive === true,
-      pollingBlockedReasons: Array.isArray(scheduler.pollingBlockedReasons) ? scheduler.pollingBlockedReasons.slice() : []
-    },
-    session: buildGrayAutoTrialSessionState()
-  };
+  return getFollowupDebugController().disarmGrayAutoTrialSession(reason);
 }
 
 function buildGrayAutoTrialRunbook() {
-  return {
-    readOnly: true,
-    title: "Gray automatic follow-up controlled trial runbook",
-    safety: [
-      "Default config stays off.",
-      "Use DevTools only in a local controlled test.",
-      "Session cap, emergency stop, disarm, cooldown, silence, policy, busy/speaking, and window limits still apply.",
-      "No desktop observation, screenshots, file access, shell execution, tool calls, backend APIs, or config writes are required."
-    ],
-    commands: {
-      preflight: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialPreflight()",
-      events: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialEvents()",
-      session: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialSession()",
-      arm: "window.__AI_CHAT_DEBUG_TTS__.armGrayAutoFollowupTrial({ confirm: \"ARM_GRAY_AUTO_TRIAL\" })",
-      stop: "window.__AI_CHAT_DEBUG_TTS__.stopGrayAutoFollowupTrial(\"manual_stop\")",
-      disarm: "window.__AI_CHAT_DEBUG_TTS__.disarmGrayAutoFollowupTrial(\"manual_disarm\")",
-      reset: "window.__AI_CHAT_DEBUG_TTS__.resetGrayAutoFollowupTrialSession()",
-      audit: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialAuditSummary()",
-      checklist: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialPreRunChecklist()",
-      timeline: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialTimeline()",
-      outcome: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialOutcome()",
-      decision: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialGoNoGoDecision()",
-      signoff: "window.__AI_CHAT_DEBUG_TTS__.grayAutoFollowupTrialSignoffPackage()",
-      statusReport: "window.__AI_CHAT_DEBUG_TTS__.followupReadiness()"
-    },
-    steps: [
-      "Run preflight and confirm whether the trial is gated_off, runtime_guards_blocked, or ready_for_local_trial.",
-      "Run arm only with the exact confirmation phrase during a local controlled test.",
-      "Watch grayAutoFollowupTrialEvents() for poll_start, poll_blocked, poll_ready, and trigger events.",
-      "If anything feels wrong, run stopGrayAutoFollowupTrial() immediately.",
-      "After the test, run disarmGrayAutoFollowupTrial() to close in-memory gates.",
-      "Use resetGrayAutoFollowupTrialSession() only when you intentionally want another capped local attempt."
-    ],
-    successCriteria: [
-      "No automatic behavior happens before explicit arm.",
-      "Poll events include trial status, gates, would_poll, and would_trigger.",
-      "At most one successful automatic trigger happens with the default session cap.",
-      "Emergency stop seals the session until reset.",
-      "Disarm turns gray gates off and leaves config unchanged."
-    ],
-    rollback: [
-      "Run stopGrayAutoFollowupTrial(\"rollback\").",
-      "Run disarmGrayAutoFollowupTrial(\"rollback\").",
-      "Restart the app if you want to clear all renderer-memory trial state."
-    ]
-  };
+  return getFollowupDebugController().buildGrayAutoTrialRunbook();
 }
 
 function shouldEnableProactiveSchedulerPolling() {
-  const status = getProactiveSchedulerPollingGateStatus();
-  return status.enabled;
+  return getFollowupDebugController().shouldEnableProactiveSchedulerPolling();
 }
 
 function getProactiveSchedulerPollingGateStatus() {
-  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
-    ? state.conversationMode
-    : {};
-  const blockedReasons = [];
-  if (conversationMode.enabled !== true) {
-    blockedReasons.push("conversation_disabled");
-  }
-  if (conversationMode.proactiveEnabled !== true) {
-    blockedReasons.push("proactive_disabled");
-  }
-  if (conversationMode.proactiveSchedulerEnabled !== true) {
-    blockedReasons.push("scheduler_disabled");
-  }
-  if (conversationMode.grayAutoEnabled !== true) {
-    blockedReasons.push("gray_auto_disabled");
-  }
-  if (conversationMode.grayAutoTrialEnabled !== true) {
-    blockedReasons.push("gray_auto_trial_disabled");
-  }
-  if (isGrayAutoTrialSessionLimitReached(conversationMode)) {
-    blockedReasons.push("gray_auto_trial_session_limit_reached");
-  }
-  return {
-    enabled: blockedReasons.length === 0,
-    blockedReasons
-  };
+  return getFollowupDebugController().getProactiveSchedulerPollingGateStatus();
 }
 
 function buildProactiveSchedulerDebugSnapshot(nowMs = Date.now()) {
-  const now = Number(nowMs);
-  const safeNow = Number.isFinite(now) ? now : Date.now();
-  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
-    ? state.conversationMode
-    : {};
-  const conversationEnabled = conversationMode.enabled === true;
-  const proactiveEnabled = conversationMode.proactiveEnabled === true;
-  const schedulerEnabled = conversationMode.proactiveSchedulerEnabled === true;
-  const grayAutoEnabled = conversationMode.grayAutoEnabled === true;
-  const grayAutoTrialEnabled = conversationMode.grayAutoTrialEnabled === true;
-  const grayAutoTrialSessionTriggerCount = getGrayAutoTrialSessionTriggerCount();
-  const grayAutoTrialMaxTriggersPerSession = getGrayAutoTrialMaxTriggersPerSession(conversationMode);
-  const pollingGate = getProactiveSchedulerPollingGateStatus();
-  const pollIntervalMs = Number.isFinite(Number(conversationMode.proactivePollIntervalMs))
-    ? Math.max(30000, Math.min(600000, Math.round(Number(conversationMode.proactivePollIntervalMs))))
-    : 60000;
-  const warmupMs = Number.isFinite(Number(conversationMode.proactiveWarmupMs))
-    ? Math.max(0, Math.round(Number(conversationMode.proactiveWarmupMs)))
-    : 120000;
-  const maxFollowupsPerWindow = Number.isFinite(Number(conversationMode.maxFollowupsPerWindow))
-    ? Math.max(0, Math.round(Number(conversationMode.maxFollowupsPerWindow)))
-    : 1;
-  const proactiveWindowMs = Number.isFinite(Number(conversationMode.proactiveWindowMs))
-    ? Math.max(0, Math.round(Number(conversationMode.proactiveWindowMs)))
-    : 3600000;
-  const startedAt = Number(state.proactiveSchedulerStartedAt || 0);
-  const proactiveCooldownUntil = Number(state.proactiveCooldownUntil || 0);
-  const proactiveWindowStartedAt = Number(state.proactiveWindowStartedAt || 0);
-  const rawProactiveCountInWindow = Number.isFinite(Number(state.proactiveCountInWindow))
-    ? Math.max(0, Math.round(Number(state.proactiveCountInWindow)))
-    : 0;
-  const proactiveInFlight = state.proactiveInFlight === true;
-  const pollTimerActive = Number(state.proactivePollTimerId || 0) > 0;
-  const pollingEnabled = pollingGate.enabled === true;
-  const lastPollAt = Number(state.proactiveLastPollAt || 0);
-  const lastPollAgeMs = lastPollAt > 0 ? Math.max(0, Math.round(safeNow - lastPollAt)) : -1;
-  const lastAttemptAt = Number(state.proactiveLastAttemptAt || 0);
-  const lastTriggeredAt = Number(state.proactiveLastTriggeredAt || 0);
-
-  const startedAgeMs = startedAt > 0 ? Math.max(0, Math.round(safeNow - startedAt)) : -1;
-  const warmupRemainingMs = startedAt > 0
-    ? Math.max(0, Math.round(warmupMs - (safeNow - startedAt)))
-    : warmupMs;
-  const cooldownRemainingMs = proactiveCooldownUntil > safeNow
-    ? Math.max(0, Math.round(proactiveCooldownUntil - safeNow))
-    : 0;
-  const rawWindowAgeMs = proactiveWindowStartedAt > 0
-    ? Math.max(0, Math.round(safeNow - proactiveWindowStartedAt))
-    : -1;
-  const windowActive = proactiveWindowStartedAt > 0 && rawWindowAgeMs <= proactiveWindowMs;
-  const windowAgeMs = windowActive ? rawWindowAgeMs : -1;
-  const proactiveCountInWindow = windowActive ? rawProactiveCountInWindow : 0;
-  const lastAttemptAgeMs = lastAttemptAt > 0 ? Math.max(0, Math.round(safeNow - lastAttemptAt)) : -1;
-  const lastTriggeredAgeMs = lastTriggeredAt > 0 ? Math.max(0, Math.round(safeNow - lastTriggeredAt)) : -1;
-
-  const blockedReasons = [];
-  if (!conversationEnabled) {
-    blockedReasons.push("conversation_disabled");
-  }
-  if (!proactiveEnabled) {
-    blockedReasons.push("proactive_disabled");
-  }
-  if (!schedulerEnabled) {
-    blockedReasons.push("scheduler_disabled");
-  }
-  if (warmupRemainingMs > 0) {
-    blockedReasons.push("warmup_active");
-  }
-  if (cooldownRemainingMs > 0) {
-    blockedReasons.push("cooldown_active");
-  }
-  if (proactiveInFlight) {
-    blockedReasons.push("in_flight");
-  }
-  if (proactiveCountInWindow >= maxFollowupsPerWindow) {
-    blockedReasons.push("window_limit_reached");
-  }
-  if (grayAutoTrialSessionTriggerCount >= grayAutoTrialMaxTriggersPerSession) {
-    blockedReasons.push("gray_auto_trial_session_limit_reached");
-  }
-
-  return {
-    schedulerEnabled,
-    conversationEnabled,
-    proactiveEnabled,
-    grayAutoEnabled,
-    grayAutoTrialEnabled,
-    grayAutoTrialSessionTriggerCount,
-    grayAutoTrialMaxTriggersPerSession,
-    startedAgeMs,
-    warmupRemainingMs,
-    cooldownRemainingMs,
-    windowAgeMs,
-    proactiveCountInWindow,
-    maxFollowupsPerWindow,
-    proactiveInFlight,
-    pollingEnabled,
-    pollingBlockedReasons: Array.isArray(pollingGate.blockedReasons)
-      ? pollingGate.blockedReasons.slice()
-      : [],
-    pollIntervalMs,
-    pollTimerActive,
-    lastPollAgeMs,
-    pollLastResult: String(state.proactivePollLastResult || ""),
-    lastAttemptAgeMs,
-    lastTriggeredAgeMs,
-    lastBlockedReason: String(state.proactiveLastBlockedReason || ""),
-    lastResult: String(state.proactiveLastResult || ""),
-    blockedReasons,
-    eligibleForSchedulerTick: blockedReasons.length === 0
-  };
+  return getFollowupDebugController().buildProactiveSchedulerDebugSnapshot(nowMs);
 }
 
 function getTTSDebugSnapshot() {
-  const audio = state.ttsAudio;
-  const now = performance.now();
-  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
-    ? state.conversationMode
-    : {};
-  const followupUpdatedAt = Number(state.followupUpdatedAt || 0);
-  const followupPlan = buildConversationFollowupDebugPlan(Date.now());
-  const followupPolicy = buildConversationFollowupPolicy({
-    reason: String(state.followupReason || ""),
-    topicHint: String(state.followupTopicHint || "")
-  });
-  const followupCharacterCue = buildConversationFollowupCharacterCue(followupPlan);
-  const followupReactionCandidates = buildConversationFollowupReactionCandidates(followupPlan);
-  const followupSelectedReaction = selectConversationFollowupReactionCandidate(followupPlan, followupReactionCandidates);
-  const followupCharacterPreview = followupSelectedReaction.candidate?.text || "";
-  const durationMs = audio && Number.isFinite(Number(audio.duration)) && audio.duration > 0
-    ? Math.round(Number(audio.duration) * 1000)
-    : Number(state.ttsDebugAudioDurationMs || -1);
-  const currentMs = audio ? Math.round(Number(audio.currentTime || 0) * 1000) : Number(state.ttsDebugAudioCurrentMs || 0);
-  return {
-    provider: state.ttsProvider,
-    speakingEnabled: !!state.speakingEnabled,
-    streamMode: state.streamSpeakMode,
-    streamWorking: !!state.streamSpeakWorking,
-    queueLen: Array.isArray(state.streamSpeakQueue) ? state.streamSpeakQueue.length : 0,
-    bufferChars: String(state.streamSpeakBuffer || "").length,
-    sessionId: Number(state.streamSpeakSession || 0),
-    traceId: state.ttsDebugCurrentTraceId || state.activePerfTraceId || "",
-    currentText: state.ttsDebugCurrentText || "",
-    audioPaused: audio ? !!audio.paused : true,
-    audioEnded: audio ? !!audio.ended : true,
-    audioReadyState: audio ? Number(audio.readyState || 0) : -1,
-    durationMs,
-    currentMs,
-    contextSpeaking: !!state.ttsContextSpeaking,
-    mouthOpen: Number(state.speechMouthOpen || 0),
-    audioLevel: Number(state.ttsAudioLevel || 0),
-    rawLevel: Number(state.ttsAudioRawLevel || 0),
-    rms: Number(state.ttsAudioRms || 0),
-    lastVoiceAgeMs: state.ttsAudioLastVoiceAt ? Math.round(now - Number(state.ttsAudioLastVoiceAt)) : -1,
-    animUntilMs: Math.round(Number(state.speechAnimUntil || 0) - now),
-    animDurationMs: Number(state.speechAnimDurationMs || 0),
-    mood: state.speechAnimMood || "idle",
-    style: state.speechAnimStyle || state.currentTalkStyle || "neutral",
-    conversationMode: {
-      enabled: conversationMode.enabled === true,
-      proactiveEnabled: conversationMode.proactiveEnabled === true,
-      proactiveSchedulerEnabled: conversationMode.proactiveSchedulerEnabled === true,
-      grayAutoEnabled: conversationMode.grayAutoEnabled === true,
-      grayAutoTrialEnabled: conversationMode.grayAutoTrialEnabled === true,
-      grayAutoTrialSessionTriggerCount: getGrayAutoTrialSessionTriggerCount(),
-      grayAutoTrialMaxTriggersPerSession: getGrayAutoTrialMaxTriggersPerSession(conversationMode),
-      proactiveCooldownMs: Number.isFinite(Number(conversationMode.proactiveCooldownMs))
-        ? Math.round(Number(conversationMode.proactiveCooldownMs))
-        : 600000,
-      proactiveWarmupMs: Number.isFinite(Number(conversationMode.proactiveWarmupMs))
-        ? Math.round(Number(conversationMode.proactiveWarmupMs))
-        : 120000,
-      proactiveWindowMs: Number.isFinite(Number(conversationMode.proactiveWindowMs))
-        ? Math.round(Number(conversationMode.proactiveWindowMs))
-        : 3600000,
-      proactivePollIntervalMs: Number.isFinite(Number(conversationMode.proactivePollIntervalMs))
-        ? Math.round(Number(conversationMode.proactivePollIntervalMs))
-        : 60000,
-      maxFollowupsPerWindow: Number.isFinite(Number(conversationMode.maxFollowupsPerWindow))
-        ? Math.round(Number(conversationMode.maxFollowupsPerWindow))
-        : 1,
-      silenceFollowupMinMs: Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
-        ? Math.round(Number(conversationMode.silenceFollowupMinMs))
-        : 180000,
-      interruptTtsOnUserSpeech: conversationMode.interruptTtsOnUserSpeech === true
-    },
-    followup: {
-      pending: state.followupPending === true,
-      reason: String(state.followupReason || ""),
-      topicHint: String(state.followupTopicHint || ""),
-      eligible: followupPlan.eligible === true,
-      blockedReasons: Array.isArray(followupPlan.blockedReasons) ? followupPlan.blockedReasons.slice() : [],
-      policy: followupPolicy.type,
-      policyNote: followupPolicy.note,
-      policyBlockedReason: String(followupPolicy.blockedReason || ""),
-      characterCue: followupCharacterCue,
-      characterPreview: followupCharacterPreview,
-      reactionCandidates: followupReactionCandidates,
-      selectedReaction: followupSelectedReaction,
-      updatedAgeMs: followupUpdatedAt > 0 ? Math.max(0, Math.round(Date.now() - followupUpdatedAt)) : -1
-    },
-    proactiveScheduler: buildProactiveSchedulerDebugSnapshot(Date.now()),
-    silence: buildConversationSilenceDebugSnapshot(Date.now()),
-    lastResult: state.ttsDebugLastResult || "",
-    lastError: state.ttsDebugLastError || ""
-  };
+  return getFollowupDebugController().getTTSDebugSnapshot();
 }
 
 function buildConversationSilenceDebugSnapshot(nowMs = Date.now()) {
-  const now = Number(nowMs);
-  const safeNow = Number.isFinite(now) ? now : Date.now();
-  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
-    ? state.conversationMode
-    : {};
-  const conversationEnabled = conversationMode.enabled === true;
-  const proactiveEnabled = conversationMode.proactiveEnabled === true;
-  const proactiveSchedulerEnabled = conversationMode.proactiveSchedulerEnabled === true;
-  const followupPending = state.followupPending === true;
-  const topicHint = String(state.followupTopicHint || "").trim();
-  const reason = String(state.followupReason || "").trim();
-  const policy = buildConversationFollowupPolicy({ reason, topicHint });
-  const chatBusy = state.chatBusy === true;
-  const speaking = isSpeakingNow();
-  const silenceFollowupMinMs = Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
-    ? Math.max(0, Math.round(Number(conversationMode.silenceFollowupMinMs)))
-    : 180000;
-  const lastUserAt = Number(state.conversationLastUserAt || 0);
-  const lastAssistantAt = Number(state.conversationLastAssistantAt || 0);
-  const lastTtsFinishedAt = Number(state.conversationLastTtsFinishedAt || 0);
-  const lastUserAgeMs = lastUserAt > 0 ? Math.max(0, Math.round(safeNow - lastUserAt)) : -1;
-  const lastAssistantAgeMs = lastAssistantAt > 0 ? Math.max(0, Math.round(safeNow - lastAssistantAt)) : -1;
-  const lastTtsFinishedAgeMs = lastTtsFinishedAt > 0 ? Math.max(0, Math.round(safeNow - lastTtsFinishedAt)) : -1;
-  const silenceWindowReached = lastTtsFinishedAgeMs >= 0 && lastTtsFinishedAgeMs >= silenceFollowupMinMs;
-
-  const blockedReasons = [];
-  if (!conversationEnabled) {
-    blockedReasons.push("conversation_disabled");
-  }
-  if (!proactiveEnabled) {
-    blockedReasons.push("proactive_disabled");
-  }
-  if (!followupPending) {
-    blockedReasons.push("no_pending_followup");
-  }
-  if (!topicHint) {
-    blockedReasons.push("empty_topic_hint");
-  }
-  if (policy.type === "do_not_followup") {
-    blockedReasons.push(policy.blockedReason || "policy_do_not_followup");
-  }
-  if (chatBusy) {
-    blockedReasons.push("chat_busy");
-  }
-  if (speaking) {
-    blockedReasons.push("speaking");
-  }
-  if (lastUserAgeMs < 0) {
-    blockedReasons.push("no_user_activity_timestamp");
-  } else if (lastUserAgeMs < silenceFollowupMinMs) {
-    blockedReasons.push("user_silence_window_not_reached");
-  }
-  if (lastTtsFinishedAgeMs < 0) {
-    blockedReasons.push("no_tts_finished_timestamp");
-  } else if (lastTtsFinishedAgeMs < silenceFollowupMinMs) {
-    blockedReasons.push("tts_silence_window_not_reached");
-  }
-
-  return {
-    lastUserAgeMs,
-    lastAssistantAgeMs,
-    lastTtsFinishedAgeMs,
-    silenceFollowupMinMs,
-    silenceWindowReached,
-    conversationEnabled,
-    proactiveEnabled,
-    proactiveSchedulerEnabled,
-    followupPending,
-    followupPolicy: policy.type,
-    followupPolicyNote: policy.note,
-    chatBusy,
-    speaking,
-    eligibleForSilenceFollowup: blockedReasons.length === 0,
-    blockedReasons
-  };
+  return getFollowupDebugController().buildConversationSilenceDebugSnapshot(nowMs);
 }
 
 function buildConversationFollowupPolicy(plan) {
-  const safePlan = plan && typeof plan === "object" ? plan : {};
-  const reason = String(safePlan.reason || "").trim();
-  const topicHint = String(safePlan.topicHint || "").replace(/\s+/g, " ").trim();
-  const closingRe = /(不用|算了|没事|先这样|不聊|结束|晚安|睡了|休息|不用回|别追问|不要继续)/i;
-  if (topicHint && closingRe.test(topicHint)) {
-    return {
-      type: "do_not_followup",
-      note: "话题像是已收口或不适合继续追问，保持安静。",
-      blockedReason: "policy_do_not_followup"
-    };
-  }
-  if (reason === "question_tail") {
-    return {
-      type: "light_question",
-      note: "上一轮以问题收尾，只允许轻轻补一个可忽略的小追问。"
-    };
-  }
-  if (reason === "keyword_hint") {
-    return {
-      type: "soft_checkin",
-      note: "上一轮像是在征求继续意愿，优先给低压力的可选接话。"
-    };
-  }
-  return {
-    type: "gentle_continue",
-    note: "默认以自然、短句的方式轻轻续一下话题。"
-  };
+  return getFollowupDebugController().buildConversationFollowupPolicy(plan);
 }
 
 function buildConversationFollowupCharacterCue(plan) {
-  const safePlan = plan && typeof plan === "object" ? plan : {};
-  const policy = String(safePlan.followupPolicy || "gentle_continue").trim() || "gentle_continue";
-  const reason = String(safePlan.reason || "followup_pending").trim() || "followup_pending";
-  const cueByPolicy = {
-    gentle_continue: {
-      persona: "温和、好奇、有一点桌宠式陪伴感",
-      tone: "像轻轻探头接一句，不像客服提醒",
-      emotion: "thinking",
-      action: "think",
-      intensity: "low",
-      voiceStyle: "soft",
-      sample: "刚才那个点我还在想，要不要先轻轻放在这里？"
-    },
-    light_question: {
-      persona: "好奇但不追着人问的小伙伴",
-      tone: "只问一个可以不回答的小问题",
-      emotion: "thinking",
-      action: "think",
-      intensity: "low",
-      voiceStyle: "soft",
-      sample: "我有点好奇这个点，不过你想先放着也完全可以。"
-    },
-    soft_checkin: {
-      persona: "低压力、会看气氛的陪伴型角色",
-      tone: "把选择权交给用户，不催促继续聊",
-      emotion: "happy",
-      action: "nod",
-      intensity: "low",
-      voiceStyle: "soft",
-      sample: "如果你还想聊这个，我在这边慢慢听。"
-    }
-  };
-  const cue = cueByPolicy[policy] || cueByPolicy.gentle_continue;
-  return {
-    ...cue,
-    policy,
-    reason,
-    runtimeMetadataHint: {
-      emotion: cue.emotion,
-      action: cue.action,
-      intensity: cue.intensity,
-      voice_style: cue.voiceStyle
-    }
-  };
-}
-
-function buildConversationFollowupCharacterPreview(plan) {
-  const candidates = buildConversationFollowupReactionCandidates(plan);
-  return selectConversationFollowupReactionCandidate(plan, candidates).candidate?.text || "";
+  return getFollowupDebugController().buildConversationFollowupCharacterCue(plan);
 }
 
 function buildConversationFollowupReactionCandidates(plan) {
-  const safePlan = plan && typeof plan === "object" ? plan : {};
-  const policy = String(safePlan.followupPolicy || "gentle_continue").trim() || "gentle_continue";
-  let topicHint = String(safePlan.topicHint || "").replace(/\s+/g, " ").trim();
-  if (topicHint.length > 28) {
-    topicHint = `${topicHint.slice(0, 28).trim()}...`;
-  }
-  if (policy === "do_not_followup") {
-    return [
-      { text: "这个话题像是已经收口了，我先安静待着。", tone: "quiet", emotion: "neutral" },
-      { text: "收到，我不追问啦，就在旁边待机。", tone: "quiet", emotion: "neutral" },
-      { text: "那我先闭麦一下，有需要你再叫我。", tone: "quiet", emotion: "neutral" }
-    ];
-  }
-  if (!topicHint) {
-    return [];
-  }
-  if (policy === "light_question") {
-    return [
-      { text: `我有点好奇「${topicHint}」，不过你想先放着也完全可以。`, tone: "curious", emotion: "thinking" },
-      { text: `刚才「${topicHint}」那里，我可以只问一个很小的问题吗？`, tone: "curious", emotion: "thinking" },
-      { text: `「${topicHint}」这个点有点勾我，但不急，想聊再聊。`, tone: "soft", emotion: "thinking" }
-    ];
-  }
-  if (policy === "soft_checkin") {
-    return [
-      { text: `如果你还想聊「${topicHint}」，我在这边慢慢听。`, tone: "soft", emotion: "happy" },
-      { text: `「${topicHint}」可以先放着，我会记得这个线头。`, tone: "soft", emotion: "thinking" },
-      { text: `想继续的话，我可以陪你把「${topicHint}」轻轻接下去。`, tone: "soft", emotion: "happy" }
-    ];
-  }
-  return [
-    { text: `刚才「${topicHint}」这个点我还在想，要不要先轻轻放在这里？`, tone: "gentle", emotion: "thinking" },
-    { text: `我把「${topicHint}」这根线先捏在手里，你想接的时候我还在。`, tone: "gentle", emotion: "thinking" },
-    { text: `关于「${topicHint}」，我有个很轻的小想法，不过不打扰你。`, tone: "gentle", emotion: "thinking" }
-  ];
+  return getFollowupDebugController().buildConversationFollowupReactionCandidates(plan);
 }
 
 function selectConversationFollowupReactionCandidate(plan, candidatesInput) {
-  const safePlan = plan && typeof plan === "object" ? plan : {};
-  const candidates = Array.isArray(candidatesInput)
-    ? candidatesInput.filter((item) => item && typeof item === "object" && String(item.text || "").trim())
-    : buildConversationFollowupReactionCandidates(safePlan);
-  if (!candidates.length) {
-    return {
-      candidate: null,
-      index: -1,
-      reason: "no_candidates",
-      preferredTone: "",
-      candidateCount: 0
-    };
-  }
-
-  const policy = String(safePlan.followupPolicy || "gentle_continue").trim() || "gentle_continue";
-  const reason = String(safePlan.reason || "").trim().toLowerCase();
-  const updatedAgeMs = Number(safePlan.updatedAgeMs);
-  let preferredTone = "gentle";
-  let selectionReason = "default_gentle";
-
-  if (policy === "do_not_followup") {
-    preferredTone = "quiet";
-    selectionReason = "policy_quiet";
-  } else if (policy === "light_question" || reason.includes("question")) {
-    preferredTone = "curious";
-    selectionReason = "question_context";
-  } else if (policy === "soft_checkin") {
-    preferredTone = "soft";
-    selectionReason = "soft_checkin_policy";
-  } else if (Number.isFinite(updatedAgeMs) && updatedAgeMs >= 10 * 60 * 1000) {
-    preferredTone = "soft";
-    selectionReason = "long_silence_soften";
-  }
-
-  let index = candidates.findIndex((item) => String(item.tone || "") === preferredTone);
-  if (index < 0) {
-    index = 0;
-    selectionReason = selectionReason + "_fallback_first";
-  }
-
-  return {
-    candidate: candidates[index],
-    index,
-    reason: selectionReason,
-    preferredTone,
-    candidateCount: candidates.length
-  };
+  return getFollowupDebugController().selectConversationFollowupReactionCandidate(plan, candidatesInput);
 }
 
 function buildConversationFollowupDebugPlan(nowMs = Date.now()) {
-  const now = Number(nowMs);
-  const safeNow = Number.isFinite(now) ? now : Date.now();
-  const conversationMode = state.conversationMode && typeof state.conversationMode === "object"
-    ? state.conversationMode
-    : {};
-  const conversationEnabled = conversationMode.enabled === true;
-  const proactiveEnabled = conversationMode.proactiveEnabled === true;
-  const silenceFollowupMinMs = Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
-    ? Math.max(0, Math.round(Number(conversationMode.silenceFollowupMinMs)))
-    : 180000;
-  const followupPending = state.followupPending === true;
-  const topicHint = String(state.followupTopicHint || "").trim();
-  const reason = String(state.followupReason || "").trim();
-  const followupUpdatedAt = Number(state.followupUpdatedAt || 0);
-  const updatedAgeMs = followupUpdatedAt > 0
-    ? Math.max(0, Math.round(safeNow - followupUpdatedAt))
-    : -1;
-  const policy = buildConversationFollowupPolicy({ reason, topicHint, updatedAgeMs });
-  const characterCue = buildConversationFollowupCharacterCue({
-    reason,
-    topicHint,
-    followupPolicy: policy.type,
-    updatedAgeMs
-  });
-  const reactionCandidates = buildConversationFollowupReactionCandidates({
-    reason,
-    topicHint,
-    followupPolicy: policy.type,
-    updatedAgeMs
-  });
-  const selectedReaction = selectConversationFollowupReactionCandidate({
-    reason,
-    topicHint,
-    followupPolicy: policy.type,
-    updatedAgeMs
-  }, reactionCandidates);
-  const characterPreview = selectedReaction.candidate?.text || "";
-
-  const blockedReasons = [];
-  if (!conversationEnabled) {
-    blockedReasons.push("conversation_disabled");
-  }
-  if (!proactiveEnabled) {
-    blockedReasons.push("proactive_disabled");
-  }
-  if (!followupPending) {
-    blockedReasons.push("no_pending_followup");
-  }
-  if (!topicHint) {
-    blockedReasons.push("empty_topic_hint");
-  }
-  if (state.chatBusy) {
-    blockedReasons.push("chat_busy");
-  }
-  if (isSpeakingNow()) {
-    blockedReasons.push("speaking");
-  }
-  if (updatedAgeMs < 0 || updatedAgeMs < silenceFollowupMinMs) {
-    blockedReasons.push("silence_window_not_reached");
-  }
-  if (policy.type === "do_not_followup") {
-    blockedReasons.push(policy.blockedReason || "policy_do_not_followup");
-  }
-
-  return {
-    eligible: blockedReasons.length === 0,
-    reason,
-    topicHint,
-    followupPolicy: policy.type,
-    followupPolicyNote: policy.note,
-    characterCue,
-    characterPreview,
-    reactionCandidates,
-    selectedReaction,
-    updatedAgeMs,
-    conversationEnabled,
-    proactiveEnabled,
-    silenceFollowupMinMs,
-    blockedReasons
-  };
+  return getFollowupDebugController().buildConversationFollowupDebugPlan(nowMs);
 }
 
 function buildConversationFollowupDebugView(nowMs = Date.now()) {
-  const plan = buildConversationFollowupDebugPlan(nowMs);
-  return {
-    ...plan,
-    promptDraft: buildConversationFollowupPromptDraft(plan),
-    characterCue: plan.characterCue || buildConversationFollowupCharacterCue(plan),
-    silence: buildConversationSilenceDebugSnapshot(nowMs)
-  };
+  return getFollowupDebugController().buildConversationFollowupDebugView(nowMs);
 }
 
 function buildConversationFollowupPromptDraft(plan) {
-  const safePlan = plan && typeof plan === "object" ? plan : {};
-  if (safePlan.eligible !== true) {
-    return "";
-  }
-  const reason = String(safePlan.reason || "").trim() || "followup_pending";
-  const policy = String(safePlan.followupPolicy || "gentle_continue").trim() || "gentle_continue";
-  const cue = safePlan.characterCue && typeof safePlan.characterCue === "object"
-    ? safePlan.characterCue
-    : buildConversationFollowupCharacterCue(safePlan);
-  let topicHint = String(safePlan.topicHint || "").replace(/\s+/g, " ").trim();
-  if (!topicHint) {
-    return "";
-  }
-  if (topicHint.length > 80) {
-    topicHint = topicHint.slice(0, 80).trim();
-  }
-  const policyInstruction = {
-    gentle_continue: "策略：轻轻续一句，不重开新话题，不扩大问题范围。",
-    light_question: "策略：如果追问，只能追一个很轻的小问题；也可以改成一句自然承接。",
-    soft_checkin: "策略：强调“想聊再聊也可以”，不要催促用户继续。"
-  }[policy] || "策略：轻轻续一句，不重开新话题，不扩大问题范围。";
-  return [
-    "你正在生成一次低打扰的主动续话，不是系统通知。",
-    "请基于上一轮未收口的话题，用自然、温和的角色口吻仅输出一句可忽略的续话或轻追问。",
-    "角色方向：像住在桌面边上的小伙伴，轻轻冒泡，有一点性格，但不要夸张表演。",
-    `语气建议: ${cue.tone || "温和、短句、低压力"}`,
-    `情绪建议: emotion=${cue.emotion || "thinking"}, action=${cue.action || "think"}, intensity=${cue.intensity || "low"}, voice_style=${cue.voiceStyle || "soft"}`,
-    `参考感觉: ${cue.sample || "我刚才还在想那个点，要不要轻轻接一下？"}`,
-    policyInstruction,
-    "保持简短，不要催促用户立刻回复，不要连续追问，不要长篇解释。",
-    "安全边界：不要读取或猜测桌面、屏幕、文件、隐私数据；不要调用工具。",
-    "如果 character_runtime 要求返回元信息，只能使用允许字段 emotion/action/intensity/voice_style/live2d_hint，并把正文保持为自然中文。",
-    `角色线索: ${cue.persona || "低打扰陪伴型角色"}`,
-    `续话策略: ${policy}`,
-    `续话原因: ${reason}`,
-    `话题线索: ${topicHint}`
-  ].join("\n");
+  return getFollowupDebugController().buildConversationFollowupPromptDraft(plan);
 }
 
 function previewConversationFollowupPolicy(input = {}) {
-  const safeInput = input && typeof input === "object" ? input : {};
-  const reason = String(safeInput.reason || "followup_pending").trim() || "followup_pending";
-  const topicHint = String(safeInput.topicHint || safeInput.text || "").replace(/\s+/g, " ").trim();
-  const policy = buildConversationFollowupPolicy({ reason, topicHint });
-  const characterCue = buildConversationFollowupCharacterCue({
-    reason,
-    topicHint,
-    followupPolicy: policy.type,
-    updatedAgeMs: 0
-  });
-  const reactionCandidates = buildConversationFollowupReactionCandidates({
-    reason,
-    topicHint,
-    followupPolicy: policy.type,
-    updatedAgeMs: 0
-  });
-  const selectedReaction = selectConversationFollowupReactionCandidate({
-    reason,
-    topicHint,
-    followupPolicy: policy.type,
-    updatedAgeMs: 0
-  }, reactionCandidates);
-  const characterPreview = selectedReaction.candidate?.text || "";
-  const blockedReasons = [];
-  if (!topicHint) {
-    blockedReasons.push("empty_topic_hint");
-  }
-  if (policy.type === "do_not_followup") {
-    blockedReasons.push(policy.blockedReason || "policy_do_not_followup");
-  }
-  const plan = {
-    eligible: blockedReasons.length === 0,
-    reason,
-    topicHint,
-    followupPolicy: policy.type,
-    followupPolicyNote: policy.note,
-    characterCue,
-    characterPreview,
-    reactionCandidates,
-    selectedReaction,
-    updatedAgeMs: 0,
-    conversationEnabled: true,
-    proactiveEnabled: true,
-    silenceFollowupMinMs: 0,
-    blockedReasons
-  };
-  return {
-    ...plan,
-    promptDraft: buildConversationFollowupPromptDraft(plan)
-  };
+  return getFollowupDebugController().previewConversationFollowupPolicy(input);
 }
 
 function getConversationFollowupPolicyDebugText(view) {
-  const policy = String(view?.followupPolicy || "").trim();
-  const topicHint = String(view?.topicHint || "").trim();
-  if (!policy || !topicHint) {
-    return "";
-  }
-  if (policy === "do_not_followup") {
-    return "do_not_followup:policy_do_not_followup";
-  }
-  const blockedReason = String(view?.followupPolicy === "do_not_followup"
-    ? (view?.followupPolicyNote || "policy_do_not_followup")
-    : (view?.followupPolicyNote || "")
-  ).trim();
-  return blockedReason ? `${policy}:${blockedReason}` : policy;
+  return getFollowupDebugController().getConversationFollowupPolicyDebugText(view);
 }
 
 function snapshotConversationFollowupPending() {
-  return {
-    pending: state.followupPending === true,
-    reason: String(state.followupReason || ""),
-    topicHint: String(state.followupTopicHint || ""),
-    updatedAt: Number(state.followupUpdatedAt || 0)
-  };
+  return getFollowupDebugController().snapshotConversationFollowupPending();
 }
 
 function restoreConversationFollowupPending(snapshot) {
-  const safe = snapshot && typeof snapshot === "object" ? snapshot : {};
-  state.followupPending = safe.pending === true;
-  state.followupReason = String(safe.reason || "");
-  state.followupTopicHint = String(safe.topicHint || "");
-  state.followupUpdatedAt = Number.isFinite(Number(safe.updatedAt))
-    ? Math.max(0, Math.round(Number(safe.updatedAt)))
-    : 0;
+  return getFollowupDebugController().restoreConversationFollowupPending(snapshot);
 }
 
 function clearConversationFollowupPending(nowMs = Date.now()) {
-  const now = Number(nowMs);
-  state.followupPending = false;
-  state.followupReason = "";
-  state.followupTopicHint = "";
-  state.followupUpdatedAt = Number.isFinite(now) ? Math.max(0, Math.round(now)) : 0;
+  return getFollowupDebugController().clearConversationFollowupPending(nowMs);
 }
 
 function getConversationFollowupRehearsalBlockedReason() {
-  const mode = state.conversationMode && typeof state.conversationMode === "object"
-    ? state.conversationMode
-    : {};
-  if (state.proactivePollTimerId) {
-    return "polling_active";
-  }
-  if (mode.enabled === true && mode.proactiveEnabled === true && mode.proactiveSchedulerEnabled === true) {
-    return "auto_scheduler_enabled";
-  }
-  return "";
+  return getFollowupDebugController().getConversationFollowupRehearsalBlockedReason();
 }
 
 function rehearseConversationFollowupPending(input = {}) {
-  const blockedReason = getConversationFollowupRehearsalBlockedReason();
-  if (blockedReason) {
-    recordTTSDebugEvent("conversation_followup_rehearsal_blocked", {
-      text: "",
-      result: blockedReason,
-      error: "fail_closed"
-    });
-    return {
-      ok: false,
-      reason: blockedReason,
-      followup: buildConversationFollowupDebugView(Date.now())
-    };
-  }
-
-  const safeInput = input && typeof input === "object" ? input : {};
-  const reason = String(safeInput.reason || "followup_pending").trim() || "followup_pending";
-  const topicHint = String(
-    safeInput.topicHint || safeInput.text || "我们刚才聊到桌宠主动续话"
-  ).replace(/\s+/g, " ").trim();
-  if (!topicHint) {
-    return {
-      ok: false,
-      reason: "empty_topic_hint",
-      followup: buildConversationFollowupDebugView(Date.now())
-    };
-  }
-
-  if (state.followupRehearsalActive !== true) {
-    state.followupRehearsalSnapshot = snapshotConversationFollowupPending();
-  }
-  state.followupRehearsalActive = true;
-  state.followupPending = true;
-  state.followupReason = reason;
-  state.followupTopicHint = topicHint;
-  state.followupUpdatedAt = Date.now();
-
-  updateFollowupCharacterChip();
-  const followup = buildConversationFollowupDebugView(Date.now());
-  recordTTSDebugEvent("conversation_followup_rehearsal_set", {
-    text: topicHint,
-    result: reason,
-    error: followup.followupPolicy || ""
-  });
-  return {
-    ok: true,
-    reason: "rehearsal_set",
-    followup,
-    characterState: getFollowupCharacterStateDebugView()
-  };
+  return getFollowupDebugController().rehearseConversationFollowupPending(input);
 }
 
 function clearConversationFollowupRehearsal() {
-  if (state.followupRehearsalActive !== true) {
-    return {
-      ok: true,
-      reason: "no_active_rehearsal",
-      followup: buildConversationFollowupDebugView(Date.now())
-    };
-  }
-  const snapshot = state.followupRehearsalSnapshot || { pending: false, reason: "", topicHint: "", updatedAt: 0 };
-  restoreConversationFollowupPending(snapshot);
-  state.followupRehearsalActive = false;
-  state.followupRehearsalSnapshot = null;
-  state.followupRehearsalScenarioId = "";
-  updateFollowupCharacterChip();
-  recordTTSDebugEvent("conversation_followup_rehearsal_cleared", {
-    text: String(snapshot.topicHint || ""),
-    result: "restored"
-  });
-  return {
-    ok: true,
-    reason: "rehearsal_cleared",
-    followup: buildConversationFollowupDebugView(Date.now()),
-    characterState: getFollowupCharacterStateDebugView()
-  };
+  return getFollowupDebugController().clearConversationFollowupRehearsal();
 }
 
-const FOLLOWUP_REHEARSAL_SCENARIOS = [
-  {
-    id: "curious_question",
-    label: "\u597d\u5947\u8ffd\u95ee",
-    reason: "question_tail",
-    topicHint: "\u6211\u4eec\u521a\u624d\u804a\u5230\u684c\u5ba0\u4e3b\u52a8\u7eed\u8bdd"
-  },
-  {
-    id: "soft_checkin",
-    label: "\u6e29\u67d4\u63a5\u8bdd",
-    reason: "soft_checkin",
-    topicHint: "\u6211\u4eec\u521a\u624d\u804a\u5230\u8ba9\u89d2\u8272\u66f4\u50cf\u966a\u4f34"
-  },
-  {
-    id: "quiet_close",
-    label: "\u6536\u53e3\u5b89\u9759",
-    reason: "followup_pending",
-    topicHint: "\u5148\u8fd9\u6837\uff0c\u665a\u5b89"
-  }
-];
-
 function getFollowupRehearsalScenario(id = "") {
-  const key = String(id || "").trim();
-  return FOLLOWUP_REHEARSAL_SCENARIOS.find((item) => item.id === key) || FOLLOWUP_REHEARSAL_SCENARIOS[0];
+  return getFollowupDebugController().getFollowupRehearsalScenario(id);
 }
 
 function getFollowupRehearsalScenarioLabel(id = "") {
-  const key = String(id || "").trim();
-  const scenario = FOLLOWUP_REHEARSAL_SCENARIOS.find((item) => item.id === key);
-  return scenario ? scenario.label : "";
+  return getFollowupDebugController().getFollowupRehearsalScenarioLabel(id);
 }
 
 function runFollowupReadinessPanelRehearsal(button = null, scenarioId = "") {
-  const scenario = getFollowupRehearsalScenario(scenarioId);
-  const result = rehearseConversationFollowupPending(scenario);
-  if (result?.ok === true) {
-    state.followupRehearsalScenarioId = scenario.id;
-  }
-  updateFollowupReadinessPanel();
-  const ok = result?.ok === true;
-  setStatus(ok ? `\u7eed\u8bdd\u9884\u6f14\u5df2\u5f00\u542f: ${scenario.label}` : `\u7eed\u8bdd\u9884\u6f14\u5df2\u963b\u6b62: ${result?.reason || "unknown"}`);
-  if (button && typeof window !== "undefined") {
-    const previous = button.textContent;
-    button.textContent = ok ? "\u9884\u6f14\u4e2d" : "\u5df2\u963b\u6b62";
-    window.setTimeout(() => {
-      button.textContent = previous || scenario.label || "\u9884\u6f14";
-    }, 1200);
-  }
-  return result;
+  return getFollowupDebugController().runFollowupReadinessPanelRehearsal(button, scenarioId);
 }
 
 function clearFollowupReadinessPanelRehearsal(button = null) {
-  const result = clearConversationFollowupRehearsal();
-  updateFollowupReadinessPanel();
-  setStatus("\u7eed\u8bdd\u9884\u6f14\u5df2\u6e05\u9664");
-  if (button && typeof window !== "undefined") {
-    const previous = button.textContent;
-    button.textContent = "\u5df2\u6e05\u9664";
-    window.setTimeout(() => {
-      button.textContent = previous || "\u6e05\u9664\u9884\u6f14";
-    }, 1200);
-  }
-  return result;
+  return getFollowupDebugController().clearFollowupReadinessPanelRehearsal(button);
 }
 
 function snapshotConversationFollowupPendingFixtureState() {
-  const mode = state.conversationMode && typeof state.conversationMode === "object"
-    ? { ...state.conversationMode }
-    : null;
-  return {
-    pending: snapshotConversationFollowupPending(),
-    conversationMode: mode,
-    conversationLastUserAt: Number(state.conversationLastUserAt || 0),
-    conversationLastAssistantAt: Number(state.conversationLastAssistantAt || 0),
-    conversationLastTtsFinishedAt: Number(state.conversationLastTtsFinishedAt || 0)
-  };
+  return getFollowupDebugController().snapshotConversationFollowupPendingFixtureState();
 }
 
 function restoreConversationFollowupPendingFixtureState(snapshot) {
-  const safe = snapshot && typeof snapshot === "object" ? snapshot : {};
-  restoreConversationFollowupPending(safe.pending);
-  if (safe.conversationMode && typeof safe.conversationMode === "object") {
-    state.conversationMode = { ...safe.conversationMode };
-  }
-  state.conversationLastUserAt = Number.isFinite(Number(safe.conversationLastUserAt))
-    ? Math.max(0, Math.round(Number(safe.conversationLastUserAt)))
-    : 0;
-  state.conversationLastAssistantAt = Number.isFinite(Number(safe.conversationLastAssistantAt))
-    ? Math.max(0, Math.round(Number(safe.conversationLastAssistantAt)))
-    : 0;
-  state.conversationLastTtsFinishedAt = Number.isFinite(Number(safe.conversationLastTtsFinishedAt))
-    ? Math.max(0, Math.round(Number(safe.conversationLastTtsFinishedAt)))
-    : 0;
+  return getFollowupDebugController().restoreConversationFollowupPendingFixtureState(snapshot);
 }
 
 function runConversationFollowupPendingFixture(input = {}) {
-  const startedAt = Date.now();
-  const previous = snapshotConversationFollowupPendingFixtureState();
-  const safeInput = input && typeof input === "object" ? input : {};
-  const reason = String(safeInput.reason || "followup_pending").trim() || "followup_pending";
-  const topicHint = String(
-    safeInput.topicHint || safeInput.text || "\u5148\u8fd9\u6837\uff0c\u665a\u5b89"
-  ).replace(/\s+/g, " ").trim();
-  let result = null;
-
-  try {
-    if (!state.conversationMode || typeof state.conversationMode !== "object") {
-      state.conversationMode = {
-        enabled: false,
-        proactiveEnabled: false,
-        proactiveSchedulerEnabled: false,
-        grayAutoEnabled: false,
-        grayAutoTrialEnabled: false,
-        grayAutoTrialMaxTriggersPerSession: 1,
-        proactiveCooldownMs: 600000,
-        proactiveWarmupMs: 120000,
-        proactiveWindowMs: 3600000,
-        proactivePollIntervalMs: 60000,
-        maxFollowupsPerWindow: 1,
-        silenceFollowupMinMs: 180000,
-        interruptTtsOnUserSpeech: false
-      };
-    }
-    const silenceFollowupMinMs = Number.isFinite(Number(state.conversationMode.silenceFollowupMinMs))
-      ? Math.max(0, Math.round(Number(state.conversationMode.silenceFollowupMinMs)))
-      : 180000;
-    const oldEnoughAt = Math.max(0, startedAt - Math.max(silenceFollowupMinMs + 1000, 30000));
-
-    state.conversationMode.enabled = true;
-    state.conversationMode.proactiveEnabled = true;
-    state.conversationMode.proactiveSchedulerEnabled = true;
-    state.followupPending = true;
-    state.followupReason = reason;
-    state.followupTopicHint = topicHint;
-    state.followupUpdatedAt = oldEnoughAt;
-    state.conversationLastUserAt = oldEnoughAt;
-    state.conversationLastAssistantAt = oldEnoughAt;
-    state.conversationLastTtsFinishedAt = oldEnoughAt;
-
-    const preview = previewConversationFollowupPolicy({ reason, topicHint });
-    const snapshotFollowup = getTTSDebugSnapshot().followup;
-    const conversationFollowup = buildConversationFollowupDebugView(startedAt);
-    const proactiveScheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
-    const policyText = getConversationFollowupPolicyDebugText(conversationFollowup);
-    const silenceBlockedReasons = Array.isArray(conversationFollowup?.silence?.blockedReasons)
-      ? conversationFollowup.silence.blockedReasons.slice()
-      : [];
-
-    recordTTSDebugEvent("conversation_followup_pending_fixture_checked", {
-      text: topicHint,
-      result: silenceBlockedReasons.join(",") || "silence_checked",
-      error: policyText || reason
-    });
-
-    result = {
-      ok: true,
-      fixture: {
-        reason,
-        topicHint,
-        silenceAgeMs: Math.max(0, startedAt - oldEnoughAt),
-        temporaryGatesEnabled: true
-      },
-      preview: {
-        followupPolicy: preview.followupPolicy,
-        eligible: preview.eligible,
-        blockedReasons: Array.isArray(preview.blockedReasons) ? preview.blockedReasons.slice() : [],
-        promptDraftEmpty: !String(preview.promptDraft || "").trim()
-      },
-      snapshotFollowup: {
-        pending: snapshotFollowup.pending,
-        eligible: snapshotFollowup.eligible,
-        blockedReasons: Array.isArray(snapshotFollowup.blockedReasons)
-          ? snapshotFollowup.blockedReasons.slice()
-          : [],
-        policy: snapshotFollowup.policy,
-        policyBlockedReason: snapshotFollowup.policyBlockedReason
-      },
-      conversationFollowup: {
-        eligible: conversationFollowup.eligible,
-        blockedReasons: Array.isArray(conversationFollowup.blockedReasons)
-          ? conversationFollowup.blockedReasons.slice()
-          : [],
-        followupPolicy: conversationFollowup.followupPolicy,
-        promptDraftEmpty: !String(conversationFollowup.promptDraft || "").trim(),
-        silence: {
-          eligibleForSilenceFollowup: conversationFollowup.silence?.eligibleForSilenceFollowup,
-          blockedReasons: silenceBlockedReasons,
-          followupPolicy: conversationFollowup.silence?.followupPolicy
-        }
-      },
-      proactiveScheduler: {
-        eligibleForSchedulerTick: proactiveScheduler.eligibleForSchedulerTick,
-        blockedReasons: Array.isArray(proactiveScheduler.blockedReasons)
-          ? proactiveScheduler.blockedReasons.slice()
-          : [],
-        pollTimerActive: proactiveScheduler.pollTimerActive,
-        lastResult: proactiveScheduler.lastResult
-      }
-    };
-  } catch (err) {
-    const errorText = String(err?.message || err || "fixture_error");
-    recordTTSDebugEvent("conversation_followup_pending_fixture_failed", {
-      text: topicHint,
-      result: "fixture_error",
-      error: errorText
-    });
-    result = {
-      ok: false,
-      reason: "fixture_error",
-      error: errorText
-    };
-  } finally {
-    restoreConversationFollowupPendingFixtureState(previous);
-  }
-
-  const endedAt = Date.now();
-  return {
-    ...result,
-    restored: true,
-    afterRestore: {
-      pending: state.followupPending === true,
-      reason: String(state.followupReason || ""),
-      topicHint: String(state.followupTopicHint || ""),
-      conversationEnabled: state.conversationMode?.enabled === true,
-      proactiveEnabled: state.conversationMode?.proactiveEnabled === true,
-      proactiveSchedulerEnabled: state.conversationMode?.proactiveSchedulerEnabled === true
-    },
-    recentEvents: state.ttsDebugEvents.slice(-30).map((event) => ({
-      type: event.type,
-      text: event.text,
-      result: event.result,
-      error: event.error
-    })),
-    startedAt,
-    endedAt,
-    elapsedMs: Math.max(0, endedAt - startedAt)
-  };
+  return getFollowupDebugController().runConversationFollowupPendingFixture(input);
 }
 
 async function runConversationFollowupDebug() {
-  const startedAt = Date.now();
-  const plan = buildConversationFollowupDebugView(startedAt);
-  const blockedSummary = Array.isArray(plan.blockedReasons) ? plan.blockedReasons.join(",") : "";
-  const reasonText = String(plan.reason || "");
-  const topicHintText = String(plan.topicHint || "");
-  const policyText = getConversationFollowupPolicyDebugText(plan);
-  const finishResult = (result) => {
-    const endedAt = Date.now();
-    return {
-      ...result,
-      plan,
-      startedAt,
-      endedAt,
-      elapsedMs: Math.max(0, endedAt - startedAt)
-    };
-  };
-
-  if (!plan.eligible || !plan.promptDraft) {
-    recordTTSDebugEvent("conversation_followup_not_eligible", {
-      text: topicHintText,
-      result: blockedSummary || "not_eligible",
-      error: policyText || reasonText
-    });
-    return finishResult({
-      ok: false,
-      reason: "not_eligible",
-      consumedPending: false,
-      restoredPending: false
-    });
-  }
-  if (typeof requestAssistantReply !== "function") {
-    recordTTSDebugEvent("conversation_followup_failed", {
-      text: topicHintText,
-      result: "no_safe_entrypoint",
-      error: policyText || reasonText
-    });
-    return finishResult({
-      ok: false,
-      reason: "no_safe_entrypoint",
-      consumedPending: false,
-      restoredPending: false
-    });
-  }
-
-  const pendingSnapshot = snapshotConversationFollowupPending();
-  recordTTSDebugEvent("conversation_followup_start", {
-    text: topicHintText,
-    result: reasonText || "followup_pending",
-    error: policyText
-  });
-  clearConversationFollowupPending(startedAt);
-  const followupInput = `（debug/manual follow-up）\n${plan.promptDraft}`;
-  try {
-    const ok = await requestAssistantReply(followupInput, {
-      showUser: false,
-      rememberUser: false,
-      rememberAssistant: true,
-      auto: true,
-      skipDesktopAttach: true,
-      silentError: true,
-      userDisplayText: "[debug/manual follow-up]"
-    });
-
-    if (ok) {
-      recordTTSDebugEvent("conversation_followup_success", {
-        text: topicHintText,
-        result: reasonText || "followup_pending",
-        error: policyText
-      });
-      return finishResult({
-        ok: true,
-        reason: "started",
-        consumedPending: true,
-        restoredPending: false
-      });
-    }
-
-    restoreConversationFollowupPending(pendingSnapshot);
-    recordTTSDebugEvent("conversation_followup_restore_pending", {
-      text: sanitizeTTSDebugText(pendingSnapshot.topicHint || topicHintText),
-      result: pendingSnapshot.reason || reasonText || "restore"
-    });
-    recordTTSDebugEvent("conversation_followup_failed", {
-      text: topicHintText,
-      result: "request_failed",
-      error: policyText || reasonText
-    });
-    return finishResult({
-      ok: false,
-      reason: "request_failed",
-      consumedPending: false,
-      restoredPending: true
-    });
-  } catch (err) {
-    restoreConversationFollowupPending(pendingSnapshot);
-    const errorText = String(err?.message || err || "request_exception");
-    recordTTSDebugEvent("conversation_followup_restore_pending", {
-      text: sanitizeTTSDebugText(pendingSnapshot.topicHint || topicHintText),
-      result: pendingSnapshot.reason || reasonText || "restore"
-    });
-    recordTTSDebugEvent("conversation_followup_failed", {
-      text: topicHintText,
-      result: "request_exception",
-      error: policyText ? `${policyText};${errorText}` : errorText
-    });
-    return finishResult({
-      ok: false,
-      reason: "request_exception",
-      consumedPending: false,
-      restoredPending: true
-    });
-  }
+  return getFollowupDebugController().runConversationFollowupDebug();
 }
 
 async function runConversationSilenceFollowupDryRun() {
-  const startedAt = Date.now();
-  const view = buildConversationFollowupDebugView(startedAt);
-  if (view?.silence?.eligibleForSilenceFollowup !== true) {
-    const endedAt = Date.now();
-    recordTTSDebugEvent("conversation_silence_followup_blocked", {
-      text: String(view?.topicHint || ""),
-      result: Array.isArray(view?.silence?.blockedReasons)
-        ? view.silence.blockedReasons.join(",")
-        : "silence_not_eligible",
-      error: getConversationFollowupPolicyDebugText(view) || String(view?.reason || "")
-    });
-    return {
-      ok: false,
-      reason: "silence_not_eligible",
-      view,
-      startedAt,
-      endedAt,
-      elapsedMs: Math.max(0, endedAt - startedAt)
-    };
-  }
-
-  recordTTSDebugEvent("conversation_silence_followup_manual_start", {
-    text: String(view?.topicHint || ""),
-    result: String(view?.reason || "silence_eligible"),
-    error: getConversationFollowupPolicyDebugText(view)
-  });
-  const result = await runConversationFollowupDebug();
-  return {
-    ...result,
-    silenceDryRun: true,
-    silenceEligibleAtStart: true,
-    silenceStartedAt: startedAt
-  };
+  return getFollowupDebugController().runConversationSilenceFollowupDryRun();
 }
 
 async function runProactiveSchedulerManualTick() {
-  const startedAt = Date.now();
-  const scheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
-  state.proactiveLastAttemptAt = startedAt;
-  const finishResult = (result) => {
-    const endedAt = Date.now();
-    return {
-      ...result,
-      schedulerManualTick: true,
-      schedulerStartedAt: startedAt,
-      scheduler,
-      startedAt,
-      endedAt,
-      elapsedMs: Math.max(0, endedAt - startedAt)
-    };
-  };
-
-  if (scheduler.eligibleForSchedulerTick !== true) {
-    const blockedReason = Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
-      ? scheduler.blockedReasons.join(",")
-      : "scheduler_not_eligible";
-    state.proactiveLastBlockedReason = blockedReason;
-    state.proactiveLastResult = "blocked";
-    recordTTSDebugEvent("proactive_scheduler_manual_blocked", {
-      result: blockedReason
-    });
-    return finishResult({
-      ok: false,
-      reason: "scheduler_not_eligible",
-      schedulerEligibleAtStart: false
-    });
-  }
-
-  recordTTSDebugEvent("proactive_scheduler_manual_start", {
-    result: "scheduler_eligible"
-  });
-  state.proactiveInFlight = true;
-  try {
-    const dryRunResult = await runConversationSilenceFollowupDryRun();
-    const finishedAt = Date.now();
-    const proactiveCooldownMs = Number.isFinite(Number(state.conversationMode?.proactiveCooldownMs))
-      ? Math.max(0, Math.round(Number(state.conversationMode.proactiveCooldownMs)))
-      : 600000;
-    const proactiveWindowMs = Number.isFinite(Number(state.conversationMode?.proactiveWindowMs))
-      ? Math.max(0, Math.round(Number(state.conversationMode.proactiveWindowMs)))
-      : 3600000;
-
-    if (dryRunResult?.ok === true) {
-      const windowStart = Number(state.proactiveWindowStartedAt || 0);
-      if (!(windowStart > 0) || (finishedAt - windowStart) > proactiveWindowMs) {
-        state.proactiveWindowStartedAt = finishedAt;
-        state.proactiveCountInWindow = 0;
-      }
-      state.proactiveLastTriggeredAt = finishedAt;
-      state.proactiveCooldownUntil = finishedAt + proactiveCooldownMs;
-      state.proactiveCountInWindow = Math.max(
-        0,
-        Math.round(Number(state.proactiveCountInWindow || 0))
-      ) + 1;
-      state.proactiveLastBlockedReason = "";
-      state.proactiveLastResult = "success";
-      recordTTSDebugEvent("proactive_scheduler_manual_success", {
-        result: "success",
-        durationMs: Number(dryRunResult?.elapsedMs || 0)
-      });
-      return finishResult({
-        ...dryRunResult,
-        ok: true,
-        schedulerEligibleAtStart: true
-      });
-    }
-
-    const silenceBlockedReasons = Array.isArray(dryRunResult?.view?.silence?.blockedReasons)
-      ? dryRunResult.view.silence.blockedReasons.join(",")
-      : "";
-    const blockedReason = String(dryRunResult?.reason || silenceBlockedReasons || "manual_tick_failed");
-    state.proactiveLastBlockedReason = blockedReason;
-    const failedReasons = new Set(["request_failed", "request_exception", "no_safe_entrypoint"]);
-    state.proactiveLastResult = failedReasons.has(String(dryRunResult?.reason || "")) ? "failed" : "blocked";
-    const shortCooldownMs = Math.min(proactiveCooldownMs, 60000);
-    state.proactiveCooldownUntil = finishedAt + shortCooldownMs;
-    recordTTSDebugEvent("proactive_scheduler_manual_failed", {
-      result: blockedReason,
-      error: String(dryRunResult?.reason || "")
-    });
-    return finishResult({
-      ...dryRunResult,
-      ok: false,
-      schedulerEligibleAtStart: true
-    });
-  } catch (err) {
-    const finishedAt = Date.now();
-    const proactiveCooldownMs = Number.isFinite(Number(state.conversationMode?.proactiveCooldownMs))
-      ? Math.max(0, Math.round(Number(state.conversationMode.proactiveCooldownMs)))
-      : 600000;
-    const shortCooldownMs = Math.min(proactiveCooldownMs, 60000);
-    const errorText = String(err?.message || err || "manual_tick_exception");
-    state.proactiveLastBlockedReason = errorText;
-    state.proactiveLastResult = "failed";
-    state.proactiveCooldownUntil = finishedAt + shortCooldownMs;
-    recordTTSDebugEvent("proactive_scheduler_manual_failed", {
-      result: "exception",
-      error: errorText
-    });
-    return finishResult({
-      ok: false,
-      reason: "manual_tick_exception",
-      error: errorText,
-      schedulerEligibleAtStart: true
-    });
-  } finally {
-    state.proactiveInFlight = false;
-  }
+  return getFollowupDebugController().runProactiveSchedulerManualTick();
 }
 
 async function runProactiveSchedulerPollingCheck() {
-  try {
-    const injectedFailure = consumeProactiveSchedulerPollFailureInjection();
-    if (injectedFailure) {
-      throw new Error(injectedFailure.reason || "manual_debug_injection");
-    }
-    const gateStatus = getProactiveSchedulerPollingGateStatus();
-    const gateTrialContext = buildGrayAutoFollowupTrialEventContext();
-    if (!gateStatus.enabled) {
-      const gateReason = gateStatus.blockedReasons.join(",") || "polling_disabled";
-      state.proactivePollLastResult = "disabled";
-      if (state.proactivePollTimerId) {
-        stopProactiveSchedulerPolling(`runtime_gate_off:${gateReason}`);
-      }
-      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
-        result: mergeProactiveSchedulerPollEventResult(gateReason, gateTrialContext),
-        error: mergeProactiveSchedulerPollEventError("", gateTrialContext)
-      });
-      return;
-    }
-    const startedAt = Date.now();
-    state.proactiveLastPollAt = startedAt;
-    const scheduler = buildProactiveSchedulerDebugSnapshot(startedAt);
-    const pollTrialContext = buildGrayAutoFollowupTrialEventContext(getTTSDebugSnapshot());
-    const followupView = buildConversationFollowupDebugView(startedAt);
-    const followupPolicyText = getConversationFollowupPolicyDebugText(followupView);
-    if (scheduler.eligibleForSchedulerTick !== true) {
-      state.proactivePollLastResult = "blocked";
-      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
-        text: String(followupView?.topicHint || ""),
-        result: mergeProactiveSchedulerPollEventResult(
-          Array.isArray(scheduler.blockedReasons) && scheduler.blockedReasons.length
-            ? scheduler.blockedReasons.join(",")
-            : "poll_blocked",
-          pollTrialContext
-        ),
-        error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
-      });
-      return;
-    }
-    const silenceBlocked = Array.isArray(followupView?.silence?.blockedReasons)
-      ? followupView.silence.blockedReasons.join(",")
-      : "";
-    if (followupView?.silence?.eligibleForSilenceFollowup !== true) {
-      state.proactivePollLastResult = "not_ready";
-      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
-        text: String(followupView?.topicHint || ""),
-        result: mergeProactiveSchedulerPollEventResult(silenceBlocked || "silence_not_ready", pollTrialContext),
-        error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
-      });
-      return;
-    }
-    state.proactivePollLastResult = "ready";
-    recordTTSDebugEvent("proactive_scheduler_poll_ready", {
-      text: String(followupView?.topicHint || ""),
-      result: mergeProactiveSchedulerPollEventResult("silence_ready", pollTrialContext),
-      error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
-    });
-    if (!shouldEnableProactiveSchedulerPolling()) {
-      state.proactivePollLastResult = "disabled";
-      if (state.proactivePollTimerId) {
-        stopProactiveSchedulerPolling("runtime_gate_off:before_trigger");
-      }
-      recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
-        text: String(followupView?.topicHint || ""),
-        result: mergeProactiveSchedulerPollEventResult("runtime_gate_off_before_trigger", pollTrialContext),
-        error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
-      });
-      return;
-    }
-    const triggerResult = await runProactiveSchedulerManualTick();
-    if (triggerResult?.ok === true) {
-      incrementGrayAutoTrialSessionTriggerCount();
-      state.proactivePollLastResult = "triggered";
-      const postTriggerTrialContext = buildGrayAutoFollowupTrialEventContext(getTTSDebugSnapshot());
-      recordTTSDebugEvent("proactive_scheduler_poll_trigger_success", {
-        text: String(followupView?.topicHint || ""),
-        result: mergeProactiveSchedulerPollEventResult(String(triggerResult?.reason || "started"), postTriggerTrialContext),
-        error: mergeProactiveSchedulerPollEventError(followupPolicyText, postTriggerTrialContext)
-      });
-      if (isGrayAutoTrialSessionLimitReached()) {
-        stopProactiveSchedulerPolling("gray_auto_trial_session_limit_reached");
-      }
-      return;
-    }
-    state.proactivePollLastResult = "trigger_blocked";
-    recordTTSDebugEvent("proactive_scheduler_poll_trigger_blocked", {
-      text: String(followupView?.topicHint || ""),
-      result: mergeProactiveSchedulerPollEventResult(String(triggerResult?.reason || "trigger_not_started"), pollTrialContext),
-      error: mergeProactiveSchedulerPollEventError(followupPolicyText, pollTrialContext)
-    });
-  } catch (err) {
-    state.proactivePollLastResult = "failed";
-    if (state.proactivePollTimerId) {
-      stopProactiveSchedulerPolling("poll_exception_fail_closed");
-    }
-    state.proactivePollLastResult = "failed";
-    const failureTrialContext = buildGrayAutoFollowupTrialEventContext();
-    recordTTSDebugEvent("proactive_scheduler_poll_failed", {
-      result: mergeProactiveSchedulerPollEventResult("poll_exception", failureTrialContext),
-      error: mergeProactiveSchedulerPollEventError(String(err?.message || err || "poll_exception"), failureTrialContext)
-    });
-  }
+  return getFollowupDebugController().runProactiveSchedulerPollingCheck();
 }
 
 function normalizeProactiveSchedulerPollFailureReason(reason) {
-  const text = String(reason || "manual_debug_injection")
-    .replace(/[\r\n\t]+/g, " ")
-    .trim()
-    .slice(0, 80);
-  return text || "manual_debug_injection";
+  return getFollowupDebugController().normalizeProactiveSchedulerPollFailureReason(reason);
 }
 
 function injectProactiveSchedulerPollFailureOnce(reason = "manual_debug_injection") {
-  const normalizedReason = normalizeProactiveSchedulerPollFailureReason(reason);
-  state.proactivePollFailureInjection = {
-    reason: normalizedReason,
-    createdAt: Date.now()
-  };
-  recordTTSDebugEvent("proactive_scheduler_poll_failure_injected", {
-    result: normalizedReason
-  });
-  return getProactiveSchedulerFailureInjectionState();
+  return getFollowupDebugController().injectProactiveSchedulerPollFailureOnce(reason);
 }
 
 function getProactiveSchedulerFailureInjectionState() {
-  const injection = state.proactivePollFailureInjection;
-  if (!injection || typeof injection !== "object") {
-    return {
-      active: false,
-      reason: "",
-      ageMs: -1
-    };
-  }
-  const createdAt = Number(injection.createdAt || 0);
-  return {
-    active: true,
-    reason: String(injection.reason || "manual_debug_injection"),
-    ageMs: createdAt > 0 ? Math.max(0, Date.now() - createdAt) : -1
-  };
+  return getFollowupDebugController().getProactiveSchedulerFailureInjectionState();
 }
 
 function clearProactiveSchedulerFailureInjection() {
-  const previous = getProactiveSchedulerFailureInjectionState();
-  state.proactivePollFailureInjection = null;
-  recordTTSDebugEvent("proactive_scheduler_poll_failure_injection_cleared", {
-    result: previous.active ? previous.reason : "none"
-  });
-  return getProactiveSchedulerFailureInjectionState();
+  return getFollowupDebugController().clearProactiveSchedulerFailureInjection();
 }
 
 function consumeProactiveSchedulerPollFailureInjection() {
-  const injection = state.proactivePollFailureInjection;
-  if (!injection || typeof injection !== "object") {
-    return null;
-  }
-  state.proactivePollFailureInjection = null;
-  const consumed = {
-    reason: normalizeProactiveSchedulerPollFailureReason(injection.reason),
-    createdAt: Number(injection.createdAt || 0) || 0
-  };
-  recordTTSDebugEvent("proactive_scheduler_poll_failure_injection_consumed", {
-    result: consumed.reason
-  });
-  return consumed;
+  return getFollowupDebugController().consumeProactiveSchedulerPollFailureInjection();
 }
 
 function stopProactiveSchedulerPolling(reason = "stop") {
-  const trialContext = buildGrayAutoFollowupTrialEventContext();
-  const wasActive = !!state.proactivePollTimerId;
-  if (state.proactivePollTimerId) {
-    clearInterval(state.proactivePollTimerId);
-    state.proactivePollTimerId = 0;
-  }
-  state.proactivePollActive = false;
-  state.proactivePollActiveIntervalMs = 0;
-  state.proactivePollLastResult = "disabled";
-  if (wasActive || String(reason || "") === "beforeunload") {
-    recordTTSDebugEvent("proactive_scheduler_poll_stop", {
-      result: mergeProactiveSchedulerPollEventResult(String(reason || "stop"), trialContext),
-      error: mergeProactiveSchedulerPollEventError("", trialContext)
-    });
-  }
+  return getFollowupDebugController().stopProactiveSchedulerPolling(reason);
 }
 
 function startProactiveSchedulerPolling() {
-  const gateStatus = getProactiveSchedulerPollingGateStatus();
-  const trialContext = buildGrayAutoFollowupTrialEventContext();
-  if (!gateStatus.enabled) {
-    stopProactiveSchedulerPolling(`gated_off:${gateStatus.blockedReasons.join(",") || "disabled"}`);
-    recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
-      result: mergeProactiveSchedulerPollEventResult(gateStatus.blockedReasons.join(",") || "polling_disabled", trialContext),
-      error: mergeProactiveSchedulerPollEventError("", trialContext)
-    });
-    return;
-  }
-  if (state.proactivePollTimerId) {
-    return;
-  }
-  const intervalMs = Number.isFinite(Number(state.conversationMode?.proactivePollIntervalMs))
-    ? Math.max(30000, Math.min(600000, Math.round(Number(state.conversationMode.proactivePollIntervalMs))))
-    : 60000;
-  state.proactivePollTimerId = window.setInterval(() => {
-    void runProactiveSchedulerPollingCheck();
-  }, intervalMs);
-  state.proactivePollActive = true;
-  state.proactivePollActiveIntervalMs = intervalMs;
-  state.proactivePollLastResult = "started";
-  recordTTSDebugEvent("proactive_scheduler_poll_start", {
-    result: mergeProactiveSchedulerPollEventResult(`interval_ms:${intervalMs}`, trialContext),
-    error: mergeProactiveSchedulerPollEventError("", trialContext)
-  });
+  return getFollowupDebugController().startProactiveSchedulerPolling();
 }
 
 function syncProactiveSchedulerPolling() {
-  const gateStatus = getProactiveSchedulerPollingGateStatus();
-  const trialContext = buildGrayAutoFollowupTrialEventContext();
-  if (!gateStatus.enabled) {
-    stopProactiveSchedulerPolling(`sync_disabled:${gateStatus.blockedReasons.join(",") || "disabled"}`);
-    recordTTSDebugEvent("proactive_scheduler_poll_blocked", {
-      result: mergeProactiveSchedulerPollEventResult(gateStatus.blockedReasons.join(",") || "polling_disabled", trialContext),
-      error: mergeProactiveSchedulerPollEventError("", trialContext)
-    });
-    return;
-  }
-  const desiredIntervalMs = Number.isFinite(Number(state.conversationMode?.proactivePollIntervalMs))
-    ? Math.max(30000, Math.min(600000, Math.round(Number(state.conversationMode.proactivePollIntervalMs))))
-    : 60000;
-  const activeIntervalMs = Number.isFinite(Number(state.proactivePollActiveIntervalMs))
-    ? Math.round(Number(state.proactivePollActiveIntervalMs))
-    : 0;
-  if (state.proactivePollTimerId && activeIntervalMs === desiredIntervalMs) {
-    return;
-  }
-  if (state.proactivePollTimerId) {
-    stopProactiveSchedulerPolling("sync_interval_change");
-  }
-  startProactiveSchedulerPolling();
+  return getFollowupDebugController().syncProactiveSchedulerPolling();
 }
 
 function buildTTSDebugReport() {
-  return typeof window.TaffyTTSDebugReport?.buildReport === "function"
-    ? window.TaffyTTSDebugReport.buildReport(
-      getTTSDebugSnapshot(),
-      state.ttsDebugEvents,
-      performance.now()
-    )
-    : "TTS debug:\nrecentEvents=none";
+  return getFollowupDebugController().buildTTSDebugReport();
 }
 
-function formatDoctorDuration(ms) {
-  return typeof window.TaffyDoctorDiagnostics?.formatDuration === "function"
-    ? window.TaffyDoctorDiagnostics.formatDuration(ms)
-    : "n/a";
+const GRAY_TRIAL_REPORT_CONTROLLER = window.TaffyGrayTrialReportController || {};
+let grayTrialReportController = null;
+
+function getGrayTrialReportController() {
+  if (!grayTrialReportController && typeof GRAY_TRIAL_REPORT_CONTROLLER.createController === "function") {
+    grayTrialReportController = GRAY_TRIAL_REPORT_CONTROLLER.createController(getFollowupControllerDeps());
+  }
+  return grayTrialReportController;
 }
 
-function formatDoctorCheckLine(label, check) {
-  return typeof window.TaffyDoctorDiagnostics?.formatCheckLine === "function"
-    ? window.TaffyDoctorDiagnostics.formatCheckLine(label, check)
-    : `${label}：${check?.ok === true ? "正常" : "异常"}。`;
+function formatReadinessBool(value) {
+  return getGrayTrialReportController().formatReadinessBool(value);
+}
+
+function formatReadinessMs(value) {
+  return getGrayTrialReportController().formatReadinessMs(value);
+}
+
+function joinReadinessReasons(reasons) {
+  return getGrayTrialReportController().joinReadinessReasons(reasons);
+}
+
+function explainReadinessReason(reason) {
+  return getGrayTrialReportController().explainReadinessReason(reason);
+}
+
+function explainReadinessReasons(reasons) {
+  return getGrayTrialReportController().explainReadinessReasons(reasons);
+}
+
+function buildGrayAutoFollowupReadinessStatus(snapshotInput = null) {
+  return getGrayTrialReportController().buildGrayAutoFollowupReadinessStatus(snapshotInput);
+}
+
+function buildGrayAutoFollowupDryRunStatus(snapshotInput = null) {
+  return getGrayTrialReportController().buildGrayAutoFollowupDryRunStatus(snapshotInput);
+}
+
+function buildGrayAutoFollowupTrialPreflight(snapshotInput = null) {
+  return getGrayTrialReportController().buildGrayAutoFollowupTrialPreflight(snapshotInput);
+}
+
+function buildGrayAutoFollowupTrialEventContext(snapshotInput = null) {
+  return getGrayTrialReportController().buildGrayAutoFollowupTrialEventContext(snapshotInput);
+}
+
+function mergeProactiveSchedulerPollEventResult(result, trialContext = null) {
+  return getGrayTrialReportController().mergeProactiveSchedulerPollEventResult(result, trialContext);
+}
+
+function mergeProactiveSchedulerPollEventError(error, trialContext = null) {
+  return getGrayTrialReportController().mergeProactiveSchedulerPollEventError(error, trialContext);
+}
+
+function parseGrayTrialPollEventResult(result) {
+  return getGrayTrialReportController().parseGrayTrialPollEventResult(result);
+}
+
+function buildGrayAutoFollowupTrialEventSummary(limit = 20) {
+  return getGrayTrialReportController().buildGrayAutoFollowupTrialEventSummary(limit);
+}
+
+function runGrayAutoFollowupDryRunDebug() {
+  return getGrayTrialReportController().runGrayAutoFollowupDryRunDebug();
+}
+
+function buildFollowupReadinessFriendlySummary(followup, silence, scheduler) {
+  return getGrayTrialReportController().buildFollowupReadinessFriendlySummary(followup, silence, scheduler);
+}
+
+const GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER = window.TaffyGrayTrialCharacterPanelController || {};
+let grayTrialCharacterPanelController = null;
+
+function getGrayTrialCharacterPanelController() {
+  if (!grayTrialCharacterPanelController && typeof GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER.createController === "function") {
+    grayTrialCharacterPanelController = GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER.createController(getFollowupControllerDeps());
+  }
+  return grayTrialCharacterPanelController;
+}
+
+function buildFollowupCharacterState(followup, silence, scheduler) {
+  return getGrayTrialCharacterPanelController().buildFollowupCharacterState(followup, silence, scheduler);
+}
+
+function formatFollowupReactionCandidateSummary(candidates) {
+  return getGrayTrialCharacterPanelController().formatFollowupReactionCandidateSummary(candidates);
+}
+
+function previewConversationFollowupReactions(input = {}) {
+  return getGrayTrialCharacterPanelController().previewConversationFollowupReactions(input);
+}
+
+function getFollowupCharacterStateDebugView() {
+  return getGrayTrialCharacterPanelController().getFollowupCharacterStateDebugView();
+}
+
+function buildFollowupCharacterChipTitle(view) {
+  return getGrayTrialCharacterPanelController().buildFollowupCharacterChipTitle(view);
+}
+
+function updateFollowupCharacterChip() {
+  return getGrayTrialCharacterPanelController().updateFollowupCharacterChip();
+}
+
+function localizeReplyCharacterValue(kind, value) {
+  return getGrayTrialCharacterPanelController().localizeReplyCharacterValue(kind, value);
+}
+
+function buildReplyCharacterChipView(candidate = null, autoApply = null) {
+  return getGrayTrialCharacterPanelController().buildReplyCharacterChipView(candidate, autoApply);
+}
+
+function updateReplyCharacterChip(candidate = null, autoApply = null) {
+  return getGrayTrialCharacterPanelController().updateReplyCharacterChip(candidate, autoApply);
+}
+
+function buildFollowupCharacterRuntimeHint(input = {}) {
+  return getGrayTrialCharacterPanelController().buildFollowupCharacterRuntimeHint(input);
+}
+
+function normalizeGrayAutoTrialCharacterCuePresetKey(value) {
+  return getGrayTrialCharacterPanelController().normalizeGrayAutoTrialCharacterCuePresetKey(value);
+}
+
+function listGrayAutoTrialCharacterCuePresets() {
+  return getGrayTrialCharacterPanelController().listGrayAutoTrialCharacterCuePresets();
+}
+
+function resolveGrayAutoTrialCharacterCuePreset(input = {}, checklist = null) {
+  return getGrayTrialCharacterPanelController().resolveGrayAutoTrialCharacterCuePreset(input, checklist);
+}
+
+function buildAssistantReplyCharacterExpressionCue(input = {}) {
+  return getGrayTrialCharacterPanelController().buildAssistantReplyCharacterExpressionCue(input);
+}
+
+function buildAssistantReplyCharacterCueCandidate(input = {}) {
+  return getGrayTrialCharacterPanelController().buildAssistantReplyCharacterCueCandidate(input);
+}
+
+function previewAssistantReplyCharacterCueCandidate(input = {}) {
+  return getGrayTrialCharacterPanelController().previewAssistantReplyCharacterCueCandidate(input);
+}
+
+function normalizeRuntimeVoiceStyle(style) {
+  return getGrayTrialCharacterPanelController().normalizeRuntimeVoiceStyle(style);
+}
+
+function runtimeVoiceStyleToTalkStyle(style, fallback = "neutral") {
+  return getGrayTrialCharacterPanelController().runtimeVoiceStyleToTalkStyle(style, fallback);
+}
+
+function isReplyCueAutoApplyEnabled() {
+  return getGrayTrialCharacterPanelController().isReplyCueAutoApplyEnabled();
+}
+
+function maybeAutoApplyAssistantReplyCharacterCueCandidate(candidate, context = {}) {
+  return getGrayTrialCharacterPanelController().maybeAutoApplyAssistantReplyCharacterCueCandidate(candidate, context);
+}
+
+function maybeEmitFollowupCharacterRuntimeHint(input = {}) {
+  return getGrayTrialCharacterPanelController().maybeEmitFollowupCharacterRuntimeHint(input);
+}
+
+function startFollowupCharacterChipRefresh() {
+  return getGrayTrialCharacterPanelController().startFollowupCharacterChipRefresh();
+}
+
+function buildFollowupAwareIdleMotionContext() {
+  return getGrayTrialCharacterPanelController().buildFollowupAwareIdleMotionContext();
+}
+
+const FOLLOWUP_READINESS_PANEL_CONTROLLER = window.TaffyFollowupReadinessPanelController || {};
+let followupReadinessPanelController = null;
+
+function getFollowupReadinessPanelController() {
+  if (!followupReadinessPanelController && typeof FOLLOWUP_READINESS_PANEL_CONTROLLER.createController === "function") {
+    followupReadinessPanelController = FOLLOWUP_READINESS_PANEL_CONTROLLER.createController(getFollowupControllerDeps());
+  }
+  return followupReadinessPanelController;
+}
+
+function buildFollowupReadinessBackendEntryView() {
+  return getFollowupReadinessPanelController().buildFollowupReadinessBackendEntryView();
+}
+
+function buildFollowupReadinessBackendEntryCardText() {
+  return getFollowupReadinessPanelController().buildFollowupReadinessBackendEntryCardText();
+}
+
+async function refreshFollowupReadinessBackendEntrySummary(force = false) {
+  return getFollowupReadinessPanelController().refreshFollowupReadinessBackendEntrySummary(force);
+}
+
+function updateFollowupReadinessBackendEntryCard() {
+  return getFollowupReadinessPanelController().updateFollowupReadinessBackendEntryCard();
+}
+
+function buildFollowupReadinessReport() {
+  return getFollowupReadinessPanelController().buildFollowupReadinessReport();
+}
+
+function buildFollowupReadinessPreviewCardText() {
+  return getFollowupReadinessPanelController().buildFollowupReadinessPreviewCardText();
+}
+
+function buildFollowupRehearsalScenarioCompareRows() {
+  return getFollowupReadinessPanelController().buildFollowupRehearsalScenarioCompareRows();
+}
+
+function buildFollowupRehearsalScenarioCompareText() {
+  return getFollowupReadinessPanelController().buildFollowupRehearsalScenarioCompareText();
+}
+
+function buildFollowupReadinessPreviewCopyBundleText() {
+  return getFollowupReadinessPanelController().buildFollowupReadinessPreviewCopyBundleText();
+}
+
+function buildFollowupReadinessPreviewJsonText() {
+  return getFollowupReadinessPanelController().buildFollowupReadinessPreviewJsonText();
+}
+
+function buildFollowupReadinessPreviewOneLineText() {
+  return getFollowupReadinessPanelController().buildFollowupReadinessPreviewOneLineText();
+}
+
+function buildFollowupReadinessPreviewCardData(snapshotInput = null) {
+  return getFollowupReadinessPanelController().buildFollowupReadinessPreviewCardData(snapshotInput);
+}
+
+function normalizeFollowupManualConfirmationToken(value = "") {
+  return getFollowupReadinessPanelController().normalizeFollowupManualConfirmationToken(value);
+}
+
+function buildFollowupManualConfirmationKey(input = {}) {
+  return getFollowupReadinessPanelController().buildFollowupManualConfirmationKey(input);
+}
+
+function buildFollowupManualConfirmationData() {
+  return getFollowupReadinessPanelController().buildFollowupManualConfirmationData();
+}
+
+function getFollowupManualConfirmationStatusLabel(status = "hidden") {
+  return getFollowupReadinessPanelController().getFollowupManualConfirmationStatusLabel(status);
+}
+
+function buildFollowupManualConfirmationDebugPayload(confirmation = {}, result = "") {
+  return getFollowupReadinessPanelController().buildFollowupManualConfirmationDebugPayload(confirmation, result);
+}
+
+function recordFollowupManualConfirmationVisibleEvent(confirmation = {}) {
+  return getFollowupReadinessPanelController().recordFollowupManualConfirmationVisibleEvent(confirmation);
+}
+
+function updateFollowupManualConfirmationControls() {
+  return getFollowupReadinessPanelController().updateFollowupManualConfirmationControls();
+}
+
+async function handleFollowupManualConfirmClick(button = null) {
+  return getFollowupReadinessPanelController().handleFollowupManualConfirmClick(button);
+}
+
+function dismissFollowupManualConfirmation(button = null) {
+  return getFollowupReadinessPanelController().dismissFollowupManualConfirmation(button);
+}
+
+function reviewFollowupManualConfirmationDetails() {
+  return getFollowupReadinessPanelController().reviewFollowupManualConfirmationDetails();
+}
+
+function updateFollowupReadinessPreviewCard() {
+  return getFollowupReadinessPanelController().updateFollowupReadinessPreviewCard();
+}
+
+function updateFollowupManualConfirmationPreviewCard() {
+  return getFollowupReadinessPanelController().updateFollowupManualConfirmationPreviewCard();
+}
+
+function buildGrayAutoTrialStatusCardText() {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialStatusCardText();
+}
+
+function updateGrayAutoTrialStatusCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialStatusCard();
+}
+
+function buildGrayAutoTrialAuditSummary(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialAuditSummary(limit);
+}
+
+function buildGrayAutoTrialAuditSummaryText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialAuditSummaryText(limit);
+}
+
+function buildGrayAutoTrialPreRunChecklist(snapshotInput = null) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialPreRunChecklist(snapshotInput);
+}
+
+function buildGrayAutoTrialPreRunChecklistText() {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialPreRunChecklistText();
+}
+
+function buildGrayAutoTrialTimeline(limit = 32) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialTimeline(limit);
+}
+
+function buildGrayAutoTrialTimelineText(limit = 32) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialTimelineText(limit);
+}
+
+function buildGrayAutoTrialOutcome(limit = 48) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialOutcome(limit);
+}
+
+function buildGrayAutoTrialOutcomeText(limit = 48) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialOutcomeText(limit);
+}
+
+function buildGrayAutoTrialGoNoGoDecision(limit = 48) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialGoNoGoDecision(limit);
+}
+
+function buildGrayAutoTrialGoNoGoDecisionText(limit = 48) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialGoNoGoDecisionText(limit);
+}
+
+function buildGrayAutoTrialSignoffPackage(limit = 48) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialSignoffPackage(limit);
+}
+
+function buildGrayAutoTrialSignoffPackageText(limit = 48) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialSignoffPackageText(limit);
+}
+
+function buildGrayAutoTrialCharacterCuePreview(limit = 48) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterCuePreview(limit);
+}
+
+function buildGrayAutoTrialCharacterCuePreviewText(limit = 48) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterCuePreviewText(limit);
+}
+
+function buildGrayAutoTrialCharacterCueHandoffChecklist(limit = 48) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
+}
+
+function buildGrayAutoTrialCharacterCueHandoffChecklistText(limit = 48) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterCueHandoffChecklistText(limit);
+}
+
+function getGrayAutoTrialCharacterCueManualEmitStatus() {
+  return getFollowupReadinessPanelController().getGrayAutoTrialCharacterCueManualEmitStatus();
+}
+
+function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterCueManualEmitStatusText();
+}
+
+function buildGrayAutoTrialCharacterManualCueStatusCardText() {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterManualCueStatusCardText();
+}
+
+function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
+}
+
+function buildGrayAutoTrialCharacterCueManualEmitRecapText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterCueManualEmitRecapText(limit);
+}
+
+function buildGrayAutoTrialCharacterExpressionStrategyDraft(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterExpressionStrategyDraft(limit);
+}
+
+function buildGrayAutoTrialCharacterExpressionStrategyDraftText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterExpressionStrategyDraftText(limit);
+}
+
+function buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
+}
+
+function buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeDryRunText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeDryRunText(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackageText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackageText(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackageText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackageText(limit);
+}
+
+function getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled() {
+  return getFollowupReadinessPanelController().getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled();
+}
+
+function getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchState() {
+  return getFollowupReadinessPanelController().getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchState();
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit);
+}
+
+function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftText(limit = 24) {
+  return getFollowupReadinessPanelController().buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftText(limit);
+}
+
+function enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(input = {}) {
+  return getFollowupReadinessPanelController().enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(input);
+}
+
+function disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason = "manual_disable") {
+  return getFollowupReadinessPanelController().disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason);
+}
+
+function rollbackGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason = "manual_rollback") {
+  return getFollowupReadinessPanelController().rollbackGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason);
+}
+
+function emitGrayAutoTrialCharacterCueManually(input = {}) {
+  return getFollowupReadinessPanelController().emitGrayAutoTrialCharacterCueManually(input);
+}
+
+async function previewGrayAutoTrialCharacterCueBackendBridge(checklist = null) {
+  return getFollowupReadinessPanelController().previewGrayAutoTrialCharacterCueBackendBridge(checklist);
+}
+
+function getSelectedGrayAutoTrialCharacterCuePresetKey() {
+  return getFollowupReadinessPanelController().getSelectedGrayAutoTrialCharacterCuePresetKey();
+}
+
+async function emitGrayAutoTrialCharacterCueViaManualBridge(input = {}) {
+  return getFollowupReadinessPanelController().emitGrayAutoTrialCharacterCueViaManualBridge(input);
+}
+
+async function emitLastReplyCharacterCueCandidateViaManualBridge(input = {}) {
+  return getFollowupReadinessPanelController().emitLastReplyCharacterCueCandidateViaManualBridge(input);
+}
+
+function updateGrayAutoTrialPreRunChecklistCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialPreRunChecklistCard();
+}
+
+function updateGrayAutoTrialTimelineCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialTimelineCard();
+}
+
+function updateGrayAutoTrialOutcomeCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialOutcomeCard();
+}
+
+function updateGrayAutoTrialDecisionCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialDecisionCard();
+}
+
+function updateGrayAutoTrialSignoffCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialSignoffCard();
+}
+
+function updateGrayAutoTrialCharacterCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterCard();
+}
+
+function updateGrayAutoTrialCharacterHandoffCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterHandoffCard();
+}
+
+function updateGrayAutoTrialCharacterRecapCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterRecapCard();
+}
+
+function updateGrayAutoTrialCharacterManualCueStatusCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterManualCueStatusCard();
+}
+
+function updateReplyCharacterCueCandidateManualSendButton() {
+  return getFollowupReadinessPanelController().updateReplyCharacterCueCandidateManualSendButton();
+}
+
+function updateGrayAutoTrialCharacterStrategyCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterStrategyCard();
+}
+
+function updateGrayAutoTrialCharacterReviewCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterReviewCard();
+}
+
+function updateGrayAutoTrialCharacterAutoPlanCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterAutoPlanCard();
+}
+
+function updateGrayAutoTrialCharacterDryRunCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterDryRunCard();
+}
+
+function updateGrayAutoTrialCharacterSwitchPlanCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterSwitchPlanCard();
+}
+
+function updateGrayAutoTrialCharacterSwitchReviewCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterSwitchReviewCard();
+}
+
+function updateGrayAutoTrialCharacterSwitchAcceptanceCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterSwitchAcceptanceCard();
+}
+
+function updateGrayAutoTrialCharacterSwitchControlCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterSwitchControlCard();
+}
+
+function updateGrayAutoTrialCharacterSwitchDiagnosticsCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterSwitchDiagnosticsCard();
+}
+
+function updateGrayAutoTrialCharacterSwitchRollbackCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterSwitchRollbackCard();
+}
+
+function updateGrayAutoTrialCharacterSwitchFinalPreflightCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterSwitchFinalPreflightCard();
+}
+
+function updateGrayAutoTrialCharacterImplementationDraftCard() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialCharacterImplementationDraftCard();
+}
+
+function promptGrayAutoTrialPhrase(phrase, actionLabel) {
+  return getFollowupReadinessPanelController().promptGrayAutoTrialPhrase(phrase, actionLabel);
+}
+
+function updateGrayAutoTrialControlPanel() {
+  return getFollowupReadinessPanelController().updateGrayAutoTrialControlPanel();
+}
+
+function handleGrayAutoTrialArmClick(button = null) {
+  return getFollowupReadinessPanelController().handleGrayAutoTrialArmClick(button);
+}
+
+function handleGrayAutoTrialStopClick(button = null) {
+  return getFollowupReadinessPanelController().handleGrayAutoTrialStopClick(button);
+}
+
+function handleGrayAutoTrialDisarmClick(button = null) {
+  return getFollowupReadinessPanelController().handleGrayAutoTrialDisarmClick(button);
+}
+
+function handleGrayAutoTrialResetClick(button = null) {
+  return getFollowupReadinessPanelController().handleGrayAutoTrialResetClick(button);
+}
+
+async function handleGrayAutoTrialCharacterCueManualEmitClick(button = null) {
+  return getFollowupReadinessPanelController().handleGrayAutoTrialCharacterCueManualEmitClick(button);
+}
+
+async function handleReplyCharacterCueCandidateManualSendClick(button = null) {
+  return getFollowupReadinessPanelController().handleReplyCharacterCueCandidateManualSendClick(button);
+}
+
+function handleGrayAutoTrialCharacterAutoRuntimeSwitchEnableClick(button = null) {
+  return getFollowupReadinessPanelController().handleGrayAutoTrialCharacterAutoRuntimeSwitchEnableClick(button);
+}
+
+function handleGrayAutoTrialCharacterAutoRuntimeSwitchDisableClick(button = null) {
+  return getFollowupReadinessPanelController().handleGrayAutoTrialCharacterAutoRuntimeSwitchDisableClick(button);
+}
+
+function handleGrayAutoTrialCharacterAutoRuntimeSwitchRollbackClick(button = null) {
+  return getFollowupReadinessPanelController().handleGrayAutoTrialCharacterAutoRuntimeSwitchRollbackClick(button);
+}
+
+async function copyGrayAutoTrialAuditSummaryToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialAuditSummaryToClipboard(button);
+}
+
+async function copyGrayAutoTrialTimelineToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialTimelineToClipboard(button);
+}
+
+async function copyGrayAutoTrialDecisionToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialDecisionToClipboard(button);
+}
+
+async function copyGrayAutoTrialSignoffToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialSignoffToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterCuePreviewToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterCuePreviewToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterCueHandoffChecklistToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterCueHandoffChecklistToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterCueManualEmitRecapToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterCueManualEmitRecapToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterExpressionStrategyDraftToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterExpressionStrategyDraftToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterExpressionStrategyReviewPackageToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterExpressionStrategyReviewPackageToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeSafetyPlanToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterAutoRuntimeSafetyPlanToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeDryRunToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterAutoRuntimeDryRunToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeSwitchPlanToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterAutoRuntimeSwitchPlanToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeSwitchReviewToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterAutoRuntimeSwitchReviewToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeSwitchAcceptanceToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterAutoRuntimeSwitchAcceptanceToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeSwitchControlToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterAutoRuntimeSwitchControlToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeSwitchDiagnosticsToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterAutoRuntimeSwitchDiagnosticsToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeSwitchRollbackToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterAutoRuntimeSwitchRollbackToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeFinalPreflightToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterAutoRuntimeFinalPreflightToClipboard(button);
+}
+
+async function copyGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftToClipboard(button);
+}
+
+function updateFollowupReadinessScenarioCompare() {
+  return getFollowupReadinessPanelController().updateFollowupReadinessScenarioCompare();
+}
+
+function createFollowupReadinessActionGroup(labelText, buttons = []) {
+  return getFollowupReadinessPanelController().createFollowupReadinessActionGroup(labelText, buttons);
+}
+
+function createFollowupReadinessCollapsibleActionGroup(labelText, buttons = [], open = false) {
+  return getFollowupReadinessPanelController().createFollowupReadinessCollapsibleActionGroup(labelText, buttons, open);
+}
+
+function ensureFollowupReadinessPanel() {
+  return getFollowupReadinessPanelController().ensureFollowupReadinessPanel();
+}
+
+function updateFollowupReadinessPanel() {
+  return getFollowupReadinessPanelController().updateFollowupReadinessPanel();
+}
+
+function toggleFollowupReadinessPanel(force = null) {
+  return getFollowupReadinessPanelController().toggleFollowupReadinessPanel(force);
+}
+
+function buildFollowupConfigTemplate() {
+  return getFollowupReadinessPanelController().buildFollowupConfigTemplate();
+}
+
+async function writeTextToClipboard(text) {
+  return getFollowupReadinessPanelController().writeTextToClipboard(text);
+}
+
+async function copyFollowupReadinessReportToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyFollowupReadinessReportToClipboard(button);
+}
+
+async function copyFollowupReadinessSelectedTextToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyFollowupReadinessSelectedTextToClipboard(button);
+}
+
+async function copyFollowupReadinessPreviewSummaryToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyFollowupReadinessPreviewSummaryToClipboard(button);
+}
+
+async function copyFollowupReadinessPreviewCopyBundleToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyFollowupReadinessPreviewCopyBundleToClipboard(button);
+}
+
+async function copyFollowupReadinessPreviewJsonToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyFollowupReadinessPreviewJsonToClipboard(button);
+}
+
+async function copyFollowupReadinessPreviewOneLineToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyFollowupReadinessPreviewOneLineToClipboard(button);
+}
+
+async function copyFollowupConfigTemplateToClipboard(button = null) {
+  return getFollowupReadinessPanelController().copyFollowupConfigTemplateToClipboard(button);
 }
 
 function formatDoctorBytes(bytes) {
   return typeof window.TaffyDoctorDiagnostics?.formatBytes === "function"
     ? window.TaffyDoctorDiagnostics.formatBytes(bytes)
     : "";
-}
-
-function buildDoctorAdvice(checks, context = {}) {
-  return typeof window.TaffyDoctorDiagnostics?.buildAdvice === "function"
-    ? window.TaffyDoctorDiagnostics.buildAdvice(checks, context)
-    : [];
 }
 
 async function runDoctorTimed(label, fn) {
@@ -2568,14 +1577,6 @@ async function runCharacterRehearsalAndAppendReport() {
   return ok;
 }
 
-function formatCharacterTuningNumber(value, fallback = "未配置") {
-  if (typeof CHARACTER_TUNING.formatNumber === "function") {
-    return CHARACTER_TUNING.formatNumber(value, fallback);
-  }
-  const n = Number(value);
-  return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : fallback;
-}
-
 function getLatestCharacterPerformanceSummary() {
   if (typeof CHARACTER_TUNING.buildLatestPerformanceSummary !== "function") {
     return null;
@@ -2650,4792 +1651,65 @@ function appendCharacterWorkflowGuide() {
 }
 
 function ensureTTSDebugPanel() {
-  if (state.ttsDebugPanel || typeof document === "undefined") {
-    return state.ttsDebugPanel;
+  if (!state.ttsDebugPanel && typeof DEBUG_PANEL_CONTROLLER.createDebugPanel === "function") {
+    const created = DEBUG_PANEL_CONTROLLER.createDebugPanel({
+      documentObject: document,
+      id: "tts-debug-panel",
+      title: "TTS Debug",
+      width: 420,
+      onHide: () => {
+        state.ttsDebugVisible = false;
+        updateTTSDebugPanel();
+      }
+    });
+    state.ttsDebugPanel = created?.panel || null;
+    state.ttsDebugBody = created?.body || null;
   }
-  const panel = document.createElement("div");
-  panel.id = "tts-debug-panel";
-  panel.style.cssText = [
-    "position:fixed",
-    "right:14px",
-    "bottom:14px",
-    "z-index:99999",
-    "width:min(420px,calc(100vw - 28px))",
-    "max-height:52vh",
-    "overflow:auto",
-    "padding:12px",
-    "border:1px solid rgba(120,150,170,.45)",
-    "border-radius:14px",
-    "background:rgba(8,18,26,.88)",
-    "color:#d8f3ff",
-    "font:12px/1.45 Consolas,Menlo,monospace",
-    "box-shadow:0 18px 45px rgba(0,0,0,.28)",
-    "backdrop-filter:blur(10px)",
-    "white-space:pre-wrap",
-    "display:none"
-  ].join(";");
-  const head = document.createElement("div");
-  head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;";
-  const title = document.createElement("strong");
-  title.textContent = "TTS Debug";
-  title.style.cssText = "font-size:13px;color:#ffffff;";
-  const close = document.createElement("button");
-  close.type = "button";
-  close.textContent = "Hide";
-  close.style.cssText = "border:0;border-radius:999px;padding:4px 9px;background:#d8f3ff;color:#10202a;cursor:pointer;";
-  close.addEventListener("click", () => {
-    state.ttsDebugVisible = false;
-    updateTTSDebugPanel();
-  });
-  head.appendChild(title);
-  head.appendChild(close);
-  const body = document.createElement("pre");
-  body.style.cssText = "margin:0;white-space:pre-wrap;";
-  panel.appendChild(head);
-  panel.appendChild(body);
-  document.body.appendChild(panel);
-  state.ttsDebugPanel = panel;
-  state.ttsDebugBody = body;
-  return panel;
+  return state.ttsDebugPanel;
 }
 
 function updateTTSDebugPanel() {
-  if (!state.ttsDebugVisible) {
-    if (state.ttsDebugPanel) {
-      state.ttsDebugPanel.style.display = "none";
-    }
-    if (state.ttsDebugRefreshTimer) {
-      clearInterval(state.ttsDebugRefreshTimer);
-      state.ttsDebugRefreshTimer = 0;
-    }
-    return;
-  }
-  const panel = ensureTTSDebugPanel();
-  if (!panel) {
-    return;
-  }
-  if (!state.ttsDebugRefreshTimer) {
-    state.ttsDebugRefreshTimer = window.setInterval(() => {
-      if (!state.ttsDebugVisible) {
+  return typeof DEBUG_PANEL_CONTROLLER.updateDebugPanel === "function"
+    ? DEBUG_PANEL_CONTROLLER.updateDebugPanel({
+      state,
+      documentObject: document,
+      windowObject: window,
+      id: "tts-debug-panel",
+      title: "TTS Debug",
+      width: 420,
+      visibleKey: "ttsDebugVisible",
+      panelKey: "ttsDebugPanel",
+      bodyKey: "ttsDebugBody",
+      timerKey: "ttsDebugRefreshTimer",
+      buildReport: buildTTSDebugReport,
+      onHide: () => {
+        state.ttsDebugVisible = false;
         updateTTSDebugPanel();
-        return;
       }
-      if (state.ttsDebugBody) {
-        state.ttsDebugBody.textContent = buildTTSDebugReport();
-      }
-    }, 1000);
-  }
-  panel.style.display = "block";
-  if (state.ttsDebugBody) {
-    state.ttsDebugBody.textContent = buildTTSDebugReport();
-  }
+    })
+    : null;
 }
 
 function toggleTTSDebugPanel(force = null) {
-  state.ttsDebugVisible = force === null ? !state.ttsDebugVisible : !!force;
-  updateTTSDebugPanel();
-  return state.ttsDebugVisible;
-}
-
-function formatReadinessBool(value) {
-  return value === true ? "开" : "关";
-}
-
-function formatReadinessMs(value) {
-  const ms = Number(value);
-  if (!Number.isFinite(ms) || ms < 0) {
-    return "n/a";
-  }
-  if (ms < 1000) {
-    return `${Math.round(ms)}ms`;
-  }
-  if (ms < 60000) {
-    return `${Math.round(ms / 1000)}s`;
-  }
-  return `${Math.round(ms / 60000)}m`;
-}
-
-function joinReadinessReasons(reasons) {
-  const list = Array.isArray(reasons) ? reasons.filter(Boolean) : [];
-  return list.length ? list.join(", ") : "none";
-}
-
-function explainReadinessReason(reason) {
-  const key = String(reason || "").trim();
-  const labels = {
-    conversation_disabled: "会话模式未开启",
-    proactive_disabled: "主动续话未开启",
-    scheduler_disabled: "主动调度未开启",
-    gray_auto_disabled: "灰度自动续话未显式启用",
-    gray_auto_trial_disabled: "灰度自动试运行未显式启用",
-    gray_auto_trial_session_limit_reached: "\u7070\u5ea6\u81ea\u52a8\u8bd5\u8fd0\u884c\u672c\u6b21\u4f1a\u8bdd\u6b21\u6570\u5df2\u8fbe\u4e0a\u9650",
-    no_pending_followup: "当前没有待续接的话题",
-    empty_topic_hint: "没有可继续的话题线索",
-    silence_window_not_reached: "安静时间还不够",
-    user_silence_window_not_reached: "用户刚刚还在互动，需要再等一会儿",
-    tts_silence_window_not_reached: "语音刚结束或还没有结束记录",
-    no_user_activity_timestamp: "还没有用户活动时间记录",
-    no_tts_finished_timestamp: "还没有语音结束时间记录",
-    policy_do_not_followup: "话题像是已经收口，所以不继续追问",
-    chat_busy: "当前正在处理对话",
-    speaking: "角色正在说话",
-    in_flight: "已有一次主动续话正在执行",
-    cooldown_active: "仍在冷却时间内",
-    window_limit_reached: "当前时间窗口内续话次数已达上限",
-    warmup_active: "调度器还在预热中"
-  };
-  return labels[key] || key || "未知原因";
-}
-
-function explainReadinessReasons(reasons) {
-  const list = Array.isArray(reasons) ? reasons.filter(Boolean) : [];
-  return list.length ? list.map(explainReadinessReason).join("；") : "没有阻塞原因";
-}
-
-function buildGrayAutoFollowupReadinessStatus(snapshotInput = null) {
-  const snapshot = snapshotInput && typeof snapshotInput === "object"
-    ? snapshotInput
-    : getTTSDebugSnapshot();
-  const mode = snapshot.conversationMode || {};
-  const followup = snapshot.followup || {};
-  const silence = snapshot.silence || {};
-  const scheduler = snapshot.proactiveScheduler || {};
-  const blockedSet = new Set();
-  if (mode.enabled !== true) {
-    blockedSet.add("conversation_disabled");
-  }
-  if (mode.proactiveEnabled !== true) {
-    blockedSet.add("proactive_disabled");
-  }
-  if (mode.proactiveSchedulerEnabled !== true) {
-    blockedSet.add("scheduler_disabled");
-  }
-  if (mode.grayAutoEnabled !== true) {
-    blockedSet.add("gray_auto_disabled");
-  }
-  if (mode.grayAutoTrialEnabled !== true) {
-    blockedSet.add("gray_auto_trial_disabled");
-  }
-  if (Number(mode.grayAutoTrialSessionTriggerCount || 0) >= Number(mode.grayAutoTrialMaxTriggersPerSession ?? 1)) {
-    blockedSet.add("gray_auto_trial_session_limit_reached");
-  }
-  [
-    scheduler.pollingBlockedReasons,
-    followup.blockedReasons,
-    silence.blockedReasons,
-    scheduler.blockedReasons
-  ].forEach((reasons) => {
-    if (Array.isArray(reasons)) {
-      reasons.filter(Boolean).forEach((reason) => blockedSet.add(String(reason)));
-    }
-  });
-  if (followup.pending !== true) {
-    blockedSet.add("no_pending_followup");
-  }
-  const pollingReady = scheduler.pollingEnabled === true;
-  const candidateReady = followup.eligible === true
-    && silence.eligibleForSilenceFollowup === true
-    && scheduler.eligibleForSchedulerTick === true;
-  const trialEnabled = mode.grayAutoTrialEnabled === true;
-  const ready = pollingReady && candidateReady && mode.grayAutoEnabled === true && trialEnabled;
-  const status = ready
-    ? "ready"
-    : mode.grayAutoEnabled === true && trialEnabled ? "blocked" : "default_off";
-  return {
-    status,
-    ready,
-    pollingReady,
-    candidateReady,
-    grayAutoEnabled: mode.grayAutoEnabled === true,
-    grayAutoTrialEnabled: trialEnabled,
-    grayAutoTrialSessionTriggerCount: Number(mode.grayAutoTrialSessionTriggerCount || 0),
-    grayAutoTrialMaxTriggersPerSession: Number(mode.grayAutoTrialMaxTriggersPerSession ?? 1),
-    blockedReasons: Array.from(blockedSet)
-  };
-}
-
-function buildGrayAutoFollowupDryRunStatus(snapshotInput = null) {
-  const snapshot = snapshotInput && typeof snapshotInput === "object"
-    ? snapshotInput
-    : getTTSDebugSnapshot();
-  const readiness = buildGrayAutoFollowupReadinessStatus(snapshot);
-  const followup = snapshot.followup || {};
-  const silence = snapshot.silence || {};
-  const scheduler = snapshot.proactiveScheduler || {};
-  const wouldPollCheck = readiness.pollingReady === true;
-  const wouldAttemptTrigger = readiness.ready === true;
-  return {
-    dryRun: true,
-    ok: wouldAttemptTrigger,
-    status: wouldAttemptTrigger ? "would_trigger" : readiness.status,
-    wouldPollCheck,
-    wouldAttemptTrigger,
-    readiness,
-    followup: {
-      pending: followup.pending === true,
-      eligible: followup.eligible === true,
-      policy: String(followup.policy || ""),
-      topicHint: String(followup.topicHint || ""),
-      blockedReasons: Array.isArray(followup.blockedReasons) ? followup.blockedReasons.slice() : []
-    },
-    silence: {
-      eligibleForSilenceFollowup: silence.eligibleForSilenceFollowup === true,
-      blockedReasons: Array.isArray(silence.blockedReasons) ? silence.blockedReasons.slice() : []
-    },
-    scheduler: {
-      pollingEnabled: scheduler.pollingEnabled === true,
-      eligibleForSchedulerTick: scheduler.eligibleForSchedulerTick === true,
-      pollTimerActive: scheduler.pollTimerActive === true,
-      blockedReasons: Array.isArray(scheduler.blockedReasons) ? scheduler.blockedReasons.slice() : [],
-      pollingBlockedReasons: Array.isArray(scheduler.pollingBlockedReasons)
-        ? scheduler.pollingBlockedReasons.slice()
-        : []
-    }
-  };
-}
-
-function buildGrayAutoFollowupTrialPreflight(snapshotInput = null) {
-  const snapshot = snapshotInput && typeof snapshotInput === "object"
-    ? snapshotInput
-    : getTTSDebugSnapshot();
-  const mode = snapshot.conversationMode || {};
-  const readiness = buildGrayAutoFollowupReadinessStatus(snapshot);
-  const dryRun = buildGrayAutoFollowupDryRunStatus(snapshot);
-  const gates = [
-    {
-      key: "enabled",
-      configKey: "conversation_mode.enabled",
-      enabled: mode.enabled === true,
-      blockedReason: "conversation_disabled"
-    },
-    {
-      key: "proactive_enabled",
-      configKey: "conversation_mode.proactive_enabled",
-      enabled: mode.proactiveEnabled === true,
-      blockedReason: "proactive_disabled"
-    },
-    {
-      key: "proactive_scheduler_enabled",
-      configKey: "conversation_mode.proactive_scheduler_enabled",
-      enabled: mode.proactiveSchedulerEnabled === true,
-      blockedReason: "scheduler_disabled"
-    },
-    {
-      key: "gray_auto_enabled",
-      configKey: "conversation_mode.gray_auto_enabled",
-      enabled: mode.grayAutoEnabled === true,
-      blockedReason: "gray_auto_disabled"
-    },
-    {
-      key: "gray_auto_trial_enabled",
-      configKey: "conversation_mode.gray_auto_trial_enabled",
-      enabled: mode.grayAutoTrialEnabled === true,
-      blockedReason: "gray_auto_trial_disabled"
-    }
-  ];
-  const gateBlockedReasons = gates
-    .filter((gate) => gate.enabled !== true)
-    .map((gate) => gate.blockedReason);
-  const sessionTriggerCount = Number(mode.grayAutoTrialSessionTriggerCount || 0);
-  const sessionMaxTriggers = Number(mode.grayAutoTrialMaxTriggersPerSession ?? 1);
-  const sessionLimitReached = sessionTriggerCount >= sessionMaxTriggers;
-  const gatesReady = gateBlockedReasons.length === 0;
-  const localTrialReady = !sessionLimitReached && gatesReady && readiness.ready === true && dryRun.wouldAttemptTrigger === true;
-  const status = sessionLimitReached
-    ? "session_limit_reached"
-    : localTrialReady
-      ? "ready_for_local_trial"
-      : gatesReady ? "runtime_guards_blocked" : "gated_off";
-  const nextAction = localTrialReady
-    ? "Local trial may be observed; keep it opt-in, reversible, and watched."
-    : gatesReady
-      ? "Wait for candidate, silence window, cooldown, policy, and scheduler guards to pass."
-      : "Enable all five gates only in a local test config when ready for controlled trial.";
-  return {
-    preflight: true,
-    readOnly: true,
-    ok: localTrialReady,
-    status,
-    gatesReady,
-    gates,
-    gateBlockedReasons,
-    sessionLimit: {
-      count: sessionTriggerCount,
-      max: sessionMaxTriggers,
-      reached: sessionLimitReached
-    },
-    readiness,
-    dryRun: {
-      dryRun: true,
-      status: dryRun.status,
-      wouldPollCheck: dryRun.wouldPollCheck === true,
-      wouldAttemptTrigger: dryRun.wouldAttemptTrigger === true,
-      blockedReasons: Array.isArray(readiness.blockedReasons) ? readiness.blockedReasons.slice() : []
-    },
-    safety: {
-      defaultOffRequired: true,
-      explicitGrayTrialOptInRequired: true,
-      manualConfirmationPrimary: true,
-      noDesktopObservationRequired: true,
-      noFileAccess: true,
-      noToolCalls: true,
-      noConfigWrites: true,
-      noModelOrTtsCall: true
-    },
-    nextAction
-  };
-}
-
-
-function buildGrayAutoFollowupTrialEventContext(snapshotInput = null) {
-  const preflight = buildGrayAutoFollowupTrialPreflight(snapshotInput);
-  const gateSummary = preflight.gatesReady === true
-    ? "pass"
-    : preflight.gateBlockedReasons.join("|") || "none";
-  const blockedReasons = Array.from(new Set([].concat(
-    Array.isArray(preflight.gateBlockedReasons) ? preflight.gateBlockedReasons : [],
-    Array.isArray(preflight.dryRun?.blockedReasons) ? preflight.dryRun.blockedReasons : []
-  ).filter(Boolean).map((reason) => String(reason))));
-  return {
-    result: [
-      `trial:${preflight.status}`,
-      `gates:${gateSummary}`,
-      `would_poll:${preflight.dryRun?.wouldPollCheck === true ? "true" : "false"}`,
-      `would_trigger:${preflight.dryRun?.wouldAttemptTrigger === true ? "true" : "false"}`
-    ].join(";"),
-    blocked: blockedReasons.join(",")
-  };
-}
-
-function mergeProactiveSchedulerPollEventResult(result, trialContext = null) {
-  const base = String(result || "").trim();
-  const extra = String(trialContext?.result || "").trim();
-  return [base, extra].filter(Boolean).join(";");
-}
-
-function mergeProactiveSchedulerPollEventError(error, trialContext = null) {
-  const base = String(error || "").trim();
-  const extra = String(trialContext?.blocked || "").trim();
-  return [base, extra].filter(Boolean).join(";").slice(0, 220);
-}
-
-
-function parseGrayTrialPollEventResult(result) {
-  const parts = String(result || "")
-    .split(";")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const parsed = {
-    raw: String(result || ""),
-    base: parts.filter((part) => !/^(trial|gates|would_poll|would_trigger):/.test(part)).join(";"),
-    trialStatus: "",
-    gates: "",
-    wouldPoll: false,
-    wouldTrigger: false
-  };
-  parts.forEach((part) => {
-    const index = part.indexOf(":");
-    if (index <= 0) {
-      return;
-    }
-    const key = part.slice(0, index);
-    const value = part.slice(index + 1);
-    if (key === "trial") {
-      parsed.trialStatus = value;
-    } else if (key === "gates") {
-      parsed.gates = value;
-    } else if (key === "would_poll") {
-      parsed.wouldPoll = value === "true";
-    } else if (key === "would_trigger") {
-      parsed.wouldTrigger = value === "true";
-    }
-  });
-  return parsed;
-}
-
-function buildGrayAutoFollowupTrialEventSummary(limit = 20) {
-  const rawLimit = Number(limit);
-  const safeLimit = Number.isFinite(rawLimit)
-    ? Math.max(1, Math.min(80, Math.round(rawLimit)))
-    : 20;
-  const events = Array.isArray(state.ttsDebugEvents) ? state.ttsDebugEvents : [];
-  const pollEvents = events
-    .filter((event) => String(event?.stage || "").startsWith("proactive_scheduler_poll_"))
-    .slice(-safeLimit);
-  const counts = {};
-  const recent = pollEvents.map((event) => {
-    const parsed = parseGrayTrialPollEventResult(event?.result || "");
-    const stage = String(event?.stage || "");
-    counts[stage] = Number(counts[stage] || 0) + 1;
-    return {
-      seq: Number(event?.seq || 0),
-      ageMs: Number(event?.ageMs || 0),
-      stage,
-      result: parsed.base,
-      trialStatus: parsed.trialStatus,
-      gates: parsed.gates,
-      wouldPoll: parsed.wouldPoll,
-      wouldTrigger: parsed.wouldTrigger,
-      blocked: sanitizeTTSDebugText(event?.error || "", 180)
-    };
-  });
-  const last = recent.length ? recent[recent.length - 1] : null;
-  return {
-    readOnly: true,
-    limit: safeLimit,
-    totalPollEvents: pollEvents.length,
-    counts,
-    last,
-    hasPollStart: recent.some((event) => event.stage === "proactive_scheduler_poll_start"),
-    hasReady: recent.some((event) => event.stage === "proactive_scheduler_poll_ready"),
-    hasTriggerAttempt: recent.some((event) =>
-      event.stage === "proactive_scheduler_poll_trigger_success"
-      || event.stage === "proactive_scheduler_poll_trigger_blocked"
-    ),
-    lastTrialStatus: last?.trialStatus || "none",
-    recent
-  };
-}
-
-function runGrayAutoFollowupDryRunDebug() {
-  const result = buildGrayAutoFollowupDryRunStatus();
-  const blockedReasons = Array.isArray(result.readiness?.blockedReasons)
-    ? result.readiness.blockedReasons.join(",")
-    : "";
-  recordTTSDebugEvent("conversation_followup_gray_auto_dry_run_checked", {
-    text: String(result.followup?.topicHint || ""),
-    result: [
-      `status:${result.status}`,
-      `would_poll:${result.wouldPollCheck === true ? "true" : "false"}`,
-      `would_trigger:${result.wouldAttemptTrigger === true ? "true" : "false"}`
-    ].join(";"),
-    error: sanitizeTTSDebugText(blockedReasons, 140)
-  });
-  return result;
-}
-
-function buildFollowupReadinessFriendlySummary(followup, silence, scheduler) {
-  if (followup?.eligible === true && silence?.eligibleForSilenceFollowup === true && scheduler?.eligibleForSchedulerTick === true) {
-    return "可以续话：续话、安静窗口和调度器都已满足。";
-  }
-  if (followup?.pending !== true) {
-    return "空闲：当前没有待续接的话题。";
-  }
-  if (String(followup?.policy || "") === "do_not_followup") {
-    return "保持安静：当前话题像是已经收口，不应该继续追问。";
-  }
-  if (silence?.eligibleForSilenceFollowup !== true) {
-    return `等待中：${explainReadinessReasons(silence?.blockedReasons)}。`;
-  }
-  if (scheduler?.eligibleForSchedulerTick !== true) {
-    return `暂不触发：${explainReadinessReasons(scheduler?.blockedReasons)}。`;
-  }
-  return `暂不触发：${explainReadinessReasons(followup?.blockedReasons)}。`;
-}
-
-function buildFollowupCharacterState(followup, silence, scheduler) {
-  if (followup?.pending !== true) {
-    return {
-      label: "安静陪伴",
-      mood: "idle",
-      description: "现在没有待续接的话题，适合安静待在桌面边上。"
-    };
-  }
-  if (String(followup?.policy || "") === "do_not_followup") {
-    return {
-      label: "识趣闭麦",
-      mood: "neutral",
-      description: "话题像是已经收口，角色应该保持安静，不追问。"
-    };
-  }
-  if (scheduler?.eligibleForSchedulerTick === true && silence?.eligibleForSilenceFollowup === true && followup?.eligible === true) {
-    return {
-      label: "有点想接话",
-      mood: followup.characterCue?.emotion || "thinking",
-      description: followup.characterPreview || "条件已满足，可以低打扰地轻轻续一句。"
-    };
-  }
-  const schedulerReasons = Array.isArray(scheduler?.blockedReasons) ? scheduler.blockedReasons : [];
-  if (schedulerReasons.includes("cooldown_active")) {
-    return {
-      label: "冷却中",
-      mood: "neutral",
-      description: "刚刚已经主动过一次，先让用户休息一下。"
-    };
-  }
-  if (schedulerReasons.includes("window_limit_reached")) {
-    return {
-      label: "今天先收一收",
-      mood: "neutral",
-      description: "当前时间窗口里的主动续话次数已达上限。"
-    };
-  }
-  const silenceReasons = Array.isArray(silence?.blockedReasons) ? silence.blockedReasons : [];
-  if (silenceReasons.includes("user_silence_window_not_reached") || silenceReasons.includes("tts_silence_window_not_reached")) {
-    return {
-      label: "刚聊完",
-      mood: "idle",
-      description: "刚刚完成一轮对话，先安静待机，不打断用户。"
-    };
-  }
-  return {
-    label: "观察气氛",
-    mood: followup.characterCue?.emotion || "thinking",
-    description: "有待续接的话题，但还有 guard 未满足。"
-  };
-}
-
-function formatFollowupReactionCandidateSummary(candidates) {
-  const list = Array.isArray(candidates) ? candidates.filter((item) => item && item.text) : [];
-  if (!list.length) {
-    return "n/a";
-  }
-  return list.slice(0, 2).map((item, index) => `${index + 1}. ${item.text}`).join(" / ");
-}
-
-function previewConversationFollowupReactions(input = {}) {
-  const preview = previewConversationFollowupPolicy(input);
-  return {
-    policy: preview.followupPolicy,
-    topicHint: preview.topicHint,
-    selected: preview.selectedReaction || null,
-    candidates: Array.isArray(preview.reactionCandidates) ? preview.reactionCandidates.slice() : [],
-    preview: preview.characterPreview || ""
-  };
-}
-
-function getFollowupCharacterStateDebugView() {
-  const followup = buildConversationFollowupDebugView(Date.now());
-  return buildFollowupCharacterState(
-    {
-      pending: state.followupPending === true,
-      policy: followup.followupPolicy,
-      eligible: followup.eligible === true,
-      characterCue: followup.characterCue || null,
-      characterPreview: followup.characterPreview || "",
-      selectedReaction: followup.selectedReaction || null
-    },
-    followup.silence || {},
-    buildProactiveSchedulerDebugSnapshot(Date.now())
-  );
-}
-
-function buildFollowupCharacterChipTitle(view) {
-  const description = String(view?.description || "").trim();
-  const selected = view?.selectedReaction && typeof view.selectedReaction === "object"
-    ? view.selectedReaction
-    : null;
-  const selectedText = String(selected?.candidate?.text || "").trim();
-  if (!selectedText) {
-    return description || "\u5f53\u524d\u7eed\u8bdd\u89d2\u8272\u72b6\u6001";
-  }
-  const reason = String(selected?.reason || "").trim() || "n/a";
-  const tone = String(selected?.preferredTone || selected?.candidate?.tone || "").trim() || "n/a";
-  return [
-    description || "\u5f53\u524d\u7eed\u8bdd\u89d2\u8272\u72b6\u6001",
-    `\u60f3\u63a5\u7684\u4e00\u53e5\uff1a${selectedText}`,
-    `\u9009\u62e9\uff1a${reason} / tone=${tone}`
-  ].join("\n");
-}
-
-function updateFollowupCharacterChip() {
-  if (!ui.followupCharacterChip) {
-    return;
-  }
-  let view = null;
-  try {
-    view = getFollowupCharacterStateDebugView();
-  } catch (_) {
-    view = { label: "安静陪伴", mood: "idle", description: "当前续话角色状态暂不可用。" };
-  }
-  const label = String(view.label || "安静陪伴");
-  const mood = String(view.mood || "idle");
-  const description = String(view.description || "");
-  const selectedReaction = view.selectedReaction && typeof view.selectedReaction === "object"
-    ? view.selectedReaction
-    : null;
-  const tone = {
-    "有点想接话": "ready",
-    "冷却中": "cooldown",
-    "今天先收一收": "limit",
-    "识趣闭麦": "quiet",
-    "刚聊完": "idle",
-    "等你缓一会儿": "waiting",
-    "观察气氛": "watching",
-    "安静陪伴": "idle"
-  }[label] || "idle";
-  const chipTitle = buildFollowupCharacterChipTitle(view);
-  ui.followupCharacterChip.textContent = `${label} · ${mood}`;
-  ui.followupCharacterChip.title = chipTitle;
-  ui.followupCharacterChip.setAttribute("aria-label", chipTitle);
-  ui.followupCharacterChip.dataset.state = label;
-  ui.followupCharacterChip.dataset.mood = mood;
-  ui.followupCharacterChip.dataset.tone = tone;
-  ui.followupCharacterChip.dataset.selectedTone = String(selectedReaction?.preferredTone || selectedReaction?.candidate?.tone || "");
-  ui.followupCharacterChip.dataset.selectedIndex = Number.isFinite(Number(selectedReaction?.index))
-    ? String(Number(selectedReaction.index))
-    : "-1";
-  maybeEmitFollowupCharacterRuntimeHint({ label, mood, tone });
-}
-
-function localizeReplyCharacterValue(kind, value) {
-  return typeof CHARACTER_REPLY_CUE.localizeValue === "function"
-    ? CHARACTER_REPLY_CUE.localizeValue(kind, value)
-    : (typeof CHARACTER_TUNING.localizeValue === "function"
-      ? CHARACTER_TUNING.localizeValue(kind, value)
-      : String(value || "").trim().toLowerCase().replace(/_/g, " ") || "未定");
-}
-
-function buildReplyCharacterChipView(candidate = null, autoApply = null) {
-  const safeCandidate = candidate && typeof candidate === "object"
-    ? candidate
-    : state.followupCharacterRuntimeLastReplyCandidate;
-  const safeAutoApply = autoApply && typeof autoApply === "object"
-    ? autoApply
-    : state.followupCharacterRuntimeLastReplyAutoApply;
-  return typeof CHARACTER_REPLY_CUE.buildReplyCharacterChipView === "function"
-    ? CHARACTER_REPLY_CUE.buildReplyCharacterChipView(safeCandidate, safeAutoApply)
-    : {
-      text: "上一句角色表现 · 待回复",
-      title: "发送一条消息后，这里会显示上一句回复触发的情绪、动作和语音风格。",
-      tone: "waiting"
-    };
-}
-
-function updateReplyCharacterChip(candidate = null, autoApply = null) {
-  if (!ui.replyCharacterChip) {
-    return;
-  }
-  const view = buildReplyCharacterChipView(candidate, autoApply);
-  ui.replyCharacterChip.textContent = view.text;
-  ui.replyCharacterChip.title = view.title;
-  ui.replyCharacterChip.setAttribute("aria-label", view.title);
-  ui.replyCharacterChip.dataset.tone = view.tone;
-}
-
-function buildFollowupCharacterRuntimeHint(input = {}) {
-  return typeof CHARACTER_REPLY_CUE.buildFollowupCharacterRuntimeHint === "function"
-    ? CHARACTER_REPLY_CUE.buildFollowupCharacterRuntimeHint(input)
-    : {
-      emotion: "neutral",
-      action: "none",
-      intensity: "low",
-      voice_style: "neutral",
-      live2d_hint: String(input.tone || "idle"),
-      source: "followup_character_state",
-      label: String(input.label || "")
-    };
-}
-
-function normalizeGrayAutoTrialCharacterCuePresetKey(value) {
-  return typeof CHARACTER_REPLY_CUE.normalizeGrayAutoTrialCharacterCuePresetKey === "function"
-    ? CHARACTER_REPLY_CUE.normalizeGrayAutoTrialCharacterCuePresetKey(value)
-    : "auto";
-}
-
-function listGrayAutoTrialCharacterCuePresets() {
-  return typeof CHARACTER_REPLY_CUE.listGrayAutoTrialCharacterCuePresets === "function"
-    ? CHARACTER_REPLY_CUE.listGrayAutoTrialCharacterCuePresets()
-    : [];
-}
-
-function resolveGrayAutoTrialCharacterCuePreset(input = {}, checklist = null) {
-  const safeChecklist = checklist && typeof checklist === "object"
-    ? checklist
-    : buildGrayAutoTrialCharacterCueHandoffChecklist();
-  return typeof CHARACTER_REPLY_CUE.resolveGrayAutoTrialCharacterCuePreset === "function"
-    ? CHARACTER_REPLY_CUE.resolveGrayAutoTrialCharacterCuePreset(input, safeChecklist)
-    : {
-      key: "auto",
-      label: String(safeChecklist.label || ""),
-      tone: String(safeChecklist.tone || ""),
-      description: "",
-      runtimeHint: { ...(safeChecklist.runtimeHint || {}) }
-    };
-}
-
-function buildAssistantReplyCharacterExpressionCue(input = {}) {
-  return typeof CHARACTER_REPLY_CUE.buildAssistantReplyCharacterExpressionCue === "function"
-    ? CHARACTER_REPLY_CUE.buildAssistantReplyCharacterExpressionCue(input)
-    : {
-      reason: "neutral_idle",
-      runtimeHint: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral", live2d_hint: "idle" }
-    };
-}
-
-function buildAssistantReplyCharacterCueCandidate(input = {}) {
-  return typeof CHARACTER_REPLY_CUE.buildAssistantReplyCharacterCueCandidate === "function"
-    ? CHARACTER_REPLY_CUE.buildAssistantReplyCharacterCueCandidate(input, {
-      normalizeMetadata: normalizeCharacterRuntimeMetadataForFrontend,
-      now: () => Date.now()
-    })
-    : {
-      readOnly: true,
-      source: "assistant_reply",
-      generatedAt: Date.now(),
-      eligibleForManualSend: false,
-      autoTriggered: false,
-      auto: input?.auto === true,
-      mood: String(input?.mood || "idle").trim().toLowerCase(),
-      style: String(input?.style || "neutral").trim().toLowerCase(),
-      tone: "idle",
-      expressionReason: "missing_helper",
-      textPreview: String(input?.text || "").trim().slice(0, 80),
-      runtimeHint: null,
-      safety: { noRuntimeCueEmission: true, noLive2DMove: true, noTts: true, noSchedulerChange: true, noFollowupExecution: true, noConfigWrites: true }
-    };
-}
-
-function previewAssistantReplyCharacterCueCandidate(input = {}) {
-  const candidate = buildAssistantReplyCharacterCueCandidate(input);
-  state.followupCharacterRuntimeLastReplyCandidate = candidate;
-  recordTTSDebugEvent("conversation_followup_character_reply_cue_candidate", {
-    text: String(candidate.textPreview || ""),
-    result: `tone:${candidate.tone};mood:${candidate.mood};style:${candidate.style}`,
-    error: candidate.runtimeHint ? String(candidate.runtimeHint.emotion || "") : "no_runtime_hint"
-  });
-  updateReplyCharacterChip(candidate);
-  updateGrayAutoTrialCharacterManualCueStatusCard();
-  updateReplyCharacterCueCandidateManualSendButton();
-  return candidate;
-}
-
-function normalizeRuntimeVoiceStyle(style) {
-  return typeof CHARACTER_REPLY_CUE.normalizeRuntimeVoiceStyle === "function"
-    ? CHARACTER_REPLY_CUE.normalizeRuntimeVoiceStyle(style)
-    : "neutral";
-}
-
-function runtimeVoiceStyleToTalkStyle(style, fallback = "neutral") {
-  return typeof CHARACTER_REPLY_CUE.runtimeVoiceStyleToTalkStyle === "function"
-    ? CHARACTER_REPLY_CUE.runtimeVoiceStyleToTalkStyle(style, fallback, normalizeTalkStyle)
-    : normalizeTalkStyle(fallback);
-}
-
-function isReplyCueAutoApplyEnabled() {
-  const runtimeCfg = state.config?.character_runtime || {};
-  return state.characterRuntimeAutoApplyReplyCue === true
-    || (runtimeCfg.enabled === true && runtimeCfg.auto_apply_reply_cue === true);
-}
-
-function maybeAutoApplyAssistantReplyCharacterCueCandidate(candidate, context = {}) {
-  if (!candidate || typeof candidate !== "object") {
-    return null;
-  }
-  if (!isReplyCueAutoApplyEnabled()) {
-    state.followupCharacterRuntimeLastReplyAutoApply = {
-      at: Date.now(),
-      applied: false,
-      reason: "disabled"
-    };
-    updateReplyCharacterChip(candidate, state.followupCharacterRuntimeLastReplyAutoApply);
-    return null;
-  }
-  const runtimeHint = candidate.runtimeHint && typeof candidate.runtimeHint === "object"
-    ? candidate.runtimeHint
-    : null;
-  if (!runtimeHint) {
-    const skipped = {
-      at: Date.now(),
-      applied: false,
-      reason: "missing_runtime_hint",
-      speechStyle: normalizeTalkStyle(context.style || candidate.style || "neutral"),
-      voiceStyle: "neutral"
-    };
-    state.followupCharacterRuntimeLastReplyAutoApply = skipped;
-    updateReplyCharacterChip(candidate, skipped);
-    return skipped;
-  }
-
-  let normalized = null;
-  let reason = "applied";
-  try {
-    normalized = handleCharacterRuntimeMetadata(runtimeHint);
-  } catch (error) {
-    reason = String(error?.message || error || "dispatch_failed") || "dispatch_failed";
-  }
-  const voiceStyle = normalizeRuntimeVoiceStyle(
-    normalized?.voice_style || runtimeHint.voice_style || candidate.mood || context.mood || "neutral"
-  );
-  const speechStyle = runtimeVoiceStyleToTalkStyle(voiceStyle, context.style || candidate.style || "neutral");
-  const result = {
-    at: Date.now(),
-    applied: !!normalized,
-    reason: normalized ? "applied" : reason,
-    voiceStyle,
-    speechStyle,
-    runtimeHint: normalized,
-    source: "assistant_reply_candidate"
-  };
-  candidate.autoTriggered = !!normalized;
-  state.followupCharacterRuntimeLastReplyAutoApply = result;
-  try {
-    window.__AI_CHAT_LAST_CHARACTER_RUNTIME_REPLY_AUTO_APPLY__ = result;
-  } catch (_) {
-    // Diagnostics are optional.
-  }
-  recordTTSDebugEvent("conversation_followup_character_reply_cue_candidate_auto_apply", {
-    text: String(candidate.textPreview || ""),
-    result: result.applied
-      ? `voice:${voiceStyle};speechStyle:${speechStyle}`
-      : `skipped:${result.reason}`,
-    error: String(normalized?.emotion || runtimeHint.emotion || "")
-  });
-  updateReplyCharacterChip(candidate, result);
-  updateGrayAutoTrialCharacterManualCueStatusCard();
-  updateReplyCharacterCueCandidateManualSendButton();
-  return result;
-}
-
-function maybeEmitFollowupCharacterRuntimeHint(input = {}) {
-  if (state.uiView !== "chat") {
-    return null;
-  }
-  const tone = String(input.tone || "idle");
-  const now = Date.now();
-  const changed = tone !== state.followupCharacterRuntimeLastTone;
-  if (!changed) {
-    return null;
-  }
-  const lastHintAt = Number(state.followupCharacterRuntimeLastHintAt || 0);
-  if (lastHintAt > 0 && now - lastHintAt < 30000) {
-    return null;
-  }
-  const hint = buildFollowupCharacterRuntimeHint(input);
-  state.followupCharacterRuntimeLastTone = tone;
-  state.followupCharacterRuntimeLastHintAt = now;
-  state.followupCharacterRuntimeLastHint = hint;
-  recordTTSDebugEvent("followup_character_runtime_hint", {
-    text: String(input.label || ""),
-    result: tone,
-    error: String(hint.emotion || "")
-  });
-  try {
-    return handleCharacterRuntimeMetadata(hint);
-  } catch (_) {
-    return null;
-  }
-}
-
-function startFollowupCharacterChipRefresh() {
-  updateFollowupCharacterChip();
-  updateReplyCharacterChip();
-  if (state.followupCharacterChipRefreshTimer || typeof window === "undefined") {
-    return;
-  }
-  state.followupCharacterChipRefreshTimer = window.setInterval(() => {
-    updateFollowupCharacterChip();
-    updateReplyCharacterChip();
-  }, 2000);
-}
-
-function buildFollowupAwareIdleMotionContext() {
-  try {
-    const view = getFollowupCharacterStateDebugView();
-    const label = String(view?.label || "");
-    if (label === "有点想接话") {
-      return { combo: false, idleIntent: "thinking", idleMood: "idle", style: "clear" };
-    }
-    if (label === "观察气氛" || label === "等你缓一会儿") {
-      return { combo: false, idleIntent: "thinking", idleMood: "idle", style: "comfort" };
-    }
-    if (label === "识趣闭麦" || label === "冷却中" || label === "今天先收一收") {
-      return { combo: false, idleIntent: "idle", idleMood: "idle", style: "steady" };
-    }
-  } catch (_) {
-    // Idle motion should never affect the main chat or scheduler flow.
-  }
-  return { combo: false, idleIntent: "idle", idleMood: "idle" };
-}
-
-function buildFollowupReadinessBackendEntryView() {
-  const summary = state.followupReadinessBackendEntrySummary;
-  const safeSummary = summary && typeof summary === "object" ? summary : {};
-  const blockedReasons = Array.isArray(safeSummary.blocked_reasons)
-    ? safeSummary.blocked_reasons.map((item) => String(item || "").trim()).filter(Boolean)
-    : [];
-  const guardContract = safeSummary.guard_contract && typeof safeSummary.guard_contract === "object"
-    ? safeSummary.guard_contract
-    : {};
-  const requiredChecks = Array.isArray(guardContract.required_checks)
-    ? guardContract.required_checks.map((item) => String(item || "").trim()).filter(Boolean)
-    : [];
-  const disallowedActions = Array.isArray(guardContract.disallowed_actions)
-    ? guardContract.disallowed_actions.map((item) => String(item || "").trim()).filter(Boolean)
-    : [];
-  const rollbackSteps = Array.isArray(guardContract.rollback)
-    ? guardContract.rollback.map((item) => String(item || "").trim()).filter(Boolean)
-    : [];
-  const executionPreview = safeSummary.entry_execution_preview && typeof safeSummary.entry_execution_preview === "object"
-    ? safeSummary.entry_execution_preview
-    : {};
-  const previewBlockedReasons = Array.isArray(executionPreview.blocked_reasons)
-    ? executionPreview.blocked_reasons.map((item) => String(item || "").trim()).filter(Boolean)
-    : [];
-  return {
-    loaded: summary && typeof summary === "object",
-    loading: state.followupReadinessBackendEntryLoading === true,
-    error: String(state.followupReadinessBackendEntryError || ""),
-    readOnly: safeSummary.read_only === true,
-    skeletonOnly: safeSummary.skeleton_only === true,
-    defaultOffBaseline: safeSummary.default_off_baseline === true,
-    configuredEnabled: safeSummary.configured_enabled === true,
-    configuredReturnMetadata: safeSummary.configured_return_metadata === true,
-    configuredDemoStable: safeSummary.configured_demo_stable === true,
-    configuredPersonaOverrideEnabled: safeSummary.configured_persona_override_enabled === true,
-    explicitEnableRequired: safeSummary.explicit_enable_required === true,
-    automaticRuntimeConnected: safeSummary.automatic_runtime_connected === true,
-    schedulerDefaultChanged: safeSummary.scheduler_default_changed === true,
-    configWriteEnabled: safeSummary.config_write_enabled === true,
-    runtimeCueEnabled: safeSummary.runtime_cue_enabled === true,
-    live2dEnabled: safeSummary.live2d_enabled === true,
-    ttsEnabled: safeSummary.tts_enabled === true,
-    entryReady: safeSummary.entry_ready === true,
-    blockedReasons,
-    guardContractReadOnly: guardContract.read_only === true,
-    guardContractFailClosed: guardContract.fail_closed === true,
-    guardContractRequiredChecks: requiredChecks,
-    guardContractDisallowedActions: disallowedActions,
-    guardContractRollbackSteps: rollbackSteps,
-    guardContractOperatorConfirmation: String(guardContract.operator_confirmation || ""),
-    previewReadOnly: executionPreview.read_only === true,
-    previewDryRun: executionPreview.dry_run === true,
-    previewAccepted: executionPreview.accepted === true,
-    previewWouldExecute: executionPreview.would_execute === true,
-    previewRequestType: String(executionPreview.request_type || ""),
-    previewRequestedAction: String(executionPreview.requested_action || ""),
-    previewBlockedReasons,
-    nextAction: String(safeSummary.next_action || ""),
-    lastRefreshAt: Number(state.followupReadinessBackendEntryLastRefreshAt || 0),
-    lastSuccessAt: Number(state.followupReadinessBackendEntryLastSuccessAt || 0)
-  };
-}
-
-function buildFollowupReadinessBackendEntryCardText() {
-  const view = buildFollowupReadinessBackendEntryView();
-  return typeof FOLLOWUP_READINESS_VIEW.buildBackendEntryCardText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildBackendEntryCardText(view, { joinReasons: joinReadinessReasons })
-    : "后端入口摘要（只读）\n状态：未获取";
-}
-
-async function refreshFollowupReadinessBackendEntrySummary(force = false) {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const existingPromise = state.followupReadinessBackendEntryRefreshPromise;
-  if (!force && existingPromise) {
-    return existingPromise;
-  }
-  const now = Date.now();
-  const lastRefreshAt = Number(state.followupReadinessBackendEntryLastRefreshAt || 0);
-  if (!force && lastRefreshAt > 0 && now - lastRefreshAt < 30000) {
-    return state.followupReadinessBackendEntrySummary;
-  }
-  state.followupReadinessBackendEntryLoading = true;
-  state.followupReadinessBackendEntryError = "";
-  state.followupReadinessBackendEntryLastRefreshAt = now;
-  const promise = (async () => {
-    try {
-      const resp = await authFetch("/api/character_runtime/backend_entry", { cache: "no-store" });
-      const payload = await resp.json().catch(() => ({}));
-      if (!resp.ok || !payload || payload.ok === false) {
-        const message = String(payload?.error || payload?.message || `HTTP ${resp.status}`);
-        throw new Error(message);
+  return typeof DEBUG_PANEL_CONTROLLER.toggleDebugPanel === "function"
+    ? DEBUG_PANEL_CONTROLLER.toggleDebugPanel({
+      state,
+      documentObject: document,
+      windowObject: window,
+      id: "tts-debug-panel",
+      title: "TTS Debug",
+      width: 420,
+      visibleKey: "ttsDebugVisible",
+      panelKey: "ttsDebugPanel",
+      bodyKey: "ttsDebugBody",
+      timerKey: "ttsDebugRefreshTimer",
+      buildReport: buildTTSDebugReport,
+      onHide: () => {
+        state.ttsDebugVisible = false;
+        updateTTSDebugPanel();
       }
-      state.followupReadinessBackendEntrySummary = payload && typeof payload.character_runtime_backend_entry === "object"
-        ? payload.character_runtime_backend_entry
-        : null;
-      state.followupReadinessBackendEntryError = "";
-      state.followupReadinessBackendEntryLastSuccessAt = Date.now();
-      return state.followupReadinessBackendEntrySummary;
-    } catch (error) {
-      state.followupReadinessBackendEntrySummary = null;
-      state.followupReadinessBackendEntryError = String(error?.message || error || "failed to load /api/character_runtime/backend_entry");
-      return null;
-    } finally {
-      state.followupReadinessBackendEntryLoading = false;
-      state.followupReadinessBackendEntryRefreshPromise = null;
-      if (state.followupReadinessVisible) {
-        updateFollowupReadinessPanel();
-      }
-    }
-  })();
-  state.followupReadinessBackendEntryRefreshPromise = promise;
-  return promise;
-}
-
-function updateFollowupReadinessBackendEntryCard() {
-  if (!state.followupReadinessBackendEntryCard) {
-    return;
-  }
-  state.followupReadinessBackendEntryCard.textContent = buildFollowupReadinessBackendEntryCardText();
-  void refreshFollowupReadinessBackendEntrySummary();
-}
-
-function buildFollowupReadinessReport() {
-  const snapshot = getTTSDebugSnapshot();
-  const mode = snapshot.conversationMode || {};
-  const followup = snapshot.followup || {};
-  const silence = snapshot.silence || {};
-  const scheduler = snapshot.proactiveScheduler || {};
-  const backendEntry = buildFollowupReadinessBackendEntryView();
-  const characterState = buildFollowupCharacterState(followup, silence, scheduler);
-  const grayReadiness = buildGrayAutoFollowupReadinessStatus(snapshot);
-  const grayDryRun = buildGrayAutoFollowupDryRunStatus(snapshot);
-  const grayPreflight = buildGrayAutoFollowupTrialPreflight(snapshot);
-  const grayEventSummary = buildGrayAutoFollowupTrialEventSummary(12);
-  const switchesReady = mode.enabled === true
-    && mode.proactiveEnabled === true
-    && mode.proactiveSchedulerEnabled === true;
-  const grayAutoEnabled = mode.grayAutoEnabled === true;
-  const grayAutoTrialEnabled = mode.grayAutoTrialEnabled === true;
-  const automaticGatesReady = switchesReady && grayAutoEnabled && grayAutoTrialEnabled;
-  const grayTrialArmed = grayAutoEnabled && grayAutoTrialEnabled;
-  const rehearsalBlockedReason = getConversationFollowupRehearsalBlockedReason();
-  const rehearsalScenarioLabel = getFollowupRehearsalScenarioLabel(state.followupRehearsalScenarioId);
-  const lines = [
-    "\u7eed\u8bdd\u72b6\u6001",
-    "",
-    "\u6458\u8981",
-    buildFollowupReadinessFriendlySummary(followup, silence, scheduler),
-    `\u7070\u5ea6\u51c6\u5907\uff1a${grayReadiness.ready === true ? "\u53ef\u89c2\u5bdf\u5230\u81ea\u52a8\u89e6\u53d1\u6761\u4ef6\u5df2\u6ee1\u8db3" : "\u6682\u4e0d\u53ef\u81ea\u52a8\u89e6\u53d1"}  \u72b6\u6001\uff1a${grayReadiness.status}`,
-    `\u89d2\u8272\u72b6\u6001\uff1a${characterState.label}  \u5fc3\u60c5\uff1a${characterState.mood}`,
-    `\u72b6\u6001\u8bf4\u660e\uff1a${characterState.description}`,
-    `\u9762\u677f\u9884\u6f14\uff1a${state.followupRehearsalActive === true ? "\u5df2\u5f00\u542f" : "\u672a\u5f00\u542f"}${rehearsalScenarioLabel ? `  \u573a\u666f\uff1a${rehearsalScenarioLabel}` : ""}  \u53ef\u9884\u6f14\uff1a${rehearsalBlockedReason ? "\u5426" : "\u662f"}${rehearsalBlockedReason ? `  \u539f\u56e0\uff1a${rehearsalBlockedReason}` : ""}`,
-    `\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\uff1a${grayAutoEnabled ? "\u5df2\u663e\u5f0f\u542f\u7528" : "\u672a\u542f\u7528\uff08\u9ed8\u8ba4\u5173\u95ed\uff09"}${grayAutoEnabled ? "" : "  \u81ea\u52a8\u8f6e\u8be2\u4f1a\u4fdd\u6301\u5173\u95ed"}`,
-    `\u8bd5\u8fd0\u884c\u603b\u95f8\uff1a${grayAutoTrialEnabled ? "\u5df2\u663e\u5f0f\u542f\u7528" : "\u672a\u542f\u7528\uff08\u9ed8\u8ba4\u5173\u95ed\uff09"}${grayAutoTrialEnabled ? "" : "  \u81ea\u52a8\u8f6e\u8be2\u4f1a\u4fdd\u6301\u5173\u95ed"}`,
-    `\u8bd5\u8fd0\u884c armed\uff1a${grayTrialArmed ? "\u662f" : "\u5426"}  polling=${scheduler.pollTimerActive === true ? "on" : "off"}`,
-    automaticGatesReady
-      ? "\u4e94\u5c42\u81ea\u52a8\u8f6e\u8be2\u5f00\u5173\u90fd\u5df2\u5f00\u542f\uff0c\u4f46\u4ecd\u4f1a\u7ee7\u7eed\u53d7\u5b89\u9759\u7a97\u53e3\u3001\u51b7\u5374\u3001\u6b21\u6570\u4e0a\u9650\u548c\u7b56\u7565\u4fdd\u62a4\u3002"
-      : "\u5f53\u524d\u4ecd\u6709\u81ea\u52a8\u8f6e\u8be2\u5f00\u5173\u672a\u5f00\u542f\uff0c\u6240\u4ee5\u4e0d\u4f1a\u81ea\u52a8\u7eed\u8bdd\u3002",
-    `\u540e\u7aef\u5165\u53e3\uff1a${backendEntry.loading ? "\u52a0\u8f7d\u4e2d" : backendEntry.loaded ? (backendEntry.entryReady === true ? "\u5df2\u63a5\u5165" : "\u9aa8\u67b6\u672a\u5c31\u7eea") : "\u672a\u83b7\u53d6"}  \u53ea\u8bfb\uff1a${backendEntry.loaded ? formatReadinessBool(backendEntry.readOnly) : "\u672a\u786e\u8ba4"}  \u9ed8\u8ba4\u5173\u95ed\uff1a${backendEntry.loaded ? formatReadinessBool(backendEntry.defaultOffBaseline) : "\u672a\u786e\u8ba4"}`,
-    `\u540e\u7aef\u963b\u585e\uff1a${backendEntry.loaded ? joinReadinessReasons(backendEntry.blockedReasons) : "n/a"}  \u7ed3\u8bba\uff1a${backendEntry.loaded ? (backendEntry.nextAction || "n/a") : "\u5148\u53ea\u8bfb\u62c9\u53d6 /api/character_runtime/backend_entry \u6458\u8981"} `,
-    "",
-    "\u5f53\u524d\u5f00\u5173",
-    `\u4f1a\u8bdd\u6a21\u5f0f\uff1a${formatReadinessBool(mode.enabled)}`,
-    `\u4e3b\u52a8\u7eed\u8bdd\uff1a${formatReadinessBool(mode.proactiveEnabled)}`,
-    `\u8c03\u5ea6\u5668\uff1a${formatReadinessBool(mode.proactiveSchedulerEnabled)}`,
-    `\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\uff1a${formatReadinessBool(mode.grayAutoEnabled)}  \u8f6e\u8be2\u95e8\u7981\uff1a${joinReadinessReasons(scheduler.pollingBlockedReasons)}`,
-    `\u8bd5\u8fd0\u884c\u603b\u95f8\uff1a${formatReadinessBool(mode.grayAutoTrialEnabled)}`,
-    `\u8bd5\u8fd0\u884c armed\uff1a${grayTrialArmed ? "true" : "false"}  polling=${scheduler.pollTimerActive === true ? "true" : "false"}`,
-    `\u8bd5\u8fd0\u884c\u6b21\u6570\uff1a${Number(mode.grayAutoTrialSessionTriggerCount || 0)}/${Number(mode.grayAutoTrialMaxTriggersPerSession ?? 1)}`,
-    `\u7070\u5ea6 readiness\uff1a${grayReadiness.ready === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u5019\u9009\uff1a${grayReadiness.candidateReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}  \u8f6e\u8be2\uff1a${grayReadiness.pollingReady === true ? "\u901a\u8fc7" : "\u963b\u585e"}`,
-    `\u7070\u5ea6\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(grayReadiness.blockedReasons)}`,
-    `\u7070\u5ea6 dry-run\uff1a${grayDryRun.wouldAttemptTrigger === true ? "\u82e5\u8f6e\u8be2\u68c0\u67e5\u53d1\u751f\uff0c\u4f1a\u5c1d\u8bd5\u89e6\u53d1" : "\u82e5\u8f6e\u8be2\u68c0\u67e5\u53d1\u751f\uff0c\u4ecd\u4f1a\u963b\u6b62"}  wouldPoll=${grayDryRun.wouldPollCheck === true ? "true" : "false"}`,
-    `\u8bd5\u8fd0\u884c preflight\uff1a${grayPreflight.status}  gates=${grayPreflight.gatesReady === true ? "pass" : joinReadinessReasons(grayPreflight.gateBlockedReasons)}`,
-    `\u8bd5\u8fd0\u884c\u4e8b\u4ef6\uff1a${grayEventSummary.totalPollEvents} \u6761  last=${grayEventSummary.last?.stage || "none"}/${grayEventSummary.lastTrialStatus}`,
-    "",
-    "\u5982\u4f55\u8c03\u6574",
-    "1. \u6253\u5f00 config.local.json\u3002",
-    "2. \u4fee\u6539 conversation_mode \u91cc\u7684 enabled / proactive_enabled / proactive_scheduler_enabled / gray_auto_enabled / gray_auto_trial_enabled\u3002",
-    "3. \u4fdd\u5b58\u540e\u91cd\u542f\u5e94\u7528\u751f\u6548\u3002",
-    "4. \u5982\u679c\u60f3\u7acb\u523b\u505c\u7528\u81ea\u52a8\u7eed\u8bdd\uff0c\u5173\u95ed\u4efb\u610f\u4e00\u4e2a\u5f00\u5173\u5373\u53ef\uff1bgray_auto_enabled \u548c gray_auto_trial_enabled \u9ed8\u8ba4\u90fd\u4e3a false\u3002",
-    "",
-    "\u5b89\u5168\u9ed8\u8ba4",
-    "\u9ed8\u8ba4\u4e0d\u4e3b\u52a8\u89c2\u5bdf\u684c\u9762\uff0c\u4e0d\u8bfb\u6587\u4ef6\uff0c\u4e0d\u8c03\u7528\u5de5\u5177\uff0c\u4e0d\u6267\u884c\u547d\u4ee4\u3002",
-    "\u7070\u5ea6\u81ea\u52a8\u7eed\u8bdd\u9700\u8981\u663e\u5f0f\u6253\u5f00 gray_auto_enabled \u548c gray_auto_trial_enabled\uff0c\u5e76\u4e14\u53ea\u4f1a\u5728\u591a\u5c42 guard \u5168\u90e8\u901a\u8fc7\u540e\u5c1d\u8bd5\uff0c\u4f1a\u907f\u5f00\u5df2\u6536\u53e3\u7684\u8bdd\u9898\u3002",
-    "",
-    "\u7eed\u8bdd\u8be6\u60c5",
-    `\u5f85\u5904\u7406\uff1a${followup.pending === true ? "\u662f" : "\u5426"}  \u7b56\u7565\uff1a${followup.policy || "n/a"}  \u53ef\u89e6\u53d1\uff1a${followup.eligible === true ? "\u662f" : "\u5426"}`,
-    `\u8bdd\u9898\uff1a${followup.topicHint || "\uff08\u7a7a\uff09"}`,
-    `\u89d2\u8272\u8bed\u6c14\uff1a${followup.characterCue?.tone || "n/a"}  \u60c5\u7eea\uff1a${followup.characterCue?.emotion || "n/a"} / ${followup.characterCue?.action || "n/a"}`,
-    `\u672c\u5730\u9884\u89c8\uff1a${followup.characterPreview || "n/a"}`,
-    `\u9009\u62e9\u7b56\u7565\uff1a${followup.selectedReaction?.reason || "n/a"}  tone=${followup.selectedReaction?.preferredTone || "n/a"}  index=${Number.isFinite(Number(followup.selectedReaction?.index)) ? Number(followup.selectedReaction.index) : -1}`,
-    `\u5019\u9009\u77ed\u53e5\uff1a${formatFollowupReactionCandidateSummary(followup.reactionCandidates)}`,
-    `\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(followup.blockedReasons)}`,
-    `\u539f\u59cb\u539f\u56e0\uff1a${joinReadinessReasons(followup.blockedReasons)}`,
-    `\u66f4\u65b0\u65f6\u95f4\uff1a${formatReadinessMs(followup.updatedAgeMs)}  \u5b89\u9759\u9608\u503c\uff1a${formatReadinessMs(mode.silenceFollowupMinMs)}`,
-    "",
-    "\u5b89\u9759\u7a97\u53e3",
-    `\u53ef\u89e6\u53d1\uff1a${silence.eligibleForSilenceFollowup === true ? "\u662f" : "\u5426"}  \u7b56\u7565\uff1a${silence.followupPolicy || "n/a"}`,
-    `\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(silence.blockedReasons)}`,
-    `\u539f\u59cb\u539f\u56e0\uff1a${joinReadinessReasons(silence.blockedReasons)}`,
-    `\u8ddd\u79bb\u7528\u6237\u53d1\u8a00\uff1a${formatReadinessMs(silence.lastUserAgeMs)}  \u8ddd\u79bb\u8bed\u97f3\u7ed3\u675f\uff1a${formatReadinessMs(silence.lastTtsFinishedAgeMs)}`,
-    "",
-    "\u8c03\u5ea6\u5668",
-    `\u53ef\u89e6\u53d1\uff1a${scheduler.eligibleForSchedulerTick === true ? "\u662f" : "\u5426"}  \u8f6e\u8be2\uff1a${scheduler.pollTimerActive === true ? "\u5f00" : "\u5173"}  \u4e0a\u6b21\u8f6e\u8be2\uff1a${scheduler.pollLastResult || "n/a"}`,
-    `\u963b\u585e\u539f\u56e0\uff1a${explainReadinessReasons(scheduler.blockedReasons)}`,
-    `\u539f\u59cb\u539f\u56e0\uff1a${joinReadinessReasons(scheduler.blockedReasons)}`,
-    `\u51b7\u5374\u5269\u4f59\uff1a${formatReadinessMs(scheduler.cooldownRemainingMs)}  \u6b21\u6570\uff1a${Number(scheduler.proactiveCountInWindow || 0)}/${Number(scheduler.maxFollowupsPerWindow || 0)}`,
-    "",
-    "\u5b89\u5168\u8bf4\u660e",
-    "\u8fd9\u4e2a\u9762\u677f\u53ea\u8bfb\uff1a\u4e0d\u4f1a\u4fee\u6539\u914d\u7f6e\u3001\u89e6\u53d1\u7eed\u8bdd\u3001\u542f\u52a8\u8f6e\u8be2\u3001\u622a\u56fe\u3001\u5de5\u5177\u8c03\u7528\u3001\u6587\u4ef6\u8bbf\u95ee\u3001TTS\u3001fetch \u6216 LLM\u3002"
-  ];
-  return lines.join("\n");
-}
-
-function buildFollowupReadinessPreviewCardText() {
-  const data = buildFollowupReadinessPreviewCardData();
-  return typeof FOLLOWUP_READINESS_VIEW.buildPreviewCardText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildPreviewCardText(data)
-    : "";
-}
-
-function buildFollowupRehearsalScenarioCompareRows() {
-  return FOLLOWUP_REHEARSAL_SCENARIOS.map((scenario) => {
-    const policy = buildConversationFollowupPolicy({
-      reason: scenario.reason,
-      topicHint: scenario.topicHint
-    });
-    const plan = {
-      reason: scenario.reason,
-      topicHint: scenario.topicHint,
-      followupPolicy: policy.type,
-      updatedAgeMs: state.conversationMode?.silenceFollowupMinMs || 180000
-    };
-    const candidates = buildConversationFollowupReactionCandidates(plan);
-    const selected = selectConversationFollowupReactionCandidate(plan, candidates);
-    const candidate = String(selected.candidate?.text || "n/a").replace(/\s+/g, " ").trim();
-    return {
-      id: scenario.id,
-      label: scenario.label,
-      policy: policy.type,
-      tone: selected.preferredTone || "n/a",
-      selectedIndex: selected.index,
-      candidateText: candidate
-    };
-  });
-}
-
-function buildFollowupRehearsalScenarioCompareText() {
-  const rows = buildFollowupRehearsalScenarioCompareRows();
-  return typeof FOLLOWUP_READINESS_VIEW.buildScenarioCompareText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildScenarioCompareText(rows)
-    : "";
-}
-
-function buildFollowupReadinessPreviewCopyBundleText() {
-  const data = buildFollowupReadinessPreviewCardData();
-  return typeof FOLLOWUP_READINESS_VIEW.buildPreviewCopyBundleText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildPreviewCopyBundleText(data)
-    : "";
-}
-
-function buildFollowupReadinessPreviewJsonText() {
-  const data = buildFollowupReadinessPreviewCardData();
-  return typeof FOLLOWUP_READINESS_VIEW.buildPreviewJsonText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildPreviewJsonText(data)
-    : "{}";
-}
-
-function buildFollowupReadinessPreviewOneLineText() {
-  const data = buildFollowupReadinessPreviewCardData();
-  return typeof FOLLOWUP_READINESS_VIEW.buildPreviewOneLineText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildPreviewOneLineText(data)
-    : "";
-}
-
-function buildFollowupReadinessPreviewCardData(snapshotInput = null) {
-  const snapshot = snapshotInput && typeof snapshotInput === "object"
-    ? snapshotInput
-    : getTTSDebugSnapshot();
-  const followup = snapshot.followup || {};
-  const silence = snapshot.silence || {};
-  const scheduler = snapshot.proactiveScheduler || {};
-  const characterState = buildFollowupCharacterState(followup, silence, scheduler);
-  const selected = followup.selectedReaction && typeof followup.selectedReaction === "object"
-    ? followup.selectedReaction
-    : null;
-  const scenarioLabel = getFollowupRehearsalScenarioLabel(state.followupRehearsalScenarioId) || "\u672a\u9009\u62e9";
-  const candidateText = String(selected?.candidate?.text || followup.characterPreview || "").trim() || "n/a";
-  const tone = String(selected?.preferredTone || selected?.candidate?.tone || followup.characterCue?.tone || "n/a");
-  const policy = String(followup.policy || "n/a");
-  const blocked = Array.isArray(followup.blockedReasons) && followup.blockedReasons.length
-    ? followup.blockedReasons.join(",")
-    : "none";
-  return {
-    scenarioLabel,
-    characterLabel: String(characterState.label || "n/a"),
-    characterMood: String(characterState.mood || "n/a"),
-    pending: followup.pending === true,
-    topicHint: String(followup.topicHint || "").trim(),
-    eligible: followup.eligible === true,
-    blockedReasons: Array.isArray(followup.blockedReasons) ? followup.blockedReasons.slice() : [],
-    policy,
-    tone,
-    selectedIndex: Number.isFinite(Number(selected?.index)) ? Number(selected.index) : -1,
-    candidateText,
-    blocked
-  };
-}
-
-function normalizeFollowupManualConfirmationToken(value = "") {
-  return typeof FOLLOWUP_READINESS_VIEW.normalizeManualConfirmationToken === "function"
-    ? FOLLOWUP_READINESS_VIEW.normalizeManualConfirmationToken(value)
-    : String(value || "").replace(/\s+/g, " ").trim();
-}
-
-function buildFollowupManualConfirmationKey(input = {}) {
-  return typeof FOLLOWUP_READINESS_VIEW.buildManualConfirmationKey === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildManualConfirmationKey(input)
-    : "";
-}
-
-function buildFollowupManualConfirmationData() {
-  const snapshot = getTTSDebugSnapshot();
-  const data = buildFollowupReadinessPreviewCardData(snapshot);
-  const silence = snapshot.silence || {};
-  const scheduler = snapshot.proactiveScheduler || {};
-  const candidateText = data.candidateText === "n/a"
-    ? ""
-    : normalizeFollowupManualConfirmationToken(data.candidateText);
-  const hasCandidate = !!candidateText;
-  const blockedReasons = []
-    .concat(Array.isArray(data.blockedReasons) ? data.blockedReasons : [])
-    .concat(Array.isArray(silence.blockedReasons) ? silence.blockedReasons : [])
-    .concat(Array.isArray(scheduler.blockedReasons) ? scheduler.blockedReasons : []);
-  const key = buildFollowupManualConfirmationKey({
-    topicHint: data.topicHint,
-    policy: data.policy,
-    candidateText
-  });
-  const dismissed = !!key
-    && state.followupManualConfirmationDismissedKeys instanceof Set
-    && state.followupManualConfirmationDismissedKeys.has(key);
-  const hidden = data.pending !== true || !hasCandidate;
-  const available = hidden !== true
-    && data.eligible === true
-    && silence.eligibleForSilenceFollowup === true
-    && scheduler.eligibleForSchedulerTick === true
-    && blockedReasons.length === 0;
-  const blocked = hidden !== true && !available;
-  const status = hidden
-    ? "hidden"
-    : dismissed
-      ? "dismissed"
-      : available
-        ? "available"
-        : "blocked";
-  return {
-    ...data,
-    candidateText,
-    hasCandidate,
-    blockedReasons,
-    key,
-    dismissed,
-    hidden,
-    available,
-    blocked,
-    status,
-    silenceEligible: silence.eligibleForSilenceFollowup === true,
-    schedulerEligible: scheduler.eligibleForSchedulerTick === true
-  };
-}
-
-function getFollowupManualConfirmationStatusLabel(status = "hidden") {
-  return typeof FOLLOWUP_READINESS_VIEW.getManualConfirmationStatusLabel === "function"
-    ? FOLLOWUP_READINESS_VIEW.getManualConfirmationStatusLabel(status)
-    : "隐藏";
-}
-
-function buildFollowupManualConfirmationDebugPayload(confirmation = {}, result = "") {
-  const blockedSummary = Array.isArray(confirmation.blockedReasons)
-    ? confirmation.blockedReasons.join(",")
-    : "";
-  const policy = String(confirmation.policy || "");
-  const error = [policy, blockedSummary].filter(Boolean).join(";");
-  return {
-    text: String(confirmation.topicHint || ""),
-    result: sanitizeTTSDebugText(result || confirmation.status || "", 80),
-    error: sanitizeTTSDebugText(error, 140)
-  };
-}
-
-function recordFollowupManualConfirmationVisibleEvent(confirmation = {}) {
-  const visible = confirmation.hidden !== true && confirmation.dismissed !== true;
-  if (!visible) {
-    state.followupManualConfirmationLastVisibleEventKey = "";
-    return;
-  }
-  const eventKey = [
-    confirmation.key || "manual_confirmation",
-    confirmation.status || "unknown"
-  ].join("::");
-  if (state.followupManualConfirmationLastVisibleEventKey === eventKey) {
-    return;
-  }
-  state.followupManualConfirmationLastVisibleEventKey = eventKey;
-  recordTTSDebugEvent(
-    "conversation_followup_manual_confirmation_preview_shown",
-    buildFollowupManualConfirmationDebugPayload(confirmation)
-  );
-}
-
-function updateFollowupManualConfirmationControls() {
-  const actions = state.followupReadinessManualActions;
-  const statusNode = state.followupReadinessManualStatus;
-  const confirmBtn = state.followupReadinessManualConfirmBtn;
-  const dismissBtn = state.followupReadinessManualDismissBtn;
-  const reviewBtn = state.followupReadinessManualReviewBtn;
-  if (!actions || !statusNode || !confirmBtn || !dismissBtn || !reviewBtn) {
-    return;
-  }
-  const confirmation = buildFollowupManualConfirmationData();
-  const visible = confirmation.hidden !== true && confirmation.dismissed !== true;
-  actions.style.display = visible ? "flex" : "none";
-  statusNode.style.display = visible ? "block" : "none";
-  if (!visible) {
-    return;
-  }
-  const blockedSummary = explainReadinessReasons(confirmation.blockedReasons);
-  const approving = state.followupManualConfirmationApproving === true;
-  confirmBtn.disabled = confirmation.available !== true;
-  if (approving) {
-    confirmBtn.disabled = true;
-  }
-  confirmBtn.textContent = approving
-    ? "\u6267\u884c\u4e2d"
-    : confirmation.available === true ? "\u786e\u8ba4" : "\u4e0d\u53ef\u786e\u8ba4";
-  confirmBtn.title = confirmation.available === true
-    ? "\u91cd\u65b0\u68c0\u67e5\u5b88\u536b\u540e\u624b\u52a8\u6267\u884c\u7eed\u8bdd"
-    : `\u5f53\u524d\u4e0d\u6ee1\u8db3\u786e\u8ba4\u6761\u4ef6\uff1a${blockedSummary}`;
-  dismissBtn.disabled = !confirmation.key;
-  dismissBtn.title = "\u4ec5\u672c\u5730\u9690\u85cf\u5f53\u524d\u786e\u8ba4\u5361\u7247\uff0c\u4e0d\u4f1a\u6539\u52a8 scheduler/pending/config";
-  reviewBtn.disabled = false;
-  reviewBtn.title = "\u6253\u5f00\u6216\u805a\u7126\u7eed\u8bdd\u8be6\u60c5\u62a5\u544a";
-  statusNode.textContent = `\u786e\u8ba4\u72b6\u6001\uff1a${getFollowupManualConfirmationStatusLabel(confirmation.status)}  guard\uff1a${confirmation.available === true ? "\u5df2\u901a\u8fc7\uff08\u53ef\u624b\u52a8\u6267\u884c\uff09" : blockedSummary}`;
-}
-
-async function handleFollowupManualConfirmClick(button = null) {
-  if (state.followupManualConfirmationApproving === true) {
-    setStatus("\u7eed\u8bdd\u786e\u8ba4\u6b63\u5728\u6267\u884c\u4e2d");
-    return false;
-  }
-  const confirmation = buildFollowupManualConfirmationData();
-  if (confirmation.available !== true) {
-    const blockedSummary = explainReadinessReasons(confirmation.blockedReasons);
-    setStatus(`\u5f53\u524d\u4e0d\u53ef\u786e\u8ba4\uff1a${blockedSummary}`);
-    recordTTSDebugEvent(
-      "conversation_followup_manual_confirmation_blocked",
-      buildFollowupManualConfirmationDebugPayload(
-        confirmation,
-        confirmation.blockedReasons.join(",") || "guard_blocked"
-      )
-    );
-    updateFollowupReadinessPanel();
-    return false;
-  }
-  recordTTSDebugEvent(
-    "conversation_followup_manual_confirmation_approval_started",
-    buildFollowupManualConfirmationDebugPayload(confirmation, "approval_started")
-  );
-  state.followupManualConfirmationApproving = true;
-  updateFollowupManualConfirmationControls();
-  setStatus("\u6b63\u5728\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd...");
-  try {
-    const freshConfirmation = buildFollowupManualConfirmationData();
-    if (freshConfirmation.available !== true) {
-      const blockedSummary = explainReadinessReasons(freshConfirmation.blockedReasons);
-      setStatus(`\u786e\u8ba4\u524d\u5b88\u536b\u5df2\u963b\u6b62\uff1a${blockedSummary}`);
-      recordTTSDebugEvent(
-        "conversation_followup_manual_confirmation_blocked",
-        buildFollowupManualConfirmationDebugPayload(
-          freshConfirmation,
-          freshConfirmation.blockedReasons.join(",") || "guard_blocked"
-        )
-      );
-      return false;
-    }
-    recordTTSDebugEvent(
-      "conversation_followup_manual_confirmation_approved",
-      buildFollowupManualConfirmationDebugPayload(freshConfirmation, "guard_passed")
-    );
-    const result = await runConversationFollowupDebug();
-    if (result?.ok === true) {
-      if (freshConfirmation.key && state.followupManualConfirmationDismissedKeys instanceof Set) {
-        state.followupManualConfirmationDismissedKeys.delete(freshConfirmation.key);
-      }
-      recordTTSDebugEvent(
-        "conversation_followup_manual_confirmation_execution_succeeded",
-        buildFollowupManualConfirmationDebugPayload(freshConfirmation, result?.reason || "executed")
-      );
-      setStatus("\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd\u5df2\u6267\u884c");
-      return true;
-    }
-    recordTTSDebugEvent(
-      "conversation_followup_manual_confirmation_execution_failed",
-      buildFollowupManualConfirmationDebugPayload(freshConfirmation, result?.reason || "not_executed")
-    );
-    setStatus(`\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd\u672a\u6267\u884c\uff1a${result?.reason || "unknown"}`);
-    return false;
-  } catch (err) {
-    recordTTSDebugEvent(
-      "conversation_followup_manual_confirmation_execution_failed",
-      buildFollowupManualConfirmationDebugPayload(confirmation, "exception")
-    );
-    setStatus(`\u624b\u52a8\u786e\u8ba4\u7eed\u8bdd\u5931\u8d25\uff1a${err?.message || err}`);
-    return false;
-  } finally {
-    state.followupManualConfirmationApproving = false;
-    updateFollowupReadinessPanel();
-  }
-}
-
-function dismissFollowupManualConfirmation(button = null) {
-  const confirmation = buildFollowupManualConfirmationData();
-  if (!confirmation.key) {
-    setStatus("\u5f53\u524d\u6ca1\u6709\u53ef\u5ffd\u7565\u7684\u786e\u8ba4\u9879");
-    return false;
-  }
-  state.followupManualConfirmationDismissedKeys.add(confirmation.key);
-  recordTTSDebugEvent(
-    "conversation_followup_manual_confirmation_dismissed",
-    buildFollowupManualConfirmationDebugPayload(confirmation, "dismissed")
-  );
-  if (button) {
-    const previous = button.textContent;
-    button.textContent = "\u5df2\u5ffd\u7565";
-    window.setTimeout(() => {
-      button.textContent = previous || "\u5ffd\u7565";
-    }, 1200);
-  }
-  updateFollowupReadinessPanel();
-  setStatus("\u5df2\u5ffd\u7565\u5f53\u524d\u786e\u8ba4\u9884\u89c8\uff08\u4ec5\u672c\u5730\u5185\u5b58\uff09");
-  return true;
-}
-
-function reviewFollowupManualConfirmationDetails() {
-  const confirmation = buildFollowupManualConfirmationData();
-  recordTTSDebugEvent(
-    "conversation_followup_manual_confirmation_review_details",
-    buildFollowupManualConfirmationDebugPayload(confirmation, confirmation.status || "review")
-  );
-  toggleFollowupReadinessPanel(true);
-  updateFollowupReadinessPanel();
-  if (state.followupReadinessBody && typeof state.followupReadinessBody.scrollIntoView === "function") {
-    state.followupReadinessBody.scrollIntoView({ block: "start", behavior: "smooth" });
-  }
-  setStatus("\u5df2\u805a\u7126\u7eed\u8bdd\u8be6\u60c5\u533a\u57df");
-}
-
-function updateFollowupReadinessPreviewCard() {
-  if (!state.followupReadinessCard) {
-    return;
-  }
-  const confirmation = buildFollowupManualConfirmationData();
-  if (confirmation.hidden === true || confirmation.dismissed === true) {
-    state.followupReadinessCard.style.display = "none";
-    return;
-  }
-  state.followupReadinessCard.style.display = "block";
-  state.followupReadinessCard.textContent = buildFollowupReadinessPreviewCardText();
-}
-
-function updateFollowupManualConfirmationPreviewCard() {
-  if (!state.followupReadinessConfirmationCard) {
-    return;
-  }
-  const data = buildFollowupManualConfirmationData();
-  recordFollowupManualConfirmationVisibleEvent(data);
-  state.followupReadinessConfirmationCard.style.display = data.hidden === true || data.dismissed === true ? "none" : "block";
-  if (data.hidden === true || data.dismissed === true) {
-    state.followupReadinessConfirmationCard.textContent = "";
-    return;
-  }
-  state.followupReadinessConfirmationCard.textContent = typeof FOLLOWUP_READINESS_VIEW.buildManualConfirmationPreviewText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildManualConfirmationPreviewText(data, {
-      explainReasons: explainReadinessReasons,
-      joinReasons: joinReadinessReasons
-    })
-    : "";
-}
-
-function buildGrayAutoTrialStatusCardText() {
-  const snapshot = getTTSDebugSnapshot();
-  const mode = snapshot.conversationMode || {};
-  const scheduler = snapshot.proactiveScheduler || {};
-  const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
-  const session = buildGrayAutoTrialSessionState();
-  const events = buildGrayAutoFollowupTrialEventSummary(8);
-  const armed = mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true;
-  const polling = scheduler.pollTimerActive === true;
-  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialStatusCardText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialStatusCardText(
-      { preflight, session, events, armed, polling },
-      { explainReasons: explainReadinessReasons }
-    )
-    : "";
-}
-
-function updateGrayAutoTrialStatusCard() {
-  if (!state.followupReadinessTrialCard) {
-    return;
-  }
-  state.followupReadinessTrialCard.textContent = buildGrayAutoTrialStatusCardText();
-}
-
-function buildGrayAutoTrialAuditSummary(limit = 24) {
-  const snapshot = getTTSDebugSnapshot();
-  const mode = snapshot.conversationMode || {};
-  const scheduler = snapshot.proactiveScheduler || {};
-  const safeLimit = Number.isFinite(Number(limit))
-    ? Math.max(4, Math.min(80, Math.round(Number(limit))))
-    : 24;
-  const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
-  const session = buildGrayAutoTrialSessionState();
-  const events = buildGrayAutoFollowupTrialEventSummary(safeLimit);
-  return typeof GRAY_TRIAL_READINESS_MODEL.buildAuditSummary === "function"
-    ? GRAY_TRIAL_READINESS_MODEL.buildAuditSummary({
-      preflight,
-      session,
-      events,
-      armed: mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true,
-      polling: scheduler.pollTimerActive === true
-    }, { now: () => Date.now() })
-    : {
-      readOnly: true,
-      generatedAt: Date.now(),
-      status: preflight.status,
-      armed: mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true,
-      polling: scheduler.pollTimerActive === true,
-      session,
-      dryRun: preflight.dryRun,
-      blockedReasons: Array.isArray(preflight.dryRun?.blockedReasons) ? preflight.dryRun.blockedReasons.slice() : [],
-      events
-    };
-}
-
-function buildGrayAutoTrialAuditSummaryText(limit = 24) {
-  const audit = buildGrayAutoTrialAuditSummary(limit);
-  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialAuditSummaryText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialAuditSummaryText(audit, { joinReasons: joinReadinessReasons })
-    : "";
-}
-
-function buildGrayAutoTrialPreRunChecklist(snapshotInput = null) {
-  const snapshot = snapshotInput && typeof snapshotInput === "object"
-    ? snapshotInput
-    : getTTSDebugSnapshot();
-  const mode = snapshot.conversationMode || {};
-  const scheduler = snapshot.proactiveScheduler || {};
-  const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
-  const session = buildGrayAutoTrialSessionState();
-  return typeof GRAY_TRIAL_READINESS_MODEL.buildPreRunChecklist === "function"
-    ? GRAY_TRIAL_READINESS_MODEL.buildPreRunChecklist(
-      { mode, scheduler, preflight, session },
-      { explainReasons: explainReadinessReasons }
-    )
-    : {
-      readOnly: true,
-      status: preflight.status,
-      readyForWatchedTrial: false,
-      readyForTriggerObservation: preflight.status === "ready_for_local_trial",
-      armed: mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true,
-      polling: scheduler.pollTimerActive === true,
-      session,
-      blockedReasons: [],
-      items: [],
-      nextAction: "Complete required checklist items before a real controlled trial."
-    };
-}
-
-function buildGrayAutoTrialPreRunChecklistText() {
-  const checklist = buildGrayAutoTrialPreRunChecklist();
-  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialPreRunChecklistText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialPreRunChecklistText(checklist)
-    : "";
-}
-
-function buildGrayAutoTrialTimeline(limit = 32) {
-  return typeof GRAY_TRIAL_READINESS_MODEL.buildTimeline === "function"
-    ? GRAY_TRIAL_READINESS_MODEL.buildTimeline(state.ttsDebugEvents, {
-      limit,
-      parseResult: parseGrayTrialPollEventResult,
-      sanitizeText: sanitizeTTSDebugText
-    })
-    : {
-      readOnly: true,
-      limit: 0,
-      total: 0,
-      last: null,
-      hasArm: false,
-      hasStop: false,
-      hasDisarm: false,
-      hasTriggerSuccess: false,
-      hasTriggerBlocked: false,
-      entries: []
-    };
-}
-
-function buildGrayAutoTrialTimelineText(limit = 32) {
-  const timeline = buildGrayAutoTrialTimeline(limit);
-  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialTimelineText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialTimelineText(timeline)
-    : "";
-}
-
-function buildGrayAutoTrialOutcome(limit = 48) {
-  const timeline = buildGrayAutoTrialTimeline(limit);
-  const checklist = buildGrayAutoTrialPreRunChecklist();
-  const snapshot = getTTSDebugSnapshot();
-  const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
-  const session = buildGrayAutoTrialSessionState();
-  return typeof GRAY_TRIAL_READINESS_MODEL.buildOutcome === "function"
-    ? GRAY_TRIAL_READINESS_MODEL.buildOutcome(
-      { timeline, checklist, preflight, session },
-      { explainReason: explainReadinessReason }
-    )
-    : {
-      readOnly: true,
-      outcome: "not_started",
-      severity: "info",
-      summary: "No gray trial control or polling events are visible yet.",
-      nextAction: "Open the readiness panel, review the runbook, then arm only during a watched local test.",
-      status: preflight.status,
-      armed: checklist.armed === true,
-      polling: checklist.polling === true,
-      session,
-      timeline: { total: timeline.total, lastStage: timeline.last?.stage || "none" },
-      rootCauses: []
-    };
-}
-
-function buildGrayAutoTrialOutcomeText(limit = 48) {
-  const result = buildGrayAutoTrialOutcome(limit);
-  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialOutcomeText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialOutcomeText(result)
-    : "";
-}
-
-function buildGrayAutoTrialGoNoGoDecision(limit = 48) {
-  const outcome = buildGrayAutoTrialOutcome(limit);
-  const checklist = buildGrayAutoTrialPreRunChecklist();
-  const timeline = buildGrayAutoTrialTimeline(limit);
-  return typeof GRAY_TRIAL_READINESS_MODEL.buildGoNoGoDecision === "function"
-    ? GRAY_TRIAL_READINESS_MODEL.buildGoNoGoDecision({ outcome, checklist, timeline })
-    : {
-      readOnly: true,
-      decision: "NO_GO",
-      reason: "Required pre-run checklist items are not complete.",
-      nextAction: "Do not run a real controlled trial yet; complete the checklist or Disarm.",
-      outcome: outcome.outcome,
-      severity: outcome.severity,
-      status: outcome.status,
-      readyForWatchedTrial: checklist.readyForWatchedTrial === true,
-      readyForTriggerObservation: checklist.readyForTriggerObservation === true,
-      missingRequired: [],
-      rootCauses: outcome.rootCauses || [],
-      timeline: { total: timeline.total, lastStage: timeline.last?.stage || "none" },
-      guardrails: []
-    };
-}
-
-function buildGrayAutoTrialGoNoGoDecisionText(limit = 48) {
-  const decision = buildGrayAutoTrialGoNoGoDecision(limit);
-  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialGoNoGoDecisionText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialGoNoGoDecisionText(decision)
-    : "";
-}
-
-function buildGrayAutoTrialSignoffPackage(limit = 48) {
-  const decision = buildGrayAutoTrialGoNoGoDecision(limit);
-  const outcome = buildGrayAutoTrialOutcome(limit);
-  const checklist = buildGrayAutoTrialPreRunChecklist();
-  const timeline = buildGrayAutoTrialTimeline(limit);
-  return typeof GRAY_TRIAL_READINESS_MODEL.buildSignoffPackage === "function"
-    ? GRAY_TRIAL_READINESS_MODEL.buildSignoffPackage(
-      { decision, outcome, checklist, timeline },
-      { now: () => Date.now() }
-    )
-    : {
-      readOnly: true,
-      trialId: ["gray-trial", decision.outcome, timeline.last?.seq || 0, Date.now()].join("-"),
-      decision: decision.decision,
-      outcome: outcome.outcome,
-      severity: outcome.severity,
-      stageRecommendation: "Not ready for the next phase.",
-      summary: outcome.summary,
-      nextAction: decision.nextAction,
-      missingRequired: decision.missingRequired,
-      rootCauses: decision.rootCauses,
-      timeline: decision.timeline,
-      manualChecks: [],
-      signoff: { tester: "", reviewedAt: "", approvedForNextPhase: false, notes: "" },
-      checklistReady: checklist.readyForWatchedTrial === true
-    };
-}
-
-function buildGrayAutoTrialSignoffPackageText(limit = 48) {
-  const pkg = buildGrayAutoTrialSignoffPackage(limit);
-  return typeof FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialSignoffPackageText === "function"
-    ? FOLLOWUP_READINESS_VIEW.buildGrayAutoTrialSignoffPackageText(pkg)
-    : "";
-}
-
-function buildGrayAutoTrialCharacterCuePreview(limit = 48) {
-  const signoff = buildGrayAutoTrialSignoffPackage(limit);
-  const outcome = buildGrayAutoTrialOutcome(limit);
-  return typeof GRAY_TRIAL_CHARACTER_MODEL.buildCharacterCuePreview === "function"
-    ? GRAY_TRIAL_CHARACTER_MODEL.buildCharacterCuePreview(
-      { signoff, outcome },
-      { buildRuntimeHint: buildFollowupCharacterRuntimeHint }
-    )
-    : {
-      readOnly: true,
-      decision: String(signoff.decision || "NO_GO"),
-      outcome: String(outcome.outcome || "not_started"),
-      label: "先安静待着",
-      mood: "idle",
-      tone: "quiet",
-      description: "当前不适合进入试跑，角色保持安静与待命。",
-      sample: "我先安静待着，等你准备好了再说。",
-      runtimeHint: buildFollowupCharacterRuntimeHint({ label: "先安静待着", tone: "quiet" }),
-      stageRecommendation: signoff.stageRecommendation,
-      nextAction: signoff.nextAction,
-      safety: { noEventEmission: true, noRuntimeHintEmission: true, noLive2DMove: true, noTts: true, noModelCall: true, noFetch: true, noPollingStart: true, noFollowupExecution: true, noConfigWrites: true }
-    };
-}
-
-function buildGrayAutoTrialCharacterCuePreviewText(limit = 48) {
-  const preview = buildGrayAutoTrialCharacterCuePreview(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCuePreviewText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCuePreviewText(preview)
-    : "";
-}
-
-function buildGrayAutoTrialCharacterCueHandoffChecklist(limit = 48) {
-  const preview = buildGrayAutoTrialCharacterCuePreview(limit);
-  const signoff = buildGrayAutoTrialSignoffPackage(limit);
-  const now = Date.now();
-  let normalizedRuntimeHint = null;
-  let runtimeHintValid = false;
-  try {
-    normalizedRuntimeHint = normalizeCharacterRuntimeMetadataForFrontend(preview.runtimeHint);
-    runtimeHintValid = !!normalizedRuntimeHint;
-  } catch (_) {
-    normalizedRuntimeHint = null;
-  }
-  const lastHintAt = Number(state.followupCharacterRuntimeLastHintAt || 0);
-  const recentRuntimeEmission = lastHintAt > 0 && now - lastHintAt < 30000;
-  const safety = preview.safety || {};
-  const allowedDecisions = ["NO_GO", "WATCH_ONLY", "GO_FOR_WATCHED_TRIAL", "REVIEW_AFTER_SUCCESS"];
-  const items = [
-    {
-      key: "preview_read_only",
-      label: "角色预览仍是只读",
-      required: true,
-      ok: preview.readOnly === true
-        && safety.noRuntimeHintEmission === true
-        && safety.noLive2DMove === true
-        && safety.noTts === true,
-      note: "预览只能描述角色表现，不能发出真实 runtime hint。"
-    },
-    {
-      key: "runtime_hint_shape",
-      label: "runtime hint 形状可被前端规范化",
-      required: true,
-      ok: runtimeHintValid,
-      note: runtimeHintValid
-        ? `emotion=${normalizedRuntimeHint.emotion || "n/a"} action=${normalizedRuntimeHint.action || "n/a"} live2d_hint=${normalizedRuntimeHint.live2d_hint || "n/a"}`
-        : "当前 runtime metadata normalizer 不可用，或预览 hint 被拒绝。"
-    },
-    {
-      key: "decision_boundary_visible",
-      label: "Go/No-Go 边界可见",
-      required: true,
-      ok: allowedDecisions.includes(preview.decision),
-      note: `decision=${preview.decision} outcome=${preview.outcome}`
-    },
-    {
-      key: "manual_signoff_required",
-      label: "人工签收仍未自动批准",
-      required: true,
-      ok: signoff.signoff?.approvedForNextPhase === false,
-      note: "approvedForNextPhase=false，不能自动进入真实角色动作。"
-    },
-    {
-      key: "no_recent_runtime_emission",
-      label: "最近没有新的真实角色 hint 压力",
-      required: false,
-      ok: !recentRuntimeEmission,
-      note: recentRuntimeEmission
-        ? `lastHintAgeMs=${Math.max(0, now - lastHintAt)}`
-        : "没有 30 秒内的新 followup_character_runtime_hint。"
-    },
-    {
-      key: "scheduler_unchanged",
-      label: "scheduler 与续话执行未被接入",
-      required: true,
-      ok: safety.noPollingStart === true
-        && safety.noFollowupExecution === true
-        && safety.noModelCall === true
-        && safety.noFetch === true
-        && safety.noConfigWrites === true,
-      note: "接入前检查不 arm/reset、不启动 polling、不触发续话、不写配置。"
-    },
-    {
-      key: "runtime_emission_gate",
-      label: "灰度续话自动角色动作仍需显式开关",
-      required: true,
-      ok: false,
-      note: "灰度续话 automatic emission 仍关闭；助手回复 cue 自动应用只受 auto_apply_reply_cue 显式开关控制。"
-    }
-  ];
-  const blockingRequired = items.filter((item) => item.required === true && item.ok !== true);
-  const readyForImplementationPlanning = blockingRequired.every((item) => item.key === "runtime_emission_gate");
-  return {
-    readOnly: true,
-    status: blockingRequired.length > 0 ? "preview_only" : "ready_for_explicit_handoff",
-    readyForImplementationPlanning,
-    manualEmitGateAvailable: true,
-    readyForRuntimeEmission: false,
-    decision: preview.decision,
-    outcome: preview.outcome,
-    label: preview.label,
-    tone: preview.tone,
-    runtimeHint: preview.runtimeHint,
-    normalizedRuntimeHint,
-    items,
-    blockingRequired,
-    nextAction: readyForImplementationPlanning
-      ? "Use the manual emit gate only with the exact confirmation phrase; keep automatic emission closed."
-      : "Keep this as preview-only; resolve required checklist items before adding any real character emission path.",
-    safety: {
-      noEventEmission: true,
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true
-    }
-  };
-}
-
-function buildGrayAutoTrialCharacterCueHandoffChecklistText(limit = 48) {
-  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
-  const manualEmitStatus = getGrayAutoTrialCharacterCueManualEmitStatus();
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueHandoffChecklistText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueHandoffChecklistText(checklist, manualEmitStatus)
-    : "";
-}
-
-function getGrayAutoTrialCharacterCueManualEmitStatus() {
-  const count = Number(state.grayAutoTrialCharacterCueManualEmitCount || 0);
-  const lastEmitAt = Number(state.grayAutoTrialCharacterCueLastManualEmitAt || 0);
-  const lastEmit = state.grayAutoTrialCharacterCueLastManualEmit || null;
-  const lastBackendBridge = state.grayAutoTrialCharacterCueLastBackendBridge || null;
-  const lastRuntimeDispatch = state.followupCharacterRuntimeLastDispatch || null;
-  const lastRuntimeApply = state.followupCharacterRuntimeLastApply || null;
-  const lastReplyCandidate = state.followupCharacterRuntimeLastReplyCandidate || null;
-  return {
-    readOnly: true,
-    count: Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0,
-    lastEmitAt,
-    lastEmit,
-    lastBackendBridge,
-    lastRuntimeDispatch,
-    lastRuntimeApply,
-    lastReplyCandidate
-  };
-}
-
-function buildGrayAutoTrialCharacterCueManualEmitStatusText() {
-  const status = getGrayAutoTrialCharacterCueManualEmitStatus();
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitStatusText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitStatusText(status)
-    : "";
-}
-
-function buildGrayAutoTrialCharacterManualCueStatusCardText() {
-  const status = getGrayAutoTrialCharacterCueManualEmitStatus();
-  const autoApply = state.followupCharacterRuntimeLastReplyAutoApply || null;
-  const selectedPreset = getSelectedGrayAutoTrialCharacterCuePresetKey();
-  const preset = resolveGrayAutoTrialCharacterCuePreset({ presetKey: selectedPreset }, {
-    label: "",
-    tone: "",
-    runtimeHint: {}
-  });
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildCharacterManualCueStatusCardText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildCharacterManualCueStatusCardText({
-      status,
-      autoApply,
-      autoApplyReplyCueEnabled: state.characterRuntimeAutoApplyReplyCue === true,
-      selectedPreset,
-      preset
-    })
-    : "";
-}
-
-function buildGrayAutoTrialCharacterCueManualEmitRecap(limit = 24) {
-  const safeLimit = Number.isFinite(Number(limit))
-    ? Math.max(1, Math.min(80, Math.round(Number(limit))))
-    : 24;
-  const status = getGrayAutoTrialCharacterCueManualEmitStatus();
-  const manualEmitStages = new Set([
-    "conversation_followup_gray_auto_trial_character_cue_manual_emit",
-    "conversation_followup_character_reply_cue_candidate_manual_emit"
-  ]);
-  const events = state.ttsDebugEvents
-    .filter((event) => event && manualEmitStages.has(event.stage))
-    .slice(-safeLimit);
-  const lastEvent = events.length ? events[events.length - 1] : null;
-  const lastEmit = status.lastEmit || null;
-  const normalized = lastEmit?.runtimeHint || null;
-  const lastRuntimeDispatch = status.lastRuntimeDispatch || lastEmit?.runtimeDispatch || null;
-  const lastRuntimeApply = status.lastRuntimeApply || lastEmit?.runtimeApply || null;
-  const accepted = !!lastEmit && !!normalized && status.count > 0;
-  const source = String(lastEmit?.source || (lastEmit?.presetKey === "reply_candidate" ? "assistant_reply_candidate" : "manual_preset"));
-  const lastBackendBridge = status.lastBackendBridge || lastEmit?.backendBridge || null;
-  const replyCandidate = status.lastReplyCandidate || null;
-  const replyCandidateSent = source === "assistant_reply_candidate"
-    && !!replyCandidate
-    && lastEmit?.replyCandidateGeneratedAt === replyCandidate.generatedAt;
-  return {
-    readOnly: true,
-    status: accepted ? "emitted" : "not_emitted",
-    count: status.count,
-    lastEmitAt: status.lastEmitAt,
-    lastEmit,
-    source,
-    lastBackendBridge,
-    lastRuntimeDispatch,
-    lastRuntimeApply,
-    replyCandidate,
-    replyCandidateSent,
-    lastEvent,
-    recentEvents: events,
-    accepted,
-    summary: accepted
-      ? `Last manual cue emitted from ${source}: ${lastEmit.label || "n/a"} / ${lastEmit.tone || "n/a"}.`
-      : "No confirmed gray trial character cue manual emit has been recorded in this renderer session.",
-    nextAction: accepted
-      ? "Review the visible character response before deciding whether to refine the role-expression strategy."
-      : "Use the manual emit gate only during a watched local test if you need a real character runtime cue.",
-    safety: {
-      noNewRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true
-    }
-  };
-}
-
-function buildGrayAutoTrialCharacterCueManualEmitRecapText(limit = 24) {
-  const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitRecapText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitRecapText(recap)
-    : "";
-}
-
-function buildGrayAutoTrialCharacterExpressionStrategyDraft(limit = 24) {
-  const preview = buildGrayAutoTrialCharacterCuePreview(limit);
-  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
-  const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
-  return typeof GRAY_TRIAL_CHARACTER_MODEL.buildExpressionStrategyDraft === "function"
-    ? GRAY_TRIAL_CHARACTER_MODEL.buildExpressionStrategyDraft(
-      { preview, checklist, recap },
-      { buildRuntimeHint: buildFollowupCharacterRuntimeHint }
-    )
-    : {
-      readOnly: true,
-      status: "draft_only",
-      decision: preview.decision,
-      outcome: preview.outcome,
-      activeRuleKey: "",
-      activeRule: null,
-      rules: [],
-      manualEmitAccepted: recap.accepted === true,
-      readyForImplementationPlanning: checklist.readyForImplementationPlanning === true,
-      readyForAutomaticRuntime: false,
-      nextAction: "Review the draft rules and one manual emit recap before deciding whether to create a separate strategy implementation task."
-    };
-}
-
-function buildGrayAutoTrialCharacterExpressionStrategyDraftText(limit = 24) {
-  const draft = buildGrayAutoTrialCharacterExpressionStrategyDraft(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExpressionStrategyDraftText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildExpressionStrategyDraftText(draft)
-    : "";
-}
-
-function buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit = 24) {
-  const strategy = buildGrayAutoTrialCharacterExpressionStrategyDraft(limit);
-  const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
-  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
-  const signoff = buildGrayAutoTrialSignoffPackage(limit);
-  const activeRule = strategy.activeRule || {};
-  const missing = [];
-  if (strategy.rules.length < 5) {
-    missing.push({
-      key: "rule_coverage",
-      reason: "strategy draft should cover the five minimum expression states"
-    });
-  }
-  if (checklist.readyForImplementationPlanning !== true) {
-    missing.push({
-      key: "handoff_checklist",
-      reason: "handoff checklist is not ready for implementation planning"
-    });
-  }
-  if (recap.accepted !== true) {
-    missing.push({
-      key: "manual_emit_recap",
-      reason: "no accepted manual cue emit has been reviewed in this renderer session"
-    });
-  }
-  if (signoff.signoff?.approvedForNextPhase !== false) {
-    missing.push({
-      key: "manual_signoff_boundary",
-      reason: "manual signoff boundary must remain false before automatic runtime"
-    });
-  }
-  const goNoGo = missing.length === 0
-    ? "READY_FOR_SEPARATE_IMPLEMENTATION_TASK"
-    : "NO_GO_FOR_AUTOMATIC_RUNTIME";
-  return {
-    readOnly: true,
-    status: "review_package",
-    goNoGo,
-    decision: strategy.decision,
-    outcome: strategy.outcome,
-    activeRuleKey: strategy.activeRuleKey,
-    activeRule,
-    ruleCount: strategy.rules.length,
-    manualEmitAccepted: recap.accepted === true,
-    checklistReady: checklist.readyForImplementationPlanning === true,
-    approvedForNextPhase: false,
-    missing,
-    nextAction: goNoGo === "READY_FOR_SEPARATE_IMPLEMENTATION_TASK"
-      ? "Create a separate, explicitly gated implementation task; keep automatic runtime disabled by default."
-      : "Keep reviewing with manual emit and recap before implementing automatic role-expression behavior.",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noModelCall: true,
-      noFetch: true,
-      noPollingStart: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      readyForAutomaticRuntime: false
-    }
-  };
-}
-
-function buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(limit = 24) {
-  const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExpressionStrategyReviewPackageText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildExpressionStrategyReviewPackageText(review)
-    : "";
-}
-
-
-function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit = 24) {
-  const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
-  const strategy = buildGrayAutoTrialCharacterExpressionStrategyDraft(limit);
-  const recap = buildGrayAutoTrialCharacterCueManualEmitRecap(limit);
-  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist(limit);
-  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSafetyPlan === "function"
-    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSafetyPlan({ review, strategy, recap, checklist })
-    : {
-      readOnly: true,
-      status: "blocked_for_auto_runtime",
-      canPlanRollout: false,
-      goNoGo: review.goNoGo,
-      decision: review.decision,
-      outcome: review.outcome,
-      strategyStatus: strategy.status,
-      ruleCount: Array.isArray(strategy.rules) ? strategy.rules.length : 0,
-      manualEmitAccepted: recap.accepted === true,
-      checklistReady: checklist.readyForImplementationPlanning === true,
-      gates: [],
-      blockingRequired: [{ key: "switch_model_unavailable", note: "auto runtime switch model unavailable" }],
-      rolloutStages: [],
-      nextAction: "Keep automatic character runtime disabled."
-    };
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText(limit = 24) {
-  const plan = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeSafetyPlanText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeSafetyPlanText(plan)
-    : "";
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit = 24) {
-  const plan = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
-  const strategy = buildGrayAutoTrialCharacterExpressionStrategyDraft(limit);
-  const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
-  return typeof GRAY_TRIAL_CHARACTER_MODEL.buildAutoRuntimeDryRun === "function"
-    ? GRAY_TRIAL_CHARACTER_MODEL.buildAutoRuntimeDryRun({ plan, strategy, review })
-    : {
-      readOnly: true,
-      status: "blocked",
-      wouldEmit: false,
-      wouldSelectRule: false,
-      selectedRuleKey: "",
-      selectedRule: null,
-      runtimeHint: null,
-      blockedReasons: ["character_model_unavailable"],
-      planStatus: plan.status,
-      goNoGo: review.goNoGo,
-      dryRunOnly: true,
-      nextAction: "Keep automatic runtime disabled; resolve blockers before implementation."
-    };
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeDryRunText(limit = 24) {
-  const dryRun = buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeDryRunText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeDryRunText(dryRun)
-    : "";
-}
-
-
-function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit = 24) {
-  const plan = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
-  const dryRun = buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit);
-  const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
-  const session = buildGrayAutoTrialSessionState();
-  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchPlan === "function"
-    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchPlan({ plan, dryRun, review, session })
-    : {
-      readOnly: true,
-      status: "blocked_until_explicit_switch_task",
-      proposedSwitchKey: "gray_auto_followup_character_runtime_enabled",
-      proposedDefault: false,
-      switchExists: false,
-      wouldEnable: false,
-      automaticRuntimeConnected: false,
-      wouldEmit: false,
-      planStatus: plan.status,
-      dryRunStatus: dryRun.status,
-      goNoGo: review.goNoGo,
-      requirements: [],
-      blockingRequired: [{ key: "switch_model_unavailable", note: "auto runtime switch model unavailable" }],
-      proposedRuntimeStates: [],
-      nextAction: "Keep automatic character runtime disabled."
-    };
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(limit = 24) {
-  const switchPlan = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchPlanText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchPlanText(switchPlan)
-    : "";
-}
-
-
-function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit = 24) {
-  const switchPlan = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
-  const review = buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit);
-  const dryRun = buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit);
-  const plan = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit);
-  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchReviewPackage === "function"
-    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchReviewPackage({ switchPlan, review, dryRun, plan })
-    : {
-      readOnly: true,
-      status: "blocked_for_explicit_switch_task",
-      goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME",
-      switchPlanStatus: switchPlan.status,
-      switchPlanDefault: switchPlan.proposedDefault === false,
-      strategyGoNoGo: review.goNoGo,
-      dryRunStatus: dryRun.status,
-      dryRunWouldSelectRule: dryRun.wouldSelectRule === true,
-      planStatus: plan.status,
-      requirements: switchPlan.requirements || [],
-      blockingRequired: switchPlan.blockingRequired || [],
-      missing: [{ key: "switch_model_unavailable", reason: "auto runtime switch model unavailable" }],
-      approvedForNextPhase: false,
-      nextAction: "Keep the explicit switch read-only."
-    };
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackageText(limit = 24) {
-  const reviewPackage = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchReviewPackageText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchReviewPackageText(reviewPackage)
-    : "";
-}
-
-
-function buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit = 24) {
-  const reviewPackage = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit);
-  const switchPlan = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
-  const dryRun = buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit);
-  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSwitchAcceptancePackage === "function"
-    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSwitchAcceptancePackage({ reviewPackage, switchPlan, dryRun })
-    : {
-      readOnly: true,
-      status: "acceptance_not_ready",
-      goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME",
-      implementationReady: false,
-      approvedForNextPhase: false,
-      reviewGoNoGo: reviewPackage.goNoGo,
-      switchPlanStatus: switchPlan.status,
-      dryRunStatus: dryRun.status,
-      acceptanceChecks: [],
-      blockingRequired: [{ key: "switch_model_unavailable", verify: "auto runtime switch model unavailable" }],
-      manualVerificationRequired: true,
-      nextAction: "Keep automatic runtime disabled now."
-    };
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackageText(limit = 24) {
-  const acceptance = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildSwitchAcceptancePackageText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildSwitchAcceptancePackageText(acceptance)
-    : "";
-}
-
-function getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled() {
-  return state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled === true;
-}
-
-function getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchState() {
-  return {
-    enabled: getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled(),
-    lastAction: String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastAction || ""),
-    lastReason: String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastReason || ""),
-    updatedAt: Number(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchUpdatedAt || 0),
-    rollbackAt: Number(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackAt || 0),
-    rollbackReason: String(state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackReason || "")
-  };
-}
-
-
-function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit = 24) {
-  const acceptance = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
-  const switchState = getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchState();
-  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchControl === "function"
-    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchControl({ acceptance, switchState })
-    : {
-      readOnly: true,
-      status: switchState.enabled ? "enabled_local_flag_only" : "blocked",
-      enabled: switchState.enabled,
-      canEnable: false,
-      canDisable: true,
-      switchKey: "gray_auto_followup_character_runtime_enabled",
-      requiredConfirm: "ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH",
-      disabledReason: "acceptance_not_ready",
-      blockedReasons: ["switch_model_unavailable"],
-      acceptanceStatus: acceptance.status,
-      acceptanceGoNoGo: acceptance.goNoGo,
-      acceptanceReady: false,
-      manualVerificationRequired: true,
-      autoRuntimeConnected: false,
-      lastAction: switchState.lastAction,
-      lastReason: switchState.lastReason,
-      updatedAt: switchState.updatedAt,
-      rollbackAt: switchState.rollbackAt,
-      rollbackReason: switchState.rollbackReason,
-      defaultOffBaseline: true,
-      nextAction: "Keep the switch off."
-    };
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText(limit = 24) {
-  const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchControlText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchControlText(control)
-    : "";
-}
-
-
-function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit = 24) {
-  const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
-  const acceptance = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
-  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSwitchControlDiagnostics === "function"
-    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSwitchControlDiagnostics({ control, acceptance })
-    : {
-      readOnly: true,
-      status: "blocked_explained",
-      enabled: control.enabled,
-      canEnable: false,
-      canDisable: control.canDisable,
-      disabledReason: control.disabledReason,
-      blockedReasons: control.blockedReasons || [],
-      blockerDetails: [],
-      acceptanceBlocking: [],
-      operatorChecklist: [],
-      nextAction: "Keep the switch off."
-    };
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(limit = 24) {
-  const diagnostics = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildSwitchControlDiagnosticsText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildSwitchControlDiagnosticsText(diagnostics)
-    : "";
-}
-
-
-function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit = 24) {
-  const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
-  const diagnostics = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit);
-  const switchState = getGrayAutoTrialCharacterAutoRuntimeExplicitSwitchState();
-  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchRollbackPackage === "function"
-    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchRollbackPackage({ control, diagnostics, switchState })
-    : {
-      readOnly: true,
-      ok: true,
-      status: switchState.enabled ? "rollback_ready" : "default_off",
-      enabled: switchState.enabled,
-      canRollback: switchState.enabled,
-      defaultOffBaseline: true,
-      switchKey: control.switchKey,
-      controlStatus: control.status,
-      diagnosticsStatus: diagnostics.status,
-      rollbackAt: switchState.rollbackAt,
-      rollbackReason: switchState.rollbackReason,
-      rollbackRecorded: Number(switchState.rollbackAt || 0) > 0,
-      lastAction: control.lastAction,
-      lastReason: control.lastReason,
-      nextAction: "Keep the switch default-off.",
-      steps: []
-    };
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(limit = 24) {
-  const rollback = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchRollbackPackageText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildExplicitSwitchRollbackPackageText(rollback)
-    : "";
-}
-
-
-function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit = 24) {
-  const plan = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit);
-  const review = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit);
-  const acceptance = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit);
-  const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit);
-  const diagnostics = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit);
-  const rollback = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit);
-  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildFinalPreflight === "function"
-    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildFinalPreflight({ plan, review, acceptance, control, diagnostics, rollback })
-    : {
-      readOnly: true,
-      ok: false,
-      status: "blocked_for_handoff",
-      goNoGo: "NO_GO_FOR_AUTOMATIC_RUNTIME",
-      implementationReady: false,
-      separateImplementationTaskReady: false,
-      defaultOffBaseline: true,
-      automaticRuntimeConnected: false,
-      manualVerificationRequired: true,
-      chain: {},
-      gates: [],
-      blockingRequired: [{ key: "switch_model_unavailable", note: "auto runtime switch model unavailable" }],
-      nextAction: "Keep the chain read-only."
-    };
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(limit = 24) {
-  const preflight = buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildFinalPreflightText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildFinalPreflightText(preflight)
-    : "";
-}
-
-
-function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit = 24) {
-  const preflight = buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit);
-  return typeof GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSeparateImplementationDraft === "function"
-    ? GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSeparateImplementationDraft({ preflight })
-    : {
-      readOnly: true,
-      ok: false,
-      status: "blocked_for_draft",
-      defaultOffBaseline: true,
-      automaticRuntimeConnected: false,
-      implementationStarted: false,
-      chainReady: false,
-      preflightStatus: preflight.status,
-      preflightReady: false,
-      implementationModules: [],
-      safetyBoundaries: [],
-      verificationPlan: [],
-      nextAction: "Do not wire automatic runtime yet."
-    };
-}
-
-function buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftText(limit = 24) {
-  const draft = buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit);
-  return typeof GRAY_TRIAL_CHARACTER_VIEW.buildSeparateImplementationDraftText === "function"
-    ? GRAY_TRIAL_CHARACTER_VIEW.buildSeparateImplementationDraftText(draft)
-    : "";
-}
-
-function enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(input = {}) {
-  const safeInput = input && typeof input === "object" ? input : {};
-  const confirm = String(safeInput.confirm || "").trim();
-  const requiredConfirm = "ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH";
-  if (confirm !== requiredConfirm) {
-    return {
-      ok: false,
-      reason: "confirmation_required",
-      requiredConfirm,
-      safety: {
-        noRuntimeHintEmission: true,
-        noLive2DMove: true,
-        noTts: true,
-        noConfigWrites: true
-      }
-    };
-  }
-  const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl();
-  if (control.canEnable !== true) {
-    return {
-      ok: false,
-      reason: "acceptance_not_ready",
-      blockedReasons: control.blockedReasons,
-      safety: {
-        noRuntimeHintEmission: true,
-        noLive2DMove: true,
-        noTts: true,
-        noConfigWrites: true
-      }
-    };
-  }
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled = true;
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchUpdatedAt = Date.now();
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastAction = "enable";
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastReason = "";
-  recordTTSDebugEvent("conversation_followup_gray_auto_trial_explicit_switch_enabled", {
-    enabled: true,
-    switchKey: "gray_auto_followup_character_runtime_enabled"
-  });
-  updateFollowupReadinessPanel();
-  return {
-    ok: true,
-    enabled: true,
-    switchKey: "gray_auto_followup_character_runtime_enabled",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noConfigWrites: true,
-      noSchedulerChange: true,
-      noFollowupExecution: true,
-      noPollingStart: true
-    }
-  };
-}
-
-function disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason = "manual_disable") {
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled = false;
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchUpdatedAt = Date.now();
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastAction = "disable";
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastReason = String(reason || "manual_disable");
-  recordTTSDebugEvent("conversation_followup_gray_auto_trial_explicit_switch_disabled", {
-    enabled: false,
-    reason: String(reason || "manual_disable"),
-    switchKey: "gray_auto_followup_character_runtime_enabled"
-  });
-  updateFollowupReadinessPanel();
-  return {
-    ok: true,
-    enabled: false,
-    switchKey: "gray_auto_followup_character_runtime_enabled",
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noConfigWrites: true,
-      noSchedulerChange: true,
-      noFollowupExecution: true,
-      noPollingStart: true
-    }
-  };
-}
-
-function rollbackGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason = "manual_rollback") {
-  const rollbackReason = String(reason || "manual_rollback");
-  const now = Date.now();
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchEnabled = false;
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchUpdatedAt = now;
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastAction = "rollback";
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchLastReason = rollbackReason;
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackAt = now;
-  state.grayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackReason = rollbackReason;
-  recordTTSDebugEvent("conversation_followup_gray_auto_trial_explicit_switch_rollback", {
-    enabled: false,
-    reason: rollbackReason,
-    switchKey: "gray_auto_followup_character_runtime_enabled"
-  });
-  updateFollowupReadinessPanel();
-  return {
-    ok: true,
-    enabled: false,
-    switchKey: "gray_auto_followup_character_runtime_enabled",
-    rollbackAt: now,
-    rollbackReason,
-    safety: {
-      noRuntimeHintEmission: true,
-      noLive2DMove: true,
-      noTts: true,
-      noConfigWrites: true,
-      noSchedulerChange: true,
-      noFollowupExecution: true,
-      noPollingStart: true
-    }
-  };
-}
-
-function emitGrayAutoTrialCharacterCueManually(input = {}) {
-  const safeInput = input && typeof input === "object" ? input : {};
-  const confirm = String(safeInput.confirm || "").trim();
-  const requiredConfirm = "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE";
-  if (confirm !== requiredConfirm) {
-    return {
-      ok: false,
-      reason: "confirmation_required",
-      requiredConfirm,
-      safety: {
-        noEventEmission: true,
-        noSchedulerChange: true,
-        noFollowupExecution: true,
-        noConfigWrites: true
-      }
-    };
-  }
-  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist();
-  if (checklist.readyForImplementationPlanning !== true) {
-    return {
-      ok: false,
-      reason: "handoff_checklist_not_ready",
-      checklistStatus: checklist.status,
-      blockingRequired: Array.isArray(checklist.blockingRequired) ? checklist.blockingRequired.slice() : [],
-      safety: {
-        noEventEmission: true,
-        noSchedulerChange: true,
-        noFollowupExecution: true,
-        noConfigWrites: true
-      }
-    };
-  }
-  const cuePreset = resolveGrayAutoTrialCharacterCuePreset(safeInput, checklist);
-  let normalized = null;
-  try {
-    normalized = handleCharacterRuntimeMetadata(cuePreset.runtimeHint);
-  } catch (_) {
-    normalized = null;
-  }
-  if (!normalized) {
-    return {
-      ok: false,
-      reason: "runtime_hint_rejected",
-      checklistStatus: checklist.status,
-      safety: {
-        noSchedulerChange: true,
-        noFollowupExecution: true,
-        noConfigWrites: true
-      }
-    };
-  }
-  const count = getGrayAutoTrialCharacterCueManualEmitStatus().count + 1;
-  state.grayAutoTrialCharacterCueManualEmitCount = count;
-  state.grayAutoTrialCharacterCueLastManualEmitAt = Date.now();
-  state.grayAutoTrialCharacterCueLastManualEmit = {
-    decision: checklist.decision,
-    outcome: checklist.outcome,
-    label: cuePreset.label,
-    tone: cuePreset.tone,
-    presetKey: cuePreset.key,
-    presetDescription: cuePreset.description,
-    runtimeHint: normalized,
-    runtimeDispatch: state.followupCharacterRuntimeLastDispatch || null,
-    runtimeApply: state.followupCharacterRuntimeLastApply || null
-  };
-  recordTTSDebugEvent("conversation_followup_gray_auto_trial_character_cue_manual_emit", {
-    text: String(cuePreset.label || ""),
-    result: [`count:${count}`, `preset:${cuePreset.key}`, `decision:${checklist.decision}`, `outcome:${checklist.outcome}`].join(";"),
-    error: String(normalized.emotion || "")
-  });
-  updateFollowupReadinessPanel();
-  return {
-    ok: true,
-    count,
-    decision: checklist.decision,
-    outcome: checklist.outcome,
-    label: cuePreset.label,
-    tone: cuePreset.tone,
-    presetKey: cuePreset.key,
-    presetDescription: cuePreset.description,
-    runtimeHint: normalized,
-    checklistStatus: checklist.status,
-    safety: {
-      readOnly: false,
-      explicitConfirmationRequired: true,
-      noSchedulerChange: true,
-      noFollowupExecution: true,
-      noConfigWrites: true
-    }
-  };
-}
-
-async function previewGrayAutoTrialCharacterCueBackendBridge(checklist = null) {
-  const safeChecklist = checklist && typeof checklist === "object"
-    ? checklist
-    : buildGrayAutoTrialCharacterCueHandoffChecklist();
-  const requestBody = {
-    type: "automatic_character_runtime",
-    action: "emit_runtime_cue"
-  };
-  let payload = null;
-  try {
-    const resp = await authFetch("/api/character_runtime/backend_entry/preview", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-      cache: "no-store"
-    });
-    payload = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      throw new Error(payload?.error || `HTTP ${resp.status}`);
-    }
-  } catch (error) {
-    const failed = {
-      ok: false,
-      reason: "backend_preview_failed",
-      error: String(error?.message || error || "unknown"),
-      requestBody,
-      label: safeChecklist.label || "",
-      tone: safeChecklist.tone || "",
-      backendNoop: false,
-      wouldExecute: false,
-      dispatched: false,
-      safety: {
-        noSchedulerChange: true,
-        noFollowupExecution: true,
-        noConfigWrites: true,
-        noTts: true
-      }
-    };
-    state.grayAutoTrialCharacterCueLastBackendBridge = failed;
-    recordTTSDebugEvent("conversation_followup_gray_auto_trial_character_cue_backend_bridge", {
-      text: String(safeChecklist.label || ""),
-      result: "failed",
-      error: failed.error
-    });
-    return failed;
-  }
-  const preview = payload && typeof payload.character_runtime_backend_entry_preview === "object"
-    ? payload.character_runtime_backend_entry_preview
-    : {};
-  const adapter = payload && typeof payload.character_runtime_backend_entry_adapter_preview === "object"
-    ? payload.character_runtime_backend_entry_adapter_preview
-    : {};
-  const backendNoop = adapter.noop === true
-    && adapter.adapter_ready === false
-    && adapter.executed === false
-    && adapter.dispatched === false
-    && adapter.dispatch_target === "none";
-  const wouldExecute = preview.would_execute === true || adapter.would_execute === true;
-  const bridge = {
-    ok: backendNoop && !wouldExecute,
-    reason: backendNoop && !wouldExecute ? "backend_preview_noop_confirmed" : "backend_preview_not_safe",
-    requestBody,
-    label: safeChecklist.label || "",
-    tone: safeChecklist.tone || "",
-    backendNoop,
-    accepted: preview.accepted === true || adapter.accepted === true,
-    wouldExecute,
-    dispatched: adapter.dispatched === true,
-    preview,
-    adapter,
-    safety: {
-      backendExecutionDisabled: adapter.executed !== true,
-      backendDispatchDisabled: adapter.dispatched !== true,
-      noSchedulerChange: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      noTts: true
-    }
-  };
-  state.grayAutoTrialCharacterCueLastBackendBridge = bridge;
-  recordTTSDebugEvent("conversation_followup_gray_auto_trial_character_cue_backend_bridge", {
-    text: String(safeChecklist.label || ""),
-    result: bridge.reason,
-    error: bridge.ok ? "" : "blocked"
-  });
-  return bridge;
-}
-
-function getSelectedGrayAutoTrialCharacterCuePresetKey() {
-  const select = state.followupReadinessTrialCharacterCuePresetSelect;
-  return normalizeGrayAutoTrialCharacterCuePresetKey(select && typeof select.value === "string" ? select.value : "auto");
-}
-
-async function emitGrayAutoTrialCharacterCueViaManualBridge(input = {}) {
-  const safeInput = input && typeof input === "object" ? input : {};
-  const confirm = String(safeInput.confirm || "").trim();
-  const requiredConfirm = "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE";
-  if (confirm !== requiredConfirm) {
-    return {
-      ok: false,
-      reason: "confirmation_required",
-      requiredConfirm,
-      safety: {
-        noEventEmission: true,
-        noSchedulerChange: true,
-        noFollowupExecution: true,
-        noConfigWrites: true
-      }
-    };
-  }
-  const checklist = buildGrayAutoTrialCharacterCueHandoffChecklist();
-  const cuePreset = resolveGrayAutoTrialCharacterCuePreset(safeInput, checklist);
-  const backendBridge = await previewGrayAutoTrialCharacterCueBackendBridge(checklist);
-  if (backendBridge.ok !== true) {
-    return {
-      ok: false,
-      reason: backendBridge.reason || "backend_bridge_blocked",
-      backendBridge,
-      checklistStatus: checklist.status,
-      safety: {
-        noEventEmission: true,
-        noSchedulerChange: true,
-        noFollowupExecution: true,
-        noConfigWrites: true,
-        noTts: true
-      }
-    };
-  }
-  const result = emitGrayAutoTrialCharacterCueManually({
-    ...safeInput,
-    presetKey: cuePreset.key
-  });
-  if (result && typeof result === "object") {
-    result.backendBridge = backendBridge;
-  }
-  if (result?.ok === true && state.grayAutoTrialCharacterCueLastManualEmit) {
-    state.grayAutoTrialCharacterCueLastManualEmit.backendBridge = backendBridge;
-  }
-  return result;
-}
-
-async function emitLastReplyCharacterCueCandidateViaManualBridge(input = {}) {
-  const safeInput = input && typeof input === "object" ? input : {};
-  const confirm = String(safeInput.confirm || "").trim();
-  const requiredConfirm = "SEND_REPLY_CHARACTER_CUE_CANDIDATE";
-  if (confirm !== requiredConfirm) {
-    return {
-      ok: false,
-      reason: "confirmation_required",
-      requiredConfirm,
-      safety: {
-        noEventEmission: true,
-        noSchedulerChange: true,
-        noFollowupExecution: true,
-        noConfigWrites: true,
-        noTts: true
-      }
-    };
-  }
-  const candidate = state.followupCharacterRuntimeLastReplyCandidate || null;
-  if (!candidate || candidate.eligibleForManualSend !== true || !candidate.runtimeHint) {
-    return {
-      ok: false,
-      reason: "no_reply_candidate",
-      safety: {
-        noEventEmission: true,
-        noSchedulerChange: true,
-        noFollowupExecution: true,
-        noConfigWrites: true,
-        noTts: true
-      }
-    };
-  }
-  const backendBridge = await previewGrayAutoTrialCharacterCueBackendBridge({
-    label: candidate.textPreview || "assistant_reply_candidate",
-    tone: candidate.tone || "idle"
-  });
-  if (backendBridge.ok !== true) {
-    return {
-      ok: false,
-      reason: backendBridge.reason || "backend_bridge_blocked",
-      backendBridge,
-      safety: {
-        noEventEmission: true,
-        noSchedulerChange: true,
-        noFollowupExecution: true,
-        noConfigWrites: true,
-        noTts: true
-      }
-    };
-  }
-  let normalized = null;
-  try {
-    normalized = handleCharacterRuntimeMetadata(candidate.runtimeHint);
-  } catch (_) {
-    normalized = null;
-  }
-  if (!normalized) {
-    return {
-      ok: false,
-      reason: "runtime_hint_rejected",
-      backendBridge,
-      safety: {
-        noSchedulerChange: true,
-        noFollowupExecution: true,
-        noConfigWrites: true,
-        noTts: true
-      }
-    };
-  }
-  const count = getGrayAutoTrialCharacterCueManualEmitStatus().count + 1;
-  state.grayAutoTrialCharacterCueManualEmitCount = count;
-  state.grayAutoTrialCharacterCueLastManualEmitAt = Date.now();
-  state.grayAutoTrialCharacterCueLastManualEmit = {
-    source: "assistant_reply_candidate",
-    decision: "MANUAL_REPLY_CANDIDATE_SEND",
-    outcome: "MANUAL_ONLY",
-    label: candidate.textPreview || "",
-    tone: candidate.tone || "",
-    presetKey: "reply_candidate",
-    presetDescription: "assistant_reply_candidate",
-    replyCandidateGeneratedAt: candidate.generatedAt || 0,
-    runtimeHint: normalized,
-    runtimeDispatch: state.followupCharacterRuntimeLastDispatch || null,
-    runtimeApply: state.followupCharacterRuntimeLastApply || null,
-    backendBridge
-  };
-  recordTTSDebugEvent("conversation_followup_character_reply_cue_candidate_manual_emit", {
-    text: String(candidate.textPreview || ""),
-    result: [`count:${count}`, `tone:${candidate.tone || ""}`, "source:assistant_reply_candidate"].join(";"),
-    error: String(normalized.emotion || "")
-  });
-  updateFollowupReadinessPanel();
-  return {
-    ok: true,
-    count,
-    label: candidate.textPreview || "",
-    tone: candidate.tone || "",
-    source: "assistant_reply_candidate",
-    runtimeHint: normalized,
-    backendBridge,
-    safety: {
-      readOnly: false,
-      explicitConfirmationRequired: true,
-      manualOnly: true,
-      noSchedulerChange: true,
-      noFollowupExecution: true,
-      noConfigWrites: true,
-      noTts: true
-    }
-  };
-}
-
-function updateGrayAutoTrialPreRunChecklistCard() {
-  if (!state.followupReadinessTrialChecklistCard) {
-    return;
-  }
-  state.followupReadinessTrialChecklistCard.textContent = buildGrayAutoTrialPreRunChecklistText();
-}
-
-function updateGrayAutoTrialTimelineCard() {
-  if (!state.followupReadinessTrialTimelineCard) {
-    return;
-  }
-  state.followupReadinessTrialTimelineCard.textContent = buildGrayAutoTrialTimelineText(18);
-}
-
-function updateGrayAutoTrialOutcomeCard() {
-  if (!state.followupReadinessTrialOutcomeCard) {
-    return;
-  }
-  state.followupReadinessTrialOutcomeCard.textContent = buildGrayAutoTrialOutcomeText(48);
-}
-
-function updateGrayAutoTrialDecisionCard() {
-  if (!state.followupReadinessTrialDecisionCard) {
-    return;
-  }
-  state.followupReadinessTrialDecisionCard.textContent = buildGrayAutoTrialGoNoGoDecisionText(48);
-}
-
-function updateGrayAutoTrialSignoffCard() {
-  if (!state.followupReadinessTrialSignoffCard) {
-    return;
-  }
-  state.followupReadinessTrialSignoffCard.textContent = buildGrayAutoTrialSignoffPackageText(48);
-}
-
-function updateGrayAutoTrialCharacterCard() {
-  if (!state.followupReadinessTrialCharacterCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterCard.textContent = buildGrayAutoTrialCharacterCuePreviewText(48);
-}
-
-function updateGrayAutoTrialCharacterHandoffCard() {
-  if (!state.followupReadinessTrialCharacterHandoffCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterHandoffCard.textContent = buildGrayAutoTrialCharacterCueHandoffChecklistText(48);
-}
-
-function updateGrayAutoTrialCharacterRecapCard() {
-  if (!state.followupReadinessTrialCharacterRecapCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterRecapCard.textContent = buildGrayAutoTrialCharacterCueManualEmitRecapText(24);
-}
-
-function updateGrayAutoTrialCharacterManualCueStatusCard() {
-  if (!state.followupReadinessTrialCharacterManualCueStatusCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterManualCueStatusCard.textContent = buildGrayAutoTrialCharacterManualCueStatusCardText();
-}
-
-function updateReplyCharacterCueCandidateManualSendButton() {
-  const button = state.followupReadinessTrialSendReplyCueCandidateBtn;
-  if (!button) {
-    return;
-  }
-  const candidate = state.followupCharacterRuntimeLastReplyCandidate || null;
-  const hint = candidate?.runtimeHint || null;
-  const available = candidate?.eligibleForManualSend === true && !!hint;
-  button.disabled = !available;
-  button.textContent = available ? "\u53d1\u9001\u56de\u590dcue" : "\u65e0\u56de\u590dcue";
-  button.title = available
-    ? [
-      "\u9700\u8981\u8f93\u5165 SEND_REPLY_CHARACTER_CUE_CANDIDATE\uff1b\u53ea\u624b\u52a8\u53d1\u9001\u4e0a\u4e00\u6761\u52a9\u624b\u56de\u590d\u7684\u5019\u9009 runtime cue",
-      `candidate tone=${candidate.tone || "n/a"} mood=${candidate.mood || "n/a"} emotion=${hint.emotion || "n/a"} action=${hint.action || "n/a"}`
-    ].join("\n")
-    : "\u6682\u65e0\u52a9\u624b\u56de\u590d\u5019\u9009 cue\uff1b\u5148\u5b8c\u6210\u4e00\u6b21\u52a9\u624b\u56de\u590d\u540e\u518d\u624b\u52a8\u53d1\u9001\u3002";
-}
-
-function updateGrayAutoTrialCharacterStrategyCard() {
-  if (!state.followupReadinessTrialCharacterStrategyCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterStrategyCard.textContent = buildGrayAutoTrialCharacterExpressionStrategyDraftText(24);
-}
-
-function updateGrayAutoTrialCharacterReviewCard() {
-  if (!state.followupReadinessTrialCharacterReviewCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterReviewCard.textContent = buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(24);
-}
-
-function updateGrayAutoTrialCharacterAutoPlanCard() {
-  if (!state.followupReadinessTrialCharacterAutoPlanCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterAutoPlanCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText(24);
-}
-
-function updateGrayAutoTrialCharacterDryRunCard() {
-  if (!state.followupReadinessTrialCharacterDryRunCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterDryRunCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeDryRunText(24);
-}
-
-function updateGrayAutoTrialCharacterSwitchPlanCard() {
-  if (!state.followupReadinessTrialCharacterSwitchPlanCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterSwitchPlanCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(24);
-}
-
-function updateGrayAutoTrialCharacterSwitchReviewCard() {
-  if (!state.followupReadinessTrialCharacterSwitchReviewCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterSwitchReviewCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackageText(24);
-}
-
-function updateGrayAutoTrialCharacterSwitchAcceptanceCard() {
-  if (!state.followupReadinessTrialCharacterSwitchAcceptanceCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterSwitchAcceptanceCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackageText(24);
-}
-
-function updateGrayAutoTrialCharacterSwitchControlCard() {
-  if (!state.followupReadinessTrialCharacterSwitchControlCard) {
-    return;
-  }
-  const control = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl();
-  state.followupReadinessTrialCharacterSwitchControlCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText(24);
-  if (state.followupReadinessTrialCharacterSwitchEnableBtn) {
-    state.followupReadinessTrialCharacterSwitchEnableBtn.disabled = control.canEnable !== true;
-    state.followupReadinessTrialCharacterSwitchEnableBtn.title = control.canEnable === true
-      ? "\u9700\u8981\u8f93\u5165 ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH\uff1b\u53ea\u5207\u6362\u672c\u5730\u6807\u8bb0"
-      : "\u9a8c\u6536\u5c1a\u672a\u5c31\u7eea\uff0c\u663e\u5f0f\u5f00\u5173\u4ecd\u4fdd\u6301\u5173\u95ed";
-  }
-  if (state.followupReadinessTrialCharacterSwitchDisableBtn) {
-    state.followupReadinessTrialCharacterSwitchDisableBtn.disabled = control.enabled !== true;
-    state.followupReadinessTrialCharacterSwitchDisableBtn.title = "\u5173\u95ed\u672c\u5730\u663e\u5f0f\u5f00\u5173\u6807\u8bb0\uff0c\u4e0d\u6539 scheduler/config";
-  }
-  if (state.followupReadinessTrialCharacterSwitchRollbackBtn) {
-    state.followupReadinessTrialCharacterSwitchRollbackBtn.disabled = control.enabled !== true;
-    state.followupReadinessTrialCharacterSwitchRollbackBtn.title = control.enabled === true
-      ? "\u6062\u590d\u672c\u5730\u663e\u5f0f\u5f00\u5173\u5230\u9ed8\u8ba4\u5173\u95ed\uff0c\u4e0d\u6539 scheduler/config"
-      : "\u5f53\u524d\u5df2\u662f\u9ed8\u8ba4\u5173\u95ed";
-  }
-}
-
-function updateGrayAutoTrialCharacterSwitchDiagnosticsCard() {
-  if (!state.followupReadinessTrialCharacterSwitchDiagnosticsCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterSwitchDiagnosticsCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(24);
-}
-
-function updateGrayAutoTrialCharacterSwitchRollbackCard() {
-  if (!state.followupReadinessTrialCharacterSwitchRollbackCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterSwitchRollbackCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(24);
-}
-
-function updateGrayAutoTrialCharacterSwitchFinalPreflightCard() {
-  if (!state.followupReadinessTrialCharacterSwitchFinalPreflightCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterSwitchFinalPreflightCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(24);
-}
-
-function updateGrayAutoTrialCharacterImplementationDraftCard() {
-  if (!state.followupReadinessTrialCharacterImplementationDraftCard) {
-    return;
-  }
-  state.followupReadinessTrialCharacterImplementationDraftCard.textContent = buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftText(24);
-}
-
-function promptGrayAutoTrialPhrase(phrase, actionLabel) {
-  if (typeof window === "undefined" || typeof window.prompt !== "function") {
-    return false;
-  }
-  const input = window.prompt(`${actionLabel}\n\nType ${phrase} to continue.`, "");
-  return String(input || "").trim() === phrase;
-}
-
-function updateGrayAutoTrialControlPanel() {
-  const statusNode = state.followupReadinessTrialStatus;
-  if (!statusNode) {
-    return;
-  }
-  const snapshot = getTTSDebugSnapshot();
-  const mode = snapshot.conversationMode || {};
-  const scheduler = snapshot.proactiveScheduler || {};
-  const preflight = buildGrayAutoFollowupTrialPreflight(snapshot);
-  const session = buildGrayAutoTrialSessionState();
-  const armed = mode.grayAutoEnabled === true && mode.grayAutoTrialEnabled === true;
-  const polling = scheduler.pollTimerActive === true;
-  statusNode.textContent = [
-    `\u8bd5\u8fd0\u884c\u63a7\u5236\uff1astatus=${preflight.status} armed=${armed ? "true" : "false"} polling=${polling ? "true" : "false"}`,
-    `session=${session.count}/${session.max} remaining=${session.remaining} blocked=${explainReadinessReasons(preflight.dryRun?.blockedReasons || preflight.gateBlockedReasons)}`,
-    "\u63d0\u793a\uff1aArm \u548c Reset \u9700\u8981\u8f93\u5165\u786e\u8ba4\u77ed\u8bed\uff1bStop/Disarm \u662f\u5b89\u5168\u6536\u53e3\u52a8\u4f5c\u3002"
-  ].join("\n");
-  if (state.followupReadinessTrialArmBtn) {
-    state.followupReadinessTrialArmBtn.disabled = armed;
-  }
-  if (state.followupReadinessTrialDisarmBtn) {
-    state.followupReadinessTrialDisarmBtn.disabled = !armed && !polling;
-  }
-  if (state.followupReadinessTrialResetBtn) {
-    state.followupReadinessTrialResetBtn.disabled = session.count <= 0 && session.reached !== true;
-  }
-  const switchControl = buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl();
-  if (state.followupReadinessTrialCharacterSwitchEnableBtn) {
-    state.followupReadinessTrialCharacterSwitchEnableBtn.disabled = switchControl.canEnable !== true;
-    state.followupReadinessTrialCharacterSwitchEnableBtn.title = switchControl.canEnable === true
-      ? "\u9700\u8981\u8f93\u5165 ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH\uff1b\u53ea\u5207\u6362\u672c\u5730\u6807\u8bb0"
-      : "\u9a8c\u6536\u5305\u5c1a\u672a\u5c31\u7eea\uff0c\u663e\u5f0f\u5f00\u5173\u4ecd\u4fdd\u6301\u5173\u95ed";
-  }
-  if (state.followupReadinessTrialCharacterSwitchDisableBtn) {
-    state.followupReadinessTrialCharacterSwitchDisableBtn.disabled = switchControl.enabled !== true;
-    state.followupReadinessTrialCharacterSwitchDisableBtn.title = "\u5173\u95ed\u672c\u5730\u663e\u5f0f\u5f00\u5173\u6807\u8bb0\uff1b\u4e0d\u6539 scheduler/config";
-  }
-  if (state.followupReadinessTrialCharacterSwitchRollbackBtn) {
-    state.followupReadinessTrialCharacterSwitchRollbackBtn.disabled = switchControl.enabled !== true;
-    state.followupReadinessTrialCharacterSwitchRollbackBtn.title = switchControl.enabled === true
-      ? "\u6062\u590d\u672c\u5730\u663e\u5f0f\u5f00\u5173\u5230\u9ed8\u8ba4\u5173\u95ed\uff1b\u4e0d\u6539 scheduler/config"
-      : "\u5f53\u524d\u5df2\u662f\u9ed8\u8ba4\u5173\u95ed";
-  }
-}
-
-function handleGrayAutoTrialArmClick(button = null) {
-  if (!promptGrayAutoTrialPhrase("ARM_GRAY_AUTO_TRIAL", "\u542f\u52a8\u672c\u5730\u53d7\u63a7\u7070\u5ea6\u81ea\u52a8\u8bd5\u8fd0\u884c")) {
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c Arm \u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
-    return false;
-  }
-  const result = armGrayAutoTrialSession({ confirm: "ARM_GRAY_AUTO_TRIAL" });
-  updateFollowupReadinessPanel();
-  setStatus(result?.ok === true
-    ? "\u7070\u5ea6\u8bd5\u8fd0\u884c\u5df2 Arm\uff08\u4ec5\u672c\u5730\u5185\u5b58\uff09"
-    : `\u7070\u5ea6\u8bd5\u8fd0\u884c Arm \u5931\u8d25\uff1a${result?.reason || "unknown"}`);
-  if (button) {
-    button.blur();
-  }
-  return result?.ok === true;
-}
-
-function handleGrayAutoTrialStopClick(button = null) {
-  const result = stopGrayAutoTrialSession("panel_emergency_stop");
-  updateFollowupReadinessPanel();
-  setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u5df2 Emergency Stop\uff0c\u672c\u6b21 session \u5df2\u5c01\u53e3");
-  if (button) {
-    button.blur();
-  }
-  return result;
-}
-
-function handleGrayAutoTrialDisarmClick(button = null) {
-  const result = disarmGrayAutoTrialSession("panel_disarm");
-  updateFollowupReadinessPanel();
-  setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u5df2 Disarm\uff0c\u5185\u5b58\u95e8\u7981\u5df2\u5173\u95ed");
-  if (button) {
-    button.blur();
-  }
-  return result;
-}
-
-function handleGrayAutoTrialResetClick(button = null) {
-  if (!promptGrayAutoTrialPhrase("RESET_GRAY_AUTO_TRIAL_SESSION", "\u91cd\u7f6e\u672c\u6b21\u7070\u5ea6\u8bd5\u8fd0\u884c\u8ba1\u6570")) {
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c Reset \u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
-    return false;
-  }
-  const result = resetGrayAutoTrialSessionTriggerCount();
-  updateFollowupReadinessPanel();
-  setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c session \u8ba1\u6570\u5df2\u91cd\u7f6e\uff08\u4e0d\u542f\u52a8 polling\uff09");
-  if (button) {
-    button.blur();
-  }
-  return result?.reset === true;
-}
-
-async function handleGrayAutoTrialCharacterCueManualEmitClick(button = null) {
-  if (!promptGrayAutoTrialPhrase("EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE", "\u624b\u52a8\u8bd5\u53d1\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272 runtime cue")) {
-    setStatus("\u89d2\u8272 cue \u8bd5\u53d1\u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
-    return false;
-  }
-  if (button) {
-    button.disabled = true;
-  }
-  setStatus("\u89d2\u8272 cue \u540e\u7aef\u9884\u68c0\u4e2d\uff1a\u53ea\u8d70 preview/no-op adapter");
-  try {
-    const result = await emitGrayAutoTrialCharacterCueViaManualBridge({
-      confirm: "EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE",
-      presetKey: getSelectedGrayAutoTrialCharacterCuePresetKey()
-    });
-    updateFollowupReadinessPanel();
-    setStatus(result?.ok === true
-      ? `\u89d2\u8272 cue \u5df2\u624b\u52a8\u8bd5\u53d1\uff08count=${result.count}\uff0cbackend=no-op confirmed\uff09`
-      : `\u89d2\u8272 cue \u8bd5\u53d1\u5931\u8d25\uff1a${result?.reason || "unknown"}`);
-    return result?.ok === true;
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.blur();
-    }
-  }
-}
-
-async function handleReplyCharacterCueCandidateManualSendClick(button = null) {
-  if (!promptGrayAutoTrialPhrase("SEND_REPLY_CHARACTER_CUE_CANDIDATE", "\u624b\u52a8\u53d1\u9001\u4e0a\u4e00\u6761\u52a9\u624b\u56de\u590d\u5019\u9009\u89d2\u8272 cue")) {
-    setStatus("\u56de\u590d\u5019\u9009 cue \u624b\u52a8\u53d1\u9001\u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
-    return false;
-  }
-  updateReplyCharacterCueCandidateManualSendButton();
-  if (button) {
-    button.disabled = true;
-  }
-  setStatus("\u56de\u590d\u5019\u9009 cue \u540e\u7aef\u9884\u68c0\u4e2d\uff1a\u53ea\u8d70 preview/no-op adapter");
-  try {
-    const result = await emitLastReplyCharacterCueCandidateViaManualBridge({
-      confirm: "SEND_REPLY_CHARACTER_CUE_CANDIDATE"
-    });
-    updateFollowupReadinessPanel();
-    setStatus(result?.ok === true
-      ? `\u56de\u590d\u5019\u9009 cue \u5df2\u624b\u52a8\u53d1\u9001\uff08count=${result.count}\uff0cbackend=no-op confirmed\uff09`
-      : `\u56de\u590d\u5019\u9009 cue \u624b\u52a8\u53d1\u9001\u5931\u8d25\uff1a${result?.reason || "unknown"}`);
-    return result?.ok === true;
-  } finally {
-    updateReplyCharacterCueCandidateManualSendButton();
-    if (button) {
-      button.blur();
-    }
-  }
-}
-
-function handleGrayAutoTrialCharacterAutoRuntimeSwitchEnableClick(button = null) {
-  if (!promptGrayAutoTrialPhrase("ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH", "\u542f\u7528\u672c\u5730\u81ea\u52a8\u89d2\u8272 runtime \u663e\u5f0f\u5f00\u5173\u6807\u8bb0")) {
-    setStatus("\u663e\u5f0f\u5f00\u5173\u542f\u7528\u5df2\u53d6\u6d88\uff1a\u786e\u8ba4\u77ed\u8bed\u4e0d\u5339\u914d");
-    return false;
-  }
-  const result = enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch({
-    confirm: "ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH"
-  });
-  setStatus(result?.ok === true
-    ? "\u663e\u5f0f\u5f00\u5173\u672c\u5730\u6807\u8bb0\u5df2\u542f\u7528\uff08\u81ea\u52a8 runtime \u4ecd\u672a\u63a5\u5165\uff09"
-    : `\u663e\u5f0f\u5f00\u5173\u542f\u7528\u88ab\u963b\u6b62\uff1a${result?.reason || "unknown"}`);
-  if (button) {
-    button.blur();
-  }
-  return result?.ok === true;
-}
-
-function handleGrayAutoTrialCharacterAutoRuntimeSwitchDisableClick(button = null) {
-  const result = disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch("panel_disable");
-  setStatus("\u663e\u5f0f\u5f00\u5173\u672c\u5730\u6807\u8bb0\u5df2\u5173\u95ed");
-  if (button) {
-    button.blur();
-  }
-  return result?.ok === true;
-}
-
-function handleGrayAutoTrialCharacterAutoRuntimeSwitchRollbackClick(button = null) {
-  const result = rollbackGrayAutoTrialCharacterAutoRuntimeExplicitSwitch("panel_rollback");
-  setStatus(result?.ok === true
-    ? "\u5df2\u56de\u6536\u5230\u9ed8\u8ba4\u5173\u95ed\uff08\u4ec5\u672c\u5730\u5185\u5b58\uff09"
-    : `\u56de\u6536\u5931\u8d25\uff1a${result?.reason || "unknown"}`);
-  if (button) {
-    button.blur();
-  }
-  return result?.ok === true;
-}
-
-async function copyGrayAutoTrialAuditSummaryToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialAuditSummaryText(30));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u5ba1\u8ba1\u6458\u8981\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u5ba1\u8ba1";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u5ba1\u8ba1\u6458\u8981\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialTimelineToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialTimelineText(40));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u65f6\u95f4\u7ebf\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u65f6\u95f4\u7ebf";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u65f6\u95f4\u7ebf\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialDecisionToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialGoNoGoDecisionText(48));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c Go/No-Go \u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u51b3\u7b56";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236 Go/No-Go \u51b3\u7b56\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialSignoffToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialSignoffPackageText(48));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u7b7e\u6536\u5305\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u7b7e\u6536";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u7b7e\u6536\u5305\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterCuePreviewToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterCuePreviewText(48));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u9884\u89c8\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u89d2\u8272\u9884\u89c8";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u9884\u89c8\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterCueHandoffChecklistToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterCueHandoffChecklistText(48));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u63a5\u5165\u68c0\u67e5\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u63a5\u5165\u68c0\u67e5";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u63a5\u5165\u68c0\u67e5\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterCueManualEmitRecapToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterCueManualEmitRecapText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272 cue \u8bd5\u53d1\u56de\u770b\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u56de\u770b";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272 cue \u8bd5\u53d1\u56de\u770b\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterExpressionStrategyDraftToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterExpressionStrategyDraftText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8349\u6848\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u7b56\u7565";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8349\u6848\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterExpressionStrategyReviewPackageToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterExpressionStrategyReviewPackageText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8bc4\u5ba1\u5305\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u8bc4\u5ba1";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8bc4\u5ba1\u5305\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterAutoRuntimeSafetyPlanToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeSafetyPlanText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u63a5\u5165\u8ba1\u5212\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u8ba1\u5212";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u63a5\u5165\u8ba1\u5212\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterAutoRuntimeDryRunToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeDryRunText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0 dry-run \u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236 dry-run";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0 dry-run \u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterAutoRuntimeSwitchPlanToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlanText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8ba1\u5212\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u5f00\u5173\u8ba1\u5212";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8ba1\u5212\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterAutoRuntimeSwitchReviewToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackageText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bc4\u5ba1\u5305\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u8bc4\u5ba1";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bc4\u5ba1\u5305\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterAutoRuntimeSwitchAcceptanceToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackageText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u9a8c\u6536\u5305\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u9a8c\u6536";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u9a8c\u6536\u5305\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterAutoRuntimeSwitchControlToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControlText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u63a7\u5236\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u72b6\u6001";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u63a7\u5236\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterAutoRuntimeSwitchDiagnosticsToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnosticsText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bca\u65ad\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u8bca\u65ad";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bca\u65ad\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterAutoRuntimeSwitchRollbackToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackageText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u56de\u6536\u5305\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u56de\u6536";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u56de\u6536\u5305\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterAutoRuntimeFinalPreflightToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeFinalPreflightText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u6700\u7ec8\u9884\u68c0\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u9884\u68c0";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u6700\u7ec8\u9884\u68c0\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftText(24));
-    setStatus("\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u5b9e\u73b0\u8349\u6848\u5df2\u590d\u5236");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u8349\u6848";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u5b9e\u73b0\u8349\u6848\u5931\u8d25");
-    return false;
-  }
-}
-
-function updateFollowupReadinessScenarioCompare() {
-  if (!state.followupReadinessCompare) {
-    return;
-  }
-  state.followupReadinessCompare.textContent = "";
-  const title = document.createElement("div");
-  title.textContent = "\u573a\u666f\u5bf9\u6bd4\uff08\u672c\u5730\u9884\u6f14\uff0c\u4e0d\u5199\u5165\u72b6\u6001\uff09";
-  title.style.cssText = "font:700 12px/1.3 system-ui,sans-serif;color:#1f3768;margin-bottom:8px;";
-  state.followupReadinessCompare.appendChild(title);
-  buildFollowupRehearsalScenarioCompareRows().forEach((row) => {
-    const item = document.createElement("div");
-    item.style.cssText = [
-      "display:grid",
-      "grid-template-columns:minmax(72px,.8fr) minmax(88px,.9fr) minmax(72px,.7fr) minmax(0,2.4fr)",
-      "gap:8px",
-      "align-items:start",
-      "padding:7px 0",
-      "border-top:1px solid rgba(93,128,195,.16)"
-    ].join(";");
-    if (row.id === state.followupRehearsalScenarioId) {
-      item.style.background = "rgba(232,255,243,.42)";
-    }
-    const cells = [
-      row.id === state.followupRehearsalScenarioId ? `${row.label} *` : row.label,
-      `policy=${row.policy}`,
-      `tone=${row.tone} #${row.selectedIndex}`,
-      row.candidateText
-    ];
-    cells.forEach((text, index) => {
-      const cell = document.createElement("span");
-      cell.textContent = text;
-      cell.style.cssText = index === 3
-        ? "white-space:normal;color:#263d70;"
-        : "white-space:normal;color:#465b84;";
-      item.appendChild(cell);
-    });
-    state.followupReadinessCompare.appendChild(item);
-  });
-}
-
-function createFollowupReadinessActionGroup(labelText, buttons = []) {
-  const group = document.createElement("div");
-  group.style.cssText = [
-    "display:flex",
-    "align-items:center",
-    "gap:6px",
-    "flex-wrap:wrap",
-    "padding:6px 8px",
-    "border:1px solid rgba(93,128,195,.18)",
-    "border-radius:12px",
-    "background:rgba(255,255,255,.44)"
-  ].join(";");
-  const label = document.createElement("span");
-  label.textContent = labelText;
-  label.style.cssText = "font:700 11px/1.2 system-ui,sans-serif;color:#54688f;margin-right:2px;";
-  group.appendChild(label);
-  buttons.forEach((button) => group.appendChild(button));
-  return group;
-}
-
-function createFollowupReadinessCollapsibleActionGroup(labelText, buttons = [], open = false) {
-  const details = document.createElement("details");
-  details.open = open === true;
-  details.style.cssText = [
-    "padding:6px 8px",
-    "border:1px solid rgba(93,128,195,.16)",
-    "border-radius:12px",
-    "background:rgba(255,255,255,.34)"
-  ].join(";");
-  const summary = document.createElement("summary");
-  summary.textContent = labelText;
-  summary.style.cssText = [
-    "cursor:pointer",
-    "font:700 11px/1.2 system-ui,sans-serif",
-    "color:#54688f",
-    "list-style-position:inside"
-  ].join(";");
-  const body = createFollowupReadinessActionGroup("", buttons);
-  body.style.marginTop = "6px";
-  const label = body.querySelector("span");
-  if (label) {
-    label.remove();
-  }
-  details.appendChild(summary);
-  details.appendChild(body);
-  return details;
-}
-
-function ensureFollowupReadinessPanel() {
-  if (state.followupReadinessPanel || typeof document === "undefined") {
-    return state.followupReadinessPanel;
-  }
-  const panel = document.createElement("div");
-  panel.id = "followup-readiness-panel";
-  panel.style.cssText = [
-    "position:fixed",
-    "left:14px",
-    "bottom:14px",
-    "z-index:99998",
-    "width:min(460px,calc(100vw - 28px))",
-    "max-height:56vh",
-    "overflow:auto",
-    "padding:14px",
-    "border:1px solid rgba(88,117,170,.36)",
-    "border-radius:18px",
-    "background:rgba(244,248,255,.94)",
-    "color:#24385f",
-    "font:12px/1.5 Consolas,Menlo,monospace",
-    "box-shadow:0 18px 45px rgba(54,70,110,.22)",
-    "backdrop-filter:blur(12px)",
-    "white-space:pre-wrap",
-    "display:none"
-  ].join(";");
-  const head = document.createElement("div");
-  head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;";
-  const title = document.createElement("strong");
-  title.textContent = "续话状态";
-  title.style.cssText = "font:700 14px/1.2 system-ui,sans-serif;color:#1f3768;";
-  const actionBar = document.createElement("div");
-  actionBar.style.cssText = [
-    "display:flex",
-    "flex-direction:column",
-    "align-items:stretch",
-    "gap:8px",
-    "margin:0 0 10px"
-  ].join(";");
-  const copy = document.createElement("button");
-  copy.type = "button";
-  copy.textContent = "复制";
-  copy.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef4ff;color:#263d70;cursor:pointer;";
-  copy.addEventListener("click", () => {
-    copyFollowupReadinessReportToClipboard(copy);
-  });
-  const copySelected = document.createElement("button");
-  copySelected.type = "button";
-  copySelected.textContent = "\u590d\u5236\u77ed\u53e5";
-  copySelected.title = "\u590d\u5236\u5f53\u524d\u9009\u4e2d\u7684\u672c\u5730\u7eed\u8bdd\u77ed\u53e5";
-  copySelected.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eafaf2;color:#18583f;cursor:pointer;";
-  copySelected.addEventListener("click", () => {
-    copyFollowupReadinessSelectedTextToClipboard(copySelected);
-  });
-  const copySummary = document.createElement("button");
-  copySummary.type = "button";
-  copySummary.textContent = "\u590d\u5236\u6458\u8981";
-  copySummary.title = "\u590d\u5236\u9884\u6f14\u5361\u7247\u4e2d\u7684\u7b80\u8981\u8c03\u8bd5\u4fe1\u606f";
-  copySummary.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef4ff;color:#263d70;cursor:pointer;";
-  copySummary.addEventListener("click", () => {
-    copyFollowupReadinessPreviewSummaryToClipboard(copySummary);
-  });
-  const copyBundle = document.createElement("button");
-  copyBundle.type = "button";
-  copyBundle.textContent = "\u590d\u5236\u5bf9\u6bd4\u5305";
-  copyBundle.title = "\u4e00\u6b21\u590d\u5236\u5f53\u524d\u77ed\u53e5\u4e0e\u9884\u6f14\u6458\u8981";
-  copyBundle.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e9f2ff;color:#1f4378;cursor:pointer;";
-  copyBundle.addEventListener("click", () => {
-    copyFollowupReadinessPreviewCopyBundleToClipboard(copyBundle);
-  });
-  const copyJson = document.createElement("button");
-  copyJson.type = "button";
-  copyJson.textContent = "\u590d\u5236JSON";
-  copyJson.title = "\u590d\u5236\u5f53\u524d\u9884\u6f14\u5361\u7247\u7684\u7ed3\u6784\u5316 JSON \u5feb\u7167";
-  copyJson.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#edf1ff;color:#2d3f7e;cursor:pointer;";
-  copyJson.addEventListener("click", () => {
-    copyFollowupReadinessPreviewJsonToClipboard(copyJson);
-  });
-  const copyOneLine = document.createElement("button");
-  copyOneLine.type = "button";
-  copyOneLine.textContent = "\u590d\u5236\u4e00\u884c";
-  copyOneLine.title = "\u590d\u5236\u5f53\u524d\u9884\u6f14\u7b80\u8981\u7684\u5355\u884c\u6587\u672c";
-  copyOneLine.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1f6ff;color:#32497f;cursor:pointer;";
-  copyOneLine.addEventListener("click", () => {
-    copyFollowupReadinessPreviewOneLineToClipboard(copyOneLine);
-  });
-  const copyTemplate = document.createElement("button");
-  copyTemplate.type = "button";
-  copyTemplate.textContent = "复制模板";
-  copyTemplate.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff7d6;color:#5b4211;cursor:pointer;";
-  copyTemplate.addEventListener("click", () => {
-    copyFollowupConfigTemplateToClipboard(copyTemplate);
-  });
-  const rehearsalButtons = FOLLOWUP_REHEARSAL_SCENARIOS.map((scenario) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = scenario.label;
-    button.title = "\u4ec5\u8bbe\u7f6e\u672c\u5730\u5185\u5b58\u7eed\u8bdd\u72b6\u6001\uff0c\u4e0d\u8bf7\u6c42\u6a21\u578b\u6216\u8bed\u97f3";
-    button.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e8fff3;color:#18583f;cursor:pointer;";
-    button.dataset.scenario = scenario.id;
-    button.addEventListener("click", () => {
-      runFollowupReadinessPanelRehearsal(button, scenario.id);
-    });
-    return button;
-  });
-  const clearRehearsal = document.createElement("button");
-  clearRehearsal.type = "button";
-  clearRehearsal.textContent = "\u6e05\u9664\u9884\u6f14";
-  clearRehearsal.title = "\u6062\u590d\u9884\u6f14\u524d\u7684\u672c\u5730 pending \u72b6\u6001";
-  clearRehearsal.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1f4fb;color:#33415f;cursor:pointer;";
-  clearRehearsal.addEventListener("click", () => {
-    clearFollowupReadinessPanelRehearsal(clearRehearsal);
-  });
-  const trialArm = document.createElement("button");
-  trialArm.type = "button";
-  trialArm.textContent = "Arm \u8bd5\u8fd0\u884c";
-  trialArm.title = "\u9700\u8981\u8f93\u5165 ARM_GRAY_AUTO_TRIAL\uff1b\u53ea\u4fee\u6539\u672c\u5730\u5185\u5b58\u95e8\u7981";
-  trialArm.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff3d8;color:#694411;cursor:pointer;";
-  trialArm.addEventListener("click", () => {
-    handleGrayAutoTrialArmClick(trialArm);
-  });
-  const trialStop = document.createElement("button");
-  trialStop.type = "button";
-  trialStop.textContent = "Emergency Stop";
-  trialStop.title = "\u7acb\u523b\u5c01\u53e3\u672c\u6b21\u8bd5\u8fd0\u884c session";
-  trialStop.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#ffe6e3;color:#7b221d;cursor:pointer;";
-  trialStop.addEventListener("click", () => {
-    handleGrayAutoTrialStopClick(trialStop);
-  });
-  const trialDisarm = document.createElement("button");
-  trialDisarm.type = "button";
-  trialDisarm.textContent = "Disarm";
-  trialDisarm.title = "\u5173\u95ed\u672c\u5730\u5185\u5b58\u7070\u5ea6\u95e8\u7981\u5e76\u505c\u6b62 polling";
-  trialDisarm.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e9f2ff;color:#1f4378;cursor:pointer;";
-  trialDisarm.addEventListener("click", () => {
-    handleGrayAutoTrialDisarmClick(trialDisarm);
-  });
-  const trialReset = document.createElement("button");
-  trialReset.type = "button";
-  trialReset.textContent = "Reset Session";
-  trialReset.title = "\u9700\u8981\u8f93\u5165 RESET_GRAY_AUTO_TRIAL_SESSION\uff1b\u4e0d\u542f\u52a8 polling";
-  trialReset.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1f4fb;color:#33415f;cursor:pointer;";
-  trialReset.addEventListener("click", () => {
-    handleGrayAutoTrialResetClick(trialReset);
-  });
-  const trialCopyAudit = document.createElement("button");
-  trialCopyAudit.type = "button";
-  trialCopyAudit.textContent = "\u590d\u5236\u5ba1\u8ba1";
-  trialCopyAudit.title = "\u590d\u5236\u672c\u6b21\u7070\u5ea6\u8bd5\u8fd0\u884c\u7684\u7b80\u8981\u5ba1\u8ba1\u6458\u8981";
-  trialCopyAudit.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef4ff;color:#263d70;cursor:pointer;";
-  trialCopyAudit.addEventListener("click", () => {
-    copyGrayAutoTrialAuditSummaryToClipboard(trialCopyAudit);
-  });
-  const trialCopyTimeline = document.createElement("button");
-  trialCopyTimeline.type = "button";
-  trialCopyTimeline.textContent = "\u590d\u5236\u65f6\u95f4\u7ebf";
-  trialCopyTimeline.title = "\u590d\u5236\u672c\u6b21\u7070\u5ea6\u8bd5\u8fd0\u884c\u63a7\u5236\u548c polling \u4e8b\u4ef6\u65f6\u95f4\u7ebf";
-  trialCopyTimeline.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#edf1ff;color:#2d3f7e;cursor:pointer;";
-  trialCopyTimeline.addEventListener("click", () => {
-    copyGrayAutoTrialTimelineToClipboard(trialCopyTimeline);
-  });
-  const trialCopyDecision = document.createElement("button");
-  trialCopyDecision.type = "button";
-  trialCopyDecision.textContent = "\u590d\u5236\u51b3\u7b56";
-  trialCopyDecision.title = "\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c Go/No-Go \u51b3\u7b56\u5305";
-  trialCopyDecision.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff6dd;color:#684914;cursor:pointer;";
-  trialCopyDecision.addEventListener("click", () => {
-    copyGrayAutoTrialDecisionToClipboard(trialCopyDecision);
-  });
-  const trialCopySignoff = document.createElement("button");
-  trialCopySignoff.type = "button";
-  trialCopySignoff.textContent = "\u590d\u5236\u7b7e\u6536";
-  trialCopySignoff.title = "\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u7b7e\u6536\u6a21\u677f";
-  trialCopySignoff.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff9e8;color:#6b5018;cursor:pointer;";
-  trialCopySignoff.addEventListener("click", () => {
-    copyGrayAutoTrialSignoffToClipboard(trialCopySignoff);
-  });
-  const trialCopyCharacter = document.createElement("button");
-  trialCopyCharacter.type = "button";
-  trialCopyCharacter.textContent = "\u590d\u5236\u89d2\u8272\u9884\u89c8";
-  trialCopyCharacter.title = "\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u540e\u7684\u53ea\u8bfb\u89d2\u8272\u8868\u73b0\u9884\u89c8";
-  trialCopyCharacter.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef8f2;color:#20513a;cursor:pointer;";
-  trialCopyCharacter.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterCuePreviewToClipboard(trialCopyCharacter);
-  });
-  const trialCopyCharacterHandoff = document.createElement("button");
-  trialCopyCharacterHandoff.type = "button";
-  trialCopyCharacterHandoff.textContent = "\u590d\u5236\u63a5\u5165\u68c0\u67e5";
-  trialCopyCharacterHandoff.title = "\u590d\u5236\u7070\u5ea6\u8bd5\u8fd0\u884c\u89d2\u8272\u8868\u73b0\u63a5\u5165\u524d\u53ea\u8bfb\u68c0\u67e5";
-  trialCopyCharacterHandoff.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1fff6;color:#22513a;cursor:pointer;";
-  trialCopyCharacterHandoff.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterCueHandoffChecklistToClipboard(trialCopyCharacterHandoff);
-  });
-  const trialCopyCharacterRecap = document.createElement("button");
-  trialCopyCharacterRecap.type = "button";
-  trialCopyCharacterRecap.textContent = "\u590d\u5236\u56de\u770b";
-  trialCopyCharacterRecap.title = "\u590d\u5236\u6700\u8fd1\u4e00\u6b21\u89d2\u8272 cue \u624b\u52a8\u8bd5\u53d1\u56de\u770b";
-  trialCopyCharacterRecap.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef9ff;color:#1d4b64;cursor:pointer;";
-  trialCopyCharacterRecap.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterCueManualEmitRecapToClipboard(trialCopyCharacterRecap);
-  });
-  const trialCopyCharacterStrategy = document.createElement("button");
-  trialCopyCharacterStrategy.type = "button";
-  trialCopyCharacterStrategy.textContent = "\u590d\u5236\u7b56\u7565";
-  trialCopyCharacterStrategy.title = "\u590d\u5236\u53ea\u8bfb\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8349\u6848";
-  trialCopyCharacterStrategy.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f4f5ff;color:#343f75;cursor:pointer;";
-  trialCopyCharacterStrategy.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterExpressionStrategyDraftToClipboard(trialCopyCharacterStrategy);
-  });
-  const trialCopyCharacterReview = document.createElement("button");
-  trialCopyCharacterReview.type = "button";
-  trialCopyCharacterReview.textContent = "\u590d\u5236\u8bc4\u5ba1";
-  trialCopyCharacterReview.title = "\u590d\u5236\u89d2\u8272\u8868\u73b0\u7b56\u7565\u8bc4\u5ba1\u5305";
-  trialCopyCharacterReview.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff7ea;color:#614517;cursor:pointer;";
-  trialCopyCharacterReview.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterExpressionStrategyReviewPackageToClipboard(trialCopyCharacterReview);
-  });
-  const trialCopyCharacterAutoPlan = document.createElement("button");
-  trialCopyCharacterAutoPlan.type = "button";
-  trialCopyCharacterAutoPlan.textContent = "\u590d\u5236\u8ba1\u5212";
-  trialCopyCharacterAutoPlan.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u63a5\u5165\u8ba1\u5212";
-  trialCopyCharacterAutoPlan.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef0ff;color:#303b74;cursor:pointer;";
-  trialCopyCharacterAutoPlan.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterAutoRuntimeSafetyPlanToClipboard(trialCopyCharacterAutoPlan);
-  });
-  const trialCopyCharacterDryRun = document.createElement("button");
-  trialCopyCharacterDryRun.type = "button";
-  trialCopyCharacterDryRun.textContent = "\u590d\u5236 dry-run";
-  trialCopyCharacterDryRun.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0 dry-run";
-  trialCopyCharacterDryRun.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eff8ff;color:#254b6a;cursor:pointer;";
-  trialCopyCharacterDryRun.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterAutoRuntimeDryRunToClipboard(trialCopyCharacterDryRun);
-  });
-  const trialCopyCharacterSwitchPlan = document.createElement("button");
-  trialCopyCharacterSwitchPlan.type = "button";
-  trialCopyCharacterSwitchPlan.textContent = "\u590d\u5236\u5f00\u5173\u8ba1\u5212";
-  trialCopyCharacterSwitchPlan.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8ba1\u5212";
-  trialCopyCharacterSwitchPlan.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff3e8;color:#68401f;cursor:pointer;";
-  trialCopyCharacterSwitchPlan.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterAutoRuntimeSwitchPlanToClipboard(trialCopyCharacterSwitchPlan);
-  });
-  const trialCopyCharacterSwitchReview = document.createElement("button");
-  trialCopyCharacterSwitchReview.type = "button";
-  trialCopyCharacterSwitchReview.textContent = "\u590d\u5236\u8bc4\u5ba1";
-  trialCopyCharacterSwitchReview.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bc4\u5ba1\u5305";
-  trialCopyCharacterSwitchReview.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff0dd;color:#6b451f;cursor:pointer;";
-  trialCopyCharacterSwitchReview.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterAutoRuntimeSwitchReviewToClipboard(trialCopyCharacterSwitchReview);
-  });
-  const trialCopyCharacterSwitchAcceptance = document.createElement("button");
-  trialCopyCharacterSwitchAcceptance.type = "button";
-  trialCopyCharacterSwitchAcceptance.textContent = "\u590d\u5236\u9a8c\u6536";
-  trialCopyCharacterSwitchAcceptance.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u9a8c\u6536\u5305";
-  trialCopyCharacterSwitchAcceptance.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff6dc;color:#654a18;cursor:pointer;";
-  trialCopyCharacterSwitchAcceptance.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterAutoRuntimeSwitchAcceptanceToClipboard(trialCopyCharacterSwitchAcceptance);
-  });
-  const trialCopyCharacterSwitchControl = document.createElement("button");
-  trialCopyCharacterSwitchControl.type = "button";
-  trialCopyCharacterSwitchControl.textContent = "\u590d\u5236\u72b6\u6001";
-  trialCopyCharacterSwitchControl.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u63a7\u5236\u72b6\u6001";
-  trialCopyCharacterSwitchControl.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff9e6;color:#6a4c19;cursor:pointer;";
-  trialCopyCharacterSwitchControl.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterAutoRuntimeSwitchControlToClipboard(trialCopyCharacterSwitchControl);
-  });
-  const trialCopyCharacterSwitchDiagnostics = document.createElement("button");
-  trialCopyCharacterSwitchDiagnostics.type = "button";
-  trialCopyCharacterSwitchDiagnostics.textContent = "\u590d\u5236\u8bca\u65ad";
-  trialCopyCharacterSwitchDiagnostics.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u8bca\u65ad";
-  trialCopyCharacterSwitchDiagnostics.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff4d2;color:#6b4814;cursor:pointer;";
-  trialCopyCharacterSwitchDiagnostics.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterAutoRuntimeSwitchDiagnosticsToClipboard(trialCopyCharacterSwitchDiagnostics);
-  });
-  const trialCopyCharacterSwitchRollback = document.createElement("button");
-  trialCopyCharacterSwitchRollback.type = "button";
-  trialCopyCharacterSwitchRollback.textContent = "\u590d\u5236\u56de\u6536";
-  trialCopyCharacterSwitchRollback.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u663e\u5f0f\u5f00\u5173\u56de\u6536\u5305";
-  trialCopyCharacterSwitchRollback.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#ffeedd;color:#6a3f1b;cursor:pointer;";
-  trialCopyCharacterSwitchRollback.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterAutoRuntimeSwitchRollbackToClipboard(trialCopyCharacterSwitchRollback);
-  });
-  const trialCopyCharacterFinalPreflight = document.createElement("button");
-  trialCopyCharacterFinalPreflight.type = "button";
-  trialCopyCharacterFinalPreflight.textContent = "\u590d\u5236\u9884\u68c0";
-  trialCopyCharacterFinalPreflight.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u6700\u7ec8\u9884\u68c0\u5305";
-  trialCopyCharacterFinalPreflight.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#ffe9cf;color:#704117;cursor:pointer;";
-  trialCopyCharacterFinalPreflight.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterAutoRuntimeFinalPreflightToClipboard(trialCopyCharacterFinalPreflight);
-  });
-  const trialCopyCharacterImplementationDraft = document.createElement("button");
-  trialCopyCharacterImplementationDraft.type = "button";
-  trialCopyCharacterImplementationDraft.textContent = "\u590d\u5236\u8349\u6848";
-  trialCopyCharacterImplementationDraft.title = "\u590d\u5236\u81ea\u52a8\u89d2\u8272\u8868\u73b0\u5b9e\u73b0\u8349\u6848";
-  trialCopyCharacterImplementationDraft.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#eef6ff;color:#1d4b64;cursor:pointer;";
-  trialCopyCharacterImplementationDraft.addEventListener("click", () => {
-    copyGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraftToClipboard(trialCopyCharacterImplementationDraft);
-  });
-  const trialEnableCharacterSwitch = document.createElement("button");
-  trialEnableCharacterSwitch.type = "button";
-  trialEnableCharacterSwitch.textContent = "\u542f\u7528\u5f00\u5173";
-  trialEnableCharacterSwitch.title = "\u9700\u8981\u8f93\u5165 ENABLE_GRAY_AUTO_TRIAL_CHARACTER_AUTO_RUNTIME_SWITCH\uff1b\u53ea\u5207\u6362\u672c\u5730\u6807\u8bb0";
-  trialEnableCharacterSwitch.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#ffe7c8;color:#6b4014;cursor:pointer;";
-  trialEnableCharacterSwitch.addEventListener("click", () => {
-    handleGrayAutoTrialCharacterAutoRuntimeSwitchEnableClick(trialEnableCharacterSwitch);
-  });
-  const trialDisableCharacterSwitch = document.createElement("button");
-  trialDisableCharacterSwitch.type = "button";
-  trialDisableCharacterSwitch.textContent = "\u5173\u95ed\u5f00\u5173";
-  trialDisableCharacterSwitch.title = "\u4ec5\u5173\u95ed\u672c\u5730\u663e\u5f0f\u5f00\u5173\u6807\u8bb0\uff0c\u4e0d\u6539 scheduler/config";
-  trialDisableCharacterSwitch.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1f4fb;color:#33415f;cursor:pointer;";
-  trialDisableCharacterSwitch.addEventListener("click", () => {
-    handleGrayAutoTrialCharacterAutoRuntimeSwitchDisableClick(trialDisableCharacterSwitch);
-  });
-  const trialRollbackCharacterSwitch = document.createElement("button");
-  trialRollbackCharacterSwitch.type = "button";
-  trialRollbackCharacterSwitch.textContent = "\u56de\u5230\u9ed8\u8ba4\u5173\u95ed";
-  trialRollbackCharacterSwitch.title = "\u6062\u590d\u672c\u5730\u663e\u5f0f\u5f00\u5173\u5230\u9ed8\u8ba4\u5173\u95ed\uff0c\u4e0d\u6539 scheduler/config";
-  trialRollbackCharacterSwitch.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#ffe4d3;color:#6f3b17;cursor:pointer;";
-  trialRollbackCharacterSwitch.addEventListener("click", () => {
-    handleGrayAutoTrialCharacterAutoRuntimeSwitchRollbackClick(trialRollbackCharacterSwitch);
-  });
-  const trialEmitCharacter = document.createElement("button");
-  trialEmitCharacter.type = "button";
-  trialEmitCharacter.textContent = "\u8bd5\u53d1\u89d2\u8272cue";
-  trialEmitCharacter.title = "\u9700\u8981\u8f93\u5165 EMIT_GRAY_AUTO_TRIAL_CHARACTER_CUE\uff1b\u53ea\u6309\u624b\u52a8\u9884\u8bbe\u8bd5\u53d1 runtime cue \u4e00\u6b21";
-  trialEmitCharacter.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e7fff1;color:#174d35;cursor:pointer;";
-  trialEmitCharacter.addEventListener("click", () => {
-    handleGrayAutoTrialCharacterCueManualEmitClick(trialEmitCharacter);
-  });
-  const trialSendReplyCueCandidate = document.createElement("button");
-  trialSendReplyCueCandidate.type = "button";
-  trialSendReplyCueCandidate.textContent = "\u53d1\u9001\u56de\u590dcue";
-  trialSendReplyCueCandidate.title = "\u9700\u8981\u8f93\u5165 SEND_REPLY_CHARACTER_CUE_CANDIDATE\uff1b\u53ea\u624b\u52a8\u53d1\u9001\u4e0a\u4e00\u6761\u52a9\u624b\u56de\u590d\u7684\u5019\u9009 runtime cue";
-  trialSendReplyCueCandidate.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#fff5d7;color:#6a4514;cursor:pointer;";
-  trialSendReplyCueCandidate.addEventListener("click", () => {
-    handleReplyCharacterCueCandidateManualSendClick(trialSendReplyCueCandidate);
-  });
-  const trialCharacterCuePreset = document.createElement("select");
-  trialCharacterCuePreset.title = "\u624b\u52a8\u89d2\u8272 cue \u9884\u8bbe\uff1b\u4ec5\u5f71\u54cd\u786e\u8ba4\u540e\u7684\u672c\u5730\u8bd5\u53d1";
-  trialCharacterCuePreset.style.cssText = [
-    "border:1px solid rgba(74,121,93,.24)",
-    "border-radius:999px",
-    "padding:5px 8px",
-    "background:#f8fffb",
-    "color:#174d35",
-    "font:12px/1.2 system-ui,sans-serif"
-  ].join(";");
-  listGrayAutoTrialCharacterCuePresets().forEach((preset) => {
-    const option = document.createElement("option");
-    option.value = preset.key;
-    option.textContent = preset.label;
-    option.title = preset.description;
-    trialCharacterCuePreset.appendChild(option);
-  });
-  const manualConfirm = document.createElement("button");
-  manualConfirm.type = "button";
-  manualConfirm.textContent = "\u786e\u8ba4";
-  manualConfirm.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e8fff3;color:#18583f;cursor:pointer;";
-  manualConfirm.addEventListener("click", () => {
-    handleFollowupManualConfirmClick(manualConfirm);
-  });
-  const manualDismiss = document.createElement("button");
-  manualDismiss.type = "button";
-  manualDismiss.textContent = "\u5ffd\u7565";
-  manualDismiss.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#f1f4fb;color:#33415f;cursor:pointer;";
-  manualDismiss.addEventListener("click", () => {
-    dismissFollowupManualConfirmation(manualDismiss);
-  });
-  const manualReview = document.createElement("button");
-  manualReview.type = "button";
-  manualReview.textContent = "\u67e5\u770b\u8be6\u60c5";
-  manualReview.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#e9f2ff;color:#1f4378;cursor:pointer;";
-  manualReview.addEventListener("click", () => {
-    reviewFollowupManualConfirmationDetails();
-  });
-  const manualActions = createFollowupReadinessActionGroup("\u786e\u8ba4", [
-    manualConfirm,
-    manualDismiss,
-    manualReview
-  ]);
-  const trialActions = createFollowupReadinessActionGroup("\u8bd5\u8fd0\u884c", [
-    trialArm,
-    trialStop,
-    trialDisarm,
-    trialReset
-  ]);
-  const recoveryActions = createFollowupReadinessActionGroup("\u6536\u53e3", [
-    trialDisableCharacterSwitch,
-    trialRollbackCharacterSwitch
-  ]);
-  const materialActions = createFollowupReadinessCollapsibleActionGroup("\u6750\u6599", [
-    trialCopyAudit,
-    trialCopyTimeline,
-    trialCopyDecision,
-    trialCopySignoff,
-    trialCopyCharacter,
-    trialCopyCharacterHandoff,
-    trialCopyCharacterRecap,
-    trialCopyCharacterStrategy,
-    trialCopyCharacterReview,
-    trialCopyCharacterAutoPlan,
-    trialCopyCharacterDryRun,
-    trialCopyCharacterSwitchPlan,
-    trialCopyCharacterSwitchReview,
-    trialCopyCharacterSwitchAcceptance,
-    trialCopyCharacterSwitchControl,
-    trialCopyCharacterSwitchDiagnostics,
-    trialCopyCharacterSwitchRollback,
-    trialCopyCharacterFinalPreflight,
-    trialCopyCharacterImplementationDraft,
-    copySelected,
-    copySummary,
-    copyBundle,
-    copyJson,
-    copyOneLine,
-    copy,
-    copyTemplate
-  ]);
-  const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup("\u9ad8\u98ce\u9669\u672c\u5730\u5165\u53e3", [
-    trialEnableCharacterSwitch,
-    trialCharacterCuePreset,
-    trialEmitCharacter,
-    trialSendReplyCueCandidate
-  ]);
-  advancedLocalActions.title = "\u9ed8\u8ba4\u6536\u8d77\uff1b\u4ec5\u7528\u4e8e\u672c\u5730\u4e13\u9879\u8bd5\u9a8c\uff0c\u4e0d\u8fde\u63a5 automatic runtime";
-  const manualStatus = document.createElement("div");
-  manualStatus.style.cssText = [
-    "margin:0 0 10px",
-    "padding:8px 10px",
-    "border:1px solid rgba(93,128,195,.2)",
-    "border-radius:12px",
-    "background:rgba(255,255,255,.58)",
-    "font:12px/1.45 system-ui,sans-serif",
-    "color:#2a416f"
-  ].join(";");
-  const trialStatus = document.createElement("div");
-  trialStatus.style.cssText = [
-    "margin:0 0 10px",
-    "padding:8px 10px",
-    "border:1px solid rgba(116,127,155,.22)",
-    "border-radius:12px",
-    "background:rgba(248,251,255,.66)",
-    "font:12px/1.45 system-ui,sans-serif",
-    "color:#30466f",
-    "white-space:pre-wrap"
-  ].join(";");
-  const close = document.createElement("button");
-  close.type = "button";
-  close.textContent = "隐藏";
-  close.style.cssText = "border:0;border-radius:999px;padding:5px 10px;background:#dce8ff;color:#263d70;cursor:pointer;";
-  close.addEventListener("click", () => {
-    state.followupReadinessVisible = false;
-    updateFollowupReadinessPanel();
-  });
-  head.appendChild(title);
-  head.appendChild(close);
-  actionBar.appendChild(manualActions);
-  actionBar.appendChild(trialActions);
-  actionBar.appendChild(recoveryActions);
-  actionBar.appendChild(createFollowupReadinessActionGroup("\u9884\u6f14", rehearsalButtons.concat(clearRehearsal)));
-  actionBar.appendChild(materialActions);
-  actionBar.appendChild(advancedLocalActions);
-  const card = document.createElement("pre");
-  card.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(93,128,195,.24)",
-    "border-radius:14px",
-    "background:rgba(255,255,255,.62)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#20345d"
-  ].join(";");
-  const confirmationCard = document.createElement("pre");
-  confirmationCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(88,137,111,.28)",
-    "border-radius:14px",
-    "background:rgba(238,255,246,.58)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#1f4c39",
-    "display:none"
-  ].join(";");
-  const trialCard = document.createElement("pre");
-  trialCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(108,126,164,.26)",
-    "border-radius:14px",
-    "background:rgba(248,251,255,.74)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#263d70"
-  ].join(";");
-  const checklistCard = document.createElement("pre");
-  checklistCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(87,143,112,.28)",
-    "border-radius:14px",
-    "background:rgba(240,255,247,.62)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#1f4c39"
-  ].join(";");
-  const timelineCard = document.createElement("pre");
-  timelineCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(116,127,155,.24)",
-    "border-radius:14px",
-    "background:rgba(255,255,255,.54)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#2f3f61"
-  ].join(";");
-  const outcomeCard = document.createElement("pre");
-  outcomeCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(139,116,78,.26)",
-    "border-radius:14px",
-    "background:rgba(255,250,238,.72)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#4f3d22"
-  ].join(";");
-  const decisionCard = document.createElement("pre");
-  decisionCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(160,128,64,.28)",
-    "border-radius:14px",
-    "background:rgba(255,252,241,.78)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#53401f"
-  ].join(";");
-  const signoffCard = document.createElement("pre");
-  signoffCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(160,128,64,.24)",
-    "border-radius:14px",
-    "background:rgba(255,253,245,.78)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#594520"
-  ].join(";");
-  const characterCard = document.createElement("pre");
-  characterCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(88,137,111,.26)",
-    "border-radius:14px",
-    "background:rgba(240,255,247,.66)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#1f4c39"
-  ].join(";");
-  const characterHandoffCard = document.createElement("pre");
-  characterHandoffCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(88,137,111,.22)",
-    "border-radius:14px",
-    "background:rgba(247,255,250,.7)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#254d39"
-  ].join(";");
-  const characterRecapCard = document.createElement("pre");
-  characterRecapCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(77,132,158,.22)",
-    "border-radius:14px",
-    "background:rgba(241,251,255,.72)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#244b5f"
-  ].join(";");
-  const characterManualCueStatusCard = document.createElement("pre");
-  characterManualCueStatusCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(64,145,112,.24)",
-    "border-radius:14px",
-    "background:rgba(238,255,248,.78)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#1d4f3b"
-  ].join(";");
-  const characterStrategyCard = document.createElement("pre");
-  characterStrategyCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(95,101,166,.22)",
-    "border-radius:14px",
-    "background:rgba(247,248,255,.72)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#303865"
-  ].join(";");
-  const characterReviewCard = document.createElement("pre");
-  characterReviewCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(156,116,54,.24)",
-    "border-radius:14px",
-    "background:rgba(255,250,241,.76)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#4f3d1f"
-  ].join(";");
-  const characterAutoPlanCard = document.createElement("pre");
-  characterAutoPlanCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(95,103,171,.24)",
-    "border-radius:14px",
-    "background:rgba(242,244,255,.76)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#2f3969"
-  ].join(";");
-  const characterDryRunCard = document.createElement("pre");
-  characterDryRunCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(77,132,158,.24)",
-    "border-radius:14px",
-    "background:rgba(241,250,255,.76)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#24485f"
-  ].join(";");
-  const characterSwitchPlanCard = document.createElement("pre");
-  characterSwitchPlanCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(169,116,58,.24)",
-    "border-radius:14px",
-    "background:rgba(255,247,239,.78)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#5d3a1d"
-  ].join(";");
-  const characterSwitchReviewCard = document.createElement("pre");
-  characterSwitchReviewCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(173,112,50,.24)",
-    "border-radius:14px",
-    "background:rgba(255,244,231,.8)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#603a19"
-  ].join(";");
-  const characterSwitchAcceptanceCard = document.createElement("pre");
-  characterSwitchAcceptanceCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(166,126,42,.24)",
-    "border-radius:14px",
-    "background:rgba(255,249,226,.8)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#5d4616"
-  ].join(";");
-  const characterSwitchControlCard = document.createElement("pre");
-  characterSwitchControlCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(170,122,43,.24)",
-    "border-radius:14px",
-    "background:rgba(255,251,234,.84)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#5e4518"
-  ].join(";");
-  const characterSwitchDiagnosticsCard = document.createElement("pre");
-  characterSwitchDiagnosticsCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(172,132,45,.24)",
-    "border-radius:14px",
-    "background:rgba(255,248,220,.82)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#5f4615"
-  ].join(";");
-  const characterSwitchRollbackCard = document.createElement("pre");
-  characterSwitchRollbackCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(190,112,62,.24)",
-    "border-radius:14px",
-    "background:rgba(255,242,232,.82)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#653b1c"
-  ].join(";");
-  const characterSwitchFinalPreflightCard = document.createElement("pre");
-  characterSwitchFinalPreflightCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(194,132,52,.26)",
-    "border-radius:14px",
-    "background:rgba(255,246,234,.84)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#694219"
-  ].join(";");
-  const characterImplementationDraftCard = document.createElement("pre");
-  characterImplementationDraftCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(87,124,165,.24)",
-    "border-radius:14px",
-    "background:rgba(241,248,255,.82)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#24425e"
-  ].join(";");
-  const backendEntryCard = document.createElement("pre");
-  backendEntryCard.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(87,124,165,.22)",
-    "border-radius:14px",
-    "background:rgba(242,247,255,.8)",
-    "white-space:pre-wrap",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#23405f"
-  ].join(";");
-  const body = document.createElement("pre");
-  body.style.cssText = "margin:0;white-space:pre-wrap;";
-  const compare = document.createElement("div");
-  compare.style.cssText = [
-    "margin:0 0 10px",
-    "padding:10px 12px",
-    "border:1px solid rgba(93,128,195,.18)",
-    "border-radius:14px",
-    "background:rgba(255,255,255,.46)",
-    "font:12px/1.55 Consolas,Menlo,monospace",
-    "color:#263d70"
-  ].join(";");
-  panel.appendChild(head);
-  panel.appendChild(actionBar);
-  panel.appendChild(manualStatus);
-  panel.appendChild(trialStatus);
-  panel.appendChild(card);
-  panel.appendChild(confirmationCard);
-  panel.appendChild(trialCard);
-  panel.appendChild(checklistCard);
-  panel.appendChild(timelineCard);
-  panel.appendChild(outcomeCard);
-  panel.appendChild(decisionCard);
-  panel.appendChild(signoffCard);
-  panel.appendChild(characterCard);
-  panel.appendChild(characterHandoffCard);
-  panel.appendChild(characterRecapCard);
-  panel.appendChild(characterManualCueStatusCard);
-  panel.appendChild(characterStrategyCard);
-  panel.appendChild(characterReviewCard);
-  panel.appendChild(characterAutoPlanCard);
-  panel.appendChild(characterDryRunCard);
-  panel.appendChild(characterSwitchPlanCard);
-  panel.appendChild(characterSwitchReviewCard);
-  panel.appendChild(characterSwitchAcceptanceCard);
-  panel.appendChild(characterSwitchControlCard);
-  panel.appendChild(characterSwitchDiagnosticsCard);
-  panel.appendChild(characterSwitchRollbackCard);
-  panel.appendChild(characterSwitchFinalPreflightCard);
-  panel.appendChild(characterImplementationDraftCard);
-  panel.appendChild(backendEntryCard);
-  panel.appendChild(compare);
-  panel.appendChild(body);
-  document.body.appendChild(panel);
-  state.followupReadinessPanel = panel;
-  state.followupReadinessCard = card;
-  state.followupReadinessConfirmationCard = confirmationCard;
-  state.followupReadinessTrialCard = trialCard;
-  state.followupReadinessTrialChecklistCard = checklistCard;
-  state.followupReadinessTrialTimelineCard = timelineCard;
-  state.followupReadinessTrialOutcomeCard = outcomeCard;
-  state.followupReadinessTrialDecisionCard = decisionCard;
-  state.followupReadinessTrialSignoffCard = signoffCard;
-  state.followupReadinessTrialCharacterCard = characterCard;
-  state.followupReadinessTrialCharacterHandoffCard = characterHandoffCard;
-  state.followupReadinessTrialCharacterRecapCard = characterRecapCard;
-  state.followupReadinessTrialCharacterManualCueStatusCard = characterManualCueStatusCard;
-  state.followupReadinessTrialCharacterStrategyCard = characterStrategyCard;
-  state.followupReadinessTrialCharacterReviewCard = characterReviewCard;
-  state.followupReadinessTrialCharacterAutoPlanCard = characterAutoPlanCard;
-  state.followupReadinessTrialCharacterDryRunCard = characterDryRunCard;
-  state.followupReadinessTrialCharacterSwitchPlanCard = characterSwitchPlanCard;
-  state.followupReadinessTrialCharacterSwitchReviewCard = characterSwitchReviewCard;
-  state.followupReadinessTrialCharacterSwitchAcceptanceCard = characterSwitchAcceptanceCard;
-  state.followupReadinessTrialCharacterSwitchControlCard = characterSwitchControlCard;
-  state.followupReadinessTrialCharacterSwitchDiagnosticsCard = characterSwitchDiagnosticsCard;
-  state.followupReadinessTrialCharacterSwitchRollbackCard = characterSwitchRollbackCard;
-  state.followupReadinessTrialCharacterSwitchFinalPreflightCard = characterSwitchFinalPreflightCard;
-  state.followupReadinessTrialCharacterImplementationDraftCard = characterImplementationDraftCard;
-  state.followupReadinessBackendEntryCard = backendEntryCard;
-  state.followupReadinessCompare = compare;
-  state.followupReadinessBody = body;
-  state.followupReadinessManualActions = manualActions;
-  state.followupReadinessManualStatus = manualStatus;
-  state.followupReadinessManualConfirmBtn = manualConfirm;
-  state.followupReadinessManualDismissBtn = manualDismiss;
-  state.followupReadinessManualReviewBtn = manualReview;
-  state.followupReadinessTrialActions = trialActions;
-  state.followupReadinessTrialStatus = trialStatus;
-  state.followupReadinessTrialArmBtn = trialArm;
-  state.followupReadinessTrialStopBtn = trialStop;
-  state.followupReadinessTrialDisarmBtn = trialDisarm;
-  state.followupReadinessTrialResetBtn = trialReset;
-  state.followupReadinessTrialCopyAuditBtn = trialCopyAudit;
-  state.followupReadinessTrialCopyTimelineBtn = trialCopyTimeline;
-  state.followupReadinessTrialCopyDecisionBtn = trialCopyDecision;
-  state.followupReadinessTrialCopySignoffBtn = trialCopySignoff;
-  state.followupReadinessTrialCopyCharacterBtn = trialCopyCharacter;
-  state.followupReadinessTrialCopyCharacterHandoffBtn = trialCopyCharacterHandoff;
-  state.followupReadinessTrialCopyCharacterRecapBtn = trialCopyCharacterRecap;
-  state.followupReadinessTrialCopyCharacterStrategyBtn = trialCopyCharacterStrategy;
-  state.followupReadinessTrialCopyCharacterReviewBtn = trialCopyCharacterReview;
-  state.followupReadinessTrialCopyCharacterAutoPlanBtn = trialCopyCharacterAutoPlan;
-  state.followupReadinessTrialCopyCharacterDryRunBtn = trialCopyCharacterDryRun;
-  state.followupReadinessTrialCopyCharacterSwitchPlanBtn = trialCopyCharacterSwitchPlan;
-  state.followupReadinessTrialCopyCharacterSwitchReviewBtn = trialCopyCharacterSwitchReview;
-  state.followupReadinessTrialCopyCharacterSwitchAcceptanceBtn = trialCopyCharacterSwitchAcceptance;
-  state.followupReadinessTrialCopyCharacterSwitchControlBtn = trialCopyCharacterSwitchControl;
-  state.followupReadinessTrialCopyCharacterSwitchDiagnosticsBtn = trialCopyCharacterSwitchDiagnostics;
-  state.followupReadinessTrialCopyCharacterSwitchRollbackBtn = trialCopyCharacterSwitchRollback;
-  state.followupReadinessTrialCopyCharacterSwitchFinalPreflightBtn = trialCopyCharacterFinalPreflight;
-  state.followupReadinessTrialCopyCharacterImplementationDraftBtn = trialCopyCharacterImplementationDraft;
-  state.followupReadinessTrialCharacterSwitchEnableBtn = trialEnableCharacterSwitch;
-  state.followupReadinessTrialCharacterSwitchDisableBtn = trialDisableCharacterSwitch;
-  state.followupReadinessTrialCharacterSwitchRollbackBtn = trialRollbackCharacterSwitch;
-  state.followupReadinessTrialEmitCharacterBtn = trialEmitCharacter;
-  state.followupReadinessTrialSendReplyCueCandidateBtn = trialSendReplyCueCandidate;
-  state.followupReadinessTrialCharacterCuePresetSelect = trialCharacterCuePreset;
-  return panel;
-}
-
-function updateFollowupReadinessPanel() {
-  if (!state.followupReadinessVisible) {
-    if (state.followupReadinessPanel) {
-      state.followupReadinessPanel.style.display = "none";
-    }
-    if (state.followupReadinessRefreshTimer) {
-      clearInterval(state.followupReadinessRefreshTimer);
-      state.followupReadinessRefreshTimer = 0;
-    }
-    return;
-  }
-  const panel = ensureFollowupReadinessPanel();
-  if (!panel) {
-    return;
-  }
-  if (!state.followupReadinessRefreshTimer) {
-    state.followupReadinessRefreshTimer = window.setInterval(() => {
-      if (!state.followupReadinessVisible) {
-        updateFollowupReadinessPanel();
-        return;
-      }
-      updateFollowupReadinessPreviewCard();
-      updateFollowupManualConfirmationPreviewCard();
-      updateGrayAutoTrialStatusCard();
-      updateGrayAutoTrialPreRunChecklistCard();
-      updateGrayAutoTrialTimelineCard();
-      updateGrayAutoTrialOutcomeCard();
-      updateGrayAutoTrialDecisionCard();
-      updateGrayAutoTrialSignoffCard();
-      updateGrayAutoTrialCharacterCard();
-      updateGrayAutoTrialCharacterHandoffCard();
-      updateGrayAutoTrialCharacterRecapCard();
-      updateGrayAutoTrialCharacterManualCueStatusCard();
-      updateGrayAutoTrialCharacterStrategyCard();
-      updateGrayAutoTrialCharacterReviewCard();
-      updateGrayAutoTrialCharacterAutoPlanCard();
-      updateGrayAutoTrialCharacterDryRunCard();
-      updateGrayAutoTrialCharacterSwitchPlanCard();
-      updateGrayAutoTrialCharacterSwitchReviewCard();
-      updateGrayAutoTrialCharacterSwitchAcceptanceCard();
-      updateGrayAutoTrialCharacterSwitchControlCard();
-      updateGrayAutoTrialCharacterSwitchDiagnosticsCard();
-      updateGrayAutoTrialCharacterSwitchRollbackCard();
-      updateGrayAutoTrialCharacterSwitchFinalPreflightCard();
-      updateGrayAutoTrialCharacterImplementationDraftCard();
-      updateReplyCharacterCueCandidateManualSendButton();
-      updateFollowupReadinessBackendEntryCard();
-      updateGrayAutoTrialControlPanel();
-      updateFollowupManualConfirmationControls();
-      updateFollowupReadinessScenarioCompare();
-      if (state.followupReadinessBody) {
-        state.followupReadinessBody.textContent = buildFollowupReadinessReport();
-      }
-    }, 1000);
-  }
-  panel.style.display = "block";
-  updateFollowupReadinessPreviewCard();
-  updateFollowupManualConfirmationPreviewCard();
-  updateGrayAutoTrialStatusCard();
-  updateGrayAutoTrialPreRunChecklistCard();
-  updateGrayAutoTrialTimelineCard();
-  updateGrayAutoTrialOutcomeCard();
-  updateGrayAutoTrialDecisionCard();
-  updateGrayAutoTrialSignoffCard();
-  updateGrayAutoTrialCharacterCard();
-  updateGrayAutoTrialCharacterHandoffCard();
-  updateGrayAutoTrialCharacterRecapCard();
-  updateGrayAutoTrialCharacterManualCueStatusCard();
-  updateGrayAutoTrialCharacterStrategyCard();
-  updateGrayAutoTrialCharacterReviewCard();
-  updateGrayAutoTrialCharacterAutoPlanCard();
-  updateGrayAutoTrialCharacterDryRunCard();
-  updateGrayAutoTrialCharacterSwitchPlanCard();
-  updateGrayAutoTrialCharacterSwitchReviewCard();
-  updateGrayAutoTrialCharacterSwitchAcceptanceCard();
-  updateGrayAutoTrialCharacterSwitchControlCard();
-  updateGrayAutoTrialCharacterSwitchDiagnosticsCard();
-  updateGrayAutoTrialCharacterSwitchRollbackCard();
-  updateGrayAutoTrialCharacterSwitchFinalPreflightCard();
-  updateGrayAutoTrialCharacterImplementationDraftCard();
-  updateReplyCharacterCueCandidateManualSendButton();
-  updateFollowupReadinessBackendEntryCard();
-  updateGrayAutoTrialControlPanel();
-  updateFollowupManualConfirmationControls();
-  updateFollowupReadinessScenarioCompare();
-  if (state.followupReadinessBody) {
-    state.followupReadinessBody.textContent = buildFollowupReadinessReport();
-  }
-}
-
-function toggleFollowupReadinessPanel(force = null) {
-  state.followupReadinessVisible = force === null ? !state.followupReadinessVisible : !!force;
-  updateFollowupReadinessPanel();
-  return state.followupReadinessVisible;
-}
-
-function buildFollowupConfigTemplate() {
-  return [
-    "{",
-    '  "conversation_mode": {',
-    '    "enabled": true,',
-    '    "proactive_enabled": true,',
-    '    "proactive_scheduler_enabled": true,',
-    '    "gray_auto_enabled": false,',
-    '    "gray_auto_trial_enabled": false,',
-    '    "gray_auto_trial_max_triggers_per_session": 1,',
-    '    "proactive_cooldown_ms": 600000,',
-    '    "proactive_warmup_ms": 120000,',
-    '    "proactive_poll_interval_ms": 60000,',
-    '    "max_followups_per_window": 1,',
-    '    "silence_followup_min_ms": 180000',
-    "  }",
-    "}"
-  ].join("\n");
-}
-
-async function writeTextToClipboard(text) {
-  const value = String(text || "");
-  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.setAttribute("readonly", "true");
-  textarea.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0;";
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand("copy");
-  textarea.remove();
-}
-
-async function copyFollowupReadinessReportToClipboard(button = null) {
-  const report = buildFollowupReadinessReport();
-  try {
-    await writeTextToClipboard(report);
-    setStatus("续话状态已复制");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "已复制";
-      window.setTimeout(() => {
-        button.textContent = previous || "复制";
-      }, 1200);
-    }
-    return true;
-  } catch (err) {
-    setStatus("复制失败，可手动选择面板文字复制");
-    return false;
-  }
-}
-
-async function copyFollowupReadinessSelectedTextToClipboard(button = null) {
-  const data = buildFollowupReadinessPreviewCardData();
-  try {
-    await writeTextToClipboard(data.candidateText === "n/a" ? "" : data.candidateText);
-    setStatus("\u5df2\u590d\u5236\u7eed\u8bdd\u77ed\u53e5");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u77ed\u53e5";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u77ed\u53e5\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyFollowupReadinessPreviewSummaryToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildFollowupReadinessPreviewCardText());
-    setStatus("\u5df2\u590d\u5236\u7eed\u8bdd\u9884\u6f14\u6458\u8981");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "\u5df2\u590d\u5236";
-      window.setTimeout(() => {
-        button.textContent = previous || "\u590d\u5236\u6458\u8981";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("\u590d\u5236\u9884\u6f14\u6458\u8981\u5931\u8d25");
-    return false;
-  }
-}
-
-async function copyFollowupReadinessPreviewCopyBundleToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildFollowupReadinessPreviewCopyBundleText());
-    setStatus("已复制续话对比包");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "已复制";
-      window.setTimeout(() => {
-        button.textContent = previous || "复制对比包";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("复制续话对比包失败");
-    return false;
-  }
-}
-
-async function copyFollowupReadinessPreviewJsonToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildFollowupReadinessPreviewJsonText());
-    setStatus("已复制续话预演JSON");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "已复制";
-      window.setTimeout(() => {
-        button.textContent = previous || "复制JSON";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("复制续话预演JSON失败");
-    return false;
-  }
-}
-
-async function copyFollowupReadinessPreviewOneLineToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildFollowupReadinessPreviewOneLineText());
-    setStatus("已复制续话一行摘要");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "已复制";
-      window.setTimeout(() => {
-        button.textContent = previous || "复制一行";
-      }, 1200);
-    }
-    return true;
-  } catch (_) {
-    setStatus("复制续话一行摘要失败");
-    return false;
-  }
-}
-
-async function copyFollowupConfigTemplateToClipboard(button = null) {
-  try {
-    await writeTextToClipboard(buildFollowupConfigTemplate());
-    setStatus("续话配置模板已复制");
-    if (button) {
-      const previous = button.textContent;
-      button.textContent = "已复制";
-      window.setTimeout(() => {
-        button.textContent = previous || "复制模板";
-      }, 1200);
-    }
-    return true;
-  } catch (err) {
-    setStatus("复制模板失败，可手动查看面板说明");
-    return false;
-  }
+    }, force)
+    : false;
 }
 
 function sanitizeTranslateDebugText(text, maxLen = 96) {
@@ -7482,13 +1756,15 @@ function recordTranslateDebugEvent(stage, payload = {}) {
 }
 
 function getTranslateDebugSnapshot() {
+  const serviceDebug = CHAT_TRANSLATION_SERVICE._debug || {};
+  const circuitState = serviceDebug.translationCircuitState || {};
   return {
     timeoutMs: _CHAT_TRANSLATE_TIMEOUT_MS,
-    cacheSize: _chatTranslationCache.size,
-    inFlight: _translationInFlight.size,
+    cacheSize: Number(serviceDebug.chatTranslationCache?.size || 0),
+    inFlight: Number(serviceDebug.translationInFlight?.size || 0),
     circuitOpen: _isTranslationCircuitOpen(),
-    circuitFailures: Number(_translationCircuitState.failures || 0),
-    circuitCooldownMs: Math.max(0, Math.round(Number(_translationCircuitState.cooldownUntil || 0) - Date.now())),
+    circuitFailures: Number(circuitState.failures || 0),
+    circuitCooldownMs: Math.max(0, Math.round(Number(circuitState.cooldownUntil || 0) - Date.now())),
     lastTraceId: state.translateDebugCurrentTraceId || "",
     lastText: state.translateDebugCurrentText || "",
     lastResult: state.translateDebugLastResult || "",
@@ -7504,202 +1780,116 @@ function buildTranslateDebugReport() {
 }
 
 function ensureTranslateDebugPanel() {
-  if (state.translateDebugPanel || typeof document === "undefined") {
-    return state.translateDebugPanel;
+  if (!state.translateDebugPanel && typeof DEBUG_PANEL_CONTROLLER.createDebugPanel === "function") {
+    const created = DEBUG_PANEL_CONTROLLER.createDebugPanel({
+      documentObject: document,
+      id: "translate-debug-panel",
+      title: "Translation Debug",
+      width: 430,
+      onHide: () => {
+        state.translateDebugVisible = false;
+        updateTranslateDebugPanel();
+      }
+    });
+    state.translateDebugPanel = created?.panel || null;
+    state.translateDebugBody = created?.body || null;
   }
-  const panel = document.createElement("div");
-  panel.id = "translate-debug-panel";
-  panel.style.cssText = [
-    "position:fixed",
-    "right:14px",
-    "bottom:14px",
-    "z-index:99999",
-    "width:min(430px,calc(100vw - 28px))",
-    "max-height:52vh",
-    "overflow:auto",
-    "padding:12px",
-    "border:1px solid rgba(120,150,170,.45)",
-    "border-radius:14px",
-    "background:rgba(8,18,26,.88)",
-    "color:#d8f3ff",
-    "font:12px/1.45 Consolas,Menlo,monospace",
-    "box-shadow:0 18px 45px rgba(0,0,0,.28)",
-    "backdrop-filter:blur(10px)",
-    "white-space:pre-wrap",
-    "display:none"
-  ].join(";");
-  const head = document.createElement("div");
-  head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;";
-  const title = document.createElement("strong");
-  title.textContent = "Translation Debug";
-  title.style.cssText = "font-size:13px;color:#ffffff;";
-  const close = document.createElement("button");
-  close.type = "button";
-  close.textContent = "Hide";
-  close.style.cssText = "border:0;border-radius:999px;padding:4px 9px;background:#d8f3ff;color:#10202a;cursor:pointer;";
-  close.addEventListener("click", () => {
-    state.translateDebugVisible = false;
-    updateTranslateDebugPanel();
-  });
-  head.appendChild(title);
-  head.appendChild(close);
-  const body = document.createElement("pre");
-  body.style.cssText = "margin:0;white-space:pre-wrap;";
-  panel.appendChild(head);
-  panel.appendChild(body);
-  document.body.appendChild(panel);
-  state.translateDebugPanel = panel;
-  state.translateDebugBody = body;
-  return panel;
+  return state.translateDebugPanel;
 }
 
 function updateTranslateDebugPanel() {
-  if (!state.translateDebugVisible) {
-    if (state.translateDebugPanel) {
-      state.translateDebugPanel.style.display = "none";
-    }
-    if (state.translateDebugRefreshTimer) {
-      clearInterval(state.translateDebugRefreshTimer);
-      state.translateDebugRefreshTimer = 0;
-    }
-    return;
-  }
-  const panel = ensureTranslateDebugPanel();
-  if (!panel) {
-    return;
-  }
-  if (!state.translateDebugRefreshTimer) {
-    state.translateDebugRefreshTimer = window.setInterval(() => {
-      if (!state.translateDebugVisible) {
+  return typeof DEBUG_PANEL_CONTROLLER.updateDebugPanel === "function"
+    ? DEBUG_PANEL_CONTROLLER.updateDebugPanel({
+      state,
+      documentObject: document,
+      windowObject: window,
+      id: "translate-debug-panel",
+      title: "Translation Debug",
+      width: 430,
+      visibleKey: "translateDebugVisible",
+      panelKey: "translateDebugPanel",
+      bodyKey: "translateDebugBody",
+      timerKey: "translateDebugRefreshTimer",
+      buildReport: buildTranslateDebugReport,
+      onHide: () => {
+        state.translateDebugVisible = false;
         updateTranslateDebugPanel();
-        return;
       }
-      if (state.translateDebugBody) {
-        state.translateDebugBody.textContent = buildTranslateDebugReport();
-      }
-    }, 1000);
-  }
-  panel.style.display = "block";
-  if (state.translateDebugBody) {
-    state.translateDebugBody.textContent = buildTranslateDebugReport();
-  }
+    })
+    : null;
 }
 
 function toggleTranslateDebugPanel(force = null) {
-  state.translateDebugVisible = force === null ? !state.translateDebugVisible : !!force;
-  updateTranslateDebugPanel();
-  return state.translateDebugVisible;
+  return typeof DEBUG_PANEL_CONTROLLER.toggleDebugPanel === "function"
+    ? DEBUG_PANEL_CONTROLLER.toggleDebugPanel({
+      state,
+      documentObject: document,
+      windowObject: window,
+      id: "translate-debug-panel",
+      title: "Translation Debug",
+      width: 430,
+      visibleKey: "translateDebugVisible",
+      panelKey: "translateDebugPanel",
+      bodyKey: "translateDebugBody",
+      timerKey: "translateDebugRefreshTimer",
+      buildReport: buildTranslateDebugReport,
+      onHide: () => {
+        state.translateDebugVisible = false;
+        updateTranslateDebugPanel();
+      }
+    }, force)
+    : false;
 }
 
-const ui = {
-  status: document.getElementById("status"),
-  assistantName: document.getElementById("assistant-name"),
-  heroAvatarImg: document.getElementById("hero-avatar-img"),
-  translationChipBtn: document.getElementById("translation-chip-btn"),
-  translationToggleBtn: document.getElementById("translation-toggle-btn"),
-  subtitleToggleBtn: document.getElementById("subtitle-toggle-btn"),
-  moreBtn: document.getElementById("more-btn"),
-  helpBtn: document.getElementById("help-btn"),
-  helpModal: document.getElementById("help-modal"),
-  helpCloseBtn: document.getElementById("help-close-btn"),
-  helpOpenOnboardingBtn: document.getElementById("help-open-onboarding-btn"),
-  onboardingModal: document.getElementById("onboarding-modal"),
-  onboardingSkipBtn: document.getElementById("onboarding-skip-btn"),
-  onboardingPrevBtn: document.getElementById("onboarding-prev-btn"),
-  onboardingNextBtn: document.getElementById("onboarding-next-btn"),
-  onboardingDoneBtn: document.getElementById("onboarding-done-btn"),
-  onboardingStepIndex: document.getElementById("onboarding-step-index"),
-  onboardingProgressBar: document.getElementById("onboarding-progress-bar"),
-  onboardingStepTitle: document.getElementById("onboarding-step-title"),
-  onboardingStepDesc: document.getElementById("onboarding-step-desc"),
-  onboardingStepTip: document.getElementById("onboarding-step-tip"),
-  onboardingPathSplit: document.getElementById("onboarding-path-split"),
-  onboardingQuickBtn: document.getElementById("onboarding-quick-btn"),
-  onboardingAdvancedBtn: document.getElementById("onboarding-advanced-btn"),
-  advancedActions: document.getElementById("advanced-actions"),
-  chatLog: document.getElementById("chat-log"),
-  attachmentPreview: document.getElementById("attachment-preview"),
-  chatInput: document.getElementById("chat-input"),
-  attachBtn: document.getElementById("attach-btn"),
-  attachInput: document.getElementById("attach-input"),
-  sendBtn: document.getElementById("send-btn"),
-  micBtn: document.getElementById("mic-btn"),
-  speakBtn: document.getElementById("speak-btn"),
-  voiceNextBtn: document.getElementById("voice-next-btn"),
-  scheduleBtn: document.getElementById("schedule-btn"),
-  personaBtn: document.getElementById("persona-btn"),
-  lockBtn: document.getElementById("lock-btn"),
-  observeBtn: document.getElementById("observe-btn"),
-  autoChatBtn: document.getElementById("auto-chat-btn"),
-  idleBtn: document.getElementById("idle-btn"),
-  micMeterWrap: document.getElementById("mic-meter-wrap"),
-  micMeterFill: document.getElementById("mic-meter-fill"),
-  micMeterText: document.getElementById("mic-meter-text"),
-  scheduleModal: document.getElementById("schedule-modal"),
-  scheduleCloseBtn: document.getElementById("schedule-close-btn"),
-  scheduleDatetime: document.getElementById("schedule-datetime"),
-  scheduleRepeat: document.getElementById("schedule-repeat"),
-  scheduleMode: document.getElementById("schedule-mode"),
-  scheduleTask: document.getElementById("schedule-task"),
-  scheduleSaveBtn: document.getElementById("schedule-save-btn"),
-  scheduleList: document.getElementById("schedule-list"),
-  personaModal: document.getElementById("persona-modal"),
-  personaPreviewBtn: document.getElementById("persona-preview-btn"),
-  personaCloseBtn: document.getElementById("persona-close-btn"),
-  personaAvatarPreview: document.getElementById("persona-avatar-preview"),
-  personaAvatarInput: document.getElementById("persona-avatar-input"),
-  personaAvatarChangeBtn: document.getElementById("persona-avatar-change-btn"),
-  personaAvatarResetBtn: document.getElementById("persona-avatar-reset-btn"),
-  personaApplyBtn: document.getElementById("persona-apply-btn"),
-  personaIdentity: document.getElementById("persona-identity"),
-  personaPreferences: document.getElementById("persona-preferences"),
-  personaDislikes: document.getElementById("persona-dislikes"),
-  personaTopics: document.getElementById("persona-topics"),
-  personaReplyStyle: document.getElementById("persona-reply-style"),
-  personaCompanionshipStyle: document.getElementById("persona-companionship-style"),
-  personaSaveBtn: document.getElementById("persona-save-btn"),
-  learningReviewBtn: document.getElementById("learning-review-btn"),
-  followupReadinessBtn: document.getElementById("followup-readiness-btn"),
-  doctorBtn: document.getElementById("doctor-btn"),
-  voiceTestBtn: document.getElementById("voice-test-btn"),
-  characterRehearsalBtn: document.getElementById("character-rehearsal-btn"),
-  characterTuningBtn: document.getElementById("character-tuning-btn"),
-  characterFeedbackGoodBtn: document.getElementById("character-feedback-good-btn"),
-  characterFeedbackBadBtn: document.getElementById("character-feedback-bad-btn"),
-  followupCharacterChip: document.getElementById("followup-character-chip"),
-  replyCharacterChip: document.getElementById("reply-character-chip"),
-  learningReviewBackdrop: document.getElementById("learning-review-backdrop"),
-  learningReviewDrawer: document.getElementById("learning-review-drawer"),
-  learningReviewCloseBtn: document.getElementById("learning-review-close-btn"),
-  learningReviewUndoBtn: document.getElementById("learning-review-undo-btn"),
-  learningTabCandidates: document.getElementById("learning-tab-candidates"),
-  learningTabSamples: document.getElementById("learning-tab-samples"),
-  learningTabDebug: document.getElementById("learning-tab-debug"),
-  learningReloadBtn: document.getElementById("learning-reload-btn"),
-  learningFilterScore: document.getElementById("learning-filter-score"),
-  learningFilterConfidence: document.getElementById("learning-filter-confidence"),
-  learningFilterKeyword: document.getElementById("learning-filter-keyword"),
-  learningSortMode: document.getElementById("learning-sort-mode"),
-  learningFilterHighBtn: document.getElementById("learning-filter-high-btn"),
-  learningFilterResetBtn: document.getElementById("learning-filter-reset-btn"),
-  learningSelectAll: document.getElementById("learning-select-all"),
-  learningSelectedCount: document.getElementById("learning-selected-count"),
-  learningBatchDeleteBtn: document.getElementById("learning-batch-delete-btn"),
-  learningBatchUpBtn: document.getElementById("learning-batch-up-btn"),
-  learningBatchDownBtn: document.getElementById("learning-batch-down-btn"),
-  learningBatchPromoteBtn: document.getElementById("learning-batch-promote-btn"),
-  learningReviewSummary: document.getElementById("learning-review-summary"),
-  learningReviewList: document.getElementById("learning-review-list"),
-  learningDebugPanel: document.getElementById("learning-debug-panel"),
-  learningQuickInject: document.getElementById("learning-quick-inject"),
-  learningQuickSupport: document.getElementById("learning-quick-support"),
-  learningQuickApplyBtn: document.getElementById("learning-quick-apply-btn"),
-  subtitleLayer: document.getElementById("subtitle-layer"),
-  subtitleDragHandle: document.getElementById("subtitle-drag-handle"),
-  personaImportTemplateBtn: document.querySelector(".persona-footer-actions .persona-ghost-btn:nth-of-type(1)"),
-  personaRandomBtn: document.querySelector(".persona-footer-actions .persona-ghost-btn:nth-of-type(2)"),
-  personaResetBtn: document.querySelector(".persona-footer-actions .persona-ghost-btn:nth-of-type(3)")
-};
+function installTTSDebugBridge() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const bridge = {
+    snapshot: () => getTTSDebugSnapshot(),
+    report: () => buildTTSDebugReport(),
+    events: () => state.ttsDebugEvents.slice(),
+    togglePanel: (force = null) => toggleTTSDebugPanel(force),
+    grayAutoFollowupTrialPreflight: () => buildGrayAutoFollowupTrialPreflight(),
+    grayAutoFollowupTrialEvents: (limit = 20) => buildGrayAutoFollowupTrialEventSummary(limit),
+    grayAutoFollowupTrialSession: () => ({
+      armed: state.grayAutoTrialArmed === true,
+      polling: state.grayAutoTrialPolling === true,
+      count: Number(state.grayAutoTrialSessionTriggerCount) || 0,
+      max: Number(state.grayAutoTrialMaxTriggersPerSession) || 0
+    }),
+    armGrayAutoFollowupTrial: (input = {}) => armGrayAutoTrialSession(input),
+    stopGrayAutoFollowupTrial: (reason = "manual_stop") => stopGrayAutoTrialSession(reason),
+    disarmGrayAutoFollowupTrial: (reason = "manual_disarm") => disarmGrayAutoTrialSession(reason),
+    resetGrayAutoFollowupTrialSession: () => resetGrayAutoTrialSessionTriggerCount(),
+    grayAutoFollowupTrialAuditSummary: (limit = 24) => buildGrayAutoTrialAuditSummary(limit),
+    grayAutoFollowupTrialPreRunChecklist: () => buildGrayAutoTrialPreRunChecklist(),
+    grayAutoFollowupTrialTimeline: (limit = 32) => buildGrayAutoTrialTimeline(limit),
+    grayAutoFollowupTrialOutcome: (limit = 48) => buildGrayAutoTrialOutcome(limit),
+    grayAutoFollowupTrialGoNoGoDecision: (limit = 48) => buildGrayAutoTrialGoNoGoDecision(limit),
+    grayAutoFollowupTrialSignoffPackage: (limit = 48) => buildGrayAutoTrialSignoffPackage(limit),
+    followupReadiness: () => buildFollowupReadinessReport()
+  };
+  window.__AI_CHAT_DEBUG_TTS__ = bridge;
+  return bridge;
+}
+
+function installTranslateDebugBridge() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const bridge = {
+    snapshot: () => getTranslateDebugSnapshot(),
+    report: () => buildTranslateDebugReport(),
+    events: () => state.translateDebugEvents.slice(),
+    togglePanel: (force = null) => toggleTranslateDebugPanel(force)
+  };
+  window.__AI_CHAT_DEBUG_TRANSLATE__ = bridge;
+  return bridge;
+}
+
+const CHAT_DOM = window.TaffyChatDom || {};
+const ui = CHAT_DOM.createUI(document);
 
 const learningReviewState = {
   activeTab: "candidates",
@@ -7722,7 +1912,26 @@ const MAX_TEXT_ATTACHMENT_CHARS = 12000;
 const MAX_TOTAL_ATTACHMENT_TEXT_CHARS = 24000;
 const MAX_IMAGE_ATTACHMENT_BYTES = 6 * 1024 * 1024;
 const ATTACHMENT_MODEL = window.TaffyAttachmentModel || {};
+const LEARNING_REVIEW_API = window.TaffyLearningReviewApi || {};
 const LEARNING_REVIEW_MODEL = window.TaffyLearningReviewModel || {};
+const LEARNING_REVIEW_VIEW = window.TaffyLearningReviewView || {};
+const LEARNING_REVIEW_BINDER = window.TaffyLearningReviewBinder || {};
+const PANEL_CONTROL_BINDER = window.TaffyPanelControlBinder || {};
+const ADVANCED_ACTION_BINDER = window.TaffyAdvancedActionBinder || {};
+const CHAT_INPUT_BINDER = window.TaffyChatInputBinder || {};
+const DESKTOP_CONTROL_BINDER = window.TaffyDesktopControlBinder || {};
+const DESKTOP_WINDOW_CONTROLLER = window.TaffyDesktopWindowController || {};
+const RUNTIME_EVENT_BINDER = window.TaffyRuntimeEventBinder || {};
+const DEBUG_PANEL_CONTROLLER = window.TaffyDebugPanelController || {};
+const STORAGE_CONTROLLER = window.TaffyStorageController || {};
+const CHAT_MESSAGE_CONTROLLER = window.TaffyChatMessageController || {};
+const PERSONA_AVATAR_CONTROLLER = window.TaffyPersonaAvatarController || {};
+const ONBOARDING_CONTROLLER = window.TaffyOnboardingController || {};
+const REMINDER_SCHEDULE_CONTROLLER = window.TaffyReminderScheduleController || {};
+const EMOTION_STATS_CONTROLLER = window.TaffyEmotionStatsController || {};
+const LOCAL_ASR_CONTROLLER = window.TaffyLocalAsrController || {};
+const AUTO_CHAT_CONTROLLER = window.TaffyAutoChatController || {};
+const RUNTIME_METADATA_CONTROLLER = window.TaffyRuntimeMetadataController || {};
 const TEXT_ATTACHMENT_EXTS = new Set(ATTACHMENT_MODEL.TEXT_ATTACHMENT_EXTS || []);
 const REMINDER_STORAGE_KEY = "taffy_reminders_v1";
 const EMOTION_STORAGE_KEY = "taffy_emotion_stats_v1";
@@ -7737,6 +1946,22 @@ const TOOL_META_MARKER = "[[TAFFY_TOOL_META]]";
 const API_CLIENT = window.TaffyModules?.apiClient || {};
 const SPEECH_TEXT = window.TaffyModules?.speechText || {};
 const TTS_API = window.TaffyModules?.ttsApi || {};
+const ATTACHMENT_CONTROLLER = window.TaffyAttachmentController || {};
+const CHAT_TRANSLATION_SERVICE = window.TaffyChatTranslationService || {};
+const SUBTITLE_CONTROLLER = window.TaffySubtitleController || {};
+const SPEECH_STYLE_CONTROLLER = window.TaffySpeechStyleController || {};
+const EMOTION_MOOD_CONTROLLER = window.TaffyEmotionMoodController || {};
+const ACTION_PLAN_CONTROLLER = window.TaffyActionPlanController || {};
+const MOTION_RUNTIME_CONTROLLER = window.TaffyMotionRuntimeController || {};
+const VOICE_RUNTIME_CONTROLLER = window.TaffyVoiceRuntimeController || {};
+const WAKE_WORD_CONTROLLER = window.TaffyWakeWordController || {};
+const APP_CONFIG_CONTROLLER = window.TaffyAppConfigController || {};
+const STREAM_TTS_QUEUE_CONTROLLER = window.TaffyStreamTtsQueueController || {};
+const TTS_PLAYBACK_CONTROLLER = window.TaffyTTSPlaybackController || {};
+const CHAT_REPLY_CONTROLLER = window.TaffyChatReplyController || {};
+const LIVE2D_RUNTIME_CONTROLLER = window.TaffyLive2DRuntimeController || {};
+const LIVE2D_LAYOUT_CONTROLLER = window.TaffyLive2DLayoutController || {};
+const LIVE2D_EXPRESSION_CONTROLLER = window.TaffyLive2DExpressionController || {};
 const PERSONA_CARD_DEFAULT = {
   identity: "",
   user_preferences: "",
@@ -7898,48 +2123,6 @@ const MOTION_INTENSITY_PRESETS = {
     talkMaxBeats: 4
   }
 };
-const STYLE_MOTION_BLUEPRINT = {
-  comfort: {
-    listen: ["Idle", "FlickDown", "Flick"],
-    thinking: ["Idle", "FlickDown"],
-    talk: ["Idle", "FlickDown", "Flick"],
-    reply: ["FlickDown", "Idle", "Flick"],
-    tap: ["Tap", "Idle", "FlickDown"],
-    idle: ["Idle", "FlickDown"]
-  },
-  clear: {
-    listen: ["Idle", "FlickUp"],
-    thinking: ["Idle", "FlickUp"],
-    talk: ["FlickUp", "Idle", "Tap"],
-    reply: ["FlickUp", "Tap", "Idle"],
-    tap: ["Tap", "FlickUp", "Idle"],
-    idle: ["Idle", "FlickUp"]
-  },
-  playful: {
-    listen: ["Tap", "FlickUp", "Idle"],
-    thinking: ["FlickUp", "Idle"],
-    talk: ["Tap", "Tap@Body", "FlickUp", "Idle"],
-    reply: ["Tap", "Tap@Body", "FlickUp", "Idle"],
-    tap: ["Tap", "Tap@Body", "FlickUp", "Idle"],
-    idle: ["Idle", "Tap", "FlickUp"]
-  },
-  steady: {
-    listen: ["Flick", "Idle", "Flick@Body"],
-    thinking: ["Idle", "Flick"],
-    talk: ["Flick@Body", "Flick", "Idle"],
-    reply: ["Flick@Body", "Flick", "Idle", "Tap@Body"],
-    tap: ["Tap@Body", "Flick", "Idle"],
-    idle: ["Idle", "Flick"]
-  },
-  neutral: {
-    listen: ["Idle", "Flick"],
-    thinking: ["Idle"],
-    talk: ["Tap", "FlickUp", "Idle"],
-    reply: ["Tap", "Flick", "Idle"],
-    tap: ["Tap", "Idle", "FlickUp"],
-    idle: ["Idle", "Tap", "FlickUp", "FlickDown"]
-  }
-};
 const LIVE2D_EXPRESSION_TUNING = window.TaffyLive2DExpressionTuning || {};
 const STYLE_EXPRESSION_PROFILE = LIVE2D_EXPRESSION_TUNING.STYLE_EXPRESSION_PROFILE || {
   neutral: {
@@ -7961,18 +2144,6 @@ const RUNTIME_EMOTION_EXPRESSION_TUNING = LIVE2D_EXPRESSION_TUNING.RUNTIME_EMOTI
     holdMs: 900,
     weight: 1.0
   }
-};
-const MOTION_SEMANTIC_TOKENS = {
-  idle: ["idle", "main", "home", "stand", "loop", "breath", "wait"],
-  listen: ["tap", "touch", "flick", "head", "body", "idle", "main"],
-  thinking: ["flick", "shake", "head", "idle", "main", "touch", "pose"],
-  talk: ["tap", "touch", "wave", "body", "arm", "flick", "idle", "main", "pose"],
-  reply: ["wave", "tap", "body", "flick", "pose", "main", "idle", "greet"],
-  tap: ["tap", "touch", "body", "head", "flick", "wave", "pose"],
-  happy: ["happy", "smile", "wave", "jump", "tap", "pose", "greet"],
-  sad: ["sad", "down", "shy", "idle", "head", "flickdown", "low"],
-  angry: ["angry", "shake", "body", "flick", "tap", "strong"],
-  surprised: ["surprise", "wow", "jump", "flickup", "shake", "pose", "open"]
 };
 const MODEL_MOTION_PROFILES = {
   hiyori_pro_t11: {
@@ -8071,112 +2242,36 @@ function refreshDesktopBridgeReady() {
 }
 
 function moveDesktopWindowBy(dx, dy) {
-  if (!state.desktopCanMoveWindow || state.windowLocked) {
-    return;
-  }
-  const ix = Math.round(dx);
-  const iy = Math.round(dy);
-  if (ix === 0 && iy === 0) {
-    return;
-  }
-  try {
-    if (state.desktopBridge === "electron") {
-      window.electronAPI.moveWindowBy(ix, iy);
-      return;
-    }
-    if (state.desktopBridge === "pywebview") {
-      window.pywebview.api.drag_window(ix, iy);
-    }
-  } catch (_) {
-    // ignore bridge failures
-  }
-}
-
-function beginDesktopWindowDragSession() {
-  if (state.windowLocked) {
-    return;
-  }
-  if (state.desktopBridge !== "electron" || !window.electronAPI) {
-    return;
-  }
-  if (typeof window.electronAPI.beginWindowDrag !== "function") {
-    return;
-  }
-  try {
-    window.electronAPI.beginWindowDrag();
-  } catch (_) {
-    // ignore bridge failures
+  if (typeof DESKTOP_WINDOW_CONTROLLER.moveWindowBy === "function") {
+    DESKTOP_WINDOW_CONTROLLER.moveWindowBy(state, dx, dy, { windowObject: window });
   }
 }
 
 function endDesktopWindowDragSession() {
-  if (state.desktopBridge !== "electron" || !window.electronAPI) {
-    return;
-  }
-  if (typeof window.electronAPI.endWindowDrag !== "function") {
-    return;
-  }
-  try {
-    window.electronAPI.endWindowDrag();
-  } catch (_) {
-    // ignore bridge failures
-  }
-}
-
-function scheduleDesktopWindowDragUpdate() {
-  if (!state.desktopCanMoveWindow || !state.windowDragActive || state.windowLocked) {
-    return;
-  }
-  if (state.desktopBridge === "electron") {
-    // Electron native drag timer is handled in main process for smoother motion.
-    return;
-  }
-  if (
-    window.electronAPI
-    && typeof window.electronAPI.updateWindowDrag === "function"
-  ) {
-    try {
-      state.suspendRelayoutUntil = performance.now() + 180;
-      window.electronAPI.updateWindowDrag();
-    } catch (_) {
-      // ignore bridge failures
-    }
+  if (typeof DESKTOP_WINDOW_CONTROLLER.endWindowDragSession === "function") {
+    DESKTOP_WINDOW_CONTROLLER.endWindowDragSession(state, { windowObject: window });
   }
 }
 
 function stopDesktopWindowDrag() {
-  state.windowDragSessionRaf = 0;
-  if (state.windowDragRaf) {
-    cancelAnimationFrame(state.windowDragRaf);
-    state.windowDragRaf = 0;
+  if (typeof DESKTOP_WINDOW_CONTROLLER.stopWindowDrag === "function") {
+    DESKTOP_WINDOW_CONTROLLER.stopWindowDrag(state, {
+      windowObject: window,
+      documentObject: document,
+      cancelAnimationFrame,
+      clampModelVisibleInViewport
+    });
   }
-  state.windowDragActive = false;
-  state.windowDragDx = 0;
-  state.windowDragDy = 0;
-  state.dragWindowAccumX = 0;
-  state.dragWindowAccumY = 0;
-  document.body.classList.remove("dragging-window");
-  document.documentElement.classList.remove("dragging-window");
-  if (state.model) {
-    clampModelVisibleInViewport(state.model);
-  }
-  endDesktopWindowDragSession();
 }
 
 function finalizeDesktopDrag() {
-  const dx = Math.round(state.dragWindowAccumX || 0);
-  const dy = Math.round(state.dragWindowAccumY || 0);
-  state.dragWindowAccumX = 0;
-  state.dragWindowAccumY = 0;
-  if (!dx && !dy) {
-    return;
+  if (typeof DESKTOP_WINDOW_CONTROLLER.finalizeDesktopDrag === "function") {
+    DESKTOP_WINDOW_CONTROLLER.finalizeDesktopDrag(state, {
+      windowObject: window,
+      performanceObject: performance,
+      placeModel
+    });
   }
-  state.suspendRelayoutUntil = performance.now() + 520;
-  moveDesktopWindowBy(dx, dy);
-  // Snap model back to anchor after moving the native window.
-  setTimeout(() => {
-    placeModel();
-  }, 30);
 }
 
 function isServerTTSProvider(provider) {
@@ -8185,200 +2280,105 @@ function isServerTTSProvider(provider) {
 }
 
 function setStatus(text) {
-  ui.status.textContent = text;
+  if (typeof CHAT_DOM.setStatus === "function") {
+    CHAT_DOM.setStatus(ui, text);
+  }
 }
 
 function safeParseJSON(raw, fallback) {
-  try {
-    const parsed = JSON.parse(String(raw || ""));
-    return parsed == null ? fallback : parsed;
-  } catch (_) {
-    return fallback;
-  }
+  return typeof STORAGE_CONTROLLER.safeParseJSON === "function"
+    ? STORAGE_CONTROLLER.safeParseJSON(raw, fallback)
+    : fallback;
 }
 
 function loadRemindersFromStorage() {
-  const raw = window.localStorage ? localStorage.getItem(REMINDER_STORAGE_KEY) : "";
-  const parsed = safeParseJSON(raw, []);
-  if (!Array.isArray(parsed)) {
-    state.reminders = [];
-    state.reminderSeq = 1;
-    renderScheduleList();
-    return;
-  }
-  const now = Date.now();
-  const restored = [];
-  let maxId = 0;
-  let changed = false;
-  for (const item of parsed) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-    const id = Math.max(1, Math.floor(Number(item.id) || 0));
-    const dueAt = Number(item.dueAt) || 0;
-    const text = String(item.text || "").trim();
-    const mode = normalizeReminderMode(item.mode);
-    const repeat = normalizeReminderRepeat(item.repeat);
-    let done = !!item.done;
-    let nextDueAt = dueAt;
-    if (!id || !dueAt || !text) {
-      continue;
-    }
-    if (repeat === "daily") {
-      done = false;
-      nextDueAt = normalizeDailyReminderDueAt(dueAt, now);
-    } else if (done && dueAt < now - 86400000) {
-      continue;
-    }
-    if (done !== !!item.done || nextDueAt !== dueAt || mode !== item.mode || repeat !== item.repeat) {
-      changed = true;
-    }
-    restored.push({ id, dueAt: nextDueAt, text, done, mode, repeat });
-    if (id > maxId) {
-      maxId = id;
-    }
-  }
-  restored.sort((a, b) => a.dueAt - b.dueAt);
-  state.reminders = restored;
-  state.reminderSeq = Math.max(maxId + 1, 1);
-  renderScheduleList();
-  if (changed) {
-    saveRemindersToStorage();
+  if (typeof STORAGE_CONTROLLER.loadReminders === "function") {
+    STORAGE_CONTROLLER.loadReminders(state, {
+      windowObject: window,
+      renderScheduleList,
+      normalizeReminderMode,
+      normalizeReminderRepeat,
+      normalizeDailyReminderDueAt
+    });
   }
 }
 
 function saveRemindersToStorage() {
-  if (!window.localStorage) {
-    return;
+  if (typeof STORAGE_CONTROLLER.saveReminders === "function") {
+    STORAGE_CONTROLLER.saveReminders(state, { windowObject: window, renderScheduleList });
   }
-  try {
-    localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(state.reminders || []));
-  } catch (_) {
-    // ignore storage quota failures
-  }
-  renderScheduleList();
 }
 
 function loadDailyGreetingState() {
-  const raw = window.localStorage ? localStorage.getItem(DAILY_GREETING_STORAGE_KEY) : "";
-  const parsed = safeParseJSON(raw, {});
-  state.dailyGreetingLastRunKey = String(parsed?.last_run_key || "").trim();
+  if (typeof STORAGE_CONTROLLER.loadDailyGreetingState === "function") {
+    STORAGE_CONTROLLER.loadDailyGreetingState(state, { windowObject: window });
+  }
 }
 
 function saveDailyGreetingState() {
-  if (!window.localStorage) {
-    return;
+  if (typeof STORAGE_CONTROLLER.saveDailyGreetingState === "function") {
+    STORAGE_CONTROLLER.saveDailyGreetingState(state, { windowObject: window });
   }
-  try {
-    localStorage.setItem(
-      DAILY_GREETING_STORAGE_KEY,
-      JSON.stringify({
-        last_run_key: String(state.dailyGreetingLastRunKey || "").trim()
-      })
-    );
-  } catch (_) {
-    // ignore storage failures
+}
+
+let chatMessageController = null;
+
+function getChatMessageController() {
+  if (!chatMessageController && typeof CHAT_MESSAGE_CONTROLLER.createController === "function") {
+    chatMessageController = CHAT_MESSAGE_CONTROLLER.createController({
+      state,
+      ui,
+      documentObject: document,
+      windowObject: window,
+      maxChatHistoryRecords: MAX_CHAT_HISTORY_RECORDS,
+      storageController: STORAGE_CONTROLLER,
+      parseToolMetaFromText,
+      renderToolMetaCards,
+      fetchChatTranslation: _fetchChatTranslation,
+      readChatTranslationCache: _readChatTranslationCache,
+      shouldShowAssistantTranslation: _shouldShowAssistantTranslation,
+      saveChatHistory: saveChatHistoryToStorage
+    });
   }
+  return chatMessageController;
 }
 
 function parseMessageTimestamp(value) {
-  const num = Number(value);
-  if (Number.isFinite(num) && num > 0) {
-    return Math.round(num);
-  }
-  return Date.now();
+  return getChatMessageController().parseMessageTimestamp(value);
 }
 
 function formatMessageTime(value) {
-  const ts = parseMessageTimestamp(value);
-  try {
-    return new Intl.DateTimeFormat("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit"
-    }).format(new Date(ts));
-  } catch (_) {
-    const d = new Date(ts);
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    return `${hh}:${mm}`;
-  }
+  return getChatMessageController().formatMessageTime(value);
 }
 
 function formatMessageDivider(value) {
-  const ts = parseMessageTimestamp(value);
-  const d = new Date(ts);
-  const now = new Date();
-  const sameYear = d.getFullYear() === now.getFullYear();
-  const sameDay =
-    d.getFullYear() === now.getFullYear()
-    && d.getMonth() === now.getMonth()
-    && d.getDate() === now.getDate();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const time = formatMessageTime(ts);
-  if (sameDay) {
-    return `今天 ${time}`;
-  }
-  return sameYear ? `${month}-${day} ${time}` : `${d.getFullYear()}-${month}-${day} ${time}`;
+  return getChatMessageController().formatMessageDivider(value);
 }
 
 function shouldInsertTimeDivider(previousTs, currentTs) {
-  if (!previousTs) {
-    return true;
-  }
-  const prev = new Date(parseMessageTimestamp(previousTs));
-  const cur = new Date(parseMessageTimestamp(currentTs));
-  const changedDay =
-    prev.getFullYear() !== cur.getFullYear()
-    || prev.getMonth() !== cur.getMonth()
-    || prev.getDate() !== cur.getDate();
-  if (changedDay) {
-    return true;
-  }
-  return Math.abs(parseMessageTimestamp(currentTs) - parseMessageTimestamp(previousTs)) >= 5 * 60 * 1000;
+  return getChatMessageController().shouldInsertTimeDivider(previousTs, currentTs);
 }
 
 function createTimeDivider(timestamp) {
-  const divider = document.createElement("div");
-  divider.className = "message-divider";
-  divider.textContent = formatMessageDivider(timestamp);
-  divider.dataset.timestamp = String(parseMessageTimestamp(timestamp));
-  return divider;
+  return getChatMessageController().createTimeDivider(timestamp);
 }
 
 function trimChatRecords(records) {
-  const list = Array.isArray(records) ? records : [];
-  if (list.length <= MAX_CHAT_HISTORY_RECORDS) {
-    return list;
-  }
-  return list.slice(list.length - MAX_CHAT_HISTORY_RECORDS);
+  return getChatMessageController().trimChatRecords(records);
 }
 
 function saveChatHistoryToStorage() {
-  if (!window.localStorage) {
-    return;
-  }
-  try {
-    localStorage.setItem(
-      CHAT_HISTORY_STORAGE_KEY,
-      JSON.stringify(trimChatRecords(state.chatRecords || []))
-    );
-  } catch (_) {
-    // ignore storage failures
+  if (typeof STORAGE_CONTROLLER.saveChatHistory === "function") {
+    STORAGE_CONTROLLER.saveChatHistory(state, {
+      windowObject: window,
+      maxChatHistoryRecords: MAX_CHAT_HISTORY_RECORDS
+    });
   }
 }
 
 function saveChatTranslationVisibilityToStorage() {
-  if (!window.localStorage) {
-    return;
-  }
-  try {
-    localStorage.setItem(
-      CHAT_TRANSLATION_VISIBILITY_STORAGE_KEY,
-      state.chatTranslationVisible ? "1" : "0"
-    );
-  } catch (_) {
-    // ignore storage failures
+  if (typeof STORAGE_CONTROLLER.saveChatTranslationVisibility === "function") {
+    STORAGE_CONTROLLER.saveChatTranslationVisibility(state, { windowObject: window });
   }
 }
 
@@ -8423,95 +2423,41 @@ function applyChatTranslationVisibility() {
 }
 
 function loadChatTranslationVisibilityFromStorage() {
-  let visible = true;
-  if (window.localStorage) {
-    try {
-      const raw = String(localStorage.getItem(CHAT_TRANSLATION_VISIBILITY_STORAGE_KEY) || "").trim();
-      if (raw === "0") {
-        visible = false;
-      } else if (raw === "1") {
-        visible = true;
-      }
-    } catch (_) {
-      // ignore storage failures
-    }
+  if (typeof STORAGE_CONTROLLER.loadChatTranslationVisibility === "function") {
+    STORAGE_CONTROLLER.loadChatTranslationVisibility(state, {
+      windowObject: window,
+      updateChatTranslationVisibility: applyChatTranslationVisibility
+    });
   }
-  state.chatTranslationVisible = visible;
-  applyChatTranslationVisibility();
 }
 
 function saveSubtitleEnabledToStorage() {
-  if (!window.localStorage) {
-    return;
-  }
-  try {
-    localStorage.setItem(SUBTITLE_ENABLED_STORAGE_KEY, state.subtitleEnabled ? "1" : "0");
-  } catch (_) {
-    // ignore storage failures
+  if (typeof STORAGE_CONTROLLER.saveSubtitleEnabled === "function") {
+    STORAGE_CONTROLLER.saveSubtitleEnabled(state, { windowObject: window });
   }
 }
 
 function loadSubtitleEnabledFromStorage() {
-  let enabled = true;
-  if (window.localStorage) {
-    try {
-      const raw = String(localStorage.getItem(SUBTITLE_ENABLED_STORAGE_KEY) || "").trim();
-      if (raw === "0") {
-        enabled = false;
-      } else if (raw === "1") {
-        enabled = true;
-      }
-    } catch (_) {
-      // ignore storage failures
-    }
+  if (typeof STORAGE_CONTROLLER.loadSubtitleEnabled === "function") {
+    STORAGE_CONTROLLER.loadSubtitleEnabled(state, {
+      windowObject: window,
+      applySubtitleEnabledState
+    });
   }
-  state.subtitleEnabled = enabled;
 }
 
 function saveSubtitlePositionToStorage() {
-  if (!window.localStorage) {
-    return;
-  }
-  try {
-    if (!state.subtitlePositionCustom) {
-      localStorage.removeItem(SUBTITLE_POSITION_STORAGE_KEY);
-      return;
-    }
-    localStorage.setItem(
-      SUBTITLE_POSITION_STORAGE_KEY,
-      JSON.stringify({
-        x: state.subtitlePositionRatioX,
-        y: state.subtitlePositionRatioY
-      })
-    );
-  } catch (_) {
-    // ignore storage failures
+  if (typeof STORAGE_CONTROLLER.saveSubtitlePosition === "function") {
+    STORAGE_CONTROLLER.saveSubtitlePosition(state, { windowObject: window });
   }
 }
 
 function loadSubtitlePositionFromStorage() {
-  state.subtitlePositionCustom = false;
-  state.subtitlePositionRatioX = 0.5;
-  state.subtitlePositionRatioY = 0.75;
-  if (!window.localStorage) {
-    return;
-  }
-  try {
-    const raw = localStorage.getItem(SUBTITLE_POSITION_STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-    const data = JSON.parse(raw);
-    const x = Number(data?.x);
-    const y = Number(data?.y);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      return;
-    }
-    state.subtitlePositionRatioX = clampNumber(x, 0.05, 0.95);
-    state.subtitlePositionRatioY = clampNumber(y, 0.12, 0.92);
-    state.subtitlePositionCustom = true;
-  } catch (_) {
-    // ignore storage failures
+  if (typeof STORAGE_CONTROLLER.loadSubtitlePosition === "function") {
+    STORAGE_CONTROLLER.loadSubtitlePosition(state, {
+      windowObject: window,
+      applySubtitlePositionFromState
+    });
   }
 }
 
@@ -8604,594 +2550,264 @@ function bindSubtitleDragHandle() {
 }
 
 function saveOnboardingSeenToStorage(seen) {
-  if (!window.localStorage) {
-    return;
-  }
-  try {
-    localStorage.setItem(ONBOARDING_SEEN_STORAGE_KEY, seen ? "1" : "0");
-  } catch (_) {
-    // ignore storage failures
+  if (typeof STORAGE_CONTROLLER.saveOnboardingSeen === "function") {
+    STORAGE_CONTROLLER.saveOnboardingSeen(seen, { windowObject: window });
   }
 }
 
 function loadOnboardingSeenFromStorage() {
-  let seen = false;
-  if (window.localStorage) {
-    try {
-      seen = String(localStorage.getItem(ONBOARDING_SEEN_STORAGE_KEY) || "").trim() === "1";
-    } catch (_) {
-      seen = false;
-    }
+  if (typeof STORAGE_CONTROLLER.loadOnboardingSeen === "function") {
+    STORAGE_CONTROLLER.loadOnboardingSeen(state, { windowObject: window });
   }
-  state.onboardingSeen = seen;
+}
+
+let onboardingController = null;
+
+function getOnboardingController() {
+  if (!onboardingController && typeof ONBOARDING_CONTROLLER.createController === "function") {
+    onboardingController = ONBOARDING_CONTROLLER.createController({
+      state,
+      ui,
+      windowObject: window,
+      onboardingSteps: ONBOARDING_STEPS,
+      saveOnboardingSeenToStorage
+    });
+  }
+  return onboardingController;
 }
 
 function isHelpOpen() {
-  return !!(ui.helpModal && !ui.helpModal.hidden);
+  return getOnboardingController().isHelpOpen();
 }
 
 function isOnboardingOpen() {
-  return !!(ui.onboardingModal && !ui.onboardingModal.hidden);
+  return getOnboardingController().isOnboardingOpen();
 }
 
 function closeHelpModal() {
-  if (!ui.helpModal) {
-    return;
-  }
-  ui.helpModal.hidden = true;
+  return getOnboardingController().closeHelpModal();
 }
 
 function openHelpModal() {
-  if (!ui.helpModal) {
-    return;
-  }
-  if (isOnboardingOpen()) {
-    ui.onboardingModal.hidden = true;
-  }
-  ui.helpModal.hidden = false;
+  return getOnboardingController().openHelpModal();
 }
 
 function openAdvancedConfigCenter() {
-  const target = "/docs/config.html";
-  try {
-    const popup = window.open(target, "_blank", "noopener,noreferrer");
-    if (popup && typeof popup.focus === "function") {
-      popup.focus();
-      return;
-    }
-  } catch (_) {
-    // ignore and fallback to same-window navigation
-  }
-  window.location.href = target;
+  return getOnboardingController().openAdvancedConfigCenter();
 }
 
 function renderOnboardingStep() {
-  const total = ONBOARDING_STEPS.length;
-  const index = Math.max(0, Math.min(total - 1, Number(state.onboardingStepIndex) || 0));
-  state.onboardingStepIndex = index;
-  const step = ONBOARDING_STEPS[index] || ONBOARDING_STEPS[0];
-  if (ui.onboardingStepTitle) {
-    ui.onboardingStepTitle.textContent = step.title;
-  }
-  if (ui.onboardingStepDesc) {
-    ui.onboardingStepDesc.textContent = step.desc;
-  }
-  if (ui.onboardingStepTip) {
-    ui.onboardingStepTip.textContent = step.tip;
-  }
-  if (ui.onboardingPathSplit) {
-    ui.onboardingPathSplit.hidden = index !== 0;
-  }
-  if (ui.onboardingStepIndex) {
-    ui.onboardingStepIndex.textContent = `${index + 1} / ${total}`;
-  }
-  if (ui.onboardingProgressBar) {
-    const ratio = total > 1 ? index / (total - 1) : 1;
-    ui.onboardingProgressBar.style.width = `${Math.round(ratio * 100)}%`;
-  }
-  const atLast = index >= total - 1;
-  if (ui.onboardingPrevBtn) {
-    ui.onboardingPrevBtn.disabled = index <= 0;
-  }
-  if (ui.onboardingNextBtn) {
-    ui.onboardingNextBtn.hidden = atLast;
-  }
-  if (ui.onboardingDoneBtn) {
-    ui.onboardingDoneBtn.hidden = !atLast;
-  }
+  return getOnboardingController().renderOnboardingStep();
 }
 
 function closeOnboardingModal(options = {}) {
-  if (!ui.onboardingModal) {
-    return;
-  }
-  ui.onboardingModal.hidden = true;
-  if (options.markSeen) {
-    state.onboardingSeen = true;
-    saveOnboardingSeenToStorage(true);
-  }
+  return getOnboardingController().closeOnboardingModal(options);
 }
 
 function openOnboardingModal(options = {}) {
-  if (!ui.onboardingModal) {
-    return;
-  }
-  if (ui.helpModal && !ui.helpModal.hidden) {
-    closeHelpModal();
-  }
-  if (options.resetStep) {
-    state.onboardingStepIndex = 0;
-  }
-  ui.onboardingModal.hidden = false;
-  renderOnboardingStep();
+  return getOnboardingController().openOnboardingModal(options);
 }
 
 function moveOnboardingStep(delta) {
-  const total = ONBOARDING_STEPS.length;
-  const next = Math.max(0, Math.min(total - 1, (Number(state.onboardingStepIndex) || 0) + Number(delta || 0)));
-  if (next === state.onboardingStepIndex) {
-    return;
-  }
-  state.onboardingStepIndex = next;
-  renderOnboardingStep();
+  return getOnboardingController().moveOnboardingStep(delta);
 }
 
 function maybeAutoOpenOnboarding() {
-  if (state.onboardingSeen) {
-    return;
-  }
-  if (state.uiView === "model") {
-    return;
-  }
-  openOnboardingModal({ resetStep: true });
+  return getOnboardingController().maybeAutoOpenOnboarding();
 }
 
 function syncConversationHistoryFromChatRecords() {
-  const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
-  const convo = records
-    .filter((item) => item && (item.role === "user" || item.role === "assistant"))
-    .map((item) => ({
-      role: item.role,
-      content: String(item.content || "").trim()
-    }))
-    .filter((item) => item.content);
-  const limit = Math.max(12, Number(state.historyMaxMessages) || 64);
-  state.history = convo.slice(Math.max(0, convo.length - limit));
+  return getChatMessageController().syncConversationHistoryFromChatRecords();
 }
 
 function normalizeChatRecord(item) {
-  if (!item || typeof item !== "object") {
-    return null;
-  }
-  const role = item.role === "user" ? "user" : "assistant";
-  const content = String(item.content || "").trim();
-  if (!content) {
-    return null;
-  }
-  return {
-    role,
-    content,
-    timestamp: parseMessageTimestamp(item.timestamp || item.created_at || item.time)
-  };
+  return getChatMessageController().normalizeChatRecord(item);
 }
 
 function renderChatHistoryFromState() {
-  if (!ui.chatLog) {
-    return;
-  }
-  ui.chatLog.innerHTML = "";
-  let previousTs = 0;
-  for (const item of state.chatRecords) {
-    const timestamp = parseMessageTimestamp(item.timestamp);
-    if (shouldInsertTimeDivider(previousTs, timestamp)) {
-      ui.chatLog.appendChild(createTimeDivider(timestamp));
-    }
-    const row = createMessageRow(item.role, item.content, {
-      timestamp,
-      enableTranslation: false
-    });
-    ui.chatLog.appendChild(row);
-    previousTs = timestamp;
-  }
-  ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
+  return getChatMessageController().renderChatHistoryFromState();
 }
 
 function loadChatHistoryFromStorage() {
-  const raw = window.localStorage ? localStorage.getItem(CHAT_HISTORY_STORAGE_KEY) : "";
-  const parsed = safeParseJSON(raw, []);
-  if (!Array.isArray(parsed)) {
-    state.chatRecords = [];
-    state.history = [];
-    renderChatHistoryFromState();
-    return;
+  return getChatMessageController().loadChatHistoryFromStorage();
+}
+
+let reminderScheduleController = null;
+
+function getReminderScheduleController() {
+  if (!reminderScheduleController && typeof REMINDER_SCHEDULE_CONTROLLER.createController === "function") {
+    reminderScheduleController = REMINDER_SCHEDULE_CONTROLLER.createController({
+      state,
+      ui,
+      documentObject: document,
+      windowObject: window,
+      reminderUtils: REMINDER_UTILS,
+      scheduleListView: SCHEDULE_LIST_VIEW,
+      scheduleFormModel: SCHEDULE_FORM_MODEL,
+      setStatus,
+      saveRemindersToStorage,
+      saveDailyGreetingState,
+      requestAssistantReply,
+      appendMessage,
+      buildSpeakProsody,
+      speak,
+      isHelpOpen,
+      closeHelpModal,
+      isOnboardingOpen,
+      closeOnboardingModal,
+      closePersonaPanel,
+      isLearningReviewOpen,
+      closeLearningReviewDrawer
+    });
   }
-  state.chatRecords = trimChatRecords(
-    parsed.map((item) => normalizeChatRecord(item)).filter(Boolean)
-  );
-  const lastUserRecord = [...state.chatRecords].reverse().find((item) => item?.role === "user");
-  if (lastUserRecord) {
-    const ts = parseMessageTimestamp(lastUserRecord.timestamp);
-    state.lastUserMessageAt = ts;
-    state.conversationLastUserAt = ts;
-  }
-  const lastAssistantRecord = [...state.chatRecords].reverse().find((item) => item?.role === "assistant");
-  if (lastAssistantRecord) {
-    state.conversationLastAssistantAt = parseMessageTimestamp(lastAssistantRecord.timestamp);
-  }
-  syncConversationHistoryFromChatRecords();
-  renderChatHistoryFromState();
+  return reminderScheduleController;
 }
 
 function getLocalDateKey(date = new Date()) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return getReminderScheduleController().getLocalDateKey(date);
 }
-
 
 function parseReminderWhen(rawWhen) {
-  return typeof REMINDER_UTILS.parseReminderWhen === "function"
-    ? REMINDER_UTILS.parseReminderWhen(rawWhen)
-    : 0;
+  return getReminderScheduleController().parseReminderWhen(rawWhen);
 }
-
 
 function formatReminderTime(ts) {
-  return typeof REMINDER_UTILS.formatReminderTime === "function"
-    ? REMINDER_UTILS.formatReminderTime(ts)
-    : "";
+  return getReminderScheduleController().formatReminderTime(ts);
 }
-
 
 function normalizeReminderMode(mode) {
-  return typeof REMINDER_UTILS.normalizeReminderMode === "function"
-    ? REMINDER_UTILS.normalizeReminderMode(mode)
-    : "reminder";
+  return getReminderScheduleController().normalizeReminderMode(mode);
 }
-
 
 function normalizeReminderRepeat(repeat) {
-  return typeof REMINDER_UTILS.normalizeReminderRepeat === "function"
-    ? REMINDER_UTILS.normalizeReminderRepeat(repeat)
-    : "once";
+  return getReminderScheduleController().normalizeReminderRepeat(repeat);
 }
-
 
 function normalizeDailyReminderDueAt(dueAt, now = Date.now()) {
-  return typeof REMINDER_UTILS.normalizeDailyReminderDueAt === "function"
-    ? REMINDER_UTILS.normalizeDailyReminderDueAt(dueAt, now)
-    : 0;
+  return getReminderScheduleController().normalizeDailyReminderDueAt(dueAt, now);
 }
-
 
 function shiftReminderToNextDay(dueAt) {
-  return typeof REMINDER_UTILS.shiftReminderToNextDay === "function"
-    ? REMINDER_UTILS.shiftReminderToNextDay(dueAt)
-    : Number(dueAt) || Date.now();
+  return getReminderScheduleController().shiftReminderToNextDay(dueAt);
 }
-
 
 function buildReminderDisplayTime(item) {
-  return typeof REMINDER_UTILS.buildReminderDisplayTime === "function"
-    ? REMINDER_UTILS.buildReminderDisplayTime(item)
-    : formatReminderTime(item?.dueAt);
+  return getReminderScheduleController().buildReminderDisplayTime(item);
 }
 
-
 function buildReminderTypeLabel(item) {
-  return typeof REMINDER_UTILS.buildReminderTypeLabel === "function"
-    ? REMINDER_UTILS.buildReminderTypeLabel(item)
-    : "????";
+  return getReminderScheduleController().buildReminderTypeLabel(item);
 }
 
 function buildDefaultScheduleDateTimeValue() {
-  return typeof SCHEDULE_FORM_MODEL.buildDefaultDateTimeValue === "function"
-    ? SCHEDULE_FORM_MODEL.buildDefaultDateTimeValue()
-    : "";
+  return getReminderScheduleController().buildDefaultScheduleDateTimeValue();
 }
 
 function openSchedulePanel() {
-  if (!ui.scheduleModal) {
-    return;
-  }
-  if (isHelpOpen()) {
-    closeHelpModal();
-  }
-  if (isOnboardingOpen()) {
-    closeOnboardingModal();
-  }
-  if (ui.personaModal && !ui.personaModal.hidden) {
-    closePersonaPanel();
-  }
-  if (isLearningReviewOpen()) {
-    closeLearningReviewDrawer();
-  }
-  ui.scheduleModal.hidden = false;
-  if (ui.scheduleDatetime && !ui.scheduleDatetime.value) {
-    ui.scheduleDatetime.value = buildDefaultScheduleDateTimeValue();
-  }
-  renderScheduleList();
-  if (ui.scheduleTask) {
-    ui.scheduleTask.focus();
-  }
+  return getReminderScheduleController().openSchedulePanel();
 }
 
 function closeSchedulePanel() {
-  if (!ui.scheduleModal) {
-    return;
+  return getReminderScheduleController().closeSchedulePanel();
+}
+
+let personaAvatarController = null;
+
+function getPersonaAvatarController() {
+  if (!personaAvatarController && typeof PERSONA_AVATAR_CONTROLLER.createController === "function") {
+    personaAvatarController = PERSONA_AVATAR_CONTROLLER.createController({
+      state,
+      ui,
+      documentObject: document,
+      windowObject: window,
+      storageController: STORAGE_CONTROLLER,
+      authFetch,
+      setStatus,
+      assistantAvatarDefault: ASSISTANT_AVATAR_DEFAULT,
+      assistantAvatarMaxBytes: ASSISTANT_AVATAR_MAX_BYTES,
+      personaCardDefault: PERSONA_CARD_DEFAULT,
+      isHelpOpen,
+      closeHelpModal,
+      isOnboardingOpen,
+      closeOnboardingModal,
+      closeSchedulePanel,
+      isLearningReviewOpen,
+      closeLearningReviewDrawer
+    });
   }
-  ui.scheduleModal.hidden = true;
+  return personaAvatarController;
 }
 
 function normalizeAssistantAvatarUrl(raw) {
-  const value = String(raw || "").trim();
-  if (!value) {
-    return ASSISTANT_AVATAR_DEFAULT;
-  }
-  if (
-    value.startsWith("data:image/")
-    || value.startsWith("./")
-    || value.startsWith("/")
-    || value.startsWith("http://")
-    || value.startsWith("https://")
-    || value.startsWith("blob:")
-  ) {
-    return value;
-  }
-  return ASSISTANT_AVATAR_DEFAULT;
+  return getPersonaAvatarController().normalizeAssistantAvatarUrl(raw);
 }
 
 function readAssistantAvatarFromStorage() {
-  try {
-    const saved = localStorage.getItem(ASSISTANT_AVATAR_STORAGE_KEY);
-    return normalizeAssistantAvatarUrl(saved);
-  } catch (_) {
-    return ASSISTANT_AVATAR_DEFAULT;
-  }
+  return getPersonaAvatarController().readAssistantAvatarFromStorage();
 }
 
 function saveAssistantAvatarToStorage(url) {
-  try {
-    localStorage.setItem(ASSISTANT_AVATAR_STORAGE_KEY, String(url || ""));
-  } catch (_) {
-    // ignore storage failures
-  }
+  return getPersonaAvatarController().saveAssistantAvatarToStorage(url);
 }
 
 function avatarUrlToCssValue(url) {
-  const safe = String(url || ASSISTANT_AVATAR_DEFAULT)
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, "\\\"");
-  return `url("${safe}")`;
+  return getPersonaAvatarController().avatarUrlToCssValue(url);
 }
 
 function applyAssistantAvatar(url, options = {}) {
-  const safe = normalizeAssistantAvatarUrl(url);
-  state.assistantAvatarUrl = safe;
-  if (ui.heroAvatarImg) {
-    ui.heroAvatarImg.src = safe;
-  }
-  if (ui.personaAvatarPreview) {
-    ui.personaAvatarPreview.src = safe;
-  }
-  document.querySelectorAll(".persona-avatar-sync").forEach((img) => {
-    if (img instanceof HTMLImageElement) {
-      img.src = safe;
-    }
-  });
-  document.documentElement.style.setProperty("--assistant-avatar-url", avatarUrlToCssValue(safe));
-  if (options.persist !== false) {
-    saveAssistantAvatarToStorage(safe);
-  }
+  return getPersonaAvatarController().applyAssistantAvatar(url, options);
 }
 
 function initAssistantAvatar() {
-  const domDefault = String(ui.heroAvatarImg?.getAttribute("src") || "").trim();
-  const stored = readAssistantAvatarFromStorage();
-  const initial = stored || domDefault || ASSISTANT_AVATAR_DEFAULT;
-  applyAssistantAvatar(initial, { persist: false });
+  return getPersonaAvatarController().initAssistantAvatar();
 }
 
 function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(reader.error || new Error("读取图片失败"));
-    reader.readAsDataURL(file);
-  });
+  return getPersonaAvatarController().readFileAsDataUrl(file);
 }
 
 async function setAssistantAvatarFromFile(file) {
-  if (!(file instanceof File)) {
-    return;
-  }
-  const mime = String(file.type || "").toLowerCase();
-  if (!mime.startsWith("image/")) {
-    setStatus("请选择图片文件");
-    return;
-  }
-  if (Number(file.size || 0) > ASSISTANT_AVATAR_MAX_BYTES) {
-    setStatus("头像图片不能超过 4MB");
-    return;
-  }
-  const dataUrl = await readFileAsDataUrl(file);
-  if (!dataUrl.startsWith("data:image/")) {
-    throw new Error("图片格式无效");
-  }
-  applyAssistantAvatar(dataUrl);
-  setStatus("头像已更新");
+  return getPersonaAvatarController().setAssistantAvatarFromFile(file);
 }
 
 function normalizePersonaCardData(raw) {
-  const src = raw && typeof raw === "object" ? raw : {};
-  return {
-    identity: String(src.identity || "").trim(),
-    user_preferences: String(src.user_preferences || "").trim(),
-    user_dislikes: String(src.user_dislikes || "").trim(),
-    common_topics: String(src.common_topics || "").trim(),
-    reply_style: String(src.reply_style || "").trim(),
-    companionship_style: String(src.companionship_style || "").trim(),
-    updated_at: String(src.updated_at || "").trim()
-  };
+  return getPersonaAvatarController().normalizePersonaCardData(raw);
 }
 
 function applyPersonaCardToForm(card) {
-  const safe = normalizePersonaCardData(card);
-  if (ui.personaIdentity) ui.personaIdentity.value = safe.identity;
-  if (ui.personaPreferences) ui.personaPreferences.value = safe.user_preferences;
-  if (ui.personaDislikes) ui.personaDislikes.value = safe.user_dislikes;
-  if (ui.personaTopics) ui.personaTopics.value = safe.common_topics;
-  if (ui.personaReplyStyle) ui.personaReplyStyle.value = safe.reply_style;
-  if (ui.personaCompanionshipStyle) ui.personaCompanionshipStyle.value = safe.companionship_style;
+  return getPersonaAvatarController().applyPersonaCardToForm(card);
 }
 
 function readPersonaCardFromForm() {
-  return normalizePersonaCardData({
-    identity: ui.personaIdentity?.value,
-    user_preferences: ui.personaPreferences?.value,
-    user_dislikes: ui.personaDislikes?.value,
-    common_topics: ui.personaTopics?.value,
-    reply_style: ui.personaReplyStyle?.value,
-    companionship_style: ui.personaCompanionshipStyle?.value
-  });
+  return getPersonaAvatarController().readPersonaCardFromForm();
 }
 
 function applyPersonaTemplateDraft() {
-  applyPersonaCardToForm({
-    identity: "你是我的桌面搭子，叫馨语AI桌宠。",
-    user_preferences: "我喜欢简洁直接的建议，也喜欢被温柔鼓励。",
-    user_dislikes: "不喜欢太官腔、太冗长、反复重复同一句话。",
-    common_topics: "开发、学习计划、日常安排、效率提升。",
-    reply_style: "像熟悉的朋友，语气自然，短句优先，必要时再展开。",
-    companionship_style: "会主动关心我，但不过度打扰，关键时刻能提醒我。"
-  });
-  setStatus("已导入人设模板草稿");
+  return getPersonaAvatarController().applyPersonaTemplateDraft();
 }
 
 function applyRandomPersonaDraft() {
-  const identities = [
-    "你是馨语AI桌宠，我的桌面陪伴伙伴。",
-    "你是我的桌宠搭子，偏活泼，也很细心。",
-    "你是我长期协作的 AI 桌面助理，兼顾陪伴和执行。"
-  ];
-  const preferences = [
-    "我喜欢清晰分点和可执行建议。",
-    "我喜欢轻松口吻，但不想被敷衍。",
-    "我喜欢先给结论，再补充原因。"
-  ];
-  const dislikes = [
-    "不喜欢空话和模板化结尾。",
-    "不喜欢过度追问和说教。",
-    "不喜欢重复前文和无效安慰。"
-  ];
-  const topics = [
-    "代码、项目推进、复盘、日程管理",
-    "学习、计划、效率工具、习惯养成",
-    "产品灵感、开发排障、日常状态"
-  ];
-  const replyStyles = [
-    "语气自然，回复长度中等，必要时简短反问。",
-    "先给重点，再给一到两条具体建议。",
-    "多用短句，少套话，尽量贴近上下文。"
-  ];
-  const companionshipStyles = [
-    "低打扰陪伴，适时主动提醒。",
-    "对我情绪有感知，先共情再给建议。",
-    "能和我连续聊下去，不像单轮问答机器人。"
-  ];
-  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)] || "";
-  applyPersonaCardToForm({
-    identity: pick(identities),
-    user_preferences: pick(preferences),
-    user_dislikes: pick(dislikes),
-    common_topics: pick(topics),
-    reply_style: pick(replyStyles),
-    companionship_style: pick(companionshipStyles)
-  });
-  setStatus("已随机生成人设草稿");
+  return getPersonaAvatarController().applyRandomPersonaDraft();
 }
 
 function resetPersonaDraft() {
-  applyPersonaCardToForm(PERSONA_CARD_DEFAULT);
-  setStatus("已重置人设草稿");
+  return getPersonaAvatarController().resetPersonaDraft();
 }
 
 async function loadPersonaCard() {
-  if (!ui.personaModal) {
-    state.personaCard = normalizePersonaCardData(PERSONA_CARD_DEFAULT);
-    return state.personaCard;
-  }
-  try {
-  const resp = await authFetch("/api/persona_card", { cache: "no-store" });
-    if (!resp.ok) {
-      throw new Error("获取人设卡失败");
-    }
-    const data = normalizePersonaCardData(await resp.json());
-    state.personaCard = data;
-    applyPersonaCardToForm(data);
-    return data;
-  } catch (err) {
-    state.personaCard = normalizePersonaCardData(PERSONA_CARD_DEFAULT);
-    applyPersonaCardToForm(state.personaCard);
-    console.warn("loadPersonaCard failed:", err);
-    return state.personaCard;
-  }
+  return getPersonaAvatarController().loadPersonaCard();
 }
 
 function openPersonaPanel() {
-  if (!ui.personaModal) {
-    return;
-  }
-  if (isHelpOpen()) {
-    closeHelpModal();
-  }
-  if (isOnboardingOpen()) {
-    closeOnboardingModal();
-  }
-  if (ui.scheduleModal && !ui.scheduleModal.hidden) {
-    closeSchedulePanel();
-  }
-  if (isLearningReviewOpen()) {
-    closeLearningReviewDrawer();
-  }
-  ui.personaModal.hidden = false;
-  applyPersonaCardToForm(state.personaCard || PERSONA_CARD_DEFAULT);
-  if (ui.personaIdentity) {
-    ui.personaIdentity.focus();
-  }
+  return getPersonaAvatarController().openPersonaPanel();
 }
 
 function closePersonaPanel() {
-  if (!ui.personaModal) {
-    return;
-  }
-  ui.personaModal.hidden = true;
+  return getPersonaAvatarController().closePersonaPanel();
 }
 
 async function savePersonaCardFromForm() {
-  if (!ui.personaModal) {
-    return false;
-  }
-  const payload = readPersonaCardFromForm();
-  try {
-  const resp = await authFetch("/api/persona_card", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      throw new Error(String(data?.error || "保存失败"));
-    }
-    state.personaCard = normalizePersonaCardData(data);
-    applyPersonaCardToForm(state.personaCard);
-    setStatus("人设卡已保存");
-    return true;
-  } catch (err) {
-    setStatus(`保存失败: ${err.message || err}`);
-    return false;
-  }
+  return getPersonaAvatarController().savePersonaCardFromForm();
 }
 
 function isLearningReviewOpen() {
@@ -9308,9 +2924,13 @@ function renderLearningDebugPanel() {
     return;
   }
   const isDebug = learningReviewState.activeTab === "debug";
-  ui.learningDebugPanel.hidden = !isDebug;
-  if (ui.learningReviewList) {
-    ui.learningReviewList.hidden = isDebug;
+  if (typeof LEARNING_REVIEW_VIEW.showLearningDebugPanel === "function") {
+    LEARNING_REVIEW_VIEW.showLearningDebugPanel(ui, isDebug);
+  } else {
+    ui.learningDebugPanel.hidden = !isDebug;
+    if (ui.learningReviewList) {
+      ui.learningReviewList.hidden = isDebug;
+    }
   }
   if (!isDebug) {
     return;
@@ -9347,17 +2967,8 @@ function renderLearningReviewList() {
     return;
   }
   if (learningReviewState.activeTab === "debug") {
-    if (ui.learningTabCandidates) {
-      ui.learningTabCandidates.classList.remove("is-active");
-      ui.learningTabCandidates.setAttribute("aria-selected", "false");
-    }
-    if (ui.learningTabSamples) {
-      ui.learningTabSamples.classList.remove("is-active");
-      ui.learningTabSamples.setAttribute("aria-selected", "false");
-    }
-    if (ui.learningTabDebug) {
-      ui.learningTabDebug.classList.add("is-active");
-      ui.learningTabDebug.setAttribute("aria-selected", "true");
+    if (typeof LEARNING_REVIEW_VIEW.renderLearningTabs === "function") {
+      LEARNING_REVIEW_VIEW.renderLearningTabs(ui, "debug");
     }
     refreshLearningSelectAllState([]);
     renderLearningDebugPanel();
@@ -9365,25 +2976,13 @@ function renderLearningReviewList() {
   }
   const tab = learningReviewState.activeTab === "samples" ? "samples" : "candidates";
   const filteredItems = getLearningFilteredItems();
-  ui.learningReviewList.innerHTML = "";
   ui.learningReviewList.hidden = false;
   if (ui.learningDebugPanel) {
     ui.learningDebugPanel.hidden = true;
   }
 
-  if (ui.learningTabCandidates) {
-    const active = tab === "candidates";
-    ui.learningTabCandidates.classList.toggle("is-active", active);
-    ui.learningTabCandidates.setAttribute("aria-selected", String(active));
-  }
-  if (ui.learningTabSamples) {
-    const active = tab === "samples";
-    ui.learningTabSamples.classList.toggle("is-active", active);
-    ui.learningTabSamples.setAttribute("aria-selected", String(active));
-  }
-  if (ui.learningTabDebug) {
-    ui.learningTabDebug.classList.remove("is-active");
-    ui.learningTabDebug.setAttribute("aria-selected", "false");
+  if (typeof LEARNING_REVIEW_VIEW.renderLearningTabs === "function") {
+    LEARNING_REVIEW_VIEW.renderLearningTabs(ui, tab);
   }
   if (ui.learningReviewSummary) {
     ui.learningReviewSummary.textContent = typeof LEARNING_REVIEW_MODEL.buildLearningSummaryText === "function"
@@ -9391,160 +2990,31 @@ function renderLearningReviewList() {
       : "";
   }
 
-  if (!filteredItems.length) {
-    const empty = document.createElement("div");
-    empty.className = "learning-empty";
-    empty.textContent = "当前筛选条件下暂无数据";
-    ui.learningReviewList.appendChild(empty);
-    refreshLearningSelectAllState(filteredItems);
-    return;
-  }
-
-  const selectedSet = getLearningSelectedSet(tab);
-  filteredItems.forEach((item) => {
-    const card = document.createElement("article");
-    card.className = "learning-item";
-    const metricViews = typeof LEARNING_REVIEW_MODEL.getLearningMetricViews === "function"
-      ? LEARNING_REVIEW_MODEL.getLearningMetricViews(item)
-      : null;
-
-    const head = document.createElement("div");
-    head.className = "learning-item-head";
-
-    const checkLabel = document.createElement("label");
-    checkLabel.className = "learning-item-check";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "learning-check";
-    checkbox.dataset.id = item.id;
-    checkbox.checked = selectedSet.has(item.id);
-    const checkText = document.createElement("span");
-    checkText.textContent = item.id;
-    checkLabel.appendChild(checkbox);
-    checkLabel.appendChild(checkText);
-
-    const status = document.createElement("span");
-    const statusView = typeof LEARNING_REVIEW_MODEL.getLearningStatusView === "function"
-      ? LEARNING_REVIEW_MODEL.getLearningStatusView(item.status)
-      : { statusClass: "candidate", label: String(item.status || "候选") };
-    status.className = `learning-item-status is-${statusView.statusClass}`;
-    status.textContent = statusView.label;
-    const toggleBtn = document.createElement("button");
-    toggleBtn.type = "button";
-    toggleBtn.className = "learning-item-toggle";
-    toggleBtn.textContent = "展开";
-    const headRight = document.createElement("div");
-    headRight.className = "learning-item-head-right";
-    headRight.appendChild(status);
-    headRight.appendChild(toggleBtn);
-
-    head.appendChild(checkLabel);
-    head.appendChild(headRight);
-
-    const preview = document.createElement("div");
-    preview.className = "learning-item-preview";
-    const lineA = document.createElement("p");
-    lineA.className = "learning-item-line";
-    const strongA = document.createElement("strong");
-    strongA.textContent = "原始回复：";
-    lineA.appendChild(strongA);
-    lineA.appendChild(document.createTextNode(item.assistant_preview || "-"));
-    const lineB = document.createElement("p");
-    lineB.className = "learning-item-line";
-    const strongB = document.createElement("strong");
-    strongB.textContent = "风格提炼：";
-    lineB.appendChild(strongB);
-    lineB.appendChild(document.createTextNode(item.compressed_pattern || "-"));
-    preview.appendChild(lineA);
-    preview.appendChild(lineB);
-
-    const metrics = document.createElement("div");
-    metrics.className = "learning-item-metrics";
-    const scoreTag = document.createElement("span");
-    scoreTag.className = "learning-metric metric-score";
-    scoreTag.textContent = metricViews?.score?.text || "评分 0.00";
-    scoreTag.classList.add(metricViews?.score?.className || "is-low");
-
-    const confTag = document.createElement("span");
-    confTag.className = "learning-metric metric-confidence";
-    confTag.textContent = metricViews?.confidence?.text || "置信 0.00";
-    confTag.classList.add(metricViews?.confidence?.className || "is-low");
-
-    const supportTag = document.createElement("span");
-    supportTag.className = "learning-metric metric-support";
-    supportTag.textContent = metricViews?.support?.text || "支持 0";
-    supportTag.classList.add(metricViews?.support?.className || "is-low");
-
-    metrics.appendChild(scoreTag);
-    metrics.appendChild(confTag);
-    metrics.appendChild(supportTag);
-
-    const actions = document.createElement("div");
-    actions.className = "learning-item-actions";
-    const makeActionButton = (label, action, extraClass = "") => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.textContent = label;
-      btn.dataset.action = action;
-      btn.dataset.id = item.id;
-      if (extraClass) {
-        String(extraClass).split(/\s+/).filter(Boolean).forEach((cls) => btn.classList.add(cls));
-      }
-      return btn;
-    };
-    actions.appendChild(makeActionButton("保留", "keep", "is-keep"));
-    actions.appendChild(makeActionButton("删除", "delete", "danger"));
-    actions.appendChild(makeActionButton("升权 +0.05", "weight_up", "is-up"));
-    actions.appendChild(makeActionButton("降权 -0.05", "weight_down", "is-down"));
-    if (tab === "candidates") {
-      actions.appendChild(makeActionButton("晋升正式池", "promote", "is-promote"));
-    }
-
-    const body = document.createElement("div");
-    body.className = "learning-item-body";
-    body.appendChild(preview);
-    body.appendChild(metrics);
-    body.appendChild(actions);
-
-    const setCollapsed = (nextCollapsed) => {
-      card.classList.toggle("is-collapsed", !!nextCollapsed);
-      toggleBtn.textContent = nextCollapsed ? "展开" : "收起";
-      toggleBtn.setAttribute("aria-expanded", String(!nextCollapsed));
-    };
-    setCollapsed(true);
-    toggleBtn.addEventListener("click", () => {
-      setCollapsed(!card.classList.contains("is-collapsed"));
+  if (typeof LEARNING_REVIEW_VIEW.renderLearningReviewItems === "function") {
+    LEARNING_REVIEW_VIEW.renderLearningReviewItems(ui.learningReviewList, filteredItems, {
+      document,
+      model: LEARNING_REVIEW_MODEL,
+      selectedSet: getLearningSelectedSet(tab),
+      tab
     });
-
-    card.appendChild(head);
-    card.appendChild(body);
-    ui.learningReviewList.appendChild(card);
-  });
-
+  } else {
+    ui.learningReviewList.innerHTML = "";
+  }
   refreshLearningSelectAllState(filteredItems);
 }
 
 async function learningFetchJson(url, options = {}) {
-  const resp = await authFetch(url, options);
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok || (data && data.ok === false)) {
-    const errText = String(data?.error || data?.message || `HTTP ${resp.status}`);
-    throw new Error(errText);
-  }
-  return data;
+  return typeof LEARNING_REVIEW_API.fetchJson === "function"
+    ? LEARNING_REVIEW_API.fetchJson(authFetch, url, options)
+    : {};
 }
 
 async function reloadLearningReviewData() {
   setLearningReviewLoading(true);
   try {
-    const [payload, debugPayload] = await Promise.all([
-      learningFetchJson("/api/learning/reload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({})
-      }),
-      learningFetchJson("/api/memory/debug")
-    ]);
+    const { payload, debugPayload } = typeof LEARNING_REVIEW_API.reload === "function"
+      ? await LEARNING_REVIEW_API.reload(learningFetchJson)
+      : { payload: {}, debugPayload: {} };
     applyLearningPayload(payload);
     applyMemoryDebugPayload(debugPayload);
     renderLearningReviewList();
@@ -9555,21 +3025,18 @@ async function reloadLearningReviewData() {
 }
 
 async function reloadMemoryDebugData() {
-  const payload = await learningFetchJson("/api/memory/debug");
+  const payload = typeof LEARNING_REVIEW_API.reloadMemoryDebug === "function"
+    ? await LEARNING_REVIEW_API.reloadMemoryDebug(learningFetchJson)
+    : {};
   applyMemoryDebugPayload(payload);
   renderLearningDebugPanel();
   return payload;
 }
 
 async function updateLearningEntries(action, extra = {}) {
-  const payload = await learningFetchJson("/api/learning/update", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action,
-      ...extra
-    })
-  });
+  const payload = typeof LEARNING_REVIEW_API.updateEntries === "function"
+    ? await LEARNING_REVIEW_API.updateEntries(learningFetchJson, action, extra)
+    : {};
   applyLearningPayload(payload);
   renderLearningReviewList();
   if (payload?.message) {
@@ -9579,13 +3046,9 @@ async function updateLearningEntries(action, extra = {}) {
 }
 
 async function promoteLearningEntries(candidateIds) {
-  const payload = await learningFetchJson("/api/learning/promote", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      candidate_ids: Array.isArray(candidateIds) ? candidateIds : []
-    })
-  });
+  const payload = typeof LEARNING_REVIEW_API.promoteEntries === "function"
+    ? await LEARNING_REVIEW_API.promoteEntries(learningFetchJson, candidateIds)
+    : {};
   applyLearningPayload(payload);
   renderLearningReviewList();
   if (payload?.message) {
@@ -9698,331 +3161,219 @@ async function runLearningBatchAction(action) {
 async function applyLearningQuickSettings() {
   const injectCount = Number(ui.learningQuickInject?.value || 0) >= 1 ? 1 : 0;
   const minSupport = Number(ui.learningQuickSupport?.value || 1) >= 2 ? 2 : 1;
-  await updateLearningEntries("config", {
-    quick_settings: {
-      inject_count: injectCount,
-      promotion_min_support: minSupport
-    }
+  const payload = typeof LEARNING_REVIEW_API.buildQuickSettingsPayload === "function"
+    ? LEARNING_REVIEW_API.buildQuickSettingsPayload(injectCount, minSupport)
+    : { quick_settings: { inject_count: injectCount, promotion_min_support: minSupport } };
+  await updateLearningEntries("config", payload);
+}
+
+function bindLearningReviewControls() {
+  if (typeof LEARNING_REVIEW_BINDER.bindLearningReviewControls !== "function") {
+    return;
+  }
+  LEARNING_REVIEW_BINDER.bindLearningReviewControls(ui, {
+    state: learningReviewState,
+    toggleDrawer: toggleLearningReviewDrawer,
+    closeDrawer: closeLearningReviewDrawer,
+    undoLastStep: undoLearningLastStep,
+    reload: reloadLearningReviewData,
+    reloadMemoryDebug: reloadMemoryDebugData,
+    applyQuickSettings: applyLearningQuickSettings,
+    applyHighScorePreset: applyLearningHighScorePreset,
+    resetFilters: resetLearningFilters,
+    getSelectedSet: getLearningSelectedSet,
+    getFilteredItems: getLearningFilteredItems,
+    runBatchAction: runLearningBatchAction,
+    runSingleAction: runLearningSingleAction,
+    render: renderLearningReviewList,
+    onError: setStatus
+  });
+}
+
+function bindPanelControls() {
+  if (typeof PANEL_CONTROL_BINDER.bindPanelControls !== "function") {
+    return;
+  }
+  PANEL_CONTROL_BINDER.bindPanelControls(ui, {
+    isHelpOpen,
+    openHelpModal,
+    closeHelpModal,
+    openOnboardingModal,
+    closeOnboardingModal,
+    moveOnboardingStep,
+    openAdvancedConfigCenter,
+    openSchedulePanel,
+    closeSchedulePanel,
+    saveScheduleFromForm,
+    openPersonaPanel,
+    closePersonaPanel,
+    savePersonaCardFromForm,
+    setAssistantAvatarFromFile,
+    applyAssistantAvatar,
+    assistantAvatarDefault: ASSISTANT_AVATAR_DEFAULT,
+    applyPersonaTemplateDraft,
+    applyRandomPersonaDraft,
+    resetPersonaDraft,
+    setStatus
+  });
+}
+
+function bindAdvancedActionControls() {
+  if (typeof ADVANCED_ACTION_BINDER.bindAdvancedActionControls !== "function") {
+    return;
+  }
+  ADVANCED_ACTION_BINDER.bindAdvancedActionControls(ui, {
+    toggleFollowupReadinessPanel,
+    updateFollowupCharacterChip,
+    runDoctorAndAppendReport,
+    runVoiceTestAndAppendReport,
+    runCharacterRehearsalAndAppendReport,
+    runCharacterTuningAndAppendReport,
+    recordCharacterPerformanceFeedback,
+    toggleChatTranslationVisibility,
+    toggleSubtitleEnabled,
+    appendMessage,
+    setStatus
+  });
+}
+
+function updateSpeakButton() {
+  if (!ui.speakBtn) {
+    return;
+  }
+  ui.speakBtn.textContent = state.speakingEnabled ? "\u8bed\u97f3\u5f00" : "\u8bed\u97f3\u5173";
+}
+
+function bindChatInputControls() {
+  if (typeof CHAT_INPUT_BINDER.bindChatInputControls !== "function") {
+    return;
+  }
+  CHAT_INPUT_BINDER.bindChatInputControls(ui, {
+    state,
+    windowObject: window,
+    sendChat,
+    handleAttachmentFiles,
+    toggleMicOpen,
+    isOnboardingOpen,
+    closeOnboardingModal,
+    isHelpOpen,
+    closeHelpModal,
+    isLearningReviewOpen,
+    closeLearningReviewDrawer,
+    closePersonaPanel,
+    closeSchedulePanel,
+    updateSpeakButton,
+    stopAllAudioPlayback,
+    switchVoice,
+    speak,
+    setStatus
+  });
+}
+
+function bindDesktopControlButtons() {
+  if (typeof DESKTOP_CONTROL_BINDER.bindDesktopControlButtons !== "function") {
+    return;
+  }
+  DESKTOP_CONTROL_BINDER.bindDesktopControlButtons(ui, {
+    state,
+    windowObject: window,
+    updateObserveButton,
+    updateLockButton,
+    updateAutoChatButton,
+    setWindowLockedFromUI,
+    startAutoChatLoop,
+    stopAutoChatLoop,
+    setAdvancedActionsExpanded,
+    enqueueActionIntent,
+    scheduleIdleMotionLoop,
+    setStatus
+  });
+}
+
+function bindRuntimeEvents() {
+  if (typeof RUNTIME_EVENT_BINDER.bindRuntimeEvents !== "function") {
+    return;
+  }
+  RUNTIME_EVENT_BINDER.bindRuntimeEvents({
+    state,
+    windowObject: window,
+    applySubtitleDOM: _applySubtitleDOM,
+    clearSubtitleDOM: _clearSubtitleDOM,
+    applyCharacterRuntimeEmotionToLive2D,
+    applyCharacterRuntimeActionToLive2D,
+    updateReplyCharacterChip
   });
 }
 
 
 function renderScheduleList() {
-  if (!ui.scheduleList) {
-    return;
-  }
-  if (typeof SCHEDULE_LIST_VIEW.renderScheduleList !== "function") {
-    ui.scheduleList.innerHTML = "";
-    return;
-  }
-  SCHEDULE_LIST_VIEW.renderScheduleList(ui.scheduleList, state.reminders || [], {
-    normalizeReminderMode,
-    normalizeReminderRepeat,
-    buildReminderTypeLabel,
-    buildReminderDisplayTime,
-    onRemove: (item) => {
-      const ok = removeReminderById(item?.id);
-      setStatus(ok ? "?????" : "??????");
-    }
-  }, document);
+  return getReminderScheduleController().renderScheduleList();
 }
 
 function addReminder(text, dueAt, opts = {}) {
-  const id = state.reminderSeq++;
-  state.reminders.push({
-    id,
-    text: String(text || "").trim(),
-    dueAt: Number(dueAt) || Date.now(),
-    done: false,
-    mode: normalizeReminderMode(opts.mode),
-    repeat: normalizeReminderRepeat(opts.repeat)
-  });
-  state.reminders.sort((a, b) => a.dueAt - b.dueAt);
-  saveRemindersToStorage();
-  return id;
+  return getReminderScheduleController().addReminder(text, dueAt, opts);
 }
 
 function listPendingReminders() {
-  return (state.reminders || []).filter((r) => r && !r.done);
+  return getReminderScheduleController().listPendingReminders();
 }
 
 function removeReminderById(id) {
-  const target = Math.floor(Number(id) || 0);
-  if (!target) {
-    return false;
-  }
-  const before = state.reminders.length;
-  state.reminders = state.reminders.filter((r) => Number(r?.id) !== target);
-  const changed = state.reminders.length !== before;
-  if (changed) {
-    saveRemindersToStorage();
-  }
-  return changed;
+  return getReminderScheduleController().removeReminderById(id);
 }
 
 function saveScheduleFromForm() {
-  if (!ui.scheduleDatetime || !ui.scheduleTask || !ui.scheduleRepeat || !ui.scheduleMode) {
-    return;
-  }
-  const draft = typeof SCHEDULE_FORM_MODEL.buildScheduleDraft === "function"
-    ? SCHEDULE_FORM_MODEL.buildScheduleDraft({
-      rawDate: ui.scheduleDatetime.value,
-      text: ui.scheduleTask.value,
-      repeat: ui.scheduleRepeat.value,
-      mode: ui.scheduleMode.value
-    }, {
-      normalizeReminderRepeat,
-      normalizeReminderMode,
-      shiftReminderToNextDay
-    })
-    : { ok: false, message: "???????", focus: "time" };
-  if (!draft.ok) {
-    setStatus(draft.message || "??????");
-    if (draft.focus === "text") {
-      ui.scheduleTask.focus();
-    } else {
-      ui.scheduleDatetime.focus();
-    }
-    return;
-  }
-
-  const id = addReminder(draft.text, draft.dueAt, { mode: draft.mode, repeat: draft.repeat });
-  ui.scheduleTask.value = "";
-  ui.scheduleDatetime.value = buildDefaultScheduleDateTimeValue();
-  setStatus(`????? #${id}`);
-}
-
-function loadEmotionStats() {
-  const raw = window.localStorage ? localStorage.getItem(EMOTION_STORAGE_KEY) : "";
-  const parsed = safeParseJSON(raw, { day: "", items: [] });
-  const today = new Date().toISOString().slice(0, 10);
-  if (!parsed || typeof parsed !== "object" || parsed.day !== today || !Array.isArray(parsed.items)) {
-    state.emotionDayKey = today;
-    state.emotionStats = [];
-    return;
-  }
-  state.emotionDayKey = today;
-  state.emotionStats = parsed.items
-    .map((x) => ({
-      mood: String(x?.mood || "idle"),
-      ts: Number(x?.ts) || Date.now()
-    }))
-    .filter((x) => ["happy", "sad", "angry", "surprised", "idle"].includes(x.mood))
-    .slice(-800);
-}
-
-function saveEmotionStats() {
-  if (!window.localStorage) {
-    return;
-  }
-  try {
-    localStorage.setItem(
-      EMOTION_STORAGE_KEY,
-      JSON.stringify({
-        day: state.emotionDayKey || new Date().toISOString().slice(0, 10),
-        items: state.emotionStats || []
-      })
-    );
-  } catch (_) {
-    // ignore
-  }
-}
-
-function recordEmotion(mood) {
-  const today = new Date().toISOString().slice(0, 10);
-  if (state.emotionDayKey !== today) {
-    state.emotionDayKey = today;
-    state.emotionStats = [];
-  }
-  const m = String(mood || "idle");
-  state.emotionStats.push({ mood: m, ts: Date.now() });
-  if (state.emotionStats.length > 1000) {
-    state.emotionStats = state.emotionStats.slice(state.emotionStats.length - 1000);
-  }
-  saveEmotionStats();
-}
-
-function buildEmotionReportText() {
-  if (!Array.isArray(state.emotionStats) || !state.emotionStats.length) {
-    return "今天还没有足够的对话数据，先多聊几句我再给你情绪日报。";
-  }
-  const counts = { happy: 0, sad: 0, angry: 0, surprised: 0, idle: 0 };
-  for (const item of state.emotionStats) {
-    const mood = String(item?.mood || "idle");
-    if (Object.prototype.hasOwnProperty.call(counts, mood)) {
-      counts[mood] += 1;
-    }
-  }
-  const label = {
-    happy: "开心",
-    sad: "低落",
-    angry: "紧张",
-    surprised: "惊讶",
-    idle: "平稳"
-  };
-  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-  const detail = Object.entries(counts)
-    .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${label[k] || k}${n}`)
-    .join("，");
-  return `今日情绪日报：我回复里占比最高的是「${label[top[0]] || top[0]}」。统计：${detail}。`;
+  return getReminderScheduleController().saveScheduleFromForm();
 }
 
 function markReminderTriggered(item) {
-  if (!item) {
-    return;
-  }
-  if (normalizeReminderRepeat(item.repeat) === "daily") {
-    item.done = false;
-    item.dueAt = shiftReminderToNextDay(item.dueAt);
-  } else {
-    item.done = true;
-  }
+  return getReminderScheduleController().markReminderTriggered(item);
 }
 
 function startAssistantReminder(item) {
-  if (!item || state.chatBusy) {
-    return false;
-  }
-  const snapshot = {
-    dueAt: Number(item.dueAt) || Date.now(),
-    done: !!item.done
-  };
-  const scheduleLabel = buildReminderDisplayTime(item);
-  const taskText = String(item.text || "").trim();
-  const reminderMode = normalizeReminderMode(item.mode);
-  if (!taskText) {
-    return false;
-  }
-  markReminderTriggered(item);
-  saveRemindersToStorage();
-  const promptPrefix = reminderMode === "tool"
-    ? `（日程工具任务：${scheduleLabel}）请直接完成这项任务；如果涉及文件、代码、命令或图片，请优先调用工具再给我简短汇报。`
-    : `（日程任务：${scheduleLabel}）`;
-  requestAssistantReply(`${promptPrefix}${taskText}`, {
-    showUser: false,
-    rememberUser: false,
-    rememberAssistant: false,
-    auto: true,
-    silentError: true,
-    forceTools: reminderMode === "tool"
-  }).then((ok) => {
-    if (ok) {
-      return;
-    }
-    item.dueAt = snapshot.dueAt;
-    item.done = snapshot.done;
-    saveRemindersToStorage();
-  }).catch(() => {
-    item.dueAt = snapshot.dueAt;
-    item.done = snapshot.done;
-    saveRemindersToStorage();
-  });
-  return true;
+  return getReminderScheduleController().startAssistantReminder(item);
 }
 
 function runReminderCheck() {
-  runDailyGreetingCheck();
-  if (!Array.isArray(state.reminders) || !state.reminders.length) {
-    return;
-  }
-  if (state.chatBusy) {
-    return;
-  }
-  const now = Date.now();
-  let assistantItem = null;
-  for (const item of state.reminders) {
-    if (!item || item.done) {
-      continue;
-    }
-    if ((Number(item.dueAt) || 0) > now) {
-      continue;
-    }
-    if (["assistant", "tool"].includes(normalizeReminderMode(item.mode))) {
-      assistantItem = item;
-      break;
-    }
-  }
-  if (assistantItem && startAssistantReminder(assistantItem)) {
-    return;
-  }
-  const dueList = [];
-  for (const item of state.reminders) {
-    if (!item || item.done) {
-      continue;
-    }
-    if (["assistant", "tool"].includes(normalizeReminderMode(item.mode))) {
-      continue;
-    }
-    if ((Number(item.dueAt) || 0) <= now) {
-      markReminderTriggered(item);
-      dueList.push(item);
-    }
-  }
-  if (!dueList.length) {
-    return;
-  }
-  saveRemindersToStorage();
-  for (const item of dueList) {
-    const text = `提醒你：${item.text}`;
-    appendMessage("assistant", text);
-    const prosody = buildSpeakProsody(text, "idle", false, "steady");
-    speak(text, { force: true, interrupt: false, prosody });
-  }
+  return getReminderScheduleController().runReminderCheck();
 }
 
 function runDailyGreetingCheck() {
-  if (!state.dailyGreetingEnabled) {
-    return;
-  }
-  if (state.chatBusy) {
-    return;
-  }
-  const now = new Date();
-  const due = new Date(now.getTime());
-  due.setHours(state.dailyGreetingHour, state.dailyGreetingMinute, 0, 0);
-  const dayKey = getLocalDateKey(now);
-  const runKey = `morning-${dayKey}`;
-  if (state.dailyGreetingLastRunKey === runKey) {
-    return;
-  }
-  if (now.getTime() < due.getTime()) {
-    return;
-  }
-  const maxDelayMs = 90 * 60 * 1000;
-  if (now.getTime() - due.getTime() > maxDelayMs) {
-    state.dailyGreetingLastRunKey = runKey;
-    saveDailyGreetingState();
-    return;
-  }
-
-  state.dailyGreetingLastRunKey = runKey;
-  saveDailyGreetingState();
-
-  const hh = String(state.dailyGreetingHour).padStart(2, "0");
-  const mm = String(state.dailyGreetingMinute).padStart(2, "0");
-  const prompt = String(state.dailyGreetingPrompt || "").trim()
-    || "请你主动说一句早安，再给一句鼓励今天努力的暖心鸡汤。";
-  requestAssistantReply(`（定时任务：每天 ${hh}:${mm} 早安问候）${prompt}`, {
-    showUser: false,
-    rememberUser: false,
-    rememberAssistant: false,
-    auto: true,
-    silentError: true
-  }).catch(() => {
-    state.dailyGreetingLastRunKey = "";
-    saveDailyGreetingState();
-  });
+  return getReminderScheduleController().runDailyGreetingCheck();
 }
 
 function startReminderLoop() {
-  if (state.reminderTimer) {
-    clearInterval(state.reminderTimer);
-    state.reminderTimer = 0;
+  return getReminderScheduleController().startReminderLoop();
+}
+
+let emotionStatsController = null;
+
+function getEmotionStatsController() {
+  if (!emotionStatsController && typeof EMOTION_STATS_CONTROLLER.createController === "function") {
+    emotionStatsController = EMOTION_STATS_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      storageKey: EMOTION_STORAGE_KEY,
+      safeParseJSON
+    });
   }
-  state.reminderTimer = window.setInterval(() => {
-    runReminderCheck();
-  }, 1200);
+  return emotionStatsController;
+}
+
+function loadEmotionStats() {
+  return getEmotionStatsController().loadEmotionStats();
+}
+
+function saveEmotionStats() {
+  return getEmotionStatsController().saveEmotionStats();
+}
+
+function recordEmotion(mood) {
+  return getEmotionStatsController().recordEmotion(mood);
+}
+
+function buildEmotionReportText() {
+  return getEmotionStatsController().buildEmotionReportText();
 }
 
 async function buildMicDebugReport() {
@@ -10278,1991 +3629,349 @@ function applyAsrHotwordCorrections(text) {
   return out.trim();
 }
 
+let localAsrController = null;
+
+function getLocalAsrController() {
+  if (!localAsrController && typeof LOCAL_ASR_CONTROLLER.createController === "function") {
+    localAsrController = LOCAL_ASR_CONTROLLER.createController({
+      state,
+      ui,
+      windowObject: window,
+      navigatorObject: navigator,
+      performanceObject: performance,
+      authFetch,
+      setStatus,
+      clampNumber,
+      applyAsrHotwordCorrections,
+      requestAssistantReply,
+      scheduleWakeWordStart,
+      stopWakeWordListener,
+      setupWakeWordRecognition
+    });
+  }
+  return localAsrController;
+}
+
 function updateMicMeter(levelOverride = null) {
-  if (!ui.micMeterWrap || !ui.micMeterFill || !ui.micMeterText) {
-    return;
-  }
-  if (!state.showMicMeter) {
-    ui.micMeterWrap.style.display = "none";
-    return;
-  }
-  ui.micMeterWrap.style.display = "flex";
-
-  let level = levelOverride;
-  if (level == null || !Number.isFinite(Number(level))) {
-    level = state.micLevel;
-  }
-  const v = Math.max(0, Math.min(1, Number(level) || 0));
-  const visualFloor = 0.025;
-  const visualLevel = v <= visualFloor ? 0 : Math.min(1, (v - visualFloor) / (1 - visualFloor));
-  const rawPct = Math.round(visualLevel * 100);
-  const eased = Math.pow(visualLevel, 0.72);
-  const displayPct = state.micOpen && state.micSuspendDepth <= 0 ? Math.round(eased * 100) : 0;
-  ui.micMeterFill.style.width = `${displayPct}%`;
-  ui.micMeterFill.style.opacity = displayPct > 0 ? "1" : "0";
-
-  if (!state.micOpen) {
-    ui.micMeterText.textContent = "未开麦";
-  } else if (state.micSuspendDepth > 0) {
-    ui.micMeterText.textContent = "暂停";
-  } else if (state.asrMode === "local_vosk" && state.localAsrInputMuted) {
-    ui.micMeterText.textContent = "系统静音";
-  } else if (rawPct < 8) {
-    ui.micMeterText.textContent = "静音";
-  } else if (rawPct < 28) {
-    ui.micMeterText.textContent = "低";
-  } else if (rawPct < 60) {
-    ui.micMeterText.textContent = "中";
-  } else {
-    ui.micMeterText.textContent = "高";
-  }
+  return getLocalAsrController().updateMicMeter(levelOverride);
 }
 
 function updateMicButton() {
-  if (!ui.micBtn) {
-    return;
-  }
-  const micAvailable = state.recognitionAvailable || state.localAsrAvailable;
-  if (!micAvailable) {
-    ui.micBtn.disabled = true;
-    ui.micBtn.textContent = "语音输入不可用";
-    updateMicMeter(0);
-    return;
-  }
-  ui.micBtn.disabled = false;
-  if (!state.micOpen) {
-    ui.micBtn.textContent = "开麦: 关";
-    updateMicMeter(0);
-    return;
-  }
-  if (state.micSuspendDepth > 0) {
-    ui.micBtn.textContent = "开麦: 暂停";
-    updateMicMeter(0);
-    return;
-  }
-  if (state.asrMode === "local_vosk") {
-    ui.micBtn.textContent =
-      state.localAsrRunning && state.localAsrInputMuted
-        ? "开麦: 静音"
-        : state.localAsrRunning
-          ? "开麦: 开"
-          : "开麦: 连接中";
-    updateMicMeter();
-    return;
-  }
-  ui.micBtn.textContent = state.recognitionActive ? "开麦: 开" : "开麦: 连接中";
-  updateMicMeter();
+  return getLocalAsrController().updateMicButton();
 }
 
 function clearMicRestartTimer() {
-  if (!state.micRestartTimer) {
-    return;
-  }
-  clearTimeout(state.micRestartTimer);
-  state.micRestartTimer = 0;
+  return getLocalAsrController().clearMicRestartTimer();
 }
 
 async function ensureMicPermission() {
-  if (state.micPermissionGranted) {
-    return true;
-  }
-  const media = navigator.mediaDevices;
-  if (!media || typeof media.getUserMedia !== "function") {
-    setStatus("当前环境不支持麦克风权限");
-    return false;
-  }
-  try {
-    const stream = await media.getUserMedia({ audio: true, video: false });
-    for (const track of stream.getTracks()) {
-      try {
-        track.stop();
-      } catch (_) {
-        // ignore
-      }
-    }
-    state.micPermissionGranted = true;
-    return true;
-  } catch (err) {
-    const name = String(err?.name || "");
-    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-      setStatus("请允许麦克风权限后再开麦");
-    } else if (name === "NotFoundError") {
-      setStatus("未检测到麦克风设备");
-    } else {
-      setStatus("麦克风权限申请失败");
-    }
-    return false;
-  }
+  return getLocalAsrController().ensureMicPermission();
 }
 
 function floatToInt16(floatArray) {
-  const src = floatArray || new Float32Array(0);
-  const out = new Int16Array(src.length);
-  for (let i = 0; i < src.length; i++) {
-    const s = Math.max(-1, Math.min(1, src[i]));
-    out[i] = s < 0 ? Math.round(s * 32768) : Math.round(s * 32767);
-  }
-  return out;
+  return getLocalAsrController().floatToInt16(floatArray);
 }
 
 function downsampleTo16k(floatArray, inputRate) {
-  const src = floatArray || new Float32Array(0);
-  const inRate = Number(inputRate) || 16000;
-  if (!src.length) {
-    return new Int16Array(0);
-  }
-  if (inRate <= 16000) {
-    return floatToInt16(src);
-  }
-  const ratio = inRate / 16000;
-  const outLen = Math.max(1, Math.floor(src.length / ratio));
-  const out = new Int16Array(outLen);
-  let pos = 0;
-  for (let i = 0; i < outLen; i++) {
-    const next = Math.min(src.length, Math.floor((i + 1) * ratio));
-    let sum = 0;
-    let count = 0;
-    while (pos < next) {
-      sum += src[pos];
-      count += 1;
-      pos += 1;
-    }
-    const avg = count > 0 ? sum / count : 0;
-    const s = Math.max(-1, Math.min(1, avg));
-    out[i] = s < 0 ? Math.round(s * 32768) : Math.round(s * 32767);
-  }
-  return out;
+  return getLocalAsrController().downsampleTo16k(floatArray, inputRate);
 }
 
 function pcmChunksToBase64(chunks) {
-  if (!Array.isArray(chunks) || chunks.length === 0) {
-    return "";
-  }
-  let totalSamples = 0;
-  for (const ch of chunks) {
-    totalSamples += ch?.length || 0;
-  }
-  if (totalSamples <= 0) {
-    return "";
-  }
-  const bytes = new Uint8Array(totalSamples * 2);
-  let offset = 0;
-  for (const ch of chunks) {
-    const arr = ch || new Int16Array(0);
-    for (let i = 0; i < arr.length; i++) {
-      const v = arr[i];
-      bytes[offset++] = v & 0xff;
-      bytes[offset++] = (v >> 8) & 0xff;
-    }
-  }
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const sub = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode.apply(null, sub);
-  }
-  return btoa(binary);
+  return getLocalAsrController().pcmChunksToBase64(chunks);
 }
 
 async function transcribeLocalPcmChunks(chunks, signal = undefined) {
-  if (!Array.isArray(chunks) || chunks.length === 0) {
-    return "";
-  }
-  const audio_base64 = pcmChunksToBase64(chunks);
-  if (!audio_base64) {
-    return "";
-  }
-  const resp = await authFetch("/api/asr_pcm", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    signal,
-    body: JSON.stringify({
-      audio_base64,
-      sample_rate: 16000
-    })
-  });
-  if (!resp.ok) {
-    let detail = `HTTP ${resp.status}`;
-    try {
-      const data = await resp.json();
-      if (data?.error) detail = data.error;
-    } catch (_) {
-      // ignore
-    }
-    throw new Error(detail);
-  }
-  const data = await resp.json();
-  return String(data?.text || "").trim();
+  return getLocalAsrController().transcribeLocalPcmChunks(chunks, signal);
 }
 
 function cancelLocalAsrRequest() {
-  if (state.localAsrAbortController) {
-    try {
-      state.localAsrAbortController.abort();
-    } catch (_) {
-      // ignore
-    }
-  }
-  state.localAsrAbortController = null;
-  state.localAsrSending = false;
+  return getLocalAsrController().cancelLocalAsrRequest();
 }
 
 function updateLocalAsrMicLevelFromRms(rms) {
-  const safeRms = Math.max(0, Number(rms) || 0);
-  state.localAsrPeakRms = Math.max(Number(state.localAsrPeakRms) || 0, safeRms);
-  const displayNoiseFloor = clampNumber(
-    state.localAsrNoiseFloor * 1.15 + 0.0004,
-    0.0004,
-    0.018
-  );
-  const normalizedLevel = clampNumber((safeRms - displayNoiseFloor) / 0.025, 0, 1);
-  const smoothing = normalizedLevel > state.micLevel ? 0.38 : 0.24;
-  state.micLevel += (normalizedLevel - state.micLevel) * smoothing;
-  if (state.micLevel < 0.01 && normalizedLevel <= 0.001) {
-    state.micLevel = 0;
-  }
-  updateMicMeter(state.micLevel);
+  return getLocalAsrController().updateLocalAsrMicLevelFromRms(rms);
 }
 
 async function ensureAudioContextRunning(ctx) {
-  if (!ctx || ctx.state !== "suspended" || typeof ctx.resume !== "function") {
-    return true;
-  }
-  try {
-    await ctx.resume();
-  } catch (_) {
-    // ignore; the caller will check the final state.
-  }
-  return ctx.state !== "suspended";
+  return getLocalAsrController().ensureAudioContextRunning(ctx);
 }
 
 function stopLocalAsrMeter() {
-  if (state.localAsrMeterRaf) {
-    try {
-      window.cancelAnimationFrame(state.localAsrMeterRaf);
-    } catch (_) {
-      // ignore
-    }
-    try {
-      clearTimeout(state.localAsrMeterRaf);
-    } catch (_) {
-      // ignore
-    }
-  }
-  state.localAsrMeterRaf = 0;
-  state.localAsrMeterBuffer = null;
+  return getLocalAsrController().stopLocalAsrMeter();
 }
 
 function startLocalAsrMeter(sessionId = null) {
-  stopLocalAsrMeter();
-  const token = sessionId == null ? state.micSession : Number(sessionId);
-  const analyser = state.localAsrAnalyser;
-  if (!analyser) {
-    return;
-  }
-  const size = Math.max(32, Number(analyser.fftSize) || 512);
-  state.localAsrMeterBuffer = new Uint8Array(size);
-  const schedule =
-    typeof window.requestAnimationFrame === "function"
-      ? (fn) => window.requestAnimationFrame(fn)
-      : (fn) => window.setTimeout(fn, 60);
-
-  const tick = () => {
-    if (token !== state.micSession || !state.micOpen || !state.localAsrAnalyser) {
-      state.localAsrMeterRaf = 0;
-      return;
-    }
-    const buffer = state.localAsrMeterBuffer;
-    if (buffer && state.micSuspendDepth <= 0) {
-      try {
-        state.localAsrAnalyser.getByteTimeDomainData(buffer);
-        let energy = 0;
-        for (let i = 0; i < buffer.length; i++) {
-          const n = (buffer[i] - 128) / 128;
-          energy += n * n;
-        }
-        updateLocalAsrMicLevelFromRms(Math.sqrt(energy / buffer.length));
-      } catch (_) {
-        // ignore; the ASR frame path can still update the meter.
-      }
-    }
-    state.localAsrMeterRaf = schedule(tick);
-  };
-  state.localAsrMeterRaf = schedule(tick);
+  return getLocalAsrController().startLocalAsrMeter(sessionId);
 }
 
 function stopLocalAsrWatchdog() {
-  if (state.localAsrWatchdogTimer) {
-    clearInterval(state.localAsrWatchdogTimer);
-  }
-  state.localAsrWatchdogTimer = 0;
-  state.localAsrNoFrameWarned = false;
-  state.localAsrMutedWarned = false;
+  return getLocalAsrController().stopLocalAsrWatchdog();
 }
 
 function startLocalAsrWatchdog(sessionId = null) {
-  stopLocalAsrWatchdog();
-  const token = sessionId == null ? state.micSession : Number(sessionId);
-  state.localAsrLastFrameAt = performance.now();
-  state.localAsrNoFrameWarned = false;
-  state.localAsrMutedWarned = false;
-  state.localAsrWatchdogTimer = window.setInterval(() => {
-    if (token !== state.micSession || !state.micOpen || !state.localAsrRunning) {
-      stopLocalAsrWatchdog();
-      return;
-    }
-    if (state.micSuspendDepth > 0) {
-      return;
-    }
-    const ctx = state.localAsrContext;
-    if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
-      ctx.resume().catch(() => {});
-      return;
-    }
-    const startedAt = Number(state.localAsrStartedAt) || 0;
-    const muted = isLocalAsrTrackMuted(state.localAsrStream) || state.localAsrInputMuted;
-    if (muted) {
-      state.localAsrInputMuted = true;
-      if (
-        !state.localAsrMutedWarned &&
-        startedAt > 0 &&
-        performance.now() - startedAt > 1200
-      ) {
-        state.localAsrMutedWarned = true;
-        setStatus("麦克风轨道被系统静音，请检查 Windows 输入设备、隐私权限或硬件静音键");
-        updateMicButton();
-      }
-      return;
-    }
-    const lastFrameAt = Number(state.localAsrLastFrameAt) || 0;
-    if (!state.localAsrNoFrameWarned && performance.now() - lastFrameAt > 2200) {
-      state.localAsrNoFrameWarned = true;
-      setStatus("麦克风已开启，但没有收到音频，请检查系统输入设备");
-      return;
-    }
-    const peakRms = Number(state.localAsrPeakRms) || 0;
-    const lowLevelLine = Math.max(0.0018, (Number(state.localAsrSpeechThreshold) || 0.0035) * 0.55);
-    if (
-      !state.localAsrLowLevelWarned &&
-      startedAt > 0 &&
-      performance.now() - startedAt > 5500 &&
-      peakRms > 0 &&
-      peakRms < lowLevelLine
-    ) {
-      state.localAsrLowLevelWarned = true;
-      if (!state.localAsrThresholdAutoAdjusted && state.localAsrSpeechThreshold > 0.0042) {
-        const loweredThreshold = clampNumber(
-          state.localAsrSpeechThreshold * 0.62,
-          0.0022,
-          0.0042
-        );
-        if (loweredThreshold < state.localAsrSpeechThreshold) {
-          state.localAsrSpeechThreshold = loweredThreshold;
-          state.localAsrThresholdAutoAdjusted = true;
-          setStatus("麦克风输入偏低，已自动降低识别阈值一次");
-          return;
-        }
-      }
-      setStatus("麦克风输入音量很低，请检查系统输入设备或靠近麦克风");
-    }
-  }, 1200);
+  return getLocalAsrController().startLocalAsrWatchdog(sessionId);
 }
 
 async function flushLocalAsrUtterance(force = false, sessionId = null) {
-  const token = sessionId == null ? state.micSession : Number(sessionId);
-  if (token !== state.micSession) {
-    return;
-  }
-  if (state.localAsrSending) {
-    return;
-  }
-  if (!state.localAsrBuffers.length) {
-    return;
-  }
-  const speechMs = state.localAsrSpeechMs;
-  if (!force && speechMs < state.localAsrMinSpeechMs) {
-    return;
-  }
-  const chunks = state.localAsrBuffers.slice();
-  state.localAsrBuffers = [];
-  state.localAsrSpeeching = false;
-  state.localAsrSpeechMs = 0;
-  state.localAsrSilenceMs = 0;
-  state.localAsrSending = true;
-  const controller = new AbortController();
-  state.localAsrAbortController = controller;
-  try {
-    const text = await transcribeLocalPcmChunks(chunks, controller.signal);
-    if (token !== state.micSession || !state.micOpen) {
-      return;
-    }
-    if (text) {
-      enqueueMicTranscript(text, token);
-    }
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      return;
-    }
-    setStatus(`语音识别失败: ${err.message}`);
-  } finally {
-    if (state.localAsrAbortController === controller) {
-      state.localAsrAbortController = null;
-    }
-    state.localAsrSending = false;
-  }
+  return getLocalAsrController().flushLocalAsrUtterance(force, sessionId);
 }
 
 function handleLocalAsrFrame(floatData, inputSampleRate, sessionId = null) {
-  const token = sessionId == null ? state.micSession : Number(sessionId);
-  if (token !== state.micSession || !state.micOpen) {
-    return;
-  }
-  const pcm16 = downsampleTo16k(floatData, inputSampleRate);
-  if (!pcm16.length) {
-    return;
-  }
-  let energy = 0;
-  for (let i = 0; i < pcm16.length; i++) {
-    const n = pcm16[i] / 32768;
-    energy += n * n;
-  }
-  const rms = Math.sqrt(energy / pcm16.length);
-  const frameMs = (pcm16.length / 16000) * 1000;
-  updateLocalAsrMicLevelFromRms(rms);
-
-  const baseThreshold = clampNumber(state.localAsrSpeechThreshold || 0.0035, 0.0015, 0.05);
-  const adaptiveThreshold = Math.max(
-    baseThreshold,
-    clampNumber(state.localAsrNoiseFloor * 1.8 + 0.001, 0.0015, 0.02)
-  );
-  const isSpeech = rms >= adaptiveThreshold;
-
-  if (isSpeech) {
-    state.localAsrSpeeching = true;
-    state.localAsrSpeechMs += frameMs;
-    state.localAsrSilenceMs = 0;
-    state.localAsrBuffers.push(pcm16);
-    if (state.localAsrSpeechMs >= state.localAsrMaxSpeechMs) {
-      flushLocalAsrUtterance(true, token);
-    }
-    return;
-  }
-
-  if (!state.localAsrSpeeching) {
-    // Keep tracking environment noise to auto-adapt threshold.
-    state.localAsrNoiseFloor = state.localAsrNoiseFloor * 0.94 + rms * 0.06;
-  }
-
-  if (!state.localAsrSpeeching) {
-    return;
-  }
-  state.localAsrSilenceMs += frameMs;
-  if (state.localAsrSilenceMs < state.localAsrSilenceTriggerMs) {
-    state.localAsrBuffers.push(pcm16);
-    return;
-  }
-  flushLocalAsrUtterance(false, token);
+  return getLocalAsrController().handleLocalAsrFrame(floatData, inputSampleRate, sessionId);
 }
 
 function clearLocalAsrGraph() {
-  stopLocalAsrMeter();
-  stopLocalAsrWatchdog();
-  if (state.localAsrProcessor) {
-    try {
-      state.localAsrProcessor.disconnect();
-    } catch (_) {
-      // ignore
-    }
-  }
-  if (state.localAsrAnalyser) {
-    try {
-      state.localAsrAnalyser.disconnect();
-    } catch (_) {
-      // ignore
-    }
-  }
-  if (state.localAsrSource) {
-    try {
-      state.localAsrSource.disconnect();
-    } catch (_) {
-      // ignore
-    }
-  }
-  if (state.localAsrContext) {
-    try {
-      state.localAsrContext.close();
-    } catch (_) {
-      // ignore
-    }
-  }
-  if (state.localAsrStream) {
-    for (const track of state.localAsrStream.getTracks()) {
-      try {
-        track.stop();
-      } catch (_) {
-        // ignore
-      }
-    }
-  }
-  state.localAsrStream = null;
-  state.localAsrContext = null;
-  state.localAsrSource = null;
-  state.localAsrProcessor = null;
-  state.localAsrAnalyser = null;
-  state.localAsrLastFrameAt = 0;
-  state.localAsrPeakRms = 0;
-  state.localAsrStartedAt = 0;
-  state.localAsrLowLevelWarned = false;
-  state.localAsrThresholdAutoAdjusted = false;
-  state.localAsrMutedWarned = false;
-  state.localAsrInputDeviceId = "";
-  state.localAsrInputDeviceLabel = "";
-  state.localAsrInputMuted = false;
-  state.localAsrRunning = false;
-  state.localAsrSpeeching = false;
-  state.localAsrSpeechMs = 0;
-  state.localAsrSilenceMs = 0;
-  state.localAsrBuffers = [];
-  state.localAsrNoiseFloor = 0.0008;
-  state.micLevel = 0;
-  updateMicMeter(0);
+  return getLocalAsrController().clearLocalAsrGraph();
 }
 
 function buildLocalAsrAudioConstraints(deviceId = "") {
-  const audio = {
-    channelCount: { ideal: 1 },
-    sampleRate: { ideal: 16000 },
-    latency: { ideal: 0 },
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true
-  };
-  const safeDeviceId = String(deviceId || "").trim();
-  if (safeDeviceId) {
-    audio.deviceId = { exact: safeDeviceId };
-  }
-  return { audio, video: false };
+  return getLocalAsrController().buildLocalAsrAudioConstraints(deviceId);
 }
 
 function getLocalAsrAudioTrack(stream) {
-  return stream && typeof stream.getAudioTracks === "function"
-    ? (stream.getAudioTracks()[0] || null)
-    : null;
+  return getLocalAsrController().getLocalAsrAudioTrack(stream);
 }
 
 function getLocalAsrTrackLabel(stream) {
-  return String(getLocalAsrAudioTrack(stream)?.label || "").trim();
+  return getLocalAsrController().getLocalAsrTrackLabel(stream);
 }
 
 function isLocalAsrTrackMuted(stream) {
-  return !!getLocalAsrAudioTrack(stream)?.muted;
+  return getLocalAsrController().isLocalAsrTrackMuted(stream);
 }
 
 function isDisfavoredLocalAsrInputLabel(label) {
-  return /stereo mix|loopback|what u hear|\u7acb\u4f53\u58f0\u6df7\u97f3/i.test(
-    String(label || "")
-  );
+  return getLocalAsrController().isDisfavoredLocalAsrInputLabel(label);
 }
 
 function scoreLocalAsrInputDevice(device) {
-  const label = String(device?.label || "").toLowerCase();
-  if (!label) {
-    return 0;
-  }
-  let score = 0;
-  if (/microphone|mic|\u9ea6\u514b\u98ce|\u9635\u5217/.test(label)) {
-    score += 80;
-  }
-  if (/realtek|array/.test(label)) {
-    score += 12;
-  }
-  if (/default|communications/.test(label)) {
-    score -= 4;
-  }
-  if (/stereo mix|loopback|what u hear|\u7acb\u4f53\u58f0\u6df7\u97f3/.test(label)) {
-    score -= 120;
-  }
-  return score;
+  return getLocalAsrController().scoreLocalAsrInputDevice(device);
 }
 
 function choosePreferredLocalAsrInputDevice(devices) {
-  const inputs = Array.isArray(devices)
-    ? devices.filter((device) => device && device.kind === "audioinput")
-    : [];
-  if (!inputs.length) {
-    return null;
-  }
-  const ranked = inputs
-    .map((device, index) => ({ device, index, score: scoreLocalAsrInputDevice(device) }))
-    .sort((a, b) => (b.score - a.score) || (a.index - b.index));
-  const best = ranked[0];
-  return best && best.score > 0 ? best.device : null;
+  return getLocalAsrController().choosePreferredLocalAsrInputDevice(devices);
 }
 
 function rememberLocalAsrInputDevice(stream, devices = []) {
-  const track = getLocalAsrAudioTrack(stream);
-  const settings = track && typeof track.getSettings === "function" ? (track.getSettings() || {}) : {};
-  state.localAsrInputDeviceId = String(settings.deviceId || "").trim();
-  state.localAsrInputDeviceLabel = String(track?.label || "").trim();
-  state.localAsrInputMuted = !!track?.muted;
-  state.localAsrInputDeviceCandidates = Array.isArray(devices)
-    ? devices
-        .filter((device) => device && device.kind === "audioinput")
-        .map((device) => String(device.label || "(hidden label)").trim())
-        .filter(Boolean)
-        .slice(0, 12)
-    : [];
+  return getLocalAsrController().rememberLocalAsrInputDevice(stream, devices);
 }
 
 async function openPreferredLocalAsrStream(media) {
-  let stream = await media.getUserMedia(buildLocalAsrAudioConstraints());
-  let devices = [];
-  try {
-    devices = await media.enumerateDevices();
-  } catch (_) {
-    devices = [];
-  }
-  const currentTrack = getLocalAsrAudioTrack(stream);
-  const currentSettings =
-    currentTrack && typeof currentTrack.getSettings === "function"
-      ? (currentTrack.getSettings() || {})
-      : {};
-  const currentDeviceId = String(currentSettings.deviceId || "").trim();
-  const currentLabel = getLocalAsrTrackLabel(stream);
-  if (!isDisfavoredLocalAsrInputLabel(currentLabel) && !isLocalAsrTrackMuted(stream)) {
-    rememberLocalAsrInputDevice(stream, devices);
-    return stream;
-  }
-
-  const inputs = Array.isArray(devices)
-    ? devices.filter((device) => device && device.kind === "audioinput")
-    : [];
-  const ranked = inputs
-    .map((device, index) => ({ device, index, score: scoreLocalAsrInputDevice(device) }))
-    .sort((a, b) => (b.score - a.score) || (a.index - b.index));
-  for (const item of ranked) {
-    const candidate = item.device;
-    const candidateDeviceId = String(candidate?.deviceId || "").trim();
-    if (!candidateDeviceId || candidateDeviceId === currentDeviceId || item.score <= 0) {
-      continue;
-    }
-    let candidateStream = null;
-    try {
-      candidateStream = await media.getUserMedia(
-        buildLocalAsrAudioConstraints(candidateDeviceId)
-      );
-      if (
-        isDisfavoredLocalAsrInputLabel(getLocalAsrTrackLabel(candidateStream)) ||
-        isLocalAsrTrackMuted(candidateStream)
-      ) {
-        for (const track of candidateStream.getTracks()) {
-          try {
-            track.stop();
-          } catch (_) {
-            // ignore
-          }
-        }
-        candidateStream = null;
-        continue;
-      }
-      for (const track of stream.getTracks()) {
-        try {
-          track.stop();
-        } catch (_) {
-          // ignore
-        }
-      }
-      stream = candidateStream;
-      candidateStream = null;
-      break;
-    } catch (_) {
-      if (candidateStream) {
-        for (const track of candidateStream.getTracks()) {
-          try {
-            track.stop();
-          } catch (_) {
-            // ignore
-          }
-        }
-      }
-    }
-  }
-  rememberLocalAsrInputDevice(stream, devices);
-  return stream;
+  return getLocalAsrController().openPreferredLocalAsrStream(media);
 }
 
 async function startLocalAsrLoop(sessionId = null) {
-  if (state.localAsrRunning) {
-    return true;
-  }
-  const token = sessionId == null ? state.micSession : Number(sessionId);
-  const media = navigator.mediaDevices;
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!media || typeof media.getUserMedia !== "function" || !AudioCtx) {
-    setStatus("当前环境不支持本地语音识别");
-    return false;
-  }
-  let stream = null;
-  try {
-    stream = await openPreferredLocalAsrStream(media);
-  } catch (err) {
-    const name = String(err?.name || "");
-    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-      setStatus("请允许麦克风权限后再开麦");
-    } else {
-      setStatus("麦克风开启失败");
-    }
-    return false;
-  }
-  if (token !== state.micSession || !state.micOpen) {
-    for (const track of stream.getTracks()) {
-      try {
-        track.stop();
-      } catch (_) {
-        // ignore
-      }
-    }
-    return false;
-  }
-  const audioTrack = stream.getAudioTracks()[0] || null;
-  if (audioTrack) {
-    audioTrack.onmute = () => {
-      state.localAsrInputMuted = true;
-      if (token === state.micSession && state.micOpen) {
-        setStatus("麦克风轨道被系统静音，请检查 Windows 输入设备、隐私权限或硬件静音键");
-        updateMicButton();
-      }
-    };
-    audioTrack.onunmute = () => {
-      state.localAsrInputMuted = false;
-      if (token === state.micSession && state.micOpen) {
-        setStatus("开麦中...");
-        updateMicButton();
-      }
-    };
-    audioTrack.onended = () => {
-      if (token === state.micSession && state.micOpen) {
-        setStatus("麦克风输入已断开，请重新开麦");
-      }
-    };
-  }
-
-  const ctx = new AudioCtx();
-  const contextReady = await ensureAudioContextRunning(ctx);
-  if (!contextReady) {
-    setStatus("麦克风音频未启动，请再点一次开麦");
-    try {
-      ctx.close();
-    } catch (_) {
-      // ignore
-    }
-    for (const track of stream.getTracks()) {
-      try {
-        track.stop();
-      } catch (_) {
-        // ignore
-      }
-    }
-    return false;
-  }
-
-  const source = ctx.createMediaStreamSource(stream);
-  const analyser = ctx.createAnalyser();
-  analyser.fftSize = 512;
-  analyser.smoothingTimeConstant = 0.65;
-  const processor = ctx.createScriptProcessor(state.localAsrProcessorBufferSize || 2048, 1, 1);
-  const sessionToken = token;
-  processor.onaudioprocess = (evt) => {
-    if (sessionToken !== state.micSession) {
-      return;
-    }
-    if (!state.micOpen || state.micSuspendDepth > 0) {
-      return;
-    }
-    state.localAsrLastFrameAt = performance.now();
-    state.localAsrNoFrameWarned = false;
-    const input = evt.inputBuffer.getChannelData(0);
-    handleLocalAsrFrame(input, ctx.sampleRate, sessionToken);
-  };
-  source.connect(analyser);
-  source.connect(processor);
-  processor.connect(ctx.destination);
-  if (sessionToken !== state.micSession || !state.micOpen) {
-    try {
-      processor.disconnect();
-    } catch (_) {
-      // ignore
-    }
-    try {
-      analyser.disconnect();
-    } catch (_) {
-      // ignore
-    }
-    try {
-      source.disconnect();
-    } catch (_) {
-      // ignore
-    }
-    try {
-      ctx.close();
-    } catch (_) {
-      // ignore
-    }
-    for (const track of stream.getTracks()) {
-      try {
-        track.stop();
-      } catch (_) {
-        // ignore
-      }
-    }
-    return false;
-  }
-
-  state.localAsrStream = stream;
-  state.localAsrContext = ctx;
-  state.localAsrSource = source;
-  state.localAsrProcessor = processor;
-  state.localAsrAnalyser = analyser;
-  state.localAsrRunning = true;
-  state.localAsrSpeeching = false;
-  state.localAsrSpeechMs = 0;
-  state.localAsrSilenceMs = 0;
-  state.localAsrBuffers = [];
-  state.localAsrNoiseFloor = 0.0008;
-  state.localAsrLastFrameAt = performance.now();
-  state.localAsrPeakRms = 0;
-  state.localAsrStartedAt = performance.now();
-  state.localAsrNoFrameWarned = false;
-  state.localAsrLowLevelWarned = false;
-  state.localAsrThresholdAutoAdjusted = false;
-  state.localAsrMutedWarned = false;
-  state.localAsrInputMuted = !!audioTrack?.muted;
-  startLocalAsrMeter(sessionToken);
-  startLocalAsrWatchdog(sessionToken);
-  return true;
+  return getLocalAsrController().startLocalAsrLoop(sessionId);
 }
 
 function stopLocalAsrLoop(forceFlush = false, sessionId = null) {
-  if (forceFlush) {
-    flushLocalAsrUtterance(true, sessionId);
-  }
-  cancelLocalAsrRequest();
-  clearLocalAsrGraph();
+  return getLocalAsrController().stopLocalAsrLoop(forceFlush, sessionId);
 }
 
 function scheduleMicRecognitionStart(delayMs = 0) {
-  if (state.asrMode === "local_vosk") {
-    return;
-  }
-  clearMicRestartTimer();
-  if (!state.micOpen || !state.recognition || state.micSuspendDepth > 0) {
-    updateMicButton();
-    return;
-  }
-  const backoff = Math.min(2500, 260 + state.micRetryCount * 320);
-  const waitMs = Math.max(backoff, Math.max(0, Number(delayMs) || 0));
-  state.micRestartTimer = window.setTimeout(() => {
-    state.micRestartTimer = 0;
-    if (!state.micOpen || !state.recognition || state.micSuspendDepth > 0) {
-      updateMicButton();
-      return;
-    }
-    try {
-      state.recognition.start();
-    } catch (_) {
-      state.micRetryCount = Math.min(8, state.micRetryCount + 1);
-      scheduleMicRecognitionStart(900);
-    }
-    updateMicButton();
-  }, waitMs);
+  return getLocalAsrController().scheduleMicRecognitionStart(delayMs);
 }
 
 function stopMicLoop(manualClose = false) {
-  clearMicRestartTimer();
-  if (manualClose) {
-    state.micSession += 1;
-    state.micOpen = false;
-    state.micSuspendDepth = 0;
-    state.micRetryCount = 0;
-    state.micQueue = [];
-    state.wakeCooldownUntil = Date.now() + 1200;
-  }
-  if (state.asrMode === "local_vosk") {
-    stopLocalAsrLoop(false, state.micSession);
-    if (manualClose) {
-      scheduleWakeWordStart(420);
-    }
-    updateMicButton();
-    return;
-  }
-  if (state.recognition) {
-    try {
-      if (manualClose && typeof state.recognition.abort === "function") {
-        state.recognition.abort();
-      } else {
-        state.recognition.stop();
-      }
-    } catch (_) {
-      // ignore
-    }
-  }
-  if (manualClose) {
-    state.recognitionActive = false;
-    scheduleWakeWordStart(420);
-  }
-  updateMicButton();
+  return getLocalAsrController().stopMicLoop(manualClose);
 }
 
 async function startMicLoop() {
-  stopWakeWordListener(true);
-  state.micSession += 1;
-  const token = state.micSession;
-  state.micOpen = true;
-  state.micRetryCount = 0;
-  state.micQueue = [];
-  if (state.asrMode === "local_vosk") {
-    const ok = await startLocalAsrLoop(token);
-    if (token !== state.micSession || !state.micOpen) {
-      stopLocalAsrLoop(false, state.micSession);
-      scheduleWakeWordStart(420);
-      updateMicButton();
-      return;
-    }
-    if (!ok) {
-      state.micOpen = false;
-      scheduleWakeWordStart(420);
-      updateMicButton();
-      return;
-    }
-  } else {
-    if (!state.recognition) {
-      state.micOpen = false;
-      scheduleWakeWordStart(420);
-      updateMicButton();
-      return;
-    }
-    const ok = await ensureMicPermission();
-    if (!ok) {
-      state.micOpen = false;
-      scheduleWakeWordStart(420);
-      updateMicButton();
-      return;
-    }
-    scheduleMicRecognitionStart(0);
-  }
-  updateMicButton();
+  return getLocalAsrController().startMicLoop();
 }
 
 function pauseMicForAssistant() {
-  if (!(state.recognitionAvailable || state.localAsrAvailable) || !state.micOpen) {
-    return;
-  }
-  if (state.micKeepListening) {
-    updateMicButton();
-    return;
-  }
-  state.micSuspendDepth += 1;
-  if (state.asrMode === "local_vosk") {
-    updateMicButton();
-    return;
-  }
-  stopMicLoop(false);
+  return getLocalAsrController().pauseMicForAssistant();
 }
 
 function resumeMicAfterAssistant() {
-  if (!(state.recognitionAvailable || state.localAsrAvailable) || !state.micOpen) {
-    return;
-  }
-  if (state.micKeepListening) {
-    updateMicButton();
-    return;
-  }
-  if (state.micSuspendDepth > 0) {
-    state.micSuspendDepth -= 1;
-  }
-  if (state.micSuspendDepth <= 0) {
-    state.micSuspendDepth = 0;
-    if (state.asrMode === "local_vosk") {
-      flushLocalAsrUtterance(true, state.micSession);
-    } else {
-      scheduleMicRecognitionStart(220);
-    }
-  }
-  updateMicButton();
+  return getLocalAsrController().resumeMicAfterAssistant();
 }
 
 function enqueueMicTranscript(text, sessionId = null) {
-  const token = sessionId == null ? state.micSession : Number(sessionId);
-  if (token !== state.micSession || !state.micOpen) {
-    return;
-  }
-  const cleaned = String(text || "").trim();
-  if (!cleaned) {
-    return;
-  }
-  const corrected = applyAsrHotwordCorrections(cleaned);
-  state.micQueue.push(corrected || cleaned);
-  runMicQueue();
+  return getLocalAsrController().enqueueMicTranscript(text, sessionId);
 }
 
 async function runMicQueue() {
-  if (state.micQueueWorking) {
-    return;
+  return getLocalAsrController().runMicQueue();
+}
+
+let autoChatController = null;
+
+function getAutoChatController() {
+  if (!autoChatController && typeof AUTO_CHAT_CONTROLLER.createController === "function") {
+    autoChatController = AUTO_CHAT_CONTROLLER.createController({
+      state,
+      ui,
+      documentObject: document,
+      windowObject: window,
+      parseMessageTimestamp,
+      requestAssistantReply,
+      constants: {
+        AUTO_CHAT_MIN_USER_GAP_MS,
+        AUTO_CHAT_MIN_ASSISTANT_GAP_MS,
+        AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS,
+        AUTO_CHAT_EMO_RE,
+        AUTO_CHAT_MIRROR_RE,
+        AUTO_CHAT_TOPIC_RE,
+        AUTO_CHAT_ASK_RE,
+        AUTO_CHAT_OPEN_LOOP_RE,
+        AUTO_CHAT_BRIEF_REPLY_RE,
+        AUTO_CHAT_REPEAT_REASON_WINDOW_MS,
+        AUTO_CHAT_REPEAT_TOPIC_WINDOW_MS,
+        AUTO_CHAT_BURST_RESET_WINDOW_MS,
+        AUTO_CHAT_REASON_PRIORITY,
+        AUTO_CHAT_REASON_HINTS,
+        AUTO_CHAT_STYLE_NOTES,
+        WAITING_VOICE_HINTS,
+        VISION_INTENT_RE
+      }
+    });
   }
-  state.micQueueWorking = true;
-  try {
-    while (state.micQueue.length > 0) {
-      if (!state.micOpen) {
-        state.micQueue = [];
-        break;
-      }
-      if (state.chatBusy) {
-        await new Promise((resolve) => setTimeout(resolve, 160));
-        continue;
-      }
-      const next = state.micQueue.shift();
-      if (!next) {
-        continue;
-      }
-      ui.chatInput.value = "";
-      await requestAssistantReply(next, {
-        showUser: true,
-        rememberUser: true,
-        auto: false,
-        silentError: false
-      });
-    }
-  } finally {
-    state.micQueueWorking = false;
-  }
+  return autoChatController;
 }
 
 function stopAutoChatLoop() {
-  if (!state.autoChatTimer) {
-    return;
-  }
-  clearTimeout(state.autoChatTimer);
-  state.autoChatTimer = 0;
+  return getAutoChatController().stopAutoChatLoop();
 }
 
 function shouldSkipAutoChat() {
-  if (state.chatBusy) {
-    return true;
-  }
-  const now = Date.now();
-  if (state.lastAutoChatAt > 0 && now - state.lastAutoChatAt < AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS) {
-    return true;
-  }
-  if (state.lastUserMessageAt > 0 && now - state.lastUserMessageAt < AUTO_CHAT_MIN_USER_GAP_MS) {
-    return true;
-  }
-  const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
-  for (let i = records.length - 1; i >= 0; i -= 1) {
-    const item = records[i];
-    if (!item || item.role !== "assistant") {
-      continue;
-    }
-    const ts = parseMessageTimestamp(item.timestamp);
-    if (ts > 0 && now - ts < AUTO_CHAT_MIN_ASSISTANT_GAP_MS) {
-      return true;
-    }
-    break;
-  }
-  if (!ui.chatInput) {
-    return false;
-  }
-  const focused = document.activeElement === ui.chatInput;
-  const typing = ui.chatInput.value.trim().length > 0;
-  return focused && typing;
+  return getAutoChatController().shouldSkipAutoChat();
 }
 
 function shouldPlayLatencyHint(isAuto, useStreamSpeak) {
-  // Disabled: latency hint can race with final reply TTS and interrupt playback.
-  return false;
+  return getAutoChatController().shouldPlayLatencyHint(isAuto, useStreamSpeak);
 }
 
 function pickLatencyHintText() {
-  const idx = Math.floor(Math.random() * WAITING_VOICE_HINTS.length);
-  return WAITING_VOICE_HINTS[idx] || WAITING_VOICE_HINTS[0];
+  return getAutoChatController().pickLatencyHintText();
 }
 
 function normalizeAutoChatTopicHint(text = "") {
-  let safe = String(text || "").replace(/\s+/g, " ").trim();
-  if (!safe) {
-    return "";
-  }
-  safe = safe.replace(/[“”"'`【】[\]（）()]/g, "").trim();
-  const maxChars = Math.max(
-    12,
-    Number(state.autoChatTuning?.maxTopicHintChars) || 42
-  );
-  if (safe.length > maxChars) {
-    safe = safe.slice(0, maxChars).trim();
-  }
-  return safe;
+  return getAutoChatController().normalizeAutoChatTopicHint(text);
 }
 
 function buildConversationFollowupTopicHint(text = "") {
-  let safe = String(text || "").replace(/\s+/g, " ").trim();
-  if (!safe) {
-    return "";
-  }
-  const lines = safe.split(/\r?\n/).map((line) => String(line || "").trim()).filter(Boolean);
-  safe = lines.length ? lines[lines.length - 1] : safe;
-  const tailSplit = safe.split(/[。！？!?]/).map((item) => String(item || "").trim()).filter(Boolean);
-  let hint = tailSplit.length ? tailSplit[tailSplit.length - 1] : safe;
-  if (hint.length > 80) {
-    hint = hint.slice(0, 80).trim();
-  }
-  return hint;
+  return getAutoChatController().buildConversationFollowupTopicHint(text);
 }
 
 function detectOpenLoopFollowup(text = "") {
-  const safe = String(text || "").replace(/\s+/g, " ").trim();
-  if (!safe) {
-    return { pending: false, reason: "", topicHint: "" };
-  }
-  if (/[?？][”"'’）)\]]*\s*$/.test(safe)) {
-    return {
-      pending: true,
-      reason: "question_tail",
-      topicHint: buildConversationFollowupTopicHint(safe)
-    };
-  }
-  if (/(你觉得呢|要不要|要不要我继续)/i.test(safe)) {
-    return {
-      pending: true,
-      reason: "keyword_hint",
-      topicHint: buildConversationFollowupTopicHint(safe)
-    };
-  }
-  return { pending: false, reason: "", topicHint: "" };
+  return getAutoChatController().detectOpenLoopFollowup(text);
 }
 
 function updateConversationFollowupState(assistantText = "") {
-  if (state.conversationMode?.enabled !== true) {
-    state.followupPending = false;
-    state.followupReason = "";
-    state.followupTopicHint = "";
-    state.followupUpdatedAt = 0;
-    return;
-  }
-  const result = detectOpenLoopFollowup(assistantText);
-  state.followupPending = result.pending === true;
-  state.followupReason = String(result.reason || "");
-  state.followupTopicHint = String(result.topicHint || "");
-  state.followupUpdatedAt = Date.now();
+  return getAutoChatController().updateConversationFollowupState(assistantText);
 }
 
 function pickAutoChatPrimaryReason(reasons = []) {
-  for (const key of AUTO_CHAT_REASON_PRIORITY) {
-    if (Array.isArray(reasons) && reasons.includes(key)) {
-      return key;
-    }
-  }
-  if (Array.isArray(reasons) && reasons.length > 0) {
-    return String(reasons[0] || "").trim() || "spontaneous";
-  }
-  return "spontaneous";
+  return getAutoChatController().pickAutoChatPrimaryReason(reasons);
 }
 
 function analyzeAutoChatContext() {
-  const now = Date.now();
-  const tuning = state.autoChatTuning || {};
-  const repeatReasonWindowMs = Math.max(
-    2 * 60 * 1000,
-    Number(tuning.repeatReasonWindowMs) || AUTO_CHAT_REPEAT_REASON_WINDOW_MS
-  );
-  const repeatTopicWindowMs = Math.max(
-    2 * 60 * 1000,
-    Number(tuning.repeatTopicWindowMs) || AUTO_CHAT_REPEAT_TOPIC_WINDOW_MS
-  );
-  const burstResetWindowMs = Math.max(
-    3 * 60 * 1000,
-    Number(tuning.burstResetWindowMs) || AUTO_CHAT_BURST_RESET_WINDOW_MS
-  );
-  const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
-  const recent = records.slice(-16);
-  const recentUsers = recent
-    .filter((item) => item && item.role === "user" && typeof item.content === "string")
-    .slice(-8);
-  const lastUser = recentUsers.length ? recentUsers[recentUsers.length - 1] : null;
-  const prevUser = recentUsers.length > 1 ? recentUsers[recentUsers.length - 2] : null;
-  const lastAssistant = [...recent].reverse().find((item) => item && item.role === "assistant") || null;
-
-  const lastUserText = String(lastUser?.content || "").trim();
-  const prevUserText = String(prevUser?.content || "").trim();
-  const lastAssistantText = String(lastAssistant?.content || "").trim();
-  const assistantRawTs = Number(lastAssistant?.timestamp);
-  const lastAssistantTs = Number.isFinite(assistantRawTs) && assistantRawTs > 0
-    ? Math.round(assistantRawTs)
-    : 0;
-  const minsSinceAssistant = lastAssistantTs > 0 ? (now - lastAssistantTs) / 60000 : 999;
-  const silentMinutes = Math.max(0, Math.round((now - (state.lastUserMessageAt || now)) / 60000));
-
-  let score = 0;
-  const reasons = [];
-  const topicSeeds = [];
-
-  if (silentMinutes >= 140) {
-    score += 1.1;
-    reasons.push("long_silence");
-  } else if (silentMinutes >= 55) {
-    score += 0.68;
-    reasons.push("mid_silence");
-  }
-
-  if (lastUserText) {
-    if (AUTO_CHAT_EMO_RE.test(lastUserText)) {
-      score += 0.95;
-      reasons.push("emotion_signal");
-      topicSeeds.push(lastUserText.slice(0, 40));
-    }
-    if (AUTO_CHAT_MIRROR_RE.test(lastUserText)) {
-      score += 0.62;
-      reasons.push("mirror_question");
-      topicSeeds.push(lastUserText.slice(0, 40));
-    }
-    if (lastUserText.length >= 16 && AUTO_CHAT_TOPIC_RE.test(lastUserText)) {
-      score += 0.52;
-      reasons.push("topic_hot");
-      topicSeeds.push(lastUserText.slice(0, 40));
-    }
-    if (AUTO_CHAT_OPEN_LOOP_RE.test(lastUserText)) {
-      score += 0.62;
-      reasons.push("open_loop");
-      topicSeeds.push(lastUserText.slice(0, 40));
-    }
-  }
-
-  const longUserCount = recentUsers
-    .filter((item) => String(item?.content || "").trim().length >= 16)
-    .length;
-  if (longUserCount >= 2 && silentMinutes >= 10) {
-    score += 0.3;
-    reasons.push("deep_talk_pause");
-  }
-
-  if (lastAssistantText) {
-    const hasPendingQuestion = AUTO_CHAT_ASK_RE.test(lastAssistantText)
-      || /(你觉得|你会|你想|要不要|可以吗|想听|要不要我)/.test(lastAssistantText);
-    if (hasPendingQuestion && silentMinutes >= 5) {
-      score += 0.56;
-      reasons.push("followup_pending");
-    }
-    if (hasPendingQuestion && AUTO_CHAT_BRIEF_REPLY_RE.test(lastUserText) && silentMinutes >= 3) {
-      score += 0.45;
-      reasons.push("brief_ack_drop");
-    }
-  }
-
-  if (!lastUserText && prevUserText && AUTO_CHAT_TOPIC_RE.test(prevUserText)) {
-    topicSeeds.push(prevUserText.slice(0, 40));
-  }
-
-  if (minsSinceAssistant < 3) {
-    score -= 0.8;
-  }
-  if (minsSinceAssistant < 1.5) {
-    score -= 1.2;
-  }
-  if (state.lastAutoChatAt > 0 && now - state.lastAutoChatAt < 7 * 60 * 1000) {
-    score -= Math.max(0, Number(tuning.recentAutoPenalty) || 0.45);
-  }
-
-  const topicHint = normalizeAutoChatTopicHint(topicSeeds.find(Boolean) || "");
-  const primaryReason = pickAutoChatPrimaryReason(reasons);
-
-  let threshold = Number.isFinite(Number(tuning.triggerBaseThreshold))
-    ? Number(tuning.triggerBaseThreshold)
-    : 1.03;
-  if (silentMinutes < 15) {
-    threshold += Math.max(0, Number(tuning.shortSilencePenalty) || 0.35);
-  }
-  if (silentMinutes >= 90) {
-    threshold -= Math.max(0, Number(tuning.longSilenceBonus) || 0.14);
-  }
-  if (reasons.includes("emotion_signal") || reasons.includes("open_loop")) {
-    threshold -= Math.max(0, Number(tuning.emotionBonus) || 0.12);
-  }
-
-  const sameReasonRecent = !!state.autoChatLastReason
-    && state.autoChatLastReason === primaryReason
-    && now - (state.lastAutoChatAt || 0) < repeatReasonWindowMs;
-  if (sameReasonRecent) {
-    threshold += Math.max(0, Number(tuning.repeatReasonPenalty) || 0.44);
-  }
-
-  const lastTopic = normalizeAutoChatTopicHint(state.autoChatLastTopicHint || "");
-  const sameTopicRecent = !!topicHint
-    && !!lastTopic
-    && (topicHint.includes(lastTopic) || lastTopic.includes(topicHint))
-    && now - (state.autoChatLastTopicAt || 0) < repeatTopicWindowMs;
-  if (sameTopicRecent) {
-    threshold += Math.max(0, Number(tuning.repeatTopicPenalty) || 0.48);
-  }
-
-  if ((Number(state.autoChatBurstCount) || 0) >= 2 && now - (state.lastAutoChatAt || 0) < burstResetWindowMs) {
-    threshold += Math.max(0, Number(tuning.burstPenalty) || 0.32);
-  }
-
-  const jitterSpan = Math.max(0, Number(tuning.scoreJitter) || 0.12);
-  const jitter = (Math.random() - 0.5) * jitterSpan;
-  const finalScore = score + jitter;
-  return {
-    shouldTrigger: finalScore >= threshold,
-    score: finalScore,
-    threshold,
-    reasons,
-    primaryReason,
-    topicHint,
-    silentMinutes
-  };
+  return getAutoChatController().analyzeAutoChatContext();
 }
 
 function buildAutoChatPrompt(context = null) {
-  const ctx = context && typeof context === "object" ? context : analyzeAutoChatContext();
-  const hour = new Date().getHours();
-  const clockText = hour < 5
-    ? `深夜${hour}点`
-    : hour < 9
-      ? `早上${hour}点`
-      : hour < 12
-        ? `上午${hour}点`
-        : hour < 14
-          ? "中午"
-          : hour < 18
-            ? `下午${hour}点`
-            : hour < 22
-              ? `晚上${hour}点`
-              : "夜里";
-  const reason = String(ctx.primaryReason || "").trim();
-  const reasonHint = AUTO_CHAT_REASON_HINTS[reason] || "像突然想到一样自然开口。";
-  const styleNote = AUTO_CHAT_STYLE_NOTES[Math.floor(Math.random() * AUTO_CHAT_STYLE_NOTES.length)]
-    || AUTO_CHAT_STYLE_NOTES[0];
-  const topicHint = normalizeAutoChatTopicHint(ctx.topicHint || "");
-  const topicLine = topicHint
-    ? `可借用线索：「${topicHint}」。`
-    : "没有明确线索时，就用当下的一句感受开场。";
-  const brevityLine = (Number(ctx.silentMinutes) || 0) >= 90
-    ? "一句也可以，最多两句。"
-    : "最多两句，优先一句。";
-
-  return [
-    "你现在是桌宠馨语AI桌宠，要主动开口。",
-    `当前时段：${clockText}。`,
-    `触发线索：${reasonHint}`,
-    topicLine,
-    `语气要求：${styleNote}`,
-    "直接输出你要说的话，不要解释你为什么主动开口。",
-    `${brevityLine} 尽量用陈述句收尾。`,
-    "避免问候模板（如“在吗/哈喽/早安模板”）和任务播报腔。"
-  ].join("\n");
+  return getAutoChatController().buildAutoChatPrompt(context);
 }
 
 function scheduleNextAutoChat() {
-  if (!state.autoChatEnabled) return;
-  const minMs = Math.max(60000, state.autoChatMinMs || 180000);
-  const maxMs = Math.max(minMs + 30000, state.autoChatMaxMs || 480000);
-  const delay = Math.round(minMs + Math.random() * (maxMs - minMs));
-  state.autoChatTimer = setTimeout(() => {
-    if (!state.autoChatEnabled) return;
-    const context = analyzeAutoChatContext();
-    if (!shouldSkipAutoChat() && context.shouldTrigger) {
-      const triggerReason = String(context.primaryReason || "").trim();
-      const triggerTopic = normalizeAutoChatTopicHint(context.topicHint || "");
-      requestAssistantReply(buildAutoChatPrompt(context), {
-          showUser: false,
-          rememberUser: false,
-          rememberAssistant: true,
-          auto: true,
-          silentError: true
-        }).then((ok) => {
-          if (ok) {
-            const now = Date.now();
-            const previousAutoAt = Number(state.lastAutoChatAt) || 0;
-            const burstResetWindowMs = Math.max(
-              3 * 60 * 1000,
-              Number(state.autoChatTuning?.burstResetWindowMs) || AUTO_CHAT_BURST_RESET_WINDOW_MS
-            );
-            state.lastAutoChatAt = now;
-            state.autoChatLastReason = triggerReason;
-            state.autoChatLastTopicHint = triggerTopic;
-            state.autoChatLastTopicAt = triggerTopic ? now : 0;
-            state.autoChatBurstCount = previousAutoAt > 0 && now - previousAutoAt < burstResetWindowMs
-              ? Math.min(6, (Number(state.autoChatBurstCount) || 0) + 1)
-              : 1;
-          }
-        }).catch(() => {
-          // ignore
-        });
-    }
-    // 无论是否跳过，都重新调度，保持随机间隔
-    scheduleNextAutoChat();
-  }, delay);
+  return getAutoChatController().scheduleNextAutoChat();
 }
 
 function startAutoChatLoop() {
-  stopAutoChatLoop();
-  if (!state.autoChatEnabled) return;
-  scheduleNextAutoChat();
+  return getAutoChatController().startAutoChatLoop();
 }
 
 async function captureDesktopSnapshot() {
-  if (!state.desktopCanCapture) {
-    return "";
-  }
-  try {
-    const dataUrl = await window.electronAPI.captureDesktop();
-    if (typeof dataUrl === "string" && dataUrl.startsWith("data:image/")) {
-      return dataUrl;
-    }
-  } catch (err) {
-    console.warn("Desktop capture failed:", err);
-  }
-  return "";
+  return getAutoChatController().captureDesktopSnapshot();
 }
 
 function shouldAttachDesktopImage(message, isAuto = false) {
-  if (!state.observeDesktop || !state.desktopCanCapture) {
-    return false;
-  }
-  if (isAuto && !state.observeAllowAutoChat) {
-    return false;
-  }
-  if (state.observeAttachMode === "always") {
-    return true;
-  }
-  return VISION_INTENT_RE.test(String(message || ""));
+  return getAutoChatController().shouldAttachDesktopImage(message, isAuto);
 }
 
-function parseToolMetaFromText(text) {
-  const src = String(text || "");
-  const idx = src.indexOf(TOOL_META_MARKER);
-  if (idx < 0) {
-    return { visibleText: stripAssistantPayloadNoise(src), meta: null };
+let runtimeMetadataController = null;
+
+function getRuntimeMetadataController() {
+  if (!runtimeMetadataController && typeof RUNTIME_METADATA_CONTROLLER.createController === "function") {
+    runtimeMetadataController = RUNTIME_METADATA_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      performanceObject: performance,
+      speechText: SPEECH_TEXT,
+      characterRuntime: window.TaffyCharacterRuntime || {},
+      characterRuntimeBridge: window.TaffyCharacterRuntimeBridge || {},
+      characterRuntimeDebugBridge: window.TaffyCharacterRuntimeDebugBridge || {},
+      live2dExpressionTuning: LIVE2D_EXPRESSION_TUNING,
+      runtimeEmotionExpressionTuning: RUNTIME_EMOTION_EXPRESSION_TUNING,
+      clampNumber,
+      triggerExpressionPulse,
+      tryBuiltInMotion
+    });
   }
-  const visibleText = stripAssistantPayloadNoise(src.slice(0, idx)).trimEnd();
-  const raw = src.slice(idx + TOOL_META_MARKER.length).trim();
-  if (!raw) {
-    return { visibleText, meta: null };
-  }
-  try {
-    const meta = JSON.parse(raw);
-    return { visibleText, meta };
-  } catch (_) {
-    return { visibleText, meta: null };
-  }
+  return runtimeMetadataController;
 }
 
 function stripRuntimeMetadataSuffix(text) {
-  if (SPEECH_TEXT && typeof SPEECH_TEXT.stripRuntimeMetadataSuffix === "function") {
-    return SPEECH_TEXT.stripRuntimeMetadataSuffix(text);
-  }
-  return String(text || "");
+  return getRuntimeMetadataController().stripRuntimeMetadataSuffix(text);
 }
 
 function stripAssistantPayloadNoise(text) {
-  if (SPEECH_TEXT && typeof SPEECH_TEXT.stripAssistantPayloadNoise === "function") {
-    return SPEECH_TEXT.stripAssistantPayloadNoise(text);
-  }
-  return stripRuntimeMetadataSuffix(text);
+  return getRuntimeMetadataController().stripAssistantPayloadNoise(text);
 }
-
-const CHARACTER_RUNTIME = window.TaffyCharacterRuntime || {};
-const CHARACTER_RUNTIME_BRIDGE = window.TaffyCharacterRuntimeBridge || {};
-const CHARACTER_RUNTIME_DEBUG_BRIDGE = window.TaffyCharacterRuntimeDebugBridge || {};
 
 function normalizeCharacterRuntimeMetadataForFrontend(raw) {
-  const filtered = typeof CHARACTER_RUNTIME_BRIDGE.copyAllowedMetadataFields === "function"
-    ? CHARACTER_RUNTIME_BRIDGE.copyAllowedMetadataFields(raw)
-    : raw;
-  if (typeof CHARACTER_RUNTIME_BRIDGE.normalizeMetadataForFrontend === "function") {
-    return CHARACTER_RUNTIME_BRIDGE.normalizeMetadataForFrontend(filtered, CHARACTER_RUNTIME);
-  }
-  if (typeof CHARACTER_RUNTIME.normalizeMetadataForFrontend !== "function") {
-    return null;
-  }
-  return CHARACTER_RUNTIME.normalizeMetadataForFrontend(filtered);
+  return getRuntimeMetadataController().normalizeCharacterRuntimeMetadataForFrontend(raw);
 }
 
-const CHARACTER_RUNTIME_BROADCAST_CHANNEL = CHARACTER_RUNTIME_BRIDGE.BROADCAST_CHANNEL || "taffy-character-runtime";
-let characterRuntimeBroadcastChannel = null;
-
 function getCharacterRuntimeBroadcastChannel() {
-  if (typeof BroadcastChannel !== "function") {
-    return null;
-  }
-  if (characterRuntimeBroadcastChannel) {
-    return characterRuntimeBroadcastChannel;
-  }
-  try {
-    characterRuntimeBroadcastChannel = new BroadcastChannel(CHARACTER_RUNTIME_BROADCAST_CHANNEL);
-  } catch (_) {
-    characterRuntimeBroadcastChannel = null;
-  }
-  return characterRuntimeBroadcastChannel;
+  return getRuntimeMetadataController().getCharacterRuntimeBroadcastChannel();
 }
 
 function dispatchCharacterRuntimeMetadataLocally(normalized) {
-  const isNormalized = typeof CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata === "function"
-    ? CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata(normalized)
-    : (!!normalized && typeof normalized === "object" && !Array.isArray(normalized));
-  if (!isNormalized) {
-    return null;
-  }
-  try {
-    window.__AI_CHAT_LAST_CHARACTER_RUNTIME__ = normalized;
-    const evtName = CHARACTER_RUNTIME_BRIDGE.UPDATE_EVENT || "character-runtime:update";
-    window.dispatchEvent(new CustomEvent(evtName, { detail: normalized }));
-  } catch (_) {
-    // Keep bridge side-effect safe; metadata is optional.
-  }
-  return normalized;
+  return getRuntimeMetadataController().dispatchCharacterRuntimeMetadataLocally(normalized);
 }
 
 function broadcastCharacterRuntimeMetadataToModel(normalized) {
-  const isNormalized = typeof CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata === "function"
-    ? CHARACTER_RUNTIME_BRIDGE.isNormalizedMetadata(normalized)
-    : (!!normalized && typeof normalized === "object" && !Array.isArray(normalized));
-  if (!isNormalized) {
-    return false;
-  }
-  if (state.uiView !== "chat") {
-    return false;
-  }
-  const channel = getCharacterRuntimeBroadcastChannel();
-  if (!channel) {
-    return false;
-  }
-  try {
-    const msg = typeof CHARACTER_RUNTIME_BRIDGE.createRuntimeUpdateMessage === "function"
-      ? CHARACTER_RUNTIME_BRIDGE.createRuntimeUpdateMessage(normalized)
-      : { type: "character-runtime:update", metadata: normalized };
-    if (!msg) {
-      return false;
-    }
-    channel.postMessage(msg);
-    return true;
-  } catch (_) {
-    return false;
-  }
+  return getRuntimeMetadataController().broadcastCharacterRuntimeMetadataToModel(normalized);
 }
 
 function normalizeRuntimeEmotionForLive2D(emotion) {
-  if (typeof emotion !== "string") {
-    return "idle";
-  }
-  const key = String(emotion || "").trim().toLowerCase();
-  if (!key) {
-    return "idle";
-  }
-  if (key === "happy") return "happy";
-  if (key === "sad") return "sad";
-  if (key === "angry") return "angry";
-  if (key === "surprised") return "surprised";
-  if (key === "annoyed") return "angry";
-  if (key === "thinking") return "idle";
-  if (key === "neutral") return "idle";
-  return "idle";
+  return getRuntimeMetadataController().normalizeRuntimeEmotionForLive2D(emotion);
 }
 
 function getRuntimeEmotionExpressionTuning(mood) {
-  if (typeof LIVE2D_EXPRESSION_TUNING.getRuntimeEmotionExpressionTuning === "function") {
-    return LIVE2D_EXPRESSION_TUNING.getRuntimeEmotionExpressionTuning(mood);
-  }
-  const key = String(mood || "idle");
-  return RUNTIME_EMOTION_EXPRESSION_TUNING[key] || RUNTIME_EMOTION_EXPRESSION_TUNING.idle;
+  return getRuntimeMetadataController().getRuntimeEmotionExpressionTuning(mood);
 }
 
 function normalizeRuntimeActionForLive2D(action) {
-  if (typeof action !== "string") {
-    return "none";
-  }
-  const key = String(action || "").trim().toLowerCase();
-  if (!key) {
-    return "none";
-  }
-  if (key === "none") return "none";
-  if (key === "wave") return "wave";
-  if (key === "nod") return "nod";
-  if (key === "shake_head") return "shake_head";
-  if (key === "think") return "think";
-  if (key === "happy_idle") return "happy_idle";
-  if (key === "surprised") return "surprised";
-  return "none";
+  return getRuntimeMetadataController().normalizeRuntimeActionForLive2D(action);
 }
 
 function getLive2DMotionForAction(action) {
-  const normalized = normalizeRuntimeActionForLive2D(action);
-  const plan = {
-    wave: {
-      mood: "happy",
-      groups: ["Tap", "FlickUp", "Idle"],
-      pulseBoost: 0.88,
-      pulseDurationMs: 420
-    },
-    nod: {
-      mood: "idle",
-      groups: ["FlickDown", "Idle"],
-      pulseBoost: 0.52,
-      pulseDurationMs: 260
-    },
-    shake_head: {
-      mood: "angry",
-      groups: ["Flick@Body", "Flick", "Idle"],
-      pulseBoost: 0.62,
-      pulseDurationMs: 300
-    },
-    think: {
-      mood: "idle",
-      groups: ["FlickDown", "Idle"],
-      pulseBoost: 0.5,
-      pulseDurationMs: 280
-    },
-    happy_idle: {
-      mood: "happy",
-      groups: ["Idle", "Tap"],
-      pulseBoost: 0.58,
-      pulseDurationMs: 300
-    },
-    surprised: {
-      mood: "surprised",
-      groups: ["FlickUp", "Tap", "Idle"],
-      pulseBoost: 0.9,
-      pulseDurationMs: 340
-    }
-  };
-  return plan[normalized] || null;
+  return getRuntimeMetadataController().getLive2DMotionForAction(action);
 }
 
 function applyCharacterRuntimeEmotionToLive2D(metadata) {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-    return false;
-  }
-  if (!state.model || !state.expressionEnabled) {
-    return false;
-  }
-  try {
-    const mood = normalizeRuntimeEmotionForLive2D(metadata.emotion);
-    const tuning = getRuntimeEmotionExpressionTuning(mood);
-    const now = performance.now();
-    state.speechAnimMood = mood;
-    state.moodHoldUntil = now + Math.max(300, Number(tuning.holdMs) || 1400);
-    state.moodExpressionWeight = clampNumber(Number(tuning.weight) || 1, 0.7, 1.45);
-    state.moodExpressionWeightUntil = state.moodHoldUntil;
-    state.moodExpressionWeightMood = mood;
-    state.moodExpressionRuntimeMood = mood;
-    triggerExpressionPulse(
-      state.currentTalkStyle || "neutral",
-      Number(tuning.pulseBoost) || 0.55,
-      Number(tuning.pulseDurationMs) || 320
-    );
-    return true;
-  } catch (err) {
-    console.debug("[character-runtime] apply emotion failed:", err);
-    return false;
-  }
+  return getRuntimeMetadataController().applyCharacterRuntimeEmotionToLive2D(metadata);
 }
 
 function applyCharacterRuntimeActionToLive2D(metadata) {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-    return false;
-  }
-  const motionPlan = getLive2DMotionForAction(metadata.action);
-  if (!motionPlan) {
-    return false;
-  }
-  if (!state.model || !state.motionEnabled) {
-    return false;
-  }
-
-  const applyPulseFallback = () => {
-    if (!state.model || !state.expressionEnabled) {
-      return false;
-    }
-    try {
-      triggerExpressionPulse(
-        state.currentTalkStyle || "neutral",
-        Number(motionPlan.pulseBoost) || 0.6,
-        Number(motionPlan.pulseDurationMs) || 280
-      );
-      return true;
-    } catch (_) {
-      return false;
-    }
-  };
-
-  try {
-    if (typeof tryBuiltInMotion !== "function") {
-      return applyPulseFallback();
-    }
-    Promise.resolve(
-      tryBuiltInMotion(motionPlan.mood, {
-        source: "emotion",
-        allowFallback: false,
-        priority: 3,
-        cooldownMs: Math.max(220, Math.round((Number(state.motionCooldownMs) || 1200) * 0.45)),
-        groups: motionPlan.groups
-      })
-    )
-      .then((played) => {
-        if (!played) {
-          applyPulseFallback();
-        }
-      })
-      .catch((err) => {
-        console.debug("[character-runtime] apply action failed:", err);
-        applyPulseFallback();
-      });
-    return true;
-  } catch (err) {
-    console.debug("[character-runtime] apply action setup failed:", err);
-    return applyPulseFallback();
-  }
+  return getRuntimeMetadataController().applyCharacterRuntimeActionToLive2D(metadata);
 }
 
 function handleCharacterRuntimeMetadata(raw, options = {}) {
-  const normalized = normalizeCharacterRuntimeMetadataForFrontend(raw);
-  if (!normalized) {
-    return null;
-  }
-  const localDispatched = !!dispatchCharacterRuntimeMetadataLocally(normalized);
-  const broadcasted = options.broadcast !== false
-    ? broadcastCharacterRuntimeMetadataToModel(normalized)
-    : false;
-  const dispatchFeedback = {
-    at: Date.now(),
-    uiView: String(state.uiView || ""),
-    emotion: String(normalized.emotion || ""),
-    action: String(normalized.action || ""),
-    intensity: String(normalized.intensity || ""),
-    live2d_hint: String(normalized.live2d_hint || ""),
-    localDispatched,
-    broadcastAllowed: options.broadcast !== false,
-    broadcasted
-  };
-  state.followupCharacterRuntimeLastDispatch = dispatchFeedback;
-  try {
-    window.__AI_CHAT_LAST_CHARACTER_RUNTIME_DISPATCH__ = dispatchFeedback;
-  } catch (_) {
-    // Diagnostics are optional.
-  }
-  return normalized;
+  return getRuntimeMetadataController().handleCharacterRuntimeMetadata(raw, options);
 }
 
 function installCharacterRuntimeWindowBridge() {
-  if (state.uiView !== "model") {
-    return null;
-  }
-  if (state._characterRuntimeBridgeInstalled) {
-    return state._characterRuntimeBridgeInstalled;
-  }
-  const channel = getCharacterRuntimeBroadcastChannel();
-  if (!channel) {
-    return null;
-  }
-  channel.onmessage = (event) => {
-    const data = event?.data;
-    if (!data || data.type !== "character-runtime:update") {
-      return;
-    }
-    handleCharacterRuntimeMetadata(data.metadata, { broadcast: false });
-  };
-  state._characterRuntimeBridgeInstalled = channel;
-  return channel;
+  return getRuntimeMetadataController().installCharacterRuntimeWindowBridge();
 }
 
 function installCharacterRuntimeDebugBridge() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const key = CHARACTER_RUNTIME_DEBUG_BRIDGE.DEBUG_BRIDGE_KEY || "__AI_CHAT_DEBUG_CHARACTER_RUNTIME__";
-  if (window[key] && typeof window[key] === "object") {
-    return window[key];
-  }
-
-  const samples = CHARACTER_RUNTIME_DEBUG_BRIDGE.DEBUG_SAMPLES || {
-    happyWave: {
-      emotion: "happy",
-      action: "wave",
-      intensity: "normal",
-      live2d_hint: "happy",
-      voice_style: "cheerful"
-    },
-    annoyed: {
-      emotion: "annoyed",
-      action: "shake_head",
-      intensity: "normal",
-      live2d_hint: "angry",
-      voice_style: "serious"
-    },
-    thinking: {
-      emotion: "thinking",
-      action: "think",
-      intensity: "low",
-      live2d_hint: "neutral",
-      voice_style: "neutral"
-    },
-    surprised: {
-      emotion: "surprised",
-      action: "surprised",
-      intensity: "high",
-      live2d_hint: "surprised",
-      voice_style: "cheerful"
-    }
-  };
-
-  const emit = (metadata) => {
-    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-      return null;
-    }
-    try {
-      return handleCharacterRuntimeMetadata(metadata);
-    } catch (_) {
-      return null;
-    }
-  };
-
-  const testEmotion = (emotion) => emit(
-    typeof CHARACTER_RUNTIME_DEBUG_BRIDGE.createEmotionMetadata === "function"
-      ? CHARACTER_RUNTIME_DEBUG_BRIDGE.createEmotionMetadata(emotion)
-      : { emotion: String(emotion || "") }
-  );
-  const testAction = (action) => emit(
-    typeof CHARACTER_RUNTIME_DEBUG_BRIDGE.createActionMetadata === "function"
-      ? CHARACTER_RUNTIME_DEBUG_BRIDGE.createActionMetadata(action)
-      : { action: String(action || "") }
-  );
-
-  const bridge = {
-    emit,
-    testEmotion,
-    testAction,
-    samples
-  };
-  try {
-    window[key] = bridge;
-  } catch (_) {
-    return null;
-  }
-  return bridge;
+  return getRuntimeMetadataController().installCharacterRuntimeDebugBridge();
 }
-
-function installTTSDebugBridge() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const key = "__AI_CHAT_DEBUG_TTS__";
-  if (window[key] && typeof window[key] === "object") {
-    return window[key];
-  }
-  const bridge = {
-    report: buildTTSDebugReport,
-    snapshot: getTTSDebugSnapshot,
-    conversationFollowup: () => buildConversationFollowupDebugView(Date.now()),
-    previewConversationFollowupPolicy: (input) => previewConversationFollowupPolicy(input),
-    previewConversationFollowupReactions: (input) => previewConversationFollowupReactions(input),
-    checkConversationFollowupPendingFixture: (input) => runConversationFollowupPendingFixture(input),
-    rehearseConversationFollowupPending: (input) => rehearseConversationFollowupPending(input),
-    clearConversationFollowupRehearsal: () => clearConversationFollowupRehearsal(),
-    grayAutoFollowupReadiness: () => buildGrayAutoFollowupReadinessStatus(),
-    grayAutoFollowupDryRun: () => runGrayAutoFollowupDryRunDebug(),
-    grayAutoFollowupTrialPreflight: () => buildGrayAutoFollowupTrialPreflight(),
-    grayAutoFollowupTrialEvents: (limit) => buildGrayAutoFollowupTrialEventSummary(limit),
-    grayAutoFollowupTrialSession: () => buildGrayAutoTrialSessionState(),
-    resetGrayAutoFollowupTrialSession: () => resetGrayAutoTrialSessionTriggerCount(),
-    stopGrayAutoFollowupTrial: (reason) => stopGrayAutoTrialSession(reason),
-    armGrayAutoFollowupTrial: (input) => armGrayAutoTrialSession(input),
-    disarmGrayAutoFollowupTrial: (reason) => disarmGrayAutoTrialSession(reason),
-    grayAutoFollowupTrialRunbook: () => buildGrayAutoTrialRunbook(),
-    grayAutoFollowupTrialAuditSummary: (limit) => buildGrayAutoTrialAuditSummary(limit),
-    grayAutoFollowupTrialPreRunChecklist: () => buildGrayAutoTrialPreRunChecklist(),
-    grayAutoFollowupTrialTimeline: (limit) => buildGrayAutoTrialTimeline(limit),
-    grayAutoFollowupTrialOutcome: (limit) => buildGrayAutoTrialOutcome(limit),
-    grayAutoFollowupTrialGoNoGoDecision: (limit) => buildGrayAutoTrialGoNoGoDecision(limit),
-    grayAutoFollowupTrialSignoffPackage: (limit) => buildGrayAutoTrialSignoffPackage(limit),
-    grayAutoFollowupTrialCharacterCuePreview: (limit) => buildGrayAutoTrialCharacterCuePreview(limit),
-    grayAutoFollowupTrialCharacterCueHandoffChecklist: (limit) => buildGrayAutoTrialCharacterCueHandoffChecklist(limit),
-    grayAutoFollowupTrialCharacterCueManualEmitStatus: () => getGrayAutoTrialCharacterCueManualEmitStatus(),
-    grayAutoFollowupTrialCharacterCueManualEmitRecap: (limit) => buildGrayAutoTrialCharacterCueManualEmitRecap(limit),
-    grayAutoFollowupTrialCharacterCuePresets: () => listGrayAutoTrialCharacterCuePresets(),
-    grayAutoFollowupTrialCharacterReplyCueCandidate: (input) => buildAssistantReplyCharacterCueCandidate(input),
-    grayAutoFollowupTrialCharacterCueBackendBridgePreview: () => previewGrayAutoTrialCharacterCueBackendBridge(),
-    emitGrayAutoFollowupTrialCharacterCueViaManualBridge: (input) => emitGrayAutoTrialCharacterCueViaManualBridge(input),
-    emitGrayAutoFollowupTrialCharacterReplyCueCandidateViaManualBridge: (input) => emitLastReplyCharacterCueCandidateViaManualBridge(input),
-    grayAutoFollowupTrialCharacterExpressionStrategyDraft: (limit) => buildGrayAutoTrialCharacterExpressionStrategyDraft(limit),
-    grayAutoFollowupTrialCharacterExpressionStrategyReviewPackage: (limit) => buildGrayAutoTrialCharacterExpressionStrategyReviewPackage(limit),
-    grayAutoFollowupTrialCharacterAutoRuntimeSafetyPlan: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSafetyPlan(limit),
-    grayAutoFollowupTrialCharacterAutoRuntimeDryRun: (limit) => buildGrayAutoTrialCharacterAutoRuntimeDryRun(limit),
-    grayAutoFollowupTrialCharacterAutoRuntimeExplicitSwitchPlan: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchPlan(limit),
-    grayAutoFollowupTrialCharacterAutoRuntimeExplicitSwitchReviewPackage: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchReviewPackage(limit),
-    grayAutoFollowupTrialCharacterAutoRuntimeSwitchAcceptancePackage: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSwitchAcceptancePackage(limit),
-    grayAutoFollowupTrialCharacterAutoRuntimeSwitchControl: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchControl(limit),
-    grayAutoFollowupTrialCharacterAutoRuntimeSwitchControlDiagnostics: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSwitchControlDiagnostics(limit),
-    grayAutoFollowupTrialCharacterAutoRuntimeSwitchRollbackPackage: (limit) => buildGrayAutoTrialCharacterAutoRuntimeExplicitSwitchRollbackPackage(limit),
-    grayAutoFollowupTrialCharacterAutoRuntimeFinalPreflight: (limit) => buildGrayAutoTrialCharacterAutoRuntimeFinalPreflight(limit),
-    grayAutoFollowupTrialCharacterAutoRuntimeSeparateImplementationDraft: (limit) => buildGrayAutoTrialCharacterAutoRuntimeSeparateImplementationDraft(limit),
-    enableGrayAutoFollowupTrialCharacterAutoRuntimeSwitch: (input) => enableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(input),
-    disableGrayAutoFollowupTrialCharacterAutoRuntimeSwitch: (reason) => disableGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason),
-    rollbackGrayAutoFollowupTrialCharacterAutoRuntimeSwitch: (reason) => rollbackGrayAutoTrialCharacterAutoRuntimeExplicitSwitch(reason),
-    emitGrayAutoFollowupTrialCharacterCue: (input) => emitGrayAutoTrialCharacterCueManually(input),
-    followupReadiness: () => buildFollowupReadinessReport(),
-    followupCharacterState: () => getFollowupCharacterStateDebugView(),
-    followupCharacterRuntimeHint: () => ({
-      lastTone: String(state.followupCharacterRuntimeLastTone || ""),
-      lastHintAt: Number(state.followupCharacterRuntimeLastHintAt || 0),
-      lastHint: state.followupCharacterRuntimeLastHint || null
-    }),
-    followupAwareIdleMotionContext: () => buildFollowupAwareIdleMotionContext(),
-    showFollowupReadiness: () => toggleFollowupReadinessPanel(true),
-    hideFollowupReadiness: () => toggleFollowupReadinessPanel(false),
-    runConversationFollowup: () => runConversationFollowupDebug(),
-    dryRunSilenceFollowup: () => runConversationSilenceFollowupDryRun(),
-    manualProactiveSchedulerTick: () => runProactiveSchedulerManualTick(),
-    injectProactiveSchedulerPollFailureOnce: (reason) => injectProactiveSchedulerPollFailureOnce(reason),
-    getProactiveSchedulerFailureInjectionState: () => getProactiveSchedulerFailureInjectionState(),
-    clearProactiveSchedulerFailureInjection: () => clearProactiveSchedulerFailureInjection(),
-    events: () => state.ttsDebugEvents.slice(),
-    show: () => toggleTTSDebugPanel(true),
-    hide: () => toggleTTSDebugPanel(false),
-    toggle: () => toggleTTSDebugPanel()
-  };
-  try {
-    window[key] = bridge;
-  } catch (_) {
-    return null;
-  }
-  return bridge;
-}
-
-function installTranslateDebugBridge() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const key = "__AI_CHAT_DEBUG_TRANSLATE__";
-  if (window[key] && typeof window[key] === "object") {
-    return window[key];
-  }
-  const bridge = {
-    report: buildTranslateDebugReport,
-    snapshot: getTranslateDebugSnapshot,
-    events: () => state.translateDebugEvents.slice(),
-    show: () => toggleTranslateDebugPanel(true),
-    hide: () => toggleTranslateDebugPanel(false),
-    toggle: () => toggleTranslateDebugPanel()
-  };
-  try {
-    window[key] = bridge;
-  } catch (_) {
-    return null;
-  }
-  return bridge;
-}
-
-
-
-
 
 
 function renderToolMetaCards(row, meta) {
@@ -12271,576 +3980,126 @@ function renderToolMetaCards(row, meta) {
   }
 }
 
-const _CHAT_TRANSLATE_TIMEOUT_MS = 60000;
-const _CHAT_TRANSLATE_CACHE_LIMIT = 160;
-const _TRANSLATE_CIRCUIT_FAILURE_THRESHOLD = 3;
-const _TRANSLATE_CIRCUIT_BASE_COOLDOWN_MS = 12000;
-const _TRANSLATE_CIRCUIT_MAX_COOLDOWN_MS = 90000;
-const _chatTranslationCache = new Map();
-const _translationInFlight = new Map();
-let _chatTranslationSeq = 0;
-const _translationCircuitState = {
-  failures: 0,
-  cooldownUntil: 0
-};
+const _CHAT_TRANSLATE_TIMEOUT_MS = CHAT_TRANSLATION_SERVICE.CHAT_TRANSLATE_TIMEOUT_MS || 60000;
 
 function _isTranslationCircuitOpen() {
-  return Date.now() < Number(_translationCircuitState.cooldownUntil || 0);
-}
-
-function _markTranslationFailure() {
-  _translationCircuitState.failures += 1;
-  if (_translationCircuitState.failures < _TRANSLATE_CIRCUIT_FAILURE_THRESHOLD) {
-    return;
-  }
-  const over = _translationCircuitState.failures - _TRANSLATE_CIRCUIT_FAILURE_THRESHOLD;
-  const factor = Math.min(6, Math.max(0, over));
-  const cooldownMs = Math.min(
-    _TRANSLATE_CIRCUIT_MAX_COOLDOWN_MS,
-    _TRANSLATE_CIRCUIT_BASE_COOLDOWN_MS * Math.pow(2, factor)
-  );
-  _translationCircuitState.cooldownUntil = Date.now() + cooldownMs;
-}
-
-function _markTranslationSuccess() {
-  _translationCircuitState.failures = 0;
-  _translationCircuitState.cooldownUntil = 0;
+  return typeof CHAT_TRANSLATION_SERVICE._debug?.isCircuitOpen === "function"
+    ? CHAT_TRANSLATION_SERVICE._debug.isCircuitOpen()
+    : false;
 }
 
 function _normalizeChatTranslationKey(text) {
-  const safe = String(text || "").replace(/\s+/g, " ").trim();
-  if (!safe) {
-    return "";
-  }
-  return safe
-    .replace(/([A-Za-z0-9])([.!?])(?=[A-Za-z0-9])/g, "$1$2 ")
-    .replace(/\s+([,.;:!?])/g, "$1")
-    .replace(/([,.;:!?])\s+/g, "$1 ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return typeof CHAT_TRANSLATION_SERVICE.normalizeKey === "function"
+    ? CHAT_TRANSLATION_SERVICE.normalizeKey(text)
+    : String(text || "").replace(/\s+/g, " ").trim();
 }
 
 function _readChatTranslationCache(text) {
-  const key = _normalizeChatTranslationKey(text);
-  if (!key || !_chatTranslationCache.has(key)) {
-    return "";
-  }
-  const hit = _chatTranslationCache.get(key) || "";
-  _chatTranslationCache.delete(key);
-  _chatTranslationCache.set(key, hit);
-  return String(hit || "").trim();
+  return typeof CHAT_TRANSLATION_SERVICE.readCache === "function"
+    ? CHAT_TRANSLATION_SERVICE.readCache(text)
+    : "";
 }
 
 function _writeChatTranslationCache(text, translated) {
-  const key = _normalizeChatTranslationKey(text);
-  const value = String(translated || "").trim();
-  if (!key || !value) {
-    return;
-  }
-  if (_looksLikeBadChatTranslation(text, value)) {
-    return;
-  }
-  if (_chatTranslationCache.has(key)) {
-    _chatTranslationCache.delete(key);
-  }
-  _chatTranslationCache.set(key, value);
-  while (_chatTranslationCache.size > _CHAT_TRANSLATE_CACHE_LIMIT) {
-    const oldestKey = _chatTranslationCache.keys().next().value;
-    if (!oldestKey) {
-      break;
-    }
-    _chatTranslationCache.delete(oldestKey);
+  if (typeof CHAT_TRANSLATION_SERVICE.writeCache === "function") {
+    CHAT_TRANSLATION_SERVICE.writeCache(text, translated);
   }
 }
 
 function _isLikelyEnglishForChat(text) {
-  const safe = String(text || "").trim();
-  if (!safe) {
-    return false;
-  }
-  const latinCount = (safe.match(/[A-Za-z]/g) || []).length;
-  const cjkCount = (safe.match(/[\u4e00-\u9fff]/g) || []).length;
-  if (latinCount < 6) {
-    return false;
-  }
-  if (cjkCount > 0) {
-    return false;
-  }
-  return _isLikelyEnglish(safe);
-}
-
-function _countCjkChars(text) {
-  return (String(text || "").match(/[\u4e00-\u9fff]/g) || []).length;
-}
-
-function _countLatinChars(text) {
-  return (String(text || "").match(/[A-Za-z]/g) || []).length;
+  return typeof CHAT_TRANSLATION_SERVICE.isLikelyEnglishForChat === "function"
+    ? CHAT_TRANSLATION_SERVICE.isLikelyEnglishForChat(text)
+    : false;
 }
 
 function _looksLikeBadChatTranslation(source, translated) {
-  const src = String(source || "").trim();
-  const out = String(translated || "").trim();
-  if (!out) {
-    return true;
-  }
-  if (!_isLikelyEnglishForChat(src)) {
-    return false;
-  }
-  const lower = out.toLowerCase();
-  if (
-    lower.includes("i'm mimo")
-    || lower.includes("i am mimo")
-    || lower.includes("xiaomi")
-    || lower.includes("hyperos")
-    || lower.includes("official ai assistant")
-    || lower.includes("here to help")
-    || lower.includes("i'll do my best")
-    || lower.includes("i'm sorry")
-  ) {
-    return true;
-  }
-  const cjkCount = _countCjkChars(out);
-  if (cjkCount <= 0) {
-    return true;
-  }
-  return _countLatinChars(out) > Math.max(12, cjkCount * 2);
+  return typeof CHAT_TRANSLATION_SERVICE.looksLikeBadTranslation === "function"
+    ? CHAT_TRANSLATION_SERVICE.looksLikeBadTranslation(source, translated)
+    : false;
 }
 
 function _shouldShowAssistantTranslation(text) {
-  const safe = String(text || "").trim();
-  if (!safe || safe.length < 4) {
-    return false;
-  }
-  if (safe.includes("```")) {
-    return false;
-  }
-  return _isLikelyEnglishForChat(safe);
-}
-
-function normalizeAssistantVisibleText(text) {
-  const safe = String(text || "").trim();
-  if (!safe || !_isLikelyEnglishForChat(safe)) {
-    return safe;
-  }
-  if (SPEECH_TEXT && typeof SPEECH_TEXT.normalizeEnglishBoundaries === "function") {
-    return SPEECH_TEXT.normalizeEnglishBoundaries(safe);
-  }
-  return safe
-    .replace(/([.!?])(?=[A-Z'"\u2018\u2019])/g, "$1 ")
-    .replace(/([,;:])(?=[A-Za-z])/g, "$1 ")
-    .replace(/\s+([.!?,;:])/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function _ensureMessageTranslationEl(row) {
-  if (!row) {
-    return null;
-  }
-  let el = row.querySelector(".content-translation");
-  if (el) {
-    return el;
-  }
-  el = document.createElement("span");
-  el.className = "content-translation";
-  el.hidden = true;
-  const timeEl = row.querySelector(".message-time");
-  if (timeEl && timeEl.parentNode === row) {
-    row.insertBefore(el, timeEl);
-  } else {
-    row.appendChild(el);
-  }
-  return el;
-}
-
-function _clearMessageTranslation(row) {
-  const el = row?.querySelector(".content-translation");
-  if (!el) {
-    return;
-  }
-  el.textContent = "";
-  el.hidden = true;
+  return typeof CHAT_TRANSLATION_SERVICE.shouldShowAssistantTranslation === "function"
+    ? CHAT_TRANSLATION_SERVICE.shouldShowAssistantTranslation(text)
+    : false;
 }
 
 async function _fetchChatTranslation(text) {
-  const safe = String(text || "").trim();
-  if (!safe) {
+  if (typeof CHAT_TRANSLATION_SERVICE.fetchTranslation !== "function") {
     return "";
   }
-  const cacheKey = _normalizeChatTranslationKey(safe);
-  const cached = _readChatTranslationCache(safe);
-  if (cached) {
-    recordTranslateDebugEvent("cache_hit", {
-      text: safe,
-      sourceChars: safe.length,
-      translatedChars: cached.length,
-      cache: "hit",
-      result: "ok"
-    });
-    return cached;
-  }
-  if (_isTranslationCircuitOpen()) {
-    recordTranslateDebugEvent("circuit_open", {
-      text: safe,
-      sourceChars: safe.length,
-      result: "skipped",
-      error: "translation circuit cooldown"
-    });
-    return "";
-  }
-  const inFlight = _translationInFlight.get(cacheKey);
-  if (inFlight) {
-    recordTranslateDebugEvent("inflight_reuse", {
-      text: safe,
-      sourceChars: safe.length,
-      result: "pending"
-    });
-    return inFlight;
-  }
-  const task = (async () => {
-    const controller = new AbortController();
-    const traceId = createPerfTraceId("translate");
-    const startedPerfMs = performance.now();
-    const startedWallMs = Date.now();
-    recordTranslateDebugEvent("request_start", {
-      traceId,
-      text: safe,
-      sourceChars: safe.length,
-      cache: "miss"
-    });
-    const timeoutId = setTimeout(() => {
-      try {
-        controller.abort();
-      } catch (_) {
-        // ignore
-      }
-    }, _CHAT_TRANSLATE_TIMEOUT_MS);
-    try {
-      const resp = await authFetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: safe,
-          _perf_trace_id: traceId,
-          _perf_client_send_ts_ms: startedWallMs
-        }),
-        signal: controller.signal
-      });
-      const elapsedMs = Math.round(performance.now() - startedPerfMs);
-      const responseTraceId =
-        typeof resp.headers?.get === "function" ? String(resp.headers.get("X-Perf-Trace-Id") || "") : "";
-      if (!resp.ok) {
-        _markTranslationFailure();
-        let errorText = `HTTP ${resp.status}`;
-        try {
-          const errData = await resp.json();
-          errorText = String(errData?.error || errorText);
-        } catch (_) {
-          // ignore
-        }
-        recordTranslateDebugEvent("request_fail", {
-          traceId: responseTraceId || traceId,
-          text: safe,
-          sourceChars: safe.length,
-          elapsedMs,
-          status: Number(resp.status) || 0,
-          result: "http_error",
-          error: errorText
-        });
-        return "";
-      }
-      const data = await resp.json();
-      const translated = String(data?.translated || data?.translated_text || "").trim();
-      const degraded = data?.degraded === true || data?.fallback === true;
-      const badTranslation = _looksLikeBadChatTranslation(safe, translated);
-      if (degraded || badTranslation) {
-        if (!badTranslation) {
-          _markTranslationFailure();
-        }
-        recordTranslateDebugEvent("request_degraded", {
-          traceId: responseTraceId || traceId,
-          text: safe,
-          sourceChars: safe.length,
-          translatedChars: translated.length,
-          elapsedMs,
-          status: Number(resp.status) || 0,
-          degraded: true,
-          fallback: data?.fallback === true,
-          result: badTranslation ? "invalid_translation" : "degraded",
-          error: badTranslation ? "invalid translation result" : String(data?.error || "")
-        });
-        return "";
-      }
-      if (!translated) {
-        _markTranslationFailure();
-        recordTranslateDebugEvent("request_empty", {
-          traceId: responseTraceId || traceId,
-          text: safe,
-          sourceChars: safe.length,
-          elapsedMs,
-          status: Number(resp.status) || 0,
-          result: "empty"
-        });
-        return "";
-      }
-      _markTranslationSuccess();
-      _writeChatTranslationCache(safe, translated);
-      recordTranslateDebugEvent("request_ok", {
-        traceId: responseTraceId || traceId,
-        text: safe,
-        sourceChars: safe.length,
-        translatedChars: translated.length,
-        elapsedMs,
-        status: Number(resp.status) || 0,
-        result: "ok"
-      });
-      return translated;
-    } catch (err) {
-      if (!controller.signal.aborted || Date.now() >= _translationCircuitState.cooldownUntil) {
-        _markTranslationFailure();
-      }
-      recordTranslateDebugEvent("request_error", {
-        traceId,
-        text: safe,
-        sourceChars: safe.length,
-        elapsedMs: Math.round(performance.now() - startedPerfMs),
-        result: controller.signal.aborted ? "timeout" : "error",
-        error: controller.signal.aborted
-          ? `timeout ${_CHAT_TRANSLATE_TIMEOUT_MS}ms`
-          : String(err?.message || err || "")
-      });
-      return "";
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  })();
-  _translationInFlight.set(cacheKey, task);
-  try {
-    return await task;
-  } finally {
-    if (_translationInFlight.get(cacheKey) === task) {
-      _translationInFlight.delete(cacheKey);
-    }
-  }
+  return CHAT_TRANSLATION_SERVICE.fetchTranslation(text, {
+    authFetch,
+    createTraceId: createPerfTraceId,
+    recordDebug: recordTranslateDebugEvent,
+    performanceObject: performance
+  });
 }
 
-function _renderAssistantTranslation(row, visibleText, options = {}) {
-  if (!row || !row.classList.contains("assistant")) {
-    return;
-  }
-  if (options.enableTranslation === false) {
-    _clearMessageTranslation(row);
-    return;
-  }
-  const safe = String(visibleText || "").trim();
-  if (!_shouldShowAssistantTranslation(safe)) {
-    _clearMessageTranslation(row);
-    return;
-  }
-  const translationEl = _ensureMessageTranslationEl(row);
-  if (!translationEl) {
-    return;
-  }
-  const cached = _readChatTranslationCache(safe);
-  if (cached && cached !== safe) {
-    translationEl.textContent = `中译：${cached}`;
-    translationEl.hidden = false;
-    return;
-  }
-  const requestId = String(++_chatTranslationSeq);
-  row.dataset.translationReqId = requestId;
-  row.dataset.translationSource = safe;
-  translationEl.textContent = "中译：翻译中...";
-  translationEl.hidden = false;
-  _fetchChatTranslation(safe).then((zh) => {
-    if (!row.isConnected || row.dataset.translationReqId !== requestId) {
-      return;
-    }
-    const translated = String(zh || "").trim();
-    if (!translated || translated === safe) {
-      translationEl.textContent = "中译：翻译暂时不可用";
-      translationEl.hidden = false;
-      return;
-    }
-    translationEl.textContent = `中译：${translated}`;
-    translationEl.hidden = false;
-  });
+function normalizeAssistantVisibleText(text) {
+  const src = String(text || "");
+  const safe = stripAssistantPayloadNoise(src);
+  return typeof CHAT_TRANSLATION_SERVICE.normalizeAssistantVisibleText === "function"
+    ? CHAT_TRANSLATION_SERVICE.normalizeAssistantVisibleText(safe, { speechText: SPEECH_TEXT })
+    : safe.trim();
 }
 
 function applyMessagePayload(row, text, options = {}) {
-  const target = row?.querySelector(".content");
-  if (!target) {
-    return;
-  }
-  const payload = parseToolMetaFromText(text);
-  target.textContent = String(payload.visibleText || "");
-  if (row.classList.contains("assistant")) {
-    renderToolMetaCards(row, payload.meta);
-    _renderAssistantTranslation(row, payload.visibleText, options);
-  } else {
-    _clearMessageTranslation(row);
-  }
+  return getChatMessageController().applyMessagePayload(row, text, options);
 }
 
 function setMessageTimestamp(row, timestamp) {
-  const target = row?.querySelector(".message-time");
-  if (!target) {
-    return;
-  }
-  const ts = parseMessageTimestamp(timestamp);
-  row.dataset.timestamp = String(ts);
-  target.textContent = formatMessageTime(ts);
-  target.hidden = false;
+  return getChatMessageController().setMessageTimestamp(row, timestamp);
 }
 
 function resolveAssistantDisplayName(fallbackName = "Mochi") {
-  const runtimeCfg = state.config?.character_runtime;
-  if (runtimeCfg?.enabled === true) {
-    const overrideCfg = runtimeCfg?.persona_override;
-    const overrideName = String(overrideCfg?.name || "").trim();
-    if (overrideCfg?.enabled === true && overrideName) {
-      return overrideName;
-    }
-  }
-  const configuredName = String(state.config?.assistant_name || "").trim();
-  return configuredName || fallbackName;
+  return getChatMessageController().resolveAssistantDisplayName(fallbackName);
 }
 
 function createMessageRow(role, text, options = {}) {
-  const row = document.createElement("div");
-  row.className = `message ${role}`;
-  const assistantName = resolveAssistantDisplayName("Hiyori");
-  const roleEl = document.createElement("span");
-  roleEl.className = "role";
-  roleEl.textContent = role === "user" ? "你" : assistantName;
-  const textEl = document.createElement("span");
-  textEl.className = "content";
-  const timeEl = document.createElement("span");
-  timeEl.className = "message-time";
-  timeEl.hidden = options.hideTimestamp === true;
-  row.appendChild(roleEl);
-  row.appendChild(textEl);
-  row.appendChild(timeEl);
-  applyMessagePayload(row, text, {
-    enableTranslation: options.enableTranslation !== false
-  });
-  if (options.hideTimestamp !== true) {
-    setMessageTimestamp(row, options.timestamp || Date.now());
-  }
-  return row;
+  return getChatMessageController().createMessageRow(role, text, options);
 }
 
 function setMessageText(row, text, options = {}) {
-  applyMessagePayload(row, text, options);
-  ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
+  return getChatMessageController().setMessageText(row, text, options);
 }
 
 function commitMessageRecord(role, text, options = {}) {
-  const content = String(text || "").trim();
-  if (!content) {
-    return null;
-  }
-  const timestamp = parseMessageTimestamp(options.timestamp);
-  const record = { role: role === "user" ? "user" : "assistant", content, timestamp };
-  const previous = state.chatRecords.length ? state.chatRecords[state.chatRecords.length - 1] : null;
-  if (shouldInsertTimeDivider(previous?.timestamp || 0, timestamp)) {
-    ui.chatLog.appendChild(createTimeDivider(timestamp));
-  }
-  state.chatRecords.push(record);
-  state.chatRecords = trimChatRecords(state.chatRecords);
-  saveChatHistoryToStorage();
-  if (options.syncHistory === true) {
-    syncConversationHistoryFromChatRecords();
-  }
-  return record;
+  return getChatMessageController().commitMessageRecord(role, text, options);
 }
 
 function appendMessage(role, text, options = {}) {
-  const timestamp = parseMessageTimestamp(options.timestamp);
-  const row = createMessageRow(role, text, {
-    timestamp,
-    hideTimestamp: options.hideTimestamp === true,
-    enableTranslation: options.enableTranslation !== false
-  });
-  if (options.persist !== false) {
-    commitMessageRecord(role, text, {
-      timestamp,
-      syncHistory: options.syncHistory === true
-    });
-  } else if (options.insertDivider && shouldInsertTimeDivider(options.previousTimestamp || 0, timestamp)) {
-    ui.chatLog.appendChild(createTimeDivider(timestamp));
-  }
-  ui.chatLog.appendChild(row);
-  ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
-  return row;
+  return getChatMessageController().appendMessage(role, text, options);
 }
 
 function finalizePendingMessageRow(row, role, text, options = {}) {
-  if (!row) {
-    return;
-  }
-  const content = String(text || "").trim();
-  if (!content) {
-    row.remove();
-    return;
-  }
-  const timestamp = parseMessageTimestamp(options.timestamp);
-  setMessageText(row, content, {
-    enableTranslation: options.enableTranslation !== false
-  });
-  setMessageTimestamp(row, timestamp);
-  if (options.persist !== false) {
-    const previous = state.chatRecords.length ? state.chatRecords[state.chatRecords.length - 1] : null;
-    if (shouldInsertTimeDivider(previous?.timestamp || 0, timestamp)) {
-      row.parentNode?.insertBefore(createTimeDivider(timestamp), row);
-    }
-    state.chatRecords.push({ role: role === "user" ? "user" : "assistant", content, timestamp });
-    state.chatRecords = trimChatRecords(state.chatRecords);
-    saveChatHistoryToStorage();
-    if (options.syncHistory === true) {
-      syncConversationHistoryFromChatRecords();
-    }
-  }
-  ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
+  return getChatMessageController().finalizePendingMessageRow(row, role, text, options);
 }
 
 function rememberMessage(role, content, options = {}) {
-  const timestamp = parseMessageTimestamp(options.timestamp);
-  state.history.push({ role, content, timestamp });
-  const limit = Math.max(12, Number(state.historyMaxMessages) || 64);
-  if (state.history.length > limit) {
-    state.history = state.history.slice(state.history.length - limit);
-  }
+  return getChatMessageController().rememberMessage(role, content, options);
+}
+
+function getAttachmentControllerDeps() {
+  return {
+    state,
+    model: ATTACHMENT_MODEL,
+    documentObject: document,
+    textAttachmentExts: TEXT_ATTACHMENT_EXTS,
+    maxPendingAttachments: MAX_PENDING_ATTACHMENTS,
+    maxTextAttachmentChars: MAX_TEXT_ATTACHMENT_CHARS,
+    maxTotalAttachmentTextChars: MAX_TOTAL_ATTACHMENT_TEXT_CHARS,
+    maxImageAttachmentBytes: MAX_IMAGE_ATTACHMENT_BYTES,
+    readFileAsDataUrl,
+    renderPendingAttachments,
+    setStatus
+  };
 }
 
 function formatFileSize(size) {
-  return typeof ATTACHMENT_MODEL.formatFileSize === "function"
-    ? ATTACHMENT_MODEL.formatFileSize(size)
-    : `${Math.max(0, Number(size) || 0)}B`;
-}
-
-function getFileExt(name) {
-  return typeof ATTACHMENT_MODEL.getFileExt === "function"
-    ? ATTACHMENT_MODEL.getFileExt(name)
-    : "";
-}
-
-function isImageFileObj(file) {
-  return typeof ATTACHMENT_MODEL.isImageFile === "function"
-    ? ATTACHMENT_MODEL.isImageFile(file)
-    : false;
-}
-
-function isLikelyTextFileObj(file) {
-  return typeof ATTACHMENT_MODEL.isLikelyTextFile === "function"
-    ? ATTACHMENT_MODEL.isLikelyTextFile(file, TEXT_ATTACHMENT_EXTS)
-    : false;
-}
-
-function sanitizeAttachmentExcerpt(text, maxChars = MAX_TEXT_ATTACHMENT_CHARS) {
-  return typeof ATTACHMENT_MODEL.sanitizeAttachmentExcerpt === "function"
-    ? ATTACHMENT_MODEL.sanitizeAttachmentExcerpt(text, maxChars)
-    : String(text || "").trim().slice(0, maxChars);
+  return typeof ATTACHMENT_CONTROLLER.formatFileSize === "function"
+    ? ATTACHMENT_CONTROLLER.formatFileSize(size, getAttachmentControllerDeps())
+    : String(Math.max(0, Number(size) || 0)) + "B";
 }
 
 function clearPendingAttachments() {
@@ -12855,141 +4114,33 @@ function removePendingAttachment(id) {
 }
 
 function renderPendingAttachments() {
-  const wrap = ui.attachmentPreview;
-  if (!wrap) {
+  if (typeof ATTACHMENT_CONTROLLER.renderPendingAttachments !== "function") {
     return;
   }
-  const items = Array.isArray(state.pendingAttachments) ? state.pendingAttachments : [];
-  wrap.innerHTML = "";
-  if (!items.length) {
-    wrap.hidden = true;
-    return;
-  }
-  wrap.hidden = false;
-  for (const item of items) {
-    const chip = document.createElement("div");
-    chip.className = "attachment-chip";
-
-    const icon = document.createElement("span");
-    icon.className = "attachment-chip-icon";
-    icon.textContent = typeof ATTACHMENT_MODEL.getAttachmentIcon === "function"
-      ? ATTACHMENT_MODEL.getAttachmentIcon(item.kind)
-      : "";
-    chip.appendChild(icon);
-
-    const main = document.createElement("span");
-    main.className = "attachment-chip-main";
-
-    const name = document.createElement("span");
-    name.className = "attachment-chip-name";
-    name.textContent = String(item.name || "未命名文件");
-    main.appendChild(name);
-
-    const meta = document.createElement("span");
-    meta.className = "attachment-chip-meta";
-    const kindLabel = typeof ATTACHMENT_MODEL.getAttachmentKindLabel === "function"
-      ? ATTACHMENT_MODEL.getAttachmentKindLabel(item.kind)
-      : "";
-    meta.textContent = `${kindLabel} · ${formatFileSize(item.size)}`;
-    main.appendChild(meta);
-    chip.appendChild(main);
-
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.className = "attachment-chip-remove";
-    removeBtn.textContent = "脳";
-    removeBtn.title = "移除";
-    removeBtn.addEventListener("click", () => {
-      removePendingAttachment(item.id);
-    });
-    chip.appendChild(removeBtn);
-
-    wrap.appendChild(chip);
-  }
+  ATTACHMENT_CONTROLLER.renderPendingAttachments(
+    ui.attachmentPreview,
+    state.pendingAttachments,
+    { ...getAttachmentControllerDeps(), onRemove: removePendingAttachment }
+  );
 }
 
 function buildAttachmentContextText(attachments) {
-  return typeof ATTACHMENT_MODEL.buildAttachmentContextText === "function"
-    ? ATTACHMENT_MODEL.buildAttachmentContextText(attachments, { maxTotalTextChars: MAX_TOTAL_ATTACHMENT_TEXT_CHARS })
+  return typeof ATTACHMENT_CONTROLLER.buildAttachmentContextText === "function"
+    ? ATTACHMENT_CONTROLLER.buildAttachmentContextText(attachments, getAttachmentControllerDeps())
     : "";
 }
 
 function buildAttachmentDisplaySuffix(attachments) {
-  return typeof ATTACHMENT_MODEL.buildAttachmentDisplaySuffix === "function"
-    ? ATTACHMENT_MODEL.buildAttachmentDisplaySuffix(attachments)
+  return typeof ATTACHMENT_CONTROLLER.buildAttachmentDisplaySuffix === "function"
+    ? ATTACHMENT_CONTROLLER.buildAttachmentDisplaySuffix(attachments, getAttachmentControllerDeps())
     : "";
 }
 
 async function handleAttachmentFiles(fileList) {
-  const files = Array.from(fileList || []);
-  if (!files.length) {
+  if (typeof ATTACHMENT_CONTROLLER.handleAttachmentFiles !== "function") {
     return;
   }
-  if (state.attachmentReadBusy) {
-    setStatus("附件处理中，请稍等...");
-    return;
-  }
-  state.attachmentReadBusy = true;
-  try {
-    const existing = Array.isArray(state.pendingAttachments) ? state.pendingAttachments.slice() : [];
-    const remain = Math.max(0, MAX_PENDING_ATTACHMENTS - existing.length);
-    if (remain <= 0) {
-      setStatus(`最多可附加 ${MAX_PENDING_ATTACHMENTS} 个文件`);
-      return;
-    }
-    const picked = files.slice(0, remain);
-    const nextItems = [];
-    for (const file of picked) {
-      const name = String(file?.name || "未命名文件").slice(0, 180);
-      const size = Math.max(0, Number(file?.size) || 0);
-      const type = String(file?.type || "").toLowerCase();
-      const base = {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-        name,
-        size,
-        type
-      };
-      if (isImageFileObj(file)) {
-        if (size > MAX_IMAGE_ATTACHMENT_BYTES) {
-          setStatus(`图片过大已跳过: ${name}`);
-          continue;
-        }
-        try {
-          const dataUrl = await readFileAsDataUrl(file);
-          if (!dataUrl || !dataUrl.startsWith("data:image/")) {
-            setStatus(`图片读取失败: ${name}`);
-            continue;
-          }
-          nextItems.push({ ...base, kind: "image", dataUrl });
-        } catch (_) {
-          setStatus(`图片读取失败: ${name}`);
-        }
-        continue;
-      }
-      if (isLikelyTextFileObj(file)) {
-        try {
-          const raw = await file.text();
-          const excerpt = sanitizeAttachmentExcerpt(raw, MAX_TEXT_ATTACHMENT_CHARS);
-          if (!excerpt) {
-            nextItems.push({ ...base, kind: "binary" });
-          } else {
-            nextItems.push({ ...base, kind: "text", text: excerpt });
-          }
-        } catch (_) {
-          nextItems.push({ ...base, kind: "binary" });
-        }
-        continue;
-      }
-      nextItems.push({ ...base, kind: "binary" });
-    }
-    state.pendingAttachments = existing.concat(nextItems).slice(0, MAX_PENDING_ATTACHMENTS);
-    renderPendingAttachments();
-    if (nextItems.length) {
-      setStatus(`已添加 ${nextItems.length} 个附件`);
-    }
-  } finally {
-    state.attachmentReadBusy = false;
-  }
+  await ATTACHMENT_CONTROLLER.handleAttachmentFiles(fileList, getAttachmentControllerDeps());
 }
 
 function sanitizeSpeakText(text) {
@@ -13001,5770 +4152,663 @@ function sanitizeSpeakText(text) {
 
 // Subtitle helpers
 
-const _SUBTITLE_MAX_CHARS = 320;
-const _SUBTITLE_TRANSLATE_TIMEOUT_MS = 15000;
-const _SUBTITLE_CACHE_LIMIT = 80;
-const _SUBTITLE_SPEECH_RECHECK_MS = 1400;
-const _SUBTITLE_HARD_MAX_MS = 90000;
-const _SUBTITLE_AFTER_SPEECH_HOLD_MS = 2200;
-const _SUBTITLE_PAGE_MIN_INTERVAL_MS = 1500;
-const _SUBTITLE_PAGE_MAX_INTERVAL_MS = 3600;
-const _subtitleTranslationCache = new Map();
-let _subtitleTranslationAbortController = null;
-const _subtitlePaging = {
-  id: 0,
-  enPages: [],
-  zhPages: [],
-  index: 0,
-  intervalMs: 2200,
-};
-
-function _subtitleDuration(text) {
-  const safe = String(text || "").trim();
-  const compact = safe.replace(/\s+/g, "");
-  const words = safe.split(/\s+/).filter(Boolean).length;
-  const weighted = _isLikelyEnglish(safe)
-    ? Math.max(words * 120, compact.length * 30)
-    : compact.length * 45;
-  return Math.min(Math.max(3800 + weighted, 4000), 10000);
-}
-
-function _isLikelyEnglish(text) {
-  const letters = String(text).replace(/\s/g, "");
-  if (!letters.length) return false;
-  const ascii = Array.from(letters).filter((c) => c.charCodeAt(0) < 128).length;
-  return ascii / letters.length > 0.70;
-}
-
-function _isSubtitleSpeechActive() {
-  return isSpeakingNow() || state.streamSpeakWorking || !!state.ttsContextSpeaking;
-}
-
-function _splitSubtitlePages(text) {
-  const src = String(text || "").replace(/\s+/g, " ").trim();
-  if (!src) {
-    return [];
-  }
-  const isEnglish = _isLikelyEnglish(src);
-  const limit = isEnglish ? 110 : 56;
-  const rough = src.match(/[^.!?。！？\n]+[.!?。！？]?/g) || [src];
-  const pages = [];
-  let current = "";
-
-  const pushPage = (value) => {
-    const clean = String(value || "").trim();
-    if (!clean) return;
-    pages.push(clean);
+function getSubtitleControllerDeps() {
+  return {
+    state,
+    documentObject: document,
+    windowObject: window,
+    sanitizeSpeakText,
+    isSpeakingNow,
+    readChatTranslationCache: _readChatTranslationCache,
+    isTranslationCircuitOpen: _isTranslationCircuitOpen,
+    fetchChatTranslation: _fetchChatTranslation
   };
-
-  const pushWithChunking = (piece) => {
-    const clean = String(piece || "").trim();
-    if (!clean) return;
-    if (clean.length <= limit) {
-      pushPage(clean);
-      return;
-    }
-    if (isEnglish) {
-      const words = clean.split(/\s+/).filter(Boolean);
-      let chunk = "";
-      for (const w of words) {
-        const next = chunk ? `${chunk} ${w}` : w;
-        if (next.length <= limit) {
-          chunk = next;
-        } else {
-          pushPage(chunk || w.slice(0, limit));
-          chunk = w.length > limit ? w.slice(0, limit) : w;
-        }
-      }
-      pushPage(chunk);
-      return;
-    }
-    for (let i = 0; i < clean.length; i += limit) {
-      pushPage(clean.slice(i, i + limit));
-    }
-  };
-
-  for (const rawPiece of rough) {
-    const piece = String(rawPiece || "").trim();
-    if (!piece) continue;
-    if (!current) {
-      if (piece.length > limit) {
-        pushWithChunking(piece);
-        continue;
-      }
-      current = piece;
-      continue;
-    }
-    const candidate = `${current} ${piece}`.replace(/\s+/g, " ").trim();
-    if (candidate.length <= limit) {
-      current = candidate;
-      continue;
-    }
-    pushPage(current);
-    if (piece.length > limit) {
-      pushWithChunking(piece);
-      current = "";
-    } else {
-      current = piece;
-    }
-  }
-  pushPage(current);
-  return pages.length ? pages : [src];
-}
-
-function _subtitlePageCount() {
-  return Math.max(
-    1,
-    Array.isArray(_subtitlePaging.enPages) ? _subtitlePaging.enPages.length : 0,
-    Array.isArray(_subtitlePaging.zhPages) ? _subtitlePaging.zhPages.length : 0
-  );
-}
-
-function _pickSubtitlePage(pages, index) {
-  if (!Array.isArray(pages) || !pages.length) {
-    return "";
-  }
-  const safeIndex = Math.max(0, Math.min(pages.length - 1, Math.round(Number(index) || 0)));
-  return String(pages[safeIndex] || "").trim();
-}
-
-function _calcSubtitlePageInterval(fullText, pageCount) {
-  const base = _subtitleDuration(fullText) / Math.max(1, Number(pageCount) || 1);
-  return Math.max(
-    _SUBTITLE_PAGE_MIN_INTERVAL_MS,
-    Math.min(_SUBTITLE_PAGE_MAX_INTERVAL_MS, Math.round(base))
-  );
-}
-
-function _stopSubtitlePaging() {
-  if (state.subtitlePageTimer) {
-    clearTimeout(state.subtitlePageTimer);
-    state.subtitlePageTimer = 0;
-  }
-}
-
-function _scheduleSubtitleSafetyHide(id, baseDelayMs) {
-  const startedAt = Date.now();
-  const firstDelay = Math.max(3200, Math.round(Number(baseDelayMs) || 0));
-  const tick = () => {
-    if (id !== state.subtitleId) {
-      return;
-    }
-    const elapsed = Date.now() - startedAt;
-    if (_isSubtitleSpeechActive() && elapsed < _SUBTITLE_HARD_MAX_MS) {
-      state.subtitleHideTimer = setTimeout(tick, _SUBTITLE_SPEECH_RECHECK_MS);
-      return;
-    }
-    hideSubtitleText();
-  };
-  state.subtitleHideTimer = setTimeout(tick, firstDelay);
-}
-
-function _normalizeSubtitleText(rawText) {
-  let out = sanitizeSpeakText(rawText);
-  out = out.replace(/^(?:en|english|原文)\s*[:：-]\s*/i, "").trim();
-  if (!out) {
-    return "";
-  }
-  return out.slice(0, _SUBTITLE_MAX_CHARS);
-}
-
-function _readSubtitleTranslationCache(text) {
-  const key = String(text || "").trim();
-  if (!key || !_subtitleTranslationCache.has(key)) {
-    return "";
-  }
-  const hit = _subtitleTranslationCache.get(key) || "";
-  _subtitleTranslationCache.delete(key);
-  _subtitleTranslationCache.set(key, hit);
-  return String(hit || "").trim();
-}
-
-function _writeSubtitleTranslationCache(text, translated) {
-  const key = String(text || "").trim();
-  const value = String(translated || "").trim();
-  if (!key || !value) {
-    return;
-  }
-  if (_subtitleTranslationCache.has(key)) {
-    _subtitleTranslationCache.delete(key);
-  }
-  _subtitleTranslationCache.set(key, value);
-  while (_subtitleTranslationCache.size > _SUBTITLE_CACHE_LIMIT) {
-    const oldestKey = _subtitleTranslationCache.keys().next().value;
-    if (!oldestKey) {
-      break;
-    }
-    _subtitleTranslationCache.delete(oldestKey);
-  }
-}
-
-function _abortSubtitleTranslation() {
-  if (!_subtitleTranslationAbortController) {
-    return;
-  }
-  try {
-    _subtitleTranslationAbortController.abort();
-  } catch (_) {
-    // ignore
-  }
-  _subtitleTranslationAbortController = null;
 }
 
 async function _fetchTranslation(text, capturedId) {
-  const safe = String(text || "").trim();
-  if (!safe) {
-    return "";
+  if (typeof SUBTITLE_CONTROLLER.fetchTranslation === "function") {
+    return SUBTITLE_CONTROLLER.fetchTranslation(text, capturedId, getSubtitleControllerDeps());
   }
-  const cached = _readSubtitleTranslationCache(safe) || _readChatTranslationCache(safe);
-  if (cached) {
-    _writeSubtitleTranslationCache(safe, cached);
-    return cached;
-  }
-  if (_isTranslationCircuitOpen() || capturedId !== state.subtitleId) {
-    return "";
-  }
-  const translated = String(await _fetchChatTranslation(safe) || "").trim();
-  if (capturedId !== state.subtitleId) {
-    return "";
-  }
-  if (!translated) {
-    return "";
-  }
-  _writeSubtitleTranslationCache(safe, translated);
-  return translated;
+  return "";
 }
 
 function _applySubtitleDOM(enText, zhText) {
-  const layer = document.getElementById("subtitle-layer");
-  if (!layer) return;
-  const spanEn = layer.querySelector(".subtitle-en");
-  const spanZh = layer.querySelector(".subtitle-zh");
-  const en = String(enText || "").trim();
-  const zh = String(zhText || "").trim();
-  if (spanEn) spanEn.textContent = en;
-  if (spanZh) spanZh.textContent = zh;
-  layer.classList.toggle("subtitle-zh-ready", !!zh);
-  layer.classList.remove("subtitle-hiding");
-  layer.classList.add("subtitle-visible");
-}
-
-function _emitSubtitleFrame(id, enText, zhText) {
-  if (!state.subtitleEnabled) {
-    _clearSubtitleDOM(id, true);
-    return;
+  if (typeof SUBTITLE_CONTROLLER.applySubtitleDOM === "function") {
+    SUBTITLE_CONTROLLER.applySubtitleDOM(enText, zhText, getSubtitleControllerDeps());
   }
-  if (window.electronAPI?.sendSubtitle) {
-    window.electronAPI.sendSubtitle({ id, en: enText, zh: zhText });
-  } else {
-    _applySubtitleDOM(enText, zhText);
-  }
-}
-
-function _renderSubtitlePage(id) {
-  if (id !== state.subtitleId || _subtitlePaging.id !== id) {
-    return false;
-  }
-  const pageIndex = _subtitlePaging.index;
-  const en = _pickSubtitlePage(_subtitlePaging.enPages, pageIndex);
-  const zh = _pickSubtitlePage(_subtitlePaging.zhPages, pageIndex);
-  _emitSubtitleFrame(id, en, zh);
-  return true;
-}
-
-function _startSubtitlePaging(id, enText, zhText = "", preserveIndex = false) {
-  _stopSubtitlePaging();
-  const enPages = _splitSubtitlePages(enText);
-  const zhPages = _splitSubtitlePages(zhText);
-  const pageCount = Math.max(1, enPages.length, zhPages.length);
-  const nextIndex = preserveIndex && _subtitlePaging.id === id
-    ? Math.max(0, Math.min(pageCount - 1, _subtitlePaging.index))
-    : 0;
-  _subtitlePaging.id = id;
-  _subtitlePaging.enPages = enPages;
-  _subtitlePaging.zhPages = zhPages;
-  _subtitlePaging.index = nextIndex;
-  _subtitlePaging.intervalMs = _calcSubtitlePageInterval(enText, pageCount);
-  _renderSubtitlePage(id);
-  if (pageCount <= 1) {
-    return;
-  }
-  const tick = () => {
-    if (id !== state.subtitleId || _subtitlePaging.id !== id) {
-      return;
-    }
-    const total = _subtitlePageCount();
-    if (_subtitlePaging.index >= total - 1) {
-      return;
-    }
-    _subtitlePaging.index += 1;
-    _renderSubtitlePage(id);
-    state.subtitlePageTimer = setTimeout(tick, _subtitlePaging.intervalMs);
-  };
-  state.subtitlePageTimer = setTimeout(tick, _subtitlePaging.intervalMs);
 }
 
 function _clearSubtitleDOM(id, force = false) {
-  if (!force && id !== state.subtitleId) return;
-  _stopSubtitlePaging();
-  state.subtitleHideTimer = 0;
-  const layer = document.getElementById("subtitle-layer");
-  if (!layer) return;
-  layer.classList.remove("subtitle-visible");
-  layer.classList.remove("subtitle-zh-ready");
-  layer.classList.add("subtitle-hiding");
-  setTimeout(() => {
-    if (!force && id !== state.subtitleId) return;
-    layer.classList.remove("subtitle-hiding");
-    layer.classList.remove("subtitle-zh-ready");
-    const spanEn = layer.querySelector(".subtitle-en");
-    const spanZh = layer.querySelector(".subtitle-zh");
-    if (spanEn) spanEn.textContent = "";
-    if (spanZh) spanZh.textContent = "";
-  }, 500);
+  if (typeof SUBTITLE_CONTROLLER.clearSubtitleDOM === "function") {
+    SUBTITLE_CONTROLLER.clearSubtitleDOM(id, force, getSubtitleControllerDeps());
+  }
 }
 
 function showSubtitleText(rawText) {
-  if (!state.subtitleEnabled) {
-    return;
-  }
-  const cleaned = _normalizeSubtitleText(rawText);
-  if (!cleaned) return;
-
-  _abortSubtitleTranslation();
-  if (state.subtitleHideTimer) {
-    clearTimeout(state.subtitleHideTimer);
-    state.subtitleHideTimer = 0;
-  }
-
-  state.subtitleId++;
-  const id = state.subtitleId;
-  _startSubtitlePaging(id, cleaned, "", false);
-
-  _scheduleSubtitleSafetyHide(id, _subtitleDuration(cleaned));
-
-  if (cleaned.length >= 3) {
-    _fetchTranslation(cleaned, id).then((zh) => {
-      if (!zh || id !== state.subtitleId) return;
-      _startSubtitlePaging(id, cleaned, zh, true);
-    });
+  if (typeof SUBTITLE_CONTROLLER.showSubtitleText === "function") {
+    SUBTITLE_CONTROLLER.showSubtitleText(rawText, getSubtitleControllerDeps());
   }
 }
 
 function hideSubtitleText() {
-  const id = state.subtitleId;
-  _abortSubtitleTranslation();
-  _stopSubtitlePaging();
-  if (state.subtitleHideTimer) clearTimeout(state.subtitleHideTimer);
-  state.subtitleHideTimer = setTimeout(() => {
-    if (id !== state.subtitleId) return;
-    if (window.electronAPI?.sendSubtitleHide) {
-      window.electronAPI.sendSubtitleHide({ id });
-    } else {
-      _clearSubtitleDOM(id, true);
-    }
-    state.subtitleHideTimer = setTimeout(() => _clearSubtitleDOM(id, true), 500);
-    if (state.subtitleId === id) {
-      state.subtitleId = id + 1;
-    }
-  }, _SUBTITLE_AFTER_SPEECH_HOLD_MS);
+  if (typeof SUBTITLE_CONTROLLER.hideSubtitleText === "function") {
+    SUBTITLE_CONTROLLER.hideSubtitleText(getSubtitleControllerDeps());
+  }
 }
 
 // End subtitle helpers
 
+let speechStyleControllerInstance = null;
+
+function getSpeechStyleController() {
+  if (!speechStyleControllerInstance && typeof SPEECH_STYLE_CONTROLLER.createController === "function") {
+    speechStyleControllerInstance = SPEECH_STYLE_CONTROLLER.createController({ state, speechText: SPEECH_TEXT, sanitizeSpeakText });
+  }
+  return speechStyleControllerInstance || SPEECH_STYLE_CONTROLLER;
+}
+
 function hashText(text) {
+  const controller = getSpeechStyleController();
+  if (typeof controller.hashText === "function") {
+    return controller.hashText(text);
+  }
   const src = String(text || "");
   let hash = 0;
-  for (let i = 0; i < src.length; i++) {
+  for (let i = 0; i < src.length; i += 1) {
     hash = (hash * 131 + src.charCodeAt(i)) % 2147483647;
   }
   return Math.abs(hash);
 }
 
 function pickByHash(seedText, options) {
+  const controller = getSpeechStyleController();
+  if (typeof controller.pickByHash === "function") {
+    return controller.pickByHash(seedText, options);
+  }
   if (!Array.isArray(options) || options.length === 0) {
     return "";
   }
-  const idx = hashText(seedText) % options.length;
-  return String(options[idx] || "");
+  return String(options[hashText(seedText) % options.length] || "");
 }
 
 function insertNaturalPause(seg) {
-  if (typeof SPEECH_TEXT.insertNaturalPause === "function") {
-    return SPEECH_TEXT.insertNaturalPause(seg);
-  }
-  return String(seg || "").trim();
+  const controller = getSpeechStyleController();
+  return typeof controller.insertNaturalPause === "function" ? controller.insertNaturalPause(seg) : String(seg || "").trim();
 }
 
 function colloquializeSpeakText(text) {
-  if (typeof SPEECH_TEXT.colloquializeSpeakText === "function") {
-    return SPEECH_TEXT.colloquializeSpeakText(text);
-  }
-  return String(text || "").trim();
+  const controller = getSpeechStyleController();
+  return typeof controller.colloquializeSpeakText === "function" ? controller.colloquializeSpeakText(text) : String(text || "").trim();
 }
 
 function simplifySpeechDeliveryText(text, style = "neutral", streamMode = false) {
-  if (typeof SPEECH_TEXT.simplifySpeechDeliveryText === "function") {
-    return SPEECH_TEXT.simplifySpeechDeliveryText(text, style, streamMode);
-  }
-  return String(text || "").trim();
+  const controller = getSpeechStyleController();
+  return typeof controller.simplifySpeechDeliveryText === "function" ? controller.simplifySpeechDeliveryText(text, style, streamMode) : String(text || "").trim();
 }
 
-
 function tightenMinorSpeechPauses(text, streamMode = false) {
-  if (typeof SPEECH_TEXT.tightenMinorSpeechPauses === "function") {
-    return SPEECH_TEXT.tightenMinorSpeechPauses(text, streamMode);
-  }
-  return String(text || "").replace(/\s+/g, " ").trim();
+  const controller = getSpeechStyleController();
+  return typeof controller.tightenMinorSpeechPauses === "function" ? controller.tightenMinorSpeechPauses(text, streamMode) : String(text || "").replace(/\s+/g, " ").trim();
 }
 
 function normalizeTalkStyle(style) {
-  const s = String(style || "neutral").trim().toLowerCase();
-  if (["neutral", "comfort", "clear", "playful", "steady"].includes(s)) {
-    return s;
-  }
-  return "neutral";
+  const controller = getSpeechStyleController();
+  return typeof controller.normalizeTalkStyle === "function" ? controller.normalizeTalkStyle(style) : "neutral";
 }
 
 function inferContextStyle(userText = "", assistantText = "", mood = "idle", isAuto = false) {
-  const src = `${String(userText || "")}\n${String(assistantText || "")}`.toLowerCase();
-  const score = {
-    comfort: 0,
-    clear: 0,
-    playful: 0,
-    steady: 0
-  };
-
-  if (/(难过|伤心|焦虑|崩溃|压力|失眠|委屈|心累|痛苦|失落|难受|不舒服)/.test(src)) {
-    score.comfort += 5;
-  }
-  if (/(报错|错误|bug|代码|修复|排查|步骤|教程|配置|接口|api|命令|运行|性能|延迟|怎么做|如何)/.test(src)) {
-    score.clear += 5;
-  }
-  if (/(紧急|立刻|马上|严谨|认真|上线|故障|事故|必须|优先)/.test(src)) {
-    score.steady += 4;
-  }
-  if (/(哈哈|好耶|太棒|开心|可爱|有趣|聊聊|玩|轻松|摸鱼|wow|lol|233)/.test(src)) {
-    score.playful += 4;
-  }
-
-  if (/[?？]/.test(src)) {
-    score.clear += 1;
-  }
-  if (/[!！]/.test(src)) {
-    score.playful += 1;
-  }
-  if (mood === "happy" || mood === "surprised") {
-    score.playful += 2;
-  }
-  if (mood === "sad") {
-    score.comfort += 2;
-  }
-  if (mood === "angry") {
-    score.steady += 2;
-  }
-  if (isAuto) {
-    score.playful += 1;
-  }
-
-  let bestStyle = "neutral";
-  let bestScore = 0;
-  for (const [style, v] of Object.entries(score)) {
-    if (v > bestScore) {
-      bestStyle = style;
-      bestScore = v;
-    }
-  }
-  return bestScore > 0 ? bestStyle : "neutral";
+  const controller = getSpeechStyleController();
+  return typeof controller.inferContextStyle === "function" ? controller.inferContextStyle(userText, assistantText, mood, isAuto) : "neutral";
 }
 
 function resolveTalkStyle(userText = "", assistantText = "", mood = "idle", isAuto = false) {
-  if (state.styleAutoEnabled) {
-    return inferContextStyle(userText, assistantText, mood, isAuto);
+  const controller = getSpeechStyleController();
+  return typeof controller.resolveTalkStyle === "function" ? controller.resolveTalkStyle(userText, assistantText, mood, isAuto) : normalizeTalkStyle(state.manualTalkStyle);
+}
+
+function buildSpeechDeliveryText(text, mood = "idle", style = "neutral", streamMode = false) {
+  const controller = getSpeechStyleController();
+  return typeof controller.buildSpeechDeliveryText === "function" ? controller.buildSpeechDeliveryText(text, mood, style, streamMode) : sanitizeSpeakText(text);
+}
+
+function buildStableSpeakText(text) {
+  const controller = getSpeechStyleController();
+  return typeof controller.buildStableSpeakText === "function" ? controller.buildStableSpeakText(text) : sanitizeSpeakText(text);
+}
+
+function splitStreamSpeakSegments(buffer, flush = false) {
+  const controller = getSpeechStyleController();
+  return typeof controller.splitStreamSpeakSegments === "function"
+    ? controller.splitStreamSpeakSegments(buffer, flush)
+    : { segments: [], rest: String(buffer || "") };
+}
+
+function textJitter(text, scale = 0.02) {
+  const controller = getSpeechStyleController();
+  return typeof controller.textJitter === "function" ? controller.textJitter(text, scale) : 0;
+}
+
+function buildSpeakProsody(text, mood, streamMode = false, style = "neutral") {
+  const controller = getSpeechStyleController();
+  if (typeof controller.buildSpeakProsody === "function") {
+    return controller.buildSpeakProsody(text, mood, streamMode, style);
   }
-  return normalizeTalkStyle(state.manualTalkStyle);
+  return { speed_ratio: 1, pitch_ratio: 1, volume_ratio: 1, rate: "+0%", pitch: "+0Hz", volume: "+0%" };
 }
 
 function waitMs(ms) {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
 }
 
-function normalizeMotionIntensity(level) {
-  const x = String(level || "normal").trim().toLowerCase();
-  if (x === "low" || x === "high" || x === "normal") {
-    return x;
-  }
-  return "normal";
-}
+let live2dExpressionControllerInstance = null;
 
-function getMotionIntensityPreset() {
-  const key = normalizeMotionIntensity(state.motionIntensity);
-  return MOTION_INTENSITY_PRESETS[key] || MOTION_INTENSITY_PRESETS.normal;
-}
-
-function getStyleExpressionProfile(style) {
-  if (typeof LIVE2D_EXPRESSION_TUNING.getStyleExpressionProfile === "function") {
-    return LIVE2D_EXPRESSION_TUNING.getStyleExpressionProfile(style);
-  }
-  const s = normalizeTalkStyle(style);
-  return STYLE_EXPRESSION_PROFILE[s] || STYLE_EXPRESSION_PROFILE.neutral;
-}
-
-function detectModelProfileName() {
-  const modelPath = String(state.config?.model_path || "").trim().toLowerCase();
-  for (const key of Object.keys(MODEL_MOTION_PROFILES)) {
-    if (modelPath.includes(key.toLowerCase())) {
-      return key;
-    }
-  }
-  return "";
-}
-
-function getActiveModelMotionProfile() {
-  const key = String(state.modelProfileName || "").trim();
-  if (!key) {
-    return null;
-  }
-  return MODEL_MOTION_PROFILES[key] || null;
-}
-
-function getActiveModelCadence() {
-  return getActiveModelMotionProfile()?.cadence || null;
-}
-
-function getCoreModel() {
-  return state.model?.internalModel?.coreModel || null;
-}
-
-function safeAddParamValue(core, id, delta, weight = 1) {
-  if (!core || !id || !Number.isFinite(Number(delta)) || Math.abs(Number(delta)) < 0.0001) {
-    return;
-  }
-  const d = Number(delta);
-  const w = Number.isFinite(Number(weight)) ? Number(weight) : 1;
-  try {
-    if (typeof core.addParameterValueById === "function") {
-      core.addParameterValueById(id, d, w);
-      return;
-    }
-    if (
-      typeof core.getParameterValueById === "function"
-      && typeof core.setParameterValueById === "function"
-    ) {
-      const cur = Number(core.getParameterValueById(id) || 0);
-      core.setParameterValueById(id, cur + d, w);
-    }
-  } catch (_) {
-    // ignore unsupported parameter ids
-  }
-}
-
-function safeSetParamValue(core, id, value, weight = 1) {
-  if (!core || !id || !Number.isFinite(Number(value))) {
-    return;
-  }
-  const v = Number(value);
-  const w = Number.isFinite(Number(weight)) ? clampNumber(Number(weight), 0, 1) : 1;
-  let apiApplied = false;
-  let apiTarget = v;
-  try {
-    if (
-      typeof core.getParameterValueById === "function"
-      && typeof core.setParameterValueById === "function"
-    ) {
-      if (w >= 0.999) {
-        core.setParameterValueById(id, v, 1);
-        apiApplied = true;
-        apiTarget = v;
-      } else {
-        const cur = Number(core.getParameterValueById(id) || 0);
-        apiTarget = cur + (v - cur) * w;
-        core.setParameterValueById(id, apiTarget, 1);
-        apiApplied = true;
-      }
-    }
-  } catch (_) {
-    // ignore and fallback to raw parameter array
-  }
-  if (apiApplied) {
-    try {
-      if (typeof core.getParameterValueById === "function") {
-        const after = Number(core.getParameterValueById(id));
-        if (Number.isFinite(after) && Math.abs(after - apiTarget) <= 0.0015) {
-          return;
-        }
-      }
-    } catch (_) {
-      // ignore and fallback to raw parameter array
-    }
-  }
-  try {
-    const params = core?._model?.parameters;
-    const ids = params?.ids;
-    const vals = params?.values;
-    if (!ids || !vals) {
-      return;
-    }
-    const idx = Array.from(ids).indexOf(id);
-    if (idx < 0) {
-      return;
-    }
-    const cur = Number(vals[idx] || 0);
-    vals[idx] = cur + (v - cur) * w;
-  } catch (_) {
-    // ignore unsupported parameter ids
-  }
-}
-
-function safeGetParamValue(core, id) {
-  if (!core || !id) {
-    return NaN;
-  }
-  try {
-    if (typeof core.getParameterValueById === "function") {
-      const v = Number(core.getParameterValueById(id));
-      if (Number.isFinite(v)) {
-        return v;
-      }
-    }
-  } catch (_) {
-    // ignore and fallback to raw parameter array
-  }
-  try {
-    const params = core?._model?.parameters;
-    const ids = params?.ids;
-    const vals = params?.values;
-    if (!ids || !vals) {
-      return NaN;
-    }
-    const idx = Array.from(ids).indexOf(id);
-    if (idx < 0) {
-      return NaN;
-    }
-    const v = Number(vals[idx]);
-    return Number.isFinite(v) ? v : NaN;
-  } catch (_) {
-    return NaN;
-  }
-}
-
-function safeDriveParamValue(core, id, target, gain = 1) {
-  if (!core || !id || !Number.isFinite(Number(target))) {
-    return;
-  }
-  const t = Number(target);
-  const g = clampNumber(Number(gain) || 1, 0, 1);
-  const cur = safeGetParamValue(core, id);
-  if (!Number.isFinite(cur)) {
-    safeSetParamValue(core, id, t, g);
-    return;
-  }
-  const delta = (t - cur) * g;
-  if (Math.abs(delta) < 0.0001) {
-    return;
-  }
-  safeAddParamValue(core, id, delta, 1);
-}
-
-function triggerExpressionPulse(style = "neutral", boost = 1, durationMs = 520) {
-  const now = performance.now();
-  state.expressionStyle = normalizeTalkStyle(style);
-  state.expressionPulseBoost = clampNumber(Number(boost) || 1, 0.2, 2.2);
-  state.expressionPulseUntil = now + Math.max(120, Number(durationMs) || 520);
-}
-
-function estimateSpeechAnimationDurationMs(text, style = "neutral") {
-  const cleaned = sanitizeSpeakText(text);
-  const chars = cleaned.length;
-  const punct = (cleaned.match(/[，。！？!?、]/g) || []).length;
-  let duration = 360 + chars * 82 + punct * 130;
-  if (style === "comfort") {
-    duration *= 1.06;
-  } else if (style === "playful") {
-    duration *= 0.94;
-  } else if (style === "steady") {
-    duration *= 0.98;
-  }
-  return Math.round(clampNumber(duration, 360, 12000));
-}
-
-function beginSpeechAnimation(text, mood = "idle", style = "neutral", opts = {}) {
-  const cleaned = sanitizeSpeakText(text);
-  if (!cleaned) {
-    return;
-  }
-  const now = performance.now();
-  const durationMs = Math.max(
-    240,
-    Math.round(Number(opts.durationMs) || estimateSpeechAnimationDurationMs(cleaned, style))
-  );
-  state.speechAnimStartedAt = now;
-  state.speechAnimDurationMs = durationMs;
-  state.speechAnimUntil = now + durationMs + 180;
-  state.speechAnimSeed = Math.random() * Math.PI * 2;
-  state.speechAnimTextLength = cleaned.length;
-  state.speechAnimPunctuation = (cleaned.match(/[，。！？!?、]/g) || []).length;
-  state.speechAnimAccentCount = (cleaned.match(/[!?\uFF01\uFF1F]/g) || []).length;
-  state.speechAnimStyle = normalizeTalkStyle(style || state.currentTalkStyle || "neutral");
-  state.speechAnimMood = String(mood || detectMood(cleaned) || "idle");
-}
-
-function endSpeechAnimation() {
-  state.speechAnimUntil = 0;
-  state.speechAnimStartedAt = 0;
-  state.speechAnimDurationMs = 0;
-  state.speechAnimAccentCount = 0;
-  state.speechMouthOpen = 0;
-  state.speechMouthTarget = 0;
-  state.speechMouthUpdatedAt = performance.now();
-  state.ttsAudioLevel = 0;
-  state.ttsAudioRawLevel = 0;
-  state.ttsAudioRms = 0;
-  state.ttsAudioLastVoiceAt = 0;
-  state.moodHoldUntil = performance.now() + 1500;
-}
-
-function finishSpeechAnimation() {
-  const now = performance.now();
-  const releaseMs = 260;
-  const holdMs = 900;
-  state.speechAnimUntil = now + releaseMs;
-  state.speechMouthTarget = 0;
-  state.speechMouthUpdatedAt = now;
-  state.ttsAudioLevel = 0;
-  state.ttsAudioRawLevel = 0;
-  state.ttsAudioRms = 0;
-  state.ttsAudioLastVoiceAt = 0;
-  state.moodHoldUntil = Math.max(Number(state.moodHoldUntil || 0), now + holdMs);
-}
-
-function ensureMicroMotionState(now = performance.now()) {
-  if (!Number.isFinite(Number(state.microBreathSeed)) || Math.abs(Number(state.microBreathSeed)) < 0.0001) {
-    state.microBreathSeed = Math.random() * Math.PI * 2;
-  }
-  if (!Number(state.microNextBlinkAt)) {
-    state.microNextBlinkAt = now + 1400 + Math.random() * 2600;
-  }
-  if (!Number(state.microNextGazeAt)) {
-    state.microNextGazeAt = now + 900 + Math.random() * 2200;
-  }
-  if (!Number.isFinite(Number(state.microMotionLastAt)) || Number(state.microMotionLastAt) <= 0) {
-    state.microMotionLastAt = now;
-  }
-  if (!["idle", "attack", "sustain", "release"].includes(String(state.speechPhase || ""))) {
-    state.speechPhase = "idle";
-  }
-  if (!Number.isFinite(Number(state.speechPhaseEnteredAt))) {
-    state.speechPhaseEnteredAt = 0;
-  }
-  if (typeof state.speechPhaseWasSpeaking !== "boolean") {
-    state.speechPhaseWasSpeaking = false;
-  }
-  if (!Number.isFinite(Number(state.speechMotionBlend))) {
-    state.speechMotionBlend = 0;
-  }
-  if (!Number.isFinite(Number(state.speechMotionStrength))) {
-    state.speechMotionStrength = 1.35;
-  }
-  if (!Number.isFinite(Number(state.beatPrevLevel))) {
-    state.beatPrevLevel = 0;
-  }
-  if (!Number.isFinite(Number(state.beatImpulse))) {
-    state.beatImpulse = 0;
-  }
-  if (!Number.isFinite(Number(state.beatNodSmoothed))) {
-    state.beatNodSmoothed = 0;
-  }
-  if (!Number.isFinite(Number(state.beatCooldownUntil))) {
-    state.beatCooldownUntil = 0;
-  }
-  if (!Number.isFinite(Number(state.mouseGazeCurrentX))) {
-    state.mouseGazeCurrentX = 0;
-  }
-  if (!Number.isFinite(Number(state.mouseGazeCurrentY))) {
-    state.mouseGazeCurrentY = 0;
-  }
-  if (!Number.isFinite(Number(state.spring_hairAhoge_vel))) state.spring_hairAhoge_vel = 0;
-  if (!Number.isFinite(Number(state.spring_hairAhoge_pos))) state.spring_hairAhoge_pos = 0;
-  if (!Number.isFinite(Number(state.spring_hairFront_vel))) state.spring_hairFront_vel = 0;
-  if (!Number.isFinite(Number(state.spring_hairFront_pos))) state.spring_hairFront_pos = 0;
-  if (!Number.isFinite(Number(state.spring_hairBack_vel))) state.spring_hairBack_vel = 0;
-  if (!Number.isFinite(Number(state.spring_hairBack_pos))) state.spring_hairBack_pos = 0;
-  if (!Number.isFinite(Number(state.spring_ribbon_vel))) state.spring_ribbon_vel = 0;
-  if (!Number.isFinite(Number(state.spring_ribbon_pos))) state.spring_ribbon_pos = 0;
-  if (!Number.isFinite(Number(state.spring_skirt_vel))) state.spring_skirt_vel = 0;
-  if (!Number.isFinite(Number(state.spring_skirt_pos))) state.spring_skirt_pos = 0;
-  if (!Number.isFinite(Number(state.spring_skirt2_vel))) state.spring_skirt2_vel = 0;
-  if (!Number.isFinite(Number(state.spring_skirt2_pos))) state.spring_skirt2_pos = 0;
-  if (!Number.isFinite(Number(state.spring_torso_vel))) state.spring_torso_vel = 0;
-  if (!Number.isFinite(Number(state.spring_torso_pos))) state.spring_torso_pos = 0;
-  if (!Number.isFinite(Number(state.spring_head_vel))) state.spring_head_vel = 0;
-  if (!Number.isFinite(Number(state.spring_head_pos))) state.spring_head_pos = 0;
-  if (!Number.isFinite(Number(state.spring_body_vel))) state.spring_body_vel = 0;
-  if (!Number.isFinite(Number(state.spring_body_pos))) state.spring_body_pos = 0;
-  if (!Number.isFinite(Number(state.spring_body_render))) state.spring_body_render = 0;
-  if (!Number.isFinite(Number(state.spring_torso_render))) state.spring_torso_render = 0;
-  if (!Number.isFinite(Number(state.spring_head_render))) state.spring_head_render = 0;
-}
-
-function getSmoothedMoodExpression(now = performance.now()) {
-  const now2 = now || performance.now();
-  const holding = now2 < Number(state.moodHoldUntil || 0);
-  const speakingNow = isSpeechMotionActive(now2);
-  const activeMood = (holding || speakingNow)
-    ? String(state.speechAnimMood || "idle")
-    : "idle";
-  const prev = state.moodExpressionSmoothed && typeof state.moodExpressionSmoothed === "object"
-    ? state.moodExpressionSmoothed
-    : { happy: 0, sad: 0, angry: 0, surprised: 0 };
-  const target = { happy: 0, sad: 0, angry: 0, surprised: 0 };
-  if (activeMood in target) {
-    target[activeMood] = 1;
-  }
-  const last = Number(state.moodExpressionUpdatedAt || 0);
-  if (last > 0 && now2 - last < 1) {
-    return prev;
-  }
-  const dtFrames = last > 0 ? clampNumber((now2 - last) / 16.6667, 0.5, 3.5) : 1;
-  const smoothing = 1 - Math.pow(1 - 0.28, dtFrames);
-  const next = {
-    happy: prev.happy + (target.happy - prev.happy) * smoothing,
-    sad: prev.sad + (target.sad - prev.sad) * smoothing,
-    angry: prev.angry + (target.angry - prev.angry) * smoothing,
-    surprised: prev.surprised + (target.surprised - prev.surprised) * smoothing
-  };
-  state.moodExpressionSmoothed = next;
-  state.moodExpressionUpdatedAt = now2;
-  return next;
-}
-
-function ensureTTSAudioAnalyser(audio) {
-  if (!audio) {
-    return false;
-  }
-  if (state.ttsAudioAnalyser && state.ttsAudioSourceNode) {
-    return true;
-  }
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) {
-    return false;
-  }
-  try {
-    if (!state.ttsAudioContext) {
-      state.ttsAudioContext = new AudioCtx();
-    }
-    if (!state.ttsAudioSourceNode) {
-      state.ttsAudioSourceNode = state.ttsAudioContext.createMediaElementSource(audio);
-    }
-    if (!state.ttsAudioAnalyser) {
-    state.ttsAudioAnalyser = state.ttsAudioContext.createAnalyser();
-    state.ttsAudioAnalyser.fftSize = 256;
-    state.ttsAudioAnalyser.smoothingTimeConstant = 0.12;
-      state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.frequencyBinCount);
-      state.ttsAudioSourceNode.connect(state.ttsAudioAnalyser);
-      state.ttsAudioAnalyser.connect(state.ttsAudioContext.destination);
-    }
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function sampleTTSAudioLevel() {
-  const analyser = state.ttsAudioAnalyser;
-  const data = state.ttsAudioAnalyserData;
-  if (!analyser || !data || !data.length) {
-    state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
-    state.ttsAudioRawLevel = 0;
-    state.ttsAudioRms = 0;
-    return state.ttsAudioLevel;
-  }
-  try {
-    analyser.getByteTimeDomainData(data);
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 1) {
-      const centered = (data[i] - 128) / 128;
-      sum += centered * centered;
-    }
-    const rms = Math.sqrt(sum / data.length);
-    const normalized = clampNumber((rms - 0.006) / 0.095, 0, 1);
-    const smoothing = normalized > state.ttsAudioLevel ? 0.88 : 0.78;
-    state.ttsAudioRawLevel = normalized;
-    state.ttsAudioRms = rms;
-    if (normalized > 0.035) {
-      state.ttsAudioLastVoiceAt = performance.now();
-    }
-    state.ttsAudioLevel += (normalized - state.ttsAudioLevel) * smoothing;
-  } catch (_) {
-    state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
-    state.ttsAudioRawLevel = 0;
-    state.ttsAudioRms = 0;
-  }
-  return state.ttsAudioLevel;
-}
-
-function updateMicroMotionLayer() {
-  if (!state.expressionEnabled || !state.model) {
-    return;
-  }
-  const core = getCoreModel();
-  if (!core) {
-    return;
-  }
-  const now = performance.now();
-  ensureMicroMotionState(now);
-  const prevMotionAt = Number(state.microMotionLastAt) || now;
-  const rawDtFrames = (now - prevMotionAt) / 16.6667;
-  state.microMotionLastAt = now;
-  const style = normalizeTalkStyle(state.currentTalkStyle || state.expressionStyle || "neutral");
-  const speaking = isSpeechMotionActive(now);
-  const dtFrames = speaking
-    ? clampNumber(rawDtFrames, 0.86, 1.16)
-    : clampNumber(rawDtFrames, 0.72, 1.5);
-  const motionBlendPrev = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
-  const motionBlendFollow = speaking
-    ? (1 - Math.pow(1 - 0.42, dtFrames))
-    : (1 - Math.pow(1 - 0.18, dtFrames));
-  const motionBlend = clampNumber(
-    motionBlendPrev + ((speaking ? 1 : 0) - motionBlendPrev) * motionBlendFollow,
-    0,
-    1
-  );
-  state.speechMotionBlend = motionBlend;
-  const smoothMotionOutput = (name, target, opts = {}) => {
-    const key = `motion_smooth_${name}`;
-    let prev = Number(state[key]);
-    if (!Number.isFinite(prev)) {
-      prev = Number(target) || 0;
-    }
-    const rise = clampNumber(
-      Number.isFinite(Number(opts.rise)) ? Number(opts.rise) : 0.22,
-      0.01,
-      0.98
-    );
-    const fall = clampNumber(
-      Number.isFinite(Number(opts.fall)) ? Number(opts.fall) : 0.16,
-      0.01,
-      0.98
-    );
-    const maxStep = Math.max(
-      0.001,
-      Number.isFinite(Number(opts.maxStep)) ? Number(opts.maxStep) : 999
-    );
-    const follow = target > prev
-      ? (1 - Math.pow(1 - rise, dtFrames))
-      : (1 - Math.pow(1 - fall, dtFrames));
-    let next = prev + (target - prev) * follow;
-    const maxDelta = maxStep * dtFrames;
-    next = prev + clampNumber(next - prev, -maxDelta, maxDelta);
-    state[key] = next;
-    return next;
-  };
-  const speechMotionStrength = clampNumber(Number(state.speechMotionStrength) || 1.35, 0.6, 2.2);
-  const speechMotionBoost = 0.82 + speechMotionStrength * 0.28;
-  const mouthEnergy = speaking ? clampNumber(Number(state.speechMouthOpen) || 0, 0, 1) : 0;
-  const audioEnergy = clampNumber(
-    Math.max(Number(state.ttsAudioLevel) || 0, mouthEnergy * 0.56),
-    0,
-    1
-  );
-  const priorBeat = clampNumber(Number(state.beatImpulse) || 0, 0, 1);
-  const energyInput = motionBlend > 0.02
-    ? Math.max(audioEnergy, (0.16 + priorBeat * 0.24 * motionBlend) * speechMotionBoost)
-    : audioEnergy;
-  const currentBodyEnergy = Number(state.speechBodyEnergy) || 0;
-  const energyAttack = 1 - Math.pow(1 - 0.24, dtFrames);
-  const energyRelease = 1 - Math.pow(1 - 0.07, dtFrames);
-  const energyFollow = energyInput > currentBodyEnergy ? energyAttack : energyRelease;
-  state.speechBodyEnergy = clampNumber(
-    currentBodyEnergy + (energyInput - currentBodyEnergy) * energyFollow,
-    0, 1
-  );
-  const rawLevel = clampNumber(Number(state.ttsAudioLevel) || 0, 0, 1);
-  const prevLevel = Number(state.beatPrevLevel) || 0;
-  const dLevel = rawLevel - prevLevel;
-  const risingLevel = Math.max(0, dLevel);
-  const fallingLevel = Math.max(0, -dLevel);
-  const beatVelocity = risingLevel + fallingLevel * 0.28;
-  const beatThreshold = 0.08;
-  state.beatPrevLevel = rawLevel;
-  const beatSoftCap = 0.32 + motionBlend * 0.5;
-  if (motionBlend > 0.06 && rawLevel > beatThreshold && beatVelocity > 0.01 && risingLevel > 0.002 && now > Number(state.beatCooldownUntil || 0)) {
-    const impulseStrength = clampNumber((beatVelocity - 0.01) / 0.085, 0.05, 0.68);
-    const slopeGain = 0.78 + clampNumber(risingLevel * 18, 0, 0.26);
-    const currentImpulse = Number(state.beatImpulse) || 0;
-    const softened = impulseStrength * 0.58 * slopeGain * (1 - currentImpulse * 0.42);
-    state.beatImpulse = clampNumber(currentImpulse + softened, 0, beatSoftCap);
-    state.beatCooldownUntil = now + 126;
-  }
-  const beatDecay = Math.pow(0.74 + motionBlend * 0.14, dtFrames);
-  state.beatImpulse = clampNumber((Number(state.beatImpulse) || 0) * beatDecay, 0, beatSoftCap);
-  if (motionBlend < 0.02) state.beatImpulse = 0;
-  const beatSmoothFollow = motionBlend > 0.05
-    ? (1 - Math.pow(1 - 0.34, dtFrames))
-    : (1 - Math.pow(1 - 0.22, dtFrames));
-  const beatSmoothPrev = Number(state.beatNodSmoothed) || 0;
-  state.beatNodSmoothed = clampNumber(
-    beatSmoothPrev + ((Number(state.beatImpulse) || 0) - beatSmoothPrev) * beatSmoothFollow,
-    0,
-    beatSoftCap
-  );
-  const beatNodRaw = Number(state.beatNodSmoothed) || 0;
-  const beatNod = smoothMotionOutput("beat_nod", beatNodRaw, {
-    rise: 0.24,
-    fall: 0.21,
-    maxStep: 0.055
-  });
-  const bodyEnergyRaw = state.speechBodyEnergy * motionBlend;
-  const bodyEnergy = smoothMotionOutput("body_energy", bodyEnergyRaw, {
-    rise: 0.22,
-    fall: 0.14,
-    maxStep: 0.08
-  });
-  const wasSpeaking = !!state.speechPhaseWasSpeaking;
-  state.speechPhaseWasSpeaking = speaking;
-
-  if (!wasSpeaking && speaking) {
-    state.speechPhase = "attack";
-    state.speechPhaseEnteredAt = now;
-  } else if (wasSpeaking && !speaking && state.speechPhase !== "idle") {
-    state.speechPhase = "release";
-    state.speechPhaseEnteredAt = now;
-  } else if (state.speechPhase === "attack" && now - Number(state.speechPhaseEnteredAt) > 300) {
-    state.speechPhase = "sustain";
-    state.speechPhaseEnteredAt = now;
-  } else if (state.speechPhase === "release" && now - Number(state.speechPhaseEnteredAt) > 600) {
-    state.speechPhase = "idle";
-    state.speechPhaseEnteredAt = 0;
-  } else if (!speaking && state.speechPhase === "idle") {
-  }
-
-  const phase = state.speechPhase || "idle";
-  const phaseAge = now - Number(state.speechPhaseEnteredAt || now);
-  const energyBoost = 1.0 + motionBlend * (0.12 + bodyEnergy * 1.2);
-  const moodBlend = getSmoothedMoodExpression(now);
-  const happyBlend = moodBlend.happy;
-  const sadBlend = moodBlend.sad;
-  const angryBlend = moodBlend.angry;
-  const surprisedBlend = moodBlend.surprised;
-  const moodGain = 0.85 + motionBlend * 0.15;
-  const blinkLength = 150 - motionBlend * 40;
-  if (now >= state.microNextBlinkAt) {
-    state.microBlinkUntil = now + blinkLength;
-    state.microNextBlinkAt = now + 1800 + Math.random() * 3400;
-  }
-  let blink = 0;
-  if (now < Number(state.microBlinkUntil || 0)) {
-    const remain = Math.max(0, Number(state.microBlinkUntil || 0) - now);
-    const phase = 1 - remain / blinkLength;
-    blink = Math.sin(Math.min(1, phase) * Math.PI);
-  }
-  if (now >= state.microNextGazeAt) {
-    const styleBias = style === "playful" ? 0.34 : (style === "steady" ? 0.16 : 0.24);
-    state.microGazeTargetX = clampNumber((Math.random() * 2 - 1) * styleBias, -0.35, 0.35);
-    state.microGazeTargetY = clampNumber((Math.random() * 2 - 1) * styleBias * 0.7, -0.22, 0.22);
-    state.microNextGazeAt = now + 1200 + Math.random() * 2400;
-  }
-  state.microGazeCurrentX += (state.microGazeTargetX - state.microGazeCurrentX) * 0.03;
-  state.microGazeCurrentY += (state.microGazeTargetY - state.microGazeCurrentY) * 0.03;
-  state.mouseGazeCurrentX += (state.mouseGazeTargetX - state.mouseGazeCurrentX) * 0.06;
-  state.mouseGazeCurrentY += (state.mouseGazeTargetY - state.mouseGazeCurrentY) * 0.06;
-  const mouseWeight = state.uiView === "model" ? 0.65 : 0;
-  const saccadeWeight = 1 - mouseWeight;
-  const finalGazeX = state.mouseGazeCurrentX * mouseWeight + state.microGazeCurrentX * saccadeWeight;
-  const finalGazeY = state.mouseGazeCurrentY * mouseWeight + state.microGazeCurrentY * saccadeWeight;
-  const breath = Math.sin(now / 1050 + state.microBreathSeed) * 0.5 + 0.5;
-  const sway = Math.sin(now / 860 + state.microBreathSeed * 0.7);
-  const ribbon = Math.sin(now / 930 + state.microBreathSeed * 1.3);
-  const hair = Math.sin(now / 780 + state.microBreathSeed * 1.9);
-  const breathGain = 0.46 - motionBlend * 0.22;
-  const styleGain = style === "comfort" ? 1.08 : (style === "playful" ? 1.15 : 1);
-  const breathShift = (breath - 0.5) * breathGain * styleGain;
-  const bodySwayGain = 0.96 + motionBlend * (0.79 + bodyEnergy * 2.2) * speechMotionBoost;
-  const bodySway = sway * 0.22 * bodySwayGain;
-  let hairAhogeTarget = hair * (0.18 + audioEnergy * 0.18) + breath * 0.12;
-  const hairFrontTarget = hair * 0.12;
-  const hairBackTarget = -hair * 0.1;
-  let ribbonTarget = ribbon * (0.1 + bodyEnergy * 0.08);
-  const skirtTarget = -sway * 0.08;
-  const skirt2Target = sway * 0.06;
-  if (motionBlend > 0.04 && bodyEnergy > 0.02) {
-    const e = bodyEnergy * speechMotionBoost;
-    hairAhogeTarget += e * 0.3;
-    ribbonTarget += e * 0.2;
-  }
-  const springK = clampNumber(
-    0.068 + motionBlend * 0.04 + bodyEnergy * 0.055 + beatNod * 0.03,
-    0.068,
-    0.19
-  );
-  const springDamping = 0.88 - motionBlend * 0.06;
-  const springStep = clampNumber(dtFrames, 0.82, 1.25);
-  const springSubsteps = Math.max(
-    2,
-    Math.min(6, Math.round((1 + motionBlend * 2.5) * springStep))
-  );
-  const springStepEach = springStep / springSubsteps;
-  const springTargetFollow = 1 - Math.pow(1 - (0.22 + motionBlend * 0.3), springStep);
-  const applySpring = (name, target) => {
-    const velKey = `spring_${name}_vel`;
-    const posKey = `spring_${name}_pos`;
-    const targetKey = `spring_${name}_target`;
-    let vel = Number(state[velKey]) || 0;
-    let pos = Number(state[posKey]) || 0;
-    let smoothedTarget = Number(state[targetKey]);
-    if (!Number.isFinite(smoothedTarget)) {
-      smoothedTarget = target;
-    }
-    smoothedTarget += (target - smoothedTarget) * springTargetFollow;
-    for (let i = 0; i < springSubsteps; i += 1) {
-      vel += (smoothedTarget - pos) * springK * springStepEach;
-      vel *= Math.pow(springDamping, springStepEach);
-      vel = clampNumber(vel, -1.9, 1.9);
-      pos += vel * springStepEach;
-      pos = clampNumber(pos, -1, 1);
-    }
-    state[targetKey] = smoothedTarget;
-    state[velKey] = vel;
-    state[posKey] = pos;
-    return pos;
-  };
-  const hairAhogeSpring = applySpring("hairAhoge", hairAhogeTarget);
-  const hairFrontSpring = applySpring("hairFront", hairFrontTarget);
-  const hairBackSpring = applySpring("hairBack", hairBackTarget);
-  const ribbonSpring = applySpring("ribbon", ribbonTarget);
-  const skirtSpring = applySpring("skirt", skirtTarget);
-  const skirt2Spring = applySpring("skirt2", skirt2Target);
-  const bodyTarget = clampNumber(
-    bodySway * (0.92 + motionBlend * 0.6) + beatNod * (0.12 + motionBlend * 0.24) + breathShift * motionBlend * 0.14,
-    -1,
-    1
-  );
-  const bodySpring = applySpring("body", bodyTarget);
-  const torsoTarget = clampNumber(
-    bodySway * (0.9 + motionBlend * 0.76) + beatNod * (0.16 + motionBlend * 0.28) + breathShift * (0.12 + motionBlend * 0.26),
-    -1,
-    1
-  );
-  const torsoSpring = applySpring("torso", torsoTarget);
-  const headTarget = clampNumber(
-    bodySway * 0.46 + beatNod * 0.24 - torsoSpring * 0.33 - finalGazeX * 0.2,
-    -1,
-    1
-  );
-  const headSpring = applySpring("head", headTarget);
-  const springRenderFollow = 1 - Math.pow(1 - (0.22 + motionBlend * 0.2), dtFrames);
-  state.spring_body_render += (bodySpring - Number(state.spring_body_render || 0)) * springRenderFollow;
-  state.spring_torso_render += (torsoSpring - Number(state.spring_torso_render || 0)) * springRenderFollow;
-  state.spring_head_render += (headSpring - Number(state.spring_head_render || 0)) * springRenderFollow;
-  const bodySpringOut = Number(state.spring_body_render) || 0;
-  const torsoSpringOut = Number(state.spring_torso_render) || 0;
-  const headSpringOut = Number(state.spring_head_render) || 0;
-  const upperSpeechEnvelopeTarget = speaking
-    ? motionBlend * (0.74 + bodyEnergy * 0.7) * speechMotionBoost
-    : 0;
-  const upperSpeechEnvelope = smoothMotionOutput("speech_upper_envelope", upperSpeechEnvelopeTarget, {
-    rise: 0.14,
-    fall: 0.11,
-    maxStep: 0.055
-  });
-  const upperSpeechEnvelopeOut = smoothMotionOutput("speech_upper_envelope_out", upperSpeechEnvelope, {
-    rise: 0.12,
-    fall: 0.1,
-    maxStep: 0.045
-  });
-  const upperSpeechGain = speaking
-    ? (1 + upperSpeechEnvelopeOut * (0.34 + bodyEnergy * 0.4))
-    : 1;
-  const upperShoulderGain = speaking
-    ? (1 + upperSpeechEnvelopeOut * (0.46 + bodyEnergy * 0.5))
-    : 1;
-  const angleYSpeechTarget = (-finalGazeY * 4.4)
-    + breathShift * (1.4 * upperSpeechGain)
-    + (speaking ? (torsoSpringOut * 0.52 + beatNod * (0.62 + upperSpeechEnvelopeOut * 0.72)) : 0);
-  const angleYBase = smoothMotionOutput("param_angle_y_base", angleYSpeechTarget, {
-    rise: 0.22,
-    fall: 0.2,
-    maxStep: 0.72
-  });
-  const angleZSpeechTarget = sway * 1.2 * energyBoost * (0.9 + motionBlend * 0.35)
-    + headSpringOut * (2.2 + motionBlend * 1.1)
-    + (speaking ? beatNod * (0.82 + upperSpeechEnvelopeOut * 2.1) : 0);
-  const angleZBase = smoothMotionOutput("param_angle_z_base", angleZSpeechTarget, {
-    rise: 0.2,
-    fall: 0.19,
-    maxStep: 0.82
-  });
-  const bodyTalkGain = 1 + motionBlend * (0.32 + bodyEnergy * 0.48) * speechMotionBoost;
-  const bodyXBase = smoothMotionOutput("param_body_x_base", finalGazeX * 2.2 + breathShift * 1.1 + torsoSpringOut * 1.08 * bodyTalkGain, {
-    rise: 0.24,
-    fall: 0.21,
-    maxStep: 0.72
-  });
-  const bodyYBase = smoothMotionOutput("param_body_y_base", breathShift * 0.86 + torsoSpringOut * 1.28 * bodyTalkGain, {
-    rise: 0.22,
-    fall: 0.2,
-    maxStep: 0.82
-  });
-  const bodyZBase = smoothMotionOutput("param_body_z_base", bodySpringOut * 9.6 * bodyTalkGain + torsoSpringOut * 3.5 * (1 + motionBlend * 0.3), {
-    rise: 0.21,
-    fall: 0.2,
-    maxStep: 1.45
-  });
-  const shoulderSpeechPulse = speaking
-    ? (Math.sin(now / 188 + state.microBreathSeed * 0.9) * 0.5 + 0.5) * upperSpeechEnvelopeOut * (0.12 + bodyEnergy * 0.28)
-    : 0;
-  const shoulderBaseTarget = 0.08
-    + breath * (speaking ? (0.2 + audioEnergy * 0.28) * upperShoulderGain : 0.18)
-    + shoulderSpeechPulse;
-  const shoulderBase = smoothMotionOutput("param_shoulder_base", shoulderBaseTarget, {
-    rise: 0.17,
-    fall: 0.15,
-    maxStep: 0.1
-  });
-  const upperTalkWave = speaking
-    ? Math.sin(now / 192 + state.microBreathSeed * 1.1) * upperSpeechEnvelopeOut * (0.32 + bodyEnergy * 0.68)
-    : 0;
-  const upperTalkWaveSmoothed = smoothMotionOutput("param_upper_talk_wave", upperTalkWave, {
-    rise: 0.17,
-    fall: 0.15,
-    maxStep: 0.09
-  });
-  const upperShoulderLift = smoothMotionOutput(
-    "param_upper_shoulder_lift",
-    speaking ? Math.abs(upperTalkWaveSmoothed) * (0.24 + motionBlend * 0.34) : 0,
-    {
-      rise: 0.18,
-      fall: 0.16,
-      maxStep: 0.06
-    }
-  );
-  const upperTalkWaveOut = smoothMotionOutput("param_upper_talk_wave_out", upperTalkWaveSmoothed, {
-    rise: 0.16,
-    fall: 0.14,
-    maxStep: 0.07
-  });
-  const upperShoulderLiftOut = smoothMotionOutput("param_upper_shoulder_lift_out", upperShoulderLift, {
-    rise: 0.16,
-    fall: 0.14,
-    maxStep: 0.05
-  });
-  safeAddParamValue(core, "ParamEyeLOpen", -blink * 0.82, 0.96);
-  safeAddParamValue(core, "ParamEyeROpen", -blink * 0.82, 0.96);
-  safeAddParamValue(core, "ParamEyeBallX", finalGazeX, 0.45);
-  safeAddParamValue(core, "ParamEyeBallY", finalGazeY, 0.45);
-  safeAddParamValue(core, "ParamAngleX", finalGazeX * 5.8, 0.18);
-  safeAddParamValue(core, "ParamAngleY", angleYBase, 0.18);
-  safeAddParamValue(core, "ParamAngleZ", angleZBase, 0.12);
-  safeAddParamValue(core, "ParamBodyAngleX", bodyXBase, 0.13);
-  safeAddParamValue(core, "ParamBodyAngleY", bodyYBase, 0.13);
-  safeAddParamValue(core, "ParamBodyAngleZ", bodyZBase, 0.64);
-  safeAddParamValue(core, "ParamBreath", 0.22 + breath * 0.42, 0.2);
-  safeAddParamValue(core, "ParamShoulder", shoulderBase, 0.14);
-  if (speaking && upperSpeechEnvelopeOut > 0.04) {
-    safeAddParamValue(core, "ParamAngleY", upperTalkWaveOut * 1.9, 0.36);
-    safeAddParamValue(core, "ParamAngleZ", upperTalkWaveOut * 0.95, 0.3);
-    safeAddParamValue(core, "ParamShoulder", upperShoulderLiftOut, 0.46);
-  }
-  safeAddParamValue(core, "ParamHairAhoge", hairAhogeSpring, 0.16);
-  safeAddParamValue(core, "ParamHairFront", hairFrontSpring, 0.12);
-  safeAddParamValue(core, "ParamHairBack", hairBackSpring, 0.1);
-  safeAddParamValue(core, "ParamRibbon", ribbonSpring, 0.1);
-  safeAddParamValue(core, "ParamSkirt", skirtSpring, 0.08);
-  safeAddParamValue(core, "ParamSkirt2", skirt2Spring, 0.08);
-  if (motionBlend > 0.06 && bodyEnergy > 0.02) {
-    const e = bodyEnergy;
-    const eShaped = Math.tanh(e * 1.45) / Math.tanh(1.45);
-    const yBounceRaw = (Math.sin(now / 118 + state.microBreathSeed * 0.6) * 0.5 + 0.5) * eShaped;
-    const yBounce = smoothMotionOutput("speech_y_bounce", yBounceRaw, {
-      rise: 0.2,
-      fall: 0.18,
-      maxStep: 0.085
+function getLive2DExpressionController() {
+  if (!live2dExpressionControllerInstance && typeof LIVE2D_EXPRESSION_CONTROLLER.createController === "function") {
+    live2dExpressionControllerInstance = LIVE2D_EXPRESSION_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      performanceObject: performance,
+      clampNumber,
+      sanitizeSpeakText,
+      normalizeTalkStyle,
+      detectMood,
+      isSpeechMotionActive,
+      isSpeakingNow,
+      live2dExpressionTuning: LIVE2D_EXPRESSION_TUNING,
+      styleExpressionProfile: STYLE_EXPRESSION_PROFILE,
+      motionIntensityPresets: MOTION_INTENSITY_PRESETS,
+      modelMotionProfiles: MODEL_MOTION_PROFILES
     });
-    const motionGain = clampNumber(
-      upperSpeechEnvelopeOut * (0.58 + upperSpeechEnvelopeOut * 0.52) * speechMotionBoost,
-      0,
-      1.55
-    );
-    const bodyZEnergyAdd = smoothMotionOutput("param_body_z_energy_add", eShaped * 17.6 * motionGain, {
-      rise: 0.18,
-      fall: 0.16,
-      maxStep: 1.22
-    });
-    const bodyXEnergyAdd = smoothMotionOutput("param_body_x_energy_add", eShaped * 1.46 * motionGain, {
-      rise: 0.2,
-      fall: 0.17,
-      maxStep: 0.2
-    });
-    const angleZEnergyAdd = smoothMotionOutput("param_angle_z_energy_add", (eShaped * 9.4 + headSpringOut * 1.9) * motionGain, {
-      rise: 0.18,
-      fall: 0.16,
-      maxStep: 0.86
-    });
-    const angleYEnergyAdd = smoothMotionOutput("param_angle_y_energy_add", (-eShaped * 1.7 + yBounce * 2.7) * motionGain, {
-      rise: 0.2,
-      fall: 0.17,
-      maxStep: 0.52
-    });
-    const bodyYEnergyAdd = smoothMotionOutput("param_body_y_energy_add", (yBounce * 5.6 + torsoSpringOut * 2.3) * motionGain, {
-      rise: 0.19,
-      fall: 0.17,
-      maxStep: 0.74
-    });
-    const shoulderEnergyAdd = smoothMotionOutput("param_shoulder_energy_add", e * 0.46 * motionGain, {
-      rise: 0.19,
-      fall: 0.16,
-      maxStep: 0.08
-    });
-    safeAddParamValue(core, "ParamBodyAngleZ", bodyZEnergyAdd, 0.84);
-    safeAddParamValue(core, "ParamBodyAngleX", bodyXEnergyAdd, 0.5);
-    safeAddParamValue(core, "ParamAngleZ", angleZEnergyAdd, 0.64);
-    safeAddParamValue(core, "ParamAngleY", angleYEnergyAdd, 0.4);
-    safeAddParamValue(core, "ParamBodyAngleY", bodyYEnergyAdd, 0.6);
-    safeAddParamValue(core, "ParamShoulder", shoulderEnergyAdd, 0.52);
-    if (beatNod > 0.02) {
-      const beatAngleYAdd = smoothMotionOutput("param_angle_y_beat_add", beatNod * 4.1 * motionGain, {
-        rise: 0.22,
-        fall: 0.2,
-        maxStep: 0.42
-      });
-      const beatBodyYAdd = smoothMotionOutput("param_body_y_beat_add", beatNod * 2.8 * motionGain, {
-        rise: 0.2,
-        fall: 0.18,
-        maxStep: 0.46
-      });
-      const beatShoulderAdd = smoothMotionOutput(
-        "param_shoulder_beat_add",
-        beatNod * 0.42 * motionGain * (1 + motionBlend * 0.8),
-        {
-          rise: 0.22,
-          fall: 0.2,
-          maxStep: 0.06
-        }
-      );
-      safeAddParamValue(core, "ParamAngleY", beatAngleYAdd, 0.52);
-      safeAddParamValue(core, "ParamBodyAngleY", beatBodyYAdd, 0.54);
-      safeAddParamValue(core, "ParamShoulder", beatShoulderAdd, 0.5);
-    }
   }
-
-  if (phase === "attack") {
-    const t = clampNumber(phaseAge / 300, 0, 1);
-    const attackCurve = Math.sin(t * Math.PI);
-    const a = attackCurve * 0.8;
-    safeAddParamValue(core, "ParamBodyAngleY", a * 2.2, 0.5);
-    safeAddParamValue(core, "ParamAngleY", -a * 1.8, 0.45);
-    safeAddParamValue(core, "ParamShoulder", a * 0.15, 0.4);
-  }
-
-  if (phase === "release") {
-    const t = clampNumber(1 - phaseAge / 600, 0, 1);
-    const r = t * 0.5;
-    safeAddParamValue(core, "ParamBodyAngleY", r * 1.2, 0.4);
-    safeAddParamValue(core, "ParamAngleY", -r * 0.8, 0.35);
-  }
-  if (happyBlend > 0.001) {
-    const g = happyBlend * moodGain;
-    safeAddParamValue(core, "ParamCheek", (0.12 + breath * 0.05) * g, 0.42);
-    safeAddParamValue(core, "ParamBrowLForm", 0.18 * g, 0.42);
-    safeAddParamValue(core, "ParamBrowRForm", 0.18 * g, 0.42);
-    safeAddParamValue(core, "ParamAngleX", 1.2 * g, 0.28);
-  }
-  if (sadBlend > 0.001) {
-    const g = sadBlend * moodGain;
-    safeAddParamValue(core, "ParamAngleY", 0.32 * g, 0.36);
-    safeAddParamValue(core, "ParamShoulder", -0.18 * g, 0.3);
-    safeAddParamValue(core, "ParamBrowLX", -0.08 * g, 0.32);
-    safeAddParamValue(core, "ParamBrowRX", 0.08 * g, 0.32);
-    safeAddParamValue(core, "ParamBrowLForm", -0.22 * g, 0.36);
-    safeAddParamValue(core, "ParamBrowRForm", -0.22 * g, 0.36);
-    safeAddParamValue(core, "ParamBodyAngleX", -0.24 * g, 0.28);
-  }
-  if (angryBlend > 0.001) {
-    const g = angryBlend * moodGain;
-    safeAddParamValue(core, "ParamBrowLY", -0.22 * g, 0.44);
-    safeAddParamValue(core, "ParamBrowRY", -0.22 * g, 0.44);
-    safeAddParamValue(core, "ParamBrowLAngle", -0.16 * g, 0.4);
-    safeAddParamValue(core, "ParamBrowRAngle", 0.16 * g, 0.4);
-    safeAddParamValue(core, "ParamEyeLOpen", 0.08 * g, 0.3);
-    safeAddParamValue(core, "ParamEyeROpen", 0.08 * g, 0.3);
-    safeAddParamValue(core, "ParamBodyAngleZ", Math.sin(now / 120) * 4 * g, 0.3);
-  }
-  if (surprisedBlend > 0.001) {
-    const g = surprisedBlend * moodGain;
-    safeAddParamValue(core, "ParamHairAhoge", 0.32 * g, 0.34);
-    safeAddParamValue(core, "ParamEyeLOpen", 0.24 * g, 0.42);
-    safeAddParamValue(core, "ParamEyeROpen", 0.24 * g, 0.42);
-    safeAddParamValue(core, "ParamBrowLY", 0.22 * g, 0.4);
-    safeAddParamValue(core, "ParamBrowRY", 0.22 * g, 0.4);
-    safeAddParamValue(core, "ParamAngleY", -0.22 * g, 0.28);
-  }
-  if (style === "comfort") {
-    safeAddParamValue(core, "ParamHandL", 0.06 + breath * 0.04, 0.1);
-    safeAddParamValue(core, "ParamHandR", -0.05 - breath * 0.03, 0.1);
-    safeAddParamValue(core, "ParamArmLB", 0.08, 0.08);
-    safeAddParamValue(core, "ParamArmRB", -0.06, 0.08);
-  } else if (style === "playful") {
-    safeAddParamValue(core, "ParamHandL", 0.08 + sway * 0.06, 0.11);
-    safeAddParamValue(core, "ParamHandR", 0.08 - sway * 0.06, 0.11);
-    safeAddParamValue(core, "ParamArmLA", sway * 0.14, 0.08);
-    safeAddParamValue(core, "ParamArmRA", -sway * 0.14, 0.08);
-  } else if (style === "steady") {
-    safeAddParamValue(core, "ParamShoulder", breath * 0.1, 0.12);
-    safeAddParamValue(core, "ParamArmLA", -0.04, 0.08);
-    safeAddParamValue(core, "ParamArmRA", 0.04, 0.08);
-  }
+  return live2dExpressionControllerInstance || LIVE2D_EXPRESSION_CONTROLLER;
 }
 
-function getSpeechAnimationMouthOpen() {
-  const now = performance.now();
-  const audioPlaying = isSpeakingNow();
-  const speaking = isSpeechMotionActive(now);
-  const activeUntil = Number(state.speechAnimUntil || 0);
-  if (!speaking) {
-    const closeSpeed = now >= activeUntil ? 0.74 : 0.48;
-    state.speechMouthOpen += (0 - state.speechMouthOpen) * closeSpeed;
-    if (Math.abs(state.speechMouthOpen) < 0.003) {
-      state.speechMouthOpen = 0;
-    }
-    return state.speechMouthOpen;
-  }
-  const liveLevel = sampleTTSAudioLevel();
-  const hasLiveAudio = audioPlaying && !!state.ttsAudioAnalyser;
-  const start = Number(state.speechAnimStartedAt || now);
-  const duration = Math.max(260, Number(state.speechAnimDurationMs) || 1000);
-  const progress = clampNumber((now - start) / duration, 0, 1.3);
-  const style = normalizeTalkStyle(state.speechAnimStyle || state.currentTalkStyle || "neutral");
-  const mood = String(state.speechAnimMood || "idle");
-  const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
-  const chars = Math.max(1, Number(state.speechAnimTextLength) || 8);
-  const punct = Math.max(0, Number(state.speechAnimPunctuation) || 0);
-  const accentCount = Math.max(0, Number(state.speechAnimAccentCount) || 0);
-  const seed = Number(state.speechAnimSeed) || 0;
-  const pace = style === "playful" ? 11.5 : (style === "comfort" ? 8.4 : 9.8);
-  const waveA = Math.abs(Math.sin(progress * Math.PI * pace + seed));
-  const waveB = Math.abs(Math.sin(progress * Math.PI * (pace * 0.53) + seed * 0.67));
-  const pauseShape = 1 - Math.pow(Math.sin(clampNumber(progress, 0, 1) * Math.PI), 6) * 0.08;
-  let energy = 0.24 + waveA * 0.64 + waveB * 0.28;
-  energy *= pauseShape;
-  if (mood === "happy" || mood === "surprised") {
-    energy += 0.06;
-  } else if (mood === "sad") {
-    energy -= 0.04;
-  }
-  energy += Math.min(0.08, punct * 0.012) + Math.min(0.06, chars / 260);
-  if (!speaking) {
-    energy *= Math.max(0, 1 - clampNumber((now - activeUntil) / 220, 0, 1));
-  }
-  const syllableRate = style === "playful" ? 2.7 : (style === "steady" ? 3.8 : 3.2);
-  const pseudoSyllables = Math.max(
-    3,
-    Math.min(26, Math.round(chars / syllableRate) + punct + accentCount * 2)
-  );
-  const durationSec = Math.max(0.24, duration / 1000);
-  const syllablesPerSec = pseudoSyllables / durationSec;
-  const fastSpeechFactor = clampNumber((syllablesPerSec - 4.8) / 4.2, 0, 1);
-  const visemePhase = progress * pseudoSyllables;
-  const visemeT = visemePhase - Math.floor(visemePhase);
-  const visemeOpen = Math.pow(Math.sin(visemeT * Math.PI), style === "steady" ? 1.6 : 1.28);
-  const visemeClosureRaw = Math.pow(Math.abs(Math.cos(visemeT * Math.PI)), 4.2) * (0.18 + punct * 0.01);
-  const closureGate = clampNumber(
-    visemeClosureRaw * (1.05 + fastSpeechFactor * 0.75),
-    0,
-    0.9
-  );
-  const accentSlots = Math.max(1, Math.min(6, punct + accentCount + 1));
-  let accentPulse = 0;
-  for (let i = 0; i < accentSlots; i += 1) {
-    const center = (i + 0.5) / accentSlots + Math.sin(seed + i * 1.7) * 0.012;
-    const width = i % 3 === 1 ? 0.1 : 0.075;
-    const shape = Math.max(0, 1 - Math.abs(progress - center) / width);
-    const accentGain = [1.12, 0.78, 1.0][i % 3];
-    accentPulse = Math.max(accentPulse, shape * accentGain);
-  }
-  const visemeJitter = Math.sin(progress * Math.PI * (5.8 + punct * 0.35) + seed * 1.37) * 0.035;
-  let target = clampNumber(
-    energy * (0.46 + visemeOpen * 0.64)
-      + accentPulse * 0.2
-      - visemeClosureRaw * (0.88 + fastSpeechFactor * 0.34)
-      + visemeJitter,
-    0,
-    1
-  );
-  if (speaking) {
-    target *= (1 - closureGate * (0.22 + fastSpeechFactor * 0.18));
-    const speakingFloor = 0.02 + motionBlend * (0.05 - fastSpeechFactor * 0.03);
-    target = Math.max(target, speakingFloor);
-  }
-  if (hasLiveAudio) {
-    const rawLevel = clampNumber(Number(state.ttsAudioRawLevel) || liveLevel || 0, 0, 1);
-    const voiceRecent = now - Number(state.ttsAudioLastVoiceAt || 0) < 58;
-    const voiced = rawLevel > 0.035 || liveLevel > 0.045 || voiceRecent;
-    const closureDip = clampNumber(closureGate * (0.68 + fastSpeechFactor * 0.5), 0, 0.92);
-    const rhythmGate = clampNumber(0.62 + visemeOpen * 0.48 - closureDip, 0.035, 1.06);
-    const liveBase = voiced
-      ? clampNumber(rawLevel * 1.48 + liveLevel * 0.42 + accentPulse * 0.02, 0, 1)
-      : 0;
-    const textHint = voiced ? clampNumber(target * (0.07 + visemeOpen * 0.08), 0, 0.1) : 0;
-    target = clampNumber(liveBase * rhythmGate + textHint, 0, 1);
-    if (voiced && closureGate > 0.28) {
-      const closureCap = clampNumber(
-        0.045 + liveLevel * 0.16 + rawLevel * 0.1 + (1 - fastSpeechFactor) * 0.035,
-        0.045,
-        0.24
-      );
-      target = Math.min(target, closureCap);
-    }
-    if (!voiced && liveLevel < 0.04) {
-      target = 0;
-    }
-    const openSmooth = voiced ? clampNumber(0.78 - closureGate * 0.28, 0.46, 0.82) : 0.22;
-    const closeSmooth = voiced
-      ? clampNumber(0.86 + closureGate * 0.2 + fastSpeechFactor * 0.1, 0.84, 0.985)
-      : 0.94;
-    const smoothing = target > state.speechMouthOpen ? openSmooth : closeSmooth;
-    state.speechMouthOpen += (target - state.speechMouthOpen) * smoothing;
-    if (!voiced && state.speechMouthOpen < 0.012) {
-      state.speechMouthOpen = 0;
-    }
-    return state.speechMouthOpen;
-  }
-  const openSmooth = clampNumber(0.64 - closureGate * 0.14, 0.45, 0.68);
-  const closeSmooth = clampNumber(
-    0.56 + closureGate * 0.18 + fastSpeechFactor * 0.1,
-    0.42,
-    0.82
-  );
-  const smoothing = target > state.speechMouthOpen ? openSmooth : closeSmooth;
-  state.speechMouthOpen += (target - state.speechMouthOpen) * smoothing;
-  return state.speechMouthOpen;
-}
+function normalizeMotionIntensity(level) { return getLive2DExpressionController().normalizeMotionIntensity(level); }
+function getMotionIntensityPreset() { return getLive2DExpressionController().getMotionIntensityPreset(); }
+function getStyleExpressionProfile(style) { return getLive2DExpressionController().getStyleExpressionProfile(style); }
+function detectModelProfileName() { return getLive2DExpressionController().detectModelProfileName(); }
+function getActiveModelMotionProfile() { return getLive2DExpressionController().getActiveModelMotionProfile(); }
+function getActiveModelCadence() { return getLive2DExpressionController().getActiveModelCadence(); }
+function getCoreModel() { return getLive2DExpressionController().getCoreModel(); }
+function safeAddParamValue(core, id, delta, weight = 1) { return getLive2DExpressionController().safeAddParamValue(core, id, delta, weight); }
+function safeSetParamValue(core, id, value, weight = 1) { return getLive2DExpressionController().safeSetParamValue(core, id, value, weight); }
+function safeGetParamValue(core, id) { return getLive2DExpressionController().safeGetParamValue(core, id); }
+function safeDriveParamValue(core, id, target, gain = 1) { return getLive2DExpressionController().safeDriveParamValue(core, id, target, gain); }
+function triggerExpressionPulse(style = "neutral", boost = 1, durationMs = 520) { return getLive2DExpressionController().triggerExpressionPulse(style, boost, durationMs); }
+function estimateSpeechAnimationDurationMs(text, style = "neutral") { return getLive2DExpressionController().estimateSpeechAnimationDurationMs(text, style); }
+function beginSpeechAnimation(text, mood = "idle", style = "neutral", opts = {}) { return getLive2DExpressionController().beginSpeechAnimation(text, mood, style, opts); }
+function endSpeechAnimation() { return getLive2DExpressionController().endSpeechAnimation(); }
+function finishSpeechAnimation() { return getLive2DExpressionController().finishSpeechAnimation(); }
+function ensureMicroMotionState(now = performance.now()) { return getLive2DExpressionController().ensureMicroMotionState(now); }
+function getSmoothedMoodExpression(now = performance.now()) { return getLive2DExpressionController().getSmoothedMoodExpression(now); }
+function ensureTTSAudioAnalyser(audio) { return getLive2DExpressionController().ensureTTSAudioAnalyser(audio); }
+function sampleTTSAudioLevel() { return getLive2DExpressionController().sampleTTSAudioLevel(); }
+function updateMicroMotionLayer() { return getLive2DExpressionController().updateMicroMotionLayer(); }
+function getSpeechAnimationMouthOpen() { return getLive2DExpressionController().getSpeechAnimationMouthOpen(); }
+function applyStyleExpressionLayer() { return getLive2DExpressionController().applyStyleExpressionLayer(); }
 
-function applyStyleExpressionLayer() {
-  if (!state.expressionEnabled || !state.model) {
-    return;
-  }
-  const core = getCoreModel();
-  if (!core) {
-    return;
-  }
-  const style = normalizeTalkStyle(state.currentTalkStyle || state.expressionStyle || "neutral");
-  const profile = getStyleExpressionProfile(style);
-  const now = performance.now();
-  const speaking = isSpeechMotionActive(now);
-  const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
-  const speakingQuiet = state.motionQuietDuringSpeech && speaking;
-  const moodBlend = getSmoothedMoodExpression(now);
-  const weightedMood = String(state.moodExpressionWeightMood || "idle");
-  const runtimeMoodActive = now < Number(state.moodExpressionWeightUntil || 0)
-    && weightedMood === String(state.moodExpressionRuntimeMood || "idle");
-  const runtimeMoodWeight = runtimeMoodActive
-    ? clampNumber(Number(state.moodExpressionWeight) || 1, 0.7, 1.45)
-    : 1;
-  const runtimeMoodBlend = runtimeMoodActive && weightedMood in moodBlend
-    ? { ...moodBlend, [weightedMood]: Math.max(Number(moodBlend[weightedMood]) || 0, 1) }
-    : moodBlend;
-  const happyMoodScale = speakingQuiet ? (0.32 + (1 - motionBlend) * 0.2) : 1;
-  const subtleMoodScale = speakingQuiet ? (0.16 + (1 - motionBlend) * 0.12) : 1;
-  const happyBlend = clampNumber(runtimeMoodBlend.happy * (weightedMood === "happy" ? runtimeMoodWeight : 1), 0, 1.35) * happyMoodScale;
-  const sadBlend = clampNumber(runtimeMoodBlend.sad * (weightedMood === "sad" ? runtimeMoodWeight : 1), 0, 1.35) * subtleMoodScale;
-  const angryBlend = clampNumber(runtimeMoodBlend.angry * (weightedMood === "angry" ? runtimeMoodWeight : 1), 0, 1.35) * subtleMoodScale * (speakingQuiet ? 0.8 : 1);
-  const surprisedBlend = clampNumber(runtimeMoodBlend.surprised * (weightedMood === "surprised" ? runtimeMoodWeight : 1), 0, 1.35) * subtleMoodScale * (speakingQuiet ? 0.75 : 1);
-  const pulseActive = now < Number(state.expressionPulseUntil || 0);
-  const pulseWeight = pulseActive ? state.expressionPulseBoost : 0;
-  const strength = clampNumber(Number(state.expressionStrength) || 1, 0.2, 2.0);
-  const speakGain = 0.36 + motionBlend * 0.64;
-  const pulseGain = pulseActive
-    ? (0.65 + pulseWeight * 0.28) * (speakingQuiet ? 0.34 : 1)
-    : 0.0;
-  const gain = strength * (speakGain + pulseGain);
-  if (state.uiView === "model" && !speaking) {
-    state.speechMouthOpen += (0 - (Number(state.speechMouthOpen) || 0)) * 0.46;
-    if (Math.abs(Number(state.speechMouthOpen) || 0) < 0.003) {
-      state.speechMouthOpen = 0;
-    }
-  }
-  const mouthOpen = state.uiView === "model"
-    ? Number(state.speechMouthOpen) || 0
-    : getSpeechAnimationMouthOpen();
+let actionPlanControllerInstance = null;
 
-  const surpriseMouthBoost = surprisedBlend > 0.001
-    ? (0.34 + 0.38 * motionBlend) * surprisedBlend * gain
-    : 0;
-  const sadMouthDip = sadBlend > 0.001
-    ? 0.16 * sadBlend * gain
-    : 0;
-  const mouthCarry = 0.08 + motionBlend * 0.94;
-  const mouthSpeakBoost = speaking ? (1.1 + motionBlend * 0.24) : 1.0;
-  const mouthTarget = clampNumber(
-    mouthOpen * mouthCarry * mouthSpeakBoost + surpriseMouthBoost - sadMouthDip,
-    0,
-    1
-  );
-  state.speechMouthTarget = mouthTarget;
-  state.speechMouthUpdatedAt = now;
-
-  safeAddParamValue(core, "ParamMouthForm", profile.mouthForm * gain, 0.9);
-  safeDriveParamValue(core, "ParamMouthOpenY", mouthTarget, 0.84 + motionBlend * 0.14);
-  safeAddParamValue(core, "ParamCheek", profile.cheek * gain, 0.9);
-  safeAddParamValue(core, "ParamEyeLSmile", profile.eyeSmile * gain, 0.9);
-  safeAddParamValue(core, "ParamEyeRSmile", profile.eyeSmile * gain, 0.9);
-  safeAddParamValue(core, "ParamBrowLY", profile.browY * gain, 0.9);
-  safeAddParamValue(core, "ParamBrowRY", profile.browY * gain, 0.9);
-  safeAddParamValue(core, "ParamBrowLAngle", profile.browAngle * gain, 0.9);
-  safeAddParamValue(core, "ParamBrowRAngle", -profile.browAngle * gain, 0.9);
-  safeAddParamValue(core, "ParamAngleX", profile.headX * gain, 0.82);
-  safeAddParamValue(core, "ParamAngleY", profile.headY * gain, 0.82);
-  safeAddParamValue(core, "ParamBodyAngleX", profile.bodyX * gain, 0.76);
-  if (happyBlend > 0.001) {
-    const g = happyBlend * gain;
-    safeAddParamValue(core, "ParamEyeLSmile", 0.4 * g, 0.85);
-    safeAddParamValue(core, "ParamEyeRSmile", 0.4 * g, 0.85);
-    safeAddParamValue(core, "ParamMouthForm", 0.5 * g, 0.85);
-    safeAddParamValue(core, "ParamCheek", 0.4 * g, 0.8);
-    safeAddParamValue(core, "ParamBrowLY", 0.15 * g, 0.7);
-    safeAddParamValue(core, "ParamBrowRY", 0.15 * g, 0.7);
-    safeAddParamValue(core, "ParamAngleX", 3.0 * g, 0.5);
+function getActionPlanController() {
+  if (!actionPlanControllerInstance && typeof ACTION_PLAN_CONTROLLER.createController === "function") {
+    actionPlanControllerInstance = ACTION_PLAN_CONTROLLER.createController({
+      state,
+      performanceObject: performance,
+      normalizeTalkStyle,
+      detectMood,
+      clampNumber,
+      waitMs,
+      getMotionIntensityPreset,
+      getActiveModelMotionProfile,
+      pickMoodMotionGroups,
+      isSpeechMotionActive,
+      playEmotion,
+      triggerExpressionPulse
+    });
   }
-  if (sadBlend > 0.001) {
-    const g = sadBlend * gain;
-    safeAddParamValue(core, "ParamEyeLOpen", -0.34 * g, 0.85);
-    safeAddParamValue(core, "ParamEyeROpen", -0.34 * g, 0.85);
-    safeAddParamValue(core, "ParamBrowLY", -0.3 * g, 0.82);
-    safeAddParamValue(core, "ParamBrowRY", -0.3 * g, 0.82);
-    safeAddParamValue(core, "ParamBrowLForm", -0.32 * g, 0.76);
-    safeAddParamValue(core, "ParamBrowRForm", -0.32 * g, 0.76);
-    safeAddParamValue(core, "ParamBrowLAngle", 0.22 * g, 0.72);
-    safeAddParamValue(core, "ParamBrowRAngle", -0.22 * g, 0.72);
-    safeAddParamValue(core, "ParamMouthForm", -0.68 * g, 0.86);
-    safeDriveParamValue(core, "ParamMouthOpenY", 0.02, 0.5);
-    safeAddParamValue(core, "ParamAngleY", 4.8 * g, 0.54);
-    safeAddParamValue(core, "ParamBodyAngleX", -3.4 * g, 0.42);
-  }
-  if (angryBlend > 0.001) {
-    const g = angryBlend * gain;
-    safeAddParamValue(core, "ParamBrowLY", -0.35 * g, 0.9);
-    safeAddParamValue(core, "ParamBrowRY", -0.35 * g, 0.9);
-    safeAddParamValue(core, "ParamBrowLAngle", -0.2 * g, 0.85);
-    safeAddParamValue(core, "ParamBrowRAngle", 0.2 * g, 0.85);
-    safeAddParamValue(core, "ParamEyeLOpen", 0.1 * g, 0.7);
-    safeAddParamValue(core, "ParamEyeROpen", 0.1 * g, 0.7);
-    safeAddParamValue(core, "ParamMouthForm", -0.35 * g, 0.85);
-    safeAddParamValue(core, "ParamBodyAngleZ", Math.sin(now / 120) * 4 * g, 0.3);
-  }
-  if (surprisedBlend > 0.001) {
-    const g = surprisedBlend * gain;
-    safeAddParamValue(core, "ParamEyeLOpen", 0.55 * g, 0.92);
-    safeAddParamValue(core, "ParamEyeROpen", 0.55 * g, 0.92);
-    safeAddParamValue(core, "ParamBrowLY", 0.42 * g, 0.88);
-    safeAddParamValue(core, "ParamBrowRY", 0.42 * g, 0.88);
-    safeAddParamValue(core, "ParamBrowLForm", 0.26 * g, 0.72);
-    safeAddParamValue(core, "ParamBrowRForm", 0.26 * g, 0.72);
-    safeAddParamValue(core, "ParamMouthForm", -0.34 * g, 0.78);
-    safeDriveParamValue(core, "ParamMouthOpenY", clampNumber(0.28 * g, 0, 0.55), 0.62);
-    safeAddParamValue(core, "ParamAngleY", -3.8 * g, 0.52);
-  }
+  return actionPlanControllerInstance || ACTION_PLAN_CONTROLLER;
 }
 
 function uniqueMotionGroups(groups) {
-  const seen = new Set();
-  const out = [];
-  for (const raw of Array.isArray(groups) ? groups : []) {
-    const g = String(raw || "").trim();
-    if (!g || seen.has(g)) {
-      continue;
-    }
-    seen.add(g);
-    out.push(g);
-  }
-  return out;
+  const controller = getActionPlanController();
+  return typeof controller.uniqueMotionGroups === "function" ? controller.uniqueMotionGroups(groups) : (Array.isArray(groups) ? groups.filter(Boolean) : []);
 }
 
 function normalizeMotionGroupKey(name) {
-  return String(name || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
+  const controller = getActionPlanController();
+  return typeof controller.normalizeMotionGroupKey === "function" ? controller.normalizeMotionGroupKey(name) : String(name || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function findSemanticMotionGroups(tags = [], limit = 8) {
-  const normalizedTags = uniqueMotionGroups(tags)
-    .map((tag) => normalizeMotionGroupKey(tag))
-    .filter(Boolean);
-  if (!normalizedTags.length || !Array.isArray(state.availableMotionGroups) || !state.availableMotionGroups.length) {
-    return [];
-  }
-  const scored = [];
-  for (const group of state.availableMotionGroups) {
-    const key = normalizeMotionGroupKey(group);
-    if (!key) {
-      continue;
-    }
-    let score = 0;
-    for (const tag of normalizedTags) {
-      if (key === tag) {
-        score += 6;
-      } else if (key.startsWith(tag) || key.endsWith(tag)) {
-        score += 4;
-      } else if (key.includes(tag)) {
-        score += 2;
-      }
-    }
-    if (score > 0) {
-      if (group === state.lastMotionGroup) {
-        score -= 1.2;
-      }
-      scored.push({ group, score });
-    }
-  }
-  scored.sort((a, b) => b.score - a.score);
-  return uniqueMotionGroups(scored.slice(0, Math.max(1, limit)).map((item) => item.group));
+  const controller = getActionPlanController();
+  return typeof controller.findSemanticMotionGroups === "function" ? controller.findSemanticMotionGroups(tags, limit) : [];
 }
 
 function getSemanticMotionTags(intent, mood = "idle", style = "neutral", source = "emotion") {
-  const tags = [];
-  tags.push(...(MOTION_SEMANTIC_TOKENS[String(intent || "idle").toLowerCase()] || []));
-  tags.push(...(MOTION_SEMANTIC_TOKENS[String(mood || "idle").toLowerCase()] || []));
-  tags.push(...(MOTION_SEMANTIC_TOKENS[String(source || "emotion").toLowerCase()] || []));
-  if (style === "playful") {
-    tags.push("tap", "wave", "happy", "jump");
-  } else if (style === "comfort") {
-    tags.push("idle", "down", "soft", "head");
-  } else if (style === "clear") {
-    tags.push("flickup", "pose", "main");
-  } else if (style === "steady") {
-    tags.push("body", "main", "flick");
-  }
-  return uniqueMotionGroups(tags);
+  const controller = getActionPlanController();
+  return typeof controller.getSemanticMotionTags === "function" ? controller.getSemanticMotionTags(intent, mood, style, source) : [];
 }
 
 function getStyleMotionGroups(style, intent) {
-  const s = normalizeTalkStyle(style);
-  const i = String(intent || "reply").trim().toLowerCase();
-  const table = STYLE_MOTION_BLUEPRINT[s] || STYLE_MOTION_BLUEPRINT.neutral;
-  const picked = table[i] || table.reply || STYLE_MOTION_BLUEPRINT.neutral.reply;
-  return uniqueMotionGroups(picked);
+  const controller = getActionPlanController();
+  return typeof controller.getStyleMotionGroups === "function" ? controller.getStyleMotionGroups(style, intent) : [];
 }
 
 function buildPlannedMotionGroups(style, intent, mood, source) {
-  const profile = getActiveModelMotionProfile();
-  const byStyle = getStyleMotionGroups(style, intent);
-  const byMood = pickMoodMotionGroups(mood, source);
-  const byProfileIntent = profile?.intents?.[String(intent || "idle").toLowerCase()] || [];
-  const byProfileMood = profile?.moods?.[String(mood || "idle").toLowerCase()] || [];
-  const semantic = findSemanticMotionGroups(
-    getSemanticMotionTags(intent, mood, style, source),
-    10
-  );
-  return uniqueMotionGroups([...byProfileIntent, ...byStyle, ...byProfileMood, ...byMood, ...semantic]);
+  const controller = getActionPlanController();
+  return typeof controller.buildPlannedMotionGroups === "function" ? controller.buildPlannedMotionGroups(style, intent, mood, source) : [];
 }
 
 function shouldThrottleActionIntent(intent, minGapMs = 700) {
-  const key = String(intent || "unknown");
-  const now = performance.now();
-  const last = Number(state.actionLastAt?.[key] || 0);
-  if ((now - last) < Math.max(80, Number(minGapMs) || 0)) {
-    return true;
-  }
-  state.actionLastAt[key] = now;
-  return false;
+  const controller = getActionPlanController();
+  return typeof controller.shouldThrottleActionIntent === "function" ? controller.shouldThrottleActionIntent(intent, minGapMs) : false;
 }
 
 function clearThinkingMotionTimer() {
-  if (!state.thinkingMotionTimer) {
-    return;
+  const controller = getActionPlanController();
+  if (typeof controller.clearThinkingMotionTimer === "function") {
+    controller.clearThinkingMotionTimer();
   }
-  clearTimeout(state.thinkingMotionTimer);
-  state.thinkingMotionTimer = 0;
 }
 
 function resetActionSystem() {
-  clearThinkingMotionTimer();
-  state.actionQueue = [];
-  state.actionRunnerBusy = false;
-  state.expressionPulseUntil = 0;
-  state.expressionPulseBoost = 0;
+  const controller = getActionPlanController();
+  if (typeof controller.resetActionSystem === "function") {
+    controller.resetActionSystem();
+  }
 }
 
 function buildActionPlan(intent, context = {}) {
-  const preset = getMotionIntensityPreset();
-  const style = normalizeTalkStyle(context.style || state.currentTalkStyle || "neutral");
-  const mood = detectMood(context.text || context.mood || "");
-  const idleMood = ["happy", "sad", "angry", "surprised", "idle"].includes(String(context.idleMood || ""))
-    ? String(context.idleMood || "")
-    : "idle";
-  const idleIntent = ["idle", "thinking", "listen"].includes(String(context.idleIntent || ""))
-    ? String(context.idleIntent || "")
-    : "idle";
-  const comboEnabled = state.motionComboEnabled && context.combo !== false;
-  const requestedBeats = Math.max(1, Math.min(4, Math.round(Number(context.beats) || 1)));
-  const steps = [];
-
-  if (intent === "tap") {
-    const tapMood = mood === "idle" ? "happy" : mood;
-    if (Math.random() <= preset.tapChance) {
-      steps.push({
-        mood: tapMood,
-        source: "tap",
-        groups: buildPlannedMotionGroups(style, "tap", tapMood, "tap"),
-        priority: 3,
-        force: true,
-        cooldownMs: 620,
-        allowFallback: false
-      });
-    }
-    if (comboEnabled && Math.random() < preset.comboChance) {
-      const followMood = ["happy", "surprised", "idle"][Math.floor(Math.random() * 3)] || "idle";
-      steps.push({
-        mood: followMood,
-        source: "talk",
-        groups: buildPlannedMotionGroups(style, "talk", followMood, "talk"),
-        priority: 2,
-        force: true,
-        cooldownMs: 520,
-        delayMs: 160,
-        allowFallback: false
-      });
-    }
-    return steps;
-  }
-
-  if (intent === "listen") {
-    const listenMood = mood === "angry" ? "angry" : "idle";
-    if (Math.random() < (Number(preset.listenChance) || 0.78)) {
-      steps.push({
-        mood: listenMood,
-        source: "talk",
-        groups: buildPlannedMotionGroups(style, "listen", listenMood, "talk"),
-        priority: 2,
-        force: false,
-        cooldownMs: 900,
-        allowFallback: false
-      });
-    }
-    if (comboEnabled && Math.random() < (Number(preset.comboChance) || 0.4) * 0.28) {
-      steps.push({
-        mood: listenMood,
-        source: "idle",
-        groups: buildPlannedMotionGroups(style, "thinking", listenMood, "idle"),
-        priority: 1,
-        force: false,
-        cooldownMs: 520,
-        delayMs: 120,
-        allowFallback: false
-      });
-    }
-    return steps;
-  }
-
-  if (intent === "thinking") {
-    steps.push({
-      mood: "idle",
-      source: "idle",
-      groups: buildPlannedMotionGroups(style, "thinking", "idle", "idle"),
-      priority: 2,
-      force: false,
-      cooldownMs: 1200,
-      allowFallback: false
-    });
-    if (comboEnabled && Math.random() < (Number(preset.thinkingComboChance) || 0.4)) {
-      steps.push({
-        mood: "idle",
-        source: "idle",
-        groups: buildPlannedMotionGroups(style, "idle", "idle", "idle"),
-        priority: 1,
-        force: false,
-        cooldownMs: 640,
-        delayMs: 180,
-        allowFallback: false
-      });
-    }
-    return steps;
-  }
-
-  if (intent === "talk") {
-    const emphasis = clampNumber(Number(context.emphasis) || 0, 0, 1);
-    const accentCount = Math.max(0, Math.round(Number(context.accentCount) || 0));
-    const talkChance = clampNumber((Number(preset.talkChance) || 0.82) + emphasis * 0.12, 0, 0.92);
-    if (Math.random() > talkChance) {
-      return steps;
-    }
-    const talkMood = mood === "idle" && style === "playful" ? "happy" : mood;
-    const maxBeats = Math.max(1, Math.min(4, Number(preset.talkMaxBeats) || 3));
-    const beats = Math.max(1, Math.min(maxBeats, requestedBeats));
-    steps.push({
-      mood: talkMood,
-      source: style === "playful" ? "tap" : "talk",
-      groups: buildPlannedMotionGroups(
-        style,
-        "talk",
-        talkMood,
-        style === "playful" ? "tap" : "talk"
-      ),
-      priority: 2,
-      force: true,
-      cooldownMs: Math.max(520, Math.round(780 - emphasis * 140)),
-      allowFallback: false
-    });
-    const cadencePattern = emphasis > 0.45 ? [96, 270, 128] : [108, 256, 136];
-    const cadenceStride = emphasis > 0.6 ? 46 : 52;
-    for (let beat = 1; beat < beats; beat += 1) {
-      const beatMood = beat % 2 === 0 ? "idle" : talkMood;
-      const beatRole = (beat - 1) % 3;
-      const isAccentBeat = beatRole === 0 || (accentCount > 1 && beatRole === 2);
-      const nonlinearBeatDelay = cadencePattern[beatRole];
-      steps.push({
-        mood: beatMood,
-        source: isAccentBeat ? "reply" : "talk",
-        groups: buildPlannedMotionGroups(style, isAccentBeat ? "reply" : "talk", beatMood, "talk"),
-        priority: isAccentBeat ? 2 : 1,
-        force: true,
-        cooldownMs: isAccentBeat ? Math.max(340, Math.round(460 - emphasis * 80)) : 460,
-        delayMs: nonlinearBeatDelay + Math.floor((beat - 1) / 3) * (cadenceStride + Math.round((1 - emphasis) * 8)),
-        allowFallback: false
-      });
-    }
-    const comboChance = (Number(preset.comboChance) || 0.4) * (0.42 + emphasis * 0.55);
-    if (comboEnabled && (emphasis > 0.82 || Math.random() < comboChance)) {
-      const accentMood = style === "comfort" ? "idle" : (talkMood === "idle" ? "happy" : talkMood);
-      steps.push({
-        mood: accentMood,
-        source: "talk",
-        groups: buildPlannedMotionGroups(style, "reply", accentMood, "talk"),
-        priority: 2,
-        force: true,
-        cooldownMs: Math.max(460, Math.round(540 - emphasis * 60)),
-        delayMs: Math.max(130, Math.round((180 + beats * 92) - emphasis * 38)),
-        allowFallback: false
-      });
-    }
-    return steps;
-  }
-
-  if (intent === "reply") {
-    steps.push({
-      mood,
-      source: style === "playful" ? "tap" : "emotion",
-      groups: buildPlannedMotionGroups(
-        style,
-        "reply",
-        mood,
-        style === "playful" ? "tap" : "emotion"
-      ),
-      priority: 3,
-      force: true,
-      cooldownMs: 860,
-      allowFallback: true
-    });
-    if (comboEnabled && Math.random() < (preset.comboChance * 0.8)) {
-      const follow = style === "comfort" ? "idle" : mood;
-      steps.push({
-        mood: follow,
-        source: "talk",
-        groups: buildPlannedMotionGroups(style, "talk", follow, "talk"),
-        priority: 2,
-        force: true,
-        cooldownMs: 560,
-        delayMs: 170,
-        allowFallback: false
-      });
-    }
-    if (comboEnabled && Math.random() < (Number(preset.replyAccentChance) || 0.42)) {
-      const tailMood = style === "playful" ? "happy" : "idle";
-      steps.push({
-        mood: tailMood,
-        source: "idle",
-        groups: buildPlannedMotionGroups(style, "idle", tailMood, "idle"),
-        priority: 1,
-        force: false,
-        cooldownMs: 480,
-        delayMs: 280,
-        allowFallback: false
-      });
-    }
-    return steps;
-  }
-
-  // idle/default
-  steps.push({
-    mood: idleMood,
-    source: "idle",
-    groups: buildPlannedMotionGroups(style, idleIntent, idleMood, "idle"),
-    priority: 2,
-    force: false,
-    cooldownMs: 1000,
-    allowFallback: false
-  });
-  if (comboEnabled && Math.random() < (Number(preset.idleComboChance) || 0.3)) {
-    steps.push({
-      mood: "idle",
-      source: "idle",
-      groups: buildPlannedMotionGroups(style, "thinking", "idle", "idle"),
-      priority: 1,
-      force: false,
-      cooldownMs: 520,
-      delayMs: 220,
-      allowFallback: false
-    });
-  }
-  return steps;
+  const controller = getActionPlanController();
+  return typeof controller.buildActionPlan === "function" ? controller.buildActionPlan(intent, context) : [];
 }
 
 function isTalkLikeActionStep(step) {
-  const source = String(step?.source || "").toLowerCase();
-  return source === "talk" || source === "reply";
+  const controller = getActionPlanController();
+  return typeof controller.isTalkLikeActionStep === "function" ? controller.isTalkLikeActionStep(step) : false;
 }
 
 function hasPendingTalkLikeAction() {
-  if (!Array.isArray(state.actionQueue) || state.actionQueue.length <= 0) {
-    return false;
-  }
-  return state.actionQueue.some((item) => isTalkLikeActionStep(item));
+  const controller = getActionPlanController();
+  return typeof controller.hasPendingTalkLikeAction === "function" ? controller.hasPendingTalkLikeAction() : false;
 }
 
 function shouldSkipActionStepForSpeech(step, now = performance.now()) {
-  if (!isTalkLikeActionStep(step)) {
-    return false;
-  }
-  const t = Number(now || performance.now());
-  const activeUntil = Number(state.speechAnimUntil || 0);
-  const speakingWindow = isSpeechMotionActive(t) || t <= activeUntil + 120;
-  if (!speakingWindow) {
-    return false;
-  }
-  if (state.motionQuietDuringSpeech) {
-    return true;
-  }
-  const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
-  const delayMs = Number(step?.delayMs) || 0;
-  if (delayMs > 0) {
-    return true;
-  }
-  return motionBlend > 0.2 && (Number(step?.priority) || 0) <= 2;
+  const controller = getActionPlanController();
+  return typeof controller.shouldSkipActionStepForSpeech === "function" ? controller.shouldSkipActionStepForSpeech(step, now) : false;
 }
 
 async function runActionQueue() {
-  if (state.actionRunnerBusy) {
-    return;
-  }
-  state.actionRunnerBusy = true;
-  try {
-    while (state.actionQueue.length > 0) {
-      const step = state.actionQueue.shift();
-      if (!step || !state.motionEnabled || !state.model) {
-        continue;
-      }
-      if (state.dragData || state.windowDragActive) {
-        continue;
-      }
-      if (shouldSkipActionStepForSpeech(step, performance.now())) {
-        continue;
-      }
-      if (Number(step.delayMs) > 0) {
-        await waitMs(step.delayMs);
-      }
-      if (shouldSkipActionStepForSpeech(step, performance.now())) {
-        continue;
-      }
-      await playEmotion(step.mood || "idle", {
-        source: step.source || "emotion",
-        groups: step.groups,
-        priority: Number.isFinite(Number(step.priority)) ? Number(step.priority) : 2,
-        force: !!step.force,
-        cooldownMs: Number.isFinite(Number(step.cooldownMs)) ? Number(step.cooldownMs) : state.motionCooldownMs,
-        allowFallback: step.allowFallback !== false
-      });
-    }
-  } finally {
-    state.actionRunnerBusy = false;
+  const controller = getActionPlanController();
+  if (typeof controller.runActionQueue === "function") {
+    await controller.runActionQueue();
   }
 }
 
 function enqueueActionIntent(intent, context = {}) {
-  if (!state.motionEnabled || !state.model) {
-    return;
+  const controller = getActionPlanController();
+  if (typeof controller.enqueueActionIntent === "function") {
+    controller.enqueueActionIntent(intent, context);
   }
-  const i = String(intent || "idle");
-  const minGap = i === "talk" ? Math.max(420, state.speakingMotionCooldownMs * 0.45) : 680;
-  if (shouldThrottleActionIntent(i, minGap)) {
-    return;
-  }
-  const plan = buildActionPlan(i, context);
-  if (!Array.isArray(plan) || !plan.length) {
-    return;
-  }
-  const style = normalizeTalkStyle(context.style || state.currentTalkStyle || "neutral");
-  if (i === "reply") {
-    triggerExpressionPulse(style, 1.2, 640);
-  } else if (i === "talk") {
-    triggerExpressionPulse(style, 0.95, 460);
-  } else if (i === "tap") {
-    triggerExpressionPulse(style, 1.0, 420);
-  } else if (i === "listen") {
-    triggerExpressionPulse(style, 0.58, 320);
-  } else if (i === "thinking") {
-    triggerExpressionPulse(style, 0.46, 260);
-  } else if (i === "idle") {
-    triggerExpressionPulse(style, 0.28, 200);
-  }
-  state.actionQueue.push(...plan);
-  runActionQueue();
 }
 
-function buildSpeechDeliveryText(text, mood = "idle", style = "neutral", streamMode = false) {
-  if (typeof SPEECH_TEXT.buildSpeechDeliveryText === "function") {
-    return SPEECH_TEXT.buildSpeechDeliveryText(text, mood, style, streamMode);
+
+let ttsPlaybackController = null;
+
+function getTTSPlaybackController() {
+  if (!ttsPlaybackController && typeof TTS_PLAYBACK_CONTROLLER.createController === "function") {
+    ttsPlaybackController = TTS_PLAYBACK_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      consoleObject: console,
+      performanceObject: performance,
+      authFetch,
+      ttsApi: TTS_API,
+      perfLog,
+      setStatus,
+      waitMs,
+      sanitizeSpeakText,
+      detectMood,
+      normalizeTalkStyle,
+      buildVoiceCandidates,
+      initTTS,
+      isServerTTSProvider,
+      recordTTSDebugEvent,
+      recordTTSAudioEvent,
+      beginSpeechAnimation,
+      finishSpeechAnimation,
+      endSpeechAnimation,
+      showSubtitleText,
+      hideSubtitleText,
+      ensureTTSAudioAnalyser,
+      isCurrentTTSPlaybackGeneration,
+      buildSpeakProsody,
+      clampNumber
+    });
   }
-  return sanitizeSpeakText(text);
+  return ttsPlaybackController || TTS_PLAYBACK_CONTROLLER;
 }
 
-function buildStableSpeakText(text) {
-  if (typeof SPEECH_TEXT.buildStableSpeakText === "function") {
-    return SPEECH_TEXT.buildStableSpeakText(text);
-  }
-  return sanitizeSpeakText(text);
-}
-
-function stopAllAudioPlayback() {
-  state.ttsPlaybackGeneration = Number(state.ttsPlaybackGeneration || 0) + 1;
-  state.streamSpeakPlayedSession = 0;
-  if (
-    state.streamSpeakWorking
-    && Number(state.streamSpeakWorkingSession || 0)
-    && Number(state.streamSpeakWorkingSession || 0) !== Number(state.streamSpeakSession || 0)
-  ) {
-    state.streamSpeakWorking = false;
-    state.streamSpeakWorkingSession = 0;
-  }
-  if ("speechSynthesis" in window) {
-    try {
-      window.speechSynthesis.cancel();
-    } catch (_) {
-      // ignore
-    }
-  }
-  if (state.ttsAudio) {
-    try {
-      state.ttsAudio.pause();
-      state.ttsAudio.currentTime = 0;
-    } catch (_) {
-      // ignore
-    }
-  }
-  if (state.ttsContextBufferSource) {
-    try {
-      state.ttsContextBufferSource.onended = null;
-      state.ttsContextBufferSource.stop(0);
-    } catch (_) {
-      // ignore
-    }
-    try {
-      state.ttsContextBufferSource.disconnect();
-    } catch (_) {
-      // ignore
-    }
-    state.ttsContextBufferSource = null;
-  }
-  endSpeechAnimation();
-  state.ttsAudioLevel = 0;
-  state.ttsAudioRawLevel = 0;
-  state.ttsAudioRms = 0;
-  state.ttsContextSpeaking = false;
-}
+function stopAllAudioPlayback() { return getTTSPlaybackController().stopAllAudioPlayback(); }
+function speakOnceWithVoice(text, voice, opts = {}) { return getTTSPlaybackController().speakOnceWithVoice(text, voice, opts); }
+function buildServerTTSPayload(cleanedText, opts = {}) { return getTTSPlaybackController().buildServerTTSPayload(cleanedText, opts); }
+function isRetriableTTSError(err) { return getTTSPlaybackController().isRetriableTTSError(err); }
+async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) { return getTTSPlaybackController().requestServerTTSBlob(text, prosody, requestOpts); }
+async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) { return getTTSPlaybackController().requestServerTTSBlobWithRetry(text, prosody, opts); }
+async function playAudioByContext(blob, debugContext = {}) { return getTTSPlaybackController().playAudioByContext(blob, debugContext); }
+async function playAudioBlob(blob, opts = {}) { return getTTSPlaybackController().playAudioBlob(blob, opts); }
+async function speakByServer(text, opts = {}) { return getTTSPlaybackController().speakByServer(text, opts); }
+async function speakByBrowser(text, opts = {}) { return getTTSPlaybackController().speakByBrowser(text, opts); }
+async function speak(text, opts = {}) { return getTTSPlaybackController().speak(text, opts); }
 
 function isCurrentTTSPlaybackGeneration(generation) {
   return Number(generation || 0) === Number(state.ttsPlaybackGeneration || 0);
-}
-
-function shouldUseStreamSpeak() {
-  return (
-    state.speakingEnabled &&
-    isServerTTSProvider(state.ttsProvider) &&
-    state.streamSpeakEnabled
-    && state.streamSpeakMode === "realtime"
-    && (state.ttsProvider !== "gpt_sovits" || state.gptSovitsRealtimeTTS)
-  );
-}
-
-function shouldSerializeStreamTTSRequests() {
-  return state.ttsProvider === "gpt_sovits";
-}
-
-function splitStreamSpeakSegments(buffer, flush = false) {
-  if (typeof SPEECH_TEXT.splitStreamSpeakSegments === "function") {
-    return SPEECH_TEXT.splitStreamSpeakSegments(buffer, {
-      flush,
-      style: state.currentTalkStyle || "neutral",
-      provider: state.ttsProvider || ""
-    });
-  }
-  return { segments: [], rest: String(buffer || "") };
 }
 
 function clampNumber(v, min, max) {
   return Math.min(max, Math.max(min, v));
 }
 
-function textJitter(text, scale = 0.02) {
-  const src = String(text || "");
-  if (!src) {
-    return 0;
-  }
-  let hash = 0;
-  for (let i = 0; i < src.length; i++) {
-    hash = (hash * 131 + src.charCodeAt(i)) % 1000003;
-  }
-  const normalized = ((hash % 1000) / 999) * 2 - 1;
-  return normalized * scale;
-}
+let streamTtsQueueController = null;
 
-function buildSpeakProsody(text, mood, streamMode = false, style = "neutral") {
-  if (typeof SPEECH_TEXT.buildSpeakProsody === "function") {
-    return SPEECH_TEXT.buildSpeakProsody(text, mood, streamMode, style);
-  }
-  return {
-    speed_ratio: 1,
-    pitch_ratio: 1,
-    volume_ratio: 1,
-    rate: "+0%",
-    pitch: "+0Hz",
-    volume: "+0%"
-  };
-}
-
-function ensureStreamSpeakBlobPromise(item) {
-  if (!item) {
-    return null;
-  }
-  if (item.blobPromise) {
-    return item.blobPromise;
-  }
-  const prosody = shouldSerializeStreamTTSRequests()
-    ? null
-    : item.prosody || buildSpeakProsody(
-      item.text,
-      detectMood(item.text),
-      true,
-      item.style || state.currentTalkStyle || "neutral"
-    );
-  item.prosody = prosody;
-  recordTTSDebugEvent("stream_request_start", {
-    traceId: item.traceId,
-    sessionId: item.sessionId,
-    segmentId: item.segmentId,
-    text: item.text
-  });
-  item.blobPromise = requestServerTTSBlob(item.text, prosody, {
-    traceId: item.traceId || state.activePerfTraceId || ""
-  }).then((blob) => {
-    recordTTSDebugEvent("stream_request_ok", {
-      traceId: item.traceId,
-      sessionId: item.sessionId,
-      segmentId: item.segmentId,
-      text: item.text,
-      blobBytes: Number(blob?.size || 0)
+function getStreamTtsQueueController() {
+  if (!streamTtsQueueController && typeof STREAM_TTS_QUEUE_CONTROLLER.createController === "function") {
+    streamTtsQueueController = STREAM_TTS_QUEUE_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      consoleObject: console,
+      isServerTTSProvider,
+      buildSpeechDeliveryText,
+      detectMood,
+      buildSpeakProsody,
+      recordTTSDebugEvent,
+      requestServerTTSBlob,
+      setStatus,
+      playAudioBlob,
+      isCurrentTTSPlaybackGeneration,
+      splitStreamSpeakSegments,
+      maybePlayTalkGesture,
+      buildStableSpeakText,
+      sanitizeSpeakText,
+      speak
     });
-    return blob;
-  }).catch((err) => {
-    recordTTSDebugEvent("stream_request_fail", {
-      traceId: item.traceId,
-      sessionId: item.sessionId,
-      segmentId: item.segmentId,
-      text: item.text,
-      error: String(err?.message || err || "")
+  }
+  return streamTtsQueueController || STREAM_TTS_QUEUE_CONTROLLER;
+}
+
+function shouldUseStreamSpeak() { return getStreamTtsQueueController().shouldUseStreamSpeak(); }
+function shouldSerializeStreamTTSRequests() { return getStreamTtsQueueController().shouldSerializeStreamTTSRequests(); }
+function ensureStreamSpeakBlobPromise(item) { return getStreamTtsQueueController().ensureStreamSpeakBlobPromise(item); }
+function enqueueStreamSpeakSegment(text, sessionId, prosody = null, style = "neutral") { return getStreamTtsQueueController().enqueueStreamSpeakSegment(text, sessionId, prosody, style); }
+function dequeueStreamSpeakItem(sessionId) { return getStreamTtsQueueController().dequeueStreamSpeakItem(sessionId); }
+function hasQueuedStreamSpeakItem(sessionId) { return getStreamTtsQueueController().hasQueuedStreamSpeakItem(sessionId); }
+function discardQueuedStreamSpeakItems(sessionId) { return getStreamTtsQueueController().discardQueuedStreamSpeakItems(sessionId); }
+function ensureStreamSpeakQueueRunning(sessionId, delayMs = 0) { return getStreamTtsQueueController().ensureStreamSpeakQueueRunning(sessionId, delayMs); }
+async function waitNextStreamSpeakItem(sessionId, waitMs = 0) { return getStreamTtsQueueController().waitNextStreamSpeakItem(sessionId, waitMs); }
+async function runStreamSpeakQueue() { return getStreamTtsQueueController().runStreamSpeakQueue(); }
+function feedStreamSpeakDelta(delta, sessionId, style = "neutral") { return getStreamTtsQueueController().feedStreamSpeakDelta(delta, sessionId, style); }
+function flushStreamSpeak(sessionId, style = "neutral") { return getStreamTtsQueueController().flushStreamSpeak(sessionId, style); }
+function scheduleFinalSpeechWatchdog(input = {}) { return getStreamTtsQueueController().scheduleFinalSpeechWatchdog(input); }
+
+
+let voiceRuntimeController = null;
+
+function getVoiceRuntimeController() {
+  if (!voiceRuntimeController && typeof VOICE_RUNTIME_CONTROLLER.createController === "function") {
+    voiceRuntimeController = VOICE_RUNTIME_CONTROLLER.createController({
+      state, ui, windowObject: window, documentObject: document, setStatus, isServerTTSProvider, clampNumber,
+      normalizeTalkStyle, detectMood, buildSpeakProsody, beginSpeechAnimation, showSubtitleText,
+      finishSpeechAnimation, hideSubtitleText, endSpeechAnimation, isCurrentTTSPlaybackGeneration
     });
-    throw err;
-  });
-  return item.blobPromise;
+  }
+  return voiceRuntimeController || VOICE_RUNTIME_CONTROLLER;
 }
 
-function enqueueStreamSpeakSegment(text, sessionId, prosody = null, style = "neutral") {
-  const cleaned = buildSpeechDeliveryText(text, detectMood(text), style, true);
-  if (!cleaned) {
-    return;
-  }
-  const item = {
-    text: cleaned,
-    sessionId,
-    prosody,
-    style,
-    playbackGeneration: Number(state.ttsPlaybackGeneration || 0),
-    blobPromise: null,
-    segmentId: ++state.perfTtsSeq,
-    traceId: state.activePerfTraceId || ""
-  };
-  state.streamSpeakQueue.push(item);
-  state.streamSpeakLastEnqueueSession = sessionId;
-  recordTTSDebugEvent("stream_enqueue", {
-    traceId: item.traceId,
-    sessionId,
-    segmentId: item.segmentId,
-    text: cleaned
-  });
-  if (!shouldSerializeStreamTTSRequests()) {
-    ensureStreamSpeakBlobPromise(item);
-  }
-}
+function initServerTTSVoices() { return getVoiceRuntimeController().initServerTTSVoices(); }
+function scoreVoice(v) { return getVoiceRuntimeController().scoreVoice(v); }
+function getSortedVoices() { return getVoiceRuntimeController().getSortedVoices(); }
+function chooseTTSVoice() { return getVoiceRuntimeController().chooseTTSVoice(); }
+function setActiveVoice(index) { return getVoiceRuntimeController().setActiveVoice(index); }
+function buildVoiceCandidates() { return getVoiceRuntimeController().buildVoiceCandidates(); }
+function initTTS() { return getVoiceRuntimeController().initTTS(); }
 
-function dequeueStreamSpeakItem(sessionId) {
-  if (!Array.isArray(state.streamSpeakQueue) || state.streamSpeakQueue.length <= 0) {
-    return null;
-  }
-  for (let i = 0; i < state.streamSpeakQueue.length; i += 1) {
-    const item = state.streamSpeakQueue[i];
-    if (!item) {
-      state.streamSpeakQueue.splice(i, 1);
-      i -= 1;
-      continue;
-    }
-    if (item.sessionId !== sessionId) {
-      continue;
-    }
-    state.streamSpeakQueue.splice(i, 1);
-    return item;
-  }
-  return null;
-}
 
-function hasQueuedStreamSpeakItem(sessionId) {
-  return Array.isArray(state.streamSpeakQueue)
-    && state.streamSpeakQueue.some((item) => item && item.sessionId === sessionId);
-}
 
-function discardQueuedStreamSpeakItems(sessionId) {
-  if (!Array.isArray(state.streamSpeakQueue) || state.streamSpeakQueue.length <= 0) {
-    return 0;
-  }
-  const before = state.streamSpeakQueue.length;
-  state.streamSpeakQueue = state.streamSpeakQueue.filter(
-    (item) => item && item.sessionId !== sessionId
-  );
-  return before - state.streamSpeakQueue.length;
-}
+let live2dRuntimeController = null;
 
-function ensureStreamSpeakQueueRunning(sessionId, delayMs = 0) {
-  const safeSession = Number(sessionId || 0);
-  if (!safeSession || safeSession !== state.streamSpeakSession || !shouldUseStreamSpeak()) {
-    return;
-  }
-  const delay = Math.max(0, Math.min(360, Math.round(Number(delayMs) || 0)));
-  window.setTimeout(() => {
-    if (safeSession !== state.streamSpeakSession || !shouldUseStreamSpeak()) {
-      return;
-    }
-    if (!hasQueuedStreamSpeakItem(safeSession)) {
-      return;
-    }
-    if (
-      state.streamSpeakWorking
-      && Number(state.streamSpeakWorkingSession || 0) === safeSession
-    ) {
-      ensureStreamSpeakQueueRunning(safeSession, 80);
-      return;
-    }
-    if (
-      state.streamSpeakWorking
-      && Number(state.streamSpeakWorkingSession || 0) !== safeSession
-    ) {
-      recordTTSDebugEvent("stream_run_clear_stale_busy", {
-        sessionId: safeSession,
-        result: "stale_busy",
-        error: String(state.streamSpeakWorkingSession || "")
-      });
-      state.streamSpeakWorking = false;
-      state.streamSpeakWorkingSession = 0;
-    }
-    runStreamSpeakQueue();
-  }, delay);
-}
-
-async function waitNextStreamSpeakItem(sessionId, waitMs = 0) {
-  let item = dequeueStreamSpeakItem(sessionId);
-  if (item || waitMs <= 0) {
-    return item;
-  }
-  const end = Date.now() + Math.max(0, Number(waitMs) || 0);
-  while (Date.now() < end) {
-    if (sessionId !== state.streamSpeakSession) {
-      return null;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 18));
-    item = dequeueStreamSpeakItem(sessionId);
-    if (item) {
-      return item;
-    }
-  }
-  return null;
-}
-
-async function runStreamSpeakQueue() {
-  if (state.streamSpeakWorking) {
-    recordTTSDebugEvent("stream_run_skip_busy");
-    return;
-  }
-  const activeSession = state.streamSpeakSession;
-  state.streamSpeakWorking = true;
-  state.streamSpeakWorkingSession = activeSession;
-  recordTTSDebugEvent("stream_run_start", { sessionId: activeSession });
-  try {
-    if (!state.speakingEnabled || !isServerTTSProvider(state.ttsProvider)) {
-      recordTTSDebugEvent("stream_run_disabled", { sessionId: activeSession });
-      return;
-    }
-
-    const idleWaitMs = Math.max(30, Math.min(220, Number(state.streamSpeakIdleWaitMs) || 90));
-    let current = await waitNextStreamSpeakItem(activeSession, state.chatBusy ? idleWaitMs : 60);
-    if (!current) {
-      recordTTSDebugEvent("stream_run_empty", { sessionId: activeSession });
-      return;
-    }
-
-    while (current) {
-      if (activeSession !== state.streamSpeakSession) {
-        recordTTSDebugEvent("stream_session_changed", {
-          sessionId: activeSession,
-          result: "break"
-        });
-        break;
-      }
-      let currentBlob = null;
-      try {
-        currentBlob = await ensureStreamSpeakBlobPromise(current);
-      } catch (err) {
-        console.warn("Stream TTS fetch failed:", err);
-        // Retry once without prosody to avoid provider-side parsing instability.
-        try {
-          recordTTSDebugEvent("stream_retry_no_prosody", {
-            traceId: current.traceId,
-            sessionId: activeSession,
-            segmentId: current.segmentId,
-            text: current.text,
-            error: String(err?.message || err || "")
-          });
-          currentBlob = await requestServerTTSBlob(current.text, null, {
-            traceId: current.traceId || state.activePerfTraceId || ""
-          });
-        } catch (retryErr) {
-          console.warn("Stream TTS retry failed:", retryErr);
-          recordTTSDebugEvent("stream_retry_fail", {
-            traceId: current.traceId,
-            sessionId: activeSession,
-            segmentId: current.segmentId,
-            text: current.text,
-            error: String(retryErr?.message || retryErr || "")
-          });
-          setStatus("语音片段失败，已跳过");
-          current = await waitNextStreamSpeakItem(activeSession, state.chatBusy ? idleWaitMs : 60);
-          continue;
-        }
-      }
-      if (!currentBlob) {
-        recordTTSDebugEvent("stream_empty_blob", {
-          traceId: current.traceId,
-          sessionId: activeSession,
-          segmentId: current.segmentId,
-          text: current.text
-        });
-        current = await waitNextStreamSpeakItem(activeSession, 20);
-        continue;
-      }
-      if (
-        activeSession !== state.streamSpeakSession ||
-        !isCurrentTTSPlaybackGeneration(current.playbackGeneration)
-      ) {
-        recordTTSDebugEvent("stream_stale_skip", {
-          traceId: current.traceId,
-          sessionId: activeSession,
-          segmentId: current.segmentId,
-          text: current.text,
-          result: "stale"
-        });
-        break;
-      }
-      let next = dequeueStreamSpeakItem(activeSession);
-      if (!next) {
-        next = await waitNextStreamSpeakItem(activeSession, state.chatBusy ? idleWaitMs : 80);
-      }
-      if (next) {
-        ensureStreamSpeakBlobPromise(next);
-      }
-
-      await playAudioBlob(currentBlob, {
-        interrupt: false,
-        text: current.text,
-        mood: detectMood(current.text),
-        style: current.style || state.currentTalkStyle || "neutral",
-        perfTraceId: current.traceId || state.activePerfTraceId || "",
-        segmentId: current.segmentId,
-        sessionId: activeSession,
-        playbackGeneration: current.playbackGeneration
-      });
-      current = next || await waitNextStreamSpeakItem(
-        activeSession,
-        state.chatBusy ? idleWaitMs : 180
-      );
-    }
-    state.ttsServerAvailable = true;
-  } catch (err) {
-    console.warn("Stream speak queue failed:", err);
-    recordTTSDebugEvent("stream_run_fail", {
-      sessionId: activeSession,
-      error: String(err?.message || err || "")
+function getLive2DRuntimeController() {
+  if (!live2dRuntimeController && typeof LIVE2D_RUNTIME_CONTROLLER.createController === "function") {
+    live2dRuntimeController = LIVE2D_RUNTIME_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      documentObject: document,
+      consoleObject: console,
+      performanceObject: performance,
+      runtimeVersion: RUNTIME_VERSION,
+      appendMessage,
+      setStatus,
+      placeModel,
+      attachDrag,
+      setupClickthroughHitTest,
+      scheduleIdleMotionLoop,
+      stopIdleMotionLoop,
+      setModelMotionDefinitions,
+      applyStyleExpressionLayer,
+      updateMicroMotionLayer,
+      getStyleExpressionProfile,
+      getActiveModelCadence,
+      clampNumber,
+      handleWindowResize
     });
-  } finally {
-    if (Number(state.streamSpeakWorkingSession || 0) === Number(activeSession || 0)) {
-      state.streamSpeakWorking = false;
-      state.streamSpeakWorkingSession = 0;
-    }
-    recordTTSDebugEvent("stream_run_done", { sessionId: activeSession });
-    if (
-      activeSession === state.streamSpeakSession
-      && shouldUseStreamSpeak()
-      && hasQueuedStreamSpeakItem(activeSession)
-    ) {
-      recordTTSDebugEvent("stream_run_restart", { sessionId: activeSession });
-      window.setTimeout(() => runStreamSpeakQueue(), 0);
-    } else if (
-      activeSession !== state.streamSpeakSession
-      && shouldUseStreamSpeak()
-      && hasQueuedStreamSpeakItem(state.streamSpeakSession)
-    ) {
-      recordTTSDebugEvent("stream_run_handoff", { sessionId: state.streamSpeakSession });
-      ensureStreamSpeakQueueRunning(state.streamSpeakSession, 0);
-    }
   }
+  return live2dRuntimeController || LIVE2D_RUNTIME_CONTROLLER;
 }
 
-function feedStreamSpeakDelta(delta, sessionId, style = "neutral") {
-  if (!shouldUseStreamSpeak()) {
-    return;
-  }
-  if (sessionId !== state.streamSpeakSession) {
-    return;
-  }
-  state.streamSpeakBuffer += String(delta || "");
-  const parsed = splitStreamSpeakSegments(state.streamSpeakBuffer, false);
-  state.streamSpeakBuffer = parsed.rest;
-  for (const seg of parsed.segments) {
-    const mood = detectMood(seg);
-    const prosody = buildSpeakProsody(seg, mood, true, style);
-    enqueueStreamSpeakSegment(seg, sessionId, prosody, style);
-    maybePlayTalkGesture(seg, style);
-  }
-  if (parsed.segments.length) {
-    ensureStreamSpeakQueueRunning(sessionId, 0);
-  }
-}
+function loadScript(src, isReady) { return getLive2DRuntimeController().loadScript(src, isReady); }
+async function ensureLive2DRuntime() { return getLive2DRuntimeController().ensureLive2DRuntime(); }
 
-function flushStreamSpeak(sessionId, style = "neutral") {
-  if (sessionId !== state.streamSpeakSession) {
-    return;
-  }
-  const parsed = splitStreamSpeakSegments(state.streamSpeakBuffer, true);
-  state.streamSpeakBuffer = "";
-  for (const seg of parsed.segments) {
-    const mood = detectMood(seg);
-    const prosody = buildSpeakProsody(seg, mood, false, style);
-    enqueueStreamSpeakSegment(seg, sessionId, prosody, style);
-    maybePlayTalkGesture(seg, style);
-  }
-  if (parsed.segments.length) {
-    ensureStreamSpeakQueueRunning(sessionId, 0);
-  }
-}
+let appConfigController = null;
 
-function scheduleFinalSpeechWatchdog({
-  sessionId,
-  text,
-  mood = "idle",
-  style = "neutral",
-  traceId = ""
-} = {}) {
-  const safeSession = Number(sessionId || 0);
-  const safeText = buildStableSpeakText(text) || sanitizeSpeakText(text);
-  if (!safeSession || !safeText || !shouldUseStreamSpeak()) {
-    return;
-  }
-  const generation = Number(state.ttsPlaybackGeneration || 0);
-  const startedAt = Number(state.ttsDebugAudioStartedAt || 0);
-  window.setTimeout(async () => {
-    if (
-      safeSession !== state.streamSpeakSession
-      || !isCurrentTTSPlaybackGeneration(generation)
-      || state.streamSpeakPlayedSession === safeSession
-    ) {
-      return;
-    }
-    if (hasQueuedStreamSpeakItem(safeSession) || state.streamSpeakWorking) {
-      ensureStreamSpeakQueueRunning(safeSession, 0);
-      window.setTimeout(async () => {
-        if (
-          safeSession !== state.streamSpeakSession
-          || !isCurrentTTSPlaybackGeneration(generation)
-          || state.streamSpeakPlayedSession === safeSession
-        ) {
-          return;
-        }
-        recordTTSDebugEvent("final_watchdog_tts", {
-          traceId,
-          sessionId: safeSession,
-          text: safeText,
-          result: "fallback_after_queue_wait"
-        });
-        const prosody = buildSpeakProsody(safeText, mood, false, style);
-        await speak(safeText, { prosody, interrupt: true, mood, style, perfTraceId: traceId, playbackGeneration: generation });
-      }, 2200);
-      return;
-    }
-    if (Number(state.ttsDebugAudioStartedAt || 0) > startedAt) {
-      return;
-    }
-    recordTTSDebugEvent("final_watchdog_tts", {
-      traceId,
-      sessionId: safeSession,
-      text: safeText,
-      result: "fallback"
+function getAppConfigController() {
+  if (!appConfigController && typeof APP_CONFIG_CONTROLLER.createController === "function") {
+    appConfigController = APP_CONFIG_CONTROLLER.createController({
+      state, ui, fetchObject: fetch, clampNumber, isServerTTSProvider, initServerTTSVoices,
+      buildAsrHotwordRules, syncProactiveSchedulerPolling, startAutoChatLoop, stopAutoChatLoop,
+      normalizeTalkStyle, normalizeMotionIntensity, loadChatHistoryFromStorage, loadRemindersFromStorage,
+      loadDailyGreetingState, loadEmotionStats, resolveAssistantDisplayName, updateObserveButton,
+      updateMicMeter, detectModelProfileName
     });
-    const prosody = buildSpeakProsody(safeText, mood, false, style);
-    await speak(safeText, { prosody, interrupt: true, mood, style, perfTraceId: traceId, playbackGeneration: generation });
-  }, 2600);
+  }
+  return appConfigController || APP_CONFIG_CONTROLLER;
 }
 
-function initServerTTSVoices() {
-  const cfg = state.config?.tts || {};
-  const isVolcengine = state.ttsProvider === "volcengine_tts" || state.ttsProvider === "volcengine";
-  const isGptSovits = state.ttsProvider === "gpt_sovits";
-  const list = Array.isArray(cfg.voices) ? cfg.voices.filter(Boolean) : [];
-  const fallback = (isVolcengine || isGptSovits)
-    ? [cfg.voice]
-    : [
-      cfg.voice,
-      "zh-CN-XiaoxiaoNeural",
-      "zh-CN-XiaoyiNeural",
-      "zh-CN-YunxiNeural",
-      "zh-CN-YunjianNeural",
-    ].filter(Boolean);
-  const merged = [...list, ...fallback];
-  const deduped = [...new Set(merged)];
-  state.ttsServerVoices = deduped;
-  const initVoice = cfg.voice || deduped[0] || null;
-  const idx = deduped.findIndex((v) => v === initVoice);
-  state.ttsServerVoiceIndex = idx >= 0 ? idx : 0;
-  state.ttsServerVoice = deduped[state.ttsServerVoiceIndex] || null;
-}
+async function loadConfig() { return getAppConfigController().loadConfig(); }
 
-function scoreVoice(v) {
-  const name = String(v?.name || "").toLowerCase();
-  const lang = String(v?.lang || "").toLowerCase();
-  let score = 0;
-  if (lang === "zh-cn") score += 500;
-  else if (lang.startsWith("zh")) score += 300;
-  if (/natural|neural|online|xiaoxiao|xiaoyi|yunxi|yunyang|huihui/.test(name)) {
-    score += 220;
-  }
-  if (/yaoyao/.test(name)) score += 90;
-  if (/kangkang/.test(name)) score += 30;
-  if (/huihui/.test(name)) score -= 20;
-  if (/microsoft|edge|google/.test(name)) {
-    score += 60;
-  }
-  if (/english|en-us|en-gb/.test(name + " " + lang)) {
-    score -= 200;
-  }
-  return score;
-}
+async function initLive2D() { return getLive2DRuntimeController().initLive2D(); }
+let live2dLayoutController = null;
 
-function getSortedVoices() {
-  if (!("speechSynthesis" in window)) {
-    return [];
-  }
-  const voices = window.speechSynthesis.getVoices() || [];
-  if (!voices.length) {
-    return [];
-  }
-  return [...voices].sort((a, b) => scoreVoice(b) - scoreVoice(a));
-}
-
-function chooseTTSVoice() {
-  const sorted = getSortedVoices();
-  return sorted.length ? sorted[0] : null;
-}
-
-function setActiveVoice(index) {
-  if (!state.ttsVoices.length) {
-    state.ttsVoice = null;
-    state.ttsVoiceIndex = -1;
-    return;
-  }
-  const safe = ((index % state.ttsVoices.length) + state.ttsVoices.length) % state.ttsVoices.length;
-  state.ttsVoiceIndex = safe;
-  state.ttsVoice = state.ttsVoices[safe];
-}
-
-function buildVoiceCandidates() {
-  const chosen = state.ttsVoice || chooseTTSVoice();
-  const fallbackZh = state.ttsVoices.find((v) => /^zh/i.test(String(v.lang || "")));
-  const candidates = [];
-  if (chosen) candidates.push(chosen);
-  if (fallbackZh && (!chosen || fallbackZh.name !== chosen.name)) {
-    candidates.push(fallbackZh);
-  }
-  // null means use browser default voice
-  candidates.push(null);
-  return candidates;
-}
-
-function speakOnceWithVoice(text, voice, opts = {}) {
-  return new Promise((resolve) => {
-    const force = typeof opts === "object" ? !!opts.force : !!opts;
-    const playbackGeneration = Number(
-      (typeof opts === "object" ? opts.playbackGeneration : 0) || state.ttsPlaybackGeneration || 0
-    );
-    if (!("speechSynthesis" in window)) {
-      resolve(false);
-      return;
-    }
-    if (!force && !state.speakingEnabled) {
-      resolve(false);
-      return;
-    }
-    const cleaned = String(text || "")
-      .replace(/https?:\/\/\S+/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (!cleaned) {
-      resolve(false);
-      return;
-    }
-
-    const speechStyle = normalizeTalkStyle(opts.style || state.currentTalkStyle || "neutral");
-    const speechMood = String(opts.mood || detectMood(cleaned) || "idle");
-    const prosodyStyle = opts.voiceStyle || speechStyle;
-    const prosody = opts.prosody && typeof opts.prosody === "object"
-      ? opts.prosody
-      : buildSpeakProsody(cleaned, speechMood, false, prosodyStyle);
-    const speedRatio = Number(prosody.speed_ratio);
-    const pitchRatio = Number(prosody.pitch_ratio);
-    const volumeRatio = Number(prosody.volume_ratio);
-    const utterance = new SpeechSynthesisUtterance(cleaned);
-    if (voice) {
-      utterance.voice = voice;
-      utterance.lang = voice.lang || "zh-CN";
-    } else {
-      utterance.lang = "zh-CN";
-    }
-    utterance.rate = Number.isFinite(speedRatio)
-      ? clampNumber(0.96 * speedRatio, 0.72, 1.32)
-      : 0.96;
-    utterance.pitch = Number.isFinite(pitchRatio)
-      ? clampNumber(pitchRatio, 0.72, 1.35)
-      : 1.0;
-    utterance.volume = Number.isFinite(volumeRatio)
-      ? clampNumber(volumeRatio, 0.45, 1.0)
-      : 1.0;
-    let started = false;
-    let settled = false;
-    utterance.onstart = () => {
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-        try {
-          window.speechSynthesis.cancel();
-        } catch (_) {
-          // ignore
-        }
-        return;
-      }
-      started = true;
-      beginSpeechAnimation(cleaned, speechMood, speechStyle);
-      showSubtitleText(cleaned);
-      setStatus("语音中...");
-    };
-    utterance.onend = () => {
-      if (settled) return;
-      settled = true;
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-        resolve(false);
-        return;
-      }
-      if (voice?.name) {
-        state.ttsLastGoodVoiceName = voice.name;
-      }
-      finishSpeechAnimation();
-      hideSubtitleText();
-      setStatus("待机");
-      resolve(true);
-    };
-    utterance.onerror = () => {
-      if (settled) return;
-      settled = true;
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-        resolve(false);
-        return;
-      }
-      endSpeechAnimation();
-      hideSubtitleText();
-      setStatus("语音失败");
-      resolve(false);
-    };
-
-    try {
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-        resolve(false);
-        return;
-      }
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(utterance);
-      // Guard against engines that fail silently (no onstart fired).
-      setTimeout(() => {
-        if (settled) return;
-        if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-          settled = true;
-          resolve(false);
-          return;
-        }
-        if (!started) {
-          settled = true;
-          endSpeechAnimation();
-          try {
-            window.speechSynthesis.cancel();
-          } catch (_) {
-            // ignore
-          }
-          resolve(false);
-        }
-      }, 1800);
-    } catch (_) {
-      resolve(false);
-    }
-  });
-}
-
-function initTTS() {
-  if (!("speechSynthesis" in window)) {
-    state.ttsReady = false;
-    ui.speakBtn.disabled = true;
-    ui.speakBtn.textContent = "语音不可用";
-    return;
-  }
-
-  const refresh = () => {
-    const prevName = state.ttsVoice?.name || "";
-    state.ttsVoices = getSortedVoices();
-    let idx = state.ttsVoices.findIndex((v) => v.name === prevName);
-    if (idx < 0) idx = 0;
-    setActiveVoice(idx);
-    state.ttsReady = true;
-    if (ui.voiceNextBtn) {
-      ui.voiceNextBtn.disabled = state.ttsVoices.length <= 1;
-    }
-    if (state.speakingEnabled) {
-      ui.speakBtn.textContent = "语音开";
-    } else {
-      ui.speakBtn.textContent = "语音关";
-    }
-  };
-
-  refresh();
-  window.speechSynthesis.onvoiceschanged = refresh;
-
-  // Warm up TTS engine so first sentence is less likely to be dropped.
-  const warmup = () => {
-    try {
-      const u = new SpeechSynthesisUtterance("");
-      window.speechSynthesis.speak(u);
-      window.speechSynthesis.cancel();
-    } catch (_) {
-      // Ignore warmup failure.
-    }
-    document.removeEventListener("pointerdown", warmup);
-    document.removeEventListener("keydown", warmup);
-  };
-  document.addEventListener("pointerdown", warmup, { once: true });
-  document.addEventListener("keydown", warmup, { once: true });
-}
-
-function loadScript(src, isReady) {
-  return new Promise((resolve, reject) => {
-    if (typeof isReady === "function" && isReady()) {
-      resolve();
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = src.includes("?") ? src : `${src}?v=${RUNTIME_VERSION}`;
-    script.async = false;
-    script.onload = () => {
-      if (typeof isReady === "function" && !isReady()) {
-        reject(new Error(`Loaded but missing runtime object: ${src}`));
-        return;
-      }
-      resolve();
-    };
-    script.onerror = () => {
-      reject(new Error(`Failed to load script: ${src}`));
-    };
-    document.head.appendChild(script);
-  });
-}
-
-async function ensureLive2DRuntime() {
-  await loadScript(
-    "/vendor/pixi.min.js",
-    () => typeof window.PIXI !== "undefined"
-  );
-
-  await loadScript(
-    "/vendor/live2dcubismcore.min.js",
-    () =>
-      typeof window.Live2DCubismCore !== "undefined" &&
-      !!window.Live2DCubismCore.Version
-  );
-
-  // Fallback to official direct link if local core script gets corrupted/cached badly.
-  if (
-    typeof window.Live2DCubismCore === "undefined" ||
-    !window.Live2DCubismCore.Version
-  ) {
-    await loadScript(
-      "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js",
-      () =>
-        typeof window.Live2DCubismCore !== "undefined" &&
-        !!window.Live2DCubismCore.Version
-    );
-  }
-
-  await loadScript(
-    "/vendor/cubism4.min.js",
-    () =>
-      !!window.PIXI &&
-      !!window.PIXI.live2d &&
-      !!window.PIXI.live2d.Live2DModel
-  );
-}
-
-async function loadConfig() {
-  const resp = await fetch("/config.json", { cache: "no-store" });
-  if (!resp.ok) {
-    throw new Error("加载 /config.json 失败");
-  }
-  state.config = await resp.json();
-  const ttsCfg = state.config?.tts || {};
-  const modelCfg = state.config?.model || {};
-  const scale = Number(modelCfg.scale);
-  const xRatio = Number(modelCfg.x_ratio);
-  const yRatio = Number(modelCfg.y_ratio);
-  state.modelConfig = {
-    scale: Number.isFinite(scale) ? Math.max(0.1, Math.min(3.0, scale)) : 1,
-    x_ratio: Number.isFinite(xRatio) ? Math.max(0, Math.min(1, xRatio)) : 0.26,
-    y_ratio: Number.isFinite(yRatio) ? Math.max(0, Math.min(1, yRatio)) : 0.96
-  };
-  state.ttsProvider = String(ttsCfg.provider || "browser").toLowerCase();
-  state.modelProfileName = detectModelProfileName();
-  state.gptSovitsRealtimeTTS = ttsCfg.gpt_sovits_realtime_tts === true;
-  state.streamSpeakMode = String(ttsCfg.stream_mode || "realtime").toLowerCase();
-  state.serverTTSFallbackToBrowser = ttsCfg.allow_browser_fallback === true;
-  const retryCountCfg = Number(ttsCfg.server_retry_count);
-  const fallbackFailThresholdCfg = Number(ttsCfg.server_fallback_fail_threshold);
-  const retryDelayCfg = Number(ttsCfg.server_retry_delay_ms);
-  const timeoutCfg = Number(ttsCfg.server_request_timeout_ms);
-  const streamIdleWaitCfg = Number(ttsCfg.stream_speak_idle_wait_ms);
-  const isSovits = state.ttsProvider === "gpt_sovits";
-  state.ttsServerRetryCount = Number.isFinite(retryCountCfg)
-    ? Math.max(0, Math.min(4, Math.round(retryCountCfg)))
-    : (isSovits ? 2 : 1);
-  state.ttsServerFallbackFailThreshold = Number.isFinite(fallbackFailThresholdCfg)
-    ? Math.max(1, Math.min(8, Math.round(fallbackFailThresholdCfg)))
-    : (isSovits ? 1 : 2);
-  state.ttsServerRetryDelayMs = Number.isFinite(retryDelayCfg)
-    ? Math.max(60, Math.min(3000, Math.round(retryDelayCfg)))
-    : 220;
-  const sovitsTimeoutMs = isSovits && Number.isFinite(Number(ttsCfg.gpt_sovits_timeout_sec))
-    ? Math.round(Number(ttsCfg.gpt_sovits_timeout_sec) * 1000)
-    : 0;
-  const resolvedTimeoutMs = Number.isFinite(timeoutCfg)
-    ? timeoutCfg
-    : (sovitsTimeoutMs || 14000);
-  state.ttsServerRequestTimeoutMs = Math.max(1500, Math.min(90000, Math.round(resolvedTimeoutMs)));
-  state.streamSpeakIdleWaitMs = Number.isFinite(streamIdleWaitCfg)
-    ? Math.max(30, Math.min(220, Math.round(streamIdleWaitCfg)))
-    : 90;
-  state.ttsServerFailStreak = 0;
-  state.ttsServerLastError = "";
-  if (!["final_only", "realtime"].includes(state.streamSpeakMode)) {
-    state.streamSpeakMode = "realtime";
-  }
-  if (state.ttsProvider === "gpt_sovits" && !state.gptSovitsRealtimeTTS) {
-    state.streamSpeakMode = "final_only";
-  }
-  if (isServerTTSProvider(state.ttsProvider)) {
-    state.ttsServerAvailable = true;
-    initServerTTSVoices();
-  }
-  const asrCfg = state.config?.asr || {};
-  const observeCfg = state.config?.observe || {};
-  const conversationCfg = state.config?.conversation_mode || {};
-  const historySummaryCfg = state.config?.history_summary || {};
-  const styleCfg = state.config?.style || {};
-  const motionCfg = state.config?.motion || {};
-  const runtimeCfg = state.config?.character_runtime || {};
-  state.characterRuntimeAutoApplyReplyCue =
-    runtimeCfg.enabled === true && runtimeCfg.auto_apply_reply_cue === true;
-  state.showMicMeter = asrCfg.show_mic_meter !== false;
-  state.micKeepListening = asrCfg.keep_listening !== false;
-  state.asrTranscribeOnClose = asrCfg.transcribe_on_close !== false;
-  state.localAsrMinSpeechMs = Math.round(
-    clampNumber(Number(asrCfg.min_speech_ms || 180), 80, 1200)
-  );
-  state.localAsrSilenceTriggerMs = Math.round(
-    clampNumber(Number(asrCfg.silence_trigger_ms || 380), 180, 1200)
-  );
-  state.localAsrMaxSpeechMs = Math.round(
-    clampNumber(Number(asrCfg.max_speech_ms || 2400), 1000, 6000)
-  );
-  state.localAsrSpeechThreshold = clampNumber(
-    Number(asrCfg.speech_threshold || 0.0035),
-    0.0015,
-    0.05
-  );
-  const buf = Math.round(Number(asrCfg.processor_buffer_size || 2048));
-  state.localAsrProcessorBufferSize = [1024, 2048, 4096, 8192].includes(buf) ? buf : 2048;
-  state.asrHotwordRules = buildAsrHotwordRules(asrCfg.hotword_replacements || {});
-  state.wakeWordEnabled = asrCfg.wake_word_enabled !== false;
-  state.wakeWords = Array.isArray(asrCfg.wake_words) && asrCfg.wake_words.length
-    ? asrCfg.wake_words.map((x) => String(x || "").trim()).filter(Boolean).slice(0, 8)
-    : ["\u5854\u83f2", "taffy", "tafi"];
-  {
-    const rawAttachMode = String(observeCfg.attach_mode || "").toLowerCase();
-    if (rawAttachMode === "always" || rawAttachMode === "auto") {
-      state.observeAttachMode = "always";
-    } else if (rawAttachMode === "keyword" || rawAttachMode === "manual") {
-      state.observeAttachMode = "manual";
-    } else {
-      state.observeAttachMode = "manual";
-    }
-  }
-  state.observeAllowAutoChat = observeCfg.allow_auto_chat === true;
-  state.conversationMode = {
-    enabled: conversationCfg.enabled === true,
-    chatStreamEnabled: conversationCfg.chat_stream_enabled !== false,
-    proactiveEnabled: conversationCfg.proactive_enabled === true,
-    proactiveSchedulerEnabled: conversationCfg.proactive_scheduler_enabled === true,
-    grayAutoEnabled: conversationCfg.gray_auto_enabled === true,
-    grayAutoTrialEnabled: conversationCfg.gray_auto_trial_enabled === true,
-    grayAutoTrialMaxTriggersPerSession: Math.round(
-      clampNumber(Number(conversationCfg.gray_auto_trial_max_triggers_per_session ?? 1), 0, 4)
-    ),
-    proactiveCooldownMs: Math.round(
-      clampNumber(Number(conversationCfg.proactive_cooldown_ms ?? 600000), 60000, 3600000)
-    ),
-    proactiveWarmupMs: Math.round(
-      clampNumber(Number(conversationCfg.proactive_warmup_ms ?? 120000), 30000, 1800000)
-    ),
-    proactiveWindowMs: Math.round(
-      clampNumber(Number(conversationCfg.proactive_window_ms ?? 3600000), 600000, 86400000)
-    ),
-    proactivePollIntervalMs: Math.round(
-      clampNumber(Number(conversationCfg.proactive_poll_interval_ms ?? 60000), 30000, 600000)
-    ),
-    maxFollowupsPerWindow: Math.round(
-      clampNumber(Number(conversationCfg.max_followups_per_window ?? 1), 0, 4)
-    ),
-    silenceFollowupMinMs: Math.round(
-      clampNumber(Number(conversationCfg.silence_followup_min_ms ?? 180000), 30000, 1800000)
-    ),
-    interruptTtsOnUserSpeech: conversationCfg.interrupt_tts_on_user_speech === true
-  };
-  if (!(Number(state.proactiveSchedulerStartedAt || 0) > 0)) {
-    state.proactiveSchedulerStartedAt = Date.now();
-  }
-  syncProactiveSchedulerPolling();
-  const autoChatTuningCfg = observeCfg && typeof observeCfg.auto_chat_tuning === "object"
-    ? observeCfg.auto_chat_tuning
-    : {};
-  state.autoChatTuning = {
-    triggerBaseThreshold: clampNumber(
-      Number(autoChatTuningCfg.trigger_base_threshold ?? 1.03),
-      0.4,
-      3.0
-    ),
-    shortSilencePenalty: clampNumber(
-      Number(autoChatTuningCfg.short_silence_penalty ?? 0.35),
-      0,
-      1.2
-    ),
-    longSilenceBonus: clampNumber(
-      Number(autoChatTuningCfg.long_silence_bonus ?? 0.14),
-      0,
-      1.0
-    ),
-    emotionBonus: clampNumber(
-      Number(autoChatTuningCfg.emotion_bonus ?? 0.12),
-      0,
-      0.8
-    ),
-    repeatReasonPenalty: clampNumber(
-      Number(autoChatTuningCfg.repeat_reason_penalty ?? 0.44),
-      0,
-      1.2
-    ),
-    repeatTopicPenalty: clampNumber(
-      Number(autoChatTuningCfg.repeat_topic_penalty ?? 0.48),
-      0,
-      1.2
-    ),
-    burstPenalty: clampNumber(
-      Number(autoChatTuningCfg.burst_penalty ?? 0.32),
-      0,
-      1.2
-    ),
-    recentAutoPenalty: clampNumber(
-      Number(autoChatTuningCfg.recent_auto_penalty ?? 0.45),
-      0,
-      1.5
-    ),
-    scoreJitter: clampNumber(
-      Number(autoChatTuningCfg.score_jitter ?? 0.12),
-      0,
-      0.8
-    ),
-    repeatReasonWindowMs: Math.round(
-      clampNumber(
-        Number(autoChatTuningCfg.repeat_reason_window_ms ?? (14 * 60 * 1000)),
-        2 * 60 * 1000,
-        120 * 60 * 1000
-      )
-    ),
-    repeatTopicWindowMs: Math.round(
-      clampNumber(
-        Number(autoChatTuningCfg.repeat_topic_window_ms ?? (22 * 60 * 1000)),
-        2 * 60 * 1000,
-        150 * 60 * 1000
-      )
-    ),
-    burstResetWindowMs: Math.round(
-      clampNumber(
-        Number(autoChatTuningCfg.burst_reset_window_ms ?? (18 * 60 * 1000)),
-        3 * 60 * 1000,
-        150 * 60 * 1000
-      )
-    ),
-    maxTopicHintChars: Math.round(
-      clampNumber(
-        Number(autoChatTuningCfg.max_topic_hint_chars ?? 42),
-        12,
-        120
-      )
-    )
-  };
-  state.dailyGreetingEnabled = observeCfg.daily_greeting_enabled === true;
-  state.dailyGreetingHour = Math.round(
-    clampNumber(Number(observeCfg.daily_greeting_hour || 8), 0, 23)
-  );
-  state.dailyGreetingMinute = Math.round(
-    clampNumber(Number(observeCfg.daily_greeting_minute || 0), 0, 59)
-  );
-  state.dailyGreetingPrompt = String(observeCfg.daily_greeting_prompt || "").trim()
-    || "请你像桌宠一样主动向我说早安，简短自然地问好，再给我一句鼓励今天认真努力的暖心鸡汤。控制在两三句内，不要太像模板。";
-  // 主动说话：从 config 读取开关和随机间隔范围
-  const prevAutoChatEnabled = state.autoChatEnabled;
-  state.autoChatEnabled = observeCfg.auto_chat_enabled === true;
-  state.autoChatMinMs = Math.max(60000, Number(observeCfg.auto_chat_min_ms || 180000));
-  state.autoChatMaxMs = Math.max(state.autoChatMinMs + 30000, Number(observeCfg.auto_chat_max_ms || 480000));
-  if (state.autoChatEnabled && !prevAutoChatEnabled) {
-    startAutoChatLoop();
-  } else if (!state.autoChatEnabled && prevAutoChatEnabled) {
-    stopAutoChatLoop();
-  }
-  const keepRecent = Math.max(4, Math.min(40, Number(historySummaryCfg.keep_recent_messages || 8)));
-  const triggerN = Math.max(8, Math.min(80, Number(historySummaryCfg.trigger_messages || 14)));
-  state.historyMaxMessages = Math.max(12, Math.min(120, triggerN + keepRecent + 8));
-  state.styleAutoEnabled = styleCfg.auto !== false;
-  state.manualTalkStyle = normalizeTalkStyle(styleCfg.manual || "neutral");
-  state.motionEnabled = motionCfg.enabled !== false;
-  state.motionQuietDuringSpeech = motionCfg.quiet_speech !== false;
-  state.motionIntensity = normalizeMotionIntensity(
-    motionCfg.intensity || motionCfg.action_intensity || "normal"
-  );
-  state.speechMotionStrength = clampNumber(
-    Number(motionCfg.speech_motion_strength ?? motionCfg.speech_body_motion_strength ?? 1.35),
-    0.6,
-    2.2
-  );
-  state.motionComboEnabled = motionCfg.combo_enabled !== false;
-  state.expressionEnabled = motionCfg.expression_enabled !== false;
-  state.expressionStrength = clampNumber(
-    Number(motionCfg.expression_strength || 1),
-    0.2,
-    2.0
-  );
-  state.motionCooldownMs = Math.round(
-    clampNumber(Number(motionCfg.cooldown_ms || 1200), 250, 8000)
-  );
-  state.speakingMotionCooldownMs = Math.round(
-    clampNumber(Number(motionCfg.speaking_cooldown_ms || 1600), 500, 8000)
-  );
-  state.idleMotionEnabled = motionCfg.idle_enabled !== false;
-  state.idleMotionMinMs = Math.round(
-    clampNumber(Number(motionCfg.idle_min_ms || 12000), 4000, 90000)
-  );
-  state.idleMotionMaxMs = Math.round(
-    clampNumber(Number(motionCfg.idle_max_ms || 24000), state.idleMotionMinMs + 1000, 150000)
-  );
-  loadChatHistoryFromStorage();
-  loadRemindersFromStorage();
-  loadDailyGreetingState();
-  loadEmotionStats();
-  ui.assistantName.textContent = resolveAssistantDisplayName("Mochi");
-  updateObserveButton();
-  updateMicMeter(0);
-}
-
-async function initLive2D() {
-  const canvas = document.getElementById("live2d-canvas");
-  const rawModelPath = String(state.config?.model_path || "").trim();
-  const normalizedModelPath = rawModelPath.replace(/\\/g, "/").toLowerCase();
-  const live2dPathMissing = !rawModelPath || normalizedModelPath.includes("your_model");
-
-  const showLive2DSetupGuide = (statusText, guideText) => {
-    setStatus(statusText);
-    if (state.live2dGuideShown) {
-      return;
-    }
-    state.live2dGuideShown = true;
-    appendMessage("assistant", guideText);
-  };
-
-  if (live2dPathMissing) {
-    showLive2DSetupGuide(
-      "未配置 Live2D 模型",
-      "还没有检测到可用的 Live2D 模型。你可以先直接聊天体验；随后把模型放到 web/models 目录，并在 config.json 设置 model_path（示例：/models/hiyori/hiyori.model3.json）。"
-    );
-    return;
-  }
-
-  if (!window.Live2DCubismCore) {
-    setStatus("CubismCore 缺失");
-    appendMessage("assistant", "Cubism 核心未加载，请强制刷新（Ctrl+F5）。");
-    return;
-  }
-  if (!window.PIXI || !PIXI.live2d || !PIXI.live2d.Live2DModel) {
-    setStatus("Live2D 运行时缺失");
-    appendMessage("assistant", "Live2D 运行时未加载，请强制刷新（Ctrl+F5）。");
-    return;
-  }
-  state.pixiApp = new PIXI.Application({
-    view: canvas,
-    autoStart: true,
-    resizeTo: window,
-    backgroundAlpha: 0,
-    antialias: true
-  });
-
-  const { Live2DModel } = PIXI.live2d;
-  try {
-    const model = await Live2DModel.from(state.config.model_path);
-    state.model = model;
-    window.__petModel = model;
-    setModelMotionDefinitions(model);
-    state.pixiApp.stage.addChild(model);
-    placeModel();
-    attachDrag(model);
-    setupClickthroughHitTest();
-    scheduleIdleMotionLoop();
-    (function patchCoreModelUpdate(m) {
-      const coreModel = m.internalModel && m.internalModel.coreModel;
-      if (!coreModel || typeof coreModel.update !== "function") {
-        return;
-      }
-      const _orig = coreModel.update.bind(coreModel);
-      coreModel.update = function () {
-        if (state.model === m && !state.dragData && !state.windowDragActive) {
-          applyStyleExpressionLayer();
-          updateMicroMotionLayer();
-        }
-        return _orig();
-      };
-    }(model));
-
-    state.pixiApp.ticker.add(() => {
-      if (!state.model) {
-        return;
-      }
-      if (!state.animating && !state.windowDragActive && !state.browserDragActive) {
-        const t = performance.now() / 1000;
-        const styleProfile = getStyleExpressionProfile(state.currentTalkStyle || "neutral");
-        const cadence = getActiveModelCadence();
-        const floatScale = clampNumber(
-          (Number(styleProfile.floatScale) || 1) * (Number(cadence?.floatAmp) || 1),
-          0.68,
-          1.36
-        );
-        const floatSpeed = Math.max(0.72, Math.min(1.4, Number(cadence?.floatSpeed) || 1));
-        const floatY = state.baseTransform.y + Math.sin(t * 1.5 * floatSpeed) * (4 * floatScale);
-        const floatRot = state.baseTransform.rotation + Math.sin(t * 1.2 * floatSpeed) * (0.02 * floatScale);
-        state.model.rotation = Number.isFinite(floatRot) ? floatRot : 0;
-        state.model.y = Number.isFinite(floatY) ? floatY : state.baseTransform.y;
-      }
+function getLive2DLayoutController() {
+  if (!live2dLayoutController && typeof LIVE2D_LAYOUT_CONTROLLER.createController === "function") {
+    live2dLayoutController = LIVE2D_LAYOUT_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      documentObject: document,
+      performanceObject: performance,
+      requestAnimationFrame,
+      cancelAnimationFrame,
+      clampNumber,
+      desktopWindowController: DESKTOP_WINDOW_CONTROLLER,
+      triggerTapMotion,
+      finalizeDesktopDrag,
+      stopDesktopWindowDrag,
+      tapMaxDurationMs: TAP_MAX_DURATION_MS,
+      tapMoveThreshold: TAP_MOVE_THRESHOLD
     });
-
-    const i = model.internalModel || {};
-    const info = `模型已就绪（${Math.round(model.width)}x${Math.round(model.height)}，动作组 ${state.availableMotionGroups.length}）`;
-    console.log("[pet] model metrics", {
-      width: model.width,
-      height: model.height,
-      internalWidth: i.width,
-      internalHeight: i.height,
-      originalWidth: i.originalWidth,
-      originalHeight: i.originalHeight,
-      x: model.x,
-      y: model.y,
-      scaleX: model.scale?.x,
-      scaleY: model.scale?.y
-    });
-    // --- Tight-fit: resize Electron window to match model bounds ---
-    if (
-      state.desktopMode &&
-      state.uiView === "model" &&
-      state.desktopBridge === "electron" &&
-      state._stableModelBounds
-    ) {
-      const bounds = state._stableModelBounds;
-      const bw = Math.round(bounds.right - bounds.left);
-      const bh = Math.round(bounds.bottom - bounds.top);
-      // Add padding so the model isn't clipped at edges.
-      const pad = 40;
-      const fitW = Math.max(200, bw + pad * 2);
-      const fitH = Math.max(300, bh + pad);
-      const canvas = state.pixiApp.view;
-      const rect = canvas.getBoundingClientRect();
-      // Only resize if current window is significantly larger than needed.
-      if (rect.width > fitW * 1.15 || rect.height > fitH * 1.15) {
-        if (typeof window.electronAPI?.resizeWindow === "function") {
-          window.electronAPI.resizeWindow(fitW, fitH);
-          // Re-place model after resize settles.
-          setTimeout(() => { placeModel(); }, 80);
-        }
-      }
-    }
-    setStatus(info);
-  } catch (err) {
-    console.error(err);
-    stopIdleMotionLoop();
-    const detail = String(err?.message || err || "").trim();
-    const missingFile = /not\s*found|failed\s*to\s*fetch|404|enoent/i.test(detail);
-    if (missingFile) {
-      showLive2DSetupGuide(
-        "未找到 Live2D 模型",
-        `未找到 Live2D 模型文件：${rawModelPath || "(空)"}。请确认模型文件已放在 web/models 下，并把 config.json 的 model_path 指向 .model3.json 文件。`
-      );
-      return;
-    }
-    showLive2DSetupGuide(
-      "模型加载失败，请检查 model_path",
-      "Live2D 初始化失败。你可以先继续使用聊天功能，再检查 model_path 是否指向可访问的 .model3.json 文件。"
-    );
-    return;
   }
-
-  window.addEventListener("resize", handleWindowResize);
+  return live2dLayoutController || LIVE2D_LAYOUT_CONTROLLER;
 }
 
-function placeModel() {
-  if (!state.model || !state.pixiApp) {
-    return;
-  }
-  const model = state.model;
-  const w = state.pixiApp.renderer.width;
-  const h = state.pixiApp.renderer.height;
-  if (!Number.isFinite(w) || !Number.isFinite(h) || w < 120 || h < 120) {
-    return;
-  }
-  const sx = Math.max(0.0001, Number(model.scale?.x) || 1);
-  const sy = Math.max(0.0001, Number(model.scale?.y) || 1);
-  const internal = model.internalModel || {};
-  const baseHeightCandidates = [
-    Number(internal.originalHeight),
-    Number(internal.height),
-    Number(model.height) / sy,
-    Number(model.height)
-  ];
-  const baseWidthCandidates = [
-    Number(internal.originalWidth),
-    Number(internal.width),
-    Number(model.width) / sx,
-    Number(model.width)
-  ];
-  const baseHeight = baseHeightCandidates.find((n) => Number.isFinite(n) && n > 1) || null;
-  const baseWidth = baseWidthCandidates.find((n) => Number.isFinite(n) && n > 1) || null;
+function placeModel() { return getLive2DLayoutController().placeModel(); }
+function clampModelVisibleInViewport(model) { return getLive2DLayoutController().clampModelVisibleInViewport(model); }
+function handleWindowResize() { return getLive2DLayoutController().handleWindowResize(); }
+function getModelInteractiveBounds() { return getLive2DLayoutController().getModelInteractiveBounds(); }
+function isPointInModelDragHotzone(x, y, bounds) { return getLive2DLayoutController().isPointInModelDragHotzone(x, y, bounds); }
+function isPointOverVisibleModelArea(clientX, clientY) { return getLive2DLayoutController().isPointOverVisibleModelArea(clientX, clientY); }
+function attachDrag(model) { return getLive2DLayoutController().attachDrag(model); }
+function setupClickthroughHitTest() { return getLive2DLayoutController().setupClickthroughHitTest(); }
+function startModelMouseGazePolling() { return getLive2DLayoutController().startModelMouseGazePolling(); }
 
-  // Fallback to a conservative scale when runtime reports odd initial size.
-  let scale = 0.28;
-  if (baseHeight) {
-    const targetHeight = h * 0.76;
-    scale = Math.max(0.08, Math.min(1.4, targetHeight / baseHeight));
-  } else if (baseWidth) {
-    const targetWidth = w * 0.34;
-    scale = Math.max(0.08, Math.min(1.4, targetWidth / baseWidth));
-  }
-  scale *= state.modelConfig?.scale || 1;
-  scale = Math.max(0.05, Math.min(4.0, scale));
+let emotionMoodControllerInstance = null;
 
-  model.scale.set(scale);
-  if (state.desktopMode && state.uiView === "model") {
-    if (!Number.isFinite(state.modelPosX) || !Number.isFinite(state.modelPosY)) {
-      state.modelPosX = w * 0.5;
-      state.modelPosY = h * 0.9;
-    }
-    model.x = state.modelPosX;
-    model.y = state.modelPosY;
-  } else {
-    model.x = w * (state.modelConfig?.x_ratio ?? 0.26);
-    model.y = h * (state.modelConfig?.y_ratio ?? 0.96);
+function getEmotionMoodController() {
+  if (!emotionMoodControllerInstance && typeof EMOTION_MOOD_CONTROLLER.createController === "function") {
+    emotionMoodControllerInstance = EMOTION_MOOD_CONTROLLER.createController();
   }
-  if (model.anchor && typeof model.anchor.set === "function") {
-    model.anchor.set(0.5, 1.0);
-  }
-  model.visible = true;
-  model.alpha = 1;
-  if (state.desktopMode && state.uiView === "model") {
-    clampModelVisibleInViewport(model);
-    state.modelPosX = Number(model.x) || (w * 0.5);
-    state.modelPosY = Number(model.y) || (h * 0.9);
-  }
-  state.layoutWidth = w;
-  state.layoutHeight = h;
-  state.baseTransform = {
-    x: model.x,
-    y: model.y,
-    scale: scale,
-    rotation: 0
-  };
+  return emotionMoodControllerInstance || EMOTION_MOOD_CONTROLLER;
 }
-
-function clampModelVisibleInViewport(model) {
-  if (!model || !state.pixiApp) {
-    return;
-  }
-  const rw = Number(state.pixiApp.renderer?.width) || 0;
-  const rh = Number(state.pixiApp.renderer?.height) || 0;
-  if (rw < 120 || rh < 120) {
-    return;
-  }
-  const mw = Math.max(80, Number(model.width) || rw * 0.32);
-  const mh = Math.max(120, Number(model.height) || rh * 0.6);
-  const marginX = Math.max(20, Math.min(rw * 0.18, mw * 0.24));
-  const minX = marginX;
-  const maxX = rw - marginX;
-  const minY = Math.max(70, Math.min(rh * 0.6, mh * 0.28));
-  const maxY = rh - 4;
-  model.x = clampNumber(Number(model.x) || 0, minX, maxX);
-  model.y = clampNumber(Number(model.y) || 0, minY, maxY);
-  if (!model.visible) {
-    model.visible = true;
-  }
-  if (!Number.isFinite(Number(model.alpha)) || model.alpha < 0.98) {
-    model.alpha = 1;
-  }
-}
-
-function handleWindowResize() {
-  if (!state.model || !state.pixiApp) {
-    return;
-  }
-  if (state.resizeRaf) {
-    cancelAnimationFrame(state.resizeRaf);
-  }
-  state.resizeRaf = requestAnimationFrame(() => {
-    state.resizeRaf = 0;
-    const now = performance.now();
-    if (state.windowDragActive || now < state.suspendRelayoutUntil) {
-      return;
-    }
-    const rw = Number(state.pixiApp.renderer?.width) || 0;
-    const rh = Number(state.pixiApp.renderer?.height) || 0;
-    if (!rw || !rh) {
-      return;
-    }
-    const dw = Math.abs(rw - state.layoutWidth);
-    const dh = Math.abs(rh - state.layoutHeight);
-    if (dw < 2 && dh < 2) {
-      return;
-    }
-    placeModel();
-  });
-}
-
-function attachDrag(model) {
-  if (state.useNativeWindowDrag) {
-    // In model-only Electron window, rely on native drag region for stability.
-    model.interactive = false;
-    model.cursor = "default";
-    return;
-  }
-  model.interactive = true;
-  model.cursor = "grab";
-
-  const maybeTriggerTapAction = () => {
-    const downAt = Number(state.lastPointerDownAt) || 0;
-    if (!downAt) {
-      return;
-    }
-    const elapsed = performance.now() - downAt;
-    const shouldTap = !state.pointerDragMoved && elapsed <= TAP_MAX_DURATION_MS;
-    state.lastPointerDownAt = 0;
-    state.pointerDragMoved = false;
-    if (shouldTap) {
-      triggerTapMotion();
-    }
-  };
-
-  model.on("pointerdown", (e) => {
-    if (state.desktopMode && state.desktopBridge === "electron") {
-      const ev = e?.data?.originalEvent || null;
-      const cx = Number(ev?.clientX);
-      const cy = Number(ev?.clientY);
-      if (!Number.isFinite(cx) || !Number.isFinite(cy)) {
-        return;
-      }
-      if (!isPointOverVisibleModelArea(cx, cy)) {
-        return;
-      }
-    }
-    const g = e.data?.global || { x: 0, y: 0 };
-    state.lastPointerDownAt = performance.now();
-    state.lastPointerDownGlobal = { x: Number(g.x) || 0, y: Number(g.y) || 0 };
-    state.pointerDragMoved = false;
-    state.windowDragActive = false;
-    state.dragWindowAccumX = 0;
-    state.dragWindowAccumY = 0;
-    state.dragData = {
-      data: e.data,
-      lastGlobal: { x: g.x, y: g.y }
-    };
-    if (state.desktopMode) {
-      document.body.classList.add("dragging-window");
-      document.documentElement.classList.add("dragging-window");
-      if (state.model) {
-        state.model.visible = true;
-        state.model.alpha = 1;
-      }
-    }
-    // Fullscreen overlay: no window drag session needed.
-    model.cursor = "grabbing";
-    if (state.desktopMode && state.desktopBridge === "electron") {
-      const start = state.dragData?.lastGlobal || { x: Number(g.x) || 0, y: Number(g.y) || 0 };
-      const grabOffsetX = (Number(state.modelPosX) || Number(state.model?.x) || 0) - Number(start.x || 0);
-      const grabOffsetY = (Number(state.modelPosY) || Number(state.model?.y) || 0) - Number(start.y || 0);
-      const onDocMove = (ev) => {
-        if (!state.dragData || !state.model) {
-          document.removeEventListener("pointermove", onDocMove);
-          return;
-        }
-        const canvas = state.pixiApp?.view;
-        if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-        const renderer = state.pixiApp.renderer;
-        const rw = Number(renderer?.width) || rect.width;
-        const rh = Number(renderer?.height) || rect.height;
-        const gx = (ev.clientX - rect.left) * (rw / rect.width);
-        const gy = (ev.clientY - rect.top) * (rh / rect.height);
-        if (!Number.isFinite(gx) || !Number.isFinite(gy)) {
-          return;
-        }
-        state.dragData.lastGlobal = { x: gx, y: gy };
-        const dxTap = Number(gx) - Number(state.lastPointerDownGlobal?.x || 0);
-        const dyTap = Number(gy) - Number(state.lastPointerDownGlobal?.y || 0);
-        if ((dxTap * dxTap + dyTap * dyTap) > (TAP_MOVE_THRESHOLD * TAP_MOVE_THRESHOLD)) {
-          state.pointerDragMoved = true;
-        }
-        const nextX = gx + grabOffsetX;
-        const nextY = gy + grabOffsetY;
-        if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
-          return;
-        }
-        state.modelPosX = nextX;
-        state.modelPosY = nextY;
-        state.model.x = state.modelPosX;
-        state.model.y = state.modelPosY;
-        state.baseTransform.x = state.modelPosX;
-        state.baseTransform.y = state.modelPosY;
-        state.suspendRelayoutUntil = performance.now() + 240;
-      };
-      document.addEventListener("pointermove", onDocMove);
-      const cleanup = () => {
-        document.removeEventListener("pointermove", onDocMove);
-        document.removeEventListener("pointerup", cleanup);
-        window.removeEventListener("pointerup", cleanup);
-      };
-      document.addEventListener("pointerup", cleanup);
-      window.addEventListener("pointerup", cleanup);
-    } else if (!state.desktopMode) {
-      // 浏览器模式：document 级监听，保证鼠标移出模型区域后拖动不中断
-      state.browserDragActive = true;
-      const canvas = state.pixiApp?.view;
-      const scaleX = canvas
-        ? (Number(state.pixiApp?.renderer?.width) || canvas.offsetWidth) /
-          (canvas.getBoundingClientRect().width || 1)
-        : 1;
-      const scaleY = canvas
-        ? (Number(state.pixiApp?.renderer?.height) || canvas.offsetHeight) /
-          (canvas.getBoundingClientRect().height || 1)
-        : 1;
-      const grabOffsetX = (Number(state.model?.x) || 0) - (Number(g.x) || 0);
-      const grabOffsetY = (Number(state.model?.y) || 0) - (Number(g.y) || 0);
-
-      const onDocMoveBrowser = (ev) => {
-        if (!state.browserDragActive || !state.model || !state.dragData) return;
-        const c = state.pixiApp?.view;
-        if (!c) return;
-        const rect = c.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return;
-        const rw = Number(state.pixiApp.renderer?.width) || rect.width;
-        const rh = Number(state.pixiApp.renderer?.height) || rect.height;
-        const px = (ev.clientX - rect.left) * (rw / rect.width) + grabOffsetX;
-        const py = (ev.clientY - rect.top) * (rh / rect.height) + grabOffsetY;
-        const dxTap = (ev.clientX - rect.left) * (rw / rect.width) -
-                      Number(state.lastPointerDownGlobal?.x || 0);
-        const dyTap = (ev.clientY - rect.top) * (rh / rect.height) -
-                      Number(state.lastPointerDownGlobal?.y || 0);
-        if ((dxTap * dxTap + dyTap * dyTap) > (TAP_MOVE_THRESHOLD * TAP_MOVE_THRESHOLD)) {
-          state.pointerDragMoved = true;
-        }
-        state.model.x = px;
-        state.model.y = py;
-        state.baseTransform.x = px;
-        state.baseTransform.y = py;
-      };
-
-      const cleanupBrowser = () => {
-        state.browserDragActive = false;
-        document.removeEventListener("pointermove", onDocMoveBrowser);
-        document.removeEventListener("pointerup", cleanupBrowser);
-        window.removeEventListener("pointerup", cleanupBrowser);
-        maybeTriggerTapAction();
-        model.cursor = "grab";
-      };
-
-      document.addEventListener("pointermove", onDocMoveBrowser);
-      document.addEventListener("pointerup", cleanupBrowser);
-      window.addEventListener("pointerup", cleanupBrowser);
-    }
-  });
-  model.on("pointerup", () => {
-    if (
-      state.windowDragActive
-      && state.desktopCanMoveWindow
-      && state.desktopBridge !== "electron"
-    ) {
-      finalizeDesktopDrag();
-    }
-    state.dragData = null;
-    stopDesktopWindowDrag();
-    maybeTriggerTapAction();
-    model.cursor = "grab";
-  });
-  model.on("pointerupoutside", () => {
-    if (
-      state.windowDragActive
-      && state.desktopCanMoveWindow
-      && state.desktopBridge !== "electron"
-    ) {
-      finalizeDesktopDrag();
-    }
-    state.dragData = null;
-    stopDesktopWindowDrag();
-    model.cursor = "grab";
-  });
-  model.on("pointercancel", () => {
-    if (
-      state.windowDragActive
-      && state.desktopCanMoveWindow
-      && state.desktopBridge !== "electron"
-    ) {
-      finalizeDesktopDrag();
-    }
-    state.dragData = null;
-    stopDesktopWindowDrag();
-    state.lastPointerDownAt = 0;
-    state.pointerDragMoved = false;
-    model.cursor = "grab";
-  });
-
-  const releaseDrag = () => {
-    if (state.browserDragActive) return;
-    if (!state.dragData) {
-      return;
-    }
-    if (
-      state.windowDragActive
-      && state.desktopCanMoveWindow
-      && state.desktopBridge !== "electron"
-    ) {
-      finalizeDesktopDrag();
-    }
-    state.dragData = null;
-    stopDesktopWindowDrag();
-    state.lastPointerDownAt = 0;
-    state.pointerDragMoved = false;
-    model.cursor = "grab";
-  };
-  window.addEventListener("mouseup", releaseDrag);
-  window.addEventListener("blur", releaseDrag);
-
-  model.on("pointermove", (e) => {
-    if (!state.dragData) {
-      return;
-    }
-
-    const globalNow = e.data?.global || state.dragData?.data?.global;
-    if (globalNow) {
-      const dxTap = Number(globalNow.x) - Number(state.lastPointerDownGlobal?.x || 0);
-      const dyTap = Number(globalNow.y) - Number(state.lastPointerDownGlobal?.y || 0);
-      if ((dxTap * dxTap + dyTap * dyTap) > (TAP_MOVE_THRESHOLD * TAP_MOVE_THRESHOLD)) {
-        state.pointerDragMoved = true;
-      }
-    }
-
-    if (state.desktopMode && state.desktopBridge === "electron") {
-      // Electron desktop mode uses document-level pointermove for stable drag tracking.
-      return;
-    }
-
-    const pos = state.dragData.data.getLocalPosition(state.pixiApp.stage);
-    const px = Number(pos?.x);
-    const py = Number(pos?.y);
-    if (!Number.isFinite(px) || !Number.isFinite(py)) {
-      return;
-    }
-    model.x = px;
-    model.y = py;
-    if (state.desktopMode) {
-      state.modelPosX = px;
-      state.modelPosY = py;
-      clampModelVisibleInViewport(model);
-      state.modelPosX = Number(model.x) || state.modelPosX;
-      state.modelPosY = Number(model.y) || state.modelPosY;
-      state.suspendRelayoutUntil = performance.now() + 180;
-    }
-    state.baseTransform.x = model.x;
-    state.baseTransform.y = model.y;
-  });
-
-  const canvas = state.pixiApp?.view;
-  if (canvas) {
-    canvas.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      if (!state.model) return;
-      const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
-      const currentScale = Number(state.model.scale?.x) || 1;
-      const newScale = Math.max(0.05, Math.min(4.0, currentScale * factor));
-      state.model.scale.set(newScale);
-      state.baseTransform.scale = newScale;
-      const baseAuto = newScale / Math.max(0.001, Number(state.modelConfig?.scale) || 1);
-      if (Number.isFinite(baseAuto) && baseAuto > 0) {
-        state.modelConfig.scale = newScale / baseAuto;
-      }
-    }, { passive: false });
-  }
-}
-
-function getModelInteractiveBounds() {
-  if (!state.model || !state.pixiApp) return null;
-  let bounds = state._stableModelBounds;
-  if (!bounds) {
-    const mw = Number(state.model.width) || 0;
-    const mh = Number(state.model.height) || 0;
-    if (mw <= 0 || mh <= 0) return null;
-    bounds = {
-      left: Number(state.model.x) - mw * 0.5,
-      right: Number(state.model.x) + mw * 0.5,
-      top: Number(state.model.y) - mh,
-      bottom: Number(state.model.y)
-    };
-  }
-  const left = Number(bounds.left);
-  const right = Number(bounds.right);
-  const top = Number(bounds.top);
-  const bottom = Number(bounds.bottom);
-  if (
-    !Number.isFinite(left) || !Number.isFinite(right) ||
-    !Number.isFinite(top) || !Number.isFinite(bottom)
-  ) {
-    return null;
-  }
-  const width = right - left;
-  const height = bottom - top;
-  if (width < 20 || height < 20) {
-    return null;
-  }
-  // Keep a conservative center zone for drag/click-through hit test.
-  // Horizontal stays narrow; vertical is widened to include head/body/legs.
-  const insetX = clampNumber(width * 0.30, 20, 180);
-  const insetTop = clampNumber(height * 0.10, 8, 72);
-  const insetBottom = clampNumber(height * 0.08, 6, 64);
-  const hitLeft = left + insetX;
-  const hitRight = right - insetX;
-  const hitTop = top + insetTop;
-  const hitBottom = bottom - insetBottom;
-  if (hitRight - hitLeft < 20 || hitBottom - hitTop < 20) {
-    return null;
-  }
-  return {
-    left: hitLeft,
-    right: hitRight,
-    top: hitTop,
-    bottom: hitBottom
-  };
-}
-
-function isPointInModelDragHotzone(x, y, bounds) {
-  if (!bounds) return false;
-  const left = Number(bounds.left);
-  const right = Number(bounds.right);
-  const top = Number(bounds.top);
-  const bottom = Number(bounds.bottom);
-  if (
-    !Number.isFinite(left) || !Number.isFinite(right) ||
-    !Number.isFinite(top) || !Number.isFinite(bottom) ||
-    !Number.isFinite(x) || !Number.isFinite(y)
-  ) {
-    return false;
-  }
-  const width = right - left;
-  const height = bottom - top;
-  if (width <= 0 || height <= 0) {
-    return false;
-  }
-  const centerX = (left + right) * 0.5;
-  const yRatio = clampNumber((y - top) / height, 0, 1);
-  let halfWidthRatio = 0.22;
-  if (yRatio < 0.22) {
-    // Head: narrower center band to preserve lateral click-through.
-    halfWidthRatio = 0.20 + (yRatio / 0.22) * 0.03;
-  } else if (yRatio < 0.64) {
-    // Torso: widest draggable region.
-    halfWidthRatio = 0.23 + ((yRatio - 0.22) / 0.42) * 0.13;
-  } else {
-    // Legs: taper back to a narrow center strip.
-    halfWidthRatio = 0.24 - ((yRatio - 0.64) / 0.36) * 0.05;
-  }
-  const halfWidth = clampNumber(width * halfWidthRatio, 10, width * 0.48);
-  return Math.abs(x - centerX) <= halfWidth;
-}
-
-function isPointOverVisibleModelArea(clientX, clientY) {
-  if (!state.model || !state.pixiApp) return false;
-  const bounds = getModelInteractiveBounds();
-  if (!bounds) return false;
-  const canvas = state.pixiApp.view;
-  const rect = canvas.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return false;
-  const renderer = state.pixiApp.renderer;
-  const rw = Number(renderer?.width) || 0;
-  const rh = Number(renderer?.height) || 0;
-  if (rw <= 0 || rh <= 0) return false;
-  const x = (clientX - rect.left) * (rw / rect.width);
-  const y = (clientY - rect.top) * (rh / rect.height);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
-  const pad = 2;
-  const inStrictBounds = (
-    x >= bounds.left - pad &&
-    x <= bounds.right + pad &&
-    y >= bounds.top - pad &&
-    y <= bounds.bottom + pad
-  );
-  if (!inStrictBounds) return false;
-  if (!isPointInModelDragHotzone(x, y, bounds)) return false;
-  // Prefer runtime hit areas when available, but do not hard-reject when
-  // hit areas miss while still inside strict conservative bounds.
-  try {
-    const hitFn = state.model && typeof state.model.hitTest === "function"
-      ? state.model.hitTest.bind(state.model)
-      : null;
-    if (!hitFn) {
-      return true;
-    }
-    const hit = hitFn(x, y);
-    if (Array.isArray(hit)) {
-      if (hit.length > 0) {
-        return true;
-      }
-      return true;
-    }
-    if (typeof hit === "boolean") {
-      if (hit) {
-        return true;
-      }
-      return true;
-    }
-  } catch (_) {
-    // Fallback to strict bounds only.
-  }
-  return true;
-}
-
-function isPointInModelDragHotzone(x, y, bounds) {
-  if (!bounds) return false;
-  const left = Number(bounds.left);
-  const right = Number(bounds.right);
-  const top = Number(bounds.top);
-  const bottom = Number(bounds.bottom);
-  if (
-    !Number.isFinite(left) || !Number.isFinite(right) ||
-    !Number.isFinite(top) || !Number.isFinite(bottom) ||
-    !Number.isFinite(x) || !Number.isFinite(y)
-  ) {
-    return false;
-  }
-  const width = right - left;
-  const height = bottom - top;
-  if (width <= 0 || height <= 0) return false;
-  const centerX = (left + right) * 0.5;
-  const rawRatio = (y - top) / height;
-  const yRatio = Math.max(0, Math.min(1, rawRatio));
-  let halfWidthRatio = 0.22;
-  if (yRatio < 0.22) {
-    halfWidthRatio = 0.20 + (yRatio / 0.22) * 0.03;
-  } else if (yRatio < 0.64) {
-    halfWidthRatio = 0.23 + ((yRatio - 0.22) / 0.42) * 0.13;
-  } else {
-    halfWidthRatio = 0.24 - ((yRatio - 0.64) / 0.36) * 0.05;
-  }
-  const halfWidth = Math.max(10, Math.min(width * 0.48, width * halfWidthRatio));
-  return Math.abs(x - centerX) <= halfWidth;
-}
-
-function setupClickthroughHitTest() {
-  if (state.desktopBridge !== "electron") return;
-  if (typeof window.electronAPI?.setClickthrough !== "function") return;
-  let lastClickthrough = true;
-  document.addEventListener("mousemove", (e) => {
-    if (state.windowDragActive) {
-      if (lastClickthrough) {
-        window.electronAPI.setClickthrough(false);
-        lastClickthrough = false;
-      }
-      return;
-    }
-    const over = isPointOverVisibleModelArea(e.clientX, e.clientY);
-    const want = !over;
-    if (want !== lastClickthrough) {
-      lastClickthrough = want;
-      window.electronAPI.setClickthrough(want);
-    }
-  });
-}
-
-function startModelMouseGazePolling() {
-  if (state.uiView !== "model") {
-    return;
-  }
-  if (state.mouseGazePollTimer) {
-    return;
-  }
-  if (
-    typeof window.electronAPI?.getCursorScreenPoint !== "function" ||
-    typeof window.electronAPI?.getModelWindowBounds !== "function"
-  ) {
-    return;
-  }
-  let busy = false;
-  state.mouseGazePollTimer = window.setInterval(async () => {
-    if (busy) {
-      return;
-    }
-    busy = true;
-    try {
-      const [cursor, bounds] = await Promise.all([
-        window.electronAPI.getCursorScreenPoint(),
-        window.electronAPI.getModelWindowBounds()
-      ]);
-      if (!cursor || !bounds) {
-        return;
-      }
-      const width = Math.max(1, Number(bounds.width) || 0);
-      const height = Math.max(1, Number(bounds.height) || 0);
-      const centerX = Number(bounds.x) + width / 2;
-      const centerY = Number(bounds.y) + height / 2;
-      const relX = clampNumber((Number(cursor.x) - centerX) / (width / 2), -1, 1);
-      const relY = clampNumber((Number(cursor.y) - centerY) / (height / 2), -1, 1);
-      const gazeX = relX * 0.55;
-      const gazeY = -relY * 0.38;
-      state.mouseGazeTargetX = clampNumber(gazeX, -0.55, 0.55);
-      state.mouseGazeTargetY = clampNumber(gazeY, -0.38, 0.38);
-    } catch (_) {
-    } finally {
-      busy = false;
-    }
-  }, 33);
-}
-
-const MOOD_KEYWORDS = {
-  happy: [
-    "哈哈", "嘻嘻", "笑死", "开心", "高兴", "太好了", "太棒了", "不错", "喜欢",
-    "爱你", "赞", "可爱", "有意思", "好玩", "真好", "厉害", "稳", "6", "666",
-    "yyds", "hhh", "lol", "lmao", "haha", "yay", "nice", "cool", "amazing", "wonderful",
-    "fantastic", "excited", "great", "awesome", "sweet", "happy", "love", "cheerful"
-  ],
-  sad: [
-    "唉", "哭", "难过", "伤心", "失落", "遗憾", "心疼", "无语", "累了",
-    "好累", "不想", "算了", "躺平", "寂寞", "孤独", "没意思", "无聊", "好烦", "emo",
-    "破防", "心累", "麻了", "废了", "摆烂", "低落", "委屈", "崩溃", "疲惫", "sad",
-    "sorry", "upset", "tired", "miss", "sigh", "alone", "depressed", "lonely", "blue"
-  ],
-  angry: [
-    "烦", "草", "卧槽", "我去", "气死", "火大", "烦死", "讨厌", "闭嘴",
-    "够了", "受不了", "离谱", "过分", "太过分", "可恶", "气炸", "炸了",
-    "tmd", "wtf", "damn", "shut up", "hate", "pissed", "furious", "annoyed", "angry", "mad",
-    "rage", "生气", "怒火", "暴躁"
-  ],
-  surprised: [
-    "啊", "卧槽", "我去", "天哪", "不会吧", "不可能吧", "什么鬼", "啥情况", "真的假的",
-    "牛", "nb", "离谱", "绝了", "不敢相信", "吓死", "震惊", "惊呆", "惊了", "居然",
-    "竟然", "omg", "what", "seriously", "no way", "incredible", "unbelievable", "wow", "unexpected",
-    "逆天", "神了", "太夸张了", "开玩笑吧"
-  ]
-};
 
 function hasMoodKeyword(text, keywords) {
-  for (let i = 0; i < keywords.length; i += 1) {
-    const token = String(keywords[i] || "").trim().toLowerCase();
-    if (token && text.includes(token)) {
-      return true;
-    }
-  }
-  return false;
+  const controller = getEmotionMoodController();
+  return typeof controller.hasMoodKeyword === "function" ? controller.hasMoodKeyword(text, keywords) : false;
 }
 
 function detectMood(text) {
-  const s = String(text || "").toLowerCase().trim();
-  if (!s) {
-    return "idle";
-  }
-  if (hasMoodKeyword(s, MOOD_KEYWORDS.surprised)) {
-    return "surprised";
-  }
-  if (hasMoodKeyword(s, MOOD_KEYWORDS.angry)) {
-    return "angry";
-  }
-  if (hasMoodKeyword(s, MOOD_KEYWORDS.sad)) {
-    return "sad";
-  }
-  if (hasMoodKeyword(s, MOOD_KEYWORDS.happy)) {
-    return "happy";
-  }
-  return "idle";
-}
-function extractMotionDefinitions(model = null) {
-  const targetModel = model || state.model;
-  if (!targetModel) {
-    return {};
-  }
-  return (
-    targetModel.internalModel?.motionManager?.definitions ||
-    targetModel.internalModel?.settings?.FileReferences?.Motions ||
-    {}
-  );
+  const controller = getEmotionMoodController();
+  return typeof controller.detectMood === "function" ? controller.detectMood(text) : "idle";
 }
 
-function getMotionCount(group) {
-  const arr = state.motionDefinitions?.[group];
-  return Array.isArray(arr) ? arr.length : 0;
-}
+let motionRuntimeController = null;
 
-function listAvailableMotionGroups() {
-  return Object.keys(state.motionDefinitions || {}).filter((group) => getMotionCount(group) > 0);
-}
-
-function setModelMotionDefinitions(model) {
-  resetActionSystem();
-  state.motionDefinitions = extractMotionDefinitions(model);
-  state.availableMotionGroups = listAvailableMotionGroups();
-}
-
-function stopIdleMotionLoop() {
-  if (!state.idleMotionTimer) {
-    return;
-  }
-  clearTimeout(state.idleMotionTimer);
-  state.idleMotionTimer = 0;
-}
-
-function isSpeakingNow() {
-  const browserSpeaking =
-    "speechSynthesis" in window &&
-    !!window.speechSynthesis &&
-    !!window.speechSynthesis.speaking;
-  const audioSpeaking =
-    !!state.ttsAudio &&
-    !state.ttsAudio.paused &&
-    !state.ttsAudio.ended;
-  const contextSpeaking = !!state.ttsContextSpeaking;
-  return browserSpeaking || audioSpeaking || contextSpeaking;
-}
-
-function isSpeechMotionActive(now = performance.now()) {
-  if (state.uiView === "model") {
-    const t = Number(now || performance.now());
-    const updatedAt = Number(state._broadcastSpeechUpdatedAt || 0);
-    const animUntil = Number(state.speechAnimUntil || 0);
-    if (updatedAt > 0 && t - updatedAt > 900) {
-      return t <= animUntil + 180;
-    }
-    if (state._broadcastSpeaking) {
-      return true;
-    }
-    return t <= animUntil + 140;
-  }
-  if (isSpeakingNow()) {
-    return true;
-  }
-  const t = Number(now || performance.now());
-  const activeUntil = Number(state.speechAnimUntil || 0);
-  const queuePending = Array.isArray(state.streamSpeakQueue) && state.streamSpeakQueue.length > 0;
-  if (queuePending && t <= activeUntil + 260) {
-    return true;
-  }
-  return false;
-}
-
-function shouldSkipIdleMotion() {
-  if (!state.model || !state.motionEnabled || !state.idleMotionEnabled) {
-    return true;
-  }
-  if (state.dragData || state.windowDragActive || state.animating) {
-    return true;
-  }
-  if (state.chatBusy || isSpeakingNow()) {
-    return true;
-  }
-  return false;
-}
-
-function scheduleIdleMotionLoop() {
-  stopIdleMotionLoop();
-  if (!state.idleMotionEnabled) {
-    return;
-  }
-  const preset = getMotionIntensityPreset();
-  const cadence = getActiveModelCadence();
-  const scale = (Number(preset.idleIntervalScale) || 1) * (Number(cadence?.idleIntervalScale) || 1);
-  const minMs = Math.max(5000, Math.round((Number(state.idleMotionMinMs) || 12000) * scale));
-  const maxMs = Math.max(minMs + 1000, Math.round((Number(state.idleMotionMaxMs) || 24000) * scale));
-  const delay = minMs + Math.floor(Math.random() * (maxMs - minMs + 1));
-  state.idleMotionTimer = window.setTimeout(async () => {
-    state.idleMotionTimer = 0;
-    if (!shouldSkipIdleMotion()) {
-      enqueueActionIntent("idle", buildFollowupAwareIdleMotionContext());
-    }
-    scheduleIdleMotionLoop();
-  }, delay);
-}
-
-function pickMoodMotionGroups(mood, source = "emotion") {
-  let idleGroups = ["Idle"];
-  if (source === "idle") {
-    idleGroups = ["Idle", "Tap", "FlickUp", "FlickDown"];
-  } else if (source === "talk") {
-    idleGroups = ["Tap", "FlickUp", "Idle"];
-  } else if (source === "tap") {
-    idleGroups = ["Tap", "Tap@Body", "FlickUp", "Idle"];
-  }
-  const map = {
-    happy: ["Tap", "Tap@Body", "FlickUp", "Idle"],
-    sad: ["FlickDown", "Idle", "Flick"],
-    angry: ["Flick@Body", "Flick", "Tap@Body", "Idle"],
-    surprised: ["FlickUp", "Tap", "Flick", "Idle"],
-    idle: idleGroups
-  };
-  return map[mood] || map.idle;
-}
-
-function canPlayMotion(cooldownMs = null, force = false) {
-  const now = performance.now();
-  if (!force && now < state.motionCooldownUntil) {
-    return false;
-  }
-  if (cooldownMs != null && Number.isFinite(Number(cooldownMs))) {
-    state.motionCooldownUntil = now + Math.max(120, Number(cooldownMs));
-  }
-  return true;
-}
-
-async function playMotionGroup(group, priority = 3) {
-  if (!state.model || !group) {
-    return false;
-  }
-  const count = getMotionCount(group);
-  if (count <= 0) {
-    return false;
-  }
-  let candidates = Array.from({ length: count }, (_, i) => i);
-  if (count > 1) {
-    const seed = Math.floor(Math.random() * count);
-    candidates = [...candidates.slice(seed), ...candidates.slice(0, seed)];
-  }
-  for (const idx of candidates) {
-    try {
-      await state.model.motion(group, idx, priority);
-      state.lastMotionGroup = group;
-      return true;
-    } catch (_) {
-      // Try next index in same group.
-    }
-  }
-  return false;
-}
-
-async function tryBuiltInMotion(mood, opts = {}) {
-  if (!state.model || !state.motionEnabled) {
-    return false;
-  }
-  if (state.dragData || state.windowDragActive) {
-    return false;
-  }
-  const source = String(opts.source || "emotion");
-  const allowFallback = opts.allowFallback !== false;
-  const priority = Number.isFinite(Number(opts.priority)) ? Number(opts.priority) : 3;
-  const force = !!opts.force;
-  const cooldownMs = Number.isFinite(Number(opts.cooldownMs))
-    ? Number(opts.cooldownMs)
-    : state.motionCooldownMs;
-  if (!canPlayMotion(cooldownMs, force)) {
-    return false;
-  }
-  const explicitGroups = uniqueMotionGroups(opts.groups);
-  const groups = (explicitGroups.length ? explicitGroups : pickMoodMotionGroups(mood, source))
-    .filter((group) => getMotionCount(group) > 0)
-    .sort((a, b) => {
-      if (a === state.lastMotionGroup) return 1;
-      if (b === state.lastMotionGroup) return -1;
-      return 0;
-    });
-  for (const group of groups) {
-    const ok = await playMotionGroup(group, priority);
-    if (ok) {
-      return true;
-    }
-  }
-  if (!allowFallback) {
-    return false;
-  }
-  return false;
-}
-
-function animateFallback(mood, opts = {}) {
-  if (!state.model || state.animating || state.dragData || state.windowDragActive) {
-    return;
-  }
-  state.animating = true;
-  const model = state.model;
-  const style = normalizeTalkStyle(opts.style || state.currentTalkStyle || "neutral");
-  const intent = String(opts.intent || opts.source || "idle").toLowerCase();
-  const start = performance.now();
-  const duration = intent === "reply" ? 980 : (intent === "talk" ? 760 : 1120);
-  const bx = state.baseTransform.x;
-  const by = state.baseTransform.y;
-  const bs = state.baseTransform.scale;
-  const swayBias = style === "playful" ? 1.18 : (style === "comfort" ? 0.82 : 1.0);
-  const tiltBias = style === "steady" ? 0.8 : 1.0;
-
-  const frame = (now) => {
-    const p = Math.min(1, (now - start) / duration);
-    const wave = Math.sin(p * Math.PI * 4);
-    const pulse = Math.sin(p * Math.PI);
-
-    if (mood === "happy") {
-      model.y = by - Math.abs(wave) * 26 * swayBias;
-      model.x = bx + wave * 7 * swayBias;
-      model.scale.set(bs * (1 + Math.abs(wave) * 0.06));
-      model.rotation = wave * 0.038 * tiltBias;
-    } else if (mood === "sad") {
-      model.y = by + p * 18;
-      model.x = bx - pulse * 4;
-      model.scale.set(bs * (1 - p * 0.05));
-      model.rotation = -0.06 * tiltBias;
-    } else if (mood === "angry") {
-      model.x = bx + wave * 14;
-      model.y = by - Math.abs(Math.sin(p * Math.PI * 5)) * 6;
-      model.rotation = wave * 0.05 * tiltBias;
-    } else if (mood === "surprised") {
-      model.y = by - pulse * 12;
-      model.scale.set(bs * (1 + Math.abs(wave) * 0.1));
-      model.rotation = wave * 0.018;
-    } else if (intent === "talk") {
-      const bounce = Math.sin(p * Math.PI * 8);
-      model.x = bx + wave * 18 * swayBias;
-      model.y = by + bounce * 6 - Math.abs(wave) * 18;
-      model.rotation = wave * 0.044 * tiltBias;
-    } else if (intent === "thinking") {
-      model.x = bx + Math.sin(p * Math.PI * 2) * 5;
-      model.y = by - pulse * 6;
-      model.rotation = -0.025;
-    } else {
-      model.x = bx + wave * 3 * swayBias;
-      model.y = by;
-      model.scale.set(bs);
-      model.rotation = wave * 0.012;
-    }
-
-    if (p < 1) {
-      requestAnimationFrame(frame);
-      return;
-    }
-
-    model.x = bx;
-    model.y = by;
-    model.scale.set(bs);
-    model.rotation = 0;
-    state.animating = false;
-  };
-
-  requestAnimationFrame(frame);
-}
-
-function triggerTapMotion() {
-  enqueueActionIntent("tap", { combo: true });
-}
-
-function maybePlayTalkGesture(text, style = "neutral") {
-  if (!state.motionEnabled || !state.model || state.dragData || state.windowDragActive) {
-    return;
-  }
-  const now = performance.now();
-  if (state.motionQuietDuringSpeech && state.speakingEnabled) {
-    state.speakingMotionCooldownUntil = Math.max(Number(state.speakingMotionCooldownUntil) || 0, now + 260);
-    return;
-  }
-  const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
-  const speakingNow = isSpeechMotionActive(now);
-  const pendingStreamSegments = Array.isArray(state.streamSpeakQueue) ? state.streamSpeakQueue.length : 0;
-  if ((speakingNow && motionBlend > 0.1) || motionBlend > 0.24) {
-    state.speakingMotionCooldownUntil = Math.max(Number(state.speakingMotionCooldownUntil) || 0, now + 220);
-    return;
-  }
-  if (pendingStreamSegments > 1 || hasPendingTalkLikeAction()) {
-    state.speakingMotionCooldownUntil = Math.max(Number(state.speakingMotionCooldownUntil) || 0, now + 180);
-    return;
-  }
-  if (now < state.speakingMotionCooldownUntil) {
-    return;
-  }
-  state.speakingMotionCooldownUntil = now + state.speakingMotionCooldownMs;
-  const clean = sanitizeSpeakText(text);
-  if (!clean) {
-    return;
-  }
-  const clauses = (clean.match(/[，。！？!?、]/g) || []).length + 1;
-  const lenBeats = Math.ceil((clean.length || 0) / 20);
-  const strongPunct = (clean.match(/[!?\uFF01\uFF1F]/g) || []).length;
-  const minorPunct = (clean.match(/[,\uFF0C\u3001;\uFF1B:\uFF1A]/g) || []).length;
-  const cadence = getActiveModelCadence();
-  const beatScale = Math.max(0.8, Math.min(1.4, Number(cadence?.talkBeatScale) || 1));
-  const beats = Math.max(1, Math.min(4, Math.round(Math.max(clauses, lenBeats) * beatScale)));
-  const emphasis = clampNumber(
-    strongPunct * 0.34 + minorPunct * 0.08 + (style === "playful" ? 0.08 : 0),
-    0,
-    1
-  );
-  enqueueActionIntent("talk", { text: clean, style, combo: true, beats, emphasis, accentCount: strongPunct });
-}
-
-async function playEmotion(text, opts = {}) {
-  const mood = detectMood(text);
-  const played = await tryBuiltInMotion(mood, opts);
-  if (!played && opts.allowFallback !== false) {
-    animateFallback(mood, opts);
-  }
-}
-
-async function speakByBrowser(text, opts = {}) {
-  const force = !!opts.force;
-  const requestedGeneration = Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0);
-  if (!force && !state.speakingEnabled) {
-    return false;
-  }
-  if (!("speechSynthesis" in window)) {
-    return false;
-  }
-  if (!state.ttsReady) {
-    initTTS();
-  }
-
-  if (!isCurrentTTSPlaybackGeneration(requestedGeneration)) {
-    recordTTSDebugEvent("browser_stale_skip", {
-      text,
-      result: "stale"
-    });
-    return false;
-  }
-  stopAllAudioPlayback();
-  const playbackGeneration = Number(state.ttsPlaybackGeneration || 0);
-  const candidates = buildVoiceCandidates();
-  const browserTTSOptions = {
-    force,
-    playbackGeneration,
-    prosody: opts.prosody || null,
-    mood: opts.mood || "",
-    style: opts.style || state.currentTalkStyle || "neutral",
-    voiceStyle: opts.voiceStyle || ""
-  };
-  for (const v of candidates) {
-    const ok = await speakOnceWithVoice(text, v, browserTTSOptions);
-    if (ok) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function buildServerTTSPayload(cleanedText, opts = {}) {
-  if (typeof TTS_API.buildServerTTSPayload === "function") {
-    return TTS_API.buildServerTTSPayload(cleanedText, {
-      ...opts,
-      voice: state.ttsServerVoice
+function getMotionRuntimeController() {
+  if (!motionRuntimeController && typeof MOTION_RUNTIME_CONTROLLER.createController === "function") {
+    motionRuntimeController = MOTION_RUNTIME_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      performanceObject: performance,
+      requestAnimationFrame,
+      detectMood,
+      normalizeTalkStyle,
+      sanitizeSpeakText,
+      clampNumber,
+      getMotionIntensityPreset,
+      getActiveModelCadence,
+      enqueueActionIntent,
+      hasPendingTalkLikeAction,
+      buildFollowupAwareIdleMotionContext,
+      resetActionSystem,
+      pickMoodMotionGroups: (mood, source = "emotion") => {
+        const controller = getEmotionMoodController();
+        return typeof controller.pickMoodMotionGroups === "function" ? controller.pickMoodMotionGroups(mood, source) : ["Idle"];
+      }
     });
   }
-  return { text: String(cleanedText || "") };
+  return motionRuntimeController || MOTION_RUNTIME_CONTROLLER;
 }
 
-function isRetriableTTSError(err) {
-  if (typeof TTS_API.isRetriableTTSError === "function") {
-    return TTS_API.isRetriableTTSError(err);
+function extractMotionDefinitions(model = null) { return getMotionRuntimeController().extractMotionDefinitions(model); }
+function getMotionCount(group) { return getMotionRuntimeController().getMotionCount(group); }
+function listAvailableMotionGroups() { return getMotionRuntimeController().listAvailableMotionGroups(); }
+function setModelMotionDefinitions(model) { return getMotionRuntimeController().setModelMotionDefinitions(model); }
+function stopIdleMotionLoop() { return getMotionRuntimeController().stopIdleMotionLoop(); }
+function isSpeakingNow() { return getMotionRuntimeController().isSpeakingNow(); }
+function isSpeechMotionActive(now = performance.now()) { return getMotionRuntimeController().isSpeechMotionActive(now); }
+function shouldSkipIdleMotion() { return getMotionRuntimeController().shouldSkipIdleMotion(); }
+function scheduleIdleMotionLoop() { return getMotionRuntimeController().scheduleIdleMotionLoop(); }
+function pickMoodMotionGroups(mood, source = "emotion") { return getMotionRuntimeController().pickMoodMotionGroups(mood, source); }
+function canPlayMotion(cooldownMs = null, force = false) { return getMotionRuntimeController().canPlayMotion(cooldownMs, force); }
+async function playMotionGroup(group, priority = 3) { return getMotionRuntimeController().playMotionGroup(group, priority); }
+async function tryBuiltInMotion(mood, opts = {}) { return getMotionRuntimeController().tryBuiltInMotion(mood, opts); }
+function animateFallback(mood, opts = {}) { return getMotionRuntimeController().animateFallback(mood, opts); }
+function triggerTapMotion() { return getMotionRuntimeController().triggerTapMotion(); }
+function maybePlayTalkGesture(text, style = "neutral") { return getMotionRuntimeController().maybePlayTalkGesture(text, style); }
+async function playEmotion(text, opts = {}) { return getMotionRuntimeController().playEmotion(text, opts); }
+
+
+function switchVoice() { return getVoiceRuntimeController().switchVoice(); }
+
+let wakeWordController = null;
+
+function getWakeWordController() {
+  if (!wakeWordController && typeof WAKE_WORD_CONTROLLER.createController === "function") {
+    wakeWordController = WAKE_WORD_CONTROLLER.createController({
+      state, windowObject: window, navigatorObject: navigator, setStatus, updateMicButton,
+      scheduleMicRecognitionStart, enqueueMicTranscript, toggleMicOpen
+    });
   }
-  return false;
+  return wakeWordController || WAKE_WORD_CONTROLLER;
 }
 
-async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) {
-  if (typeof TTS_API.requestServerTTSBlob !== "function") {
-    throw new Error("ttsApi request helper is not available");
+function clearWakeRestartTimer() { return getWakeWordController().clearWakeRestartTimer(); }
+function shouldRunWakeWordListener() { return getWakeWordController().shouldRunWakeWordListener(); }
+function stopWakeWordListener(hardStop = false) { return getWakeWordController().stopWakeWordListener(hardStop); }
+function scheduleWakeWordStart(delayMs = 0) { return getWakeWordController().scheduleWakeWordStart(delayMs); }
+function wakeTranscriptHit(text) { return getWakeWordController().wakeTranscriptHit(text); }
+function setupWakeWordRecognition(RecognitionCtor) { return getWakeWordController().setupWakeWordRecognition(RecognitionCtor); }
+function setupSpeechRecognition() { return getWakeWordController().setupSpeechRecognition(); }
+
+let chatReplyController = null;
+
+function getChatReplyController() {
+  if (!chatReplyController && typeof CHAT_REPLY_CONTROLLER.createController === "function") {
+    chatReplyController = CHAT_REPLY_CONTROLLER.createController({
+      state,
+      ui,
+      windowObject: window,
+      performanceObject: performance,
+      authFetch,
+      createPerfTraceId,
+      perfLog,
+      handleCharacterRuntimeMetadata,
+      appendMessage,
+      rememberMessage,
+      detectMood,
+      resolveTalkStyle,
+      enqueueActionIntent,
+      stopWakeWordListener,
+      pauseMicForAssistant,
+      resumeMicAfterAssistant,
+      setStatus,
+      shouldUseStreamSpeak,
+      stopAllAudioPlayback,
+      shouldPlayLatencyHint,
+      pickLatencyHintText,
+      buildSpeakProsody,
+      speak,
+      clearThinkingMotionTimer,
+      shouldAttachDesktopImage,
+      captureDesktopSnapshot,
+      parseToolMetaFromText,
+      setMessageText,
+      feedStreamSpeakDelta,
+      normalizeAssistantVisibleText,
+      finalizePendingMessageRow,
+      updateConversationFollowupState,
+      recordEmotion,
+      previewAssistantReplyCharacterCueCandidate,
+      maybeAutoApplyAssistantReplyCharacterCueCandidate,
+      normalizeTalkStyle,
+      triggerExpressionPulse,
+      flushStreamSpeak,
+      scheduleFinalSpeechWatchdog,
+      buildStableSpeakText,
+      maybePlayTalkGesture,
+      discardQueuedStreamSpeakItems,
+      recordTTSDebugEvent,
+      buildChatFailureDoctorHint,
+      scheduleWakeWordStart,
+      updateMicButton,
+      handleLocalCommand,
+      buildAttachmentContextText,
+      buildAttachmentDisplaySuffix,
+      clearPendingAttachments
+    });
   }
-  return TTS_API.requestServerTTSBlob(text, prosody, {
-    authFetch,
-    sanitizeSpeakText,
-    perfLog,
-    traceId: String(requestOpts.traceId || state.activePerfTraceId || "").trim(),
-    timeoutMs: Math.max(
-      1500,
-      Math.min(90000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
-    ),
-    voice: state.ttsServerVoice,
-    now: () => performance.now(),
-    wallNow: () => Date.now()
-  });
+  return chatReplyController || CHAT_REPLY_CONTROLLER;
 }
 
-async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) {
-  if (typeof TTS_API.requestServerTTSBlobWithRetry !== "function") {
-    throw new Error("ttsApi retry helper is not available");
-  }
-  return TTS_API.requestServerTTSBlobWithRetry(text, prosody, {
-    authFetch,
-    sanitizeSpeakText,
-    perfLog,
-    traceId: opts.traceId,
-    retries: Math.max(0, Math.min(4, Math.round(Number(opts.retries) || 0))),
-    retryDelayMs: Math.max(
-      60,
-      Math.min(3000, Math.round(Number(opts.retryDelayMs) || Number(state.ttsServerRetryDelayMs) || 220))
-    ),
-    timeoutMs: Math.max(
-      1500,
-      Math.min(90000, Math.round(Number(opts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
-    ),
-    voice: state.ttsServerVoice,
-    now: () => performance.now(),
-    wallNow: () => Date.now(),
-    wait: waitMs,
-    onRetry: ({ attempt, nextWaitMs, error }) => {
-      console.warn("Server TTS request retry", {
-        attempt,
-        nextWaitMs,
-        reason: String(error?.message || error)
-      });
-    }
-  });
-}
-
-async function playAudioByContext(blob, debugContext = {}) {
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx || !blob) {
-    recordTTSDebugEvent("context_unavailable", debugContext);
-    return false;
-  }
-  const playbackGeneration = Number(debugContext.playbackGeneration || state.ttsPlaybackGeneration || 0);
-  if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-    recordTTSDebugEvent("context_stale_skip", {
-      ...debugContext,
-      result: "stale"
-    });
-    return false;
-  }
-  let markedSpeaking = false;
-  let fallbackTimer = 0;
-  let source = null;
-  let contextPlaybackStarted = false;
-  try {
-    if (!state.ttsDecodeContext || state.ttsDecodeContext.state === "closed") {
-      state.ttsDecodeContext = new AudioCtx();
-    }
-    const ctx = state.ttsDecodeContext;
-    if (ctx.state === "suspended") {
-      await ctx.resume();
-    }
-    if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-      recordTTSDebugEvent("context_stale_skip", {
-        ...debugContext,
-        result: "stale"
-      });
-      return false;
-    }
-    const arrayBuf = await blob.arrayBuffer();
-    const decoded = await ctx.decodeAudioData(arrayBuf.slice(0));
-    if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-      recordTTSDebugEvent("context_stale_skip", {
-        ...debugContext,
-        result: "stale"
-      });
-      return false;
-    }
-      recordTTSDebugEvent("context_play_start", {
-        ...debugContext,
-        blobBytes: Number(blob?.size || arrayBuf.byteLength || 0),
-        durationMs: Number.isFinite(Number(decoded.duration)) && decoded.duration > 0
-          ? Math.round(decoded.duration * 1000)
-          : -1
-      });
-      state.ttsDebugAudioStartedAt = performance.now();
-      if (debugContext.sessionId) {
-        state.streamSpeakPlayedSession = Number(debugContext.sessionId || 0);
-      }
-    source = ctx.createBufferSource();
-    const gain = ctx.createGain();
-    gain.gain.value = 1.0;
-    source.buffer = decoded;
-    state.ttsContextBufferSource = source;
-    if (!state.ttsAudioAnalyser || state.ttsAudioAnalyser.context !== ctx) {
-      state.ttsAudioAnalyser = ctx.createAnalyser();
-      state.ttsAudioAnalyser.fftSize = 256;
-      state.ttsAudioAnalyser.smoothingTimeConstant = 0.12;
-      state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.frequencyBinCount);
-    }
-    source.connect(state.ttsAudioAnalyser);
-    state.ttsAudioAnalyser.connect(gain);
-    gain.connect(ctx.destination);
-    state.ttsContextSpeaking = true;
-    markedSpeaking = true;
-    await new Promise((resolve) => {
-      let resolved = false;
-      const resolveOnce = () => {
-        if (resolved) {
-          return;
-        }
-        resolved = true;
-        resolve();
-      };
-      source.onended = resolveOnce;
-      const durationMs = Number.isFinite(Number(decoded.duration)) && decoded.duration > 0
-        ? Math.round(decoded.duration * 1000)
-        : 45000;
-      fallbackTimer = window.setTimeout(resolveOnce, Math.min(180000, durationMs + 900));
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-        recordTTSDebugEvent("context_stale_skip", {
-          ...debugContext,
-          result: "stale"
-        });
-        resolveOnce();
-        return;
-      }
-      source.start(0);
-      contextPlaybackStarted = true;
-    });
-    if (state.ttsContextBufferSource === source) {
-      state.ttsContextBufferSource = null;
-    }
-    if (fallbackTimer) {
-      clearTimeout(fallbackTimer);
-      fallbackTimer = 0;
-    }
-    try {
-      source.disconnect();
-    } catch (_) {
-      // ignore
-    }
-    if (!contextPlaybackStarted || !isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-      recordTTSDebugEvent("context_stale_skip", {
-        ...debugContext,
-        result: "stale"
-      });
-      return false;
-    }
-    state.ttsContextSpeaking = false;
-    state.ttsAudioLevel = 0;
-    state.ttsAudioRawLevel = 0;
-    state.ttsAudioRms = 0;
-    state.conversationLastTtsFinishedAt = Date.now();
-    markedSpeaking = false;
-    recordTTSDebugEvent("context_play_end", {
-      ...debugContext,
-      result: "ok"
-    });
-    return true;
-  } catch (err) {
-    if (fallbackTimer) {
-      clearTimeout(fallbackTimer);
-      fallbackTimer = 0;
-    }
-    if (markedSpeaking && isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-      state.ttsContextSpeaking = false;
-    }
-    if (source) {
-      try {
-        source.stop(0);
-      } catch (_) {
-        // ignore
-      }
-      try {
-        source.disconnect();
-      } catch (_) {
-        // ignore
-      }
-    }
-    if (state.ttsContextBufferSource === source) {
-      state.ttsContextBufferSource = null;
-    }
-    if (isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-      state.ttsAudioLevel = 0;
-      state.ttsAudioRawLevel = 0;
-      state.ttsAudioRms = 0;
-    }
-    recordTTSDebugEvent("context_play_fail", {
-      ...debugContext,
-      result: "fail",
-      error: String(err?.message || err || "")
-    });
-    return false;
-  }
-}
-
-async function playAudioBlob(blob, opts = {}) {
-  if (!blob) {
-    return false;
-  }
-  const playbackGeneration = Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0);
-  if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-    recordTTSDebugEvent("audio_stale_skip", {
-      traceId: String(opts.perfTraceId || state.activePerfTraceId || "").trim(),
-      sessionId: Number(opts.sessionId || state.streamSpeakSession || 0),
-      segmentId: Number(opts.segmentId || 0),
-      text: opts.text || "",
-      blobBytes: Number(blob?.size || 0),
-      result: "stale"
-    });
-    return false;
-  }
-  const perfTraceId = String(opts.perfTraceId || state.activePerfTraceId || "").trim();
-  const perfBlobReadyPerfMs = Number(opts.perfBlobReadyPerfMs) || 0;
-  const perfSpeakStartedPerfMs = Number(opts.perfSpeakStartedPerfMs) || 0;
-  const debugContext = {
-    traceId: perfTraceId,
-    sessionId: Number(opts.sessionId || state.streamSpeakSession || 0),
-    segmentId: Number(opts.segmentId || 0),
-    text: opts.text || "",
-    blobBytes: Number(blob?.size || 0),
-    playbackGeneration
-  };
-  recordTTSDebugEvent("audio_blob_ready", debugContext);
-  if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-    recordTTSDebugEvent("audio_stale_skip", {
-      ...debugContext,
-      result: "stale"
-    });
-    return false;
-  }
-  if (!state.ttsAudio) {
-    state.ttsAudio = new Audio();
-    state.ttsAudio.preload = "auto";
-  }
-  const audio = state.ttsAudio;
-  ensureTTSAudioAnalyser(audio);
-  audio.muted = false;
-  audio.volume = 1.0;
-  const speechText = sanitizeSpeakText(opts.text || "");
-  const speechMood = String(opts.mood || detectMood(speechText) || "idle");
-  const speechStyle = normalizeTalkStyle(opts.style || state.currentTalkStyle || "neutral");
-  const url = URL.createObjectURL(blob);
-  const audioPlaybackToken = Number(state.ttsAudioPlaybackToken || 0) + 1;
-  state.ttsAudioPlaybackToken = audioPlaybackToken;
-  if (opts.interrupt) {
-    recordTTSDebugEvent("audio_interrupt", debugContext);
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-    } catch (_) {
-      // ignore
-    }
-  }
-  return await new Promise((resolve) => {
-    let settled = false;
-    let failTimer = 0;
-    let startupTimer = 0;
-    let progressTimer = 0;
-    let fallbackSpeechStarted = false;
-    const isCurrentHtmlAudioPlayback = () => (
-      Number(state.ttsAudioPlaybackToken || 0) === audioPlaybackToken
-      && audio.src === url
-    );
-    const stopHtmlAudio = () => {
-      if (!isCurrentHtmlAudioPlayback()) {
-        return;
-      }
-      try {
-        audio.pause();
-        audio.currentTime = 0;
-      } catch (_) {
-        // ignore
-      }
-    };
-    const beginFallbackSpeech = () => {
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-        return;
-      }
-      if (fallbackSpeechStarted) {
-        return;
-      }
-      fallbackSpeechStarted = true;
-      recordTTSDebugEvent("audio_fallback_begin", {
-        ...debugContext,
-        durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
-          ? Math.round(audio.duration * 1000)
-          : -1,
-        currentMs: Math.round(Number(audio.currentTime || 0) * 1000)
-      });
-      beginSpeechAnimation(speechText, speechMood, speechStyle, {
-        durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
-          ? Math.round(audio.duration * 1000)
-          : undefined
-      });
-    };
-    const armFailTimer = (ms) => {
-      if (failTimer) {
-        clearTimeout(failTimer);
-        failTimer = 0;
-      }
-      const timeoutMs = Math.max(12000, Math.min(180000, Math.round(Number(ms) || 0)));
-      failTimer = window.setTimeout(() => done(false), timeoutMs);
-    };
-    const done = (ok) => {
-      if (settled) return;
-      settled = true;
-      if (failTimer) {
-        clearTimeout(failTimer);
-        failTimer = 0;
-      }
-      if (startupTimer) {
-        clearTimeout(startupTimer);
-        startupTimer = 0;
-      }
-      if (progressTimer) {
-        clearInterval(progressTimer);
-        progressTimer = 0;
-      }
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration) || !isCurrentHtmlAudioPlayback()) {
-        recordTTSDebugEvent("audio_stale_skip", {
-          ...debugContext,
-          result: "stale"
-        });
-        try {
-          URL.revokeObjectURL(url);
-        } catch (_) {
-          // ignore
-        }
-        resolve(false);
-        return;
-      }
-      state.ttsContextSpeaking = false;
-      state.ttsAudioLevel = 0;
-      state.ttsAudioRawLevel = 0;
-      state.ttsAudioRms = 0;
-      state.ttsDebugAudioEndedAt = performance.now();
-      state.conversationLastTtsFinishedAt = Date.now();
-      state.ttsDebugAudioCurrentMs = Math.round(Number(audio.currentTime || 0) * 1000);
-      if (ok) {
-        finishSpeechAnimation();
-      } else {
-        stopHtmlAudio();
-        endSpeechAnimation();
-      }
-      hideSubtitleText();
-      recordTTSDebugEvent("audio_done", {
-        ...debugContext,
-        result: ok ? "ok" : "fail",
-        durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
-          ? Math.round(audio.duration * 1000)
-          : -1,
-        currentMs: Math.round(Number(audio.currentTime || 0) * 1000)
-      });
-      try {
-        URL.revokeObjectURL(url);
-      } catch (_) {
-        // ignore
-      }
-      setStatus(ok ? "待机" : "语音失败");
-      resolve(ok);
-    };
-    audio.onended = () => {
-      if (!isCurrentHtmlAudioPlayback()) {
-        done(false);
-        return;
-      }
-      recordTTSAudioEvent("audio_ended_event", audio, debugContext);
-      done(true);
-    };
-    audio.onerror = async () => {
-      if (!isCurrentHtmlAudioPlayback()) {
-        done(false);
-        return;
-      }
-      recordTTSAudioEvent("audio_error", audio, debugContext, {
-        error: String(audio.error?.message || audio.error?.code || "")
-      });
-      stopHtmlAudio();
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-        done(false);
-        return;
-      }
-      beginFallbackSpeech();
-      const ok = await playAudioByContext(blob, debugContext);
-      done(!!ok);
-    };
-    audio.oncanplay = () => recordTTSAudioEvent("audio_canplay", audio, debugContext);
-    audio.onplaying = () => recordTTSAudioEvent("audio_playing", audio, debugContext);
-    audio.onpause = () => {
-      if (!settled && !audio.ended) {
-        recordTTSAudioEvent("audio_pause", audio, debugContext);
-      }
-    };
-    audio.onwaiting = () => recordTTSAudioEvent("audio_waiting", audio, debugContext);
-    audio.onstalled = () => recordTTSAudioEvent("audio_stalled", audio, debugContext);
-    audio.onsuspend = () => recordTTSAudioEvent("audio_suspend", audio, debugContext);
-    audio.onplay = () => {
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration) || !isCurrentHtmlAudioPlayback()) {
-        stopHtmlAudio();
-        done(false);
-        return;
-      }
-      state.ttsDebugAudioStartedAt = performance.now();
-      state.ttsDebugAudioEndedAt = 0;
-      if (debugContext.sessionId) {
-        state.streamSpeakPlayedSession = Number(debugContext.sessionId || 0);
-      }
-      recordTTSDebugEvent("audio_play_start", {
-        ...debugContext,
-        durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
-          ? Math.round(audio.duration * 1000)
-          : -1,
-        currentMs: Math.round(Number(audio.currentTime || 0) * 1000)
-      });
-      if (perfTraceId) {
-        perfLog("tts", "audio_play_start", {
-          traceId: perfTraceId,
-          fromBlobReadyMs: perfBlobReadyPerfMs ? Math.round(performance.now() - perfBlobReadyPerfMs) : -1,
-          fromSpeakStartMs: perfSpeakStartedPerfMs ? Math.round(performance.now() - perfSpeakStartedPerfMs) : -1
-        });
-      }
-      if (state.ttsAudioContext && typeof state.ttsAudioContext.resume === "function") {
-        state.ttsAudioContext.resume().catch(() => {});
-      }
-      if (progressTimer) {
-        clearInterval(progressTimer);
-        progressTimer = 0;
-      }
-      // Some environments resolve play() but never advance currentTime.
-      let lastProgressAt = performance.now();
-      let lastCurrentTime = Number(audio.currentTime || 0);
-      progressTimer = window.setInterval(async () => {
-        if (settled) {
-          return;
-        }
-        if (!isCurrentHtmlAudioPlayback()) {
-          done(false);
-          return;
-        }
-        const current = Number(audio.currentTime || 0);
-        if (current > lastCurrentTime + 0.01) {
-          lastCurrentTime = current;
-          lastProgressAt = performance.now();
-          return;
-        }
-        if (audio.paused || audio.ended) {
-          return;
-        }
-        if (performance.now() - lastProgressAt < 2800) {
-          return;
-        }
-        stopHtmlAudio();
-        if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-          done(false);
-          return;
-        }
-        beginFallbackSpeech();
-        const ok = await playAudioByContext(blob, debugContext);
-        done(!!ok);
-      }, 650);
-      beginSpeechAnimation(speechText, speechMood, speechStyle, {
-        durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
-          ? Math.round(audio.duration * 1000)
-          : undefined
-      });
-      showSubtitleText(speechText);
-    };
-    audio.onloadedmetadata = () => {
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration) || !isCurrentHtmlAudioPlayback()) {
-        stopHtmlAudio();
-        done(false);
-        return;
-      }
-      if (Number.isFinite(Number(audio.duration)) && audio.duration > 0) {
-        state.ttsDebugAudioDurationMs = Math.round(audio.duration * 1000);
-        recordTTSDebugEvent("audio_metadata", {
-          ...debugContext,
-          durationMs: Math.round(audio.duration * 1000)
-        });
-        armFailTimer(audio.duration * 1000 + 12000);
-        beginSpeechAnimation(speechText, speechMood, speechStyle, {
-          durationMs: Math.round(audio.duration * 1000)
-        });
-        if (audio.paused && !audio.ended) {
-          audio.play().catch(async () => {
-            if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-              done(false);
-              return;
-            }
-            beginFallbackSpeech();
-            const ok = await playAudioByContext(blob, debugContext);
-            done(!!ok);
-          });
-        }
-      }
-    };
-    if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-      done(false);
-      return;
-    }
-    audio.src = url;
-    audio.play().then(() => {
-      if (startupTimer) {
-        clearTimeout(startupTimer);
-        startupTimer = 0;
-      }
-    }).catch(async () => {
-      recordTTSDebugEvent("audio_play_rejected", debugContext);
-      stopHtmlAudio();
-      if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-        done(false);
-        return;
-      }
-      beginFallbackSpeech();
-      const ok = await playAudioByContext(blob, debugContext);
-      done(!!ok);
-    });
-    armFailTimer(45000);
-    startupTimer = window.setTimeout(async () => {
-      if (settled) {
-        return;
-      }
-      if (audio.paused && !audio.ended && Number(audio.currentTime || 0) === 0) {
-        recordTTSDebugEvent("audio_startup_stalled", debugContext);
-        stopHtmlAudio();
-        if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-          done(false);
-          return;
-        }
-        beginFallbackSpeech();
-        const ok = await playAudioByContext(blob, debugContext);
-        done(!!ok);
-      }
-    }, 3200);
-  });
-}
-
-async function speakByServer(text, opts = {}) {
-  const force = !!opts.force;
-  const perfTraceId = String(opts.perfTraceId || state.activePerfTraceId || "").trim();
-  const speakStartedPerfMs = performance.now();
-  const playbackGeneration = Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0);
-  if (!force && !state.speakingEnabled) {
-    return false;
-  }
-  if ("speechSynthesis" in window) {
-    try {
-      window.speechSynthesis.cancel();
-    } catch (_) {
-      // ignore
-    }
-  }
-  if (opts.interrupt && state.ttsAudio) {
-    try {
-      state.ttsAudio.pause();
-      state.ttsAudio.currentTime = 0;
-    } catch (_) {
-      // ignore
-    }
-  }
-  const cleaned = sanitizeSpeakText(text);
-  if (!cleaned) {
-    return false;
-  }
-
-  try {
-    setStatus("语音中...");
-    perfLog("tts", "speak_start", {
-      traceId: perfTraceId || "(none)",
-      textChars: cleaned.length
-    });
-    const blob = await requestServerTTSBlobWithRetry(cleaned, opts.prosody || null, {
-      retries: Number.isFinite(Number(opts.retries))
-        ? Number(opts.retries)
-        : Number(state.ttsServerRetryCount),
-      retryDelayMs: Number(state.ttsServerRetryDelayMs),
-      timeoutMs: Number(state.ttsServerRequestTimeoutMs),
-      traceId: perfTraceId
-    });
-    if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-      recordTTSDebugEvent("speak_stale_skip", {
-        traceId: perfTraceId || "(none)",
-        text: cleaned,
-        result: "stale"
-      });
-      return false;
-    }
-    return await playAudioBlob(blob, {
-      interrupt: !!opts.interrupt,
-      text: cleaned,
-      mood: opts.mood || detectMood(cleaned),
-      style: opts.style || state.currentTalkStyle || "neutral",
-      perfTraceId,
-      perfBlobReadyPerfMs: performance.now(),
-      perfSpeakStartedPerfMs: speakStartedPerfMs,
-      playbackGeneration
-    });
-  } catch (err) {
-    if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-      recordTTSDebugEvent("speak_stale_skip", {
-        traceId: perfTraceId || "(none)",
-        text: cleaned,
-        result: "stale",
-        error: String(err?.message || err || "")
-      });
-      return false;
-    }
-    perfLog("tts", "speak_fail", {
-      traceId: perfTraceId || "(none)",
-      elapsedMs: Math.round(performance.now() - speakStartedPerfMs),
-      error: String(err?.message || err || "")
-    });
-    console.warn("Server TTS failed:", err);
-    state.ttsServerAvailable = false;
-    state.ttsServerFailStreak = Math.max(0, Number(state.ttsServerFailStreak) || 0) + 1;
-    state.ttsServerLastError = String(err?.message || err || "");
-    setStatus("语音服务未就绪");
-    return false;
-  }
-}
-
-async function speak(text, opts = {}) {
-  const speakOpts = {
-    ...opts,
-    playbackGeneration: Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0)
-  };
-  if (isServerTTSProvider(state.ttsProvider)) {
-    // Always retry even if a previous call failed - GPT-SoVITS may have started later.
-    const ok = await speakByServer(text, speakOpts);
-    if (ok) {
-      state.ttsServerAvailable = true;
-      state.ttsServerFailStreak = 0;
-      state.ttsServerLastError = "";
-      return true;
-    }
-    if (!isCurrentTTSPlaybackGeneration(speakOpts.playbackGeneration)) {
-      recordTTSDebugEvent("speak_fallback_stale_skip", {
-        traceId: String(speakOpts.perfTraceId || state.activePerfTraceId || "(none)"),
-        text,
-        result: "stale"
-      });
-      return false;
-    }
-    if (!state.serverTTSFallbackToBrowser) {
-      return false;
-    }
-    const failThreshold = Math.max(
-      1,
-      Math.min(8, Math.round(Number(state.ttsServerFallbackFailThreshold) || 1))
-    );
-    const failStreak = Math.max(0, Number(state.ttsServerFailStreak) || 0);
-    const lastErr = String(state.ttsServerLastError || "");
-    const lastErrLower = lastErr.toLowerCase();
-    const immediateBrowserFallback =
-      state.ttsProvider === "gpt_sovits" ||
-      lastErrLower.includes("connection failed") ||
-      lastErrLower.includes("network") ||
-      lastErrLower.includes("timeout") ||
-      lastErrLower.includes("aborted") ||
-      lastErrLower.includes("empty audio") ||
-      /^http\s+5\d\d$/i.test(lastErr);
-    if (immediateBrowserFallback) {
-      console.warn("Server TTS immediate fallback -> browser TTS", {
-        provider: state.ttsProvider,
-        streak: failStreak,
-        reason: lastErr
-      });
-      recordTTSDebugEvent("browser_fallback_start", {
-        traceId: String(speakOpts.perfTraceId || state.activePerfTraceId || "(none)"),
-        text,
-        provider: state.ttsProvider,
-        streak: failStreak,
-        threshold: failThreshold,
-        error: lastErr,
-        timeoutMs: Number(state.ttsServerRequestTimeoutMs || 0)
-      });
-      return await speakByBrowser(text, {
-        ...speakOpts,
-        force: !!speakOpts.force,
-        playbackGeneration: speakOpts.playbackGeneration
-      });
-    }
-    const nonRetriableClientError =
-      /^HTTP\s+4\d\d$/i.test(lastErr) && !/^HTTP\s+(408|429)$/i.test(lastErr);
-    if (!nonRetriableClientError && failStreak < failThreshold) {
-      console.warn("Server TTS failed but fallback is delayed", {
-        streak: failStreak,
-        threshold: failThreshold,
-        provider: state.ttsProvider,
-        reason: lastErr
-      });
-      setStatus(`TTS retrying (${failStreak}/${failThreshold})`);
-      return false;
-    }
-    // Server TTS failed: fallback to browser speech when enabled.
-    console.warn("Server TTS fallback -> browser TTS", {
-      provider: state.ttsProvider,
-      streak: failStreak,
-      threshold: failThreshold,
-      reason: lastErr
-    });
-    return await speakByBrowser(text, {
-      ...speakOpts,
-      force: !!speakOpts.force,
-      playbackGeneration: speakOpts.playbackGeneration
-    });
-  }
-  return await speakByBrowser(text, speakOpts);
-}
-
-function switchVoice() {
-  if (isServerTTSProvider(state.ttsProvider)) {
-    if (!state.ttsServerVoices.length) {
-      setStatus("无可用服务端音色");
-      return;
-    }
-    state.ttsServerVoiceIndex =
-      (state.ttsServerVoiceIndex + 1) % state.ttsServerVoices.length;
-    state.ttsServerVoice = state.ttsServerVoices[state.ttsServerVoiceIndex];
-    setStatus(`音色: ${state.ttsServerVoice}`);
-    return;
-  }
-
-  if (!state.ttsVoices.length) {
-    setStatus("无可用音色");
-    return;
-  }
-  setActiveVoice(state.ttsVoiceIndex + 1);
-  const name = state.ttsVoice?.name || "未知";
-  setStatus(`音色: ${name}`);
-}
-
-function clearWakeRestartTimer() {
-  if (!state.wakeRestartTimer) {
-    return;
-  }
-  clearTimeout(state.wakeRestartTimer);
-  state.wakeRestartTimer = 0;
-}
-
-function shouldRunWakeWordListener() {
-  return (
-    !!state.wakeWordEnabled &&
-    !!state.recognitionAvailable &&
-    !state.micToggleBusy &&
-    !state.micOpen &&
-    !state.recognitionActive &&
-    !state.chatBusy
-  );
-}
-
-function stopWakeWordListener(hardStop = false) {
-  clearWakeRestartTimer();
-  if (!state.wakeRecognition) {
-    state.wakeRecognitionActive = false;
-    return;
-  }
-  try {
-    if (hardStop && typeof state.wakeRecognition.abort === "function") {
-      state.wakeRecognition.abort();
-    } else {
-      state.wakeRecognition.stop();
-    }
-  } catch (_) {
-    // ignore
-  }
-  state.wakeRecognitionActive = false;
-}
-
-function scheduleWakeWordStart(delayMs = 0) {
-  clearWakeRestartTimer();
-  if (!shouldRunWakeWordListener()) {
-    return;
-  }
-  state.wakeRestartTimer = window.setTimeout(() => {
-    state.wakeRestartTimer = 0;
-    if (!shouldRunWakeWordListener() || !state.wakeRecognition || state.wakeRecognitionActive) {
-      return;
-    }
-    try {
-      state.wakeRecognition.start();
-    } catch (_) {
-      scheduleWakeWordStart(900);
-    }
-  }, Math.max(0, Number(delayMs) || 0));
-}
-
-function wakeTranscriptHit(text) {
-  const src = String(text || "").toLowerCase();
-  if (!src) {
-    return false;
-  }
-  const words = Array.isArray(state.wakeWords) ? state.wakeWords : [];
-  for (const raw of words) {
-    const w = String(raw || "").trim().toLowerCase();
-    if (w && src.includes(w)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function setupWakeWordRecognition(RecognitionCtor) {
-  if (!RecognitionCtor) {
-    state.wakeRecognition = null;
-    state.wakeRecognitionActive = false;
-    return;
-  }
-  const wake = new RecognitionCtor();
-  wake.lang = "zh-CN";
-  wake.continuous = true;
-  wake.interimResults = false;
-  wake.maxAlternatives = 1;
-  wake.onstart = () => {
-    state.wakeRecognitionActive = true;
-  };
-  wake.onerror = () => {
-    state.wakeRecognitionActive = false;
-  };
-  wake.onend = () => {
-    state.wakeRecognitionActive = false;
-    if (shouldRunWakeWordListener()) {
-      scheduleWakeWordStart(280);
-    }
-  };
-  wake.onresult = async (event) => {
-    if (!shouldRunWakeWordListener()) {
-      return;
-    }
-    if (Date.now() < state.wakeCooldownUntil) {
-      return;
-    }
-    for (let i = event.resultIndex || 0; i < (event.results?.length || 0); i++) {
-      const result = event.results[i];
-      if (!result || !result.isFinal) {
-        continue;
-      }
-      const transcript = String(result?.[0]?.transcript || "").trim();
-      if (!wakeTranscriptHit(transcript)) {
-        continue;
-      }
-      state.wakeCooldownUntil = Date.now() + 2200;
-      stopWakeWordListener(true);
-      setStatus("热词已唤醒，正在开麦...");
-      if (!state.micOpen) {
-        await toggleMicOpen();
-      }
-      return;
-    }
-  };
-  state.wakeRecognition = wake;
-  scheduleWakeWordStart(700);
-}
-
-function setupSpeechRecognition() {
-  const hasLocalAsr =
-    !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function") &&
-    !!(window.AudioContext || window.webkitAudioContext);
-  state.localAsrAvailable = hasLocalAsr;
-
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Recognition) {
-    state.recognitionAvailable = false;
-    state.recognition = null;
-    if (hasLocalAsr) {
-      state.asrMode = "local_vosk";
-    }
-    updateMicButton();
-    return;
-  }
-
-  const recog = new Recognition();
-  recog.lang = "zh-CN";
-  recog.continuous = true;
-  recog.interimResults = false;
-  recog.maxAlternatives = 1;
-
-  recog.onstart = () => {
-    state.recognitionActive = true;
-    state.micRetryCount = 0;
-    if (state.micOpen && state.micSuspendDepth === 0) {
-      setStatus("开麦中...");
-    }
-    updateMicButton();
-  };
-  recog.onerror = (event) => {
-    state.recognitionActive = false;
-    const code = String(event?.error || "");
-    if (code === "not-allowed" || code === "service-not-allowed") {
-      state.micOpen = false;
-      setStatus("麦克风权限被拒绝");
-    } else if (code === "audio-capture") {
-      state.micRetryCount = Math.min(8, state.micRetryCount + 1);
-      setStatus("麦克风不可用，请检查设备");
-    } else if (code === "network") {
-      state.micRetryCount = Math.min(8, state.micRetryCount + 1);
-      setStatus("语音识别网络异常，正在重试");
-    } else if (code && code !== "aborted" && code !== "no-speech") {
-      state.micRetryCount = Math.min(8, state.micRetryCount + 1);
-      setStatus("语音输入失败");
-    }
-    updateMicButton();
-  };
-  recog.onend = () => {
-    state.recognitionActive = false;
-    if (state.micOpen && state.micSuspendDepth === 0) {
-      scheduleMicRecognitionStart(220);
-      setStatus("开麦中...");
-    } else {
-      setStatus("待机");
-    }
-    updateMicButton();
-  };
-  recog.onresult = (event) => {
-    for (let i = event.resultIndex || 0; i < (event.results?.length || 0); i++) {
-      const result = event.results[i];
-      if (!result || !result.isFinal) {
-        continue;
-      }
-      const transcript = result?.[0]?.transcript?.trim();
-      if (transcript) {
-        enqueueMicTranscript(transcript, state.micSession);
-      }
-    }
-  };
-
-  state.recognition = recog;
-  state.recognitionAvailable = true;
-  if (state.localAsrAvailable) {
-    // Prefer local Vosk ASR to avoid browser cloud recognition instability.
-    state.asrMode = "local_vosk";
-  } else {
-    state.asrMode = "webspeech";
-  }
-  setupWakeWordRecognition(Recognition);
-  updateMicButton();
-}
-
-async function streamAssistantReply(payload, onDelta, perfHooks = null) {
-  const chatApi = window.TaffyModules?.chatApi || {};
-  if (typeof chatApi.streamAssistantReply !== "function") {
-    throw new Error("chatApi stream helper is not available");
-  }
-  return chatApi.streamAssistantReply(payload, onDelta, {
-    authFetch,
-    onCharacterRuntimeMetadata: handleCharacterRuntimeMetadata,
-    preferStream: state.conversationMode.chatStreamEnabled !== false,
-    perfHooks,
-    perfLog,
-    now: () => performance.now()
-  });
-}
-
-async function requestAssistantReply(text, opts = {}) {
-  const message = String(text || "").trim();
-  if (!message || state.chatBusy) {
-    return false;
-  }
-  const userDisplayText = String(opts.userDisplayText || message).trim() || message;
-  const rememberContent = String(opts.rememberContent || message).trim() || message;
-  const imageDataUrlOverride = typeof opts.imageDataUrlOverride === "string"
-    ? String(opts.imageDataUrlOverride || "").trim()
-    : "";
-
-  const showUser = opts.showUser !== false;
-  const rememberUser = opts.rememberUser !== false;
-  const rememberAssistant = opts.rememberAssistant !== false;
-  const silentError = !!opts.silentError;
-  const isAuto = !!opts.auto;
-  const skipDesktopAttach = opts.skipDesktopAttach === true;
-  const forceTools = opts.forceTools === true;
-  const chatPerfTraceId = createPerfTraceId("chat");
-  const chatPerfStartPerfMs = performance.now();
-  const chatPerfStartWallMs = Date.now();
-  let chatPerfApiHeaderPerfMs = 0;
-  let chatPerfFirstDeltaPerfMs = 0;
-  state.activePerfTraceId = chatPerfTraceId;
-  perfLog("chat", "send_click", {
-    traceId: chatPerfTraceId,
-    mode: String(state.streamSpeakMode || ""),
-    ttsProvider: String(state.ttsProvider || ""),
-    messageChars: message.length
-  });
-  const userTimestamp = Date.now();
-  if (showUser || rememberUser) {
-    state.lastUserMessageAt = userTimestamp;
-    state.conversationLastUserAt = userTimestamp;
-    if (!isAuto) {
-      state.autoChatBurstCount = 0;
-    }
-  }
-
-  if (showUser) {
-    appendMessage("user", userDisplayText, { timestamp: userTimestamp });
-  }
-  if (rememberUser) {
-    rememberMessage("user", rememberContent, { timestamp: userTimestamp });
-  }
-  const initialMood = detectMood(userDisplayText);
-  const talkStyle = resolveTalkStyle(userDisplayText, "", initialMood, isAuto);
-  state.currentTalkStyle = talkStyle;
-  enqueueActionIntent("listen", { text: userDisplayText, style: talkStyle, mood: initialMood });
-
-  state.chatBusy = true;
-  stopWakeWordListener(true);
-  pauseMicForAssistant();
-  setStatus(isAuto ? "自动对话中..." : "思考中...");
-  let assistantRow = null;
-  let reply = "";
-  let visibleStreamReply = "";
-  let gotFirstDelta = false;
-  let latencyHintTimer = 0;
-  const streamSpeakSession = Date.now();
-  const useStreamSpeak = shouldUseStreamSpeak();
-  stopAllAudioPlayback();
-  state.streamSpeakSession = streamSpeakSession;
-  state.streamSpeakQueue = [];
-  state.streamSpeakBuffer = "";
-  state.streamSpeakLastEnqueueSession = 0;
-  if (shouldPlayLatencyHint(isAuto, useStreamSpeak)) {
-    latencyHintTimer = window.setTimeout(async () => {
-      if (!state.chatBusy || gotFirstDelta) {
-        return;
-      }
-      if (streamSpeakSession !== state.streamSpeakSession) {
-        return;
-      }
-      const hint = pickLatencyHintText();
-      const prosody = buildSpeakProsody(hint, "idle", false, talkStyle);
-        await speak(hint, { force: true, interrupt: true, prosody });
-      if (state.chatBusy && !gotFirstDelta) {
-        setStatus(isAuto ? "自动对话中..." : "思考中...");
-      }
-    }, 850);
-  }
-  clearThinkingMotionTimer();
-  state.thinkingMotionTimer = window.setTimeout(() => {
-    if (!state.chatBusy || gotFirstDelta) {
-      return;
-    }
-    enqueueActionIntent("thinking", { style: talkStyle, mood: initialMood, combo: false });
-  }, 520);
-
-  try {
-    let imageDataUrl = imageDataUrlOverride;
-    if (!skipDesktopAttach && !imageDataUrl && shouldAttachDesktopImage(message, isAuto)) {
-      setStatus("正在观察桌面...");
-      imageDataUrl = await captureDesktopSnapshot();
-      setStatus(isAuto ? "自动对话中..." : "思考中...");
-    }
-
-    const payload = {
-      message,
-      history: (state.history || []).map((item) => ({
-        role: item.role,
-        content: item.content
-      })),
-      auto: isAuto,
-      force_tools: forceTools,
-      _perf_trace_id: chatPerfTraceId,
-      _perf_client_send_ts_ms: chatPerfStartWallMs
-    };
-    if (imageDataUrl) {
-      payload.image_data_url = imageDataUrl;
-    }
-
-    assistantRow = appendMessage("assistant", "", {
-      persist: false,
-      hideTimestamp: true
-    });
-    const streamed = await streamAssistantReply(payload, (delta) => {
-      if (!gotFirstDelta) {
-        gotFirstDelta = true;
-        if (!chatPerfFirstDeltaPerfMs) {
-          chatPerfFirstDeltaPerfMs = performance.now();
-        }
-        perfLog("chat", "first_text_render", {
-          traceId: chatPerfTraceId,
-          elapsedMs: Math.round(chatPerfFirstDeltaPerfMs - chatPerfStartPerfMs),
-          fromApiHeadersMs: chatPerfApiHeaderPerfMs
-            ? Math.round(chatPerfFirstDeltaPerfMs - chatPerfApiHeaderPerfMs)
-            : -1
-        });
-        clearThinkingMotionTimer();
-        if (latencyHintTimer) {
-          clearTimeout(latencyHintTimer);
-          latencyHintTimer = 0;
-        }
-      }
-      reply += delta;
-      const nextVisibleStreamReply = parseToolMetaFromText(reply).visibleText;
-      const visibleDelta = nextVisibleStreamReply.startsWith(visibleStreamReply)
-        ? nextVisibleStreamReply.slice(visibleStreamReply.length)
-        : "";
-      visibleStreamReply = nextVisibleStreamReply;
-      setMessageText(assistantRow, visibleStreamReply, { enableTranslation: false });
-      if (useStreamSpeak) {
-        feedStreamSpeakDelta(visibleDelta, streamSpeakSession, talkStyle);
-      }
-      setStatus(isAuto ? "自动对话中..." : "思考中...");
-    }, {
-      onApiHeaders: ({ mode, status, atPerfMs }) => {
-        chatPerfApiHeaderPerfMs = Number(atPerfMs) || performance.now();
-        perfLog("chat", "api_headers", {
-          traceId: chatPerfTraceId,
-          mode: String(mode || ""),
-          status: Number(status) || 0,
-          elapsedMs: Math.round(chatPerfApiHeaderPerfMs - chatPerfStartPerfMs)
-        });
-      },
-      onFirstDelta: ({ atPerfMs }) => {
-        chatPerfFirstDeltaPerfMs = Number(atPerfMs) || performance.now();
-      }
-    });
-    if (streamed && streamed !== reply) {
-      reply = streamed;
-      visibleStreamReply = parseToolMetaFromText(reply).visibleText;
-      setMessageText(assistantRow, visibleStreamReply, { enableTranslation: false });
-    }
-    reply = reply.trim();
-    const parsedReply = parseToolMetaFromText(reply);
-    const visibleReply = normalizeAssistantVisibleText(parsedReply.visibleText);
-    if (!visibleReply) {
-      throw new Error("模型没有返回内容");
-    }
-    const assistantTimestamp = Date.now();
-    finalizePendingMessageRow(assistantRow, "assistant", visibleReply, {
-      timestamp: assistantTimestamp,
-      persist: true
-    });
-    perfLog("chat", "reply_ready", {
-      traceId: chatPerfTraceId,
-      elapsedMs: Math.round(performance.now() - chatPerfStartPerfMs),
-      replyChars: visibleReply.length,
-      apiToRenderMs: chatPerfApiHeaderPerfMs
-        ? Math.round((chatPerfFirstDeltaPerfMs || performance.now()) - chatPerfApiHeaderPerfMs)
-        : -1
-    });
-    if (rememberAssistant) {
-      rememberMessage("assistant", visibleReply, { timestamp: assistantTimestamp });
-    }
-    state.conversationLastAssistantAt = assistantTimestamp;
-    updateConversationFollowupState(visibleReply);
-    const mood = detectMood(visibleReply);
-    recordEmotion(mood);
-    const baseTalkStyle = resolveTalkStyle(message, visibleReply, mood, isAuto);
-    const replyCueCandidate = previewAssistantReplyCharacterCueCandidate({
-      text: visibleReply,
-      mood,
-      style: baseTalkStyle,
-      auto: isAuto
-    });
-    const replyCueApply = maybeAutoApplyAssistantReplyCharacterCueCandidate(replyCueCandidate, {
-      text: visibleReply,
-      mood,
-      style: baseTalkStyle,
-      auto: isAuto
-    });
-    const finalTalkStyle = normalizeTalkStyle(replyCueApply?.speechStyle || baseTalkStyle);
-    const finalProsodyStyle = replyCueApply?.voiceStyle || finalTalkStyle;
-    state.currentTalkStyle = finalTalkStyle;
-    state.speechAnimMood = mood;
-    if (state.motionQuietDuringSpeech && state.speakingEnabled) {
-      triggerExpressionPulse(finalTalkStyle, 0.4, 220);
-    } else {
-      enqueueActionIntent("reply", { text: visibleReply, style: finalTalkStyle, mood, combo: true });
-    }
-    if (useStreamSpeak) {
-      flushStreamSpeak(streamSpeakSession, finalTalkStyle);
-      const hadStreamSegments = state.streamSpeakLastEnqueueSession === streamSpeakSession;
-      if (hadStreamSegments && state.streamSpeakPlayedSession === streamSpeakSession) {
-        scheduleFinalSpeechWatchdog({
-          sessionId: streamSpeakSession,
-          text: visibleReply,
-          mood,
-          style: finalTalkStyle,
-          traceId: chatPerfTraceId
-        });
-      } else if (!hadStreamSegments || !state.streamSpeakWorking) {
-        const speechText = buildStableSpeakText(visibleReply) || visibleReply;
-        const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle);
-        maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
-        const discardedSegments = discardQueuedStreamSpeakItems(streamSpeakSession);
-        recordTTSDebugEvent("final_direct_tts", {
-          traceId: chatPerfTraceId,
-          sessionId: streamSpeakSession,
-          text: speechText || visibleReply,
-          result: hadStreamSegments ? "no_stream_playback_yet" : "no_stream_segments",
-          blobBytes: discardedSegments
-        });
-        await speak(speechText || visibleReply, {
-          prosody,
-          interrupt: true,
-          mood,
-          style: finalTalkStyle,
-          voiceStyle: finalProsodyStyle,
-          perfTraceId: chatPerfTraceId,
-          playbackGeneration: Number(state.ttsPlaybackGeneration || 0)
-        });
-      } else {
-        scheduleFinalSpeechWatchdog({
-          sessionId: streamSpeakSession,
-          text: visibleReply,
-          mood,
-          style: finalTalkStyle,
-          traceId: chatPerfTraceId
-        });
-      }
-    } else {
-      const speechText = buildStableSpeakText(visibleReply) || visibleReply;
-      const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle);
-      maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
-      await speak(speechText || visibleReply, {
-        prosody,
-        interrupt: false,
-        mood,
-        style: finalTalkStyle,
-        voiceStyle: finalProsodyStyle,
-        perfTraceId: chatPerfTraceId
-      });
-    }
-    setStatus("待机");
-    return true;
-  } catch (err) {
-    perfLog("chat", "fail", {
-      traceId: chatPerfTraceId,
-      elapsedMs: Math.round(performance.now() - chatPerfStartPerfMs),
-      error: String(err?.message || err || "")
-    });
-    clearThinkingMotionTimer();
-    if (latencyHintTimer) {
-      clearTimeout(latencyHintTimer);
-      latencyHintTimer = 0;
-    }
-    if (streamSpeakSession === state.streamSpeakSession) {
-      state.streamSpeakQueue = [];
-      state.streamSpeakBuffer = "";
-    }
-    if (assistantRow && !reply) {
-      try {
-        assistantRow.remove();
-      } catch (_) {
-        // ignore
-      }
-    }
-    if (!silentError) {
-      const msg = buildChatFailureDoctorHint(err);
-      appendMessage("assistant", msg);
-    }
-    setStatus("请求失败");
-    return false;
-  } finally {
-    perfLog("chat", "done", {
-      traceId: chatPerfTraceId,
-      elapsedMs: Math.round(performance.now() - chatPerfStartPerfMs)
-    });
-    state.activePerfTraceId = "";
-    clearThinkingMotionTimer();
-    if (latencyHintTimer) {
-      clearTimeout(latencyHintTimer);
-      latencyHintTimer = 0;
-    }
-    state.chatBusy = false;
-    resumeMicAfterAssistant();
-    if (!state.micOpen) {
-      scheduleWakeWordStart(360);
-    }
-    updateMicButton();
-  }
-}
-
-async function sendChat() {
-  const rawText = ui.chatInput.value.trim();
-  const pending = Array.isArray(state.pendingAttachments) ? state.pendingAttachments.slice() : [];
-  if (!rawText && !pending.length) {
-    return;
-  }
-  ui.chatInput.value = "";
-  const text = rawText || "请帮我看看我发的附件。";
-  const consumed = await handleLocalCommand(text);
-  if (consumed) {
-    setStatus("待机");
-    return;
-  }
-  let modelText = text;
-  let displayText = text;
-  let imageDataUrlOverride = "";
-  if (pending.length) {
-    const ctx = buildAttachmentContextText(pending);
-    if (ctx) {
-      modelText = `${text}\n\n${ctx}`;
-    }
-    displayText = `${text}${buildAttachmentDisplaySuffix(pending)}`;
-    const firstImage = pending.find((item) => item?.kind === "image" && typeof item?.dataUrl === "string");
-    if (firstImage?.dataUrl) {
-      imageDataUrlOverride = String(firstImage.dataUrl || "");
-    }
-  }
-  const ok = await requestAssistantReply(modelText, {
-    showUser: true,
-    rememberUser: true,
-    auto: false,
-    silentError: false,
-    userDisplayText: displayText,
-    rememberContent: displayText,
-    imageDataUrlOverride
-  });
-  if (ok && pending.length) {
-    clearPendingAttachments();
-    if (ui.attachInput) {
-      ui.attachInput.value = "";
-    }
-  }
-}
+async function streamAssistantReply(payload, onDelta, perfHooks = null) { return getChatReplyController().streamAssistantReply(payload, onDelta, perfHooks); }
+async function requestAssistantReply(text, opts = {}) { return getChatReplyController().requestAssistantReply(text, opts); }
+async function sendChat() { return getChatReplyController().sendChat(); }
 
 function snapshotPendingLocalAsr() {
   const chunks = Array.isArray(state.localAsrBuffers) ? state.localAsrBuffers.slice() : [];
@@ -18854,7 +4898,7 @@ async function toggleMicOpen() {
 
 function bindUI() {
   if ("speechSynthesis" in window) {
-    ui.speakBtn.textContent = state.speakingEnabled ? "语音开" : "语音关";
+    updateSpeakButton();
   }
   if (ui.scheduleDatetime && !ui.scheduleDatetime.value) {
     ui.scheduleDatetime.value = buildDefaultScheduleDateTimeValue();
@@ -18880,716 +4924,21 @@ function bindUI() {
   bindSubtitleDragHandle();
   renderOnboardingStep();
 
-  ui.sendBtn.addEventListener("click", sendChat);
-  ui.chatInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      sendChat();
-    }
-  });
-  if (ui.attachBtn && ui.attachInput) {
-    ui.attachBtn.addEventListener("click", () => {
-      if (state.attachmentReadBusy) {
-        setStatus("附件处理中，请稍等...");
-        return;
-      }
-      ui.attachInput.click();
-    });
-    ui.attachInput.addEventListener("change", async () => {
-      try {
-        await handleAttachmentFiles(ui.attachInput.files);
-      } finally {
-        ui.attachInput.value = "";
-      }
-    });
-  }
+  bindChatInputControls();
+  bindDesktopControlButtons();
 
-  ui.micBtn.addEventListener("click", async () => {
-    await toggleMicOpen();
-  });
-  window.addEventListener("keydown", async (event) => {
-    if (!event.ctrlKey) {
-      if (event.key === "Escape" && isOnboardingOpen()) {
-        event.preventDefault();
-        closeOnboardingModal({ markSeen: true });
-        return;
-      }
-      if (event.key === "Escape" && isHelpOpen()) {
-        event.preventDefault();
-        closeHelpModal();
-        return;
-      }
-      if (event.key === "Escape" && isLearningReviewOpen()) {
-        event.preventDefault();
-        closeLearningReviewDrawer();
-        return;
-      }
-      if (event.key === "Escape" && ui.personaModal && !ui.personaModal.hidden) {
-        event.preventDefault();
-        closePersonaPanel();
-        return;
-      }
-      if (event.key === "Escape" && ui.scheduleModal && !ui.scheduleModal.hidden) {
-        event.preventDefault();
-        closeSchedulePanel();
-      }
-      return;
-    }
-    if (String(event.key || "").toLowerCase() !== "m") {
-      return;
-    }
-    if (event.repeat) {
-      return;
-    }
-    event.preventDefault();
-    await toggleMicOpen();
-  });
+  bindPanelControls();
 
-  ui.speakBtn.addEventListener("click", () => {
-    state.speakingEnabled = !state.speakingEnabled;
-    ui.speakBtn.textContent = state.speakingEnabled ? "语音开" : "语音关";
-    if (!state.speakingEnabled) {
-      stopAllAudioPlayback();
-    }
-  });
+  bindLearningReviewControls();
 
-  if (ui.voiceNextBtn) {
-    ui.voiceNextBtn.addEventListener("click", async () => {
-      switchVoice();
-      state.speakingEnabled = true;
-      ui.speakBtn.textContent = "语音开";
-      const ok = await speak("你好，我是新的音色。", { force: true });
-      if (!ok) {
-        setStatus("当前声线不可用");
-      }
-    });
-  }
-
-  if (ui.observeBtn) {
-    ui.observeBtn.addEventListener("click", () => {
-      if (!state.desktopCanCapture) {
-        setStatus("桌面观察不可用");
-        return;
-      }
-      state.observeDesktop = !state.observeDesktop;
-      updateObserveButton();
-      setStatus(state.observeDesktop ? "桌面观察已开启" : "桌面观察已关闭");
-    });
-  }
-
-  if (ui.lockBtn) {
-    ui.lockBtn.addEventListener("click", () => {
-      if (
-        state.desktopBridge !== "electron" ||
-        !window.electronAPI ||
-        typeof window.electronAPI.setWindowLock !== "function"
-      ) {
-        setStatus("桌面锁定仅在桌面版可用");
-        updateLockButton();
-        return;
-      }
-      const next = !state.windowLocked;
-      setWindowLockedFromUI(next);
-      setStatus(next ? "桌面已锁定" : "桌面已解锁");
-    });
-  }
-
-  if (ui.autoChatBtn) {
-    ui.autoChatBtn.addEventListener("click", () => {
-      state.autoChatEnabled = !state.autoChatEnabled;
-      updateAutoChatButton();
-      if (state.autoChatEnabled) {
-        startAutoChatLoop();
-        setStatus("自动对话已开启");
-      } else {
-        stopAutoChatLoop();
-        setStatus("自动对话已关闭");
-      }
-    });
-  }
-
-  if (ui.scheduleBtn) {
-    ui.scheduleBtn.addEventListener("click", () => {
-      if (ui.scheduleModal?.hidden) {
-        openSchedulePanel();
-      } else {
-        closeSchedulePanel();
-      }
-    });
-  }
-
-  if (ui.moreBtn) {
-    ui.moreBtn.addEventListener("click", () => {
-      const expanded = ui.moreBtn.getAttribute("aria-expanded") === "true";
-      setAdvancedActionsExpanded(!expanded);
-    });
-  }
-
-  if (ui.personaBtn) {
-    ui.personaBtn.addEventListener("click", () => {
-      if (ui.personaModal?.hidden) {
-        openPersonaPanel();
-      } else {
-        closePersonaPanel();
-      }
-    });
-  }
-
-  if (ui.learningReviewBtn) {
-    ui.learningReviewBtn.addEventListener("click", () => {
-      toggleLearningReviewDrawer();
-    });
-  }
-
-  if (ui.followupReadinessBtn) {
-    ui.followupReadinessBtn.addEventListener("click", () => {
-      const visible = toggleFollowupReadinessPanel();
-      updateFollowupCharacterChip();
-      setStatus(visible ? "续话状态面板已打开" : "续话状态面板已隐藏");
-    });
-  }
-
-  if (ui.doctorBtn) {
-    ui.doctorBtn.addEventListener("click", async () => {
-      ui.doctorBtn.disabled = true;
-      const previousText = ui.doctorBtn.textContent || "链路自检";
-      ui.doctorBtn.textContent = "自检中";
-      try {
-        await runDoctorAndAppendReport();
-      } catch (err) {
-        appendMessage("assistant", `Doctor failed: ${err.message || err}`, { enableTranslation: false });
-        setStatus("链路自检失败");
-      } finally {
-        ui.doctorBtn.disabled = false;
-        ui.doctorBtn.textContent = previousText;
-      }
-    });
-  }
-
-  if (ui.voiceTestBtn) {
-    ui.voiceTestBtn.addEventListener("click", async () => {
-      ui.voiceTestBtn.disabled = true;
-      const previousText = ui.voiceTestBtn.textContent || "测试语音";
-      ui.voiceTestBtn.textContent = "测试中";
-      try {
-        await runVoiceTestAndAppendReport();
-      } catch (err) {
-        appendMessage("assistant", `语音测试失败: ${err.message || err}`, { enableTranslation: false });
-        setStatus("语音测试失败");
-      } finally {
-        ui.voiceTestBtn.disabled = false;
-        ui.voiceTestBtn.textContent = previousText;
-      }
-    });
-  }
-
-  if (ui.characterRehearsalBtn) {
-    ui.characterRehearsalBtn.addEventListener("click", async () => {
-      ui.characterRehearsalBtn.disabled = true;
-      const previousText = ui.characterRehearsalBtn.textContent || "角色试演";
-      ui.characterRehearsalBtn.textContent = "试演中";
-      try {
-        await runCharacterRehearsalAndAppendReport();
-      } catch (err) {
-        appendMessage("assistant", `角色试演失败: ${err.message || err}`, { enableTranslation: false });
-        setStatus("角色试演失败");
-      } finally {
-        ui.characterRehearsalBtn.disabled = false;
-        ui.characterRehearsalBtn.textContent = previousText;
-      }
-    });
-  }
-
-  if (ui.characterTuningBtn) {
-    ui.characterTuningBtn.addEventListener("click", () => {
-      runCharacterTuningAndAppendReport();
-    });
-  }
-
-  if (ui.characterFeedbackGoodBtn) {
-    ui.characterFeedbackGoodBtn.addEventListener("click", () => {
-      recordCharacterPerformanceFeedback("good");
-    });
-  }
-
-  if (ui.characterFeedbackBadBtn) {
-    ui.characterFeedbackBadBtn.addEventListener("click", () => {
-      recordCharacterPerformanceFeedback("bad");
-    });
-  }
-
-  if (ui.learningReviewCloseBtn) {
-    ui.learningReviewCloseBtn.addEventListener("click", () => {
-      closeLearningReviewDrawer();
-    });
-  }
-
-  if (ui.learningReviewBackdrop) {
-    ui.learningReviewBackdrop.addEventListener("click", () => {
-      closeLearningReviewDrawer();
-    });
-  }
-
-  if (ui.learningReviewUndoBtn) {
-    ui.learningReviewUndoBtn.addEventListener("click", async () => {
-      try {
-        await undoLearningLastStep();
-      } catch (err) {
-        setStatus(`撤销失败: ${err.message || err}`);
-      }
-    });
-  }
-
-  if (ui.translationToggleBtn) {
-    ui.translationToggleBtn.addEventListener("click", () => {
-      toggleChatTranslationVisibility();
-    });
-  }
-
-  if (ui.subtitleToggleBtn) {
-    ui.subtitleToggleBtn.addEventListener("click", () => {
-      toggleSubtitleEnabled();
-    });
-  }
-
-  if (ui.translationChipBtn) {
-    ui.translationChipBtn.addEventListener("click", () => {
-      toggleChatTranslationVisibility();
-    });
-  }
-
-  if (ui.helpBtn) {
-    ui.helpBtn.addEventListener("click", () => {
-      if (isHelpOpen()) {
-        closeHelpModal();
-      } else {
-        openHelpModal();
-      }
-    });
-  }
-
-  if (ui.helpCloseBtn) {
-    ui.helpCloseBtn.addEventListener("click", () => {
-      closeHelpModal();
-    });
-  }
-
-  if (ui.helpModal) {
-    ui.helpModal.addEventListener("click", (event) => {
-      if (event.target === ui.helpModal) {
-        closeHelpModal();
-      }
-    });
-  }
-
-  if (ui.helpOpenOnboardingBtn) {
-    ui.helpOpenOnboardingBtn.addEventListener("click", () => {
-      openOnboardingModal({ resetStep: true });
-    });
-  }
-
-  if (ui.onboardingSkipBtn) {
-    ui.onboardingSkipBtn.addEventListener("click", () => {
-      closeOnboardingModal({ markSeen: true });
-    });
-  }
-
-  if (ui.onboardingQuickBtn) {
-    ui.onboardingQuickBtn.addEventListener("click", () => {
-      closeOnboardingModal({ markSeen: true });
-      setStatus("已进入立即体验模式");
-    });
-  }
-
-  if (ui.onboardingAdvancedBtn) {
-    ui.onboardingAdvancedBtn.addEventListener("click", () => {
-      closeOnboardingModal({ markSeen: true });
-      setStatus("正在打开高级配置中心");
-      openAdvancedConfigCenter();
-    });
-  }
-
-  if (ui.onboardingPrevBtn) {
-    ui.onboardingPrevBtn.addEventListener("click", () => {
-      moveOnboardingStep(-1);
-    });
-  }
-
-  if (ui.onboardingNextBtn) {
-    ui.onboardingNextBtn.addEventListener("click", () => {
-      moveOnboardingStep(1);
-    });
-  }
-
-  if (ui.onboardingDoneBtn) {
-    ui.onboardingDoneBtn.addEventListener("click", () => {
-      closeOnboardingModal({ markSeen: true });
-      setStatus("新手引导已完成");
-    });
-  }
-
-  if (ui.onboardingModal) {
-    ui.onboardingModal.addEventListener("click", (event) => {
-      if (event.target === ui.onboardingModal) {
-        closeOnboardingModal({ markSeen: true });
-      }
-    });
-  }
-
-  if (ui.learningTabCandidates) {
-    ui.learningTabCandidates.addEventListener("click", () => {
-      learningReviewState.activeTab = "candidates";
-      renderLearningReviewList();
-    });
-  }
-
-  if (ui.learningTabSamples) {
-    ui.learningTabSamples.addEventListener("click", () => {
-      learningReviewState.activeTab = "samples";
-      renderLearningReviewList();
-    });
-  }
-
-  if (ui.learningTabDebug) {
-    ui.learningTabDebug.addEventListener("click", async () => {
-      learningReviewState.activeTab = "debug";
-      renderLearningReviewList();
-      try {
-        await reloadMemoryDebugData();
-      } catch (err) {
-        setStatus(`Memory debug failed: ${err.message || err}`);
-      }
-    });
-  }
-
-  for (const filterInput of [
-    ui.learningFilterScore,
-    ui.learningFilterConfidence,
-    ui.learningFilterKeyword
-  ]) {
-    if (!filterInput) {
-      continue;
-    }
-    filterInput.addEventListener("input", () => {
-      renderLearningReviewList();
-    });
-  }
-
-  if (ui.learningSortMode) {
-    ui.learningSortMode.value = learningReviewState.sortMode;
-    ui.learningSortMode.addEventListener("change", () => {
-      learningReviewState.sortMode = String(ui.learningSortMode?.value || "score_desc");
-      renderLearningReviewList();
-    });
-  }
-
-  if (ui.learningFilterHighBtn) {
-    ui.learningFilterHighBtn.addEventListener("click", () => {
-      applyLearningHighScorePreset();
-    });
-  }
-
-  if (ui.learningFilterResetBtn) {
-    ui.learningFilterResetBtn.addEventListener("click", () => {
-      resetLearningFilters();
-    });
-  }
-
-  if (ui.learningReloadBtn) {
-    ui.learningReloadBtn.addEventListener("click", async () => {
-      try {
-        await reloadLearningReviewData();
-      } catch (err) {
-        setStatus(`重读失败: ${err.message || err}`);
-      }
-    });
-  }
-
-  if (ui.learningQuickApplyBtn) {
-    ui.learningQuickApplyBtn.addEventListener("click", async () => {
-      try {
-        await applyLearningQuickSettings();
-      } catch (err) {
-        setStatus(`快捷开关更新失败: ${err.message || err}`);
-      }
-    });
-  }
-
-  if (ui.learningSelectAll) {
-    ui.learningSelectAll.addEventListener("change", () => {
-      const selectedSet = getLearningSelectedSet();
-      const filteredItems = getLearningFilteredItems();
-      if (ui.learningSelectAll.checked) {
-        filteredItems.forEach((item) => selectedSet.add(item.id));
-      } else {
-        filteredItems.forEach((item) => selectedSet.delete(item.id));
-      }
-      renderLearningReviewList();
-    });
-  }
-
-  if (ui.learningBatchDeleteBtn) {
-    ui.learningBatchDeleteBtn.addEventListener("click", async () => {
-      try {
-        await runLearningBatchAction("delete");
-      } catch (err) {
-        setStatus(`批量删除失败: ${err.message || err}`);
-      }
-    });
-  }
-
-  if (ui.learningBatchUpBtn) {
-    ui.learningBatchUpBtn.addEventListener("click", async () => {
-      try {
-        await runLearningBatchAction("weight_up");
-      } catch (err) {
-        setStatus(`批量升权失败: ${err.message || err}`);
-      }
-    });
-  }
-
-  if (ui.learningBatchDownBtn) {
-    ui.learningBatchDownBtn.addEventListener("click", async () => {
-      try {
-        await runLearningBatchAction("weight_down");
-      } catch (err) {
-        setStatus(`批量降权失败: ${err.message || err}`);
-      }
-    });
-  }
-
-  if (ui.learningBatchPromoteBtn) {
-    ui.learningBatchPromoteBtn.addEventListener("click", async () => {
-      try {
-        await runLearningBatchAction("promote");
-      } catch (err) {
-        setStatus(`批量晋升失败: ${err.message || err}`);
-      }
-    });
-  }
-
-  if (ui.learningReviewList) {
-    ui.learningReviewList.addEventListener("change", (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLInputElement)) {
-        return;
-      }
-      if (!target.classList.contains("learning-check")) {
-        return;
-      }
-      const id = String(target.dataset.id || "").trim();
-      if (!id) {
-        return;
-      }
-      const selectedSet = getLearningSelectedSet();
-      if (target.checked) {
-        selectedSet.add(id);
-      } else {
-        selectedSet.delete(id);
-      }
-      renderLearningReviewList();
-    });
-
-    ui.learningReviewList.addEventListener("click", async (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLButtonElement)) {
-        return;
-      }
-      const action = String(target.dataset.action || "").trim();
-      const id = String(target.dataset.id || "").trim();
-      if (!action || !id) {
-        return;
-      }
-      try {
-        await runLearningSingleAction(action, id);
-      } catch (err) {
-        setStatus(`操作失败: ${err.message || err}`);
-      }
-    });
-  }
-
-  if (ui.scheduleCloseBtn) {
-    ui.scheduleCloseBtn.addEventListener("click", () => {
-      closeSchedulePanel();
-    });
-  }
-
-  if (ui.scheduleModal) {
-    ui.scheduleModal.addEventListener("click", (event) => {
-      if (event.target === ui.scheduleModal) {
-        closeSchedulePanel();
-      }
-    });
-  }
-
-  if (ui.personaCloseBtn) {
-    ui.personaCloseBtn.addEventListener("click", () => {
-      closePersonaPanel();
-    });
-  }
-
-  if (ui.personaModal) {
-    ui.personaModal.addEventListener("click", (event) => {
-      if (event.target === ui.personaModal) {
-        closePersonaPanel();
-      }
-    });
-  }
-
-  if (ui.personaSaveBtn) {
-    ui.personaSaveBtn.addEventListener("click", async () => {
-      await savePersonaCardFromForm();
-    });
-  }
-
-  if (ui.personaPreviewBtn) {
-    ui.personaPreviewBtn.addEventListener("click", () => {
-      setStatus("预览提示：保存后会在接下来的对话中逐步生效");
-    });
-  }
-
-  if (ui.personaAvatarChangeBtn && ui.personaAvatarInput) {
-    ui.personaAvatarChangeBtn.addEventListener("click", () => {
-      ui.personaAvatarInput.click();
-    });
-  }
-
-  if (ui.personaAvatarInput) {
-    ui.personaAvatarInput.addEventListener("change", async () => {
-      try {
-        const file = ui.personaAvatarInput.files && ui.personaAvatarInput.files[0];
-        if (!file) {
-          return;
-        }
-        await setAssistantAvatarFromFile(file);
-      } catch (err) {
-        setStatus(`头像更新失败: ${err.message || err}`);
-      } finally {
-        ui.personaAvatarInput.value = "";
-      }
-    });
-  }
-
-  if (ui.personaAvatarResetBtn) {
-    ui.personaAvatarResetBtn.addEventListener("click", () => {
-      applyAssistantAvatar(ASSISTANT_AVATAR_DEFAULT);
-      setStatus("已恢复默认头像");
-    });
-  }
-
-  if (ui.personaApplyBtn) {
-    ui.personaApplyBtn.addEventListener("click", async () => {
-      const ok = await savePersonaCardFromForm();
-      if (ok) {
-        setStatus("人设卡已应用");
-      }
-    });
-  }
-
-  if (ui.personaImportTemplateBtn) {
-    ui.personaImportTemplateBtn.addEventListener("click", () => {
-      applyPersonaTemplateDraft();
-    });
-  }
-
-  if (ui.personaRandomBtn) {
-    ui.personaRandomBtn.addEventListener("click", () => {
-      applyRandomPersonaDraft();
-    });
-  }
-
-  if (ui.personaResetBtn) {
-    ui.personaResetBtn.addEventListener("click", () => {
-      resetPersonaDraft();
-    });
-  }
-
-  for (const field of [
-    ui.personaIdentity,
-    ui.personaPreferences,
-    ui.personaDislikes,
-    ui.personaTopics,
-    ui.personaReplyStyle,
-    ui.personaCompanionshipStyle
-  ]) {
-    if (!field) {
-      continue;
-    }
-    field.addEventListener("keydown", async (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-        event.preventDefault();
-        await savePersonaCardFromForm();
-      }
-    });
-  }
-
-  if (ui.scheduleSaveBtn) {
-    ui.scheduleSaveBtn.addEventListener("click", () => {
-      saveScheduleFromForm();
-    });
-  }
-
-  if (ui.scheduleTask) {
-    ui.scheduleTask.addEventListener("keydown", (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-        event.preventDefault();
-        saveScheduleFromForm();
-      }
-    });
-  }
-
-  if (ui.idleBtn) {
-    ui.idleBtn.addEventListener("click", () => {
-      enqueueActionIntent("tap", { combo: true });
-      scheduleIdleMotionLoop();
-    });
-  }
+  bindAdvancedActionControls();
 
   setTimeout(() => {
     maybeAutoOpenOnboarding();
   }, 180);
 }
 
-if (window.electronAPI?.onSubtitle) {
-  window.electronAPI.onSubtitle(({ id, en, zh }) => {
-    state.subtitleId = id;
-    if (!state.subtitleEnabled) {
-      _clearSubtitleDOM(id, true);
-      return;
-    }
-    _applySubtitleDOM(en || "", zh || "");
-  });
-  window.electronAPI.onSubtitleHide(({ id }) => {
-    _clearSubtitleDOM(id);
-  });
-}
-
-window.addEventListener("character-runtime:update", (event) => {
-  try {
-    const metadata = event?.detail || null;
-    const appliedEmotion = applyCharacterRuntimeEmotionToLive2D(metadata);
-    const appliedAction = applyCharacterRuntimeActionToLive2D(metadata);
-    const applyFeedback = {
-      at: Date.now(),
-      uiView: String(state.uiView || ""),
-      emotion: String(metadata?.emotion || ""),
-      action: String(metadata?.action || ""),
-      appliedEmotion,
-      appliedAction,
-      modelReady: !!state.model,
-      expressionEnabled: !!state.expressionEnabled,
-      motionEnabled: !!state.motionEnabled
-    };
-    state.followupCharacterRuntimeLastApply = applyFeedback;
-    updateReplyCharacterChip();
-    try {
-      window.__AI_CHAT_LAST_CHARACTER_RUNTIME_APPLY__ = applyFeedback;
-    } catch (_) {
-      // Diagnostics are optional.
-    }
-  } catch (_) {
-    // Keep runtime bridge isolated from chat main flow.
-  }
-});
+bindRuntimeEvents();
 installCharacterRuntimeWindowBridge();
 installCharacterRuntimeDebugBridge();
 installTTSDebugBridge();

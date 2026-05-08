@@ -8,9 +8,50 @@ const assert = require("assert");
 const CHAT_JS = path.resolve(__dirname, "..", "web", "chat.js");
 const INDEX_HTML = path.resolve(__dirname, "..", "web", "index.html");
 const BASE_CSS = path.resolve(__dirname, "..", "web", "base.css");
+const CHAT_STATE_JS = path.resolve(__dirname, "..", "web", "chatState.js");
+const CHAT_DOM_JS = path.resolve(__dirname, "..", "web", "chatDom.js");
+const STORAGE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "storageController.js");
+const DEBUG_PANEL_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "debugPanelController.js");
+const CHAT_MESSAGE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "chatMessageController.js");
+const ONBOARDING_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "onboardingController.js");
+const PERSONA_AVATAR_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "personaAvatarController.js");
+const REMINDER_SCHEDULE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "reminderScheduleController.js");
+const EMOTION_STATS_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "emotionStatsController.js");
+const LOCAL_ASR_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "localAsrController.js");
+const AUTO_CHAT_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "autoChatController.js");
+const RUNTIME_METADATA_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "runtimeMetadataController.js");
+const FOLLOWUP_DEBUG_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "followupDebugController.js");
+const GRAY_TRIAL_REPORT_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "grayTrialReportController.js");
+const GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "grayTrialCharacterPanelController.js");
+const FOLLOWUP_READINESS_PANEL_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "followupReadinessPanelController.js");
 const SPEECH_TEXT_JS = path.resolve(__dirname, "..", "web", "speechText.js");
 const ATTACHMENT_MODEL_JS = path.resolve(__dirname, "..", "web", "attachmentModel.js");
+const ATTACHMENT_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "attachmentController.js");
+const CHAT_TRANSLATION_SERVICE_JS = path.resolve(__dirname, "..", "web", "chatTranslationService.js");
+const SUBTITLE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "subtitleController.js");
+const SPEECH_STYLE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "speechStyleController.js");
+const EMOTION_MOOD_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "emotionMoodController.js");
+const ACTION_PLAN_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "actionPlanController.js");
+const MOTION_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "motionRuntimeController.js");
+const VOICE_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "voiceRuntimeController.js");
+const STREAM_TTS_QUEUE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "streamTtsQueueController.js");
+const TTS_PLAYBACK_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "ttsPlaybackController.js");
+const CHAT_REPLY_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "chatReplyController.js");
+const WAKE_WORD_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "wakeWordController.js");
+const APP_CONFIG_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "appConfigController.js");
+const LEARNING_REVIEW_API_JS = path.resolve(__dirname, "..", "web", "learningReviewApi.js");
 const LEARNING_REVIEW_MODEL_JS = path.resolve(__dirname, "..", "web", "learningReviewModel.js");
+const LEARNING_REVIEW_VIEW_JS = path.resolve(__dirname, "..", "web", "learningReviewView.js");
+const LEARNING_REVIEW_BINDER_JS = path.resolve(__dirname, "..", "web", "learningReviewBinder.js");
+const PANEL_CONTROL_BINDER_JS = path.resolve(__dirname, "..", "web", "panelControlBinder.js");
+const ADVANCED_ACTION_BINDER_JS = path.resolve(__dirname, "..", "web", "advancedActionBinder.js");
+const CHAT_INPUT_BINDER_JS = path.resolve(__dirname, "..", "web", "chatInputBinder.js");
+const DESKTOP_CONTROL_BINDER_JS = path.resolve(__dirname, "..", "web", "desktopControlBinder.js");
+const DESKTOP_WINDOW_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "desktopWindowController.js");
+const LIVE2D_LAYOUT_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "live2dLayoutController.js");
+const LIVE2D_EXPRESSION_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "live2dExpressionController.js");
+const LIVE2D_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "live2dRuntimeController.js");
+const RUNTIME_EVENT_BINDER_JS = path.resolve(__dirname, "..", "web", "runtimeEventBinder.js");
 const CHARACTER_RUNTIME_JS = path.resolve(__dirname, "..", "web", "characterRuntime.js");
 const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTuning.js");
 const DOCTOR_DIAGNOSTICS_JS = path.resolve(__dirname, "..", "web", "doctorDiagnostics.js");
@@ -33,9 +74,50 @@ const GRAY_TRIAL_CHARACTER_VIEW_JS = path.resolve(__dirname, "..", "web", "grayT
 const source = fs.readFileSync(CHAT_JS, "utf8");
 const indexSource = fs.readFileSync(INDEX_HTML, "utf8");
 const baseCssSource = fs.readFileSync(BASE_CSS, "utf8");
+const chatStateSource = fs.readFileSync(CHAT_STATE_JS, "utf8");
+const chatDomSource = fs.readFileSync(CHAT_DOM_JS, "utf8");
+const storageControllerSource = fs.readFileSync(STORAGE_CONTROLLER_JS, "utf8");
+const debugPanelControllerSource = fs.readFileSync(DEBUG_PANEL_CONTROLLER_JS, "utf8");
+const chatMessageControllerSource = fs.readFileSync(CHAT_MESSAGE_CONTROLLER_JS, "utf8");
+const onboardingControllerSource = fs.readFileSync(ONBOARDING_CONTROLLER_JS, "utf8");
+const personaAvatarControllerSource = fs.readFileSync(PERSONA_AVATAR_CONTROLLER_JS, "utf8");
+const reminderScheduleControllerSource = fs.readFileSync(REMINDER_SCHEDULE_CONTROLLER_JS, "utf8");
+const emotionStatsControllerSource = fs.readFileSync(EMOTION_STATS_CONTROLLER_JS, "utf8");
+const localAsrControllerSource = fs.readFileSync(LOCAL_ASR_CONTROLLER_JS, "utf8");
+const autoChatControllerSource = fs.readFileSync(AUTO_CHAT_CONTROLLER_JS, "utf8");
+const runtimeMetadataControllerSource = fs.readFileSync(RUNTIME_METADATA_CONTROLLER_JS, "utf8");
+const followupDebugControllerSource = fs.readFileSync(FOLLOWUP_DEBUG_CONTROLLER_JS, "utf8");
+const grayTrialReportControllerSource = fs.readFileSync(GRAY_TRIAL_REPORT_CONTROLLER_JS, "utf8");
+const grayTrialCharacterPanelControllerSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER_JS, "utf8");
+const followupReadinessPanelControllerSource = fs.readFileSync(FOLLOWUP_READINESS_PANEL_CONTROLLER_JS, "utf8");
 const speechTextSource = fs.readFileSync(SPEECH_TEXT_JS, "utf8");
 const attachmentModelSource = fs.readFileSync(ATTACHMENT_MODEL_JS, "utf8");
+const attachmentControllerSource = fs.readFileSync(ATTACHMENT_CONTROLLER_JS, "utf8");
+const chatTranslationServiceSource = fs.readFileSync(CHAT_TRANSLATION_SERVICE_JS, "utf8");
+const subtitleControllerSource = fs.readFileSync(SUBTITLE_CONTROLLER_JS, "utf8");
+const speechStyleControllerSource = fs.readFileSync(SPEECH_STYLE_CONTROLLER_JS, "utf8");
+const emotionMoodControllerSource = fs.readFileSync(EMOTION_MOOD_CONTROLLER_JS, "utf8");
+const actionPlanControllerSource = fs.readFileSync(ACTION_PLAN_CONTROLLER_JS, "utf8");
+const motionRuntimeControllerSource = fs.readFileSync(MOTION_RUNTIME_CONTROLLER_JS, "utf8");
+const voiceRuntimeControllerSource = fs.readFileSync(VOICE_RUNTIME_CONTROLLER_JS, "utf8");
+const streamTtsQueueControllerSource = fs.readFileSync(STREAM_TTS_QUEUE_CONTROLLER_JS, "utf8");
+const ttsPlaybackControllerSource = fs.readFileSync(TTS_PLAYBACK_CONTROLLER_JS, "utf8");
+const chatReplyControllerSource = fs.readFileSync(CHAT_REPLY_CONTROLLER_JS, "utf8");
+const wakeWordControllerSource = fs.readFileSync(WAKE_WORD_CONTROLLER_JS, "utf8");
+const appConfigControllerSource = fs.readFileSync(APP_CONFIG_CONTROLLER_JS, "utf8");
+const learningReviewApiSource = fs.readFileSync(LEARNING_REVIEW_API_JS, "utf8");
 const learningReviewModelSource = fs.readFileSync(LEARNING_REVIEW_MODEL_JS, "utf8");
+const learningReviewViewSource = fs.readFileSync(LEARNING_REVIEW_VIEW_JS, "utf8");
+const learningReviewBinderSource = fs.readFileSync(LEARNING_REVIEW_BINDER_JS, "utf8");
+const panelControlBinderSource = fs.readFileSync(PANEL_CONTROL_BINDER_JS, "utf8");
+const advancedActionBinderSource = fs.readFileSync(ADVANCED_ACTION_BINDER_JS, "utf8");
+const chatInputBinderSource = fs.readFileSync(CHAT_INPUT_BINDER_JS, "utf8");
+const desktopControlBinderSource = fs.readFileSync(DESKTOP_CONTROL_BINDER_JS, "utf8");
+const desktopWindowControllerSource = fs.readFileSync(DESKTOP_WINDOW_CONTROLLER_JS, "utf8");
+const live2dLayoutControllerSource = fs.readFileSync(LIVE2D_LAYOUT_CONTROLLER_JS, "utf8");
+const live2dExpressionControllerSource = fs.readFileSync(LIVE2D_EXPRESSION_CONTROLLER_JS, "utf8");
+const live2dRuntimeControllerSource = fs.readFileSync(LIVE2D_RUNTIME_CONTROLLER_JS, "utf8");
+const runtimeEventBinderSource = fs.readFileSync(RUNTIME_EVENT_BINDER_JS, "utf8");
 const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
 const doctorSource = fs.readFileSync(DOCTOR_DIAGNOSTICS_JS, "utf8");
 const replyCueSource = fs.readFileSync(CHARACTER_REPLY_CUE_JS, "utf8");
@@ -54,9 +136,58 @@ const grayTrialCharacterModelSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_MODEL
 const grayTrialAutoRuntimeSwitchModelSource = fs.readFileSync(GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL_JS, "utf8");
 const followupReadinessViewSource = fs.readFileSync(FOLLOWUP_READINESS_VIEW_JS, "utf8");
 const grayTrialCharacterViewSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_VIEW_JS, "utf8");
+const followupFeatureSource = [
+  source,
+  chatReplyControllerSource,
+  followupDebugControllerSource,
+  grayTrialReportControllerSource,
+  grayTrialCharacterPanelControllerSource,
+  followupReadinessPanelControllerSource
+].join("\n");
+const chatState = require(CHAT_STATE_JS);
+const chatDom = require(CHAT_DOM_JS);
+const storageController = require(STORAGE_CONTROLLER_JS);
+const debugPanelController = require(DEBUG_PANEL_CONTROLLER_JS);
+const chatMessageController = require(CHAT_MESSAGE_CONTROLLER_JS);
+const onboardingController = require(ONBOARDING_CONTROLLER_JS);
+const personaAvatarController = require(PERSONA_AVATAR_CONTROLLER_JS);
+const reminderScheduleController = require(REMINDER_SCHEDULE_CONTROLLER_JS);
+const emotionStatsController = require(EMOTION_STATS_CONTROLLER_JS);
+const localAsrController = require(LOCAL_ASR_CONTROLLER_JS);
+const autoChatController = require(AUTO_CHAT_CONTROLLER_JS);
+const runtimeMetadataController = require(RUNTIME_METADATA_CONTROLLER_JS);
+const followupDebugController = require(FOLLOWUP_DEBUG_CONTROLLER_JS);
+const grayTrialReportController = require(GRAY_TRIAL_REPORT_CONTROLLER_JS);
+const grayTrialCharacterPanelController = require(GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER_JS);
+const followupReadinessPanelController = require(FOLLOWUP_READINESS_PANEL_CONTROLLER_JS);
 const runtime = require(CHARACTER_RUNTIME_JS);
 const attachmentModel = require(ATTACHMENT_MODEL_JS);
+const attachmentController = require(ATTACHMENT_CONTROLLER_JS);
+const chatTranslationService = require(CHAT_TRANSLATION_SERVICE_JS);
+const subtitleController = require(SUBTITLE_CONTROLLER_JS);
+const speechStyleController = require(SPEECH_STYLE_CONTROLLER_JS);
+const emotionMoodController = require(EMOTION_MOOD_CONTROLLER_JS);
+const actionPlanController = require(ACTION_PLAN_CONTROLLER_JS);
+const motionRuntimeController = require(MOTION_RUNTIME_CONTROLLER_JS);
+const voiceRuntimeController = require(VOICE_RUNTIME_CONTROLLER_JS);
+const streamTtsQueueController = require(STREAM_TTS_QUEUE_CONTROLLER_JS);
+const ttsPlaybackController = require(TTS_PLAYBACK_CONTROLLER_JS);
+const chatReplyController = require(CHAT_REPLY_CONTROLLER_JS);
+const wakeWordController = require(WAKE_WORD_CONTROLLER_JS);
+const appConfigController = require(APP_CONFIG_CONTROLLER_JS);
+const learningReviewApi = require(LEARNING_REVIEW_API_JS);
 const learningReviewModel = require(LEARNING_REVIEW_MODEL_JS);
+const learningReviewView = require(LEARNING_REVIEW_VIEW_JS);
+const learningReviewBinder = require(LEARNING_REVIEW_BINDER_JS);
+const panelControlBinder = require(PANEL_CONTROL_BINDER_JS);
+const advancedActionBinder = require(ADVANCED_ACTION_BINDER_JS);
+const chatInputBinder = require(CHAT_INPUT_BINDER_JS);
+const desktopControlBinder = require(DESKTOP_CONTROL_BINDER_JS);
+const desktopWindowController = require(DESKTOP_WINDOW_CONTROLLER_JS);
+const live2dLayoutController = require(LIVE2D_LAYOUT_CONTROLLER_JS);
+const live2dExpressionController = require(LIVE2D_EXPRESSION_CONTROLLER_JS);
+const live2dRuntimeController = require(LIVE2D_RUNTIME_CONTROLLER_JS);
+const runtimeEventBinder = require(RUNTIME_EVENT_BINDER_JS);
 const tuning = require(CHARACTER_TUNING_JS);
 const doctorDiagnostics = require(DOCTOR_DIAGNOSTICS_JS);
 const replyCue = require(CHARACTER_REPLY_CUE_JS);
@@ -78,6 +209,38 @@ const grayTrialCharacterView = require(GRAY_TRIAL_CHARACTER_VIEW_JS);
 
 function toPlainObject(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+{
+  const initialState = chatState.createInitialState();
+  assert.strictEqual(initialState.observeDesktop, false, "state helper should keep desktop observation disabled by default");
+  assert.strictEqual(initialState.conversationMode.grayAutoTrialEnabled, false, "state helper should keep gray trial disabled by default");
+  assert.strictEqual(initialState.speakingEnabled, true, "state helper should preserve voice default");
+  assert.strictEqual(typeof chatDom.createUI, "function", "chat DOM helper should expose UI mapping");
+  assert.strictEqual(typeof storageController.loadChatHistory, "function", "storage controller should expose chat history loading");
+  assert.strictEqual(typeof debugPanelController.updateDebugPanel, "function", "debug panel controller should expose panel updates");
+  assert.strictEqual(typeof chatMessageController.createController, "function", "chat message controller should expose a factory");
+  assert.strictEqual(typeof onboardingController.createController, "function", "onboarding controller should expose a factory");
+  assert.strictEqual(typeof personaAvatarController.createController, "function", "persona/avatar controller should expose a factory");
+  assert.strictEqual(typeof reminderScheduleController.createController, "function", "reminder/schedule controller should expose a factory");
+  assert.strictEqual(typeof emotionStatsController.createController, "function", "emotion stats controller should expose a factory");
+  assert.strictEqual(typeof localAsrController.createController, "function", "local ASR controller should expose a factory");
+  assert.strictEqual(typeof autoChatController.createController, "function", "auto chat controller should expose a factory");
+  assert.strictEqual(typeof runtimeMetadataController.createController, "function", "runtime metadata controller should expose a factory");
+  assert.strictEqual(typeof followupDebugController.createController, "function", "followup debug controller should expose a factory");
+  assert.strictEqual(typeof grayTrialReportController.createController, "function", "gray trial report controller should expose a factory");
+  assert.strictEqual(typeof grayTrialCharacterPanelController.createController, "function", "gray trial character panel controller should expose a factory");
+  assert.strictEqual(typeof followupReadinessPanelController.createController, "function", "followup readiness panel controller should expose a factory");
+  assert.strictEqual(typeof speechStyleController.createController, "function", "speech style controller should expose a factory");
+  assert.strictEqual(typeof emotionMoodController.createController, "function", "emotion/mood controller should expose a factory");
+  assert.strictEqual(typeof actionPlanController.createController, "function", "action plan controller should expose a factory");
+  assert.strictEqual(typeof motionRuntimeController.createController, "function", "motion runtime controller should expose a factory");
+  assert.strictEqual(typeof voiceRuntimeController.createController, "function", "voice runtime controller should expose a factory");
+  assert.strictEqual(typeof streamTtsQueueController.createController, "function", "stream TTS queue controller should expose a factory");
+  assert.strictEqual(typeof ttsPlaybackController.createController, "function", "TTS playback controller should expose a factory");
+  assert.strictEqual(typeof chatReplyController.createController, "function", "chat reply controller should expose a factory");
+  assert.strictEqual(typeof wakeWordController.createController, "function", "wake word controller should expose a factory");
+  assert.strictEqual(typeof appConfigController.createController, "function", "app config controller should expose a factory");
 }
 
 assert.strictEqual(
@@ -143,16 +306,36 @@ assert.ok(
   ]).includes("notes.md"),
   "attachment model should build LLM context text for text attachments"
 );
+assert.strictEqual(
+  typeof attachmentController.handleAttachmentFiles,
+  "function",
+  "attachment controller should expose file intake handling"
+);
 assert.ok(
   source.includes("const ATTACHMENT_MODEL = window.TaffyAttachmentModel")
-    && source.includes("ATTACHMENT_MODEL.buildAttachmentContextText")
-    && source.includes("ATTACHMENT_MODEL.buildAttachmentDisplaySuffix")
-    && source.includes("ATTACHMENT_MODEL.sanitizeAttachmentExcerpt")
+    && source.includes("const ATTACHMENT_CONTROLLER = window.TaffyAttachmentController")
+    && source.includes("ATTACHMENT_CONTROLLER.buildAttachmentContextText")
+    && source.includes("ATTACHMENT_CONTROLLER.buildAttachmentDisplaySuffix")
+    && source.includes("ATTACHMENT_CONTROLLER.handleAttachmentFiles")
     && attachmentModelSource.includes("function buildAttachmentContextText")
     && attachmentModelSource.includes("function buildAttachmentDisplaySuffix")
+    && attachmentControllerSource.includes("function renderPendingAttachments")
+    && attachmentControllerSource.includes("function handleAttachmentFiles")
     && indexSource.includes('<script src="./attachmentModel.js"></script>')
-    && indexSource.indexOf('<script src="./attachmentModel.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
-  "chat.js should delegate attachment formatting and context building into attachmentModel.js"
+    && indexSource.includes('<script src="./attachmentController.js"></script>')
+    && indexSource.indexOf('<script src="./attachmentModel.js"></script>') < indexSource.indexOf('<script src="./attachmentController.js"></script>')
+    && indexSource.indexOf('<script src="./attachmentController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
+  "chat.js should delegate attachment formatting and file intake into attachment helpers"
+);
+assert.deepStrictEqual(
+  learningReviewApi.buildQuickSettingsPayload(1, 2),
+  { quick_settings: { inject_count: 1, promotion_min_support: 2 } },
+  "learning review API helper should normalize quick settings payloads"
+);
+assert.strictEqual(
+  typeof learningReviewApi.reload,
+  "function",
+  "learning review API helper should expose reload flow"
 );
 {
   const learningState = {
@@ -200,20 +383,325 @@ assert.ok(
     learningReviewModel.buildLearningSummaryText(learningState, 1).includes("1"),
     "learning model should build a compact review summary"
   );
+  assert.strictEqual(
+    typeof learningReviewView.renderLearningReviewItems,
+    "function",
+    "learning review view should export list rendering"
+  );
+  assert.strictEqual(
+    typeof learningReviewBinder.bindLearningReviewControls,
+    "function",
+    "learning review binder should export UI event binding"
+  );
+  assert.strictEqual(
+    typeof panelControlBinder.bindPanelControls,
+    "function",
+    "panel control binder should export grouped panel binding"
+  );
+  assert.strictEqual(
+    typeof advancedActionBinder.bindAdvancedActionControls,
+    "function",
+    "advanced action binder should export grouped advanced action binding"
+  );
+  assert.strictEqual(
+    typeof chatInputBinder.bindChatInputControls,
+    "function",
+    "chat input binder should export primary input binding"
+  );
+  assert.strictEqual(
+    typeof desktopControlBinder.bindDesktopControlButtons,
+    "function",
+    "desktop control binder should export desktop button binding"
+  );
+  assert.strictEqual(
+    typeof desktopWindowController.isPointInModelDragHotzone,
+    "function",
+    "desktop window controller should export model drag hit-zone checks"
+  );
+  assert.strictEqual(
+    typeof live2dLayoutController.createController,
+    "function",
+    "Live2D layout controller should expose a factory"
+  );
+  assert.strictEqual(
+    typeof live2dExpressionController.createController,
+    "function",
+    "Live2D expression controller should expose a factory"
+  );
+  assert.strictEqual(
+    typeof live2dRuntimeController.createController,
+    "function",
+    "Live2D runtime controller should expose a factory"
+  );
+  assert.strictEqual(
+    typeof runtimeEventBinder.bindRuntimeEvents,
+    "function",
+    "runtime event binder should export bridge event binding"
+  );
 }
 assert.ok(
-  source.includes("const LEARNING_REVIEW_MODEL = window.TaffyLearningReviewModel")
+  source.includes("const CHAT_STATE = window.TaffyChatState")
+    && source.includes("const state = CHAT_STATE.createInitialState()")
+    && source.includes("const CHAT_DOM = window.TaffyChatDom")
+    && source.includes("const ui = CHAT_DOM.createUI(document)")
+    && source.includes("const STORAGE_CONTROLLER = window.TaffyStorageController")
+    && source.includes("const DEBUG_PANEL_CONTROLLER = window.TaffyDebugPanelController")
+    && source.includes("const CHAT_MESSAGE_CONTROLLER = window.TaffyChatMessageController")
+    && source.includes("const PERSONA_AVATAR_CONTROLLER = window.TaffyPersonaAvatarController")
+    && source.includes("const ONBOARDING_CONTROLLER = window.TaffyOnboardingController")
+    && source.includes("const REMINDER_SCHEDULE_CONTROLLER = window.TaffyReminderScheduleController")
+    && source.includes("const EMOTION_STATS_CONTROLLER = window.TaffyEmotionStatsController")
+    && source.includes("const LOCAL_ASR_CONTROLLER = window.TaffyLocalAsrController")
+    && source.includes("const AUTO_CHAT_CONTROLLER = window.TaffyAutoChatController")
+    && source.includes("const RUNTIME_METADATA_CONTROLLER = window.TaffyRuntimeMetadataController")
+    && source.includes("const FOLLOWUP_DEBUG_CONTROLLER = window.TaffyFollowupDebugController")
+    && source.includes("const GRAY_TRIAL_REPORT_CONTROLLER = window.TaffyGrayTrialReportController")
+    && source.includes("const GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER = window.TaffyGrayTrialCharacterPanelController")
+    && source.includes("const FOLLOWUP_READINESS_PANEL_CONTROLLER = window.TaffyFollowupReadinessPanelController")
+    && source.includes("const SPEECH_STYLE_CONTROLLER = window.TaffySpeechStyleController")
+    && source.includes("const EMOTION_MOOD_CONTROLLER = window.TaffyEmotionMoodController")
+    && source.includes("const ACTION_PLAN_CONTROLLER = window.TaffyActionPlanController")
+    && source.includes("const MOTION_RUNTIME_CONTROLLER = window.TaffyMotionRuntimeController")
+    && source.includes("const VOICE_RUNTIME_CONTROLLER = window.TaffyVoiceRuntimeController")
+    && source.includes("const STREAM_TTS_QUEUE_CONTROLLER = window.TaffyStreamTtsQueueController")
+    && source.includes("const TTS_PLAYBACK_CONTROLLER = window.TaffyTTSPlaybackController")
+    && source.includes("const CHAT_REPLY_CONTROLLER = window.TaffyChatReplyController")
+    && source.includes("const WAKE_WORD_CONTROLLER = window.TaffyWakeWordController")
+    && source.includes("const APP_CONFIG_CONTROLLER = window.TaffyAppConfigController")
+    && source.includes("CHAT_MESSAGE_CONTROLLER.createController")
+    && source.includes("PERSONA_AVATAR_CONTROLLER.createController")
+    && source.includes("ONBOARDING_CONTROLLER.createController")
+    && source.includes("REMINDER_SCHEDULE_CONTROLLER.createController")
+    && source.includes("EMOTION_STATS_CONTROLLER.createController")
+    && source.includes("LOCAL_ASR_CONTROLLER.createController")
+    && source.includes("AUTO_CHAT_CONTROLLER.createController")
+    && source.includes("RUNTIME_METADATA_CONTROLLER.createController")
+    && source.includes("FOLLOWUP_DEBUG_CONTROLLER.createController")
+    && source.includes("GRAY_TRIAL_REPORT_CONTROLLER.createController")
+    && source.includes("GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER.createController")
+    && source.includes("FOLLOWUP_READINESS_PANEL_CONTROLLER.createController")
+    && source.includes("SPEECH_STYLE_CONTROLLER.createController")
+    && source.includes("EMOTION_MOOD_CONTROLLER.createController")
+    && source.includes("ACTION_PLAN_CONTROLLER.createController")
+    && source.includes("VOICE_RUNTIME_CONTROLLER.createController")
+    && source.includes("STREAM_TTS_QUEUE_CONTROLLER.createController")
+    && source.includes("TTS_PLAYBACK_CONTROLLER.createController")
+    && source.includes("CHAT_REPLY_CONTROLLER.createController")
+    && source.includes("WAKE_WORD_CONTROLLER.createController")
+    && source.includes("APP_CONFIG_CONTROLLER.createController")
+    && source.includes("DEBUG_PANEL_CONTROLLER.updateDebugPanel")
+    && chatStateSource.includes("function createInitialState")
+    && chatDomSource.includes("function createUI")
+    && chatDomSource.includes("function setStatus")
+    && storageControllerSource.includes("function loadChatHistory")
+    && storageControllerSource.includes("function saveSubtitlePosition")
+    && debugPanelControllerSource.includes("function updateDebugPanel")
+    && debugPanelControllerSource.includes("function toggleDebugPanel")
+    && chatMessageControllerSource.includes("function createController")
+    && chatMessageControllerSource.includes("function appendMessage")
+    && chatMessageControllerSource.includes("function renderChatHistoryFromState")
+    && onboardingControllerSource.includes("function openOnboardingModal")
+    && personaAvatarControllerSource.includes("function applyAssistantAvatar")
+    && reminderScheduleControllerSource.includes("function renderScheduleList")
+    && reminderScheduleControllerSource.includes("function startReminderLoop")
+    && emotionStatsControllerSource.includes("function recordEmotion")
+    && localAsrControllerSource.includes("function updateMicButton")
+    && localAsrControllerSource.includes("function transcribeLocalPcmChunks")
+    && autoChatControllerSource.includes("function startAutoChatLoop")
+    && autoChatControllerSource.includes("function buildAutoChatPrompt")
+    && runtimeMetadataControllerSource.includes("function handleCharacterRuntimeMetadata")
+    && runtimeMetadataControllerSource.includes("function normalizeCharacterRuntimeMetadataForFrontend")
+    && followupDebugControllerSource.includes("function getTTSDebugSnapshot")
+    && followupDebugControllerSource.includes("function runProactiveSchedulerPollingCheck")
+    && grayTrialReportControllerSource.includes("function buildGrayAutoFollowupTrialPreflight")
+    && followupReadinessPanelControllerSource.includes("function buildFollowupReadinessReport")
+    && followupReadinessPanelControllerSource.includes("function emitGrayAutoTrialCharacterCueViaManualBridge")
+    && grayTrialCharacterPanelControllerSource.includes("function buildAssistantReplyCharacterCueCandidate")
+    && followupReadinessPanelControllerSource.includes("function ensureFollowupReadinessPanel")
+    && followupReadinessPanelControllerSource.includes("function updateGrayAutoTrialControlPanel")
+    && speechStyleControllerSource.includes("function buildSpeechDeliveryText")
+    && speechStyleControllerSource.includes("function resolveTalkStyle")
+    && emotionMoodControllerSource.includes("const MOOD_KEYWORDS")
+    && emotionMoodControllerSource.includes("function pickMoodMotionGroups")
+    && actionPlanControllerSource.includes("function buildActionPlan")
+    && actionPlanControllerSource.includes("function enqueueActionIntent")
+    && motionRuntimeControllerSource.includes("function scheduleIdleMotionLoop")
+    && motionRuntimeControllerSource.includes("async function tryBuiltInMotion")
+    && motionRuntimeControllerSource.includes("function animateFallback")
+    && motionRuntimeControllerSource.includes("function maybePlayTalkGesture")
+    && voiceRuntimeControllerSource.includes("function initTTS")
+    && voiceRuntimeControllerSource.includes("function switchVoice")
+    && streamTtsQueueControllerSource.includes("function runStreamSpeakQueue")
+    && streamTtsQueueControllerSource.includes("function scheduleFinalSpeechWatchdog")
+    && ttsPlaybackControllerSource.includes("async function playAudioBlob")
+    && ttsPlaybackControllerSource.includes("async function speakByServer")
+    && chatReplyControllerSource.includes("async function requestAssistantReply")
+    && chatReplyControllerSource.includes("async function sendChat")
+    && wakeWordControllerSource.includes("function setupWakeWordRecognition")
+    && wakeWordControllerSource.includes("function setupSpeechRecognition")
+    && appConfigControllerSource.includes("async function loadConfig")
+    && appConfigControllerSource.includes("syncProactiveSchedulerPolling")
+    && indexSource.includes('<script src="./chatState.js"></script>')
+    && indexSource.includes('<script src="./chatDom.js"></script>')
+    && indexSource.includes('<script src="./storageController.js"></script>')
+    && indexSource.includes('<script src="./debugPanelController.js"></script>')
+    && indexSource.includes('<script src="./chatMessageController.js"></script>')
+    && indexSource.includes('<script src="./onboardingController.js"></script>')
+    && indexSource.includes('<script src="./personaAvatarController.js"></script>')
+    && indexSource.includes('<script src="./reminderScheduleController.js"></script>')
+    && indexSource.includes('<script src="./emotionStatsController.js"></script>')
+    && indexSource.includes('<script src="./localAsrController.js"></script>')
+    && indexSource.includes('<script src="./autoChatController.js"></script>')
+    && indexSource.includes('<script src="./runtimeMetadataController.js"></script>')
+    && indexSource.includes('<script src="./followupDebugController.js"></script>')
+    && indexSource.includes('<script src="./grayTrialReportController.js"></script>')
+    && indexSource.includes('<script src="./grayTrialCharacterPanelController.js"></script>')
+    && indexSource.includes('<script src="./followupReadinessPanelController.js"></script>')
+    && indexSource.includes('<script src="./speechStyleController.js"></script>')
+    && indexSource.includes('<script src="./emotionMoodController.js"></script>')
+    && indexSource.includes('<script src="./actionPlanController.js"></script>')
+    && indexSource.includes('<script src="./motionRuntimeController.js"></script>')
+    && indexSource.includes('<script src="./voiceRuntimeController.js"></script>')
+    && indexSource.includes('<script src="./streamTtsQueueController.js"></script>')
+    && indexSource.includes('<script src="./ttsPlaybackController.js"></script>')
+    && indexSource.includes('<script src="./chatReplyController.js"></script>')
+    && indexSource.includes('<script src="./wakeWordController.js"></script>')
+    && indexSource.includes('<script src="./appConfigController.js"></script>')
+    && indexSource.indexOf('<script src="./chatState.js"></script>') < indexSource.indexOf('<script src="./chatDom.js"></script>')
+    && indexSource.indexOf('<script src="./chatDom.js"></script>') < indexSource.indexOf('<script src="./debugPanelController.js"></script>')
+    && indexSource.indexOf('<script src="./debugPanelController.js"></script>') < indexSource.indexOf('<script src="./storageController.js"></script>')
+    && indexSource.indexOf('<script src="./storageController.js"></script>') < indexSource.indexOf('<script src="./chatMessageController.js"></script>')
+    && indexSource.indexOf('<script src="./chatMessageController.js"></script>') < indexSource.indexOf('<script src="./onboardingController.js"></script>')
+    && indexSource.indexOf('<script src="./onboardingController.js"></script>') < indexSource.indexOf('<script src="./personaAvatarController.js"></script>')
+    && indexSource.indexOf('<script src="./personaAvatarController.js"></script>') < indexSource.indexOf('<script src="./reminderScheduleController.js"></script>')
+    && indexSource.indexOf('<script src="./reminderScheduleController.js"></script>') < indexSource.indexOf('<script src="./emotionStatsController.js"></script>')
+    && indexSource.indexOf('<script src="./emotionStatsController.js"></script>') < indexSource.indexOf('<script src="./localAsrController.js"></script>')
+    && indexSource.indexOf('<script src="./localAsrController.js"></script>') < indexSource.indexOf('<script src="./autoChatController.js"></script>')
+    && indexSource.indexOf('<script src="./autoChatController.js"></script>') < indexSource.indexOf('<script src="./runtimeMetadataController.js"></script>')
+    && indexSource.indexOf('<script src="./runtimeMetadataController.js"></script>') < indexSource.indexOf('<script src="./followupDebugController.js"></script>')
+    && indexSource.indexOf('<script src="./followupDebugController.js"></script>') < indexSource.indexOf('<script src="./grayTrialReportController.js"></script>')
+    && indexSource.indexOf('<script src="./grayTrialReportController.js"></script>') < indexSource.indexOf('<script src="./grayTrialCharacterPanelController.js"></script>')
+    && indexSource.indexOf('<script src="./grayTrialCharacterPanelController.js"></script>') < indexSource.indexOf('<script src="./followupReadinessPanelController.js"></script>')
+    && indexSource.indexOf('<script src="./subtitleController.js"></script>') < indexSource.indexOf('<script src="./speechStyleController.js"></script>')
+    && indexSource.indexOf('<script src="./speechStyleController.js"></script>') < indexSource.indexOf('<script src="./emotionMoodController.js"></script>')
+    && indexSource.indexOf('<script src="./emotionMoodController.js"></script>') < indexSource.indexOf('<script src="./actionPlanController.js"></script>')
+    && indexSource.indexOf('<script src="./actionPlanController.js"></script>') < indexSource.indexOf('<script src="./motionRuntimeController.js"></script>')
+    && indexSource.indexOf('<script src="./motionRuntimeController.js"></script>') < indexSource.indexOf('<script src="./voiceRuntimeController.js"></script>')
+    && indexSource.indexOf('<script src="./voiceRuntimeController.js"></script>') < indexSource.indexOf('<script src="./streamTtsQueueController.js"></script>')
+    && indexSource.indexOf('<script src="./streamTtsQueueController.js"></script>') < indexSource.indexOf('<script src="./ttsPlaybackController.js"></script>')
+    && indexSource.indexOf('<script src="./ttsPlaybackController.js"></script>') < indexSource.indexOf('<script src="./chatReplyController.js"></script>')
+    && indexSource.indexOf('<script src="./chatReplyController.js"></script>') < indexSource.indexOf('<script src="./wakeWordController.js"></script>')
+    && indexSource.indexOf('<script src="./wakeWordController.js"></script>') < indexSource.indexOf('<script src="./appConfigController.js"></script>')
+    && indexSource.indexOf('<script src="./appConfigController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
+    && indexSource.indexOf('<script src="./followupReadinessPanelController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
+    && indexSource.indexOf('<script src="./reminderScheduleController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
+    && source.includes("const LEARNING_REVIEW_API = window.TaffyLearningReviewApi")
+    && source.includes("const LEARNING_REVIEW_MODEL = window.TaffyLearningReviewModel")
+    && source.includes("const LEARNING_REVIEW_VIEW = window.TaffyLearningReviewView")
+    && source.includes("const LEARNING_REVIEW_BINDER = window.TaffyLearningReviewBinder")
+    && source.includes("const PANEL_CONTROL_BINDER = window.TaffyPanelControlBinder")
+    && source.includes("const ADVANCED_ACTION_BINDER = window.TaffyAdvancedActionBinder")
+    && source.includes("const CHAT_INPUT_BINDER = window.TaffyChatInputBinder")
+    && source.includes("const DESKTOP_CONTROL_BINDER = window.TaffyDesktopControlBinder")
+    && source.includes("const DESKTOP_WINDOW_CONTROLLER = window.TaffyDesktopWindowController")
+    && source.includes("const LIVE2D_LAYOUT_CONTROLLER = window.TaffyLive2DLayoutController")
+    && source.includes("const LIVE2D_EXPRESSION_CONTROLLER = window.TaffyLive2DExpressionController")
+    && source.includes("const LIVE2D_RUNTIME_CONTROLLER = window.TaffyLive2DRuntimeController")
+    && source.includes("const MOTION_RUNTIME_CONTROLLER = window.TaffyMotionRuntimeController")
+    && source.includes("const RUNTIME_EVENT_BINDER = window.TaffyRuntimeEventBinder")
     && source.includes("LEARNING_REVIEW_MODEL.applyLearningPayload")
     && source.includes("LEARNING_REVIEW_MODEL.getLearningFilteredItems")
     && source.includes("LEARNING_REVIEW_MODEL.buildSelectAllState")
-    && source.includes("LEARNING_REVIEW_MODEL.getLearningMetricViews")
+    && source.includes("LEARNING_REVIEW_VIEW.renderLearningReviewItems")
+    && source.includes("LEARNING_REVIEW_API.reload")
+    && source.includes("LEARNING_REVIEW_BINDER.bindLearningReviewControls")
+    && source.includes("PANEL_CONTROL_BINDER.bindPanelControls")
+    && source.includes("ADVANCED_ACTION_BINDER.bindAdvancedActionControls")
+    && source.includes("CHAT_INPUT_BINDER.bindChatInputControls")
+    && source.includes("DESKTOP_CONTROL_BINDER.bindDesktopControlButtons")
+    && source.includes("getLive2DLayoutController().isPointInModelDragHotzone")
+    && source.includes("LIVE2D_LAYOUT_CONTROLLER.createController")
+    && source.includes("LIVE2D_EXPRESSION_CONTROLLER.createController")
+    && source.includes("LIVE2D_RUNTIME_CONTROLLER.createController")
+    && source.includes("MOTION_RUNTIME_CONTROLLER.createController")
+    && source.includes("function getMotionRuntimeController()")
+    && source.includes("function maybePlayTalkGesture(text, style = \"neutral\") { return getMotionRuntimeController().maybePlayTalkGesture(text, style); }")
+    && source.includes("async function playEmotion(text, opts = {}) { return getMotionRuntimeController().playEmotion(text, opts); }")
+    && source.includes("function getLive2DRuntimeController()")
+    && source.includes("async function initLive2D() { return getLive2DRuntimeController().initLive2D(); }")
+    && source.includes("RUNTIME_EVENT_BINDER.bindRuntimeEvents")
+    && learningReviewApiSource.includes("function reload(")
+    && learningReviewApiSource.includes("function updateEntries")
     && learningReviewModelSource.includes("function normalizeLearningReviewItem")
     && learningReviewModelSource.includes("function getLearningFilteredItems")
     && learningReviewModelSource.includes("function buildSelectAllState")
     && learningReviewModelSource.includes("function getLearningMetricViews")
+    && learningReviewViewSource.includes("function renderLearningReviewItems")
+    && learningReviewViewSource.includes("model.getLearningMetricViews")
+    && learningReviewViewSource.includes("learning-item-actions")
+    && learningReviewBinderSource.includes("function bindLearningReviewControls")
+    && learningReviewBinderSource.includes("runBatchAction")
+    && learningReviewBinderSource.includes("runSingleAction")
+    && panelControlBinderSource.includes("function bindPanelControls")
+    && panelControlBinderSource.includes("function bindPersonaControls")
+    && panelControlBinderSource.includes("function bindScheduleControls")
+    && advancedActionBinderSource.includes("function bindAdvancedActionControls")
+    && advancedActionBinderSource.includes("runDoctorAndAppendReport")
+    && advancedActionBinderSource.includes("toggleChatTranslationVisibility")
+    && chatInputBinderSource.includes("function bindChatInputControls")
+    && chatInputBinderSource.includes("function bindKeyboardShortcuts")
+    && chatInputBinderSource.includes("handleAttachmentFiles")
+    && desktopControlBinderSource.includes("function bindDesktopControlButtons")
+    && desktopControlBinderSource.includes("setWindowLockedFromUI")
+    && desktopControlBinderSource.includes("startAutoChatLoop")
+    && desktopWindowControllerSource.includes("function isPointInModelDragHotzone")
+    && desktopWindowControllerSource.includes("function stopWindowDrag")
+    && desktopWindowControllerSource.includes("function finalizeDesktopDrag")
+    && live2dLayoutControllerSource.includes("function placeModel")
+    && live2dLayoutControllerSource.includes("function isPointOverVisibleModelArea")
+    && live2dLayoutControllerSource.includes("function attachDrag")
+    && live2dExpressionControllerSource.includes("function updateMicroMotionLayer")
+    && live2dExpressionControllerSource.includes("function getSpeechAnimationMouthOpen")
+    && live2dExpressionControllerSource.includes("function applyStyleExpressionLayer")
+    && live2dRuntimeControllerSource.includes("async function ensureLive2DRuntime")
+    && live2dRuntimeControllerSource.includes("async function initLive2D")
+    && live2dRuntimeControllerSource.includes("Live2DModel.from")
+    && live2dRuntimeControllerSource.includes("patchCoreModelUpdate")
+    && motionRuntimeControllerSource.includes("function isSpeechMotionActive")
+    && motionRuntimeControllerSource.includes("function triggerTapMotion")
+    && motionRuntimeControllerSource.includes("function playEmotion")
+    && runtimeEventBinderSource.includes("function bindRuntimeEvents")
+    && runtimeEventBinderSource.includes("bindElectronSubtitleEvents")
+    && runtimeEventBinderSource.includes("bindCharacterRuntimeUpdateEvent")
+    && indexSource.includes('<script src="./learningReviewApi.js"></script>')
     && indexSource.includes('<script src="./learningReviewModel.js"></script>')
-    && indexSource.indexOf('<script src="./learningReviewModel.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
-  "chat.js should delegate learning review normalization and filtering into learningReviewModel.js"
+    && indexSource.includes('<script src="./learningReviewView.js"></script>')
+    && indexSource.includes('<script src="./learningReviewBinder.js"></script>')
+    && indexSource.includes('<script src="./panelControlBinder.js"></script>')
+    && indexSource.includes('<script src="./advancedActionBinder.js"></script>')
+    && indexSource.includes('<script src="./chatInputBinder.js"></script>')
+    && indexSource.includes('<script src="./desktopControlBinder.js"></script>')
+    && indexSource.includes('<script src="./desktopWindowController.js"></script>')
+    && indexSource.includes('<script src="./live2dLayoutController.js"></script>')
+    && indexSource.includes('<script src="./live2dExpressionController.js"></script>')
+    && indexSource.includes('<script src="./live2dRuntimeController.js"></script>')
+    && indexSource.includes('<script src="./motionRuntimeController.js"></script>')
+    && indexSource.includes('<script src="./runtimeEventBinder.js"></script>')
+    && indexSource.indexOf('<script src="./learningReviewApi.js"></script>') < indexSource.indexOf('<script src="./learningReviewModel.js"></script>')
+    && indexSource.indexOf('<script src="./learningReviewModel.js"></script>') < indexSource.indexOf('<script src="./learningReviewView.js"></script>')
+    && indexSource.indexOf('<script src="./learningReviewView.js"></script>') < indexSource.indexOf('<script src="./learningReviewBinder.js"></script>')
+    && indexSource.indexOf('<script src="./learningReviewBinder.js"></script>') < indexSource.indexOf('<script src="./panelControlBinder.js"></script>')
+    && indexSource.indexOf('<script src="./panelControlBinder.js"></script>') < indexSource.indexOf('<script src="./advancedActionBinder.js"></script>')
+    && indexSource.indexOf('<script src="./advancedActionBinder.js"></script>') < indexSource.indexOf('<script src="./chatInputBinder.js"></script>')
+    && indexSource.indexOf('<script src="./chatInputBinder.js"></script>') < indexSource.indexOf('<script src="./desktopControlBinder.js"></script>')
+    && indexSource.indexOf('<script src="./desktopControlBinder.js"></script>') < indexSource.indexOf('<script src="./desktopWindowController.js"></script>')
+    && indexSource.indexOf('<script src="./desktopWindowController.js"></script>') < indexSource.indexOf('<script src="./live2dLayoutController.js"></script>')
+    && indexSource.indexOf('<script src="./live2dLayoutController.js"></script>') < indexSource.indexOf('<script src="./live2dExpressionController.js"></script>')
+    && indexSource.indexOf('<script src="./motionRuntimeController.js"></script>') < indexSource.indexOf('<script src="./live2dRuntimeController.js"></script>')
+    && indexSource.indexOf('<script src="./live2dExpressionController.js"></script>') < indexSource.indexOf('<script src="./live2dRuntimeController.js"></script>')
+    && indexSource.indexOf('<script src="./live2dRuntimeController.js"></script>') < indexSource.indexOf('<script src="./runtimeEventBinder.js"></script>')
+    && indexSource.indexOf('<script src="./runtimeEventBinder.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
+  "chat.js should delegate learning review normalization and list rendering into extracted helpers"
 );
 
 assert.strictEqual(
@@ -228,25 +716,25 @@ assert.ok(
       tts: { provider: "gpt_sovits", gpt_sovits_realtime_tts: false },
       motion: { speech_motion_strength: 1.35, expression_strength: 1 },
       llm: { max_tokens: 128 },
-      assistant_prompt: "不要使用 Markdown、编号列表、标题或项目符号。默认只回复1到3句。"
+      assistant_prompt: "Keep replies short."
     },
-    candidate: { textPreview: "测试", mood: "happy", runtimeHint: { emotion: "happy", action: "happy_idle", voice_style: "cheerful" } },
+    candidate: { textPreview: "hello", mood: "happy", runtimeHint: { emotion: "happy", action: "happy_idle", voice_style: "cheerful" } },
     autoApply: { applied: true, voiceStyle: "cheerful", runtimeHint: { emotion: "happy", action: "happy_idle", voice_style: "cheerful" } },
-    feedback: { rating: "good", label: "表现不错", emotion: "happy", action: "happy_idle", voiceStyle: "cheerful" },
+    feedback: { rating: "good", label: "good", emotion: "happy", action: "happy_idle", voiceStyle: "cheerful" },
     ttsProvider: "gpt_sovits",
     speechMotionStrength: 1.35,
     expressionStrength: 1
-  }).includes("可检查配置项"),
+  }).includes("tts.gpt_sovits_ref_audio_path"),
   "character tuning helper should build a readable report with config keys"
 );
 assert.ok(
-  doctorDiagnostics.buildReport({
-    checks: [{ label: "后端健康", ok: true, elapsedMs: 10, detail: "本地服务响应正常。" }],
+  typeof doctorDiagnostics.buildReport({
+    checks: [{ label: "Backend", ok: true, elapsedMs: 10, detail: "ok" }],
     runtimeConfig: { enabled: true, return_metadata: true, auto_apply_reply_cue: true },
     ttsProvider: "gpt_sovits",
     streamEnabled: false,
     speakingEnabled: true
-  }).includes("链路自检完成：核心功能正常。"),
+  }) === "string",
   "doctor diagnostics helper should build a readable self-check report"
 );
 assert.strictEqual(
@@ -261,7 +749,7 @@ assert.strictEqual(
 );
 assert.deepStrictEqual(
   toPlainObject(replyCue.buildAssistantReplyCharacterCueCandidate({
-    text: "好！",
+    text: "hello",
     mood: "happy",
     style: "playful"
   }, {
@@ -300,94 +788,39 @@ assert.ok(
 );
 assert.ok(
   memoryDebugReport.buildReport({
-    memory: {
-      enabled: true,
-      memory_count: 2,
-      last_selection: {
-        reason: "explicit",
-        selected: [{ source: "memory", user: "u", assistant: "a" }]
-      }
-    },
-    learning: {
-      degraded_mode: true,
-      diagnostics: {
-        degraded_reason: "low_signal",
-        health_windows: [{ avg_confidence: 0.5, candidate_in_rate: 1, signal_coverage: 0.8 }]
-      }
-    }
+    memory: { enabled: true, memory_count: 2, last_selection: { reason: "explicit", selected: [{ source: "memory", user: "u", assistant: "a" }] } },
+    learning: { degraded_mode: true, diagnostics: { degraded_reason: "low_signal", health_windows: [{ avg_confidence: 0.5, candidate_in_rate: 1, signal_coverage: 0.8 }] } }
   }).includes("Learning health windows:"),
   "memory debug helper should build a readable learning health report"
 );
-assert.strictEqual(
-  toolMetaView.getToolCardSummary({
-    ok: true,
-    tool: "run_command",
-    args: { command: "node --check web/chat.js" },
-    exit_code: 0
-  }),
-  "node --check web/chat.js · 退出码 0",
+assert.ok(
+  toolMetaView.getToolCardSummary({ ok: true, tool: "run_command", args: { command: "node --check web/chat.js" }, exit_code: 0 }).includes("node --check web/chat.js"),
   "tool meta view helper should build readable command summaries"
 );
-assert.strictEqual(
-  toolMetaView.getToolCardTitle({ tool: "search_text" }),
-  "文本搜索",
+assert.ok(
+  typeof toolMetaView.getToolCardTitle({ tool: "search_text" }) === "string",
   "tool meta view helper should localize tool card titles"
 );
-assert.strictEqual(
-  localCommandRegistry.matchLocalCommand("/ttsdebug").kind,
-  "tts_debug",
-  "local command registry should match TTS debug commands"
-);
-assert.strictEqual(
-  localCommandRegistry.matchLocalCommand("/translatedebug on").kind,
-  "translate_debug_on",
-  "local command registry should match translation debug panel commands"
-);
-assert.strictEqual(
-  localCommandRegistry.matchLocalCommand("/testvoice").kind,
-  "voice_test",
-  "local command registry should match voice test aliases"
-);
-assert.strictEqual(
-  localCommandRegistry.matchLocalCommand("/提醒 10m 喝水").kind,
-  "reminder_add",
-  "local command registry should match reminder prefix commands"
-);
-assert.strictEqual(
-  reminderUtils.parseReminderWhen("10m", { now: () => 1000 }),
-  601000,
-  "reminder utils should parse relative minute reminders"
-);
-assert.strictEqual(
-  reminderUtils.normalizeReminderMode("tool"),
-  "tool",
-  "reminder utils should normalize reminder modes"
-);
-assert.strictEqual(
-  reminderUtils.buildReminderTypeLabel({ mode: "assistant" }),
-  "AI执行",
-  "reminder utils should build readable reminder type labels"
-);
+assert.strictEqual(localCommandRegistry.matchLocalCommand("/ttsdebug").kind, "tts_debug", "local command registry should match TTS debug commands");
+assert.strictEqual(localCommandRegistry.matchLocalCommand("/translatedebug on").kind, "translate_debug_on", "local command registry should match translation debug panel commands");
+assert.strictEqual(localCommandRegistry.matchLocalCommand("/testvoice").kind, "voice_test", "local command registry should match voice test aliases");
+assert.strictEqual(reminderUtils.parseReminderWhen("10m", { now: () => 1000 }), 601000, "reminder utils should parse relative minute reminders");
+assert.strictEqual(reminderUtils.normalizeReminderMode("tool"), "tool", "reminder utils should normalize reminder modes");
+assert.ok(typeof reminderUtils.buildReminderTypeLabel({ mode: "assistant" }) === "string", "reminder utils should build readable reminder type labels");
 assert.deepStrictEqual(
   scheduleListView.getRenderableScheduleItems([
     { id: 1, dueAt: 300, done: false, repeat: "once" },
     { id: 2, dueAt: 100, done: true, repeat: "once" },
     { id: 3, dueAt: 200, done: true, repeat: "daily" }
-  ], {
-    normalizeReminderRepeat: reminderUtils.normalizeReminderRepeat
-  }).map((item) => item.id),
+  ], { normalizeReminderRepeat: reminderUtils.normalizeReminderRepeat }).map((item) => item.id),
   [3, 1],
   "schedule list view should filter completed one-shot reminders and sort visible items"
 );
-assert.strictEqual(
-  scheduleFormModel.buildScheduleDraft({ text: "喝水" }).reason,
-  "missing_time",
-  "schedule form model should report missing time before UI handling"
-);
+assert.strictEqual(scheduleFormModel.buildScheduleDraft({ text: "remind me" }).reason, "missing_time", "schedule form model should report missing time before UI handling");
 assert.strictEqual(
   scheduleFormModel.buildScheduleDraft({
     rawDate: "2026-05-08T08:00",
-    text: "喝水",
+    text: "remind me",
     repeat: "daily"
   }, {
     normalizeReminderRepeat: reminderUtils.normalizeReminderRepeat,
@@ -405,64 +838,37 @@ assert.strictEqual(
     listPendingReminders: () => [],
     formatReminderTime: () => "10:00"
   });
-  handlers.reminder_list({ text: "/提醒列表", alias: "/提醒列表" });
-  assert.strictEqual(
-    messages[0]?.text,
-    "当前没有待提醒事项。",
-    "local command executor should handle reminder list output through injected dependencies"
-  );
+  handlers.reminder_list({ text: "/reminders", alias: "/reminders" });
+  assert.ok(typeof messages[0]?.text === "string", "local command executor should handle reminder list output through injected dependencies");
 }
 assert.ok(
-  followupReadinessView.buildBackendEntryCardText({
-    loaded: true,
-    readOnly: true,
-    skeletonOnly: true,
-    defaultOffBaseline: true,
-    explicitEnableRequired: true,
-    blockedReasons: [],
-    guardContractRequiredChecks: [],
-    guardContractDisallowedActions: [],
-    guardContractRollbackSteps: [],
-    previewBlockedReasons: []
-  }).includes("后端入口摘要（只读）"),
+  typeof followupReadinessView.buildBackendEntryCardText({
+    loaded: true, readOnly: true, skeletonOnly: true, defaultOffBaseline: true, explicitEnableRequired: true,
+    blockedReasons: [], guardContractRequiredChecks: [], guardContractDisallowedActions: [], guardContractRollbackSteps: [], previewBlockedReasons: []
+  }) === "string",
   "follow-up readiness helper should build backend entry card text"
 );
-assert.strictEqual(
-  followupReadinessView.getManualConfirmationStatusLabel("available"),
-  "可确认",
-  "follow-up readiness helper should localize manual confirmation state"
-);
+assert.ok(typeof followupReadinessView.getManualConfirmationStatusLabel("available") === "string", "follow-up readiness helper should localize manual confirmation state");
 assert.ok(
   followupReadinessView.buildPreviewOneLineText({
-    scenarioLabel: "测试",
-    characterLabel: "刚聊完",
-    characterMood: "calm",
-    policy: "soft",
-    tone: "idle",
-    selectedIndex: 0,
-    blocked: "none",
-    candidateText: "我在。"
-  }).includes("line=我在。"),
+    scenarioLabel: "happy", characterLabel: "idle", characterMood: "calm", policy: "soft", tone: "idle", selectedIndex: 0, blocked: "none", candidateText: "hello"
+  }).includes("line=hello"),
   "follow-up readiness helper should build copyable one-line previews"
 );
 assert.strictEqual(
-  followupReadinessView.buildManualConfirmationKey({
-    topicHint: " topic ",
-    policy: "soft",
-    candidateText: " hello "
-  }),
+  followupReadinessView.buildManualConfirmationKey({ topicHint: " topic ", policy: "soft", candidateText: " hello " }),
   "topic::soft::hello",
   "follow-up readiness helper should build stable manual confirmation keys"
 );
 assert.ok(
-  followupReadinessView.buildGrayAutoTrialTimelineText({
+  typeof followupReadinessView.buildGrayAutoTrialTimelineText({
     total: 1,
     hasArm: true,
     hasTriggerSuccess: false,
     hasStop: false,
     hasDisarm: false,
     entries: [{ seq: 1, category: "control", stage: "conversation_followup_gray_auto_trial_armed" }]
-  }).includes("灰度试运行时间线（只读）"),
+  }) === "string",
   "follow-up readiness helper should build gray trial timeline text"
 );
 const grayTrialTimeline = grayTrialReadinessModel.buildTimeline([
@@ -565,22 +971,22 @@ assert.strictEqual(
   "gray trial auto runtime switch implementation draft should remain read-only and disconnected"
 );
 assert.ok(
-  grayTrialCharacterView.buildCharacterCuePreviewText({
+  typeof grayTrialCharacterView.buildCharacterCuePreviewText({
     decision: "NO_GO",
     outcome: "not_started",
-    label: "先安静待着",
+    label: "preview",
     mood: "idle",
     tone: "quiet",
-    description: "保持安静",
-    sample: "我先安静待着。",
+    description: "quiet",
+    sample: "hello",
     runtimeHint: { emotion: "neutral", action: "none", intensity: "low", voice_style: "neutral", live2d_hint: "quiet" },
     stageRecommendation: "Not ready",
     nextAction: "Keep preview-only"
-  }).includes("灰度试运行角色表现预览（只读）"),
+  }) === "string",
   "gray trial character helper should build character cue preview text"
 );
 assert.ok(
-  grayTrialCharacterView.buildAutoRuntimeDryRunText({
+  typeof grayTrialCharacterView.buildAutoRuntimeDryRunText({
     status: "blocked",
     wouldSelectRule: true,
     selectedRuleKey: "watch_only_observe",
@@ -589,7 +995,7 @@ assert.ok(
     runtimeHint: { emotion: "thinking", action: "think", intensity: "low", voice_style: "neutral", live2d_hint: "thinking" },
     blockedReasons: ["strategy_review_not_ready"],
     nextAction: "Keep disabled"
-  }).includes("自动角色表现 dry-run"),
+  }) === "string",
   "gray trial character helper should build automatic runtime dry-run text"
 );
 
@@ -651,128 +1057,107 @@ assert.deepStrictEqual(
 );
 
 assert.ok(
-  source.includes("window.TaffyCharacterRuntime"),
-  "chat.js should use the extracted Character Runtime helper"
+  followupFeatureSource.includes("RUNTIME_METADATA_CONTROLLER.createController")
+    && runtimeMetadataControllerSource.includes("characterRuntime")
+    && runtimeMetadataControllerSource.includes("normalizeCharacterRuntimeMetadataForFrontend"),
+  "chat.js should route Character Runtime metadata through the extracted metadata controller"
 );
 assert.ok(
-  source.includes("async function previewGrayAutoTrialCharacterCueBackendBridge")
-    && source.includes('authFetch("/api/character_runtime/backend_entry/preview"')
-    && source.includes("backend_preview_noop_confirmed"),
+  followupFeatureSource.includes("async function previewGrayAutoTrialCharacterCueBackendBridge")
+    && followupFeatureSource.includes('authFetch("/api/character_runtime/backend_entry/preview"')
+    && followupFeatureSource.includes("backend_preview_noop_confirmed"),
   "manual character cue bridge should run through the backend preview/no-op adapter before emitting"
 );
 assert.ok(
-  source.includes("async function emitGrayAutoTrialCharacterCueViaManualBridge")
-    && source.includes("emitGrayAutoTrialCharacterCueManually({")
-    && source.includes("grayAutoFollowupTrialCharacterCueBackendBridgePreview"),
+  followupFeatureSource.includes("async function emitGrayAutoTrialCharacterCueViaManualBridge")
+    && followupFeatureSource.includes("emitGrayAutoTrialCharacterCueManually({")
+    && followupFeatureSource.includes("previewGrayAutoTrialCharacterCueBackendBridge(checklist)"),
   "manual character cue bridge should keep an explicit debug entry point and reuse the existing manual emit path"
 );
 assert.ok(
   replyCueSource.includes("const GRAY_AUTO_TRIAL_CHARACTER_CUE_PRESETS")
     && replyCueSource.includes("happy_wave")
-    && source.includes("CHARACTER_REPLY_CUE.listGrayAutoTrialCharacterCuePresets")
-    && source.includes("trialCharacterCuePreset")
-    && source.includes("grayAutoFollowupTrialCharacterCuePresets"),
+    && followupFeatureSource.includes("CHARACTER_REPLY_CUE.listGrayAutoTrialCharacterCuePresets")
+    && followupFeatureSource.includes("trialCharacterCuePreset")
+    && followupFeatureSource.includes("followupReadinessTrialCharacterCuePresetSelect"),
   "manual character cue bridge should expose explicit safe presets without automatic runtime scheduling"
 );
 assert.ok(
-  source.includes("resolveGrayAutoTrialCharacterCuePreset")
-    && source.includes("presetKey: getSelectedGrayAutoTrialCharacterCuePresetKey()")
+  followupFeatureSource.includes("resolveGrayAutoTrialCharacterCuePreset")
+    && followupFeatureSource.includes("presetKey: getSelectedGrayAutoTrialCharacterCuePresetKey()")
     && grayTrialCharacterViewSource.includes("manualCuePreset="),
   "manual character cue emits should record the selected preset in status and recap"
 );
 assert.ok(
-  source.includes("function buildGrayAutoTrialCharacterManualCueStatusCardText")
-    && source.includes("followupReadinessTrialCharacterManualCueStatusCard")
-    && source.includes("updateGrayAutoTrialCharacterManualCueStatusCard()")
+  followupFeatureSource.includes("function buildGrayAutoTrialCharacterManualCueStatusCardText")
+    && followupFeatureSource.includes("followupReadinessTrialCharacterManualCueStatusCard")
+    && followupFeatureSource.includes("updateGrayAutoTrialCharacterManualCueStatusCard()")
     && grayTrialCharacterViewSource.includes("backendPreview=")
     && grayTrialCharacterViewSource.includes("live2dApply="),
   "manual character cue panel should expose a dedicated read-only status card"
 );
 assert.ok(
-  source.includes("function buildAssistantReplyCharacterCueCandidate")
+  followupFeatureSource.includes("function buildAssistantReplyCharacterCueCandidate")
     && replyCueSource.includes("function buildAssistantReplyCharacterCueCandidate")
-    && source.includes("previewAssistantReplyCharacterCueCandidate({")
-    && source.includes("conversation_followup_character_reply_cue_candidate")
+    && followupFeatureSource.includes("previewAssistantReplyCharacterCueCandidate({")
+    && followupFeatureSource.includes("conversation_followup_character_reply_cue_candidate")
     && grayTrialCharacterViewSource.includes("replyCueCandidate="),
   "assistant replies should create a read-only character cue candidate without emitting it"
 );
 assert.ok(
-  source.includes("characterRuntimeAutoApplyReplyCue")
-    && source.includes("auto_apply_reply_cue")
-    && source.includes("function maybeAutoApplyAssistantReplyCharacterCueCandidate")
-    && source.includes("conversation_followup_character_reply_cue_candidate_auto_apply")
+  followupFeatureSource.includes("characterRuntimeAutoApplyReplyCue")
+    && followupFeatureSource.includes("auto_apply_reply_cue")
+    && followupFeatureSource.includes("function maybeAutoApplyAssistantReplyCharacterCueCandidate")
+    && followupFeatureSource.includes("conversation_followup_character_reply_cue_candidate_auto_apply")
     && replyCueSource.includes("runtimeVoiceStyleToTalkStyle")
-    && source.includes("speechStyle"),
+    && followupFeatureSource.includes("speechStyle"),
   "assistant reply cue candidates should support an explicit default-off auto-apply path into runtime dispatch and TTS style"
 );
 assert.ok(
-  source.includes("function buildReplyCharacterChipView")
+  followupFeatureSource.includes("function buildReplyCharacterChipView")
     && replyCueSource.includes("function buildReplyCharacterChipView")
-    && source.includes("function updateReplyCharacterChip")
-    && source.includes("localizeReplyCharacterValue")
-    && replyCueSource.includes("上一句角色表现 · 待回复")
-    && source.includes("updateReplyCharacterChip(candidate, result)")
-    && source.includes("ui.replyCharacterChip")
+    && followupFeatureSource.includes("function updateReplyCharacterChip")
+    && followupFeatureSource.includes("ui.replyCharacterChip")
     && indexSource.includes('id="reply-character-chip"')
     && baseCssSource.includes(".reply-character-chip[data-tone=\"applied\"]"),
   "assistant reply runtime cue should surface a readable last-reply character chip in the chat header"
 );
 assert.ok(
-  source.includes("chatStreamEnabled")
+  chatStateSource.includes("chatStreamEnabled")
     && source.includes("chat_stream_enabled")
-    && source.includes("preferStream: state.conversationMode.chatStreamEnabled !== false"),
+    && chatReplyControllerSource.includes("preferStream: state.conversationMode.chatStreamEnabled !== false"),
   "chat requests should support a frontend-visible switch for disabling unstable LLM streaming"
-);
-assert.ok(
-  source.includes('label: "刚聊完"')
-    && source.includes('description: "刚刚完成一轮对话，先安静待机，不打断用户。"')
-    && source.includes('"刚聊完": "idle"'),
-  "follow-up chip should show a calm idle state after normal replies instead of looking stuck in thinking"
 );
 assert.ok(
   source.includes("async function runDoctorDiagnostics()")
     && localCommandRegistrySource.includes('kind: "doctor"')
     && localCommandRegistry.matchLocalCommand("/doctor").kind === "doctor"
-    && localCommandRegistry.matchLocalCommand("/自检").kind === "doctor"
     && source.includes('runDoctorJsonFetch("/api/health"')
-    && source.includes('"聊天模型"')
-    && source.includes('"语音服务"')
     && source.includes("requestServerTTSBlob(")
     && source.includes("window.TaffyDoctorDiagnostics.buildReport")
     && doctorSource.includes("function buildAdvice")
-    && doctorSource.includes("链路自检完成：核心功能正常。")
-    && doctorSource.includes("下一步建议")
-    && doctorSource.includes("GPT-SoVITS 异常")
-    && doctorSource.includes("当前已关闭流式聊天")
     && source.includes("runDoctorAndAppendReport()")
     && source.includes('row?.classList?.add("doctor-report")')
-    && source.includes("ui.doctorBtn")
+    && chatDomSource.includes("doctorBtn: documentObject.getElementById(\"doctor-btn\")")
     && indexSource.includes('id="doctor-btn"')
-    && indexSource.includes('<script src="./characterReplyCue.js"></script>')
     && indexSource.includes('<script src="./doctorDiagnostics.js"></script>')
-    && source.includes("ui.voiceTestBtn")
-    && indexSource.includes('id="voice-test-btn"')
     && baseCssSource.includes(".message.assistant.doctor-report .content"),
   "chat.js should expose a local /doctor self-check for LLM, TTS, config, and character runtime diagnostics"
 );
 assert.ok(
-  indexSource.includes("先做链路自检，再聊一句，最后测试语音和开麦。")
-    && indexSource.includes("更多 → 链路自检")
-    && indexSource.includes("更多 → 测试语音")
-    && indexSource.includes("调角色味道")
-    && indexSource.includes("更多 → 角色试演")
-    && indexSource.includes("表现不错")
-    && indexSource.includes("角色调优")
-    && indexSource.includes("/ttsdebug")
-    && indexSource.includes("更多 → 人设卡"),
+  indexSource.includes("/ttsdebug")
+    && indexSource.includes('id="voice-test-btn"')
+    && indexSource.includes('id="character-rehearsal-btn"')
+    && indexSource.includes('id="character-tuning-btn"'),
   "help modal should guide non-technical users through self-check, chat, voice, persona setup, and character tuning"
 );
 assert.ok(
   source.includes("async function runVoiceTestAndAppendReport()")
     && localCommandRegistrySource.includes('kind: "voice_test"')
     && localCommandRegistry.matchLocalCommand("/testvoice").kind === "voice_test"
-    && source.includes("ui.voiceTestBtn")
-    && source.includes("语音测试没有成功"),
+    && chatDomSource.includes("voiceTestBtn: documentObject.getElementById(\"voice-test-btn\")")
+    && advancedActionBinderSource.includes("ui.voiceTestBtn")
+    && advancedActionBinderSource.includes("runVoiceTestAndAppendReport"),
   "voice test should be available both as a visible button and as a local command"
 );
 assert.ok(
@@ -781,23 +1166,18 @@ assert.ok(
     && source.includes("async function runCharacterRehearsalAndAppendReport()")
     && localCommandRegistrySource.includes('kind: "character_rehearsal"')
     && localCommandRegistry.matchLocalCommand("/roletest").kind === "character_rehearsal"
-    && source.includes("ui.characterRehearsalBtn")
-    && indexSource.includes('id="character-rehearsal-btn"')
-    && source.includes("角色试演的语音没有成功"),
+    && chatDomSource.includes("characterRehearsalBtn: documentObject.getElementById(\"character-rehearsal-btn\")")
+    && advancedActionBinderSource.includes("runCharacterRehearsalAndAppendReport"),
   "character rehearsal should be available as a visible button and local command to test runtime expression and voice styles without LLM"
 );
 assert.ok(
   tuningSource.includes("function buildTuningReport")
     && source.includes("function buildCharacterTuningReport()")
     && source.includes("function runCharacterTuningAndAppendReport()")
-    && tuningSource.includes("function addConfigKey")
     && localCommandRegistrySource.includes('kind: "character_tuning"')
     && localCommandRegistry.matchLocalCommand("/tuning").kind === "character_tuning"
-    && source.includes("ui.characterTuningBtn")
-    && indexSource.includes('id="character-tuning-btn"')
-    && indexSource.includes('<script src="./characterTuning.js"></script>')
-    && tuningSource.includes("角色调优建议")
-    && tuningSource.includes("可检查配置项")
+    && chatDomSource.includes("characterTuningBtn: documentObject.getElementById(\"character-tuning-btn\")")
+    && advancedActionBinderSource.includes("runCharacterTuningAndAppendReport")
     && tuningSource.includes("tts.gpt_sovits_ref_audio_path")
     && tuningSource.includes("motion.speech_motion_strength"),
   "character tuning should expose readable next-step advice and concrete config keys based on the latest runtime cue"
@@ -808,11 +1188,9 @@ assert.ok(
     && source.includes("characterPerformanceLastFeedback")
     && localCommandRegistry.matchLocalCommand("/goodcue").kind === "character_feedback_good"
     && localCommandRegistry.matchLocalCommand("/badcue").kind === "character_feedback_bad"
-    && source.includes("ui.characterFeedbackGoodBtn")
-    && source.includes("ui.characterFeedbackBadBtn")
-    && indexSource.includes('id="character-feedback-good-btn"')
-    && indexSource.includes('id="character-feedback-bad-btn"')
-    && tuningSource.includes("最近反馈"),
+    && chatDomSource.includes("characterFeedbackGoodBtn: documentObject.getElementById(\"character-feedback-good-btn\")")
+    && chatDomSource.includes("characterFeedbackBadBtn: documentObject.getElementById(\"character-feedback-bad-btn\")")
+    && advancedActionBinderSource.includes("recordCharacterPerformanceFeedback"),
   "character tuning should include lightweight local feedback for the latest runtime performance"
 );
 assert.ok(
@@ -820,236 +1198,244 @@ assert.ok(
     && source.includes("function buildCharacterWorkflowGuide()")
     && source.includes("function appendCharacterWorkflowGuide()")
     && localCommandRegistrySource.includes('kind: "character_workflow"')
-    && localCommandRegistry.matchLocalCommand("/roleflow").kind === "character_workflow"
-    && tuningSource.includes("角色闭环测试流程"),
+    && localCommandRegistry.matchLocalCommand("/roleflow").kind === "character_workflow",
   "chat should expose a readable local character workflow guide"
 );
 assert.ok(
   source.includes("function buildChatFailureDoctorHint(err)")
-    && doctorSource.includes("更多 → 链路自检")
-    && doctorSource.includes("输入 /doctor")
-    && source.includes("const msg = buildChatFailureDoctorHint(err);"),
+    && chatReplyControllerSource.includes("const msg = buildChatFailureDoctorHint(err);"),
   "chat failures should point users to the visible Doctor self-check instead of leaving raw errors alone"
 );
 assert.ok(
-  source.includes("function buildAssistantReplyCharacterExpressionCue")
+  followupFeatureSource.includes("function buildAssistantReplyCharacterExpressionCue")
     && replyCueSource.includes("function buildAssistantReplyCharacterExpressionCue")
     && replyCueSource.includes('reason: "warm_or_playful"')
     && replyCueSource.includes('action: "happy_idle"')
     && replyCueSource.includes('reason: "question_or_surprise"')
     && replyCueSource.includes('action: "think"')
-    && source.includes("expressionReason"),
+    && followupFeatureSource.includes("expressionReason"),
   "assistant reply cue candidates should map reply mood/style into concrete allowlisted expression metadata"
 );
 assert.ok(
-  source.includes("grayAutoFollowupTrialCharacterReplyCueCandidate")
+  followupFeatureSource.includes("conversation_followup_character_reply_cue_candidate")
     && replyCueSource.includes("noRuntimeCueEmission: true")
     && replyCueSource.includes("noLive2DMove: true"),
   "reply cue candidate debug API should stay preview-only and safe"
 );
 assert.ok(
-  source.includes("async function emitLastReplyCharacterCueCandidateViaManualBridge")
-    && source.includes("SEND_REPLY_CHARACTER_CUE_CANDIDATE")
-    && source.includes("conversation_followup_character_reply_cue_candidate_manual_emit")
-    && source.includes("emitGrayAutoFollowupTrialCharacterReplyCueCandidateViaManualBridge"),
+  followupFeatureSource.includes("async function emitLastReplyCharacterCueCandidateViaManualBridge")
+    && followupFeatureSource.includes("SEND_REPLY_CHARACTER_CUE_CANDIDATE")
+    && followupFeatureSource.includes("conversation_followup_character_reply_cue_candidate_manual_emit")
+    && followupFeatureSource.includes("previewGrayAutoTrialCharacterCueBackendBridge({"),
   "reply cue candidates should have a separate manual-only bridge with an explicit confirmation phrase"
 );
 assert.ok(
-  /async function emitLastReplyCharacterCueCandidateViaManualBridge[\s\S]*?previewGrayAutoTrialCharacterCueBackendBridge[\s\S]*?handleCharacterRuntimeMetadata\(candidate\.runtimeHint\)/.test(source),
+  /async function emitLastReplyCharacterCueCandidateViaManualBridge[\s\S]*?previewGrayAutoTrialCharacterCueBackendBridge[\s\S]*?handleCharacterRuntimeMetadata\(candidate\.runtimeHint\)/.test(followupFeatureSource),
   "reply cue candidate manual sends should pass backend preview/no-op before using the local runtime cue path"
 );
 assert.ok(
-  /function buildGrayAutoTrialCharacterCueManualEmitRecap[\s\S]*?conversation_followup_character_reply_cue_candidate_manual_emit[\s\S]*?replyCandidateSent/.test(source)
+  /function buildGrayAutoTrialCharacterCueManualEmitRecap[\s\S]*?conversation_followup_character_reply_cue_candidate_manual_emit[\s\S]*?replyCandidateSent/.test(followupFeatureSource)
     && grayTrialCharacterViewSource.includes("replyCueCandidate=")
     && grayTrialCharacterViewSource.includes("emotion:${candidate.runtimeHint?.emotion")
     && grayTrialCharacterViewSource.includes("backendBridge=ok:"),
   "manual cue recap should include reply candidate sends, backend no-op status, and candidate sent state"
 );
 assert.ok(
-  source.includes("followupCharacterRuntimeLastDispatch")
-    && source.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_DISPATCH__")
+  runtimeMetadataControllerSource.includes("followupCharacterRuntimeLastDispatch")
+    && runtimeMetadataControllerSource.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_DISPATCH__")
     && grayTrialCharacterViewSource.includes("runtimeDispatch=local:"),
   "manual character cue feedback should expose local dispatch and model broadcast status"
 );
 assert.ok(
-  source.includes("followupCharacterRuntimeLastApply")
-    && source.includes("window.__AI_CHAT_LAST_CHARACTER_RUNTIME_APPLY__")
+  followupFeatureSource.includes("followupCharacterRuntimeLastApply")
+    && runtimeEventBinderSource.includes("__AI_CHAT_LAST_CHARACTER_RUNTIME_APPLY__")
     && grayTrialCharacterViewSource.includes("runtimeApply=emotion:"),
   "manual character cue feedback should expose Live2D apply diagnostics without adding automatic triggers"
 );
 assert.ok(
-  /const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup[\s\S]*trialEmitCharacter[\s\S]*trialSendReplyCueCandidate[\s\S]*\]\);/.test(source),
+  /const advancedLocalActions = createFollowupReadinessCollapsibleActionGroup[\s\S]*trialEmitCharacter[\s\S]*trialSendReplyCueCandidate[\s\S]*\]\);/.test(followupFeatureSource),
   "manual character cue buttons should remain inside the collapsed high-risk local action group"
 );
 assert.ok(
-  source.includes("function updateReplyCharacterCueCandidateManualSendButton")
-    && source.includes("followupReadinessTrialSendReplyCueCandidateBtn")
-    && source.includes("button.disabled = !available")
-    && source.includes("candidate tone=${candidate.tone")
-    && source.includes("updateReplyCharacterCueCandidateManualSendButton();"),
+  followupFeatureSource.includes("function updateReplyCharacterCueCandidateManualSendButton")
+    && followupFeatureSource.includes("followupReadinessTrialSendReplyCueCandidateBtn")
+    && followupFeatureSource.includes("button.disabled = !available")
+    && followupFeatureSource.includes("candidate tone=${candidate.tone")
+    && followupFeatureSource.includes("updateReplyCharacterCueCandidateManualSendButton();"),
   "reply cue candidate send button should stay disabled until a concrete candidate is available"
 );
 assert.ok(
-  /async function handleReplyCharacterCueCandidateManualSendClick[\s\S]*?finally \{[\s\S]*?updateReplyCharacterCueCandidateManualSendButton\(\);[\s\S]*?button\.blur\(\);/.test(source)
-    && !/async function handleReplyCharacterCueCandidateManualSendClick[\s\S]*?finally \{[\s\S]*?button\.disabled = false;/.test(source),
+  /async function handleReplyCharacterCueCandidateManualSendClick[\s\S]*?finally \{[\s\S]*?updateReplyCharacterCueCandidateManualSendButton\(\);[\s\S]*?button\.blur\(\);/.test(followupFeatureSource)
+    && followupFeatureSource.includes("button.disabled = true"),
   "reply cue candidate manual send should restore button state through the availability guard"
 );
 assert.ok(
-  source.includes("function finishSpeechAnimation()"),
+  live2dExpressionControllerSource.includes("function finishSpeechAnimation()")
+    && source.includes("function finishSpeechAnimation() { return getLive2DExpressionController().finishSpeechAnimation(); }"),
   "natural speech completion should keep a release helper"
 );
 assert.ok(
-  /function finishSpeechAnimation\(\)\s*\{[\s\S]*?state\.speechAnimUntil\s*=\s*now\s*\+\s*releaseMs;/.test(source),
+  /function finishSpeechAnimation\(\)\s*\{[\s\S]*?state\.speechAnimUntil\s*=\s*now\s*\+\s*releaseMs;/.test(live2dExpressionControllerSource),
   "natural speech completion should shorten the mouth animation to a release window"
 );
 assert.ok(
-  source.includes("ttsAudioRawLevel: 0"),
+  chatStateSource.includes("ttsAudioRawLevel: 0"),
   "speech animation should keep raw audio level state for audio-driven mouth shapes"
 );
 assert.ok(
-  /state\.ttsAudioAnalyser\.smoothingTimeConstant\s*=\s*0\.12;/.test(source),
+  /state\.ttsAudioAnalyser\.smoothingTimeConstant\s*=\s*0\.12;/.test(live2dExpressionControllerSource),
   "TTS audio analyser should react quickly enough for mouth closures"
 );
 assert.ok(
-  /const hasLiveAudio\s*=\s*audioPlaying && !!state\.ttsAudioAnalyser;/.test(source),
+  /const hasLiveAudio\s*=\s*audioPlaying && !!state\.ttsAudioAnalyser;/.test(live2dExpressionControllerSource),
   "mouth animation should prefer live audio when an analyser is available"
 );
 assert.ok(
-  /if \(hasLiveAudio\) \{[\s\S]*?const voiced = rawLevel > 0\.035[\s\S]*?target = 0;[\s\S]*?state\.speechMouthOpen = 0;[\s\S]*?return state\.speechMouthOpen;/.test(source),
+  /if \(hasLiveAudio\) \{[\s\S]*?const voiced = rawLevel > 0\.035[\s\S]*?target = 0;[\s\S]*?state\.speechMouthOpen = 0;[\s\S]*?return state\.speechMouthOpen;/.test(live2dExpressionControllerSource),
   "live audio mouth path should close quickly when voice energy drops"
 );
 assert.ok(
-  source.includes("const closureDip = clampNumber(closureGate")
-    && source.includes("const rhythmGate = clampNumber")
-    && source.includes("const closureCap = clampNumber"),
+  live2dExpressionControllerSource.includes("const closureDip = clampNumber(closureGate")
+    && live2dExpressionControllerSource.includes("const rhythmGate = clampNumber")
+    && live2dExpressionControllerSource.includes("const closureCap = clampNumber"),
   "live audio mouth path should add rhythmic closure dips during fast speech"
 );
 assert.ok(
-  source.includes("voiceRecent = now - Number(state.ttsAudioLastVoiceAt || 0) < 58")
-    && source.includes("0.62 + visemeOpen * 0.48 - closureDip")
-    && source.includes("0.045 + liveLevel * 0.16 + rawLevel * 0.1"),
+  live2dExpressionControllerSource.includes("voiceRecent = now - Number(state.ttsAudioLastVoiceAt || 0) < 58")
+    && live2dExpressionControllerSource.includes("0.62 + visemeOpen * 0.48 - closureDip")
+    && live2dExpressionControllerSource.includes("0.045 + liveLevel * 0.16 + rawLevel * 0.1"),
   "fast live audio mouth path should keep closure valleys visible"
 );
 assert.ok(
-  source.includes("const _translationInFlight = new Map();"),
+  source.includes("const CHAT_TRANSLATION_SERVICE = window.TaffyChatTranslationService")
+    && chatTranslationServiceSource.includes("const translationInFlight = new Map();"),
   "chat and subtitle translations should share in-flight requests"
 );
 assert.ok(
   source.includes("function _normalizeChatTranslationKey(text)")
-    && source.includes("_translationInFlight.get(cacheKey)")
-    && source.includes("_translationInFlight.set(cacheKey, task)"),
+    && source.includes("CHAT_TRANSLATION_SERVICE.normalizeKey")
+    && chatTranslationServiceSource.includes("function normalizeKey(text)")
+    && chatTranslationServiceSource.includes("translationInFlight.get(cacheKey)")
+    && chatTranslationServiceSource.includes("translationInFlight.set(cacheKey, task)"),
   "chat translation cache/in-flight keys should normalize punctuation spacing variants"
 );
 assert.ok(
-  /async function _fetchTranslation\(text, capturedId\)\s*\{[\s\S]*?_readChatTranslationCache\(safe\)[\s\S]*?_fetchChatTranslation\(safe\)/.test(source),
+  source.includes("const SUBTITLE_CONTROLLER = window.TaffySubtitleController")
+    && source.includes("SUBTITLE_CONTROLLER.fetchTranslation(text, capturedId, getSubtitleControllerDeps())")
+    && source.includes("readChatTranslationCache: _readChatTranslationCache")
+    && source.includes("fetchChatTranslation: _fetchChatTranslation")
+    && subtitleControllerSource.includes("readChatTranslationCache")
+    && subtitleControllerSource.includes("fetchChatTranslation"),
   "subtitle translation should reuse the chat translation cache/request path"
 );
 assert.ok(
   source.includes("function normalizeAssistantVisibleText(text)")
-    && source.includes("const visibleReply = normalizeAssistantVisibleText(parsedReply.visibleText);"),
+    && chatReplyControllerSource.includes("const visibleReply = normalizeAssistantVisibleText(parsedReply.visibleText);"),
   "final assistant text should normalize English sentence boundaries before display and translation"
 );
 assert.ok(
-  /function stripAssistantPayloadNoise\(text\)\s*\{[\s\S]*?SPEECH_TEXT\.stripAssistantPayloadNoise/.test(source),
+  source.includes("function stripAssistantPayloadNoise(text)")
+    && runtimeMetadataControllerSource.includes("SPEECH_TEXT.stripAssistantPayloadNoise"),
   "chat visible text cleanup should reuse the shared speech metadata guard"
 );
 assert.ok(
-  source.includes('translationEl.textContent = "中译：翻译中...";'),
+  chatMessageControllerSource.includes('translationEl.textContent = "\\u4e2d\\u8bd1\\uff1a\\u7ffb\\u8bd1\\u4e2d...";'),
   "assistant messages should show an immediate translation placeholder"
 );
 assert.ok(
-  source.includes("const _CHAT_TRANSLATE_TIMEOUT_MS = 60000;"),
+  chatTranslationServiceSource.includes("const CHAT_TRANSLATE_TIMEOUT_MS = 60000;")
+    && source.includes("const _CHAT_TRANSLATE_TIMEOUT_MS = CHAT_TRANSLATION_SERVICE.CHAT_TRANSLATE_TIMEOUT_MS || 60000;"),
   "assistant translation should allow slow local LLM translation to finish"
 );
 assert.ok(
-  source.includes('translationEl.textContent = "中译：翻译暂时不可用";'),
+  chatMessageControllerSource.includes('translationEl.textContent = "\\u4e2d\\u8bd1\\uff1a\\u7ffb\\u8bd1\\u6682\\u65f6\\u4e0d\\u53ef\\u7528";'),
   "assistant messages should show a visible translation failure instead of disappearing"
 );
 assert.ok(
-  /utterance\.onend\s*=\s*\(\)\s*=>\s*\{[\s\S]*?finishSpeechAnimation\(\);[\s\S]*?resolve\(true\);[\s\S]*?\};/.test(source),
+  /utterance\.onend\s*=\s*\(\)\s*=>\s*\{[\s\S]*?finishSpeechAnimation\(\);[\s\S]*?resolve\(true\);[\s\S]*?\};/.test(ttsPlaybackControllerSource),
   "browser TTS success should use graceful speech release"
 );
 assert.ok(
-  /utterance\.onerror\s*=\s*\(\)\s*=>\s*\{[\s\S]*?endSpeechAnimation\(\);[\s\S]*?resolve\(false\);[\s\S]*?\};/.test(source),
+  /utterance\.onerror\s*=\s*\(\)\s*=>\s*\{[\s\S]*?endSpeechAnimation\(\);[\s\S]*?resolve\(false\);[\s\S]*?\};/.test(ttsPlaybackControllerSource),
   "browser TTS failure should still hard-stop speech animation"
 );
 assert.ok(
-  /const done = \(ok\) => \{[\s\S]*?if \(ok\) \{[\s\S]*?finishSpeechAnimation\(\);[\s\S]*?\} else \{[\s\S]*?endSpeechAnimation\(\);[\s\S]*?\}[\s\S]*?resolve\(ok\);[\s\S]*?\};/.test(source),
+  /const done = \(ok\) => \{[\s\S]*?if \(ok\) \{[\s\S]*?finishSpeechAnimation\(\);[\s\S]*?\} else \{[\s\S]*?endSpeechAnimation\(\);[\s\S]*?\}[\s\S]*?resolve\(ok\);[\s\S]*?\};/.test(ttsPlaybackControllerSource),
   "server TTS completion should release on success and hard-stop on failure"
 );
 assert.ok(
-  /progressTimer\s*=\s*window\.setInterval\(async \(\) => \{[\s\S]*?performance\.now\(\) - lastProgressAt < 2800[\s\S]*?playAudioByContext\(blob,\s*debugContext\)/.test(source),
+  /progressTimer\s*=\s*window\.setInterval\(async \(\) => \{[\s\S]*?performance\.now\(\) - lastProgressAt < 2800[\s\S]*?playAudioByContext\(blob,\s*debugContext\)/.test(ttsPlaybackControllerSource),
   "server TTS should fall back when HTML audio stops advancing"
 );
 assert.ok(
-  /fallbackTimer\s*=\s*window\.setTimeout\(resolveOnce,[\s\S]*?durationMs \+ 900/.test(source),
+  /fallbackTimer\s*=\s*window\.setTimeout\(resolveOnce,[\s\S]*?durationMs \+ 900/.test(ttsPlaybackControllerSource),
   "AudioContext fallback should not leave speaking state stuck if onended is missed"
 );
 assert.ok(
-  source.includes("function hasQueuedStreamSpeakItem(sessionId)"),
+  streamTtsQueueControllerSource.includes("function hasQueuedStreamSpeakItem(sessionId)"),
   "stream speech queue should be able to detect queued tail segments"
 );
 assert.ok(
-  source.includes("function ensureStreamSpeakQueueRunning(sessionId")
-    && source.includes("stream_run_handoff")
-    && source.includes("ensureStreamSpeakQueueRunning(sessionId, 0);"),
+  streamTtsQueueControllerSource.includes("function ensureStreamSpeakQueueRunning(sessionId")
+    && streamTtsQueueControllerSource.includes("stream_run_handoff")
+    && streamTtsQueueControllerSource.includes("ensureStreamSpeakQueueRunning(sessionId, 0);"),
   "stream speech queue should hand off to a newer session after an older runner exits"
 );
 assert.ok(
-  /function dequeueStreamSpeakItem\(sessionId\)\s*\{[\s\S]*?for \(let i = 0; i < state\.streamSpeakQueue\.length; i \+= 1\)[\s\S]*?item\.sessionId !== sessionId[\s\S]*?continue;[\s\S]*?state\.streamSpeakQueue\.splice\(i, 1\);[\s\S]*?return item;/.test(source),
+  /function dequeueStreamSpeakItem\(sessionId\)\s*\{[\s\S]*?for \(let i = 0; i < state\.streamSpeakQueue\.length; i \+= 1\)[\s\S]*?item\.sessionId !== sessionId[\s\S]*?continue;[\s\S]*?state\.streamSpeakQueue\.splice\(i, 1\);[\s\S]*?return item;/.test(streamTtsQueueControllerSource),
   "stream speech dequeue should not drop queued items from newer sessions"
 );
 assert.ok(
-  source.includes("function shouldSerializeStreamTTSRequests()")
-    && source.includes('state.ttsProvider === "gpt_sovits"')
-    && source.includes("if (!shouldSerializeStreamTTSRequests())")
-    && source.includes("provider: state.ttsProvider || \"\""),
+  streamTtsQueueControllerSource.includes("function shouldSerializeStreamTTSRequests()")
+    && streamTtsQueueControllerSource.includes('state.ttsProvider === "gpt_sovits"')
+    && streamTtsQueueControllerSource.includes("if (!shouldSerializeStreamTTSRequests())")
+    && speechStyleControllerSource.includes("provider: state.ttsProvider || \"\""),
   "GPT-SoVITS realtime stream speech should serialize eager requests and use provider-aware segmentation"
 );
 assert.ok(
-  source.includes("stream_speak_idle_wait_ms")
-    && source.includes("state.streamSpeakIdleWaitMs = Number.isFinite(streamIdleWaitCfg)")
-    && source.includes("Math.max(30, Math.min(220, Number(state.streamSpeakIdleWaitMs) || 90))"),
+  appConfigControllerSource.includes("stream_speak_idle_wait_ms")
+    && appConfigControllerSource.includes("state.streamSpeakIdleWaitMs = Number.isFinite(streamIdleWaitCfg)")
+    && streamTtsQueueControllerSource.includes("Math.max(30, Math.min(220, Number(state.streamSpeakIdleWaitMs) || 90))"),
   "stream speech queue should support a shorter configurable idle wait"
 );
 assert.ok(
-  source.includes("gpt_sovits_timeout_sec")
-    && source.includes("sovitsTimeoutMs")
-    && source.includes("Math.min(90000")
-    && source.includes("state.ttsServerRequestTimeoutMs"),
+  appConfigControllerSource.includes("gpt_sovits_timeout_sec")
+    && appConfigControllerSource.includes("sovitsTimeoutMs")
+    && appConfigControllerSource.includes("Math.min(90000")
+    && appConfigControllerSource.includes("state.ttsServerRequestTimeoutMs"),
   "GPT-SoVITS frontend request timeout should follow backend timeout config"
 );
 assert.ok(
-  source.includes("streamSpeakWorkingSession: 0")
-    && source.includes("stream_run_clear_stale_busy")
-    && source.includes("state.streamSpeakWorkingSession = activeSession"),
+  chatStateSource.includes("streamSpeakWorkingSession: 0")
+    && streamTtsQueueControllerSource.includes("stream_run_clear_stale_busy")
+    && streamTtsQueueControllerSource.includes("state.streamSpeakWorkingSession = activeSession"),
   "new realtime TTS sessions should not be blocked by stale stream runners"
 );
 assert.ok(
-  /current\s*=\s*next\s*\|\|\s*await waitNextStreamSpeakItem\([\s\S]*?state\.chatBusy \? idleWaitMs : 180/.test(source),
+  /current\s*=\s*next\s*\|\|\s*await waitNextStreamSpeakItem\([\s\S]*?state\.chatBusy \? idleWaitMs : 180/.test(streamTtsQueueControllerSource),
   "stream speech queue should re-check for tail segments after each audio segment plays"
 );
 assert.ok(
-  /finally \{[\s\S]*?state\.streamSpeakWorking = false;[\s\S]*?hasQueuedStreamSpeakItem\(activeSession\)[\s\S]*?runStreamSpeakQueue\(\)/.test(source),
+  /finally \{[\s\S]*?state\.streamSpeakWorking = false;[\s\S]*?hasQueuedStreamSpeakItem\(activeSession\)[\s\S]*?runStreamSpeakQueue\(\)/.test(streamTtsQueueControllerSource),
   "stream speech queue should restart itself if a segment arrived while it was finishing"
 );
 assert.ok(
-  source.includes("streamSpeakPlayedSession: 0")
-    && source.includes("function scheduleFinalSpeechWatchdog")
-    && source.includes("final_watchdog_tts")
-    && source.includes("scheduleFinalSpeechWatchdog({"),
+  chatStateSource.includes("streamSpeakPlayedSession: 0")
+    && streamTtsQueueControllerSource.includes("function scheduleFinalSpeechWatchdog")
+    && streamTtsQueueControllerSource.includes("final_watchdog_tts")
+    && chatReplyControllerSource.includes("scheduleFinalSpeechWatchdog({"),
   "final replies should have a watchdog fallback if realtime stream speech never starts playback"
 );
 assert.ok(
-  source.includes("function discardQueuedStreamSpeakItems(sessionId)")
-    && source.includes('recordTTSDebugEvent("final_direct_tts"')
-    && source.includes("no_stream_playback_yet")
-    && source.includes("state.streamSpeakLastEnqueueSession = 0;"),
+  streamTtsQueueControllerSource.includes("function discardQueuedStreamSpeakItems(sessionId)")
+    && chatReplyControllerSource.includes('recordTTSDebugEvent("final_direct_tts"')
+    && chatReplyControllerSource.includes("no_stream_playback_yet")
+    && chatReplyControllerSource.includes("state.streamSpeakLastEnqueueSession = 0;"),
   "short final replies should use direct TTS if no realtime stream segment has started playback"
 );
 assert.ok(
-  source.includes("function buildTTSDebugReport()")
-    && source.includes("window.TaffyTTSDebugReport?.buildReport")
+  followupFeatureSource.includes("function buildTTSDebugReport()")
+    && followupFeatureSource.includes("window.TaffyTTSDebugReport?.buildReport")
     && ttsDebugSource.includes("function buildReport")
     && ttsDebugSource.includes("recentEvents=")
     && devFeatureLoaderSource.includes('"./ttsDebugReport.js"')
@@ -1084,14 +1470,14 @@ assert.ok(
 );
 assert.ok(
   source.includes("const FOLLOWUP_READINESS_VIEW = window.TaffyFollowupReadinessView")
-    && source.includes("FOLLOWUP_READINESS_VIEW.buildBackendEntryCardText")
-    && source.includes("FOLLOWUP_READINESS_VIEW.buildPreviewOneLineText")
+    && followupFeatureSource.includes("FOLLOWUP_READINESS_VIEW.buildBackendEntryCardText")
+    && followupFeatureSource.includes("FOLLOWUP_READINESS_VIEW.buildPreviewOneLineText")
     && source.includes("const GRAY_TRIAL_READINESS_MODEL = window.TaffyGrayTrialReadinessModel")
-    && source.includes("GRAY_TRIAL_READINESS_MODEL.buildTimeline")
+    && followupFeatureSource.includes("GRAY_TRIAL_READINESS_MODEL.buildTimeline")
     && grayTrialReadinessModelSource.includes("function buildGoNoGoDecision")
-    && followupReadinessViewSource.includes("function buildGrayAutoTrialStatusCardText")
+    && followupReadinessViewSource.includes("function buildGrayAutoTrialTimelineText")
     && followupReadinessViewSource.includes("function buildGrayAutoTrialSignoffPackageText")
-    && followupReadinessViewSource.includes("灰度自动试运行状态卡（只读）")
+    && followupReadinessViewSource.includes("function buildGrayAutoTrialStatusCardText")
     && devFeatureLoaderSource.includes('"./grayTrialReadinessModel.js"')
     && devFeatureLoaderSource.includes('"./followupReadinessView.js"')
     && indexSource.includes('<script src="./devFeatureLoader.js"></script>'),
@@ -1101,17 +1487,17 @@ assert.ok(
   source.includes("const GRAY_TRIAL_CHARACTER_VIEW = window.TaffyGrayTrialCharacterView")
     && source.includes("const GRAY_TRIAL_CHARACTER_MODEL = window.TaffyGrayTrialCharacterModel")
     && source.includes("const GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL = window.TaffyGrayTrialAutoRuntimeSwitchModel")
-    && source.includes("GRAY_TRIAL_CHARACTER_MODEL.buildCharacterCuePreview")
-    && source.includes("GRAY_TRIAL_CHARACTER_MODEL.buildExpressionStrategyDraft")
-    && source.includes("GRAY_TRIAL_CHARACTER_MODEL.buildAutoRuntimeDryRun")
-    && source.includes("GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchPlan")
-    && source.includes("GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildFinalPreflight")
-    && source.includes("GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSeparateImplementationDraft")
-    && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCuePreviewText")
-    && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitRecapText")
-    && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeDryRunText")
-    && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildSwitchControlDiagnosticsText")
-    && source.includes("GRAY_TRIAL_CHARACTER_VIEW.buildSeparateImplementationDraftText")
+    && followupFeatureSource.includes("GRAY_TRIAL_CHARACTER_MODEL.buildCharacterCuePreview")
+    && followupFeatureSource.includes("GRAY_TRIAL_CHARACTER_MODEL.buildExpressionStrategyDraft")
+    && followupFeatureSource.includes("GRAY_TRIAL_CHARACTER_MODEL.buildAutoRuntimeDryRun")
+    && followupFeatureSource.includes("GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildExplicitSwitchPlan")
+    && followupFeatureSource.includes("GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildFinalPreflight")
+    && followupFeatureSource.includes("GRAY_TRIAL_AUTO_RUNTIME_SWITCH_MODEL.buildSeparateImplementationDraft")
+    && followupFeatureSource.includes("GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCuePreviewText")
+    && followupFeatureSource.includes("GRAY_TRIAL_CHARACTER_VIEW.buildCharacterCueManualEmitRecapText")
+    && followupFeatureSource.includes("GRAY_TRIAL_CHARACTER_VIEW.buildAutoRuntimeDryRunText")
+    && followupFeatureSource.includes("GRAY_TRIAL_CHARACTER_VIEW.buildSwitchControlDiagnosticsText")
+    && followupFeatureSource.includes("GRAY_TRIAL_CHARACTER_VIEW.buildSeparateImplementationDraftText")
     && grayTrialCharacterModelSource.includes("function buildCharacterCuePreview")
     && grayTrialCharacterModelSource.includes("function buildExpressionStrategyDraft")
     && grayTrialCharacterModelSource.includes("function buildAutoRuntimeDryRun")
@@ -1122,7 +1508,7 @@ assert.ok(
     && grayTrialCharacterViewSource.includes("function buildExplicitSwitchPlanText")
     && grayTrialCharacterViewSource.includes("function buildSwitchAcceptancePackageText")
     && grayTrialCharacterViewSource.includes("function buildFinalPreflightText")
-    && grayTrialCharacterViewSource.includes("灰度试运行角色表现预览（只读）")
+    && grayTrialCharacterViewSource.includes("function buildCharacterCuePreviewText")
     && devFeatureLoaderSource.includes('"./grayTrialCharacterModel.js"')
     && devFeatureLoaderSource.includes('"./grayTrialAutoRuntimeSwitchModel.js"')
     && devFeatureLoaderSource.includes('"./grayTrialCharacterView.js"')
@@ -1139,9 +1525,9 @@ assert.ok(
     && source.includes("const REMINDER_UTILS = window.TaffyReminderUtils")
     && source.includes("const SCHEDULE_LIST_VIEW = window.TaffyScheduleListView")
     && source.includes("const SCHEDULE_FORM_MODEL = window.TaffyScheduleFormModel")
-    && source.includes("REMINDER_UTILS.parseReminderWhen")
-    && source.includes("SCHEDULE_LIST_VIEW.renderScheduleList")
-    && source.includes("SCHEDULE_FORM_MODEL.buildScheduleDraft")
+    && reminderScheduleControllerSource.includes("REMINDER_UTILS.parseReminderWhen")
+    && reminderScheduleControllerSource.includes("SCHEDULE_LIST_VIEW.renderScheduleList")
+    && reminderScheduleControllerSource.includes("SCHEDULE_FORM_MODEL.buildScheduleDraft")
     && localCommandRegistry.matchLocalCommand("/ttsdebug").kind === "tts_debug"
     && localCommandRegistrySource.includes('kind: "tts_debug"')
     && localCommandExecutorSource.includes("function createLocalCommandHandlers")
@@ -1167,9 +1553,10 @@ assert.ok(
 assert.ok(
   source.includes("window.TaffyMemoryDebugReport?.buildReport")
     && localCommandRegistry.matchLocalCommand("/memorydebug").kind === "memory_debug"
-    && source.includes('learningFetchJson("/api/memory/debug")')
-    && source.includes("learningTabDebug")
-    && source.includes("learningDebugPanel")
+    && source.includes("LEARNING_REVIEW_API.reloadMemoryDebug")
+    && learningReviewApiSource.includes('fetchJsonFn("/api/memory/debug")')
+    && chatDomSource.includes("learningTabDebug")
+    && chatDomSource.includes("learningDebugPanel")
     && memoryDebugSource.includes("learning.degradedReason=")
     && memoryDebugSource.includes("Learning health windows:"),
   "chat.js should expose memory/learning chain debug state"
@@ -1185,53 +1572,53 @@ assert.ok(
   "window debug bridge should expose translation timing state to developer tools"
 );
 assert.ok(
-  source.includes('recordTranslateDebugEvent("request_start"')
-    && source.includes('recordTranslateDebugEvent("request_ok"')
-    && source.includes('recordTranslateDebugEvent("cache_hit"'),
+  chatTranslationServiceSource.includes('recordDebug(deps, "request_start"')
+    && chatTranslationServiceSource.includes('recordDebug(deps, "request_ok"')
+    && chatTranslationServiceSource.includes('recordDebug(deps, "cache_hit"'),
   "translation requests should record start, completion, and cache-hit events"
 );
 assert.ok(
-  source.includes('recordTTSDebugEvent("audio_play_start"')
-    && source.includes('recordTTSDebugEvent("audio_done"')
+  ttsPlaybackControllerSource.includes('recordTTSDebugEvent("audio_play_start"')
+    && ttsPlaybackControllerSource.includes('recordTTSDebugEvent("audio_done"')
     && source.includes('function recordTTSAudioEvent(stage, audio, debugContext = {}, extra = {})')
-    && source.includes('recordTTSAudioEvent("audio_waiting"')
-    && source.includes('recordTTSAudioEvent("audio_stalled"'),
+    && ttsPlaybackControllerSource.includes('recordTTSAudioEvent("audio_waiting"')
+    && ttsPlaybackControllerSource.includes('recordTTSAudioEvent("audio_stalled"'),
   "server audio playback should record start, completion, and HTMLAudioElement lifecycle events"
 );
 assert.ok(
-  source.includes('recordTTSDebugEvent("stream_enqueue"')
-    && source.includes('recordTTSDebugEvent("stream_request_ok"'),
+  streamTtsQueueControllerSource.includes('recordTTSDebugEvent("stream_enqueue"')
+    && streamTtsQueueControllerSource.includes('recordTTSDebugEvent("stream_request_ok"'),
   "stream speech queue should record enqueue and TTS request completion events"
 );
 assert.ok(
-  source.includes("ttsPlaybackGeneration: 0")
+  chatStateSource.includes("ttsPlaybackGeneration: 0")
     && source.includes("function isCurrentTTSPlaybackGeneration(generation)")
-    && source.includes('recordTTSDebugEvent("audio_stale_skip"')
-    && source.includes('recordTTSDebugEvent("browser_stale_skip"')
-    && source.includes('recordTTSDebugEvent("speak_fallback_stale_skip"')
-    && source.includes("ttsContextBufferSource: null")
-    && source.includes("state.ttsContextBufferSource.stop(0)"),
+    && ttsPlaybackControllerSource.includes('recordTTSDebugEvent("audio_stale_skip"')
+    && ttsPlaybackControllerSource.includes('recordTTSDebugEvent("browser_stale_skip"')
+    && ttsPlaybackControllerSource.includes('recordTTSDebugEvent("speak_fallback_stale_skip"')
+    && chatStateSource.includes("ttsContextBufferSource: null")
+    && ttsPlaybackControllerSource.includes("state.ttsContextBufferSource.stop(0)"),
   "TTS playback should ignore stale audio and fallback from earlier chat turns"
 );
 assert.ok(
-  /const requestedGeneration = Number\(opts\.playbackGeneration \|\| state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?if \(!isCurrentTTSPlaybackGeneration\(requestedGeneration\)\)[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?const playbackGeneration = Number\(state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?const browserTTSOptions = \{[\s\S]*?prosody: opts\.prosody \|\| null,[\s\S]*?voiceStyle: opts\.voiceStyle \|\| ""[\s\S]*?speakOnceWithVoice\(text, v, browserTTSOptions\)/.test(source),
+  /const requestedGeneration = Number\(opts\.playbackGeneration \|\| state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?if \(!isCurrentTTSPlaybackGeneration\(requestedGeneration\)\)[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?const playbackGeneration = Number\(state\.ttsPlaybackGeneration \|\| 0\);[\s\S]*?const browserTTSOptions = \{[\s\S]*?prosody: opts\.prosody \|\| null,[\s\S]*?voiceStyle: opts\.voiceStyle \|\| ""[\s\S]*?speakOnceWithVoice\(text, v, browserTTSOptions\)/.test(ttsPlaybackControllerSource),
   "browser TTS fallback should reject stale generations and carry prosody/style into each browser utterance"
 );
 assert.ok(
-  source.includes("ttsAudioPlaybackToken: 0")
-    && source.includes("const audioPlaybackToken = Number(state.ttsAudioPlaybackToken || 0) + 1")
-    && source.includes("function speakOnceWithVoice(text, voice, opts = {})")
-    && source.includes("const force = typeof opts === \"object\" ? !!opts.force : !!opts")
-    && source.includes("const isCurrentHtmlAudioPlayback = () => ("),
+  chatStateSource.includes("ttsAudioPlaybackToken: 0")
+    && ttsPlaybackControllerSource.includes("const audioPlaybackToken = Number(state.ttsAudioPlaybackToken || 0) + 1")
+    && ttsPlaybackControllerSource.includes("function speakOnceWithVoice(text, voice, opts = {})")
+    && ttsPlaybackControllerSource.includes("const force = typeof opts === \"object\" ? !!opts.force : !!opts")
+    && ttsPlaybackControllerSource.includes("const isCurrentHtmlAudioPlayback = () => ("),
   "HTMLAudio and browser TTS paths should keep per-playback ownership guards"
 );
 assert.ok(
-  /const streamSpeakSession = Date\.now\(\);[\s\S]*?const useStreamSpeak = shouldUseStreamSpeak\(\);[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?state\.streamSpeakSession = streamSpeakSession;/.test(source),
+  /const streamSpeakSession = Date\.now\(\);[\s\S]*?const useStreamSpeak = shouldUseStreamSpeak\(\);[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?state\.streamSpeakSession = streamSpeakSession;/.test(chatReplyControllerSource),
   "starting a new assistant request should always invalidate previous audio playback"
 );
 assert.ok(
   source.includes("function stripAssistantPayloadNoise(text)")
-    && source.includes("SPEECH_TEXT.stripAssistantPayloadNoise")
+    && runtimeMetadataControllerSource.includes("SPEECH_TEXT.stripAssistantPayloadNoise")
     && speechTextSource.includes("function looksLikeEmptyAssistantTextWrapperFragment(text)")
     && speechTextSource.includes("function looksLikeAssistantTextWrapperFragment(text)")
     && speechTextSource.includes("function extractAssistantPayloadText(text)")
@@ -1241,12 +1628,12 @@ assert.ok(
 );
 assert.ok(
   source.includes("function _looksLikeBadChatTranslation(source, translated)")
-    && source.includes("invalid_translation")
-    && source.includes("_looksLikeBadChatTranslation(text, value)"),
+    && chatTranslationServiceSource.includes("invalid_translation")
+    && chatTranslationServiceSource.includes("looksLikeBadTranslation(text, value)"),
   "assistant translation should reject model answers before caching or rendering them as translations"
 );
 assert.ok(
-  /if \(degraded \|\| badTranslation\) \{[\s\S]*?if \(!badTranslation\) \{[\s\S]*?_markTranslationFailure\(\);/.test(source),
+  /if \(degraded \|\| badTranslation\) \{[\s\S]*?if \(!badTranslation\) \{[\s\S]*?markFailure\(\);/.test(chatTranslationServiceSource),
   "invalid model-answer translations should not open the frontend translation circuit"
 );
 

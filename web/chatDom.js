@@ -1,0 +1,132 @@
+(function (root) {
+  "use strict";
+
+  function createUI(documentObject) {
+    return {
+  status: documentObject.getElementById("status"),
+  assistantName: documentObject.getElementById("assistant-name"),
+  heroAvatarImg: documentObject.getElementById("hero-avatar-img"),
+  translationChipBtn: documentObject.getElementById("translation-chip-btn"),
+  translationToggleBtn: documentObject.getElementById("translation-toggle-btn"),
+  subtitleToggleBtn: documentObject.getElementById("subtitle-toggle-btn"),
+  moreBtn: documentObject.getElementById("more-btn"),
+  helpBtn: documentObject.getElementById("help-btn"),
+  helpModal: documentObject.getElementById("help-modal"),
+  helpCloseBtn: documentObject.getElementById("help-close-btn"),
+  helpOpenOnboardingBtn: documentObject.getElementById("help-open-onboarding-btn"),
+  onboardingModal: documentObject.getElementById("onboarding-modal"),
+  onboardingSkipBtn: documentObject.getElementById("onboarding-skip-btn"),
+  onboardingPrevBtn: documentObject.getElementById("onboarding-prev-btn"),
+  onboardingNextBtn: documentObject.getElementById("onboarding-next-btn"),
+  onboardingDoneBtn: documentObject.getElementById("onboarding-done-btn"),
+  onboardingStepIndex: documentObject.getElementById("onboarding-step-index"),
+  onboardingProgressBar: documentObject.getElementById("onboarding-progress-bar"),
+  onboardingStepTitle: documentObject.getElementById("onboarding-step-title"),
+  onboardingStepDesc: documentObject.getElementById("onboarding-step-desc"),
+  onboardingStepTip: documentObject.getElementById("onboarding-step-tip"),
+  onboardingPathSplit: documentObject.getElementById("onboarding-path-split"),
+  onboardingQuickBtn: documentObject.getElementById("onboarding-quick-btn"),
+  onboardingAdvancedBtn: documentObject.getElementById("onboarding-advanced-btn"),
+  advancedActions: documentObject.getElementById("advanced-actions"),
+  chatLog: documentObject.getElementById("chat-log"),
+  attachmentPreview: documentObject.getElementById("attachment-preview"),
+  chatInput: documentObject.getElementById("chat-input"),
+  attachBtn: documentObject.getElementById("attach-btn"),
+  attachInput: documentObject.getElementById("attach-input"),
+  sendBtn: documentObject.getElementById("send-btn"),
+  micBtn: documentObject.getElementById("mic-btn"),
+  speakBtn: documentObject.getElementById("speak-btn"),
+  voiceNextBtn: documentObject.getElementById("voice-next-btn"),
+  scheduleBtn: documentObject.getElementById("schedule-btn"),
+  personaBtn: documentObject.getElementById("persona-btn"),
+  lockBtn: documentObject.getElementById("lock-btn"),
+  observeBtn: documentObject.getElementById("observe-btn"),
+  autoChatBtn: documentObject.getElementById("auto-chat-btn"),
+  idleBtn: documentObject.getElementById("idle-btn"),
+  micMeterWrap: documentObject.getElementById("mic-meter-wrap"),
+  micMeterFill: documentObject.getElementById("mic-meter-fill"),
+  micMeterText: documentObject.getElementById("mic-meter-text"),
+  scheduleModal: documentObject.getElementById("schedule-modal"),
+  scheduleCloseBtn: documentObject.getElementById("schedule-close-btn"),
+  scheduleDatetime: documentObject.getElementById("schedule-datetime"),
+  scheduleRepeat: documentObject.getElementById("schedule-repeat"),
+  scheduleMode: documentObject.getElementById("schedule-mode"),
+  scheduleTask: documentObject.getElementById("schedule-task"),
+  scheduleSaveBtn: documentObject.getElementById("schedule-save-btn"),
+  scheduleList: documentObject.getElementById("schedule-list"),
+  personaModal: documentObject.getElementById("persona-modal"),
+  personaPreviewBtn: documentObject.getElementById("persona-preview-btn"),
+  personaCloseBtn: documentObject.getElementById("persona-close-btn"),
+  personaAvatarPreview: documentObject.getElementById("persona-avatar-preview"),
+  personaAvatarInput: documentObject.getElementById("persona-avatar-input"),
+  personaAvatarChangeBtn: documentObject.getElementById("persona-avatar-change-btn"),
+  personaAvatarResetBtn: documentObject.getElementById("persona-avatar-reset-btn"),
+  personaApplyBtn: documentObject.getElementById("persona-apply-btn"),
+  personaIdentity: documentObject.getElementById("persona-identity"),
+  personaPreferences: documentObject.getElementById("persona-preferences"),
+  personaDislikes: documentObject.getElementById("persona-dislikes"),
+  personaTopics: documentObject.getElementById("persona-topics"),
+  personaReplyStyle: documentObject.getElementById("persona-reply-style"),
+  personaCompanionshipStyle: documentObject.getElementById("persona-companionship-style"),
+  personaSaveBtn: documentObject.getElementById("persona-save-btn"),
+  learningReviewBtn: documentObject.getElementById("learning-review-btn"),
+  followupReadinessBtn: documentObject.getElementById("followup-readiness-btn"),
+  doctorBtn: documentObject.getElementById("doctor-btn"),
+  voiceTestBtn: documentObject.getElementById("voice-test-btn"),
+  characterRehearsalBtn: documentObject.getElementById("character-rehearsal-btn"),
+  characterTuningBtn: documentObject.getElementById("character-tuning-btn"),
+  characterFeedbackGoodBtn: documentObject.getElementById("character-feedback-good-btn"),
+  characterFeedbackBadBtn: documentObject.getElementById("character-feedback-bad-btn"),
+  followupCharacterChip: documentObject.getElementById("followup-character-chip"),
+  replyCharacterChip: documentObject.getElementById("reply-character-chip"),
+  learningReviewBackdrop: documentObject.getElementById("learning-review-backdrop"),
+  learningReviewDrawer: documentObject.getElementById("learning-review-drawer"),
+  learningReviewCloseBtn: documentObject.getElementById("learning-review-close-btn"),
+  learningReviewUndoBtn: documentObject.getElementById("learning-review-undo-btn"),
+  learningTabCandidates: documentObject.getElementById("learning-tab-candidates"),
+  learningTabSamples: documentObject.getElementById("learning-tab-samples"),
+  learningTabDebug: documentObject.getElementById("learning-tab-debug"),
+  learningReloadBtn: documentObject.getElementById("learning-reload-btn"),
+  learningFilterScore: documentObject.getElementById("learning-filter-score"),
+  learningFilterConfidence: documentObject.getElementById("learning-filter-confidence"),
+  learningFilterKeyword: documentObject.getElementById("learning-filter-keyword"),
+  learningSortMode: documentObject.getElementById("learning-sort-mode"),
+  learningFilterHighBtn: documentObject.getElementById("learning-filter-high-btn"),
+  learningFilterResetBtn: documentObject.getElementById("learning-filter-reset-btn"),
+  learningSelectAll: documentObject.getElementById("learning-select-all"),
+  learningSelectedCount: documentObject.getElementById("learning-selected-count"),
+  learningBatchDeleteBtn: documentObject.getElementById("learning-batch-delete-btn"),
+  learningBatchUpBtn: documentObject.getElementById("learning-batch-up-btn"),
+  learningBatchDownBtn: documentObject.getElementById("learning-batch-down-btn"),
+  learningBatchPromoteBtn: documentObject.getElementById("learning-batch-promote-btn"),
+  learningReviewSummary: documentObject.getElementById("learning-review-summary"),
+  learningReviewList: documentObject.getElementById("learning-review-list"),
+  learningDebugPanel: documentObject.getElementById("learning-debug-panel"),
+  learningQuickInject: documentObject.getElementById("learning-quick-inject"),
+  learningQuickSupport: documentObject.getElementById("learning-quick-support"),
+  learningQuickApplyBtn: documentObject.getElementById("learning-quick-apply-btn"),
+  subtitleLayer: documentObject.getElementById("subtitle-layer"),
+  subtitleDragHandle: documentObject.getElementById("subtitle-drag-handle"),
+  personaImportTemplateBtn: documentObject.querySelector(".persona-footer-actions .persona-ghost-btn:nth-of-type(1)"),
+  personaRandomBtn: documentObject.querySelector(".persona-footer-actions .persona-ghost-btn:nth-of-type(2)"),
+  personaResetBtn: documentObject.querySelector(".persona-footer-actions .persona-ghost-btn:nth-of-type(3)")
+};
+  }
+
+  function setStatus(ui, text) {
+    if (ui && ui.status) {
+      ui.status.textContent = text;
+    }
+  }
+
+  const api = {
+    createUI,
+    setStatus
+  };
+
+  root.TaffyChatDom = api;
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = api;
+  }
+})(typeof window !== "undefined" ? window : globalThis);

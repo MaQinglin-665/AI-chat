@@ -2,6 +2,8 @@
 
 本清单用于发布前、打包前，或改动启动体验 / 后端自检 / 语音链路后做一轮人工确认。它不是成熟产品认证，只是帮助早期测试者稳定复现 MVP 桌宠体验。发布 go/no-go 汇总见 `docs/release-readiness.md`。
 
+v1.4 角色体验、动作/TTS 一致性和 demo 场景的专项验收见 `docs/v1.4-ai-vtuber-feeling.md`。
+
 ## Test Rules
 
 - 使用 PowerShell 从仓库根目录执行命令。
