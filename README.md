@@ -158,6 +158,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - v1.3 Character Runtime 计划：`docs/v1.3-character-runtime-plan.md`
 - v1.3 preview 发布说明草稿：`docs/release-notes-v1.3.0-preview.md`
 - v1.3 Character Runtime 检查脚本：`python scripts/check_character_runtime_v1_3.py`
+- v1.4 AI VTuber Feeling 检查脚本：`python scripts/check_character_v1_4.py`
 
 ## LLM / TTS / ASR / Live2D (Where to Configure)
 
