@@ -298,7 +298,7 @@
       const jitterSpan = Math.max(0, Number(tuning.scoreJitter) || 0.12);
       const jitter = (Math.random() - 0.5) * jitterSpan;
       const finalScore = score + jitter;
-      return {
+      const context = {
         shouldTrigger: finalScore >= threshold,
         score: finalScore,
         threshold,
@@ -307,6 +307,43 @@
         topicHint,
         silentMinutes
       };
+      context.brainGate = buildAutoChatBrainGate(context);
+      context.explanation = buildAutoChatTriggerExplanation(context);
+      return context;
+    }
+
+    function buildAutoChatBrainGate(context = {}) {
+      const reason = String(context.primaryReason || "spontaneous").trim() || "spontaneous";
+      return {
+        intent: "low_interrupt_checkin",
+        reason,
+        optional: true,
+        maxSentences: Number(context.silentMinutes) >= 90 ? 2 : 1,
+        allowFollowupQuestion: false,
+        allowDesktopObservation: false,
+        allowToolCall: false,
+        voiceStyle: "soft",
+        action: "none"
+      };
+    }
+
+    function buildAutoChatTriggerExplanation(context = {}) {
+      const reason = String(context.primaryReason || "spontaneous").trim() || "spontaneous";
+      const labels = {
+        followup_pending: "\u4e0a\u4e00\u8f6e\u8bdd\u9898\u8fd8\u6709\u4e00\u70b9\u6ca1\u63a5\u4e0a",
+        long_silence: "\u5df2\u7ecf\u5b89\u9759\u4e86\u6bd4\u8f83\u4e45",
+        mid_silence: "\u6c89\u9ed8\u4e86\u4e00\u9635",
+        emotion_signal: "\u521a\u624d\u6709\u60c5\u7eea\u4fe1\u53f7",
+        open_loop: "\u521a\u624d\u50cf\u7559\u4e0b\u4e86\u5f00\u653e\u8bdd\u9898",
+        topic_hot: "\u521a\u624d\u7684\u8bdd\u9898\u8fd8\u6709\u70ed\u5ea6",
+        mirror_question: "\u521a\u624d\u50cf\u662f\u5728\u628a\u95ee\u9898\u9012\u56de\u6765",
+        brief_ack_drop: "\u521a\u624d\u7528\u5f88\u77ed\u7684\u56de\u5e94\u6536\u4f4f\u4e86",
+        deep_talk_pause: "\u521a\u624d\u804a\u5f97\u6bd4\u8f83\u6df1\uff0c\u505c\u4e86\u4e00\u4f1a\u513f",
+        spontaneous: "\u4f4e\u6253\u6270\u966a\u4f34\u68c0\u67e5"
+      };
+      const topic = normalizeAutoChatTopicHint(context.topicHint || "");
+      const base = labels[reason] || labels.spontaneous;
+      return topic ? `${base}\uff1b\u7ebf\u7d22\uff1a${topic}` : base;
     }
 
     function buildAutoChatPrompt(context = null) {
@@ -336,6 +373,7 @@
       const brevityLine = (Number(ctx.silentMinutes) || 0) >= 90
         ? "一句也可以，最多两句。"
         : "最多两句，优先一句。";
+      const brainGate = buildAutoChatBrainGate(ctx);
 
       return [
         "你现在是桌宠馨语AI桌宠，要主动开口。",
@@ -343,6 +381,7 @@
         `触发线索：${reasonHint}`,
         topicLine,
         `语气要求：${styleNote}`,
+        `Character brain guard: ${brainGate.intent}; max_sentences=${brainGate.maxSentences}; optional=true; no desktop observation; no tool call; do not require a reply.`,
         "直接输出你要说的话，不要解释你为什么主动开口。",
         `${brevityLine} 尽量用陈述句收尾。`,
         "避免问候模板（如“在吗/哈喽/早安模板”）和任务播报腔。"
@@ -378,6 +417,7 @@
                 state.autoChatLastReason = triggerReason;
                 state.autoChatLastTopicHint = triggerTopic;
                 state.autoChatLastTopicAt = triggerTopic ? now : 0;
+                state.autoChatLastExplanation = buildAutoChatTriggerExplanation(context);
                 state.autoChatBurstCount = previousAutoAt > 0 && now - previousAutoAt < burstResetWindowMs
                   ? Math.min(6, (Number(state.autoChatBurstCount) || 0) + 1)
                   : 1;
@@ -437,6 +477,8 @@
       updateConversationFollowupState,
       pickAutoChatPrimaryReason,
       analyzeAutoChatContext,
+      buildAutoChatBrainGate,
+      buildAutoChatTriggerExplanation,
       buildAutoChatPrompt,
       scheduleNextAutoChat,
       startAutoChatLoop,

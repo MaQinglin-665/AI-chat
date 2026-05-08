@@ -287,6 +287,40 @@ function createMemoryStorage(initial = {}) {
 }
 
 {
+  const controller = autoChatController.createController({
+    state: {
+      observeDesktop: true,
+      desktopCanCapture: true,
+      observeAllowAutoChat: false,
+      observeAttachMode: "intent",
+      autoChatTuning: {}
+    },
+    constants: {
+      VISION_INTENT_RE: /screen|desktop/i,
+      AUTO_CHAT_STYLE_NOTES: ["soft"]
+    }
+  });
+  const gate = controller.buildAutoChatBrainGate({
+    primaryReason: "long_silence",
+    silentMinutes: 120,
+    topicHint: "demo"
+  });
+  const prompt = controller.buildAutoChatPrompt({
+    primaryReason: "long_silence",
+    silentMinutes: 120,
+    topicHint: "demo topic"
+  });
+
+  assert.strictEqual(gate.intent, "low_interrupt_checkin", "auto chat should be gated through low-interruption brain intent");
+  assert.strictEqual(gate.allowDesktopObservation, false, "auto chat brain gate should not allow desktop observation");
+  assert.strictEqual(gate.allowToolCall, false, "auto chat brain gate should not allow tool calls");
+  assert.ok(prompt.includes("low_interrupt_checkin") && prompt.includes("no desktop observation"), "auto chat prompt should carry the brain safety guard");
+  assert.ok(controller.buildAutoChatTriggerExplanation({ primaryReason: "long_silence", topicHint: "demo" }).includes("demo"), "auto chat should expose a compact trigger explanation");
+  assert.strictEqual(controller.shouldAttachDesktopImage("look at the screen", true), false, "auto chat should not attach desktop images without explicit auto permission");
+  assert.strictEqual(controller.shouldAttachDesktopImage("look at the screen", false), true, "manual chat may attach desktop images when observation is already enabled");
+}
+
+{
   const sessionStorage = createMemoryStorage();
   const stateForBrainStorage = {
     characterBrainLastUpdatedAt: 12345,
