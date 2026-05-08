@@ -187,14 +187,14 @@ def _derive_topic(user_message: str, intent: str) -> str:
     compact = re.sub(r"\s+", "", text)
     if intent == "comfort":
         return "emotional_support"
+    if re.search(r"(voice|tts|asr|live2d|motion|expression|speech|sentence)", compact):
+        return "character_runtime"
     if re.search(r"(code|bug|fix|implement|error|traceback|test|pytest)", compact):
         return "coding"
     if re.search(r"(nextstep|todo|plan|roadmap|priority|whatshouldidonext)", compact):
         return "planning"
     if re.search(r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u5148\u505a\u4ec0\u4e48|\u8be5\u505a\u4ec0\u4e48|\u8ba1\u5212|\u4f18\u5148)", text):
         return "planning"
-    if re.search(r"(voice|tts|asr|live2d|motion|expression)", compact):
-        return "character_runtime"
     if intent in {"task_help", "question"}:
         return "task"
     if intent == "encouragement":
@@ -550,6 +550,43 @@ def _apply_output_constraints(decision: Dict[str, Any]) -> None:
         decision["directive"] += " Avoid teasing for this intent."
 
 
+def _character_flavor_directive(intent: str, topic: str = "") -> str:
+    intent = _clean_text(intent, 40)
+    topic = _clean_text(topic, 40)
+    base = (
+        "Write natural spoken English as Taffy, an original desktop AI companion with a quick, slightly odd inner life. "
+        "Keep it useful, but add one alive detail: a tiny opinion, dry aside, or concrete image. "
+        "Avoid empty helper phrases like 'great job', 'take it easy', 'sweet dreams', 'you've got this', or 'I'm here to help' unless you twist them into something character-specific."
+    )
+    if intent == "comfort":
+        return (
+            base
+            + " For comfort, do not perform therapy or motivational speeches; sound quietly present, a little weird-soft, and specific to this moment."
+        )
+    if intent == "encouragement":
+        return (
+            base
+            + " For encouragement, celebrate with playful bite or proud disbelief instead of generic praise."
+        )
+    if intent == "task_help":
+        if topic == "character_runtime":
+            return (
+                base
+                + " For voice or Live2D tests, answer the test directly with a self-contained line; do not drag in the previous topic."
+            )
+        return (
+            base
+            + " For task help, choose one concrete next move and add a dry little supervisor aside, not a checklist unless asked."
+        )
+    if intent == "closing":
+        return base + " For closing, make it soft but unmistakably Taffy; no fresh advice and no question."
+    if intent == "greeting":
+        return base + " For greetings, skip assistant enthusiasm; arrive like she was already on the desktop thinking about something unnecessary."
+    if intent == "low_interrupt_checkin":
+        return base + " For proactive check-ins, one easy-to-ignore line only; no demand for a reply."
+    return base
+
+
 def _experience_flags(profile: Optional[Dict[str, Any]]) -> Dict[str, bool]:
     flags = {
         "prefer_short": False,
@@ -709,6 +746,7 @@ def build_character_brain_decision(
     previous_need = continuity.get("recent_user_need")
     previous_intent = continuity.get("last_intent")
     same_need_turns = _safe_int(continuity.get("same_need_turns"), 0)
+    topic = _derive_topic(user_message, intent)
     if intent == "comfort" and previous_need == "reassurance":
         decision.update(
             relationship="trusted_desktop_companion",
@@ -759,6 +797,8 @@ def build_character_brain_decision(
     if flags["voice_care"] and decision["voice_style"] == "neutral" and intent in {"comfort", "closing"}:
         decision["voice_style"] = "soft"
 
+    decision["directive"] += " " + _character_flavor_directive(intent, topic)
+
     _apply_output_constraints(decision)
 
     decision["emotion"] = _normalize_emotion(decision.get("emotion"))
@@ -785,7 +825,7 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Output constraints: {_format_output_constraints_for_prompt(decision.get('output_constraints') if isinstance(decision.get('output_constraints'), dict) else {})}",
         "Question policy: avoid routine questions; only ask when the reply would be blocked without clarification.",
         f"Expression target: emotion={_normalize_emotion(decision.get('emotion'))}, action={_normalize_action(decision.get('action'))}, intensity={_normalize_intensity(decision.get('intensity'))}, voice_style={_clean_text(decision.get('voice_style'), 32)}",
-        f"Directive: {_clean_text(decision.get('directive'), 240)}",
+        f"Directive: {_clean_text(decision.get('directive'), 720)}",
     ]
     return "\n".join(lines)
 
@@ -886,19 +926,82 @@ def _drop_intent_mismatched_sentences(sentences: List[str], intent: str) -> List
 
 
 def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
+    topic = _derive_topic(user_message, intent)
+    if intent == "greeting":
+        return "Oh, you found me. I was doing very important desktop nothing."
     if intent == "closing":
-        return "Rest up. I'll be here when you come back."
+        return "Go sleep. I'll keep the pixels under questionable supervision."
     if intent == "comfort":
-        return "That really stings. I'm here with you."
-    if intent == "task_help" and _derive_topic(user_message, intent) == "planning":
-        return "Pick one tiny next step and give it ten quiet minutes."
+        return "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+    if intent == "encouragement":
+        compact = re.sub(r"\s+", "", _clean_text(user_message, 300).lower())
+        if re.search(r"(done|finished|completed|shipped|fixed|madeit|wrappedup|\u505a\u5b8c\u4e86|\u5b8c\u6210\u4e86|\u641e\u5b9a\u4e86|\u4fee\u597d\u4e86)", compact):
+            return "Look at you, actually finishing the thing. Suspiciously competent."
+        if re.search(r"(code|bug|stuck|error|\u4ee3\u7801|\u5361\u4f4f|\u62a5\u9519)", compact):
+            return "The bug is acting important. Embarrassing for it, because you're still here."
+        return "Look at you, actually finishing the thing. Suspiciously competent."
+    if intent == "task_help" and topic == "planning":
+        return "One tiny step. Ten minutes. No grand destiny ceremony."
+    if intent == "task_help" and topic == "character_runtime":
+        return "Testing voice endurance now: if I reach the end of this sentence without vanishing, the tiny sound machine gets one reluctant point."
     return ""
+
+
+def _looks_like_bland_character_reply(text: str, intent: str) -> bool:
+    lower = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    if not lower:
+        return False
+    generic_patterns = (
+        r"^great job[.!]*$",
+        r"^good job[.!]*$",
+        r"^well done[.!]*$",
+        r"^sweet dreams[.!]*$",
+        r"^take it easy[.!]*$",
+        r"\byou'?ve got this\b",
+        r"\bwow,?\s+you did it\b",
+        r"\bhooray\b",
+        r"\byou tackled that\b",
+        r"\bvirtual high[- ]five\b",
+        r"\bgoodnight\b.*\bsweet dreams\b",
+        r"\bsweet dreams\b",
+        r"\bi'?m (right )?here( to help)?\b",
+        r"\bready for (some )?(chat|whatever)\b",
+        r"\bshort break can do wonders\b",
+        r"\baw+w,?\s+that stinks\b",
+        r"\boh,?\s+that'?s tough\b",
+        r"\btired vibes\b",
+        r"\bsilly things\b",
+        r"\bdistract your brain\b",
+        r"\beveryone giggle\b",
+        r"\bsounds just right\b",
+        r"\bsure thing\b",
+        r"\bhow can i help\b",
+    )
+    if any(re.search(pattern, lower) for pattern in generic_patterns):
+        return True
+    return False
 
 
 def _looks_like_vague_planning_reply(text: str) -> bool:
     lower = str(text or "").strip().lower()
     if not lower:
         return False
+    vague_markers = (
+        "clear your head",
+        "new ideas",
+        "maybe",
+        "quick break",
+        "grab some tea",
+        "stare into space",
+        "your brain needs it",
+        "something fun",
+        "short video",
+        "funny video",
+        "cat meme",
+        "memes",
+    )
+    if any(marker in lower for marker in vague_markers):
+        return True
     action_patterns = (
         r"\bstart\b",
         r"\bpick\b",
@@ -920,17 +1023,7 @@ def _looks_like_vague_planning_reply(text: str) -> bool:
     )
     if any(re.search(pattern, lower) for pattern in action_patterns):
         return False
-    vague_markers = (
-        "clear your head",
-        "new ideas",
-        "maybe",
-        "something fun",
-        "short video",
-        "funny video",
-        "cat meme",
-        "memes",
-    )
-    return len(lower) < 90 or any(marker in lower for marker in vague_markers)
+    return len(lower) < 90
 
 
 def apply_character_brain_reply_constraints(
@@ -968,6 +1061,15 @@ def apply_character_brain_reply_constraints(
                 return _normalize_reply_text_spacing(fallback) + meta
     constrained = " ".join(sentences[:max_sentences]).strip()
     if intent == "task_help" and _derive_topic(user_message, intent) == "planning" and _looks_like_vague_planning_reply(constrained):
+        fallback = _fallback_reply_for_intent(intent, user_message)
+        if fallback:
+            constrained = fallback
+    if intent == "task_help" and _derive_topic(user_message, intent) == "character_runtime":
+        if not re.search(r"\b(voice|sound|sentence|ending|end|test|machine|vanish|audio)\b", constrained.lower()):
+            fallback = _fallback_reply_for_intent(intent, user_message)
+            if fallback:
+                constrained = fallback
+    if _looks_like_bland_character_reply(constrained, intent):
         fallback = _fallback_reply_for_intent(intent, user_message)
         if fallback:
             constrained = fallback

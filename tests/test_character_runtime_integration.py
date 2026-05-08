@@ -244,7 +244,7 @@ def test_chat_payload_reapplies_brain_constraints_after_english_fallback(monkeyp
         )
 
     assert status == 200
-    assert payload.get("reply") == "Pick one tiny next step and give it ten quiet minutes."
+    assert payload.get("reply") == "One tiny step. Ten minutes. No grand destiny ceremony."
     assert payload.get("character_brain", {}).get("intent") == "task_help"
 
 

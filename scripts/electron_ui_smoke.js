@@ -21,6 +21,53 @@ function getArgValue(name) {
 
 const CHAT_TEXT = getArgValue("--chat") || String(process.env.TAFFY_UI_SMOKE_CHAT_TEXT || "").trim();
 const SKIP_CHAT = process.argv.includes("--skip-chat");
+const RUN_V14_DEMO = process.argv.includes("--v14-demo")
+  || ["1", "true", "yes", "on"].includes(String(process.env.TAFFY_UI_SMOKE_V14_DEMO || "").trim().toLowerCase());
+
+const V14_DEMO_SCENES = [
+  {
+    id: "welcome",
+    input: "Hi Taffy, are you there?",
+    expectedIntent: "greeting",
+    expectedVoice: "cheerful",
+    expectedAction: "wave"
+  },
+  {
+    id: "comfort",
+    input: "I'm feeling worn out. Stay with me for a second.",
+    expectedIntent: "comfort",
+    expectedVoice: "soft",
+    expectedAction: "none"
+  },
+  {
+    id: "next_step",
+    input: "What should I do next?",
+    expectedIntent: "task_help",
+    expectedVoice: "serious",
+    expectedAction: "think"
+  },
+  {
+    id: "encouragement",
+    input: "I finished it.",
+    expectedIntent: "encouragement",
+    expectedVoice: "cheerful",
+    expectedAction: "happy_idle"
+  },
+  {
+    id: "long_tts",
+    input: "Say a longer sentence so I can test whether your voice keeps the ending complete.",
+    expectedIntent: "task_help",
+    expectedVoice: "serious",
+    expectedAction: "think"
+  },
+  {
+    id: "closing",
+    input: "I'm going to sleep, bye.",
+    expectedIntent: "closing",
+    expectedVoice: "soft",
+    expectedAction: "wave"
+  }
+];
 
 function readTextIfExists(filePath) {
   try {
@@ -278,7 +325,26 @@ async function getAssistantMessages(win) {
     .filter(Boolean))()`);
 }
 
+async function getLastBrainSnapshot(win) {
+  return evalIn(win, `(() => {
+    const snapshot = window.__AI_CHAT_LAST_CHARACTER_BRAIN__ || window.__petState?.characterBrainLastDecision || null;
+    if (!snapshot || typeof snapshot !== "object") return null;
+    return JSON.parse(JSON.stringify(snapshot));
+  })()`);
+}
+
+async function waitForChatIdle(win, timeoutMs = 30000) {
+  return poll(
+    win,
+    `(() => window.__petState?.chatBusy !== true)()`,
+    Boolean,
+    timeoutMs,
+    "chat idle"
+  );
+}
+
 async function sendInput(win, text) {
+  await waitForChatIdle(win, 45000);
   const before = await getAssistantMessages(win);
   await evalIn(win, `((text) => {
     const input = document.getElementById("chat-input");
@@ -311,13 +377,165 @@ async function waitForAssistantMessage(win, beforeMessages, expectedText, timeou
   );
 }
 
+function hasCjkText(text = "") {
+  return /[\u3400-\u9fff]/.test(String(text || ""));
+}
+
+function hasTokenLikeLeak(text = "") {
+  return /(?:api[_-]?key|token|secret)\s*[:=]\s*[\w.-]{12,}/i.test(String(text || ""));
+}
+
+function isErrorReply(text = "") {
+  return /^(error|错误)[:：]/i.test(String(text || "").trim());
+}
+
+function getBlandDemoIssue(sceneId, text = "") {
+  const lower = String(text || "").trim().toLowerCase();
+  if (!lower) {
+    return "";
+  }
+  if (sceneId === "next_step" && /(quick break|grab some tea|stare into space|your brain needs it)/i.test(lower)) {
+    return "non_directional_next_step";
+  }
+  if (sceneId === "encouragement" && /(virtual high[- ]five|wow, you did it|great job|good job|hooray|you tackled that)/i.test(lower)) {
+    return "generic_encouragement";
+  }
+  if (sceneId === "closing" && /(sweet dreams|goodnight)/i.test(lower)) {
+    return "generic_closing";
+  }
+  if (sceneId === "comfort" && /(take it easy|short break can do wonders|aww,? that stinks|oh,? that's tough|tired vibes|silly things|distract your brain|everyone giggle)/i.test(lower)) {
+    return "generic_comfort";
+  }
+  if (sceneId === "welcome" && /(ready for some chat|how can i help|i'm right here)/i.test(lower)) {
+    return "generic_welcome";
+  }
+  if (sceneId === "long_tts" && !/(voice|sound|sentence|ending|end|test|machine|vanish|audio)/i.test(lower)) {
+    return "voice_test_not_direct";
+  }
+  return "";
+}
+
+function normalizeSnapshotField(snapshot, key) {
+  return String(snapshot?.[key] || "").trim().toLowerCase().replace(/-/g, "_");
+}
+
+function buildV14DemoSceneReport(scene, reply, snapshot) {
+  const issues = [];
+  const warnings = [];
+  const safeReply = String(reply || "").trim();
+  const snapshotText = JSON.stringify(snapshot || {});
+  const intent = normalizeSnapshotField(snapshot, "intent");
+  const voice = normalizeSnapshotField(snapshot, "voice_style");
+  const action = normalizeSnapshotField(snapshot, "action");
+
+  if (!safeReply) {
+    issues.push("empty_reply");
+  }
+  if (isErrorReply(safeReply)) {
+    issues.push("error_reply");
+  }
+  if (hasCjkText(safeReply)) {
+    issues.push("non_english_reply");
+  }
+  const blandIssue = getBlandDemoIssue(scene.id, safeReply);
+  if (blandIssue) {
+    issues.push(blandIssue);
+  }
+  if (hasTokenLikeLeak(`${safeReply}\n${snapshotText}`)) {
+    issues.push("token_like_leak");
+  }
+  if (!snapshot || typeof snapshot !== "object") {
+    issues.push("missing_brain_snapshot");
+  }
+  if (scene.expectedIntent && intent !== scene.expectedIntent) {
+    issues.push(`intent:${intent || "missing"}!=${scene.expectedIntent}`);
+  }
+  if (scene.expectedVoice && voice !== scene.expectedVoice) {
+    issues.push(`voice:${voice || "missing"}!=${scene.expectedVoice}`);
+  }
+  if (scene.expectedAction && action !== scene.expectedAction) {
+    issues.push(`action:${action || "missing"}!=${scene.expectedAction}`);
+  }
+  if (snapshot?.output_constraints?.allow_followup_question === false && /\?\s*$/.test(safeReply)) {
+    warnings.push("question_tail_despite_no_followup_preference");
+  }
+
+  return {
+    id: scene.id,
+    input: scene.input,
+    ok: issues.length === 0,
+    issues,
+    warnings,
+    reply: safeReply.slice(0, 700),
+    brain: snapshot
+      ? {
+          intent: snapshot.intent,
+          reply_style: snapshot.reply_style,
+          emotion: snapshot.emotion,
+          action: snapshot.action,
+          voice_style: snapshot.voice_style,
+          max_sentences: snapshot.max_sentences,
+          output_constraints: snapshot.output_constraints,
+          continuity: snapshot.continuity
+        }
+      : null
+  };
+}
+
+async function runV14DemoSmoke(win, results) {
+  const scenes = [];
+  for (const scene of V14_DEMO_SCENES) {
+    const before = await sendInput(win, scene.input);
+    const messages = await waitForAssistantMessage(win, before, "", 70000, `v1.4 demo scene ${scene.id}`);
+    await waitForChatIdle(win, 45000);
+    const reply = String(messages[messages.length - 1] || "");
+    const snapshot = await getLastBrainSnapshot(win);
+    scenes.push(buildV14DemoSceneReport(scene, reply, snapshot));
+  }
+
+  results.v14Demo = {
+    ok: scenes.every((scene) => scene.ok),
+    scenes,
+    failures: scenes.filter((scene) => !scene.ok).map((scene) => `${scene.id}:${scene.issues.join(",")}`),
+    warnings: scenes.flatMap((scene) => scene.warnings.map((warning) => `${scene.id}:${warning}`))
+  };
+  results.normalChat = {
+    ok: results.v14Demo.ok,
+    v14Demo: true,
+    scenes: scenes.length
+  };
+  results.screenshots.push(await capture(win, "chat-after-v14-demo-scenes.png"));
+}
+
+async function runDebugCommandSmoke(win, results) {
+  const beforeBrain = await sendInput(win, "/braindebug");
+  const brainMessages = await waitForAssistantMessage(win, beforeBrain, "角色大脑状态", 8000, "/braindebug report");
+  const brainText = String(brainMessages[brainMessages.length - 1] || brainMessages.join("\n"));
+  results.brainDebug = {
+    ok: brainText.includes("角色大脑状态"),
+    safeBoundary: brainText.includes("不会触发语音、动作、桌面观察、工具调用或 shell"),
+    reportTail: brainText.slice(-1000)
+  };
+  await waitForChatIdle(win, 15000);
+
+  const beforeDoctor = await sendInput(win, "/doctor");
+  const doctorMessages = await waitForAssistantMessage(win, beforeDoctor, "链路自检完成", 45000, "/doctor report");
+  const doctorText = String(doctorMessages[doctorMessages.length - 1] || doctorMessages.join("\n"));
+  results.doctor = {
+    ok: doctorText.includes("链路自检完成：核心功能正常。"),
+    tokenLeak: /(?:api[_-]?key|token)\s*[:=]\s*[\w.-]{12,}/i.test(doctorText),
+    reportTail: doctorText.slice(-1000)
+  };
+}
+
 async function runChatSmoke(win, results) {
   if (!SKIP_CHAT && CHAT_TEXT) {
     const beforeChat = await sendInput(win, CHAT_TEXT);
     const messages = await waitForAssistantMessage(win, beforeChat, "", 60000, "normal chat reply");
+    await waitForChatIdle(win, 30000);
     const lastAssistant = String(messages[messages.length - 1] || "");
     results.normalChat = {
-      ok: !/^错误[:：]/.test(lastAssistant.trim()),
+      ok: !isErrorReply(lastAssistant),
       lastAssistant: lastAssistant.slice(0, 1000)
     };
     results.screenshots.push(await capture(win, "chat-after-normal-message.png"));
@@ -329,23 +547,7 @@ async function runChatSmoke(win, results) {
     };
   }
 
-  const beforeBrain = await sendInput(win, "/braindebug");
-  const brainMessages = await waitForAssistantMessage(win, beforeBrain, "角色大脑状态", 8000, "/braindebug report");
-  const brainText = String(brainMessages[brainMessages.length - 1] || brainMessages.join("\n"));
-  results.brainDebug = {
-    ok: brainText.includes("角色大脑状态"),
-    safeBoundary: brainText.includes("不会触发语音、动作、桌面观察、工具调用或 shell"),
-    reportTail: brainText.slice(-1000)
-  };
-
-  const beforeDoctor = await sendInput(win, "/doctor");
-  const doctorMessages = await waitForAssistantMessage(win, beforeDoctor, "链路自检完成", 15000, "/doctor report");
-  const doctorText = String(doctorMessages[doctorMessages.length - 1] || doctorMessages.join("\n"));
-  results.doctor = {
-    ok: doctorText.includes("链路自检完成：核心功能正常。"),
-    tokenLeak: /(?:api[_-]?key|token)\s*[:=]\s*[\w.-]{12,}/i.test(doctorText),
-    reportTail: doctorText.slice(-1000)
-  };
+  await runDebugCommandSmoke(win, results);
 }
 
 async function runFeedbackSmoke(win, results) {
@@ -392,7 +594,8 @@ async function main() {
     ok: true,
     baseUrl: BASE_URL,
     tokenPresent: !!token,
-    chatTextSent: !!CHAT_TEXT && !SKIP_CHAT,
+    chatTextSent: RUN_V14_DEMO || (!!CHAT_TEXT && !SKIP_CHAT),
+    v14DemoMode: RUN_V14_DEMO,
     screenshots: []
   };
 
@@ -410,7 +613,12 @@ async function main() {
     results.chat = await getChatInfo(chatWin);
     results.screenshots.push(await capture(chatWin, "chat-initial.png"));
 
-    await runChatSmoke(chatWin, results);
+    if (RUN_V14_DEMO) {
+      await runV14DemoSmoke(chatWin, results);
+      await runDebugCommandSmoke(chatWin, results);
+    } else {
+      await runChatSmoke(chatWin, results);
+    }
     await runFeedbackSmoke(chatWin, results);
     results.screenshots.push(await capture(chatWin, "chat-after-debug-feedback.png"));
 
@@ -431,6 +639,9 @@ async function main() {
     }
     if (results.chatTextSent && !results.normalChat.ok) {
       failures.push("normal chat returned an error");
+    }
+    if (RUN_V14_DEMO && !results.v14Demo?.ok) {
+      failures.push(`v1.4 demo scenes failed: ${(results.v14Demo?.failures || []).join("; ")}`);
     }
     if (!results.brainDebug.ok || !results.brainDebug.safeBoundary) {
       failures.push("/braindebug report missing or unsafe");

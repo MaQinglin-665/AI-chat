@@ -43,6 +43,8 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert "Output constraints:" in block
     assert "Expression target:" in block
     assert "voice_style=" in block
+    assert "slightly odd inner life" in block
+    assert "empty helper phrases" in block
 
 
 def test_character_brain_comfort_priority_beats_next_step_question():
@@ -379,6 +381,63 @@ def test_character_brain_reply_constraints_soften_preference_question_for_next_s
     assert not constrained.endswith("?")
 
 
+def test_character_brain_reply_constraints_replace_bland_character_replies():
+    encouragement = character_brain.build_character_brain_decision(user_message="I finished it.")
+    comfort = character_brain.build_character_brain_decision(
+        user_message="I'm feeling worn out. Stay with me for a second."
+    )
+    greeting = character_brain.build_character_brain_decision(user_message="Hi Taffy, are you there?")
+    voice_test = character_brain.build_character_brain_decision(
+        user_message="Say a longer sentence so I can test whether your voice keeps the ending complete."
+    )
+
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Great job!",
+        encouragement,
+        user_message="I finished it.",
+    ) == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "You've got this!",
+        encouragement,
+        user_message="I'm stuck on this bug, give me a little encouragement.",
+    ) == "The bug is acting important. Embarrassing for it, because you're still here."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Wow, you did it! Time to celebrate with a virtual high-five.",
+        encouragement,
+        user_message="I finished it.",
+    ) == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Hooray! You tackled that one.",
+        encouragement,
+        user_message="I finished it.",
+    ) == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Take it easy. Sometimes a short break can do wonders.",
+        comfort,
+        user_message="I'm feeling worn out. Stay with me for a second.",
+    ) == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Yeah, I can feel the tired vibes. A good old chat about silly things to distract your brain.",
+        comfort,
+        user_message="I'm feeling worn out. Stay with me for a second.",
+    ) == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Hey there! I'm right here, ready for some chat.",
+        greeting,
+        user_message="Hi Taffy, are you there?",
+    ) == "Oh, you found me. I was doing very important desktop nothing."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Sure thing!",
+        voice_test,
+        user_message="Say a longer sentence so I can test whether your voice keeps the ending complete.",
+    ) == "Testing voice endurance now: if I reach the end of this sentence without vanishing, the tiny sound machine gets one reluctant point."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Even though the night is young and there's still so much desktop AI magic to discover, let's make sure those ideas stay bright in your mind until morning.",
+        voice_test,
+        user_message="Say a longer sentence so I can test whether your voice keeps the ending complete.",
+    ) == "Testing voice endurance now: if I reach the end of this sentence without vanishing, the tiny sound machine gets one reluctant point."
+
+
 def test_character_brain_reply_constraints_filter_intent_mismatch():
     comfort = character_brain.build_character_brain_decision(user_message="I feel hurt.")
     closing = character_brain.build_character_brain_decision(user_message="I am going offline, goodbye.")
@@ -388,17 +447,27 @@ def test_character_brain_reply_constraints_filter_intent_mismatch():
         "Aww, that stinks! Every no brings you closer to yes. Keep going!",
         comfort,
         user_message="I feel hurt.",
-    ) == "Aww, that stinks!"
+    ) == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
     assert character_brain.apply_character_brain_reply_constraints(
         "Stay strong! Every line of code is progress.",
         closing,
         user_message="I am going offline, goodbye.",
-    ) == "Rest up. I'll be here when you come back."
+    ) == "Go sleep. I'll keep the pixels under questionable supervision."
     assert character_brain.apply_character_brain_reply_constraints(
         "Might help clear your head.",
         next_step,
         user_message="What should I do next?",
-    ) == "Pick one tiny next step and give it ten quiet minutes."
+    ) == "One tiny step. Ten minutes. No grand destiny ceremony."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Take a quick break if you can. Maybe grab some tea and stare into space for a bit.",
+        next_step,
+        user_message="What should I do next?",
+    ) == "One tiny step. Ten minutes. No grand destiny ceremony."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "Goodnight! Sweet dreams.",
+        closing,
+        user_message="I am going offline, goodbye.",
+    ) == "Go sleep. I'll keep the pixels under questionable supervision."
     chinese_next_step = character_brain.build_character_brain_decision(
         user_message="\u6211\u4eca\u5929\u6709\u70b9\u4e0d\u77e5\u9053\u5148\u505a\u4ec0\u4e48\u3002"
     )
@@ -406,12 +475,12 @@ def test_character_brain_reply_constraints_filter_intent_mismatch():
         "I hear you. I'll keep this short and focused.",
         chinese_next_step,
         user_message="\u6211\u4eca\u5929\u6709\u70b9\u4e0d\u77e5\u9053\u5148\u505a\u4ec0\u4e48\u3002",
-    ) == "Pick one tiny next step and give it ten quiet minutes."
+    ) == "One tiny step. Ten minutes. No grand destiny ceremony."
     assert character_brain.apply_character_brain_reply_constraints(
         "How about starting with something fun. Like watching a short video or checking out some cat memes.",
         chinese_next_step,
         user_message="\u6211\u4eca\u5929\u6709\u70b9\u4e0d\u77e5\u9053\u5148\u505a\u4ec0\u4e48\u3002",
-    ) == "Pick one tiny next step and give it ten quiet minutes."
+    ) == "One tiny step. Ten minutes. No grand destiny ceremony."
 
 
 def test_character_brain_repeated_next_step_stays_task_help_and_concise():
