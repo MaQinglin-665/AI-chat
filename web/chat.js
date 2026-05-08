@@ -3980,6 +3980,24 @@ function renderToolMetaCards(row, meta) {
   }
 }
 
+function parseToolMetaFromText(text) {
+  const raw = String(text || "");
+  const idx = raw.indexOf(TOOL_META_MARKER);
+  if (idx < 0) {
+    return { visibleText: raw, meta: null };
+  }
+  const visibleText = raw.slice(0, idx).trimEnd();
+  const metaRaw = raw.slice(idx + TOOL_META_MARKER.length).trim();
+  if (!metaRaw) {
+    return { visibleText, meta: null };
+  }
+  try {
+    return { visibleText, meta: JSON.parse(metaRaw) };
+  } catch (_) {
+    return { visibleText, meta: null };
+  }
+}
+
 const _CHAT_TRANSLATE_TIMEOUT_MS = CHAT_TRANSLATION_SERVICE.CHAT_TRANSLATE_TIMEOUT_MS || 60000;
 
 function _isTranslationCircuitOpen() {
