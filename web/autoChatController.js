@@ -23,8 +23,10 @@
     const AUTO_CHAT_BURST_RESET_WINDOW_MS = constants.AUTO_CHAT_BURST_RESET_WINDOW_MS || 18 * 60 * 1000;
     const AUTO_CHAT_REASON_PRIORITY = constants.AUTO_CHAT_REASON_PRIORITY || [];
     const AUTO_CHAT_REASON_HINTS = constants.AUTO_CHAT_REASON_HINTS || {};
-    const AUTO_CHAT_STYLE_NOTES = constants.AUTO_CHAT_STYLE_NOTES || ["??????????????"];
-    const WAITING_VOICE_HINTS = constants.WAITING_VOICE_HINTS || [""];
+    const AUTO_CHAT_STYLE_NOTES = constants.AUTO_CHAT_STYLE_NOTES || [
+      "Keep it casual, present, and easy to ignore."
+    ];
+    const WAITING_VOICE_HINTS = constants.WAITING_VOICE_HINTS || ["I'm thinking, one second."];
     const VISION_INTENT_RE = constants.VISION_INTENT_RE || /a^/;
     function stopAutoChatLoop() {
       if (!state.autoChatTimer) {
@@ -318,7 +320,7 @@
         intent: "low_interrupt_checkin",
         reason,
         optional: true,
-        maxSentences: Number(context.silentMinutes) >= 90 ? 2 : 1,
+        maxSentences: 1,
         allowFollowupQuestion: false,
         allowDesktopObservation: false,
         allowToolCall: false,
@@ -330,61 +332,60 @@
     function buildAutoChatTriggerExplanation(context = {}) {
       const reason = String(context.primaryReason || "spontaneous").trim() || "spontaneous";
       const labels = {
-        followup_pending: "\u4e0a\u4e00\u8f6e\u8bdd\u9898\u8fd8\u6709\u4e00\u70b9\u6ca1\u63a5\u4e0a",
-        long_silence: "\u5df2\u7ecf\u5b89\u9759\u4e86\u6bd4\u8f83\u4e45",
-        mid_silence: "\u6c89\u9ed8\u4e86\u4e00\u9635",
-        emotion_signal: "\u521a\u624d\u6709\u60c5\u7eea\u4fe1\u53f7",
-        open_loop: "\u521a\u624d\u50cf\u7559\u4e0b\u4e86\u5f00\u653e\u8bdd\u9898",
-        topic_hot: "\u521a\u624d\u7684\u8bdd\u9898\u8fd8\u6709\u70ed\u5ea6",
-        mirror_question: "\u521a\u624d\u50cf\u662f\u5728\u628a\u95ee\u9898\u9012\u56de\u6765",
-        brief_ack_drop: "\u521a\u624d\u7528\u5f88\u77ed\u7684\u56de\u5e94\u6536\u4f4f\u4e86",
-        deep_talk_pause: "\u521a\u624d\u804a\u5f97\u6bd4\u8f83\u6df1\uff0c\u505c\u4e86\u4e00\u4f1a\u513f",
-        spontaneous: "\u4f4e\u6253\u6270\u966a\u4f34\u68c0\u67e5"
+        followup_pending: "the last thread still has a soft open loop",
+        long_silence: "things have been quiet for a while",
+        mid_silence: "there has been a short quiet pause",
+        emotion_signal: "the recent tone carried an emotional signal",
+        open_loop: "the last message left a light open thread",
+        topic_hot: "the recent topic still has a little energy",
+        mirror_question: "the user handed the thought back",
+        brief_ack_drop: "the user closed with a very short acknowledgement",
+        deep_talk_pause: "the previous exchange was a little deeper, then paused",
+        spontaneous: "low-interruption companion check-in"
       };
       const topic = normalizeAutoChatTopicHint(context.topicHint || "");
       const base = labels[reason] || labels.spontaneous;
-      return topic ? `${base}\uff1b\u7ebf\u7d22\uff1a${topic}` : base;
+      return topic ? `${base}; clue: ${topic}` : base;
     }
 
     function buildAutoChatPrompt(context = null) {
       const ctx = context && typeof context === "object" ? context : analyzeAutoChatContext();
       const hour = new Date().getHours();
       const clockText = hour < 5
-        ? `深夜${hour}点`
+        ? `late night, around ${hour}:00`
         : hour < 9
-          ? `早上${hour}点`
+          ? `morning, around ${hour}:00`
           : hour < 12
-            ? `上午${hour}点`
+            ? `late morning, around ${hour}:00`
             : hour < 14
-              ? "中午"
+              ? "midday"
               : hour < 18
-                ? `下午${hour}点`
+                ? `afternoon, around ${hour}:00`
                 : hour < 22
-                  ? `晚上${hour}点`
-                  : "夜里";
+                  ? `evening, around ${hour}:00`
+                  : "night";
       const reason = String(ctx.primaryReason || "").trim();
-      const reasonHint = AUTO_CHAT_REASON_HINTS[reason] || "像突然想到一样自然开口。";
+      const reasonHint = AUTO_CHAT_REASON_HINTS[reason] || "Open naturally, like a small thought surfaced.";
       const styleNote = AUTO_CHAT_STYLE_NOTES[Math.floor(Math.random() * AUTO_CHAT_STYLE_NOTES.length)]
         || AUTO_CHAT_STYLE_NOTES[0];
       const topicHint = normalizeAutoChatTopicHint(ctx.topicHint || "");
       const topicLine = topicHint
-        ? `可借用线索：「${topicHint}」。`
-        : "没有明确线索时，就用当下的一句感受开场。";
-      const brevityLine = (Number(ctx.silentMinutes) || 0) >= 90
-        ? "一句也可以，最多两句。"
-        : "最多两句，优先一句。";
+        ? `Possible thread: "${topicHint}".`
+        : "No explicit thread; use one grounded present-moment line.";
+      const brevityLine = "Use exactly one short sentence.";
       const brainGate = buildAutoChatBrainGate(ctx);
 
       return [
-        "你现在是桌宠馨语AI桌宠，要主动开口。",
-        `当前时段：${clockText}。`,
-        `触发线索：${reasonHint}`,
+        "You are Taffy, a small desktop AI companion. This is a proactive low-interruption check-in.",
+        `Current time hint: ${clockText}.`,
+        `Trigger clue: ${reasonHint}`,
         topicLine,
-        `语气要求：${styleNote}`,
+        `Tone: ${styleNote}`,
         `Character brain guard: ${brainGate.intent}; max_sentences=${brainGate.maxSentences}; optional=true; no desktop observation; no tool call; do not require a reply.`,
-        "直接输出你要说的话，不要解释你为什么主动开口。",
-        `${brevityLine} 尽量用陈述句收尾。`,
-        "避免问候模板（如“在吗/哈喽/早安模板”）和任务播报腔。"
+        "Reply in English only.",
+        "Output only the line Taffy should say. Do not explain why you are speaking.",
+        `${brevityLine} Prefer a statement the user can ignore; do not force an answer.`,
+        "Avoid greeting templates, task-report language, and notification wording."
       ].join("\n");
     }
 

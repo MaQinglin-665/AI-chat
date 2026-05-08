@@ -312,9 +312,12 @@ function createMemoryStorage(initial = {}) {
   });
 
   assert.strictEqual(gate.intent, "low_interrupt_checkin", "auto chat should be gated through low-interruption brain intent");
+  assert.strictEqual(gate.maxSentences, 1, "auto chat brain gate should keep proactive bubbles to one sentence");
   assert.strictEqual(gate.allowDesktopObservation, false, "auto chat brain gate should not allow desktop observation");
   assert.strictEqual(gate.allowToolCall, false, "auto chat brain gate should not allow tool calls");
   assert.ok(prompt.includes("low_interrupt_checkin") && prompt.includes("no desktop observation"), "auto chat prompt should carry the brain safety guard");
+  assert.ok(prompt.includes("Reply in English only.") && prompt.includes("Use exactly one short sentence."), "auto chat prompt should preserve the English one-line character setting");
+  assert.ok(!/[\u4e00-\u9fff]/.test(prompt), "auto chat prompt should not mix Chinese instructions into the English-only character output path");
   assert.ok(controller.buildAutoChatTriggerExplanation({ primaryReason: "long_silence", topicHint: "demo" }).includes("demo"), "auto chat should expose a compact trigger explanation");
   assert.strictEqual(controller.shouldAttachDesktopImage("look at the screen", true), false, "auto chat should not attach desktop images without explicit auto permission");
   assert.strictEqual(controller.shouldAttachDesktopImage("look at the screen", false), true, "manual chat may attach desktop images when observation is already enabled");

@@ -1614,27 +1614,27 @@ const AUTO_CHAT_REASON_PRIORITY = [
   "deep_talk_pause"
 ];
 const AUTO_CHAT_REASON_HINTS = {
-  emotion_signal: "用户状态看起来不太好，给一句带温度的接话。",
-  open_loop: "用户留了个没收口的话头，轻轻续一下。",
-  followup_pending: "上一轮你抛过问题，现在自然接上，不重开场。",
-  brief_ack_drop: "用户刚才只简短应了一句，把话题接回来一点点。",
-  mirror_question: "用户把问题反问给你，先给你的态度，再顺手延一句。",
-  topic_hot: "抓住刚聊过的点，补一句有观点的话。",
-  long_silence: "安静有点久了，像突然想到一样冒一句。",
-  mid_silence: "沉默了一阵，用自然口吻轻触一下。",
-  deep_talk_pause: "刚才聊得不浅，顺着停顿补一句。"
+  emotion_signal: "The recent tone carried an emotional signal; answer with warmth, not pressure.",
+  open_loop: "The last message left a light open thread; continue it gently.",
+  followup_pending: "The previous turn had a small open loop; reconnect without restarting.",
+  brief_ack_drop: "The user closed with a short acknowledgement; leave one soft bridge.",
+  mirror_question: "The user handed the thought back; give your stance in one line.",
+  topic_hot: "The recent topic still has energy; add one small lived-in reaction.",
+  long_silence: "It has been quiet for a while; speak like a small thought surfaced.",
+  mid_silence: "There has been a pause; touch the thread lightly.",
+  deep_talk_pause: "The previous exchange was deeper; add one calm, grounded line."
 };
 const AUTO_CHAT_STYLE_NOTES = [
-  "像突然想到就开口，轻一点，不解释。",
-  "偏口语，像真人碎碎念，不端着。",
-  "短句优先，收尾别太正式。",
-  "带一点点态度，但别像说教。",
-  "可以有轻微跳跃感，别写成任务通知。"
+  "Keep it casual, like a thought spoken aloud.",
+  "Use a short sentence with a little personality.",
+  "Stay warm without sounding like a support script.",
+  "Let the line end naturally without pushing for a reply.",
+  "Avoid task-notification phrasing."
 ];
 const WAITING_VOICE_HINTS = [
-  "我在想，马上回你。",
-  "我在组织一下语言，马上好。",
-  "稍等一下，我这就回答你。"
+  "I'm thinking, one second.",
+  "Let me shape that for a moment.",
+  "One second, I'm with you."
 ];
 const MOTION_INTENSITY_PRESETS = {
   low: {
