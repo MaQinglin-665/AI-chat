@@ -5,84 +5,105 @@ const fs = require("fs");
 const path = require("path");
 const assert = require("assert");
 
-const CHAT_JS = path.resolve(__dirname, "..", "web", "chat.js");
-const APP_JS = path.resolve(__dirname, "..", "web", "app.js");
-const sourcePath = fs.existsSync(CHAT_JS) ? CHAT_JS : APP_JS;
-const appSource = fs.readFileSync(sourcePath, "utf8");
+const LIVE2D_LAYOUT_JS = path.resolve(__dirname, "..", "web", "live2dLayoutController.js");
+const DESKTOP_WINDOW_JS = path.resolve(__dirname, "..", "web", "desktopWindowController.js");
+const live2dLayoutSource = fs.readFileSync(LIVE2D_LAYOUT_JS, "utf8");
+const desktopWindowSource = fs.readFileSync(DESKTOP_WINDOW_JS, "utf8");
+const dragSource = `${live2dLayoutSource}\n${desktopWindowSource}`;
 const TAP_MOVE_THRESHOLD = 10;
 
-function ensureSourceContains(pattern, label) {
-  const ok = pattern instanceof RegExp ? pattern.test(appSource) : appSource.includes(pattern);
+function ensureSourceContains(source, pattern, label) {
+  const ok = pattern instanceof RegExp ? pattern.test(source) : source.includes(pattern);
   assert.ok(ok, `Missing source pattern: ${label}`);
 }
 
 function staticChecks() {
   ensureSourceContains(
+    live2dLayoutSource,
+    "function attachDrag(model) {",
+    "Live2D layout controller owns attachDrag"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
     "model.on(\"pointerdown\", (e) => {",
     "Model pointerdown handler exists"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "state.desktopMode && state.desktopBridge === \"electron\"",
     "Electron desktop bridge condition exists in pointerdown flow"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "isPointOverVisibleModelArea(cx, cy)",
     "Electron pointerdown path still uses visible-area hit test"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "isPointInModelDragHotzone(x, y, bounds)",
     "Visible-area hit test uses segmented drag hotzone"
   );
   ensureSourceContains(
+    desktopWindowSource,
     "if (yRatio < 0.22)",
     "Drag hotzone keeps dedicated head-band rule"
   );
   ensureSourceContains(
+    desktopWindowSource,
     "} else if (yRatio < 0.64)",
     "Drag hotzone keeps dedicated torso-band rule"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "const onDocMove = (ev) => {",
     "Document-level electron pointermove handler exists"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "document.addEventListener(\"pointermove\", onDocMove);",
     "Electron branch registers document pointermove listener"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "document.removeEventListener(\"pointermove\", onDocMove);",
     "Electron branch removes document pointermove listener on cleanup"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "state.modelPosX = nextX;",
     "Electron doc-move branch updates model X position"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "state.baseTransform.y = state.modelPosY;",
     "Electron doc-move branch keeps base transform in sync"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "state.suspendRelayoutUntil = performance.now() + 240;",
     "Electron desktop drag keeps relayout suspension"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "const onDocMoveBrowser = (ev) => {",
     "Browser/non-desktop drag path keeps document-level pointermove handler"
   );
   ensureSourceContains(
+    live2dLayoutSource,
     "state.model.x = px;",
     "Browser/non-desktop doc-move branch updates model X"
   );
   ensureSourceContains(
-    "moveDesktopWindowBy(dx, dy);",
-    "Native window move call is still used for non-electron pointermove path"
+    desktopWindowSource,
+    "moveWindowBy(state, dx, dy, deps);",
+    "Desktop drag finalizer still delegates native window movement"
   );
   assert.ok(
-    !appSource.includes("_dragLastScreenX"),
+    !dragSource.includes("_dragLastScreenX"),
     "Legacy screen coordinate cache should be removed"
   );
   assert.ok(
-    !appSource.includes("queueNativeWindowMoveBy("),
+    !dragSource.includes("queueNativeWindowMoveBy("),
     "Legacy queued native move path should be removed"
   );
 }

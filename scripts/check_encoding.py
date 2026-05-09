@@ -41,6 +41,7 @@ SKIP_DIRS = {
     "__pycache__",
     "tts_ref",
     "models",
+    "dist",
 }
 
 # Common mojibake fragments seen when UTF-8 text is decoded/saved through GBK.
