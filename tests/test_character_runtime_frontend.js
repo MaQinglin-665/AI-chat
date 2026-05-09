@@ -365,10 +365,48 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(gate.allowToolCall, false, "auto chat brain gate should not allow tool calls");
   assert.ok(prompt.includes("low_interrupt_checkin") && prompt.includes("no desktop observation") && prompt.includes("no shell"), "auto chat prompt should carry the brain safety guard");
   assert.ok(prompt.includes("Reply in English only.") && prompt.includes("Use exactly one short sentence."), "auto chat prompt should preserve the English one-line character setting");
+  assert.ok(prompt.includes("live stage aside") && prompt.includes("not a customer-service follow-up"), "auto chat prompt should bias proactive replies toward stage asides instead of service follow-ups");
   assert.ok(!/[\u4e00-\u9fff]/.test(prompt), "auto chat prompt should not mix Chinese instructions into the English-only character output path");
   assert.ok(controller.buildAutoChatTriggerExplanation({ primaryReason: "long_silence", topicHint: "demo" }).includes("demo"), "auto chat should expose a compact trigger explanation");
   assert.strictEqual(controller.shouldAttachDesktopImage("look at the screen", true), false, "auto chat should not attach desktop images without explicit auto permission");
   assert.strictEqual(controller.shouldAttachDesktopImage("look at the screen", false), true, "manual chat may attach desktop images when observation is already enabled");
+}
+
+{
+  const now = Date.now();
+  const state = {
+    autoChatTuning: {
+      triggerBaseThreshold: 0.4,
+      shortSilencePenalty: 0,
+      scoreJitter: 0
+    },
+    lastUserMessageAt: now - 70 * 1000,
+    lastAutoChatAt: 0,
+    chatRecords: [
+      { role: "user", content: "This desk feels weird.", timestamp: now - 70 * 1000 }
+    ]
+  };
+  const controller = autoChatController.createController({
+    state,
+    documentObject: { activeElement: null },
+    constants: {
+      AUTO_CHAT_MIN_USER_GAP_MS: 45 * 1000,
+      AUTO_CHAT_MIN_ASSISTANT_GAP_MS: 60 * 1000,
+      AUTO_CHAT_TOPIC_RE: /desk/i,
+      AUTO_CHAT_ASK_RE: /[?\uFF1F]\s*$/,
+      AUTO_CHAT_REASON_PRIORITY: ["stage_pause", "topic_hot"]
+    }
+  });
+  const context = controller.analyzeAutoChatContext();
+  assert.ok(context.reasons.includes("stage_pause"), "auto chat should treat a short post-user pause as a proactive stage-aside opportunity");
+  assert.strictEqual(context.primaryReason, "stage_pause", "stage pauses should outrank generic topic heat for proactive stage replies");
+  assert.strictEqual(context.shouldTrigger, true, "stage-aside proactive replies should be eligible after the short opt-in pause");
+  assert.strictEqual(controller.shouldSkipAutoChat(), false, "idle auto chat should not skip after the short opt-in pause");
+  state.ttsContextSpeaking = true;
+  assert.strictEqual(controller.shouldSkipAutoChat(), true, "auto chat should stay silent while assistant speech is active");
+  state.ttsContextSpeaking = false;
+  state.localAsrSpeeching = true;
+  assert.strictEqual(controller.shouldSkipAutoChat(), true, "auto chat should stay silent while user speech input is active");
 }
 
 {
@@ -2774,8 +2812,10 @@ assert.ok(
   "HTMLAudio and browser TTS paths should keep per-playback ownership guards"
 );
 assert.ok(
-  /const streamSpeakSession = Date\.now\(\);[\s\S]*?const useStreamSpeak = shouldUseStreamSpeak\(\);[\s\S]*?stopAllAudioPlayback\(\);[\s\S]*?state\.streamSpeakSession = streamSpeakSession;/.test(chatReplyControllerSource),
-  "starting a new assistant request should always invalidate previous audio playback"
+  chatReplyControllerSource.includes("async function waitForNonInterruptingSpeechTurn")
+    && chatReplyControllerSource.includes('recordTTSDebugEvent(isAuto ? "proactive_reply_suppressed" : "chat_turn_wait_failed"')
+    && /if \(speechTurn\.interrupt \|\| !isAssistantSpeechActive\(\)\) \{[\s\S]*?stopAllAudioPlayback\(\);/.test(chatReplyControllerSource),
+  "assistant requests should respect non-interrupting speech turn-taking and suppress proactive overlap"
 );
 assert.ok(
   source.includes("function stripAssistantPayloadNoise(text)")

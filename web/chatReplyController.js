@@ -138,6 +138,51 @@
       return normalized;
     }
 
+    function isAssistantSpeechActive() {
+      const phase = String(state.speechPhase || "").trim().toLowerCase();
+      const now = Date.now();
+      return state.ttsContextSpeaking === true
+        || state.streamSpeakWorking === true
+        || phase === "speaking"
+        || (Number(state.speechAnimUntil || 0) > now + 80);
+    }
+
+    function waitForSpeechTurnIdle(timeoutMs = 14000) {
+      const limitMs = Math.max(0, Math.min(45000, Math.round(Number(timeoutMs) || 0)));
+      if (!isAssistantSpeechActive()) {
+        return Promise.resolve(true);
+      }
+      const startedAt = Date.now();
+      return new Promise((resolve) => {
+        const tick = () => {
+          if (!isAssistantSpeechActive()) {
+            resolve(true);
+            return;
+          }
+          if (Date.now() - startedAt >= limitMs) {
+            resolve(false);
+            return;
+          }
+          window.setTimeout(tick, 120);
+        };
+        tick();
+      });
+    }
+
+    async function waitForNonInterruptingSpeechTurn(opts = {}) {
+      const isAutoTurn = opts.auto === true;
+      const allowInterrupt = opts.interruptTts === true
+        || (state.conversationMode?.interruptTtsOnUserSpeech === true && !isAutoTurn);
+      if (allowInterrupt || !isAssistantSpeechActive()) {
+        return { ready: true, interrupt: allowInterrupt, waited: false };
+      }
+      if (isAutoTurn || opts.dropIfSpeaking === true) {
+        return { ready: false, interrupt: false, waited: false, reason: "speaking" };
+      }
+      const ok = await waitForSpeechTurnIdle(opts.speechTurnWaitMs ?? 14000);
+      return { ready: ok, interrupt: false, waited: true, reason: ok ? "" : "speech_wait_timeout" };
+    }
+
     function normalizeRuntimeVoiceStyleForSpeech(style) {
       const raw = String(style || "").trim();
       if (!raw) {
@@ -329,6 +374,19 @@
       const isAuto = !!opts.auto;
       const skipDesktopAttach = opts.skipDesktopAttach === true;
       const forceTools = opts.forceTools === true;
+      const speechTurn = await waitForNonInterruptingSpeechTurn({
+        auto: isAuto,
+        interruptTts: opts.interruptTts === true,
+        dropIfSpeaking: opts.dropIfSpeaking === true,
+        speechTurnWaitMs: opts.speechTurnWaitMs
+      });
+      if (!speechTurn.ready) {
+        recordTTSDebugEvent(isAuto ? "proactive_reply_suppressed" : "chat_turn_wait_failed", {
+          result: speechTurn.reason || "speaking",
+          text: message
+        });
+        return false;
+      }
       characterRuntimeMetadataForReply = null;
       const chatPerfTraceId = createPerfTraceId("chat");
       const chatPerfStartPerfMs = performance.now();
@@ -400,7 +458,9 @@
       let latencyHintTimer = 0;
       const streamSpeakSession = Date.now();
       const useStreamSpeak = shouldUseStreamSpeak();
-      stopAllAudioPlayback();
+      if (speechTurn.interrupt || !isAssistantSpeechActive()) {
+        stopAllAudioPlayback();
+      }
       clearPerformanceTimelineTimers();
       state.streamSpeakSession = streamSpeakSession;
       state.streamSpeakQueue = [];

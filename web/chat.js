@@ -1719,23 +1719,25 @@ function isApiRequestTarget(input) {
     return false;
   }
 }
-const AUTO_CHAT_MIN_USER_GAP_MS = 90 * 1000;
-const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = 120 * 1000;
+const AUTO_CHAT_MIN_USER_GAP_MS = 45 * 1000;
+const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = 60 * 1000;
 const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = 4 * 60 * 1000;
-const AUTO_CHAT_EMO_RE = /(难受|难过|焦虑|压力|累|困|崩溃|失眠|emo|心情不好|低落)/i;
-const AUTO_CHAT_MIRROR_RE = /(你呢|那你呢|你会|你想|你觉得|那你|你自己)/i;
-const AUTO_CHAT_TOPIC_RE = /(项目|考试|工作|学习|代码|模型|部署|计划|进度|复盘|目标)/i;
-const AUTO_CHAT_ASK_RE = /[?？]\s*$/;
-const AUTO_CHAT_OPEN_LOOP_RE = /(待会|稍后|回头|明天|下次|之后|再聊|先这样|先不|以后)/i;
-const AUTO_CHAT_BRIEF_REPLY_RE = /^(嗯|哦|好|行|ok|收到|知道了|先这样|回头说)$/i;
+const AUTO_CHAT_EMO_RE = /(emo|sad|bad|tired|stressed|anxious|lonely|rough|overwhelmed|\u96be\u53d7|\u96be\u8fc7|\u7126\u8651|\u538b\u529b|\u5931\u7720|\u5fc3\u60c5\u4e0d\u597d|\u4f4e\u843d)/i;
+const AUTO_CHAT_MIRROR_RE = /(what about you|your turn|you think|do you think|what do you think|\u4f60\u5462|\u90a3\u4f60|\u4f60\u89c9\u5f97|\u4f60\u600e\u4e48\u60f3)/i;
+const AUTO_CHAT_TOPIC_RE = /(project|exam|work|study|code|model|deploy|plan|progress|goal|desk|desktop|cursor|\u9879\u76ee|\u8003\u8bd5|\u5de5\u4f5c|\u5b66\u4e60|\u4ee3\u7801|\u6a21\u578b|\u90e8\u7f72|\u8ba1\u5212|\u8fdb\u5ea6|\u76ee\u6807|\u684c\u9762|\u5149\u6807)/i;
+const AUTO_CHAT_ASK_RE = /[?\uFF1F]\s*$/;
+const AUTO_CHAT_OPEN_LOOP_RE = /(later|tomorrow|next time|after this|come back to it|drop it for now|\u5f85\u4f1a|\u7a0d\u540e|\u56de\u5934|\u660e\u5929|\u4e0b\u6b21|\u4e4b\u540e|\u518d\u804a|\u5148\u8fd9\u6837)/i;
+const AUTO_CHAT_BRIEF_REPLY_RE = /^(ok|okay|sure|yeah|yep|got it|fine|good|\u55ef|\u597d|\u884c|\u6536\u5230|\u77e5\u9053\u4e86|\u5148\u8fd9\u6837)$/i;
 const AUTO_CHAT_REPEAT_REASON_WINDOW_MS = 14 * 60 * 1000;
 const AUTO_CHAT_REPEAT_TOPIC_WINDOW_MS = 22 * 60 * 1000;
 const AUTO_CHAT_BURST_RESET_WINDOW_MS = 18 * 60 * 1000;
 const AUTO_CHAT_REASON_PRIORITY = [
   "emotion_signal",
   "open_loop",
+  "stage_pause",
   "followup_pending",
   "brief_ack_drop",
+  "quiet_ack",
   "mirror_question",
   "topic_hot",
   "long_silence",
@@ -1745,8 +1747,10 @@ const AUTO_CHAT_REASON_PRIORITY = [
 const AUTO_CHAT_REASON_HINTS = {
   emotion_signal: "The recent tone carried an emotional signal; answer with warmth, not pressure.",
   open_loop: "The last message left a light open thread; continue it gently.",
+  stage_pause: "The user left a small pause after a statement; add one live stage aside without demanding a reply.",
   followup_pending: "The previous turn had a small open loop; reconnect without restarting.",
   brief_ack_drop: "The user closed with a short acknowledgement; leave one soft bridge.",
+  quiet_ack: "The user gave a quiet acknowledgement; leave one tiny companion line and stop.",
   mirror_question: "The user handed the thought back; give your stance in one line.",
   topic_hot: "The recent topic still has energy; add one small lived-in reaction.",
   long_silence: "It has been quiet for a while; speak like a small thought surfaced.",

@@ -83,3 +83,28 @@ def test_sanitized_client_config_preserves_chat_stream_switch():
     sanitized = config.sanitize_client_config(cfg)
 
     assert sanitized["conversation_mode"]["chat_stream_enabled"] is False
+
+
+def test_default_auto_chat_stays_off_but_uses_stage_aside_timing():
+    observe = config.DEFAULT_CONFIG["observe"]
+
+    assert observe["auto_chat_enabled"] is False
+    assert observe["allow_auto_chat"] is False
+    assert observe["auto_chat_min_ms"] == 60000
+    assert observe["auto_chat_max_ms"] == 180000
+    assert observe["auto_chat_tuning"]["trigger_base_threshold"] == 0.82
+    assert observe["auto_chat_tuning"]["short_silence_penalty"] == 0.16
+
+
+def test_sanitized_client_config_preserves_stage_aside_auto_chat_defaults():
+    cfg = copy.deepcopy(config.DEFAULT_CONFIG)
+
+    sanitized = config.sanitize_client_config(cfg)
+    observe = sanitized["observe"]
+
+    assert observe["auto_chat_enabled"] is False
+    assert observe["allow_auto_chat"] is False
+    assert observe["auto_chat_min_ms"] == 60000
+    assert observe["auto_chat_max_ms"] == 180000
+    assert observe["auto_chat_tuning"]["trigger_base_threshold"] == 0.82
+    assert observe["auto_chat_tuning"]["short_silence_penalty"] == 0.16

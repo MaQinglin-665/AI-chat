@@ -260,11 +260,11 @@ DEFAULT_CONFIG = {
         "attach_mode": "manual",
         "allow_auto_chat": False,
         "auto_chat_enabled": False,
-        "auto_chat_min_ms": 180000,
-        "auto_chat_max_ms": 480000,
+        "auto_chat_min_ms": 60000,
+        "auto_chat_max_ms": 180000,
         "auto_chat_tuning": {
-            "trigger_base_threshold": 1.03,
-            "short_silence_penalty": 0.35,
+            "trigger_base_threshold": 0.82,
+            "short_silence_penalty": 0.16,
             "long_silence_bonus": 0.14,
             "emotion_bonus": 0.12,
             "repeat_reason_penalty": 0.44,
@@ -699,8 +699,8 @@ def sanitize_client_config(config):
             min(
                 3.0,
                 _safe_float(
-                    observe_auto_chat_tuning_raw.get("trigger_base_threshold", 1.03),
-                    1.03,
+                    observe_auto_chat_tuning_raw.get("trigger_base_threshold", 0.82),
+                    0.82,
                 ),
             ),
         ),
@@ -709,8 +709,8 @@ def sanitize_client_config(config):
             min(
                 1.2,
                 _safe_float(
-                    observe_auto_chat_tuning_raw.get("short_silence_penalty", 0.35),
-                    0.35,
+                    observe_auto_chat_tuning_raw.get("short_silence_penalty", 0.16),
+                    0.16,
                 ),
             ),
         ),
@@ -838,14 +838,14 @@ def sanitize_client_config(config):
         60 * 1000,
         min(
             30 * 60 * 1000,
-            _safe_int(observe_cfg.get("auto_chat_min_ms", 180000), 180000),
+            _safe_int(observe_cfg.get("auto_chat_min_ms", 60000), 60000),
         ),
     )
     observe_auto_chat_max_ms = max(
         observe_auto_chat_min_ms + 30 * 1000,
         min(
             60 * 60 * 1000,
-            _safe_int(observe_cfg.get("auto_chat_max_ms", 480000), 480000),
+            _safe_int(observe_cfg.get("auto_chat_max_ms", 180000), 180000),
         ),
     )
     wake_words_raw = asr_cfg.get("wake_words", ["馨语", "馨语ai", "xinyu", "\u5854\u83f2", "taffy", "tafi"])

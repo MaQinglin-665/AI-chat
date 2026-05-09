@@ -9,8 +9,8 @@
     const constants = deps.constants || {};
     const parseMessageTimestamp = typeof deps.parseMessageTimestamp === "function" ? deps.parseMessageTimestamp : (value) => Number(value) || Date.now();
     const requestAssistantReply = typeof deps.requestAssistantReply === "function" ? deps.requestAssistantReply : async () => false;
-    const AUTO_CHAT_MIN_USER_GAP_MS = constants.AUTO_CHAT_MIN_USER_GAP_MS || 90 * 1000;
-    const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = constants.AUTO_CHAT_MIN_ASSISTANT_GAP_MS || 120 * 1000;
+    const AUTO_CHAT_MIN_USER_GAP_MS = constants.AUTO_CHAT_MIN_USER_GAP_MS || 45 * 1000;
+    const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = constants.AUTO_CHAT_MIN_ASSISTANT_GAP_MS || 60 * 1000;
     const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = constants.AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS || 4 * 60 * 1000;
     const AUTO_CHAT_EMO_RE = constants.AUTO_CHAT_EMO_RE || /a^/;
     const AUTO_CHAT_MIRROR_RE = constants.AUTO_CHAT_MIRROR_RE || /a^/;
@@ -28,6 +28,23 @@
     ];
     const WAITING_VOICE_HINTS = constants.WAITING_VOICE_HINTS || ["I'm thinking, one second."];
     const VISION_INTENT_RE = constants.VISION_INTENT_RE || /a^/;
+    function isAssistantSpeechActive() {
+      const phase = String(state.speechPhase || "").trim().toLowerCase();
+      const now = Date.now();
+      return state.ttsContextSpeaking === true
+        || state.streamSpeakWorking === true
+        || phase === "speaking"
+        || (Number(state.speechAnimUntil || 0) > now + 80);
+    }
+
+    function isUserSpeechInputActive() {
+      return state.localAsrSpeeching === true
+        || state.localAsrSending === true
+        || (state.micOpen === true
+          && Number(state.micSuspendDepth || 0) <= 0
+          && state.recognitionActive === true);
+    }
+
     function stopAutoChatLoop() {
       if (!state.autoChatTimer) {
         return;
@@ -38,6 +55,12 @@
 
     function shouldSkipAutoChat() {
       if (state.chatBusy) {
+        return true;
+      }
+      if (isAssistantSpeechActive()) {
+        return true;
+      }
+      if (isUserSpeechInputActive()) {
         return true;
       }
       const now = Date.now();
@@ -189,7 +212,8 @@
         ? Math.round(assistantRawTs)
         : 0;
       const minsSinceAssistant = lastAssistantTs > 0 ? (now - lastAssistantTs) / 60000 : 999;
-      const silentMinutes = Math.max(0, Math.round((now - (state.lastUserMessageAt || now)) / 60000));
+      const userSilenceMs = Math.max(0, now - (state.lastUserMessageAt || now));
+      const silentMinutes = Math.max(0, Math.round(userSilenceMs / 60000));
 
       let score = 0;
       const reasons = [];
@@ -222,6 +246,13 @@
         if (AUTO_CHAT_OPEN_LOOP_RE.test(lastUserText)) {
           score += 0.62;
           reasons.push("open_loop");
+          topicSeeds.push(lastUserText.slice(0, 40));
+        }
+        const lastUserWasQuestion = AUTO_CHAT_ASK_RE.test(lastUserText);
+        const lastUserWasBrief = AUTO_CHAT_BRIEF_REPLY_RE.test(lastUserText);
+        if (!lastUserWasQuestion && userSilenceMs >= 45 * 1000 && userSilenceMs <= 8 * 60 * 1000) {
+          score += lastUserWasBrief ? 0.38 : 0.72;
+          reasons.push(lastUserWasBrief ? "quiet_ack" : "stage_pause");
           topicSeeds.push(lastUserText.slice(0, 40));
         }
       }
@@ -266,9 +297,9 @@
 
       let threshold = Number.isFinite(Number(tuning.triggerBaseThreshold))
         ? Number(tuning.triggerBaseThreshold)
-        : 1.03;
+        : 0.82;
       if (silentMinutes < 15) {
-        threshold += Math.max(0, Number(tuning.shortSilencePenalty) || 0.35);
+        threshold += Math.max(0, Number(tuning.shortSilencePenalty) || 0.16);
       }
       if (silentMinutes >= 90) {
         threshold -= Math.max(0, Number(tuning.longSilenceBonus) || 0.14);
@@ -339,6 +370,8 @@
       const reason = String(context.primaryReason || "spontaneous").trim() || "spontaneous";
       const labels = {
         followup_pending: "the last thread still has a soft open loop",
+        stage_pause: "the user left a small stage pause",
+        quiet_ack: "the user gave a quiet acknowledgement",
         long_silence: "things have been quiet for a while",
         mid_silence: "there has been a short quiet pause",
         emotion_signal: "the recent tone carried an emotional signal",
@@ -392,14 +425,15 @@
         "Reply in English only.",
         "Output only the line Taffy should say. Do not explain why you are speaking.",
         `${brevityLine} Prefer a statement the user can ignore; do not force an answer.`,
+        "Make it feel like a live stage aside, not a customer-service follow-up.",
         "Avoid greeting templates, task-report language, and notification wording."
       ].join("\n");
     }
 
     function scheduleNextAutoChat() {
       if (!state.autoChatEnabled) return;
-      const minMs = Math.max(60000, state.autoChatMinMs || 180000);
-      const maxMs = Math.max(minMs + 30000, state.autoChatMaxMs || 480000);
+      const minMs = Math.max(60000, state.autoChatMinMs || 60000);
+      const maxMs = Math.max(minMs + 30000, state.autoChatMaxMs || 180000);
       const delay = Math.round(minMs + Math.random() * (maxMs - minMs));
       state.autoChatTimer = setTimeout(() => {
         if (!state.autoChatEnabled) return;
@@ -412,6 +446,8 @@
               rememberUser: false,
               rememberAssistant: true,
               auto: true,
+              dropIfSpeaking: true,
+              skipDesktopAttach: true,
               silentError: true
             }).then((ok) => {
               if (ok) {

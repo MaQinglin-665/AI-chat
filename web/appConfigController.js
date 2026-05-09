@@ -164,12 +164,12 @@
         : {};
       state.autoChatTuning = {
         triggerBaseThreshold: clampNumber(
-          Number(autoChatTuningCfg.trigger_base_threshold ?? 1.03),
+          Number(autoChatTuningCfg.trigger_base_threshold ?? 0.82),
           0.4,
           3.0
         ),
         shortSilencePenalty: clampNumber(
-          Number(autoChatTuningCfg.short_silence_penalty ?? 0.35),
+          Number(autoChatTuningCfg.short_silence_penalty ?? 0.16),
           0,
           1.2
         ),
@@ -249,8 +249,8 @@
       // 主动说话：从 config 读取开关和随机间隔范围
       const prevAutoChatEnabled = state.autoChatEnabled;
       state.autoChatEnabled = observeCfg.auto_chat_enabled === true;
-      state.autoChatMinMs = Math.max(60000, Number(observeCfg.auto_chat_min_ms || 180000));
-      state.autoChatMaxMs = Math.max(state.autoChatMinMs + 30000, Number(observeCfg.auto_chat_max_ms || 480000));
+      state.autoChatMinMs = Math.max(60000, Number(observeCfg.auto_chat_min_ms || 60000));
+      state.autoChatMaxMs = Math.max(state.autoChatMinMs + 30000, Number(observeCfg.auto_chat_max_ms || 180000));
       if (state.autoChatEnabled && !prevAutoChatEnabled) {
         startAutoChatLoop();
       } else if (!state.autoChatEnabled && prevAutoChatEnabled) {
