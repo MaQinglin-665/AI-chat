@@ -35,6 +35,7 @@
     const normalizeAssistantVisibleText = typeof deps.normalizeAssistantVisibleText === "function" ? deps.normalizeAssistantVisibleText : (text) => String(text || "").trim();
     const finalizePendingMessageRow = typeof deps.finalizePendingMessageRow === "function" ? deps.finalizePendingMessageRow : () => {};
     const updateConversationFollowupState = typeof deps.updateConversationFollowupState === "function" ? deps.updateConversationFollowupState : () => {};
+    const scheduleAutoChatInterjectionAfterTurn = typeof deps.scheduleAutoChatInterjectionAfterTurn === "function" ? deps.scheduleAutoChatInterjectionAfterTurn : () => null;
     const recordEmotion = typeof deps.recordEmotion === "function" ? deps.recordEmotion : () => {};
     const previewAssistantReplyCharacterCueCandidate = typeof deps.previewAssistantReplyCharacterCueCandidate === "function" ? deps.previewAssistantReplyCharacterCueCandidate : () => null;
     const maybeAutoApplyAssistantReplyCharacterCueCandidate = typeof deps.maybeAutoApplyAssistantReplyCharacterCueCandidate === "function" ? deps.maybeAutoApplyAssistantReplyCharacterCueCandidate : () => null;
@@ -769,6 +770,17 @@
           runTimelinePostSettle();
         }
         finishPerformanceAudit({ status: "reply_done", lastEvent: "reply_done" });
+        if (!isAuto) {
+          scheduleAutoChatInterjectionAfterTurn({
+            userText: userDisplayText,
+            assistantText: visibleReply,
+            mood,
+            talkStyle: finalTalkStyle,
+            brainSnapshot: state.characterBrainLastDecision,
+            userTimestamp,
+            assistantTimestamp
+          });
+        }
         setStatus("待机");
         return true;
       } catch (err) {

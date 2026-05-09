@@ -12,6 +12,9 @@
     const AUTO_CHAT_MIN_USER_GAP_MS = constants.AUTO_CHAT_MIN_USER_GAP_MS || 45 * 1000;
     const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = constants.AUTO_CHAT_MIN_ASSISTANT_GAP_MS || 60 * 1000;
     const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = constants.AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS || 4 * 60 * 1000;
+    const AUTO_CHAT_INTERJECTION_COOLDOWN_MS = constants.AUTO_CHAT_INTERJECTION_COOLDOWN_MS || 24 * 1000;
+    const AUTO_CHAT_INTERJECTION_RETRY_MS = constants.AUTO_CHAT_INTERJECTION_RETRY_MS || 1400;
+    const AUTO_CHAT_INTERJECTION_MAX_RETRIES = constants.AUTO_CHAT_INTERJECTION_MAX_RETRIES || 8;
     const AUTO_CHAT_EMO_RE = constants.AUTO_CHAT_EMO_RE || /a^/;
     const AUTO_CHAT_MIRROR_RE = constants.AUTO_CHAT_MIRROR_RE || /a^/;
     const AUTO_CHAT_TOPIC_RE = constants.AUTO_CHAT_TOPIC_RE || /a^/;
@@ -53,6 +56,36 @@
       state.autoChatTimer = 0;
     }
 
+    function stopTurnInterjectionTimer() {
+      if (!state.autoChatInterjectionTimer) {
+        return;
+      }
+      clearTimeout(state.autoChatInterjectionTimer);
+      state.autoChatInterjectionTimer = 0;
+    }
+
+    function rememberAutoChatSuccess(context = {}) {
+      const now = Date.now();
+      const previousAutoAt = Number(state.lastAutoChatAt) || 0;
+      const burstResetWindowMs = Math.max(
+        3 * 60 * 1000,
+        Number(state.autoChatTuning?.burstResetWindowMs) || AUTO_CHAT_BURST_RESET_WINDOW_MS
+      );
+      const triggerReason = String(context.primaryReason || "spontaneous").trim() || "spontaneous";
+      const triggerTopic = normalizeAutoChatTopicHint(context.topicHint || "");
+      state.lastAutoChatAt = now;
+      state.autoChatLastReason = triggerReason;
+      state.autoChatLastTopicHint = triggerTopic;
+      state.autoChatLastTopicAt = triggerTopic ? now : 0;
+      state.autoChatLastExplanation = buildAutoChatTriggerExplanation(context);
+      state.autoChatBurstCount = previousAutoAt > 0 && now - previousAutoAt < burstResetWindowMs
+        ? Math.min(6, (Number(state.autoChatBurstCount) || 0) + 1)
+        : 1;
+      if (context.interjection === true) {
+        state.autoChatInterjectionLastAt = now;
+      }
+    }
+
     function shouldSkipAutoChat() {
       if (state.chatBusy) {
         return true;
@@ -88,6 +121,44 @@
       const focused = document.activeElement === ui.chatInput;
       const typing = ui.chatInput.value.trim().length > 0;
       return focused && typing;
+    }
+
+    function shouldSkipTurnInterjection(context = {}) {
+      if (state.autoChatEnabled !== true) {
+        return { skip: true, reason: "disabled" };
+      }
+      if (state.chatBusy) {
+        return { skip: true, reason: "busy", retry: true };
+      }
+      if (isAssistantSpeechActive()) {
+        return { skip: true, reason: "assistant_speaking", retry: true };
+      }
+      if (isUserSpeechInputActive()) {
+        return { skip: true, reason: "user_speaking" };
+      }
+      if (ui.chatInput) {
+        const focused = document.activeElement === ui.chatInput;
+        const typing = ui.chatInput.value.trim().length > 0;
+        if (focused && typing) {
+          return { skip: true, reason: "user_typing" };
+        }
+      }
+      const now = Date.now();
+      if (state.lastAutoChatAt > 0 && now - state.lastAutoChatAt < AUTO_CHAT_INTERJECTION_COOLDOWN_MS) {
+        return { skip: true, reason: "cooldown" };
+      }
+      if (state.autoChatInterjectionLastAt > 0 && now - state.autoChatInterjectionLastAt < AUTO_CHAT_INTERJECTION_COOLDOWN_MS) {
+        return { skip: true, reason: "interjection_cooldown" };
+      }
+      const expectedUserAt = Number(context.expectedUserAt || 0);
+      if (expectedUserAt > 0 && Number(state.lastUserMessageAt || 0) > expectedUserAt + 50) {
+        return { skip: true, reason: "new_user_turn" };
+      }
+      const expectedAssistantAt = Number(context.expectedAssistantAt || 0);
+      if (expectedAssistantAt > 0 && Number(state.conversationLastAssistantAt || 0) > expectedAssistantAt + 50) {
+        return { skip: true, reason: "new_assistant_turn" };
+      }
+      return { skip: false, reason: "" };
     }
 
     function shouldPlayLatencyHint(isAuto, useStreamSpeak) {
@@ -345,6 +416,88 @@
       return context;
     }
 
+    function buildTurnInterjectionContext(input = {}) {
+      const userText = String(input.userText || "").replace(/\s+/g, " ").trim();
+      const assistantText = String(input.assistantText || "").replace(/\s+/g, " ").trim();
+      const intent = String(input.brainSnapshot?.intent || input.intent || "").trim().toLowerCase();
+      const mood = String(input.mood || "").trim().toLowerCase();
+      const loweredUser = userText.toLowerCase();
+      const loweredAssistant = assistantText.toLowerCase();
+      const reasons = [];
+      const topicSeeds = [];
+      let score = 0;
+
+      if (!userText || userText.startsWith("/")) {
+        return { shouldTrigger: false, primaryReason: "no_interjection", reasons: [], score: 0, threshold: 1 };
+      }
+      if (/doctor|debug|api key|token|password|secret|private key/i.test(userText)) {
+        return { shouldTrigger: false, primaryReason: "safety_quiet", reasons: ["safety_quiet"], score: 0, threshold: 1 };
+      }
+      if (/sleep|good night|bye|later|leave|exit|i'?m going to sleep|我要睡|晚安|再见/i.test(userText)) {
+        return { shouldTrigger: false, primaryReason: "closing_quiet", reasons: ["closing_quiet"], score: 0, threshold: 1 };
+      }
+      if (/(feel bad|sad|depressed|anxious|panic|hurt|难受|难过|焦虑)/i.test(userText) || intent === "comfort" || mood === "sad") {
+        return { shouldTrigger: false, primaryReason: "comfort_quiet", reasons: ["comfort_quiet"], score: 0, threshold: 1 };
+      }
+      if (intent === "task_help" || intent === "reminder" || intent === "doctor" || intent === "debug") {
+        return { shouldTrigger: false, primaryReason: "focused_quiet", reasons: ["focused_quiet"], score: 0, threshold: 1 };
+      }
+
+      if (/(wrong|mistake|not true|you lied|you were off|不对|错了|说错)/i.test(userText)) {
+        score += 1.05;
+        reasons.push("correction_afterthought");
+      }
+      if (/(desk|desktop|cursor|window|screen|keyboard|weird|strange|怪|桌面|光标|键盘)/i.test(userText)) {
+        score += 0.92;
+        reasons.push("stage_observation");
+        topicSeeds.push(userText);
+      }
+      if (/(finished|done|completed|it works|搞定|完成|好了)/i.test(userText)) {
+        score += 0.82;
+        reasons.push("completion_spark");
+      }
+      if (AUTO_CHAT_MIRROR_RE.test(userText)) {
+        score += 0.7;
+        reasons.push("handed_back");
+      }
+      if (AUTO_CHAT_ASK_RE.test(userText) && assistantText.length > 0 && assistantText.length < 260) {
+        score += 0.48;
+        reasons.push("answer_afterthought");
+      }
+      if (userText.length >= 10 && userText.length <= 120 && !AUTO_CHAT_ASK_RE.test(userText)) {
+        score += 0.46;
+        reasons.push("small_stage_thought");
+        topicSeeds.push(userText);
+      }
+      if (/\?$/.test(loweredAssistant) || /what do you think|anything else|let me know/.test(loweredAssistant)) {
+        score -= 0.35;
+      }
+
+      const threshold = reasons.includes("correction_afterthought") || reasons.includes("stage_observation")
+        ? 0.62
+        : 0.72;
+      const primaryReason = pickAutoChatPrimaryReason(reasons);
+      const topicHint = normalizeAutoChatTopicHint(topicSeeds.find(Boolean) || userText);
+      const delayMs = Math.round(2600 + Math.random() * 5200);
+      const context = {
+        interjection: true,
+        shouldTrigger: score >= threshold,
+        score,
+        threshold,
+        reasons,
+        primaryReason: primaryReason === "spontaneous" ? "afterthought" : primaryReason,
+        topicHint,
+        silentMinutes: 0,
+        expectedUserAt: Number(input.userTimestamp || state.lastUserMessageAt || 0),
+        expectedAssistantAt: Number(input.assistantTimestamp || state.conversationLastAssistantAt || 0),
+        delayMs,
+        assistantHint: assistantText.slice(0, 140)
+      };
+      context.brainGate = buildAutoChatBrainGate(context);
+      context.explanation = buildAutoChatTriggerExplanation(context);
+      return context;
+    }
+
     function buildAutoChatBrainGate(context = {}) {
       const reason = String(context.primaryReason || "spontaneous").trim() || "spontaneous";
       return {
@@ -370,6 +523,13 @@
       const reason = String(context.primaryReason || "spontaneous").trim() || "spontaneous";
       const labels = {
         followup_pending: "the last thread still has a soft open loop",
+        correction_afterthought: "Taffy had a quick recovery thought after being corrected",
+        stage_observation: "the recent turn left a stage object to react to",
+        completion_spark: "the user finished something and the moment still has energy",
+        handed_back: "the user handed the thought back",
+        answer_afterthought: "Taffy has a small thought after answering",
+        small_stage_thought: "the last turn left room for a small aside",
+        afterthought: "Taffy had a small thought after the turn",
         stage_pause: "the user left a small stage pause",
         quiet_ack: "the user gave a quiet acknowledgement",
         long_silence: "things have been quiet for a while",
@@ -413,21 +573,69 @@
         : "No explicit thread; use one grounded present-moment line.";
       const brevityLine = "Use exactly one short sentence.";
       const brainGate = buildAutoChatBrainGate(ctx);
+      const openingLine = ctx.interjection === true
+        ? "You are Taffy, a small desktop AI companion. This is a quick afterthought after the last turn, like she had her own tiny thought bubble."
+        : "You are Taffy, a small desktop AI companion. This is a proactive low-interruption check-in.";
+      const afterthoughtLine = ctx.interjection === true
+        ? "Make it feel like a spontaneous interjection between friends; it can be mildly teasing or deadpan when safe, but never turns into a new task."
+        : "Make it feel like a live stage aside, not a customer-service follow-up.";
 
       return [
-        "You are Taffy, a small desktop AI companion. This is a proactive low-interruption check-in.",
+        openingLine,
         `Current time hint: ${clockText}.`,
         `Trigger clue: ${reasonHint}`,
         topicLine,
         `Tone: ${styleNote}`,
         `Character brain guard: ${brainGate.intent}; max_sentences=${brainGate.maxSentences}; optional=true; can_ignore=true; no desktop observation; no file read; no shell; no tool call; do not require a reply.`,
         `Why now: ${brainGate.explanation}`,
+        ctx.assistantHint ? `Previous answer vibe: "${String(ctx.assistantHint).replace(/"/g, "'")}".` : "",
         "Reply in English only.",
         "Output only the line Taffy should say. Do not explain why you are speaking.",
         `${brevityLine} Prefer a statement the user can ignore; do not force an answer.`,
-        "Make it feel like a live stage aside, not a customer-service follow-up.",
+        afterthoughtLine,
         "Avoid greeting templates, task-report language, and notification wording."
-      ].join("\n");
+      ].filter(Boolean).join("\n");
+    }
+
+    function dispatchAutoChatContext(context = {}) {
+      const prompt = buildAutoChatPrompt(context);
+      return requestAssistantReply(prompt, {
+        showUser: false,
+        rememberUser: false,
+        rememberAssistant: true,
+        auto: true,
+        dropIfSpeaking: true,
+        skipDesktopAttach: true,
+        silentError: true
+      }).then((ok) => {
+        if (ok) {
+          rememberAutoChatSuccess(context);
+        }
+        return ok;
+      }).catch(() => false);
+    }
+
+    function scheduleTurnInterjection(input = {}) {
+      stopTurnInterjectionTimer();
+      const context = buildTurnInterjectionContext(input);
+      state.autoChatInterjectionLastContext = context;
+      if (state.autoChatEnabled !== true || context.shouldTrigger !== true) {
+        return { scheduled: false, context };
+      }
+      const run = (attempt = 0) => {
+        state.autoChatInterjectionTimer = 0;
+        const skip = shouldSkipTurnInterjection(context);
+        if (!skip.skip) {
+          dispatchAutoChatContext(context);
+          return;
+        }
+        state.autoChatInterjectionLastSuppressed = skip.reason || "skipped";
+        if (skip.retry && attempt < AUTO_CHAT_INTERJECTION_MAX_RETRIES) {
+          state.autoChatInterjectionTimer = window.setTimeout(() => run(attempt + 1), AUTO_CHAT_INTERJECTION_RETRY_MS);
+        }
+      };
+      state.autoChatInterjectionTimer = window.setTimeout(() => run(0), Math.max(500, Number(context.delayMs) || 3600));
+      return { scheduled: true, context };
     }
 
     function scheduleNextAutoChat() {
@@ -439,36 +647,7 @@
         if (!state.autoChatEnabled) return;
         const context = analyzeAutoChatContext();
         if (!shouldSkipAutoChat() && context.shouldTrigger) {
-          const triggerReason = String(context.primaryReason || "").trim();
-          const triggerTopic = normalizeAutoChatTopicHint(context.topicHint || "");
-          requestAssistantReply(buildAutoChatPrompt(context), {
-              showUser: false,
-              rememberUser: false,
-              rememberAssistant: true,
-              auto: true,
-              dropIfSpeaking: true,
-              skipDesktopAttach: true,
-              silentError: true
-            }).then((ok) => {
-              if (ok) {
-                const now = Date.now();
-                const previousAutoAt = Number(state.lastAutoChatAt) || 0;
-                const burstResetWindowMs = Math.max(
-                  3 * 60 * 1000,
-                  Number(state.autoChatTuning?.burstResetWindowMs) || AUTO_CHAT_BURST_RESET_WINDOW_MS
-                );
-                state.lastAutoChatAt = now;
-                state.autoChatLastReason = triggerReason;
-                state.autoChatLastTopicHint = triggerTopic;
-                state.autoChatLastTopicAt = triggerTopic ? now : 0;
-                state.autoChatLastExplanation = buildAutoChatTriggerExplanation(context);
-                state.autoChatBurstCount = previousAutoAt > 0 && now - previousAutoAt < burstResetWindowMs
-                  ? Math.min(6, (Number(state.autoChatBurstCount) || 0) + 1)
-                  : 1;
-              }
-            }).catch(() => {
-              // ignore
-            });
+          dispatchAutoChatContext(context);
         }
         // 无论是否跳过，都重新调度，保持随机间隔
         scheduleNextAutoChat();
@@ -521,9 +700,12 @@
       updateConversationFollowupState,
       pickAutoChatPrimaryReason,
       analyzeAutoChatContext,
+      buildTurnInterjectionContext,
+      shouldSkipTurnInterjection,
       buildAutoChatBrainGate,
       buildAutoChatTriggerExplanation,
       buildAutoChatPrompt,
+      scheduleTurnInterjection,
       scheduleNextAutoChat,
       startAutoChatLoop,
       captureDesktopSnapshot,

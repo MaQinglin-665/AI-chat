@@ -407,6 +407,34 @@ function createMemoryStorage(initial = {}) {
   state.ttsContextSpeaking = false;
   state.localAsrSpeeching = true;
   assert.strictEqual(controller.shouldSkipAutoChat(), true, "auto chat should stay silent while user speech input is active");
+  state.localAsrSpeeching = false;
+  state.autoChatEnabled = true;
+  state.conversationLastAssistantAt = now - 2000;
+  const interjection = controller.buildTurnInterjectionContext({
+    userText: "This desk feels weird.",
+    assistantText: "It does have suspicious desk energy.",
+    userTimestamp: now - 7000,
+    assistantTimestamp: now - 2000,
+    brainSnapshot: { intent: "casual" }
+  });
+  assert.strictEqual(interjection.shouldTrigger, true, "turn-based interjection should trigger on a safe weird-stage moment");
+  assert.ok(interjection.reasons.includes("stage_observation"), "turn interjection should carry a concrete stage-observation reason");
+  const interjectionPrompt = controller.buildAutoChatPrompt(interjection);
+  assert.ok(interjectionPrompt.includes("quick afterthought") && interjectionPrompt.includes("tiny thought bubble"), "turn interjection prompt should frame the line as Taffy's own afterthought");
+  assert.strictEqual(controller.shouldSkipTurnInterjection(interjection).skip, false, "turn interjection should be allowed when both sides are idle");
+  state.ttsContextSpeaking = true;
+  assert.deepStrictEqual(
+    controller.shouldSkipTurnInterjection(interjection),
+    { skip: true, reason: "assistant_speaking", retry: true },
+    "turn interjection should retry instead of interrupting active assistant speech"
+  );
+  state.ttsContextSpeaking = false;
+  const comfortInterjection = controller.buildTurnInterjectionContext({
+    userText: "I feel bad.",
+    assistantText: "I'm here with you.",
+    brainSnapshot: { intent: "comfort" }
+  });
+  assert.strictEqual(comfortInterjection.shouldTrigger, false, "turn interjection should stay quiet in comfort scenes");
 }
 
 {
@@ -1559,6 +1587,8 @@ assert.ok(
     && localAsrControllerSource.includes("function transcribeLocalPcmChunks")
     && autoChatControllerSource.includes("function startAutoChatLoop")
     && autoChatControllerSource.includes("function buildAutoChatPrompt")
+    && autoChatControllerSource.includes("function scheduleTurnInterjection")
+    && autoChatControllerSource.includes("function shouldSkipTurnInterjection")
     && runtimeMetadataControllerSource.includes("function handleCharacterRuntimeMetadata")
     && runtimeMetadataControllerSource.includes("function normalizeCharacterRuntimeMetadataForFrontend")
     && diagnosticsRuntimeControllerSource.includes("function recordTTSDebugEvent")
@@ -2814,6 +2844,8 @@ assert.ok(
 assert.ok(
   chatReplyControllerSource.includes("async function waitForNonInterruptingSpeechTurn")
     && chatReplyControllerSource.includes('recordTTSDebugEvent(isAuto ? "proactive_reply_suppressed" : "chat_turn_wait_failed"')
+    && chatReplyControllerSource.includes("scheduleAutoChatInterjectionAfterTurn")
+    && chatReplyControllerSource.includes("if (!isAuto)")
     && /if \(speechTurn\.interrupt \|\| !isAssistantSpeechActive\(\)\) \{[\s\S]*?stopAllAudioPlayback\(\);/.test(chatReplyControllerSource),
   "assistant requests should respect non-interrupting speech turn-taking and suppress proactive overlap"
 );

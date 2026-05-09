@@ -1722,6 +1722,7 @@ function isApiRequestTarget(input) {
 const AUTO_CHAT_MIN_USER_GAP_MS = 45 * 1000;
 const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = 60 * 1000;
 const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = 4 * 60 * 1000;
+const AUTO_CHAT_INTERJECTION_COOLDOWN_MS = 24 * 1000;
 const AUTO_CHAT_EMO_RE = /(emo|sad|bad|tired|stressed|anxious|lonely|rough|overwhelmed|\u96be\u53d7|\u96be\u8fc7|\u7126\u8651|\u538b\u529b|\u5931\u7720|\u5fc3\u60c5\u4e0d\u597d|\u4f4e\u843d)/i;
 const AUTO_CHAT_MIRROR_RE = /(what about you|your turn|you think|do you think|what do you think|\u4f60\u5462|\u90a3\u4f60|\u4f60\u89c9\u5f97|\u4f60\u600e\u4e48\u60f3)/i;
 const AUTO_CHAT_TOPIC_RE = /(project|exam|work|study|code|model|deploy|plan|progress|goal|desk|desktop|cursor|\u9879\u76ee|\u8003\u8bd5|\u5de5\u4f5c|\u5b66\u4e60|\u4ee3\u7801|\u6a21\u578b|\u90e8\u7f72|\u8ba1\u5212|\u8fdb\u5ea6|\u76ee\u6807|\u684c\u9762|\u5149\u6807)/i;
@@ -1734,6 +1735,12 @@ const AUTO_CHAT_BURST_RESET_WINDOW_MS = 18 * 60 * 1000;
 const AUTO_CHAT_REASON_PRIORITY = [
   "emotion_signal",
   "open_loop",
+  "correction_afterthought",
+  "stage_observation",
+  "completion_spark",
+  "handed_back",
+  "answer_afterthought",
+  "small_stage_thought",
   "stage_pause",
   "followup_pending",
   "brief_ack_drop",
@@ -1747,6 +1754,12 @@ const AUTO_CHAT_REASON_PRIORITY = [
 const AUTO_CHAT_REASON_HINTS = {
   emotion_signal: "The recent tone carried an emotional signal; answer with warmth, not pressure.",
   open_loop: "The last message left a light open thread; continue it gently.",
+  correction_afterthought: "You noticed your last answer got challenged; add one quick recovery thought without defending yourself.",
+  stage_observation: "The user left a weird little stage object in the room; react like it caught your attention.",
+  completion_spark: "The user finished something; add one small celebratory spark and stop.",
+  handed_back: "The user handed the thought back; give your own stance in one short line.",
+  answer_afterthought: "You already answered; now add one tiny personal afterthought.",
+  small_stage_thought: "A small thought popped up after the turn; say it like an aside.",
   stage_pause: "The user left a small pause after a statement; add one live stage aside without demanding a reply.",
   followup_pending: "The previous turn had a small open loop; reconnect without restarting.",
   brief_ack_drop: "The user closed with a short acknowledgement; leave one soft bridge.",
@@ -3095,6 +3108,7 @@ function getAutoChatController() {
         AUTO_CHAT_MIN_USER_GAP_MS,
         AUTO_CHAT_MIN_ASSISTANT_GAP_MS,
         AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS,
+        AUTO_CHAT_INTERJECTION_COOLDOWN_MS,
         AUTO_CHAT_EMO_RE,
         AUTO_CHAT_MIRROR_RE,
         AUTO_CHAT_TOPIC_RE,
@@ -3157,6 +3171,10 @@ function analyzeAutoChatContext() {
 
 function buildAutoChatPrompt(context = null) {
   return getAutoChatController().buildAutoChatPrompt(context);
+}
+
+function scheduleAutoChatInterjectionAfterTurn(context = {}) {
+  return getAutoChatController().scheduleTurnInterjection(context);
 }
 
 function scheduleNextAutoChat() {
@@ -4087,6 +4105,7 @@ function getChatReplyController() {
       normalizeAssistantVisibleText,
       finalizePendingMessageRow,
       updateConversationFollowupState,
+      scheduleAutoChatInterjectionAfterTurn,
       recordEmotion,
       previewAssistantReplyCharacterCueCandidate,
       maybeAutoApplyAssistantReplyCharacterCueCandidate,
