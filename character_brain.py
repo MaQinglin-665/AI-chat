@@ -190,6 +190,36 @@ REACTION_MODES = {
     "easy_ignore": "one optional line, effortless to ignore",
 }
 
+OPENING_MOVES = {
+    "micro_reaction",
+    "answer_first",
+    "deadpan_aside",
+    "soft_anchor",
+    "no_opening",
+}
+
+REPLY_SHAPES = {
+    "one_liner",
+    "two_beat",
+    "answer_then_bit",
+    "bit_then_answer",
+    "mini_rant",
+}
+
+QUESTION_POLICIES = {"none", "clarify_only", "optional_playful"}
+
+BIT_BANK = {
+    "cursor_side_eye": "use one safe desktop image: the cursor seems suspicious, then move on",
+    "keyboard_judge": "use one safe desktop image: the keyboard is judging the situation",
+    "pixel_static": "use one safe desktop image: pixels or tiny static reacting in the corner",
+    "background_process": "use one safe AI image: a background process pretending to be busy",
+    "clipboard_supervisor": "use one safe desktop image: a tiny clipboard supervisor with unreasonable confidence",
+    "room_anchor": "use one gentle room image; no jokes at the user's expense",
+    "pixel_watch": "use one soft closing image about quietly supervising pixels",
+    "clean_ping": "use one crisp confirmation image like a small system ping",
+    "none": "do not add an extra bit this turn",
+}
+
 
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
@@ -313,6 +343,94 @@ def _select_reaction_mode(
         level = min(level, 1)
     guide = REACTION_MODES.get(key, REACTION_MODES["quick_snap"])
     return {"key": key, "guide": guide, "banter_level": max(0, min(3, level))}
+
+
+def _normalize_opening_move(value: Any) -> str:
+    key = _clean_text(value, 48)
+    return key if key in OPENING_MOVES else "no_opening"
+
+
+def _normalize_reply_shape(value: Any) -> str:
+    key = _clean_text(value, 48)
+    return key if key in REPLY_SHAPES else "two_beat"
+
+
+def _normalize_question_policy(value: Any) -> str:
+    key = _clean_text(value, 48)
+    return key if key in QUESTION_POLICIES else "none"
+
+
+def _select_performance_bit(intent: str, topic: str, user_message: str, reaction_mode: str) -> Dict[str, str]:
+    safe_intent = _clean_text(intent, 40) or "casual"
+    if safe_intent == "comfort":
+        key = "room_anchor"
+    elif safe_intent == "closing":
+        key = "pixel_watch"
+    elif safe_intent == "reminder":
+        key = "clean_ping"
+    elif safe_intent == "task_help":
+        key = "clipboard_supervisor"
+    elif reaction_mode == "tangent_spark":
+        choices = ("cursor_side_eye", "pixel_static", "background_process")
+        key = choices[_stable_text_score(safe_intent, topic, user_message) % len(choices)]
+    elif reaction_mode == "deadpan_aside":
+        key = "keyboard_judge"
+    elif safe_intent in {"greeting", "casual", "question", "encouragement"}:
+        choices = ("cursor_side_eye", "keyboard_judge", "pixel_static", "background_process")
+        key = choices[_stable_text_score(safe_intent, topic, user_message, reaction_mode) % len(choices)]
+    else:
+        key = "none"
+    return {"key": key, "guide": BIT_BANK.get(key, BIT_BANK["none"])}
+
+
+def _select_performance_controls(
+    intent: str,
+    topic: str,
+    user_message: str,
+    reaction_mode: str,
+    *,
+    experience_profile: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    safe_intent = _clean_text(intent, 40) or "casual"
+    flags = _experience_flags(experience_profile)
+    if safe_intent == "comfort":
+        opening, shape, spontaneity, question_policy = "soft_anchor", "two_beat", 0, "none"
+    elif safe_intent == "closing":
+        opening, shape, spontaneity, question_policy = "no_opening", "one_liner", 0, "none"
+    elif safe_intent == "reminder":
+        opening, shape, spontaneity, question_policy = "answer_first", "one_liner", 0, "none"
+    elif safe_intent == "low_interrupt_checkin":
+        opening, shape, spontaneity, question_policy = "no_opening", "one_liner", 0, "none"
+    elif safe_intent == "task_help":
+        opening, shape, spontaneity, question_policy = "answer_first", "answer_then_bit", 1, "clarify_only"
+    elif safe_intent == "question":
+        opening, shape, spontaneity, question_policy = "answer_first", "answer_then_bit", 2, "optional_playful"
+    elif safe_intent == "encouragement":
+        opening, shape, spontaneity, question_policy = "micro_reaction", "two_beat", 2, "none"
+    elif safe_intent == "greeting":
+        opening, shape, spontaneity, question_policy = "micro_reaction", "two_beat", 2, "none"
+    else:
+        opening = "deadpan_aside" if reaction_mode == "deadpan_aside" else "micro_reaction"
+        if reaction_mode == "tangent_spark":
+            shape = "bit_then_answer"
+        elif reaction_mode == "playful_pushback":
+            shape = "mini_rant"
+        else:
+            shape = "one_liner"
+        spontaneity, question_policy = 2, "none"
+    if flags["prefer_short"] and shape == "mini_rant":
+        shape = "two_beat"
+    if flags["prefer_short"]:
+        spontaneity = min(spontaneity, 1)
+    bit = _select_performance_bit(safe_intent, topic, user_message, reaction_mode)
+    return {
+        "opening_move": opening,
+        "reply_shape": shape,
+        "spontaneity": max(0, min(3, _safe_int(spontaneity, 0))),
+        "question_policy": question_policy,
+        "performance_bit": _clean_text(bit.get("key"), 48),
+        "performance_bit_guide": _clean_text(bit.get("guide"), 180),
+    }
 
 
 def _need_for_intent(intent: str) -> str:
@@ -644,6 +762,16 @@ def _format_output_constraints_for_prompt(constraints: Dict[str, Any]) -> str:
 
 def _apply_output_constraints(decision: Dict[str, Any]) -> None:
     constraints = _constraints_for_intent(str(decision.get("intent") or "casual"))
+    question_policy = _normalize_question_policy(decision.get("question_policy"))
+    if question_policy == "none":
+        constraints["allow_followup_question"] = False
+        constraints["clarify_only_when_needed"] = False
+    elif question_policy == "clarify_only":
+        constraints["allow_followup_question"] = True
+        constraints["clarify_only_when_needed"] = True
+    elif question_policy == "optional_playful":
+        constraints["allow_followup_question"] = True
+        constraints["clarify_only_when_needed"] = False
     decision["output_constraints"] = constraints
     decision["max_sentences"] = min(
         max(1, _safe_int(decision.get("max_sentences"), constraints["max_sentences"])),
@@ -922,10 +1050,29 @@ def build_character_brain_decision(
     decision["reaction_mode"] = _clean_text(reaction.get("key"), 48)
     decision["reaction_mode_guide"] = _clean_text(reaction.get("guide"), 220)
     decision["banter_level"] = max(0, min(3, _safe_int(reaction.get("banter_level"), 0)))
+    performance = _select_performance_controls(
+        intent,
+        topic,
+        user_message,
+        decision["reaction_mode"],
+        experience_profile=experience_profile,
+    )
+    decision["opening_move"] = _normalize_opening_move(performance.get("opening_move"))
+    decision["reply_shape"] = _normalize_reply_shape(performance.get("reply_shape"))
+    decision["spontaneity"] = max(0, min(3, _safe_int(performance.get("spontaneity"), 0)))
+    decision["question_policy"] = _normalize_question_policy(performance.get("question_policy"))
+    decision["performance_bit"] = _clean_text(performance.get("performance_bit"), 48)
+    decision["performance_bit_guide"] = _clean_text(performance.get("performance_bit_guide"), 180)
     decision["directive"] += f" Style beat: {decision['style_beat_guide']}."
     decision["directive"] += (
         f" Reaction mode: {decision['reaction_mode_guide']} "
         f"Use banter level {decision['banter_level']} of 3; never name the mode."
+    )
+    decision["directive"] += (
+        f" Performance: opening={decision['opening_move']}, shape={decision['reply_shape']}, "
+        f"spontaneity={decision['spontaneity']}/3, question_policy={decision['question_policy']}. "
+        f"Bit bank cue: {decision['performance_bit_guide']}. "
+        "Use at most one bit; for answer_first, answer the user's actual question before the bit."
     )
     decision["directive"] += " " + _character_flavor_directive(intent, topic)
 
@@ -954,10 +1101,11 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Reply style: {_clean_text(decision.get('reply_style'), 40)}, max_sentences={int(decision.get('max_sentences') or 3)}",
         f"Style beat: {_clean_text(decision.get('style_beat'), 48)} - {_clean_text(decision.get('style_beat_guide'), 180)}",
         f"Reaction mode: {_clean_text(decision.get('reaction_mode'), 48)}; banter_level={max(0, min(3, _safe_int(decision.get('banter_level'), 0)))}; {_clean_text(decision.get('reaction_mode_guide'), 220)}",
+        f"Performance: opening={_normalize_opening_move(decision.get('opening_move'))}, shape={_normalize_reply_shape(decision.get('reply_shape'))}, spontaneity={max(0, min(3, _safe_int(decision.get('spontaneity'), 0)))}/3, question_policy={_normalize_question_policy(decision.get('question_policy'))}, bit={_clean_text(decision.get('performance_bit'), 48)}",
         f"Output constraints: {_format_output_constraints_for_prompt(decision.get('output_constraints') if isinstance(decision.get('output_constraints'), dict) else {})}",
         "Question policy: avoid routine questions; only ask when the reply would be blocked without clarification.",
         f"Expression target: emotion={_normalize_emotion(decision.get('emotion'))}, action={_normalize_action(decision.get('action'))}, intensity={_normalize_intensity(decision.get('intensity'))}, voice_style={_clean_text(decision.get('voice_style'), 32)}",
-        f"Directive: {_clean_text(decision.get('directive'), 720)}",
+        f"Directive: {_clean_text(decision.get('directive'), 960)}",
     ]
     return "\n".join(lines)
 
@@ -1059,6 +1207,7 @@ def _drop_intent_mismatched_sentences(sentences: List[str], intent: str) -> List
 
 def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
     topic = _derive_topic(user_message, intent)
+    compact = re.sub(r"\s+", "", _clean_text(user_message, 300).lower())
     if intent == "greeting":
         return "Oh, you found me. I was doing very important desktop nothing."
     if intent == "closing":
@@ -1066,7 +1215,6 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
     if intent == "comfort":
         return "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
     if intent == "encouragement":
-        compact = re.sub(r"\s+", "", _clean_text(user_message, 300).lower())
         if re.search(r"(done|finished|completed|shipped|fixed|madeit|wrappedup|\u505a\u5b8c\u4e86|\u5b8c\u6210\u4e86|\u641e\u5b9a\u4e86|\u4fee\u597d\u4e86)", compact):
             return "Look at you, actually finishing the thing. Suspiciously competent."
         if re.search(r"(code|bug|stuck|error|\u4ee3\u7801|\u5361\u4f4f|\u62a5\u9519)", compact):
@@ -1079,8 +1227,14 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
     if intent == "task_help":
         return "Point me at the messy bit. I'll stare at it with unreasonable confidence."
     if intent == "question":
+        if re.search(r"(whatareyoudoing|whatyoudoing|whatdoing|\u5728\u5e72\u561b|\u5728\u505a\u4ec0\u4e48|\u4f60\u5728\u5e72\u561b)", compact):
+            return "I was supervising the pixels. They remain suspiciously rectangular."
+        if re.search(r"(wrong|mistake|incorrect|\u8bf4\u9519|\u9519\u4e86|\u4e0d\u5bf9)", compact):
+            return "No, I was testing your alertness. Extremely official."
         return "Short answer: probably yes, but I reserve the right to be smug about it."
     if intent == "casual":
+        if re.search(r"(wrong|mistake|incorrect|\u8bf4\u9519|\u9519\u4e86|\u4e0d\u5bf9)", compact):
+            return "No, I was testing your alertness. Extremely official."
         return "Hm. The desktop air just shifted. Suspicious, but continue."
     return ""
 
@@ -1123,6 +1277,13 @@ def _looks_like_bland_character_reply(text: str, intent: str) -> bool:
         r"\bi'?d be happy to\b",
         r"\bit'?s important to\b",
         r"\bthat sounds (great|nice|interesting)\b",
+        r"\bfeel free to\b",
+        r"\bdon'?t hesitate\b",
+        r"\bin summary\b",
+        r"\bto summarize\b",
+        r"\boverall,\b",
+        r"\bi apologize\b",
+        r"\bi'?m sorry,? but\b",
     )
     if any(re.search(pattern, lower) for pattern in generic_patterns):
         return True
@@ -1253,6 +1414,11 @@ def build_character_brain_public_snapshot(
         "style_beat": _clean_text(decision.get("style_beat"), 48),
         "reaction_mode": _clean_text(decision.get("reaction_mode"), 48),
         "banter_level": max(0, min(3, _safe_int(decision.get("banter_level"), 0))),
+        "opening_move": _normalize_opening_move(decision.get("opening_move")),
+        "reply_shape": _normalize_reply_shape(decision.get("reply_shape")),
+        "spontaneity": max(0, min(3, _safe_int(decision.get("spontaneity"), 0))),
+        "question_policy": _normalize_question_policy(decision.get("question_policy")),
+        "performance_bit": _clean_text(decision.get("performance_bit"), 48),
         "energy": _clean_text(decision.get("energy"), 24),
         "attention": _clean_text(decision.get("attention"), 24),
         "relationship": _clean_text(decision.get("relationship"), 40),

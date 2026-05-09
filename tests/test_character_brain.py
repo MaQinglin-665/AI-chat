@@ -45,10 +45,14 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert "voice_style=" in block
     assert "Style beat:" in block
     assert "Reaction mode:" in block
+    assert "Performance:" in block
     assert "slightly odd inner life" in block
     assert "empty helper phrases" in block
     assert decision["style_beat"]
     assert decision["reaction_mode"]
+    assert decision["opening_move"]
+    assert decision["reply_shape"]
+    assert decision["question_policy"]
 
 
 def test_character_brain_style_beat_rotates_with_continuity():
@@ -92,6 +96,33 @@ def test_character_brain_reaction_modes_keep_safety_by_intent():
     assert closing["banter_level"] == 0
     assert task["reaction_mode"] == "task_snap"
     assert task["banter_level"] == 1
+
+
+def test_character_brain_performance_controls_by_intent():
+    casual = character_brain.build_character_brain_decision(user_message="This desk feels weird today.")
+    question = character_brain.build_character_brain_decision(user_message="Do you think AI pets can be funny?")
+    task = character_brain.build_character_brain_decision(user_message="Can you help me fix this project?")
+    comfort = character_brain.build_character_brain_decision(user_message="I feel worn out. Stay with me.")
+    reminder = character_brain.build_character_brain_decision(user_message="Remind me in 10 minutes to drink water.")
+    closing = character_brain.build_character_brain_decision(user_message="I'm going to sleep, bye.")
+
+    assert casual["opening_move"] in {"micro_reaction", "deadpan_aside"}
+    assert casual["reply_shape"] in {"one_liner", "bit_then_answer", "mini_rant"}
+    assert casual["spontaneity"] >= 1
+    assert casual["question_policy"] == "none"
+    assert question["opening_move"] == "answer_first"
+    assert question["reply_shape"] == "answer_then_bit"
+    assert question["question_policy"] == "optional_playful"
+    assert task["opening_move"] == "answer_first"
+    assert task["reply_shape"] == "answer_then_bit"
+    assert task["question_policy"] == "clarify_only"
+    assert comfort["opening_move"] == "soft_anchor"
+    assert comfort["spontaneity"] == 0
+    assert comfort["question_policy"] == "none"
+    assert reminder["reply_shape"] == "one_liner"
+    assert reminder["spontaneity"] == 0
+    assert closing["opening_move"] == "no_opening"
+    assert closing["question_policy"] == "none"
 
 
 def test_character_brain_comfort_priority_beats_next_step_question():
@@ -615,10 +646,16 @@ def test_character_brain_public_snapshot_continuity_is_safe_and_compact():
     assert snapshot["style_beat"]
     assert snapshot["reaction_mode"]
     assert 0 <= snapshot["banter_level"] <= 3
+    assert snapshot["opening_move"]
+    assert snapshot["reply_shape"]
+    assert 0 <= snapshot["spontaneity"] <= 3
+    assert snapshot["question_policy"] in {"none", "clarify_only", "optional_playful"}
+    assert snapshot["performance_bit"]
     assert snapshot["continuity"]["recent_user_need"] == "direction"
     assert snapshot["continuity"]["last_topic"] == "planning"
     assert "style_beat_guide" not in snapshot
     assert "reaction_mode_guide" not in snapshot
+    assert "performance_bit_guide" not in snapshot
     assert "history_tail" not in snapshot
     assert "directive" not in snapshot
     assert "raw history" not in raw

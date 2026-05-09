@@ -21,6 +21,7 @@ function getArgValue(name) {
 
 const CHAT_TEXT = getArgValue("--chat") || String(process.env.TAFFY_UI_SMOKE_CHAT_TEXT || "").trim();
 const SKIP_CHAT = process.argv.includes("--skip-chat");
+const REAL_CHAT_REPLY_TIMEOUT_MS = 140000;
 const RUN_V14_DEMO = process.argv.includes("--v14-demo")
   || ["1", "true", "yes", "on"].includes(String(process.env.TAFFY_UI_SMOKE_V14_DEMO || "").trim().toLowerCase());
 
@@ -180,6 +181,13 @@ function registerIpcHandlers() {
 }
 
 function createWindow(name, url, options = {}) {
+  const diagnostics = [];
+  const pushDiagnostic = (entry) => {
+    diagnostics.push(entry);
+    if (diagnostics.length > 80) {
+      diagnostics.shift();
+    }
+  };
   const win = new BrowserWindow({
     width: options.width || 900,
     height: options.height || 760,
@@ -194,8 +202,44 @@ function createWindow(name, url, options = {}) {
       partition: `taffy-ui-smoke-${Date.now()}-${name}`
     }
   });
+  win.__smokeDiagnostics = diagnostics;
+  win.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    pushDiagnostic({
+      type: "console",
+      level,
+      message: String(message || "").slice(0, 600),
+      line: Number(line) || 0,
+      source: String(sourceId || "").slice(0, 180)
+    });
+  });
+  win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    pushDiagnostic({
+      type: "did-fail-load",
+      errorCode,
+      errorDescription: String(errorDescription || "").slice(0, 300),
+      url: String(validatedURL || "").slice(0, 220)
+    });
+  });
+  win.webContents.on("render-process-gone", (_event, details) => {
+    pushDiagnostic({
+      type: "render-process-gone",
+      reason: String(details?.reason || "").slice(0, 120),
+      exitCode: Number(details?.exitCode) || 0
+    });
+  });
+  win.webContents.on("preload-error", (_event, preloadPath, error) => {
+    pushDiagnostic({
+      type: "preload-error",
+      path: String(preloadPath || "").slice(0, 220),
+      message: String(error?.message || error || "").slice(0, 400)
+    });
+  });
   win.setMenuBarVisibility(false);
   return win.loadURL(url).then(() => win);
+}
+
+function getWindowDiagnostics(win) {
+  return Array.isArray(win?.__smokeDiagnostics) ? win.__smokeDiagnostics.slice(-20) : [];
 }
 
 function wait(ms) {
@@ -453,6 +497,15 @@ function buildV14DemoSceneReport(scene, reply, snapshot) {
   if (snapshot && !normalizeSnapshotField(snapshot, "reaction_mode")) {
     issues.push("missing_reaction_mode");
   }
+  if (snapshot && !normalizeSnapshotField(snapshot, "opening_move")) {
+    issues.push("missing_opening_move");
+  }
+  if (snapshot && !normalizeSnapshotField(snapshot, "reply_shape")) {
+    issues.push("missing_reply_shape");
+  }
+  if (snapshot && !normalizeSnapshotField(snapshot, "question_policy")) {
+    issues.push("missing_question_policy");
+  }
   if (scene.expectedIntent && intent !== scene.expectedIntent) {
     issues.push(`intent:${intent || "missing"}!=${scene.expectedIntent}`);
   }
@@ -480,6 +533,11 @@ function buildV14DemoSceneReport(scene, reply, snapshot) {
           style_beat: snapshot.style_beat,
           reaction_mode: snapshot.reaction_mode,
           banter_level: snapshot.banter_level,
+          opening_move: snapshot.opening_move,
+          reply_shape: snapshot.reply_shape,
+          spontaneity: snapshot.spontaneity,
+          question_policy: snapshot.question_policy,
+          performance_bit: snapshot.performance_bit,
           emotion: snapshot.emotion,
           action: snapshot.action,
           voice_style: snapshot.voice_style,
@@ -542,7 +600,7 @@ async function runDebugCommandSmoke(win, results) {
 async function runChatSmoke(win, results) {
   if (!SKIP_CHAT && CHAT_TEXT) {
     const beforeChat = await sendInput(win, CHAT_TEXT);
-    const messages = await waitForAssistantMessage(win, beforeChat, "", 60000, "normal chat reply");
+    const messages = await waitForAssistantMessage(win, beforeChat, "", REAL_CHAT_REPLY_TIMEOUT_MS, "normal chat reply");
     await waitForChatIdle(win, 30000);
     const lastAssistant = String(messages[messages.length - 1] || "");
     results.normalChat = {
@@ -640,6 +698,7 @@ async function main() {
     });
     await wait(2500);
     results.model = await getModelInfo(modelWin);
+    results.model.diagnostics = getWindowDiagnostics(modelWin);
     const modelShot = await capture(modelWin, "model-window.png");
     results.screenshots.push(modelShot);
     results.model.nonWhiteRatio = modelShot.nonWhiteRatio;

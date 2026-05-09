@@ -57,6 +57,33 @@ def test_v14_demo_scenes_keep_english_continuity_and_no_routine_questions():
             "action": "wave",
         },
         {
+            "label": "what_are_you_doing",
+            "message": "\u4f60\u5728\u5e72\u561b\uff1f",
+            "raw": "As an AI, I'm here to help.",
+            "reply": "I was supervising the pixels. They remain suspiciously rectangular.",
+            "intent": "question",
+            "voice": "neutral",
+            "action": "think",
+        },
+        {
+            "label": "desk_weird",
+            "message": "\u8fd9\u4e2a\u684c\u5b50\u611f\u89c9\u602a\u602a\u7684\u3002",
+            "raw": "That sounds interesting! Let me know if you want to explore it.",
+            "reply": "Hm. The desktop air just shifted. Suspicious, but continue.",
+            "intent": "casual",
+            "voice": "neutral",
+            "action": "none",
+        },
+        {
+            "label": "you_were_wrong",
+            "message": "\u4f60\u521a\u624d\u8bf4\u9519\u4e86\u3002",
+            "raw": "I apologize. Let me know what you want me to correct.",
+            "reply": "No, I was testing your alertness. Extremely official.",
+            "intent": "casual",
+            "voice": "neutral",
+            "action": "none",
+        },
+        {
             "label": "comfort_1",
             "message": "\u6211\u521a\u521a\u88ab\u5426\u5b9a\u4e86\uff0c\u6709\u70b9\u96be\u53d7\u3002",
             "raw": "Awww, that stinks. \u60f3\u804a\u804a\u5417\uff1f",
@@ -75,6 +102,16 @@ def test_v14_demo_scenes_keep_english_continuity_and_no_routine_questions():
             "action": "none",
             "style": "comfort_continuing",
             "same_need_turns": 2,
+        },
+        {
+            "label": "sad_short",
+            "message": "\u6211\u6709\u70b9\u96be\u53d7\u3002",
+            "raw": "Take it easy. Sometimes a short break can do wonders.",
+            "reply": "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company.",
+            "intent": "comfort",
+            "voice": "soft",
+            "action": "none",
+            "style": "comfort_continuing",
         },
         {
             "label": "next_step_1",
@@ -105,9 +142,27 @@ def test_v14_demo_scenes_keep_english_continuity_and_no_routine_questions():
             "action": "happy_idle",
         },
         {
+            "label": "done_short",
+            "message": "\u6211\u5b8c\u6210\u4e86\u3002",
+            "raw": "Great job! Let me know if there is anything else.",
+            "reply": "Look at you, actually finishing the thing. Suspiciously competent.",
+            "intent": "encouragement",
+            "voice": "cheerful",
+            "action": "happy_idle",
+        },
+        {
             "label": "closing",
             "message": "\u6211\u51c6\u5907\u4e0b\u7ebf\u4e86\uff0c\u8ddf\u6211\u8bf4\u53e5\u6536\u5c3e\u7684\u8bdd\u3002",
             "raw": "Stay strong! Every line of code is progress.",
+            "reply": "Go sleep. I'll keep the pixels under questionable supervision.",
+            "intent": "closing",
+            "voice": "soft",
+            "action": "wave",
+        },
+        {
+            "label": "sleep_short",
+            "message": "\u6211\u8981\u7761\u4e86\u3002",
+            "raw": "Goodnight! Sweet dreams.",
             "reply": "Go sleep. I'll keep the pixels under questionable supervision.",
             "intent": "closing",
             "voice": "soft",
@@ -139,6 +194,10 @@ def test_v14_demo_scenes_keep_english_continuity_and_no_routine_questions():
         assert snapshot["style_beat"], scene["label"]
         assert snapshot["reaction_mode"], scene["label"]
         assert 0 <= snapshot["banter_level"] <= 3, scene["label"]
+        assert snapshot["opening_move"], scene["label"]
+        assert snapshot["reply_shape"], scene["label"]
+        assert 0 <= snapshot["spontaneity"] <= 3, scene["label"]
+        assert snapshot["question_policy"] in {"none", "clarify_only", "optional_playful"}, scene["label"]
         assert runtime["brain_intent"] == scene["intent"], scene["label"]
         assert runtime["voice_style"] == scene["voice"], scene["label"]
         assert runtime["action"] == scene["action"], scene["label"]
@@ -159,8 +218,11 @@ def test_v14_demo_scene_snapshot_stays_public_and_safe():
     assert snapshot["intent"] == "task_help"
     assert snapshot["style_beat"]
     assert snapshot["reaction_mode"]
+    assert snapshot["opening_move"]
+    assert snapshot["reply_shape"]
     assert "style_beat_guide" not in snapshot
     assert "reaction_mode_guide" not in snapshot
+    assert "performance_bit_guide" not in snapshot
     assert "directive" not in snapshot
     assert "history_tail" not in snapshot
     assert "secret" not in raw

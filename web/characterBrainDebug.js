@@ -94,6 +94,8 @@
       `回复风格：${localize(STYLE_LABELS, safe.reply_style)}；最多约 ${Number(safe.max_sentences) || 3} 句`,
       `Style beat: ${clean(safe.style_beat, "none")}`,
       `Reaction: ${clean(safe.reaction_mode, "none")}；banter=${Number(safe.banter_level) || 0}/3`,
+      `Performance: opening=${clean(safe.opening_move, "none")}；shape=${clean(safe.reply_shape, "none")}；bit=${clean(safe.performance_bit, "none")}`,
+      `Spontaneity: ${Number(safe.spontaneity) || 0}/3；Question policy: ${clean(safe.question_policy, "none")}`,
       ...constraintLines,
       `角色状态：能量=${clean(safe.energy)}；注意力=${clean(safe.attention)}；关系=${clean(safe.relationship)}`,
       `表现建议：情绪=${clean(safe.emotion)}；动作=${clean(safe.action)}；强度=${clean(safe.intensity)}；语音=${clean(safe.voice_style)}`,
