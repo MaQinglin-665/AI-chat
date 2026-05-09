@@ -68,6 +68,11 @@
       : (input) => (typeof root.TaffyPerformanceTimelineController?.buildVoiceTimeline === "function"
           ? root.TaffyPerformanceTimelineController.buildVoiceTimeline(input)
           : null);
+    const buildVoiceSpeechSegments = typeof deps.buildVoiceSpeechSegments === "function"
+      ? deps.buildVoiceSpeechSegments
+      : (text, voiceTimeline) => (typeof root.TaffyPerformanceTimelineController?.buildVoiceSpeechSegments === "function"
+          ? root.TaffyPerformanceTimelineController.buildVoiceSpeechSegments(text, voiceTimeline)
+          : [String(text || "").trim()].filter(Boolean));
     const rememberVoiceTimeline = typeof deps.rememberVoiceTimeline === "function"
       ? deps.rememberVoiceTimeline
       : () => null;
@@ -136,6 +141,108 @@
         return normalizeTalkStyle(fallback);
       }
       return normalizeTalkStyle(runtimeVoiceStyleToTalkStyle(runtimeVoiceStyle, fallback, normalizeTalkStyle));
+    }
+
+    function waitVoiceDirectorPause(ms, sessionId) {
+      const delayMs = Math.max(0, Math.min(1600, Number(ms) || 0));
+      if (delayMs <= 0) {
+        return Promise.resolve(true);
+      }
+      return new Promise((resolve) => {
+        const timer = window.setTimeout(() => {
+          resolve(true);
+        }, delayMs);
+        state.performanceTimelineTimers = Array.isArray(state.performanceTimelineTimers) ? state.performanceTimelineTimers : [];
+        state.performanceTimelineTimers.push(timer);
+      }).then(() => {
+        if (sessionId && Number(state.streamSpeakSession || 0) !== Number(sessionId || 0)) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    async function speakWithVoiceTimeline(speechText, context = {}) {
+      const text = String(speechText || "").trim();
+      if (!text) {
+        return false;
+      }
+      const voiceTimeline = context.voiceTimeline && typeof context.voiceTimeline === "object" && !Array.isArray(context.voiceTimeline)
+        ? context.voiceTimeline
+        : null;
+      const voiceDirector = state.characterBrainLastDecision?.voice_director;
+      const segments = buildVoiceSpeechSegments(text, voiceTimeline).filter(Boolean);
+      const safeSegments = segments.length ? segments : [text];
+      const useSegmented = voiceTimeline?.enabled === true && safeSegments.length > 1;
+      const mode = useSegmented ? `${context.mode || "direct"}_segmented` : (context.mode || "direct");
+      recordPerformanceAuditEvent("tts_start", { mode });
+      if (!useSegmented) {
+        recordPerformanceAuditEvent("voice_segment_plan", { mode, segments: safeSegments.length });
+        const prosody = applyVoiceDirectorProsody(
+          buildSpeakProsody(text, context.mood, false, context.prosodyStyle),
+          voiceDirector
+        );
+        const ok = await speak(text, {
+          prosody,
+          interrupt: context.interrupt === true,
+          mood: context.mood,
+          style: context.talkStyle,
+          voiceStyle: context.prosodyStyle,
+          perfTraceId: context.traceId,
+          playbackGeneration: context.playbackGeneration
+        });
+        if (ok !== false) {
+          recordPerformanceAuditEvent("tts_segment", { mode, segments: safeSegments.length });
+        }
+        recordPerformanceAuditEvent("tts_end", { mode, ok: ok !== false });
+        return ok !== false;
+      }
+
+      recordPerformanceAuditEvent("voice_segment_plan", { mode, segments: safeSegments.length });
+      if (!(await waitVoiceDirectorPause(voiceTimeline.pre_pause_ms, context.sessionId))) {
+        recordPerformanceAuditEvent("tts_end", { mode, ok: false });
+        return false;
+      }
+      let allOk = true;
+      let spokenCount = 0;
+      for (let i = 0; i < safeSegments.length; i += 1) {
+        const segment = String(safeSegments[i] || "").trim();
+        if (!segment) {
+          continue;
+        }
+        const prosody = applyVoiceDirectorProsody(
+          buildSpeakProsody(segment, context.mood, false, context.prosodyStyle),
+          voiceDirector
+        );
+        recordPerformanceAuditEvent("tts_segment", {
+          mode,
+          index: i + 1,
+          segments: safeSegments.length
+        });
+        const ok = await speak(segment, {
+          prosody,
+          interrupt: context.interrupt === true && i === 0,
+          mood: context.mood,
+          style: context.talkStyle,
+          voiceStyle: context.prosodyStyle,
+          perfTraceId: context.traceId,
+          playbackGeneration: context.playbackGeneration
+        });
+        if (ok === false) {
+          allOk = false;
+        } else {
+          spokenCount += 1;
+        }
+        if (i < safeSegments.length - 1) {
+          const keepGoing = await waitVoiceDirectorPause(voiceTimeline.inter_segment_pause_ms, context.sessionId);
+          if (!keepGoing) {
+            allOk = false;
+            break;
+          }
+        }
+      }
+      recordPerformanceAuditEvent("tts_end", { mode, ok: allOk && spokenCount > 0 });
+      return allOk && spokenCount > 0;
     }
 
     function shouldSuppressGenericReplyMotion(metadata) {
@@ -414,7 +521,8 @@
             traceId: chatPerfTraceId,
             sessionId: streamSpeakSession,
             brainSnapshot: state.characterBrainLastDecision,
-            timelineSummary: performanceTimelineSummary
+            timelineSummary: performanceTimelineSummary,
+            voiceSummary: voiceTimelineSummary
           });
           if (voiceTimelineSummary) {
             recordPerformanceAuditEvent("voice_plan", {
@@ -486,10 +594,6 @@
             });
           } else if (!hadStreamSegments || !state.streamSpeakWorking) {
             const speechText = buildStableSpeakText(visibleReply) || visibleReply;
-            const prosody = applyVoiceDirectorProsody(
-              buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle),
-              state.characterBrainLastDecision?.voice_director
-            );
             if (!performanceTimeline) {
               maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
             }
@@ -501,16 +605,17 @@
               result: hadStreamSegments ? "no_stream_playback_yet" : "no_stream_segments",
               blobBytes: discardedSegments
             });
-            const streamDirectOk = await speak(speechText || visibleReply, {
-              prosody,
+            await speakWithVoiceTimeline(speechText || visibleReply, {
+              voiceTimeline,
+              mode: "stream_direct_fallback",
               interrupt: true,
               mood,
-              style: finalTalkStyle,
-              voiceStyle: finalProsodyStyle,
-              perfTraceId: chatPerfTraceId,
+              talkStyle: finalTalkStyle,
+              prosodyStyle: finalProsodyStyle,
+              traceId: chatPerfTraceId,
+              sessionId: streamSpeakSession,
               playbackGeneration: Number(state.ttsPlaybackGeneration || 0)
             });
-            recordPerformanceAuditEvent("tts_end", { mode: "stream_direct_fallback", ok: streamDirectOk !== false });
           } else {
             recordPerformanceAuditEvent("tts_handoff", { mode: "stream_working", ok: true });
             scheduleFinalSpeechWatchdog({
@@ -524,24 +629,20 @@
           runTimelinePostSettle(Math.min(9000, Math.max(900, visibleReply.length * 48 + 420)));
         } else {
           const speechText = buildStableSpeakText(visibleReply) || visibleReply;
-          const prosody = applyVoiceDirectorProsody(
-            buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle),
-            state.characterBrainLastDecision?.voice_director
-          );
           runTimelineSpeechStart();
           if (!performanceTimeline) {
             maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
           }
-          recordPerformanceAuditEvent("tts_start", { mode: "direct" });
-          const directOk = await speak(speechText || visibleReply, {
-            prosody,
+          await speakWithVoiceTimeline(speechText || visibleReply, {
+            voiceTimeline,
+            mode: "direct",
             interrupt: false,
             mood,
-            style: finalTalkStyle,
-            voiceStyle: finalProsodyStyle,
-            perfTraceId: chatPerfTraceId
+            talkStyle: finalTalkStyle,
+            prosodyStyle: finalProsodyStyle,
+            traceId: chatPerfTraceId,
+            sessionId: streamSpeakSession
           });
-          recordPerformanceAuditEvent("tts_end", { mode: "direct", ok: directOk !== false });
           runTimelinePostSettle();
         }
         finishPerformanceAudit({ status: "reply_done", lastEvent: "reply_done" });

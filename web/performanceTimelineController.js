@@ -468,6 +468,25 @@
     };
   }
 
+  function buildVoiceSpeechSegments(text, voiceTimeline = null) {
+    const source = String(text || "").replace(/\s+/g, " ").trim();
+    if (!source) {
+      return [];
+    }
+    const safe = voiceTimeline && typeof voiceTimeline === "object" && !Array.isArray(voiceTimeline)
+      ? voiceTimeline
+      : null;
+    if (!safe || safe.enabled === false) {
+      return [source];
+    }
+    const director = safe.voice_director && typeof safe.voice_director === "object" && !Array.isArray(safe.voice_director)
+      ? normalizeVoiceDirector(safe.voice_director)
+      : normalizeVoiceDirector(safe);
+    const style = clean(safe.segment_style || director.segment_style, "whole");
+    const maxSegments = clampInt(safe.max_segments || director.max_segments, 1, 1, 4);
+    return splitVoiceSegments(source, style, maxSegments);
+  }
+
   function toPublicVoiceTimelineSummary(timeline = null) {
     const safe = timeline && typeof timeline === "object" && !Array.isArray(timeline) ? timeline : null;
     if (!safe) {
@@ -696,6 +715,7 @@
       buildPerformanceTimeline,
       toPublicTimelineSummary,
       buildVoiceTimeline,
+      buildVoiceSpeechSegments,
       toPublicVoiceTimelineSummary,
       applyVoiceDirectorProsody,
       rememberPerformanceTimeline,
@@ -710,6 +730,7 @@
     buildPerformanceTimeline,
     toPublicTimelineSummary,
     buildVoiceTimeline,
+    buildVoiceSpeechSegments,
     toPublicVoiceTimelineSummary,
     applyVoiceDirectorProsody,
     countSpeechBeats,

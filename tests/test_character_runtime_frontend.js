@@ -394,6 +394,7 @@ function createMemoryStorage(initial = {}) {
         timeline: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", suppressed: ["motion_disallowed"] },
         actual: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", action_dispatches: 0, pulse_dispatches: 2 },
         tts: { started: true, finished: true, mode: "direct" },
+        voice: { delivery: "soft_low", pace: "slow", planned_segments: 2, spoken_segments: 2, mode: "direct_segmented" },
         settled: true,
         private_prompt: "SECRET"
       },
@@ -504,6 +505,7 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.voice_timeline.private_prompt, undefined, "character brain snapshot should not persist private voice timeline fields");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.actual.post, "soft_idle", "character brain snapshot should restore public audit summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.tts.finished, true, "character brain snapshot should restore public TTS audit state");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_audit.voice.spoken_segments, 2, "character brain snapshot should restore public voice audit state");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.private_prompt, undefined, "character brain snapshot should not persist private audit fields");
   assert.strictEqual(restored.characterBrainLastDecision.improv.stance, "soft_hold", "character brain snapshot should restore public improv stance");
   assert.strictEqual(restored.characterBrainLastDecision.improv.private_prompt, undefined, "character brain snapshot should not persist private improv fields");
@@ -581,6 +583,7 @@ function createMemoryStorage(initial = {}) {
         timeline: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle" },
         actual: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", action_dispatches: 0, pulse_dispatches: 2 },
         tts: { started: true, finished: true, mode: "direct" },
+        voice: { delivery: "soft_low", pace: "slow", planned_segments: 2, spoken_segments: 2, mode: "direct_segmented" },
         settled: true,
         private_prompt: "SECRET"
       },
@@ -700,7 +703,9 @@ function createMemoryStorage(initial = {}) {
     brainReport.includes("Actual")
       && brainReport.includes("status=settled")
       && brainReport.includes("dispatches=action:0/pulse:2")
-      && brainReport.includes("settle=yes"),
+      && brainReport.includes("settle=yes")
+      && brainReport.includes("voice=soft_low/slow")
+      && brainReport.includes("segments=2/2"),
     "character brain debug report should include compact actual performance audit"
   );
   assert.ok(
@@ -739,13 +744,17 @@ function createMemoryStorage(initial = {}) {
     traceId: "trace_demo",
     sessionId: 7,
     brainSnapshot: { intent: "casual" },
-    timelineSummary: { pre: "micro_reaction", speech: "expressive_speech_start", beats: 1, post: "settle_idle" }
+    timelineSummary: { pre: "micro_reaction", speech: "expressive_speech_start", beats: 1, post: "settle_idle" },
+    voiceSummary: { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented" }
   });
+  audit.recordPerformanceAuditEvent("voice_plan", { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented" });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "preReaction", name: "micro_reaction", action: "listen", pulse: true });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechStart", name: "expressive_speech_start", action: "talk", pulse: true });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechBeat", name: "speech_beat", action: "talk", pulse: true });
-  audit.recordPerformanceAuditEvent("tts_start", { mode: "direct" });
-  audit.recordPerformanceAuditEvent("tts_end", { mode: "direct", ok: true });
+  audit.recordPerformanceAuditEvent("tts_start", { mode: "direct_segmented" });
+  audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", segments: 2 });
+  audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", segments: 2 });
+  audit.recordPerformanceAuditEvent("tts_end", { mode: "direct_segmented", ok: true });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "postSettle", name: "settle_idle", action: "idle", pulse: true });
   const auditSummary = auditState.characterBrainLastDecision.performance_audit;
   assert.strictEqual(auditSummary.actual.pre, "micro_reaction", "audit should record actual pre-reaction dispatch");
@@ -753,6 +762,8 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(auditSummary.actual.beats, 1, "audit should count actual speech beats");
   assert.strictEqual(auditSummary.actual.post, "settle_idle", "audit should record actual post-settle dispatch");
   assert.strictEqual(auditSummary.tts.finished, true, "audit should record direct TTS completion");
+  assert.strictEqual(auditSummary.voice.planned_segments, 2, "audit should record planned voice segments");
+  assert.strictEqual(auditSummary.voice.spoken_segments, 2, "audit should record actual spoken voice segments");
   assert.strictEqual(auditSummary.settled, true, "audit should mark settle after post phase");
   assert.strictEqual(auditSummary.raw_history, undefined, "audit summary should not expose raw history");
 }
@@ -760,6 +771,7 @@ function createMemoryStorage(initial = {}) {
 {
   assert.strictEqual(typeof performanceTimelineController.buildPerformanceTimeline, "function", "performance timeline controller should build timeline plans");
   assert.strictEqual(typeof performanceTimelineController.buildVoiceTimeline, "function", "performance timeline controller should build voice timeline plans");
+  assert.strictEqual(typeof performanceTimelineController.buildVoiceSpeechSegments, "function", "performance timeline controller should build voice speech segments");
   assert.strictEqual(typeof performanceTimelineController.applyVoiceDirectorProsody, "function", "performance timeline controller should apply voice director prosody");
   assert.strictEqual(typeof performanceTimelineController.createController, "function", "performance timeline controller should expose a runtime adapter");
   const comfortTimeline = performanceTimelineController.buildPerformanceTimeline({
@@ -892,6 +904,11 @@ function createMemoryStorage(initial = {}) {
     ttsEnabled: true
   });
   assert.ok(miniRantVoiceTimeline.segments.length <= 3, "mini-rant voice timeline should cap speech beats");
+  const plannedSpeechSegments = performanceTimelineController.buildVoiceSpeechSegments(
+    "One. Two. Three.",
+    miniRantVoiceTimeline
+  );
+  assert.deepStrictEqual(plannedSpeechSegments, ["One.", "Two.", "Three."], "voice speech segmentation should preserve ordered spoken segments without storing them in public summary");
   const voiceSummary = performanceTimelineController.toPublicVoiceTimelineSummary(comfortVoiceTimeline);
   assert.deepStrictEqual(
     Object.keys(voiceSummary).sort(),
@@ -2331,6 +2348,8 @@ assert.ok(
     && chatStateSource.includes("performanceTimelineTimers: []")
     && chatReplyControllerSource.includes("const performanceTimeline = buildPerformanceTimeline({")
     && chatReplyControllerSource.includes("const voiceTimeline = buildVoiceTimeline({")
+    && chatReplyControllerSource.includes("speakWithVoiceTimeline(")
+    && chatReplyControllerSource.includes("buildVoiceSpeechSegments(")
     && chatReplyControllerSource.includes("applyVoiceDirectorProsody(")
     && chatReplyControllerSource.includes("startPerformanceAudit({")
     && chatReplyControllerSource.includes('recordPerformanceAuditEvent("tts_start"')
@@ -2341,7 +2360,9 @@ assert.ok(
     && performanceAuditControllerSource.includes("function sanitizePerformanceAuditSummary")
     && performanceTimelineControllerSource.includes("function buildPerformanceTimeline")
     && performanceTimelineControllerSource.includes("function buildVoiceTimeline")
+    && performanceTimelineControllerSource.includes("function buildVoiceSpeechSegments")
     && performanceTimelineControllerSource.includes("function applyVoiceDirectorProsody")
+    && performanceAuditControllerSource.includes("function normalizeVoiceSummary")
     && performanceTimelineControllerSource.includes("recordPerformanceAuditEvent")
     && performanceTimelineControllerSource.includes("function toPublicTimelineSummary")
     && indexSource.includes('<script src="./performanceAuditController.js"></script>')

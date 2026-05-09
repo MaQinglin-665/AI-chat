@@ -32,6 +32,17 @@
     };
   }
 
+  function normalizeVoiceSummary(value = {}) {
+    const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return {
+      delivery: clean(raw.delivery, "none", 48),
+      pace: clean(raw.pace, "none", 32),
+      planned_segments: cleanInt(raw.planned_segments ?? raw.segments, 0, 0, 4),
+      spoken_segments: cleanInt(raw.spoken_segments, 0, 0, 8),
+      mode: clean(raw.mode, "none", 32)
+    };
+  }
+
   function sanitizePerformanceAuditSummary(raw = null) {
     const audit = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
     const timeline = normalizeTimelineSummary(audit.timeline || audit);
@@ -55,6 +66,7 @@
         finished: audit.tts?.finished === true || audit.tts_finished === true,
         mode: clean(audit.tts?.mode || audit.tts_mode, "none", 32)
       },
+      voice: normalizeVoiceSummary(audit.voice),
       settled: audit.settled === true,
       suppressed: Array.isArray(audit.suppressed)
         ? audit.suppressed.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 8)
@@ -114,6 +126,7 @@
           finished: false,
           mode: "none"
         },
+        voice: normalizeVoiceSummary(context.voiceSummary),
         settled: false,
         suppressed: timeline.suppressed.slice(0, 8),
         last_event: "started",
@@ -132,6 +145,7 @@
       const name = clean(detail.name, "none", 48);
       const action = clean(detail.action, "none", 48);
       const mode = clean(detail.mode, "", 32);
+      const segments = cleanInt(detail.segments, 0, 0, 8);
       const event = {
         kind: eventKind,
         phase,
@@ -140,6 +154,7 @@
         ok: detail.ok !== false,
         suppressed: detail.suppressed === true,
         mode,
+        segments,
         at: nowMs()
       };
       state.performanceAuditEvents = Array.isArray(state.performanceAuditEvents) ? state.performanceAuditEvents : [];
@@ -150,6 +165,7 @@
         ...summary,
         actual: { ...summary.actual },
         tts: { ...summary.tts },
+        voice: { ...summary.voice },
         suppressed: Array.isArray(summary.suppressed) ? summary.suppressed.slice(0, 8) : [],
         last_event: eventKind,
         updated_at: event.at
@@ -187,6 +203,15 @@
         next.tts.started = true;
         next.tts.mode = mode || "stream";
         next.status = "stream_handoff";
+      } else if (eventKind === "voice_plan" || eventKind === "voice_segment_plan") {
+        next.voice.delivery = clean(detail.delivery || next.voice.delivery, next.voice.delivery || "none", 48);
+        next.voice.pace = clean(detail.pace || next.voice.pace, next.voice.pace || "none", 32);
+        next.voice.planned_segments = segments || cleanInt(next.voice.planned_segments, 0, 0, 4);
+        next.voice.mode = mode || next.voice.mode || "none";
+      } else if (eventKind === "tts_segment") {
+        next.voice.spoken_segments = cleanInt(next.voice.spoken_segments, 0, 0, 8) + 1;
+        next.voice.planned_segments = segments || cleanInt(next.voice.planned_segments, 0, 0, 4);
+        next.voice.mode = mode || next.voice.mode || "direct_segmented";
       } else if (eventKind === "failure") {
         next.status = "failed";
       }

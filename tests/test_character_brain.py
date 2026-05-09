@@ -242,10 +242,28 @@ def test_character_brain_context_bleed_guard_blocks_prior_task_agenda():
         encouragement,
         user_message="I finished it.",
     )
+    encouragement_closeout = character_brain.apply_character_brain_reply_constraints(
+        "Nice鈥攖iny victory secured. Take 3 slow breaths, save one last time if you didn't, close anything you don't need, then go crash.",
+        encouragement,
+        user_message="I finished it.",
+    )
+    encouragement_next_step = character_brain.apply_character_brain_reply_constraints(
+        "Nice鈥攖iny victory lap achieved. Do a 10-minute brain-cooldown now: stand up, water sip, then come back and start the next step on purpose.",
+        encouragement,
+        user_message="I finished it.",
+    )
+    encouragement_save_it = character_brain.apply_character_brain_reply_constraints(
+        "Tiny victory lap on my monitor. Save it, do a quick last scan, then we're done-done.",
+        encouragement,
+        user_message="I finished it.",
+    )
 
     assert encouragement["context_bleed_guard"]["active"] is True
     assert constrained == "Look at you, actually finishing the thing. Suspiciously competent."
     assert encouragement_save_check == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert encouragement_closeout == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert encouragement_next_step == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert encouragement_save_it == "Look at you, actually finishing the thing. Suspiciously competent."
     assert encouragement["performance_execution"]["removed_context_bleed"] is True
     assert "close the tabs" not in constrained.lower()
 
@@ -271,11 +289,32 @@ def test_character_brain_context_bleed_guard_blocks_prior_task_agenda():
         closing,
         user_message="I'm going to sleep.",
     )
+    closing_save_close = character_brain.apply_character_brain_reply_constraints(
+        "Alright, save/close anything you changed, then lights out.",
+        closing,
+        user_message="I'm going to sleep.",
+    )
     vague_task = character_brain.build_character_brain_decision(user_message="What next?")
     vague_task_reply = character_brain.apply_character_brain_reply_constraints(
         "Start a 10-minute timer now, save your work, close the extra windows, and clear your desktop.",
         vague_task,
         user_message="What next?",
+    )
+    vague_task_reset = character_brain.apply_character_brain_reply_constraints(
+        "Next do a 10-minute reset: grab water, close whatever you can, and write a one-sentence next task note. No guilt tax.",
+        vague_task,
+        user_message="What next?",
+    )
+    question = character_brain.build_character_brain_decision(user_message="What are you doing?")
+    question_reply = character_brain.apply_character_brain_reply_constraints(
+        "Idling on your desktop. Tiny question though: are you about to save and shut things down, or are we letting the tabs live forever?",
+        question,
+        user_message="What are you doing?",
+    )
+    question_next_action = character_brain.apply_character_brain_reply_constraints(
+        "Idling on your desktop. I'm basically monitoring for next action vibes while you do your thing.",
+        question,
+        user_message="What are you doing?",
     )
 
     assert comfort_reply == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
@@ -283,9 +322,14 @@ def test_character_brain_context_bleed_guard_blocks_prior_task_agenda():
     assert comfort_save_sweep == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
     assert comfort["performance_execution"]["removed_context_bleed"] is True
     assert closing_reply == "Go sleep. I'll keep the pixels under questionable supervision."
+    assert closing_save_close == "Go sleep. I'll keep the pixels under questionable supervision."
     assert closing["performance_execution"]["removed_context_bleed"] is True
     assert vague_task_reply == "One tiny step. Ten minutes. No grand destiny ceremony."
     assert vague_task["performance_execution"]["removed_context_bleed"] is True
+    assert vague_task_reset == "One tiny step. Ten minutes. No grand destiny ceremony."
+    assert question_reply == "I was supervising the pixels. They remain suspiciously rectangular."
+    assert question_next_action == "I was supervising the pixels. They remain suspiciously rectangular."
+    assert question["performance_execution"]["removed_context_bleed"] is True
 
 
 def test_character_brain_comfort_priority_beats_next_step_question():

@@ -347,6 +347,9 @@
     const auditTtsRaw = auditRaw.tts && typeof auditRaw.tts === "object" && !Array.isArray(auditRaw.tts)
       ? auditRaw.tts
       : {};
+    const auditVoiceRaw = auditRaw.voice && typeof auditRaw.voice === "object" && !Array.isArray(auditRaw.voice)
+      ? auditRaw.voice
+      : {};
     return {
       version: 1,
       intent: cleanText(raw.intent, 40),
@@ -425,6 +428,13 @@
           started: auditTtsRaw.started === true,
           finished: auditTtsRaw.finished === true,
           mode: cleanText(auditTtsRaw.mode, 32)
+        },
+        voice: {
+          delivery: cleanText(auditVoiceRaw.delivery, 48),
+          pace: cleanText(auditVoiceRaw.pace, 32),
+          planned_segments: cleanInt(auditVoiceRaw.planned_segments, 0, 0, 4),
+          spoken_segments: cleanInt(auditVoiceRaw.spoken_segments, 0, 0, 8),
+          mode: cleanText(auditVoiceRaw.mode, 32)
         },
         settled: auditRaw.settled === true,
         suppressed: Array.isArray(auditRaw.suppressed)

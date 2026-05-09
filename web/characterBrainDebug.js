@@ -194,12 +194,16 @@
     const auditTts = audit?.tts && typeof audit.tts === "object" && !Array.isArray(audit.tts)
       ? audit.tts
       : {};
+    const auditVoice = audit?.voice && typeof audit.voice === "object" && !Array.isArray(audit.voice)
+      ? audit.voice
+      : {};
     const auditLines = audit
       ? [
           "",
           "Actual",
           `status=${clean(audit.status, "unknown")}; pre=${clean(auditActual.pre, "pending")}; speech=${clean(auditActual.speech, "pending")}; beats=${Number(auditActual.beats) || 0}; post=${clean(auditActual.post, "pending")}`,
-          `dispatches=action:${Number(auditActual.action_dispatches) || 0}/pulse:${Number(auditActual.pulse_dispatches) || 0}; tts=${auditTts.started === true ? "started" : "not_started"}/${auditTts.finished === true ? "finished" : "pending"}; settle=${audit.settled === true ? "yes" : "pending"}`
+          `dispatches=action:${Number(auditActual.action_dispatches) || 0}/pulse:${Number(auditActual.pulse_dispatches) || 0}; tts=${auditTts.started === true ? "started" : "not_started"}/${auditTts.finished === true ? "finished" : "pending"}; settle=${audit.settled === true ? "yes" : "pending"}`,
+          `voice=${clean(auditVoice.delivery, "none")}/${clean(auditVoice.pace, "none")}; segments=${Number(auditVoice.spoken_segments) || 0}/${Number(auditVoice.planned_segments) || 0}; mode=${clean(auditVoice.mode, "none")}`
         ]
       : [];
     return [

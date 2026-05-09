@@ -1506,6 +1506,13 @@ function rememberVoiceTimeline(timeline) {
     : null;
 }
 
+function buildVoiceSpeechSegments(text, voiceTimeline) {
+  const controller = getPerformanceTimelineController();
+  return typeof controller.buildVoiceSpeechSegments === "function"
+    ? controller.buildVoiceSpeechSegments(text, voiceTimeline)
+    : [String(text || "").trim()].filter(Boolean);
+}
+
 function applyVoiceDirectorProsody(prosody, voiceDirector) {
   const controller = getPerformanceTimelineController();
   return typeof controller.applyVoiceDirectorProsody === "function"
@@ -4085,6 +4092,7 @@ function getChatReplyController() {
       buildPerformanceTimeline,
       rememberPerformanceTimeline,
       buildVoiceTimeline,
+      buildVoiceSpeechSegments,
       rememberVoiceTimeline,
       applyVoiceDirectorProsody,
       clearPerformanceTimelineTimers,
