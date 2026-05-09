@@ -423,9 +423,21 @@ def test_character_brain_reply_director_repairs_scene_policy_violations():
         character_brain.build_character_brain_decision(user_message="What are you doing?"),
         user_message="What are you doing?",
     )
+    question_next_step_bleed = character_brain.apply_character_brain_reply_constraints(
+        "Idling on your desktop, watching the keyboard judge what we should do next. So-pick the next tiny step and I'll match your pace.",
+        character_brain.build_character_brain_decision(user_message="What are you doing?"),
+        user_message="What are you doing?",
+    )
+    question_stage_drift = character_brain.apply_character_brain_reply_constraints(
+        "Idling on your desktop, watching the keyboard like it's judging what we should do next.",
+        character_brain.build_character_brain_decision(user_message="What are you doing?"),
+        user_message="What are you doing?",
+    )
     assert chinese == "I was supervising the pixels. They remain suspiciously rectangular."
     assert question_reprompt == "I was supervising the pixels. They remain suspiciously rectangular."
     assert question_bleed == "I was supervising the pixels. They remain suspiciously rectangular."
+    assert question_next_step_bleed == "I was supervising the pixels. They remain suspiciously rectangular."
+    assert question_stage_drift == "I was supervising the pixels. They remain suspiciously rectangular."
 
     casual = character_brain.build_character_brain_decision(user_message="This desk feels weird.")
     casual_task_bleed = character_brain.apply_character_brain_reply_constraints(
@@ -438,8 +450,64 @@ def test_character_brain_reply_director_repairs_scene_policy_violations():
         casual,
         user_message="This desk feels weird.",
     )
+    casual_pointer_drift = character_brain.apply_character_brain_reply_constraints(
+        "Nah, your desk isn\u2019t haunted\u2014your cursor is doing suspicious side-eye like it\u2019s about to confess. If it feels \u201cweird,\u201d that\u2019s usually the pointer lag or a jittery input, not the furniture plotting against you.",
+        casual,
+        user_message="This desk feels weird.",
+    )
+    casual_move_it = character_brain.apply_character_brain_reply_constraints(
+        "Your desk isn\u2019t weird\u2014it\u2019s your cursor doing suspicious side-eye like it\u2019s about to confess. Move it to the other side of the screen for a sec and see if the vibe goes normal.",
+        casual,
+        user_message="This desk feels weird.",
+    )
+    casual_try_moving = character_brain.apply_character_brain_reply_constraints(
+        "Nah, your desk isn't haunted-it's your cursor doing suspicious little side-eye. Give it 10 minutes and try moving it away from the weird spot.",
+        casual,
+        user_message="This desk feels weird.",
+    )
+    casual_diagnostic_bit = character_brain.apply_character_brain_reply_constraints(
+        "Nah, your desk isn't haunted-your cursor is doing that suspicious look again. Probably just a weird tracking/position hiccup, not the furniture plotting.",
+        casual,
+        user_message="This desk feels weird.",
+    )
     assert casual_task_bleed == "The desk is acting normal, which is exactly how it gets you."
     assert casual_quick_test == "The desk is acting normal, which is exactly how it gets you."
+    assert casual_pointer_drift == "The desk is acting normal, which is exactly how it gets you."
+    assert casual_move_it == "The desk is acting normal, which is exactly how it gets you."
+    assert casual_try_moving == "The desk is acting normal, which is exactly how it gets you."
+    assert casual_diagnostic_bit == "The desk is acting normal, which is exactly how it gets you."
+
+    vague_next = character_brain.apply_character_brain_reply_constraints(
+        "I hear you. I'll keep this short and focused.",
+        character_brain.build_character_brain_decision(user_message="What next?"),
+        user_message="What next?",
+    )
+    next_step_context_drift = character_brain.apply_character_brain_reply_constraints(
+        "Save/confirm what you just finished first. Then do a quick desktop/file tidy or a short restart + check mouse/cursor is calm reset.",
+        character_brain.build_character_brain_decision(user_message="What next?"),
+        user_message="What next?",
+    )
+    next_step_save_drift = character_brain.apply_character_brain_reply_constraints(
+        "Quick check: hit Save and confirm everything from what you finished is actually on-screen-clipboard supervisor demands receipts. Then take one tiny next move for 10 minutes and stop on purpose when the timer's done.",
+        character_brain.build_character_brain_decision(user_message="What next?"),
+        user_message="What next?",
+    )
+    assert vague_next == "One tiny step. Ten minutes. No grand destiny ceremony."
+    assert next_step_context_drift == "One tiny step. Ten minutes. No grand destiny ceremony."
+    assert next_step_save_drift == "One tiny step. Ten minutes. No grand destiny ceremony."
+
+    finished_next_step = character_brain.apply_character_brain_reply_constraints(
+        "Tiny victory-nice. Quick check: make sure you saved everything and you're looking at the updated version, then tell me what you wanna do next.",
+        character_brain.build_character_brain_decision(user_message="I finished it."),
+        user_message="I finished it.",
+    )
+    closing_save_prompt = character_brain.apply_character_brain_reply_constraints(
+        "Before you fully zone out, save/confirm whatever you're leaving on-screen, then goodnight.",
+        character_brain.build_character_brain_decision(user_message="I'm going to sleep."),
+        user_message="I'm going to sleep.",
+    )
+    assert finished_next_step == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert closing_save_prompt == "Go sleep. I'll keep the pixels under questionable supervision."
 
 
 def test_character_brain_comfort_priority_beats_next_step_question():

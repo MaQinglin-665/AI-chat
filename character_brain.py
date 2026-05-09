@@ -259,6 +259,34 @@ def _normalize_intensity(value: Any, fallback: str = "normal") -> str:
     return key if key in SUPPORTED_INTENSITY else fallback
 
 
+def _normalize_smart_punctuation(text: Any) -> str:
+    return (
+        str(text or "")
+        .replace("\u2018", "'")
+        .replace("\u2019", "'")
+        .replace("\u201a", "'")
+        .replace("\u201b", "'")
+        .replace("\u201c", '"')
+        .replace("\u201d", '"')
+        .replace("\u201e", '"')
+        .replace("\u201f", '"')
+        .replace("\u2010", "-")
+        .replace("\u2011", "-")
+        .replace("\u2012", "-")
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+    )
+
+
+def _is_next_step_request(user_message: str) -> bool:
+    text = _clean_text(user_message, 300).lower()
+    compact = re.sub(r"\s+", "", text)
+    return bool(
+        re.search(r"(whatnext|nextstep|whatshouldidonext|whatdoidonext|nexttodo)", compact)
+        or re.search(r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u5148\u505a\u4ec0\u4e48|\u8be5\u505a\u4ec0\u4e48)", text)
+    )
+
+
 def _history_tail_text(history: Iterable[Any], max_items: int = 4) -> str:
     if not isinstance(history, list):
         return ""
@@ -282,7 +310,7 @@ def _derive_topic(user_message: str, intent: str) -> str:
         return "character_runtime"
     if re.search(r"(code|bug|fix|implement|error|traceback|test|pytest)", compact):
         return "coding"
-    if re.search(r"(nextstep|todo|plan|roadmap|priority|whatshouldidonext)", compact):
+    if _is_next_step_request(user_message) or re.search(r"(todo|plan|roadmap|priority)", compact):
         return "planning"
     if re.search(r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u5148\u505a\u4ec0\u4e48|\u8be5\u505a\u4ec0\u4e48|\u8ba1\u5212|\u4f18\u5148)", text):
         return "planning"
@@ -1695,7 +1723,7 @@ def _split_tool_meta_suffix(text: str) -> tuple[str, str]:
 
 
 def _normalize_reply_text_spacing(text: str) -> str:
-    out = str(text or "").strip()
+    out = _normalize_smart_punctuation(text).strip()
     if not out:
         return ""
     latin = bool(re.search(r"[A-Za-z]", out))
@@ -1796,10 +1824,7 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
         if re.search(r"(code|bug|stuck|error|\u4ee3\u7801|\u5361\u4f4f|\u62a5\u9519)", compact):
             return "The bug is acting important. Embarrassing for it, because you're still here."
         return "Look at you, actually finishing the thing. Suspiciously competent."
-    if intent == "task_help" and (
-        topic == "planning"
-        or re.search(r"(whatnext|nextstep|whatshouldidonext|whatdoidonext|nexttodo)", compact)
-    ):
+    if intent == "task_help" and (topic == "planning" or _is_next_step_request(user_message)):
         return "One tiny step. Ten minutes. No grand destiny ceremony."
     if intent == "task_help" and topic == "character_runtime":
         return "Testing voice endurance now: if I reach the end of this sentence without vanishing, the tiny sound machine gets one reluctant point."
@@ -1821,14 +1846,7 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
 
 
 def _looks_like_bland_character_reply(text: str, intent: str) -> bool:
-    lower = re.sub(r"\s+", " ", str(text or "").strip().lower())
-    lower = (
-        lower.replace("\u2010", "-")
-        .replace("\u2011", "-")
-        .replace("\u2012", "-")
-        .replace("\u2013", "-")
-        .replace("\u2014", "-")
-    )
+    lower = re.sub(r"\s+", " ", _normalize_smart_punctuation(text).strip().lower())
     if not lower:
         return False
     generic_patterns = (
@@ -1927,7 +1945,7 @@ def _contains_cjk_text(text: str) -> bool:
 
 
 def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str = "") -> bool:
-    lower = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    lower = re.sub(r"\s+", " ", _normalize_smart_punctuation(text).strip().lower())
     if not lower:
         return False
     compact_user = re.sub(r"\s+", "", _clean_text(user_message, 300).lower())
@@ -1935,7 +1953,7 @@ def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str
     user_asked_advice = bool(re.search(r"(whatshouldido|whatdoido|whatnext|nextstep|helpme|advice)", compact_user))
     task_bleed = bool(
         re.search(
-            r"\b(save/confirm|save anything|save|confirm|take 10 minutes|10[- ]?minute|restart|ctrl\+shift|task manager|quick test|unplug|replug|trackpad|mouse settings|jitter|vanishes|do this|test with|settings|steps?:|fix:|next chunk|mini[- ]?reset|tidy your space)\b",
+            r"\b(save/confirm|save anything|save|confirm|take 10 minutes|10[- ]?minutes?|restart|ctrl\+shift|task manager|quick test|unplug|replug|trackpad|mouse settings|jitter|vanishes|do this|test with|settings|steps?:|fix:|next chunk|mini[- ]?reset|tidy your space)\b",
             lower,
         )
     )
@@ -1949,17 +1967,24 @@ def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str
         return True
     if intent in {"casual", "question"} and not user_asked_advice and task_bleed:
         return True
+    if intent == "casual" and re.search(r"(desk|desktop|cursor|weird|strange|\u684c\u9762|\u5149\u6807|\u602a)", compact_user):
+        return bool(
+            re.search(
+                r"\b(pointer lag|jitter\w*|tracking|position hiccup|hiccup|input|mouse|trackpad|accessibility|settings|restart|explorer|quick test|move it|moving it|try moving|blank spot|click once|click|10[- ]?minutes?|other side|vibe goes normal|setup|diagnos\w*)\b",
+                lower,
+            )
+        )
     if intent == "encouragement" and re.search(r"(done|finished|completed|shipped|fixed|madeit|wrappedup)", compact_user):
         return bool(
             re.search(
-                r"\b(save|confirm|close|next step|what next|todo|to-do|checklist|start by|now you should|let'?s|we should|plan for tomorrow|10[- ]?minute|one clean push|fatigue drop)\b",
+                r"\b(save|saved|confirm|close|next step|what next|todo|to-do|checklist|start by|now you should|let'?s|we should|plan for tomorrow|10[- ]?minute|one clean push|fatigue drop|updated version|make sure you saved|tell me what (you )?(want|wanna) to do next|wanna do next)\b",
                 lower,
             )
         )
     if intent == "closing":
         return bool(
             re.search(
-                r"\b(before you go|one more thing|next time we can|tomorrow we|let'?s continue|do you want|would you like|anything else|hit save|save if|dim the screen|power down|anything'?s lingering)\b",
+                r"\b(before you (fully )?(go|sleep|zone out)|before you go|one more thing|next time we can|tomorrow we|let'?s continue|do you want|would you like|anything else|hit save|save if|save/confirm|save whatever|leaving on-screen|dim the screen|power down|anything'?s lingering)\b",
                 lower,
             )
         )
@@ -1973,7 +1998,16 @@ def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str
     if intent == "question" and re.search(r"(whatareyoudoing|whatyoudoing|whatdoing)", compact_user):
         return bool(
             re.search(
-                r"\b(how can i help|waiting to assist|ready to help|next action|your request|task|support|what'?s up|what are you up to|are we fixing|surviving the day|trying to figure out|why everything feels)\b|\?\s*$",
+                r"\b(how can i help|waiting to assist|ready to help|next action|your request|task|support|what'?s up|what are you up to|are we fixing|surviving the day|trying to figure out|why everything feels|tell me what you want|want to finish|pick the next|next tiny step|tiny step|match your pace|what we should do next)\b|\?\s*$",
+                lower,
+            )
+        )
+    if intent == "task_help" and _is_next_step_request(user_message):
+        if _looks_like_vague_planning_reply(lower):
+            return True
+        return bool(
+            re.search(
+                r"\b(desktop/file tidy|desktop tidy|file tidy|restart|quick test|mouse|cursor|pointer|trackpad|jitter\w*|input|save/confirm|hit save|on-screen|clipboard supervisor|timer|stop on purpose)\b",
                 lower,
             )
         )
@@ -2298,7 +2332,9 @@ def apply_character_brain_reply_constraints(
         fallback = _fallback_reply_for_intent(intent, user_message)
         if fallback:
             constrained = fallback
-    if intent == "task_help" and _derive_topic(user_message, intent) == "planning" and _looks_like_vague_planning_reply(constrained):
+    if intent == "task_help" and (
+        _derive_topic(user_message, intent) == "planning" or _is_next_step_request(user_message)
+    ) and _looks_like_vague_planning_reply(constrained):
         fallback = _fallback_reply_for_intent(intent, user_message)
         if fallback:
             constrained = fallback

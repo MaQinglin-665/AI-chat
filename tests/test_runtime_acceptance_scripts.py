@@ -81,11 +81,59 @@ def test_dialogue_quality_flags_customer_service_questions_and_chinese():
     result = audit.analyze_reply_quality("Happy to help! Let me know if you need anything else?", brain)
     cn = audit.analyze_reply_quality("好的, I can do that.", brain)
     broken = audit.analyze_reply_quality("Just hanging out. (The keyboard is being dramatic.", brain)
+    drift = audit.analyze_reply_quality(
+        "Your desk is weird because of pointer lag. Move it to the other side.",
+        brain,
+        scene_id="desk_weird",
+    )
+    subtle_desk_drift = audit.analyze_reply_quality(
+        "Nah, your desk isn't haunted. Give it 10 minutes and try moving it away from the weird spot.",
+        brain,
+        scene_id="desk_weird",
+    )
+    diagnostic_desk_drift = audit.analyze_reply_quality(
+        "Probably just a weird tracking/position hiccup, not the furniture plotting.",
+        brain,
+        scene_id="desk_weird",
+    )
+    status_drift = audit.analyze_reply_quality(
+        "Idling on your desktop, watching the keyboard like it's judging what we should do next.",
+        brain,
+        scene_id="what_are_you_doing",
+    )
+    finished_drift = audit.analyze_reply_quality(
+        "Tiny victory. Make sure you saved everything, then tell me what you wanna do next.",
+        brain,
+        scene_id="finished",
+    )
+    next_step_drift = audit.analyze_reply_quality(
+        "Save/confirm what you just finished first. Then do a quick desktop/file tidy or restart and check the mouse/cursor is calm.",
+        brain,
+        scene_id="next_step",
+    )
+    next_step_save_drift = audit.analyze_reply_quality(
+        "Quick check: hit Save and confirm everything on-screen, then stop on purpose when the timer's done.",
+        brain,
+        scene_id="next_step",
+    )
+    closing_drift = audit.analyze_reply_quality(
+        "Before you fully zone out, save/confirm whatever you're leaving on-screen, then goodnight.",
+        brain,
+        scene_id="closing",
+    )
 
     assert "customer_service_phrase" in result["issues"]
     assert "routine_question" in result["issues"]
     assert "chinese_leak" in cn["issues"]
     assert "unbalanced_punctuation" in broken["issues"]
+    assert "scene_drift" in drift["issues"]
+    assert "scene_drift" in subtle_desk_drift["issues"]
+    assert "scene_drift" in diagnostic_desk_drift["issues"]
+    assert "scene_drift" in status_drift["issues"]
+    assert "scene_drift" in finished_drift["issues"]
+    assert "scene_drift" in next_step_drift["issues"]
+    assert "scene_drift" in next_step_save_drift["issues"]
+    assert "scene_drift" in closing_drift["issues"]
 
 
 def test_dialogue_audit_report_is_public_and_uses_safe_payload_shape():
@@ -144,6 +192,42 @@ def test_v16_performance_audit_clamps_safe_scenes_and_reports_public_contract():
         {"intent": "casual", "opening_move": "deadpan_aside", "reply_shape": "bit_then_answer", "spontaneity": 2, "question_policy": "none"},
         {"emotion": "thinking", "action": "none", "voice_style": "neutral"},
     )
+    drift_issues = audit_v16.analyze_performance_contract(
+        "Oof, fair call. Reset reality: unplug/replug the mouse.",
+        {"intent": "casual", "opening_move": "micro_reaction", "reply_shape": "bit_then_answer", "spontaneity": 2, "question_policy": "none"},
+        {"emotion": "thinking", "action": "none", "voice_style": "neutral"},
+        scene_id="correction",
+    )
+    next_step_drift_issues = audit_v16.analyze_performance_contract(
+        "Do a quick desktop/file tidy, then restart and check the cursor.",
+        {"intent": "task_help", "opening_move": "answer_first", "reply_shape": "answer_then_bit", "spontaneity": 1, "question_policy": "clarify_only"},
+        {"emotion": "thinking", "action": "think", "voice_style": "serious"},
+        scene_id="next_step",
+    )
+    subtle_desk_drift_issues = audit_v16.analyze_performance_contract(
+        "Nah, your desk isn't haunted. Try moving it to a blank spot and click once.",
+        {"intent": "casual", "opening_move": "micro_reaction", "reply_shape": "mini_rant", "spontaneity": 3, "question_policy": "none"},
+        {"emotion": "thinking", "action": "shake_head", "voice_style": "teasing"},
+        scene_id="desk_weird",
+    )
+    diagnostic_desk_drift_issues = audit_v16.analyze_performance_contract(
+        "Probably just a weird tracking/position hiccup, not the furniture plotting.",
+        {"intent": "casual", "opening_move": "micro_reaction", "reply_shape": "mini_rant", "spontaneity": 3, "question_policy": "none"},
+        {"emotion": "neutral", "action": "none", "voice_style": "neutral"},
+        scene_id="desk_weird",
+    )
+    finished_drift_issues = audit_v16.analyze_performance_contract(
+        "Tiny victory. Make sure you saved everything, then tell me what you wanna do next.",
+        {"intent": "encouragement", "opening_move": "micro_reaction", "reply_shape": "two_beat", "spontaneity": 3, "question_policy": "none"},
+        {"emotion": "happy", "action": "happy_idle", "voice_style": "cheerful"},
+        scene_id="finished",
+    )
+    closing_drift_issues = audit_v16.analyze_performance_contract(
+        "Before you fully zone out, save/confirm whatever you're leaving on-screen, then goodnight.",
+        {"intent": "closing", "opening_move": "no_opening", "reply_shape": "one_liner", "spontaneity": 0, "question_policy": "none"},
+        {"emotion": "neutral", "action": "wave", "voice_style": "soft"},
+        scene_id="closing",
+    )
     record = audit_v16.build_scene_record(
         {"id": "desk_weird", "input": "This desk feels weird."},
         {
@@ -160,6 +244,12 @@ def test_v16_performance_audit_clamps_safe_scenes_and_reports_public_contract():
     assert "safe_scene_too_chaotic" in safe_issues
     assert "unsafe_motion_for_safe_scene" in safe_issues
     assert play_issues == []
+    assert "scene_drift" in drift_issues
+    assert "scene_drift" in subtle_desk_drift_issues
+    assert "scene_drift" in diagnostic_desk_drift_issues
+    assert "scene_drift" in next_step_drift_issues
+    assert "scene_drift" in finished_drift_issues
+    assert "scene_drift" in closing_drift_issues
     assert record["ok"] is True
     assert "deadpan_aside" in report
     assert "SECRET" not in report

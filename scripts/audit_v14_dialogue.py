@@ -212,7 +212,27 @@ def request_chat_direct(
     }
 
 
-def analyze_reply_quality(reply: str, brain: dict[str, Any] | None = None, *, elapsed_ms: int = 0, timeout: bool = False) -> dict[str, Any]:
+def detect_scene_drift(scene_id: str, reply: str) -> str:
+    scene = clean_text(scene_id, 80).lower()
+    text = str(reply or "").strip().lower()
+    if not text:
+        return ""
+    checks = {
+        "what_are_you_doing": r"\b(want to finish|pick the next|next tiny step|10[- ]?minute|save-and|match your pace|how can i help|what we should do next)\b",
+        "desk_weird": r"\b(pointer lag|jitter\w*|tracking|position hiccup|hiccup|input|mouse|trackpad|move it|moving it|try moving|blank spot|click once|click|10[- ]?minutes?|vibe goes normal|quick test|restart|settings|setup)\b",
+        "you_were_wrong": r"\b(unplug|replug|trackpad|mouse|settings|reset reality|10[- ]?minute|save/confirm)\b",
+        "finished": r"\b(save|saved|next ten|next 10|close|re-check|check for anything broken|next step|done-done|updated version|make sure you saved|tell me what (you )?(want|wanna) to do next|wanna do next)\b",
+        "comfort": r"\b(steps?:|you should|try to|set a timer|10[- ]?minute|next small step|action plan)\b",
+        "next_step": r"\b(i hear you|keep this short|what sounds good|maybe|whatever you want|desktop/file tidy|desktop tidy|file tidy|restart|quick test|mouse|cursor|pointer|trackpad|jitter\w*|input|save/confirm|hit save|on-screen|clipboard supervisor|timer|stop on purpose)\b",
+        "closing": r"\b(tomorrow|continue|anything else|before you (fully )?(go|sleep|zone out)|before you go|hit save|save if|save/confirm|save whatever|leaving on-screen)\b",
+    }
+    pattern = checks.get(scene)
+    if pattern and re.search(pattern, text):
+        return "scene_drift"
+    return ""
+
+
+def analyze_reply_quality(reply: str, brain: dict[str, Any] | None = None, *, scene_id: str = "", elapsed_ms: int = 0, timeout: bool = False) -> dict[str, Any]:
     text = str(reply or "").strip()
     brain_data = brain if isinstance(brain, dict) else {}
     policy = clean_text(brain_data.get("question_policy"), 48)
@@ -231,6 +251,9 @@ def analyze_reply_quality(reply: str, brain: dict[str, Any] | None = None, *, el
         issues.append("routine_question")
     if text.count("(") != text.count(")") or text.count("[") != text.count("]"):
         issues.append("unbalanced_punctuation")
+    drift = detect_scene_drift(scene_id, text)
+    if drift:
+        issues.append(drift)
     if elapsed_ms > 15000:
         issues.append("slow_turn")
     return {
@@ -249,6 +272,7 @@ def build_scene_record(scene: dict[str, str], result: dict[str, Any]) -> dict[st
     analysis = analyze_reply_quality(
         reply,
         brain,
+        scene_id=clean_text(scene.get("id"), 80),
         elapsed_ms=safe_int(result.get("elapsed_ms"), 0),
         timeout=bool(result.get("timeout")),
     )

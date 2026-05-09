@@ -79,7 +79,23 @@ def request_chat_direct(*, base_url: str, token: str, message: str, history: lis
     }
 
 
-def analyze_performance_contract(reply: str, brain: dict[str, Any] | None, runtime: dict[str, Any] | None, *, elapsed_ms: int = 0, timeout: bool = False) -> list[str]:
+def detect_scene_drift(scene_id: str, reply: str) -> bool:
+    scene = clean_text(scene_id, 80).lower()
+    text = str(reply or "").strip().lower()
+    checks = {
+        "casual_status": r"\b(want to finish|pick the next|next tiny step|10[- ]?minute|save-and|match your pace|how can i help|what we should do next)\b",
+        "desk_weird": r"\b(pointer lag|jitter\w*|tracking|position hiccup|hiccup|input|mouse|trackpad|move it|moving it|try moving|blank spot|click once|click|10[- ]?minutes?|vibe goes normal|quick test|restart|settings|setup)\b",
+        "correction": r"\b(unplug|replug|trackpad|mouse|settings|reset reality|10[- ]?minute|save/confirm)\b",
+        "finished": r"\b(save|saved|next ten|next 10|close|re-check|check for anything broken|next step|done-done|updated version|make sure you saved|tell me what (you )?(want|wanna) to do next|wanna do next)\b",
+        "comfort": r"\b(steps?:|you should|try to|set a timer|10[- ]?minute|next small step|action plan)\b",
+        "next_step": r"\b(i hear you|keep this short|what sounds good|maybe|whatever you want|desktop/file tidy|desktop tidy|file tidy|restart|quick test|mouse|cursor|pointer|trackpad|jitter\w*|input|save/confirm|hit save|on-screen|clipboard supervisor|timer|stop on purpose)\b",
+        "closing": r"\b(tomorrow|continue|anything else|before you (fully )?(go|sleep|zone out)|before you go|hit save|save if|save/confirm|save whatever|leaving on-screen)\b",
+    }
+    pattern = checks.get(scene)
+    return bool(pattern and re.search(pattern, text))
+
+
+def analyze_performance_contract(reply: str, brain: dict[str, Any] | None, runtime: dict[str, Any] | None, *, scene_id: str = "", elapsed_ms: int = 0, timeout: bool = False) -> list[str]:
     issues: list[str] = []
     text = str(reply or "").strip()
     brain_data = brain if isinstance(brain, dict) else {}
@@ -100,6 +116,8 @@ def analyze_performance_contract(reply: str, brain: dict[str, Any] | None, runti
         issues.append("chinese_leak")
     if GENERIC_RE.search(text):
         issues.append("customer_service_phrase")
+    if detect_scene_drift(scene_id, text):
+        issues.append("scene_drift")
     if not opening or not shape or not policy:
         issues.append("missing_performance_controls")
     if intent in SAFE_CLAMP_INTENTS and spontaneity > 0:
@@ -122,6 +140,7 @@ def build_scene_record(scene: dict[str, str], result: dict[str, Any]) -> dict[st
         str(result.get("reply") or ""),
         brain,
         runtime,
+        scene_id=clean_text(scene.get("id"), 48),
         elapsed_ms=safe_int(result.get("elapsed_ms"), 0),
         timeout=bool(result.get("timeout")),
     )
