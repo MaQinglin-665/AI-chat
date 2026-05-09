@@ -17,12 +17,16 @@ if not exist scripts\first_run_check.py (
 )
 
 set "PYTHON_CMD=python"
-python --version >nul 2>nul
+if exist ".venv\Scripts\python.exe" (
+  set "PYTHON_CMD=.venv\Scripts\python.exe"
+)
+
+%PYTHON_CMD% --version >nul 2>nul
 if errorlevel 1 (
   py -3 --version >nul 2>nul
   if errorlevel 1 (
     echo Python 3.10+ was not found.
-    echo Install Python first, then run start_electron.bat again.
+    echo Run install_first_run.bat first, or install Python and run start_electron.bat again.
     pause
     exit /b 1
   )

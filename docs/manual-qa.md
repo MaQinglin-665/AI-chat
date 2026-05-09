@@ -19,23 +19,34 @@ v1.4 角色体验、动作/TTS 一致性和 demo 场景的专项验收见 `docs/
 先跑这组轻量检查：
 
 ```powershell
-python -m py_compile app_health.py scripts\first_run_check.py
-C:\Users\MQL\AppData\Local\Programs\Python\Python312\python.exe -m pytest -q -p no:cacheprovider tests/test_api_health.py
+python scripts\check_encoding.py
+python scripts\check_python_syntax.py
+python scripts\check_js_syntax.py
+python scripts\check_secrets.py
+node scripts\run_node_tests.js
+python -m pytest -q
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
 git diff --check
 ```
 
 通过标准：
 
-- Python 编译检查无错误。
-- `tests/test_api_health.py` 通过。
+- 编码、语法、secret、Node 前端测试和 Python 测试通过。
+- `scripts\check_first_run_package.ps1` 通过。
 - `git diff --check` 无尾随空白或冲突标记。
 
-## First-Run Preflight
+## First-Run Bootstrap
 
-- [ ] 运行 `powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1`。
+从干净源码测试包开始，优先验证用户路径，不优先验证开发者路径。
+
 - [ ] 如果缺 `electron/`、`web/`、`tests/` 或 `scripts/`，重新下载 main 分支源码。
-- [ ] 运行 `powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1`。
-- [ ] 运行 `python scripts\first_run_check.py`。
+- [ ] 运行或双击 `install_first_run.bat`。
+- [ ] 确认 bootstrap 创建 `.venv`、`config.json`、`.env`，并安装 Python / Node 依赖。
+- [ ] 如果包内只有一个 Live2D 模型，确认 `model_path` 被自动写入。
+- [ ] 如果 bootstrap 输出 `ACTION`，确认动作说明具体、可执行。
+- [ ] 运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1`。
+- [ ] 确认 LLM provider / base URL / model 写入 `config.local.json`。
+- [ ] 确认 API Key 只写入 `.env`，不写入 `config.json` 或 `config.local.json`。
 - [ ] 确认预检能清楚提示 Python / Node / npm / Python 包依赖状态。
 - [ ] 确认预检能清楚提示 `model_path` 是否仍是占位符或不存在。
 - [ ] 确认 LLM 缺 API Key、模型名为空、Ollama 未启动时有可执行提示。
@@ -43,8 +54,21 @@ git diff --check
 - [ ] 如果预检失败，对照 `docs/startup-failure-examples.md` 能找到相近样例和处理动作。
 - [ ] 确认预检没有建议开启桌面自动观察、工具调用、文件读取或 shell 执行。
 
+开发者路径仍可额外验证：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
+powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
+python scripts\first_run_check.py
+```
+
 ## Launch And Health
 
+- [ ] 运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1`。
+- [ ] 如不想消耗真实 LLM 请求，可先跑 `scripts\first_chat_smoke.ps1 -SkipLlmProbe -SkipChat`，但发布 go/no-go 前至少需要一次真实 LLM probe 或 `/api/chat` 记录。
+- [ ] 确认 smoke 能检测或启动后端。
+- [ ] 确认 smoke 能访问 `/healthz` 和带 token 的 `/api/health`。
+- [ ] 确认真实模式下 `/api/llm_probe` 和 `/api/chat` 返回成功。
 - [ ] 运行 `.\start_electron.bat`。
 - [ ] Electron 桌宠窗口打开；如果启动失败，批处理窗口保留可读错误。
 - [ ] 打开 `http://127.0.0.1:8123/healthz`，确认只返回轻量探活结果。
@@ -90,7 +114,7 @@ git diff --check
 | Python | `python --version`, requirements | 明确提示安装 Python 3.10+ 或依赖包。 |
 | Node / Electron | `node --version`, `npm install` | 明确提示 Node 18+，推荐 20/22 LTS。 |
 | Live2D | `model_path` | 占位符、目录、缺文件都有明确提示。 |
-| LLM | `llm.provider`, `llm.base_url`, `llm.model`, API Key env | 缺 key / 模型名 / 本地服务未启动时有行动建议。 |
+| LLM | `configure-llm.ps1`, `llm.provider`, `llm.base_url`, `llm.model`, API Key env | 缺 key / 模型名 / 本地服务未启动时有行动建议；Key 只进入 `.env`。 |
 | GPT-SoVITS | `tts.provider`, `tts.gpt_sovits_api_url` | 高级可选项；服务未启动不应破坏文本聊天。 |
 | API health | `/healthz` vs `/api/health` | `/healthz` 轻量公开，`/api/health` 详细且遵守 token 设置。 |
 | Safety | observe / tools / shell | 默认保持关闭；任何开启都必须是显式本地配置。 |
@@ -103,6 +127,7 @@ Tester:
 Commit / branch:
 Config profile:
 LLM provider/model:
+First-chat smoke: real / skipped / partial
 TTS provider:
 ASR tested: yes/no
 GPT-SoVITS tested: yes/no

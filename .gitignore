@@ -8,6 +8,7 @@ __pycache__/
 server_*.log
 desktop_run.log
 node_modules/
+.venv/
 web/generated_images/
 .mem0/
 models/

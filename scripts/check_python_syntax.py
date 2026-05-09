@@ -10,6 +10,7 @@ from pathlib import Path
 
 SKIP_DIRS = {
     ".git",
+    ".venv",
     ".mem0",
     ".pytest_cache",
     "__pycache__",

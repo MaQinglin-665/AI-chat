@@ -331,7 +331,13 @@ function resolvePythonExecutable(runtimeConfig) {
     return configuredPython;
   }
 
-  const candidates = ["python3", "python"];
+  const localVenvCandidates = process.platform === "win32"
+    ? [path.join(ROOT_DIR, ".venv", "Scripts", "python.exe")]
+    : [
+        path.join(ROOT_DIR, ".venv", "bin", "python3"),
+        path.join(ROOT_DIR, ".venv", "bin", "python"),
+      ];
+  const candidates = [...localVenvCandidates, "python3", "python"];
   const probeErrors = [];
   for (const candidate of candidates) {
     const probe = probePythonExecutable(candidate);

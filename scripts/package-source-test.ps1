@@ -42,7 +42,11 @@ function Copy-PathIfExists($RelativePath, $DestinationRoot) {
 
 $packageVersion = Get-PackageVersion
 $packageName = "Taffy-AI-Desktop-Pet-v$packageVersion-windows-source-test"
-$distRoot = Join-Path $RepoRoot $OutputDir
+if ([System.IO.Path]::IsPathRooted($OutputDir)) {
+    $distRoot = $OutputDir
+} else {
+    $distRoot = Join-Path $RepoRoot $OutputDir
+}
 $stageRoot = Join-Path $distRoot $packageName
 $zipPath = Join-Path $distRoot "$packageName.zip"
 
@@ -63,6 +67,7 @@ $pathsToCopy = @(
     "README-FIRST-RUN.txt",
     "README.md",
     "SECURITY.md",
+    "THIRD_PARTY_NOTICES.md",
     "app.py",
     "asr.py",
     "character_runtime.py",
@@ -77,6 +82,7 @@ $pathsToCopy = @(
     "package.json",
     "requirements-dev.txt",
     "requirements.txt",
+    "install_first_run.bat",
     "start.bat",
     "start_chat_oneclick.bat",
     "start_desktop.bat",
@@ -99,6 +105,7 @@ foreach ($path in $pathsToCopy) {
 }
 
 $runtimeDirs = @(
+    ".venv",
     ".pytest_cache",
     "docs\node_modules",
     "docs\test-results",
@@ -110,6 +117,22 @@ foreach ($dir in $runtimeDirs) {
     $fullPath = Join-Path $stageRoot $dir
     if (Test-Path $fullPath) {
         Remove-Item -LiteralPath $fullPath -Recurse -Force
+    }
+}
+
+$runtimeFiles = @(
+    ".env",
+    "config.json",
+    "config.local.json",
+    "server_out.log",
+    "server_err.log",
+    "desktop_run.log"
+)
+
+foreach ($file in $runtimeFiles) {
+    $fullPath = Join-Path $stageRoot $file
+    if (Test-Path $fullPath) {
+        Remove-Item -LiteralPath $fullPath -Force
     }
 }
 

@@ -2,7 +2,7 @@
 
 本页是发布前 / 打包前的 go/no-go 清单。它不是成熟商业产品认证，而是为了让当前 MVP / 开源孵化阶段的源码测试包具备可复现、可排障、默认安全的最低体验门槛。
 
-更细的人工步骤见 `docs/manual-qa.md`；启动失败样例见 `docs/startup-failure-examples.md`；健康接口字段见 `docs/backend-health.md`。
+更细的人工步骤见 `docs/manual-qa.md`；干净首跑记录模板见 `docs/first-run-validation.md`；启动失败样例见 `docs/startup-failure-examples.md`；健康接口字段见 `docs/backend-health.md`。
 
 ## Release Positioning Gate
 
@@ -18,16 +18,22 @@
 发布前至少跑：
 
 ```powershell
-python -m py_compile app_health.py scripts\first_run_check.py
-C:\Users\MQL\AppData\Local\Programs\Python\Python312\python.exe -m pytest -q -p no:cacheprovider tests/test_api_health.py tests/test_first_run_check.py
+python scripts\check_encoding.py
+python scripts\check_python_syntax.py
+python scripts\check_js_syntax.py
+python scripts\check_secrets.py
+node scripts\run_node_tests.js
+python -m pytest -q
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
 git diff --check
 ```
 
 通过标准：
 
-- [ ] Python 编译检查无错误。
-- [ ] `tests/test_api_health.py` 通过。
-- [ ] `tests/test_first_run_check.py` 通过。
+- [ ] 编码、Python 语法、JavaScript 语法、secret 扫描通过。
+- [ ] Node 前端测试通过。
+- [ ] Python 测试通过。
+- [ ] `scripts\check_first_run_package.ps1` 能打包、解压并验证首跑入口。
 - [ ] `git diff --check` 没有冲突标记或尾随空白错误。
 - [ ] 如果有 warning，必须能解释来源，例如 Python 版本弃用提醒或 CRLF 提示。
 
@@ -39,24 +45,29 @@ No-go：
 
 ## First-Run Gate
 
-从干净源码包或清楚记录过本地差异的工作区开始：
+从 `scripts\package-source-test.ps1` 生成的干净源码测试包开始，或从清楚记录过本地差异的干净目录开始。首跑主路径是：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
-powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
-python scripts\first_run_check.py
+.\install_first_run.bat
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
+.\start_electron.bat
 ```
+
+`scripts\doctor.ps1`、`scripts\setup-dev.ps1` 仍可作为开发者路径使用，但不再是早期用户首跑的主入口。
 
 通过标准：
 
 - [ ] 项目目录完整：`electron/`、`web/`、`tests/`、`scripts/`、`package.json` 存在。
 - [ ] Python 3.10+ 可用。
 - [ ] Node.js 18+ 可用，推荐 20/22 LTS。
-- [ ] 依赖安装路径清楚；缺依赖时提示能指导用户修复。
-- [ ] `config.json` / `config.local.json` 能加载。
-- [ ] `model_path` 指向真实 `.model3.json` 文件。
-- [ ] LLM provider、base URL、model 和 API Key 状态清楚。
+- [ ] `install_first_run.bat` 能完成依赖安装、创建 `.venv`、初始化 `config.json` / `.env`。
+- [ ] `configure-llm.ps1` 能把 provider / base URL / model 写入 `config.local.json`，并把 API Key 写入 `.env`。
+- [ ] `first_chat_smoke.ps1` 能通过 preflight、`/healthz`、`/api/health`，并在启用真实请求时拿到 LLM probe 与 `/api/chat` 回复。
+- [ ] `model_path` 指向真实 `.model3.json` 文件；如果包内只有一个模型，bootstrap 能自动设置。
+- [ ] LLM provider、base URL、model 和 API Key 状态清楚，且 Key 不写入 JSON。
 - [ ] 本地 Ollama / GPT-SoVITS 作为可选项时，端口状态提示清楚。
+- [ ] 验收结果记录到 `docs/first-run-validation.md` 模板或等价发布记录。
 
 Allowed warning：
 
@@ -67,13 +78,14 @@ Allowed warning：
 No-go：
 
 - `first_run_check.py` 有 `[FAIL]` blocker。
+- `first_chat_smoke.ps1` 在真实 LLM 配置下无法完成 probe 或第一条 `/api/chat`。
 - Live2D 路径仍是占位符。
 - 远程 LLM 缺 API Key 且没有本地替代配置。
 - 启动脚本要求用户放宽安全默认值才能继续。
 
 ## Desktop Experience Gate
 
-使用 `.\start_electron.bat` 启动。
+在首跑 smoke 通过后，使用 `.\start_electron.bat` 启动。
 
 通过标准：
 
@@ -84,6 +96,7 @@ No-go：
 - [ ] 助手回复不显示原始 JSON、内部 metadata、API Key、Token 或完整私密配置。
 - [ ] `/healthz` 可访问。
 - [ ] `/api/health` 可访问或在 token 开启时按预期拒绝无 token 请求。
+- [ ] `first_chat_smoke.ps1` 的结果与桌面 UI 实测一致：脚本能聊，UI 也能聊。
 
 No-go：
 
@@ -162,19 +175,24 @@ No-go：
 发布包或 README 至少能把用户导向这些入口：
 
 - [ ] `README-FIRST-RUN.txt`
+- [ ] `THIRD_PARTY_NOTICES.md`
 - [ ] `docs/setup.md`
 - [ ] `docs/backend-health.md`
 - [ ] `docs/startup-failure-examples.md`
 - [ ] `docs/manual-qa.md`
+- [ ] `docs/first-run-validation.md`
 - [ ] `docs/troubleshooting.md`
 - [ ] `docs/voice-troubleshooting.md`
 
 通过标准：
 
-- [ ] 新用户知道先跑 `python scripts\first_run_check.py`。
-- [ ] 新用户知道用 `.\start_electron.bat` 启动。
+- [ ] 新用户知道先跑 `install_first_run.bat`。
+- [ ] 新用户知道用 `scripts\configure-llm.ps1` 配置 LLM。
+- [ ] 新用户知道用 `scripts\first_chat_smoke.ps1` 验证第一句对话。
+- [ ] 新用户知道最后用 `.\start_electron.bat` 启动桌宠。
 - [ ] 常见失败有可执行修复路径。
 - [ ] `/healthz` 与 `/api/health` 的区别写清楚。
+- [ ] 第三方 runtime、Live2D sample model、demo 媒体和项目素材的边界写清楚。
 - [ ] 文档没有把项目描述成已经成熟的商业产品。
 
 ## Go / No-Go Summary
@@ -207,6 +225,7 @@ Config profile:
 
 Automated gate:
 First-run gate:
+First-chat smoke:
 Desktop experience gate:
 Voice gate:
 Debug gate:

@@ -11,6 +11,7 @@ from pathlib import Path
 CHECK_SUFFIXES = {".js", ".mjs", ".cjs"}
 SKIP_DIRS = {
     ".git",
+    ".venv",
     ".mem0",
     "__pycache__",
     "node_modules",

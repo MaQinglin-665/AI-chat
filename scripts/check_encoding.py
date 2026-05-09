@@ -36,6 +36,7 @@ TEXT_SUFFIXES = {
 
 SKIP_DIRS = {
     ".git",
+    ".venv",
     "node_modules",
     ".mem0",
     "__pycache__",

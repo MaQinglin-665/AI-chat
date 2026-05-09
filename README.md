@@ -66,9 +66,31 @@ requirements-dev.txt
 
 ## Quick Start
 
-### Early Tester Package
+### Recommended First Run
 
-当前 preview 还没有真正的免安装 Windows installer。面向早期测试者的发布包应使用源码测试包：
+当前 preview 还没有真正的免安装 Windows installer。早期测试者请优先走这一条主路径：
+
+```powershell
+.\install_first_run.bat
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
+.\start_electron.bat
+```
+
+`install_first_run.bat` 会创建本地 `.venv`、安装 Python / Node 依赖、初始化 `config.json` / `.env`，并运行首跑预检。结束时会给出 `READY` 或 `ACTION`：
+
+- `READY`：可以继续配置 LLM、跑首句 smoke，然后启动桌宠。
+- `ACTION`：依赖设置已经尽力完成，但还需要按输出修复 Live2D 模型、LLM Key / 模型名、Node / Python 环境等阻塞项。
+
+`configure-llm.ps1` 会把 provider / base URL / model 写入 `config.local.json`，把 API Key 写入 `.env`，不会把真实 Key 写进 JSON 配置。
+
+`first_chat_smoke.ps1` 会检测或启动后端，检查 `/healthz` / `/api/health`，再进行轻量 LLM probe 和一条短 `/api/chat` 请求。想避免真实聊天请求时可加 `-SkipChat` 或 `-SkipLlmProbe`。
+
+`start_electron.bat` 会在启动前再次运行首跑预检；如果有阻塞项，会停下来显示原因。也可以双击 `一键启动桌宠.vbs`，但如果双击后没有明显反应，请改用 `start_electron.bat` 查看诊断输出。
+
+### Source Test Package
+
+维护者准备早期测试包时使用：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\package-source-test.ps1
@@ -76,43 +98,22 @@ powershell -ExecutionPolicy Bypass -File scripts\package-source-test.ps1
 
 生成的 `dist/Taffy-AI-Desktop-Pet-v*-windows-source-test.zip` 仍需要目标电脑安装 Python 和 Node.js。解压后先阅读 `README-FIRST-RUN.txt`。
 
-### Developer / Tester Path
+发布前可用临时目录模拟源码测试包首跑入口：
 
-下载源码后，建议先运行环境诊断：
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
+```
+
+### Developer Commands
+
+开发者需要更细的环境诊断或完整本地测试时再使用：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
-```
-
-然后一键安装开发依赖：
-
-```powershell
 powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
-```
-
-本地验证：
-
-```powershell
 powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1
-```
-
-最后放置 Live2D 模型到 `web/models/`，设置 `config.json` 的 `model_path`，再运行首跑预检：
-
-```powershell
 python scripts\first_run_check.py
 ```
-
-预检会做只读检查：Python / Node 依赖、配置加载、Live2D 路径、本地端口、LLM Key / 模型名、本地 Ollama / GPT-SoVITS 端口、TTS / ASR 依赖，以及桌面观察和工具调用的安全默认值。
-
-预检通过后启动桌面模式：
-
-```powershell
-.\start_electron.bat
-```
-
-`start_electron.bat` 会在启动前自动运行首跑预检；如果有阻塞项，会停下来显示原因。
-
-也可以双击：`一键启动桌宠.vbs`。如果双击后没有明显反应，请改用 `start_electron.bat` 查看诊断输出。
 
 后端启动后可用健康接口辅助排障：
 
@@ -140,6 +141,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - 后端健康接口契约：`docs/backend-health.md`
 - 启动失败样例库：`docs/startup-failure-examples.md`
 - 发布前 go/no-go 门槛：`docs/release-readiness.md`
+- 第三方组件与资源说明：`THIRD_PARTY_NOTICES.md`
 - Character Runtime demo 启用与验证：`docs/character-runtime-demo.md`
 - AI VTuber 长期体验目标：`docs/ai-vtuber-experience-target.md`
 - v1.4 AI VTuber Feeling 规格与 demo 场景：`docs/v1.4-ai-vtuber-feeling.md`
@@ -176,6 +178,10 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - `tools.allow_shell=false`
 
 不要把真实 API Key / Token 提交到仓库。
+
+## Third-Party Assets
+
+仓库中包含用于预览和本地运行的第三方 runtime、Live2D sample model、demo 媒体和项目素材。项目代码的 MIT License 不会自动覆盖这些资源；重新分发、二次打包或替换素材前，请先看 `THIRD_PARTY_NOTICES.md`。
 
 ## Roadmap Summary
 
