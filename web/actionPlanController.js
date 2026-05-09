@@ -83,6 +83,58 @@
     curious_speech_start: ["talk", "head", "thinking"]
   };
 
+  const MOTION_CUE_FALLBACK_GROUPS = {
+    side_eye: ["Flick", "Idle", "Tap"],
+    head_tilt: ["HeadTilt", "Flick", "Idle"],
+    tiny_nod: ["HeadTilt", "Flick", "Idle"],
+    tiny_victory_nod: ["HeadTilt", "FlickUp", "Tap", "Idle"],
+    deadpan_pause: ["Idle", "Flick"],
+    embarrassed_recovery: ["FlickDown", "Idle", "Flick"],
+    idle_fidget: ["Tap@Body", "Tap", "Idle"],
+    soft_stillness: ["Idle", "FlickDown"],
+    eyes_down_soft: ["FlickDown", "Idle"],
+    micro_pulse: ["Flick", "Idle", "Tap"],
+    blink_pulse: ["Flick", "Idle"],
+    thinking_nod: ["HeadTilt", "Flick", "Idle"],
+    happy_pulse: ["FlickUp", "Tap", "Idle"],
+    task_snap: ["Flick", "Tap@Body", "Idle"],
+    answer_first: ["Flick", "Idle"],
+    soft_idle: ["Idle", "FlickDown"],
+    focused_idle: ["Idle", "Flick"],
+    closing_idle: ["Idle", "FlickDown"],
+    settle_idle: ["Idle", "Flick"],
+    dry_speech_start: ["Flick", "Tap", "Idle"],
+    steady_speech_start: ["Flick", "Tap@Body", "Idle"],
+    expressive_speech_start: ["Tap", "Flick", "Idle"],
+    curious_speech_start: ["HeadTilt", "Flick", "Idle"]
+  };
+
+  const MOTION_CUE_FAMILIES = {
+    side_eye: "side_eye",
+    head_tilt: "head_tilt",
+    tiny_nod: "nod",
+    tiny_victory_nod: "nod",
+    deadpan_pause: "deadpan",
+    embarrassed_recovery: "recovery",
+    idle_fidget: "fidget",
+    soft_stillness: "soft_stillness",
+    eyes_down_soft: "soft_stillness",
+    micro_pulse: "micro_reaction",
+    blink_pulse: "micro_reaction",
+    thinking_nod: "thinking",
+    happy_pulse: "celebration",
+    task_snap: "thinking",
+    answer_first: "thinking",
+    soft_idle: "settle",
+    focused_idle: "settle",
+    closing_idle: "settle",
+    settle_idle: "settle",
+    dry_speech_start: "speech_start",
+    steady_speech_start: "speech_start",
+    expressive_speech_start: "speech_start",
+    curious_speech_start: "speech_start"
+  };
+
   function call(fn, ...args) {
     return typeof fn === "function" ? fn(...args) : undefined;
   }
@@ -118,6 +170,15 @@
 
   function getMotionCueTags(cue) {
     return uniqueMotionGroups(MOTION_CUE_TOKENS[normalizeMotionCue(cue)] || []);
+  }
+
+  function getMotionCueFallbackGroups(cue) {
+    return uniqueMotionGroups(MOTION_CUE_FALLBACK_GROUPS[normalizeMotionCue(cue)] || []);
+  }
+
+  function getMotionCueFamily(cue) {
+    const key = normalizeMotionCue(cue);
+    return String(MOTION_CUE_FAMILIES[key] || key || "generic");
   }
 
   function createController(deps = {}) {
@@ -241,13 +302,19 @@
         ...getMotionCueTags(motionCue),
         ...(Array.isArray(context.motionTags) ? context.motionTags : [])
       ]);
+      const motionCueFallbackGroups = getMotionCueFallbackGroups(motionCue);
+      const motionFamily = getMotionCueFamily(motionCue);
       const auditMotion = context.auditMotion === true;
       const steps = [];
-      const planGroups = (motionIntent, motionMood, motionSource) => buildPlannedMotionGroups(style, motionIntent, motionMood, motionSource, motionTags);
+      const planGroups = (motionIntent, motionMood, motionSource) => uniqueMotionGroups([
+        ...motionCueFallbackGroups,
+        ...buildPlannedMotionGroups(style, motionIntent, motionMood, motionSource, motionTags)
+      ]);
       const finalizeSteps = () => steps.map((step) => ({
         ...step,
         motionCue,
         motionRole,
+        motionFamily,
         motionTags: motionTags.slice(0, 8),
         auditMotion
       }));
@@ -408,7 +475,9 @@
               action: step.source || "emotion",
               motion_cue: step.motionCue,
               motion_role: step.motionRole,
-              group: dispatch?.group || "fallback",
+              motion_family: step.motionFamily,
+              planned_groups: Array.isArray(step.groups) ? step.groups.slice(0, 8) : [],
+              group: dispatch?.group || (played === false ? "none" : "fallback"),
               ok: played !== false
             });
           }
@@ -449,10 +518,10 @@
       runActionQueue();
     }
 
-    return { uniqueMotionGroups, normalizeMotionGroupKey, normalizeMotionCue, getMotionCueTags, findSemanticMotionGroups, getSemanticMotionTags, getStyleMotionGroups, buildPlannedMotionGroups, shouldThrottleActionIntent, clearThinkingMotionTimer, resetActionSystem, buildActionPlan, isTalkLikeActionStep, hasPendingTalkLikeAction, shouldSkipActionStepForSpeech, runActionQueue, enqueueActionIntent };
+    return { uniqueMotionGroups, normalizeMotionGroupKey, normalizeMotionCue, getMotionCueTags, getMotionCueFallbackGroups, getMotionCueFamily, findSemanticMotionGroups, getSemanticMotionTags, getStyleMotionGroups, buildPlannedMotionGroups, shouldThrottleActionIntent, clearThinkingMotionTimer, resetActionSystem, buildActionPlan, isTalkLikeActionStep, hasPendingTalkLikeAction, shouldSkipActionStepForSpeech, runActionQueue, enqueueActionIntent };
   }
 
-  const api = { STYLE_MOTION_BLUEPRINT, MOTION_SEMANTIC_TOKENS, MOTION_CUE_TOKENS, uniqueMotionGroups, normalizeMotionGroupKey, normalizeMotionCue, getMotionCueTags, createController };
+  const api = { STYLE_MOTION_BLUEPRINT, MOTION_SEMANTIC_TOKENS, MOTION_CUE_TOKENS, MOTION_CUE_FALLBACK_GROUPS, MOTION_CUE_FAMILIES, uniqueMotionGroups, normalizeMotionGroupKey, normalizeMotionCue, getMotionCueTags, getMotionCueFallbackGroups, getMotionCueFamily, createController };
   root.TaffyActionPlanController = api;
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;

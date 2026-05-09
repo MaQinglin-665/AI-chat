@@ -121,6 +121,11 @@ def test_dialogue_quality_flags_customer_service_questions_and_chinese():
         brain,
         scene_id="closing",
     )
+    comfort_task_drift = audit.analyze_reply_quality(
+        "Take a quiet breath, then save what you have and do a quick on-screen check before you drift.",
+        brain,
+        scene_id="comfort",
+    )
 
     assert "customer_service_phrase" in result["issues"]
     assert "routine_question" in result["issues"]
@@ -134,6 +139,7 @@ def test_dialogue_quality_flags_customer_service_questions_and_chinese():
     assert "scene_drift" in next_step_drift["issues"]
     assert "scene_drift" in next_step_save_drift["issues"]
     assert "scene_drift" in closing_drift["issues"]
+    assert "scene_drift" in comfort_task_drift["issues"]
 
 
 def test_dialogue_audit_report_is_public_and_uses_safe_payload_shape():
@@ -228,6 +234,12 @@ def test_v16_performance_audit_clamps_safe_scenes_and_reports_public_contract():
         {"emotion": "neutral", "action": "wave", "voice_style": "soft"},
         scene_id="closing",
     )
+    comfort_task_drift_issues = audit_v16.analyze_performance_contract(
+        "Take a quiet breath, then save what you have and do a quick on-screen check before you drift.",
+        {"intent": "comfort", "opening_move": "soft_anchor", "reply_shape": "two_beat", "spontaneity": 0, "question_policy": "none"},
+        {"emotion": "sad", "action": "none", "voice_style": "soft"},
+        scene_id="comfort",
+    )
     record = audit_v16.build_scene_record(
         {"id": "desk_weird", "input": "This desk feels weird."},
         {
@@ -250,6 +262,7 @@ def test_v16_performance_audit_clamps_safe_scenes_and_reports_public_contract():
     assert "scene_drift" in next_step_drift_issues
     assert "scene_drift" in finished_drift_issues
     assert "scene_drift" in closing_drift_issues
+    assert "scene_drift" in comfort_task_drift_issues
     assert record["ok"] is True
     assert "deadpan_aside" in report
     assert "SECRET" not in report

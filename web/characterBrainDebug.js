@@ -236,7 +236,8 @@
           "",
           "Motion Actual",
           `planned=${clean(auditMotionPlanned.pre, "none")}/${clean(auditMotionPlanned.speech, "none")}/${auditMotionPlannedBeats.length ? auditMotionPlannedBeats.join(",") : "none"}/${clean(auditMotionPlanned.post, "none")}`,
-          `actual=${clean(auditMotionActual.pre, "pending")}/${clean(auditMotionActual.speech, "pending")}/${auditMotionActualBeats.length ? auditMotionActualBeats.join(",") : "none"}/${clean(auditMotionActual.post, "pending")}; dispatches=${Number(auditMotionActual.dispatches) || 0}; pulse_only=${Number(auditMotionActual.pulse_only) || 0}; settle=${clean(auditMotionActual.settle_result, "pending")}`,
+          `actual=${clean(auditMotionActual.pre, "pending")}/${clean(auditMotionActual.speech, "pending")}/${auditMotionActualBeats.length ? auditMotionActualBeats.join(",") : "none"}/${clean(auditMotionActual.post, "pending")}; dispatches=${Number(auditMotionActual.dispatches) || 0}; failed=${Number(auditMotionActual.failed_dispatches) || 0}; pulse_only=${Number(auditMotionActual.pulse_only) || 0}; settle=${clean(auditMotionActual.settle_result, "pending")}`,
+          `last_group=${clean(auditMotionActual.last_group, "none")}; last_cue=${clean(auditMotionActual.last_cue, "none")}; family=${clean(auditMotionActual.last_family, "none")}`,
           `suppressed=${auditMotionSuppressed.length ? auditMotionSuppressed.join(", ") : "none"}`
         ]
       : [];

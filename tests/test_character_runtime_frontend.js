@@ -283,6 +283,8 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(typeof emotionMoodController.createController, "function", "emotion/mood controller should expose a factory");
   assert.strictEqual(typeof actionPlanController.createController, "function", "action plan controller should expose a factory");
   assert.deepStrictEqual(actionPlanController.getMotionCueTags("side-eye").slice(0, 3), ["head", "eye", "side"], "action plan controller should expose safe motion cue tags");
+  assert.deepStrictEqual(actionPlanController.getMotionCueFallbackGroups("embarrassed-recovery").slice(0, 2), ["FlickDown", "Idle"], "action plan controller should expose concrete fallback groups for director cues");
+  assert.strictEqual(actionPlanController.getMotionCueFamily("tiny-nod"), "nod", "action plan controller should expose public motion cue families");
   assert.strictEqual(typeof motionRuntimeController.createController, "function", "motion runtime controller should expose a factory");
   assert.strictEqual(typeof voiceRuntimeController.createController, "function", "voice runtime controller should expose a factory");
   assert.strictEqual(typeof streamTtsQueueController.createController, "function", "stream TTS queue controller should expose a factory");
@@ -317,7 +319,15 @@ function createMemoryStorage(initial = {}) {
   assert.ok(headTiltPlan.length >= 1, "motion cue action plan should produce a lightweight step");
   assert.strictEqual(headTiltPlan[0].motionCue, "head_tilt", "action plan steps should carry the director motion cue");
   assert.strictEqual(headTiltPlan[0].motionRole, "pre_reaction", "action plan steps should carry the timeline motion role");
+  assert.strictEqual(headTiltPlan[0].motionFamily, "head_tilt", "action plan steps should carry the director motion family");
   assert.ok(headTiltPlan[0].groups.includes("HeadTilt"), "motion cue tags should help select matching Live2D groups");
+  const recoveryPlan = controller.buildActionPlan("listen", {
+    style: "neutral",
+    mood: "idle",
+    motionCue: "embarrassed_recovery",
+    motionRole: "pre_reaction"
+  });
+  assert.strictEqual(recoveryPlan[0].groups[0], "FlickDown", "concrete cue fallback should prefer a matching Live2D group before generic semantic groups");
 }
 
 {
@@ -429,7 +439,7 @@ function createMemoryStorage(initial = {}) {
         actual: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", action_dispatches: 0, pulse_dispatches: 2 },
         motion: {
           planned: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle" },
-          actual: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle", dispatches: 0, pulse_only: 2, settle_result: "idle_returned" },
+          actual: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle", dispatches: 0, failed_dispatches: 0, pulse_only: 2, last_group: "FlickDown", last_cue: "soft_stillness", last_family: "soft_stillness", settle_result: "idle_returned" },
           suppressed: ["motion_disallowed"]
         },
         tts: { started: true, finished: true, mode: "direct" },
@@ -546,6 +556,8 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.voice_timeline.private_prompt, undefined, "character brain snapshot should not persist private voice timeline fields");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.actual.post, "soft_idle", "character brain snapshot should restore public audit summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.motion.actual.settle_result, "idle_returned", "character brain snapshot should restore public motion settle audit");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_audit.motion.actual.last_group, "FlickDown", "character brain snapshot should restore public actual motion group");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_audit.motion.actual.last_family, "soft_stillness", "character brain snapshot should restore public actual motion family");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.early_reaction.motion_cue, "soft_stillness", "character brain snapshot should restore public early motion cue");
   assert.deepStrictEqual(restored.characterBrainLastDecision.performance_audit.early_reaction.suppressed, ["motion_disallowed"], "character brain snapshot should restore public early suppression reasons");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.early_reaction.latency_status, "ok", "character brain snapshot should restore public early latency status");
@@ -632,7 +644,7 @@ function createMemoryStorage(initial = {}) {
         actual: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", action_dispatches: 0, pulse_dispatches: 2 },
         motion: {
           planned: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle" },
-          actual: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle", dispatches: 0, pulse_only: 2, settle_result: "idle_returned" },
+          actual: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle", dispatches: 0, failed_dispatches: 0, pulse_only: 2, last_group: "FlickDown", last_cue: "soft_stillness", last_family: "soft_stillness", settle_result: "idle_returned" },
           suppressed: ["motion_disallowed"]
         },
         tts: { started: true, finished: true, mode: "direct" },
@@ -770,6 +782,9 @@ function createMemoryStorage(initial = {}) {
     brainReport.includes("Motion Actual")
       && brainReport.includes("planned=soft_stillness/soft_speech_start/none/soft_idle")
       && brainReport.includes("actual=soft_stillness/soft_speech_start/none/soft_idle")
+      && brainReport.includes("failed=0")
+      && brainReport.includes("last_group=FlickDown")
+      && brainReport.includes("family=soft_stillness")
       && brainReport.includes("settle=idle_returned"),
     "character brain debug report should include planned vs actual motion audit"
   );
@@ -832,17 +847,18 @@ function createMemoryStorage(initial = {}) {
   });
   audit.recordPerformanceAuditEvent("voice_plan", { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented", fallback_reason: "none" });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "preReaction", name: "micro_reaction", action: "listen", pulse: true, motion_cue: "micro_pulse", motion_role: "pre_reaction" });
-  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "micro_pulse", motion_role: "pre_reaction", action: "listen", ok: true });
+  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "micro_pulse", motion_role: "pre_reaction", motion_family: "micro_reaction", action: "listen", group: "Flick", ok: true });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechStart", name: "expressive_speech_start", action: "talk", pulse: true, motion_cue: "expressive_speech_start", motion_role: "speech_start" });
-  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "expressive_speech_start", motion_role: "speech_start", action: "talk", ok: true });
+  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "expressive_speech_start", motion_role: "speech_start", motion_family: "speech_start", action: "talk", group: "Tap", ok: true });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechBeat", name: "speech_beat", action: "talk", pulse: true, motion_cue: "head_tilt", motion_role: "speech_beat" });
-  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "head_tilt", motion_role: "speech_beat", action: "talk", ok: true });
+  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "head_tilt", motion_role: "speech_beat", motion_family: "head_tilt", action: "talk", group: "HeadTilt", ok: true });
+  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "side_eye", motion_role: "speech_beat", motion_family: "side_eye", action: "talk", group: "none", ok: false });
   audit.recordPerformanceAuditEvent("tts_start", { mode: "direct_segmented" });
   audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", segments: 2 });
   audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", segments: 2 });
   audit.recordPerformanceAuditEvent("tts_end", { mode: "direct_segmented", ok: true });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "postSettle", name: "settle_idle", action: "idle", pulse: true, motion_cue: "settle_idle", motion_role: "post_settle" });
-  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "settle_idle", motion_role: "post_settle", action: "idle", ok: true });
+  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "settle_idle", motion_role: "post_settle", motion_family: "settle", action: "idle", group: "Idle", ok: true });
   const auditSummary = auditState.characterBrainLastDecision.performance_audit;
   assert.strictEqual(auditSummary.actual.pre, "micro_reaction", "audit should record actual pre-reaction dispatch");
   assert.strictEqual(auditSummary.actual.speech, "expressive_speech_start", "audit should record actual speech-start dispatch");
@@ -860,6 +876,11 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(auditSummary.motion.actual.pre, "micro_pulse", "audit should record actual motion cue");
   assert.deepStrictEqual(auditSummary.motion.actual.beats, ["head_tilt"], "audit should record actual motion beat cues");
   assert.strictEqual(auditSummary.motion.actual.dispatches, 4, "audit should count actual motion dispatch events");
+  assert.strictEqual(auditSummary.motion.actual.failed_dispatches, 1, "audit should count failed motion dispatch events");
+  assert.strictEqual(auditSummary.motion.actual.last_group, "Idle", "audit should record the last actual Live2D motion group");
+  assert.strictEqual(auditSummary.motion.actual.last_cue, "settle_idle", "audit should record the last actual motion cue");
+  assert.strictEqual(auditSummary.motion.actual.last_family, "settle", "audit should record the last actual motion family");
+  assert.ok(auditSummary.motion.suppressed.includes("side_eye"), "audit should keep failed motion cues visible as suppressions");
   assert.strictEqual(auditSummary.motion.actual.settle_result, "idle_returned", "audit should record motion settle result");
   assert.strictEqual(auditSummary.settled, true, "audit should mark settle after post phase");
   assert.strictEqual(auditSummary.raw_history, undefined, "audit summary should not expose raw history");

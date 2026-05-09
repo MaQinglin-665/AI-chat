@@ -464,7 +464,11 @@
               : [],
             post: cleanText(auditMotionActualRaw.post, 48),
             dispatches: cleanInt(auditMotionActualRaw.dispatches, 0, 0, 20),
+            failed_dispatches: cleanInt(auditMotionActualRaw.failed_dispatches, 0, 0, 20),
             pulse_only: cleanInt(auditMotionActualRaw.pulse_only, 0, 0, 20),
+            last_group: cleanText(auditMotionActualRaw.last_group, 80),
+            last_cue: cleanText(auditMotionActualRaw.last_cue, 48),
+            last_family: cleanText(auditMotionActualRaw.last_family, 48),
             settle_result: cleanText(auditMotionActualRaw.settle_result, 48)
           },
           suppressed: Array.isArray(auditMotionRaw.suppressed)

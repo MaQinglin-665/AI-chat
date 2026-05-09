@@ -87,7 +87,7 @@ def detect_scene_drift(scene_id: str, reply: str) -> bool:
         "desk_weird": r"\b(pointer lag|jitter\w*|tracking|position hiccup|hiccup|input|mouse|trackpad|move it|moving it|try moving|blank spot|click once|click|10[- ]?minutes?|vibe goes normal|quick test|restart|settings|setup)\b",
         "correction": r"\b(unplug|replug|trackpad|mouse|settings|reset reality|10[- ]?minute|save/confirm)\b",
         "finished": r"\b(save|saved|next ten|next 10|close|re-check|check for anything broken|next step|done-done|updated version|make sure you saved|tell me what (you )?(want|wanna) to do next|wanna do next)\b",
-        "comfort": r"\b(steps?:|you should|try to|set a timer|10[- ]?minute|next small step|action plan)\b",
+        "comfort": r"\b(steps?:|you should|try to|set a timer|10[- ]?minute|next small step|action plan|save what you have|save what you|on-screen check|quick on-screen|before you drift)\b",
         "next_step": r"\b(i hear you|keep this short|what sounds good|maybe|whatever you want|desktop/file tidy|desktop tidy|file tidy|restart|quick test|mouse|cursor|pointer|trackpad|jitter\w*|input|save/confirm|hit save|on-screen|clipboard supervisor|timer|stop on purpose)\b",
         "closing": r"\b(tomorrow|continue|anything else|before you (fully )?(go|sleep|zone out)|before you go|hit save|save if|save/confirm|save whatever|leaving on-screen)\b",
     }

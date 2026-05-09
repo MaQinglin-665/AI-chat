@@ -509,6 +509,13 @@ def test_character_brain_reply_director_repairs_scene_policy_violations():
     assert finished_next_step == "Look at you, actually finishing the thing. Suspiciously competent."
     assert closing_save_prompt == "Go sleep. I'll keep the pixels under questionable supervision."
 
+    comfort_task_drift = character_brain.apply_character_brain_reply_constraints(
+        "Hey... I'm sorry. That low-battery, heavy-in-the-brain kind of bad is brutal-so take a quiet breath, then save what you have and do a quick on-screen check before you drift.",
+        character_brain.build_character_brain_decision(user_message="I feel bad."),
+        user_message="I feel bad.",
+    )
+    assert comfort_task_drift == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+
 
 def test_character_brain_comfort_priority_beats_next_step_question():
     decision = character_brain.build_character_brain_decision(

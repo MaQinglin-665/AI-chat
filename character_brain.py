@@ -1991,7 +1991,7 @@ def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str
     if intent == "comfort" and not user_asked_advice:
         return bool(
             re.search(
-                r"(^|\s)(1\.|2\.|first,|second,|steps?:|strategy|you should|try to|set a timer|make a list|action plan)\b|\b(save anything|take 10 minutes|tidy your space|call it|10[- ]?minute|next small step|tiny step|first move|open the thing|allowed to stop|reassess|we'?ll do|we will do|let'?s do)\b",
+                r"(^|\s)(1\.|2\.|first,|second,|steps?:|strategy|you should|try to|set a timer|make a list|action plan)\b|\b(save anything|save what you have|save what you|on-screen check|quick on-screen|before you drift|take 10 minutes|tidy your space|call it|10[- ]?minute|next small step|tiny step|first move|open the thing|allowed to stop|reassess|we'?ll do|we will do|let'?s do)\b",
                 lower,
             )
         )
