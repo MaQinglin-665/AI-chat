@@ -1002,6 +1002,7 @@ def test_character_brain_question_policy_none_removes_generic_followup_without_f
 
     assert reply == "The desk is giving cursed furniture energy."
     assert decision["performance_execution"]["removed_followup"] is True
+    assert decision["performance_execution"]["stage_callback_added"] is False
 
 
 def test_character_brain_safe_intents_strip_unsafe_bits_and_task_stays_useful():
@@ -1022,6 +1023,112 @@ def test_character_brain_safe_intents_strip_unsafe_bits_and_task_stays_useful():
     assert "keyboard" not in comfort_reply.lower()
     assert comfort["performance_execution"]["removed_unsafe_bit"] is True
     assert task_reply == "One tiny step. Ten minutes. No grand destiny ceremony."
+
+
+def test_character_brain_stage_callback_recalls_recent_bit_then_cools_down():
+    decision = character_brain.build_character_brain_decision(
+        user_message="This desk feels weird today.",
+        history=[],
+    )
+
+    reply = character_brain.apply_character_brain_reply_constraints(
+        "The desk is acting innocent. A background process is pretending it meant to do that.",
+        decision,
+        user_message="This desk feels weird today.",
+    )
+    state = character_brain.update_brain_session_state(
+        None,
+        decision=decision,
+        user_message="This desk feels weird today.",
+        now_ts=7000,
+    )
+    ready_state = {
+        **state,
+        "stage_callback_cooldown_turns": 0,
+        "stage_turns_since_callback": 2,
+    }
+    second = character_brain.build_character_brain_decision(
+        user_message="This desk still feels weird.",
+        history=[],
+        session_state=ready_state,
+    )
+    second_reply = character_brain.apply_character_brain_reply_constraints(
+        "The desk is still pretending to be furniture.",
+        second,
+        user_message="This desk still feels weird.",
+    )
+    next_state = character_brain.update_brain_session_state(
+        ready_state,
+        decision=second,
+        user_message="This desk still feels weird.",
+        now_ts=7010,
+    )
+
+    assert decision["improv"]["callback_policy"] == "allow_one_callback"
+    assert decision["performance_execution"]["stage_callback_added"] is False
+    assert decision["performance_execution"]["used_bit"] is True
+    assert "background process" in reply.lower()
+    assert state["stage_recent_callback"] == decision["performance_bit"]
+    assert second["improv"]["callback_policy"] == "recall_recent"
+    assert second["performance_execution"]["stage_callback_added"] is True
+    assert second["performance_execution"]["stage_callback_bit"] == state["stage_recent_callback"]
+    assert second_reply.endswith("A background process is pretending it meant to do that.")
+    assert next_state["stage_recent_callback"] == state["stage_recent_callback"]
+    assert next_state["stage_callback_cooldown_turns"] >= 1
+
+
+def test_character_brain_unspoken_stage_callback_is_not_recorded_as_recent_memory():
+    decision = character_brain.build_character_brain_decision(
+        user_message="This desk feels weird today.",
+        history=[],
+    )
+    decision["reply_shape"] = "one_liner"
+
+    reply = character_brain.apply_character_brain_reply_constraints(
+        "The desk is acting innocent.",
+        decision,
+        user_message="This desk feels weird today.",
+    )
+    state = character_brain.update_brain_session_state(
+        None,
+        decision=decision,
+        user_message="This desk feels weird today.",
+        now_ts=7100,
+    )
+
+    assert reply == "The desk is acting innocent."
+    assert decision["performance_execution"]["stage_callback_added"] is False
+    assert decision["performance_execution"]["stage_callback_suppressed"] == "allow_one_callback"
+    assert decision["performance_execution"]["used_bit"] is False
+    assert state["stage_recent_callback"] == ""
+    assert state["stage_turns_since_callback"] == 0
+
+
+def test_character_brain_stage_callbacks_are_clamped_for_safe_and_task_scenes():
+    scenarios = [
+        ("I feel bad.", "Stay still for a second."),
+        ("What next?", "Pick the smallest next step."),
+        ("I'm going to sleep.", "Go sleep."),
+    ]
+
+    for user_message, raw_reply in scenarios:
+        decision = character_brain.build_character_brain_decision(user_message=user_message, history=[])
+        reply = character_brain.apply_character_brain_reply_constraints(
+            raw_reply,
+            decision,
+            user_message=user_message,
+        )
+
+        assert decision["performance_execution"]["stage_callback_added"] is False
+        assert decision["performance_execution"]["stage_callback_suppressed"] in {
+            "",
+            "none",
+            "intent_clamped",
+            "safety_clamp",
+            "clarify_only",
+        }
+        assert "background process" not in reply.lower()
+        assert "keyboard" not in reply.lower()
 
 
 def test_character_brain_repairs_unbalanced_parenthetical_after_shape_trim():

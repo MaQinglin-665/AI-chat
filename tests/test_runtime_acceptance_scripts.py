@@ -187,6 +187,52 @@ def test_dialogue_audit_report_is_public_and_uses_safe_payload_shape():
     assert "answer_then_bit" in report
 
 
+def test_dialogue_audit_marks_repeated_stage_bits_without_private_data():
+    records = [
+        {
+            "ok": True,
+            "performance_bit": "cursor_side_eye",
+            "performance_execution": {
+                "used_bit": True,
+                "stage_callback_added": True,
+                "stage_callback_bit": "cursor_side_eye",
+                "private_prompt": "SECRET",
+            },
+            "issues": [],
+        },
+        {
+            "ok": True,
+            "performance_bit": "cursor_side_eye",
+            "performance_execution": {
+                "used_bit": True,
+                "stage_callback_added": True,
+                "stage_callback_bit": "cursor_side_eye",
+                "private_prompt": "SECRET",
+            },
+            "issues": [],
+        },
+    ]
+
+    audit.mark_repeated_bit_issues(records)
+    report = audit.format_audit_report(
+        {
+            "mode": "chat",
+            "scene_count": 2,
+            "gate_ok": False,
+            "median_elapsed_ms": 0,
+            "p95_elapsed_ms": 0,
+            "issue_counts": {"bit_repeat": 1},
+            "recommendation": "review",
+            "records": records,
+        }
+    )
+
+    assert "bit_repeat" in records[1]["issues"]
+    assert records[1]["ok"] is False
+    assert "SECRET" not in report
+    assert "private_prompt" not in report
+
+
 def test_v16_performance_audit_clamps_safe_scenes_and_reports_public_contract():
     safe_issues = audit_v16.analyze_performance_contract(
         "Tiny victory lap.",
@@ -268,3 +314,25 @@ def test_v16_performance_audit_clamps_safe_scenes_and_reports_public_contract():
     assert "SECRET" not in report
     assert "private_prompt" not in report
     assert "raw history" not in report.lower()
+
+
+def test_v16_performance_audit_marks_repeated_stage_bits():
+    records = [
+        {
+            "ok": True,
+            "performance_bit": "keyboard_judge",
+            "performance_execution": {"used_bit": True, "stage_callback_bit": "keyboard_judge"},
+            "issues": [],
+        },
+        {
+            "ok": True,
+            "performance_bit": "keyboard_judge",
+            "performance_execution": {"stage_callback_added": True, "stage_callback_bit": "keyboard_judge"},
+            "issues": [],
+        },
+    ]
+
+    audit_v16.mark_repeated_bit_issues(records)
+
+    assert "bit_repeat" in records[1]["issues"]
+    assert records[1]["ok"] is False

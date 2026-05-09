@@ -406,6 +406,9 @@ function createMemoryStorage(initial = {}) {
         shortened: true,
         used_bit: false,
         final_sentences: 2,
+        stage_callback_added: true,
+        stage_callback_suppressed: "",
+        stage_callback_bit: "cursor_side_eye",
         private_prompt: "SECRET"
       },
       performance_timeline: {
@@ -546,6 +549,8 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.performance_bit_guide, undefined, "character brain snapshot should not persist private bit guidance");
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.removed_followup, true, "character brain snapshot should restore public execution summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.removed_context_bleed, true, "character brain snapshot should restore context bleed execution summary");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_execution.stage_callback_added, true, "character brain snapshot should restore public stage callback status");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_execution.stage_callback_bit, "cursor_side_eye", "character brain snapshot should restore public stage callback bit");
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.private_prompt, undefined, "character brain snapshot should not persist private execution fields");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.pre, "soft_anchor", "character brain snapshot should restore public timeline summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.beats, 0, "character brain snapshot should restore compact timeline beat count");
@@ -613,7 +618,10 @@ function createMemoryStorage(initial = {}) {
         removed_context_bleed: false,
         shortened: true,
         used_bit: false,
-        final_sentences: 2
+        final_sentences: 2,
+        stage_callback_added: false,
+        stage_callback_suppressed: "none",
+        stage_callback_bit: "room_anchor"
       },
       performance_timeline: {
         enabled: true,
@@ -747,7 +755,9 @@ function createMemoryStorage(initial = {}) {
   assert.ok(
     brainReport.includes("Execution")
       && brainReport.includes("removed_followup=yes")
-      && brainReport.includes("shortened=yes"),
+      && brainReport.includes("shortened=yes")
+      && brainReport.includes("stage_callback=none")
+      && brainReport.includes("bit=room_anchor"),
     "character brain debug report should include compact public execution summary"
   );
   assert.ok(

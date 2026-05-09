@@ -164,7 +164,8 @@
           "",
           "Execution",
           `shape=${clean(execution.reply_shape, clean(safe.reply_shape, "none"))}; final_sentences=${Number(execution.final_sentences) || 0}`,
-          `removed_followup=${execution.removed_followup === true ? "yes" : "no"}; shortened=${execution.shortened === true ? "yes" : "no"}; used_bit=${execution.used_bit === true ? "yes" : "no"}; removed_unsafe_bit=${execution.removed_unsafe_bit === true ? "yes" : "no"}; removed_context=${execution.removed_context_bleed === true ? "yes" : "no"}`
+          `removed_followup=${execution.removed_followup === true ? "yes" : "no"}; shortened=${execution.shortened === true ? "yes" : "no"}; used_bit=${execution.used_bit === true ? "yes" : "no"}; removed_unsafe_bit=${execution.removed_unsafe_bit === true ? "yes" : "no"}; removed_context=${execution.removed_context_bleed === true ? "yes" : "no"}`,
+          `stage_callback=${execution.stage_callback_added === true ? "added" : clean(execution.stage_callback_suppressed, "no")}; bit=${clean(execution.stage_callback_bit, "none")}`
         ]
       : [];
     const timelineSuppressed = Array.isArray(timeline?.suppressed)

@@ -269,6 +269,7 @@ def build_scene_record(scene: dict[str, str], result: dict[str, Any]) -> dict[st
     brain = result.get("character_brain") if isinstance(result.get("character_brain"), dict) else {}
     runtime = result.get("character_runtime") if isinstance(result.get("character_runtime"), dict) else {}
     reply = redact_report_text(result.get("reply") or "")
+    execution_raw = brain.get("performance_execution") if isinstance(brain.get("performance_execution"), dict) else {}
     analysis = analyze_reply_quality(
         reply,
         brain,
@@ -291,16 +292,13 @@ def build_scene_record(scene: dict[str, str], result: dict[str, Any]) -> dict[st
         "reply_shape": clean_text(brain.get("reply_shape"), 80),
         "spontaneity": safe_int(brain.get("spontaneity"), 0),
         "question_policy": clean_text(brain.get("question_policy"), 80),
+        "performance_bit": clean_text(brain.get("performance_bit"), 48),
         "performance_execution": {
-            "removed_followup": bool((brain.get("performance_execution") or {}).get("removed_followup"))
-            if isinstance(brain.get("performance_execution"), dict)
-            else False,
-            "shortened": bool((brain.get("performance_execution") or {}).get("shortened"))
-            if isinstance(brain.get("performance_execution"), dict)
-            else False,
-            "used_bit": bool((brain.get("performance_execution") or {}).get("used_bit"))
-            if isinstance(brain.get("performance_execution"), dict)
-            else False,
+            "removed_followup": bool(execution_raw.get("removed_followup")),
+            "shortened": bool(execution_raw.get("shortened")),
+            "used_bit": bool(execution_raw.get("used_bit")),
+            "stage_callback_added": bool(execution_raw.get("stage_callback_added")),
+            "stage_callback_bit": clean_text(execution_raw.get("stage_callback_bit"), 48),
         },
         "runtime": {
             "emotion": clean_text(runtime.get("emotion"), 80),
@@ -309,6 +307,37 @@ def build_scene_record(scene: dict[str, str], result: dict[str, Any]) -> dict[st
         },
         "issues": list(dict.fromkeys(analysis["issues"])),
         "error": clean_text(redact_report_text(result.get("error")), 240),
+    }
+
+
+def _record_spoken_bit(record: dict[str, Any]) -> str:
+    execution = record.get("performance_execution") if isinstance(record.get("performance_execution"), dict) else {}
+    if execution.get("stage_callback_added") or execution.get("used_bit"):
+        return clean_text(execution.get("stage_callback_bit") or record.get("performance_bit"), 48)
+    return ""
+
+
+def mark_repeated_bit_issues(records: list[dict[str, Any]]) -> None:
+    last_bit = ""
+    for record in records:
+        bit = _record_spoken_bit(record)
+        if bit and bit == last_bit:
+            issues = record.setdefault("issues", [])
+            if "bit_repeat" not in issues:
+                issues.append("bit_repeat")
+            record["ok"] = False
+        if bit:
+            last_bit = bit
+
+
+def _public_execution_summary(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    return {
+        "removed_followup": bool(raw.get("removed_followup")),
+        "shortened": bool(raw.get("shortened")),
+        "used_bit": bool(raw.get("used_bit")),
+        "stage_callback_added": bool(raw.get("stage_callback_added")),
+        "stage_callback_bit": clean_text(raw.get("stage_callback_bit"), 48),
     }
 
 
@@ -350,6 +379,7 @@ def run_dialogue_audit(
                     {"role": "assistant", "content": record["reply"]},
                 ]
             )
+    mark_repeated_bit_issues(records)
     elapsed = [safe_int(item.get("elapsed_ms"), 0) for item in records if safe_int(item.get("elapsed_ms"), 0) > 0]
     issues: dict[str, int] = {}
     for item in records:
@@ -409,7 +439,7 @@ def format_audit_report(summary: dict[str, Any]) -> str:
                     f"spontaneity={safe_int(item.get('spontaneity'), 0)}/3 policy={clean_text(item.get('question_policy'), 80)}"
                 ),
                 f"    reply: {clean_text(item.get('reply'), 500)}",
-                f"    execution: {json.dumps(item.get('performance_execution') or {}, ensure_ascii=False, sort_keys=True)}",
+                f"    execution: {json.dumps(_public_execution_summary(item.get('performance_execution')), ensure_ascii=False, sort_keys=True)}",
                 f"    runtime: {json.dumps(item.get('runtime') or {}, ensure_ascii=False, sort_keys=True)}",
                 f"    issues: {issues}",
             ]

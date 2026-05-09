@@ -223,6 +223,13 @@ BIT_BANK = {
     "none": "do not add an extra bit this turn",
 }
 
+STAGE_CALLBACK_PHRASES = {
+    "cursor_side_eye": "Cursor side-eye logged.",
+    "keyboard_judge": "The keyboard is judging this with tiny authority.",
+    "pixel_static": "The pixels made a small suspicious noise.",
+    "background_process": "A background process is pretending it meant to do that.",
+}
+
 
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
@@ -432,6 +439,9 @@ def _public_stage_memory(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         value = src.get(flat_key)
         if value not in (None, ""):
             return value
+        value = src.get(nested_key)
+        if value not in (None, ""):
+            return value
         return nested.get(nested_key)
 
     return {
@@ -518,10 +528,12 @@ def _select_improv_director(
     cooldown = max(0, min(8, _safe_int(stage.get("callback_cooldown_turns"), 0)))
     if clamp != "none" or bit == "none":
         callback_policy = "none"
-    elif recent_callback == bit and turns_since < 3:
+    elif recent_callback == bit and turns_since < 2:
         callback_policy = "avoid_repeat"
     elif cooldown > 0:
         callback_policy = "cooldown"
+    elif recent_callback and 2 <= turns_since <= 4 and chaos >= 2:
+        callback_policy = "recall_recent"
     elif chaos >= 2:
         callback_policy = "allow_one_callback"
     else:
@@ -1116,11 +1128,20 @@ def update_brain_session_state(
     if bit == "none":
         bit = ""
     callback_policy = _clean_text(improv.get("callback_policy"), 40)
+    execution = decision.get("performance_execution") if isinstance(decision.get("performance_execution"), dict) else None
+    execution_bit = _clean_text(execution.get("stage_callback_bit") if isinstance(execution, dict) else "", 48)
+    callback_reached_reply = (
+        True
+        if execution is None
+        else execution.get("used_bit") is True or execution.get("stage_callback_added") is True
+    )
+    if execution_bit and callback_reached_reply:
+        bit = execution_bit
     recent_callback = _clean_text(stage.get("recent_callback"), 48)
     turns_since_callback = max(0, min(20, _safe_int(stage.get("turns_since_callback"), 0)))
     callback_cooldown_turns = max(0, min(8, _safe_int(stage.get("callback_cooldown_turns"), 0)))
     last_callback_at = max(0, _safe_int(stage.get("last_callback_at"), 0))
-    if callback_policy == "allow_one_callback" and bit:
+    if callback_policy in {"allow_one_callback", "recall_recent"} and bit and callback_reached_reply:
         recent_callback = bit
         turns_since_callback = 0
         callback_cooldown_turns = STAGE_CALLBACK_COOLDOWN_TURNS
@@ -2120,6 +2141,52 @@ def _contains_performance_bit_language(sentence: str) -> bool:
     return any(marker in lower for marker in markers)
 
 
+def _stage_callback_phrase(performance_bit: str) -> str:
+    return STAGE_CALLBACK_PHRASES.get(_clean_text(performance_bit, 48), "")
+
+
+def _stage_callback_execution_plan(
+    text: str,
+    decision: Dict[str, Any],
+    *,
+    intent: str,
+    reply_shape: str,
+    max_sentences: int,
+    user_message: str = "",
+) -> Dict[str, Any]:
+    improv = decision.get("improv") if isinstance(decision.get("improv"), dict) else {}
+    safety = decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
+    stage = _public_stage_memory(decision.get("stage_memory"))
+    bit = _clean_text(decision.get("performance_bit"), 48)
+    policy = _clean_text(improv.get("callback_policy"), 40) or "none"
+    callback_bit = _clean_text(stage.get("recent_callback"), 48) if policy == "recall_recent" else bit
+    phrase = _stage_callback_phrase(callback_bit)
+    safe_intent = _clean_text(intent, 40)
+    current = _normalize_reply_text_spacing(text)
+    if policy != "recall_recent":
+        return {"text": current, "added": False, "suppressed": policy or "not_allowed", "bit": callback_bit or bit}
+    if safe_intent not in IMPROV_HIGH_CHAOS_INTENTS:
+        return {"text": current, "added": False, "suppressed": "intent_clamped", "bit": callback_bit}
+    if _clean_text(safety.get("level"), 40) not in {"", "none"}:
+        return {"text": current, "added": False, "suppressed": "safety_clamp", "bit": callback_bit}
+    if not phrase:
+        return {"text": current, "added": False, "suppressed": "no_public_phrase", "bit": callback_bit}
+    if not current or _contains_cjk_text(current):
+        return {"text": current, "added": False, "suppressed": "unsafe_text", "bit": callback_bit}
+    if _reply_contains_selected_bit(current, callback_bit):
+        return {"text": current, "added": False, "suppressed": "already_present", "bit": callback_bit}
+    sentence_limit = _shape_sentence_limit(reply_shape, safe_intent, max_sentences)
+    sentences = _split_reply_sentences(current)
+    if len(sentences) >= sentence_limit:
+        return {"text": current, "added": False, "suppressed": "shape_full", "bit": callback_bit}
+    candidate = _normalize_reply_text_spacing(f"{current} {phrase}")
+    if _looks_like_scene_policy_violation(candidate, safe_intent, user_message):
+        return {"text": current, "added": False, "suppressed": "scene_policy", "bit": callback_bit}
+    if _looks_like_context_bleed_reply(candidate, safe_intent, user_message):
+        return {"text": current, "added": False, "suppressed": "context_bleed", "bit": callback_bit}
+    return {"text": candidate, "added": True, "suppressed": "", "bit": callback_bit}
+
+
 def _filter_unsafe_bits_for_intent(sentences: List[str], intent: str) -> List[str]:
     if intent not in {"comfort", "reminder", "closing", "low_interrupt_checkin"}:
         return sentences
@@ -2219,9 +2286,11 @@ def _record_performance_execution(
     removed_context_bleed: bool,
     before_sentence_count: int,
     after_sentence_count: int,
+    stage_callback: Optional[Dict[str, Any]] = None,
 ) -> None:
     if not isinstance(decision, dict):
         return
+    callback_plan = stage_callback if isinstance(stage_callback, dict) else {}
     decision["performance_execution"] = {
         "reply_shape": _normalize_reply_shape(reply_shape),
         "question_policy": _normalize_question_policy(question_policy),
@@ -2237,6 +2306,9 @@ def _record_performance_execution(
             _clean_text(decision.get("performance_bit"), 48),
         ),
         "final_sentences": max(0, min(8, after_sentence_count)),
+        "stage_callback_added": callback_plan.get("added") is True,
+        "stage_callback_suppressed": _clean_text(callback_plan.get("suppressed"), 48),
+        "stage_callback_bit": _clean_text(callback_plan.get("bit"), 48),
     }
 
 
@@ -2365,6 +2437,15 @@ def apply_character_brain_reply_constraints(
         constrained = _fallback_reply_for_intent(intent, user_message) or original
     constrained = _normalize_reply_text_spacing(constrained)
     constrained = _repair_unbalanced_reply_punctuation(constrained)
+    stage_callback = _stage_callback_execution_plan(
+        constrained,
+        decision,
+        intent=intent,
+        reply_shape=reply_shape,
+        max_sentences=max_sentences,
+        user_message=user_message,
+    )
+    constrained = _normalize_reply_text_spacing(stage_callback.get("text") or constrained)
     _record_performance_execution(
         decision,
         reply_shape=reply_shape,
@@ -2379,6 +2460,7 @@ def apply_character_brain_reply_constraints(
         removed_context_bleed=removed_context_bleed,
         before_sentence_count=before_sentence_count,
         after_sentence_count=len(_split_reply_sentences(constrained)),
+        stage_callback=stage_callback,
     )
     return constrained + meta
 
@@ -2417,6 +2499,9 @@ def build_character_brain_public_snapshot(
         "shortened": raw_execution.get("shortened") is True,
         "used_bit": raw_execution.get("used_bit") is True,
         "final_sentences": max(0, min(8, _safe_int(raw_execution.get("final_sentences"), 0))),
+        "stage_callback_added": raw_execution.get("stage_callback_added") is True,
+        "stage_callback_suppressed": _clean_text(raw_execution.get("stage_callback_suppressed"), 48),
+        "stage_callback_bit": _clean_text(raw_execution.get("stage_callback_bit"), 48),
     }
     return {
         "version": 1,

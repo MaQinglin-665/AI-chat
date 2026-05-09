@@ -393,7 +393,10 @@
         removed_context_bleed: executionRaw.removed_context_bleed === true,
         shortened: executionRaw.shortened === true,
         used_bit: executionRaw.used_bit === true,
-        final_sentences: cleanInt(executionRaw.final_sentences, 0, 0, 8)
+        final_sentences: cleanInt(executionRaw.final_sentences, 0, 0, 8),
+        stage_callback_added: executionRaw.stage_callback_added === true,
+        stage_callback_suppressed: cleanText(executionRaw.stage_callback_suppressed, 48),
+        stage_callback_bit: cleanText(executionRaw.stage_callback_bit, 48)
       },
       performance_timeline: {
         enabled: timelineRaw.enabled === true,

@@ -136,6 +136,7 @@ def analyze_performance_contract(reply: str, brain: dict[str, Any] | None, runti
 def build_scene_record(scene: dict[str, str], result: dict[str, Any]) -> dict[str, Any]:
     brain = result.get("character_brain") if isinstance(result.get("character_brain"), dict) else {}
     runtime = result.get("character_runtime") if isinstance(result.get("character_runtime"), dict) else {}
+    execution = brain.get("performance_execution") if isinstance(brain.get("performance_execution"), dict) else {}
     issues = analyze_performance_contract(
         str(result.get("reply") or ""),
         brain,
@@ -155,6 +156,12 @@ def build_scene_record(scene: dict[str, str], result: dict[str, Any]) -> dict[st
         "shape": clean_text(brain.get("reply_shape"), 48),
         "spontaneity": safe_int(brain.get("spontaneity"), 0),
         "policy": clean_text(brain.get("question_policy"), 48),
+        "performance_bit": clean_text(brain.get("performance_bit"), 48),
+        "performance_execution": {
+            "used_bit": bool(execution.get("used_bit")),
+            "stage_callback_added": bool(execution.get("stage_callback_added")),
+            "stage_callback_bit": clean_text(execution.get("stage_callback_bit"), 48),
+        },
         "runtime": {
             "emotion": clean_text(runtime.get("emotion"), 32),
             "action": clean_text(runtime.get("action"), 32),
@@ -162,6 +169,26 @@ def build_scene_record(scene: dict[str, str], result: dict[str, Any]) -> dict[st
         },
         "issues": issues,
     }
+
+
+def _record_spoken_bit(record: dict[str, Any]) -> str:
+    execution = record.get("performance_execution") if isinstance(record.get("performance_execution"), dict) else {}
+    if execution.get("stage_callback_added") or execution.get("used_bit"):
+        return clean_text(execution.get("stage_callback_bit") or record.get("performance_bit"), 48)
+    return ""
+
+
+def mark_repeated_bit_issues(records: list[dict[str, Any]]) -> None:
+    last_bit = ""
+    for record in records:
+        bit = _record_spoken_bit(record)
+        if bit and bit == last_bit:
+            issues = record.setdefault("issues", [])
+            if "bit_repeat" not in issues:
+                issues.append("bit_repeat")
+            record["ok"] = False
+        if bit:
+            last_bit = bit
 
 
 def summarize_records(records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -232,6 +259,7 @@ def run_audit(*, base_url: str, token: str, timeout_sec: float) -> dict[str, Any
                 {"role": "user", "content": scene["input"]},
                 {"role": "assistant", "content": reply},
             ])
+    mark_repeated_bit_issues(records)
     return summarize_records(records)
 
 
