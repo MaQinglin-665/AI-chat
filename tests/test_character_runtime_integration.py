@@ -57,6 +57,35 @@ def _chat_payload(message="hello"):
     return {"message": message, "history": []}
 
 
+def test_lightweight_llm_probe_caps_timeout_without_long_doctor_wait(monkeypatch):
+    captured = {}
+    cfg = _build_test_config()
+    cfg["llm"] = {
+        "provider": "openai-compatible",
+        "base_url": "http://127.0.0.1:9999/v1",
+        "model": "fast-test-model",
+        "request_timeout": 120,
+    }
+
+    def fake_http_post_json(url, payload, **kwargs):
+        captured["url"] = url
+        captured["payload"] = payload
+        captured["timeout"] = kwargs.get("timeout")
+        captured["attempts"] = kwargs.get("attempts")
+        return {"choices": [{"message": {"content": "OK"}}]}
+
+    monkeypatch.setattr(app, "http_post_json", fake_http_post_json)
+
+    result = app._run_lightweight_llm_probe(cfg)
+
+    assert result["ok"] is True
+    assert result["model"] == "fast-test-model"
+    assert captured["url"] == "http://127.0.0.1:9999/v1/chat/completions"
+    assert captured["payload"]["max_tokens"] == 8
+    assert captured["timeout"] == 12
+    assert captured["attempts"] == 1
+
+
 def _post_stream_events(url, payload):
     req = urllib.request.Request(
         url,

@@ -434,8 +434,8 @@ def _run_lightweight_llm_probe(config):
     llm_cfg["max_tokens"] = 8
     llm_cfg["max_output_tokens"] = 8
     llm_cfg["request_timeout"] = min(
-        8,
-        max(4, _safe_int_value(llm_cfg.get("request_timeout", 8), 8)),
+        12,
+        max(4, _safe_int_value(llm_cfg.get("request_timeout", 12), 12)),
     )
     provider = _resolve_llm_provider(llm_cfg)
     model = str(llm_cfg.get("model", "") or "").strip()
