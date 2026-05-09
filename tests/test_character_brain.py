@@ -166,6 +166,73 @@ def test_character_brain_improv_director_clamps_protected_intents():
     assert task["question_policy"] == "clarify_only"
 
 
+def test_character_brain_motion_director_maps_intents_to_safe_action_plans():
+    casual = character_brain.build_character_brain_decision(user_message="This desk feels weird today.")
+    question = character_brain.build_character_brain_decision(user_message="What are you doing?")
+    correction = character_brain.build_character_brain_decision(user_message="You were wrong.")
+    encouragement = character_brain.build_character_brain_decision(user_message="I finished it.")
+    comfort = character_brain.build_character_brain_decision(user_message="I feel bad.")
+    task = character_brain.build_character_brain_decision(user_message="What next?")
+    closing = character_brain.build_character_brain_decision(user_message="I'm going to sleep.")
+
+    assert casual["motion_director"]["pre_reaction"] in {"blink_pulse", "side_eye", "deadpan_pause"}
+    assert casual["motion_director"]["speech_beats"]
+    assert question["motion_director"]["pre_reaction"] in {"head_tilt", "side_eye", "blink_pulse"}
+    assert correction["motion_director"]["correction_reaction"] == "embarrassed_recovery"
+    assert "deadpan_pause" in correction["motion_director"]["speech_beats"]
+    assert encouragement["motion_director"]["pre_reaction"] == "happy_pulse"
+    assert "tiny_victory_nod" in encouragement["motion_director"]["speech_beats"]
+    assert comfort["motion_director"]["pre_reaction"] == "eyes_down_soft"
+    assert comfort["motion_director"]["speech_beats"] == []
+    assert "comfort_no_extra_motion" in comfort["motion_director"]["suppressed_reasons"]
+    assert task["motion_director"]["pre_reaction"] == "thinking_nod"
+    assert task["motion_director"]["post_settle"] == "focused_idle"
+    assert closing["motion_director"]["pre_reaction"] == "no_opening"
+    assert closing["motion_director"]["post_settle"] == "closing_idle"
+
+
+def test_character_brain_context_bleed_guard_blocks_prior_task_agenda():
+    task = character_brain.build_character_brain_decision(user_message="What should I do next?")
+    state = character_brain.update_brain_session_state(
+        None,
+        decision=task,
+        user_message="What should I do next?",
+        now_ts=7000,
+    )
+    encouragement = character_brain.build_character_brain_decision(
+        user_message="I finished it.",
+        session_state=state,
+    )
+    constrained = character_brain.apply_character_brain_reply_constraints(
+        "Nice—tiny victory lap. Save what you did, close the tabs/apps you don't need, then go sleep.",
+        encouragement,
+        user_message="I finished it.",
+    )
+
+    assert encouragement["context_bleed_guard"]["active"] is True
+    assert constrained == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert encouragement["performance_execution"]["removed_context_bleed"] is True
+    assert "close the tabs" not in constrained.lower()
+
+    comfort = character_brain.build_character_brain_decision(user_message="I feel bad.")
+    comfort_reply = character_brain.apply_character_brain_reply_constraints(
+        "Hey, take 10 minutes right now: set a timer, save your work, and close it down gently.",
+        comfort,
+        user_message="I feel bad.",
+    )
+    closing = character_brain.build_character_brain_decision(user_message="I'm going to sleep.")
+    closing_reply = character_brain.apply_character_brain_reply_constraints(
+        "Alright, save your work and close the tabs, then go sleep.",
+        closing,
+        user_message="I'm going to sleep.",
+    )
+
+    assert comfort_reply == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+    assert comfort["performance_execution"]["removed_context_bleed"] is True
+    assert closing_reply == "Go sleep. I'll keep the pixels under questionable supervision."
+    assert closing["performance_execution"]["removed_context_bleed"] is True
+
+
 def test_character_brain_comfort_priority_beats_next_step_question():
     decision = character_brain.build_character_brain_decision(
         user_message="I feel sad and anxious. What should I do next?",
@@ -845,6 +912,8 @@ def test_character_brain_public_snapshot_continuity_is_safe_and_compact():
     assert 0 <= snapshot["improv"]["chaos_level"] <= 3
     assert snapshot["stage_memory"]["agenda"]
     assert snapshot["safety_clamp"]["level"] in {"none", "safe_scene", "task_scene"}
+    assert snapshot["motion_director"]["pre_reaction"]
+    assert snapshot["motion_director"]["post_settle"]
     assert snapshot["continuity"]["recent_user_need"] == "direction"
     assert snapshot["continuity"]["last_topic"] == "planning"
     assert "style_beat_guide" not in snapshot

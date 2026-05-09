@@ -360,6 +360,7 @@ function createMemoryStorage(initial = {}) {
         question_policy: "none",
         removed_followup: true,
         removed_unsafe_bit: false,
+        removed_context_bleed: true,
         shortened: true,
         used_bit: false,
         final_sentences: 2,
@@ -412,6 +413,15 @@ function createMemoryStorage(initial = {}) {
         reason: "comfort",
         bit_guide: "SECRET"
       },
+      motion_director: {
+        pre_reaction: "eyes_down_soft",
+        speech_start: "soft_speech_start",
+        speech_beats: ["SECRET", "tiny_nod"].slice(1),
+        correction_reaction: "none",
+        post_settle: "soft_idle",
+        suppressed_reasons: ["motion_disallowed", "comfort_no_extra_motion"],
+        private_prompt: "SECRET"
+      },
       feedback_effects: ["shorter_replies"],
       continuity: {
         last_intent: "comfort",
@@ -461,6 +471,7 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.performance_bit, "room_anchor", "character brain snapshot should restore public performance bit");
   assert.strictEqual(restored.characterBrainLastDecision.performance_bit_guide, undefined, "character brain snapshot should not persist private bit guidance");
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.removed_followup, true, "character brain snapshot should restore public execution summary");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_execution.removed_context_bleed, true, "character brain snapshot should restore context bleed execution summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.private_prompt, undefined, "character brain snapshot should not persist private execution fields");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.pre, "soft_anchor", "character brain snapshot should restore public timeline summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.beats, 0, "character brain snapshot should restore compact timeline beat count");
@@ -474,6 +485,9 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.stage_memory.raw_history, undefined, "character brain snapshot should not persist raw stage memory fields");
   assert.strictEqual(restored.characterBrainLastDecision.safety_clamp.level, "safe_scene", "character brain snapshot should restore public safety clamp");
   assert.strictEqual(restored.characterBrainLastDecision.safety_clamp.bit_guide, undefined, "character brain snapshot should not persist private safety clamp fields");
+  assert.strictEqual(restored.characterBrainLastDecision.motion_director.pre_reaction, "eyes_down_soft", "character brain snapshot should restore public motion director plan");
+  assert.deepStrictEqual(restored.characterBrainLastDecision.motion_director.suppressed_reasons, ["motion_disallowed", "comfort_no_extra_motion"], "character brain snapshot should restore compact motion suppressions");
+  assert.strictEqual(restored.characterBrainLastDecision.motion_director.private_prompt, undefined, "character brain snapshot should not persist private motion fields");
   assert.strictEqual(restored.characterBrainLastDecision.continuity.recent_user_need, "reassurance", "character brain snapshot should restore compact continuity");
   assert.strictEqual(restored.characterBrainLastDecision.output_constraints.allow_motion, false, "character brain snapshot should restore safe output constraints");
   assert.strictEqual(restored.characterBrainLastDecision.history_tail, undefined, "restored character brain snapshot should stay public-only");
@@ -505,6 +519,7 @@ function createMemoryStorage(initial = {}) {
         question_policy: "none",
         removed_followup: true,
         removed_unsafe_bit: false,
+        removed_context_bleed: false,
         shortened: true,
         used_bit: false,
         final_sentences: 2
@@ -552,6 +567,14 @@ function createMemoryStorage(initial = {}) {
       safety_clamp: {
         level: "safe_scene",
         reason: "comfort"
+      },
+      motion_director: {
+        pre_reaction: "eyes_down_soft",
+        speech_start: "soft_speech_start",
+        speech_beats: [],
+        correction_reaction: "none",
+        post_settle: "soft_idle",
+        suppressed_reasons: ["motion_disallowed", "comfort_no_extra_motion"]
       },
       feedback_effects: ["shorter_replies", "less_generic_tone"],
       continuity: {
@@ -625,6 +648,14 @@ function createMemoryStorage(initial = {}) {
       && brainReport.includes("Safety clamp")
       && brainReport.includes("level=safe_scene"),
     "character brain debug report should include public improv and stage memory summaries"
+  );
+  assert.ok(
+    brainReport.includes("Motion Director")
+      && brainReport.includes("pre=eyes_down_soft")
+      && brainReport.includes("post=soft_idle")
+      && brainReport.includes("suppressed=motion_disallowed, comfort_no_extra_motion")
+      && brainReport.includes("removed_context=no"),
+    "character brain debug report should include compact public motion director summary"
   );
   assert.ok(
     !brainReport.includes("SECRET") && !brainReport.includes("private_prompt"),
@@ -726,6 +757,34 @@ function createMemoryStorage(initial = {}) {
   });
   assert.strictEqual(closingTimeline.preReaction.suppressed, true, "closing should not perform an opening bit");
   assert.strictEqual(closingTimeline.speechBeats.length, 0, "closing should not add extra beats");
+
+  const directedTimeline = performanceTimelineController.buildPerformanceTimeline({
+    brainSnapshot: {
+      intent: "casual",
+      opening_move: "micro_reaction",
+      spontaneity: 3,
+      motion_director: {
+        pre_reaction: "side_eye",
+        speech_start: "dry_speech_start",
+        speech_beats: ["blink_pulse", "head_tilt", "side_eye"],
+        correction_reaction: "none",
+        post_settle: "settle_idle",
+        suppressed_reasons: []
+      }
+    },
+    replyText: "The desk is acting normal, which is how it gets you.",
+    mood: "idle",
+    talkStyle: "neutral",
+    ttsEnabled: true
+  });
+  assert.strictEqual(directedTimeline.preReaction.name, "side_eye", "timeline should prefer Motion Director pre-reaction");
+  assert.strictEqual(directedTimeline.speechStart.name, "dry_speech_start", "timeline should prefer Motion Director speech start");
+  assert.deepStrictEqual(
+    directedTimeline.speechBeats.map((beat) => beat.name),
+    ["blink_pulse", "head_tilt", "side_eye"],
+    "timeline should use Motion Director speech beats"
+  );
+  assert.strictEqual(directedTimeline.postSettle.name, "settle_idle", "timeline should prefer Motion Director post-settle");
 
   const summary = performanceTimelineController.toPublicTimelineSummary(deadpanTimeline);
   assert.deepStrictEqual(

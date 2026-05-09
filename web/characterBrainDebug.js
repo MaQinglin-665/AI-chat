@@ -83,6 +83,9 @@
     const safetyClamp = safe.safety_clamp && typeof safe.safety_clamp === "object" && !Array.isArray(safe.safety_clamp)
       ? safe.safety_clamp
       : null;
+    const motionDirector = safe.motion_director && typeof safe.motion_director === "object" && !Array.isArray(safe.motion_director)
+      ? safe.motion_director
+      : null;
     const improvLines = improv
       ? [
           "",
@@ -102,6 +105,20 @@
           "",
           "Safety clamp",
           `level=${clean(safetyClamp.level, "none")}; reason=${clean(safetyClamp.reason, "none")}`
+        ]
+      : [];
+    const motionSuppressed = Array.isArray(motionDirector?.suppressed_reasons)
+      ? motionDirector.suppressed_reasons.map((item) => clean(item, "")).filter(Boolean).slice(0, 6)
+      : [];
+    const motionBeats = Array.isArray(motionDirector?.speech_beats)
+      ? motionDirector.speech_beats.map((item) => clean(item, "")).filter(Boolean).slice(0, 3)
+      : [];
+    const motionLines = motionDirector
+      ? [
+          "",
+          "Motion Director",
+          `pre=${clean(motionDirector.pre_reaction, "none")}; speech=${clean(motionDirector.speech_start, "none")}; beats=${motionBeats.length ? motionBeats.join(",") : "none"}; correction=${clean(motionDirector.correction_reaction, "none")}; post=${clean(motionDirector.post_settle, "none")}`,
+          `suppressed=${motionSuppressed.length ? motionSuppressed.join(", ") : "none"}`
         ]
       : [];
     const constraints = safe.output_constraints && typeof safe.output_constraints === "object" && !Array.isArray(safe.output_constraints)
@@ -129,7 +146,7 @@
           "",
           "Execution",
           `shape=${clean(execution.reply_shape, clean(safe.reply_shape, "none"))}; final_sentences=${Number(execution.final_sentences) || 0}`,
-          `removed_followup=${execution.removed_followup === true ? "yes" : "no"}; shortened=${execution.shortened === true ? "yes" : "no"}; used_bit=${execution.used_bit === true ? "yes" : "no"}; removed_unsafe_bit=${execution.removed_unsafe_bit === true ? "yes" : "no"}`
+          `removed_followup=${execution.removed_followup === true ? "yes" : "no"}; shortened=${execution.shortened === true ? "yes" : "no"}; used_bit=${execution.used_bit === true ? "yes" : "no"}; removed_unsafe_bit=${execution.removed_unsafe_bit === true ? "yes" : "no"}; removed_context=${execution.removed_context_bleed === true ? "yes" : "no"}`
         ]
       : [];
     const timelineSuppressed = Array.isArray(timeline?.suppressed)
@@ -165,6 +182,7 @@
       ...improvLines,
       ...stageMemoryLines,
       ...safetyClampLines,
+      ...motionLines,
       `当前判断：${localize(INTENT_LABELS, safe.intent)}`,
       `回复风格：${localize(STYLE_LABELS, safe.reply_style)}；最多约 ${Number(safe.max_sentences) || 3} 句`,
       `Style beat: ${clean(safe.style_beat, "none")}`,

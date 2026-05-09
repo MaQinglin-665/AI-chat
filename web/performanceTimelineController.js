@@ -70,6 +70,56 @@
     return beats;
   }
 
+  function motionDirectorPhase(name, slot, context = {}) {
+    const key = clean(name, "");
+    if (!key || key === "none") {
+      return null;
+    }
+    const allowMotion = context.allowMotion !== false;
+    const ttsEnabled = context.ttsEnabled !== false;
+    const style = clean(context.style, "neutral");
+    const mood = clean(context.mood, "idle");
+    const beatIndex = clampInt(context.index, 0, 0, 4);
+    if (slot === "pre" && key === "no_opening") {
+      return phase("no_opening", { suppressed: true });
+    }
+    const presets = {
+      blink_pulse: { pulseStyle: "neutral", pulseBoost: 0.3, actionIntent: "listen", actionMood: mood },
+      head_tilt: { pulseStyle: "steady", pulseBoost: 0.28, actionIntent: "listen", actionMood: "thinking" },
+      side_eye: { pulseStyle: "neutral", pulseBoost: 0.34, actionIntent: "listen", actionMood: mood },
+      deadpan_pause: { pulseStyle: "neutral", pulseBoost: 0.2, actionIntent: slot === "beat" ? "talk" : "listen", actionMood: mood },
+      embarrassed_recovery: { pulseStyle: "neutral", pulseBoost: 0.36, actionIntent: "listen", actionMood: "idle" },
+      happy_pulse: { pulseStyle: "cheerful", pulseBoost: 0.36, actionIntent: "listen", actionMood: "happy" },
+      tiny_victory_nod: { pulseStyle: "cheerful", pulseBoost: 0.3, actionIntent: slot === "beat" ? "talk" : "thinking", actionMood: "happy" },
+      tiny_nod: { pulseStyle: "steady", pulseBoost: 0.24, actionIntent: slot === "beat" ? "talk" : "thinking", actionMood: "thinking" },
+      thinking_nod: { pulseStyle: "steady", pulseBoost: 0.28, actionIntent: "thinking", actionMood: "thinking" },
+      eyes_down_soft: { pulseStyle: "comfort", pulseBoost: 0.2, actionIntent: "none", actionMood: "sad" },
+      soft_idle: { pulseStyle: "comfort", pulseBoost: 0.14, actionIntent: "none", actionMood: "idle" },
+      focused_idle: { pulseStyle: "steady", pulseBoost: 0.16, actionIntent: "idle", actionMood: "idle" },
+      closing_idle: { pulseStyle: "comfort", pulseBoost: 0.18, actionIntent: "idle", actionMood: "idle" },
+      settle_idle: { pulseStyle: style, pulseBoost: 0.18, actionIntent: "idle", actionMood: "idle" },
+      soft_speech_start: { pulseStyle: "comfort", pulseBoost: 0.2, actionIntent: "none", actionMood: "sad" },
+      steady_speech_start: { pulseStyle: "steady", pulseBoost: 0.22, actionIntent: "talk", actionMood: "thinking" },
+      closing_speech_start: { pulseStyle: "comfort", pulseBoost: 0.16, actionIntent: "none", actionMood: "idle" },
+      dry_speech_start: { pulseStyle: "neutral", pulseBoost: 0.22, actionIntent: "talk", actionMood: mood },
+      bright_speech_start: { pulseStyle: "cheerful", pulseBoost: 0.26, actionIntent: "talk", actionMood: "happy" },
+      curious_speech_start: { pulseStyle: "steady", pulseBoost: 0.24, actionIntent: "talk", actionMood: "thinking" },
+      expressive_speech_start: { pulseStyle: style, pulseBoost: 0.28, actionIntent: "talk", actionMood: mood }
+    };
+    const preset = presets[key] || { pulseStyle: style, pulseBoost: 0.2, actionIntent: slot === "post" ? "idle" : "talk", actionMood: mood };
+    return phase(key, {
+      delayMs: slot === "pre" ? 50 : slot === "beat" ? 360 + beatIndex * 620 : slot === "post" ? 260 : 0,
+      pulseStyle: preset.pulseStyle,
+      pulseBoost: Number(preset.pulseBoost) || 0,
+      pulseDurationMs: slot === "post" ? 230 : 190,
+      actionIntent: allowMotion && (slot !== "speech" || ttsEnabled) ? preset.actionIntent : "none",
+      actionStyle: preset.pulseStyle,
+      actionMood: preset.actionMood,
+      beats: 1,
+      emphasis: slot === "beat" ? 0.32 : 0.2
+    });
+  }
+
   function buildPerformanceTimeline(input = {}) {
     const brain = input.brainSnapshot && typeof input.brainSnapshot === "object" && !Array.isArray(input.brainSnapshot)
       ? input.brainSnapshot
@@ -84,6 +134,9 @@
     const constraints = brain.output_constraints && typeof brain.output_constraints === "object" && !Array.isArray(brain.output_constraints)
       ? brain.output_constraints
       : {};
+    const motionDirector = brain.motion_director && typeof brain.motion_director === "object" && !Array.isArray(brain.motion_director)
+      ? brain.motion_director
+      : null;
     const allowMotion = constraints.allow_motion === false ? false : true;
     const ttsEnabled = input.ttsEnabled !== false;
     const style = clean(input.talkStyle || runtime.voice_style || brain.voice_style, "neutral");
@@ -213,9 +266,28 @@
       });
     }
 
-    const speechBeats = ttsEnabled
+    let speechBeats = ttsEnabled
       ? buildSpeechBeats({ text: replyText, spontaneity, style, mood, intent, allowMotion })
       : [];
+    if (motionDirector) {
+      const motionSuppressed = Array.isArray(motionDirector.suppressed_reasons)
+        ? motionDirector.suppressed_reasons.map((item) => clean(item)).filter(Boolean).slice(0, 6)
+        : [];
+      for (const reason of motionSuppressed) {
+        if (!suppressed.includes(reason)) suppressed.push(reason);
+      }
+      preReaction = motionDirectorPhase(motionDirector.pre_reaction, "pre", { allowMotion, ttsEnabled, style, mood }) || preReaction;
+      speechStart = motionDirectorPhase(motionDirector.speech_start, "speech", { allowMotion, ttsEnabled, style, mood }) || speechStart;
+      postSettle = motionDirectorPhase(motionDirector.post_settle, "post", { allowMotion, ttsEnabled, style, mood }) || postSettle;
+      const motionBeats = Array.isArray(motionDirector.speech_beats)
+        ? motionDirector.speech_beats.map((item) => clean(item)).filter(Boolean).slice(0, Math.max(0, Math.min(3, spontaneity)))
+        : [];
+      if (ttsEnabled) {
+        speechBeats = motionBeats.map((item, index) => motionDirectorPhase(item, "beat", { allowMotion, ttsEnabled, style, mood, index })).filter(Boolean);
+      } else {
+        speechBeats = [];
+      }
+    }
     return {
       version: 1,
       enabled: true,

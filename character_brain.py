@@ -517,6 +517,127 @@ def _public_safety_clamp(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def _public_motion_director(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    beats_raw = raw.get("speech_beats") if isinstance(raw.get("speech_beats"), list) else []
+    suppressed_raw = raw.get("suppressed_reasons") if isinstance(raw.get("suppressed_reasons"), list) else []
+    return {
+        "pre_reaction": _clean_text(raw.get("pre_reaction"), 48) or "none",
+        "speech_start": _clean_text(raw.get("speech_start"), 48) or "steady_speech_start",
+        "speech_beats": [
+            _clean_text(item, 48)
+            for item in beats_raw[:3]
+            if _clean_text(item, 48)
+        ],
+        "correction_reaction": _clean_text(raw.get("correction_reaction"), 48) or "none",
+        "post_settle": _clean_text(raw.get("post_settle"), 48) or "settle_idle",
+        "suppressed_reasons": [
+            _clean_text(item, 48)
+            for item in suppressed_raw[:6]
+            if _clean_text(item, 48)
+        ],
+    }
+
+
+def _select_motion_director(decision: Dict[str, Any]) -> Dict[str, Any]:
+    intent = _clean_text(decision.get("intent"), 40) or "casual"
+    opening = _normalize_opening_move(decision.get("opening_move"))
+    reaction = _clean_text(decision.get("reaction_mode"), 48)
+    spontaneity = max(0, min(3, _safe_int(decision.get("spontaneity"), 0)))
+    constraints = _public_output_constraints(
+        decision.get("output_constraints") if isinstance(decision.get("output_constraints"), dict) else {}
+    )
+    safety = _public_safety_clamp(
+        decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
+    )
+    improv = _public_improv_director(
+        decision.get("improv") if isinstance(decision.get("improv"), dict) else {}
+    )
+    suppressed: List[str] = []
+    allow_motion = constraints.get("allow_motion") is not False
+    if not allow_motion:
+        suppressed.append("motion_disallowed")
+    if safety["level"] != "none":
+        suppressed.append(f"safety_clamp_{safety['level']}")
+
+    pre = "blink_pulse"
+    speech = "expressive_speech_start"
+    beats: List[str] = []
+    correction = "none"
+    post = "settle_idle"
+
+    if intent == "comfort":
+        pre, speech, beats, post = "eyes_down_soft", "soft_speech_start", [], "soft_idle"
+        suppressed.append("comfort_no_extra_motion")
+    elif intent == "low_interrupt_checkin":
+        pre, speech, beats, post = "no_opening", "soft_speech_start", [], "soft_idle"
+        suppressed.append("low_interrupt_no_extra_motion")
+    elif intent == "reminder":
+        pre, speech, beats, post = "tiny_nod", "steady_speech_start", [], "focused_idle"
+        suppressed.append("reminder_no_extra_beats")
+    elif intent == "closing":
+        pre, speech, beats, post = "no_opening", "closing_speech_start", [], "closing_idle"
+        suppressed.append("closing_no_extra_beats")
+    elif intent == "task_help":
+        pre, speech, post = "thinking_nod", "steady_speech_start", "focused_idle"
+        beats = ["tiny_nod"] if spontaneity >= 1 and allow_motion else []
+    elif improv["stance"] == "mock_defensive_repair":
+        pre, speech, post = "embarrassed_recovery", "dry_speech_start", "settle_idle"
+        beats = ["deadpan_pause"] if spontaneity >= 1 and allow_motion else []
+        correction = "embarrassed_recovery"
+    elif intent == "encouragement":
+        pre, speech, post = "happy_pulse", "bright_speech_start", "settle_idle"
+        beats = ["tiny_victory_nod"] if spontaneity >= 1 and allow_motion else []
+    elif intent == "question":
+        pre = "head_tilt" if opening == "answer_first" else "blink_pulse"
+        if reaction in {"deadpan_aside", "tangent_spark"}:
+            pre = "side_eye"
+        speech = "curious_speech_start"
+        beats = ["tiny_nod"] if spontaneity >= 1 and allow_motion else []
+        if spontaneity >= 3 and allow_motion:
+            beats.append("blink_pulse")
+    elif intent in {"casual", "greeting"}:
+        pre = "deadpan_pause" if opening == "deadpan_aside" else "side_eye"
+        if reaction == "quick_snap":
+            pre = "blink_pulse"
+        speech = "dry_speech_start" if reaction == "deadpan_aside" else "expressive_speech_start"
+        if spontaneity >= 1 and allow_motion:
+            beats.append("blink_pulse")
+        if spontaneity >= 2 and allow_motion:
+            beats.append("head_tilt")
+        if spontaneity >= 3 and allow_motion:
+            beats.append("side_eye")
+
+    if not allow_motion:
+        beats = []
+    return _public_motion_director(
+        {
+            "pre_reaction": pre,
+            "speech_start": speech,
+            "speech_beats": beats,
+            "correction_reaction": correction,
+            "post_settle": post,
+            "suppressed_reasons": suppressed,
+        }
+    )
+
+
+def _should_guard_context_bleed(intent: str, continuity: Optional[Dict[str, Any]]) -> bool:
+    safe_intent = _clean_text(intent, 40)
+    if safe_intent not in {"greeting", "casual", "question", "encouragement"}:
+        return False
+    safe = continuity if isinstance(continuity, dict) else {}
+    previous_intent = _clean_text(safe.get("last_intent"), 40)
+    previous_need = _clean_text(safe.get("recent_user_need"), 40)
+    stage = safe.get("stage_memory") if isinstance(safe.get("stage_memory"), dict) else {}
+    stage_agenda = _clean_text(stage.get("agenda"), 48)
+    return (
+        previous_intent in {"task_help", "closing"}
+        or previous_need in {"direction", "space"}
+        or stage_agenda in {"push_one_tiny_step", "soft_logout"}
+    )
+
+
 def _apply_improv_director_controls(decision: Dict[str, Any], improv: Dict[str, Any]) -> None:
     intent = _clean_text(decision.get("intent"), 40) or "casual"
     public_improv = _public_improv_director(improv)
@@ -1272,6 +1393,16 @@ def build_character_brain_decision(
     elif intent in {"casual", "question"} and previous_intent == "casual" and same_need_turns >= 1:
         decision["max_sentences"] = min(int(decision.get("max_sentences") or 3), 2)
         decision["directive"] += " Do not force a follow-up question; it is fine to let the exchange rest naturally."
+    if _should_guard_context_bleed(intent, continuity):
+        decision["context_bleed_guard"] = {
+            "active": True,
+            "reason": "previous_task_or_closing",
+        }
+        decision["directive"] += (
+            " Context bleed guard: this is not a task-continuation turn. "
+            "Do not inherit prior next-step, close-tabs, sleep, timer, or shutdown instructions unless the user repeats them now. "
+            "Stage memory may carry only a small performance callback, never a task agenda."
+        )
 
     dominant = _normalize_emotion(emotion_state.get("dominant", "neutral"))
     if dominant in {"sad", "anxious"} and intent in {"casual", "question"}:
@@ -1347,6 +1478,7 @@ def build_character_brain_decision(
         decision.get("live2d_hint") or LIVE2D_HINTS.get(decision["emotion"], "idle_relaxed"),
         40,
     )
+    decision["motion_director"] = _select_motion_director(decision)
     return decision
 
 
@@ -1359,6 +1491,9 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
     safety_clamp = _public_safety_clamp(
         decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
     )
+    motion_director = _public_motion_director(
+        decision.get("motion_director") if isinstance(decision.get("motion_director"), dict) else {}
+    )
     lines = [
         "[Character brain state]",
         "Use this as private guidance for the next reply. Do not mention the brain state or expose metadata.",
@@ -1368,6 +1503,7 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Improv: stance={improv['stance']}, chaos={improv['chaos_level']}/3, callback_policy={improv['callback_policy']}, agenda={improv['agenda']}",
         f"Stage memory: current_bit={stage_memory.get('current_bit') or 'none'}, recent_callback={stage_memory.get('recent_callback') or 'none'}, correction={stage_memory.get('correction_state')}, turns_since_callback={stage_memory.get('turns_since_callback')}",
         f"Safety clamp: level={safety_clamp['level']}, reason={safety_clamp['reason'] or 'none'}",
+        f"Motion director: pre={motion_director['pre_reaction']}, speech={motion_director['speech_start']}, beats={','.join(motion_director['speech_beats'] or ['none'])}, correction={motion_director['correction_reaction']}, post={motion_director['post_settle']}",
         f"Reply style: {_clean_text(decision.get('reply_style'), 40)}, max_sentences={int(decision.get('max_sentences') or 3)}",
         f"Style beat: {_clean_text(decision.get('style_beat'), 48)} - {_clean_text(decision.get('style_beat_guide'), 180)}",
         f"Reaction mode: {_clean_text(decision.get('reaction_mode'), 48)}; banter_level={max(0, min(3, _safe_int(decision.get('banter_level'), 0)))}; {_clean_text(decision.get('reaction_mode_guide'), 220)}",
@@ -1514,6 +1650,13 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
 
 def _looks_like_bland_character_reply(text: str, intent: str) -> bool:
     lower = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    lower = (
+        lower.replace("\u2010", "-")
+        .replace("\u2011", "-")
+        .replace("\u2012", "-")
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+    )
     if not lower:
         return False
     generic_patterns = (
@@ -1522,7 +1665,7 @@ def _looks_like_bland_character_reply(text: str, intent: str) -> bool:
         r"^well done[.!]*$",
         r"^sweet dreams[.!]*$",
         r"^take it easy[.!]*$",
-        r"\byou'?ve got this\b",
+        r"\byou['’]?ve got this\b",
         r"\bwow,?\s+you did it\b",
         r"\bhooray\b",
         r"\byou tackled that\b",
@@ -1605,6 +1748,39 @@ def _looks_like_vague_planning_reply(text: str) -> bool:
     if any(re.search(pattern, lower) for pattern in action_patterns):
         return False
     return len(lower) < 90
+
+
+def _looks_like_context_bleed_reply(text: str, intent: str, user_message: str = "") -> bool:
+    safe_intent = _clean_text(intent, 40)
+    if safe_intent not in {"greeting", "casual", "question", "encouragement", "comfort", "closing"}:
+        return False
+    user_lower = _clean_text(user_message, 300).lower()
+    if re.search(r"\b(next|plan|task|todo|remind|close tabs?|save work)\b", user_lower):
+        return False
+    lower = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    lower = (
+        lower.replace("\u2010", "-")
+        .replace("\u2011", "-")
+        .replace("\u2012", "-")
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+    )
+    bleed_patterns = (
+        r"\b(save|close|shut down|shutdown|lock)\s+(your\s+)?(work|tabs?|apps?|screen|browser)\b",
+        r"\bsave (anything important|what you did)\b",
+        r"\bsave .{0,24}\bwork\b",
+        r"\bsave what you did\b",
+        r"\bbrowser tabs?\b",
+        r"\bclose (anything|everything|the stuff|the )?(apps?|tabs?|tabs/apps)\b",
+        r"\bclose what you\b",
+        r"\bclose (the )?.{0,16}\btabs?\b",
+        r"\b10[- ]?minute (timer|cleanup|clean-up|close-out|closeout|shutdown|lap|step)\b",
+        r"\bnext 10 minutes\b",
+        r"\bdesk close[- ]?out\b",
+        r"\bgo sleep\b",
+        r"\bcrash guilt[- ]?free\b",
+    )
+    return any(re.search(pattern, lower) for pattern in bleed_patterns)
 
 
 def _is_generic_followup_sentence(sentence: str) -> bool:
@@ -1735,6 +1911,7 @@ def _record_performance_execution(
     constrained: str,
     removed_followup: bool,
     removed_bit: bool,
+    removed_context_bleed: bool,
     before_sentence_count: int,
     after_sentence_count: int,
 ) -> None:
@@ -1745,6 +1922,7 @@ def _record_performance_execution(
         "question_policy": _normalize_question_policy(question_policy),
         "removed_followup": bool(removed_followup),
         "removed_unsafe_bit": bool(removed_bit),
+        "removed_context_bleed": bool(removed_context_bleed),
         "shortened": bool(
             after_sentence_count < before_sentence_count
             or len(str(constrained or "")) + 12 < len(str(original or ""))
@@ -1775,8 +1953,32 @@ def apply_character_brain_reply_constraints(
     intent = _clean_text(decision.get("intent"), 40)
     reply_shape = _normalize_reply_shape(decision.get("reply_shape"))
     question_policy = _normalize_question_policy(decision.get("question_policy"))
+    context_bleed_guard = (
+        decision.get("context_bleed_guard")
+        if isinstance(decision.get("context_bleed_guard"), dict)
+        else {}
+    )
     sentences = _split_reply_sentences(original)
     before_sentence_count = len(sentences)
+    removed_context_bleed = False
+    context_bleed_sensitive = intent in {"greeting", "casual", "question", "encouragement", "comfort", "closing"}
+    if (context_bleed_guard.get("active") is True or context_bleed_sensitive) and _looks_like_context_bleed_reply(original, intent, user_message):
+        fallback = _fallback_reply_for_intent(intent, user_message)
+        if fallback:
+            constrained = _normalize_reply_text_spacing(fallback)
+            _record_performance_execution(
+                decision,
+                reply_shape=reply_shape,
+                question_policy=question_policy,
+                original=original,
+                constrained=constrained,
+                removed_followup=False,
+                removed_bit=False,
+                removed_context_bleed=True,
+                before_sentence_count=before_sentence_count,
+                after_sentence_count=len(_split_reply_sentences(constrained)),
+            )
+            return constrained + meta
     sentences = _remove_unwanted_questions(
         sentences,
         allow_followup=bool(constraints.get("allow_followup_question", False)),
@@ -1821,6 +2023,11 @@ def apply_character_brain_reply_constraints(
             fallback = _fallback_reply_for_intent(intent, user_message)
             if fallback:
                 constrained = fallback
+    if (context_bleed_guard.get("active") is True or context_bleed_sensitive) and _looks_like_context_bleed_reply(constrained, intent, user_message):
+        fallback = _fallback_reply_for_intent(intent, user_message)
+        if fallback:
+            constrained = fallback
+            removed_context_bleed = True
     if _looks_like_bland_character_reply(constrained, intent):
         fallback = _fallback_reply_for_intent(intent, user_message)
         if fallback:
@@ -1840,6 +2047,7 @@ def apply_character_brain_reply_constraints(
             or after_policy_count < after_question_count
         ),
         removed_bit=after_safe_bit_count < after_policy_count,
+        removed_context_bleed=removed_context_bleed,
         before_sentence_count=before_sentence_count,
         after_sentence_count=len(_split_reply_sentences(constrained)),
     )
@@ -1876,6 +2084,7 @@ def build_character_brain_public_snapshot(
         "question_policy": _normalize_question_policy(raw_execution.get("question_policy") or decision.get("question_policy")),
         "removed_followup": raw_execution.get("removed_followup") is True,
         "removed_unsafe_bit": raw_execution.get("removed_unsafe_bit") is True,
+        "removed_context_bleed": raw_execution.get("removed_context_bleed") is True,
         "shortened": raw_execution.get("shortened") is True,
         "used_bit": raw_execution.get("used_bit") is True,
         "final_sentences": max(0, min(8, _safe_int(raw_execution.get("final_sentences"), 0))),
@@ -1910,6 +2119,9 @@ def build_character_brain_public_snapshot(
         ),
         "safety_clamp": _public_safety_clamp(
             decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
+        ),
+        "motion_director": _public_motion_director(
+            decision.get("motion_director") if isinstance(decision.get("motion_director"), dict) else {}
         ),
         "feedback_effects": feedback_effects[:5],
         "continuity": _public_continuity_state(

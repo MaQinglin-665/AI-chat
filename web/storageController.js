@@ -329,6 +329,9 @@
     const safetyClampRaw = raw.safety_clamp && typeof raw.safety_clamp === "object" && !Array.isArray(raw.safety_clamp)
       ? raw.safety_clamp
       : {};
+    const motionRaw = raw.motion_director && typeof raw.motion_director === "object" && !Array.isArray(raw.motion_director)
+      ? raw.motion_director
+      : {};
     const auditTimelineRaw = auditRaw.timeline && typeof auditRaw.timeline === "object" && !Array.isArray(auditRaw.timeline)
       ? auditRaw.timeline
       : {};
@@ -363,6 +366,7 @@
         question_policy: cleanText(executionRaw.question_policy || raw.question_policy, 48),
         removed_followup: executionRaw.removed_followup === true,
         removed_unsafe_bit: executionRaw.removed_unsafe_bit === true,
+        removed_context_bleed: executionRaw.removed_context_bleed === true,
         shortened: executionRaw.shortened === true,
         used_bit: executionRaw.used_bit === true,
         final_sentences: cleanInt(executionRaw.final_sentences, 0, 0, 8)
@@ -434,6 +438,18 @@
       safety_clamp: {
         level: cleanText(safetyClampRaw.level, 40),
         reason: cleanText(safetyClampRaw.reason, 48)
+      },
+      motion_director: {
+        pre_reaction: cleanText(motionRaw.pre_reaction, 48),
+        speech_start: cleanText(motionRaw.speech_start, 48),
+        speech_beats: Array.isArray(motionRaw.speech_beats)
+          ? motionRaw.speech_beats.slice(0, 3).map((item) => cleanText(item, 48)).filter(Boolean)
+          : [],
+        correction_reaction: cleanText(motionRaw.correction_reaction, 48),
+        post_settle: cleanText(motionRaw.post_settle, 48),
+        suppressed_reasons: Array.isArray(motionRaw.suppressed_reasons)
+          ? motionRaw.suppressed_reasons.slice(0, 6).map((item) => cleanText(item, 48)).filter(Boolean)
+          : []
       },
       feedback_effects: Array.isArray(raw.feedback_effects)
         ? raw.feedback_effects.slice(0, 5).map((item) => cleanText(item, 48)).filter(Boolean)
