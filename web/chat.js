@@ -1411,12 +1411,40 @@ function handleCharacterBrainDecision(snapshot) {
   return state.characterBrainLastDecision;
 }
 function buildCharacterBrainDebugReport() {
+  const appendInterjectionDebug = (base) => {
+    const extra = buildAutoChatInterjectionDebugReport();
+    return extra ? `${base}\n\n${extra}` : base;
+  };
   if (typeof CHARACTER_BRAIN_DEBUG.buildBrainDebugReport === "function") {
-    return CHARACTER_BRAIN_DEBUG.buildBrainDebugReport(state.characterBrainLastDecision, {
+    return appendInterjectionDebug(CHARACTER_BRAIN_DEBUG.buildBrainDebugReport(state.characterBrainLastDecision, {
       updatedAt: state.characterBrainLastUpdatedAt
-    });
+    }));
   }
-  return "角色大脑状态\n\n角色大脑诊断模块暂不可用。";
+  return appendInterjectionDebug("Character brain status\n\nCharacter brain debug module is unavailable.");
+}
+
+function buildAutoChatInterjectionDebugReport() {
+  const context = state.autoChatInterjectionLastContext;
+  const safeContext = context && typeof context === "object" && !Array.isArray(context) ? context : null;
+  const fmtTime = (value) => {
+    const ts = Number(value || 0);
+    return ts > 0 ? new Date(ts).toLocaleTimeString() : "none";
+  };
+  const reasons = Array.isArray(safeContext?.reasons)
+    ? safeContext.reasons.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 6)
+    : [];
+  const topic = String(safeContext?.topicHint || "").replace(/\s+/g, " ").trim().slice(0, 64) || "none";
+  return [
+    "Auto Thought",
+    `enabled=${state.autoChatEnabled === true ? "yes" : "no"}; pending_timer=${state.autoChatInterjectionTimer ? "yes" : "no"}; last_ok=${state.autoChatInterjectionLastOk === true ? "yes" : "no"}`,
+    safeContext
+      ? `planned=${safeContext.shouldTrigger === true ? "yes" : "no"}; reason=${String(safeContext.primaryReason || "none")}; score=${Number(safeContext.score || 0).toFixed(2)}/${Number(safeContext.threshold || 0).toFixed(2)}; delay=${Math.round(Number(safeContext.delayMs || 0))}ms`
+      : "planned=none",
+    `topic=${topic}`,
+    `scheduled=${fmtTime(state.autoChatInterjectionLastScheduledAt)}; attempted=${fmtTime(state.autoChatInterjectionLastAttemptAt)}; dispatched=${fmtTime(state.autoChatInterjectionLastDispatchAt)}; success=${fmtTime(state.autoChatInterjectionLastAt)}`,
+    `suppressed=${String(state.autoChatInterjectionLastSuppressed || "none")}; reasons=${reasons.length ? reasons.join(",") : "none"}`,
+    "Safety: chat context only; no desktop observation, screenshots, files, tools, or shell."
+  ].join("\n");
 }
 
 let performanceAuditController = null;
@@ -1722,7 +1750,7 @@ function isApiRequestTarget(input) {
 const AUTO_CHAT_MIN_USER_GAP_MS = 45 * 1000;
 const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = 60 * 1000;
 const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = 4 * 60 * 1000;
-const AUTO_CHAT_INTERJECTION_COOLDOWN_MS = 24 * 1000;
+const AUTO_CHAT_INTERJECTION_COOLDOWN_MS = 8 * 1000;
 const AUTO_CHAT_EMO_RE = /(emo|sad|bad|tired|stressed|anxious|lonely|rough|overwhelmed|\u96be\u53d7|\u96be\u8fc7|\u7126\u8651|\u538b\u529b|\u5931\u7720|\u5fc3\u60c5\u4e0d\u597d|\u4f4e\u843d)/i;
 const AUTO_CHAT_MIRROR_RE = /(what about you|your turn|you think|do you think|what do you think|\u4f60\u5462|\u90a3\u4f60|\u4f60\u89c9\u5f97|\u4f60\u600e\u4e48\u60f3)/i;
 const AUTO_CHAT_TOPIC_RE = /(project|exam|work|study|code|model|deploy|plan|progress|goal|desk|desktop|cursor|\u9879\u76ee|\u8003\u8bd5|\u5de5\u4f5c|\u5b66\u4e60|\u4ee3\u7801|\u6a21\u578b|\u90e8\u7f72|\u8ba1\u5212|\u8fdb\u5ea6|\u76ee\u6807|\u684c\u9762|\u5149\u6807)/i;
@@ -3102,6 +3130,7 @@ function getAutoChatController() {
       ui,
       documentObject: document,
       windowObject: window,
+      setStatus,
       parseMessageTimestamp,
       requestAssistantReply,
       constants: {

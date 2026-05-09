@@ -7,14 +7,15 @@
     const document = deps.documentObject || root.document || {};
     const window = deps.windowObject || root;
     const constants = deps.constants || {};
+    const setStatus = typeof deps.setStatus === "function" ? deps.setStatus : () => {};
     const parseMessageTimestamp = typeof deps.parseMessageTimestamp === "function" ? deps.parseMessageTimestamp : (value) => Number(value) || Date.now();
     const requestAssistantReply = typeof deps.requestAssistantReply === "function" ? deps.requestAssistantReply : async () => false;
     const AUTO_CHAT_MIN_USER_GAP_MS = constants.AUTO_CHAT_MIN_USER_GAP_MS || 45 * 1000;
     const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = constants.AUTO_CHAT_MIN_ASSISTANT_GAP_MS || 60 * 1000;
     const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = constants.AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS || 4 * 60 * 1000;
-    const AUTO_CHAT_INTERJECTION_COOLDOWN_MS = constants.AUTO_CHAT_INTERJECTION_COOLDOWN_MS || 24 * 1000;
+    const AUTO_CHAT_INTERJECTION_COOLDOWN_MS = constants.AUTO_CHAT_INTERJECTION_COOLDOWN_MS || 8 * 1000;
     const AUTO_CHAT_INTERJECTION_RETRY_MS = constants.AUTO_CHAT_INTERJECTION_RETRY_MS || 1400;
-    const AUTO_CHAT_INTERJECTION_MAX_RETRIES = constants.AUTO_CHAT_INTERJECTION_MAX_RETRIES || 8;
+    const AUTO_CHAT_INTERJECTION_MAX_RETRIES = constants.AUTO_CHAT_INTERJECTION_MAX_RETRIES || 30;
     const AUTO_CHAT_EMO_RE = constants.AUTO_CHAT_EMO_RE || /a^/;
     const AUTO_CHAT_MIRROR_RE = constants.AUTO_CHAT_MIRROR_RE || /a^/;
     const AUTO_CHAT_TOPIC_RE = constants.AUTO_CHAT_TOPIC_RE || /a^/;
@@ -50,10 +51,12 @@
 
     function stopAutoChatLoop() {
       if (!state.autoChatTimer) {
+        stopTurnInterjectionTimer();
         return;
       }
       clearTimeout(state.autoChatTimer);
       state.autoChatTimer = 0;
+      stopTurnInterjectionTimer();
     }
 
     function stopTurnInterjectionTimer() {
@@ -478,7 +481,7 @@
         : 0.72;
       const primaryReason = pickAutoChatPrimaryReason(reasons);
       const topicHint = normalizeAutoChatTopicHint(topicSeeds.find(Boolean) || userText);
-      const delayMs = Math.round(2600 + Math.random() * 5200);
+      const delayMs = Math.round(1200 + Math.random() * 1800);
       const context = {
         interjection: true,
         shouldTrigger: score >= threshold,
@@ -608,24 +611,41 @@
         skipDesktopAttach: true,
         silentError: true
       }).then((ok) => {
+        state.autoChatInterjectionLastOk = ok === true;
         if (ok) {
           rememberAutoChatSuccess(context);
+        } else if (context.interjection === true) {
+          state.autoChatInterjectionLastSuppressed = "request_failed_or_suppressed";
         }
         return ok;
-      }).catch(() => false);
+      }).catch(() => {
+        state.autoChatInterjectionLastOk = false;
+        if (context.interjection === true) {
+          state.autoChatInterjectionLastSuppressed = "request_error";
+        }
+        return false;
+      });
     }
 
     function scheduleTurnInterjection(input = {}) {
       stopTurnInterjectionTimer();
       const context = buildTurnInterjectionContext(input);
       state.autoChatInterjectionLastContext = context;
+      state.autoChatInterjectionLastScheduledAt = 0;
+      state.autoChatInterjectionLastSuppressed = "";
       if (state.autoChatEnabled !== true || context.shouldTrigger !== true) {
+        state.autoChatInterjectionLastSuppressed = state.autoChatEnabled === true
+          ? `not_triggered:${context.primaryReason || "unknown"}`
+          : "disabled";
         return { scheduled: false, context };
       }
       const run = (attempt = 0) => {
         state.autoChatInterjectionTimer = 0;
+        state.autoChatInterjectionLastAttemptAt = Date.now();
         const skip = shouldSkipTurnInterjection(context);
         if (!skip.skip) {
+          state.autoChatInterjectionLastDispatchAt = Date.now();
+          state.autoChatInterjectionLastSuppressed = "";
           dispatchAutoChatContext(context);
           return;
         }
@@ -634,7 +654,9 @@
           state.autoChatInterjectionTimer = window.setTimeout(() => run(attempt + 1), AUTO_CHAT_INTERJECTION_RETRY_MS);
         }
       };
-      state.autoChatInterjectionTimer = window.setTimeout(() => run(0), Math.max(500, Number(context.delayMs) || 3600));
+      state.autoChatInterjectionLastScheduledAt = Date.now();
+      state.autoChatInterjectionTimer = window.setTimeout(() => run(0), Math.max(500, Number(context.delayMs) || 1800));
+      setStatus("Taffy thought queued");
       return { scheduled: true, context };
     }
 

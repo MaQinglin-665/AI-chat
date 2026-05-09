@@ -421,6 +421,7 @@ function createMemoryStorage(initial = {}) {
   assert.ok(interjection.reasons.includes("stage_observation"), "turn interjection should carry a concrete stage-observation reason");
   const interjectionPrompt = controller.buildAutoChatPrompt(interjection);
   assert.ok(interjectionPrompt.includes("quick afterthought") && interjectionPrompt.includes("tiny thought bubble"), "turn interjection prompt should frame the line as Taffy's own afterthought");
+  assert.ok(interjection.delayMs >= 1200 && interjection.delayMs <= 3000, "turn interjection should feel immediate enough to notice during manual testing");
   assert.strictEqual(controller.shouldSkipTurnInterjection(interjection).skip, false, "turn interjection should be allowed when both sides are idle");
   state.ttsContextSpeaking = true;
   assert.deepStrictEqual(
@@ -2343,6 +2344,8 @@ assert.ok(
     && source.includes("function saveCharacterBrainSnapshotToStorage")
     && source.includes("function loadCharacterBrainSnapshotFromStorage")
     && source.includes("function buildCharacterBrainDebugReport")
+    && source.includes("function buildAutoChatInterjectionDebugReport")
+    && source.includes("Auto Thought")
     && chatApi.streamAssistantReply
     && chatApiSource.includes("onCharacterBrainDecision")
     && chatReplyControllerSource.includes("onCharacterBrainDecision: handleCharacterBrainDecision")
