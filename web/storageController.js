@@ -320,6 +320,15 @@
     const auditRaw = raw.performance_audit && typeof raw.performance_audit === "object" && !Array.isArray(raw.performance_audit)
       ? raw.performance_audit
       : {};
+    const improvRaw = raw.improv && typeof raw.improv === "object" && !Array.isArray(raw.improv)
+      ? raw.improv
+      : {};
+    const stageRaw = raw.stage_memory && typeof raw.stage_memory === "object" && !Array.isArray(raw.stage_memory)
+      ? raw.stage_memory
+      : {};
+    const safetyClampRaw = raw.safety_clamp && typeof raw.safety_clamp === "object" && !Array.isArray(raw.safety_clamp)
+      ? raw.safety_clamp
+      : {};
     const auditTimelineRaw = auditRaw.timeline && typeof auditRaw.timeline === "object" && !Array.isArray(auditRaw.timeline)
       ? auditRaw.timeline
       : {};
@@ -408,6 +417,23 @@
         allow_teasing: constraintsRaw.allow_teasing === true,
         allow_motion: constraintsRaw.allow_motion === false ? false : true,
         voice_style: cleanText(constraintsRaw.voice_style, 32)
+      },
+      improv: {
+        stance: cleanText(improvRaw.stance, 48),
+        chaos_level: cleanInt(improvRaw.chaos_level, 0, 0, 3),
+        callback_policy: cleanText(improvRaw.callback_policy, 40),
+        agenda: cleanText(improvRaw.agenda, 48)
+      },
+      stage_memory: {
+        current_bit: cleanText(stageRaw.current_bit, 48),
+        recent_callback: cleanText(stageRaw.recent_callback, 48),
+        correction_state: cleanText(stageRaw.correction_state, 40),
+        agenda: cleanText(stageRaw.agenda, 48),
+        turns_since_callback: cleanInt(stageRaw.turns_since_callback, 0, 0, 20)
+      },
+      safety_clamp: {
+        level: cleanText(safetyClampRaw.level, 40),
+        reason: cleanText(safetyClampRaw.reason, 48)
       },
       feedback_effects: Array.isArray(raw.feedback_effects)
         ? raw.feedback_effects.slice(0, 5).map((item) => cleanText(item, 48)).filter(Boolean)

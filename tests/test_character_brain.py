@@ -46,6 +46,9 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert "Style beat:" in block
     assert "Reaction mode:" in block
     assert "Performance:" in block
+    assert "Improv:" in block
+    assert "Stage memory:" in block
+    assert "Safety clamp:" in block
     assert "slightly odd inner life" in block
     assert "empty helper phrases" in block
     assert decision["style_beat"]
@@ -123,6 +126,44 @@ def test_character_brain_performance_controls_by_intent():
     assert reminder["spontaneity"] == 0
     assert closing["opening_move"] == "no_opening"
     assert closing["question_policy"] == "none"
+
+
+def test_character_brain_improv_director_high_chaos_only_for_safe_play_scenes():
+    casual = character_brain.build_character_brain_decision(user_message="This desk feels weird today.")
+    question = character_brain.build_character_brain_decision(user_message="What are you doing?")
+    correction = character_brain.build_character_brain_decision(user_message="You were wrong.")
+    encouragement = character_brain.build_character_brain_decision(user_message="I finished it.")
+
+    for decision in (casual, question, correction, encouragement):
+        assert decision["improv"]["chaos_level"] == 3
+        assert decision["safety_clamp"]["level"] == "none"
+        assert decision["spontaneity"] == 3
+        assert decision["banter_level"] == 3
+
+    assert correction["improv"]["stance"] == "mock_defensive_repair"
+    assert correction["improv"]["agenda"] == "repair_the_bit"
+
+
+def test_character_brain_improv_director_clamps_protected_intents():
+    comfort = character_brain.build_character_brain_decision(user_message="I feel bad.")
+    reminder = character_brain.build_character_brain_decision(user_message="Remind me in 10 minutes to stretch.")
+    closing = character_brain.build_character_brain_decision(user_message="I'm going to sleep.")
+    task = character_brain.build_character_brain_decision(user_message="What next?")
+
+    for decision in (comfort, reminder, closing):
+        assert decision["improv"]["chaos_level"] == 0
+        assert decision["safety_clamp"]["level"] == "safe_scene"
+        assert decision["spontaneity"] == 0
+        assert decision["question_policy"] == "none"
+        assert decision["banter_level"] == 0
+
+    assert comfort["opening_move"] == "soft_anchor"
+    assert reminder["reply_shape"] == "one_liner"
+    assert closing["opening_move"] == "no_opening"
+    assert task["improv"]["chaos_level"] == 1
+    assert task["safety_clamp"]["level"] == "task_scene"
+    assert task["spontaneity"] <= 1
+    assert task["question_policy"] == "clarify_only"
 
 
 def test_character_brain_comfort_priority_beats_next_step_question():
@@ -690,6 +731,87 @@ def test_character_brain_session_state_decays_to_neutral_after_idle():
     assert decayed["decay"] == "reset_after_idle"
 
 
+def test_character_brain_stage_memory_tracks_callback_and_decays():
+    first = character_brain.build_character_brain_decision(
+        user_message="This desk feels weird today.",
+        history=[],
+    )
+    state = character_brain.update_brain_session_state(
+        None,
+        decision=first,
+        user_message="This desk feels weird today.",
+        now_ts=5000,
+    )
+    probe_state = {
+        "last_intent": "casual",
+        "last_topic": "casual",
+        "recent_user_need": "companionship",
+        "same_need_turns": 1,
+        "stage_turns_since_callback": 0,
+    }
+    probe = character_brain.build_character_brain_decision(
+        user_message="This desk feels weird today.",
+        history=[],
+        session_state=probe_state,
+    )
+    repeat_state = {
+        **probe_state,
+        "stage_current_bit": probe["performance_bit"],
+        "stage_recent_callback": probe["performance_bit"],
+    }
+    second = character_brain.build_character_brain_decision(
+        user_message="This desk feels weird today.",
+        history=[],
+        session_state=repeat_state,
+    )
+    next_state = character_brain.update_brain_session_state(
+        repeat_state,
+        decision=second,
+        user_message="This desk feels weird today.",
+        now_ts=5015,
+    )
+    softened = character_brain.decay_brain_session_state(
+        next_state,
+        now_ts=5015 + character_brain.SESSION_SOFT_DECAY_AFTER_SEC + 1,
+    )
+
+    assert state["stage_current_bit"]
+    assert state["stage_recent_callback"] == state["stage_current_bit"]
+    assert second["improv"]["callback_policy"] == "avoid_repeat"
+    assert next_state["stage_turns_since_callback"] >= 1
+    assert softened["stage_turns_since_callback"] >= next_state["stage_turns_since_callback"]
+    if softened["stage_turns_since_callback"] >= 3:
+        assert softened["stage_recent_callback"] == ""
+
+
+def test_character_brain_stage_memory_marks_corrections_temporarily():
+    correction = character_brain.build_character_brain_decision(
+        user_message="You were wrong.",
+        history=[],
+    )
+    state = character_brain.update_brain_session_state(
+        None,
+        decision=correction,
+        user_message="You were wrong.",
+        now_ts=6000,
+    )
+    next_turn = character_brain.build_character_brain_decision(
+        user_message="Anyway, this desk is weird.",
+        history=[],
+        session_state=state,
+    )
+    cooled = character_brain.update_brain_session_state(
+        state,
+        decision=next_turn,
+        user_message="Anyway, this desk is weird.",
+        now_ts=6015,
+    )
+
+    assert correction["improv"]["stance"] == "mock_defensive_repair"
+    assert state["stage_correction_state"] == "correcting"
+    assert cooled["stage_correction_state"] == "cooling"
+
+
 def test_character_brain_public_snapshot_continuity_is_safe_and_compact():
     history = [{"role": "user", "content": "raw history with api_key=SECRET and prompt text"}]
     decision = character_brain.build_character_brain_decision(
@@ -719,11 +841,16 @@ def test_character_brain_public_snapshot_continuity_is_safe_and_compact():
     assert snapshot["performance_bit"]
     assert snapshot["performance_execution"]["reply_shape"] == snapshot["reply_shape"]
     assert "performance_bit_guide" not in snapshot["performance_execution"]
+    assert snapshot["improv"]["stance"]
+    assert 0 <= snapshot["improv"]["chaos_level"] <= 3
+    assert snapshot["stage_memory"]["agenda"]
+    assert snapshot["safety_clamp"]["level"] in {"none", "safe_scene", "task_scene"}
     assert snapshot["continuity"]["recent_user_need"] == "direction"
     assert snapshot["continuity"]["last_topic"] == "planning"
     assert "style_beat_guide" not in snapshot
     assert "reaction_mode_guide" not in snapshot
     assert "performance_bit_guide" not in snapshot
+    assert "bit guide" not in raw
     assert "history_tail" not in snapshot
     assert "directive" not in snapshot
     assert "raw history" not in raw

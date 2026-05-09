@@ -131,6 +131,8 @@ INTENT_OUTPUT_CONSTRAINTS = {
 
 SESSION_RESET_AFTER_SEC = 30 * 60
 SESSION_SOFT_DECAY_AFTER_SEC = 10 * 60
+IMPROV_HIGH_CHAOS_INTENTS = {"greeting", "casual", "question", "encouragement"}
+IMPROV_SAFE_CLAMP_INTENTS = {"comfort", "reminder", "closing", "low_interrupt_checkin"}
 
 STYLE_BEATS = {
     "greeting": [
@@ -383,6 +385,190 @@ def _select_performance_bit(intent: str, topic: str, user_message: str, reaction
     return {"key": key, "guide": BIT_BANK.get(key, BIT_BANK["none"])}
 
 
+def _is_correction_message(user_message: str) -> bool:
+    text = _clean_text(user_message, 300).lower()
+    return bool(
+        re.search(
+            r"\b(you were wrong|you are wrong|that's wrong|that is wrong|incorrect|not true|you said wrong|mistake)\b",
+            text,
+        )
+    )
+
+
+def _public_stage_memory(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    src = state if isinstance(state, dict) else {}
+    nested = src.get("stage_memory") if isinstance(src.get("stage_memory"), dict) else {}
+
+    def pick(flat_key: str, nested_key: str) -> Any:
+        value = src.get(flat_key)
+        if value not in (None, ""):
+            return value
+        return nested.get(nested_key)
+
+    return {
+        "current_bit": _clean_text(pick("stage_current_bit", "current_bit"), 48),
+        "recent_callback": _clean_text(pick("stage_recent_callback", "recent_callback"), 48),
+        "correction_state": _clean_text(pick("stage_correction_state", "correction_state"), 40) or "none",
+        "agenda": _clean_text(pick("stage_agenda", "agenda"), 48) or "none",
+        "turns_since_callback": max(0, min(20, _safe_int(pick("stage_turns_since_callback", "turns_since_callback"), 0))),
+    }
+
+
+def _agenda_for_turn(intent: str, topic: str, user_message: str) -> str:
+    if _is_correction_message(user_message):
+        return "repair_the_bit"
+    if intent == "task_help" or topic == "planning":
+        return "push_one_tiny_step"
+    if intent == "encouragement":
+        return "collect_tiny_victory"
+    if intent == "comfort":
+        return "hold_the_room_still"
+    if intent == "closing":
+        return "soft_logout"
+    if topic == "character_runtime":
+        return "test_the_stage_lights"
+    return "inspect_desktop_weirdness"
+
+
+def _select_improv_director(
+    intent: str,
+    topic: str,
+    user_message: str,
+    *,
+    reaction_mode: str,
+    performance_bit: str,
+    continuity: Optional[Dict[str, Any]] = None,
+    stage_memory: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    safe_intent = _clean_text(intent, 40) or "casual"
+    bit = _clean_text(performance_bit, 48) or "none"
+    stage = stage_memory if isinstance(stage_memory, dict) else {}
+    correction = _is_correction_message(user_message)
+    clamp = "none"
+    clamp_reason = ""
+    if safe_intent in IMPROV_SAFE_CLAMP_INTENTS:
+        chaos = 0
+        clamp = "safe_scene"
+        clamp_reason = safe_intent
+    elif safe_intent == "task_help":
+        chaos = 1
+        clamp = "task_scene"
+        clamp_reason = "useful_first"
+    elif correction:
+        chaos = 3
+    elif safe_intent in IMPROV_HIGH_CHAOS_INTENTS:
+        chaos = 3
+    else:
+        chaos = 1
+
+    if safe_intent == "comfort":
+        stance = "soft_hold"
+    elif safe_intent == "reminder":
+        stance = "clean_confirm"
+    elif safe_intent == "closing":
+        stance = "soft_exit"
+    elif safe_intent == "task_help":
+        stance = "bossy_next_step"
+    elif correction:
+        stance = "mock_defensive_repair"
+    elif safe_intent == "encouragement":
+        stance = "victory_gloat"
+    elif safe_intent == "question":
+        stance = "answer_with_side_eye"
+    else:
+        stance = "feral_observation" if reaction_mode in {"tangent_spark", "playful_pushback"} else "deadpan_observation"
+
+    recent_callback = _clean_text(stage.get("recent_callback"), 48)
+    turns_since = max(0, min(20, _safe_int(stage.get("turns_since_callback"), 0)))
+    if clamp != "none" or bit == "none":
+        callback_policy = "none"
+    elif recent_callback == bit and turns_since < 2:
+        callback_policy = "avoid_repeat"
+    elif chaos >= 2:
+        callback_policy = "allow_one_callback"
+    else:
+        callback_policy = "optional"
+
+    return {
+        "stance": stance,
+        "chaos_level": max(0, min(3, chaos)),
+        "callback_policy": callback_policy,
+        "agenda": _agenda_for_turn(safe_intent, topic, user_message),
+        "safety_clamp": {"level": clamp, "reason": clamp_reason},
+        "correction": correction,
+    }
+
+
+def _public_improv_director(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    return {
+        "stance": _clean_text(raw.get("stance"), 48) or "steady",
+        "chaos_level": max(0, min(3, _safe_int(raw.get("chaos_level"), 0))),
+        "callback_policy": _clean_text(raw.get("callback_policy"), 40) or "none",
+        "agenda": _clean_text(raw.get("agenda"), 48) or "none",
+    }
+
+
+def _public_safety_clamp(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    return {
+        "level": _clean_text(raw.get("level"), 40) or "none",
+        "reason": _clean_text(raw.get("reason"), 48),
+    }
+
+
+def _apply_improv_director_controls(decision: Dict[str, Any], improv: Dict[str, Any]) -> None:
+    intent = _clean_text(decision.get("intent"), 40) or "casual"
+    public_improv = _public_improv_director(improv)
+    safety = _public_safety_clamp(improv.get("safety_clamp") if isinstance(improv, dict) else None)
+    chaos = public_improv["chaos_level"]
+    clamp_level = safety["level"]
+
+    if clamp_level == "safe_scene":
+        decision["banter_level"] = 0
+        decision["spontaneity"] = 0
+        decision["question_policy"] = "none"
+        if intent == "comfort":
+            decision["opening_move"] = "soft_anchor"
+            decision["reply_shape"] = "two_beat"
+        elif intent == "closing":
+            decision["opening_move"] = "no_opening"
+            decision["reply_shape"] = "one_liner"
+        elif intent == "reminder":
+            decision["opening_move"] = "answer_first"
+            decision["reply_shape"] = "one_liner"
+        elif intent == "low_interrupt_checkin":
+            decision["opening_move"] = "no_opening"
+            decision["reply_shape"] = "one_liner"
+    elif clamp_level == "task_scene":
+        decision["banter_level"] = min(max(0, _safe_int(decision.get("banter_level"), 0)), 1)
+        decision["spontaneity"] = min(max(0, _safe_int(decision.get("spontaneity"), 0)), 1)
+        decision["question_policy"] = "clarify_only"
+        decision["opening_move"] = "answer_first"
+        decision["reply_shape"] = "answer_then_bit"
+    elif chaos >= 3:
+        decision["banter_level"] = max(_safe_int(decision.get("banter_level"), 0), 3)
+        decision["spontaneity"] = max(_safe_int(decision.get("spontaneity"), 0), 3)
+        if intent == "casual" and _normalize_reply_shape(decision.get("reply_shape")) == "one_liner":
+            decision["reply_shape"] = (
+                "mini_rant"
+                if decision.get("reaction_mode") == "playful_pushback"
+                else "bit_then_answer"
+            )
+
+    if public_improv["callback_policy"] == "avoid_repeat":
+        decision["directive"] += " Do not repeat the last desktop bit; make this turn feel freshly reacted to."
+    decision["directive"] += (
+        f" Improv director: stance={public_improv['stance']}, chaos={public_improv['chaos_level']}/3, "
+        f"callback_policy={public_improv['callback_policy']}, agenda={public_improv['agenda']}."
+    )
+    if clamp_level != "none":
+        decision["directive"] += (
+            f" Safety clamp active: {clamp_level}/{safety['reason'] or 'protected_intent'}; "
+            "do not add extra chaos beyond this turn's constraints."
+        )
+
+
 def _select_performance_controls(
     intent: str,
     topic: str,
@@ -490,11 +676,13 @@ def _public_continuity_state(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "same_need_turns": max(0, min(20, _safe_int(safe.get("same_need_turns"), 0))),
         "updated_at": max(0, _safe_int(safe.get("updated_at"), 0)),
         "decay": _clean_text(safe.get("decay"), 40) or "fresh",
+        "stage_memory": _public_stage_memory(safe),
     }
 
 
 def normalize_brain_session_state(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     src = raw if isinstance(raw, dict) else {}
+    stage_src = src.get("stage_memory") if isinstance(src.get("stage_memory"), dict) else {}
     state = {
         "version": 1,
         "last_intent": _clean_text(src.get("last_intent"), 40),
@@ -506,6 +694,26 @@ def normalize_brain_session_state(raw: Optional[Dict[str, Any]]) -> Dict[str, An
         "same_need_turns": max(0, min(20, _safe_int(src.get("same_need_turns"), 0))),
         "updated_at": max(0, _safe_int(src.get("updated_at"), 0)),
         "decay": _clean_text(src.get("decay"), 40) or "fresh",
+        "stage_current_bit": _clean_text(src.get("stage_current_bit") or stage_src.get("current_bit"), 48),
+        "stage_recent_callback": _clean_text(src.get("stage_recent_callback") or stage_src.get("recent_callback"), 48),
+        "stage_correction_state": _clean_text(
+            src.get("stage_correction_state") or stage_src.get("correction_state"),
+            40,
+        )
+        or "none",
+        "stage_agenda": _clean_text(src.get("stage_agenda") or stage_src.get("agenda"), 48),
+        "stage_turns_since_callback": max(
+            0,
+            min(
+                20,
+                _safe_int(
+                    src.get("stage_turns_since_callback")
+                    if src.get("stage_turns_since_callback") is not None
+                    else stage_src.get("turns_since_callback"),
+                    0,
+                ),
+            ),
+        ),
     }
     if state["mood_baseline"] not in {
         "neutral",
@@ -555,6 +763,11 @@ def decay_brain_session_state(
             "same_need_turns": 0,
             "updated_at": updated_at,
             "decay": "reset_after_idle",
+            "stage_current_bit": "",
+            "stage_recent_callback": "",
+            "stage_correction_state": "none",
+            "stage_agenda": "",
+            "stage_turns_since_callback": 0,
         }
     if age >= SESSION_SOFT_DECAY_AFTER_SEC:
         if state["mood_baseline"] in {"concerned", "focused", "playful"}:
@@ -562,6 +775,9 @@ def decay_brain_session_state(
         if state["energy"] in {"bright", "high", "focused"}:
             state["energy"] = "calm"
         state["same_need_turns"] = min(1, state["same_need_turns"])
+        state["stage_turns_since_callback"] = min(3, state["stage_turns_since_callback"] + 1)
+        if state["stage_turns_since_callback"] >= 3:
+            state["stage_recent_callback"] = ""
         state["decay"] = "softened"
         return state
     state["decay"] = "fresh"
@@ -592,6 +808,33 @@ def update_brain_session_state(
     elif intent == "casual" and same_need_turns > 1:
         energy = "calm"
 
+    stage = _public_stage_memory(prev)
+    improv = decision.get("improv") if isinstance(decision.get("improv"), dict) else {}
+    bit = _clean_text(decision.get("performance_bit"), 48)
+    if bit == "none":
+        bit = ""
+    callback_policy = _clean_text(improv.get("callback_policy"), 40)
+    recent_callback = _clean_text(stage.get("recent_callback"), 48)
+    turns_since_callback = max(0, min(20, _safe_int(stage.get("turns_since_callback"), 0)))
+    if callback_policy == "allow_one_callback" and bit:
+        recent_callback = bit
+        turns_since_callback = 0
+    elif recent_callback:
+        turns_since_callback = min(20, turns_since_callback + 1)
+        if turns_since_callback >= 3:
+            recent_callback = ""
+    elif turns_since_callback:
+        turns_since_callback = min(20, turns_since_callback + 1)
+
+    previous_correction = _clean_text(stage.get("correction_state"), 40)
+    if _is_correction_message(user_message) or _clean_text(improv.get("stance"), 48) == "mock_defensive_repair":
+        correction_state = "correcting"
+    elif previous_correction == "correcting":
+        correction_state = "cooling"
+    else:
+        correction_state = "none"
+    stage_agenda = _clean_text(improv.get("agenda"), 48) or _agenda_for_turn(intent, topic, user_message)
+
     return normalize_brain_session_state(
         {
             "version": 1,
@@ -608,6 +851,11 @@ def update_brain_session_state(
             "same_need_turns": same_need_turns,
             "updated_at": now,
             "decay": "fresh",
+            "stage_current_bit": bit,
+            "stage_recent_callback": recent_callback,
+            "stage_correction_state": correction_state,
+            "stage_agenda": stage_agenda,
+            "stage_turns_since_callback": turns_since_callback,
         }
     )
 
@@ -1063,6 +1311,20 @@ def build_character_brain_decision(
     decision["question_policy"] = _normalize_question_policy(performance.get("question_policy"))
     decision["performance_bit"] = _clean_text(performance.get("performance_bit"), 48)
     decision["performance_bit_guide"] = _clean_text(performance.get("performance_bit_guide"), 180)
+    stage_memory = _public_stage_memory(session_state)
+    improv = _select_improv_director(
+        intent,
+        topic,
+        user_message,
+        reaction_mode=decision["reaction_mode"],
+        performance_bit=decision["performance_bit"],
+        continuity=continuity,
+        stage_memory=stage_memory,
+    )
+    decision["improv"] = _public_improv_director(improv)
+    decision["stage_memory"] = stage_memory
+    decision["safety_clamp"] = _public_safety_clamp(improv.get("safety_clamp"))
+    _apply_improv_director_controls(decision, improv)
     decision["directive"] += f" Style beat: {decision['style_beat_guide']}."
     decision["directive"] += (
         f" Reaction mode: {decision['reaction_mode_guide']} "
@@ -1092,12 +1354,20 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
     if not isinstance(decision, dict):
         return ""
     continuity = _public_continuity_state(decision.get("continuity"))
+    improv = _public_improv_director(decision.get("improv") if isinstance(decision.get("improv"), dict) else {})
+    stage_memory = _public_stage_memory(decision.get("stage_memory") or continuity.get("stage_memory"))
+    safety_clamp = _public_safety_clamp(
+        decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
+    )
     lines = [
         "[Character brain state]",
         "Use this as private guidance for the next reply. Do not mention the brain state or expose metadata.",
         f"Intent: {_clean_text(decision.get('intent'), 40)}",
         f"Character state: energy={_clean_text(decision.get('energy'), 24)}, attention={_clean_text(decision.get('attention'), 24)}, relationship={_clean_text(decision.get('relationship'), 40)}",
         f"Session continuity: last_intent={continuity.get('last_intent') or 'none'}, last_topic={continuity.get('last_topic') or 'none'}, mood_baseline={continuity.get('mood_baseline')}, recent_user_need={continuity.get('recent_user_need') or 'none'}, same_need_turns={continuity.get('same_need_turns')}, decay={continuity.get('decay')}",
+        f"Improv: stance={improv['stance']}, chaos={improv['chaos_level']}/3, callback_policy={improv['callback_policy']}, agenda={improv['agenda']}",
+        f"Stage memory: current_bit={stage_memory.get('current_bit') or 'none'}, recent_callback={stage_memory.get('recent_callback') or 'none'}, correction={stage_memory.get('correction_state')}, turns_since_callback={stage_memory.get('turns_since_callback')}",
+        f"Safety clamp: level={safety_clamp['level']}, reason={safety_clamp['reason'] or 'none'}",
         f"Reply style: {_clean_text(decision.get('reply_style'), 40)}, max_sentences={int(decision.get('max_sentences') or 3)}",
         f"Style beat: {_clean_text(decision.get('style_beat'), 48)} - {_clean_text(decision.get('style_beat_guide'), 180)}",
         f"Reaction mode: {_clean_text(decision.get('reaction_mode'), 48)}; banter_level={max(0, min(3, _safe_int(decision.get('banter_level'), 0)))}; {_clean_text(decision.get('reaction_mode_guide'), 220)}",
@@ -1632,6 +1902,15 @@ def build_character_brain_public_snapshot(
         "voice_style": _clean_text(decision.get("voice_style"), 32).lower() or "neutral",
         "performance_execution": execution,
         "output_constraints": _public_output_constraints(decision.get("output_constraints")),
+        "improv": _public_improv_director(decision.get("improv") if isinstance(decision.get("improv"), dict) else {}),
+        "stage_memory": _public_stage_memory(
+            session_state
+            if isinstance(session_state, dict)
+            else decision.get("stage_memory") or decision.get("continuity")
+        ),
+        "safety_clamp": _public_safety_clamp(
+            decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
+        ),
         "feedback_effects": feedback_effects[:5],
         "continuity": _public_continuity_state(
             session_state if isinstance(session_state, dict) else decision.get("continuity")

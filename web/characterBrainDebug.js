@@ -74,6 +74,36 @@
           `\u8fd1\u671f\u9700\u8981\uff1a${clean(continuity.recent_user_need, "\u65e0")}\uff1b\u8fde\u7eed\u8f6e\u6570=${Number(continuity.same_need_turns) || 0}\uff1b\u8870\u51cf=${clean(continuity.decay, "fresh")}`
         ]
       : [];
+    const improv = safe.improv && typeof safe.improv === "object" && !Array.isArray(safe.improv)
+      ? safe.improv
+      : null;
+    const stageMemory = safe.stage_memory && typeof safe.stage_memory === "object" && !Array.isArray(safe.stage_memory)
+      ? safe.stage_memory
+      : null;
+    const safetyClamp = safe.safety_clamp && typeof safe.safety_clamp === "object" && !Array.isArray(safe.safety_clamp)
+      ? safe.safety_clamp
+      : null;
+    const improvLines = improv
+      ? [
+          "",
+          "Improv",
+          `stance=${clean(improv.stance, "steady")}; chaos=${Number(improv.chaos_level) || 0}/3; callback=${clean(improv.callback_policy, "none")}; agenda=${clean(improv.agenda, "none")}`
+        ]
+      : [];
+    const stageMemoryLines = stageMemory
+      ? [
+          "",
+          "Stage memory",
+          `bit=${clean(stageMemory.current_bit, "none")}; callback=${clean(stageMemory.recent_callback, "none")}; correction=${clean(stageMemory.correction_state, "none")}; turns=${Number(stageMemory.turns_since_callback) || 0}`
+        ]
+      : [];
+    const safetyClampLines = safetyClamp
+      ? [
+          "",
+          "Safety clamp",
+          `level=${clean(safetyClamp.level, "none")}; reason=${clean(safetyClamp.reason, "none")}`
+        ]
+      : [];
     const constraints = safe.output_constraints && typeof safe.output_constraints === "object" && !Array.isArray(safe.output_constraints)
       ? safe.output_constraints
       : null;
@@ -132,6 +162,9 @@
       "",
       timeLine,
       ...continuityLines,
+      ...improvLines,
+      ...stageMemoryLines,
+      ...safetyClampLines,
       `当前判断：${localize(INTENT_LABELS, safe.intent)}`,
       `回复风格：${localize(STYLE_LABELS, safe.reply_style)}；最多约 ${Number(safe.max_sentences) || 3} 句`,
       `Style beat: ${clean(safe.style_beat, "none")}`,

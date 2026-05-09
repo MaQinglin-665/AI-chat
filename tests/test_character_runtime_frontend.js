@@ -392,6 +392,26 @@ function createMemoryStorage(initial = {}) {
         allow_motion: false,
         voice_style: "soft"
       },
+      improv: {
+        stance: "soft_hold",
+        chaos_level: 0,
+        callback_policy: "none",
+        agenda: "hold_the_room_still",
+        private_prompt: "SECRET"
+      },
+      stage_memory: {
+        current_bit: "room_anchor",
+        recent_callback: "cursor_side_eye",
+        correction_state: "none",
+        agenda: "hold_the_room_still",
+        turns_since_callback: 2,
+        raw_history: "SECRET"
+      },
+      safety_clamp: {
+        level: "safe_scene",
+        reason: "comfort",
+        bit_guide: "SECRET"
+      },
       feedback_effects: ["shorter_replies"],
       continuity: {
         last_intent: "comfort",
@@ -448,6 +468,12 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.actual.post, "soft_idle", "character brain snapshot should restore public audit summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.tts.finished, true, "character brain snapshot should restore public TTS audit state");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.private_prompt, undefined, "character brain snapshot should not persist private audit fields");
+  assert.strictEqual(restored.characterBrainLastDecision.improv.stance, "soft_hold", "character brain snapshot should restore public improv stance");
+  assert.strictEqual(restored.characterBrainLastDecision.improv.private_prompt, undefined, "character brain snapshot should not persist private improv fields");
+  assert.strictEqual(restored.characterBrainLastDecision.stage_memory.current_bit, "room_anchor", "character brain snapshot should restore public stage memory");
+  assert.strictEqual(restored.characterBrainLastDecision.stage_memory.raw_history, undefined, "character brain snapshot should not persist raw stage memory fields");
+  assert.strictEqual(restored.characterBrainLastDecision.safety_clamp.level, "safe_scene", "character brain snapshot should restore public safety clamp");
+  assert.strictEqual(restored.characterBrainLastDecision.safety_clamp.bit_guide, undefined, "character brain snapshot should not persist private safety clamp fields");
   assert.strictEqual(restored.characterBrainLastDecision.continuity.recent_user_need, "reassurance", "character brain snapshot should restore compact continuity");
   assert.strictEqual(restored.characterBrainLastDecision.output_constraints.allow_motion, false, "character brain snapshot should restore safe output constraints");
   assert.strictEqual(restored.characterBrainLastDecision.history_tail, undefined, "restored character brain snapshot should stay public-only");
@@ -509,6 +535,23 @@ function createMemoryStorage(initial = {}) {
         allow_teasing: false,
         allow_motion: false,
         voice_style: "soft"
+      },
+      improv: {
+        stance: "soft_hold",
+        chaos_level: 0,
+        callback_policy: "none",
+        agenda: "hold_the_room_still"
+      },
+      stage_memory: {
+        current_bit: "room_anchor",
+        recent_callback: "",
+        correction_state: "none",
+        agenda: "hold_the_room_still",
+        turns_since_callback: 1
+      },
+      safety_clamp: {
+        level: "safe_scene",
+        reason: "comfort"
       },
       feedback_effects: ["shorter_replies", "less_generic_tone"],
       continuity: {
@@ -572,6 +615,16 @@ function createMemoryStorage(initial = {}) {
       && brainReport.includes("dispatches=action:0/pulse:2")
       && brainReport.includes("settle=yes"),
     "character brain debug report should include compact actual performance audit"
+  );
+  assert.ok(
+    brainReport.includes("Improv")
+      && brainReport.includes("stance=soft_hold")
+      && brainReport.includes("chaos=0/3")
+      && brainReport.includes("Stage memory")
+      && brainReport.includes("bit=room_anchor")
+      && brainReport.includes("Safety clamp")
+      && brainReport.includes("level=safe_scene"),
+    "character brain debug report should include public improv and stage memory summaries"
   );
   assert.ok(
     !brainReport.includes("SECRET") && !brainReport.includes("private_prompt"),
