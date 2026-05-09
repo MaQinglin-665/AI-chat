@@ -317,6 +317,18 @@
     const timelineRaw = raw.performance_timeline && typeof raw.performance_timeline === "object" && !Array.isArray(raw.performance_timeline)
       ? raw.performance_timeline
       : {};
+    const auditRaw = raw.performance_audit && typeof raw.performance_audit === "object" && !Array.isArray(raw.performance_audit)
+      ? raw.performance_audit
+      : {};
+    const auditTimelineRaw = auditRaw.timeline && typeof auditRaw.timeline === "object" && !Array.isArray(auditRaw.timeline)
+      ? auditRaw.timeline
+      : {};
+    const auditActualRaw = auditRaw.actual && typeof auditRaw.actual === "object" && !Array.isArray(auditRaw.actual)
+      ? auditRaw.actual
+      : {};
+    const auditTtsRaw = auditRaw.tts && typeof auditRaw.tts === "object" && !Array.isArray(auditRaw.tts)
+      ? auditRaw.tts
+      : {};
     return {
       version: 1,
       intent: cleanText(raw.intent, 40),
@@ -355,6 +367,39 @@
         suppressed: Array.isArray(timelineRaw.suppressed)
           ? timelineRaw.suppressed.slice(0, 6).map((item) => cleanText(item, 48)).filter(Boolean)
           : []
+      },
+      performance_audit: {
+        enabled: auditRaw.enabled === true,
+        status: cleanText(auditRaw.status, 32),
+        intent: cleanText(auditRaw.intent, 40),
+        timeline: {
+          pre: cleanText(auditTimelineRaw.pre, 48),
+          speech: cleanText(auditTimelineRaw.speech, 48),
+          beats: cleanInt(auditTimelineRaw.beats, 0, 0, 4),
+          post: cleanText(auditTimelineRaw.post, 48),
+          suppressed: Array.isArray(auditTimelineRaw.suppressed)
+            ? auditTimelineRaw.suppressed.slice(0, 6).map((item) => cleanText(item, 48)).filter(Boolean)
+            : []
+        },
+        actual: {
+          pre: cleanText(auditActualRaw.pre, 48),
+          speech: cleanText(auditActualRaw.speech, 48),
+          beats: cleanInt(auditActualRaw.beats, 0, 0, 8),
+          post: cleanText(auditActualRaw.post, 48),
+          action_dispatches: cleanInt(auditActualRaw.action_dispatches, 0, 0, 20),
+          pulse_dispatches: cleanInt(auditActualRaw.pulse_dispatches, 0, 0, 20)
+        },
+        tts: {
+          started: auditTtsRaw.started === true,
+          finished: auditTtsRaw.finished === true,
+          mode: cleanText(auditTtsRaw.mode, 32)
+        },
+        settled: auditRaw.settled === true,
+        suppressed: Array.isArray(auditRaw.suppressed)
+          ? auditRaw.suppressed.slice(0, 8).map((item) => cleanText(item, 48)).filter(Boolean)
+          : [],
+        last_event: cleanText(auditRaw.last_event, 48),
+        updated_at: cleanInt(auditRaw.updated_at, 0, 0)
       },
       output_constraints: {
         max_sentences: cleanInt(constraintsRaw.max_sentences, cleanInt(raw.max_sentences, 3, 1, 8), 1, 8),

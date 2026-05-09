@@ -1418,6 +1418,49 @@ function buildCharacterBrainDebugReport() {
   }
   return "角色大脑状态\n\n角色大脑诊断模块暂不可用。";
 }
+
+let performanceAuditController = null;
+
+function getPerformanceAuditController() {
+  if (!performanceAuditController && typeof PERFORMANCE_AUDIT_CONTROLLER.createController === "function") {
+    performanceAuditController = PERFORMANCE_AUDIT_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      perfLog
+    });
+  }
+  return performanceAuditController || PERFORMANCE_AUDIT_CONTROLLER;
+}
+
+function startPerformanceAudit(context = {}) {
+  const controller = getPerformanceAuditController();
+  return typeof controller.startPerformanceAudit === "function"
+    ? controller.startPerformanceAudit(context)
+    : null;
+}
+
+function recordPerformanceAuditEvent(kind, detail = {}) {
+  const controller = getPerformanceAuditController();
+  const summary = typeof controller.recordPerformanceAuditEvent === "function"
+    ? controller.recordPerformanceAuditEvent(kind, detail)
+    : null;
+  if (summary) {
+    saveCharacterBrainSnapshotToStorage();
+  }
+  return summary;
+}
+
+function finishPerformanceAudit(extra = {}) {
+  const controller = getPerformanceAuditController();
+  const summary = typeof controller.finishPerformanceAudit === "function"
+    ? controller.finishPerformanceAudit(extra)
+    : null;
+  if (summary) {
+    saveCharacterBrainSnapshotToStorage();
+  }
+  return summary;
+}
+
 let performanceTimelineController = null;
 
 function getPerformanceTimelineController() {
@@ -1428,6 +1471,7 @@ function getPerformanceTimelineController() {
       enqueueActionIntent,
       triggerExpressionPulse,
       maybePlayTalkGesture,
+      recordPerformanceAuditEvent,
       perfLog
     });
   }
@@ -1562,6 +1606,7 @@ const APP_STARTUP_CONTROLLER = window.TaffyAppStartupController || {};
 const STREAM_TTS_QUEUE_CONTROLLER = window.TaffyStreamTtsQueueController || {};
 const TTS_PLAYBACK_CONTROLLER = window.TaffyTTSPlaybackController || {};
 const CHAT_REPLY_CONTROLLER = window.TaffyChatReplyController || {};
+const PERFORMANCE_AUDIT_CONTROLLER = window.TaffyPerformanceAuditController || {};
 const PERFORMANCE_TIMELINE_CONTROLLER = window.TaffyPerformanceTimelineController || {};
 const LIVE2D_RUNTIME_CONTROLLER = window.TaffyLive2DRuntimeController || {};
 const LIVE2D_LAYOUT_CONTROLLER = window.TaffyLive2DLayoutController || {};
@@ -4021,6 +4066,9 @@ function getChatReplyController() {
       clearPerformanceTimelineTimers,
       executePerformanceTimelinePhase,
       schedulePerformanceTimelineSpeechBeats,
+      startPerformanceAudit,
+      recordPerformanceAuditEvent,
+      finishPerformanceAudit,
       persistCharacterBrainSnapshot: saveCharacterBrainSnapshotToStorage,
       triggerExpressionPulse,
       flushStreamSpeak,

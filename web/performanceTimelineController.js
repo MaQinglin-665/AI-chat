@@ -255,6 +255,7 @@
     const enqueueActionIntent = typeof deps.enqueueActionIntent === "function" ? deps.enqueueActionIntent : () => {};
     const triggerExpressionPulse = typeof deps.triggerExpressionPulse === "function" ? deps.triggerExpressionPulse : () => {};
     const maybePlayTalkGesture = typeof deps.maybePlayTalkGesture === "function" ? deps.maybePlayTalkGesture : () => {};
+    const recordPerformanceAuditEvent = typeof deps.recordPerformanceAuditEvent === "function" ? deps.recordPerformanceAuditEvent : () => {};
     const perfLog = typeof deps.perfLog === "function" ? deps.perfLog : () => {};
 
     function clearPerformanceTimelineTimers() {
@@ -283,14 +284,27 @@
       return summary;
     }
 
-    function executePhasePlan(plan, context = {}) {
-      if (!plan || typeof plan !== "object" || plan.suppressed === true) {
+    function executePhasePlan(plan, context = {}, phaseKey = "") {
+      if (!plan || typeof plan !== "object") {
+        return false;
+      }
+      if (plan.suppressed === true) {
+        recordPerformanceAuditEvent("timeline_phase", {
+          phase: phaseKey,
+          name: clean(plan.name, "none"),
+          ok: false,
+          suppressed: true,
+          action: "none",
+          pulse: false
+        });
         return false;
       }
       const style = clean(plan.actionStyle || plan.pulseStyle || context.style, "neutral");
       const mood = clean(plan.actionMood || context.mood, "idle");
+      let didPulse = false;
       if (Number(plan.pulseBoost) > 0 && Number(plan.pulseDurationMs) > 0) {
         triggerExpressionPulse(clean(plan.pulseStyle || style, style), Number(plan.pulseBoost), Number(plan.pulseDurationMs));
+        didPulse = true;
       }
       const actionIntent = clean(plan.actionIntent, "none");
       if (actionIntent && actionIntent !== "none") {
@@ -303,6 +317,14 @@
           emphasis: Math.max(0, Math.min(1, Number(plan.emphasis) || 0))
         });
       }
+      recordPerformanceAuditEvent("timeline_phase", {
+        phase: phaseKey,
+        name: clean(plan.name, "none"),
+        ok: true,
+        suppressed: false,
+        action: actionIntent,
+        pulse: didPulse
+      });
       return true;
     }
 
@@ -322,7 +344,7 @@
         return false;
       }
       const run = () => {
-        const ok = executePhasePlan(plan, context);
+        const ok = executePhasePlan(plan, context, phaseKey);
         perfLog("performance_timeline", phaseKey, {
           name: clean(plan.name, "none"),
           ok,
@@ -353,7 +375,7 @@
           if (typeof maybePlayTalkGesture === "function") {
             maybePlayTalkGesture(String(context.text || ""), clean(beat.actionStyle || context.style, "neutral"));
           }
-          executePhasePlan(beat, context);
+          executePhasePlan(beat, context, "speechBeat");
         }, Math.max(0, Number(beat.delayMs) || 0));
         state.performanceTimelineTimers.push(timer);
         count += 1;

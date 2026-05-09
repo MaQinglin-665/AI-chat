@@ -66,6 +66,9 @@
     const clearPerformanceTimelineTimers = typeof deps.clearPerformanceTimelineTimers === "function" ? deps.clearPerformanceTimelineTimers : () => {};
     const executePerformanceTimelinePhase = typeof deps.executePerformanceTimelinePhase === "function" ? deps.executePerformanceTimelinePhase : () => false;
     const schedulePerformanceTimelineSpeechBeats = typeof deps.schedulePerformanceTimelineSpeechBeats === "function" ? deps.schedulePerformanceTimelineSpeechBeats : () => 0;
+    const startPerformanceAudit = typeof deps.startPerformanceAudit === "function" ? deps.startPerformanceAudit : () => null;
+    const recordPerformanceAuditEvent = typeof deps.recordPerformanceAuditEvent === "function" ? deps.recordPerformanceAuditEvent : () => null;
+    const finishPerformanceAudit = typeof deps.finishPerformanceAudit === "function" ? deps.finishPerformanceAudit : () => null;
     const persistCharacterBrainSnapshot = typeof deps.persistCharacterBrainSnapshot === "function" ? deps.persistCharacterBrainSnapshot : () => {};
     const triggerExpressionPulse = typeof deps.triggerExpressionPulse === "function" ? deps.triggerExpressionPulse : () => {};
     const flushStreamSpeak = typeof deps.flushStreamSpeak === "function" ? deps.flushStreamSpeak : () => {};
@@ -385,6 +388,12 @@
         });
         const performanceTimelineSummary = rememberPerformanceTimeline(performanceTimeline);
         if (performanceTimelineSummary) {
+          startPerformanceAudit({
+            traceId: chatPerfTraceId,
+            sessionId: streamSpeakSession,
+            brainSnapshot: state.characterBrainLastDecision,
+            timelineSummary: performanceTimelineSummary
+          });
           persistCharacterBrainSnapshot();
         }
         const timelineContext = {
@@ -433,10 +442,12 @@
           enqueueActionIntent("reply", { text: visibleReply, style: finalTalkStyle, mood, combo: true });
         }
         if (useStreamSpeak) {
+          recordPerformanceAuditEvent("tts_start", { mode: "stream" });
           runTimelineSpeechStart();
           flushStreamSpeak(streamSpeakSession, finalTalkStyle);
           const hadStreamSegments = state.streamSpeakLastEnqueueSession === streamSpeakSession;
           if (hadStreamSegments && state.streamSpeakPlayedSession === streamSpeakSession) {
+            recordPerformanceAuditEvent("tts_handoff", { mode: "stream_playing", ok: true });
             scheduleFinalSpeechWatchdog({
               sessionId: streamSpeakSession,
               text: visibleReply,
@@ -458,7 +469,7 @@
               result: hadStreamSegments ? "no_stream_playback_yet" : "no_stream_segments",
               blobBytes: discardedSegments
             });
-            await speak(speechText || visibleReply, {
+            const streamDirectOk = await speak(speechText || visibleReply, {
               prosody,
               interrupt: true,
               mood,
@@ -467,7 +478,9 @@
               perfTraceId: chatPerfTraceId,
               playbackGeneration: Number(state.ttsPlaybackGeneration || 0)
             });
+            recordPerformanceAuditEvent("tts_end", { mode: "stream_direct_fallback", ok: streamDirectOk !== false });
           } else {
+            recordPerformanceAuditEvent("tts_handoff", { mode: "stream_working", ok: true });
             scheduleFinalSpeechWatchdog({
               sessionId: streamSpeakSession,
               text: visibleReply,
@@ -484,7 +497,8 @@
           if (!performanceTimeline) {
             maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
           }
-          await speak(speechText || visibleReply, {
+          recordPerformanceAuditEvent("tts_start", { mode: "direct" });
+          const directOk = await speak(speechText || visibleReply, {
             prosody,
             interrupt: false,
             mood,
@@ -492,8 +506,10 @@
             voiceStyle: finalProsodyStyle,
             perfTraceId: chatPerfTraceId
           });
+          recordPerformanceAuditEvent("tts_end", { mode: "direct", ok: directOk !== false });
           runTimelinePostSettle();
         }
+        finishPerformanceAudit({ status: "reply_done", lastEvent: "reply_done" });
         setStatus("待机");
         return true;
       } catch (err) {
@@ -504,6 +520,8 @@
         });
         clearThinkingMotionTimer();
         clearPerformanceTimelineTimers();
+        recordPerformanceAuditEvent("failure", { ok: false });
+        finishPerformanceAudit({ status: "failed", lastEvent: "failure" });
         if (latencyHintTimer) {
           clearTimeout(latencyHintTimer);
           latencyHintTimer = 0;

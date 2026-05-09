@@ -21,6 +21,7 @@ def _load_script(name):
 
 probe = _load_script("model_acceptance_probe")
 audit = _load_script("audit_v14_dialogue")
+audit_v16 = _load_script("audit_v16_performance")
 
 
 def test_model_acceptance_summary_counts_gate_and_redacts_secret():
@@ -130,3 +131,37 @@ def test_dialogue_audit_report_is_public_and_uses_safe_payload_shape():
     assert "/braindebug" not in report
     assert "llm_probe" not in report
     assert "answer_then_bit" in report
+
+
+def test_v16_performance_audit_clamps_safe_scenes_and_reports_public_contract():
+    safe_issues = audit_v16.analyze_performance_contract(
+        "Tiny victory lap.",
+        {"intent": "comfort", "opening_move": "micro_reaction", "reply_shape": "mini_rant", "spontaneity": 3, "question_policy": "optional_playful"},
+        {"emotion": "happy", "action": "happy_idle", "voice_style": "cheerful"},
+    )
+    play_issues = audit_v16.analyze_performance_contract(
+        "Clipboard mode. Unfortunately useful.",
+        {"intent": "casual", "opening_move": "deadpan_aside", "reply_shape": "bit_then_answer", "spontaneity": 2, "question_policy": "none"},
+        {"emotion": "thinking", "action": "none", "voice_style": "neutral"},
+    )
+    record = audit_v16.build_scene_record(
+        {"id": "desk_weird", "input": "This desk feels weird."},
+        {
+            "ok": True,
+            "status": 200,
+            "elapsed_ms": 900,
+            "reply": "The desk is acting suspicious. I respect the drama.",
+            "character_brain": {"intent": "casual", "opening_move": "deadpan_aside", "reply_shape": "bit_then_answer", "spontaneity": 2, "question_policy": "none", "private_prompt": "SECRET"},
+            "character_runtime": {"emotion": "thinking", "action": "none", "voice_style": "neutral"},
+        },
+    )
+    report = audit_v16.format_report(audit_v16.summarize_records([record]))
+
+    assert "safe_scene_too_chaotic" in safe_issues
+    assert "unsafe_motion_for_safe_scene" in safe_issues
+    assert play_issues == []
+    assert record["ok"] is True
+    assert "deadpan_aside" in report
+    assert "SECRET" not in report
+    assert "private_prompt" not in report
+    assert "raw history" not in report.lower()

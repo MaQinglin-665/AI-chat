@@ -83,6 +83,9 @@
     const timeline = safe.performance_timeline && typeof safe.performance_timeline === "object" && !Array.isArray(safe.performance_timeline)
       ? safe.performance_timeline
       : null;
+    const audit = safe.performance_audit && typeof safe.performance_audit === "object" && !Array.isArray(safe.performance_audit)
+      ? safe.performance_audit
+      : null;
     const constraintLines = constraints
       ? [
           "",
@@ -110,6 +113,20 @@
           `suppressed=${timelineSuppressed.length ? timelineSuppressed.join(", ") : "none"}`
         ]
       : [];
+    const auditActual = audit?.actual && typeof audit.actual === "object" && !Array.isArray(audit.actual)
+      ? audit.actual
+      : {};
+    const auditTts = audit?.tts && typeof audit.tts === "object" && !Array.isArray(audit.tts)
+      ? audit.tts
+      : {};
+    const auditLines = audit
+      ? [
+          "",
+          "Actual",
+          `status=${clean(audit.status, "unknown")}; pre=${clean(auditActual.pre, "pending")}; speech=${clean(auditActual.speech, "pending")}; beats=${Number(auditActual.beats) || 0}; post=${clean(auditActual.post, "pending")}`,
+          `dispatches=action:${Number(auditActual.action_dispatches) || 0}/pulse:${Number(auditActual.pulse_dispatches) || 0}; tts=${auditTts.started === true ? "started" : "not_started"}/${auditTts.finished === true ? "finished" : "pending"}; settle=${audit.settled === true ? "yes" : "pending"}`
+        ]
+      : [];
     return [
       "角色大脑状态",
       "",
@@ -124,6 +141,7 @@
       ...constraintLines,
       ...executionLines,
       ...timelineLines,
+      ...auditLines,
       `角色状态：能量=${clean(safe.energy)}；注意力=${clean(safe.attention)}；关系=${clean(safe.relationship)}`,
       `表现建议：情绪=${clean(safe.emotion)}；动作=${clean(safe.action)}；强度=${clean(safe.intensity)}；语音=${clean(safe.voice_style)}`,
       "",
