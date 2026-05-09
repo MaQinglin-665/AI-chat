@@ -317,6 +317,9 @@
     const timelineRaw = raw.performance_timeline && typeof raw.performance_timeline === "object" && !Array.isArray(raw.performance_timeline)
       ? raw.performance_timeline
       : {};
+    const voiceTimelineRaw = raw.voice_timeline && typeof raw.voice_timeline === "object" && !Array.isArray(raw.voice_timeline)
+      ? raw.voice_timeline
+      : {};
     const auditRaw = raw.performance_audit && typeof raw.performance_audit === "object" && !Array.isArray(raw.performance_audit)
       ? raw.performance_audit
       : {};
@@ -331,6 +334,9 @@
       : {};
     const motionRaw = raw.motion_director && typeof raw.motion_director === "object" && !Array.isArray(raw.motion_director)
       ? raw.motion_director
+      : {};
+    const voiceRaw = raw.voice_director && typeof raw.voice_director === "object" && !Array.isArray(raw.voice_director)
+      ? raw.voice_director
       : {};
     const auditTimelineRaw = auditRaw.timeline && typeof auditRaw.timeline === "object" && !Array.isArray(auditRaw.timeline)
       ? auditRaw.timeline
@@ -379,6 +385,19 @@
         post: cleanText(timelineRaw.post, 48),
         suppressed: Array.isArray(timelineRaw.suppressed)
           ? timelineRaw.suppressed.slice(0, 6).map((item) => cleanText(item, 48)).filter(Boolean)
+          : []
+      },
+      voice_timeline: {
+        enabled: voiceTimelineRaw.enabled === true,
+        delivery: cleanText(voiceTimelineRaw.delivery, 48),
+        pace: cleanText(voiceTimelineRaw.pace, 32),
+        pause_profile: cleanText(voiceTimelineRaw.pause_profile, 48),
+        segment_style: cleanText(voiceTimelineRaw.segment_style, 48),
+        segments: cleanInt(voiceTimelineRaw.segments, 0, 0, 4),
+        pre_pause_ms: cleanInt(voiceTimelineRaw.pre_pause_ms, 0, 0, 1200),
+        inter_segment_pause_ms: cleanInt(voiceTimelineRaw.inter_segment_pause_ms, 160, 0, 1600),
+        suppressed: Array.isArray(voiceTimelineRaw.suppressed)
+          ? voiceTimelineRaw.suppressed.slice(0, 6).map((item) => cleanText(item, 48)).filter(Boolean)
           : []
       },
       performance_audit: {
@@ -449,6 +468,18 @@
         post_settle: cleanText(motionRaw.post_settle, 48),
         suppressed_reasons: Array.isArray(motionRaw.suppressed_reasons)
           ? motionRaw.suppressed_reasons.slice(0, 6).map((item) => cleanText(item, 48)).filter(Boolean)
+          : []
+      },
+      voice_director: {
+        delivery: cleanText(voiceRaw.delivery, 48),
+        pace: cleanText(voiceRaw.pace, 32),
+        pause_profile: cleanText(voiceRaw.pause_profile, 48),
+        segment_style: cleanText(voiceRaw.segment_style, 48),
+        pre_pause_ms: cleanInt(voiceRaw.pre_pause_ms, 0, 0, 1200),
+        inter_segment_pause_ms: cleanInt(voiceRaw.inter_segment_pause_ms, 160, 0, 1600),
+        max_segments: cleanInt(voiceRaw.max_segments, 1, 1, 4),
+        suppressed_reasons: Array.isArray(voiceRaw.suppressed_reasons)
+          ? voiceRaw.suppressed_reasons.slice(0, 6).map((item) => cleanText(item, 48)).filter(Boolean)
           : []
       },
       feedback_effects: Array.isArray(raw.feedback_effects)

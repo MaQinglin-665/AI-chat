@@ -86,6 +86,9 @@
     const motionDirector = safe.motion_director && typeof safe.motion_director === "object" && !Array.isArray(safe.motion_director)
       ? safe.motion_director
       : null;
+    const voiceDirector = safe.voice_director && typeof safe.voice_director === "object" && !Array.isArray(safe.voice_director)
+      ? safe.voice_director
+      : null;
     const improvLines = improv
       ? [
           "",
@@ -121,6 +124,17 @@
           `suppressed=${motionSuppressed.length ? motionSuppressed.join(", ") : "none"}`
         ]
       : [];
+    const voiceSuppressed = Array.isArray(voiceDirector?.suppressed_reasons)
+      ? voiceDirector.suppressed_reasons.map((item) => clean(item, "")).filter(Boolean).slice(0, 6)
+      : [];
+    const voiceLines = voiceDirector
+      ? [
+          "",
+          "Voice Director",
+          `delivery=${clean(voiceDirector.delivery, "steady_clear")}; pace=${clean(voiceDirector.pace, "normal")}; pause=${clean(voiceDirector.pause_profile, "light")}; segment=${clean(voiceDirector.segment_style, "whole")}; max_segments=${Number(voiceDirector.max_segments) || 1}`,
+          `suppressed=${voiceSuppressed.length ? voiceSuppressed.join(", ") : "none"}`
+        ]
+      : [];
     const constraints = safe.output_constraints && typeof safe.output_constraints === "object" && !Array.isArray(safe.output_constraints)
       ? safe.output_constraints
       : null;
@@ -129,6 +143,9 @@
       : null;
     const timeline = safe.performance_timeline && typeof safe.performance_timeline === "object" && !Array.isArray(safe.performance_timeline)
       ? safe.performance_timeline
+      : null;
+    const voiceTimeline = safe.voice_timeline && typeof safe.voice_timeline === "object" && !Array.isArray(safe.voice_timeline)
+      ? safe.voice_timeline
       : null;
     const audit = safe.performance_audit && typeof safe.performance_audit === "object" && !Array.isArray(safe.performance_audit)
       ? safe.performance_audit
@@ -160,6 +177,17 @@
           `suppressed=${timelineSuppressed.length ? timelineSuppressed.join(", ") : "none"}`
         ]
       : [];
+    const voiceTimelineSuppressed = Array.isArray(voiceTimeline?.suppressed)
+      ? voiceTimeline.suppressed.map((item) => clean(item, "")).filter(Boolean).slice(0, 6)
+      : [];
+    const voiceTimelineLines = voiceTimeline
+      ? [
+          "",
+          "Voice Timeline",
+          `enabled=${voiceTimeline.enabled === true ? "yes" : "no"}; delivery=${clean(voiceTimeline.delivery, "steady_clear")}; pace=${clean(voiceTimeline.pace, "normal")}; segments=${Number(voiceTimeline.segments) || 0}; pause=${clean(voiceTimeline.pause_profile, "light")}`,
+          `suppressed=${voiceTimelineSuppressed.length ? voiceTimelineSuppressed.join(", ") : "none"}`
+        ]
+      : [];
     const auditActual = audit?.actual && typeof audit.actual === "object" && !Array.isArray(audit.actual)
       ? audit.actual
       : {};
@@ -183,6 +211,7 @@
       ...stageMemoryLines,
       ...safetyClampLines,
       ...motionLines,
+      ...voiceLines,
       `当前判断：${localize(INTENT_LABELS, safe.intent)}`,
       `回复风格：${localize(STYLE_LABELS, safe.reply_style)}；最多约 ${Number(safe.max_sentences) || 3} 句`,
       `Style beat: ${clean(safe.style_beat, "none")}`,
@@ -192,6 +221,7 @@
       ...constraintLines,
       ...executionLines,
       ...timelineLines,
+      ...voiceTimelineLines,
       ...auditLines,
       `角色状态：能量=${clean(safe.energy)}；注意力=${clean(safe.attention)}；关系=${clean(safe.relationship)}`,
       `表现建议：情绪=${clean(safe.emotion)}；动作=${clean(safe.action)}；强度=${clean(safe.intensity)}；语音=${clean(safe.voice_style)}`,

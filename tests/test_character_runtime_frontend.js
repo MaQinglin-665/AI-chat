@@ -375,6 +375,18 @@ function createMemoryStorage(initial = {}) {
         suppressed: ["motion_disallowed"],
         private_prompt: "SECRET"
       },
+      voice_timeline: {
+        enabled: true,
+        delivery: "soft_low",
+        pace: "slow",
+        pause_profile: "gentle",
+        segment_style: "short_soft",
+        segments: 2,
+        pre_pause_ms: 120,
+        inter_segment_pause_ms: 360,
+        suppressed: ["comfort_no_voice_bits"],
+        private_prompt: "SECRET"
+      },
       performance_audit: {
         enabled: true,
         status: "settled",
@@ -420,6 +432,17 @@ function createMemoryStorage(initial = {}) {
         correction_reaction: "none",
         post_settle: "soft_idle",
         suppressed_reasons: ["motion_disallowed", "comfort_no_extra_motion"],
+        private_prompt: "SECRET"
+      },
+      voice_director: {
+        delivery: "soft_low",
+        pace: "slow",
+        pause_profile: "gentle",
+        segment_style: "short_soft",
+        pre_pause_ms: 120,
+        inter_segment_pause_ms: 360,
+        max_segments: 2,
+        suppressed_reasons: ["comfort_no_voice_bits"],
         private_prompt: "SECRET"
       },
       feedback_effects: ["shorter_replies"],
@@ -476,6 +499,9 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.pre, "soft_anchor", "character brain snapshot should restore public timeline summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.beats, 0, "character brain snapshot should restore compact timeline beat count");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.private_prompt, undefined, "character brain snapshot should not persist private timeline fields");
+  assert.strictEqual(restored.characterBrainLastDecision.voice_timeline.delivery, "soft_low", "character brain snapshot should restore public voice timeline summary");
+  assert.strictEqual(restored.characterBrainLastDecision.voice_timeline.segments, 2, "character brain snapshot should restore compact voice segment count");
+  assert.strictEqual(restored.characterBrainLastDecision.voice_timeline.private_prompt, undefined, "character brain snapshot should not persist private voice timeline fields");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.actual.post, "soft_idle", "character brain snapshot should restore public audit summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.tts.finished, true, "character brain snapshot should restore public TTS audit state");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.private_prompt, undefined, "character brain snapshot should not persist private audit fields");
@@ -488,6 +514,9 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.motion_director.pre_reaction, "eyes_down_soft", "character brain snapshot should restore public motion director plan");
   assert.deepStrictEqual(restored.characterBrainLastDecision.motion_director.suppressed_reasons, ["motion_disallowed", "comfort_no_extra_motion"], "character brain snapshot should restore compact motion suppressions");
   assert.strictEqual(restored.characterBrainLastDecision.motion_director.private_prompt, undefined, "character brain snapshot should not persist private motion fields");
+  assert.strictEqual(restored.characterBrainLastDecision.voice_director.delivery, "soft_low", "character brain snapshot should restore public voice director plan");
+  assert.deepStrictEqual(restored.characterBrainLastDecision.voice_director.suppressed_reasons, ["comfort_no_voice_bits"], "character brain snapshot should restore compact voice suppressions");
+  assert.strictEqual(restored.characterBrainLastDecision.voice_director.private_prompt, undefined, "character brain snapshot should not persist private voice fields");
   assert.strictEqual(restored.characterBrainLastDecision.continuity.recent_user_need, "reassurance", "character brain snapshot should restore compact continuity");
   assert.strictEqual(restored.characterBrainLastDecision.output_constraints.allow_motion, false, "character brain snapshot should restore safe output constraints");
   assert.strictEqual(restored.characterBrainLastDecision.history_tail, undefined, "restored character brain snapshot should stay public-only");
@@ -533,6 +562,18 @@ function createMemoryStorage(initial = {}) {
         suppressed: ["motion_disallowed"],
         private_prompt: "SECRET"
       },
+      voice_timeline: {
+        enabled: true,
+        delivery: "soft_low",
+        pace: "slow",
+        pause_profile: "gentle",
+        segment_style: "short_soft",
+        segments: 2,
+        pre_pause_ms: 120,
+        inter_segment_pause_ms: 360,
+        suppressed: ["comfort_no_voice_bits"],
+        private_prompt: "SECRET"
+      },
       performance_audit: {
         enabled: true,
         status: "settled",
@@ -575,6 +616,16 @@ function createMemoryStorage(initial = {}) {
         correction_reaction: "none",
         post_settle: "soft_idle",
         suppressed_reasons: ["motion_disallowed", "comfort_no_extra_motion"]
+      },
+      voice_director: {
+        delivery: "soft_low",
+        pace: "slow",
+        pause_profile: "gentle",
+        segment_style: "short_soft",
+        pre_pause_ms: 120,
+        inter_segment_pause_ms: 360,
+        max_segments: 2,
+        suppressed_reasons: ["comfort_no_voice_bits"]
       },
       feedback_effects: ["shorter_replies", "less_generic_tone"],
       continuity: {
@@ -631,6 +682,19 @@ function createMemoryStorage(initial = {}) {
       && brainReport.includes("beats=0")
       && brainReport.includes("suppressed=motion_disallowed"),
     "character brain debug report should include compact public timeline summary"
+  );
+  assert.ok(
+    brainReport.includes("Voice Director")
+      && brainReport.includes("delivery=soft_low")
+      && brainReport.includes("segment=short_soft")
+      && brainReport.includes("suppressed=comfort_no_voice_bits"),
+    "character brain debug report should include compact public voice director summary"
+  );
+  assert.ok(
+    brainReport.includes("Voice Timeline")
+      && brainReport.includes("segments=2")
+      && brainReport.includes("pause=gentle"),
+    "character brain debug report should include compact public voice timeline summary"
   );
   assert.ok(
     brainReport.includes("Actual")
@@ -695,6 +759,8 @@ function createMemoryStorage(initial = {}) {
 
 {
   assert.strictEqual(typeof performanceTimelineController.buildPerformanceTimeline, "function", "performance timeline controller should build timeline plans");
+  assert.strictEqual(typeof performanceTimelineController.buildVoiceTimeline, "function", "performance timeline controller should build voice timeline plans");
+  assert.strictEqual(typeof performanceTimelineController.applyVoiceDirectorProsody, "function", "performance timeline controller should apply voice director prosody");
   assert.strictEqual(typeof performanceTimelineController.createController, "function", "performance timeline controller should expose a runtime adapter");
   const comfortTimeline = performanceTimelineController.buildPerformanceTimeline({
     brainSnapshot: {
@@ -792,6 +858,52 @@ function createMemoryStorage(initial = {}) {
     ["beats", "enabled", "post", "pre", "speech", "suppressed"].sort(),
     "public timeline summary should only include safe execution fields"
   );
+
+  const comfortVoiceTimeline = performanceTimelineController.buildVoiceTimeline({
+    brainSnapshot: {
+      intent: "comfort",
+      voice_director: {
+        delivery: "soft_low",
+        pace: "slow",
+        pause_profile: "gentle",
+        segment_style: "short_soft",
+        max_segments: 2,
+        suppressed_reasons: ["comfort_no_voice_bits"]
+      }
+    },
+    replyText: "I'm here. We keep the room tiny for a second.",
+    ttsEnabled: true
+  });
+  assert.strictEqual(comfortVoiceTimeline.delivery, "soft_low", "comfort voice timeline should use soft delivery");
+  assert.ok(comfortVoiceTimeline.segments.length <= 2, "comfort voice timeline should stay compact");
+  const miniRantVoiceTimeline = performanceTimelineController.buildVoiceTimeline({
+    brainSnapshot: {
+      intent: "casual",
+      reply_shape: "mini_rant",
+      voice_director: {
+        delivery: "dry_playful",
+        pace: "varied",
+        pause_profile: "beat",
+        segment_style: "mini_rant_beats",
+        max_segments: 3
+      }
+    },
+    replyText: "The desk is suspicious. The cursor knows something. I am filing a tiny report.",
+    ttsEnabled: true
+  });
+  assert.ok(miniRantVoiceTimeline.segments.length <= 3, "mini-rant voice timeline should cap speech beats");
+  const voiceSummary = performanceTimelineController.toPublicVoiceTimelineSummary(comfortVoiceTimeline);
+  assert.deepStrictEqual(
+    Object.keys(voiceSummary).sort(),
+    ["delivery", "enabled", "inter_segment_pause_ms", "pace", "pause_profile", "pre_pause_ms", "segment_style", "segments", "suppressed"].sort(),
+    "public voice timeline summary should not include raw speech text"
+  );
+  const softProsody = performanceTimelineController.applyVoiceDirectorProsody(
+    { speed_ratio: 1.08, pitch_ratio: 1.01, volume_ratio: 1.0 },
+    comfortVoiceTimeline.voice_director
+  );
+  assert.ok(softProsody.speed_ratio < 1.08, "soft voice director should slow speech down");
+  assert.ok(softProsody.volume_ratio < 1.0, "soft voice director should lower volume slightly");
 }
 
 {
@@ -827,6 +939,15 @@ function createMemoryStorage(initial = {}) {
   });
   const publicSummary = controller.rememberPerformanceTimeline(timeline);
   assert.strictEqual(timelineState.characterBrainLastDecision.performance_timeline.pre, publicSummary.pre, "controller should attach public timeline to the brain snapshot");
+  const voicePublicSummary = controller.rememberVoiceTimeline(controller.buildVoiceTimeline({
+    brainSnapshot: {
+      intent: "casual",
+      voice_director: { delivery: "dry_playful", pace: "measured", pause_profile: "dry_beat", segment_style: "two_beat", max_segments: 2 }
+    },
+    replyText: "Yep. The cursor blinked with opinions.",
+    ttsEnabled: true
+  }));
+  assert.strictEqual(timelineState.characterBrainLastDecision.voice_timeline.delivery, voicePublicSummary.delivery, "controller should attach public voice timeline to the brain snapshot");
   controller.executePerformanceTimelinePhase(timeline, "preReaction", { text: "hi", style: "neutral", mood: "idle", sessionId: 42 });
   controller.schedulePerformanceTimelineSpeechBeats(timeline, { text: "hi", style: "neutral", mood: "idle", sessionId: 42 });
   assert.ok(calls.some((item) => item[0] === "pulse"), "timeline execution should trigger expression pulses");
@@ -2209,6 +2330,8 @@ assert.ok(
     && chatStateSource.includes("performanceTimelineLastSummary: null")
     && chatStateSource.includes("performanceTimelineTimers: []")
     && chatReplyControllerSource.includes("const performanceTimeline = buildPerformanceTimeline({")
+    && chatReplyControllerSource.includes("const voiceTimeline = buildVoiceTimeline({")
+    && chatReplyControllerSource.includes("applyVoiceDirectorProsody(")
     && chatReplyControllerSource.includes("startPerformanceAudit({")
     && chatReplyControllerSource.includes('recordPerformanceAuditEvent("tts_start"')
     && chatReplyControllerSource.includes('executePerformanceTimelinePhase(performanceTimeline, "preReaction"')
@@ -2217,6 +2340,8 @@ assert.ok(
     && chatReplyControllerSource.includes('executePerformanceTimelinePhase(performanceTimeline, "postSettle"')
     && performanceAuditControllerSource.includes("function sanitizePerformanceAuditSummary")
     && performanceTimelineControllerSource.includes("function buildPerformanceTimeline")
+    && performanceTimelineControllerSource.includes("function buildVoiceTimeline")
+    && performanceTimelineControllerSource.includes("function applyVoiceDirectorProsody")
     && performanceTimelineControllerSource.includes("recordPerformanceAuditEvent")
     && performanceTimelineControllerSource.includes("function toPublicTimelineSummary")
     && indexSource.includes('<script src="./performanceAuditController.js"></script>')

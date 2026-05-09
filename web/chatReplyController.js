@@ -63,6 +63,19 @@
       : (runtimeHint) => runtimeHint;
     const buildPerformanceTimeline = typeof deps.buildPerformanceTimeline === "function" ? deps.buildPerformanceTimeline : () => null;
     const rememberPerformanceTimeline = typeof deps.rememberPerformanceTimeline === "function" ? deps.rememberPerformanceTimeline : () => null;
+    const buildVoiceTimeline = typeof deps.buildVoiceTimeline === "function"
+      ? deps.buildVoiceTimeline
+      : (input) => (typeof root.TaffyPerformanceTimelineController?.buildVoiceTimeline === "function"
+          ? root.TaffyPerformanceTimelineController.buildVoiceTimeline(input)
+          : null);
+    const rememberVoiceTimeline = typeof deps.rememberVoiceTimeline === "function"
+      ? deps.rememberVoiceTimeline
+      : () => null;
+    const applyVoiceDirectorProsody = typeof deps.applyVoiceDirectorProsody === "function"
+      ? deps.applyVoiceDirectorProsody
+      : (prosody, voiceDirector) => (typeof root.TaffyPerformanceTimelineController?.applyVoiceDirectorProsody === "function"
+          ? root.TaffyPerformanceTimelineController.applyVoiceDirectorProsody(prosody, voiceDirector)
+          : prosody);
     const clearPerformanceTimelineTimers = typeof deps.clearPerformanceTimelineTimers === "function" ? deps.clearPerformanceTimelineTimers : () => {};
     const executePerformanceTimelinePhase = typeof deps.executePerformanceTimelinePhase === "function" ? deps.executePerformanceTimelinePhase : () => false;
     const schedulePerformanceTimelineSpeechBeats = typeof deps.schedulePerformanceTimelineSpeechBeats === "function" ? deps.schedulePerformanceTimelineSpeechBeats : () => 0;
@@ -387,13 +400,29 @@
           ttsEnabled: state.speakingEnabled !== false
         });
         const performanceTimelineSummary = rememberPerformanceTimeline(performanceTimeline);
-        if (performanceTimelineSummary) {
+        const voiceTimeline = buildVoiceTimeline({
+          brainSnapshot: state.characterBrainLastDecision,
+          runtimeMetadata: characterRuntimeMetadataForReply,
+          replyText: visibleReply,
+          mood,
+          talkStyle: finalTalkStyle,
+          ttsEnabled: state.speakingEnabled !== false
+        });
+        const voiceTimelineSummary = rememberVoiceTimeline(voiceTimeline);
+        if (performanceTimelineSummary || voiceTimelineSummary) {
           startPerformanceAudit({
             traceId: chatPerfTraceId,
             sessionId: streamSpeakSession,
             brainSnapshot: state.characterBrainLastDecision,
             timelineSummary: performanceTimelineSummary
           });
+          if (voiceTimelineSummary) {
+            recordPerformanceAuditEvent("voice_plan", {
+              delivery: voiceTimelineSummary.delivery,
+              pace: voiceTimelineSummary.pace,
+              segments: voiceTimelineSummary.segments
+            });
+          }
           persistCharacterBrainSnapshot();
         }
         const timelineContext = {
@@ -457,7 +486,10 @@
             });
           } else if (!hadStreamSegments || !state.streamSpeakWorking) {
             const speechText = buildStableSpeakText(visibleReply) || visibleReply;
-            const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle);
+            const prosody = applyVoiceDirectorProsody(
+              buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle),
+              state.characterBrainLastDecision?.voice_director
+            );
             if (!performanceTimeline) {
               maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
             }
@@ -492,7 +524,10 @@
           runTimelinePostSettle(Math.min(9000, Math.max(900, visibleReply.length * 48 + 420)));
         } else {
           const speechText = buildStableSpeakText(visibleReply) || visibleReply;
-          const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle);
+          const prosody = applyVoiceDirectorProsody(
+            buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle),
+            state.characterBrainLastDecision?.voice_director
+          );
           runTimelineSpeechStart();
           if (!performanceTimeline) {
             maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);

@@ -321,6 +321,228 @@
     };
   }
 
+  function clampNumber(value, fallback, min, max) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) {
+      return fallback;
+    }
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function normalizeVoiceDirector(raw = null) {
+    const safe = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    const suppressed = Array.isArray(safe.suppressed_reasons)
+      ? safe.suppressed_reasons.map((item) => clean(item)).filter(Boolean).slice(0, 6)
+      : [];
+    return {
+      delivery: clean(safe.delivery, "steady_clear"),
+      pace: clean(safe.pace, "normal"),
+      pause_profile: clean(safe.pause_profile, "light"),
+      segment_style: clean(safe.segment_style, "whole"),
+      pre_pause_ms: clampInt(safe.pre_pause_ms, 0, 0, 1200),
+      inter_segment_pause_ms: clampInt(safe.inter_segment_pause_ms, 160, 0, 1600),
+      max_segments: clampInt(safe.max_segments, 1, 1, 4),
+      suppressed_reasons: suppressed
+    };
+  }
+
+  function inferVoiceDirector(brain = {}) {
+    const intent = clean(brain.intent, "casual");
+    const shape = clean(brain.reply_shape, "one_liner");
+    const opening = clean(brain.opening_move, "micro_reaction");
+    if (brain.voice_director && typeof brain.voice_director === "object" && !Array.isArray(brain.voice_director)) {
+      return normalizeVoiceDirector(brain.voice_director);
+    }
+    if (intent === "comfort") {
+      return normalizeVoiceDirector({
+        delivery: "soft_low",
+        pace: "slow",
+        pause_profile: "gentle",
+        segment_style: "short_soft",
+        pre_pause_ms: 120,
+        inter_segment_pause_ms: 360,
+        max_segments: 2,
+        suppressed_reasons: ["comfort_no_voice_bits"]
+      });
+    }
+    if (intent === "closing") {
+      return normalizeVoiceDirector({
+        delivery: "soft_close",
+        pace: "slow",
+        pause_profile: "final",
+        segment_style: "one_liner",
+        pre_pause_ms: 80,
+        inter_segment_pause_ms: 260,
+        max_segments: 1,
+        suppressed_reasons: ["closing_no_extra_voice"]
+      });
+    }
+    if (intent === "task_help" || intent === "reminder") {
+      return normalizeVoiceDirector({
+        delivery: "steady_clear",
+        pace: "steady",
+        pause_profile: "clean",
+        segment_style: intent === "task_help" ? "step_then_aside" : "one_liner",
+        pre_pause_ms: 40,
+        inter_segment_pause_ms: 220,
+        max_segments: intent === "task_help" ? 2 : 1,
+        suppressed_reasons: [intent === "task_help" ? "task_steady_voice" : "reminder_clear_voice"]
+      });
+    }
+    if (shape === "mini_rant") {
+      return normalizeVoiceDirector({
+        delivery: "dry_playful",
+        pace: "varied",
+        pause_profile: "beat",
+        segment_style: "mini_rant_beats",
+        pre_pause_ms: 80,
+        inter_segment_pause_ms: 260,
+        max_segments: 3
+      });
+    }
+    if (shape === "answer_then_bit") {
+      return normalizeVoiceDirector({
+        delivery: "answer_first",
+        pace: "steady_playful",
+        pause_profile: "answer_then_bit",
+        segment_style: "answer_then_bit",
+        pre_pause_ms: 20,
+        inter_segment_pause_ms: 220,
+        max_segments: 2
+      });
+    }
+    return normalizeVoiceDirector({
+      delivery: opening === "deadpan_aside" ? "dry_playful" : "steady_clear",
+      pace: opening === "deadpan_aside" ? "measured" : "normal",
+      pause_profile: opening === "deadpan_aside" ? "dry_beat" : "light",
+      segment_style: opening === "deadpan_aside" ? "two_beat" : "whole",
+      pre_pause_ms: opening === "deadpan_aside" ? 80 : 0,
+      inter_segment_pause_ms: 200,
+      max_segments: opening === "deadpan_aside" ? 2 : 1
+    });
+  }
+
+  function splitVoiceSegments(text, segmentStyle = "whole", maxSegments = 1) {
+    const source = String(text || "").replace(/\s+/g, " ").trim();
+    if (!source) {
+      return [];
+    }
+    const limit = clampInt(maxSegments, 1, 1, 4);
+    if (clean(segmentStyle, "whole") === "whole") {
+      return [source];
+    }
+    const sentences = source
+      .split(/(?<=[.!?;:\u3002\uFF01\uFF1F])\s+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (sentences.length <= 1 && source.length > 90) {
+      const midpoint = Math.max(36, Math.min(source.length - 24, Math.floor(source.length / 2)));
+      const splitAt = source.indexOf(", ", midpoint) > -1 ? source.indexOf(", ", midpoint) + 1 : midpoint;
+      return [source.slice(0, splitAt).trim(), source.slice(splitAt).trim()].filter(Boolean).slice(0, limit);
+    }
+    return (sentences.length ? sentences : [source]).slice(0, limit);
+  }
+
+  function buildVoiceTimeline(input = {}) {
+    const brain = input.brainSnapshot && typeof input.brainSnapshot === "object" && !Array.isArray(input.brainSnapshot)
+      ? input.brainSnapshot
+      : {};
+    const ttsEnabled = input.ttsEnabled !== false;
+    const director = inferVoiceDirector(brain);
+    const segments = splitVoiceSegments(input.replyText, director.segment_style, director.max_segments);
+    const suppressed = [...director.suppressed_reasons];
+    if (!ttsEnabled) suppressed.push("tts_disabled");
+    return {
+      version: 1,
+      enabled: ttsEnabled,
+      voice_director: director,
+      delivery: director.delivery,
+      pace: director.pace,
+      pause_profile: director.pause_profile,
+      segment_style: director.segment_style,
+      pre_pause_ms: director.pre_pause_ms,
+      inter_segment_pause_ms: director.inter_segment_pause_ms,
+      max_segments: director.max_segments,
+      segments,
+      suppressed
+    };
+  }
+
+  function toPublicVoiceTimelineSummary(timeline = null) {
+    const safe = timeline && typeof timeline === "object" && !Array.isArray(timeline) ? timeline : null;
+    if (!safe) {
+      return null;
+    }
+    return {
+      enabled: safe.enabled === true,
+      delivery: clean(safe.delivery, "steady_clear"),
+      pace: clean(safe.pace, "normal"),
+      pause_profile: clean(safe.pause_profile, "light"),
+      segment_style: clean(safe.segment_style, "whole"),
+      segments: Array.isArray(safe.segments) ? clampInt(safe.segments.length, 0, 0, 4) : 0,
+      pre_pause_ms: clampInt(safe.pre_pause_ms, 0, 0, 1200),
+      inter_segment_pause_ms: clampInt(safe.inter_segment_pause_ms, 160, 0, 1600),
+      suppressed: Array.isArray(safe.suppressed)
+        ? safe.suppressed.map((item) => clean(item)).filter(Boolean).slice(0, 6)
+        : []
+    };
+  }
+
+  function formatProsodyPercent(value, base = 1) {
+    const pct = Math.round((Number(value || base) - base) * 100);
+    return `${pct >= 0 ? "+" : ""}${pct}%`;
+  }
+
+  function formatPitchHz(value) {
+    const hz = Math.round((Number(value || 1) - 1) * 34);
+    return `${hz >= 0 ? "+" : ""}${hz}Hz`;
+  }
+
+  function applyVoiceDirectorProsody(prosody = null, voiceDirector = null) {
+    const base = prosody && typeof prosody === "object" && !Array.isArray(prosody) ? prosody : {};
+    const director = normalizeVoiceDirector(voiceDirector);
+    let speed = Number.isFinite(Number(base.speed_ratio)) ? Number(base.speed_ratio) : 1;
+    let pitch = Number.isFinite(Number(base.pitch_ratio)) ? Number(base.pitch_ratio) : 1;
+    let volume = Number.isFinite(Number(base.volume_ratio)) ? Number(base.volume_ratio) : 1;
+
+    if (director.pace === "slow") speed *= 0.92;
+    else if (director.pace === "steady") speed *= 0.98;
+    else if (director.pace === "short_pause") speed *= 0.96;
+    else if (director.pace === "bright") speed *= 1.04;
+    else if (director.pace === "playful" || director.pace === "steady_playful") speed *= 1.01;
+
+    if (director.delivery === "soft_low" || director.delivery === "soft_close" || director.delivery === "soft_clear") {
+      pitch *= 0.97;
+      volume *= 0.94;
+    } else if (director.delivery === "steady_clear" || director.delivery === "answer_first") {
+      pitch *= 0.99;
+      volume *= 1.01;
+    } else if (director.delivery === "dry_recovery" || director.delivery === "dry_playful") {
+      speed *= 0.98;
+      pitch *= 0.98;
+      volume *= 0.98;
+    } else if (director.delivery === "bright_pop" || director.delivery === "bit_pop") {
+      speed *= 1.03;
+      pitch *= 1.03;
+      volume *= 1.01;
+    }
+
+    speed = clampNumber(speed, 1, 0.82, 1.24);
+    pitch = clampNumber(pitch, 1, 0.86, 1.18);
+    volume = clampNumber(volume, 1, 0.72, 1.08);
+    return {
+      ...base,
+      speed_ratio: Number(speed.toFixed(2)),
+      pitch_ratio: Number(pitch.toFixed(2)),
+      volume_ratio: Number(volume.toFixed(2)),
+      rate: formatProsodyPercent(speed),
+      pitch: formatPitchHz(pitch),
+      volume: formatProsodyPercent(volume),
+      voice_director_delivery: director.delivery,
+      voice_director_pace: director.pace
+    };
+  }
+
   function createController(deps = {}) {
     const state = deps.state || {};
     const windowObject = deps.windowObject || root;
@@ -350,6 +572,20 @@
       }
       try {
         windowObject.__AI_CHAT_LAST_PERFORMANCE_TIMELINE__ = summary;
+      } catch (_) {
+        // Optional debug bridge only.
+      }
+      return summary;
+    }
+
+    function rememberVoiceTimeline(timeline) {
+      const summary = toPublicVoiceTimelineSummary(timeline);
+      state.voiceTimelineLastSummary = summary;
+      if (state.characterBrainLastDecision && typeof state.characterBrainLastDecision === "object" && !Array.isArray(state.characterBrainLastDecision)) {
+        state.characterBrainLastDecision.voice_timeline = summary;
+      }
+      try {
+        windowObject.__AI_CHAT_LAST_VOICE_TIMELINE__ = summary;
       } catch (_) {
         // Optional debug bridge only.
       }
@@ -459,7 +695,11 @@
     return {
       buildPerformanceTimeline,
       toPublicTimelineSummary,
+      buildVoiceTimeline,
+      toPublicVoiceTimelineSummary,
+      applyVoiceDirectorProsody,
       rememberPerformanceTimeline,
+      rememberVoiceTimeline,
       clearPerformanceTimelineTimers,
       executePerformanceTimelinePhase,
       schedulePerformanceTimelineSpeechBeats
@@ -469,6 +709,9 @@
   const api = {
     buildPerformanceTimeline,
     toPublicTimelineSummary,
+    buildVoiceTimeline,
+    toPublicVoiceTimelineSummary,
+    applyVoiceDirectorProsody,
     countSpeechBeats,
     createController
   };

@@ -1492,6 +1492,27 @@ function rememberPerformanceTimeline(timeline) {
     : null;
 }
 
+function buildVoiceTimeline(input = {}) {
+  const controller = getPerformanceTimelineController();
+  return typeof controller.buildVoiceTimeline === "function"
+    ? controller.buildVoiceTimeline(input)
+    : null;
+}
+
+function rememberVoiceTimeline(timeline) {
+  const controller = getPerformanceTimelineController();
+  return typeof controller.rememberVoiceTimeline === "function"
+    ? controller.rememberVoiceTimeline(timeline)
+    : null;
+}
+
+function applyVoiceDirectorProsody(prosody, voiceDirector) {
+  const controller = getPerformanceTimelineController();
+  return typeof controller.applyVoiceDirectorProsody === "function"
+    ? controller.applyVoiceDirectorProsody(prosody, voiceDirector)
+    : prosody;
+}
+
 function clearPerformanceTimelineTimers() {
   const controller = getPerformanceTimelineController();
   if (typeof controller.clearPerformanceTimelineTimers === "function") {
@@ -4063,6 +4084,9 @@ function getChatReplyController() {
       applyPerformanceControlsToRuntimeHint,
       buildPerformanceTimeline,
       rememberPerformanceTimeline,
+      buildVoiceTimeline,
+      rememberVoiceTimeline,
+      applyVoiceDirectorProsody,
       clearPerformanceTimelineTimers,
       executePerformanceTimelinePhase,
       schedulePerformanceTimelineSpeechBeats,

@@ -49,6 +49,7 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert "Improv:" in block
     assert "Stage memory:" in block
     assert "Safety clamp:" in block
+    assert "Voice director:" in block
     assert "slightly odd inner life" in block
     assert "empty helper phrases" in block
     assert decision["style_beat"]
@@ -191,6 +192,33 @@ def test_character_brain_motion_director_maps_intents_to_safe_action_plans():
     assert closing["motion_director"]["post_settle"] == "closing_idle"
 
 
+def test_character_brain_voice_director_maps_intents_to_delivery_plans():
+    casual = character_brain.build_character_brain_decision(user_message="This desk feels weird today.")
+    question = character_brain.build_character_brain_decision(user_message="What are you doing?")
+    correction = character_brain.build_character_brain_decision(user_message="You were wrong.")
+    encouragement = character_brain.build_character_brain_decision(user_message="I finished it.")
+    comfort = character_brain.build_character_brain_decision(user_message="I feel bad.")
+    task = character_brain.build_character_brain_decision(user_message="What next?")
+    closing = character_brain.build_character_brain_decision(user_message="I'm going to sleep.")
+
+    assert casual["voice_director"]["delivery"] in {"dry_playful", "bit_pop", "steady_clear"}
+    assert casual["voice_director"]["max_segments"] >= 1
+    assert question["voice_director"]["delivery"] == "answer_first"
+    assert question["voice_director"]["segment_style"] == "answer_then_bit"
+    assert correction["voice_director"]["delivery"] == "dry_recovery"
+    assert correction["voice_director"]["pause_profile"] == "awkward_beat"
+    assert encouragement["voice_director"]["delivery"] == "bright_pop"
+    assert comfort["voice_director"]["delivery"] == "soft_low"
+    assert comfort["voice_director"]["pace"] == "slow"
+    assert comfort["voice_director"]["segment_style"] == "short_soft"
+    assert "comfort_no_voice_bits" in comfort["voice_director"]["suppressed_reasons"]
+    assert task["voice_director"]["delivery"] == "steady_clear"
+    assert task["voice_director"]["segment_style"] == "step_then_aside"
+    assert "task_steady_voice" in task["voice_director"]["suppressed_reasons"]
+    assert closing["voice_director"]["delivery"] == "soft_close"
+    assert closing["voice_director"]["segment_style"] == "one_liner"
+
+
 def test_character_brain_context_bleed_guard_blocks_prior_task_agenda():
     task = character_brain.build_character_brain_decision(user_message="What should I do next?")
     state = character_brain.update_brain_session_state(
@@ -209,8 +237,15 @@ def test_character_brain_context_bleed_guard_blocks_prior_task_agenda():
         user_message="I finished it.",
     )
 
+    encouragement_save_check = character_brain.apply_character_brain_reply_constraints(
+        "Tiny victory, then. If you haven't already, do one last save check and close the extra stuff so your brain can power down for real.",
+        encouragement,
+        user_message="I finished it.",
+    )
+
     assert encouragement["context_bleed_guard"]["active"] is True
     assert constrained == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert encouragement_save_check == "Look at you, actually finishing the thing. Suspiciously competent."
     assert encouragement["performance_execution"]["removed_context_bleed"] is True
     assert "close the tabs" not in constrained.lower()
 
@@ -220,17 +255,37 @@ def test_character_brain_context_bleed_guard_blocks_prior_task_agenda():
         comfort,
         user_message="I feel bad.",
     )
+    comfort_smart_agenda = character_brain.apply_character_brain_reply_constraints(
+        "Hey, that low-battery feeling is heavy. Take 10 minutes: save what you've got, close extra windows, and clear your desktop.",
+        comfort,
+        user_message="I feel bad.",
+    )
+    comfort_save_sweep = character_brain.apply_character_brain_reply_constraints(
+        "I've got you. First thing: do a quick 10-minute save sweep (Ctrl+S, then zip/archive anything you won't need tonight).",
+        comfort,
+        user_message="I feel bad.",
+    )
     closing = character_brain.build_character_brain_decision(user_message="I'm going to sleep.")
     closing_reply = character_brain.apply_character_brain_reply_constraints(
         "Alright, save your work and close the tabs, then go sleep.",
         closing,
         user_message="I'm going to sleep.",
     )
+    vague_task = character_brain.build_character_brain_decision(user_message="What next?")
+    vague_task_reply = character_brain.apply_character_brain_reply_constraints(
+        "Start a 10-minute timer now, save your work, close the extra windows, and clear your desktop.",
+        vague_task,
+        user_message="What next?",
+    )
 
     assert comfort_reply == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+    assert comfort_smart_agenda == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+    assert comfort_save_sweep == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
     assert comfort["performance_execution"]["removed_context_bleed"] is True
     assert closing_reply == "Go sleep. I'll keep the pixels under questionable supervision."
     assert closing["performance_execution"]["removed_context_bleed"] is True
+    assert vague_task_reply == "One tiny step. Ten minutes. No grand destiny ceremony."
+    assert vague_task["performance_execution"]["removed_context_bleed"] is True
 
 
 def test_character_brain_comfort_priority_beats_next_step_question():
@@ -914,6 +969,8 @@ def test_character_brain_public_snapshot_continuity_is_safe_and_compact():
     assert snapshot["safety_clamp"]["level"] in {"none", "safe_scene", "task_scene"}
     assert snapshot["motion_director"]["pre_reaction"]
     assert snapshot["motion_director"]["post_settle"]
+    assert snapshot["voice_director"]["delivery"]
+    assert snapshot["voice_director"]["segment_style"]
     assert snapshot["continuity"]["recent_user_need"] == "direction"
     assert snapshot["continuity"]["last_topic"] == "planning"
     assert "style_beat_guide" not in snapshot

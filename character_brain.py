@@ -539,6 +539,25 @@ def _public_motion_director(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def _public_voice_director(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    suppressed_raw = raw.get("suppressed_reasons") if isinstance(raw.get("suppressed_reasons"), list) else []
+    return {
+        "delivery": _clean_text(raw.get("delivery"), 48) or "steady_clear",
+        "pace": _clean_text(raw.get("pace"), 32) or "normal",
+        "pause_profile": _clean_text(raw.get("pause_profile"), 48) or "light",
+        "segment_style": _clean_text(raw.get("segment_style"), 48) or "whole",
+        "pre_pause_ms": max(0, min(1200, _safe_int(raw.get("pre_pause_ms"), 0))),
+        "inter_segment_pause_ms": max(0, min(1600, _safe_int(raw.get("inter_segment_pause_ms"), 160))),
+        "max_segments": max(1, min(4, _safe_int(raw.get("max_segments"), 1))),
+        "suppressed_reasons": [
+            _clean_text(item, 48)
+            for item in suppressed_raw[:6]
+            if _clean_text(item, 48)
+        ],
+    }
+
+
 def _select_motion_director(decision: Dict[str, Any]) -> Dict[str, Any]:
     intent = _clean_text(decision.get("intent"), 40) or "casual"
     opening = _normalize_opening_move(decision.get("opening_move"))
@@ -617,6 +636,96 @@ def _select_motion_director(decision: Dict[str, Any]) -> Dict[str, Any]:
             "speech_beats": beats,
             "correction_reaction": correction,
             "post_settle": post,
+            "suppressed_reasons": suppressed,
+        }
+    )
+
+
+def _select_voice_director(decision: Dict[str, Any]) -> Dict[str, Any]:
+    intent = _clean_text(decision.get("intent"), 40) or "casual"
+    opening = _normalize_opening_move(decision.get("opening_move"))
+    shape = _normalize_reply_shape(decision.get("reply_shape"))
+    reaction = _clean_text(decision.get("reaction_mode"), 48)
+    spontaneity = max(0, min(3, _safe_int(decision.get("spontaneity"), 0)))
+    constraints = _public_output_constraints(
+        decision.get("output_constraints") if isinstance(decision.get("output_constraints"), dict) else {}
+    )
+    safety = _public_safety_clamp(
+        decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
+    )
+    improv = _public_improv_director(
+        decision.get("improv") if isinstance(decision.get("improv"), dict) else {}
+    )
+    motion = _public_motion_director(
+        decision.get("motion_director") if isinstance(decision.get("motion_director"), dict) else {}
+    )
+    suppressed: List[str] = []
+    if safety["level"] != "none":
+        suppressed.append(f"safety_clamp_{safety['level']}")
+    if spontaneity <= 0:
+        suppressed.append("spontaneity_zero_no_voice_beats")
+
+    delivery = "steady_clear"
+    pace = "normal"
+    pause_profile = "light"
+    segment_style = "whole"
+    pre_pause_ms = 0
+    inter_segment_pause_ms = 160
+    max_segments = 1
+
+    if intent == "comfort":
+        delivery, pace, pause_profile, segment_style = "soft_low", "slow", "gentle", "short_soft"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 120, 360, 2
+        suppressed.append("comfort_no_voice_bits")
+    elif intent == "low_interrupt_checkin":
+        delivery, pace, pause_profile, segment_style = "soft_low", "slow", "gentle", "one_liner"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 80, 260, 1
+        suppressed.append("low_interrupt_one_line_voice")
+    elif intent == "reminder":
+        delivery, pace, pause_profile, segment_style = "steady_clear", "steady", "clean", "one_liner"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 180, 1
+        suppressed.append("reminder_clear_voice")
+    elif intent == "closing":
+        delivery, pace, pause_profile, segment_style = "soft_close", "slow", "final", "one_liner"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 80, 260, 1
+        suppressed.append("closing_no_extra_voice")
+    elif intent == "task_help":
+        delivery, pace, pause_profile, segment_style = "steady_clear", "steady", "clean", "step_then_aside"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 220, 2
+        suppressed.append("task_steady_voice")
+    elif improv["stance"] == "mock_defensive_repair" or motion["correction_reaction"] != "none":
+        delivery, pace, pause_profile, segment_style = "dry_recovery", "short_pause", "awkward_beat", "two_beat"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 140, 260, 2
+    elif intent == "encouragement":
+        delivery, pace, pause_profile, segment_style = "bright_pop", "bright", "quick", "two_beat"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 220, 2
+    elif shape == "mini_rant":
+        delivery, pace, pause_profile, segment_style = "dry_playful", "varied", "beat", "mini_rant_beats"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 80, 260, 3
+    elif shape == "bit_then_answer":
+        delivery, pace, pause_profile, segment_style = "bit_pop", "playful", "quick", "bit_then_answer"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 220, 2
+    elif shape == "answer_then_bit":
+        delivery, pace, pause_profile, segment_style = "answer_first", "steady_playful", "answer_then_bit", "answer_then_bit"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 20, 220, 2
+    elif opening == "deadpan_aside" or reaction == "deadpan_aside":
+        delivery, pace, pause_profile, segment_style = "dry_playful", "measured", "dry_beat", "two_beat"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 80, 240, 2
+
+    if constraints["voice_style"] == "soft" and intent not in {"comfort", "closing", "low_interrupt_checkin"}:
+        delivery = "soft_clear"
+        pace = "slow" if pace == "normal" else pace
+    if safety["level"] == "safe_scene":
+        max_segments = min(max_segments, 2)
+    return _public_voice_director(
+        {
+            "delivery": delivery,
+            "pace": pace,
+            "pause_profile": pause_profile,
+            "segment_style": segment_style,
+            "pre_pause_ms": pre_pause_ms,
+            "inter_segment_pause_ms": inter_segment_pause_ms,
+            "max_segments": max_segments,
             "suppressed_reasons": suppressed,
         }
     )
@@ -1479,6 +1588,7 @@ def build_character_brain_decision(
         40,
     )
     decision["motion_director"] = _select_motion_director(decision)
+    decision["voice_director"] = _select_voice_director(decision)
     return decision
 
 
@@ -1494,6 +1604,9 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
     motion_director = _public_motion_director(
         decision.get("motion_director") if isinstance(decision.get("motion_director"), dict) else {}
     )
+    voice_director = _public_voice_director(
+        decision.get("voice_director") if isinstance(decision.get("voice_director"), dict) else {}
+    )
     lines = [
         "[Character brain state]",
         "Use this as private guidance for the next reply. Do not mention the brain state or expose metadata.",
@@ -1504,6 +1617,7 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Stage memory: current_bit={stage_memory.get('current_bit') or 'none'}, recent_callback={stage_memory.get('recent_callback') or 'none'}, correction={stage_memory.get('correction_state')}, turns_since_callback={stage_memory.get('turns_since_callback')}",
         f"Safety clamp: level={safety_clamp['level']}, reason={safety_clamp['reason'] or 'none'}",
         f"Motion director: pre={motion_director['pre_reaction']}, speech={motion_director['speech_start']}, beats={','.join(motion_director['speech_beats'] or ['none'])}, correction={motion_director['correction_reaction']}, post={motion_director['post_settle']}",
+        f"Voice director: delivery={voice_director['delivery']}, pace={voice_director['pace']}, pause={voice_director['pause_profile']}, segment={voice_director['segment_style']}, max_segments={voice_director['max_segments']}",
         f"Reply style: {_clean_text(decision.get('reply_style'), 40)}, max_sentences={int(decision.get('max_sentences') or 3)}",
         f"Style beat: {_clean_text(decision.get('style_beat'), 48)} - {_clean_text(decision.get('style_beat_guide'), 180)}",
         f"Reaction mode: {_clean_text(decision.get('reaction_mode'), 48)}; banter_level={max(0, min(3, _safe_int(decision.get('banter_level'), 0)))}; {_clean_text(decision.get('reaction_mode_guide'), 220)}",
@@ -1752,10 +1866,10 @@ def _looks_like_vague_planning_reply(text: str) -> bool:
 
 def _looks_like_context_bleed_reply(text: str, intent: str, user_message: str = "") -> bool:
     safe_intent = _clean_text(intent, 40)
-    if safe_intent not in {"greeting", "casual", "question", "encouragement", "comfort", "closing"}:
+    if safe_intent not in {"greeting", "casual", "question", "encouragement", "comfort", "closing", "task_help"}:
         return False
     user_lower = _clean_text(user_message, 300).lower()
-    if re.search(r"\b(next|plan|task|todo|remind|close tabs?|save work)\b", user_lower):
+    if re.search(r"\b(remind|timer|alarm|close tabs?|close windows?|save work|save files?|shutdown|shut down)\b", user_lower):
         return False
     lower = re.sub(r"\s+", " ", str(text or "").strip().lower())
     lower = (
@@ -1768,15 +1882,28 @@ def _looks_like_context_bleed_reply(text: str, intent: str, user_message: str = 
     bleed_patterns = (
         r"\b(save|close|shut down|shutdown|lock)\s+(your\s+)?(work|tabs?|apps?|screen|browser)\b",
         r"\bsave (anything important|what you did)\b",
+        r"\bsave (what you.{0,4}ve got|everything|your stuff|it all)\b",
         r"\bsave .{0,24}\bwork\b",
         r"\bsave what you did\b",
+        r"\b(last )?save check\b",
         r"\bbrowser tabs?\b",
-        r"\bclose (anything|everything|the stuff|the )?(apps?|tabs?|tabs/apps)\b",
+        r"\bclose (anything|everything|the stuff|the )?(apps?|tabs?|tabs/apps|windows?)\b",
+        r"\bclose (the )?(extra )?(apps?|tabs?|windows?|tabs/apps)\b",
+        r"\bclose (the )?extra stuff\b",
         r"\bclose what you\b",
         r"\bclose (the )?.{0,16}\btabs?\b",
+        r"\bset (a )?10[- ]?minute timer\b",
         r"\b10[- ]?minute (timer|cleanup|clean-up|close-out|closeout|shutdown|lap|step)\b",
+        r"\b10[- ]?minute save sweep\b",
         r"\bnext 10 minutes\b",
+        r"\bctrl\+s\b",
+        r"\bzip/archive\b",
+        r"\bwon.{0,4}t need tonight\b",
+        r"\bclear (your )?(desktop|desk)\b",
+        r"\bdesktop tidy\b",
+        r"\bdesk reset\b",
         r"\bdesk close[- ]?out\b",
+        r"\bpower down for real\b",
         r"\bgo sleep\b",
         r"\bcrash guilt[- ]?free\b",
     )
@@ -1961,7 +2088,7 @@ def apply_character_brain_reply_constraints(
     sentences = _split_reply_sentences(original)
     before_sentence_count = len(sentences)
     removed_context_bleed = False
-    context_bleed_sensitive = intent in {"greeting", "casual", "question", "encouragement", "comfort", "closing"}
+    context_bleed_sensitive = intent in {"greeting", "casual", "question", "encouragement", "comfort", "closing", "task_help"}
     if (context_bleed_guard.get("active") is True or context_bleed_sensitive) and _looks_like_context_bleed_reply(original, intent, user_message):
         fallback = _fallback_reply_for_intent(intent, user_message)
         if fallback:
@@ -2122,6 +2249,9 @@ def build_character_brain_public_snapshot(
         ),
         "motion_director": _public_motion_director(
             decision.get("motion_director") if isinstance(decision.get("motion_director"), dict) else {}
+        ),
+        "voice_director": _public_voice_director(
+            decision.get("voice_director") if isinstance(decision.get("voice_director"), dict) else {}
         ),
         "feedback_effects": feedback_effects[:5],
         "continuity": _public_continuity_state(
