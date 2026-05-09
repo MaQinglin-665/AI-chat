@@ -247,7 +247,8 @@
           "Actual",
           `status=${clean(audit.status, "unknown")}; pre=${clean(auditActual.pre, "pending")}; speech=${clean(auditActual.speech, "pending")}; beats=${Number(auditActual.beats) || 0}; post=${clean(auditActual.post, "pending")}`,
           `dispatches=action:${Number(auditActual.action_dispatches) || 0}/pulse:${Number(auditActual.pulse_dispatches) || 0}; tts=${auditTts.started === true ? "started" : "not_started"}/${auditTts.finished === true ? "finished" : "pending"}; settle=${audit.settled === true ? "yes" : "pending"}`,
-          `voice=${clean(auditVoice.delivery, "none")}/${clean(auditVoice.pace, "none")}; segments=${Number(auditVoice.spoken_segments) || 0}/${Number(auditVoice.planned_segments) || 0}; mode=${clean(auditVoice.mode, "none")}; fallback=${clean(auditVoice.fallback_reason, "none")}`
+          `voice=${clean(auditVoice.delivery, "none")}/${clean(auditVoice.pace, "none")}; segment=${clean(auditVoice.segment_style, "none")}; pause=${clean(auditVoice.pause_profile, "none")}; segments=${Number(auditVoice.spoken_segments) || 0}/${Number(auditVoice.planned_segments) || 0}; failed=${Number(auditVoice.failed_segments) || 0}; last=${Number(auditVoice.last_segment_index) || 0}; mode=${clean(auditVoice.mode, "none")}; fallback=${clean(auditVoice.fallback_reason, "none")}`,
+          `voice_pause=pre:${Number(auditVoice.pre_pause_ms) || 0}ms/inter:${Number(auditVoice.inter_segment_pause_ms) || 0}ms`
         ]
       : [];
     return [

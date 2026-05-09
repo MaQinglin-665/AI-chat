@@ -483,8 +483,14 @@
         voice: {
           delivery: cleanText(auditVoiceRaw.delivery, 48),
           pace: cleanText(auditVoiceRaw.pace, 32),
+          pause_profile: cleanText(auditVoiceRaw.pause_profile, 48),
+          segment_style: cleanText(auditVoiceRaw.segment_style, 48),
           planned_segments: cleanInt(auditVoiceRaw.planned_segments, 0, 0, 4),
           spoken_segments: cleanInt(auditVoiceRaw.spoken_segments, 0, 0, 8),
+          failed_segments: cleanInt(auditVoiceRaw.failed_segments, 0, 0, 8),
+          last_segment_index: cleanInt(auditVoiceRaw.last_segment_index, 0, 0, 8),
+          pre_pause_ms: cleanInt(auditVoiceRaw.pre_pause_ms, 0, 0, 1600),
+          inter_segment_pause_ms: cleanInt(auditVoiceRaw.inter_segment_pause_ms, 0, 0, 2000),
           mode: cleanText(auditVoiceRaw.mode, 32)
         },
         early_reaction: {

@@ -443,7 +443,7 @@ function createMemoryStorage(initial = {}) {
           suppressed: ["motion_disallowed"]
         },
         tts: { started: true, finished: true, mode: "direct" },
-        voice: { delivery: "soft_low", pace: "slow", planned_segments: 2, spoken_segments: 2, mode: "direct_segmented", fallback_reason: "none" },
+        voice: { delivery: "soft_low", pace: "slow", pause_profile: "gentle", segment_style: "short_soft", planned_segments: 2, spoken_segments: 2, failed_segments: 0, last_segment_index: 2, pre_pause_ms: 120, inter_segment_pause_ms: 360, mode: "direct_segmented", fallback_reason: "none" },
         early_reaction: { enabled: true, intent: "comfort", pre: "soft_stillness", actual: "dispatched", action: "none", motion_cue: "soft_stillness", pulse: true, reason: "safe_pre_llm_reaction", suppressed: ["motion_disallowed"], latency_ms: 42, target_latency_ms: 500, latency_status: "ok", updated_at: 12340 },
         settled: true,
         private_prompt: "SECRET"
@@ -564,6 +564,8 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.early_reaction.target_latency_ms, 500, "character brain snapshot should restore public early latency target");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.tts.finished, true, "character brain snapshot should restore public TTS audit state");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.voice.spoken_segments, 2, "character brain snapshot should restore public voice audit state");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_audit.voice.segment_style, "short_soft", "character brain snapshot should restore public voice segment style");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_audit.voice.inter_segment_pause_ms, 360, "character brain snapshot should restore public voice pause timing");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.private_prompt, undefined, "character brain snapshot should not persist private audit fields");
   assert.strictEqual(restored.characterBrainLastDecision.improv.stance, "soft_hold", "character brain snapshot should restore public improv stance");
   assert.strictEqual(restored.characterBrainLastDecision.improv.private_prompt, undefined, "character brain snapshot should not persist private improv fields");
@@ -648,7 +650,7 @@ function createMemoryStorage(initial = {}) {
           suppressed: ["motion_disallowed"]
         },
         tts: { started: true, finished: true, mode: "direct" },
-        voice: { delivery: "soft_low", pace: "slow", planned_segments: 2, spoken_segments: 2, mode: "direct_segmented", fallback_reason: "none" },
+        voice: { delivery: "soft_low", pace: "slow", pause_profile: "gentle", segment_style: "short_soft", planned_segments: 2, spoken_segments: 2, failed_segments: 0, last_segment_index: 2, pre_pause_ms: 120, inter_segment_pause_ms: 360, mode: "direct_segmented", fallback_reason: "none" },
         early_reaction: { enabled: true, intent: "comfort", pre: "soft_stillness", actual: "dispatched", action: "none", motion_cue: "soft_stillness", pulse: true, reason: "safe_pre_llm_reaction", suppressed: ["motion_disallowed"], latency_ms: 42, target_latency_ms: 500, latency_status: "ok" },
         settled: true,
         private_prompt: "SECRET"
@@ -775,8 +777,16 @@ function createMemoryStorage(initial = {}) {
       && brainReport.includes("dispatches=action:0/pulse:2")
       && brainReport.includes("settle=yes")
       && brainReport.includes("voice=soft_low/slow")
+      && brainReport.includes("segment=short_soft")
+      && brainReport.includes("pause=gentle")
       && brainReport.includes("segments=2/2"),
     "character brain debug report should include compact actual performance audit"
+  );
+  assert.ok(
+    brainReport.includes("failed=0")
+      && brainReport.includes("last=2")
+      && brainReport.includes("voice_pause=pre:120ms/inter:360ms"),
+    "character brain debug report should include voice segment execution details"
   );
   assert.ok(
     brainReport.includes("Motion Actual")
@@ -842,10 +852,10 @@ function createMemoryStorage(initial = {}) {
       post: "settle_idle",
       motion: { pre: "micro_pulse", speech: "expressive_speech_start", beats: ["head_tilt"], post: "settle_idle" }
     },
-    voiceSummary: { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented", fallback_reason: "none" },
+    voiceSummary: { delivery: "dry_playful", pace: "measured", pause_profile: "dry_beat", segment_style: "two_beat", segments: 3, pre_pause_ms: 80, inter_segment_pause_ms: 220, mode: "direct_segmented", fallback_reason: "none" },
     earlyReactionSummary: { enabled: true, intent: "casual", pre: "micro_pulse", actual: "dispatched", action: "listen", motion_cue: "micro_pulse", pulse: true, reason: "safe_pre_llm_reaction", latency_ms: 120, target_latency_ms: 500, latency_status: "ok" }
   });
-  audit.recordPerformanceAuditEvent("voice_plan", { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented", fallback_reason: "none" });
+  audit.recordPerformanceAuditEvent("voice_plan", { delivery: "dry_playful", pace: "measured", pause_profile: "dry_beat", segment_style: "two_beat", segments: 3, pre_pause_ms: 80, inter_segment_pause_ms: 220, mode: "direct_segmented", fallback_reason: "none" });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "preReaction", name: "micro_reaction", action: "listen", pulse: true, motion_cue: "micro_pulse", motion_role: "pre_reaction" });
   audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "micro_pulse", motion_role: "pre_reaction", motion_family: "micro_reaction", action: "listen", group: "Flick", ok: true });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechStart", name: "expressive_speech_start", action: "talk", pulse: true, motion_cue: "expressive_speech_start", motion_role: "speech_start" });
@@ -854,8 +864,9 @@ function createMemoryStorage(initial = {}) {
   audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "head_tilt", motion_role: "speech_beat", motion_family: "head_tilt", action: "talk", group: "HeadTilt", ok: true });
   audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "side_eye", motion_role: "speech_beat", motion_family: "side_eye", action: "talk", group: "none", ok: false });
   audit.recordPerformanceAuditEvent("tts_start", { mode: "direct_segmented" });
-  audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", segments: 2 });
-  audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", segments: 2 });
+  audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", index: 1, segments: 3, ok: true });
+  audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", index: 2, segments: 3, ok: false });
+  audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", index: 3, segments: 3, ok: true });
   audit.recordPerformanceAuditEvent("tts_end", { mode: "direct_segmented", ok: true });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "postSettle", name: "settle_idle", action: "idle", pulse: true, motion_cue: "settle_idle", motion_role: "post_settle" });
   audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "settle_idle", motion_role: "post_settle", motion_family: "settle", action: "idle", group: "Idle", ok: true });
@@ -865,8 +876,14 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(auditSummary.actual.beats, 1, "audit should count actual speech beats");
   assert.strictEqual(auditSummary.actual.post, "settle_idle", "audit should record actual post-settle dispatch");
   assert.strictEqual(auditSummary.tts.finished, true, "audit should record direct TTS completion");
-  assert.strictEqual(auditSummary.voice.planned_segments, 2, "audit should record planned voice segments");
+  assert.strictEqual(auditSummary.voice.planned_segments, 3, "audit should record planned voice segments");
   assert.strictEqual(auditSummary.voice.spoken_segments, 2, "audit should record actual spoken voice segments");
+  assert.strictEqual(auditSummary.voice.failed_segments, 1, "audit should record failed voice segments separately");
+  assert.strictEqual(auditSummary.voice.last_segment_index, 3, "audit should record the last attempted voice segment index");
+  assert.strictEqual(auditSummary.voice.segment_style, "two_beat", "audit should record public voice segment style");
+  assert.strictEqual(auditSummary.voice.pause_profile, "dry_beat", "audit should record public voice pause profile");
+  assert.strictEqual(auditSummary.voice.pre_pause_ms, 80, "audit should record public voice pre-pause");
+  assert.strictEqual(auditSummary.voice.inter_segment_pause_ms, 220, "audit should record public voice inter-segment pause");
   assert.strictEqual(auditSummary.voice.fallback_reason, "none", "audit should record voice fallback reason");
   assert.strictEqual(auditSummary.early_reaction.pre, "micro_pulse", "audit should carry early pre-reaction summary");
   assert.strictEqual(auditSummary.early_reaction.motion_cue, "micro_pulse", "audit should carry public early motion cue");
@@ -1070,6 +1087,26 @@ function createMemoryStorage(initial = {}) {
     miniRantVoiceTimeline
   );
   assert.deepStrictEqual(plannedSpeechSegments, ["One.", "Two.", "Three."], "voice speech segmentation should preserve ordered spoken segments without storing them in public summary");
+  const mergedSpeechSegments = performanceTimelineController.buildVoiceSpeechSegments(
+    "One. Two. Three. Four.",
+    {
+      enabled: true,
+      segment_style: "mini_rant_beats",
+      max_segments: 3,
+      voice_director: { segment_style: "mini_rant_beats", max_segments: 3 }
+    }
+  );
+  assert.deepStrictEqual(mergedSpeechSegments, ["One.", "Two.", "Three. Four."], "voice segmentation should merge tail sentences instead of dropping them");
+  const oneLinerSegments = performanceTimelineController.buildVoiceSpeechSegments(
+    "Go sleep. I'll keep the pixels under questionable supervision.",
+    {
+      enabled: true,
+      segment_style: "one_liner",
+      max_segments: 1,
+      voice_director: { segment_style: "one_liner", max_segments: 1 }
+    }
+  );
+  assert.deepStrictEqual(oneLinerSegments, ["Go sleep. I'll keep the pixels under questionable supervision."], "one-liner voice style should keep the full reply in one segment");
   const voiceSummary = performanceTimelineController.toPublicVoiceTimelineSummary(comfortVoiceTimeline);
   assert.deepStrictEqual(
     Object.keys(voiceSummary).sort(),

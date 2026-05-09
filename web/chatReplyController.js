@@ -195,9 +195,20 @@
       const useSegmented = voiceTimeline?.enabled === true && safeSegments.length > 1;
       const mode = useSegmented ? `${context.mode || "direct"}_segmented` : (context.mode || "direct");
       const fallbackReason = String(voiceTimeline?.fallback_reason || "none");
+      const voiceSegmentAudit = {
+        mode,
+        segments: safeSegments.length,
+        delivery: String(voiceTimeline?.delivery || voiceDirector?.delivery || "none"),
+        pace: String(voiceTimeline?.pace || voiceDirector?.pace || "none"),
+        pause_profile: String(voiceTimeline?.pause_profile || voiceDirector?.pause_profile || "none"),
+        segment_style: String(voiceTimeline?.segment_style || voiceDirector?.segment_style || "whole"),
+        pre_pause_ms: Number(voiceTimeline?.pre_pause_ms) || 0,
+        inter_segment_pause_ms: Number(voiceTimeline?.inter_segment_pause_ms) || 0,
+        fallback_reason: fallbackReason
+      };
       recordPerformanceAuditEvent("tts_start", { mode });
       if (!useSegmented) {
-        recordPerformanceAuditEvent("voice_segment_plan", { mode, segments: safeSegments.length, fallback_reason: fallbackReason });
+        recordPerformanceAuditEvent("voice_segment_plan", voiceSegmentAudit);
         const prosody = applyVoiceDirectorProsody(
           buildSpeakProsody(text, context.mood, false, context.prosodyStyle),
           voiceDirector
@@ -212,13 +223,15 @@
           playbackGeneration: context.playbackGeneration
         });
         if (ok !== false) {
-          recordPerformanceAuditEvent("tts_segment", { mode, segments: safeSegments.length });
+          recordPerformanceAuditEvent("tts_segment", { mode, index: 1, segments: safeSegments.length, ok: true });
+        } else {
+          recordPerformanceAuditEvent("tts_segment", { mode, index: 1, segments: safeSegments.length, ok: false });
         }
         recordPerformanceAuditEvent("tts_end", { mode, ok: ok !== false });
         return ok !== false;
       }
 
-      recordPerformanceAuditEvent("voice_segment_plan", { mode, segments: safeSegments.length, fallback_reason: fallbackReason });
+      recordPerformanceAuditEvent("voice_segment_plan", voiceSegmentAudit);
       if (!(await waitVoiceDirectorPause(voiceTimeline.pre_pause_ms, context.sessionId))) {
         recordPerformanceAuditEvent("tts_end", { mode, ok: false });
         return false;
@@ -234,11 +247,6 @@
           buildSpeakProsody(segment, context.mood, false, context.prosodyStyle),
           voiceDirector
         );
-        recordPerformanceAuditEvent("tts_segment", {
-          mode,
-          index: i + 1,
-          segments: safeSegments.length
-        });
         const ok = await speak(segment, {
           prosody,
           interrupt: context.interrupt === true && i === 0,
@@ -247,6 +255,12 @@
           voiceStyle: context.prosodyStyle,
           perfTraceId: context.traceId,
           playbackGeneration: context.playbackGeneration
+        });
+        recordPerformanceAuditEvent("tts_segment", {
+          mode,
+          index: i + 1,
+          segments: safeSegments.length,
+          ok: ok !== false
         });
         if (ok === false) {
           allOk = false;

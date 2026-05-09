@@ -647,7 +647,8 @@
       return [];
     }
     const limit = clampInt(maxSegments, 1, 1, 4);
-    if (clean(segmentStyle, "whole") === "whole") {
+    const style = clean(segmentStyle, "whole");
+    if (style === "whole" || style === "one_liner") {
       return [source];
     }
     const sentences = source
@@ -657,9 +658,17 @@
     if (sentences.length <= 1 && source.length > 90) {
       const midpoint = Math.max(36, Math.min(source.length - 24, Math.floor(source.length / 2)));
       const splitAt = source.indexOf(", ", midpoint) > -1 ? source.indexOf(", ", midpoint) + 1 : midpoint;
-      return [source.slice(0, splitAt).trim(), source.slice(splitAt).trim()].filter(Boolean).slice(0, limit);
+      const chunks = [source.slice(0, splitAt).trim(), source.slice(splitAt).trim()].filter(Boolean);
+      if (limit <= 1 || chunks.length <= limit) {
+        return limit <= 1 ? [source] : chunks;
+      }
+      return [...chunks.slice(0, limit - 1), chunks.slice(limit - 1).join(" ")].filter(Boolean);
     }
-    return (sentences.length ? sentences : [source]).slice(0, limit);
+    const parts = sentences.length ? sentences : [source];
+    if (parts.length <= limit) {
+      return parts;
+    }
+    return [...parts.slice(0, limit - 1), parts.slice(limit - 1).join(" ")].filter(Boolean);
   }
 
   function buildVoiceTimeline(input = {}) {

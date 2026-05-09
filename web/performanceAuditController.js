@@ -37,8 +37,14 @@
     return {
       delivery: clean(raw.delivery, "none", 48),
       pace: clean(raw.pace, "none", 32),
+      pause_profile: clean(raw.pause_profile, "none", 48),
+      segment_style: clean(raw.segment_style, "none", 48),
       planned_segments: cleanInt(raw.planned_segments ?? raw.segments, 0, 0, 4),
       spoken_segments: cleanInt(raw.spoken_segments, 0, 0, 8),
+      failed_segments: cleanInt(raw.failed_segments, 0, 0, 8),
+      last_segment_index: cleanInt(raw.last_segment_index, 0, 0, 8),
+      pre_pause_ms: cleanInt(raw.pre_pause_ms, 0, 0, 1600),
+      inter_segment_pause_ms: cleanInt(raw.inter_segment_pause_ms, 0, 0, 2000),
       mode: clean(raw.mode, "none", 32),
       fallback_reason: clean(raw.fallback_reason, "none", 64)
     };
@@ -221,6 +227,7 @@
       const motionGroup = cleanLabel(detail.group, "none", 80);
       const mode = clean(detail.mode, "", 32);
       const segments = cleanInt(detail.segments, 0, 0, 8);
+      const segmentIndex = cleanInt(detail.index, 0, 0, 8);
       const event = {
         kind: eventKind,
         phase,
@@ -322,11 +329,20 @@
       } else if (eventKind === "voice_plan" || eventKind === "voice_segment_plan") {
         next.voice.delivery = clean(detail.delivery || next.voice.delivery, next.voice.delivery || "none", 48);
         next.voice.pace = clean(detail.pace || next.voice.pace, next.voice.pace || "none", 32);
+        next.voice.pause_profile = clean(detail.pause_profile || next.voice.pause_profile, next.voice.pause_profile || "none", 48);
+        next.voice.segment_style = clean(detail.segment_style || next.voice.segment_style, next.voice.segment_style || "none", 48);
+        next.voice.pre_pause_ms = cleanInt(detail.pre_pause_ms, cleanInt(next.voice.pre_pause_ms, 0, 0, 1600), 0, 1600);
+        next.voice.inter_segment_pause_ms = cleanInt(detail.inter_segment_pause_ms, cleanInt(next.voice.inter_segment_pause_ms, 0, 0, 2000), 0, 2000);
         next.voice.planned_segments = segments || cleanInt(next.voice.planned_segments, 0, 0, 4);
         next.voice.fallback_reason = clean(detail.fallback_reason || next.voice.fallback_reason, "none", 64);
         next.voice.mode = mode || next.voice.mode || "none";
       } else if (eventKind === "tts_segment") {
-        next.voice.spoken_segments = cleanInt(next.voice.spoken_segments, 0, 0, 8) + 1;
+        if (event.ok) {
+          next.voice.spoken_segments = cleanInt(next.voice.spoken_segments, 0, 0, 8) + 1;
+        } else {
+          next.voice.failed_segments = cleanInt(next.voice.failed_segments, 0, 0, 8) + 1;
+        }
+        next.voice.last_segment_index = segmentIndex || cleanInt(next.voice.last_segment_index, 0, 0, 8);
         next.voice.planned_segments = segments || cleanInt(next.voice.planned_segments, 0, 0, 4);
         next.voice.mode = mode || next.voice.mode || "direct_segmented";
       } else if (eventKind === "failure") {
