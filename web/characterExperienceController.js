@@ -143,8 +143,9 @@
   }
 
   function rebuildProfile(feedbacks = []) {
+    const defaultAt = Date.now();
     const normalized = feedbacks
-      .map((item) => normalizeFeedback(item, Number(item?.at) || Date.now()))
+      .map((item) => normalizeFeedback(item, Number(item?.at) || defaultAt))
       .filter(Boolean)
       .sort((a, b) => b.at - a.at)
       .slice(0, MAX_FEEDBACKS);

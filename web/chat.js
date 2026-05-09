@@ -1418,6 +1418,57 @@ function buildCharacterBrainDebugReport() {
   }
   return "角色大脑状态\n\n角色大脑诊断模块暂不可用。";
 }
+let performanceTimelineController = null;
+
+function getPerformanceTimelineController() {
+  if (!performanceTimelineController && typeof PERFORMANCE_TIMELINE_CONTROLLER.createController === "function") {
+    performanceTimelineController = PERFORMANCE_TIMELINE_CONTROLLER.createController({
+      state,
+      windowObject: window,
+      enqueueActionIntent,
+      triggerExpressionPulse,
+      maybePlayTalkGesture,
+      perfLog
+    });
+  }
+  return performanceTimelineController || PERFORMANCE_TIMELINE_CONTROLLER;
+}
+
+function buildPerformanceTimeline(input = {}) {
+  const controller = getPerformanceTimelineController();
+  return typeof controller.buildPerformanceTimeline === "function"
+    ? controller.buildPerformanceTimeline(input)
+    : null;
+}
+
+function rememberPerformanceTimeline(timeline) {
+  const controller = getPerformanceTimelineController();
+  return typeof controller.rememberPerformanceTimeline === "function"
+    ? controller.rememberPerformanceTimeline(timeline)
+    : null;
+}
+
+function clearPerformanceTimelineTimers() {
+  const controller = getPerformanceTimelineController();
+  if (typeof controller.clearPerformanceTimelineTimers === "function") {
+    controller.clearPerformanceTimelineTimers();
+  }
+}
+
+function executePerformanceTimelinePhase(timeline, phaseName, context = {}) {
+  const controller = getPerformanceTimelineController();
+  return typeof controller.executePerformanceTimelinePhase === "function"
+    ? controller.executePerformanceTimelinePhase(timeline, phaseName, context)
+    : false;
+}
+
+function schedulePerformanceTimelineSpeechBeats(timeline, context = {}) {
+  const controller = getPerformanceTimelineController();
+  return typeof controller.schedulePerformanceTimelineSpeechBeats === "function"
+    ? controller.schedulePerformanceTimelineSpeechBeats(timeline, context)
+    : 0;
+}
+
 function buildCharacterTuningReport() { return getCharacterDiagnosticsController().buildCharacterTuningReport(); }
 function runCharacterTuningAndAppendReport() { return getCharacterDiagnosticsController().runCharacterTuningAndAppendReport(); }
 function buildCharacterWorkflowGuide() { return getCharacterDiagnosticsController().buildCharacterWorkflowGuide(); }
@@ -1511,6 +1562,7 @@ const APP_STARTUP_CONTROLLER = window.TaffyAppStartupController || {};
 const STREAM_TTS_QUEUE_CONTROLLER = window.TaffyStreamTtsQueueController || {};
 const TTS_PLAYBACK_CONTROLLER = window.TaffyTTSPlaybackController || {};
 const CHAT_REPLY_CONTROLLER = window.TaffyChatReplyController || {};
+const PERFORMANCE_TIMELINE_CONTROLLER = window.TaffyPerformanceTimelineController || {};
 const LIVE2D_RUNTIME_CONTROLLER = window.TaffyLive2DRuntimeController || {};
 const LIVE2D_LAYOUT_CONTROLLER = window.TaffyLive2DLayoutController || {};
 const LIVE2D_EXPRESSION_CONTROLLER = window.TaffyLive2DExpressionController || {};
@@ -3964,6 +4016,12 @@ function getChatReplyController() {
       normalizeRuntimeVoiceStyle,
       runtimeVoiceStyleToTalkStyle,
       applyPerformanceControlsToRuntimeHint,
+      buildPerformanceTimeline,
+      rememberPerformanceTimeline,
+      clearPerformanceTimelineTimers,
+      executePerformanceTimelinePhase,
+      schedulePerformanceTimelineSpeechBeats,
+      persistCharacterBrainSnapshot: saveCharacterBrainSnapshotToStorage,
       triggerExpressionPulse,
       flushStreamSpeak,
       scheduleFinalSpeechWatchdog,

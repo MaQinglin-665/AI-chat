@@ -314,6 +314,9 @@
     const executionRaw = raw.performance_execution && typeof raw.performance_execution === "object" && !Array.isArray(raw.performance_execution)
       ? raw.performance_execution
       : {};
+    const timelineRaw = raw.performance_timeline && typeof raw.performance_timeline === "object" && !Array.isArray(raw.performance_timeline)
+      ? raw.performance_timeline
+      : {};
     return {
       version: 1,
       intent: cleanText(raw.intent, 40),
@@ -342,6 +345,16 @@
         shortened: executionRaw.shortened === true,
         used_bit: executionRaw.used_bit === true,
         final_sentences: cleanInt(executionRaw.final_sentences, 0, 0, 8)
+      },
+      performance_timeline: {
+        enabled: timelineRaw.enabled === true,
+        pre: cleanText(timelineRaw.pre, 48),
+        speech: cleanText(timelineRaw.speech, 48),
+        beats: cleanInt(timelineRaw.beats, 0, 0, 4),
+        post: cleanText(timelineRaw.post, 48),
+        suppressed: Array.isArray(timelineRaw.suppressed)
+          ? timelineRaw.suppressed.slice(0, 6).map((item) => cleanText(item, 48)).filter(Boolean)
+          : []
       },
       output_constraints: {
         max_sentences: cleanInt(constraintsRaw.max_sentences, cleanInt(raw.max_sentences, 3, 1, 8), 1, 8),

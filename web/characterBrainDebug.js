@@ -80,6 +80,9 @@
     const execution = safe.performance_execution && typeof safe.performance_execution === "object" && !Array.isArray(safe.performance_execution)
       ? safe.performance_execution
       : null;
+    const timeline = safe.performance_timeline && typeof safe.performance_timeline === "object" && !Array.isArray(safe.performance_timeline)
+      ? safe.performance_timeline
+      : null;
     const constraintLines = constraints
       ? [
           "",
@@ -96,6 +99,17 @@
           `removed_followup=${execution.removed_followup === true ? "yes" : "no"}; shortened=${execution.shortened === true ? "yes" : "no"}; used_bit=${execution.used_bit === true ? "yes" : "no"}; removed_unsafe_bit=${execution.removed_unsafe_bit === true ? "yes" : "no"}`
         ]
       : [];
+    const timelineSuppressed = Array.isArray(timeline?.suppressed)
+      ? timeline.suppressed.map((item) => clean(item, "")).filter(Boolean).slice(0, 6)
+      : [];
+    const timelineLines = timeline
+      ? [
+          "",
+          "Timeline",
+          `enabled=${timeline.enabled === true ? "yes" : "no"}; pre=${clean(timeline.pre, "none")}; speech=${clean(timeline.speech, "none")}; beats=${Number(timeline.beats) || 0}; post=${clean(timeline.post, "none")}`,
+          `suppressed=${timelineSuppressed.length ? timelineSuppressed.join(", ") : "none"}`
+        ]
+      : [];
     return [
       "角色大脑状态",
       "",
@@ -109,6 +123,7 @@
       `Spontaneity: ${Number(safe.spontaneity) || 0}/3；Question policy: ${clean(safe.question_policy, "none")}`,
       ...constraintLines,
       ...executionLines,
+      ...timelineLines,
       `角色状态：能量=${clean(safe.energy)}；注意力=${clean(safe.attention)}；关系=${clean(safe.relationship)}`,
       `表现建议：情绪=${clean(safe.emotion)}；动作=${clean(safe.action)}；强度=${clean(safe.intensity)}；语音=${clean(safe.voice_style)}`,
       "",

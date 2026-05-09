@@ -39,6 +39,7 @@ const STREAM_TTS_QUEUE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "str
 const TTS_PLAYBACK_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "ttsPlaybackController.js");
 const CHAT_API_JS = path.resolve(__dirname, "..", "web", "chatApi.js");
 const CHAT_REPLY_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "chatReplyController.js");
+const PERFORMANCE_TIMELINE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "performanceTimelineController.js");
 const WAKE_WORD_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "wakeWordController.js");
 const APP_CONFIG_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "appConfigController.js");
 const APP_STARTUP_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "appStartupController.js");
@@ -112,6 +113,7 @@ const streamTtsQueueControllerSource = fs.readFileSync(STREAM_TTS_QUEUE_CONTROLL
 const ttsPlaybackControllerSource = fs.readFileSync(TTS_PLAYBACK_CONTROLLER_JS, "utf8");
 const chatApiSource = fs.readFileSync(CHAT_API_JS, "utf8");
 const chatReplyControllerSource = fs.readFileSync(CHAT_REPLY_CONTROLLER_JS, "utf8");
+const performanceTimelineControllerSource = fs.readFileSync(PERFORMANCE_TIMELINE_CONTROLLER_JS, "utf8");
 const wakeWordControllerSource = fs.readFileSync(WAKE_WORD_CONTROLLER_JS, "utf8");
 const appConfigControllerSource = fs.readFileSync(APP_CONFIG_CONTROLLER_JS, "utf8");
 const appStartupControllerSource = fs.readFileSync(APP_STARTUP_CONTROLLER_JS, "utf8");
@@ -189,6 +191,7 @@ const streamTtsQueueController = require(STREAM_TTS_QUEUE_CONTROLLER_JS);
 const ttsPlaybackController = require(TTS_PLAYBACK_CONTROLLER_JS);
 const chatApi = require(CHAT_API_JS);
 const chatReplyController = require(CHAT_REPLY_CONTROLLER_JS);
+const performanceTimelineController = require(PERFORMANCE_TIMELINE_CONTROLLER_JS);
 const wakeWordController = require(WAKE_WORD_CONTROLLER_JS);
 const appConfigController = require(APP_CONFIG_CONTROLLER_JS);
 const appStartupController = require(APP_STARTUP_CONTROLLER_JS);
@@ -359,6 +362,15 @@ function createMemoryStorage(initial = {}) {
         final_sentences: 2,
         private_prompt: "SECRET"
       },
+      performance_timeline: {
+        enabled: true,
+        pre: "soft_anchor",
+        speech: "soft_speech_start",
+        beats: 0,
+        post: "soft_idle",
+        suppressed: ["motion_disallowed"],
+        private_prompt: "SECRET"
+      },
       output_constraints: {
         max_sentences: 3,
         allow_followup_question: false,
@@ -417,6 +429,9 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.performance_bit_guide, undefined, "character brain snapshot should not persist private bit guidance");
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.removed_followup, true, "character brain snapshot should restore public execution summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.private_prompt, undefined, "character brain snapshot should not persist private execution fields");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.pre, "soft_anchor", "character brain snapshot should restore public timeline summary");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.beats, 0, "character brain snapshot should restore compact timeline beat count");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.private_prompt, undefined, "character brain snapshot should not persist private timeline fields");
   assert.strictEqual(restored.characterBrainLastDecision.continuity.recent_user_need, "reassurance", "character brain snapshot should restore compact continuity");
   assert.strictEqual(restored.characterBrainLastDecision.output_constraints.allow_motion, false, "character brain snapshot should restore safe output constraints");
   assert.strictEqual(restored.characterBrainLastDecision.history_tail, undefined, "restored character brain snapshot should stay public-only");
@@ -451,6 +466,15 @@ function createMemoryStorage(initial = {}) {
         shortened: true,
         used_bit: false,
         final_sentences: 2
+      },
+      performance_timeline: {
+        enabled: true,
+        pre: "soft_anchor",
+        speech: "soft_speech_start",
+        beats: 0,
+        post: "soft_idle",
+        suppressed: ["motion_disallowed"],
+        private_prompt: "SECRET"
       },
       output_constraints: {
         max_sentences: 3,
@@ -509,6 +533,130 @@ function createMemoryStorage(initial = {}) {
       && brainReport.includes("shortened=yes"),
     "character brain debug report should include compact public execution summary"
   );
+  assert.ok(
+    brainReport.includes("Timeline")
+      && brainReport.includes("pre=soft_anchor")
+      && brainReport.includes("beats=0")
+      && brainReport.includes("suppressed=motion_disallowed"),
+    "character brain debug report should include compact public timeline summary"
+  );
+  assert.ok(
+    !brainReport.includes("SECRET") && !brainReport.includes("private_prompt"),
+    "character brain debug report should not leak private timeline fields"
+  );
+}
+
+{
+  assert.strictEqual(typeof performanceTimelineController.buildPerformanceTimeline, "function", "performance timeline controller should build timeline plans");
+  assert.strictEqual(typeof performanceTimelineController.createController, "function", "performance timeline controller should expose a runtime adapter");
+  const comfortTimeline = performanceTimelineController.buildPerformanceTimeline({
+    brainSnapshot: {
+      intent: "comfort",
+      opening_move: "soft_anchor",
+      spontaneity: 3,
+      output_constraints: { allow_motion: false }
+    },
+    replyText: "I'm here. Tiny desk lamp mode.",
+    mood: "sad",
+    talkStyle: "comfort",
+    ttsEnabled: true
+  });
+  assert.strictEqual(comfortTimeline.preReaction.name, "soft_anchor", "comfort should use a soft pre-reaction");
+  assert.strictEqual(comfortTimeline.speechStart.name, "soft_speech_start", "comfort should start speech softly");
+  assert.strictEqual(comfortTimeline.speechBeats.length, 0, "comfort should not add extra speech beats");
+  assert.strictEqual(comfortTimeline.postSettle.name, "soft_idle", "comfort should settle back to soft idle");
+  assert.ok(comfortTimeline.suppressed.includes("motion_disallowed"), "timeline should expose suppressed motion");
+
+  const taskTimeline = performanceTimelineController.buildPerformanceTimeline({
+    brainSnapshot: {
+      intent: "task_help",
+      opening_move: "answer_first",
+      reaction_mode: "task_snap",
+      spontaneity: 1
+    },
+    replyText: "First, open the settings panel. Then check the model field.",
+    mood: "thinking",
+    talkStyle: "steady",
+    ttsEnabled: true
+  });
+  assert.strictEqual(taskTimeline.preReaction.name, "task_snap", "task requests should start with a focused snap");
+  assert.strictEqual(taskTimeline.speechStart.name, "steady_speech_start", "task requests should use steady speech");
+  assert.ok(taskTimeline.speechBeats.length <= 1, "spontaneity=1 should allow at most one light beat");
+
+  const deadpanTimeline = performanceTimelineController.buildPerformanceTimeline({
+    brainSnapshot: {
+      intent: "casual",
+      opening_move: "deadpan_aside",
+      spontaneity: 3
+    },
+    replyText: "I am rearranging one pixel of self-respect. Very technical.",
+    mood: "idle",
+    talkStyle: "neutral",
+    ttsEnabled: true
+  });
+  assert.strictEqual(deadpanTimeline.preReaction.name, "deadpan_aside", "deadpan aside should become a tiny pre-reaction");
+  assert.ok(deadpanTimeline.speechBeats.length >= 1, "high spontaneity casual replies should get light speech beats");
+
+  const closingTimeline = performanceTimelineController.buildPerformanceTimeline({
+    brainSnapshot: {
+      intent: "closing",
+      opening_move: "no_opening",
+      spontaneity: 3
+    },
+    replyText: "Sleep well. I'll keep the desk quiet.",
+    mood: "idle",
+    talkStyle: "comfort",
+    ttsEnabled: true
+  });
+  assert.strictEqual(closingTimeline.preReaction.suppressed, true, "closing should not perform an opening bit");
+  assert.strictEqual(closingTimeline.speechBeats.length, 0, "closing should not add extra beats");
+
+  const summary = performanceTimelineController.toPublicTimelineSummary(deadpanTimeline);
+  assert.deepStrictEqual(
+    Object.keys(summary).sort(),
+    ["beats", "enabled", "post", "pre", "speech", "suppressed"].sort(),
+    "public timeline summary should only include safe execution fields"
+  );
+}
+
+{
+  const calls = [];
+  const fakeWindow = {
+    __AI_CHAT_LAST_PERFORMANCE_TIMELINE__: null,
+    setTimeout(fn) {
+      calls.push(["timer"]);
+      fn();
+      return 1;
+    },
+    clearTimeout() {}
+  };
+  const timelineState = {
+    characterBrainLastDecision: { intent: "casual" },
+    streamSpeakSession: 42,
+    performanceTimelineTimers: []
+  };
+  const controller = performanceTimelineController.createController({
+    state: timelineState,
+    windowObject: fakeWindow,
+    enqueueActionIntent: (intent, context) => calls.push(["action", intent, context.style]),
+    triggerExpressionPulse: (style, boost) => calls.push(["pulse", style, boost]),
+    maybePlayTalkGesture: (text, style) => calls.push(["gesture", style]),
+    perfLog: () => {}
+  });
+  const timeline = controller.buildPerformanceTimeline({
+    brainSnapshot: { intent: "casual", opening_move: "micro_reaction", spontaneity: 1 },
+    replyText: "Yep. The cursor blinked with opinions.",
+    mood: "idle",
+    talkStyle: "neutral",
+    ttsEnabled: true
+  });
+  const publicSummary = controller.rememberPerformanceTimeline(timeline);
+  assert.strictEqual(timelineState.characterBrainLastDecision.performance_timeline.pre, publicSummary.pre, "controller should attach public timeline to the brain snapshot");
+  controller.executePerformanceTimelinePhase(timeline, "preReaction", { text: "hi", style: "neutral", mood: "idle", sessionId: 42 });
+  controller.schedulePerformanceTimelineSpeechBeats(timeline, { text: "hi", style: "neutral", mood: "idle", sessionId: 42 });
+  assert.ok(calls.some((item) => item[0] === "pulse"), "timeline execution should trigger expression pulses");
+  assert.ok(calls.some((item) => item[0] === "action"), "timeline execution should enqueue safe action intents");
+  assert.ok(calls.some((item) => item[0] === "gesture"), "timeline beats should use lightweight talk gestures");
 }
 
 {
@@ -1874,6 +2022,23 @@ assert.ok(
     && chatReplyControllerSource.includes("no_stream_playback_yet")
     && chatReplyControllerSource.includes("state.streamSpeakLastEnqueueSession = 0;"),
   "short final replies should use direct TTS if no realtime stream segment has started playback"
+);
+assert.ok(
+  source.includes("const PERFORMANCE_TIMELINE_CONTROLLER = window.TaffyPerformanceTimelineController")
+    && source.includes("function getPerformanceTimelineController()")
+    && source.includes("function buildPerformanceTimeline(input = {})")
+    && chatStateSource.includes("performanceTimelineLastSummary: null")
+    && chatStateSource.includes("performanceTimelineTimers: []")
+    && chatReplyControllerSource.includes("const performanceTimeline = buildPerformanceTimeline({")
+    && chatReplyControllerSource.includes('executePerformanceTimelinePhase(performanceTimeline, "preReaction"')
+    && chatReplyControllerSource.includes('executePerformanceTimelinePhase(performanceTimeline, "speechStart"')
+    && chatReplyControllerSource.includes("schedulePerformanceTimelineSpeechBeats(performanceTimeline")
+    && chatReplyControllerSource.includes('executePerformanceTimelinePhase(performanceTimeline, "postSettle"')
+    && performanceTimelineControllerSource.includes("function buildPerformanceTimeline")
+    && performanceTimelineControllerSource.includes("function toPublicTimelineSummary")
+    && indexSource.includes('<script src="./performanceTimelineController.js"></script>')
+    && indexSource.indexOf('<script src="./performanceTimelineController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
+  "chat replies should route brain performance controls through the front-end performance timeline"
 );
 assert.ok(
   followupFeatureSource.includes("function buildTTSDebugReport()")

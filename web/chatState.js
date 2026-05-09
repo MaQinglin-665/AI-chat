@@ -236,6 +236,8 @@
   actionRunnerBusy: false,
   actionLastAt: {},
   thinkingMotionTimer: 0,
+  performanceTimelineLastSummary: null,
+  performanceTimelineTimers: [],
   expressionEnabled: true,
   expressionStrength: 1,
   expressionPulseUntil: 0,

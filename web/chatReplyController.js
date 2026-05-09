@@ -61,6 +61,12 @@
     const applyPerformanceControlsToRuntimeHint = typeof deps.applyPerformanceControlsToRuntimeHint === "function"
       ? deps.applyPerformanceControlsToRuntimeHint
       : (runtimeHint) => runtimeHint;
+    const buildPerformanceTimeline = typeof deps.buildPerformanceTimeline === "function" ? deps.buildPerformanceTimeline : () => null;
+    const rememberPerformanceTimeline = typeof deps.rememberPerformanceTimeline === "function" ? deps.rememberPerformanceTimeline : () => null;
+    const clearPerformanceTimelineTimers = typeof deps.clearPerformanceTimelineTimers === "function" ? deps.clearPerformanceTimelineTimers : () => {};
+    const executePerformanceTimelinePhase = typeof deps.executePerformanceTimelinePhase === "function" ? deps.executePerformanceTimelinePhase : () => false;
+    const schedulePerformanceTimelineSpeechBeats = typeof deps.schedulePerformanceTimelineSpeechBeats === "function" ? deps.schedulePerformanceTimelineSpeechBeats : () => 0;
+    const persistCharacterBrainSnapshot = typeof deps.persistCharacterBrainSnapshot === "function" ? deps.persistCharacterBrainSnapshot : () => {};
     const triggerExpressionPulse = typeof deps.triggerExpressionPulse === "function" ? deps.triggerExpressionPulse : () => {};
     const flushStreamSpeak = typeof deps.flushStreamSpeak === "function" ? deps.flushStreamSpeak : () => {};
     const scheduleFinalSpeechWatchdog = typeof deps.scheduleFinalSpeechWatchdog === "function" ? deps.scheduleFinalSpeechWatchdog : () => {};
@@ -211,6 +217,7 @@
       const streamSpeakSession = Date.now();
       const useStreamSpeak = shouldUseStreamSpeak();
       stopAllAudioPlayback();
+      clearPerformanceTimelineTimers();
       state.streamSpeakSession = streamSpeakSession;
       state.streamSpeakQueue = [];
       state.streamSpeakBuffer = "";
@@ -368,7 +375,57 @@
         const finalProsodyStyle = runtimeVoiceStyle || replyCueApply?.voiceStyle || finalTalkStyle;
         state.currentTalkStyle = finalTalkStyle;
         state.speechAnimMood = mood;
-        if (state.motionQuietDuringSpeech && state.speakingEnabled) {
+        const performanceTimeline = buildPerformanceTimeline({
+          brainSnapshot: state.characterBrainLastDecision,
+          runtimeMetadata: characterRuntimeMetadataForReply,
+          replyText: visibleReply,
+          mood,
+          talkStyle: finalTalkStyle,
+          ttsEnabled: state.speakingEnabled !== false
+        });
+        const performanceTimelineSummary = rememberPerformanceTimeline(performanceTimeline);
+        if (performanceTimelineSummary) {
+          persistCharacterBrainSnapshot();
+        }
+        const timelineContext = {
+          text: visibleReply,
+          mood,
+          style: finalTalkStyle,
+          sessionId: streamSpeakSession,
+          traceId: chatPerfTraceId
+        };
+        let timelineSpeechStarted = false;
+        let timelinePostSettled = false;
+        const runTimelineSpeechStart = () => {
+          if (!performanceTimeline || timelineSpeechStarted) {
+            return false;
+          }
+          timelineSpeechStarted = true;
+          executePerformanceTimelinePhase(performanceTimeline, "speechStart", timelineContext);
+          schedulePerformanceTimelineSpeechBeats(performanceTimeline, timelineContext);
+          return true;
+        };
+        const runTimelinePostSettle = (delayOverrideMs = null) => {
+          if (!performanceTimeline || timelinePostSettled) {
+            return false;
+          }
+          timelinePostSettled = true;
+          if (delayOverrideMs != null && performanceTimeline.postSettle && typeof performanceTimeline.postSettle === "object") {
+            executePerformanceTimelinePhase({
+              ...performanceTimeline,
+              postSettle: {
+                ...performanceTimeline.postSettle,
+                delayMs: Math.max(0, Number(delayOverrideMs) || 0)
+              }
+            }, "postSettle", timelineContext);
+            return true;
+          }
+          executePerformanceTimelinePhase(performanceTimeline, "postSettle", timelineContext);
+          return true;
+        };
+        if (performanceTimeline) {
+          executePerformanceTimelinePhase(performanceTimeline, "preReaction", timelineContext);
+        } else if (state.motionQuietDuringSpeech && state.speakingEnabled) {
           triggerExpressionPulse(finalTalkStyle, 0.4, 220);
         } else if (shouldSuppressGenericReplyMotion(characterRuntimeMetadataForReply)) {
           triggerExpressionPulse(finalTalkStyle, 0.28, 180);
@@ -376,6 +433,7 @@
           enqueueActionIntent("reply", { text: visibleReply, style: finalTalkStyle, mood, combo: true });
         }
         if (useStreamSpeak) {
+          runTimelineSpeechStart();
           flushStreamSpeak(streamSpeakSession, finalTalkStyle);
           const hadStreamSegments = state.streamSpeakLastEnqueueSession === streamSpeakSession;
           if (hadStreamSegments && state.streamSpeakPlayedSession === streamSpeakSession) {
@@ -389,7 +447,9 @@
           } else if (!hadStreamSegments || !state.streamSpeakWorking) {
             const speechText = buildStableSpeakText(visibleReply) || visibleReply;
             const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle);
-            maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
+            if (!performanceTimeline) {
+              maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
+            }
             const discardedSegments = discardQueuedStreamSpeakItems(streamSpeakSession);
             recordTTSDebugEvent("final_direct_tts", {
               traceId: chatPerfTraceId,
@@ -416,10 +476,14 @@
               traceId: chatPerfTraceId
             });
           }
+          runTimelinePostSettle(Math.min(9000, Math.max(900, visibleReply.length * 48 + 420)));
         } else {
           const speechText = buildStableSpeakText(visibleReply) || visibleReply;
           const prosody = buildSpeakProsody(speechText || visibleReply, mood, false, finalProsodyStyle);
-          maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
+          runTimelineSpeechStart();
+          if (!performanceTimeline) {
+            maybePlayTalkGesture(speechText || visibleReply, finalTalkStyle);
+          }
           await speak(speechText || visibleReply, {
             prosody,
             interrupt: false,
@@ -428,6 +492,7 @@
             voiceStyle: finalProsodyStyle,
             perfTraceId: chatPerfTraceId
           });
+          runTimelinePostSettle();
         }
         setStatus("待机");
         return true;
@@ -438,6 +503,7 @@
           error: String(err?.message || err || "")
         });
         clearThinkingMotionTimer();
+        clearPerformanceTimelineTimers();
         if (latencyHintTimer) {
           clearTimeout(latencyHintTimer);
           latencyHintTimer = 0;
