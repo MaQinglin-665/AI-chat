@@ -44,9 +44,11 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert "Expression target:" in block
     assert "voice_style=" in block
     assert "Style beat:" in block
+    assert "Reaction mode:" in block
     assert "slightly odd inner life" in block
     assert "empty helper phrases" in block
     assert decision["style_beat"]
+    assert decision["reaction_mode"]
 
 
 def test_character_brain_style_beat_rotates_with_continuity():
@@ -68,6 +70,28 @@ def test_character_brain_style_beat_rotates_with_continuity():
     assert first["style_beat"] in {"one_tiny_step", "clipboard_supervisor", "no_ceremony"}
     assert second["style_beat"] in {"one_tiny_step", "clipboard_supervisor", "no_ceremony"}
     assert first["style_beat"] != second["style_beat"]
+
+
+def test_character_brain_reaction_modes_keep_safety_by_intent():
+    greeting = character_brain.build_character_brain_decision(user_message="Hi Taffy, are you awake?")
+    casual = character_brain.build_character_brain_decision(user_message="This desk feels weird today.")
+    comfort = character_brain.build_character_brain_decision(user_message="I feel worn out. Stay with me.")
+    reminder = character_brain.build_character_brain_decision(user_message="Remind me in 10 minutes to drink water.")
+    closing = character_brain.build_character_brain_decision(user_message="I'm going to sleep, bye.")
+    task = character_brain.build_character_brain_decision(user_message="What should I do next?")
+
+    assert greeting["reaction_mode"] in {"quick_snap", "deadpan_aside", "playful_pushback", "tangent_spark"}
+    assert greeting["banter_level"] >= 1
+    assert casual["reaction_mode"] in {"quick_snap", "deadpan_aside", "playful_pushback", "tangent_spark"}
+    assert casual["banter_level"] >= 1
+    assert comfort["reaction_mode"] == "soft_anchor"
+    assert comfort["banter_level"] == 0
+    assert reminder["reaction_mode"] == "clean_ping"
+    assert reminder["banter_level"] == 0
+    assert closing["reaction_mode"] == "fade_out"
+    assert closing["banter_level"] == 0
+    assert task["reaction_mode"] == "task_snap"
+    assert task["banter_level"] == 1
 
 
 def test_character_brain_comfort_priority_beats_next_step_question():
@@ -413,6 +437,10 @@ def test_character_brain_reply_constraints_replace_bland_character_replies():
     voice_test = character_brain.build_character_brain_decision(
         user_message="Say a longer sentence so I can test whether your voice keeps the ending complete."
     )
+    casual = character_brain.build_character_brain_decision(user_message="This desk feels weird today.")
+    question = character_brain.build_character_brain_decision(user_message="Do you think AI pets can be funny?")
+    task = character_brain.build_character_brain_decision(user_message="Can you help me fix this project?")
+    assert task["intent"] == "task_help"
 
     assert character_brain.apply_character_brain_reply_constraints(
         "Great job!",
@@ -459,6 +487,21 @@ def test_character_brain_reply_constraints_replace_bland_character_replies():
         voice_test,
         user_message="Say a longer sentence so I can test whether your voice keeps the ending complete.",
     ) == "Testing voice endurance now: if I reach the end of this sentence without vanishing, the tiny sound machine gets one reluctant point."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "That sounds interesting! Let me know if you want to explore it.",
+        casual,
+        user_message="This desk feels weird today.",
+    ) == "Hm. The desktop air just shifted. Suspicious, but continue."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "As an AI, I can certainly help with that.",
+        question,
+        user_message="Do you think AI pets can be funny?",
+    ) == "Short answer: probably yes, but I reserve the right to be smug about it."
+    assert character_brain.apply_character_brain_reply_constraints(
+        "I can help with that. Let me know what you need.",
+        task,
+        user_message="Can you help me fix this project?",
+    ) == "Point me at the messy bit. I'll stare at it with unreasonable confidence."
 
 
 def test_character_brain_reply_constraints_filter_intent_mismatch():
@@ -570,9 +613,12 @@ def test_character_brain_public_snapshot_continuity_is_safe_and_compact():
     raw = json.dumps(snapshot, ensure_ascii=False).lower()
 
     assert snapshot["style_beat"]
+    assert snapshot["reaction_mode"]
+    assert 0 <= snapshot["banter_level"] <= 3
     assert snapshot["continuity"]["recent_user_need"] == "direction"
     assert snapshot["continuity"]["last_topic"] == "planning"
     assert "style_beat_guide" not in snapshot
+    assert "reaction_mode_guide" not in snapshot
     assert "history_tail" not in snapshot
     assert "directive" not in snapshot
     assert "raw history" not in raw

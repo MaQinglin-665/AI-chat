@@ -332,6 +332,9 @@ function createMemoryStorage(initial = {}) {
       reply_style: "comfort",
       style_beat: "room_anchor",
       style_beat_guide: "private prompt hint",
+      reaction_mode: "soft_anchor",
+      reaction_mode_guide: "private reaction hint",
+      banter_level: 0,
       energy: "calm",
       attention: "focused",
       relationship: "desktop_companion",
@@ -369,7 +372,14 @@ function createMemoryStorage(initial = {}) {
   });
   const stored = sessionStorage.dump()[storageController.STORAGE_KEYS.characterBrainLastDecision];
   assert.ok(stored, "character brain snapshot should be stored in sessionStorage");
-  assert.ok(!stored.includes("history_tail") && !stored.includes("SECRET") && !stored.includes("directive"), "stored character brain snapshot should not include private fields");
+  assert.ok(
+    !stored.includes("history_tail")
+      && !stored.includes("SECRET")
+      && !stored.includes("directive")
+      && !stored.includes("private prompt hint")
+      && !stored.includes("private reaction hint"),
+    "stored character brain snapshot should not include private fields"
+  );
   const restored = { characterBrainLastDecision: null, characterBrainLastUpdatedAt: 0 };
   storageController.loadCharacterBrainSnapshot(restored, {
     windowObject: { sessionStorage }
@@ -378,6 +388,9 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.intent, "comfort", "character brain snapshot should restore public intent");
   assert.strictEqual(restored.characterBrainLastDecision.style_beat, "room_anchor", "character brain snapshot should restore public style beat");
   assert.strictEqual(restored.characterBrainLastDecision.style_beat_guide, undefined, "character brain snapshot should not persist private style guidance");
+  assert.strictEqual(restored.characterBrainLastDecision.reaction_mode, "soft_anchor", "character brain snapshot should restore public reaction mode");
+  assert.strictEqual(restored.characterBrainLastDecision.reaction_mode_guide, undefined, "character brain snapshot should not persist private reaction guidance");
+  assert.strictEqual(restored.characterBrainLastDecision.banter_level, 0, "character brain snapshot should restore compact banter level");
   assert.strictEqual(restored.characterBrainLastDecision.continuity.recent_user_need, "reassurance", "character brain snapshot should restore compact continuity");
   assert.strictEqual(restored.characterBrainLastDecision.output_constraints.allow_motion, false, "character brain snapshot should restore safe output constraints");
   assert.strictEqual(restored.characterBrainLastDecision.history_tail, undefined, "restored character brain snapshot should stay public-only");
@@ -389,6 +402,8 @@ function createMemoryStorage(initial = {}) {
       intent: "comfort",
       reply_style: "comfort",
       style_beat: "room_anchor",
+      reaction_mode: "soft_anchor",
+      banter_level: 0,
       energy: "calm",
       attention: "focused",
       relationship: "desktop_companion",
@@ -437,6 +452,10 @@ function createMemoryStorage(initial = {}) {
   assert.ok(
     brainReport.includes("Style beat: room_anchor"),
     "character brain debug report should include the public style beat"
+  );
+  assert.ok(
+    brainReport.includes("Reaction: soft_anchor"),
+    "character brain debug report should include the public reaction mode"
   );
 }
 

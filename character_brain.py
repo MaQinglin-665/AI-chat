@@ -178,6 +178,18 @@ STYLE_BEATS = {
     ],
 }
 
+REACTION_MODES = {
+    "quick_snap": "start with a tiny immediate reaction, then stop before it turns into assistant patter",
+    "deadpan_aside": "answer directly, but add one dry sideways aside like the desktop is judging the situation",
+    "playful_pushback": "mildly challenge the premise without being hostile; keep it original and safe",
+    "tangent_spark": "take one brief weird association, then land back on the user's point",
+    "soft_anchor": "be quietly present and specific; no jokes at the user's expense",
+    "task_snap": "pick the next useful move fast, with no ceremony or motivational fog",
+    "clean_ping": "confirm clearly like a small system ping with personality",
+    "fade_out": "end softly with one characterful last image and no new hook",
+    "easy_ignore": "one optional line, effortless to ignore",
+}
+
 
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
@@ -268,6 +280,39 @@ def _select_style_beat(
     score = _stable_text_score(safe_intent, topic, user_message, continuity.get("last_intent")) + turn_offset
     key, guide = beats[score % len(beats)]
     return {"key": key, "guide": guide}
+
+
+def _select_reaction_mode(
+    intent: str,
+    topic: str,
+    user_message: str,
+    continuity: Optional[Dict[str, Any]] = None,
+    experience_profile: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    safe_intent = _clean_text(intent, 40) or "casual"
+    continuity = continuity if isinstance(continuity, dict) else {}
+    flags = _experience_flags(experience_profile)
+    if safe_intent == "comfort":
+        key, level = "soft_anchor", 0
+    elif safe_intent == "closing":
+        key, level = "fade_out", 0
+    elif safe_intent == "reminder":
+        key, level = "clean_ping", 0
+    elif safe_intent == "low_interrupt_checkin":
+        key, level = "easy_ignore", 0
+    elif safe_intent == "task_help":
+        key, level = "task_snap", 1
+    else:
+        choices = ("quick_snap", "deadpan_aside", "playful_pushback", "tangent_spark")
+        score = _stable_text_score(safe_intent, topic, user_message, continuity.get("last_topic"))
+        key = choices[score % len(choices)]
+        level = 2 if safe_intent in {"greeting", "casual", "question", "encouragement"} else 1
+    if flags["avoid_generic"] and level < 2 and safe_intent not in {"comfort", "closing", "reminder", "low_interrupt_checkin"}:
+        level = 2
+    if flags["prefer_short"]:
+        level = min(level, 1)
+    guide = REACTION_MODES.get(key, REACTION_MODES["quick_snap"])
+    return {"key": key, "guide": guide, "banter_level": max(0, min(3, level))}
 
 
 def _need_for_intent(intent: str) -> str:
@@ -514,6 +559,11 @@ def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str,
         r"(code|bug|fix|implement|error|traceback|pytest|debug|refactor|plan|analy[sz]e|helpme)",
         "task_help",
         70,
+    )
+    add_if(
+        r"(helpme(fix|debug|implement|ship|test)|canyouhelpme(fix|debug|implement|ship|test)|help.*(fix|debug|implement|project))",
+        "task_help",
+        45,
     )
     add_if(
         r"(\u4ee3\u7801|\u62a5\u9519|\u4fee\u590d|\u5b9e\u73b0|\u600e\u4e48\u505a|\u5e2e\u6211|\u5206\u6790|\u8ba1\u5212)",
@@ -868,7 +918,15 @@ def build_character_brain_decision(
     style_beat = _select_style_beat(intent, topic, user_message, continuity)
     decision["style_beat"] = _clean_text(style_beat.get("key"), 48)
     decision["style_beat_guide"] = _clean_text(style_beat.get("guide"), 180)
+    reaction = _select_reaction_mode(intent, topic, user_message, continuity, experience_profile)
+    decision["reaction_mode"] = _clean_text(reaction.get("key"), 48)
+    decision["reaction_mode_guide"] = _clean_text(reaction.get("guide"), 220)
+    decision["banter_level"] = max(0, min(3, _safe_int(reaction.get("banter_level"), 0)))
     decision["directive"] += f" Style beat: {decision['style_beat_guide']}."
+    decision["directive"] += (
+        f" Reaction mode: {decision['reaction_mode_guide']} "
+        f"Use banter level {decision['banter_level']} of 3; never name the mode."
+    )
     decision["directive"] += " " + _character_flavor_directive(intent, topic)
 
     _apply_output_constraints(decision)
@@ -895,6 +953,7 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Session continuity: last_intent={continuity.get('last_intent') or 'none'}, last_topic={continuity.get('last_topic') or 'none'}, mood_baseline={continuity.get('mood_baseline')}, recent_user_need={continuity.get('recent_user_need') or 'none'}, same_need_turns={continuity.get('same_need_turns')}, decay={continuity.get('decay')}",
         f"Reply style: {_clean_text(decision.get('reply_style'), 40)}, max_sentences={int(decision.get('max_sentences') or 3)}",
         f"Style beat: {_clean_text(decision.get('style_beat'), 48)} - {_clean_text(decision.get('style_beat_guide'), 180)}",
+        f"Reaction mode: {_clean_text(decision.get('reaction_mode'), 48)}; banter_level={max(0, min(3, _safe_int(decision.get('banter_level'), 0)))}; {_clean_text(decision.get('reaction_mode_guide'), 220)}",
         f"Output constraints: {_format_output_constraints_for_prompt(decision.get('output_constraints') if isinstance(decision.get('output_constraints'), dict) else {})}",
         "Question policy: avoid routine questions; only ask when the reply would be blocked without clarification.",
         f"Expression target: emotion={_normalize_emotion(decision.get('emotion'))}, action={_normalize_action(decision.get('action'))}, intensity={_normalize_intensity(decision.get('intensity'))}, voice_style={_clean_text(decision.get('voice_style'), 32)}",
@@ -1017,6 +1076,12 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
         return "One tiny step. Ten minutes. No grand destiny ceremony."
     if intent == "task_help" and topic == "character_runtime":
         return "Testing voice endurance now: if I reach the end of this sentence without vanishing, the tiny sound machine gets one reluctant point."
+    if intent == "task_help":
+        return "Point me at the messy bit. I'll stare at it with unreasonable confidence."
+    if intent == "question":
+        return "Short answer: probably yes, but I reserve the right to be smug about it."
+    if intent == "casual":
+        return "Hm. The desktop air just shifted. Suspicious, but continue."
     return ""
 
 
@@ -1049,6 +1114,15 @@ def _looks_like_bland_character_reply(text: str, intent: str) -> bool:
         r"\bsounds just right\b",
         r"\bsure thing\b",
         r"\bhow can i help\b",
+        r"\bhappy to help\b",
+        r"\blet me know\b",
+        r"\bis there anything else\b",
+        r"\bas an ai\b",
+        r"\bas a language model\b",
+        r"\bi can (certainly )?help with that\b",
+        r"\bi'?d be happy to\b",
+        r"\bit'?s important to\b",
+        r"\bthat sounds (great|nice|interesting)\b",
     )
     if any(re.search(pattern, lower) for pattern in generic_patterns):
         return True
@@ -1177,6 +1251,8 @@ def build_character_brain_public_snapshot(
         "intent": _clean_text(decision.get("intent"), 40),
         "reply_style": _clean_text(decision.get("reply_style"), 40),
         "style_beat": _clean_text(decision.get("style_beat"), 48),
+        "reaction_mode": _clean_text(decision.get("reaction_mode"), 48),
+        "banter_level": max(0, min(3, _safe_int(decision.get("banter_level"), 0))),
         "energy": _clean_text(decision.get("energy"), 24),
         "attention": _clean_text(decision.get("attention"), 24),
         "relationship": _clean_text(decision.get("relationship"), 40),

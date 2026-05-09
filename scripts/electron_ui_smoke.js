@@ -450,6 +450,9 @@ function buildV14DemoSceneReport(scene, reply, snapshot) {
   if (snapshot && !normalizeSnapshotField(snapshot, "style_beat")) {
     issues.push("missing_style_beat");
   }
+  if (snapshot && !normalizeSnapshotField(snapshot, "reaction_mode")) {
+    issues.push("missing_reaction_mode");
+  }
   if (scene.expectedIntent && intent !== scene.expectedIntent) {
     issues.push(`intent:${intent || "missing"}!=${scene.expectedIntent}`);
   }
@@ -475,6 +478,8 @@ function buildV14DemoSceneReport(scene, reply, snapshot) {
           intent: snapshot.intent,
           reply_style: snapshot.reply_style,
           style_beat: snapshot.style_beat,
+          reaction_mode: snapshot.reaction_mode,
+          banter_level: snapshot.banter_level,
           emotion: snapshot.emotion,
           action: snapshot.action,
           voice_style: snapshot.voice_style,
