@@ -175,7 +175,7 @@
       ? [
           "",
           "Timeline",
-          `enabled=${timeline.enabled === true ? "yes" : "no"}; pre=${clean(timeline.pre, "none")}; speech=${clean(timeline.speech, "none")}; beats=${Number(timeline.beats) || 0}; post=${clean(timeline.post, "none")}`,
+          `enabled=${timeline.enabled === true ? "yes" : "no"}; thought=${clean(timeline.thought_type, "none")}; pre=${clean(timeline.pre, "none")}; speech=${clean(timeline.speech, "none")}; beats=${Number(timeline.beats) || 0}; post=${clean(timeline.post, "none")}`,
           `suppressed=${timelineSuppressed.length ? timelineSuppressed.join(", ") : "none"}`
         ]
       : [];
@@ -186,7 +186,7 @@
       ? [
           "",
           "Voice Timeline",
-          `enabled=${voiceTimeline.enabled === true ? "yes" : "no"}; delivery=${clean(voiceTimeline.delivery, "steady_clear")}; pace=${clean(voiceTimeline.pace, "normal")}; segments=${Number(voiceTimeline.segments) || 0}; pause=${clean(voiceTimeline.pause_profile, "light")}`,
+          `enabled=${voiceTimeline.enabled === true ? "yes" : "no"}; thought=${clean(voiceTimeline.thought_type, "none")}; delivery=${clean(voiceTimeline.delivery, "steady_clear")}; pace=${clean(voiceTimeline.pace, "normal")}; segments=${Number(voiceTimeline.segments) || 0}; pause=${clean(voiceTimeline.pause_profile, "light")}`,
           `suppressed=${voiceTimelineSuppressed.length ? voiceTimelineSuppressed.join(", ") : "none"}; fallback=${clean(voiceTimeline.fallback_reason, "none")}`
         ]
       : [];

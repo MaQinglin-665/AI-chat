@@ -1008,6 +1008,7 @@ function createMemoryStorage(initial = {}) {
 
 {
   assert.strictEqual(typeof performanceTimelineController.buildPerformanceTimeline, "function", "performance timeline controller should build timeline plans");
+  assert.strictEqual(typeof performanceTimelineController.buildThoughtBurstChoreography, "function", "performance timeline controller should build thought burst choreography");
   assert.strictEqual(typeof performanceTimelineController.buildVoiceTimeline, "function", "performance timeline controller should build voice timeline plans");
   assert.strictEqual(typeof performanceTimelineController.buildVoiceSpeechSegments, "function", "performance timeline controller should build voice speech segments");
   assert.strictEqual(typeof performanceTimelineController.applyVoiceDirectorProsody, "function", "performance timeline controller should apply voice director prosody");
@@ -1144,13 +1145,41 @@ function createMemoryStorage(initial = {}) {
   );
   assert.strictEqual(directedTimeline.postSettle.name, "settle_idle", "timeline should prefer Motion Director post-settle");
 
+  const thoughtBurstTimeline = performanceTimelineController.buildPerformanceTimeline({
+    brainSnapshot: {
+      intent: "thought_burst",
+      opening_move: "deadpan_aside",
+      spontaneity: 3,
+      thought_burst: {
+        thought_type: "mock_defense",
+        length_budget: "2-3 short beats",
+        max_sentences: 3,
+        burst_reason: "correction"
+      }
+    },
+    replyText: "I was not wrong. I was stress-testing reality. Fine, tiny correction accepted.",
+    mood: "idle",
+    talkStyle: "neutral",
+    ttsEnabled: true
+  });
+  assert.strictEqual(thoughtBurstTimeline.thought_type, "mock_defense", "thought burst timelines should keep the public thought type");
+  assert.strictEqual(thoughtBurstTimeline.preReaction.name, "embarrassed_recovery", "mock-defense bursts should start with a recovery motion");
+  assert.deepStrictEqual(
+    thoughtBurstTimeline.speechBeats.map((beat) => beat.name),
+    ["deadpan_pause", "tiny_nod"],
+    "mock-defense bursts should use type-specific speech beats"
+  );
+  assert.ok(thoughtBurstTimeline.suppressed.includes("thought_burst_choreography"), "thought burst timeline should mark choreography routing");
+
   const summary = performanceTimelineController.toPublicTimelineSummary(deadpanTimeline);
   assert.deepStrictEqual(
     Object.keys(summary).sort(),
-    ["beats", "enabled", "motion", "post", "pre", "speech", "suppressed"].sort(),
+    ["beats", "enabled", "motion", "post", "pre", "speech", "suppressed", "thought_type"].sort(),
     "public timeline summary should only include safe execution fields"
   );
   assert.strictEqual(summary.motion.pre, "deadpan_aside", "public timeline summary should expose planned motion cue");
+  const thoughtSummary = performanceTimelineController.toPublicTimelineSummary(thoughtBurstTimeline);
+  assert.strictEqual(thoughtSummary.thought_type, "mock_defense", "public timeline summary should expose the thought burst type");
 
   const comfortVoiceTimeline = performanceTimelineController.buildVoiceTimeline({
     brainSnapshot: {
@@ -1210,12 +1239,31 @@ function createMemoryStorage(initial = {}) {
     }
   );
   assert.deepStrictEqual(oneLinerSegments, ["Go sleep. I'll keep the pixels under questionable supervision."], "one-liner voice style should keep the full reply in one segment");
+  const thoughtBurstVoiceTimeline = performanceTimelineController.buildVoiceTimeline({
+    brainSnapshot: {
+      intent: "thought_burst",
+      reply_shape: "mini_rant",
+      thought_burst: {
+        thought_type: "tiny_rant",
+        max_sentences: 4
+      }
+    },
+    replyText: "The desk moved first. The cursor saw it. I am not escalating. I am simply judging furniture.",
+    ttsEnabled: true
+  });
+  assert.strictEqual(thoughtBurstVoiceTimeline.thought_type, "tiny_rant", "thought burst voice timeline should keep the thought type");
+  assert.strictEqual(thoughtBurstVoiceTimeline.pause_profile, "thought_burst_beats", "tiny-rant voice should use burst pauses");
+  assert.strictEqual(thoughtBurstVoiceTimeline.segment_style, "thought_burst_beats", "tiny-rant voice should use burst segments");
+  assert.strictEqual(thoughtBurstVoiceTimeline.segments.length, 4, "tiny-rant voice should allow up to four natural beats");
+  assert.ok(thoughtBurstVoiceTimeline.suppressed.includes("thought_burst_choreography"), "thought burst voice should mark choreography routing");
   const voiceSummary = performanceTimelineController.toPublicVoiceTimelineSummary(comfortVoiceTimeline);
   assert.deepStrictEqual(
     Object.keys(voiceSummary).sort(),
-    ["delivery", "enabled", "fallback_reason", "inter_segment_pause_ms", "pace", "pause_profile", "pre_pause_ms", "segment_style", "segments", "suppressed"].sort(),
+    ["delivery", "enabled", "fallback_reason", "inter_segment_pause_ms", "pace", "pause_profile", "pre_pause_ms", "segment_style", "segments", "suppressed", "thought_type"].sort(),
     "public voice timeline summary should not include raw speech text"
   );
+  const thoughtVoiceSummary = performanceTimelineController.toPublicVoiceTimelineSummary(thoughtBurstVoiceTimeline);
+  assert.strictEqual(thoughtVoiceSummary.thought_type, "tiny_rant", "public voice timeline summary should expose the thought burst type");
   const softProsody = performanceTimelineController.applyVoiceDirectorProsody(
     { speed_ratio: 1.08, pitch_ratio: 1.01, volume_ratio: 1.0 },
     comfortVoiceTimeline.voice_director
@@ -2681,6 +2729,7 @@ assert.ok(
     && chatReplyControllerSource.includes('executePerformanceTimelinePhase(performanceTimeline, "postSettle"')
     && performanceAuditControllerSource.includes("function sanitizePerformanceAuditSummary")
     && performanceTimelineControllerSource.includes("function buildPerformanceTimeline")
+    && performanceTimelineControllerSource.includes("function buildThoughtBurstChoreography")
     && performanceTimelineControllerSource.includes("function buildVoiceTimeline")
     && performanceTimelineControllerSource.includes("function buildVoiceSpeechSegments")
     && performanceTimelineControllerSource.includes("function applyVoiceDirectorProsody")

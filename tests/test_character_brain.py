@@ -257,6 +257,16 @@ def test_character_brain_context_bleed_guard_blocks_prior_task_agenda():
         encouragement,
         user_message="I finished it.",
     )
+    encouragement_mouse_drift = character_brain.apply_character_brain_reply_constraints(
+        "Nice, you're done-tiny victory lap secured. Next ten minutes: wiggle the mouse and click around to see if anything sticks or flickers; then check if the cursor calms down and the desktop feels smooth again.",
+        encouragement,
+        user_message="I finished it.",
+    )
+    encouragement_fragment_drift = character_brain.apply_character_brain_reply_constraints(
+        "Nice-tiny victory secured. check, then we're done for the night.",
+        encouragement,
+        user_message="I finished it.",
+    )
 
     assert encouragement["context_bleed_guard"]["active"] is True
     assert constrained == "Look at you, actually finishing the thing. Suspiciously competent."
@@ -264,6 +274,8 @@ def test_character_brain_context_bleed_guard_blocks_prior_task_agenda():
     assert encouragement_closeout == "Look at you, actually finishing the thing. Suspiciously competent."
     assert encouragement_next_step == "Look at you, actually finishing the thing. Suspiciously competent."
     assert encouragement_save_it == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert encouragement_mouse_drift == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert encouragement_fragment_drift == "Look at you, actually finishing the thing. Suspiciously competent."
     assert encouragement["performance_execution"]["removed_context_bleed"] is True
     assert "close the tabs" not in constrained.lower()
 
@@ -347,6 +359,15 @@ def test_character_brain_reply_director_repairs_scene_policy_violations():
     assert finished_reply == "Look at you, actually finishing the thing. Suspiciously competent."
     assert finished_save_reply == "Look at you, actually finishing the thing. Suspiciously competent."
     assert finished["performance_execution"]["removed_context_bleed"] is True
+
+    desk = character_brain.build_character_brain_decision(user_message="This desk feels weird.")
+    desk_reply = character_brain.apply_character_brain_reply_constraints(
+        'Yeah, I do not think the desk is haunted-it is usually your cursor doing the "totally normal" glitchy thing. Check for any highlight or floating pop-up on-screen, then hit Esc once to kill weird focus.',
+        desk,
+        user_message="This desk feels weird.",
+    )
+    assert desk_reply == "The desk is acting normal, which is exactly how it gets you."
+    assert desk["performance_execution"]["removed_context_bleed"] is True
 
     comfort = character_brain.build_character_brain_decision(user_message="I feel bad.")
     comfort_reply = character_brain.apply_character_brain_reply_constraints(
@@ -701,9 +722,20 @@ def test_character_brain_auto_thought_burst_allows_natural_length_budget():
     assert decision["question_policy"] == "none"
     assert decision["output_constraints"]["allow_followup_question"] is False
     assert decision["output_constraints"]["allow_motion"] is True
+    assert decision["motion_director"]["pre_reaction"] == "side_eye"
+    assert decision["motion_director"]["speech_start"] == "dry_speech_start"
+    assert decision["motion_director"]["speech_beats"] == ["deadpan_pause", "head_tilt", "idle_fidget"]
+    assert "thought_burst_choreography" in decision["motion_director"]["suppressed_reasons"]
+    assert decision["voice_director"]["delivery"] == "dry_playful"
+    assert decision["voice_director"]["pause_profile"] == "thought_burst_beats"
+    assert decision["voice_director"]["segment_style"] == "thought_burst_beats"
+    assert decision["voice_director"]["max_segments"] == 4
+    assert "thought_burst_choreography" in decision["voice_director"]["suppressed_reasons"]
     assert "Thought burst" in character_brain.build_character_brain_prompt_block(decision)
     assert snapshot["thought_burst"]["thought_type"] == "tiny_rant"
     assert snapshot["thought_burst"]["max_sentences"] == 4
+    assert snapshot["motion_director"]["pre_reaction"] == "side_eye"
+    assert snapshot["voice_director"]["segment_style"] == "thought_burst_beats"
     assert "directive" not in snapshot
     assert "history_tail" not in snapshot
 

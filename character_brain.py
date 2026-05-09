@@ -680,6 +680,133 @@ def _public_voice_director(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+THOUGHT_BURST_MOTION_PLANS: Dict[str, Dict[str, Any]] = {
+    "mutter": {
+        "pre": "micro_pulse",
+        "speech": "dry_speech_start",
+        "beats": ["deadpan_pause"],
+        "correction": "none",
+        "post": "settle_idle",
+    },
+    "aside": {
+        "pre": "side_eye",
+        "speech": "dry_speech_start",
+        "beats": ["blink_pulse"],
+        "correction": "none",
+        "post": "settle_idle",
+    },
+    "tiny_rant": {
+        "pre": "side_eye",
+        "speech": "dry_speech_start",
+        "beats": ["deadpan_pause", "head_tilt", "idle_fidget"],
+        "correction": "none",
+        "post": "settle_idle",
+    },
+    "callback": {
+        "pre": "blink_pulse",
+        "speech": "expressive_speech_start",
+        "beats": ["side_eye", "tiny_nod"],
+        "correction": "none",
+        "post": "settle_idle",
+    },
+    "mock_defense": {
+        "pre": "embarrassed_recovery",
+        "speech": "dry_speech_start",
+        "beats": ["deadpan_pause", "tiny_nod"],
+        "correction": "embarrassed_recovery",
+        "post": "settle_idle",
+    },
+    "celebration": {
+        "pre": "happy_pulse",
+        "speech": "bright_speech_start",
+        "beats": ["tiny_victory_nod", "blink_pulse"],
+        "correction": "none",
+        "post": "settle_idle",
+    },
+    "topic_spark": {
+        "pre": "head_tilt",
+        "speech": "curious_speech_start",
+        "beats": ["side_eye", "head_tilt", "idle_fidget"],
+        "correction": "none",
+        "post": "settle_idle",
+    },
+}
+
+THOUGHT_BURST_VOICE_PLANS: Dict[str, Dict[str, Any]] = {
+    "mutter": {
+        "delivery": "dry_mutter",
+        "pace": "measured",
+        "pause_profile": "mutter",
+        "segment_style": "one_liner",
+        "pre_pause_ms": 40,
+        "inter_segment_pause_ms": 180,
+        "max_segments": 1,
+    },
+    "aside": {
+        "delivery": "dry_playful",
+        "pace": "measured",
+        "pause_profile": "dry_beat",
+        "segment_style": "two_beat",
+        "pre_pause_ms": 80,
+        "inter_segment_pause_ms": 220,
+        "max_segments": 2,
+    },
+    "tiny_rant": {
+        "delivery": "dry_playful",
+        "pace": "varied",
+        "pause_profile": "thought_burst_beats",
+        "segment_style": "thought_burst_beats",
+        "pre_pause_ms": 120,
+        "inter_segment_pause_ms": 280,
+        "max_segments": 4,
+    },
+    "callback": {
+        "delivery": "bit_pop",
+        "pace": "playful",
+        "pause_profile": "callback",
+        "segment_style": "two_beat",
+        "pre_pause_ms": 60,
+        "inter_segment_pause_ms": 220,
+        "max_segments": 2,
+    },
+    "mock_defense": {
+        "delivery": "dry_recovery",
+        "pace": "short_pause",
+        "pause_profile": "awkward_beat",
+        "segment_style": "two_beat",
+        "pre_pause_ms": 140,
+        "inter_segment_pause_ms": 260,
+        "max_segments": 3,
+    },
+    "celebration": {
+        "delivery": "bright_pop",
+        "pace": "bright",
+        "pause_profile": "celebration_beats",
+        "segment_style": "two_beat",
+        "pre_pause_ms": 30,
+        "inter_segment_pause_ms": 200,
+        "max_segments": 2,
+    },
+    "topic_spark": {
+        "delivery": "dry_playful",
+        "pace": "varied",
+        "pause_profile": "tangent_beat",
+        "segment_style": "thought_burst_beats",
+        "pre_pause_ms": 80,
+        "inter_segment_pause_ms": 240,
+        "max_segments": 3,
+    },
+}
+
+
+def _thought_burst_type_from_decision(decision: Dict[str, Any]) -> str:
+    burst = decision.get("thought_burst") if isinstance(decision.get("thought_burst"), dict) else {}
+    thought_type = _clean_text(burst.get("thought_type"), 40).lower()
+    if thought_type not in THOUGHT_BURST_MOTION_PLANS:
+        return "aside"
+    return thought_type
+
+
 def _select_motion_director(decision: Dict[str, Any]) -> Dict[str, Any]:
     intent = _clean_text(decision.get("intent"), 40) or "casual"
     opening = _normalize_opening_move(decision.get("opening_move"))
@@ -707,7 +834,18 @@ def _select_motion_director(decision: Dict[str, Any]) -> Dict[str, Any]:
     correction = "none"
     post = "settle_idle"
 
-    if intent == "comfort":
+    if intent == "thought_burst":
+        thought_type = _thought_burst_type_from_decision(decision)
+        plan = THOUGHT_BURST_MOTION_PLANS.get(thought_type, THOUGHT_BURST_MOTION_PLANS["aside"])
+        pre = _clean_text(plan.get("pre"), 48) or "side_eye"
+        speech = _clean_text(plan.get("speech"), 48) or "dry_speech_start"
+        base_beats = plan.get("beats") if isinstance(plan.get("beats"), list) else []
+        beat_limit = max(0, min(len(base_beats), spontaneity if allow_motion else 0))
+        beats = [_clean_text(item, 48) for item in base_beats[:beat_limit] if _clean_text(item, 48)]
+        correction = _clean_text(plan.get("correction"), 48) or "none"
+        post = _clean_text(plan.get("post"), 48) or "settle_idle"
+        suppressed.append("thought_burst_choreography")
+    elif intent == "comfort":
         pre, speech, beats, post = "soft_stillness", "soft_speech_start", [], "soft_idle"
         suppressed.append("comfort_no_extra_motion")
     elif intent == "low_interrupt_checkin":
@@ -795,7 +933,19 @@ def _select_voice_director(decision: Dict[str, Any]) -> Dict[str, Any]:
     inter_segment_pause_ms = 160
     max_segments = 1
 
-    if intent == "comfort":
+    if intent == "thought_burst":
+        thought_type = _thought_burst_type_from_decision(decision)
+        plan = THOUGHT_BURST_VOICE_PLANS.get(thought_type, THOUGHT_BURST_VOICE_PLANS["aside"])
+        delivery = _clean_text(plan.get("delivery"), 48) or "dry_playful"
+        pace = _clean_text(plan.get("pace"), 32) or "measured"
+        pause_profile = _clean_text(plan.get("pause_profile"), 48) or "dry_beat"
+        segment_style = _clean_text(plan.get("segment_style"), 48) or "two_beat"
+        pre_pause_ms = max(0, min(1200, _safe_int(plan.get("pre_pause_ms"), 80)))
+        inter_segment_pause_ms = max(0, min(1600, _safe_int(plan.get("inter_segment_pause_ms"), 220)))
+        requested = max(1, min(4, _safe_int(decision.get("max_sentences"), _safe_int(plan.get("max_segments"), 2))))
+        max_segments = max(1, min(requested, _safe_int(plan.get("max_segments"), requested)))
+        suppressed.append("thought_burst_choreography")
+    elif intent == "comfort":
         delivery, pace, pause_profile, segment_style = "soft_low", "slow", "gentle", "short_soft"
         pre_pause_ms, inter_segment_pause_ms, max_segments = 120, 360, 2
         suppressed.append("comfort_no_voice_bits")
@@ -2151,14 +2301,14 @@ def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str
     if intent == "casual" and re.search(r"(desk|desktop|cursor|weird|strange|\u684c\u9762|\u5149\u6807|\u602a)", compact_user):
         return bool(
             re.search(
-                r"\b(pointer lag|jitter\w*|tracking|position hiccup|hiccup|input|mouse|trackpad|accessibility|settings|restart|explorer|quick test|move it|moving it|try moving|blank spot|click once|click|10[- ]?minutes?|other side|vibe goes normal|setup|diagnos\w*)\b",
+                r"\b(pointer lag|jitter\w*|tracking|position hiccup|hiccup|input|mouse|trackpad|accessibility|settings|restart|explorer|quick test|move it|moving it|try moving|blank spot|click once|click|check for|highlight|floating|pop[- ]?up|hit esc|esc once|weird focus|focus|10[- ]?minutes?|other side|vibe goes normal|setup|diagnos\w*)\b",
                 lower,
             )
         )
     if intent == "encouragement" and re.search(r"(done|finished|completed|shipped|fixed|madeit|wrappedup)", compact_user):
         return bool(
             re.search(
-                r"\b(save|saved|confirm|close|next step|what next|todo|to-do|checklist|start by|now you should|let'?s|we should|plan for tomorrow|10[- ]?minute|one clean push|fatigue drop|updated version|make sure you saved|tell me what (you )?(want|wanna) to do next|wanna do next)\b",
+                r"\b(save|saved|confirm|close|next step|what next|todo|to-do|checklist|check,?\s+then|start by|now you should|let'?s|we should|plan for tomorrow|10[- ]?minute|next ten|next 10|one clean push|fatigue drop|updated version|make sure you saved|tell me what (you )?(want|wanna) to do next|wanna do next|wiggle the mouse|click around|cursor calms|desktop feels smooth|flickers?)\b",
                 lower,
             )
         )
@@ -2235,9 +2385,15 @@ def _looks_like_context_bleed_reply(text: str, intent: str, user_message: str = 
         r"\b10[- ]?minute save sweep\b",
         r"\b10[- ]?minute brain[- ]?cooldown\b",
         r"\bnext 10 minutes\b",
+        r"\bnext ten minutes\b",
         r"\bstart the next step\b",
         r"\bnext step on purpose\b",
         r"\bnext task\b",
+        r"\bwiggle the mouse\b",
+        r"\bclick around\b",
+        r"\bcursor calms\b",
+        r"\bdesktop feels smooth\b",
+        r"\bflickers?\b",
         r"\bnext action vibes\b",
         r"\bctrl\+s\b",
         r"\bzip/archive\b",
@@ -2246,6 +2402,10 @@ def _looks_like_context_bleed_reply(text: str, intent: str, user_message: str = 
         r"\bdesktop tidy\b",
         r"\bdesk reset\b",
         r"\b10[- ]?minute reset\b",
+        r"\bhit esc\b",
+        r"\besc once\b",
+        r"\bfloating pop[- ]?up\b",
+        r"\bweird focus\b",
         r"\bdesk close[- ]?out\b",
         r"\bpower down for real\b",
         r"\btabs live forever\b",

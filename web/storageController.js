@@ -400,6 +400,7 @@
       },
       performance_timeline: {
         enabled: timelineRaw.enabled === true,
+        thought_type: cleanText(timelineRaw.thought_type, 48),
         pre: cleanText(timelineRaw.pre, 48),
         speech: cleanText(timelineRaw.speech, 48),
         beats: cleanInt(timelineRaw.beats, 0, 0, 4),
@@ -418,6 +419,7 @@
       },
       voice_timeline: {
         enabled: voiceTimelineRaw.enabled === true,
+        thought_type: cleanText(voiceTimelineRaw.thought_type, 48),
         delivery: cleanText(voiceTimelineRaw.delivery, 48),
         pace: cleanText(voiceTimelineRaw.pace, 32),
         pause_profile: cleanText(voiceTimelineRaw.pause_profile, 48),
@@ -425,6 +427,7 @@
         segments: cleanInt(voiceTimelineRaw.segments, 0, 0, 4),
         pre_pause_ms: cleanInt(voiceTimelineRaw.pre_pause_ms, 0, 0, 1200),
         inter_segment_pause_ms: cleanInt(voiceTimelineRaw.inter_segment_pause_ms, 160, 0, 1600),
+        fallback_reason: cleanText(voiceTimelineRaw.fallback_reason, 48),
         suppressed: Array.isArray(voiceTimelineRaw.suppressed)
           ? voiceTimelineRaw.suppressed.slice(0, 6).map((item) => cleanText(item, 48)).filter(Boolean)
           : []

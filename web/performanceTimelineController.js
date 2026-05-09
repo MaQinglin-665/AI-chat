@@ -162,6 +162,108 @@
     });
   }
 
+  const THOUGHT_BURST_ALLOWED_TYPES = new Set([
+    "mutter",
+    "aside",
+    "tiny_rant",
+    "callback",
+    "mock_defense",
+    "celebration",
+    "topic_spark"
+  ]);
+
+  const THOUGHT_BURST_DEFAULT_SENTENCES = {
+    mutter: 1,
+    aside: 2,
+    tiny_rant: 4,
+    callback: 2,
+    mock_defense: 3,
+    celebration: 2,
+    topic_spark: 3
+  };
+
+  const THOUGHT_BURST_CHOREOGRAPHY = {
+    mutter: {
+      motion: { pre: "micro_pulse", speech: "dry_speech_start", beats: ["deadpan_pause"], post: "settle_idle" },
+      voice: { delivery: "dry_mutter", pace: "measured", pause_profile: "mutter", segment_style: "one_liner", pre_pause_ms: 40, inter_segment_pause_ms: 180, max_segments: 1 }
+    },
+    aside: {
+      motion: { pre: "side_eye", speech: "dry_speech_start", beats: ["blink_pulse"], post: "settle_idle" },
+      voice: { delivery: "dry_playful", pace: "measured", pause_profile: "dry_beat", segment_style: "two_beat", pre_pause_ms: 80, inter_segment_pause_ms: 220, max_segments: 2 }
+    },
+    tiny_rant: {
+      motion: { pre: "side_eye", speech: "dry_speech_start", beats: ["deadpan_pause", "head_tilt", "idle_fidget"], post: "settle_idle" },
+      voice: { delivery: "dry_playful", pace: "varied", pause_profile: "thought_burst_beats", segment_style: "thought_burst_beats", pre_pause_ms: 120, inter_segment_pause_ms: 280, max_segments: 4 }
+    },
+    callback: {
+      motion: { pre: "blink_pulse", speech: "expressive_speech_start", beats: ["side_eye", "tiny_nod"], post: "settle_idle" },
+      voice: { delivery: "bit_pop", pace: "playful", pause_profile: "callback", segment_style: "two_beat", pre_pause_ms: 60, inter_segment_pause_ms: 220, max_segments: 2 }
+    },
+    mock_defense: {
+      motion: { pre: "embarrassed_recovery", speech: "dry_speech_start", beats: ["deadpan_pause", "tiny_nod"], post: "settle_idle" },
+      voice: { delivery: "dry_recovery", pace: "short_pause", pause_profile: "awkward_beat", segment_style: "two_beat", pre_pause_ms: 140, inter_segment_pause_ms: 260, max_segments: 3 }
+    },
+    celebration: {
+      motion: { pre: "happy_pulse", speech: "bright_speech_start", beats: ["tiny_victory_nod", "blink_pulse"], post: "settle_idle" },
+      voice: { delivery: "bright_pop", pace: "bright", pause_profile: "celebration_beats", segment_style: "two_beat", pre_pause_ms: 30, inter_segment_pause_ms: 200, max_segments: 2 }
+    },
+    topic_spark: {
+      motion: { pre: "head_tilt", speech: "curious_speech_start", beats: ["side_eye", "head_tilt", "idle_fidget"], post: "settle_idle" },
+      voice: { delivery: "dry_playful", pace: "varied", pause_profile: "tangent_beat", segment_style: "thought_burst_beats", pre_pause_ms: 80, inter_segment_pause_ms: 240, max_segments: 3 }
+    }
+  };
+
+  function getThoughtBurstContext(brain = {}) {
+    const safe = brain && typeof brain === "object" && !Array.isArray(brain) ? brain : {};
+    const raw = safe.thought_burst && typeof safe.thought_burst === "object" && !Array.isArray(safe.thought_burst)
+      ? safe.thought_burst
+      : {};
+    const intent = clean(safe.intent, "");
+    let thoughtType = clean(raw.thought_type, "");
+    if (!THOUGHT_BURST_ALLOWED_TYPES.has(thoughtType)) {
+      thoughtType = intent === "thought_burst" ? "aside" : "";
+    }
+    if (!thoughtType) {
+      return null;
+    }
+    const fallback = THOUGHT_BURST_DEFAULT_SENTENCES[thoughtType] || 2;
+    const maxSentences = clampInt(raw.max_sentences || safe.max_sentences, fallback, 1, 4);
+    const minSentences = clampInt(raw.min_sentences, Math.min(maxSentences, 1), 1, maxSentences);
+    return {
+      thought_type: thoughtType,
+      max_sentences: maxSentences,
+      min_sentences: minSentences,
+      length_budget: clean(raw.length_budget, `${minSentences}_${maxSentences}_sentences`),
+      burst_reason: clean(raw.burst_reason, "stage_thought")
+    };
+  }
+
+  function buildThoughtBurstChoreography(brain = {}) {
+    const context = getThoughtBurstContext(brain);
+    if (!context) {
+      return null;
+    }
+    const base = THOUGHT_BURST_CHOREOGRAPHY[context.thought_type] || THOUGHT_BURST_CHOREOGRAPHY.aside;
+    const voiceMax = clampInt(base.voice.max_segments, context.max_sentences, 1, 4);
+    return {
+      thought_type: context.thought_type,
+      length_budget: context.length_budget,
+      burst_reason: context.burst_reason,
+      motion: {
+        pre: clean(base.motion.pre, "micro_pulse"),
+        speech: clean(base.motion.speech, "expressive_speech_start"),
+        beats: cleanList(base.motion.beats, 4),
+        post: clean(base.motion.post, "settle_idle")
+      },
+      voice: {
+        ...base.voice,
+        thought_type: context.thought_type,
+        max_segments: Math.max(1, Math.min(context.max_sentences, voiceMax)),
+        suppressed_reasons: ["thought_burst_choreography"]
+      }
+    };
+  }
+
   function classifyEarlyReaction(text = "") {
     const source = String(text || "").replace(/\s+/g, " ").trim();
     const lower = source.toLowerCase();
@@ -347,6 +449,7 @@
     const motionDirector = brain.motion_director && typeof brain.motion_director === "object" && !Array.isArray(brain.motion_director)
       ? brain.motion_director
       : null;
+    const thoughtChoreography = buildThoughtBurstChoreography(brain);
     const allowMotion = constraints.allow_motion === false ? false : true;
     const ttsEnabled = input.ttsEnabled !== false;
     const style = clean(input.talkStyle || runtime.voice_style || brain.voice_style, "neutral");
@@ -498,10 +601,21 @@
         speechBeats = [];
       }
     }
+    if (thoughtChoreography) {
+      if (!suppressed.includes("thought_burst_choreography")) suppressed.push("thought_burst_choreography");
+      preReaction = motionDirectorPhase(thoughtChoreography.motion.pre, "pre", { allowMotion, ttsEnabled, style, mood }) || preReaction;
+      speechStart = motionDirectorPhase(thoughtChoreography.motion.speech, "speech", { allowMotion, ttsEnabled, style, mood }) || speechStart;
+      postSettle = motionDirectorPhase(thoughtChoreography.motion.post, "post", { allowMotion, ttsEnabled, style, mood }) || postSettle;
+      const beatLimit = Math.max(0, Math.min(4, spontaneity, thoughtChoreography.motion.beats.length));
+      speechBeats = ttsEnabled
+        ? thoughtChoreography.motion.beats.slice(0, beatLimit).map((item, index) => motionDirectorPhase(item, "beat", { allowMotion, ttsEnabled, style, mood, index })).filter(Boolean)
+        : [];
+    }
     return {
       version: 1,
       enabled: true,
       intent,
+      thought_type: thoughtChoreography ? thoughtChoreography.thought_type : "none",
       opening_move: opening,
       reaction_mode: reaction,
       spontaneity,
@@ -524,6 +638,7 @@
       : [];
     return {
       enabled: safe.enabled === true,
+      thought_type: clean(safe.thought_type, "none"),
       pre: clean(safe.preReaction?.name, "none"),
       speech: clean(safe.speechStart?.name, "none"),
       beats: Array.isArray(safe.speechBeats) ? safe.speechBeats.length : 0,
@@ -561,6 +676,7 @@
       pre_pause_ms: clampInt(safe.pre_pause_ms, 0, 0, 1200),
       inter_segment_pause_ms: clampInt(safe.inter_segment_pause_ms, 160, 0, 1600),
       max_segments: clampInt(safe.max_segments, 1, 1, 4),
+      thought_type: clean(safe.thought_type, "none"),
       suppressed_reasons: suppressed
     };
   }
@@ -569,6 +685,10 @@
     const intent = clean(brain.intent, "casual");
     const shape = clean(brain.reply_shape, "one_liner");
     const opening = clean(brain.opening_move, "micro_reaction");
+    const thoughtChoreography = buildThoughtBurstChoreography(brain);
+    if (thoughtChoreography) {
+      return normalizeVoiceDirector(thoughtChoreography.voice);
+    }
     if (brain.voice_director && typeof brain.voice_director === "object" && !Array.isArray(brain.voice_director)) {
       return normalizeVoiceDirector(brain.voice_director);
     }
@@ -685,6 +805,7 @@
       version: 1,
       enabled: ttsEnabled,
       voice_director: director,
+      thought_type: clean(director.thought_type, "none"),
       delivery: director.delivery,
       pace: director.pace,
       pause_profile: director.pause_profile,
@@ -724,6 +845,7 @@
     }
     return {
       enabled: safe.enabled === true,
+      thought_type: clean(safe.thought_type || safe.voice_director?.thought_type, "none"),
       delivery: clean(safe.delivery, "steady_clear"),
       pace: clean(safe.pace, "normal"),
       pause_profile: clean(safe.pause_profile, "light"),
@@ -758,6 +880,8 @@
     if (director.pace === "slow") speed *= 0.92;
     else if (director.pace === "steady") speed *= 0.98;
     else if (director.pace === "short_pause") speed *= 0.96;
+    else if (director.pace === "measured") speed *= 0.97;
+    else if (director.pace === "varied") speed *= 1.02;
     else if (director.pace === "bright") speed *= 1.04;
     else if (director.pace === "playful" || director.pace === "steady_playful") speed *= 1.01;
 
@@ -767,6 +891,10 @@
     } else if (director.delivery === "steady_clear" || director.delivery === "answer_first") {
       pitch *= 0.99;
       volume *= 1.01;
+    } else if (director.delivery === "dry_mutter") {
+      speed *= 0.95;
+      pitch *= 0.96;
+      volume *= 0.95;
     } else if (director.delivery === "dry_recovery" || director.delivery === "dry_playful") {
       speed *= 0.98;
       pitch *= 0.98;
@@ -970,6 +1098,7 @@
     }
 
     return {
+      buildThoughtBurstChoreography,
       buildPerformanceTimeline,
       toPublicTimelineSummary,
       buildVoiceTimeline,
@@ -989,6 +1118,7 @@
   }
 
   const api = {
+    buildThoughtBurstChoreography,
     buildPerformanceTimeline,
     toPublicTimelineSummary,
     buildVoiceTimeline,

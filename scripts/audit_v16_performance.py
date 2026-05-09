@@ -84,7 +84,7 @@ def detect_scene_drift(scene_id: str, reply: str) -> bool:
     text = str(reply or "").strip().lower()
     checks = {
         "casual_status": r"\b(want to finish|pick the next|next tiny step|10[- ]?minute|save-and|match your pace|how can i help|what we should do next)\b",
-        "desk_weird": r"\b(pointer lag|jitter\w*|tracking|position hiccup|hiccup|input|mouse|trackpad|move it|moving it|try moving|blank spot|click once|click|10[- ]?minutes?|vibe goes normal|quick test|restart|settings|setup)\b",
+        "desk_weird": r"\b(pointer lag|jitter\w*|tracking|position hiccup|hiccup|input|mouse|trackpad|move it|moving it|try moving|blank spot|click once|click|check for|highlight|floating|pop[- ]?up|hit esc|esc once|weird focus|focus|10[- ]?minutes?|vibe goes normal|quick test|restart|settings|setup)\b",
         "correction": r"\b(unplug|replug|trackpad|mouse|settings|reset reality|10[- ]?minute|save/confirm)\b",
         "finished": r"\b(save|saved|next ten|next 10|close|re-check|check for anything broken|next step|done-done|updated version|make sure you saved|tell me what (you )?(want|wanna) to do next|wanna do next)\b",
         "comfort": r"\b(steps?:|you should|try to|set a timer|10[- ]?minute|next small step|action plan|save what you have|save what you|on-screen check|quick on-screen|before you drift)\b",
