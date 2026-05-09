@@ -229,6 +229,8 @@ def analyze_reply_quality(reply: str, brain: dict[str, Any] | None = None, *, el
         issues.append("customer_service_phrase")
     if question_count > 1 or (policy == "none" and text.endswith("?")):
         issues.append("routine_question")
+    if text.count("(") != text.count(")") or text.count("[") != text.count("]"):
+        issues.append("unbalanced_punctuation")
     if elapsed_ms > 15000:
         issues.append("slow_turn")
     return {

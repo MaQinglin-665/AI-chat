@@ -632,6 +632,20 @@ def test_character_brain_safe_intents_strip_unsafe_bits_and_task_stays_useful():
     assert task_reply == "One tiny step. Ten minutes. No grand destiny ceremony."
 
 
+def test_character_brain_repairs_unbalanced_parenthetical_after_shape_trim():
+    decision = character_brain.build_character_brain_decision(user_message="What are you doing?")
+    decision["reply_shape"] = "answer_then_bit"
+
+    reply = character_brain.apply_character_brain_reply_constraints(
+        "Just hanging out. (The keyboard is being dramatic, but fair.",
+        decision,
+        user_message="What are you doing?",
+    )
+
+    assert reply == "Just hanging out. The keyboard is being dramatic, but fair."
+    assert "(" not in reply
+
+
 def test_character_brain_repeated_next_step_stays_task_help_and_concise():
     first = character_brain.build_character_brain_decision(
         user_message="What should I do next?",

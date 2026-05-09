@@ -24,6 +24,7 @@ audit = _load_script("audit_v14_dialogue")
 
 
 def test_model_acceptance_summary_counts_gate_and_redacts_secret():
+    fake_secret = "api_key=" + "sk-" + "supersecret1234567890 timed out"
     records = [
         probe.build_probe_record(
             1,
@@ -43,7 +44,7 @@ def test_model_acceptance_summary_counts_gate_and_redacts_secret():
         ),
         probe.build_probe_record(
             5,
-            {"status": 500, "elapsed_ms": 18000, "error": "api_key=sk-supersecret1234567890 timed out"},
+            {"status": 500, "elapsed_ms": 18000, "error": fake_secret},
         ),
     ]
 
@@ -78,10 +79,12 @@ def test_dialogue_quality_flags_customer_service_questions_and_chinese():
 
     result = audit.analyze_reply_quality("Happy to help! Let me know if you need anything else?", brain)
     cn = audit.analyze_reply_quality("好的, I can do that.", brain)
+    broken = audit.analyze_reply_quality("Just hanging out. (The keyboard is being dramatic.", brain)
 
     assert "customer_service_phrase" in result["issues"]
     assert "routine_question" in result["issues"]
     assert "chinese_leak" in cn["issues"]
+    assert "unbalanced_punctuation" in broken["issues"]
 
 
 def test_dialogue_audit_report_is_public_and_uses_safe_payload_shape():

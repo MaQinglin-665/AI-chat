@@ -1427,6 +1427,17 @@ def _compact_one_liner(text: str, max_chars: int = 170) -> str:
     return out or compact[:max_chars].rstrip(" ,;:")
 
 
+def _repair_unbalanced_reply_punctuation(text: str) -> str:
+    repaired = _normalize_reply_text_spacing(text)
+    if not repaired:
+        return ""
+    if repaired.count("(") > repaired.count(")"):
+        repaired = repaired.replace("(", "", repaired.count("(") - repaired.count(")"))
+    if repaired.count("[") > repaired.count("]"):
+        repaired = repaired.replace("[", "", repaired.count("[") - repaired.count("]"))
+    return _normalize_reply_text_spacing(repaired)
+
+
 def _reply_contains_selected_bit(text: str, performance_bit: str) -> bool:
     key = _clean_text(performance_bit, 48)
     if not key or key == "none":
@@ -1547,6 +1558,7 @@ def apply_character_brain_reply_constraints(
     if not constrained:
         constrained = _fallback_reply_for_intent(intent, user_message) or original
     constrained = _normalize_reply_text_spacing(constrained)
+    constrained = _repair_unbalanced_reply_punctuation(constrained)
     _record_performance_execution(
         decision,
         reply_shape=reply_shape,
