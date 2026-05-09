@@ -261,11 +261,21 @@
     const safe = plan && typeof plan === "object" && !Array.isArray(plan) ? plan : null;
     if (!safe) return null;
     const actualSafe = actual && typeof actual === "object" && !Array.isArray(actual) ? actual : {};
+    const latencyMs = clampInt(actualSafe.latency_ms, 0, 0, 60000);
+    const targetLatencyMs = clampInt(safe.target_latency_ms, 500, 100, 2000);
+    const actualState = clean(actualSafe.actual || actualSafe.status, safe.enabled === true ? "planned" : "suppressed");
+    const latencyStatus = safe.enabled !== true || actualState === "suppressed"
+      ? "suppressed"
+      : actualState !== "dispatched"
+        ? "pending"
+        : latencyMs <= targetLatencyMs
+          ? "ok"
+          : "slow";
     return {
       enabled: safe.enabled === true,
       intent: clean(safe.intent, "casual"),
       pre: clean(safe.pre || safe.preReaction?.name, "none"),
-      actual: clean(actualSafe.actual || actualSafe.status, safe.enabled === true ? "planned" : "suppressed"),
+      actual: actualState,
       action: clean(actualSafe.action || safe.action || safe.preReaction?.actionIntent, "none"),
       motion_cue: clean(actualSafe.motion_cue || safe.motion_cue || safe.preReaction?.motionCue || safe.preReaction?.name, "none"),
       pulse: actualSafe.pulse === true || safe.pulse === true,
@@ -273,7 +283,9 @@
       suppressed: Array.isArray(safe.suppressed)
         ? safe.suppressed.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 8)
         : [],
-      latency_ms: clampInt(actualSafe.latency_ms, 0, 0, 60000),
+      latency_ms: latencyMs,
+      target_latency_ms: targetLatencyMs,
+      latency_status: latencyStatus,
       updated_at: clampInt(safe.updated_at, 0, 0, Number.MAX_SAFE_INTEGER)
     };
   }

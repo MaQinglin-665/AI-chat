@@ -492,7 +492,13 @@
           motion_cue: cleanText(auditEarlyRaw.motion_cue, 48),
           pulse: auditEarlyRaw.pulse === true,
           reason: cleanText(auditEarlyRaw.reason, 64),
-          latency_ms: cleanInt(auditEarlyRaw.latency_ms, 0, 0, 60000)
+          suppressed: Array.isArray(auditEarlyRaw.suppressed)
+            ? auditEarlyRaw.suppressed.slice(0, 8).map((item) => cleanText(item, 48)).filter(Boolean)
+            : [],
+          latency_ms: cleanInt(auditEarlyRaw.latency_ms, 0, 0, 60000),
+          target_latency_ms: cleanInt(auditEarlyRaw.target_latency_ms, 500, 100, 2000),
+          latency_status: cleanText(auditEarlyRaw.latency_status, 32),
+          updated_at: cleanInt(auditEarlyRaw.updated_at, 0, 0)
         },
         settled: auditRaw.settled === true,
         suppressed: Array.isArray(auditRaw.suppressed)

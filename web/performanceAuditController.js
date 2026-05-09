@@ -59,6 +59,8 @@
         ? raw.suppressed.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 8)
         : [],
       latency_ms: cleanInt(raw.latency_ms, 0, 0, 60000),
+      target_latency_ms: cleanInt(raw.target_latency_ms, 500, 100, 2000),
+      latency_status: clean(raw.latency_status, raw.actual === "suppressed" ? "suppressed" : "pending", 32),
       updated_at: cleanInt(raw.updated_at, 0, 0)
     };
   }

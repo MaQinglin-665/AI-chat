@@ -219,12 +219,16 @@
     const auditEarly = audit?.early_reaction && typeof audit.early_reaction === "object" && !Array.isArray(audit.early_reaction)
       ? audit.early_reaction
       : null;
+    const auditEarlySuppressed = auditEarly && Array.isArray(auditEarly.suppressed)
+      ? auditEarly.suppressed.map((item) => clean(item, "")).filter(Boolean).slice(0, 6)
+      : [];
     const earlyLines = auditEarly
       ? [
           "",
           "Early Reaction",
           `enabled=${auditEarly.enabled === true ? "yes" : "no"}; intent=${clean(auditEarly.intent, "none")}; pre=${clean(auditEarly.pre, "none")}; actual=${clean(auditEarly.actual, "pending")}; cue=${clean(auditEarly.motion_cue, clean(auditEarly.pre, "none"))}`,
-          `action=${clean(auditEarly.action, "none")}; pulse=${auditEarly.pulse === true ? "yes" : "no"}; latency=${Number(auditEarly.latency_ms) || 0}ms; reason=${clean(auditEarly.reason, "none")}`
+          `action=${clean(auditEarly.action, "none")}; pulse=${auditEarly.pulse === true ? "yes" : "no"}; latency=${Number(auditEarly.latency_ms) || 0}ms/${Number(auditEarly.target_latency_ms) || 500}ms; status=${clean(auditEarly.latency_status, "pending")}; reason=${clean(auditEarly.reason, "none")}`,
+          `suppressed=${auditEarlySuppressed.length ? auditEarlySuppressed.join(", ") : "none"}`
         ]
       : [];
     const motionActualLines = audit
