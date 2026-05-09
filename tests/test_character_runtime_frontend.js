@@ -282,6 +282,7 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(typeof speechStyleController.createController, "function", "speech style controller should expose a factory");
   assert.strictEqual(typeof emotionMoodController.createController, "function", "emotion/mood controller should expose a factory");
   assert.strictEqual(typeof actionPlanController.createController, "function", "action plan controller should expose a factory");
+  assert.deepStrictEqual(actionPlanController.getMotionCueTags("side-eye").slice(0, 3), ["head", "eye", "side"], "action plan controller should expose safe motion cue tags");
   assert.strictEqual(typeof motionRuntimeController.createController, "function", "motion runtime controller should expose a factory");
   assert.strictEqual(typeof voiceRuntimeController.createController, "function", "voice runtime controller should expose a factory");
   assert.strictEqual(typeof streamTtsQueueController.createController, "function", "stream TTS queue controller should expose a factory");
@@ -290,6 +291,33 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(typeof wakeWordController.createController, "function", "wake word controller should expose a factory");
   assert.strictEqual(typeof appConfigController.createController, "function", "app config controller should expose a factory");
   assert.strictEqual(typeof appStartupController.createController, "function", "app startup controller should expose startup orchestration");
+}
+
+{
+  const actionState = {
+    availableMotionGroups: ["Idle", "HeadTilt", "SideEyePose", "FlickDown", "Tap"],
+    motionComboEnabled: false,
+    actionLastAt: {}
+  };
+  const controller = actionPlanController.createController({
+    state: actionState,
+    performanceObject: { now: () => 1000 },
+    normalizeTalkStyle: (style) => String(style || "neutral"),
+    detectMood: (text) => String(text || "idle"),
+    getMotionIntensityPreset: () => ({ listenChance: 1, comboChance: 0 }),
+    pickMoodMotionGroups: () => []
+  });
+  const headTiltPlan = controller.buildActionPlan("listen", {
+    style: "steady",
+    mood: "idle",
+    motionCue: "head_tilt",
+    motionRole: "pre_reaction",
+    motionTags: ["tilt"]
+  });
+  assert.ok(headTiltPlan.length >= 1, "motion cue action plan should produce a lightweight step");
+  assert.strictEqual(headTiltPlan[0].motionCue, "head_tilt", "action plan steps should carry the director motion cue");
+  assert.strictEqual(headTiltPlan[0].motionRole, "pre_reaction", "action plan steps should carry the timeline motion role");
+  assert.ok(headTiltPlan[0].groups.includes("HeadTilt"), "motion cue tags should help select matching Live2D groups");
 }
 
 {
@@ -376,6 +404,7 @@ function createMemoryStorage(initial = {}) {
         speech: "soft_speech_start",
         beats: 0,
         post: "soft_idle",
+        motion: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle" },
         suppressed: ["motion_disallowed"],
         private_prompt: "SECRET"
       },
@@ -398,9 +427,14 @@ function createMemoryStorage(initial = {}) {
         intent: "comfort",
         timeline: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", suppressed: ["motion_disallowed"] },
         actual: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", action_dispatches: 0, pulse_dispatches: 2 },
+        motion: {
+          planned: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle" },
+          actual: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle", dispatches: 0, pulse_only: 2, settle_result: "idle_returned" },
+          suppressed: ["motion_disallowed"]
+        },
         tts: { started: true, finished: true, mode: "direct" },
         voice: { delivery: "soft_low", pace: "slow", planned_segments: 2, spoken_segments: 2, mode: "direct_segmented", fallback_reason: "none" },
-        early_reaction: { enabled: true, intent: "comfort", pre: "soft_stillness", actual: "dispatched", action: "none", pulse: true, reason: "safe_pre_llm_reaction" },
+        early_reaction: { enabled: true, intent: "comfort", pre: "soft_stillness", actual: "dispatched", action: "none", motion_cue: "soft_stillness", pulse: true, reason: "safe_pre_llm_reaction", latency_ms: 42 },
         settled: true,
         private_prompt: "SECRET"
       },
@@ -505,11 +539,14 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.private_prompt, undefined, "character brain snapshot should not persist private execution fields");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.pre, "soft_anchor", "character brain snapshot should restore public timeline summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.beats, 0, "character brain snapshot should restore compact timeline beat count");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.motion.pre, "soft_stillness", "character brain snapshot should restore public planned motion cue");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.private_prompt, undefined, "character brain snapshot should not persist private timeline fields");
   assert.strictEqual(restored.characterBrainLastDecision.voice_timeline.delivery, "soft_low", "character brain snapshot should restore public voice timeline summary");
   assert.strictEqual(restored.characterBrainLastDecision.voice_timeline.segments, 2, "character brain snapshot should restore compact voice segment count");
   assert.strictEqual(restored.characterBrainLastDecision.voice_timeline.private_prompt, undefined, "character brain snapshot should not persist private voice timeline fields");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.actual.post, "soft_idle", "character brain snapshot should restore public audit summary");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_audit.motion.actual.settle_result, "idle_returned", "character brain snapshot should restore public motion settle audit");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_audit.early_reaction.motion_cue, "soft_stillness", "character brain snapshot should restore public early motion cue");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.tts.finished, true, "character brain snapshot should restore public TTS audit state");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.voice.spoken_segments, 2, "character brain snapshot should restore public voice audit state");
   assert.strictEqual(restored.characterBrainLastDecision.performance_audit.private_prompt, undefined, "character brain snapshot should not persist private audit fields");
@@ -567,6 +604,7 @@ function createMemoryStorage(initial = {}) {
         speech: "soft_speech_start",
         beats: 0,
         post: "soft_idle",
+        motion: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle" },
         suppressed: ["motion_disallowed"],
         private_prompt: "SECRET"
       },
@@ -589,9 +627,14 @@ function createMemoryStorage(initial = {}) {
         intent: "comfort",
         timeline: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle" },
         actual: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", action_dispatches: 0, pulse_dispatches: 2 },
+        motion: {
+          planned: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle" },
+          actual: { pre: "soft_stillness", speech: "soft_speech_start", beats: [], post: "soft_idle", dispatches: 0, pulse_only: 2, settle_result: "idle_returned" },
+          suppressed: ["motion_disallowed"]
+        },
         tts: { started: true, finished: true, mode: "direct" },
         voice: { delivery: "soft_low", pace: "slow", planned_segments: 2, spoken_segments: 2, mode: "direct_segmented", fallback_reason: "none" },
-        early_reaction: { enabled: true, intent: "comfort", pre: "soft_stillness", actual: "dispatched", action: "none", pulse: true, reason: "safe_pre_llm_reaction" },
+        early_reaction: { enabled: true, intent: "comfort", pre: "soft_stillness", actual: "dispatched", action: "none", motion_cue: "soft_stillness", pulse: true, reason: "safe_pre_llm_reaction", latency_ms: 42 },
         settled: true,
         private_prompt: "SECRET"
       },
@@ -721,6 +764,13 @@ function createMemoryStorage(initial = {}) {
     "character brain debug report should include compact actual performance audit"
   );
   assert.ok(
+    brainReport.includes("Motion Actual")
+      && brainReport.includes("planned=soft_stillness/soft_speech_start/none/soft_idle")
+      && brainReport.includes("actual=soft_stillness/soft_speech_start/none/soft_idle")
+      && brainReport.includes("settle=idle_returned"),
+    "character brain debug report should include planned vs actual motion audit"
+  );
+  assert.ok(
     brainReport.includes("Improv")
       && brainReport.includes("stance=soft_hold")
       && brainReport.includes("chaos=0/3")
@@ -742,7 +792,9 @@ function createMemoryStorage(initial = {}) {
   assert.ok(
     brainReport.includes("Early Reaction")
       && brainReport.includes("pre=soft_stillness")
-      && brainReport.includes("actual=dispatched"),
+      && brainReport.includes("actual=dispatched")
+      && brainReport.includes("cue=soft_stillness")
+      && brainReport.includes("latency=42ms"),
     "character brain debug report should include early pre-reaction summary"
   );
   assert.ok(
@@ -763,19 +815,29 @@ function createMemoryStorage(initial = {}) {
     traceId: "trace_demo",
     sessionId: 7,
     brainSnapshot: { intent: "casual" },
-    timelineSummary: { pre: "micro_reaction", speech: "expressive_speech_start", beats: 1, post: "settle_idle" },
+    timelineSummary: {
+      pre: "micro_reaction",
+      speech: "expressive_speech_start",
+      beats: 1,
+      post: "settle_idle",
+      motion: { pre: "micro_pulse", speech: "expressive_speech_start", beats: ["head_tilt"], post: "settle_idle" }
+    },
     voiceSummary: { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented", fallback_reason: "none" },
-    earlyReactionSummary: { enabled: true, intent: "casual", pre: "micro_pulse", actual: "dispatched", action: "listen", pulse: true, reason: "safe_pre_llm_reaction" }
+    earlyReactionSummary: { enabled: true, intent: "casual", pre: "micro_pulse", actual: "dispatched", action: "listen", motion_cue: "micro_pulse", pulse: true, reason: "safe_pre_llm_reaction", latency_ms: 120 }
   });
   audit.recordPerformanceAuditEvent("voice_plan", { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented", fallback_reason: "none" });
-  audit.recordPerformanceAuditEvent("timeline_phase", { phase: "preReaction", name: "micro_reaction", action: "listen", pulse: true });
-  audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechStart", name: "expressive_speech_start", action: "talk", pulse: true });
-  audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechBeat", name: "speech_beat", action: "talk", pulse: true });
+  audit.recordPerformanceAuditEvent("timeline_phase", { phase: "preReaction", name: "micro_reaction", action: "listen", pulse: true, motion_cue: "micro_pulse", motion_role: "pre_reaction" });
+  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "micro_pulse", motion_role: "pre_reaction", action: "listen", ok: true });
+  audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechStart", name: "expressive_speech_start", action: "talk", pulse: true, motion_cue: "expressive_speech_start", motion_role: "speech_start" });
+  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "expressive_speech_start", motion_role: "speech_start", action: "talk", ok: true });
+  audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechBeat", name: "speech_beat", action: "talk", pulse: true, motion_cue: "head_tilt", motion_role: "speech_beat" });
+  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "head_tilt", motion_role: "speech_beat", action: "talk", ok: true });
   audit.recordPerformanceAuditEvent("tts_start", { mode: "direct_segmented" });
   audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", segments: 2 });
   audit.recordPerformanceAuditEvent("tts_segment", { mode: "direct_segmented", segments: 2 });
   audit.recordPerformanceAuditEvent("tts_end", { mode: "direct_segmented", ok: true });
-  audit.recordPerformanceAuditEvent("timeline_phase", { phase: "postSettle", name: "settle_idle", action: "idle", pulse: true });
+  audit.recordPerformanceAuditEvent("timeline_phase", { phase: "postSettle", name: "settle_idle", action: "idle", pulse: true, motion_cue: "settle_idle", motion_role: "post_settle" });
+  audit.recordPerformanceAuditEvent("motion_dispatch", { motion_cue: "settle_idle", motion_role: "post_settle", action: "idle", ok: true });
   const auditSummary = auditState.characterBrainLastDecision.performance_audit;
   assert.strictEqual(auditSummary.actual.pre, "micro_reaction", "audit should record actual pre-reaction dispatch");
   assert.strictEqual(auditSummary.actual.speech, "expressive_speech_start", "audit should record actual speech-start dispatch");
@@ -786,6 +848,12 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(auditSummary.voice.spoken_segments, 2, "audit should record actual spoken voice segments");
   assert.strictEqual(auditSummary.voice.fallback_reason, "none", "audit should record voice fallback reason");
   assert.strictEqual(auditSummary.early_reaction.pre, "micro_pulse", "audit should carry early pre-reaction summary");
+  assert.strictEqual(auditSummary.early_reaction.motion_cue, "micro_pulse", "audit should carry public early motion cue");
+  assert.strictEqual(auditSummary.motion.planned.pre, "micro_pulse", "audit should record planned motion cue");
+  assert.strictEqual(auditSummary.motion.actual.pre, "micro_pulse", "audit should record actual motion cue");
+  assert.deepStrictEqual(auditSummary.motion.actual.beats, ["head_tilt"], "audit should record actual motion beat cues");
+  assert.strictEqual(auditSummary.motion.actual.dispatches, 4, "audit should count actual motion dispatch events");
+  assert.strictEqual(auditSummary.motion.actual.settle_result, "idle_returned", "audit should record motion settle result");
   assert.strictEqual(auditSummary.settled, true, "audit should mark settle after post phase");
   assert.strictEqual(auditSummary.raw_history, undefined, "audit summary should not expose raw history");
 }
@@ -829,6 +897,8 @@ function createMemoryStorage(initial = {}) {
     triggerExpressionPulse: (style) => earlyCalls.push(["pulse", style])
   });
   assert.strictEqual(earlySummary.actual, "dispatched", "early reaction execution should report dispatch");
+  assert.strictEqual(earlySummary.motion_cue, "head_tilt", "early reaction summary should expose public motion cue");
+  assert.ok(earlySummary.latency_ms >= 0, "early reaction summary should expose dispatch latency");
   assert.ok(earlyCalls.some((item) => item[0] === "pulse") && earlyCalls.some((item) => item[0] === "action"), "early reaction should pulse and enqueue safe motion");
   const comfortTimeline = performanceTimelineController.buildPerformanceTimeline({
     brainSnapshot: {
@@ -923,9 +993,10 @@ function createMemoryStorage(initial = {}) {
   const summary = performanceTimelineController.toPublicTimelineSummary(deadpanTimeline);
   assert.deepStrictEqual(
     Object.keys(summary).sort(),
-    ["beats", "enabled", "post", "pre", "speech", "suppressed"].sort(),
+    ["beats", "enabled", "motion", "post", "pre", "speech", "suppressed"].sort(),
     "public timeline summary should only include safe execution fields"
   );
+  assert.strictEqual(summary.motion.pre, "deadpan_aside", "public timeline summary should expose planned motion cue");
 
   const comfortVoiceTimeline = performanceTimelineController.buildVoiceTimeline({
     brainSnapshot: {

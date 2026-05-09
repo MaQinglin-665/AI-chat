@@ -14,6 +14,26 @@
     return Math.max(min, Math.min(max, n));
   }
 
+  function cleanList(values, limit = 8) {
+    if (!Array.isArray(values)) {
+      return [];
+    }
+    const seen = new Set();
+    const out = [];
+    for (const value of values) {
+      const item = clean(value, "");
+      if (!item || seen.has(item)) {
+        continue;
+      }
+      seen.add(item);
+      out.push(item);
+      if (out.length >= Math.max(1, Number(limit) || 8)) {
+        break;
+      }
+    }
+    return out;
+  }
+
   function countSpeechBeats(text, spontaneity) {
     const safeSpontaneity = clampInt(spontaneity, 0, 0, 3);
     if (safeSpontaneity <= 0) {
@@ -51,7 +71,12 @@
       actionMood: clean(extra.actionMood, "idle"),
       combo: extra.combo === true,
       beats: clampInt(extra.beats, 1, 1, 4),
-      emphasis: Math.max(0, Math.min(1, Number(extra.emphasis) || 0))
+      emphasis: Math.max(0, Math.min(1, Number(extra.emphasis) || 0)),
+      motionCue: clean(extra.motionCue, name || "none"),
+      motionRole: clean(extra.motionRole, ""),
+      motionTags: cleanList(extra.motionTags, 8),
+      priority: clampInt(extra.priority, 2, 0, 5),
+      cooldownMs: clampInt(extra.cooldownMs, 0, 0, 4000)
     };
   }
 
@@ -93,30 +118,30 @@
       return phase("no_opening", { suppressed: true });
     }
     const presets = {
-      blink_pulse: { pulseStyle: "neutral", pulseBoost: 0.3, actionIntent: "listen", actionMood: mood },
-      micro_pulse: { pulseStyle: "neutral", pulseBoost: 0.26, actionIntent: "listen", actionMood: mood },
-      head_tilt: { pulseStyle: "steady", pulseBoost: 0.28, actionIntent: "listen", actionMood: "thinking" },
-      side_eye: { pulseStyle: "neutral", pulseBoost: 0.34, actionIntent: "listen", actionMood: mood },
-      deadpan_pause: { pulseStyle: "neutral", pulseBoost: 0.2, actionIntent: slot === "beat" ? "talk" : "listen", actionMood: mood },
-      embarrassed_recovery: { pulseStyle: "neutral", pulseBoost: 0.36, actionIntent: "listen", actionMood: "idle" },
-      idle_fidget: { pulseStyle: "neutral", pulseBoost: 0.22, actionIntent: slot === "beat" ? "talk" : "idle", actionMood: "idle" },
-      happy_pulse: { pulseStyle: "cheerful", pulseBoost: 0.36, actionIntent: "listen", actionMood: "happy" },
-      tiny_victory_nod: { pulseStyle: "cheerful", pulseBoost: 0.3, actionIntent: slot === "beat" ? "talk" : "thinking", actionMood: "happy" },
-      tiny_nod: { pulseStyle: "steady", pulseBoost: 0.24, actionIntent: slot === "beat" ? "talk" : "thinking", actionMood: "thinking" },
-      thinking_nod: { pulseStyle: "steady", pulseBoost: 0.28, actionIntent: "thinking", actionMood: "thinking" },
-      soft_stillness: { pulseStyle: "comfort", pulseBoost: 0.18, actionIntent: "none", actionMood: "sad" },
-      eyes_down_soft: { pulseStyle: "comfort", pulseBoost: 0.2, actionIntent: "none", actionMood: "sad" },
-      soft_idle: { pulseStyle: "comfort", pulseBoost: 0.14, actionIntent: "none", actionMood: "idle" },
-      focused_idle: { pulseStyle: "steady", pulseBoost: 0.16, actionIntent: "idle", actionMood: "idle" },
-      closing_idle: { pulseStyle: "comfort", pulseBoost: 0.18, actionIntent: "idle", actionMood: "idle" },
-      settle_idle: { pulseStyle: style, pulseBoost: 0.18, actionIntent: "idle", actionMood: "idle" },
-      soft_speech_start: { pulseStyle: "comfort", pulseBoost: 0.2, actionIntent: "none", actionMood: "sad" },
-      steady_speech_start: { pulseStyle: "steady", pulseBoost: 0.22, actionIntent: "talk", actionMood: "thinking" },
-      closing_speech_start: { pulseStyle: "comfort", pulseBoost: 0.16, actionIntent: "none", actionMood: "idle" },
-      dry_speech_start: { pulseStyle: "neutral", pulseBoost: 0.22, actionIntent: "talk", actionMood: mood },
-      bright_speech_start: { pulseStyle: "cheerful", pulseBoost: 0.26, actionIntent: "talk", actionMood: "happy" },
-      curious_speech_start: { pulseStyle: "steady", pulseBoost: 0.24, actionIntent: "talk", actionMood: "thinking" },
-      expressive_speech_start: { pulseStyle: style, pulseBoost: 0.28, actionIntent: "talk", actionMood: mood }
+      blink_pulse: { pulseStyle: "neutral", pulseBoost: 0.3, actionIntent: "listen", actionMood: mood, motionTags: ["blink", "idle", "flick"] },
+      micro_pulse: { pulseStyle: "neutral", pulseBoost: 0.26, actionIntent: "listen", actionMood: mood, motionTags: ["idle", "tap", "flick"] },
+      head_tilt: { pulseStyle: "steady", pulseBoost: 0.28, actionIntent: "listen", actionMood: "thinking", motionTags: ["head", "tilt", "flick", "pose"] },
+      side_eye: { pulseStyle: "neutral", pulseBoost: 0.34, actionIntent: "listen", actionMood: mood, motionTags: ["head", "eye", "side", "flick", "idle"] },
+      deadpan_pause: { pulseStyle: "neutral", pulseBoost: 0.2, actionIntent: slot === "beat" ? "talk" : "listen", actionMood: mood, motionTags: ["idle", "wait", "head", "main"] },
+      embarrassed_recovery: { pulseStyle: "neutral", pulseBoost: 0.36, actionIntent: "listen", actionMood: "idle", motionTags: ["shy", "down", "head", "flickdown", "idle"] },
+      idle_fidget: { pulseStyle: "neutral", pulseBoost: 0.22, actionIntent: slot === "beat" ? "talk" : "idle", actionMood: "idle", motionTags: ["idle", "touch", "body", "flick"] },
+      happy_pulse: { pulseStyle: "cheerful", pulseBoost: 0.36, actionIntent: "listen", actionMood: "happy", motionTags: ["happy", "wave", "tap"] },
+      tiny_victory_nod: { pulseStyle: "cheerful", pulseBoost: 0.3, actionIntent: slot === "beat" ? "talk" : "thinking", actionMood: "happy", motionTags: ["nod", "happy", "head", "pose"] },
+      tiny_nod: { pulseStyle: "steady", pulseBoost: 0.24, actionIntent: slot === "beat" ? "talk" : "thinking", actionMood: "thinking", motionTags: ["nod", "head", "idle", "flick"] },
+      thinking_nod: { pulseStyle: "steady", pulseBoost: 0.28, actionIntent: "thinking", actionMood: "thinking", motionTags: ["thinking", "nod", "head", "idle"] },
+      soft_stillness: { pulseStyle: "comfort", pulseBoost: 0.18, actionIntent: "none", actionMood: "sad", motionTags: ["soft", "down", "idle", "breath"] },
+      eyes_down_soft: { pulseStyle: "comfort", pulseBoost: 0.2, actionIntent: "none", actionMood: "sad", motionTags: ["soft", "down", "head", "idle"] },
+      soft_idle: { pulseStyle: "comfort", pulseBoost: 0.14, actionIntent: "none", actionMood: "idle", motionTags: ["soft", "idle", "breath"] },
+      focused_idle: { pulseStyle: "steady", pulseBoost: 0.16, actionIntent: "idle", actionMood: "idle", motionTags: ["idle", "main", "steady"] },
+      closing_idle: { pulseStyle: "comfort", pulseBoost: 0.18, actionIntent: "idle", actionMood: "idle", motionTags: ["idle", "wave", "soft"] },
+      settle_idle: { pulseStyle: style, pulseBoost: 0.18, actionIntent: "idle", actionMood: "idle", motionTags: ["idle", "main", "breath"] },
+      soft_speech_start: { pulseStyle: "comfort", pulseBoost: 0.2, actionIntent: "none", actionMood: "sad", motionTags: ["soft", "down", "idle"] },
+      steady_speech_start: { pulseStyle: "steady", pulseBoost: 0.22, actionIntent: "talk", actionMood: "thinking", motionTags: ["talk", "body", "steady"] },
+      closing_speech_start: { pulseStyle: "comfort", pulseBoost: 0.16, actionIntent: "none", actionMood: "idle", motionTags: ["soft", "idle"] },
+      dry_speech_start: { pulseStyle: "neutral", pulseBoost: 0.22, actionIntent: "talk", actionMood: mood, motionTags: ["talk", "flick", "head"] },
+      bright_speech_start: { pulseStyle: "cheerful", pulseBoost: 0.26, actionIntent: "talk", actionMood: "happy", motionTags: ["happy", "talk", "wave"] },
+      curious_speech_start: { pulseStyle: "steady", pulseBoost: 0.24, actionIntent: "talk", actionMood: "thinking", motionTags: ["curious", "head", "talk"] },
+      expressive_speech_start: { pulseStyle: style, pulseBoost: 0.28, actionIntent: "talk", actionMood: mood, motionTags: ["talk", "body", "pose"] }
     };
     const preset = presets[key] || { pulseStyle: style, pulseBoost: 0.2, actionIntent: slot === "post" ? "idle" : "talk", actionMood: mood };
     return phase(key, {
@@ -128,7 +153,12 @@
       actionStyle: preset.pulseStyle,
       actionMood: preset.actionMood,
       beats: 1,
-      emphasis: slot === "beat" ? 0.32 : 0.2
+      emphasis: slot === "beat" ? 0.32 : 0.2,
+      motionCue: key,
+      motionRole: slot === "pre" ? "pre_reaction" : slot === "speech" ? "speech_start" : slot === "beat" ? "speech_beat" : "post_settle",
+      motionTags: preset.motionTags,
+      priority: slot === "post" ? 1 : slot === "speech" ? 2 : 3,
+      cooldownMs: slot === "post" ? 520 : slot === "beat" ? 440 : 760
     });
   }
 
@@ -237,11 +267,13 @@
       pre: clean(safe.pre || safe.preReaction?.name, "none"),
       actual: clean(actualSafe.actual || actualSafe.status, safe.enabled === true ? "planned" : "suppressed"),
       action: clean(actualSafe.action || safe.action || safe.preReaction?.actionIntent, "none"),
+      motion_cue: clean(actualSafe.motion_cue || safe.motion_cue || safe.preReaction?.motionCue || safe.preReaction?.name, "none"),
       pulse: actualSafe.pulse === true || safe.pulse === true,
       reason: clean(safe.reason, safe.enabled === true ? "safe_pre_llm_reaction" : "suppressed", 64),
       suppressed: Array.isArray(safe.suppressed)
         ? safe.suppressed.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 8)
         : [],
+      latency_ms: clampInt(actualSafe.latency_ms, 0, 0, 60000),
       updated_at: clampInt(safe.updated_at, 0, 0, Number.MAX_SAFE_INTEGER)
     };
   }
@@ -269,14 +301,20 @@
         mood,
         combo: phasePlan.combo === true,
         beats: clampInt(phasePlan.beats, 1, 1, 4),
-        emphasis: Math.max(0, Math.min(1, Number(phasePlan.emphasis) || 0))
+        emphasis: Math.max(0, Math.min(1, Number(phasePlan.emphasis) || 0)),
+        motionCue: clean(phasePlan.motionCue || phasePlan.name, "none"),
+        motionRole: clean(phasePlan.motionRole, "pre_reaction"),
+        motionTags: cleanList(phasePlan.motionTags, 8),
+        auditMotion: false
       });
     }
     return toPublicEarlyReactionSummary(safe, {
       status: "dispatched",
       actual: "dispatched",
       action: actionIntent,
-      pulse: didPulse
+      motion_cue: clean(phasePlan.motionCue || phasePlan.name, "none"),
+      pulse: didPulse,
+      latency_ms: Math.max(0, Date.now() - clampInt(safe.updated_at, Date.now(), 0, Number.MAX_SAFE_INTEGER))
     });
   }
 
@@ -469,12 +507,21 @@
     if (!safe) {
       return null;
     }
+    const beatCues = Array.isArray(safe.speechBeats)
+      ? safe.speechBeats.map((beat) => clean(beat?.motionCue || beat?.name, "")).filter(Boolean).slice(0, 3)
+      : [];
     return {
       enabled: safe.enabled === true,
       pre: clean(safe.preReaction?.name, "none"),
       speech: clean(safe.speechStart?.name, "none"),
       beats: Array.isArray(safe.speechBeats) ? safe.speechBeats.length : 0,
       post: clean(safe.postSettle?.name, "none"),
+      motion: {
+        pre: clean(safe.preReaction?.motionCue || safe.preReaction?.name, "none"),
+        speech: clean(safe.speechStart?.motionCue || safe.speechStart?.name, "none"),
+        beats: beatCues,
+        post: clean(safe.postSettle?.motionCue || safe.postSettle?.name, "none")
+      },
       suppressed: Array.isArray(safe.suppressed)
         ? safe.suppressed.map((item) => clean(item)).filter(Boolean).slice(0, 6)
         : []
@@ -801,7 +848,9 @@
           ok: false,
           suppressed: true,
           action: "none",
-          pulse: false
+          pulse: false,
+          motion_cue: clean(plan.motionCue || plan.name, "none"),
+          motion_role: clean(plan.motionRole || phaseKey, "timeline_phase")
         });
         return false;
       }
@@ -820,7 +869,13 @@
           mood,
           combo: plan.combo === true,
           beats: clampInt(plan.beats, 1, 1, 4),
-          emphasis: Math.max(0, Math.min(1, Number(plan.emphasis) || 0))
+          emphasis: Math.max(0, Math.min(1, Number(plan.emphasis) || 0)),
+          motionCue: clean(plan.motionCue || plan.name, "none"),
+          motionRole: clean(plan.motionRole || phaseKey, "timeline_phase"),
+          motionTags: cleanList(plan.motionTags, 8),
+          auditMotion: true,
+          priority: clampInt(plan.priority, 2, 0, 5),
+          cooldownMs: clampInt(plan.cooldownMs, 0, 0, 4000)
         });
       }
       recordPerformanceAuditEvent("timeline_phase", {
@@ -829,7 +884,10 @@
         ok: true,
         suppressed: false,
         action: actionIntent,
-        pulse: didPulse
+        pulse: didPulse,
+        motion_cue: clean(plan.motionCue || plan.name, "none"),
+        motion_role: clean(plan.motionRole || phaseKey, "timeline_phase"),
+        motion_tags: cleanList(plan.motionTags, 8)
       });
       return true;
     }

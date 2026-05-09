@@ -3661,7 +3661,8 @@ function getActionPlanController() {
       pickMoodMotionGroups,
       isSpeechMotionActive,
       playEmotion,
-      triggerExpressionPulse
+      triggerExpressionPulse,
+      recordPerformanceAuditEvent
     });
   }
   return actionPlanControllerInstance || ACTION_PLAN_CONTROLLER;

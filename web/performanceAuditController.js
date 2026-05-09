@@ -52,12 +52,52 @@
       pre: clean(raw.pre, "none", 48),
       actual: clean(raw.actual, raw.enabled === true ? "planned" : "suppressed", 48),
       action: clean(raw.action, "none", 48),
+      motion_cue: clean(raw.motion_cue || raw.pre, "none", 48),
       pulse: raw.pulse === true,
       reason: clean(raw.reason, "none", 64),
       suppressed: Array.isArray(raw.suppressed)
         ? raw.suppressed.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 8)
         : [],
+      latency_ms: cleanInt(raw.latency_ms, 0, 0, 60000),
       updated_at: cleanInt(raw.updated_at, 0, 0)
+    };
+  }
+
+  function normalizeMotionPlan(value = {}) {
+    const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return {
+      pre: clean(raw.pre, "none", 48),
+      speech: clean(raw.speech, "none", 48),
+      beats: Array.isArray(raw.beats)
+        ? raw.beats.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 3)
+        : [],
+      post: clean(raw.post, "none", 48)
+    };
+  }
+
+  function normalizeMotionActual(value = {}) {
+    const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return {
+      pre: clean(raw.pre, "pending", 48),
+      speech: clean(raw.speech, "pending", 48),
+      beats: Array.isArray(raw.beats)
+        ? raw.beats.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 8)
+        : [],
+      post: clean(raw.post, "pending", 48),
+      dispatches: cleanInt(raw.dispatches, 0, 0, 20),
+      pulse_only: cleanInt(raw.pulse_only, 0, 0, 20),
+      settle_result: clean(raw.settle_result, "pending", 48)
+    };
+  }
+
+  function normalizeMotionSummary(value = {}) {
+    const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return {
+      planned: normalizeMotionPlan(raw.planned || raw),
+      actual: normalizeMotionActual(raw.actual),
+      suppressed: Array.isArray(raw.suppressed)
+        ? raw.suppressed.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 8)
+        : []
     };
   }
 
@@ -79,6 +119,7 @@
         action_dispatches: cleanInt(audit.actual?.action_dispatches ?? audit.action_dispatches, 0, 0, 20),
         pulse_dispatches: cleanInt(audit.actual?.pulse_dispatches ?? audit.pulse_dispatches, 0, 0, 20)
       },
+      motion: normalizeMotionSummary(audit.motion),
       tts: {
         started: audit.tts?.started === true || audit.tts_started === true,
         finished: audit.tts?.finished === true || audit.tts_finished === true,
@@ -123,6 +164,9 @@
         ? context.brainSnapshot
         : {};
       const timeline = normalizeTimelineSummary(context.timelineSummary);
+      const timelineMotion = context.timelineSummary && typeof context.timelineSummary === "object" && !Array.isArray(context.timelineSummary)
+        ? context.timelineSummary.motion
+        : null;
       const startedAt = nowMs();
       state.performanceAuditEvents = [];
       const summary = {
@@ -140,6 +184,7 @@
           action_dispatches: 0,
           pulse_dispatches: 0
         },
+        motion: normalizeMotionSummary({ planned: timelineMotion || timeline }),
         tts: {
           started: false,
           finished: false,
@@ -164,6 +209,8 @@
       const phase = clean(detail.phase, "", 48);
       const name = clean(detail.name, "none", 48);
       const action = clean(detail.action, "none", 48);
+      const motionCue = clean(detail.motion_cue || name, "none", 48);
+      const motionRole = clean(detail.motion_role || phase, "timeline_phase", 48);
       const mode = clean(detail.mode, "", 32);
       const segments = cleanInt(detail.segments, 0, 0, 8);
       const event = {
@@ -186,6 +233,11 @@
         actual: { ...summary.actual },
         tts: { ...summary.tts },
         voice: { ...summary.voice },
+        motion: {
+          planned: normalizeMotionPlan(summary.motion?.planned),
+          actual: normalizeMotionActual(summary.motion?.actual),
+          suppressed: Array.isArray(summary.motion?.suppressed) ? summary.motion.suppressed.slice(0, 8) : []
+        },
         suppressed: Array.isArray(summary.suppressed) ? summary.suppressed.slice(0, 8) : [],
         last_event: eventKind,
         updated_at: event.at
@@ -210,6 +262,34 @@
         }
         if (event.suppressed && !next.suppressed.includes(name)) {
           next.suppressed.push(name);
+        }
+        if (phase === "prereaction" || phase === "pre_reaction") {
+          next.motion.actual.pre = event.suppressed ? "suppressed" : motionCue;
+        } else if (phase === "speechstart" || phase === "speech_start") {
+          next.motion.actual.speech = event.suppressed ? "suppressed" : motionCue;
+        } else if (phase === "postsettle" || phase === "post_settle") {
+          next.motion.actual.post = event.suppressed ? "suppressed" : motionCue;
+          next.motion.actual.settle_result = event.ok && !event.suppressed ? "idle_returned" : "not_settled";
+        } else if (phase === "speechbeat" || phase === "speech_beat") {
+          next.motion.actual.beats = next.motion.actual.beats.concat(event.suppressed ? "suppressed" : motionCue).slice(-8);
+        }
+        if ((!action || action === "none") && detail.pulse === true && !event.suppressed) {
+          next.motion.actual.pulse_only = cleanInt(next.motion.actual.pulse_only, 0, 0, 20) + 1;
+        }
+        if (event.suppressed && !next.motion.suppressed.includes(motionCue)) {
+          next.motion.suppressed.push(motionCue);
+        }
+      } else if (eventKind === "motion_dispatch") {
+        if (motionRole === "pre_reaction") next.motion.actual.pre = motionCue;
+        else if (motionRole === "speech_start") next.motion.actual.speech = motionCue;
+        else if (motionRole === "post_settle") next.motion.actual.post = motionCue;
+        else if (motionRole === "speech_beat" && next.motion.actual.beats[next.motion.actual.beats.length - 1] !== motionCue) {
+          next.motion.actual.beats = next.motion.actual.beats.concat(motionCue).slice(-8);
+        }
+        if (event.ok) {
+          next.motion.actual.dispatches = cleanInt(next.motion.actual.dispatches, 0, 0, 20) + 1;
+        } else if (!next.motion.suppressed.includes(motionCue)) {
+          next.motion.suppressed.push(motionCue);
         }
       } else if (eventKind === "tts_start") {
         next.tts.started = true;

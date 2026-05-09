@@ -198,6 +198,24 @@
     const auditVoice = audit?.voice && typeof audit.voice === "object" && !Array.isArray(audit.voice)
       ? audit.voice
       : {};
+    const auditMotion = audit?.motion && typeof audit.motion === "object" && !Array.isArray(audit.motion)
+      ? audit.motion
+      : {};
+    const auditMotionPlanned = auditMotion.planned && typeof auditMotion.planned === "object" && !Array.isArray(auditMotion.planned)
+      ? auditMotion.planned
+      : {};
+    const auditMotionActual = auditMotion.actual && typeof auditMotion.actual === "object" && !Array.isArray(auditMotion.actual)
+      ? auditMotion.actual
+      : {};
+    const auditMotionPlannedBeats = Array.isArray(auditMotionPlanned.beats)
+      ? auditMotionPlanned.beats.map((item) => clean(item, "")).filter(Boolean).slice(0, 3)
+      : [];
+    const auditMotionActualBeats = Array.isArray(auditMotionActual.beats)
+      ? auditMotionActual.beats.map((item) => clean(item, "")).filter(Boolean).slice(0, 4)
+      : [];
+    const auditMotionSuppressed = Array.isArray(auditMotion.suppressed)
+      ? auditMotion.suppressed.map((item) => clean(item, "")).filter(Boolean).slice(0, 6)
+      : [];
     const auditEarly = audit?.early_reaction && typeof audit.early_reaction === "object" && !Array.isArray(audit.early_reaction)
       ? audit.early_reaction
       : null;
@@ -205,8 +223,17 @@
       ? [
           "",
           "Early Reaction",
-          `enabled=${auditEarly.enabled === true ? "yes" : "no"}; intent=${clean(auditEarly.intent, "none")}; pre=${clean(auditEarly.pre, "none")}; actual=${clean(auditEarly.actual, "pending")}`,
-          `action=${clean(auditEarly.action, "none")}; pulse=${auditEarly.pulse === true ? "yes" : "no"}; reason=${clean(auditEarly.reason, "none")}`
+          `enabled=${auditEarly.enabled === true ? "yes" : "no"}; intent=${clean(auditEarly.intent, "none")}; pre=${clean(auditEarly.pre, "none")}; actual=${clean(auditEarly.actual, "pending")}; cue=${clean(auditEarly.motion_cue, clean(auditEarly.pre, "none"))}`,
+          `action=${clean(auditEarly.action, "none")}; pulse=${auditEarly.pulse === true ? "yes" : "no"}; latency=${Number(auditEarly.latency_ms) || 0}ms; reason=${clean(auditEarly.reason, "none")}`
+        ]
+      : [];
+    const motionActualLines = audit
+      ? [
+          "",
+          "Motion Actual",
+          `planned=${clean(auditMotionPlanned.pre, "none")}/${clean(auditMotionPlanned.speech, "none")}/${auditMotionPlannedBeats.length ? auditMotionPlannedBeats.join(",") : "none"}/${clean(auditMotionPlanned.post, "none")}`,
+          `actual=${clean(auditMotionActual.pre, "pending")}/${clean(auditMotionActual.speech, "pending")}/${auditMotionActualBeats.length ? auditMotionActualBeats.join(",") : "none"}/${clean(auditMotionActual.post, "pending")}; dispatches=${Number(auditMotionActual.dispatches) || 0}; pulse_only=${Number(auditMotionActual.pulse_only) || 0}; settle=${clean(auditMotionActual.settle_result, "pending")}`,
+          `suppressed=${auditMotionSuppressed.length ? auditMotionSuppressed.join(", ") : "none"}`
         ]
       : [];
     const auditLines = audit
@@ -239,6 +266,7 @@
       ...timelineLines,
       ...voiceTimelineLines,
       ...earlyLines,
+      ...motionActualLines,
       ...auditLines,
       `角色状态：能量=${clean(safe.energy)}；注意力=${clean(safe.attention)}；关系=${clean(safe.relationship)}`,
       `表现建议：情绪=${clean(safe.emotion)}；动作=${clean(safe.action)}；强度=${clean(safe.intensity)}；语音=${clean(safe.voice_style)}`,

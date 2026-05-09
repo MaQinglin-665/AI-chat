@@ -198,6 +198,13 @@
       for (const group of groups) {
         const ok = await playMotionGroup(group, priority);
         if (ok) {
+          state.lastMotionDirectorDispatch = {
+            group,
+            source,
+            motionCue: String(opts.motionCue || ""),
+            motionRole: String(opts.motionRole || ""),
+            at: Date.now()
+          };
           return true;
         }
       }
@@ -225,7 +232,7 @@
 
     function animateFallback(mood, opts = {}) {
       if (!state.model || state.animating || state.dragData || state.windowDragActive) {
-        return;
+        return false;
       }
       state.animating = true;
       const model = state.model;
@@ -291,6 +298,7 @@
       };
 
       requestAnimationFrame(frame);
+      return true;
     }
 
     function triggerTapMotion() {
@@ -343,9 +351,13 @@
     async function playEmotion(text, opts = {}) {
       const mood = detectMood(text);
       const played = await tryBuiltInMotion(mood, opts);
-      if (!played && opts.allowFallback !== false) {
-        animateFallback(mood, opts);
+      if (played) {
+        return true;
       }
+      if (opts.allowFallback !== false) {
+        return animateFallback(mood, opts);
+      }
+      return false;
     }
 
     return {

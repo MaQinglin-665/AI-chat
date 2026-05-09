@@ -350,6 +350,21 @@
     const auditVoiceRaw = auditRaw.voice && typeof auditRaw.voice === "object" && !Array.isArray(auditRaw.voice)
       ? auditRaw.voice
       : {};
+    const timelineMotionRaw = timelineRaw.motion && typeof timelineRaw.motion === "object" && !Array.isArray(timelineRaw.motion)
+      ? timelineRaw.motion
+      : {};
+    const auditMotionRaw = auditRaw.motion && typeof auditRaw.motion === "object" && !Array.isArray(auditRaw.motion)
+      ? auditRaw.motion
+      : {};
+    const auditMotionPlannedRaw = auditMotionRaw.planned && typeof auditMotionRaw.planned === "object" && !Array.isArray(auditMotionRaw.planned)
+      ? auditMotionRaw.planned
+      : {};
+    const auditMotionActualRaw = auditMotionRaw.actual && typeof auditMotionRaw.actual === "object" && !Array.isArray(auditMotionRaw.actual)
+      ? auditMotionRaw.actual
+      : {};
+    const auditEarlyRaw = auditRaw.early_reaction && typeof auditRaw.early_reaction === "object" && !Array.isArray(auditRaw.early_reaction)
+      ? auditRaw.early_reaction
+      : {};
     return {
       version: 1,
       intent: cleanText(raw.intent, 40),
@@ -386,6 +401,14 @@
         speech: cleanText(timelineRaw.speech, 48),
         beats: cleanInt(timelineRaw.beats, 0, 0, 4),
         post: cleanText(timelineRaw.post, 48),
+        motion: {
+          pre: cleanText(timelineMotionRaw.pre, 48),
+          speech: cleanText(timelineMotionRaw.speech, 48),
+          beats: Array.isArray(timelineMotionRaw.beats)
+            ? timelineMotionRaw.beats.slice(0, 3).map((item) => cleanText(item, 48)).filter(Boolean)
+            : [],
+          post: cleanText(timelineMotionRaw.post, 48)
+        },
         suppressed: Array.isArray(timelineRaw.suppressed)
           ? timelineRaw.suppressed.slice(0, 6).map((item) => cleanText(item, 48)).filter(Boolean)
           : []
@@ -424,6 +447,30 @@
           action_dispatches: cleanInt(auditActualRaw.action_dispatches, 0, 0, 20),
           pulse_dispatches: cleanInt(auditActualRaw.pulse_dispatches, 0, 0, 20)
         },
+        motion: {
+          planned: {
+            pre: cleanText(auditMotionPlannedRaw.pre, 48),
+            speech: cleanText(auditMotionPlannedRaw.speech, 48),
+            beats: Array.isArray(auditMotionPlannedRaw.beats)
+              ? auditMotionPlannedRaw.beats.slice(0, 3).map((item) => cleanText(item, 48)).filter(Boolean)
+              : [],
+            post: cleanText(auditMotionPlannedRaw.post, 48)
+          },
+          actual: {
+            pre: cleanText(auditMotionActualRaw.pre, 48),
+            speech: cleanText(auditMotionActualRaw.speech, 48),
+            beats: Array.isArray(auditMotionActualRaw.beats)
+              ? auditMotionActualRaw.beats.slice(0, 8).map((item) => cleanText(item, 48)).filter(Boolean)
+              : [],
+            post: cleanText(auditMotionActualRaw.post, 48),
+            dispatches: cleanInt(auditMotionActualRaw.dispatches, 0, 0, 20),
+            pulse_only: cleanInt(auditMotionActualRaw.pulse_only, 0, 0, 20),
+            settle_result: cleanText(auditMotionActualRaw.settle_result, 48)
+          },
+          suppressed: Array.isArray(auditMotionRaw.suppressed)
+            ? auditMotionRaw.suppressed.slice(0, 8).map((item) => cleanText(item, 48)).filter(Boolean)
+            : []
+        },
         tts: {
           started: auditTtsRaw.started === true,
           finished: auditTtsRaw.finished === true,
@@ -435,6 +482,17 @@
           planned_segments: cleanInt(auditVoiceRaw.planned_segments, 0, 0, 4),
           spoken_segments: cleanInt(auditVoiceRaw.spoken_segments, 0, 0, 8),
           mode: cleanText(auditVoiceRaw.mode, 32)
+        },
+        early_reaction: {
+          enabled: auditEarlyRaw.enabled === true,
+          intent: cleanText(auditEarlyRaw.intent, 40),
+          pre: cleanText(auditEarlyRaw.pre, 48),
+          actual: cleanText(auditEarlyRaw.actual, 48),
+          action: cleanText(auditEarlyRaw.action, 48),
+          motion_cue: cleanText(auditEarlyRaw.motion_cue, 48),
+          pulse: auditEarlyRaw.pulse === true,
+          reason: cleanText(auditEarlyRaw.reason, 64),
+          latency_ms: cleanInt(auditEarlyRaw.latency_ms, 0, 0, 60000)
         },
         settled: auditRaw.settled === true,
         suppressed: Array.isArray(auditRaw.suppressed)
