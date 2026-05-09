@@ -421,6 +421,34 @@ def _select_performance_bit(intent: str, topic: str, user_message: str, reaction
     return {"key": key, "guide": BIT_BANK.get(key, BIT_BANK["none"])}
 
 
+def _avoid_recent_stage_bit(
+    performance_bit: str,
+    intent: str,
+    topic: str,
+    user_message: str,
+    reaction_mode: str,
+    stage_memory: Optional[Dict[str, Any]] = None,
+) -> str:
+    key = _clean_text(performance_bit, 48) or "none"
+    if key in {"none", "room_anchor", "pixel_watch", "clean_ping", "clipboard_supervisor"}:
+        return key
+    stage = stage_memory if isinstance(stage_memory, dict) else {}
+    recent = _clean_text(stage.get("recent_callback") or stage.get("current_bit"), 48)
+    if not recent or recent != key:
+        return key
+    safe_intent = _clean_text(intent, 40) or "casual"
+    if safe_intent not in {"greeting", "casual", "question", "encouragement"}:
+        return key
+    if reaction_mode == "deadpan_aside":
+        choices = ("keyboard_judge", "pixel_static", "background_process")
+    else:
+        choices = ("cursor_side_eye", "keyboard_judge", "pixel_static", "background_process")
+    rotated = [item for item in choices if item != recent]
+    if not rotated:
+        return key
+    return rotated[_stable_text_score(safe_intent, topic, user_message, reaction_mode, "avoid_repeat") % len(rotated)]
+
+
 def _is_correction_message(user_message: str) -> bool:
     text = _clean_text(user_message, 300).lower()
     return bool(
@@ -528,7 +556,7 @@ def _select_improv_director(
     cooldown = max(0, min(8, _safe_int(stage.get("callback_cooldown_turns"), 0)))
     if clamp != "none" or bit == "none":
         callback_policy = "none"
-    elif recent_callback == bit and turns_since < 2:
+    elif recent_callback and turns_since < 2:
         callback_policy = "avoid_repeat"
     elif cooldown > 0:
         callback_policy = "cooldown"
@@ -1657,6 +1685,17 @@ def build_character_brain_decision(
     decision["performance_bit"] = _clean_text(performance.get("performance_bit"), 48)
     decision["performance_bit_guide"] = _clean_text(performance.get("performance_bit_guide"), 180)
     stage_memory = _public_stage_memory(session_state)
+    rotated_bit = _avoid_recent_stage_bit(
+        decision["performance_bit"],
+        intent,
+        topic,
+        user_message,
+        decision["reaction_mode"],
+        stage_memory,
+    )
+    if rotated_bit != decision["performance_bit"]:
+        decision["performance_bit"] = rotated_bit
+        decision["performance_bit_guide"] = _clean_text(BIT_BANK.get(rotated_bit, BIT_BANK["none"]), 180)
     improv = _select_improv_director(
         intent,
         topic,

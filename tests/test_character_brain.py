@@ -1244,6 +1244,26 @@ def test_character_brain_stage_memory_tracks_callback_and_decays():
         assert softened["stage_recent_callback"] == ""
 
 
+def test_character_brain_rotates_performance_bit_away_from_recent_stage_memory():
+    first = character_brain.build_character_brain_decision(user_message="I finished it.")
+    recent_bit = first["performance_bit"]
+    repeated_state = {
+        "stage_current_bit": recent_bit,
+        "stage_recent_callback": recent_bit,
+        "stage_turns_since_callback": 1,
+        "stage_callback_cooldown_turns": 1,
+    }
+
+    second = character_brain.build_character_brain_decision(
+        user_message="I finished it.",
+        session_state=repeated_state,
+    )
+
+    assert recent_bit != "none"
+    assert second["performance_bit"] != recent_bit
+    assert second["performance_bit_guide"] == character_brain.BIT_BANK[second["performance_bit"]]
+
+
 def test_character_brain_stage_memory_marks_corrections_temporarily():
     correction = character_brain.build_character_brain_decision(
         user_message="You were wrong.",

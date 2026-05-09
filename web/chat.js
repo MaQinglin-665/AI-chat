@@ -1434,12 +1434,19 @@ function buildAutoChatInterjectionDebugReport() {
     ? safeContext.reasons.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 6)
     : [];
   const topic = String(safeContext?.topicHint || "").replace(/\s+/g, " ").trim().slice(0, 64) || "none";
+  const director = safeContext?.director && typeof safeContext.director === "object"
+    ? safeContext.director
+    : (state.autoChatInterjectionLastDirector && typeof state.autoChatInterjectionLastDirector === "object" ? state.autoChatInterjectionLastDirector : null);
   return [
     "Auto Thought",
     `enabled=${state.autoChatEnabled === true ? "yes" : "no"}; pending_timer=${state.autoChatInterjectionTimer ? "yes" : "no"}; last_ok=${state.autoChatInterjectionLastOk === true ? "yes" : "no"}`,
     safeContext
       ? `planned=${safeContext.shouldTrigger === true ? "yes" : "no"}; reason=${String(safeContext.primaryReason || "none")}; score=${Number(safeContext.score || 0).toFixed(2)}/${Number(safeContext.threshold || 0).toFixed(2)}; delay=${Math.round(Number(safeContext.delayMs || 0))}ms`
       : "planned=none",
+    director
+      ? `director=${String(director.decision || "hold_back")}; stance=${String(director.stance || "quiet")}; chaos=${Number(director.chaos_level || 0)}/3; motion=${String(director.motion_cue || "none")}; voice=${String(director.voice_style || "soft")}; clamp=${String(director.safety_clamp || "none")}`
+      : "director=none",
+    `motion_dispatch=${String(state.autoChatInterjectionLastMotion || "none")}`,
     `topic=${topic}`,
     `scheduled=${fmtTime(state.autoChatInterjectionLastScheduledAt)}; attempted=${fmtTime(state.autoChatInterjectionLastAttemptAt)}; dispatched=${fmtTime(state.autoChatInterjectionLastDispatchAt)}; success=${fmtTime(state.autoChatInterjectionLastAt)}`,
     `suppressed=${String(state.autoChatInterjectionLastSuppressed || "none")}; reasons=${reasons.length ? reasons.join(",") : "none"}`,
@@ -3133,6 +3140,8 @@ function getAutoChatController() {
       setStatus,
       parseMessageTimestamp,
       requestAssistantReply,
+      enqueueActionIntent,
+      triggerExpressionPulse,
       constants: {
         AUTO_CHAT_MIN_USER_GAP_MS,
         AUTO_CHAT_MIN_ASSISTANT_GAP_MS,

@@ -29,6 +29,8 @@
   lastAutoChatAt: 0,
   autoChatInterjectionLastAt: 0,
   autoChatInterjectionLastContext: null,
+  autoChatInterjectionLastDirector: null,
+  autoChatInterjectionLastMotion: "",
   autoChatInterjectionLastSuppressed: "",
   autoChatInterjectionLastScheduledAt: 0,
   autoChatInterjectionLastAttemptAt: 0,

@@ -10,6 +10,8 @@
     const setStatus = typeof deps.setStatus === "function" ? deps.setStatus : () => {};
     const parseMessageTimestamp = typeof deps.parseMessageTimestamp === "function" ? deps.parseMessageTimestamp : (value) => Number(value) || Date.now();
     const requestAssistantReply = typeof deps.requestAssistantReply === "function" ? deps.requestAssistantReply : async () => false;
+    const enqueueActionIntent = typeof deps.enqueueActionIntent === "function" ? deps.enqueueActionIntent : () => {};
+    const triggerExpressionPulse = typeof deps.triggerExpressionPulse === "function" ? deps.triggerExpressionPulse : () => {};
     const AUTO_CHAT_MIN_USER_GAP_MS = constants.AUTO_CHAT_MIN_USER_GAP_MS || 45 * 1000;
     const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = constants.AUTO_CHAT_MIN_ASSISTANT_GAP_MS || 60 * 1000;
     const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = constants.AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS || 4 * 60 * 1000;
@@ -419,10 +421,238 @@
       return context;
     }
 
+    function buildInterjectionDirectorPlan(context = {}, input = {}) {
+      const reasons = Array.isArray(context.reasons)
+        ? context.reasons.map((item) => String(item || "").trim()).filter(Boolean)
+        : [];
+      const primaryReason = String(context.primaryReason || reasons[0] || "afterthought").trim() || "afterthought";
+      const protectedReasons = ["comfort_quiet", "closing_quiet", "focused_quiet", "safety_quiet", "no_interjection"];
+      const safetyClamp = protectedReasons.includes(primaryReason)
+        ? primaryReason
+        : reasons.find((reason) => protectedReasons.includes(reason)) || "";
+      const base = {
+        version: 2,
+        decision: "hold_back",
+        stance: "quiet",
+        chaos_level: 0,
+        reason: primaryReason,
+        safety_clamp: safetyClamp,
+        motion_cue: "none",
+        pulse_style: "neutral",
+        pulse_boost: 0,
+        voice_style: "soft",
+        can_speak: false,
+        can_motion: false,
+        no_desktop_observation: true,
+        no_screenshot: true,
+        no_file_read: true,
+        no_shell: true,
+        no_tools: true
+      };
+
+      if (safetyClamp) {
+        return base;
+      }
+
+      const score = Number(context.score || 0);
+      const threshold = Number(context.threshold || 1);
+      if (!(context.shouldTrigger === true || score >= threshold)) {
+        return {
+          ...base,
+          decision: "react",
+          stance: "listening",
+          chaos_level: 1,
+          safety_clamp: "",
+          motion_cue: "micro_pulse",
+          pulse_style: "neutral",
+          pulse_boost: 0.16,
+          can_motion: true
+        };
+      }
+
+      if (reasons.includes("stage_callback")) {
+        return {
+          ...base,
+          decision: "callback",
+          stance: "callback_imp",
+          chaos_level: 2,
+          safety_clamp: "",
+          motion_cue: "idle_fidget",
+          pulse_style: "neutral",
+          pulse_boost: 0.22,
+          voice_style: "teasing",
+          can_speak: true,
+          can_motion: true
+        };
+      }
+      if (reasons.includes("correction_afterthought")) {
+        return {
+          ...base,
+          decision: "interject",
+          stance: "mock_defensive_repair",
+          chaos_level: 2,
+          safety_clamp: "",
+          motion_cue: "embarrassed_recovery",
+          pulse_style: "neutral",
+          pulse_boost: 0.34,
+          voice_style: "warm",
+          can_speak: true,
+          can_motion: true
+        };
+      }
+      if (reasons.includes("stage_observation")) {
+        return {
+          ...base,
+          decision: "interject",
+          stance: "suspicious_deadpan",
+          chaos_level: 3,
+          safety_clamp: "",
+          motion_cue: "side_eye",
+          pulse_style: "neutral",
+          pulse_boost: 0.34,
+          voice_style: "dry",
+          can_speak: true,
+          can_motion: true
+        };
+      }
+      if (reasons.includes("completion_spark")) {
+        return {
+          ...base,
+          decision: "interject",
+          stance: "tiny_victory",
+          chaos_level: 2,
+          safety_clamp: "",
+          motion_cue: "tiny_victory_nod",
+          pulse_style: "cheerful",
+          pulse_boost: 0.3,
+          voice_style: "cheerful",
+          can_speak: true,
+          can_motion: true
+        };
+      }
+      if (reasons.includes("handed_back")) {
+        return {
+          ...base,
+          decision: "interject",
+          stance: "opinionated",
+          chaos_level: 2,
+          safety_clamp: "",
+          motion_cue: "head_tilt",
+          pulse_style: "steady",
+          pulse_boost: 0.26,
+          voice_style: "curious",
+          can_speak: true,
+          can_motion: true
+        };
+      }
+      if (reasons.includes("answer_afterthought")) {
+        return {
+          ...base,
+          decision: "interject",
+          stance: "answer_echo",
+          chaos_level: 1,
+          safety_clamp: "",
+          motion_cue: "tiny_nod",
+          pulse_style: "steady",
+          pulse_boost: 0.22,
+          voice_style: "soft",
+          can_speak: true,
+          can_motion: true
+        };
+      }
+
+      return {
+        ...base,
+        decision: "interject",
+        stance: "small_aside",
+        chaos_level: 1,
+        safety_clamp: "",
+        motion_cue: "micro_pulse",
+        pulse_style: "neutral",
+        pulse_boost: 0.22,
+        voice_style: "soft",
+        can_speak: true,
+        can_motion: true
+      };
+    }
+
+    function buildQuietTurnInterjectionContext(primaryReason, reasons = []) {
+      const safeReasons = Array.isArray(reasons) && reasons.length ? reasons : [primaryReason].filter(Boolean);
+      const context = {
+        interjection: true,
+        shouldTrigger: false,
+        primaryReason,
+        reasons: safeReasons,
+        score: 0,
+        threshold: 1,
+        topicHint: "",
+        silentMinutes: 0,
+        expectedUserAt: Number(state.lastUserMessageAt || 0),
+        expectedAssistantAt: Number(state.conversationLastAssistantAt || 0),
+        delayMs: 0,
+        assistantHint: ""
+      };
+      context.director = buildInterjectionDirectorPlan(context);
+      context.brainGate = buildAutoChatBrainGate(context);
+      context.explanation = buildAutoChatTriggerExplanation(context);
+      return context;
+    }
+
+    function getInterjectionMotionPlan(motionCue = "none") {
+      const cue = String(motionCue || "none").trim().toLowerCase();
+      const plans = {
+        side_eye: { intent: "listen", style: "neutral", mood: "idle", boost: 0.34, tags: ["head", "eye", "side", "flick", "idle"] },
+        head_tilt: { intent: "listen", style: "steady", mood: "thinking", boost: 0.26, tags: ["head", "tilt", "flick", "pose"] },
+        tiny_nod: { intent: "listen", style: "steady", mood: "thinking", boost: 0.22, tags: ["nod", "head", "idle", "flick"] },
+        tiny_victory_nod: { intent: "listen", style: "cheerful", mood: "happy", boost: 0.3, tags: ["nod", "happy", "head", "pose"] },
+        embarrassed_recovery: { intent: "listen", style: "neutral", mood: "idle", boost: 0.34, tags: ["shy", "down", "head", "flickdown", "idle"] },
+        idle_fidget: { intent: "idle", style: "neutral", mood: "idle", boost: 0.22, tags: ["idle", "touch", "body", "flick"] },
+        micro_pulse: { intent: "listen", style: "neutral", mood: "idle", boost: 0.2, tags: ["idle", "tap", "flick"] }
+      };
+      return plans[cue] ? { cue, ...plans[cue] } : { cue: "none", intent: "none", style: "neutral", mood: "idle", boost: 0, tags: [] };
+    }
+
+    function executeInterjectionDirectorMotion(context = {}) {
+      const director = context && typeof context === "object" ? context.director || {} : {};
+      const motionCue = String(director.motion_cue || "none").trim().toLowerCase();
+      if (director.can_motion !== true || !motionCue || motionCue === "none") {
+        state.autoChatInterjectionLastMotion = "none";
+        return false;
+      }
+      const plan = getInterjectionMotionPlan(motionCue);
+      if (plan.intent === "none") {
+        state.autoChatInterjectionLastMotion = "none";
+        return false;
+      }
+      state.autoChatInterjectionLastMotion = plan.cue;
+      try {
+        triggerExpressionPulse(plan.style, Number(director.pulse_boost || plan.boost || 0.2), 420);
+      } catch (err) {
+        state.autoChatInterjectionLastMotion = `${plan.cue}:pulse_failed`;
+      }
+      try {
+        enqueueActionIntent(plan.intent, {
+          source: "auto_interjection_director",
+          style: plan.style,
+          mood: plan.mood,
+          combo: true,
+          motionCue: plan.cue,
+          motionRole: "interjection_reaction",
+          motionTags: plan.tags
+        });
+        state.autoChatInterjectionLastMotion = plan.cue;
+        return true;
+      } catch (err) {
+        state.autoChatInterjectionLastMotion = `${plan.cue}:action_failed`;
+        return false;
+      }
+    }
+
     function buildTurnInterjectionContext(input = {}) {
       const userText = String(input.userText || "").replace(/\s+/g, " ").trim();
       const assistantText = String(input.assistantText || "").replace(/\s+/g, " ").trim();
-      const intent = String(input.brainSnapshot?.intent || input.intent || "").trim().toLowerCase();
+      const brainSnapshot = input.brainSnapshot && typeof input.brainSnapshot === "object" ? input.brainSnapshot : {};
+      const intent = String(brainSnapshot.intent || input.intent || "").trim().toLowerCase();
       const mood = String(input.mood || "").trim().toLowerCase();
       const loweredUser = userText.toLowerCase();
       const loweredAssistant = assistantText.toLowerCase();
@@ -431,19 +661,19 @@
       let score = 0;
 
       if (!userText || userText.startsWith("/")) {
-        return { shouldTrigger: false, primaryReason: "no_interjection", reasons: [], score: 0, threshold: 1 };
+        return buildQuietTurnInterjectionContext("no_interjection", ["no_interjection"]);
       }
       if (/doctor|debug|api key|token|password|secret|private key/i.test(userText)) {
-        return { shouldTrigger: false, primaryReason: "safety_quiet", reasons: ["safety_quiet"], score: 0, threshold: 1 };
+        return buildQuietTurnInterjectionContext("safety_quiet", ["safety_quiet"]);
       }
       if (/sleep|good night|bye|later|leave|exit|i'?m going to sleep|我要睡|晚安|再见/i.test(userText)) {
-        return { shouldTrigger: false, primaryReason: "closing_quiet", reasons: ["closing_quiet"], score: 0, threshold: 1 };
+        return buildQuietTurnInterjectionContext("closing_quiet", ["closing_quiet"]);
       }
       if (/(feel bad|sad|depressed|anxious|panic|hurt|难受|难过|焦虑)/i.test(userText) || intent === "comfort" || mood === "sad") {
-        return { shouldTrigger: false, primaryReason: "comfort_quiet", reasons: ["comfort_quiet"], score: 0, threshold: 1 };
+        return buildQuietTurnInterjectionContext("comfort_quiet", ["comfort_quiet"]);
       }
       if (intent === "task_help" || intent === "reminder" || intent === "doctor" || intent === "debug") {
-        return { shouldTrigger: false, primaryReason: "focused_quiet", reasons: ["focused_quiet"], score: 0, threshold: 1 };
+        return buildQuietTurnInterjectionContext("focused_quiet", ["focused_quiet"]);
       }
 
       if (/(wrong|mistake|not true|you lied|you were off|不对|错了|说错)/i.test(userText)) {
@@ -472,11 +702,24 @@
         reasons.push("small_stage_thought");
         topicSeeds.push(userText);
       }
+      const stageMemory = brainSnapshot.stage_memory && typeof brainSnapshot.stage_memory === "object"
+        ? brainSnapshot.stage_memory
+        : (brainSnapshot.stageMemory && typeof brainSnapshot.stageMemory === "object" ? brainSnapshot.stageMemory : {});
+      const improv = brainSnapshot.improv && typeof brainSnapshot.improv === "object" ? brainSnapshot.improv : {};
+      const callbackPolicy = String(stageMemory.callback_policy || improv.callback_policy || "").trim().toLowerCase();
+      const callbackBlocked = callbackPolicy === "none" || callbackPolicy === "blocked" || callbackPolicy === "avoid_repeat";
+      const callbackSeed = normalizeAutoChatTopicHint(stageMemory.current_bit || stageMemory.recent_callback || stageMemory.mini_agenda || "");
+      if (callbackSeed && !callbackBlocked && !reasons.includes("stage_observation")) {
+        score += 0.8;
+        reasons.push("stage_callback");
+        topicSeeds.push(callbackSeed);
+      }
       if (/\?$/.test(loweredAssistant) || /what do you think|anything else|let me know/.test(loweredAssistant)) {
         score -= 0.35;
       }
 
       const threshold = reasons.includes("correction_afterthought") || reasons.includes("stage_observation")
+        || reasons.includes("stage_callback")
         ? 0.62
         : 0.72;
       const primaryReason = pickAutoChatPrimaryReason(reasons);
@@ -496,6 +739,8 @@
         delayMs,
         assistantHint: assistantText.slice(0, 140)
       };
+      context.director = buildInterjectionDirectorPlan(context, input);
+      context.shouldTrigger = context.director.decision === "interject" || context.director.decision === "callback";
       context.brainGate = buildAutoChatBrainGate(context);
       context.explanation = buildAutoChatTriggerExplanation(context);
       return context;
@@ -532,6 +777,7 @@
         handed_back: "the user handed the thought back",
         answer_afterthought: "Taffy has a small thought after answering",
         small_stage_thought: "the last turn left room for a small aside",
+        stage_callback: "Taffy can briefly callback a recent stage bit",
         afterthought: "Taffy had a small thought after the turn",
         stage_pause: "the user left a small stage pause",
         quiet_ack: "the user gave a quiet acknowledgement",
@@ -582,12 +828,17 @@
       const afterthoughtLine = ctx.interjection === true
         ? "Make it feel like a spontaneous interjection between friends; it can be mildly teasing or deadpan when safe, but never turns into a new task."
         : "Make it feel like a live stage aside, not a customer-service follow-up.";
+      const director = ctx.director && typeof ctx.director === "object" ? ctx.director : buildInterjectionDirectorPlan(ctx);
+      const directorLine = ctx.interjection === true
+        ? `Interjection director: decision=${director.decision || "hold_back"}; stance=${director.stance || "quiet"}; chaos=${Number(director.chaos_level || 0)}/3; motion=${director.motion_cue || "none"}; voice=${director.voice_style || "soft"}; safety_clamp=${director.safety_clamp || "none"}.`
+        : "";
 
       return [
         openingLine,
         `Current time hint: ${clockText}.`,
         `Trigger clue: ${reasonHint}`,
         topicLine,
+        directorLine,
         `Tone: ${styleNote}`,
         `Character brain guard: ${brainGate.intent}; max_sentences=${brainGate.maxSentences}; optional=true; can_ignore=true; no desktop observation; no file read; no shell; no tool call; do not require a reply.`,
         `Why now: ${brainGate.explanation}`,
@@ -631,8 +882,10 @@
       stopTurnInterjectionTimer();
       const context = buildTurnInterjectionContext(input);
       state.autoChatInterjectionLastContext = context;
+      state.autoChatInterjectionLastDirector = context.director || null;
       state.autoChatInterjectionLastScheduledAt = 0;
       state.autoChatInterjectionLastSuppressed = "";
+      state.autoChatInterjectionLastMotion = "";
       if (state.autoChatEnabled !== true || context.shouldTrigger !== true) {
         state.autoChatInterjectionLastSuppressed = state.autoChatEnabled === true
           ? `not_triggered:${context.primaryReason || "unknown"}`
@@ -646,6 +899,7 @@
         if (!skip.skip) {
           state.autoChatInterjectionLastDispatchAt = Date.now();
           state.autoChatInterjectionLastSuppressed = "";
+          executeInterjectionDirectorMotion(context);
           dispatchAutoChatContext(context);
           return;
         }
@@ -722,11 +976,13 @@
       updateConversationFollowupState,
       pickAutoChatPrimaryReason,
       analyzeAutoChatContext,
+      buildInterjectionDirectorPlan,
       buildTurnInterjectionContext,
       shouldSkipTurnInterjection,
       buildAutoChatBrainGate,
       buildAutoChatTriggerExplanation,
       buildAutoChatPrompt,
+      executeInterjectionDirectorMotion,
       scheduleTurnInterjection,
       scheduleNextAutoChat,
       startAutoChatLoop,
