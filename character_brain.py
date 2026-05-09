@@ -131,6 +131,7 @@ INTENT_OUTPUT_CONSTRAINTS = {
 
 SESSION_RESET_AFTER_SEC = 30 * 60
 SESSION_SOFT_DECAY_AFTER_SEC = 10 * 60
+STAGE_CALLBACK_COOLDOWN_TURNS = 2
 IMPROV_HIGH_CHAOS_INTENTS = {"greeting", "casual", "question", "encouragement"}
 IMPROV_SAFE_CLAMP_INTENTS = {"comfort", "reminder", "closing", "low_interrupt_checkin"}
 
@@ -410,6 +411,12 @@ def _public_stage_memory(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "recent_callback": _clean_text(pick("stage_recent_callback", "recent_callback"), 48),
         "correction_state": _clean_text(pick("stage_correction_state", "correction_state"), 40) or "none",
         "agenda": _clean_text(pick("stage_agenda", "agenda"), 48) or "none",
+        "mini_agenda": _clean_text(pick("stage_mini_agenda", "mini_agenda"), 48) or "none",
+        "callback_cooldown_turns": max(
+            0,
+            min(8, _safe_int(pick("stage_callback_cooldown_turns", "callback_cooldown_turns"), 0)),
+        ),
+        "last_callback_at": max(0, _safe_int(pick("stage_last_callback_at", "last_callback_at"), 0)),
         "turns_since_callback": max(0, min(20, _safe_int(pick("stage_turns_since_callback", "turns_since_callback"), 0))),
     }
 
@@ -480,10 +487,13 @@ def _select_improv_director(
 
     recent_callback = _clean_text(stage.get("recent_callback"), 48)
     turns_since = max(0, min(20, _safe_int(stage.get("turns_since_callback"), 0)))
+    cooldown = max(0, min(8, _safe_int(stage.get("callback_cooldown_turns"), 0)))
     if clamp != "none" or bit == "none":
         callback_policy = "none"
-    elif recent_callback == bit and turns_since < 2:
+    elif recent_callback == bit and turns_since < 3:
         callback_policy = "avoid_repeat"
+    elif cooldown > 0:
+        callback_policy = "cooldown"
     elif chaos >= 2:
         callback_policy = "allow_one_callback"
     else:
@@ -586,7 +596,7 @@ def _select_motion_director(decision: Dict[str, Any]) -> Dict[str, Any]:
     post = "settle_idle"
 
     if intent == "comfort":
-        pre, speech, beats, post = "eyes_down_soft", "soft_speech_start", [], "soft_idle"
+        pre, speech, beats, post = "soft_stillness", "soft_speech_start", [], "soft_idle"
         suppressed.append("comfort_no_extra_motion")
     elif intent == "low_interrupt_checkin":
         pre, speech, beats, post = "no_opening", "soft_speech_start", [], "soft_idle"
@@ -618,14 +628,14 @@ def _select_motion_director(decision: Dict[str, Any]) -> Dict[str, Any]:
     elif intent in {"casual", "greeting"}:
         pre = "deadpan_pause" if opening == "deadpan_aside" else "side_eye"
         if reaction == "quick_snap":
-            pre = "blink_pulse"
+            pre = "micro_pulse"
         speech = "dry_speech_start" if reaction == "deadpan_aside" else "expressive_speech_start"
         if spontaneity >= 1 and allow_motion:
             beats.append("blink_pulse")
         if spontaneity >= 2 and allow_motion:
             beats.append("head_tilt")
         if spontaneity >= 3 and allow_motion:
-            beats.append("side_eye")
+            beats.append("idle_fidget")
 
     if not allow_motion:
         beats = []
@@ -788,6 +798,8 @@ def _apply_improv_director_controls(decision: Dict[str, Any], improv: Dict[str, 
 
     if public_improv["callback_policy"] == "avoid_repeat":
         decision["directive"] += " Do not repeat the last desktop bit; make this turn feel freshly reacted to."
+    elif public_improv["callback_policy"] == "cooldown":
+        decision["directive"] += " Callback memory is cooling down; do not force a callback this turn."
     decision["directive"] += (
         f" Improv director: stance={public_improv['stance']}, chaos={public_improv['chaos_level']}/3, "
         f"callback_policy={public_improv['callback_policy']}, agenda={public_improv['agenda']}."
@@ -932,6 +944,34 @@ def normalize_brain_session_state(raw: Optional[Dict[str, Any]]) -> Dict[str, An
         )
         or "none",
         "stage_agenda": _clean_text(src.get("stage_agenda") or stage_src.get("agenda"), 48),
+        "stage_mini_agenda": _clean_text(
+            src.get("stage_mini_agenda")
+            or stage_src.get("mini_agenda")
+            or src.get("stage_agenda")
+            or stage_src.get("agenda"),
+            48,
+        ),
+        "stage_callback_cooldown_turns": max(
+            0,
+            min(
+                8,
+                _safe_int(
+                    src.get("stage_callback_cooldown_turns")
+                    if src.get("stage_callback_cooldown_turns") is not None
+                    else stage_src.get("callback_cooldown_turns"),
+                    0,
+                ),
+            ),
+        ),
+        "stage_last_callback_at": max(
+            0,
+            _safe_int(
+                src.get("stage_last_callback_at")
+                if src.get("stage_last_callback_at") is not None
+                else stage_src.get("last_callback_at"),
+                0,
+            ),
+        ),
         "stage_turns_since_callback": max(
             0,
             min(
@@ -997,6 +1037,9 @@ def decay_brain_session_state(
             "stage_recent_callback": "",
             "stage_correction_state": "none",
             "stage_agenda": "",
+            "stage_mini_agenda": "",
+            "stage_callback_cooldown_turns": 0,
+            "stage_last_callback_at": 0,
             "stage_turns_since_callback": 0,
         }
     if age >= SESSION_SOFT_DECAY_AFTER_SEC:
@@ -1006,6 +1049,7 @@ def decay_brain_session_state(
             state["energy"] = "calm"
         state["same_need_turns"] = min(1, state["same_need_turns"])
         state["stage_turns_since_callback"] = min(3, state["stage_turns_since_callback"] + 1)
+        state["stage_callback_cooldown_turns"] = max(0, state["stage_callback_cooldown_turns"] - 1)
         if state["stage_turns_since_callback"] >= 3:
             state["stage_recent_callback"] = ""
         state["decay"] = "softened"
@@ -1046,15 +1090,23 @@ def update_brain_session_state(
     callback_policy = _clean_text(improv.get("callback_policy"), 40)
     recent_callback = _clean_text(stage.get("recent_callback"), 48)
     turns_since_callback = max(0, min(20, _safe_int(stage.get("turns_since_callback"), 0)))
+    callback_cooldown_turns = max(0, min(8, _safe_int(stage.get("callback_cooldown_turns"), 0)))
+    last_callback_at = max(0, _safe_int(stage.get("last_callback_at"), 0))
     if callback_policy == "allow_one_callback" and bit:
         recent_callback = bit
         turns_since_callback = 0
+        callback_cooldown_turns = STAGE_CALLBACK_COOLDOWN_TURNS
+        last_callback_at = now
     elif recent_callback:
         turns_since_callback = min(20, turns_since_callback + 1)
-        if turns_since_callback >= 3:
+        callback_cooldown_turns = max(0, callback_cooldown_turns - 1)
+        if turns_since_callback >= 4:
             recent_callback = ""
     elif turns_since_callback:
         turns_since_callback = min(20, turns_since_callback + 1)
+        callback_cooldown_turns = max(0, callback_cooldown_turns - 1)
+    else:
+        callback_cooldown_turns = max(0, callback_cooldown_turns - 1)
 
     previous_correction = _clean_text(stage.get("correction_state"), 40)
     if _is_correction_message(user_message) or _clean_text(improv.get("stance"), 48) == "mock_defensive_repair":
@@ -1064,6 +1116,7 @@ def update_brain_session_state(
     else:
         correction_state = "none"
     stage_agenda = _clean_text(improv.get("agenda"), 48) or _agenda_for_turn(intent, topic, user_message)
+    stage_mini_agenda = stage_agenda if stage_agenda != "none" else _agenda_for_turn(intent, topic, user_message)
 
     return normalize_brain_session_state(
         {
@@ -1085,6 +1138,9 @@ def update_brain_session_state(
             "stage_recent_callback": recent_callback,
             "stage_correction_state": correction_state,
             "stage_agenda": stage_agenda,
+            "stage_mini_agenda": stage_mini_agenda,
+            "stage_callback_cooldown_turns": callback_cooldown_turns,
+            "stage_last_callback_at": last_callback_at,
             "stage_turns_since_callback": turns_since_callback,
         }
     )
@@ -1614,7 +1670,7 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Character state: energy={_clean_text(decision.get('energy'), 24)}, attention={_clean_text(decision.get('attention'), 24)}, relationship={_clean_text(decision.get('relationship'), 40)}",
         f"Session continuity: last_intent={continuity.get('last_intent') or 'none'}, last_topic={continuity.get('last_topic') or 'none'}, mood_baseline={continuity.get('mood_baseline')}, recent_user_need={continuity.get('recent_user_need') or 'none'}, same_need_turns={continuity.get('same_need_turns')}, decay={continuity.get('decay')}",
         f"Improv: stance={improv['stance']}, chaos={improv['chaos_level']}/3, callback_policy={improv['callback_policy']}, agenda={improv['agenda']}",
-        f"Stage memory: current_bit={stage_memory.get('current_bit') or 'none'}, recent_callback={stage_memory.get('recent_callback') or 'none'}, correction={stage_memory.get('correction_state')}, turns_since_callback={stage_memory.get('turns_since_callback')}",
+        f"Stage memory: current_bit={stage_memory.get('current_bit') or 'none'}, recent_callback={stage_memory.get('recent_callback') or 'none'}, mini_agenda={stage_memory.get('mini_agenda') or stage_memory.get('agenda') or 'none'}, correction={stage_memory.get('correction_state')}, cooldown={stage_memory.get('callback_cooldown_turns')}, turns_since_callback={stage_memory.get('turns_since_callback')}",
         f"Safety clamp: level={safety_clamp['level']}, reason={safety_clamp['reason'] or 'none'}",
         f"Motion director: pre={motion_director['pre_reaction']}, speech={motion_director['speech_start']}, beats={','.join(motion_director['speech_beats'] or ['none'])}, correction={motion_director['correction_reaction']}, post={motion_director['post_settle']}",
         f"Voice director: delivery={voice_director['delivery']}, pace={voice_director['pace']}, pause={voice_director['pause_profile']}, segment={voice_director['segment_style']}, max_segments={voice_director['max_segments']}",
@@ -1758,6 +1814,8 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
     if intent == "casual":
         if re.search(r"(wrong|mistake|incorrect|\u8bf4\u9519|\u9519\u4e86|\u4e0d\u5bf9)", compact):
             return "No, I was testing your alertness. Extremely official."
+        if re.search(r"(desk|desktop|cursor|weird|strange|\u684c\u9762|\u5149\u6807|\u602a)", compact):
+            return "The desk is acting normal, which is exactly how it gets you."
         return "Hm. The desktop air just shifted. Suspicious, but continue."
     return ""
 
@@ -1862,6 +1920,64 @@ def _looks_like_vague_planning_reply(text: str) -> bool:
     if any(re.search(pattern, lower) for pattern in action_patterns):
         return False
     return len(lower) < 90
+
+
+def _contains_cjk_text(text: str) -> bool:
+    return bool(re.search(r"[\u4e00-\u9fff]", str(text or "")))
+
+
+def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str = "") -> bool:
+    lower = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    if not lower:
+        return False
+    compact_user = re.sub(r"\s+", "", _clean_text(user_message, 300).lower())
+    is_correction = _is_correction_message(user_message)
+    user_asked_advice = bool(re.search(r"(whatshouldido|whatdoido|whatnext|nextstep|helpme|advice)", compact_user))
+    task_bleed = bool(
+        re.search(
+            r"\b(save/confirm|save anything|save|confirm|take 10 minutes|10[- ]?minute|restart|ctrl\+shift|task manager|quick test|unplug|replug|trackpad|mouse settings|jitter|vanishes|do this|test with|settings|steps?:|fix:|next chunk|mini[- ]?reset|tidy your space)\b",
+            lower,
+        )
+    )
+    if _contains_cjk_text(text):
+        return True
+    if is_correction:
+        if task_bleed:
+            return True
+        if re.search(r"\b(i apologize|sorry for the confusion|you'?re right|my bad|wrong|mistake|incorrect|alertness|official)\b", lower):
+            return False
+        return True
+    if intent in {"casual", "question"} and not user_asked_advice and task_bleed:
+        return True
+    if intent == "encouragement" and re.search(r"(done|finished|completed|shipped|fixed|madeit|wrappedup)", compact_user):
+        return bool(
+            re.search(
+                r"\b(save|confirm|close|next step|what next|todo|to-do|checklist|start by|now you should|let'?s|we should|plan for tomorrow|10[- ]?minute|one clean push|fatigue drop)\b",
+                lower,
+            )
+        )
+    if intent == "closing":
+        return bool(
+            re.search(
+                r"\b(before you go|one more thing|next time we can|tomorrow we|let'?s continue|do you want|would you like|anything else|hit save|save if|dim the screen|power down|anything'?s lingering)\b",
+                lower,
+            )
+        )
+    if intent == "comfort" and not user_asked_advice:
+        return bool(
+            re.search(
+                r"(^|\s)(1\.|2\.|first,|second,|steps?:|strategy|you should|try to|set a timer|make a list|action plan)\b|\b(save anything|take 10 minutes|tidy your space|call it|10[- ]?minute|next small step|tiny step|first move|open the thing|allowed to stop|reassess|we'?ll do|we will do|let'?s do)\b",
+                lower,
+            )
+        )
+    if intent == "question" and re.search(r"(whatareyoudoing|whatyoudoing|whatdoing)", compact_user):
+        return bool(
+            re.search(
+                r"\b(how can i help|waiting to assist|ready to help|next action|your request|task|support|what'?s up|what are you up to|are we fixing|surviving the day|trying to figure out|why everything feels)\b|\?\s*$",
+                lower,
+            )
+        )
+    return False
 
 
 def _looks_like_context_bleed_reply(text: str, intent: str, user_message: str = "") -> bool:
@@ -2024,8 +2140,18 @@ def _repair_unbalanced_reply_punctuation(text: str) -> str:
         return ""
     if repaired.count("(") > repaired.count(")"):
         repaired = repaired.replace("(", "", repaired.count("(") - repaired.count(")"))
+    if repaired.count(")") > repaired.count("("):
+        for _ in range(repaired.count(")") - repaired.count("(")):
+            repaired = repaired.replace(")", "", 1)
     if repaired.count("[") > repaired.count("]"):
         repaired = repaired.replace("[", "", repaired.count("[") - repaired.count("]"))
+    if repaired.count("]") > repaired.count("["):
+        for _ in range(repaired.count("]") - repaired.count("[")):
+            repaired = repaired.replace("]", "", 1)
+    if repaired.count('"') % 2 == 1:
+        repaired = repaired.replace('"', "")
+    if (repaired.count("\u201c") + repaired.count("\u201d")) % 2 == 1:
+        repaired = repaired.replace("\u201c", "").replace("\u201d", "")
     return _normalize_reply_text_spacing(repaired)
 
 
@@ -2107,6 +2233,23 @@ def apply_character_brain_reply_constraints(
     before_sentence_count = len(sentences)
     removed_context_bleed = False
     context_bleed_sensitive = intent in {"greeting", "casual", "question", "encouragement", "comfort", "closing", "task_help"}
+    if _looks_like_scene_policy_violation(original, intent, user_message):
+        fallback = _fallback_reply_for_intent(intent, user_message)
+        if fallback:
+            constrained = _normalize_reply_text_spacing(fallback)
+            _record_performance_execution(
+                decision,
+                reply_shape=reply_shape,
+                question_policy=question_policy,
+                original=original,
+                constrained=constrained,
+                removed_followup=False,
+                removed_bit=False,
+                removed_context_bleed=True,
+                before_sentence_count=before_sentence_count,
+                after_sentence_count=len(_split_reply_sentences(constrained)),
+            )
+            return constrained + meta
     if (context_bleed_guard.get("active") is True or context_bleed_sensitive) and _looks_like_context_bleed_reply(original, intent, user_message):
         fallback = _fallback_reply_for_intent(intent, user_message)
         if fallback:
@@ -2169,6 +2312,11 @@ def apply_character_brain_reply_constraints(
             if fallback:
                 constrained = fallback
     if (context_bleed_guard.get("active") is True or context_bleed_sensitive) and _looks_like_context_bleed_reply(constrained, intent, user_message):
+        fallback = _fallback_reply_for_intent(intent, user_message)
+        if fallback:
+            constrained = fallback
+            removed_context_bleed = True
+    if _looks_like_scene_policy_violation(constrained, intent, user_message):
         fallback = _fallback_reply_for_intent(intent, user_message)
         if fallback:
             constrained = fallback

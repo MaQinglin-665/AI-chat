@@ -39,7 +39,25 @@
       pace: clean(raw.pace, "none", 32),
       planned_segments: cleanInt(raw.planned_segments ?? raw.segments, 0, 0, 4),
       spoken_segments: cleanInt(raw.spoken_segments, 0, 0, 8),
-      mode: clean(raw.mode, "none", 32)
+      mode: clean(raw.mode, "none", 32),
+      fallback_reason: clean(raw.fallback_reason, "none", 64)
+    };
+  }
+
+  function normalizeEarlyReactionSummary(value = {}) {
+    const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return {
+      enabled: raw.enabled === true,
+      intent: clean(raw.intent, "none", 40),
+      pre: clean(raw.pre, "none", 48),
+      actual: clean(raw.actual, raw.enabled === true ? "planned" : "suppressed", 48),
+      action: clean(raw.action, "none", 48),
+      pulse: raw.pulse === true,
+      reason: clean(raw.reason, "none", 64),
+      suppressed: Array.isArray(raw.suppressed)
+        ? raw.suppressed.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 8)
+        : [],
+      updated_at: cleanInt(raw.updated_at, 0, 0)
     };
   }
 
@@ -67,6 +85,7 @@
         mode: clean(audit.tts?.mode || audit.tts_mode, "none", 32)
       },
       voice: normalizeVoiceSummary(audit.voice),
+      early_reaction: normalizeEarlyReactionSummary(audit.early_reaction),
       settled: audit.settled === true,
       suppressed: Array.isArray(audit.suppressed)
         ? audit.suppressed.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 8)
@@ -127,6 +146,7 @@
           mode: "none"
         },
         voice: normalizeVoiceSummary(context.voiceSummary),
+        early_reaction: normalizeEarlyReactionSummary(context.earlyReactionSummary || state.earlyPreReactionLastSummary),
         settled: false,
         suppressed: timeline.suppressed.slice(0, 8),
         last_event: "started",
@@ -207,6 +227,7 @@
         next.voice.delivery = clean(detail.delivery || next.voice.delivery, next.voice.delivery || "none", 48);
         next.voice.pace = clean(detail.pace || next.voice.pace, next.voice.pace || "none", 32);
         next.voice.planned_segments = segments || cleanInt(next.voice.planned_segments, 0, 0, 4);
+        next.voice.fallback_reason = clean(detail.fallback_reason || next.voice.fallback_reason, "none", 64);
         next.voice.mode = mode || next.voice.mode || "none";
       } else if (eventKind === "tts_segment") {
         next.voice.spoken_segments = cleanInt(next.voice.spoken_segments, 0, 0, 8) + 1;

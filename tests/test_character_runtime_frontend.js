@@ -319,9 +319,13 @@ function createMemoryStorage(initial = {}) {
 
   assert.strictEqual(gate.intent, "low_interrupt_checkin", "auto chat should be gated through low-interruption brain intent");
   assert.strictEqual(gate.maxSentences, 1, "auto chat brain gate should keep proactive bubbles to one sentence");
+  assert.strictEqual(gate.canIgnore, true, "auto chat brain gate should make proactive bubbles ignorable");
+  assert.strictEqual(gate.singleSentence, true, "auto chat brain gate should force one-line delivery");
   assert.strictEqual(gate.allowDesktopObservation, false, "auto chat brain gate should not allow desktop observation");
+  assert.strictEqual(gate.allowFileRead, false, "auto chat brain gate should not allow file reads");
+  assert.strictEqual(gate.allowShell, false, "auto chat brain gate should not allow shell execution");
   assert.strictEqual(gate.allowToolCall, false, "auto chat brain gate should not allow tool calls");
-  assert.ok(prompt.includes("low_interrupt_checkin") && prompt.includes("no desktop observation"), "auto chat prompt should carry the brain safety guard");
+  assert.ok(prompt.includes("low_interrupt_checkin") && prompt.includes("no desktop observation") && prompt.includes("no shell"), "auto chat prompt should carry the brain safety guard");
   assert.ok(prompt.includes("Reply in English only.") && prompt.includes("Use exactly one short sentence."), "auto chat prompt should preserve the English one-line character setting");
   assert.ok(!/[\u4e00-\u9fff]/.test(prompt), "auto chat prompt should not mix Chinese instructions into the English-only character output path");
   assert.ok(controller.buildAutoChatTriggerExplanation({ primaryReason: "long_silence", topicHint: "demo" }).includes("demo"), "auto chat should expose a compact trigger explanation");
@@ -384,6 +388,7 @@ function createMemoryStorage(initial = {}) {
         segments: 2,
         pre_pause_ms: 120,
         inter_segment_pause_ms: 360,
+        fallback_reason: "none",
         suppressed: ["comfort_no_voice_bits"],
         private_prompt: "SECRET"
       },
@@ -394,7 +399,8 @@ function createMemoryStorage(initial = {}) {
         timeline: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", suppressed: ["motion_disallowed"] },
         actual: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", action_dispatches: 0, pulse_dispatches: 2 },
         tts: { started: true, finished: true, mode: "direct" },
-        voice: { delivery: "soft_low", pace: "slow", planned_segments: 2, spoken_segments: 2, mode: "direct_segmented" },
+        voice: { delivery: "soft_low", pace: "slow", planned_segments: 2, spoken_segments: 2, mode: "direct_segmented", fallback_reason: "none" },
+        early_reaction: { enabled: true, intent: "comfort", pre: "soft_stillness", actual: "dispatched", action: "none", pulse: true, reason: "safe_pre_llm_reaction" },
         settled: true,
         private_prompt: "SECRET"
       },
@@ -573,6 +579,7 @@ function createMemoryStorage(initial = {}) {
         segments: 2,
         pre_pause_ms: 120,
         inter_segment_pause_ms: 360,
+        fallback_reason: "none",
         suppressed: ["comfort_no_voice_bits"],
         private_prompt: "SECRET"
       },
@@ -583,7 +590,8 @@ function createMemoryStorage(initial = {}) {
         timeline: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle" },
         actual: { pre: "soft_anchor", speech: "soft_speech_start", beats: 0, post: "soft_idle", action_dispatches: 0, pulse_dispatches: 2 },
         tts: { started: true, finished: true, mode: "direct" },
-        voice: { delivery: "soft_low", pace: "slow", planned_segments: 2, spoken_segments: 2, mode: "direct_segmented" },
+        voice: { delivery: "soft_low", pace: "slow", planned_segments: 2, spoken_segments: 2, mode: "direct_segmented", fallback_reason: "none" },
+        early_reaction: { enabled: true, intent: "comfort", pre: "soft_stillness", actual: "dispatched", action: "none", pulse: true, reason: "safe_pre_llm_reaction" },
         settled: true,
         private_prompt: "SECRET"
       },
@@ -606,6 +614,9 @@ function createMemoryStorage(initial = {}) {
         recent_callback: "",
         correction_state: "none",
         agenda: "hold_the_room_still",
+        mini_agenda: "hold_the_room_still",
+        callback_cooldown_turns: 0,
+        last_callback_at: 0,
         turns_since_callback: 1
       },
       safety_clamp: {
@@ -613,7 +624,7 @@ function createMemoryStorage(initial = {}) {
         reason: "comfort"
       },
       motion_director: {
-        pre_reaction: "eyes_down_soft",
+        pre_reaction: "soft_stillness",
         speech_start: "soft_speech_start",
         speech_beats: [],
         correction_reaction: "none",
@@ -696,7 +707,8 @@ function createMemoryStorage(initial = {}) {
   assert.ok(
     brainReport.includes("Voice Timeline")
       && brainReport.includes("segments=2")
-      && brainReport.includes("pause=gentle"),
+      && brainReport.includes("pause=gentle")
+      && brainReport.includes("fallback=none"),
     "character brain debug report should include compact public voice timeline summary"
   );
   assert.ok(
@@ -714,17 +726,24 @@ function createMemoryStorage(initial = {}) {
       && brainReport.includes("chaos=0/3")
       && brainReport.includes("Stage memory")
       && brainReport.includes("bit=room_anchor")
+      && brainReport.includes("cooldown=0")
       && brainReport.includes("Safety clamp")
       && brainReport.includes("level=safe_scene"),
     "character brain debug report should include public improv and stage memory summaries"
   );
   assert.ok(
     brainReport.includes("Motion Director")
-      && brainReport.includes("pre=eyes_down_soft")
+      && brainReport.includes("pre=soft_stillness")
       && brainReport.includes("post=soft_idle")
       && brainReport.includes("suppressed=motion_disallowed, comfort_no_extra_motion")
       && brainReport.includes("removed_context=no"),
     "character brain debug report should include compact public motion director summary"
+  );
+  assert.ok(
+    brainReport.includes("Early Reaction")
+      && brainReport.includes("pre=soft_stillness")
+      && brainReport.includes("actual=dispatched"),
+    "character brain debug report should include early pre-reaction summary"
   );
   assert.ok(
     !brainReport.includes("SECRET") && !brainReport.includes("private_prompt"),
@@ -745,9 +764,10 @@ function createMemoryStorage(initial = {}) {
     sessionId: 7,
     brainSnapshot: { intent: "casual" },
     timelineSummary: { pre: "micro_reaction", speech: "expressive_speech_start", beats: 1, post: "settle_idle" },
-    voiceSummary: { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented" }
+    voiceSummary: { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented", fallback_reason: "none" },
+    earlyReactionSummary: { enabled: true, intent: "casual", pre: "micro_pulse", actual: "dispatched", action: "listen", pulse: true, reason: "safe_pre_llm_reaction" }
   });
-  audit.recordPerformanceAuditEvent("voice_plan", { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented" });
+  audit.recordPerformanceAuditEvent("voice_plan", { delivery: "dry_playful", pace: "measured", segments: 2, mode: "direct_segmented", fallback_reason: "none" });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "preReaction", name: "micro_reaction", action: "listen", pulse: true });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechStart", name: "expressive_speech_start", action: "talk", pulse: true });
   audit.recordPerformanceAuditEvent("timeline_phase", { phase: "speechBeat", name: "speech_beat", action: "talk", pulse: true });
@@ -764,6 +784,8 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(auditSummary.tts.finished, true, "audit should record direct TTS completion");
   assert.strictEqual(auditSummary.voice.planned_segments, 2, "audit should record planned voice segments");
   assert.strictEqual(auditSummary.voice.spoken_segments, 2, "audit should record actual spoken voice segments");
+  assert.strictEqual(auditSummary.voice.fallback_reason, "none", "audit should record voice fallback reason");
+  assert.strictEqual(auditSummary.early_reaction.pre, "micro_pulse", "audit should carry early pre-reaction summary");
   assert.strictEqual(auditSummary.settled, true, "audit should mark settle after post phase");
   assert.strictEqual(auditSummary.raw_history, undefined, "audit summary should not expose raw history");
 }
@@ -773,7 +795,41 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(typeof performanceTimelineController.buildVoiceTimeline, "function", "performance timeline controller should build voice timeline plans");
   assert.strictEqual(typeof performanceTimelineController.buildVoiceSpeechSegments, "function", "performance timeline controller should build voice speech segments");
   assert.strictEqual(typeof performanceTimelineController.applyVoiceDirectorProsody, "function", "performance timeline controller should apply voice director prosody");
+  assert.strictEqual(typeof performanceTimelineController.buildEarlyPreReactionPlan, "function", "performance timeline controller should build early pre-reactions");
+  assert.strictEqual(typeof performanceTimelineController.executeEarlyPreReactionPlan, "function", "performance timeline controller should execute early pre-reactions");
   assert.strictEqual(typeof performanceTimelineController.createController, "function", "performance timeline controller should expose a runtime adapter");
+  const earlyQuestion = performanceTimelineController.buildEarlyPreReactionPlan({
+    text: "What are you doing?",
+    motionEnabled: true,
+    expressionEnabled: true,
+    nowMs: 1000
+  });
+  assert.strictEqual(earlyQuestion.enabled, true, "safe question should allow an early pre-reaction");
+  assert.strictEqual(earlyQuestion.preReaction.name, "head_tilt", "questions should map to a head-tilt pre-reaction");
+  const earlyComfort = performanceTimelineController.buildEarlyPreReactionPlan({
+    text: "I feel bad.",
+    motionEnabled: true,
+    expressionEnabled: true,
+    nowMs: 2000
+  });
+  assert.strictEqual(earlyComfort.preReaction.name, "soft_stillness", "comfort should map to soft stillness before LLM");
+  const earlySuppressed = performanceTimelineController.buildEarlyPreReactionPlan({
+    text: "/braindebug",
+    speakingNow: true,
+    nowMs: 2100
+  });
+  assert.strictEqual(earlySuppressed.enabled, false, "local commands and active TTS should suppress early reactions");
+  assert.ok(earlySuppressed.suppressed.includes("local_command") && earlySuppressed.suppressed.includes("tts_active"));
+  const earlyCalls = [];
+  const earlySummary = performanceTimelineController.executeEarlyPreReactionPlan(earlyQuestion, {
+    text: "What are you doing?",
+    style: "steady",
+    mood: "thinking",
+    enqueueActionIntent: (intent) => earlyCalls.push(["action", intent]),
+    triggerExpressionPulse: (style) => earlyCalls.push(["pulse", style])
+  });
+  assert.strictEqual(earlySummary.actual, "dispatched", "early reaction execution should report dispatch");
+  assert.ok(earlyCalls.some((item) => item[0] === "pulse") && earlyCalls.some((item) => item[0] === "action"), "early reaction should pulse and enqueue safe motion");
   const comfortTimeline = performanceTimelineController.buildPerformanceTimeline({
     brainSnapshot: {
       intent: "comfort",
@@ -912,7 +968,7 @@ function createMemoryStorage(initial = {}) {
   const voiceSummary = performanceTimelineController.toPublicVoiceTimelineSummary(comfortVoiceTimeline);
   assert.deepStrictEqual(
     Object.keys(voiceSummary).sort(),
-    ["delivery", "enabled", "inter_segment_pause_ms", "pace", "pause_profile", "pre_pause_ms", "segment_style", "segments", "suppressed"].sort(),
+    ["delivery", "enabled", "fallback_reason", "inter_segment_pause_ms", "pace", "pause_profile", "pre_pause_ms", "segment_style", "segments", "suppressed"].sort(),
     "public voice timeline summary should not include raw speech text"
   );
   const softProsody = performanceTimelineController.applyVoiceDirectorProsody(
@@ -956,6 +1012,14 @@ function createMemoryStorage(initial = {}) {
   });
   const publicSummary = controller.rememberPerformanceTimeline(timeline);
   assert.strictEqual(timelineState.characterBrainLastDecision.performance_timeline.pre, publicSummary.pre, "controller should attach public timeline to the brain snapshot");
+  const earlyPublicSummary = controller.rememberEarlyPreReaction(
+    controller.executeEarlyPreReactionPlan(
+      controller.buildEarlyPreReactionPlan({ text: "You were wrong.", nowMs: 1234 }),
+      { text: "You were wrong.", style: "neutral", mood: "idle" }
+    )
+  );
+  assert.strictEqual(earlyPublicSummary.pre, "embarrassed_recovery", "controller should remember early correction reactions");
+  assert.strictEqual(timelineState.earlyPreReactionLastSummary.pre, "embarrassed_recovery", "controller should store public early reaction summary");
   const voicePublicSummary = controller.rememberVoiceTimeline(controller.buildVoiceTimeline({
     brainSnapshot: {
       intent: "casual",

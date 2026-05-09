@@ -176,14 +176,14 @@ def test_character_brain_motion_director_maps_intents_to_safe_action_plans():
     task = character_brain.build_character_brain_decision(user_message="What next?")
     closing = character_brain.build_character_brain_decision(user_message="I'm going to sleep.")
 
-    assert casual["motion_director"]["pre_reaction"] in {"blink_pulse", "side_eye", "deadpan_pause"}
+    assert casual["motion_director"]["pre_reaction"] in {"blink_pulse", "micro_pulse", "side_eye", "deadpan_pause"}
     assert casual["motion_director"]["speech_beats"]
     assert question["motion_director"]["pre_reaction"] in {"head_tilt", "side_eye", "blink_pulse"}
     assert correction["motion_director"]["correction_reaction"] == "embarrassed_recovery"
     assert "deadpan_pause" in correction["motion_director"]["speech_beats"]
     assert encouragement["motion_director"]["pre_reaction"] == "happy_pulse"
     assert "tiny_victory_nod" in encouragement["motion_director"]["speech_beats"]
-    assert comfort["motion_director"]["pre_reaction"] == "eyes_down_soft"
+    assert comfort["motion_director"]["pre_reaction"] == "soft_stillness"
     assert comfort["motion_director"]["speech_beats"] == []
     assert "comfort_no_extra_motion" in comfort["motion_director"]["suppressed_reasons"]
     assert task["motion_director"]["pre_reaction"] == "thinking_nod"
@@ -330,6 +330,116 @@ def test_character_brain_context_bleed_guard_blocks_prior_task_agenda():
     assert question_reply == "I was supervising the pixels. They remain suspiciously rectangular."
     assert question_next_action == "I was supervising the pixels. They remain suspiciously rectangular."
     assert question["performance_execution"]["removed_context_bleed"] is True
+
+
+def test_character_brain_reply_director_repairs_scene_policy_violations():
+    finished = character_brain.build_character_brain_decision(user_message="I finished it.")
+    finished_reply = character_brain.apply_character_brain_reply_constraints(
+        "Great job. Next step: make a checklist for tomorrow and keep going.",
+        finished,
+        user_message="I finished it.",
+    )
+    finished_save_reply = character_brain.apply_character_brain_reply_constraints(
+        "Tiny victory lap. Save/confirm it, then do the next 10-minute step.",
+        finished,
+        user_message="I finished it.",
+    )
+    assert finished_reply == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert finished_save_reply == "Look at you, actually finishing the thing. Suspiciously competent."
+    assert finished["performance_execution"]["removed_context_bleed"] is True
+
+    comfort = character_brain.build_character_brain_decision(user_message="I feel bad.")
+    comfort_reply = character_brain.apply_character_brain_reply_constraints(
+        "I'm sorry you're feeling this way. First, make a list of strategies. 1. Breathe. 2. Plan.",
+        comfort,
+        user_message="I feel bad.",
+    )
+    comfort_next_reply = character_brain.apply_character_brain_reply_constraints(
+        "I'm here at desk-light level, then we'll do the next small step when you're ready.",
+        comfort,
+        user_message="I feel bad.",
+    )
+    comfort_tiny_step_reply = character_brain.apply_character_brain_reply_constraints(
+        "Do one 10-minute tiny step right now-open the thing and do the smallest first move, then reassess.",
+        comfort,
+        user_message="I feel bad.",
+    )
+    comfort_tidy_reply = character_brain.apply_character_brain_reply_constraints(
+        "I'm here-keep it small for now: save anything, take 10 minutes, tidy your space just enough, then we can call it.",
+        comfort,
+        user_message="I feel bad.",
+    )
+    assert comfort_reply == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+    assert comfort_next_reply == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+    assert comfort_tiny_step_reply == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+    assert comfort_tidy_reply == "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+
+    closing = character_brain.build_character_brain_decision(user_message="I'm going to sleep.")
+    closing_reply = character_brain.apply_character_brain_reply_constraints(
+        "Goodnight. Tomorrow we can continue the plan if you want.",
+        closing,
+        user_message="I'm going to sleep.",
+    )
+    closing_save_reply = character_brain.apply_character_brain_reply_constraints(
+        "Alright, hit save if anything's lingering and let your brain power down.",
+        closing,
+        user_message="I'm going to sleep.",
+    )
+    assert closing_reply == "Go sleep. I'll keep the pixels under questionable supervision."
+    assert closing_save_reply == "Go sleep. I'll keep the pixels under questionable supervision."
+
+    correction = character_brain.build_character_brain_decision(user_message="You were wrong.")
+    correction_reply = character_brain.apply_character_brain_reply_constraints(
+        "That sounds interesting. Let me know if you want anything else.",
+        correction,
+        user_message="You were wrong.",
+    )
+    assert correction_reply == "No, I was testing your alertness. Extremely official."
+    repaired_correction = character_brain.apply_character_brain_reply_constraints(
+        "Oof, fair call-you're right, I guessed wrong. desk itself), I'll stop free-styling.",
+        correction,
+        user_message="You were wrong.",
+    )
+    correction_task_bleed = character_brain.apply_character_brain_reply_constraints(
+        "Ouch, you're right-my bad. Do this 10-minute fix: save/confirm what you've got open, then test with another mouse.",
+        correction,
+        user_message="You were wrong.",
+    )
+    assert ")" not in repaired_correction
+    assert correction_task_bleed == "No, I was testing your alertness. Extremely official."
+
+    chinese = character_brain.apply_character_brain_reply_constraints(
+        "好的，我来帮你。",
+        character_brain.build_character_brain_decision(user_message="What are you doing?"),
+        user_message="What are you doing?",
+    )
+    question_reprompt = character_brain.apply_character_brain_reply_constraints(
+        "Idling on your desktop, watching the keyboard. What's up-are we fixing something or just surviving the day?",
+        character_brain.build_character_brain_decision(user_message="What are you doing?"),
+        user_message="What are you doing?",
+    )
+    question_bleed = character_brain.apply_character_brain_reply_constraints(
+        "Idling on your desktop. Trying to figure out why everything feels \"a little off.",
+        character_brain.build_character_brain_decision(user_message="What are you doing?"),
+        user_message="What are you doing?",
+    )
+    assert chinese == "I was supervising the pixels. They remain suspiciously rectangular."
+    assert question_reprompt == "I was supervising the pixels. They remain suspiciously rectangular."
+    assert question_bleed == "I was supervising the pixels. They remain suspiciously rectangular."
+
+    casual = character_brain.build_character_brain_decision(user_message="This desk feels weird.")
+    casual_task_bleed = character_brain.apply_character_brain_reply_constraints(
+        "The desk is haunted. Save/confirm what you're working on, then do a 10-minute mini-reset: restart Explorer.",
+        casual,
+        user_message="This desk feels weird.",
+    )
+    casual_quick_test = character_brain.apply_character_brain_reply_constraints(
+        "Your cursor is doing jitter side-eye. Quick test: unplug/replug the mouse or switch to the trackpad and see if the weird feeling vanishes.",
+        casual,
+        user_message="This desk feels weird.",
+    )
+    assert casual_task_bleed == "The desk is acting normal, which is exactly how it gets you."
+    assert casual_quick_test == "The desk is acting normal, which is exactly how it gets you."
 
 
 def test_character_brain_comfort_priority_beats_next_step_question():
@@ -729,7 +839,7 @@ def test_character_brain_reply_constraints_replace_bland_character_replies():
         "That sounds interesting! Let me know if you want to explore it.",
         casual,
         user_message="This desk feels weird today.",
-    ) == "Hm. The desktop air just shifted. Suspicious, but continue."
+    ) == "The desk is acting normal, which is exactly how it gets you."
     assert character_brain.apply_character_brain_reply_constraints(
         "As an AI, I can certainly help with that.",
         question,
@@ -943,6 +1053,8 @@ def test_character_brain_stage_memory_tracks_callback_and_decays():
 
     assert state["stage_current_bit"]
     assert state["stage_recent_callback"] == state["stage_current_bit"]
+    assert state["stage_callback_cooldown_turns"] >= 1
+    assert state["stage_last_callback_at"] == 5000
     assert second["improv"]["callback_policy"] == "avoid_repeat"
     assert next_state["stage_turns_since_callback"] >= 1
     assert softened["stage_turns_since_callback"] >= next_state["stage_turns_since_callback"]
@@ -1010,6 +1122,9 @@ def test_character_brain_public_snapshot_continuity_is_safe_and_compact():
     assert snapshot["improv"]["stance"]
     assert 0 <= snapshot["improv"]["chaos_level"] <= 3
     assert snapshot["stage_memory"]["agenda"]
+    assert snapshot["stage_memory"]["mini_agenda"]
+    assert snapshot["stage_memory"]["callback_cooldown_turns"] >= 0
+    assert snapshot["stage_memory"]["last_callback_at"] >= 0
     assert snapshot["safety_clamp"]["level"] in {"none", "safe_scene", "task_scene"}
     assert snapshot["motion_director"]["pre_reaction"]
     assert snapshot["motion_director"]["post_settle"]

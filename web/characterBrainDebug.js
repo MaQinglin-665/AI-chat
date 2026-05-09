@@ -100,7 +100,8 @@
       ? [
           "",
           "Stage memory",
-          `bit=${clean(stageMemory.current_bit, "none")}; callback=${clean(stageMemory.recent_callback, "none")}; correction=${clean(stageMemory.correction_state, "none")}; turns=${Number(stageMemory.turns_since_callback) || 0}`
+          `bit=${clean(stageMemory.current_bit, "none")}; callback=${clean(stageMemory.recent_callback, "none")}; agenda=${clean(stageMemory.mini_agenda || stageMemory.agenda, "none")}`,
+          `correction=${clean(stageMemory.correction_state, "none")}; cooldown=${Number(stageMemory.callback_cooldown_turns) || 0}; turns=${Number(stageMemory.turns_since_callback) || 0}`
         ]
       : [];
     const safetyClampLines = safetyClamp
@@ -185,7 +186,7 @@
           "",
           "Voice Timeline",
           `enabled=${voiceTimeline.enabled === true ? "yes" : "no"}; delivery=${clean(voiceTimeline.delivery, "steady_clear")}; pace=${clean(voiceTimeline.pace, "normal")}; segments=${Number(voiceTimeline.segments) || 0}; pause=${clean(voiceTimeline.pause_profile, "light")}`,
-          `suppressed=${voiceTimelineSuppressed.length ? voiceTimelineSuppressed.join(", ") : "none"}`
+          `suppressed=${voiceTimelineSuppressed.length ? voiceTimelineSuppressed.join(", ") : "none"}; fallback=${clean(voiceTimeline.fallback_reason, "none")}`
         ]
       : [];
     const auditActual = audit?.actual && typeof audit.actual === "object" && !Array.isArray(audit.actual)
@@ -197,13 +198,24 @@
     const auditVoice = audit?.voice && typeof audit.voice === "object" && !Array.isArray(audit.voice)
       ? audit.voice
       : {};
+    const auditEarly = audit?.early_reaction && typeof audit.early_reaction === "object" && !Array.isArray(audit.early_reaction)
+      ? audit.early_reaction
+      : null;
+    const earlyLines = auditEarly
+      ? [
+          "",
+          "Early Reaction",
+          `enabled=${auditEarly.enabled === true ? "yes" : "no"}; intent=${clean(auditEarly.intent, "none")}; pre=${clean(auditEarly.pre, "none")}; actual=${clean(auditEarly.actual, "pending")}`,
+          `action=${clean(auditEarly.action, "none")}; pulse=${auditEarly.pulse === true ? "yes" : "no"}; reason=${clean(auditEarly.reason, "none")}`
+        ]
+      : [];
     const auditLines = audit
       ? [
           "",
           "Actual",
           `status=${clean(audit.status, "unknown")}; pre=${clean(auditActual.pre, "pending")}; speech=${clean(auditActual.speech, "pending")}; beats=${Number(auditActual.beats) || 0}; post=${clean(auditActual.post, "pending")}`,
           `dispatches=action:${Number(auditActual.action_dispatches) || 0}/pulse:${Number(auditActual.pulse_dispatches) || 0}; tts=${auditTts.started === true ? "started" : "not_started"}/${auditTts.finished === true ? "finished" : "pending"}; settle=${audit.settled === true ? "yes" : "pending"}`,
-          `voice=${clean(auditVoice.delivery, "none")}/${clean(auditVoice.pace, "none")}; segments=${Number(auditVoice.spoken_segments) || 0}/${Number(auditVoice.planned_segments) || 0}; mode=${clean(auditVoice.mode, "none")}`
+          `voice=${clean(auditVoice.delivery, "none")}/${clean(auditVoice.pace, "none")}; segments=${Number(auditVoice.spoken_segments) || 0}/${Number(auditVoice.planned_segments) || 0}; mode=${clean(auditVoice.mode, "none")}; fallback=${clean(auditVoice.fallback_reason, "none")}`
         ]
       : [];
     return [
@@ -226,6 +238,7 @@
       ...executionLines,
       ...timelineLines,
       ...voiceTimelineLines,
+      ...earlyLines,
       ...auditLines,
       `角色状态：能量=${clean(safe.energy)}；注意力=${clean(safe.attention)}；关系=${clean(safe.relationship)}`,
       `表现建议：情绪=${clean(safe.emotion)}；动作=${clean(safe.action)}；强度=${clean(safe.intensity)}；语音=${clean(safe.voice_style)}`,

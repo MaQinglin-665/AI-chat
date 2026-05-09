@@ -69,7 +69,7 @@ def test_v14_demo_scenes_keep_english_continuity_and_no_routine_questions():
             "label": "desk_weird",
             "message": "\u8fd9\u4e2a\u684c\u5b50\u611f\u89c9\u602a\u602a\u7684\u3002",
             "raw": "That sounds interesting! Let me know if you want to explore it.",
-            "reply": "Hm. The desktop air just shifted. Suspicious, but continue.",
+            "reply": "The desk is acting normal, which is exactly how it gets you.",
             "intent": "casual",
             "voice": "neutral",
             "action": "none",

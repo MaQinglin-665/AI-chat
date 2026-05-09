@@ -320,12 +320,18 @@
         intent: "low_interrupt_checkin",
         reason,
         optional: true,
+        canIgnore: true,
+        singleSentence: true,
         maxSentences: 1,
         allowFollowupQuestion: false,
         allowDesktopObservation: false,
+        allowFileRead: false,
+        allowShell: false,
         allowToolCall: false,
         voiceStyle: "soft",
-        action: "none"
+        action: "none",
+        cooldownMs: AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS,
+        explanation: buildAutoChatTriggerExplanation(context)
       };
     }
 
@@ -381,7 +387,8 @@
         `Trigger clue: ${reasonHint}`,
         topicLine,
         `Tone: ${styleNote}`,
-        `Character brain guard: ${brainGate.intent}; max_sentences=${brainGate.maxSentences}; optional=true; no desktop observation; no tool call; do not require a reply.`,
+        `Character brain guard: ${brainGate.intent}; max_sentences=${brainGate.maxSentences}; optional=true; can_ignore=true; no desktop observation; no file read; no shell; no tool call; do not require a reply.`,
+        `Why now: ${brainGate.explanation}`,
         "Reply in English only.",
         "Output only the line Taffy should say. Do not explain why you are speaking.",
         `${brevityLine} Prefer a statement the user can ignore; do not force an answer.`,

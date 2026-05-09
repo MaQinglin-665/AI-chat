@@ -29,6 +29,15 @@
     return Math.min(safeSpontaneity, naturalBeats);
   }
 
+  function stableScore(text = "") {
+    const safe = String(text || "");
+    let score = 0;
+    for (let i = 0; i < safe.length; i += 1) {
+      score = (score * 31 + safe.charCodeAt(i)) % 9973;
+    }
+    return score;
+  }
+
   function phase(name, extra = {}) {
     return {
       name,
@@ -85,14 +94,17 @@
     }
     const presets = {
       blink_pulse: { pulseStyle: "neutral", pulseBoost: 0.3, actionIntent: "listen", actionMood: mood },
+      micro_pulse: { pulseStyle: "neutral", pulseBoost: 0.26, actionIntent: "listen", actionMood: mood },
       head_tilt: { pulseStyle: "steady", pulseBoost: 0.28, actionIntent: "listen", actionMood: "thinking" },
       side_eye: { pulseStyle: "neutral", pulseBoost: 0.34, actionIntent: "listen", actionMood: mood },
       deadpan_pause: { pulseStyle: "neutral", pulseBoost: 0.2, actionIntent: slot === "beat" ? "talk" : "listen", actionMood: mood },
       embarrassed_recovery: { pulseStyle: "neutral", pulseBoost: 0.36, actionIntent: "listen", actionMood: "idle" },
+      idle_fidget: { pulseStyle: "neutral", pulseBoost: 0.22, actionIntent: slot === "beat" ? "talk" : "idle", actionMood: "idle" },
       happy_pulse: { pulseStyle: "cheerful", pulseBoost: 0.36, actionIntent: "listen", actionMood: "happy" },
       tiny_victory_nod: { pulseStyle: "cheerful", pulseBoost: 0.3, actionIntent: slot === "beat" ? "talk" : "thinking", actionMood: "happy" },
       tiny_nod: { pulseStyle: "steady", pulseBoost: 0.24, actionIntent: slot === "beat" ? "talk" : "thinking", actionMood: "thinking" },
       thinking_nod: { pulseStyle: "steady", pulseBoost: 0.28, actionIntent: "thinking", actionMood: "thinking" },
+      soft_stillness: { pulseStyle: "comfort", pulseBoost: 0.18, actionIntent: "none", actionMood: "sad" },
       eyes_down_soft: { pulseStyle: "comfort", pulseBoost: 0.2, actionIntent: "none", actionMood: "sad" },
       soft_idle: { pulseStyle: "comfort", pulseBoost: 0.14, actionIntent: "none", actionMood: "idle" },
       focused_idle: { pulseStyle: "steady", pulseBoost: 0.16, actionIntent: "idle", actionMood: "idle" },
@@ -117,6 +129,154 @@
       actionMood: preset.actionMood,
       beats: 1,
       emphasis: slot === "beat" ? 0.32 : 0.2
+    });
+  }
+
+  function classifyEarlyReaction(text = "") {
+    const source = String(text || "").replace(/\s+/g, " ").trim();
+    const lower = source.toLowerCase();
+    const compact = lower.replace(/\s+/g, "");
+    if (!source) return "none";
+    if (/^\//.test(source)) return "local_command";
+    if (/(sad|tired|anxious|upset|hurt|overwhelmed|lonely|depressed|panic|scared|stress|worn out|wornout|feel bad|feeling bad|stay with me|\u96be\u53d7|\u7126\u8651|\u5d29\u6e83)/i.test(source)) {
+      return "comfort";
+    }
+    if (/\b(you were wrong|you are wrong|that's wrong|incorrect|mistake|not true)\b/i.test(source)) {
+      return "correction";
+    }
+    if (/\b(bye|sleep|goodbye|sign off|wrap up|offline|i'?m going to sleep)\b/i.test(source)) {
+      return "closing";
+    }
+    if (/(whatnext|nextstep|whatshouldidonext|whatdoidonext|todo|roadmap|priority)/i.test(compact)) {
+      return "task";
+    }
+    if (/\?/.test(source) || /^(what|why|how|when|where|who|can|could|should|is|are|do|does)\b/i.test(lower)) {
+      return "question";
+    }
+    return "casual";
+  }
+
+  function buildEarlyPreReactionPlan(input = {}) {
+    const text = String(input.text || input.userText || "").trim();
+    const intent = clean(input.intent || classifyEarlyReaction(text), "casual");
+    const nowMs = clampInt(input.nowMs, Date.now(), 0, Number.MAX_SAFE_INTEGER);
+    const lastAt = clampInt(input.lastReactionAt, 0, 0, Number.MAX_SAFE_INTEGER);
+    const cooldownMs = clampInt(input.cooldownMs, 900, 0, 10000);
+    const motionEnabled = input.motionEnabled !== false;
+    const expressionEnabled = input.expressionEnabled !== false;
+    const speakingNow = input.speakingNow === true;
+    const suppressed = [];
+    if (!text) suppressed.push("empty_text");
+    if (intent === "local_command") suppressed.push("local_command");
+    if (input.isAuto === true) suppressed.push("auto_checkin_no_early_reaction");
+    if (!motionEnabled && !expressionEnabled) suppressed.push("motion_and_expression_disabled");
+    if (speakingNow) suppressed.push("tts_active");
+    if (lastAt > 0 && nowMs - lastAt < cooldownMs) suppressed.push("cooldown");
+
+    let name = "micro_pulse";
+    let style = clean(input.talkStyle, "neutral");
+    let mood = clean(input.mood, "idle");
+    if (intent === "comfort") {
+      name = "soft_stillness";
+      style = "comfort";
+      mood = "sad";
+    } else if (intent === "correction") {
+      name = "embarrassed_recovery";
+    } else if (intent === "question") {
+      name = "head_tilt";
+      style = "steady";
+      mood = "thinking";
+    } else if (intent === "task") {
+      name = "thinking_nod";
+      style = "steady";
+      mood = "thinking";
+    } else if (intent === "closing") {
+      name = "no_opening";
+      suppressed.push("closing_no_opening");
+    } else if (stableScore(text) % 3 === 0) {
+      name = "side_eye";
+    }
+
+    const planned = name === "no_opening"
+      ? phase("no_opening", { suppressed: true })
+      : motionDirectorPhase(name, "pre", {
+          allowMotion: motionEnabled,
+          ttsEnabled: true,
+          style,
+          mood
+        }) || phase(name, {
+          pulseStyle: style,
+          pulseBoost: 0.24,
+          pulseDurationMs: 180,
+          actionIntent: motionEnabled ? "listen" : "none",
+          actionStyle: style,
+          actionMood: mood
+        });
+    if (!expressionEnabled) {
+      planned.pulseBoost = 0;
+      planned.pulseDurationMs = 0;
+    }
+    return {
+      version: 1,
+      enabled: suppressed.length === 0,
+      intent,
+      preReaction: planned,
+      suppressed: suppressed.slice(0, 8),
+      reason: suppressed.length ? suppressed[0] : "safe_pre_llm_reaction",
+      updated_at: nowMs
+    };
+  }
+
+  function toPublicEarlyReactionSummary(plan = null, actual = null) {
+    const safe = plan && typeof plan === "object" && !Array.isArray(plan) ? plan : null;
+    if (!safe) return null;
+    const actualSafe = actual && typeof actual === "object" && !Array.isArray(actual) ? actual : {};
+    return {
+      enabled: safe.enabled === true,
+      intent: clean(safe.intent, "casual"),
+      pre: clean(safe.pre || safe.preReaction?.name, "none"),
+      actual: clean(actualSafe.actual || actualSafe.status, safe.enabled === true ? "planned" : "suppressed"),
+      action: clean(actualSafe.action || safe.action || safe.preReaction?.actionIntent, "none"),
+      pulse: actualSafe.pulse === true || safe.pulse === true,
+      reason: clean(safe.reason, safe.enabled === true ? "safe_pre_llm_reaction" : "suppressed", 64),
+      suppressed: Array.isArray(safe.suppressed)
+        ? safe.suppressed.map((item) => clean(item, "", 48)).filter(Boolean).slice(0, 8)
+        : [],
+      updated_at: clampInt(safe.updated_at, 0, 0, Number.MAX_SAFE_INTEGER)
+    };
+  }
+
+  function executeEarlyPreReactionPlan(plan = null, context = {}) {
+    const safe = plan && typeof plan === "object" && !Array.isArray(plan) ? plan : null;
+    if (!safe || safe.enabled !== true || !safe.preReaction || safe.preReaction.suppressed === true) {
+      return toPublicEarlyReactionSummary(safe, { status: "suppressed", action: "none", pulse: false });
+    }
+    const enqueue = typeof context.enqueueActionIntent === "function" ? context.enqueueActionIntent : () => {};
+    const pulse = typeof context.triggerExpressionPulse === "function" ? context.triggerExpressionPulse : () => {};
+    const phasePlan = safe.preReaction;
+    const style = clean(phasePlan.actionStyle || phasePlan.pulseStyle || context.style, "neutral");
+    const mood = clean(phasePlan.actionMood || context.mood, "idle");
+    let didPulse = false;
+    if (Number(phasePlan.pulseBoost) > 0 && Number(phasePlan.pulseDurationMs) > 0) {
+      pulse(clean(phasePlan.pulseStyle || style, style), Number(phasePlan.pulseBoost), Number(phasePlan.pulseDurationMs));
+      didPulse = true;
+    }
+    const actionIntent = clean(phasePlan.actionIntent, "none");
+    if (actionIntent && actionIntent !== "none") {
+      enqueue(actionIntent, {
+        text: String(context.text || ""),
+        style,
+        mood,
+        combo: phasePlan.combo === true,
+        beats: clampInt(phasePlan.beats, 1, 1, 4),
+        emphasis: Math.max(0, Math.min(1, Number(phasePlan.emphasis) || 0))
+      });
+    }
+    return toPublicEarlyReactionSummary(safe, {
+      status: "dispatched",
+      actual: "dispatched",
+      action: actionIntent,
+      pulse: didPulse
     });
   }
 
@@ -452,6 +612,7 @@
     const segments = splitVoiceSegments(input.replyText, director.segment_style, director.max_segments);
     const suppressed = [...director.suppressed_reasons];
     if (!ttsEnabled) suppressed.push("tts_disabled");
+    const fallbackReason = segments.length ? "none" : "empty_reply";
     return {
       version: 1,
       enabled: ttsEnabled,
@@ -464,6 +625,7 @@
       inter_segment_pause_ms: director.inter_segment_pause_ms,
       max_segments: director.max_segments,
       segments,
+      fallback_reason: fallbackReason,
       suppressed
     };
   }
@@ -501,6 +663,7 @@
       segments: Array.isArray(safe.segments) ? clampInt(safe.segments.length, 0, 0, 4) : 0,
       pre_pause_ms: clampInt(safe.pre_pause_ms, 0, 0, 1200),
       inter_segment_pause_ms: clampInt(safe.inter_segment_pause_ms, 160, 0, 1600),
+      fallback_reason: clean(safe.fallback_reason, "none"),
       suppressed: Array.isArray(safe.suppressed)
         ? safe.suppressed.map((item) => clean(item)).filter(Boolean).slice(0, 6)
         : []
@@ -611,6 +774,22 @@
       return summary;
     }
 
+    function rememberEarlyPreReaction(summary) {
+      const safe = summary && typeof summary === "object" && !Array.isArray(summary)
+        ? toPublicEarlyReactionSummary(summary)
+        : null;
+      state.earlyPreReactionLastSummary = safe;
+      if (safe && safe.actual === "dispatched") {
+        state.earlyPreReactionLastAt = safe.updated_at || Date.now();
+      }
+      try {
+        windowObject.__AI_CHAT_LAST_EARLY_REACTION__ = safe;
+      } catch (_) {
+        // Optional debug bridge only.
+      }
+      return safe;
+    }
+
     function executePhasePlan(plan, context = {}, phaseKey = "") {
       if (!plan || typeof plan !== "object") {
         return false;
@@ -718,6 +897,10 @@
       buildVoiceSpeechSegments,
       toPublicVoiceTimelineSummary,
       applyVoiceDirectorProsody,
+      buildEarlyPreReactionPlan,
+      toPublicEarlyReactionSummary,
+      executeEarlyPreReactionPlan,
+      rememberEarlyPreReaction,
       rememberPerformanceTimeline,
       rememberVoiceTimeline,
       clearPerformanceTimelineTimers,
@@ -733,6 +916,9 @@
     buildVoiceSpeechSegments,
     toPublicVoiceTimelineSummary,
     applyVoiceDirectorProsody,
+    buildEarlyPreReactionPlan,
+    toPublicEarlyReactionSummary,
+    executeEarlyPreReactionPlan,
     countSpeechBeats,
     createController
   };

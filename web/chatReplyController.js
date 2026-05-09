@@ -63,6 +63,25 @@
       : (runtimeHint) => runtimeHint;
     const buildPerformanceTimeline = typeof deps.buildPerformanceTimeline === "function" ? deps.buildPerformanceTimeline : () => null;
     const rememberPerformanceTimeline = typeof deps.rememberPerformanceTimeline === "function" ? deps.rememberPerformanceTimeline : () => null;
+    const buildEarlyPreReactionPlan = typeof deps.buildEarlyPreReactionPlan === "function"
+      ? deps.buildEarlyPreReactionPlan
+      : (input) => (typeof root.TaffyPerformanceTimelineController?.buildEarlyPreReactionPlan === "function"
+          ? root.TaffyPerformanceTimelineController.buildEarlyPreReactionPlan(input)
+          : null);
+    const executeEarlyPreReactionPlan = typeof deps.executeEarlyPreReactionPlan === "function"
+      ? deps.executeEarlyPreReactionPlan
+      : (plan, context) => (typeof root.TaffyPerformanceTimelineController?.executeEarlyPreReactionPlan === "function"
+          ? root.TaffyPerformanceTimelineController.executeEarlyPreReactionPlan(plan, context)
+          : null);
+    const rememberEarlyPreReaction = typeof deps.rememberEarlyPreReaction === "function"
+      ? deps.rememberEarlyPreReaction
+      : (summary) => {
+          state.earlyPreReactionLastSummary = summary || null;
+          if (summary?.actual === "dispatched") {
+            state.earlyPreReactionLastAt = Number(summary.updated_at) || Date.now();
+          }
+          return summary || null;
+        };
     const buildVoiceTimeline = typeof deps.buildVoiceTimeline === "function"
       ? deps.buildVoiceTimeline
       : (input) => (typeof root.TaffyPerformanceTimelineController?.buildVoiceTimeline === "function"
@@ -175,9 +194,10 @@
       const safeSegments = segments.length ? segments : [text];
       const useSegmented = voiceTimeline?.enabled === true && safeSegments.length > 1;
       const mode = useSegmented ? `${context.mode || "direct"}_segmented` : (context.mode || "direct");
+      const fallbackReason = String(voiceTimeline?.fallback_reason || "none");
       recordPerformanceAuditEvent("tts_start", { mode });
       if (!useSegmented) {
-        recordPerformanceAuditEvent("voice_segment_plan", { mode, segments: safeSegments.length });
+        recordPerformanceAuditEvent("voice_segment_plan", { mode, segments: safeSegments.length, fallback_reason: fallbackReason });
         const prosody = applyVoiceDirectorProsody(
           buildSpeakProsody(text, context.mood, false, context.prosodyStyle),
           voiceDirector
@@ -198,7 +218,7 @@
         return ok !== false;
       }
 
-      recordPerformanceAuditEvent("voice_segment_plan", { mode, segments: safeSegments.length });
+      recordPerformanceAuditEvent("voice_segment_plan", { mode, segments: safeSegments.length, fallback_reason: fallbackReason });
       if (!(await waitVoiceDirectorPause(voiceTimeline.pre_pause_ms, context.sessionId))) {
         recordPerformanceAuditEvent("tts_end", { mode, ok: false });
         return false;
@@ -326,7 +346,34 @@
       const initialMood = detectMood(userDisplayText);
       const talkStyle = resolveTalkStyle(userDisplayText, "", initialMood, isAuto);
       state.currentTalkStyle = talkStyle;
-      enqueueActionIntent("listen", { text: userDisplayText, style: talkStyle, mood: initialMood });
+      const wasSpeakingAtSend = state.ttsContextSpeaking === true
+        || state.streamSpeakWorking === true
+        || String(state.speechPhase || "").toLowerCase() === "speaking";
+      const earlyPreReactionPlan = buildEarlyPreReactionPlan({
+        text: userDisplayText,
+        mood: initialMood,
+        talkStyle,
+        motionEnabled: state.motionEnabled !== false,
+        expressionEnabled: state.expressionEnabled !== false,
+        speakingNow: wasSpeakingAtSend,
+        lastReactionAt: Number(state.earlyPreReactionLastAt || 0),
+        nowMs: Date.now(),
+        isAuto
+      });
+      let earlyPreReactionSummary = null;
+      if (earlyPreReactionPlan) {
+        earlyPreReactionSummary = executeEarlyPreReactionPlan(earlyPreReactionPlan, {
+          text: userDisplayText,
+          style: talkStyle,
+          mood: initialMood,
+          enqueueActionIntent,
+          triggerExpressionPulse
+        });
+        earlyPreReactionSummary = rememberEarlyPreReaction(earlyPreReactionSummary);
+      }
+      if (!earlyPreReactionPlan && (!earlyPreReactionSummary || earlyPreReactionSummary.actual !== "dispatched")) {
+        enqueueActionIntent("listen", { text: userDisplayText, style: talkStyle, mood: initialMood });
+      }
 
       state.chatBusy = true;
       stopWakeWordListener(true);
@@ -522,13 +569,15 @@
             sessionId: streamSpeakSession,
             brainSnapshot: state.characterBrainLastDecision,
             timelineSummary: performanceTimelineSummary,
-            voiceSummary: voiceTimelineSummary
+            voiceSummary: voiceTimelineSummary,
+            earlyReactionSummary: earlyPreReactionSummary
           });
           if (voiceTimelineSummary) {
             recordPerformanceAuditEvent("voice_plan", {
               delivery: voiceTimelineSummary.delivery,
               pace: voiceTimelineSummary.pace,
-              segments: voiceTimelineSummary.segments
+              segments: voiceTimelineSummary.segments,
+              fallback_reason: voiceTimelineSummary.fallback_reason
             });
           }
           persistCharacterBrainSnapshot();
