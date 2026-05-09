@@ -510,6 +510,12 @@
           _perf_trace_id: chatPerfTraceId,
           _perf_client_send_ts_ms: chatPerfStartWallMs
         };
+        if (isAuto && opts.autoKind) {
+          payload.auto_kind = String(opts.autoKind || "").trim().slice(0, 40);
+        }
+        if (isAuto && opts.autoThoughtBurst && typeof opts.autoThoughtBurst === "object" && !Array.isArray(opts.autoThoughtBurst)) {
+          payload.auto_thought_burst = opts.autoThoughtBurst;
+        }
         if (imageDataUrl) {
           payload.image_data_url = imageDataUrl;
         }

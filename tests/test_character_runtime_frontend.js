@@ -424,13 +424,16 @@ function createMemoryStorage(initial = {}) {
   assert.ok(interjection.reasons.includes("stage_observation"), "turn interjection should carry a concrete stage-observation reason");
   assert.strictEqual(interjection.director.decision, "interject", "interjection director should approve safe stage asides");
   assert.strictEqual(interjection.director.stance, "suspicious_deadpan", "stage interjections should use a deadpan VTuber stance");
+  assert.strictEqual(interjection.director.thought_type, "tiny_rant", "stage interjections should become a thought burst, not a forced one-liner");
+  assert.strictEqual(interjection.director.max_sentences, 4, "tiny-rant thought bursts should allow a few short beats");
   assert.strictEqual(interjection.director.motion_cue, "side_eye", "stage interjections should plan a visible side-eye motion cue");
   const interjectionPrompt = controller.buildAutoChatPrompt(interjection);
-  assert.ok(interjectionPrompt.includes("quick afterthought") && interjectionPrompt.includes("tiny thought bubble"), "turn interjection prompt should frame the line as Taffy's own afterthought");
-  assert.ok(interjectionPrompt.includes("Interjection director: decision=interject") && interjectionPrompt.includes("motion=side_eye"), "turn interjection prompt should carry the director execution plan");
+  assert.ok(interjectionPrompt.includes("sudden thought burst") && interjectionPrompt.includes("thinking out loud"), "turn interjection prompt should frame the line as Taffy's own thought burst");
+  assert.ok(interjectionPrompt.includes("Interjection director: decision=interject") && interjectionPrompt.includes("thought_type=tiny_rant") && interjectionPrompt.includes("motion=side_eye"), "turn interjection prompt should carry the director execution plan");
+  assert.ok(interjectionPrompt.includes("2-4 short beats") && !interjectionPrompt.includes("Use exactly one short sentence."), "thought burst prompt should not force every interjection into a one-liner");
   assert.strictEqual(controller.executeInterjectionDirectorMotion(interjection), true, "interjection director should dispatch a safe motion cue");
   assert.ok(interjectionMotionCalls.some((call) => call[0] === "action" && call[1] === "listen" && call[2]?.motionRole === "interjection_reaction" && call[2]?.motionCue === "side_eye"), "interjection motion should land on the action plan as a director reaction");
-  assert.ok(interjection.delayMs >= 1200 && interjection.delayMs <= 3000, "turn interjection should feel immediate enough to notice during manual testing");
+  assert.ok(interjection.delayMs >= 450 && interjection.delayMs <= 1600, "turn interjection should feel immediate enough to notice during manual testing");
   assert.strictEqual(controller.shouldSkipTurnInterjection(interjection).skip, false, "turn interjection should be allowed when both sides are idle");
   state.ttsContextSpeaking = true;
   assert.deepStrictEqual(
@@ -458,6 +461,7 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(callbackInterjection.shouldTrigger, true, "recent stage memory should allow one short callback interjection");
   assert.ok(callbackInterjection.reasons.includes("stage_callback"), "stage callback should be explicit in the interjection reason list");
   assert.strictEqual(callbackInterjection.director.decision, "callback", "stage memory interjections should be marked as callbacks");
+  assert.strictEqual(callbackInterjection.director.thought_type, "callback", "stage memory interjections should expose a callback thought type");
 }
 
 {
@@ -2369,8 +2373,12 @@ assert.ok(
     && source.includes("function buildAutoChatInterjectionDebugReport")
     && source.includes("Auto Thought")
     && autoChatControllerSource.includes("function buildInterjectionDirectorPlan")
+    && autoChatControllerSource.includes("thought_type")
+    && autoChatControllerSource.includes("length_budget")
     && autoChatControllerSource.includes("function executeInterjectionDirectorMotion")
     && autoChatControllerSource.includes('motionRole: "interjection_reaction"')
+    && chatReplyControllerSource.includes("payload.auto_kind")
+    && chatReplyControllerSource.includes("payload.auto_thought_burst")
     && source.includes("director=")
     && source.includes("motion_dispatch=")
     && chatApi.streamAssistantReply

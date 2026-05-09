@@ -50,6 +50,7 @@ INTENT_PRIORITIES = {
     "encouragement": 60,
     "question": 50,
     "greeting": 40,
+    "thought_burst": 35,
     "low_interrupt_checkin": 30,
     "casual": 10,
 }
@@ -127,12 +128,20 @@ INTENT_OUTPUT_CONSTRAINTS = {
         "allow_motion": False,
         "voice_style": "soft",
     },
+    "thought_burst": {
+        "max_sentences": 4,
+        "allow_followup_question": False,
+        "clarify_only_when_needed": False,
+        "allow_teasing": True,
+        "allow_motion": True,
+        "voice_style": "teasing",
+    },
 }
 
 SESSION_RESET_AFTER_SEC = 30 * 60
 SESSION_SOFT_DECAY_AFTER_SEC = 10 * 60
 STAGE_CALLBACK_COOLDOWN_TURNS = 2
-IMPROV_HIGH_CHAOS_INTENTS = {"greeting", "casual", "question", "encouragement"}
+IMPROV_HIGH_CHAOS_INTENTS = {"greeting", "casual", "question", "encouragement", "thought_burst"}
 IMPROV_SAFE_CLAMP_INTENTS = {"comfort", "reminder", "closing", "low_interrupt_checkin"}
 
 STYLE_BEATS = {
@@ -243,6 +252,39 @@ def _clean_text(value: Any, max_len: int = 180) -> str:
     if len(text) > max_len:
         return text[: max(0, max_len - 3)].rstrip() + "..."
     return text
+
+
+def _public_thought_burst_context(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    cfg = config if isinstance(config, dict) else {}
+    if _clean_text(cfg.get("_character_auto_kind"), 40).lower() != "thought_burst":
+        return {"enabled": False}
+    raw = cfg.get("_character_auto_thought_burst")
+    data = raw if isinstance(raw, dict) else {}
+    allowed_types = {
+        "mutter",
+        "aside",
+        "tiny_rant",
+        "callback",
+        "mock_defense",
+        "celebration",
+        "topic_spark",
+    }
+    thought_type = _clean_text(data.get("thought_type"), 40).lower()
+    if thought_type not in allowed_types:
+        thought_type = "aside"
+    max_sentences = max(1, min(4, _safe_int(data.get("max_sentences"), 2)))
+    min_sentences = max(1, min(max_sentences, _safe_int(data.get("min_sentences"), 1)))
+    return {
+        "enabled": True,
+        "thought_type": thought_type,
+        "length_budget": _clean_text(data.get("length_budget"), 48) or f"{min_sentences}-{max_sentences} sentences",
+        "min_sentences": min_sentences,
+        "max_sentences": max_sentences,
+        "stance": _clean_text(data.get("stance"), 48),
+        "burst_reason": _clean_text(data.get("burst_reason"), 48),
+        "voice_style": _clean_text(data.get("voice_style"), 32).lower(),
+        "safety_clamp": _clean_text(data.get("safety_clamp"), 48) or "none",
+    }
 
 
 def _norm_key(value: Any) -> str:
@@ -413,7 +455,7 @@ def _select_performance_bit(intent: str, topic: str, user_message: str, reaction
         key = choices[_stable_text_score(safe_intent, topic, user_message) % len(choices)]
     elif reaction_mode == "deadpan_aside":
         key = "keyboard_judge"
-    elif safe_intent in {"greeting", "casual", "question", "encouragement"}:
+    elif safe_intent in {"greeting", "casual", "question", "encouragement", "thought_burst"}:
         choices = ("cursor_side_eye", "keyboard_judge", "pixel_static", "background_process")
         key = choices[_stable_text_score(safe_intent, topic, user_message, reaction_mode) % len(choices)]
     else:
@@ -544,6 +586,8 @@ def _select_improv_director(
         stance = "bossy_next_step"
     elif correction:
         stance = "mock_defensive_repair"
+    elif safe_intent == "thought_burst":
+        stance = _clean_text(stage.get("burst_stance"), 48) or "thinking_out_loud"
     elif safe_intent == "encouragement":
         stance = "victory_gloat"
     elif safe_intent == "question":
@@ -693,7 +737,7 @@ def _select_motion_director(decision: Dict[str, Any]) -> Dict[str, Any]:
         beats = ["tiny_nod"] if spontaneity >= 1 and allow_motion else []
         if spontaneity >= 3 and allow_motion:
             beats.append("blink_pulse")
-    elif intent in {"casual", "greeting"}:
+    elif intent in {"casual", "greeting", "thought_burst"}:
         pre = "deadpan_pause" if opening == "deadpan_aside" else "side_eye"
         if reaction == "quick_snap":
             pre = "micro_pulse"
@@ -897,6 +941,8 @@ def _select_performance_controls(
         opening, shape, spontaneity, question_policy = "answer_first", "one_liner", 0, "none"
     elif safe_intent == "low_interrupt_checkin":
         opening, shape, spontaneity, question_policy = "no_opening", "one_liner", 0, "none"
+    elif safe_intent == "thought_burst":
+        opening, shape, spontaneity, question_policy = "deadpan_aside", "mini_rant", 3, "none"
     elif safe_intent == "task_help":
         opening, shape, spontaneity, question_policy = "answer_first", "answer_then_bit", 1, "clarify_only"
     elif safe_intent == "question":
@@ -938,6 +984,7 @@ def _need_for_intent(intent: str) -> str:
         "reminder": "reminder",
         "closing": "space",
         "greeting": "companionship",
+        "thought_burst": "stage_thought",
         "low_interrupt_checkin": "low_interrupt",
     }.get(_clean_text(intent, 40), "companionship")
 
@@ -1481,8 +1528,14 @@ def build_character_brain_decision(
     session_state: Optional[Dict[str, Any]] = None,
     is_auto: bool = False,
 ) -> Dict[str, Any]:
-    intent_scores = score_user_intents(user_message, is_auto=is_auto)
-    intent = _select_intent_from_scores(intent_scores)
+    thought_burst = _public_thought_burst_context(config)
+    is_thought_burst = is_auto and thought_burst.get("enabled") is True
+    if is_thought_burst:
+        intent_scores = {"thought_burst": 999}
+        intent = "thought_burst"
+    else:
+        intent_scores = score_user_intents(user_message, is_auto=is_auto)
+        intent = _select_intent_from_scores(intent_scores)
     emotion_state = emotion_state if isinstance(emotion_state, dict) else {}
     flags = _experience_flags(experience_profile)
     continuity = _public_continuity_state(session_state)
@@ -1599,6 +1652,44 @@ def build_character_brain_decision(
             voice_style="soft",
             directive="Use one optional, easy-to-ignore sentence; never pressure the user to respond.",
         )
+    elif intent == "thought_burst":
+        thought_type = _clean_text(thought_burst.get("thought_type"), 40) or "aside"
+        voice_style = _clean_text(thought_burst.get("voice_style"), 32) or "teasing"
+        if voice_style == "dry":
+            voice_style = "teasing"
+        max_sentences = max(1, min(4, _safe_int(thought_burst.get("max_sentences"), 2)))
+        if thought_type == "celebration":
+            emotion, action, voice_style = "happy", "happy_idle", voice_style or "cheerful"
+        elif thought_type == "mock_defense":
+            emotion, action = "thinking", "shake_head"
+        elif thought_type in {"tiny_rant", "topic_spark"}:
+            emotion, action = "playful", "nod"
+        else:
+            emotion, action = "neutral", "none"
+        decision.update(
+            phase="thought_burst",
+            energy="sparked",
+            relationship="desktop_stage_companion",
+            reply_style="thought_burst",
+            max_sentences=max_sentences,
+            emotion=emotion,
+            action=action,
+            intensity="normal",
+            voice_style=voice_style,
+            directive=(
+                "This is Taffy thinking out loud, not answering a user request. "
+                "Let the thought be as long as it naturally needs within the budget, then stop. "
+                "No customer-service closer, no follow-up question, no tool or desktop-observation claim."
+            ),
+            thought_burst={
+                "thought_type": thought_type,
+                "length_budget": _clean_text(thought_burst.get("length_budget"), 48),
+                "min_sentences": max(1, min(max_sentences, _safe_int(thought_burst.get("min_sentences"), 1))),
+                "max_sentences": max_sentences,
+                "stance": _clean_text(thought_burst.get("stance"), 48),
+                "burst_reason": _clean_text(thought_burst.get("burst_reason"), 48),
+            },
+        )
 
     previous_need = continuity.get("recent_user_need")
     previous_intent = continuity.get("last_intent")
@@ -1684,6 +1775,21 @@ def build_character_brain_decision(
     decision["question_policy"] = _normalize_question_policy(performance.get("question_policy"))
     decision["performance_bit"] = _clean_text(performance.get("performance_bit"), 48)
     decision["performance_bit_guide"] = _clean_text(performance.get("performance_bit_guide"), 180)
+    if is_thought_burst:
+        burst_type = _clean_text(thought_burst.get("thought_type"), 40) or "aside"
+        burst_shapes = {
+            "mutter": "one_liner",
+            "aside": "two_beat",
+            "tiny_rant": "mini_rant",
+            "callback": "two_beat",
+            "mock_defense": "two_beat",
+            "celebration": "two_beat",
+            "topic_spark": "mini_rant",
+        }
+        decision["reply_shape"] = _normalize_reply_shape(burst_shapes.get(burst_type, "two_beat"))
+        decision["opening_move"] = "deadpan_aside" if burst_type in {"tiny_rant", "topic_spark"} else "micro_reaction"
+        decision["spontaneity"] = 3 if burst_type in {"tiny_rant", "topic_spark", "mock_defense", "celebration"} else 2
+        decision["question_policy"] = "none"
     stage_memory = _public_stage_memory(session_state)
     rotated_bit = _avoid_recent_stage_bit(
         decision["performance_bit"],
@@ -1720,6 +1826,14 @@ def build_character_brain_decision(
         f"Bit bank cue: {decision['performance_bit_guide']}. "
         "Use at most one bit; for answer_first, answer the user's actual question before the bit."
     )
+    if is_thought_burst:
+        burst = decision.get("thought_burst") if isinstance(decision.get("thought_burst"), dict) else {}
+        decision["directive"] += (
+            f" Thought burst: type={_clean_text(burst.get('thought_type'), 40)}, "
+            f"length={_clean_text(burst.get('length_budget'), 48)}, "
+            f"reason={_clean_text(burst.get('burst_reason'), 48) or 'stage_thought'}. "
+            "This is allowed to be more than one sentence when the budget allows it, but it must still feel like a sudden thought, not a service reply."
+        )
     decision["directive"] += " " + _character_flavor_directive(intent, topic)
 
     _apply_output_constraints(decision)
@@ -1751,6 +1865,7 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
     voice_director = _public_voice_director(
         decision.get("voice_director") if isinstance(decision.get("voice_director"), dict) else {}
     )
+    thought_burst = decision.get("thought_burst") if isinstance(decision.get("thought_burst"), dict) else {}
     lines = [
         "[Character brain state]",
         "Use this as private guidance for the next reply. Do not mention the brain state or expose metadata.",
@@ -1766,6 +1881,12 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Style beat: {_clean_text(decision.get('style_beat'), 48)} - {_clean_text(decision.get('style_beat_guide'), 180)}",
         f"Reaction mode: {_clean_text(decision.get('reaction_mode'), 48)}; banter_level={max(0, min(3, _safe_int(decision.get('banter_level'), 0)))}; {_clean_text(decision.get('reaction_mode_guide'), 220)}",
         f"Performance: opening={_normalize_opening_move(decision.get('opening_move'))}, shape={_normalize_reply_shape(decision.get('reply_shape'))}, spontaneity={max(0, min(3, _safe_int(decision.get('spontaneity'), 0)))}/3, question_policy={_normalize_question_policy(decision.get('question_policy'))}, bit={_clean_text(decision.get('performance_bit'), 48)}",
+        (
+            f"Thought burst: type={_clean_text(thought_burst.get('thought_type'), 40)}, "
+            f"length={_clean_text(thought_burst.get('length_budget'), 48)}, "
+            f"reason={_clean_text(thought_burst.get('burst_reason'), 48) or 'none'}"
+            if thought_burst else "Thought burst: none"
+        ),
         f"Output constraints: {_format_output_constraints_for_prompt(decision.get('output_constraints') if isinstance(decision.get('output_constraints'), dict) else {})}",
         "Question policy: avoid routine questions; only ask when the reply would be blocked without clarification.",
         f"Expression target: emotion={_normalize_emotion(decision.get('emotion'))}, action={_normalize_action(decision.get('action'))}, intensity={_normalize_intensity(decision.get('intensity'))}, voice_style={_clean_text(decision.get('voice_style'), 32)}",
@@ -2254,8 +2375,10 @@ def _shape_sentence_limit(reply_shape: str, intent: str, max_sentences: int) -> 
     if shape == "answer_then_bit":
         return min(max_sentences, 2)
     if shape == "bit_then_answer":
-        return min(max_sentences, 2 if safe_intent in {"casual", "greeting", "encouragement"} else 1)
+        return min(max_sentences, 2 if safe_intent in {"casual", "greeting", "encouragement", "thought_burst"} else 1)
     if shape == "mini_rant":
+        if safe_intent == "thought_burst":
+            return min(max_sentences, 4)
         return min(max_sentences, 3 if safe_intent in {"casual", "greeting", "encouragement"} else 2)
     return max_sentences
 
@@ -2562,6 +2685,18 @@ def build_character_brain_public_snapshot(
         "action": _normalize_action(decision.get("action")),
         "intensity": _normalize_intensity(decision.get("intensity")),
         "voice_style": _clean_text(decision.get("voice_style"), 32).lower() or "neutral",
+        "thought_burst": (
+            {
+                "thought_type": _clean_text(decision.get("thought_burst", {}).get("thought_type"), 40),
+                "length_budget": _clean_text(decision.get("thought_burst", {}).get("length_budget"), 48),
+                "min_sentences": max(0, min(4, _safe_int(decision.get("thought_burst", {}).get("min_sentences"), 0))),
+                "max_sentences": max(0, min(4, _safe_int(decision.get("thought_burst", {}).get("max_sentences"), 0))),
+                "stance": _clean_text(decision.get("thought_burst", {}).get("stance"), 48),
+                "burst_reason": _clean_text(decision.get("thought_burst", {}).get("burst_reason"), 48),
+            }
+            if isinstance(decision.get("thought_burst"), dict)
+            else {}
+        ),
         "performance_execution": execution,
         "output_constraints": _public_output_constraints(decision.get("output_constraints")),
         "improv": _public_improv_director(decision.get("improv") if isinstance(decision.get("improv"), dict) else {}),

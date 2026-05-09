@@ -820,16 +820,23 @@ def finalize_assistant_reply(config, llm_cfg, provider, user_message, safe_histo
 
 def build_prompt_with_style(config, user_message, safe_history, base_prompt, is_auto=False):
     style_cfg = config.get("style", {}) if isinstance(config, dict) else {}
+    is_thought_burst = bool(is_auto and isinstance(config, dict) and config.get("_character_auto_kind") == "thought_burst")
+    prompt_auto = bool(is_auto and not is_thought_burst)
     auto_mode = bool(style_cfg.get("auto", True))
     manual_style = normalize_style_name(style_cfg.get("manual", "neutral"))
     style_name = (
-        infer_context_style(user_message, safe_history, is_auto=is_auto)
+        infer_context_style(user_message, safe_history, is_auto=prompt_auto)
         if auto_mode
         else manual_style
     )
     style_block = build_style_prompt_block(style_name)
     prompt = merge_prompt_with_memory(base_prompt, style_block)
-    human_block = build_human_prompt_block(user_message, safe_history, is_auto=is_auto)
+    human_block = build_human_prompt_block(user_message, safe_history, is_auto=prompt_auto)
+    if is_thought_burst:
+        human_block += (
+            "\nThis automatic turn is a thought burst: it may be longer than one sentence when the thought needs it, "
+            "but it must still sound like Taffy thinking out loud, not a task notification."
+        )
     prompt = merge_prompt_with_memory(prompt, human_block)
     # 时间感知：让模型知道现在几点，语气自动适配
     time_block = build_time_awareness_block()

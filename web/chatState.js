@@ -31,6 +31,8 @@
   autoChatInterjectionLastContext: null,
   autoChatInterjectionLastDirector: null,
   autoChatInterjectionLastMotion: "",
+  autoChatInterjectionLastThoughtType: "",
+  autoChatInterjectionLastLengthBudget: "",
   autoChatInterjectionLastSuppressed: "",
   autoChatInterjectionLastScheduledAt: 0,
   autoChatInterjectionLastAttemptAt: 0,

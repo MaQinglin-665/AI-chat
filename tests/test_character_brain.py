@@ -674,6 +674,40 @@ def test_character_brain_auto_checkin_is_low_interruption_by_default():
     assert "directive" not in snapshot
 
 
+def test_character_brain_auto_thought_burst_allows_natural_length_budget():
+    decision = character_brain.build_character_brain_decision(
+        config={
+            "_character_auto_kind": "thought_burst",
+            "_character_auto_thought_burst": {
+                "thought_type": "tiny_rant",
+                "length_budget": "2-4 short beats",
+                "min_sentences": 2,
+                "max_sentences": 4,
+                "stance": "suspicious_deadpan",
+                "burst_reason": "stage_observation",
+                "voice_style": "dry",
+            },
+        },
+        user_message="Thought burst director test.",
+        history=[],
+        is_auto=True,
+    )
+    snapshot = character_brain.build_character_brain_public_snapshot(decision)
+
+    assert decision["intent"] == "thought_burst"
+    assert decision["phase"] == "thought_burst"
+    assert decision["max_sentences"] == 4
+    assert decision["reply_shape"] == "mini_rant"
+    assert decision["question_policy"] == "none"
+    assert decision["output_constraints"]["allow_followup_question"] is False
+    assert decision["output_constraints"]["allow_motion"] is True
+    assert "Thought burst" in character_brain.build_character_brain_prompt_block(decision)
+    assert snapshot["thought_burst"]["thought_type"] == "tiny_rant"
+    assert snapshot["thought_burst"]["max_sentences"] == 4
+    assert "directive" not in snapshot
+    assert "history_tail" not in snapshot
+
+
 def test_character_brain_public_snapshot_is_safe_and_compact():
     decision = character_brain.build_character_brain_decision(
         user_message="你觉得我下一步做什么？",

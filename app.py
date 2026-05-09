@@ -806,6 +806,35 @@ def _sanitize_character_experience_profile(raw):
     return profile
 
 
+def _sanitize_auto_thought_burst(raw):
+    if not isinstance(raw, dict):
+        return None
+    thought_type = _clean_experience_text(raw.get("thought_type"), 40).lower()
+    allowed_types = {
+        "mutter",
+        "aside",
+        "tiny_rant",
+        "callback",
+        "mock_defense",
+        "celebration",
+        "topic_spark",
+    }
+    if thought_type not in allowed_types:
+        thought_type = "aside"
+    max_sentences = max(1, min(4, _safe_int_value(raw.get("max_sentences", 2), 2)))
+    min_sentences = max(1, min(max_sentences, _safe_int_value(raw.get("min_sentences", 1), 1)))
+    return {
+        "thought_type": thought_type,
+        "length_budget": _clean_experience_text(raw.get("length_budget"), 48) or f"{min_sentences}-{max_sentences} sentences",
+        "min_sentences": min_sentences,
+        "max_sentences": max_sentences,
+        "stance": _clean_experience_text(raw.get("stance"), 48),
+        "burst_reason": _clean_experience_text(raw.get("burst_reason"), 48),
+        "voice_style": _clean_experience_text(raw.get("voice_style"), 32),
+        "safety_clamp": _clean_experience_text(raw.get("safety_clamp"), 48) or "none",
+    }
+
+
 def _build_character_experience_prompt_block(profile):
     safe = _sanitize_character_experience_profile(profile)
     if not safe:
@@ -1657,6 +1686,7 @@ class PetHandler(SimpleHTTPRequestHandler):
         history = body.get("history", [])
         image_data_url = body.get("image_data_url", "")
         is_auto = bool(body.get("auto", False))
+        auto_kind = _clean_experience_text(body.get("auto_kind"), 40).lower()
         force_tools = bool(body.get("force_tools", False))
         character_experience_profile = _sanitize_character_experience_profile(
             body.get("character_experience_profile")
@@ -1664,6 +1694,12 @@ class PetHandler(SimpleHTTPRequestHandler):
         if character_experience_profile:
             chat_config = dict(chat_config or {})
             chat_config["_character_experience_profile"] = character_experience_profile
+        if is_auto and auto_kind == "thought_burst":
+            chat_config = dict(chat_config or {})
+            chat_config["_character_auto_kind"] = "thought_burst"
+            chat_config["_character_auto_thought_burst"] = _sanitize_auto_thought_burst(
+                body.get("auto_thought_burst")
+            )
 
         if not user_message:
             self._send_json(

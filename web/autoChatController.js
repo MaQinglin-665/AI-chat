@@ -34,6 +34,16 @@
     ];
     const WAITING_VOICE_HINTS = constants.WAITING_VOICE_HINTS || ["I'm thinking, one second."];
     const VISION_INTENT_RE = constants.VISION_INTENT_RE || /a^/;
+    const THOUGHT_BURST_BUDGETS = {
+      none: { label: "quiet", min: 0, max: 0, guide: "Do not speak." },
+      mutter: { label: "1 sentence", min: 1, max: 1, guide: "A quick mutter is enough." },
+      aside: { label: "1-2 sentences", min: 1, max: 2, guide: "A small side thought may take one or two sentences." },
+      tiny_rant: { label: "2-4 short beats", min: 2, max: 4, guide: "Let the thought run for a few short beats, then stop before it becomes an assistant answer." },
+      callback: { label: "1-2 sentences", min: 1, max: 2, guide: "Briefly callback the recent stage bit without turning it into a catchphrase." },
+      mock_defense: { label: "1-3 sentences", min: 1, max: 3, guide: "A little mock-defensive recovery is allowed, but own the miss." },
+      celebration: { label: "1-3 sentences", min: 1, max: 3, guide: "Celebrate like a spontaneous desk-side victory lap." },
+      topic_spark: { label: "1-3 sentences", min: 1, max: 3, guide: "Follow the sudden association for a moment, then land it." }
+    };
     function isAssistantSpeechActive() {
       const phase = String(state.speechPhase || "").trim().toLowerCase();
       const now = Date.now();
@@ -437,6 +447,11 @@
         chaos_level: 0,
         reason: primaryReason,
         safety_clamp: safetyClamp,
+        thought_type: "none",
+        length_budget: THOUGHT_BURST_BUDGETS.none.label,
+        min_sentences: 0,
+        max_sentences: 0,
+        burst_reason: primaryReason,
         motion_cue: "none",
         pulse_style: "neutral",
         pulse_boost: 0,
@@ -454,11 +469,25 @@
         return base;
       }
 
+      const withThoughtBurst = (plan = {}, thoughtType = "aside") => {
+        const type = THOUGHT_BURST_BUDGETS[thoughtType] ? thoughtType : "aside";
+        const budget = THOUGHT_BURST_BUDGETS[type];
+        return {
+          ...base,
+          ...plan,
+          thought_type: type,
+          length_budget: budget.label,
+          min_sentences: budget.min,
+          max_sentences: budget.max,
+          burst_reason: plan.burst_reason || primaryReason,
+          length_guide: budget.guide
+        };
+      };
+
       const score = Number(context.score || 0);
       const threshold = Number(context.threshold || 1);
       if (!(context.shouldTrigger === true || score >= threshold)) {
-        return {
-          ...base,
+        return withThoughtBurst({
           decision: "react",
           stance: "listening",
           chaos_level: 1,
@@ -467,12 +496,11 @@
           pulse_style: "neutral",
           pulse_boost: 0.16,
           can_motion: true
-        };
+        }, "mutter");
       }
 
       if (reasons.includes("stage_callback")) {
-        return {
-          ...base,
+        return withThoughtBurst({
           decision: "callback",
           stance: "callback_imp",
           chaos_level: 2,
@@ -483,11 +511,10 @@
           voice_style: "teasing",
           can_speak: true,
           can_motion: true
-        };
+        }, "callback");
       }
       if (reasons.includes("correction_afterthought")) {
-        return {
-          ...base,
+        return withThoughtBurst({
           decision: "interject",
           stance: "mock_defensive_repair",
           chaos_level: 2,
@@ -498,11 +525,10 @@
           voice_style: "warm",
           can_speak: true,
           can_motion: true
-        };
+        }, "mock_defense");
       }
       if (reasons.includes("stage_observation")) {
-        return {
-          ...base,
+        return withThoughtBurst({
           decision: "interject",
           stance: "suspicious_deadpan",
           chaos_level: 3,
@@ -513,11 +539,10 @@
           voice_style: "dry",
           can_speak: true,
           can_motion: true
-        };
+        }, "tiny_rant");
       }
       if (reasons.includes("completion_spark")) {
-        return {
-          ...base,
+        return withThoughtBurst({
           decision: "interject",
           stance: "tiny_victory",
           chaos_level: 2,
@@ -528,11 +553,10 @@
           voice_style: "cheerful",
           can_speak: true,
           can_motion: true
-        };
+        }, "celebration");
       }
       if (reasons.includes("handed_back")) {
-        return {
-          ...base,
+        return withThoughtBurst({
           decision: "interject",
           stance: "opinionated",
           chaos_level: 2,
@@ -543,11 +567,10 @@
           voice_style: "curious",
           can_speak: true,
           can_motion: true
-        };
+        }, "topic_spark");
       }
       if (reasons.includes("answer_afterthought")) {
-        return {
-          ...base,
+        return withThoughtBurst({
           decision: "interject",
           stance: "answer_echo",
           chaos_level: 1,
@@ -558,11 +581,10 @@
           voice_style: "soft",
           can_speak: true,
           can_motion: true
-        };
+        }, "aside");
       }
 
-      return {
-        ...base,
+      return withThoughtBurst({
         decision: "interject",
         stance: "small_aside",
         chaos_level: 1,
@@ -573,7 +595,7 @@
         voice_style: "soft",
         can_speak: true,
         can_motion: true
-      };
+      }, "aside");
     }
 
     function buildQuietTurnInterjectionContext(primaryReason, reasons = []) {
@@ -724,7 +746,7 @@
         : 0.72;
       const primaryReason = pickAutoChatPrimaryReason(reasons);
       const topicHint = normalizeAutoChatTopicHint(topicSeeds.find(Boolean) || userText);
-      const delayMs = Math.round(1200 + Math.random() * 1800);
+      const delayMs = Math.round(450 + Math.random() * 1150);
       const context = {
         interjection: true,
         shouldTrigger: score >= threshold,
@@ -748,19 +770,25 @@
 
     function buildAutoChatBrainGate(context = {}) {
       const reason = String(context.primaryReason || "spontaneous").trim() || "spontaneous";
+      const director = context.interjection === true && context.director && typeof context.director === "object"
+        ? context.director
+        : null;
+      const maxSentences = director
+        ? Math.max(1, Math.min(4, Math.round(Number(director.max_sentences || 1))))
+        : 1;
       return {
-        intent: "low_interrupt_checkin",
+        intent: director ? "thought_burst" : "low_interrupt_checkin",
         reason,
         optional: true,
         canIgnore: true,
-        singleSentence: true,
-        maxSentences: 1,
+        singleSentence: maxSentences <= 1,
+        maxSentences,
         allowFollowupQuestion: false,
         allowDesktopObservation: false,
         allowFileRead: false,
         allowShell: false,
         allowToolCall: false,
-        voiceStyle: "soft",
+        voiceStyle: director?.voice_style || "soft",
         action: "none",
         cooldownMs: AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS,
         explanation: buildAutoChatTriggerExplanation(context)
@@ -820,18 +848,20 @@
       const topicLine = topicHint
         ? `Possible thread: "${topicHint}".`
         : "No explicit thread; use one grounded present-moment line.";
-      const brevityLine = "Use exactly one short sentence.";
       const brainGate = buildAutoChatBrainGate(ctx);
       const openingLine = ctx.interjection === true
-        ? "You are Taffy, a small desktop AI companion. This is a quick afterthought after the last turn, like she had her own tiny thought bubble."
+        ? "You are Taffy, a small desktop AI companion. This is a sudden thought burst after the last turn, like she briefly got caught thinking out loud."
         : "You are Taffy, a small desktop AI companion. This is a proactive low-interruption check-in.";
       const afterthoughtLine = ctx.interjection === true
-        ? "Make it feel like a spontaneous interjection between friends; it can be mildly teasing or deadpan when safe, but never turns into a new task."
+        ? "Make it feel like a spontaneous interjection between friends; it can be mildly teasing, deadpan, or oddly specific when safe, but never turns into a full assistant answer."
         : "Make it feel like a live stage aside, not a customer-service follow-up.";
       const director = ctx.director && typeof ctx.director === "object" ? ctx.director : buildInterjectionDirectorPlan(ctx);
       const directorLine = ctx.interjection === true
-        ? `Interjection director: decision=${director.decision || "hold_back"}; stance=${director.stance || "quiet"}; chaos=${Number(director.chaos_level || 0)}/3; motion=${director.motion_cue || "none"}; voice=${director.voice_style || "soft"}; safety_clamp=${director.safety_clamp || "none"}.`
+        ? `Interjection director: decision=${director.decision || "hold_back"}; stance=${director.stance || "quiet"}; chaos=${Number(director.chaos_level || 0)}/3; thought_type=${director.thought_type || "aside"}; length=${director.length_budget || "1-2 sentences"}; motion=${director.motion_cue || "none"}; voice=${director.voice_style || "soft"}; safety_clamp=${director.safety_clamp || "none"}.`
         : "";
+      const lengthLine = ctx.interjection === true
+        ? `Length: ${director.length_guide || "Speak as long as the thought naturally needs, then stop."} Use ${Math.max(1, Number(director.min_sentences || 1))}-${Math.max(1, Number(director.max_sentences || 2))} sentence-like beats if the thought wants that shape.`
+        : "Use exactly one short sentence.";
 
       return [
         openingLine,
@@ -845,7 +875,7 @@
         ctx.assistantHint ? `Previous answer vibe: "${String(ctx.assistantHint).replace(/"/g, "'")}".` : "",
         "Reply in English only.",
         "Output only the line Taffy should say. Do not explain why you are speaking.",
-        `${brevityLine} Prefer a statement the user can ignore; do not force an answer.`,
+        `${lengthLine} Prefer a statement the user can ignore; do not force an answer.`,
         afterthoughtLine,
         "Avoid greeting templates, task-report language, and notification wording."
       ].filter(Boolean).join("\n");
@@ -858,6 +888,17 @@
         rememberUser: false,
         rememberAssistant: true,
         auto: true,
+        autoKind: context.interjection === true ? "thought_burst" : "low_interrupt_checkin",
+        autoThoughtBurst: context.interjection === true ? {
+          thought_type: String(context.director?.thought_type || "aside"),
+          length_budget: String(context.director?.length_budget || "1-2 sentences"),
+          min_sentences: Number(context.director?.min_sentences || 1),
+          max_sentences: Number(context.director?.max_sentences || 2),
+          stance: String(context.director?.stance || "small_aside"),
+          burst_reason: String(context.director?.burst_reason || context.primaryReason || "afterthought"),
+          voice_style: String(context.director?.voice_style || "soft"),
+          safety_clamp: String(context.director?.safety_clamp || "none")
+        } : null,
         dropIfSpeaking: true,
         skipDesktopAttach: true,
         silentError: true
@@ -883,6 +924,8 @@
       const context = buildTurnInterjectionContext(input);
       state.autoChatInterjectionLastContext = context;
       state.autoChatInterjectionLastDirector = context.director || null;
+      state.autoChatInterjectionLastThoughtType = String(context.director?.thought_type || "");
+      state.autoChatInterjectionLastLengthBudget = String(context.director?.length_budget || "");
       state.autoChatInterjectionLastScheduledAt = 0;
       state.autoChatInterjectionLastSuppressed = "";
       state.autoChatInterjectionLastMotion = "";

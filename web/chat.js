@@ -1444,7 +1444,7 @@ function buildAutoChatInterjectionDebugReport() {
       ? `planned=${safeContext.shouldTrigger === true ? "yes" : "no"}; reason=${String(safeContext.primaryReason || "none")}; score=${Number(safeContext.score || 0).toFixed(2)}/${Number(safeContext.threshold || 0).toFixed(2)}; delay=${Math.round(Number(safeContext.delayMs || 0))}ms`
       : "planned=none",
     director
-      ? `director=${String(director.decision || "hold_back")}; stance=${String(director.stance || "quiet")}; chaos=${Number(director.chaos_level || 0)}/3; motion=${String(director.motion_cue || "none")}; voice=${String(director.voice_style || "soft")}; clamp=${String(director.safety_clamp || "none")}`
+      ? `director=${String(director.decision || "hold_back")}; stance=${String(director.stance || "quiet")}; chaos=${Number(director.chaos_level || 0)}/3; thought=${String(director.thought_type || state.autoChatInterjectionLastThoughtType || "none")}; length=${String(director.length_budget || state.autoChatInterjectionLastLengthBudget || "none")}; motion=${String(director.motion_cue || "none")}; voice=${String(director.voice_style || "soft")}; clamp=${String(director.safety_clamp || "none")}`
       : "director=none",
     `motion_dispatch=${String(state.autoChatInterjectionLastMotion || "none")}`,
     `topic=${topic}`,
