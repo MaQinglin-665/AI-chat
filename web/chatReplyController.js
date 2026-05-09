@@ -58,6 +58,9 @@
           if (voiceStyle === "curious") return "clear";
           return normalizeTalkStyle(fallback);
         };
+    const applyPerformanceControlsToRuntimeHint = typeof deps.applyPerformanceControlsToRuntimeHint === "function"
+      ? deps.applyPerformanceControlsToRuntimeHint
+      : (runtimeHint) => runtimeHint;
     const triggerExpressionPulse = typeof deps.triggerExpressionPulse === "function" ? deps.triggerExpressionPulse : () => {};
     const flushStreamSpeak = typeof deps.flushStreamSpeak === "function" ? deps.flushStreamSpeak : () => {};
     const scheduleFinalSpeechWatchdog = typeof deps.scheduleFinalSpeechWatchdog === "function" ? deps.scheduleFinalSpeechWatchdog : () => {};
@@ -79,7 +82,8 @@
     let characterRuntimeMetadataForReply = null;
 
     function rememberCharacterRuntimeMetadataForReply(metadata) {
-      const normalized = handleCharacterRuntimeMetadata(metadata);
+      const adjusted = applyPerformanceControlsToRuntimeHint(metadata, state.characterBrainLastDecision);
+      const normalized = handleCharacterRuntimeMetadata(adjusted || metadata);
       if (normalized && typeof normalized === "object" && !Array.isArray(normalized)) {
         characterRuntimeMetadataForReply = normalized;
       } else if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
@@ -346,13 +350,15 @@
           text: visibleReply,
           mood,
           style: baseTalkStyle,
-          auto: isAuto
+          auto: isAuto,
+          characterBrain: state.characterBrainLastDecision
         });
         const replyCueApply = maybeAutoApplyAssistantReplyCharacterCueCandidate(replyCueCandidate, {
           text: visibleReply,
           mood,
           style: baseTalkStyle,
-          auto: isAuto
+          auto: isAuto,
+          characterBrain: state.characterBrainLastDecision
         });
         const runtimeVoiceStyle = normalizeRuntimeVoiceStyleForSpeech(characterRuntimeMetadataForReply?.voice_style);
         const finalTalkStyle = resolveRuntimeTalkStyleForSpeech(

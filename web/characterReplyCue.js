@@ -221,6 +221,84 @@
     };
   }
 
+  function normalizeBrainPerformanceField(value) {
+    return String(value || "").trim().toLowerCase().replace(/-/g, "_");
+  }
+
+  function applyPerformanceControlsToRuntimeHint(runtimeHint = null, brainSnapshot = null) {
+    const hint = runtimeHint && typeof runtimeHint === "object" && !Array.isArray(runtimeHint)
+      ? { ...runtimeHint }
+      : {};
+    const brain = brainSnapshot && typeof brainSnapshot === "object" && !Array.isArray(brainSnapshot)
+      ? brainSnapshot
+      : null;
+    if (!brain) {
+      return Object.keys(hint).length ? hint : null;
+    }
+    const intent = normalizeBrainPerformanceField(brain.intent);
+    const opening = normalizeBrainPerformanceField(brain.opening_move);
+    const reaction = normalizeBrainPerformanceField(brain.reaction_mode);
+    const shape = normalizeBrainPerformanceField(brain.reply_shape);
+    const spontaneity = Math.max(0, Math.min(3, Number(brain.spontaneity) || 0));
+    const action = normalizeBrainPerformanceField(hint.action || brain.action || "none");
+    const emotion = normalizeBrainPerformanceField(hint.emotion || brain.emotion || "neutral");
+
+    const setQuiet = () => {
+      hint.emotion = ["sad", "anxious"].includes(String(brain.emotion || "").toLowerCase())
+        ? String(brain.emotion).toLowerCase()
+        : (intent === "comfort" ? "sad" : "neutral");
+      hint.action = "none";
+      hint.intensity = "low";
+      hint.voice_style = "soft";
+      hint.live2d_hint = "quiet";
+    };
+
+    if (intent === "comfort" || opening === "soft_anchor") {
+      setQuiet();
+      return hint;
+    }
+
+    if (intent === "task_help" || intent === "reminder" || reaction === "task_snap" || opening === "answer_first") {
+      if (["happy", "playful", "surprised"].includes(emotion)) {
+        hint.emotion = intent === "reminder" ? "neutral" : "thinking";
+      } else {
+        hint.emotion = hint.emotion || (intent === "reminder" ? "neutral" : "thinking");
+      }
+      hint.action = action === "none" || ["happy_idle", "wave", "surprised"].includes(action)
+        ? (intent === "reminder" ? "nod" : "think")
+        : action;
+      hint.intensity = "low";
+      hint.voice_style = intent === "task_help" ? "serious" : "neutral";
+      hint.live2d_hint = intent === "task_help" ? "thinking" : "idle";
+      return hint;
+    }
+
+    if (intent === "closing" || opening === "no_opening") {
+      hint.emotion = "neutral";
+      hint.action = action === "none" ? "wave" : action;
+      hint.intensity = "low";
+      hint.voice_style = "soft";
+      hint.live2d_hint = "idle";
+      return hint;
+    }
+
+    if (opening === "deadpan_aside" || opening === "micro_reaction" || shape === "mini_rant") {
+      hint.emotion = hint.emotion || "neutral";
+      hint.action = action === "none" ? "nod" : action;
+      hint.intensity = "low";
+      if (!hint.voice_style || hint.voice_style === "neutral") {
+        hint.voice_style = shape === "mini_rant" ? "teasing" : "neutral";
+      }
+      hint.live2d_hint = hint.live2d_hint || "idle";
+    }
+
+    if (spontaneity <= 0 && ["happy_idle", "surprised"].includes(normalizeBrainPerformanceField(hint.action))) {
+      hint.action = "none";
+      hint.intensity = "low";
+    }
+    return Object.keys(hint).length ? hint : null;
+  }
+
   function buildAssistantReplyCharacterCueCandidate(input = {}, options = {}) {
     const safe = input && typeof input === "object" ? input : {};
     const normalizeMetadata = typeof options.normalizeMetadata === "function"
@@ -251,7 +329,12 @@
       auto,
       tone
     });
-    const runtimeHint = normalizeMetadata(expressionCue.runtimeHint);
+    let runtimeHint = normalizeMetadata(expressionCue.runtimeHint);
+    const performanceHint = applyPerformanceControlsToRuntimeHint(
+      runtimeHint,
+      safe.characterBrain || safe.brainSnapshot || safe.brain || null
+    );
+    runtimeHint = normalizeMetadata(performanceHint) || runtimeHint;
     return {
       readOnly: true,
       source: "assistant_reply",
@@ -326,6 +409,7 @@
     listGrayAutoTrialCharacterCuePresets,
     resolveGrayAutoTrialCharacterCuePreset,
     buildAssistantReplyCharacterExpressionCue,
+    applyPerformanceControlsToRuntimeHint,
     buildAssistantReplyCharacterCueCandidate,
     normalizeRuntimeVoiceStyle,
     runtimeVoiceStyleToTalkStyle

@@ -325,23 +325,23 @@
 
       checks.push(await runDoctorTimed("聊天模型", async () => {
         const payload = await runDoctorJsonFetch(
-          "/api/chat",
+          "/api/llm_probe",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              message: "Reply with OK only.",
-              history: [],
-              auto: false,
-              force_tools: false
+              probe: "llm_lightweight"
             })
           },
-          22000
+          18000
         );
-        const reply = String(payload?.reply || "").trim();
+        const replyChars = Number(payload?.reply_chars || 0);
+        const elapsed = Math.round(Number(payload?.elapsed_ms) || 0);
         return {
-          ok: !!reply,
-          detail: reply ? "模型已经返回文本。" : "模型没有返回文本。"
+          ok: payload?.ok === true && replyChars > 0,
+          detail: payload?.ok === true
+            ? `Lightweight model probe returned text (${elapsed}ms).`
+            : "Lightweight model probe returned no text."
         };
       }));
 

@@ -77,12 +77,23 @@
     const constraints = safe.output_constraints && typeof safe.output_constraints === "object" && !Array.isArray(safe.output_constraints)
       ? safe.output_constraints
       : null;
+    const execution = safe.performance_execution && typeof safe.performance_execution === "object" && !Array.isArray(safe.performance_execution)
+      ? safe.performance_execution
+      : null;
     const constraintLines = constraints
       ? [
           "",
           "\u8f93\u51fa\u7ea6\u675f",
           `\u8ffd\u95ee\uff1a${constraints.allow_followup_question ? "\u5141\u8bb8" : "\u907f\u514d"}\uff1b\u6f84\u6e05\uff1a${constraints.clarify_only_when_needed ? "\u53ea\u5728\u5fc5\u8981\u65f6" : "\u4e0d\u5f3a\u5236"}`,
           `\u8c03\u4f83\uff1a${constraints.allow_teasing ? "\u5141\u8bb8" : "\u907f\u514d"}\uff1b\u52a8\u4f5c\uff1a${constraints.allow_motion === false ? "\u907f\u514d" : "\u5141\u8bb8"}\uff1b\u8bed\u97f3=${clean(constraints.voice_style, clean(safe.voice_style, "neutral"))}`
+        ]
+      : [];
+    const executionLines = execution
+      ? [
+          "",
+          "Execution",
+          `shape=${clean(execution.reply_shape, clean(safe.reply_shape, "none"))}; final_sentences=${Number(execution.final_sentences) || 0}`,
+          `removed_followup=${execution.removed_followup === true ? "yes" : "no"}; shortened=${execution.shortened === true ? "yes" : "no"}; used_bit=${execution.used_bit === true ? "yes" : "no"}; removed_unsafe_bit=${execution.removed_unsafe_bit === true ? "yes" : "no"}`
         ]
       : [];
     return [
@@ -97,6 +108,7 @@
       `Performance: opening=${clean(safe.opening_move, "none")}；shape=${clean(safe.reply_shape, "none")}；bit=${clean(safe.performance_bit, "none")}`,
       `Spontaneity: ${Number(safe.spontaneity) || 0}/3；Question policy: ${clean(safe.question_policy, "none")}`,
       ...constraintLines,
+      ...executionLines,
       `角色状态：能量=${clean(safe.energy)}；注意力=${clean(safe.attention)}；关系=${clean(safe.relationship)}`,
       `表现建议：情绪=${clean(safe.emotion)}；动作=${clean(safe.action)}；强度=${clean(safe.intensity)}；语音=${clean(safe.voice_style)}`,
       "",

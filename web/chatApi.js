@@ -82,8 +82,8 @@
         doneReply = evt.reply.trim();
       }
       if (evt.type === "done") {
-        onCharacterRuntimeMetadata(evt.character_runtime);
         onCharacterBrainDecision(evt.character_brain);
+        onCharacterRuntimeMetadata(evt.character_runtime);
       }
       return evt.type === "done";
     };
@@ -206,8 +206,8 @@
       if (!directResp.ok) {
         throw new Error(directData.error || `HTTP ${directResp.status}`);
       }
-      onCharacterRuntimeMetadata(directData?.character_runtime);
       onCharacterBrainDecision(directData?.character_brain);
+      onCharacterRuntimeMetadata(directData?.character_runtime);
       const text = String(directData.reply || "");
       if (text) {
         onDelta(text);

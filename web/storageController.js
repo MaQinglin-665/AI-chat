@@ -311,6 +311,9 @@
     const constraintsRaw = raw.output_constraints && typeof raw.output_constraints === "object" && !Array.isArray(raw.output_constraints)
       ? raw.output_constraints
       : {};
+    const executionRaw = raw.performance_execution && typeof raw.performance_execution === "object" && !Array.isArray(raw.performance_execution)
+      ? raw.performance_execution
+      : {};
     return {
       version: 1,
       intent: cleanText(raw.intent, 40),
@@ -331,6 +334,15 @@
       action: cleanText(raw.action, 32),
       intensity: cleanText(raw.intensity, 16),
       voice_style: cleanText(raw.voice_style, 32),
+      performance_execution: {
+        reply_shape: cleanText(executionRaw.reply_shape || raw.reply_shape, 48),
+        question_policy: cleanText(executionRaw.question_policy || raw.question_policy, 48),
+        removed_followup: executionRaw.removed_followup === true,
+        removed_unsafe_bit: executionRaw.removed_unsafe_bit === true,
+        shortened: executionRaw.shortened === true,
+        used_bit: executionRaw.used_bit === true,
+        final_sentences: cleanInt(executionRaw.final_sentences, 0, 0, 8)
+      },
       output_constraints: {
         max_sentences: cleanInt(constraintsRaw.max_sentences, cleanInt(raw.max_sentences, 3, 1, 8), 1, 8),
         allow_followup_question: constraintsRaw.allow_followup_question === true,

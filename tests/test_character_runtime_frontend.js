@@ -349,6 +349,16 @@ function createMemoryStorage(initial = {}) {
       action: "none",
       intensity: "low",
       voice_style: "soft",
+      performance_execution: {
+        reply_shape: "two_beat",
+        question_policy: "none",
+        removed_followup: true,
+        removed_unsafe_bit: false,
+        shortened: true,
+        used_bit: false,
+        final_sentences: 2,
+        private_prompt: "SECRET"
+      },
       output_constraints: {
         max_sentences: 3,
         allow_followup_question: false,
@@ -384,7 +394,8 @@ function createMemoryStorage(initial = {}) {
       && !stored.includes("directive")
       && !stored.includes("private prompt hint")
       && !stored.includes("private reaction hint")
-      && !stored.includes("private bit hint"),
+      && !stored.includes("private bit hint")
+      && !stored.includes("private_prompt"),
     "stored character brain snapshot should not include private fields"
   );
   const restored = { characterBrainLastDecision: null, characterBrainLastUpdatedAt: 0 };
@@ -404,6 +415,8 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.question_policy, "none", "character brain snapshot should restore public question policy");
   assert.strictEqual(restored.characterBrainLastDecision.performance_bit, "room_anchor", "character brain snapshot should restore public performance bit");
   assert.strictEqual(restored.characterBrainLastDecision.performance_bit_guide, undefined, "character brain snapshot should not persist private bit guidance");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_execution.removed_followup, true, "character brain snapshot should restore public execution summary");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_execution.private_prompt, undefined, "character brain snapshot should not persist private execution fields");
   assert.strictEqual(restored.characterBrainLastDecision.continuity.recent_user_need, "reassurance", "character brain snapshot should restore compact continuity");
   assert.strictEqual(restored.characterBrainLastDecision.output_constraints.allow_motion, false, "character brain snapshot should restore safe output constraints");
   assert.strictEqual(restored.characterBrainLastDecision.history_tail, undefined, "restored character brain snapshot should stay public-only");
@@ -430,6 +443,15 @@ function createMemoryStorage(initial = {}) {
       action: "none",
       intensity: "low",
       voice_style: "soft",
+      performance_execution: {
+        reply_shape: "two_beat",
+        question_policy: "none",
+        removed_followup: true,
+        removed_unsafe_bit: false,
+        shortened: true,
+        used_bit: false,
+        final_sentences: 2
+      },
       output_constraints: {
         max_sentences: 3,
         allow_followup_question: false,
@@ -480,6 +502,12 @@ function createMemoryStorage(initial = {}) {
       && brainReport.includes("Spontaneity: 0/3")
       && brainReport.includes("Question policy: none"),
     "character brain debug report should include compact public performance controls"
+  );
+  assert.ok(
+    brainReport.includes("Execution")
+      && brainReport.includes("removed_followup=yes")
+      && brainReport.includes("shortened=yes"),
+    "character brain debug report should include compact public execution summary"
   );
 }
 
@@ -1095,6 +1123,22 @@ assert.deepStrictEqual(
   },
   "reply cue helper should build read-only assistant reply runtime hints"
 );
+assert.deepStrictEqual(
+  toPlainObject(replyCue.applyPerformanceControlsToRuntimeHint(
+    { emotion: "happy", action: "happy_idle", intensity: "high", voice_style: "cheerful", live2d_hint: "happy" },
+    { intent: "comfort", opening_move: "soft_anchor", emotion: "sad", action: "none", reply_shape: "two_beat", spontaneity: 0 }
+  )),
+  { emotion: "sad", action: "none", intensity: "low", voice_style: "soft", live2d_hint: "quiet" },
+  "reply cue helper should map soft-anchor performance to quiet runtime delivery"
+);
+assert.deepStrictEqual(
+  toPlainObject(replyCue.applyPerformanceControlsToRuntimeHint(
+    { emotion: "happy", action: "happy_idle", intensity: "normal", voice_style: "cheerful", live2d_hint: "happy" },
+    { intent: "task_help", opening_move: "answer_first", reaction_mode: "task_snap", emotion: "thinking", action: "think", reply_shape: "answer_then_bit", spontaneity: 1 }
+  )),
+  { emotion: "thinking", action: "think", intensity: "low", voice_style: "serious", live2d_hint: "thinking" },
+  "reply cue helper should map task performance to focused thinking delivery"
+);
 assert.ok(
   ttsDebugReport.buildReport(
     { provider: "gpt_sovits", speakingEnabled: true, currentMs: 42, rms: 0.01234 },
@@ -1492,6 +1536,7 @@ assert.ok(
     && localCommandRegistrySource.includes('kind: "doctor"')
     && localCommandRegistry.matchLocalCommand("/doctor").kind === "doctor"
     && diagnosticsRuntimeControllerSource.includes('runDoctorJsonFetch("/api/health"')
+    && diagnosticsRuntimeControllerSource.includes('"/api/llm_probe"')
     && diagnosticsRuntimeControllerSource.includes("requestServerTTSBlob(")
     && diagnosticsRuntimeControllerSource.includes("doctorDiagnostics.buildReport")
     && doctorSource.includes("function buildAdvice")
@@ -1582,8 +1627,11 @@ assert.ok(
     && chatReplyControllerSource.includes("const finalProsodyStyle = runtimeVoiceStyle || replyCueApply?.voiceStyle || finalTalkStyle;")
     && chatReplyControllerSource.includes("function shouldSuppressGenericReplyMotion")
     && chatReplyControllerSource.includes("shouldSuppressGenericReplyMotion(characterRuntimeMetadataForReply)")
+    && chatReplyControllerSource.includes("applyPerformanceControlsToRuntimeHint")
     && source.includes("normalizeRuntimeVoiceStyle,")
-    && source.includes("runtimeVoiceStyleToTalkStyle,"),
+    && source.includes("runtimeVoiceStyleToTalkStyle,")
+    && source.includes("applyPerformanceControlsToRuntimeHint,")
+    && replyCueSource.includes("function applyPerformanceControlsToRuntimeHint"),
   "final reply TTS and generic reply motion should prefer backend Character Brain runtime metadata"
 );
 assert.ok(

@@ -53,6 +53,10 @@
         addUniqueAdvice(advice, "鉴权失败。先刷新或重启应用；如果还失败，检查 server.require_api_token 和本地 token 环境变量。");
         continue;
       }
+      if (message.includes("timeout") && (label.includes("聊天") || label.toLowerCase().includes("chat"))) {
+        addUniqueAdvice(advice, "Chat model probe timed out. For daily character testing, switch to a faster stable model first, then return to the larger model after the dialogue loop feels right.");
+        continue;
+      }
       if (message.includes("timeout")) {
         addUniqueAdvice(advice, `${label}超时。先确认对应服务没有卡住，必要时重启这一层，然后再点一次链路自检。`);
         continue;

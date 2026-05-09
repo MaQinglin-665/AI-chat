@@ -580,6 +580,58 @@ def test_character_brain_reply_constraints_filter_intent_mismatch():
     ) == "One tiny step. Ten minutes. No grand destiny ceremony."
 
 
+def test_character_brain_reply_shape_enforces_one_liner_and_execution_summary():
+    decision = character_brain.build_character_brain_decision(user_message="Say hi.")
+    decision["reply_shape"] = "one_liner"
+    decision["question_policy"] = "none"
+
+    reply = character_brain.apply_character_brain_reply_constraints(
+        "Tiny status report: I am awake. The keyboard is behaving for now. Let me know if you need anything else.",
+        decision,
+        user_message="Say hi.",
+    )
+
+    assert reply == "Tiny status report: I am awake."
+    execution = decision["performance_execution"]
+    assert execution["reply_shape"] == "one_liner"
+    assert execution["removed_followup"] is True
+    assert execution["shortened"] is True
+    assert execution["final_sentences"] == 1
+
+
+def test_character_brain_question_policy_none_removes_generic_followup_without_fallback():
+    decision = character_brain.build_character_brain_decision(user_message="This desk feels weird today.")
+
+    reply = character_brain.apply_character_brain_reply_constraints(
+        "The desk is giving cursed furniture energy. Let me know if you want me to help with anything else.",
+        decision,
+        user_message="This desk feels weird today.",
+    )
+
+    assert reply == "The desk is giving cursed furniture energy."
+    assert decision["performance_execution"]["removed_followup"] is True
+
+
+def test_character_brain_safe_intents_strip_unsafe_bits_and_task_stays_useful():
+    comfort = character_brain.build_character_brain_decision(user_message="I feel bad.")
+    task = character_brain.build_character_brain_decision(user_message="What next?")
+
+    comfort_reply = character_brain.apply_character_brain_reply_constraints(
+        "The keyboard is judging you. Let me know if you need anything.",
+        comfort,
+        user_message="I feel bad.",
+    )
+    task_reply = character_brain.apply_character_brain_reply_constraints(
+        "The clipboard is judging the situation.",
+        task,
+        user_message="What next?",
+    )
+
+    assert "keyboard" not in comfort_reply.lower()
+    assert comfort["performance_execution"]["removed_unsafe_bit"] is True
+    assert task_reply == "One tiny step. Ten minutes. No grand destiny ceremony."
+
+
 def test_character_brain_repeated_next_step_stays_task_help_and_concise():
     first = character_brain.build_character_brain_decision(
         user_message="What should I do next?",
@@ -651,6 +703,8 @@ def test_character_brain_public_snapshot_continuity_is_safe_and_compact():
     assert 0 <= snapshot["spontaneity"] <= 3
     assert snapshot["question_policy"] in {"none", "clarify_only", "optional_playful"}
     assert snapshot["performance_bit"]
+    assert snapshot["performance_execution"]["reply_shape"] == snapshot["reply_shape"]
+    assert "performance_bit_guide" not in snapshot["performance_execution"]
     assert snapshot["continuity"]["recent_user_need"] == "direction"
     assert snapshot["continuity"]["last_topic"] == "planning"
     assert "style_beat_guide" not in snapshot

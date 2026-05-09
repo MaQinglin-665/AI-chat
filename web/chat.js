@@ -694,6 +694,10 @@ function runtimeVoiceStyleToTalkStyle(style, fallback = "neutral") {
   return getGrayTrialCharacterPanelController().runtimeVoiceStyleToTalkStyle(style, fallback);
 }
 
+function applyPerformanceControlsToRuntimeHint(runtimeHint = null, brainSnapshot = null) {
+  return getGrayTrialCharacterPanelController().applyPerformanceControlsToRuntimeHint(runtimeHint, brainSnapshot);
+}
+
 function isReplyCueAutoApplyEnabled() {
   return getGrayTrialCharacterPanelController().isReplyCueAutoApplyEnabled();
 }
@@ -3959,6 +3963,7 @@ function getChatReplyController() {
       normalizeTalkStyle,
       normalizeRuntimeVoiceStyle,
       runtimeVoiceStyleToTalkStyle,
+      applyPerformanceControlsToRuntimeHint,
       triggerExpressionPulse,
       flushStreamSpeak,
       scheduleFinalSpeechWatchdog,

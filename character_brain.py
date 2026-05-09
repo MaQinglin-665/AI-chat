@@ -627,7 +627,7 @@ def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str,
             scores[intent] = scores.get(intent, 0) + points
 
     add_if(
-        r"(sad|tired|anxious|upset|hurt|overwhelmed|lonely|depressed|panic|scared|stress|wornout|exhausted|drained|wipedout|burnedout|burntout|stillhurts|notokay|cantshakeit|can'tshakeit|notoverit|staywithme|needcompany|needcomfort)",
+        r"(sad|tired|anxious|upset|hurt|overwhelmed|lonely|depressed|panic|scared|stress|wornout|exhausted|drained|wipedout|burnedout|burntout|feelbad|feelingbad|feelawful|feelingawful|unwell|stillhurts|notokay|cantshakeit|can'tshakeit|notoverit|staywithme|needcompany|needcomfort)",
         "comfort",
         120,
     )
@@ -1220,7 +1220,10 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
         if re.search(r"(code|bug|stuck|error|\u4ee3\u7801|\u5361\u4f4f|\u62a5\u9519)", compact):
             return "The bug is acting important. Embarrassing for it, because you're still here."
         return "Look at you, actually finishing the thing. Suspiciously competent."
-    if intent == "task_help" and topic == "planning":
+    if intent == "task_help" and (
+        topic == "planning"
+        or re.search(r"(whatnext|nextstep|whatshouldidonext|whatdoidonext|nexttodo)", compact)
+    ):
         return "One tiny step. Ten minutes. No grand destiny ceremony."
     if intent == "task_help" and topic == "character_runtime":
         return "Testing voice endurance now: if I reach the end of this sentence without vanishing, the tiny sound machine gets one reluctant point."
@@ -1334,6 +1337,145 @@ def _looks_like_vague_planning_reply(text: str) -> bool:
     return len(lower) < 90
 
 
+def _is_generic_followup_sentence(sentence: str) -> bool:
+    lower = re.sub(r"\s+", " ", str(sentence or "").strip().lower())
+    if not lower:
+        return False
+    patterns = (
+        r"\blet me know\b",
+        r"\bfeel free to\b",
+        r"\bdon'?t hesitate\b",
+        r"\banything else\b",
+        r"\bis there (anything|something) else\b",
+        r"\bif you (need|want|would like)\b",
+        r"\bi'?m here (to help|if you need)\b",
+        r"\bhappy to help\b",
+    )
+    return any(re.search(pattern, lower) for pattern in patterns)
+
+
+def _filter_policy_closers(sentences: List[str], *, question_policy: str) -> List[str]:
+    if question_policy != "none":
+        return sentences
+    kept = [sentence for sentence in sentences if not _is_generic_followup_sentence(sentence)]
+    return kept or sentences
+
+
+def _contains_performance_bit_language(sentence: str) -> bool:
+    lower = re.sub(r"\s+", " ", str(sentence or "").strip().lower())
+    if not lower:
+        return False
+    markers = (
+        "cursor",
+        "keyboard",
+        "pixel",
+        "static",
+        "background process",
+        "clipboard",
+        "system ping",
+        "desktop air",
+        "sound machine",
+    )
+    return any(marker in lower for marker in markers)
+
+
+def _filter_unsafe_bits_for_intent(sentences: List[str], intent: str) -> List[str]:
+    if intent not in {"comfort", "reminder", "closing", "low_interrupt_checkin"}:
+        return sentences
+    kept = [sentence for sentence in sentences if not _contains_performance_bit_language(sentence)]
+    return kept
+
+
+def _drop_generic_preamble(sentences: List[str]) -> List[str]:
+    if len(sentences) <= 1:
+        return sentences
+    first = str(sentences[0] or "").strip().lower()
+    if re.fullmatch(r"(sure|sure thing|of course|absolutely|okay|ok|yeah|yep|i can help with that)[.!]*", first):
+        return sentences[1:]
+    if re.fullmatch(r"(sure|of course|absolutely),?\s*(i can|i'll|let's).{0,50}", first):
+        return sentences[1:]
+    return sentences
+
+
+def _shape_sentence_limit(reply_shape: str, intent: str, max_sentences: int) -> int:
+    shape = _normalize_reply_shape(reply_shape)
+    safe_intent = _clean_text(intent, 40)
+    if shape == "one_liner":
+        return 1
+    if shape == "two_beat":
+        return min(max_sentences, 2)
+    if shape == "answer_then_bit":
+        return min(max_sentences, 2)
+    if shape == "bit_then_answer":
+        return min(max_sentences, 2 if safe_intent in {"casual", "greeting", "encouragement"} else 1)
+    if shape == "mini_rant":
+        return min(max_sentences, 3 if safe_intent in {"casual", "greeting", "encouragement"} else 2)
+    return max_sentences
+
+
+def _compact_one_liner(text: str, max_chars: int = 170) -> str:
+    compact = _normalize_reply_text_spacing(text)
+    if len(compact) <= max_chars:
+        return compact
+    parts = re.split(r"(?<=[,;:])\s+", compact)
+    out = ""
+    for part in parts:
+        candidate = f"{out} {part}".strip()
+        if len(candidate) > max_chars:
+            break
+        out = candidate
+    return out or compact[:max_chars].rstrip(" ,;:")
+
+
+def _reply_contains_selected_bit(text: str, performance_bit: str) -> bool:
+    key = _clean_text(performance_bit, 48)
+    if not key or key == "none":
+        return False
+    lower = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    markers = {
+        "cursor_side_eye": ("cursor",),
+        "keyboard_judge": ("keyboard",),
+        "pixel_static": ("pixel", "static"),
+        "background_process": ("background process",),
+        "clipboard_supervisor": ("clipboard",),
+        "room_anchor": ("room",),
+        "pixel_watch": ("pixel",),
+        "clean_ping": ("ping",),
+    }.get(key, ())
+    return any(marker in lower for marker in markers)
+
+
+def _record_performance_execution(
+    decision: Optional[Dict[str, Any]],
+    *,
+    reply_shape: str,
+    question_policy: str,
+    original: str,
+    constrained: str,
+    removed_followup: bool,
+    removed_bit: bool,
+    before_sentence_count: int,
+    after_sentence_count: int,
+) -> None:
+    if not isinstance(decision, dict):
+        return
+    decision["performance_execution"] = {
+        "reply_shape": _normalize_reply_shape(reply_shape),
+        "question_policy": _normalize_question_policy(question_policy),
+        "removed_followup": bool(removed_followup),
+        "removed_unsafe_bit": bool(removed_bit),
+        "shortened": bool(
+            after_sentence_count < before_sentence_count
+            or len(str(constrained or "")) + 12 < len(str(original or ""))
+        ),
+        "used_bit": _reply_contains_selected_bit(
+            constrained,
+            _clean_text(decision.get("performance_bit"), 48),
+        ),
+        "final_sentences": max(0, min(8, after_sentence_count)),
+    }
+
+
 def apply_character_brain_reply_constraints(
     reply: Any,
     decision: Optional[Dict[str, Any]],
@@ -1350,12 +1492,22 @@ def apply_character_brain_reply_constraints(
     )
     max_sentences = max(1, min(8, _safe_int(decision.get("max_sentences"), constraints["max_sentences"])))
     intent = _clean_text(decision.get("intent"), 40)
+    reply_shape = _normalize_reply_shape(decision.get("reply_shape"))
+    question_policy = _normalize_question_policy(decision.get("question_policy"))
     sentences = _split_reply_sentences(original)
+    before_sentence_count = len(sentences)
     sentences = _remove_unwanted_questions(
         sentences,
         allow_followup=bool(constraints.get("allow_followup_question", False)),
         clarify_only=bool(constraints.get("clarify_only_when_needed", False)),
     )
+    after_question_count = len(sentences)
+    sentences = _filter_policy_closers(sentences, question_policy=question_policy)
+    after_policy_count = len(sentences)
+    sentences = _filter_unsafe_bits_for_intent(sentences, intent)
+    after_safe_bit_count = len(sentences)
+    if reply_shape in {"answer_then_bit", "bit_then_answer"}:
+        sentences = _drop_generic_preamble(sentences)
     before_intent_filter = list(sentences)
     sentences = _drop_intent_mismatched_sentences(sentences, intent)
     if sentences == before_intent_filter and intent in {"comfort", "closing"}:
@@ -1367,8 +1519,19 @@ def apply_character_brain_reply_constraints(
             fallback = _fallback_reply_for_intent(intent, user_message)
             if fallback:
                 return _normalize_reply_text_spacing(fallback) + meta
-    constrained = " ".join(sentences[:max_sentences]).strip()
+    shape_limit = _shape_sentence_limit(reply_shape, intent, max_sentences)
+    constrained = " ".join(sentences[:shape_limit]).strip()
+    if reply_shape == "one_liner":
+        constrained = _compact_one_liner(constrained)
+    if intent == "closing" and _looks_like_bland_character_reply(original, intent):
+        fallback = _fallback_reply_for_intent(intent, user_message)
+        if fallback:
+            constrained = fallback
     if intent == "task_help" and _derive_topic(user_message, intent) == "planning" and _looks_like_vague_planning_reply(constrained):
+        fallback = _fallback_reply_for_intent(intent, user_message)
+        if fallback:
+            constrained = fallback
+    if intent == "task_help" and _contains_performance_bit_language(constrained) and _looks_like_vague_planning_reply(constrained):
         fallback = _fallback_reply_for_intent(intent, user_message)
         if fallback:
             constrained = fallback
@@ -1384,6 +1547,20 @@ def apply_character_brain_reply_constraints(
     if not constrained:
         constrained = _fallback_reply_for_intent(intent, user_message) or original
     constrained = _normalize_reply_text_spacing(constrained)
+    _record_performance_execution(
+        decision,
+        reply_shape=reply_shape,
+        question_policy=question_policy,
+        original=original,
+        constrained=constrained,
+        removed_followup=(
+            after_question_count < before_sentence_count
+            or after_policy_count < after_question_count
+        ),
+        removed_bit=after_safe_bit_count < after_policy_count,
+        before_sentence_count=before_sentence_count,
+        after_sentence_count=len(_split_reply_sentences(constrained)),
+    )
     return constrained + meta
 
 
@@ -1407,6 +1584,20 @@ def build_character_brain_public_snapshot(
         feedback_effects.append("more_visible_motion")
     if flags["voice_care"]:
         feedback_effects.append("voice_style_care")
+    raw_execution = (
+        decision.get("performance_execution")
+        if isinstance(decision.get("performance_execution"), dict)
+        else {}
+    )
+    execution = {
+        "reply_shape": _normalize_reply_shape(raw_execution.get("reply_shape") or decision.get("reply_shape")),
+        "question_policy": _normalize_question_policy(raw_execution.get("question_policy") or decision.get("question_policy")),
+        "removed_followup": raw_execution.get("removed_followup") is True,
+        "removed_unsafe_bit": raw_execution.get("removed_unsafe_bit") is True,
+        "shortened": raw_execution.get("shortened") is True,
+        "used_bit": raw_execution.get("used_bit") is True,
+        "final_sentences": max(0, min(8, _safe_int(raw_execution.get("final_sentences"), 0))),
+    }
     return {
         "version": 1,
         "intent": _clean_text(decision.get("intent"), 40),
@@ -1427,6 +1618,7 @@ def build_character_brain_public_snapshot(
         "action": _normalize_action(decision.get("action")),
         "intensity": _normalize_intensity(decision.get("intensity")),
         "voice_style": _clean_text(decision.get("voice_style"), 32).lower() or "neutral",
+        "performance_execution": execution,
         "output_constraints": _public_output_constraints(decision.get("output_constraints")),
         "feedback_effects": feedback_effects[:5],
         "continuity": _public_continuity_state(

@@ -102,6 +102,7 @@ from llm_client import (
     call_openai_compatible,
     http_post_json,
     is_local_url,
+    normalize_text_content,
 )
 
 from humanize import (
@@ -423,6 +424,85 @@ def _ensure_llm_auth_ready(llm_cfg):
 
 def _diagnose_llm_exception(exc, llm_cfg):
     return _diagnose_llm_exception_impl(exc, llm_cfg)
+
+
+def _run_lightweight_llm_probe(config):
+    cfg = config if isinstance(config, dict) else load_config()
+    raw_llm_cfg = cfg.get("llm", {}) if isinstance(cfg.get("llm", {}), dict) else {}
+    llm_cfg = dict(_build_reply_llm_cfg(cfg, raw_llm_cfg))
+    llm_cfg["temperature"] = 0
+    llm_cfg["max_tokens"] = 8
+    llm_cfg["max_output_tokens"] = 8
+    llm_cfg["request_timeout"] = min(
+        8,
+        max(4, _safe_int_value(llm_cfg.get("request_timeout", 8), 8)),
+    )
+    provider = _resolve_llm_provider(llm_cfg)
+    model = str(llm_cfg.get("model", "") or "").strip()
+    started = time.monotonic()
+    messages = [
+        {
+            "role": "system",
+            "content": "Reply with exactly OK. No punctuation, no extra words.",
+        },
+        {"role": "user", "content": "Ping."},
+    ]
+    if provider in {"openai", "openai-compatible", "openai_compatible"}:
+        _ensure_llm_auth_ready(llm_cfg)
+        base_url = str(llm_cfg.get("base_url", "") or "").strip().rstrip("/")
+        key, key_env = _resolve_llm_api_key(llm_cfg)
+        headers = {}
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
+        elif not is_local_url(base_url):
+            raise RuntimeError(f"Missing API key. Please set environment variable: {key_env}.")
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0,
+            "max_tokens": 8,
+            "stream": False,
+        }
+        data = http_post_json(
+            f"{base_url}/chat/completions",
+            payload,
+            headers=headers,
+            timeout=llm_cfg["request_timeout"],
+            attempts=1,
+        )
+        choices = data.get("choices") or []
+        reply = ""
+        if choices:
+            reply = normalize_text_content((choices[0].get("message") or {}).get("content", ""))
+    elif provider == "ollama":
+        base_url = str(llm_cfg.get("base_url", OLLAMA_DEFAULT_BASE_URL) or OLLAMA_DEFAULT_BASE_URL).strip().rstrip("/")
+        payload = {
+            "model": model or OLLAMA_DEFAULT_MODEL,
+            "messages": messages,
+            "stream": False,
+            "options": {"temperature": 0, "num_predict": 8},
+        }
+        data = http_post_json(
+            f"{base_url}/api/chat",
+            payload,
+            timeout=llm_cfg["request_timeout"],
+            attempts=1,
+        )
+        if isinstance(data.get("error"), str) and data["error"].strip():
+            raise RuntimeError(f"Ollama error: {data['error']}")
+        reply = normalize_text_content((data.get("message") or {}).get("content", "")) or normalize_text_content(data.get("response", ""))
+    else:
+        raise RuntimeError(f"Unsupported llm.provider: {provider}.")
+
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    return {
+        "ok": bool(reply),
+        "provider": provider,
+        "model": model,
+        "elapsed_ms": elapsed_ms,
+        "reply_chars": len(reply or ""),
+        "detail": "Lightweight model probe returned text." if reply else "Lightweight model probe returned no text.",
+    }
 
 
 def reset_runtime_state():
@@ -1440,6 +1520,7 @@ class PetHandler(SimpleHTTPRequestHandler):
             "/api/chat_stream",
             "/api/tts",
             "/api/translate",
+            "/api/llm_probe",
             "/api/asr_pcm",
             "/api/persona_card",
         }:
@@ -1535,6 +1616,28 @@ class PetHandler(SimpleHTTPRequestHandler):
                 log_backend_perf_func=_log_backend_perf,
                 perf_now_ms_func=_perf_now_ms,
             )
+            return
+
+        if path_only == "/api/llm_probe":
+            try:
+                probe_config = load_config()
+                payload = _run_lightweight_llm_probe(probe_config)
+                self._send_json(payload, status=HTTPStatus.OK, extra_headers=perf_headers)
+            except Exception as exc:
+                cfg = {}
+                try:
+                    cfg = load_config().get("llm", {})
+                except Exception:
+                    cfg = {}
+                diagnosed = _diagnose_llm_exception(exc, cfg)
+                safe = _diagnostic_payload(diagnosed)
+                safe["ok"] = False
+                safe["probe"] = "llm_lightweight"
+                self._send_json(
+                    safe,
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                    extra_headers=perf_headers,
+                )
             return
 
         if path_only == "/api/asr_pcm":

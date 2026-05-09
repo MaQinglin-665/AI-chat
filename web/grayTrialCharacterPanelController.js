@@ -522,6 +522,12 @@
         : normalizeTalkStyle(fallback);
     }
 
+    function applyPerformanceControlsToRuntimeHint(runtimeHint = null, brainSnapshot = null) {
+      return typeof CHARACTER_REPLY_CUE.applyPerformanceControlsToRuntimeHint === "function"
+        ? CHARACTER_REPLY_CUE.applyPerformanceControlsToRuntimeHint(runtimeHint, brainSnapshot)
+        : runtimeHint;
+    }
+
     function isReplyCueAutoApplyEnabled() {
       const runtimeCfg = state.config?.character_runtime || {};
       return state.characterRuntimeAutoApplyReplyCue === true
@@ -677,6 +683,7 @@
       previewAssistantReplyCharacterCueCandidate,
       normalizeRuntimeVoiceStyle,
       runtimeVoiceStyleToTalkStyle,
+      applyPerformanceControlsToRuntimeHint,
       isReplyCueAutoApplyEnabled,
       maybeAutoApplyAssistantReplyCharacterCueCandidate,
       maybeEmitFollowupCharacterRuntimeHint,

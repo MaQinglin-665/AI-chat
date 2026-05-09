@@ -34,7 +34,7 @@ def is_local_url(url):
     lowered = url.lower()
     return lowered.startswith("http://127.0.0.1") or lowered.startswith("http://localhost")
 
-def http_post_json(url, payload, headers=None, timeout=60):
+def http_post_json(url, payload, headers=None, timeout=60, attempts=3):
     req_headers = {"Content-Type": "application/json"}
     if headers:
         req_headers.update(headers)
@@ -43,7 +43,11 @@ def http_post_json(url, payload, headers=None, timeout=60):
 
     # Retry transient upstream/network failures to reduce visible chat errors.
     # This is especially useful for proxy relays that occasionally close sockets.
-    attempts = 3
+    try:
+        attempts = int(attempts)
+    except (TypeError, ValueError):
+        attempts = 3
+    attempts = max(1, min(5, attempts))
     body = ""
     last_exc = None
     for attempt in range(1, attempts + 1):
