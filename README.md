@@ -103,6 +103,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 
 `configure-llm.ps1` 会把 provider / base URL / model 写入 `config.local.json`，把 API Key 写入 `.env`，不会把真实 Key 写进 JSON 配置。
 
+模型由用户自行选择；项目不内置云端模型或 API Key。选择标准见 `docs/model-selection.md`：优先选择诊断通过、成功率 >= 80%、常态单轮 < 15 秒、英文输出稳定的模型。
+
 `apply-preview-experience-config.ps1` 会合并 `config.preview.example.json`，保留你已经配置好的 LLM provider / base URL / model / api_key_env，只应用 Taffy preview 的角色、TTS、动作和安全主动插话设置。
 
 `first_chat_smoke.ps1` 会检测或启动后端，检查 `/healthz` / `/api/health`，再进行轻量 LLM probe 和一条短 `/api/chat` 请求。想避免真实聊天请求时可加 `-SkipChat` 或 `-SkipLlmProbe`。
@@ -167,6 +169,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 
 - 安装依赖与启动方式：`docs/setup.md`
 - 安装与运行、Live2D、LLM、TTS/ASR：`docs/setup.md`
+- 模型选择与验收标准：`docs/model-selection.md`
 - 后端健康接口契约：`docs/backend-health.md`
 - 启动失败样例库：`docs/startup-failure-examples.md`
 - 发布前 go/no-go 门槛：`docs/release-readiness.md`

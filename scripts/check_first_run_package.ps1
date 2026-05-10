@@ -100,6 +100,7 @@ try {
         "README-FIRST-RUN.txt",
         "README.md",
         "THIRD_PARTY_NOTICES.md",
+        "docs\model-selection.md",
         "install_first_run.bat",
         "start_electron.bat",
         "scripts\bootstrap-first-run.ps1",

@@ -51,6 +51,10 @@ If the remaining blocker is LLM configuration, run:
 The LLM helper writes provider/model settings to config.local.json and stores
 API keys in .env. It does not write API keys into config JSON.
 
+Model choice is yours. The project does not include a cloud model or API key.
+Use docs\model-selection.md to choose a provider/model that passes diagnostics,
+reaches at least 80% probe success, and usually replies in under 15 seconds.
+
 To try the current Taffy AI VTuber preview profile, run:
 
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\apply-preview-experience-config.ps1

@@ -311,7 +311,11 @@ if ($defaults.needs_key) {
 
 Write-Host ""
 Write-Ok "LLM configuration complete."
-Write-Host "Next check:"
-Write-Host "  .venv\Scripts\python.exe scripts\first_run_check.py"
+Write-Host "Model choice is yours; for Taffy preview, prefer a stable model that passes diagnostics and usually replies in under 15 seconds."
+Write-Host "Model selection guide:"
+Write-Host "  docs\model-selection.md"
+Write-Host "Next checks:"
+Write-Host "  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1"
+Write-Host "  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1"
 Write-Host "Then launch:"
 Write-Host "  .\start_electron.bat"

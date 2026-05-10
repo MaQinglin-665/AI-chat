@@ -8,6 +8,8 @@
 
 This release is inspired by AI VTuber interaction patterns, including the sense of immediacy found in Neuro-sama-like experiences, but it is not a clone and does not copy existing VTuber lines, lore, or proprietary bits.
 
+The preview does not include a cloud model, hosted endpoint, or API key. Testers choose their own model provider; see `docs/model-selection.md` for compatibility and latency expectations.
+
 ## What Changed
 
 ### Character Brain and Stage Continuity
