@@ -100,6 +100,7 @@ $pathsToCopy = @(
     "config.example.json",
     "package-lock.json",
     "package.json",
+    "prepare_preview_environment.bat",
     "requirements-dev.txt",
     "requirements.txt",
     "install_first_run.bat",

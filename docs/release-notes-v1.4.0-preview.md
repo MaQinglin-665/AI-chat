@@ -139,6 +139,13 @@ This preview keeps conservative defaults:
   - one thought burst
   - `/braindebug` public summary
 
+Recommended first-run entry for testers:
+
+- `prepare_preview_environment.bat`
+- then `scripts\configure-llm.ps1`
+- then `scripts\first_chat_smoke.ps1`
+- then `start_electron.bat`
+
 ## Suggested Release Checklist
 
 - [ ] Confirm `main` is up to date.

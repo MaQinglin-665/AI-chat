@@ -29,6 +29,14 @@ Recommended first-run bootstrap
 
 For the easiest first run, double-click:
 
+    prepare_preview_environment.bat
+
+This prepares Python/Node dependencies, initializes local config/token files,
+and applies the Taffy preview experience profile. You still choose your own LLM
+provider/model/API key.
+
+For a lower-level dependency bootstrap only, double-click:
+
     install_first_run.bat
 
 Or run:

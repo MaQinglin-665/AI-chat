@@ -10,6 +10,7 @@ All notable changes to this project are documented in this file.
 - Added source-test package checks for backend imports and preview config safety.
 - Added read-only LLM link diagnostics for first-run `/api/llm_probe` failures.
 - Added a model selection guide for user-chosen LLM providers and Taffy preview readiness.
+- Added a one-click preview environment preparation entry for early testers.
 
 ### Fixed
 - Fixed source-test packaging so all tracked root Python backend modules are included.

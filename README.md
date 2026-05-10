@@ -71,14 +71,15 @@ requirements-dev.txt
 如果你只是想体验当前 `v1.4.0-preview` 的 Taffy AI VTuber feeling，请走这条最短路径：
 
 ```powershell
-.\install_first_run.bat
+.\prepare_preview_environment.bat
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\apply-preview-experience-config.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 .\start_electron.bat
 ```
 
 这仍然是源码预览包，不是免安装 installer。你需要本机安装 Python 和 Node.js，并配置一个稳定的 LLM。
+
+`prepare_preview_environment.bat` 会尽量一键完成环境准备：检查/安装 Python 与 Node.js、创建 `.venv`、安装 Python / Electron 依赖、初始化 `config.json` / `.env`，并应用 Taffy preview 体验配置。
 
 `apply-preview-experience-config.ps1` 会把本地体验切到 Taffy 英文角色、Character Runtime、动作/语音 cue 和低风险主动插话配置；它不会写入 API Key，也不会开启桌面观察、截图、文件读取、工具调用或 shell。
 
@@ -86,7 +87,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 
 ### Recommended First Run
 
-当前 preview 还没有真正的免安装 Windows installer。早期测试者请优先走这一条主路径：
+当前 preview 还没有真正的免安装 Windows installer。早期测试者可以先用一键环境准备入口：
+
+```powershell
+.\prepare_preview_environment.bat
+```
+
+如果需要分步排障，再走这一条主路径：
 
 ```powershell
 .\install_first_run.bat
