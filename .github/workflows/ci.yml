@@ -105,6 +105,10 @@ jobs:
       - name: Run Node frontend tests
         run: node scripts/run_node_tests.js
 
+      - name: Run source-test first-run package smoke
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
+
       - name: Install docs dependencies
         working-directory: docs
         run: npm ci
