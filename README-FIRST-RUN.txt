@@ -51,6 +51,14 @@ If the remaining blocker is LLM configuration, run:
 The LLM helper writes provider/model settings to config.local.json and stores
 API keys in .env. It does not write API keys into config JSON.
 
+To try the current Taffy AI VTuber preview profile, run:
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\apply-preview-experience-config.ps1
+
+This keeps your LLM provider/base URL/model/api_key_env, switches the local
+character profile to English Taffy, enables Character Runtime cues, and keeps
+desktop observation, screenshots, tools, and shell disabled.
+
 After LLM configuration, you can verify the first chat path before opening the
 desktop windows:
 

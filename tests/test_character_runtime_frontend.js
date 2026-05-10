@@ -299,6 +299,42 @@ function createMemoryStorage(initial = {}) {
 }
 
 {
+  const browserVoices = [
+    { name: "Microsoft Xiaoxiao Online (Natural) - Chinese (Mainland)", lang: "zh-CN" },
+    { name: "Microsoft Aria Online (Natural) - English (United States)", lang: "en-US" }
+  ];
+  const englishPreviewVoice = voiceRuntimeController.createController({
+    state: {
+      config: {
+        tts: {
+          provider: "browser",
+          voice: "en-US-AriaNeural",
+          voices: ["en-US-AriaNeural"]
+        }
+      }
+    },
+    ui: {},
+    windowObject: { speechSynthesis: { getVoices: () => browserVoices } }
+  }).chooseTTSVoice();
+  assert.strictEqual(englishPreviewVoice.lang, "en-US", "preview English TTS config should prefer English browser voices");
+
+  const chineseDefaultVoice = voiceRuntimeController.createController({
+    state: {
+      config: {
+        tts: {
+          provider: "browser",
+          voice: "zh-CN-XiaoxiaoNeural",
+          voices: ["zh-CN-XiaoxiaoNeural"]
+        }
+      }
+    },
+    ui: {},
+    windowObject: { speechSynthesis: { getVoices: () => browserVoices } }
+  }).chooseTTSVoice();
+  assert.strictEqual(chineseDefaultVoice.lang, "zh-CN", "default Chinese TTS config should keep preferring Chinese browser voices");
+}
+
+{
   const actionState = {
     availableMotionGroups: ["Idle", "HeadTilt", "SideEyePose", "FlickDown", "Tap"],
     motionComboEnabled: false,

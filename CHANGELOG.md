@@ -6,6 +6,11 @@ All notable changes to this project are documented in this file.
 
 ### Added
 - Added Turn-taking Director v1 so spontaneous thoughts can queue, defer, or cancel instead of interrupting user/assistant speech.
+- Added a Taffy preview experience config and helper script for early testers.
+- Added source-test package checks for backend imports and preview config safety.
+
+### Fixed
+- Fixed source-test packaging so all tracked root Python backend modules are included.
 
 ## [1.4.0-preview] - 2026-05-10
 

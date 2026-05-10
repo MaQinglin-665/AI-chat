@@ -40,6 +40,32 @@ function Copy-PathIfExists($RelativePath, $DestinationRoot) {
     Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force
 }
 
+function Get-TrackedRootPythonFiles {
+    try {
+        $files = git -C $RepoRoot ls-files "*.py" 2>$null
+        if ($LASTEXITCODE -eq 0 -and $files) {
+            return @(
+                $files |
+                    Where-Object {
+                        $_ -and
+                        $_.EndsWith(".py") -and
+                        -not $_.Contains("/") -and
+                        -not $_.Contains("\")
+                    } |
+                    Sort-Object -Unique
+            )
+        }
+    } catch {
+        # Fall back below when git is unavailable.
+    }
+
+    return @(
+        Get-ChildItem -LiteralPath $RepoRoot -File -Filter "*.py" |
+            ForEach-Object { $_.Name } |
+            Sort-Object -Unique
+    )
+}
+
 $packageVersion = Get-PackageVersion
 $packageName = "Taffy-AI-Desktop-Pet-v$packageVersion-windows-source-test"
 if ([System.IO.Path]::IsPathRooted($OutputDir)) {
@@ -58,26 +84,20 @@ if (Test-Path $zipPath) {
 }
 New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
 
+$trackedRootPythonFiles = @(Get-TrackedRootPythonFiles)
+
 $pathsToCopy = @(
     ".env.example",
     "AGENTS.md",
     "CHANGELOG.md",
+    "config.preview.example.json",
     "CONTRIBUTING.md",
     "LICENSE",
     "README-FIRST-RUN.txt",
     "README.md",
     "SECURITY.md",
     "THIRD_PARTY_NOTICES.md",
-    "app.py",
-    "asr.py",
-    "character_runtime.py",
     "config.example.json",
-    "config.py",
-    "desktop_app.py",
-    "emotion.py",
-    "humanize.py",
-    "llm_client.py",
-    "memory.py",
     "package-lock.json",
     "package.json",
     "requirements-dev.txt",
@@ -87,9 +107,6 @@ $pathsToCopy = @(
     "start_chat_oneclick.bat",
     "start_desktop.bat",
     "start_electron.bat",
-    "tools.py",
-    "tts.py",
-    "utils.py",
     ".github",
     "config",
     "docs",
@@ -100,7 +117,7 @@ $pathsToCopy = @(
     "web"
 )
 
-foreach ($path in $pathsToCopy) {
+foreach ($path in @($pathsToCopy + $trackedRootPythonFiles)) {
     Copy-PathIfExists $path $stageRoot
 }
 

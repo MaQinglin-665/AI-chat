@@ -103,10 +103,15 @@ try {
         "install_first_run.bat",
         "start_electron.bat",
         "scripts\bootstrap-first-run.ps1",
+        "scripts\apply-preview-experience-config.ps1",
         "scripts\configure-llm.ps1",
         "scripts\first_chat_smoke.ps1",
         "scripts\first_run_check.py",
         "config.example.json",
+        "config.preview.example.json",
+        "app_health.py",
+        "character_brain.py",
+        "llm_runtime.py",
         "package.json",
         "package-lock.json",
         "requirements.txt",
@@ -208,6 +213,12 @@ if (mismatches.length) {
     }
     Write-Ok "Packaged tool-calling and shell defaults are off"
 
+    Invoke-Step "Import packaged backend app" @(
+        "python",
+        "-c",
+        "import app; print('import app ok')"
+    ) $packageRoot.FullName
+
     $models = @(Get-ChildItem -LiteralPath (Join-Path $packageRoot.FullName "web\models") -Recurse -Filter "*.model3.json" -File -ErrorAction SilentlyContinue)
     if ($models.Count -eq 1) {
         if ([string]$cfg.model_path -eq "/models/your_model/model3.json") {
@@ -253,6 +264,39 @@ if (mismatches.length) {
         Write-Fail "LLM configure did not write TAFFY_LLM_API_KEY to .env"
     }
     Write-Ok "LLM configure smoke wrote config.local.json and .env"
+
+    Invoke-Step "Run preview experience config smoke" @(
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        (Join-Path $packageRoot.FullName "scripts\apply-preview-experience-config.ps1")
+    ) $packageRoot.FullName
+
+    $previewCfg = Get-Content -Raw -LiteralPath (Join-Path $packageRoot.FullName "config.local.json") -Encoding UTF8 | ConvertFrom-Json
+    if ([string]$previewCfg.llm.provider -ne "openai-compatible") {
+        Write-Fail "Preview config should not overwrite existing LLM provider."
+    }
+    if ([string]$previewCfg.llm.base_url -ne "http://127.0.0.1:9999/v1") {
+        Write-Fail "Preview config should not overwrite existing LLM base_url."
+    }
+    if ([string]$previewCfg.llm.model -ne "smoke-model") {
+        Write-Fail "Preview config should not overwrite existing LLM model."
+    }
+    if ([string]$previewCfg.llm.api_key_env -ne "TAFFY_LLM_API_KEY") {
+        Write-Fail "Preview config should not overwrite existing LLM api_key_env."
+    }
+    if ($previewCfg.character_runtime.enabled -ne $true -or $previewCfg.character_runtime.auto_apply_reply_cue -ne $true) {
+        Write-Fail "Preview config should enable the explicit Character Runtime experience layer."
+    }
+    if ([string]$previewCfg.observe.attach_mode -eq "auto") {
+        Write-Fail "Preview config should not enable automatic desktop observation."
+    }
+    if ($previewCfg.tools.enabled -eq $true -or $previewCfg.tools.allow_shell -eq $true) {
+        Write-Fail "Preview config should keep tools and shell disabled."
+    }
+    Write-Ok "Preview experience config smoke kept LLM settings and safety defaults"
 
     Invoke-Step "Parse first-chat smoke script" @(
         "powershell",

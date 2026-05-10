@@ -66,6 +66,24 @@ requirements-dev.txt
 
 ## Quick Start
 
+### Fastest Taffy Preview Path
+
+如果你只是想体验当前 `v1.4.0-preview` 的 Taffy AI VTuber feeling，请走这条最短路径：
+
+```powershell
+.\install_first_run.bat
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\apply-preview-experience-config.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
+.\start_electron.bat
+```
+
+这仍然是源码预览包，不是免安装 installer。你需要本机安装 Python 和 Node.js，并配置一个稳定的 LLM。
+
+`apply-preview-experience-config.ps1` 会把本地体验切到 Taffy 英文角色、Character Runtime、动作/语音 cue 和低风险主动插话配置；它不会写入 API Key，也不会开启桌面观察、截图、文件读取、工具调用或 shell。
+
+模型质量和延迟会直接影响角色感。如果 `model_acceptance_probe` 成功率低于 80%，或日常单轮经常超过 15 秒，请先换更快更稳定的模型，再评价 Taffy 的 AI VTuber 体验。
+
 ### Recommended First Run
 
 当前 preview 还没有真正的免安装 Windows installer。早期测试者请优先走这一条主路径：
@@ -73,6 +91,7 @@ requirements-dev.txt
 ```powershell
 .\install_first_run.bat
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\apply-preview-experience-config.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 .\start_electron.bat
 ```
@@ -83,6 +102,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 - `ACTION`：依赖设置已经尽力完成，但还需要按输出修复 Live2D 模型、LLM Key / 模型名、Node / Python 环境等阻塞项。
 
 `configure-llm.ps1` 会把 provider / base URL / model 写入 `config.local.json`，把 API Key 写入 `.env`，不会把真实 Key 写进 JSON 配置。
+
+`apply-preview-experience-config.ps1` 会合并 `config.preview.example.json`，保留你已经配置好的 LLM provider / base URL / model / api_key_env，只应用 Taffy preview 的角色、TTS、动作和安全主动插话设置。
 
 `first_chat_smoke.ps1` 会检测或启动后端，检查 `/healthz` / `/api/health`，再进行轻量 LLM probe 和一条短 `/api/chat` 请求。想避免真实聊天请求时可加 `-SkipChat` 或 `-SkipLlmProbe`。
 

@@ -46,7 +46,24 @@
     function scoreVoice(v) {
       const name = String(v?.name || "").toLowerCase();
       const lang = String(v?.lang || "").toLowerCase();
+      const cfg = state.config?.tts || {};
+      const preferredNames = [
+        cfg.voice,
+        ...(Array.isArray(cfg.voices) ? cfg.voices : [])
+      ].map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
+      const preferredLangs = [...new Set(preferredNames
+        .map((item) => {
+          const match = item.match(/\b([a-z]{2})(?:[-_][a-z]{2})?\b/i);
+          return match ? match[1].toLowerCase() : "";
+        })
+        .filter(Boolean))];
       let score = 0;
+      if (preferredNames.some((preferred) => name === preferred || name.includes(preferred) || preferred.includes(name))) {
+        score += 900;
+      }
+      if (preferredLangs.some((preferred) => lang.startsWith(preferred))) {
+        score += 900;
+      }
       if (lang === "zh-cn") score += 500;
       else if (lang.startsWith("zh")) score += 300;
       if (/natural|neural|online|xiaoxiao|xiaoyi|yunxi|yunyang|huihui/.test(name)) {
