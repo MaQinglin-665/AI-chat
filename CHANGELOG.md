@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.4.0-preview] - 2026-05-10
+
+### Added
+- Added Character Brain continuity, stage memory callbacks, and public `/braindebug` summaries for AI VTuber-style behavior tuning.
+- Added turn-level performance controls for reply shape, spontaneity, question policy, motion, and voice direction.
+- Added proactive stage replies, interjection director, thought burst director, and thought burst choreography for short spontaneous character reactions.
+- Added v1.4/v1.6 model and dialogue audit scripts for repeatable character-feel checks.
+
+### Changed
+- Kept Taffy replies fixed to English for the current character setting.
+- Improved anti-generic reply constraints to reduce customer-service phrasing, unwanted follow-up questions, and context drift.
+- Improved performance timeline, voice timeline, Live2D action routing, and TTS settle behavior.
+
+### Security
+- Desktop observation, screenshots, file reads, shell execution, and tool calls remain disabled by default.
+- Public debug surfaces keep raw history, prompts, API keys, private bit guides, and user file paths out of snapshots and reports.
+
 ## [1.1.2] - 2026-05-01
 
 ### Changed
