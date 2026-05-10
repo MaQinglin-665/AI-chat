@@ -1437,6 +1437,12 @@ function buildAutoChatInterjectionDebugReport() {
   const director = safeContext?.director && typeof safeContext.director === "object"
     ? safeContext.director
     : (state.autoChatInterjectionLastDirector && typeof state.autoChatInterjectionLastDirector === "object" ? state.autoChatInterjectionLastDirector : null);
+  const turnTaking = state.turnTakingLastDecision && typeof state.turnTakingLastDecision === "object"
+    ? state.turnTakingLastDecision
+    : null;
+  const pendingThought = state.turnTakingPendingThoughtBurst && typeof state.turnTakingPendingThoughtBurst === "object"
+    ? state.turnTakingPendingThoughtBurst
+    : null;
   return [
     "Auto Thought",
     `enabled=${state.autoChatEnabled === true ? "yes" : "no"}; pending_timer=${state.autoChatInterjectionTimer ? "yes" : "no"}; last_ok=${state.autoChatInterjectionLastOk === true ? "yes" : "no"}`,
@@ -1446,6 +1452,9 @@ function buildAutoChatInterjectionDebugReport() {
     director
       ? `director=${String(director.decision || "hold_back")}; stance=${String(director.stance || "quiet")}; chaos=${Number(director.chaos_level || 0)}/3; thought=${String(director.thought_type || state.autoChatInterjectionLastThoughtType || "none")}; length=${String(director.length_budget || state.autoChatInterjectionLastLengthBudget || "none")}; motion=${String(director.motion_cue || "none")}; voice=${String(director.voice_style || "soft")}; clamp=${String(director.safety_clamp || "none")}`
       : "director=none",
+    turnTaking
+      ? `turn_taking=${String(turnTaking.decision || "hold")}; reason=${String(turnTaking.reason || "none")}; queued=${turnTaking.queued === true ? "yes" : "no"}; retry=${turnTaking.retry === true ? "yes" : "no"}; pressure=${Number(turnTaking.conversation_pressure || 0).toFixed(2)}/3; pending=${pendingThought ? String(pendingThought.thought_type || "none") : "none"}`
+      : "turn_taking=none",
     `motion_dispatch=${String(state.autoChatInterjectionLastMotion || "none")}`,
     `topic=${topic}`,
     `scheduled=${fmtTime(state.autoChatInterjectionLastScheduledAt)}; attempted=${fmtTime(state.autoChatInterjectionLastAttemptAt)}; dispatched=${fmtTime(state.autoChatInterjectionLastDispatchAt)}; success=${fmtTime(state.autoChatInterjectionLastAt)}`,

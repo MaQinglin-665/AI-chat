@@ -18,6 +18,7 @@ const PERSONA_AVATAR_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "perso
 const REMINDER_SCHEDULE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "reminderScheduleController.js");
 const EMOTION_STATS_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "emotionStatsController.js");
 const LOCAL_ASR_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "localAsrController.js");
+const TURN_TAKING_DIRECTOR_JS = path.resolve(__dirname, "..", "web", "turnTakingDirector.js");
 const AUTO_CHAT_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "autoChatController.js");
 const RUNTIME_METADATA_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "runtimeMetadataController.js");
 const DIAGNOSTICS_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "diagnosticsRuntimeController.js");
@@ -93,6 +94,7 @@ const personaAvatarControllerSource = fs.readFileSync(PERSONA_AVATAR_CONTROLLER_
 const reminderScheduleControllerSource = fs.readFileSync(REMINDER_SCHEDULE_CONTROLLER_JS, "utf8");
 const emotionStatsControllerSource = fs.readFileSync(EMOTION_STATS_CONTROLLER_JS, "utf8");
 const localAsrControllerSource = fs.readFileSync(LOCAL_ASR_CONTROLLER_JS, "utf8");
+const turnTakingDirectorSource = fs.readFileSync(TURN_TAKING_DIRECTOR_JS, "utf8");
 const autoChatControllerSource = fs.readFileSync(AUTO_CHAT_CONTROLLER_JS, "utf8");
 const runtimeMetadataControllerSource = fs.readFileSync(RUNTIME_METADATA_CONTROLLER_JS, "utf8");
 const diagnosticsRuntimeControllerSource = fs.readFileSync(DIAGNOSTICS_RUNTIME_CONTROLLER_JS, "utf8");
@@ -172,6 +174,7 @@ const personaAvatarController = require(PERSONA_AVATAR_CONTROLLER_JS);
 const reminderScheduleController = require(REMINDER_SCHEDULE_CONTROLLER_JS);
 const emotionStatsController = require(EMOTION_STATS_CONTROLLER_JS);
 const localAsrController = require(LOCAL_ASR_CONTROLLER_JS);
+const turnTakingDirector = require(TURN_TAKING_DIRECTOR_JS);
 const autoChatController = require(AUTO_CHAT_CONTROLLER_JS);
 const runtimeMetadataController = require(RUNTIME_METADATA_CONTROLLER_JS);
 const diagnosticsRuntimeController = require(DIAGNOSTICS_RUNTIME_CONTROLLER_JS);
@@ -328,6 +331,72 @@ function createMemoryStorage(initial = {}) {
     motionRole: "pre_reaction"
   });
   assert.strictEqual(recoveryPlan[0].groups[0], "FlickDown", "concrete cue fallback should prefer a matching Live2D group before generic semantic groups");
+}
+
+{
+  assert.strictEqual(typeof turnTakingDirector.buildTurnTakingDecision, "function", "turn-taking director should build decisions");
+  assert.strictEqual(typeof turnTakingDirector.buildPendingThoughtBurst, "function", "turn-taking director should build public pending thoughts");
+  const baseContext = {
+    interjection: true,
+    shouldTrigger: true,
+    score: 0.9,
+    primaryReason: "stage_observation",
+    topicHint: "This desk feels weird.",
+    expectedUserAt: 1000,
+    expectedAssistantAt: 2000,
+    delayMs: 900,
+    reasons: ["stage_observation"],
+    director: { thought_type: "tiny_rant", safety_clamp: "none" }
+  };
+  const idleDecision = turnTakingDirector.buildTurnTakingDecision({
+    context: baseContext,
+    state: { lastUserMessageAt: 1000, conversationLastAssistantAt: 2000, autoChatInterjectionLastAt: 0 },
+    nowMs: 5000,
+    userSpeaking: false,
+    assistantSpeaking: false
+  });
+  assert.strictEqual(idleDecision.decision, "interject_now", "idle turn-taking should allow the thought burst");
+  assert.strictEqual(idleDecision.reason, "both_idle", "idle turn-taking should explain the floor state");
+  assert.strictEqual(idleDecision.pending_thought_type, "tiny_rant", "turn-taking should expose public thought type only");
+  assert.ok(idleDecision.conversation_pressure > 0, "turn-taking should expose compact conversation pressure");
+  const pending = turnTakingDirector.buildPendingThoughtBurst(baseContext, idleDecision, 5000);
+  assert.strictEqual(pending.thought_type, "tiny_rant", "pending thought should keep the public thought type");
+  assert.strictEqual(pending.topic_hint.includes("desk"), true, "pending thought should keep only a compact topic hint");
+  assert.strictEqual(pending.raw_history, undefined, "pending thought should not expose raw history");
+
+  const userSpeakingDecision = turnTakingDirector.buildTurnTakingDecision({
+    context: baseContext,
+    state: { lastUserMessageAt: 1000, conversationLastAssistantAt: 2000 },
+    nowMs: 5000,
+    userSpeaking: true
+  });
+  assert.strictEqual(userSpeakingDecision.decision, "queue_after_user", "user speech should queue interjections instead of hard interrupting");
+  assert.strictEqual(userSpeakingDecision.retry, true, "queued user-speech interjections should retry");
+
+  const assistantSpeakingDecision = turnTakingDirector.buildTurnTakingDecision({
+    context: baseContext,
+    state: { lastUserMessageAt: 1000, conversationLastAssistantAt: 2000 },
+    nowMs: 5000,
+    assistantSpeaking: true
+  });
+  assert.strictEqual(assistantSpeakingDecision.decision, "defer_until_tts_end", "assistant speech should defer new thought bursts");
+  assert.strictEqual(assistantSpeakingDecision.retry, true, "deferred assistant-speech interjections should retry");
+
+  const staleDecision = turnTakingDirector.buildTurnTakingDecision({
+    context: baseContext,
+    state: { lastUserMessageAt: 3000, conversationLastAssistantAt: 2000 },
+    nowMs: 5000
+  });
+  assert.strictEqual(staleDecision.decision, "cancel_stale_thought", "new user turns should cancel stale pending thoughts");
+  assert.ok(staleDecision.suppressed.includes("new_user_turn"), "stale cancellation should expose a public reason");
+
+  const debugDecision = turnTakingDirector.buildTurnTakingDecision({
+    context: { ...baseContext, topicHint: "/braindebug" },
+    state: { lastUserMessageAt: 1000, conversationLastAssistantAt: 2000 },
+    nowMs: 5000
+  });
+  assert.strictEqual(debugDecision.decision, "hold", "debug/local commands should not trigger thought bursts");
+  assert.ok(debugDecision.suppressed.includes("local_command"), "debug/local command suppression should be visible");
 }
 
 {
@@ -1664,6 +1733,10 @@ assert.ok(
     && autoChatControllerSource.includes("function buildAutoChatPrompt")
     && autoChatControllerSource.includes("function scheduleTurnInterjection")
     && autoChatControllerSource.includes("function shouldSkipTurnInterjection")
+    && autoChatControllerSource.includes("turnTakingDirector")
+    && turnTakingDirectorSource.includes("function buildTurnTakingDecision")
+    && indexSource.includes('<script src="./turnTakingDirector.js"></script>')
+    && indexSource.indexOf('<script src="./turnTakingDirector.js"></script>') < indexSource.indexOf('<script src="./autoChatController.js"></script>')
     && runtimeMetadataControllerSource.includes("function handleCharacterRuntimeMetadata")
     && runtimeMetadataControllerSource.includes("function normalizeCharacterRuntimeMetadataForFrontend")
     && diagnosticsRuntimeControllerSource.includes("function recordTTSDebugEvent")
@@ -2428,11 +2501,13 @@ assert.ok(
     && chatReplyControllerSource.includes("payload.auto_kind")
     && chatReplyControllerSource.includes("payload.auto_thought_burst")
     && source.includes("director=")
+    && source.includes("turn_taking=")
     && source.includes("motion_dispatch=")
     && chatApi.streamAssistantReply
     && chatApiSource.includes("onCharacterBrainDecision")
     && chatReplyControllerSource.includes("onCharacterBrainDecision: handleCharacterBrainDecision")
     && chatStateSource.includes("characterBrainLastDecision")
+    && chatStateSource.includes("turnTakingPendingThoughtBurst")
     && localCommandRegistry.matchLocalCommand("/braindebug").kind === "brain_debug"
     && localCommandExecutorSource.includes("brain_debug")
     && localCommandExecutorSource.includes("buildCharacterBrainDebugReport")

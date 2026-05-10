@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+- Added Turn-taking Director v1 so spontaneous thoughts can queue, defer, or cancel instead of interrupting user/assistant speech.
+
 ## [1.4.0-preview] - 2026-05-10
 
 ### Added

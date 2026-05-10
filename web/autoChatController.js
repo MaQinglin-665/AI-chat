@@ -12,10 +12,11 @@
     const requestAssistantReply = typeof deps.requestAssistantReply === "function" ? deps.requestAssistantReply : async () => false;
     const enqueueActionIntent = typeof deps.enqueueActionIntent === "function" ? deps.enqueueActionIntent : () => {};
     const triggerExpressionPulse = typeof deps.triggerExpressionPulse === "function" ? deps.triggerExpressionPulse : () => {};
+    const turnTakingDirector = deps.turnTakingDirector || root.TaffyTurnTakingDirector || {};
     const AUTO_CHAT_MIN_USER_GAP_MS = constants.AUTO_CHAT_MIN_USER_GAP_MS || 45 * 1000;
     const AUTO_CHAT_MIN_ASSISTANT_GAP_MS = constants.AUTO_CHAT_MIN_ASSISTANT_GAP_MS || 60 * 1000;
     const AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS = constants.AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS || 4 * 60 * 1000;
-    const AUTO_CHAT_INTERJECTION_COOLDOWN_MS = constants.AUTO_CHAT_INTERJECTION_COOLDOWN_MS || 8 * 1000;
+    const AUTO_CHAT_INTERJECTION_COOLDOWN_MS = constants.AUTO_CHAT_INTERJECTION_COOLDOWN_MS || 22 * 1000;
     const AUTO_CHAT_INTERJECTION_RETRY_MS = constants.AUTO_CHAT_INTERJECTION_RETRY_MS || 1400;
     const AUTO_CHAT_INTERJECTION_MAX_RETRIES = constants.AUTO_CHAT_INTERJECTION_MAX_RETRIES || 30;
     const AUTO_CHAT_EMO_RE = constants.AUTO_CHAT_EMO_RE || /a^/;
@@ -59,6 +60,61 @@
         || (state.micOpen === true
           && Number(state.micSuspendDepth || 0) <= 0
           && state.recognitionActive === true);
+    }
+
+    function isUserTypingNow() {
+      if (!ui.chatInput) {
+        return false;
+      }
+      return document.activeElement === ui.chatInput && String(ui.chatInput.value || "").trim().length > 0;
+    }
+
+    function buildTurnTakingDecisionForContext(context = {}, attempt = 0) {
+      const builder = typeof turnTakingDirector.buildTurnTakingDecision === "function"
+        ? turnTakingDirector.buildTurnTakingDecision
+        : null;
+      if (!builder) {
+        return {
+          version: 1,
+          decision: isAssistantSpeechActive() || state.chatBusy ? "defer_until_tts_end" : "interject_now",
+          reason: isAssistantSpeechActive() || state.chatBusy ? "assistant_speaking" : "both_idle",
+          queued: isAssistantSpeechActive() || state.chatBusy,
+          retry: isAssistantSpeechActive() || state.chatBusy,
+          delay_ms: isAssistantSpeechActive() || state.chatBusy ? AUTO_CHAT_INTERJECTION_RETRY_MS : Math.max(500, Number(context.delayMs) || 900),
+          silence_window_ms: 650,
+          conversation_pressure: Math.max(0, Math.min(3, Number(context.score || 0))),
+          pending_thought_type: String(context.director?.thought_type || "none"),
+          suppressed: [],
+          updated_at: Date.now()
+        };
+      }
+      return builder({
+        context,
+        state,
+        nowMs: Date.now(),
+        userSpeaking: isUserSpeechInputActive(),
+        userTyping: isUserTypingNow(),
+        assistantSpeaking: isAssistantSpeechActive(),
+        chatBusy: state.chatBusy === true,
+        cooldownMs: AUTO_CHAT_INTERJECTION_COOLDOWN_MS,
+        retryMs: AUTO_CHAT_INTERJECTION_RETRY_MS,
+        attempt
+      });
+    }
+
+    function rememberTurnTakingDecision(decision = null, context = {}) {
+      const summary = typeof turnTakingDirector.toPublicTurnTakingSummary === "function"
+        ? turnTakingDirector.toPublicTurnTakingSummary(decision)
+        : decision;
+      state.turnTakingLastDecision = summary;
+      state.turnTakingLastUpdatedAt = Date.now();
+      state.turnTakingLastSuppressed = String(summary?.reason || "");
+      if (summary && ["queue_after_user", "defer_until_tts_end", "interject_now"].includes(summary.decision) && typeof turnTakingDirector.buildPendingThoughtBurst === "function") {
+        state.turnTakingPendingThoughtBurst = turnTakingDirector.buildPendingThoughtBurst(context, summary, Date.now());
+      } else if (summary && (summary.decision === "interject_now" || summary.decision === "cancel_stale_thought" || summary.decision === "hold")) {
+        state.turnTakingPendingThoughtBurst = null;
+      }
+      return summary;
     }
 
     function stopAutoChatLoop() {
@@ -142,38 +198,24 @@
       if (state.autoChatEnabled !== true) {
         return { skip: true, reason: "disabled" };
       }
-      if (state.chatBusy) {
-        return { skip: true, reason: "busy", retry: true };
+      const turn = rememberTurnTakingDecision(buildTurnTakingDecisionForContext(context), context);
+      if (!turn || turn.decision === "interject_now") {
+        return { skip: false, reason: "" };
       }
-      if (isAssistantSpeechActive()) {
-        return { skip: true, reason: "assistant_speaking", retry: true };
+      if (turn.decision === "defer_until_tts_end") {
+        return { skip: true, reason: turn.reason === "chat_busy" ? "busy" : "assistant_speaking", retry: true };
       }
-      if (isUserSpeechInputActive()) {
-        return { skip: true, reason: "user_speaking" };
+      if (turn.decision === "queue_after_user") {
+        return { skip: true, reason: turn.reason || "user_speaking", retry: true };
       }
-      if (ui.chatInput) {
-        const focused = document.activeElement === ui.chatInput;
-        const typing = ui.chatInput.value.trim().length > 0;
-        if (focused && typing) {
-          return { skip: true, reason: "user_typing" };
-        }
+      if (turn.decision === "cancel_stale_thought") {
+        state.turnTakingPendingThoughtBurst = null;
+        return { skip: true, reason: turn.reason || "cancel_stale_thought", retry: false };
       }
-      const now = Date.now();
-      if (state.lastAutoChatAt > 0 && now - state.lastAutoChatAt < AUTO_CHAT_INTERJECTION_COOLDOWN_MS) {
-        return { skip: true, reason: "cooldown" };
+      if (turn.decision === "soft_react_only") {
+        return { skip: true, reason: turn.reason || "soft_react_only", retry: false };
       }
-      if (state.autoChatInterjectionLastAt > 0 && now - state.autoChatInterjectionLastAt < AUTO_CHAT_INTERJECTION_COOLDOWN_MS) {
-        return { skip: true, reason: "interjection_cooldown" };
-      }
-      const expectedUserAt = Number(context.expectedUserAt || 0);
-      if (expectedUserAt > 0 && Number(state.lastUserMessageAt || 0) > expectedUserAt + 50) {
-        return { skip: true, reason: "new_user_turn" };
-      }
-      const expectedAssistantAt = Number(context.expectedAssistantAt || 0);
-      if (expectedAssistantAt > 0 && Number(state.conversationLastAssistantAt || 0) > expectedAssistantAt + 50) {
-        return { skip: true, reason: "new_assistant_turn" };
-      }
-      return { skip: false, reason: "" };
+      return { skip: true, reason: turn.reason || "hold", retry: false };
     }
 
     function shouldPlayLatencyHint(isAuto, useStreamSpeak) {
@@ -883,6 +925,7 @@
 
     function dispatchAutoChatContext(context = {}) {
       const prompt = buildAutoChatPrompt(context);
+      state.turnTakingPendingThoughtBurst = null;
       return requestAssistantReply(prompt, {
         showUser: false,
         rememberUser: false,
@@ -922,6 +965,8 @@
     function scheduleTurnInterjection(input = {}) {
       stopTurnInterjectionTimer();
       const context = buildTurnInterjectionContext(input);
+      const initialTurn = rememberTurnTakingDecision(buildTurnTakingDecisionForContext(context), context);
+      context.turn_taking = initialTurn;
       state.autoChatInterjectionLastContext = context;
       state.autoChatInterjectionLastDirector = context.director || null;
       state.autoChatInterjectionLastThoughtType = String(context.director?.thought_type || "");
@@ -935,9 +980,18 @@
           : "disabled";
         return { scheduled: false, context };
       }
+      if (initialTurn && ["hold", "soft_react_only", "cancel_stale_thought"].includes(initialTurn.decision)) {
+        state.autoChatInterjectionLastSuppressed = `turn_taking:${initialTurn.reason || initialTurn.decision}`;
+        if (initialTurn.decision === "cancel_stale_thought") {
+          state.turnTakingPendingThoughtBurst = null;
+        }
+        return { scheduled: false, context };
+      }
       const run = (attempt = 0) => {
         state.autoChatInterjectionTimer = 0;
         state.autoChatInterjectionLastAttemptAt = Date.now();
+        const turn = rememberTurnTakingDecision(buildTurnTakingDecisionForContext(context, attempt), context);
+        context.turn_taking = turn;
         const skip = shouldSkipTurnInterjection(context);
         if (!skip.skip) {
           state.autoChatInterjectionLastDispatchAt = Date.now();
@@ -948,11 +1002,13 @@
         }
         state.autoChatInterjectionLastSuppressed = skip.reason || "skipped";
         if (skip.retry && attempt < AUTO_CHAT_INTERJECTION_MAX_RETRIES) {
-          state.autoChatInterjectionTimer = window.setTimeout(() => run(attempt + 1), AUTO_CHAT_INTERJECTION_RETRY_MS);
+          const retryMs = Math.max(300, Math.min(6000, Number(turn?.delay_ms || AUTO_CHAT_INTERJECTION_RETRY_MS)));
+          state.autoChatInterjectionTimer = window.setTimeout(() => run(attempt + 1), retryMs);
         }
       };
       state.autoChatInterjectionLastScheduledAt = Date.now();
-      state.autoChatInterjectionTimer = window.setTimeout(() => run(0), Math.max(500, Number(context.delayMs) || 1800));
+      const scheduledDelayMs = Math.max(500, Number(initialTurn?.delay_ms || context.delayMs) || 1800);
+      state.autoChatInterjectionTimer = window.setTimeout(() => run(0), scheduledDelayMs);
       setStatus("Taffy thought queued");
       return { scheduled: true, context };
     }
