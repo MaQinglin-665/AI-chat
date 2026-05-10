@@ -1,0 +1,130 @@
+name: Preview Feedback
+description: Share first-run and AI VTuber feeling feedback for the Taffy preview.
+title: "[Preview Feedback]: "
+labels:
+  - feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Taffy. Please remove API keys, tokens, raw prompts, raw history, private file paths, and private desktop screenshots before sharing logs or screenshots.
+
+  - type: dropdown
+    id: package_source
+    attributes:
+      label: Package source
+      description: What did you run?
+      options:
+        - GitHub Release source-test zip
+        - main branch clone
+        - GitHub automatic Source code archive
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS / Python / Node / launch path
+      placeholder: Windows 11, Python 3.11, Node 20, prepare_preview_environment.bat
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model setup
+      description: Provider and model name only. Do not paste API keys.
+      placeholder: OpenAI-compatible, model-name-here
+    validations:
+      required: true
+
+  - type: dropdown
+    id: model_probe
+    attributes:
+      label: Model probe result
+      description: Use scripts\diagnose-llm-link.ps1 -SoftFail or model_acceptance_probe if available.
+      options:
+        - 80%+ success and usually under 15 seconds
+        - Works but often over 15 seconds
+        - Fails or times out
+        - Not tested
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: first_run
+    attributes:
+      label: First-run path
+      options:
+        - label: prepare_preview_environment.bat completed.
+        - label: configure-llm.ps1 completed.
+        - label: first_chat_smoke.ps1 completed.
+        - label: start_electron.bat opened the app.
+
+  - type: checkboxes
+    id: smoke
+    attributes:
+      label: UI smoke
+      options:
+        - label: Live2D model is visible.
+        - label: Text chat works.
+        - label: Browser TTS speaks.
+        - label: Long TTS replies finish without losing the tail.
+        - label: Mouth movement releases after speech.
+        - label: Expression/motion returns to idle.
+        - label: /doctor is readable and does not leak secrets.
+        - label: /braindebug is read-only and does not trigger TTS/motion/tools.
+
+  - type: checkboxes
+    id: character_feel
+    attributes:
+      label: Taffy feeling
+      options:
+        - label: Replies feel like Taffy, not a generic assistant.
+        - label: Replies stay in English.
+        - label: Customer-service closers are rare.
+        - label: Taffy does not over-ask follow-up questions.
+        - label: Spontaneous replies are visible.
+        - label: Spontaneous replies are not too noisy.
+        - label: Motions match the text and voice.
+        - label: Comfort/task/closing scenes stay restrained.
+
+  - type: textarea
+    id: demo_inputs
+    attributes:
+      label: Demo inputs tried
+      description: Which fixed prompts did you test, and what happened?
+      placeholder: |
+        What are you doing?
+        This desk feels weird.
+        You were wrong.
+        I finished it.
+        I feel bad.
+        What next?
+        I'm going to sleep.
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: What felt good, generic, noisy, slow, or broken?
+      placeholder: Keep it short and concrete.
+
+  - type: textarea
+    id: redacted_logs
+    attributes:
+      label: Redacted logs or diagnostic summary
+      description: Paste only redacted output. Do not include API keys, tokens, raw prompts, raw history, or private paths.
+      render: shell
+
+  - type: checkboxes
+    id: privacy_checks
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed API keys, tokens, raw prompts, raw history, and private local paths.
+          required: true
+        - label: I understand that model latency/quality can affect the character feeling.
+          required: true

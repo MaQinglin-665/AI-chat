@@ -1,0 +1,86 @@
+Taffy v1.4 Preview - Start Here
+===============================
+
+This is a source-based preview for early testers and contributors. It is not a
+finished installer.
+
+Use this package if you want to try Taffy's original AI VTuber feeling:
+Live2D, chat, browser TTS, Character Brain cues, and low-risk spontaneous
+stage replies.
+
+1. Prepare the local environment
+
+   Double-click:
+
+       prepare_preview_environment.bat
+
+   Or run from PowerShell:
+
+       .\prepare_preview_environment.bat
+
+   This prepares Python/Node dependencies, creates local config/token files,
+   and applies the Taffy preview experience profile.
+
+2. Configure your own model
+
+   Run:
+
+       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
+
+   Taffy does not include a cloud model, hosted endpoint, or API key. You choose
+   the provider/model. See docs\model-selection.md for compatibility and latency
+   guidance.
+
+3. Diagnose the model link
+
+   Run:
+
+       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
+
+   The report hides API keys, raw prompts, raw history, Authorization headers,
+   and private local files.
+
+4. Run the first chat smoke check
+
+   Run:
+
+       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
+
+   If model probe success is below 80%, or normal turns often take more than 15
+   seconds, switch to a faster stable model before judging Taffy's character
+   experience.
+
+5. Start the desktop pet
+
+   Run:
+
+       .\start_electron.bat
+
+First things to try
+-------------------
+
+- Send a short English chat message.
+- Check that the Live2D model is visible.
+- Check that browser TTS speaks the full reply.
+- Try /doctor for local diagnostics.
+- Try /braindebug after a normal chat turn.
+- Watch whether spontaneous replies and small stage reactions appear without
+  becoming noisy.
+
+Safety defaults
+---------------
+
+The preview profile does not enable desktop observation, screenshots, user file
+reading, tool calling, or shell execution by default.
+
+Feedback
+--------
+
+If you want to report your test result, use:
+
+    docs\external-tester-checklist.md
+
+or open a GitHub issue with the "Preview Feedback" template.
+
+Please remove API keys, tokens, raw prompts, raw history, private file paths,
+and private desktop screenshots before sharing logs or screenshots.

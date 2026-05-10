@@ -96,6 +96,7 @@ $pathsToCopy = @(
     "README-FIRST-RUN.txt",
     "README.md",
     "SECURITY.md",
+    "START_HERE.txt",
     "THIRD_PARTY_NOTICES.md",
     "config.example.json",
     "package-lock.json",

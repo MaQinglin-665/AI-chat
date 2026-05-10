@@ -3,6 +3,8 @@ Taffy AI Desktop Pet - First Run
 
 This is an early tester/developer package, not a finished installer.
 
+If you only want the shortest preview path, read START_HERE.txt first.
+
 Before running
 --------------
 

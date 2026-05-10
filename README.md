@@ -79,6 +79,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 
 这仍然是源码预览包，不是免安装 installer。你需要本机安装 Python 和 Node.js，并配置一个稳定的 LLM。
 
+如果你下载的是 Release source-test zip，解压后可以先看 `START_HERE.txt`。它只保留体验者需要的最短步骤和安全提醒。
+
 `prepare_preview_environment.bat` 会尽量一键完成环境准备：检查/安装 Python 与 Node.js、创建 `.venv`、安装 Python / Electron 依赖、初始化 `config.json` / `.env`，并应用 Taffy preview 体验配置。
 
 `apply-preview-experience-config.ps1` 会把本地体验切到 Taffy 英文角色、Character Runtime、动作/语音 cue 和低风险主动插话配置；它不会写入 API Key，也不会开启桌面观察、截图、文件读取、工具调用或 shell。
@@ -134,7 +136,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps
 powershell -ExecutionPolicy Bypass -File scripts\package-source-test.ps1
 ```
 
-生成的 `dist/Taffy-AI-Desktop-Pet-v*-windows-source-test.zip` 仍需要目标电脑安装 Python 和 Node.js。解压后先阅读 `README-FIRST-RUN.txt`。
+生成的 `dist/Taffy-AI-Desktop-Pet-v*-windows-source-test.zip` 仍需要目标电脑安装 Python 和 Node.js。解压后建议先阅读 `START_HERE.txt`；需要更细排障时再看 `README-FIRST-RUN.txt`。
 
 发布前可用临时目录模拟源码测试包首跑入口：
 
@@ -177,6 +179,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - 安装依赖与启动方式：`docs/setup.md`
 - 安装与运行、Live2D、LLM、TTS/ASR：`docs/setup.md`
 - 模型选择与验收标准：`docs/model-selection.md`
+- 外部测试反馈清单：`docs/external-tester-checklist.md`
 - 后端健康接口契约：`docs/backend-health.md`
 - 启动失败样例库：`docs/startup-failure-examples.md`
 - 发布前 go/no-go 门槛：`docs/release-readiness.md`

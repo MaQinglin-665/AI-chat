@@ -99,7 +99,10 @@ try {
     $requiredPaths = @(
         "README-FIRST-RUN.txt",
         "README.md",
+        "START_HERE.txt",
         "THIRD_PARTY_NOTICES.md",
+        ".github\ISSUE_TEMPLATE\preview-feedback.yml",
+        "docs\external-tester-checklist.md",
         "docs\model-selection.md",
         "install_first_run.bat",
         "prepare_preview_environment.bat",
