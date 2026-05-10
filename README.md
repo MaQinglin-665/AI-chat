@@ -107,6 +107,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 
 `first_chat_smoke.ps1` 会检测或启动后端，检查 `/healthz` / `/api/health`，再进行轻量 LLM probe 和一条短 `/api/chat` 请求。想避免真实聊天请求时可加 `-SkipChat` 或 `-SkipLlmProbe`。
 
+如果 `first_chat_smoke.ps1` 卡在 `/api/llm_probe` 或返回 HTTP 500，先运行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1
+```
+
+它只输出脱敏摘要，用来判断是本地后端、API token、base URL、模型名、API key、网关兼容性还是模型超时问题。
+
 `start_electron.bat` 会在启动前再次运行首跑预检；如果有阻塞项，会停下来显示原因。也可以双击 `一键启动桌宠.vbs`，但如果双击后没有明显反应，请改用 `start_electron.bat` 查看诊断输出。
 
 ### Source Test Package

@@ -68,6 +68,13 @@ The smoke check runs preflight, starts or detects the backend, checks /healthz
 and /api/health, then sends a lightweight LLM probe and one short /api/chat
 request. Use -SkipLlmProbe or -SkipChat if you want to avoid that request.
 
+If the smoke check fails at /api/llm_probe or returns HTTP 500, run:
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1
+
+The diagnostic report is read-only and hides API keys, raw prompts, raw
+history, Authorization headers, and private local files.
+
 If Python or Node.js is missing, the script can ask whether to install it with
 winget. If winget changes PATH, open a new PowerShell window and rerun the
 bootstrap.

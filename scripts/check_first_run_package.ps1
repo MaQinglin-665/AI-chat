@@ -105,6 +105,8 @@ try {
         "scripts\bootstrap-first-run.ps1",
         "scripts\apply-preview-experience-config.ps1",
         "scripts\configure-llm.ps1",
+        "scripts\diagnose-llm-link.ps1",
+        "scripts\diagnose_llm_link.py",
         "scripts\first_chat_smoke.ps1",
         "scripts\first_run_check.py",
         "config.example.json",

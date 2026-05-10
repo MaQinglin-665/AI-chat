@@ -68,6 +68,7 @@ python scripts/check_encoding.py
 python scripts/check_secrets.py
 python -m pytest -q
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 --soft-fail
 python scripts/model_acceptance_probe.py --attempts 5 --timeout-sec 14 --soft-fail
 python scripts/audit_v14_dialogue.py --mode chat --timeout-sec 45 --soft-fail
 python scripts/audit_v16_performance.py --soft-fail
@@ -86,6 +87,7 @@ Model-dependent checks must be interpreted with the local configuration in mind:
 - If the model probe success rate is below 80%, do not use that run to judge the character experience.
 - If normal turns often exceed 15 seconds, switch to a faster stable model for daily tuning and compare larger models later.
 - v1.4/v1.6 dialogue audits are useful only when the configured model returns non-empty English replies.
+- If `/api/llm_probe` returns HTTP 500, run `scripts\diagnose-llm-link.ps1` and fix the reported provider/base URL/model/key/gateway issue before tuning character behavior.
 
 ## Manual Smoke Checklist
 

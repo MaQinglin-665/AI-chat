@@ -8,6 +8,7 @@ All notable changes to this project are documented in this file.
 - Added Turn-taking Director v1 so spontaneous thoughts can queue, defer, or cancel instead of interrupting user/assistant speech.
 - Added a Taffy preview experience config and helper script for early testers.
 - Added source-test package checks for backend imports and preview config safety.
+- Added read-only LLM link diagnostics for first-run `/api/llm_probe` failures.
 
 ### Fixed
 - Fixed source-test packaging so all tracked root Python backend modules are included.

@@ -20,6 +20,7 @@ def _load_script(name):
 
 
 probe = _load_script("model_acceptance_probe")
+llm_diag = _load_script("diagnose_llm_link")
 audit = _load_script("audit_v14_dialogue")
 audit_v16 = _load_script("audit_v16_performance")
 
@@ -73,6 +74,87 @@ def test_model_acceptance_fails_for_empty_text_and_timeouts():
     assert summary["gate_ok"] is False
     assert summary["empty_text_count"] == 1
     assert summary["timeout_count"] == 1
+
+
+def test_llm_link_diagnostics_classifies_remote_close_and_redacts_secret():
+    llm_url = {
+        "valid": True,
+        "is_loopback": False,
+    }
+    probe_result = {
+        "status": 500,
+        "payload": {
+            "detail": "LLM connection failed: [WinError 10054] remote host closed sk-supersecret123456"
+        },
+        "error": "Authorization: Bearer sk-supersecret123456",
+    }
+
+    issue, recommendation = llm_diag._classify_probe_failure(
+        probe_result,
+        llm_url,
+        True,
+        "openai-compatible",
+    )
+    report = llm_diag.format_report(
+        {
+            "gate_ok": False,
+            "issue_code": issue,
+            "recommendation": recommendation,
+            "local_backend": {
+                "base_url": "http://127.0.0.1:8123",
+                "healthz_ok": True,
+                "healthz_status": 200,
+                "api_health_ok": True,
+                "api_health_status": 200,
+                "api_token_required": True,
+                "api_token_configured": True,
+            },
+            "llm_config": {
+                "provider": "openai-compatible",
+                "model": "demo-model",
+                "base_url_scheme": "https",
+                "base_url_host": "example.invalid",
+                "base_url_port": 443,
+                "base_url_path": "/v1",
+                "base_url_valid": True,
+                "base_url_is_loopback": False,
+                "request_timeout": 12,
+                "api_key_env": "TAFFY_LLM_API_KEY",
+                "api_key_present": True,
+                "api_key_source": "env",
+            },
+            "network": {"tcp_checked": True, "tcp_ok": True, "tcp_elapsed_ms": 50, "tcp_error": ""},
+            "probe": {
+                "status": 500,
+                "ok": False,
+                "elapsed_ms": 10000,
+                "timeout": False,
+                "reply_chars": 0,
+                "provider": "openai-compatible",
+                "model": "demo-model",
+                "detail": probe_result["payload"]["detail"],
+            },
+        }
+    )
+
+    assert issue == "remote_closed_connection"
+    assert "gateway" in recommendation.lower()
+    assert "sk-supersecret" not in report
+    assert "Bearer" not in report
+    assert "SECRET_PROMPT" not in report
+    assert "old private chat" not in report
+
+
+def test_llm_link_diagnostics_classifies_missing_key_before_remote_probe():
+    issue, recommendation = llm_diag._classify_probe_failure(
+        {"status": 500, "payload": {"detail": "Missing API key. Please set environment variable: TAFFY_LLM_API_KEY."}},
+        {"valid": True, "is_loopback": False},
+        False,
+        "openai-compatible",
+    )
+
+    assert issue == "api_key_missing"
+    assert "API key" in recommendation
 
 
 def test_dialogue_quality_flags_customer_service_questions_and_chinese():
