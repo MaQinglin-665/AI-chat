@@ -153,7 +153,10 @@ powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
 powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
 powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1
 python scripts\first_run_check.py
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\clean-local-artifacts.ps1
 ```
+
+`clean-local-artifacts.ps1` 默认只预览会清理的 ignored 运行产物；需要真正删除时加 `-Apply`。本地配置、依赖目录、dist 和 memory 需要额外显式开关才会纳入清理范围。
 
 后端启动后可用健康接口辅助排障：
 

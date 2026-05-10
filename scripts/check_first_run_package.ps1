@@ -109,6 +109,7 @@ try {
         "start_electron.bat",
         "scripts\bootstrap-first-run.ps1",
         "scripts\apply-preview-experience-config.ps1",
+        "scripts\clean-local-artifacts.ps1",
         "scripts\prepare-preview-environment.ps1",
         "scripts\configure-llm.ps1",
         "scripts\diagnose-llm-link.ps1",
