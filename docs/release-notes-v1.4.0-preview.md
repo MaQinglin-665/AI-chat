@@ -174,6 +174,7 @@ Recommended source-package first-run path after extracting the zip:
 ```
 
 The installer and the source-package guided path both prepare dependencies,
-apply the Xinyu preview profile, ask for the user's own model provider/model/key,
-run a first-chat smoke check, and launch Electron. The preview does not ship a
-cloud model, endpoint, or API key.
+apply the Xinyu preview profile, and launch Electron. The user's own model
+provider/model/key is configured in the in-app first-run wizard. The first-chat
+smoke check remains available as an advanced diagnostic step. The preview does
+not ship a cloud model, endpoint, or API key.

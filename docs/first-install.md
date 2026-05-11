@@ -10,9 +10,8 @@
 2. 创建本地 `.venv` 并安装依赖。
 3. 初始化 `config.json` 和 `.env`。
 4. 应用当前预览体验配置。
-5. 配置用户自己的 LLM provider / model / API key。
-6. 跑一次首句 smoke check。
-7. 启动 Electron 桌宠。
+5. 启动 Electron 桌宠。
+6. 在应用内首次配置向导里配置用户自己的 LLM provider / model / API key。
 
 ## 最省心入口：安装器
 
@@ -51,16 +50,17 @@ install_and_start.bat
 这个入口也是安装器完成复制后启动的脚本。它会调用：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\prepare-preview-environment.ps1 -RunLlmConfigure -RunSmoke -StartApp
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\prepare-preview-environment.ps1 -StartApp
 ```
 
 它不是静默安装器。首次运行时可能会提示你：
 
 - 安装缺失的 Python 3.10+ 或 Node.js 18+。
-- 选择 LLM provider、base URL 和 model。
+- 启动应用内首次配置向导。
+- 在向导里选择 LLM provider、base URL 和 model。
 - 输入 API key。Key 会写入本地 `.env`，不会写入 `config.json`。
 
-`-RunSmoke` 会在配置完成后发送一次很小的模型测试请求，用来提前发现模型名、API key、base URL 或网关兼容性问题。
+如果需要高级排查，可以手动运行 `scripts\first_chat_smoke.ps1`。它会发送一次很小的模型测试请求，用来提前发现模型名、API key、base URL 或网关兼容性问题。
 
 ## 应用内首次配置
 

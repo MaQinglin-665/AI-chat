@@ -26,7 +26,7 @@ SHA256SUMS.txt
 .\install_and_start.bat
 ```
 
-它会串起依赖安装、预览配置、LLM 配置、首句 smoke check 和 Electron 启动。仍会在需要时提示你选择模型、填写 API key，且 smoke check 会向你配置的模型发送一次小请求。
+它会串起依赖安装、预览配置和 Electron 启动。LLM 配置放到应用内首次配置向导完成；首句 smoke check 改为高级排查步骤，不再阻塞普通用户首次启动。
 
 更详细说明见 `docs/first-install.md`。
 

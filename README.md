@@ -120,11 +120,10 @@ install_and_start.bat
 3. 安装 Electron / Node 依赖。
 4. 初始化 `config.json` 和 `.env`。
 5. 应用当前预览体验配置。
-6. 引导配置你自己的 OpenAI-compatible provider / base URL / model / API key。
-7. 运行首句 smoke check。
-8. 启动 Electron 桌宠。
+6. 启动 Electron 桌宠。
+7. 在应用内首次配置向导里填写 OpenAI-compatible provider / base URL / model / API key。
 
-注意：你仍需要提供自己的模型和 API key。smoke check 会向你配置的模型发送一次很小的测试请求，用来提前发现模型名、API key、base URL 或网关兼容问题。
+注意：你仍需要提供自己的模型和 API key。首句 smoke check 改为高级排查步骤，不再阻塞普通用户首次启动。
 
 ### 4. 应用内首次配置向导
 
