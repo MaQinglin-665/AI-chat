@@ -1,6 +1,18 @@
 import memory
 
 
+class ImmediateThread:
+    def __init__(self, target=None, args=None, kwargs=None, daemon=None):
+        self.target = target
+        self.args = args or ()
+        self.kwargs = kwargs or {}
+        self.daemon = daemon
+
+    def start(self):
+        if self.target:
+            self.target(*self.args, **self.kwargs)
+
+
 def _item(ts, user, assistant):
     return {"ts": ts, "user": user, "assistant": assistant}
 
@@ -11,11 +23,31 @@ def _config(**memory_overrides):
             "enabled": True,
             "inject_recent": 2,
             "inject_relevant": 2,
+            "learning_samples_enabled": False,
             "mem0_enabled": False,
         }
     }
     cfg["memory"].update(memory_overrides)
     return cfg
+
+
+def _patch_learning_paths(monkeypatch, tmp_path):
+    candidates_path = tmp_path / "learning_candidates.json"
+    samples_path = tmp_path / "learning_samples.json"
+    state_path = tmp_path / "learning_state.json"
+    audit_path = tmp_path / "learning_audit_log.jsonl"
+    shadow_path = tmp_path / "learning_shadow_log.jsonl"
+    candidates_path.write_text("[]", encoding="utf-8")
+    samples_path.write_text("[]", encoding="utf-8")
+    state_path.write_text("{}", encoding="utf-8")
+    audit_path.write_text("", encoding="utf-8")
+    shadow_path.write_text("", encoding="utf-8")
+    monkeypatch.setattr(memory, "LEARNING_CANDIDATES_PATH", candidates_path)
+    monkeypatch.setattr(memory, "LEARNING_SAMPLES_PATH", samples_path)
+    monkeypatch.setattr(memory, "LEARNING_STATE_PATH", state_path)
+    monkeypatch.setattr(memory, "LEARNING_AUDIT_LOG_PATH", audit_path)
+    monkeypatch.setattr(memory, "LEARNING_SHADOW_LOG_PATH", shadow_path)
+    return candidates_path, samples_path, state_path
 
 
 def test_low_signal_reply_does_not_inject_recent_memory(monkeypatch):
@@ -126,6 +158,180 @@ def test_memory_debug_snapshot_includes_last_selection(monkeypatch):
     assert snapshot["memory"]["memory_count"] == 1
     assert snapshot["memory"]["last_selection"]["reason"] == "selected"
     assert snapshot["memory"]["last_selection"]["selected"][0]["user"] == "old topic about cookies"
+
+
+def test_formal_learning_sample_can_join_prompt_when_relevant(monkeypatch, tmp_path):
+    samples_path = tmp_path / "learning_samples.json"
+    state_path = tmp_path / "learning_state.json"
+    samples_path.write_text(
+        """
+[
+  {
+    "id": "learned_short_reply",
+    "source": "learned",
+    "status": "active",
+    "user_preview": "我不喜欢长篇大论，开发问题先给重点",
+    "assistant_preview": "收到，我先给结论再补细节。",
+    "compressed_pattern": "用户聊开发问题时偏好短句、先给重点、少说套话。",
+    "score": 0.86,
+    "confidence": 0.72,
+    "support_count": 3
+  }
+]
+""".strip(),
+        encoding="utf-8",
+    )
+    state_path.write_text('{"quick_settings":{"inject_count":1}}', encoding="utf-8")
+    monkeypatch.setattr(memory, "LEARNING_SAMPLES_PATH", samples_path)
+    monkeypatch.setattr(memory, "LEARNING_STATE_PATH", state_path)
+    monkeypatch.setattr(memory, "load_memory_items", lambda: [])
+    monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [])
+
+    block = memory.build_memory_prompt_block(
+        _config(learning_samples_enabled=True, learning_inject_count=1),
+        "这个开发问题怎么优化，先给重点",
+        [],
+    )
+
+    assert "长期互动偏好" in block
+    assert "先给重点" in block
+    assert memory.LAST_MEMORY_DEBUG["learning_reason"] == "selected"
+    assert memory.LAST_MEMORY_DEBUG["learning_samples_selected"][0]["id"] == "learned_short_reply"
+
+
+def test_learning_sample_injection_respects_quick_disable(monkeypatch, tmp_path):
+    samples_path = tmp_path / "learning_samples.json"
+    state_path = tmp_path / "learning_state.json"
+    samples_path.write_text(
+        """
+[
+  {
+    "id": "learned_dev",
+    "source": "learned",
+    "status": "active",
+    "user_preview": "开发问题先给重点",
+    "compressed_pattern": "用户偏好开发问题先给重点。",
+    "score": 0.9,
+    "confidence": 0.8
+  }
+]
+""".strip(),
+        encoding="utf-8",
+    )
+    state_path.write_text('{"quick_settings":{"inject_count":0}}', encoding="utf-8")
+    monkeypatch.setattr(memory, "LEARNING_SAMPLES_PATH", samples_path)
+    monkeypatch.setattr(memory, "LEARNING_STATE_PATH", state_path)
+    monkeypatch.setattr(memory, "load_memory_items", lambda: [])
+    monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [])
+
+    selected = memory.select_memory_items_for_prompt(
+        _config(learning_samples_enabled=True, learning_inject_count=1),
+        "这个开发问题怎么优化，先给重点",
+        [],
+    )
+
+    assert selected == []
+    assert memory.LAST_MEMORY_DEBUG["learning_reason"] == "quick_disabled"
+
+
+def test_remember_interaction_generates_learning_candidate(monkeypatch, tmp_path):
+    memory_path = tmp_path / "memory.json"
+    candidates_path, _samples_path, _state_path = _patch_learning_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(memory, "MEMORY_PATH", memory_path)
+    monkeypatch.setattr(memory.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(
+        memory,
+        "_call_summary_llm",
+        lambda _cfg, _prompt: """
+{
+  "remember": true,
+  "category": "user_preference",
+  "compressed_pattern": "用户聊开发问题时偏好短句、先给重点。",
+  "user_preview": "以后开发问题请先给重点，我喜欢短句",
+  "assistant_preview": "收到，我以后先给重点。",
+  "score": 0.7,
+  "confidence": 0.66
+}
+""",
+    )
+
+    memory.remember_interaction(
+        _config(summary_trigger_every=100),
+        "以后开发问题请先给重点，我喜欢短句",
+        "收到，我以后先给重点，再补必要细节。",
+    )
+
+    candidates = memory._safe_load_json_file(candidates_path, [])
+    assert len(candidates) == 1
+    assert candidates[0]["status"] == "candidate"
+    assert candidates[0]["category"] == "user_preference"
+    assert candidates[0]["support_count"] == 1
+    assert "先给重点" in candidates[0]["compressed_pattern"]
+    assert memory.LAST_LEARNING_EXTRACTION_DEBUG["status"] == "stored"
+
+
+def test_learning_candidate_skip_low_signal_and_sensitive_text(monkeypatch, tmp_path):
+    _patch_learning_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(memory.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(
+        memory,
+        "_call_summary_llm",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("LLM should not be called")),
+    )
+
+    memory._schedule_learning_candidate_extraction(
+        _config(),
+        {"user": "早上好", "assistant": "早呀，今天也慢慢来。"},
+    )
+    assert memory.LAST_LEARNING_EXTRACTION_DEBUG["reason"] == "lightweight_checkin"
+
+    memory._schedule_learning_candidate_extraction(
+        _config(),
+        {"user": "请记住我的 API key 是 " + "sk-" + "abcdefghijklmnop", "assistant": "我不会记录这个。"},
+    )
+    assert memory.LAST_LEARNING_EXTRACTION_DEBUG["reason"] == "sensitive_text"
+
+
+def test_learning_candidate_invalid_json_is_safe(monkeypatch, tmp_path):
+    _patch_learning_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(memory, "_call_summary_llm", lambda *_args: "not json")
+
+    result = memory._extract_and_store_learning_candidate(
+        _config(),
+        {"user": "以后开发问题请先给重点，我喜欢短句", "assistant": "收到，我以后先给重点。"},
+    )
+
+    assert result["status"] == "skipped"
+    assert result["reason"] == "llm_invalid_json"
+
+
+def test_learning_candidate_duplicate_merges_support_count(monkeypatch, tmp_path):
+    candidates_path, _samples_path, _state_path = _patch_learning_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        memory,
+        "_call_summary_llm",
+        lambda *_args: """
+{
+  "remember": true,
+  "category": "response_feedback",
+  "compressed_pattern": "用户偏好开发回答先给重点、少说套话。",
+  "user_preview": "以后开发问题请先给重点，少说套话",
+  "assistant_preview": "明白，我会更直接。",
+  "score": 0.72,
+  "confidence": 0.7
+}
+""",
+    )
+
+    record = {"user": "以后开发问题请先给重点，少说套话", "assistant": "明白，我会更直接。"}
+    first = memory._extract_and_store_learning_candidate(_config(), record)
+    second = memory._extract_and_store_learning_candidate(_config(), record)
+    candidates = memory._safe_load_json_file(candidates_path, [])
+
+    assert first["action"] == "created"
+    assert second["action"] == "merged"
+    assert len(candidates) == 1
+    assert candidates[0]["support_count"] == 2
 
 
 def test_memory_debug_snapshot_includes_learning_diagnostics(monkeypatch, tmp_path):
@@ -355,6 +561,7 @@ def test_learning_review_promote_update_and_undo(monkeypatch, tmp_path):
     promoted = memory.promote_learning_review_candidates(_config(), ["cand_1"])
     assert promoted["ok"] is True
     assert promoted["samples"][0]["id"] == "learned_cand_1"
+    assert promoted["samples"][0]["status"] == "active"
     assert promoted["candidates"][0]["status"] == "promoted"
 
     weighted = memory.update_learning_review_entries(

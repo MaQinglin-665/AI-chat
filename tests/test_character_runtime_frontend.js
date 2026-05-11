@@ -2278,8 +2278,19 @@ assert.ok(
 assert.ok(
   memoryDebugReport.buildReport({
     memory: { enabled: true, memory_count: 2, last_selection: { reason: "explicit", selected: [{ source: "memory", user: "u", assistant: "a" }] } },
-    learning: { degraded_mode: true, diagnostics: { degraded_reason: "low_signal", health_windows: [{ avg_confidence: 0.5, candidate_in_rate: 1, signal_coverage: 0.8 }] } }
-  }).includes("Learning health windows:"),
+    learning: {
+      degraded_mode: true,
+      last_extraction: { status: "stored", action: "created", candidate_id: "cand_1", category: "user_preference", score: 0.8, confidence: 0.7 },
+      diagnostics: { degraded_reason: "low_signal", health_windows: [{ avg_confidence: 0.5, candidate_in_rate: 1, signal_coverage: 0.8 }] }
+    }
+  }).includes("Learning health windows:")
+    && memoryDebugReport.buildReport({
+      memory: { enabled: true, memory_count: 2, last_selection: { reason: "explicit", selected: [{ source: "memory", user: "u", assistant: "a" }] } },
+      learning: {
+        last_extraction: { status: "stored", action: "created", candidate_id: "cand_1", category: "user_preference", score: 0.8, confidence: 0.7 },
+        diagnostics: {}
+      }
+    }).includes("Last learning extraction:"),
   "memory debug helper should build a readable learning health report"
 );
 assert.ok(
