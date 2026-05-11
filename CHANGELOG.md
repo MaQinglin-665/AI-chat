@@ -11,11 +11,16 @@ All notable changes to this project are documented in this file.
 - Added read-only LLM link diagnostics for first-run `/api/llm_probe` failures.
 - Added a model selection guide for user-chosen LLM providers and Taffy preview readiness.
 - Added a one-click preview environment preparation entry for early testers.
+- Added a guided `install_and_start.bat` first-run entry that chains setup, LLM configuration, smoke check, and launch.
+- Added `docs/first-install.md` for the GitHub-first installation path and safety expectations.
 - Added reviewed learning memory flow: normal chats can create candidate memories asynchronously, while only user-promoted learning samples can affect future replies.
 - Added `/api/memory/debug` and memory management debug visibility for recent learning-sample injection and candidate extraction status.
 
 ### Changed
 - Documented the memory candidate pool, formal learning sample pool, and conservative memory safety boundaries.
+- Reworked the main settings entry into a role-first experience panel, with model/API connection fields tucked under advanced connection settings.
+- Improved first-run onboarding copy and memory review cards so normal users see actionable summaries before technical details.
+- Reworked the README first impression around project positioning, guided first run, safety defaults, and repository navigation.
 
 ### Fixed
 - Fixed source-test packaging so all tracked root Python backend modules are included.

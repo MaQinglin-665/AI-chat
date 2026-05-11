@@ -1,60 +1,49 @@
-Taffy v1.4 Preview - Start Here
-===============================
+Xinyu Desktop Pet v1.4 Preview - Start Here
+===========================================
 
 This is a source-based preview for early testers and contributors. It is not a
-finished installer.
+finished Windows installer.
 
-Use this package if you want to try Taffy's original AI VTuber feeling:
-Live2D, chat, browser TTS, Character Brain cues, and low-risk spontaneous
-stage replies.
+Fastest guided path
+-------------------
 
-1. Prepare the local environment
+Double-click:
 
-   Double-click:
+    install_and_start.bat
 
-       prepare_preview_environment.bat
+This guided first-run entry prepares dependencies, applies the preview profile,
+helps you configure your own LLM, runs a first-chat smoke check, then starts the
+Electron desktop pet.
 
-   Or run from PowerShell:
+Important notes:
 
-       .\prepare_preview_environment.bat
+- You still need your own model/provider/API key, or a local Ollama model.
+- The smoke check sends one small request to your configured model.
+- Desktop observation, screenshots, user file reading, tool calling, and shell
+  execution stay disabled by default.
 
-   This prepares Python/Node dependencies, creates local config/token files,
-   and applies the Taffy preview experience profile.
+Step-by-step path
+-----------------
 
-2. Configure your own model
+If you want more control or easier troubleshooting, run:
 
-   Run:
+    prepare_preview_environment.bat
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
+    start_electron.bat
 
-       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
+Model choice
+------------
 
-   Taffy does not include a cloud model, hosted endpoint, or API key. You choose
-   the provider/model. See docs\model-selection.md for compatibility and latency
-   guidance.
+Xinyu does not include a cloud model, hosted endpoint, or API key. You choose
+the provider/model. See:
 
-3. Diagnose the model link
+    docs\model-selection.md
 
-   Run:
-
-       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
-
-   The report hides API keys, raw prompts, raw history, Authorization headers,
-   and private local files.
-
-4. Run the first chat smoke check
-
-   Run:
-
-       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
-
-   If model probe success is below 80%, or normal turns often take more than 15
-   seconds, switch to a faster stable model before judging Taffy's character
-   experience.
-
-5. Start the desktop pet
-
-   Run:
-
-       .\start_electron.bat
+If model probe success is below 80%, or normal turns often take more than 15
+seconds, switch to a faster stable model before judging the character
+experience.
 
 First things to try
 -------------------
@@ -67,20 +56,15 @@ First things to try
 - Watch whether spontaneous replies and small stage reactions appear without
   becoming noisy.
 
-Safety defaults
----------------
+More help
+---------
 
-The preview profile does not enable desktop observation, screenshots, user file
-reading, tool calling, or shell execution by default.
+Read:
 
-Feedback
---------
+    docs\first-install.md
+    README-FIRST-RUN.txt
+    docs\troubleshooting.md
 
-If you want to report your test result, use:
-
-    docs\external-tester-checklist.md
-
-or open a GitHub issue with the "Preview Feedback" template.
-
-Please remove API keys, tokens, raw prompts, raw history, private file paths,
-and private desktop screenshots before sharing logs or screenshots.
+If you report feedback, remove API keys, tokens, raw prompts, raw history,
+private file paths, and private desktop screenshots before sharing logs or
+screenshots.

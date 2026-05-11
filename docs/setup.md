@@ -9,7 +9,29 @@
 - Node.js 18+
 - 可用的 Live2D 模型文件（`.model3.json`）
 
-## 2. Install Dependencies
+## 2. Recommended First Run
+
+第一次从 GitHub 下载或克隆仓库后，推荐先走引导式入口：
+
+```powershell
+.\install_and_start.bat
+```
+
+它会串起依赖安装、预览配置、LLM 配置、首句 smoke check 和 Electron 启动。它不是静默 installer，仍会在需要时提示你选择模型、填写 API key，且 smoke check 会向你配置的模型发送一次小请求。
+
+更详细说明见 `docs/first-install.md`。
+
+如果你想分步排查，使用：
+
+```powershell
+.\prepare_preview_environment.bat
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
+.\start_electron.bat
+```
+
+## 3. Install Dependencies
 
 如果你下载的是 Release 附件中的 `windows-source-test.zip`，请先阅读根目录的 `README-FIRST-RUN.txt`。它不是免安装包，仍需要本机安装 Python 和 Node.js。
 
@@ -47,7 +69,7 @@ python scripts\first_run_check.py
 它会检查配置能否加载、Live2D 路径是否有效、LLM key 是否已配置、端口是否占用、TTS 是否适合首跑，以及桌面观察/工具调用等安全默认值。
 如果选择本地 Ollama 或 GPT-SoVITS，它还会检查对应本地端口是否可连通，但不会调用外部模型接口，也不会打印密钥。
 
-## 3. Place Live2D Model
+## 4. Place Live2D Model
 
 将模型放到 `web/models/`，例如：
 
@@ -66,7 +88,7 @@ python scripts\first_run_check.py
 }
 ```
 
-## 4. Configure LLM
+## 5. Configure LLM
 
 ### Recommended first run (OpenAI-compatible)
 
@@ -109,7 +131,7 @@ $env:DASHSCOPE_API_KEY = "your_key_here"
 
 `translate_model` 是可选项。如果聊天主模型较大、中文翻译出现较慢，可以把它设为一个已经安装的更小模型，同时保留 `model` 作为主聊天模型。`translate_provider`、`translate_base_url`、`translate_api_key_env` 也是可选项；当聊天模型容易把翻译请求当成普通对话回答时，可以把翻译切到另一个 OpenAI-compatible 服务或本地 Ollama。`translate_num_ctx` 用于让本地 Ollama 的短翻译请求更轻量；如果指定的翻译模型还没安装，Ollama 会返回错误，请先选择本地已有模型，或执行 `ollama pull <model>`。
 
-## 5. Configure TTS / ASR
+## 6. Configure TTS / ASR
 
 ### Recommended first run TTS
 
@@ -144,7 +166,7 @@ $env:DASHSCOPE_API_KEY = "your_key_here"
 }
 ```
 
-## 6. Run the App
+## 7. Run the App
 
 启动前如果不确定配置是否完整，先运行：
 
@@ -172,7 +194,7 @@ curl http://127.0.0.1:8123/api/health
 
 如果看到具体报错但不确定怎么处理，先看 `docs/startup-failure-examples.md`。
 
-## 6.1 Recommended Local Experience Templates
+## 7.1 Recommended Local Experience Templates
 
 如果你想复现当前推荐的本地体验，可以使用：
 
@@ -195,7 +217,7 @@ cd D:\AI\ai_desktop_pet
 start_desktop.bat
 ```
 
-## 7. First-run Safety Defaults
+## 8. First-run Safety Defaults
 
 默认推荐保持：
 
@@ -205,7 +227,7 @@ start_desktop.bat
 
 说明：高风险能力保持关闭，按需显式开启。
 
-## 8. Config Center
+## 9. Config Center
 
 可视化配置入口：
 
@@ -217,14 +239,15 @@ start_desktop.bat
 2. 通过后一键应用配置。
 3. 必要时使用备份回滚。
 
-## 9. Security Notes
+## 10. Security Notes
 
 - 不要把真实 API Key / Token 写入仓库文件。
 - `config.json` 默认不纳入 git。
 - `tts_ref/` 建议仅存放本地参考音频，不提交隐私音频。
 
-## 10. Related Docs
+## 11. Related Docs
 
+- 首次安装：`docs/first-install.md`
 - 后端健康接口契约：`docs/backend-health.md`
 - 启动失败样例库：`docs/startup-failure-examples.md`
 - 发布前 go/no-go 门槛：`docs/release-readiness.md`

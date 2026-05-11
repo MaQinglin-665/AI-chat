@@ -1,56 +1,71 @@
-﻿# 馨语桌宠
+# 馨语桌宠
+
+<p align="center">
+  <img src="docs/assets/og-cover.png" alt="馨语桌宠预览图" width="760">
+</p>
+
+<p align="center">
+  <a href="https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview"><img alt="version" src="https://img.shields.io/badge/version-v1.4.0--preview-6f5bd5"></a>
+  <img alt="status" src="https://img.shields.io/badge/status-MVP%20preview-f59e0b">
+  <img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-2563eb">
+  <img alt="python" src="https://img.shields.io/badge/Python-3.10%2B-3776ab">
+  <img alt="node" src="https://img.shields.io/badge/Node.js-18%2B-339933">
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-111827"></a>
+</p>
 
 开源 Windows 桌面 AI 伙伴 / 桌面 AI VTuber 实验项目。
 
-这个项目受 AI VTuber 与 Neuro-sama 这类项目启发，目标是探索 `Live2D + LLM 对话 + TTS/ASR + 情绪动作 + 低打扰陪伴` 的可用组合。
+它把 `Electron + Python 本地服务 + Live2D + LLM 对话 + TTS/ASR + 情绪动作反馈` 组合到桌面上，探索一个能聊天、能说话、能表达情绪、低打扰陪伴的角色体验。
 
-它目前是持续迭代中的开源可体验版，不是成熟商业产品。
+当前项目仍处于 `MVP / 开源孵化` 阶段，不是成熟商业产品，也不是完整免安装 installer。项目可以提到受 AI VTuber 与 Neuro-sama-like 交互方向启发，但它不是任何项目的克隆或复刻。
 
-## Project Positioning
+- 项目网站：[maqinglin-665.github.io/AI-chat](https://maqinglin-665.github.io/AI-chat/)
+- 最新预览版：[v1.4.0-preview](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview)
+- 首次安装指南：[docs/first-install.md](docs/first-install.md)
+- 模型选择指南：[docs/model-selection.md](docs/model-selection.md)
 
-- 桌面形态：Electron + Python 本地服务
-- 交互核心：Live2D 角色、文本与语音对话、轻量主动陪伴
-- 体验目标：低打扰、可长期陪伴、可配置、可扩展
+## 适合谁
 
-## Current Status & Version
+- 想体验 Windows 桌面 AI 伙伴 / Live2D AI VTuber 原型的人。
+- 想研究 Electron 桌面 UI、Python 本地服务、LLM、TTS/ASR、Live2D 串联方式的开发者。
+- 愿意接受源码预览版限制，并反馈首跑、模型兼容、语音链路、角色体验问题的早期测试者。
 
-- 当前阶段：`MVP / 开源孵化`
-- 当前仓库版本：`1.4.0-preview`（与 `package.json` / `CHANGELOG.md` 对齐）
-- 项目网站：[`maqinglin-665.github.io/AI-chat`](https://maqinglin-665.github.io/AI-chat/)
-- 最新预览版：[`v1.4.0-preview`](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview)
-- Demo 素材：见 `v1.4.0-preview` Release assets
+## 当前能力
 
-## Current Capabilities
+- Live2D 桌宠渲染与 Electron 透明桌面窗口。
+- 文本对话，支持 OpenAI-compatible、OpenAI、Ollama 等用户自选模型。
+- TTS / ASR 语音交互链路，首跑推荐浏览器 TTS。
+- 情绪状态、动作映射、角色运行时 cue。
+- 低风险主动反馈与状态中心。
+- 默认关闭的桌面截图上下文辅助回复，需要用户显式启用。
 
-- Live2D 桌宠渲染与桌面透明窗口联动
-- LLM 对话（支持 OpenAI-compatible / Ollama 等）
-- TTS / ASR 语音交互链路
-- 情绪状态与动作映射
-- 默认关闭的可选桌面截图上下文辅助回复（需用户显式启用）
-
-## System Requirements
+## 系统要求
 
 - Windows 10/11
 - Python 3.10+
 - Node.js 18+
-- Live2D 模型文件（`.model3.json`）
+- npm
+- 一个可用的 LLM provider / model / API key，或本地 Ollama 模型
+- Live2D `.model3.json` 模型文件
 
-## Download Source For Testing
+## 快速开始
 
-如果你是开发者或早期测试者，请优先下载 `main` 分支源码，而不是旧 Release 的源码包：
+### 1. 下载源码
+
+推荐使用当前 `main` 分支源码：
 
 ```powershell
 git clone https://github.com/MaQinglin-665/AI-chat.git
 cd AI-chat
 ```
 
-如果当前网络无法稳定访问 GitHub，也可以在 GitHub 首页点击 `Code` -> `Download ZIP`，或直接下载：
+如果无法稳定访问 GitHub，也可以下载 `main` 分支 ZIP：
 
 ```text
 https://github.com/MaQinglin-665/AI-chat/archive/refs/heads/main.zip
 ```
 
-解压后请先确认源码完整。项目根目录至少应包含：
+解压后确认根目录至少包含：
 
 ```text
 electron/
@@ -62,161 +77,113 @@ requirements.txt
 requirements-dev.txt
 ```
 
-如果缺少 `tests/`、`web/` 或 `electron/`，说明下载或解压的不是完整的当前源码，请重新下载 `main` 分支 ZIP 或换网络后重新 `git clone`。
+如果缺少 `web/`、`electron/` 或 `tests/`，说明下载的不是完整当前源码，请重新下载。
 
-## Quick Start
+### 2. 引导式一键入口
 
-### Fastest 馨语 Preview Path
+第一次体验优先双击：
 
-如果你只是想体验当前 `v1.4.0-preview` 的馨语桌宠 AI VTuber feeling，请走这条最短路径：
+```text
+install_and_start.bat
+```
+
+或在 PowerShell 中运行：
+
+```powershell
+.\install_and_start.bat
+```
+
+它会尽量串起完整首跑路径：
+
+1. 检查 Python / Node.js / npm，必要时提示使用 winget 安装。
+2. 创建 `.venv` 并安装 Python 依赖。
+3. 安装 Electron / Node 依赖。
+4. 初始化 `config.json` 和 `.env`。
+5. 应用当前预览体验配置。
+6. 引导配置你自己的 LLM provider / model / API key。
+7. 运行首句 smoke check。
+8. 启动 Electron 桌宠。
+
+注意：这不是静默安装器。你仍需要提供自己的模型和 API key。smoke check 会向你配置的模型发送一次很小的测试请求，用来提前发现模型名、API key、base URL 或网关兼容问题。
+
+### 3. 分步首跑路径
+
+如果你更想逐步排查，使用下面的流程：
 
 ```powershell
 .\prepare_preview_environment.bat
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 .\start_electron.bat
 ```
 
-这仍然是源码预览包，不是免安装 installer。你需要本机安装 Python 和 Node.js，并配置一个稳定的 LLM。
+`prepare_preview_environment.bat` 会准备依赖、初始化本地配置，并应用预览体验配置。
 
-如果你下载的是 Release source-test zip，解压后可以先看 `START_HERE.txt`。它只保留体验者需要的最短步骤和安全提醒。
+`configure-llm.ps1` 会把 provider / base URL / model 写入 `config.local.json`，把 API key 写入 `.env`，不会把真实 Key 写进 JSON 配置。
 
-`prepare_preview_environment.bat` 会尽量一键完成环境准备：检查/安装 Python 与 Node.js、创建 `.venv`、安装 Python / Electron 依赖、初始化 `config.json` / `.env`，并应用馨语 preview 体验配置。
+`first_chat_smoke.ps1` 会检查后端健康状态，并发送一条轻量聊天请求。想避免真实聊天请求时可加 `-SkipChat` 或 `-SkipLlmProbe`。
 
-`apply-preview-experience-config.ps1` 会把本地体验切到馨语 / Xinyu 英文角色、Character Runtime、动作/语音 cue 和低风险主动插话配置；它不会写入 API Key，也不会开启桌面观察、截图、文件读取、工具调用或 shell。
+### 4. 只安装依赖
 
-模型质量和延迟会直接影响角色感。如果 `model_acceptance_probe` 成功率低于 80%，或日常单轮经常超过 15 秒，请先换更快更稳定的模型，再评价馨语的 AI VTuber 体验。
-
-### Recommended First Run
-
-当前 preview 还没有真正的免安装 Windows installer。早期测试者可以先用一键环境准备入口：
-
-```powershell
-.\prepare_preview_environment.bat
-```
-
-如果需要分步排障，再走这一条主路径：
+如果只想做低层依赖 bootstrap，不应用预览配置：
 
 ```powershell
 .\install_first_run.bat
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\apply-preview-experience-config.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
-.\start_electron.bat
 ```
 
-`install_first_run.bat` 会创建本地 `.venv`、安装 Python / Node 依赖、初始化 `config.json` / `.env`，并运行首跑预检。结束时会给出 `READY` 或 `ACTION`：
+## 常用命令
 
-- `READY`：可以继续配置 LLM、跑首句 smoke，然后启动桌宠。
-- `ACTION`：依赖设置已经尽力完成，但还需要按输出修复 Live2D 模型、LLM Key / 模型名、Node / Python 环境等阻塞项。
-
-`configure-llm.ps1` 会把 provider / base URL / model 写入 `config.local.json`，把 API Key 写入 `.env`，不会把真实 Key 写进 JSON 配置。
-
-模型由用户自行选择；项目不内置云端模型或 API Key。选择标准见 `docs/model-selection.md`：优先选择诊断通过、成功率 >= 80%、常态单轮 < 15 秒、英文输出稳定的模型。
-
-`apply-preview-experience-config.ps1` 会合并 `config.preview.example.json`，保留你已经配置好的 LLM provider / base URL / model / api_key_env，只应用馨语 preview 的角色、TTS、动作和安全主动插话设置。
-
-`first_chat_smoke.ps1` 会检测或启动后端，检查 `/healthz` / `/api/health`，再进行轻量 LLM probe 和一条短 `/api/chat` 请求。想避免真实聊天请求时可加 `-SkipChat` 或 `-SkipLlmProbe`。
-
-如果 `first_chat_smoke.ps1` 卡在 `/api/llm_probe` 或返回 HTTP 500，先运行：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1
-```
-
-它只输出脱敏摘要，用来判断是本地后端、API token、base URL、模型名、API key、网关兼容性还是模型超时问题。
-
-`start_electron.bat` 会在启动前再次运行首跑预检；如果有阻塞项，会停下来显示原因。也可以双击 `一键启动桌宠.vbs`，但如果双击后没有明显反应，请改用 `start_electron.bat` 查看诊断输出。
-
-### Source Test Package
-
-维护者准备早期测试包时使用：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\package-source-test.ps1
-```
-
-生成的 `dist/Taffy-AI-Desktop-Pet-v*-windows-source-test.zip` 仍需要目标电脑安装 Python 和 Node.js。解压后建议先阅读 `START_HERE.txt`；需要更细排障时再看 `README-FIRST-RUN.txt`。
-
-发布前可用临时目录模拟源码测试包首跑入口：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
-```
-
-### Developer Commands
-
-开发者需要更细的环境诊断或完整本地测试时再使用：
+开发者本地验证：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
 powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
 powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1
 python scripts\first_run_check.py
+node scripts/run_node_tests.js
+```
+
+清理本地 ignored 运行产物：
+
+```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\clean-local-artifacts.ps1
 ```
 
-`clean-local-artifacts.ps1` 默认只预览会清理的 ignored 运行产物；需要真正删除时加 `-Apply`。本地配置、依赖目录、dist 和 memory 需要额外显式开关才会纳入清理范围。
+默认只预览要清理的内容，需要真正删除时加 `-Apply`。本地配置、依赖目录、dist 和 memory 需要额外显式开关才会纳入清理范围。
 
-后端启动后可用健康接口辅助排障：
+## 项目结构
 
-- `http://127.0.0.1:8123/healthz`：轻量公开探活
-- `http://127.0.0.1:8123/api/health`：详细自检，包含 LLM / TTS / ASR / Live2D / 安全配置摘要；如果启用了 `server.require_api_token`，需要带 `X-Taffy-Token`
-
-### Manual Commands
-
-如果不使用脚本，也可以手动执行：
-
-```powershell
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-npm install
-python -m pytest -q
-node tests/test_drag_logic.js
+```text
+electron/      Electron 桌面窗口与进程管理
+web/           前端 UI、Live2D 渲染、聊天与配置页面
+scripts/       首跑、诊断、测试、打包脚本
+docs/          安装、配置、路线图、GitHub Pages 文档站
+tests/         Python / Node / 前端行为测试
+app.py         Python 本地服务入口
+config.py      配置加载与安全默认值
 ```
 
-## Configuration Guide
+## 配置入口
 
-README 保留首跑关键入口，详细配置迁移到文档：
+- 首次安装：[docs/first-install.md](docs/first-install.md)
+- 安装与运行：[docs/setup.md](docs/setup.md)
+- 模型选择：[docs/model-selection.md](docs/model-selection.md)
+- 推荐本地配置：[docs/recommended-local-config.md](docs/recommended-local-config.md)
+- Live2D / Character Runtime：[docs/character-runtime-live2d-mapping.md](docs/character-runtime-live2d-mapping.md)
+- 语音输入 / 输出排障：[docs/voice-troubleshooting.md](docs/voice-troubleshooting.md)
+- 常见问题与排障：[docs/troubleshooting.md](docs/troubleshooting.md)
+- 后端健康接口：[docs/backend-health.md](docs/backend-health.md)
+- 可视化配置中心：[docs/config.html](docs/config.html)
 
-- 安装依赖与启动方式：`docs/setup.md`
-- 安装与运行、Live2D、LLM、TTS/ASR：`docs/setup.md`
-- 模型选择与验收标准：`docs/model-selection.md`
-- 外部测试反馈清单：`docs/external-tester-checklist.md`
-- 后端健康接口契约：`docs/backend-health.md`
-- 启动失败样例库：`docs/startup-failure-examples.md`
-- 发布前 go/no-go 门槛：`docs/release-readiness.md`
-- 第三方组件与资源说明：`THIRD_PARTY_NOTICES.md`
-- Character Runtime demo 启用与验证：`docs/character-runtime-demo.md`
-- AI VTuber 长期体验目标：`docs/ai-vtuber-experience-target.md`
-- v1.4 AI VTuber Feeling 规格与 demo 场景：`docs/v1.4-ai-vtuber-feeling.md`
-- 发布前 / 打包前人工验收清单：`docs/manual-qa.md`
-- 推荐本地体验模板：`docs/recommended-local-config.md`
-- 记忆系统机制与安全边界：`docs/memory-system.md`
-- Character Runtime Live2D 映射：`docs/character-runtime-live2d-mapping.md`
-- Character Runtime 验证记录模板：`docs/character-runtime-validation-log.md`
-- Character Runtime 主动行为安全边界：`docs/character-runtime-proactive-safety.md`
-- 常见问题与排障：`docs/troubleshooting.md`
-- 语音输入 / 输出排障：`docs/voice-troubleshooting.md`
-- 语音与 Character Runtime 回归清单：`docs/voice-runtime-regression-checklist.md`
-- 路线图（v1.2 -> v2.0）：`docs/ROADMAP.md`
-- v1.2 发布验收清单：`docs/release-v1.2-checklist.md`
-- v1.2 当前缺口：`docs/v1.2-current-gaps.md`
-- v1.2 preview 发布说明草稿：`docs/release-notes-v1.2.0-preview.md`
-- v1.3 Character Runtime 计划：`docs/v1.3-character-runtime-plan.md`
-- v1.3 preview 发布说明草稿：`docs/release-notes-v1.3.0-preview.md`
-- v1.3 Character Runtime 检查脚本：`python scripts/check_character_runtime_v1_3.py`
-- v1.4 AI VTuber Feeling 检查脚本：`python scripts/check_character_v1_4.py`
-- 项目宣传素材与发布文案：`docs/promotion-kit.md`
+后端启动后可以访问：
 
-## LLM / TTS / ASR / Live2D (Where to Configure)
+- `http://127.0.0.1:8123/healthz`：轻量公开探活
+- `http://127.0.0.1:8123/api/health`：详细自检，包含 LLM / TTS / ASR / Live2D / 安全配置摘要
 
-- LLM：见 `docs/setup.md` 的 “Configure LLM”
-- TTS / ASR：见 `docs/setup.md` 的 “Configure TTS / ASR”
-- Live2D：见 `docs/setup.md` 的 “Place Live2D Model”
-- 可视化配置中心：`docs/config.html`
+如果启用了 `server.require_api_token`，访问 `/api/health` 需要带 `X-Taffy-Token`。
 
-## Security Defaults
+## 安全默认值
 
 默认建议保持：
 
@@ -224,13 +191,13 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - `tools.enabled=false`
 - `tools.allow_shell=false`
 
-不要把真实 API Key / Token 提交到仓库。
+首次安装脚本不会默认开启桌面观察、截图、用户文件读取、工具调用或 shell 执行。不要把真实 API Key / Token 提交到仓库。
 
-## Third-Party Assets
+## 第三方资源
 
-仓库中包含用于预览和本地运行的第三方 runtime、Live2D sample model、demo 媒体和项目素材。项目代码的 MIT License 不会自动覆盖这些资源；重新分发、二次打包或替换素材前，请先看 `THIRD_PARTY_NOTICES.md`。
+仓库中包含用于预览和本地运行的第三方 runtime、Live2D sample model、demo 媒体和项目素材。项目代码的 MIT License 不会自动覆盖这些资源；重新分发、二次打包或替换素材前，请先看 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-## Roadmap Summary
+## 路线图
 
 - `v1.2` First Run & Stability
 - `v1.3` Character Runtime
@@ -238,9 +205,13 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - `v1.5` Desktop Awareness
 - `v2.0` Productized Release
 
-## Contributing, Changelog, License
+详细计划见 [docs/ROADMAP.md](docs/ROADMAP.md)。路线图是当前执行方向，不代表所有能力已经成熟可用。
 
-- Contributing：`CONTRIBUTING.md`
-- Changelog：`CHANGELOG.md`
-- Security：`SECURITY.md`
-- License：`LICENSE`
+## 参与贡献
+
+- 贡献指南：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 更新日志：[CHANGELOG.md](CHANGELOG.md)
+- 安全策略：[SECURITY.md](SECURITY.md)
+- License：[LICENSE](LICENSE)
+
+反馈首跑问题时，建议使用 GitHub issue 的 `First-Run Help` 模板，并移除 API key、token、原始 prompt、raw history、私有本地路径和私密截图。

@@ -1,0 +1,92 @@
+name: First-Run Help
+description: Get help with first install, dependency setup, LLM configuration, or launch blockers.
+title: "[First-Run]: "
+labels:
+  - first-run
+  - support
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing the preview. Please remove API keys, tokens, raw prompts, raw history, private file paths, and private desktop screenshots before sharing logs.
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: Source
+      description: How did you get the project?
+      options:
+        - git clone from main
+        - Download ZIP from main
+        - Release source-test zip
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS / Python / Node.js / npm
+      placeholder: Windows 11, Python 3.11, Node 20, npm 10
+    validations:
+      required: true
+
+  - type: dropdown
+    id: entry
+    attributes:
+      label: Entry used
+      description: Which first-run entry did you use?
+      options:
+        - install_and_start.bat
+        - prepare_preview_environment.bat
+        - install_first_run.bat
+        - scripts/bootstrap-first-run.ps1
+        - Manual commands
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: progress
+    attributes:
+      label: Progress
+      options:
+        - label: Dependency setup completed.
+        - label: config.json was created.
+        - label: .env was created.
+        - label: LLM provider/model/API key was configured.
+        - label: diagnose-llm-link.ps1 completed.
+        - label: first_chat_smoke.ps1 completed.
+        - label: start_electron.bat opened the app.
+
+  - type: textarea
+    id: blocker
+    attributes:
+      label: Blocker
+      description: What stopped you? Paste the exact [FAIL], [ACTION], or error summary if available.
+      placeholder: The install stopped at...
+    validations:
+      required: true
+
+  - type: textarea
+    id: redacted_output
+    attributes:
+      label: Redacted command output
+      description: Paste only redacted output. Do not include secrets, tokens, raw prompts, raw history, or private paths.
+      render: shell
+
+  - type: input
+    id: model
+    attributes:
+      label: Model setup
+      description: Provider and model name only. Do not paste API keys.
+      placeholder: OpenAI-compatible / qwen-plus
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed API keys, tokens, raw prompts, raw history, and private local paths.
+          required: true

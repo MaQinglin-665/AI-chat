@@ -1,7 +1,7 @@
-Taffy AI Desktop Pet - First Run
-================================
+Xinyu Desktop Pet - First Run
+=============================
 
-This is an early tester/developer package, not a finished installer.
+This is an early tester/developer source package, not a finished installer.
 
 If you only want the shortest preview path, read START_HERE.txt first.
 
@@ -14,6 +14,9 @@ Install:
 2. Python 3.10+ (Python 3.11 or 3.12 recommended)
 3. Node.js 18+ (Node.js 20 or 22 LTS recommended)
 
+The guided scripts can offer to install missing Python/Node.js with winget.
+If winget changes PATH, open a new PowerShell window and rerun the script.
+
 First checks
 ------------
 
@@ -21,23 +24,29 @@ Open PowerShell in this folder and run:
 
     powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
 
-If it says tests/, web/, or electron/ is missing, this is not a complete
-source package. Download the current main branch again:
+If it says tests/, web/, or electron/ is missing, this is not a complete source
+package. Download the current main branch again:
 
     https://github.com/MaQinglin-665/AI-chat/archive/refs/heads/main.zip
 
-Recommended first-run bootstrap
--------------------------------
+Guided first-run path
+---------------------
 
 For the easiest first run, double-click:
 
-    prepare_preview_environment.bat
+    install_and_start.bat
 
 This prepares Python/Node dependencies, initializes local config/token files,
-and applies the Taffy preview experience profile. You still choose your own LLM
-provider/model/API key.
+applies the Xinyu preview experience profile, asks you to configure your own
+LLM, runs the first-chat smoke check, and launches Electron.
 
-For a lower-level dependency bootstrap only, double-click:
+It does not include a cloud model, hosted endpoint, or API key. API keys are
+stored in local .env, not in config JSON.
+
+Lower-level bootstrap
+---------------------
+
+For a dependency bootstrap only, double-click:
 
     install_first_run.bat
 
@@ -51,30 +60,36 @@ local TAFFY_API_TOKEN in .env, and runs the same read-only preflight used before
 launch.
 
 If the bootstrap finishes with READY, run start_electron.bat. If it finishes
-with ACTION, the dependency setup completed but launch still needs the listed
-[FAIL] items fixed, most often Live2D model_path or LLM API key/model settings.
+with ACTION, dependency setup completed but launch still needs the listed [FAIL]
+items fixed, most often Live2D model_path or LLM API key/model settings.
 
-If the remaining blocker is LLM configuration, run:
+Manual preview path
+-------------------
 
+Run:
+
+    prepare_preview_environment.bat
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
+    start_electron.bat
 
 The LLM helper writes provider/model settings to config.local.json and stores
 API keys in .env. It does not write API keys into config JSON.
 
-Model choice is yours. The project does not include a cloud model or API key.
-Use docs\model-selection.md to choose a provider/model that passes diagnostics,
-reaches at least 80% probe success, and usually replies in under 15 seconds.
+Model choice is yours. Use docs\model-selection.md to choose a provider/model
+that passes diagnostics, reaches at least 80% probe success, and usually replies
+in under 15 seconds.
 
-To try the current Taffy AI VTuber preview profile, run:
+The preview config keeps your LLM provider/base URL/model/api_key_env, switches
+the local character profile to Xinyu/Taffy preview settings, enables Character
+Runtime cues, and keeps desktop observation, screenshots, tools, and shell
+disabled.
 
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\apply-preview-experience-config.ps1
+First-chat smoke
+----------------
 
-This keeps your LLM provider/base URL/model/api_key_env, switches the local
-character profile to English Taffy, enables Character Runtime cues, and keeps
-desktop observation, screenshots, tools, and shell disabled.
-
-After LLM configuration, you can verify the first chat path before opening the
-desktop windows:
+Run:
 
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 
@@ -84,40 +99,17 @@ request. Use -SkipLlmProbe or -SkipChat if you want to avoid that request.
 
 If the smoke check fails at /api/llm_probe or returns HTTP 500, run:
 
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
 
-The diagnostic report is read-only and hides API keys, raw prompts, raw
-history, Authorization headers, and private local files.
-
-If Python or Node.js is missing, the script can ask whether to install it with
-winget. If winget changes PATH, open a new PowerShell window and rerun the
-bootstrap.
-
-Developer setup
----------------
-
-Run:
-
-    powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
-    powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1
-
-Preflight before launch
------------------------
-
-After placing a Live2D model and setting model_path, run:
-
-    python scripts\first_run_check.py
-
-This read-only preflight checks config loading, Live2D path, Python and Node
-dependencies, server port, LLM key/model settings, optional local Ollama or
-GPT-SoVITS ports, and safety defaults.
+The diagnostic report is read-only and hides API keys, raw prompts, raw history,
+Authorization headers, and private local files.
 
 Start the desktop pet
 ---------------------
 
 Run:
 
-    .\start_electron.bat
+    start_electron.bat
 
 start_electron.bat runs the same preflight before Electron starts. If it stops,
 read the [FAIL] lines first. Common blockers are missing Python/Node/Electron
@@ -140,7 +132,7 @@ Live2D and LLM notes
 --------------------
 
 - Put a Live2D .model3.json model under web\models\.
-- Set model_path in config.json.
+- Set model_path in config.json if auto-detection did not find one.
 - Keep TTS provider as browser for the first run.
 - Keep API keys in environment variables, not in committed files.
 - Desktop observation and shell tools are opt-in and should stay disabled by default.
@@ -148,6 +140,7 @@ Live2D and LLM notes
 If you only want to inspect the project, read:
 
     README.md
+    docs\first-install.md
     THIRD_PARTY_NOTICES.md
     docs\setup.md
     docs\backend-health.md
