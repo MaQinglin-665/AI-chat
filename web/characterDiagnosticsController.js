@@ -27,7 +27,7 @@
       if (!ok) {
         appendMessage(
           "assistant",
-          "语音测试没有成功。请点“更多 -> 链路自检”，或输入 /ttsdebug 查看最近一次语音状态。",
+          "语音测试没有成功。请打开“模型 / 语音”里的“测试语音”，或输入 /ttsdebug 查看最近一次语音状态。",
           { enableTranslation: false }
         );
         setStatus("语音测试失败");
@@ -89,7 +89,7 @@
         voiceStyle
       });
       if (!ok) {
-        appendMessage("assistant", "角色试演的语音没有成功。可以先点“测试语音”或“链路自检”确认语音服务。", {
+        appendMessage("assistant", "角色试演的语音没有成功。可以先打开“模型 / 语音”里的“测试语音”，或点“故障自检”确认语音服务。", {
           enableTranslation: false
         });
         setStatus("角色试演语音失败");
@@ -110,7 +110,7 @@
     function recordCharacterPerformanceFeedback(rating = "good", note = "") {
       const summary = getLatestCharacterPerformanceSummary();
       if (!summary) {
-        appendMessage("assistant", "还没有可评价的角色表现。先发一句聊天，或点“角色试演”再反馈。", { enableTranslation: false });
+        appendMessage("assistant", "还没有可评价的角色表现。先正常聊一句，再在 AI 回复旁点“表现不错”或“需要调整”。", { enableTranslation: false, enableFeedback: false });
         setStatus("暂无角色表现可反馈");
         return null;
       }
@@ -140,7 +140,7 @@
             ? "这条反馈已纳入下轮角色风格微调。"
             : ""
         ].filter(Boolean).join("\n"),
-        { enableTranslation: false }
+        { enableTranslation: false, enableFeedback: false }
       );
       setStatus(`已记录：${feedback.label}`);
       return feedback;

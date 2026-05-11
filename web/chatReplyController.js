@@ -26,6 +26,8 @@
     const pickLatencyHintText = typeof deps.pickLatencyHintText === "function" ? deps.pickLatencyHintText : () => "";
     const buildSpeakProsody = typeof deps.buildSpeakProsody === "function" ? deps.buildSpeakProsody : () => null;
     const speak = typeof deps.speak === "function" ? deps.speak : async () => false;
+    const requestServerTTSBlobWithRetry = typeof deps.requestServerTTSBlobWithRetry === "function" ? deps.requestServerTTSBlobWithRetry : null;
+    const playAudioBlob = typeof deps.playAudioBlob === "function" ? deps.playAudioBlob : null;
     const clearThinkingMotionTimer = typeof deps.clearThinkingMotionTimer === "function" ? deps.clearThinkingMotionTimer : () => {};
     const shouldAttachDesktopImage = typeof deps.shouldAttachDesktopImage === "function" ? deps.shouldAttachDesktopImage : () => false;
     const captureDesktopSnapshot = typeof deps.captureDesktopSnapshot === "function" ? deps.captureDesktopSnapshot : async () => "";
@@ -35,6 +37,7 @@
     const normalizeAssistantVisibleText = typeof deps.normalizeAssistantVisibleText === "function" ? deps.normalizeAssistantVisibleText : (text) => String(text || "").trim();
     const finalizePendingMessageRow = typeof deps.finalizePendingMessageRow === "function" ? deps.finalizePendingMessageRow : () => {};
     const updateConversationFollowupState = typeof deps.updateConversationFollowupState === "function" ? deps.updateConversationFollowupState : () => {};
+    const maybeSendAssistantMoodSticker = typeof deps.maybeSendAssistantMoodSticker === "function" ? deps.maybeSendAssistantMoodSticker : () => null;
     const scheduleAutoChatInterjectionAfterTurn = typeof deps.scheduleAutoChatInterjectionAfterTurn === "function" ? deps.scheduleAutoChatInterjectionAfterTurn : () => null;
     const recordEmotion = typeof deps.recordEmotion === "function" ? deps.recordEmotion : () => {};
     const previewAssistantReplyCharacterCueCandidate = typeof deps.previewAssistantReplyCharacterCueCandidate === "function" ? deps.previewAssistantReplyCharacterCueCandidate : () => null;
@@ -227,6 +230,122 @@
       });
     }
 
+    function canPrefetchServerVoiceSegments(voiceTimeline, segments) {
+      return String(state.ttsProvider || "").toLowerCase() === "gpt_sovits"
+        && typeof requestServerTTSBlobWithRetry === "function"
+        && typeof playAudioBlob === "function"
+        && voiceTimeline?.enabled === true
+        && Array.isArray(segments)
+        && segments.length > 1;
+    }
+
+    async function speakPrefetchedServerVoiceSegments(segments, context, voiceTimeline, voiceDirector, mode) {
+      const playbackGeneration = Number(context.playbackGeneration || state.ttsPlaybackGeneration || 0);
+      const sessionId = Number(context.sessionId || 0);
+      const requests = [];
+      const makeRequest = (index) => {
+        if (requests[index]) {
+          return requests[index];
+        }
+        const segment = String(segments[index] || "").trim();
+        const prosody = applyVoiceDirectorProsody(
+          buildSpeakProsody(segment, context.mood, false, context.prosodyStyle),
+          voiceDirector
+        );
+        const startedAt = performance.now();
+        requests[index] = requestServerTTSBlobWithRetry(segment, prosody, {
+          retries: Number(state.ttsServerRetryCount),
+          retryDelayMs: Number(state.ttsServerRetryDelayMs),
+          timeoutMs: Number(state.ttsServerRequestTimeoutMs),
+          traceId: context.traceId
+        })
+          .then((blob) => ({ ok: true, blob, segment, index, startedAt, readyAt: performance.now() }))
+          .catch((error) => ({ ok: false, error, segment, index, startedAt, readyAt: performance.now() }));
+        return requests[index];
+      };
+
+      makeRequest(0);
+      if (segments.length > 1) {
+        makeRequest(1);
+      }
+      if (!(await waitVoiceDirectorPause(Math.min(30, Number(voiceTimeline.pre_pause_ms) || 0), context.sessionId))) {
+        recordPerformanceAuditEvent("tts_end", { mode, ok: false, reason: "prefetch_pre_pause_cancelled" });
+        return false;
+      }
+
+      let allOk = true;
+      let spokenCount = 0;
+      for (let i = 0; i < segments.length; i += 1) {
+        const result = await makeRequest(i);
+        if (i + 1 < segments.length) {
+          makeRequest(i + 1);
+        }
+        if (sessionId && Number(state.streamSpeakSession || 0) !== sessionId) {
+          allOk = false;
+          break;
+        }
+        if (!result.ok || !result.blob) {
+          allOk = false;
+          recordPerformanceAuditEvent("tts_segment", {
+            mode,
+            index: i + 1,
+            segments: segments.length,
+            ok: false,
+            prefetch: true
+          });
+          const fallbackOk = await speak(result.segment || segments[i], {
+            prosody: applyVoiceDirectorProsody(
+              buildSpeakProsody(result.segment || segments[i], context.mood, false, context.prosodyStyle),
+              voiceDirector
+            ),
+            interrupt: context.interrupt === true && i === 0,
+            mood: context.mood,
+            style: context.talkStyle,
+            voiceStyle: context.prosodyStyle,
+            perfTraceId: context.traceId,
+            playbackGeneration
+          });
+          if (fallbackOk !== false) {
+            spokenCount += 1;
+          }
+        } else {
+          const ok = await playAudioBlob(result.blob, {
+            interrupt: context.interrupt === true && i === 0,
+            text: result.segment,
+            mood: context.mood,
+            style: context.talkStyle,
+            perfTraceId: context.traceId,
+            perfBlobReadyPerfMs: result.readyAt,
+            perfSpeakStartedPerfMs: result.startedAt,
+            playbackGeneration,
+            sessionId: context.sessionId,
+            segmentId: i + 1
+          });
+          recordPerformanceAuditEvent("tts_segment", {
+            mode,
+            index: i + 1,
+            segments: segments.length,
+            ok: ok !== false,
+            prefetch: true
+          });
+          if (ok === false) {
+            allOk = false;
+          } else {
+            spokenCount += 1;
+          }
+        }
+        if (i < segments.length - 1) {
+          const keepGoing = await waitVoiceDirectorPause(Math.min(40, Number(voiceTimeline.inter_segment_pause_ms) || 0), context.sessionId);
+          if (!keepGoing) {
+            allOk = false;
+            break;
+          }
+        }
+      }
+      recordPerformanceAuditEvent("tts_end", { mode, ok: allOk && spokenCount > 0, prefetch: true });
+      return allOk && spokenCount > 0;
+    }
+
     async function speakWithVoiceTimeline(speechText, context = {}) {
       const text = String(speechText || "").trim();
       if (!text) {
@@ -239,7 +358,10 @@
       const segments = buildVoiceSpeechSegments(text, voiceTimeline).filter(Boolean);
       const safeSegments = segments.length ? segments : [text];
       const useSegmented = voiceTimeline?.enabled === true && safeSegments.length > 1;
-      const mode = useSegmented ? `${context.mode || "direct"}_segmented` : (context.mode || "direct");
+      const usePrefetchSegmented = canPrefetchServerVoiceSegments(voiceTimeline, safeSegments);
+      const mode = usePrefetchSegmented
+        ? `${context.mode || "direct"}_prefetch_segmented`
+        : (useSegmented ? `${context.mode || "direct"}_segmented` : (context.mode || "direct"));
       const fallbackReason = String(voiceTimeline?.fallback_reason || "none");
       const voiceSegmentAudit = {
         mode,
@@ -278,6 +400,9 @@
       }
 
       recordPerformanceAuditEvent("voice_segment_plan", voiceSegmentAudit);
+      if (usePrefetchSegmented) {
+        return await speakPrefetchedServerVoiceSegments(safeSegments, context, voiceTimeline, voiceDirector, mode);
+      }
       if (!(await waitVoiceDirectorPause(voiceTimeline.pre_pause_ms, context.sessionId))) {
         recordPerformanceAuditEvent("tts_end", { mode, ok: false });
         return false;
@@ -451,7 +576,7 @@
       state.chatBusy = true;
       stopWakeWordListener(true);
       pauseMicForAssistant();
-      setStatus(isAuto ? "自动对话中..." : "思考中...");
+      setStatus(isAuto ? "主动陪伴中..." : "思考中...");
       let assistantRow = null;
       let reply = "";
       let visibleStreamReply = "";
@@ -479,7 +604,7 @@
           const prosody = buildSpeakProsody(hint, "idle", false, talkStyle);
             await speak(hint, { force: true, interrupt: true, prosody });
           if (state.chatBusy && !gotFirstDelta) {
-            setStatus(isAuto ? "自动对话中..." : "思考中...");
+            setStatus(isAuto ? "主动陪伴中..." : "思考中...");
           }
         }, 850);
       }
@@ -496,7 +621,7 @@
         if (!skipDesktopAttach && !imageDataUrl && shouldAttachDesktopImage(message, isAuto)) {
           setStatus("正在观察桌面...");
           imageDataUrl = await captureDesktopSnapshot();
-          setStatus(isAuto ? "自动对话中..." : "思考中...");
+          setStatus(isAuto ? "主动陪伴中..." : "思考中...");
         }
 
         const payload = {
@@ -548,7 +673,7 @@
             }
           }
           reply += delta;
-          const nextVisibleStreamReply = parseToolMetaFromText(reply).visibleText;
+          const nextVisibleStreamReply = normalizeAssistantVisibleText(parseToolMetaFromText(reply).visibleText);
           const visibleDelta = nextVisibleStreamReply.startsWith(visibleStreamReply)
             ? nextVisibleStreamReply.slice(visibleStreamReply.length)
             : "";
@@ -557,7 +682,7 @@
           if (useStreamSpeak) {
             feedStreamSpeakDelta(visibleDelta, streamSpeakSession, talkStyle);
           }
-          setStatus(isAuto ? "自动对话中..." : "思考中...");
+          setStatus(isAuto ? "主动陪伴中..." : "思考中...");
         }, {
           onApiHeaders: ({ mode, status, atPerfMs }) => {
             chatPerfApiHeaderPerfMs = Number(atPerfMs) || performance.now();
@@ -574,7 +699,7 @@
         });
         if (streamed && streamed !== reply) {
           reply = streamed;
-          visibleStreamReply = parseToolMetaFromText(reply).visibleText;
+          visibleStreamReply = normalizeAssistantVisibleText(parseToolMetaFromText(reply).visibleText);
           setMessageText(assistantRow, visibleStreamReply, { enableTranslation: false });
         }
         reply = reply.trim();
@@ -603,6 +728,7 @@
         updateConversationFollowupState(visibleReply);
         const mood = detectMood(visibleReply);
         recordEmotion(mood);
+        maybeSendAssistantMoodSticker({ mood, text: visibleReply, auto: isAuto });
         const baseTalkStyle = resolveTalkStyle(message, visibleReply, mood, isAuto);
         const replyCueCandidate = previewAssistantReplyCharacterCueCandidate({
           text: visibleReply,
@@ -641,6 +767,7 @@
           replyText: visibleReply,
           mood,
           talkStyle: finalTalkStyle,
+          ttsProvider: state.ttsProvider,
           ttsEnabled: state.speakingEnabled !== false
         });
         const voiceTimelineSummary = rememberVoiceTimeline(voiceTimeline);

@@ -6,6 +6,7 @@ import urllib.request
 from contextlib import contextmanager
 
 import app
+import config_switch
 
 
 def _request_json(url, headers=None):
@@ -161,6 +162,46 @@ def test_api_health_requires_valid_token_when_enabled(monkeypatch):
         assert payload.get("ok") is True
         assert payload.get("security", {}).get("require_api_token") is True
         assert payload.get("security", {}).get("api_token_configured") is True
+
+
+def test_api_config_switch_post_uses_token_and_writes_local_files(monkeypatch, tmp_path):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = True
+    local_config_path = tmp_path / "config.local.json"
+    env_path = tmp_path / ".env"
+    monkeypatch.setenv("TAFFY_API_TOKEN_TEST", "token-switch-123")
+    monkeypatch.setattr(config_switch, "LOCAL_CONFIG_PATH", local_config_path)
+    monkeypatch.setattr(config_switch, "ENV_PATH", env_path)
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status_denied, payload_denied = _post_json(
+            f"{base}/api/config/switch",
+            {"llm": {"preset_id": "ollama"}, "tts": {"provider": "browser"}},
+        )
+        status_ok, payload_ok = _post_json(
+            f"{base}/api/config/switch",
+            {
+                "llm": {
+                    "preset_id": "openai",
+                    "api_key_env": "OPENAI_SWITCH_TEST_KEY",
+                    "api_key": "sk-route-secret",
+                },
+                "tts": {"provider": "browser", "voice": "zh-CN-XiaoxiaoNeural"},
+            },
+            headers={"X-Taffy-Token": "token-switch-123"},
+        )
+
+    assert status_denied == 401
+    assert payload_denied.get("error") == "Invalid API token."
+    assert status_ok == 200
+    assert payload_ok["saved"]["api_key_saved"] is True
+    saved = json.loads(local_config_path.read_text(encoding="utf-8"))
+    serialized_payload = json.dumps(payload_ok, ensure_ascii=False)
+    assert saved["llm"]["provider"] == "openai"
+    assert saved["llm"]["api_key"] == ""
+    assert env_path.read_text(encoding="utf-8").strip() == "OPENAI_SWITCH_TEST_KEY=sk-route-secret"
+    assert "sk-route-secret" not in json.dumps(saved, ensure_ascii=False)
+    assert "sk-route-secret" not in serialized_payload
 
 
 def test_api_health_includes_backend_readiness_checks_without_leaking_secrets(monkeypatch):

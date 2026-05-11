@@ -96,10 +96,10 @@ print("yes" if provider and model and base_url and (has_key or not needs_key) el
     }
 }
 
-Write-Host "Taffy preview environment setup"
+Write-Host "Xinyu preview environment setup"
 Write-Host "Root: $RepoRoot"
 Write-Host ""
-Write-InfoLine "This script prepares Python/Node dependencies and the Taffy preview profile."
+Write-InfoLine "This script prepares Python/Node dependencies and the Xinyu preview profile."
 Write-InfoLine "It does not choose a cloud model or write an API key unless you explicitly run configure-llm."
 
 $bootstrapArgs = @(
@@ -120,7 +120,7 @@ $bootstrapCommand = @(
 Invoke-Step "Install/check local runtime dependencies" $bootstrapCommand
 
 if (-not $SkipPreviewConfig) {
-    Invoke-Step "Apply Taffy preview experience profile" @(
+    Invoke-Step "Apply Xinyu preview experience profile" @(
         "powershell",
         "-NoProfile",
         "-ExecutionPolicy",
@@ -170,7 +170,7 @@ if ($RunSmoke) {
 }
 
 if ($StartApp) {
-    Invoke-Step "Start Taffy desktop app" @("cmd", "/c", "start_electron.bat")
+    Invoke-Step "Start Xinyu desktop app" @("cmd", "/c", "start_electron.bat")
 }
 
 Write-Host ""

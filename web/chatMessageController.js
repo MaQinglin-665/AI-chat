@@ -84,7 +84,7 @@
     function syncConversationHistoryFromChatRecords() {
       const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
       const convo = records
-        .filter((item) => item && (item.role === "user" || item.role === "assistant"))
+        .filter((item) => item && item.kind !== "sticker" && (item.role === "user" || item.role === "assistant"))
         .map((item) => ({
           role: item.role,
           content: String(item.content || "").trim()
@@ -94,11 +94,41 @@
       state.history = convo.slice(Math.max(0, convo.length - limit));
     }
 
+    function normalizeStickerPayload(item) {
+      const src = item && typeof item === "object" ? item : {};
+      const sticker = src.sticker && typeof src.sticker === "object" ? src.sticker : src;
+      const id = String(sticker.id || sticker.stickerId || src.stickerId || "").trim();
+      const source = sticker.source === "user" || src.stickerSource === "user" ? "user" : "default";
+      const label = String(sticker.label || sticker.name || src.stickerLabel || src.content || "\u8868\u60c5\u5305").trim().slice(0, 80);
+      return {
+        id,
+        source,
+        label: label || "\u8868\u60c5\u5305",
+        name: String(sticker.name || label || "\u8868\u60c5\u5305").trim().slice(0, 120),
+        mood: String(sticker.mood || src.stickerMood || "idle").trim().slice(0, 32),
+        url: String(sticker.url || sticker.dataUrl || src.url || "").trim()
+      };
+    }
+
     function normalizeChatRecord(item) {
       if (!item || typeof item !== "object") {
         return null;
       }
       const role = item.role === "user" ? "user" : "assistant";
+      if (item.kind === "sticker") {
+        const sticker = normalizeStickerPayload(item);
+        if (!sticker.id && !sticker.url) {
+          return null;
+        }
+        const content = String(item.content || `[\u8868\u60c5\u5305: ${sticker.label}]`).trim();
+        return {
+          role,
+          kind: "sticker",
+          content,
+          sticker,
+          timestamp: parseMessageTimestamp(item.timestamp || item.created_at || item.time)
+        };
+      }
       const content = String(item.content || "").trim();
       if (!content) {
         return null;
@@ -209,6 +239,43 @@
       }
     }
 
+    function resolveStickerPayload(sticker) {
+      const base = normalizeStickerPayload(sticker);
+      if (typeof deps.resolveStickerPayload === "function") {
+        const resolved = deps.resolveStickerPayload(base);
+        if (resolved && typeof resolved === "object") {
+          return { ...base, ...resolved, url: resolved.url || resolved.dataUrl || base.url || "" };
+        }
+      }
+      return base;
+    }
+
+    function applyStickerPayload(row, stickerInput) {
+      const target = row?.querySelector(".content");
+      if (!target) {
+        return;
+      }
+      const sticker = resolveStickerPayload(stickerInput);
+      row.classList.add("sticker-message");
+      row.dataset.messageKind = "sticker";
+      target.textContent = "";
+      target.classList.add("sticker-content");
+      const url = String(sticker.url || sticker.dataUrl || "").trim();
+      if (url) {
+        const img = documentObject.createElement("img");
+        img.className = "sticker-message-img";
+        img.alt = sticker.label || sticker.name || "\u8868\u60c5\u5305";
+        img.src = url;
+        target.appendChild(img);
+      } else {
+        const missing = documentObject.createElement("span");
+        missing.className = "sticker-missing";
+        missing.textContent = sticker.label ? `[\u8868\u60c5\u5305: ${sticker.label}]` : "\u8868\u60c5\u5305\u5df2\u79fb\u9664";
+        target.appendChild(missing);
+      }
+      _clearMessageTranslation(row);
+    }
+
     function setMessageTimestamp(row, timestamp) {
       const target = row?.querySelector(".message-time");
       if (!target) {
@@ -233,9 +300,44 @@
       return configuredName || fallbackName;
     }
 
+    function createAssistantFeedbackControls() {
+      if (typeof deps.recordCharacterPerformanceFeedback !== "function") {
+        return null;
+      }
+      const wrap = documentObject.createElement("div");
+      wrap.className = "message-feedback";
+      wrap.setAttribute("aria-label", "\u8bc4\u4ef7\u6700\u8fd1\u4e00\u6b21\u89d2\u8272\u8868\u73b0");
+      const items = [
+        { rating: "good", label: "\u8868\u73b0\u4e0d\u9519", title: "\u8bb0\u5f55\u6700\u8fd1\u4e00\u6b21\u89d2\u8272\u8868\u73b0\u4e0d\u9519" },
+        { rating: "bad", label: "\u9700\u8981\u8c03\u6574", title: "\u8bb0\u5f55\u6700\u8fd1\u4e00\u6b21\u89d2\u8272\u8868\u73b0\u9700\u8981\u8c03\u6574" }
+      ];
+      for (const item of items) {
+        const button = documentObject.createElement("button");
+        button.type = "button";
+        button.className = `message-feedback-btn is-${item.rating}`;
+        button.dataset.feedback = item.rating;
+        button.title = item.title;
+        button.textContent = item.label;
+        button.addEventListener("click", (event) => {
+          if (event && typeof event.stopPropagation === "function") {
+            event.stopPropagation();
+          }
+          const result = deps.recordCharacterPerformanceFeedback(item.rating);
+          if (result && typeof deps.setStatus === "function") {
+            deps.setStatus(item.rating === "good" ? "\u5df2\u8bb0\u5f55\uff1a\u8868\u73b0\u4e0d\u9519" : "\u5df2\u8bb0\u5f55\uff1a\u9700\u8981\u8c03\u6574");
+          }
+        });
+        wrap.appendChild(button);
+      }
+      return wrap;
+    }
+
     function createMessageRow(role, text, options = {}) {
       const row = documentObject.createElement("div");
       row.className = `message ${role}`;
+      if (options.kind === "sticker") {
+        row.className += " sticker-message";
+      }
       const assistantName = resolveAssistantDisplayName("Hiyori");
       const roleEl = documentObject.createElement("span");
       roleEl.className = "role";
@@ -247,10 +349,20 @@
       timeEl.hidden = options.hideTimestamp === true;
       row.appendChild(roleEl);
       row.appendChild(textEl);
+      if (role === "assistant" && options.kind !== "sticker" && options.enableFeedback !== false) {
+        const feedbackEl = createAssistantFeedbackControls();
+        if (feedbackEl) {
+          row.appendChild(feedbackEl);
+        }
+      }
       row.appendChild(timeEl);
-      applyMessagePayload(row, text, {
-        enableTranslation: options.enableTranslation !== false
-      });
+      if (options.kind === "sticker") {
+        applyStickerPayload(row, options.sticker || text);
+      } else {
+        applyMessagePayload(row, text, {
+          enableTranslation: options.enableTranslation !== false
+        });
+      }
       if (options.hideTimestamp !== true) {
         setMessageTimestamp(row, options.timestamp || Date.now());
       }
@@ -286,17 +398,75 @@
       return record;
     }
 
+    function commitStickerRecord(role, stickerInput, options = {}) {
+      const sticker = normalizeStickerPayload(stickerInput);
+      if (!sticker.id && !sticker.url) {
+        return null;
+      }
+      const timestamp = parseMessageTimestamp(options.timestamp);
+      const content = String(options.content || `[\u8868\u60c5\u5305: ${sticker.label}]`).trim();
+      const record = {
+        role: role === "user" ? "user" : "assistant",
+        kind: "sticker",
+        content,
+        sticker: {
+          id: sticker.id,
+          source: sticker.source,
+          label: sticker.label,
+          name: sticker.name,
+          mood: sticker.mood
+        },
+        timestamp
+      };
+      const previous = state.chatRecords.length ? state.chatRecords[state.chatRecords.length - 1] : null;
+      if (ui.chatLog && shouldInsertTimeDivider(previous?.timestamp || 0, timestamp)) {
+        ui.chatLog.appendChild(createTimeDivider(timestamp));
+      }
+      state.chatRecords.push(record);
+      state.chatRecords = trimChatRecords(state.chatRecords);
+      if (typeof deps.saveChatHistory === "function") {
+        deps.saveChatHistory();
+      }
+      return record;
+    }
+
     function appendMessage(role, text, options = {}) {
       const timestamp = parseMessageTimestamp(options.timestamp);
       const row = createMessageRow(role, text, {
         timestamp,
         hideTimestamp: options.hideTimestamp === true,
+        enableFeedback: options.enableFeedback !== false,
         enableTranslation: options.enableTranslation !== false
       });
       if (options.persist !== false) {
         commitMessageRecord(role, text, {
           timestamp,
           syncHistory: options.syncHistory === true
+        });
+      } else if (ui.chatLog && options.insertDivider && shouldInsertTimeDivider(options.previousTimestamp || 0, timestamp)) {
+        ui.chatLog.appendChild(createTimeDivider(timestamp));
+      }
+      if (ui.chatLog) {
+        ui.chatLog.appendChild(row);
+        ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
+      }
+      return row;
+    }
+
+    function appendStickerMessage(role, sticker, options = {}) {
+      const timestamp = parseMessageTimestamp(options.timestamp);
+      const row = createMessageRow(role, "", {
+        kind: "sticker",
+        sticker,
+        timestamp,
+        hideTimestamp: options.hideTimestamp === true,
+        enableFeedback: false,
+        enableTranslation: false
+      });
+      if (options.persist !== false) {
+        commitStickerRecord(role, sticker, {
+          timestamp,
+          content: options.content
         });
       } else if (ui.chatLog && options.insertDivider && shouldInsertTimeDivider(options.previousTimestamp || 0, timestamp)) {
         ui.chatLog.appendChild(createTimeDivider(timestamp));
@@ -361,10 +531,19 @@
         if (shouldInsertTimeDivider(previousTs, timestamp)) {
           ui.chatLog.appendChild(createTimeDivider(timestamp));
         }
-        const row = createMessageRow(item.role, item.content, {
-          timestamp,
-          enableTranslation: false
-        });
+        const row = item.kind === "sticker"
+          ? createMessageRow(item.role, item.content, {
+            kind: "sticker",
+            sticker: item.sticker,
+            timestamp,
+            enableFeedback: false,
+            enableTranslation: false
+          })
+          : createMessageRow(item.role, item.content, {
+            timestamp,
+            enableFeedback: item.role === "assistant",
+            enableTranslation: false
+          });
         ui.chatLog.appendChild(row);
         previousTs = timestamp;
       }
@@ -392,16 +571,21 @@
       createTimeDivider,
       trimChatRecords,
       syncConversationHistoryFromChatRecords,
+      normalizeStickerPayload,
       normalizeChatRecord,
       renderChatHistoryFromState,
       loadChatHistoryFromStorage,
       applyMessagePayload,
+      applyStickerPayload,
+      resolveStickerPayload,
       setMessageTimestamp,
       resolveAssistantDisplayName,
       createMessageRow,
       setMessageText,
       commitMessageRecord,
+      commitStickerRecord,
       appendMessage,
+      appendStickerMessage,
       finalizePendingMessageRow,
       rememberMessage
     };

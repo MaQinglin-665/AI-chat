@@ -1665,6 +1665,9 @@ const API_CLIENT = window.TaffyModules?.apiClient || {};
 const SPEECH_TEXT = window.TaffyModules?.speechText || {};
 const TTS_API = window.TaffyModules?.ttsApi || {};
 const ATTACHMENT_CONTROLLER = window.TaffyAttachmentController || {};
+const STICKER_MODEL = window.TaffyStickerModel || {};
+const STICKER_STORE = window.TaffyStickerStore || {};
+const STICKER_CONTROLLER = window.TaffyStickerController || {};
 const CHAT_TRANSLATION_SERVICE = window.TaffyChatTranslationService || {};
 const SUBTITLE_CONTROLLER = window.TaffySubtitleController || {};
 const SPEECH_STYLE_CONTROLLER = window.TaffySpeechStyleController || {};
@@ -1684,6 +1687,15 @@ const LIVE2D_RUNTIME_CONTROLLER = window.TaffyLive2DRuntimeController || {};
 const LIVE2D_LAYOUT_CONTROLLER = window.TaffyLive2DLayoutController || {};
 const LIVE2D_EXPRESSION_CONTROLLER = window.TaffyLive2DExpressionController || {};
 const PERSONA_CARD_DEFAULT = {
+  character_name: "馨语",
+  user_alias: "",
+  personality_tags: "",
+  speaking_style: "",
+  catchphrases: "",
+  likes: "",
+  dislikes: "",
+  initiative_level: "适中",
+  relationship_role: "桌面伙伴",
   identity: "",
   user_preferences: "",
   user_dislikes: "",
@@ -2075,6 +2087,9 @@ function getChatMessageController() {
       fetchChatTranslation: _fetchChatTranslation,
       readChatTranslationCache: _readChatTranslationCache,
       shouldShowAssistantTranslation: _shouldShowAssistantTranslation,
+      resolveStickerPayload,
+      recordCharacterPerformanceFeedback,
+      setStatus,
       saveChatHistory: saveChatHistoryToStorage
     });
   }
@@ -2122,12 +2137,6 @@ function saveChatTranslationVisibilityToStorage() {
 
 function updateTranslationToggleButton() {
   const visible = state.chatTranslationVisible !== false;
-  if (ui.translationToggleBtn) {
-    ui.translationToggleBtn.classList.toggle("is-off", !visible);
-    ui.translationToggleBtn.setAttribute("aria-pressed", visible ? "true" : "false");
-    ui.translationToggleBtn.setAttribute("title", visible ? "隐藏会话翻译" : "显示会话翻译");
-    ui.translationToggleBtn.textContent = visible ? "翻译  开" : "翻译  关";
-  }
   if (ui.translationChipBtn) {
     ui.translationChipBtn.classList.toggle("is-off", !visible);
     ui.translationChipBtn.setAttribute("aria-pressed", visible ? "true" : "false");
@@ -2548,6 +2557,20 @@ async function savePersonaCardFromForm() {
   return getPersonaAvatarController().savePersonaCardFromForm();
 }
 
+function preparePersonaTestPrompt() {
+  if (!ui.chatInput) {
+    setStatus("当前聊天输入框不可用");
+    return false;
+  }
+  const prompt = "我今天有点累，但还想把任务做完。请按当前人设自然地回应我一句。";
+  closePersonaPanel();
+  ui.chatInput.value = prompt;
+  ui.chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+  ui.chatInput.focus();
+  setStatus("已填入测试句，点击发送即可验证当前人设");
+  return true;
+}
+
 let learningReviewController = null;
 
 function getLearningReviewController() {
@@ -2627,6 +2650,7 @@ function bindPanelControls() {
     applyPersonaTemplateDraft,
     applyRandomPersonaDraft,
     resetPersonaDraft,
+    preparePersonaTestPrompt,
     setStatus
   });
 }
@@ -2666,6 +2690,10 @@ function bindChatInputControls() {
     windowObject: window,
     sendChat,
     handleAttachmentFiles,
+    toggleStickerPanel,
+    closeStickerPanel,
+    handleStickerImportFiles,
+    setStickerRespondAfterSend,
     toggleMicOpen,
     isOnboardingOpen,
     closeOnboardingModal,
@@ -2937,7 +2965,7 @@ function updateAutoChatButton() {
   if (!ui.autoChatBtn) {
     return;
   }
-  ui.autoChatBtn.textContent = state.autoChatEnabled ? "自动对话: 开" : "自动对话: 关";
+  ui.autoChatBtn.textContent = state.autoChatEnabled ? "主动陪伴: 开" : "主动陪伴: 关";
 }
 
 function escapeRegExp(text) {
@@ -3439,6 +3467,10 @@ function appendMessage(role, text, options = {}) {
   return getChatMessageController().appendMessage(role, text, options);
 }
 
+function appendStickerMessage(role, sticker, options = {}) {
+  return getChatMessageController().appendStickerMessage(role, sticker, options);
+}
+
 function finalizePendingMessageRow(row, role, text, options = {}) {
   return getChatMessageController().finalizePendingMessageRow(row, role, text, options);
 }
@@ -3508,6 +3540,68 @@ async function handleAttachmentFiles(fileList) {
     return;
   }
   await ATTACHMENT_CONTROLLER.handleAttachmentFiles(fileList, getAttachmentControllerDeps());
+}
+
+let stickerController = null;
+
+function getStickerController() {
+  if (!stickerController && typeof STICKER_CONTROLLER.createController === "function") {
+    stickerController = STICKER_CONTROLLER.createController({
+      state,
+      ui,
+      model: STICKER_MODEL,
+      store: STICKER_STORE,
+      documentObject: document,
+      windowObject: window,
+      fetchObject: fetch,
+      appendStickerMessage,
+      requestAssistantReply,
+      renderChatHistoryFromState,
+      setStatus
+    });
+  }
+  return stickerController || STICKER_CONTROLLER;
+}
+
+function initStickerPanel() {
+  const controller = getStickerController();
+  return typeof controller.initStickerPanel === "function" ? controller.initStickerPanel() : undefined;
+}
+
+function toggleStickerPanel() {
+  const controller = getStickerController();
+  return typeof controller.toggleStickerPanel === "function" ? controller.toggleStickerPanel() : undefined;
+}
+
+function closeStickerPanel() {
+  const controller = getStickerController();
+  return typeof controller.closeStickerPanel === "function" ? controller.closeStickerPanel() : undefined;
+}
+
+function setStickerRespondAfterSend(value) {
+  const controller = getStickerController();
+  return typeof controller.setStickerRespondAfterSend === "function"
+    ? controller.setStickerRespondAfterSend(value)
+    : undefined;
+}
+
+function handleStickerImportFiles(fileList) {
+  const controller = getStickerController();
+  return typeof controller.handleStickerImportFiles === "function"
+    ? controller.handleStickerImportFiles(fileList)
+    : undefined;
+}
+
+function resolveStickerPayload(sticker) {
+  const controller = getStickerController();
+  return typeof controller.resolveStickerPayload === "function" ? controller.resolveStickerPayload(sticker) : sticker;
+}
+
+function maybeSendAssistantMoodSticker(input = {}) {
+  const controller = getStickerController();
+  return typeof controller.maybeSendAssistantMoodSticker === "function"
+    ? controller.maybeSendAssistantMoodSticker(input)
+    : null;
 }
 
 function sanitizeSpeakText(text) {
@@ -4143,6 +4237,8 @@ function getChatReplyController() {
       pickLatencyHintText,
       buildSpeakProsody,
       speak,
+      requestServerTTSBlobWithRetry,
+      playAudioBlob,
       clearThinkingMotionTimer,
       shouldAttachDesktopImage,
       captureDesktopSnapshot,
@@ -4152,6 +4248,7 @@ function getChatReplyController() {
       normalizeAssistantVisibleText,
       finalizePendingMessageRow,
       updateConversationFollowupState,
+      maybeSendAssistantMoodSticker,
       scheduleAutoChatInterjectionAfterTurn,
       recordEmotion,
       previewAssistantReplyCharacterCueCandidate,
@@ -4310,6 +4407,7 @@ function bindUI() {
   applySubtitlePositionFromState();
   bindSubtitleDragHandle();
   renderOnboardingStep();
+  initStickerPanel();
 
   bindChatInputControls();
   bindDesktopControlButtons();

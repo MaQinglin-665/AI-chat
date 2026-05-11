@@ -119,48 +119,158 @@
       setStatus("头像已更新");
     }
 
+    function isRegressionPersonaText(value) {
+      return /^回归检查-\d+$/u.test(String(value || "").trim());
+    }
+
+    function isLegacyOnlyPersonaText(value) {
+      const parts = String(value || "")
+        .split(/[;；]/u)
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (!parts.length) {
+        return false;
+      }
+      return parts.every((part) => (
+        /^主动程度[:：]\s*(低|适中|高|很高)\s*$/u.test(part)
+        || /^关系定位[:：]\s*(桌面伙伴|学习搭子|情绪陪伴|工作助手)\s*$/u.test(part)
+      ));
+    }
+
+    function normalizePersonaText(value, options = {}) {
+      const text = String(value || "").trim();
+      if (!text || isRegressionPersonaText(text)) {
+        return "";
+      }
+      if (options.dropLegacyOnly && isLegacyOnlyPersonaText(text)) {
+        return "";
+      }
+      return text;
+    }
+
+    function getPersonaDefault(key, fallback = "") {
+      const value = PERSONA_CARD_DEFAULT && Object.prototype.hasOwnProperty.call(PERSONA_CARD_DEFAULT, key)
+        ? PERSONA_CARD_DEFAULT[key]
+        : fallback;
+      return normalizePersonaText(value, { dropLegacyOnly: true }) || fallback;
+    }
+
     function normalizePersonaCardData(raw) {
       const src = raw && typeof raw === "object" ? raw : {};
+      const characterName = normalizePersonaText(src.character_name)
+        || getPersonaDefault("character_name", "馨语");
+      const userAlias = normalizePersonaText(src.user_alias)
+        || getPersonaDefault("user_alias", "");
+      const personalityTags = normalizePersonaText(src.personality_tags, { dropLegacyOnly: true })
+        || getPersonaDefault("personality_tags", "");
+      const speakingStyle = normalizePersonaText(src.speaking_style)
+        || getPersonaDefault("speaking_style", "");
+      const catchphrases = normalizePersonaText(src.catchphrases)
+        || getPersonaDefault("catchphrases", "");
+      const likes = normalizePersonaText(src.likes || src.user_preferences, { dropLegacyOnly: true })
+        || getPersonaDefault("likes", "");
+      const dislikes = normalizePersonaText(src.dislikes || src.user_dislikes)
+        || getPersonaDefault("dislikes", "");
+      const initiativeLevel = normalizePersonaText(src.initiative_level)
+        || getPersonaDefault("initiative_level", "适中")
+        || "适中";
+      const relationshipRole = normalizePersonaText(src.relationship_role)
+        || getPersonaDefault("relationship_role", "桌面伙伴")
+        || "桌面伙伴";
+      const identity = normalizePersonaText(src.identity)
+        || [
+          relationshipRole ? `关系定位：${relationshipRole}` : "",
+          characterName ? `角色名：${characterName}` : "",
+          userAlias ? `用户称呼：${userAlias}` : ""
+        ].filter(Boolean).join("；");
+      const replyStyle = normalizePersonaText(src.reply_style) || speakingStyle;
+      const companionshipStyle = normalizePersonaText(src.companionship_style, { dropLegacyOnly: true })
+        || [personalityTags ? `性格标签：${personalityTags}` : "", `主动程度：${initiativeLevel}`, `关系定位：${relationshipRole}`].filter(Boolean).join("；");
       return {
-        identity: String(src.identity || "").trim(),
-        user_preferences: String(src.user_preferences || "").trim(),
-        user_dislikes: String(src.user_dislikes || "").trim(),
-        common_topics: String(src.common_topics || "").trim(),
-        reply_style: String(src.reply_style || "").trim(),
-        companionship_style: String(src.companionship_style || "").trim(),
-        updated_at: String(src.updated_at || "").trim()
+        character_name: characterName,
+        user_alias: userAlias,
+        personality_tags: personalityTags,
+        speaking_style: speakingStyle,
+        catchphrases,
+        likes,
+        dislikes,
+        initiative_level: initiativeLevel,
+        relationship_role: relationshipRole,
+        identity,
+        user_preferences: normalizePersonaText(src.user_preferences || likes, { dropLegacyOnly: true }),
+        user_dislikes: normalizePersonaText(src.user_dislikes || dislikes),
+        common_topics: normalizePersonaText(src.common_topics || likes, { dropLegacyOnly: true }),
+        reply_style: replyStyle,
+        companionship_style: companionshipStyle,
+        updated_at: normalizePersonaText(src.updated_at)
       };
     }
 
     function applyPersonaCardToForm(card) {
       const safe = normalizePersonaCardData(card);
+      if (ui.personaCharacterName) ui.personaCharacterName.value = safe.character_name;
+      if (ui.personaUserAlias) ui.personaUserAlias.value = safe.user_alias;
+      if (ui.personaPersonalityTags) ui.personaPersonalityTags.value = safe.personality_tags;
+      if (ui.personaSpeakingStyle) ui.personaSpeakingStyle.value = safe.speaking_style || safe.reply_style;
+      if (ui.personaCatchphrases) ui.personaCatchphrases.value = safe.catchphrases;
+      if (ui.personaInitiativeLevel) ui.personaInitiativeLevel.value = safe.initiative_level || "适中";
+      if (ui.personaRelationshipRole) ui.personaRelationshipRole.value = safe.relationship_role || "桌面伙伴";
       if (ui.personaIdentity) ui.personaIdentity.value = safe.identity;
-      if (ui.personaPreferences) ui.personaPreferences.value = safe.user_preferences;
-      if (ui.personaDislikes) ui.personaDislikes.value = safe.user_dislikes;
+      if (ui.personaPreferences) ui.personaPreferences.value = safe.likes || safe.user_preferences;
+      if (ui.personaDislikes) ui.personaDislikes.value = safe.dislikes || safe.user_dislikes;
       if (ui.personaTopics) ui.personaTopics.value = safe.common_topics;
       if (ui.personaReplyStyle) ui.personaReplyStyle.value = safe.reply_style;
       if (ui.personaCompanionshipStyle) ui.personaCompanionshipStyle.value = safe.companionship_style;
     }
 
     function readPersonaCardFromForm() {
+      const characterName = String(ui.personaCharacterName?.value || "").trim();
+      const userAlias = String(ui.personaUserAlias?.value || "").trim();
+      const personalityTags = String(ui.personaPersonalityTags?.value || "").trim();
+      const speakingStyle = String(ui.personaSpeakingStyle?.value || "").trim();
+      const catchphrases = String(ui.personaCatchphrases?.value || "").trim();
+      const likes = String(ui.personaPreferences?.value || "").trim();
+      const dislikes = String(ui.personaDislikes?.value || "").trim();
+      const initiativeLevel = String(ui.personaInitiativeLevel?.value || "适中").trim() || "适中";
+      const relationshipRole = String(ui.personaRelationshipRole?.value || "桌面伙伴").trim() || "桌面伙伴";
+      const identity = String(ui.personaIdentity?.value || "").trim()
+        || [
+          relationshipRole ? `关系定位：${relationshipRole}` : "",
+          characterName ? `角色名：${characterName}` : "",
+          userAlias ? `用户称呼：${userAlias}` : ""
+        ].filter(Boolean).join("；");
+      const replyStyle = [speakingStyle, catchphrases ? `口头禅/禁忌：${catchphrases}` : ""].filter(Boolean).join("；");
+      const companionshipStyle = [personalityTags ? `性格标签：${personalityTags}` : "", `主动程度：${initiativeLevel}`, `关系定位：${relationshipRole}`].filter(Boolean).join("；");
       return normalizePersonaCardData({
-        identity: ui.personaIdentity?.value,
-        user_preferences: ui.personaPreferences?.value,
-        user_dislikes: ui.personaDislikes?.value,
-        common_topics: ui.personaTopics?.value,
-        reply_style: ui.personaReplyStyle?.value,
-        companionship_style: ui.personaCompanionshipStyle?.value
+        character_name: characterName,
+        user_alias: userAlias,
+        personality_tags: personalityTags,
+        speaking_style: speakingStyle,
+        catchphrases,
+        likes,
+        dislikes,
+        initiative_level: initiativeLevel,
+        relationship_role: relationshipRole,
+        identity,
+        user_preferences: likes,
+        user_dislikes: dislikes,
+        common_topics: String(ui.personaTopics?.value || likes).trim(),
+        reply_style: replyStyle,
+        companionship_style: companionshipStyle
       });
     }
 
     function applyPersonaTemplateDraft() {
       applyPersonaCardToForm({
-        identity: "你是我的桌面搭子，叫馨语AI桌宠。",
-        user_preferences: "我喜欢简洁直接的建议，也喜欢被温柔鼓励。",
-        user_dislikes: "不喜欢太官腔、太冗长、反复重复同一句话。",
-        common_topics: "开发、学习计划、日常安排、效率提升。",
-        reply_style: "像熟悉的朋友，语气自然，短句优先，必要时再展开。",
-        companionship_style: "会主动关心我，但不过度打扰，关键时刻能提醒我。"
+        character_name: "馨语",
+        user_alias: "小Q",
+        personality_tags: "温柔、机灵、轻微吐槽、可靠、低打扰",
+        speaking_style: "像熟悉的朋友，先给重点，再给一两句具体建议；不要官话，不要长篇说教。",
+        catchphrases: "可以偶尔说“我在”；避免模板化结尾。",
+        likes: "喜欢简洁直接的建议，也喜欢被温柔鼓励；常聊开发、学习计划、日常安排和效率提升。",
+        dislikes: "不喜欢太官腔、太冗长、重复同一句安慰。",
+        initiative_level: "适中",
+        relationship_role: "桌面伙伴"
       });
       setStatus("已导入人设模板草稿");
     }
@@ -196,8 +306,22 @@
         "对我情绪有感知，先共情再给建议。",
         "能和我连续聊下去，不像单轮问答机器人。"
       ];
+      const names = ["馨语", "小语", "Taffy"];
+      const aliases = ["小Q", "主人", "搭档"];
+      const tags = ["温柔、机灵、可靠", "活泼、轻微吐槽、低打扰", "认真、细心、会鼓励"];
+      const roles = ["桌面伙伴", "学习搭子", "情绪陪伴", "工作助手"];
+      const initiatives = ["低", "适中", "高"];
       const pick = (arr) => arr[Math.floor(Math.random() * arr.length)] || "";
       applyPersonaCardToForm({
+        character_name: pick(names),
+        user_alias: pick(aliases),
+        personality_tags: pick(tags),
+        speaking_style: pick(replyStyles),
+        catchphrases: "少说套话，必要时用一句轻松吐槽。",
+        likes: `${pick(preferences)} ${pick(topics)}`,
+        dislikes: pick(dislikes),
+        initiative_level: pick(initiatives),
+        relationship_role: pick(roles),
         identity: pick(identities),
         user_preferences: pick(preferences),
         user_dislikes: pick(dislikes),
@@ -253,8 +377,8 @@
       }
       ui.personaModal.hidden = false;
       applyPersonaCardToForm(state.personaCard || PERSONA_CARD_DEFAULT);
-      if (ui.personaIdentity) {
-        ui.personaIdentity.focus();
+      if (ui.personaCharacterName) {
+        ui.personaCharacterName.focus();
       }
     }
 
@@ -296,6 +420,8 @@
       readAssistantAvatarFromStorage,
       saveAssistantAvatarToStorage,
       avatarUrlToCssValue,
+      isRegressionPersonaText,
+      isLegacyOnlyPersonaText,
       applyAssistantAvatar,
       initAssistantAvatar,
       readFileAsDataUrl,

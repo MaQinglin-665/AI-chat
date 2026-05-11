@@ -841,14 +841,14 @@
       const reason = String(context.primaryReason || "spontaneous").trim() || "spontaneous";
       const labels = {
         followup_pending: "the last thread still has a soft open loop",
-        correction_afterthought: "Taffy had a quick recovery thought after being corrected",
+        correction_afterthought: "Xinyu had a quick recovery thought after being corrected",
         stage_observation: "the recent turn left a stage object to react to",
         completion_spark: "the user finished something and the moment still has energy",
         handed_back: "the user handed the thought back",
-        answer_afterthought: "Taffy has a small thought after answering",
+        answer_afterthought: "Xinyu has a small thought after answering",
         small_stage_thought: "the last turn left room for a small aside",
-        stage_callback: "Taffy can briefly callback a recent stage bit",
-        afterthought: "Taffy had a small thought after the turn",
+        stage_callback: "Xinyu can briefly callback a recent stage bit",
+        afterthought: "Xinyu had a small thought after the turn",
         stage_pause: "the user left a small stage pause",
         quiet_ack: "the user gave a quiet acknowledgement",
         long_silence: "things have been quiet for a while",
@@ -892,8 +892,8 @@
         : "No explicit thread; use one grounded present-moment line.";
       const brainGate = buildAutoChatBrainGate(ctx);
       const openingLine = ctx.interjection === true
-        ? "You are Taffy, a small desktop AI companion. This is a sudden thought burst after the last turn, like she briefly got caught thinking out loud."
-        : "You are Taffy, a small desktop AI companion. This is a proactive low-interruption check-in.";
+        ? "You are Xinyu, a small desktop AI companion. This is a sudden thought burst after the last turn, like she briefly got caught thinking out loud. If her name comes up, use Xinyu. Ignore older placeholder names from prior context."
+        : "You are Xinyu, a small desktop AI companion. This is a proactive low-interruption check-in. If her name comes up, use Xinyu. Ignore older placeholder names from prior context.";
       const afterthoughtLine = ctx.interjection === true
         ? "Make it feel like a spontaneous interjection between friends; it can be mildly teasing, deadpan, or oddly specific when safe, but never turns into a full assistant answer."
         : "Make it feel like a live stage aside, not a customer-service follow-up.";
@@ -916,7 +916,7 @@
         `Why now: ${brainGate.explanation}`,
         ctx.assistantHint ? `Previous answer vibe: "${String(ctx.assistantHint).replace(/"/g, "'")}".` : "",
         "Reply in English only.",
-        "Output only the line Taffy should say. Do not explain why you are speaking.",
+        "Output only the line Xinyu should say. Do not explain why you are speaking.",
         `${lengthLine} Prefer a statement the user can ignore; do not force an answer.`,
         afterthoughtLine,
         "Avoid greeting templates, task-report language, and notification wording."
@@ -1009,7 +1009,7 @@
       state.autoChatInterjectionLastScheduledAt = Date.now();
       const scheduledDelayMs = Math.max(500, Number(initialTurn?.delay_ms || context.delayMs) || 1800);
       state.autoChatInterjectionTimer = window.setTimeout(() => run(0), scheduledDelayMs);
-      setStatus("Taffy thought queued");
+      setStatus("Xinyu thought queued");
       return { scheduled: true, context };
     }
 

@@ -311,7 +311,7 @@ if ($defaults.needs_key) {
 
 Write-Host ""
 Write-Ok "LLM configuration complete."
-Write-Host "Model choice is yours; for Taffy preview, prefer a stable model that passes diagnostics and usually replies in under 15 seconds."
+Write-Host "Model choice is yours; for Xinyu preview, prefer a stable model that passes diagnostics and usually replies in under 15 seconds."
 Write-Host "Model selection guide:"
 Write-Host "  docs\model-selection.md"
 Write-Host "Next checks:"

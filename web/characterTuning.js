@@ -131,7 +131,10 @@
     const emotion = localizeValue("emotion", feedback.emotion);
     const action = localizeValue("action", feedback.action);
     const voice = localizeValue("voice", feedback.voiceStyle);
-    return `已记录反馈：${feedback.label}\n对象：${emotion} / ${action} / ${voice}\n下一步可以点“角色调优”看建议。`;
+    const nextStep = feedback.rating === "bad"
+      ? "我会把这条反馈用于下一轮角色风格微调；想手动改口吻或性格，可以去“更多 → 人设卡”。"
+      : "我会保留这组表现倾向，用在下一轮角色风格微调里。";
+    return `已记录反馈：${feedback.label}\n对象：${emotion} / ${action} / ${voice}\n${nextStep}`;
   }
 
   function buildTuningReport(input = {}) {
@@ -165,13 +168,13 @@
       addConfigKey(configKeys, "character_runtime.auto_apply_reply_cue", "控制上一句回复 cue 是否自动应用到本地表现层");
     }
     if (!candidate) {
-      addUnique(advice, "先发一句正常聊天，或点“角色试演”，再看这里的调优建议会更准。");
+      addUnique(advice, "先发一句正常聊天，再在 AI 回复旁点“表现不错”或“需要调整”，这里的调优建议会更准。");
     } else if (autoApply?.applied !== true) {
       addUnique(advice, "上一句只生成了候选表现，没有真正应用。优先检查角色接入开关和顶部“上一句角色表现”卡片。");
       addConfigKey(configKeys, "character_runtime.auto_apply_reply_cue", "候选表现未应用时优先检查这个开关");
     }
     if (feedback?.rating === "bad") {
-      addUnique(advice, "你刚标记“需要调整”。先用“角色试演”复现是哪种情绪不对，再分别判断是声音差异小、动作太弱，还是回复文本不像角色。");
+      addUnique(advice, "你刚标记“需要调整”。优先去“人设卡”调整口吻、回复长度和陪伴方式；开发诊断模式下再用“角色试演”复现表情、动作或声音问题。");
       addConfigKey(configKeys, "assistant_prompt", "如果文本不像角色，先改这里的人设和说话规则");
       addConfigKey(configKeys, "motion.speech_motion_strength", "如果说话动作太弱，调这里");
       addConfigKey(configKeys, "tts.gpt_sovits_fallback_ref_audio_path", "如果声线味道不对，优先检查参考音频");
@@ -247,10 +250,10 @@
     return [
       "角色闭环测试流程",
       "",
-      "1. 点“更多 → 链路自检”，先确认 LLM、TTS 和角色接入都正常。",
-      "2. 点“更多 → 角色试演”，不经过 LLM，单独听表情、动作和语音风格。",
-      "3. 听完点“表现不错”或“需要调整”，把你的主观判断记到本次会话。",
-      "4. 点“角色调优”，看下一步该改人设、回复长度、参考音频还是动作强度。",
+      "1. 点“更多 → 故障自检”，先确认 LLM、TTS 和角色接入都正常。",
+      "2. 正常聊天后，在 AI 回复旁点“表现不错”或“需要调整”，把你的主观判断记到本次会话。",
+      "3. 想手动改口吻或陪伴方式时，优先去“更多 → 人设卡”。",
+      "4. 开发诊断模式下仍可用“角色试演”和“角色调优”排查表情、动作和语音风格。",
       "5. 再发一句真实聊天，看顶部“上一句角色表现”是否符合预期。"
     ].join("\n");
   }

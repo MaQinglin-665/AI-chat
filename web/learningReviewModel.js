@@ -8,8 +8,9 @@
       return null;
     }
     const assistantPreview = String(src.assistant_preview || "").trim();
+    const userPreview = String(src.user_preview || "").trim();
     const compressedPattern = String(src.compressed_pattern || "").trim();
-    if (!assistantPreview && !compressedPattern) {
+    if (!assistantPreview && !userPreview && !compressedPattern) {
       return null;
     }
     const scoreRaw = Number(src.score);
@@ -18,6 +19,7 @@
     return {
       id: itemId,
       assistant_preview: assistantPreview,
+      user_preview: userPreview,
       compressed_pattern: compressedPattern,
       score: Number.isFinite(scoreRaw) ? Math.max(0, Math.min(1, scoreRaw)) : 0,
       confidence: Number.isFinite(confRaw) ? Math.max(0, Math.min(1, confRaw)) : 0,
@@ -124,7 +126,7 @@
         if (!keyword) {
           return true;
         }
-        const haystack = `${item.assistant_preview || ""}\n${item.compressed_pattern || ""}`.toLowerCase();
+        const haystack = `${item.user_preview || ""}\n${item.assistant_preview || ""}\n${item.compressed_pattern || ""}`.toLowerCase();
         return haystack.includes(keyword);
       })
       .sort((a, b) => compareLearningItems(a, b, sortMode));
@@ -179,7 +181,24 @@
     const target = state && typeof state === "object" ? state : {};
     const candidates = Array.isArray(target.candidates) ? target.candidates.length : 0;
     const samples = Array.isArray(target.samples) ? target.samples.length : 0;
-    return `\u5019\u9009 ${candidates} \u6761 \u00b7 \u6b63\u5f0f ${samples} \u6761 \u00b7 \u5f53\u524d\u663e\u793a ${Math.max(0, Number(visibleCount) || 0)} \u6761`;
+    const pool = target.activeTab === "samples" ? "\u6b63\u5f0f\u6c60" : "\u5019\u9009\u6c60";
+    return `${pool}\u5f53\u524d\u663e\u793a ${Math.max(0, Number(visibleCount) || 0)} \u6761\u3002\u5019\u9009\u6c60\u7528\u6765\u5ba1\u6838\u65b0\u6c89\u6dc0\u7684\u8bb0\u5fc6\uff0c\u6b63\u5f0f\u6c60\u4f1a\u5728\u76f8\u5173\u5bf9\u8bdd\u4e2d\u53c2\u4e0e\u56de\u590d\u3002`;
+  }
+
+  function buildLearningStats(state, visibleCount = 0) {
+    const target = state && typeof state === "object" ? state : {};
+    const candidates = Array.isArray(target.candidates) ? target.candidates.length : 0;
+    const samples = Array.isArray(target.samples) ? target.samples.length : 0;
+    const selected = target.activeTab === "samples"
+      ? (target.selectedSamples instanceof Set ? target.selectedSamples.size : 0)
+      : (target.selectedCandidates instanceof Set ? target.selectedCandidates.size : 0);
+    return {
+      candidates,
+      samples,
+      visible: Math.max(0, Number(visibleCount) || 0),
+      selected,
+      activePoolLabel: target.activeTab === "samples" ? "\u6b63\u5f0f\u6c60" : "\u5019\u9009\u6c60"
+    };
   }
 
   function buildSelectAllState(activeTab, filteredItems, selectedSet) {
@@ -208,6 +227,7 @@
   const api = {
     applyLearningPayload,
     buildLearningSummaryText,
+    buildLearningStats,
     buildSelectAllState,
     compareLearningItems,
     getLearningMetricViews,

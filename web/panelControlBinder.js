@@ -169,6 +169,14 @@
         }
       });
     }
+    if (ui.personaTestBtn) {
+      ui.personaTestBtn.addEventListener("click", async () => {
+        const ok = await call(deps.savePersonaCardFromForm);
+        if (ok) {
+          call(deps.preparePersonaTestPrompt);
+        }
+      });
+    }
     if (ui.personaImportTemplateBtn) {
       ui.personaImportTemplateBtn.addEventListener("click", () => call(deps.applyPersonaTemplateDraft));
     }
@@ -179,6 +187,13 @@
       ui.personaResetBtn.addEventListener("click", () => call(deps.resetPersonaDraft));
     }
     for (const field of [
+      ui.personaCharacterName,
+      ui.personaUserAlias,
+      ui.personaPersonalityTags,
+      ui.personaSpeakingStyle,
+      ui.personaCatchphrases,
+      ui.personaInitiativeLevel,
+      ui.personaRelationshipRole,
       ui.personaIdentity,
       ui.personaPreferences,
       ui.personaDislikes,

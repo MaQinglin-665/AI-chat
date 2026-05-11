@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="./schedule.css">
   <link rel="stylesheet" href="./onboarding.css">
   <link rel="stylesheet" href="./desktop.css">
+  <link rel="stylesheet" href="./configSwitch.css">
 </head>
 <body>
   <canvas id="live2d-canvas"></canvas>
@@ -44,11 +45,35 @@
 
     <div id="attachment-preview" class="attachment-preview" hidden></div>
 
+    <div id="sticker-panel" class="sticker-panel" hidden>
+      <div class="sticker-panel-head">
+        <strong>表情包</strong>
+        <label class="sticker-respond-toggle">
+          <input id="sticker-respond-toggle" type="checkbox" />
+          <span>发送后让 AI 回应</span>
+        </label>
+        <button id="sticker-close-btn" class="sticker-close-btn" type="button" aria-label="关闭表情包面板">×</button>
+      </div>
+      <section class="sticker-section">
+        <div class="sticker-section-title">默认表情</div>
+        <div id="sticker-default-grid" class="sticker-grid" aria-label="默认表情包"></div>
+      </section>
+      <section class="sticker-section">
+        <div class="sticker-section-title sticker-user-title">
+          <span>我的表情</span>
+          <button id="sticker-import-btn" type="button">导入</button>
+        </div>
+        <div id="sticker-user-grid" class="sticker-grid" aria-label="我的表情包"></div>
+        <div id="sticker-user-empty" class="sticker-empty">可以导入 PNG、JPG、WebP 或 GIF 表情包。</div>
+      </section>
+    </div>
+
     <div class="row controls">
       <button id="attach-btn" type="button" title="添加图片或文件" aria-label="添加图片或文件">+</button>
       <div class="chat-input-wrap">
         <input id="chat-input" type="text" placeholder="和我说点什么..." />
-        <span class="chat-input-icons" aria-hidden="true">&#9786; &#10023;</span>
+        <button id="sticker-btn" class="chat-input-icon-btn" type="button" title="表情包" aria-label="打开表情包" aria-expanded="false">&#9786;</button>
+        <span class="chat-input-icons" aria-hidden="true">&#10023;</span>
       </div>
       <button id="send-btn" type="button">发送</button>
     </div>
@@ -59,35 +84,121 @@
       multiple
       accept="image/*,.txt,.md,.json,.csv,.tsv,.yaml,.yml,.xml,.html,.css,.js,.ts,.py,.java,.c,.cpp,.h,.hpp,.go,.rs,.sh,.ps1,.bat,.sql,.log,.ini,.toml,.pdf,.doc,.docx"
     />
+    <input id="sticker-import-input" type="file" hidden multiple accept="image/png,image/jpeg,image/webp,image/gif" />
 
     <div class="row controls action-buttons primary-actions">
       <button id="mic-btn" type="button">开麦: 关</button>
       <button id="speak-btn" type="button">语音: 开</button>
       <button id="subtitle-toggle-btn" type="button">字幕: 开</button>
-      <button id="translation-toggle-btn" type="button" aria-pressed="true" title="隐藏会话翻译">翻译: 开</button>
     </div>
 
     <div class="row controls action-buttons utility-actions">
-      <button id="schedule-btn" type="button">日程</button>
       <button id="help-btn" type="button">上手</button>
       <button id="more-btn" type="button" aria-expanded="false" aria-controls="advanced-actions">更多</button>
     </div>
 
     <div id="advanced-actions" class="row controls action-buttons advanced-actions" hidden>
-      <button id="persona-btn" type="button">人设卡</button>
-      <button id="learning-review-btn" type="button">学习审核</button>
-      <button id="followup-readiness-btn" type="button" data-dev-feature="diagnostics">续话状态</button>
-      <button id="doctor-btn" type="button">链路自检</button>
-      <button id="voice-test-btn" type="button">测试语音</button>
-      <button id="character-rehearsal-btn" type="button">角色试演</button>
-      <button id="character-tuning-btn" type="button">角色调优</button>
-      <button id="character-feedback-good-btn" type="button">表现不错</button>
-      <button id="character-feedback-bad-btn" type="button">需要调整</button>
-      <button id="lock-btn" type="button">锁定: 关</button>
-      <button id="observe-btn" type="button">观察: 开</button>
-      <button id="auto-chat-btn" type="button">自动聊: 关</button>
+      <div class="advanced-actions-group" aria-label="常用功能">
+        <span class="advanced-actions-title">常用</span>
+        <button id="schedule-btn" type="button">日程</button>
+        <button id="persona-btn" type="button">人设卡</button>
+        <button id="config-switch-btn" type="button">模型 / 语音</button>
+        <button id="learning-review-btn" type="button">记忆管理</button>
+        <button id="doctor-btn" type="button">故障自检</button>
+      </div>
+      <div class="advanced-actions-group" aria-label="桌面功能">
+        <span class="advanced-actions-title">桌面</span>
+        <button id="lock-btn" type="button">桌面锁定: 关</button>
+        <button id="observe-btn" type="button">观察桌面: 关</button>
+        <button id="auto-chat-btn" type="button">主动陪伴: 关</button>
+      </div>
+      <div class="advanced-actions-group advanced-actions-dev" aria-label="开发诊断" data-dev-feature="diagnostics" hidden>
+        <span class="advanced-actions-title">开发诊断</span>
+        <button id="followup-readiness-btn" type="button" data-dev-feature="diagnostics" hidden>续话状态</button>
+        <button id="character-rehearsal-btn" type="button" data-dev-feature="diagnostics" hidden>角色试演</button>
+        <button id="character-tuning-btn" type="button" data-dev-feature="diagnostics" hidden>角色调优</button>
+      </div>
     </div>
   </section>
+
+  <div id="config-switch-modal" class="config-switch-modal" hidden>
+    <div class="config-switch-dialog" role="dialog" aria-modal="true" aria-labelledby="config-switch-title">
+      <div class="config-switch-head">
+        <div class="config-switch-head-copy">
+          <strong id="config-switch-title">模型 / 语音配置</strong>
+          <p>常用模型和语音服务的一键切换。API Key 只写入 .env，界面不会再次显示真实密钥。</p>
+        </div>
+        <button id="config-switch-close-btn" class="config-switch-close-btn" type="button" aria-label="关闭配置面板" title="关闭">×</button>
+      </div>
+
+      <div class="config-switch-body">
+        <section class="config-switch-section">
+          <div class="config-switch-section-title">聊天模型</div>
+          <div class="config-switch-grid">
+            <label class="config-switch-field">
+              <span>预设</span>
+              <select id="config-switch-llm-preset">
+                <option value="dashscope">DashScope / Qwen</option>
+                <option value="openai">OpenAI</option>
+                <option value="ollama">Ollama 本地模型</option>
+                <option value="custom_openai_compatible">自定义 OpenAI 兼容接口</option>
+              </select>
+            </label>
+            <label class="config-switch-field">
+              <span>模型名称</span>
+              <input id="config-switch-llm-model" type="text" spellcheck="false" />
+            </label>
+            <label class="config-switch-field config-switch-field-wide">
+              <span>接口地址</span>
+              <input id="config-switch-llm-base-url" type="url" spellcheck="false" />
+            </label>
+            <label class="config-switch-field">
+              <span>密钥变量名</span>
+              <input id="config-switch-llm-api-key-env" type="text" spellcheck="false" />
+            </label>
+            <label class="config-switch-field">
+              <span>API Key</span>
+              <input id="config-switch-llm-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="留空则保留已有密钥" />
+            </label>
+          </div>
+          <p id="config-switch-key-status" class="config-switch-note"></p>
+        </section>
+
+        <section class="config-switch-section">
+          <div class="config-switch-section-title">语音合成</div>
+          <div class="config-switch-grid">
+            <label class="config-switch-field">
+              <span>语音服务</span>
+              <select id="config-switch-tts-provider">
+                <option value="browser">浏览器语音</option>
+                <option value="edge_tts">Edge TTS</option>
+                <option value="gpt_sovits">GPT-SoVITS</option>
+              </select>
+            </label>
+            <label class="config-switch-field">
+              <span>音色 / Voice</span>
+              <input id="config-switch-tts-voice" type="text" spellcheck="false" />
+            </label>
+            <label id="config-switch-gpt-sovits-row" class="config-switch-field config-switch-field-wide">
+              <span>GPT-SoVITS 地址</span>
+              <input id="config-switch-gpt-sovits-url" type="url" spellcheck="false" />
+            </label>
+            <label class="config-switch-check">
+              <input id="config-switch-tts-browser-fallback" type="checkbox" />
+              <span>服务端语音失败时，使用浏览器语音兜底</span>
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <div class="config-switch-actions">
+        <button id="config-switch-test-llm-btn" type="button">测试模型</button>
+        <button id="config-switch-test-tts-btn" type="button">测试语音</button>
+        <button id="config-switch-save-btn" class="config-switch-primary-btn" type="button">保存配置</button>
+      </div>
+      <div id="config-switch-status" class="config-switch-status" aria-live="polite"></div>
+    </div>
+  </div>
 
   <div id="help-modal" class="help-modal" hidden>
     <div class="help-dialog">
@@ -96,29 +207,29 @@
         <button id="help-close-btn" class="help-close-btn" type="button" aria-label="关闭帮助">关闭</button>
       </div>
       <div class="help-body">
-        <p class="help-intro">30 秒入门：先做链路自检，再聊一句，最后测试语音和开麦。</p>
+        <p class="help-intro">30 秒入门：先做故障自检，再聊一句，最后测试语音和开麦。</p>
         <div class="help-section">
           <div class="help-title">先做这 3 件事</div>
           <ul class="help-list">
-            <li>点“更多 → 链路自检”，确认聊天模型、语音服务和角色接入都正常。</li>
+            <li>点“更多 → 故障自检”，确认聊天模型、语音服务和角色接入都正常。</li>
             <li>在输入框输入一句话，按 Enter 测试正常聊天。</li>
-            <li>点“更多 → 测试语音”确认能听到回复；再点“开麦”测试语音输入。</li>
+            <li>点“更多 → 模型 / 语音 → 测试语音”确认能听到回复；再点“开麦”测试语音输入。</li>
           </ul>
         </div>
         <div class="help-section">
           <div class="help-title">常见情况</div>
           <ul class="help-list">
-            <li>聊天或语音报错：先点“链路自检”，报告会告诉你该查 LLM、TTS 还是配置。</li>
-            <li>没有声音：点“测试语音”；还不行再输入 /ttsdebug 查看最近一次语音状态。</li>
+            <li>聊天或语音报错：先点“故障自检”，报告会告诉你该查 LLM、TTS 还是配置。</li>
+            <li>没有声音：点“模型 / 语音 → 测试语音”；还不行再输入 /ttsdebug 查看最近一次语音状态。</li>
             <li>想更像你的桌面伙伴：点“更多 → 人设卡”调整名字、说话方式和偏好。</li>
           </ul>
         </div>
         <div class="help-section">
           <div class="help-title">调角色味道</div>
           <ul class="help-list">
-            <li>点“更多 → 角色试演”，先不经过 LLM，单独测试表情、动作和语音风格。</li>
-            <li>听完后点“表现不错”或“需要调整”，记录你对上一句表现的判断。</li>
-            <li>点“角色调优”查看下一步该改人设、回复长度、参考音频还是动作强度。</li>
+            <li>正常聊天后，在 AI 回复旁点“表现不错”或“需要调整”，记录你对上一句表现的判断。</li>
+            <li>想调整性格、称呼和说话方式时，点“更多 → 人设卡”。</li>
+            <li>开发诊断模式里仍保留“角色试演”和“角色调优”，用于排查表情、动作和语音风格。</li>
           </ul>
         </div>
         <div class="help-actions">
@@ -227,11 +338,10 @@
           <span class="persona-head-icon" aria-hidden="true">✦</span>
           <div class="persona-head-copy">
             <strong id="persona-title">人设卡</strong>
-            <p>定义桌宠的身份、性格、说话方式与互动偏好</p>
+            <p>定义角色身份、称呼、说话方式和陪伴边界，保存后会参与后续回复。</p>
           </div>
         </div>
         <div class="persona-head-actions">
-          <button id="persona-preview-btn" class="persona-ghost-btn" type="button">预览效果</button>
           <button id="persona-save-btn" class="persona-primary-btn" type="button">保存</button>
           <button id="persona-close-btn" class="persona-close-btn" type="button" aria-label="关闭">关闭</button>
         </div>
@@ -253,23 +363,44 @@
                 <button id="persona-avatar-change-btn" class="persona-ghost-btn" type="button">更换形象</button>
                 <button id="persona-avatar-reset-btn" class="persona-ghost-btn" type="button">恢复默认</button>
               </div>
-              <div class="persona-chip-row">
-                <span class="persona-chip">治愈系</span>
-                <span class="persona-chip">活泼</span>
-                <span class="persona-chip">高情商</span>
-                <span class="persona-chip">学习陪伴</span>
-              </div>
             </div>
 
             <div class="persona-form persona-form-basic">
-              <label class="persona-field">
-                <span>身份定位</span>
-                <textarea id="persona-identity" rows="2" placeholder="例如：你是馨语AI桌宠，是我熟悉的搭子，叫我小Q。"></textarea>
-              </label>
-              <label class="persona-field">
-                <span>人设简介</span>
-                <textarea id="persona-companionship-style" rows="3" placeholder="例如：温柔、机灵、会陪伴，也会在你需要时认真提醒你。"></textarea>
-              </label>
+              <div class="persona-field-grid">
+                <label class="persona-field">
+                  <span>角色名</span>
+                  <input id="persona-character-name" type="text" placeholder="例如：馨语" />
+                </label>
+                <label class="persona-field">
+                  <span>怎么称呼我</span>
+                  <input id="persona-user-alias" type="text" placeholder="例如：小Q" />
+                </label>
+                <label class="persona-field">
+                  <span>关系定位</span>
+                  <select id="persona-relationship-role">
+                    <option value="桌面伙伴">桌面伙伴</option>
+                    <option value="学习搭子">学习搭子</option>
+                    <option value="情绪陪伴">情绪陪伴</option>
+                    <option value="工作助手">工作助手</option>
+                  </select>
+                </label>
+                <label class="persona-field">
+                  <span>回复主动感</span>
+                  <select id="persona-initiative-level">
+                    <option value="低">低打扰</option>
+                    <option value="适中">适中</option>
+                    <option value="高">主动一些</option>
+                    <option value="很高">很主动</option>
+                  </select>
+                </label>
+              </div>
+              <details class="persona-advanced-details">
+                <summary>高级补充</summary>
+                <label class="persona-field">
+                  <span>身份补充</span>
+                  <textarea id="persona-identity" rows="2" placeholder="例如：你是我的桌面伙伴，熟悉我的工作节奏，会自然地陪我推进事情。"></textarea>
+                </label>
+              </details>
             </div>
           </div>
         </section>
@@ -279,17 +410,20 @@
             <span class="persona-section-icon" aria-hidden="true">☺</span>
             <span>性格与说话风格</span>
           </div>
-          <div class="persona-style-grid">
-            <div class="persona-style-item">核心性格（已选）：温柔 · 俏皮 · 主动 · 细心 · 可靠</div>
-            <div class="persona-style-item">语气：自然亲切</div>
-            <div class="persona-style-item">回复长度：适中</div>
-            <div class="persona-style-item">情绪表达：丰富</div>
-          </div>
           <div class="persona-form">
             <label class="persona-field">
-              <span>希望桌宠怎么说话</span>
-              <textarea id="persona-reply-style" rows="3" placeholder="例如：像真人朋友，语气自然，有温度，别太模板化。"></textarea>
+              <span>性格标签</span>
+              <textarea id="persona-personality-tags" rows="2" placeholder="例如：温柔、机灵、轻微吐槽、可靠、低打扰。"></textarea>
             </label>
+            <label class="persona-field">
+              <span>说话风格</span>
+              <textarea id="persona-speaking-style" rows="3" placeholder="例如：先给重点，再给一两句原因；语气像熟人，不要官话。"></textarea>
+            </label>
+            <label class="persona-field">
+              <span>口头禅 / 禁忌</span>
+              <textarea id="persona-catchphrases" rows="2" placeholder="例如：可以偶尔说“我在”；避免过度撒娇、避免模板化结尾。"></textarea>
+            </label>
+            <textarea id="persona-reply-style" hidden></textarea>
           </div>
         </section>
 
@@ -300,87 +434,59 @@
           </div>
           <div class="persona-form">
             <label class="persona-field">
-              <span>我的偏好</span>
-              <textarea id="persona-preferences" rows="3" placeholder="例如：喜欢简短直给、喜欢被鼓励、喜欢二次元梗。"></textarea>
+              <span>我喜欢 / 常关注</span>
+              <textarea id="persona-preferences" rows="3" placeholder="例如：喜欢简短直给、喜欢被鼓励、常聊开发、游戏、学习计划。"></textarea>
             </label>
-
-            <label class="persona-field">
-              <span>常聊话题</span>
-              <textarea id="persona-topics" rows="3" placeholder="例如：开发、游戏、学习计划、日常吐槽。"></textarea>
-            </label>
-
             <label class="persona-field">
               <span>我不喜欢</span>
               <textarea id="persona-dislikes" rows="3" placeholder="例如：不喜欢太官话、长篇大论、机械重复。"></textarea>
             </label>
+            <textarea id="persona-topics" hidden></textarea>
+            <textarea id="persona-companionship-style" hidden></textarea>
           </div>
         </section>
 
-        <section class="persona-section">
-          <div class="persona-section-title">
-            <span class="persona-section-icon" aria-hidden="true">✧</span>
-            <span>经典台词 / 对话示例</span>
-          </div>
-          <div class="persona-example-list">
-            <div class="persona-example-item">
-              <img class="persona-example-avatar persona-avatar-sync" src="./assets/assistant_avatar_ref.png?v=2" alt="" />
-              <span class="persona-example-text">早呀，今天也要一起加油哦。</span>
-            </div>
-            <div class="persona-example-item">
-              <img class="persona-example-avatar persona-avatar-sync" src="./assets/assistant_avatar_ref.png?v=2" alt="" />
-              <span class="persona-example-text">如果有点累了，我们先把最重要的一件事做完。</span>
-            </div>
-            <div class="persona-example-item">
-              <img class="persona-example-avatar persona-avatar-sync" src="./assets/assistant_avatar_ref.png?v=2" alt="" />
-              <span class="persona-example-text">我会一直陪着你，不用一个人硬撑。</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="persona-section persona-bottom-grid">
-          <div class="persona-mini-preview">
-            <div class="persona-mini-title">互动预览</div>
-            <div class="persona-mini-card">
-              <img class="persona-mini-avatar persona-avatar-sync" src="./assets/assistant_avatar_ref.png?v=2" alt="" />
-              <div class="persona-mini-copy">
-                <strong>馨语AI桌宠</strong>
-                <p>温柔 · 俏皮 · 主动 · 细心 · 可靠</p>
-                <span>想和你一起把今天过得更好</span>
-              </div>
-            </div>
-          </div>
+        <section class="persona-section persona-guide-section">
           <div class="persona-mini-tips">
-            <div class="persona-mini-title">人设小贴士</div>
+            <div class="persona-mini-title">填写建议</div>
             <ul>
-              <li>人设越清晰，互动越贴心。</li>
-              <li>可以随时微调，保存后会自动生效。</li>
-              <li>建议补充具体场景，陪伴效果更自然。</li>
+              <li>优先写“你希望她怎么回应”，少写抽象形容词。</li>
+              <li>不喜欢的表达要写清楚，模型更容易避开。</li>
+              <li>回复主动感只影响说话方式，不会扩大桌面观察权限。</li>
             </ul>
           </div>
         </section>
       </div>
 
       <div class="persona-footer-actions">
-        <button class="persona-ghost-btn" type="button">导入模板</button>
-        <button class="persona-ghost-btn" type="button">随机生成</button>
-        <button class="persona-ghost-btn" type="button">重置</button>
+        <button id="persona-import-template-btn" class="persona-ghost-btn" type="button">导入模板</button>
+        <button id="persona-random-btn" class="persona-ghost-btn" type="button">随机生成</button>
+        <button id="persona-test-btn" class="persona-ghost-btn" type="button">测试一句</button>
+        <button id="persona-reset-btn" class="persona-ghost-btn" type="button">重置</button>
         <button id="persona-apply-btn" class="persona-primary-btn" type="button">应用人设卡</button>
       </div>
     </div>
   </div>
   <div id="learning-review-backdrop" class="learning-review-backdrop" hidden></div>
-  <aside id="learning-review-drawer" class="learning-review-drawer" hidden aria-label="学习审核侧栏">
+  <aside id="learning-review-drawer" class="learning-review-drawer" hidden aria-label="记忆管理侧栏">
     <div class="learning-review-head learning-card">
       <div class="learning-review-title-wrap">
         <span class="learning-title-badge" aria-hidden="true">&#10003;</span>
-        <strong>学习审核</strong>
+        <div class="learning-title-copy">
+          <strong>记忆管理</strong>
+          <p>查看桌宠从对话里沉淀出的记忆，决定哪些可以进入正式池。</p>
+        </div>
       </div>
       <div class="learning-review-head-actions">
         <button id="learning-review-undo-btn" class="learning-btn-with-icon" type="button">
           <span class="learning-btn-icon" aria-hidden="true">&#8634;</span>
           <span>撤销上一步</span>
         </button>
-        <button id="learning-review-close-btn" class="learning-btn-with-icon" type="button" aria-label="关闭学习审核">
+        <button id="learning-reload-btn" class="learning-btn-with-icon" type="button">
+          <span class="learning-btn-icon" aria-hidden="true">&#8635;</span>
+          <span>刷新记忆</span>
+        </button>
+        <button id="learning-review-close-btn" class="learning-btn-with-icon" type="button" aria-label="关闭记忆管理">
           <span class="learning-btn-icon" aria-hidden="true">&times;</span>
           <span>关闭</span>
         </button>
@@ -388,33 +494,25 @@
     </div>
 
     <div class="learning-review-toolbar">
-      <section class="learning-card learning-section">
-        <div class="learning-review-quick">
-          <label class="learning-field">
-            <span class="learning-field-title">
-              <span>inject_count</span>
-              <span class="learning-help-dot" aria-hidden="true">i</span>
-            </span>
-            <select id="learning-quick-inject">
-              <option value="0">0</option>
-              <option value="1">1</option>
-            </select>
-          </label>
-          <label class="learning-field">
-            <span class="learning-field-title">
-              <span>promotion_min_support</span>
-              <span class="learning-help-dot" aria-hidden="true">i</span>
-            </span>
-            <select id="learning-quick-support">
-              <option value="1">1</option>
-              <option value="2">2</option>
-            </select>
-          </label>
-          <button id="learning-quick-apply-btn" class="learning-primary-btn" type="button">应用开关</button>
+      <section class="learning-card learning-memory-overview" aria-label="记忆池概览">
+        <div class="learning-overview-item">
+          <span>候选池</span>
+          <strong id="learning-stat-candidates">0</strong>
+          <small>待确认</small>
+        </div>
+        <div class="learning-overview-item">
+          <span>正式池</span>
+          <strong id="learning-stat-samples">0</strong>
+          <small>会参与回复</small>
+        </div>
+        <div class="learning-overview-item">
+          <span>当前显示</span>
+          <strong id="learning-stat-visible">0</strong>
+          <small id="learning-active-pool-label">候选池</small>
         </div>
       </section>
 
-      <section class="learning-card learning-section">
+      <section class="learning-card learning-section learning-pool-card">
         <div class="learning-review-tabs" role="tablist" aria-label="学习池切换">
           <button id="learning-tab-candidates" class="learning-tab is-active" type="button" role="tab" aria-selected="true">
             <span class="learning-btn-icon" aria-hidden="true">&#128101;</span>
@@ -429,32 +527,31 @@
             <span>Debug</span>
           </button>
         </div>
-        <button id="learning-reload-btn" class="learning-reload-btn learning-btn-with-icon" type="button">
-          <span class="learning-btn-icon" aria-hidden="true">&#8635;</span>
-          <span>重读</span>
-        </button>
       </section>
 
-      <section class="learning-card learning-section">
-        <div class="learning-section-title">
-          <span class="learning-section-icon" aria-hidden="true">&#9661;</span>
-          <strong>筛选条件</strong>
+      <section class="learning-card learning-section learning-filter-card">
+        <div class="learning-section-title learning-section-title-inline">
+          <span>
+            <span class="learning-section-icon" aria-hidden="true">&#9661;</span>
+            <strong>筛选与排序</strong>
+          </span>
+          <span class="learning-section-hint">留空即可看完整池子</span>
         </div>
         <div class="learning-review-filters">
-          <label class="learning-field">
-            <span class="learning-field-title">score &#8805;</span>
-            <input id="learning-filter-score" type="number" min="0" max="1" step="0.01" value="0">
-          </label>
-          <label class="learning-field">
-            <span class="learning-field-title">confidence &#8805;</span>
-            <input id="learning-filter-confidence" type="number" min="0" max="1" step="0.01" value="0">
-          </label>
           <label class="learning-field learning-field-keyword">
             <span class="learning-field-title">关键词</span>
             <div class="learning-input-with-icon">
               <span class="learning-inline-icon" aria-hidden="true">&#9906;</span>
-              <input id="learning-filter-keyword" type="text" placeholder="搜索 assistant/compressed">
+              <input id="learning-filter-keyword" type="text" placeholder="搜索用户原话、回复或提炼记忆">
             </div>
+          </label>
+          <label class="learning-field">
+            <span class="learning-field-title">评分不低于</span>
+            <input id="learning-filter-score" type="number" min="0" max="1" step="0.01" value="0">
+          </label>
+          <label class="learning-field">
+            <span class="learning-field-title">置信不低于</span>
+            <input id="learning-filter-confidence" type="number" min="0" max="1" step="0.01" value="0">
           </label>
           <div class="learning-filter-tools">
             <label class="learning-field">
@@ -480,7 +577,7 @@
         </div>
       </section>
 
-      <section class="learning-card learning-section">
+      <section class="learning-card learning-section learning-batch-card">
         <div class="learning-section-title">
           <span class="learning-section-icon" aria-hidden="true">&#8801;</span>
           <strong>批量操作</strong>
@@ -493,19 +590,19 @@
           <div class="learning-batch-actions">
             <button id="learning-batch-delete-btn" class="learning-btn-with-icon" type="button">
               <span class="learning-btn-icon" aria-hidden="true">&#128465;</span>
-              <span>批量删除</span>
+              <span>删除</span>
             </button>
             <button id="learning-batch-up-btn" class="learning-btn-with-icon" type="button">
               <span class="learning-btn-icon" aria-hidden="true">&#8593;</span>
-              <span>批量升权</span>
+              <span>升权</span>
             </button>
             <button id="learning-batch-down-btn" class="learning-btn-with-icon" type="button">
               <span class="learning-btn-icon" aria-hidden="true">&#8595;</span>
-              <span>批量降权</span>
+              <span>降权</span>
             </button>
             <button id="learning-batch-promote-btn" class="learning-btn-with-icon" type="button">
               <span class="learning-btn-icon" aria-hidden="true">&#127942;</span>
-              <span>批量晋升</span>
+              <span>晋升</span>
             </button>
           </div>
         </div>
@@ -541,6 +638,9 @@
   <script src="./ttsApi.js"></script>
   <script src="./attachmentModel.js"></script>
   <script src="./attachmentController.js"></script>
+  <script src="./stickerModel.js"></script>
+  <script src="./stickerStore.js"></script>
+  <script src="./stickerController.js"></script>
   <script src="./chatTranslationService.js"></script>
   <script src="./subtitleController.js"></script>
   <script src="./speechStyleController.js"></script>
@@ -592,6 +692,7 @@
     <script src="./characterDiagnosticsController.js"></script>
   <script src="./devFeatureLoader.js"></script>
   <script src="./chat.js"></script>
+  <script src="./configSwitchController.js"></script>
   <script src="./app.js"></script>
   <div id="subtitle-layer" class="subtitle-layer" aria-live="polite" aria-atomic="true">
     <span class="subtitle-en"></span>

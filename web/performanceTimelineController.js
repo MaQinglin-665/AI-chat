@@ -185,31 +185,31 @@
   const THOUGHT_BURST_CHOREOGRAPHY = {
     mutter: {
       motion: { pre: "micro_pulse", speech: "dry_speech_start", beats: ["deadpan_pause"], post: "settle_idle" },
-      voice: { delivery: "dry_mutter", pace: "measured", pause_profile: "mutter", segment_style: "one_liner", pre_pause_ms: 40, inter_segment_pause_ms: 180, max_segments: 1 }
+      voice: { delivery: "dry_mutter", pace: "measured", pause_profile: "mutter", segment_style: "one_liner", pre_pause_ms: 30, inter_segment_pause_ms: 90, max_segments: 1 }
     },
     aside: {
       motion: { pre: "side_eye", speech: "dry_speech_start", beats: ["blink_pulse"], post: "settle_idle" },
-      voice: { delivery: "dry_playful", pace: "measured", pause_profile: "dry_beat", segment_style: "two_beat", pre_pause_ms: 80, inter_segment_pause_ms: 220, max_segments: 2 }
+      voice: { delivery: "dry_playful", pace: "measured", pause_profile: "dry_beat", segment_style: "two_beat", pre_pause_ms: 40, inter_segment_pause_ms: 120, max_segments: 2 }
     },
     tiny_rant: {
       motion: { pre: "side_eye", speech: "dry_speech_start", beats: ["deadpan_pause", "head_tilt", "idle_fidget"], post: "settle_idle" },
-      voice: { delivery: "dry_playful", pace: "varied", pause_profile: "thought_burst_beats", segment_style: "thought_burst_beats", pre_pause_ms: 120, inter_segment_pause_ms: 280, max_segments: 4 }
+      voice: { delivery: "dry_playful", pace: "varied", pause_profile: "thought_burst_beats", segment_style: "thought_burst_beats", pre_pause_ms: 60, inter_segment_pause_ms: 140, max_segments: 4 }
     },
     callback: {
       motion: { pre: "blink_pulse", speech: "expressive_speech_start", beats: ["side_eye", "tiny_nod"], post: "settle_idle" },
-      voice: { delivery: "bit_pop", pace: "playful", pause_profile: "callback", segment_style: "two_beat", pre_pause_ms: 60, inter_segment_pause_ms: 220, max_segments: 2 }
+      voice: { delivery: "bit_pop", pace: "playful", pause_profile: "callback", segment_style: "two_beat", pre_pause_ms: 30, inter_segment_pause_ms: 120, max_segments: 2 }
     },
     mock_defense: {
       motion: { pre: "embarrassed_recovery", speech: "dry_speech_start", beats: ["deadpan_pause", "tiny_nod"], post: "settle_idle" },
-      voice: { delivery: "dry_recovery", pace: "short_pause", pause_profile: "awkward_beat", segment_style: "two_beat", pre_pause_ms: 140, inter_segment_pause_ms: 260, max_segments: 3 }
+      voice: { delivery: "dry_recovery", pace: "short_pause", pause_profile: "awkward_beat", segment_style: "two_beat", pre_pause_ms: 70, inter_segment_pause_ms: 140, max_segments: 3 }
     },
     celebration: {
       motion: { pre: "happy_pulse", speech: "bright_speech_start", beats: ["tiny_victory_nod", "blink_pulse"], post: "settle_idle" },
-      voice: { delivery: "bright_pop", pace: "bright", pause_profile: "celebration_beats", segment_style: "two_beat", pre_pause_ms: 30, inter_segment_pause_ms: 200, max_segments: 2 }
+      voice: { delivery: "bright_pop", pace: "bright", pause_profile: "celebration_beats", segment_style: "two_beat", pre_pause_ms: 20, inter_segment_pause_ms: 110, max_segments: 2 }
     },
     topic_spark: {
       motion: { pre: "head_tilt", speech: "curious_speech_start", beats: ["side_eye", "head_tilt", "idle_fidget"], post: "settle_idle" },
-      voice: { delivery: "dry_playful", pace: "varied", pause_profile: "tangent_beat", segment_style: "thought_burst_beats", pre_pause_ms: 80, inter_segment_pause_ms: 240, max_segments: 3 }
+      voice: { delivery: "dry_playful", pace: "varied", pause_profile: "tangent_beat", segment_style: "thought_burst_beats", pre_pause_ms: 40, inter_segment_pause_ms: 130, max_segments: 3 }
     }
   };
 
@@ -698,8 +698,8 @@
         pace: "slow",
         pause_profile: "gentle",
         segment_style: "short_soft",
-        pre_pause_ms: 120,
-        inter_segment_pause_ms: 360,
+        pre_pause_ms: 60,
+        inter_segment_pause_ms: 140,
         max_segments: 2,
         suppressed_reasons: ["comfort_no_voice_bits"]
       });
@@ -710,8 +710,8 @@
         pace: "slow",
         pause_profile: "final",
         segment_style: "one_liner",
-        pre_pause_ms: 80,
-        inter_segment_pause_ms: 260,
+        pre_pause_ms: 40,
+        inter_segment_pause_ms: 120,
         max_segments: 1,
         suppressed_reasons: ["closing_no_extra_voice"]
       });
@@ -722,8 +722,8 @@
         pace: "steady",
         pause_profile: "clean",
         segment_style: intent === "task_help" ? "step_then_aside" : "one_liner",
-        pre_pause_ms: 40,
-        inter_segment_pause_ms: 220,
+        pre_pause_ms: 20,
+        inter_segment_pause_ms: 120,
         max_segments: intent === "task_help" ? 2 : 1,
         suppressed_reasons: [intent === "task_help" ? "task_steady_voice" : "reminder_clear_voice"]
       });
@@ -734,8 +734,8 @@
         pace: "varied",
         pause_profile: "beat",
         segment_style: "mini_rant_beats",
-        pre_pause_ms: 80,
-        inter_segment_pause_ms: 260,
+        pre_pause_ms: 40,
+        inter_segment_pause_ms: 140,
         max_segments: 3
       });
     }
@@ -745,8 +745,8 @@
         pace: "steady_playful",
         pause_profile: "answer_then_bit",
         segment_style: "answer_then_bit",
-        pre_pause_ms: 20,
-        inter_segment_pause_ms: 220,
+        pre_pause_ms: 10,
+        inter_segment_pause_ms: 120,
         max_segments: 2
       });
     }
@@ -755,8 +755,8 @@
       pace: opening === "deadpan_aside" ? "measured" : "normal",
       pause_profile: opening === "deadpan_aside" ? "dry_beat" : "light",
       segment_style: opening === "deadpan_aside" ? "two_beat" : "whole",
-      pre_pause_ms: opening === "deadpan_aside" ? 80 : 0,
-      inter_segment_pause_ms: 200,
+      pre_pause_ms: opening === "deadpan_aside" ? 40 : 0,
+      inter_segment_pause_ms: 110,
       max_segments: opening === "deadpan_aside" ? 2 : 1
     });
   }

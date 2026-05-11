@@ -45,6 +45,7 @@ LIVE2D_HINTS = {
 INTENT_PRIORITIES = {
     "comfort": 100,
     "reminder": 90,
+    "feedback": 85,
     "closing": 80,
     "task_help": 70,
     "encouragement": 60,
@@ -87,6 +88,14 @@ INTENT_OUTPUT_CONSTRAINTS = {
         "allow_teasing": False,
         "allow_motion": True,
         "voice_style": "serious",
+    },
+    "feedback": {
+        "max_sentences": 2,
+        "allow_followup_question": False,
+        "clarify_only_when_needed": False,
+        "allow_teasing": False,
+        "allow_motion": True,
+        "voice_style": "neutral",
     },
     "closing": {
         "max_sentences": 2,
@@ -142,7 +151,7 @@ SESSION_RESET_AFTER_SEC = 30 * 60
 SESSION_SOFT_DECAY_AFTER_SEC = 10 * 60
 STAGE_CALLBACK_COOLDOWN_TURNS = 2
 IMPROV_HIGH_CHAOS_INTENTS = {"greeting", "casual", "question", "encouragement", "thought_burst"}
-IMPROV_SAFE_CLAMP_INTENTS = {"comfort", "reminder", "closing", "low_interrupt_checkin"}
+IMPROV_SAFE_CLAMP_INTENTS = {"comfort", "reminder", "feedback", "closing", "low_interrupt_checkin"}
 
 STYLE_BEATS = {
     "greeting": [
@@ -168,6 +177,10 @@ STYLE_BEATS = {
     "reminder": [
         ("clean_ping", "confirm like a clean little desktop ping"),
         ("serious_nod", "be clear, calm, and lightly serious"),
+    ],
+    "feedback": [
+        ("grounded_repair", "acknowledge the user's wording feedback and answer more plainly"),
+        ("weirdness_down", "turn the weirdness down without becoming formal"),
     ],
     "closing": [
         ("pixel_watch", "close softly while promising quiet pixel supervision"),
@@ -197,6 +210,7 @@ REACTION_MODES = {
     "tangent_spark": "take one brief weird association, then land back on the user's point",
     "soft_anchor": "be quietly present and specific; no jokes at the user's expense",
     "task_snap": "pick the next useful move fast, with no ceremony or motivational fog",
+    "grounding_repair": "acknowledge wording feedback plainly; lower the bit density and sound like a person",
     "clean_ping": "confirm clearly like a small system ping with personality",
     "fade_out": "end softly with one characterful last image and no new hook",
     "easy_ignore": "one optional line, effortless to ignore",
@@ -336,6 +350,30 @@ def _is_next_step_request(user_message: str) -> bool:
     )
 
 
+def _is_style_feedback_message(user_message: str) -> bool:
+    text = _clean_text(user_message, 300).lower()
+    compact = re.sub(r"\s+", "", text)
+    if not text:
+        return False
+    if re.search(
+        r"(what are you talking about|that made no sense|this makes no sense|too abstract|sounds random|"
+        r"you sound weird|that was weird|not human|more human|speak normally|talk normally|less weird|"
+        r"your reply|your answer|what you said|you said).{0,80}"
+        r"(weird|strange|odd|confusing|random|nonsense|abstract|robot|ai|customer service)",
+        text,
+    ):
+        return True
+    return bool(
+        re.search(
+            r"(说人话|不像人话|人话味|ai味|机器人味|客服味|莫名其妙|听不懂|看不懂|答非所问|不自然|"
+            r"太抽象|很抽象|抽象|跑题|随机|乱说)",
+            text,
+        )
+        or re.search(r"(你的|你这|你刚才|你说的|回复|回答|想法).{0,12}(好奇特|奇怪|很怪|怪怪|离谱|抽象)", text)
+        or re.search(r"(你的想法|你这想法|你刚才说的).{0,16}(curious|weird|strange|odd)", compact)
+    )
+
+
 def _history_tail_text(history: Iterable[Any], max_items: int = 4) -> str:
     if not isinstance(history, list):
         return ""
@@ -353,6 +391,8 @@ def _history_tail_text(history: Iterable[Any], max_items: int = 4) -> str:
 def _derive_topic(user_message: str, intent: str) -> str:
     text = _clean_text(user_message, 300).lower()
     compact = re.sub(r"\s+", "", text)
+    if intent == "feedback":
+        return "persona_feedback"
     if intent == "comfort":
         return "emotional_support"
     if re.search(r"(voice|tts|asr|live2d|motion|expression|speech|sentence)", compact):
@@ -404,6 +444,8 @@ def _select_reaction_mode(
     flags = _experience_flags(experience_profile)
     if safe_intent == "comfort":
         key, level = "soft_anchor", 0
+    elif safe_intent == "feedback":
+        key, level = "grounding_repair", 0
     elif safe_intent == "closing":
         key, level = "fade_out", 0
     elif safe_intent == "reminder":
@@ -444,6 +486,8 @@ def _select_performance_bit(intent: str, topic: str, user_message: str, reaction
     safe_intent = _clean_text(intent, 40) or "casual"
     if safe_intent == "comfort":
         key = "room_anchor"
+    elif safe_intent == "feedback":
+        key = "none"
     elif safe_intent == "closing":
         key = "pixel_watch"
     elif safe_intent == "reminder":
@@ -530,6 +574,8 @@ def _public_stage_memory(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def _agenda_for_turn(intent: str, topic: str, user_message: str) -> str:
+    if intent == "feedback" or _is_style_feedback_message(user_message):
+        return "ground_the_voice"
     if _is_correction_message(user_message):
         return "repair_the_bit"
     if intent == "task_help" or topic == "planning":
@@ -578,6 +624,8 @@ def _select_improv_director(
 
     if safe_intent == "comfort":
         stance = "soft_hold"
+    elif safe_intent == "feedback":
+        stance = "grounded_repair"
     elif safe_intent == "reminder":
         stance = "clean_confirm"
     elif safe_intent == "closing":
@@ -738,8 +786,8 @@ THOUGHT_BURST_VOICE_PLANS: Dict[str, Dict[str, Any]] = {
         "pace": "measured",
         "pause_profile": "mutter",
         "segment_style": "one_liner",
-        "pre_pause_ms": 40,
-        "inter_segment_pause_ms": 180,
+        "pre_pause_ms": 30,
+        "inter_segment_pause_ms": 90,
         "max_segments": 1,
     },
     "aside": {
@@ -747,8 +795,8 @@ THOUGHT_BURST_VOICE_PLANS: Dict[str, Dict[str, Any]] = {
         "pace": "measured",
         "pause_profile": "dry_beat",
         "segment_style": "two_beat",
-        "pre_pause_ms": 80,
-        "inter_segment_pause_ms": 220,
+        "pre_pause_ms": 40,
+        "inter_segment_pause_ms": 120,
         "max_segments": 2,
     },
     "tiny_rant": {
@@ -756,8 +804,8 @@ THOUGHT_BURST_VOICE_PLANS: Dict[str, Dict[str, Any]] = {
         "pace": "varied",
         "pause_profile": "thought_burst_beats",
         "segment_style": "thought_burst_beats",
-        "pre_pause_ms": 120,
-        "inter_segment_pause_ms": 280,
+        "pre_pause_ms": 60,
+        "inter_segment_pause_ms": 140,
         "max_segments": 4,
     },
     "callback": {
@@ -765,8 +813,8 @@ THOUGHT_BURST_VOICE_PLANS: Dict[str, Dict[str, Any]] = {
         "pace": "playful",
         "pause_profile": "callback",
         "segment_style": "two_beat",
-        "pre_pause_ms": 60,
-        "inter_segment_pause_ms": 220,
+        "pre_pause_ms": 30,
+        "inter_segment_pause_ms": 120,
         "max_segments": 2,
     },
     "mock_defense": {
@@ -774,8 +822,8 @@ THOUGHT_BURST_VOICE_PLANS: Dict[str, Dict[str, Any]] = {
         "pace": "short_pause",
         "pause_profile": "awkward_beat",
         "segment_style": "two_beat",
-        "pre_pause_ms": 140,
-        "inter_segment_pause_ms": 260,
+        "pre_pause_ms": 70,
+        "inter_segment_pause_ms": 140,
         "max_segments": 3,
     },
     "celebration": {
@@ -783,8 +831,8 @@ THOUGHT_BURST_VOICE_PLANS: Dict[str, Dict[str, Any]] = {
         "pace": "bright",
         "pause_profile": "celebration_beats",
         "segment_style": "two_beat",
-        "pre_pause_ms": 30,
-        "inter_segment_pause_ms": 200,
+        "pre_pause_ms": 20,
+        "inter_segment_pause_ms": 110,
         "max_segments": 2,
     },
     "topic_spark": {
@@ -792,8 +840,8 @@ THOUGHT_BURST_VOICE_PLANS: Dict[str, Dict[str, Any]] = {
         "pace": "varied",
         "pause_profile": "tangent_beat",
         "segment_style": "thought_burst_beats",
-        "pre_pause_ms": 80,
-        "inter_segment_pause_ms": 240,
+        "pre_pause_ms": 40,
+        "inter_segment_pause_ms": 130,
         "max_segments": 3,
     },
 }
@@ -854,6 +902,9 @@ def _select_motion_director(decision: Dict[str, Any]) -> Dict[str, Any]:
     elif intent == "reminder":
         pre, speech, beats, post = "tiny_nod", "steady_speech_start", [], "focused_idle"
         suppressed.append("reminder_no_extra_beats")
+    elif intent == "feedback":
+        pre, speech, beats, post = "tiny_nod", "steady_speech_start", [], "settle_idle"
+        suppressed.append("feedback_no_extra_bits")
     elif intent == "closing":
         pre, speech, beats, post = "no_opening", "closing_speech_start", [], "closing_idle"
         suppressed.append("closing_no_extra_beats")
@@ -947,42 +998,46 @@ def _select_voice_director(decision: Dict[str, Any]) -> Dict[str, Any]:
         suppressed.append("thought_burst_choreography")
     elif intent == "comfort":
         delivery, pace, pause_profile, segment_style = "soft_low", "slow", "gentle", "short_soft"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 120, 360, 2
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 60, 140, 2
         suppressed.append("comfort_no_voice_bits")
     elif intent == "low_interrupt_checkin":
         delivery, pace, pause_profile, segment_style = "soft_low", "slow", "gentle", "one_liner"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 80, 260, 1
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 120, 1
         suppressed.append("low_interrupt_one_line_voice")
     elif intent == "reminder":
         delivery, pace, pause_profile, segment_style = "steady_clear", "steady", "clean", "one_liner"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 180, 1
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 20, 100, 1
         suppressed.append("reminder_clear_voice")
+    elif intent == "feedback":
+        delivery, pace, pause_profile, segment_style = "steady_clear", "measured", "grounded", "two_beat"
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 30, 120, 2
+        suppressed.append("feedback_no_voice_bits")
     elif intent == "closing":
         delivery, pace, pause_profile, segment_style = "soft_close", "slow", "final", "one_liner"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 80, 260, 1
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 120, 1
         suppressed.append("closing_no_extra_voice")
     elif intent == "task_help":
         delivery, pace, pause_profile, segment_style = "steady_clear", "steady", "clean", "step_then_aside"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 220, 2
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 20, 120, 2
         suppressed.append("task_steady_voice")
     elif improv["stance"] == "mock_defensive_repair" or motion["correction_reaction"] != "none":
         delivery, pace, pause_profile, segment_style = "dry_recovery", "short_pause", "awkward_beat", "two_beat"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 140, 260, 2
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 70, 140, 2
     elif intent == "encouragement":
         delivery, pace, pause_profile, segment_style = "bright_pop", "bright", "quick", "two_beat"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 220, 2
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 20, 120, 2
     elif shape == "mini_rant":
         delivery, pace, pause_profile, segment_style = "dry_playful", "varied", "beat", "mini_rant_beats"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 80, 260, 3
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 140, 3
     elif shape == "bit_then_answer":
         delivery, pace, pause_profile, segment_style = "bit_pop", "playful", "quick", "bit_then_answer"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 220, 2
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 20, 120, 2
     elif shape == "answer_then_bit":
         delivery, pace, pause_profile, segment_style = "answer_first", "steady_playful", "answer_then_bit", "answer_then_bit"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 20, 220, 2
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 10, 120, 2
     elif opening == "deadpan_aside" or reaction == "deadpan_aside":
         delivery, pace, pause_profile, segment_style = "dry_playful", "measured", "dry_beat", "two_beat"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 80, 240, 2
+        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 130, 2
 
     if constraints["voice_style"] == "soft" and intent not in {"comfort", "closing", "low_interrupt_checkin"}:
         delivery = "soft_clear"
@@ -1089,6 +1144,8 @@ def _select_performance_controls(
         opening, shape, spontaneity, question_policy = "no_opening", "one_liner", 0, "none"
     elif safe_intent == "reminder":
         opening, shape, spontaneity, question_policy = "answer_first", "one_liner", 0, "none"
+    elif safe_intent == "feedback":
+        opening, shape, spontaneity, question_policy = "answer_first", "two_beat", 0, "none"
     elif safe_intent == "low_interrupt_checkin":
         opening, shape, spontaneity, question_policy = "no_opening", "one_liner", 0, "none"
     elif safe_intent == "thought_burst":
@@ -1128,6 +1185,7 @@ def _select_performance_controls(
 def _need_for_intent(intent: str) -> str:
     return {
         "comfort": "reassurance",
+        "feedback": "grounding",
         "task_help": "direction",
         "question": "answer",
         "encouragement": "closure",
@@ -1142,6 +1200,8 @@ def _need_for_intent(intent: str) -> str:
 def _baseline_for_intent(intent: str, previous: Optional[str] = None) -> str:
     if intent == "comfort":
         return "concerned"
+    if intent == "feedback":
+        return "calm"
     if intent == "task_help":
         return "focused"
     if intent in {"greeting", "encouragement"}:
@@ -1162,6 +1222,8 @@ def _relationship_tone_for_intent(
         return "careful"
     if intent == "comfort":
         return "gentle"
+    if intent == "feedback":
+        return "careful"
     if intent == "task_help":
         return "steady_coach"
     if intent == "encouragement":
@@ -1445,6 +1507,8 @@ def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str,
         120,
         text,
     )
+    if _is_style_feedback_message(user_message):
+        scores["feedback"] += 125
     add_if(
         r"(nextstep|whatshouldidonext|whatdoidonext|whatnext|nexttodo|todo|roadmap|priority)",
         "task_help",
@@ -1608,14 +1672,21 @@ def _character_flavor_directive(intent: str, topic: str = "") -> str:
     intent = _clean_text(intent, 40)
     topic = _clean_text(topic, 40)
     base = (
-        "Write natural spoken English as Taffy, an original desktop AI companion with a quick, slightly odd inner life. "
+        "Write natural spoken English as Xinyu (馨语), an original desktop AI companion with a quick, slightly odd inner life. "
+        "Avoid empty helper phrases. "
+        "If her name comes up, use Xinyu or 馨语. Ignore older placeholder names from prior context. "
         "Keep it useful, but add one alive detail: a tiny opinion, dry aside, or concrete image. "
-        "Avoid empty helper phrases like 'great job', 'take it easy', 'sweet dreams', 'you've got this', or 'I'm here to help' unless you twist them into something character-specific."
+        "Phrases like 'great job', 'take it easy', 'sweet dreams', 'you've got this', or 'I'm here to help' need a character-specific twist."
     )
     if intent == "comfort":
         return (
             base
             + " For comfort, do not perform therapy or motivational speeches; sound quietly present, a little weird-soft, and specific to this moment."
+        )
+    if intent == "feedback":
+        return (
+            base
+            + " For feedback about your wording, drop the bit first: admit the previous line got too abstract, then answer in plain spoken English."
         )
     if intent == "encouragement":
         return (
@@ -1633,7 +1704,7 @@ def _character_flavor_directive(intent: str, topic: str = "") -> str:
             + " For task help, choose one concrete next move and add a dry little supervisor aside, not a checklist unless asked."
         )
     if intent == "closing":
-        return base + " For closing, make it soft but unmistakably Taffy; no fresh advice and no question."
+        return base + " For closing, make it soft but unmistakably Xinyu; no fresh advice and no question."
     if intent == "greeting":
         return base + " For greetings, skip assistant enthusiasm; arrive like she was already on the desktop thinking about something unnecessary."
     if intent == "low_interrupt_checkin":
@@ -1755,6 +1826,22 @@ def build_character_brain_decision(
             voice_style="serious",
             directive="Confirm the reminder clearly and briefly; do not overperform.",
         )
+    elif intent == "feedback":
+        decision.update(
+            energy="steady",
+            reply_style="grounded_repair",
+            max_sentences=2,
+            emotion="thinking",
+            action="nod",
+            intensity="low",
+            voice_style="neutral",
+            live2d_hint="idle_relaxed",
+            directive=(
+                "The user is reacting to Xinyu's wording or saying it felt strange. "
+                "Acknowledge that plainly, lightly self-correct, and answer more grounded. "
+                "Do not add desktop/process/cursor/keyboard/pixel bits in this turn."
+            ),
+        )
     elif intent == "closing":
         decision.update(
             energy="soft",
@@ -1827,7 +1914,7 @@ def build_character_brain_decision(
             intensity="normal",
             voice_style=voice_style,
             directive=(
-                "This is Taffy thinking out loud, not answering a user request. "
+                "This is Xinyu thinking out loud, not answering a user request. "
                 "Let the thought be as long as it naturally needs within the budget, then stop. "
                 "No customer-service closer, no follow-up question, no tool or desktop-observation claim."
             ),
@@ -2149,6 +2236,8 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
         return "Go sleep. I'll keep the pixels under questionable supervision."
     if intent == "comfort":
         return "Yeah, you're on low battery right now. Stay still for a second; I'll keep the room company."
+    if intent == "feedback":
+        return "Fair, that came out too abstract. I'll keep it more grounded and direct."
     if intent == "encouragement":
         if re.search(r"(done|finished|completed|shipped|fixed|madeit|wrappedup|\u505a\u5b8c\u4e86|\u5b8c\u6210\u4e86|\u641e\u5b9a\u4e86|\u4fee\u597d\u4e86)", compact):
             return "Look at you, actually finishing the thing. Suspiciously competent."
@@ -2290,6 +2379,14 @@ def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str
     )
     if _contains_cjk_text(text):
         return True
+    if intent == "feedback" or _is_style_feedback_message(user_message):
+        if _contains_performance_bit_language(text):
+            return True
+        if re.search(r"\b(background process|desktop air|system ping|tiny static|clipboard supervisor)\b", lower):
+            return True
+        if lower.rstrip().endswith("?"):
+            return True
+        return False
     if is_correction:
         if task_bleed:
             return True

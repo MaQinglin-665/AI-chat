@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "name": "default-chibi-pack",
+  "items": [
+    {
+      "id": "hello",
+      "label": "\u6253\u62db\u547c",
+      "mood": "happy",
+      "src": "./assets/stickers/default/hello.png"
+    },
+    {
+      "id": "happy",
+      "label": "\u5f00\u5fc3",
+      "mood": "happy",
+      "src": "./assets/stickers/default/happy.png"
+    },
+    {
+      "id": "love",
+      "label": "\u559c\u6b22",
+      "mood": "happy",
+      "src": "./assets/stickers/default/love.png"
+    },
+    {
+      "id": "sleepy",
+      "label": "\u56f0\u56f0",
+      "mood": "sleepy",
+      "src": "./assets/stickers/default/sleepy.png"
+    },
+    {
+      "id": "thinking",
+      "label": "\u601d\u8003",
+      "mood": "idle",
+      "src": "./assets/stickers/default/thinking.png"
+    },
+    {
+      "id": "surprised",
+      "label": "\u60ca\u8bb6",
+      "mood": "surprised",
+      "src": "./assets/stickers/default/surprised.png"
+    },
+    {
+      "id": "sad",
+      "label": "\u59d4\u5c48",
+      "mood": "sad",
+      "src": "./assets/stickers/default/sad.png"
+    },
+    {
+      "id": "cheer",
+      "label": "\u52a0\u6cb9",
+      "mood": "happy",
+      "src": "./assets/stickers/default/cheer.png"
+    }
+  ]
+}

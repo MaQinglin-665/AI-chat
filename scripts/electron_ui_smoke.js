@@ -28,7 +28,7 @@ const RUN_V14_DEMO = process.argv.includes("--v14-demo")
 const V14_DEMO_SCENES = [
   {
     id: "welcome",
-    input: "Hi Taffy, are you there?",
+    input: "Hi Xinyu, are you there?",
     expectedIntent: "greeting",
     expectedVoice: "cheerful",
     expectedAction: "wave"
@@ -363,6 +363,183 @@ async function openMore(win) {
   );
 }
 
+async function getMorePanelInfo(win) {
+  return evalIn(win, `(() => {
+    const rect = (el) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: Math.round(r.x),
+        y: Math.round(r.y),
+        width: Math.round(r.width),
+        height: Math.round(r.height)
+      };
+    };
+    const item = (el) => {
+      if (!el) return null;
+      const style = getComputedStyle(el);
+      const box = rect(el);
+      const centerX = box ? box.x + Math.max(1, Math.floor(box.width / 2)) : 0;
+      const centerY = box ? box.y + Math.max(1, Math.floor(box.height / 2)) : 0;
+      const top = box ? document.elementFromPoint(centerX, centerY) : null;
+      return {
+        id: el.id || "",
+        className: el.className || "",
+        text: (el.innerText || el.textContent || "").trim(),
+        hidden: !!el.hidden,
+        display: style.display,
+        visibility: style.visibility,
+        opacity: style.opacity,
+        topElement: top ? {
+          id: top.id || "",
+          className: top.className || "",
+          tagName: top.tagName || "",
+          text: (top.innerText || top.textContent || "").trim().slice(0, 60)
+        } : null,
+        rect: box
+      };
+    };
+    const advanced = document.getElementById("advanced-actions");
+    const more = document.getElementById("more-btn");
+    return {
+      more: item(more),
+      advanced: item(advanced),
+      groups: Array.from(advanced?.querySelectorAll(".advanced-actions-group") || []).map(item),
+      buttons: Array.from(advanced?.querySelectorAll("button") || []).map(item)
+    };
+  })()`);
+}
+
+async function getLearningPanelInfo(win) {
+  return evalIn(win, `(() => {
+    const byId = (id) => document.getElementById(id);
+    const rect = (el) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: Math.round(r.x),
+        y: Math.round(r.y),
+        width: Math.round(r.width),
+        height: Math.round(r.height)
+      };
+    };
+    const drawer = byId("learning-review-drawer");
+    const list = byId("learning-review-list");
+    const firstCard = list?.querySelector(".learning-item") || null;
+    return {
+      visible: !!drawer && !drawer.hidden && getComputedStyle(drawer).display !== "none",
+      title: byId("learning-title")?.textContent?.trim() || "",
+      stats: {
+        candidates: byId("learning-stat-candidates")?.textContent?.trim() || "",
+        samples: byId("learning-stat-samples")?.textContent?.trim() || "",
+        visible: byId("learning-stat-visible")?.textContent?.trim() || "",
+        pool: byId("learning-active-pool-label")?.textContent?.trim() || ""
+      },
+      quickSettingsVisible: !!byId("learning-quick-inject") || !!byId("learning-quick-support"),
+      filterPlaceholder: byId("learning-filter-keyword")?.getAttribute("placeholder") || "",
+      listRect: rect(list),
+      itemCount: list ? list.querySelectorAll(".learning-item").length : 0,
+      firstCardExpanded: firstCard ? !firstCard.classList.contains("is-collapsed") : null,
+      bodyText: drawer?.innerText?.slice(0, 1200) || ""
+    };
+  })()`);
+}
+
+async function openLearningPanel(win) {
+  await openMore(win);
+  await evalIn(win, `(() => {
+    const button = document.getElementById("learning-review-btn");
+    if (button) button.click();
+    return true;
+  })()`);
+  await poll(
+    win,
+    `(() => {
+      const drawer = document.getElementById("learning-review-drawer");
+      return !!drawer && !drawer.hidden;
+    })()`,
+    Boolean,
+    5000,
+    "learning review drawer"
+  );
+  await wait(700);
+  return getLearningPanelInfo(win);
+}
+
+async function closeLearningPanel(win) {
+  await evalIn(win, `(() => {
+    const button = document.getElementById("learning-review-close-btn");
+    if (button) button.click();
+    const drawer = document.getElementById("learning-review-drawer");
+    if (drawer && !drawer.hidden) drawer.hidden = true;
+    return !!drawer?.hidden;
+  })()`);
+}
+
+async function getPersonaPanelInfo(win) {
+  return evalIn(win, `(() => {
+    const byId = (id) => document.getElementById(id);
+    const rect = (el) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: Math.round(r.x),
+        y: Math.round(r.y),
+        width: Math.round(r.width),
+        height: Math.round(r.height)
+      };
+    };
+    const modal = byId("persona-modal");
+    const dialog = modal?.querySelector(".persona-dialog") || null;
+    return {
+      visible: !!modal && !modal.hidden && getComputedStyle(modal).display !== "none",
+      title: byId("persona-title")?.textContent?.trim() || "",
+      hasCharacterName: !!byId("persona-character-name"),
+      characterNameValue: byId("persona-character-name")?.value || "",
+      hasUserAlias: !!byId("persona-user-alias"),
+      hasRelationshipRole: !!byId("persona-relationship-role"),
+      hasSpeakingStyle: !!byId("persona-speaking-style"),
+      hasTestButton: !!byId("persona-test-btn"),
+      duplicatePreviewButton: !!byId("persona-preview-btn"),
+      staticPreviewVisible: !!modal?.querySelector(".persona-mini-preview"),
+      dialogRect: rect(dialog),
+      scrollRect: rect(modal?.querySelector(".persona-scroll")),
+      bodyText: modal?.innerText?.slice(0, 1200) || ""
+    };
+  })()`);
+}
+
+async function openPersonaPanel(win) {
+  await openMore(win);
+  await evalIn(win, `(() => {
+    const button = document.getElementById("persona-btn");
+    if (button) button.click();
+    return true;
+  })()`);
+  await poll(
+    win,
+    `(() => {
+      const modal = document.getElementById("persona-modal");
+      return !!modal && !modal.hidden;
+    })()`,
+    Boolean,
+    5000,
+    "persona panel"
+  );
+  await wait(500);
+  return getPersonaPanelInfo(win);
+}
+
+async function closePersonaPanel(win) {
+  await evalIn(win, `(() => {
+    const button = document.getElementById("persona-close-btn");
+    if (button) button.click();
+    const modal = document.getElementById("persona-modal");
+    if (modal && !modal.hidden) modal.hidden = true;
+    return !!modal?.hidden;
+  })()`);
+}
+
 async function getAssistantMessages(win) {
   return evalIn(win, `(() => Array.from(document.querySelectorAll(".message.assistant .content"))
     .map((item) => item.innerText.trim())
@@ -586,12 +763,12 @@ async function runDebugCommandSmoke(win, results) {
   await waitForChatIdle(win, 15000);
 
   const beforeDoctor = await sendInput(win, "/doctor");
-  const doctorMessages = await waitForAssistantMessage(win, beforeDoctor, "链路自检完成", 45000, "/doctor report");
+  const doctorMessages = await waitForAssistantMessage(win, beforeDoctor, "故障自检完成", 45000, "/doctor report");
   const doctorText = String(doctorMessages[doctorMessages.length - 1] || doctorMessages.join("\n"));
   const doctorTokenLeak = /(?:api[_-]?key|token)\s*[:=]\s*[\w.-]{12,}/i.test(doctorText);
   results.doctor = {
-    ok: doctorText.includes("链路自检完成") && !doctorTokenLeak,
-    coreOk: doctorText.includes("链路自检完成：核心功能正常。"),
+    ok: doctorText.includes("故障自检完成") && !doctorTokenLeak,
+    coreOk: doctorText.includes("故障自检完成：核心功能正常。"),
     tokenLeak: doctorTokenLeak,
     reportTail: doctorText.slice(-1000)
   };
@@ -620,19 +797,30 @@ async function runChatSmoke(win, results) {
 }
 
 async function runFeedbackSmoke(win, results) {
-  await openMore(win);
+  const clickFeedback = (rating) => `(() => {
+    const rows = Array.from(document.querySelectorAll(".message.assistant")).reverse();
+    for (const row of rows) {
+      const button = row.querySelector(\`.message-feedback-btn[data-feedback="${rating}"]\`);
+      if (!button) continue;
+      const style = getComputedStyle(button);
+      if (style.display === "none" || style.visibility === "hidden") continue;
+      button.click();
+      return true;
+    }
+    return false;
+  })()`;
   const beforeGood = await getAssistantMessages(win);
-  await evalIn(win, `document.getElementById("character-feedback-good-btn")?.click(); true`);
+  const goodClicked = await evalIn(win, clickFeedback("good"));
   const goodMessages = await waitForAssistantMessage(win, beforeGood, "", 5000, "good feedback");
 
   const beforeBad = await getAssistantMessages(win);
-  await evalIn(win, `document.getElementById("character-feedback-bad-btn")?.click(); true`);
+  const badClicked = await evalIn(win, clickFeedback("bad"));
   const badMessages = await waitForAssistantMessage(win, beforeBad, "", 5000, "bad feedback");
   const feedbackText = `${goodMessages.join("\n")}\n${badMessages.join("\n")}`;
 
   results.feedback = {
-    goodResponded: goodMessages.length > beforeGood.length,
-    badResponded: badMessages.length > beforeBad.length,
+    goodResponded: goodClicked && goodMessages.length > beforeGood.length,
+    badResponded: badClicked && badMessages.length > beforeBad.length,
     hasNoPerformanceWarning: feedbackText.includes("还没有可评价的角色表现")
   };
 }
@@ -681,6 +869,24 @@ async function main() {
     await wait(500);
     results.chat = await getChatInfo(chatWin);
     results.screenshots.push(await capture(chatWin, "chat-initial.png"));
+    await openMore(chatWin);
+    await wait(250);
+    results.morePanel = await getMorePanelInfo(chatWin);
+    results.screenshots.push(await capture(chatWin, "chat-more-open.png"));
+    chatWin.setSize(800, 900);
+    await wait(300);
+    results.learningPanel = await openLearningPanel(chatWin);
+    results.screenshots.push(await capture(chatWin, "learning-review-panel.png"));
+    await closeLearningPanel(chatWin);
+    results.personaPanel = await openPersonaPanel(chatWin);
+    results.screenshots.push(await capture(chatWin, "persona-panel.png"));
+    await closePersonaPanel(chatWin);
+    await evalIn(chatWin, `(() => {
+      const more = document.getElementById("more-btn");
+      const advanced = document.getElementById("advanced-actions");
+      if (advanced && !advanced.hidden && more) more.click();
+      return !!advanced?.hidden;
+    })()`);
 
     if (RUN_V14_DEMO) {
       await runV14DemoSmoke(chatWin, results);
@@ -706,6 +912,35 @@ async function main() {
     const failures = [];
     if (!results.chat.chatInput || !results.chat.sendBtn || !results.chat.chatLog) {
       failures.push("chat controls missing");
+    }
+    if (
+      !results.morePanel?.advanced
+      || results.morePanel.advanced.hidden
+      || results.morePanel.advanced.display === "none"
+      || Number(results.morePanel.advanced.opacity || 0) < 0.95
+    ) {
+      failures.push("more panel did not open as a visible full-opacity drawer");
+    }
+    const defaultDevVisible = (results.morePanel?.buttons || []).some((button) => (
+      ["followup-readiness-btn", "character-rehearsal-btn", "character-tuning-btn"].includes(button.id)
+      && button.display !== "none"
+    ));
+    if (defaultDevVisible) {
+      failures.push("developer diagnostics are visible in the default more panel");
+    }
+    if (!results.learningPanel?.visible || results.learningPanel.quickSettingsVisible) {
+      failures.push("memory management panel missing or still exposes quick tuning fields");
+    }
+    if (
+      !results.personaPanel?.visible
+      || !results.personaPanel.hasCharacterName
+      || !results.personaPanel.hasRelationshipRole
+      || !results.personaPanel.hasTestButton
+      || results.personaPanel.duplicatePreviewButton
+      || results.personaPanel.staticPreviewVisible
+      || /^回归检查-\d+$/.test(results.personaPanel.characterNameValue || "")
+    ) {
+      failures.push("persona panel missing redesigned functional fields");
     }
     if (results.chatTextSent && !results.normalChat.ok) {
       failures.push("normal chat returned an error");

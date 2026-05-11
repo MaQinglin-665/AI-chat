@@ -1,4 +1,4 @@
-﻿# Taffy AI Desktop Pet
+﻿# 馨语桌宠
 
 开源 Windows 桌面 AI 伙伴 / 桌面 AI VTuber 实验项目。
 
@@ -66,9 +66,9 @@ requirements-dev.txt
 
 ## Quick Start
 
-### Fastest Taffy Preview Path
+### Fastest 馨语 Preview Path
 
-如果你只是想体验当前 `v1.4.0-preview` 的 Taffy AI VTuber feeling，请走这条最短路径：
+如果你只是想体验当前 `v1.4.0-preview` 的馨语桌宠 AI VTuber feeling，请走这条最短路径：
 
 ```powershell
 .\prepare_preview_environment.bat
@@ -81,11 +81,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 
 如果你下载的是 Release source-test zip，解压后可以先看 `START_HERE.txt`。它只保留体验者需要的最短步骤和安全提醒。
 
-`prepare_preview_environment.bat` 会尽量一键完成环境准备：检查/安装 Python 与 Node.js、创建 `.venv`、安装 Python / Electron 依赖、初始化 `config.json` / `.env`，并应用 Taffy preview 体验配置。
+`prepare_preview_environment.bat` 会尽量一键完成环境准备：检查/安装 Python 与 Node.js、创建 `.venv`、安装 Python / Electron 依赖、初始化 `config.json` / `.env`，并应用馨语 preview 体验配置。
 
-`apply-preview-experience-config.ps1` 会把本地体验切到 Taffy 英文角色、Character Runtime、动作/语音 cue 和低风险主动插话配置；它不会写入 API Key，也不会开启桌面观察、截图、文件读取、工具调用或 shell。
+`apply-preview-experience-config.ps1` 会把本地体验切到馨语 / Xinyu 英文角色、Character Runtime、动作/语音 cue 和低风险主动插话配置；它不会写入 API Key，也不会开启桌面观察、截图、文件读取、工具调用或 shell。
 
-模型质量和延迟会直接影响角色感。如果 `model_acceptance_probe` 成功率低于 80%，或日常单轮经常超过 15 秒，请先换更快更稳定的模型，再评价 Taffy 的 AI VTuber 体验。
+模型质量和延迟会直接影响角色感。如果 `model_acceptance_probe` 成功率低于 80%，或日常单轮经常超过 15 秒，请先换更快更稳定的模型，再评价馨语的 AI VTuber 体验。
 
 ### Recommended First Run
 
@@ -114,7 +114,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 
 模型由用户自行选择；项目不内置云端模型或 API Key。选择标准见 `docs/model-selection.md`：优先选择诊断通过、成功率 >= 80%、常态单轮 < 15 秒、英文输出稳定的模型。
 
-`apply-preview-experience-config.ps1` 会合并 `config.preview.example.json`，保留你已经配置好的 LLM provider / base URL / model / api_key_env，只应用 Taffy preview 的角色、TTS、动作和安全主动插话设置。
+`apply-preview-experience-config.ps1` 会合并 `config.preview.example.json`，保留你已经配置好的 LLM provider / base URL / model / api_key_env，只应用馨语 preview 的角色、TTS、动作和安全主动插话设置。
 
 `first_chat_smoke.ps1` 会检测或启动后端，检查 `/healthz` / `/api/health`，再进行轻量 LLM probe 和一条短 `/api/chat` 请求。想避免真实聊天请求时可加 `-SkipChat` 或 `-SkipLlmProbe`。
 
@@ -206,6 +206,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - v1.3 preview 发布说明草稿：`docs/release-notes-v1.3.0-preview.md`
 - v1.3 Character Runtime 检查脚本：`python scripts/check_character_runtime_v1_3.py`
 - v1.4 AI VTuber Feeling 检查脚本：`python scripts/check_character_v1_4.py`
+- 项目宣传素材与发布文案：`docs/promotion-kit.md`
 
 ## LLM / TTS / ASR / Live2D (Where to Configure)
 

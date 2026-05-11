@@ -230,6 +230,32 @@
     return "";
   }
 
+  function looksLikeLooseAssistantTextWrapperFragment(text) {
+    const safe = normalizeAssistantWrapperSource(text);
+    if (!safe) {
+      return false;
+    }
+    return /^(?:"text"|'text'|text|"message"|'message'|message|"content"|'content'|content|"output_text"|'output_text'|output_text)\s*:/i.test(safe);
+  }
+
+  function shouldHoldStreamSpeechBuffer(text, flush = false) {
+    if (flush) {
+      return false;
+    }
+    const safe = normalizeAssistantWrapperSource(text);
+    if (!safe) {
+      return false;
+    }
+    const hasCompletePayload = !!extractAssistantPayloadText(safe);
+    if (!hasCompletePayload && (looksLikeAssistantTextWrapperFragment(safe) || looksLikeLooseAssistantTextWrapperFragment(safe))) {
+      return true;
+    }
+    if (looksLikeEmptyAssistantTextWrapperFragment(safe)) {
+      return true;
+    }
+    return false;
+  }
+
   function stripAssistantPayloadNoise(text) {
     const raw = String(text || "");
     const payloadText = extractAssistantPayloadText(raw);
@@ -532,9 +558,12 @@
     const style = String(options.style || "neutral");
     const provider = String(options.provider || "").toLowerCase();
     const isGptSovits = provider === "gpt_sovits";
+    const segments = [];
+    if (shouldHoldStreamSpeechBuffer(buffer, flush)) {
+      return { segments, rest: String(buffer || "") };
+    }
     const raw = parseToolMetaVisibleText(buffer);
     const src = simplifySpeechDeliveryText(raw, style, true);
-    const segments = [];
     if (!src) {
       return { segments, rest: "" };
     }
@@ -620,12 +649,12 @@
     const commaCount = (clean.match(/[，,、]/g) || []).length;
     const exclaimCount = (clean.match(/[!！]/g) || []).length;
 
-    let speed = 1.04;
+    let speed = 0.96;
     let pitch = 0.99;
     let volume = 1.0;
 
-    if (textLen > 36) speed -= 0.02;
-    if (textLen < 12) speed += 0.02;
+    if (textLen > 36) speed -= 0.01;
+    if (textLen < 12) speed += 0.01;
     if (commaCount >= 2) speed -= 0.01;
     if (exclaimCount >= 1) {
       speed += 0.01;
@@ -685,10 +714,10 @@
     pitch += textJitter(clean.split("").reverse().join(""), 0.004);
 
     if (streamMode && textLen > 0 && textLen < 18) {
-      speed = Math.max(speed, 1.04);
+      speed = Math.max(speed, 0.98);
     }
 
-    speed = clampNumber(speed, 0.98, 1.16);
+    speed = clampNumber(speed, 0.88, 1.1);
     pitch = clampNumber(pitch, 0.95, 1.07);
     volume = clampNumber(volume, 0.9, 1.08);
 
