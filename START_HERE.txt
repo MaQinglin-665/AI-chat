@@ -1,60 +1,63 @@
 Xinyu Desktop Pet v1.4 Preview - Start Here
 ===========================================
 
-This is a source-based preview for early testers and contributors. It is not a
-finished Windows installer.
+This is an MVP preview for early users and contributors, not a mature
+commercial product.
 
-Fastest guided path
+Recommended download
+--------------------
+
+For normal Windows 10/11 users, download these release assets first:
+
+    Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+    SHA256SUMS.txt
+
+The installer copies the project to your user folder, creates Start Menu and
+desktop shortcuts, then runs the guided first start.
+
+This first installer is unsigned. Before running it, compare:
+
+    Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
+    Get-Content .\SHA256SUMS.txt
+
+If SmartScreen warns about an unknown publisher, continue only when the file
+came from this repository release and the SHA256 matches.
+
+Source package path
 -------------------
 
-Double-click:
+Developers and early testers can use:
+
+    Xinyu-AI-Desktop-Pet-v1.4.0-preview-windows-source-test.zip
+
+From an extracted source package, double-click:
 
     install_and_start.bat
 
-This guided first-run entry prepares dependencies, applies the preview profile,
-helps you configure your own LLM, runs a first-chat smoke check, then starts the
-Electron desktop pet.
-
-Important notes:
-
-- You still need your own model/provider/API key, or a local Ollama model.
-- The smoke check sends one small request to your configured model.
-- Desktop observation, screenshots, user file reading, tool calling, and shell
-  execution stay disabled by default.
-
-Step-by-step path
+First model setup
 -----------------
 
-If you want more control or easier troubleshooting, run:
+Xinyu does not include a cloud model, hosted endpoint, or API key. On first
+launch, the chat window shows a model setup wizard when LLM configuration is
+missing.
 
-    prepare_preview_environment.bat
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
-    start_electron.bat
+Default provider:
 
-Model choice
-------------
+    openai-compatible
 
-Xinyu does not include a cloud model, hosted endpoint, or API key. You choose
-the provider/model. See:
+Default key env:
 
-    docs\model-selection.md
+    TAFFY_LLM_API_KEY
 
-If model probe success is below 80%, or normal turns often take more than 15
-seconds, switch to a faster stable model before judging the character
-experience.
+The real API key is stored only in local .env. Non-secret model settings go to
+config.local.json. After saving, the app runs a lightweight model probe and
+shows a readable success or failure reason.
 
-First things to try
--------------------
+Safety defaults
+---------------
 
-- Send a short English chat message.
-- Check that the Live2D model is visible.
-- Check that browser TTS speaks the full reply.
-- Try /doctor for local diagnostics.
-- Try /braindebug after a normal chat turn.
-- Watch whether spontaneous replies and small stage reactions appear without
-  becoming noisy.
+Desktop observation, screenshots, user file reading, tool calling, and shell
+execution stay disabled by default.
 
 More help
 ---------
@@ -62,9 +65,9 @@ More help
 Read:
 
     docs\first-install.md
+    docs\installer.md
     README-FIRST-RUN.txt
     docs\troubleshooting.md
 
-If you report feedback, remove API keys, tokens, raw prompts, raw history,
-private file paths, and private desktop screenshots before sharing logs or
-screenshots.
+When reporting feedback, remove API keys, tokens, raw prompts, raw history,
+private local paths, and private desktop screenshots.

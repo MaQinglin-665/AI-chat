@@ -119,7 +119,8 @@ def _expected_backend_entry_noop_adapter(requested_action="none"):
 
 @contextmanager
 def _run_server_with_config(monkeypatch, cfg):
-    monkeypatch.setattr(app, "load_config", lambda: cfg)
+    load_config_func = cfg if callable(cfg) else (lambda: cfg)
+    monkeypatch.setattr(app, "load_config", load_config_func)
     httpd, _, _ = app.build_server()
     thread = threading.Thread(target=httpd.serve_forever, daemon=True, name="test-http-server")
     thread.start()
@@ -202,6 +203,109 @@ def test_api_config_switch_post_uses_token_and_writes_local_files(monkeypatch, t
     assert env_path.read_text(encoding="utf-8").strip() == "OPENAI_SWITCH_TEST_KEY=sk-route-secret"
     assert "sk-route-secret" not in json.dumps(saved, ensure_ascii=False)
     assert "sk-route-secret" not in serialized_payload
+
+
+def test_first_run_status_uses_token_and_reports_safe_summary(monkeypatch):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = True
+    cfg["onboarding_completed"] = False
+    cfg["llm"] = {
+        "provider": "openai-compatible",
+        "base_url": "https://api.example.test/v1",
+        "model": "demo-model",
+        "api_key_env": "FIRST_RUN_TEST_KEY",
+    }
+    cfg["observe"]["attach_mode"] = "manual"
+    cfg["tools"]["enabled"] = False
+    cfg["tools"]["allow_shell"] = False
+    monkeypatch.setenv("TAFFY_API_TOKEN_TEST", "token-first-run-status")
+    monkeypatch.delenv("FIRST_RUN_TEST_KEY", raising=False)
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        denied_status, denied_payload = _request_json(f"{base}/api/first_run/status")
+        ok_status, payload = _request_json(
+            f"{base}/api/first_run/status",
+            headers={"X-Taffy-Token": "token-first-run-status"},
+        )
+
+    assert denied_status == 401
+    assert denied_payload.get("error") == "Invalid API token."
+    assert ok_status == 200
+    assert payload["ok"] is True
+    assert payload["first_run"]["needs_first_run"] is True
+    assert payload["llm"]["configured"] is False
+    assert payload["llm"]["api_key_configured"] is False
+    assert payload["llm"]["api_key_returned"] is False
+    assert "api_key" not in payload["llm"]
+    assert payload["safety"]["observe_attach_mode"] == "manual"
+    assert payload["safety"]["tools_enabled"] is False
+    assert payload["safety"]["tools_allow_shell"] is False
+
+
+def test_first_run_configure_llm_writes_local_files_and_masks_secret(monkeypatch, tmp_path):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = True
+    local_config_path = tmp_path / "config.local.json"
+    env_path = tmp_path / ".env"
+    monkeypatch.setenv("TAFFY_API_TOKEN_TEST", "token-first-run-config")
+    monkeypatch.setattr(config_switch, "LOCAL_CONFIG_PATH", local_config_path)
+    monkeypatch.setattr(config_switch, "ENV_PATH", env_path)
+
+    def load_merged_config():
+        merged = copy.deepcopy(cfg)
+        if local_config_path.exists():
+            local_data = json.loads(local_config_path.read_text(encoding="utf-8"))
+            merged.update(local_data)
+            if isinstance(local_data.get("llm"), dict):
+                merged["llm"] = {**merged.get("llm", {}), **local_data["llm"]}
+        return merged
+
+    with _run_server_with_config(monkeypatch, load_merged_config) as base:
+        denied_status, denied_payload = _post_json(
+            f"{base}/api/first_run/configure_llm",
+            {
+                "provider": "openai-compatible",
+                "base_url": "https://api.example.test/v1",
+                "model": "demo-model",
+                "api_key_env": "TAFFY_LLM_API_KEY",
+                "api_key": "sk-first-run-secret",
+            },
+        )
+        ok_status, payload = _post_json(
+            f"{base}/api/first_run/configure_llm",
+            {
+                "provider": "openai-compatible",
+                "base_url": "https://api.example.test/v1",
+                "model": "demo-model",
+                "api_key_env": "TAFFY_LLM_API_KEY",
+                "api_key": "sk-first-run-secret",
+            },
+            headers={"X-Taffy-Token": "token-first-run-config"},
+        )
+        status_after, payload_after = _request_json(
+            f"{base}/api/first_run/status",
+            headers={"X-Taffy-Token": "token-first-run-config"},
+        )
+
+    assert denied_status == 401
+    assert denied_payload.get("error") == "Invalid API token."
+    assert ok_status == 200
+    assert payload["saved"]["api_key_saved"] is True
+    assert payload["saved"]["api_key_returned"] is False
+    assert payload["llm"]["configured"] is True
+    assert status_after == 200
+    assert payload_after["llm"]["configured"] is True
+    saved = json.loads(local_config_path.read_text(encoding="utf-8"))
+    serialized_payload = json.dumps(payload, ensure_ascii=False)
+    assert saved["onboarding_completed"] is True
+    assert saved["llm"]["provider"] == "openai-compatible"
+    assert saved["llm"]["base_url"] == "https://api.example.test/v1"
+    assert saved["llm"]["model"] == "demo-model"
+    assert saved["llm"]["api_key_env"] == "TAFFY_LLM_API_KEY"
+    assert saved["llm"]["api_key"] == ""
+    assert env_path.read_text(encoding="utf-8").strip() == "TAFFY_LLM_API_KEY=sk-first-run-secret"
+    assert "sk-first-run-secret" not in json.dumps(saved, ensure_ascii=False)
+    assert "sk-first-run-secret" not in serialized_payload
 
 
 def test_api_health_includes_backend_readiness_checks_without_leaking_secrets(monkeypatch):

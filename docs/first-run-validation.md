@@ -7,6 +7,7 @@
 ## Scope
 
 - Package/source:
+- Installer:
 - Commit / branch:
 - Tester:
 - Date:
@@ -21,19 +22,40 @@
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package-source-test.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_installer_smoke.ps1
 ```
 
 - [ ] Source-test zip created.
+- [ ] Installer exe created.
 - [ ] `SHA256SUMS.txt` created.
 - [ ] Package does not include `.env`, `.venv`, `config.json`, `config.local.json`, logs, `node_modules`, or generated images.
-- [ ] Package includes `install_first_run.bat`, `scripts\bootstrap-first-run.ps1`, `scripts\configure-llm.ps1`, and `scripts\first_chat_smoke.ps1`.
+- [ ] Package includes `install_and_start.bat`, `install_first_run.bat`, `docs\first-install.md`, `docs\installer.md`, `scripts\bootstrap-first-run.ps1`, `scripts\configure-llm.ps1`, and `scripts\first_chat_smoke.ps1`.
+
+## Installer Install
+
+Run from the release assets:
+
+```powershell
+Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
+Get-Content .\SHA256SUMS.txt
+.\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+```
+
+Record:
+
+- SHA256 matched: yes / no
+- SmartScreen appeared: yes / no
+- Installed without admin: yes / no
+- Start Menu shortcut created: yes / no
+- Desktop shortcut created: yes / no
+- `install_and_start.bat` launched after install: yes / no
 
 ## Clean Install
 
 Run from the extracted package:
 
 ```powershell
-.\install_first_run.bat
+.\install_and_start.bat
 ```
 
 Record:
@@ -53,18 +75,17 @@ No-go if bootstrap cannot explain what the user must do next.
 
 ## LLM Configuration
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
-```
-
 Record:
 
+- Configured by app wizard / configure-llm.ps1:
 - Provider:
 - Base URL:
 - Model:
 - API key env:
 - API key stored in `.env`: yes / no
 - API key absent from `config.json` and `config.local.json`: yes / no
+- `/api/first_run/status` does not return key: yes / no
+- `/api/first_run/configure_llm` requires token: yes / no
 - Ollama running, if selected: yes / no / not applicable
 
 No-go if the only working path requires putting a real API key into JSON.

@@ -20,7 +20,7 @@ function Resolve-PythonCommand {
     if (Get-Command py -ErrorAction SilentlyContinue) {
         return @("py", "-3")
     }
-    throw "Python 3.10+ was not found. Run install_first_run.bat first."
+    throw "Python 3.10+ was not found. Run install_and_start.bat first."
 }
 
 $python = @(Resolve-PythonCommand)

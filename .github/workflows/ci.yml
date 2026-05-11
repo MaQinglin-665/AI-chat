@@ -109,6 +109,14 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
 
+      - name: Install NSIS
+        shell: powershell
+        run: choco install nsis -y --no-progress
+
+      - name: Run installer build smoke
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_installer_smoke.ps1 -Version ci-smoke
+
       - name: Install docs dependencies
         working-directory: docs
         run: npm ci

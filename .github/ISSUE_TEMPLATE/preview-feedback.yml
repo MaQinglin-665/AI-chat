@@ -1,5 +1,5 @@
 name: Preview Feedback
-description: Share first-run and AI VTuber feeling feedback for the Taffy preview.
+description: Share first-run and AI VTuber feeling feedback for the Xinyu preview.
 title: "[Preview Feedback]: "
 labels:
   - feedback
@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for testing Taffy. Please remove API keys, tokens, raw prompts, raw history, private file paths, and private desktop screenshots before sharing logs or screenshots.
+        Thanks for testing Xinyu. Please remove API keys, tokens, raw prompts, raw history, private file paths, and private desktop screenshots before sharing logs or screenshots.
 
   - type: dropdown
     id: package_source
@@ -15,6 +15,7 @@ body:
       label: Package source
       description: What did you run?
       options:
+        - GitHub Release installer exe
         - GitHub Release source-test zip
         - main branch clone
         - GitHub automatic Source code archive
@@ -58,8 +59,8 @@ body:
     attributes:
       label: First-run path
       options:
-        - label: prepare_preview_environment.bat completed.
-        - label: configure-llm.ps1 completed.
+        - label: install_and_start.bat completed.
+        - label: LLM wizard or configure-llm.ps1 completed.
         - label: first_chat_smoke.ps1 completed.
         - label: start_electron.bat opened the app.
 
@@ -80,12 +81,12 @@ body:
   - type: checkboxes
     id: character_feel
     attributes:
-      label: Taffy feeling
+      label: Xinyu feeling
       options:
-        - label: Replies feel like Taffy, not a generic assistant.
+        - label: Replies feel like Xinyu, not a generic assistant.
         - label: Replies stay in English.
         - label: Customer-service closers are rare.
-        - label: Taffy does not over-ask follow-up questions.
+        - label: Xinyu does not over-ask follow-up questions.
         - label: Spontaneous replies are visible.
         - label: Spontaneous replies are not too noisy.
         - label: Motions match the text and voice.

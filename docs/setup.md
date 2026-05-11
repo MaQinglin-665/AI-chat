@@ -11,13 +11,22 @@
 
 ## 2. Recommended First Run
 
-第一次从 GitHub 下载或克隆仓库后，推荐先走引导式入口：
+普通 Windows 用户推荐先下载 release 安装器：
+
+```text
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+SHA256SUMS.txt
+```
+
+校验 SHA256 后运行安装器。首发安装器未签名，SmartScreen 的未知发布者提醒是预期现象；不要关闭系统安全设置，只有在来源和 SHA256 都匹配时继续。
+
+如果你下载的是源码测试包或 clone 仓库，推荐先走引导式入口：
 
 ```powershell
 .\install_and_start.bat
 ```
 
-它会串起依赖安装、预览配置、LLM 配置、首句 smoke check 和 Electron 启动。它不是静默 installer，仍会在需要时提示你选择模型、填写 API key，且 smoke check 会向你配置的模型发送一次小请求。
+它会串起依赖安装、预览配置、LLM 配置、首句 smoke check 和 Electron 启动。仍会在需要时提示你选择模型、填写 API key，且 smoke check 会向你配置的模型发送一次小请求。
 
 更详细说明见 `docs/first-install.md`。
 

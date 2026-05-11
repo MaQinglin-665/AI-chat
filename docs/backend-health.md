@@ -52,6 +52,50 @@ curl http://127.0.0.1:8123/api/health
 curl http://127.0.0.1:8123/api/health -H "X-Taffy-Token: <your-token>"
 ```
 
+### `GET /api/first_run/status`
+
+首跑向导使用的脱敏状态接口。若启用了 `server.require_api_token`，需要 `X-Taffy-Token`。
+
+返回摘要包含：
+
+- `first_run.onboarding_completed`
+- `first_run.needs_first_run`
+- `llm.configured`
+- `llm.provider`
+- `llm.base_url`
+- `llm.model`
+- `llm.api_key_env`
+- `llm.api_key_configured`
+- `live2d.ok`
+- `safety.observe_attach_mode`
+- `safety.tools_enabled`
+- `safety.tools_allow_shell`
+
+不会返回真实 API key。
+
+### `POST /api/first_run/configure_llm`
+
+首跑向导保存 LLM 配置时使用。该接口需要本地 API token。
+
+请求字段：
+
+```json
+{
+  "provider": "openai-compatible",
+  "base_url": "https://api.example.com/v1",
+  "model": "model-name",
+  "api_key_env": "TAFFY_LLM_API_KEY",
+  "api_key": "..."
+}
+```
+
+保存行为：
+
+- provider / base URL / model / API key env 写入 `config.local.json`
+- 真实 API key 写入 `.env`
+- `config.local.json` 中的 `llm.api_key` 保持为空字符串
+- 响应只返回脱敏状态
+
 ## Response Shape
 
 `/api/health` 的顶层字段：

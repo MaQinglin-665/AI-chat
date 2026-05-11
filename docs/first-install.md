@@ -1,6 +1,6 @@
 # First Install Guide
 
-本指南面向第一次从 GitHub 下载或克隆仓库的用户。当前项目仍是源码预览版，不是成熟的免安装 Windows installer。
+本指南面向第一次从 GitHub release 下载的 Windows 用户。当前项目仍是 MVP preview，不是成熟商业产品；首发推荐使用 Windows 在线引导安装器，源码包保留给开发者和早期测试者。
 
 ## 目标
 
@@ -14,9 +14,29 @@
 6. 跑一次首句 smoke check。
 7. 启动 Electron 桌宠。
 
-## 最省心入口
+## 最省心入口：安装器
 
-在仓库根目录双击：
+在 release 页面下载：
+
+```text
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+SHA256SUMS.txt
+```
+
+安装器默认安装到当前用户目录，不需要管理员权限；安装后会创建开始菜单和桌面快捷方式，并启动 `install_and_start.bat`。
+
+首发安装器未签名。运行前请校验 SHA256：
+
+```powershell
+Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
+Get-Content .\SHA256SUMS.txt
+```
+
+如果 Windows SmartScreen 出现未知发布者提醒，只有在文件来自本仓库 release 且 SHA256 匹配时才继续。
+
+## 源码包入口
+
+如果你下载的是源码测试 zip 或 clone 仓库，在根目录双击：
 
 ```text
 install_and_start.bat
@@ -28,7 +48,7 @@ install_and_start.bat
 .\install_and_start.bat
 ```
 
-这个入口会调用：
+这个入口也是安装器完成复制后启动的脚本。它会调用：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\prepare-preview-environment.ps1 -RunLlmConfigure -RunSmoke -StartApp
@@ -41,6 +61,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\prepare-preview-envi
 - 输入 API key。Key 会写入本地 `.env`，不会写入 `config.json`。
 
 `-RunSmoke` 会在配置完成后发送一次很小的模型测试请求，用来提前发现模型名、API key、base URL 或网关兼容性问题。
+
+## 应用内首次配置
+
+首次启动或 LLM 配置不完整时，聊天窗口会显示“首次模型配置”向导。默认 provider 是 `openai-compatible`，默认 API key env 名称是 `TAFFY_LLM_API_KEY`。
+
+保存时：
+
+- provider / base URL / model / API key env 写入 `config.local.json`
+- 真实 API key 写入 `.env`
+- 界面不会回显真实 key
+- 保存后自动调用 `/api/llm_probe`，显示成功或可读失败原因
 
 ## 更稳的分步路径
 

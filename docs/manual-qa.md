@@ -26,6 +26,7 @@ python scripts\check_secrets.py
 node scripts\run_node_tests.js
 python -m pytest -q
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_installer_smoke.ps1
 git diff --check
 ```
 
@@ -33,20 +34,27 @@ git diff --check
 
 - 编码、语法、secret、Node 前端测试和 Python 测试通过。
 - `scripts\check_first_run_package.ps1` 通过。
+- `scripts\check_installer_smoke.ps1` 通过，生成 installer exe、source zip 和 `SHA256SUMS.txt`。
 - `git diff --check` 无尾随空白或冲突标记。
 
 ## First-Run Bootstrap
 
-从干净源码测试包开始，优先验证用户路径，不优先验证开发者路径。
+优先从 release 安装器开始验证普通用户路径；源码测试包作为开发者 / 早期测试者路径。
 
+- [ ] 下载 `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe` 和 `SHA256SUMS.txt`。
+- [ ] 校验 SHA256；若 SmartScreen 提醒未知发布者，确认说明没有要求关闭系统安全设置。
+- [ ] 安装器默认安装到当前用户目录，不要求管理员权限。
+- [ ] 安装器创建开始菜单和桌面快捷方式。
+- [ ] 安装结束后启动 `install_and_start.bat`。
 - [ ] 如果缺 `electron/`、`web/`、`tests/` 或 `scripts/`，重新下载 main 分支源码。
-- [ ] 运行或双击 `install_first_run.bat`。
+- [ ] 源码包路径下运行或双击 `install_and_start.bat`。
 - [ ] 确认 bootstrap 创建 `.venv`、`config.json`、`.env`，并安装 Python / Node 依赖。
 - [ ] 如果包内只有一个 Live2D 模型，确认 `model_path` 被自动写入。
 - [ ] 如果 bootstrap 输出 `ACTION`，确认动作说明具体、可执行。
-- [ ] 运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1`。
+- [ ] 使用应用内首次配置向导，或运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1`。
 - [ ] 确认 LLM provider / base URL / model 写入 `config.local.json`。
 - [ ] 确认 API Key 只写入 `.env`，不写入 `config.json` 或 `config.local.json`。
+- [ ] 确认 `/api/first_run/status` 不返回真实 key。
 - [ ] 确认预检能清楚提示 Python / Node / npm / Python 包依赖状态。
 - [ ] 确认预检能清楚提示 `model_path` 是否仍是占位符或不存在。
 - [ ] 确认 LLM 缺 API Key、模型名为空、Ollama 未启动时有可执行提示。

@@ -11,6 +11,7 @@ const tests = [
   "tests/test_character_runtime_frontend.js",
   "tests/test_chat_api_frontend.js",
   "tests/test_config_switch_frontend.js",
+  "tests/test_first_run_frontend.js",
   "tests/test_drag_logic.js",
   "tests/test_local_asr_frontend.js",
   "tests/test_sticker_frontend.js",

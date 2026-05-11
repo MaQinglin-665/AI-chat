@@ -17,7 +17,7 @@
 
 它把 `Electron + Python 本地服务 + Live2D + LLM 对话 + TTS/ASR + 情绪动作反馈` 组合到桌面上，探索一个能聊天、能说话、能表达情绪、低打扰陪伴的角色体验。
 
-当前项目仍处于 `MVP / 开源孵化` 阶段，不是成熟商业产品，也不是完整免安装 installer。项目可以提到受 AI VTuber 与 Neuro-sama-like 交互方向启发，但它不是任何项目的克隆或复刻。
+当前项目仍处于 `MVP / 开源孵化` 阶段，不是成熟商业产品。首次公开发布会优先提供 Windows 在线引导安装器；源码测试包保留给开发者和早期测试者。项目可以提到受 AI VTuber 与 Neuro-sama-like 交互方向启发，但它不是任何项目的克隆或复刻。
 
 - 项目网站：[maqinglin-665.github.io/AI-chat](https://maqinglin-665.github.io/AI-chat/)
 - 最新预览版：[v1.4.0-preview](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview)
@@ -50,19 +50,32 @@
 
 ## 快速开始
 
-### 1. 下载源码
+### 1. 普通用户下载安装器
 
-推荐使用当前 `main` 分支源码：
-
-```powershell
-git clone https://github.com/MaQinglin-665/AI-chat.git
-cd AI-chat
-```
-
-如果无法稳定访问 GitHub，也可以下载 `main` 分支 ZIP：
+在 release 页面优先下载：
 
 ```text
-https://github.com/MaQinglin-665/AI-chat/archive/refs/heads/main.zip
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+SHA256SUMS.txt
+```
+
+安装器会把项目文件复制到当前用户目录，创建开始菜单 / 桌面快捷方式，并启动 `install_and_start.bat` 完成首跑引导。它不会内置云模型、不会写入 API key、不会开启桌面观察、工具调用或 shell。
+
+首发安装器允许未签名。运行前建议先校验 SHA256：
+
+```powershell
+Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
+Get-Content .\SHA256SUMS.txt
+```
+
+如果 Windows SmartScreen 提醒未知发布者，只有在文件来自本仓库 release 且 SHA256 匹配时才继续。
+
+### 2. 开发者使用源码包
+
+需要看源码或参与开发时，下载 release 里的源码测试包：
+
+```text
+Xinyu-AI-Desktop-Pet-v1.4.0-preview-windows-source-test.zip
 ```
 
 解压后确认根目录至少包含：
@@ -79,7 +92,14 @@ requirements-dev.txt
 
 如果缺少 `web/`、`electron/` 或 `tests/`，说明下载的不是完整当前源码，请重新下载。
 
-### 2. 引导式一键入口
+也可以使用当前 `main` 分支源码：
+
+```powershell
+git clone https://github.com/MaQinglin-665/AI-chat.git
+cd AI-chat
+```
+
+### 3. 引导式一键入口
 
 第一次体验优先双击：
 
@@ -100,13 +120,25 @@ install_and_start.bat
 3. 安装 Electron / Node 依赖。
 4. 初始化 `config.json` 和 `.env`。
 5. 应用当前预览体验配置。
-6. 引导配置你自己的 LLM provider / model / API key。
+6. 引导配置你自己的 OpenAI-compatible provider / base URL / model / API key。
 7. 运行首句 smoke check。
 8. 启动 Electron 桌宠。
 
-注意：这不是静默安装器。你仍需要提供自己的模型和 API key。smoke check 会向你配置的模型发送一次很小的测试请求，用来提前发现模型名、API key、base URL 或网关兼容问题。
+注意：你仍需要提供自己的模型和 API key。smoke check 会向你配置的模型发送一次很小的测试请求，用来提前发现模型名、API key、base URL 或网关兼容问题。
 
-### 3. 分步首跑路径
+### 4. 应用内首次配置向导
+
+首次启动或 LLM 配置不完整时，聊天窗口会显示模型配置向导。字段固定为：
+
+- provider 类型
+- base URL
+- model
+- API key env 名称
+- API key
+
+默认 provider 是 `openai-compatible`，默认 env 名称是 `TAFFY_LLM_API_KEY`。保存时，非密钥配置写入 `config.local.json`，真实 key 写入 `.env`，随后自动调用 `/api/llm_probe` 显示成功或可读失败原因。
+
+### 5. 分步首跑路径
 
 如果你更想逐步排查，使用下面的流程：
 
@@ -124,7 +156,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 
 `first_chat_smoke.ps1` 会检查后端健康状态，并发送一条轻量聊天请求。想避免真实聊天请求时可加 `-SkipChat` 或 `-SkipLlmProbe`。
 
-### 4. 只安装依赖
+### 6. 只安装依赖
 
 如果只想做低层依赖 bootstrap，不应用预览配置：
 

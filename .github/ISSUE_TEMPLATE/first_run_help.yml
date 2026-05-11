@@ -16,6 +16,7 @@ body:
       label: Source
       description: How did you get the project?
       options:
+        - Release installer exe
         - git clone from main
         - Download ZIP from main
         - Release source-test zip
@@ -39,6 +40,7 @@ body:
       description: Which first-run entry did you use?
       options:
         - install_and_start.bat
+        - Installer launched install_and_start.bat
         - prepare_preview_environment.bat
         - install_first_run.bat
         - scripts/bootstrap-first-run.ps1

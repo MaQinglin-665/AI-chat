@@ -121,6 +121,49 @@
     </div>
   </section>
 
+  <div id="first-run-modal" class="first-run-modal" hidden>
+    <div class="first-run-dialog" role="dialog" aria-modal="true" aria-labelledby="first-run-title">
+      <div class="first-run-head">
+        <div>
+          <strong id="first-run-title">首次模型配置</strong>
+          <p id="first-run-summary">模型配置待完成 · Live2D 待检查 · 安全默认值正常</p>
+        </div>
+        <button id="first-run-close-btn" class="first-run-close-btn" type="button" aria-label="稍后配置" title="稍后配置">×</button>
+      </div>
+      <div class="first-run-grid">
+        <label class="first-run-field">
+          <span>Provider 类型</span>
+          <select id="first-run-provider">
+            <option value="openai-compatible">OpenAI-compatible</option>
+            <option value="openai">OpenAI</option>
+            <option value="ollama">Ollama 本地</option>
+          </select>
+        </label>
+        <label class="first-run-field">
+          <span>Model</span>
+          <input id="first-run-model" type="text" spellcheck="false" value="gpt-4o-mini" />
+        </label>
+        <label class="first-run-field first-run-field-wide">
+          <span>Base URL</span>
+          <input id="first-run-base-url" type="url" spellcheck="false" value="http://127.0.0.1:8000/v1" />
+        </label>
+        <label class="first-run-field">
+          <span>API key env 名称</span>
+          <input id="first-run-api-key-env" type="text" spellcheck="false" value="TAFFY_LLM_API_KEY" />
+        </label>
+        <label class="first-run-field">
+          <span>API Key</span>
+          <input id="first-run-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="只保存到本地 .env" />
+        </label>
+      </div>
+      <div class="first-run-actions">
+        <button id="first-run-test-btn" type="button">测试模型</button>
+        <button id="first-run-save-btn" class="first-run-primary-btn" type="button">保存并测试</button>
+      </div>
+      <div id="first-run-status" class="first-run-status" aria-live="polite">填写 provider、base URL、model 和 API key 后保存。</div>
+    </div>
+  </div>
+
   <div id="config-switch-modal" class="config-switch-modal" hidden>
     <div class="config-switch-dialog" role="dialog" aria-modal="true" aria-labelledby="config-switch-title">
       <div class="config-switch-head">
@@ -693,6 +736,7 @@
   <script src="./devFeatureLoader.js"></script>
   <script src="./chat.js"></script>
   <script src="./configSwitchController.js"></script>
+  <script src="./firstRunWizardController.js"></script>
   <script src="./app.js"></script>
   <div id="subtitle-layer" class="subtitle-layer" aria-live="polite" aria-atomic="true">
     <span class="subtitle-en"></span>

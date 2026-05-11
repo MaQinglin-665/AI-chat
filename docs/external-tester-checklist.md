@@ -1,8 +1,8 @@
 # External Tester Checklist
 
-Use this checklist when trying the Taffy v1.4 preview from a source test
-package. It helps separate setup problems, model problems, and character
-experience problems.
+Use this checklist when trying the Xinyu v1.4 preview from the installer or
+source test package. It helps separate setup problems, model problems, and
+character experience problems.
 
 Please do not share API keys, tokens, raw prompts, raw history, private file
 paths, or private desktop screenshots in public issues.
@@ -13,10 +13,13 @@ paths, or private desktop screenshots in public issues.
 - Python version:
 - Node.js version:
 - Launch path:
+  - release installer exe
+  - `install_and_start.bat`
   - `prepare_preview_environment.bat`
   - `install_first_run.bat`
   - manual setup
 - Package source:
+  - GitHub Release installer exe
   - GitHub Release source-test zip
   - `main` branch clone
   - other:
@@ -41,11 +44,11 @@ paths, or private desktop screenshots in public issues.
 
 ## First Run
 
-- `prepare_preview_environment.bat` completed:
+- `install_and_start.bat` completed:
   - yes
   - no
   - not used
-- `scripts\configure-llm.ps1` completed:
+- App LLM wizard or `scripts\configure-llm.ps1` completed:
   - yes
   - no
   - not used
@@ -85,7 +88,7 @@ paths, or private desktop screenshots in public issues.
   - yes
   - no
 
-## Taffy Feeling
+## Xinyu Feeling
 
 Try these English inputs:
 
@@ -101,7 +104,7 @@ I'm going to sleep.
 
 Mark what you noticed:
 
-- Replies feel like Taffy, not a generic assistant:
+- Replies feel like Xinyu, not a generic assistant:
   - yes
   - partly
   - no
@@ -111,7 +114,7 @@ Mark what you noticed:
 - Customer-service closers are rare:
   - yes
   - no
-- Taffy does not over-ask follow-up questions:
+- Xinyu does not over-ask follow-up questions:
   - yes
   - no
 - Spontaneous replies are visible:
