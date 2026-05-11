@@ -1339,6 +1339,27 @@ def _normalize_persona_value(value, max_len=240):
     return normalize_memory_text(value, max_len=max_len)
 
 
+def _is_regression_persona_placeholder(value):
+    return bool(re.fullmatch(r"\u56de\u5f52\u68c0\u67e5-\d+", str(value or "").strip()))
+
+
+def _is_legacy_only_persona_text(value):
+    parts = [part.strip() for part in re.split(r"[;\uff1b]", str(value or "").strip()) if part.strip()]
+    if not parts:
+        return False
+    return all(
+        re.fullmatch(
+            r"\u4e3b\u52a8\u7a0b\u5ea6[:\uff1a]\s*(?:\u4f4e|\u9002\u4e2d|\u9ad8|\u5f88\u9ad8)\s*",
+            part,
+        )
+        or re.fullmatch(
+            r"\u5173\u7cfb\u5b9a\u4f4d[:\uff1a]\s*(?:\u684c\u9762\u4f19\u4f34|\u5b66\u4e60\u642d\u5b50|\u60c5\u7eea\u966a\u4f34|\u5de5\u4f5c\u52a9\u624b)\s*",
+            part,
+        )
+        for part in parts
+    )
+
+
 def _normalize_persona_relationship_role(value):
     text = _normalize_persona_value(value, max_len=MANUAL_PERSONA_CARD_LIMITS["relationship_role"])
     if not text:
@@ -1455,6 +1476,8 @@ def _compose_legacy_companionship_style(card):
 
 def _normalize_manual_persona_card(card):
     src = card if isinstance(card, dict) else {}
+    if any(_is_regression_persona_placeholder(src.get(key, "")) for key in ("character_name", "identity")):
+        src = {}
     normalized = {}
     for key in MANUAL_PERSONA_CARD_FIELDS:
         if key == "relationship_role":
@@ -1464,7 +1487,12 @@ def _normalize_manual_persona_card(card):
             normalized[key] = _normalize_persona_initiative_level(src.get(key, ""))
             continue
         max_len = MANUAL_PERSONA_CARD_LIMITS.get(key, 240)
-        normalized[key] = _normalize_persona_value(src.get(key, ""), max_len=max_len)
+        value = _normalize_persona_value(src.get(key, ""), max_len=max_len)
+        if _is_regression_persona_placeholder(value):
+            value = ""
+        if key in {"personality_tags", "companionship_style"} and _is_legacy_only_persona_text(value):
+            value = ""
+        normalized[key] = value
 
     identity = str(normalized.get("identity", "")).strip()
     companionship_style = str(normalized.get("companionship_style", "")).strip()
@@ -1483,7 +1511,11 @@ def _normalize_manual_persona_card(card):
         normalized["dislikes"] = normalized.get("user_dislikes", "")
     if not normalized.get("speaking_style"):
         normalized["speaking_style"] = normalized.get("reply_style", "")
-    if not normalized.get("personality_tags") and companionship_style:
+    if (
+        not normalized.get("personality_tags")
+        and companionship_style
+        and not _is_legacy_only_persona_text(companionship_style)
+    ):
         normalized["personality_tags"] = normalize_memory_text(
             companionship_style, max_len=MANUAL_PERSONA_CARD_LIMITS["personality_tags"]
         )

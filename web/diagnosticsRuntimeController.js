@@ -385,7 +385,7 @@
 
     async function runDoctorAndAppendReport() {
       appendMessage("assistant", "正在自检聊天、语音和角色接入状态...", { enableTranslation: false });
-      setStatus("链路自检中...");
+      setStatus("故障自检中...");
       const row = appendMessage("assistant", await runDoctorDiagnostics(), { enableTranslation: false });
       row?.classList?.add("doctor-report");
     }

@@ -128,7 +128,7 @@ Merge-PreviewObject $local $preview
 
 $local | ConvertTo-Json -Depth 80 | Set-Content -LiteralPath $LocalConfigPath -Encoding UTF8
 
-Write-Ok "Applied Taffy preview experience settings to config.local.json"
+Write-Ok "Applied Xinyu preview experience settings to config.local.json"
 Write-InfoLine "Existing LLM provider/base URL/model/api_key_env were preserved when present."
 Write-InfoLine "No API key was written by this script."
 Write-InfoLine "Desktop observation, screenshots, tools, and shell remain disabled unless you explicitly change them."

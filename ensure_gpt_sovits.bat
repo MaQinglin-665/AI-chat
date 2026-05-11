@@ -46,7 +46,7 @@ if defined ENV_PYTHON (
 )
 
 if "%NO_WAIT%"=="1" (
-  echo GPT-SoVITS startup triggered in background (no-wait mode).
+  echo GPT-SoVITS startup triggered in background no-wait mode.
   exit /b 0
 )
 

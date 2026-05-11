@@ -6,6 +6,7 @@
     'live2dController',
     'personaCard',
     'schedulePanel',
+    'configSwitchController',
     'onboarding',
     'desktopBridge'
   ];

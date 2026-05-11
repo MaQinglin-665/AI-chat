@@ -50,6 +50,8 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert "Stage memory:" in block
     assert "Safety clamp:" in block
     assert "Voice director:" in block
+    assert "Xinyu" in block
+    assert "older placeholder names" in block
     assert "slightly odd inner life" in block
     assert "empty helper phrases" in block
     assert decision["style_beat"]
@@ -81,7 +83,7 @@ def test_character_brain_style_beat_rotates_with_continuity():
 
 
 def test_character_brain_reaction_modes_keep_safety_by_intent():
-    greeting = character_brain.build_character_brain_decision(user_message="Hi Taffy, are you awake?")
+    greeting = character_brain.build_character_brain_decision(user_message="Hi Xinyu, are you awake?")
     casual = character_brain.build_character_brain_decision(user_message="This desk feels weird today.")
     comfort = character_brain.build_character_brain_decision(user_message="I feel worn out. Stay with me.")
     reminder = character_brain.build_character_brain_decision(user_message="Remind me in 10 minutes to drink water.")
@@ -105,6 +107,7 @@ def test_character_brain_reaction_modes_keep_safety_by_intent():
 def test_character_brain_performance_controls_by_intent():
     casual = character_brain.build_character_brain_decision(user_message="This desk feels weird today.")
     question = character_brain.build_character_brain_decision(user_message="Do you think AI pets can be funny?")
+    feedback = character_brain.build_character_brain_decision(user_message="你的想法好奇特")
     task = character_brain.build_character_brain_decision(user_message="Can you help me fix this project?")
     comfort = character_brain.build_character_brain_decision(user_message="I feel worn out. Stay with me.")
     reminder = character_brain.build_character_brain_decision(user_message="Remind me in 10 minutes to drink water.")
@@ -117,6 +120,11 @@ def test_character_brain_performance_controls_by_intent():
     assert question["opening_move"] == "answer_first"
     assert question["reply_shape"] == "answer_then_bit"
     assert question["question_policy"] == "optional_playful"
+    assert feedback["intent"] == "feedback"
+    assert feedback["reply_shape"] == "two_beat"
+    assert feedback["performance_bit"] == "none"
+    assert feedback["spontaneity"] == 0
+    assert feedback["question_policy"] == "none"
     assert task["opening_move"] == "answer_first"
     assert task["reply_shape"] == "answer_then_bit"
     assert task["question_policy"] == "clarify_only"
@@ -148,10 +156,11 @@ def test_character_brain_improv_director_high_chaos_only_for_safe_play_scenes():
 def test_character_brain_improv_director_clamps_protected_intents():
     comfort = character_brain.build_character_brain_decision(user_message="I feel bad.")
     reminder = character_brain.build_character_brain_decision(user_message="Remind me in 10 minutes to stretch.")
+    feedback = character_brain.build_character_brain_decision(user_message="你这回答有点莫名其妙")
     closing = character_brain.build_character_brain_decision(user_message="I'm going to sleep.")
     task = character_brain.build_character_brain_decision(user_message="What next?")
 
-    for decision in (comfort, reminder, closing):
+    for decision in (comfort, reminder, feedback, closing):
         assert decision["improv"]["chaos_level"] == 0
         assert decision["safety_clamp"]["level"] == "safe_scene"
         assert decision["spontaneity"] == 0
@@ -160,6 +169,8 @@ def test_character_brain_improv_director_clamps_protected_intents():
 
     assert comfort["opening_move"] == "soft_anchor"
     assert reminder["reply_shape"] == "one_liner"
+    assert feedback["improv"]["stance"] == "grounded_repair"
+    assert feedback["performance_bit"] == "none"
     assert closing["opening_move"] == "no_opening"
     assert task["improv"]["chaos_level"] == 1
     assert task["safety_clamp"]["level"] == "task_scene"
@@ -498,6 +509,17 @@ def test_character_brain_reply_director_repairs_scene_policy_violations():
     assert casual_try_moving == "The desk is acting normal, which is exactly how it gets you."
     assert casual_diagnostic_bit == "The desk is acting normal, which is exactly how it gets you."
 
+    feedback = character_brain.build_character_brain_decision(user_message="你的想法好奇特")
+    feedback_bit_reply = character_brain.apply_character_brain_reply_constraints(
+        "Just a background process pretending to be busy.",
+        feedback,
+        user_message="你的想法好奇特",
+    )
+    assert feedback_bit_reply == "Fair, that came out too abstract. I'll keep it more grounded and direct."
+    assert feedback["performance_execution"]["removed_context_bleed"] is True
+    assert character_brain.classify_user_intent("This desk feels weird.") == "casual"
+    assert character_brain.classify_user_intent("你这回答有点莫名其妙") == "feedback"
+
     vague_next = character_brain.apply_character_brain_reply_constraints(
         "I hear you. I'll keep this short and focused.",
         character_brain.build_character_brain_decision(user_message="What next?"),
@@ -608,7 +630,7 @@ def test_character_brain_reminder_and_closing_have_clear_limits():
 
 def test_character_brain_nice_to_see_you_is_not_closing():
     greeting = character_brain.build_character_brain_decision(
-        user_message="Hi Taffy, nice to see you today. Keep it short.",
+        user_message="Hi Xinyu, nice to see you today. Keep it short.",
         history=[],
     )
     closing = character_brain.build_character_brain_decision(
@@ -922,7 +944,7 @@ def test_character_brain_reply_constraints_replace_bland_character_replies():
     comfort = character_brain.build_character_brain_decision(
         user_message="I'm feeling worn out. Stay with me for a second."
     )
-    greeting = character_brain.build_character_brain_decision(user_message="Hi Taffy, are you there?")
+    greeting = character_brain.build_character_brain_decision(user_message="Hi Xinyu, are you there?")
     voice_test = character_brain.build_character_brain_decision(
         user_message="Say a longer sentence so I can test whether your voice keeps the ending complete."
     )
@@ -964,7 +986,7 @@ def test_character_brain_reply_constraints_replace_bland_character_replies():
     assert character_brain.apply_character_brain_reply_constraints(
         "Hey there! I'm right here, ready for some chat.",
         greeting,
-        user_message="Hi Taffy, are you there?",
+        user_message="Hi Xinyu, are you there?",
     ) == "Oh, you found me. I was doing very important desktop nothing."
     assert character_brain.apply_character_brain_reply_constraints(
         "Sure thing!",

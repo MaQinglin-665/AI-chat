@@ -58,7 +58,7 @@
         continue;
       }
       if (message.includes("timeout")) {
-        addUniqueAdvice(advice, `${label}超时。先确认对应服务没有卡住，必要时重启这一层，然后再点一次链路自检。`);
+        addUniqueAdvice(advice, `${label}超时。先确认对应服务没有卡住，必要时重启这一层，然后再点一次故障自检。`);
         continue;
       }
       if (label.includes("LLM") || label.includes("聊天")) {
@@ -67,7 +67,7 @@
       }
       if (label.includes("TTS") || label.includes("语音")) {
         if (String(context.ttsProvider || "").toLowerCase() === "gpt_sovits") {
-          addUniqueAdvice(advice, "GPT-SoVITS 异常。确认 GPT-SoVITS API 已启动，并且地址和端口与配置一致，然后再点一次链路自检。");
+          addUniqueAdvice(advice, "GPT-SoVITS 异常。确认 GPT-SoVITS API 已启动，并且地址和端口与配置一致，然后再点一次故障自检。");
         } else {
           addUniqueAdvice(advice, "语音异常。检查当前音色和 TTS provider 是否可用。");
         }
@@ -77,7 +77,7 @@
         addUniqueAdvice(advice, "后端异常。重启 Python 服务，并检查 config.json / config.local.json 是否有语法或路径问题。");
         continue;
       }
-      addUniqueAdvice(advice, `${label}异常。先修这一层，再点一次链路自检。`);
+      addUniqueAdvice(advice, `${label}异常。先修这一层，再点一次故障自检。`);
     }
     if (context.streamEnabled === false) {
       addUniqueAdvice(advice, "当前已关闭流式聊天，会直接走普通聊天请求。这是为了避开某些模型流式接口长时间不返回内容的问题。");
@@ -107,7 +107,7 @@
     });
 
     return [
-      allOk ? "链路自检完成：核心功能正常。" : `链路自检完成：${checks.length - okCount} 项需要处理。`,
+      allOk ? "故障自检完成：核心功能正常。" : `故障自检完成：${checks.length - okCount} 项需要处理。`,
       "",
       "检查结果",
       ...checks.map((check) => formatCheckLine(check.label, check)),
@@ -136,7 +136,7 @@
       `错误: ${message}`,
       "",
       `建议: 这次看起来可能卡在 ${likelyLayer} 链路。`,
-      "你可以点「更多 → 链路自检」，或输入 /doctor，让我自动检查 LLM、TTS、配置和角色接入状态。"
+      "你可以点「更多 → 故障自检」，或输入 /doctor，让我自动检查 LLM、TTS、配置和角色接入状态。"
     ].join("\n");
   }
 

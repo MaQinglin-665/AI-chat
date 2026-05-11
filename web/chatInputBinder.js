@@ -45,6 +45,43 @@
     });
   }
 
+  function bindStickerControls(ui = {}, deps = {}) {
+    if (ui.stickerBtn) {
+      ui.stickerBtn.addEventListener("click", (event) => {
+        if (event && typeof event.stopPropagation === "function") {
+          event.stopPropagation();
+        }
+        call(deps.toggleStickerPanel);
+      });
+    }
+    if (ui.stickerCloseBtn) {
+      ui.stickerCloseBtn.addEventListener("click", () => {
+        call(deps.closeStickerPanel);
+      });
+    }
+    if (ui.stickerImportBtn && ui.stickerImportInput) {
+      ui.stickerImportBtn.addEventListener("click", () => {
+        if (isBusy(deps, "stickerImportBusy")) {
+          call(deps.setStatus, "\u8868\u60c5\u5305\u5bfc\u5165\u4e2d\uff0c\u8bf7\u7a0d\u7b49...");
+          return;
+        }
+        ui.stickerImportInput.click();
+      });
+      ui.stickerImportInput.addEventListener("change", async () => {
+        try {
+          await call(deps.handleStickerImportFiles, ui.stickerImportInput.files);
+        } finally {
+          ui.stickerImportInput.value = "";
+        }
+      });
+    }
+    if (ui.stickerRespondToggle) {
+      ui.stickerRespondToggle.addEventListener("change", () => {
+        call(deps.setStickerRespondAfterSend, ui.stickerRespondToggle.checked === true);
+      });
+    }
+  }
+
   function bindMicControls(ui = {}, deps = {}) {
     if (ui.micBtn) {
       ui.micBtn.addEventListener("click", async () => {
@@ -73,6 +110,11 @@
         if (event.key === "Escape" && call(deps.isLearningReviewOpen)) {
           event.preventDefault();
           call(deps.closeLearningReviewDrawer);
+          return;
+        }
+        if (event.key === "Escape" && ui.stickerPanel && !ui.stickerPanel.hidden) {
+          event.preventDefault();
+          call(deps.closeStickerPanel);
           return;
         }
         if (event.key === "Escape" && ui.personaModal && !ui.personaModal.hidden) {
@@ -124,6 +166,7 @@
   function bindChatInputControls(ui = {}, deps = {}) {
     bindSendControls(ui, deps);
     bindAttachmentControls(ui, deps);
+    bindStickerControls(ui, deps);
     bindMicControls(ui, deps);
     bindKeyboardShortcuts(ui, deps);
     bindSpeakControls(ui, deps);
@@ -133,6 +176,7 @@
     bindChatInputControls,
     bindSendControls,
     bindAttachmentControls,
+    bindStickerControls,
     bindMicControls,
     bindKeyboardShortcuts,
     bindSpeakControls

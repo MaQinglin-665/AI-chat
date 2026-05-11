@@ -54,7 +54,7 @@
       state.loading = !!loading;
       if (ui.learningReviewSummary) {
         ui.learningReviewSummary.textContent = state.loading
-          ? "学习审核数据加载中..."
+          ? "记忆管理数据加载中..."
           : ui.learningReviewSummary.textContent;
       }
     }
@@ -182,6 +182,30 @@
       }
     }
 
+    function updateLearningOverview(filteredItems = []) {
+      const visibleCount = Array.isArray(filteredItems) ? filteredItems.length : 0;
+      const stats = typeof model.buildLearningStats === "function"
+        ? model.buildLearningStats(state, visibleCount)
+        : {
+          candidates: Array.isArray(state.candidates) ? state.candidates.length : 0,
+          samples: Array.isArray(state.samples) ? state.samples.length : 0,
+          visible: visibleCount,
+          activePoolLabel: state.activeTab === "samples" ? "\u6b63\u5f0f\u6c60" : "\u5019\u9009\u6c60"
+        };
+      if (ui.learningStatCandidates) {
+        ui.learningStatCandidates.textContent = String(stats.candidates);
+      }
+      if (ui.learningStatSamples) {
+        ui.learningStatSamples.textContent = String(stats.samples);
+      }
+      if (ui.learningStatVisible) {
+        ui.learningStatVisible.textContent = String(stats.visible);
+      }
+      if (ui.learningActivePoolLabel) {
+        ui.learningActivePoolLabel.textContent = stats.activePoolLabel || "";
+      }
+    }
+
     function renderLearningReviewList() {
       if (!ui.learningReviewList) {
         return;
@@ -191,6 +215,7 @@
           view.renderLearningTabs(ui, "debug");
         }
         refreshLearningSelectAllState([]);
+        updateLearningOverview([]);
         renderLearningDebugPanel();
         return;
       }
@@ -209,6 +234,7 @@
           ? model.buildLearningSummaryText(state, filteredItems.length)
           : "";
       }
+      updateLearningOverview(filteredItems);
 
       if (typeof view.renderLearningReviewItems === "function") {
         view.renderLearningReviewItems(ui.learningReviewList, filteredItems, {
@@ -236,7 +262,7 @@
         applyLearningPayload(payload);
         applyMemoryDebugPayload(debugPayload);
         renderLearningReviewList();
-        setStatus(payload?.message || "学习审核数据已刷新");
+        setStatus(payload?.message || "记忆管理数据已刷新");
       } finally {
         setLearningReviewLoading(false);
       }
@@ -302,7 +328,7 @@
       documentObject.body?.classList?.add("learning-review-open");
       renderLearningReviewList();
       reloadLearningReviewData().catch((err) => {
-        setStatus(`学习审核加载失败: ${err.message || err}`);
+        setStatus(`记忆管理加载失败: ${err.message || err}`);
       });
     }
 
@@ -424,6 +450,7 @@
       buildMemoryDebugReport,
       renderLearningDebugPanel,
       refreshLearningSelectAllState,
+      updateLearningOverview,
       renderLearningReviewList,
       learningFetchJson,
       reloadLearningReviewData,

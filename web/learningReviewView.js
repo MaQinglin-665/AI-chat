@@ -31,6 +31,35 @@
     return btn;
   }
 
+  function formatLearningDate(item = {}) {
+    const raw = String(item.updated_at || item.created_at || "").trim();
+    if (!raw) {
+      return "\u672a\u8bb0\u5f55\u65f6\u95f4";
+    }
+    const parsed = Date.parse(raw);
+    if (!Number.isFinite(parsed)) {
+      return raw.slice(0, 16);
+    }
+    try {
+      return new Date(parsed).toLocaleString("zh-CN", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    } catch (_) {
+      return raw.slice(0, 16);
+    }
+  }
+
+  function buildLearningItemTitle(item = {}) {
+    const text = String(item.compressed_pattern || item.assistant_preview || item.user_preview || "").trim();
+    if (!text) {
+      return "\u672a\u547d\u540d\u8bb0\u5fc6";
+    }
+    return text.length > 46 ? `${text.slice(0, 46)}...` : text;
+  }
+
   function setLearningCardCollapsed(card, toggleBtn, nextCollapsed) {
     card.classList.toggle("is-collapsed", !!nextCollapsed);
     toggleBtn.textContent = nextCollapsed ? "\u5c55\u5f00" : "\u6536\u8d77";
@@ -85,6 +114,17 @@
       checkLabel.appendChild(checkbox);
       checkLabel.appendChild(checkText);
 
+      const titleWrap = doc.createElement("div");
+      titleWrap.className = "learning-item-title-wrap";
+      const title = doc.createElement("strong");
+      title.className = "learning-item-title";
+      title.textContent = buildLearningItemTitle(item);
+      const meta = doc.createElement("small");
+      meta.className = "learning-item-meta";
+      meta.textContent = `${formatLearningDate(item)} · ID ${item.id}`;
+      titleWrap.appendChild(title);
+      titleWrap.appendChild(meta);
+
       const status = doc.createElement("span");
       const statusView = typeof model.getLearningStatusView === "function"
         ? model.getLearningStatusView(item.status)
@@ -102,12 +142,14 @@
       headRight.appendChild(toggleBtn);
 
       head.appendChild(checkLabel);
+      head.appendChild(titleWrap);
       head.appendChild(headRight);
 
       const preview = doc.createElement("div");
       preview.className = "learning-item-preview";
-      preview.appendChild(createTextLine(doc, "learning-item-line", "\u539f\u59cb\u56de\u590d\uff1a", item.assistant_preview || "-"));
-      preview.appendChild(createTextLine(doc, "learning-item-line", "\u98ce\u683c\u63d0\u70bc\uff1a", item.compressed_pattern || "-"));
+      preview.appendChild(createTextLine(doc, "learning-item-line", "\u7528\u6237\u539f\u8bdd\uff1a", item.user_preview || "-"));
+      preview.appendChild(createTextLine(doc, "learning-item-line", "\u684c\u5ba0\u56de\u590d\uff1a", item.assistant_preview || "-"));
+      preview.appendChild(createTextLine(doc, "learning-item-line learning-item-pattern", "\u63d0\u70bc\u8bb0\u5fc6\uff1a", item.compressed_pattern || "-"));
 
       const metrics = doc.createElement("div");
       metrics.className = "learning-item-metrics";
@@ -117,13 +159,13 @@
 
       const actions = doc.createElement("div");
       actions.className = "learning-item-actions";
-      actions.appendChild(createActionButton(doc, item, "\u4fdd\u7559", "keep", "is-keep"));
-      actions.appendChild(createActionButton(doc, item, "\u5220\u9664", "delete", "danger"));
-      actions.appendChild(createActionButton(doc, item, "\u5347\u6743 +0.05", "weight_up", "is-up"));
-      actions.appendChild(createActionButton(doc, item, "\u964d\u6743 -0.05", "weight_down", "is-down"));
       if (tab === "candidates") {
-        actions.appendChild(createActionButton(doc, item, "\u664b\u5347\u6b63\u5f0f\u6c60", "promote", "is-promote"));
+        actions.appendChild(createActionButton(doc, item, "\u91c7\u7528\u5230\u6b63\u5f0f\u6c60", "promote", "is-promote"));
+        actions.appendChild(createActionButton(doc, item, "\u5148\u7559\u7740", "keep", "is-keep"));
       }
+      actions.appendChild(createActionButton(doc, item, "\u66f4\u5e38\u7528", "weight_up", "is-up"));
+      actions.appendChild(createActionButton(doc, item, "\u5c11\u7528", "weight_down", "is-down"));
+      actions.appendChild(createActionButton(doc, item, "\u5220\u9664", "delete", "danger"));
 
       const body = doc.createElement("div");
       body.className = "learning-item-body";
@@ -131,7 +173,7 @@
       body.appendChild(metrics);
       body.appendChild(actions);
 
-      setLearningCardCollapsed(card, toggleBtn, true);
+      setLearningCardCollapsed(card, toggleBtn, false);
       toggleBtn.addEventListener("click", () => {
         setLearningCardCollapsed(card, toggleBtn, !card.classList.contains("is-collapsed"));
       });

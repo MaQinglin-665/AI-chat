@@ -299,6 +299,66 @@ function createMemoryStorage(initial = {}) {
 }
 
 {
+  const ui = {
+    personaCharacterName: { value: "馨语" },
+    personaUserAlias: { value: "小Q" },
+    personaPersonalityTags: { value: "温柔、机灵、低打扰" },
+    personaSpeakingStyle: { value: "先给重点，再给一两句具体建议。" },
+    personaCatchphrases: { value: "可以偶尔说我在。" },
+    personaInitiativeLevel: { value: "高" },
+    personaRelationshipRole: { value: "学习搭子" },
+    personaIdentity: { value: "" },
+    personaPreferences: { value: "喜欢短句和开发计划" },
+    personaDislikes: { value: "不喜欢官话和长篇说教" },
+    personaTopics: { value: "" },
+    personaReplyStyle: { value: "" },
+    personaCompanionshipStyle: { value: "" }
+  };
+  const personaController = personaAvatarController.createController({
+    state: {},
+    ui,
+    documentObject: {
+      querySelectorAll: () => [],
+      documentElement: { style: { setProperty() {} } }
+    }
+  });
+  const draft = personaController.readPersonaCardFromForm();
+  assert.strictEqual(draft.character_name, "馨语", "persona card should save the visible character name field");
+  assert.strictEqual(draft.user_alias, "小Q", "persona card should save the visible user alias field");
+  assert.strictEqual(draft.relationship_role, "学习搭子", "persona card should save the role selector");
+  assert.strictEqual(draft.initiative_level, "高", "persona card should save the initiative selector");
+  assert.ok(draft.identity.includes("学习搭子"), "persona card should keep legacy identity compatible with the new fields");
+  assert.ok(draft.reply_style.includes("先给重点"), "persona card should keep legacy reply style compatible with the new fields");
+  personaController.applyPersonaCardToForm({
+    character_name: "小蓝",
+    user_alias: "主人",
+    personality_tags: "可靠、活泼",
+    speaking_style: "更短一点",
+    catchphrases: "收到",
+    likes: "做项目",
+    dislikes: "机械重复",
+    initiative_level: "低",
+    relationship_role: "工作助手"
+  });
+  assert.strictEqual(ui.personaCharacterName.value, "小蓝", "persona form should hydrate the character name field");
+  assert.strictEqual(ui.personaUserAlias.value, "主人", "persona form should hydrate the user alias field");
+  assert.strictEqual(ui.personaPersonalityTags.value, "可靠、活泼", "persona form should hydrate personality tags");
+  assert.strictEqual(ui.personaSpeakingStyle.value, "更短一点", "persona form should hydrate speaking style");
+  assert.strictEqual(ui.personaRelationshipRole.value, "工作助手", "persona form should hydrate relationship role");
+  assert.ok(ui.personaIdentity.value.includes("工作助手"), "persona form should hydrate legacy identity from the new role field");
+
+  const cleanedRegressionCard = personaController.normalizePersonaCardData({
+    character_name: "回归检查-1777296226618",
+    identity: "回归检查-1777296226618",
+    personality_tags: "主动程度：适中；关系定位：桌面伙伴",
+    companionship_style: "主动程度：适中；关系定位：桌面伙伴"
+  });
+  assert.strictEqual(cleanedRegressionCard.character_name, "馨语", "persona card should not surface regression smoke names as user defaults");
+  assert.ok(!cleanedRegressionCard.identity.includes("回归检查"), "persona card should rebuild identity after dropping regression placeholders");
+  assert.strictEqual(cleanedRegressionCard.personality_tags, "", "persona card should hide legacy-only initiative text from personality tags");
+}
+
+{
   const browserVoices = [
     { name: "Microsoft Xiaoxiao Online (Natural) - Chinese (Mainland)", lang: "zh-CN" },
     { name: "Microsoft Aria Online (Natural) - English (United States)", lang: "en-US" }
@@ -533,7 +593,7 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(interjection.director.max_sentences, 4, "tiny-rant thought bursts should allow a few short beats");
   assert.strictEqual(interjection.director.motion_cue, "side_eye", "stage interjections should plan a visible side-eye motion cue");
   const interjectionPrompt = controller.buildAutoChatPrompt(interjection);
-  assert.ok(interjectionPrompt.includes("sudden thought burst") && interjectionPrompt.includes("thinking out loud"), "turn interjection prompt should frame the line as Taffy's own thought burst");
+  assert.ok(interjectionPrompt.includes("sudden thought burst") && interjectionPrompt.includes("thinking out loud"), "turn interjection prompt should frame the line as Xinyu's own thought burst");
   assert.ok(interjectionPrompt.includes("Interjection director: decision=interject") && interjectionPrompt.includes("thought_type=tiny_rant") && interjectionPrompt.includes("motion=side_eye"), "turn interjection prompt should carry the director execution plan");
   assert.ok(interjectionPrompt.includes("2-4 short beats") && !interjectionPrompt.includes("Use exactly one short sentence."), "thought burst prompt should not force every interjection into a one-liner");
   assert.strictEqual(controller.executeInterjectionDirectorMotion(interjection), true, "interjection director should dispatch a safe motion cue");
@@ -1319,6 +1379,27 @@ function createMemoryStorage(initial = {}) {
     ttsEnabled: true
   });
   assert.ok(miniRantVoiceTimeline.segments.length <= 3, "mini-rant voice timeline should cap speech beats");
+  const gptSovitsVoiceTimeline = performanceTimelineController.buildVoiceTimeline({
+    brainSnapshot: {
+      intent: "casual",
+      reply_shape: "mini_rant",
+      voice_director: {
+        delivery: "dry_playful",
+        pace: "varied",
+        pause_profile: "beat",
+        segment_style: "mini_rant_beats",
+        max_segments: 3
+      }
+    },
+    replyText: "The desk is suspicious. The cursor knows something. I am filing a tiny report.",
+    ttsProvider: "gpt_sovits",
+    ttsEnabled: true
+  });
+  assert.deepStrictEqual(
+    gptSovitsVoiceTimeline.segments,
+    ["The desk is suspicious.", "The cursor knows something.", "I am filing a tiny report."],
+    "GPT-SoVITS should keep segment planning so playback can prefetch the next sentence"
+  );
   const plannedSpeechSegments = performanceTimelineController.buildVoiceSpeechSegments(
     "One. Two. Three.",
     miniRantVoiceTimeline
@@ -1578,8 +1659,11 @@ assert.strictEqual(
   };
   learningReviewModel.applyLearningPayload(learningState, {
     candidates: [
-      { id: "a", assistant_preview: "soft reply", compressed_pattern: "warm", score: 0.7, confidence: 0.6, support_count: 1 },
-      { id: "b", assistant_preview: "strong reply", compressed_pattern: "direct", score: 0.9, confidence: 0.8, support_count: 2 }
+      { id: "a", user_preview: "quiet desk", assistant_preview: "soft reply", compressed_pattern: "warm", score: 0.7, confidence: 0.6, support_count: 1 },
+      { id: "b", user_preview: "ship today", assistant_preview: "strong reply", compressed_pattern: "direct", score: 0.9, confidence: 0.8, support_count: 2 }
+    ],
+    samples: [
+      { id: "s1", user_preview: "study mode", assistant_preview: "sample reply", compressed_pattern: "focus", score: 0.8, confidence: 0.7, support_count: 4 }
     ],
     quick_settings: { inject_count: 1, promotion_min_support: 2 }
   });
@@ -1590,9 +1674,19 @@ assert.strictEqual(
     "learning model should filter and sort candidate items"
   );
   assert.deepStrictEqual(
+    learningReviewModel.getLearningFilteredItems(learningState, { keyword: "quiet" }).map((item) => item.id),
+    ["a"],
+    "learning model should search user preview text so the pool content is discoverable"
+  );
+  assert.deepStrictEqual(
     learningState.quickSettings,
     { inject_count: 1, promotion_min_support: 2 },
     "learning model should normalize quick settings"
+  );
+  assert.deepStrictEqual(
+    learningReviewModel.buildLearningStats(learningState, 1),
+    { candidates: 2, samples: 1, visible: 1, selected: 1, activePoolLabel: "候选池" },
+    "learning model should build memory pool overview stats"
   );
   assert.strictEqual(
     learningReviewModel.getLearningStatusView("promoted").statusClass,
@@ -1618,6 +1712,91 @@ assert.strictEqual(
     "function",
     "learning review view should export list rendering"
   );
+  {
+    function createClassList(el) {
+      return {
+        contains(name) {
+          return String(el.className || "").split(/\s+/).includes(name);
+        },
+        add(name) {
+          if (!this.contains(name)) {
+            el.className = `${el.className || ""} ${name}`.trim();
+          }
+        },
+        remove(name) {
+          el.className = String(el.className || "")
+            .split(/\s+/)
+            .filter((item) => item && item !== name)
+            .join(" ");
+        },
+        toggle(name, force) {
+          const shouldAdd = force === undefined ? !this.contains(name) : force === true;
+          if (shouldAdd) {
+            this.add(name);
+          } else {
+            this.remove(name);
+          }
+        }
+      };
+    }
+    function createElement(tagName = "div") {
+      const el = {
+        tagName: String(tagName || "div").toUpperCase(),
+        type: "",
+        className: "",
+        textContent: "",
+        hidden: false,
+        checked: false,
+        dataset: {},
+        attributes: {},
+        children: [],
+        listeners: {},
+        appendChild(child) {
+          this.children.push(child);
+          return child;
+        },
+        setAttribute(name, value) {
+          this.attributes[name] = String(value);
+        },
+        addEventListener(type, handler) {
+          this.listeners[type] = handler;
+        },
+        querySelector(selector) {
+          const className = selector.startsWith(".") ? selector.slice(1) : "";
+          if (!className) {
+            return null;
+          }
+          const stack = [...this.children];
+          while (stack.length) {
+            const item = stack.shift();
+            if (String(item.className || "").split(/\s+/).includes(className)) {
+              return item;
+            }
+            stack.push(...(item.children || []));
+          }
+          return null;
+        }
+      };
+      el.classList = createClassList(el);
+      return el;
+    }
+    const doc = {
+      createElement,
+      createTextNode(text) {
+        return { nodeType: 3, textContent: String(text || ""), children: [] };
+      }
+    };
+    const container = createElement("div");
+    const rendered = learningReviewView.renderLearningReviewItems(container, [learningState.candidates[0]], {
+      document: doc,
+      model: learningReviewModel,
+      tab: "candidates"
+    });
+    assert.strictEqual(rendered, 1, "learning review view should render visible memory pool items");
+    assert.strictEqual(container.children[0].classList.contains("is-collapsed"), false, "memory cards should be expanded by default");
+    assert.ok(container.children[0].querySelector(".learning-item-preview"), "memory cards should show concrete pool details");
+    assert.ok(container.children[0].querySelector(".learning-item-actions"), "memory cards should keep useful review actions");
+  }
   assert.strictEqual(
     typeof learningReviewBinder.bindLearningReviewControls,
     "function",
@@ -1632,6 +1811,13 @@ assert.strictEqual(
     typeof panelControlBinder.bindPanelControls,
     "function",
     "panel control binder should export grouped panel binding"
+  );
+  assert.ok(
+    chatDomSource.includes('personaTestBtn: documentObject.getElementById("persona-test-btn")')
+      && panelControlBinderSource.includes("ui.personaTestBtn")
+      && source.includes("function preparePersonaTestPrompt()")
+      && source.includes("preparePersonaTestPrompt,"),
+    "persona card should expose a real test prompt action instead of a static preview"
   );
   assert.strictEqual(
     typeof advancedActionBinder.bindAdvancedActionControls,
@@ -2479,7 +2665,7 @@ assert.ok(
 );
 assert.ok(
   indexSource.includes("/ttsdebug")
-    && indexSource.includes('id="voice-test-btn"')
+    && indexSource.includes('id="config-switch-test-tts-btn"')
     && indexSource.includes('id="character-rehearsal-btn"')
     && indexSource.includes('id="character-tuning-btn"'),
   "help modal should guide non-technical users through self-check, chat, voice, persona setup, and character tuning"
@@ -2490,10 +2676,8 @@ assert.ok(
     && characterDiagnosticsControllerSource.includes("async function runVoiceTestAndAppendReport")
     && localCommandRegistrySource.includes('kind: "voice_test"')
     && localCommandRegistry.matchLocalCommand("/testvoice").kind === "voice_test"
-    && chatDomSource.includes("voiceTestBtn: documentObject.getElementById(\"voice-test-btn\")")
-    && advancedActionBinderSource.includes("ui.voiceTestBtn")
-    && advancedActionBinderSource.includes("runVoiceTestAndAppendReport"),
-  "voice test should be available both as a visible button and as a local command"
+    && indexSource.includes('id="config-switch-test-tts-btn"'),
+  "voice test should be available from the model/voice panel and as a local command"
 );
 assert.ok(
   tuningSource.includes("CHARACTER_REHEARSAL_PRESETS")
@@ -2503,8 +2687,9 @@ assert.ok(
     && localCommandRegistrySource.includes('kind: "character_rehearsal"')
     && localCommandRegistry.matchLocalCommand("/roletest").kind === "character_rehearsal"
     && chatDomSource.includes("characterRehearsalBtn: documentObject.getElementById(\"character-rehearsal-btn\")")
+    && indexSource.includes('id="character-rehearsal-btn" type="button" data-dev-feature="diagnostics"')
     && advancedActionBinderSource.includes("runCharacterRehearsalAndAppendReport"),
-  "character rehearsal should be available as a visible button and local command to test runtime expression and voice styles without LLM"
+  "character rehearsal should be available as a dev-mode button and local command to test runtime expression and voice styles without LLM"
 );
 assert.ok(
   tuningSource.includes("function buildTuningReport")
@@ -2515,6 +2700,7 @@ assert.ok(
     && localCommandRegistrySource.includes('kind: "character_tuning"')
     && localCommandRegistry.matchLocalCommand("/tuning").kind === "character_tuning"
     && chatDomSource.includes("characterTuningBtn: documentObject.getElementById(\"character-tuning-btn\")")
+    && indexSource.includes('id="character-tuning-btn" type="button" data-dev-feature="diagnostics"')
     && advancedActionBinderSource.includes("runCharacterTuningAndAppendReport")
     && tuningSource.includes("tts.gpt_sovits_ref_audio_path")
     && tuningSource.includes("motion.speech_motion_strength"),
@@ -2557,10 +2743,12 @@ assert.ok(
     && characterDiagnosticsControllerSource.includes("characterPerformanceLastFeedback")
     && localCommandRegistry.matchLocalCommand("/goodcue").kind === "character_feedback_good"
     && localCommandRegistry.matchLocalCommand("/badcue").kind === "character_feedback_bad"
-    && chatDomSource.includes("characterFeedbackGoodBtn: documentObject.getElementById(\"character-feedback-good-btn\")")
-    && chatDomSource.includes("characterFeedbackBadBtn: documentObject.getElementById(\"character-feedback-bad-btn\")")
-    && advancedActionBinderSource.includes("recordCharacterPerformanceFeedback"),
-  "character tuning should include persistent lightweight feedback that can guide the next runtime reply"
+    && source.includes("recordCharacterPerformanceFeedback,")
+    && chatMessageControllerSource.includes("message-feedback")
+    && chatMessageControllerSource.includes("recordCharacterPerformanceFeedback")
+    && !indexSource.includes('id="character-feedback-good-btn"')
+    && !indexSource.includes('id="character-feedback-bad-btn"'),
+  "character tuning should include persistent lightweight feedback on assistant messages that can guide the next runtime reply"
 );
 assert.ok(
   chatReplyControllerSource.includes("let characterRuntimeMetadataForReply = null")
@@ -2830,6 +3018,10 @@ assert.ok(
     && chatReplyControllerSource.includes("const performanceTimeline = buildPerformanceTimeline({")
     && chatReplyControllerSource.includes("const voiceTimeline = buildVoiceTimeline({")
     && chatReplyControllerSource.includes("speakWithVoiceTimeline(")
+    && chatReplyControllerSource.includes("speakPrefetchedServerVoiceSegments")
+    && chatReplyControllerSource.includes("_prefetch_segmented")
+    && chatReplyControllerSource.includes("requestServerTTSBlobWithRetry")
+    && chatReplyControllerSource.includes("playAudioBlob")
     && chatReplyControllerSource.includes("buildVoiceSpeechSegments(")
     && chatReplyControllerSource.includes("applyVoiceDirectorProsody(")
     && chatReplyControllerSource.includes("startPerformanceAudit({")

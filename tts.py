@@ -628,6 +628,34 @@ def _concat_wav_audio_bytes(chunks):
     return out.getvalue()
 
 
+def _trim_wav_audio_bytes(audio_bytes, threshold=200):
+    if not isinstance(audio_bytes, (bytes, bytearray)) or not audio_bytes:
+        return audio_bytes
+    try:
+        with wave.open(io.BytesIO(audio_bytes), "rb") as wf:
+            params = (
+                wf.getnchannels(),
+                wf.getsampwidth(),
+                wf.getframerate(),
+                wf.getcomptype(),
+                wf.getcompname(),
+            )
+            frames = wf.readframes(wf.getnframes())
+            trimmed = _trim_wav_silence(frames, wf.getsampwidth(), threshold=threshold)
+        if not trimmed or len(trimmed) >= len(frames):
+            return bytes(audio_bytes)
+        out = io.BytesIO()
+        with wave.open(out, "wb") as wf_out:
+            wf_out.setnchannels(params[0])
+            wf_out.setsampwidth(params[1])
+            wf_out.setframerate(params[2])
+            wf_out.setcomptype(params[3], params[4])
+            wf_out.writeframes(trimmed)
+        return out.getvalue()
+    except Exception:
+        return bytes(audio_bytes)
+
+
 def _looks_too_short_for_text(audio_bytes, text):
     dur = _wav_duration_seconds(audio_bytes)
     if dur is None:
@@ -1402,6 +1430,17 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         audio_bytes=len(audio or b""),
         audio_duration_ms=int(round(float(_wav_duration_seconds(audio) or 0.0) * 1000)),
     )
+    trimmed_audio = _trim_wav_audio_bytes(audio)
+    if trimmed_audio and len(trimmed_audio) != len(audio):
+        _log_tts_perf(
+            "TTS_GPT_SOVITS",
+            trace_id,
+            stage="silence_trimmed",
+            audio_bytes_before=len(audio or b""),
+            audio_bytes_after=len(trimmed_audio or b""),
+            audio_duration_ms=int(round(float(_wav_duration_seconds(trimmed_audio) or 0.0) * 1000)),
+        )
+        audio = trimmed_audio
     if normalize_loudness:
         audio, loudness_meta = _normalize_wav_loudness(
             audio,

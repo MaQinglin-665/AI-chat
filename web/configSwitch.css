@@ -1,0 +1,537 @@
+.config-switch-modal[hidden] {
+  display: none !important;
+}
+
+body.config-switch-open .panel {
+  z-index: 0;
+}
+
+.config-switch-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10050 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 9px;
+  background:
+    radial-gradient(110% 70% at 10% 0%, rgba(143, 165, 255, 0.20), transparent 52%),
+    radial-gradient(70% 80% at 92% 14%, rgba(85, 214, 185, 0.11), transparent 54%),
+    rgba(22, 35, 64, 0.28);
+  backdrop-filter: blur(7px);
+  pointer-events: auto;
+}
+
+.config-switch-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(720px, calc(100vw - 18px));
+  height: min(850px, calc(100vh - 18px));
+  min-height: min(620px, calc(100vh - 18px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(166, 184, 236, 0.66);
+  border-radius: 26px;
+  background:
+    radial-gradient(120% 90% at 4% 0%, rgba(226, 234, 255, 0.95), rgba(226, 234, 255, 0) 52%),
+    linear-gradient(180deg, rgba(252, 254, 255, 0.99), rgba(239, 245, 255, 0.99));
+  box-shadow:
+    0 28px 62px rgba(33, 55, 107, 0.30),
+    0 0 0 1px rgba(255, 255, 255, 0.52) inset;
+  color: #243f77;
+}
+
+.config-switch-head {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 142px;
+  padding: 30px 34px 18px;
+  overflow: hidden;
+}
+
+.config-switch-head::before {
+  content: "✦";
+  position: absolute;
+  left: 22px;
+  top: 24px;
+  color: rgba(115, 129, 236, 0.48);
+  font-size: 27px;
+  line-height: 1;
+  text-shadow:
+    24px 4px 0 rgba(115, 129, 236, 0.20),
+    594px 92px 0 rgba(115, 129, 236, 0.16),
+    640px 54px 0 rgba(115, 129, 236, 0.18);
+  pointer-events: none;
+}
+
+.config-switch-head::after {
+  content: "";
+  position: absolute;
+  right: 28px;
+  bottom: -2px;
+  width: 150px;
+  height: 105px;
+  background:
+    linear-gradient(180deg, rgba(183, 197, 255, 0.34), rgba(183, 197, 255, 0.08));
+  clip-path: polygon(6% 100%, 12% 46%, 27% 64%, 39% 32%, 50% 58%, 62% 32%, 74% 64%, 88% 46%, 94% 100%);
+  opacity: 0.68;
+  pointer-events: none;
+}
+
+.config-switch-head-copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding-left: 8px;
+}
+
+.config-switch-head-copy strong {
+  display: block;
+  max-width: calc(100vw - 148px);
+  font-size: 40px;
+  line-height: 1.08;
+  font-weight: 900;
+  letter-spacing: 0;
+  color: #4f64d8;
+  text-shadow:
+    0 2px 0 #ffffff,
+    2px 4px 0 rgba(56, 76, 174, 0.16);
+}
+
+.config-switch-head-copy strong::after {
+  content: "";
+  display: inline-block;
+  width: 28px;
+  height: 22px;
+  margin-left: 10px;
+  vertical-align: 3px;
+  border-radius: 50% 50% 45% 45%;
+  border: 2px solid rgba(120, 141, 232, 0.32);
+  box-shadow:
+    -9px -5px 0 -5px rgba(120, 141, 232, 0.30),
+    9px -5px 0 -5px rgba(120, 141, 232, 0.30),
+    -4px -12px 0 -6px rgba(120, 141, 232, 0.24),
+    4px -12px 0 -6px rgba(120, 141, 232, 0.24);
+}
+
+.config-switch-head-copy p {
+  max-width: 540px;
+  margin: 14px 0 0;
+  color: #53679e;
+  font-size: 16px;
+  line-height: 1.65;
+  font-weight: 650;
+}
+
+.config-switch-close-btn {
+  position: relative;
+  z-index: 2;
+  width: 62px;
+  height: 62px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid rgba(161, 174, 245, 0.70);
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 120% at 30% 20%, rgba(255, 255, 255, 0.94), rgba(244, 247, 255, 0.82)),
+    rgba(248, 250, 255, 0.96);
+  color: #6a61db;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 0.92;
+  box-shadow:
+    0 12px 25px rgba(81, 91, 193, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.config-switch-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 14px;
+  padding: 24px 26px 22px;
+  overflow: auto;
+  border: 1px solid rgba(172, 190, 238, 0.62);
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  background:
+    radial-gradient(130% 90% at 0% 0%, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.70)),
+    rgba(252, 254, 255, 0.78);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 10px 24px rgba(68, 93, 156, 0.08);
+  scrollbar-color: rgba(125, 133, 230, 0.78) transparent;
+  scrollbar-width: thin;
+}
+
+.config-switch-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.config-switch-body::-webkit-scrollbar-track {
+  margin: 14px 0;
+  background: transparent;
+}
+
+.config-switch-body::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(125, 133, 230, 0.78);
+  background-clip: content-box;
+}
+
+.config-switch-section {
+  position: relative;
+}
+
+.config-switch-section + .config-switch-section {
+  margin-top: 28px;
+  padding-top: 26px;
+  border-top: 1px solid rgba(157, 177, 229, 0.36);
+}
+
+.config-switch-section-title {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+  margin-bottom: 18px;
+  font-size: 24px;
+  font-weight: 900;
+  color: #334a93;
+}
+
+.config-switch-section-title::before {
+  content: "";
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, #ffffff 0 20%, transparent 22%),
+    radial-gradient(circle at 36% 38%, #ffffff 0 8%, transparent 10%),
+    radial-gradient(circle at 64% 38%, #ffffff 0 8%, transparent 10%),
+    linear-gradient(135deg, #5e7cff, #5a61e7);
+  box-shadow:
+    0 7px 16px rgba(87, 106, 227, 0.24),
+    0 0 0 5px rgba(94, 124, 255, 0.12);
+}
+
+.config-switch-section-title::after {
+  content: "";
+  height: 1px;
+  flex: 1 1 auto;
+  border-top: 1px dashed rgba(138, 157, 214, 0.42);
+}
+
+.config-switch-section:nth-of-type(2) .config-switch-section-title::before {
+  background:
+    radial-gradient(circle at 50% 35%, #ffffff 0 12%, transparent 14%),
+    linear-gradient(180deg, transparent 0 42%, #ffffff 44% 56%, transparent 58%),
+    linear-gradient(135deg, #52d1bd, #4972ef);
+  box-shadow:
+    0 7px 16px rgba(73, 114, 239, 0.20),
+    0 0 0 5px rgba(82, 209, 189, 0.12);
+}
+
+.config-switch-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+.config-switch-field,
+.config-switch-check {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 900;
+  color: #41558a;
+}
+
+.config-switch-field-wide,
+.config-switch-check {
+  grid-column: 1 / -1;
+}
+
+.config-switch-field input,
+.config-switch-field select {
+  width: 100%;
+  min-width: 0;
+  height: 58px;
+  padding: 0 20px;
+  border: 1px solid rgba(163, 181, 230, 0.70);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(249, 252, 255, 0.98));
+  color: #213967;
+  font-size: 18px;
+  font-weight: 650;
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 5px 12px rgba(80, 103, 165, 0.05);
+}
+
+.config-switch-field select {
+  appearance: none;
+  padding-right: 50px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #7690ff 50%),
+    linear-gradient(135deg, #7690ff 50%, transparent 50%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(249, 252, 255, 0.98));
+  background-position:
+    calc(100% - 28px) 25px,
+    calc(100% - 18px) 25px,
+    0 0;
+  background-size: 9px 9px, 9px 9px, 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.config-switch-field input::placeholder {
+  color: #8896b8;
+  font-weight: 600;
+}
+
+.config-switch-field input:focus,
+.config-switch-field select:focus {
+  border-color: rgba(82, 106, 242, 0.84);
+  box-shadow:
+    0 0 0 4px rgba(82, 106, 242, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.config-switch-note,
+.config-switch-status {
+  color: #5d73a3;
+  font-size: 14px;
+  line-height: 1.48;
+}
+
+.config-switch-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 15px 16px;
+  border: 1px solid rgba(65, 190, 149, 0.26);
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, rgba(235, 252, 246, 0.96), rgba(245, 253, 250, 0.86));
+  color: #2f8a69;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.config-switch-note::before {
+  content: "✓";
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #3abb82;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.config-switch-check {
+  min-height: 56px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(163, 181, 230, 0.58);
+  border-radius: 14px;
+  background: rgba(252, 254, 255, 0.84);
+  color: #41558a;
+}
+
+.config-switch-check input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: #5d76f4;
+}
+
+.config-switch-actions {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 0 14px;
+  padding: 2px 26px 14px;
+  border-right: 1px solid rgba(172, 190, 238, 0.62);
+  border-left: 1px solid rgba(172, 190, 238, 0.62);
+  background: rgba(252, 254, 255, 0.78);
+}
+
+.config-switch-actions button {
+  min-width: 0;
+  height: 52px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px solid rgba(161, 181, 238, 0.70);
+  border-radius: 14px;
+  background:
+    radial-gradient(100% 120% at 100% 70%, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 255, 0.96));
+  color: #314a88;
+  font-size: 17px;
+  font-weight: 900;
+  box-shadow:
+    0 8px 18px rgba(81, 103, 174, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.90);
+}
+
+.config-switch-actions button::before {
+  width: 24px;
+  text-align: center;
+  color: #6b70e9;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+#config-switch-test-llm-btn::before {
+  content: "◇";
+}
+
+#config-switch-test-tts-btn::before {
+  content: "♪";
+}
+
+#config-switch-save-btn::before {
+  content: "✦";
+  color: #ffffff;
+}
+
+.config-switch-primary-btn {
+  height: 60px !important;
+  border-color: rgba(81, 101, 245, 0.84) !important;
+  border-radius: 15px !important;
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgba(173, 112, 255, 0.82), rgba(173, 112, 255, 0)),
+    linear-gradient(135deg, #5d83ff 0%, #4d6ff1 56%, #7658ef 100%) !important;
+  color: #ffffff !important;
+  font-size: 22px !important;
+  letter-spacing: 0 !important;
+  box-shadow:
+    0 13px 26px rgba(76, 107, 239, 0.30),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.30) !important;
+}
+
+.config-switch-status {
+  position: relative;
+  min-height: 42px;
+  margin: 0 14px 14px;
+  padding: 10px 26px 18px 50px;
+  border-right: 1px solid rgba(172, 190, 238, 0.62);
+  border-bottom: 1px solid rgba(172, 190, 238, 0.62);
+  border-left: 1px solid rgba(172, 190, 238, 0.62);
+  border-radius: 0 0 24px 24px;
+  background: rgba(252, 254, 255, 0.78);
+  color: #5b6e9e;
+  font-weight: 700;
+}
+
+.config-switch-status::before {
+  content: "";
+  position: absolute;
+  left: 28px;
+  top: 17px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #38be87;
+  box-shadow: 0 0 0 5px rgba(56, 190, 135, 0.14);
+}
+
+@media (max-width: 640px) {
+  .config-switch-modal {
+    align-items: stretch;
+    padding: 6px;
+  }
+
+  .config-switch-dialog {
+    width: 100%;
+    height: calc(100vh - 12px);
+    min-height: 0;
+    border-radius: 20px;
+  }
+
+  .config-switch-head {
+    min-height: 126px;
+    padding: 24px 22px 14px;
+  }
+
+  .config-switch-head-copy {
+    padding-left: 0;
+  }
+
+  .config-switch-head-copy strong {
+    max-width: calc(100vw - 116px);
+    font-size: 30px;
+  }
+
+  .config-switch-head-copy p {
+    margin-top: 9px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .config-switch-close-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    font-size: 36px;
+  }
+
+  .config-switch-body {
+    margin: 0 10px;
+    padding: 20px 20px 18px;
+  }
+
+  .config-switch-section-title {
+    font-size: 20px;
+  }
+
+  .config-switch-field,
+  .config-switch-check {
+    font-size: 14px;
+  }
+
+  .config-switch-field input,
+  .config-switch-field select {
+    height: 52px;
+    font-size: 16px;
+  }
+
+  .config-switch-actions,
+  .config-switch-status {
+    margin-right: 10px;
+    margin-left: 10px;
+  }
+
+  .config-switch-actions {
+    padding: 2px 20px 12px;
+  }
+
+  .config-switch-status {
+    margin-bottom: 10px;
+    padding-right: 20px;
+  }
+}

@@ -85,6 +85,44 @@ assert.deepStrictEqual(
   "stream speech should segment extracted visible text instead of JSON wrapper fields"
 );
 
+{
+  let streamBuffer = "";
+  const spokenSegments = [];
+  const chunks = '{"text":"Just a background process pretending to be busy.","emotion":"neutral","action":"none","intensity":"low","voice_style":"teasing"}'.match(/.{1,12}/g);
+  for (const [index, chunk] of chunks.entries()) {
+    streamBuffer += chunk;
+    const parsed = speechText.splitStreamSpeakSegments(streamBuffer, {
+      flush: false,
+      style: "playful",
+      provider: "gpt_sovits"
+    });
+    if (index < chunks.length - 1) {
+      assert.deepStrictEqual(
+        parsed.segments,
+        [],
+        "stream speech should hold incomplete JSON wrappers instead of speaking metadata fragments"
+      );
+    }
+    spokenSegments.push(...parsed.segments);
+    streamBuffer = parsed.rest;
+  }
+  assert.deepStrictEqual(
+    spokenSegments,
+    ["Just a background process pretending to be busy."],
+    "stream speech should speak only the JSON text field and never the voice_style value"
+  );
+  const flushedJson = speechText.splitStreamSpeakSegments(streamBuffer, {
+    flush: true,
+    style: "playful",
+    provider: "gpt_sovits"
+  });
+  assert.deepStrictEqual(
+    flushedJson.segments,
+    [],
+    "stream speech should have no leftover metadata to flush after JSON wrapper playback"
+  );
+}
+
 assert.deepStrictEqual(
   speechText.splitStreamSpeakSegments('"json"\n"text": "Told ya. Less is more sometimes."', {
     flush: true,

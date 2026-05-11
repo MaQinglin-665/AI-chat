@@ -179,6 +179,7 @@ from app_diagnostics import (
 from app_asr_route import handle_asr_pcm_request
 from app_translate_route import handle_translate_request
 from app_tts_route import handle_tts_request
+from config_switch import build_config_switch_payload, save_config_switch_update
 from llm_diagnostics import (
     diagnose_llm_exception as _diagnose_llm_exception_impl,
     ensure_llm_auth_ready as _ensure_llm_auth_ready_impl,
@@ -1345,6 +1346,17 @@ class PetHandler(SimpleHTTPRequestHandler):
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 )
             return
+        if path_only == "/api/config/switch":
+            try:
+                config = load_config()
+                self._send_json(build_config_switch_payload(config))
+            except Exception as exc:
+                _log_backend_exception("CONFIG", exc, extra="GET /api/config/switch failed")
+                self._send_json(
+                    _diagnostic_payload(exc),
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
         if path_only == "/api/config/reload":
             try:
                 self._send_json(self._reload_runtime_config())
@@ -1401,6 +1413,47 @@ class PetHandler(SimpleHTTPRequestHandler):
         if self._reject_disallowed_origin(path_only):
             return
         if self._reject_invalid_api_token(path_only):
+            return
+        if path_only == "/api/config/switch":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._send_json(
+                    {"ok": False, "error": "Invalid JSON body."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            if not isinstance(body, dict):
+                body = {}
+            try:
+                saved = save_config_switch_update(body)
+                try:
+                    reload_snapshot = self._reload_runtime_config()
+                except Exception as reload_exc:
+                    _log_backend_exception("CONFIG", reload_exc, extra="POST /api/config/switch reload failed")
+                    reload_snapshot = {"ok": False, **_diagnostic_payload(reload_exc)}
+                current = build_config_switch_payload(load_config())
+                self._send_json(
+                    {
+                        **current,
+                        "saved": saved.get("saved", {}),
+                        "reload": reload_snapshot,
+                    },
+                    status=HTTPStatus.OK,
+                )
+            except DiagnosticError as exc:
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+            except Exception as exc:
+                _log_backend_exception("CONFIG", exc, extra="POST /api/config/switch failed")
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
             return
         if path_only == "/api/config/reload":
             content_length = int(self.headers.get("Content-Length", "0"))
