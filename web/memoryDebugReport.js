@@ -6,6 +6,7 @@
     const memory = data.memory && typeof data.memory === "object" ? data.memory : {};
     const learning = data.learning && typeof data.learning === "object" ? data.learning : {};
     const diagnostics = learning.diagnostics && typeof learning.diagnostics === "object" ? learning.diagnostics : {};
+    const extraction = learning.last_extraction && typeof learning.last_extraction === "object" ? learning.last_extraction : {};
     const last = memory.last_selection && typeof memory.last_selection === "object" ? memory.last_selection : {};
     const lines = [
       "Memory/Learning Debug:",
@@ -19,6 +20,15 @@
       `last.lightweight=${last.is_lightweight_checkin === true}`,
       `last.candidates=${Number(last.candidate_count || 0)}`,
       `last.selected=${Array.isArray(last.selected) ? last.selected.length : 0}`,
+      `last.learningReason=${String(last.learning_reason || "(none)")}`,
+      `last.learningSamples=${Number(last.learning_samples_considered || 0)}`,
+      `last.learningSelected=${Array.isArray(last.learning_samples_selected) ? last.learning_samples_selected.length : 0}`,
+      `extract.status=${String(extraction.status || "(none)")}`,
+      `extract.reason=${String(extraction.reason || "(none)")}`,
+      `extract.action=${String(extraction.action || "(none)")}`,
+      `extract.category=${String(extraction.category || "(none)")}`,
+      `extract.score=${Number(extraction.score || 0)}`,
+      `extract.confidence=${Number(extraction.confidence || 0)}`,
       `learning.candidates=${Number(learning.candidates_count || 0)}`,
       `learning.samples=${Number(learning.samples_count || 0)}`,
       `learning.degraded=${learning.degraded_mode === true}`,
@@ -35,6 +45,19 @@
       selected.forEach((item, idx) => {
         lines.push(`${idx + 1}. [${item.source || "selected"}] ${item.user || ""} => ${item.assistant || ""}`);
       });
+    }
+    const learningSelected = Array.isArray(last.learning_samples_selected) ? last.learning_samples_selected.slice(0, 5) : [];
+    if (learningSelected.length) {
+      lines.push("Selected learning samples:");
+      learningSelected.forEach((item, idx) => {
+        lines.push(`${idx + 1}. relevance=${Number(item.relevance || 0)} ${item.compressed_pattern || item.user_preview || item.id || ""}`);
+      });
+    }
+    if (extraction.status || extraction.reason || extraction.candidate_id) {
+      lines.push("Last learning extraction:");
+      lines.push(
+        `${extraction.status || "(none)"} ${extraction.action || ""} ${extraction.candidate_id || ""} category=${extraction.category || "(none)"} score=${Number(extraction.score || 0)} confidence=${Number(extraction.confidence || 0)} reason=${extraction.reason || "(none)"}`
+      );
     }
     const relevant = Array.isArray(last.relevant_candidates) ? last.relevant_candidates.slice(0, 5) : [];
     if (relevant.length) {

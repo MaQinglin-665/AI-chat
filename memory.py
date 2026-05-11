@@ -20,6 +20,7 @@ except Exception:
 MEMORY_LOCK = threading.Lock()
 MEM0_LOCK = threading.Lock()
 SUMMARY_LOCK = threading.Lock()
+LEARNING_LOCK = threading.Lock()
 
 MEM0_DIR = MEMORY_PATH.parent / ".mem0"
 MEM0_QDRANT_DIR = MEM0_DIR / "qdrant"
@@ -35,6 +36,7 @@ LEARNING_SHADOW_LOG_PATH = MEMORY_PATH.parent / "learning_shadow_log.jsonl"
 
 MEM0_CLIENT = None
 LAST_MEMORY_DEBUG = {}
+LAST_LEARNING_EXTRACTION_DEBUG = {}
 MEM0_CLIENT_KEY = ""
 
 LEGACY_MANUAL_PERSONA_CARD_FIELDS = (
@@ -136,6 +138,23 @@ STAGEY_REPLY_RE = re.compile(
     r"刚(揉|眯|啃|吃)|揉了揉眼|眨巴眼|端来一杯|拿了杯)"
 )
 MOJIBAKE_RE = re.compile(r"(浣犲|鍦ㄥ悧|鍢匡紝|銆\?|鐢ㄦ埛|鍥炵瓟|涓€|锛|鎬庝箞)")
+SENSITIVE_MEMORY_RE = re.compile(
+    r"(?i)("
+    r"api[_-]?key|secret|password|passwd|authorization|bearer\s+[a-z0-9._-]+|"
+    r"sk-[a-z0-9]{16,}|github_pat_[a-z0-9_]+|ghp_[a-z0-9]{16,}|"
+    r"[a-z]:\\(?:users|ai|windows|program files)|"
+    r"/(?:users|home|var|etc)/|"
+    r"https?://[^/\s]+:[^@\s]+@"
+    r")"
+)
+
+LEARNING_CANDIDATE_CATEGORIES = {
+    "user_preference",
+    "project_context",
+    "relationship_style",
+    "response_feedback",
+    "stable_fact",
+}
 
 
 def _clamp_int(value, default, min_value, max_value):
@@ -161,6 +180,14 @@ def get_memory_settings(config):
         "max_items": _clamp_int(raw.get("max_items", 600), 600, 50, 4000),
         "inject_recent": _clamp_int(raw.get("inject_recent", 2), 2, 0, 8),
         "inject_relevant": _clamp_int(raw.get("inject_relevant", 4), 4, 0, 12),
+        "learning_samples_enabled": bool(raw.get("learning_samples_enabled", True)),
+        "learning_inject_count": _clamp_int(raw.get("learning_inject_count", 2), 2, 0, 4),
+        "learning_min_score": _clamp_float(raw.get("learning_min_score", 0.55), 0.55, 0.0, 1.0),
+        "learning_min_confidence": _clamp_float(raw.get("learning_min_confidence", 0.45), 0.45, 0.0, 1.0),
+        "learning_candidates_enabled": bool(raw.get("learning_candidates_enabled", True)),
+        "learning_candidate_max_items": _clamp_int(raw.get("learning_candidate_max_items", 200), 200, 20, 1000),
+        "learning_candidate_min_score": _clamp_float(raw.get("learning_candidate_min_score", 0.45), 0.45, 0.0, 1.0),
+        "learning_candidate_min_confidence": _clamp_float(raw.get("learning_candidate_min_confidence", 0.45), 0.45, 0.0, 1.0),
         "summary_trigger_every": _clamp_int(raw.get("summary_trigger_every", 10), 10, 5, 50),
         "mem0_enabled": bool(raw.get("mem0_enabled", True)),
         "mem0_top_k": _clamp_int(raw.get("mem0_top_k", 5), 5, 1, 12),
@@ -197,13 +224,20 @@ def looks_stagey_text(text):
     return bool(STAGEY_REPLY_RE.search(s))
 
 
+def looks_sensitive_memory_text(text):
+    s = str(text or "").strip()
+    if not s:
+        return False
+    return bool(SENSITIVE_MEMORY_RE.search(s))
+
+
 def is_lightweight_checkin_message(text):
     safe = re.sub(r"\s+", "", str(text or "").strip().lower())
     if not safe:
         return False
     return bool(
         re.fullmatch(
-            r"(在吗|在嘛|在不在|在么|喂|嗨|hi|hello|哈喽|早|早安|晚安|午安|睡了吗)[!！?？~～]*",
+            r"(在吗|在嘛|在不在|在么|喂|嗨|hi|hello|哈喽|早|早安|早上好|晚安|午安|睡了吗)[!！?？~～]*",
             safe,
         )
     )
@@ -567,6 +601,17 @@ def _append_unique_memory_item(chosen, seen, item):
     return True
 
 
+def _append_unique_learning_item(chosen, seen, item):
+    if not isinstance(item, dict):
+        return False
+    key = ("learning", item.get("id", ""), item.get("compressed_pattern", ""))
+    if key in seen:
+        return False
+    seen.add(key)
+    chosen.append(item)
+    return True
+
+
 def _compact_memory_debug_item(item, source="", score=None):
     safe = item if isinstance(item, dict) else {}
     out = {
@@ -581,6 +626,431 @@ def _compact_memory_debug_item(item, source="", score=None):
         except (TypeError, ValueError):
             out["score"] = 0
     return out
+
+
+def _compact_learning_prompt_item(item, score=None):
+    safe = item if isinstance(item, dict) else {}
+    out = {
+        "id": str(safe.get("id", "")).strip()[:80],
+        "source": "learning_sample",
+        "score": safe.get("score", 0),
+        "confidence": safe.get("confidence", 0),
+        "support_count": safe.get("support_count", 0),
+        "user_preview": normalize_memory_text(safe.get("user_preview", ""), max_len=90),
+        "assistant_preview": normalize_memory_text(safe.get("assistant_preview", ""), max_len=90),
+        "compressed_pattern": normalize_memory_text(safe.get("compressed_pattern", ""), max_len=110),
+    }
+    if score is not None:
+        try:
+            out["relevance"] = int(score)
+        except (TypeError, ValueError):
+            out["relevance"] = 0
+    return out
+
+
+def _learning_item_sort_time(item):
+    raw = str((item or {}).get("updated_at") or (item or {}).get("created_at") or "").strip()
+    if not raw:
+        return 0.0
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except Exception:
+        return 0.0
+    return parsed.timestamp()
+
+
+def _learning_item_quality(item):
+    safe = item if isinstance(item, dict) else {}
+    try:
+        score = float(safe.get("score", 0) or 0)
+    except (TypeError, ValueError):
+        score = 0.0
+    try:
+        confidence = float(safe.get("confidence", 0) or 0)
+    except (TypeError, ValueError):
+        confidence = 0.0
+    try:
+        support = int(safe.get("support_count", 0) or 0)
+    except (TypeError, ValueError):
+        support = 0
+    return score, confidence, support
+
+
+def _is_learning_sample_prompt_eligible(item, settings):
+    safe = item if isinstance(item, dict) else {}
+    if not safe:
+        return False
+    status = str(safe.get("status", "") or "").strip().lower()
+    source = str(safe.get("source", "") or "").strip().lower()
+    item_id = str(safe.get("id", "") or "").strip().lower()
+    if status in {"archived", "deleted", "rejected"}:
+        return False
+    if status and status not in {"active", "promoted", "learned", "candidate"}:
+        return False
+    if status == "candidate" and source != "learned" and not item_id.startswith(("learned_", "manual_")):
+        return False
+    if _is_learning_text_garbled(safe):
+        return False
+    if looks_stagey_text(safe.get("assistant_preview", "")) or looks_stagey_text(safe.get("compressed_pattern", "")):
+        return False
+    score, confidence, _support = _learning_item_quality(safe)
+    return (
+        score >= float(settings.get("learning_min_score", 0.55))
+        and confidence >= float(settings.get("learning_min_confidence", 0.45))
+    )
+
+
+def _select_learning_samples_for_prompt(settings, query_tokens, explicit_memory_intent=False):
+    if not settings.get("learning_samples_enabled", True):
+        return [], "disabled", 0
+    count = max(0, int(settings.get("learning_inject_count", 0) or 0))
+    if count <= 0:
+        return [], "count_zero", 0
+    _candidates, samples, state = _load_learning_review_store()
+    quick = _learning_quick_settings(state)
+    if quick.get("inject_count", 1) < 1:
+        return [], "quick_disabled", len(samples)
+
+    eligible = [
+        item for item in samples
+        if _is_learning_sample_prompt_eligible(item, settings)
+    ]
+    if not eligible:
+        return [], "no_eligible_samples", len(samples)
+
+    query = query_tokens if isinstance(query_tokens, set) else set()
+    scored = []
+    for idx, item in enumerate(eligible):
+        sample_tokens = tokenize_memory_text(
+            f"{item.get('user_preview', '')} {item.get('assistant_preview', '')} {item.get('compressed_pattern', '')}"
+        )
+        relevance = len(query & sample_tokens)
+        if relevance <= 0 and not explicit_memory_intent:
+            continue
+        score, confidence, support = _learning_item_quality(item)
+        scored.append((relevance, score, confidence, support, _learning_item_sort_time(item), -idx, item))
+
+    if not scored:
+        return [], "no_relevant_samples", len(samples)
+    scored.sort(reverse=True)
+
+    selected = []
+    seen = set()
+    for relevance, _score, _confidence, _support, _time, _idx, item in scored:
+        enriched = dict(item)
+        enriched["kind"] = "learning_sample"
+        enriched["relevance"] = relevance
+        if _append_unique_learning_item(selected, seen, enriched) and len(selected) >= count:
+            break
+    return selected, "selected" if selected else "no_match", len(samples)
+
+
+def _set_last_learning_extraction_debug(snapshot):
+    global LAST_LEARNING_EXTRACTION_DEBUG
+    LAST_LEARNING_EXTRACTION_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+
+
+def _compact_learning_extraction_debug(snapshot):
+    safe = snapshot if isinstance(snapshot, dict) else {}
+    return {
+        "at": str(safe.get("at", "")).strip()[:40],
+        "status": str(safe.get("status", "")).strip()[:40],
+        "reason": str(safe.get("reason", "")).strip()[:80],
+        "candidate_id": str(safe.get("candidate_id", "")).strip()[:80],
+        "category": str(safe.get("category", "")).strip()[:40],
+        "score": safe.get("score", 0),
+        "confidence": safe.get("confidence", 0),
+        "support_count": safe.get("support_count", 0),
+        "action": str(safe.get("action", "")).strip()[:40],
+    }
+
+
+def _has_explicit_learning_signal(user_text):
+    safe = str(user_text or "").strip().lower()
+    if not safe:
+        return False
+    return bool(
+        re.search(
+            r"(remember this|remember that|please remember|from now on|next time|call me|i prefer|i like|i dislike|"
+            r"don't|do not|avoid|以后|下次|记住|记一下|我喜欢|我不喜欢|别再|不要再|不要|希望你|叫我|称呼我)",
+            safe,
+        )
+    )
+
+
+def _learning_candidate_skip_reason(settings, user, assistant):
+    if not settings.get("learning_candidates_enabled", True):
+        return "candidate_learning_disabled"
+    if is_lightweight_checkin_message(user):
+        return "lightweight_checkin"
+    if len(str(user or "").strip()) < 6 or len(str(assistant or "").strip()) < 4:
+        return "too_short"
+    if looks_garbled_text(user) or looks_garbled_text(assistant):
+        return "garbled_text"
+    if looks_stagey_text(assistant):
+        return "stagey_reply"
+    if looks_sensitive_memory_text(user) or looks_sensitive_memory_text(assistant):
+        return "sensitive_text"
+    if not _has_explicit_learning_signal(user) and not is_specific_memory_query(user):
+        return "low_signal"
+    return ""
+
+
+def _build_learning_candidate_prompt(user, assistant, explicit_signal=False):
+    explicit_note = "这轮用户有明确记忆/偏好指令，可适度提高 score。" if explicit_signal else "这轮没有明确记忆指令，只在信息稳定、可复用时记。"
+    return (
+        "你是本地桌宠的记忆提炼器。只根据下面这一轮用户和桌宠的聊天，判断是否值得形成一条候选长期记忆。\n"
+        "只允许记稳定、可复用、对以后聊天有帮助的信息；不要记录一次性闲聊、临时情绪、隐私密钥、路径、账号、token、API key。\n"
+        "如果值得记，输出一个 JSON 对象；如果不值得记，输出 {\"remember\": false}。\n"
+        "JSON 字段必须是：remember(boolean), category, compressed_pattern, user_preview, assistant_preview, score, confidence。\n"
+        "category 只能是 user_preference, project_context, relationship_style, response_feedback, stable_fact。\n"
+        "compressed_pattern 用中文，40字以内，写成可长期复用的偏好/事实，不要写成对用户说的话。\n"
+        "score/confidence 是 0 到 1 的数字。\n"
+        f"{explicit_note}\n\n"
+        f"用户：{normalize_memory_text(user, 240)}\n"
+        f"桌宠：{normalize_memory_text(assistant, 260)}"
+    )
+
+
+def _parse_json_object_from_llm(text):
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
+        raw = re.sub(r"\s*```$", "", raw)
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start < 0 or end <= start:
+        return None
+    try:
+        data = json.loads(raw[start : end + 1])
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _normalize_learning_candidate_payload(raw, user, assistant, explicit_signal=False):
+    data = raw if isinstance(raw, dict) else {}
+    if data.get("remember") is False:
+        return None, "llm_no_candidate"
+    category = str(data.get("category", "") or "").strip()
+    if category not in LEARNING_CANDIDATE_CATEGORIES:
+        return None, "invalid_category"
+    compressed = normalize_memory_text(data.get("compressed_pattern", ""), max_len=120)
+    user_preview = normalize_memory_text(data.get("user_preview") or user, max_len=140)
+    assistant_preview = normalize_memory_text(data.get("assistant_preview") or assistant, max_len=160)
+    if len(compressed) < 4:
+        return None, "empty_pattern"
+    if (
+        looks_garbled_text(compressed)
+        or looks_sensitive_memory_text(compressed)
+        or looks_stagey_text(compressed)
+        or looks_sensitive_memory_text(user_preview)
+        or looks_sensitive_memory_text(assistant_preview)
+    ):
+        return None, "unsafe_candidate"
+    try:
+        score = float(data.get("score", 0.55) or 0.55)
+    except (TypeError, ValueError):
+        score = 0.55
+    try:
+        confidence = float(data.get("confidence", 0.5) or 0.5)
+    except (TypeError, ValueError):
+        confidence = 0.5
+    if explicit_signal:
+        score += 0.12
+        confidence += 0.08
+    return {
+        "category": category,
+        "compressed_pattern": compressed,
+        "user_preview": user_preview,
+        "assistant_preview": assistant_preview,
+        "score": round(max(0.0, min(1.0, score)), 4),
+        "confidence": round(max(0.0, min(1.0, confidence)), 4),
+    }, ""
+
+
+def _learning_pattern_key(text):
+    compact = re.sub(r"[\s\u3000，。！？!?.,;:、~～'\"“”‘’（）()【】\[\]{}<>《》\-_/\\]+", "", str(text or "").lower())
+    return compact[:96]
+
+
+def _learning_patterns_similar(a, b):
+    key_a = _learning_pattern_key(a)
+    key_b = _learning_pattern_key(b)
+    if not key_a or not key_b:
+        return False
+    if key_a == key_b or key_a in key_b or key_b in key_a:
+        return True
+    tokens_a = tokenize_memory_text(a)
+    tokens_b = tokenize_memory_text(b)
+    if not tokens_a or not tokens_b:
+        return False
+    overlap = len(tokens_a & tokens_b)
+    return overlap >= 2 and overlap / max(1, min(len(tokens_a), len(tokens_b))) >= 0.6
+
+
+def _make_learning_candidate_id(category, pattern):
+    slug = re.sub(r"[^a-z0-9]+", "_", str(pattern or "").lower()).strip("_")[:24]
+    if not slug:
+        slug = "memory"
+    return f"cand_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{category}_{slug}"
+
+
+def _trim_learning_candidates(candidates, max_items):
+    limit = max(1, int(max_items or 200))
+    items = [item for item in candidates if isinstance(item, dict)]
+    if len(items) <= limit:
+        return items
+    def sort_key(item):
+        score, confidence, support = _learning_item_quality(item)
+        status = str(item.get("status", "candidate") or "candidate").strip().lower()
+        promoted_penalty = -1 if status == "promoted" else 0
+        return (promoted_penalty, score, confidence, support, _learning_item_sort_time(item))
+    return sorted(items, key=sort_key, reverse=True)[:limit]
+
+
+def _record_learning_candidate(candidate, settings):
+    if not isinstance(candidate, dict):
+        return None, "invalid_candidate"
+    score = float(candidate.get("score", 0) or 0)
+    confidence = float(candidate.get("confidence", 0) or 0)
+    if score < float(settings.get("learning_candidate_min_score", 0.45)):
+        return None, "low_score"
+    if confidence < float(settings.get("learning_candidate_min_confidence", 0.45)):
+        return None, "low_confidence"
+
+    now = _learning_now_iso()
+    with LEARNING_LOCK:
+        candidates, samples, state = _load_learning_review_store()
+        existing = None
+        for item in candidates:
+            if _learning_patterns_similar(item.get("compressed_pattern", ""), candidate.get("compressed_pattern", "")):
+                existing = item
+                break
+        if existing is not None:
+            existing["support_count"] = max(0, int(existing.get("support_count", 0) or 0)) + 1
+            existing["score"] = round(max(float(existing.get("score", 0) or 0), score), 4)
+            existing["confidence"] = round(max(float(existing.get("confidence", 0) or 0), confidence), 4)
+            existing["category"] = existing.get("category") or candidate.get("category", "")
+            existing["updated_at"] = now
+            if score >= float(existing.get("score", 0) or 0):
+                existing["user_preview"] = candidate.get("user_preview", existing.get("user_preview", ""))
+                existing["assistant_preview"] = candidate.get("assistant_preview", existing.get("assistant_preview", ""))
+                existing["compressed_pattern"] = candidate.get("compressed_pattern", existing.get("compressed_pattern", ""))
+            action = "merged"
+            item = existing
+        else:
+            item = {
+                "id": _make_learning_candidate_id(candidate.get("category", "stable_fact"), candidate.get("compressed_pattern", "")),
+                "source": "auto_llm",
+                "status": "candidate",
+                "category": candidate.get("category", "stable_fact"),
+                "user_preview": candidate.get("user_preview", ""),
+                "assistant_preview": candidate.get("assistant_preview", ""),
+                "compressed_pattern": candidate.get("compressed_pattern", ""),
+                "score": round(score, 4),
+                "confidence": round(confidence, 4),
+                "support_count": 1,
+                "created_at": now,
+                "updated_at": now,
+            }
+            candidates.append(item)
+            action = "created"
+        candidates = _trim_learning_candidates(candidates, settings.get("learning_candidate_max_items", 200))
+        state["last_candidate_extracted_at"] = now
+        _save_learning_review_store(candidates, samples, state)
+    return item, action
+
+
+def _extract_and_store_learning_candidate(config, record):
+    settings = get_memory_settings(config)
+    safe = record if isinstance(record, dict) else {}
+    user = normalize_memory_text(safe.get("user", ""), max_len=240)
+    assistant = normalize_memory_text(safe.get("assistant", ""), max_len=280)
+    explicit_signal = _has_explicit_learning_signal(user)
+    base_debug = {
+        "at": _learning_now_iso(),
+        "status": "skipped",
+        "reason": "",
+        "action": "",
+        "candidate_id": "",
+        "category": "",
+        "score": 0,
+        "confidence": 0,
+        "support_count": 0,
+    }
+    skip_reason = _learning_candidate_skip_reason(settings, user, assistant)
+    if skip_reason:
+        base_debug["reason"] = skip_reason
+        _set_last_learning_extraction_debug(base_debug)
+        return base_debug
+
+    prompt = _build_learning_candidate_prompt(user, assistant, explicit_signal=explicit_signal)
+    try:
+        raw = _call_summary_llm(config, prompt)
+    except Exception:
+        logger.debug("learning candidate extraction llm failed", exc_info=True)
+        base_debug["reason"] = "llm_error"
+        _set_last_learning_extraction_debug(base_debug)
+        return base_debug
+    data = _parse_json_object_from_llm(raw)
+    if data is None:
+        base_debug["reason"] = "llm_invalid_json" if str(raw or "").strip() else "llm_empty"
+        _set_last_learning_extraction_debug(base_debug)
+        return base_debug
+    candidate, reason = _normalize_learning_candidate_payload(data, user, assistant, explicit_signal=explicit_signal)
+    if not candidate:
+        base_debug["reason"] = reason or "candidate_rejected"
+        _set_last_learning_extraction_debug(base_debug)
+        return base_debug
+    item, action = _record_learning_candidate(candidate, settings)
+    if not item:
+        base_debug["reason"] = action or "candidate_rejected"
+        _set_last_learning_extraction_debug(base_debug)
+        return base_debug
+
+    debug = {
+        **base_debug,
+        "status": "stored",
+        "reason": "",
+        "action": action,
+        "candidate_id": item.get("id", ""),
+        "category": item.get("category", ""),
+        "score": item.get("score", 0),
+        "confidence": item.get("confidence", 0),
+        "support_count": item.get("support_count", 0),
+    }
+    _set_last_learning_extraction_debug(debug)
+    return debug
+
+
+def _schedule_learning_candidate_extraction(config, record):
+    settings = get_memory_settings(config)
+    user = record.get("user", "") if isinstance(record, dict) else ""
+    assistant = record.get("assistant", "") if isinstance(record, dict) else ""
+    skip_reason = _learning_candidate_skip_reason(settings, user, assistant)
+    if skip_reason:
+        _set_last_learning_extraction_debug(
+            {
+                "at": _learning_now_iso(),
+                "status": "skipped",
+                "reason": skip_reason,
+                "action": "",
+                "candidate_id": "",
+                "category": "",
+                "score": 0,
+                "confidence": 0,
+                "support_count": 0,
+            }
+        )
+        return
+    threading.Thread(
+        target=_extract_and_store_learning_candidate,
+        args=(config, dict(record)),
+        daemon=True,
+    ).start()
 
 
 def _set_last_memory_debug(snapshot):
@@ -604,6 +1074,10 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
         "candidate_count": 0,
         "relevant_candidates": [],
         "recent_considered": 0,
+        "learning_samples_enabled": bool(settings["learning_samples_enabled"]),
+        "learning_samples_considered": 0,
+        "learning_samples_selected": [],
+        "learning_reason": "",
     }
     if not settings["enabled"]:
         debug["reason"] = "memory_disabled"
@@ -628,15 +1102,9 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
     total_target = max(0, relevant_target + settings["inject_recent"])
 
     for item in _search_mem0_items(config, user_message, safe_history):
-        if _append_unique_memory_item(chosen, seen, item) and len(chosen) >= relevant_target:
-            result = chosen[:total_target] if total_target else []
-            debug["selected"] = [
-                _compact_memory_debug_item(item, source="mem0")
-                for item in result
-            ]
-            debug["reason"] = "selected" if result else "no_match"
-            _set_last_memory_debug(debug)
-            return result
+        _append_unique_memory_item(chosen, seen, item)
+        if len(chosen) >= relevant_target:
+            break
 
     query_parts = [str(user_message or "")]
     query_parts.extend(
@@ -676,10 +1144,22 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
                 break
 
     result = chosen[:total_target] if total_target else []
+    learning_selected, learning_reason, learning_count = _select_learning_samples_for_prompt(
+        settings,
+        query_tokens,
+        explicit_memory_intent=explicit_memory_intent,
+    )
+    debug["learning_samples_considered"] = learning_count
+    debug["learning_samples_selected"] = [
+        _compact_learning_prompt_item(item, score=item.get("relevance", 0))
+        for item in learning_selected
+    ]
+    debug["learning_reason"] = learning_reason
     debug["selected"] = [
         _compact_memory_debug_item(item, source="selected")
         for item in result
     ]
+    result = result + learning_selected
     debug["reason"] = "selected" if result else "no_match"
     _set_last_memory_debug(debug)
     return result
@@ -691,16 +1171,33 @@ def build_memory_prompt_block(config, user_message, safe_history):
         return ""
 
     lines = []
+    learned_lines = []
     for item in selected:
+        if item.get("kind") == "learning_sample":
+            pattern = normalize_memory_text(item.get("compressed_pattern", ""), max_len=120)
+            user_preview = normalize_memory_text(item.get("user_preview", ""), max_len=70)
+            if pattern and user_preview:
+                learned_lines.append(f'- 和当前话题相关的长期偏好：{pattern}（来自用户表达：“{user_preview}”）。')
+            elif pattern:
+                learned_lines.append(f"- 和当前话题相关的长期偏好：{pattern}。")
+            continue
         ago = _human_time_ago(str(item.get("ts", "")).strip())
         user = normalize_memory_text(item.get("user", ""), max_len=70)
         assistant = normalize_memory_text(item.get("assistant", ""), max_len=90)
         lines.append(f'- {ago}，你们聊过：用户说“{user}”，你回答“{assistant}”。')
 
-    return (
-        "以下是你和用户过去对话里值得参考的记忆。只在自然相关时用上，不要逐条复述，也不要强行提起：\n"
-        + "\n".join(lines)
-    )
+    blocks = []
+    if lines:
+        blocks.append(
+            "以下是你和用户过去对话里值得参考的记忆。只在自然相关时用上，不要逐条复述，也不要强行提起：\n"
+            + "\n".join(lines)
+        )
+    if learned_lines:
+        blocks.append(
+            "以下是已经人工确认或高置信沉淀的长期互动偏好。把它当成轻量风格约束，不要主动解释你在使用记忆：\n"
+            + "\n".join(learned_lines)
+        )
+    return "\n\n".join(blocks)
 
 
 def merge_prompt_with_memory(prompt, memory_block):
@@ -1099,6 +1596,7 @@ def promote_learning_review_candidates(config, candidate_ids):
         sample = dict(item)
         sample["id"] = f"learned_{item['id']}" if not str(item["id"]).startswith(("learned_", "manual_")) else item["id"]
         sample["source"] = str(sample.get("source", "") or "learned")
+        sample["status"] = "active"
         sample["updated_at"] = now
         if not sample.get("created_at"):
             sample["created_at"] = now
@@ -1254,6 +1752,7 @@ def get_memory_debug_snapshot(config):
     with MEMORY_LOCK:
         memory_count = len(load_memory_items())
         last_memory_debug = dict(LAST_MEMORY_DEBUG) if isinstance(LAST_MEMORY_DEBUG, dict) else {}
+    last_extraction_debug = _compact_learning_extraction_debug(LAST_LEARNING_EXTRACTION_DEBUG)
     candidates = _safe_load_json_file(LEARNING_CANDIDATES_PATH, [])
     samples = _safe_load_json_file(LEARNING_SAMPLES_PATH, [])
     state = _safe_load_json_file(LEARNING_STATE_PATH, {})
@@ -1274,6 +1773,7 @@ def get_memory_debug_snapshot(config):
         "learning": {
             "candidates_count": len(candidates),
             "samples_count": len(samples),
+            "last_extraction": last_extraction_debug,
             "degraded_mode": bool(state.get("degraded_mode", False)),
             "turn_count": int(state.get("turn_count", 0) or 0),
             "diagnostics": _build_learning_diagnostics(candidates, samples, state),
@@ -1775,6 +2275,8 @@ def remember_interaction(config, user_message, assistant_reply, is_auto=False):
             args=(config, record["user"], record["assistant"], record["ts"]),
             daemon=True,
         ).start()
+
+    _schedule_learning_candidate_extraction(config, record)
 
     if new_count % settings["summary_trigger_every"] == 0:
         threading.Thread(

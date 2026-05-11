@@ -192,6 +192,7 @@ README 保留首跑关键入口，详细配置迁移到文档：
 - v1.4 AI VTuber Feeling 规格与 demo 场景：`docs/v1.4-ai-vtuber-feeling.md`
 - 发布前 / 打包前人工验收清单：`docs/manual-qa.md`
 - 推荐本地体验模板：`docs/recommended-local-config.md`
+- 记忆系统机制与安全边界：`docs/memory-system.md`
 - Character Runtime Live2D 映射：`docs/character-runtime-live2d-mapping.md`
 - Character Runtime 验证记录模板：`docs/character-runtime-validation-log.md`
 - Character Runtime 主动行为安全边界：`docs/character-runtime-proactive-safety.md`

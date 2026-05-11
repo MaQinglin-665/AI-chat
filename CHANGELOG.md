@@ -11,6 +11,11 @@ All notable changes to this project are documented in this file.
 - Added read-only LLM link diagnostics for first-run `/api/llm_probe` failures.
 - Added a model selection guide for user-chosen LLM providers and Taffy preview readiness.
 - Added a one-click preview environment preparation entry for early testers.
+- Added reviewed learning memory flow: normal chats can create candidate memories asynchronously, while only user-promoted learning samples can affect future replies.
+- Added `/api/memory/debug` and memory management debug visibility for recent learning-sample injection and candidate extraction status.
+
+### Changed
+- Documented the memory candidate pool, formal learning sample pool, and conservative memory safety boundaries.
 
 ### Fixed
 - Fixed source-test packaging so all tracked root Python backend modules are included.
