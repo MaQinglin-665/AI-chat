@@ -87,6 +87,29 @@ TTS_PRESETS = {
     },
 }
 
+REPLY_LANGUAGES = [
+    {"id": "zh", "label": "中文", "description": "Default Simplified Chinese character replies."},
+    {"id": "en", "label": "English", "description": "Force English character replies."},
+    {"id": "ja", "label": "日本語", "description": "Force Japanese character replies."},
+    {"id": "ko", "label": "한국어", "description": "Force Korean character replies."},
+    {"id": "auto", "label": "Auto", "description": "Follow the user's main input language."},
+]
+
+ALLOWED_REPLY_LANGUAGES = {item["id"] for item in REPLY_LANGUAGES}
+VOICE_BY_REPLY_LANGUAGE = {
+    "zh": "zh-CN-XiaoxiaoNeural",
+    "en": "en-US-AriaNeural",
+    "ja": "ja-JP-NanamiNeural",
+    "ko": "ko-KR-SunHiNeural",
+}
+GPT_SOVITS_LANG_BY_REPLY_LANGUAGE = {
+    "zh": "zh",
+    "en": "en",
+    "ja": "ja",
+    "ko": "ko",
+    "auto": "zh",
+}
+
 ALLOWED_LLM_PRESETS = set(LLM_PRESETS)
 ALLOWED_TTS_PROVIDERS = set(TTS_PRESETS)
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
@@ -141,6 +164,91 @@ def _safe_bool(value, default=False):
     if text in {"0", "false", "no", "off"}:
         return False
     return bool(default)
+
+
+def _safe_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _safe_int(value, default=0):
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _normalize_reply_language(value, default="zh"):
+    raw = str(value or default or "zh").strip().lower()
+    aliases = {
+        "follow": "auto",
+        "match": "auto",
+        "cn": "zh",
+        "zh-cn": "zh",
+        "zh_cn": "zh",
+        "chinese": "zh",
+        "english": "en",
+        "jp": "ja",
+        "japanese": "ja",
+        "kr": "ko",
+        "korean": "ko",
+    }
+    lang = aliases.get(raw, raw)
+    if lang not in ALLOWED_REPLY_LANGUAGES:
+        lang = default if default in ALLOWED_REPLY_LANGUAGES else "zh"
+    return lang
+
+
+def _reply_language_from_payload(payload, current="zh"):
+    if not isinstance(payload, dict):
+        return _normalize_reply_language(current)
+    if "assistant_reply_language" in payload:
+        return _normalize_reply_language(payload.get("assistant_reply_language"), current)
+    if "reply_language" in payload:
+        return _normalize_reply_language(payload.get("reply_language"), current)
+    section = payload.get("language")
+    if isinstance(section, dict) and "assistant_reply_language" in section:
+        return _normalize_reply_language(section.get("assistant_reply_language"), current)
+    return _normalize_reply_language(current)
+
+
+def _has_reply_language_update(payload):
+    if not isinstance(payload, dict):
+        return False
+    return (
+        "assistant_reply_language" in payload
+        or "reply_language" in payload
+        or (
+            isinstance(payload.get("language"), dict)
+            and "assistant_reply_language" in payload.get("language", {})
+        )
+    )
+
+
+def _recommended_voice_for_reply_language(lang):
+    return VOICE_BY_REPLY_LANGUAGE.get(_normalize_reply_language(lang), VOICE_BY_REPLY_LANGUAGE["zh"])
+
+
+def _gpt_sovits_lang_for_reply_language(lang):
+    return GPT_SOVITS_LANG_BY_REPLY_LANGUAGE.get(_normalize_reply_language(lang), "zh")
+
+
+def _apply_tts_language_defaults(tts, reply_language):
+    if not isinstance(tts, dict):
+        return
+    if not str(tts.get("provider", "") or "").strip():
+        tts["provider"] = "browser"
+    if tts.get("auto_voice_by_reply_language", True) is False:
+        tts["gpt_sovits_text_lang"] = _gpt_sovits_lang_for_reply_language(reply_language)
+        return
+    provider = str(tts.get("provider", "browser") or "browser").strip().lower()
+    if provider in {"browser", "edge_tts"}:
+        voice = _recommended_voice_for_reply_language(reply_language)
+        tts["voice"] = voice
+        tts["voices"] = [voice]
+    tts["gpt_sovits_text_lang"] = _gpt_sovits_lang_for_reply_language(reply_language)
 
 
 def _read_json_object(path):
@@ -278,6 +386,8 @@ def _build_tts_current(tts_cfg):
     return {
         "provider": provider if provider in ALLOWED_TTS_PROVIDERS else "browser",
         "voice": str(cfg.get("voice", "") or "").strip(),
+        "auto_voice_by_reply_language": bool(cfg.get("auto_voice_by_reply_language", True)),
+        "gpt_sovits_text_lang": str(cfg.get("gpt_sovits_text_lang", "zh") or "zh").strip().lower(),
         "gpt_sovits_api_url": safe_url_display(
             cfg.get("gpt_sovits_api_url", ""),
             default_url=GPT_SOVITS_DEFAULT_API_URL,
@@ -286,9 +396,19 @@ def _build_tts_current(tts_cfg):
     }
 
 
+def _build_stickers_current(stickers_cfg):
+    cfg = stickers_cfg if isinstance(stickers_cfg, dict) else {}
+    return {
+        "assistant_enabled": bool(cfg.get("assistant_enabled", True)),
+        "assistant_chance": max(0.0, min(1.0, _safe_float(cfg.get("assistant_chance", 0.18), 0.18))),
+        "assistant_cooldown_ms": max(10000, min(30 * 60 * 1000, _safe_int(cfg.get("assistant_cooldown_ms", 60000), 60000))),
+    }
+
+
 def build_config_switch_payload(config, *, env_path=None):
     cfg = config if isinstance(config, dict) else {}
     env_file = ENV_PATH if env_path is None else Path(env_path)
+    reply_language = _normalize_reply_language(cfg.get("assistant_reply_language", "zh"))
     return {
         "ok": True,
         "target": "config.local.json",
@@ -298,9 +418,13 @@ def build_config_switch_payload(config, *, env_path=None):
         },
         "llm_presets": list(LLM_PRESETS.values()),
         "tts_presets": list(TTS_PRESETS.values()),
+        "reply_languages": REPLY_LANGUAGES,
+        "voice_by_reply_language": VOICE_BY_REPLY_LANGUAGE,
         "current": {
+            "assistant_reply_language": reply_language,
             "llm": _build_llm_current(cfg.get("llm", {}), env_file),
             "tts": _build_tts_current(cfg.get("tts", {})),
+            "stickers": _build_stickers_current(cfg.get("stickers", {})),
         },
     }
 
@@ -359,9 +483,10 @@ def _normalize_llm_update(raw):
     }
 
 
-def _normalize_tts_update(raw):
+def _normalize_tts_update(raw, existing=None):
     body = raw if isinstance(raw, dict) else {}
-    provider = _clean_text(body.get("provider") or "browser", 64).lower()
+    current = existing if isinstance(existing, dict) else {}
+    provider = _clean_text(body.get("provider") or current.get("provider") or "browser", 64).lower()
     if provider not in ALLOWED_TTS_PROVIDERS:
         raise DiagnosticError(
             code="config_switch_invalid_tts_provider",
@@ -370,46 +495,103 @@ def _normalize_tts_update(raw):
             config_key="tts.provider",
         )
     preset = TTS_PRESETS[provider]
-    voice = _clean_text(body.get("voice") or preset.get("voice") or TTS_DEFAULT_VOICE, 120)
+    voice = _clean_text(body.get("voice") or current.get("voice") or preset.get("voice") or TTS_DEFAULT_VOICE, 120)
     update = {
         "provider": provider,
         "voice": voice,
         "voices": [voice] if voice else [],
-        "allow_browser_fallback": _safe_bool(body.get("allow_browser_fallback", False), False),
+        "auto_voice_by_reply_language": _safe_bool(
+            body.get("auto_voice_by_reply_language", current.get("auto_voice_by_reply_language", True)),
+            True,
+        ),
+        "gpt_sovits_text_lang": _clean_text(
+            body.get("gpt_sovits_text_lang") or current.get("gpt_sovits_text_lang") or "zh",
+            8,
+        ).lower(),
+        "allow_browser_fallback": _safe_bool(
+            body.get("allow_browser_fallback", current.get("allow_browser_fallback", False)),
+            False,
+        ),
     }
     if provider == "gpt_sovits":
         update["gpt_sovits_api_url"] = _normalize_http_url(
-            body.get("gpt_sovits_api_url") or preset["gpt_sovits_api_url"],
+            body.get("gpt_sovits_api_url") or current.get("gpt_sovits_api_url") or preset["gpt_sovits_api_url"],
             default_url=preset["gpt_sovits_api_url"],
             config_key="tts.gpt_sovits_api_url",
         )
     return update
 
 
+def _normalize_sticker_update(raw, existing=None):
+    body = raw if isinstance(raw, dict) else {}
+    current = existing if isinstance(existing, dict) else {}
+    return {
+        "assistant_enabled": _safe_bool(
+            body.get("assistant_enabled", body.get("assistantEnabled", current.get("assistant_enabled", True))),
+            True,
+        ),
+        "assistant_chance": max(
+            0.0,
+            min(1.0, _safe_float(body.get("assistant_chance", current.get("assistant_chance", 0.18)), 0.18)),
+        ),
+        "assistant_cooldown_ms": max(
+            10000,
+            min(
+                30 * 60 * 1000,
+                _safe_int(body.get("assistant_cooldown_ms", current.get("assistant_cooldown_ms", 60000)), 60000),
+            ),
+        ),
+    }
+
+
 def save_config_switch_update(body, *, local_config_path=None, env_path=None):
     payload = body if isinstance(body, dict) else {}
-    llm_update = _normalize_llm_update(payload.get("llm", {}))
-    tts_update = _normalize_tts_update(payload.get("tts", {}))
     local_path = LOCAL_CONFIG_PATH if local_config_path is None else Path(local_config_path)
     env_file = ENV_PATH if env_path is None else Path(env_path)
     local_config = _read_json_object(local_path)
 
-    llm = _ensure_section(local_config, "llm")
-    llm["provider"] = llm_update["provider"]
-    llm["base_url"] = llm_update["base_url"]
-    llm["model"] = llm_update["model"]
-    llm["api_key"] = ""
-    if llm_update["api_key_env"]:
-        llm["api_key_env"] = llm_update["api_key_env"]
-    elif "api_key_env" in llm:
-        llm["api_key_env"] = ""
+    llm_update = None
+    tts_update = None
+    sticker_update = None
+    key_saved = False
 
-    tts = _ensure_section(local_config, "tts")
-    for key, value in tts_update.items():
-        tts[key] = value
+    current_reply_language = _normalize_reply_language(local_config.get("assistant_reply_language", "zh"))
+    reply_language = _reply_language_from_payload(payload, current_reply_language)
+    if _has_reply_language_update(payload):
+        local_config["assistant_reply_language"] = reply_language
+
+    if "llm" in payload:
+        llm_update = _normalize_llm_update(payload.get("llm", {}))
+        llm = _ensure_section(local_config, "llm")
+        llm["provider"] = llm_update["provider"]
+        llm["base_url"] = llm_update["base_url"]
+        llm["model"] = llm_update["model"]
+        llm["api_key"] = ""
+        if llm_update["api_key_env"]:
+            llm["api_key_env"] = llm_update["api_key_env"]
+        elif "api_key_env" in llm:
+            llm["api_key_env"] = ""
+        key_saved = _write_env_value(env_file, llm_update["api_key_env"], llm_update["api_key"])
+
+    if "tts" in payload:
+        tts = _ensure_section(local_config, "tts")
+        tts_update = _normalize_tts_update(payload.get("tts", {}), tts)
+        for key, value in tts_update.items():
+            tts[key] = value
+
+    if _has_reply_language_update(payload) or "tts" in payload:
+        tts = _ensure_section(local_config, "tts")
+        if "auto_voice_by_reply_language" not in tts:
+            tts["auto_voice_by_reply_language"] = True
+        _apply_tts_language_defaults(tts, reply_language)
+
+    if "stickers" in payload:
+        stickers = _ensure_section(local_config, "stickers")
+        sticker_update = _normalize_sticker_update(payload.get("stickers", {}), stickers)
+        for key, value in sticker_update.items():
+            stickers[key] = value
 
     _write_json_object(local_path, local_config)
-    key_saved = _write_env_value(env_file, llm_update["api_key_env"], llm_update["api_key"])
 
     return {
         "ok": True,
@@ -422,15 +604,21 @@ def save_config_switch_update(body, *, local_config_path=None, env_path=None):
                 "base_url": safe_url_display(llm_update["base_url"]),
                 "model": llm_update["model"],
                 "api_key_env": llm_update["api_key_env"],
-            },
+            } if llm_update else {},
+            "assistant_reply_language": reply_language,
             "tts": {
-                "provider": tts_update["provider"],
-                "voice": tts_update["voice"],
+                "provider": _ensure_section(local_config, "tts").get("provider", "browser"),
+                "voice": _ensure_section(local_config, "tts").get("voice", ""),
+                "auto_voice_by_reply_language": bool(
+                    _ensure_section(local_config, "tts").get("auto_voice_by_reply_language", True)
+                ),
+                "gpt_sovits_text_lang": _ensure_section(local_config, "tts").get("gpt_sovits_text_lang", "zh"),
                 "gpt_sovits_api_url": safe_url_display(
-                    tts_update.get("gpt_sovits_api_url", ""),
+                    _ensure_section(local_config, "tts").get("gpt_sovits_api_url", ""),
                     default_url=GPT_SOVITS_DEFAULT_API_URL,
                 ),
-                "allow_browser_fallback": bool(tts_update.get("allow_browser_fallback", False)),
+                "allow_browser_fallback": bool(_ensure_section(local_config, "tts").get("allow_browser_fallback", False)),
             },
+            "stickers": sticker_update or _build_stickers_current(local_config.get("stickers", {})),
         },
     }

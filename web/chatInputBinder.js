@@ -80,6 +80,20 @@
         call(deps.setStickerRespondAfterSend, ui.stickerRespondToggle.checked === true);
       });
     }
+    if (ui.assistantStickerToggle) {
+      ui.assistantStickerToggle.addEventListener("change", () => {
+        call(deps.setAssistantStickerEnabled, ui.assistantStickerToggle.checked === true);
+      });
+    }
+  }
+
+  function bindReplyLanguageControls(ui = {}, deps = {}) {
+    if (!ui.replyLanguageSelect) {
+      return;
+    }
+    ui.replyLanguageSelect.addEventListener("change", () => {
+      call(deps.setReplyLanguage, ui.replyLanguageSelect.value);
+    });
   }
 
   function bindMicControls(ui = {}, deps = {}) {
@@ -167,6 +181,7 @@
     bindSendControls(ui, deps);
     bindAttachmentControls(ui, deps);
     bindStickerControls(ui, deps);
+    bindReplyLanguageControls(ui, deps);
     bindMicControls(ui, deps);
     bindKeyboardShortcuts(ui, deps);
     bindSpeakControls(ui, deps);
@@ -177,6 +192,7 @@
     bindSendControls,
     bindAttachmentControls,
     bindStickerControls,
+    bindReplyLanguageControls,
     bindMicControls,
     bindKeyboardShortcuts,
     bindSpeakControls

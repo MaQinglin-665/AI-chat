@@ -92,6 +92,11 @@ function createUi() {
       llmApiKey: createElement(doc),
       ttsProvider: createElement(doc),
       ttsVoice: createElement(doc),
+      replyLanguage: createElement(doc),
+      ttsAutoVoice: createElement(doc),
+      assistantStickerEnabled: createElement(doc),
+      assistantStickerChance: createElement(doc),
+      assistantStickerCooldown: createElement(doc),
       ttsBrowserFallback: createElement(doc),
       gptSovitsRow: createElement(doc),
       gptSovitsUrl: createElement(doc)
@@ -127,7 +132,21 @@ const SUMMARY = {
       gpt_sovits_api_url: "http://127.0.0.1:9880/tts"
     }
   ],
+  reply_languages: [
+    { id: "zh", label: "中文" },
+    { id: "en", label: "English" },
+    { id: "ja", label: "日本語" },
+    { id: "ko", label: "한국어" },
+    { id: "auto", label: "自动跟随" }
+  ],
+  voice_by_reply_language: {
+    zh: "zh-CN-XiaoxiaoNeural",
+    en: "en-US-AriaNeural",
+    ja: "ja-JP-NanamiNeural",
+    ko: "ko-KR-SunHiNeural"
+  },
   current: {
+    assistant_reply_language: "ja",
     llm: {
       preset_id: "dashscope",
       base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -139,7 +158,13 @@ const SUMMARY = {
       provider: "gpt_sovits",
       voice: "default",
       gpt_sovits_api_url: "http://127.0.0.1:9880/tts",
+      auto_voice_by_reply_language: true,
       allow_browser_fallback: true
+    },
+    stickers: {
+      assistant_enabled: true,
+      assistant_chance: 0.18,
+      assistant_cooldown_ms: 60000
     }
   }
 };
@@ -156,6 +181,9 @@ function testFormInitializationAndPresetSwitch() {
   assert.ok(ui.keyStatus.textContent.includes("已检测到"));
   assert.strictEqual(ui.ttsProvider.value, "gpt_sovits");
   assert.strictEqual(ui.gptSovitsRow.hidden, false);
+  assert.strictEqual(ui.replyLanguage.value, "ja");
+  assert.strictEqual(ui.ttsAutoVoice.checked, true);
+  assert.strictEqual(ui.assistantStickerEnabled.checked, true);
 
   controller.applyLlmPresetToForm("ollama");
   assert.strictEqual(ui.llmPreset.value, "ollama");
@@ -166,6 +194,9 @@ function testFormInitializationAndPresetSwitch() {
   controller.applyTtsPresetToForm("browser");
   assert.strictEqual(ui.ttsProvider.value, "browser");
   assert.strictEqual(ui.gptSovitsRow.hidden, true);
+  controller.applyReplyLanguageToForm("ko");
+  assert.strictEqual(ui.replyLanguage.value, "ko");
+  assert.strictEqual(ui.ttsVoice.value, "ko-KR-SunHiNeural");
 }
 
 async function testSavePayloadAndReload() {
@@ -187,6 +218,10 @@ async function testSavePayloadAndReload() {
   controller.setFormFromSummary(SUMMARY);
   ui.llmApiKey.value = "sk-not-returned";
   ui.ttsBrowserFallback.checked = false;
+  ui.replyLanguage.value = "en";
+  ui.assistantStickerEnabled.checked = false;
+  ui.assistantStickerChance.value = "0.12";
+  ui.assistantStickerCooldown.value = "90000";
 
   await controller.saveConfigSwitch();
 
@@ -195,6 +230,11 @@ async function testSavePayloadAndReload() {
   assert.strictEqual(calls[0].payload.llm.preset_id, "dashscope");
   assert.strictEqual(calls[0].payload.llm.api_key, "sk-not-returned");
   assert.strictEqual(calls[0].payload.tts.allow_browser_fallback, false);
+  assert.strictEqual(calls[0].payload.assistant_reply_language, "en");
+  assert.strictEqual(calls[0].payload.tts.auto_voice_by_reply_language, true);
+  assert.strictEqual(calls[0].payload.stickers.assistant_enabled, false);
+  assert.strictEqual(calls[0].payload.stickers.assistant_chance, 0.12);
+  assert.strictEqual(calls[0].payload.stickers.assistant_cooldown_ms, 90000);
   assert.strictEqual(reloaded, 1);
   assert.ok(ui.status.textContent.includes("已保存"));
 }

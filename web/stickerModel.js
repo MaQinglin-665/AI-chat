@@ -173,19 +173,42 @@
     return pool[index] || pool[0];
   }
 
-  function shouldSendAssistantSticker(input = {}) {
+  function getAssistantStickerDecision(input = {}) {
     if (input.enabled === false || input.auto === true) {
-      return false;
+      return { ok: false, reason: input.enabled === false ? "disabled" : "auto_turn" };
+    }
+    const brain = input.characterBrain && typeof input.characterBrain === "object" ? input.characterBrain : {};
+    const intent = clampText(input.intent || brain.intent, "", 40).toLowerCase();
+    const text = String(input.text || "").toLowerCase();
+    const seriousIntents = new Set(["comfort", "reminder", "feedback", "task_help", "closing", "low_interrupt_checkin"]);
+    if (seriousIntents.has(intent)) {
+      return { ok: false, reason: `scene_${intent}` };
+    }
+    if (
+      input.diagnostic === true
+      || input.tool === true
+      || /\b(error|failed|failure|exception|traceback|diagnostic|doctor|api key|secret)\b/.test(text)
+      || /(报错|错误|失败|故障|诊断|密钥|异常|崩溃)/.test(text)
+    ) {
+      return { ok: false, reason: "diagnostic_or_error" };
     }
     const now = Math.max(1, Number(input.now) || Date.now());
     const lastAt = Math.max(0, Number(input.lastAt) || 0);
     const cooldownMs = Math.max(0, Number(input.cooldownMs) || 60000);
     if (lastAt && now - lastAt < cooldownMs) {
-      return false;
+      return { ok: false, reason: "cooldown", remainingMs: Math.max(0, cooldownMs - (now - lastAt)) };
     }
-    const chance = Math.max(0, Math.min(1, Number(input.chance) || 0.42));
+    const chance = Math.max(0, Math.min(1, Number(input.chance) || 0.18));
     const random = typeof input.random === "function" ? input.random : Math.random;
-    return random() < chance;
+    const roll = random();
+    if (roll >= chance) {
+      return { ok: false, reason: "chance", roll, chance };
+    }
+    return { ok: true, reason: "ok", roll, chance };
+  }
+
+  function shouldSendAssistantSticker(input = {}) {
+    return getAssistantStickerDecision(input).ok === true;
   }
 
   const api = {
@@ -198,6 +221,7 @@
     buildStickerPrompt,
     getDefaultStickers,
     getFileExt,
+    getAssistantStickerDecision,
     isStickerImageFile,
     moodToStickerIds,
     normalizeDefaultManifest,

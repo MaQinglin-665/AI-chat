@@ -54,6 +54,13 @@
         </label>
         <button id="sticker-close-btn" class="sticker-close-btn" type="button" aria-label="关闭表情包面板">×</button>
       </div>
+      <div class="sticker-assistant-row">
+        <label class="sticker-assistant-toggle">
+          <input id="assistant-sticker-toggle" type="checkbox" />
+          <span>AI 偶尔发表情</span>
+        </label>
+        <span id="assistant-sticker-debug" class="sticker-assistant-debug">最近：待机</span>
+      </div>
       <section class="sticker-section">
         <div class="sticker-section-title">默认表情</div>
         <div id="sticker-default-grid" class="sticker-grid" aria-label="默认表情包"></div>
@@ -71,12 +78,20 @@
     <div class="row controls">
       <button id="attach-btn" type="button" title="添加图片或文件" aria-label="添加图片或文件">+</button>
       <div class="chat-input-wrap">
+        <select id="reply-language-select" class="reply-language-select" title="角色输出语言" aria-label="角色输出语言">
+          <option value="zh">中</option>
+          <option value="en">EN</option>
+          <option value="ja">日</option>
+          <option value="ko">한</option>
+          <option value="auto">Auto</option>
+        </select>
         <input id="chat-input" type="text" placeholder="和我说点什么..." />
         <button id="sticker-btn" class="chat-input-icon-btn" type="button" title="表情包" aria-label="打开表情包" aria-expanded="false">&#9786;</button>
         <span class="chat-input-icons" aria-hidden="true">&#10023;</span>
       </div>
       <button id="send-btn" type="button">发送</button>
     </div>
+    <div id="reply-language-status" class="reply-language-status" aria-live="polite">中文输出 · 中文声线</div>
     <input
       id="attach-input"
       type="file"
@@ -162,6 +177,38 @@
             </label>
           </div>
           <p id="config-switch-key-status" class="config-switch-note"></p>
+        </section>
+
+        <section class="config-switch-section">
+          <div class="config-switch-section-title">角色体验</div>
+          <div class="config-switch-grid">
+            <label class="config-switch-field">
+              <span>角色输出语言</span>
+              <select id="config-switch-reply-language">
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+                <option value="ko">한국어</option>
+                <option value="auto">自动跟随</option>
+              </select>
+            </label>
+            <label class="config-switch-check">
+              <input id="config-switch-tts-auto-voice" type="checkbox" />
+              <span>随语言推荐声线</span>
+            </label>
+            <label class="config-switch-check">
+              <input id="config-switch-assistant-sticker-enabled" type="checkbox" />
+              <span>AI 可低频发送心情表情</span>
+            </label>
+            <label class="config-switch-field">
+              <span>表情概率</span>
+              <input id="config-switch-assistant-sticker-chance" type="number" min="0" max="1" step="0.01" />
+            </label>
+            <label class="config-switch-field">
+              <span>表情冷却(ms)</span>
+              <input id="config-switch-assistant-sticker-cooldown" type="number" min="10000" step="1000" />
+            </label>
+          </div>
         </section>
 
         <section class="config-switch-section">

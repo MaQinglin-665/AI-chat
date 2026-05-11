@@ -1,6 +1,26 @@
 (function (root) {
   "use strict";
 
+  function normalizeReplyLanguage(value) {
+    const raw = String(value || "zh").trim().toLowerCase();
+    if (["auto", "zh", "en", "ja", "ko"].includes(raw)) {
+      return raw;
+    }
+    if (["zh-cn", "zh_cn", "cn", "chinese"].includes(raw)) {
+      return "zh";
+    }
+    if (["english"].includes(raw)) {
+      return "en";
+    }
+    if (["jp", "japanese"].includes(raw)) {
+      return "ja";
+    }
+    if (["kr", "korean"].includes(raw)) {
+      return "ko";
+    }
+    return "zh";
+  }
+
   function createController(deps = {}) {
     const state = deps.state || {};
     const ui = deps.ui || {};
@@ -22,6 +42,8 @@
     const updateObserveButton = typeof deps.updateObserveButton === "function" ? deps.updateObserveButton : () => {};
     const updateMicMeter = typeof deps.updateMicMeter === "function" ? deps.updateMicMeter : () => {};
     const detectModelProfileName = typeof deps.detectModelProfileName === "function" ? deps.detectModelProfileName : () => "";
+    const updateReplyLanguageControls = typeof deps.updateReplyLanguageControls === "function" ? deps.updateReplyLanguageControls : () => {};
+    const renderStickerPanel = typeof deps.renderStickerPanel === "function" ? deps.renderStickerPanel : () => {};
 
     async function loadConfig() {
       const resp = await fetch("/config.json", { cache: "no-store" });
@@ -40,6 +62,12 @@
         y_ratio: Number.isFinite(yRatio) ? Math.max(0, Math.min(1, yRatio)) : 0.96
       };
       state.ttsProvider = String(ttsCfg.provider || "browser").toLowerCase();
+      state.replyLanguage = normalizeReplyLanguage(state.config?.assistant_reply_language || "zh");
+      state.ttsAutoVoiceByReplyLanguage = ttsCfg.auto_voice_by_reply_language !== false;
+      const stickersCfg = state.config?.stickers || {};
+      state.assistantStickerEnabled = stickersCfg.assistant_enabled !== false;
+      state.assistantStickerChance = Math.max(0, Math.min(1, Number(stickersCfg.assistant_chance ?? 0.18)));
+      state.assistantStickerCooldownMs = Math.max(10000, Number(stickersCfg.assistant_cooldown_ms || 60000));
       state.modelProfileName = detectModelProfileName();
       state.gptSovitsRealtimeTTS = ttsCfg.gpt_sovits_realtime_tts === true;
       state.streamSpeakMode = String(ttsCfg.stream_mode || "realtime").toLowerCase();
@@ -298,6 +326,8 @@
       ui.assistantName.textContent = resolveAssistantDisplayName("Mochi");
       updateObserveButton();
       updateMicMeter(0);
+      updateReplyLanguageControls();
+      renderStickerPanel();
     }
 
     return { loadConfig };

@@ -2681,6 +2681,124 @@ function updateSpeakButton() {
   ui.speakBtn.textContent = state.speakingEnabled ? "\u8bed\u97f3\u5f00" : "\u8bed\u97f3\u5173";
 }
 
+const REPLY_LANGUAGE_LABELS = {
+  zh: "中文输出",
+  en: "English output",
+  ja: "日本語出力",
+  ko: "한국어 출력",
+  auto: "自动跟随"
+};
+
+function normalizeReplyLanguage(value) {
+  const raw = String(value || "zh").trim().toLowerCase();
+  if (["auto", "zh", "en", "ja", "ko"].includes(raw)) {
+    return raw;
+  }
+  if (["zh-cn", "zh_cn", "cn", "chinese"].includes(raw)) return "zh";
+  if (raw === "english") return "en";
+  if (["jp", "japanese"].includes(raw)) return "ja";
+  if (["kr", "korean"].includes(raw)) return "ko";
+  return "zh";
+}
+
+function getEffectiveVoiceLanguage() {
+  const lang = normalizeReplyLanguage(state.replyLanguage || state.config?.assistant_reply_language || "zh");
+  return lang === "auto" ? "zh" : lang;
+}
+
+function getVoiceLangCode(voice = null) {
+  const name = String(voice?.name || voice || "").toLowerCase();
+  const lang = String(voice?.lang || "").toLowerCase();
+  const combined = `${name} ${lang}`;
+  if (/^ja|ja[-_]|japanese|nanami|keita/.test(combined)) return "ja";
+  if (/^ko|ko[-_]|korean|sunhi|injoon/.test(combined)) return "ko";
+  if (/^en|en[-_]|english|aria|jenny|guy|sonia/.test(combined)) return "en";
+  if (/^zh|zh[-_]|chinese|xiaoxiao|xiaoyi|yunxi|yunyang|yunjian/.test(combined)) return "zh";
+  return "";
+}
+
+function buildReplyLanguageStatusText() {
+  const lang = normalizeReplyLanguage(state.replyLanguage || state.config?.assistant_reply_language || "zh");
+  const target = getEffectiveVoiceLanguage();
+  const label = REPLY_LANGUAGE_LABELS[lang] || REPLY_LANGUAGE_LABELS.zh;
+  if (state.ttsAutoVoiceByReplyLanguage === false) {
+    return `${label} · 自定义声线`;
+  }
+  const voice = isServerTTSProvider(state.ttsProvider)
+    ? state.ttsServerVoice || state.config?.tts?.voice || ""
+    : state.ttsVoice || state.config?.tts?.voice || "";
+  const voiceLang = getVoiceLangCode(voice);
+  if ((target === "ja" || target === "ko") && voiceLang === "en") {
+    return `${label} · 英文声线兜底`;
+  }
+  const voiceLabels = { zh: "中文声线", en: "英文声线", ja: "日语声线", ko: "韩语声线" };
+  if (voiceLang === target) {
+    return `${label} · ${voiceLabels[target] || "匹配声线"}`;
+  }
+  if (!voiceLang && (target === "ja" || target === "ko")) {
+    return `${label} · 声线待检测`;
+  }
+  return `${label} · ${voiceLang ? "声线可能不匹配" : "浏览器默认声线"}`;
+}
+
+function updateReplyLanguageControls() {
+  state.replyLanguage = normalizeReplyLanguage(state.replyLanguage || state.config?.assistant_reply_language || "zh");
+  if (ui.replyLanguageSelect) {
+    ui.replyLanguageSelect.value = state.replyLanguage;
+  }
+  if (ui.replyLanguageStatus) {
+    ui.replyLanguageStatus.textContent = buildReplyLanguageStatusText();
+  }
+}
+
+function refreshTTSVoiceAfterLanguageChange() {
+  if (isServerTTSProvider(state.ttsProvider)) {
+    initServerTTSVoices();
+  } else {
+    state.ttsVoices = getSortedVoices();
+    setActiveVoice(0);
+  }
+  updateReplyLanguageControls();
+}
+
+async function setReplyLanguage(value) {
+  const lang = normalizeReplyLanguage(value);
+  state.replyLanguage = lang;
+  updateReplyLanguageControls();
+  try {
+    const resp = await authFetch("/api/config/switch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assistant_reply_language: lang })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data?.error || data?.reason || `HTTP ${resp.status}`);
+    }
+    await loadConfig();
+    refreshTTSVoiceAfterLanguageChange();
+    setStatus(buildReplyLanguageStatusText());
+  } catch (err) {
+    setStatus(`语言切换失败：${err?.message || err}`);
+  }
+}
+
+async function saveAssistantStickerSettings(update = {}) {
+  try {
+    const resp = await authFetch("/api/config/switch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stickers: update })
+    });
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      throw new Error(data?.error || data?.reason || `HTTP ${resp.status}`);
+    }
+  } catch (err) {
+    setStatus(`AI 表情设置保存失败：${err?.message || err}`);
+  }
+}
+
 function bindChatInputControls() {
   if (typeof CHAT_INPUT_BINDER.bindChatInputControls !== "function") {
     return;
@@ -2694,6 +2812,13 @@ function bindChatInputControls() {
     closeStickerPanel,
     handleStickerImportFiles,
     setStickerRespondAfterSend,
+    setAssistantStickerEnabled: (value) => {
+      const controller = getStickerController();
+      return typeof controller.setAssistantStickerEnabled === "function"
+        ? controller.setAssistantStickerEnabled(value)
+        : undefined;
+    },
+    setReplyLanguage,
     toggleMicOpen,
     isOnboardingOpen,
     closeOnboardingModal,
@@ -3557,6 +3682,7 @@ function getStickerController() {
       appendStickerMessage,
       requestAssistantReply,
       renderChatHistoryFromState,
+      saveAssistantStickerSettings,
       setStatus
     });
   }
@@ -3582,6 +3708,13 @@ function setStickerRespondAfterSend(value) {
   const controller = getStickerController();
   return typeof controller.setStickerRespondAfterSend === "function"
     ? controller.setStickerRespondAfterSend(value)
+    : undefined;
+}
+
+function renderStickerPanel() {
+  const controller = getStickerController();
+  return typeof controller.renderStickerPanel === "function"
+    ? controller.renderStickerPanel()
     : undefined;
 }
 
@@ -4020,7 +4153,8 @@ function getVoiceRuntimeController() {
     voiceRuntimeController = VOICE_RUNTIME_CONTROLLER.createController({
       state, ui, windowObject: window, documentObject: document, setStatus, isServerTTSProvider, clampNumber,
       normalizeTalkStyle, detectMood, buildSpeakProsody, beginSpeechAnimation, showSubtitleText,
-      finishSpeechAnimation, hideSubtitleText, endSpeechAnimation, isCurrentTTSPlaybackGeneration
+      finishSpeechAnimation, hideSubtitleText, endSpeechAnimation, isCurrentTTSPlaybackGeneration,
+      updateReplyLanguageControls
     });
   }
   return voiceRuntimeController || VOICE_RUNTIME_CONTROLLER;
@@ -4078,7 +4212,7 @@ function getAppConfigController() {
       buildAsrHotwordRules, syncProactiveSchedulerPolling, startAutoChatLoop, stopAutoChatLoop,
       normalizeTalkStyle, normalizeMotionIntensity, loadChatHistoryFromStorage, loadRemindersFromStorage,
       loadDailyGreetingState, loadEmotionStats, resolveAssistantDisplayName, updateObserveButton,
-      updateMicMeter, detectModelProfileName
+      updateMicMeter, detectModelProfileName, updateReplyLanguageControls, renderStickerPanel
     });
   }
   return appConfigController || APP_CONFIG_CONTROLLER;
@@ -4397,6 +4531,7 @@ function bindUI() {
   updateLockButton();
   updateAutoChatButton();
   updateTranslationToggleButton();
+  updateReplyLanguageControls();
   applySubtitleEnabledState();
   setAdvancedActionsExpanded(false);
   updateMicButton();

@@ -32,6 +32,8 @@ TTS_DEFAULT_VOICES = [
     "zh-CN-YunxiNeural",
     "zh-CN-YunjianNeural",
 ]
+ASSISTANT_REPLY_LANGUAGE_DEFAULT = "zh"
+ASSISTANT_REPLY_LANGUAGE_OPTIONS = {"auto", "zh", "en", "ja", "ko"}
 VOLCENGINE_TTS_DEFAULT_API_URL = "https://openspeech.bytedance.com/api/v1/tts"
 VOLCENGINE_TTS_DEFAULT_CLUSTER = "volcano_icl"
 VOLCENGINE_TTS_DEFAULT_VOICE = "S_uos2AQPX1"
@@ -93,6 +95,7 @@ REQUIRE_API_TOKEN_DEFAULT = any(_env_flag(key, False) for key in RELEASE_MODE_EN
 
 DEFAULT_CONFIG = {
     "onboarding_completed": False,
+    "assistant_reply_language": ASSISTANT_REPLY_LANGUAGE_DEFAULT,
     "assistant_name": "馨语AI桌宠",
     "model_path": "/models/your_model/model3.json",
     "model": {
@@ -159,6 +162,7 @@ DEFAULT_CONFIG = {
         "provider": TTS_DEFAULT_PROVIDER,
         "voice": TTS_DEFAULT_VOICE,
         "voices": TTS_DEFAULT_VOICES,
+        "auto_voice_by_reply_language": True,
         "stream_mode": "realtime",
         "app_id_env": VOLCENGINE_APP_ID_ENV,
         "access_token_env": VOLCENGINE_ACCESS_TOKEN_ENV,
@@ -214,6 +218,11 @@ DEFAULT_CONFIG = {
         "refine_max_chars": 120,
         "refine_timeout_sec": 12,
         "refine_min_chars": 36,
+    },
+    "stickers": {
+        "assistant_enabled": True,
+        "assistant_chance": 0.18,
+        "assistant_cooldown_ms": 60000,
     },
     "memory": {
         "enabled": True,
@@ -602,6 +611,12 @@ def sanitize_client_config(config):
     voice = str(tts_cfg.get("voice", voices[0] if voices else default_voice))
     if not voice and voices:
         voice = voices[0]
+    reply_language = str(
+        config.get("assistant_reply_language", ASSISTANT_REPLY_LANGUAGE_DEFAULT)
+        or ASSISTANT_REPLY_LANGUAGE_DEFAULT
+    ).strip().lower()
+    if reply_language not in ASSISTANT_REPLY_LANGUAGE_OPTIONS:
+        reply_language = ASSISTANT_REPLY_LANGUAGE_DEFAULT
     model_cfg = config.get("model", {})
 
     def _safe_float(value, default):
@@ -628,6 +643,9 @@ def sanitize_client_config(config):
     summary_cfg = config.get("history_summary", {})
     style_cfg = config.get("style", {})
     humanize_cfg = config.get("humanize", {})
+    stickers_cfg = config.get("stickers", {})
+    if not isinstance(stickers_cfg, dict):
+        stickers_cfg = {}
     motion_cfg = config.get("motion", {})
     tools_cfg = config.get("tools", {})
     conversation_cfg = config.get("conversation_mode", {})
@@ -869,6 +887,7 @@ def sanitize_client_config(config):
     return {
         "onboarding_completed": bool(config.get("onboarding_completed", False)),
         "assistant_name": config.get("assistant_name", "Mochi"),
+        "assistant_reply_language": reply_language,
         "model_path": config.get("model_path", DEFAULT_CONFIG["model_path"]),
         "model": {
             "scale": model_scale,
@@ -879,10 +898,16 @@ def sanitize_client_config(config):
             "provider": provider,
             "voice": voice,
             "voices": voices,
+            "auto_voice_by_reply_language": bool(
+                tts_cfg.get("auto_voice_by_reply_language", True)
+            ),
             "stream_mode": stream_mode,
             "gpt_sovits_realtime_tts": bool(
                 tts_cfg.get("gpt_sovits_realtime_tts", False)
             ),
+            "gpt_sovits_text_lang": str(
+                tts_cfg.get("gpt_sovits_text_lang", "zh") or "zh"
+            ).strip().lower()[:8],
             "gpt_sovits_timeout_sec": gpt_sovits_timeout_sec,
             "server_request_timeout_ms": server_request_timeout_ms,
             "server_retry_count": server_retry_count,
@@ -1056,6 +1081,17 @@ def sanitize_client_config(config):
             ),
             "refine_min_chars": max(
                 12, min(120, _safe_int(humanize_cfg.get("refine_min_chars", 36), 36))
+            ),
+        },
+        "stickers": {
+            "assistant_enabled": bool(stickers_cfg.get("assistant_enabled", True)),
+            "assistant_chance": max(
+                0.0,
+                min(1.0, _safe_float(stickers_cfg.get("assistant_chance", 0.18), 0.18)),
+            ),
+            "assistant_cooldown_ms": max(
+                10000,
+                min(30 * 60 * 1000, _safe_int(stickers_cfg.get("assistant_cooldown_ms", 60000), 60000)),
             ),
         },
         "motion": {

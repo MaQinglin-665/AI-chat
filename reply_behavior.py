@@ -35,6 +35,81 @@ def build_reply_language_block(config):
     return ""
 
 
+REPLY_LANGUAGE_ALIASES = {
+    "auto": "auto",
+    "follow": "auto",
+    "match": "auto",
+    "zh": "zh",
+    "zh-cn": "zh",
+    "zh_cn": "zh",
+    "chinese": "zh",
+    "cn": "zh",
+    "en": "en",
+    "english": "en",
+    "ja": "ja",
+    "jp": "ja",
+    "japanese": "ja",
+    "ko": "ko",
+    "kr": "ko",
+    "korean": "ko",
+}
+
+
+def resolve_reply_language(config):
+    raw = str(
+        config.get("assistant_reply_language", "")
+        or config.get("reply_language", "")
+        or ""
+    ).strip().lower()
+    return REPLY_LANGUAGE_ALIASES.get(raw, "zh")
+
+
+def build_reply_language_block(config):
+    lang = resolve_reply_language(config if isinstance(config, dict) else {})
+    if lang == "auto":
+        return (
+            "Reply language rule:\n"
+            "- Match the user's main input language for the main user-facing reply.\n"
+            "- If the user mixes languages, prefer the language that carries the request.\n"
+            "- Keep the reply natural, short, and in-character; do not explain language rules."
+        )
+    if lang == "en":
+        return (
+            "Reply language rule:\n"
+            "- The assistant's main user-facing reply MUST be natural English.\n"
+            "- Treat Chinese user messages as input only; do NOT mirror the user's Chinese language.\n"
+            "- Do not include a Chinese translation in the main reply. The UI translation layer handles Chinese separately.\n"
+            "- Answer the user's latest message directly and contextually before anything else.\n"
+            "- Do not explain language or translation rules unless the user asks about language or translation.\n"
+            "- Switch to Chinese only if the user explicitly asks: 'reply in Chinese', 'use Chinese', or equivalent."
+        )
+    if lang == "zh":
+        return (
+            "Reply language rule:\n"
+            "- The assistant's main user-facing reply MUST be natural Simplified Chinese.\n"
+            "- Keep it conversational, short, and characterful; avoid customer-service phrasing.\n"
+            "- Do not include English translations unless the user explicitly asks for English or translation.\n"
+            "- Do not explain language rules unless the user asks about language or translation."
+        )
+    if lang == "ja":
+        return (
+            "Reply language rule:\n"
+            "- The assistant's main user-facing reply MUST be natural Japanese.\n"
+            "- Keep it brief, warm, and characterful, like a desktop companion rather than a service bot.\n"
+            "- Do not include Chinese, English, or Korean translations unless the user explicitly asks for them.\n"
+            "- Do not explain language rules unless the user asks about language or translation."
+        )
+    if lang == "ko":
+        return (
+            "Reply language rule:\n"
+            "- The assistant's main user-facing reply MUST be natural Korean.\n"
+            "- Keep it brief, warm, and characterful, like a desktop companion rather than a service bot.\n"
+            "- Do not include Chinese, English, or Japanese translations unless the user explicitly asks for them.\n"
+            "- Do not explain language rules unless the user asks about language or translation."
+        )
+    return ""
+
+
 def is_demo_stable_enabled(config, get_character_runtime_settings_func):
     settings = get_character_runtime_settings_func(config if isinstance(config, dict) else {})
     return bool(settings.get("enabled", False) and settings.get("demo_stable", False))
@@ -45,10 +120,17 @@ def build_demo_stable_reply_behavior_block(config, get_character_runtime_setting
     if not bool(settings.get("enabled", False) and settings.get("demo_stable", False)):
         return ""
 
+    lang = resolve_reply_language(config if isinstance(config, dict) else {})
+    language_rule = {
+        "auto": "Follow the user's main input language for the main reply.",
+        "zh": "Keep the main reply in natural spoken Simplified Chinese.",
+        "en": "Keep the main reply in natural spoken English, even when the user writes in Chinese.",
+        "ja": "Keep the main reply in natural spoken Japanese.",
+        "ko": "Keep the main reply in natural spoken Korean.",
+    }.get(lang, "Keep the main reply in the configured reply language.")
+
     rules = [
-        "Keep the main reply in natural spoken English.",
-        "Even when the user writes in Chinese, answer in English; do not mirror the user's Chinese.",
-        "The Chinese translation layer may explain it separately; the main reply must stay English.",
+        language_rule,
         "Answer the user's latest message directly and contextually; do not drift into policy or translation explanations.",
         "For simple daily status updates such as leaving, eating, or sleeping, give a brief natural acknowledgement.",
         "Use complete sentences only, and never end with a cut-off half sentence.",

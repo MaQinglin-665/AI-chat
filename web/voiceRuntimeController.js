@@ -1,6 +1,43 @@
 (function (root) {
   "use strict";
 
+  const VOICE_PREFS_BY_LANGUAGE = {
+    zh: {
+      voice: "zh-CN-XiaoxiaoNeural",
+      names: ["xiaoxiao", "xiaoyi", "yunxi", "yunyang", "yunjian", "chinese"],
+      langs: ["zh"]
+    },
+    en: {
+      voice: "en-US-AriaNeural",
+      names: ["aria", "jenny", "guy", "sonia", "english"],
+      langs: ["en"]
+    },
+    ja: {
+      voice: "ja-JP-NanamiNeural",
+      names: ["nanami", "keita", "japanese"],
+      langs: ["ja"],
+      fallback: "en"
+    },
+    ko: {
+      voice: "ko-KR-SunHiNeural",
+      names: ["sunhi", "injoon", "korean"],
+      langs: ["ko"],
+      fallback: "en"
+    }
+  };
+
+  function normalizeReplyLanguage(value) {
+    const raw = String(value || "zh").trim().toLowerCase();
+    if (["auto", "zh", "en", "ja", "ko"].includes(raw)) {
+      return raw;
+    }
+    if (["zh-cn", "zh_cn", "cn", "chinese"].includes(raw)) return "zh";
+    if (raw === "english") return "en";
+    if (["jp", "japanese"].includes(raw)) return "ja";
+    if (["kr", "korean"].includes(raw)) return "ko";
+    return "zh";
+  }
+
   function createController(deps = {}) {
     const state = deps.state || {};
     const ui = deps.ui || {};
@@ -19,6 +56,34 @@
     const hideSubtitleText = typeof deps.hideSubtitleText === "function" ? deps.hideSubtitleText : () => {};
     const endSpeechAnimation = typeof deps.endSpeechAnimation === "function" ? deps.endSpeechAnimation : () => {};
     const isCurrentTTSPlaybackGeneration = typeof deps.isCurrentTTSPlaybackGeneration === "function" ? deps.isCurrentTTSPlaybackGeneration : () => true;
+    const updateReplyLanguageControls = typeof deps.updateReplyLanguageControls === "function" ? deps.updateReplyLanguageControls : () => {};
+
+    function getTargetReplyLanguage() {
+      const explicit = state.replyLanguage || state.config?.assistant_reply_language || "";
+      if (!explicit) {
+        const cfg = state.config?.tts || {};
+        const voiceHints = [cfg.voice, ...(Array.isArray(cfg.voices) ? cfg.voices : [])]
+          .map((item) => String(item || "").toLowerCase())
+          .join(" ");
+        if (/\bja[-_]|japanese|nanami|keita/.test(voiceHints)) return "ja";
+        if (/\bko[-_]|korean|sunhi|injoon/.test(voiceHints)) return "ko";
+        if (/\ben[-_]|english|aria|jenny|guy|sonia/.test(voiceHints)) return "en";
+      }
+      const lang = normalizeReplyLanguage(explicit || "zh");
+      return lang === "auto" ? "zh" : lang;
+    }
+
+    function getPreferredVoiceNameForReplyLanguage(lang = getTargetReplyLanguage()) {
+      return VOICE_PREFS_BY_LANGUAGE[normalizeReplyLanguage(lang)]?.voice || VOICE_PREFS_BY_LANGUAGE.zh.voice;
+    }
+
+    function voiceMatchesLanguage(voice, lang) {
+      const pref = VOICE_PREFS_BY_LANGUAGE[normalizeReplyLanguage(lang)] || VOICE_PREFS_BY_LANGUAGE.zh;
+      const name = String(voice?.name || voice || "").toLowerCase();
+      const voiceLang = String(voice?.lang || "").toLowerCase();
+      return pref.langs.some((prefix) => voiceLang.startsWith(prefix))
+        || pref.names.some((marker) => name.includes(marker));
+    }
 
     function initServerTTSVoices() {
       const cfg = state.config?.tts || {};
@@ -47,6 +112,9 @@
       const name = String(v?.name || "").toLowerCase();
       const lang = String(v?.lang || "").toLowerCase();
       const cfg = state.config?.tts || {};
+      const targetLang = getTargetReplyLanguage();
+      const targetPref = VOICE_PREFS_BY_LANGUAGE[targetLang] || VOICE_PREFS_BY_LANGUAGE.zh;
+      const fallbackPref = VOICE_PREFS_BY_LANGUAGE[targetPref.fallback || ""];
       const preferredNames = [
         cfg.voice,
         ...(Array.isArray(cfg.voices) ? cfg.voices : [])
@@ -58,14 +126,23 @@
         })
         .filter(Boolean))];
       let score = 0;
+      if (targetPref.langs.some((preferred) => lang.startsWith(preferred))) {
+        score += 1200;
+      }
+      if (targetPref.names.some((marker) => name.includes(marker))) {
+        score += 420;
+      }
+      if (fallbackPref && fallbackPref.langs.some((preferred) => lang.startsWith(preferred))) {
+        score += 260;
+      }
       if (preferredNames.some((preferred) => name === preferred || name.includes(preferred) || preferred.includes(name))) {
         score += 900;
       }
       if (preferredLangs.some((preferred) => lang.startsWith(preferred))) {
         score += 900;
       }
-      if (lang === "zh-cn") score += 500;
-      else if (lang.startsWith("zh")) score += 300;
+      if (targetLang === "zh" && lang === "zh-cn") score += 500;
+      else if (targetLang === "zh" && lang.startsWith("zh")) score += 300;
       if (/natural|neural|online|xiaoxiao|xiaoyi|yunxi|yunyang|huihui/.test(name)) {
         score += 220;
       }
@@ -75,7 +152,7 @@
       if (/microsoft|edge|google/.test(name)) {
         score += 60;
       }
-      if (/english|en-us|en-gb/.test(name + " " + lang)) {
+      if (targetLang !== "en" && targetPref.fallback !== "en" && /english|en-us|en-gb/.test(name + " " + lang)) {
         score -= 200;
       }
       return score;
@@ -110,10 +187,19 @@
 
     function buildVoiceCandidates() {
       const chosen = state.ttsVoice || chooseTTSVoice();
-      const fallbackZh = state.ttsVoices.find((v) => /^zh/i.test(String(v.lang || "")));
+      const targetLang = getTargetReplyLanguage();
+      const fallbackTarget = state.ttsVoices.find((v) => voiceMatchesLanguage(v, targetLang));
+      const fallbackEn = state.ttsVoices.find((v) => voiceMatchesLanguage(v, "en"));
+      const fallbackZh = state.ttsVoices.find((v) => voiceMatchesLanguage(v, "zh"));
       const candidates = [];
       if (chosen) candidates.push(chosen);
-      if (fallbackZh && (!chosen || fallbackZh.name !== chosen.name)) {
+      if (fallbackTarget && (!chosen || fallbackTarget.name !== chosen.name)) {
+        candidates.push(fallbackTarget);
+      }
+      if ((targetLang === "ja" || targetLang === "ko") && fallbackEn && !candidates.some((v) => v && v.name === fallbackEn.name)) {
+        candidates.push(fallbackEn);
+      }
+      if (fallbackZh && !candidates.some((v) => v && v.name === fallbackZh.name)) {
         candidates.push(fallbackZh);
       }
       // null means use browser default voice
@@ -136,6 +222,7 @@
         if (idx < 0) idx = 0;
         setActiveVoice(idx);
         state.ttsReady = true;
+        updateReplyLanguageControls();
         if (ui.voiceNextBtn) {
           ui.voiceNextBtn.disabled = state.ttsVoices.length <= 1;
         }
@@ -187,7 +274,17 @@
       setStatus(`音色: ${name}`);
     }
 
-    return { initServerTTSVoices, scoreVoice, getSortedVoices, chooseTTSVoice, setActiveVoice, buildVoiceCandidates, initTTS, switchVoice };
+    return {
+      initServerTTSVoices,
+      scoreVoice,
+      getSortedVoices,
+      chooseTTSVoice,
+      setActiveVoice,
+      buildVoiceCandidates,
+      getPreferredVoiceNameForReplyLanguage,
+      initTTS,
+      switchVoice
+    };
   }
 
   const api = { createController };

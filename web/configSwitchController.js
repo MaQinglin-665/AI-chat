@@ -48,6 +48,21 @@
     }
   ];
 
+  const DEFAULT_REPLY_LANGUAGES = [
+    { id: "zh", label: "中文" },
+    { id: "en", label: "English" },
+    { id: "ja", label: "日本語" },
+    { id: "ko", label: "한국어" },
+    { id: "auto", label: "自动跟随" }
+  ];
+
+  const DEFAULT_VOICE_BY_REPLY_LANGUAGE = {
+    zh: "zh-CN-XiaoxiaoNeural",
+    en: "en-US-AriaNeural",
+    ja: "ja-JP-NanamiNeural",
+    ko: "ko-KR-SunHiNeural"
+  };
+
   function clean(value) {
     return String(value || "").trim();
   }
@@ -71,6 +86,11 @@
       llmApiKey: byId("config-switch-llm-api-key"),
       ttsProvider: byId("config-switch-tts-provider"),
       ttsVoice: byId("config-switch-tts-voice"),
+      replyLanguage: byId("config-switch-reply-language"),
+      ttsAutoVoice: byId("config-switch-tts-auto-voice"),
+      assistantStickerEnabled: byId("config-switch-assistant-sticker-enabled"),
+      assistantStickerChance: byId("config-switch-assistant-sticker-chance"),
+      assistantStickerCooldown: byId("config-switch-assistant-sticker-cooldown"),
       ttsBrowserFallback: byId("config-switch-tts-browser-fallback"),
       gptSovitsRow: byId("config-switch-gpt-sovits-row"),
       gptSovitsUrl: byId("config-switch-gpt-sovits-url")
@@ -153,6 +173,24 @@
         : DEFAULT_TTS_PRESETS;
     }
 
+    function getReplyLanguages() {
+      return Array.isArray(state.summary?.reply_languages) && state.summary.reply_languages.length
+        ? state.summary.reply_languages
+        : DEFAULT_REPLY_LANGUAGES;
+    }
+
+    function getVoiceByReplyLanguage() {
+      return state.summary?.voice_by_reply_language || DEFAULT_VOICE_BY_REPLY_LANGUAGE;
+    }
+
+    function normalizeReplyLanguage(value) {
+      const raw = String(value || "zh").trim().toLowerCase();
+      if (["auto", "zh", "en", "ja", "ko"].includes(raw)) {
+        return raw;
+      }
+      return "zh";
+    }
+
     function findLlmPreset(id) {
       return getLlmPresets().find((item) => item.id === id) || DEFAULT_LLM_PRESETS[0];
     }
@@ -173,6 +211,17 @@
       }
       if (isGptSovits && !getValue(ui.gptSovitsUrl)) {
         setValue(ui.gptSovitsUrl, preset.gpt_sovits_api_url || "http://127.0.0.1:9880/tts");
+      }
+    }
+
+    function applyReplyLanguageToForm(lang) {
+      const safeLang = normalizeReplyLanguage(lang);
+      setValue(ui.replyLanguage, safeLang);
+      if (ui.ttsAutoVoice?.checked === true && getValue(ui.ttsProvider) !== "gpt_sovits") {
+        const voice = getVoiceByReplyLanguage()[safeLang === "auto" ? "zh" : safeLang];
+        if (voice) {
+          setValue(ui.ttsVoice, voice);
+        }
       }
     }
 
@@ -200,6 +249,7 @@
       setValue(ui.ttsVoice, preset.voice || "");
       setValue(ui.gptSovitsUrl, preset.gpt_sovits_api_url || "");
       updateTtsFields();
+      applyReplyLanguageToForm(getValue(ui.replyLanguage));
     }
 
     function updateKeyStatus(fromSummary = true) {
@@ -233,8 +283,15 @@
         (item) => item.provider || item.id,
         (item) => item.label || item.provider || item.id
       );
+      setSelectOptions(
+        ui.replyLanguage,
+        getReplyLanguages(),
+        (item) => item.id,
+        (item) => item.label || item.id
+      );
       const llm = state.summary?.current?.llm || {};
       const tts = state.summary?.current?.tts || {};
+      const stickers = state.summary?.current?.stickers || {};
       setValue(ui.llmPreset, llm.preset_id || "dashscope");
       setValue(ui.llmBaseUrl, llm.base_url || findLlmPreset(llm.preset_id || "dashscope")?.base_url || "");
       setValue(ui.llmModel, llm.model || findLlmPreset(llm.preset_id || "dashscope")?.model || "");
@@ -242,6 +299,11 @@
       setValue(ui.llmApiKey, "");
       setValue(ui.ttsProvider, tts.provider || "browser");
       setValue(ui.ttsVoice, tts.voice || findTtsPreset(tts.provider || "browser")?.voice || "");
+      setValue(ui.replyLanguage, normalizeReplyLanguage(state.summary?.current?.assistant_reply_language || "zh"));
+      setChecked(ui.ttsAutoVoice, tts.auto_voice_by_reply_language !== false);
+      setChecked(ui.assistantStickerEnabled, stickers.assistant_enabled !== false);
+      setValue(ui.assistantStickerChance, stickers.assistant_chance ?? 0.18);
+      setValue(ui.assistantStickerCooldown, stickers.assistant_cooldown_ms ?? 60000);
       setValue(ui.gptSovitsUrl, tts.gpt_sovits_api_url || "http://127.0.0.1:9880/tts");
       setChecked(ui.ttsBrowserFallback, tts.allow_browser_fallback === true);
       updateTtsFields();
@@ -261,7 +323,14 @@
           provider: getValue(ui.ttsProvider) || "browser",
           voice: getValue(ui.ttsVoice),
           gpt_sovits_api_url: getValue(ui.gptSovitsUrl),
+          auto_voice_by_reply_language: ui.ttsAutoVoice?.checked !== false,
           allow_browser_fallback: ui.ttsBrowserFallback?.checked === true
+        },
+        assistant_reply_language: normalizeReplyLanguage(getValue(ui.replyLanguage) || "zh"),
+        stickers: {
+          assistant_enabled: ui.assistantStickerEnabled?.checked !== false,
+          assistant_chance: Number(getValue(ui.assistantStickerChance) || 0.18),
+          assistant_cooldown_ms: Number(getValue(ui.assistantStickerCooldown) || 60000)
         }
       };
     }
@@ -386,6 +455,8 @@
       });
       ui.llmPreset?.addEventListener("change", () => applyLlmPresetToForm(getValue(ui.llmPreset)));
       ui.ttsProvider?.addEventListener("change", () => applyTtsPresetToForm(getValue(ui.ttsProvider)));
+      ui.replyLanguage?.addEventListener("change", () => applyReplyLanguageToForm(getValue(ui.replyLanguage)));
+      ui.ttsAutoVoice?.addEventListener("change", () => applyReplyLanguageToForm(getValue(ui.replyLanguage)));
       ui.llmApiKeyEnv?.addEventListener("input", () => updateKeyStatus(false));
       updateTtsFields();
     }
@@ -393,6 +464,7 @@
     return {
       applyLlmPresetToForm,
       applyTtsPresetToForm,
+      applyReplyLanguageToForm,
       bind,
       buildPayload,
       close,

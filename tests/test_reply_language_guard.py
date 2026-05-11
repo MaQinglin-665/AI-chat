@@ -12,6 +12,42 @@ def test_english_reply_language_block_is_strict_about_chinese_input():
     assert "Do not explain language or translation rules" in block
 
 
+def test_reply_language_block_supports_chinese_japanese_korean_and_auto():
+    zh_block = reply_behavior.build_reply_language_block({"assistant_reply_language": "zh"})
+    ja_block = reply_behavior.build_reply_language_block({"assistant_reply_language": "ja"})
+    ko_block = reply_behavior.build_reply_language_block({"assistant_reply_language": "ko"})
+    auto_block = reply_behavior.build_reply_language_block({"assistant_reply_language": "auto"})
+
+    assert "Simplified Chinese" in zh_block
+    assert "natural Japanese" in ja_block
+    assert "natural Korean" in ko_block
+    assert "Match the user's main input language" in auto_block
+    assert "Do not explain language rules" in ja_block
+    assert "Do not explain language rules" in ko_block
+
+
+def test_japanese_and_korean_modes_do_not_use_english_guard_fallback():
+    ja = humanize.finalize_assistant_reply(
+        {"assistant_reply_language": "ja", "humanize": {"enabled": False}},
+        {},
+        "ollama",
+        "日本語で話して",
+        [],
+        "もちろん、短く自然に話すね。",
+    )
+    ko = humanize.finalize_assistant_reply(
+        {"assistant_reply_language": "ko", "humanize": {"enabled": False}},
+        {},
+        "ollama",
+        "한국어로 말해줘",
+        [],
+        "좋아, 짧고 자연스럽게 말할게.",
+    )
+
+    assert ja == "もちろん、短く自然に話すね。"
+    assert ko == "좋아, 짧고 자연스럽게 말할게."
+
+
 def test_english_mode_skips_chinese_refine_rewrite(monkeypatch):
     called = {"openai": 0, "ollama": 0}
     monkeypatch.setattr(

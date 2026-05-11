@@ -728,7 +728,12 @@
         updateConversationFollowupState(visibleReply);
         const mood = detectMood(visibleReply);
         recordEmotion(mood);
-        maybeSendAssistantMoodSticker({ mood, text: visibleReply, auto: isAuto });
+        maybeSendAssistantMoodSticker({
+          mood,
+          text: visibleReply,
+          auto: isAuto,
+          characterBrain: state.characterBrainLastDecision
+        });
         const baseTalkStyle = resolveTalkStyle(message, visibleReply, mood, isAuto);
         const replyCueCandidate = previewAssistantReplyCharacterCueCandidate({
           text: visibleReply,

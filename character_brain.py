@@ -2071,6 +2071,7 @@ def build_character_brain_decision(
             f"reason={_clean_text(burst.get('burst_reason'), 48) or 'stage_thought'}. "
             "This is allowed to be more than one sentence when the budget allows it, but it must still feel like a sudden thought, not a service reply."
         )
+    decision["directive"] += " Follow the separate reply-language rule; language choice must not depend on the English examples in this guidance."
     decision["directive"] += " " + _character_flavor_directive(intent, topic)
 
     _apply_output_constraints(decision)
@@ -2127,6 +2128,7 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Output constraints: {_format_output_constraints_for_prompt(decision.get('output_constraints') if isinstance(decision.get('output_constraints'), dict) else {})}",
         "Question policy: avoid routine questions; only ask when the reply would be blocked without clarification.",
         f"Expression target: emotion={_normalize_emotion(decision.get('emotion'))}, action={_normalize_action(decision.get('action'))}, intensity={_normalize_intensity(decision.get('intensity'))}, voice_style={_clean_text(decision.get('voice_style'), 32)}",
+        "Identity rule: use Xinyu/棣ㄨ when naming yourself and ignore older placeholder names.",
         f"Directive: {_clean_text(decision.get('directive'), 960)}",
     ]
     return "\n".join(lines)

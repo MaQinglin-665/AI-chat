@@ -361,7 +361,9 @@ function createMemoryStorage(initial = {}) {
 {
   const browserVoices = [
     { name: "Microsoft Xiaoxiao Online (Natural) - Chinese (Mainland)", lang: "zh-CN" },
-    { name: "Microsoft Aria Online (Natural) - English (United States)", lang: "en-US" }
+    { name: "Microsoft Aria Online (Natural) - English (United States)", lang: "en-US" },
+    { name: "Microsoft Nanami Online (Natural) - Japanese (Japan)", lang: "ja-JP" },
+    { name: "Microsoft SunHi Online (Natural) - Korean (Korea)", lang: "ko-KR" }
   ];
   const englishPreviewVoice = voiceRuntimeController.createController({
     state: {
@@ -392,6 +394,26 @@ function createMemoryStorage(initial = {}) {
     windowObject: { speechSynthesis: { getVoices: () => browserVoices } }
   }).chooseTTSVoice();
   assert.strictEqual(chineseDefaultVoice.lang, "zh-CN", "default Chinese TTS config should keep preferring Chinese browser voices");
+
+  const japaneseVoice = voiceRuntimeController.createController({
+    state: {
+      replyLanguage: "ja",
+      config: { assistant_reply_language: "ja", tts: { provider: "browser", auto_voice_by_reply_language: true } }
+    },
+    ui: {},
+    windowObject: { speechSynthesis: { getVoices: () => browserVoices } }
+  }).chooseTTSVoice();
+  assert.strictEqual(japaneseVoice.lang, "ja-JP", "Japanese reply language should prefer Japanese browser voices");
+
+  const koreanVoice = voiceRuntimeController.createController({
+    state: {
+      replyLanguage: "ko",
+      config: { assistant_reply_language: "ko", tts: { provider: "browser", auto_voice_by_reply_language: true } }
+    },
+    ui: {},
+    windowObject: { speechSynthesis: { getVoices: () => browserVoices.filter((v) => v.lang !== "ko-KR") } }
+  }).chooseTTSVoice();
+  assert.strictEqual(koreanVoice.lang, "en-US", "Korean reply language should fall back to English when Korean voices are unavailable");
 }
 
 {

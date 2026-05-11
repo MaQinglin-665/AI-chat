@@ -101,6 +101,35 @@ def resolve_reply_language(config):
         return "zh"
     return "auto"
 
+REPLY_LANGUAGE_ALIASES = {
+    "auto": "auto",
+    "follow": "auto",
+    "match": "auto",
+    "zh": "zh",
+    "zh-cn": "zh",
+    "zh_cn": "zh",
+    "chinese": "zh",
+    "cn": "zh",
+    "en": "en",
+    "english": "en",
+    "ja": "ja",
+    "jp": "ja",
+    "japanese": "ja",
+    "ko": "ko",
+    "kr": "ko",
+    "korean": "ko",
+}
+
+
+def resolve_reply_language(config):
+    raw = str(
+        (config or {}).get("assistant_reply_language", "")
+        or (config or {}).get("reply_language", "")
+        or ""
+    ).strip().lower()
+    return REPLY_LANGUAGE_ALIASES.get(raw, "zh")
+
+
 def _text_language_counts(text):
     safe = str(text or "")
     latin = len(re.findall(r"[A-Za-z]", safe))
@@ -502,7 +531,7 @@ def maybe_refine_assistant_reply(config, llm_cfg, provider, user_message, safe_h
     settings = get_humanize_settings(config)
     if not settings["enabled"] or not settings["refine_enabled"]:
         return reply
-    if resolve_reply_language(config if isinstance(config, dict) else {}) == "en":
+    if resolve_reply_language(config if isinstance(config, dict) else {}) in {"en", "ja", "ko"}:
         return reply
     visible, meta = split_tool_meta_suffix(reply)
     raw_visible = str(visible or "").strip()
@@ -683,7 +712,7 @@ def _is_reply_too_similar_to_recent(reply_text, safe_history, threshold=0.84):
 def maybe_diversify_repetitive_reply(config, llm_cfg, provider, user_message, safe_history, reply, is_auto=False):
     if is_auto:
         return reply
-    if resolve_reply_language(config if isinstance(config, dict) else {}) == "en":
+    if resolve_reply_language(config if isinstance(config, dict) else {}) in {"en", "ja", "ko"}:
         return reply
 
     visible, meta = split_tool_meta_suffix(reply)

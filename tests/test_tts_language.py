@@ -48,6 +48,11 @@ def test_gpt_sovits_language_detection_keeps_english_role_lines():
     )
 
 
+def test_gpt_sovits_language_detection_supports_japanese_and_korean():
+    assert _detect_text_lang("今日は少し眠いね。") == "ja"
+    assert _detect_text_lang("오늘은 조금 졸리네.") == "ko"
+
+
 def test_gpt_sovits_phonetic_replacement_still_applies_to_chinese_lines():
     converted = _replace_en_words_for_tts("\u8fd9\u4e2a API \u53ef\u4ee5\u7528\uff0cOK")
     assert "API" not in converted

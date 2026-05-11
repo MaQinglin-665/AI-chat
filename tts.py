@@ -869,12 +869,18 @@ def _looks_too_long_for_text(audio_bytes, text):
 
 
 def _detect_text_lang(text):
-    """Detect text language. Use 'auto' for any Chinese+English mix."""
+    """Detect text language. Use 'auto' for Chinese+English mix."""
     s = str(text or "").strip()
     if not s:
         return "zh"
+    ja_chars = sum(1 for c in s if "\u3040" <= c <= "\u30ff")
+    ko_chars = sum(1 for c in s if "\uac00" <= c <= "\ud7af")
     cn_chars = sum(1 for c in s if "\u4e00" <= c <= "\u9fff")
     en_chars = sum(1 for c in s if c.isascii() and c.isalpha())
+    if ja_chars > 0 and ja_chars >= max(1, cn_chars):
+        return "ja"
+    if ko_chars > 0:
+        return "ko"
     if cn_chars == 0 and en_chars > 0:
         return "en"
     if cn_chars > 0 and en_chars > 0:
@@ -1008,7 +1014,7 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
     detected_lang = _detect_text_lang(text)
     # Always follow runtime text detection to avoid language mismatch
     # (e.g. config fixed to "en" but current reply is Chinese).
-    if detected_lang in {"auto", "en", "zh"}:
+    if detected_lang in {"auto", "en", "zh", "ja", "ko"}:
         payload["text_lang"] = detected_lang
     if tts_cfg.get("gpt_sovits_use_prompt_text"):
         prompt_text = str(tts_cfg.get("gpt_sovits_prompt_text") or "").strip()

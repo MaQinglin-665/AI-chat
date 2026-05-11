@@ -13,6 +13,7 @@ def test_config_switch_save_writes_local_config_and_env_without_json_secret(tmp_
         json.dumps(
             {
                 "assistant_name": "keep-me",
+                "assistant_reply_language": "zh",
                 "llm": {"temperature": 0.25, "api_key": "old-inline-secret"},
                 "tts": {"stream_mode": "final_only"},
             },
@@ -33,8 +34,15 @@ def test_config_switch_save_writes_local_config_and_env_without_json_secret(tmp_
             "tts": {
                 "provider": "gpt_sovits",
                 "voice": "default",
+                "auto_voice_by_reply_language": True,
                 "gpt_sovits_api_url": "http://user:pass@127.0.0.1:9880/tts?token=secret",
                 "allow_browser_fallback": True,
+            },
+            "assistant_reply_language": "ja",
+            "stickers": {
+                "assistant_enabled": False,
+                "assistant_chance": 0.12,
+                "assistant_cooldown_ms": 90000,
             },
         },
         local_config_path=local_config_path,
@@ -46,6 +54,7 @@ def test_config_switch_save_writes_local_config_and_env_without_json_secret(tmp_
 
     assert result["ok"] is True
     assert saved["assistant_name"] == "keep-me"
+    assert saved["assistant_reply_language"] == "ja"
     assert saved["llm"]["temperature"] == 0.25
     assert saved["llm"]["provider"] == "openai-compatible"
     assert saved["llm"]["model"] == "qwen-turbo"
@@ -53,13 +62,49 @@ def test_config_switch_save_writes_local_config_and_env_without_json_secret(tmp_
     assert saved["llm"]["api_key"] == ""
     assert saved["tts"]["provider"] == "gpt_sovits"
     assert saved["tts"]["gpt_sovits_api_url"] == "http://127.0.0.1:9880/tts"
+    assert saved["tts"]["gpt_sovits_text_lang"] == "ja"
     assert saved["tts"]["allow_browser_fallback"] is True
+    assert saved["stickers"]["assistant_enabled"] is False
+    assert saved["stickers"]["assistant_chance"] == 0.12
+    assert saved["stickers"]["assistant_cooldown_ms"] == 90000
     assert "sk-secret-value" not in serialized
     assert "old-inline-secret" not in serialized
     assert "user:pass" not in serialized
     assert "token=secret" not in serialized
     assert "DASHSCOPE_TEST_KEY=sk-secret-value-123" in env_path.read_text(encoding="utf-8")
     assert result["saved"]["api_key_saved"] is True
+
+
+def test_config_switch_partial_language_update_recommends_voice(tmp_path):
+    local_config_path = tmp_path / "config.local.json"
+    env_path = tmp_path / ".env"
+    local_config_path.write_text(
+        json.dumps(
+            {
+                "assistant_reply_language": "zh",
+                "tts": {
+                    "provider": "browser",
+                    "voice": "zh-CN-XiaoxiaoNeural",
+                    "auto_voice_by_reply_language": True,
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = save_config_switch_update(
+        {"assistant_reply_language": "ko"},
+        local_config_path=local_config_path,
+        env_path=env_path,
+    )
+
+    saved = json.loads(local_config_path.read_text(encoding="utf-8"))
+    assert result["ok"] is True
+    assert saved["assistant_reply_language"] == "ko"
+    assert saved["tts"]["voice"] == "ko-KR-SunHiNeural"
+    assert saved["tts"]["gpt_sovits_text_lang"] == "ko"
+    assert not env_path.exists()
 
 
 def test_config_switch_rejects_unknown_provider_without_writing(tmp_path):
@@ -100,12 +145,16 @@ def test_config_switch_payload_reports_key_presence_without_leaking_secret(tmp_p
                 "voice": "default",
                 "gpt_sovits_api_url": "http://user:pass@127.0.0.1:9880/tts?token=secret",
             },
+            "assistant_reply_language": "ko",
+            "stickers": {"assistant_enabled": True, "assistant_chance": 0.18},
         },
         env_path=env_path,
     )
 
     serialized = json.dumps(payload, ensure_ascii=False)
     assert payload["current"]["llm"]["api_key_configured"] is True
+    assert payload["current"]["assistant_reply_language"] == "ko"
+    assert payload["current"]["stickers"]["assistant_chance"] == 0.18
     assert payload["current"]["llm"]["base_url"] == "https://example.test/v1"
     assert payload["current"]["tts"]["gpt_sovits_api_url"] == "http://127.0.0.1:9880/tts"
     assert "sk-file-secret" not in serialized

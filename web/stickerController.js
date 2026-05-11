@@ -83,6 +83,45 @@
       }
     }
 
+    function formatAssistantStickerDebug(debug = {}) {
+      const status = String(debug.status || "idle");
+      const reason = String(debug.reason || "");
+      if (status === "sent") {
+        return `最近：已发送 ${debug.label || debug.stickerId || ""}`.trim();
+      }
+      if (status === "skipped") {
+        const labels = {
+          disabled: "已关闭",
+          auto_turn: "自动对话跳过",
+          cooldown: "冷却中",
+          chance: "本次未触发",
+          diagnostic_or_error: "诊断/错误场景跳过",
+          no_sticker: "无可用表情"
+        };
+        return `最近：${labels[reason] || reason || "已跳过"}`;
+      }
+      return "最近：待机";
+    }
+
+    function updateAssistantStickerControls() {
+      if (ui.assistantStickerToggle) {
+        ui.assistantStickerToggle.checked = state.assistantStickerEnabled !== false;
+      }
+      if (ui.assistantStickerDebug) {
+        ui.assistantStickerDebug.textContent = formatAssistantStickerDebug(state.assistantStickerLastDebug || {});
+      }
+    }
+
+    function setAssistantStickerEnabled(value) {
+      state.assistantStickerEnabled = value === true;
+      updateAssistantStickerControls();
+      call(deps.saveAssistantStickerSettings, {
+        assistant_enabled: state.assistantStickerEnabled,
+        assistant_chance: state.assistantStickerChance,
+        assistant_cooldown_ms: state.assistantStickerCooldownMs
+      });
+    }
+
     async function loadDefaultStickers() {
       state.defaultStickers = typeof model.getDefaultStickers === "function" ? model.getDefaultStickers() : [];
       if (typeof fetchObject !== "function" || typeof model.normalizeDefaultManifest !== "function") {
@@ -199,6 +238,7 @@
       if (ui.stickerRespondToggle) {
         ui.stickerRespondToggle.checked = state.stickerRespondAfterSend === true;
       }
+      updateAssistantStickerControls();
     }
 
     async function handleStickerImportFiles(fileList) {
@@ -310,31 +350,52 @@
         ? state.defaultStickers
         : (typeof model.getDefaultStickers === "function" ? model.getDefaultStickers() : []);
       const now = Date.now();
-      const ok = typeof model.shouldSendAssistantSticker === "function"
-        ? model.shouldSendAssistantSticker({
+      const decision = typeof model.getAssistantStickerDecision === "function"
+        ? model.getAssistantStickerDecision({
           enabled: state.assistantStickerEnabled !== false,
           auto: input.auto === true,
           now,
           lastAt: state.assistantStickerLastAt,
           cooldownMs: state.assistantStickerCooldownMs,
-          chance: state.assistantStickerChance
+          chance: state.assistantStickerChance,
+          mood: input.mood || "idle",
+          text: input.text || "",
+          characterBrain: input.characterBrain,
+          intent: input.intent
         })
-        : false;
-      if (!ok) {
+        : { ok: false, reason: "unsupported" };
+      if (decision.ok !== true) {
+        state.assistantStickerLastDebug = {
+          status: "skipped",
+          reason: decision.reason || "skipped",
+          remainingMs: decision.remainingMs || 0,
+          at: now
+        };
+        updateAssistantStickerControls();
         return null;
       }
       const sticker = typeof model.pickStickerByMood === "function"
         ? model.pickStickerByMood(stickers, input.mood || "idle", input.text || "")
         : stickers[0];
       if (!sticker) {
+        state.assistantStickerLastDebug = { status: "skipped", reason: "no_sticker", at: now };
+        updateAssistantStickerControls();
         return null;
       }
       state.assistantStickerLastAt = now;
+      state.assistantStickerLastDebug = {
+        status: "sent",
+        reason: "ok",
+        stickerId: sticker.id,
+        label: sticker.label || sticker.name || "",
+        at: now
+      };
       call(deps.appendStickerMessage, "assistant", sticker, {
         timestamp: now,
         persist: true,
         enableFeedback: false
       });
+      updateAssistantStickerControls();
       return sticker;
     }
 
@@ -350,6 +411,7 @@
       renderStickerPanel,
       resolveStickerPayload,
       sendSticker,
+      setAssistantStickerEnabled,
       setStickerPanelOpen,
       setStickerRespondAfterSend,
       toggleStickerPanel

@@ -1,5 +1,6 @@
 {
   "onboarding_completed": false,
+  "assistant_reply_language": "zh",
   "assistant_name": "馨语AI桌宠",
   "model_path": "/models/your_model/model3.json",
   "model": {
@@ -54,6 +55,7 @@
   "tts": {
     "provider": "browser",
     "voice": "zh-CN-XiaoxiaoNeural",
+    "auto_voice_by_reply_language": true,
     "voices": [
       "zh-CN-XiaoxiaoNeural",
       "zh-CN-XiaoyiNeural",
@@ -97,6 +99,11 @@
     "gpt_sovits_realtime_tts": false
   },
   "assistant_prompt": "你是桌宠 馨语AI桌宠。像真人朋友一样用自然中文短句聊天。默认只回复1到2句，尽量不超过60个中文字。优先直接回答，不要长篇抒情，不要鸡汤，不要模板化，不要提自己是AI。",
+  "stickers": {
+    "assistant_enabled": true,
+    "assistant_chance": 0.18,
+    "assistant_cooldown_ms": 60000
+  },
   "memory": {
     "enabled": true,
     "max_items": 600,

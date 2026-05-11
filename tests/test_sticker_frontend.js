@@ -208,6 +208,30 @@ function testStickerHelpers() {
     true,
     "assistant sticker helper should allow deterministic send in tests"
   );
+  assert.deepStrictEqual(
+    stickerModel.getAssistantStickerDecision({
+      enabled: true,
+      now: 1000,
+      lastAt: 0,
+      cooldownMs: 0,
+      chance: 1,
+      random: () => 0,
+      characterBrain: { intent: "comfort" }
+    }).reason,
+    "scene_comfort",
+    "assistant stickers should skip serious comfort scenes"
+  );
+  assert.strictEqual(
+    stickerModel.getAssistantStickerDecision({
+      enabled: true,
+      text: "diagnostic failed with error",
+      cooldownMs: 0,
+      chance: 1,
+      random: () => 0
+    }).reason,
+    "diagnostic_or_error",
+    "assistant stickers should skip diagnostic/error scenes"
+  );
 }
 
 function testStickerMessageHistoryStaysOutOfLlmHistory() {
@@ -244,7 +268,8 @@ async function testStickerControllerSendModes() {
     assistantStickerEnabled: true,
     assistantStickerChance: 1,
     assistantStickerCooldownMs: 0,
-    assistantStickerLastAt: 0
+    assistantStickerLastAt: 0,
+    assistantStickerLastDebug: { status: "idle" }
   };
   const appended = [];
   const requests = [];
@@ -280,6 +305,16 @@ async function testStickerControllerSendModes() {
   });
   assert.ok(assistantSticker, "assistant should be able to send a mood sticker");
   assert.strictEqual(appended[appended.length - 1].role, "assistant");
+  assert.strictEqual(state.assistantStickerLastDebug.status, "sent");
+
+  const skippedSticker = controller.maybeSendAssistantMoodSticker({
+    mood: "sad",
+    text: "I am handling a serious comfort scene.",
+    auto: false,
+    characterBrain: { intent: "comfort" }
+  });
+  assert.strictEqual(skippedSticker, null, "assistant stickers should skip serious scenes");
+  assert.strictEqual(state.assistantStickerLastDebug.reason, "scene_comfort");
 }
 
 function testScriptAndDomWiring() {
@@ -287,7 +322,9 @@ function testScriptAndDomWiring() {
   assert.ok(html.includes('id="sticker-btn"'), "index should include a sticker button");
   assert.ok(chatStateSource.includes("defaultStickers: []"), "chat state should track default stickers");
   assert.ok(chatDomSource.includes("stickerPanel"), "chat DOM should expose sticker panel elements");
+  assert.ok(chatDomSource.includes("replyLanguageSelect"), "chat DOM should expose the reply language menu");
   assert.ok(chatInputBinderSource.includes("bindStickerControls"), "chat input binder should bind sticker controls");
+  assert.ok(chatInputBinderSource.includes("bindReplyLanguageControls"), "chat input binder should bind reply language controls");
   assert.ok(chatMessageControllerSource.includes('kind: "sticker"'), "chat history should support sticker records");
   assert.ok(
     /body\.view-chat \.chat-input-icon-btn:hover,[\s\S]*?transform: translateY\(-50%\);/.test(baseCssSource),
@@ -313,6 +350,8 @@ function testScriptAndDomWiring() {
       && html.indexOf('<script src="./stickerController.js"></script>') < html.indexOf('<script src="./chat.js"></script>'),
     "sticker modules should load before chat.js"
   );
+  assert.ok(html.includes('id="reply-language-select"'), "chat input should include a quick reply language menu");
+  assert.ok(html.includes('id="assistant-sticker-toggle"'), "sticker panel should include an AI sticker toggle");
 }
 
 async function main() {

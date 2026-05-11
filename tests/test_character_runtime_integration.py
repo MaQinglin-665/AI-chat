@@ -461,6 +461,7 @@ def test_call_llm_demo_stable_persona_override_enabled_injects_identity_rules(mo
             "style": "playful, cheeky, lightly teasing, reliable",
         },
     }
+    cfg["assistant_reply_language"] = "en"
     captured = _capture_openai_prompt_in_call_llm(monkeypatch, cfg, raw_reply="plain reply")
 
     result = app.call_llm("who are you?", [], config=cfg)
@@ -471,7 +472,8 @@ def test_call_llm_demo_stable_persona_override_enabled_injects_identity_rules(mo
     assert "When the user asks who you are, introduce yourself using this name." in prompt
     assert "Do not use any other character name." in prompt
     assert "Keep this local persona style: playful, cheeky, lightly teasing, reliable." in prompt
-    assert "Even when the user writes in Chinese, answer in English; do not mirror the user's Chinese." in prompt
+    assert "Keep the main reply in natural spoken English" in prompt
+    assert "even when the user writes in Chinese" in prompt
     assert "Usually keep replies to 2 to 3 short sentences." in prompt
     assert "Do not call yourself ChatGPT." in prompt
     assert "发布演示" not in prompt
