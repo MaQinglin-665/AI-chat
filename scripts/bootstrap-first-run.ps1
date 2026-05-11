@@ -363,7 +363,7 @@ function Write-FinalSummary {
     Write-Host "  .\start_electron.bat"
 }
 
-Write-Host "Taffy AI Desktop Pet first-run bootstrap"
+Write-Host "Xinyu AI Desktop Pet first-run bootstrap"
 Write-Host "Root: $RepoRoot"
 Write-Host ""
 

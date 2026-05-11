@@ -1,86 +1,73 @@
-Taffy v1.4 Preview - Start Here
-===============================
+Xinyu Desktop Pet v1.4 Preview - Start Here
+===========================================
 
-This is a source-based preview for early testers and contributors. It is not a
-finished installer.
+This is an MVP preview for early users and contributors, not a mature
+commercial product.
 
-Use this package if you want to try Taffy's original AI VTuber feeling:
-Live2D, chat, browser TTS, Character Brain cues, and low-risk spontaneous
-stage replies.
+Recommended download
+--------------------
 
-1. Prepare the local environment
+For normal Windows 10/11 users, download these release assets first:
 
-   Double-click:
+    Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+    SHA256SUMS.txt
 
-       prepare_preview_environment.bat
+The installer copies the project to your user folder, creates Start Menu and
+desktop shortcuts, then runs the guided first start.
 
-   Or run from PowerShell:
+This first installer is unsigned. Before running it, compare:
 
-       .\prepare_preview_environment.bat
+    Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
+    Get-Content .\SHA256SUMS.txt
 
-   This prepares Python/Node dependencies, creates local config/token files,
-   and applies the Taffy preview experience profile.
+If SmartScreen warns about an unknown publisher, continue only when the file
+came from this repository release and the SHA256 matches.
 
-2. Configure your own model
-
-   Run:
-
-       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
-
-   Taffy does not include a cloud model, hosted endpoint, or API key. You choose
-   the provider/model. See docs\model-selection.md for compatibility and latency
-   guidance.
-
-3. Diagnose the model link
-
-   Run:
-
-       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
-
-   The report hides API keys, raw prompts, raw history, Authorization headers,
-   and private local files.
-
-4. Run the first chat smoke check
-
-   Run:
-
-       powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
-
-   If model probe success is below 80%, or normal turns often take more than 15
-   seconds, switch to a faster stable model before judging Taffy's character
-   experience.
-
-5. Start the desktop pet
-
-   Run:
-
-       .\start_electron.bat
-
-First things to try
+Source package path
 -------------------
 
-- Send a short English chat message.
-- Check that the Live2D model is visible.
-- Check that browser TTS speaks the full reply.
-- Try /doctor for local diagnostics.
-- Try /braindebug after a normal chat turn.
-- Watch whether spontaneous replies and small stage reactions appear without
-  becoming noisy.
+Developers and early testers can use:
+
+    Xinyu-AI-Desktop-Pet-v1.4.0-preview-windows-source-test.zip
+
+From an extracted source package, double-click:
+
+    install_and_start.bat
+
+First model setup
+-----------------
+
+Xinyu does not include a cloud model, hosted endpoint, or API key. On first
+launch, the chat window shows a model setup wizard when LLM configuration is
+missing.
+
+Default provider:
+
+    openai-compatible
+
+Default key env:
+
+    TAFFY_LLM_API_KEY
+
+The real API key is stored only in local .env. Non-secret model settings go to
+config.local.json. After saving, the app runs a lightweight model probe and
+shows a readable success or failure reason.
 
 Safety defaults
 ---------------
 
-The preview profile does not enable desktop observation, screenshots, user file
-reading, tool calling, or shell execution by default.
+Desktop observation, screenshots, user file reading, tool calling, and shell
+execution stay disabled by default.
 
-Feedback
---------
+More help
+---------
 
-If you want to report your test result, use:
+Read:
 
-    docs\external-tester-checklist.md
+    docs\first-install.md
+    docs\installer.md
+    README-FIRST-RUN.txt
+    docs\troubleshooting.md
 
-or open a GitHub issue with the "Preview Feedback" template.
-
-Please remove API keys, tokens, raw prompts, raw history, private file paths,
-and private desktop screenshots before sharing logs or screenshots.
+When reporting feedback, remove API keys, tokens, raw prompts, raw history,
+private local paths, and private desktop screenshots.

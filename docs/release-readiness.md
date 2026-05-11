@@ -1,6 +1,6 @@
 # Release Readiness
 
-本页是发布前 / 打包前的 go/no-go 清单。它不是成熟商业产品认证，而是为了让当前 MVP / 开源孵化阶段的源码测试包具备可复现、可排障、默认安全的最低体验门槛。
+本页是发布前 / 打包前的 go/no-go 清单。它不是成熟商业产品认证，而是为了让当前 MVP / 开源孵化阶段的 Windows 在线引导安装器和源码测试包具备可复现、可排障、默认安全的最低体验门槛。
 
 更细的人工步骤见 `docs/manual-qa.md`；干净首跑记录模板见 `docs/first-run-validation.md`；启动失败样例见 `docs/startup-failure-examples.md`；健康接口字段见 `docs/backend-health.md`。
 
@@ -25,6 +25,7 @@ python scripts\check_secrets.py
 node scripts\run_node_tests.js
 python -m pytest -q
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_installer_smoke.ps1
 git diff --check
 ```
 
@@ -34,6 +35,7 @@ git diff --check
 - [ ] Node 前端测试通过。
 - [ ] Python 测试通过。
 - [ ] `scripts\check_first_run_package.ps1` 能打包、解压并验证首跑入口。
+- [ ] `scripts\check_installer_smoke.ps1` 能生成 installer exe、source zip 和 `SHA256SUMS.txt`。
 - [ ] `git diff --check` 没有冲突标记或尾随空白错误。
 - [ ] 如果有 warning，必须能解释来源，例如 Python 版本弃用提醒或 CRLF 提示。
 
@@ -45,13 +47,19 @@ No-go：
 
 ## First-Run Gate
 
-从 `scripts\package-source-test.ps1` 生成的干净源码测试包开始，或从清楚记录过本地差异的干净目录开始。首跑主路径是：
+普通用户首跑主路径从 release 安装器开始：
+
+```text
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+SHA256SUMS.txt
+```
+
+先校验 SHA256；如果 SmartScreen 提醒未知发布者，只有在来源和 SHA256 都可信时才继续。安装器应复制项目文件、创建快捷方式，并启动 `install_and_start.bat`。
+
+开发者 / 早期测试者可从 `scripts\package-source-test.ps1` 生成的干净源码测试包开始。源码包首跑路径是：
 
 ```powershell
-.\install_first_run.bat
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
-.\start_electron.bat
+.\install_and_start.bat
 ```
 
 `scripts\doctor.ps1`、`scripts\setup-dev.ps1` 仍可作为开发者路径使用，但不再是早期用户首跑的主入口。
@@ -61,8 +69,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 - [ ] 项目目录完整：`electron/`、`web/`、`tests/`、`scripts/`、`package.json` 存在。
 - [ ] Python 3.10+ 可用。
 - [ ] Node.js 18+ 可用，推荐 20/22 LTS。
-- [ ] `install_first_run.bat` 能完成依赖安装、创建 `.venv`、初始化 `config.json` / `.env`。
-- [ ] `configure-llm.ps1` 能把 provider / base URL / model 写入 `config.local.json`，并把 API Key 写入 `.env`。
+- [ ] 安装器默认安装到用户目录，不要求管理员权限。
+- [ ] 安装器创建开始菜单和桌面快捷方式。
+- [ ] `install_and_start.bat` 能完成依赖安装、创建 `.venv`、初始化 `config.json` / `.env`。
+- [ ] 应用内首次配置向导或 `configure-llm.ps1` 能把 provider / base URL / model 写入 `config.local.json`，并把 API Key 写入 `.env`。
+- [ ] `/api/first_run/status` 不返回密钥，能显示 LLM 完整性、Live2D 状态和安全默认值摘要。
+- [ ] `/api/first_run/configure_llm` 需要本地 API token，并且响应只返回脱敏状态。
 - [ ] `first_chat_smoke.ps1` 能通过 preflight、`/healthz`、`/api/health`，并在启用真实请求时拿到 LLM probe 与 `/api/chat` 回复。
 - [ ] `model_path` 指向真实 `.model3.json` 文件；如果包内只有一个模型，bootstrap 能自动设置。
 - [ ] LLM provider、base URL、model 和 API Key 状态清楚，且 Key 不写入 JSON。
@@ -174,8 +186,12 @@ No-go：
 
 发布包或 README 至少能把用户导向这些入口：
 
+- [ ] `Xinyu-AI-Desktop-Pet-Setup-v{version}.exe`
+- [ ] `Xinyu-AI-Desktop-Pet-v{version}-windows-source-test.zip`
+- [ ] `SHA256SUMS.txt`
 - [ ] `README-FIRST-RUN.txt`
 - [ ] `THIRD_PARTY_NOTICES.md`
+- [ ] `docs/installer.md`
 - [ ] `docs/setup.md`
 - [ ] `docs/backend-health.md`
 - [ ] `docs/startup-failure-examples.md`
@@ -186,8 +202,9 @@ No-go：
 
 通过标准：
 
-- [ ] 新用户知道先跑 `install_first_run.bat`。
-- [ ] 新用户知道用 `scripts\configure-llm.ps1` 配置 LLM。
+- [ ] 普通新用户知道优先下载 installer exe，而不是 GitHub 自动源码归档。
+- [ ] 新用户知道首发安装器未签名，并能找到 SHA256 校验步骤。
+- [ ] 新用户知道在应用内首次配置向导里配置 LLM；源码用户也知道可用 `scripts\configure-llm.ps1`。
 - [ ] 新用户知道用 `scripts\first_chat_smoke.ps1` 验证第一句对话。
 - [ ] 新用户知道最后用 `.\start_electron.bat` 启动桌宠。
 - [ ] 常见失败有可执行修复路径。

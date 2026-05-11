@@ -40,8 +40,8 @@
   },
   "observe": {
     "attach_mode": "manual",
-    "allow_auto_chat": true,
-    "auto_chat_enabled": true,
+    "allow_auto_chat": false,
+    "auto_chat_enabled": false,
     "auto_chat_min_ms": 45000,
     "auto_chat_max_ms": 120000,
     "daily_greeting_enabled": false

@@ -223,7 +223,7 @@ def build_diagnosis(*, base_url: str = "", timeout_sec: float = 14.0) -> dict[st
         recommendation = "Start the backend with start_electron.bat or python app.py, then rerun this script."
     elif api_health.get("status") in {401, 403}:
         issue_code = "local_api_token_rejected"
-        recommendation = "The local backend requires X-Taffy-Token. Run install_first_run.bat to create .env, then restart."
+        recommendation = "The local backend requires X-Taffy-Token. Run install_and_start.bat to create .env, then restart."
     elif not llm_url.get("valid"):
         issue_code = "llm_base_url_invalid"
         recommendation = "Fix llm.base_url so it starts with http:// or https:// and includes a host."

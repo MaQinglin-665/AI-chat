@@ -7,6 +7,7 @@
     'personaCard',
     'schedulePanel',
     'configSwitchController',
+    'firstRunWizardController',
     'onboarding',
     'desktopBridge'
   ];

@@ -1,16 +1,38 @@
 # v1.4.0-preview Release Notes
 
-> This is a preview release for early testers and contributors. It is not a finished installer, mature AI VTuber product, or commercial desktop agent.
+> This is a preview release for early testers and contributors. It includes an unsigned Windows online guided installer, but it is still not a mature AI VTuber product or commercial desktop agent.
 
 ## Summary
 
-`v1.4.0-preview` focuses on the original AI VTuber feeling: Taffy can keep a light stage memory, react with Character Brain performance controls, produce low-interruption spontaneous thoughts, and expose readable debug summaries for tuning.
+`v1.4.0-preview` focuses on the original AI VTuber feeling and first public usability: Xinyu can keep a light stage memory, react with Character Brain performance controls, produce low-interruption spontaneous thoughts, and guide first-time users through installer-first setup.
 
 This release is inspired by AI VTuber interaction patterns, including the sense of immediacy found in Neuro-sama-like experiences, but it is not a clone and does not copy existing VTuber lines, lore, or proprietary bits.
 
 The preview does not include a cloud model, hosted endpoint, or API key. Testers choose their own model provider; see `docs/model-selection.md` for compatibility and latency expectations.
 
+Recommended release assets:
+
+- `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe`
+- `Xinyu-AI-Desktop-Pet-v1.4.0-preview-windows-source-test.zip`
+- `SHA256SUMS.txt`
+- these release notes
+
 ## What Changed
+
+### First Public Install Path
+
+- Added an NSIS Windows online guided installer that installs under the current user directory, creates Start Menu / desktop shortcuts, and launches `install_and_start.bat`.
+- Added source package alignment so `install_and_start.bat`, installer docs, and installer build scripts are included in the source test zip.
+- Renamed release package artifacts from older Taffy package names to Xinyu package names. Some compatibility environment variables, such as `TAFFY_API_TOKEN` and `TAFFY_LLM_API_KEY`, are intentionally retained.
+- Added SHA256 generation for installer and source zip. The first installer is unsigned, so SmartScreen warnings are expected unless/until code signing is added.
+
+### First-Run LLM Wizard
+
+- Added `/api/first_run/status` for a safe first-run summary: onboarding state, LLM completeness, Live2D availability, and safety default summary. It does not return API keys.
+- Added `/api/first_run/configure_llm`, protected by the local API token, to write non-secret LLM settings to `config.local.json` and the real API key to `.env`.
+- Added an in-app first-run model setup wizard for provider type, base URL, model, API key env name, and API key.
+- The default provider is `openai-compatible`; the default key env name is `TAFFY_LLM_API_KEY`.
+- After saving, the UI calls the existing lightweight LLM probe and shows a readable success or failure reason.
 
 ### Character Brain and Stage Continuity
 
@@ -38,7 +60,7 @@ The preview does not include a cloud model, hosted endpoint, or API key. Testers
 ### Spontaneous Thought Bursts
 
 - Added proactive stage replies and turn-based interjections.
-- Added an interjection director that decides whether Taffy should hold back, callback, or interject.
+- Added an interjection director that decides whether Xinyu should hold back, callback, or interject.
 - Added thought burst types such as:
   - mutter
   - aside
@@ -70,6 +92,7 @@ python scripts/check_encoding.py
 python scripts/check_secrets.py
 python -m pytest -q
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_installer_smoke.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 --soft-fail
 python scripts/model_acceptance_probe.py --attempts 5 --timeout-sec 14 --soft-fail
 python scripts/audit_v14_dialogue.py --mode chat --timeout-sec 45 --soft-fail
@@ -118,34 +141,39 @@ This preview keeps conservative defaults:
 
 ## Known Limitations
 
-- This is still a source-based preview, not a packaged consumer installer.
+- The Windows installer is an unsigned online guided installer; it does not bundle Python/Node runtimes or a model provider.
 - The character feel depends heavily on the configured model latency and output quality.
 - Spontaneous thought bursts are still early and may need manual tuning for each TTS/Live2D setup.
 - TTS and Live2D timing still need manual smoke testing on each machine.
-- A slow or unstable OpenAI-compatible gateway can make Taffy feel broken even when the local app code is healthy.
+- A slow or unstable OpenAI-compatible gateway can make Xinyu feel broken even when the local app code is healthy.
 - Desktop awareness remains manual and intentionally conservative.
 
 ## Download and First Run
 
-Recommended download:
+Recommended download for normal Windows users:
 
-- `Taffy-AI-Desktop-Pet-v1.4.0-preview-windows-source-test.zip`
+- `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe`
 - `SHA256SUMS.txt`
 
-Use the source test package above for preview testing. GitHub's automatic
-`Source code` archives are plain repository snapshots and do not run the
-first-run package checks.
+Verify SHA256 before running. If SmartScreen warns about an unknown publisher,
+continue only when the file came from this repository release and the SHA256
+matches.
 
-Recommended first-run path after extracting the zip:
+Recommended download for developers / early testers:
+
+- `Xinyu-AI-Desktop-Pet-v1.4.0-preview-windows-source-test.zip`
+- `SHA256SUMS.txt`
+
+GitHub's automatic `Source code` archives are plain repository snapshots and do
+not run the first-run package checks.
+
+Recommended source-package first-run path after extracting the zip:
 
 ```powershell
-.\prepare_preview_environment.bat
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
-.\start_electron.bat
+.\install_and_start.bat
 ```
 
-The first command prepares dependencies and applies the Taffy preview
-experience profile. The model choice still belongs to the tester: the preview
-does not ship a cloud model, endpoint, or API key.
+The installer and the source-package guided path both prepare dependencies,
+apply the Xinyu preview profile, ask for the user's own model provider/model/key,
+run a first-chat smoke check, and launch Electron. The preview does not ship a
+cloud model, endpoint, or API key.

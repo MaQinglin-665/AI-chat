@@ -1,128 +1,76 @@
-Taffy AI Desktop Pet - First Run
-================================
+Xinyu Desktop Pet - First Run
+=============================
 
-This is an early tester/developer package, not a finished installer.
+This is an MVP preview. It is meant to be usable for first public testing, but
+it is not a mature commercial desktop product.
 
-If you only want the shortest preview path, read START_HERE.txt first.
+Normal Windows users
+--------------------
 
-Before running
---------------
+Download from the GitHub release:
 
-Install:
+    Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+    SHA256SUMS.txt
 
-1. Windows 10/11
-2. Python 3.10+ (Python 3.11 or 3.12 recommended)
-3. Node.js 18+ (Node.js 20 or 22 LTS recommended)
+Verify the installer before running:
 
-First checks
-------------
+    Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
+    Get-Content .\SHA256SUMS.txt
 
-Open PowerShell in this folder and run:
+The first public installer is unsigned. SmartScreen may show an unknown
+publisher warning. Continue only if the file came from this repository release
+and the SHA256 matches.
 
-    powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
+What the installer does
+-----------------------
 
-If it says tests/, web/, or electron/ is missing, this is not a complete
-source package. Download the current main branch again:
+- Installs under the current user folder.
+- Creates Start Menu and desktop shortcuts.
+- Runs install_and_start.bat after copying files.
+- Checks Python / Node.js / npm.
+- Prompts to install missing runtime dependencies through winget when needed.
+- Does not include a cloud model, hosted endpoint, or API key.
+- Does not enable desktop observation, screenshots, file reads, tool calling,
+  or shell execution by default.
 
-    https://github.com/MaQinglin-665/AI-chat/archive/refs/heads/main.zip
+First model setup
+-----------------
 
-Recommended first-run bootstrap
+On first launch, the chat window opens a model setup wizard if the LLM is not
+complete. Fill:
+
+    provider type
+    base URL
+    model
+    API key env name
+    API key
+
+The default provider is openai-compatible. The default API key env name is
+TAFFY_LLM_API_KEY.
+
+The real API key is stored in local .env. Non-secret LLM settings are stored in
+config.local.json. The app does not return or display the real key after saving.
+After saving, it runs /api/llm_probe and shows a readable success/failure
+reason.
+
+Developer / source package path
 -------------------------------
 
-For the easiest first run, double-click:
+If you downloaded the source test zip or cloned the repository, run:
 
-    prepare_preview_environment.bat
+    install_and_start.bat
 
-This prepares Python/Node dependencies, initializes local config/token files,
-and applies the Taffy preview experience profile. You still choose your own LLM
-provider/model/API key.
-
-For a lower-level dependency bootstrap only, double-click:
+For lower-level bootstrap only:
 
     install_first_run.bat
 
-Or run:
+Manual path:
 
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\bootstrap-first-run.ps1
-
-The bootstrap creates a local .venv, installs Python runtime dependencies,
-installs Node/Electron dependencies, creates config.json if needed, generates a
-local TAFFY_API_TOKEN in .env, and runs the same read-only preflight used before
-launch.
-
-If the bootstrap finishes with READY, run start_electron.bat. If it finishes
-with ACTION, the dependency setup completed but launch still needs the listed
-[FAIL] items fixed, most often Live2D model_path or LLM API key/model settings.
-
-If the remaining blocker is LLM configuration, run:
-
+    prepare_preview_environment.bat
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\configure-llm.ps1
-
-The LLM helper writes provider/model settings to config.local.json and stores
-API keys in .env. It does not write API keys into config JSON.
-
-Model choice is yours. The project does not include a cloud model or API key.
-Use docs\model-selection.md to choose a provider/model that passes diagnostics,
-reaches at least 80% probe success, and usually replies in under 15 seconds.
-
-To try the current Taffy AI VTuber preview profile, run:
-
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\apply-preview-experience-config.ps1
-
-This keeps your LLM provider/base URL/model/api_key_env, switches the local
-character profile to English Taffy, enables Character Runtime cues, and keeps
-desktop observation, screenshots, tools, and shell disabled.
-
-After LLM configuration, you can verify the first chat path before opening the
-desktop windows:
-
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1 -SoftFail
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
-
-The smoke check runs preflight, starts or detects the backend, checks /healthz
-and /api/health, then sends a lightweight LLM probe and one short /api/chat
-request. Use -SkipLlmProbe or -SkipChat if you want to avoid that request.
-
-If the smoke check fails at /api/llm_probe or returns HTTP 500, run:
-
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\diagnose-llm-link.ps1
-
-The diagnostic report is read-only and hides API keys, raw prompts, raw
-history, Authorization headers, and private local files.
-
-If Python or Node.js is missing, the script can ask whether to install it with
-winget. If winget changes PATH, open a new PowerShell window and rerun the
-bootstrap.
-
-Developer setup
----------------
-
-Run:
-
-    powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
-    powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1
-
-Preflight before launch
------------------------
-
-After placing a Live2D model and setting model_path, run:
-
-    python scripts\first_run_check.py
-
-This read-only preflight checks config loading, Live2D path, Python and Node
-dependencies, server port, LLM key/model settings, optional local Ollama or
-GPT-SoVITS ports, and safety defaults.
-
-Start the desktop pet
----------------------
-
-Run:
-
-    .\start_electron.bat
-
-start_electron.bat runs the same preflight before Electron starts. If it stops,
-read the [FAIL] lines first. Common blockers are missing Python/Node/Electron
-dependencies, a placeholder Live2D model_path, missing LLM API key, wrong model
-name, or a GPT-SoVITS URL that points to a service that is not running.
+    start_electron.bat
 
 Health checks
 -------------
@@ -131,27 +79,23 @@ After the backend starts:
 
     http://127.0.0.1:8123/healthz
     http://127.0.0.1:8123/api/health
+    http://127.0.0.1:8123/api/first_run/status
 
-/healthz is a lightweight public liveness check. /api/health is the detailed
-self-check for config, Live2D, LLM, TTS, ASR, and readiness. If
-server.require_api_token is enabled, /api/health requires X-Taffy-Token.
+/healthz is a lightweight public liveness check. /api/health and
+/api/first_run/status are detailed local API summaries and obey the local API
+token setting.
 
-Live2D and LLM notes
---------------------
+Live2D and voice notes
+----------------------
 
-- Put a Live2D .model3.json model under web\models\.
-- Set model_path in config.json.
+- Put a Live2D .model3.json model under web\models\ if the packaged model is
+  missing or you want to replace it.
 - Keep TTS provider as browser for the first run.
-- Keep API keys in environment variables, not in committed files.
-- Desktop observation and shell tools are opt-in and should stay disabled by default.
+- GPT-SoVITS, ASR, Ollama, and local advanced voice paths are optional.
 
-If you only want to inspect the project, read:
+Feedback
+--------
 
-    README.md
-    THIRD_PARTY_NOTICES.md
-    docs\setup.md
-    docs\backend-health.md
-    docs\startup-failure-examples.md
-    docs\release-readiness.md
-    docs\troubleshooting.md
-    docs\manual-qa.md
+Use the GitHub First-Run Help issue template. Remove API keys, tokens,
+Authorization headers, raw prompts, raw history, private paths, and private
+desktop screenshots before sharing logs.

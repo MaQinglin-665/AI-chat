@@ -67,7 +67,7 @@ function Get-TrackedRootPythonFiles {
 }
 
 $packageVersion = Get-PackageVersion
-$packageName = "Taffy-AI-Desktop-Pet-v$packageVersion-windows-source-test"
+$packageName = "Xinyu-AI-Desktop-Pet-v$packageVersion-windows-source-test"
 if ([System.IO.Path]::IsPathRooted($OutputDir)) {
     $distRoot = $OutputDir
 } else {
@@ -99,11 +99,13 @@ $pathsToCopy = @(
     "START_HERE.txt",
     "THIRD_PARTY_NOTICES.md",
     "config.example.json",
+    "first_run.py",
     "package-lock.json",
     "package.json",
     "prepare_preview_environment.bat",
     "requirements-dev.txt",
     "requirements.txt",
+    "install_and_start.bat",
     "install_first_run.bat",
     "start.bat",
     "start_chat_oneclick.bat",
@@ -113,6 +115,7 @@ $pathsToCopy = @(
     "config",
     "docs",
     "electron",
+    "installer",
     "scripts",
     "tests",
     "tts_ref\README.md",
@@ -167,4 +170,5 @@ $hashPath = Join-Path $distRoot "SHA256SUMS.txt"
 
 Write-Host "[OK] Created $zipPath" -ForegroundColor Green
 Write-Host "[OK] Wrote $hashPath" -ForegroundColor Green
-Write-Host "This is a source test package. It still requires Python and Node.js on the target machine."
+Write-Host "This is the Xinyu source test package. Older Taffy names may still appear in compatibility env vars and local tokens."
+Write-Host "This source package still requires Python and Node.js on the target machine."

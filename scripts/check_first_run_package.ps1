@@ -103,12 +103,18 @@ try {
         "THIRD_PARTY_NOTICES.md",
         ".github\ISSUE_TEMPLATE\preview-feedback.yml",
         "docs\external-tester-checklist.md",
+        "docs\first-install.md",
+        "docs\installer.md",
         "docs\model-selection.md",
+        "install_and_start.bat",
         "install_first_run.bat",
+        "installer\xinyu-online-installer.nsi",
         "prepare_preview_environment.bat",
         "start_electron.bat",
         "scripts\bootstrap-first-run.ps1",
         "scripts\apply-preview-experience-config.ps1",
+        "scripts\build-installer.ps1",
+        "scripts\check_installer_smoke.ps1",
         "scripts\clean-local-artifacts.ps1",
         "scripts\prepare-preview-environment.ps1",
         "scripts\configure-llm.ps1",
@@ -119,6 +125,7 @@ try {
         "config.example.json",
         "config.preview.example.json",
         "app_health.py",
+        "first_run.py",
         "character_brain.py",
         "llm_runtime.py",
         "package.json",
@@ -301,6 +308,9 @@ if (mismatches.length) {
     }
     if ([string]$previewCfg.observe.attach_mode -eq "auto") {
         Write-Fail "Preview config should not enable automatic desktop observation."
+    }
+    if ($previewCfg.observe.allow_auto_chat -eq $true -or $previewCfg.observe.auto_chat_enabled -eq $true) {
+        Write-Fail "Preview config should keep proactive/auto chat disabled by default."
     }
     if ($previewCfg.tools.enabled -eq $true -or $previewCfg.tools.allow_shell -eq $true) {
         Write-Fail "Preview config should keep tools and shell disabled."

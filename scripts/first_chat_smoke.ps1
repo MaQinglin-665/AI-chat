@@ -59,7 +59,7 @@ function Resolve-PythonCommand {
         return
     }
 
-    Write-Fail "Python was not found. Run install_first_run.bat first."
+    Write-Fail "Python was not found. Run install_and_start.bat first."
 }
 
 function Invoke-ProjectPython {
@@ -339,13 +339,13 @@ try {
     Resolve-PythonCommand
 
     if (-not (Test-Path (Join-Path $RepoRoot "config.json"))) {
-        Write-Fail "config.json was not found. Run install_first_run.bat first."
+        Write-Fail "config.json was not found. Run install_and_start.bat first."
     }
     if (-not (Test-Path (Join-Path $RepoRoot ".env"))) {
-        Write-Fail ".env was not found. Run install_first_run.bat first."
+        Write-Fail ".env was not found. Run install_and_start.bat first."
     }
     if (-not (Test-Path (Join-Path $RepoRoot "node_modules"))) {
-        Write-Fail "node_modules was not found. Run install_first_run.bat first."
+        Write-Fail "node_modules was not found. Run install_and_start.bat first."
     }
 
     if (-not $SkipPreflight) {
@@ -364,7 +364,7 @@ try {
     $targetBaseUrl = if ($BaseUrl) { $BaseUrl.TrimEnd("/") } else { [string]$runtime.base_url }
     $token = [string]$runtime.api_token
     if ([bool]$runtime.require_api_token -and -not $token) {
-        Write-Fail "API token is required but missing. Run install_first_run.bat again."
+        Write-Fail "API token is required but missing. Run install_and_start.bat again."
     }
 
     Start-BackendIfNeeded $targetBaseUrl

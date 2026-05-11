@@ -22,6 +22,9 @@ from config import (
 DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 DASHSCOPE_DEFAULT_MODEL = "qwen-plus"
 DASHSCOPE_KEY_ENV = "DASHSCOPE_API_KEY"
+FIRST_RUN_DEFAULT_BASE_URL = "http://127.0.0.1:8000/v1"
+FIRST_RUN_DEFAULT_KEY_ENV = "TAFFY_LLM_API_KEY"
+FIRST_RUN_ALLOWED_PROVIDERS = {"openai-compatible", "openai", "ollama"}
 
 LLM_PRESETS = {
     "dashscope": {
@@ -210,6 +213,8 @@ def _read_env_file_value(path, name):
 
 
 def _write_env_value(path, name, value):
+    if not str(name or "").strip() and not str(value or "").strip():
+        return False
     env_name = _clean_env_name(name)
     secret = str(value or "").strip()
     if not secret:
@@ -384,6 +389,116 @@ def _normalize_tts_update(raw):
             config_key="tts.gpt_sovits_api_url",
         )
     return update
+
+
+def _normalize_first_run_llm_update(raw):
+    body = raw.get("llm", raw) if isinstance(raw, dict) else {}
+    provider = _clean_text(body.get("provider") or "openai-compatible", 64).lower()
+    if provider == "openai_compatible":
+        provider = "openai-compatible"
+    if provider not in FIRST_RUN_ALLOWED_PROVIDERS:
+        raise DiagnosticError(
+            code="first_run_invalid_llm_provider",
+            reason=f"Unsupported LLM provider: {provider or '(empty)'}.",
+            solution="Use openai-compatible, openai, or ollama.",
+            config_key="llm.provider",
+        )
+
+    default_url = OLLAMA_DEFAULT_BASE_URL if provider == "ollama" else FIRST_RUN_DEFAULT_BASE_URL
+    default_model = OLLAMA_DEFAULT_MODEL if provider == "ollama" else OPENAI_DEFAULT_MODEL
+    base_url = _normalize_http_url(
+        body.get("base_url") or default_url,
+        default_url=default_url,
+        config_key="llm.base_url",
+    )
+    model = _clean_text(body.get("model") or default_model, 120)
+    if not model:
+        raise DiagnosticError(
+            code="first_run_empty_model",
+            reason="LLM model cannot be empty.",
+            solution="Choose a model name supported by your provider.",
+            config_key="llm.model",
+        )
+
+    requires_key = provider in {"openai", "openai-compatible"}
+    api_key_env = _clean_env_name(
+        body.get("api_key_env") or ("" if provider == "ollama" else FIRST_RUN_DEFAULT_KEY_ENV),
+        allow_empty=not requires_key,
+    )
+    api_key = str(body.get("api_key", "") or "").strip()
+    if "\n" in api_key or "\r" in api_key:
+        raise DiagnosticError(
+            code="first_run_invalid_secret",
+            reason="API key cannot contain line breaks.",
+            solution="Paste a single-line API key.",
+            config_key="llm.api_key",
+        )
+    if api_key and not api_key_env:
+        raise DiagnosticError(
+            code="first_run_missing_env",
+            reason="API key env name is required when saving an API key.",
+            solution="Set llm.api_key_env before saving the key.",
+            config_key="llm.api_key_env",
+        )
+
+    return {
+        "provider": provider,
+        "base_url": base_url,
+        "model": model,
+        "api_key_env": api_key_env,
+        "api_key": api_key,
+        "requires_api_key": requires_key,
+    }
+
+
+def save_first_run_llm_config(body, *, local_config_path=None, env_path=None):
+    llm_update = _normalize_first_run_llm_update(body)
+    local_path = LOCAL_CONFIG_PATH if local_config_path is None else Path(local_config_path)
+    env_file = ENV_PATH if env_path is None else Path(env_path)
+    existing_key = ""
+    if llm_update["api_key_env"]:
+        existing_key = (
+            str(os.environ.get(llm_update["api_key_env"], "") or "").strip()
+            or _read_env_file_value(env_file, llm_update["api_key_env"])
+        )
+    if llm_update["requires_api_key"] and not llm_update["api_key"] and not existing_key:
+        raise DiagnosticError(
+            code="first_run_missing_api_key",
+            reason="API key is missing for the selected remote-compatible provider.",
+            solution="Paste an API key, or choose Ollama for a local model that does not require one.",
+            config_key="llm.api_key",
+        )
+
+    local_config = _read_json_object(local_path)
+    local_config["onboarding_completed"] = True
+    llm = _ensure_section(local_config, "llm")
+    llm["provider"] = llm_update["provider"]
+    llm["base_url"] = llm_update["base_url"]
+    llm["model"] = llm_update["model"]
+    llm["api_key"] = ""
+    if llm_update["api_key_env"]:
+        llm["api_key_env"] = llm_update["api_key_env"]
+    elif "api_key_env" in llm:
+        llm["api_key_env"] = ""
+
+    _write_json_object(local_path, local_config)
+    key_saved = _write_env_value(env_file, llm_update["api_key_env"], llm_update["api_key"])
+
+    return {
+        "ok": True,
+        "saved": {
+            "local_config": str(Path(local_path).name),
+            "api_key_saved": bool(key_saved),
+            "api_key_returned": False,
+            "llm": {
+                "provider": llm_update["provider"],
+                "base_url": safe_url_display(llm_update["base_url"]),
+                "model": llm_update["model"],
+                "api_key_env": llm_update["api_key_env"],
+                "api_key_configured": bool(llm_update["api_key"] or existing_key),
+            },
+        },
+    }
 
 
 def save_config_switch_update(body, *, local_config_path=None, env_path=None):
