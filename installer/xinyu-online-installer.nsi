@@ -42,10 +42,10 @@ Section "Install"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
   CreateDirectory "$SMPROGRAMS\${START_MENU_DIR}"
-  CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\Xinyu Guided First Run.lnk" "$INSTDIR\install_and_start.bat" "" "$INSTDIR\install_and_start.bat" 0 SW_SHOWNORMAL "" "Prepare dependencies, configure LLM, and start Xinyu"
+  CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\Xinyu Guided First Run.lnk" "$INSTDIR\install_and_start.bat" "" "$INSTDIR\install_and_start.bat" 0 SW_SHOWNORMAL "" "Prepare dependencies and start Xinyu"
   CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\Start Xinyu.lnk" "$INSTDIR\start_electron.bat" "" "$INSTDIR\start_electron.bat" 0 SW_SHOWNORMAL "" "Start Xinyu AI Desktop Pet"
   CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\Uninstall Xinyu.lnk" "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$DESKTOP\Xinyu AI Desktop Pet.lnk" "$INSTDIR\install_and_start.bat" "" "$INSTDIR\install_and_start.bat" 0 SW_SHOWNORMAL "" "Run Xinyu guided first start"
+  CreateShortcut "$DESKTOP\Xinyu AI Desktop Pet.lnk" "$INSTDIR\start_electron.bat" "" "$INSTDIR\start_electron.bat" 0 SW_SHOWMINIMIZED "" "Start Xinyu AI Desktop Pet"
 
   ExecShell "open" "$INSTDIR\install_and_start.bat"
 SectionEnd

@@ -36,9 +36,11 @@ if errorlevel 1 (
 %PYTHON_CMD% scripts\first_run_check.py
 if errorlevel 1 (
   echo.
-  echo Startup preflight found blockers. Fix the issue above, then run start_electron.bat again.
-  pause
-  exit /b 1
+  echo Startup preflight found items to review.
+  echo Continuing launch so the in-app first-run wizard can help with setup.
+  echo For full diagnostics later, run:
+  echo   %PYTHON_CMD% scripts\first_run_check.py
+  echo.
 )
 
 rem Do not kill port 8123 here.
