@@ -1641,8 +1641,12 @@ const learningReviewState =
       debugSnapshot: null,
       candidates: [],
       samples: [],
+      shortMemories: [],
+      coreMemories: [],
       selectedCandidates: new Set(),
       selectedSamples: new Set(),
+      selectedShort: new Set(),
+      selectedCore: new Set(),
       quickSettings: {
         inject_count: 0,
         promotion_min_support: 1

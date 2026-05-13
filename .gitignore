@@ -16,6 +16,8 @@ memory_persona_card.json
 memory_profile.json
 memory_relationship.json
 memory_summary.json
+memory_session.json
+memory_core.json
 
 # Temporary audio files
 tmp_*.wav
@@ -51,6 +53,8 @@ memory.bak
 memory_profile.json
 memory_relationship.json
 memory_summary.json
+memory_session.bak
+memory_core.bak
 
 # Emotion state (runtime generated)
 emotion_state.json

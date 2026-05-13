@@ -187,6 +187,10 @@ function testAssistantFeedbackButtonsCallExistingHandler() {
 function testMemoryAndPersonaSurfaces() {
   assert.ok(html.includes('id="learning-stat-candidates"'), "memory management should show candidate pool stats");
   assert.ok(html.includes('id="learning-stat-samples"'), "memory management should show official pool stats");
+  assert.ok(html.includes('id="learning-stat-short"'), "memory management should show short-term memory stats");
+  assert.ok(html.includes('id="learning-stat-core"'), "memory management should show true memory stats");
+  assert.ok(html.includes('id="learning-tab-short"'), "memory management should expose short-term memory tab");
+  assert.ok(html.includes('id="learning-tab-core"'), "memory management should expose true memory tab");
   assert.ok(html.includes('id="learning-stat-visible"'), "memory management should show filtered visible count");
   assert.ok(html.includes("搜索用户原话、回复或提炼记忆"), "memory management search should match actual pool content");
   assert.ok(!html.includes('id="learning-quick-inject"'), "memory management should hide engineering quick settings from normal users");

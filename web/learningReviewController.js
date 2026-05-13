@@ -7,8 +7,12 @@
       debugSnapshot: null,
       candidates: [],
       samples: [],
+      shortMemories: [],
+      coreMemories: [],
       selectedCandidates: new Set(),
       selectedSamples: new Set(),
+      selectedShort: new Set(),
+      selectedCore: new Set(),
       quickSettings: {
         inject_count: 0,
         promotion_min_support: 1
@@ -35,12 +39,30 @@
     const closeOnboardingModal = typeof deps.closeOnboardingModal === "function" ? deps.closeOnboardingModal : () => {};
     const closeSchedulePanel = typeof deps.closeSchedulePanel === "function" ? deps.closeSchedulePanel : () => {};
     const closePersonaPanel = typeof deps.closePersonaPanel === "function" ? deps.closePersonaPanel : () => {};
+    if (!Array.isArray(state.coreMemories)) {
+      state.coreMemories = [];
+    }
+    if (!Array.isArray(state.shortMemories)) {
+      state.shortMemories = [];
+    }
+    if (!(state.selectedShort instanceof Set)) {
+      state.selectedShort = new Set();
+    }
+    if (!(state.selectedCore instanceof Set)) {
+      state.selectedCore = new Set();
+    }
 
     function isLearningReviewOpen() {
       return !!ui.learningReviewDrawer && !ui.learningReviewDrawer.hidden;
     }
 
     function getLearningSelectedSet(tab = state.activeTab) {
+      if (tab === "short") {
+        return state.selectedShort;
+      }
+      if (tab === "core") {
+        return state.selectedCore;
+      }
       return tab === "samples" ? state.selectedSamples : state.selectedCandidates;
     }
 
@@ -189,14 +211,22 @@
         : {
           candidates: Array.isArray(state.candidates) ? state.candidates.length : 0,
           samples: Array.isArray(state.samples) ? state.samples.length : 0,
+          short: Array.isArray(state.shortMemories) ? state.shortMemories.length : 0,
+          core: Array.isArray(state.coreMemories) ? state.coreMemories.length : 0,
           visible: visibleCount,
-          activePoolLabel: state.activeTab === "samples" ? "\u6b63\u5f0f\u6c60" : "\u5019\u9009\u6c60"
+          activePoolLabel: state.activeTab === "samples" ? "\u6b63\u5f0f\u6c60" : (state.activeTab === "short" ? "\u77ed\u671f\u8bb0\u5fc6" : (state.activeTab === "core" ? "\u957f\u671f\u8bb0\u5fc6" : "\u5019\u9009\u6c60"))
         };
       if (ui.learningStatCandidates) {
         ui.learningStatCandidates.textContent = String(stats.candidates);
       }
       if (ui.learningStatSamples) {
         ui.learningStatSamples.textContent = String(stats.samples);
+      }
+      if (ui.learningStatShort) {
+        ui.learningStatShort.textContent = String(stats.short || 0);
+      }
+      if (ui.learningStatCore) {
+        ui.learningStatCore.textContent = String(stats.core || 0);
       }
       if (ui.learningStatVisible) {
         ui.learningStatVisible.textContent = String(stats.visible);
@@ -219,7 +249,7 @@
         renderLearningDebugPanel();
         return;
       }
-      const tab = state.activeTab === "samples" ? "samples" : "candidates";
+      const tab = state.activeTab === "samples" ? "samples" : (state.activeTab === "short" ? "short" : (state.activeTab === "core" ? "core" : "candidates"));
       const filteredItems = getLearningFilteredItems();
       ui.learningReviewList.hidden = false;
       if (ui.learningDebugPanel) {
@@ -256,10 +286,12 @@
     async function reloadLearningReviewData() {
       setLearningReviewLoading(true);
       try {
-        const { payload, debugPayload } = typeof api.reload === "function"
+        const { payload, debugPayload, shortPayload, corePayload } = typeof api.reload === "function"
           ? await api.reload(learningFetchJson)
-          : { payload: {}, debugPayload: {} };
+          : { payload: {}, debugPayload: {}, shortPayload: {}, corePayload: {} };
         applyLearningPayload(payload);
+        applyLearningPayload(shortPayload);
+        applyLearningPayload(corePayload);
         applyMemoryDebugPayload(debugPayload);
         renderLearningReviewList();
         setStatus(payload?.message || "记忆管理数据已刷新");
@@ -280,6 +312,30 @@
     async function updateLearningEntries(action, extra = {}) {
       const payload = typeof api.updateEntries === "function"
         ? await api.updateEntries(learningFetchJson, action, extra)
+        : {};
+      applyLearningPayload(payload);
+      renderLearningReviewList();
+      if (payload?.message) {
+        setStatus(payload.message);
+      }
+      return payload;
+    }
+
+    async function updateCoreMemoryEntries(action, extra = {}) {
+      const payload = typeof api.updateCoreEntries === "function"
+        ? await api.updateCoreEntries(learningFetchJson, action, extra)
+        : {};
+      applyLearningPayload(payload);
+      renderLearningReviewList();
+      if (payload?.message) {
+        setStatus(payload.message);
+      }
+      return payload;
+    }
+
+    async function updateShortTermMemoryEntries(action, extra = {}) {
+      const payload = typeof api.updateShortEntries === "function"
+        ? await api.updateShortEntries(learningFetchJson, action, extra)
         : {};
       applyLearningPayload(payload);
       renderLearningReviewList();
@@ -349,10 +405,54 @@
       openLearningReviewDrawer();
     }
 
-    async function runLearningSingleAction(action, itemId) {
-      const tab = state.activeTab === "samples" ? "samples" : "candidates";
+    async function runLearningSingleAction(action, itemId, sourceElement = null) {
+      const tab = state.activeTab === "samples" ? "samples" : (state.activeTab === "short" ? "short" : (state.activeTab === "core" ? "core" : "candidates"));
       const id = String(itemId || "").trim();
       if (!id) {
+        return;
+      }
+      if (tab === "short") {
+        if (action === "edit") {
+          const card = sourceElement?.closest?.(".learning-item") || null;
+          const textarea = card?.querySelector?.(".short-memory-edit") || null;
+          await updateShortTermMemoryEntries("edit", { ids: [id], patch: { text: textarea?.value || "" } });
+          return;
+        }
+        if (action === "weight_up") {
+          await updateShortTermMemoryEntries("weight", { ids: [id], delta: 0.05 });
+          return;
+        }
+        if (action === "weight_down") {
+          await updateShortTermMemoryEntries("weight", { ids: [id], delta: -0.05 });
+          return;
+        }
+        if (action === "delete") {
+          await updateShortTermMemoryEntries("delete", { ids: [id] });
+        }
+        return;
+      }
+      if (tab === "core") {
+        if (action === "pin" || action === "unpin") {
+          await updateCoreMemoryEntries(action, { ids: [id] });
+          return;
+        }
+        if (action === "edit") {
+          const card = sourceElement?.closest?.(".learning-item") || null;
+          const textarea = card?.querySelector?.(".core-memory-edit") || null;
+          await updateCoreMemoryEntries("edit", { ids: [id], patch: { text: textarea?.value || "" } });
+          return;
+        }
+        if (action === "weight_up") {
+          await updateCoreMemoryEntries("weight", { ids: [id], delta: 0.05 });
+          return;
+        }
+        if (action === "weight_down") {
+          await updateCoreMemoryEntries("weight", { ids: [id], delta: -0.05 });
+          return;
+        }
+        if (action === "delete") {
+          await updateCoreMemoryEntries("delete", { ids: [id] });
+        }
         return;
       }
       if (action === "promote") {
@@ -377,7 +477,7 @@
     }
 
     async function runLearningBatchAction(action) {
-      const tab = state.activeTab === "samples" ? "samples" : "candidates";
+      const tab = state.activeTab === "samples" ? "samples" : (state.activeTab === "short" ? "short" : (state.activeTab === "core" ? "core" : "candidates"));
       const selectedSet = getLearningSelectedSet(tab);
       const visibleIds = new Set(getLearningFilteredItems().map((item) => String(item?.id || "").trim()).filter(Boolean));
       const ids = Array.from(selectedSet).filter((id) => visibleIds.has(String(id || "").trim()));
@@ -391,6 +491,18 @@
           return;
         }
         await promoteLearningEntries(ids);
+      } else if (tab === "short" && action === "delete") {
+        await updateShortTermMemoryEntries("delete", { ids });
+      } else if (tab === "short" && action === "weight_up") {
+        await updateShortTermMemoryEntries("weight", { ids, delta: 0.05 });
+      } else if (tab === "short" && action === "weight_down") {
+        await updateShortTermMemoryEntries("weight", { ids, delta: -0.05 });
+      } else if (tab === "core" && action === "delete") {
+        await updateCoreMemoryEntries("delete", { ids });
+      } else if (tab === "core" && action === "weight_up") {
+        await updateCoreMemoryEntries("weight", { ids, delta: 0.05 });
+      } else if (tab === "core" && action === "weight_down") {
+        await updateCoreMemoryEntries("weight", { ids, delta: -0.05 });
       } else if (action === "delete") {
         await updateLearningEntries("delete", { pool: tab, ids });
       } else if (action === "weight_up") {
@@ -456,6 +568,8 @@
       reloadLearningReviewData,
       reloadMemoryDebugData,
       updateLearningEntries,
+      updateShortTermMemoryEntries,
+      updateCoreMemoryEntries,
       promoteLearningEntries,
       undoLearningLastStep,
       openLearningReviewDrawer,

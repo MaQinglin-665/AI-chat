@@ -41,7 +41,9 @@ from config import (
 import memory as _memory_module
 from memory import (
     build_memory_prompt_block,
+    get_core_memories_for_review,
     get_memory_debug_snapshot,
+    get_short_term_memories_for_review,
     merge_prompt_with_memory,
     build_manual_persona_card_block,
     build_persona_memory_block,
@@ -49,6 +51,8 @@ from memory import (
     load_manual_persona_card,
     remember_interaction,
     save_manual_persona_card,
+    update_core_memory_entries,
+    update_short_term_memory_entries,
     build_wakeup_summary_block,
     is_lightweight_checkin_message,
 )
@@ -1758,6 +1762,26 @@ class PetHandler(SimpleHTTPRequestHandler):
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 )
             return
+        if path_only == "/api/memory/core":
+            try:
+                cfg = load_config()
+                self._send_json(get_core_memories_for_review(cfg))
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/memory/short":
+            try:
+                cfg = load_config()
+                self._send_json(get_short_term_memories_for_review(cfg))
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
         if path_only == "/api/memory/debug":
             try:
                 cfg = load_config()
@@ -1992,6 +2016,66 @@ class PetHandler(SimpleHTTPRequestHandler):
                         delta=body.get("delta", 0.0),
                         quick_settings=body.get("quick_settings", {}),
                     )
+                status = HTTPStatus.OK if payload.get("ok", True) else HTTPStatus.BAD_REQUEST
+                self._send_json(payload, status=status)
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/memory/core/update":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._send_json(
+                    {"ok": False, "error": "Invalid JSON body."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            if not isinstance(body, dict):
+                body = {}
+            try:
+                cfg = load_config()
+                payload = update_core_memory_entries(
+                    cfg,
+                    action=body.get("action", ""),
+                    ids=body.get("ids", []),
+                    delta=body.get("delta", 0.0),
+                    patch=body.get("patch", {}),
+                )
+                status = HTTPStatus.OK if payload.get("ok", True) else HTTPStatus.BAD_REQUEST
+                self._send_json(payload, status=status)
+            except Exception as exc:
+                self._send_json(
+                    {"ok": False, "error": str(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == "/api/memory/short/update":
+            content_length = int(self.headers.get("Content-Length", "0"))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+            except Exception:
+                self._send_json(
+                    {"ok": False, "error": "Invalid JSON body."},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            if not isinstance(body, dict):
+                body = {}
+            try:
+                cfg = load_config()
+                payload = update_short_term_memory_entries(
+                    cfg,
+                    action=body.get("action", ""),
+                    ids=body.get("ids", []),
+                    delta=body.get("delta", 0.0),
+                    patch=body.get("patch", {}),
+                )
                 status = HTTPStatus.OK if payload.get("ok", True) else HTTPStatus.BAD_REQUEST
                 self._send_json(payload, status=status)
             except Exception as exc:
