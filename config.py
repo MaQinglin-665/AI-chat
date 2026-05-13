@@ -255,9 +255,21 @@ DEFAULT_CONFIG = {
         "max_speech_ms": 2200,
         "speech_threshold": 0.0035,
         "processor_buffer_size": 2048,
+        "semantic_correction_enabled": True,
+        "voice_turn_merge_window_ms": 1200,
+        "voice_turn_hold_incomplete_enabled": True,
+        "low_confidence_confirm_enabled": True,
+        "low_confidence_threshold": 0.48,
         "wake_word_enabled": True,
         "wake_words": ["馨语", "馨语ai", "xinyu", "\u5854\u83f2", "taffy", "tafi"],
         "hotword_replacements": {
+            "馨语": "馨语AI桌宠",
+            "馨语ai": "馨语AI桌宠",
+            "xinyu": "馨语AI桌宠",
+            "心语": "馨语AI桌宠",
+            "新语": "馨语AI桌宠",
+            "星语": "馨语AI桌宠",
+            "欣语": "馨语AI桌宠",
             "\u5854\u83f2": "馨语AI桌宠",
             "taffy": "馨语AI桌宠",
             "neuro": "Neuro",
@@ -307,13 +319,18 @@ DEFAULT_CONFIG = {
         "proactive_poll_interval_ms": 60000,
         "max_followups_per_window": 1,
         "silence_followup_min_ms": 180000,
-        "interrupt_tts_on_user_speech": False,
+        "interrupt_tts_on_user_speech": True,
+        "protect_important_speech": True,
+        "important_speech_min_ms": 900,
+        "important_speech_max_hold_ms": 4200,
+        "important_speech_force_after_attempts": 2,
     },
     "motion": {
         "enabled": True,
         "cooldown_ms": 1200,
-        "speaking_cooldown_ms": 1600,
-        "speech_motion_strength": 1.35,
+        "speaking_cooldown_ms": 1100,
+        "speech_motion_strength": 1.48,
+        "quiet_speech": False,
         "intensity": "normal",
         "combo_enabled": True,
         "expression_enabled": True,
@@ -633,6 +650,26 @@ def sanitize_client_config(config):
     conversation_cfg = config.get("conversation_mode", {})
     if not isinstance(conversation_cfg, dict):
         conversation_cfg = {}
+    important_speech_max_hold_ms = max(
+        500,
+        min(
+            9000,
+            _safe_int(
+                conversation_cfg.get("important_speech_max_hold_ms", 4200),
+                4200,
+            ),
+        ),
+    )
+    important_speech_min_ms = max(
+        0,
+        min(
+            min(3000, important_speech_max_hold_ms),
+            _safe_int(
+                conversation_cfg.get("important_speech_min_ms", 900),
+                900,
+            ),
+        ),
+    )
     character_runtime_cfg = config.get("character_runtime", {})
     if not isinstance(character_runtime_cfg, dict):
         character_runtime_cfg = {}
@@ -911,6 +948,23 @@ def sanitize_client_config(config):
                 in {1024, 2048, 4096, 8192}
                 else 2048
             ),
+            "semantic_correction_enabled": asr_cfg.get("semantic_correction_enabled", True) is not False,
+            "voice_turn_merge_window_ms": max(
+                0,
+                min(
+                    2500,
+                    _safe_int(asr_cfg.get("voice_turn_merge_window_ms", 1200), 1200),
+                ),
+            ),
+            "voice_turn_hold_incomplete_enabled": asr_cfg.get("voice_turn_hold_incomplete_enabled", True) is not False,
+            "low_confidence_confirm_enabled": asr_cfg.get("low_confidence_confirm_enabled", True) is not False,
+            "low_confidence_threshold": max(
+                0.2,
+                min(
+                    0.9,
+                    _safe_float(asr_cfg.get("low_confidence_threshold", 0.48), 0.48),
+                ),
+            ),
             "wake_word_enabled": bool(asr_cfg.get("wake_word_enabled", True)),
             "wake_words": wake_words[:8],
             "hotword_replacements": hotword_replacements,
@@ -1024,7 +1078,22 @@ def sanitize_client_config(config):
                 ),
             ),
             "interrupt_tts_on_user_speech": _safe_bool_true(
-                conversation_cfg.get("interrupt_tts_on_user_speech", False)
+                conversation_cfg.get("interrupt_tts_on_user_speech", True)
+            ),
+            "protect_important_speech": _safe_bool_true(
+                conversation_cfg.get("protect_important_speech", True)
+            ),
+            "important_speech_min_ms": important_speech_min_ms,
+            "important_speech_max_hold_ms": important_speech_max_hold_ms,
+            "important_speech_force_after_attempts": max(
+                1,
+                min(
+                    4,
+                    _safe_int(
+                        conversation_cfg.get("important_speech_force_after_attempts", 2),
+                        2,
+                    ),
+                ),
             ),
         },
         "history_summary": {
@@ -1068,11 +1137,12 @@ def sanitize_client_config(config):
                 min(
                     8000,
                     _safe_int(
-                        motion_cfg.get("speaking_cooldown_ms", 1600),
-                        1600,
+                        motion_cfg.get("speaking_cooldown_ms", 1100),
+                        1100,
                     ),
                 ),
             ),
+            "quiet_speech": _safe_bool_true(motion_cfg.get("quiet_speech", False)),
             "speech_motion_strength": max(
                 0.6,
                 min(
@@ -1080,9 +1150,9 @@ def sanitize_client_config(config):
                     _safe_float(
                         motion_cfg.get(
                             "speech_motion_strength",
-                            motion_cfg.get("speech_body_motion_strength", 1.35),
+                            motion_cfg.get("speech_body_motion_strength", 1.48),
                         ),
-                        1.35,
+                        1.48,
                     ),
                 ),
             ),

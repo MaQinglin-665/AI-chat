@@ -60,6 +60,7 @@ function createElement(documentObject, value = "") {
     disabled: false,
     textContent: "",
     innerHTML: "",
+    classList: createClassList(),
     ownerDocument: documentObject,
     children: [],
     listeners: {},
@@ -83,8 +84,12 @@ function createUi() {
       saveBtn: createElement(doc),
       testLlmBtn: createElement(doc),
       testTtsBtn: createElement(doc),
+      testLive2dBtn: createElement(doc),
       status: createElement(doc),
       keyStatus: createElement(doc),
+      summaryLlm: createElement(doc),
+      summaryTts: createElement(doc),
+      summaryLive2d: createElement(doc),
       llmPreset: createElement(doc),
       llmBaseUrl: createElement(doc),
       llmModel: createElement(doc),
@@ -92,9 +97,22 @@ function createUi() {
       llmApiKey: createElement(doc),
       ttsProvider: createElement(doc),
       ttsVoice: createElement(doc),
+      ttsStreamMode: createElement(doc),
       ttsBrowserFallback: createElement(doc),
       gptSovitsRow: createElement(doc),
-      gptSovitsUrl: createElement(doc)
+      gptSovitsUrl: createElement(doc),
+      gptSovitsTimeoutRow: createElement(doc),
+      gptSovitsTimeout: createElement(doc),
+      volcengineUrlRow: createElement(doc),
+      volcengineUrl: createElement(doc),
+      volcengineClusterRow: createElement(doc),
+      volcengineCluster: createElement(doc),
+      live2dPreset: createElement(doc),
+      live2dModelPath: createElement(doc),
+      live2dScale: createElement(doc),
+      live2dXRatio: createElement(doc),
+      live2dYRatio: createElement(doc),
+      live2dReport: createElement(doc)
     }
   };
 }
@@ -125,6 +143,21 @@ const SUMMARY = {
       label: "GPT-SoVITS",
       voice: "default",
       gpt_sovits_api_url: "http://127.0.0.1:9880/tts"
+    },
+    {
+      id: "volcengine_tts",
+      provider: "volcengine_tts",
+      label: "Volcengine TTS",
+      voice: "S_uos2AQPX1",
+      api_url: "https://openspeech.bytedance.com/api/v1/tts",
+      cluster: "volcano_icl"
+    }
+  ],
+  live2d_models: [
+    {
+      id: "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json",
+      label: "hiyori_pro_t11",
+      model_path: "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json"
     }
   ],
   current: {
@@ -139,7 +172,25 @@ const SUMMARY = {
       provider: "gpt_sovits",
       voice: "default",
       gpt_sovits_api_url: "http://127.0.0.1:9880/tts",
+      gpt_sovits_timeout_sec: 60,
+      stream_mode: "realtime",
       allow_browser_fallback: true
+    },
+    live2d: {
+      preset_id: "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json",
+      model_path: "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json",
+      scale: 1.1,
+      x_ratio: 0.28,
+      y_ratio: 0.94,
+      motion_groups: [
+        { name: "Idle", count: 3 },
+        { name: "Tap@Body", count: 1 }
+      ],
+      expressions: [{ name: "smile", file: "expressions/smile.exp3.json" }],
+      compatibility: {
+        warnings: ["missing_motion_families"],
+        missing_motion_families: ["speech"]
+      }
     }
   }
 };
@@ -156,6 +207,18 @@ function testFormInitializationAndPresetSwitch() {
   assert.ok(ui.keyStatus.textContent.includes("已检测到"));
   assert.strictEqual(ui.ttsProvider.value, "gpt_sovits");
   assert.strictEqual(ui.gptSovitsRow.hidden, false);
+  assert.strictEqual(ui.gptSovitsTimeoutRow.hidden, false);
+  assert.strictEqual(ui.volcengineUrlRow.hidden, true);
+  assert.strictEqual(ui.ttsStreamMode.value, "realtime");
+  assert.strictEqual(ui.live2dPreset.value, "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json");
+  assert.strictEqual(ui.live2dModelPath.value, "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json");
+  assert.strictEqual(ui.live2dScale.value, "1.1");
+  assert.ok(ui.live2dReport.textContent.includes("Motion groups: Idle(3), Tap@Body(1)"));
+  assert.ok(ui.live2dReport.textContent.includes("Missing families: speech"));
+  assert.strictEqual(ui.live2dReport.classList.contains("config-switch-live2d-report-warning"), true);
+  assert.ok(ui.summaryLlm.textContent.includes("qwen-plus"));
+  assert.ok(ui.summaryTts.textContent.includes("GPT-SoVITS"));
+  assert.ok(ui.summaryLive2d.textContent.includes("hiyori_pro_t11"));
 
   controller.applyLlmPresetToForm("ollama");
   assert.strictEqual(ui.llmPreset.value, "ollama");
@@ -166,6 +229,14 @@ function testFormInitializationAndPresetSwitch() {
   controller.applyTtsPresetToForm("browser");
   assert.strictEqual(ui.ttsProvider.value, "browser");
   assert.strictEqual(ui.gptSovitsRow.hidden, true);
+
+  controller.applyTtsPresetToForm("volcengine_tts");
+  assert.strictEqual(ui.ttsProvider.value, "volcengine_tts");
+  assert.strictEqual(ui.volcengineUrlRow.hidden, false);
+  assert.strictEqual(ui.volcengineCluster.value, "volcano_icl");
+
+  controller.applyLive2dPresetToForm("/models/hiyori_pro_t11/hiyori_pro_t11.model3.json");
+  assert.strictEqual(ui.live2dModelPath.value, "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json");
 }
 
 async function testSavePayloadAndReload() {
@@ -195,6 +266,9 @@ async function testSavePayloadAndReload() {
   assert.strictEqual(calls[0].payload.llm.preset_id, "dashscope");
   assert.strictEqual(calls[0].payload.llm.api_key, "sk-not-returned");
   assert.strictEqual(calls[0].payload.tts.allow_browser_fallback, false);
+  assert.strictEqual(calls[0].payload.tts.stream_mode, "realtime");
+  assert.strictEqual(calls[0].payload.live2d.model_path, "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json");
+  assert.strictEqual(calls[0].payload.live2d.scale, 1.1);
   assert.strictEqual(reloaded, 1);
   assert.ok(ui.status.textContent.includes("已保存"));
 }
@@ -209,6 +283,53 @@ async function testSaveErrorPropagates() {
 
   controller.setFormFromSummary(SUMMARY);
   await assert.rejects(() => controller.saveConfigSwitch(), /bad config/);
+}
+
+async function testCurrentFormChecksUseDraftPayloads() {
+  const { doc, ui } = createUi();
+  const calls = [];
+  const played = [];
+  const controller = configSwitch.createController({
+    documentObject: doc,
+    ui,
+    playAudioBlob: async (blob) => {
+      played.push(blob);
+      return true;
+    },
+    authFetch: async (url, init = {}) => {
+      const payload = init.body ? JSON.parse(init.body) : null;
+      calls.push({ url, init, payload });
+      if (url === "/api/config/switch/test_llm") {
+        return { ok: true, status: 200, json: async () => ({ ok: true, elapsed_ms: 12 }) };
+      }
+      if (url === "/api/config/switch/test_tts") {
+        return { ok: true, status: 200, blob: async () => new Blob(["audio"], { type: "audio/mpeg" }) };
+      }
+      if (url === "/api/config/switch/validate_live2d") {
+        return { ok: true, status: 200, json: async () => ({ ok: true, live2d: payload.live2d, reload_required: true }) };
+      }
+      return { ok: true, status: 200, json: async () => SUMMARY };
+    }
+  });
+
+  controller.setFormFromSummary(SUMMARY);
+  await controller.testLlm();
+  await controller.testTts();
+  await controller.testLive2d();
+
+  assert.strictEqual(calls[0].url, "/api/config/switch/test_llm");
+  assert.strictEqual(calls[0].payload.llm.model, "qwen-plus");
+  assert.strictEqual(calls[0].payload.tts, undefined);
+  assert.strictEqual(calls[0].payload.live2d, undefined);
+  assert.strictEqual(calls[1].url, "/api/config/switch/test_tts");
+  assert.strictEqual(calls[1].payload.tts.provider, "gpt_sovits");
+  assert.strictEqual(calls[1].payload.llm, undefined);
+  assert.strictEqual(calls[1].payload.live2d, undefined);
+  assert.strictEqual(calls[1].payload.text, "这是一句语音测试。");
+  assert.strictEqual(played.length, 1);
+  assert.strictEqual(calls[2].url, "/api/config/switch/validate_live2d");
+  assert.strictEqual(calls[2].payload.live2d.model_path, "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json");
+  assert.ok(ui.status.textContent.includes("Live2D"));
 }
 
 function testOpenCloseModalLayerState() {
@@ -250,6 +371,13 @@ function testConfigSwitchStylesheetLoadedLast() {
   assert.strictEqual(stylesheetHrefs[stylesheetHrefs.length - 1], "./configSwitch.css");
 }
 
+function testLive2dReportCss() {
+  const css = fs.readFileSync(CONFIG_SWITCH_CSS, "utf8");
+  assert.ok(css.includes(".config-switch-live2d-report"), "Live2D compatibility report CSS should exist");
+  assert.ok(css.includes(".config-switch-live2d-report-warning"), "Live2D warning report CSS should exist");
+  assert.ok(/white-space:\s*pre-line/.test(css), "Live2D report should preserve line breaks");
+}
+
 function testChineseUiCopy() {
   const html = fs.readFileSync(INDEX_HTML, "utf8");
   for (const text of [
@@ -265,6 +393,18 @@ function testChineseUiCopy() {
   ]) {
     assert.ok(html.includes(text), `config switch UI should include Chinese label: ${text}`);
   }
+  for (const id of [
+    "config-switch-summary-llm",
+    "config-switch-summary-tts",
+    "config-switch-summary-live2d",
+    "config-switch-test-live2d-btn",
+    "config-switch-tts-stream-mode",
+    "config-switch-live2d-preset",
+    "config-switch-live2d-model-path",
+    "config-switch-live2d-report"
+  ]) {
+    assert.ok(html.includes(id), `config switch UI should include ${id}`);
+  }
 }
 
 async function main() {
@@ -272,9 +412,11 @@ async function main() {
   testOpenCloseModalLayerState();
   testModalCssLayer();
   testConfigSwitchStylesheetLoadedLast();
+  testLive2dReportCss();
   testChineseUiCopy();
   await testSavePayloadAndReload();
   await testSaveErrorPropagates();
+  await testCurrentFormChecksUseDraftPayloads();
   console.log("Config switch frontend checks passed.");
 }
 

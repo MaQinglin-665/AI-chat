@@ -1,6 +1,20 @@
 (function (root) {
   "use strict";
 
+  const LOCAL_ASR_PRE_SPEECH_MS = 260;
+  const ASR_CONTEXT_TERMS = [
+    { term: "ASR", aliases: ["a s r", "as r", "语音识别"] },
+    { term: "LLM", aliases: ["l l m", "ll m", "大模型"] },
+    { term: "TTS", aliases: ["t t s", "tt s", "语音合成"] },
+    { term: "Live2D", aliases: ["live 2d", "live 2 d", "live to d", "live two d", "莱夫2d", "来福2d"] },
+    { term: "GPT-SoVITS", aliases: ["gpt sovits", "gpt so vits", "gpt so vit s", "gpt so bits", "gpt sovit"] },
+    { term: "Vosk", aliases: ["vosk", "沃斯克"] },
+    { term: "Ollama", aliases: ["ollama", "欧拉马", "奥拉马"] },
+    { term: "Qwen", aliases: ["qwen", "通义千问", "千问"] },
+    { term: "DashScope", aliases: ["dash scope", "dashscope", "灵积"] },
+    { term: "Neuro-sama", aliases: ["neuro sama", "neuro-sama", "neurosama"] }
+  ];
+
   function createController(deps = {}) {
     const state = deps.state || {};
     const ui = deps.ui || {};
@@ -12,6 +26,7 @@
     const clampNumber = typeof deps.clampNumber === "function" ? deps.clampNumber : (v, min, max) => Math.max(min, Math.min(max, Number(v) || 0));
     const applyAsrHotwordCorrections = typeof deps.applyAsrHotwordCorrections === "function" ? deps.applyAsrHotwordCorrections : (text) => String(text || "").trim();
     const requestAssistantReply = typeof deps.requestAssistantReply === "function" ? deps.requestAssistantReply : async () => false;
+    const handleUserSpeechStart = typeof deps.handleUserSpeechStart === "function" ? deps.handleUserSpeechStart : () => false;
     const scheduleWakeWordStart = typeof deps.scheduleWakeWordStart === "function" ? deps.scheduleWakeWordStart : () => {};
     const stopWakeWordListener = typeof deps.stopWakeWordListener === "function" ? deps.stopWakeWordListener : () => {};
     const setupWakeWordRecognition = typeof deps.setupWakeWordRecognition === "function" ? deps.setupWakeWordRecognition : () => {};
@@ -206,6 +221,446 @@
       return btoa(binary);
     }
 
+    function cleanAsrText(text, maxLen = 240) {
+      let out = String(text || "").replace(/\s+/g, " ").trim();
+      const limit = Math.max(24, Math.min(800, Math.round(Number(maxLen) || 240)));
+      if (out.length > limit) {
+        out = out.slice(0, limit).trim();
+      }
+      return out;
+    }
+
+    function escapeRegExp(text) {
+      return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function hasAsciiLetterOrDigit(text) {
+      return /[A-Za-z0-9]/.test(String(text || ""));
+    }
+
+    function aliasToFlexiblePattern(alias) {
+      const raw = String(alias || "").trim();
+      if (!raw) {
+        return "";
+      }
+      const compact = raw.replace(/\s+/g, "");
+      if (/^[A-Za-z0-9]+$/.test(compact) && raw.includes(" ")) {
+        return Array.from(compact).map((ch) => escapeRegExp(ch)).join("\\s*");
+      }
+      return escapeRegExp(raw).replace(/\\ /g, "\\s+");
+    }
+
+    function replaceContextAlias(text, alias, term) {
+      let out = String(text || "");
+      const pattern = aliasToFlexiblePattern(alias);
+      if (!pattern || !term) {
+        return out;
+      }
+      const needsBoundary = hasAsciiLetterOrDigit(alias);
+      const re = new RegExp(
+        needsBoundary ? `(^|[^A-Za-z0-9])(${pattern})(?=$|[^A-Za-z0-9])` : `(${pattern})`,
+        "gi"
+      );
+      return out.replace(re, (...args) => {
+        const prefix = needsBoundary ? args[1] : "";
+        const match = needsBoundary ? args[2] : args[1];
+        if (String(match || "").toLowerCase() === String(term || "").toLowerCase()) {
+          return `${prefix}${match}`;
+        }
+        return `${prefix}${term}`;
+      });
+    }
+
+    function addContextTerm(map, term, aliases = []) {
+      const safeTerm = cleanAsrText(term, 48);
+      if (!safeTerm || safeTerm.length < 2) {
+        return;
+      }
+      const key = safeTerm.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, { term: safeTerm, aliases: [] });
+      }
+      const item = map.get(key);
+      for (const alias of aliases) {
+        const safeAlias = cleanAsrText(alias, 48);
+        if (safeAlias && safeAlias.toLowerCase() !== key && !item.aliases.includes(safeAlias)) {
+          item.aliases.push(safeAlias);
+        }
+      }
+      if (/^[A-Za-z0-9.+_-]{2,24}$/.test(safeTerm)) {
+        const spaced = Array.from(safeTerm.replace(/[-_.+]/g, "")).join(" ");
+        if (spaced && spaced.toLowerCase() !== key && !item.aliases.includes(spaced)) {
+          item.aliases.push(spaced);
+        }
+      }
+    }
+
+    function buildRecentAsrContextTerms() {
+      const terms = new Map();
+      for (const item of ASR_CONTEXT_TERMS) {
+        addContextTerm(terms, item.term, item.aliases);
+      }
+      if (Array.isArray(state.asrHotwordRules)) {
+        for (const rule of state.asrHotwordRules) {
+          addContextTerm(terms, rule?.to, [rule?.from]);
+        }
+      }
+      const recent = [
+        ...(Array.isArray(state.history) ? state.history.slice(-12) : []),
+        ...(Array.isArray(state.chatRecords) ? state.chatRecords.slice(-8) : [])
+      ];
+      for (const item of recent) {
+        const text = cleanAsrText(item?.content || item?.text || "", 500);
+        for (const match of text.matchAll(/\b[A-Za-z][A-Za-z0-9.+_-]{1,24}\b/g)) {
+          const term = match[0];
+          if (!/^(the|and|you|for|with|this|that|have|from|your|are|can|will)$/i.test(term)) {
+            addContextTerm(terms, term, []);
+          }
+        }
+      }
+      return Array.from(terms.values());
+    }
+
+    function applyContextualAsrCorrections(text) {
+      let out = cleanAsrText(text, 300);
+      if (!out || state.asrSemanticCorrectionEnabled === false) {
+        return out;
+      }
+      for (const item of buildRecentAsrContextTerms()) {
+        for (const alias of item.aliases || []) {
+          out = replaceContextAlias(out, alias, item.term);
+        }
+      }
+      return cleanAsrText(out, 300);
+    }
+
+    function recordAsrCorrectionEvent(stage, payload = {}) {
+      const confidence = Number(payload.confidence);
+      const entry = {
+        seq: Math.max(1, Math.round(Number(state.asrCorrectionSeq || 0)) + 1),
+        atMs: Math.round(typeof performance.now === "function" ? performance.now() : Date.now()),
+        stage: String(stage || "asr"),
+        source: String(payload.source || ""),
+        raw_text: cleanAsrText(payload.raw_text, 180),
+        hotword_text: cleanAsrText(payload.hotword_text, 180),
+        context_text: cleanAsrText(payload.context_text, 180),
+        final_text: cleanAsrText(payload.final_text, 180),
+        merged_parts: Math.max(1, Math.round(Number(payload.merged_parts || 1))),
+        confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 1,
+        confidence_reason: cleanAsrText(payload.confidence_reason, 80),
+        needs_confirmation: payload.needs_confirmation === true,
+        turn_wait_reason: cleanAsrText(payload.turn_wait_reason, 80),
+        held_for_more_speech: payload.held_for_more_speech === true,
+        changed: payload.changed === true
+      };
+      state.asrCorrectionSeq = entry.seq;
+      state.asrLastCorrectionDebug = entry;
+      if (!Array.isArray(state.asrCorrectionEvents)) {
+        state.asrCorrectionEvents = [];
+      }
+      state.asrCorrectionEvents.push(entry);
+      if (state.asrCorrectionEvents.length > 60) {
+        state.asrCorrectionEvents.splice(0, state.asrCorrectionEvents.length - 60);
+      }
+      return entry;
+    }
+
+    function getAsrLowConfidenceThreshold() {
+      return clampNumber(Number(state.asrLowConfidenceThreshold ?? 0.48), 0.2, 0.9);
+    }
+
+    function assessAsrConfidence(rawText, finalText, opts = {}) {
+      const raw = cleanAsrText(rawText, 300);
+      const text = cleanAsrText(finalText, 300);
+      const explicit = Number(opts.confidence);
+      let score = Number.isFinite(explicit) && explicit > 0 ? Math.max(0, Math.min(1, explicit)) : 0.72;
+      const reasons = [];
+      if (!raw || !text) {
+        return { score: 0, reason: "empty", needsConfirmation: false };
+      }
+      if (text.length <= 2) {
+        score -= 0.35;
+        reasons.push("very_short");
+      } else if (text.length <= 6) {
+        score -= 0.18;
+        reasons.push("short");
+      }
+      const speechMs = Number(opts.speechMs || opts.speech_ms || 0);
+      if (speechMs > 0 && speechMs < Math.max(120, Number(state.localAsrMinSpeechMs || 180) + 90)) {
+        score -= 0.18;
+        reasons.push("short_audio");
+      }
+      const peakRms = Number(opts.peakRms || opts.peak_rms || state.localAsrPeakRms || 0);
+      const threshold = Number(state.localAsrSpeechThreshold || 0.0035);
+      if (peakRms > 0 && threshold > 0 && peakRms < threshold * 1.45) {
+        score -= 0.16;
+        reasons.push("low_energy");
+      }
+      if (/^(um+|uh+|ah+|hmm+|\u55ef+|\u554a+|\u5443+)$/i.test(text.replace(/\s+/g, ""))) {
+        score -= 0.3;
+        reasons.push("filler_only");
+      }
+      if (raw !== text) {
+        score += 0.06;
+        reasons.push("corrected");
+      }
+      if (Number(opts.mergedParts || opts.merged_parts || 1) > 1) {
+        score += 0.05;
+        reasons.push("merged");
+      }
+      score = Math.max(0, Math.min(1, score));
+      const confirmEnabled = state.asrLowConfidenceConfirmEnabled !== false;
+      return {
+        score,
+        reason: reasons.join(",") || "ok",
+        needsConfirmation: confirmEnabled && score < getAsrLowConfidenceThreshold()
+      };
+    }
+
+    function buildAsrConversationContext(debug = null) {
+      const safe = debug && typeof debug === "object" && !Array.isArray(debug) ? debug : null;
+      if (!safe || safe.needs_confirmation !== true) {
+        return null;
+      }
+      return {
+        version: 1,
+        source: String(safe.source || "voice_transcript"),
+        raw_text: cleanAsrText(safe.raw_text, 160),
+        final_text: cleanAsrText(safe.final_text, 160),
+        confidence: Number(safe.confidence || 0),
+        reason: cleanAsrText(safe.confidence_reason, 80),
+        needs_confirmation: true
+      };
+    }
+
+    function prepareAsrTranscript(rawText, source = "voice_transcript", opts = {}) {
+      const raw = cleanAsrText(rawText, 300);
+      const hotword = applyAsrHotwordCorrections(raw);
+      const context = applyContextualAsrCorrections(hotword || raw);
+      const finalText = context || hotword || raw;
+      const confidence = assessAsrConfidence(raw, finalText, opts);
+      const debug = recordAsrCorrectionEvent("prepared", {
+        source,
+        raw_text: raw,
+        hotword_text: hotword,
+        context_text: context,
+        final_text: finalText,
+        confidence: confidence.score,
+        confidence_reason: confidence.reason,
+        needs_confirmation: confidence.needsConfirmation,
+        changed: finalText !== raw
+      });
+      return { text: finalText, raw, hotword, context, debug, source, asr_context: buildAsrConversationContext(debug) };
+    }
+
+    function getVoiceTurnMergeWindowMs() {
+      return Math.round(clampNumber(Number(state.voiceTurnMergeWindowMs ?? 1200), 0, 2500));
+    }
+
+    function hasVoiceTurnBoundary(text) {
+      const compact = cleanAsrText(text, 300);
+      if (!compact) {
+        return false;
+      }
+      if (/[.!?\u3002\uFF01\uFF1F]$/.test(compact)) {
+        return true;
+      }
+      return /(\u5417|\u5462|\u5427|\u554a|\u5440|\u54e6|\u55ef|ok|okay|yes|no)$/i.test(compact.replace(/\s+/g, ""));
+    }
+
+    function isQuickCompleteVoiceTurn(text) {
+      const compact = cleanAsrText(text, 80).toLowerCase().replace(/\s+/g, "");
+      if (!compact) {
+        return false;
+      }
+      const quick = new Set([
+        "ok", "okay", "yes", "no", "yeah", "yep", "nope", "continue", "goon", "stop",
+        "\u597d", "\u597d\u7684", "\u53ef\u4ee5", "\u884c", "\u5bf9", "\u4e0d\u5bf9", "\u4e0d\u662f",
+        "\u7ee7\u7eed", "\u505c", "\u505c\u4e00\u4e0b", "\u505a\u5427", "\u4e0b\u4e00\u6b65"
+      ]);
+      return quick.has(compact);
+    }
+
+    function getIncompleteVoiceTurnReason(text) {
+      if (state.voiceTurnHoldIncompleteEnabled === false) {
+        return "";
+      }
+      const compact = cleanAsrText(text, 300);
+      if (!compact || hasVoiceTurnBoundary(compact) || isQuickCompleteVoiceTurn(compact)) {
+        return "";
+      }
+      const noSpace = compact.replace(/\s+/g, "");
+      if (/(then|and|but|so|because|if|when|with|to|for|about|like|that)$/i.test(compact)) {
+        return "trailing_connector";
+      }
+      if (/(\u7136\u540e|\u5c31\u662f|\u56e0\u4e3a|\u6240\u4ee5|\u5982\u679c|\u4f46\u662f|\u8fd8\u6709|\u6bd4\u5982|\u5173\u4e8e|\u90a3\u4e2a|\u8fd9\u4e2a)$/.test(noSpace)) {
+        return "trailing_connector";
+      }
+      const words = compact.split(/\s+/).filter(Boolean);
+      if (noSpace.length <= 12 || (words.length > 0 && words.length <= 4)) {
+        return "short_fragment";
+      }
+      if (noSpace.length <= 24 && !/[,\uFF0C\u3001;\uFF1B]/.test(compact)) {
+        return "no_terminal_short";
+      }
+      return "";
+    }
+
+    function getAsrMergeReason(prepared, opts = {}) {
+      const mergeWindowMs = getVoiceTurnMergeWindowMs();
+      if (mergeWindowMs <= 0) {
+        return "";
+      }
+      if (state.micPendingTranscript) {
+        return "pending_merge";
+      }
+      if (opts.forceMerge === true) {
+        return "forced_merge";
+      }
+      const now = Date.now();
+      if (now - Number(state.chatInterruptedAt || 0) < 3500) {
+        return "barge_in_merge";
+      }
+      if (Number(state.protectedInterruptionUntil || 0) > now) {
+        return "protected_speech_merge";
+      }
+      if (opts.allowWhenMicClosed === true) {
+        return "";
+      }
+      return getIncompleteVoiceTurnReason(prepared?.text);
+    }
+
+    function joinVoiceTurnParts(parts) {
+      return (Array.isArray(parts) ? parts : [])
+        .map((part) => cleanAsrText(part, 180))
+        .filter(Boolean)
+        .join("，")
+        .replace(/，{2,}/g, "，")
+        .trim();
+    }
+
+    function queueAsrVoiceTurn(prepared, opts = {}) {
+      const item = {
+        text: cleanAsrText(prepared?.text, 300),
+        source: String(opts.source || prepared?.source || "voice_transcript"),
+        interruptReason: String(opts.interruptReason || opts.source || prepared?.source || "voice_transcript"),
+        allowWhenMicClosed: opts.allowWhenMicClosed === true,
+        asr_debug: prepared?.debug || null,
+        asr_context: prepared?.asr_context || buildAsrConversationContext(prepared?.debug)
+      };
+      if (!item.text) {
+        return false;
+      }
+      state.micQueue.push(item);
+      runMicQueue();
+      return true;
+    }
+
+    function clearPendingMicTranscriptTimer() {
+      if (state.micPendingTranscriptTimer) {
+        clearTimeout(state.micPendingTranscriptTimer);
+        state.micPendingTranscriptTimer = 0;
+      }
+    }
+
+    function flushPendingMicTranscript() {
+      clearPendingMicTranscriptTimer();
+      const pending = state.micPendingTranscript;
+      state.micPendingTranscript = null;
+      state.micPendingTranscriptUpdatedAt = 0;
+      if (!pending || !Array.isArray(pending.parts) || !pending.parts.length) {
+        return false;
+      }
+      const raw = joinVoiceTurnParts(pending.rawParts);
+      const hotword = joinVoiceTurnParts(pending.hotwordParts);
+      const context = applyContextualAsrCorrections(joinVoiceTurnParts(pending.parts));
+      const finalText = context || joinVoiceTurnParts(pending.parts);
+      const debug = recordAsrCorrectionEvent("merged", {
+        source: pending.source,
+        raw_text: raw,
+        hotword_text: hotword,
+        context_text: context,
+        final_text: finalText,
+        merged_parts: pending.parts.length,
+        ...(() => {
+          const confidence = assessAsrConfidence(raw, finalText, { mergedParts: pending.parts.length });
+          return {
+            confidence: confidence.score,
+            confidence_reason: confidence.reason,
+            needs_confirmation: confidence.needsConfirmation,
+            turn_wait_reason: pending.waitReason || "pending_merge"
+          };
+        })(),
+        changed: finalText !== raw || pending.parts.length > 1
+      });
+      return queueAsrVoiceTurn(
+        { text: finalText, debug, source: pending.source, asr_context: buildAsrConversationContext(debug) },
+        {
+          source: pending.source,
+          interruptReason: pending.interruptReason,
+          allowWhenMicClosed: pending.allowWhenMicClosed
+        }
+      );
+    }
+
+    function holdOrMergeAsrTranscript(prepared, opts = {}) {
+      const now = Date.now();
+      const mergeWindowMs = getVoiceTurnMergeWindowMs();
+      const source = String(opts.source || prepared.source || "voice_transcript");
+      const interruptReason = String(opts.interruptReason || source);
+      const mergeReason = String(opts.mergeReason || "pending_merge");
+      const pending = state.micPendingTranscript && typeof state.micPendingTranscript === "object"
+        ? state.micPendingTranscript
+        : {
+            parts: [],
+            rawParts: [],
+            hotwordParts: [],
+            source,
+            interruptReason,
+            allowWhenMicClosed: opts.allowWhenMicClosed === true,
+            waitReason: mergeReason
+          };
+      pending.parts.push(prepared.text);
+      pending.rawParts.push(prepared.raw);
+      pending.hotwordParts.push(prepared.hotword || prepared.raw);
+      pending.source = source;
+      pending.interruptReason = interruptReason;
+      pending.allowWhenMicClosed = pending.allowWhenMicClosed || opts.allowWhenMicClosed === true;
+      pending.waitReason = pending.waitReason || mergeReason;
+      pending.updatedAt = now;
+      state.micPendingTranscript = pending;
+      state.micPendingTranscriptUpdatedAt = now;
+      clearPendingMicTranscriptTimer();
+      state.micPendingTranscriptTimer = window.setTimeout(flushPendingMicTranscript, mergeWindowMs);
+      recordAsrCorrectionEvent("merge_wait", {
+        source,
+        raw_text: joinVoiceTurnParts(pending.rawParts),
+        hotword_text: joinVoiceTurnParts(pending.hotwordParts),
+        context_text: joinVoiceTurnParts(pending.parts),
+        final_text: joinVoiceTurnParts(pending.parts),
+        merged_parts: pending.parts.length,
+        confidence: prepared.debug?.confidence,
+        confidence_reason: prepared.debug?.confidence_reason,
+        needs_confirmation: prepared.debug?.needs_confirmation === true,
+        turn_wait_reason: mergeReason,
+        held_for_more_speech: true,
+        changed: pending.parts.length > 1
+      });
+      return true;
+    }
+
+    function sendAsrTranscript(text, opts = {}) {
+      const prepared = prepareAsrTranscript(text, opts.source || "voice_transcript", opts);
+      if (!prepared.text) {
+        return false;
+      }
+      const mergeReason = getAsrMergeReason(prepared, opts);
+      if (mergeReason) {
+        return holdOrMergeAsrTranscript(prepared, { ...opts, mergeReason });
+      }
+      return queueAsrVoiceTurn(prepared, opts);
+    }
+
     async function transcribeLocalPcmChunks(chunks, signal = undefined) {
       if (!Array.isArray(chunks) || chunks.length === 0) {
         return "";
@@ -234,7 +689,8 @@
         throw new Error(detail);
       }
       const data = await resp.json();
-      return String(data?.text || "").trim();
+      const rawText = String(data?.raw_text || "").trim();
+      return rawText || String(data?.text || "").trim();
     }
 
     function cancelLocalAsrRequest() {
@@ -410,6 +866,44 @@
       }, 1200);
     }
 
+    function resetLocalAsrPreSpeechBuffer() {
+      state.localAsrPreSpeechBuffers = [];
+      state.localAsrPreSpeechMs = 0;
+    }
+
+    function pushLocalAsrPreSpeechFrame(pcm16, frameMs) {
+      if (!pcm16 || !pcm16.length) {
+        return;
+      }
+      if (!Array.isArray(state.localAsrPreSpeechBuffers)) {
+        state.localAsrPreSpeechBuffers = [];
+      }
+      state.localAsrPreSpeechBuffers.push({ pcm16, frameMs });
+      state.localAsrPreSpeechMs = (Number(state.localAsrPreSpeechMs) || 0) + frameMs;
+      while (
+        state.localAsrPreSpeechBuffers.length > 0 &&
+        state.localAsrPreSpeechMs > LOCAL_ASR_PRE_SPEECH_MS
+      ) {
+        const removed = state.localAsrPreSpeechBuffers.shift();
+        state.localAsrPreSpeechMs = Math.max(
+          0,
+          (Number(state.localAsrPreSpeechMs) || 0) - (Number(removed?.frameMs) || 0)
+        );
+      }
+    }
+
+    function takeLocalAsrPreSpeechFrames() {
+      if (!Array.isArray(state.localAsrPreSpeechBuffers) || !state.localAsrPreSpeechBuffers.length) {
+        resetLocalAsrPreSpeechBuffer();
+        return [];
+      }
+      const frames = state.localAsrPreSpeechBuffers
+        .map((item) => item?.pcm16)
+        .filter((chunk) => chunk && chunk.length);
+      resetLocalAsrPreSpeechBuffer();
+      return frames;
+    }
+
     async function flushLocalAsrUtterance(force = false, sessionId = null) {
       const token = sessionId == null ? state.micSession : Number(sessionId);
       if (token !== state.micSession) {
@@ -439,7 +933,11 @@
           return;
         }
         if (text) {
-          enqueueMicTranscript(text, token);
+          enqueueMicTranscript(text, token, {
+            source: "voice_transcript",
+            speechMs,
+            peakRms: state.localAsrPeakRms
+          });
         }
       } catch (err) {
         if (err?.name === "AbortError") {
@@ -480,6 +978,18 @@
       const isSpeech = rms >= adaptiveThreshold;
 
       if (isSpeech) {
+        if (!state.localAsrSpeeching) {
+          const speechStartNow = typeof performance.now === "function" ? performance.now() : Date.now();
+          const lastInterruptAt = Number(state.localAsrLastSpeechInterruptAt || 0);
+          if (!lastInterruptAt || speechStartNow - lastInterruptAt > 700) {
+            state.localAsrLastSpeechInterruptAt = speechStartNow;
+            handleUserSpeechStart({ reason: "local_asr_speech_start", rms });
+          }
+          const preSpeechFrames = takeLocalAsrPreSpeechFrames();
+          if (preSpeechFrames.length) {
+            state.localAsrBuffers.push(...preSpeechFrames);
+          }
+        }
         state.localAsrSpeeching = true;
         state.localAsrSpeechMs += frameMs;
         state.localAsrSilenceMs = 0;
@@ -493,6 +1003,7 @@
       if (!state.localAsrSpeeching) {
         // Keep tracking environment noise to auto-adapt threshold.
         state.localAsrNoiseFloor = state.localAsrNoiseFloor * 0.94 + rms * 0.06;
+        pushLocalAsrPreSpeechFrame(pcm16, frameMs);
       }
 
       if (!state.localAsrSpeeching) {
@@ -564,7 +1075,9 @@
       state.localAsrSpeeching = false;
       state.localAsrSpeechMs = 0;
       state.localAsrSilenceMs = 0;
+      state.localAsrLastSpeechInterruptAt = 0;
       state.localAsrBuffers = [];
+      resetLocalAsrPreSpeechBuffer();
       state.localAsrNoiseFloor = 0.0008;
       state.micLevel = 0;
       updateMicMeter(0);
@@ -870,6 +1383,7 @@
       state.localAsrSpeechMs = 0;
       state.localAsrSilenceMs = 0;
       state.localAsrBuffers = [];
+      resetLocalAsrPreSpeechBuffer();
       state.localAsrNoiseFloor = 0.0008;
       state.localAsrLastFrameAt = performance.now();
       state.localAsrPeakRms = 0;
@@ -927,6 +1441,9 @@
         state.micSuspendDepth = 0;
         state.micRetryCount = 0;
         state.micQueue = [];
+        clearPendingMicTranscriptTimer();
+        state.micPendingTranscript = null;
+        state.micPendingTranscriptUpdatedAt = 0;
         state.wakeCooldownUntil = Date.now() + 1200;
       }
       if (state.asrMode === "local_vosk") {
@@ -1033,7 +1550,7 @@
       updateMicButton();
     }
 
-    function enqueueMicTranscript(text, sessionId = null) {
+    function enqueueMicTranscript(text, sessionId = null, opts = {}) {
       const token = sessionId == null ? state.micSession : Number(sessionId);
       if (token !== state.micSession || !state.micOpen) {
         return;
@@ -1042,9 +1559,15 @@
       if (!cleaned) {
         return;
       }
-      const corrected = applyAsrHotwordCorrections(cleaned);
-      state.micQueue.push(corrected || cleaned);
-      runMicQueue();
+      sendAsrTranscript(cleaned, {
+        source: opts.source || "voice_transcript",
+        interruptReason: "voice_transcript",
+        ...(opts.interruptReason ? { interruptReason: opts.interruptReason } : {}),
+        ...(Number.isFinite(Number(opts.confidence)) ? { confidence: Number(opts.confidence) } : {}),
+        ...(Number(opts.speechMs || opts.speech_ms) > 0 ? { speechMs: Number(opts.speechMs || opts.speech_ms) } : {}),
+        ...(Number(opts.peakRms || opts.peak_rms) > 0 ? { peakRms: Number(opts.peakRms || opts.peak_rms) } : {}),
+        forceMerge: opts.forceMerge === true
+      });
     }
 
     async function runMicQueue() {
@@ -1054,15 +1577,19 @@
       state.micQueueWorking = true;
       try {
         while (state.micQueue.length > 0) {
-          if (!state.micOpen) {
+          const peek = state.micQueue[0];
+          if (!state.micOpen && !(peek && typeof peek === "object" && peek.allowWhenMicClosed === true)) {
             state.micQueue = [];
             break;
           }
-          if (state.chatBusy) {
-            await new Promise((resolve) => setTimeout(resolve, 160));
+          const item = state.micQueue.shift();
+          if (!item) {
             continue;
           }
-          const next = state.micQueue.shift();
+          if (!state.micOpen && item.allowWhenMicClosed !== true) {
+            continue;
+          }
+          const next = typeof item === "string" ? item : String(item.text || "").trim();
           if (!next) {
             continue;
           }
@@ -1071,6 +1598,11 @@
             showUser: true,
             rememberUser: true,
             auto: false,
+            inputModality: "voice",
+            interruptTts: true,
+            interruptActive: true,
+            interruptReason: typeof item === "object" ? item.interruptReason || "voice_transcript" : "voice_transcript",
+            asrContext: typeof item === "object" ? item.asr_context || null : null,
             silentError: false
           });
         }
@@ -1146,7 +1678,10 @@
           }
           const transcript = result?.[0]?.transcript?.trim();
           if (transcript) {
-            enqueueMicTranscript(transcript, state.micSession);
+            enqueueMicTranscript(transcript, state.micSession, {
+              source: "voice_transcript",
+              confidence: Number(result?.[0]?.confidence || 0)
+            });
           }
         }
       };
@@ -1186,24 +1721,17 @@
       }
       try {
         const text = await transcribeLocalPcmChunks(snapshot.chunks);
-        const corrected = applyAsrHotwordCorrections(text);
-        if (!corrected) {
-          return false;
-        }
-        let spins = 0;
-        while (state.chatBusy && spins < 50) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          spins += 1;
-        }
-        if (state.chatBusy) {
-          return false;
-        }
-        await requestAssistantReply(corrected, {
-          showUser: true,
-          rememberUser: true,
-          auto: false,
-          silentError: false
+        const ok = sendAsrTranscript(text, {
+          source: "voice_close_transcript",
+          interruptReason: "voice_close_transcript",
+          allowWhenMicClosed: true,
+          speechMs: snapshot.speechMs,
+          peakRms: state.localAsrPeakRms,
+          forceMerge: false
         });
+        if (!ok) {
+          return false;
+        }
         return true;
       } catch (err) {
         console.warn("transcribeSnapshotAfterMicClose failed:", err);
@@ -1286,6 +1814,8 @@
       pauseMicForAssistant,
       resumeMicAfterAssistant,
       enqueueMicTranscript,
+      sendAsrTranscript,
+      flushPendingMicTranscript,
       runMicQueue,
       setupSpeechRecognition,
       snapshotPendingLocalAsr,

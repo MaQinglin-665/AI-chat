@@ -301,6 +301,24 @@
     return Math.max(min, Math.min(max, n));
   }
 
+  function sanitizeTopicStack(raw) {
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return raw.slice(0, 3).map((item) => {
+      const src = item && typeof item === "object" && !Array.isArray(item) ? item : {};
+      return {
+        topic_id: cleanText(src.topic_id || src.topic, 48) || "casual",
+        label: cleanText(src.label, 64),
+        intent: cleanText(src.intent, 40) || "casual",
+        last_user: cleanText(src.last_user || src.user_excerpt, 90),
+        last_assistant: cleanText(src.last_assistant || src.assistant_excerpt, 90),
+        turns: cleanInt(src.turns, 1, 1, 99),
+        updated_at: cleanInt(src.updated_at, 0, 0)
+      };
+    }).filter((item) => item.topic_id || item.label);
+  }
+
   function sanitizeCharacterBrainSnapshot(raw) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
       return null;
@@ -313,6 +331,9 @@
       : {};
     const executionRaw = raw.performance_execution && typeof raw.performance_execution === "object" && !Array.isArray(raw.performance_execution)
       ? raw.performance_execution
+      : {};
+    const qualityRaw = raw.reply_quality && typeof raw.reply_quality === "object" && !Array.isArray(raw.reply_quality)
+      ? raw.reply_quality
       : {};
     const timelineRaw = raw.performance_timeline && typeof raw.performance_timeline === "object" && !Array.isArray(raw.performance_timeline)
       ? raw.performance_timeline
@@ -337,6 +358,15 @@
       : {};
     const voiceRaw = raw.voice_director && typeof raw.voice_director === "object" && !Array.isArray(raw.voice_director)
       ? raw.voice_director
+      : {};
+    const topicReferenceRaw = raw.topic_reference && typeof raw.topic_reference === "object" && !Array.isArray(raw.topic_reference)
+      ? raw.topic_reference
+      : {};
+    const bargeInRaw = raw.barge_in_policy && typeof raw.barge_in_policy === "object" && !Array.isArray(raw.barge_in_policy)
+      ? raw.barge_in_policy
+      : {};
+    const asrRaw = raw.asr_status && typeof raw.asr_status === "object" && !Array.isArray(raw.asr_status)
+      ? raw.asr_status
       : {};
     const auditTimelineRaw = auditRaw.timeline && typeof auditRaw.timeline === "object" && !Array.isArray(auditRaw.timeline)
       ? auditRaw.timeline
@@ -381,6 +411,7 @@
       attention: cleanText(raw.attention, 24),
       relationship: cleanText(raw.relationship, 40),
       max_sentences: cleanInt(raw.max_sentences, 3, 1, 8),
+      input_modality: cleanText(raw.input_modality, 32),
       emotion: cleanText(raw.emotion, 32),
       action: cleanText(raw.action, 32),
       intensity: cleanText(raw.intensity, 16),
@@ -396,7 +427,30 @@
         final_sentences: cleanInt(executionRaw.final_sentences, 0, 0, 8),
         stage_callback_added: executionRaw.stage_callback_added === true,
         stage_callback_suppressed: cleanText(executionRaw.stage_callback_suppressed, 48),
-        stage_callback_bit: cleanText(executionRaw.stage_callback_bit, 48)
+        stage_callback_bit: cleanText(executionRaw.stage_callback_bit, 48),
+        quality_score: cleanInt(executionRaw.quality_score, 100, 0, 100),
+        quality_issues: Array.isArray(executionRaw.quality_issues)
+          ? executionRaw.quality_issues.slice(0, 8).map((item) => cleanText(item, 48)).filter(Boolean)
+          : [],
+        quality_repair_actions: Array.isArray(executionRaw.quality_repair_actions)
+          ? executionRaw.quality_repair_actions.slice(0, 8).map((item) => cleanText(item, 48)).filter(Boolean)
+          : []
+      },
+      reply_quality: {
+        score: cleanInt(qualityRaw.score, 100, 0, 100),
+        passed: qualityRaw.passed === false ? false : true,
+        issues: Array.isArray(qualityRaw.issues)
+          ? qualityRaw.issues.slice(0, 8).map((item) => cleanText(item, 48)).filter(Boolean)
+          : [],
+        pre_issues: Array.isArray(qualityRaw.pre_issues)
+          ? qualityRaw.pre_issues.slice(0, 8).map((item) => cleanText(item, 48)).filter(Boolean)
+          : [],
+        repair_actions: Array.isArray(qualityRaw.repair_actions)
+          ? qualityRaw.repair_actions.slice(0, 8).map((item) => cleanText(item, 48)).filter(Boolean)
+          : [],
+        final_sentences: cleanInt(qualityRaw.final_sentences, 0, 0, 8),
+        final_chars: cleanInt(qualityRaw.final_chars, 0, 0, 1200),
+        reason: cleanText(qualityRaw.reason, 96)
       },
       performance_timeline: {
         enabled: timelineRaw.enabled === true,
@@ -531,6 +585,30 @@
         allow_motion: constraintsRaw.allow_motion === false ? false : true,
         voice_style: cleanText(constraintsRaw.voice_style, 32)
       },
+      topic_reference: {
+        active: topicReferenceRaw.active === true,
+        reply_move: cleanText(topicReferenceRaw.reply_move, 48) || "none",
+        topic_id: cleanText(topicReferenceRaw.topic_id, 48),
+        label: cleanText(topicReferenceRaw.label, 64),
+        reason: cleanText(topicReferenceRaw.reason, 48),
+        confidence: Math.max(0, Math.min(1, Number(topicReferenceRaw.confidence) || 0))
+      },
+      barge_in_policy: {
+        active: bargeInRaw.active === true,
+        kind: cleanText(bargeInRaw.kind, 48) || "none",
+        reply_move: cleanText(bargeInRaw.reply_move, 48) || "none",
+        goal: cleanText(bargeInRaw.goal, 96),
+        turn_action: cleanText(bargeInRaw.turn_action, 48),
+        segment_role: cleanText(bargeInRaw.segment_role, 32)
+      },
+      asr_status: {
+        active: asrRaw.active === true,
+        source: cleanText(asrRaw.source, 48) || "none",
+        confidence: Math.max(0, Math.min(1, Number(asrRaw.confidence) || 0)),
+        needs_confirmation: asrRaw.needs_confirmation === true,
+        reason: cleanText(asrRaw.reason, 80)
+      },
+      topic_stack: sanitizeTopicStack(raw.topic_stack),
       improv: {
         stance: cleanText(improvRaw.stance, 48),
         chaos_level: cleanInt(improvRaw.chaos_level, 0, 0, 3),
@@ -584,7 +662,8 @@
         recent_user_need: cleanText(continuityRaw.recent_user_need, 40),
         same_need_turns: cleanInt(continuityRaw.same_need_turns, 0, 0, 20),
         updated_at: cleanInt(continuityRaw.updated_at, 0, 0),
-        decay: cleanText(continuityRaw.decay, 40)
+        decay: cleanText(continuityRaw.decay, 40),
+        topic_stack: sanitizeTopicStack(continuityRaw.topic_stack)
       }
     };
   }

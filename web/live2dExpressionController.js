@@ -291,7 +291,7 @@
         state.speechMotionBlend = 0;
       }
       if (!Number.isFinite(Number(state.speechMotionStrength))) {
-        state.speechMotionStrength = 1.35;
+        state.speechMotionStrength = 1.48;
       }
       if (!Number.isFinite(Number(state.beatPrevLevel))) {
         state.beatPrevLevel = 0;
@@ -487,7 +487,7 @@
         state[key] = next;
         return next;
       };
-      const speechMotionStrength = clampNumber(Number(state.speechMotionStrength) || 1.35, 0.6, 2.2);
+      const speechMotionStrength = clampNumber(Number(state.speechMotionStrength) || 1.48, 0.6, 2.2);
       const speechMotionBoost = 0.82 + speechMotionStrength * 0.28;
       const mouthEnergy = speaking ? clampNumber(Number(state.speechMouthOpen) || 0, 0, 1) : 0;
       const audioEnergy = clampNumber(

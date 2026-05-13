@@ -188,6 +188,40 @@ body.config-switch-open .panel {
   position: relative;
 }
 
+.config-switch-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.config-switch-summary-item {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(163, 181, 230, 0.56);
+  border-radius: 8px;
+  background: rgba(247, 250, 255, 0.86);
+}
+
+.config-switch-summary-item span {
+  display: block;
+  color: #65749b;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.config-switch-summary-item strong {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #243f77;
+  font-size: 15px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .config-switch-section + .config-switch-section {
   margin-top: 28px;
   padding-top: 26px;
@@ -238,6 +272,15 @@ body.config-switch-open .panel {
     0 0 0 5px rgba(82, 209, 189, 0.12);
 }
 
+.config-switch-section:nth-of-type(3) .config-switch-section-title::before {
+  background:
+    linear-gradient(90deg, transparent 0 30%, #ffffff 32% 42%, transparent 44% 56%, #ffffff 58% 68%, transparent 70%),
+    linear-gradient(135deg, #49b7ef, #42b58d);
+  box-shadow:
+    0 7px 16px rgba(66, 181, 141, 0.18),
+    0 0 0 5px rgba(73, 183, 239, 0.12);
+}
+
 .config-switch-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -245,6 +288,25 @@ body.config-switch-open .panel {
 }
 
 .config-switch-field,
+.config-switch-live2d-report {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(89, 136, 190, 0.30);
+  border-radius: 8px;
+  background: rgba(246, 250, 255, 0.92);
+  color: #3b557f;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.config-switch-live2d-report-warning {
+  border-color: rgba(210, 145, 52, 0.36);
+  background: rgba(255, 249, 237, 0.94);
+  color: #80602c;
+}
+
 .config-switch-check {
   min-width: 0;
   display: flex;
@@ -458,6 +520,17 @@ body.config-switch-open .panel {
   border-radius: 999px;
   background: #38be87;
   box-shadow: 0 0 0 5px rgba(56, 190, 135, 0.14);
+}
+
+@media (min-width: 660px) {
+  .config-switch-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .config-switch-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
 }
 
 @media (max-width: 640px) {

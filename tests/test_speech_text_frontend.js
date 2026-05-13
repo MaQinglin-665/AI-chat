@@ -260,6 +260,10 @@ const softProsody = speechText.buildSpeakProsody("I hear you.", "idle", false, "
 const cheerfulProsody = speechText.buildSpeakProsody("I hear you!", "happy", false, "cheerful");
 const seriousProsody = speechText.buildSpeakProsody("Let's keep it steady.", "idle", false, "serious");
 const neutralProsody = speechText.buildSpeakProsody("Let's keep it steady.", "idle", false, "neutral");
+const anxiousProsody = speechText.buildSpeakProsody("嗯……我有点担心。", "anxious", false, "anxious");
+const ellipsisProsody = speechText.buildSpeakProsody("Let me think...", "thinking", false, "thinking");
+const neutralQuestionProsody = speechText.buildSpeakProsody("Wait... what do you mean?", "idle", false, "neutral");
+const curiousQuestionProsody = speechText.buildSpeakProsody("Wait... what do you mean?", "thinking", false, "curious");
 assert.ok(
   softProsody.speed_ratio < cheerfulProsody.speed_ratio,
   "runtime soft voice style should produce calmer prosody than cheerful"
@@ -267,6 +271,22 @@ assert.ok(
 assert.ok(
   seriousProsody.pitch_ratio <= neutralProsody.pitch_ratio,
   "runtime serious voice style should keep pitch at or below neutral"
+);
+assert.ok(
+  anxiousProsody.volume_ratio < neutralProsody.volume_ratio,
+  "anxious voice style should lower volume for a closer, calmer delivery"
+);
+assert.ok(
+  ellipsisProsody.speed_ratio < neutralProsody.speed_ratio,
+  "ellipsis/thinking prosody should slow the line down"
+);
+assert.ok(
+  curiousQuestionProsody.speed_ratio < neutralQuestionProsody.speed_ratio,
+  "curious/thinking prosody should slow question delivery for more natural pacing"
+);
+assert.ok(
+  curiousQuestionProsody.pitch_ratio > neutralQuestionProsody.pitch_ratio,
+  "curious/thinking prosody should gently lift question pitch"
 );
 
 console.log("Speech text frontend checks passed.");

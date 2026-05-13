@@ -137,6 +137,11 @@
     "max_speech_ms": 2200,
     "speech_threshold": 0.0035,
     "processor_buffer_size": 2048,
+    "semantic_correction_enabled": true,
+    "voice_turn_merge_window_ms": 1200,
+    "voice_turn_hold_incomplete_enabled": true,
+    "low_confidence_confirm_enabled": true,
+    "low_confidence_threshold": 0.48,
     "wake_word_enabled": true,
     "wake_words": [
       "馨语",
@@ -153,7 +158,11 @@
       "fifa": "FIFA",
       "馨语": "馨语AI桌宠",
       "馨语ai": "馨语AI桌宠",
-      "xinyu": "馨语AI桌宠"
+      "xinyu": "馨语AI桌宠",
+      "心语": "馨语AI桌宠",
+      "新语": "馨语AI桌宠",
+      "星语": "馨语AI桌宠",
+      "欣语": "馨语AI桌宠"
     }
   },
   "observe": {
@@ -196,13 +205,18 @@
     "proactive_poll_interval_ms": 60000,
     "max_followups_per_window": 1,
     "silence_followup_min_ms": 180000,
-    "interrupt_tts_on_user_speech": false
+    "interrupt_tts_on_user_speech": true,
+    "protect_important_speech": true,
+    "important_speech_min_ms": 900,
+    "important_speech_max_hold_ms": 4200,
+    "important_speech_force_after_attempts": 2
   },
   "motion": {
     "enabled": true,
     "cooldown_ms": 1200,
-    "speaking_cooldown_ms": 1600,
-    "speech_motion_strength": 1.35,
+    "speaking_cooldown_ms": 1100,
+    "speech_motion_strength": 1.48,
+    "quiet_speech": false,
     "idle_enabled": true,
     "idle_min_ms": 12000,
     "idle_max_ms": 24000,

@@ -23,6 +23,7 @@
 - 最新预览版：[v1.4.0-preview](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview)
 - 首次安装指南：[docs/first-install.md](docs/first-install.md)
 - 模型选择指南：[docs/model-selection.md](docs/model-selection.md)
+- 首跑后反馈模板：[docs/first-run-feedback.md](docs/first-run-feedback.md)
 
 ## 适合谁
 
@@ -38,6 +39,12 @@
 - 情绪状态、动作映射、角色运行时 cue。
 - 低风险主动反馈与状态中心。
 - 默认关闭的桌面截图上下文辅助回复，需要用户显式启用。
+
+## 首跑成功后怎么反馈
+
+如果已经能打开桌宠并完成一次聊天，下一步最有价值的反馈是：启动耗时、模型响应速度、语音是否稳定、Live2D 动作是否自然、角色语气是否像“馨语”而不是通用助手。
+
+建议使用 [docs/first-run-feedback.md](docs/first-run-feedback.md) 记录测试结果。公开反馈前请移除 API key、token、原始 prompt、raw history、私有本地路径和私密截图。
 
 ## 系统要求
 

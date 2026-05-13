@@ -633,7 +633,7 @@
           silenceFollowupMinMs: Number.isFinite(Number(conversationMode.silenceFollowupMinMs))
             ? Math.round(Number(conversationMode.silenceFollowupMinMs))
             : 180000,
-          interruptTtsOnUserSpeech: conversationMode.interruptTtsOnUserSpeech === true
+          interruptTtsOnUserSpeech: conversationMode.interruptTtsOnUserSpeech !== false
         },
         followup: {
           pending: state.followupPending === true,
@@ -1340,7 +1340,7 @@
             proactivePollIntervalMs: 60000,
             maxFollowupsPerWindow: 1,
             silenceFollowupMinMs: 180000,
-            interruptTtsOnUserSpeech: false
+            interruptTtsOnUserSpeech: true
           };
         }
         const silenceFollowupMinMs = Number.isFinite(Number(state.conversationMode.silenceFollowupMinMs))

@@ -22,9 +22,29 @@
 - GitHub repo: `https://github.com/MaQinglin-665/AI-chat`
 - Latest preview: `https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview`
 - Demo assets: `docs/assets/demo-idle.mp4`, `docs/assets/demo-voice.mp4`, `docs/assets/demo-config.mp4`
+- First-run feedback template: `docs/first-run-feedback.md`
 - Recording plan: `docs/release-demo-capture-plan.md`
 
 ## Ready-To-Post Copy
+
+### Early Tester Invite
+
+我正在小范围测试一个开源 Windows AI 桌宠 / 桌面 AI VTuber 实验项目：馨语桌宠。
+
+现在首跑路径已经能跑起来，最需要的不是夸它成熟，而是帮忙确认真实机器上的体验：启动是否顺、模型回复是否慢、TTS/ASR 是否稳定、Live2D 动作是否自然、角色语气是否像一个桌面伙伴。
+
+项目当前仍是 MVP / 开源孵化阶段，需要你自己配置可用的 LLM provider / model / API key，默认不会开启桌面观察、文件读取、工具调用或 shell 执行。
+
+如果你愿意测，可以优先记录这几件事：
+
+1. 从启动到看到桌宠用了多久。
+2. 能不能完成一次聊天。
+3. TTS 是否能正常发声。
+4. Live2D 是否显示和动作正常。
+5. 哪个地方最影响你继续使用。
+
+反馈模板：`docs/first-run-feedback.md`
+项目地址：`https://github.com/MaQinglin-665/AI-chat`
 
 ### Short Chinese Post
 

@@ -263,7 +263,16 @@ function createMemoryStorage(initial = {}) {
   const initialState = chatState.createInitialState();
   assert.strictEqual(initialState.observeDesktop, false, "state helper should keep desktop observation disabled by default");
   assert.strictEqual(initialState.conversationMode.grayAutoTrialEnabled, false, "state helper should keep gray trial disabled by default");
+  assert.strictEqual(initialState.conversationMode.protectImportantSpeech, true, "state helper should briefly protect important assistant speech by default");
+  assert.strictEqual(initialState.conversationMode.importantSpeechMaxHoldMs, 4200, "state helper should cap protected speech hold time");
   assert.strictEqual(initialState.speakingEnabled, true, "state helper should preserve voice default");
+  assert.strictEqual(initialState.interruptedAssistantContext, null, "state helper should start with no interrupted assistant context");
+  assert.strictEqual(initialState.activeAssistantDraftText, "", "state helper should start without an active assistant draft");
+  assert.strictEqual(initialState.turnManagerLastDecision, null, "state helper should start without a turn-manager decision");
+  assert.strictEqual(initialState.activeAssistantSpeechPlan, null, "state helper should start without an assistant speech plan");
+  assert.strictEqual(initialState.asrLowConfidenceConfirmEnabled, true, "state helper should confirm low-confidence ASR by default");
+  assert.strictEqual(initialState.asrLowConfidenceThreshold, 0.48, "state helper should keep a conservative ASR confirmation threshold");
+  assert.strictEqual(initialState.voiceTurnHoldIncompleteEnabled, true, "state helper should briefly hold incomplete spoken turns by default");
   assert.strictEqual(typeof chatDom.createUI, "function", "chat DOM helper should expose UI mapping");
   assert.strictEqual(typeof storageController.loadChatHistory, "function", "storage controller should expose chat history loading");
   assert.strictEqual(typeof storageController.saveCharacterBrainSnapshot, "function", "storage controller should save last character brain snapshot");
@@ -296,6 +305,189 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(typeof wakeWordController.createController, "function", "wake word controller should expose a factory");
   assert.strictEqual(typeof appConfigController.createController, "function", "app config controller should expose a factory");
   assert.strictEqual(typeof appStartupController.createController, "function", "app startup controller should expose startup orchestration");
+}
+
+{
+  const state = chatState.createInitialState();
+  const events = [];
+  const statuses = [];
+  let stopped = 0;
+  let aborted = 0;
+  state.chatBusy = true;
+  state.activeChatTurnId = 7;
+  state.chatAbortController = {
+    signal: { aborted: false },
+    abort() {
+      aborted += 1;
+      this.signal.aborted = true;
+    }
+  };
+  state.ttsContextSpeaking = true;
+  state.activeAssistantDraftText = "注意，API Key 不要写进日志里。";
+  state.activeAssistantTurnStartedAt = Date.now();
+  state.characterBrainLastDecision = {
+    intent: "task_help",
+    conversation_director: {
+      interruption_policy: "finish_key_sentence_before_yield"
+    }
+  };
+  const controller = chatReplyController.createController({
+    state,
+    ui: {},
+    windowObject: { setTimeout, clearTimeout, AbortController },
+    stopAllAudioPlayback: () => {
+      stopped += 1;
+    },
+    recordTTSDebugEvent: (event, payload) => {
+      events.push({ event, payload });
+    },
+    setStatus: (text) => {
+      statuses.push(String(text || ""));
+    }
+  });
+
+  const protectedResult = controller.handleUserSpeechStart({ reason: "local_asr_speech_start" });
+  assert.strictEqual(protectedResult, false, "important assistant speech should resist the first speech-start interruption");
+  assert.strictEqual(state.chatBusy, true, "protected interruption should not cancel the active assistant turn");
+  assert.strictEqual(stopped, 0, "protected interruption should not stop audio playback");
+  assert.strictEqual(aborted, 0, "protected interruption should not abort the chat request");
+  assert.ok(events.some((item) => item.event === "important_speech_protected"), "protected interruption should be observable in TTS debug events");
+  assert.ok(statuses.some((text) => text.includes("重要")), "protected interruption should surface a compact status hint");
+
+  const forcedResult = controller.interruptActiveChatTurn("voice_transcript", { bypassProtection: true });
+  assert.strictEqual(forcedResult, true, "forced interruption should still be able to cut in after the protected beat");
+  assert.strictEqual(state.chatBusy, false, "forced interruption should clear the active assistant turn");
+  assert.strictEqual(stopped, 1, "forced interruption should stop audio playback");
+  assert.strictEqual(aborted, 1, "forced interruption should abort the active chat request");
+}
+
+{
+  const state = chatState.createInitialState();
+  state.ttsContextSpeaking = true;
+  state.activeChatTurnId = 11;
+  state.chatBusy = true;
+  state.activeAssistantDraftText = "Key point: do not put tokens in logs. Tiny aside after that.";
+  state.activeAssistantTurnStartedAt = Date.now();
+  state.characterBrainLastDecision = {
+    intent: "task_help",
+    conversation_director: {
+      interruption_policy: "finish_key_sentence_before_yield",
+      reply_move: "answer"
+    }
+  };
+  const controller = chatReplyController.createController({
+    state,
+    ui: {},
+    windowObject: { setTimeout, clearTimeout, AbortController },
+    recordTTSDebugEvent: () => {}
+  });
+  const plan = controller.buildAssistantSpeechPlan(
+    state.activeAssistantDraftText,
+    { enabled: true, segment_style: "two_beat", max_segments: 2 },
+    state.characterBrainLastDecision,
+    ["Key point: do not put tokens in logs.", "Tiny aside after that."]
+  );
+  assert.strictEqual(plan.segments[0].role, "key", "turn manager should mark the first protected sentence as key");
+  assert.strictEqual(plan.segments[0].protected, true, "key sentence should be protected");
+  assert.strictEqual(plan.segments[1].role, "tail", "later nonessential sentence should be interruptible tail");
+  state.activeAssistantSpeechPlan = plan;
+  state.activeAssistantSpeechSegmentIndex = 1;
+  state.activeAssistantSpeechSegmentRole = "key";
+  state.activeAssistantSpeechSegmentStartedAt = Date.now();
+  let decision = controller.buildInterruptionArbitration("user_speech_start");
+  assert.strictEqual(decision.action, "finish_key_sentence", "key segment should finish before yielding");
+  assert.strictEqual(decision.protected_key_sentence, true, "decision should expose protected key sentence");
+  assert.strictEqual(state.turnManagerLastDecision.action, "finish_key_sentence", "state should remember turn-manager arbitration");
+
+  state.protectedInterruptionUntil = 0;
+  state.protectedInterruptionLastAt = 0;
+  state.protectedInterruptionCount = 0;
+  state.activeAssistantDraftText = "Tiny aside after that.";
+  state.activeAssistantSpeechSegmentIndex = 2;
+  state.activeAssistantSpeechSegmentRole = "tail";
+  state.activeAssistantSpeechSegmentStartedAt = Date.now();
+  decision = controller.buildInterruptionArbitration("user_speech_start");
+  assert.strictEqual(decision.action, "interrupt_now", "tail segment should yield immediately");
+  assert.strictEqual(decision.reason, "tail_segment", "tail interruption should be explicit");
+}
+
+{
+  const cjkPages = subtitleController.splitSubtitlePages(
+    "今天先把弹幕变短一点，然后再处理语音识别；这样屏幕上不会挤成一大坨字。第二句继续测试一下分页。"
+  );
+  assert.ok(cjkPages.length >= 2, "Chinese subtitle text should be split into compact danmaku-like pages");
+  assert.ok(
+    cjkPages.every((page) => page.length <= 42),
+    "Chinese subtitle pages should stay short enough for the desktop overlay"
+  );
+
+  const englishPages = subtitleController.splitSubtitlePages(
+    "This is a longer subtitle line that should wrap across pages without slicing straight through an English word."
+  );
+  assert.ok(
+    englishPages.every((page) => !/\w-$/.test(page) && page.length <= 96),
+    "English subtitle pages should keep whole words within the compact page limit"
+  );
+
+  const makeLayer = () => {
+    const classes = new Set();
+    const spanEn = { textContent: "" };
+    const spanZh = { textContent: "" };
+    return {
+      spanEn,
+      spanZh,
+      classList: {
+        add: (name) => classes.add(name),
+        remove: (name) => classes.delete(name),
+        toggle: (name, enabled) => enabled ? classes.add(name) : classes.delete(name),
+        contains: (name) => classes.has(name)
+      },
+      querySelector: (selector) => selector === ".subtitle-en" ? spanEn : spanZh
+    };
+  };
+  const cjkLayer = makeLayer();
+  subtitleController.applySubtitleDOM("你好，开麦测试。", "", {
+    documentObject: { getElementById: () => cjkLayer }
+  });
+  assert.ok(cjkLayer.classList.contains("subtitle-source-cjk"), "Chinese subtitles should render as the primary overlay line");
+  assert.ok(!cjkLayer.classList.contains("subtitle-zh-ready"), "Chinese subtitles should not show a duplicate translated line");
+
+  const enLayer = makeLayer();
+  subtitleController.applySubtitleDOM("Hello, testing captions.", "你好，测试字幕。", {
+    documentObject: { getElementById: () => enLayer }
+  });
+  assert.ok(enLayer.classList.contains("subtitle-source-english"), "English subtitles should keep the bilingual overlay state");
+  assert.ok(enLayer.classList.contains("subtitle-zh-ready"), "English subtitles should reveal the translated line when available");
+
+  assert.ok(
+    /\.subtitle-layer\s*\{[\s\S]*?overflow:\s*visible;/.test(baseCssSource)
+      && /\.subtitle-layer::before\s*\{[\s\S]*?pointer-events:\s*none;/.test(baseCssSource),
+    "subtitle drag handle should not be clipped or blocked by the subtitle backdrop"
+  );
+
+  const dragHandle = {
+    getBoundingClientRect: () => ({ left: 100, right: 180, top: 40, bottom: 62, width: 80, height: 22 })
+  };
+  const visibleLayer = {
+    classList: { contains: (name) => name === "subtitle-visible" }
+  };
+  const layoutController = live2dLayoutController.createController({
+    state: { subtitleEnabled: true },
+    documentObject: {
+      getElementById: (id) => id === "subtitle-drag-handle" ? dragHandle : visibleLayer
+    },
+    windowObject: {}
+  });
+  assert.strictEqual(
+    layoutController.isPointOverSubtitleDragHandle(110, 50),
+    true,
+    "desktop click-through hit test should include the subtitle drag handle"
+  );
+  assert.strictEqual(
+    layoutController.isPointOverSubtitleDragHandle(20, 20),
+    false,
+    "subtitle drag hit test should reject points outside the handle"
+  );
 }
 
 {
@@ -651,10 +843,59 @@ function createMemoryStorage(initial = {}) {
       attention: "focused",
       relationship: "desktop_companion",
       max_sentences: 3,
+      input_modality: "voice",
       emotion: "sad",
       action: "none",
       intensity: "low",
       voice_style: "soft",
+      conversation_director: {
+        mode: "soft_presence",
+        turn_taking: "answer_then_yield",
+        reply_goal: "stay_close_without_solving_too_much",
+        reply_move: "support",
+        initiative: "none",
+        followup_policy: "avoid_routine_question",
+        max_spoken_beats: 2,
+        interruption_policy: "finish_key_sentence_before_yield"
+      },
+      topic_reference: {
+        active: true,
+        reply_move: "shorten",
+        topic_id: "character_runtime",
+        label: "ASR/TTS/Live2D runtime",
+        reason: "implicit_recent_topic",
+        confidence: 0.64,
+        private_prompt: "SECRET"
+      },
+      barge_in_policy: {
+        active: true,
+        kind: "shorten",
+        reply_move: "shorten",
+        goal: "compress_interrupted_answer",
+        turn_action: "finish_key_sentence",
+        segment_role: "key",
+        private_prompt: "SECRET"
+      },
+      asr_status: {
+        active: true,
+        source: "voice_transcript",
+        confidence: 0.33,
+        needs_confirmation: true,
+        reason: "low_confidence",
+        raw_text: "SECRET"
+      },
+      topic_stack: [
+        {
+          topic_id: "character_runtime",
+          label: "ASR/TTS/Live2D runtime",
+          intent: "task_help",
+          last_user: "Let's tune ASR and Live2D motion.",
+          last_assistant: "Start with ASR, then Live2D.",
+          turns: 2,
+          updated_at: 99,
+          private_prompt: "SECRET"
+        }
+      ],
       performance_execution: {
         reply_shape: "two_beat",
         question_policy: "none",
@@ -667,6 +908,20 @@ function createMemoryStorage(initial = {}) {
         stage_callback_added: true,
         stage_callback_suppressed: "",
         stage_callback_bit: "cursor_side_eye",
+        quality_score: 82,
+        quality_issues: ["too_long_for_voice"],
+        quality_repair_actions: ["compressed_voice_reply"],
+        private_prompt: "SECRET"
+      },
+      reply_quality: {
+        score: 82,
+        passed: false,
+        issues: ["too_long_for_voice"],
+        pre_issues: ["generic_followup"],
+        repair_actions: ["compressed_voice_reply"],
+        final_sentences: 1,
+        final_chars: 42,
+        reason: "repaired_with_residual_issues",
         private_prompt: "SECRET"
       },
       performance_timeline: {
@@ -767,7 +1022,18 @@ function createMemoryStorage(initial = {}) {
         recent_user_need: "reassurance",
         same_need_turns: 2,
         updated_at: 99,
-        decay: "fresh"
+        decay: "fresh",
+        topic_stack: [
+          {
+            topic_id: "character_runtime",
+            label: "ASR/TTS/Live2D runtime",
+            intent: "task_help",
+            last_user: "Let's tune ASR and Live2D motion.",
+            last_assistant: "Start with ASR, then Live2D.",
+            turns: 2,
+            updated_at: 99
+          }
+        ]
       },
       history_tail: "raw history api_key=SECRET",
       directive: "private prompt"
@@ -809,7 +1075,20 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.removed_context_bleed, true, "character brain snapshot should restore context bleed execution summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.stage_callback_added, true, "character brain snapshot should restore public stage callback status");
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.stage_callback_bit, "cursor_side_eye", "character brain snapshot should restore public stage callback bit");
+  assert.strictEqual(restored.characterBrainLastDecision.performance_execution.quality_score, 82, "character brain snapshot should restore public quality score");
+  assert.deepStrictEqual(restored.characterBrainLastDecision.performance_execution.quality_repair_actions, ["compressed_voice_reply"], "character brain snapshot should restore public quality repair actions");
   assert.strictEqual(restored.characterBrainLastDecision.performance_execution.private_prompt, undefined, "character brain snapshot should not persist private execution fields");
+  assert.strictEqual(restored.characterBrainLastDecision.reply_quality.score, 82, "character brain snapshot should restore top-level reply quality");
+  assert.deepStrictEqual(restored.characterBrainLastDecision.reply_quality.pre_issues, ["generic_followup"], "character brain snapshot should restore public pre-repair quality issues");
+  assert.strictEqual(restored.characterBrainLastDecision.reply_quality.private_prompt, undefined, "character brain snapshot should not persist private quality fields");
+  assert.strictEqual(restored.characterBrainLastDecision.barge_in_policy.kind, "shorten", "character brain snapshot should restore public barge-in policy");
+  assert.strictEqual(restored.characterBrainLastDecision.barge_in_policy.private_prompt, undefined, "character brain snapshot should not persist private barge-in fields");
+  assert.strictEqual(restored.characterBrainLastDecision.asr_status.needs_confirmation, true, "character brain snapshot should restore public ASR confirmation status");
+  assert.strictEqual(restored.characterBrainLastDecision.asr_status.raw_text, undefined, "character brain snapshot should not persist raw ASR text");
+  assert.strictEqual(restored.characterBrainLastDecision.topic_reference.reply_move, "shorten", "character brain snapshot should restore topic reference move");
+  assert.strictEqual(restored.characterBrainLastDecision.topic_reference.private_prompt, undefined, "character brain snapshot should not persist private topic reference fields");
+  assert.strictEqual(restored.characterBrainLastDecision.topic_stack[0].topic_id, "character_runtime", "character brain snapshot should restore recent topic stack");
+  assert.strictEqual(restored.characterBrainLastDecision.topic_stack[0].private_prompt, undefined, "character brain snapshot should not persist private topic stack fields");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.pre, "soft_anchor", "character brain snapshot should restore public timeline summary");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.beats, 0, "character brain snapshot should restore compact timeline beat count");
   assert.strictEqual(restored.characterBrainLastDecision.performance_timeline.motion.pre, "soft_stillness", "character brain snapshot should restore public planned motion cue");
@@ -864,10 +1143,55 @@ function createMemoryStorage(initial = {}) {
       attention: "focused",
       relationship: "desktop_companion",
       max_sentences: 3,
+      input_modality: "voice",
       emotion: "sad",
       action: "none",
       intensity: "low",
       voice_style: "soft",
+      conversation_director: {
+        mode: "soft_presence",
+        turn_taking: "answer_then_yield",
+        reply_goal: "stay_close_without_solving_too_much",
+        reply_move: "support",
+        initiative: "none",
+        followup_policy: "avoid_routine_question",
+        max_spoken_beats: 2,
+        interruption_policy: "finish_key_sentence_before_yield"
+      },
+      topic_reference: {
+        active: true,
+        reply_move: "shorten",
+        topic_id: "character_runtime",
+        label: "ASR/TTS/Live2D runtime",
+        reason: "implicit_recent_topic",
+        confidence: 0.64
+      },
+      barge_in_policy: {
+        active: true,
+        kind: "shorten",
+        reply_move: "shorten",
+        goal: "compress_interrupted_answer",
+        turn_action: "finish_key_sentence",
+        segment_role: "key"
+      },
+      asr_status: {
+        active: true,
+        source: "voice_transcript",
+        confidence: 0.33,
+        needs_confirmation: true,
+        reason: "low_confidence"
+      },
+      topic_stack: [
+        {
+          topic_id: "character_runtime",
+          label: "ASR/TTS/Live2D runtime",
+          intent: "task_help",
+          last_user: "Let's tune ASR and Live2D motion.",
+          last_assistant: "Start with ASR, then Live2D.",
+          turns: 2,
+          updated_at: 99
+        }
+      ],
       performance_execution: {
         reply_shape: "two_beat",
         question_policy: "none",
@@ -879,7 +1203,20 @@ function createMemoryStorage(initial = {}) {
         final_sentences: 2,
         stage_callback_added: false,
         stage_callback_suppressed: "none",
-        stage_callback_bit: "room_anchor"
+        stage_callback_bit: "room_anchor",
+        quality_score: 91,
+        quality_issues: [],
+        quality_repair_actions: ["removed_extra_question"]
+      },
+      reply_quality: {
+        score: 91,
+        passed: true,
+        issues: [],
+        pre_issues: ["generic_followup"],
+        repair_actions: ["removed_extra_question"],
+        final_sentences: 2,
+        final_chars: 96,
+        reason: "repaired"
       },
       performance_timeline: {
         enabled: true,
@@ -993,6 +1330,31 @@ function createMemoryStorage(initial = {}) {
     "character brain debug report should include compact continuity state"
   );
   assert.ok(
+    brainReport.includes("Conversation Director")
+      && brainReport.includes("input=voice")
+      && brainReport.includes("move=support")
+      && brainReport.includes("turn=answer_then_yield"),
+    "character brain debug report should include the conversation reply move"
+  );
+  assert.ok(
+    brainReport.includes("Topic Stack")
+      && brainReport.includes("move=shorten")
+      && brainReport.includes("character_runtime"),
+    "character brain debug report should include the compact topic reference"
+  );
+  assert.ok(
+    brainReport.includes("Barge-in")
+      && brainReport.includes("kind=shorten")
+      && brainReport.includes("turn_action=finish_key_sentence"),
+    "character brain debug report should include the next barge-in reply policy"
+  );
+  assert.ok(
+    brainReport.includes("ASR")
+      && brainReport.includes("confidence=0.33")
+      && brainReport.includes("confirm=yes"),
+    "character brain debug report should include public ASR confidence and confirmation state"
+  );
+  assert.ok(
     brainReport.includes("\u8f93\u51fa\u7ea6\u675f") && brainReport.includes("\u8ffd\u95ee\uff1a\u907f\u514d"),
     "character brain debug report should include compact output constraints"
   );
@@ -1017,6 +1379,13 @@ function createMemoryStorage(initial = {}) {
       && brainReport.includes("stage_callback=none")
       && brainReport.includes("bit=room_anchor"),
     "character brain debug report should include compact public execution summary"
+  );
+  assert.ok(
+    brainReport.includes("Reply Quality")
+      && brainReport.includes("score=91")
+      && brainReport.includes("repairs=removed_extra_question")
+      && brainReport.includes("pre=generic_followup"),
+    "character brain debug report should include the reply quality loop"
   );
   assert.ok(
     brainReport.includes("Timeline")
@@ -1379,6 +1748,49 @@ function createMemoryStorage(initial = {}) {
     ttsEnabled: true
   });
   assert.ok(miniRantVoiceTimeline.segments.length <= 3, "mini-rant voice timeline should cap speech beats");
+  const runtimeSoftVoiceTimeline = performanceTimelineController.buildVoiceTimeline({
+    brainSnapshot: { intent: "casual" },
+    runtimeMetadata: { emotion: "sad", voice_style: "soft" },
+    replyText: "我在。先慢一点呼吸。这个问题不用马上解决。",
+    mood: "sad",
+    talkStyle: "comfort",
+    ttsEnabled: true
+  });
+  assert.strictEqual(runtimeSoftVoiceTimeline.delivery, "soft_low", "runtime soft voice should choose a softer TTS delivery");
+  assert.ok(runtimeSoftVoiceTimeline.segments.length >= 2, "Chinese soft replies should split into natural spoken beats without whitespace");
+  const runtimeBrightTimeline = performanceTimelineController.buildPerformanceTimeline({
+    brainSnapshot: { intent: "casual", opening_move: "micro_reaction", spontaneity: 2 },
+    replyText: "太好了。这个节奏就对了。",
+    mood: "happy",
+    talkStyle: "playful",
+    ttsEnabled: true
+  });
+  assert.strictEqual(runtimeBrightTimeline.speechStart.name, "bright_speech_start", "happy/playful replies should use brighter Live2D speech-start motion");
+  const runtimeCuriousVoiceTimeline = performanceTimelineController.buildVoiceTimeline({
+    brainSnapshot: { intent: "casual" },
+    runtimeMetadata: { emotion: "thinking", voice_style: "curious" },
+    replyText: "Let me think... there are two routes here? The quiet one is probably better.",
+    mood: "thinking",
+    talkStyle: "curious",
+    ttsEnabled: true
+  });
+  assert.strictEqual(runtimeCuriousVoiceTimeline.delivery, "curious_lift", "thinking/curious replies should get a lifted curious delivery");
+  assert.strictEqual(runtimeCuriousVoiceTimeline.pause_profile, "thinking", "ellipsis in curious replies should choose thinking pauses");
+  assert.strictEqual(runtimeCuriousVoiceTimeline.segment_style, "thoughtful_beats", "curious replies should segment into thoughtful beats");
+  assert.strictEqual(runtimeCuriousVoiceTimeline.voice_director.gesture_profile, "curious", "voice v2 should expose a matching Live2D gesture profile");
+  assert.ok(runtimeCuriousVoiceTimeline.inter_segment_pause_ms >= 180, "thinking pauses should leave audible room between segments");
+  assert.ok(runtimeCuriousVoiceTimeline.segments.length >= 2, "curious/thinking replies should split into natural spoken beats");
+  assert.ok(runtimeCuriousVoiceTimeline.suppressed.includes("punctuation_pause_v2"), "voice v2 should mark punctuation-aware pause tuning");
+  const runtimeCuriousTimeline = performanceTimelineController.buildPerformanceTimeline({
+    brainSnapshot: { intent: "casual", opening_move: "micro_reaction", spontaneity: 0 },
+    replyText: "Let me think... that might actually work.",
+    mood: "thinking",
+    talkStyle: "curious",
+    ttsEnabled: true
+  });
+  assert.strictEqual(runtimeCuriousTimeline.speechStart.name, "curious_speech_start", "curious replies should start with a curious Live2D speech motion");
+  assert.ok(runtimeCuriousTimeline.speechBeats.length >= 1, "voice v2 should allow one natural thinking beat even without spontaneity");
+  assert.strictEqual(runtimeCuriousTimeline.speechBeats[0].motionCue, "head_tilt", "thinking speech beats should use a head-tilt motion cue");
   const gptSovitsVoiceTimeline = performanceTimelineController.buildVoiceTimeline({
     brainSnapshot: {
       intent: "casual",
@@ -1456,6 +1868,13 @@ function createMemoryStorage(initial = {}) {
   );
   assert.ok(softProsody.speed_ratio < 1.08, "soft voice director should slow speech down");
   assert.ok(softProsody.volume_ratio < 1.0, "soft voice director should lower volume slightly");
+  const curiousDirectorProsody = performanceTimelineController.applyVoiceDirectorProsody(
+    { speed_ratio: 1, pitch_ratio: 1, volume_ratio: 1 },
+    runtimeCuriousVoiceTimeline.voice_director
+  );
+  assert.ok(curiousDirectorProsody.speed_ratio < 1, "curious voice director should slow down enough to sound thoughtful");
+  assert.ok(curiousDirectorProsody.pitch_ratio > 1, "curious voice director should gently lift pitch");
+  assert.strictEqual(curiousDirectorProsody.voice_director_gesture_profile, "curious", "prosody audit should carry the Live2D gesture profile");
 }
 
 {
@@ -1932,6 +2351,9 @@ assert.ok(
     && source.includes("APP_CONFIG_CONTROLLER.createController")
     && source.includes("APP_STARTUP_CONTROLLER.createController")
     && characterBrainDebugSource.includes("function buildBrainDebugReport")
+    && characterBrainDebugSource.includes("Reply Quality")
+    && characterBrainDebugSource.includes("Barge-in")
+    && characterBrainDebugSource.includes("asr_status")
     && source.includes("CHARACTER_EXPERIENCE_CONTROLLER.createController")
     && diagnosticsRuntimeControllerSource.includes("debugPanelController.updateDebugPanel")
     && chatStateSource.includes("function createInitialState")
@@ -2302,6 +2724,7 @@ assert.ok(
   "tool meta view helper should localize tool card titles"
 );
 assert.strictEqual(localCommandRegistry.matchLocalCommand("/ttsdebug").kind, "tts_debug", "local command registry should match TTS debug commands");
+assert.strictEqual(localCommandRegistry.matchLocalCommand("/turndebug").kind, "turn_debug", "local command registry should match turn debug commands");
 assert.strictEqual(localCommandRegistry.matchLocalCommand("/translatedebug on").kind, "translate_debug_on", "local command registry should match translation debug panel commands");
 assert.strictEqual(localCommandRegistry.matchLocalCommand("/testvoice").kind, "voice_test", "local command registry should match voice test aliases");
 assert.strictEqual(localCommandRegistry.matchLocalCommand("/badcue long").kind, "character_feedback_bad", "local command registry should match bad character cue reasons");
@@ -2654,8 +3077,11 @@ assert.ok(
 assert.ok(
   chatStateSource.includes("chatStreamEnabled")
     && appConfigControllerSource.includes("chat_stream_enabled")
+    && chatStateSource.includes("protectImportantSpeech")
+    && appConfigControllerSource.includes("protect_important_speech")
+    && appConfigControllerSource.includes("important_speech_max_hold_ms")
     && chatReplyControllerSource.includes("preferStream: state.conversationMode.chatStreamEnabled !== false"),
-  "chat requests should support a frontend-visible switch for disabling unstable LLM streaming"
+  "chat requests should support frontend-visible switches for stream stability and protected important speech"
 );
 assert.ok(
   source.includes("async function runDoctorDiagnostics()")
@@ -2738,12 +3164,15 @@ assert.ok(
     && source.includes("motion_dispatch=")
     && chatApi.streamAssistantReply
     && chatApiSource.includes("onCharacterBrainDecision")
-    && chatReplyControllerSource.includes("onCharacterBrainDecision: handleCharacterBrainDecision")
+    && chatReplyControllerSource.includes("return handleCharacterBrainDecision(decision);")
     && chatStateSource.includes("characterBrainLastDecision")
     && chatStateSource.includes("turnTakingPendingThoughtBurst")
     && localCommandRegistry.matchLocalCommand("/braindebug").kind === "brain_debug"
+    && localCommandRegistry.matchLocalCommand("/turndebug").kind === "turn_debug"
     && localCommandExecutorSource.includes("brain_debug")
+    && localCommandExecutorSource.includes("turn_debug")
     && localCommandExecutorSource.includes("buildCharacterBrainDebugReport")
+    && source.includes("function buildTurnDebugReport")
     && appStartupControllerSource.includes("loadCharacterBrainSnapshotFromStorage")
     && storageControllerSource.includes("taffy_character_brain_last_decision_v1")
     && source.includes("function getCharacterExperienceRequestProfile")
@@ -3244,11 +3673,41 @@ assert.ok(
 );
 assert.ok(
   chatReplyControllerSource.includes("async function waitForNonInterruptingSpeechTurn")
+    && chatReplyControllerSource.includes("function shouldProtectImportantAssistantSpeech")
+    && chatReplyControllerSource.includes("function buildInterruptionArbitration")
+    && chatReplyControllerSource.includes("function buildAssistantSpeechPlan")
+    && chatReplyControllerSource.includes("turn_segment_start")
+    && chatReplyControllerSource.includes("important_speech_protected")
     && chatReplyControllerSource.includes('recordTTSDebugEvent(isAuto ? "proactive_reply_suppressed" : "chat_turn_wait_failed"')
     && chatReplyControllerSource.includes("scheduleAutoChatInterjectionAfterTurn")
     && chatReplyControllerSource.includes("if (!isAuto)")
     && /if \(speechTurn\.interrupt \|\| !isAssistantSpeechActive\(\)\) \{[\s\S]*?stopAllAudioPlayback\(\);/.test(chatReplyControllerSource),
   "assistant requests should respect non-interrupting speech turn-taking and suppress proactive overlap"
+);
+assert.ok(
+  chatStateSource.includes("activeChatTurnId: 0")
+    && chatStateSource.includes("chatAbortController: null")
+    && chatReplyControllerSource.includes("function interruptActiveChatTurn")
+    && chatReplyControllerSource.includes("controller.abort()")
+    && chatReplyControllerSource.includes("function rememberInterruptedAssistantContext")
+    && chatReplyControllerSource.includes("function takeInterruptedAssistantContext")
+    && chatReplyControllerSource.includes("function classifyBargeInReplyPolicy")
+    && chatReplyControllerSource.includes("interruptionContext.reply_policy")
+    && source.includes("nextBargeIn=")
+    && chatReplyControllerSource.includes("payload.conversation_context")
+    && chatReplyControllerSource.includes("function normalizeAsrConversationContext")
+    && chatReplyControllerSource.includes("conversationContext.asr = asrContext")
+    && chatReplyControllerSource.includes("function normalizeInputModality")
+    && chatReplyControllerSource.includes('? "auto"')
+    && chatReplyControllerSource.includes("input_modality: inputModality")
+    && localAsrControllerSource.includes('inputModality: "voice"')
+    && source.includes("getLocalAsrController().transcribeSnapshotAfterMicClose")
+    && chatReplyControllerSource.includes("assistant_partial")
+    && chatReplyControllerSource.includes("throwIfChatTurnCancelled(turnId, chatAbortController)")
+    && chatReplyControllerSource.includes("signal: chatAbortController?.signal || null")
+    && source.includes("function handleUserSpeechStart")
+    && source.includes("handleUserSpeechStart,"),
+  "manual text and voice turns should be able to cancel stale assistant replies instead of waiting for chatBusy"
 );
 assert.ok(
   source.includes("function stripAssistantPayloadNoise(text)")

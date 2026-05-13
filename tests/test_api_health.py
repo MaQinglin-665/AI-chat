@@ -37,6 +37,21 @@ def _post_json(url, payload, headers=None):
         return int(exc.code), json.loads(body or "{}")
 
 
+def _post_raw(url, payload, headers=None):
+    if isinstance(payload, bytes):
+        data = payload
+    else:
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request_headers = {"Content-Type": "application/json"}
+    request_headers.update(headers or {})
+    req = urllib.request.Request(url, data=data, headers=request_headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            return int(resp.status), dict(resp.headers), resp.read()
+    except urllib.error.HTTPError as exc:
+        return int(exc.code), dict(exc.headers), exc.read()
+
+
 def _build_test_config():
     cfg = copy.deepcopy(app.DEFAULT_CONFIG)
     cfg.setdefault("server", {})
@@ -203,6 +218,121 @@ def test_api_config_switch_post_uses_token_and_writes_local_files(monkeypatch, t
     assert env_path.read_text(encoding="utf-8").strip() == "OPENAI_SWITCH_TEST_KEY=sk-route-secret"
     assert "sk-route-secret" not in json.dumps(saved, ensure_ascii=False)
     assert "sk-route-secret" not in serialized_payload
+
+
+def test_api_config_switch_test_llm_uses_unsaved_draft_without_leaking_key(monkeypatch):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = False
+    cfg["llm"] = {
+        "provider": "ollama",
+        "base_url": "http://127.0.0.1:11434",
+        "model": "saved-model",
+        "api_key_env": "",
+        "api_key": "",
+    }
+    captured = {}
+
+    def fake_http_post_json(url, payload, headers=None, **kwargs):
+        captured["url"] = url
+        captured["payload"] = payload
+        captured["headers"] = headers or {}
+        captured["kwargs"] = kwargs
+        return {"choices": [{"message": {"content": "OK"}}]}
+
+    monkeypatch.setattr(app, "http_post_json", fake_http_post_json)
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(
+            f"{base}/api/config/switch/test_llm",
+            {
+                "llm": {
+                    "preset_id": "custom_openai_compatible",
+                    "base_url": "https://api.example.test/v1",
+                    "model": "draft-model",
+                    "api_key_env": "DRAFT_LLM_KEY",
+                    "api_key": "sk-draft-route-secret",
+                }
+            },
+        )
+
+    assert status == 200
+    assert payload["ok"] is True
+    assert payload["provider"] == "openai-compatible"
+    assert payload["model"] == "draft-model"
+    assert captured["url"] == "https://api.example.test/v1/chat/completions"
+    assert captured["payload"]["model"] == "draft-model"
+    assert captured["headers"]["Authorization"] == "Bearer sk-draft-route-secret"
+    serialized_payload = json.dumps(payload, ensure_ascii=False)
+    assert "sk-draft-route-secret" not in serialized_payload
+
+
+def test_api_config_switch_test_tts_uses_unsaved_draft_config(monkeypatch):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = False
+    cfg["tts"] = {"provider": "browser", "voice": "saved-voice"}
+    captured = {}
+
+    def fake_synthesize_tts_audio(
+        text,
+        voice_override=None,
+        prosody=None,
+        perf_trace_id="",
+        config_override=None,
+    ):
+        captured["text"] = text
+        captured["voice_override"] = voice_override
+        captured["prosody"] = prosody
+        captured["perf_trace_id"] = perf_trace_id
+        captured["config_override"] = config_override
+        return b"ID3draft-audio"
+
+    monkeypatch.setattr(app, "synthesize_tts_audio", fake_synthesize_tts_audio)
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, headers, body = _post_raw(
+            f"{base}/api/config/switch/test_tts",
+            {
+                "tts": {
+                    "provider": "gpt_sovits",
+                    "voice": "draft-voice",
+                    "gpt_sovits_api_url": "http://127.0.0.1:9880/tts",
+                    "stream_mode": "realtime",
+                },
+                "text": "draft text",
+            },
+        )
+
+    assert status == 200
+    assert body == b"ID3draft-audio"
+    assert headers["Content-Type"].startswith("audio/")
+    assert captured["text"] == "draft text"
+    assert captured["voice_override"] == "draft-voice"
+    assert captured["config_override"]["tts"]["provider"] == "gpt_sovits"
+    assert captured["config_override"]["tts"]["voice"] == "draft-voice"
+    assert captured["config_override"]["tts"]["gpt_sovits_realtime_tts"] is True
+
+
+def test_api_config_switch_validate_live2d_reports_reload_hint(monkeypatch):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = False
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status_ok, payload_ok = _post_json(
+            f"{base}/api/config/switch/validate_live2d",
+            {"live2d": {"model_path": "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json"}},
+        )
+        status_bad, payload_bad = _post_json(
+            f"{base}/api/config/switch/validate_live2d",
+            {"live2d": {"model_path": "../secret.model3.json"}},
+        )
+
+    assert status_ok == 200
+    assert payload_ok["ok"] is True
+    assert payload_ok["reload_required"] is True
+    assert payload_ok["live2d"]["model_path"] == "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json"
+    assert status_bad == 400
+    assert payload_bad["ok"] is False
+    assert payload_bad["code"] == "config_switch_live2d_path_escape"
 
 
 def test_first_run_status_uses_token_and_reports_safe_summary(monkeypatch):

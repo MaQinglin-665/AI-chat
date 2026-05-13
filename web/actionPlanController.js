@@ -420,15 +420,16 @@
       if (!speakingWindow) {
         return false;
       }
+      const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
       if (state.motionQuietDuringSpeech) {
         return true;
       }
-      const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
       const delayMs = Number(step?.delayMs) || 0;
-      if (delayMs > 0) {
+      const priority = Number(step?.priority) || 0;
+      if (delayMs > 0 && motionBlend > 0.62 && priority <= 1) {
         return true;
       }
-      return motionBlend > 0.2 && (Number(step?.priority) || 0) <= 2;
+      return motionBlend > 0.54 && priority <= 1;
     }
 
     async function runActionQueue() {
@@ -492,7 +493,7 @@
         return;
       }
       const i = String(intent || "idle");
-      const minGap = i === "talk" ? Math.max(420, state.speakingMotionCooldownMs * 0.45) : 680;
+      const minGap = i === "talk" ? Math.max(360, state.speakingMotionCooldownMs * 0.36) : 680;
       if (shouldThrottleActionIntent(i, minGap)) {
         return;
       }

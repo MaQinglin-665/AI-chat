@@ -3,6 +3,9 @@ contact_links:
   - name: First install guide
     url: https://github.com/MaQinglin-665/AI-chat/blob/main/docs/first-install.md
     about: Start here if you are running the project from GitHub for the first time.
+  - name: 首跑后反馈模板
+    url: https://github.com/MaQinglin-665/AI-chat/blob/main/docs/first-run-feedback.md
+    about: Use this after the app can launch and you want to share startup, model, voice, Live2D, and character-feel feedback.
   - name: Troubleshooting guide
     url: https://github.com/MaQinglin-665/AI-chat/blob/main/docs/troubleshooting.md
     about: Common startup, model, voice, and Live2D troubleshooting notes.

@@ -219,7 +219,7 @@ Live2D 主要承担“说话期间的表情/动作反馈”，而不是“对话
   - `conversation_mode.proactive_enabled=false`
   - `conversation_mode.max_followups_per_window=1`
   - `conversation_mode.silence_followup_min_ms=180000`
-  - `conversation_mode.interrupt_tts_on_user_speech=false`
+  - `conversation_mode.interrupt_tts_on_user_speech=true`
 
 ## 16. Task 030 Landing Notes
 
@@ -1338,15 +1338,15 @@ The reset helper exists to speed up local trial verification without restarting 
 
 - Task 142 adds a read-only automatic character runtime explicit switch plan.
 - DevTools exposes `grayAutoFollowupTrialCharacterAutoRuntimeExplicitSwitchPlan(limit)`.
-- The readiness panel shows `鐏板害璇曡繍琛岃嚜鍔ㄨ鑹茶〃鐜版樉寮忓紑鍏宠鍒`, including proposed switch key, default-off baseline, explicit config gate requirement, separate runtime task requirement, review readiness, dry-run selection status, single-session cap expectation, emergency stop/disarm availability, and next action.
-- The panel adds `澶嶅埗寮€鍏宠鍒` for user-click clipboard export.
+- The readiness panel shows `Gray auto-followup trial character runtime explicit switch plan`, including proposed switch key, default-off baseline, explicit config gate requirement, separate runtime task requirement, review readiness, dry-run selection status, single-session cap expectation, emergency stop/disarm availability, and next action.
+- The panel adds `Copy switch plan` for user-click clipboard export.
 - The explicit switch plan stays read-only, keeps automatic runtime disabled, and does not implement the actual switch.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.
 
 ## 52. Task 142 Gray Trial Character Auto Runtime Explicit Switch Plan Note
 
 - Task 142 adds `grayAutoFollowupTrialCharacterAutoRuntimeExplicitSwitchPlan(limit)` as a read-only DevTools helper.
-- The readiness panel renders an explicit switch plan and exposes `澶嶅埗寮€鍏宠鍒`.
+- The readiness panel renders an explicit switch plan and exposes `Copy switch plan`.
 - The plan summarizes the proposed switch key, default-off baseline, explicit config gate requirement, separate runtime task requirement, review readiness, dry-run selection status, single-session cap expectation, emergency stop/disarm availability, and next action.
 - It keeps automatic runtime disabled and never implements the actual switch.
 - It does not emit runtime cues, move Live2D, request LLM output, play TTS, fetch, arm/disarm/stop/reset, start polling, execute follow-up, write config, mutate pending state, or change scheduler behavior.

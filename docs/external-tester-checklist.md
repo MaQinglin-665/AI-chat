@@ -4,6 +4,8 @@ Use this checklist when trying the Xinyu v1.4 preview from the installer or
 source test package. It helps separate setup problems, model problems, and
 character experience problems.
 
+Chinese feedback template: `docs/first-run-feedback.md`.
+
 Please do not share API keys, tokens, raw prompts, raw history, private file
 paths, or private desktop screenshots in public issues.
 

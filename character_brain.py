@@ -4,6 +4,24 @@ import re
 import time
 from typing import Any, Dict, Iterable, List, Optional
 
+from character_brain_barge import (
+    apply_barge_in_policy_controls as _apply_barge_in_policy_controls_impl,
+    detect_barge_in_reply_policy as _detect_barge_in_reply_policy_impl,
+    public_barge_in_policy as _public_barge_in_policy_impl,
+)
+from character_brain_directors import (
+    public_motion_director as _public_motion_director_impl,
+    public_voice_director as _public_voice_director_impl,
+    select_motion_director as _select_motion_director_impl,
+    select_voice_director as _select_voice_director_impl,
+    thought_burst_type_from_decision as _thought_burst_type_from_decision_impl,
+)
+from character_brain_reply_quality import (
+    apply_reply_quality_repair as _apply_reply_quality_repair_impl,
+    assess_reply_quality as _assess_reply_quality_impl,
+    public_reply_quality as _public_reply_quality_impl,
+)
+
 
 TOOL_META_MARKER = "[[TAFFY_TOOL_META]]"
 SUPPORTED_EMOTIONS = {
@@ -152,6 +170,18 @@ SESSION_SOFT_DECAY_AFTER_SEC = 10 * 60
 STAGE_CALLBACK_COOLDOWN_TURNS = 2
 IMPROV_HIGH_CHAOS_INTENTS = {"greeting", "casual", "question", "encouragement", "thought_burst"}
 IMPROV_SAFE_CLAMP_INTENTS = {"comfort", "reminder", "feedback", "closing", "low_interrupt_checkin"}
+TOPIC_STACK_LIMIT = 3
+
+TOPIC_LABELS = {
+    "persona_feedback": "persona feedback",
+    "emotional_support": "emotional support",
+    "character_runtime": "ASR/TTS/Live2D runtime",
+    "coding": "coding",
+    "planning": "next-step planning",
+    "task": "task thread",
+    "progress": "progress",
+    "casual": "casual chat",
+}
 
 STYLE_BEATS = {
     "greeting": [
@@ -408,6 +438,180 @@ def _derive_topic(user_message: str, intent: str) -> str:
     if intent == "encouragement":
         return "progress"
     return "casual"
+
+
+def _clean_topic_excerpt(value: Any, max_len: int = 90) -> str:
+    text = _clean_text(value, max_len)
+    if not text:
+        return ""
+    text = re.sub(
+        r"(?i)(?:api[_-]?key|secret|password|passwd|token)\s*[:=]\s*['\"]?[^'\"\s,;]+",
+        "[redacted]",
+        text,
+    )
+    return _clean_text(text, max_len)
+
+
+def _topic_label_for(topic: str, user_message: str = "") -> str:
+    safe_topic = _clean_text(topic, 48) or "casual"
+    if safe_topic in TOPIC_LABELS:
+        return TOPIC_LABELS[safe_topic]
+    excerpt = _clean_topic_excerpt(user_message, 48)
+    return excerpt or safe_topic
+
+
+def _public_topic_stack(value: Optional[Any]) -> List[Dict[str, Any]]:
+    if isinstance(value, dict):
+        raw_stack = value.get("topic_stack")
+    else:
+        raw_stack = value
+    if not isinstance(raw_stack, list):
+        return []
+    stack: List[Dict[str, Any]] = []
+    for item in raw_stack:
+        if not isinstance(item, dict):
+            continue
+        topic_id = _clean_text(item.get("topic_id") or item.get("topic"), 48)
+        label = _clean_text(item.get("label"), 64) or _topic_label_for(topic_id)
+        if not topic_id and not label:
+            continue
+        stack.append(
+            {
+                "topic_id": topic_id or "casual",
+                "label": label,
+                "intent": _clean_text(item.get("intent"), 40) or "casual",
+                "last_user": _clean_topic_excerpt(item.get("last_user") or item.get("user_excerpt"), 90),
+                "last_assistant": _clean_topic_excerpt(
+                    item.get("last_assistant") or item.get("assistant_excerpt"),
+                    90,
+                ),
+                "turns": max(1, min(99, _safe_int(item.get("turns"), 1))),
+                "updated_at": max(0, _safe_int(item.get("updated_at"), 0)),
+            }
+        )
+        if len(stack) >= TOPIC_STACK_LIMIT:
+            break
+    return stack
+
+
+def _detect_topic_reference_move(user_message: str) -> str:
+    text = _clean_text(user_message, 240).lower()
+    compact = re.sub(r"\s+", "", text)
+    if not compact:
+        return ""
+    if re.search(r"(notthat|thatsnotit|that'snotit|wrongthread|wrongtopic)", compact) or re.search(
+        r"(\u4e0d\u662f\u8fd9\u4e2a|\u4e0d\u662f\u90a3\u4e2a|\u4e0d\u5bf9|\u6211\u4e0d\u662f\u8bf4)",
+        text,
+    ):
+        return "repair"
+    if re.search(r"(shorter|toomuch|too long|summari[sz]e|one sentence|briefly)", text) or re.search(
+        r"(\u8bf4\u77ed\u70b9|\u77ed\u4e00\u70b9|\u7b80\u5355\u70b9|\u7b80\u77ed|\u592a\u957f|\u522b\u5c55\u5f00|\u4e00\u53e5\u8bdd|\u5c11\u4e00\u70b9)",
+        text,
+    ):
+        return "shorten"
+    if re.search(r"(more detail|elaborate|expand|go deeper|tell me more)", text) or re.search(
+        r"(\u8be6\u7ec6\u70b9|\u5c55\u5f00|\u591a\u8bf4\u4e00\u70b9|\u7ec6\u8bf4)",
+        text,
+    ):
+        return "expand"
+    if re.search(r"(rephrase|say it differently|different wording|another way)", text) or re.search(
+        r"(\u6362\u4e2a\u8bf4\u6cd5|\u91cd\u65b0\u8bf4|\u6362\u4e00\u4e0b)",
+        text,
+    ):
+        return "rephrase"
+    if re.search(r"(continue|go on|keep going|same topic|that one|that thing|what about that|about it|back to that|previous point|last thing)", text) or re.search(
+        r"(\u7ee7\u7eed|\u63a5\u7740|\u63a5\u4e0a|\u8bf4\u4e0b\u53bb|\u8bf4\u5b8c|\u56de\u5230\u521a\u624d|\u521a\u624d\u90a3\u4e2a|\u521a\u521a\u90a3\u4e2a|\u521a\u624d\u8bf4\u7684|\u4e0a\u4e00\u4e2a|\u4e0a\u4e00\u70b9|\u90a3\u4e2a\u5462|\u8fd9\u4e2a\u5462|\u8fd8\u662f\u8fd9\u4e2a|\u90a3\u90e8\u5206)",
+        text,
+    ):
+        return "continue_topic"
+    return ""
+
+
+def _public_topic_reference(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    move = _clean_text(raw.get("reply_move"), 48)
+    if move not in {"continue_topic", "shorten", "expand", "rephrase", "repair"}:
+        move = "none"
+    topic_id = _clean_text(raw.get("topic_id"), 48)
+    label = _clean_text(raw.get("label"), 64) or _topic_label_for(topic_id)
+    try:
+        confidence = float(raw.get("confidence", 0.0))
+    except (TypeError, ValueError):
+        confidence = 0.0
+    active = raw.get("active") is True and move != "none" and bool(topic_id or label)
+    return {
+        "active": bool(active),
+        "reply_move": move if active else "none",
+        "topic_id": topic_id,
+        "label": label if active else "",
+        "reason": _clean_text(raw.get("reason"), 48) if active else "",
+        "confidence": max(0.0, min(1.0, confidence if active else 0.0)),
+    }
+
+
+def _build_topic_reference(user_message: str, topic_stack: Optional[Any]) -> Dict[str, Any]:
+    stack = _public_topic_stack(topic_stack)
+    move = _detect_topic_reference_move(user_message)
+    if not move or not stack:
+        return _public_topic_reference({})
+    target = stack[0]
+    return _public_topic_reference(
+        {
+            "active": True,
+            "reply_move": move,
+            "topic_id": target.get("topic_id"),
+            "label": target.get("label"),
+            "reason": "implicit_recent_topic",
+            "confidence": 0.72 if len(stack) == 1 else 0.64,
+        }
+    )
+
+
+def _update_topic_stack(
+    previous: Optional[Dict[str, Any]],
+    *,
+    topic: str,
+    intent: str,
+    user_message: str,
+    assistant_reply: str = "",
+    decision: Optional[Dict[str, Any]] = None,
+    now: int = 0,
+) -> List[Dict[str, Any]]:
+    stack = _public_topic_stack(previous)
+    ref = _public_topic_reference(
+        decision.get("topic_reference") if isinstance(decision, dict) else None
+    )
+    target_id = _clean_text(ref.get("topic_id"), 48) if ref.get("active") else ""
+    topic_id = target_id or _clean_text(topic, 48) or "casual"
+    label = _clean_text(ref.get("label"), 64) if ref.get("active") else ""
+    label = label or _topic_label_for(topic_id, user_message)
+    user_excerpt = _clean_topic_excerpt(user_message, 90)
+    assistant_excerpt = _clean_topic_excerpt(assistant_reply, 90)
+    if not user_excerpt and not assistant_excerpt:
+        return stack[:TOPIC_STACK_LIMIT]
+
+    existing: Optional[Dict[str, Any]] = None
+    rest: List[Dict[str, Any]] = []
+    for item in stack:
+        if not existing and _clean_text(item.get("topic_id"), 48) == topic_id:
+            existing = item
+            continue
+        rest.append(item)
+    existing = existing or {}
+    existing_intent = _clean_text(existing.get("intent"), 40)
+    next_intent = _clean_text(intent, 40) or existing_intent or "casual"
+    if ref.get("active") and existing_intent and next_intent in {"casual", "question"}:
+        next_intent = existing_intent
+    entry = {
+        "topic_id": topic_id,
+        "label": label,
+        "intent": next_intent,
+        "last_user": user_excerpt or _clean_topic_excerpt(existing.get("last_user"), 90),
+        "last_assistant": assistant_excerpt or _clean_topic_excerpt(existing.get("last_assistant"), 90),
+        "turns": max(1, min(99, _safe_int(existing.get("turns"), 0) + 1)),
+        "updated_at": max(0, _safe_int(now, 0)),
+    }
+    return [entry, *rest][:TOPIC_STACK_LIMIT]
 
 
 def _stable_text_score(*parts: Any) -> int:
@@ -688,44 +892,274 @@ def _public_safety_clamp(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def _public_motion_director(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    raw = value if isinstance(value, dict) else {}
-    beats_raw = raw.get("speech_beats") if isinstance(raw.get("speech_beats"), list) else []
-    suppressed_raw = raw.get("suppressed_reasons") if isinstance(raw.get("suppressed_reasons"), list) else []
-    return {
-        "pre_reaction": _clean_text(raw.get("pre_reaction"), 48) or "none",
-        "speech_start": _clean_text(raw.get("speech_start"), 48) or "steady_speech_start",
-        "speech_beats": [
-            _clean_text(item, 48)
-            for item in beats_raw[:3]
-            if _clean_text(item, 48)
-        ],
-        "correction_reaction": _clean_text(raw.get("correction_reaction"), 48) or "none",
-        "post_settle": _clean_text(raw.get("post_settle"), 48) or "settle_idle",
-        "suppressed_reasons": [
-            _clean_text(item, 48)
-            for item in suppressed_raw[:6]
-            if _clean_text(item, 48)
-        ],
-    }
+    return _public_motion_director_impl(value)
 
 
 def _public_voice_director(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    raw = value if isinstance(value, dict) else {}
-    suppressed_raw = raw.get("suppressed_reasons") if isinstance(raw.get("suppressed_reasons"), list) else []
+    return _public_voice_director_impl(value)
+
+
+def _has_interruption_context(config: Optional[Dict[str, Any]]) -> bool:
+    interruption = _interruption_context(config)
+    if not interruption:
+        return False
+    return bool(
+        _clean_text(interruption.get("assistant_summary") or interruption.get("assistant_partial"), 24)
+        or _clean_text(interruption.get("previous_user_summary") or interruption.get("previous_user_message"), 24)
+    )
+
+
+def _interruption_context(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(config, dict):
+        return {}
+    context = config.get("_conversation_context")
+    if not isinstance(context, dict):
+        return {}
+    interruption = context.get("interruption") if isinstance(context.get("interruption"), dict) else context
+    if not isinstance(interruption, dict):
+        return {}
+    return interruption
+
+
+def _detect_barge_in_reply_policy(user_message: str, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    return _detect_barge_in_reply_policy_impl(user_message, config)
+
+
+def _public_barge_in_policy(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    return _public_barge_in_policy_impl(value)
+
+
+def _public_asr_status(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(config, dict):
+        return {
+            "active": False,
+            "source": "none",
+            "confidence": 0.0,
+            "needs_confirmation": False,
+            "reason": "",
+        }
+    context = config.get("_conversation_context")
+    if not isinstance(context, dict):
+        return {
+            "active": False,
+            "source": "none",
+            "confidence": 0.0,
+            "needs_confirmation": False,
+            "reason": "",
+        }
+    asr = context.get("asr") if isinstance(context.get("asr"), dict) else {}
+    if not isinstance(asr, dict) or not asr:
+        return {
+            "active": False,
+            "source": "none",
+            "confidence": 0.0,
+            "needs_confirmation": False,
+            "reason": "",
+        }
+    if asr.get("active") is False:
+        return {
+            "active": False,
+            "source": "none",
+            "confidence": 0.0,
+            "needs_confirmation": False,
+            "reason": "",
+        }
+    try:
+        confidence = float(asr.get("confidence", 0.0))
+    except (TypeError, ValueError):
+        confidence = 0.0
     return {
-        "delivery": _clean_text(raw.get("delivery"), 48) or "steady_clear",
-        "pace": _clean_text(raw.get("pace"), 32) or "normal",
-        "pause_profile": _clean_text(raw.get("pause_profile"), 48) or "light",
-        "segment_style": _clean_text(raw.get("segment_style"), 48) or "whole",
-        "pre_pause_ms": max(0, min(1200, _safe_int(raw.get("pre_pause_ms"), 0))),
-        "inter_segment_pause_ms": max(0, min(1600, _safe_int(raw.get("inter_segment_pause_ms"), 160))),
-        "max_segments": max(1, min(4, _safe_int(raw.get("max_segments"), 1))),
-        "suppressed_reasons": [
-            _clean_text(item, 48)
-            for item in suppressed_raw[:6]
-            if _clean_text(item, 48)
-        ],
+        "active": True,
+        "source": _clean_text(asr.get("source"), 48) or "voice_transcript",
+        "confidence": max(0.0, min(1.0, confidence)),
+        "needs_confirmation": asr.get("needs_confirmation") is True,
+        "reason": _clean_text(asr.get("reason"), 80),
     }
+
+
+def _has_uncertain_asr_context(config: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(config, dict):
+        return False
+    context = config.get("_conversation_context")
+    if not isinstance(context, dict):
+        return False
+    asr = context.get("asr") if isinstance(context.get("asr"), dict) else {}
+    if not isinstance(asr, dict):
+        return False
+    return asr.get("needs_confirmation") is True
+
+
+def _input_modality(config: Optional[Dict[str, Any]], *, is_auto: bool = False) -> str:
+    if is_auto:
+        return "auto"
+    if not isinstance(config, dict):
+        return "text"
+    key = _clean_text(config.get("_input_modality"), 32).lower().replace("-", "_")
+    if key in {"voice", "speech", "asr", "mic", "microphone"}:
+        return "voice"
+    if key in {"auto", "proactive"}:
+        return "auto"
+    return "text"
+
+
+def _public_conversation_director(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    return {
+        "mode": _clean_text(raw.get("mode"), 48) or "steady_turn",
+        "turn_taking": _clean_text(raw.get("turn_taking"), 48) or "answer_then_yield",
+        "reply_goal": _clean_text(raw.get("reply_goal"), 96) or "answer_the_latest_message",
+        "reply_move": _clean_text(raw.get("reply_move"), 48) or "answer",
+        "initiative": _clean_text(raw.get("initiative"), 48) or "none",
+        "followup_policy": _clean_text(raw.get("followup_policy"), 64) or "avoid_routine_question",
+        "max_spoken_beats": max(1, min(4, _safe_int(raw.get("max_spoken_beats"), 2))),
+        "interruption_policy": _clean_text(raw.get("interruption_policy"), 64) or "none",
+    }
+
+
+def _select_conversation_director(
+    decision: Dict[str, Any],
+    *,
+    config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    intent = _clean_text(decision.get("intent"), 40) or "casual"
+    modality = _input_modality(config)
+    topic_reference = _public_topic_reference(
+        decision.get("topic_reference") if isinstance(decision.get("topic_reference"), dict) else {}
+    )
+    if _has_uncertain_asr_context(config):
+        return _public_conversation_director(
+            {
+                "mode": "voice_asr_confirmation" if modality == "voice" else "asr_confirmation",
+                "turn_taking": "confirm_then_yield",
+                "reply_goal": "confirm_uncertain_voice_input",
+                "reply_move": "clarify",
+                "initiative": "none",
+                "followup_policy": "confirmation_only",
+                "max_spoken_beats": 1,
+                "interruption_policy": "yield_if_user_speaks",
+            }
+        )
+    barge_policy = _public_barge_in_policy(
+        decision.get("barge_in_policy") if isinstance(decision.get("barge_in_policy"), dict) else {}
+    )
+    if barge_policy["active"]:
+        kind = barge_policy["kind"]
+        mode_by_kind = {
+            "stop": "barge_in_stop",
+            "correction": "barge_in_repair",
+            "shorten": "barge_in_adjustment",
+            "rephrase": "barge_in_adjustment",
+            "continue": "barge_in_continue",
+            "supplement": "barge_in_supplement",
+            "new_topic": "barge_in_recovery",
+        }
+        return _public_conversation_director(
+            {
+                "mode": f"voice_{mode_by_kind.get(kind, 'barge_in_recovery')}" if modality == "voice" else mode_by_kind.get(kind, "barge_in_recovery"),
+                "turn_taking": "short_spoken_yield" if modality == "voice" else "yield_to_user",
+                "reply_goal": barge_policy["goal"] or "answer_latest_first",
+                "reply_move": barge_policy["reply_move"] or "yield",
+                "initiative": "acknowledge_barge_in",
+                "followup_policy": "resume_only_if_user_asked" if kind == "continue" else "do_not_resume_unasked",
+                "max_spoken_beats": 1 if modality == "voice" else (1 if kind in {"stop", "shorten", "rephrase", "correction"} else 2),
+                "interruption_policy": "treat_as_natural_interruption",
+            }
+        )
+    if topic_reference["active"]:
+        move = topic_reference["reply_move"]
+        goal_by_move = {
+            "continue_topic": "continue_recent_topic_without_reasking",
+            "shorten": "compress_the_referenced_topic",
+            "expand": "expand_the_referenced_topic",
+            "rephrase": "restate_the_referenced_topic",
+            "repair": "repair_topic_mismatch",
+        }
+        return _public_conversation_director(
+            {
+                "mode": "voice_topic_followup" if modality == "voice" else "topic_followup",
+                "turn_taking": "short_react_first" if modality == "voice" else "answer_then_yield",
+                "reply_goal": goal_by_move.get(move, "continue_recent_topic_without_reasking"),
+                "reply_move": move,
+                "initiative": "stay_on_referenced_topic",
+                "followup_policy": "no_topic_reset_question",
+                "max_spoken_beats": 1 if modality == "voice" else (3 if move == "expand" else 2),
+                "interruption_policy": "yield_if_user_speaks",
+            }
+        )
+    if _has_interruption_context(config):
+        return _public_conversation_director(
+            {
+                "mode": "voice_barge_in_recovery" if modality == "voice" else "barge_in_recovery",
+                "turn_taking": "short_spoken_yield" if modality == "voice" else "yield_to_user",
+                "reply_goal": "answer_latest_first",
+                "reply_move": "yield",
+                "initiative": "brief_acknowledgement",
+                "followup_policy": "do_not_resume_unasked",
+                "max_spoken_beats": 1 if modality == "voice" else 2,
+                "interruption_policy": "treat_as_natural_interruption",
+            }
+        )
+    if intent in {"greeting", "casual", "question", "encouragement"}:
+        return _public_conversation_director(
+            {
+                "mode": "voice_free_chat" if modality == "voice" else "free_chat",
+                "turn_taking": "short_react_first" if modality == "voice" else "react_first",
+                "reply_goal": "keep_conversation_alive_without_pressuring_user",
+                "reply_move": "answer" if intent == "question" else ("ack" if intent in {"greeting", "encouragement"} else "riff"),
+                "initiative": "one_micro_opinion_or_aside",
+                "followup_policy": "avoid_routine_question",
+                "max_spoken_beats": 1 if modality == "voice" else (2 if intent != "question" else 3),
+                "interruption_policy": "yield_if_user_speaks",
+            }
+        )
+    if intent == "thought_burst":
+        return _public_conversation_director(
+            {
+                "mode": "stage_thought",
+                "turn_taking": "self_contained_aside",
+                "reply_goal": "sound_like_a_sudden_thought_then_stop",
+                "reply_move": "aside",
+                "initiative": "tiny_spontaneous_bit",
+                "followup_policy": "no_question",
+                "max_spoken_beats": max(1, min(4, _safe_int(decision.get("max_sentences"), 2))),
+                "interruption_policy": "stop_cleanly",
+            }
+        )
+    if intent == "comfort":
+        mode, goal, reply_move, initiative = "soft_presence", "stay_close_without_solving_too_much", "support", "none"
+    elif intent == "task_help":
+        mode, goal, reply_move, initiative = "useful_companion", "give_one_concrete_next_move", "answer", "small_supervisor_aside"
+    elif intent == "reminder":
+        mode, goal, reply_move, initiative = "clean_ping", "confirm_briefly", "confirm", "none"
+    elif intent == "closing":
+        mode, goal, reply_move, initiative = "soft_exit", "close_without_new_hooks", "close", "none"
+    elif intent == "feedback":
+        mode, goal, reply_move, initiative = "grounded_repair", "lower_the_bit_density", "repair", "none"
+    else:
+        mode, goal, reply_move, initiative = "steady_turn", "answer_the_latest_message", "answer", "none"
+    if modality == "voice":
+        mode = f"voice_{mode}"
+    interruption_policy = (
+        "finish_key_sentence_before_yield"
+        if intent in {"comfort", "task_help", "reminder", "feedback"}
+        else "yield_if_user_speaks"
+    )
+    return _public_conversation_director(
+        {
+            "mode": mode,
+            "turn_taking": "short_answer_then_yield" if modality == "voice" else "answer_then_yield",
+            "reply_goal": goal,
+            "reply_move": reply_move,
+            "initiative": initiative,
+            "followup_policy": "avoid_routine_question",
+            "max_spoken_beats": 1 if modality == "voice" else max(1, min(3, _safe_int(decision.get("max_sentences"), 2))),
+            "interruption_policy": interruption_policy,
+        }
+    )
+
+
+def _apply_barge_in_policy_controls(decision: Dict[str, Any]) -> None:
+    _apply_barge_in_policy_controls_impl(decision)
 
 
 THOUGHT_BURST_MOTION_PLANS: Dict[str, Dict[str, Any]] = {
@@ -847,215 +1281,28 @@ THOUGHT_BURST_VOICE_PLANS: Dict[str, Dict[str, Any]] = {
 }
 
 
+def _director_deps() -> Dict[str, Any]:
+    return {
+        "clean_text": _clean_text,
+        "safe_int": _safe_int,
+        "normalize_opening_move": _normalize_opening_move,
+        "normalize_reply_shape": _normalize_reply_shape,
+        "public_output_constraints": _public_output_constraints,
+        "public_safety_clamp": _public_safety_clamp,
+        "public_improv_director": _public_improv_director,
+    }
+
+
 def _thought_burst_type_from_decision(decision: Dict[str, Any]) -> str:
-    burst = decision.get("thought_burst") if isinstance(decision.get("thought_burst"), dict) else {}
-    thought_type = _clean_text(burst.get("thought_type"), 40).lower()
-    if thought_type not in THOUGHT_BURST_MOTION_PLANS:
-        return "aside"
-    return thought_type
+    return _thought_burst_type_from_decision_impl(decision)
 
 
 def _select_motion_director(decision: Dict[str, Any]) -> Dict[str, Any]:
-    intent = _clean_text(decision.get("intent"), 40) or "casual"
-    opening = _normalize_opening_move(decision.get("opening_move"))
-    reaction = _clean_text(decision.get("reaction_mode"), 48)
-    spontaneity = max(0, min(3, _safe_int(decision.get("spontaneity"), 0)))
-    constraints = _public_output_constraints(
-        decision.get("output_constraints") if isinstance(decision.get("output_constraints"), dict) else {}
-    )
-    safety = _public_safety_clamp(
-        decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
-    )
-    improv = _public_improv_director(
-        decision.get("improv") if isinstance(decision.get("improv"), dict) else {}
-    )
-    suppressed: List[str] = []
-    allow_motion = constraints.get("allow_motion") is not False
-    if not allow_motion:
-        suppressed.append("motion_disallowed")
-    if safety["level"] != "none":
-        suppressed.append(f"safety_clamp_{safety['level']}")
-
-    pre = "blink_pulse"
-    speech = "expressive_speech_start"
-    beats: List[str] = []
-    correction = "none"
-    post = "settle_idle"
-
-    if intent == "thought_burst":
-        thought_type = _thought_burst_type_from_decision(decision)
-        plan = THOUGHT_BURST_MOTION_PLANS.get(thought_type, THOUGHT_BURST_MOTION_PLANS["aside"])
-        pre = _clean_text(plan.get("pre"), 48) or "side_eye"
-        speech = _clean_text(plan.get("speech"), 48) or "dry_speech_start"
-        base_beats = plan.get("beats") if isinstance(plan.get("beats"), list) else []
-        beat_limit = max(0, min(len(base_beats), spontaneity if allow_motion else 0))
-        beats = [_clean_text(item, 48) for item in base_beats[:beat_limit] if _clean_text(item, 48)]
-        correction = _clean_text(plan.get("correction"), 48) or "none"
-        post = _clean_text(plan.get("post"), 48) or "settle_idle"
-        suppressed.append("thought_burst_choreography")
-    elif intent == "comfort":
-        pre, speech, beats, post = "soft_stillness", "soft_speech_start", [], "soft_idle"
-        suppressed.append("comfort_no_extra_motion")
-    elif intent == "low_interrupt_checkin":
-        pre, speech, beats, post = "no_opening", "soft_speech_start", [], "soft_idle"
-        suppressed.append("low_interrupt_no_extra_motion")
-    elif intent == "reminder":
-        pre, speech, beats, post = "tiny_nod", "steady_speech_start", [], "focused_idle"
-        suppressed.append("reminder_no_extra_beats")
-    elif intent == "feedback":
-        pre, speech, beats, post = "tiny_nod", "steady_speech_start", [], "settle_idle"
-        suppressed.append("feedback_no_extra_bits")
-    elif intent == "closing":
-        pre, speech, beats, post = "no_opening", "closing_speech_start", [], "closing_idle"
-        suppressed.append("closing_no_extra_beats")
-    elif intent == "task_help":
-        pre, speech, post = "thinking_nod", "steady_speech_start", "focused_idle"
-        beats = ["tiny_nod"] if spontaneity >= 1 and allow_motion else []
-    elif improv["stance"] == "mock_defensive_repair":
-        pre, speech, post = "embarrassed_recovery", "dry_speech_start", "settle_idle"
-        beats = ["deadpan_pause"] if spontaneity >= 1 and allow_motion else []
-        correction = "embarrassed_recovery"
-    elif intent == "encouragement":
-        pre, speech, post = "happy_pulse", "bright_speech_start", "settle_idle"
-        beats = ["tiny_victory_nod"] if spontaneity >= 1 and allow_motion else []
-    elif intent == "question":
-        pre = "head_tilt" if opening == "answer_first" else "blink_pulse"
-        if reaction in {"deadpan_aside", "tangent_spark"}:
-            pre = "side_eye"
-        speech = "curious_speech_start"
-        beats = ["tiny_nod"] if spontaneity >= 1 and allow_motion else []
-        if spontaneity >= 3 and allow_motion:
-            beats.append("blink_pulse")
-    elif intent in {"casual", "greeting", "thought_burst"}:
-        pre = "deadpan_pause" if opening == "deadpan_aside" else "side_eye"
-        if reaction == "quick_snap":
-            pre = "micro_pulse"
-        speech = "dry_speech_start" if reaction == "deadpan_aside" else "expressive_speech_start"
-        if spontaneity >= 1 and allow_motion:
-            beats.append("blink_pulse")
-        if spontaneity >= 2 and allow_motion:
-            beats.append("head_tilt")
-        if spontaneity >= 3 and allow_motion:
-            beats.append("idle_fidget")
-
-    if not allow_motion:
-        beats = []
-    return _public_motion_director(
-        {
-            "pre_reaction": pre,
-            "speech_start": speech,
-            "speech_beats": beats,
-            "correction_reaction": correction,
-            "post_settle": post,
-            "suppressed_reasons": suppressed,
-        }
-    )
+    return _select_motion_director_impl(decision, deps=_director_deps())
 
 
 def _select_voice_director(decision: Dict[str, Any]) -> Dict[str, Any]:
-    intent = _clean_text(decision.get("intent"), 40) or "casual"
-    opening = _normalize_opening_move(decision.get("opening_move"))
-    shape = _normalize_reply_shape(decision.get("reply_shape"))
-    reaction = _clean_text(decision.get("reaction_mode"), 48)
-    spontaneity = max(0, min(3, _safe_int(decision.get("spontaneity"), 0)))
-    constraints = _public_output_constraints(
-        decision.get("output_constraints") if isinstance(decision.get("output_constraints"), dict) else {}
-    )
-    safety = _public_safety_clamp(
-        decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
-    )
-    improv = _public_improv_director(
-        decision.get("improv") if isinstance(decision.get("improv"), dict) else {}
-    )
-    motion = _public_motion_director(
-        decision.get("motion_director") if isinstance(decision.get("motion_director"), dict) else {}
-    )
-    suppressed: List[str] = []
-    if safety["level"] != "none":
-        suppressed.append(f"safety_clamp_{safety['level']}")
-    if spontaneity <= 0:
-        suppressed.append("spontaneity_zero_no_voice_beats")
-
-    delivery = "steady_clear"
-    pace = "normal"
-    pause_profile = "light"
-    segment_style = "whole"
-    pre_pause_ms = 0
-    inter_segment_pause_ms = 160
-    max_segments = 1
-
-    if intent == "thought_burst":
-        thought_type = _thought_burst_type_from_decision(decision)
-        plan = THOUGHT_BURST_VOICE_PLANS.get(thought_type, THOUGHT_BURST_VOICE_PLANS["aside"])
-        delivery = _clean_text(plan.get("delivery"), 48) or "dry_playful"
-        pace = _clean_text(plan.get("pace"), 32) or "measured"
-        pause_profile = _clean_text(plan.get("pause_profile"), 48) or "dry_beat"
-        segment_style = _clean_text(plan.get("segment_style"), 48) or "two_beat"
-        pre_pause_ms = max(0, min(1200, _safe_int(plan.get("pre_pause_ms"), 80)))
-        inter_segment_pause_ms = max(0, min(1600, _safe_int(plan.get("inter_segment_pause_ms"), 220)))
-        requested = max(1, min(4, _safe_int(decision.get("max_sentences"), _safe_int(plan.get("max_segments"), 2))))
-        max_segments = max(1, min(requested, _safe_int(plan.get("max_segments"), requested)))
-        suppressed.append("thought_burst_choreography")
-    elif intent == "comfort":
-        delivery, pace, pause_profile, segment_style = "soft_low", "slow", "gentle", "short_soft"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 60, 140, 2
-        suppressed.append("comfort_no_voice_bits")
-    elif intent == "low_interrupt_checkin":
-        delivery, pace, pause_profile, segment_style = "soft_low", "slow", "gentle", "one_liner"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 120, 1
-        suppressed.append("low_interrupt_one_line_voice")
-    elif intent == "reminder":
-        delivery, pace, pause_profile, segment_style = "steady_clear", "steady", "clean", "one_liner"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 20, 100, 1
-        suppressed.append("reminder_clear_voice")
-    elif intent == "feedback":
-        delivery, pace, pause_profile, segment_style = "steady_clear", "measured", "grounded", "two_beat"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 30, 120, 2
-        suppressed.append("feedback_no_voice_bits")
-    elif intent == "closing":
-        delivery, pace, pause_profile, segment_style = "soft_close", "slow", "final", "one_liner"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 120, 1
-        suppressed.append("closing_no_extra_voice")
-    elif intent == "task_help":
-        delivery, pace, pause_profile, segment_style = "steady_clear", "steady", "clean", "step_then_aside"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 20, 120, 2
-        suppressed.append("task_steady_voice")
-    elif improv["stance"] == "mock_defensive_repair" or motion["correction_reaction"] != "none":
-        delivery, pace, pause_profile, segment_style = "dry_recovery", "short_pause", "awkward_beat", "two_beat"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 70, 140, 2
-    elif intent == "encouragement":
-        delivery, pace, pause_profile, segment_style = "bright_pop", "bright", "quick", "two_beat"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 20, 120, 2
-    elif shape == "mini_rant":
-        delivery, pace, pause_profile, segment_style = "dry_playful", "varied", "beat", "mini_rant_beats"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 140, 3
-    elif shape == "bit_then_answer":
-        delivery, pace, pause_profile, segment_style = "bit_pop", "playful", "quick", "bit_then_answer"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 20, 120, 2
-    elif shape == "answer_then_bit":
-        delivery, pace, pause_profile, segment_style = "answer_first", "steady_playful", "answer_then_bit", "answer_then_bit"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 10, 120, 2
-    elif opening == "deadpan_aside" or reaction == "deadpan_aside":
-        delivery, pace, pause_profile, segment_style = "dry_playful", "measured", "dry_beat", "two_beat"
-        pre_pause_ms, inter_segment_pause_ms, max_segments = 40, 130, 2
-
-    if constraints["voice_style"] == "soft" and intent not in {"comfort", "closing", "low_interrupt_checkin"}:
-        delivery = "soft_clear"
-        pace = "slow" if pace == "normal" else pace
-    if safety["level"] == "safe_scene":
-        max_segments = min(max_segments, 2)
-    return _public_voice_director(
-        {
-            "delivery": delivery,
-            "pace": pace,
-            "pause_profile": pause_profile,
-            "segment_style": segment_style,
-            "pre_pause_ms": pre_pause_ms,
-            "inter_segment_pause_ms": inter_segment_pause_ms,
-            "max_segments": max_segments,
-            "suppressed_reasons": suppressed,
-        }
-    )
+    return _select_voice_director_impl(decision, deps=_director_deps())
 
 
 def _should_guard_context_bleed(intent: str, continuity: Optional[Dict[str, Any]]) -> bool:
@@ -1246,6 +1493,7 @@ def _public_continuity_state(state: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "updated_at": max(0, _safe_int(safe.get("updated_at"), 0)),
         "decay": _clean_text(safe.get("decay"), 40) or "fresh",
         "stage_memory": _public_stage_memory(safe),
+        "topic_stack": _public_topic_stack(safe),
     }
 
 
@@ -1263,6 +1511,7 @@ def normalize_brain_session_state(raw: Optional[Dict[str, Any]]) -> Dict[str, An
         "same_need_turns": max(0, min(20, _safe_int(src.get("same_need_turns"), 0))),
         "updated_at": max(0, _safe_int(src.get("updated_at"), 0)),
         "decay": _clean_text(src.get("decay"), 40) or "fresh",
+        "topic_stack": _public_topic_stack(src),
         "stage_current_bit": _clean_text(src.get("stage_current_bit") or stage_src.get("current_bit"), 48),
         "stage_recent_callback": _clean_text(src.get("stage_recent_callback") or stage_src.get("recent_callback"), 48),
         "stage_correction_state": _clean_text(
@@ -1360,6 +1609,7 @@ def decay_brain_session_state(
             "same_need_turns": 0,
             "updated_at": updated_at,
             "decay": "reset_after_idle",
+            "topic_stack": [],
             "stage_current_bit": "",
             "stage_recent_callback": "",
             "stage_correction_state": "none",
@@ -1390,6 +1640,7 @@ def update_brain_session_state(
     *,
     decision: Optional[Dict[str, Any]] = None,
     user_message: str = "",
+    assistant_reply: str = "",
     history: Optional[List[Dict[str, Any]]] = None,
     experience_profile: Optional[Dict[str, Any]] = None,
     now_ts: Optional[float] = None,
@@ -1453,6 +1704,15 @@ def update_brain_session_state(
         correction_state = "none"
     stage_agenda = _clean_text(improv.get("agenda"), 48) or _agenda_for_turn(intent, topic, user_message)
     stage_mini_agenda = stage_agenda if stage_agenda != "none" else _agenda_for_turn(intent, topic, user_message)
+    topic_stack = _update_topic_stack(
+        prev,
+        topic=topic,
+        intent=intent,
+        user_message=user_message,
+        assistant_reply=assistant_reply,
+        decision=decision,
+        now=now,
+    )
 
     return normalize_brain_session_state(
         {
@@ -1470,6 +1730,7 @@ def update_brain_session_state(
             "same_need_turns": same_need_turns,
             "updated_at": now,
             "decay": "fresh",
+            "topic_stack": topic_stack,
             "stage_current_bit": bit,
             "stage_recent_callback": recent_callback,
             "stage_correction_state": correction_state,
@@ -1751,6 +2012,7 @@ def build_character_brain_decision(
 ) -> Dict[str, Any]:
     thought_burst = _public_thought_burst_context(config)
     is_thought_burst = is_auto and thought_burst.get("enabled") is True
+    input_modality = _input_modality(config, is_auto=is_auto)
     if is_thought_burst:
         intent_scores = {"thought_burst": 999}
         intent = "thought_burst"
@@ -1760,6 +2022,9 @@ def build_character_brain_decision(
     emotion_state = emotion_state if isinstance(emotion_state, dict) else {}
     flags = _experience_flags(experience_profile)
     continuity = _public_continuity_state(session_state)
+    topic_stack = _public_topic_stack(session_state)
+    topic_reference = _build_topic_reference(user_message, topic_stack)
+    barge_in_policy = _detect_barge_in_reply_policy(user_message, config)
 
     decision: Dict[str, Any] = {
         "version": 1,
@@ -1778,6 +2043,11 @@ def build_character_brain_decision(
         "directive": "Reply as the same desktop character with a natural, low-interruption tone.",
         "history_tail": _history_tail_text(history or []),
         "continuity": continuity,
+        "topic_stack": topic_stack,
+        "topic_reference": topic_reference,
+        "barge_in_policy": _public_barge_in_policy(barge_in_policy),
+        "asr_status": _public_asr_status(config),
+        "input_modality": input_modality,
         "intent_scores": {key: value for key, value in intent_scores.items() if value > 0},
     }
 
@@ -1932,6 +2202,24 @@ def build_character_brain_decision(
     previous_intent = continuity.get("last_intent")
     same_need_turns = _safe_int(continuity.get("same_need_turns"), 0)
     topic = _derive_topic(user_message, intent)
+    if topic_reference["active"]:
+        move = topic_reference["reply_move"]
+        label = topic_reference["label"] or topic_reference["topic_id"] or "recent topic"
+        decision["relationship"] = "continuing_desktop_companion"
+        decision["reply_style"] = "topic_followup"
+        decision["question_policy"] = "none"
+        if move == "shorten":
+            decision["max_sentences"] = min(int(decision.get("max_sentences") or 3), 2)
+        elif move == "rephrase":
+            decision["max_sentences"] = min(int(decision.get("max_sentences") or 3), 2)
+        elif move == "repair":
+            decision["max_sentences"] = min(int(decision.get("max_sentences") or 3), 2)
+        elif move == "expand":
+            decision["max_sentences"] = min(max(2, int(decision.get("max_sentences") or 3)), 4)
+        decision["directive"] += (
+            f" Topic reference: the user is pointing back to {label}; "
+            f"apply reply_move={move} to that recent thread instead of treating the message as a new unrelated topic."
+        )
     if intent == "comfort" and previous_need == "reassurance":
         decision.update(
             relationship="trusted_desktop_companion",
@@ -2052,6 +2340,7 @@ def build_character_brain_decision(
     decision["stage_memory"] = stage_memory
     decision["safety_clamp"] = _public_safety_clamp(improv.get("safety_clamp"))
     _apply_improv_director_controls(decision, improv)
+    _apply_barge_in_policy_controls(decision)
     decision["directive"] += f" Style beat: {decision['style_beat_guide']}."
     decision["directive"] += (
         f" Reaction mode: {decision['reaction_mode_guide']} "
@@ -2074,6 +2363,27 @@ def build_character_brain_decision(
     decision["directive"] += " " + _character_flavor_directive(intent, topic)
 
     _apply_output_constraints(decision)
+    if input_modality == "voice" and not is_thought_burst:
+        voice_sentence_cap = 3 if intent == "task_help" else 2
+        decision["max_sentences"] = min(
+            int(decision.get("max_sentences") or voice_sentence_cap),
+            voice_sentence_cap,
+        )
+        constraints = decision.get("output_constraints")
+        if isinstance(constraints, dict):
+            constraints["max_sentences"] = min(
+                _safe_int(constraints.get("max_sentences"), voice_sentence_cap),
+                voice_sentence_cap,
+            )
+            if intent in {"greeting", "casual", "question", "encouragement"}:
+                constraints["allow_followup_question"] = False
+                constraints["clarify_only_when_needed"] = False
+        if intent in {"greeting", "casual", "question", "encouragement"}:
+            decision["question_policy"] = "none"
+        decision["directive"] += (
+            " Voice input mode: treat this as a spoken back-and-forth turn; use short natural beats, "
+            "avoid list formatting unless explicitly requested, and do not add a routine follow-up question."
+        )
 
     decision["emotion"] = _normalize_emotion(decision.get("emotion"))
     decision["action"] = _normalize_action(decision.get("action"))
@@ -2084,6 +2394,60 @@ def build_character_brain_decision(
     )
     decision["motion_director"] = _select_motion_director(decision)
     decision["voice_director"] = _select_voice_director(decision)
+    decision["conversation_director"] = _select_conversation_director(decision, config=config)
+    conv = decision["conversation_director"]
+    if conv["mode"] in {"asr_confirmation", "voice_asr_confirmation"}:
+        decision["max_sentences"] = 1
+        decision["question_policy"] = "clarify_only"
+        constraints = decision.get("output_constraints")
+        if isinstance(constraints, dict):
+            constraints["max_sentences"] = 1
+            constraints["allow_followup_question"] = True
+            constraints["clarify_only_when_needed"] = True
+    decision["directive"] += (
+        f" Conversation director: mode={conv['mode']}, turn_taking={conv['turn_taking']}, "
+        f"goal={conv['reply_goal']}, reply_move={conv['reply_move']}, initiative={conv['initiative']}, "
+        f"followup={conv['followup_policy']}, beats={conv['max_spoken_beats']}, "
+        f"interruption={conv['interruption_policy']}."
+    )
+    decision["directive"] += " Treat reply_move as the main social move for this turn; do not name it."
+    if conv["mode"] in {"free_chat", "voice_free_chat"}:
+        decision["directive"] += (
+            " Treat casual statements as valid conversation, not as support tickets. "
+            "React in one or two spoken beats with a tiny opinion, aside, or image; then let the user steer."
+        )
+    elif conv["mode"] in {"topic_followup", "voice_topic_followup"}:
+        ref = _public_topic_reference(decision.get("topic_reference"))
+        decision["directive"] += (
+            f" Topic follow-up target: {ref['label'] or ref['topic_id'] or 'recent topic'}. "
+            "Resolve pronouns like 'that', 'it', or '\u90a3\u4e2a' to this topic, and do not ask the user to restate it."
+        )
+    elif conv["mode"] in {"asr_confirmation", "voice_asr_confirmation"}:
+        decision["directive"] += (
+            " ASR uncertainty: the latest spoken text may be misrecognized. "
+            "Do not answer as if it is definite; ask one short, natural confirmation of what you think the user meant."
+        )
+    elif _public_barge_in_policy(decision.get("barge_in_policy")).get("active"):
+        barge = _public_barge_in_policy(decision.get("barge_in_policy"))
+        kind = barge["kind"]
+        move_instructions = {
+            "stop": "Acknowledge briefly if needed, then stop without continuing the old answer.",
+            "correction": "Repair the mismatch plainly and do not defend the interrupted wording.",
+            "shorten": "Compress the interrupted point into the shorter answer the user asked for.",
+            "rephrase": "Restate the interrupted point in different words without adding new bulk.",
+            "continue": "Continue only the interrupted thread the user asked for, then yield.",
+            "supplement": "Fold the user's new addition into the current thread and answer the combined point.",
+            "new_topic": "Answer the latest user message and do not resume the interrupted answer.",
+        }
+        decision["directive"] += " " + move_instructions.get(
+            kind,
+            "Treat the interruption naturally and answer the latest user message first.",
+        )
+    elif conv["mode"] in {"barge_in_recovery", "voice_barge_in_recovery"}:
+        decision["directive"] += (
+            " The user interrupted the previous assistant turn; yield naturally, answer the latest user message first, "
+            "and do not resume the interrupted answer unless the user asks."
+        )
     return decision
 
 
@@ -2096,6 +2460,20 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
     safety_clamp = _public_safety_clamp(
         decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
     )
+    conversation_director = _public_conversation_director(
+        decision.get("conversation_director") if isinstance(decision.get("conversation_director"), dict) else {}
+    )
+    topic_stack = _public_topic_stack(decision.get("topic_stack") or continuity.get("topic_stack"))
+    topic_reference = _public_topic_reference(
+        decision.get("topic_reference") if isinstance(decision.get("topic_reference"), dict) else {}
+    )
+    barge_in_policy = _public_barge_in_policy(
+        decision.get("barge_in_policy") if isinstance(decision.get("barge_in_policy"), dict) else {}
+    )
+    topic_stack_summary = "; ".join(
+        f"{item['topic_id']}:{item['label']}({item['turns']})"
+        for item in topic_stack[:TOPIC_STACK_LIMIT]
+    ) or "none"
     motion_director = _public_motion_director(
         decision.get("motion_director") if isinstance(decision.get("motion_director"), dict) else {}
     )
@@ -2109,6 +2487,10 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
         f"Intent: {_clean_text(decision.get('intent'), 40)}",
         f"Character state: energy={_clean_text(decision.get('energy'), 24)}, attention={_clean_text(decision.get('attention'), 24)}, relationship={_clean_text(decision.get('relationship'), 40)}",
         f"Session continuity: last_intent={continuity.get('last_intent') or 'none'}, last_topic={continuity.get('last_topic') or 'none'}, mood_baseline={continuity.get('mood_baseline')}, recent_user_need={continuity.get('recent_user_need') or 'none'}, same_need_turns={continuity.get('same_need_turns')}, decay={continuity.get('decay')}",
+        f"Conversation director: mode={conversation_director['mode']}, turn_taking={conversation_director['turn_taking']}, goal={conversation_director['reply_goal']}, reply_move={conversation_director['reply_move']}, initiative={conversation_director['initiative']}, followup={conversation_director['followup_policy']}, beats={conversation_director['max_spoken_beats']}, interruption={conversation_director['interruption_policy']}",
+        f"Topic reference: active={str(topic_reference['active']).lower()}, move={topic_reference['reply_move']}, target={topic_reference['topic_id'] or 'none'}, label={topic_reference['label'] or 'none'}, reason={topic_reference['reason'] or 'none'}",
+        f"Barge-in policy: active={str(barge_in_policy['active']).lower()}, kind={barge_in_policy['kind']}, reply_move={barge_in_policy['reply_move']}, goal={barge_in_policy['goal'] or 'none'}",
+        f"Topic stack: {topic_stack_summary}",
         f"Improv: stance={improv['stance']}, chaos={improv['chaos_level']}/3, callback_policy={improv['callback_policy']}, agenda={improv['agenda']}",
         f"Stage memory: current_bit={stage_memory.get('current_bit') or 'none'}, recent_callback={stage_memory.get('recent_callback') or 'none'}, mini_agenda={stage_memory.get('mini_agenda') or stage_memory.get('agenda') or 'none'}, correction={stage_memory.get('correction_state')}, cooldown={stage_memory.get('callback_cooldown_turns')}, turns_since_callback={stage_memory.get('turns_since_callback')}",
         f"Safety clamp: level={safety_clamp['level']}, reason={safety_clamp['reason'] or 'none'}",
@@ -2693,6 +3075,62 @@ def _reply_contains_selected_bit(text: str, performance_bit: str) -> bool:
     return any(marker in lower for marker in markers)
 
 
+def _reply_quality_deps() -> Dict[str, Any]:
+    return {
+        "clean_text": _clean_text,
+        "safe_int": _safe_int,
+        "normalize_reply_text_spacing": _normalize_reply_text_spacing,
+        "split_reply_sentences": _split_reply_sentences,
+        "public_conversation_director": _public_conversation_director,
+        "public_barge_in_policy": _public_barge_in_policy,
+        "normalize_question_policy": _normalize_question_policy,
+        "is_generic_followup_sentence": _is_generic_followup_sentence,
+        "looks_like_bland_character_reply": _looks_like_bland_character_reply,
+        "looks_like_scene_policy_violation": _looks_like_scene_policy_violation,
+        "looks_like_context_bleed_reply": _looks_like_context_bleed_reply,
+        "fallback_reply_for_intent": _fallback_reply_for_intent,
+        "remove_unwanted_questions": _remove_unwanted_questions,
+        "filter_policy_closers": _filter_policy_closers,
+        "compact_one_liner": _compact_one_liner,
+    }
+
+
+def _public_reply_quality(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    return _public_reply_quality_impl(value)
+
+
+def _assess_reply_quality(
+    text: str,
+    decision: Dict[str, Any],
+    *,
+    user_message: str = "",
+    original: str = "",
+) -> Dict[str, Any]:
+    return _assess_reply_quality_impl(
+        text,
+        decision,
+        user_message=user_message,
+        original=original,
+        deps=_reply_quality_deps(),
+    )
+
+
+def _apply_reply_quality_repair(
+    text: str,
+    decision: Dict[str, Any],
+    *,
+    user_message: str = "",
+    original: str = "",
+) -> tuple[str, Dict[str, Any]]:
+    return _apply_reply_quality_repair_impl(
+        text,
+        decision,
+        user_message=user_message,
+        original=original,
+        deps=_reply_quality_deps(),
+    )
+
+
 def _record_performance_execution(
     decision: Optional[Dict[str, Any]],
     *,
@@ -2706,10 +3144,12 @@ def _record_performance_execution(
     before_sentence_count: int,
     after_sentence_count: int,
     stage_callback: Optional[Dict[str, Any]] = None,
+    reply_quality: Optional[Dict[str, Any]] = None,
 ) -> None:
     if not isinstance(decision, dict):
         return
     callback_plan = stage_callback if isinstance(stage_callback, dict) else {}
+    quality = _public_reply_quality(reply_quality)
     decision["performance_execution"] = {
         "reply_shape": _normalize_reply_shape(reply_shape),
         "question_policy": _normalize_question_policy(question_policy),
@@ -2728,7 +3168,11 @@ def _record_performance_execution(
         "stage_callback_added": callback_plan.get("added") is True,
         "stage_callback_suppressed": _clean_text(callback_plan.get("suppressed"), 48),
         "stage_callback_bit": _clean_text(callback_plan.get("bit"), 48),
+        "quality_score": quality["score"],
+        "quality_issues": quality["issues"],
+        "quality_repair_actions": quality["repair_actions"],
     }
+    decision["reply_quality"] = quality
 
 
 def apply_character_brain_reply_constraints(
@@ -2773,6 +3217,12 @@ def apply_character_brain_reply_constraints(
                 removed_context_bleed=True,
                 before_sentence_count=before_sentence_count,
                 after_sentence_count=len(_split_reply_sentences(constrained)),
+                reply_quality=_assess_reply_quality(
+                    constrained,
+                    decision,
+                    user_message=user_message,
+                    original=original,
+                ),
             )
             return constrained + meta
     if (context_bleed_guard.get("active") is True or context_bleed_sensitive) and _looks_like_context_bleed_reply(original, intent, user_message):
@@ -2790,6 +3240,12 @@ def apply_character_brain_reply_constraints(
                 removed_context_bleed=True,
                 before_sentence_count=before_sentence_count,
                 after_sentence_count=len(_split_reply_sentences(constrained)),
+                reply_quality=_assess_reply_quality(
+                    constrained,
+                    decision,
+                    user_message=user_message,
+                    original=original,
+                ),
             )
             return constrained + meta
     sentences = _remove_unwanted_questions(
@@ -2865,6 +3321,18 @@ def apply_character_brain_reply_constraints(
         user_message=user_message,
     )
     constrained = _normalize_reply_text_spacing(stage_callback.get("text") or constrained)
+    constrained, reply_quality = _apply_reply_quality_repair(
+        constrained,
+        decision,
+        user_message=user_message,
+        original=original,
+    )
+    if reply_quality["repair_actions"] and stage_callback.get("added") is True:
+        stage_callback = {
+            **stage_callback,
+            "added": False,
+            "suppressed": "quality_repair",
+        }
     _record_performance_execution(
         decision,
         reply_shape=reply_shape,
@@ -2880,6 +3348,7 @@ def apply_character_brain_reply_constraints(
         before_sentence_count=before_sentence_count,
         after_sentence_count=len(_split_reply_sentences(constrained)),
         stage_callback=stage_callback,
+        reply_quality=reply_quality,
     )
     return constrained + meta
 
@@ -2921,6 +3390,17 @@ def build_character_brain_public_snapshot(
         "stage_callback_added": raw_execution.get("stage_callback_added") is True,
         "stage_callback_suppressed": _clean_text(raw_execution.get("stage_callback_suppressed"), 48),
         "stage_callback_bit": _clean_text(raw_execution.get("stage_callback_bit"), 48),
+        "quality_score": max(0, min(100, _safe_int(raw_execution.get("quality_score"), 100))),
+        "quality_issues": [
+            _clean_text(item, 48)
+            for item in (raw_execution.get("quality_issues") if isinstance(raw_execution.get("quality_issues"), list) else [])[:8]
+            if _clean_text(item, 48)
+        ],
+        "quality_repair_actions": [
+            _clean_text(item, 48)
+            for item in (raw_execution.get("quality_repair_actions") if isinstance(raw_execution.get("quality_repair_actions"), list) else [])[:8]
+            if _clean_text(item, 48)
+        ],
     }
     return {
         "version": 1,
@@ -2938,6 +3418,8 @@ def build_character_brain_public_snapshot(
         "attention": _clean_text(decision.get("attention"), 24),
         "relationship": _clean_text(decision.get("relationship"), 40),
         "max_sentences": max(1, min(8, int(decision.get("max_sentences") or 3))),
+        "input_modality": _input_modality({"_input_modality": decision.get("input_modality")}),
+        "asr_status": _public_asr_status({"_conversation_context": {"asr": decision.get("asr_status")}}),
         "emotion": _normalize_emotion(decision.get("emotion")),
         "action": _normalize_action(decision.get("action")),
         "intensity": _normalize_intensity(decision.get("intensity")),
@@ -2955,7 +3437,20 @@ def build_character_brain_public_snapshot(
             else {}
         ),
         "performance_execution": execution,
+        "reply_quality": _public_reply_quality(decision.get("reply_quality")),
         "output_constraints": _public_output_constraints(decision.get("output_constraints")),
+        "topic_reference": _public_topic_reference(
+            decision.get("topic_reference") if isinstance(decision.get("topic_reference"), dict) else {}
+        ),
+        "barge_in_policy": _public_barge_in_policy(
+            decision.get("barge_in_policy") if isinstance(decision.get("barge_in_policy"), dict) else {}
+        ),
+        "topic_stack": _public_topic_stack(
+            session_state if isinstance(session_state, dict) else decision.get("topic_stack")
+        ),
+        "conversation_director": _public_conversation_director(
+            decision.get("conversation_director") if isinstance(decision.get("conversation_director"), dict) else {}
+        ),
         "improv": _public_improv_director(decision.get("improv") if isinstance(decision.get("improv"), dict) else {}),
         "stage_memory": _public_stage_memory(
             session_state

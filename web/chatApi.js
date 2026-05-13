@@ -12,12 +12,34 @@
     // optional hook
   }
 
-  function buildChatRequestInit(payload) {
-    return {
+  function buildChatRequestInit(payload, options = {}) {
+    const init = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     };
+    if (options && options.signal) {
+      init.signal = options.signal;
+    }
+    return init;
+  }
+
+  function isAbortLikeError(err, signal = null) {
+    return err?.name === "AbortError"
+      || (signal && signal.aborted === true)
+      || /abort/i.test(String(err?.message || ""));
+  }
+
+  function makeAbortError() {
+    const err = new Error("Chat request aborted");
+    err.name = "AbortError";
+    return err;
+  }
+
+  function throwIfAborted(signal) {
+    if (signal && signal.aborted === true) {
+      throw makeAbortError();
+    }
   }
 
   function describeError(err) {
@@ -191,10 +213,13 @@
     const onCharacterBrainDecision = typeof options.onCharacterBrainDecision === "function"
       ? options.onCharacterBrainDecision
       : () => {};
-    const requestInit = buildChatRequestInit(payload);
+    const signal = options.signal || null;
+    const requestInit = buildChatRequestInit(payload, { signal });
 
     const fetchDirectChat = async (fallbackReason = "") => {
+      throwIfAborted(signal);
       const directResp = await authFetch("/api/chat", requestInit);
+      throwIfAborted(signal);
       if (perfHooks && typeof perfHooks.onApiHeaders === "function") {
         perfHooks.onApiHeaders({
           mode: fallbackReason ? `chat_fallback:${fallbackReason}` : "chat",
@@ -216,9 +241,15 @@
     };
 
     const fetchDirectChatOrThrowCombined = async (fallbackReason, primaryErr) => {
+      if (isAbortLikeError(primaryErr, signal)) {
+        throw primaryErr || makeAbortError();
+      }
       try {
         return await fetchDirectChat(fallbackReason);
       } catch (fallbackErr) {
+        if (isAbortLikeError(fallbackErr, signal)) {
+          throw fallbackErr || makeAbortError();
+        }
         throw buildFallbackFailureError(primaryErr, fallbackErr);
       }
     };
@@ -232,8 +263,13 @@
 
     let resp;
     try {
+      throwIfAborted(signal);
       resp = await authFetch("/api/chat_stream", requestInit);
+      throwIfAborted(signal);
     } catch (err) {
+      if (isAbortLikeError(err, signal)) {
+        throw err || makeAbortError();
+      }
       perfLog("chat", "stream_fallback", {
         reason: "stream_fetch_error",
         error: String(err?.message || err || "")
@@ -289,8 +325,12 @@
         now: getNow,
         firstDeltaTimeoutMs
       });
+      throwIfAborted(signal);
       return result.reply;
     } catch (err) {
+      if (isAbortLikeError(err, signal)) {
+        throw err || makeAbortError();
+      }
       if (!err || err.seenFirstDelta !== true) {
         perfLog("chat", "stream_fallback", {
           reason: "stream_read_error_before_delta",

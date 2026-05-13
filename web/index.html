@@ -175,6 +175,21 @@
       </div>
 
       <div class="config-switch-body">
+        <div class="config-switch-summary" aria-live="polite">
+          <div class="config-switch-summary-item">
+            <span>LLM</span>
+            <strong id="config-switch-summary-llm">-</strong>
+          </div>
+          <div class="config-switch-summary-item">
+            <span>TTS</span>
+            <strong id="config-switch-summary-tts">-</strong>
+          </div>
+          <div class="config-switch-summary-item">
+            <span>Live2D</span>
+            <strong id="config-switch-summary-live2d">-</strong>
+          </div>
+        </div>
+
         <section class="config-switch-section">
           <div class="config-switch-section-title">聊天模型</div>
           <div class="config-switch-grid">
@@ -216,15 +231,35 @@
                 <option value="browser">浏览器语音</option>
                 <option value="edge_tts">Edge TTS</option>
                 <option value="gpt_sovits">GPT-SoVITS</option>
+                <option value="volcengine_tts">Volcengine TTS</option>
               </select>
             </label>
             <label class="config-switch-field">
               <span>音色 / Voice</span>
               <input id="config-switch-tts-voice" type="text" spellcheck="false" />
             </label>
+            <label class="config-switch-field">
+              <span>Stream Mode</span>
+              <select id="config-switch-tts-stream-mode">
+                <option value="realtime">Realtime</option>
+                <option value="final_only">Final only</option>
+              </select>
+            </label>
             <label id="config-switch-gpt-sovits-row" class="config-switch-field config-switch-field-wide">
               <span>GPT-SoVITS 地址</span>
               <input id="config-switch-gpt-sovits-url" type="url" spellcheck="false" />
+            </label>
+            <label id="config-switch-gpt-sovits-timeout-row" class="config-switch-field">
+              <span>GPT-SoVITS Timeout</span>
+              <input id="config-switch-gpt-sovits-timeout" type="number" min="1" max="180" step="1" />
+            </label>
+            <label id="config-switch-volcengine-url-row" class="config-switch-field config-switch-field-wide">
+              <span>Volcengine API URL</span>
+              <input id="config-switch-volcengine-url" type="url" spellcheck="false" />
+            </label>
+            <label id="config-switch-volcengine-cluster-row" class="config-switch-field">
+              <span>Volcengine Cluster</span>
+              <input id="config-switch-volcengine-cluster" type="text" spellcheck="false" />
             </label>
             <label class="config-switch-check">
               <input id="config-switch-tts-browser-fallback" type="checkbox" />
@@ -232,11 +267,41 @@
             </label>
           </div>
         </section>
+
+        <section class="config-switch-section">
+          <div class="config-switch-section-title">Live2D 模型</div>
+          <div class="config-switch-grid">
+            <label class="config-switch-field">
+              <span>Detected Model</span>
+              <select id="config-switch-live2d-preset">
+                <option value="__custom_live2d__">Custom path</option>
+              </select>
+            </label>
+            <label class="config-switch-field config-switch-field-wide">
+              <span>model_path</span>
+              <input id="config-switch-live2d-model-path" type="text" spellcheck="false" />
+            </label>
+            <label class="config-switch-field">
+              <span>Scale</span>
+              <input id="config-switch-live2d-scale" type="number" min="0.1" max="3" step="0.01" />
+            </label>
+            <label class="config-switch-field">
+              <span>X Ratio</span>
+              <input id="config-switch-live2d-x-ratio" type="number" min="0" max="1" step="0.01" />
+            </label>
+            <label class="config-switch-field">
+              <span>Y Ratio</span>
+              <input id="config-switch-live2d-y-ratio" type="number" min="0" max="1" step="0.01" />
+            </label>
+          </div>
+          <div id="config-switch-live2d-report" class="config-switch-live2d-report" aria-live="polite"></div>
+        </section>
       </div>
 
       <div class="config-switch-actions">
         <button id="config-switch-test-llm-btn" type="button">测试模型</button>
         <button id="config-switch-test-tts-btn" type="button">测试语音</button>
+        <button id="config-switch-test-live2d-btn" type="button">检查模型</button>
         <button id="config-switch-save-btn" class="config-switch-primary-btn" type="button">保存配置</button>
       </div>
       <div id="config-switch-status" class="config-switch-status" aria-live="polite"></div>
@@ -732,8 +797,9 @@
     <script src="./characterTuning.js"></script>
     <script src="./characterBrainDebug.js"></script>
     <script src="./characterExperienceController.js"></script>
-    <script src="./characterDiagnosticsController.js"></script>
+  <script src="./characterDiagnosticsController.js"></script>
   <script src="./devFeatureLoader.js"></script>
+  <script src="./chatControllerDelegates.js"></script>
   <script src="./chat.js"></script>
   <script src="./configSwitchController.js"></script>
   <script src="./firstRunWizardController.js"></script>

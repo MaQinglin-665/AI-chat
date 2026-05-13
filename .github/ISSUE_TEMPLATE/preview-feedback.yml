@@ -8,6 +8,7 @@ body:
     attributes:
       value: |
         Thanks for testing Xinyu. Please remove API keys, tokens, raw prompts, raw history, private file paths, and private desktop screenshots before sharing logs or screenshots.
+        中文测试者也可以先参考 docs/first-run-feedback.md 整理反馈重点，再填写本表单。
 
   - type: dropdown
     id: package_source

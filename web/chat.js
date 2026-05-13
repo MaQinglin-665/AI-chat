@@ -1423,6 +1423,35 @@ function buildCharacterBrainDebugReport() {
   return appendInterjectionDebug("Character brain status\n\nCharacter brain debug module is unavailable.");
 }
 
+function buildTurnDebugReport() {
+  const decision = state.turnManagerLastDecision && typeof state.turnManagerLastDecision === "object" && !Array.isArray(state.turnManagerLastDecision)
+    ? state.turnManagerLastDecision
+    : null;
+  const plan = state.activeAssistantSpeechPlan && typeof state.activeAssistantSpeechPlan === "object" && !Array.isArray(state.activeAssistantSpeechPlan)
+    ? state.activeAssistantSpeechPlan
+    : null;
+  const segments = Array.isArray(plan?.segments) ? plan.segments.slice(0, 4) : [];
+  const activeIndex = Number(state.activeAssistantSpeechSegmentIndex || 0);
+  const lines = [
+    "Turn debug:",
+    `chatBusy=${state.chatBusy === true}`,
+    `speechActive=${state.ttsContextSpeaking === true || state.streamSpeakWorking === true || String(state.speechPhase || "").toLowerCase() === "speaking"}`,
+    `lastAction=${decision?.action || "none"}; reason=${decision?.reason || "none"}; waitMs=${Number(decision?.wait_ms || 0)}`,
+    `protectedKey=${decision?.protected_key_sentence === true}; segment=${activeIndex}/${Number(plan?.total_segments || segments.length || 0)}; role=${state.activeAssistantSpeechSegmentRole || decision?.segment_role || "none"}`,
+    `policy=${plan?.interruption_policy || decision?.interruption_policy || "none"}; replyMove=${plan?.reply_move || decision?.reply_move || "none"}`,
+    `nextBargeIn=${decision?.barge_in_kind || "none"}; nextMove=${decision?.next_reply_move || "none"}; nextGoal=${decision?.next_reply_goal || "none"}`
+  ];
+  if (segments.length) {
+    lines.push("segments:");
+    for (const item of segments) {
+      lines.push(`#${item.index} role=${item.role} protected=${item.protected === true} reason=${item.reason || "none"} text=${item.text_excerpt || ""}`);
+    }
+  } else {
+    lines.push("segments=none");
+  }
+  return lines.join("\n");
+}
+
 function buildAutoChatInterjectionDebugReport() {
   const context = state.autoChatInterjectionLastContext;
   const safeContext = context && typeof context === "object" && !Array.isArray(context) ? context : null;
@@ -1686,6 +1715,7 @@ const PERFORMANCE_TIMELINE_CONTROLLER = window.TaffyPerformanceTimelineControlle
 const LIVE2D_RUNTIME_CONTROLLER = window.TaffyLive2DRuntimeController || {};
 const LIVE2D_LAYOUT_CONTROLLER = window.TaffyLive2DLayoutController || {};
 const LIVE2D_EXPRESSION_CONTROLLER = window.TaffyLive2DExpressionController || {};
+const CHAT_CONTROLLER_DELEGATES = window.TaffyChatControllerDelegates || {};
 const PERSONA_CARD_DEFAULT = {
   character_name: "馨语",
   user_alias: "",
@@ -1852,14 +1882,14 @@ const MOTION_INTENSITY_PRESETS = {
   },
   normal: {
     idleIntervalScale: 1.0,
-    talkChance: 0.82,
-    comboChance: 0.4,
+    talkChance: 0.9,
+    comboChance: 0.46,
     tapChance: 0.92,
     listenChance: 0.8,
     thinkingComboChance: 0.46,
     idleComboChance: 0.3,
-    replyAccentChance: 0.42,
-    talkMaxBeats: 3
+    replyAccentChance: 0.5,
+    talkMaxBeats: 4
   },
   high: {
     idleIntervalScale: 0.76,
@@ -2833,6 +2863,7 @@ function getLocalCommandHandlers() {
       reloadMemoryDebugData,
       buildMemoryDebugReport,
       buildCharacterBrainDebugReport,
+      buildTurnDebugReport,
       buildEmotionReportText,
       buildSpeakProsody,
       speak,
@@ -2972,6 +3003,25 @@ function escapeRegExp(text) {
   return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function compactAsrHotword(text) {
+  return String(text || "").replace(/\s+/g, "").trim();
+}
+
+function hasCjkText(text) {
+  return /[\u4e00-\u9fff]/.test(String(text || ""));
+}
+
+function buildFlexibleAsrHotwordPattern(text, forceFlexible = false) {
+  const compact = compactAsrHotword(text);
+  if (!compact) {
+    return "";
+  }
+  if (!forceFlexible && !hasCjkText(compact)) {
+    return escapeRegExp(String(text || "").trim());
+  }
+  return Array.from(compact).map((ch) => escapeRegExp(ch)).join("\\s*");
+}
+
 function buildAsrHotwordRules(raw) {
   if (!raw || typeof raw !== "object") {
     return [];
@@ -2983,7 +3033,20 @@ function buildAsrHotwordRules(raw) {
   return entries.map(([from, to]) => ({
     from,
     to,
-    regex: new RegExp(escapeRegExp(from), "gi")
+    regex: (() => {
+      const fromCompact = compactAsrHotword(from);
+      const toCompact = compactAsrHotword(to);
+      let source = buildFlexibleAsrHotwordPattern(from);
+      if (
+        fromCompact &&
+        toCompact.toLowerCase().startsWith(fromCompact.toLowerCase()) &&
+        toCompact.length > fromCompact.length
+      ) {
+        const suffix = toCompact.slice(fromCompact.length);
+        source += `(?!\\s*${buildFlexibleAsrHotwordPattern(suffix, true)})`;
+      }
+      return new RegExp(source, "gi");
+    })()
   }));
 }
 
@@ -3013,6 +3076,7 @@ function getLocalAsrController() {
       clampNumber,
       applyAsrHotwordCorrections,
       requestAssistantReply,
+      handleUserSpeechStart,
       scheduleWakeWordStart,
       stopWakeWordListener,
       setupWakeWordRecognition
@@ -3157,8 +3221,8 @@ function resumeMicAfterAssistant() {
   return getLocalAsrController().resumeMicAfterAssistant();
 }
 
-function enqueueMicTranscript(text, sessionId = null) {
-  return getLocalAsrController().enqueueMicTranscript(text, sessionId);
+function enqueueMicTranscript(text, sessionId = null, opts = {}) {
+  return getLocalAsrController().enqueueMicTranscript(text, sessionId, opts);
 }
 
 async function runMicQueue() {
@@ -4210,89 +4274,123 @@ function setupSpeechRecognition() { return getWakeWordController().setupSpeechRe
 
 let chatReplyController = null;
 
+function createChatReplyControllerDeps() {
+  return {
+    state,
+    ui,
+    windowObject: window,
+    performanceObject: performance,
+    authFetch,
+    createPerfTraceId,
+    perfLog,
+    handleCharacterRuntimeMetadata,
+    handleCharacterBrainDecision,
+    appendMessage,
+    rememberMessage,
+    detectMood,
+    resolveTalkStyle,
+    enqueueActionIntent,
+    stopWakeWordListener,
+    pauseMicForAssistant,
+    resumeMicAfterAssistant,
+    setStatus,
+    shouldUseStreamSpeak,
+    stopAllAudioPlayback,
+    shouldPlayLatencyHint,
+    pickLatencyHintText,
+    buildSpeakProsody,
+    speak,
+    requestServerTTSBlobWithRetry,
+    playAudioBlob,
+    clearThinkingMotionTimer,
+    shouldAttachDesktopImage,
+    captureDesktopSnapshot,
+    parseToolMetaFromText,
+    setMessageText,
+    feedStreamSpeakDelta,
+    normalizeAssistantVisibleText,
+    finalizePendingMessageRow,
+    updateConversationFollowupState,
+    maybeSendAssistantMoodSticker,
+    scheduleAutoChatInterjectionAfterTurn,
+    recordEmotion,
+    previewAssistantReplyCharacterCueCandidate,
+    maybeAutoApplyAssistantReplyCharacterCueCandidate,
+    normalizeTalkStyle,
+    normalizeRuntimeVoiceStyle,
+    runtimeVoiceStyleToTalkStyle,
+    applyPerformanceControlsToRuntimeHint,
+    buildPerformanceTimeline,
+    rememberPerformanceTimeline,
+    buildVoiceTimeline,
+    buildVoiceSpeechSegments,
+    rememberVoiceTimeline,
+    applyVoiceDirectorProsody,
+    clearPerformanceTimelineTimers,
+    executePerformanceTimelinePhase,
+    schedulePerformanceTimelineSpeechBeats,
+    startPerformanceAudit,
+    recordPerformanceAuditEvent,
+    finishPerformanceAudit,
+    persistCharacterBrainSnapshot: saveCharacterBrainSnapshotToStorage,
+    triggerExpressionPulse,
+    flushStreamSpeak,
+    scheduleFinalSpeechWatchdog,
+    buildStableSpeakText,
+    maybePlayTalkGesture,
+    discardQueuedStreamSpeakItems,
+    recordTTSDebugEvent,
+    buildChatFailureDoctorHint,
+    getCharacterExperienceRequestProfile,
+    scheduleWakeWordStart,
+    updateMicButton,
+    handleLocalCommand,
+    buildAttachmentContextText,
+    buildAttachmentDisplaySuffix,
+    clearPendingAttachments
+  };
+}
+
+const getChatReplyControllerDelegate =
+  typeof CHAT_CONTROLLER_DELEGATES.createLazyControllerGetter === "function"
+    ? CHAT_CONTROLLER_DELEGATES.createLazyControllerGetter({
+        fallback: CHAT_REPLY_CONTROLLER,
+        canCreate: () => typeof CHAT_REPLY_CONTROLLER.createController === "function",
+        create: () => {
+          chatReplyController = CHAT_REPLY_CONTROLLER.createController(createChatReplyControllerDeps());
+          return chatReplyController;
+        }
+      })
+    : null;
+
 function getChatReplyController() {
+  if (getChatReplyControllerDelegate) {
+    chatReplyController = getChatReplyControllerDelegate();
+    return chatReplyController || CHAT_REPLY_CONTROLLER;
+  }
   if (!chatReplyController && typeof CHAT_REPLY_CONTROLLER.createController === "function") {
-    chatReplyController = CHAT_REPLY_CONTROLLER.createController({
-      state,
-      ui,
-      windowObject: window,
-      performanceObject: performance,
-      authFetch,
-      createPerfTraceId,
-      perfLog,
-      handleCharacterRuntimeMetadata,
-      handleCharacterBrainDecision,
-      appendMessage,
-      rememberMessage,
-      detectMood,
-      resolveTalkStyle,
-      enqueueActionIntent,
-      stopWakeWordListener,
-      pauseMicForAssistant,
-      resumeMicAfterAssistant,
-      setStatus,
-      shouldUseStreamSpeak,
-      stopAllAudioPlayback,
-      shouldPlayLatencyHint,
-      pickLatencyHintText,
-      buildSpeakProsody,
-      speak,
-      requestServerTTSBlobWithRetry,
-      playAudioBlob,
-      clearThinkingMotionTimer,
-      shouldAttachDesktopImage,
-      captureDesktopSnapshot,
-      parseToolMetaFromText,
-      setMessageText,
-      feedStreamSpeakDelta,
-      normalizeAssistantVisibleText,
-      finalizePendingMessageRow,
-      updateConversationFollowupState,
-      maybeSendAssistantMoodSticker,
-      scheduleAutoChatInterjectionAfterTurn,
-      recordEmotion,
-      previewAssistantReplyCharacterCueCandidate,
-      maybeAutoApplyAssistantReplyCharacterCueCandidate,
-      normalizeTalkStyle,
-      normalizeRuntimeVoiceStyle,
-      runtimeVoiceStyleToTalkStyle,
-      applyPerformanceControlsToRuntimeHint,
-      buildPerformanceTimeline,
-      rememberPerformanceTimeline,
-      buildVoiceTimeline,
-      buildVoiceSpeechSegments,
-      rememberVoiceTimeline,
-      applyVoiceDirectorProsody,
-      clearPerformanceTimelineTimers,
-      executePerformanceTimelinePhase,
-      schedulePerformanceTimelineSpeechBeats,
-      startPerformanceAudit,
-      recordPerformanceAuditEvent,
-      finishPerformanceAudit,
-      persistCharacterBrainSnapshot: saveCharacterBrainSnapshotToStorage,
-      triggerExpressionPulse,
-      flushStreamSpeak,
-      scheduleFinalSpeechWatchdog,
-      buildStableSpeakText,
-      maybePlayTalkGesture,
-      discardQueuedStreamSpeakItems,
-      recordTTSDebugEvent,
-      buildChatFailureDoctorHint,
-      getCharacterExperienceRequestProfile,
-      scheduleWakeWordStart,
-      updateMicButton,
-      handleLocalCommand,
-      buildAttachmentContextText,
-      buildAttachmentDisplaySuffix,
-      clearPendingAttachments
-    });
+    chatReplyController = CHAT_REPLY_CONTROLLER.createController(createChatReplyControllerDeps());
   }
   return chatReplyController || CHAT_REPLY_CONTROLLER;
 }
 
-async function streamAssistantReply(payload, onDelta, perfHooks = null) { return getChatReplyController().streamAssistantReply(payload, onDelta, perfHooks); }
-async function requestAssistantReply(text, opts = {}) { return getChatReplyController().requestAssistantReply(text, opts); }
-async function sendChat() { return getChatReplyController().sendChat(); }
+function invokeChatReplyController(methodName, args = [], fallback) {
+  if (typeof CHAT_CONTROLLER_DELEGATES.invoke === "function") {
+    return CHAT_CONTROLLER_DELEGATES.invoke(getChatReplyController, methodName, args, fallback);
+  }
+  const controller = getChatReplyController();
+  const method = controller && controller[methodName];
+  if (typeof method === "function") {
+    return method.apply(controller, args);
+  }
+  return typeof fallback === "function" ? fallback() : fallback;
+}
+
+async function streamAssistantReply(payload, onDelta, perfHooks = null) { return invokeChatReplyController("streamAssistantReply", [payload, onDelta, perfHooks]); }
+async function requestAssistantReply(text, opts = {}) { return invokeChatReplyController("requestAssistantReply", [text, opts]); }
+function interruptActiveChatTurn(reason = "user_input") { return invokeChatReplyController("interruptActiveChatTurn", [reason]); }
+function handleUserSpeechStart(input = {}) { return invokeChatReplyController("handleUserSpeechStart", [input]); }
+async function sendChat() { return invokeChatReplyController("sendChat"); }
 
 function snapshotPendingLocalAsr() {
   const chunks = Array.isArray(state.localAsrBuffers) ? state.localAsrBuffers.slice() : [];
@@ -4308,38 +4406,7 @@ async function waitLocalAsrSendingDone(timeoutMs = 700) {
 }
 
 async function transcribeSnapshotAfterMicClose(snapshot) {
-  if (!snapshot || !Array.isArray(snapshot.chunks) || snapshot.chunks.length === 0) {
-    return false;
-  }
-  const minCloseMs = Math.max(90, Math.min(state.localAsrMinSpeechMs || 180, 220));
-  if ((Number(snapshot.speechMs) || 0) < minCloseMs) {
-    return false;
-  }
-  try {
-    const text = await transcribeLocalPcmChunks(snapshot.chunks);
-    const corrected = applyAsrHotwordCorrections(text);
-    if (!corrected) {
-      return false;
-    }
-    let spins = 0;
-    while (state.chatBusy && spins < 50) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      spins += 1;
-    }
-    if (state.chatBusy) {
-      return false;
-    }
-    await requestAssistantReply(corrected, {
-      showUser: true,
-      rememberUser: true,
-      auto: false,
-      silentError: false
-    });
-    return true;
-  } catch (err) {
-    console.warn("transcribeSnapshotAfterMicClose failed:", err);
-    return false;
-  }
+  return getLocalAsrController().transcribeSnapshotAfterMicClose(snapshot);
 }
 
 async function toggleMicOpen() {

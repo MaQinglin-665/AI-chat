@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import re
@@ -16,6 +17,13 @@ from config import (
     OPENAI_DEFAULT_KEY_ENV,
     OPENAI_DEFAULT_MODEL,
     TTS_DEFAULT_VOICE,
+    VOLCENGINE_ACCESS_TOKEN_ENV,
+    VOLCENGINE_APP_ID_ENV,
+    VOLCENGINE_SECRET_KEY_ENV,
+    VOLCENGINE_TTS_DEFAULT_API_URL,
+    VOLCENGINE_TTS_DEFAULT_CLUSTER,
+    VOLCENGINE_TTS_DEFAULT_VOICE,
+    WEB_DIR,
 )
 
 
@@ -80,6 +88,15 @@ TTS_PRESETS = {
         "voice": TTS_DEFAULT_VOICE,
         "server_tts_provider": True,
     },
+    "volcengine_tts": {
+        "id": "volcengine_tts",
+        "label": "Volcengine TTS",
+        "provider": "volcengine_tts",
+        "voice": VOLCENGINE_TTS_DEFAULT_VOICE,
+        "api_url": VOLCENGINE_TTS_DEFAULT_API_URL,
+        "cluster": VOLCENGINE_TTS_DEFAULT_CLUSTER,
+        "server_tts_provider": True,
+    },
     "gpt_sovits": {
         "id": "gpt_sovits",
         "label": "GPT-SoVITS",
@@ -93,6 +110,15 @@ TTS_PRESETS = {
 ALLOWED_LLM_PRESETS = set(LLM_PRESETS)
 ALLOWED_TTS_PROVIDERS = set(TTS_PRESETS)
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+LIVE2D_CUSTOM_ID = "__custom_live2d__"
+LIVE2D_MOTION_FAMILIES = {
+    "idle": ("idle", "breath", "main"),
+    "reaction": ("flick", "tap", "reaction", "pose"),
+    "speech": ("talk", "speech", "tap", "flick"),
+    "body": ("body", "tapbody", "flickbody"),
+    "upbeat": ("happy", "joy", "smile", "flickup", "victory"),
+    "soft_down": ("sad", "down", "flickdown", "soft"),
+}
 
 
 def _clean_text(value, max_len=200):
@@ -146,6 +172,24 @@ def _safe_bool(value, default=False):
     return bool(default)
 
 
+def _safe_float(value, default):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _safe_int(value, default):
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _clamp_float(value, default, low, high):
+    return max(float(low), min(float(high), _safe_float(value, default)))
+
+
 def _read_json_object(path):
     file_path = Path(path)
     if not file_path.exists():
@@ -191,6 +235,215 @@ def _ensure_section(config, name):
         section = {}
         config[name] = section
     return section
+
+
+def _web_model_path_from_file(path, *, web_dir=None):
+    root = (WEB_DIR if web_dir is None else Path(web_dir)).resolve()
+    try:
+        resolved = Path(path).resolve()
+        rel = resolved.relative_to(root)
+    except Exception:
+        return ""
+    rel_text = rel.as_posix()
+    if not rel_text.lower().startswith("models/"):
+        return ""
+    return "/" + rel_text
+
+
+def discover_live2d_model_presets(*, web_dir=None):
+    root = WEB_DIR if web_dir is None else Path(web_dir)
+    model_root = root / "models"
+    if not model_root.exists() or not model_root.is_dir():
+        return []
+    items = []
+    for path in sorted(model_root.rglob("*.model3.json"))[:80]:
+        if not path.is_file():
+            continue
+        web_path = _web_model_path_from_file(path, web_dir=root)
+        if not web_path:
+            continue
+        label_base = path.parent.name or path.stem.replace(".model3", "")
+        label = f"{label_base} ({path.name})"
+        items.append(
+            {
+                "id": web_path,
+                "label": _clean_text(label, 120),
+                "model_path": web_path,
+            }
+        )
+    return items
+
+
+def _normalize_live2d_model_path(value, *, web_dir=None):
+    raw = str(value or "").strip().replace("\\", "/")
+    if not raw:
+        raise DiagnosticError(
+            code="config_switch_live2d_empty",
+            reason="Live2D model path cannot be empty.",
+            solution="Choose a detected model or enter a /models/.../*.model3.json path.",
+            config_key="model_path",
+        )
+    if "://" in raw or raw.startswith("//"):
+        raise DiagnosticError(
+            code="config_switch_live2d_url_not_allowed",
+            reason="Live2D model path must be a local web model path.",
+            solution="Put the model under web/models and use a path such as /models/hiyori/model.model3.json.",
+            config_key="model_path",
+        )
+    if ".." in Path(raw).parts:
+        raise DiagnosticError(
+            code="config_switch_live2d_path_escape",
+            reason="Live2D model path cannot contain parent-directory segments.",
+            solution="Use a model file under web/models.",
+            config_key="model_path",
+        )
+
+    root = (WEB_DIR if web_dir is None else Path(web_dir)).resolve()
+    if raw.startswith("/models/"):
+        candidate = root / raw.lstrip("/")
+    elif raw.startswith("models/"):
+        candidate = root / raw
+    else:
+        candidate = Path(raw)
+        if not candidate.is_absolute():
+            candidate = root / raw
+
+    try:
+        resolved = candidate.resolve()
+        rel = resolved.relative_to(root)
+    except Exception as exc:
+        raise DiagnosticError(
+            code="config_switch_live2d_outside_web",
+            reason="Live2D model path must stay inside the web directory.",
+            solution="Put the model under web/models and select it from the list.",
+            config_key="model_path",
+            detail=str(candidate),
+        ) from exc
+
+    web_path = "/" + rel.as_posix()
+    if not web_path.lower().startswith("/models/"):
+        raise DiagnosticError(
+            code="config_switch_live2d_outside_models",
+            reason="Live2D model path must stay inside web/models.",
+            solution="Move the model folder into web/models and select the model3.json file.",
+            config_key="model_path",
+            detail=web_path,
+        )
+    if not web_path.lower().endswith(".model3.json"):
+        raise DiagnosticError(
+            code="config_switch_live2d_not_model3",
+            reason="Live2D model path must point to a .model3.json file.",
+            solution="Select the model's .model3.json file.",
+            config_key="model_path",
+            detail=web_path,
+        )
+    if not resolved.exists() or not resolved.is_file():
+        raise DiagnosticError(
+            code="config_switch_live2d_not_found",
+            reason="Live2D model file was not found.",
+            solution="Confirm the model folder is under web/models and refresh the config panel.",
+            config_key="model_path",
+            detail=web_path,
+        )
+    return web_path
+
+
+def _live2d_model_file_from_web_path(model_path, *, web_dir=None):
+    web_path = _normalize_live2d_model_path(model_path, web_dir=web_dir)
+    root = (WEB_DIR if web_dir is None else Path(web_dir)).resolve()
+    return root / web_path.lstrip("/"), web_path
+
+
+def _normalize_live2d_family_text(value):
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
+def _live2d_empty_compatibility_report(*warnings, missing_motion_families=None):
+    return {
+        "motion_groups": [],
+        "expressions": [],
+        "compatibility": {
+            "warnings": [item for item in warnings if item],
+            "missing_motion_families": list(missing_motion_families or []),
+        },
+    }
+
+
+def inspect_live2d_model_compatibility(model_path, *, web_dir=None):
+    try:
+        model_file, _web_path = _live2d_model_file_from_web_path(model_path, web_dir=web_dir)
+    except DiagnosticError:
+        raise
+    except Exception:
+        return _live2d_empty_compatibility_report(
+            "model_path_unavailable",
+            missing_motion_families=LIVE2D_MOTION_FAMILIES.keys(),
+        )
+
+    try:
+        data = json.loads(model_file.read_text(encoding="utf-8"))
+    except Exception:
+        return _live2d_empty_compatibility_report(
+            "model_json_unreadable",
+            missing_motion_families=LIVE2D_MOTION_FAMILIES.keys(),
+        )
+
+    if not isinstance(data, dict):
+        return _live2d_empty_compatibility_report(
+            "model_json_not_object",
+            missing_motion_families=LIVE2D_MOTION_FAMILIES.keys(),
+        )
+
+    refs = data.get("FileReferences") if isinstance(data.get("FileReferences"), dict) else {}
+    motions = refs.get("Motions") if isinstance(refs.get("Motions"), dict) else {}
+    motion_groups = []
+    normalized_group_names = []
+    for name in sorted(motions, key=lambda item: str(item).lower()):
+        entries = motions.get(name)
+        count = len(entries) if isinstance(entries, list) else 0
+        if count <= 0:
+            continue
+        text_name = _clean_text(name, 80)
+        motion_groups.append({"name": text_name, "count": count})
+        normalized_group_names.append(_normalize_live2d_family_text(text_name))
+
+    expressions = []
+    raw_expressions = refs.get("Expressions")
+    if isinstance(raw_expressions, list):
+        for item in raw_expressions[:80]:
+            if not isinstance(item, dict):
+                continue
+            file_name = _clean_text(item.get("File"), 160)
+            expression_name = _clean_text(item.get("Name"), 80) or _clean_text(Path(file_name).stem, 80)
+            if expression_name or file_name:
+                expressions.append({"name": expression_name, "file": file_name})
+
+    missing = []
+    for family, tokens in LIVE2D_MOTION_FAMILIES.items():
+        normalized_tokens = [_normalize_live2d_family_text(token) for token in tokens]
+        if not any(
+            token and token in group_name
+            for group_name in normalized_group_names
+            for token in normalized_tokens
+        ):
+            missing.append(family)
+
+    warnings = []
+    if not motion_groups:
+        warnings.append("no_motion_groups")
+    if not expressions:
+        warnings.append("no_expressions")
+    if missing:
+        warnings.append("missing_motion_families")
+
+    return {
+        "motion_groups": motion_groups,
+        "expressions": expressions,
+        "compatibility": {
+            "warnings": warnings,
+            "missing_motion_families": missing,
+        },
+    }
 
 
 def _read_env_file_value(path, name):
@@ -280,6 +533,13 @@ def _build_llm_current(llm_cfg, env_path):
 def _build_tts_current(tts_cfg):
     cfg = tts_cfg if isinstance(tts_cfg, dict) else {}
     provider = str(cfg.get("provider", "browser") or "browser").strip().lower()
+    if provider == "volcengine":
+        provider = "volcengine_tts"
+    stream_mode = str(cfg.get("stream_mode", "realtime") or "realtime").strip().lower()
+    if stream_mode not in {"final_only", "realtime"}:
+        stream_mode = "realtime"
+    if provider == "gpt_sovits" and not bool(cfg.get("gpt_sovits_realtime_tts", False)):
+        stream_mode = "final_only"
     return {
         "provider": provider if provider in ALLOWED_TTS_PROVIDERS else "browser",
         "voice": str(cfg.get("voice", "") or "").strip(),
@@ -287,13 +547,45 @@ def _build_tts_current(tts_cfg):
             cfg.get("gpt_sovits_api_url", ""),
             default_url=GPT_SOVITS_DEFAULT_API_URL,
         ),
+        "api_url": safe_url_display(
+            cfg.get("api_url", ""),
+            default_url=VOLCENGINE_TTS_DEFAULT_API_URL,
+        ),
+        "cluster": str(cfg.get("cluster", VOLCENGINE_TTS_DEFAULT_CLUSTER) or VOLCENGINE_TTS_DEFAULT_CLUSTER).strip(),
+        "stream_mode": stream_mode,
+        "gpt_sovits_timeout_sec": max(1, min(180, _safe_int(cfg.get("gpt_sovits_timeout_sec", 60), 60))),
         "allow_browser_fallback": bool(cfg.get("allow_browser_fallback", False)),
     }
 
 
-def build_config_switch_payload(config, *, env_path=None):
+def _build_live2d_current(config, live2d_models, *, web_dir=None):
+    cfg = config if isinstance(config, dict) else {}
+    model_cfg = cfg.get("model", {}) if isinstance(cfg.get("model", {}), dict) else {}
+    model_path = str(cfg.get("model_path", "") or "").strip().replace("\\", "/")
+    model_paths = {item.get("model_path") for item in live2d_models if isinstance(item, dict)}
+    report = _live2d_empty_compatibility_report("model_path_unset")
+    if model_path:
+        try:
+            report = inspect_live2d_model_compatibility(model_path, web_dir=web_dir)
+        except DiagnosticError as exc:
+            report = _live2d_empty_compatibility_report(
+                exc.code or "model_path_invalid",
+                missing_motion_families=LIVE2D_MOTION_FAMILIES.keys(),
+            )
+    return {
+        "model_path": model_path,
+        "preset_id": model_path if model_path in model_paths else LIVE2D_CUSTOM_ID,
+        "scale": _clamp_float(model_cfg.get("scale", 1.0), 1.0, 0.1, 3.0),
+        "x_ratio": _clamp_float(model_cfg.get("x_ratio", 0.26), 0.26, 0.0, 1.0),
+        "y_ratio": _clamp_float(model_cfg.get("y_ratio", 0.96), 0.96, 0.0, 1.0),
+        **report,
+    }
+
+
+def build_config_switch_payload(config, *, env_path=None, web_dir=None):
     cfg = config if isinstance(config, dict) else {}
     env_file = ENV_PATH if env_path is None else Path(env_path)
+    live2d_models = discover_live2d_model_presets(web_dir=web_dir)
     return {
         "ok": True,
         "target": "config.local.json",
@@ -303,9 +595,11 @@ def build_config_switch_payload(config, *, env_path=None):
         },
         "llm_presets": list(LLM_PRESETS.values()),
         "tts_presets": list(TTS_PRESETS.values()),
+        "live2d_models": live2d_models,
         "current": {
             "llm": _build_llm_current(cfg.get("llm", {}), env_file),
             "tts": _build_tts_current(cfg.get("tts", {})),
+            "live2d": _build_live2d_current(cfg, live2d_models, web_dir=web_dir),
         },
     }
 
@@ -367,19 +661,25 @@ def _normalize_llm_update(raw):
 def _normalize_tts_update(raw):
     body = raw if isinstance(raw, dict) else {}
     provider = _clean_text(body.get("provider") or "browser", 64).lower()
+    if provider == "volcengine":
+        provider = "volcengine_tts"
     if provider not in ALLOWED_TTS_PROVIDERS:
         raise DiagnosticError(
             code="config_switch_invalid_tts_provider",
             reason=f"Unsupported TTS provider: {provider or '(empty)'}",
-            solution="Use browser, edge_tts, or gpt_sovits.",
+            solution="Use browser, edge_tts, gpt_sovits, or volcengine_tts.",
             config_key="tts.provider",
         )
     preset = TTS_PRESETS[provider]
     voice = _clean_text(body.get("voice") or preset.get("voice") or TTS_DEFAULT_VOICE, 120)
+    stream_mode = _clean_text(body.get("stream_mode") or "realtime", 32).lower()
+    if stream_mode not in {"final_only", "realtime"}:
+        stream_mode = "realtime"
     update = {
         "provider": provider,
         "voice": voice,
         "voices": [voice] if voice else [],
+        "stream_mode": stream_mode,
         "allow_browser_fallback": _safe_bool(body.get("allow_browser_fallback", False), False),
     }
     if provider == "gpt_sovits":
@@ -388,7 +688,32 @@ def _normalize_tts_update(raw):
             default_url=preset["gpt_sovits_api_url"],
             config_key="tts.gpt_sovits_api_url",
         )
+        update["gpt_sovits_realtime_tts"] = stream_mode == "realtime"
+        update["gpt_sovits_timeout_sec"] = max(
+            1,
+            min(180, _safe_int(body.get("gpt_sovits_timeout_sec"), 60)),
+        )
+    if provider == "volcengine_tts":
+        update["api_url"] = _normalize_http_url(
+            body.get("api_url") or preset["api_url"],
+            default_url=preset["api_url"],
+            config_key="tts.api_url",
+        )
+        update["cluster"] = _clean_text(body.get("cluster") or preset.get("cluster"), 80)
+        update["app_id_env"] = VOLCENGINE_APP_ID_ENV
+        update["access_token_env"] = VOLCENGINE_ACCESS_TOKEN_ENV
+        update["secret_key_env"] = VOLCENGINE_SECRET_KEY_ENV
     return update
+
+
+def _normalize_live2d_update(raw, *, web_dir=None):
+    body = raw if isinstance(raw, dict) else {}
+    return {
+        "model_path": _normalize_live2d_model_path(body.get("model_path"), web_dir=web_dir),
+        "scale": _clamp_float(body.get("scale"), 1.0, 0.1, 3.0),
+        "x_ratio": _clamp_float(body.get("x_ratio"), 0.26, 0.0, 1.0),
+        "y_ratio": _clamp_float(body.get("y_ratio"), 0.96, 0.0, 1.0),
+    }
 
 
 def _normalize_first_run_llm_update(raw):
@@ -501,10 +826,51 @@ def save_first_run_llm_config(body, *, local_config_path=None, env_path=None):
     }
 
 
-def save_config_switch_update(body, *, local_config_path=None, env_path=None):
+def build_config_switch_test_config(body, base_config, *, web_dir=None):
+    payload = body if isinstance(body, dict) else {}
+    config = copy.deepcopy(base_config if isinstance(base_config, dict) else {})
+    if isinstance(payload.get("llm"), dict):
+        llm_update = _normalize_llm_update(payload.get("llm", {}))
+        llm = _ensure_section(config, "llm")
+        llm["provider"] = llm_update["provider"]
+        llm["base_url"] = llm_update["base_url"]
+        llm["model"] = llm_update["model"]
+        llm["api_key_env"] = llm_update["api_key_env"]
+        llm["api_key"] = llm_update["api_key"]
+    if isinstance(payload.get("tts"), dict):
+        tts_update = _normalize_tts_update(payload.get("tts", {}))
+        tts = _ensure_section(config, "tts")
+        for key, value in tts_update.items():
+            tts[key] = value
+    if isinstance(payload.get("live2d"), dict):
+        live2d_update = _normalize_live2d_update(payload.get("live2d", {}), web_dir=web_dir)
+        config["model_path"] = live2d_update["model_path"]
+        model = _ensure_section(config, "model")
+        model["scale"] = live2d_update["scale"]
+        model["x_ratio"] = live2d_update["x_ratio"]
+        model["y_ratio"] = live2d_update["y_ratio"]
+    return config
+
+
+def validate_config_switch_live2d_update(raw, *, web_dir=None):
+    update = _normalize_live2d_update(raw, web_dir=web_dir)
+    update.update(inspect_live2d_model_compatibility(update["model_path"], web_dir=web_dir))
+    return {
+        "ok": True,
+        "live2d": update,
+        "reload_required": True,
+    }
+
+
+def save_config_switch_update(body, *, local_config_path=None, env_path=None, web_dir=None):
     payload = body if isinstance(body, dict) else {}
     llm_update = _normalize_llm_update(payload.get("llm", {}))
     tts_update = _normalize_tts_update(payload.get("tts", {}))
+    live2d_update = (
+        _normalize_live2d_update(payload.get("live2d", {}), web_dir=web_dir)
+        if isinstance(payload.get("live2d"), dict)
+        else None
+    )
     local_path = LOCAL_CONFIG_PATH if local_config_path is None else Path(local_config_path)
     env_file = ENV_PATH if env_path is None else Path(env_path)
     local_config = _read_json_object(local_path)
@@ -522,6 +888,12 @@ def save_config_switch_update(body, *, local_config_path=None, env_path=None):
     tts = _ensure_section(local_config, "tts")
     for key, value in tts_update.items():
         tts[key] = value
+    if live2d_update:
+        local_config["model_path"] = live2d_update["model_path"]
+        model = _ensure_section(local_config, "model")
+        model["scale"] = live2d_update["scale"]
+        model["x_ratio"] = live2d_update["x_ratio"]
+        model["y_ratio"] = live2d_update["y_ratio"]
 
     _write_json_object(local_path, local_config)
     key_saved = _write_env_value(env_file, llm_update["api_key_env"], llm_update["api_key"])
@@ -547,5 +919,16 @@ def save_config_switch_update(body, *, local_config_path=None, env_path=None):
                 ),
                 "allow_browser_fallback": bool(tts_update.get("allow_browser_fallback", False)),
             },
+            "live2d": (
+                {
+                    "model_path": live2d_update["model_path"],
+                    "scale": live2d_update["scale"],
+                    "x_ratio": live2d_update["x_ratio"],
+                    "y_ratio": live2d_update["y_ratio"],
+                    **inspect_live2d_model_compatibility(live2d_update["model_path"], web_dir=web_dir),
+                }
+                if live2d_update
+                else None
+            ),
         },
     }

@@ -4427,6 +4427,8 @@ body:not(.view-model) .subtitle-layer {
 /* Subtitle overlay polish */
 .subtitle-layer {
   transform: translate(-50%, 12px);
+  max-height: min(42vh, 380px);
+  overflow: visible;
   padding: 10px 14px;
   border-radius: 14px;
   transition: opacity 0.26s ease, transform 0.3s ease;
@@ -4441,6 +4443,7 @@ body:not(.view-model) .subtitle-layer {
     radial-gradient(120% 140% at 50% 120%, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.08) 60%, rgba(0, 0, 0, 0));
   backdrop-filter: blur(2px);
   opacity: 0.88;
+  pointer-events: none;
   transition: opacity 0.25s ease;
 }
 
@@ -4455,13 +4458,14 @@ body:not(.view-model) .subtitle-layer {
 .subtitle-en,
 .subtitle-zh {
   position: relative;
+  overflow-wrap: anywhere;
 }
 
 .subtitle-en {
   font-size: clamp(1.05rem, 2.3vw, 1.5rem);
   font-weight: 560;
   line-height: 1.32;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .subtitle-zh {
@@ -4477,6 +4481,16 @@ body:not(.view-model) .subtitle-layer {
 .subtitle-layer.subtitle-zh-ready .subtitle-zh {
   opacity: 1;
   transform: translateY(0);
+}
+
+.subtitle-layer.subtitle-source-cjk .subtitle-en {
+  font-size: clamp(1.28rem, 3vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.34;
+}
+
+.subtitle-layer.subtitle-source-cjk .subtitle-zh {
+  display: none;
 }
 
 @media (max-width: 640px) {
