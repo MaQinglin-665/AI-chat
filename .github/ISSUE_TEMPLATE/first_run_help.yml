@@ -9,6 +9,7 @@ body:
     attributes:
       value: |
         Thanks for testing the preview. Please remove API keys, tokens, raw prompts, raw history, private file paths, and private desktop screenshots before sharing logs.
+        如果项目已经能正常启动并完成聊天，请改用 Preview Feedback，并可参考 docs/first-run-feedback.md。
 
   - type: dropdown
     id: source

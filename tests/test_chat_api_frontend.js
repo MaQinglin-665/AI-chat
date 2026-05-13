@@ -56,10 +56,12 @@ function makeHangingStreamResponse(cancelled) {
 }
 
 async function testBuildRequestInit() {
-  const init = chatApi.buildChatRequestInit({ message: "hi" });
+  const controller = new AbortController();
+  const init = chatApi.buildChatRequestInit({ message: "hi" }, { signal: controller.signal });
   assert.strictEqual(init.method, "POST");
   assert.strictEqual(init.headers["Content-Type"], "application/json");
   assert.deepStrictEqual(JSON.parse(init.body), { message: "hi" });
+  assert.strictEqual(init.signal, controller.signal);
 }
 
 async function testStreamingReply() {
@@ -68,8 +70,10 @@ async function testStreamingReply() {
   const brain = [];
   const headers = [];
   const firstDelta = [];
-  const authFetch = async (url) => {
+  const controller = new AbortController();
+  const authFetch = async (url, init) => {
     assert.strictEqual(url, "/api/chat_stream");
+    assert.strictEqual(init.signal, controller.signal);
     return makeStreamResponse([
       'data: {"type":"delta","text":"hel"}\n',
       'data: {"type":"delta","text":"lo"}\n',
@@ -88,6 +92,7 @@ async function testStreamingReply() {
         onApiHeaders: (value) => headers.push(value),
         onFirstDelta: (value) => firstDelta.push(value)
       },
+      signal: controller.signal,
       now: () => 123
     }
   );
@@ -240,6 +245,32 @@ async function testStreamErrorFallbackFailureKeepsDiagnostic() {
   assert.deepStrictEqual(urls, ["/api/chat_stream", "/api/chat"]);
 }
 
+async function testAbortDoesNotFallbackToDirectChat() {
+  const urls = [];
+  const controller = new AbortController();
+  controller.abort();
+
+  await assert.rejects(
+    () => chatApi.streamAssistantReply(
+      { message: "hi" },
+      () => {},
+      {
+        authFetch: async (url) => {
+          urls.push(url);
+          return makeJsonResponse(200, { reply: "should not run" });
+        },
+        signal: controller.signal,
+        perfLog: () => {}
+      }
+    ),
+    (err) => {
+      assert.strictEqual(err.name, "AbortError");
+      return true;
+    }
+  );
+  assert.deepStrictEqual(urls, []);
+}
+
 async function main() {
   await testBuildRequestInit();
   await testStreamingReply();
@@ -248,6 +279,7 @@ async function main() {
   await testStreamReaderErrorBeforeDeltaFallback();
   await testStreamFirstDeltaTimeoutFallback();
   await testStreamErrorFallbackFailureKeepsDiagnostic();
+  await testAbortDoesNotFallbackToDirectChat();
   console.log("Chat API frontend checks passed.");
 }
 

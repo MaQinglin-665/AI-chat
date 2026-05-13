@@ -13,6 +13,7 @@
     { kind: "translate_debug_off", aliases: ["/translatedebug off"] },
     { kind: "memory_debug", aliases: ["/memorydebug"] },
     { kind: "brain_debug", aliases: ["/braindebug", "/brain"] },
+    { kind: "turn_debug", aliases: ["/turndebug", "/turn"] },
     { kind: "emotion_report", aliases: ["/情绪日报"] },
     { kind: "voice_test", aliases: ["/测试语音", "/testvoice"] },
     { kind: "character_rehearsal", aliases: ["/角色试演", "/roletest", "/rehearse"] },

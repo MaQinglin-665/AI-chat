@@ -109,6 +109,17 @@
       );
       const buf = Math.round(Number(asrCfg.processor_buffer_size || 2048));
       state.localAsrProcessorBufferSize = [1024, 2048, 4096, 8192].includes(buf) ? buf : 2048;
+      state.asrSemanticCorrectionEnabled = asrCfg.semantic_correction_enabled !== false;
+      state.voiceTurnMergeWindowMs = Math.round(
+        clampNumber(Number(asrCfg.voice_turn_merge_window_ms ?? 1200), 0, 2500)
+      );
+      state.voiceTurnHoldIncompleteEnabled = asrCfg.voice_turn_hold_incomplete_enabled !== false;
+      state.asrLowConfidenceConfirmEnabled = asrCfg.low_confidence_confirm_enabled !== false;
+      state.asrLowConfidenceThreshold = clampNumber(
+        Number(asrCfg.low_confidence_threshold ?? 0.48),
+        0.2,
+        0.9
+      );
       state.asrHotwordRules = buildAsrHotwordRules(asrCfg.hotword_replacements || {});
       state.wakeWordEnabled = asrCfg.wake_word_enabled !== false;
       state.wakeWords = Array.isArray(asrCfg.wake_words) && asrCfg.wake_words.length
@@ -153,7 +164,17 @@
         silenceFollowupMinMs: Math.round(
           clampNumber(Number(conversationCfg.silence_followup_min_ms ?? 180000), 30000, 1800000)
         ),
-        interruptTtsOnUserSpeech: conversationCfg.interrupt_tts_on_user_speech === true
+        interruptTtsOnUserSpeech: conversationCfg.interrupt_tts_on_user_speech !== false,
+        protectImportantSpeech: conversationCfg.protect_important_speech !== false,
+        importantSpeechMinMs: Math.round(
+          clampNumber(Number(conversationCfg.important_speech_min_ms ?? 900), 0, 3000)
+        ),
+        importantSpeechMaxHoldMs: Math.round(
+          clampNumber(Number(conversationCfg.important_speech_max_hold_ms ?? 4200), 500, 9000)
+        ),
+        importantSpeechForceAfterAttempts: Math.round(
+          clampNumber(Number(conversationCfg.important_speech_force_after_attempts ?? 2), 1, 4)
+        )
       };
       if (!(Number(state.proactiveSchedulerStartedAt || 0) > 0)) {
         state.proactiveSchedulerStartedAt = Date.now();
@@ -262,12 +283,12 @@
       state.styleAutoEnabled = styleCfg.auto !== false;
       state.manualTalkStyle = normalizeTalkStyle(styleCfg.manual || "neutral");
       state.motionEnabled = motionCfg.enabled !== false;
-      state.motionQuietDuringSpeech = motionCfg.quiet_speech !== false;
+      state.motionQuietDuringSpeech = motionCfg.quiet_speech === true;
       state.motionIntensity = normalizeMotionIntensity(
         motionCfg.intensity || motionCfg.action_intensity || "normal"
       );
       state.speechMotionStrength = clampNumber(
-        Number(motionCfg.speech_motion_strength ?? motionCfg.speech_body_motion_strength ?? 1.35),
+        Number(motionCfg.speech_motion_strength ?? motionCfg.speech_body_motion_strength ?? 1.48),
         0.6,
         2.2
       );
@@ -282,7 +303,7 @@
         clampNumber(Number(motionCfg.cooldown_ms || 1200), 250, 8000)
       );
       state.speakingMotionCooldownMs = Math.round(
-        clampNumber(Number(motionCfg.speaking_cooldown_ms || 1600), 500, 8000)
+        clampNumber(Number(motionCfg.speaking_cooldown_ms || 1100), 500, 8000)
       );
       state.idleMotionEnabled = motionCfg.idle_enabled !== false;
       state.idleMotionMinMs = Math.round(

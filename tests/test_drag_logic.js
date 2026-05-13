@@ -40,6 +40,21 @@ function staticChecks() {
   );
   ensureSourceContains(
     live2dLayoutSource,
+    "function isPointOverSubtitleDragHandle",
+    "Electron click-through hit test includes subtitle drag handle helper"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "|| isPointOverSubtitleDragHandle(e.clientX, e.clientY);",
+    "Electron click-through hit test keeps subtitle drag handle interactive"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "state.windowDragActive || state.subtitleDragPointerId",
+    "Electron click-through stays disabled while subtitle dragging"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
     "isPointInModelDragHotzone(x, y, bounds)",
     "Visible-area hit test uses segmented drag hotzone"
   );

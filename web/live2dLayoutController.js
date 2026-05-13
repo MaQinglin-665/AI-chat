@@ -247,19 +247,42 @@
       return true;
     }
 
+    function isPointOverSubtitleDragHandle(clientX, clientY) {
+      if (state.subtitleEnabled === false) {
+        return false;
+      }
+      const handle = document.getElementById?.("subtitle-drag-handle");
+      const layer = document.getElementById?.("subtitle-layer");
+      if (!handle || !layer || !layer.classList?.contains("subtitle-visible")) {
+        return false;
+      }
+      const rect = handle.getBoundingClientRect?.();
+      if (!rect || rect.width <= 0 || rect.height <= 0) {
+        return false;
+      }
+      const pad = 8;
+      return (
+        clientX >= rect.left - pad &&
+        clientX <= rect.right + pad &&
+        clientY >= rect.top - pad &&
+        clientY <= rect.bottom + pad
+      );
+    }
+
     function setupClickthroughHitTest() {
       if (state.desktopBridge !== "electron") return;
       if (typeof window.electronAPI?.setClickthrough !== "function") return;
       let lastClickthrough = true;
       document.addEventListener("mousemove", (e) => {
-        if (state.windowDragActive) {
+        if (state.windowDragActive || state.subtitleDragPointerId) {
           if (lastClickthrough) {
             window.electronAPI.setClickthrough(false);
             lastClickthrough = false;
           }
           return;
         }
-        const over = isPointOverVisibleModelArea(e.clientX, e.clientY);
+        const over = isPointOverVisibleModelArea(e.clientX, e.clientY)
+          || isPointOverSubtitleDragHandle(e.clientX, e.clientY);
         const want = !over;
         if (want !== lastClickthrough) {
           lastClickthrough = want;
@@ -594,6 +617,7 @@ function attachDrag(model) {
       getModelInteractiveBounds,
       isPointInModelDragHotzone,
       isPointOverVisibleModelArea,
+      isPointOverSubtitleDragHandle,
       attachDrag,
       setupClickthroughHitTest,
       startModelMouseGazePolling

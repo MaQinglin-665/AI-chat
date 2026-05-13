@@ -646,16 +646,28 @@
   function buildSpeakProsody(text, mood, streamMode = false, style = "neutral") {
     const clean = String(text || "").replace(/\s+/g, " ").trim();
     const textLen = clean.length;
-    const commaCount = (clean.match(/[，,、]/g) || []).length;
-    const exclaimCount = (clean.match(/[!！]/g) || []).length;
+    const commaCount = (clean.match(/[,\uFF0C\u3001;\uFF1B]/g) || []).length;
+    const questionCount = (clean.match(/[?\uFF1F]/g) || []).length;
+    const exclaimCount = (clean.match(/[!\uFF01]/g) || []).length;
+    const ellipsisCount = (clean.match(/(?:\.{2,}|\u2026|\u3002{2,})/g) || []).length;
+    const colonCount = (clean.match(/[:\uFF1A]/g) || []).length;
+    const sentenceCount = Math.max(1, (clean.match(/[.!?\u3002\uFF01\uFF1F]/g) || []).length);
 
     let speed = 0.96;
     let pitch = 0.99;
     let volume = 1.0;
 
     if (textLen > 36) speed -= 0.01;
+    if (textLen > 84) speed -= 0.02;
     if (textLen < 12) speed += 0.01;
     if (commaCount >= 2) speed -= 0.01;
+    if (commaCount >= 3 || colonCount >= 1) speed -= 0.006;
+    if (sentenceCount >= 3) speed -= 0.01;
+    if (ellipsisCount >= 1) {
+      speed -= 0.025;
+      pitch -= 0.01;
+      volume -= 0.01;
+    }
     if (exclaimCount >= 1) {
       speed += 0.01;
       volume += 0.02;
@@ -674,12 +686,24 @@
     } else if (mood === "surprised") {
       speed += 0.02;
       pitch += 0.03;
+    } else if (mood === "thinking") {
+      speed -= 0.015;
+      pitch -= 0.005;
+    } else if (mood === "anxious") {
+      speed -= 0.025;
+      pitch -= 0.015;
+      volume -= 0.025;
+    } else if (mood === "annoyed") {
+      speed -= 0.005;
+      pitch -= 0.02;
+      volume += 0.01;
     }
 
-    if (/[?？]/.test(clean)) {
-      pitch += 0.02;
+    if (questionCount >= 1) {
+      pitch += 0.018;
+      speed -= 0.005;
     }
-    if (/[!！]/.test(clean)) {
+    if (exclaimCount >= 1) {
       pitch += 0.02;
     }
 
@@ -691,12 +715,13 @@
       if (styleKey === "soft" || styleKey === "warm") {
         speed -= 0.01;
       }
-    } else if (styleKey === "clear" || styleKey === "curious") {
-      speed += 0.02;
-      pitch -= 0.02;
-      if (styleKey === "curious") {
-        pitch += 0.03;
-      }
+    } else if (styleKey === "clear") {
+      speed += 0.014;
+      pitch -= 0.018;
+    } else if (styleKey === "curious") {
+      speed -= 0.004;
+      pitch += 0.02;
+      volume += 0.005;
     } else if (styleKey === "playful" || styleKey === "cheerful" || styleKey === "teasing") {
       speed += 0.02;
       pitch += 0.02;
@@ -708,10 +733,30 @@
       speed -= 0.01;
       pitch -= 0.02;
       volume += 0.02;
+    } else if (styleKey === "thinking") {
+      speed -= 0.02;
+      pitch -= 0.01;
+    } else if (styleKey === "anxious") {
+      speed -= 0.035;
+      pitch -= 0.02;
+      volume -= 0.03;
+    } else if (styleKey === "annoyed") {
+      speed -= 0.005;
+      pitch -= 0.025;
+      volume += 0.015;
+    } else if (styleKey === "sad") {
+      speed -= 0.025;
+      pitch -= 0.015;
+      volume -= 0.025;
+    } else if (styleKey === "happy") {
+      speed += 0.018;
+      pitch += 0.018;
+      volume += 0.01;
     }
 
-    speed += textJitter(clean, 0.004);
-    pitch += textJitter(clean.split("").reverse().join(""), 0.004);
+    const jitterScale = ["comfort", "soft", "warm", "sad", "anxious"].includes(styleKey) ? 0.0025 : 0.004;
+    speed += textJitter(clean, jitterScale);
+    pitch += textJitter(clean.split("").reverse().join(""), jitterScale);
 
     if (streamMode && textLen > 0 && textLen < 18) {
       speed = Math.max(speed, 0.98);

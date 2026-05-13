@@ -317,7 +317,7 @@
       const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
       const speakingNow = isSpeechMotionActive(now);
       const pendingStreamSegments = Array.isArray(state.streamSpeakQueue) ? state.streamSpeakQueue.length : 0;
-      if ((speakingNow && motionBlend > 0.1) || motionBlend > 0.24) {
+      if ((speakingNow && motionBlend > 0.48) || motionBlend > 0.7) {
         state.speakingMotionCooldownUntil = Math.max(Number(state.speakingMotionCooldownUntil) || 0, now + 220);
         return;
       }

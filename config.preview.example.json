@@ -14,7 +14,11 @@
     "proactive_scheduler_enabled": false,
     "gray_auto_enabled": false,
     "gray_auto_trial_enabled": false,
-    "interrupt_tts_on_user_speech": false
+    "interrupt_tts_on_user_speech": true,
+    "protect_important_speech": true,
+    "important_speech_min_ms": 900,
+    "important_speech_max_hold_ms": 4200,
+    "important_speech_force_after_attempts": 2
   },
   "tts": {
     "provider": "browser",
@@ -33,7 +37,9 @@
   },
   "motion": {
     "enabled": true,
-    "speech_motion_strength": 1.25,
+    "speech_motion_strength": 1.42,
+    "speaking_cooldown_ms": 1100,
+    "quiet_speech": false,
     "expression_enabled": true,
     "expression_strength": 0.95,
     "idle_enabled": true

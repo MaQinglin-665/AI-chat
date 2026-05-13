@@ -8,6 +8,9 @@
   const SUBTITLE_AFTER_SPEECH_HOLD_MS = 2200;
   const SUBTITLE_PAGE_MIN_INTERVAL_MS = 1500;
   const SUBTITLE_PAGE_MAX_INTERVAL_MS = 3600;
+  const SUBTITLE_EN_PAGE_CHARS = 96;
+  const SUBTITLE_CJK_PAGE_CHARS = 42;
+  const SUBTITLE_MIN_SOFT_BREAK_CHARS = 14;
 
   const subtitleTranslationCache = new Map();
   let subtitleTranslationAbortController = null;
@@ -53,8 +56,10 @@
       return [];
     }
     const english = isLikelyEnglish(src);
-    const limit = english ? 110 : 56;
-    const rough = src.match(/[^.!?\u3002\uff01\uff1f\n]+[.!?\u3002\uff01\uff1f]?/g) || [src];
+    const limit = english ? SUBTITLE_EN_PAGE_CHARS : SUBTITLE_CJK_PAGE_CHARS;
+    const rough = english
+      ? src.match(/[^.!?\u3002\uff01\uff1f\n]+[.!?\u3002\uff01\uff1f]?/g) || [src]
+      : src.match(/[^，,、；;：:\u3002\uff01\uff1f!?]+[，,、；;：:\u3002\uff01\uff1f!?]?/g) || [src];
     const pages = [];
     let current = "";
 
@@ -89,9 +94,30 @@
         pushPage(chunk);
         return;
       }
-      for (let i = 0; i < clean.length; i += limit) {
-        pushPage(clean.slice(i, i + limit));
+      let rest = clean;
+      while (rest.length > limit) {
+        const windowText = rest.slice(0, limit);
+        let breakAt = -1;
+        for (const mark of ["。", "！", "？", "，", "、", "；", "：", "!", "?", ",", ";", ":"]) {
+          const idx = windowText.lastIndexOf(mark);
+          if (idx >= SUBTITLE_MIN_SOFT_BREAK_CHARS) {
+            breakAt = Math.max(breakAt, idx + 1);
+          }
+        }
+        if (breakAt < SUBTITLE_MIN_SOFT_BREAK_CHARS) {
+          breakAt = limit;
+        }
+        pushPage(rest.slice(0, breakAt));
+        rest = rest.slice(breakAt).trim();
       }
+      pushPage(rest);
+    };
+
+    const joinPieces = (left, right) => {
+      if (!left) {
+        return right;
+      }
+      return english ? `${left} ${right}` : `${left}${right}`;
     };
 
     for (const rawPiece of rough) {
@@ -107,7 +133,7 @@
         current = piece;
         continue;
       }
-      const candidate = `${current} ${piece}`.replace(/\s+/g, " ").trim();
+      const candidate = joinPieces(current, piece).replace(/\s+/g, " ").trim();
       if (candidate.length <= limit) {
         current = candidate;
         continue;
@@ -262,6 +288,8 @@
     if (spanZh) {
       spanZh.textContent = zh;
     }
+    layer.classList.toggle("subtitle-source-english", !!en && isLikelyEnglish(en));
+    layer.classList.toggle("subtitle-source-cjk", !!en && !isLikelyEnglish(en));
     layer.classList.toggle("subtitle-zh-ready", !!zh);
     layer.classList.remove("subtitle-hiding");
     layer.classList.add("subtitle-visible");
@@ -340,6 +368,8 @@
     }
     layer.classList.remove("subtitle-visible");
     layer.classList.remove("subtitle-zh-ready");
+    layer.classList.remove("subtitle-source-english");
+    layer.classList.remove("subtitle-source-cjk");
     layer.classList.add("subtitle-hiding");
     setTimeout(() => {
       if (!force && id !== state.subtitleId) {
@@ -347,6 +377,8 @@
       }
       layer.classList.remove("subtitle-hiding");
       layer.classList.remove("subtitle-zh-ready");
+      layer.classList.remove("subtitle-source-english");
+      layer.classList.remove("subtitle-source-cjk");
       const spanEn = layer.querySelector(".subtitle-en");
       const spanZh = layer.querySelector(".subtitle-zh");
       if (spanEn) {
@@ -379,7 +411,7 @@
     startSubtitlePaging(id, cleaned, "", false, deps);
     scheduleSubtitleSafetyHide(id, subtitleDuration(cleaned), deps);
 
-    if (cleaned.length >= 3) {
+    if (cleaned.length >= 3 && isLikelyEnglish(cleaned)) {
       fetchTranslation(cleaned, id, deps).then((zh) => {
         if (!zh || id !== state.subtitleId) {
           return;

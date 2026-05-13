@@ -46,6 +46,7 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert "Style beat:" in block
     assert "Reaction mode:" in block
     assert "Performance:" in block
+    assert "Conversation director:" in block
     assert "Improv:" in block
     assert "Stage memory:" in block
     assert "Safety clamp:" in block
@@ -59,6 +60,7 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert decision["opening_move"]
     assert decision["reply_shape"]
     assert decision["question_policy"]
+    assert decision["conversation_director"]["mode"]
 
 
 def test_character_brain_style_beat_rotates_with_continuity():
@@ -602,7 +604,12 @@ def test_character_brain_task_help_allows_only_needed_clarification():
     assert decision["output_constraints"]["allow_followup_question"] is True
     assert decision["output_constraints"]["clarify_only_when_needed"] is True
     assert decision["output_constraints"]["allow_teasing"] is False
+    assert (
+        decision["conversation_director"]["interruption_policy"]
+        == "finish_key_sentence_before_yield"
+    )
     assert "Ask a follow-up only if" in decision["directive"]
+    assert "interruption=finish_key_sentence_before_yield" in block
     assert "follow_up=clarify-only" in block
 
 
@@ -762,6 +769,256 @@ def test_character_brain_auto_thought_burst_allows_natural_length_budget():
     assert "history_tail" not in snapshot
 
 
+def test_character_brain_free_chat_director_keeps_casual_turn_loose():
+    decision = character_brain.build_character_brain_decision(
+        user_message="I'm just hanging around while the rain hits the window.",
+        history=[],
+    )
+    block = character_brain.build_character_brain_prompt_block(decision)
+    snapshot = character_brain.build_character_brain_public_snapshot(decision)
+
+    assert decision["intent"] == "casual"
+    assert decision["conversation_director"]["mode"] == "free_chat"
+    assert decision["conversation_director"]["turn_taking"] == "react_first"
+    assert decision["conversation_director"]["initiative"] == "one_micro_opinion_or_aside"
+    assert decision["conversation_director"]["reply_move"] == "riff"
+    assert decision["question_policy"] == "none"
+    assert decision["max_sentences"] <= 2
+    assert "casual statements as valid conversation" in decision["directive"]
+    assert "Conversation director: mode=free_chat" in block
+    assert "reply_move=riff" in block
+    assert snapshot["conversation_director"]["mode"] == "free_chat"
+    assert snapshot["conversation_director"]["reply_move"] == "riff"
+    assert "directive" not in snapshot
+
+
+def test_character_brain_interruption_director_yields_to_user():
+    decision = character_brain.build_character_brain_decision(
+        config={
+            "_conversation_context": {
+                "interruption": {
+                    "reason": "user_speech_start",
+                    "assistant_partial": "I was halfway through a long explanation.",
+                    "previous_user_message": "Tell me the plan.",
+                }
+            }
+        },
+        user_message="Wait, say it shorter.",
+        history=[],
+    )
+    block = character_brain.build_character_brain_prompt_block(decision)
+    snapshot = character_brain.build_character_brain_public_snapshot(decision)
+
+    assert decision["barge_in_policy"]["kind"] == "shorten"
+    assert decision["barge_in_policy"]["reply_move"] == "shorten"
+    assert decision["conversation_director"]["mode"] == "barge_in_adjustment"
+    assert decision["conversation_director"]["turn_taking"] == "yield_to_user"
+    assert decision["conversation_director"]["reply_move"] == "shorten"
+    assert decision["conversation_director"]["followup_policy"] == "do_not_resume_unasked"
+    assert "Barge-in reply policy" in decision["directive"]
+    assert "Compress the interrupted point" in decision["directive"]
+    assert "Barge-in policy: active=true" in block
+    assert snapshot["conversation_director"]["mode"] == "barge_in_adjustment"
+    assert snapshot["barge_in_policy"]["kind"] == "shorten"
+    assert "directive" not in snapshot
+
+
+def test_character_brain_barge_in_supplement_integrates_latest_addition():
+    decision = character_brain.build_character_brain_decision(
+        config={
+            "_conversation_context": {
+                "interruption": {
+                    "reason": "user_input",
+                    "assistant_summary": "We were discussing the voice chat plan.",
+                    "previous_user_summary": "Make the character more conversational.",
+                }
+            }
+        },
+        user_message="Also, make ASR confirmation stricter.",
+        history=[],
+    )
+    snapshot = character_brain.build_character_brain_public_snapshot(decision)
+
+    assert decision["barge_in_policy"]["kind"] == "supplement"
+    assert decision["conversation_director"]["mode"] == "barge_in_supplement"
+    assert decision["conversation_director"]["reply_move"] == "integrate"
+    assert decision["conversation_director"]["max_spoken_beats"] == 2
+    assert decision["question_policy"] == "none"
+    assert "Fold the user's new addition" in decision["directive"]
+    assert snapshot["barge_in_policy"]["kind"] == "supplement"
+    assert snapshot["conversation_director"]["reply_move"] == "integrate"
+
+
+def test_character_brain_voice_input_keeps_free_chat_spoken_and_short():
+    decision = character_brain.build_character_brain_decision(
+        config={"_input_modality": "voice"},
+        user_message="The rain sound is kind of nice right now.",
+        history=[],
+    )
+    block = character_brain.build_character_brain_prompt_block(decision)
+    snapshot = character_brain.build_character_brain_public_snapshot(decision)
+
+    assert decision["input_modality"] == "voice"
+    assert decision["conversation_director"]["mode"] == "voice_free_chat"
+    assert decision["conversation_director"]["turn_taking"] == "short_react_first"
+    assert decision["conversation_director"]["reply_move"] == "riff"
+    assert decision["conversation_director"]["max_spoken_beats"] == 1
+    assert decision["max_sentences"] <= 2
+    assert decision["question_policy"] == "none"
+    assert "Voice input mode" in decision["directive"]
+    assert "Conversation director: mode=voice_free_chat" in block
+    assert snapshot["input_modality"] == "voice"
+    assert snapshot["conversation_director"]["mode"] == "voice_free_chat"
+    assert "directive" not in snapshot
+
+
+def test_character_brain_uncertain_asr_uses_confirmation_director():
+    decision = character_brain.build_character_brain_decision(
+        config={
+            "_input_modality": "voice",
+            "_conversation_context": {
+                "asr": {
+                    "source": "voice_transcript",
+                    "raw_text": "um",
+                    "final_text": "um",
+                    "confidence": 0.22,
+                    "reason": "very_short",
+                    "needs_confirmation": True,
+                }
+            },
+        },
+        user_message="um",
+        history=[],
+    )
+    block = character_brain.build_character_brain_prompt_block(decision)
+    snapshot = character_brain.build_character_brain_public_snapshot(decision)
+
+    assert decision["conversation_director"]["mode"] == "voice_asr_confirmation"
+    assert decision["conversation_director"]["turn_taking"] == "confirm_then_yield"
+    assert decision["conversation_director"]["reply_move"] == "clarify"
+    assert decision["conversation_director"]["max_spoken_beats"] == 1
+    assert decision["question_policy"] == "clarify_only"
+    assert decision["max_sentences"] == 1
+    assert "ASR uncertainty" in decision["directive"]
+    assert "Conversation director: mode=voice_asr_confirmation" in block
+    assert snapshot["conversation_director"]["mode"] == "voice_asr_confirmation"
+    snapshot_raw = json.dumps(snapshot, ensure_ascii=False).lower()
+    assert "raw_text" not in snapshot_raw
+    assert "final_text" not in snapshot_raw
+    assert snapshot["asr_status"]["reason"] == "very_short"
+
+
+def test_character_brain_uncertain_asr_with_barge_in_confirms_before_adjusting():
+    decision = character_brain.build_character_brain_decision(
+        config={
+            "_input_modality": "voice",
+            "_conversation_context": {
+                "interruption": {
+                    "reason": "user_speech_start",
+                    "assistant_summary": "We were discussing the longer ASR plan.",
+                    "previous_user_summary": "Tune voice input.",
+                },
+                "asr": {
+                    "source": "voice_transcript",
+                    "raw_text": "wet say shorter",
+                    "final_text": "Wait, say it shorter.",
+                    "confidence": 0.29,
+                    "reason": "low_confidence",
+                    "needs_confirmation": True,
+                },
+            },
+        },
+        user_message="Wait, say it shorter.",
+        history=[],
+    )
+
+    assert decision["barge_in_policy"]["kind"] == "shorten"
+    assert decision["conversation_director"]["mode"] == "voice_asr_confirmation"
+    assert decision["conversation_director"]["reply_move"] == "clarify"
+    assert decision["question_policy"] == "clarify_only"
+    assert decision["max_sentences"] == 1
+    snapshot = character_brain.build_character_brain_public_snapshot(decision)
+    assert snapshot["asr_status"]["active"] is True
+    assert snapshot["asr_status"]["needs_confirmation"] is True
+    assert snapshot["asr_status"]["confidence"] == 0.29
+    assert "raw_text" not in json.dumps(snapshot, ensure_ascii=False).lower()
+
+
+def test_character_brain_topic_stack_resolves_short_followup_to_recent_topic():
+    first = character_brain.build_character_brain_decision(
+        user_message="Let's tune ASR and Live2D motion next.",
+        history=[],
+    )
+    state = character_brain.update_brain_session_state(
+        None,
+        decision=first,
+        user_message="Let's tune ASR and Live2D motion next.",
+        assistant_reply="Start with ASR turn merging, then tune Live2D motion.",
+        now_ts=2000,
+    )
+    second = character_brain.build_character_brain_decision(
+        user_message="Continue that one, but shorter.",
+        history=[],
+        session_state=state,
+    )
+    next_state = character_brain.update_brain_session_state(
+        state,
+        decision=second,
+        user_message="Continue that one, but shorter.",
+        assistant_reply="Short version: keep the ASR merge, then polish motion.",
+        now_ts=2010,
+    )
+    block = character_brain.build_character_brain_prompt_block(second)
+    snapshot = character_brain.build_character_brain_public_snapshot(
+        second,
+        session_state=next_state,
+    )
+
+    assert state["topic_stack"][0]["topic_id"] == "character_runtime"
+    assert "ASR" in state["topic_stack"][0]["last_user"]
+    assert second["topic_reference"]["active"] is True
+    assert second["topic_reference"]["reply_move"] == "shorten"
+    assert second["topic_reference"]["topic_id"] == "character_runtime"
+    assert second["conversation_director"]["mode"] == "topic_followup"
+    assert second["conversation_director"]["reply_move"] == "shorten"
+    assert second["conversation_director"]["followup_policy"] == "no_topic_reset_question"
+    assert second["max_sentences"] <= 2
+    assert "Topic reference: active=true" in block
+    assert "Topic stack:" in block
+    assert next_state["topic_stack"][0]["topic_id"] == "character_runtime"
+    assert next_state["topic_stack"][0]["turns"] == 2
+    assert snapshot["topic_reference"]["active"] is True
+    assert snapshot["topic_stack"][0]["topic_id"] == "character_runtime"
+    assert "directive" not in snapshot
+
+
+def test_character_brain_topic_stack_resolves_chinese_recent_topic_reference():
+    state = {
+        "topic_stack": [
+            {
+                "topic_id": "character_runtime",
+                "label": "ASR/TTS/Live2D runtime",
+                "intent": "task_help",
+                "last_user": "Tune ASR and Live2D motion.",
+                "last_assistant": "Start with ASR, then tune motion.",
+                "turns": 1,
+                "updated_at": 100,
+            }
+        ]
+    }
+
+    decision = character_brain.build_character_brain_decision(
+        user_message="\u56de\u5230\u521a\u624d\u8bf4\u7684\u90a3\u4e2a\uff0c\u7ee7\u7eed\u8bf4\u5b8c\u3002",
+        history=[],
+        session_state=state,
+    )
+
+    assert decision["topic_reference"]["active"] is True
+    assert decision["topic_reference"]["reply_move"] == "continue_topic"
+    assert decision["topic_reference"]["topic_id"] == "character_runtime"
+    assert decision["conversation_director"]["mode"] == "topic_followup"
+
+
 def test_character_brain_public_snapshot_is_safe_and_compact():
     decision = character_brain.build_character_brain_decision(
         user_message="你觉得我下一步做什么？",
@@ -783,6 +1040,9 @@ def test_character_brain_public_snapshot_is_safe_and_compact():
     assert snapshot["intent"] == "task_help"
     assert snapshot["max_sentences"] <= 3
     assert snapshot["output_constraints"]["clarify_only_when_needed"] is True
+    assert snapshot["reply_quality"]["score"] == 100
+    assert snapshot["reply_quality"]["passed"] is True
+    assert snapshot["asr_status"]["active"] is False
     assert "shorter_replies" in snapshot["feedback_effects"]
     assert "less_generic_tone" in snapshot["feedback_effects"]
     assert "intent_scores" not in snapshot
@@ -1077,6 +1337,26 @@ def test_character_brain_reply_shape_enforces_one_liner_and_execution_summary():
     assert execution["removed_followup"] is True
     assert execution["shortened"] is True
     assert execution["final_sentences"] == 1
+
+
+def test_character_brain_reply_quality_repairs_voice_free_chat_overrun():
+    decision = character_brain.build_character_brain_decision(
+        config={"_input_modality": "voice"},
+        user_message="The rain sound is kind of nice right now.",
+        history=[],
+    )
+
+    reply = character_brain.apply_character_brain_reply_constraints(
+        "Yeah, that sounds nice. I can help with that. Let me know if you need anything else?",
+        decision,
+        user_message="The rain sound is kind of nice right now.",
+    )
+
+    assert len(character_brain._split_reply_sentences(reply)) == 1
+    assert decision["reply_quality"]["passed"] is True
+    assert "too_long_for_voice" in decision["reply_quality"]["pre_issues"]
+    assert "compressed_voice_reply" in decision["reply_quality"]["repair_actions"]
+    assert decision["performance_execution"]["quality_score"] == decision["reply_quality"]["score"]
 
 
 def test_character_brain_question_policy_none_removes_generic_followup_without_fallback():
@@ -1416,6 +1696,8 @@ def test_character_brain_public_snapshot_continuity_is_safe_and_compact():
     assert snapshot["stage_memory"]["callback_cooldown_turns"] >= 0
     assert snapshot["stage_memory"]["last_callback_at"] >= 0
     assert snapshot["safety_clamp"]["level"] in {"none", "safe_scene", "task_scene"}
+    assert snapshot["conversation_director"]["mode"]
+    assert snapshot["conversation_director"]["reply_goal"]
     assert snapshot["motion_director"]["pre_reaction"]
     assert snapshot["motion_director"]["post_settle"]
     assert snapshot["voice_director"]["delivery"]

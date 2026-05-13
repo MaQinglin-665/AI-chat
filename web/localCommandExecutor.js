@@ -104,6 +104,9 @@
       brain_debug: () => {
         append(deps, deps.buildCharacterBrainDebugReport(), { enableTranslation: false });
       },
+      turn_debug: () => {
+        append(deps, deps.buildTurnDebugReport(), { enableTranslation: false });
+      },
       emotion_report: async () => {
         const report = deps.buildEmotionReportText();
         append(deps, report);

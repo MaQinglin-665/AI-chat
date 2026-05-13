@@ -417,9 +417,23 @@
         `peakRms=${peakRms.toFixed(5)}`,
         `noiseFloor=${(Number(state.localAsrNoiseFloor) || 0).toFixed(5)}`,
         `threshold=${(Number(state.localAsrSpeechThreshold) || 0).toFixed(5)}`,
+        `semanticCorrection=${state.asrSemanticCorrectionEnabled !== false}`,
+        `mergeWindowMs=${Number(state.voiceTurnMergeWindowMs || 0)}`,
         `selectedInput=${state.localAsrInputDeviceLabel || "(unknown)"}`,
         `selectedInputMuted=${state.localAsrInputMuted}`
       ];
+      if (state.asrLastCorrectionDebug) {
+        const dbg = state.asrLastCorrectionDebug;
+        lines.push(`asrRaw=${dbg.raw_text || ""}`);
+        lines.push(`asrHotword=${dbg.hotword_text || ""}`);
+        lines.push(`asrContext=${dbg.context_text || ""}`);
+        lines.push(`asrFinal=${dbg.final_text || ""}`);
+        lines.push(`asrMergedParts=${dbg.merged_parts || 1}`);
+        lines.push(`asrConfidence=${Number(dbg.confidence || 0).toFixed(2)}`);
+        lines.push(`asrConfirm=${dbg.needs_confirmation === true}`);
+        lines.push(`asrConfidenceReason=${dbg.confidence_reason || ""}`);
+        lines.push(`asrWaitReason=${dbg.turn_wait_reason || ""}`);
+      }
       if (Array.isArray(state.localAsrInputDeviceCandidates) && state.localAsrInputDeviceCandidates.length) {
         lines.push(`knownInputs=${state.localAsrInputDeviceCandidates.join(" | ")}`);
       }

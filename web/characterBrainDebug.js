@@ -74,6 +74,52 @@
           `\u8fd1\u671f\u9700\u8981\uff1a${clean(continuity.recent_user_need, "\u65e0")}\uff1b\u8fde\u7eed\u8f6e\u6570=${Number(continuity.same_need_turns) || 0}\uff1b\u8870\u51cf=${clean(continuity.decay, "fresh")}`
         ]
       : [];
+    const conversationDirector = safe.conversation_director && typeof safe.conversation_director === "object" && !Array.isArray(safe.conversation_director)
+      ? safe.conversation_director
+      : null;
+    const conversationLines = conversationDirector
+      ? [
+          "",
+          "Conversation Director",
+          `input=${clean(safe.input_modality, "text")}; mode=${clean(conversationDirector.mode, "steady_turn")}; move=${clean(conversationDirector.reply_move, "answer")}; turn=${clean(conversationDirector.turn_taking, "answer_then_yield")}`,
+          `goal=${clean(conversationDirector.reply_goal, "answer_the_latest_message")}; followup=${clean(conversationDirector.followup_policy, "avoid_routine_question")}; beats=${Number(conversationDirector.max_spoken_beats) || 2}; interrupt=${clean(conversationDirector.interruption_policy, "none")}`
+        ]
+      : [];
+    const topicReference = safe.topic_reference && typeof safe.topic_reference === "object" && !Array.isArray(safe.topic_reference)
+      ? safe.topic_reference
+      : null;
+    const topicStack = Array.isArray(safe.topic_stack)
+      ? safe.topic_stack.map((item) => (item && typeof item === "object" && !Array.isArray(item) ? item : null)).filter(Boolean).slice(0, 3)
+      : [];
+    const topicLines = topicReference || topicStack.length
+      ? [
+          "",
+          "Topic Stack",
+          `reference=${topicReference?.active === true ? "active" : "none"}; move=${clean(topicReference?.reply_move, "none")}; target=${clean(topicReference?.topic_id || topicReference?.label, "none")}`,
+          `recent=${topicStack.length ? topicStack.map((item) => `${clean(item.topic_id, "casual")}:${clean(item.label, "topic")}(${Number(item.turns) || 1})`).join(" | ") : "none"}`
+        ]
+      : [];
+    const bargeIn = safe.barge_in_policy && typeof safe.barge_in_policy === "object" && !Array.isArray(safe.barge_in_policy)
+      ? safe.barge_in_policy
+      : null;
+    const bargeInLines = bargeIn
+      ? [
+          "",
+          "Barge-in",
+          `active=${bargeIn.active === true ? "yes" : "no"}; kind=${clean(bargeIn.kind, "none")}; move=${clean(bargeIn.reply_move, "none")}; goal=${clean(bargeIn.goal, "none")}`,
+          `turn_action=${clean(bargeIn.turn_action, "none")}; segment=${clean(bargeIn.segment_role, "none")}`
+        ]
+      : [];
+    const asrStatus = safe.asr_status && typeof safe.asr_status === "object" && !Array.isArray(safe.asr_status)
+      ? safe.asr_status
+      : null;
+    const asrLines = asrStatus
+      ? [
+          "",
+          "ASR",
+          `active=${asrStatus.active === true ? "yes" : "no"}; source=${clean(asrStatus.source, "none")}; confidence=${Number(asrStatus.confidence || 0).toFixed(2)}; confirm=${asrStatus.needs_confirmation === true ? "yes" : "no"}; reason=${clean(asrStatus.reason, "none")}`
+        ]
+      : [];
     const improv = safe.improv && typeof safe.improv === "object" && !Array.isArray(safe.improv)
       ? safe.improv
       : null;
@@ -142,6 +188,9 @@
     const execution = safe.performance_execution && typeof safe.performance_execution === "object" && !Array.isArray(safe.performance_execution)
       ? safe.performance_execution
       : null;
+    const quality = safe.reply_quality && typeof safe.reply_quality === "object" && !Array.isArray(safe.reply_quality)
+      ? safe.reply_quality
+      : null;
     const timeline = safe.performance_timeline && typeof safe.performance_timeline === "object" && !Array.isArray(safe.performance_timeline)
       ? safe.performance_timeline
       : null;
@@ -166,6 +215,23 @@
           `shape=${clean(execution.reply_shape, clean(safe.reply_shape, "none"))}; final_sentences=${Number(execution.final_sentences) || 0}`,
           `removed_followup=${execution.removed_followup === true ? "yes" : "no"}; shortened=${execution.shortened === true ? "yes" : "no"}; used_bit=${execution.used_bit === true ? "yes" : "no"}; removed_unsafe_bit=${execution.removed_unsafe_bit === true ? "yes" : "no"}; removed_context=${execution.removed_context_bleed === true ? "yes" : "no"}`,
           `stage_callback=${execution.stage_callback_added === true ? "added" : clean(execution.stage_callback_suppressed, "no")}; bit=${clean(execution.stage_callback_bit, "none")}`
+        ]
+      : [];
+    const qualityIssues = Array.isArray(quality?.issues)
+      ? quality.issues.map((item) => clean(item, "")).filter(Boolean).slice(0, 8)
+      : [];
+    const qualityPreIssues = Array.isArray(quality?.pre_issues)
+      ? quality.pre_issues.map((item) => clean(item, "")).filter(Boolean).slice(0, 8)
+      : [];
+    const qualityActions = Array.isArray(quality?.repair_actions)
+      ? quality.repair_actions.map((item) => clean(item, "")).filter(Boolean).slice(0, 8)
+      : [];
+    const qualityLines = quality
+      ? [
+          "",
+          "Reply Quality",
+          `score=${Number(quality.score) || 0}; passed=${quality.passed === false ? "no" : "yes"}; issues=${qualityIssues.length ? qualityIssues.join(",") : "none"}`,
+          `pre=${qualityPreIssues.length ? qualityPreIssues.join(",") : "none"}; repairs=${qualityActions.length ? qualityActions.join(",") : "none"}; final=${Number(quality.final_sentences) || 0} sentences/${Number(quality.final_chars) || 0} chars; reason=${clean(quality.reason, "none")}`
         ]
       : [];
     const timelineSuppressed = Array.isArray(timeline?.suppressed)
@@ -257,6 +323,10 @@
       "",
       timeLine,
       ...continuityLines,
+      ...conversationLines,
+      ...topicLines,
+      ...bargeInLines,
+      ...asrLines,
       ...improvLines,
       ...stageMemoryLines,
       ...safetyClampLines,
@@ -270,6 +340,7 @@
       `Spontaneity: ${Number(safe.spontaneity) || 0}/3；Question policy: ${clean(safe.question_policy, "none")}`,
       ...constraintLines,
       ...executionLines,
+      ...qualityLines,
       ...timelineLines,
       ...voiceTimelineLines,
       ...earlyLines,

@@ -1505,10 +1505,10 @@ def _replace_en_words_for_tts(text):
     return result
 
 
-def synthesize_tts_audio(text, voice_override=None, prosody=None, perf_trace_id=""):
+def synthesize_tts_audio(text, voice_override=None, prosody=None, perf_trace_id="", config_override=None):
     perf_trace = _sanitize_perf_trace_id(perf_trace_id)
     total_started_ms = _perf_now_ms()
-    config = load_config()
+    config = config_override if isinstance(config_override, dict) else load_config()
     tts_cfg = config.get("tts", {})
     provider = str(tts_cfg.get("provider", TTS_DEFAULT_PROVIDER)).strip().lower()
     if provider in ("gpt_sovits",):

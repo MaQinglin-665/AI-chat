@@ -2,6 +2,7 @@ import base64
 from http import HTTPStatus
 
 from app_asr_route import decode_audio_base64, handle_asr_pcm_request
+from hotword_utils import apply_hotword_replacements
 
 
 def test_decode_audio_base64_rejects_empty_value():
@@ -35,6 +36,18 @@ def test_handle_asr_pcm_request_applies_hotword_replacements():
 
     assert sent["status"] == HTTPStatus.OK
     assert sent["data"] == {"text": "hello 馨语", "raw_text": "hello taffy"}
+
+
+def test_apply_hotword_replacements_matches_spaced_cjk_asr_text():
+    text = apply_hotword_replacements("心 语你在吗", {"心语": "馨语AI桌宠"})
+
+    assert text == "馨语AI桌宠你在吗"
+
+
+def test_apply_hotword_replacements_avoids_repeating_prefix_expansion():
+    text = apply_hotword_replacements("馨语AI桌宠你好", {"馨语": "馨语AI桌宠"})
+
+    assert text == "馨语AI桌宠你好"
 
 
 def test_handle_asr_pcm_request_reports_transcription_failure():

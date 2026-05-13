@@ -34,6 +34,13 @@
     return out;
   }
 
+  function pushUnique(list, value) {
+    const item = clean(value, "");
+    if (item && Array.isArray(list) && !list.includes(item)) {
+      list.push(item);
+    }
+  }
+
   function countSpeechBeats(text, spontaneity) {
     const safeSpontaneity = clampInt(spontaneity, 0, 0, 3);
     if (safeSpontaneity <= 0) {
@@ -81,25 +88,46 @@
   }
 
   function buildSpeechBeats({ text, spontaneity, style, mood, intent, allowMotion }) {
-    if (allowMotion === false || ["comfort", "reminder", "closing", "low_interrupt_checkin"].includes(intent)) {
+    const intentKey = clean(intent, "casual");
+    if (allowMotion === false || ["comfort", "reminder", "closing", "low_interrupt_checkin"].includes(intentKey)) {
       return [];
     }
-    const count = countSpeechBeats(text, spontaneity);
+    const styleKey = clean(style, "neutral");
+    const moodKey = clean(mood, "idle");
+    const source = String(text || "").trim();
+    const expressive = ["playful", "cheerful", "teasing", "curious"].includes(styleKey)
+      || ["happy", "surprised", "thinking", "annoyed"].includes(moodKey);
+    let count = countSpeechBeats(source, spontaneity);
+    if (count <= 0 && expressive && source.length >= 18 && !["task_help", "reminder"].includes(intentKey)) {
+      count = source.length > 120 ? 2 : 1;
+    }
     const beats = [];
     for (let i = 0; i < count; i += 1) {
-      beats.push(
-        phase(i === 0 ? "speech_beat" : `speech_beat_${i + 1}`, {
-          delayMs: 360 + i * 620,
-          pulseStyle: style,
-          pulseBoost: 0.26 + Math.min(0.18, Number(spontaneity || 0) * 0.04),
-          pulseDurationMs: 180,
-          actionIntent: "talk",
-          actionStyle: style,
-          actionMood: mood,
-          beats: 1,
-          emphasis: Math.min(0.55, 0.18 + Number(spontaneity || 0) * 0.08)
-        })
-      );
+      const cue = moodKey === "thinking" || styleKey === "curious"
+        ? (i === 0 ? "head_tilt" : "tiny_nod")
+        : moodKey === "happy" || moodKey === "surprised" || ["playful", "cheerful"].includes(styleKey)
+          ? (i === 0 ? "tiny_victory_nod" : "blink_pulse")
+          : moodKey === "annoyed" || styleKey === "teasing"
+            ? (i === 0 ? "deadpan_pause" : "side_eye")
+            : (i === 0 ? "tiny_nod" : "blink_pulse");
+      const directed = motionDirectorPhase(cue, "beat", {
+        allowMotion,
+        ttsEnabled: true,
+        style: styleKey,
+        mood: moodKey,
+        index: i
+      });
+      beats.push(directed || phase(i === 0 ? "speech_beat" : `speech_beat_${i + 1}`, {
+        delayMs: 360 + i * 620,
+        pulseStyle: styleKey,
+        pulseBoost: 0.26 + Math.min(0.18, Number(spontaneity || 0) * 0.04),
+        pulseDurationMs: 180,
+        actionIntent: "talk",
+        actionStyle: styleKey,
+        actionMood: moodKey,
+        beats: 1,
+        emphasis: Math.min(0.55, 0.18 + Number(spontaneity || 0) * 0.08)
+      }));
     }
     return beats;
   }
@@ -577,6 +605,34 @@
         actionStyle: "neutral",
         actionMood: mood
       });
+    } else if (mood === "happy" || mood === "surprised" || style === "playful") {
+      speechStart = phase("bright_speech_start", {
+        pulseStyle: "cheerful",
+        pulseBoost: mood === "surprised" ? 0.34 : 0.3,
+        pulseDurationMs: 190,
+        actionIntent: allowMotion && ttsEnabled ? "talk" : "none",
+        actionStyle: "playful",
+        actionMood: mood === "surprised" ? "surprised" : "happy",
+        motionCue: "bright_speech_start",
+        motionRole: "speech_start",
+        motionTags: ["happy", "talk", "wave"],
+        beats: 2,
+        emphasis: 0.42
+      });
+    } else if (style === "clear" || style === "curious") {
+      speechStart = phase(style === "curious" ? "curious_speech_start" : "steady_speech_start", {
+        pulseStyle: style === "curious" ? "clear" : "steady",
+        pulseBoost: 0.24,
+        pulseDurationMs: 180,
+        actionIntent: allowMotion && ttsEnabled ? "talk" : "none",
+        actionStyle: style === "curious" ? "clear" : "steady",
+        actionMood: "thinking",
+        motionCue: style === "curious" ? "curious_speech_start" : "steady_speech_start",
+        motionRole: "speech_start",
+        motionTags: style === "curious" ? ["curious", "head", "talk"] : ["talk", "body", "steady"],
+        beats: 1,
+        emphasis: 0.28
+      });
     }
 
     let speechBeats = ttsEnabled
@@ -673,12 +729,25 @@
       pace: clean(safe.pace, "normal"),
       pause_profile: clean(safe.pause_profile, "light"),
       segment_style: clean(safe.segment_style, "whole"),
+      energy: clean(safe.energy, "neutral"),
+      gesture_profile: clean(safe.gesture_profile, "neutral"),
       pre_pause_ms: clampInt(safe.pre_pause_ms, 0, 0, 1200),
       inter_segment_pause_ms: clampInt(safe.inter_segment_pause_ms, 160, 0, 1600),
       max_segments: clampInt(safe.max_segments, 1, 1, 4),
       thought_type: clean(safe.thought_type, "none"),
       suppressed_reasons: suppressed
     };
+  }
+
+  function hasExplicitVoiceDirector(brain = {}) {
+    return !!(
+      brain
+      && typeof brain === "object"
+      && !Array.isArray(brain)
+      && brain.voice_director
+      && typeof brain.voice_director === "object"
+      && !Array.isArray(brain.voice_director)
+    );
   }
 
   function inferVoiceDirector(brain = {}) {
@@ -761,6 +830,80 @@
     });
   }
 
+  function splitSentenceUnits(source) {
+    const src = String(source || "").replace(/\s+/g, " ").trim();
+    if (!src) {
+      return [];
+    }
+    const units = [];
+    let start = 0;
+    const terminalRe = /[.!?;:\u3002\uFF01\uFF1F\uFF1B\uFF1A\u2026]/;
+    for (let i = 0; i < src.length; i += 1) {
+      if (!terminalRe.test(src[i])) {
+        continue;
+      }
+      let end = i + 1;
+      while (end < src.length && /[.!?\u3002\uFF01\uFF1F\u2026]/.test(src[end])) {
+        end += 1;
+      }
+      while (end < src.length && /["')\]\u201D\u2019]/.test(src[end])) {
+        end += 1;
+      }
+      const piece = src.slice(start, end).trim();
+      if (piece) {
+        units.push(piece);
+      }
+      start = end;
+      while (start < src.length && /\s/.test(src[start])) {
+        start += 1;
+      }
+      i = start - 1;
+    }
+    const tail = src.slice(start).trim();
+    if (tail) {
+      units.push(tail);
+    }
+    return units.length ? units : [src];
+  }
+
+  function splitLongSpeechUnit(unit, targetChars = 48) {
+    const src = String(unit || "").trim();
+    const target = Math.max(28, Math.min(80, Math.round(Number(targetChars) || 48)));
+    if (src.length <= target + 14) {
+      return [src].filter(Boolean);
+    }
+    const chunks = [];
+    let rest = src;
+    while (rest.length > target + 14 && chunks.length < 3) {
+      const windowStart = Math.max(18, target - 16);
+      const windowEnd = Math.min(rest.length - 12, target + 16);
+      let cut = -1;
+      for (let i = windowEnd; i >= windowStart; i -= 1) {
+        if (/[,;:\uFF0C\u3001\uFF1B\uFF1A]/.test(rest[i])) {
+          cut = i + 1;
+          break;
+        }
+      }
+      if (cut < 0) {
+        for (let i = windowEnd; i >= windowStart; i -= 1) {
+          if (/\s/.test(rest[i])) {
+            cut = i + 1;
+            break;
+          }
+        }
+      }
+      if (cut < 0) {
+        cut = target;
+      }
+      chunks.push(rest.slice(0, cut).trim());
+      rest = rest.slice(cut).trim();
+    }
+    if (rest) {
+      chunks.push(rest);
+    }
+    return chunks.filter(Boolean);
+  }
+
   function splitVoiceSegments(text, segmentStyle = "whole", maxSegments = 1) {
     const source = String(text || "").replace(/\s+/g, " ").trim();
     if (!source) {
@@ -771,18 +914,23 @@
     if (style === "whole" || style === "one_liner") {
       return [source];
     }
-    const sentences = source
-      .split(/(?<=[.!?;:\u3002\uFF01\uFF1F])\s+/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-    if (sentences.length <= 1 && source.length > 90) {
-      const midpoint = Math.max(36, Math.min(source.length - 24, Math.floor(source.length / 2)));
-      const splitAt = source.indexOf(", ", midpoint) > -1 ? source.indexOf(", ", midpoint) + 1 : midpoint;
-      const chunks = [source.slice(0, splitAt).trim(), source.slice(splitAt).trim()].filter(Boolean);
-      if (limit <= 1 || chunks.length <= limit) {
-        return limit <= 1 ? [source] : chunks;
-      }
-      return [...chunks.slice(0, limit - 1), chunks.slice(limit - 1).join(" ")].filter(Boolean);
+    let sentences = splitSentenceUnits(source);
+    const commaCount = (source.match(/[,\uFF0C\u3001;\uFF1B:\uFF1A]/g) || []).length;
+    const targetByStyle = {
+      short_soft: 38,
+      thoughtful_beats: 44,
+      breath_beats: 42,
+      thought_burst_beats: 46,
+      mini_rant_beats: 50,
+      step_then_aside: 52,
+      answer_then_bit: 56,
+      two_beat: 58
+    };
+    const target = targetByStyle[style] || 52;
+    const shouldSplitLongUnit = sentences.length <= 1
+      && (source.length > target + 18 || (commaCount >= 2 && ["thoughtful_beats", "breath_beats", "step_then_aside"].includes(style)));
+    if (shouldSplitLongUnit) {
+      sentences = splitLongSpeechUnit(source, target);
     }
     const parts = sentences.length ? sentences : [source];
     if (parts.length <= limit) {
@@ -791,18 +939,185 @@
     return [...parts.slice(0, limit - 1), parts.slice(limit - 1).join(" ")].filter(Boolean);
   }
 
+  function countNaturalVoiceUnits(text) {
+    return splitSentenceUnits(text).length;
+  }
+
+  function analyzeVoiceShape(text) {
+    const source = String(text || "").replace(/\s+/g, " ").trim();
+    const sentences = splitSentenceUnits(source);
+    const commaCount = (source.match(/[,\uFF0C\u3001;\uFF1B:\uFF1A]/g) || []).length;
+    const ellipsisCount = (source.match(/(?:\.{2,}|\u2026|\u3002{2,})/g) || []).length;
+    const questionCount = (source.match(/[?\uFF1F]/g) || []).length;
+    const exclaimCount = (source.match(/[!\uFF01]/g) || []).length;
+    const clauseUnits = Math.max(sentences.length, sentences.length + commaCount + ellipsisCount);
+    return {
+      length: source.length,
+      naturalUnits: sentences.length,
+      commaCount,
+      ellipsisCount,
+      questionCount,
+      exclaimCount,
+      clauseUnits,
+      hasQuestion: questionCount > 0,
+      hasEllipsis: ellipsisCount > 0,
+      isLong: source.length > 110
+    };
+  }
+
+  function refineVoiceDirectorForReply(director, input = {}) {
+    const base = normalizeVoiceDirector(director);
+    if (input.explicitVoiceDirector === true || input.thoughtChoreography === true) {
+      return base;
+    }
+    const text = String(input.replyText || "").replace(/\s+/g, " ").trim();
+    const runtime = input.runtimeMetadata && typeof input.runtimeMetadata === "object" && !Array.isArray(input.runtimeMetadata)
+      ? input.runtimeMetadata
+      : {};
+    const mood = clean(input.mood || runtime.emotion, "idle");
+    const style = clean(input.talkStyle || runtime.voice_style, "neutral");
+    const voiceStyle = clean(runtime.voice_style || style, style);
+    const shape = analyzeVoiceShape(text);
+    const naturalUnits = shape.naturalUnits;
+    const isSoft = ["comfort", "soft", "warm"].includes(style) || ["soft", "warm"].includes(voiceStyle) || ["sad", "anxious"].includes(mood);
+    const isBright = ["playful", "cheerful", "teasing"].includes(style) || ["cheerful", "teasing"].includes(voiceStyle) || ["happy", "surprised"].includes(mood);
+    const isClear = ["clear", "steady", "serious", "curious"].includes(style) || ["serious", "curious"].includes(voiceStyle);
+    const isCurious = ["curious", "thinking"].includes(style) || ["curious", "thinking"].includes(voiceStyle) || mood === "thinking";
+    const isDry = ["annoyed", "angry"].includes(mood) || ["deadpan", "dry", "dry_playful"].includes(style) || ["deadpan", "dry", "dry_playful"].includes(voiceStyle);
+    const patch = {};
+    const suppressed = Array.isArray(base.suppressed_reasons) ? base.suppressed_reasons.slice() : [];
+
+    if (isSoft) {
+      patch.delivery = "soft_low";
+      patch.pace = "slow";
+      patch.pause_profile = "gentle";
+      patch.segment_style = "short_soft";
+      patch.energy = "low";
+      patch.gesture_profile = "soft";
+      patch.pre_pause_ms = 50;
+      patch.inter_segment_pause_ms = 170;
+      patch.max_segments = Math.max(base.max_segments, naturalUnits > 1 || text.length > 42 ? 2 : 1);
+      pushUnique(suppressed, "runtime_soft_voice");
+    } else if (isDry) {
+      patch.delivery = "dry_playful";
+      patch.pace = "measured";
+      patch.pause_profile = "dry_beat";
+      patch.segment_style = shape.clauseUnits >= 2 || text.length > 56 ? "two_beat" : "whole";
+      patch.energy = "dry";
+      patch.gesture_profile = "deadpan";
+      patch.pre_pause_ms = 45;
+      patch.inter_segment_pause_ms = 150;
+      patch.max_segments = Math.max(base.max_segments, naturalUnits > 1 || text.length > 58 ? 2 : 1);
+      pushUnique(suppressed, "runtime_dry_voice");
+    } else if (isBright) {
+      patch.delivery = "bright_pop";
+      patch.pace = "bright";
+      patch.pause_profile = "spark";
+      patch.segment_style = "two_beat";
+      patch.energy = "bright";
+      patch.gesture_profile = "bright";
+      patch.pre_pause_ms = 10;
+      patch.inter_segment_pause_ms = 105;
+      patch.max_segments = Math.max(base.max_segments, naturalUnits > 1 || text.length > 58 ? 2 : 1);
+      pushUnique(suppressed, "runtime_bright_voice");
+    } else if (isCurious) {
+      patch.delivery = "curious_lift";
+      patch.pace = "measured";
+      patch.pause_profile = shape.hasEllipsis ? "thinking" : "curious";
+      patch.segment_style = shape.clauseUnits >= 2 || text.length > 52 ? "thoughtful_beats" : "whole";
+      patch.energy = "focused";
+      patch.gesture_profile = "curious";
+      patch.pre_pause_ms = shape.hasEllipsis ? 70 : 35;
+      patch.inter_segment_pause_ms = shape.hasEllipsis ? 190 : 170;
+      patch.max_segments = Math.max(base.max_segments, naturalUnits > 1 || text.length > 52 ? Math.min(3, Math.max(2, naturalUnits)) : 1);
+      pushUnique(suppressed, "runtime_curious_voice");
+    } else if (isClear) {
+      patch.delivery = "steady_clear";
+      patch.pace = style === "curious" || voiceStyle === "curious" ? "measured" : "steady";
+      patch.pause_profile = "clean";
+      patch.segment_style = text.length > 64 || naturalUnits > 1 ? "step_then_aside" : "whole";
+      patch.energy = "focused";
+      patch.gesture_profile = "steady";
+      patch.pre_pause_ms = 20;
+      patch.inter_segment_pause_ms = 130;
+      patch.max_segments = Math.max(base.max_segments, text.length > 96 ? 3 : (naturalUnits > 1 ? 2 : 1));
+      pushUnique(suppressed, "runtime_clear_voice");
+    }
+
+    if (shape.hasEllipsis) {
+      patch.pre_pause_ms = Math.max(Number(patch.pre_pause_ms || base.pre_pause_ms), 65);
+      patch.inter_segment_pause_ms = Math.max(Number(patch.inter_segment_pause_ms || base.inter_segment_pause_ms), 180);
+      if (!patch.pause_profile || patch.pause_profile === "light" || patch.pause_profile === "clean") {
+        patch.pause_profile = "thinking";
+      }
+      if (!patch.segment_style || patch.segment_style === "whole") {
+        patch.segment_style = "thoughtful_beats";
+      }
+      pushUnique(suppressed, "punctuation_pause_v2");
+    }
+
+    if (shape.hasQuestion && !isSoft) {
+      patch.inter_segment_pause_ms = Math.max(Number(patch.inter_segment_pause_ms || base.inter_segment_pause_ms), 145);
+      if (!patch.delivery || patch.delivery === "steady_clear") {
+        patch.delivery = "curious_lift";
+      }
+      if (!patch.gesture_profile || patch.gesture_profile === "neutral") {
+        patch.gesture_profile = "curious";
+      }
+      pushUnique(suppressed, "question_lift_v2");
+    }
+
+    if (shape.exclaimCount > 0 && isBright) {
+      patch.inter_segment_pause_ms = Math.min(Number(patch.inter_segment_pause_ms || base.inter_segment_pause_ms), 115);
+      pushUnique(suppressed, "bright_snap_v2");
+    }
+
+    if (shape.clauseUnits >= 3 && !isSoft) {
+      patch.segment_style = patch.segment_style === "whole" || !patch.segment_style ? "thoughtful_beats" : patch.segment_style;
+      patch.max_segments = Math.max(Number(patch.max_segments || base.max_segments), Math.min(3, shape.clauseUnits));
+      patch.inter_segment_pause_ms = Math.max(Number(patch.inter_segment_pause_ms || base.inter_segment_pause_ms), isBright ? 120 : 155);
+      pushUnique(suppressed, "clause_aware_segmented_v2");
+    }
+
+    if (shape.isLong) {
+      patch.segment_style = patch.segment_style === "whole" || !patch.segment_style ? "step_then_aside" : patch.segment_style;
+      patch.max_segments = Math.max(Number(patch.max_segments || base.max_segments), 3);
+      patch.inter_segment_pause_ms = Math.max(Number(patch.inter_segment_pause_ms || base.inter_segment_pause_ms), 130);
+      pushUnique(suppressed, "long_reply_segmented");
+    } else if (naturalUnits >= 2 && base.segment_style === "whole") {
+      patch.segment_style = patch.segment_style || "two_beat";
+      patch.max_segments = Math.max(Number(patch.max_segments || base.max_segments), Math.min(2, naturalUnits));
+      pushUnique(suppressed, "sentence_aware_segmented");
+    }
+
+    return normalizeVoiceDirector({
+      ...base,
+      ...patch,
+      suppressed_reasons: suppressed
+    });
+  }
+
   function buildVoiceTimeline(input = {}) {
     const brain = input.brainSnapshot && typeof input.brainSnapshot === "object" && !Array.isArray(input.brainSnapshot)
       ? input.brainSnapshot
       : {};
+    const runtime = input.runtimeMetadata && typeof input.runtimeMetadata === "object" && !Array.isArray(input.runtimeMetadata)
+      ? input.runtimeMetadata
+      : {};
     const ttsEnabled = input.ttsEnabled !== false;
-    const director = inferVoiceDirector(brain);
+    const thoughtChoreography = buildThoughtBurstChoreography(brain);
+    const director = refineVoiceDirectorForReply(inferVoiceDirector(brain), {
+      ...input,
+      runtimeMetadata: runtime,
+      explicitVoiceDirector: hasExplicitVoiceDirector(brain),
+      thoughtChoreography: !!thoughtChoreography
+    });
     const segments = splitVoiceSegments(input.replyText, director.segment_style, director.max_segments);
     const suppressed = [...director.suppressed_reasons];
     if (!ttsEnabled) suppressed.push("tts_disabled");
     const fallbackReason = segments.length ? "none" : "empty_reply";
     return {
-      version: 1,
+      version: 2,
       enabled: ttsEnabled,
       voice_director: director,
       thought_type: clean(director.thought_type, "none"),
@@ -810,6 +1125,8 @@
       pace: director.pace,
       pause_profile: director.pause_profile,
       segment_style: director.segment_style,
+      energy: director.energy,
+      gesture_profile: director.gesture_profile,
       pre_pause_ms: director.pre_pause_ms,
       inter_segment_pause_ms: director.inter_segment_pause_ms,
       max_segments: director.max_segments,
@@ -878,6 +1195,7 @@
     let volume = Number.isFinite(Number(base.volume_ratio)) ? Number(base.volume_ratio) : 1;
 
     if (director.pace === "slow") speed *= 0.92;
+    else if (director.pace === "gentle") speed *= 0.94;
     else if (director.pace === "steady") speed *= 0.98;
     else if (director.pace === "short_pause") speed *= 0.96;
     else if (director.pace === "measured") speed *= 0.97;
@@ -885,9 +1203,23 @@
     else if (director.pace === "bright") speed *= 1.04;
     else if (director.pace === "playful" || director.pace === "steady_playful") speed *= 1.01;
 
+    if (director.pause_profile === "thinking" || director.pause_profile === "curious") {
+      speed *= 0.96;
+      pitch *= 1.01;
+    } else if (director.pause_profile === "dry_beat") {
+      speed *= 0.97;
+      pitch *= 0.99;
+    } else if (director.pause_profile === "spark") {
+      speed *= 1.01;
+    }
+
     if (director.delivery === "soft_low" || director.delivery === "soft_close" || director.delivery === "soft_clear") {
       pitch *= 0.97;
       volume *= 0.94;
+    } else if (director.delivery === "warm_close") {
+      speed *= 0.96;
+      pitch *= 0.98;
+      volume *= 0.95;
     } else if (director.delivery === "steady_clear" || director.delivery === "answer_first") {
       pitch *= 0.99;
       volume *= 1.01;
@@ -903,6 +1235,24 @@
       speed *= 1.03;
       pitch *= 1.03;
       volume *= 1.01;
+    } else if (director.delivery === "curious_lift") {
+      speed *= 0.98;
+      pitch *= 1.03;
+      volume *= 1.01;
+    }
+
+    if (director.energy === "low") {
+      speed *= 0.97;
+      volume *= 0.97;
+    } else if (director.energy === "bright") {
+      speed *= 1.02;
+      pitch *= 1.01;
+    } else if (director.energy === "focused") {
+      speed *= 0.98;
+      pitch *= 1.005;
+    } else if (director.energy === "dry") {
+      speed *= 0.98;
+      pitch *= 0.99;
     }
 
     speed = clampNumber(speed, 1, 0.82, 1.24);
@@ -917,7 +1267,9 @@
       pitch: formatPitchHz(pitch),
       volume: formatProsodyPercent(volume),
       voice_director_delivery: director.delivery,
-      voice_director_pace: director.pace
+      voice_director_pace: director.pace,
+      voice_director_energy: director.energy,
+      voice_director_gesture_profile: director.gesture_profile
     };
   }
 

@@ -237,6 +237,250 @@ def test_chat_payload_includes_compact_character_brain_continuity(monkeypatch):
     assert "directive" not in brain
 
 
+def test_conversation_context_prompt_block_sanitizes_interrupted_turn():
+    context = app._sanitize_conversation_context(
+        {
+            "interruption": {
+                "reason": "user_speech_start",
+                "speech_active": True,
+                "turn_id": 12,
+                "previous_user_message": "Tell me the plan with api_key=SECRET_VALUE",
+                "assistant_partial": "First I would use sk-1234567890abcdef and then keep talking.",
+                "turn_manager": {
+                    "action": "finish_key_sentence",
+                    "reason": "key_segment",
+                    "protected_key_sentence": True,
+                    "segment_index": 1,
+                    "segment_role": "key",
+                    "interruption_policy": "finish_key_sentence_before_yield",
+                    "reply_move": "answer",
+                    "private_prompt": "SHOULD_NOT_LEAK",
+                },
+                "raw_history": "SHOULD_NOT_LEAK",
+            }
+        }
+    )
+    block = app._build_conversation_context_prompt_block(context, "Wait, say it shorter.")
+
+    assert context["interruption"]["reason"] == "user_speech_start"
+    assert context["interruption"]["assistant_summary"]
+    assert context["interruption"]["previous_user_summary"]
+    assert "Conversation continuity hint" in block
+    assert "natural continuation or barge-in" in block
+    assert "Answer the latest user message first" in block
+    assert context["interruption"]["turn_manager"]["action"] == "finish_key_sentence"
+    assert context["interruption"]["turn_manager"]["protected_key_sentence"] is True
+    assert "Turn manager: action=finish_key_sentence" in block
+    assert "segment_role=key" in block
+    assert "Barge-in reply policy: kind=shorten" in block
+    assert "reply_move=shorten" in block
+    assert "SHOULD_NOT_LEAK" not in block
+    assert "SECRET_VALUE" not in block
+    assert "sk-1234567890abcdef" not in block
+    assert "[redacted]" in block
+
+
+def test_conversation_context_prompt_block_handles_low_confidence_asr():
+    context = app._sanitize_conversation_context(
+        {
+            "asr": {
+                "source": "voice_transcript",
+                "raw_text": "um api_key=SECRET_VALUE",
+                "final_text": "um",
+                "confidence": 0.27,
+                "reason": "very_short",
+                "needs_confirmation": True,
+                "raw_history": "SHOULD_NOT_LEAK",
+            }
+        }
+    )
+    block = app._build_conversation_context_prompt_block(context)
+
+    assert context["asr"]["needs_confirmation"] is True
+    assert context["asr"]["confidence"] == 0.27
+    assert "speech recognition" in block
+    assert "needs_confirmation=true" in block
+    assert "confirm the likely meaning" in block
+    assert "SHOULD_NOT_LEAK" not in block
+    assert "SECRET_VALUE" not in block
+    assert "[redacted]" in block
+
+
+def test_base_prompt_includes_interruption_context_without_history_leak(monkeypatch):
+    cfg = _build_test_config()
+    cfg["assistant_prompt"] = "Base prompt."
+    cfg["llm"] = {"provider": "openai"}
+    cfg["_conversation_context"] = app._sanitize_conversation_context(
+        {
+            "interruption": {
+                "reason": "new_user_turn",
+                "speech_active": False,
+                "previous_user_message": "Explain the ASR issue.",
+                "assistant_partial": "The first thing I would check is the microphone level.",
+            }
+        }
+    )
+
+    monkeypatch.setattr(app, "build_manual_persona_card_block", lambda: "")
+    monkeypatch.setattr(app, "build_wakeup_summary_block", lambda: "")
+    monkeypatch.setattr(app, "build_persona_memory_block", lambda: "")
+    monkeypatch.setattr(app, "build_relationship_memory_block", lambda: "")
+    monkeypatch.setattr(app, "build_memory_prompt_block", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(app, "load_emotion_state", lambda: {})
+    monkeypatch.setattr(
+        app,
+        "build_prompt_with_history_summary",
+        lambda **kwargs: (kwargs["base_prompt"], []),
+    )
+
+    prompt, safe_history = app._build_base_prompt(
+        cfg,
+        "Actually, stop there.",
+        [{"role": "user", "content": "raw history api_key=SECRET"}],
+        cfg["llm"],
+        "openai",
+    )
+
+    assert safe_history == []
+    assert "Conversation continuity hint" in prompt
+    assert "Explain the ASR issue." in prompt
+    assert "microphone level" in prompt
+    assert "Barge-in reply policy: kind=stop" in prompt
+    assert "raw history" not in prompt
+    assert "api_key=SECRET" not in prompt
+
+
+def test_chat_payload_marks_voice_input_for_character_brain(monkeypatch):
+    cfg = _build_test_config()
+    monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: "tiny spoken reply")
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(
+            f"{base}/api/chat",
+            {
+                "message": "The rain sound is kind of nice right now.",
+                "history": [],
+                "input_modality": "voice",
+            },
+        )
+
+    assert status == 200
+    brain = payload.get("character_brain")
+    assert isinstance(brain, dict)
+    assert brain.get("input_modality") == "voice"
+    assert brain.get("conversation_director", {}).get("mode") == "voice_free_chat"
+    assert brain.get("conversation_director", {}).get("reply_move") == "riff"
+    assert brain.get("conversation_director", {}).get("max_spoken_beats") == 1
+    assert brain.get("max_sentences") <= 2
+    assert brain.get("reply_quality", {}).get("score") >= 80
+    assert brain.get("asr_status", {}).get("active") is False
+    assert "directive" not in brain
+
+
+def test_chat_payload_routes_uncertain_asr_to_confirmation_director(monkeypatch):
+    cfg = _build_test_config()
+    monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: "Did you mean 'um'?")
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(
+            f"{base}/api/chat",
+            {
+                "message": "um",
+                "history": [],
+                "input_modality": "voice",
+                "conversation_context": {
+                    "asr": {
+                        "source": "voice_transcript",
+                        "raw_text": "um",
+                        "final_text": "um",
+                        "confidence": 0.28,
+                        "reason": "very_short",
+                        "needs_confirmation": True,
+                    }
+                },
+            },
+        )
+
+    assert status == 200
+    brain = payload.get("character_brain")
+    assert isinstance(brain, dict)
+    assert brain.get("input_modality") == "voice"
+    assert brain.get("conversation_director", {}).get("mode") == "voice_asr_confirmation"
+    assert brain.get("conversation_director", {}).get("reply_move") == "clarify"
+    assert brain.get("conversation_director", {}).get("max_spoken_beats") == 1
+    assert brain.get("question_policy") == "clarify_only"
+    assert brain.get("max_sentences") == 1
+    assert brain.get("asr_status", {}).get("active") is True
+    assert brain.get("asr_status", {}).get("needs_confirmation") is True
+    assert brain.get("asr_status", {}).get("confidence") == 0.28
+    assert "directive" not in brain
+
+
+def test_chat_payload_keeps_barge_in_reply_policy_for_followup(monkeypatch):
+    cfg = _build_test_config()
+    monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: "Short version: check the ASR confidence first.")
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(
+            f"{base}/api/chat",
+            {
+                "message": "Wait, say it shorter.",
+                "history": [],
+                "conversation_context": {
+                    "interruption": {
+                        "reason": "user_speech_start",
+                        "assistant_partial": "I was explaining a long ASR debugging sequence.",
+                        "previous_user_message": "Tell me the plan.",
+                    }
+                },
+            },
+        )
+
+    assert status == 200
+    brain = payload.get("character_brain")
+    assert isinstance(brain, dict)
+    assert brain.get("barge_in_policy", {}).get("kind") == "shorten"
+    assert brain.get("conversation_director", {}).get("mode") == "barge_in_adjustment"
+    assert brain.get("conversation_director", {}).get("reply_move") == "shorten"
+    assert brain.get("conversation_director", {}).get("followup_policy") == "do_not_resume_unasked"
+    assert brain.get("question_policy") == "none"
+    assert brain.get("reply_quality", {}).get("score") >= 80
+    assert "directive" not in brain
+
+
+def test_chat_payload_resolves_topic_followup_from_previous_turn(monkeypatch):
+    cfg = _build_test_config()
+    monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: "compact reply")
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        first_status, _first_payload = _post_json(
+            f"{base}/api/chat",
+            _chat_payload("Let's tune ASR and Live2D motion next."),
+        )
+        second_status, second_payload = _post_json(
+            f"{base}/api/chat",
+            _chat_payload("Continue that one, but shorter."),
+        )
+
+    assert first_status == 200
+    assert second_status == 200
+    brain = second_payload.get("character_brain")
+    assert isinstance(brain, dict)
+    assert brain.get("topic_reference", {}).get("active") is True
+    assert brain.get("topic_reference", {}).get("reply_move") == "shorten"
+    assert brain.get("topic_reference", {}).get("topic_id") == "character_runtime"
+    assert brain.get("conversation_director", {}).get("mode") == "topic_followup"
+    assert brain.get("conversation_director", {}).get("reply_move") == "shorten"
+    assert brain.get("topic_stack", [{}])[0].get("topic_id") == "character_runtime"
+    assert "directive" not in brain
+
+
+def test_auto_input_modality_wins_over_voice_alias():
+    assert app._sanitize_input_modality("voice", is_auto=True) == "auto"
+    assert app._sanitize_input_modality("speech") == "voice"
+    assert app._sanitize_input_modality("keyboard") == "text"
+
+
 def test_chat_payload_applies_brain_reply_text_constraints(monkeypatch):
     cfg = _build_test_config()
     cfg["assistant_reply_language"] = "en"
