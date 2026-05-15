@@ -4,6 +4,18 @@ import re
 import time
 from typing import Any, Dict, Iterable, List, Optional
 
+from character_brain_intent_strategy import (
+    INTENT_OUTPUT_CONSTRAINTS,
+    INTENT_PRIORITIES,
+    _constraints_for_intent as _constraints_for_intent_impl,
+    _format_output_constraints_for_prompt as _format_output_constraints_for_prompt_impl,
+    _is_style_feedback_message as _is_style_feedback_message_impl,
+    _public_output_constraints as _public_output_constraints_impl,
+    _select_intent_from_scores as _select_intent_from_scores_impl,
+    classify_user_intent as _classify_user_intent_impl,
+    score_user_intents as _score_user_intents_impl,
+)
+import character_brain_topic_strategy as topic_strategy
 from character_brain_barge import (
     apply_barge_in_policy_controls as _apply_barge_in_policy_controls_impl,
     detect_barge_in_reply_policy as _detect_barge_in_reply_policy_impl,
@@ -60,128 +72,13 @@ LIVE2D_HINTS = {
     "thinking": "idle_relaxed",
 }
 
-INTENT_PRIORITIES = {
-    "comfort": 100,
-    "reminder": 90,
-    "feedback": 85,
-    "closing": 80,
-    "task_help": 70,
-    "encouragement": 60,
-    "question": 50,
-    "greeting": 40,
-    "thought_burst": 35,
-    "low_interrupt_checkin": 30,
-    "casual": 10,
-}
-
-INTENT_OUTPUT_CONSTRAINTS = {
-    "greeting": {
-        "max_sentences": 2,
-        "allow_followup_question": False,
-        "clarify_only_when_needed": False,
-        "allow_teasing": True,
-        "allow_motion": True,
-        "voice_style": "cheerful",
-    },
-    "comfort": {
-        "max_sentences": 3,
-        "allow_followup_question": False,
-        "clarify_only_when_needed": False,
-        "allow_teasing": False,
-        "allow_motion": False,
-        "voice_style": "soft",
-    },
-    "encouragement": {
-        "max_sentences": 2,
-        "allow_followup_question": False,
-        "clarify_only_when_needed": False,
-        "allow_teasing": True,
-        "allow_motion": True,
-        "voice_style": "cheerful",
-    },
-    "reminder": {
-        "max_sentences": 2,
-        "allow_followup_question": False,
-        "clarify_only_when_needed": False,
-        "allow_teasing": False,
-        "allow_motion": True,
-        "voice_style": "serious",
-    },
-    "feedback": {
-        "max_sentences": 2,
-        "allow_followup_question": False,
-        "clarify_only_when_needed": False,
-        "allow_teasing": False,
-        "allow_motion": True,
-        "voice_style": "neutral",
-    },
-    "closing": {
-        "max_sentences": 2,
-        "allow_followup_question": False,
-        "clarify_only_when_needed": False,
-        "allow_teasing": False,
-        "allow_motion": True,
-        "voice_style": "soft",
-    },
-    "task_help": {
-        "max_sentences": 4,
-        "allow_followup_question": True,
-        "clarify_only_when_needed": True,
-        "allow_teasing": False,
-        "allow_motion": True,
-        "voice_style": "serious",
-    },
-    "question": {
-        "max_sentences": 3,
-        "allow_followup_question": True,
-        "clarify_only_when_needed": True,
-        "allow_teasing": True,
-        "allow_motion": True,
-        "voice_style": "neutral",
-    },
-    "casual": {
-        "max_sentences": 2,
-        "allow_followup_question": False,
-        "clarify_only_when_needed": False,
-        "allow_teasing": True,
-        "allow_motion": True,
-        "voice_style": "neutral",
-    },
-    "low_interrupt_checkin": {
-        "max_sentences": 1,
-        "allow_followup_question": False,
-        "clarify_only_when_needed": False,
-        "allow_teasing": False,
-        "allow_motion": False,
-        "voice_style": "soft",
-    },
-    "thought_burst": {
-        "max_sentences": 4,
-        "allow_followup_question": False,
-        "clarify_only_when_needed": False,
-        "allow_teasing": True,
-        "allow_motion": True,
-        "voice_style": "teasing",
-    },
-}
-
 SESSION_RESET_AFTER_SEC = 30 * 60
 SESSION_SOFT_DECAY_AFTER_SEC = 10 * 60
 STAGE_CALLBACK_COOLDOWN_TURNS = 2
 IMPROV_HIGH_CHAOS_INTENTS = {"greeting", "casual", "question", "encouragement", "thought_burst"}
 IMPROV_SAFE_CLAMP_INTENTS = {"comfort", "reminder", "feedback", "closing", "low_interrupt_checkin"}
-TOPIC_STACK_LIMIT = 3
-
-TOPIC_LABELS = {
-    "persona_feedback": "persona feedback",
-    "emotional_support": "emotional support",
-    "character_runtime": "ASR/TTS/Live2D runtime",
-    "coding": "coding",
-    "planning": "next-step planning",
-    "task": "task thread",
-    "progress": "progress",
-    "casual": "casual chat",
-}
+TOPIC_STACK_LIMIT = topic_strategy.TOPIC_STACK_LIMIT
+TOPIC_LABELS = topic_strategy.TOPIC_LABELS
 
 STYLE_BEATS = {
     "greeting": [
@@ -381,28 +278,7 @@ def _is_next_step_request(user_message: str) -> bool:
 
 
 def _is_style_feedback_message(user_message: str) -> bool:
-    text = _clean_text(user_message, 300).lower()
-    compact = re.sub(r"\s+", "", text)
-    if not text:
-        return False
-    if re.search(
-        r"(what are you talking about|that made no sense|this makes no sense|too abstract|sounds random|"
-        r"you sound weird|that was weird|not human|more human|speak normally|talk normally|less weird|"
-        r"your reply|your answer|what you said|you said).{0,80}"
-        r"(weird|strange|odd|confusing|random|nonsense|abstract|robot|ai|customer service)",
-        text,
-    ):
-        return True
-    return bool(
-        re.search(
-            r"(说人话|不像人话|人话味|ai味|机器人味|客服味|莫名其妙|听不懂|看不懂|答非所问|不自然|"
-            r"太抽象|很抽象|抽象|跑题|随机|乱说)",
-            text,
-        )
-        or re.search(r"(你的|你这|你刚才|你说的|回复|回答|想法).{0,12}(好奇特|奇怪|很怪|怪怪|离谱|抽象)", text)
-        or re.search(r"(你的想法|你这想法|你刚才说的).{0,16}(curious|weird|strange|odd)", compact)
-    )
-
+    return _is_style_feedback_message_impl(user_message)
 
 def _history_tail_text(history: Iterable[Any], max_items: int = 4) -> str:
     if not isinstance(history, list):
@@ -419,152 +295,35 @@ def _history_tail_text(history: Iterable[Any], max_items: int = 4) -> str:
 
 
 def _derive_topic(user_message: str, intent: str) -> str:
-    text = _clean_text(user_message, 300).lower()
-    compact = re.sub(r"\s+", "", text)
-    if intent == "feedback":
-        return "persona_feedback"
-    if intent == "comfort":
-        return "emotional_support"
-    if re.search(r"(voice|tts|asr|live2d|motion|expression|speech|sentence)", compact):
-        return "character_runtime"
-    if re.search(r"(code|bug|fix|implement|error|traceback|test|pytest)", compact):
-        return "coding"
-    if _is_next_step_request(user_message) or re.search(r"(todo|plan|roadmap|priority)", compact):
-        return "planning"
-    if re.search(r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u5148\u505a\u4ec0\u4e48|\u8be5\u505a\u4ec0\u4e48|\u8ba1\u5212|\u4f18\u5148)", text):
-        return "planning"
-    if intent in {"task_help", "question"}:
-        return "task"
-    if intent == "encouragement":
-        return "progress"
-    return "casual"
+    return topic_strategy.derive_topic(
+        user_message,
+        intent,
+        is_next_step_request=_is_next_step_request,
+    )
 
 
 def _clean_topic_excerpt(value: Any, max_len: int = 90) -> str:
-    text = _clean_text(value, max_len)
-    if not text:
-        return ""
-    text = re.sub(
-        r"(?i)(?:api[_-]?key|secret|password|passwd|token)\s*[:=]\s*['\"]?[^'\"\s,;]+",
-        "[redacted]",
-        text,
-    )
-    return _clean_text(text, max_len)
+    return topic_strategy.clean_topic_excerpt(value, max_len=max_len)
 
 
 def _topic_label_for(topic: str, user_message: str = "") -> str:
-    safe_topic = _clean_text(topic, 48) or "casual"
-    if safe_topic in TOPIC_LABELS:
-        return TOPIC_LABELS[safe_topic]
-    excerpt = _clean_topic_excerpt(user_message, 48)
-    return excerpt or safe_topic
+    return topic_strategy.topic_label_for(topic, user_message)
 
 
 def _public_topic_stack(value: Optional[Any]) -> List[Dict[str, Any]]:
-    if isinstance(value, dict):
-        raw_stack = value.get("topic_stack")
-    else:
-        raw_stack = value
-    if not isinstance(raw_stack, list):
-        return []
-    stack: List[Dict[str, Any]] = []
-    for item in raw_stack:
-        if not isinstance(item, dict):
-            continue
-        topic_id = _clean_text(item.get("topic_id") or item.get("topic"), 48)
-        label = _clean_text(item.get("label"), 64) or _topic_label_for(topic_id)
-        if not topic_id and not label:
-            continue
-        stack.append(
-            {
-                "topic_id": topic_id or "casual",
-                "label": label,
-                "intent": _clean_text(item.get("intent"), 40) or "casual",
-                "last_user": _clean_topic_excerpt(item.get("last_user") or item.get("user_excerpt"), 90),
-                "last_assistant": _clean_topic_excerpt(
-                    item.get("last_assistant") or item.get("assistant_excerpt"),
-                    90,
-                ),
-                "turns": max(1, min(99, _safe_int(item.get("turns"), 1))),
-                "updated_at": max(0, _safe_int(item.get("updated_at"), 0)),
-            }
-        )
-        if len(stack) >= TOPIC_STACK_LIMIT:
-            break
-    return stack
+    return topic_strategy.public_topic_stack(value)
 
 
 def _detect_topic_reference_move(user_message: str) -> str:
-    text = _clean_text(user_message, 240).lower()
-    compact = re.sub(r"\s+", "", text)
-    if not compact:
-        return ""
-    if re.search(r"(notthat|thatsnotit|that'snotit|wrongthread|wrongtopic)", compact) or re.search(
-        r"(\u4e0d\u662f\u8fd9\u4e2a|\u4e0d\u662f\u90a3\u4e2a|\u4e0d\u5bf9|\u6211\u4e0d\u662f\u8bf4)",
-        text,
-    ):
-        return "repair"
-    if re.search(r"(shorter|toomuch|too long|summari[sz]e|one sentence|briefly)", text) or re.search(
-        r"(\u8bf4\u77ed\u70b9|\u77ed\u4e00\u70b9|\u7b80\u5355\u70b9|\u7b80\u77ed|\u592a\u957f|\u522b\u5c55\u5f00|\u4e00\u53e5\u8bdd|\u5c11\u4e00\u70b9)",
-        text,
-    ):
-        return "shorten"
-    if re.search(r"(more detail|elaborate|expand|go deeper|tell me more)", text) or re.search(
-        r"(\u8be6\u7ec6\u70b9|\u5c55\u5f00|\u591a\u8bf4\u4e00\u70b9|\u7ec6\u8bf4)",
-        text,
-    ):
-        return "expand"
-    if re.search(r"(rephrase|say it differently|different wording|another way)", text) or re.search(
-        r"(\u6362\u4e2a\u8bf4\u6cd5|\u91cd\u65b0\u8bf4|\u6362\u4e00\u4e0b)",
-        text,
-    ):
-        return "rephrase"
-    if re.search(r"(continue|go on|keep going|same topic|that one|that thing|what about that|about it|back to that|previous point|last thing)", text) or re.search(
-        r"(\u7ee7\u7eed|\u63a5\u7740|\u63a5\u4e0a|\u8bf4\u4e0b\u53bb|\u8bf4\u5b8c|\u56de\u5230\u521a\u624d|\u521a\u624d\u90a3\u4e2a|\u521a\u521a\u90a3\u4e2a|\u521a\u624d\u8bf4\u7684|\u4e0a\u4e00\u4e2a|\u4e0a\u4e00\u70b9|\u90a3\u4e2a\u5462|\u8fd9\u4e2a\u5462|\u8fd8\u662f\u8fd9\u4e2a|\u90a3\u90e8\u5206)",
-        text,
-    ):
-        return "continue_topic"
-    return ""
+    return topic_strategy.detect_topic_reference_move(user_message)
 
 
 def _public_topic_reference(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    raw = value if isinstance(value, dict) else {}
-    move = _clean_text(raw.get("reply_move"), 48)
-    if move not in {"continue_topic", "shorten", "expand", "rephrase", "repair"}:
-        move = "none"
-    topic_id = _clean_text(raw.get("topic_id"), 48)
-    label = _clean_text(raw.get("label"), 64) or _topic_label_for(topic_id)
-    try:
-        confidence = float(raw.get("confidence", 0.0))
-    except (TypeError, ValueError):
-        confidence = 0.0
-    active = raw.get("active") is True and move != "none" and bool(topic_id or label)
-    return {
-        "active": bool(active),
-        "reply_move": move if active else "none",
-        "topic_id": topic_id,
-        "label": label if active else "",
-        "reason": _clean_text(raw.get("reason"), 48) if active else "",
-        "confidence": max(0.0, min(1.0, confidence if active else 0.0)),
-    }
+    return topic_strategy.public_topic_reference(value)
 
 
 def _build_topic_reference(user_message: str, topic_stack: Optional[Any]) -> Dict[str, Any]:
-    stack = _public_topic_stack(topic_stack)
-    move = _detect_topic_reference_move(user_message)
-    if not move or not stack:
-        return _public_topic_reference({})
-    target = stack[0]
-    return _public_topic_reference(
-        {
-            "active": True,
-            "reply_move": move,
-            "topic_id": target.get("topic_id"),
-            "label": target.get("label"),
-            "reason": "implicit_recent_topic",
-            "confidence": 0.72 if len(stack) == 1 else 0.64,
-        }
-    )
+    return topic_strategy.build_topic_reference(user_message, topic_stack)
 
 
 def _update_topic_stack(
@@ -577,41 +336,15 @@ def _update_topic_stack(
     decision: Optional[Dict[str, Any]] = None,
     now: int = 0,
 ) -> List[Dict[str, Any]]:
-    stack = _public_topic_stack(previous)
-    ref = _public_topic_reference(
-        decision.get("topic_reference") if isinstance(decision, dict) else None
+    return topic_strategy.update_topic_stack(
+        previous,
+        topic=topic,
+        intent=intent,
+        user_message=user_message,
+        assistant_reply=assistant_reply,
+        decision=decision,
+        now=now,
     )
-    target_id = _clean_text(ref.get("topic_id"), 48) if ref.get("active") else ""
-    topic_id = target_id or _clean_text(topic, 48) or "casual"
-    label = _clean_text(ref.get("label"), 64) if ref.get("active") else ""
-    label = label or _topic_label_for(topic_id, user_message)
-    user_excerpt = _clean_topic_excerpt(user_message, 90)
-    assistant_excerpt = _clean_topic_excerpt(assistant_reply, 90)
-    if not user_excerpt and not assistant_excerpt:
-        return stack[:TOPIC_STACK_LIMIT]
-
-    existing: Optional[Dict[str, Any]] = None
-    rest: List[Dict[str, Any]] = []
-    for item in stack:
-        if not existing and _clean_text(item.get("topic_id"), 48) == topic_id:
-            existing = item
-            continue
-        rest.append(item)
-    existing = existing or {}
-    existing_intent = _clean_text(existing.get("intent"), 40)
-    next_intent = _clean_text(intent, 40) or existing_intent or "casual"
-    if ref.get("active") and existing_intent and next_intent in {"casual", "question"}:
-        next_intent = existing_intent
-    entry = {
-        "topic_id": topic_id,
-        "label": label,
-        "intent": next_intent,
-        "last_user": user_excerpt or _clean_topic_excerpt(existing.get("last_user"), 90),
-        "last_assistant": assistant_excerpt or _clean_topic_excerpt(existing.get("last_assistant"), 90),
-        "turns": max(1, min(99, _safe_int(existing.get("turns"), 0) + 1)),
-        "updated_at": max(0, _safe_int(now, 0)),
-    }
-    return [entry, *rest][:TOPIC_STACK_LIMIT]
 
 
 def _stable_text_score(*parts: Any) -> int:
@@ -1744,154 +1477,27 @@ def update_brain_session_state(
 
 
 def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str, int]:
-    text = _clean_text(user_message, 300)
-    lower = text.lower()
-    compact = re.sub(r"\s+", "", lower)
-    scores = {intent: 0 for intent in INTENT_PRIORITIES}
-    scores["casual"] = 1
-    if is_auto:
-        scores["low_interrupt_checkin"] = 999
-        return scores
-
-    def add_if(pattern: str, intent: str, points: int, source: str = compact) -> None:
-        if re.search(pattern, source):
-            scores[intent] = scores.get(intent, 0) + points
-
-    add_if(
-        r"(sad|tired|anxious|upset|hurt|overwhelmed|lonely|depressed|panic|scared|stress|wornout|exhausted|drained|wipedout|burnedout|burntout|feelbad|feelingbad|feelawful|feelingawful|unwell|stillhurts|notokay|cantshakeit|can'tshakeit|notoverit|staywithme|needcompany|needcomfort)",
-        "comfort",
-        120,
-    )
-    add_if(
-        r"(\u96be\u53d7|\u4f24\u5fc3|\u7126\u8651|\u5d29\u6e83|\u88ab\u5426\u5b9a|\u4e0d\u5f00\u5fc3|\u538b\u529b|\u7d2f|\u5bb3\u6015|\u7f13\u4e0d\u8fc7\u6765|\u6ca1\u7f13\u8fc7\u6765|\u8fd8\u662f\u6709\u70b9|\u5fc3\u91cc\u5835)",
-        "comfort",
-        120,
-        text,
-    )
-    if _is_style_feedback_message(user_message):
-        scores["feedback"] += 125
-    add_if(
-        r"(nextstep|whatshouldidonext|whatdoidonext|whatnext|nexttodo|todo|roadmap|priority)",
-        "task_help",
-        80,
-    )
-    add_if(
-        r"(\u4e0b\u4e00\u6b65|\u63a5\u4e0b\u6765|\u8be5\u505a\u4ec0\u4e48|\u5148\u505a\u4ec0\u4e48|\u600e\u4e48\u63a8\u8fdb)",
-        "task_help",
-        80,
-        text,
-    )
-    add_if(r"(done|finished|completed|shipped|fixed|madeit|wrappedup)", "encouragement", 65)
-    add_if(
-        r"(\u505a\u5b8c\u4e86|\u5b8c\u6210\u4e86|\u641e\u5b9a\u4e86|\u4fee\u597d\u4e86|\u7ed3\u675f\u4e86)",
-        "encouragement",
-        65,
-        text,
-    )
-    add_if(r"\b(hello|hi|hey|good morning|good evening|are you there)\b", "greeting", 60, lower)
-    add_if(r"(\u4f60\u597d|\u65e9\u5b89|\u665a\u5b89|\u5728\u5417)", "greeting", 60, text)
-    add_if(r"(encourage|encourageme|cheerme|cheermeup|needapush|motivateme|peptalk)", "encouragement", 95)
-    add_if(r"(\u9f13\u52b1|\u52a0\u6cb9|\u6253\u6c14|\u5938\u6211)", "encouragement", 95, text)
-    add_if(r"(remind|timer|alarm|calendar|schedule|in\d+minutes|in\d+hours)", "reminder", 90)
-    add_if(
-        r"(\u63d0\u9192|\u95f9\u949f|\u65e5\u7a0b|\u5206\u949f\u540e|\u5c0f\u65f6\u540e)",
-        "reminder",
-        90,
-        text,
-    )
-    add_if(
-        r"\b(goodbye|bye|sleep|sign off|signoff|wrap up|wrapup|see you (later|soon|tomorrow|next time)|seeyoulater|seeyousoon|offline)\b",
-        "closing",
-        75,
-        lower,
-    )
-    add_if(r"(\u4e0b\u7ebf|\u7761\u4e86|\u518d\u89c1|\u62dc\u62dc|\u6536\u5c3e)", "closing", 75, text)
-    add_if(
-        r"(code|bug|fix|implement|error|traceback|pytest|debug|refactor|plan|analy[sz]e|helpme)",
-        "task_help",
-        70,
-    )
-    add_if(
-        r"(helpme(fix|debug|implement|ship|test)|canyouhelpme(fix|debug|implement|ship|test)|help.*(fix|debug|implement|project))",
-        "task_help",
-        45,
-    )
-    add_if(
-        r"(\u4ee3\u7801|\u62a5\u9519|\u4fee\u590d|\u5b9e\u73b0|\u600e\u4e48\u505a|\u5e2e\u6211|\u5206\u6790|\u8ba1\u5212)",
-        "task_help",
-        70,
-        text,
-    )
-    add_if(
-        r"(testtts|ttstest|testvoice|voicetest|speechtest|longersentence|longsentence|whatshouldicheck)",
-        "task_help",
-        90,
-    )
-    add_if(
-        r"((voice|tts|asr|live2d|motion).{0,24}(failed|failure|broken|notworking|doesn.?twork))",
-        "task_help",
-        90,
-    )
-    if "?" in text or "\uff1f" in text:
-        scores["question"] += 45
-    add_if(r"^(what|why|how|when|where|who|can|could|should|is|are|do|does)\b", "question", 35, lower)
-    add_if(r"(\u4ec0\u4e48|\u4e3a\u4ec0\u4e48|\u600e\u4e48|\u5417|\u5462)", "question", 35, text)
-    return scores
+    return _score_user_intents_impl(user_message, is_auto=is_auto)
 
 
 def _select_intent_from_scores(scores: Dict[str, int]) -> str:
-    if not isinstance(scores, dict):
-        return "casual"
-    best_intent = "casual"
-    best_rank = (-1, -1)
-    for intent, score in scores.items():
-        rank = (_safe_int(score), INTENT_PRIORITIES.get(intent, 0))
-        if rank > best_rank:
-            best_intent = intent
-            best_rank = rank
-    return best_intent if best_rank[0] > 0 else "casual"
+    return _select_intent_from_scores_impl(scores)
 
 
 def classify_user_intent(user_message: str, *, is_auto: bool = False) -> str:
-    return _select_intent_from_scores(score_user_intents(user_message, is_auto=is_auto))
+    return _classify_user_intent_impl(user_message, is_auto=is_auto)
 
 
 def _constraints_for_intent(intent: str) -> Dict[str, Any]:
-    base = INTENT_OUTPUT_CONSTRAINTS.get(_clean_text(intent, 40), INTENT_OUTPUT_CONSTRAINTS["casual"])
-    return {
-        "max_sentences": max(1, min(8, _safe_int(base.get("max_sentences"), 3))),
-        "allow_followup_question": bool(base.get("allow_followup_question", False)),
-        "clarify_only_when_needed": bool(base.get("clarify_only_when_needed", False)),
-        "allow_teasing": bool(base.get("allow_teasing", False)),
-        "allow_motion": bool(base.get("allow_motion", True)),
-        "voice_style": _clean_text(base.get("voice_style"), 32).lower() or "neutral",
-    }
+    return _constraints_for_intent_impl(intent)
 
 
 def _public_output_constraints(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    constraints = value if isinstance(value, dict) else {}
-    return {
-        "max_sentences": max(1, min(8, _safe_int(constraints.get("max_sentences"), 3))),
-        "allow_followup_question": bool(constraints.get("allow_followup_question", False)),
-        "clarify_only_when_needed": bool(constraints.get("clarify_only_when_needed", False)),
-        "allow_teasing": bool(constraints.get("allow_teasing", False)),
-        "allow_motion": bool(constraints.get("allow_motion", True)),
-        "voice_style": _clean_text(constraints.get("voice_style"), 32).lower() or "neutral",
-    }
+    return _public_output_constraints_impl(value)
 
 
 def _format_output_constraints_for_prompt(constraints: Dict[str, Any]) -> str:
-    public = _public_output_constraints(constraints)
-    followup = "allowed" if public["allow_followup_question"] else "avoid"
-    if public["clarify_only_when_needed"]:
-        followup = "clarify-only"
-    teasing = "allowed" if public["allow_teasing"] else "avoid"
-    motion = "allowed" if public["allow_motion"] else "avoid"
-    return (
-        f"follow_up={followup}, teasing={teasing}, motion={motion}, "
-        f"voice_style={public['voice_style']}, max_sentences={public['max_sentences']}"
-    )
-
+    return _format_output_constraints_for_prompt_impl(constraints)
 
 def _apply_output_constraints(decision: Dict[str, Any]) -> None:
     constraints = _constraints_for_intent(str(decision.get("intent") or "casual"))

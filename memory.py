@@ -8,6 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from config import MEMORY_PATH, MEMORY_SUMMARY_PATH
+import memory_consolidation
+import memory_correction
+import memory_debug
+import memory_selection
+import memory_store
 
 logger = logging.getLogger(__name__)
 
@@ -362,66 +367,23 @@ def tokenize_memory_text(text):
 
 
 def load_memory_items():
-    if not MEMORY_PATH.exists():
-        return []
-    try:
-        data = json.loads(MEMORY_PATH.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return []
-    if not isinstance(data, list):
-        return []
-
-    items = []
-    for raw in data:
-        if not isinstance(raw, dict):
-            continue
-        user = normalize_memory_text(raw.get("user", ""), max_len=240)
-        assistant = normalize_memory_text(raw.get("assistant", ""), max_len=280)
-        ts = str(raw.get("ts", "")).strip()
-        if not user or not assistant:
-            continue
-        if looks_garbled_text(user) or looks_garbled_text(assistant):
-            continue
-        if looks_stagey_text(assistant):
-            continue
-        items.append({"ts": ts, "user": user, "assistant": assistant})
-    return items
+    return memory_store.load_interaction_items(
+        MEMORY_PATH,
+        normalize_text=normalize_memory_text,
+        looks_garbled=looks_garbled_text,
+        looks_stagey=looks_stagey_text,
+    )
 
 
 def save_memory_items(items):
-    serializable = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        user = normalize_memory_text(item.get("user", ""), max_len=240)
-        assistant = normalize_memory_text(item.get("assistant", ""), max_len=280)
-        ts = str(item.get("ts", "")).strip()
-        if not user or not assistant:
-            continue
-        if looks_garbled_text(user) or looks_garbled_text(assistant):
-            continue
-        if looks_stagey_text(assistant):
-            continue
-        serializable.append({"ts": ts, "user": user, "assistant": assistant})
-
-    payload = json.dumps(serializable, ensure_ascii=False, indent=2)
-    tmp_path = MEMORY_PATH.with_suffix(".tmp")
-    bak_path = MEMORY_PATH.with_suffix(".bak")
-    previous = None
-    if MEMORY_PATH.exists():
-        try:
-            previous = MEMORY_PATH.read_bytes()
-        except Exception:
-            previous = None
-
-    tmp_path.write_text(payload, encoding="utf-8")
-    tmp_path.replace(MEMORY_PATH)
-
-    if previous is not None:
-        try:
-            bak_path.write_bytes(previous)
-        except Exception:
-            logger.debug("write memory backup failed", exc_info=True)
+    return memory_store.save_interaction_items(
+        MEMORY_PATH,
+        items,
+        normalize_text=normalize_memory_text,
+        looks_garbled=looks_garbled_text,
+        looks_stagey=looks_stagey_text,
+        logger=logger,
+    )
 
 
 def has_explicit_memory_write_intent(text):
@@ -801,7 +763,7 @@ def _derive_short_term_memory_candidates(user, assistant, settings):
 
 def _set_last_short_term_memory_debug(snapshot):
     global LAST_SHORT_TERM_MEMORY_DEBUG
-    LAST_SHORT_TERM_MEMORY_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+    LAST_SHORT_TERM_MEMORY_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
 
 
 def _compact_short_term_memory_debug(snapshot):
@@ -1353,7 +1315,7 @@ def _select_learning_samples_for_prompt(settings, query_tokens, explicit_memory_
 
 def _set_last_learning_extraction_debug(snapshot):
     global LAST_LEARNING_EXTRACTION_DEBUG
-    LAST_LEARNING_EXTRACTION_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+    LAST_LEARNING_EXTRACTION_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
 
 
 def _compact_learning_extraction_debug(snapshot):
@@ -1661,7 +1623,7 @@ def _schedule_learning_candidate_extraction(config, record):
 
 def _set_last_core_memory_debug(snapshot):
     global LAST_CORE_MEMORY_DEBUG
-    LAST_CORE_MEMORY_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+    LAST_CORE_MEMORY_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
 
 
 def _compact_core_memory_debug(snapshot):
@@ -1875,7 +1837,7 @@ def _record_core_memory_candidates(candidates, settings):
 
 def _set_last_memory_consolidation_debug(snapshot):
     global LAST_MEMORY_CONSOLIDATION_DEBUG
-    LAST_MEMORY_CONSOLIDATION_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+    LAST_MEMORY_CONSOLIDATION_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
 
 
 def _compact_memory_consolidation_debug(snapshot):
@@ -1904,7 +1866,7 @@ def _compact_memory_consolidation_debug(snapshot):
 
 def _set_last_memory_correction_debug(snapshot):
     global LAST_MEMORY_CORRECTION_DEBUG
-    LAST_MEMORY_CORRECTION_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+    LAST_MEMORY_CORRECTION_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
 
 
 def _compact_memory_correction_debug(snapshot):
@@ -1931,70 +1893,42 @@ def _compact_memory_correction_debug(snapshot):
 
 
 def _strip_short_memory_prefix(text):
-    safe = normalize_memory_text(text, max_len=220)
-    return re.sub(
-        r"^(当前任务|当前话题|最近判断|未完成事项|用户当前状态)[：:]\s*",
-        "",
-        safe,
-        flags=re.IGNORECASE,
-    ).strip()
-
-
-def _is_completed_or_decided_short_memory(text):
-    safe = str(text or "").strip().lower()
-    if not safe:
-        return False
-    return bool(
-        re.search(
-            r"(完成|已完成|修复|通过|决定|确认|下一阶段|收口|上线|发布|"
-            r"done|finished|fixed|implemented|passed|decided|confirmed|released)",
-            safe,
-            flags=re.IGNORECASE,
-        )
+    return memory_consolidation.strip_short_memory_prefix(
+        text,
+        normalize_memory_text=normalize_memory_text,
     )
 
 
+def _is_completed_or_decided_short_memory(text):
+    return memory_consolidation.is_completed_or_decided_short_memory(text)
+
+
+def _memory_consolidation_helpers():
+    return {
+        "normalize_memory_text": normalize_memory_text,
+        "looks_garbled_text": looks_garbled_text,
+        "looks_sensitive_memory_text": looks_sensitive_memory_text,
+        "looks_stagey_text": looks_stagey_text,
+        "clamp_int": _clamp_int,
+        "clamp_float": _clamp_float,
+        "classify_core_memory_text": _classify_core_memory_text,
+    }
+
+
 def _short_memory_consolidation_reason(item, settings):
-    safe = item if isinstance(item, dict) else {}
-    if safe.get("consolidated_at"):
-        return ""
-    text = _strip_short_memory_prefix(safe.get("text", ""))
-    if len(text) < 4 or looks_garbled_text(text) or looks_sensitive_memory_text(text) or looks_stagey_text(text):
-        return ""
-    kind = str(safe.get("kind", "") or "").strip().lower()
-    support_count = _clamp_int(safe.get("support_count", 1), 1, 1, 999)
-    min_support = int(settings.get("memory_consolidation_min_support", 2) or 2)
-    if kind in {"current_task", "recent_decision", "open_loop"} and support_count >= min_support:
-        return "repeated_short_memory"
-    if kind in {"current_task", "recent_decision", "open_loop"} and _is_completed_or_decided_short_memory(text):
-        return "completed_or_decided"
-    if kind == "current_topic" and support_count >= min_support + 1:
-        return "repeated_topic"
-    return ""
+    return memory_consolidation.short_memory_consolidation_reason(
+        item,
+        settings,
+        helpers=_memory_consolidation_helpers(),
+    )
 
 
 def _build_short_memory_consolidation_candidate(item, reason):
-    safe = item if isinstance(item, dict) else {}
-    text = _strip_short_memory_prefix(safe.get("text", ""))
-    kind, category = _classify_core_memory_text(text)
-    short_kind = str(safe.get("kind", "") or "").strip().lower()
-    if short_kind in {"current_task", "recent_decision", "open_loop"}:
-        kind = "episodic"
-        if category == "stable_fact":
-            category = "recent_event"
-    salience = _clamp_float(safe.get("salience", 0.62), 0.62, 0.0, 1.0)
-    support_count = _clamp_int(safe.get("support_count", 1), 1, 1, 999)
-    return {
-        "kind": kind,
-        "category": category,
-        "text": text,
-        "source": "short_consolidation",
-        "importance": max(0.62, salience),
-        "confidence": 0.72 if support_count >= 2 else 0.66,
-        "tags": list(dict.fromkeys([*(safe.get("tags", []) or []), "consolidated", reason]))[:8],
-        "origin": safe.get("origin", {}) if isinstance(safe.get("origin"), dict) else {},
-    }
-
+    return memory_consolidation.build_short_memory_consolidation_candidate(
+        item,
+        reason,
+        helpers=_memory_consolidation_helpers(),
+    )
 
 def _maybe_consolidate_short_term_memories(config):
     settings = get_memory_settings(config)
@@ -2076,88 +2010,36 @@ def _maybe_consolidate_short_term_memories(config):
 
 
 def has_memory_forget_intent(text):
-    safe = str(text or "").strip().lower()
-    if not safe:
-        return False
-    return bool(
-        re.search(
-            r"(forget this|forget that|forget what|forget the memory|forget .*memory|forget .*about|"
-            r"delete memory|remove memory|clear memory|"
-            r"don't remember|do not remember|"
-            r"忘掉|忘记这|忘记刚|删掉|删除记忆|清除记忆|别记住|别记录|不要记住|不要再记)",
-            safe,
-            flags=re.IGNORECASE,
-        )
-    )
+    return memory_correction.has_memory_forget_intent(text)
 
 
 def has_memory_correction_intent(text):
-    safe = str(text or "").strip().lower()
-    if not safe:
-        return False
-    if has_memory_forget_intent(safe):
-        return True
-    return bool(
-        re.search(
-            r"(you remembered wrong|remembered wrong|that's wrong|that is wrong|not that|not this|"
-            r"actually\s+(?:it'?s|it is|my|the|this|that)|"
-            r"should be|correct to|correction|change it to|update it to|"
-            r"你记错|记错了|不对|错了|不是这个|不是这样|应该是|其实是|改成|更正|纠正)",
-            safe,
-            flags=re.IGNORECASE,
-        )
-    )
+    return memory_correction.has_memory_correction_intent(text)
 
 
 def _extract_memory_correction_text(text):
-    safe = normalize_memory_text(text, max_len=220)
-    if not safe:
-        return ""
-    cleaned = re.sub(
-        r"^(你记错了?|记错了?|不对|错了|不是这个|不是这样|actually|you remembered wrong|remembered wrong|that's wrong|that is wrong)"
-        r"[，,。.:：\s]*",
-        "",
-        safe,
-        flags=re.IGNORECASE,
-    ).strip()
-    for pattern in (
-        r"(?:应该是|其实是|改成|更正为|纠正为)[：:，,\s]*(.+)$",
-        r"(?:should be|actually|correct(?:ion)?(?: to)?|change it to|update it to)[：:，,\s]*(.+)$",
-    ):
-        match = re.search(pattern, safe, flags=re.IGNORECASE)
-        if match:
-            tail = normalize_memory_text(match.group(1), max_len=180)
-            if len(tail) >= 4 and len(tokenize_memory_text(tail)) >= 2:
-                return tail
-            if len(cleaned) >= 4:
-                return cleaned
-    return cleaned if len(cleaned) >= 4 else safe
+    return memory_correction.extract_memory_correction_text(
+        text,
+        normalize_memory_text=normalize_memory_text,
+        tokenize_memory_text=tokenize_memory_text,
+    )
+
+
+def _memory_correction_helpers():
+    return {
+        "normalize_memory_text": normalize_memory_text,
+        "tokenize_memory_text": tokenize_memory_text,
+        "core_memory_similarity": _core_memory_similarity,
+    }
 
 
 def _score_memory_correction_match(query_text, correction_text, item):
-    safe = item if isinstance(item, dict) else {}
-    text = normalize_memory_text(safe.get("text", ""), max_len=260)
-    if not text:
-        return 0.0
-    score = max(
-        _core_memory_similarity(query_text, text),
-        _core_memory_similarity(correction_text, text),
+    return memory_correction.score_memory_correction_match(
+        query_text,
+        correction_text,
+        item,
+        helpers=_memory_correction_helpers(),
     )
-    query_tokens = tokenize_memory_text(f"{query_text} {correction_text}")
-    text_tokens = tokenize_memory_text(text)
-    if query_tokens and text_tokens:
-        score = max(score, len(query_tokens & text_tokens) / max(1, min(len(query_tokens), len(text_tokens))))
-    category = str(safe.get("category", "") or "").strip()
-    kind = str(safe.get("kind", "") or "").strip()
-    joined = f"{query_text} {correction_text}".lower()
-    if category == "project_context" and re.search(r"(project|repo|codebase|项目|仓库|功能|live2d|tts|asr|llm)", joined):
-        score += 0.12
-    if category == "user_preference" and re.search(r"(prefer|like|dislike|喜欢|不喜欢|偏好)", joined):
-        score += 0.12
-    if kind in {"current_task", "recent_decision", "open_loop"} and re.search(r"(下一步|任务|继续|做|next|task|continue)", joined):
-        score += 0.08
-    return round(min(1.0, score), 4)
-
 
 def _apply_memory_correction_from_turn(config, record):
     settings = get_memory_settings(config)
@@ -2409,121 +2291,67 @@ def _schedule_core_memory_extraction(config, record):
 
 def _set_last_memory_debug(snapshot):
     global LAST_MEMORY_DEBUG
-    LAST_MEMORY_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+    LAST_MEMORY_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
+
+
+RECALL_GENERIC_TOKENS = memory_selection.RECALL_GENERIC_TOKENS
 
 
 def _is_core_memory_prompt_eligible(item, settings):
-    safe = item if isinstance(item, dict) else {}
-    if not safe:
-        return False
-    if str(safe.get("status", "active") or "active").strip().lower() != "active":
-        return False
-    if looks_garbled_text(safe.get("text", "")) or looks_sensitive_memory_text(safe.get("text", "")):
-        return False
-    try:
-        importance = float(safe.get("importance", 0) or 0)
-    except (TypeError, ValueError):
-        importance = 0.0
-    try:
-        confidence = float(safe.get("confidence", 0) or 0)
-    except (TypeError, ValueError):
-        confidence = 0.0
-    return (
-        importance >= float(settings.get("core_min_importance", 0.45))
-        and confidence >= float(settings.get("core_min_confidence", 0.55))
+    return memory_selection.is_core_memory_prompt_eligible(
+        item,
+        settings,
+        looks_garbled_text=looks_garbled_text,
+        looks_sensitive_memory_text=looks_sensitive_memory_text,
     )
-
-
-RECALL_GENERIC_TOKENS = {
-    "memory", "memories", "remember", "remembered", "wrong", "correct", "correction",
-    "forget", "delete", "remove", "should", "actually", "called", "named", "project",
-    "repo", "codebase", "next", "step", "continue", "topic", "task", "about",
-    "记忆", "记得", "记错", "忘记", "忘掉", "删除", "更正", "纠正", "应该", "其实",
-    "不是", "项目", "仓库", "下一步", "继续", "任务", "话题",
-}
 
 
 def _strong_recall_tokens(text):
-    tokens = tokenize_memory_text(text)
-    out = set()
-    for token in tokens:
-        safe = str(token or "").strip().lower()
-        if not safe or safe in RECALL_GENERIC_TOKENS:
-            continue
-        if re.fullmatch(r"[a-z0-9_][a-z0-9_-]{2,}", safe):
-            out.add(safe)
-            continue
-        if re.fullmatch(r"[\u4e00-\u9fff]{2,10}", safe) and safe not in RECALL_GENERIC_TOKENS:
-            out.add(safe)
-    return out
+    return memory_selection.strong_recall_tokens(
+        text,
+        tokenize_memory_text=tokenize_memory_text,
+    )
 
 
 def _extract_denied_memory_tokens(text):
-    safe = str(text or "").strip()
-    if not safe:
-        return set()
-    out = set()
-    patterns = (
-        r"\bnot\s+(?:called|named|about|this|that|it|as)?\s*([A-Za-z0-9_-]{2,})",
-        r"\binstead of\s+([A-Za-z0-9_-]{2,})",
-        r"\bno longer\s+(?:called|named|about)?\s*([A-Za-z0-9_-]{2,})",
-        r"(?:不是叫|不是|不叫|并非|不要叫|别叫)\s*([A-Za-z0-9_-]{2,}|[\u4e00-\u9fff]{2,12})",
+    return memory_selection.extract_denied_memory_tokens(
+        text,
+        normalize_memory_text=normalize_memory_text,
+        strong_recall_tokens_fn=_strong_recall_tokens,
     )
-    for pattern in patterns:
-        for match in re.finditer(pattern, safe, flags=re.IGNORECASE):
-            token = normalize_memory_text(match.group(1), max_len=40).strip("，,。.!！?？:：;；\"'“”‘’()（）[]【】")
-            if token:
-                out.update(_strong_recall_tokens(token) or {token.lower()})
-    return {token for token in out if token and token not in RECALL_GENERIC_TOKENS}
 
 
 def _has_current_fact_assertion(text):
-    safe = str(text or "").strip().lower()
-    if not safe:
-        return False
-    return bool(
-        re.search(
-            r"(my .{0,32}\b(?:is|are|was|were|called|named)\b|"
-            r"\bi (?:am|prefer|like|dislike|want|need)\b|"
-            r"\bthe .{0,32}\b(?:is|are|should be|changed to)\b|"
-            r"我.{0,12}(?:叫|是|喜欢|不喜欢|想要|需要|希望|偏好)|"
-            r"(?:项目|仓库|名字|称呼).{0,16}(?:是|叫|改成|应该是))",
-            safe,
-            flags=re.IGNORECASE,
-        )
-    )
+    return memory_selection.has_current_fact_assertion(text)
+
+
+def _memory_selection_helpers():
+    return {
+        "normalize_memory_text": normalize_memory_text,
+        "has_memory_forget_intent": has_memory_forget_intent,
+        "has_memory_correction_intent": has_memory_correction_intent,
+        "extract_denied_memory_tokens": _extract_denied_memory_tokens,
+        "strong_recall_tokens": _strong_recall_tokens,
+    }
 
 
 def _memory_recall_conflict_reason(user_message, memory_text, settings=None):
-    settings = settings or {}
-    if not settings.get("memory_conflict_protection_enabled", True):
-        return ""
-    user = normalize_memory_text(user_message, max_len=220)
-    item_text = normalize_memory_text(memory_text, max_len=260)
-    if not user or not item_text:
-        return ""
-    if has_memory_forget_intent(user):
-        return "current_forget_request"
-    if has_memory_correction_intent(user):
-        return "current_correction"
-    denied = _extract_denied_memory_tokens(user)
-    if denied and denied & _strong_recall_tokens(item_text):
-        return "current_denies_memory_token"
-    return ""
-
+    return memory_selection.memory_recall_conflict_reason(
+        user_message,
+        memory_text,
+        settings=settings,
+        helpers=_memory_selection_helpers(),
+    )
 
 def _compact_memory_skip_item(item, reason, score=0, source="memory"):
-    safe = item if isinstance(item, dict) else {}
-    text = safe.get("text")
-    if text is None:
-        text = f"{safe.get('user', '')} {safe.get('assistant', '')}"
-    return {
-        "id": str(safe.get("id", "")).strip()[:80],
-        "source": str(source or "").strip()[:40],
-        "reason": str(reason or "").strip()[:80],
-        "score": _clamp_int(score, 0, 0, 999),
-        "text": normalize_memory_text(text, max_len=120),
-    }
+    return memory_selection.compact_memory_skip_item(
+        item,
+        reason,
+        score=score,
+        source=source,
+        normalize_memory_text=normalize_memory_text,
+        clamp_int=_clamp_int,
+    )
 
 
 def _select_core_memories_for_prompt(settings, query_tokens, user_message="", explicit_memory_intent=False):
@@ -2539,74 +2367,23 @@ def _select_core_memories_for_prompt(settings, query_tokens, user_message="", ex
     ]
     if not eligible:
         return [], "no_eligible_memories", len(items), []
-    query = query_tokens if isinstance(query_tokens, set) else set()
-    requires_strong_match = _has_current_fact_assertion(user_message) and not explicit_memory_intent
-    scored = []
-    skipped = []
-    for idx, item in enumerate(eligible):
-        memory_tokens = tokenize_memory_text(
-            f"{item.get('text', '')} {' '.join(item.get('tags', []) if isinstance(item.get('tags'), list) else [])}"
-        )
-        relevance = len(query & memory_tokens)
-        conflict_reason = _memory_recall_conflict_reason(user_message, item.get("text", ""), settings=settings)
-        if conflict_reason:
-            skipped.append(_compact_memory_skip_item(item, conflict_reason, score=relevance, source="core_memory"))
-            continue
-        if requires_strong_match and relevance <= 1:
-            skipped.append(_compact_memory_skip_item(item, "weak_match_current_assertion", score=relevance, source="core_memory"))
-            continue
-        if relevance <= 0 and not explicit_memory_intent:
-            continue
-        try:
-            importance = float(item.get("importance", 0) or 0)
-        except (TypeError, ValueError):
-            importance = 0.0
-        try:
-            confidence = float(item.get("confidence", 0) or 0)
-        except (TypeError, ValueError):
-            confidence = 0.0
-        pinned = 1 if item.get("pinned") else 0
-        scored.append((relevance, pinned, importance, confidence, _learning_item_sort_time(item), -idx, item))
-    if not scored:
-        return [], "conflict_protected" if skipped else "no_relevant_memories", len(items), skipped[:8]
-    scored.sort(reverse=True)
-
-    selected = []
-    seen = set()
-    for relevance, _pinned, _importance, _confidence, _time, _idx, item in scored:
-        enriched = dict(item)
-        enriched["memory_kind"] = str(item.get("kind", "") or "").strip()
-        enriched["kind"] = "core_memory"
-        enriched["relevance"] = relevance
-        if _append_unique_core_memory_item(selected, seen, enriched) and len(selected) >= count:
-            break
-    if selected:
-        reason = "selected"
-    elif skipped:
-        reason = "conflict_protected"
-    else:
-        reason = "no_match"
+    selected, reason, skipped = memory_selection.select_core_memory_items_for_prompt(
+        eligible,
+        settings,
+        query_tokens,
+        user_message=user_message,
+        explicit_memory_intent=explicit_memory_intent,
+        tokenize_memory_text=tokenize_memory_text,
+        learning_item_sort_time=_learning_item_sort_time,
+        conflict_reason_fn=_memory_recall_conflict_reason,
+        append_unique_core_memory_item=_append_unique_core_memory_item,
+        compact_skip_item_fn=_compact_memory_skip_item,
+    )
     return selected, reason, len(items), skipped[:8]
 
 
 def _is_short_followup_message(text):
-    compact = re.sub(r"[\s\u3000，。！？!?.,;:、~～'\"]+", "", str(text or "").strip().lower())
-    return compact in {
-        "继续",
-        "下一步",
-        "下一个阶段",
-        "下一阶段",
-        "好的",
-        "好",
-        "做吧",
-        "做",
-        "开始吧",
-        "继续做",
-        "next",
-        "nextstep",
-        "continue",
-        "goon",
-    }
+    return memory_selection.is_short_followup_message(text)
 
 
 def _select_short_term_memories_for_prompt(settings, query_tokens, user_message, explicit_memory_intent=False):
@@ -2620,51 +2397,19 @@ def _select_short_term_memories_for_prompt(settings, query_tokens, user_message,
     items = _prune_short_term_items(state.get("items", []), current_turn)
     if not items:
         return [], "no_short_memories", 0, []
-    query = query_tokens if isinstance(query_tokens, set) else set()
-    followup = _is_short_followup_message(user_message)
-    scored = []
-    skipped = []
-    for idx, item in enumerate(items):
-        if str(item.get("status", "active") or "active").strip().lower() != "active":
-            continue
-        text = item.get("text", "")
-        if looks_sensitive_memory_text(text) or looks_garbled_text(text):
-            continue
-        memory_tokens = tokenize_memory_text(f"{text} {' '.join(item.get('tags', []) if isinstance(item.get('tags'), list) else [])}")
-        relevance = len(query & memory_tokens)
-        conflict_reason = _memory_recall_conflict_reason(user_message, text, settings=settings)
-        if conflict_reason:
-            skipped.append(_compact_memory_skip_item(item, conflict_reason, score=relevance, source="short_term_memory"))
-            continue
-        if relevance <= 0 and not followup and not explicit_memory_intent:
-            continue
-        try:
-            salience = float(item.get("salience", 0) or 0)
-        except (TypeError, ValueError):
-            salience = 0.0
-        try:
-            last_seen_turn = int(item.get("last_seen_turn", 0) or 0)
-        except (TypeError, ValueError):
-            last_seen_turn = 0
-        scored.append((relevance, 1 if followup else 0, salience, last_seen_turn, -idx, item))
-    if not scored:
-        return [], "no_relevant_short_memories", len(items)
-    scored.sort(reverse=True)
-    selected = []
-    seen = set()
-    for relevance, _followup, _salience, _turn, _idx, item in scored:
-        enriched = dict(item)
-        enriched["kind"] = "short_term_memory"
-        enriched["short_kind"] = str(item.get("kind", "") or "").strip()
-        enriched["relevance"] = relevance
-        if _append_unique_short_term_memory_item(selected, seen, enriched) and len(selected) >= count:
-            break
-    if selected:
-        reason = "selected"
-    elif skipped:
-        reason = "conflict_protected"
-    else:
-        reason = "no_match"
+    selected, reason, skipped = memory_selection.select_short_term_memory_items_for_prompt(
+        items,
+        settings,
+        query_tokens,
+        user_message,
+        explicit_memory_intent=explicit_memory_intent,
+        tokenize_memory_text=tokenize_memory_text,
+        looks_sensitive_memory_text=looks_sensitive_memory_text,
+        looks_garbled_text=looks_garbled_text,
+        conflict_reason_fn=_memory_recall_conflict_reason,
+        append_unique_short_term_memory_item=_append_unique_short_term_memory_item,
+        compact_skip_item_fn=_compact_memory_skip_item,
+    )
     return selected, reason, len(items), skipped[:8]
 
 
@@ -2917,42 +2662,15 @@ def merge_prompt_with_memory(prompt, memory_block):
 
 
 def _safe_load_json_file(path, fallback):
-    try:
-        if not path.exists():
-            return fallback
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-        return data if data is not None else fallback
-    except Exception:
-        return fallback
+    return memory_store.safe_load_json_file(path, fallback)
 
 
 def _safe_save_json_file(path, payload):
-    tmp_path = path.with_suffix(".tmp")
-    tmp_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    tmp_path.replace(path)
+    return memory_store.safe_save_json_file(path, payload)
 
 
 def _tail_jsonl(path, limit=5):
-    try:
-        if not path.exists():
-            return []
-        lines = path.read_text(encoding="utf-8-sig").splitlines()[-max(0, int(limit)):]
-    except Exception:
-        return []
-    out = []
-    for line in lines:
-        line = str(line or "").strip()
-        if not line:
-            continue
-        try:
-            data = json.loads(line)
-        except Exception:
-            data = {"raw": line[:300]}
-        out.append(data if isinstance(data, dict) else {"raw": str(data)[:300]})
-    return out
+    return memory_store.tail_jsonl(path, limit=limit)
 
 
 def _compact_learning_audit_item(item):
