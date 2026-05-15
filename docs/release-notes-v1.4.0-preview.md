@@ -1,32 +1,36 @@
-# v1.4.0-preview Release Notes
+# v1.4.0-preview 更新说明 / Release Notes
 
-> This is a preview release for early testers and contributors. It includes an unsigned Windows online guided installer, but it is still not a mature AI VTuber product or commercial desktop agent.
+> 这是面向早期测试者和贡献者的预览版。它包含未签名的 Windows 在线引导安装器，但仍不是成熟 AI VTuber 产品或商业桌面 Agent。
+>
+> English: preview release with an unsigned Windows guided installer; not a mature commercial desktop agent.
 
-## Summary
+## 摘要 / Summary
 
-`v1.4.0-preview` focuses on the original AI VTuber feeling and first public usability: Xinyu can keep a light stage memory, react with Character Brain performance controls, produce low-interruption spontaneous thoughts, and guide first-time users through installer-first setup.
+`v1.4.0-preview` 聚焦 AI VTuber 感和首次公开可用性：馨语可以保留轻量舞台记忆，用 Character Brain performance controls 驱动回应，生成低打扰 spontaneous thoughts，并通过安装器优先的路径引导首次用户完成配置。
 
-This release is inspired by AI VTuber interaction patterns, including the sense of immediacy found in Neuro-sama-like experiences, but it is not a clone and does not copy existing VTuber lines, lore, or proprietary bits.
+这个版本受 AI VTuber 交互方向启发，包括 Neuro-sama-like 体验中那种即时感；但它不是任何项目的克隆，也不会复制现有 VTuber 的台词、设定或专有内容。
 
-The preview does not include a cloud model, hosted endpoint, or API key. Testers choose their own model provider; see `docs/model-selection.md` for compatibility and latency expectations.
+预览包不包含云模型、托管 endpoint 或 API key。测试者需要选择自己的模型 provider；兼容性和延迟预期见 `docs/model-selection.md`。
+
+English summary: v1.4 focuses on installer-first usability, stage memory, Character Brain performance controls, low-interruption thought bursts, and conservative security defaults.
 
 Recommended release assets:
 
 - `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe`
 - `Xinyu-AI-Desktop-Pet-v1.4.0-preview-windows-source-test.zip`
 - `SHA256SUMS.txt`
-- these release notes
+- these bilingual release notes
 
-## What Changed
+## 变化摘要 / What Changed
 
-### First Public Install Path
+### 首次公开安装路径 / First Public Install Path
 
 - Added an NSIS Windows online guided installer that installs under the current user directory, creates Start Menu / desktop shortcuts, and launches `install_and_start.bat`.
 - Added source package alignment so `install_and_start.bat`, installer docs, and installer build scripts are included in the source test zip.
 - Renamed release package artifacts from older Taffy package names to Xinyu package names. Some compatibility environment variables, such as `TAFFY_API_TOKEN` and `TAFFY_LLM_API_KEY`, are intentionally retained.
 - Added SHA256 generation for installer and source zip. The first installer is unsigned, so SmartScreen warnings are expected unless/until code signing is added.
 
-### First-Run LLM Wizard
+### 首次 LLM 配置向导 / First-Run LLM Wizard
 
 - Added `/api/first_run/status` for a safe first-run summary: onboarding state, LLM completeness, Live2D availability, and safety default summary. It does not return API keys.
 - Added `/api/first_run/configure_llm`, protected by the local API token, to write non-secret LLM settings to `config.local.json` and the real API key to `.env`.
@@ -34,14 +38,14 @@ Recommended release assets:
 - The default provider is `openai-compatible`; the default key env name is `TAFFY_LLM_API_KEY`.
 - After saving, the UI calls the existing lightweight LLM probe and shows a readable success or failure reason.
 
-### Character Brain and Stage Continuity
+### Character Brain 与舞台连续性 / Stage Continuity
 
 - Added lightweight session continuity for intent, topic, mood baseline, energy, relationship tone, and recent user need.
 - Added short-term stage memory for small callbacks without writing long-term memory.
 - Added safety clamps so comfort, reminder, task, diagnostic, and closing scenes stay controlled.
 - Added `/braindebug` public summaries for intent, performance, motion, voice, timeline, stage memory, and safety state.
 
-### AI VTuber Performance Layer
+### AI VTuber 表演层 / Performance Layer
 
 - Added turn-level performance controls:
   - opening move
@@ -57,7 +61,7 @@ Recommended release assets:
   - post-settle
 - Added voice timeline segmentation so short rants and thought bursts can speak in beats instead of one flat block.
 
-### Spontaneous Thought Bursts
+### 低打扰 spontaneous thoughts / Thought Bursts
 
 - Added proactive stage replies and turn-based interjections.
 - Added an interjection director that decides whether Xinyu should hold back, callback, or interject.
@@ -71,7 +75,7 @@ Recommended release assets:
   - topic spark
 - Added thought burst choreography so each type maps to safer Live2D motion and voice pacing.
 
-### Dialogue Quality and Audits
+### 对话质量与审核 / Dialogue Quality and Audits
 
 - Added model acceptance and v1.4/v1.6 dialogue audit scripts.
 - Improved reply constraints to reduce:
@@ -81,7 +85,7 @@ Recommended release assets:
   - context drift from earlier tasks
   - turning casual stage comments into troubleshooting steps
 
-## Validation Guidance
+## 验证建议 / Validation Guidance
 
 Before publishing or sharing a source test package, run:
 
@@ -114,7 +118,7 @@ Model-dependent checks must be interpreted with the local configuration in mind:
 - v1.4/v1.6 dialogue audits are useful only when the configured model returns non-empty English replies.
 - If `/api/llm_probe` returns HTTP 500, run `scripts\diagnose-llm-link.ps1` and fix the reported provider/base URL/model/key/gateway issue before tuning character behavior.
 
-## Manual Smoke Checklist
+## 手动冒烟清单 / Manual Smoke Checklist
 
 Before recording or sharing a public demo, verify:
 
@@ -128,7 +132,7 @@ Before recording or sharing a public demo, verify:
 - Spontaneous replies are visible but not noisy.
 - Comfort, task, reminder, diagnostic, and closing scenes stay restrained.
 
-## Security Defaults
+## 安全默认值 / Security Defaults
 
 This preview keeps conservative defaults:
 
@@ -139,7 +143,7 @@ This preview keeps conservative defaults:
 - Shell execution is disabled unless explicitly configured.
 - Debug reports must not expose API keys, raw prompts, raw history, private bit guides, or sensitive local paths.
 
-## Known Limitations
+## 已知限制 / Known Limitations
 
 - The Windows installer is an unsigned online guided installer; it does not bundle Python/Node runtimes or a model provider.
 - The character feel depends heavily on the configured model latency and output quality.
@@ -148,7 +152,7 @@ This preview keeps conservative defaults:
 - A slow or unstable OpenAI-compatible gateway can make Xinyu feel broken even when the local app code is healthy.
 - Desktop awareness remains manual and intentionally conservative.
 
-## Download and First Run
+## 下载与首跑 / Download and First Run
 
 Recommended download for normal Windows users:
 

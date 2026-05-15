@@ -1,17 +1,19 @@
-# Windows Installer
+# Windows 安装器 / Windows Installer
 
 本页说明首次公开发布的 Windows 在线引导安装器。它面向普通 Windows 10/11 用户；源码测试包仍保留给开发者和早期测试者。
 
-## Release Assets
+English summary: the preview installer is unsigned and guided; verify SHA256 and configure your own model provider after first launch.
+
+## 发布资产 / Release Assets
 
 发布资产固定为：
 
 - `Xinyu-AI-Desktop-Pet-Setup-v{version}.exe`
 - `Xinyu-AI-Desktop-Pet-v{version}-windows-source-test.zip`
 - `SHA256SUMS.txt`
-- release notes
+- 中英双语 release notes
 
-安装器未内置 Python、Node.js、云模型或 API key。它复制项目文件、创建快捷方式，然后运行 `install_and_start.bat`，由现有 bootstrap 检查 Python / Node / npm，缺失时提示用户通过 winget 安装。
+安装器未内置 Python、Node.js、云模型、托管 endpoint 或 API key。它复制项目文件、创建快捷方式，然后运行 `install_and_start.bat`，由现有 bootstrap 检查 Python / Node / npm，缺失时提示用户通过 winget 安装。
 
 ## Install Behavior
 
@@ -23,7 +25,7 @@
 - 不修改 Windows 安全策略。
 - 不默认开启桌面观察、截图、文件读取、工具调用或 shell 执行。
 
-## SHA256 And SmartScreen
+## SHA256 与 SmartScreen / SHA256 And SmartScreen
 
 首发安装包允许未签名，因此 release 页面必须同时提供 SHA256。
 

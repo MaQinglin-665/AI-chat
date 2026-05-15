@@ -4,7 +4,7 @@
       ".hero-subtitle": "一只会聊天、会说话、有记忆的桌面小伙伴 ✨",
       "#demo .section-title": "🎬 对话与语音演示",
       ".demo-media-tip": "已内置默认演示素材，可直接预览；替换 docs/assets/ 下同名文件即可展示你的真实录屏。",
-      ".config-page-subtitle": "单独页面管理更多参数：模型、LLM、语音、记忆、观察、动作与工具权限。",
+      ".config-page-subtitle": "单独页面管理更多参数：模型、LLM、语音、记忆、观察、动作与工具权限。默认保持低风险配置，新能力需要显式启用。",
       ".version-panel-desc": "这里是最近版本的关键变化，便于快速回顾升级内容。"
     },
     "features": [
@@ -16,13 +16,13 @@
       "输入 /提醒 10m 喝水，到时间主动语音提醒你。"
     ],
     "steps": [
-      "从 GitHub Releases 下载最新版，解压到任意目录。",
-      "注册阿里云 DashScope，获取 API Key 填入 .env 文件。",
-      "双击“一键启动桌宠.vbs”，馨语AI桌宠就会出现在你的桌面上。"
+      "普通 Windows 用户优先下载 v1.4 preview 安装器，并同时下载 SHA256SUMS.txt 做校验。",
+      "安装后在应用内向导填写 provider / base URL / model / API key；项目不内置云模型或密钥。",
+      "完成首跑后验证聊天、语音、Live2D 与安全默认值；开发者可使用源码测试包继续调试。"
     ],
     "download_notes": {
-      "1": "先到 配置中心 完成自检与一键应用，再启动桌宠体验最佳。",
-      "2": "发布流程统一为：配置自检 → 一键应用验证 → 创建 Release → 更新下载说明。"
+      "1": "普通用户优先下载安装器与 SHA256SUMS.txt；开发者下载 windows-source-test.zip 或 clone 仓库。",
+      "2": "English: download the installer first; configure your own model provider in the first-run wizard."
     }
   },
   "release": {
@@ -42,9 +42,9 @@
       "支持提醒指令，到点主动提示。"
     ],
     "steps": [
-      "下载并解压最新版安装包。",
-      "填写 API Key 完成基础配置。",
-      "双击启动脚本即可运行。"
+      "Download the v1.4 preview installer and verify SHA256.",
+      "Configure your own model provider in the first-run wizard.",
+      "Launch Xinyu and verify chat, voice, Live2D, and safety defaults."
     ],
     "download_notes": {
       "1": "推荐流程：配置自检 → 一键应用 → 启动桌宠。",

@@ -1720,6 +1720,10 @@ const LIVE2D_RUNTIME_CONTROLLER = window.TaffyLive2DRuntimeController || {};
 const LIVE2D_LAYOUT_CONTROLLER = window.TaffyLive2DLayoutController || {};
 const LIVE2D_EXPRESSION_CONTROLLER = window.TaffyLive2DExpressionController || {};
 const CHAT_CONTROLLER_DELEGATES = window.TaffyChatControllerDelegates || {};
+const CHAT_TTS_BOUNDARY = window.TaffyChatTtsBoundary || {};
+const CHAT_LIVE2D_BOUNDARY = window.TaffyChatLive2DBoundary || {};
+const CHAT_CONFIG_BOUNDARY = window.TaffyChatConfigBoundary || {};
+const CHAT_RUNTIME_DEBUG_BRIDGE_BOUNDARY = window.TaffyChatRuntimeDebugBridgeBoundary || {};
 const PERSONA_CARD_DEFAULT = {
   character_name: "馨语",
   user_alias: "",
@@ -3336,86 +3340,108 @@ function shouldAttachDesktopImage(message, isAuto = false) {
   return getAutoChatController().shouldAttachDesktopImage(message, isAuto);
 }
 
-let runtimeMetadataController = null;
+let chatRuntimeDebugBridgeBoundary = null;
+
+function createRuntimeMetadataBoundaryDeps() {
+  return {
+    state,
+    windowObject: window,
+    performanceObject: performance,
+    speechText: SPEECH_TEXT,
+    characterRuntime: window.TaffyCharacterRuntime || {},
+    characterRuntimeBridge: window.TaffyCharacterRuntimeBridge || {},
+    characterRuntimeDebugBridge: window.TaffyCharacterRuntimeDebugBridge || {},
+    live2dExpressionTuning: LIVE2D_EXPRESSION_TUNING,
+    runtimeEmotionExpressionTuning: RUNTIME_EMOTION_EXPRESSION_TUNING,
+    clampNumber,
+    triggerExpressionPulse,
+    tryBuiltInMotion
+  };
+}
+
+function getChatRuntimeDebugBridgeBoundary() {
+  if (
+    !chatRuntimeDebugBridgeBoundary
+    && typeof CHAT_RUNTIME_DEBUG_BRIDGE_BOUNDARY.createBoundaryIfAvailable === "function"
+    && typeof RUNTIME_METADATA_CONTROLLER.createController === "function"
+  ) {
+    chatRuntimeDebugBridgeBoundary = CHAT_RUNTIME_DEBUG_BRIDGE_BOUNDARY.createBoundaryIfAvailable(
+      {
+        runtimeMetadataController: RUNTIME_METADATA_CONTROLLER,
+        createRuntimeMetadataDeps: createRuntimeMetadataBoundaryDeps
+      },
+      chatRuntimeDebugBridgeBoundary
+    );
+  }
+  return chatRuntimeDebugBridgeBoundary || CHAT_RUNTIME_DEBUG_BRIDGE_BOUNDARY;
+}
 
 function getRuntimeMetadataController() {
-  if (!runtimeMetadataController && typeof RUNTIME_METADATA_CONTROLLER.createController === "function") {
-    runtimeMetadataController = RUNTIME_METADATA_CONTROLLER.createController({
-      state,
-      windowObject: window,
-      performanceObject: performance,
-      speechText: SPEECH_TEXT,
-      characterRuntime: window.TaffyCharacterRuntime || {},
-      characterRuntimeBridge: window.TaffyCharacterRuntimeBridge || {},
-      characterRuntimeDebugBridge: window.TaffyCharacterRuntimeDebugBridge || {},
-      live2dExpressionTuning: LIVE2D_EXPRESSION_TUNING,
-      runtimeEmotionExpressionTuning: RUNTIME_EMOTION_EXPRESSION_TUNING,
-      clampNumber,
-      triggerExpressionPulse,
-      tryBuiltInMotion
-    });
+  const boundary = getChatRuntimeDebugBridgeBoundary();
+  if (boundary && typeof boundary.getRuntimeMetadataController === "function") {
+    return boundary.getRuntimeMetadataController();
   }
-  return runtimeMetadataController;
+  return RUNTIME_METADATA_CONTROLLER;
 }
 
 function stripRuntimeMetadataSuffix(text) {
-  return getRuntimeMetadataController().stripRuntimeMetadataSuffix(text);
+  return getChatRuntimeDebugBridgeBoundary().stripRuntimeMetadataSuffix(text);
 }
 
 function stripAssistantPayloadNoise(text) {
-  return getRuntimeMetadataController().stripAssistantPayloadNoise(text);
+  return getChatRuntimeDebugBridgeBoundary().stripAssistantPayloadNoise(text);
 }
 
 function normalizeCharacterRuntimeMetadataForFrontend(raw) {
-  return getRuntimeMetadataController().normalizeCharacterRuntimeMetadataForFrontend(raw);
+  return getChatRuntimeDebugBridgeBoundary().normalizeCharacterRuntimeMetadataForFrontend(raw);
 }
 
 function getCharacterRuntimeBroadcastChannel() {
-  return getRuntimeMetadataController().getCharacterRuntimeBroadcastChannel();
+  return getChatRuntimeDebugBridgeBoundary().getCharacterRuntimeBroadcastChannel();
 }
 
 function dispatchCharacterRuntimeMetadataLocally(normalized) {
-  return getRuntimeMetadataController().dispatchCharacterRuntimeMetadataLocally(normalized);
+  return getChatRuntimeDebugBridgeBoundary().dispatchCharacterRuntimeMetadataLocally(normalized);
 }
 
 function broadcastCharacterRuntimeMetadataToModel(normalized) {
-  return getRuntimeMetadataController().broadcastCharacterRuntimeMetadataToModel(normalized);
+  return getChatRuntimeDebugBridgeBoundary().broadcastCharacterRuntimeMetadataToModel(normalized);
 }
 
 function normalizeRuntimeEmotionForLive2D(emotion) {
-  return getRuntimeMetadataController().normalizeRuntimeEmotionForLive2D(emotion);
+  return getChatRuntimeDebugBridgeBoundary().normalizeRuntimeEmotionForLive2D(emotion);
 }
 
 function getRuntimeEmotionExpressionTuning(mood) {
-  return getRuntimeMetadataController().getRuntimeEmotionExpressionTuning(mood);
+  return getChatRuntimeDebugBridgeBoundary().getRuntimeEmotionExpressionTuning(mood);
 }
 
 function normalizeRuntimeActionForLive2D(action) {
-  return getRuntimeMetadataController().normalizeRuntimeActionForLive2D(action);
+  return getChatRuntimeDebugBridgeBoundary().normalizeRuntimeActionForLive2D(action);
 }
 
 function getLive2DMotionForAction(action) {
-  return getRuntimeMetadataController().getLive2DMotionForAction(action);
+  return getChatRuntimeDebugBridgeBoundary().getLive2DMotionForAction(action);
 }
 
 function applyCharacterRuntimeEmotionToLive2D(metadata) {
-  return getRuntimeMetadataController().applyCharacterRuntimeEmotionToLive2D(metadata);
+  return getChatRuntimeDebugBridgeBoundary().applyCharacterRuntimeEmotionToLive2D(metadata);
 }
 
 function applyCharacterRuntimeActionToLive2D(metadata) {
-  return getRuntimeMetadataController().applyCharacterRuntimeActionToLive2D(metadata);
+  return getChatRuntimeDebugBridgeBoundary().applyCharacterRuntimeActionToLive2D(metadata);
 }
 
 function handleCharacterRuntimeMetadata(raw, options = {}) {
-  return getRuntimeMetadataController().handleCharacterRuntimeMetadata(raw, options);
+  return getChatRuntimeDebugBridgeBoundary().handleCharacterRuntimeMetadata(raw, options);
 }
 
 function installCharacterRuntimeWindowBridge() {
-  return getRuntimeMetadataController().installCharacterRuntimeWindowBridge();
+  return getChatRuntimeDebugBridgeBoundary().installCharacterRuntimeWindowBridge();
 }
 
 function installCharacterRuntimeDebugBridge() {
-  return getRuntimeMetadataController().installCharacterRuntimeDebugBridge();
+  return getChatRuntimeDebugBridgeBoundary().installCharacterRuntimeDebugBridge();
 }
 
 
@@ -3829,27 +3855,100 @@ function waitMs(ms) {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
 }
 
-let live2dExpressionControllerInstance = null;
+let chatLive2DBoundary = null;
+
+function createLive2DExpressionBoundaryDeps() {
+  return {
+    state,
+    windowObject: window,
+    performanceObject: performance,
+    clampNumber,
+    sanitizeSpeakText,
+    normalizeTalkStyle,
+    detectMood,
+    isSpeechMotionActive,
+    isSpeakingNow,
+    live2dExpressionTuning: LIVE2D_EXPRESSION_TUNING,
+    styleExpressionProfile: STYLE_EXPRESSION_PROFILE,
+    motionIntensityPresets: MOTION_INTENSITY_PRESETS,
+    modelMotionProfiles: MODEL_MOTION_PROFILES
+  };
+}
+
+function createLive2DRuntimeBoundaryDeps() {
+  return {
+    state,
+    windowObject: window,
+    documentObject: document,
+    consoleObject: console,
+    performanceObject: performance,
+    runtimeVersion: RUNTIME_VERSION,
+    appendMessage,
+    setStatus,
+    placeModel,
+    attachDrag,
+    setupClickthroughHitTest,
+    scheduleIdleMotionLoop,
+    stopIdleMotionLoop,
+    setModelMotionDefinitions,
+    applyStyleExpressionLayer,
+    updateMicroMotionLayer,
+    getStyleExpressionProfile,
+    getActiveModelCadence,
+    clampNumber,
+    handleWindowResize
+  };
+}
+
+function createLive2DLayoutBoundaryDeps() {
+  return {
+    state,
+    windowObject: window,
+    documentObject: document,
+    performanceObject: performance,
+    requestAnimationFrame,
+    cancelAnimationFrame,
+    clampNumber,
+    desktopWindowController: DESKTOP_WINDOW_CONTROLLER,
+    triggerTapMotion,
+    finalizeDesktopDrag,
+    stopDesktopWindowDrag,
+    tapMaxDurationMs: TAP_MAX_DURATION_MS,
+    tapMoveThreshold: TAP_MOVE_THRESHOLD
+  };
+}
+
+function getChatLive2DBoundary() {
+  if (
+    !chatLive2DBoundary
+    && typeof CHAT_LIVE2D_BOUNDARY.createBoundaryIfAvailable === "function"
+    && (
+      typeof LIVE2D_EXPRESSION_CONTROLLER.createController === "function"
+      || typeof LIVE2D_RUNTIME_CONTROLLER.createController === "function"
+      || typeof LIVE2D_LAYOUT_CONTROLLER.createController === "function"
+    )
+  ) {
+    chatLive2DBoundary = CHAT_LIVE2D_BOUNDARY.createBoundaryIfAvailable(
+      {
+        live2dExpressionController: LIVE2D_EXPRESSION_CONTROLLER,
+        live2dRuntimeController: LIVE2D_RUNTIME_CONTROLLER,
+        live2dLayoutController: LIVE2D_LAYOUT_CONTROLLER,
+        createExpressionDeps: createLive2DExpressionBoundaryDeps,
+        createRuntimeDeps: createLive2DRuntimeBoundaryDeps,
+        createLayoutDeps: createLive2DLayoutBoundaryDeps
+      },
+      chatLive2DBoundary
+    );
+  }
+  return chatLive2DBoundary || CHAT_LIVE2D_BOUNDARY;
+}
 
 function getLive2DExpressionController() {
-  if (!live2dExpressionControllerInstance && typeof LIVE2D_EXPRESSION_CONTROLLER.createController === "function") {
-    live2dExpressionControllerInstance = LIVE2D_EXPRESSION_CONTROLLER.createController({
-      state,
-      windowObject: window,
-      performanceObject: performance,
-      clampNumber,
-      sanitizeSpeakText,
-      normalizeTalkStyle,
-      detectMood,
-      isSpeechMotionActive,
-      isSpeakingNow,
-      live2dExpressionTuning: LIVE2D_EXPRESSION_TUNING,
-      styleExpressionProfile: STYLE_EXPRESSION_PROFILE,
-      motionIntensityPresets: MOTION_INTENSITY_PRESETS,
-      modelMotionProfiles: MODEL_MOTION_PROFILES
-    });
+  const boundary = getChatLive2DBoundary();
+  if (boundary && typeof boundary.getLive2DExpressionController === "function") {
+    return boundary.getLive2DExpressionController();
   }
-  return live2dExpressionControllerInstance || LIVE2D_EXPRESSION_CONTROLLER;
+  return LIVE2D_EXPRESSION_CONTROLLER;
 }
 
 function normalizeMotionIntensity(level) { return getLive2DExpressionController().normalizeMotionIntensity(level); }
@@ -3983,40 +4082,113 @@ function enqueueActionIntent(intent, context = {}) {
 }
 
 
-let ttsPlaybackController = null;
+let chatTtsBoundary = null;
+
+function createTTSPlaybackBoundaryDeps() {
+  return {
+    state,
+    windowObject: window,
+    consoleObject: console,
+    performanceObject: performance,
+    authFetch,
+    ttsApi: TTS_API,
+    perfLog,
+    setStatus,
+    waitMs,
+    sanitizeSpeakText,
+    detectMood,
+    normalizeTalkStyle,
+    buildVoiceCandidates,
+    initTTS,
+    isServerTTSProvider,
+    recordTTSDebugEvent,
+    recordTTSAudioEvent,
+    beginSpeechAnimation,
+    finishSpeechAnimation,
+    endSpeechAnimation,
+    showSubtitleText,
+    hideSubtitleText,
+    ensureTTSAudioAnalyser,
+    isCurrentTTSPlaybackGeneration,
+    buildSpeakProsody,
+    clampNumber
+  };
+}
+
+function createStreamTtsQueueBoundaryDeps() {
+  return {
+    state,
+    windowObject: window,
+    consoleObject: console,
+    isServerTTSProvider,
+    buildSpeechDeliveryText,
+    detectMood,
+    buildSpeakProsody,
+    recordTTSDebugEvent,
+    requestServerTTSBlob,
+    setStatus,
+    playAudioBlob,
+    isCurrentTTSPlaybackGeneration,
+    splitStreamSpeakSegments,
+    maybePlayTalkGesture,
+    buildStableSpeakText,
+    sanitizeSpeakText,
+    speak
+  };
+}
+
+function createVoiceRuntimeBoundaryDeps() {
+  return {
+    state,
+    ui,
+    windowObject: window,
+    documentObject: document,
+    setStatus,
+    isServerTTSProvider,
+    clampNumber,
+    normalizeTalkStyle,
+    detectMood,
+    buildSpeakProsody,
+    beginSpeechAnimation,
+    showSubtitleText,
+    finishSpeechAnimation,
+    hideSubtitleText,
+    endSpeechAnimation,
+    isCurrentTTSPlaybackGeneration
+  };
+}
+
+function getChatTtsBoundary() {
+  if (
+    !chatTtsBoundary
+    && typeof CHAT_TTS_BOUNDARY.createBoundaryIfAvailable === "function"
+    && (
+      typeof TTS_PLAYBACK_CONTROLLER.createController === "function"
+      || typeof STREAM_TTS_QUEUE_CONTROLLER.createController === "function"
+      || typeof VOICE_RUNTIME_CONTROLLER.createController === "function"
+    )
+  ) {
+    chatTtsBoundary = CHAT_TTS_BOUNDARY.createBoundaryIfAvailable(
+      {
+        ttsPlaybackController: TTS_PLAYBACK_CONTROLLER,
+        streamTtsQueueController: STREAM_TTS_QUEUE_CONTROLLER,
+        voiceRuntimeController: VOICE_RUNTIME_CONTROLLER,
+        createPlaybackDeps: createTTSPlaybackBoundaryDeps,
+        createStreamQueueDeps: createStreamTtsQueueBoundaryDeps,
+        createVoiceRuntimeDeps: createVoiceRuntimeBoundaryDeps
+      },
+      chatTtsBoundary
+    );
+  }
+  return chatTtsBoundary || CHAT_TTS_BOUNDARY;
+}
 
 function getTTSPlaybackController() {
-  if (!ttsPlaybackController && typeof TTS_PLAYBACK_CONTROLLER.createController === "function") {
-    ttsPlaybackController = TTS_PLAYBACK_CONTROLLER.createController({
-      state,
-      windowObject: window,
-      consoleObject: console,
-      performanceObject: performance,
-      authFetch,
-      ttsApi: TTS_API,
-      perfLog,
-      setStatus,
-      waitMs,
-      sanitizeSpeakText,
-      detectMood,
-      normalizeTalkStyle,
-      buildVoiceCandidates,
-      initTTS,
-      isServerTTSProvider,
-      recordTTSDebugEvent,
-      recordTTSAudioEvent,
-      beginSpeechAnimation,
-      finishSpeechAnimation,
-      endSpeechAnimation,
-      showSubtitleText,
-      hideSubtitleText,
-      ensureTTSAudioAnalyser,
-      isCurrentTTSPlaybackGeneration,
-      buildSpeakProsody,
-      clampNumber
-    });
+  const boundary = getChatTtsBoundary();
+  if (boundary && typeof boundary.getTTSPlaybackController === "function") {
+    return boundary.getTTSPlaybackController();
   }
-  return ttsPlaybackController || TTS_PLAYBACK_CONTROLLER;
+  return TTS_PLAYBACK_CONTROLLER;
 }
 
 function stopAllAudioPlayback() { return getTTSPlaybackController().stopAllAudioPlayback(); }
@@ -4031,39 +4203,12 @@ async function speakByServer(text, opts = {}) { return getTTSPlaybackController(
 async function speakByBrowser(text, opts = {}) { return getTTSPlaybackController().speakByBrowser(text, opts); }
 async function speak(text, opts = {}) { return getTTSPlaybackController().speak(text, opts); }
 
-function isCurrentTTSPlaybackGeneration(generation) {
-  return Number(generation || 0) === Number(state.ttsPlaybackGeneration || 0);
-}
-
-function clampNumber(v, min, max) {
-  return Math.min(max, Math.max(min, v));
-}
-
-let streamTtsQueueController = null;
-
 function getStreamTtsQueueController() {
-  if (!streamTtsQueueController && typeof STREAM_TTS_QUEUE_CONTROLLER.createController === "function") {
-    streamTtsQueueController = STREAM_TTS_QUEUE_CONTROLLER.createController({
-      state,
-      windowObject: window,
-      consoleObject: console,
-      isServerTTSProvider,
-      buildSpeechDeliveryText,
-      detectMood,
-      buildSpeakProsody,
-      recordTTSDebugEvent,
-      requestServerTTSBlob,
-      setStatus,
-      playAudioBlob,
-      isCurrentTTSPlaybackGeneration,
-      splitStreamSpeakSegments,
-      maybePlayTalkGesture,
-      buildStableSpeakText,
-      sanitizeSpeakText,
-      speak
-    });
+  const boundary = getChatTtsBoundary();
+  if (boundary && typeof boundary.getStreamTtsQueueController === "function") {
+    return boundary.getStreamTtsQueueController();
   }
-  return streamTtsQueueController || STREAM_TTS_QUEUE_CONTROLLER;
+  return STREAM_TTS_QUEUE_CONTROLLER;
 }
 
 function shouldUseStreamSpeak() { return getStreamTtsQueueController().shouldUseStreamSpeak(); }
@@ -4080,18 +4225,12 @@ function feedStreamSpeakDelta(delta, sessionId, style = "neutral") { return getS
 function flushStreamSpeak(sessionId, style = "neutral") { return getStreamTtsQueueController().flushStreamSpeak(sessionId, style); }
 function scheduleFinalSpeechWatchdog(input = {}) { return getStreamTtsQueueController().scheduleFinalSpeechWatchdog(input); }
 
-
-let voiceRuntimeController = null;
-
 function getVoiceRuntimeController() {
-  if (!voiceRuntimeController && typeof VOICE_RUNTIME_CONTROLLER.createController === "function") {
-    voiceRuntimeController = VOICE_RUNTIME_CONTROLLER.createController({
-      state, ui, windowObject: window, documentObject: document, setStatus, isServerTTSProvider, clampNumber,
-      normalizeTalkStyle, detectMood, buildSpeakProsody, beginSpeechAnimation, showSubtitleText,
-      finishSpeechAnimation, hideSubtitleText, endSpeechAnimation, isCurrentTTSPlaybackGeneration
-    });
+  const boundary = getChatTtsBoundary();
+  if (boundary && typeof boundary.getVoiceRuntimeController === "function") {
+    return boundary.getVoiceRuntimeController();
   }
-  return voiceRuntimeController || VOICE_RUNTIME_CONTROLLER;
+  return VOICE_RUNTIME_CONTROLLER;
 }
 
 function initServerTTSVoices() { return getVoiceRuntimeController().initServerTTSVoices(); }
@@ -4103,79 +4242,87 @@ function buildVoiceCandidates() { return getVoiceRuntimeController().buildVoiceC
 function initTTS() { return getVoiceRuntimeController().initTTS(); }
 
 
+function isCurrentTTSPlaybackGeneration(generation) {
+  return Number(generation || 0) === Number(state.ttsPlaybackGeneration || 0);
+}
 
-let live2dRuntimeController = null;
+function clampNumber(v, min, max) {
+  return Math.min(max, Math.max(min, v));
+}
 
 function getLive2DRuntimeController() {
-  if (!live2dRuntimeController && typeof LIVE2D_RUNTIME_CONTROLLER.createController === "function") {
-    live2dRuntimeController = LIVE2D_RUNTIME_CONTROLLER.createController({
-      state,
-      windowObject: window,
-      documentObject: document,
-      consoleObject: console,
-      performanceObject: performance,
-      runtimeVersion: RUNTIME_VERSION,
-      appendMessage,
-      setStatus,
-      placeModel,
-      attachDrag,
-      setupClickthroughHitTest,
-      scheduleIdleMotionLoop,
-      stopIdleMotionLoop,
-      setModelMotionDefinitions,
-      applyStyleExpressionLayer,
-      updateMicroMotionLayer,
-      getStyleExpressionProfile,
-      getActiveModelCadence,
-      clampNumber,
-      handleWindowResize
-    });
+  const boundary = getChatLive2DBoundary();
+  if (boundary && typeof boundary.getLive2DRuntimeController === "function") {
+    return boundary.getLive2DRuntimeController();
   }
-  return live2dRuntimeController || LIVE2D_RUNTIME_CONTROLLER;
+  return LIVE2D_RUNTIME_CONTROLLER;
 }
 
 function loadScript(src, isReady) { return getLive2DRuntimeController().loadScript(src, isReady); }
 async function ensureLive2DRuntime() { return getLive2DRuntimeController().ensureLive2DRuntime(); }
 
-let appConfigController = null;
+let chatConfigBoundary = null;
+
+function createAppConfigBoundaryDeps() {
+  return {
+    state,
+    ui,
+    fetchObject: fetch,
+    clampNumber,
+    isServerTTSProvider,
+    initServerTTSVoices,
+    buildAsrHotwordRules,
+    syncProactiveSchedulerPolling,
+    startAutoChatLoop,
+    stopAutoChatLoop,
+    normalizeTalkStyle,
+    normalizeMotionIntensity,
+    loadChatHistoryFromStorage,
+    loadRemindersFromStorage,
+    loadDailyGreetingState,
+    loadEmotionStats,
+    resolveAssistantDisplayName,
+    updateObserveButton,
+    updateMicMeter,
+    detectModelProfileName
+  };
+}
+
+function getChatConfigBoundary() {
+  if (
+    !chatConfigBoundary
+    && typeof CHAT_CONFIG_BOUNDARY.createBoundaryIfAvailable === "function"
+    && typeof APP_CONFIG_CONTROLLER.createController === "function"
+  ) {
+    chatConfigBoundary = CHAT_CONFIG_BOUNDARY.createBoundaryIfAvailable(
+      {
+        appConfigController: APP_CONFIG_CONTROLLER,
+        createConfigDeps: createAppConfigBoundaryDeps
+      },
+      chatConfigBoundary
+    );
+  }
+  return chatConfigBoundary || CHAT_CONFIG_BOUNDARY;
+}
 
 function getAppConfigController() {
-  if (!appConfigController && typeof APP_CONFIG_CONTROLLER.createController === "function") {
-    appConfigController = APP_CONFIG_CONTROLLER.createController({
-      state, ui, fetchObject: fetch, clampNumber, isServerTTSProvider, initServerTTSVoices,
-      buildAsrHotwordRules, syncProactiveSchedulerPolling, startAutoChatLoop, stopAutoChatLoop,
-      normalizeTalkStyle, normalizeMotionIntensity, loadChatHistoryFromStorage, loadRemindersFromStorage,
-      loadDailyGreetingState, loadEmotionStats, resolveAssistantDisplayName, updateObserveButton,
-      updateMicMeter, detectModelProfileName
-    });
+  const boundary = getChatConfigBoundary();
+  if (boundary && typeof boundary.getAppConfigController === "function") {
+    return boundary.getAppConfigController();
   }
-  return appConfigController || APP_CONFIG_CONTROLLER;
+  return APP_CONFIG_CONTROLLER;
 }
 
 async function loadConfig() { return getAppConfigController().loadConfig(); }
 
 async function initLive2D() { return getLive2DRuntimeController().initLive2D(); }
-let live2dLayoutController = null;
 
 function getLive2DLayoutController() {
-  if (!live2dLayoutController && typeof LIVE2D_LAYOUT_CONTROLLER.createController === "function") {
-    live2dLayoutController = LIVE2D_LAYOUT_CONTROLLER.createController({
-      state,
-      windowObject: window,
-      documentObject: document,
-      performanceObject: performance,
-      requestAnimationFrame,
-      cancelAnimationFrame,
-      clampNumber,
-      desktopWindowController: DESKTOP_WINDOW_CONTROLLER,
-      triggerTapMotion,
-      finalizeDesktopDrag,
-      stopDesktopWindowDrag,
-      tapMaxDurationMs: TAP_MAX_DURATION_MS,
-      tapMoveThreshold: TAP_MOVE_THRESHOLD
-    });
+  const boundary = getChatLive2DBoundary();
+  if (boundary && typeof boundary.getLive2DLayoutController === "function") {
+    return boundary.getLive2DLayoutController();
   }
-  return live2dLayoutController || LIVE2D_LAYOUT_CONTROLLER;
+  return LIVE2D_LAYOUT_CONTROLLER;
 }
 
 function placeModel() { return getLive2DLayoutController().placeModel(); }

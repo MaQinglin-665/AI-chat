@@ -1,19 +1,21 @@
-# v1.2.0-preview Release Notes Draft
+# v1.2.0-preview 更新说明 / Release Notes Draft
 
-> Draft for GitHub Release.
+> 这是面向早期测试者和贡献者的开源 MVP 预览版草稿，不是成熟商业产品。
 >
-> This is a preview release for the open-source MVP. It is intended for early testers and contributors, not as a mature commercial product.
+> English: preview release notes for early testers and contributors, not a mature commercial product.
 
-## Summary
+## 摘要 / Summary
 
-`v1.2.0-preview` focuses on first-run clarity, safer defaults, and a repeatable baseline desktop pet experience:
+`v1.2.0-preview` 聚焦首跑清晰度、安全默认值和可重复的桌宠基础体验：
 
-- Electron desktop window with Live2D rendering.
-- Text chat through an OpenAI-compatible or Ollama-style local/provider backend.
-- Browser TTS as the recommended first-run voice path.
-- Manual, opt-in desktop observation.
-- Character Runtime demo path kept opt-in for emotion/action metadata testing.
-- Release checklist and smoke-test documentation for contributors.
+- Electron 桌面窗口与 Live2D 渲染。
+- 通过 OpenAI-compatible 或 Ollama 风格后端完成文本聊天。
+- Browser TTS 作为推荐首跑语音路径。
+- 桌面观察保持手动、显式启用。
+- Character Runtime demo 继续作为 opt-in 的情绪/动作元数据验证路径。
+- 给贡献者补齐 release checklist 和 smoke-test 文档。
+
+English summary: first-run clarity, safer defaults, Browser TTS, opt-in desktop observation, and repeatable contributor validation.
 
 ## What Works In This Preview
 
