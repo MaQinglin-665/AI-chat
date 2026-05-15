@@ -47,7 +47,9 @@ Section "Install"
   CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\Uninstall Xinyu.lnk" "$INSTDIR\Uninstall.exe"
   CreateShortcut "$DESKTOP\Xinyu AI Desktop Pet.lnk" "$INSTDIR\start_electron.bat" "" "$INSTDIR\start_electron.bat" 0 SW_SHOWMINIMIZED "" "Start Xinyu AI Desktop Pet"
 
+  IfSilent skip_guided_first_run
   ExecShell "open" "$INSTDIR\install_and_start.bat"
+  skip_guided_first_run:
 SectionEnd
 
 Section "Uninstall"

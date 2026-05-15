@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview"><img alt="version" src="https://img.shields.io/badge/version-v1.4.0--preview-6f5bd5"></a>
+  <a href="https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.5"><img alt="version" src="https://img.shields.io/badge/version-v1.4.0--preview.5-6f5bd5"></a>
   <img alt="status" src="https://img.shields.io/badge/status-MVP%20preview-f59e0b">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-2563eb">
   <img alt="python" src="https://img.shields.io/badge/Python-3.10%2B-3776ab">
@@ -22,7 +22,7 @@
 English summary: Xinyu Desktop Pet is an open-source Windows desktop AI companion / AI VTuber MVP. It ships no cloud model, hosted endpoint, or API key; users configure their own model provider.
 
 - 项目网站：[maqinglin-665.github.io/AI-chat](https://maqinglin-665.github.io/AI-chat/)
-- 最新预览版：[v1.4.0-preview](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview)
+- 最新预览版：[v1.4.0-preview.5](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.5)
 - 首次安装指南：[docs/first-install.md](docs/first-install.md)
 - 模型选择指南：[docs/model-selection.md](docs/model-selection.md)
 - 首跑反馈模板：[docs/first-run-feedback.md](docs/first-run-feedback.md)
@@ -50,7 +50,7 @@ English summary: Xinyu Desktop Pet is an open-source Windows desktop AI companio
 在 release 页面优先下载：
 
 ```text
-Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe
 SHA256SUMS.txt
 ```
 
@@ -59,7 +59,7 @@ SHA256SUMS.txt
 首发安装器未签名。运行前建议先校验 SHA256：
 
 ```powershell
-Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
+Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -70,7 +70,7 @@ Get-Content .\SHA256SUMS.txt
 需要看源码或参与开发时，下载 release 里的源码测试包：
 
 ```text
-Xinyu-AI-Desktop-Pet-v1.4.0-preview-windows-source-test.zip
+Xinyu-AI-Desktop-Pet-v1.4.0-preview.5-windows-source-test.zip
 ```
 
 解压后确认根目录至少包含：

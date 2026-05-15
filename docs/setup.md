@@ -16,7 +16,7 @@ English summary: install the Windows preview, verify SHA256, configure your own 
 普通 Windows 用户推荐先下载 release 安装器，而不是直接下载 GitHub 自动生成的源码压缩包：
 
 ```text
-Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe
 SHA256SUMS.txt
 ```
 

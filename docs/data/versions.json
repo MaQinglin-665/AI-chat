@@ -1,13 +1,13 @@
 {
-  "updated_at": "2026-05-14",
+  "updated_at": "2026-05-15",
   "versions": [
     {
-      "tag": "v1.4.0-preview",
+      "tag": "v1.4.0-preview.5",
       "date": "2026-05",
       "log_anchor": "log-v140",
       "title": "首次公开安装路径与 AI VTuber 体验收口",
       "panel_summary": "安装器优先的公开预览版：补齐首次模型配置向导、Character Brain 舞台连续性、语音/动作 director 与保守安全默认值。",
-      "release_summary": "v1.4 preview focuses on installer-first usability, stage memory, Character Brain performance controls, and conservative safety defaults.",
+      "release_summary": "v1.4.0-preview.5 keeps the installer-first public preview current and fixes silent install smoke behavior without changing interactive first-run setup.",
       "highlights": [
         "普通 Windows 用户优先下载安装器与 SHA256SUMS.txt，源码测试包保留给开发者和早期测试者。",
         "新增应用内首次模型配置向导，provider/base URL/model 写入本地配置，真实 API key 写入 .env。",

@@ -25,6 +25,25 @@ All notable changes to this project are documented in this file.
 ### Fixed
 - Fixed source-test packaging so all tracked root Python backend modules are included.
 
+## [1.4.0-preview.5] - 2026-05-15
+
+### Changed
+- Updated public download entry points to `v1.4.0-preview.5`.
+- Kept interactive installer behavior unchanged while skipping guided first-run auto-launch during `/S` silent installs.
+- Extended installer smoke checks to guard the silent-install behavior.
+
+### Security
+- Silent install now copies files and shortcuts only; it does not create local config, write API keys, or start the first-run script.
+
+## [1.4.0-preview.4] - 2026-05-15
+
+### Changed
+- Refreshed the public preview assets after release readiness and clean source-package first-run validation.
+- Updated older GitHub preview releases to point ordinary testers to `v1.4.0-preview.4`.
+
+### Security
+- Kept desktop observation, screenshots, file reads, tool calling, and shell execution disabled by default.
+
 ## [1.4.0-preview] - 2026-05-10
 
 ### Added

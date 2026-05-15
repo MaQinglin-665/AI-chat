@@ -21,6 +21,7 @@ English summary: the preview installer is unsigned and guided; verify SHA256 and
 - 不要求管理员权限。
 - 创建开始菜单快捷方式和桌面快捷方式。
 - 安装完成后启动 `install_and_start.bat`。
+- 使用 `/S` 静默安装时只复制文件和创建快捷方式，不自动启动 `install_and_start.bat`，便于无人值守 smoke / CI 验证。
 - 不写入 API key。
 - 不修改 Windows 安全策略。
 - 不默认开启桌面观察、截图、文件读取、工具调用或 shell 执行。
@@ -32,7 +33,7 @@ English summary: the preview installer is unsigned and guided; verify SHA256 and
 用户校验示例：
 
 ```powershell
-Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
+Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 

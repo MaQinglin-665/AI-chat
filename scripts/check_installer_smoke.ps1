@@ -50,6 +50,19 @@ try {
     }
     Write-Ok "SHA256SUMS.txt lists installer and source package"
 
+    $nsiPath = Join-Path $RepoRoot "installer\xinyu-online-installer.nsi"
+    $nsiText = Get-Content -Raw -LiteralPath $nsiPath -Encoding UTF8
+    $launchPattern = 'ExecShell\s+"open"\s+"\$INSTDIR\\install_and_start\.bat"'
+    $launchMatch = [regex]::Match($nsiText, $launchPattern)
+    if (-not $launchMatch.Success) {
+        Write-Fail "Installer script does not launch install_and_start.bat in interactive mode."
+    }
+    $beforeLaunch = $nsiText.Substring(0, $launchMatch.Index)
+    if ($beforeLaunch -notmatch 'IfSilent\s+\S+') {
+        Write-Fail "Installer script should skip guided first-run launch when running with /S."
+    }
+    Write-Ok "Installer script skips guided first-run launch in silent mode"
+
     Write-Host ""
     Write-Ok "Installer smoke passed."
 } finally {

@@ -69,7 +69,7 @@ No-go：
 普通用户首跑主路径从 release 安装器开始：
 
 ```text
-Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe
 SHA256SUMS.txt
 ```
 

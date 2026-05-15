@@ -41,7 +41,7 @@ git diff --check
 
 优先从 release 安装器开始验证普通用户路径；源码测试包作为开发者 / 早期测试者路径。
 
-- [ ] 下载 `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe` 和 `SHA256SUMS.txt`。
+- [ ] 下载 `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe` 和 `SHA256SUMS.txt`。
 - [ ] 校验 SHA256；若 SmartScreen 提醒未知发布者，确认说明没有要求关闭系统安全设置。
 - [ ] 安装器默认安装到当前用户目录，不要求管理员权限。
 - [ ] 安装器创建开始菜单和桌面快捷方式。
