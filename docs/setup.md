@@ -1,17 +1,19 @@
-﻿# Setup Guide
+﻿# 安装与运行指南 / Setup Guide
 
 本指南面向首次运行与开源贡献者，覆盖系统要求、依赖安装、启动方式与核心配置。
 
-## 1. System Requirements
+English summary: install the Windows preview, verify SHA256, configure your own model provider, and keep high-risk capabilities opt-in.
+
+## 1. 系统要求 / System Requirements
 
 - Windows 10/11
 - Python 3.10+
 - Node.js 18+
 - 可用的 Live2D 模型文件（`.model3.json`）
 
-## 2. Recommended First Run
+## 2. 推荐首跑路径 / Recommended First Run
 
-普通 Windows 用户推荐先下载 release 安装器：
+普通 Windows 用户推荐先下载 release 安装器，而不是直接下载 GitHub 自动生成的源码压缩包：
 
 ```text
 Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
@@ -26,7 +28,7 @@ SHA256SUMS.txt
 .\install_and_start.bat
 ```
 
-它会串起依赖安装、预览配置和 Electron 启动。LLM 配置放到应用内首次配置向导完成；首句 smoke check 改为高级排查步骤，不再阻塞普通用户首次启动。
+它会串起依赖安装、预览配置和 Electron 启动。LLM 配置放到应用内首次配置向导完成；首句 smoke check 改为高级排查步骤，不再阻塞普通用户首次启动。项目不会附带云模型、托管 endpoint 或 API key。
 
 更详细说明见 `docs/first-install.md`。
 
@@ -170,7 +172,7 @@ $env:DASHSCOPE_API_KEY = "your_key_here"
 {
   "asr": {
     "wake_word_enabled": true,
-    "wake_words": ["塔菲", "taffy", "tafi"]
+    "wake_words": ["馨语", "馨语ai", "xinyu", "心语", "新语", "星语"]
   }
 }
 ```
@@ -226,7 +228,7 @@ cd D:\AI\ai_desktop_pet
 start_desktop.bat
 ```
 
-## 8. First-run Safety Defaults
+## 8. 首跑安全默认值 / First-Run Safety Defaults
 
 默认推荐保持：
 
@@ -236,7 +238,7 @@ start_desktop.bat
 
 说明：高风险能力保持关闭，按需显式开启。
 
-## 9. Config Center
+## 9. 配置中心 / Config Center
 
 可视化配置入口：
 

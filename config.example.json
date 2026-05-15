@@ -161,13 +161,11 @@
       "馨语",
       "馨语ai",
       "xinyu",
-      "塔菲",
-      "taffy",
-      "tafi"
+      "心语",
+      "新语",
+      "星语"
     ],
     "hotword_replacements": {
-      "塔菲": "馨语AI桌宠",
-      "taffy": "馨语AI桌宠",
       "neuro": "Neuro",
       "fifa": "FIFA",
       "馨语": "馨语AI桌宠",
@@ -301,8 +299,6 @@
       "馨语",
       "馨语ai",
       "xinyu",
-      "塔菲",
-      "taffy",
       "?",
       "？",
       "帮我",

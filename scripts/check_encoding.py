@@ -45,6 +45,26 @@ SKIP_DIRS = {
     "dist",
 }
 
+PUBLIC_FACADE_PATHS = {
+    "README.md",
+    "README-FIRST-RUN.txt",
+    "START_HERE.txt",
+    "CHANGELOG.md",
+    "package.json",
+    "docs/index.html",
+    "docs/config.html",
+    "docs/setup.md",
+    "docs/first-install.md",
+    "docs/installer.md",
+    "docs/package.json",
+    "docs/data/content.json",
+    "docs/data/versions.json",
+    "docs/js/config-page.js",
+    "docs/release-notes-v1.2.0-preview.md",
+    "docs/release-notes-v1.3.0-preview.md",
+    "docs/release-notes-v1.4.0-preview.md",
+}
+
 # Common mojibake fragments seen when UTF-8 text is decoded/saved through GBK.
 SUSPICIOUS_FRAGMENTS = (
     "鑷姩",
@@ -57,6 +77,20 @@ SUSPICIOUS_FRAGMENTS = (
     "宸叉挙閿",
     "澶辫触",
     "涓嶅彲鐢",
+)
+
+# Stricter fragments for public-facing docs/metadata. These are kept out of the
+# repo-wide check because some backend tests intentionally mention mojibake text.
+PUBLIC_SUSPICIOUS_FRAGMENTS = (
+    "棣ㄨ",
+    "妗屽疇",
+    "涓€",
+    "銆",
+    "锛",
+    "馃",
+    "鈥",
+    "鐨",
+    "閰",
 )
 
 
@@ -97,6 +131,14 @@ def _normalize_paths(root: Path, raw_paths: list[str]) -> list[Path]:
         seen.add(candidate)
         out.append(candidate)
     return out
+
+
+def _public_facade_candidates(root: Path) -> list[Path]:
+    return [
+        root / rel
+        for rel in sorted(PUBLIC_FACADE_PATHS)
+        if (root / rel).exists() and _is_text_candidate(root / rel)
+    ]
 
 
 def _git_staged_added_lines(root: Path, rel_path: str) -> list[str]:
@@ -147,11 +189,14 @@ def _contains_suspicious_text(text: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Check UTF-8 encoding / mojibake.")
     parser.add_argument("--staged", action="store_true", help="Only check added staged lines for mojibake.")
+    parser.add_argument("--public", action="store_true", help="Check public README/docs/release metadata with stricter mojibake fragments.")
     parser.add_argument("paths", nargs="*", help="Optional file paths to check.")
     args = parser.parse_args()
 
     root = _repo_root()
-    if args.staged and not args.paths:
+    if args.public and not args.paths:
+        candidates = _public_facade_candidates(root)
+    elif args.staged and not args.paths:
         staged = _git_staged_files(root)
         candidates = [p for p in _normalize_paths(root, staged) if _is_text_candidate(p)]
     elif args.paths:
@@ -194,6 +239,11 @@ def main() -> int:
                 continue
             if _contains_suspicious_text(content):
                 failures.append(f"[mojibake] {rel}: contains suspicious mojibake fragments")
+            if rel in PUBLIC_FACADE_PATHS:
+                for fragment in PUBLIC_SUSPICIOUS_FRAGMENTS:
+                    if fragment in content:
+                        failures.append(f"[public-mojibake] {rel}: contains suspicious fragment {fragment!r}")
+                        break
 
     if failures:
         print("Encoding check failed:")

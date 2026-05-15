@@ -90,7 +90,7 @@ class Reporter:
             return 1
         print(f"First-run preflight passed with {len(self.warnings)} warning(s).")
         if self.warnings:
-            print("You can start the app after reviewing the [WARN] items.")
+            print("You can start the app after reviewing the [WARN] items; [FAIL] items are the blockers.")
         else:
             print("You can start the app now.")
         return 0
@@ -464,7 +464,7 @@ def check_safety_defaults(r: Reporter, cfg: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    print("Taffy AI Desktop Pet first-run preflight")
+    print("Xinyu Desktop Pet first-run preflight")
     print(f"Root: {ROOT}")
     reporter = Reporter()
     check_project_files(reporter)

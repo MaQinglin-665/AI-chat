@@ -15,15 +15,31 @@
 
 ## Automated Gate
 
-发布前至少跑：
+发布前建议先跑完整本地质量门：
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_release_readiness.ps1
+```
+
+如果只想先跑较快的代码与体验检查，可以临时跳过打包项：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_release_readiness.ps1 -SkipPackage -SkipInstaller
+```
+
+完整脚本会串起下面这些检查；需要逐项排查时也可以单独运行：
+
+```powershell
+python scripts\check_encoding.py --public
 python scripts\check_encoding.py
 python scripts\check_python_syntax.py
 python scripts\check_js_syntax.py
 python scripts\check_secrets.py
 node scripts\run_node_tests.js
 python -m pytest -q
+python scripts\first_run_check.py
+python scripts\check_character_v1_4.py
+python scripts\check_demo_readiness.py
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_installer_smoke.ps1
 git diff --check
@@ -31,9 +47,12 @@ git diff --check
 
 通过标准：
 
-- [ ] 编码、Python 语法、JavaScript 语法、secret 扫描通过。
+- [ ] 公开文档编码、全仓库编码、Python 语法、JavaScript 语法、secret 扫描通过。
 - [ ] Node 前端测试通过。
 - [ ] Python 测试通过。
+- [ ] 首跑预检无 blocker；warning 必须能解释为本地环境或显式 demo 配置。
+- [ ] Character v1.4 质量门通过。
+- [ ] Demo readiness 无 blocker；如果使用 GPT-SoVITS，服务必须可达，否则切回 browser TTS 基线。
 - [ ] `scripts\check_first_run_package.ps1` 能打包、解压并验证首跑入口。
 - [ ] `scripts\check_installer_smoke.ps1` 能生成 installer exe、source zip 和 `SHA256SUMS.txt`。
 - [ ] `git diff --check` 没有冲突标记或尾随空白错误。

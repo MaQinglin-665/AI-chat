@@ -164,7 +164,7 @@ def _classify_probe_failure(probe: dict[str, Any], llm_url: dict[str, Any], key_
     if "timed out" in lower or "timeout" in lower:
         return (
             "provider_timeout",
-            "The provider did not respond fast enough. Use a faster model for daily Taffy tuning or increase request_timeout for manual checks.",
+            "The provider did not respond fast enough. Use a faster model for daily Xinyu tuning or increase request_timeout for manual checks.",
         )
     if "model" in lower and "not found" in lower:
         return (
@@ -286,7 +286,7 @@ def format_report(report: dict[str, Any]) -> str:
     network = _safe_dict(report.get("network"))
     probe = _safe_dict(report.get("probe"))
     lines = [
-        "== Taffy LLM Link Diagnostics ==",
+        "== Xinyu LLM Link Diagnostics ==",
         f"gate: {'PASS' if report.get('gate_ok') else 'FAIL'}",
         f"issue: {clean_text(report.get('issue_code'), 80)}",
         f"recommendation: {clean_text(report.get('recommendation'), 360)}",
@@ -322,8 +322,8 @@ def format_report(report: dict[str, Any]) -> str:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Diagnose Taffy LLM connectivity without leaking secrets.")
-    parser.add_argument("--base-url", default="", help="Local Taffy service base URL. Default: http://127.0.0.1:8123")
+    parser = argparse.ArgumentParser(description="Diagnose Xinyu LLM connectivity without leaking secrets.")
+    parser.add_argument("--base-url", default="", help="Local Xinyu service base URL. Default: http://127.0.0.1:8123")
     parser.add_argument("--timeout-sec", type=float, default=14.0, help="HTTP timeout for /api/llm_probe.")
     parser.add_argument("--json", action="store_true", help="Print JSON instead of text.")
     parser.add_argument("--soft-fail", action="store_true", help="Always exit 0 after printing the report.")
