@@ -8,6 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from config import MEMORY_PATH, MEMORY_SUMMARY_PATH
+import memory_consolidation
+import memory_correction
+import memory_debug
+import memory_selection
+import memory_store
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +33,8 @@ MEM0_HISTORY_DB_PATH = MEM0_DIR / "history.db"
 PROFILE_MEMORY_PATH = MEMORY_PATH.parent / "memory_profile.json"
 RELATIONSHIP_MEMORY_PATH = MEMORY_PATH.parent / "memory_relationship.json"
 MANUAL_PERSONA_CARD_PATH = MEMORY_PATH.parent / "memory_persona_card.json"
+SHORT_TERM_MEMORY_PATH = MEMORY_PATH.parent / "memory_session.json"
+CORE_MEMORY_PATH = MEMORY_PATH.parent / "memory_core.json"
 LEARNING_CANDIDATES_PATH = MEMORY_PATH.parent / "learning_candidates.json"
 LEARNING_SAMPLES_PATH = MEMORY_PATH.parent / "learning_samples.json"
 LEARNING_STATE_PATH = MEMORY_PATH.parent / "learning_state.json"
@@ -37,6 +44,10 @@ LEARNING_SHADOW_LOG_PATH = MEMORY_PATH.parent / "learning_shadow_log.jsonl"
 MEM0_CLIENT = None
 LAST_MEMORY_DEBUG = {}
 LAST_LEARNING_EXTRACTION_DEBUG = {}
+LAST_SHORT_TERM_MEMORY_DEBUG = {}
+LAST_CORE_MEMORY_DEBUG = {}
+LAST_MEMORY_CONSOLIDATION_DEBUG = {}
+LAST_MEMORY_CORRECTION_DEBUG = {}
 MEM0_CLIENT_KEY = ""
 
 LEGACY_MANUAL_PERSONA_CARD_FIELDS = (
@@ -77,6 +88,22 @@ MANUAL_PERSONA_CARD_LIMITS = {
     "common_topics": 320,
     "reply_style": 360,
     "companionship_style": 360,
+}
+
+CORE_MEMORY_KINDS = {"semantic", "episodic"}
+CORE_MEMORY_CATEGORIES = {
+    "project_context",
+    "stable_fact",
+    "user_preference",
+    "relationship",
+    "recent_event",
+}
+SHORT_TERM_MEMORY_KINDS = {
+    "current_topic",
+    "current_task",
+    "recent_decision",
+    "user_state",
+    "open_loop",
 }
 
 PERSONA_RELATIONSHIP_ROLES = (
@@ -188,6 +215,20 @@ def get_memory_settings(config):
         "learning_candidate_max_items": _clamp_int(raw.get("learning_candidate_max_items", 200), 200, 20, 1000),
         "learning_candidate_min_score": _clamp_float(raw.get("learning_candidate_min_score", 0.45), 0.45, 0.0, 1.0),
         "learning_candidate_min_confidence": _clamp_float(raw.get("learning_candidate_min_confidence", 0.45), 0.45, 0.0, 1.0),
+        "short_enabled": bool(raw.get("short_enabled", True)),
+        "short_max_items": _clamp_int(raw.get("short_max_items", 24), 24, 4, 80),
+        "short_inject_count": _clamp_int(raw.get("short_inject_count", 4), 4, 0, 8),
+        "short_ttl_turns": _clamp_int(raw.get("short_ttl_turns", 16), 16, 2, 80),
+        "memory_consolidation_enabled": bool(raw.get("memory_consolidation_enabled", True)),
+        "memory_consolidation_min_support": _clamp_int(raw.get("memory_consolidation_min_support", 2), 2, 2, 8),
+        "memory_correction_enabled": bool(raw.get("memory_correction_enabled", True)),
+        "memory_conflict_protection_enabled": bool(raw.get("memory_conflict_protection_enabled", True)),
+        "core_enabled": bool(raw.get("core_enabled", True)),
+        "core_extraction_enabled": bool(raw.get("core_extraction_enabled", True)),
+        "core_max_items": _clamp_int(raw.get("core_max_items", 300), 300, 20, 1200),
+        "core_inject_count": _clamp_int(raw.get("core_inject_count", 3), 3, 0, 6),
+        "core_min_importance": _clamp_float(raw.get("core_min_importance", 0.45), 0.45, 0.0, 1.0),
+        "core_min_confidence": _clamp_float(raw.get("core_min_confidence", 0.55), 0.55, 0.0, 1.0),
         "summary_trigger_every": _clamp_int(raw.get("summary_trigger_every", 10), 10, 5, 50),
         "mem0_enabled": bool(raw.get("mem0_enabled", True)),
         "mem0_top_k": _clamp_int(raw.get("mem0_top_k", 5), 5, 1, 12),
@@ -326,66 +367,527 @@ def tokenize_memory_text(text):
 
 
 def load_memory_items():
-    if not MEMORY_PATH.exists():
-        return []
-    try:
-        data = json.loads(MEMORY_PATH.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return []
-    if not isinstance(data, list):
-        return []
-
-    items = []
-    for raw in data:
-        if not isinstance(raw, dict):
-            continue
-        user = normalize_memory_text(raw.get("user", ""), max_len=240)
-        assistant = normalize_memory_text(raw.get("assistant", ""), max_len=280)
-        ts = str(raw.get("ts", "")).strip()
-        if not user or not assistant:
-            continue
-        if looks_garbled_text(user) or looks_garbled_text(assistant):
-            continue
-        if looks_stagey_text(assistant):
-            continue
-        items.append({"ts": ts, "user": user, "assistant": assistant})
-    return items
+    return memory_store.load_interaction_items(
+        MEMORY_PATH,
+        normalize_text=normalize_memory_text,
+        looks_garbled=looks_garbled_text,
+        looks_stagey=looks_stagey_text,
+    )
 
 
 def save_memory_items(items):
-    serializable = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        user = normalize_memory_text(item.get("user", ""), max_len=240)
-        assistant = normalize_memory_text(item.get("assistant", ""), max_len=280)
-        ts = str(item.get("ts", "")).strip()
-        if not user or not assistant:
-            continue
-        if looks_garbled_text(user) or looks_garbled_text(assistant):
-            continue
-        if looks_stagey_text(assistant):
-            continue
-        serializable.append({"ts": ts, "user": user, "assistant": assistant})
+    return memory_store.save_interaction_items(
+        MEMORY_PATH,
+        items,
+        normalize_text=normalize_memory_text,
+        looks_garbled=looks_garbled_text,
+        looks_stagey=looks_stagey_text,
+        logger=logger,
+    )
 
-    payload = json.dumps(serializable, ensure_ascii=False, indent=2)
-    tmp_path = MEMORY_PATH.with_suffix(".tmp")
-    bak_path = MEMORY_PATH.with_suffix(".bak")
+
+def has_explicit_memory_write_intent(text):
+    safe = str(text or "").strip().lower()
+    if not safe:
+        return False
+    return bool(
+        re.search(
+            r"(please remember|remember that|remember this|make a note|note that|"
+            r"记住|记一下|帮我记|记到记忆|请记得|以后记得|你要记得)",
+            safe,
+        )
+    )
+
+
+def _extract_explicit_memory_text(text):
+    raw = str(text or "").strip()
+    if not raw:
+        return ""
+    patterns = [
+        r"^(?:请|麻烦你|帮我|你)?(?:记住|记一下|帮我记|记到记忆里|请记得|以后记得|你要记得)[：:，,\s]*(.+)$",
+        r"^(?:please\s+)?remember(?:\s+that|\s+this)?[:\s,]*(.+)$",
+        r"^make\s+a\s+note(?:\s+that)?[:\s,]*(.+)$",
+        r"^note\s+that[:\s,]*(.+)$",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, raw, flags=re.IGNORECASE)
+        if match:
+            return normalize_memory_text(match.group(1), max_len=220)
+    return ""
+
+
+def _classify_core_memory_text(text):
+    safe = str(text or "").strip().lower()
+    category = "stable_fact"
+    kind = "semantic"
+    if re.search(r"(项目|仓库|project|repo|repository|codebase|功能|bug|live2d|tts|asr|llm|electron|python)", safe):
+        category = "project_context"
+    elif re.search(r"(喜欢|不喜欢|偏好|prefer|preference|like|dislike|讨厌)", safe):
+        category = "user_preference"
+    elif re.search(r"(关系|陪伴|朋友|聊天方式|相处|称呼|叫我|call me)", safe):
+        category = "relationship"
+    if re.search(r"(今天|刚刚|刚才|昨天|昨晚|这次|现在|正在|已经|完成|修复|下一步|下一阶段|today|yesterday|now|currently|finished|fixed)", safe):
+        kind = "episodic"
+        if category == "stable_fact":
+            category = "recent_event"
+    return kind, category
+
+
+def _make_core_memory_id(kind, category, text):
+    slug = re.sub(r"[^a-z0-9]+", "_", str(text or "").lower()).strip("_")[:24]
+    if not slug:
+        slug = "memory"
+    safe_kind = kind if kind in CORE_MEMORY_KINDS else "semantic"
+    safe_category = category if category in CORE_MEMORY_CATEGORIES else "stable_fact"
+    return f"mem_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{safe_kind}_{safe_category}_{slug}"
+
+
+def _normalize_core_memory_item(item, fallback_id=""):
+    safe = item if isinstance(item, dict) else {}
+    text = normalize_memory_text(safe.get("text", ""), max_len=260)
+    if len(text) < 4:
+        return None
+    if looks_garbled_text(text) or looks_sensitive_memory_text(text) or looks_stagey_text(text):
+        return None
+    kind = str(safe.get("kind", "semantic") or "semantic").strip().lower()
+    if kind not in CORE_MEMORY_KINDS:
+        kind = "semantic"
+    category = str(safe.get("category", "stable_fact") or "stable_fact").strip().lower()
+    if category not in CORE_MEMORY_CATEGORIES:
+        category = "stable_fact"
+    try:
+        importance = max(0.0, min(1.0, float(safe.get("importance", 0.55) or 0.55)))
+    except (TypeError, ValueError):
+        importance = 0.55
+    try:
+        confidence = max(0.0, min(1.0, float(safe.get("confidence", 0.55) or 0.55)))
+    except (TypeError, ValueError):
+        confidence = 0.55
+    tags = safe.get("tags", [])
+    if not isinstance(tags, list):
+        tags = []
+    tags = [
+        normalize_memory_text(tag, max_len=24)
+        for tag in tags[:8]
+        if normalize_memory_text(tag, max_len=24)
+    ]
+    origin = safe.get("origin") if isinstance(safe.get("origin"), dict) else {}
+    now = datetime.now().isoformat(timespec="seconds")
+    return {
+        "id": str(safe.get("id") or fallback_id or _make_core_memory_id(kind, category, text)).strip(),
+        "kind": kind,
+        "category": category,
+        "text": text,
+        "source": str(safe.get("source", "conversation") or "conversation").strip()[:40],
+        "status": str(safe.get("status", "active") or "active").strip().lower(),
+        "importance": round(importance, 4),
+        "confidence": round(confidence, 4),
+        "tags": tags,
+        "created_at": str(safe.get("created_at", "") or now).strip(),
+        "updated_at": str(safe.get("updated_at", "") or safe.get("created_at", "") or now).strip(),
+        "last_used_at": str(safe.get("last_used_at", "") or "").strip(),
+        "use_count": _clamp_int(safe.get("use_count", 0), 0, 0, 999999),
+        "pinned": bool(safe.get("pinned", False)),
+        "origin": {
+            "user_preview": normalize_memory_text(origin.get("user_preview", ""), max_len=140),
+            "assistant_preview": normalize_memory_text(origin.get("assistant_preview", ""), max_len=160),
+        },
+    }
+
+
+def load_core_memory_items():
+    if not CORE_MEMORY_PATH.exists():
+        return []
+    try:
+        data = json.loads(CORE_MEMORY_PATH.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return []
+    raw_items = data.get("items", []) if isinstance(data, dict) else data
+    if not isinstance(raw_items, list):
+        return []
+    items = []
+    for idx, raw in enumerate(raw_items):
+        item = _normalize_core_memory_item(raw, fallback_id=f"mem_{idx}")
+        if item and item.get("status") not in {"deleted", "rejected", "archived"}:
+            items.append(item)
+    return items
+
+
+def save_core_memory_items(items):
+    normalized = []
+    for idx, raw in enumerate(items if isinstance(items, list) else []):
+        item = _normalize_core_memory_item(raw, fallback_id=f"mem_{idx}")
+        if item is not None:
+            normalized.append(item)
+    payload = {
+        "schema_version": 1,
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+        "items": normalized,
+    }
+    tmp_path = CORE_MEMORY_PATH.with_suffix(".tmp")
+    bak_path = CORE_MEMORY_PATH.with_suffix(".bak")
     previous = None
-    if MEMORY_PATH.exists():
+    if CORE_MEMORY_PATH.exists():
         try:
-            previous = MEMORY_PATH.read_bytes()
+            previous = CORE_MEMORY_PATH.read_bytes()
         except Exception:
             previous = None
-
-    tmp_path.write_text(payload, encoding="utf-8")
-    tmp_path.replace(MEMORY_PATH)
-
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp_path.replace(CORE_MEMORY_PATH)
     if previous is not None:
         try:
             bak_path.write_bytes(previous)
         except Exception:
-            logger.debug("write memory backup failed", exc_info=True)
+            logger.debug("write core memory backup failed", exc_info=True)
+
+
+def _core_memory_similarity(a, b):
+    key_a = _learning_pattern_key(a)
+    key_b = _learning_pattern_key(b)
+    if not key_a or not key_b:
+        return 0.0
+    if key_a == key_b:
+        return 1.0
+    if len(key_a) >= 12 and len(key_b) >= 12 and (key_a in key_b or key_b in key_a):
+        return 0.9
+    tokens_a = tokenize_memory_text(a)
+    tokens_b = tokenize_memory_text(b)
+    if not tokens_a or not tokens_b:
+        return 0.0
+    overlap = len(tokens_a & tokens_b)
+    return round(overlap / max(1, min(len(tokens_a), len(tokens_b))), 4)
+
+
+def _short_term_now_iso():
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def _load_short_term_memory_state():
+    if not SHORT_TERM_MEMORY_PATH.exists():
+        return {"schema_version": 1, "turn_index": 0, "items": []}
+    try:
+        data = json.loads(SHORT_TERM_MEMORY_PATH.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return {"schema_version": 1, "turn_index": 0, "items": []}
+    if not isinstance(data, dict):
+        return {"schema_version": 1, "turn_index": 0, "items": []}
+    items = data.get("items", [])
+    if not isinstance(items, list):
+        items = []
+    try:
+        turn_index = max(0, int(data.get("turn_index", 0) or 0))
+    except (TypeError, ValueError):
+        turn_index = 0
+    return {
+        "schema_version": 1,
+        "turn_index": turn_index,
+        "updated_at": str(data.get("updated_at", "") or "").strip(),
+        "items": items,
+    }
+
+
+def _normalize_short_term_memory_item(item, fallback_id="", current_turn=0, ttl_turns=16):
+    safe = item if isinstance(item, dict) else {}
+    text = normalize_memory_text(safe.get("text", ""), max_len=240)
+    if len(text) < 3:
+        return None
+    if looks_garbled_text(text) or looks_sensitive_memory_text(text) or looks_stagey_text(text):
+        return None
+    kind = str(safe.get("kind", "current_topic") or "current_topic").strip().lower()
+    if kind not in SHORT_TERM_MEMORY_KINDS:
+        kind = "current_topic"
+    try:
+        salience = max(0.0, min(1.0, float(safe.get("salience", 0.55) or 0.55)))
+    except (TypeError, ValueError):
+        salience = 0.55
+    try:
+        last_seen_turn = max(0, int(safe.get("last_seen_turn", current_turn) or current_turn))
+    except (TypeError, ValueError):
+        last_seen_turn = max(0, int(current_turn or 0))
+    try:
+        ttl = max(1, int(safe.get("ttl_turns", ttl_turns) or ttl_turns))
+    except (TypeError, ValueError):
+        ttl = max(1, int(ttl_turns or 16))
+    support_count = _clamp_int(safe.get("support_count", 1), 1, 1, 999)
+    tags = safe.get("tags", [])
+    if isinstance(tags, str):
+        tags = re.split(r"[,，\s]+", tags)
+    if not isinstance(tags, list):
+        tags = []
+    origin = safe.get("origin") if isinstance(safe.get("origin"), dict) else {}
+    now = _short_term_now_iso()
+    return {
+        "id": str(safe.get("id") or fallback_id or _make_core_memory_id("episodic", "recent_event", text)).strip(),
+        "kind": kind,
+        "text": text,
+        "source": str(safe.get("source", "conversation") or "conversation").strip()[:40],
+        "status": str(safe.get("status", "active") or "active").strip().lower(),
+        "salience": round(salience, 4),
+        "tags": [
+            normalize_memory_text(tag, max_len=24)
+            for tag in tags[:8]
+            if normalize_memory_text(tag, max_len=24)
+        ],
+        "created_at": str(safe.get("created_at", "") or now).strip(),
+        "updated_at": str(safe.get("updated_at", "") or safe.get("created_at", "") or now).strip(),
+        "last_seen_turn": last_seen_turn,
+        "ttl_turns": ttl,
+        "support_count": support_count,
+        "consolidated_at": str(safe.get("consolidated_at", "") or "").strip(),
+        "consolidated_memory_ids": [
+            str(item_id or "").strip()
+            for item_id in safe.get("consolidated_memory_ids", [])
+            if str(item_id or "").strip()
+        ][:8]
+        if isinstance(safe.get("consolidated_memory_ids", []), list)
+        else [],
+        "origin": {
+            "user_preview": normalize_memory_text(origin.get("user_preview", ""), max_len=140),
+            "assistant_preview": normalize_memory_text(origin.get("assistant_preview", ""), max_len=160),
+        },
+    }
+
+
+def _normalize_short_term_memory_state(state, settings=None):
+    safe = state if isinstance(state, dict) else {}
+    settings = settings or {}
+    try:
+        turn_index = max(0, int(safe.get("turn_index", 0) or 0))
+    except (TypeError, ValueError):
+        turn_index = 0
+    ttl = int(settings.get("short_ttl_turns", 16) or 16)
+    items = []
+    for idx, raw in enumerate(safe.get("items", []) if isinstance(safe.get("items", []), list) else []):
+        item = _normalize_short_term_memory_item(raw, fallback_id=f"short_{idx}", current_turn=turn_index, ttl_turns=ttl)
+        if item and item.get("status") not in {"deleted", "rejected", "archived"}:
+            items.append(item)
+    return {
+        "schema_version": 1,
+        "turn_index": turn_index,
+        "updated_at": str(safe.get("updated_at", "") or "").strip(),
+        "items": items,
+    }
+
+
+def load_short_term_memory_items(settings=None):
+    state = _normalize_short_term_memory_state(_load_short_term_memory_state(), settings=settings)
+    return state.get("items", [])
+
+
+def _save_short_term_memory_state(state):
+    safe = _normalize_short_term_memory_state(state)
+    safe["updated_at"] = _short_term_now_iso()
+    tmp_path = SHORT_TERM_MEMORY_PATH.with_suffix(".tmp")
+    bak_path = SHORT_TERM_MEMORY_PATH.with_suffix(".bak")
+    previous = None
+    if SHORT_TERM_MEMORY_PATH.exists():
+        try:
+            previous = SHORT_TERM_MEMORY_PATH.read_bytes()
+        except Exception:
+            previous = None
+    tmp_path.write_text(json.dumps(safe, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp_path.replace(SHORT_TERM_MEMORY_PATH)
+    if previous is not None:
+        try:
+            bak_path.write_bytes(previous)
+        except Exception:
+            logger.debug("write short-term memory backup failed", exc_info=True)
+
+
+def _prune_short_term_items(items, current_turn):
+    pruned = []
+    for item in items if isinstance(items, list) else []:
+        try:
+            last_seen = int(item.get("last_seen_turn", current_turn) or current_turn)
+            ttl = int(item.get("ttl_turns", 16) or 16)
+        except (TypeError, ValueError):
+            last_seen = current_turn
+            ttl = 16
+        if current_turn - last_seen <= ttl:
+            pruned.append(item)
+    return pruned
+
+
+def _short_term_memory_id(kind, text):
+    return _make_core_memory_id("episodic", "recent_event", f"{kind} {text}")
+
+
+def _derive_short_term_memory_candidates(user, assistant, settings):
+    user_text = normalize_memory_text(user, max_len=180)
+    assistant_text = normalize_memory_text(assistant, max_len=180)
+    if not user_text or looks_sensitive_memory_text(user_text) or looks_sensitive_memory_text(assistant_text):
+        return []
+    compact = re.sub(r"\s+", "", user_text.lower())
+    candidates = []
+    ttl = int(settings.get("short_ttl_turns", 16) or 16)
+    origin = {
+        "user_preview": normalize_memory_text(user, max_len=140),
+        "assistant_preview": normalize_memory_text(assistant, max_len=160),
+    }
+
+    def add(kind, text, salience, tags=None, ttl_multiplier=1):
+        text = normalize_memory_text(text, max_len=220)
+        if len(text) < 3:
+            return
+        candidates.append(
+            {
+                "id": _short_term_memory_id(kind, text),
+                "kind": kind,
+                "text": text,
+                "source": "conversation",
+                "salience": salience,
+                "tags": tags or [],
+                "ttl_turns": max(2, int(ttl * ttl_multiplier)),
+                "origin": origin,
+            }
+        )
+
+    task_signal = re.search(
+        r"(下一步|下一阶段|直接进入|继续|做吧|好的做|开始做|先做|优化|实现|修复|需要|计划|接下来|"
+        r"next step|continue|start|implement|fix|optimi[sz]e)",
+        user_text,
+        flags=re.IGNORECASE,
+    )
+    if task_signal:
+        add("current_task", f"当前任务：{user_text}", 0.78, ["task"], ttl_multiplier=1.25)
+    if re.search(r"(我觉得|我认为|不是|并非|更像|应该|最好|希望|想要|需要|not really|should|prefer)", user_text, flags=re.IGNORECASE):
+        add("recent_decision", f"最近判断：{user_text}", 0.7, ["decision"], ttl_multiplier=1.15)
+    if re.search(r"(累|困|开心|难受|焦虑|生气|担心|满意|不满意|confused|tired|happy|worried)", user_text, flags=re.IGNORECASE):
+        add("user_state", f"用户当前状态：{user_text}", 0.62, ["state"], ttl_multiplier=0.75)
+    if len(compact) >= 8 and not is_lightweight_checkin_message(user_text):
+        add("current_topic", f"当前话题：{user_text}", 0.56, ["topic"], ttl_multiplier=1)
+    if re.search(r"(稍后|之后|待办|还没|需要确认|手动验收|manual check|todo|later)", user_text, flags=re.IGNORECASE):
+        add("open_loop", f"未完成事项：{user_text}", 0.76, ["open_loop"], ttl_multiplier=1.5)
+    return candidates[:4]
+
+
+def _set_last_short_term_memory_debug(snapshot):
+    global LAST_SHORT_TERM_MEMORY_DEBUG
+    LAST_SHORT_TERM_MEMORY_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
+
+
+def _compact_short_term_memory_debug(snapshot):
+    safe = snapshot if isinstance(snapshot, dict) else {}
+    return {
+        "at": str(safe.get("at", "")).strip()[:40],
+        "status": str(safe.get("status", "")).strip()[:40],
+        "reason": str(safe.get("reason", "")).strip()[:80],
+        "turn_index": _clamp_int(safe.get("turn_index", 0), 0, 0, 999999),
+        "stored": _clamp_int(safe.get("stored", 0), 0, 0, 20),
+        "merged": _clamp_int(safe.get("merged", 0), 0, 0, 20),
+        "expired": _clamp_int(safe.get("expired", 0), 0, 0, 999),
+        "memory_ids": [
+            str(item_id or "").strip()[:80]
+            for item_id in safe.get("memory_ids", [])
+            if str(item_id or "").strip()
+        ][:8],
+    }
+
+
+def _update_short_term_memory(config, record):
+    settings = get_memory_settings(config)
+    safe = record if isinstance(record, dict) else {}
+    user = normalize_memory_text(safe.get("user", ""), max_len=240)
+    assistant = normalize_memory_text(safe.get("assistant", ""), max_len=280)
+    debug = {
+        "at": _short_term_now_iso(),
+        "status": "skipped",
+        "reason": "",
+        "turn_index": 0,
+        "stored": 0,
+        "merged": 0,
+        "expired": 0,
+        "memory_ids": [],
+    }
+    if not settings.get("short_enabled", True):
+        debug["reason"] = "short_memory_disabled"
+        _set_last_short_term_memory_debug(debug)
+        return debug
+    with MEMORY_LOCK:
+        state = _normalize_short_term_memory_state(_load_short_term_memory_state(), settings=settings)
+        current_turn = int(state.get("turn_index", 0) or 0) + 1
+        state["turn_index"] = current_turn
+        before_count = len(state.get("items", []))
+        items = _prune_short_term_items(state.get("items", []), current_turn)
+        debug["expired"] = max(0, before_count - len(items))
+        debug["turn_index"] = current_turn
+
+        if (
+            is_lightweight_checkin_message(user)
+            or len(user) < 2
+            or len(assistant) < 2
+            or looks_garbled_text(user)
+            or looks_garbled_text(assistant)
+            or looks_stagey_text(assistant)
+            or looks_sensitive_memory_text(user)
+            or looks_sensitive_memory_text(assistant)
+        ):
+            state["items"] = items
+            _save_short_term_memory_state(state)
+            debug["reason"] = "low_signal_or_unsafe"
+            _set_last_short_term_memory_debug(debug)
+            return debug
+
+        candidates = _derive_short_term_memory_candidates(user, assistant, settings)
+        if not candidates:
+            state["items"] = items
+            _save_short_term_memory_state(state)
+            debug["reason"] = "no_short_memory_candidate"
+            _set_last_short_term_memory_debug(debug)
+            return debug
+
+        now = _short_term_now_iso()
+        stored = 0
+        merged = 0
+        changed_ids = []
+        for raw in candidates:
+            candidate = _normalize_short_term_memory_item(raw, current_turn=current_turn, ttl_turns=settings.get("short_ttl_turns", 16))
+            if not candidate:
+                continue
+            candidate["created_at"] = now
+            candidate["updated_at"] = now
+            candidate["last_seen_turn"] = current_turn
+            existing = None
+            for item in items:
+                if item.get("kind") == candidate.get("kind") and _core_memory_similarity(item.get("text", ""), candidate.get("text", "")) >= 0.72:
+                    existing = item
+                    break
+            if existing is not None:
+                existing["text"] = candidate["text"] if len(candidate["text"]) >= len(existing.get("text", "")) else existing.get("text", "")
+                existing["salience"] = round(max(float(existing.get("salience", 0) or 0), float(candidate.get("salience", 0) or 0)), 4)
+                existing["updated_at"] = now
+                existing["last_seen_turn"] = current_turn
+                existing["ttl_turns"] = max(int(existing.get("ttl_turns", 1) or 1), int(candidate.get("ttl_turns", 1) or 1))
+                existing["support_count"] = min(999, int(existing.get("support_count", 1) or 1) + 1)
+                existing["tags"] = list(dict.fromkeys([*(existing.get("tags", []) or []), *(candidate.get("tags", []) or [])]))[:8]
+                changed_ids.append(existing.get("id", ""))
+                merged += 1
+            else:
+                candidate["id"] = _short_term_memory_id(candidate.get("kind", "current_topic"), candidate.get("text", ""))
+                items.append(candidate)
+                changed_ids.append(candidate["id"])
+                stored += 1
+        items = sorted(
+            items,
+            key=lambda item: (
+                int(item.get("last_seen_turn", 0) or 0),
+                float(item.get("salience", 0) or 0),
+            ),
+            reverse=True,
+        )[: int(settings.get("short_max_items", 24) or 24)]
+        state["items"] = items
+        _save_short_term_memory_state(state)
+    debug.update(
+        {
+            "status": "stored" if stored or merged else "skipped",
+            "reason": "" if stored or merged else "no_short_memory_candidate",
+            "stored": stored,
+            "merged": merged,
+            "memory_ids": changed_ids,
+        }
+    )
+    _set_last_short_term_memory_debug(debug)
+    return debug
 
 
 def _human_time_ago(ts_str):
@@ -612,6 +1114,28 @@ def _append_unique_learning_item(chosen, seen, item):
     return True
 
 
+def _append_unique_core_memory_item(chosen, seen, item):
+    if not isinstance(item, dict):
+        return False
+    key = ("core", item.get("id", ""), item.get("text", ""))
+    if key in seen:
+        return False
+    seen.add(key)
+    chosen.append(item)
+    return True
+
+
+def _append_unique_short_term_memory_item(chosen, seen, item):
+    if not isinstance(item, dict):
+        return False
+    key = ("short", item.get("id", ""), item.get("text", ""))
+    if key in seen:
+        return False
+    seen.add(key)
+    chosen.append(item)
+    return True
+
+
 def _compact_memory_debug_item(item, source="", score=None):
     safe = item if isinstance(item, dict) else {}
     out = {
@@ -625,6 +1149,50 @@ def _compact_memory_debug_item(item, source="", score=None):
             out["score"] = int(score)
         except (TypeError, ValueError):
             out["score"] = 0
+    return out
+
+
+def _compact_core_memory_prompt_item(item, score=None):
+    safe = item if isinstance(item, dict) else {}
+    out = {
+        "id": str(safe.get("id", "")).strip()[:80],
+        "source": "core_memory",
+        "kind": str(safe.get("memory_kind") or safe.get("kind", "")).strip()[:24],
+        "category": str(safe.get("category", "")).strip()[:40],
+        "text": normalize_memory_text(safe.get("text", ""), max_len=120),
+        "importance": safe.get("importance", 0),
+        "confidence": safe.get("confidence", 0),
+        "pinned": bool(safe.get("pinned", False)),
+        "created_at": str(safe.get("created_at", "")).strip()[:40],
+        "updated_at": str(safe.get("updated_at", "")).strip()[:40],
+    }
+    if score is not None:
+        try:
+            out["relevance"] = int(score)
+        except (TypeError, ValueError):
+            out["relevance"] = 0
+    return out
+
+
+def _compact_short_term_memory_prompt_item(item, score=None):
+    safe = item if isinstance(item, dict) else {}
+    out = {
+        "id": str(safe.get("id", "")).strip()[:80],
+        "source": "short_term_memory",
+        "kind": str(safe.get("kind", "")).strip()[:40],
+        "text": normalize_memory_text(safe.get("text", ""), max_len=120),
+        "salience": safe.get("salience", 0),
+        "last_seen_turn": safe.get("last_seen_turn", 0),
+        "ttl_turns": safe.get("ttl_turns", 0),
+        "support_count": safe.get("support_count", 0),
+        "consolidated_at": str(safe.get("consolidated_at", "")).strip()[:40],
+        "updated_at": str(safe.get("updated_at", "")).strip()[:40],
+    }
+    if score is not None:
+        try:
+            out["relevance"] = int(score)
+        except (TypeError, ValueError):
+            out["relevance"] = 0
     return out
 
 
@@ -747,7 +1315,7 @@ def _select_learning_samples_for_prompt(settings, query_tokens, explicit_memory_
 
 def _set_last_learning_extraction_debug(snapshot):
     global LAST_LEARNING_EXTRACTION_DEBUG
-    LAST_LEARNING_EXTRACTION_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+    LAST_LEARNING_EXTRACTION_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
 
 
 def _compact_learning_extraction_debug(snapshot):
@@ -1053,15 +1621,803 @@ def _schedule_learning_candidate_extraction(config, record):
     ).start()
 
 
+def _set_last_core_memory_debug(snapshot):
+    global LAST_CORE_MEMORY_DEBUG
+    LAST_CORE_MEMORY_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
+
+
+def _compact_core_memory_debug(snapshot):
+    safe = snapshot if isinstance(snapshot, dict) else {}
+    return {
+        "at": str(safe.get("at", "")).strip()[:40],
+        "status": str(safe.get("status", "")).strip()[:40],
+        "reason": str(safe.get("reason", "")).strip()[:80],
+        "action": str(safe.get("action", "")).strip()[:40],
+        "stored": _clamp_int(safe.get("stored", 0), 0, 0, 20),
+        "merged": _clamp_int(safe.get("merged", 0), 0, 0, 20),
+        "source": str(safe.get("source", "")).strip()[:40],
+        "memory_ids": [
+            str(item_id or "").strip()[:80]
+            for item_id in safe.get("memory_ids", [])
+            if str(item_id or "").strip()
+        ][:8],
+    }
+
+
+def _has_core_memory_signal(user, assistant):
+    text = f"{user}\n{assistant}".lower()
+    if has_explicit_memory_write_intent(user):
+        return True
+    return bool(
+        re.search(
+            r"(项目|仓库|repo|codebase|正在|完成|修复|下一步|下一阶段|计划|目标|"
+            r"我叫|我是|我的|我在|我喜欢|我不喜欢|叫我|称呼我|"
+            r"project|currently|finished|fixed|plan|goal|call me|my name is)",
+            text,
+        )
+    )
+
+
+def _build_explicit_core_memory_candidate(user, assistant):
+    text = _extract_explicit_memory_text(user)
+    if not text:
+        return None
+    kind, category = _classify_core_memory_text(text)
+    return {
+        "kind": kind,
+        "category": category,
+        "text": text,
+        "source": "explicit_user",
+        "importance": 0.86,
+        "confidence": 0.88,
+        "tags": [],
+        "origin": {
+            "user_preview": normalize_memory_text(user, max_len=140),
+            "assistant_preview": normalize_memory_text(assistant, max_len=160),
+        },
+    }
+
+
+def _build_core_memory_extraction_prompt(user, assistant):
+    return (
+        "你是本地桌宠的“真实记忆”提炼器，不是回复风格调参器。\n"
+        "只根据下面这一轮聊天，提炼事实、事件、项目进展、用户稳定信息或关系信息。\n"
+        "不要记录“用户喜欢短句/少说套话/语气如何”等回复风格规则；这类内容属于互动偏好学习，不属于真实记忆。\n"
+        "不要记录一次性寒暄、临时情绪、隐私密钥、账号、token、API key、本地敏感路径、文件内容、截图内容或工具结果。\n"
+        "最多输出2条。没有值得长期保存的真实记忆时，输出 {\"memories\": []}。\n"
+        "输出 JSON 对象：{\"memories\":[{\"kind\":\"semantic|episodic\",\"category\":\"project_context|stable_fact|user_preference|relationship|recent_event\",\"text\":\"...\",\"importance\":0.0,\"confidence\":0.0,\"tags\":[\"...\"]}]}。\n"
+        "text 用中文，80字以内，只写可复用事实或发生过的事件，不要写成对用户说的话。\n\n"
+        f"用户：{normalize_memory_text(user, 240)}\n"
+        f"桌宠：{normalize_memory_text(assistant, 260)}"
+    )
+
+
+def _normalize_core_memory_payload(raw, user, assistant, *, source="auto_llm"):
+    safe = raw if isinstance(raw, dict) else {}
+    if safe.get("remember") is False:
+        return None, "llm_no_memory"
+    text = normalize_memory_text(
+        safe.get("text") or safe.get("memory") or safe.get("content") or "",
+        max_len=260,
+    )
+    if len(text) < 4:
+        return None, "empty_memory"
+    kind = str(safe.get("kind", "") or "").strip().lower()
+    category = str(safe.get("category", "") or "").strip().lower()
+    inferred_kind, inferred_category = _classify_core_memory_text(text)
+    if kind not in CORE_MEMORY_KINDS:
+        kind = inferred_kind
+    if category not in CORE_MEMORY_CATEGORIES:
+        category = inferred_category
+    if (
+        looks_garbled_text(text)
+        or looks_sensitive_memory_text(text)
+        or looks_stagey_text(text)
+        or looks_sensitive_memory_text(user)
+        or looks_sensitive_memory_text(assistant)
+    ):
+        return None, "unsafe_memory"
+    try:
+        importance = float(safe.get("importance", 0.55) or 0.55)
+    except (TypeError, ValueError):
+        importance = 0.55
+    try:
+        confidence = float(safe.get("confidence", 0.55) or 0.55)
+    except (TypeError, ValueError):
+        confidence = 0.55
+    tags = safe.get("tags", [])
+    if not isinstance(tags, list):
+        tags = []
+    return {
+        "kind": kind,
+        "category": category,
+        "text": text,
+        "source": source,
+        "importance": round(max(0.0, min(1.0, importance)), 4),
+        "confidence": round(max(0.0, min(1.0, confidence)), 4),
+        "tags": tags[:8],
+        "origin": {
+            "user_preview": normalize_memory_text(user, max_len=140),
+            "assistant_preview": normalize_memory_text(assistant, max_len=160),
+        },
+    }, ""
+
+
+def _parse_core_memory_payloads(data, user, assistant):
+    if not isinstance(data, dict):
+        return [], "llm_invalid_json"
+    raw_items = data.get("memories", [])
+    if raw_items is None:
+        raw_items = []
+    if not isinstance(raw_items, list):
+        raw_items = [raw_items]
+    memories = []
+    last_reason = ""
+    for raw in raw_items[:4]:
+        candidate, reason = _normalize_core_memory_payload(raw, user, assistant, source="auto_llm")
+        if candidate:
+            memories.append(candidate)
+        elif reason:
+            last_reason = reason
+    if not memories:
+        return [], last_reason or "llm_no_memory"
+    return memories[:2], ""
+
+
+def _trim_core_memory_items(items, max_items):
+    limit = max(1, int(max_items or 300))
+    safe_items = [item for item in items if isinstance(item, dict)]
+    if len(safe_items) <= limit:
+        return safe_items
+    def sort_key(item):
+        return (
+            float(item.get("importance", 0) or 0),
+            float(item.get("confidence", 0) or 0),
+            int(item.get("use_count", 0) or 0),
+            _learning_item_sort_time(item),
+        )
+    return sorted(safe_items, key=sort_key, reverse=True)[:limit]
+
+
+def _record_core_memory_candidates(candidates, settings):
+    normalized = []
+    for raw in candidates if isinstance(candidates, list) else []:
+        item = _normalize_core_memory_item(raw)
+        if item is not None:
+            normalized.append(item)
+    if not normalized:
+        return [], {"stored": 0, "merged": 0, "action": "none"}
+
+    min_importance = float(settings.get("core_min_importance", 0.45))
+    min_confidence = float(settings.get("core_min_confidence", 0.55))
+    normalized = [
+        item for item in normalized
+        if float(item.get("importance", 0) or 0) >= min_importance
+        and float(item.get("confidence", 0) or 0) >= min_confidence
+    ]
+    if not normalized:
+        return [], {"stored": 0, "merged": 0, "action": "below_threshold"}
+
+    now = datetime.now().isoformat(timespec="seconds")
+    stored = 0
+    merged = 0
+    changed_ids = []
+    with MEMORY_LOCK:
+        items = load_core_memory_items()
+        for candidate in normalized:
+            existing = None
+            for item in items:
+                if _core_memory_similarity(item.get("text", ""), candidate.get("text", "")) >= 0.8:
+                    existing = item
+                    break
+            if existing is not None:
+                existing["importance"] = round(max(float(existing.get("importance", 0) or 0), float(candidate.get("importance", 0) or 0)), 4)
+                existing["confidence"] = round(max(float(existing.get("confidence", 0) or 0), float(candidate.get("confidence", 0) or 0)), 4)
+                existing["updated_at"] = now
+                existing["status"] = "active"
+                if len(str(candidate.get("text", ""))) > len(str(existing.get("text", ""))):
+                    existing["text"] = candidate.get("text", existing.get("text", ""))
+                if candidate.get("tags"):
+                    existing["tags"] = list(dict.fromkeys([*(existing.get("tags", []) or []), *candidate.get("tags", [])]))[:8]
+                changed_ids.append(existing.get("id", ""))
+                merged += 1
+                continue
+            candidate["id"] = _make_core_memory_id(candidate.get("kind", "semantic"), candidate.get("category", "stable_fact"), candidate.get("text", ""))
+            candidate["created_at"] = now
+            candidate["updated_at"] = now
+            candidate["status"] = "active"
+            items.append(candidate)
+            changed_ids.append(candidate["id"])
+            stored += 1
+        items = _trim_core_memory_items(items, settings.get("core_max_items", 300))
+        save_core_memory_items(items)
+    action = "stored" if stored and not merged else "merged" if merged and not stored else "stored_and_merged" if stored and merged else "none"
+    return changed_ids, {"stored": stored, "merged": merged, "action": action}
+
+
+def _set_last_memory_consolidation_debug(snapshot):
+    global LAST_MEMORY_CONSOLIDATION_DEBUG
+    LAST_MEMORY_CONSOLIDATION_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
+
+
+def _compact_memory_consolidation_debug(snapshot):
+    safe = snapshot if isinstance(snapshot, dict) else {}
+    return {
+        "at": str(safe.get("at", "")).strip()[:40],
+        "status": str(safe.get("status", "")).strip()[:40],
+        "reason": str(safe.get("reason", "")).strip()[:80],
+        "action": str(safe.get("action", "")).strip()[:40],
+        "scanned": _clamp_int(safe.get("scanned", 0), 0, 0, 999),
+        "candidates": _clamp_int(safe.get("candidates", 0), 0, 0, 80),
+        "stored": _clamp_int(safe.get("stored", 0), 0, 0, 80),
+        "merged": _clamp_int(safe.get("merged", 0), 0, 0, 80),
+        "short_ids": [
+            str(item_id or "").strip()[:80]
+            for item_id in safe.get("short_ids", [])
+            if str(item_id or "").strip()
+        ][:8],
+        "memory_ids": [
+            str(item_id or "").strip()[:80]
+            for item_id in safe.get("memory_ids", [])
+            if str(item_id or "").strip()
+        ][:8],
+    }
+
+
+def _set_last_memory_correction_debug(snapshot):
+    global LAST_MEMORY_CORRECTION_DEBUG
+    LAST_MEMORY_CORRECTION_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
+
+
+def _compact_memory_correction_debug(snapshot):
+    safe = snapshot if isinstance(snapshot, dict) else {}
+    return {
+        "at": str(safe.get("at", "")).strip()[:40],
+        "status": str(safe.get("status", "")).strip()[:40],
+        "reason": str(safe.get("reason", "")).strip()[:80],
+        "action": str(safe.get("action", "")).strip()[:40],
+        "core_changed": _clamp_int(safe.get("core_changed", 0), 0, 0, 80),
+        "short_changed": _clamp_int(safe.get("short_changed", 0), 0, 0, 80),
+        "score": safe.get("score", 0),
+        "memory_ids": [
+            str(item_id or "").strip()[:80]
+            for item_id in safe.get("memory_ids", [])
+            if str(item_id or "").strip()
+        ][:8],
+        "short_ids": [
+            str(item_id or "").strip()[:80]
+            for item_id in safe.get("short_ids", [])
+            if str(item_id or "").strip()
+        ][:8],
+    }
+
+
+def _strip_short_memory_prefix(text):
+    return memory_consolidation.strip_short_memory_prefix(
+        text,
+        normalize_memory_text=normalize_memory_text,
+    )
+
+
+def _is_completed_or_decided_short_memory(text):
+    return memory_consolidation.is_completed_or_decided_short_memory(text)
+
+
+def _memory_consolidation_helpers():
+    return {
+        "normalize_memory_text": normalize_memory_text,
+        "looks_garbled_text": looks_garbled_text,
+        "looks_sensitive_memory_text": looks_sensitive_memory_text,
+        "looks_stagey_text": looks_stagey_text,
+        "clamp_int": _clamp_int,
+        "clamp_float": _clamp_float,
+        "classify_core_memory_text": _classify_core_memory_text,
+    }
+
+
+def _short_memory_consolidation_reason(item, settings):
+    return memory_consolidation.short_memory_consolidation_reason(
+        item,
+        settings,
+        helpers=_memory_consolidation_helpers(),
+    )
+
+
+def _build_short_memory_consolidation_candidate(item, reason):
+    return memory_consolidation.build_short_memory_consolidation_candidate(
+        item,
+        reason,
+        helpers=_memory_consolidation_helpers(),
+    )
+
+def _maybe_consolidate_short_term_memories(config):
+    settings = get_memory_settings(config)
+    debug = {
+        "at": _short_term_now_iso(),
+        "status": "skipped",
+        "reason": "",
+        "action": "",
+        "scanned": 0,
+        "candidates": 0,
+        "stored": 0,
+        "merged": 0,
+        "short_ids": [],
+        "memory_ids": [],
+    }
+    if (
+        not settings.get("enabled", True)
+        or not settings.get("short_enabled", True)
+        or not settings.get("core_enabled", True)
+        or not settings.get("core_extraction_enabled", True)
+        or not settings.get("memory_consolidation_enabled", True)
+    ):
+        debug["reason"] = "consolidation_disabled"
+        _set_last_memory_consolidation_debug(debug)
+        return debug
+
+    with MEMORY_LOCK:
+        state = _normalize_short_term_memory_state(_load_short_term_memory_state(), settings=settings)
+        current_turn = int(state.get("turn_index", 0) or 0)
+        items = _prune_short_term_items(state.get("items", []), current_turn)
+
+    candidates = []
+    candidate_short_ids = []
+    for item in items:
+        reason = _short_memory_consolidation_reason(item, settings)
+        if not reason:
+            continue
+        candidate = _build_short_memory_consolidation_candidate(item, reason)
+        if _normalize_core_memory_item(candidate):
+            candidates.append(candidate)
+            candidate_short_ids.append(str(item.get("id", "") or "").strip())
+
+    debug["scanned"] = len(items)
+    debug["candidates"] = len(candidates)
+    debug["short_ids"] = candidate_short_ids[:8]
+    if not candidates:
+        debug["reason"] = "no_consolidation_candidate"
+        _set_last_memory_consolidation_debug(debug)
+        return debug
+
+    memory_ids, result = _record_core_memory_candidates(candidates, settings)
+    debug["action"] = result.get("action", "")
+    debug["stored"] = result.get("stored", 0)
+    debug["merged"] = result.get("merged", 0)
+    debug["memory_ids"] = memory_ids
+    if not memory_ids:
+        debug["reason"] = result.get("action", "core_memory_rejected")
+        _set_last_memory_consolidation_debug(debug)
+        return debug
+
+    now = _short_term_now_iso()
+    ids_by_short = {}
+    for short_id, memory_id in zip(candidate_short_ids, memory_ids):
+        if short_id and memory_id:
+            ids_by_short.setdefault(short_id, []).append(memory_id)
+    with MEMORY_LOCK:
+        state = _normalize_short_term_memory_state(_load_short_term_memory_state(), settings=settings)
+        for item in state.get("items", []):
+            item_id = str(item.get("id", "") or "").strip()
+            if item_id not in ids_by_short:
+                continue
+            item["consolidated_at"] = now
+            item["consolidated_memory_ids"] = ids_by_short[item_id][:8]
+        _save_short_term_memory_state(state)
+
+    debug["status"] = "stored"
+    _set_last_memory_consolidation_debug(debug)
+    return debug
+
+
+def has_memory_forget_intent(text):
+    return memory_correction.has_memory_forget_intent(text)
+
+
+def has_memory_correction_intent(text):
+    return memory_correction.has_memory_correction_intent(text)
+
+
+def _extract_memory_correction_text(text):
+    return memory_correction.extract_memory_correction_text(
+        text,
+        normalize_memory_text=normalize_memory_text,
+        tokenize_memory_text=tokenize_memory_text,
+    )
+
+
+def _memory_correction_helpers():
+    return {
+        "normalize_memory_text": normalize_memory_text,
+        "tokenize_memory_text": tokenize_memory_text,
+        "core_memory_similarity": _core_memory_similarity,
+    }
+
+
+def _score_memory_correction_match(query_text, correction_text, item):
+    return memory_correction.score_memory_correction_match(
+        query_text,
+        correction_text,
+        item,
+        helpers=_memory_correction_helpers(),
+    )
+
+def _apply_memory_correction_from_turn(config, record):
+    settings = get_memory_settings(config)
+    safe = record if isinstance(record, dict) else {}
+    user = normalize_memory_text(safe.get("user", ""), max_len=240)
+    debug = {
+        "at": _short_term_now_iso(),
+        "status": "skipped",
+        "reason": "",
+        "action": "",
+        "core_changed": 0,
+        "short_changed": 0,
+        "score": 0,
+        "memory_ids": [],
+        "short_ids": [],
+    }
+    if not settings.get("enabled", True) or not settings.get("core_enabled", True) or not settings.get("memory_correction_enabled", True):
+        debug["reason"] = "correction_disabled"
+        _set_last_memory_correction_debug(debug)
+        return debug
+    if not has_memory_correction_intent(user):
+        debug["reason"] = "no_correction_intent"
+        _set_last_memory_correction_debug(debug)
+        return debug
+    if len(user) < 4 or looks_garbled_text(user) or looks_sensitive_memory_text(user) or looks_stagey_text(user):
+        debug["reason"] = "low_signal_or_unsafe"
+        _set_last_memory_correction_debug(debug)
+        return debug
+
+    correction_text = _extract_memory_correction_text(user)
+    if len(correction_text) < 4 or looks_garbled_text(correction_text) or looks_sensitive_memory_text(correction_text):
+        debug["reason"] = "invalid_correction_text"
+        _set_last_memory_correction_debug(debug)
+        return debug
+
+    is_forget = has_memory_forget_intent(user)
+    changed_core_ids = []
+    changed_short_ids = []
+    best_score = 0.0
+    now = datetime.now().isoformat(timespec="seconds")
+
+    with MEMORY_LOCK:
+        core_items = load_core_memory_items()
+        short_state = _normalize_short_term_memory_state(_load_short_term_memory_state(), settings=settings)
+        short_items = short_state.get("items", [])
+        if is_forget:
+            kept_core = []
+            for item in core_items:
+                score = _score_memory_correction_match(user, correction_text, item)
+                best_score = max(best_score, score)
+                if score >= 0.22:
+                    changed_core_ids.append(item.get("id", ""))
+                else:
+                    kept_core.append(item)
+            kept_short = []
+            for item in short_items:
+                score = _score_memory_correction_match(user, correction_text, item)
+                best_score = max(best_score, score)
+                if score >= 0.22:
+                    changed_short_ids.append(item.get("id", ""))
+                else:
+                    kept_short.append(item)
+            if changed_core_ids:
+                save_core_memory_items(kept_core)
+            if changed_short_ids:
+                short_state["items"] = kept_short
+                _save_short_term_memory_state(short_state)
+        else:
+            scored_core = [
+                (_score_memory_correction_match(user, correction_text, item), item)
+                for item in core_items
+            ]
+            scored_core = [(score, item) for score, item in scored_core if score >= 0.22]
+            scored_core.sort(key=lambda pair: pair[0], reverse=True)
+            if scored_core:
+                best_score, best_item = scored_core[0]
+                best_item["text"] = correction_text
+                best_item["source"] = "user_correction"
+                best_item["updated_at"] = now
+                best_item["status"] = "active"
+                best_item["confidence"] = round(max(float(best_item.get("confidence", 0) or 0), 0.78), 4)
+                best_item["importance"] = round(max(float(best_item.get("importance", 0) or 0), 0.62), 4)
+                best_item["tags"] = list(dict.fromkeys([*(best_item.get("tags", []) or []), "corrected"]))[:8]
+                save_core_memory_items(core_items)
+                changed_core_ids.append(best_item.get("id", ""))
+
+            scored_short = [
+                (_score_memory_correction_match(user, correction_text, item), item)
+                for item in short_items
+            ]
+            scored_short = [(score, item) for score, item in scored_short if score >= 0.22]
+            scored_short.sort(key=lambda pair: pair[0], reverse=True)
+            if scored_short:
+                short_score, short_item = scored_short[0]
+                best_score = max(best_score, short_score)
+                short_item["text"] = f"最近更正：{correction_text}"
+                short_item["source"] = "user_correction"
+                short_item["updated_at"] = now
+                short_item["support_count"] = min(999, int(short_item.get("support_count", 1) or 1) + 1)
+                _save_short_term_memory_state(short_state)
+                changed_short_ids.append(short_item.get("id", ""))
+
+    if not is_forget and not changed_core_ids:
+        kind, category = _classify_core_memory_text(correction_text)
+        candidate = {
+            "kind": kind,
+            "category": category,
+            "text": correction_text,
+            "source": "user_correction",
+            "importance": 0.72,
+            "confidence": 0.82,
+            "tags": ["corrected"],
+            "origin": {
+                "user_preview": normalize_memory_text(user, max_len=140),
+                "assistant_preview": normalize_memory_text(safe.get("assistant", ""), max_len=160),
+            },
+        }
+        created_ids, result = _record_core_memory_candidates([candidate], settings)
+        changed_core_ids.extend(created_ids)
+        debug["action"] = result.get("action", "")
+    else:
+        debug["action"] = "forget" if is_forget else "update"
+
+    debug.update(
+        {
+            "status": "applied" if changed_core_ids or changed_short_ids else "skipped",
+            "reason": "" if changed_core_ids or changed_short_ids else "no_matching_memory",
+            "core_changed": len(changed_core_ids),
+            "short_changed": len(changed_short_ids),
+            "score": round(best_score, 4),
+            "memory_ids": changed_core_ids,
+            "short_ids": changed_short_ids,
+        }
+    )
+    _set_last_memory_correction_debug(debug)
+    return debug
+
+
+def _extract_and_store_core_memory(config, record):
+    settings = get_memory_settings(config)
+    safe = record if isinstance(record, dict) else {}
+    user = normalize_memory_text(safe.get("user", ""), max_len=240)
+    assistant = normalize_memory_text(safe.get("assistant", ""), max_len=280)
+    base_debug = {
+        "at": _learning_now_iso(),
+        "status": "skipped",
+        "reason": "",
+        "action": "",
+        "stored": 0,
+        "merged": 0,
+        "source": "",
+        "memory_ids": [],
+    }
+    if not settings.get("core_enabled", True) or not settings.get("core_extraction_enabled", True):
+        base_debug["reason"] = "core_memory_disabled"
+        _set_last_core_memory_debug(base_debug)
+        return base_debug
+    if is_lightweight_checkin_message(user):
+        base_debug["reason"] = "lightweight_checkin"
+        _set_last_core_memory_debug(base_debug)
+        return base_debug
+    if len(user) < 4 or len(assistant) < 2:
+        base_debug["reason"] = "too_short"
+        _set_last_core_memory_debug(base_debug)
+        return base_debug
+    if looks_garbled_text(user) or looks_garbled_text(assistant):
+        base_debug["reason"] = "garbled_text"
+        _set_last_core_memory_debug(base_debug)
+        return base_debug
+    if looks_stagey_text(assistant):
+        base_debug["reason"] = "stagey_reply"
+        _set_last_core_memory_debug(base_debug)
+        return base_debug
+    if looks_sensitive_memory_text(user) or looks_sensitive_memory_text(assistant):
+        base_debug["reason"] = "sensitive_text"
+        _set_last_core_memory_debug(base_debug)
+        return base_debug
+    if not _has_core_memory_signal(user, assistant):
+        base_debug["reason"] = "low_signal"
+        _set_last_core_memory_debug(base_debug)
+        return base_debug
+
+    explicit = _build_explicit_core_memory_candidate(user, assistant)
+    candidates = []
+    source = "auto_llm"
+    if explicit:
+        candidates.append(explicit)
+        source = "explicit_user"
+    else:
+        try:
+            raw = _call_summary_llm(config, _build_core_memory_extraction_prompt(user, assistant))
+        except Exception:
+            logger.debug("core memory extraction llm failed", exc_info=True)
+            base_debug["reason"] = "llm_error"
+            _set_last_core_memory_debug(base_debug)
+            return base_debug
+        data = _parse_json_object_from_llm(raw)
+        if data is None:
+            base_debug["reason"] = "llm_invalid_json" if str(raw or "").strip() else "llm_empty"
+            _set_last_core_memory_debug(base_debug)
+            return base_debug
+        candidates, reason = _parse_core_memory_payloads(data, user, assistant)
+        if not candidates:
+            base_debug["reason"] = reason or "llm_no_memory"
+            _set_last_core_memory_debug(base_debug)
+            return base_debug
+
+    memory_ids, result = _record_core_memory_candidates(candidates, settings)
+    if not memory_ids:
+        base_debug["reason"] = result.get("action", "memory_rejected")
+        _set_last_core_memory_debug(base_debug)
+        return base_debug
+    debug = {
+        **base_debug,
+        "status": "stored",
+        "reason": "",
+        "action": result.get("action", ""),
+        "stored": result.get("stored", 0),
+        "merged": result.get("merged", 0),
+        "source": source,
+        "memory_ids": memory_ids,
+    }
+    _set_last_core_memory_debug(debug)
+    return debug
+
+
+def _schedule_core_memory_extraction(config, record):
+    settings = get_memory_settings(config)
+    if not settings.get("core_enabled", True) or not settings.get("core_extraction_enabled", True):
+        _set_last_core_memory_debug(
+            {
+                "at": _learning_now_iso(),
+                "status": "skipped",
+                "reason": "core_memory_disabled",
+                "action": "",
+                "stored": 0,
+                "merged": 0,
+                "source": "",
+                "memory_ids": [],
+            }
+        )
+        return
+    threading.Thread(
+        target=_extract_and_store_core_memory,
+        args=(config, dict(record)),
+        daemon=True,
+    ).start()
+
+
 def _set_last_memory_debug(snapshot):
     global LAST_MEMORY_DEBUG
-    LAST_MEMORY_DEBUG = snapshot if isinstance(snapshot, dict) else {}
+    LAST_MEMORY_DEBUG = memory_debug.normalize_debug_snapshot(snapshot)
+
+
+RECALL_GENERIC_TOKENS = memory_selection.RECALL_GENERIC_TOKENS
+
+
+def _is_core_memory_prompt_eligible(item, settings):
+    return memory_selection.is_core_memory_prompt_eligible(
+        item,
+        settings,
+        looks_garbled_text=looks_garbled_text,
+        looks_sensitive_memory_text=looks_sensitive_memory_text,
+    )
+
+
+def _strong_recall_tokens(text):
+    return memory_selection.strong_recall_tokens(
+        text,
+        tokenize_memory_text=tokenize_memory_text,
+    )
+
+
+def _extract_denied_memory_tokens(text):
+    return memory_selection.extract_denied_memory_tokens(
+        text,
+        normalize_memory_text=normalize_memory_text,
+        strong_recall_tokens_fn=_strong_recall_tokens,
+    )
+
+
+def _has_current_fact_assertion(text):
+    return memory_selection.has_current_fact_assertion(text)
+
+
+def _memory_selection_helpers():
+    return {
+        "normalize_memory_text": normalize_memory_text,
+        "has_memory_forget_intent": has_memory_forget_intent,
+        "has_memory_correction_intent": has_memory_correction_intent,
+        "extract_denied_memory_tokens": _extract_denied_memory_tokens,
+        "strong_recall_tokens": _strong_recall_tokens,
+    }
+
+
+def _memory_recall_conflict_reason(user_message, memory_text, settings=None):
+    return memory_selection.memory_recall_conflict_reason(
+        user_message,
+        memory_text,
+        settings=settings,
+        helpers=_memory_selection_helpers(),
+    )
+
+def _compact_memory_skip_item(item, reason, score=0, source="memory"):
+    return memory_selection.compact_memory_skip_item(
+        item,
+        reason,
+        score=score,
+        source=source,
+        normalize_memory_text=normalize_memory_text,
+        clamp_int=_clamp_int,
+    )
+
+
+def _select_core_memories_for_prompt(settings, query_tokens, user_message="", explicit_memory_intent=False):
+    if not settings.get("core_enabled", True):
+        return [], "disabled", 0, []
+    count = max(0, int(settings.get("core_inject_count", 0) or 0))
+    if count <= 0:
+        return [], "count_zero", 0, []
+    items = load_core_memory_items()
+    eligible = [
+        item for item in items
+        if _is_core_memory_prompt_eligible(item, settings)
+    ]
+    if not eligible:
+        return [], "no_eligible_memories", len(items), []
+    selected, reason, skipped = memory_selection.select_core_memory_items_for_prompt(
+        eligible,
+        settings,
+        query_tokens,
+        user_message=user_message,
+        explicit_memory_intent=explicit_memory_intent,
+        tokenize_memory_text=tokenize_memory_text,
+        learning_item_sort_time=_learning_item_sort_time,
+        conflict_reason_fn=_memory_recall_conflict_reason,
+        append_unique_core_memory_item=_append_unique_core_memory_item,
+        compact_skip_item_fn=_compact_memory_skip_item,
+    )
+    return selected, reason, len(items), skipped[:8]
+
+
+def _is_short_followup_message(text):
+    return memory_selection.is_short_followup_message(text)
+
+
+def _select_short_term_memories_for_prompt(settings, query_tokens, user_message, explicit_memory_intent=False):
+    if not settings.get("short_enabled", True):
+        return [], "disabled", 0, []
+    count = max(0, int(settings.get("short_inject_count", 0) or 0))
+    if count <= 0:
+        return [], "count_zero", 0, []
+    state = _normalize_short_term_memory_state(_load_short_term_memory_state(), settings=settings)
+    current_turn = int(state.get("turn_index", 0) or 0)
+    items = _prune_short_term_items(state.get("items", []), current_turn)
+    if not items:
+        return [], "no_short_memories", 0, []
+    selected, reason, skipped = memory_selection.select_short_term_memory_items_for_prompt(
+        items,
+        settings,
+        query_tokens,
+        user_message,
+        explicit_memory_intent=explicit_memory_intent,
+        tokenize_memory_text=tokenize_memory_text,
+        looks_sensitive_memory_text=looks_sensitive_memory_text,
+        looks_garbled_text=looks_garbled_text,
+        conflict_reason_fn=_memory_recall_conflict_reason,
+        append_unique_short_term_memory_item=_append_unique_short_term_memory_item,
+        compact_skip_item_fn=_compact_memory_skip_item,
+    )
+    return selected, reason, len(items), skipped[:8]
 
 
 def select_memory_items_for_prompt(config, user_message, safe_history):
     settings = get_memory_settings(config)
     explicit_memory_intent = has_explicit_memory_intent(user_message)
     specific_memory_query = is_specific_memory_query(user_message)
+    correction_or_forget_intent = has_memory_correction_intent(user_message) or has_memory_forget_intent(user_message)
     debug = {
         "message": normalize_memory_text(user_message, max_len=160),
         "enabled": bool(settings["enabled"]),
@@ -1069,6 +2425,7 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
         "is_lightweight_checkin": is_lightweight_checkin_message(user_message),
         "explicit_memory_intent": explicit_memory_intent,
         "is_specific_memory_query": specific_memory_query,
+        "correction_or_forget_intent": correction_or_forget_intent,
         "reason": "",
         "selected": [],
         "candidate_count": 0,
@@ -1078,6 +2435,17 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
         "learning_samples_considered": 0,
         "learning_samples_selected": [],
         "learning_reason": "",
+        "short_memory_enabled": bool(settings["short_enabled"]),
+        "short_memories_considered": 0,
+        "short_memories_selected": [],
+        "short_memories_skipped": [],
+        "short_reason": "",
+        "core_memory_enabled": bool(settings["core_enabled"]),
+        "core_memories_considered": 0,
+        "core_memories_selected": [],
+        "core_memories_skipped": [],
+        "core_reason": "",
+        "memory_skipped": [],
     }
     if not settings["enabled"]:
         debug["reason"] = "memory_disabled"
@@ -1087,7 +2455,30 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
         debug["reason"] = "lightweight_checkin"
         _set_last_memory_debug(debug)
         return []
-    if not explicit_memory_intent and not specific_memory_query:
+
+    query_parts = [str(user_message or "")]
+    query_parts.extend(
+        str(msg.get("content", ""))
+        for msg in safe_history[-4:]
+        if isinstance(msg, dict) and msg.get("role") == "user"
+    )
+    query_tokens = tokenize_memory_text(" ".join(query_parts))
+
+    short_selected, short_reason, short_count, short_skipped = _select_short_term_memories_for_prompt(
+        settings,
+        query_tokens,
+        user_message,
+        explicit_memory_intent=explicit_memory_intent,
+    )
+    debug["short_memories_considered"] = short_count
+    debug["short_memories_selected"] = [
+        _compact_short_term_memory_prompt_item(item, score=item.get("relevance", 0))
+        for item in short_selected
+    ]
+    debug["short_memories_skipped"] = short_skipped
+    debug["short_reason"] = short_reason
+
+    if not explicit_memory_intent and not specific_memory_query and not correction_or_forget_intent and not short_selected:
         debug["reason"] = "low_signal_or_unspecific"
         _set_last_memory_debug(debug)
         return []
@@ -1101,18 +2492,31 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
     relevant_target = max(0, settings["inject_relevant"])
     total_target = max(0, relevant_target + settings["inject_recent"])
 
+    requires_strong_match = _has_current_fact_assertion(user_message) and not explicit_memory_intent
+
     for item in _search_mem0_items(config, user_message, safe_history):
+        mem0_text = f"{item.get('user', '')} {item.get('assistant', '')}"
+        conflict_reason = _memory_recall_conflict_reason(user_message, mem0_text, settings=settings)
+        if conflict_reason:
+            debug["memory_skipped"].append(_compact_memory_skip_item(item, conflict_reason, source="mem0"))
+            continue
         _append_unique_memory_item(chosen, seen, item)
         if len(chosen) >= relevant_target:
             break
 
-    query_parts = [str(user_message or "")]
-    query_parts.extend(
-        str(msg.get("content", ""))
-        for msg in safe_history[-4:]
-        if isinstance(msg, dict) and msg.get("role") == "user"
+    core_selected, core_reason, core_count, core_skipped = _select_core_memories_for_prompt(
+        settings,
+        query_tokens,
+        user_message=user_message,
+        explicit_memory_intent=explicit_memory_intent,
     )
-    query_tokens = tokenize_memory_text(" ".join(query_parts))
+    debug["core_memories_considered"] = core_count
+    debug["core_memories_selected"] = [
+        _compact_core_memory_prompt_item(item, score=item.get("relevance", 0))
+        for item in core_selected
+    ]
+    debug["core_memories_skipped"] = core_skipped
+    debug["core_reason"] = core_reason
 
     if relevant_target > len(chosen) and query_tokens:
         scored = []
@@ -1121,6 +2525,17 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
                 f"{item.get('user', '')} {item.get('assistant', '')}"
             )
             score = len(query_tokens & memory_tokens)
+            conflict_reason = _memory_recall_conflict_reason(
+                user_message,
+                f"{item.get('user', '')} {item.get('assistant', '')}",
+                settings=settings,
+            )
+            if conflict_reason:
+                debug["memory_skipped"].append(_compact_memory_skip_item(item, conflict_reason, score=score, source="history"))
+                continue
+            if requires_strong_match and score <= 1:
+                debug["memory_skipped"].append(_compact_memory_skip_item(item, "weak_match_current_assertion", score=score, source="history"))
+                continue
             if score > 0:
                 scored.append((score, idx, item))
         scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
@@ -1140,6 +2555,14 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
     if recent_n > 0 and len(chosen) < total_target:
         recent_items = fallback_items[-recent_n:]
         for item in recent_items:
+            conflict_reason = _memory_recall_conflict_reason(
+                user_message,
+                f"{item.get('user', '')} {item.get('assistant', '')}",
+                settings=settings,
+            )
+            if conflict_reason:
+                debug["memory_skipped"].append(_compact_memory_skip_item(item, conflict_reason, source="recent"))
+                continue
             if _append_unique_memory_item(chosen, seen, item) and len(chosen) >= total_target:
                 break
 
@@ -1159,7 +2582,8 @@ def select_memory_items_for_prompt(config, user_message, safe_history):
         _compact_memory_debug_item(item, source="selected")
         for item in result
     ]
-    result = result + learning_selected
+    debug["memory_skipped"] = debug["memory_skipped"][:8]
+    result = short_selected + core_selected + result + learning_selected
     debug["reason"] = "selected" if result else "no_match"
     _set_last_memory_debug(debug)
     return result
@@ -1170,9 +2594,28 @@ def build_memory_prompt_block(config, user_message, safe_history):
     if not selected:
         return ""
 
+    short_lines = []
+    core_lines = []
     lines = []
     learned_lines = []
     for item in selected:
+        if item.get("kind") == "short_term_memory":
+            text = normalize_memory_text(item.get("text", ""), max_len=120)
+            short_kind = normalize_memory_text(item.get("short_kind", ""), max_len=30)
+            if text and short_kind:
+                short_lines.append(f"- {short_kind}：{text}")
+            elif text:
+                short_lines.append(f"- {text}")
+            continue
+        if item.get("kind") == "core_memory":
+            ago = _human_time_ago(str(item.get("updated_at") or item.get("created_at") or "").strip())
+            text = normalize_memory_text(item.get("text", ""), max_len=120)
+            category = normalize_memory_text(item.get("category", ""), max_len=30)
+            if text and category:
+                core_lines.append(f"- {ago}，{category}：{text}")
+            elif text:
+                core_lines.append(f"- {ago}，{text}")
+            continue
         if item.get("kind") == "learning_sample":
             pattern = normalize_memory_text(item.get("compressed_pattern", ""), max_len=120)
             user_preview = normalize_memory_text(item.get("user_preview", ""), max_len=70)
@@ -1187,6 +2630,16 @@ def build_memory_prompt_block(config, user_message, safe_history):
         lines.append(f'- {ago}，你们聊过：用户说“{user}”，你回答“{assistant}”。')
 
     blocks = []
+    if short_lines:
+        blocks.append(
+            "以下是当前会话的短期记忆，用来保持当下任务、话题和未完成事项的连续性。优先用于理解“下一步、继续、好的”等短回复，不要把它当成长期事实反复强调：\n"
+            + "\n".join(short_lines)
+        )
+    if core_lines:
+        blocks.append(
+            "以下是已经保存的真实长期记忆，包括事实、事件、项目进展或关系信息。只在自然相关时轻量使用，不要逐条复述，也不要主动解释你在使用记忆：\n"
+            + "\n".join(core_lines)
+        )
     if lines:
         blocks.append(
             "以下是你和用户过去对话里值得参考的记忆。只在自然相关时用上，不要逐条复述，也不要强行提起：\n"
@@ -1209,42 +2662,15 @@ def merge_prompt_with_memory(prompt, memory_block):
 
 
 def _safe_load_json_file(path, fallback):
-    try:
-        if not path.exists():
-            return fallback
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-        return data if data is not None else fallback
-    except Exception:
-        return fallback
+    return memory_store.safe_load_json_file(path, fallback)
 
 
 def _safe_save_json_file(path, payload):
-    tmp_path = path.with_suffix(".tmp")
-    tmp_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    tmp_path.replace(path)
+    return memory_store.safe_save_json_file(path, payload)
 
 
 def _tail_jsonl(path, limit=5):
-    try:
-        if not path.exists():
-            return []
-        lines = path.read_text(encoding="utf-8-sig").splitlines()[-max(0, int(limit)):]
-    except Exception:
-        return []
-    out = []
-    for line in lines:
-        line = str(line or "").strip()
-        if not line:
-            continue
-        try:
-            data = json.loads(line)
-        except Exception:
-            data = {"raw": line[:300]}
-        out.append(data if isinstance(data, dict) else {"raw": str(data)[:300]})
-    return out
+    return memory_store.tail_jsonl(path, limit=limit)
 
 
 def _compact_learning_audit_item(item):
@@ -1341,6 +2767,59 @@ def _build_learning_diagnostics(candidates, samples, state):
         "garbled_candidates_count": sum(1 for item in candidate_items if _is_learning_text_garbled(item)),
         "garbled_samples_count": sum(1 for item in sample_items if _is_learning_text_garbled(item)),
         "garbled_examples": [_compact_learning_item(item) for item in garbled_items[:3]],
+    }
+
+
+def _is_pending_learning_candidate(item):
+    if not isinstance(item, dict):
+        return False
+    status = str(item.get("status", "candidate") or "candidate").strip().lower()
+    return status in {"", "candidate"}
+
+
+def _is_active_learning_sample(item):
+    if not isinstance(item, dict):
+        return False
+    status = str(item.get("status", "active") or "active").strip().lower()
+    return status not in {"archived", "deleted", "rejected"}
+
+
+def _build_learning_review_status(settings, candidates, samples, state, memory_count):
+    quick = _learning_quick_settings(state)
+    inject_limit = max(0, int(settings.get("learning_inject_count", 0) or 0))
+    quick_injection_enabled = bool(quick.get("inject_count", 1) >= 1)
+    samples_enabled = bool(settings.get("enabled", True) and settings.get("learning_samples_enabled", True))
+    prompt_injection_enabled = bool(samples_enabled and quick_injection_enabled and inject_limit > 0)
+    prompt_eligible_samples = [
+        item for item in samples
+        if _is_learning_sample_prompt_eligible(item, settings)
+    ]
+    return {
+        "enabled": bool(settings.get("enabled", True)),
+        "mem0_enabled": bool(settings.get("mem0_enabled", False)),
+        "memory_count": int(memory_count or 0),
+        "candidates_enabled": bool(settings.get("learning_candidates_enabled", True)),
+        "samples_enabled": samples_enabled,
+        "quick_injection_enabled": quick_injection_enabled,
+        "prompt_injection_enabled": prompt_injection_enabled,
+        "prompt_inject_limit": inject_limit,
+        "prompt_inject_effective_limit": inject_limit if prompt_injection_enabled else 0,
+        "candidate_total": len(candidates),
+        "pending_review_count": sum(1 for item in candidates if _is_pending_learning_candidate(item)),
+        "sample_total": len(samples),
+        "active_sample_count": sum(1 for item in samples if _is_active_learning_sample(item)),
+        "prompt_eligible_sample_count": len(prompt_eligible_samples),
+        "candidate_max_items": int(settings.get("learning_candidate_max_items", 0) or 0),
+        "candidate_min_score": settings.get("learning_candidate_min_score", 0),
+        "candidate_min_confidence": settings.get("learning_candidate_min_confidence", 0),
+        "sample_min_score": settings.get("learning_min_score", 0),
+        "sample_min_confidence": settings.get("learning_min_confidence", 0),
+        "candidates_affect_prompt": False,
+        "requires_user_promotion": True,
+        "sensitive_filter_enabled": True,
+        "local_only": True,
+        "input_scope": "chat_turn_text_only",
+        "degraded_mode": bool((state or {}).get("degraded_mode", False)),
     }
 
 
@@ -1695,6 +3174,243 @@ def update_learning_review_entries(
     )
 
 
+def _build_core_memory_review_payload(memories=None, message=""):
+    items = memories if isinstance(memories, list) else load_core_memory_items()
+    active = [item for item in items if str(item.get("status", "active")).lower() == "active"]
+    pinned = [item for item in active if item.get("pinned")]
+    return {
+        "ok": True,
+        "message": str(message or "").strip(),
+        "core_memories": items,
+        "stats": {
+            "total": len(items),
+            "active": len(active),
+            "pinned": len(pinned),
+            "semantic": sum(1 for item in active if item.get("kind") == "semantic"),
+            "episodic": sum(1 for item in active if item.get("kind") == "episodic"),
+        },
+    }
+
+
+def _build_short_term_memory_review_payload(state=None, message=""):
+    settings = get_memory_settings({})
+    safe_state = _normalize_short_term_memory_state(state if isinstance(state, dict) else _load_short_term_memory_state(), settings=settings)
+    current_turn = int(safe_state.get("turn_index", 0) or 0)
+    items = _prune_short_term_items(safe_state.get("items", []), current_turn)
+    return {
+        "ok": True,
+        "message": str(message or "").strip(),
+        "short_memories": items,
+        "stats": {
+            "total": len(items),
+            "turn_index": current_turn,
+            "current_topic": sum(1 for item in items if item.get("kind") == "current_topic"),
+            "current_task": sum(1 for item in items if item.get("kind") == "current_task"),
+            "open_loop": sum(1 for item in items if item.get("kind") == "open_loop"),
+        },
+    }
+
+
+def get_short_term_memories_for_review(config=None):
+    settings = get_memory_settings(config or {})
+    return _build_short_term_memory_review_payload(
+        _normalize_short_term_memory_state(_load_short_term_memory_state(), settings=settings)
+    )
+
+
+def _apply_short_term_memory_patch(item, patch):
+    safe_patch = patch if isinstance(patch, dict) else {}
+    updated = dict(item)
+    if "text" in safe_patch:
+        text = normalize_memory_text(safe_patch.get("text", ""), max_len=240)
+        if len(text) < 3:
+            return None, "empty_text"
+        if looks_garbled_text(text) or looks_sensitive_memory_text(text) or looks_stagey_text(text):
+            return None, "unsafe_text"
+        updated["text"] = text
+    if "kind" in safe_patch:
+        kind = str(safe_patch.get("kind", "") or "").strip().lower()
+        if kind in SHORT_TERM_MEMORY_KINDS:
+            updated["kind"] = kind
+    if "tags" in safe_patch:
+        tags = safe_patch.get("tags", [])
+        if isinstance(tags, str):
+            tags = re.split(r"[,，\s]+", tags)
+        if not isinstance(tags, list):
+            tags = []
+        updated["tags"] = [
+            normalize_memory_text(tag, max_len=24)
+            for tag in tags[:8]
+            if normalize_memory_text(tag, max_len=24)
+        ]
+    if "salience" in safe_patch:
+        try:
+            updated["salience"] = round(max(0.0, min(1.0, float(safe_patch.get("salience", updated.get("salience", 0)) or 0))), 4)
+        except (TypeError, ValueError):
+            pass
+    updated["updated_at"] = _short_term_now_iso()
+    normalized = _normalize_short_term_memory_item(updated)
+    if normalized is None:
+        return None, "invalid_memory"
+    return normalized, ""
+
+
+def update_short_term_memory_entries(config, *, action, ids=None, delta=0.0, patch=None):
+    settings = get_memory_settings(config or {})
+    action_key = str(action or "").strip().lower()
+    ids = [str(item_id or "").strip() for item_id in (ids or []) if str(item_id or "").strip()]
+    wanted = set(ids)
+    changed = 0
+    with MEMORY_LOCK:
+        state = _normalize_short_term_memory_state(_load_short_term_memory_state(), settings=settings)
+        current_turn = int(state.get("turn_index", 0) or 0)
+        items = _prune_short_term_items(state.get("items", []), current_turn)
+        if action_key == "clear":
+            changed = len(items)
+            items = []
+        elif action_key == "delete":
+            before = len(items)
+            items = [item for item in items if str(item.get("id", "")).strip() not in wanted]
+            changed = before - len(items)
+        elif action_key == "weight":
+            try:
+                step = float(delta)
+            except (TypeError, ValueError):
+                step = 0.0
+            for item in items:
+                if str(item.get("id", "")).strip() not in wanted:
+                    continue
+                try:
+                    salience = float(item.get("salience", 0) or 0)
+                except (TypeError, ValueError):
+                    salience = 0.0
+                item["salience"] = round(max(0.0, min(1.0, salience + step)), 4)
+                item["updated_at"] = _short_term_now_iso()
+                changed += 1
+        elif action_key == "edit":
+            edited = []
+            for item in items:
+                if str(item.get("id", "")).strip() not in wanted:
+                    edited.append(item)
+                    continue
+                patched, reason = _apply_short_term_memory_patch(item, patch or {})
+                if patched is None:
+                    return {"ok": False, "error": f"Short-term memory edit rejected: {reason}"}
+                edited.append(patched)
+                changed += 1
+            items = edited
+        else:
+            return {"ok": False, "error": f"Unsupported short-term memory action: {action_key}"}
+        state["items"] = items
+        _save_short_term_memory_state(state)
+    return _build_short_term_memory_review_payload(
+        state,
+        message=f"Short-term memory action '{action_key}' changed {changed} item(s).",
+    )
+
+
+def get_core_memories_for_review(config=None):
+    return _build_core_memory_review_payload()
+
+
+def _apply_core_memory_patch(item, patch):
+    safe_patch = patch if isinstance(patch, dict) else {}
+    updated = dict(item)
+    if "text" in safe_patch:
+        text = normalize_memory_text(safe_patch.get("text", ""), max_len=260)
+        if len(text) < 4:
+            return None, "empty_text"
+        if looks_garbled_text(text) or looks_sensitive_memory_text(text) or looks_stagey_text(text):
+            return None, "unsafe_text"
+        updated["text"] = text
+    if "kind" in safe_patch:
+        kind = str(safe_patch.get("kind", "") or "").strip().lower()
+        if kind in CORE_MEMORY_KINDS:
+            updated["kind"] = kind
+    if "category" in safe_patch:
+        category = str(safe_patch.get("category", "") or "").strip().lower()
+        if category in CORE_MEMORY_CATEGORIES:
+            updated["category"] = category
+    if "tags" in safe_patch:
+        tags = safe_patch.get("tags", [])
+        if isinstance(tags, str):
+            tags = re.split(r"[,，\s]+", tags)
+        if not isinstance(tags, list):
+            tags = []
+        updated["tags"] = [
+            normalize_memory_text(tag, max_len=24)
+            for tag in tags[:8]
+            if normalize_memory_text(tag, max_len=24)
+        ]
+    for key in ("importance", "confidence"):
+        if key not in safe_patch:
+            continue
+        try:
+            updated[key] = round(max(0.0, min(1.0, float(safe_patch.get(key, updated.get(key, 0)) or 0))), 4)
+        except (TypeError, ValueError):
+            pass
+    updated["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    normalized = _normalize_core_memory_item(updated)
+    if normalized is None:
+        return None, "invalid_memory"
+    return normalized, ""
+
+
+def update_core_memory_entries(config, *, action, ids=None, delta=0.0, patch=None):
+    action_key = str(action or "").strip().lower()
+    ids = [str(item_id or "").strip() for item_id in (ids or []) if str(item_id or "").strip()]
+    wanted = set(ids)
+    changed = 0
+    now = datetime.now().isoformat(timespec="seconds")
+    with MEMORY_LOCK:
+        items = load_core_memory_items()
+        if action_key == "delete":
+            before = len(items)
+            items = [item for item in items if str(item.get("id", "")).strip() not in wanted]
+            changed = before - len(items)
+        elif action_key in {"pin", "unpin"}:
+            for item in items:
+                if str(item.get("id", "")).strip() not in wanted:
+                    continue
+                item["pinned"] = action_key == "pin"
+                item["updated_at"] = now
+                changed += 1
+        elif action_key == "weight":
+            try:
+                step = float(delta)
+            except (TypeError, ValueError):
+                step = 0.0
+            for item in items:
+                if str(item.get("id", "")).strip() not in wanted:
+                    continue
+                try:
+                    importance = float(item.get("importance", 0) or 0)
+                except (TypeError, ValueError):
+                    importance = 0.0
+                item["importance"] = round(max(0.0, min(1.0, importance + step)), 4)
+                item["updated_at"] = now
+                changed += 1
+        elif action_key == "edit":
+            edited = []
+            for item in items:
+                if str(item.get("id", "")).strip() not in wanted:
+                    edited.append(item)
+                    continue
+                patched, reason = _apply_core_memory_patch(item, patch or {})
+                if patched is None:
+                    return {"ok": False, "error": f"Core memory edit rejected: {reason}"}
+                edited.append(patched)
+                changed += 1
+            items = edited
+        else:
+            return {"ok": False, "error": f"Unsupported core memory action: {action_key}"}
+        save_core_memory_items(items)
+    return _build_core_memory_review_payload(
+        items,
+        message=f"Core memory action '{action_key}' changed {changed} item(s).",
+    )
+
+
 def undo_last_learning_review_action(config=None):
     audits = _tail_jsonl(LEARNING_AUDIT_LOG_PATH, limit=80)
     if not audits:
@@ -1751,17 +3467,17 @@ def get_memory_debug_snapshot(config):
     settings = get_memory_settings(config)
     with MEMORY_LOCK:
         memory_count = len(load_memory_items())
+        short_state = _normalize_short_term_memory_state(_load_short_term_memory_state(), settings=settings)
+        short_items = _prune_short_term_items(short_state.get("items", []), int(short_state.get("turn_index", 0) or 0))
+        core_items = load_core_memory_items()
         last_memory_debug = dict(LAST_MEMORY_DEBUG) if isinstance(LAST_MEMORY_DEBUG, dict) else {}
     last_extraction_debug = _compact_learning_extraction_debug(LAST_LEARNING_EXTRACTION_DEBUG)
-    candidates = _safe_load_json_file(LEARNING_CANDIDATES_PATH, [])
-    samples = _safe_load_json_file(LEARNING_SAMPLES_PATH, [])
-    state = _safe_load_json_file(LEARNING_STATE_PATH, {})
-    if not isinstance(candidates, list):
-        candidates = []
-    if not isinstance(samples, list):
-        samples = []
-    if not isinstance(state, dict):
-        state = {}
+    last_short_debug = _compact_short_term_memory_debug(LAST_SHORT_TERM_MEMORY_DEBUG)
+    last_core_debug = _compact_core_memory_debug(LAST_CORE_MEMORY_DEBUG)
+    last_consolidation_debug = _compact_memory_consolidation_debug(LAST_MEMORY_CONSOLIDATION_DEBUG)
+    last_correction_debug = _compact_memory_correction_debug(LAST_MEMORY_CORRECTION_DEBUG)
+    candidates, samples, state = _load_learning_review_store()
+    review_status = _build_learning_review_status(settings, candidates, samples, state, memory_count)
     return {
         "ok": True,
         "memory": {
@@ -1770,12 +3486,37 @@ def get_memory_debug_snapshot(config):
             "memory_count": memory_count,
             "last_selection": last_memory_debug,
         },
+        "short_memory": {
+            "enabled": bool(settings["short_enabled"]),
+            "count": len(short_items),
+            "turn_index": int(short_state.get("turn_index", 0) or 0),
+            "inject_count": settings["short_inject_count"],
+            "ttl_turns": settings["short_ttl_turns"],
+            "consolidation_enabled": bool(settings["memory_consolidation_enabled"]),
+            "consolidation_min_support": settings["memory_consolidation_min_support"],
+            "last_update": last_short_debug,
+            "last_consolidation": last_consolidation_debug,
+            "recent": [_compact_short_term_memory_prompt_item(item) for item in short_items[:5]],
+        },
+        "core_memory": {
+            "enabled": bool(settings["core_enabled"]),
+            "extraction_enabled": bool(settings["core_extraction_enabled"]),
+            "correction_enabled": bool(settings["memory_correction_enabled"]),
+            "count": len(core_items),
+            "inject_count": settings["core_inject_count"],
+            "min_importance": settings["core_min_importance"],
+            "min_confidence": settings["core_min_confidence"],
+            "last_extraction": last_core_debug,
+            "last_correction": last_correction_debug,
+            "recent": [_compact_core_memory_prompt_item(item) for item in core_items[-5:]],
+        },
         "learning": {
             "candidates_count": len(candidates),
             "samples_count": len(samples),
             "last_extraction": last_extraction_debug,
             "degraded_mode": bool(state.get("degraded_mode", False)),
             "turn_count": int(state.get("turn_count", 0) or 0),
+            "review_status": review_status,
             "diagnostics": _build_learning_diagnostics(candidates, samples, state),
             "recent_candidates": [_compact_learning_item(item) for item in candidates[-5:]],
             "recent_samples": [_compact_learning_item(item) for item in samples[-5:]],
@@ -2276,6 +4017,24 @@ def remember_interaction(config, user_message, assistant_reply, is_auto=False):
             daemon=True,
         ).start()
 
+    _update_short_term_memory(config, record)
+    _maybe_consolidate_short_term_memories(config)
+    correction_debug = _apply_memory_correction_from_turn(config, record)
+    if correction_debug.get("status") == "applied":
+        _set_last_core_memory_debug(
+            {
+                "at": _learning_now_iso(),
+                "status": "skipped",
+                "reason": "handled_by_memory_correction",
+                "action": "",
+                "stored": 0,
+                "merged": 0,
+                "source": "",
+                "memory_ids": [],
+            }
+        )
+    else:
+        _schedule_core_memory_extraction(config, record)
     _schedule_learning_candidate_extraction(config, record)
 
     if new_count % settings["summary_trigger_every"] == 0:

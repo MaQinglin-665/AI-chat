@@ -19,7 +19,7 @@ set "GPT_EXIT=%ERRORLEVEL%"
 >>"%LAUNCHER_LOG%" echo GPT-SoVITS launcher exit code: %GPT_EXIT%
 
 >>"%LAUNCHER_LOG%" echo Starting Electron desktop app in a separate process...
-start "Taffy Desktop Pet" /min "%ComSpec%" /d /c "call ""%~dp0start_electron.bat"" >> ""%ELECTRON_LOG%"" 2>&1"
+start "Xinyu Desktop Pet" /min "%ComSpec%" /d /c "call ""%~dp0start_electron.bat"" >> ""%ELECTRON_LOG%"" 2>&1"
 if errorlevel 1 (
   >>"%LAUNCHER_LOG%" echo Failed to spawn Electron startup command.
   exit /b 1

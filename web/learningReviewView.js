@@ -82,7 +82,7 @@
       return 0;
     }
     const model = options.model || root.TaffyLearningReviewModel || {};
-    const tab = options.tab === "samples" ? "samples" : "candidates";
+    const tab = options.tab === "samples" ? "samples" : (options.tab === "short" ? "short" : (options.tab === "core" ? "core" : "candidates"));
     const selectedSet = options.selectedSet instanceof Set ? options.selectedSet : new Set();
     const list = Array.isArray(items) ? items : [];
     container.innerHTML = "";
@@ -126,8 +126,10 @@
       titleWrap.appendChild(meta);
 
       const status = doc.createElement("span");
-      const statusView = typeof model.getLearningStatusView === "function"
-        ? model.getLearningStatusView(item.status)
+      const statusView = tab === "short"
+        ? { statusClass: "active", label: "\u77ed\u671f" }
+        : typeof model.getLearningStatusView === "function"
+        ? model.getLearningStatusView(tab === "core" && item.pinned ? "pinned" : item.status)
         : { statusClass: "candidate", label: String(item.status || "\u5019\u9009") };
       status.className = `learning-item-status is-${statusView.statusClass}`;
       status.textContent = statusView.label;
@@ -147,9 +149,41 @@
 
       const preview = doc.createElement("div");
       preview.className = "learning-item-preview";
-      preview.appendChild(createTextLine(doc, "learning-item-line", "\u7528\u6237\u539f\u8bdd\uff1a", item.user_preview || "-"));
-      preview.appendChild(createTextLine(doc, "learning-item-line", "\u684c\u5ba0\u56de\u590d\uff1a", item.assistant_preview || "-"));
-      preview.appendChild(createTextLine(doc, "learning-item-line learning-item-pattern", "\u63d0\u70bc\u8bb0\u5fc6\uff1a", item.compressed_pattern || "-"));
+      if (tab === "short") {
+        preview.appendChild(createTextLine(doc, "learning-item-line", "\u7c7b\u578b\uff1a", item.kind || "current_topic"));
+        const editLine = doc.createElement("div");
+        editLine.className = "learning-item-line learning-item-pattern";
+        const editLabel = doc.createElement("strong");
+        editLabel.textContent = "\u77ed\u671f\u8bb0\u5fc6\uff1a";
+        const textarea = doc.createElement("textarea");
+        textarea.className = "short-memory-edit";
+        textarea.dataset.id = item.id;
+        textarea.value = item.text || item.compressed_pattern || "";
+        editLine.appendChild(editLabel);
+        editLine.appendChild(textarea);
+        preview.appendChild(editLine);
+        preview.appendChild(createTextLine(doc, "learning-item-line", "\u8f6e\u6b21\uff1a", `${item.last_seen_turn || 0} / TTL ${item.ttl_turns || 0}`));
+        preview.appendChild(createTextLine(doc, "learning-item-line", "\u89e6\u53d1\u539f\u8bdd\uff1a", item.user_preview || "-"));
+      } else if (tab === "core") {
+        preview.appendChild(createTextLine(doc, "learning-item-line", "\u7c7b\u578b\uff1a", `${item.kind || "semantic"} / ${item.category || "stable_fact"}`));
+        const editLine = doc.createElement("div");
+        editLine.className = "learning-item-line learning-item-pattern";
+        const editLabel = doc.createElement("strong");
+        editLabel.textContent = "\u8bb0\u5fc6\u5185\u5bb9\uff1a";
+        const textarea = doc.createElement("textarea");
+        textarea.className = "core-memory-edit";
+        textarea.dataset.id = item.id;
+        textarea.value = item.text || item.compressed_pattern || "";
+        editLine.appendChild(editLabel);
+        editLine.appendChild(textarea);
+        preview.appendChild(editLine);
+        preview.appendChild(createTextLine(doc, "learning-item-line", "\u6765\u6e90\uff1a", item.source || "-"));
+        preview.appendChild(createTextLine(doc, "learning-item-line", "\u89e6\u53d1\u539f\u8bdd\uff1a", item.user_preview || "-"));
+      } else {
+        preview.appendChild(createTextLine(doc, "learning-item-line", "\u7528\u6237\u539f\u8bdd\uff1a", item.user_preview || "-"));
+        preview.appendChild(createTextLine(doc, "learning-item-line", "\u684c\u5ba0\u56de\u590d\uff1a", item.assistant_preview || "-"));
+        preview.appendChild(createTextLine(doc, "learning-item-line learning-item-pattern", "\u63d0\u70bc\u8bb0\u5fc6\uff1a", item.compressed_pattern || "-"));
+      }
 
       const metrics = doc.createElement("div");
       metrics.className = "learning-item-metrics";
@@ -159,7 +193,12 @@
 
       const actions = doc.createElement("div");
       actions.className = "learning-item-actions";
-      if (tab === "candidates") {
+      if (tab === "short") {
+        actions.appendChild(createActionButton(doc, item, "\u4fdd\u5b58\u4fee\u6539", "edit", "is-promote"));
+      } else if (tab === "core") {
+        actions.appendChild(createActionButton(doc, item, item.pinned ? "\u53d6\u6d88\u56fa\u5b9a" : "\u56fa\u5b9a", item.pinned ? "unpin" : "pin", "is-keep"));
+        actions.appendChild(createActionButton(doc, item, "\u4fdd\u5b58\u4fee\u6539", "edit", "is-promote"));
+      } else if (tab === "candidates") {
         actions.appendChild(createActionButton(doc, item, "\u91c7\u7528\u5230\u6b63\u5f0f\u6c60", "promote", "is-promote"));
         actions.appendChild(createActionButton(doc, item, "\u5148\u7559\u7740", "keep", "is-keep"));
       }
@@ -195,9 +234,11 @@
   }
 
   function renderLearningTabs(ui = {}, activeTab = "candidates") {
-    const tab = activeTab === "samples" ? "samples" : (activeTab === "debug" ? "debug" : "candidates");
+    const tab = activeTab === "samples" ? "samples" : (activeTab === "short" ? "short" : (activeTab === "core" ? "core" : (activeTab === "debug" ? "debug" : "candidates")));
     setTabActive(ui.learningTabCandidates, tab === "candidates");
     setTabActive(ui.learningTabSamples, tab === "samples");
+    setTabActive(ui.learningTabShort, tab === "short");
+    setTabActive(ui.learningTabCore, tab === "core");
     setTabActive(ui.learningTabDebug, tab === "debug");
   }
 

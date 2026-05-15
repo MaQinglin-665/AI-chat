@@ -13,51 +13,39 @@
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-111827"></a>
 </p>
 
-开源 Windows 桌面 AI 伙伴 / 桌面 AI VTuber 实验项目。
+馨语桌宠是一个开源 Windows 桌面 AI 伙伴 / 桌面 AI VTuber 实验项目。
 
 它把 `Electron + Python 本地服务 + Live2D + LLM 对话 + TTS/ASR + 情绪动作反馈` 组合到桌面上，探索一个能聊天、能说话、能表达情绪、低打扰陪伴的角色体验。
 
-当前项目仍处于 `MVP / 开源孵化` 阶段，不是成熟商业产品。首次公开发布会优先提供 Windows 在线引导安装器；源码测试包保留给开发者和早期测试者。项目可以提到受 AI VTuber 与 Neuro-sama-like 交互方向启发，但它不是任何项目的克隆或复刻。
+当前项目仍处于 `MVP / 开源孵化` 阶段，不是成熟商业产品。项目可以提到受 AI VTuber 与 Neuro-sama-like 交互方向启发，但它不是任何项目的克隆或复刻。
+
+English summary: Xinyu Desktop Pet is an open-source Windows desktop AI companion / AI VTuber MVP. It ships no cloud model, hosted endpoint, or API key; users configure their own model provider.
 
 - 项目网站：[maqinglin-665.github.io/AI-chat](https://maqinglin-665.github.io/AI-chat/)
 - 最新预览版：[v1.4.0-preview](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview)
 - 首次安装指南：[docs/first-install.md](docs/first-install.md)
 - 模型选择指南：[docs/model-selection.md](docs/model-selection.md)
-- 首跑后反馈模板：[docs/first-run-feedback.md](docs/first-run-feedback.md)
+- 首跑反馈模板：[docs/first-run-feedback.md](docs/first-run-feedback.md)
 
 ## 适合谁
 
 - 想体验 Windows 桌面 AI 伙伴 / Live2D AI VTuber 原型的人。
 - 想研究 Electron 桌面 UI、Python 本地服务、LLM、TTS/ASR、Live2D 串联方式的开发者。
-- 愿意接受源码预览版限制，并反馈首跑、模型兼容、语音链路、角色体验问题的早期测试者。
+- 愿意接受预览版限制，并反馈首跑、模型兼容、语音链路、角色体验问题的早期测试者。
 
 ## 当前能力
 
 - Live2D 桌宠渲染与 Electron 透明桌面窗口。
 - 文本对话，支持 OpenAI-compatible、OpenAI、Ollama 等用户自选模型。
-- TTS / ASR 语音交互链路，首跑推荐浏览器 TTS。
+- TTS / ASR 语音交互链路，首跑推荐 Browser / Edge TTS。
 - 情绪状态、动作映射、角色运行时 cue。
+- 记忆系统、短期舞台记忆与可审核学习样本。
 - 低风险主动反馈与状态中心。
-- 默认关闭的桌面截图上下文辅助回复，需要用户显式启用。
-
-## 首跑成功后怎么反馈
-
-如果已经能打开桌宠并完成一次聊天，下一步最有价值的反馈是：启动耗时、模型响应速度、语音是否稳定、Live2D 动作是否自然、角色语气是否像“馨语”而不是通用助手。
-
-建议使用 [docs/first-run-feedback.md](docs/first-run-feedback.md) 记录测试结果。公开反馈前请移除 API key、token、原始 prompt、raw history、私有本地路径和私密截图。
-
-## 系统要求
-
-- Windows 10/11
-- Python 3.10+
-- Node.js 18+
-- npm
-- 一个可用的 LLM provider / model / API key，或本地 Ollama 模型
-- Live2D `.model3.json` 模型文件
+- 可选桌面上下文辅助回复，默认关闭，需要用户显式启用。
 
 ## 快速开始
 
-### 1. 普通用户下载安装器
+### 1. 普通 Windows 用户下载安装器
 
 在 release 页面优先下载：
 
@@ -68,14 +56,14 @@ SHA256SUMS.txt
 
 安装器会把项目文件复制到当前用户目录，创建开始菜单 / 桌面快捷方式，并启动 `install_and_start.bat` 完成首跑引导。它不会内置云模型、不会写入 API key、不会开启桌面观察、工具调用或 shell。
 
-首发安装器允许未签名。运行前建议先校验 SHA256：
+首发安装器未签名。运行前建议先校验 SHA256：
 
 ```powershell
 Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
-如果 Windows SmartScreen 提醒未知发布者，只有在文件来自本仓库 release 且 SHA256 匹配时才继续。
+如果 Windows SmartScreen 提醒未知发布者，只有在文件来自本仓库 release 且 SHA256 匹配时才继续。不要为了运行预览包关闭系统安全设置。
 
 ### 2. 开发者使用源码包
 
@@ -97,7 +85,7 @@ requirements.txt
 requirements-dev.txt
 ```
 
-如果缺少 `web/`、`electron/` 或 `tests/`，说明下载的不是完整当前源码，请重新下载。
+如果缺少 `web/`、`electron/` 或 `tests/`，说明下载的不是完整当前源码，请重新下载。GitHub 自动生成的 `Source code` 压缩包只是仓库快照，不等同于经过首跑检查的源码测试包。
 
 也可以使用当前 `main` 分支源码：
 
@@ -128,9 +116,9 @@ install_and_start.bat
 4. 初始化 `config.json` 和 `.env`。
 5. 应用当前预览体验配置。
 6. 启动 Electron 桌宠。
-7. 在应用内首次配置向导里填写 OpenAI-compatible provider / base URL / model / API key。
+7. 在应用内首次配置向导里填写 provider / base URL / model / API key。
 
-注意：你仍需要提供自己的模型和 API key。首句 smoke check 改为高级排查步骤，不再阻塞普通用户首次启动。
+你仍需要提供自己的模型和 API key。首句 smoke check 已改为高级排查步骤，不再阻塞普通用户首次启动。
 
 ### 4. 应用内首次配置向导
 
@@ -230,6 +218,12 @@ config.py      配置加载与安全默认值
 - `tools.allow_shell=false`
 
 首次安装脚本不会默认开启桌面观察、截图、用户文件读取、工具调用或 shell 执行。不要把真实 API Key / Token 提交到仓库。
+
+## 首跑成功后怎么反馈
+
+如果已经能打开桌宠并完成一次聊天，下一步最有价值的反馈是：启动耗时、模型响应速度、语音是否稳定、Live2D 动作是否自然、角色语气是否像“馨语”而不是通用助手。
+
+建议使用 [docs/first-run-feedback.md](docs/first-run-feedback.md) 记录测试结果。公开反馈前请移除 API key、token、原始 prompt、raw history、私有本地路径和私密截图。
 
 ## 第三方资源
 

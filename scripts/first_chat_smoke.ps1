@@ -39,27 +39,55 @@ function Write-Fail($MessageText) {
 function Resolve-PythonCommand {
     $venvPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
     if (Test-Path $venvPython) {
-        $script:PythonExe = $venvPython
-        $script:PythonArgsPrefix = @()
-        Write-Ok "Using local Python: .venv\Scripts\python.exe"
-        return
+        if (Test-PythonCandidate $venvPython @()) {
+            $script:PythonExe = $venvPython
+            $script:PythonArgsPrefix = @()
+            Write-Ok "Using local Python: .venv\Scripts\python.exe"
+            return
+        }
+        Write-WarnLine ".venv\Scripts\python.exe exists but is not runnable; falling back to Python on PATH."
     }
 
     if (Get-Command python -ErrorAction SilentlyContinue) {
-        $script:PythonExe = "python"
-        $script:PythonArgsPrefix = @()
-        Write-WarnLine ".venv was not found; falling back to python on PATH."
-        return
+        if (Test-PythonCandidate "python" @()) {
+            $script:PythonExe = "python"
+            $script:PythonArgsPrefix = @()
+            Write-WarnLine "Using python on PATH."
+            return
+        }
     }
 
     if (Get-Command py -ErrorAction SilentlyContinue) {
-        $script:PythonExe = "py"
-        $script:PythonArgsPrefix = @("-3")
-        Write-WarnLine ".venv was not found; falling back to py -3."
-        return
+        if (Test-PythonCandidate "py" @("-3")) {
+            $script:PythonExe = "py"
+            $script:PythonArgsPrefix = @("-3")
+            Write-WarnLine "Using py -3."
+            return
+        }
     }
 
     Write-Fail "Python was not found. Run install_and_start.bat first."
+}
+
+function Test-PythonCandidate {
+    param(
+        [string]$Exe,
+        [string[]]$ArgsPrefix
+    )
+
+    try {
+        $output = & $Exe @($ArgsPrefix + @("--version")) 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            return $true
+        }
+        $detail = (($output | Out-String).Trim())
+        if ($detail) {
+            Write-WarnLine "Python candidate failed: $Exe $($ArgsPrefix -join ' ') ($detail)"
+        }
+    } catch {
+        Write-WarnLine "Python candidate failed: $Exe $($ArgsPrefix -join ' ') ($($_.Exception.Message))"
+    }
+    return $false
 }
 
 function Invoke-ProjectPython {
@@ -332,7 +360,7 @@ function Assert-Chat {
 }
 
 try {
-    Write-Host "Taffy AI Desktop Pet first-chat smoke"
+    Write-Host "Xinyu Desktop Pet first-chat smoke"
     Write-Host "Root: $RepoRoot"
     Write-Host ""
 

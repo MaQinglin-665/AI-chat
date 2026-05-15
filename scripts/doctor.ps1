@@ -71,7 +71,7 @@ function Get-MajorVersion($VersionText) {
     return $null
 }
 
-Write-Host "Taffy AI Desktop Pet environment doctor"
+Write-Host "Xinyu Desktop Pet environment doctor"
 Write-Host "Root: $RepoRoot"
 Write-Host ""
 

@@ -18,15 +18,17 @@
     if (typeof fetchJsonFn !== "function") {
       throw new Error("fetchJson is required");
     }
-    const [payload, debugPayload] = await Promise.all([
+    const [payload, debugPayload, shortPayload, corePayload] = await Promise.all([
       fetchJsonFn("/api/learning/reload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({})
       }),
-      fetchJsonFn("/api/memory/debug")
+      fetchJsonFn("/api/memory/debug"),
+      fetchJsonFn("/api/memory/short"),
+      fetchJsonFn("/api/memory/core")
     ]);
-    return { payload, debugPayload };
+    return { payload, debugPayload, shortPayload, corePayload };
   }
 
   function reloadMemoryDebug(fetchJsonFn) {
@@ -41,6 +43,34 @@
       throw new Error("fetchJson is required");
     }
     return fetchJsonFn("/api/learning/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        ...extra
+      })
+    });
+  }
+
+  function updateCoreEntries(fetchJsonFn, action, extra = {}) {
+    if (typeof fetchJsonFn !== "function") {
+      throw new Error("fetchJson is required");
+    }
+    return fetchJsonFn("/api/memory/core/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        ...extra
+      })
+    });
+  }
+
+  function updateShortEntries(fetchJsonFn, action, extra = {}) {
+    if (typeof fetchJsonFn !== "function") {
+      throw new Error("fetchJson is required");
+    }
+    return fetchJsonFn("/api/memory/short/update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -78,6 +108,8 @@
     promoteEntries,
     reload,
     reloadMemoryDebug,
+    updateCoreEntries,
+    updateShortEntries,
     updateEntries
   };
 

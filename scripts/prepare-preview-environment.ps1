@@ -44,15 +44,37 @@ function Invoke-Step {
 function Resolve-PythonForCheck {
     $venvPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
     if (Test-Path $venvPython) {
-        return $venvPython
+        if (Test-PythonForCheck $venvPython) {
+            return $venvPython
+        }
+        Write-WarnLine ".venv\Scripts\python.exe exists but is not runnable; checking Python on PATH."
     }
     if (Get-Command python -ErrorAction SilentlyContinue) {
-        return "python"
+        if (Test-PythonForCheck "python") {
+            return "python"
+        }
     }
     if (Get-Command py -ErrorAction SilentlyContinue) {
-        return "py"
+        if (Test-PythonForCheck "py") {
+            return "py"
+        }
     }
     return ""
+}
+
+function Test-PythonForCheck {
+    param([string]$PythonExe)
+
+    try {
+        if ($PythonExe -eq "py") {
+            & py -3 --version >$null 2>$null
+        } else {
+            & $PythonExe --version >$null 2>$null
+        }
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
 }
 
 function Test-LlmLooksConfigured {

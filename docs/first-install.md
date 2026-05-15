@@ -1,6 +1,8 @@
-# First Install Guide
+# 首次安装指南 / First Install Guide
 
 本指南面向第一次从 GitHub release 下载的 Windows 用户。当前项目仍是 MVP preview，不是成熟商业产品；首发推荐使用 Windows 在线引导安装器，源码包保留给开发者和早期测试者。
+
+English summary: use the Windows guided installer first, verify SHA256, then configure your own model provider in the in-app first-run wizard.
 
 ## 目标
 
@@ -13,7 +15,7 @@
 5. 启动 Electron 桌宠。
 6. 在应用内首次配置向导里配置用户自己的 LLM provider / model / API key。
 
-## 最省心入口：安装器
+## 最省心入口：安装器 / Recommended Installer Path
 
 在 release 页面下载：
 
@@ -22,7 +24,7 @@ Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
 SHA256SUMS.txt
 ```
 
-安装器默认安装到当前用户目录，不需要管理员权限；安装后会创建开始菜单和桌面快捷方式，并启动 `install_and_start.bat`。
+安装器默认安装到当前用户目录，不需要管理员权限；安装后会创建开始菜单和桌面快捷方式，并启动 `install_and_start.bat`。安装器不内置 Python、Node.js、云模型、托管接口或 API key。
 
 首发安装器未签名。运行前请校验 SHA256：
 
@@ -62,7 +64,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\prepare-preview-envi
 
 如果需要高级排查，可以手动运行 `scripts\first_chat_smoke.ps1`。它会发送一次很小的模型测试请求，用来提前发现模型名、API key、base URL 或网关兼容性问题。
 
-## 应用内首次配置
+## 应用内首次配置 / In-App Model Setup
 
 首次启动或 LLM 配置不完整时，聊天窗口会显示“首次模型配置”向导。默认 provider 是 `openai-compatible`，默认 API key env 名称是 `TAFFY_LLM_API_KEY`。
 
@@ -99,7 +101,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 - `/api/llm_probe failed`：运行 `scripts\diagnose-llm-link.ps1 -SoftFail`，重点检查 API key、base URL、model 名称和模型响应时间。
 - `npm install failed`：检查网络、代理或 npm 镜像。脚本默认使用 Electron 镜像降低下载失败概率。
 
-## 安全默认值
+## 安全默认值 / Safety Defaults
 
 首次安装路径不会默认开启：
 

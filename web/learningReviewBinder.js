@@ -54,6 +54,20 @@
       });
     }
 
+    if (ui.learningTabShort) {
+      ui.learningTabShort.addEventListener("click", () => {
+        state.activeTab = "short";
+        call(deps.render);
+      });
+    }
+
+    if (ui.learningTabCore) {
+      ui.learningTabCore.addEventListener("click", () => {
+        state.activeTab = "core";
+        call(deps.render);
+      });
+    }
+
     if (ui.learningTabDebug) {
       ui.learningTabDebug.addEventListener("click", async () => {
         state.activeTab = "debug";
@@ -171,7 +185,7 @@
         if (!action || !id) {
           return;
         }
-        await guarded(() => call(deps.runSingleAction, action, id), deps.onError, "操作失败");
+        await guarded(() => call(deps.runSingleAction, action, id, target), deps.onError, "操作失败");
       });
     }
   }

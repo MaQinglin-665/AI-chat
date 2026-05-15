@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="馨语AI桌宠是一只会聊天、会说话、有记忆的桌面伙伴。">
+  <meta name="description" content="馨语AI桌宠是一只会聊天、会说话、有记忆的 Windows 桌面 AI 伙伴 / AI VTuber MVP。">
   <meta name="robots" content="index,follow">
   <meta name="theme-color" content="#7c5cbf">
   <link rel="canonical" href="https://maqinglin-665.github.io/AI-chat/">
@@ -13,12 +13,12 @@
   <meta property="og:site_name" content="馨语AI桌宠">
   <meta property="og:locale" content="zh_CN">
   <meta property="og:title" content="馨语AI桌宠">
-  <meta property="og:description" content="一只会聊天、会说话、有记忆的桌面小伙伴。支持语音、记忆、可选桌面上下文与情绪表达。">
+  <meta property="og:description" content="一只会聊天、会说话、有记忆的桌面小伙伴。支持语音、记忆、可选桌面上下文与情绪表达；仍处于开源预览阶段。">
   <meta property="og:url" content="https://maqinglin-665.github.io/AI-chat/">
   <meta property="og:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="馨语AI桌宠">
-  <meta name="twitter:description" content="会聊天、会说话、有记忆的 AI 桌宠。">
+  <meta name="twitter:description" content="会聊天、会说话、有记忆的 Windows AI 桌宠 / AI VTuber MVP。">
   <meta name="twitter:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
   <title>馨语AI桌宠</title>
   <link rel="stylesheet" href="css/style.css?v=20260423-rc14">
@@ -58,6 +58,7 @@
         <div class="hero-content fade-in-up">
           <h1 class="hero-title">馨语AI桌宠</h1>
           <p class="hero-subtitle">一只会聊天、会说话、有记忆的桌面小伙伴 ✨</p>
+          <p class="hero-subtitle">Open-source Windows desktop AI companion / AI VTuber MVP.</p>
           <div class="hero-actions">
             <a class="btn btn-primary" href="#download">✨ 立即下载</a>
             <a class="btn btn-outline" href="#features">💡 了解更多</a>
@@ -232,18 +233,18 @@
         <div class="steps-grid">
           <article class="step-card fade-in-up">
             <span class="step-badge">1</span>
-            <h3>📥 下载安装包</h3>
-            <p>从 GitHub Releases 下载最新版，解压到任意目录。</p>
+            <h3>📥 下载安装器</h3>
+            <p>普通 Windows 用户优先下载 v1.4 preview 安装器，并同时下载 SHA256SUMS.txt 做校验。</p>
           </article>
           <article class="step-card fade-in-up">
             <span class="step-badge">2</span>
-            <h3>🔑 配置 API Key</h3>
-            <p>注册阿里云 DashScope，获取 API Key 填入 .env 文件。</p>
+            <h3>🔑 完成首次模型配置</h3>
+            <p>安装后在应用内向导填写 provider / base URL / model / API key；项目不内置云模型或密钥。</p>
           </article>
           <article class="step-card fade-in-up">
             <span class="step-badge">3</span>
-            <h3>🚀 启动运行</h3>
-            <p>双击“一键启动桌宠.vbs”，馨语AI桌宠就会出现在你的桌面上。</p>
+            <h3>🚀 启动并反馈</h3>
+            <p>完成首跑后验证聊天、语音、Live2D 与安全默认值；开发者可使用源码测试包继续调试。</p>
           </article>
         </div>
       </div>
@@ -393,6 +394,14 @@
             </div>
             <p class="changelog-review-tip">提示：请先运行 <code>python app.py</code>，再打开学习审核页面。</p>
             <ol class="timeline">
+              <li id="log-v140">
+                <h4>v1.4.0-preview（2026-05）— 首次公开安装路径与 AI VTuber 体验收口</h4>
+                <p>· 新增 Windows 在线引导安装器，普通用户优先走安装器 + SHA256 校验路径</p>
+                <p>· 新增应用内首次模型配置向导，密钥写入本地 .env，不写入公开配置</p>
+                <p>· Character Brain 增加舞台连续性、动作/语音 director 与低打扰 thought burst</p>
+                <p>· 安全默认值继续保持保守：不自动观察桌面、不默认截图、不默认工具调用或 shell</p>
+                <p>· English: installer-first preview release for early testers and contributors.</p>
+              </li>
               <li id="log-v118">
                 <h4>v1.1.8（2026-04）— 🈶 双语字幕与会话翻译可折叠</h4>
                 <p>· 新增双语字幕基础链路：后端翻译接口、Electron 字幕 IPC、前端字幕层与预加载桥接全部打通</p>
@@ -559,11 +568,11 @@
         <p class="download-subtitle">支持 Windows 10/11 · 首次启动自动安装运行环境</p>
         <a id="downloadGithubBtn" class="btn btn-primary btn-large" href="https://github.com/MaQinglin-665/AI-chat/releases" target="_blank" rel="noopener noreferrer">🎀 前往 GitHub 下载</a>
         <p class="download-note release-version">
-          最新版本：<strong id="latestReleaseText">v1.1.8（以 Release 为准）</strong>
-          <span id="latestReleaseDate" class="release-date">发布时间：2026-04-25</span>
+          最新版本：<strong id="latestReleaseText">v1.4.0-preview（以 Release 为准）</strong>
+          <span id="latestReleaseDate" class="release-date">更新时间：2026-05-14</span>
         </p>
-        <p class="download-note">先到 <a href="config.html">配置中心</a> 完成自检与一键应用，再启动桌宠体验最佳。</p>
-        <p class="download-note">发布流程统一为：配置自检 → 一键应用验证 → 创建 Release → 更新下载说明。</p>
+        <p class="download-note">普通用户优先下载安装器与 SHA256SUMS.txt；开发者下载 windows-source-test.zip 或 clone 仓库。</p>
+        <p class="download-note">English: download the installer first; configure your own model provider in the first-run wizard.</p>
         <p class="download-note">或查看 <a id="sourceCodeLink" href="https://github.com/MaQinglin-665/AI-chat" target="_blank" rel="noopener noreferrer">源代码</a></p>
       </div>
     </section>
@@ -589,6 +598,11 @@
     </div>
     <p class="version-panel-desc">这里是最近版本的关键变化，便于快速回顾升级内容。</p>
     <ol class="version-panel-list">
+      <li>
+        <h4>v1.4.0-preview（2026-05）</h4>
+        <p>安装器优先的公开预览版：补齐首次模型配置向导、Character Brain 舞台连续性、语音/动作 director 与保守安全默认值。</p>
+        <p><a class="version-view-link" href="#log-v140">查看变更</a></p>
+      </li>
       <li>
         <h4>v1.1.8（2026-04）</h4>
         <p>新增双语字幕链路与会话翻译可折叠开关，补齐翻译缓存、分页滚动与延迟隐藏稳定性策略。</p>

@@ -31,7 +31,7 @@ function Invoke-Step {
     }
 }
 
-Write-Host "Setting up Taffy AI Desktop Pet for local development"
+Write-Host "Setting up Xinyu Desktop Pet for local development"
 Write-Host "Root: $RepoRoot"
 
 Invoke-Step "Run environment doctor" @("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $PSScriptRoot "doctor.ps1"))

@@ -2067,6 +2067,16 @@ assert.strictEqual(
   "function",
   "learning review API helper should expose reload flow"
 );
+assert.strictEqual(
+  typeof learningReviewApi.updateCoreEntries,
+  "function",
+  "learning review API helper should expose core memory updates"
+);
+assert.strictEqual(
+  typeof learningReviewApi.updateShortEntries,
+  "function",
+  "learning review API helper should expose short-term memory updates"
+);
 {
   const learningState = {
     activeTab: "candidates",
@@ -2083,6 +2093,12 @@ assert.strictEqual(
     ],
     samples: [
       { id: "s1", user_preview: "study mode", assistant_preview: "sample reply", compressed_pattern: "focus", score: 0.8, confidence: 0.7, support_count: 4 }
+    ],
+    short_memories: [
+      { id: "st1", kind: "current_task", text: "Current task is memory layers.", salience: 0.8, last_seen_turn: 4 }
+    ],
+    core_memories: [
+      { id: "m1", kind: "semantic", category: "project_context", text: "User is building true memory.", importance: 0.85, confidence: 0.75, pinned: true }
     ],
     quick_settings: { inject_count: 1, promotion_min_support: 2 }
   });
@@ -2104,9 +2120,27 @@ assert.strictEqual(
   );
   assert.deepStrictEqual(
     learningReviewModel.buildLearningStats(learningState, 1),
-    { candidates: 2, samples: 1, visible: 1, selected: 1, activePoolLabel: "候选池" },
+    { candidates: 2, samples: 1, short: 1, core: 1, visible: 1, selected: 1, activePoolLabel: "候选池" },
     "learning model should build memory pool overview stats"
   );
+  learningState.activeTab = "short";
+  assert.deepStrictEqual(
+    learningReviewModel.getLearningFilteredItems(learningState, { keyword: "memory layers" }).map((item) => item.id),
+    ["st1"],
+    "learning model should filter short-term memories"
+  );
+  learningState.activeTab = "core";
+  assert.deepStrictEqual(
+    learningReviewModel.getLearningFilteredItems(learningState, { keyword: "true memory" }).map((item) => item.id),
+    ["m1"],
+    "learning model should filter true core memories"
+  );
+  assert.strictEqual(
+    learningReviewModel.getLearningStatusView("pinned").label,
+    "已固定",
+    "learning model should label pinned core memories"
+  );
+  learningState.activeTab = "candidates";
   assert.strictEqual(
     learningReviewModel.getLearningStatusView("promoted").statusClass,
     "promoted",
@@ -2521,7 +2555,11 @@ assert.ok(
     && source.includes("RUNTIME_EVENT_BINDER.bindRuntimeEvents")
     && learningReviewApiSource.includes("function reload(")
     && learningReviewApiSource.includes("function updateEntries")
+    && learningReviewApiSource.includes("function updateCoreEntries")
+    && learningReviewApiSource.includes("function updateShortEntries")
     && learningReviewModelSource.includes("function normalizeLearningReviewItem")
+    && learningReviewModelSource.includes("function normalizeCoreMemoryItem")
+    && learningReviewModelSource.includes("function normalizeShortTermMemoryItem")
     && learningReviewModelSource.includes("function getLearningFilteredItems")
     && learningReviewModelSource.includes("function buildSelectAllState")
     && learningReviewModelSource.includes("function getLearningMetricViews")
@@ -2531,6 +2569,8 @@ assert.ok(
     && learningReviewBinderSource.includes("function bindLearningReviewControls")
     && learningReviewBinderSource.includes("runBatchAction")
     && learningReviewBinderSource.includes("runSingleAction")
+    && learningReviewBinderSource.includes("learningTabShort")
+    && learningReviewBinderSource.includes("learningTabCore")
     && learningReviewControllerSource.includes("function createInitialState")
     && learningReviewControllerSource.includes("function renderLearningReviewList")
     && learningReviewControllerSource.includes("async function reloadLearningReviewData")
@@ -2700,12 +2740,60 @@ assert.ok(
 assert.ok(
   memoryDebugReport.buildReport({
     memory: { enabled: true, memory_count: 2, last_selection: { reason: "explicit", selected: [{ source: "memory", user: "u", assistant: "a" }] } },
+    core_memory: {
+      enabled: true,
+      extraction_enabled: true,
+      count: 1,
+      inject_count: 3,
+      min_importance: 0.45,
+      min_confidence: 0.55,
+      last_extraction: { status: "stored", action: "stored", stored: 1, merged: 0 },
+      recent: [{ category: "project_context", text: "User is building true memory." }]
+    },
     learning: {
+      review_status: {
+        candidates_enabled: true,
+        samples_enabled: true,
+        prompt_injection_enabled: true,
+        prompt_inject_effective_limit: 2,
+        pending_review_count: 1,
+        active_sample_count: 2,
+        prompt_eligible_sample_count: 1,
+        candidates_affect_prompt: false,
+        requires_user_promotion: true,
+        sensitive_filter_enabled: true,
+        local_only: true,
+        input_scope: "chat_turn_text_only"
+      },
       degraded_mode: true,
       last_extraction: { status: "stored", action: "created", candidate_id: "cand_1", category: "user_preference", score: 0.8, confidence: 0.7 },
       diagnostics: { degraded_reason: "low_signal", health_windows: [{ avg_confidence: 0.5, candidate_in_rate: 1, signal_coverage: 0.8 }] }
     }
   }).includes("Learning health windows:")
+    && memoryDebugReport.buildReport({
+      memory: {
+        enabled: true,
+        memory_count: 2,
+        last_selection: {
+          reason: "selected",
+          core_memories_selected: [{ category: "project_context", text: "User is building true memory.", relevance: 2 }]
+        }
+      },
+      core_memory: { enabled: true, count: 1, recent: [{ category: "project_context", text: "User is building true memory." }] },
+      learning: { diagnostics: {} }
+    }).includes("Selected core memories:")
+    && memoryDebugReport.buildReport({
+      memory: { enabled: true, memory_count: 2, last_selection: { reason: "explicit", selected: [{ source: "memory", user: "u", assistant: "a" }] } },
+      learning: {
+        review_status: {
+          prompt_injection_enabled: true,
+          pending_review_count: 1,
+          candidates_affect_prompt: false,
+          requires_user_promotion: true
+        },
+        diagnostics: {}
+      }
+    }).includes("review.candidatesAffectPrompt=false")
     && memoryDebugReport.buildReport({
       memory: { enabled: true, memory_count: 2, last_selection: { reason: "explicit", selected: [{ source: "memory", user: "u", assistant: "a" }] } },
       learning: {
@@ -3617,6 +3705,10 @@ assert.ok(
     && chatDomSource.includes("learningTabDebug")
     && chatDomSource.includes("learningDebugPanel")
     && memoryDebugSource.includes("learning.degradedReason=")
+    && memoryDebugSource.includes("short.consolidateStatus=")
+    && memoryDebugSource.includes("core.correctStatus=")
+    && memoryDebugSource.includes("last.skipped=")
+    && memoryDebugSource.includes("Skipped memory candidates:")
     && memoryDebugSource.includes("Learning health windows:"),
   "chat.js should expose memory/learning chain debug state"
 );

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="馨语AI桌宠 配置中心：集中管理桌宠模型、LLM、语音、记忆和系统参数。">
+  <meta name="description" content="馨语AI桌宠配置中心：集中管理桌宠模型、LLM、语音、记忆、安全默认值和运行参数。">
   <meta name="robots" content="index,follow">
   <meta name="theme-color" content="#7c5cbf">
   <link rel="canonical" href="https://maqinglin-665.github.io/AI-chat/config.html">
@@ -13,12 +13,12 @@
   <meta property="og:site_name" content="馨语AI桌宠">
   <meta property="og:locale" content="zh_CN">
   <meta property="og:title" content="馨语AI桌宠 配置中心">
-  <meta property="og:description" content="集中管理桌宠模型、LLM、语音、记忆、工具权限与运行时配置。">
+  <meta property="og:description" content="集中管理桌宠模型、LLM、语音、记忆、工具权限、安全默认值与运行时配置。">
   <meta property="og:url" content="https://maqinglin-665.github.io/AI-chat/config.html">
   <meta property="og:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="馨语AI桌宠 配置中心">
-  <meta name="twitter:description" content="管理 LLM、语音、记忆和运行参数的一站式配置页面。">
+  <meta name="twitter:description" content="管理 LLM、语音、记忆、安全默认值和运行参数的一站式配置页面。">
   <meta name="twitter:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
   <title>馨语AI桌宠 配置中心</title>
   <link rel="stylesheet" href="css/style.css?v=20260423-rc14">
@@ -365,7 +365,8 @@
     <div class="container config-page-shell">
       <section class="config-page-hero fade-in-up">
         <h1 class="section-title">🧩 馨语AI桌宠 配置中心</h1>
-        <p class="config-page-subtitle">单独页面管理更多参数：模型、LLM、语音、记忆、观察、动作与工具权限。</p>
+        <p class="config-page-subtitle">单独页面管理更多参数：模型、LLM、语音、记忆、观察、动作与工具权限。默认保持低风险配置，新能力需要显式启用。</p>
+        <p class="config-page-subtitle">English: configure your own model provider and keep desktop observation, tools, and shell disabled unless you opt in.</p>
         <p class="center-actions">
           <a class="btn btn-outline" href="index.html#config">↩ 返回首页预览</a>
           <a class="btn btn-outline" href="persona.html">Persona Card</a>
@@ -813,9 +814,12 @@
                 </label>
                 <label class="field col-span-3">
                   <span>唤醒词（逗号或换行分隔）</span>
-                  <textarea rows="2" data-path="asr.wake_words" data-kind="list">塔菲
-taffy
-tafi</textarea>
+                  <textarea rows="2" data-path="asr.wake_words" data-kind="list">馨语
+馨语ai
+xinyu
+心语
+新语
+星语</textarea>
                 </label>
                 <label class="field">
                   <span>attach_mode</span>
@@ -1068,7 +1072,7 @@ tafi</textarea>
                 <li>将首页下载链接与仓库地址指向当前 GitHub 仓库与 Releases。</li>
                 <li>发布前在本地运行桌宠并验证“一键应用配置”流程可走通。</li>
                 <li>如验证中配置异常，可用“回滚到最近备份”快速恢复后再继续。</li>
-                <li>在 GitHub 创建新版本 Release，并上传安装包与更新说明。</li>
+                <li>在 GitHub 创建新版本 Release，并上传安装包、SHA256SUMS.txt 与中英双语更新说明。</li>
               </ol>
 
               <h3>导入 JSON（可选）</h3>
@@ -1105,6 +1109,11 @@ tafi</textarea>
     </div>
     <p class="version-panel-desc">这里是最近版本的关键变化，便于快速回顾升级内容。</p>
     <ol class="version-panel-list">
+      <li>
+        <h4>v1.4.0-preview（2026-05）</h4>
+        <p>安装器优先的公开预览版：补齐首次模型配置向导、Character Brain 舞台连续性、语音/动作 director 与保守安全默认值。</p>
+        <p><a class="version-view-link" href="index.html#log-v140">查看变更</a></p>
+      </li>
       <li>
         <h4>v1.1.5（2026-04）</h4>
         <p>修复浏览器模式 Live2D 拖动坐标系错误，解决模型拖动飞屏与起点跳位问题。</p>

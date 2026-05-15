@@ -1,18 +1,22 @@
-# v1.3.0-preview Release Notes
+# v1.3.0-preview 更新说明 / Release Notes
 
-> This is a preview release for early testers and contributors. It is not a finished installer, mature AI VTuber product, or commercial desktop agent.
+> 这是面向早期测试者和贡献者的预览版，不是完成态安装器、成熟 AI VTuber 产品或商业桌面 Agent。
+>
+> English: preview release for early testers and contributors, not a finished commercial desktop agent.
 
-## Summary
+## 摘要 / Summary
 
-`v1.3.0-preview` focuses on making the Character Runtime safer and more repeatable while improving the first-run source testing path:
+`v1.3.0-preview` 聚焦让 Character Runtime 更安全、更可重复，同时改善源码测试包的首跑路径：
 
-- Safer Character Runtime metadata handling and runtime health reporting.
-- More explicit Live2D emotion/action mapping documentation.
-- Low-interruption proactive behavior gates, still disabled unless configured.
-- First-run preflight checks before desktop startup.
-- Source test package and local docs helper scripts for contributors.
-- Clearer troubleshooting guidance for common startup and packaging issues.
-- Safer GPT-SoVITS demo playback with peak limiting for hot generated audio.
+- 更安全的 Character Runtime metadata 处理与运行时健康报告。
+- 更明确的 Live2D 情绪/动作映射文档。
+- 低打扰主动行为门禁，未配置时继续保持关闭。
+- 桌面启动前的首跑 preflight 检查。
+- 面向贡献者的源码测试包与本地 docs helper 脚本。
+- 更清晰的启动、打包排障说明。
+- GPT-SoVITS demo 播放加入峰值限制，降低热音频风险。
+
+English summary: safer Character Runtime metadata, opt-in proactive behavior, first-run preflight, and clearer source-test guidance.
 
 ## What Changed
 
