@@ -15,11 +15,11 @@
   <meta property="og:title" content="馨语AI桌宠">
   <meta property="og:description" content="一只会聊天、会说话、有记忆的桌面小伙伴。支持语音、记忆、可选桌面上下文与情绪表达；仍处于开源预览阶段。">
   <meta property="og:url" content="https://maqinglin-665.github.io/AI-chat/">
-  <meta property="og:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
+  <meta property="og:image" content="https://maqinglin-665.github.io/AI-chat/assets/preview-chat.png?v=20260517">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="馨语AI桌宠">
   <meta name="twitter:description" content="会聊天、会说话、有记忆的 Windows AI 桌宠 / AI VTuber MVP。">
-  <meta name="twitter:image" content="https://maqinglin-665.github.io/AI-chat/assets/og-cover.png">
+  <meta name="twitter:image" content="https://maqinglin-665.github.io/AI-chat/assets/preview-chat.png?v=20260517">
   <title>馨语AI桌宠</title>
   <link rel="stylesheet" href="css/style.css?v=20260423-rc14">
 </head>
@@ -70,10 +70,13 @@
             <li>可选桌面上下文</li>
           </ul>
         </div>
-        <div class="demo-placeholder fade-in-up" role="img" aria-label="演示动图占位图">
-          <span class="demo-label">演示动图</span>
-          <span class="demo-sub">支持替换为你的真实录屏素材</span>
-        </div>
+        <figure class="hero-preview fade-in-up" aria-label="馨语AI桌宠聊天窗口预览">
+          <img class="hero-preview-image" src="assets/preview-chat.png?v=20260517" alt="馨语AI桌宠聊天窗口预览" loading="eager" decoding="async">
+          <figcaption class="hero-preview-caption">
+            <strong>聊天窗口与角色反馈预览</strong>
+            <span>下载前先看当前界面状态：聊天、语音、字幕、翻译和快捷操作都在同一条首跑路径里。</span>
+          </figcaption>
+        </figure>
       </div>
     </section>
 
@@ -146,30 +149,21 @@
         <h2 class="section-title fade-in-up">🎬 对话与语音演示</h2>
         <div class="demo-lab-grid">
           <article class="demo-lab-card demo-media-card fade-in-up">
-            <h3>🖼️ 真实演示素材</h3>
-            <p class="demo-media-tip">已内置默认演示素材，可直接预览；替换 <code>docs/assets/</code> 下同名文件即可展示你的真实录屏。</p>
-            <div class="media-showcase">
-              <figure class="media-tile" data-media-tile>
-                <figcaption>桌宠待机与跟随（assets/demo-idle.mp4）</figcaption>
-                <video class="media-video" controls muted loop playsinline preload="none">
-                  <source src="assets/demo-idle.mp4" type="video/mp4">
+            <h3>🎬 真实 Demo 视频</h3>
+            <p class="demo-media-tip">48 秒公开预览：展示桌面角色、聊天窗口、TTS/字幕节奏和安全默认值说明。</p>
+            <div class="media-showcase media-showcase-single">
+              <figure class="media-tile media-screenshot-tile" data-media-tile>
+                <figcaption>桌面角色、聊天、TTS、字幕和安全边界演示</figcaption>
+                <video class="media-video" controls playsinline preload="metadata" poster="assets/demo-overview-poster.png">
+                  <source src="assets/demo-overview.mp4" type="video/mp4">
                 </video>
-                <div class="media-placeholder">未检测到素材：assets/demo-idle.mp4</div>
+                <div class="media-placeholder">未检测到素材：assets/demo-overview.mp4</div>
               </figure>
-              <figure class="media-tile" data-media-tile>
-                <figcaption>语音回复演示（assets/demo-voice.mp4）</figcaption>
-                <video class="media-video" controls muted loop playsinline preload="none">
-                  <source src="assets/demo-voice.mp4" type="video/mp4">
-                </video>
-                <div class="media-placeholder">未检测到素材：assets/demo-voice.mp4</div>
-              </figure>
-              <figure class="media-tile" data-media-tile>
-                <figcaption>配置中心操作（assets/demo-config.mp4）</figcaption>
-                <video class="media-video" controls muted loop playsinline preload="none">
-                  <source src="assets/demo-config.mp4" type="video/mp4">
-                </video>
-                <div class="media-placeholder">未检测到素材：assets/demo-config.mp4</div>
-              </figure>
+              <ul class="demo-proof-list" aria-label="当前预览能力">
+                <li>安装器优先：普通用户下载 exe 与 SHA256 即可开始首跑。</li>
+                <li>模型自选：项目不内置云模型或 API key，首跑向导保存本地配置。</li>
+                <li>安全默认值：桌面观察、工具调用、shell 默认保持关闭。</li>
+              </ul>
             </div>
           </article>
 
@@ -395,7 +389,7 @@
             <p class="changelog-review-tip">提示：请先运行 <code>python app.py</code>，再打开学习审核页面。</p>
             <ol class="timeline">
               <li id="log-v140">
-                <h4>v1.4.0-preview.5（2026-05）— 首次公开安装路径与 AI VTuber 体验收口</h4>
+                <h4>v1.4.0-preview.6（2026-05）— 首次公开安装路径与 AI VTuber 体验收口</h4>
                 <p>· 新增 Windows 在线引导安装器，普通用户优先走安装器 + SHA256 校验路径</p>
                 <p>· 新增应用内首次模型配置向导，密钥写入本地 .env，不写入公开配置</p>
                 <p>· Character Brain 增加舞台连续性、动作/语音 director 与低打扰 thought burst</p>
@@ -565,12 +559,29 @@
     <section id="download" class="section download-section">
       <div class="container download-inner fade-in-up">
         <h2 class="section-title">📥 开始使用 馨语AI桌宠</h2>
-        <p class="download-subtitle">支持 Windows 10/11 · 首次启动自动安装运行环境</p>
-        <a id="downloadGithubBtn" class="btn btn-primary btn-large" href="https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.5" target="_blank" rel="noopener noreferrer">🎀 前往 GitHub 下载</a>
+        <p class="download-subtitle">支持 Windows 10/11 · 首次启动引导依赖检查与模型配置</p>
+        <a id="downloadGithubBtn" class="btn btn-primary btn-large" href="https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6" target="_blank" rel="noopener noreferrer">🎀 前往 GitHub 下载</a>
         <p class="download-note release-version">
-          最新版本：<strong id="latestReleaseText">v1.4.0-preview.5（以 Release 为准）</strong>
-          <span id="latestReleaseDate" class="release-date">更新时间：2026-05-15</span>
+          最新版本：<strong id="latestReleaseText">v1.4.0-preview.6（以 Release 为准）</strong>
+          <span id="latestReleaseDate" class="release-date">更新时间：2026-05-18</span>
         </p>
+        <div class="download-asset-grid" aria-label="下载文件选择">
+          <article class="download-asset-card">
+            <h3>普通 Windows 用户</h3>
+            <p>下载安装器和 <code>SHA256SUMS.txt</code>，校验后运行安装器。</p>
+            <code>Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe</code>
+          </article>
+          <article class="download-asset-card">
+            <h3>开发者 / 早期测试者</h3>
+            <p>下载源码测试包，按包内首跑说明配置本机 Python、Node 和模型。</p>
+            <code>Xinyu-AI-Desktop-Pet-v1.4.0-preview.6-windows-source-test.zip</code>
+          </article>
+          <article class="download-asset-card">
+            <h3>发布校验</h3>
+            <p>Release 包会生成 <code>SHA256SUMS.txt</code> 和 <code>RELEASE-ASSETS.md</code>，用于确认文件用途、大小和哈希。</p>
+            <code>Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe -Algorithm SHA256</code>
+          </article>
+        </div>
         <p class="download-note">普通用户优先下载安装器与 SHA256SUMS.txt；开发者下载 windows-source-test.zip 或 clone 仓库。</p>
         <p class="download-note">English: download the installer first; configure your own model provider in the first-run wizard.</p>
         <p class="download-note">或查看 <a id="sourceCodeLink" href="https://github.com/MaQinglin-665/AI-chat" target="_blank" rel="noopener noreferrer">源代码</a></p>
@@ -599,8 +610,8 @@
     <p class="version-panel-desc">这里是最近版本的关键变化，便于快速回顾升级内容。</p>
     <ol class="version-panel-list">
       <li>
-        <h4>v1.4.0-preview.5（2026-05）</h4>
-        <p>安装器优先的公开预览版：补齐首次模型配置向导、Character Brain 舞台连续性、语音/动作 director 与保守安全默认值。</p>
+        <h4>v1.4.0-preview.6（2026-05）</h4>
+        <p>安装器优先的公开预览版：补齐真实 demo 视频、发布资产清单、首次模型配置向导与保守安全默认值。</p>
         <p><a class="version-view-link" href="#log-v140">查看变更</a></p>
       </li>
       <li>

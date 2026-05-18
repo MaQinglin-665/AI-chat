@@ -36,9 +36,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_installer_smok
 Run from the release assets:
 
 ```powershell
-Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe -Algorithm SHA256
+Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
-.\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe
+.\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe
 ```
 
 Record:

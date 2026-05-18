@@ -1,11 +1,11 @@
 # 馨语桌宠
 
 <p align="center">
-  <img src="docs/assets/og-cover.png" alt="馨语桌宠预览图" width="760">
+  <img src="docs/assets/preview-chat.png" alt="馨语桌宠预览图" width="760">
 </p>
 
 <p align="center">
-  <a href="https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.5"><img alt="version" src="https://img.shields.io/badge/version-v1.4.0--preview.5-6f5bd5"></a>
+  <a href="https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6"><img alt="version" src="https://img.shields.io/badge/version-v1.4.0--preview.6-6f5bd5"></a>
   <img alt="status" src="https://img.shields.io/badge/status-MVP%20preview-f59e0b">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-2563eb">
   <img alt="python" src="https://img.shields.io/badge/Python-3.10%2B-3776ab">
@@ -21,11 +21,29 @@
 
 English summary: Xinyu Desktop Pet is an open-source Windows desktop AI companion / AI VTuber MVP. It ships no cloud model, hosted endpoint, or API key; users configure their own model provider.
 
-- 项目网站：[maqinglin-665.github.io/AI-chat](https://maqinglin-665.github.io/AI-chat/)
-- 最新预览版：[v1.4.0-preview.5](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.5)
+- 最新预览版：[v1.4.0-preview.6](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6)
 - 首次安装指南：[docs/first-install.md](docs/first-install.md)
 - 模型选择指南：[docs/model-selection.md](docs/model-selection.md)
 - 首跑反馈模板：[docs/first-run-feedback.md](docs/first-run-feedback.md)
+- 项目网站：[maqinglin-665.github.io/AI-chat](https://maqinglin-665.github.io/AI-chat/)
+
+## 直接下载
+
+如果你只是想试用，不需要先访问项目网站，直接打开 GitHub Release：
+
+[下载 v1.4.0-preview.6](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6)
+
+普通 Windows 用户优先下载这 3 个文件：
+
+```text
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe
+SHA256SUMS.txt
+RELEASE-ASSETS.md
+```
+
+`RELEASE-ASSETS.md` 会说明每个文件的用途、大小和 SHA256；`SHA256SUMS.txt` 用来校验安装器。项目不内置云模型、托管 endpoint 或 API key，首次启动后需要在应用内配置自己的模型。
+
+48 秒 demo 视频：[docs/assets/demo-overview.mp4](docs/assets/demo-overview.mp4)
 
 ## 适合谁
 
@@ -50,8 +68,9 @@ English summary: Xinyu Desktop Pet is an open-source Windows desktop AI companio
 在 release 页面优先下载：
 
 ```text
-Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe
 SHA256SUMS.txt
+RELEASE-ASSETS.md
 ```
 
 安装器会把项目文件复制到当前用户目录，创建开始菜单 / 桌面快捷方式，并启动 `install_and_start.bat` 完成首跑引导。它不会内置云模型、不会写入 API key、不会开启桌面观察、工具调用或 shell。
@@ -59,18 +78,20 @@ SHA256SUMS.txt
 首发安装器未签名。运行前建议先校验 SHA256：
 
 ```powershell
-Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe -Algorithm SHA256
+Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
 如果 Windows SmartScreen 提醒未知发布者，只有在文件来自本仓库 release 且 SHA256 匹配时才继续。不要为了运行预览包关闭系统安全设置。
+
+`RELEASE-ASSETS.md` 会列出每个发布文件的用途、大小和 SHA256，便于普通用户判断该下载哪个文件。
 
 ### 2. 开发者使用源码包
 
 需要看源码或参与开发时，下载 release 里的源码测试包：
 
 ```text
-Xinyu-AI-Desktop-Pet-v1.4.0-preview.5-windows-source-test.zip
+Xinyu-AI-Desktop-Pet-v1.4.0-preview.6-windows-source-test.zip
 ```
 
 解压后确认根目录至少包含：

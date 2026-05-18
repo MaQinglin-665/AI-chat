@@ -113,8 +113,12 @@ if (-not (Test-Path $installerPath)) {
 }
 
 $hashPath = Write-HashFile -DistRoot $distRoot
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\write-release-assets.ps1") -Version $packageVersion -OutputDir $distRoot
+if ($LASTEXITCODE -ne 0) {
+    throw "Release assets manifest generation failed."
+}
 
 Write-Host "[OK] Created $installerPath" -ForegroundColor Green
 Write-Host "[OK] Source zip: $sourceZip" -ForegroundColor Green
 Write-Host "[OK] Wrote $hashPath" -ForegroundColor Green
-Write-Host "Release assets: installer exe, source test zip, SHA256SUMS.txt, and release notes."
+Write-Host "Release assets: installer exe, source test zip, SHA256SUMS.txt, RELEASE-ASSETS.md, and release notes."

@@ -1,4 +1,4 @@
-# v1.4.0-preview.5 更新说明 / Release Notes
+# v1.4.0-preview.6 更新说明 / Release Notes
 
 > 这是面向早期测试者和贡献者的预览版。它包含未签名的 Windows 在线引导安装器，但仍不是成熟 AI VTuber 产品或商业桌面 Agent。
 >
@@ -6,7 +6,7 @@
 
 ## 摘要 / Summary
 
-`v1.4.0-preview.5` 是 v1.4 公开预览链路的当前推荐下载版本，聚焦 AI VTuber 感、首次公开可用性和发布稳定性：馨语可以保留轻量舞台记忆，用 Character Brain performance controls 驱动回应，生成低打扰 spontaneous thoughts，并通过安装器优先的路径引导首次用户完成配置。这个刷新版本还修复了 `/S` 静默安装时自动启动首跑脚本的问题。
+`v1.4.0-preview.6` 是 v1.4 公开预览链路的当前推荐下载版本，聚焦 AI VTuber 感、首次公开可用性和发布稳定性：馨语可以保留轻量舞台记忆，用 Character Brain performance controls 驱动回应，生成低打扰 spontaneous thoughts，并通过安装器优先的路径引导首次用户完成配置。这个刷新版本增加了真实 48 秒 demo 视频、GitHub-first 下载说明和发布资产清单，降低早期测试者判断“该下载哪个文件”的成本。
 
 这个版本受 AI VTuber 交互方向启发，包括 Neuro-sama-like 体验中那种即时感；但它不是任何项目的克隆，也不会复制现有 VTuber 的台词、设定或专有内容。
 
@@ -16,20 +16,26 @@ English summary: v1.4 focuses on installer-first usability, stage memory, Charac
 
 Recommended release assets:
 
-- `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe`
-- `Xinyu-AI-Desktop-Pet-v1.4.0-preview.5-windows-source-test.zip`
+- `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe`
+- `Xinyu-AI-Desktop-Pet-v1.4.0-preview.6-windows-source-test.zip`
 - `SHA256SUMS.txt`
+- `RELEASE-ASSETS.md`
 - these bilingual release notes
+
+Demo video in the repository:
+
+- `docs/assets/demo-overview.mp4`
 
 ## 变化摘要 / What Changed
 
-### v1.4.0-preview.5 发布刷新 / Release Refresh
+### v1.4.0-preview.6 发布刷新 / Release Refresh
 
 - Rebuilt the installer and source-test package from the current `main` branch after release readiness validation.
-- Added a current GitHub prerelease so ordinary testers do not need to choose between older preview assets.
-- Marked older preview release pages as superseded by `v1.4.0-preview.5`.
+- Added a current GitHub prerelease target so ordinary testers do not need to choose between older preview assets.
+- Added a real 48-second demo video and poster to the repository and project site.
+- Added `RELEASE-ASSETS.md` generation so release uploads explain artifact purpose, size, and SHA256 in one place.
+- Marked older preview release pages as superseded by `v1.4.0-preview.6`.
 - Clean source-package first-run validation passed with local dummy LLM configuration and safe defaults intact.
-- Kept interactive install behavior unchanged, but `/S` silent install now only copies files and shortcuts; it does not auto-launch `install_and_start.bat`.
 
 ### 首次公开安装路径 / First Public Install Path
 
@@ -164,7 +170,7 @@ This preview keeps conservative defaults:
 
 Recommended download for normal Windows users:
 
-- `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe`
+- `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe`
 - `SHA256SUMS.txt`
 
 Verify SHA256 before running. If SmartScreen warns about an unknown publisher,
@@ -173,7 +179,7 @@ matches.
 
 Recommended download for developers / early testers:
 
-- `Xinyu-AI-Desktop-Pet-v1.4.0-preview.5-windows-source-test.zip`
+- `Xinyu-AI-Desktop-Pet-v1.4.0-preview.6-windows-source-test.zip`
 - `SHA256SUMS.txt`
 
 GitHub's automatic `Source code` archives are plain repository snapshots and do

@@ -1,15 +1,16 @@
 {
-  "updated_at": "2026-05-15",
+  "updated_at": "2026-05-18",
   "versions": [
     {
-      "tag": "v1.4.0-preview.5",
+      "tag": "v1.4.0-preview.6",
       "date": "2026-05",
       "log_anchor": "log-v140",
       "title": "首次公开安装路径与 AI VTuber 体验收口",
-      "panel_summary": "安装器优先的公开预览版：补齐首次模型配置向导、Character Brain 舞台连续性、语音/动作 director 与保守安全默认值。",
-      "release_summary": "v1.4.0-preview.5 keeps the installer-first public preview current and fixes silent install smoke behavior without changing interactive first-run setup.",
+      "panel_summary": "安装器优先的公开预览版：补齐真实 demo 视频、发布资产清单、首次模型配置向导与保守安全默认值。",
+      "release_summary": "v1.4.0-preview.6 adds the real demo video, GitHub-first download guidance, and release asset manifest while keeping installer-first setup and safe defaults.",
       "highlights": [
-        "普通 Windows 用户优先下载安装器与 SHA256SUMS.txt，源码测试包保留给开发者和早期测试者。",
+        "普通 Windows 用户优先下载安装器、SHA256SUMS.txt 和 RELEASE-ASSETS.md，源码测试包保留给开发者和早期测试者。",
+        "新增 48 秒真实 demo 视频，展示桌面角色、聊天窗口、TTS/字幕节奏和安全默认值说明。",
         "新增应用内首次模型配置向导，provider/base URL/model 写入本地配置，真实 API key 写入 .env。",
         "Character Brain 增加舞台连续性、短期舞台记忆、动作/语音 director 与输出约束。",
         "低打扰 spontaneous thoughts 继续保持可控，comfort/task/reminder/diagnostic/closing 场景保持收敛。",

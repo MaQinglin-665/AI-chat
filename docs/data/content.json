@@ -3,7 +3,7 @@
     "selectors": {
       ".hero-subtitle": "一只会聊天、会说话、有记忆的桌面小伙伴 ✨",
       "#demo .section-title": "🎬 对话与语音演示",
-      ".demo-media-tip": "已内置默认演示素材，可直接预览；替换 docs/assets/ 下同名文件即可展示你的真实录屏。",
+      ".demo-media-tip": "48 秒公开预览：展示桌面角色、聊天窗口、TTS/字幕节奏和安全默认值说明。",
       ".config-page-subtitle": "单独页面管理更多参数：模型、LLM、语音、记忆、观察、动作与工具权限。默认保持低风险配置，新能力需要显式启用。",
       ".version-panel-desc": "这里是最近版本的关键变化，便于快速回顾升级内容。"
     },
@@ -29,7 +29,7 @@
     "selectors": {
       ".hero-subtitle": "会聊天、会说话、会记忆的 AI 桌宠。",
       "#demo .section-title": "🎬 快速演示",
-      ".demo-media-tip": "已内置默认演示素材，可直接预览；发布前替换 docs/assets/ 下同名文件为你的真实录屏。",
+      ".demo-media-tip": "48 秒公开预览：展示桌面角色、聊天窗口、TTS/字幕节奏和安全默认值说明。",
       ".config-page-subtitle": "集中完成关键参数配置与运行检查。",
       ".version-panel-desc": "最近版本重点更新一览。"
     },

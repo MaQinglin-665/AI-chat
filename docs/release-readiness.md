@@ -54,7 +54,7 @@ git diff --check
 - [ ] Character v1.4 质量门通过。
 - [ ] Demo readiness 无 blocker；如果使用 GPT-SoVITS，服务必须可达，否则切回 browser TTS 基线。
 - [ ] `scripts\check_first_run_package.ps1` 能打包、解压并验证首跑入口。
-- [ ] `scripts\check_installer_smoke.ps1` 能生成 installer exe、source zip 和 `SHA256SUMS.txt`。
+- [ ] `scripts\check_installer_smoke.ps1` 能生成 installer exe、source zip、`SHA256SUMS.txt` 和 `RELEASE-ASSETS.md`。
 - [ ] `git diff --check` 没有冲突标记或尾随空白错误。
 - [ ] 如果有 warning，必须能解释来源，例如 Python 版本弃用提醒或 CRLF 提示。
 
@@ -69,7 +69,7 @@ No-go：
 普通用户首跑主路径从 release 安装器开始：
 
 ```text
-Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe
 SHA256SUMS.txt
 ```
 
@@ -208,6 +208,7 @@ No-go：
 - [ ] `Xinyu-AI-Desktop-Pet-Setup-v{version}.exe`
 - [ ] `Xinyu-AI-Desktop-Pet-v{version}-windows-source-test.zip`
 - [ ] `SHA256SUMS.txt`
+- [ ] `RELEASE-ASSETS.md`
 - [ ] `README-FIRST-RUN.txt`
 - [ ] `THIRD_PARTY_NOTICES.md`
 - [ ] `docs/installer.md`
