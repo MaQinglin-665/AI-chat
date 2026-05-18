@@ -409,7 +409,7 @@
       selectors: {
         '.hero-subtitle': '会聊天、会说话、会记忆的 AI 桌宠。',
         '#demo .section-title': '🎬 快速演示',
-        '.demo-media-tip': '将演示素材放入 docs/assets/ 后可自动展示。',
+        '.demo-media-tip': '48 秒公开预览：展示桌面角色、聊天窗口、TTS/字幕节奏和安全默认值说明。',
         '.config-page-subtitle': '集中完成关键参数配置与运行检查。',
         '.version-panel-desc': '最近版本重点更新一览。'
       },
@@ -480,7 +480,7 @@
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 6500);
 
-    fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+    fetch(`https://api.github.com/repos/${repo}/releases?per_page=10`, {
       headers: {
         Accept: 'application/vnd.github+json'
       },
@@ -492,7 +492,10 @@
         }
         return response.json();
       })
-      .then((release) => {
+      .then((releases) => {
+        const release = Array.isArray(releases)
+          ? releases.find((item) => item && typeof item === 'object' && item.draft !== true)
+          : null;
         if (!release || typeof release !== 'object') {
           return;
         }

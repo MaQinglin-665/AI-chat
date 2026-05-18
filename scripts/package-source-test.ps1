@@ -167,6 +167,10 @@ Compress-Archive -LiteralPath $stageRoot -DestinationPath $zipPath -Force
 $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath
 $hashPath = Join-Path $distRoot "SHA256SUMS.txt"
 "$($hash.Hash)  $packageName.zip" | Set-Content -LiteralPath $hashPath -Encoding ASCII
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\write-release-assets.ps1") -Version $packageVersion -OutputDir $distRoot
+if ($LASTEXITCODE -ne 0) {
+    throw "Release assets manifest generation failed."
+}
 
 Write-Host "[OK] Created $zipPath" -ForegroundColor Green
 Write-Host "[OK] Wrote $hashPath" -ForegroundColor Green

@@ -33,8 +33,9 @@ try {
     $installer = Join-Path $PackageOut "Xinyu-AI-Desktop-Pet-Setup-v$Version.exe"
     $sourceZip = Join-Path $PackageOut "Xinyu-AI-Desktop-Pet-v$Version-windows-source-test.zip"
     $hashFile = Join-Path $PackageOut "SHA256SUMS.txt"
+    $manifestFile = Join-Path $PackageOut "RELEASE-ASSETS.md"
 
-    foreach ($path in @($installer, $sourceZip, $hashFile)) {
+    foreach ($path in @($installer, $sourceZip, $hashFile, $manifestFile)) {
         if (-not (Test-Path $path)) {
             Write-Fail "Missing installer smoke artifact: $path"
         }
@@ -49,6 +50,18 @@ try {
         Write-Fail "SHA256SUMS.txt does not include source zip."
     }
     Write-Ok "SHA256SUMS.txt lists installer and source package"
+
+    $manifestText = Get-Content -Raw -LiteralPath $manifestFile -Encoding UTF8
+    if ($manifestText -notmatch [regex]::Escape((Split-Path -Leaf $installer))) {
+        Write-Fail "RELEASE-ASSETS.md does not include installer exe."
+    }
+    if ($manifestText -notmatch [regex]::Escape((Split-Path -Leaf $sourceZip))) {
+        Write-Fail "RELEASE-ASSETS.md does not include source zip."
+    }
+    if ($manifestText -notmatch "SHA256SUMS\.txt") {
+        Write-Fail "RELEASE-ASSETS.md should tell users to verify SHA256SUMS.txt."
+    }
+    Write-Ok "RELEASE-ASSETS.md explains release artifacts and SHA256 verification"
 
     $nsiPath = Join-Path $RepoRoot "installer\xinyu-online-installer.nsi"
     $nsiText = Get-Content -Raw -LiteralPath $nsiPath -Encoding UTF8

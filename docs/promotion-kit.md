@@ -18,10 +18,14 @@
 
 ## Official Links
 
-- Project site: `https://maqinglin-665.github.io/AI-chat/`
 - GitHub repo: `https://github.com/MaQinglin-665/AI-chat`
-- Latest preview: `https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.5`
-- Demo assets: `docs/assets/demo-idle.mp4`, `docs/assets/demo-voice.mp4`, `docs/assets/demo-config.mp4`
+- Latest preview: `https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6`
+- Direct installer asset: `Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe`
+- Required checksum: `SHA256SUMS.txt`
+- Release asset guide: `RELEASE-ASSETS.md`
+- Project site: `https://maqinglin-665.github.io/AI-chat/`
+- Preview image: `docs/assets/preview-chat.png`
+- Demo video: `docs/assets/demo-overview.mp4`
 - First-run feedback template: `docs/first-run-feedback.md`
 - Recording plan: `docs/release-demo-capture-plan.md`
 
@@ -44,30 +48,32 @@
 5. 哪个地方最影响你继续使用。
 
 反馈模板：`docs/first-run-feedback.md`
+下载地址：`https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6`
 项目地址：`https://github.com/MaQinglin-665/AI-chat`
 
 ### Short Chinese Post
 
-我在做一个开源 Windows AI 桌宠 / 桌面 AI VTuber 实验：Live2D 角色可以在桌面上聊天、说话、根据情绪做动作，并接入本地 Python 服务和用户自选 LLM。现在是 v1.4.0-preview.5，仍是 MVP，欢迎早期体验和提 issue。
+我在做一个开源 Windows AI 桌宠 / 桌面 AI VTuber 实验：Live2D 角色可以在桌面上聊天、说话、根据情绪做动作，并接入本地 Python 服务和用户自选 LLM。现在是 v1.4.0-preview.6，仍是 MVP，欢迎早期体验和提 issue。
 
-项目主页：`https://maqinglin-665.github.io/AI-chat/`
+下载：`https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6`
+GitHub：`https://github.com/MaQinglin-665/AI-chat`
 
 ### Longer Chinese Post
 
 最近在推进一个开源桌面 AI 伙伴项目：馨语桌宠。
 
-它不是传统聊天窗口，而是尝试让一个 Live2D 角色住在 Windows 桌面上：可以文本/语音聊天，调用 TTS/ASR，带一点记忆、情绪状态和动作反馈。当前 v1.4.0-preview.5 的重点是提升 “AI VTuber feeling”：让回复、语气、动作和低打扰主动反馈更像一个角色，而不是普通客服机器人。
+它不是传统聊天窗口，而是尝试让一个 Live2D 角色住在 Windows 桌面上：可以文本/语音聊天，调用 TTS/ASR，带一点记忆、情绪状态和动作反馈。当前 v1.4.0-preview.6 的重点是提升 “AI VTuber feeling”：让回复、语气、动作和低打扰主动反馈更像一个角色，而不是普通客服机器人。
 
 技术栈大概是 Electron 桌面 UI + Python 本地服务 + Live2D + OpenAI-compatible/Ollama 等用户自选模型。安全默认值会保守处理：不会默认观察桌面，不默认读文件，不默认执行 shell，不默认开启工具调用；涉及桌面上下文的能力都需要显式启用。
 
 目前还是 MVP / 开源孵化阶段，提供未签名的 Windows 在线引导安装器；仍需要用户自选 LLM provider / model / API key。欢迎对 AI 桌宠、桌面 AI VTuber、低打扰陪伴、Live2D 交互感兴趣的人试试，也欢迎贡献文档、测试、模型配置和角色体验反馈。
 
-项目主页：`https://maqinglin-665.github.io/AI-chat/`
+下载：`https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6`
 GitHub：`https://github.com/MaQinglin-665/AI-chat`
 
 ### Video Caption
 
-馨语桌宠 v1.4.0-preview.5 demo：一个开源 Windows AI 桌宠实验。Live2D 角色在桌面上聊天、说话，并用情绪和动作反馈回应你。当前仍是 MVP，需要用户自选 LLM，不默认开启桌面观察或高风险工具能力。
+馨语桌宠 v1.4.0-preview.6 demo：一个开源 Windows AI 桌宠实验。Live2D 角色在桌面上聊天、说话，并用情绪和动作反馈回应你。当前仍是 MVP，需要用户自选 LLM，不默认开启桌面观察或高风险工具能力。
 
 ### Bilibili Title Ideas
 
@@ -81,7 +87,11 @@ Xinyu Desktop Pet is an open-source Windows desktop AI companion experiment. It 
 
 ## What To Show In A Demo
 
-Recommended 30-60 second clip order:
+Current 48-second demo:
+
+- `docs/assets/demo-overview.mp4`
+
+Recommended 30-60 second clip order for future refreshes:
 
 1. Start the Electron app and show the Live2D character appearing on the desktop.
 2. Send one natural chat message and show the reply.
@@ -102,7 +112,7 @@ For longer videos:
 Use these phrases:
 
 - `MVP / 开源孵化`
-- `v1.4.0-preview.5`
+- `v1.4.0-preview.6`
 - `源码预览包`
 - `AI 桌宠 / 桌面 AI 伙伴实验`
 - `受 AI VTuber 方向启发`

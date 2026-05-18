@@ -20,7 +20,7 @@ English summary: use the Windows guided installer first, verify SHA256, then con
 在 release 页面下载：
 
 ```text
-Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe
 SHA256SUMS.txt
 ```
 
@@ -29,7 +29,7 @@ SHA256SUMS.txt
 首发安装器未签名。运行前请校验 SHA256：
 
 ```powershell
-Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe -Algorithm SHA256
+Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 

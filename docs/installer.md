@@ -11,6 +11,7 @@ English summary: the preview installer is unsigned and guided; verify SHA256 and
 - `Xinyu-AI-Desktop-Pet-Setup-v{version}.exe`
 - `Xinyu-AI-Desktop-Pet-v{version}-windows-source-test.zip`
 - `SHA256SUMS.txt`
+- `RELEASE-ASSETS.md`
 - 中英双语 release notes
 
 安装器未内置 Python、Node.js、云模型、托管 endpoint 或 API key。它复制项目文件、创建快捷方式，然后运行 `install_and_start.bat`，由现有 bootstrap 检查 Python / Node / npm，缺失时提示用户通过 winget 安装。
@@ -33,7 +34,7 @@ English summary: the preview installer is unsigned and guided; verify SHA256 and
 用户校验示例：
 
 ```powershell
-Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe -Algorithm SHA256
+Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -53,4 +54,4 @@ CI / smoke 路径：
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_installer_smoke.ps1 -Version ci-smoke
 ```
 
-通过后，`dist\` 下应能看到 installer exe、source zip 和 `SHA256SUMS.txt`。
+通过后，`dist\` 下应能看到 installer exe、source zip、`SHA256SUMS.txt` 和 `RELEASE-ASSETS.md`。

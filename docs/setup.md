@@ -1,4 +1,4 @@
-﻿# 安装与运行指南 / Setup Guide
+# 安装与运行指南 / Setup Guide
 
 本指南面向首次运行与开源贡献者，覆盖系统要求、依赖安装、启动方式与核心配置。
 
@@ -16,7 +16,7 @@ English summary: install the Windows preview, verify SHA256, configure your own 
 普通 Windows 用户推荐先下载 release 安装器，而不是直接下载 GitHub 自动生成的源码压缩包：
 
 ```text
-Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.5.exe
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe
 SHA256SUMS.txt
 ```
 
