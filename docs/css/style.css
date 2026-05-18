@@ -1182,6 +1182,7 @@ body.doc-learning-open {
 
 .step-card {
   position: relative;
+  overflow: visible;
   padding-top: calc(var(--space-card-padding) + 1rem);
 }
 
