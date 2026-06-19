@@ -25,6 +25,7 @@ const DIAGNOSTICS_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "
 const FOLLOWUP_DEBUG_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "followupDebugController.js");
 const GRAY_TRIAL_REPORT_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "grayTrialReportController.js");
 const GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "grayTrialCharacterPanelController.js");
+const FOLLOWUP_READINESS_PANEL_MODEL_JS = path.resolve(__dirname, "..", "web", "followupReadinessPanelModel.js");
 const FOLLOWUP_READINESS_PANEL_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "followupReadinessPanelController.js");
 const SPEECH_TEXT_JS = path.resolve(__dirname, "..", "web", "speechText.js");
 const ATTACHMENT_MODEL_JS = path.resolve(__dirname, "..", "web", "attachmentModel.js");
@@ -39,6 +40,7 @@ const VOICE_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "voiceR
 const STREAM_TTS_QUEUE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "streamTtsQueueController.js");
 const TTS_PLAYBACK_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "ttsPlaybackController.js");
 const CHAT_API_JS = path.resolve(__dirname, "..", "web", "chatApi.js");
+const CHAT_PAYLOAD_BUILDER_JS = path.resolve(__dirname, "..", "web", "chatPayloadBuilder.js");
 const CHAT_REPLY_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "chatReplyController.js");
 const PERFORMANCE_AUDIT_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "performanceAuditController.js");
 const PERFORMANCE_TIMELINE_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "performanceTimelineController.js");
@@ -101,6 +103,7 @@ const diagnosticsRuntimeControllerSource = fs.readFileSync(DIAGNOSTICS_RUNTIME_C
 const followupDebugControllerSource = fs.readFileSync(FOLLOWUP_DEBUG_CONTROLLER_JS, "utf8");
 const grayTrialReportControllerSource = fs.readFileSync(GRAY_TRIAL_REPORT_CONTROLLER_JS, "utf8");
 const grayTrialCharacterPanelControllerSource = fs.readFileSync(GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER_JS, "utf8");
+const followupReadinessPanelModelSource = fs.readFileSync(FOLLOWUP_READINESS_PANEL_MODEL_JS, "utf8");
 const followupReadinessPanelControllerSource = fs.readFileSync(FOLLOWUP_READINESS_PANEL_CONTROLLER_JS, "utf8");
 const speechTextSource = fs.readFileSync(SPEECH_TEXT_JS, "utf8");
 const attachmentModelSource = fs.readFileSync(ATTACHMENT_MODEL_JS, "utf8");
@@ -115,6 +118,7 @@ const voiceRuntimeControllerSource = fs.readFileSync(VOICE_RUNTIME_CONTROLLER_JS
 const streamTtsQueueControllerSource = fs.readFileSync(STREAM_TTS_QUEUE_CONTROLLER_JS, "utf8");
 const ttsPlaybackControllerSource = fs.readFileSync(TTS_PLAYBACK_CONTROLLER_JS, "utf8");
 const chatApiSource = fs.readFileSync(CHAT_API_JS, "utf8");
+const chatPayloadBuilderSource = fs.readFileSync(CHAT_PAYLOAD_BUILDER_JS, "utf8");
 const chatReplyControllerSource = fs.readFileSync(CHAT_REPLY_CONTROLLER_JS, "utf8");
 const performanceAuditControllerSource = fs.readFileSync(PERFORMANCE_AUDIT_CONTROLLER_JS, "utf8");
 const performanceTimelineControllerSource = fs.readFileSync(PERFORMANCE_TIMELINE_CONTROLLER_JS, "utf8");
@@ -162,6 +166,7 @@ const followupFeatureSource = [
   followupDebugControllerSource,
   grayTrialReportControllerSource,
   grayTrialCharacterPanelControllerSource,
+  followupReadinessPanelModelSource,
   followupReadinessPanelControllerSource
 ].join("\n");
 const chatState = require(CHAT_STATE_JS);
@@ -181,6 +186,7 @@ const diagnosticsRuntimeController = require(DIAGNOSTICS_RUNTIME_CONTROLLER_JS);
 const followupDebugController = require(FOLLOWUP_DEBUG_CONTROLLER_JS);
 const grayTrialReportController = require(GRAY_TRIAL_REPORT_CONTROLLER_JS);
 const grayTrialCharacterPanelController = require(GRAY_TRIAL_CHARACTER_PANEL_CONTROLLER_JS);
+const followupReadinessPanelModel = require(FOLLOWUP_READINESS_PANEL_MODEL_JS);
 const followupReadinessPanelController = require(FOLLOWUP_READINESS_PANEL_CONTROLLER_JS);
 const runtime = require(CHARACTER_RUNTIME_JS);
 const attachmentModel = require(ATTACHMENT_MODEL_JS);
@@ -290,6 +296,7 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(typeof followupDebugController.createController, "function", "followup debug controller should expose a factory");
   assert.strictEqual(typeof grayTrialReportController.createController, "function", "gray trial report controller should expose a factory");
   assert.strictEqual(typeof grayTrialCharacterPanelController.createController, "function", "gray trial character panel controller should expose a factory");
+  assert.strictEqual(typeof followupReadinessPanelModel.buildPreviewCardData, "function", "followup readiness panel model should expose pure preview data shaping");
   assert.strictEqual(typeof followupReadinessPanelController.createController, "function", "followup readiness panel controller should expose a factory");
   assert.strictEqual(typeof speechStyleController.createController, "function", "speech style controller should expose a factory");
   assert.strictEqual(typeof emotionMoodController.createController, "function", "emotion/mood controller should expose a factory");
@@ -2472,6 +2479,7 @@ assert.ok(
     && indexSource.includes('<script src="./followupDebugController.js"></script>')
     && indexSource.includes('<script src="./grayTrialReportController.js"></script>')
     && indexSource.includes('<script src="./grayTrialCharacterPanelController.js"></script>')
+    && indexSource.includes('<script src="./followupReadinessPanelModel.js"></script>')
     && indexSource.includes('<script src="./followupReadinessPanelController.js"></script>')
     && indexSource.includes('<script src="./speechStyleController.js"></script>')
     && indexSource.includes('<script src="./emotionMoodController.js"></script>')
@@ -2499,7 +2507,8 @@ assert.ok(
     && indexSource.indexOf('<script src="./diagnosticsRuntimeController.js"></script>') < indexSource.indexOf('<script src="./followupDebugController.js"></script>')
     && indexSource.indexOf('<script src="./followupDebugController.js"></script>') < indexSource.indexOf('<script src="./grayTrialReportController.js"></script>')
     && indexSource.indexOf('<script src="./grayTrialReportController.js"></script>') < indexSource.indexOf('<script src="./grayTrialCharacterPanelController.js"></script>')
-    && indexSource.indexOf('<script src="./grayTrialCharacterPanelController.js"></script>') < indexSource.indexOf('<script src="./followupReadinessPanelController.js"></script>')
+    && indexSource.indexOf('<script src="./grayTrialCharacterPanelController.js"></script>') < indexSource.indexOf('<script src="./followupReadinessPanelModel.js"></script>')
+    && indexSource.indexOf('<script src="./followupReadinessPanelModel.js"></script>') < indexSource.indexOf('<script src="./followupReadinessPanelController.js"></script>')
     && indexSource.indexOf('<script src="./subtitleController.js"></script>') < indexSource.indexOf('<script src="./speechStyleController.js"></script>')
     && indexSource.indexOf('<script src="./speechStyleController.js"></script>') < indexSource.indexOf('<script src="./emotionMoodController.js"></script>')
     && indexSource.indexOf('<script src="./emotionMoodController.js"></script>') < indexSource.indexOf('<script src="./actionPlanController.js"></script>')
@@ -3245,8 +3254,8 @@ assert.ok(
     && autoChatControllerSource.includes("length_budget")
     && autoChatControllerSource.includes("function executeInterjectionDirectorMotion")
     && autoChatControllerSource.includes('motionRole: "interjection_reaction"')
-    && chatReplyControllerSource.includes("payload.auto_kind")
-    && chatReplyControllerSource.includes("payload.auto_thought_burst")
+    && chatPayloadBuilderSource.includes("payload.auto_kind")
+    && chatPayloadBuilderSource.includes("payload.auto_thought_burst")
     && source.includes("director=")
     && source.includes("turn_taking=")
     && source.includes("motion_dispatch=")
@@ -3264,7 +3273,7 @@ assert.ok(
     && appStartupControllerSource.includes("loadCharacterBrainSnapshotFromStorage")
     && storageControllerSource.includes("taffy_character_brain_last_decision_v1")
     && source.includes("function getCharacterExperienceRequestProfile")
-    && chatReplyControllerSource.includes("payload.character_experience_profile")
+    && chatPayloadBuilderSource.includes("payload.character_experience_profile")
     && characterExperienceControllerSource.includes("taffy_character_experience_v1")
     && characterExperienceControllerSource.includes("function buildRequestProfile")
     && characterDiagnosticsControllerSource.includes("characterExperienceController.recordFeedback")
@@ -3610,6 +3619,8 @@ assert.ok(
 );
 assert.ok(
   source.includes("const FOLLOWUP_READINESS_VIEW = window.TaffyFollowupReadinessView")
+    && followupReadinessPanelControllerSource.includes("FOLLOWUP_READINESS_PANEL_MODEL.buildPreviewCardData")
+    && followupReadinessPanelModelSource.includes("function buildManualConfirmationData")
     && followupFeatureSource.includes("FOLLOWUP_READINESS_VIEW.buildBackendEntryCardText")
     && followupFeatureSource.includes("FOLLOWUP_READINESS_VIEW.buildPreviewOneLineText")
     && source.includes("const GRAY_TRIAL_READINESS_MODEL = window.TaffyGrayTrialReadinessModel")
@@ -3784,14 +3795,14 @@ assert.ok(
     && chatReplyControllerSource.includes("function rememberInterruptedAssistantContext")
     && chatReplyControllerSource.includes("function takeInterruptedAssistantContext")
     && chatReplyControllerSource.includes("function classifyBargeInReplyPolicy")
-    && chatReplyControllerSource.includes("interruptionContext.reply_policy")
+    && chatPayloadBuilderSource.includes("reply_policy: replyPolicy")
     && source.includes("nextBargeIn=")
-    && chatReplyControllerSource.includes("payload.conversation_context")
+    && chatPayloadBuilderSource.includes("payload.conversation_context")
     && chatReplyControllerSource.includes("function normalizeAsrConversationContext")
-    && chatReplyControllerSource.includes("conversationContext.asr = asrContext")
+    && chatPayloadBuilderSource.includes("conversationContext.asr = asrContext")
     && chatReplyControllerSource.includes("function normalizeInputModality")
     && chatReplyControllerSource.includes('? "auto"')
-    && chatReplyControllerSource.includes("input_modality: inputModality")
+    && chatPayloadBuilderSource.includes("input_modality: inputModality")
     && localAsrControllerSource.includes('inputModality: "voice"')
     && source.includes("getLocalAsrController().transcribeSnapshotAfterMicClose")
     && chatReplyControllerSource.includes("assistant_partial")

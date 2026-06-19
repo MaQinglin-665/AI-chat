@@ -16,6 +16,7 @@ from character_brain_intent_strategy import (
     score_user_intents as _score_user_intents_impl,
 )
 import character_brain_topic_strategy as topic_strategy
+import character_brain_snapshot
 from character_brain_barge import (
     apply_barge_in_policy_controls as _apply_barge_in_policy_controls_impl,
     detect_barge_in_reply_policy as _detect_barge_in_reply_policy_impl,
@@ -2701,6 +2702,35 @@ def _reply_quality_deps() -> Dict[str, Any]:
     }
 
 
+def _snapshot_deps() -> Dict[str, Any]:
+    return {
+        "clean_text": _clean_text,
+        "safe_int": _safe_int,
+        "experience_flags": _experience_flags,
+        "normalize_opening_move": _normalize_opening_move,
+        "normalize_reply_shape": _normalize_reply_shape,
+        "normalize_question_policy": _normalize_question_policy,
+        "input_modality": _input_modality,
+        "public_asr_status": _public_asr_status,
+        "normalize_emotion": _normalize_emotion,
+        "normalize_action": _normalize_action,
+        "normalize_intensity": _normalize_intensity,
+        "public_reply_quality": _public_reply_quality,
+        "public_output_constraints": _public_output_constraints,
+        "public_topic_reference": _public_topic_reference,
+        "public_barge_in_policy": _public_barge_in_policy,
+        "public_topic_stack": _public_topic_stack,
+        "public_conversation_director": _public_conversation_director,
+        "public_improv_director": _public_improv_director,
+        "public_stage_memory": _public_stage_memory,
+        "public_safety_clamp": _public_safety_clamp,
+        "public_motion_director": _public_motion_director,
+        "public_voice_director": _public_voice_director,
+        "public_continuity_state": _public_continuity_state,
+        "constraints_for_intent": _constraints_for_intent,
+    }
+
+
 def _public_reply_quality(value: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return _public_reply_quality_impl(value)
 
@@ -2965,173 +2995,21 @@ def build_character_brain_public_snapshot(
     experience_profile: Optional[Dict[str, Any]] = None,
     session_state: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
-    if not isinstance(decision, dict):
-        return None
-    flags = _experience_flags(experience_profile)
-    feedback_effects = []
-    if flags["prefer_short"]:
-        feedback_effects.append("shorter_replies")
-    if flags["avoid_generic"]:
-        feedback_effects.append("less_generic_tone")
-    if flags["lower_motion"]:
-        feedback_effects.append("lower_motion_intensity")
-    if flags["raise_motion"]:
-        feedback_effects.append("more_visible_motion")
-    if flags["voice_care"]:
-        feedback_effects.append("voice_style_care")
-    raw_execution = (
-        decision.get("performance_execution")
-        if isinstance(decision.get("performance_execution"), dict)
-        else {}
+    return character_brain_snapshot.build_public_snapshot(
+        decision,
+        experience_profile=experience_profile,
+        session_state=session_state,
+        deps=_snapshot_deps(),
     )
-    execution = {
-        "reply_shape": _normalize_reply_shape(raw_execution.get("reply_shape") or decision.get("reply_shape")),
-        "question_policy": _normalize_question_policy(raw_execution.get("question_policy") or decision.get("question_policy")),
-        "removed_followup": raw_execution.get("removed_followup") is True,
-        "removed_unsafe_bit": raw_execution.get("removed_unsafe_bit") is True,
-        "removed_context_bleed": raw_execution.get("removed_context_bleed") is True,
-        "shortened": raw_execution.get("shortened") is True,
-        "used_bit": raw_execution.get("used_bit") is True,
-        "final_sentences": max(0, min(8, _safe_int(raw_execution.get("final_sentences"), 0))),
-        "stage_callback_added": raw_execution.get("stage_callback_added") is True,
-        "stage_callback_suppressed": _clean_text(raw_execution.get("stage_callback_suppressed"), 48),
-        "stage_callback_bit": _clean_text(raw_execution.get("stage_callback_bit"), 48),
-        "quality_score": max(0, min(100, _safe_int(raw_execution.get("quality_score"), 100))),
-        "quality_issues": [
-            _clean_text(item, 48)
-            for item in (raw_execution.get("quality_issues") if isinstance(raw_execution.get("quality_issues"), list) else [])[:8]
-            if _clean_text(item, 48)
-        ],
-        "quality_repair_actions": [
-            _clean_text(item, 48)
-            for item in (raw_execution.get("quality_repair_actions") if isinstance(raw_execution.get("quality_repair_actions"), list) else [])[:8]
-            if _clean_text(item, 48)
-        ],
-    }
-    return {
-        "version": 1,
-        "intent": _clean_text(decision.get("intent"), 40),
-        "reply_style": _clean_text(decision.get("reply_style"), 40),
-        "style_beat": _clean_text(decision.get("style_beat"), 48),
-        "reaction_mode": _clean_text(decision.get("reaction_mode"), 48),
-        "banter_level": max(0, min(3, _safe_int(decision.get("banter_level"), 0))),
-        "opening_move": _normalize_opening_move(decision.get("opening_move")),
-        "reply_shape": _normalize_reply_shape(decision.get("reply_shape")),
-        "spontaneity": max(0, min(3, _safe_int(decision.get("spontaneity"), 0))),
-        "question_policy": _normalize_question_policy(decision.get("question_policy")),
-        "performance_bit": _clean_text(decision.get("performance_bit"), 48),
-        "energy": _clean_text(decision.get("energy"), 24),
-        "attention": _clean_text(decision.get("attention"), 24),
-        "relationship": _clean_text(decision.get("relationship"), 40),
-        "max_sentences": max(1, min(8, int(decision.get("max_sentences") or 3))),
-        "input_modality": _input_modality({"_input_modality": decision.get("input_modality")}),
-        "asr_status": _public_asr_status({"_conversation_context": {"asr": decision.get("asr_status")}}),
-        "emotion": _normalize_emotion(decision.get("emotion")),
-        "action": _normalize_action(decision.get("action")),
-        "intensity": _normalize_intensity(decision.get("intensity")),
-        "voice_style": _clean_text(decision.get("voice_style"), 32).lower() or "neutral",
-        "thought_burst": (
-            {
-                "thought_type": _clean_text(decision.get("thought_burst", {}).get("thought_type"), 40),
-                "length_budget": _clean_text(decision.get("thought_burst", {}).get("length_budget"), 48),
-                "min_sentences": max(0, min(4, _safe_int(decision.get("thought_burst", {}).get("min_sentences"), 0))),
-                "max_sentences": max(0, min(4, _safe_int(decision.get("thought_burst", {}).get("max_sentences"), 0))),
-                "stance": _clean_text(decision.get("thought_burst", {}).get("stance"), 48),
-                "burst_reason": _clean_text(decision.get("thought_burst", {}).get("burst_reason"), 48),
-            }
-            if isinstance(decision.get("thought_burst"), dict)
-            else {}
-        ),
-        "performance_execution": execution,
-        "reply_quality": _public_reply_quality(decision.get("reply_quality")),
-        "output_constraints": _public_output_constraints(decision.get("output_constraints")),
-        "topic_reference": _public_topic_reference(
-            decision.get("topic_reference") if isinstance(decision.get("topic_reference"), dict) else {}
-        ),
-        "barge_in_policy": _public_barge_in_policy(
-            decision.get("barge_in_policy") if isinstance(decision.get("barge_in_policy"), dict) else {}
-        ),
-        "topic_stack": _public_topic_stack(
-            session_state if isinstance(session_state, dict) else decision.get("topic_stack")
-        ),
-        "conversation_director": _public_conversation_director(
-            decision.get("conversation_director") if isinstance(decision.get("conversation_director"), dict) else {}
-        ),
-        "improv": _public_improv_director(decision.get("improv") if isinstance(decision.get("improv"), dict) else {}),
-        "stage_memory": _public_stage_memory(
-            session_state
-            if isinstance(session_state, dict)
-            else decision.get("stage_memory") or decision.get("continuity")
-        ),
-        "safety_clamp": _public_safety_clamp(
-            decision.get("safety_clamp") if isinstance(decision.get("safety_clamp"), dict) else {}
-        ),
-        "motion_director": _public_motion_director(
-            decision.get("motion_director") if isinstance(decision.get("motion_director"), dict) else {}
-        ),
-        "voice_director": _public_voice_director(
-            decision.get("voice_director") if isinstance(decision.get("voice_director"), dict) else {}
-        ),
-        "feedback_effects": feedback_effects[:5],
-        "continuity": _public_continuity_state(
-            session_state if isinstance(session_state, dict) else decision.get("continuity")
-        ),
-    }
 
 
 def merge_brain_runtime_metadata(
     runtime_meta: Optional[Dict[str, Any]],
     decision: Optional[Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
-    if runtime_meta is None or not isinstance(decision, dict):
-        return runtime_meta
-    merged = dict(runtime_meta)
-    brain_emotion = _normalize_emotion(decision.get("emotion"))
-    brain_action = _normalize_action(decision.get("action"))
-    brain_intensity = _normalize_intensity(decision.get("intensity"))
-    brain_voice = _clean_text(decision.get("voice_style") or brain_emotion, 32).lower() or "neutral"
-    brain_intent = _clean_text(decision.get("intent"), 40)
-    constraints = _public_output_constraints(
-        decision.get("output_constraints")
-        if isinstance(decision.get("output_constraints"), dict)
-        else _constraints_for_intent(brain_intent)
+    return character_brain_snapshot.merge_runtime_metadata(
+        runtime_meta,
+        decision,
+        deps=_snapshot_deps(),
+        live2d_hints=LIVE2D_HINTS,
     )
-
-    if _normalize_emotion(merged.get("emotion")) == "neutral" and brain_emotion != "neutral":
-        merged["emotion"] = brain_emotion
-    if _normalize_action(merged.get("action")) == "none" and brain_action != "none":
-        merged["action"] = brain_action
-    if _normalize_intensity(merged.get("intensity")) == "normal" and brain_intensity != "normal":
-        merged["intensity"] = brain_intensity
-    if _clean_text(merged.get("voice_style"), 32).lower() in {"", "neutral"} and brain_voice != "neutral":
-        merged["voice_style"] = brain_voice
-
-    strict_live2d_refresh = False
-    if not constraints["allow_motion"]:
-        merged["action"] = "none"
-        merged["intensity"] = "low"
-        strict_live2d_refresh = True
-    if brain_intent == "comfort":
-        if brain_emotion in {"sad", "anxious"}:
-            merged["emotion"] = brain_emotion
-        merged["voice_style"] = "soft"
-        merged["action"] = "none"
-        merged["intensity"] = "low"
-        strict_live2d_refresh = True
-    elif brain_intent in {"task_help", "reminder"}:
-        if _normalize_emotion(merged.get("emotion")) in {"happy", "playful", "surprised"}:
-            merged["emotion"] = brain_emotion
-            strict_live2d_refresh = True
-        if _normalize_action(merged.get("action")) in {"happy_idle", "surprised", "wave"}:
-            merged["action"] = brain_action
-            merged["intensity"] = brain_intensity
-            strict_live2d_refresh = True
-        if brain_voice in {"serious", "neutral"}:
-            merged["voice_style"] = brain_voice
-    elif brain_intent in {"closing", "low_interrupt_checkin"} and brain_voice != "neutral":
-        merged["voice_style"] = brain_voice
-
-    if strict_live2d_refresh or not _clean_text(merged.get("live2d_hint"), 40):
-        merged["live2d_hint"] = LIVE2D_HINTS.get(_normalize_emotion(merged.get("emotion")), "idle_relaxed")
-    merged["brain_intent"] = brain_intent
-    return merged

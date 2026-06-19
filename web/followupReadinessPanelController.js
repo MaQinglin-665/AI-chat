@@ -1,6 +1,23 @@
 (function (root) {
   "use strict";
 
+  function resolveFollowupReadinessPanelModel() {
+    const api = root.TaffyModules?.followupReadinessPanelModel;
+    if (api && typeof api.buildBackendEntryView === "function") {
+      return api;
+    }
+    if (typeof module !== "undefined" && module.exports && typeof require === "function") {
+      try {
+        return require("./followupReadinessPanelModel.js");
+      } catch (_) {
+        // Browser builds load this before followupReadinessPanelController.js.
+      }
+    }
+    return {};
+  }
+
+  const FOLLOWUP_READINESS_PANEL_MODEL = resolveFollowupReadinessPanelModel();
+
   function createController(deps = {}) {
     const state = deps.state || {};
     const ui = deps.ui || {};
@@ -119,66 +136,7 @@
     const startFollowupCharacterChipRefresh = typeof deps.startFollowupCharacterChipRefresh === "function" ? deps.startFollowupCharacterChipRefresh : () => null;
 
     function buildFollowupReadinessBackendEntryView() {
-      const summary = state.followupReadinessBackendEntrySummary;
-      const safeSummary = summary && typeof summary === "object" ? summary : {};
-      const blockedReasons = Array.isArray(safeSummary.blocked_reasons)
-        ? safeSummary.blocked_reasons.map((item) => String(item || "").trim()).filter(Boolean)
-        : [];
-      const guardContract = safeSummary.guard_contract && typeof safeSummary.guard_contract === "object"
-        ? safeSummary.guard_contract
-        : {};
-      const requiredChecks = Array.isArray(guardContract.required_checks)
-        ? guardContract.required_checks.map((item) => String(item || "").trim()).filter(Boolean)
-        : [];
-      const disallowedActions = Array.isArray(guardContract.disallowed_actions)
-        ? guardContract.disallowed_actions.map((item) => String(item || "").trim()).filter(Boolean)
-        : [];
-      const rollbackSteps = Array.isArray(guardContract.rollback)
-        ? guardContract.rollback.map((item) => String(item || "").trim()).filter(Boolean)
-        : [];
-      const executionPreview = safeSummary.entry_execution_preview && typeof safeSummary.entry_execution_preview === "object"
-        ? safeSummary.entry_execution_preview
-        : {};
-      const previewBlockedReasons = Array.isArray(executionPreview.blocked_reasons)
-        ? executionPreview.blocked_reasons.map((item) => String(item || "").trim()).filter(Boolean)
-        : [];
-      return {
-        loaded: summary && typeof summary === "object",
-        loading: state.followupReadinessBackendEntryLoading === true,
-        error: String(state.followupReadinessBackendEntryError || ""),
-        readOnly: safeSummary.read_only === true,
-        skeletonOnly: safeSummary.skeleton_only === true,
-        defaultOffBaseline: safeSummary.default_off_baseline === true,
-        configuredEnabled: safeSummary.configured_enabled === true,
-        configuredReturnMetadata: safeSummary.configured_return_metadata === true,
-        configuredDemoStable: safeSummary.configured_demo_stable === true,
-        configuredPersonaOverrideEnabled: safeSummary.configured_persona_override_enabled === true,
-        explicitEnableRequired: safeSummary.explicit_enable_required === true,
-        automaticRuntimeConnected: safeSummary.automatic_runtime_connected === true,
-        schedulerDefaultChanged: safeSummary.scheduler_default_changed === true,
-        configWriteEnabled: safeSummary.config_write_enabled === true,
-        runtimeCueEnabled: safeSummary.runtime_cue_enabled === true,
-        live2dEnabled: safeSummary.live2d_enabled === true,
-        ttsEnabled: safeSummary.tts_enabled === true,
-        entryReady: safeSummary.entry_ready === true,
-        blockedReasons,
-        guardContractReadOnly: guardContract.read_only === true,
-        guardContractFailClosed: guardContract.fail_closed === true,
-        guardContractRequiredChecks: requiredChecks,
-        guardContractDisallowedActions: disallowedActions,
-        guardContractRollbackSteps: rollbackSteps,
-        guardContractOperatorConfirmation: String(guardContract.operator_confirmation || ""),
-        previewReadOnly: executionPreview.read_only === true,
-        previewDryRun: executionPreview.dry_run === true,
-        previewAccepted: executionPreview.accepted === true,
-        previewWouldExecute: executionPreview.would_execute === true,
-        previewRequestType: String(executionPreview.request_type || ""),
-        previewRequestedAction: String(executionPreview.requested_action || ""),
-        previewBlockedReasons,
-        nextAction: String(safeSummary.next_action || ""),
-        lastRefreshAt: Number(state.followupReadinessBackendEntryLastRefreshAt || 0),
-        lastSuccessAt: Number(state.followupReadinessBackendEntryLastSuccessAt || 0)
-      };
+      return FOLLOWUP_READINESS_PANEL_MODEL.buildBackendEntryView(state);
     }
 
     function buildFollowupReadinessBackendEntryCardText() {
@@ -399,34 +357,10 @@
       const snapshot = snapshotInput && typeof snapshotInput === "object"
         ? snapshotInput
         : getTTSDebugSnapshot();
-      const followup = snapshot.followup || {};
-      const silence = snapshot.silence || {};
-      const scheduler = snapshot.proactiveScheduler || {};
-      const characterState = buildFollowupCharacterState(followup, silence, scheduler);
-      const selected = followup.selectedReaction && typeof followup.selectedReaction === "object"
-        ? followup.selectedReaction
-        : null;
-      const scenarioLabel = getFollowupRehearsalScenarioLabel(state.followupRehearsalScenarioId) || "\u672a\u9009\u62e9";
-      const candidateText = String(selected?.candidate?.text || followup.characterPreview || "").trim() || "n/a";
-      const tone = String(selected?.preferredTone || selected?.candidate?.tone || followup.characterCue?.tone || "n/a");
-      const policy = String(followup.policy || "n/a");
-      const blocked = Array.isArray(followup.blockedReasons) && followup.blockedReasons.length
-        ? followup.blockedReasons.join(",")
-        : "none";
-      return {
-        scenarioLabel,
-        characterLabel: String(characterState.label || "n/a"),
-        characterMood: String(characterState.mood || "n/a"),
-        pending: followup.pending === true,
-        topicHint: String(followup.topicHint || "").trim(),
-        eligible: followup.eligible === true,
-        blockedReasons: Array.isArray(followup.blockedReasons) ? followup.blockedReasons.slice() : [],
-        policy,
-        tone,
-        selectedIndex: Number.isFinite(Number(selected?.index)) ? Number(selected.index) : -1,
-        candidateText,
-        blocked
-      };
+      return FOLLOWUP_READINESS_PANEL_MODEL.buildPreviewCardData(snapshot, {
+        getCharacterState: buildFollowupCharacterState,
+        getScenarioLabel: () => getFollowupRehearsalScenarioLabel(state.followupRehearsalScenarioId)
+      });
     }
 
     function normalizeFollowupManualConfirmationToken(value = "") {
@@ -444,52 +378,15 @@
     function buildFollowupManualConfirmationData() {
       const snapshot = getTTSDebugSnapshot();
       const data = buildFollowupReadinessPreviewCardData(snapshot);
-      const silence = snapshot.silence || {};
-      const scheduler = snapshot.proactiveScheduler || {};
-      const candidateText = data.candidateText === "n/a"
-        ? ""
-        : normalizeFollowupManualConfirmationToken(data.candidateText);
-      const hasCandidate = !!candidateText;
-      const blockedReasons = []
-        .concat(Array.isArray(data.blockedReasons) ? data.blockedReasons : [])
-        .concat(Array.isArray(silence.blockedReasons) ? silence.blockedReasons : [])
-        .concat(Array.isArray(scheduler.blockedReasons) ? scheduler.blockedReasons : []);
-      const key = buildFollowupManualConfirmationKey({
-        topicHint: data.topicHint,
-        policy: data.policy,
-        candidateText
+      return FOLLOWUP_READINESS_PANEL_MODEL.buildManualConfirmationData({
+        previewData: data,
+        snapshot,
+        dismissedKeys: state.followupManualConfirmationDismissedKeys,
+        helpers: {
+          normalizeToken: normalizeFollowupManualConfirmationToken,
+          buildKey: buildFollowupManualConfirmationKey
+        }
       });
-      const dismissed = !!key
-        && state.followupManualConfirmationDismissedKeys instanceof Set
-        && state.followupManualConfirmationDismissedKeys.has(key);
-      const hidden = data.pending !== true || !hasCandidate;
-      const available = hidden !== true
-        && data.eligible === true
-        && silence.eligibleForSilenceFollowup === true
-        && scheduler.eligibleForSchedulerTick === true
-        && blockedReasons.length === 0;
-      const blocked = hidden !== true && !available;
-      const status = hidden
-        ? "hidden"
-        : dismissed
-          ? "dismissed"
-          : available
-            ? "available"
-            : "blocked";
-      return {
-        ...data,
-        candidateText,
-        hasCandidate,
-        blockedReasons,
-        key,
-        dismissed,
-        hidden,
-        available,
-        blocked,
-        status,
-        silenceEligible: silence.eligibleForSilenceFollowup === true,
-        schedulerEligible: scheduler.eligibleForSchedulerTick === true
-      };
     }
 
     function getFollowupManualConfirmationStatusLabel(status = "hidden") {
@@ -499,16 +396,9 @@
     }
 
     function buildFollowupManualConfirmationDebugPayload(confirmation = {}, result = "") {
-      const blockedSummary = Array.isArray(confirmation.blockedReasons)
-        ? confirmation.blockedReasons.join(",")
-        : "";
-      const policy = String(confirmation.policy || "");
-      const error = [policy, blockedSummary].filter(Boolean).join(";");
-      return {
-        text: String(confirmation.topicHint || ""),
-        result: sanitizeTTSDebugText(result || confirmation.status || "", 80),
-        error: sanitizeTTSDebugText(error, 140)
-      };
+      return FOLLOWUP_READINESS_PANEL_MODEL.buildManualConfirmationDebugPayload(confirmation, result, {
+        sanitizeText: sanitizeTTSDebugText
+      });
     }
 
     function recordFollowupManualConfirmationVisibleEvent(confirmation = {}) {
