@@ -189,6 +189,12 @@ from app_config_route import (
     handle_config_get_route,
     handle_config_post_route,
 )
+from app_memory_route import (
+    MEMORY_GET_ROUTES,
+    MEMORY_POST_ROUTES,
+    handle_memory_get_route,
+    handle_memory_post_route,
+)
 from app_translate_route import handle_translate_request
 from app_tts_route import handle_tts_request
 from config_switch import (
@@ -1228,6 +1234,38 @@ class PetHandler(SimpleHTTPRequestHandler):
             diagnostic_payload_func=_diagnostic_payload,
         )
 
+    def _handle_memory_get_route(self, path_only):
+        handle_memory_get_route(
+            path_only,
+            send_json_func=self._send_json,
+            load_config_func=load_config,
+            load_manual_persona_card_func=load_manual_persona_card,
+            get_learning_candidates_for_review_func=get_learning_candidates_for_review,
+            get_learning_samples_for_review_func=get_learning_samples_for_review,
+            get_core_memories_for_review_func=get_core_memories_for_review,
+            get_short_term_memories_for_review_func=get_short_term_memories_for_review,
+            get_memory_debug_snapshot_func=get_memory_debug_snapshot,
+            log_backend_exception_func=_log_backend_exception,
+            diagnostic_payload_func=_diagnostic_payload,
+        )
+
+    def _handle_memory_post_route(self, path_only):
+        handle_memory_post_route(
+            path_only,
+            read_json_body_func=self._read_json_body,
+            send_json_func=self._send_json,
+            load_config_func=load_config,
+            save_manual_persona_card_func=save_manual_persona_card,
+            reload_learning_review_data_func=reload_learning_review_data,
+            promote_learning_review_candidates_func=promote_learning_review_candidates,
+            update_learning_review_entries_func=update_learning_review_entries,
+            undo_last_learning_review_action_func=undo_last_learning_review_action,
+            update_core_memory_entries_func=update_core_memory_entries,
+            update_short_term_memory_entries_func=update_short_term_memory_entries,
+            log_backend_exception_func=_log_backend_exception,
+            diagnostic_payload_func=_diagnostic_payload,
+        )
+
     def _build_health_payload(self, detailed=False):
         return _build_health_payload(
             detailed=detailed,
@@ -1360,63 +1398,8 @@ class PetHandler(SimpleHTTPRequestHandler):
                 status=HTTPStatus.METHOD_NOT_ALLOWED,
             )
             return
-        if path_only == "/api/persona_card":
-            self._send_json(load_manual_persona_card())
-            return
-        if path_only == "/api/learning/candidates":
-            try:
-                cfg = load_config()
-                self._send_json(get_learning_candidates_for_review(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="GET /api/learning/candidates failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/learning/samples":
-            try:
-                cfg = load_config()
-                self._send_json(get_learning_samples_for_review(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="GET /api/learning/samples failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/memory/core":
-            try:
-                cfg = load_config()
-                self._send_json(get_core_memories_for_review(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="GET /api/memory/core failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/memory/short":
-            try:
-                cfg = load_config()
-                self._send_json(get_short_term_memories_for_review(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="GET /api/memory/short failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/memory/debug":
-            try:
-                cfg = load_config()
-                self._send_json(get_memory_debug_snapshot(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="GET /api/memory/debug failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
+        if path_only in MEMORY_GET_ROUTES:
+            self._handle_memory_get_route(path_only)
             return
         return super().do_GET()
 
@@ -1477,149 +1460,8 @@ class PetHandler(SimpleHTTPRequestHandler):
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 )
             return
-        if path_only == "/api/learning/reload":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b""
-            if raw_body.strip():
-                try:
-                    json.loads(raw_body.decode("utf-8"))
-                except Exception:
-                    self._send_json(
-                        {"ok": False, "error": "Invalid JSON body."},
-                        status=HTTPStatus.BAD_REQUEST,
-                    )
-                    return
-            try:
-                cfg = load_config()
-                self._send_json(reload_learning_review_data(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="POST /api/learning/reload failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/learning/promote":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
-            try:
-                body = json.loads(raw_body.decode("utf-8"))
-            except Exception:
-                self._send_json(
-                    {"ok": False, "error": "Invalid JSON body."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-                return
-            candidate_ids = body.get("candidate_ids", []) if isinstance(body, dict) else []
-            try:
-                cfg = load_config()
-                payload = promote_learning_review_candidates(cfg, candidate_ids)
-                status = HTTPStatus.OK if payload.get("ok", True) else HTTPStatus.BAD_REQUEST
-                self._send_json(payload, status=status)
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="POST /api/learning/promote failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/learning/update":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
-            try:
-                body = json.loads(raw_body.decode("utf-8"))
-            except Exception:
-                self._send_json(
-                    {"ok": False, "error": "Invalid JSON body."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-                return
-            if not isinstance(body, dict):
-                body = {}
-            action = str(body.get("action", "")).strip().lower()
-            try:
-                cfg = load_config()
-                if action == "undo":
-                    payload = undo_last_learning_review_action(cfg)
-                else:
-                    payload = update_learning_review_entries(
-                        cfg,
-                        action=action,
-                        pool=body.get("pool", "candidates"),
-                        ids=body.get("ids", []),
-                        delta=body.get("delta", 0.0),
-                        quick_settings=body.get("quick_settings", {}),
-                    )
-                status = HTTPStatus.OK if payload.get("ok", True) else HTTPStatus.BAD_REQUEST
-                self._send_json(payload, status=status)
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="POST /api/learning/update failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/memory/core/update":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
-            try:
-                body = json.loads(raw_body.decode("utf-8"))
-            except Exception:
-                self._send_json(
-                    {"ok": False, "error": "Invalid JSON body."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-                return
-            if not isinstance(body, dict):
-                body = {}
-            try:
-                cfg = load_config()
-                payload = update_core_memory_entries(
-                    cfg,
-                    action=body.get("action", ""),
-                    ids=body.get("ids", []),
-                    delta=body.get("delta", 0.0),
-                    patch=body.get("patch", {}),
-                )
-                status = HTTPStatus.OK if payload.get("ok", True) else HTTPStatus.BAD_REQUEST
-                self._send_json(payload, status=status)
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="POST /api/memory/core/update failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/memory/short/update":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
-            try:
-                body = json.loads(raw_body.decode("utf-8"))
-            except Exception:
-                self._send_json(
-                    {"ok": False, "error": "Invalid JSON body."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
-                return
-            if not isinstance(body, dict):
-                body = {}
-            try:
-                cfg = load_config()
-                payload = update_short_term_memory_entries(
-                    cfg,
-                    action=body.get("action", ""),
-                    ids=body.get("ids", []),
-                    delta=body.get("delta", 0.0),
-                    patch=body.get("patch", {}),
-                )
-                status = HTTPStatus.OK if payload.get("ok", True) else HTTPStatus.BAD_REQUEST
-                self._send_json(payload, status=status)
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="POST /api/memory/short/update failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
+        if path_only in MEMORY_POST_ROUTES:
+            self._handle_memory_post_route(path_only)
             return
         if path_only not in {
             "/api/chat",
@@ -1627,7 +1469,6 @@ class PetHandler(SimpleHTTPRequestHandler):
             "/api/tts",
             "/api/translate",
             "/api/asr_pcm",
-            "/api/persona_card",
             *CONFIG_POST_PERF_ROUTES,
         }:
             self._send_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
@@ -1658,18 +1499,6 @@ class PetHandler(SimpleHTTPRequestHandler):
             0,
         )
         client_to_server_ms = _wall_now_ms() - client_send_wall_ms if client_send_wall_ms > 0 else -1
-
-        if path_only == "/api/persona_card":
-            try:
-                saved = save_manual_persona_card(body if isinstance(body, dict) else {})
-                self._send_json(saved)
-            except Exception as exc:
-                _log_backend_exception("PERSONA", exc, extra="/api/persona_card failed")
-                self._send_json(
-                    _diagnostic_payload(exc),
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-            )
-            return
 
         if path_only in CONFIG_POST_PERF_ROUTES:
             self._handle_config_post_route(

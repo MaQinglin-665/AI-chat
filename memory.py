@@ -10,9 +10,13 @@ from pathlib import Path
 from config import MEMORY_PATH, MEMORY_SUMMARY_PATH
 import memory_consolidation
 import memory_correction
+import memory_core
 import memory_debug
+import memory_persona
 import memory_selection
+import memory_snapshot
 import memory_store
+import memory_text
 
 logger = logging.getLogger(__name__)
 
@@ -50,54 +54,12 @@ LAST_MEMORY_CONSOLIDATION_DEBUG = {}
 LAST_MEMORY_CORRECTION_DEBUG = {}
 MEM0_CLIENT_KEY = ""
 
-LEGACY_MANUAL_PERSONA_CARD_FIELDS = (
-    "identity",
-    "user_preferences",
-    "user_dislikes",
-    "common_topics",
-    "reply_style",
-    "companionship_style",
-)
+LEGACY_MANUAL_PERSONA_CARD_FIELDS = memory_persona.LEGACY_MANUAL_PERSONA_CARD_FIELDS
+MANUAL_PERSONA_CARD_FIELDS = memory_persona.MANUAL_PERSONA_CARD_FIELDS
+MANUAL_PERSONA_CARD_LIMITS = memory_persona.MANUAL_PERSONA_CARD_LIMITS
 
-MANUAL_PERSONA_CARD_FIELDS = (
-    "character_name",
-    "user_alias",
-    "personality_tags",
-    "speaking_style",
-    "catchphrases",
-    "likes",
-    "dislikes",
-    "initiative_level",
-    "relationship_role",
-    *LEGACY_MANUAL_PERSONA_CARD_FIELDS,
-)
-
-MANUAL_PERSONA_CARD_LIMITS = {
-    "character_name": 80,
-    "user_alias": 80,
-    "personality_tags": 220,
-    "speaking_style": 360,
-    "catchphrases": 220,
-    "likes": 400,
-    "dislikes": 320,
-    "initiative_level": 24,
-    "relationship_role": 24,
-    "identity": 180,
-    "user_preferences": 400,
-    "user_dislikes": 300,
-    "common_topics": 320,
-    "reply_style": 360,
-    "companionship_style": 360,
-}
-
-CORE_MEMORY_KINDS = {"semantic", "episodic"}
-CORE_MEMORY_CATEGORIES = {
-    "project_context",
-    "stable_fact",
-    "user_preference",
-    "relationship",
-    "recent_event",
-}
+CORE_MEMORY_KINDS = memory_core.CORE_MEMORY_KINDS
+CORE_MEMORY_CATEGORIES = memory_core.CORE_MEMORY_CATEGORIES
 SHORT_TERM_MEMORY_KINDS = {
     "current_topic",
     "current_task",
@@ -106,19 +68,8 @@ SHORT_TERM_MEMORY_KINDS = {
     "open_loop",
 }
 
-PERSONA_RELATIONSHIP_ROLES = (
-    "\u5b66\u4e60\u642d\u5b50",
-    "\u684c\u9762\u4f19\u4f34",
-    "\u60c5\u7eea\u966a\u4f34",
-    "\u5de5\u4f5c\u52a9\u624b",
-)
-
-PERSONA_INITIATIVE_LEVELS = (
-    "\u4f4e",
-    "\u9002\u4e2d",
-    "\u9ad8",
-    "\u5f88\u9ad8",
-)
+PERSONA_RELATIONSHIP_ROLES = memory_persona.PERSONA_RELATIONSHIP_ROLES
+PERSONA_INITIATIVE_LEVELS = memory_persona.PERSONA_INITIATIVE_LEVELS
 
 
 def _close_mem0_client():
@@ -139,41 +90,12 @@ def _close_mem0_client():
 atexit.register(_close_mem0_client)
 
 
-EN_STOPWORDS = {
-    "the", "a", "an", "and", "or", "to", "of", "in", "on", "for", "with",
-    "is", "are", "was", "were", "be", "been", "am", "i", "you", "he", "she",
-    "it", "we", "they", "this", "that", "these", "those", "my", "your", "his",
-    "her", "our", "their", "me", "him", "them", "do", "does", "did", "have",
-    "has", "had", "can", "could", "will", "would", "should", "at", "by",
-    "from", "as", "if", "then", "than",
-}
-
-CN_WORD_STOPWORDS = {
-    "我们", "你们", "他们", "她们", "这个", "那个", "这里", "那里", "现在", "然后",
-    "就是", "一个", "一些", "没有", "可以", "不是", "什么", "怎么", "真的", "但是",
-    "因为", "所以", "而且", "如果", "已经", "还是", "只是",
-}
-
-CN_CHAR_STOPWORDS = {
-    "的", "了", "吗", "呢", "啊", "呀", "哦", "吧", "嘛", "啦", "这", "那", "我",
-    "你", "他", "她", "它", "们", "是", "在", "有", "和", "就", "都", "也", "很",
-    "还", "又", "被", "让", "给", "对", "把", "着", "个",
-}
-
-STAGEY_REPLY_RE = re.compile(
-    r"(递给你|倒(一)?杯|泡(杯|壶)?茶|茶(刚)?泡开|分你半杯|陪你喝|"
-    r"刚(揉|眯|啃|吃)|揉了揉眼|眨巴眼|端来一杯|拿了杯)"
-)
-MOJIBAKE_RE = re.compile(r"(浣犲|鍦ㄥ悧|鍢匡紝|銆\?|鐢ㄦ埛|鍥炵瓟|涓€|锛|鎬庝箞)")
-SENSITIVE_MEMORY_RE = re.compile(
-    r"(?i)("
-    r"api[_-]?key|secret|password|passwd|authorization|bearer\s+[a-z0-9._-]+|"
-    r"sk-[a-z0-9]{16,}|github_pat_[a-z0-9_]+|ghp_[a-z0-9]{16,}|"
-    r"[a-z]:\\(?:users|ai|windows|program files)|"
-    r"/(?:users|home|var|etc)/|"
-    r"https?://[^/\s]+:[^@\s]+@"
-    r")"
-)
+EN_STOPWORDS = memory_text.EN_STOPWORDS
+CN_WORD_STOPWORDS = memory_text.CN_WORD_STOPWORDS
+CN_CHAR_STOPWORDS = memory_text.CN_CHAR_STOPWORDS
+STAGEY_REPLY_RE = memory_text.STAGEY_REPLY_RE
+MOJIBAKE_RE = memory_text.MOJIBAKE_RE
+SENSITIVE_MEMORY_RE = memory_text.SENSITIVE_MEMORY_RE
 
 LEARNING_CANDIDATE_CATEGORIES = {
     "user_preference",
@@ -243,127 +165,38 @@ def get_memory_settings(config):
 
 
 def normalize_memory_text(text, max_len=220):
-    safe = " ".join(str(text or "").split())
-    if len(safe) > max_len:
-        safe = safe[: max_len - 1].rstrip() + "..."
-    return safe
+    return memory_text.normalize_memory_text(text, max_len=max_len)
 
 
 def looks_garbled_text(text):
-    s = str(text or "").strip()
-    if not s:
-        return False
-    if "\ufffd" in s:
-        return True
-    return bool(MOJIBAKE_RE.search(s))
+    return memory_text.looks_garbled_text(text)
 
 
 def looks_stagey_text(text):
-    s = str(text or "").strip()
-    if not s:
-        return False
-    return bool(STAGEY_REPLY_RE.search(s))
+    return memory_text.looks_stagey_text(text)
 
 
 def looks_sensitive_memory_text(text):
-    s = str(text or "").strip()
-    if not s:
-        return False
-    return bool(SENSITIVE_MEMORY_RE.search(s))
+    return memory_text.looks_sensitive_memory_text(text)
 
 
 def is_lightweight_checkin_message(text):
-    safe = re.sub(r"\s+", "", str(text or "").strip().lower())
-    if not safe:
-        return False
-    return bool(
-        re.fullmatch(
-            r"(在吗|在嘛|在不在|在么|喂|嗨|hi|hello|哈喽|早|早安|早上好|晚安|午安|睡了吗)[!！?？~～]*",
-            safe,
-        )
-    )
+    return memory_text.is_lightweight_checkin_message(text)
 
 
-LOW_SIGNAL_MEMORY_QUERIES = {
-    "ok",
-    "okay",
-    "yes",
-    "yep",
-    "sure",
-    "good",
-    "continue",
-    "goon",
-    "next",
-    "nextstep",
-    "\u597d",
-    "\u597d\u7684",
-    "\u53ef\u4ee5",
-    "\u884c",
-    "\u55ef",
-    "\u55ef\u55ef",
-    "\u662f\u7684",
-    "\u7ee7\u7eed",
-    "\u4e0b\u4e00\u6b65",
-    "\u7136\u540e\u5462",
-}
+LOW_SIGNAL_MEMORY_QUERIES = memory_text.LOW_SIGNAL_MEMORY_QUERIES
 
 
 def has_explicit_memory_intent(text):
-    safe = str(text or "").strip().lower()
-    if not safe:
-        return False
-    return bool(
-        re.search(
-            r"(remember|recall|memory|memories|previously|earlier|last time|\u8bb0\u5f97|\u8bb0\u5fc6|\u4e4b\u524d|\u4ee5\u524d|\u4e0a\u6b21)",
-            safe,
-        )
-    )
+    return memory_text.has_explicit_memory_intent(text)
 
 
 def is_specific_memory_query(text):
-    raw = str(text or "").strip()
-    if not raw:
-        return False
-    compact = re.sub(r"[\s\u3000，。！？!?.,;:、~～'\"]+", "", raw.lower())
-    if compact in LOW_SIGNAL_MEMORY_QUERIES:
-        return False
-    if has_explicit_memory_intent(raw):
-        return True
-
-    alpha_terms = re.findall(r"[A-Za-z0-9_]{3,}", raw.lower())
-    cjk_terms = [ch for ch in raw if "\u4e00" <= ch <= "\u9fff" and ch not in CN_CHAR_STOPWORDS]
-    tokens = tokenize_memory_text(raw)
-    if len(alpha_terms) >= 2:
-        return True
-    if len(cjk_terms) >= 6 and len(tokens) >= 2:
-        return True
-    return len(tokens) >= 3 and len(compact) >= 8
+    return memory_text.is_specific_memory_query(text)
 
 
 def tokenize_memory_text(text):
-    src = str(text or "")
-    tokens = set()
-
-    for token in re.findall(r"[A-Za-z0-9_]{2,}", src.lower()):
-        if token not in EN_STOPWORDS:
-            tokens.add(token)
-
-    for chunk in re.findall(r"[\u4e00-\u9fff]{2,10}", src):
-        if chunk not in CN_WORD_STOPWORDS:
-            tokens.add(chunk)
-        for i in range(len(chunk) - 1):
-            bg = chunk[i : i + 2]
-            if bg in CN_WORD_STOPWORDS:
-                continue
-            if all(ch in CN_CHAR_STOPWORDS for ch in bg):
-                continue
-            tokens.add(bg)
-
-    for ch in src:
-        if "\u4e00" <= ch <= "\u9fff" and ch not in CN_CHAR_STOPWORDS:
-            tokens.add(ch)
-
-    return tokens
+    return memory_text.tokenize_memory_text(text)
 
 
 def load_memory_items():
@@ -416,146 +249,55 @@ def _extract_explicit_memory_text(text):
     return ""
 
 
+def _core_memory_normalize_kwargs():
+    return {
+        "normalize_text_func": normalize_memory_text,
+        "looks_garbled_func": looks_garbled_text,
+        "looks_sensitive_func": looks_sensitive_memory_text,
+        "looks_stagey_func": looks_stagey_text,
+        "clamp_int_func": _clamp_int,
+    }
+
+
 def _classify_core_memory_text(text):
-    safe = str(text or "").strip().lower()
-    category = "stable_fact"
-    kind = "semantic"
-    if re.search(r"(项目|仓库|project|repo|repository|codebase|功能|bug|live2d|tts|asr|llm|electron|python)", safe):
-        category = "project_context"
-    elif re.search(r"(喜欢|不喜欢|偏好|prefer|preference|like|dislike|讨厌)", safe):
-        category = "user_preference"
-    elif re.search(r"(关系|陪伴|朋友|聊天方式|相处|称呼|叫我|call me)", safe):
-        category = "relationship"
-    if re.search(r"(今天|刚刚|刚才|昨天|昨晚|这次|现在|正在|已经|完成|修复|下一步|下一阶段|today|yesterday|now|currently|finished|fixed)", safe):
-        kind = "episodic"
-        if category == "stable_fact":
-            category = "recent_event"
-    return kind, category
+    return memory_core.classify_core_memory_text(text)
 
 
 def _make_core_memory_id(kind, category, text):
-    slug = re.sub(r"[^a-z0-9]+", "_", str(text or "").lower()).strip("_")[:24]
-    if not slug:
-        slug = "memory"
-    safe_kind = kind if kind in CORE_MEMORY_KINDS else "semantic"
-    safe_category = category if category in CORE_MEMORY_CATEGORIES else "stable_fact"
-    return f"mem_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{safe_kind}_{safe_category}_{slug}"
+    return memory_core.make_core_memory_id(kind, category, text)
 
 
 def _normalize_core_memory_item(item, fallback_id=""):
-    safe = item if isinstance(item, dict) else {}
-    text = normalize_memory_text(safe.get("text", ""), max_len=260)
-    if len(text) < 4:
-        return None
-    if looks_garbled_text(text) or looks_sensitive_memory_text(text) or looks_stagey_text(text):
-        return None
-    kind = str(safe.get("kind", "semantic") or "semantic").strip().lower()
-    if kind not in CORE_MEMORY_KINDS:
-        kind = "semantic"
-    category = str(safe.get("category", "stable_fact") or "stable_fact").strip().lower()
-    if category not in CORE_MEMORY_CATEGORIES:
-        category = "stable_fact"
-    try:
-        importance = max(0.0, min(1.0, float(safe.get("importance", 0.55) or 0.55)))
-    except (TypeError, ValueError):
-        importance = 0.55
-    try:
-        confidence = max(0.0, min(1.0, float(safe.get("confidence", 0.55) or 0.55)))
-    except (TypeError, ValueError):
-        confidence = 0.55
-    tags = safe.get("tags", [])
-    if not isinstance(tags, list):
-        tags = []
-    tags = [
-        normalize_memory_text(tag, max_len=24)
-        for tag in tags[:8]
-        if normalize_memory_text(tag, max_len=24)
-    ]
-    origin = safe.get("origin") if isinstance(safe.get("origin"), dict) else {}
-    now = datetime.now().isoformat(timespec="seconds")
-    return {
-        "id": str(safe.get("id") or fallback_id or _make_core_memory_id(kind, category, text)).strip(),
-        "kind": kind,
-        "category": category,
-        "text": text,
-        "source": str(safe.get("source", "conversation") or "conversation").strip()[:40],
-        "status": str(safe.get("status", "active") or "active").strip().lower(),
-        "importance": round(importance, 4),
-        "confidence": round(confidence, 4),
-        "tags": tags,
-        "created_at": str(safe.get("created_at", "") or now).strip(),
-        "updated_at": str(safe.get("updated_at", "") or safe.get("created_at", "") or now).strip(),
-        "last_used_at": str(safe.get("last_used_at", "") or "").strip(),
-        "use_count": _clamp_int(safe.get("use_count", 0), 0, 0, 999999),
-        "pinned": bool(safe.get("pinned", False)),
-        "origin": {
-            "user_preview": normalize_memory_text(origin.get("user_preview", ""), max_len=140),
-            "assistant_preview": normalize_memory_text(origin.get("assistant_preview", ""), max_len=160),
-        },
-    }
+    return memory_core.normalize_core_memory_item(
+        item,
+        fallback_id=fallback_id,
+        **_core_memory_normalize_kwargs(),
+    )
 
 
 def load_core_memory_items():
-    if not CORE_MEMORY_PATH.exists():
-        return []
-    try:
-        data = json.loads(CORE_MEMORY_PATH.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return []
-    raw_items = data.get("items", []) if isinstance(data, dict) else data
-    if not isinstance(raw_items, list):
-        return []
-    items = []
-    for idx, raw in enumerate(raw_items):
-        item = _normalize_core_memory_item(raw, fallback_id=f"mem_{idx}")
-        if item and item.get("status") not in {"deleted", "rejected", "archived"}:
-            items.append(item)
-    return items
+    return memory_core.load_core_memory_items(
+        CORE_MEMORY_PATH,
+        **_core_memory_normalize_kwargs(),
+    )
 
 
 def save_core_memory_items(items):
-    normalized = []
-    for idx, raw in enumerate(items if isinstance(items, list) else []):
-        item = _normalize_core_memory_item(raw, fallback_id=f"mem_{idx}")
-        if item is not None:
-            normalized.append(item)
-    payload = {
-        "schema_version": 1,
-        "updated_at": datetime.now().isoformat(timespec="seconds"),
-        "items": normalized,
-    }
-    tmp_path = CORE_MEMORY_PATH.with_suffix(".tmp")
-    bak_path = CORE_MEMORY_PATH.with_suffix(".bak")
-    previous = None
-    if CORE_MEMORY_PATH.exists():
-        try:
-            previous = CORE_MEMORY_PATH.read_bytes()
-        except Exception:
-            previous = None
-    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp_path.replace(CORE_MEMORY_PATH)
-    if previous is not None:
-        try:
-            bak_path.write_bytes(previous)
-        except Exception:
-            logger.debug("write core memory backup failed", exc_info=True)
+    memory_core.save_core_memory_items(
+        CORE_MEMORY_PATH,
+        items,
+        logger=logger,
+        **_core_memory_normalize_kwargs(),
+    )
 
 
 def _core_memory_similarity(a, b):
-    key_a = _learning_pattern_key(a)
-    key_b = _learning_pattern_key(b)
-    if not key_a or not key_b:
-        return 0.0
-    if key_a == key_b:
-        return 1.0
-    if len(key_a) >= 12 and len(key_b) >= 12 and (key_a in key_b or key_b in key_a):
-        return 0.9
-    tokens_a = tokenize_memory_text(a)
-    tokens_b = tokenize_memory_text(b)
-    if not tokens_a or not tokens_b:
-        return 0.0
-    overlap = len(tokens_a & tokens_b)
-    return round(overlap / max(1, min(len(tokens_a), len(tokens_b))), 4)
+    return memory_core.core_memory_similarity(
+        a,
+        b,
+        learning_pattern_key_func=_learning_pattern_key,
+        tokenize_text_func=tokenize_memory_text,
+    )
 
 
 def _short_term_now_iso():
@@ -767,21 +509,7 @@ def _set_last_short_term_memory_debug(snapshot):
 
 
 def _compact_short_term_memory_debug(snapshot):
-    safe = snapshot if isinstance(snapshot, dict) else {}
-    return {
-        "at": str(safe.get("at", "")).strip()[:40],
-        "status": str(safe.get("status", "")).strip()[:40],
-        "reason": str(safe.get("reason", "")).strip()[:80],
-        "turn_index": _clamp_int(safe.get("turn_index", 0), 0, 0, 999999),
-        "stored": _clamp_int(safe.get("stored", 0), 0, 0, 20),
-        "merged": _clamp_int(safe.get("merged", 0), 0, 0, 20),
-        "expired": _clamp_int(safe.get("expired", 0), 0, 0, 999),
-        "memory_ids": [
-            str(item_id or "").strip()[:80]
-            for item_id in safe.get("memory_ids", [])
-            if str(item_id or "").strip()
-        ][:8],
-    }
+    return memory_snapshot.compact_short_term_memory_debug(snapshot)
 
 
 def _update_short_term_memory(config, record):
@@ -1153,67 +881,27 @@ def _compact_memory_debug_item(item, source="", score=None):
 
 
 def _compact_core_memory_prompt_item(item, score=None):
-    safe = item if isinstance(item, dict) else {}
-    out = {
-        "id": str(safe.get("id", "")).strip()[:80],
-        "source": "core_memory",
-        "kind": str(safe.get("memory_kind") or safe.get("kind", "")).strip()[:24],
-        "category": str(safe.get("category", "")).strip()[:40],
-        "text": normalize_memory_text(safe.get("text", ""), max_len=120),
-        "importance": safe.get("importance", 0),
-        "confidence": safe.get("confidence", 0),
-        "pinned": bool(safe.get("pinned", False)),
-        "created_at": str(safe.get("created_at", "")).strip()[:40],
-        "updated_at": str(safe.get("updated_at", "")).strip()[:40],
-    }
-    if score is not None:
-        try:
-            out["relevance"] = int(score)
-        except (TypeError, ValueError):
-            out["relevance"] = 0
-    return out
+    return memory_snapshot.compact_core_memory_prompt_item(
+        item,
+        score=score,
+        normalize_text_func=normalize_memory_text,
+    )
 
 
 def _compact_short_term_memory_prompt_item(item, score=None):
-    safe = item if isinstance(item, dict) else {}
-    out = {
-        "id": str(safe.get("id", "")).strip()[:80],
-        "source": "short_term_memory",
-        "kind": str(safe.get("kind", "")).strip()[:40],
-        "text": normalize_memory_text(safe.get("text", ""), max_len=120),
-        "salience": safe.get("salience", 0),
-        "last_seen_turn": safe.get("last_seen_turn", 0),
-        "ttl_turns": safe.get("ttl_turns", 0),
-        "support_count": safe.get("support_count", 0),
-        "consolidated_at": str(safe.get("consolidated_at", "")).strip()[:40],
-        "updated_at": str(safe.get("updated_at", "")).strip()[:40],
-    }
-    if score is not None:
-        try:
-            out["relevance"] = int(score)
-        except (TypeError, ValueError):
-            out["relevance"] = 0
-    return out
+    return memory_snapshot.compact_short_term_memory_prompt_item(
+        item,
+        score=score,
+        normalize_text_func=normalize_memory_text,
+    )
 
 
 def _compact_learning_prompt_item(item, score=None):
-    safe = item if isinstance(item, dict) else {}
-    out = {
-        "id": str(safe.get("id", "")).strip()[:80],
-        "source": "learning_sample",
-        "score": safe.get("score", 0),
-        "confidence": safe.get("confidence", 0),
-        "support_count": safe.get("support_count", 0),
-        "user_preview": normalize_memory_text(safe.get("user_preview", ""), max_len=90),
-        "assistant_preview": normalize_memory_text(safe.get("assistant_preview", ""), max_len=90),
-        "compressed_pattern": normalize_memory_text(safe.get("compressed_pattern", ""), max_len=110),
-    }
-    if score is not None:
-        try:
-            out["relevance"] = int(score)
-        except (TypeError, ValueError):
-            out["relevance"] = 0
-    return out
+    return memory_snapshot.compact_learning_prompt_item(
+        item,
+        score=score,
+        normalize_text_func=normalize_memory_text,
+    )
 
 
 def _learning_item_sort_time(item):
@@ -1319,18 +1007,7 @@ def _set_last_learning_extraction_debug(snapshot):
 
 
 def _compact_learning_extraction_debug(snapshot):
-    safe = snapshot if isinstance(snapshot, dict) else {}
-    return {
-        "at": str(safe.get("at", "")).strip()[:40],
-        "status": str(safe.get("status", "")).strip()[:40],
-        "reason": str(safe.get("reason", "")).strip()[:80],
-        "candidate_id": str(safe.get("candidate_id", "")).strip()[:80],
-        "category": str(safe.get("category", "")).strip()[:40],
-        "score": safe.get("score", 0),
-        "confidence": safe.get("confidence", 0),
-        "support_count": safe.get("support_count", 0),
-        "action": str(safe.get("action", "")).strip()[:40],
-    }
+    return memory_snapshot.compact_learning_extraction_debug(snapshot)
 
 
 def _has_explicit_learning_signal(user_text):
@@ -1627,21 +1304,7 @@ def _set_last_core_memory_debug(snapshot):
 
 
 def _compact_core_memory_debug(snapshot):
-    safe = snapshot if isinstance(snapshot, dict) else {}
-    return {
-        "at": str(safe.get("at", "")).strip()[:40],
-        "status": str(safe.get("status", "")).strip()[:40],
-        "reason": str(safe.get("reason", "")).strip()[:80],
-        "action": str(safe.get("action", "")).strip()[:40],
-        "stored": _clamp_int(safe.get("stored", 0), 0, 0, 20),
-        "merged": _clamp_int(safe.get("merged", 0), 0, 0, 20),
-        "source": str(safe.get("source", "")).strip()[:40],
-        "memory_ids": [
-            str(item_id or "").strip()[:80]
-            for item_id in safe.get("memory_ids", [])
-            if str(item_id or "").strip()
-        ][:8],
-    }
+    return memory_snapshot.compact_core_memory_debug(snapshot)
 
 
 def _has_core_memory_signal(user, assistant):
@@ -1841,27 +1504,7 @@ def _set_last_memory_consolidation_debug(snapshot):
 
 
 def _compact_memory_consolidation_debug(snapshot):
-    safe = snapshot if isinstance(snapshot, dict) else {}
-    return {
-        "at": str(safe.get("at", "")).strip()[:40],
-        "status": str(safe.get("status", "")).strip()[:40],
-        "reason": str(safe.get("reason", "")).strip()[:80],
-        "action": str(safe.get("action", "")).strip()[:40],
-        "scanned": _clamp_int(safe.get("scanned", 0), 0, 0, 999),
-        "candidates": _clamp_int(safe.get("candidates", 0), 0, 0, 80),
-        "stored": _clamp_int(safe.get("stored", 0), 0, 0, 80),
-        "merged": _clamp_int(safe.get("merged", 0), 0, 0, 80),
-        "short_ids": [
-            str(item_id or "").strip()[:80]
-            for item_id in safe.get("short_ids", [])
-            if str(item_id or "").strip()
-        ][:8],
-        "memory_ids": [
-            str(item_id or "").strip()[:80]
-            for item_id in safe.get("memory_ids", [])
-            if str(item_id or "").strip()
-        ][:8],
-    }
+    return memory_snapshot.compact_memory_consolidation_debug(snapshot)
 
 
 def _set_last_memory_correction_debug(snapshot):
@@ -1870,26 +1513,7 @@ def _set_last_memory_correction_debug(snapshot):
 
 
 def _compact_memory_correction_debug(snapshot):
-    safe = snapshot if isinstance(snapshot, dict) else {}
-    return {
-        "at": str(safe.get("at", "")).strip()[:40],
-        "status": str(safe.get("status", "")).strip()[:40],
-        "reason": str(safe.get("reason", "")).strip()[:80],
-        "action": str(safe.get("action", "")).strip()[:40],
-        "core_changed": _clamp_int(safe.get("core_changed", 0), 0, 0, 80),
-        "short_changed": _clamp_int(safe.get("short_changed", 0), 0, 0, 80),
-        "score": safe.get("score", 0),
-        "memory_ids": [
-            str(item_id or "").strip()[:80]
-            for item_id in safe.get("memory_ids", [])
-            if str(item_id or "").strip()
-        ][:8],
-        "short_ids": [
-            str(item_id or "").strip()[:80]
-            for item_id in safe.get("short_ids", [])
-            if str(item_id or "").strip()
-        ][:8],
-    }
+    return memory_snapshot.compact_memory_correction_debug(snapshot)
 
 
 def _strip_short_memory_prefix(text):
@@ -2674,32 +2298,14 @@ def _tail_jsonl(path, limit=5):
 
 
 def _compact_learning_audit_item(item):
-    safe = item if isinstance(item, dict) else {}
-    detail = safe.get("detail") if isinstance(safe.get("detail"), dict) else {}
-    compact_detail = {}
-    for key in ("candidate_ids", "promoted", "skipped", "pool", "ids", "delta", "changed"):
-        if key in detail:
-            compact_detail[key] = detail.get(key)
-    return {
-        "id": str(safe.get("id", ""))[:64],
-        "ts": str(safe.get("ts", ""))[:40],
-        "action": str(safe.get("action", safe.get("event", "")))[:48],
-        "event": str(safe.get("event", ""))[:48],
-        "detail": compact_detail,
-    }
+    return memory_snapshot.compact_learning_audit_item(item)
 
 
 def _compact_learning_item(item):
-    safe = item if isinstance(item, dict) else {}
-    return {
-        "id": str(safe.get("id", "")).strip(),
-        "status": str(safe.get("status", "")).strip(),
-        "score": safe.get("score", 0),
-        "confidence": safe.get("confidence", 0),
-        "support_count": safe.get("support_count", 0),
-        "assistant_preview": normalize_memory_text(safe.get("assistant_preview", ""), max_len=90),
-        "compressed_pattern": normalize_memory_text(safe.get("compressed_pattern", ""), max_len=110),
-    }
+    return memory_snapshot.compact_learning_item(
+        item,
+        normalize_text_func=normalize_memory_text,
+    )
 
 
 def _is_learning_text_garbled(item):
@@ -2710,145 +2316,25 @@ def _is_learning_text_garbled(item):
     )
 
 
-def _compact_learning_health_window(window):
-    safe = window if isinstance(window, dict) else {}
-    return {
-        "window_ended_at": str(safe.get("window_ended_at", "")).strip(),
-        "window_size": safe.get("window_size", 0),
-        "candidate_in_rate": safe.get("candidate_in_rate", 0),
-        "avg_confidence": safe.get("avg_confidence", 0),
-        "signal_coverage": safe.get("signal_coverage", 0),
-    }
-
-
-def _compact_learning_event(event):
-    safe = event if isinstance(event, dict) else {}
-    return {
-        "ts": str(safe.get("ts", "")).strip(),
-        "event": str(safe.get("event", "")).strip(),
-        "reason": str(safe.get("reason", "")).strip(),
-        "window_count": safe.get("window_count", 0),
-    }
-
-
 def _build_learning_diagnostics(candidates, samples, state):
-    candidate_items = [item for item in candidates if isinstance(item, dict)]
-    sample_items = [item for item in samples if isinstance(item, dict)]
-    all_items = candidate_items + sample_items
-    garbled_items = [item for item in all_items if _is_learning_text_garbled(item)]
-    events = state.get("events", []) if isinstance(state, dict) else []
-    if not isinstance(events, list):
-        events = []
-    health_windows = state.get("health_windows", []) if isinstance(state, dict) else []
-    if not isinstance(health_windows, list):
-        health_windows = []
-    current_window = state.get("current_window", []) if isinstance(state, dict) else []
-    if not isinstance(current_window, list):
-        current_window = []
-
-    degraded_events = [
-        _compact_learning_event(item)
-        for item in events
-        if isinstance(item, dict) and str(item.get("event", "")).strip()
-    ]
-    latest_degraded = degraded_events[-1] if degraded_events else {}
-    return {
-        "degraded_reason": latest_degraded.get("reason", ""),
-        "latest_event": latest_degraded,
-        "health_windows": [
-            _compact_learning_health_window(item)
-            for item in health_windows[-3:]
-            if isinstance(item, dict)
-        ],
-        "current_window_size": len(current_window),
-        "current_window_avg_confidence": _avg_numeric_field(current_window, "confidence"),
-        "current_window_signal_coverage": _rate_positive_field(current_window, "signal_count"),
-        "garbled_count": len(garbled_items),
-        "garbled_candidates_count": sum(1 for item in candidate_items if _is_learning_text_garbled(item)),
-        "garbled_samples_count": sum(1 for item in sample_items if _is_learning_text_garbled(item)),
-        "garbled_examples": [_compact_learning_item(item) for item in garbled_items[:3]],
-    }
-
-
-def _is_pending_learning_candidate(item):
-    if not isinstance(item, dict):
-        return False
-    status = str(item.get("status", "candidate") or "candidate").strip().lower()
-    return status in {"", "candidate"}
-
-
-def _is_active_learning_sample(item):
-    if not isinstance(item, dict):
-        return False
-    status = str(item.get("status", "active") or "active").strip().lower()
-    return status not in {"archived", "deleted", "rejected"}
+    return memory_snapshot.build_learning_diagnostics(
+        candidates,
+        samples,
+        state,
+        normalize_text_func=normalize_memory_text,
+        learning_text_garbled_func=_is_learning_text_garbled,
+    )
 
 
 def _build_learning_review_status(settings, candidates, samples, state, memory_count):
-    quick = _learning_quick_settings(state)
-    inject_limit = max(0, int(settings.get("learning_inject_count", 0) or 0))
-    quick_injection_enabled = bool(quick.get("inject_count", 1) >= 1)
-    samples_enabled = bool(settings.get("enabled", True) and settings.get("learning_samples_enabled", True))
-    prompt_injection_enabled = bool(samples_enabled and quick_injection_enabled and inject_limit > 0)
-    prompt_eligible_samples = [
-        item for item in samples
-        if _is_learning_sample_prompt_eligible(item, settings)
-    ]
-    return {
-        "enabled": bool(settings.get("enabled", True)),
-        "mem0_enabled": bool(settings.get("mem0_enabled", False)),
-        "memory_count": int(memory_count or 0),
-        "candidates_enabled": bool(settings.get("learning_candidates_enabled", True)),
-        "samples_enabled": samples_enabled,
-        "quick_injection_enabled": quick_injection_enabled,
-        "prompt_injection_enabled": prompt_injection_enabled,
-        "prompt_inject_limit": inject_limit,
-        "prompt_inject_effective_limit": inject_limit if prompt_injection_enabled else 0,
-        "candidate_total": len(candidates),
-        "pending_review_count": sum(1 for item in candidates if _is_pending_learning_candidate(item)),
-        "sample_total": len(samples),
-        "active_sample_count": sum(1 for item in samples if _is_active_learning_sample(item)),
-        "prompt_eligible_sample_count": len(prompt_eligible_samples),
-        "candidate_max_items": int(settings.get("learning_candidate_max_items", 0) or 0),
-        "candidate_min_score": settings.get("learning_candidate_min_score", 0),
-        "candidate_min_confidence": settings.get("learning_candidate_min_confidence", 0),
-        "sample_min_score": settings.get("learning_min_score", 0),
-        "sample_min_confidence": settings.get("learning_min_confidence", 0),
-        "candidates_affect_prompt": False,
-        "requires_user_promotion": True,
-        "sensitive_filter_enabled": True,
-        "local_only": True,
-        "input_scope": "chat_turn_text_only",
-        "degraded_mode": bool((state or {}).get("degraded_mode", False)),
-    }
-
-
-def _avg_numeric_field(items, key):
-    values = []
-    for item in items if isinstance(items, list) else []:
-        if not isinstance(item, dict):
-            continue
-        try:
-            values.append(float(item.get(key, 0) or 0))
-        except (TypeError, ValueError):
-            continue
-    if not values:
-        return 0
-    return round(sum(values) / len(values), 4)
-
-
-def _rate_positive_field(items, key):
-    valid = [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
-    if not valid:
-        return 0
-    positives = 0
-    for item in valid:
-        try:
-            if float(item.get(key, 0) or 0) > 0:
-                positives += 1
-        except (TypeError, ValueError):
-            continue
-    return round(positives / len(valid), 4)
+    return memory_snapshot.build_learning_review_status(
+        settings,
+        candidates,
+        samples,
+        state,
+        memory_count,
+        learning_sample_prompt_eligible_func=_is_learning_sample_prompt_eligible,
+    )
 
 
 def _learning_now_iso():
@@ -2919,35 +2405,11 @@ def _save_learning_review_store(candidates, samples, state=None):
 
 
 def _learning_quick_settings(state):
-    raw = state.get("quick_settings", {}) if isinstance(state, dict) else {}
-    if not isinstance(raw, dict):
-        raw = {}
-    try:
-        inject_count = int(raw.get("inject_count", 1) or 0)
-    except (TypeError, ValueError):
-        inject_count = 1
-    try:
-        promotion_min_support = int(raw.get("promotion_min_support", 1) or 1)
-    except (TypeError, ValueError):
-        promotion_min_support = 1
-    return {
-        "inject_count": 1 if inject_count >= 1 else 0,
-        "promotion_min_support": 2 if promotion_min_support >= 2 else 1,
-    }
+    return memory_snapshot.learning_quick_settings(state)
 
 
 def _build_learning_review_payload(candidates, samples, state, message=""):
-    return {
-        "ok": True,
-        "message": str(message or "").strip(),
-        "candidates": candidates,
-        "samples": samples,
-        "quick_settings": _learning_quick_settings(state),
-        "state": {
-            "degraded_mode": bool((state or {}).get("degraded_mode", False)),
-            "turn_count": int((state or {}).get("turn_count", 0) or 0),
-        },
-    }
+    return memory_snapshot.build_learning_review_payload(candidates, samples, state, message=message)
 
 
 def _append_learning_audit(action, before, after, detail=None):
@@ -2964,18 +2426,7 @@ def _append_learning_audit(action, before, after, detail=None):
 
 
 def _snapshot_learning_review(candidates, samples, state):
-    try:
-        safe_candidates = json.loads(json.dumps(candidates, ensure_ascii=False))
-        safe_samples = json.loads(json.dumps(samples, ensure_ascii=False))
-    except Exception:
-        safe_candidates = []
-        safe_samples = []
-    return {
-        "candidates": safe_candidates if isinstance(safe_candidates, list) else [],
-        "samples": safe_samples if isinstance(safe_samples, list) else [],
-        "quick_settings": _learning_quick_settings(state),
-        "degraded_mode": bool((state or {}).get("degraded_mode", False)),
-    }
+    return memory_snapshot.snapshot_learning_review(candidates, samples, state)
 
 
 def _last_learning_shadow_observation_at():
@@ -3471,107 +2922,44 @@ def get_memory_debug_snapshot(config):
         short_items = _prune_short_term_items(short_state.get("items", []), int(short_state.get("turn_index", 0) or 0))
         core_items = load_core_memory_items()
         last_memory_debug = dict(LAST_MEMORY_DEBUG) if isinstance(LAST_MEMORY_DEBUG, dict) else {}
-    last_extraction_debug = _compact_learning_extraction_debug(LAST_LEARNING_EXTRACTION_DEBUG)
-    last_short_debug = _compact_short_term_memory_debug(LAST_SHORT_TERM_MEMORY_DEBUG)
-    last_core_debug = _compact_core_memory_debug(LAST_CORE_MEMORY_DEBUG)
-    last_consolidation_debug = _compact_memory_consolidation_debug(LAST_MEMORY_CONSOLIDATION_DEBUG)
-    last_correction_debug = _compact_memory_correction_debug(LAST_MEMORY_CORRECTION_DEBUG)
     candidates, samples, state = _load_learning_review_store()
-    review_status = _build_learning_review_status(settings, candidates, samples, state, memory_count)
-    return {
-        "ok": True,
-        "memory": {
-            "enabled": bool(settings["enabled"]),
-            "mem0_enabled": bool(settings["mem0_enabled"]),
-            "memory_count": memory_count,
-            "last_selection": last_memory_debug,
-        },
-        "short_memory": {
-            "enabled": bool(settings["short_enabled"]),
-            "count": len(short_items),
-            "turn_index": int(short_state.get("turn_index", 0) or 0),
-            "inject_count": settings["short_inject_count"],
-            "ttl_turns": settings["short_ttl_turns"],
-            "consolidation_enabled": bool(settings["memory_consolidation_enabled"]),
-            "consolidation_min_support": settings["memory_consolidation_min_support"],
-            "last_update": last_short_debug,
-            "last_consolidation": last_consolidation_debug,
-            "recent": [_compact_short_term_memory_prompt_item(item) for item in short_items[:5]],
-        },
-        "core_memory": {
-            "enabled": bool(settings["core_enabled"]),
-            "extraction_enabled": bool(settings["core_extraction_enabled"]),
-            "correction_enabled": bool(settings["memory_correction_enabled"]),
-            "count": len(core_items),
-            "inject_count": settings["core_inject_count"],
-            "min_importance": settings["core_min_importance"],
-            "min_confidence": settings["core_min_confidence"],
-            "last_extraction": last_core_debug,
-            "last_correction": last_correction_debug,
-            "recent": [_compact_core_memory_prompt_item(item) for item in core_items[-5:]],
-        },
-        "learning": {
-            "candidates_count": len(candidates),
-            "samples_count": len(samples),
-            "last_extraction": last_extraction_debug,
-            "degraded_mode": bool(state.get("degraded_mode", False)),
-            "turn_count": int(state.get("turn_count", 0) or 0),
-            "review_status": review_status,
-            "diagnostics": _build_learning_diagnostics(candidates, samples, state),
-            "recent_candidates": [_compact_learning_item(item) for item in candidates[-5:]],
-            "recent_samples": [_compact_learning_item(item) for item in samples[-5:]],
-            "recent_audit": [
-                _compact_learning_audit_item(item)
-                for item in _tail_jsonl(LEARNING_AUDIT_LOG_PATH, limit=5)
-            ],
-            "recent_shadow": _tail_jsonl(LEARNING_SHADOW_LOG_PATH, limit=5),
-        },
-    }
+    return memory_snapshot.build_memory_debug_snapshot_payload(
+        settings=settings,
+        memory_count=memory_count,
+        short_state=short_state,
+        short_items=short_items,
+        core_items=core_items,
+        last_memory_debug=last_memory_debug,
+        last_learning_extraction_debug=LAST_LEARNING_EXTRACTION_DEBUG,
+        last_short_debug=LAST_SHORT_TERM_MEMORY_DEBUG,
+        last_core_debug=LAST_CORE_MEMORY_DEBUG,
+        last_consolidation_debug=LAST_MEMORY_CONSOLIDATION_DEBUG,
+        last_correction_debug=LAST_MEMORY_CORRECTION_DEBUG,
+        candidates=candidates,
+        samples=samples,
+        learning_state=state,
+        recent_audit=_tail_jsonl(LEARNING_AUDIT_LOG_PATH, limit=5),
+        recent_shadow=_tail_jsonl(LEARNING_SHADOW_LOG_PATH, limit=5),
+        normalize_text_func=normalize_memory_text,
+        learning_sample_prompt_eligible_func=_is_learning_sample_prompt_eligible,
+        learning_text_garbled_func=_is_learning_text_garbled,
+    )
 
 
 def _load_wakeup_summary():
-    if not MEMORY_SUMMARY_PATH.exists():
-        return ""
-    try:
-        data = json.loads(MEMORY_SUMMARY_PATH.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return ""
-    return str(data.get("summary", "")).strip()
+    return memory_persona.load_wakeup_summary(MEMORY_SUMMARY_PATH)
 
 
 def _save_wakeup_summary(summary, item_count):
-    payload = json.dumps(
-        {
-            "summary": str(summary or "").strip(),
-            "item_count": int(item_count or 0),
-            "updated_at": datetime.now().isoformat(timespec="seconds"),
-        },
-        ensure_ascii=False,
-        indent=2,
-    )
-    tmp_path = MEMORY_SUMMARY_PATH.with_suffix(".tmp")
-    tmp_path.write_text(payload, encoding="utf-8")
-    tmp_path.replace(MEMORY_SUMMARY_PATH)
+    memory_persona.save_wakeup_summary(MEMORY_SUMMARY_PATH, summary, item_count)
 
 
 def _load_json_summary(path):
-    if not path.exists():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
+    return memory_persona.load_json_summary(path)
 
 
 def _save_json_summary(path, payload):
-    safe = payload if isinstance(payload, dict) else {}
-    tmp_path = path.with_suffix(".tmp")
-    tmp_path.write_text(
-        json.dumps(safe, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    tmp_path.replace(path)
+    memory_persona.save_json_summary(path, payload)
 
 
 def _normalize_persona_value(value, max_len=240):
@@ -3581,272 +2969,89 @@ def _normalize_persona_value(value, max_len=240):
 
 
 def _is_regression_persona_placeholder(value):
-    return bool(re.fullmatch(r"\u56de\u5f52\u68c0\u67e5-\d+", str(value or "").strip()))
+    return memory_persona.is_regression_persona_placeholder(value)
 
 
 def _is_legacy_only_persona_text(value):
-    parts = [part.strip() for part in re.split(r"[;\uff1b]", str(value or "").strip()) if part.strip()]
-    if not parts:
-        return False
-    return all(
-        re.fullmatch(
-            r"\u4e3b\u52a8\u7a0b\u5ea6[:\uff1a]\s*(?:\u4f4e|\u9002\u4e2d|\u9ad8|\u5f88\u9ad8)\s*",
-            part,
-        )
-        or re.fullmatch(
-            r"\u5173\u7cfb\u5b9a\u4f4d[:\uff1a]\s*(?:\u684c\u9762\u4f19\u4f34|\u5b66\u4e60\u642d\u5b50|\u60c5\u7eea\u966a\u4f34|\u5de5\u4f5c\u52a9\u624b)\s*",
-            part,
-        )
-        for part in parts
-    )
+    return memory_persona.is_legacy_only_persona_text(value)
 
 
 def _normalize_persona_relationship_role(value):
-    text = _normalize_persona_value(value, max_len=MANUAL_PERSONA_CARD_LIMITS["relationship_role"])
-    if not text:
-        return ""
-    if text in PERSONA_RELATIONSHIP_ROLES:
-        return text
-    if any(keyword in text for keyword in ("\u5b66\u4e60", "\u642d\u5b50")):
-        return PERSONA_RELATIONSHIP_ROLES[0]
-    if any(keyword in text for keyword in ("\u684c\u9762", "\u4f19\u4f34")):
-        return PERSONA_RELATIONSHIP_ROLES[1]
-    if any(keyword in text for keyword in ("\u60c5\u7eea", "\u966a\u4f34", "\u5b89\u6170")):
-        return PERSONA_RELATIONSHIP_ROLES[2]
-    if any(keyword in text for keyword in ("\u5de5\u4f5c", "\u52a9\u624b", "\u6548\u7387")):
-        return PERSONA_RELATIONSHIP_ROLES[3]
-    lowered = text.lower()
-    if any(keyword in lowered for keyword in ("study", "learn")):
-        return PERSONA_RELATIONSHIP_ROLES[0]
-    if any(keyword in lowered for keyword in ("desktop", "partner")):
-        return PERSONA_RELATIONSHIP_ROLES[1]
-    if any(keyword in lowered for keyword in ("emotion", "companion", "support")):
-        return PERSONA_RELATIONSHIP_ROLES[2]
-    if any(keyword in lowered for keyword in ("work", "assistant", "productivity")):
-        return PERSONA_RELATIONSHIP_ROLES[3]
-    return ""
+    return memory_persona.normalize_persona_relationship_role(
+        value,
+        normalize_text_func=normalize_memory_text,
+    )
 
 
 def _normalize_persona_initiative_level(value):
-    text = _normalize_persona_value(value, max_len=MANUAL_PERSONA_CARD_LIMITS["initiative_level"])
-    if not text:
-        return ""
-    direct_map = {
-        "\u4f4e": PERSONA_INITIATIVE_LEVELS[0],
-        "\u8f83\u4f4e": PERSONA_INITIATIVE_LEVELS[0],
-        "\u88ab\u52a8": PERSONA_INITIATIVE_LEVELS[0],
-        "\u5c11\u6253\u6270": PERSONA_INITIATIVE_LEVELS[0],
-        "\u9002\u4e2d": PERSONA_INITIATIVE_LEVELS[1],
-        "\u4e2d": PERSONA_INITIATIVE_LEVELS[1],
-        "\u5e73\u8861": PERSONA_INITIATIVE_LEVELS[1],
-        "\u4e00\u822c": PERSONA_INITIATIVE_LEVELS[1],
-        "\u9ad8": PERSONA_INITIATIVE_LEVELS[2],
-        "\u8f83\u9ad8": PERSONA_INITIATIVE_LEVELS[2],
-        "\u4e3b\u52a8": PERSONA_INITIATIVE_LEVELS[2],
-        "\u5f88\u9ad8": PERSONA_INITIATIVE_LEVELS[3],
-        "\u8d85\u9ad8": PERSONA_INITIATIVE_LEVELS[3],
-    }
-    if text in direct_map:
-        return direct_map[text]
-    lowered = text.lower()
-    if "low" in lowered:
-        return PERSONA_INITIATIVE_LEVELS[0]
-    if "very high" in lowered or "ultra" in lowered:
-        return PERSONA_INITIATIVE_LEVELS[3]
-    if "high" in lowered:
-        return PERSONA_INITIATIVE_LEVELS[2]
-    if "mid" in lowered or "medium" in lowered:
-        return PERSONA_INITIATIVE_LEVELS[1]
-    if "\u4e3b\u52a8" in text:
-        return PERSONA_INITIATIVE_LEVELS[2]
-    if "\u4f4e\u6253\u6270" in text:
-        return PERSONA_INITIATIVE_LEVELS[0]
-    return text
+    return memory_persona.normalize_persona_initiative_level(
+        value,
+        normalize_text_func=normalize_memory_text,
+    )
 
 
 def _extract_alias_from_identity(identity):
-    text = str(identity or "").strip()
-    if not text:
-        return ""
-    patterns = (
-        r"(?:\u53eb\u6211|\u79f0\u547c\u6211|\u558a\u6211)([^\s,\uFF0C\u3002\uFF1B;\u3001]{1,20})",
-        r"(?:\u7528\u6237\u79f0\u547c|\u79f0\u547c\u7528\u6237)\s*[:\uFF1A]\s*([^\s,\uFF0C\u3002\uFF1B;\u3001]{1,20})",
+    return memory_persona.extract_alias_from_identity(
+        identity,
+        normalize_text_func=normalize_memory_text,
     )
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return normalize_memory_text(match.group(1), max_len=MANUAL_PERSONA_CARD_LIMITS["user_alias"])
-    return ""
 
 
 def _compose_legacy_identity(card):
-    parts = []
-    character_name = str(card.get("character_name", "")).strip()
-    user_alias = str(card.get("user_alias", "")).strip()
-    if character_name:
-        parts.append(f"\u89d2\u8272\u540d\uff1a{character_name}")
-    if user_alias:
-        parts.append(f"\u7528\u6237\u79f0\u547c\uff1a{user_alias}")
-    return normalize_memory_text("; ".join(parts), max_len=MANUAL_PERSONA_CARD_LIMITS["identity"])
+    normalized = memory_persona.normalize_manual_persona_card(
+        card,
+        normalize_text_func=normalize_memory_text,
+    )
+    return normalized.get("identity", "")
 
 
 def _compose_legacy_reply_style(card):
-    parts = []
-    speaking_style = str(card.get("speaking_style", "")).strip()
-    catchphrases = str(card.get("catchphrases", "")).strip()
-    if speaking_style:
-        parts.append(speaking_style)
-    if catchphrases:
-        parts.append(f"\u53e3\u5934\u7985\uff1a{catchphrases}")
-    return normalize_memory_text("; ".join(parts), max_len=MANUAL_PERSONA_CARD_LIMITS["reply_style"])
+    normalized = memory_persona.normalize_manual_persona_card(
+        card,
+        normalize_text_func=normalize_memory_text,
+    )
+    return normalized.get("reply_style", "")
 
 
 def _compose_legacy_companionship_style(card):
-    parts = []
-    personality_tags = str(card.get("personality_tags", "")).strip()
-    initiative_level = str(card.get("initiative_level", "")).strip()
-    relationship_role = str(card.get("relationship_role", "")).strip()
-    if personality_tags:
-        parts.append(f"\u6027\u683c\u6807\u7b7e\uff1a{personality_tags}")
-    if initiative_level:
-        parts.append(f"\u4e3b\u52a8\u7a0b\u5ea6\uff1a{initiative_level}")
-    if relationship_role:
-        parts.append(f"\u5173\u7cfb\u5b9a\u4f4d\uff1a{relationship_role}")
-    return normalize_memory_text("; ".join(parts), max_len=MANUAL_PERSONA_CARD_LIMITS["companionship_style"])
+    normalized = memory_persona.normalize_manual_persona_card(
+        card,
+        normalize_text_func=normalize_memory_text,
+    )
+    return normalized.get("companionship_style", "")
 
 
 def _normalize_manual_persona_card(card):
-    src = card if isinstance(card, dict) else {}
-    if any(_is_regression_persona_placeholder(src.get(key, "")) for key in ("character_name", "identity")):
-        src = {}
-    normalized = {}
-    for key in MANUAL_PERSONA_CARD_FIELDS:
-        if key == "relationship_role":
-            normalized[key] = _normalize_persona_relationship_role(src.get(key, ""))
-            continue
-        if key == "initiative_level":
-            normalized[key] = _normalize_persona_initiative_level(src.get(key, ""))
-            continue
-        max_len = MANUAL_PERSONA_CARD_LIMITS.get(key, 240)
-        value = _normalize_persona_value(src.get(key, ""), max_len=max_len)
-        if _is_regression_persona_placeholder(value):
-            value = ""
-        if key in {"personality_tags", "companionship_style"} and _is_legacy_only_persona_text(value):
-            value = ""
-        normalized[key] = value
-
-    identity = str(normalized.get("identity", "")).strip()
-    companionship_style = str(normalized.get("companionship_style", "")).strip()
-
-    if not normalized.get("character_name") and identity:
-        normalized["character_name"] = normalize_memory_text(
-            identity, max_len=MANUAL_PERSONA_CARD_LIMITS["character_name"]
-        )
-    if not normalized.get("user_alias") and identity:
-        normalized["user_alias"] = _extract_alias_from_identity(identity)
-    if not normalized.get("likes"):
-        normalized["likes"] = (
-            normalized.get("user_preferences", "") or normalized.get("common_topics", "")
-        )
-    if not normalized.get("dislikes"):
-        normalized["dislikes"] = normalized.get("user_dislikes", "")
-    if not normalized.get("speaking_style"):
-        normalized["speaking_style"] = normalized.get("reply_style", "")
-    if (
-        not normalized.get("personality_tags")
-        and companionship_style
-        and not _is_legacy_only_persona_text(companionship_style)
-    ):
-        normalized["personality_tags"] = normalize_memory_text(
-            companionship_style, max_len=MANUAL_PERSONA_CARD_LIMITS["personality_tags"]
-        )
-    if not normalized.get("relationship_role") and companionship_style:
-        normalized["relationship_role"] = _normalize_persona_relationship_role(companionship_style)
-    if not normalized.get("initiative_level") and companionship_style:
-        normalized["initiative_level"] = _normalize_persona_initiative_level(companionship_style)
-    if not normalized.get("initiative_level"):
-        normalized["initiative_level"] = PERSONA_INITIATIVE_LEVELS[1]
-
-    if not normalized.get("identity"):
-        normalized["identity"] = _compose_legacy_identity(normalized)
-    if not normalized.get("user_preferences"):
-        normalized["user_preferences"] = normalize_memory_text(
-            normalized.get("likes", ""), max_len=MANUAL_PERSONA_CARD_LIMITS["user_preferences"]
-        )
-    if not normalized.get("user_dislikes"):
-        normalized["user_dislikes"] = normalize_memory_text(
-            normalized.get("dislikes", ""), max_len=MANUAL_PERSONA_CARD_LIMITS["user_dislikes"]
-        )
-    if not normalized.get("common_topics") and normalized.get("likes"):
-        normalized["common_topics"] = normalize_memory_text(
-            normalized.get("likes", ""), max_len=MANUAL_PERSONA_CARD_LIMITS["common_topics"]
-        )
-    if not normalized.get("reply_style"):
-        normalized["reply_style"] = _compose_legacy_reply_style(normalized)
-    if not normalized.get("companionship_style"):
-        normalized["companionship_style"] = _compose_legacy_companionship_style(normalized)
-
-    updated_at = str(src.get("updated_at", "")).strip()
-    normalized["updated_at"] = updated_at
-    return normalized
+    return memory_persona.normalize_manual_persona_card(
+        card,
+        normalize_text_func=normalize_memory_text,
+    )
 
 
 def load_manual_persona_card():
-    if not MANUAL_PERSONA_CARD_PATH.exists():
-        return _normalize_manual_persona_card({})
-    try:
-        data = json.loads(MANUAL_PERSONA_CARD_PATH.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return _normalize_manual_persona_card({})
-    return _normalize_manual_persona_card(data if isinstance(data, dict) else {})
+    return memory_persona.load_manual_persona_card(
+        MANUAL_PERSONA_CARD_PATH,
+        normalize_text_func=normalize_memory_text,
+    )
 
 
 def save_manual_persona_card(card):
-    safe = _normalize_manual_persona_card(card)
-    safe["updated_at"] = datetime.now().isoformat(timespec="seconds")
-    tmp_path = MANUAL_PERSONA_CARD_PATH.with_suffix(".tmp")
-    tmp_path.write_text(
-        json.dumps(safe, ensure_ascii=False, indent=2),
-        encoding="utf-8",
+    return memory_persona.save_manual_persona_card(
+        MANUAL_PERSONA_CARD_PATH,
+        card,
+        normalize_text_func=normalize_memory_text,
     )
-    tmp_path.replace(MANUAL_PERSONA_CARD_PATH)
-    return safe
 
 
 def build_manual_persona_card_block():
-    card = load_manual_persona_card()
-    mapping = [
-        ("character_name", "\u89d2\u8272\u540d"),
-        ("user_alias", "\u7528\u6237\u79f0\u547c"),
-        ("personality_tags", "\u6027\u683c\u6807\u7b7e"),
-        ("speaking_style", "\u8bf4\u8bdd\u98ce\u683c"),
-        ("catchphrases", "\u53e3\u5934\u7985"),
-        ("likes", "\u559c\u6b22\u7684\u4e8b\u7269"),
-        ("dislikes", "\u4e0d\u559c\u6b22\u7684\u4e8b\u7269"),
-        ("initiative_level", "\u4e3b\u52a8\u7a0b\u5ea6"),
-        ("relationship_role", "\u5173\u7cfb\u5b9a\u4f4d"),
-    ]
-    lines = []
-    for key, label in mapping:
-        value = str(card.get(key, "")).strip()
-        if not value:
-            continue
-        lines.append(f"- {label}: {value}")
-    if not lines:
-        return ""
-    return (
-        "以下是用户手动填写的人设卡（高优先级，回答时尽量遵守；如与用户最新明确指令冲突，以最新指令为准）：\n"
-        + "\n".join(lines)
-    )
+    return memory_persona.build_manual_persona_card_block(load_manual_persona_card())
 
 
 def _build_dialogue_excerpt(items, limit=60):
-    sample = items[-max(1, int(limit)) :]
-    return "\n\n".join(
-        f"[{str(item.get('ts', ''))[:10]}] 用户：{normalize_memory_text(item.get('user', ''), 80)}\n"
-        f"Taffy：{normalize_memory_text(item.get('assistant', ''), 100)}"
-        for item in sample
-        if isinstance(item, dict)
+    return memory_persona.build_dialogue_excerpt(
+        items,
+        limit=limit,
+        normalize_text_func=normalize_memory_text,
     )
 
 
@@ -3950,32 +3155,29 @@ def _refresh_persona_and_relationship_memory(config):
 
 
 def build_wakeup_summary_block():
-    summary = _load_wakeup_summary()
-    if not summary:
-        return ""
-    if looks_garbled_text(summary) or looks_stagey_text(summary):
-        return ""
-    return f"关于用户的长期画像：{summary}"
+    return memory_persona.build_wakeup_summary_block(
+        MEMORY_SUMMARY_PATH,
+        looks_garbled_text,
+        looks_stagey_text,
+    )
 
 
 def build_persona_memory_block():
-    data = _load_json_summary(PROFILE_MEMORY_PATH)
-    summary = str(data.get("summary", "")).strip()
-    if not summary:
-        return ""
-    if looks_garbled_text(summary) or looks_stagey_text(summary):
-        return ""
-    return f"关于用户的人设记忆：{summary}"
+    return memory_persona.build_summary_block(
+        PROFILE_MEMORY_PATH,
+        "关于用户的人设记忆：",
+        looks_garbled_text,
+        looks_stagey_text,
+    )
 
 
 def build_relationship_memory_block():
-    data = _load_json_summary(RELATIONSHIP_MEMORY_PATH)
-    summary = str(data.get("summary", "")).strip()
-    if not summary:
-        return ""
-    if looks_garbled_text(summary) or looks_stagey_text(summary):
-        return ""
-    return f"你和用户的关系记忆：{summary}"
+    return memory_persona.build_summary_block(
+        RELATIONSHIP_MEMORY_PATH,
+        "你和用户的关系记忆：",
+        looks_garbled_text,
+        looks_stagey_text,
+    )
 
 
 def remember_interaction(config, user_message, assistant_reply, is_auto=False):
