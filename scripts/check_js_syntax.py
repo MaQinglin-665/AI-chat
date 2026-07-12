@@ -7,6 +7,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.node_runtime import resolve_node_command
+
 
 CHECK_SUFFIXES = {".js", ".mjs", ".cjs"}
 SKIP_DIRS = {
@@ -22,7 +28,7 @@ SKIP_DIRS = {
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return ROOT
 
 
 def _should_skip(path: Path) -> bool:
@@ -46,7 +52,7 @@ def _iter_js_files(root: Path):
 
 def _check_file(path: Path, root: Path) -> str:
     proc = subprocess.run(
-        ["node", "--check", str(path)],
+        [*resolve_node_command("node"), "--check", str(path)],
         cwd=str(root),
         capture_output=True,
         text=True,

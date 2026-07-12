@@ -83,7 +83,7 @@
 
     if (ui.idleBtn) {
       ui.idleBtn.addEventListener("click", () => {
-        call(deps.enqueueActionIntent, "tap", { combo: true });
+        call(deps.enqueueActionIntent, "tap", { combo: true, userInitiated: true });
         call(deps.scheduleIdleMotionLoop);
       });
     }

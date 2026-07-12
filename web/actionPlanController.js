@@ -305,6 +305,7 @@
       const motionCueFallbackGroups = getMotionCueFallbackGroups(motionCue);
       const motionFamily = getMotionCueFamily(motionCue);
       const auditMotion = context.auditMotion === true;
+      const userInitiated = context.userInitiated === true;
       const steps = [];
       const planGroups = (motionIntent, motionMood, motionSource) => uniqueMotionGroups([
         ...motionCueFallbackGroups,
@@ -316,7 +317,8 @@
         motionRole,
         motionFamily,
         motionTags: motionTags.slice(0, 8),
-        auditMotion
+        auditMotion,
+        userInitiated
       }));
 
       if (intent === "tap") {
@@ -432,6 +434,13 @@
       return motionBlend > 0.54 && priority <= 1;
     }
 
+    function shouldSkipActionStepForListening(step) {
+      const phase = String(state.listeningPresencePhase || "idle").toLowerCase();
+      const sessionId = Number(state.listeningPresenceSession || 0);
+      const listening = sessionId > 0 && ["armed", "hearing", "release"].includes(phase);
+      return listening && step?.userInitiated !== true && call(deps.isSpeakingNow) !== true;
+    }
+
     async function runActionQueue() {
       if (state.actionRunnerBusy) {
         return;
@@ -449,10 +458,16 @@
           if (shouldSkipActionStepForSpeech(step, perf.now())) {
             continue;
           }
+          if (shouldSkipActionStepForListening(step)) {
+            continue;
+          }
           if (Number(step.delayMs) > 0) {
             await waitMs(step.delayMs);
           }
           if (shouldSkipActionStepForSpeech(step, perf.now())) {
+            continue;
+          }
+          if (shouldSkipActionStepForListening(step)) {
             continue;
           }
           const beforeDispatchAt = Number(state.lastMotionDirectorDispatch?.at || 0);
@@ -492,6 +507,9 @@
       if (!state.motionEnabled || !state.model) {
         return;
       }
+      if (shouldSkipActionStepForListening({ userInitiated: context.userInitiated === true })) {
+        return;
+      }
       const i = String(intent || "idle");
       const minGap = i === "talk" ? Math.max(360, state.speakingMotionCooldownMs * 0.36) : 680;
       if (shouldThrottleActionIntent(i, minGap)) {
@@ -519,7 +537,7 @@
       runActionQueue();
     }
 
-    return { uniqueMotionGroups, normalizeMotionGroupKey, normalizeMotionCue, getMotionCueTags, getMotionCueFallbackGroups, getMotionCueFamily, findSemanticMotionGroups, getSemanticMotionTags, getStyleMotionGroups, buildPlannedMotionGroups, shouldThrottleActionIntent, clearThinkingMotionTimer, resetActionSystem, buildActionPlan, isTalkLikeActionStep, hasPendingTalkLikeAction, shouldSkipActionStepForSpeech, runActionQueue, enqueueActionIntent };
+    return { uniqueMotionGroups, normalizeMotionGroupKey, normalizeMotionCue, getMotionCueTags, getMotionCueFallbackGroups, getMotionCueFamily, findSemanticMotionGroups, getSemanticMotionTags, getStyleMotionGroups, buildPlannedMotionGroups, shouldThrottleActionIntent, clearThinkingMotionTimer, resetActionSystem, buildActionPlan, isTalkLikeActionStep, hasPendingTalkLikeAction, shouldSkipActionStepForSpeech, shouldSkipActionStepForListening, runActionQueue, enqueueActionIntent };
   }
 
   const api = { STYLE_MOTION_BLUEPRINT, MOTION_SEMANTIC_TOKENS, MOTION_CUE_TOKENS, MOTION_CUE_FALLBACK_GROUPS, MOTION_CUE_FAMILIES, uniqueMotionGroups, normalizeMotionGroupKey, normalizeMotionCue, getMotionCueTags, getMotionCueFallbackGroups, getMotionCueFamily, createController };

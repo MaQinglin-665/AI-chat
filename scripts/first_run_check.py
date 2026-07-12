@@ -39,6 +39,7 @@ from config import (  # noqa: E402
     resolve_live2d_model_path,
     validate_live2d_model_path,
 )
+from scripts.node_runtime import resolve_node_command  # noqa: E402
 
 
 REQUIRED_PATHS = [
@@ -203,7 +204,7 @@ def check_tools(r: Reporter) -> None:
     else:
         r.fail(f"Python 3.10+ is required. Detected: {sys.version.split()[0]}")
 
-    code, node_version = _run_version(["node", "--version"])
+    code, node_version = _run_version([*resolve_node_command("node"), "--version"])
     if code == 0:
         parsed = _parse_major_minor(node_version)
         if parsed and parsed[0] >= 18:
@@ -215,7 +216,7 @@ def check_tools(r: Reporter) -> None:
     else:
         r.fail("Node.js command not found. Install Node.js 18+.")
 
-    code, npm_version = _run_version(["npm", "--version"])
+    code, npm_version = _run_version([*resolve_node_command("npm"), "--version"])
     if code == 0:
         r.pass_(f"npm detected: {npm_version}")
     else:

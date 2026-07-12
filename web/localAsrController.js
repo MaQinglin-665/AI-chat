@@ -2,6 +2,9 @@
   "use strict";
 
   const LOCAL_ASR_PRE_SPEECH_MS = 260;
+  const MAX_PENDING_LOCAL_ASR_UTTERANCES = 3;
+  const NO_BARGE_IN_VOICE_QUEUE_RETRY_MS = 280;
+  const NO_BARGE_IN_VOICE_QUEUE_MAX_WAIT_MS = 30000;
   const ASR_CONTEXT_TERMS = [
     { term: "ASR", aliases: ["a s r", "as r", "语音识别"] },
     { term: "LLM", aliases: ["l l m", "ll m", "大模型"] },
@@ -35,6 +38,99 @@
     const Float32Array = window.Float32Array || root.Float32Array;
     const Int16Array = window.Int16Array || root.Int16Array;
     const Uint8Array = window.Uint8Array || root.Uint8Array;
+
+    function getBrowserRecognitionLanguage() {
+      // Keep browser fallback deterministic. Automatic Chinese/English selection
+      // belongs to the local dual-Vosk route, not two simultaneous cloud listeners.
+      return String(state.asrInputLanguageMode || "auto").trim().toLowerCase() === "en"
+        ? "en-US"
+        : "zh-CN";
+    }
+
+    function clearListeningPresenceReleaseTimer() {
+      if (!state.listeningPresenceReleaseTimer) {
+        return;
+      }
+      try {
+        (window.clearTimeout || root.clearTimeout || clearTimeout)(state.listeningPresenceReleaseTimer);
+      } catch (_) {
+        // ignore timer cleanup failures
+      }
+      state.listeningPresenceReleaseTimer = 0;
+    }
+
+    function setListeningPresence(phase = "idle", opts = {}) {
+      const requestedPhase = ["idle", "armed", "hearing", "release"].includes(String(phase || "").toLowerCase())
+        ? String(phase || "idle").toLowerCase()
+        : "idle";
+      const sessionId = Number(opts.sessionId ?? opts.session_id ?? state.micSession ?? 0);
+      const force = opts.force === true;
+      if (!force && sessionId !== Number(state.micSession || 0)) {
+        return false;
+      }
+      const canListen = state.micOpen === true && Number(state.micSuspendDepth || 0) <= 0;
+      const nextPhase = requestedPhase !== "idle" && canListen ? requestedPhase : "idle";
+      const nextSession = nextPhase === "idle" ? 0 : sessionId;
+      const nextLevel = nextPhase === "hearing"
+        ? clampNumber(Number(opts.level), 0, 1)
+        : 0;
+      const previousPhase = String(state.listeningPresencePhase || "idle");
+      const previousSession = Number(state.listeningPresenceSession || 0);
+      const previousLevel = Number(state.listeningPresenceLevel || 0);
+      const changed = previousPhase !== nextPhase
+        || previousSession !== nextSession
+        || Math.abs(previousLevel - nextLevel) >= 0.025;
+      if (!changed) {
+        return false;
+      }
+      if (nextPhase !== "release") {
+        clearListeningPresenceReleaseTimer();
+      }
+      state.listeningPresencePhase = nextPhase;
+      state.listeningPresenceSession = nextSession;
+      state.listeningPresenceLevel = nextLevel;
+      state.listeningPresenceRevision = Math.max(0, Number(state.listeningPresenceRevision || 0)) + 1;
+      state.listeningPresenceUpdatedAt = Date.now();
+      if (nextPhase === "release") {
+        const releaseRevision = Number(state.listeningPresenceRevision || 0);
+        const releaseSession = nextSession;
+        clearListeningPresenceReleaseTimer();
+        state.listeningPresenceReleaseTimer = window.setTimeout(() => {
+          state.listeningPresenceReleaseTimer = 0;
+          if (
+            Number(state.micSession || 0) !== releaseSession
+            || Number(state.listeningPresenceSession || 0) !== releaseSession
+            || Number(state.listeningPresenceRevision || 0) !== releaseRevision
+            || String(state.listeningPresencePhase || "") !== "release"
+            || state.micOpen !== true
+            || Number(state.micSuspendDepth || 0) > 0
+          ) {
+            return;
+          }
+          setListeningPresence("armed", { sessionId: releaseSession });
+        }, Math.max(180, Math.min(420, Number(opts.releaseMs) || 280)));
+      }
+      return true;
+    }
+
+    function clearListeningPresence(opts = {}) {
+      clearListeningPresenceReleaseTimer();
+      return setListeningPresence("idle", { ...opts, force: true, sessionId: 0 });
+    }
+
+    function clearMicQueueRetryTimer() {
+      const timer = state.micQueueRetryTimer;
+      if (!timer) {
+        return;
+      }
+      try {
+        (window.clearTimeout || root.clearTimeout || clearTimeout)(timer);
+      } catch (_) {
+        // ignore timer cleanup failures
+      }
+      state.micQueueRetryTimer = 0;
+    }
+
     function updateMicMeter(levelOverride = null) {
       if (!ui.micMeterWrap || !ui.micMeterFill || !ui.micMeterText) {
         return;
@@ -349,6 +445,10 @@
         confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 1,
         confidence_reason: cleanAsrText(payload.confidence_reason, 80),
         needs_confirmation: payload.needs_confirmation === true,
+        language_selection_ambiguous: payload.language_selection_ambiguous === true,
+        detected_language: ["zh-CN", "en-US"].includes(String(payload.detected_language || ""))
+          ? String(payload.detected_language)
+          : "",
         turn_wait_reason: cleanAsrText(payload.turn_wait_reason, 80),
         held_for_more_speech: payload.held_for_more_speech === true,
         changed: payload.changed === true
@@ -408,6 +508,10 @@
         score += 0.05;
         reasons.push("merged");
       }
+      if (opts.languageSelectionAmbiguous === true) {
+        score = Math.min(score, Math.max(0, getAsrLowConfidenceThreshold() - 0.02));
+        reasons.push("language_selection_ambiguous");
+      }
       score = Math.max(0, Math.min(1, score));
       const confirmEnabled = state.asrLowConfidenceConfirmEnabled !== false;
       return {
@@ -429,6 +533,7 @@
         final_text: cleanAsrText(safe.final_text, 160),
         confidence: Number(safe.confidence || 0),
         reason: cleanAsrText(safe.confidence_reason, 80),
+        language_selection_ambiguous: safe.language_selection_ambiguous === true,
         needs_confirmation: true
       };
     }
@@ -448,6 +553,8 @@
         confidence: confidence.score,
         confidence_reason: confidence.reason,
         needs_confirmation: confidence.needsConfirmation,
+        language_selection_ambiguous: opts.languageSelectionAmbiguous === true,
+        detected_language: opts.detectedLanguage,
         changed: finalText !== raw
       });
       return { text: finalText, raw, hotword, context, debug, source, asr_context: buildAsrConversationContext(debug) };
@@ -539,18 +646,50 @@
         .trim();
     }
 
+    function isRecentBargeInVoiceTurn(waitReason = "") {
+      const reason = String(waitReason || "");
+      if (reason === "barge_in_merge" || reason === "protected_speech_merge") {
+        return true;
+      }
+      const interruptedAt = Number(state.chatInterruptedAt || 0);
+      return interruptedAt > 0 && Date.now() - interruptedAt < 7000;
+    }
+
+    function shouldDropUnreliableBargeInVoiceTurn(text, debug = null, waitReason = "") {
+      if (!isRecentBargeInVoiceTurn(waitReason)) {
+        return false;
+      }
+      const compact = cleanAsrText(text, 300);
+      const noSpace = compact.replace(/\s+/g, "");
+      if (!noSpace) {
+        return true;
+      }
+      if (isQuickCompleteVoiceTurn(compact) || hasVoiceTurnBoundary(compact)) {
+        return false;
+      }
+      const score = Number(debug?.confidence || 0);
+      const needsConfirmation = debug?.needs_confirmation === true;
+      if (noSpace.length <= 6) {
+        return true;
+      }
+      return noSpace.length <= 10 && (needsConfirmation || (score > 0 && score < 0.58));
+    }
+
     function queueAsrVoiceTurn(prepared, opts = {}) {
       const item = {
         text: cleanAsrText(prepared?.text, 300),
         source: String(opts.source || prepared?.source || "voice_transcript"),
         interruptReason: String(opts.interruptReason || opts.source || prepared?.source || "voice_transcript"),
         allowWhenMicClosed: opts.allowWhenMicClosed === true,
+        micSession: Number(state.micSession || 0),
+        queuedAt: Date.now(),
         asr_debug: prepared?.debug || null,
         asr_context: prepared?.asr_context || buildAsrConversationContext(prepared?.debug)
       };
       if (!item.text) {
         return false;
       }
+      state.micQueueLastDroppedReason = "";
       state.micQueue.push(item);
       runMicQueue();
       return true;
@@ -583,16 +722,37 @@
         final_text: finalText,
         merged_parts: pending.parts.length,
         ...(() => {
-          const confidence = assessAsrConfidence(raw, finalText, { mergedParts: pending.parts.length });
+          const confidence = assessAsrConfidence(raw, finalText, {
+            mergedParts: pending.parts.length,
+            languageSelectionAmbiguous: pending.languageSelectionAmbiguous === true
+          });
           return {
             confidence: confidence.score,
             confidence_reason: confidence.reason,
             needs_confirmation: confidence.needsConfirmation,
+            language_selection_ambiguous: pending.languageSelectionAmbiguous === true,
             turn_wait_reason: pending.waitReason || "pending_merge"
           };
         })(),
         changed: finalText !== raw || pending.parts.length > 1
       });
+      if (shouldDropUnreliableBargeInVoiceTurn(finalText, debug, pending.waitReason)) {
+        recordAsrCorrectionEvent("dropped", {
+          source: pending.source,
+          raw_text: raw,
+          hotword_text: hotword,
+          context_text: context,
+          final_text: finalText,
+          merged_parts: pending.parts.length,
+          confidence: debug.confidence,
+          confidence_reason: debug.confidence_reason,
+          needs_confirmation: debug.needs_confirmation,
+          language_selection_ambiguous: debug.language_selection_ambiguous === true,
+          turn_wait_reason: "unreliable_barge_in_fragment",
+          changed: finalText !== raw || pending.parts.length > 1
+        });
+        return false;
+      }
       return queueAsrVoiceTurn(
         { text: finalText, debug, source: pending.source, asr_context: buildAsrConversationContext(debug) },
         {
@@ -618,6 +778,7 @@
             source,
             interruptReason,
             allowWhenMicClosed: opts.allowWhenMicClosed === true,
+            languageSelectionAmbiguous: false,
             waitReason: mergeReason
           };
       pending.parts.push(prepared.text);
@@ -626,6 +787,8 @@
       pending.source = source;
       pending.interruptReason = interruptReason;
       pending.allowWhenMicClosed = pending.allowWhenMicClosed || opts.allowWhenMicClosed === true;
+      pending.languageSelectionAmbiguous = pending.languageSelectionAmbiguous
+        || prepared.debug?.language_selection_ambiguous === true;
       pending.waitReason = pending.waitReason || mergeReason;
       pending.updatedAt = now;
       state.micPendingTranscript = pending;
@@ -642,6 +805,7 @@
         confidence: prepared.debug?.confidence,
         confidence_reason: prepared.debug?.confidence_reason,
         needs_confirmation: prepared.debug?.needs_confirmation === true,
+        language_selection_ambiguous: pending.languageSelectionAmbiguous === true,
         turn_wait_reason: mergeReason,
         held_for_more_speech: true,
         changed: pending.parts.length > 1
@@ -661,13 +825,17 @@
       return queueAsrVoiceTurn(prepared, opts);
     }
 
-    async function transcribeLocalPcmChunks(chunks, signal = undefined) {
+    async function transcribeLocalPcmChunks(chunks, signal = undefined, returnMetadata = false) {
       if (!Array.isArray(chunks) || chunks.length === 0) {
-        return "";
+        return returnMetadata
+          ? { text: "", confidence: 0, detectedLanguage: "", languageSelectionAmbiguous: false }
+          : "";
       }
       const audio_base64 = pcmChunksToBase64(chunks);
       if (!audio_base64) {
-        return "";
+        return returnMetadata
+          ? { text: "", confidence: 0, detectedLanguage: "", languageSelectionAmbiguous: false }
+          : "";
       }
       const resp = await authFetch("/api/asr_pcm", {
         method: "POST",
@@ -690,7 +858,18 @@
       }
       const data = await resp.json();
       const rawText = String(data?.raw_text || "").trim();
-      return rawText || String(data?.text || "").trim();
+      const text = rawText || String(data?.text || "").trim();
+      const detectedLanguage = ["zh-CN", "en-US"].includes(String(data?.detected_language || ""))
+        ? String(data.detected_language)
+        : "";
+      const confidence = Number(data?.confidence);
+      const result = {
+        text,
+        detectedLanguage,
+        confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0,
+        languageSelectionAmbiguous: data?.language_selection_ambiguous === true
+      };
+      return returnMetadata ? result : result.text;
     }
 
     function cancelLocalAsrRequest() {
@@ -904,52 +1083,105 @@
       return frames;
     }
 
-    async function flushLocalAsrUtterance(force = false, sessionId = null) {
-      const token = sessionId == null ? state.micSession : Number(sessionId);
-      if (token !== state.micSession) {
-        return;
-      }
-      if (state.localAsrSending) {
-        return;
-      }
-      if (!state.localAsrBuffers.length) {
-        return;
-      }
-      const speechMs = state.localAsrSpeechMs;
-      if (!force && speechMs < state.localAsrMinSpeechMs) {
-        return;
-      }
-      const chunks = state.localAsrBuffers.slice();
+    function resetLocalAsrUtteranceCapture() {
       state.localAsrBuffers = [];
       state.localAsrSpeeching = false;
       state.localAsrSpeechMs = 0;
       state.localAsrSilenceMs = 0;
+    }
+
+    function queuePendingLocalAsrUtterance(utterance) {
+      if (!utterance || !Array.isArray(utterance.chunks) || utterance.chunks.length <= 0) {
+        return false;
+      }
+      if (!Array.isArray(state.localAsrPendingUtterances)) {
+        state.localAsrPendingUtterances = [];
+      }
+      const queue = state.localAsrPendingUtterances;
+      if (queue.length >= MAX_PENDING_LOCAL_ASR_UTTERANCES) {
+        const tail = queue[queue.length - 1];
+        if (tail && Array.isArray(tail.chunks)) {
+          tail.chunks.push(...utterance.chunks);
+          tail.speechMs = (Number(tail.speechMs) || 0) + (Number(utterance.speechMs) || 0);
+          tail.peakRms = Math.max(Number(tail.peakRms) || 0, Number(utterance.peakRms) || 0);
+          return true;
+        }
+      }
+      queue.push(utterance);
+      return true;
+    }
+
+    async function transcribeQueuedLocalAsrUtterance(utterance, token) {
+      if (!utterance || token !== state.micSession || !state.micOpen) {
+        return false;
+      }
       state.localAsrSending = true;
       const controller = new AbortController();
       state.localAsrAbortController = controller;
       try {
-        const text = await transcribeLocalPcmChunks(chunks, controller.signal);
+        const transcript = await transcribeLocalPcmChunks(utterance.chunks, controller.signal, true);
         if (token !== state.micSession || !state.micOpen) {
-          return;
+          return false;
         }
-        if (text) {
-          enqueueMicTranscript(text, token, {
+        if (transcript.text) {
+          enqueueMicTranscript(transcript.text, token, {
             source: "voice_transcript",
-            speechMs,
-            peakRms: state.localAsrPeakRms
+            speechMs: utterance.speechMs,
+            peakRms: utterance.peakRms,
+            confidence: transcript.confidence,
+            detectedLanguage: transcript.detectedLanguage,
+            languageSelectionAmbiguous: transcript.languageSelectionAmbiguous
           });
         }
+        return true;
       } catch (err) {
         if (err?.name === "AbortError") {
-          return;
+          return false;
         }
         setStatus(`语音识别失败: ${err.message}`);
+        return false;
       } finally {
-        if (state.localAsrAbortController === controller) {
-          state.localAsrAbortController = null;
+        const ownsRequest = state.localAsrAbortController === controller;
+        if (!ownsRequest) {
+          return;
         }
+        state.localAsrAbortController = null;
         state.localAsrSending = false;
+        if (token !== state.micSession || !state.micOpen) {
+          state.localAsrPendingUtterances = [];
+          return;
+        }
+        const next = Array.isArray(state.localAsrPendingUtterances)
+          ? state.localAsrPendingUtterances.shift()
+          : null;
+        if (next) {
+          void transcribeQueuedLocalAsrUtterance(next, token);
+        }
       }
+    }
+
+    async function flushLocalAsrUtterance(force = false, sessionId = null) {
+      const token = sessionId == null ? state.micSession : Number(sessionId);
+      if (token !== state.micSession || !Array.isArray(state.localAsrBuffers) || !state.localAsrBuffers.length) {
+        return false;
+      }
+      const speechMs = Number(state.localAsrSpeechMs) || 0;
+      if (!force && speechMs < state.localAsrMinSpeechMs) {
+        resetLocalAsrUtteranceCapture();
+        setListeningPresence("release", { sessionId: token });
+        return false;
+      }
+      const utterance = {
+        chunks: state.localAsrBuffers.slice(),
+        speechMs,
+        peakRms: Number(state.localAsrPeakRms) || 0
+      };
+      resetLocalAsrUtteranceCapture();
+      setListeningPresence("release", { sessionId: token });
+      if (state.localAsrSending) {
+        return queuePendingLocalAsrUtterance(utterance);
+      }
+      return transcribeQueuedLocalAsrUtterance(utterance, token);
     }
 
     function handleLocalAsrFrame(floatData, inputSampleRate, sessionId = null) {
@@ -978,7 +1210,13 @@
       const isSpeech = rms >= adaptiveThreshold;
 
       if (isSpeech) {
+        const listeningLevel = clampNumber(
+          (rms - adaptiveThreshold) / Math.max(0.004, adaptiveThreshold * 5.5),
+          0.18,
+          1
+        );
         if (!state.localAsrSpeeching) {
+          setListeningPresence("hearing", { sessionId: token, level: listeningLevel });
           const speechStartNow = typeof performance.now === "function" ? performance.now() : Date.now();
           const lastInterruptAt = Number(state.localAsrLastSpeechInterruptAt || 0);
           if (!lastInterruptAt || speechStartNow - lastInterruptAt > 700) {
@@ -990,6 +1228,7 @@
             state.localAsrBuffers.push(...preSpeechFrames);
           }
         }
+        setListeningPresence("hearing", { sessionId: token, level: listeningLevel });
         state.localAsrSpeeching = true;
         state.localAsrSpeechMs += frameMs;
         state.localAsrSilenceMs = 0;
@@ -1011,6 +1250,7 @@
       }
       state.localAsrSilenceMs += frameMs;
       if (state.localAsrSilenceMs < state.localAsrSilenceTriggerMs) {
+        setListeningPresence("release", { sessionId: token });
         state.localAsrBuffers.push(pcm16);
         return;
       }
@@ -1020,6 +1260,7 @@
     function clearLocalAsrGraph() {
       stopLocalAsrMeter();
       stopLocalAsrWatchdog();
+      clearListeningPresence({ force: true });
       if (state.localAsrProcessor) {
         try {
           state.localAsrProcessor.disconnect();
@@ -1077,6 +1318,7 @@
       state.localAsrSilenceMs = 0;
       state.localAsrLastSpeechInterruptAt = 0;
       state.localAsrBuffers = [];
+      state.localAsrPendingUtterances = [];
       resetLocalAsrPreSpeechBuffer();
       state.localAsrNoiseFloor = 0.0008;
       state.micLevel = 0;
@@ -1284,6 +1526,7 @@
         audioTrack.onmute = () => {
           state.localAsrInputMuted = true;
           if (token === state.micSession && state.micOpen) {
+            setListeningPresence("release", { sessionId: token });
             setStatus("麦克风轨道被系统静音，请检查 Windows 输入设备、隐私权限或硬件静音键");
             updateMicButton();
           }
@@ -1291,12 +1534,14 @@
         audioTrack.onunmute = () => {
           state.localAsrInputMuted = false;
           if (token === state.micSession && state.micOpen) {
+            setListeningPresence("armed", { sessionId: token });
             setStatus("开麦中...");
             updateMicButton();
           }
         };
         audioTrack.onended = () => {
           if (token === state.micSession && state.micOpen) {
+            clearListeningPresence({ force: true });
             setStatus("麦克风输入已断开，请重新开麦");
           }
         };
@@ -1383,6 +1628,7 @@
       state.localAsrSpeechMs = 0;
       state.localAsrSilenceMs = 0;
       state.localAsrBuffers = [];
+      state.localAsrPendingUtterances = [];
       resetLocalAsrPreSpeechBuffer();
       state.localAsrNoiseFloor = 0.0008;
       state.localAsrLastFrameAt = performance.now();
@@ -1395,6 +1641,7 @@
       state.localAsrInputMuted = !!audioTrack?.muted;
       startLocalAsrMeter(sessionToken);
       startLocalAsrWatchdog(sessionToken);
+      setListeningPresence("armed", { sessionId: sessionToken });
       return true;
     }
 
@@ -1436,6 +1683,8 @@
     function stopMicLoop(manualClose = false) {
       clearMicRestartTimer();
       if (manualClose) {
+        clearListeningPresence({ force: true });
+        clearMicQueueRetryTimer();
         state.micSession += 1;
         state.micOpen = false;
         state.micSuspendDepth = 0;
@@ -1474,6 +1723,7 @@
 
     async function startMicLoop() {
       stopWakeWordListener(true);
+      clearMicQueueRetryTimer();
       state.micSession += 1;
       const token = state.micSession;
       state.micOpen = true;
@@ -1509,45 +1759,63 @@
         }
         scheduleMicRecognitionStart(0);
       }
+      if (token === state.micSession && state.micOpen && state.micSuspendDepth <= 0) {
+        setListeningPresence("armed", { sessionId: token });
+      }
       updateMicButton();
+    }
+
+    function shouldKeepListeningDuringAssistant() {
+      return state.micKeepListening === true
+        && state.conversationMode?.interruptTtsOnUserSpeech === true;
     }
 
     function pauseMicForAssistant() {
       if (!(state.recognitionAvailable || state.localAsrAvailable) || !state.micOpen) {
-        return;
+        return false;
       }
-      if (state.micKeepListening) {
+      if (shouldKeepListeningDuringAssistant()) {
         updateMicButton();
-        return;
+        return false;
       }
       state.micSuspendDepth += 1;
+      clearListeningPresence({ force: true });
       if (state.asrMode === "local_vosk") {
         updateMicButton();
-        return;
+        return true;
       }
       stopMicLoop(false);
+      return true;
     }
 
     function resumeMicAfterAssistant() {
-      if (!(state.recognitionAvailable || state.localAsrAvailable) || !state.micOpen) {
-        return;
+      if (!state.micOpen) {
+        return false;
       }
-      if (state.micKeepListening) {
+      if (shouldKeepListeningDuringAssistant()) {
         updateMicButton();
-        return;
-      }
-      if (state.micSuspendDepth > 0) {
-        state.micSuspendDepth -= 1;
+        return false;
       }
       if (state.micSuspendDepth <= 0) {
+        updateMicButton();
+        return false;
+      }
+      state.micSuspendDepth -= 1;
+      if (state.micSuspendDepth <= 0) {
         state.micSuspendDepth = 0;
+        if (!(state.recognitionAvailable || state.localAsrAvailable)) {
+          updateMicButton();
+          return true;
+        }
         if (state.asrMode === "local_vosk") {
           flushLocalAsrUtterance(true, state.micSession);
         } else {
           scheduleMicRecognitionStart(220);
         }
+        setListeningPresence("armed", { sessionId: state.micSession });
       }
       updateMicButton();
+      return true;
     }
 
     function enqueueMicTranscript(text, sessionId = null, opts = {}) {
@@ -1564,10 +1832,19 @@
         interruptReason: "voice_transcript",
         ...(opts.interruptReason ? { interruptReason: opts.interruptReason } : {}),
         ...(Number.isFinite(Number(opts.confidence)) ? { confidence: Number(opts.confidence) } : {}),
+        ...(opts.detectedLanguage ? { detectedLanguage: String(opts.detectedLanguage) } : {}),
+        ...(opts.languageSelectionAmbiguous === true ? { languageSelectionAmbiguous: true } : {}),
         ...(Number(opts.speechMs || opts.speech_ms) > 0 ? { speechMs: Number(opts.speechMs || opts.speech_ms) } : {}),
         ...(Number(opts.peakRms || opts.peak_rms) > 0 ? { peakRms: Number(opts.peakRms || opts.peak_rms) } : {}),
         forceMerge: opts.forceMerge === true
       });
+    }
+
+    function isAssistantSpeechOrStreamActive() {
+      const phase = String(state.speechPhase || "").trim().toLowerCase();
+      return state.ttsContextSpeaking === true
+        || state.streamSpeakWorking === true
+        || phase === "speaking";
     }
 
     async function runMicQueue() {
@@ -1579,9 +1856,48 @@
         while (state.micQueue.length > 0) {
           const peek = state.micQueue[0];
           if (!state.micOpen && !(peek && typeof peek === "object" && peek.allowWhenMicClosed === true)) {
+            clearMicQueueRetryTimer();
             state.micQueue = [];
             break;
           }
+          const queuedSession = Number(peek?.micSession);
+          if (
+            peek && typeof peek === "object"
+            && peek.allowWhenMicClosed !== true
+            && Number.isFinite(queuedSession)
+            && queuedSession !== Number(state.micSession || 0)
+          ) {
+            state.micQueue.shift();
+            state.micQueueLastDroppedReason = "stale_mic_session";
+            continue;
+          }
+          const allowVoiceInterrupt = state.conversationMode?.interruptTtsOnUserSpeech === true;
+          const assistantTurnOrAudioActive = state.chatBusy === true || isAssistantSpeechOrStreamActive();
+          if (!allowVoiceInterrupt && assistantTurnOrAudioActive) {
+            const queuedAt = Number(peek?.queuedAt || Date.now());
+            const waitedMs = Math.max(0, Date.now() - queuedAt);
+            if (waitedMs >= NO_BARGE_IN_VOICE_QUEUE_MAX_WAIT_MS) {
+              state.micQueue.shift();
+              state.micQueueLastDroppedReason = "no_barge_in_wait_timeout";
+              continue;
+            }
+            state.micQueueLastDeferredAt = Date.now();
+            state.micQueueLastDeferredReason = state.chatBusy === true
+              ? "assistant_turn_busy"
+              : "assistant_audio_active";
+            if (!state.micQueueRetryTimer) {
+              const retryTimer = (window.setTimeout || root.setTimeout || setTimeout)(() => {
+                if (state.micQueueRetryTimer !== retryTimer) {
+                  return;
+                }
+                state.micQueueRetryTimer = 0;
+                runMicQueue();
+              }, Math.max(120, NO_BARGE_IN_VOICE_QUEUE_RETRY_MS));
+              state.micQueueRetryTimer = retryTimer;
+            }
+            break;
+          }
+          clearMicQueueRetryTimer();
           const item = state.micQueue.shift();
           if (!item) {
             continue;
@@ -1599,14 +1915,18 @@
             rememberUser: true,
             auto: false,
             inputModality: "voice",
-            interruptTts: true,
-            interruptActive: true,
+            interruptTts: allowVoiceInterrupt,
+            interruptActive: allowVoiceInterrupt,
             interruptReason: typeof item === "object" ? item.interruptReason || "voice_transcript" : "voice_transcript",
             asrContext: typeof item === "object" ? item.asr_context || null : null,
+            speechTurnWaitMs: allowVoiceInterrupt ? undefined : NO_BARGE_IN_VOICE_QUEUE_MAX_WAIT_MS,
             silentError: false
           });
         }
       } finally {
+        if (!state.micQueue.length) {
+          clearMicQueueRetryTimer();
+        }
         state.micQueueWorking = false;
       }
     }
@@ -1629,7 +1949,7 @@
       }
 
       const recog = new Recognition();
-      recog.lang = "zh-CN";
+      recog.lang = getBrowserRecognitionLanguage();
       recog.continuous = true;
       recog.interimResults = false;
       recog.maxAlternatives = 1;
@@ -1720,13 +2040,16 @@
         return false;
       }
       try {
-        const text = await transcribeLocalPcmChunks(snapshot.chunks);
-        const ok = sendAsrTranscript(text, {
+        const transcript = await transcribeLocalPcmChunks(snapshot.chunks, undefined, true);
+        const ok = sendAsrTranscript(transcript.text, {
           source: "voice_close_transcript",
           interruptReason: "voice_close_transcript",
           allowWhenMicClosed: true,
           speechMs: snapshot.speechMs,
           peakRms: state.localAsrPeakRms,
+          confidence: transcript.confidence,
+          detectedLanguage: transcript.detectedLanguage,
+          languageSelectionAmbiguous: transcript.languageSelectionAmbiguous,
           forceMerge: false
         });
         if (!ok) {
@@ -1782,6 +2105,8 @@
       updateMicMeter,
       updateMicButton,
       clearMicRestartTimer,
+      setListeningPresence,
+      clearListeningPresence,
       ensureMicPermission,
       floatToInt16,
       downsampleTo16k,
@@ -1818,6 +2143,7 @@
       flushPendingMicTranscript,
       runMicQueue,
       setupSpeechRecognition,
+      getBrowserRecognitionLanguage,
       snapshotPendingLocalAsr,
       waitLocalAsrSendingDone,
       transcribeSnapshotAfterMicClose,

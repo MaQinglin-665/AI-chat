@@ -29,6 +29,13 @@
   }
 
   function bindAdvancedActionControls(ui = {}, deps = {}) {
+    if (ui.experienceDiagnosticsBtn) {
+      ui.experienceDiagnosticsBtn.addEventListener("click", () => {
+        const visible = call(deps.toggleExperienceDiagnosticsPanel);
+        call(deps.setStatus, visible ? "体验延迟面板已打开" : "体验延迟面板已隐藏");
+      });
+    }
+
     if (ui.followupReadinessBtn) {
       ui.followupReadinessBtn.addEventListener("click", () => {
         const visible = call(deps.toggleFollowupReadinessPanel);

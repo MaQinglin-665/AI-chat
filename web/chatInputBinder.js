@@ -17,10 +17,30 @@
       });
     }
     if (ui.chatInput) {
+      let isComposing = false;
+      ui.chatInput.addEventListener("compositionstart", () => {
+        isComposing = true;
+      });
+      ui.chatInput.addEventListener("compositionend", () => {
+        isComposing = false;
+      });
       ui.chatInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          call(deps.sendChat);
+        if (event.key !== "Enter") {
+          return;
         }
+        // Enter is commonly used to confirm a Chinese/Japanese/Korean IME
+        // candidate. Do not clear or submit the field until composition has
+        // genuinely ended; keyCode 229 covers Chromium's legacy ordering.
+        if (isComposing || event.isComposing === true || Number(event.keyCode || event.which || 0) === 229) {
+          return;
+        }
+        if (event.repeat === true) {
+          return;
+        }
+        if (typeof event.preventDefault === "function") {
+          event.preventDefault();
+        }
+        call(deps.sendChat);
       });
     }
   }

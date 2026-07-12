@@ -58,6 +58,7 @@ const DESKTOP_WINDOW_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "deskt
 const LIVE2D_LAYOUT_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "live2dLayoutController.js");
 const LIVE2D_EXPRESSION_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "live2dExpressionController.js");
 const LIVE2D_RUNTIME_CONTROLLER_JS = path.resolve(__dirname, "..", "web", "live2dRuntimeController.js");
+const PIXI_UNSAFE_EVAL_VENDOR_JS = path.resolve(__dirname, "..", "web", "vendor", "pixi-unsafe-eval.min.js");
 const RUNTIME_EVENT_BINDER_JS = path.resolve(__dirname, "..", "web", "runtimeEventBinder.js");
 const CHARACTER_RUNTIME_JS = path.resolve(__dirname, "..", "web", "characterRuntime.js");
 const CHARACTER_TUNING_JS = path.resolve(__dirname, "..", "web", "characterTuning.js");
@@ -134,6 +135,7 @@ const desktopWindowControllerSource = fs.readFileSync(DESKTOP_WINDOW_CONTROLLER_
 const live2dLayoutControllerSource = fs.readFileSync(LIVE2D_LAYOUT_CONTROLLER_JS, "utf8");
 const live2dExpressionControllerSource = fs.readFileSync(LIVE2D_EXPRESSION_CONTROLLER_JS, "utf8");
 const live2dRuntimeControllerSource = fs.readFileSync(LIVE2D_RUNTIME_CONTROLLER_JS, "utf8");
+const pixiUnsafeEvalVendorSource = fs.readFileSync(PIXI_UNSAFE_EVAL_VENDOR_JS, "utf8");
 const runtimeEventBinderSource = fs.readFileSync(RUNTIME_EVENT_BINDER_JS, "utf8");
 const tuningSource = fs.readFileSync(CHARACTER_TUNING_JS, "utf8");
 const characterBrainDebugSource = fs.readFileSync(CHARACTER_BRAIN_DEBUG_JS, "utf8");
@@ -622,6 +624,78 @@ function createMemoryStorage(initial = {}) {
 }
 
 {
+  let now = 1000;
+  const motionCalls = [];
+  const motionState = {
+    model: {
+      motion(group, index, priority) {
+        motionCalls.push({ group, index, priority });
+        return Promise.resolve(true);
+      }
+    },
+    motionDefinitions: { Idle: [{}] },
+    motionEnabled: true,
+    idleMotionEnabled: true,
+    motionCooldownUntil: 0,
+    listeningPresencePhase: "hearing",
+    listeningPresenceSession: 8,
+    streamSpeakQueue: [{}],
+    speechAnimUntil: now + 9999
+  };
+  const motionController = motionRuntimeController.createController({
+    state: motionState,
+    windowObject: {},
+    performanceObject: { now: () => now },
+    detectMood: () => "idle"
+  });
+  assert.strictEqual(motionController.isListeningPresenceActive(), true, "hearing should be recognized as an active listening presence");
+  assert.strictEqual(motionController.shouldSkipIdleMotion(), true, "idle dispatch must stay silent while the user is being heard");
+  assert.strictEqual(motionController.shouldDeferMotionForListening(), true, "queued stream timing alone must not count as real assistant audio");
+  motionController.tryBuiltInMotion("idle", { force: true });
+  motionController.playEmotion("idle", { force: true, allowFallback: true });
+  assert.strictEqual(motionCalls.length, 0, "hearing must block direct motion-manager and fallback gesture dispatches");
+  assert.strictEqual(motionController.animateFallback("idle"), false, "hearing must also block the transform fallback gesture");
+
+  motionController.tryBuiltInMotion("idle", { force: true, userInitiated: true });
+  assert.strictEqual(motionCalls.length, 1, "a direct user tap may still request its explicit motion while the mic is armed");
+  motionState.ttsContextSpeaking = true;
+  motionController.tryBuiltInMotion("idle", { force: true });
+  assert.strictEqual(motionCalls.length, 2, "real assistant audio should retain priority over a pending listening state");
+
+  const actionCalls = [];
+  const actionState = {
+    model: {},
+    motionEnabled: true,
+    motionComboEnabled: false,
+    actionLastAt: {},
+    actionQueue: [
+      { mood: "idle", source: "idle", userInitiated: false },
+      { mood: "idle", source: "talk", userInitiated: false },
+      { mood: "idle", source: "reply", userInitiated: false },
+      { mood: "idle", source: "tap", userInitiated: false }
+    ],
+    listeningPresencePhase: "armed",
+    listeningPresenceSession: 8
+  };
+  const actionController = actionPlanController.createController({
+    state: actionState,
+    performanceObject: { now: () => now },
+    detectMood: () => "idle",
+    normalizeTalkStyle: () => "neutral",
+    getMotionIntensityPreset: () => ({ tapChance: 1, comboChance: 0 }),
+    isSpeakingNow: () => false,
+    playEmotion: (_mood, opts) => actionCalls.push(opts)
+  });
+  actionController.runActionQueue();
+  assert.strictEqual(actionCalls.length, 0, "queued non-user motions must be dropped when the listening layer is active");
+  actionController.enqueueActionIntent("idle");
+  assert.strictEqual(actionState.actionQueue.length, 0, "new automatic idle intents must not enter the queue while listening");
+  const userTapPlan = actionController.buildActionPlan("tap", { userInitiated: true, combo: false });
+  assert.ok(userTapPlan.every((step) => step.userInitiated === true), "the action plan should preserve an explicit user-initiated marker");
+  assert.strictEqual(actionController.shouldSkipActionStepForListening(userTapPlan[0]), false, "explicit user tap steps should remain available while listening");
+}
+
+{
   assert.strictEqual(typeof turnTakingDirector.buildTurnTakingDecision, "function", "turn-taking director should build decisions");
   assert.strictEqual(typeof turnTakingDirector.buildPendingThoughtBurst, "function", "turn-taking director should build public pending thoughts");
   const baseContext = {
@@ -819,6 +893,84 @@ function createMemoryStorage(initial = {}) {
   assert.ok(callbackInterjection.reasons.includes("stage_callback"), "stage callback should be explicit in the interjection reason list");
   assert.strictEqual(callbackInterjection.director.decision, "callback", "stage memory interjections should be marked as callbacks");
   assert.strictEqual(callbackInterjection.director.thought_type, "callback", "stage memory interjections should expose a callback thought type");
+}
+
+{
+  const timers = [];
+  const requests = [];
+  const now = Date.now();
+  const state = {
+    autoChatEnabled: true,
+    autoChatTuning: {},
+    lastAutoChatAt: now - 30 * 1000,
+    autoChatInterjectionLastAt: now - 30 * 1000,
+    lastUserMessageAt: now - 8000,
+    conversationLastAssistantAt: now - 2000,
+    chatRecords: [],
+    micOpen: false,
+    micSuspendDepth: 0,
+    autoChatInterjectionTimer: 0
+  };
+  const controller = autoChatController.createController({
+    state,
+    documentObject: { activeElement: null },
+    windowObject: {
+      setTimeout(fn, ms) {
+        timers.push({ fn, ms });
+        return timers.length;
+      },
+      clearTimeout() {}
+    },
+    requestAssistantReply: async (prompt, opts) => {
+      requests.push({ prompt, opts });
+      return true;
+    },
+    constants: {
+      AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS: 4 * 60 * 1000,
+      AUTO_CHAT_INTERJECTION_COOLDOWN_MS: 22 * 1000,
+      AUTO_CHAT_INTERJECTION_RETRY_MS: 20,
+      AUTO_CHAT_ASK_RE: /[?\uFF1F]\s*$/
+    }
+  });
+  const input = {
+    userText: "This desk feels weird.",
+    assistantText: "It does have suspicious desk energy.",
+    userTimestamp: now - 8000,
+    assistantTimestamp: now - 2000,
+    brainSnapshot: { intent: "casual" }
+  };
+
+  assert.strictEqual(typeof controller.getAutoCompanionSpeechGate, "function", "auto-chat should expose one shared dispatch gate");
+  assert.deepStrictEqual(
+    controller.getAutoCompanionSpeechGate(),
+    { allowed: false, reason: "auto_cooldown_active" },
+    "a recent automatic companion line should block a turn interjection for the shared low-frequency window"
+  );
+  const recent = controller.scheduleTurnInterjection(input);
+  assert.strictEqual(recent.scheduled, true, "eligible stage reaction may still schedule its quiet timing check");
+  timers.shift().fn();
+  assert.strictEqual(requests.length, 0, "turn interjections must not bypass the shared automatic-speech cooldown");
+  assert.strictEqual(state.autoChatInterjectionLastSuppressed, "auto_cooldown_active", "cooldown suppression should remain inspectable without user text");
+
+  state.lastAutoChatAt = now - 5 * 60 * 1000;
+  state.autoChatInterjectionLastAt = now - 5 * 60 * 1000;
+  assert.deepStrictEqual(controller.getAutoCompanionSpeechGate(), { allowed: true, reason: "" }, "the shared gate should open after the full low-frequency window");
+  const first = controller.scheduleTurnInterjection(input);
+  assert.strictEqual(first.scheduled, true);
+  timers.shift().fn();
+  assert.strictEqual(requests.length, 1, "an eligible interjection may dispatch one optional companion line");
+  const racing = controller.scheduleTurnInterjection(input);
+  assert.strictEqual(racing.scheduled, true);
+  timers.shift().fn();
+  assert.strictEqual(requests.length, 1, "a second timer must not race into a duplicate automatic speech request");
+
+  state.autoChatDispatchInFlight = false;
+  state.localAsrSpeeching = true;
+  assert.deepStrictEqual(
+    controller.getAutoCompanionSpeechGate(),
+    { allowed: false, reason: "user_speaking" },
+    "the shared gate must remain fail-closed while the user is speaking"
+  );
 }
 
 {
@@ -2017,6 +2169,7 @@ assert.ok(
     && !indexSource.includes('<script src="./character-runtime-debug-bridge.js"></script>')
     && devFeatureLoaderSource.includes("DEVELOPER_FEATURE_SCRIPTS")
     && devFeatureLoaderSource.includes('"./grayTrialReadinessModel.js"')
+    && devFeatureLoaderSource.includes('"./followupReadinessPanelController.js"')
     && devFeatureLoaderSource.includes('"./character-runtime-debug-bridge.js"'),
   "developer-only diagnostics should be routed through the optional loader before chat.js starts"
 );
@@ -2472,7 +2625,8 @@ assert.ok(
     && indexSource.includes('<script src="./followupDebugController.js"></script>')
     && indexSource.includes('<script src="./grayTrialReportController.js"></script>')
     && indexSource.includes('<script src="./grayTrialCharacterPanelController.js"></script>')
-    && indexSource.includes('<script src="./followupReadinessPanelController.js"></script>')
+    && !indexSource.includes('<script src="./followupReadinessPanelController.js"></script>')
+    && devFeatureLoaderSource.includes('"./followupReadinessPanelController.js"')
     && indexSource.includes('<script src="./speechStyleController.js"></script>')
     && indexSource.includes('<script src="./emotionMoodController.js"></script>')
     && indexSource.includes('<script src="./actionPlanController.js"></script>')
@@ -2499,7 +2653,6 @@ assert.ok(
     && indexSource.indexOf('<script src="./diagnosticsRuntimeController.js"></script>') < indexSource.indexOf('<script src="./followupDebugController.js"></script>')
     && indexSource.indexOf('<script src="./followupDebugController.js"></script>') < indexSource.indexOf('<script src="./grayTrialReportController.js"></script>')
     && indexSource.indexOf('<script src="./grayTrialReportController.js"></script>') < indexSource.indexOf('<script src="./grayTrialCharacterPanelController.js"></script>')
-    && indexSource.indexOf('<script src="./grayTrialCharacterPanelController.js"></script>') < indexSource.indexOf('<script src="./followupReadinessPanelController.js"></script>')
     && indexSource.indexOf('<script src="./subtitleController.js"></script>') < indexSource.indexOf('<script src="./speechStyleController.js"></script>')
     && indexSource.indexOf('<script src="./speechStyleController.js"></script>') < indexSource.indexOf('<script src="./emotionMoodController.js"></script>')
     && indexSource.indexOf('<script src="./emotionMoodController.js"></script>') < indexSource.indexOf('<script src="./actionPlanController.js"></script>')
@@ -2512,7 +2665,6 @@ assert.ok(
     && indexSource.indexOf('<script src="./wakeWordController.js"></script>') < indexSource.indexOf('<script src="./appConfigController.js"></script>')
     && indexSource.indexOf('<script src="./appConfigController.js"></script>') < indexSource.indexOf('<script src="./appStartupController.js"></script>')
     && indexSource.indexOf('<script src="./appStartupController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
-    && indexSource.indexOf('<script src="./followupReadinessPanelController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
     && indexSource.indexOf('<script src="./reminderScheduleController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>')
     && source.includes("const LEARNING_REVIEW_API = window.TaffyLearningReviewApi")
     && source.includes("const LEARNING_REVIEW_MODEL = window.TaffyLearningReviewModel")
@@ -2597,6 +2749,9 @@ assert.ok(
     && live2dExpressionControllerSource.includes("function getSpeechAnimationMouthOpen")
     && live2dExpressionControllerSource.includes("function applyStyleExpressionLayer")
     && live2dRuntimeControllerSource.includes("async function ensureLive2DRuntime")
+    && live2dRuntimeControllerSource.includes('await loadScript("/vendor/pixi-unsafe-eval.min.js")')
+    && live2dRuntimeControllerSource.indexOf('"/vendor/pixi.min.js"') < live2dRuntimeControllerSource.indexOf('"/vendor/pixi-unsafe-eval.min.js"')
+    && pixiUnsafeEvalVendorSource.includes("@pixi/unsafe-eval - v6.5.8")
     && live2dRuntimeControllerSource.includes("async function initLive2D")
     && live2dRuntimeControllerSource.includes("Live2DModel.from")
     && live2dRuntimeControllerSource.includes("patchCoreModelUpdate")
@@ -3282,10 +3437,12 @@ assert.ok(
   chatReplyControllerSource.includes("let characterRuntimeMetadataForReply = null")
     && chatReplyControllerSource.includes("function rememberCharacterRuntimeMetadataForReply")
     && chatReplyControllerSource.includes("function normalizeRuntimeVoiceStyleForSpeech")
-    && chatReplyControllerSource.includes("const finalProsodyStyle = runtimeVoiceStyle || replyCueApply?.voiceStyle || finalTalkStyle;")
+    && chatReplyControllerSource.includes("const finalProsodyStyle = runtimeVoiceStyle || performanceCue?.voiceStyle || replyCueApply?.voiceStyle || finalTalkStyle;")
     && chatReplyControllerSource.includes("function shouldSuppressGenericReplyMotion")
-    && chatReplyControllerSource.includes("shouldSuppressGenericReplyMotion(characterRuntimeMetadataForReply)")
+    && chatReplyControllerSource.includes("shouldSuppressGenericReplyMotion(performanceMetadataForReply)")
     && chatReplyControllerSource.includes("applyPerformanceControlsToRuntimeHint")
+    && chatReplyControllerSource.includes("runtimeMetadata: performanceMetadataForReply")
+    && chatReplyControllerSource.includes("performancePlan: activeCompanionTurn?.performance || null")
     && source.includes("normalizeRuntimeVoiceStyle,")
     && source.includes("runtimeVoiceStyleToTalkStyle,")
     && source.includes("applyPerformanceControlsToRuntimeHint,")
@@ -3452,19 +3609,25 @@ assert.ok(
   "assistant messages should show a visible translation failure instead of disappearing"
 );
 assert.ok(
-  /utterance\.onend\s*=\s*\(\)\s*=>\s*\{[\s\S]*?finishSpeechAnimation\(\);[\s\S]*?resolve\(true\);[\s\S]*?\};/.test(ttsPlaybackControllerSource),
+  /utterance\.onend\s*=\s*\(\)\s*=>\s*\{[\s\S]*?finishSpeechAnimation\(\);[\s\S]*?settle\(true\);[\s\S]*?\};/.test(ttsPlaybackControllerSource),
   "browser TTS success should use graceful speech release"
 );
 assert.ok(
-  /utterance\.onerror\s*=\s*\(\)\s*=>\s*\{[\s\S]*?endSpeechAnimation\(\);[\s\S]*?resolve\(false\);[\s\S]*?\};/.test(ttsPlaybackControllerSource),
+  /utterance\.onerror\s*=\s*\(\)\s*=>\s*\{[\s\S]*?endSpeechAnimation\(\);[\s\S]*?settle\(false\);[\s\S]*?\};/.test(ttsPlaybackControllerSource),
   "browser TTS failure should still hard-stop speech animation"
+);
+assert.ok(
+  ttsPlaybackControllerSource.includes('registerPlaybackCancelWaiter("browser_tts"')
+    && ttsPlaybackControllerSource.includes('registerPlaybackCancelWaiter("html_audio"')
+    && ttsPlaybackControllerSource.includes('registerPlaybackCancelWaiter("context_tts"'),
+  "browser, HTML audio, and AudioContext playback should settle promptly when cancelled"
 );
 assert.ok(
   /const done = \(ok\) => \{[\s\S]*?if \(ok\) \{[\s\S]*?finishSpeechAnimation\(\);[\s\S]*?\} else \{[\s\S]*?endSpeechAnimation\(\);[\s\S]*?\}[\s\S]*?resolve\(ok\);[\s\S]*?\};/.test(ttsPlaybackControllerSource),
   "server TTS completion should release on success and hard-stop on failure"
 );
 assert.ok(
-  /progressTimer\s*=\s*window\.setInterval\(async \(\) => \{[\s\S]*?performance\.now\(\) - lastProgressAt < 2800[\s\S]*?playAudioByContext\(blob,\s*debugContext\)/.test(ttsPlaybackControllerSource),
+  /progressTimer\s*=\s*window\.setInterval\(async \(\) => \{[\s\S]*?performance\.now\(\) - lastProgressAt < 2800[\s\S]*?playAudioByContext\(blob,\s*contextPlaybackDebugContext(?:,\s*notifyPlaybackStart)?\)/.test(ttsPlaybackControllerSource),
   "server TTS should fall back when HTML audio stops advancing"
 );
 assert.ok(
@@ -3504,6 +3667,16 @@ assert.ok(
     && appConfigControllerSource.includes("Math.min(90000")
     && appConfigControllerSource.includes("state.ttsServerRequestTimeoutMs"),
   "GPT-SoVITS frontend request timeout should follow backend timeout config"
+);
+assert.ok(
+  chatStateSource.includes("modelDirectReply: false")
+    && appConfigControllerSource.includes("state.modelDirectReply = runtimeCfg.model_direct_reply === true;")
+    && chatReplyControllerSource.includes("function isCompanionSpeechPrewarmEligible()")
+    && chatReplyControllerSource.includes('recordTTSDebugEvent("companion_prewarm_start"')
+    && chatReplyControllerSource.includes('recordTTSDebugEvent("companion_prewarm_reuse"')
+    && ttsPlaybackControllerSource.includes("onPlaybackStart")
+    && ttsPlaybackControllerSource.includes("notifyPlaybackStart(\"server_tts\")"),
+  "model-direct companion turns should safely prewarm only confirmed server speech and start its cue at actual playback"
 );
 assert.ok(
   chatStateSource.includes("streamSpeakWorkingSession: 0")

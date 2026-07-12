@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -23,6 +24,120 @@ probe = _load_script("model_acceptance_probe")
 llm_diag = _load_script("diagnose_llm_link")
 audit = _load_script("audit_v14_dialogue")
 audit_v16 = _load_script("audit_v16_performance")
+
+
+def _assert_powershell_script_parses(script_name):
+    script_path = SCRIPTS / script_name
+    script_literal = str(script_path).replace("'", "''")
+    proc = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            f"$script = Get-Content -Raw -LiteralPath '{script_literal}'; [scriptblock]::Create($script) | Out-Null",
+        ],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        timeout=10,
+    )
+
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+
+
+def test_powershell_node_runtime_helper_parses():
+    _assert_powershell_script_parses("node-runtime.ps1")
+
+
+def test_powershell_install_node22_script_parses():
+    _assert_powershell_script_parses("install-node22-local.ps1")
+
+
+def test_first_chat_smoke_uses_separate_chat_timeout():
+    script = (SCRIPTS / "first_chat_smoke.ps1").read_text(encoding="utf-8")
+
+    assert "[int]$ChatTimeoutSec = 90" in script
+    assert "-TimeoutSec ([Math]::Max($ChatTimeoutSec, 45))" in script
+    assert "-TimeoutSec ([Math]::Max($RequestTimeoutSec, 45))" not in script
+
+
+def test_first_chat_smoke_uses_separate_llm_probe_timeout():
+    script = (SCRIPTS / "first_chat_smoke.ps1").read_text(encoding="utf-8")
+
+    assert "[int]$LlmProbeTimeoutSec = 120" in script
+    assert "-TimeoutSec ([Math]::Max($LlmProbeTimeoutSec, 20))" in script
+    assert 'POST /api/llm_probe failed' in script
+
+
+def test_llm_diagnostics_default_timeout_matches_slow_probe_models():
+    ps_script = (SCRIPTS / "diagnose-llm-link.ps1").read_text(encoding="utf-8")
+    py_script = (SCRIPTS / "diagnose_llm_link.py").read_text(encoding="utf-8")
+
+    assert "[int]$TimeoutSec = 60" in ps_script
+    assert "default=60.0" in py_script
+    assert "Increase -TimeoutSec for manual checks" in py_script
+
+
+def test_release_readiness_can_include_real_first_chat_smoke():
+    script = (SCRIPTS / "check_release_readiness.ps1").read_text(encoding="utf-8")
+
+    assert "[switch]$WithFirstChatSmoke" in script
+    assert 'Invoke-ReadinessStep "First-chat smoke"' in script
+    assert "scripts\\first_chat_smoke.ps1" in script
+
+
+def test_release_readiness_keeps_demo_check_advisory_unless_strict():
+    script = (SCRIPTS / "check_release_readiness.ps1").read_text(encoding="utf-8")
+
+    assert "[switch]$RequireDemoReadiness" in script
+    assert "function Invoke-AdvisoryStep" in script
+    assert 'Invoke-AdvisoryStep "Demo readiness advisory"' in script
+    assert 'Invoke-ReadinessStep "Demo readiness (strict)"' in script
+    assert "Release validation continues" in script
+
+
+def test_first_run_package_checks_split_backend_modules():
+    script = (SCRIPTS / "check_first_run_package.ps1").read_text(encoding="utf-8")
+
+    for module_path in (
+        "app_brain_session.py",
+        "app_reply_pipeline.py",
+        "app_startup.py",
+        "character_brain_text.py",
+        "llm_probe.py",
+        "memory_text.py",
+        "tts_audio.py",
+    ):
+        assert f'"{module_path}"' in script
+
+
+def test_source_package_includes_current_root_python_files():
+    script = (SCRIPTS / "package-source-test.ps1").read_text(encoding="utf-8")
+
+    assert "function Get-CurrentRootPythonFiles" in script
+    assert "function Get-PackageRootPythonFiles" in script
+    assert "$packageRootPythonFiles = @(Get-PackageRootPythonFiles)" in script
+    assert "Get-ChildItem -LiteralPath $RepoRoot -File -Filter \"*.py\"" in script
+
+
+def test_source_package_removes_gitignored_local_artifacts_before_archive():
+    script = (SCRIPTS / "package-source-test.ps1").read_text(encoding="utf-8")
+
+    assert "function Remove-IgnoredPackagePaths" in script
+    assert "function Test-IsTrackedOrTrackedAncestorPackagePath" in script
+    assert "core.quotePath=false" in script
+    assert "check-ignore -q --" in script
+    assert "Remove-IgnoredPackagePaths $stageRoot" in script
+
+
+def test_first_run_package_smoke_checks_ignored_artifact_exclusion():
+    script = (SCRIPTS / "check_first_run_package.ps1").read_text(encoding="utf-8")
+
+    assert "tmp_package_ignored_probe_" in script
+    assert "Assert-PathMissing $packageRoot.FullName $ignoredPackageProbePath" in script
 
 
 def test_model_acceptance_summary_counts_gate_and_redacts_secret():

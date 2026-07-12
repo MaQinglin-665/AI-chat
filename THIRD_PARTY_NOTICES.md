@@ -11,6 +11,7 @@ This document is a practical release checklist, not legal advice. Before publish
 | Paths | Component | Notice |
 | --- | --- | --- |
 | `web/vendor/pixi.min.js`, `docs/live2d/vendor/pixi.min.js` | PixiJS | PixiJS is distributed under the MIT license. Keep upstream license notices when redistributing. Source: https://github.com/pixijs/pixijs |
+| `web/vendor/pixi-unsafe-eval.min.js` | `@pixi/unsafe-eval` 6.5.8 | Official PixiJS CSP compatibility patch, distributed under the MIT license. It replaces runtime-generated uniform sync functions so Pixi can run where `unsafe-eval` is blocked. Source: https://www.npmjs.com/package/@pixi/unsafe-eval |
 | `web/vendor/cubism4.min.js`, `docs/live2d/vendor/cubism4.min.js` | Live2D Cubism Framework for Web | Governed by Live2D Cubism SDK terms. Keep Live2D notices and verify the current SDK agreement before redistribution. Source: https://www.live2d.com/en/sdk/download/web/ |
 | `web/vendor/live2dcubismcore.min.js`, `docs/live2d/vendor/live2dcubismcore.min.js` | Live2D Cubism Core | Governed by Live2D Cubism SDK terms. Keep Live2D notices and verify the current SDK agreement before redistribution. Source: https://www.live2d.com/en/sdk/about/ |
 

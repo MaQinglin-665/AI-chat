@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from asr import get_vosk_model_availability
+
 from character_runtime import (
     evaluate_backend_entry_guard,
     preview_backend_entry_noop_adapter,
@@ -296,15 +298,33 @@ def build_asr_health_summary(config):
     warnings = []
     actions = []
     vosk_installed = importlib.util.find_spec("vosk") is not None
-    model_root = resolve_vosk_model_root_for_health()
-    model_found = model_root.exists()
+    availability = get_vosk_model_availability(asr_cfg)
+    language_models = availability["languages"]
+    language_mode = availability["input_language_mode"]
+    chinese = language_models["zh-CN"]
+    english = language_models["en-US"]
+    if language_mode == "en-US":
+        model_found = bool(english["available"])
+    elif language_mode == "zh-CN":
+        model_found = bool(chinese["available"])
+    else:
+        model_found = bool(chinese["available"] or english["available"])
 
     if not vosk_installed:
         warnings.append("vosk is not installed; /api/asr_pcm transcription will fail.")
         actions.append("Run python -m pip install -r requirements.txt.")
-    if not model_found:
-        warnings.append("Vosk model directory was not found.")
-        actions.append("Download a Vosk Chinese model under models/vosk, or set VOSK_MODEL_PATH.")
+    if language_mode != "en-US" and not chinese["available"]:
+        warnings.append("Chinese Vosk model directory was not found.")
+        actions.append("Install a local Chinese Vosk model under models/vosk, or set VOSK_MODEL_PATH.")
+    if language_mode == "en-US" and not english["available"]:
+        warnings.append("English Vosk model directory was not found.")
+        actions.append("Set asr.vosk_model_paths.en-US to an existing local English Vosk model directory.")
+    elif language_mode == "auto":
+        if english["configured"] and not english["available"]:
+            warnings.append("Configured English Vosk model directory was not found.")
+            actions.append("Fix asr.vosk_model_paths.en-US or clear it to keep Chinese-only local ASR.")
+        elif not english["available"]:
+            actions.append("Optional: configure a local English Vosk model in asr.vosk_model_paths.en-US for automatic English voice input.")
 
     wake_words = asr_cfg.get("wake_words", [])
     wake_word_count = len(wake_words) if isinstance(wake_words, list) else 0
@@ -313,7 +333,18 @@ def build_asr_health_summary(config):
         "severity": summarize_messages_severity(errors, warnings),
         "vosk_installed": bool(vosk_installed),
         "vosk_model_found": bool(model_found),
-        "vosk_model_path": str(model_root),
+        "input_language_mode": language_mode,
+        "local_languages": {
+            "zh-CN": {
+                "configured": bool(chinese["configured"]),
+                "available": bool(chinese["available"]),
+            },
+            "en-US": {
+                "configured": bool(english["configured"]),
+                "available": bool(english["available"]),
+            },
+        },
+        "bilingual_local_ready": bool(chinese["available"] and english["available"]),
         "wake_word_enabled": parse_bool_flag(asr_cfg.get("wake_word_enabled", True), True),
         "wake_word_count": wake_word_count,
         "messages": errors + warnings,

@@ -6,6 +6,7 @@
     const ui = deps.ui || {};
     const document = deps.documentObject || root.document || {};
     const window = deps.windowObject || root;
+    const performance = deps.performanceObject || window.performance || root.performance || { now: () => Date.now() };
     const constants = deps.constants || {};
     const setStatus = typeof deps.setStatus === "function" ? deps.setStatus : () => {};
     const parseMessageTimestamp = typeof deps.parseMessageTimestamp === "function" ? deps.parseMessageTimestamp : (value) => Number(value) || Date.now();
@@ -45,9 +46,14 @@
       celebration: { label: "1-3 sentences", min: 1, max: 3, guide: "Celebrate like a spontaneous desk-side victory lap." },
       topic_spark: { label: "1-3 sentences", min: 1, max: 3, guide: "Follow the sudden association for a moment, then land it." }
     };
+    function getSpeechAnimationClockNow() {
+      const now = Number(typeof performance.now === "function" ? performance.now() : NaN);
+      return Number.isFinite(now) ? now : Date.now();
+    }
+
     function isAssistantSpeechActive() {
       const phase = String(state.speechPhase || "").trim().toLowerCase();
-      const now = Date.now();
+      const now = getSpeechAnimationClockNow();
       return state.ttsContextSpeaking === true
         || state.streamSpeakWorking === true
         || phase === "speaking"
@@ -192,6 +198,32 @@
       const focused = document.activeElement === ui.chatInput;
       const typing = ui.chatInput.value.trim().length > 0;
       return focused && typing;
+    }
+
+    function getAutoCompanionSpeechGate() {
+      if (state.autoChatEnabled !== true) {
+        return { allowed: false, reason: "disabled" };
+      }
+      if (state.autoChatDispatchInFlight === true) {
+        return { allowed: false, reason: "auto_dispatch_in_flight" };
+      }
+      if (state.chatBusy === true) {
+        return { allowed: false, reason: "chat_busy" };
+      }
+      if (isAssistantSpeechActive()) {
+        return { allowed: false, reason: "assistant_speaking" };
+      }
+      if (isUserSpeechInputActive()) {
+        return { allowed: false, reason: "user_speaking" };
+      }
+      if (isUserTypingNow()) {
+        return { allowed: false, reason: "user_typing" };
+      }
+      const lastAutoAt = Number(state.lastAutoChatAt || 0);
+      if (lastAutoAt > 0 && Date.now() - lastAutoAt < AUTO_CHAT_MIN_BETWEEN_TRIGGERS_MS) {
+        return { allowed: false, reason: "auto_cooldown_active" };
+      }
+      return { allowed: true, reason: "" };
     }
 
     function shouldSkipTurnInterjection(context = {}) {
@@ -924,9 +956,17 @@
     }
 
     function dispatchAutoChatContext(context = {}) {
+      const speechGate = getAutoCompanionSpeechGate();
+      if (!speechGate.allowed) {
+        if (context.interjection === true) {
+          state.autoChatInterjectionLastSuppressed = speechGate.reason;
+        }
+        return Promise.resolve(false);
+      }
       const prompt = buildAutoChatPrompt(context);
       state.turnTakingPendingThoughtBurst = null;
-      return requestAssistantReply(prompt, {
+      state.autoChatDispatchInFlight = true;
+      return Promise.resolve(requestAssistantReply(prompt, {
         showUser: false,
         rememberUser: false,
         rememberAssistant: true,
@@ -945,7 +985,7 @@
         dropIfSpeaking: true,
         skipDesktopAttach: true,
         silentError: true
-      }).then((ok) => {
+      })).then((ok) => {
         state.autoChatInterjectionLastOk = ok === true;
         if (ok) {
           rememberAutoChatSuccess(context);
@@ -959,6 +999,8 @@
           state.autoChatInterjectionLastSuppressed = "request_error";
         }
         return false;
+      }).finally(() => {
+        state.autoChatDispatchInFlight = false;
       });
     }
 
@@ -1067,6 +1109,7 @@
     return {
       stopAutoChatLoop,
       shouldSkipAutoChat,
+      getAutoCompanionSpeechGate,
       shouldPlayLatencyHint,
       pickLatencyHintText,
       normalizeAutoChatTopicHint,

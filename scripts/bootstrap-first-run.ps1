@@ -11,6 +11,7 @@ param(
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RepoRoot
+. (Join-Path $PSScriptRoot "node-runtime.ps1")
 
 $VenvDir = Join-Path $RepoRoot ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
@@ -122,11 +123,8 @@ function Resolve-PythonCommand {
 }
 
 function Test-NodeCommand {
-    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-        return $false
-    }
-
-    $version = Get-VersionText @("node", "--version")
+    $command = @(Resolve-ProjectNodeCommand -Tool "node")
+    $version = Get-VersionText (@($command) + @("--version"))
     if (-not $version) {
         return $false
     }
@@ -150,28 +148,11 @@ function Test-NodeCommand {
 }
 
 function Test-NpmCommand {
-    $candidates = @()
-    if ($env:OS -eq "Windows_NT") {
-        $candidates += "npm.cmd"
-    }
-    $candidates += "npm"
-
-    $command = $null
-    foreach ($candidate in $candidates) {
-        if (Get-Command $candidate -ErrorAction SilentlyContinue) {
-            $command = $candidate
-            break
-        }
-    }
-
-    if (-not $command) {
-        return $false
-    }
-
-    $version = Get-VersionText @($command, "--version")
+    $command = @(Resolve-ProjectNodeCommand -Tool "npm")
+    $version = Get-VersionText (@($command) + @("--version"))
     if ($version) {
         Write-Ok "npm detected: $version"
-        $script:NpmCommand = $command
+        $script:NpmCommand = [string]$command[0]
         return $true
     }
     return $false

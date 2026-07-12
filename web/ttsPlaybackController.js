@@ -5,6 +5,7 @@
     const state = deps.state || {};
     const window = deps.windowObject || root;
     const console = deps.consoleObject || root.console || { warn() {} };
+    const AbortControllerImpl = window.AbortController || root.AbortController;
     const performance = deps.performanceObject || window.performance || root.performance || { now: () => Date.now() };
     const authFetch = typeof deps.authFetch === "function" ? deps.authFetch : async () => { throw new Error("authFetch is not available"); };
     const TTS_API = deps.ttsApi || {};
@@ -20,6 +21,9 @@
     const recordTTSDebugEvent = typeof deps.recordTTSDebugEvent === "function" ? deps.recordTTSDebugEvent : () => {};
     const recordTTSAudioEvent = typeof deps.recordTTSAudioEvent === "function" ? deps.recordTTSAudioEvent : () => {};
     const beginSpeechAnimation = typeof deps.beginSpeechAnimation === "function" ? deps.beginSpeechAnimation : () => {};
+    const triggerPerformanceCueMotion = typeof deps.triggerPerformanceCueMotion === "function"
+      ? deps.triggerPerformanceCueMotion
+      : () => false;
     const finishSpeechAnimation = typeof deps.finishSpeechAnimation === "function" ? deps.finishSpeechAnimation : () => {};
     const endSpeechAnimation = typeof deps.endSpeechAnimation === "function" ? deps.endSpeechAnimation : () => {};
     const showSubtitleText = typeof deps.showSubtitleText === "function" ? deps.showSubtitleText : () => {};
@@ -29,17 +33,213 @@
     const buildSpeakProsody = typeof deps.buildSpeakProsody === "function" ? deps.buildSpeakProsody : () => null;
     const clampNumber = typeof deps.clampNumber === "function" ? deps.clampNumber : (v, min, max) => Math.min(max, Math.max(min, Number(v) || 0));
 
-    function stopAllAudioPlayback() {
-      state.ttsPlaybackGeneration = Number(state.ttsPlaybackGeneration || 0) + 1;
-      state.streamSpeakPlayedSession = 0;
-      if (
-        state.streamSpeakWorking
-        && Number(state.streamSpeakWorkingSession || 0)
-        && Number(state.streamSpeakWorkingSession || 0) !== Number(state.streamSpeakSession || 0)
-      ) {
-        state.streamSpeakWorking = false;
-        state.streamSpeakWorkingSession = 0;
+    function getServerTTSRequestScopes() {
+      if (!Array.isArray(state.ttsServerRequestScopes)) {
+        state.ttsServerRequestScopes = [];
       }
+      return state.ttsServerRequestScopes;
+    }
+
+    function normalizeRequestScopeNumber(value, fallback = 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : Number(fallback || 0);
+    }
+
+    function isServerTTSRequestCancelled(err = null, opts = {}) {
+      return opts?.signal?.aborted === true
+        || opts?.requestScope?.signal?.aborted === true
+        || err?.aborted === true
+        || err?.name === "AbortError";
+    }
+
+    function releaseServerTTSRequestScope(scope) {
+      if (!scope || scope.released === true) {
+        return false;
+      }
+      scope.released = true;
+      if (typeof scope.removeParentAbortListener === "function") {
+        try {
+          scope.removeParentAbortListener();
+        } catch (_) {
+          // ignore
+        }
+        scope.removeParentAbortListener = null;
+      }
+      const scopes = getServerTTSRequestScopes();
+      const index = scopes.indexOf(scope);
+      if (index >= 0) {
+        scopes.splice(index, 1);
+      }
+      return true;
+    }
+
+    function abortServerTTSRequestScope(scope, reason = "cancelled") {
+      if (!scope || scope.released === true || scope.signal?.aborted === true) {
+        return false;
+      }
+      scope.cancelReason = String(reason || "cancelled");
+      try {
+        scope.controller?.abort();
+      } catch (_) {
+        return false;
+      }
+      recordTTSDebugEvent("server_tts_request_cancelled", {
+        requestId: Number(scope.id || 0),
+        kind: String(scope.kind || "request"),
+        sessionId: Number(scope.sessionId || 0),
+        playbackGeneration: Number(scope.playbackGeneration || 0),
+        reason: scope.cancelReason
+      });
+      return true;
+    }
+
+    function createServerTTSRequestScope(opts = {}) {
+      if (typeof AbortControllerImpl !== "function") {
+        return null;
+      }
+      let controller = null;
+      try {
+        controller = new AbortControllerImpl();
+      } catch (_) {
+        return null;
+      }
+      const parentSignal = opts.signal && typeof opts.signal === "object" ? opts.signal : null;
+      const scope = {
+        id: Math.max(0, Number(state.ttsServerRequestScopeSeq || 0)) + 1,
+        kind: String(opts.kind || "request"),
+        sessionId: normalizeRequestScopeNumber(opts.sessionId, 0),
+        playbackGeneration: normalizeRequestScopeNumber(
+          opts.playbackGeneration,
+          state.ttsPlaybackGeneration || 0
+        ),
+        traceId: String(opts.traceId || state.activePerfTraceId || "").trim(),
+        controller,
+        signal: controller.signal,
+        parentSignal,
+        cancelReason: "",
+        released: false,
+        removeParentAbortListener: null,
+        abort: null
+      };
+      scope.abort = (reason = "cancelled") => abortServerTTSRequestScope(scope, reason);
+      state.ttsServerRequestScopeSeq = scope.id;
+      const abortFromParent = () => abortServerTTSRequestScope(scope, "parent_cancelled");
+      if (parentSignal?.aborted === true) {
+        abortFromParent();
+      } else if (typeof parentSignal?.addEventListener === "function") {
+        parentSignal.addEventListener("abort", abortFromParent, { once: true });
+        scope.removeParentAbortListener = () => {
+          try {
+            parentSignal.removeEventListener("abort", abortFromParent);
+          } catch (_) {
+            // ignore
+          }
+        };
+      }
+      getServerTTSRequestScopes().push(scope);
+      return scope;
+    }
+
+    function abortServerTTSRequests(opts = {}) {
+      const beforePlaybackGeneration = Number(opts.beforePlaybackGeneration);
+      const targetSessionId = normalizeRequestScopeNumber(opts.sessionId, 0);
+      const abortAll = opts.all === true;
+      const reason = String(opts.reason || "cancelled");
+      let aborted = 0;
+      for (const scope of getServerTTSRequestScopes().slice()) {
+        const staleGeneration = Number.isFinite(beforePlaybackGeneration)
+          && Number(scope?.playbackGeneration || 0) < beforePlaybackGeneration;
+        const matchingSession = targetSessionId > 0
+          && Number(scope?.sessionId || 0) === targetSessionId;
+        if ((abortAll || staleGeneration || matchingSession) && abortServerTTSRequestScope(scope, reason)) {
+          aborted += 1;
+        }
+      }
+      return aborted;
+    }
+
+    function getServerTTSRequestScope(requestOpts = {}) {
+      const supplied = requestOpts.requestScope;
+      if (supplied && typeof supplied === "object" && supplied.released !== true) {
+        return supplied;
+      }
+      return createServerTTSRequestScope(requestOpts);
+    }
+
+    function beginSpeechPerformance(text, mood, style, opts = {}, context = {}) {
+      const performanceCue = opts.performanceCue && typeof opts.performanceCue === "object"
+        ? opts.performanceCue
+        : null;
+      beginSpeechAnimation(text, mood, style, opts);
+      if (performanceCue) {
+        try {
+          triggerPerformanceCueMotion(performanceCue, context);
+        } catch (_) {
+          // Motion playback is optional; speech should continue normally.
+        }
+      }
+    }
+
+    function advanceBrowserPlaybackToken() {
+      const next = Math.max(0, Number(state.ttsBrowserPlaybackToken || 0)) + 1;
+      state.ttsBrowserPlaybackToken = next;
+      return next;
+    }
+
+    function getPlaybackCancelWaiters() {
+      if (!Array.isArray(state.ttsPlaybackCancelWaiters)) {
+        state.ttsPlaybackCancelWaiters = [];
+      }
+      return state.ttsPlaybackCancelWaiters;
+    }
+
+    function unregisterPlaybackCancelWaiter(waiter) {
+      const waiters = getPlaybackCancelWaiters();
+      const index = waiters.indexOf(waiter);
+      if (index >= 0) {
+        waiters.splice(index, 1);
+      }
+    }
+
+    function registerPlaybackCancelWaiter(kind, cancel) {
+      if (typeof cancel !== "function") {
+        return () => {};
+      }
+      const waiter = {
+        id: Math.max(0, Number(state.ttsPlaybackCancelWaiterSeq || 0)) + 1,
+        kind: String(kind || "playback"),
+        cancel,
+        cancelled: false
+      };
+      state.ttsPlaybackCancelWaiterSeq = waiter.id;
+      getPlaybackCancelWaiters().push(waiter);
+      return () => unregisterPlaybackCancelWaiter(waiter);
+    }
+
+    function cancelPlaybackWaiters(reason = "cancelled") {
+      for (const waiter of getPlaybackCancelWaiters().slice()) {
+        if (!waiter || waiter.cancelled === true) {
+          continue;
+        }
+        waiter.cancelled = true;
+        try {
+          waiter.cancel(String(reason || "cancelled"));
+        } catch (_) {
+          // Playback cancellation should be best-effort and never throw into turn cleanup.
+        } finally {
+          unregisterPlaybackCancelWaiter(waiter);
+        }
+      }
+    }
+
+    function stopCurrentMediaInPlace() {
+      // The turn generation fences cross-turn playback. A separate browser
+      // token keeps a cancelled utterance in this same turn from mutating a
+      // newer segment after its delayed callbacks arrive.
+      cancelPlaybackWaiters("playback_stopped");
+      advanceBrowserPlaybackToken();
+      state.ttsAudioPlaybackToken = Math.max(0, Number(state.ttsAudioPlaybackToken || 0)) + 1;
+      state.streamSpeakPlayedSession = 0;
       if ("speechSynthesis" in window) {
         try {
           window.speechSynthesis.cancel();
@@ -76,6 +276,23 @@
       state.ttsContextSpeaking = false;
     }
 
+    function stopAllAudioPlayback() {
+      state.ttsPlaybackGeneration = Number(state.ttsPlaybackGeneration || 0) + 1;
+      abortServerTTSRequests({
+        beforePlaybackGeneration: Number(state.ttsPlaybackGeneration || 0),
+        reason: "playback_generation_advanced"
+      });
+      if (
+        state.streamSpeakWorking
+        && Number(state.streamSpeakWorkingSession || 0)
+        && Number(state.streamSpeakWorkingSession || 0) !== Number(state.streamSpeakSession || 0)
+      ) {
+        state.streamSpeakWorking = false;
+        state.streamSpeakWorkingSession = 0;
+      }
+      stopCurrentMediaInPlace();
+    }
+
     function speakOnceWithVoice(text, voice, opts = {}) {
       return new Promise((resolve) => {
         const force = typeof opts === "object" ? !!opts.force : !!opts;
@@ -99,9 +316,17 @@
           return;
         }
 
+        const browserPlaybackToken = advanceBrowserPlaybackToken();
+        const isCurrentBrowserPlayback = () => (
+          isCurrentTTSPlaybackGeneration(playbackGeneration)
+          && Number(state.ttsBrowserPlaybackToken || 0) === browserPlaybackToken
+        );
         const speechStyle = normalizeTalkStyle(opts.style || state.currentTalkStyle || "neutral");
         const speechMood = String(opts.mood || detectMood(cleaned) || "idle");
         const prosodyStyle = opts.voiceStyle || speechStyle;
+        const speechPerformanceCue = opts.performanceCue && typeof opts.performanceCue === "object"
+          ? opts.performanceCue
+          : null;
         const prosody = opts.prosody && typeof opts.prosody === "object"
           ? opts.prosody
           : buildSpeakProsody(cleaned, speechMood, false, prosodyStyle);
@@ -126,51 +351,98 @@
           : 1.0;
         let started = false;
         let settled = false;
+        let unregisterCancelWaiter = null;
+        const settle = (ok) => {
+          if (settled) {
+            return false;
+          }
+          settled = true;
+          if (unregisterCancelWaiter) {
+            unregisterCancelWaiter();
+            unregisterCancelWaiter = null;
+          }
+          resolve(ok);
+          return true;
+        };
+        unregisterCancelWaiter = registerPlaybackCancelWaiter("browser_tts", () => {
+          settle(false);
+        });
         utterance.onstart = () => {
-          if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-            try {
-              window.speechSynthesis.cancel();
-            } catch (_) {
-              // ignore
-            }
+          if (!isCurrentBrowserPlayback()) {
+            settle(false);
             return;
           }
           started = true;
-          beginSpeechAnimation(cleaned, speechMood, speechStyle);
+          state.ttsDebugAudioStartedAt = performance.now();
+          state.ttsDebugAudioEndedAt = 0;
+          perfLog("tts", "browser_play_start", {
+            traceId: String(opts.perfTraceId || state.activePerfTraceId || ""),
+            ttsProvider: "browser"
+          });
+          if (opts.sessionId) {
+            state.streamSpeakPlayedSession = Number(opts.sessionId || 0);
+          }
+          if (typeof opts.onPlaybackStart === "function") {
+            try {
+              opts.onPlaybackStart({
+              source: "browser_tts",
+              playbackGeneration,
+              browserPlaybackToken,
+              sessionId: Number(opts.sessionId || 0)
+            });
+            } catch (_) {
+              // Optional playback hooks must not interrupt speech.
+            }
+          }
+          beginSpeechPerformance(cleaned, speechMood, speechStyle, {
+            performanceCue: speechPerformanceCue
+          }, {
+            source: "browser_tts",
+            playbackGeneration,
+            browserPlaybackToken,
+            sessionId: Number(opts.sessionId || 0)
+          });
           showSubtitleText(cleaned);
           setStatus("语音中...");
         };
         utterance.onend = () => {
           if (settled) return;
-          settled = true;
-          if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-            resolve(false);
+          if (!isCurrentBrowserPlayback()) {
+            settle(false);
             return;
           }
           if (voice?.name) {
             state.ttsLastGoodVoiceName = voice.name;
           }
+          state.conversationLastTtsFinishedAt = Date.now();
+          perfLog("tts", "browser_play_end", {
+            traceId: String(opts.perfTraceId || state.activePerfTraceId || ""),
+            result: "ok"
+          });
           finishSpeechAnimation();
           hideSubtitleText();
           setStatus("待机");
-          resolve(true);
+          settle(true);
         };
         utterance.onerror = () => {
           if (settled) return;
-          settled = true;
-          if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-            resolve(false);
+          if (!isCurrentBrowserPlayback()) {
+            settle(false);
             return;
           }
           endSpeechAnimation();
+          perfLog("tts", "browser_play_end", {
+            traceId: String(opts.perfTraceId || state.activePerfTraceId || ""),
+            result: "fail"
+          });
           hideSubtitleText();
           setStatus("语音失败");
-          resolve(false);
+          settle(false);
         };
 
         try {
-          if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-            resolve(false);
+          if (!isCurrentBrowserPlayback()) {
+            settle(false);
             return;
           }
           window.speechSynthesis.resume();
@@ -178,30 +450,29 @@
           // Guard against engines that fail silently (no onstart fired).
           setTimeout(() => {
             if (settled) return;
-            if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-              settled = true;
-              resolve(false);
+            if (!isCurrentBrowserPlayback()) {
+              settle(false);
               return;
             }
             if (!started) {
-              settled = true;
               endSpeechAnimation();
               try {
                 window.speechSynthesis.cancel();
               } catch (_) {
                 // ignore
               }
-              resolve(false);
+              settle(false);
             }
           }, 1800);
         } catch (_) {
-          resolve(false);
+          settle(false);
         }
       });
     }
 
     async function speakByBrowser(text, opts = {}) {
       const force = !!opts.force;
+      const preserveTurnPlaybackGeneration = opts.preserveTurnPlaybackGeneration === true;
       const requestedGeneration = Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0);
       if (!force && !state.speakingEnabled) {
         return false;
@@ -220,7 +491,13 @@
         });
         return false;
       }
-      stopAllAudioPlayback();
+      if (preserveTurnPlaybackGeneration) {
+        if (opts.interrupt === true) {
+          stopCurrentMediaInPlace();
+        }
+      } else {
+        stopAllAudioPlayback();
+      }
       const playbackGeneration = Number(state.ttsPlaybackGeneration || 0);
       const candidates = buildVoiceCandidates();
       const browserTTSOptions = {
@@ -229,7 +506,11 @@
         prosody: opts.prosody || null,
         mood: opts.mood || "",
         style: opts.style || state.currentTalkStyle || "neutral",
-        voiceStyle: opts.voiceStyle || ""
+        voiceStyle: opts.voiceStyle || "",
+        performanceCue: opts.performanceCue || null,
+        preserveTurnPlaybackGeneration,
+        sessionId: Number(opts.sessionId || 0),
+        onPlaybackStart: typeof opts.onPlaybackStart === "function" ? opts.onPlaybackStart : null
       };
       for (const v of candidates) {
         const ok = await speakOnceWithVoice(text, v, browserTTSOptions);
@@ -261,54 +542,66 @@
       if (typeof TTS_API.requestServerTTSBlob !== "function") {
         throw new Error("ttsApi request helper is not available");
       }
-      return TTS_API.requestServerTTSBlob(text, prosody, {
-        authFetch,
-        sanitizeSpeakText,
-        perfLog,
-        traceId: String(requestOpts.traceId || state.activePerfTraceId || "").trim(),
-        timeoutMs: Math.max(
-          1500,
-          Math.min(90000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
-        ),
-        voice: state.ttsServerVoice,
-        now: () => performance.now(),
-        wallNow: () => Date.now()
-      });
+      const scope = getServerTTSRequestScope(requestOpts);
+      try {
+        return await TTS_API.requestServerTTSBlob(text, prosody, {
+          authFetch,
+          sanitizeSpeakText,
+          perfLog,
+          traceId: String(requestOpts.traceId || state.activePerfTraceId || "").trim(),
+          timeoutMs: Math.max(
+            1500,
+            Math.min(90000, Math.round(Number(requestOpts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
+          ),
+          voice: state.ttsServerVoice,
+          signal: scope?.signal || requestOpts.signal || null,
+          now: () => performance.now(),
+          wallNow: () => Date.now()
+        });
+      } finally {
+        releaseServerTTSRequestScope(scope);
+      }
     }
 
     async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) {
       if (typeof TTS_API.requestServerTTSBlobWithRetry !== "function") {
         throw new Error("ttsApi retry helper is not available");
       }
-      return TTS_API.requestServerTTSBlobWithRetry(text, prosody, {
-        authFetch,
-        sanitizeSpeakText,
-        perfLog,
-        traceId: opts.traceId,
-        retries: Math.max(0, Math.min(4, Math.round(Number(opts.retries) || 0))),
-        retryDelayMs: Math.max(
-          60,
-          Math.min(3000, Math.round(Number(opts.retryDelayMs) || Number(state.ttsServerRetryDelayMs) || 220))
-        ),
-        timeoutMs: Math.max(
-          1500,
-          Math.min(90000, Math.round(Number(opts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
-        ),
-        voice: state.ttsServerVoice,
-        now: () => performance.now(),
-        wallNow: () => Date.now(),
-        wait: waitMs,
-        onRetry: ({ attempt, nextWaitMs, error }) => {
-          console.warn("Server TTS request retry", {
-            attempt,
-            nextWaitMs,
-            reason: String(error?.message || error)
-          });
-        }
-      });
+      const scope = getServerTTSRequestScope(opts);
+      try {
+        return await TTS_API.requestServerTTSBlobWithRetry(text, prosody, {
+          authFetch,
+          sanitizeSpeakText,
+          perfLog,
+          traceId: opts.traceId,
+          retries: Math.max(0, Math.min(4, Math.round(Number(opts.retries) || 0))),
+          retryDelayMs: Math.max(
+            60,
+            Math.min(3000, Math.round(Number(opts.retryDelayMs) || Number(state.ttsServerRetryDelayMs) || 220))
+          ),
+          timeoutMs: Math.max(
+            1500,
+            Math.min(90000, Math.round(Number(opts.timeoutMs) || Number(state.ttsServerRequestTimeoutMs) || 14000))
+          ),
+          voice: state.ttsServerVoice,
+          signal: scope?.signal || opts.signal || null,
+          now: () => performance.now(),
+          wallNow: () => Date.now(),
+          wait: waitMs,
+          onRetry: ({ attempt, nextWaitMs, error }) => {
+            console.warn("Server TTS request retry", {
+              attempt,
+              nextWaitMs,
+              reason: String(error?.message || error)
+            });
+          }
+        });
+      } finally {
+        releaseServerTTSRequestScope(scope);
+      }
     }
 
-    async function playAudioByContext(blob, debugContext = {}) {
+    async function playAudioByContext(blob, debugContext = {}, onPlaybackStart = null) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx || !blob) {
         recordTTSDebugEvent("context_unavailable", debugContext);
@@ -326,6 +619,7 @@
       let fallbackTimer = 0;
       let source = null;
       let contextPlaybackStarted = false;
+      let contextPlaybackCancelled = false;
       try {
         if (!state.ttsDecodeContext || state.ttsDecodeContext.state === "closed") {
           state.ttsDecodeContext = new AudioCtx();
@@ -350,17 +644,6 @@
           });
           return false;
         }
-          recordTTSDebugEvent("context_play_start", {
-            ...debugContext,
-            blobBytes: Number(blob?.size || arrayBuf.byteLength || 0),
-            durationMs: Number.isFinite(Number(decoded.duration)) && decoded.duration > 0
-              ? Math.round(decoded.duration * 1000)
-              : -1
-          });
-          state.ttsDebugAudioStartedAt = performance.now();
-          if (debugContext.sessionId) {
-            state.streamSpeakPlayedSession = Number(debugContext.sessionId || 0);
-          }
         source = ctx.createBufferSource();
         const gain = ctx.createGain();
         gain.gain.value = 1.0;
@@ -375,17 +658,24 @@
         source.connect(state.ttsAudioAnalyser);
         state.ttsAudioAnalyser.connect(gain);
         gain.connect(ctx.destination);
-        state.ttsContextSpeaking = true;
-        markedSpeaking = true;
         await new Promise((resolve) => {
           let resolved = false;
+          let unregisterCancelWaiter = null;
           const resolveOnce = () => {
             if (resolved) {
               return;
             }
             resolved = true;
+            if (unregisterCancelWaiter) {
+              unregisterCancelWaiter();
+              unregisterCancelWaiter = null;
+            }
             resolve();
           };
+          unregisterCancelWaiter = registerPlaybackCancelWaiter("context_tts", () => {
+            contextPlaybackCancelled = true;
+            resolveOnce();
+          });
           source.onended = resolveOnce;
           const durationMs = Number.isFinite(Number(decoded.duration)) && decoded.duration > 0
             ? Math.round(decoded.duration * 1000)
@@ -401,6 +691,53 @@
           }
           source.start(0);
           contextPlaybackStarted = true;
+          state.ttsContextSpeaking = true;
+          markedSpeaking = true;
+          recordTTSDebugEvent("context_play_start", {
+            ...debugContext,
+            blobBytes: Number(blob?.size || arrayBuf.byteLength || 0),
+            durationMs: Number.isFinite(Number(decoded.duration)) && decoded.duration > 0
+              ? Math.round(decoded.duration * 1000)
+              : -1
+          });
+          perfLog("tts", "context_play_start", {
+            traceId: String(debugContext.traceId || state.activePerfTraceId || ""),
+            ttsProvider: String(state.ttsProvider || "")
+          });
+          state.ttsDebugAudioStartedAt = performance.now();
+          state.ttsDebugAudioEndedAt = 0;
+          if (debugContext.sessionId) {
+            state.streamSpeakPlayedSession = Number(debugContext.sessionId || 0);
+          }
+          if (typeof onPlaybackStart === "function") {
+            try {
+              onPlaybackStart({
+                source: "context_tts",
+                playbackGeneration,
+                sessionId: Number(debugContext.sessionId || 0)
+              });
+            } catch (_) {
+              // Optional playback hooks must not interrupt speech.
+            }
+          }
+          const contextSpeechText = sanitizeSpeakText(debugContext.speechText || debugContext.text || "");
+          if (contextSpeechText) {
+            beginSpeechPerformance(
+              contextSpeechText,
+              String(debugContext.speechMood || detectMood(contextSpeechText) || "idle"),
+              normalizeTalkStyle(debugContext.speechStyle || state.currentTalkStyle || "neutral"),
+              {
+                durationMs,
+                performanceCue: debugContext.speechPerformanceCue || debugContext.performanceCue || null
+              },
+              {
+                source: "context_tts",
+                playbackGeneration,
+                sessionId: Number(debugContext.sessionId || 0)
+              }
+            );
+            showSubtitleText(contextSpeechText);
+          }
         });
         if (state.ttsContextBufferSource === source) {
           state.ttsContextBufferSource = null;
@@ -414,10 +751,10 @@
         } catch (_) {
           // ignore
         }
-        if (!contextPlaybackStarted || !isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+        if (contextPlaybackCancelled || !contextPlaybackStarted || !isCurrentTTSPlaybackGeneration(playbackGeneration)) {
           recordTTSDebugEvent("context_stale_skip", {
             ...debugContext,
-            result: "stale"
+            result: contextPlaybackCancelled ? "cancelled" : "stale"
           });
           return false;
         }
@@ -429,6 +766,10 @@
         markedSpeaking = false;
         recordTTSDebugEvent("context_play_end", {
           ...debugContext,
+          result: "ok"
+        });
+        perfLog("tts", "context_play_end", {
+          traceId: String(debugContext.traceId || state.activePerfTraceId || ""),
           result: "ok"
         });
         return true;
@@ -515,6 +856,12 @@
       const speechText = sanitizeSpeakText(opts.text || "");
       const speechMood = String(opts.mood || detectMood(speechText) || "idle");
       const speechStyle = normalizeTalkStyle(opts.style || state.currentTalkStyle || "neutral");
+      const speechPerformanceCue = opts.performanceCue && typeof opts.performanceCue === "object"
+        ? opts.performanceCue
+        : null;
+      const onPlaybackStart = typeof opts.onPlaybackStart === "function"
+        ? opts.onPlaybackStart
+        : null;
       const url = URL.createObjectURL(blob);
       const audioPlaybackToken = Number(state.ttsAudioPlaybackToken || 0) + 1;
       state.ttsAudioPlaybackToken = audioPlaybackToken;
@@ -529,10 +876,27 @@
       }
       return await new Promise((resolve) => {
         let settled = false;
+        let unregisterCancelWaiter = null;
         let failTimer = 0;
         let startupTimer = 0;
         let progressTimer = 0;
         let fallbackSpeechStarted = false;
+        let playbackStartNotified = false;
+        const notifyPlaybackStart = (source) => {
+          if (playbackStartNotified || typeof onPlaybackStart !== "function") {
+            return;
+          }
+          playbackStartNotified = true;
+          try {
+            onPlaybackStart({
+              source,
+              playbackGeneration,
+              sessionId: Number(debugContext.sessionId || 0)
+            });
+          } catch (_) {
+            // Optional playback hooks must not interrupt speech.
+          }
+        };
         const isCurrentHtmlAudioPlayback = () => (
           Number(state.ttsAudioPlaybackToken || 0) === audioPlaybackToken
           && audio.src === url
@@ -548,12 +912,16 @@
             // ignore
           }
         };
+        const contextPlaybackDebugContext = {
+          ...debugContext,
+          speechText,
+          speechMood,
+          speechStyle,
+          speechPerformanceCue
+        };
         const beginFallbackSpeech = () => {
-          if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
-            return;
-          }
-          if (fallbackSpeechStarted) {
-            return;
+          if (!isCurrentTTSPlaybackGeneration(playbackGeneration) || fallbackSpeechStarted) {
+            return false;
           }
           fallbackSpeechStarted = true;
           recordTTSDebugEvent("audio_fallback_begin", {
@@ -563,11 +931,7 @@
               : -1,
             currentMs: Math.round(Number(audio.currentTime || 0) * 1000)
           });
-          beginSpeechAnimation(speechText, speechMood, speechStyle, {
-            durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
-              ? Math.round(audio.duration * 1000)
-              : undefined
-          });
+          return true;
         };
         const armFailTimer = (ms) => {
           if (failTimer) {
@@ -580,6 +944,10 @@
         const done = (ok) => {
           if (settled) return;
           settled = true;
+          if (unregisterCancelWaiter) {
+            unregisterCancelWaiter();
+            unregisterCancelWaiter = null;
+          }
           if (failTimer) {
             clearTimeout(failTimer);
             failTimer = 0;
@@ -627,6 +995,10 @@
               : -1,
             currentMs: Math.round(Number(audio.currentTime || 0) * 1000)
           });
+          perfLog("tts", "audio_play_end", {
+            traceId: String(perfTraceId || debugContext.traceId || state.activePerfTraceId || ""),
+            result: ok ? "ok" : "fail"
+          });
           try {
             URL.revokeObjectURL(url);
           } catch (_) {
@@ -635,6 +1007,9 @@
           setStatus(ok ? "待机" : "语音失败");
           resolve(ok);
         };
+        unregisterCancelWaiter = registerPlaybackCancelWaiter("html_audio", () => {
+          done(false);
+        });
         audio.onended = () => {
           if (!isCurrentHtmlAudioPlayback()) {
             done(false);
@@ -657,7 +1032,7 @@
             return;
           }
           beginFallbackSpeech();
-          const ok = await playAudioByContext(blob, debugContext);
+          const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart);
           done(!!ok);
         };
         audio.oncanplay = () => recordTTSAudioEvent("audio_canplay", audio, debugContext);
@@ -695,6 +1070,7 @@
               fromSpeakStartMs: perfSpeakStartedPerfMs ? Math.round(performance.now() - perfSpeakStartedPerfMs) : -1
             });
           }
+          notifyPlaybackStart("server_tts");
           if (state.ttsAudioContext && typeof state.ttsAudioContext.resume === "function") {
             state.ttsAudioContext.resume().catch(() => {});
           }
@@ -731,13 +1107,18 @@
               return;
             }
             beginFallbackSpeech();
-            const ok = await playAudioByContext(blob, debugContext);
+            const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart);
             done(!!ok);
           }, 650);
-          beginSpeechAnimation(speechText, speechMood, speechStyle, {
+          beginSpeechPerformance(speechText, speechMood, speechStyle, {
             durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
               ? Math.round(audio.duration * 1000)
-              : undefined
+              : undefined,
+            performanceCue: speechPerformanceCue
+          }, {
+            source: "server_tts",
+            playbackGeneration,
+            sessionId: debugContext.sessionId
           });
           showSubtitleText(speechText);
         };
@@ -754,9 +1135,6 @@
               durationMs: Math.round(audio.duration * 1000)
             });
             armFailTimer(audio.duration * 1000 + 12000);
-            beginSpeechAnimation(speechText, speechMood, speechStyle, {
-              durationMs: Math.round(audio.duration * 1000)
-            });
             if (audio.paused && !audio.ended) {
               audio.play().catch(async () => {
                 if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
@@ -764,7 +1142,7 @@
                   return;
                 }
                 beginFallbackSpeech();
-                const ok = await playAudioByContext(blob, debugContext);
+                const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart);
                 done(!!ok);
               });
             }
@@ -788,7 +1166,7 @@
             return;
           }
           beginFallbackSpeech();
-          const ok = await playAudioByContext(blob, debugContext);
+          const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart);
           done(!!ok);
         });
         armFailTimer(45000);
@@ -804,7 +1182,7 @@
               return;
             }
             beginFallbackSpeech();
-            const ok = await playAudioByContext(blob, debugContext);
+            const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart);
             done(!!ok);
           }
         }, 3200);
@@ -821,6 +1199,7 @@
       }
       if ("speechSynthesis" in window) {
         try {
+          advanceBrowserPlaybackToken();
           window.speechSynthesis.cancel();
         } catch (_) {
           // ignore
@@ -851,8 +1230,24 @@
             : Number(state.ttsServerRetryCount),
           retryDelayMs: Number(state.ttsServerRetryDelayMs),
           timeoutMs: Number(state.ttsServerRequestTimeoutMs),
-          traceId: perfTraceId
+          traceId: perfTraceId,
+          signal: opts.signal || null,
+          playbackGeneration,
+          sessionId: Number(opts.sessionId || 0),
+          kind: "direct"
         });
+        if (isServerTTSRequestCancelled(null, opts)) {
+          if (opts.requestOutcome && typeof opts.requestOutcome === "object") {
+            opts.requestOutcome.cancelled = true;
+          }
+          recordTTSDebugEvent("speak_cancelled", {
+            traceId: perfTraceId || "(none)",
+            sessionId: Number(opts.sessionId || 0),
+            playbackGeneration,
+            result: "request_cancelled"
+          });
+          return false;
+        }
         if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
           recordTTSDebugEvent("speak_stale_skip", {
             traceId: perfTraceId || "(none)",
@@ -866,12 +1261,28 @@
           text: cleaned,
           mood: opts.mood || detectMood(cleaned),
           style: opts.style || state.currentTalkStyle || "neutral",
+          performanceCue: opts.performanceCue || null,
           perfTraceId,
           perfBlobReadyPerfMs: performance.now(),
           perfSpeakStartedPerfMs: speakStartedPerfMs,
-          playbackGeneration
+          playbackGeneration,
+          sessionId: Number(opts.sessionId || 0),
+          onPlaybackStart: typeof opts.onPlaybackStart === "function" ? opts.onPlaybackStart : null
         });
       } catch (err) {
+        if (isServerTTSRequestCancelled(err, opts)) {
+          if (opts.requestOutcome && typeof opts.requestOutcome === "object") {
+            opts.requestOutcome.cancelled = true;
+          }
+          recordTTSDebugEvent("speak_cancelled", {
+            traceId: perfTraceId || "(none)",
+            sessionId: Number(opts.sessionId || 0),
+            playbackGeneration,
+            result: "request_cancelled",
+            error: String(err?.message || err || "")
+          });
+          return false;
+        }
         if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) {
           recordTTSDebugEvent("speak_stale_skip", {
             traceId: perfTraceId || "(none)",
@@ -896,8 +1307,12 @@
     }
 
     async function speak(text, opts = {}) {
+      const requestOutcome = opts.requestOutcome && typeof opts.requestOutcome === "object"
+        ? opts.requestOutcome
+        : { cancelled: false };
       const speakOpts = {
         ...opts,
+        requestOutcome,
         playbackGeneration: Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0)
       };
       if (isServerTTSProvider(state.ttsProvider)) {
@@ -908,6 +1323,14 @@
           state.ttsServerFailStreak = 0;
           state.ttsServerLastError = "";
           return true;
+        }
+        if (requestOutcome.cancelled === true || speakOpts.signal?.aborted === true) {
+          recordTTSDebugEvent("speak_fallback_cancelled_skip", {
+            traceId: String(speakOpts.perfTraceId || state.activePerfTraceId || "(none)"),
+            text,
+            result: "request_cancelled"
+          });
+          return false;
         }
         if (!isCurrentTTSPlaybackGeneration(speakOpts.playbackGeneration)) {
           recordTTSDebugEvent("speak_fallback_stale_skip", {
@@ -989,6 +1412,9 @@
       speakOnceWithVoice,
       buildServerTTSPayload,
       isRetriableTTSError,
+      createServerTTSRequestScope,
+      abortServerTTSRequestScope,
+      abortServerTTSRequests,
       requestServerTTSBlob,
       requestServerTTSBlobWithRetry,
       playAudioByContext,

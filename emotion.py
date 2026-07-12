@@ -6,6 +6,7 @@ from datetime import datetime
 import re
 
 from config import DEFAULT_CONFIG, ROOT_DIR
+import memory_store
 
 _INNER_STATES = [
     # 精力状态
@@ -49,8 +50,8 @@ def load_emotion_state():
         "last_updated": None,
     }
     try:
-        if EMOTION_STATE_PATH.exists():
-            state = json.loads(EMOTION_STATE_PATH.read_text(encoding="utf-8"))
+        state = memory_store.safe_load_json_file(EMOTION_STATE_PATH, None)
+        if state is not None:
             if not isinstance(state, dict):
                 state = {}
             import time
@@ -76,10 +77,7 @@ def load_emotion_state():
 def save_emotion_state(state):
     try:
         state["last_updated"] = datetime.now().isoformat()
-        EMOTION_STATE_PATH.write_text(
-            json.dumps(state, ensure_ascii=False, indent=2),
-            encoding="utf-8"
-        )
+        memory_store.safe_save_json_file(EMOTION_STATE_PATH, state, keep_backup=True)
     except Exception:
         pass
 
@@ -131,6 +129,11 @@ def update_emotion_from_reply(user_message, reply):
     return state
 
 def build_inner_state_block(config) -> str:
+    runtime_cfg = (config.get("character_runtime") or {}) if isinstance(config, dict) else {}
+    if isinstance(runtime_cfg, dict) and runtime_cfg.get("model_direct_reply") is True:
+        # The model-direct companion policy owns tone. Do not inject a random
+        # pseudo-human inner state that can contradict the actual conversation.
+        return ""
     personality_cfg = (config.get("personality") or {}) if isinstance(config, dict) else {}
     prob = float(personality_cfg.get("state_inject_prob", _STATE_INJECT_PROB))
     emotion = load_emotion_state()

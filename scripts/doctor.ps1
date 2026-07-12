@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RepoRoot
+. (Join-Path $PSScriptRoot "node-runtime.ps1")
 
 $script:ErrorCount = 0
 $script:WarnCount = 0
@@ -57,6 +58,18 @@ function Test-CommandVersion($Name, $VersionArgs, $Label) {
         Write-Ok "$Label detected: $version"
     } else {
         Write-WarnLine "$Label command exists but version check failed: $Name"
+    }
+    return $version
+}
+
+function Test-CommandPartsVersion($CommandParts, $Label) {
+    $exe = [string]$CommandParts[0]
+    $args = @($CommandParts | Select-Object -Skip 1)
+    $version = Get-VersionText $exe $args
+    if ($version) {
+        Write-Ok "$Label detected: $version"
+    } else {
+        Write-WarnLine "$Label command exists but version check failed: $($CommandParts -join ' ')"
     }
     return $version
 }
@@ -116,9 +129,11 @@ if ($pythonMajor -and $pythonMajor -lt 3) {
     Write-WarnLine "Python 3.10+ is recommended. Detected: $pythonVersion"
 }
 
-$nodeVersion = Test-CommandVersion "node" @("--version") "Node.js"
+$nodeVersion = Test-CommandPartsVersion (@(Resolve-ProjectNodeCommand -Tool "node") + @("--version")) "Node.js"
 $nodeMajor = Get-MajorVersion $nodeVersion
-if ($nodeMajor) {
+if (-not $nodeVersion) {
+    Write-Fail "Node.js command not found: node"
+} elseif ($nodeMajor) {
     if ($nodeMajor -lt 18) {
         Write-Fail "Node.js 18+ is required."
     } elseif ($nodeMajor -ge 24) {
@@ -126,7 +141,10 @@ if ($nodeMajor) {
     }
 }
 
-Test-CommandVersion "npm" @("--version") "npm" | Out-Null
+$npmVersion = Test-CommandPartsVersion (@(Resolve-ProjectNodeCommand -Tool "npm") + @("--version")) "npm"
+if (-not $npmVersion) {
+    Write-Fail "npm command not found."
+}
 
 $gitVersion = Test-CommandVersion "git" @("--version") "Git"
 if (-not $gitVersion) {

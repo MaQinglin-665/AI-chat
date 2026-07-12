@@ -33,9 +33,17 @@ from character_brain_reply_quality import (
     assess_reply_quality as _assess_reply_quality_impl,
     public_reply_quality as _public_reply_quality_impl,
 )
+from character_brain_text import (
+    TOOL_META_MARKER,
+    compact_one_liner as _compact_one_liner,
+    normalize_reply_text_spacing as _normalize_reply_text_spacing,
+    normalize_smart_punctuation as _normalize_smart_punctuation,
+    repair_unbalanced_reply_punctuation as _repair_unbalanced_reply_punctuation,
+    split_reply_sentences as _split_reply_sentences,
+    split_tool_meta_suffix as _split_tool_meta_suffix,
+)
 
 
-TOOL_META_MARKER = "[[TAFFY_TOOL_META]]"
 SUPPORTED_EMOTIONS = {
     "neutral",
     "happy",
@@ -247,25 +255,6 @@ def _normalize_action(value: Any, fallback: str = "none") -> str:
 def _normalize_intensity(value: Any, fallback: str = "normal") -> str:
     key = _norm_key(value)
     return key if key in SUPPORTED_INTENSITY else fallback
-
-
-def _normalize_smart_punctuation(text: Any) -> str:
-    return (
-        str(text or "")
-        .replace("\u2018", "'")
-        .replace("\u2019", "'")
-        .replace("\u201a", "'")
-        .replace("\u201b", "'")
-        .replace("\u201c", '"')
-        .replace("\u201d", '"')
-        .replace("\u201e", '"')
-        .replace("\u201f", '"')
-        .replace("\u2010", "-")
-        .replace("\u2011", "-")
-        .replace("\u2012", "-")
-        .replace("\u2013", "-")
-        .replace("\u2014", "-")
-    )
 
 
 def _is_next_step_request(user_message: str) -> bool:
@@ -2120,42 +2109,6 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
     return "\n".join(lines)
 
 
-def _split_tool_meta_suffix(text: str) -> tuple[str, str]:
-    safe = str(text or "")
-    if TOOL_META_MARKER not in safe:
-        return safe, ""
-    visible, meta = safe.split(TOOL_META_MARKER, 1)
-    return visible, TOOL_META_MARKER + meta
-
-
-def _normalize_reply_text_spacing(text: str) -> str:
-    out = _normalize_smart_punctuation(text).strip()
-    if not out:
-        return ""
-    latin = bool(re.search(r"[A-Za-z]", out))
-    if latin:
-        out = (
-            out.replace("\u3002", ".")
-            .replace("\uff1f", "?")
-            .replace("\uff01", "!")
-            .replace("\uff0c", ",")
-        )
-    out = re.sub(r"\s+", " ", out).strip()
-    out = re.sub(r"\s+([,.!?;:])", r"\1", out)
-    out = re.sub(r"([,.!?;:])(?=[A-Za-z0-9])", r"\1 ", out)
-    out = re.sub(r"([,.!?;:])\s+", r"\1 ", out)
-    return re.sub(r"\s{2,}", " ", out).strip()
-
-
-def _split_reply_sentences(text: str) -> List[str]:
-    safe = str(text or "").strip()
-    if not safe:
-        return []
-    matches = re.findall(r"[^.!?\n]+[.!?]*", safe)
-    parts = [part.strip() for part in matches if part and part.strip()]
-    return parts or [safe]
-
-
 def _is_needed_clarification_question(sentence: str) -> bool:
     lower = str(sentence or "").strip().lower()
     if not lower.endswith("?"):
@@ -2626,41 +2579,6 @@ def _shape_sentence_limit(reply_shape: str, intent: str, max_sentences: int) -> 
             return min(max_sentences, 4)
         return min(max_sentences, 3 if safe_intent in {"casual", "greeting", "encouragement"} else 2)
     return max_sentences
-
-
-def _compact_one_liner(text: str, max_chars: int = 170) -> str:
-    compact = _normalize_reply_text_spacing(text)
-    if len(compact) <= max_chars:
-        return compact
-    parts = re.split(r"(?<=[,;:])\s+", compact)
-    out = ""
-    for part in parts:
-        candidate = f"{out} {part}".strip()
-        if len(candidate) > max_chars:
-            break
-        out = candidate
-    return out or compact[:max_chars].rstrip(" ,;:")
-
-
-def _repair_unbalanced_reply_punctuation(text: str) -> str:
-    repaired = _normalize_reply_text_spacing(text)
-    if not repaired:
-        return ""
-    if repaired.count("(") > repaired.count(")"):
-        repaired = repaired.replace("(", "", repaired.count("(") - repaired.count(")"))
-    if repaired.count(")") > repaired.count("("):
-        for _ in range(repaired.count(")") - repaired.count("(")):
-            repaired = repaired.replace(")", "", 1)
-    if repaired.count("[") > repaired.count("]"):
-        repaired = repaired.replace("[", "", repaired.count("[") - repaired.count("]"))
-    if repaired.count("]") > repaired.count("["):
-        for _ in range(repaired.count("]") - repaired.count("[")):
-            repaired = repaired.replace("]", "", 1)
-    if repaired.count('"') % 2 == 1:
-        repaired = repaired.replace('"', "")
-    if (repaired.count("\u201c") + repaired.count("\u201d")) % 2 == 1:
-        repaired = repaired.replace("\u201c", "").replace("\u201d", "")
-    return _normalize_reply_text_spacing(repaired)
 
 
 def _reply_contains_selected_bit(text: str, performance_bit: str) -> bool:

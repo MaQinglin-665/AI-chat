@@ -13,11 +13,6 @@ import urllib.request
 import uuid
 import wave
 
-try:
-    import audioop as _audioop
-except ImportError:
-    _audioop = None  # Python 3.13+ removed audioop; graceful degradation
-
 from config import (
     DiagnosticError,
     GPT_SOVITS_DEFAULT_API_URL,
@@ -33,6 +28,15 @@ from config import (
     VOLCENGINE_TTS_DEFAULT_CLUSTER,
     VOLCENGINE_TTS_DEFAULT_VOICE,
     load_config,
+)
+from tts_audio import (
+    pcm_lin2lin,
+    pcm_max,
+    pcm_mul,
+    pcm_ratecv,
+    pcm_rms,
+    pcm_tomono,
+    pcm_tostereo,
 )
 
 try:
@@ -89,6 +93,11 @@ def _normalize_gpt_sovits_spoken_text(text):
         src.replace("_", " ")
         .replace("/", " ")
         .replace("\\", " ")
+        .replace("\u2014", ". ")
+        .replace("\u2013", ". ")
+        .replace("\u2012", ". ")
+        .replace("\u2011", "-")
+        .replace("\u2010", "-")
     )
     speak = re.sub(r"[\u2600-\u27BF\uE000-\uF8FF\U0001F300-\U0001FAFF]", " ", speak)
 
@@ -116,6 +125,13 @@ def _normalize_gpt_sovits_spoken_text(text):
         speak = re.sub(r"\s+([,.!?;:])", r"\1", speak)
         speak = re.sub(r"([,.!?;:])(?=[^\s])", r"\1 ", speak)
         speak = re.sub(r"[,;:]\s+", ". ", speak)
+        for marker in ("alright", "okay", "ok", "yeah"):
+            speak = re.sub(
+                rf"\b({marker})[.!?,]?\s+\1\b[.!?,]?",
+                r"\1.",
+                speak,
+                flags=re.I,
+            )
         speak = re.sub(r"\s+", " ", speak).strip()
 
     return speak[:600]
@@ -590,24 +606,19 @@ def _concat_wav_audio_bytes(chunks):
         ch, sw, sr, _comp, _comp_name = cur
         pcm = frames
         try:
-            if _audioop is not None:
-                if sw != target_sw:
-                    pcm = _audioop.lin2lin(pcm, sw, target_sw)
-                    sw = target_sw
-                if ch != target_ch:
-                    if ch == 2 and target_ch == 1:
-                        pcm = _audioop.tomono(pcm, sw, 0.5, 0.5)
-                    elif ch == 1 and target_ch == 2:
-                        pcm = _audioop.tostereo(pcm, sw, 1.0, 1.0)
-                    else:
-                        raise RuntimeError("Unsupported channel conversion")
-                    ch = target_ch
-                if sr != target_sr:
-                    pcm, _ = _audioop.ratecv(pcm, sw, ch, sr, target_sr, None)
-            else:
-                # audioop unavailable (Python 3.13+): skip mismatched chunks
-                if cur != params:
-                    continue
+            if sw != target_sw:
+                pcm = pcm_lin2lin(pcm, sw, target_sw)
+                sw = target_sw
+            if ch != target_ch:
+                if ch == 2 and target_ch == 1:
+                    pcm = pcm_tomono(pcm, sw, 0.5, 0.5)
+                elif ch == 1 and target_ch == 2:
+                    pcm = pcm_tostereo(pcm, sw, 1.0, 1.0)
+                else:
+                    raise RuntimeError("Unsupported channel conversion")
+                ch = target_ch
+            if sr != target_sr:
+                pcm = pcm_ratecv(pcm, sw, ch, sr, target_sr)
         except Exception:
             # Skip incompatible chunk instead of failing the whole reply.
             if cur != params:
@@ -706,8 +717,6 @@ def _normalize_wav_loudness(
     peak_limit=26000,
     max_rms=4200.0,
 ):
-    if _audioop is None:
-        return audio_bytes, None
     if not isinstance(audio_bytes, (bytes, bytearray)) or len(audio_bytes) < 44:
         return audio_bytes, None
     data = bytes(audio_bytes)
@@ -721,8 +730,8 @@ def _normalize_wav_loudness(
         if sample_width != 2 or not frames:
             return audio_bytes, None
 
-        peak_before = int(_audioop.max(frames, sample_width) or 0)
-        rms_before = float(_audioop.rms(frames, sample_width) or 0.0)
+        peak_before = int(pcm_max(frames, sample_width) or 0)
+        rms_before = float(pcm_rms(frames, sample_width) or 0.0)
         if peak_before <= 0 or rms_before <= 0:
             return audio_bytes, {
                 "changed": False,
@@ -756,9 +765,9 @@ def _normalize_wav_loudness(
                 "rms_after": rms_before,
             }
 
-        boosted = _audioop.mul(frames, sample_width, gain)
-        peak_after = int(_audioop.max(boosted, sample_width) or 0)
-        rms_after = float(_audioop.rms(boosted, sample_width) or 0.0)
+        boosted = pcm_mul(frames, sample_width, gain)
+        peak_after = int(pcm_max(boosted, sample_width) or 0)
+        rms_after = float(pcm_rms(boosted, sample_width) or 0.0)
         out = io.BytesIO()
         with wave.open(out, "wb") as wf_out:
             wf_out.setparams(params)
@@ -966,7 +975,7 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         tts_cfg.get("gpt_sovits_max_loudness_gain", 3.2), 3.2
     )
     max_rms = _safe_float(tts_cfg.get("gpt_sovits_max_rms", 4200), 4200)
-    prefer_clean_prompt = _safe_bool(tts_cfg.get("gpt_sovits_prefer_clean_prompt", True), True)
+    prefer_clean_prompt = _safe_bool(tts_cfg.get("gpt_sovits_prefer_clean_prompt", False), False)
     chunk_max_candidates = max(
         1, min(4, _safe_int(tts_cfg.get("gpt_sovits_chunk_max_candidates", 2), 2))
     )

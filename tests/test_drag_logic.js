@@ -45,13 +45,33 @@ function staticChecks() {
   );
   ensureSourceContains(
     live2dLayoutSource,
-    "|| isPointOverSubtitleDragHandle(e.clientX, e.clientY);",
+    "|| isPointOverSubtitleDragHandle(clientX, clientY);",
     "Electron click-through hit test keeps subtitle drag handle interactive"
   );
   ensureSourceContains(
     live2dLayoutSource,
     "state.windowDragActive || state.subtitleDragPointerId",
     "Electron click-through stays disabled while subtitle dragging"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "state.dragData || state.windowDragActive || state.subtitleDragPointerId",
+    "Electron click-through stays disabled while model dragging"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "state.clickthroughHitTestTimer = window.setInterval(async () => {",
+    "Electron click-through has cursor polling fallback"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "window.electronAPI.getCursorScreenPoint()",
+    "Electron click-through polling reads global cursor position"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "window.electronAPI.getModelWindowBounds()",
+    "Electron click-through polling maps cursor into model window bounds"
   );
   ensureSourceContains(
     live2dLayoutSource,

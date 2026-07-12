@@ -21,6 +21,12 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_release_readiness.ps1
 ```
 
+默认情况下，演示环境检查是 advisory：本地 GPT-SoVITS 等可选服务未启动时会显示警告，但不会让代码、测试和打包门禁失败。录制公开演示前使用严格模式：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_release_readiness.ps1 -RequireDemoReadiness
+```
+
 如果只想先跑较快的代码与体验检查，可以临时跳过打包项：
 
 ```powershell
@@ -43,6 +49,12 @@ python scripts\check_demo_readiness.py
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_installer_smoke.ps1
 git diff --check
+```
+
+如需在本机一次性包含真实 LLM probe 和首句聊天 smoke：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_release_readiness.ps1 -WithFirstChatSmoke
 ```
 
 通过标准：

@@ -88,8 +88,11 @@
       const styleCfg = state.config?.style || {};
       const motionCfg = state.config?.motion || {};
       const runtimeCfg = state.config?.character_runtime || {};
+      const companionTurnCfg = state.config?.companion_turn || {};
       state.characterRuntimeAutoApplyReplyCue =
         runtimeCfg.enabled === true && runtimeCfg.auto_apply_reply_cue === true;
+      state.modelDirectReply = runtimeCfg.model_direct_reply === true;
+      state.companionTurnEnabled = companionTurnCfg.enabled === true;
       state.showMicMeter = asrCfg.show_mic_meter !== false;
       state.micKeepListening = asrCfg.keep_listening !== false;
       state.asrTranscribeOnClose = asrCfg.transcribe_on_close !== false;
@@ -109,6 +112,12 @@
       );
       const buf = Math.round(Number(asrCfg.processor_buffer_size || 2048));
       state.localAsrProcessorBufferSize = [1024, 2048, 4096, 8192].includes(buf) ? buf : 2048;
+      {
+        const inputLanguageMode = String(asrCfg.input_language_mode || "auto").trim().toLowerCase();
+        state.asrInputLanguageMode = inputLanguageMode === "zh" || inputLanguageMode === "en"
+          ? inputLanguageMode
+          : "auto";
+      }
       state.asrSemanticCorrectionEnabled = asrCfg.semantic_correction_enabled !== false;
       state.voiceTurnMergeWindowMs = Math.round(
         clampNumber(Number(asrCfg.voice_turn_merge_window_ms ?? 1200), 0, 2500)

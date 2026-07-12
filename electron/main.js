@@ -629,24 +629,32 @@ function applyWindowLockToAllWindows() {
   applyWindowLockToWindow(chatWindow);
 }
 
+function shouldKeepWindowsAlwaysOnTop() {
+  const desktopCfg = earlyRuntimeConfig && typeof earlyRuntimeConfig === "object"
+    ? (earlyRuntimeConfig.desktop || {})
+    : {};
+  return desktopCfg.always_on_top === true;
+}
+
 function applyWindowAlwaysOnTop(win) {
   if (!win || win.isDestroyed()) {
     return;
   }
+  const enabled = shouldKeepWindowsAlwaysOnTop();
   try {
     if (process.platform === "darwin") {
-      win.setAlwaysOnTop(true, "screen-saver");
+      win.setAlwaysOnTop(enabled, "screen-saver");
     } else {
-      win.setAlwaysOnTop(true);
+      win.setAlwaysOnTop(enabled);
     }
   } catch (_) {
     try {
-      win.setAlwaysOnTop(true);
+      win.setAlwaysOnTop(enabled);
     } catch (_) {
       // ignore
     }
   }
-  if (process.platform === "darwin") {
+  if (enabled && process.platform === "darwin") {
     try {
       if (typeof win.setVisibleOnAllWorkspaces === "function") {
         win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -870,6 +878,8 @@ function stopPythonServer() {
 
 function createModelWindow() {
   const bounds = getDefaultModelBounds();
+  const alwaysOnTop = shouldKeepWindowsAlwaysOnTop();
+  const modelWindowFocusable = alwaysOnTop ? false : true;
   modelWindow = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
@@ -879,9 +889,9 @@ function createModelWindow() {
     transparent: true,
     hasShadow: false,
     backgroundColor: "#00000000",
-    alwaysOnTop: true,
+    alwaysOnTop,
     skipTaskbar: true,
-    focusable: false,
+    focusable: modelWindowFocusable,
     resizable: false,
     show: true,
     webPreferences: {

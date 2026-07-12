@@ -52,6 +52,11 @@
         () => typeof window.PIXI !== "undefined"
       );
 
+      if (!window.__TAFFY_PIXI_CSP_PATCHED__) {
+        await loadScript("/vendor/pixi-unsafe-eval.min.js");
+        window.__TAFFY_PIXI_CSP_PATCHED__ = true;
+      }
+
       await loadScript(
         "/vendor/live2dcubismcore.min.js",
         () =>

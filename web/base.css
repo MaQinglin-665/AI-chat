@@ -133,6 +133,25 @@ body.desktop-mode.view-model.native-window-drag #live2d-canvas {
   pointer-events: auto;
 }
 
+.panel .hero-avatar {
+  position: relative;
+  width: 82px;
+  height: 82px;
+  flex: 0 0 82px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.panel .hero-avatar > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+  object-position: center center;
+}
+
 body.view-chat .panel {
   z-index: 1;
   inset: 12px;
@@ -6346,6 +6365,92 @@ body.view-chat #more-btn[aria-expanded="true"] {
   grid-column: 1 / -1;
 }
 
+.persona-relationship-section {
+  grid-column: 1 / -1;
+}
+
+.relationship-state-intro {
+  margin: -2px 0 10px;
+  color: #58709f;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.relationship-state-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(139, 160, 221, 0.42);
+  border-radius: 13px;
+  background: rgba(246, 249, 255, 0.88);
+}
+
+.relationship-state-summary strong {
+  color: #304d86;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.relationship-state-summary span,
+.relationship-state-status {
+  color: #6278a6;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.relationship-state-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: #385587;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.relationship-state-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #6684ef;
+}
+
+.relationship-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.relationship-state-actions .persona-ghost-btn,
+.relationship-state-actions .persona-primary-btn {
+  min-width: 0;
+  transition: transform 160ms cubic-bezier(.2, .8, .2, 1), filter 160ms ease;
+}
+
+.relationship-state-actions .persona-ghost-btn:active,
+.relationship-state-actions .persona-primary-btn:active {
+  transform: scale(.97);
+}
+
+.relationship-state-actions button:disabled,
+.relationship-state-toggle input:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+.relationship-state-danger-btn {
+  color: #9a4d63 !important;
+}
+
+.relationship-state-status {
+  min-height: 17px;
+  margin: 8px 0 0;
+}
+
 .persona-advanced-details {
   border: 1px solid rgba(154, 174, 226, 0.38);
   border-radius: 14px;
@@ -6427,6 +6532,14 @@ body.view-chat #more-btn[aria-expanded="true"] {
 
   .persona-footer-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .relationship-state-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .relationship-state-actions > * {
+    flex: 1 1 130px;
   }
 
   #persona-apply-btn {

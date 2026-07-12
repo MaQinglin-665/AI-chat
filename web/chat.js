@@ -13,6 +13,15 @@ function perfLog(scope, stage, payload = {}) {
   } catch (_) {
     // ignore logging errors
   }
+  try {
+    window.TaffyCompanionExperienceDiagnostics?.record?.(scope, stage, payload);
+  } catch (_) {
+    // Developer-only diagnostics must never affect the conversation path.
+  }
+}
+
+function toggleExperienceDiagnosticsPanel(force = null) {
+  return window.TaffyCompanionExperienceDiagnostics?.togglePanel?.(force) === true;
 }
 
 let diagnosticsRuntimeController = null;
@@ -720,12 +729,27 @@ function buildFollowupAwareIdleMotionContext() {
 
 const FOLLOWUP_READINESS_PANEL_CONTROLLER = window.TaffyFollowupReadinessPanelController || {};
 let followupReadinessPanelController = null;
+let missingFollowupReadinessPanelController = null;
+
+function getMissingFollowupReadinessPanelController() {
+  if (!missingFollowupReadinessPanelController) {
+    missingFollowupReadinessPanelController = new Proxy({}, {
+      get(_target, property) {
+        if (property === "toggleFollowupReadinessPanel") {
+          return () => false;
+        }
+        return () => null;
+      }
+    });
+  }
+  return missingFollowupReadinessPanelController;
+}
 
 function getFollowupReadinessPanelController() {
   if (!followupReadinessPanelController && typeof FOLLOWUP_READINESS_PANEL_CONTROLLER.createController === "function") {
     followupReadinessPanelController = FOLLOWUP_READINESS_PANEL_CONTROLLER.createController(getFollowupControllerDeps());
   }
-  return followupReadinessPanelController;
+  return followupReadinessPanelController || getMissingFollowupReadinessPanelController();
 }
 
 function buildFollowupReadinessBackendEntryView() {
@@ -1676,6 +1700,7 @@ const DEBUG_PANEL_CONTROLLER = window.TaffyDebugPanelController || {};
 const STORAGE_CONTROLLER = window.TaffyStorageController || {};
 const CHAT_MESSAGE_CONTROLLER = window.TaffyChatMessageController || {};
 const PERSONA_AVATAR_CONTROLLER = window.TaffyPersonaAvatarController || {};
+const RELATIONSHIP_STATE_CONTROLLER = window.TaffyRelationshipStateController || {};
 const ONBOARDING_CONTROLLER = window.TaffyOnboardingController || {};
 const REMINDER_SCHEDULE_CONTROLLER = window.TaffyReminderScheduleController || {};
 const EMOTION_STATS_CONTROLLER = window.TaffyEmotionStatsController || {};
@@ -1715,10 +1740,12 @@ const STREAM_TTS_QUEUE_CONTROLLER = window.TaffyStreamTtsQueueController || {};
 const TTS_PLAYBACK_CONTROLLER = window.TaffyTTSPlaybackController || {};
 const CHAT_REPLY_CONTROLLER = window.TaffyChatReplyController || {};
 const PERFORMANCE_AUDIT_CONTROLLER = window.TaffyPerformanceAuditController || {};
+const PERFORMANCE_CUE_CONTROLLER = window.TaffyPerformanceCueController || {};
 const PERFORMANCE_TIMELINE_CONTROLLER = window.TaffyPerformanceTimelineController || {};
 const LIVE2D_RUNTIME_CONTROLLER = window.TaffyLive2DRuntimeController || {};
 const LIVE2D_LAYOUT_CONTROLLER = window.TaffyLive2DLayoutController || {};
 const LIVE2D_EXPRESSION_CONTROLLER = window.TaffyLive2DExpressionController || {};
+const HIYORI_EMOTION_OVERLAY_CONTROLLER = window.TaffyHiyoriEmotionOverlayController || {};
 const CHAT_CONTROLLER_DELEGATES = window.TaffyChatControllerDelegates || {};
 const CHAT_TTS_BOUNDARY = window.TaffyChatTtsBoundary || {};
 const CHAT_LIVE2D_BOUNDARY = window.TaffyChatLive2DBoundary || {};
@@ -1795,6 +1822,67 @@ async function authFetch(input, init = {}) {
     return window.authFetch(input, init);
   }
   return fetch(input, init);
+}
+
+async function acknowledgeDeliveredTurn(deliveryId) {
+  const chatApi = window.TaffyModules?.chatApi || {};
+  if (typeof chatApi.acknowledgeDeliveredTurn !== "function") {
+    return false;
+  }
+  return await chatApi.acknowledgeDeliveredTurn(authFetch, deliveryId);
+}
+
+let deliveredTurnAckQueue = null;
+let deliveredTurnAckPagehideInstalled = false;
+
+function getDeliveredTurnAckQueue() {
+  if (deliveredTurnAckQueue) {
+    return deliveredTurnAckQueue;
+  }
+  const chatApi = window.TaffyModules?.chatApi || {};
+  if (typeof chatApi.createDeliveredTurnAckQueue !== "function") {
+    return null;
+  }
+  deliveredTurnAckQueue = chatApi.createDeliveredTurnAckQueue({
+    sender: async (deliveryId, options = {}) => {
+      if (typeof chatApi.attemptDeliveredTurnAck === "function") {
+        return await chatApi.attemptDeliveredTurnAck(authFetch, deliveryId, options);
+      }
+      return {
+        confirmed: await acknowledgeDeliveredTurn(deliveryId),
+        retryable: true,
+        outcome: "legacy_ack_adapter"
+      };
+    },
+    onResult: (result) => {
+      if (result?.confirmed === true) {
+        return;
+      }
+      recordTTSDebugEvent("delivery_ack_not_confirmed", {
+        result: String(result?.outcome || "unconfirmed"),
+        attempts: Number(result?.attempts || 0)
+      });
+    }
+  });
+  if (!deliveredTurnAckPagehideInstalled && typeof window.addEventListener === "function") {
+    deliveredTurnAckPagehideInstalled = true;
+    window.addEventListener("pagehide", () => {
+      try {
+        deliveredTurnAckQueue?.flushWithKeepalive?.();
+      } catch (_) {
+        // A page close must never surface an extra UI error.
+      }
+    });
+  }
+  return deliveredTurnAckQueue;
+}
+
+function getPendingDeliveryReceiptIds() {
+  try {
+    return getDeliveredTurnAckQueue()?.getPendingIds?.() || [];
+  } catch (_) {
+    return [];
+  }
 }
 
 function isApiRequestTarget(input) {
@@ -2496,6 +2584,34 @@ function closeSchedulePanel() {
   return getReminderScheduleController().closeSchedulePanel();
 }
 
+let relationshipStateController = null;
+
+function getRelationshipStateController() {
+  if (!relationshipStateController && typeof RELATIONSHIP_STATE_CONTROLLER.createController === "function") {
+    relationshipStateController = RELATIONSHIP_STATE_CONTROLLER.createController({
+      ui,
+      authFetch,
+      setStatus,
+      windowObject: window
+    });
+  }
+  return relationshipStateController || RELATIONSHIP_STATE_CONTROLLER;
+}
+
+function loadRelationshipState() {
+  const controller = getRelationshipStateController();
+  return typeof controller.loadRelationshipState === "function"
+    ? controller.loadRelationshipState({ silent: true })
+    : Promise.resolve(null);
+}
+
+function bindRelationshipStateControls() {
+  const controller = getRelationshipStateController();
+  if (typeof controller.bindRelationshipStateControls === "function") {
+    controller.bindRelationshipStateControls();
+  }
+}
+
 let personaAvatarController = null;
 
 function getPersonaAvatarController() {
@@ -2517,7 +2633,8 @@ function getPersonaAvatarController() {
       closeOnboardingModal,
       closeSchedulePanel,
       isLearningReviewOpen,
-      closeLearningReviewDrawer
+      closeLearningReviewDrawer,
+      loadRelationshipState
     });
   }
   return personaAvatarController;
@@ -2698,6 +2815,7 @@ function bindAdvancedActionControls() {
     return;
   }
   ADVANCED_ACTION_BINDER.bindAdvancedActionControls(ui, {
+    toggleExperienceDiagnosticsPanel,
     toggleFollowupReadinessPanel,
     updateFollowupCharacterChip,
     runDoctorAndAppendReport,
@@ -3229,6 +3347,14 @@ function resumeMicAfterAssistant() {
   return getLocalAsrController().resumeMicAfterAssistant();
 }
 
+function setListeningPresence(phase = "idle", opts = {}) {
+  return getLocalAsrController().setListeningPresence(phase, opts);
+}
+
+function clearListeningPresence(opts = {}) {
+  return getLocalAsrController().clearListeningPresence(opts);
+}
+
 function enqueueMicTranscript(text, sessionId = null, opts = {}) {
   return getLocalAsrController().enqueueMicTranscript(text, sessionId, opts);
 }
@@ -3246,6 +3372,7 @@ function getAutoChatController() {
       ui,
       documentObject: document,
       windowObject: window,
+      performanceObject: performance,
       setStatus,
       parseMessageTimestamp,
       requestAssistantReply,
@@ -3558,7 +3685,10 @@ function commitMessageRecord(role, text, options = {}) {
 }
 
 function appendMessage(role, text, options = {}) {
-  return getChatMessageController().appendMessage(role, text, options);
+  const controller = getChatMessageController();
+  return typeof controller?.appendMessage === "function"
+    ? controller.appendMessage(role, text, options)
+    : null;
 }
 
 function appendStickerMessage(role, sticker, options = {}) {
@@ -3867,8 +3997,17 @@ function createLive2DExpressionBoundaryDeps() {
     normalizeTalkStyle,
     detectMood,
     isSpeechMotionActive,
-    isSpeakingNow,
-    live2dExpressionTuning: LIVE2D_EXPRESSION_TUNING,
+      isSpeakingNow,
+      hiyoriEmotionOverlayController:
+        typeof HIYORI_EMOTION_OVERLAY_CONTROLLER.createController === "function"
+          ? HIYORI_EMOTION_OVERLAY_CONTROLLER.createController({
+              state,
+              documentObject: document,
+              windowObject: window,
+              performanceObject: performance
+            })
+          : null,
+      live2dExpressionTuning: LIVE2D_EXPRESSION_TUNING,
     styleExpressionProfile: STYLE_EXPRESSION_PROFILE,
     motionIntensityPresets: MOTION_INTENSITY_PRESETS,
     modelMotionProfiles: MODEL_MOTION_PROFILES
@@ -3975,6 +4114,54 @@ function updateMicroMotionLayer() { return getLive2DExpressionController().updat
 function getSpeechAnimationMouthOpen() { return getLive2DExpressionController().getSpeechAnimationMouthOpen(); }
 function applyStyleExpressionLayer() { return getLive2DExpressionController().applyStyleExpressionLayer(); }
 
+function buildPerformanceCue(input = {}) {
+  return typeof PERFORMANCE_CUE_CONTROLLER.buildPerformanceCue === "function"
+    ? PERFORMANCE_CUE_CONTROLLER.buildPerformanceCue(input)
+    : null;
+}
+
+function resolvePerformanceCueMotionPlan(cue = null) {
+  return typeof PERFORMANCE_CUE_CONTROLLER.resolvePerformanceCueMotionPlan === "function"
+    ? PERFORMANCE_CUE_CONTROLLER.resolvePerformanceCueMotionPlan(cue)
+    : null;
+}
+
+function triggerPerformanceCueMotion(cue = null, context = {}) {
+  const plan = resolvePerformanceCueMotionPlan(cue);
+  if (!plan?.shouldTrigger || !state.model || !state.motionEnabled) {
+    return false;
+  }
+  const key = [
+    context.sessionId || context.playbackGeneration || state.ttsPlaybackGeneration || state.activePerfTraceId || "turn",
+    plan.emotion || "",
+    plan.action || "",
+    plan.intensity || ""
+  ].join("|");
+  if (key && state._lastFullPerformanceCueMotionKey === key) {
+    return false;
+  }
+  state._lastFullPerformanceCueMotionKey = key;
+  Promise.resolve(tryBuiltInMotion(plan.mood || "idle", {
+    source: "performance_cue",
+    motionCue: plan.motionCue || "",
+    motionRole: plan.motionRole || "",
+    groups: plan.groups,
+    preserveGroupOrder: true,
+    force: true,
+    cooldownMs: plan.cooldownMs,
+    priority: plan.priority,
+    allowFallback: false
+  })).catch(() => {});
+  return true;
+}
+
+function applySpeechPerformanceCue(cue = null) {
+  const controller = getLive2DExpressionController();
+  return typeof controller.applySpeechPerformanceCue === "function"
+    ? controller.applySpeechPerformanceCue(cue)
+    : null;
+}
+
 let actionPlanControllerInstance = null;
 
 function getActionPlanController() {
@@ -3990,6 +4177,7 @@ function getActionPlanController() {
       getActiveModelMotionProfile,
       pickMoodMotionGroups,
       isSpeechMotionActive,
+      isSpeakingNow,
       playEmotion,
       triggerExpressionPulse,
       recordPerformanceAuditEvent
@@ -4104,6 +4292,7 @@ function createTTSPlaybackBoundaryDeps() {
     recordTTSDebugEvent,
     recordTTSAudioEvent,
     beginSpeechAnimation,
+    triggerPerformanceCueMotion,
     finishSpeechAnimation,
     endSpeechAnimation,
     showSubtitleText,
@@ -4126,6 +4315,7 @@ function createStreamTtsQueueBoundaryDeps() {
     buildSpeakProsody,
     recordTTSDebugEvent,
     requestServerTTSBlob,
+    createServerTTSRequestScope,
     setStatus,
     playAudioBlob,
     isCurrentTTSPlaybackGeneration,
@@ -4195,6 +4385,8 @@ function stopAllAudioPlayback() { return getTTSPlaybackController().stopAllAudio
 function speakOnceWithVoice(text, voice, opts = {}) { return getTTSPlaybackController().speakOnceWithVoice(text, voice, opts); }
 function buildServerTTSPayload(cleanedText, opts = {}) { return getTTSPlaybackController().buildServerTTSPayload(cleanedText, opts); }
 function isRetriableTTSError(err) { return getTTSPlaybackController().isRetriableTTSError(err); }
+function createServerTTSRequestScope(opts = {}) { return getTTSPlaybackController().createServerTTSRequestScope(opts); }
+function abortServerTTSRequests(opts = {}) { return getTTSPlaybackController().abortServerTTSRequests(opts); }
 async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) { return getTTSPlaybackController().requestServerTTSBlob(text, prosody, requestOpts); }
 async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) { return getTTSPlaybackController().requestServerTTSBlobWithRetry(text, prosody, opts); }
 async function playAudioByContext(blob, debugContext = {}) { return getTTSPlaybackController().playAudioByContext(blob, debugContext); }
@@ -4214,15 +4406,15 @@ function getStreamTtsQueueController() {
 function shouldUseStreamSpeak() { return getStreamTtsQueueController().shouldUseStreamSpeak(); }
 function shouldSerializeStreamTTSRequests() { return getStreamTtsQueueController().shouldSerializeStreamTTSRequests(); }
 function ensureStreamSpeakBlobPromise(item) { return getStreamTtsQueueController().ensureStreamSpeakBlobPromise(item); }
-function enqueueStreamSpeakSegment(text, sessionId, prosody = null, style = "neutral") { return getStreamTtsQueueController().enqueueStreamSpeakSegment(text, sessionId, prosody, style); }
+function enqueueStreamSpeakSegment(text, sessionId, prosody = null, style = "neutral", playbackOptions = {}) { return getStreamTtsQueueController().enqueueStreamSpeakSegment(text, sessionId, prosody, style, playbackOptions); }
 function dequeueStreamSpeakItem(sessionId) { return getStreamTtsQueueController().dequeueStreamSpeakItem(sessionId); }
 function hasQueuedStreamSpeakItem(sessionId) { return getStreamTtsQueueController().hasQueuedStreamSpeakItem(sessionId); }
 function discardQueuedStreamSpeakItems(sessionId) { return getStreamTtsQueueController().discardQueuedStreamSpeakItems(sessionId); }
 function ensureStreamSpeakQueueRunning(sessionId, delayMs = 0) { return getStreamTtsQueueController().ensureStreamSpeakQueueRunning(sessionId, delayMs); }
 async function waitNextStreamSpeakItem(sessionId, waitMs = 0) { return getStreamTtsQueueController().waitNextStreamSpeakItem(sessionId, waitMs); }
 async function runStreamSpeakQueue() { return getStreamTtsQueueController().runStreamSpeakQueue(); }
-function feedStreamSpeakDelta(delta, sessionId, style = "neutral") { return getStreamTtsQueueController().feedStreamSpeakDelta(delta, sessionId, style); }
-function flushStreamSpeak(sessionId, style = "neutral") { return getStreamTtsQueueController().flushStreamSpeak(sessionId, style); }
+function feedStreamSpeakDelta(delta, sessionId, style = "neutral", playbackOptions = {}) { return getStreamTtsQueueController().feedStreamSpeakDelta(delta, sessionId, style, playbackOptions); }
+function flushStreamSpeak(sessionId, style = "neutral", playbackOptions = {}) { return getStreamTtsQueueController().flushStreamSpeak(sessionId, style, playbackOptions); }
 function scheduleFinalSpeechWatchdog(input = {}) { return getStreamTtsQueueController().scheduleFinalSpeechWatchdog(input); }
 
 function getVoiceRuntimeController() {
@@ -4264,6 +4456,8 @@ async function ensureLive2DRuntime() { return getLive2DRuntimeController().ensur
 let chatConfigBoundary = null;
 
 function createAppConfigBoundaryDeps() {
+  const modelOnly = state.uiView === "model";
+  const noop = () => {};
   return {
     state,
     ui,
@@ -4272,18 +4466,18 @@ function createAppConfigBoundaryDeps() {
     isServerTTSProvider,
     initServerTTSVoices,
     buildAsrHotwordRules,
-    syncProactiveSchedulerPolling,
-    startAutoChatLoop,
-    stopAutoChatLoop,
+    syncProactiveSchedulerPolling: modelOnly ? noop : syncProactiveSchedulerPolling,
+    startAutoChatLoop: modelOnly ? noop : startAutoChatLoop,
+    stopAutoChatLoop: modelOnly ? noop : stopAutoChatLoop,
     normalizeTalkStyle,
     normalizeMotionIntensity,
-    loadChatHistoryFromStorage,
-    loadRemindersFromStorage,
-    loadDailyGreetingState,
-    loadEmotionStats,
-    resolveAssistantDisplayName,
-    updateObserveButton,
-    updateMicMeter,
+    loadChatHistoryFromStorage: modelOnly ? noop : loadChatHistoryFromStorage,
+    loadRemindersFromStorage: modelOnly ? noop : loadRemindersFromStorage,
+    loadDailyGreetingState: modelOnly ? noop : loadDailyGreetingState,
+    loadEmotionStats: modelOnly ? noop : loadEmotionStats,
+    resolveAssistantDisplayName: modelOnly ? (name) => name : resolveAssistantDisplayName,
+    updateObserveButton: modelOnly ? noop : updateObserveButton,
+    updateMicMeter: modelOnly ? noop : updateMicMeter,
     detectModelProfileName
   };
 }
@@ -4409,7 +4603,8 @@ function getWakeWordController() {
   if (!wakeWordController && typeof WAKE_WORD_CONTROLLER.createController === "function") {
     wakeWordController = WAKE_WORD_CONTROLLER.createController({
       state, windowObject: window, navigatorObject: navigator, setStatus, updateMicButton,
-      scheduleMicRecognitionStart, enqueueMicTranscript, toggleMicOpen
+      scheduleMicRecognitionStart, enqueueMicTranscript, toggleMicOpen,
+      handleUserSpeechStart, setListeningPresence, clearListeningPresence
     });
   }
   return wakeWordController || WAKE_WORD_CONTROLLER;
@@ -4432,6 +4627,9 @@ function createChatReplyControllerDeps() {
     windowObject: window,
     performanceObject: performance,
     authFetch,
+    acknowledgeDeliveredTurn,
+    deliveryAckQueue: getDeliveredTurnAckQueue(),
+    getPendingDeliveryReceiptIds,
     createPerfTraceId,
     perfLog,
     handleCharacterRuntimeMetadata,
@@ -4447,6 +4645,7 @@ function createChatReplyControllerDeps() {
     setStatus,
     shouldUseStreamSpeak,
     stopAllAudioPlayback,
+    abortServerTTSRequests,
     shouldPlayLatencyHint,
     pickLatencyHintText,
     buildSpeakProsody,
@@ -4471,6 +4670,11 @@ function createChatReplyControllerDeps() {
     normalizeRuntimeVoiceStyle,
     runtimeVoiceStyleToTalkStyle,
     applyPerformanceControlsToRuntimeHint,
+    buildPerformanceCue,
+    triggerPerformanceCueMotion,
+    applySpeechPerformanceCue,
+    publishPerformancePhase: publishSplitWindowPerformancePhase,
+    clearPerformancePhase: clearSplitWindowPerformancePhase,
     buildPerformanceTimeline,
     rememberPerformanceTimeline,
     buildVoiceTimeline,
@@ -4632,6 +4836,8 @@ function bindUI() {
 
   bindPanelControls();
 
+  bindRelationshipStateControls();
+
   bindLearningReviewControls();
 
   bindAdvancedActionControls();
@@ -4676,8 +4882,14 @@ function getAppStartupController() {
       startReminderLoop,
       runReminderCheck,
       isSpeechMotionActive,
+      isSpeakingNow,
       getSpeechAnimationMouthOpen,
+      applySpeechPerformanceCue,
+      resolvePerformanceCueMotionPlan,
+      tryBuiltInMotion,
       bindRuntimeEvents,
+      enqueueActionIntent,
+      triggerExpressionPulse,
       installCharacterRuntimeWindowBridge,
       installCharacterRuntimeDebugBridge,
       installTTSDebugBridge,
@@ -4697,6 +4909,18 @@ function getAppStartupController() {
 function bindRuntimeBridges() { return getAppStartupController().bindRuntimeBridges(); }
 async function main() { return getAppStartupController().main(); }
 function handleBeforeUnload() { return getAppStartupController().handleBeforeUnload(); }
+function publishSplitWindowPerformancePhase(input = {}) {
+  const controller = getAppStartupController();
+  return typeof controller.publishPerformancePhase === "function"
+    ? controller.publishPerformancePhase(input)
+    : false;
+}
+function clearSplitWindowPerformancePhase(input = {}) {
+  const controller = getAppStartupController();
+  return typeof controller.clearPublishedPerformancePhase === "function"
+    ? controller.clearPublishedPerformancePhase(input)
+    : false;
+}
 
 bindRuntimeBridges();
 window.addEventListener("beforeunload", handleBeforeUnload);

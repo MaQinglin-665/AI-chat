@@ -133,6 +133,13 @@ DEFAULT_CONFIG = {
         "return_metadata": False,
         "demo_stable": False,
         "auto_apply_reply_cue": False,
+        "model_direct_reply": False,
+    },
+    "companion_turn": {
+        "enabled": False,
+    },
+    "relationship_state": {
+        "enabled": False,
     },
     "thinking": {
         "enabled": True,
@@ -191,7 +198,7 @@ DEFAULT_CONFIG = {
         "gpt_sovits_target_rms": 1400,
         "gpt_sovits_max_rms": 5000,
         "gpt_sovits_max_loudness_gain": 3.2,
-        "gpt_sovits_prefer_clean_prompt": True,
+        "gpt_sovits_prefer_clean_prompt": False,
         "gpt_sovits_chunk_max_candidates": 2,
         "gpt_sovits_chunk_split_depth": 1,
         "gpt_sovits_enable_global_retry": False,
@@ -199,9 +206,9 @@ DEFAULT_CONFIG = {
         "gpt_sovits_chunk_timeout_sec": 20,
     },
     "assistant_prompt": (
-        "你是桌宠 馨语AI桌宠。你在和一位真实人类用户聊天，不要把用户当成设备、程序或系统。"
+        "你是桌宠 馨语AI桌宠，一个 AI 陪伴角色。你在和一位真实人类用户聊天，不要把用户当成设备、程序或系统，也不要冒充人类。"
         "默认短句回复，先给直接答案，再补半句自然交流；避免模板腔、客服腔和重复口头禅。"
-        "信息不足先问一个关键点，不要乱猜。"
+        "身份、能力、记忆、感知或边界相关时，诚实说明自己是 AI；不必每句话都加免责声明。信息不足先问一个关键点，不要乱猜。"
     ),
     "style": {
         "auto": True,
@@ -247,6 +254,11 @@ DEFAULT_CONFIG = {
         "sync_summarize_on_chat": False,
     },
     "asr": {
+        "input_language_mode": "auto",
+        "vosk_model_paths": {
+            "zh-CN": "",
+            "en-US": "",
+        },
         "show_mic_meter": True,
         "keep_listening": True,
         "transcribe_on_close": True,
@@ -597,6 +609,15 @@ def sanitize_hotword_replacements(raw):
     return pairs
 
 
+def sanitize_asr_input_language_mode(value):
+    text = str(value or "auto").strip().lower().replace("_", "-")
+    if text in {"zh", "zh-cn", "chinese", "cn"}:
+        return "zh"
+    if text in {"en", "en-us", "english", "us"}:
+        return "en"
+    return "auto"
+
+
 def sanitize_client_config(config):
     tts_cfg = config.get("tts", {})
     provider = str(tts_cfg.get("provider", TTS_DEFAULT_PROVIDER)).strip().lower()
@@ -676,6 +697,15 @@ def sanitize_client_config(config):
     runtime_enabled = bool(character_runtime_cfg.get("enabled", False))
     runtime_return_metadata = bool(character_runtime_cfg.get("return_metadata", False))
     runtime_demo_stable = bool(character_runtime_cfg.get("demo_stable", False))
+    runtime_model_direct_reply = bool(character_runtime_cfg.get("model_direct_reply", False))
+    companion_turn_cfg = config.get("companion_turn", {})
+    if not isinstance(companion_turn_cfg, dict):
+        companion_turn_cfg = {}
+    companion_turn_enabled = bool(companion_turn_cfg.get("enabled", False))
+    relationship_state_cfg = config.get("relationship_state", {})
+    if not isinstance(relationship_state_cfg, dict):
+        relationship_state_cfg = {}
+    relationship_state_enabled = bool(relationship_state_cfg.get("enabled", False))
     runtime_auto_apply_reply_cue = bool(
         runtime_enabled and character_runtime_cfg.get("auto_apply_reply_cue", False)
     )
@@ -931,6 +961,9 @@ def sanitize_client_config(config):
             ),
         },
         "asr": {
+            "input_language_mode": sanitize_asr_input_language_mode(
+                asr_cfg.get("input_language_mode", "auto")
+            ),
             "show_mic_meter": bool(asr_cfg.get("show_mic_meter", True)),
             "keep_listening": bool(asr_cfg.get("keep_listening", True)),
             "transcribe_on_close": bool(asr_cfg.get("transcribe_on_close", True)),
@@ -1189,9 +1222,16 @@ def sanitize_client_config(config):
             "return_metadata": runtime_return_metadata,
             "demo_stable": runtime_demo_stable,
             "auto_apply_reply_cue": runtime_auto_apply_reply_cue,
+            "model_direct_reply": runtime_model_direct_reply,
             "persona_override": {
                 "enabled": persona_override_enabled,
                 "name": persona_override_name if persona_override_enabled else "",
             },
+        },
+        "companion_turn": {
+            "enabled": companion_turn_enabled,
+        },
+        "relationship_state": {
+            "enabled": relationship_state_enabled,
         },
     }

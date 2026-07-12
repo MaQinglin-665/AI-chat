@@ -3,6 +3,8 @@ param(
     [string]$Message = "Please reply with OK only.",
     [int]$StartupTimeoutSec = 45,
     [int]$RequestTimeoutSec = 20,
+    [int]$LlmProbeTimeoutSec = 120,
+    [int]$ChatTimeoutSec = 90,
     [switch]$NoStartServer,
     [switch]$KeepServer,
     [switch]$SkipPreflight,
@@ -311,7 +313,7 @@ function Assert-LlmProbe {
         return
     }
 
-    $result = Invoke-JsonRequest -Method "POST" -Url "$TargetBaseUrl/api/llm_probe" -Body @{} -Token $Token -TimeoutSec $RequestTimeoutSec
+    $result = Invoke-JsonRequest -Method "POST" -Url "$TargetBaseUrl/api/llm_probe" -Body @{} -Token $Token -TimeoutSec ([Math]::Max($LlmProbeTimeoutSec, 20))
     if (-not $result.Ok) {
         Write-Fail "POST /api/llm_probe failed (HTTP $($result.Status)): $($result.Error)"
     }
@@ -345,7 +347,7 @@ function Assert-Chat {
         history = @()
         image_data_url = ""
     }
-    $result = Invoke-JsonRequest -Method "POST" -Url "$TargetBaseUrl/api/chat" -Body $body -Token $Token -TimeoutSec ([Math]::Max($RequestTimeoutSec, 45))
+    $result = Invoke-JsonRequest -Method "POST" -Url "$TargetBaseUrl/api/chat" -Body $body -Token $Token -TimeoutSec ([Math]::Max($ChatTimeoutSec, 45))
     if (-not $result.Ok) {
         Write-Fail "POST /api/chat failed (HTTP $($result.Status)): $($result.Error)"
     }

@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 import app
 import config_switch
+import relationship_state
 
 
 def _request_json(url, headers=None):
@@ -178,6 +179,96 @@ def test_api_health_requires_valid_token_when_enabled(monkeypatch):
         assert payload.get("ok") is True
         assert payload.get("security", {}).get("require_api_token") is True
         assert payload.get("security", {}).get("api_token_configured") is True
+
+
+def test_relationship_state_routes_inherit_token_and_keep_payload_bounded(monkeypatch, tmp_path):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = True
+    cfg["relationship_state"] = {"enabled": True}
+    monkeypatch.setenv("TAFFY_API_TOKEN_TEST", "token-relationship-state")
+    monkeypatch.setattr(
+        relationship_state,
+        "RELATIONSHIP_STATE_PATH",
+        tmp_path / "relationship_state.json",
+    )
+    headers = {"X-Taffy-Token": "token-relationship-state"}
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        denied_status, denied_payload = _request_json(f"{base}/api/relationship_state")
+        save_status, save_payload = _post_json(
+            f"{base}/api/relationship_state/update",
+            {
+                "action": "upsert",
+                "entries": [
+                    {"key": "address", "value": "Quinn"},
+                    {"key": "reply_length", "value": "concise"},
+                ],
+            },
+            headers=headers,
+        )
+        read_status, read_payload = _request_json(
+            f"{base}/api/relationship_state", headers=headers
+        )
+        rejected_status, rejected_payload = _post_json(
+            f"{base}/api/relationship_state/update",
+            {"action": "upsert", "entries": [{"key": "desktop_access", "value": "enabled"}]},
+            headers=headers,
+        )
+
+    assert denied_status == 401
+    assert denied_payload.get("error") == "Invalid API token."
+    assert save_status == 200
+    assert save_payload["state"]["revision"] == 1
+    assert read_status == 200
+    assert read_payload["available"] is True
+    entries = {entry["key"]: entry for entry in read_payload["state"]["entries"]}
+    assert entries["address"]["value"] == "Quinn"
+    assert entries["reply_length"]["value"] == "concise"
+    serialized = json.dumps(read_payload, ensure_ascii=False)
+    assert "transcript" not in serialized
+    assert "history" not in serialized
+    assert rejected_status == 400
+    assert rejected_payload["ok"] is False
+
+
+def test_delivered_turn_ack_inherits_token_and_commits_once(monkeypatch):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = True
+    monkeypatch.setenv("TAFFY_API_TOKEN_TEST", "token-delivery-ack")
+    committed = []
+    headers = {"X-Taffy-Token": "token-delivery-ack"}
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        delivery_id = app._DELIVERED_TURN_REGISTRY.stage(lambda: committed.append("delivered"))
+        denied_status, denied_payload = _post_json(
+            f"{base}/api/chat/delivery_ack",
+            {"delivery_id": delivery_id},
+        )
+        first_status, first_payload = _post_json(
+            f"{base}/api/chat/delivery_ack",
+            {"delivery_id": delivery_id},
+            headers=headers,
+        )
+        duplicate_status, duplicate_payload = _post_json(
+            f"{base}/api/chat/delivery_ack",
+            {"delivery_id": delivery_id},
+            headers=headers,
+        )
+        unknown_status, unknown_payload = _post_json(
+            f"{base}/api/chat/delivery_ack",
+            {"delivery_id": "delivery_receipt_0123456789unknown"},
+            headers=headers,
+        )
+
+    assert denied_status == 401
+    assert denied_payload.get("error") == "Invalid API token."
+    assert first_status == 200
+    assert first_payload == {"ok": True, "status": "committed"}
+    assert duplicate_status == 200
+    assert duplicate_payload == {"ok": True, "status": "already_committed"}
+    assert unknown_status == 404
+    assert unknown_payload == {"ok": False, "status": "unknown"}
+    assert committed == ["delivered"]
 
 
 def test_api_config_switch_post_uses_token_and_writes_local_files(monkeypatch, tmp_path):

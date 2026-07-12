@@ -10,7 +10,6 @@ import urllib.parse
 import webbrowser
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 
 # Ensure stdout/stderr can handle Unicode on Windows (GBK console → UTF-8).
 try:
@@ -54,6 +53,12 @@ from memory import (
     update_short_term_memory_entries,
     build_wakeup_summary_block,
     is_lightweight_checkin_message,
+)
+from relationship_state import (
+    build_relationship_state_prompt_block,
+    get_relationship_state_for_client,
+    is_relationship_state_feature_enabled,
+    update_relationship_state,
 )
 
 
@@ -107,6 +112,7 @@ from llm_client import (
     is_local_url,
     normalize_text_content,
 )
+from llm_probe import run_lightweight_llm_probe_impl
 
 from humanize import (
     apply_contextual_human_override,
@@ -137,12 +143,9 @@ from emotion import (
 from asr import (
     guess_audio_content_type,
     transcribe_pcm16_with_vosk,
+    transcribe_pcm16_with_vosk_result,
 )
 from character_runtime import (
-    emotion_to_live2d_hint,
-    looks_like_empty_text_wrapper_fragment,
-    looks_like_runtime_metadata_only_text,
-    normalize_runtime_payload,
     preview_backend_entry_noop_adapter,
     preview_backend_entry_request,
 )
@@ -152,7 +155,6 @@ from character_brain import (
     build_character_brain_prompt_block,
     build_character_brain_public_snapshot,
     decay_brain_session_state,
-    merge_brain_runtime_metadata,
     update_brain_session_state,
 )
 from app_health import (
@@ -164,6 +166,20 @@ from app_health import (
     reload_runtime_config as _reload_runtime_config,
     run_startup_self_check as _run_startup_self_check,
 )
+from app_startup import (
+    ensure_config_hint as _ensure_config_hint,
+    run_startup_self_check as _run_startup_self_check_wrapper,
+)
+from app_reply_pipeline import (
+    apply_character_brain_reply_text as _apply_character_brain_reply_text_impl,
+    apply_character_runtime_reply as _apply_character_runtime_reply_impl,
+)
+from app_brain_session import (
+    get_character_brain_session_state as _get_character_brain_session_state_impl,
+    reset_character_brain_session_state as _reset_character_brain_session_state_impl,
+    update_character_brain_session_state as _update_character_brain_session_state_impl,
+)
+from app_delivered_turn import DeliveredTurnRegistry
 from app_security import (
     get_server_security_settings as _get_server_security_settings,
     is_loopback_host as _is_loopback_host,
@@ -182,6 +198,8 @@ from app_diagnostics import (
 from app_asr_route import handle_asr_pcm_request
 import app_chat_context as _chat_context
 from app_chat_route import CHAT_ROUTES, handle_chat_route
+from companion_turn_contract import build_companion_turn
+from companion_dialogue_policy import build_model_direct_dialogue_policy
 from app_config_route import (
     CONFIG_GET_ROUTES,
     CONFIG_POST_PERF_ROUTES,
@@ -267,11 +285,14 @@ from time_awareness import (
 
 _SUMMARY_CACHE_LOCK = threading.Lock()
 _HISTORY_SUMMARY_CACHE = {"key": "", "summary": ""}
-_CHARACTER_BRAIN_SESSION_LOCK = threading.Lock()
-_CHARACTER_BRAIN_SESSION_STATE = {}
+_DELIVERED_TURN_REGISTRY = DeliveredTurnRegistry()
 RUNTIME_RESTART_EXIT_CODE = 75
 API_TOKEN_HEADER = "X-Taffy-Token"
 API_TOKEN_ENV_DEFAULT = "TAFFY_API_TOKEN"
+CHAT_DELIVERY_ACK_ROUTE = "/api/chat/delivery_ack"
+DEFAULT_JSON_BODY_LIMIT_BYTES = 2 * 1024 * 1024
+CHAT_JSON_BODY_LIMIT_BYTES = 32 * 1024 * 1024
+ASR_JSON_BODY_LIMIT_BYTES = 8 * 1024 * 1024
 DEFAULT_HUMANIZE_SETTINGS = {
     "enabled": True,
     "strip_fillers": True,
@@ -357,6 +378,8 @@ def _build_character_runtime_prompt_contract():
 
 
 def _apply_character_runtime_prompt_contract(config, prompt):
+    if _is_model_direct_reply_enabled(config):
+        return str(prompt or "")
     return _apply_character_runtime_prompt_contract_impl(
         config,
         prompt,
@@ -367,74 +390,22 @@ def _apply_character_runtime_prompt_contract(config, prompt):
 
 
 def _apply_character_runtime_reply(config, raw_reply):
-    settings = _get_character_runtime_settings(config)
-    if not settings.get("enabled", False):
-        return raw_reply, None
-
-    fallback_text = raw_reply if isinstance(raw_reply, str) else str(raw_reply or "")
-    try:
-        normalized = normalize_runtime_payload(raw_reply)
-        normalized_text = str(normalized.get("text", "") or "").strip()
-        reply_text = normalized_text
-        if not reply_text:
-            fallback_normalized = normalize_runtime_payload(fallback_text)
-            fallback_visible_text = str(fallback_normalized.get("text", "") or "").strip()
-            if fallback_visible_text:
-                reply_text = fallback_visible_text
-            elif looks_like_runtime_metadata_only_text(
-                fallback_text
-            ) or looks_like_empty_text_wrapper_fragment(fallback_text):
-                reply_text = ""
-            else:
-                reply_text = fallback_text
-        runtime_meta = None
-        if settings.get("return_metadata", False):
-            emotion = str(normalized.get("emotion", "neutral") or "neutral").strip().lower() or "neutral"
-            voice_style = (
-                str(normalized.get("voice_style", "neutral") or "neutral").strip().lower() or "neutral"
-            )
-            action = str(normalized.get("action", "none") or "none").strip().lower() or "none"
-            intensity = str(normalized.get("intensity", "normal") or "normal").strip().lower() or "normal"
-            runtime_meta = {
-                "emotion": emotion,
-                "action": action,
-                "intensity": intensity,
-                "live2d_hint": str(normalized.get("live2d_hint") or emotion_to_live2d_hint(emotion)),
-                "voice_style": voice_style,
-            }
-            runtime_meta = merge_brain_runtime_metadata(
-                runtime_meta,
-                config.get("_character_brain_decision") if isinstance(config, dict) else None,
-            )
-        return reply_text, runtime_meta
-    except Exception as exc:
-        _log_backend_exception(
-            "CHAR_RUNTIME",
-            exc,
-            extra="normalize runtime payload failed; fallback to raw reply",
-        )
-        return fallback_text, None
+    return _apply_character_runtime_reply_impl(
+        config,
+        raw_reply,
+        get_character_runtime_settings_func=_get_character_runtime_settings,
+        log_backend_exception_func=_log_backend_exception,
+    )
 
 
 def _apply_character_brain_reply_text(config, user_message, reply):
-    if not isinstance(config, dict):
-        return str(reply or "")
-    decision = config.get("_character_brain_decision") or config.get(
-        "_character_brain_response_decision"
-    )
-    constrained = apply_character_brain_reply_constraints(
+    return _apply_character_brain_reply_text_impl(
+        config,
+        user_message,
         reply,
-        decision,
-        user_message=user_message,
+        apply_character_brain_reply_constraints_func=apply_character_brain_reply_constraints,
+        enforce_reply_language_func=enforce_reply_language,
     )
-    enforced = enforce_reply_language(config, user_message, constrained)
-    if enforced != constrained:
-        return apply_character_brain_reply_constraints(
-            enforced,
-            decision,
-            user_message=user_message,
-        )
-    return enforced
 
 
 def _ensure_llm_auth_ready(llm_cfg):
@@ -446,82 +417,18 @@ def _diagnose_llm_exception(exc, llm_cfg):
 
 
 def _run_lightweight_llm_probe(config):
-    cfg = config if isinstance(config, dict) else load_config()
-    raw_llm_cfg = cfg.get("llm", {}) if isinstance(cfg.get("llm", {}), dict) else {}
-    llm_cfg = dict(_build_reply_llm_cfg(cfg, raw_llm_cfg))
-    llm_cfg["temperature"] = 0
-    llm_cfg["max_tokens"] = 8
-    llm_cfg["max_output_tokens"] = 8
-    llm_cfg["request_timeout"] = min(
-        12,
-        max(4, _safe_int_value(llm_cfg.get("request_timeout", 12), 12)),
+    return run_lightweight_llm_probe_impl(
+        config,
+        load_config_func=load_config,
+        build_reply_llm_cfg_func=_build_reply_llm_cfg,
+        resolve_llm_provider_func=_resolve_llm_provider,
+        ensure_llm_auth_ready_func=_ensure_llm_auth_ready,
+        resolve_llm_api_key_func=_resolve_llm_api_key,
+        http_post_json_func=http_post_json,
+        is_local_url_func=is_local_url,
+        normalize_text_content_func=normalize_text_content,
+        safe_int_value_func=_safe_int_value,
     )
-    provider = _resolve_llm_provider(llm_cfg)
-    model = str(llm_cfg.get("model", "") or "").strip()
-    started = time.monotonic()
-    messages = [
-        {
-            "role": "system",
-            "content": "Reply with exactly OK. No punctuation, no extra words.",
-        },
-        {"role": "user", "content": "Ping."},
-    ]
-    if provider in {"openai", "openai-compatible", "openai_compatible"}:
-        _ensure_llm_auth_ready(llm_cfg)
-        base_url = str(llm_cfg.get("base_url", "") or "").strip().rstrip("/")
-        key, key_env = _resolve_llm_api_key(llm_cfg)
-        headers = {}
-        if key:
-            headers["Authorization"] = f"Bearer {key}"
-        elif not is_local_url(base_url):
-            raise RuntimeError(f"Missing API key. Please set environment variable: {key_env}.")
-        payload = {
-            "model": model,
-            "messages": messages,
-            "temperature": 0,
-            "max_tokens": 8,
-            "stream": False,
-        }
-        data = http_post_json(
-            f"{base_url}/chat/completions",
-            payload,
-            headers=headers,
-            timeout=llm_cfg["request_timeout"],
-            attempts=1,
-        )
-        choices = data.get("choices") or []
-        reply = ""
-        if choices:
-            reply = normalize_text_content((choices[0].get("message") or {}).get("content", ""))
-    elif provider == "ollama":
-        base_url = str(llm_cfg.get("base_url", OLLAMA_DEFAULT_BASE_URL) or OLLAMA_DEFAULT_BASE_URL).strip().rstrip("/")
-        payload = {
-            "model": model or OLLAMA_DEFAULT_MODEL,
-            "messages": messages,
-            "stream": False,
-            "options": {"temperature": 0, "num_predict": 8},
-        }
-        data = http_post_json(
-            f"{base_url}/api/chat",
-            payload,
-            timeout=llm_cfg["request_timeout"],
-            attempts=1,
-        )
-        if isinstance(data.get("error"), str) and data["error"].strip():
-            raise RuntimeError(f"Ollama error: {data['error']}")
-        reply = normalize_text_content((data.get("message") or {}).get("content", "")) or normalize_text_content(data.get("response", ""))
-    else:
-        raise RuntimeError(f"Unsupported llm.provider: {provider}.")
-
-    elapsed_ms = int((time.monotonic() - started) * 1000)
-    return {
-        "ok": bool(reply),
-        "provider": provider,
-        "model": model,
-        "elapsed_ms": elapsed_ms,
-        "reply_chars": len(reply or ""),
-        "detail": "Lightweight model probe returned text." if reply else "Lightweight model probe returned no text.",
-    }
 
 
 def reset_runtime_state():
@@ -529,57 +436,54 @@ def reset_runtime_state():
     with _SUMMARY_CACHE_LOCK:
         _HISTORY_SUMMARY_CACHE["key"] = ""
         _HISTORY_SUMMARY_CACHE["summary"] = ""
+    _DELIVERED_TURN_REGISTRY.clear()
     reset_character_brain_session_state()
 
 
+def _stage_delivered_turn(commit_func):
+    return _DELIVERED_TURN_REGISTRY.stage(commit_func)
+
+
+def _acknowledge_delivered_turn(delivery_id):
+    return _DELIVERED_TURN_REGISTRY.acknowledge(delivery_id)
+
+
+def _delivery_ack_http_status(payload):
+    status = str(payload.get("status", "") if isinstance(payload, dict) else "")
+    if status in {"committed", "already_committed"}:
+        return HTTPStatus.OK
+    if status == "invalid":
+        return HTTPStatus.BAD_REQUEST
+    if status == "unknown":
+        return HTTPStatus.NOT_FOUND
+    if status in {"expired", "evicted"}:
+        return HTTPStatus.GONE
+    return HTTPStatus.INTERNAL_SERVER_ERROR
+
+
 def reset_character_brain_session_state():
-    global _CHARACTER_BRAIN_SESSION_STATE
-    with _CHARACTER_BRAIN_SESSION_LOCK:
-        _CHARACTER_BRAIN_SESSION_STATE = {}
+    return _reset_character_brain_session_state_impl()
 
 
 def _get_character_brain_session_state():
-    global _CHARACTER_BRAIN_SESSION_STATE
-    now_ts = time.time()
-    with _CHARACTER_BRAIN_SESSION_LOCK:
-        state = decay_brain_session_state(_CHARACTER_BRAIN_SESSION_STATE, now_ts=now_ts)
-        _CHARACTER_BRAIN_SESSION_STATE = dict(state)
-        return dict(state)
+    return _get_character_brain_session_state_impl(
+        decay_brain_session_state_func=decay_brain_session_state,
+        now_func=time.time,
+    )
 
 
 def _update_character_brain_session_state(config, user_message, history, assistant_reply=""):
-    global _CHARACTER_BRAIN_SESSION_STATE
-    if not isinstance(config, dict):
-        return None
-    decision = config.get("_character_brain_decision") or config.get(
-        "_character_brain_response_decision"
-    )
-    if not isinstance(decision, dict):
-        return None
-    previous = config.get("_character_brain_session_state")
-    if not isinstance(previous, dict):
-        previous = _get_character_brain_session_state()
-    try:
-        history_settings = get_history_summary_settings(config)
-        keep_recent = int(history_settings.get("keep_recent_messages", 8))
-        safe_history = sanitize_history(history, max_items=keep_recent)
-    except Exception:
-        safe_history = []
-    state = update_brain_session_state(
-        previous,
-        decision=decision,
-        user_message=user_message,
+    return _update_character_brain_session_state_impl(
+        config,
+        user_message,
+        history,
         assistant_reply=assistant_reply,
-        history=safe_history,
-        experience_profile=config.get("_character_experience_profile"),
-        now_ts=time.time(),
+        get_history_summary_settings_func=get_history_summary_settings,
+        sanitize_history_func=sanitize_history,
+        update_brain_session_state_func=update_brain_session_state,
+        decay_brain_session_state_func=decay_brain_session_state,
+        now_func=time.time,
     )
-    with _CHARACTER_BRAIN_SESSION_LOCK:
-        _CHARACTER_BRAIN_SESSION_STATE = dict(state)
-    config["_character_brain_session_state"] = dict(state)
-    if isinstance(decision, dict):
-        decision["continuity"] = dict(state)
-    return dict(state)
 
 
 def schedule_runtime_restart(delay_sec=0.35):
@@ -817,6 +721,8 @@ def _build_conversation_context_prompt_block(context, user_message=""):
 def _build_character_brain_response_payload(config):
     if not isinstance(config, dict):
         return None
+    if _is_model_direct_reply_enabled(config):
+        return None
     decision = config.get("_character_brain_decision") or config.get(
         "_character_brain_response_decision"
     )
@@ -827,8 +733,19 @@ def _build_character_brain_response_payload(config):
     )
 
 
+def _is_model_direct_reply_enabled(config):
+    if not isinstance(config, dict):
+        return False
+    settings = config.get("character_runtime")
+    return isinstance(settings, dict) and settings.get("model_direct_reply") is True
+
+
 def _ensure_character_brain_decision(config, user_message, history, *, is_auto=False):
     if not isinstance(config, dict):
+        return config
+    if _is_model_direct_reply_enabled(config):
+        config.pop("_character_brain_decision", None)
+        config.pop("_character_brain_response_decision", None)
         return config
     if (
         config.get("_character_brain_decision") is not None
@@ -865,7 +782,12 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto
     manual_persona_block = "" if lightweight_checkin else build_manual_persona_card_block()
     wakeup_block = "" if lightweight_checkin else build_wakeup_summary_block()
     persona_block = "" if lightweight_checkin else build_persona_memory_block()
-    relationship_block = "" if lightweight_checkin else build_relationship_memory_block()
+    relationship_state_feature_enabled = is_relationship_state_feature_enabled(config)
+    # The old free-text relationship summary is opaque and cannot be corrected
+    # by the user. Once the structured state is enabled, keep it out of the
+    # prompt even while the user has temporarily paused relationship learning.
+    relationship_block = "" if lightweight_checkin or relationship_state_feature_enabled else build_relationship_memory_block()
+    relationship_state_block = "" if lightweight_checkin else build_relationship_state_prompt_block(config)
     assistant_prompt = config.get("assistant_prompt", "")
     if manual_persona_block:
         assistant_prompt = merge_prompt_with_memory(manual_persona_block, assistant_prompt)
@@ -875,26 +797,32 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto
         assistant_prompt = merge_prompt_with_memory(persona_block, assistant_prompt)
     if relationship_block:
         assistant_prompt = merge_prompt_with_memory(relationship_block, assistant_prompt)
-    session_state = config.get("_character_brain_session_state") if isinstance(config, dict) else None
-    if isinstance(config, dict) and not isinstance(session_state, dict):
-        session_state = _get_character_brain_session_state()
-        config["_character_brain_session_state"] = session_state
-    brain_decision = build_character_brain_decision(
-        config=config,
-        user_message=user_message,
-        history=safe_history,
-        emotion_state=load_emotion_state(),
-        experience_profile=config.get("_character_experience_profile") if isinstance(config, dict) else None,
-        session_state=session_state,
-        is_auto=is_auto,
-    )
-    if isinstance(config, dict):
-        config["_character_brain_decision"] = brain_decision
+    if relationship_state_block:
+        assistant_prompt = merge_prompt_with_memory(relationship_state_block, assistant_prompt)
     memory_block = "" if lightweight_checkin else build_memory_prompt_block(config, user_message, safe_history)
     base_prompt = merge_prompt_with_memory(assistant_prompt, memory_block)
-    brain_block = build_character_brain_prompt_block(brain_decision)
-    if brain_block:
-        base_prompt = merge_prompt_with_memory(base_prompt, brain_block)
+    dialogue_policy = build_model_direct_dialogue_policy(config)
+    if dialogue_policy:
+        base_prompt = merge_prompt_with_memory(base_prompt, dialogue_policy)
+    if not _is_model_direct_reply_enabled(config):
+        session_state = config.get("_character_brain_session_state") if isinstance(config, dict) else None
+        if isinstance(config, dict) and not isinstance(session_state, dict):
+            session_state = _get_character_brain_session_state()
+            config["_character_brain_session_state"] = session_state
+        brain_decision = build_character_brain_decision(
+            config=config,
+            user_message=user_message,
+            history=safe_history,
+            emotion_state=load_emotion_state(),
+            experience_profile=config.get("_character_experience_profile") if isinstance(config, dict) else None,
+            session_state=session_state,
+            is_auto=is_auto,
+        )
+        if isinstance(config, dict):
+            config["_character_brain_decision"] = brain_decision
+        brain_block = build_character_brain_prompt_block(brain_decision)
+        if brain_block:
+            base_prompt = merge_prompt_with_memory(base_prompt, brain_block)
     conversation_context_block = _build_conversation_context_prompt_block(
         config.get("_conversation_context") if isinstance(config, dict) else None,
         user_message,
@@ -1176,9 +1104,50 @@ class PetHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(audio_bytes)
 
-    def _read_json_body(self, *, allow_empty=False, invalid_payload=None):
-        content_length = int(self.headers.get("Content-Length", "0"))
-        raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+    def _request_body_limit(self, path_only=None):
+        route = str(path_only or self.path.split("?", 1)[0] or "")
+        if route in {"/api/chat", "/api/chat_stream"}:
+            return CHAT_JSON_BODY_LIMIT_BYTES
+        if route == "/api/asr_pcm":
+            return ASR_JSON_BODY_LIMIT_BYTES
+        return DEFAULT_JSON_BODY_LIMIT_BYTES
+
+    def _read_request_body(self, *, allow_empty=False, path_only=None):
+        raw_length = str(self.headers.get("Content-Length", "0") or "0").strip()
+        try:
+            content_length = int(raw_length)
+        except (TypeError, ValueError):
+            self._send_json(
+                {"ok": False, "error": "Invalid Content-Length header."},
+                status=HTTPStatus.BAD_REQUEST,
+            )
+            return None, False
+        if content_length < 0:
+            self._send_json(
+                {"ok": False, "error": "Invalid Content-Length header."},
+                status=HTTPStatus.BAD_REQUEST,
+            )
+            return None, False
+        limit = self._request_body_limit(path_only)
+        if content_length > limit:
+            self._send_json(
+                {
+                    "ok": False,
+                    "error": "Request body too large.",
+                    "max_body_bytes": limit,
+                },
+                status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
+            return None, False
+        raw_body = self.rfile.read(content_length) if content_length > 0 else b""
+        if not raw_body and not allow_empty:
+            raw_body = b"{}"
+        return raw_body, True
+
+    def _read_json_body(self, *, allow_empty=False, invalid_payload=None, path_only=None):
+        raw_body, ok = self._read_request_body(allow_empty=allow_empty, path_only=path_only)
+        if not ok:
+            return None, False
         if allow_empty and not raw_body.strip():
             return {}, True
         try:
@@ -1363,6 +1332,17 @@ class PetHandler(SimpleHTTPRequestHandler):
         if path_only == "/api/persona_card":
             self._send_json(load_manual_persona_card())
             return
+        if path_only == "/api/relationship_state":
+            try:
+                cfg = load_config()
+                self._send_json(get_relationship_state_for_client(cfg))
+            except Exception as exc:
+                _log_backend_exception("RELATIONSHIP", exc, extra="GET /api/relationship_state failed")
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
         if path_only == "/api/learning/candidates":
             try:
                 cfg = load_config()
@@ -1430,24 +1410,20 @@ class PetHandler(SimpleHTTPRequestHandler):
             body, ok = self._read_json_body(
                 allow_empty=path_only == "/api/config/reload",
                 invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
             )
             if not ok:
                 return
             self._handle_config_post_route(path_only, body)
             return
         if path_only == "/api/runtime/restart":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b""
-            body = {}
-            if raw_body.strip():
-                try:
-                    body = json.loads(raw_body.decode("utf-8"))
-                except Exception:
-                    self._send_json(
-                        {"ok": False, "error": "Invalid JSON body."},
-                        status=HTTPStatus.BAD_REQUEST,
-                    )
-                    return
+            body, ok = self._read_json_body(
+                allow_empty=True,
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
+                return
             if not isinstance(body, dict):
                 body = {}
             _, status, payload = self._restart_runtime(
@@ -1456,15 +1432,11 @@ class PetHandler(SimpleHTTPRequestHandler):
             self._send_json(payload, status=status)
             return
         if path_only == "/api/character_runtime/backend_entry/preview":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
-            try:
-                body = json.loads(raw_body.decode("utf-8"))
-            except Exception:
-                self._send_json(
-                    {"ok": False, "error": "Invalid JSON body."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
+            body, ok = self._read_json_body(
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
                 return
             if not isinstance(body, dict):
                 body = {}
@@ -1478,17 +1450,13 @@ class PetHandler(SimpleHTTPRequestHandler):
                 )
             return
         if path_only == "/api/learning/reload":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b""
-            if raw_body.strip():
-                try:
-                    json.loads(raw_body.decode("utf-8"))
-                except Exception:
-                    self._send_json(
-                        {"ok": False, "error": "Invalid JSON body."},
-                        status=HTTPStatus.BAD_REQUEST,
-                    )
-                    return
+            _, ok = self._read_json_body(
+                allow_empty=True,
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
+                return
             try:
                 cfg = load_config()
                 self._send_json(reload_learning_review_data(cfg))
@@ -1500,15 +1468,11 @@ class PetHandler(SimpleHTTPRequestHandler):
                 )
             return
         if path_only == "/api/learning/promote":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
-            try:
-                body = json.loads(raw_body.decode("utf-8"))
-            except Exception:
-                self._send_json(
-                    {"ok": False, "error": "Invalid JSON body."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
+            body, ok = self._read_json_body(
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
                 return
             candidate_ids = body.get("candidate_ids", []) if isinstance(body, dict) else []
             try:
@@ -1524,15 +1488,11 @@ class PetHandler(SimpleHTTPRequestHandler):
                 )
             return
         if path_only == "/api/learning/update":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
-            try:
-                body = json.loads(raw_body.decode("utf-8"))
-            except Exception:
-                self._send_json(
-                    {"ok": False, "error": "Invalid JSON body."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
+            body, ok = self._read_json_body(
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
                 return
             if not isinstance(body, dict):
                 body = {}
@@ -1560,15 +1520,11 @@ class PetHandler(SimpleHTTPRequestHandler):
                 )
             return
         if path_only == "/api/memory/core/update":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
-            try:
-                body = json.loads(raw_body.decode("utf-8"))
-            except Exception:
-                self._send_json(
-                    {"ok": False, "error": "Invalid JSON body."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
+            body, ok = self._read_json_body(
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
                 return
             if not isinstance(body, dict):
                 body = {}
@@ -1591,15 +1547,11 @@ class PetHandler(SimpleHTTPRequestHandler):
                 )
             return
         if path_only == "/api/memory/short/update":
-            content_length = int(self.headers.get("Content-Length", "0"))
-            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
-            try:
-                body = json.loads(raw_body.decode("utf-8"))
-            except Exception:
-                self._send_json(
-                    {"ok": False, "error": "Invalid JSON body."},
-                    status=HTTPStatus.BAD_REQUEST,
-                )
+            body, ok = self._read_json_body(
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
                 return
             if not isinstance(body, dict):
                 body = {}
@@ -1621,6 +1573,43 @@ class PetHandler(SimpleHTTPRequestHandler):
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 )
             return
+        if path_only == "/api/relationship_state/update":
+            body, ok = self._read_json_body(
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
+                return
+            if not isinstance(body, dict):
+                body = {}
+            try:
+                cfg = load_config()
+                payload = update_relationship_state(
+                    cfg,
+                    action=body.get("action", ""),
+                    entries=body.get("entries", []),
+                    enabled=body.get("enabled", None),
+                )
+                status = HTTPStatus.OK if payload.get("ok", True) else HTTPStatus.BAD_REQUEST
+                self._send_json(payload, status=status)
+            except Exception as exc:
+                _log_backend_exception("RELATIONSHIP", exc, extra="POST /api/relationship_state/update failed")
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path_only == CHAT_DELIVERY_ACK_ROUTE:
+            body, ok = self._read_json_body(
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
+                return
+            delivery_id = body.get("delivery_id", "") if isinstance(body, dict) else ""
+            payload = _acknowledge_delivered_turn(delivery_id)
+            self._send_json(payload, status=_delivery_ack_http_status(payload))
+            return
         if path_only not in {
             "/api/chat",
             "/api/chat_stream",
@@ -1633,14 +1622,11 @@ class PetHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
             return
 
-        content_length = int(self.headers.get("Content-Length", "0"))
-        raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
-        try:
-            body = json.loads(raw_body.decode("utf-8"))
-        except Exception:
-            self._send_json(
-                {"error": "Invalid JSON body."}, status=HTTPStatus.BAD_REQUEST
-            )
+        body, ok = self._read_json_body(
+            invalid_payload={"error": "Invalid JSON body."},
+            path_only=path_only,
+        )
+        if not ok:
             return
 
         perf_started_ms = _perf_now_ms()
@@ -1727,6 +1713,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                 send_json_func=self._send_json,
                 load_config_func=load_config,
                 transcribe_pcm16_func=transcribe_pcm16_with_vosk,
+                transcribe_pcm16_result_func=transcribe_pcm16_with_vosk_result,
                 sanitize_hotword_replacements_func=sanitize_hotword_replacements,
                 apply_hotword_replacements_func=apply_hotword_replacements,
                 log_backend_exception_func=_log_backend_exception,
@@ -1758,8 +1745,11 @@ class PetHandler(SimpleHTTPRequestHandler):
                 apply_demo_stable_identity_fallback_func=_apply_demo_stable_identity_fallback,
                 apply_character_runtime_reply_func=_apply_character_runtime_reply,
                 apply_character_brain_reply_text_func=_apply_character_brain_reply_text,
+                build_companion_turn_func=build_companion_turn,
                 remember_interaction_func=remember_interaction,
                 update_character_brain_session_state_func=_update_character_brain_session_state,
+                stage_delivered_turn_func=_stage_delivered_turn,
+                acknowledge_delivered_turn_func=_acknowledge_delivered_turn,
                 build_character_brain_response_payload_func=_build_character_brain_response_payload,
                 get_history_summary_settings_func=get_history_summary_settings,
                 sanitize_history_func=sanitize_history,
@@ -1774,18 +1764,13 @@ class PetHandler(SimpleHTTPRequestHandler):
 
 
 def ensure_config_hint():
-    if CONFIG_PATH.exists():
-        return
-    if not EXAMPLE_CONFIG_PATH.exists():
-        return
-    print(
-        "Tip: copy config.example.json to config.json and set model_path if needed."
-    )
+    return _ensure_config_hint(CONFIG_PATH, EXAMPLE_CONFIG_PATH)
 
 
 def run_startup_self_check(config):
-    return _run_startup_self_check(
+    return _run_startup_self_check_wrapper(
         config,
+        run_startup_self_check_func=_run_startup_self_check,
         validate_live2d_model_path_func=validate_live2d_model_path,
         diagnostic_payload_func=_diagnostic_payload,
         api_token_env_default=API_TOKEN_ENV_DEFAULT,
@@ -1794,6 +1779,7 @@ def run_startup_self_check(config):
 
 def build_server():
     config = load_config()
+    _DELIVERED_TURN_REGISTRY.clear()
     reset_character_brain_session_state()
     server_cfg = config.get("server", {})
     host = server_cfg.get("host", DEFAULT_CONFIG["server"]["host"])

@@ -139,7 +139,7 @@ def _classify_probe_failure(probe: dict[str, Any], llm_url: dict[str, Any], key_
     if probe.get("timeout"):
         return (
             "local_probe_timeout",
-            "The local backend did not finish the probe before the script timeout. Check model latency or lower the model size.",
+            "The local backend did not finish the probe before the script timeout. Check model latency, lower the model size, or Increase -TimeoutSec for manual checks.",
         )
     if status in {401, 403} or "unauthorized" in lower or "forbidden" in lower or "invalid api key" in lower:
         return (
@@ -324,7 +324,7 @@ def format_report(report: dict[str, Any]) -> str:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Diagnose Xinyu LLM connectivity without leaking secrets.")
     parser.add_argument("--base-url", default="", help="Local Xinyu service base URL. Default: http://127.0.0.1:8123")
-    parser.add_argument("--timeout-sec", type=float, default=14.0, help="HTTP timeout for /api/llm_probe.")
+    parser.add_argument("--timeout-sec", type=float, default=60.0, help="HTTP timeout for /api/llm_probe.")
     parser.add_argument("--json", action="store_true", help="Print JSON instead of text.")
     parser.add_argument("--soft-fail", action="store_true", help="Always exit 0 after printing the report.")
     return parser.parse_args(argv)

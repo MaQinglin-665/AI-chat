@@ -1,4 +1,5 @@
 from config import OLLAMA_DEFAULT_MODEL
+from companion_turn_contract import is_model_direct_reply_enabled
 
 
 OPENAI_COMPATIBLE_PROVIDERS = {"openai", "openai-compatible", "openai_compatible"}
@@ -92,7 +93,7 @@ def call_llm_impl(
 
     thought = ""
     thinking_cfg = config.get("thinking", {})
-    if thinking_cfg.get("enabled", True) and not is_auto:
+    if thinking_cfg.get("enabled", True) and not is_auto and not is_model_direct_reply_enabled(config):
         thought = generate_inner_thought_fn(
             llm_cfg, user_message, safe_history,
             persona_summary=base_prompt[:200],

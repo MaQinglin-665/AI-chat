@@ -272,23 +272,68 @@
     function setupClickthroughHitTest() {
       if (state.desktopBridge !== "electron") return;
       if (typeof window.electronAPI?.setClickthrough !== "function") return;
+      if (state.clickthroughHitTestReady) return;
+      state.clickthroughHitTestReady = true;
       let lastClickthrough = true;
-      document.addEventListener("mousemove", (e) => {
-        if (state.windowDragActive || state.subtitleDragPointerId) {
-          if (lastClickthrough) {
-            window.electronAPI.setClickthrough(false);
-            lastClickthrough = false;
-          }
-          return;
-        }
-        const over = isPointOverVisibleModelArea(e.clientX, e.clientY)
-          || isPointOverSubtitleDragHandle(e.clientX, e.clientY);
-        const want = !over;
+      const setClickthrough = (want) => {
         if (want !== lastClickthrough) {
           lastClickthrough = want;
           window.electronAPI.setClickthrough(want);
         }
+      };
+      const isDragActive = () => !!(state.dragData || state.windowDragActive || state.subtitleDragPointerId);
+      const updateFromClientPoint = (clientX, clientY) => {
+        if (isDragActive()) {
+          setClickthrough(false);
+          return;
+        }
+        const over = isPointOverVisibleModelArea(clientX, clientY)
+          || isPointOverSubtitleDragHandle(clientX, clientY);
+        setClickthrough(!over);
+      };
+      document.addEventListener("mousemove", (e) => {
+        updateFromClientPoint(e.clientX, e.clientY);
       });
+      if (
+        typeof window.electronAPI?.getCursorScreenPoint !== "function" ||
+        typeof window.electronAPI?.getModelWindowBounds !== "function" ||
+        state.clickthroughHitTestTimer
+      ) {
+        return;
+      }
+      let busy = false;
+      state.clickthroughHitTestTimer = window.setInterval(async () => {
+        if (busy) {
+          return;
+        }
+        busy = true;
+        try {
+          const [cursor, bounds] = await Promise.all([
+            window.electronAPI.getCursorScreenPoint(),
+            window.electronAPI.getModelWindowBounds()
+          ]);
+          if (!cursor || !bounds) {
+            return;
+          }
+          const width = Number(bounds.width) || 0;
+          const height = Number(bounds.height) || 0;
+          const clientX = Number(cursor.x) - Number(bounds.x);
+          const clientY = Number(cursor.y) - Number(bounds.y);
+          if (
+            !Number.isFinite(clientX) || !Number.isFinite(clientY) ||
+            width <= 0 || height <= 0 ||
+            clientX < -1 || clientY < -1 ||
+            clientX > width + 1 || clientY > height + 1
+          ) {
+            setClickthrough(!isDragActive());
+            return;
+          }
+          updateFromClientPoint(clientX, clientY);
+        } catch (_) {
+        } finally {
+          busy = false;
+        }
+      }, 50);
     }
 
     function startModelMouseGazePolling() {

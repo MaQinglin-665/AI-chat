@@ -199,6 +199,32 @@ def is_short_followup_message(text):
     }
 
 
+def is_generic_short_followup_memory_item(item):
+    safe = item if isinstance(item, dict) else {}
+    if str(safe.get("kind", "") or "").strip().lower() not in {
+        "current_task",
+        "current_topic",
+        "recent_decision",
+        "open_loop",
+    }:
+        return False
+    text = str(safe.get("text", "") or "").strip()
+    if not text:
+        return False
+    content = re.split(r"[:：]", text, maxsplit=1)[-1].strip()
+    return is_short_followup_message(content)
+
+
+def short_followup_memory_priority(item):
+    kind = str((item if isinstance(item, dict) else {}).get("kind", "") or "").strip().lower()
+    return {
+        "current_task": 4,
+        "open_loop": 3,
+        "recent_decision": 2,
+        "current_topic": 1,
+    }.get(kind, 0)
+
+
 def select_short_term_memory_items_for_prompt(
     items,
     settings,
@@ -223,6 +249,9 @@ def select_short_term_memory_items_for_prompt(
         text = item.get("text", "")
         if looks_sensitive_memory_text(text) or looks_garbled_text(text):
             continue
+        if followup and is_generic_short_followup_memory_item(item):
+            skipped.append(compact_skip_item_fn(item, "generic_followup_anchor", source="short_term_memory"))
+            continue
         memory_tokens = tokenize_memory_text(f"{text} {' '.join(item.get('tags', []) if isinstance(item.get('tags'), list) else [])}")
         relevance = len(query & memory_tokens)
         conflict_reason = conflict_reason_fn(user_message, text, settings=settings)
@@ -239,7 +268,7 @@ def select_short_term_memory_items_for_prompt(
             last_seen_turn = int(item.get("last_seen_turn", 0) or 0)
         except (TypeError, ValueError):
             last_seen_turn = 0
-        scored.append((relevance, 1 if followup else 0, salience, last_seen_turn, -idx, item))
+        scored.append((relevance, short_followup_memory_priority(item) if followup else 0, salience, last_seen_turn, -idx, item))
     if not scored:
         return [], "no_relevant_short_memories", skipped[:8]
     scored.sort(reverse=True)
@@ -247,7 +276,7 @@ def select_short_term_memory_items_for_prompt(
     count = max(0, int(settings.get("short_inject_count", 0) or 0))
     selected = []
     seen = set()
-    for relevance, _followup, _salience, _turn, _idx, item in scored:
+    for relevance, _priority, _salience, _turn, _idx, item in scored:
         enriched = dict(item)
         enriched["kind"] = "short_term_memory"
         enriched["short_kind"] = str(item.get("kind", "") or "").strip()

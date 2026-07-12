@@ -71,13 +71,76 @@
       return browserSpeaking || audioSpeaking || contextSpeaking;
     }
 
+    function isListeningPresenceActive() {
+      const phase = String(state.listeningPresencePhase || "idle").toLowerCase();
+      const sessionId = Number(state.listeningPresenceSession || 0);
+      if (!sessionId || !["armed", "hearing", "release"].includes(phase)) {
+        return false;
+      }
+      if (state.uiView !== "model") {
+        return true;
+      }
+      const updatedAt = Number(state._broadcastListeningUpdatedAt || 0);
+      return updatedAt > 0 && Date.now() - updatedAt <= 1200;
+    }
+
+    function isActualAssistantAudioActive(now = performance.now()) {
+      if (state.uiView !== "model") {
+        return isSpeakingNow();
+      }
+      const updatedAt = Number(state._broadcastSpeechUpdatedAt || 0);
+      const age = Number(now || performance.now()) - updatedAt;
+      return state._broadcastAssistantAudioActive === true
+        && updatedAt > 0
+        && age >= -80
+        && age <= 900;
+    }
+
+    function clearStaleBroadcastSpeechState(now = performance.now()) {
+      if (state.uiView !== "model") {
+        return false;
+      }
+      const t = Number(now || performance.now());
+      const updatedAt = Number(state._broadcastSpeechUpdatedAt || 0);
+      const animUntil = Number(state._broadcastSpeechExpiresAt || state.speechAnimUntil || 0);
+      if (!updatedAt || t - updatedAt <= 900 || t <= animUntil + 180) {
+        return false;
+      }
+      state._broadcastSpeaking = false;
+      state._broadcastAssistantAudioActive = false;
+      state._broadcastSpeechExpiresAt = 0;
+      state.speechAnimUntil = 0;
+      state.speechAnimStartedAt = 0;
+      state.speechAnimDurationMs = 0;
+      state.speechMouthOpen = 0;
+      state.ttsAudioLevel = 0;
+      state.moodHoldUntil = 0;
+      if (state._broadcastSpeechCueOwned === true) {
+        state._broadcastSpeechCueExpiresAt = Math.min(
+          Number(state._broadcastSpeechCueExpiresAt || t),
+          t
+        );
+      }
+      return true;
+    }
+
+    function shouldDeferMotionForListening(opts = {}, now = performance.now()) {
+      return isListeningPresenceActive()
+        && opts.userInitiated !== true
+        && !isActualAssistantAudioActive(now);
+    }
+
     function isSpeechMotionActive(now = performance.now()) {
       if (state.uiView === "model") {
         const t = Number(now || performance.now());
         const updatedAt = Number(state._broadcastSpeechUpdatedAt || 0);
-        const animUntil = Number(state.speechAnimUntil || 0);
+        const animUntil = Number(state._broadcastSpeechExpiresAt || state.speechAnimUntil || 0);
         if (updatedAt > 0 && t - updatedAt > 900) {
-          return t <= animUntil + 180;
+          if (t <= animUntil + 180) {
+            return true;
+          }
+          clearStaleBroadcastSpeechState(t);
+          return false;
         }
         if (state._broadcastSpeaking) {
           return true;
@@ -103,7 +166,10 @@
       if (state.dragData || state.windowDragActive || state.animating) {
         return true;
       }
-      if (state.chatBusy || isSpeakingNow()) {
+      if (state.chatBusy || isSpeakingNow() || (state.uiView === "model" && isSpeechMotionActive())) {
+        return true;
+      }
+      if (shouldDeferMotionForListening()) {
         return true;
       }
       return false;
@@ -177,10 +243,14 @@
       if (state.dragData || state.windowDragActive) {
         return false;
       }
+      if (shouldDeferMotionForListening(opts)) {
+        return false;
+      }
       const source = String(opts.source || "emotion");
       const allowFallback = opts.allowFallback !== false;
       const priority = Number.isFinite(Number(opts.priority)) ? Number(opts.priority) : 3;
       const force = !!opts.force;
+      const preserveGroupOrder = !!opts.preserveGroupOrder;
       const cooldownMs = Number.isFinite(Number(opts.cooldownMs))
         ? Number(opts.cooldownMs)
         : state.motionCooldownMs;
@@ -189,12 +259,14 @@
       }
       const explicitGroups = uniqueMotionGroups(opts.groups);
       const groups = (explicitGroups.length ? explicitGroups : pickMoodMotionGroups(mood, source))
-        .filter((group) => getMotionCount(group) > 0)
-        .sort((a, b) => {
+        .filter((group) => getMotionCount(group) > 0);
+      if (!preserveGroupOrder) {
+        groups.sort((a, b) => {
           if (a === state.lastMotionGroup) return 1;
           if (b === state.lastMotionGroup) return -1;
           return 0;
         });
+      }
       for (const group of groups) {
         const ok = await playMotionGroup(group, priority);
         if (ok) {
@@ -232,6 +304,9 @@
 
     function animateFallback(mood, opts = {}) {
       if (!state.model || state.animating || state.dragData || state.windowDragActive) {
+        return false;
+      }
+      if (shouldDeferMotionForListening(opts)) {
         return false;
       }
       state.animating = true;
@@ -302,7 +377,7 @@
     }
 
     function triggerTapMotion() {
-      enqueueActionIntent("tap", { combo: true });
+      enqueueActionIntent("tap", { combo: true, userInitiated: true });
     }
 
     function maybePlayTalkGesture(text, style = "neutral") {
@@ -349,6 +424,9 @@
     }
 
     async function playEmotion(text, opts = {}) {
+      if (shouldDeferMotionForListening(opts)) {
+        return false;
+      }
       const mood = detectMood(text);
       const played = await tryBuiltInMotion(mood, opts);
       if (played) {
@@ -367,6 +445,10 @@
       setModelMotionDefinitions,
       stopIdleMotionLoop,
       isSpeakingNow,
+      isListeningPresenceActive,
+      isActualAssistantAudioActive,
+      clearStaleBroadcastSpeechState,
+      shouldDeferMotionForListening,
       isSpeechMotionActive,
       shouldSkipIdleMotion,
       scheduleIdleMotionLoop,

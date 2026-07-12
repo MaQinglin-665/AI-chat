@@ -118,6 +118,43 @@ def test_openai_compatible_length_retry_uses_max_completion_tokens(monkeypatch):
     assert "max_tokens" not in payloads[1]
 
 
+def test_openai_compatible_retries_reasoning_only_length_when_enabled(monkeypatch):
+    payloads = []
+
+    def fake_http_post_json(url, payload, **kwargs):
+        payloads.append(payload)
+        if len(payloads) == 1:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "reasoning_content": "thinking before visible text",
+                        },
+                        "finish_reason": "length",
+                    }
+                ]
+            }
+        return {"choices": [{"message": {"content": "complete"}, "finish_reason": "stop"}]}
+
+    monkeypatch.setattr(llm_client, "http_post_json", fake_http_post_json)
+
+    result = llm_client.call_openai_compatible(
+        {
+            "base_url": "http://127.0.0.1:9999/v1",
+            "model": "test-model",
+            "max_output_tokens": 128,
+            "length_retry_max_output_tokens": 512,
+            "retry_on_length": True,
+        },
+        [{"role": "user", "content": "hi"}],
+    )
+
+    assert result == "complete"
+    assert payloads[0]["max_tokens"] == 128
+    assert payloads[1]["max_tokens"] == 512
+
+
 def test_call_ollama_allows_lower_num_ctx_floor_for_lightweight_tasks(monkeypatch):
     captured = {}
 

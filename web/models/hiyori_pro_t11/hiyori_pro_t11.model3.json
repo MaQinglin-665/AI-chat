@@ -9,6 +9,40 @@
 		"Physics": "hiyori_pro_t11.physics3.json",
 		"Pose": "hiyori_pro_t11.pose3.json",
 		"DisplayInfo": "hiyori_pro_t11.cdi3.json",
+		"Expressions": [
+			{
+				"Name": "neutral",
+				"File": "expressions/neutral.exp3.json"
+			},
+			{
+				"Name": "happy",
+				"File": "expressions/happy.exp3.json"
+			},
+			{
+				"Name": "playful",
+				"File": "expressions/playful.exp3.json"
+			},
+			{
+				"Name": "sad",
+				"File": "expressions/sad.exp3.json"
+			},
+			{
+				"Name": "anxious",
+				"File": "expressions/anxious.exp3.json"
+			},
+			{
+				"Name": "angry",
+				"File": "expressions/angry.exp3.json"
+			},
+			{
+				"Name": "surprised",
+				"File": "expressions/surprised.exp3.json"
+			},
+			{
+				"Name": "thinking",
+				"File": "expressions/thinking.exp3.json"
+			}
+		],
 		"Motions": {
 			"Idle": [
 				{
@@ -52,6 +86,11 @@
 			"Flick@Body": [
 				{
 					"File": "motion/hiyori_m10.motion3.json"
+				}
+			],
+			"Thinking": [
+				{
+					"File": "motion/hiyori_thinking_01.motion3.json"
 				}
 			]
 		}

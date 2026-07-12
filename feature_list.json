@@ -1,0 +1,781 @@
+{
+  "features": [
+    {
+      "id": "local-data-durability-v1",
+      "name": "Local data durability and recovery",
+      "description": "Audit and harden local JSON persistence so interrupted writes do not silently destroy user memory, persona or configuration data.",
+      "status": "complete",
+      "dependencies": [
+        "memory.py persistence helpers",
+        "persona/config state writers",
+        "existing local data formats"
+      ],
+      "scope": [
+        "Preserve existing JSON formats",
+        "Use atomic replace for durable writes where missing",
+        "Keep recoverable backups for user-owned state"
+      ],
+      "done_criteria": [
+        "Core user data writes are atomic",
+        "Corrupt primary files can recover from a valid backup where appropriate",
+        "Existing memory/config tests pass with new durability tests",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "electron-dependency-security-v1",
+      "name": "Electron dependency security",
+      "description": "Resolve the high-severity npm audit finding with the smallest compatible Electron upgrade and verify desktop behavior.",
+      "status": "complete",
+      "dependencies": [
+        "package.json and package-lock.json",
+        "Electron main/preload APIs",
+        "installer and UI smoke workflows"
+      ],
+      "scope": [
+        "Identify the exact advisory before upgrading",
+        "Avoid unrelated dependency additions",
+        "Retest Electron windows, preload bridge and packaging"
+      ],
+      "done_criteria": [
+        "npm audit reports no high-severity findings",
+        "Electron and Node frontend smoke tests pass",
+        "Package metadata remains consistent",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "renderer-content-security-policy-v1",
+      "name": "Renderer content security policy",
+      "description": "Add a restrictive local-web CSP for Electron chat and model renderers without breaking Live2D, audio, images or local API requests.",
+      "status": "complete",
+      "dependencies": [
+        "web/index.html",
+        "Pixi/Live2D runtime",
+        "local HTTP API and blob/data media"
+      ],
+      "scope": [
+        "Do not enable unsafe-eval",
+        "Allow only resources required by current local functionality",
+        "Verify both chat and model windows in Electron"
+      ],
+      "done_criteria": [
+        "Electron no longer reports a missing or unsafe-eval CSP warning",
+        "Chat UI and Live2D render successfully",
+        "Local API, blob audio and data/blob images remain allowed",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "chat-diagnostics-lazy-load-v1",
+      "name": "Chat developer diagnostics lazy loading",
+      "description": "Stop loading large developer-only readiness panels in normal chat sessions while preserving core proactive companionship logic and existing developer flags.",
+      "status": "complete",
+      "dependencies": [
+        "devFeatureLoader.js",
+        "follow-up scheduler core controllers",
+        "advanced diagnostics controls"
+      ],
+      "scope": [
+        "Move only proven developer-panel code behind the existing flag",
+        "Keep proactive scheduling and character cue generation available in normal chat",
+        "Do not alter developer flag semantics"
+      ],
+      "done_criteria": [
+        "Normal chat does not load the readiness panel controller",
+        "Developer chat still loads and operates the readiness panel",
+        "Normal chat and Electron smoke tests pass",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "local-http-request-bounds-v1",
+      "name": "Local HTTP request body bounds",
+      "description": "Prevent malformed or oversized local API requests from causing unbounded memory reads while preserving normal chat, audio, and attachment workflows.",
+      "status": "complete",
+      "dependencies": [
+        "app.py HTTP request handler",
+        "chat, ASR, TTS, attachment and configuration routes"
+      ],
+      "scope": [
+        "Reject invalid and oversized Content-Length before reading the body",
+        "Use route-appropriate limits",
+        "Keep API token and loopback security behavior unchanged"
+      ],
+      "done_criteria": [
+        "Oversized JSON and binary requests receive a bounded 413 response",
+        "Invalid Content-Length receives a controlled 400 response",
+        "Normal API route tests remain green",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "release-advisory-semantics-v1",
+      "name": "Release advisory semantics",
+      "description": "Keep optional demo-service availability visible without making the default release gate depend on transient local services.",
+      "status": "complete",
+      "dependencies": [
+        "scripts/check_release_readiness.ps1",
+        "scripts/check_demo_readiness.py"
+      ],
+      "scope": [
+        "Do not modify the user's TTS provider or fallback preference",
+        "Keep a strict opt-in path for public demo recording",
+        "Default release validation must remain deterministic"
+      ],
+      "done_criteria": [
+        "Default release gate reports unavailable demo services without failing",
+        "Strict demo readiness mode still fails on blockers",
+        "Acceptance tests cover both paths",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "release-privacy-scan-v1",
+      "name": "Release privacy and secret-scan reliability",
+      "description": "Make release privacy checks distinguish real private artifacts from safe repository documentation while keeping secret detection fail-closed.",
+      "status": "complete",
+      "dependencies": [
+        "scripts/check_secrets.py",
+        "release documentation and state artifacts"
+      ],
+      "scope": [
+        "Do not weaken API-key or credential detection",
+        "Detect user-specific absolute paths that would leak in packaged artifacts",
+        "Keep repository state documentation practical for local development"
+      ],
+      "done_criteria": [
+        "Secret scan passes on safe tracked project content",
+        "Synthetic credentials and private path fixtures are still rejected",
+        "Release checks no longer fail solely on documented verification paths",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "hermetic-test-stability-v1",
+      "name": "Hermetic local test stability",
+      "description": "Remove workstation credential dependencies from local probe tests without weakening production authentication checks.",
+      "status": "complete",
+      "dependencies": [
+        "MiMo lightweight probe tests",
+        "production LLM authentication guard"
+      ],
+      "scope": [
+        "Keep production API-key validation unchanged",
+        "Use explicit fake credentials only inside tests",
+        "Make the full Python suite reproducible on a clean machine"
+      ],
+      "done_criteria": [
+        "MiMo reasoning-budget probe test passes without environment API keys",
+        "Missing-key production guard tests still pass",
+        "Full Python test suite passes",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "frontend-runtime-efficiency-v1",
+      "name": "Frontend view loading and idle runtime efficiency",
+      "description": "Reduce default frontend script work and idle cross-window speech traffic while preserving the current chat/model URLs and behavior.",
+      "status": "complete",
+      "dependencies": [
+        "existing global-script load order",
+        "chat-to-model speech BroadcastChannel contract",
+        "developer diagnostics feature flag"
+      ],
+      "scope": [
+        "Keep /?view=model and /?view=chat compatible",
+        "Keep developer diagnostics available through the existing flag",
+        "Do not change security defaults or add dependencies",
+        "Preserve active speech animation smoothness while reducing idle work"
+      ],
+      "done_criteria": [
+        "Default view loading no longer eagerly loads scripts that belong only to another view or disabled developer diagnostics",
+        "Idle chat-to-model speech broadcast does not run at display refresh rate or resend unchanged state continuously",
+        "Existing frontend tests and an Electron smoke test pass",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "character-performance-cue-v1",
+      "name": "Exaggerated but recoverable character performance cue v1",
+      "description": "Unify assistant reply emotion, TTS delivery, and Live2D body/expression performance using existing model and motion resources, with safe fallback when metadata or motions are missing. The technical cue layer is implemented; final perceptual tuning is deferred until the reply-to-performance contract is stable.",
+      "status": "complete",
+      "dependencies": [
+        "character_runtime metadata contract",
+        "web Live2D expression and motion controllers",
+        "TTS playback lifecycle"
+      ],
+      "scope": [
+        "Use backend metadata first and frontend fallback second",
+        "Cover neutral, happy, playful, sad, anxious, angry, surprised, and thinking",
+        "Keep behavior default-safe and recoverable",
+        "Do not add or redistribute new Live2D model assets in this phase"
+      ],
+      "done_criteria": [
+        "TTS playback visibly drives body/expression movement beyond mouth-only animation",
+        "Core emotions are distinguishable by manual or normal chat testing",
+        "Internal metadata is not shown or spoken to users",
+        "Missing motion resources degrade to parameter or expression fallback without breaking chat",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "companion-turn-contract-v1",
+      "name": "Companion turn contract v1",
+      "description": "Make every assistant turn carry one canonical visible reply and one optional performance plan so text, subtitles, TTS, and Live2D coordinate without rewriting each other's output.",
+      "status": "complete",
+      "dependencies": [
+        "app chat and chat-stream routes",
+        "model-direct-reply behavior",
+        "web chat reply, TTS, and performance cue controllers"
+      ],
+      "scope": [
+        "Keep the model-owned visible reply intact in model-direct mode",
+        "Add a backward-compatible versioned turn payload for normal and streamed replies",
+        "Use one turn identifier and performance cue across subtitle, TTS, and Live2D paths",
+        "Do not change desktop-observation, tool-calling, or permission defaults",
+        "Do not add dependencies or new Live2D assets"
+      ],
+      "done_criteria": [
+        "Normal and streamed chat responses expose compatible versioned turn metadata",
+        "The visible reply is never replaced by cue/metadata processing in model-direct mode",
+        "Frontend consumes one canonical turn/cue rather than independently guessing divergent speech and motion state",
+        "Existing clients safely ignore the optional payload",
+        "Targeted backend/frontend tests and verification evidence are recorded in progress.md"
+      ]
+    },
+    {
+      "id": "natural-character-dialogue-v1",
+      "name": "Natural bilingual companion dialogue v1",
+      "description": "Make the personal companion respond naturally in English to Chinese or English user input, with stable personality, light humor, honest AI identity, and no artificial roulette in model-direct dialogue.",
+      "status": "complete",
+      "dependencies": [
+        "model_direct_reply behavior",
+        "assistant prompt and reply-language policy",
+        "humanize, inner-thought, and emotion prompt helpers"
+      ],
+      "scope": [
+        "Keep one authoritative companion dialogue contract for the personal local configuration",
+        "Keep English output while accepting Chinese and English input",
+        "Remove random response-density and random inner-state pressure from model-direct dialogue",
+        "Keep the assistant openly AI when identity is relevant; do not impersonate a human",
+        "Do not change memory policy, proactive behavior, desktop observation, tools, or permissions"
+      ],
+      "done_criteria": [
+        "Direct dialogue prompt has no conflicting language or identity instruction",
+        "Model-direct replies do not receive random text-shaping pressure after generation",
+        "Chinese and English input are both explicitly supported by the output contract",
+        "Prompt and behavior regressions are covered by focused tests",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "relationship-growth-v1",
+      "name": "Structured relationship growth v1",
+      "description": "Give the personal companion a local, inspectable relationship state for stable preferences, familiarity, and interaction boundaries instead of relying only on free-text memory summaries.",
+      "status": "complete",
+      "dependencies": [
+        "existing local memory persistence",
+        "assistant prompt construction",
+        "existing memory/persona review interfaces"
+      ],
+      "scope": [
+        "Keep all state local and user-scoped",
+        "Represent preferences, familiarity, and interaction boundaries with bounded fields",
+        "Let recent interactions propose gradual changes without fabricating facts",
+        "Provide an inspect/reset/correct path before automatic promotion becomes stronger",
+        "Do not access desktop, files, screenshots, tools, or private data by default"
+      ],
+      "done_criteria": [
+        "Relationship state has a versioned, recoverable local format",
+        "Prompt construction receives a concise safe relationship snapshot",
+        "The user can inspect and reset/correct the state locally",
+        "Tests cover persistence, prompt boundaries, and reset/correction behavior",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "conversation-flow-v1",
+      "name": "Low-interruption conversation flow",
+      "description": "Improve continuity with short responses, guarded follow-up, and low-interruption proactive behavior after the performance cue work is stable.",
+      "status": "complete",
+      "dependencies": [
+        "character-performance-cue-v1",
+        "conversation_mode guardrails"
+      ],
+      "scope": [
+        "Keep proactive behavior opt-in",
+        "Reuse existing follow-up scheduler guardrails"
+      ],
+      "done_criteria": [
+        "Follow-up remains low-frequency and user-controllable",
+        "Failure paths are fail-closed",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "memory-continuity-v1",
+      "name": "Memory and relationship continuity",
+      "description": "Make short-term and long-term memory feel more continuous without over-injecting stale facts or unreviewed learning candidates.",
+      "status": "complete",
+      "dependencies": [
+        "memory safety boundaries",
+        "learning review workflow"
+      ],
+      "scope": [
+        "Respect user-reviewed memory promotion",
+        "Do not read desktop, files, screenshots, or tool output by default"
+      ],
+      "done_criteria": [
+        "Short replies like continue or next step keep context reliably",
+        "Memory corrections and forget requests remain safe",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "companion-speech-prewarm-v1",
+      "name": "Companion speech prewarm v1",
+      "description": "Reduce the perceived wait before a personal companion reply speaks by safely prewarming one confirmed draft sentence while preserving the canonical final-turn contract.",
+      "status": "complete",
+      "dependencies": [
+        "companion-turn-contract-v1",
+        "model-direct streamed replies",
+        "server TTS request and playback controllers"
+      ],
+      "scope": [
+        "Only prewarm for the existing opt-in companion-turn and server-TTS path",
+        "Never speak mutable draft text before the final canonical turn confirms the exact prefix",
+        "Keep subtitle, Live2D cue, and speech animation activation tied to actual playback",
+        "Cancel or discard stale, failed, mismatched, and interrupted prewarm requests",
+        "Do not change memory, permissions, desktop observation, tools, or model assets"
+      ],
+      "done_criteria": [
+        "A complete stable first sentence can begin TTS synthesis while the model reply is still streaming",
+        "Only a final canonical reply with the same prefix may reuse the prefetched audio",
+        "A mismatch, cancellation, or request failure cannot cause duplicate or stale speech",
+        "Fallback final speech remains available when prewarm is not usable",
+        "Focused frontend and TTS-request tests cover reuse, mismatch, interruption, and cancellation",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "release-experience-alignment-v1",
+      "name": "Release experience alignment v1",
+      "description": "Align the documented preview setup with the intended personal bilingual-input, natural-English, candid-AI companion experience without weakening privacy or safety defaults.",
+      "status": "complete",
+      "dependencies": [
+        "config.preview.example.json",
+        "apply-preview-experience-config.ps1",
+        "model-direct companion contract",
+        "release and first-run documentation"
+      ],
+      "scope": [
+        "Enable the existing model-direct, canonical companion-turn, and structured relationship features in the preview profile",
+        "Make the preview dialogue contract accept Chinese or English input and answer in natural English by default while candidly identifying as AI when relevant",
+        "Keep browser TTS fallback and all desktop-observation, tool, and shell defaults safe",
+        "Add regression coverage for the preview profile and its merge behavior",
+        "Do not publish a release, change user credentials, or modify the private local configuration"
+      ],
+      "done_criteria": [
+        "The preview profile explicitly represents the intended dialogue, language, model-direct, companion-turn, and relationship behavior",
+        "Preview application preserves existing model credentials and does not write secrets",
+        "Preview safety defaults remain manual/disabled for desktop observation, tools, and shell",
+        "Automated tests verify the profile and merge behavior",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "bilingual-voice-input-v1",
+      "name": "Private bilingual voice input v1",
+      "description": "Let the personal companion automatically choose between locally configured Chinese and English Vosk models for one spoken turn, without uploading audio or weakening current safety defaults.",
+      "status": "complete",
+      "dependencies": [
+        "local Vosk PCM route",
+        "ASR configuration and health diagnostics",
+        "voice turn confidence pipeline"
+      ],
+      "scope": [
+        "Keep the existing Chinese local model as the legacy-safe fallback",
+        "Allow an optional user-provided English local model path without automatic downloads",
+        "Choose one whole-utterance candidate in auto mode using Vosk confidence and script plausibility",
+        "Preserve English whitespace and return compatible ASR metadata to the existing frontend confidence flow",
+        "Do not expose local model paths to the client, upload audio, or switch to browser/cloud ASR automatically",
+        "Document the code-switching limitation honestly"
+      ],
+      "done_criteria": [
+        "A configured Chinese and English local Vosk pair can be selected automatically per utterance",
+        "Chinese-only installations continue to work with no user configuration changes",
+        "English/bilingual whitespace is preserved and no request can override server model paths",
+        "Health diagnostics distinguish available and optional local language models without leaking private paths",
+        "Focused backend, route, config, frontend, and health tests pass with verification evidence recorded"
+      ]
+    },
+    {
+      "id": "realtime-tts-performance-sync-v1",
+      "name": "Realtime TTS performance sync v1",
+      "description": "Keep streamed server-TTS speech, Live2D talk gestures, and performance timelines synchronized to actual audible playback instead of mutable text or queued synthesis work.",
+      "status": "complete",
+      "dependencies": [
+        "stream TTS queue",
+        "TTS playback onPlaybackStart contract",
+        "companion performance timeline"
+      ],
+      "scope": [
+        "Carry a once-only actual-playback callback through each realtime queue item",
+        "Start speaking motion and speech timeline only after HTML audio onplay or AudioContext source.start",
+        "Keep pre-reaction/thinking available while synthesis is pending",
+        "Discard cancelled, failed, stale, or interrupted segments without triggering speaking motion",
+        "Do not change TTS providers, private configuration, permissions, or network behavior"
+      ],
+      "done_criteria": [
+        "Enqueueing text or receiving a TTS blob does not start talk gestures or speech timeline",
+        "The first real playback event starts the stream speech timeline and talk gesture exactly once",
+        "Late, failed, cancelled, and stale realtime segments cannot start a speaking performance",
+        "Direct and companion-turn speech paths remain compatible",
+        "Focused realtime queue/performance tests and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "voice-listening-presence-v1",
+      "name": "Voice listening presence v1",
+      "description": "Make the Live2D companion visibly and calmly attentive while the user is speaking, before ASR finalization or reply latency begins.",
+      "status": "complete",
+      "dependencies": [
+        "local/browser ASR microphone and VAD lifecycle",
+        "Live2D expression parameter layer",
+        "chat-to-model speech-state bridge"
+      ],
+      "scope": [
+        "Add session-bound armed, hearing, and release listening state using existing microphone/VAD events",
+        "Render a restrained attentive pose without mouth animation or repetitive arm gestures",
+        "Give actual assistant speech priority and resolve barge-in only after speech stops",
+        "Mirror only compact non-audio listening state to the detached model view",
+        "Do not collect extra microphone data, add services/dependencies, change permissions, or touch private configuration"
+      ],
+      "done_criteria": [
+        "Opening the microphone visibly enters a quiet attentive state before transcript submission",
+        "Detected user speech becomes visibly attentive without conflicting with assistant speech",
+        "Silence, close, pause, cancellation, and stale sessions reliably settle the pose",
+        "Chat and detached model views remain synchronized without broadcasting transcript or audio content",
+        "Focused ASR/Live2D/runtime tests and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "stream-tts-delivery-completeness-v1",
+      "name": "Stream TTS delivery completeness v1",
+      "description": "Detect and recover safely when a realtime TTS stream starts successfully but later queued segments fail or stall, without replaying already delivered speech.",
+      "status": "complete",
+      "dependencies": [
+        "realtime-tts-performance-sync-v1",
+        "stream TTS queue item lifecycle",
+        "final speech watchdog"
+      ],
+      "scope": [
+        "Track delivery completion separately from first actual playback",
+        "Recover only undelivered final content and never duplicate delivered audio",
+        "Keep provider, privacy, permission, and private configuration behavior unchanged"
+      ],
+      "done_criteria": [
+        "A later failed or stalled stream segment is detectable after the first segment has played",
+        "Recovery does not replay already audible text",
+        "Interrupted and stale sessions cannot recover into a newer turn",
+        "Focused queue/watchdog regressions and verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "bilingual-text-composition-v1",
+      "name": "Bilingual text composition and intentional send v1",
+      "description": "Keep Chinese/English IME composition from accidentally submitting partial chat turns while preserving fast intentional Enter-to-send behavior.",
+      "status": "complete",
+      "dependencies": [
+        "chat input keyboard binding",
+        "chat reply turn interruption handling",
+        "existing click-to-send UI"
+      ],
+      "scope": [
+        "Ignore Enter while an IME composition is active",
+        "Submit once only after composition has ended and the user intentionally presses Enter",
+        "Preserve click-to-send, ordinary finalized Enter behavior, and existing chat cancellation semantics",
+        "Do not change providers, conversation content, permissions, private configuration, or browser security behavior"
+      ],
+      "done_criteria": [
+        "Pinyin/IME Enter confirmation cannot submit or clear a partial input",
+        "Finalized Enter submits exactly once and existing send-button behavior remains available",
+        "Composition events cannot interrupt an active reply through an accidental submission",
+        "Focused frontend regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "server-tts-cancellation-v1",
+      "name": "Generation- and session-bound server TTS cancellation v1",
+      "description": "Abort obsolete server-TTS synthesis on interruption or a newer turn so stale local work cannot delay the next companion reply.",
+      "status": "complete",
+      "dependencies": [
+        "TTS API AbortSignal support",
+        "playback generation and chat interruption lifecycle",
+        "direct, segmented, and realtime stream TTS paths"
+      ],
+      "scope": [
+        "Track active server-TTS requests by playback generation and stream session",
+        "Abort stale requests before or during generation/session turnover",
+        "Propagate cancellation through direct, segmented, realtime, and retry paths",
+        "Treat caller cancellation as cancellation rather than a provider failure, browser fallback, or failure-streak event",
+        "Do not change providers, request payloads, permissions, private configuration, or network exposure"
+      ],
+      "done_criteria": [
+        "Interrupting a turn aborts its pending server-TTS work promptly",
+        "Late aborted results cannot play, retry, fall back, or delay the next generation",
+        "A current newer turn remains unaffected by cleanup of its predecessor",
+        "Focused direct/stream cancellation regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "split-window-speech-timebase-v1",
+      "name": "Split-window speech timebase and stale-state cleanup v1",
+      "description": "Keep chat-to-model speech state coherent across Electron renderer windows whose performance clocks have different origins, so stale remote speech cannot suppress natural Live2D motion or leave the character visibly speaking.",
+      "status": "complete",
+      "dependencies": [
+        "chat-to-model speech BroadcastChannel payload",
+        "app startup speech bridge",
+        "model-window motion/runtime speech state"
+      ],
+      "scope": [
+        "Use a renderer-independent speech expiry representation",
+        "Reject stale or out-of-order bridge updates safely",
+        "Preserve active audio priority and local single-window behavior",
+        "Do not change providers, permissions, desktop observation, private configuration, or model assets"
+      ],
+      "done_criteria": [
+        "A remote speech start/finish has the same visible lifetime in chat and model windows",
+        "A dead or delayed chat window cannot leave the model window in a speaking/suppressed-idle state",
+        "Newer speech revisions remain unaffected by stale cleanup",
+        "Focused bridge/runtime regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "local-speech-timebase-consistency-v1",
+      "name": "Local speech timebase consistency v1",
+      "description": "Remove mixed Date.now/performance.now comparisons from local chat-turn and proactive-speech decisions so interruption protection and follow-up timing reflect the actual visible speech window.",
+      "status": "complete",
+      "dependencies": [
+        "speech animation lifecycle",
+        "chat turn interruption policy",
+        "auto-chat and follow-up timing"
+      ],
+      "scope": [
+        "Use one local timebase for speech-animation state checks",
+        "Keep actual audio and existing user interruption policy authoritative",
+        "Do not change providers, memory contents, permissions, desktop observation, private configuration, or model assets"
+      ],
+      "done_criteria": [
+        "Assistant-speech activity and interruption protection honor the intended release window",
+        "Automatic follow-up timing cannot treat a visible local speech animation as already expired solely due to clock mismatch",
+        "Existing active audio and newer-turn behavior remain unchanged",
+        "Focused timing regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "no-barge-in-voice-turn-queue-v1",
+      "name": "No-barge-in voice turn queue v1",
+      "description": "Keep a completed voice transcript from being lost when no-barge-in mode receives it while the assistant is still finishing an earlier turn.",
+      "status": "complete",
+      "dependencies": [
+        "local/browser ASR transcript queue",
+        "chat turn interruption policy",
+        "microphone session lifecycle"
+      ],
+      "scope": [
+        "Retain non-interrupting voice transcripts until the active assistant turn is idle or a bounded wait expires",
+        "Preserve FIFO order and discard pending items safely after manual microphone close or a stale session",
+        "Keep barge-in voice behavior immediate and unchanged",
+        "Do not change ASR models, TTS providers, permissions, desktop observation, private configuration, or model assets"
+      ],
+      "done_criteria": [
+        "A no-barge-in transcript finalized during an active chat turn is delivered once the turn becomes available",
+        "Two deferred voice transcripts preserve their original order",
+        "Manual microphone close, stale sessions, and bounded timeout discard only the pending item safely",
+        "Focused voice-queue regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "split-window-performance-phase-bridge-v1",
+      "name": "Split-window performance phase bridge v1",
+      "description": "Let the detached Live2D model window visibly receive safe, non-speech reaction phases while the chat renderer is waiting for the model or audio.",
+      "status": "complete",
+      "dependencies": [
+        "Electron split chat/model windows",
+        "existing BroadcastChannel speech bridge",
+        "performance timeline, action-plan, and expression pulse runtime"
+      ],
+      "scope": [
+        "Mirror a compact, expiring, revisioned non-speech performance phase from chat to model",
+        "Apply existing model action/pulse fallbacks once without starting mouth or speech animation",
+        "Ignore stale, reordered, expired, and duplicate phase updates safely",
+        "Keep the full-view path local-only and do not send transcript text, audio data, prompts, providers, permissions, desktop observation, private configuration, or model assets"
+      ],
+      "done_criteria": [
+        "A detached model window visibly receives an eligible pre-reaction before assistant speech starts",
+        "Full view does not double-dispatch the same performance phase",
+        "Late, stale, expired, and completed-turn phase updates cannot revive an old reaction",
+        "Focused bridge/runtime regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "no-barge-in-audio-lease-completeness-v1",
+      "name": "No-barge-in audio lease completeness v1",
+      "description": "Keep microphone suppression bound to the assistant audio that is actually still being delivered, so queued realtime speech cannot be transcribed as a new user turn.",
+      "status": "complete",
+      "dependencies": [
+        "no-barge-in voice turn queue",
+        "chat-owned microphone pause leases",
+        "realtime stream TTS delivery and playback lifecycle"
+      ],
+      "scope": [
+        "Retain a chat-owned no-barge microphone pause until its finalized stream session/generation has completed or been cancelled",
+        "Release direct, text-only, failed, interrupted, and superseded turns safely without affecting a newer lease",
+        "Keep queued no-barge ASR behind actual assistant audio or active stream delivery even when the LLM request is no longer busy",
+        "Do not change providers, ASR models, memory, permissions, desktop observation, private configuration, or model assets"
+      ],
+      "done_criteria": [
+        "A completed realtime LLM stream cannot resume the microphone while its queued audio tail is still audible",
+        "Cancellation or a newer turn releases only the stale turn's microphone lease",
+        "No-barge ASR items defer while active assistant audio/stream work remains after chatBusy clears",
+        "Focused stream, chat-lease, and ASR queue regressions plus full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "delivered-turn-persistence-v1",
+      "name": "Delivered-turn persistence v1",
+      "description": "Keep long-term memory, relationship growth, and character-session updates aligned with assistant replies that the user actually received rather than replies cancelled before final display.",
+      "status": "complete",
+      "dependencies": [
+        "chat terminal response delivery",
+        "local memory and relationship persistence",
+        "stream/direct reply lifecycle and cancellation"
+      ],
+      "scope": [
+        "Treat current-client finalization as the persistence boundary for an assistant turn",
+        "Use bounded local delivery acknowledgement with retained completed outcomes, serialized commits, and explicit unconfirmed failure states",
+        "Do not persist or advance relationship state for cancelled/stale replies that never finalize visibly",
+        "Do not change providers, memory file formats, permissions, desktop observation, private configuration, or model assets"
+      ],
+      "done_criteria": [
+        "A failed terminal response write or interrupted/stale renderer turn does not persist its assistant reply or relationship change",
+        "A finalized current reply commits its associated persistence exactly once",
+        "Duplicate, unknown, and expired delivery acknowledgements are harmless",
+        "Focused backend/frontend memory-delivery regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "split-window-speech-style-bridge-v1",
+      "name": "Split-window speech style bridge v1",
+      "description": "Keep the detached Live2D window's speaking expression, body motion, and mouth rhythm aligned with the actual delivered talk style instead of falling back to neutral.",
+      "status": "complete",
+      "dependencies": [
+        "Electron split chat/model windows",
+        "existing revisioned taffy-speech BroadcastChannel bridge",
+        "existing Live2D speechAnimStyle and currentTalkStyle consumers"
+      ],
+      "scope": [
+        "Bridge only the allowlisted neutral/playful/comfort/steady/clear speech-style enum",
+        "Apply it only after existing sender, revision, expiry, and stale-packet validation",
+        "Do not send text, prompts, audio, providers, private configuration, permissions, desktop data, or model assets",
+        "Do not change server TTS, speech timing, memory, or full-window behavior"
+      ],
+      "done_criteria": [
+        "Detached model speech receives the authoritative valid talk style for the current speech identity",
+        "Missing, invalid, expired, reordered, or completed packets cannot overwrite a newer style",
+        "The detached window does not start speech/motion merely because a non-speaking style packet arrives",
+        "Focused bridge/expression regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "turn-playback-generation-continuity-v1",
+      "name": "Per-turn browser playback generation continuity v1",
+      "description": "Keep actual Browser TTS and server-to-browser fallback playback events attached to their current assistant turn so canonical Live2D speech timing is not discarded as stale.",
+      "status": "complete",
+      "dependencies": [
+        "chat reply playback lifecycle",
+        "ttsPlaybackController browser speech callbacks",
+        "canonical performance timeline and split-window speech bridge"
+      ],
+      "scope": [
+        "Preserve a current turn's identity across the expected Browser TTS generation increment",
+        "Cover direct Browser TTS and server-TTS fallback-to-browser delivery",
+        "Retain strict rejection for interrupted, superseded, stale-session, and genuinely old playback callbacks",
+        "Do not change TTS providers, provider configuration, backend routes, memory, permissions, or model assets"
+      ],
+      "done_criteria": [
+        "Actual Browser TTS playback starts one canonical speech timeline and post-settle path for the current turn",
+        "Server-to-browser fallback receives the same current-turn performance lifecycle",
+        "Interrupted or superseded Browser callbacks cannot revive an old turn",
+        "Focused playback/turn/bridge regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "cancelled-playback-settlement-v1",
+      "name": "Cancelled playback promise settlement v1",
+      "description": "Settle cancelled audio playback promises promptly so interrupted or superseded speech cannot hold microphone pause leases or chat-turn cleanup for the old timeout window.",
+      "status": "complete",
+      "dependencies": [
+        "TTS playback cancellation lifecycle",
+        "no-barge microphone pause leases",
+        "direct and stream speech settlement"
+      ],
+      "scope": [
+        "Resolve current audio playback waiters when playback is cancelled or superseded",
+        "Cover Browser TTS, HTML audio, and AudioContext playback paths where existing callbacks may never fire after stop",
+        "Preserve strict generation/session stale rejection",
+        "Do not change providers, backend routes, ASR models, memory, permissions, private configuration, or model assets"
+      ],
+      "done_criteria": [
+        "Interrupting or superseding playback settles old playback promises promptly",
+        "No-barge microphone pause leases are not held by cancelled speech until watchdog timeouts",
+        "Current newer playback remains unaffected by stale cancellation cleanup",
+        "Focused cancellation regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "companion-experience-diagnostics-v1",
+      "name": "Companion experience diagnostics v1",
+      "description": "Expose a developer-only, text-free per-turn latency summary so real Electron chat, TTS fallback, and first-sound bottlenecks can be measured before deeper streaming-audio work.",
+      "status": "complete",
+      "dependencies": [
+        "existing chat and TTS performance events",
+        "developer feature lazy loader",
+        "existing debug panel controller"
+      ],
+      "scope": [
+        "Record only timing, provider/mode enums, outcome, and bounded failure/fallback categories",
+        "Do not retain user text, assistant text, audio, prompts, credentials, model paths, or desktop data",
+        "Load and expose the panel only through the existing developer-feature mode",
+        "Do not change providers, playback behavior, privacy defaults, permissions, memory, or model assets"
+      ],
+      "done_criteria": [
+        "A developer can inspect first headers, first text, reply-ready, TTS-ready, first-audio, and completion timing for recent turns",
+        "Fallback, cancellation, failure, and missing-stage states are distinguishable without conversation content",
+        "Normal non-developer views do not load the diagnostics module or show its control",
+        "Focused diagnostics regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "release-first-run-stability",
+      "name": "First-run and release stability",
+      "description": "Keep installer, source-test package, model configuration, and release trust surfaces reliable while role-experience work continues.",
+      "status": "maintenance",
+      "dependencies": [
+        "installer scripts",
+        "first-run checks",
+        "release readiness gate"
+      ],
+      "scope": [
+        "Do not mix release packaging changes into role-experience feature work unless required"
+      ],
+      "done_criteria": [
+        "Release checks pass or failures are documented",
+        "No secrets or private runtime artifacts are packaged",
+        "Verification evidence is recorded in progress.md"
+      ]
+    }
+  ]
+}

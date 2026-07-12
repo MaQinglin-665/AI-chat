@@ -1,8 +1,40 @@
 from http import HTTPStatus
 
+from companion_turn_contract import is_model_direct_reply_enabled
+
 
 CHAT_ROUTES = {"/api/chat", "/api/chat_stream"}
 PRE_FINALIZED_STREAM_SENTINEL = "\x00PRE_FINALIZED\x00"
+DELIVERED_TURN_RECEIPT_CAPABILITY = "delivered_turn_receipt_v1"
+MAX_PENDING_DELIVERY_RECEIPTS = 8
+
+
+def _has_delivered_turn_receipt_capability(body):
+    if not isinstance(body, dict):
+        return False
+    capabilities = body.get("client_capabilities")
+    return isinstance(capabilities, dict) and capabilities.get(DELIVERED_TURN_RECEIPT_CAPABILITY) is True
+
+
+def _acknowledge_pending_delivered_turns(body, acknowledge_delivered_turn_func):
+    """Commit known prior visible turns before planning the next receipt-aware turn."""
+    if not _has_delivered_turn_receipt_capability(body) or not callable(acknowledge_delivered_turn_func):
+        return
+    candidates = body.get("pending_delivery_ids") if isinstance(body, dict) else None
+    if not isinstance(candidates, list):
+        return
+    seen = set()
+    for delivery_id in candidates[:MAX_PENDING_DELIVERY_RECEIPTS]:
+        if not isinstance(delivery_id, str) or delivery_id in seen:
+            continue
+        seen.add(delivery_id)
+        try:
+            acknowledge_delivered_turn_func(delivery_id)
+        except Exception:
+            # The standalone ACK queue will retry transient delivery failures.
+            # A new chat request must not fail merely because an old receipt has
+            # expired or the local process has restarted.
+            continue
 
 
 def _resolve_llm_provider(llm_cfg):
@@ -17,6 +49,20 @@ def _safe_recent_history(config, history, *, get_history_summary_settings_func, 
     settings = get_history_summary_settings_func(config)
     keep_recent = int(settings.get("keep_recent_messages", 8))
     return sanitize_history_func(history, max_items=keep_recent)
+
+
+def _drop_duplicate_current_user_history_item(history, user_message):
+    safe_history = list(history) if isinstance(history, list) else []
+    if not safe_history:
+        return safe_history
+    last = safe_history[-1]
+    if not isinstance(last, dict):
+        return safe_history
+    if str(last.get("role", "") or "").strip().lower() != "user":
+        return safe_history
+    if str(last.get("content", "") or "").strip() != str(user_message or "").strip():
+        return safe_history
+    return safe_history[:-1]
 
 
 def _build_chat_config(
@@ -68,12 +114,108 @@ def _remember_reply(
     reply,
     *,
     is_auto,
+    interaction_id,
     remember_interaction_func,
 ):
+    return remember_interaction_func(
+        config,
+        user_message,
+        reply,
+        is_auto=is_auto,
+        interaction_id=interaction_id,
+    )
+
+
+def _stage_delivered_turn(
+    config,
+    user_message,
+    history,
+    reply,
+    *,
+    is_auto,
+    interaction_id,
+    remember_interaction_func,
+    update_character_brain_session_state_func,
+    get_history_summary_settings_func,
+    sanitize_history_func,
+    stage_delivered_turn_func,
+    defer_until_delivery,
+):
+    """Commit now for legacy clients or stage a receipt-aware current renderer turn."""
+    final_reply = str(reply or "")
+    if not final_reply:
+        return ""
     try:
-        remember_interaction_func(config, user_message, reply, is_auto=is_auto)
+        settings = get_history_summary_settings_func(config)
+        keep_recent = int(settings.get("keep_recent_messages", 8))
+        safe_history = sanitize_history_func(history, max_items=keep_recent)
     except Exception:
-        pass
+        safe_history = []
+
+    def commit():
+        _remember_reply(
+            config,
+            user_message,
+            final_reply,
+            is_auto=is_auto,
+            interaction_id=interaction_id,
+            remember_interaction_func=remember_interaction_func,
+        )
+        # The request-time session snapshot may be older than another delivered
+        # turn that is acknowledged first. Start session progression from the
+        # current global state while retaining this turn's own brain decision.
+        session_config = dict(config) if isinstance(config, dict) else config
+        if isinstance(session_config, dict):
+            session_config.pop("_character_brain_session_state", None)
+        update_character_brain_session_state_func(
+            session_config,
+            user_message,
+            safe_history,
+            assistant_reply=final_reply,
+        )
+
+    if not defer_until_delivery:
+        # Preserve the historical API behavior for callers that cannot ACK a
+        # receipt. Their writes are still best-effort and must not turn a normal
+        # completed chat response into a server error.
+        try:
+            commit()
+        except Exception:
+            pass
+        return ""
+    if not callable(stage_delivered_turn_func):
+        return ""
+    try:
+        return str(stage_delivered_turn_func(commit) or "")
+    except Exception:
+        return ""
+
+
+def _build_companion_turn_safely(
+    build_companion_turn_func,
+    config,
+    reply,
+    *,
+    perf_trace_id,
+    is_auto,
+    runtime_metadata,
+    character_brain,
+):
+    if not callable(build_companion_turn_func):
+        return None
+    try:
+        return build_companion_turn_func(
+            config,
+            reply,
+            turn_id=perf_trace_id,
+            is_auto=is_auto,
+            input_modality=config.get("_input_modality", "text") if isinstance(config, dict) else "text",
+            runtime_metadata=runtime_metadata,
+            character_brain=character_brain,
+        )
+    except Exception:
+        # The optional presentation contract must never make chat fail.
+        return None
 
 
 def _handle_chat_stream_request(
@@ -85,6 +227,7 @@ def _handle_chat_stream_request(
     *,
     is_auto,
     force_tools,
+    delivery_receipt_enabled,
     perf_trace_id,
     perf_started_ms,
     begin_sse_func,
@@ -94,8 +237,10 @@ def _handle_chat_stream_request(
     apply_demo_stable_identity_fallback_func,
     apply_character_runtime_reply_func,
     apply_character_brain_reply_text_func,
+    build_companion_turn_func,
     remember_interaction_func,
     update_character_brain_session_state_func,
+    stage_delivered_turn_func,
     build_character_brain_response_payload_func,
     get_history_summary_settings_func,
     sanitize_history_func,
@@ -134,10 +279,12 @@ def _handle_chat_stream_request(
             if first_delta_ms < 0:
                 first_delta_ms = perf_now_ms_func() - llm_started_ms
             send_sse_func({"type": "delta", "text": chunk})
-        final_reply = "".join(full_parts).strip()
+        model_direct_reply = is_model_direct_reply_enabled(chat_config)
+        raw_stream_reply = "".join(full_parts)
+        final_reply = raw_stream_reply if model_direct_reply else raw_stream_reply.strip()
         runtime_meta = None
         finalize_started_ms = perf_now_ms_func()
-        if final_reply and not already_finalized:
+        if final_reply and not already_finalized and not model_direct_reply:
             llm_cfg = chat_config.get("llm", {})
             final_reply = finalize_assistant_reply_func(
                 chat_config,
@@ -153,41 +300,56 @@ def _handle_chat_stream_request(
                 final_reply,
                 is_auto=is_auto,
             )
-        final_reply = apply_demo_stable_identity_fallback_func(
-            chat_config, user_message, final_reply
-        )
+        if not model_direct_reply:
+            final_reply = apply_demo_stable_identity_fallback_func(
+                chat_config, user_message, final_reply
+            )
         finalize_ms = perf_now_ms_func() - finalize_started_ms
         runtime_started_ms = perf_now_ms_func()
-        final_reply, runtime_meta = apply_character_runtime_reply_func(
-            chat_config,
-            final_reply,
-        )
-        final_reply = apply_character_brain_reply_text_func(
-            chat_config,
-            user_message,
-            final_reply,
-        )
-        if final_reply:
-            _remember_reply(
+        if not model_direct_reply:
+            final_reply, runtime_meta = apply_character_runtime_reply_func(
+                chat_config,
+                final_reply,
+            )
+            final_reply = apply_character_brain_reply_text_func(
                 chat_config,
                 user_message,
                 final_reply,
-                is_auto=is_auto,
-                remember_interaction_func=remember_interaction_func,
             )
-        update_character_brain_session_state_func(
-            chat_config,
-            user_message,
-            history,
-            assistant_reply=final_reply,
-        )
         runtime_ms = perf_now_ms_func() - runtime_started_ms
         done_payload = {"type": "done", "reply": final_reply}
         if runtime_meta is not None:
             done_payload["character_runtime"] = runtime_meta
-        brain_payload = build_character_brain_response_payload_func(chat_config)
+        brain_payload = None if model_direct_reply else build_character_brain_response_payload_func(chat_config)
         if brain_payload is not None:
             done_payload["character_brain"] = brain_payload
+        companion_turn = _build_companion_turn_safely(
+            build_companion_turn_func,
+            chat_config,
+            final_reply,
+            perf_trace_id=perf_trace_id,
+            is_auto=is_auto,
+            runtime_metadata=runtime_meta,
+            character_brain=brain_payload,
+        )
+        if companion_turn is not None:
+            done_payload["turn"] = companion_turn
+        delivery_id = _stage_delivered_turn(
+            chat_config,
+            user_message,
+            history,
+            final_reply,
+            is_auto=is_auto,
+            interaction_id=perf_trace_id,
+            remember_interaction_func=remember_interaction_func,
+            update_character_brain_session_state_func=update_character_brain_session_state_func,
+            get_history_summary_settings_func=get_history_summary_settings_func,
+            sanitize_history_func=sanitize_history_func,
+            stage_delivered_turn_func=stage_delivered_turn_func,
+            defer_until_delivery=delivery_receipt_enabled,
+        )
+        if delivery_id:
+            done_payload["delivery_id"] = delivery_id
         send_sse_func(done_payload)
         log_backend_perf_func(
             "CHAT_STREAM",
@@ -229,6 +391,7 @@ def _handle_chat_request(
     *,
     is_auto,
     force_tools,
+    delivery_receipt_enabled,
     perf_trace_id,
     perf_started_ms,
     perf_headers,
@@ -237,9 +400,13 @@ def _handle_chat_request(
     apply_demo_stable_identity_fallback_func,
     apply_character_runtime_reply_func,
     apply_character_brain_reply_text_func,
+    build_companion_turn_func,
     remember_interaction_func,
     update_character_brain_session_state_func,
+    stage_delivered_turn_func,
     build_character_brain_response_payload_func,
+    get_history_summary_settings_func,
+    sanitize_history_func,
     diagnose_llm_exception_func,
     log_backend_exception_func,
     log_backend_perf_func,
@@ -256,33 +423,52 @@ def _handle_chat_request(
             force_tools=force_tools,
             config=chat_config,
         )
-        reply = apply_demo_stable_identity_fallback_func(
-            chat_config, user_message, reply
-        )
+        if not is_model_direct_reply_enabled(chat_config):
+            reply = apply_demo_stable_identity_fallback_func(
+                chat_config, user_message, reply
+            )
         llm_ms = perf_now_ms_func() - llm_started_ms
         runtime_started_ms = perf_now_ms_func()
-        reply, runtime_meta = apply_character_runtime_reply_func(chat_config, reply)
-        reply = apply_character_brain_reply_text_func(chat_config, user_message, reply)
+        model_direct_reply = is_model_direct_reply_enabled(chat_config)
+        if model_direct_reply:
+            runtime_meta = None
+        else:
+            reply, runtime_meta = apply_character_runtime_reply_func(chat_config, reply)
+            reply = apply_character_brain_reply_text_func(chat_config, user_message, reply)
         runtime_ms = perf_now_ms_func() - runtime_started_ms
-        _remember_reply(
-            chat_config,
-            user_message,
-            reply,
-            is_auto=is_auto,
-            remember_interaction_func=remember_interaction_func,
-        )
-        update_character_brain_session_state_func(
-            chat_config,
-            user_message,
-            history,
-            assistant_reply=reply,
-        )
         payload = {"reply": str(reply or "")}
         if runtime_meta is not None:
             payload["character_runtime"] = runtime_meta
-        brain_payload = build_character_brain_response_payload_func(chat_config)
+        brain_payload = None if model_direct_reply else build_character_brain_response_payload_func(chat_config)
         if brain_payload is not None:
             payload["character_brain"] = brain_payload
+        companion_turn = _build_companion_turn_safely(
+            build_companion_turn_func,
+            chat_config,
+            reply,
+            perf_trace_id=perf_trace_id,
+            is_auto=is_auto,
+            runtime_metadata=runtime_meta,
+            character_brain=brain_payload,
+        )
+        if companion_turn is not None:
+            payload["turn"] = companion_turn
+        delivery_id = _stage_delivered_turn(
+            chat_config,
+            user_message,
+            history,
+            reply,
+            is_auto=is_auto,
+            interaction_id=perf_trace_id,
+            remember_interaction_func=remember_interaction_func,
+            update_character_brain_session_state_func=update_character_brain_session_state_func,
+            get_history_summary_settings_func=get_history_summary_settings_func,
+            sanitize_history_func=sanitize_history_func,
+            stage_delivered_turn_func=stage_delivered_turn_func,
+            defer_until_delivery=delivery_receipt_enabled,
+        )
+        if delivery_id:
+            payload["delivery_id"] = delivery_id
         send_json_func(payload, extra_headers=perf_headers)
         log_backend_perf_func(
             "CHAT",
@@ -334,8 +520,11 @@ def handle_chat_route(
     apply_demo_stable_identity_fallback_func,
     apply_character_runtime_reply_func,
     apply_character_brain_reply_text_func,
+    build_companion_turn_func,
     remember_interaction_func,
     update_character_brain_session_state_func,
+    stage_delivered_turn_func,
+    acknowledge_delivered_turn_func,
     build_character_brain_response_payload_func,
     get_history_summary_settings_func,
     sanitize_history_func,
@@ -345,6 +534,9 @@ def handle_chat_route(
     diagnostic_payload_func,
     perf_now_ms_func,
 ):
+    delivery_receipt_enabled = _has_delivered_turn_receipt_capability(body)
+    if delivery_receipt_enabled:
+        _acknowledge_pending_delivered_turns(body, acknowledge_delivered_turn_func)
     try:
         chat_config = load_config_func()
     except Exception as exc:
@@ -381,6 +573,7 @@ def handle_chat_route(
 
     if not isinstance(history, list):
         history = []
+    history = _drop_duplicate_current_user_history_item(history, user_message)
     if image_data_url is None:
         image_data_url = ""
     if not isinstance(image_data_url, str):
@@ -419,6 +612,7 @@ def handle_chat_route(
             image_data_url,
             is_auto=is_auto,
             force_tools=force_tools,
+            delivery_receipt_enabled=delivery_receipt_enabled,
             perf_trace_id=perf_trace_id,
             perf_started_ms=perf_started_ms,
             begin_sse_func=begin_sse_func,
@@ -428,8 +622,10 @@ def handle_chat_route(
             apply_demo_stable_identity_fallback_func=apply_demo_stable_identity_fallback_func,
             apply_character_runtime_reply_func=apply_character_runtime_reply_func,
             apply_character_brain_reply_text_func=apply_character_brain_reply_text_func,
+            build_companion_turn_func=build_companion_turn_func,
             remember_interaction_func=remember_interaction_func,
             update_character_brain_session_state_func=update_character_brain_session_state_func,
+            stage_delivered_turn_func=stage_delivered_turn_func,
             build_character_brain_response_payload_func=build_character_brain_response_payload_func,
             get_history_summary_settings_func=get_history_summary_settings_func,
             sanitize_history_func=sanitize_history_func,
@@ -448,6 +644,7 @@ def handle_chat_route(
         image_data_url,
         is_auto=is_auto,
         force_tools=force_tools,
+        delivery_receipt_enabled=delivery_receipt_enabled,
         perf_trace_id=perf_trace_id,
         perf_started_ms=perf_started_ms,
         perf_headers=perf_headers,
@@ -456,9 +653,13 @@ def handle_chat_route(
         apply_demo_stable_identity_fallback_func=apply_demo_stable_identity_fallback_func,
         apply_character_runtime_reply_func=apply_character_runtime_reply_func,
         apply_character_brain_reply_text_func=apply_character_brain_reply_text_func,
+        build_companion_turn_func=build_companion_turn_func,
         remember_interaction_func=remember_interaction_func,
         update_character_brain_session_state_func=update_character_brain_session_state_func,
+        stage_delivered_turn_func=stage_delivered_turn_func,
         build_character_brain_response_payload_func=build_character_brain_response_payload_func,
+        get_history_summary_settings_func=get_history_summary_settings_func,
+        sanitize_history_func=sanitize_history_func,
         diagnose_llm_exception_func=diagnose_llm_exception_func,
         log_backend_exception_func=log_backend_exception_func,
         log_backend_perf_func=log_backend_perf_func,

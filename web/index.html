@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:* http://localhost:*; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
   <title>馨语AI桌宠</title>
   <link rel="stylesheet" href="./base.css">
   <link rel="stylesheet" href="./chat.css">
@@ -13,7 +14,10 @@
   <link rel="stylesheet" href="./configSwitch.css">
 </head>
 <body>
+  <script src="./earlyViewBootstrap.js"></script>
   <canvas id="live2d-canvas"></canvas>
+  <div id="thinking-cue-bubble" class="thinking-cue-bubble" aria-hidden="true" hidden>?</div>
+  <div id="live2d-emotion-overlay-layer" class="live2d-emotion-overlay-layer" aria-hidden="true" hidden></div>
 
   <section class="panel">
     <section class="hero-card">
@@ -114,6 +118,7 @@
       </div>
       <div class="advanced-actions-group advanced-actions-dev" aria-label="开发诊断" data-dev-feature="diagnostics" hidden>
         <span class="advanced-actions-title">开发诊断</span>
+        <button id="experience-diagnostics-btn" type="button" data-dev-feature="diagnostics" hidden>体验延迟</button>
         <button id="followup-readiness-btn" type="button" data-dev-feature="diagnostics" hidden>续话状态</button>
         <button id="character-rehearsal-btn" type="button" data-dev-feature="diagnostics" hidden>角色试演</button>
         <button id="character-tuning-btn" type="button" data-dev-feature="diagnostics" hidden>角色调优</button>
@@ -554,6 +559,61 @@
           </div>
         </section>
 
+        <section class="persona-section persona-relationship-section" aria-labelledby="relationship-state-title">
+          <div class="persona-section-title">
+            <span class="persona-section-icon" aria-hidden="true">✦</span>
+            <span id="relationship-state-title">互动关系</span>
+          </div>
+          <p class="relationship-state-intro">它只保留可解释的互动偏好与熟悉度，不保存聊天原文，也不会改变桌面、文件或工具权限。</p>
+          <div class="relationship-state-summary" aria-live="polite">
+            <strong id="relationship-state-summary">正在读取本地互动状态…</strong>
+            <span id="relationship-state-updated"></span>
+          </div>
+          <label class="relationship-state-toggle" for="relationship-state-enabled">
+            <input id="relationship-state-enabled" type="checkbox" checked />
+            <span>让馨语继续使用这些互动偏好</span>
+          </label>
+          <div class="persona-field-grid relationship-state-fields">
+            <label class="persona-field">
+              <span>怎么称呼我</span>
+              <input id="relationship-state-address" type="text" maxlength="40" placeholder="留空则沿用人设卡或自然称呼" />
+            </label>
+            <label class="persona-field">
+              <span>回复节奏</span>
+              <select id="relationship-state-reply-length">
+                <option value="">随对话自然调整</option>
+                <option value="concise">简短直接</option>
+                <option value="balanced">自然均衡</option>
+                <option value="detailed">需要时更详细</option>
+              </select>
+            </label>
+            <label class="persona-field">
+              <span>给建议的方式</span>
+              <select id="relationship-state-advice-style">
+                <option value="">随话题自然调整</option>
+                <option value="ask_first">先问我是否想听建议</option>
+                <option value="direct">需要时直接说重点</option>
+                <option value="comfort_first">先共情，再讨论建议</option>
+              </select>
+            </label>
+            <label class="persona-field">
+              <span>轻松吐槽的边界</span>
+              <select id="relationship-state-teasing">
+                <option value="">随当下语境自然调整</option>
+                <option value="none">不要吐槽</option>
+                <option value="gentle">可以偶尔轻微吐槽</option>
+                <option value="playful">可以更玩笑一点</option>
+              </select>
+            </label>
+          </div>
+          <div class="relationship-state-actions">
+            <button id="relationship-state-reload-btn" class="persona-ghost-btn" type="button">重新读取</button>
+            <button id="relationship-state-save-btn" class="persona-primary-btn" type="button">保存互动偏好</button>
+            <button id="relationship-state-reset-btn" class="persona-ghost-btn relationship-state-danger-btn" type="button">重置互动关系</button>
+          </div>
+          <p id="relationship-state-status" class="relationship-state-status" aria-live="polite"></p>
+        </section>
+
         <section class="persona-section persona-guide-section">
           <div class="persona-mini-tips">
             <div class="persona-mini-title">填写建议</div>
@@ -740,6 +800,7 @@
     <div id="learning-debug-panel" class="learning-debug-panel" hidden></div>
   </aside>
 
+  <template id="taffy-view-script-manifest">
   <script src="./chatState.js"></script>
   <script src="./chatDom.js"></script>
   <script src="./debugPanelController.js"></script>
@@ -747,6 +808,7 @@
   <script src="./chatMessageController.js"></script>
   <script src="./onboardingController.js"></script>
   <script src="./personaAvatarController.js"></script>
+  <script src="./relationshipStateController.js"></script>
   <script src="./reminderScheduleController.js"></script>
   <script src="./emotionStatsController.js"></script>
   <script src="./localAsrController.js"></script>
@@ -757,7 +819,6 @@
   <script src="./followupDebugController.js"></script>
   <script src="./grayTrialReportController.js"></script>
   <script src="./grayTrialCharacterPanelController.js"></script>
-  <script src="./followupReadinessPanelController.js"></script>
   <script src="./apiClient.js"></script>
   <script src="./chatApi.js"></script>
   <script src="./speechText.js"></script>
@@ -775,6 +836,8 @@
   <script src="./motionRuntimeController.js"></script>
   <script src="./voiceRuntimeController.js"></script>
   <script src="./performanceAuditController.js"></script>
+  <script src="./performanceCueController.js"></script>
+  <script src="./hiyoriEmotionOverlayController.js"></script>
   <script src="./performanceTimelineController.js"></script>
   <script src="./streamTtsQueueController.js"></script>
   <script src="./ttsPlaybackController.js"></script>
@@ -826,6 +889,8 @@
   <script src="./configSwitchController.js"></script>
   <script src="./firstRunWizardController.js"></script>
   <script src="./app.js"></script>
+  </template>
+  <script src="./viewScriptLoader.js"></script>
   <div id="subtitle-layer" class="subtitle-layer" aria-live="polite" aria-atomic="true">
     <span class="subtitle-en"></span>
     <span class="subtitle-zh"></span>

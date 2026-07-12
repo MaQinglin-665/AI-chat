@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+. (Join-Path $PSScriptRoot "node-runtime.ps1")
 
 if ($WorkRoot) {
     $TempRoot = Join-Path (Resolve-Path $WorkRoot) ("taffy-first-run-smoke-" + [guid]::NewGuid().ToString("N"))
@@ -14,6 +15,7 @@ if ($WorkRoot) {
 
 $PackageOut = Join-Path $TempRoot "dist"
 $ExtractRoot = Join-Path $TempRoot "extract"
+$ignoredPackageProbePath = "tests\tmp_package_ignored_probe_$([guid]::NewGuid().ToString("N")).log"
 
 function Write-Ok($Message) {
     Write-Host "[OK]   $Message" -ForegroundColor Green
@@ -69,6 +71,7 @@ function Assert-PathMissing {
 try {
     New-Item -ItemType Directory -Path $PackageOut -Force | Out-Null
     New-Item -ItemType Directory -Path $ExtractRoot -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $RepoRoot $ignoredPackageProbePath) -Value "package ignored probe" -Encoding UTF8
 
     Invoke-Step "Create source-test package" @(
         "powershell",
@@ -120,6 +123,9 @@ try {
         "scripts\check_installer_smoke.ps1",
         "scripts\clean-local-artifacts.ps1",
         "scripts\prepare-preview-environment.ps1",
+        "scripts\node-runtime.ps1",
+        "scripts\node_runtime.py",
+        "scripts\install-node22-local.ps1",
         "scripts\configure-llm.ps1",
         "scripts\diagnose-llm-link.ps1",
         "scripts\diagnose_llm_link.py",
@@ -128,14 +134,22 @@ try {
         "scripts\write-release-assets.ps1",
         "config.example.json",
         "config.preview.example.json",
+        "app_brain_session.py",
         "app_health.py",
+        "app_reply_pipeline.py",
+        "app_startup.py",
         "first_run.py",
         "character_brain.py",
+        "character_brain_text.py",
+        "llm_probe.py",
         "llm_runtime.py",
+        "memory_text.py",
         "package.json",
         "package-lock.json",
         "requirements.txt",
-        "web"
+        "tts_audio.py",
+        "web",
+        "web\vendor\pixi-unsafe-eval.min.js"
     )
     foreach ($path in $requiredPaths) {
         Assert-PathExists $packageRoot.FullName $path
@@ -143,6 +157,7 @@ try {
 
     $forbiddenPaths = @(
         ".env",
+        ".local-tools",
         ".venv",
         "config.json",
         "config.local.json",
@@ -154,6 +169,7 @@ try {
     foreach ($path in $forbiddenPaths) {
         Assert-PathMissing $packageRoot.FullName $path
     }
+    Assert-PathMissing $packageRoot.FullName $ignoredPackageProbePath
 
     $packageMetadataCheck = @'
 const fs = require("fs");
@@ -172,10 +188,8 @@ if (mismatches.length) {
 '@
     $packageMetadataCheckPath = Join-Path $TempRoot "check-package-metadata.js"
     Set-Content -LiteralPath $packageMetadataCheckPath -Value $packageMetadataCheck -Encoding UTF8
-    Invoke-Step "Check package metadata consistency" @(
-        "node",
-        $packageMetadataCheckPath
-    ) $packageRoot.FullName
+    $nodeCommand = @(Resolve-ProjectNodeCommand -Tool "node")
+    Invoke-Step "Check package metadata consistency" (@($nodeCommand) + @($packageMetadataCheckPath)) $packageRoot.FullName
     Write-Ok "Package metadata matches package-lock.json"
 
     Invoke-Step "Run package bootstrap smoke without network installs" @(
@@ -310,6 +324,15 @@ if (mismatches.length) {
     if ($previewCfg.character_runtime.enabled -ne $true -or $previewCfg.character_runtime.auto_apply_reply_cue -ne $true) {
         Write-Fail "Preview config should enable the explicit Character Runtime experience layer."
     }
+    if ($previewCfg.character_runtime.model_direct_reply -ne $true -or $previewCfg.companion_turn.enabled -ne $true) {
+        Write-Fail "Preview config should enable the model-direct canonical companion-turn experience."
+    }
+    if ($previewCfg.relationship_state.enabled -ne $true -or [string]$previewCfg.assistant_reply_language -ne "en") {
+        Write-Fail "Preview config should enable structured relationship continuity and English-by-default replies."
+    }
+    if ([string]$previewCfg.assistant_prompt -match "Do not say you are an AI unless directly asked") {
+        Write-Fail "Preview config should keep the companion candid about its AI identity when relevant."
+    }
     if ([string]$previewCfg.observe.attach_mode -eq "auto") {
         Write-Fail "Preview config should not enable automatic desktop observation."
     }
@@ -331,6 +354,10 @@ if (mismatches.length) {
     Write-Host ""
     Write-Ok "First-run package smoke passed."
 } finally {
+    $ignoredProbeFullPath = Join-Path $RepoRoot $ignoredPackageProbePath
+    if (Test-Path $ignoredProbeFullPath) {
+        Remove-Item -LiteralPath $ignoredProbeFullPath -Force
+    }
     if (-not $KeepTemp -and (Test-Path $TempRoot)) {
         Remove-Item -LiteralPath $TempRoot -Recurse -Force
     } elseif ($KeepTemp) {

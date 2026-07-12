@@ -22,6 +22,13 @@ def generate_inner_thought_impl(
     if not thinking_cfg.get("enabled", True):
         return ""
 
+    runtime_settings = character_runtime_settings_fn(config if isinstance(config, dict) else {})
+    if runtime_settings.get("model_direct_reply") is True:
+        # A second hidden LLM call used to inject random, occasionally
+        # off-topic behavior. Model-direct dialogue stays grounded in the
+        # user's message and the canonical prompt policy instead.
+        return ""
+
     emotion_hint = ""
     if emotion_state and isinstance(emotion_state, dict):
         dominant = emotion_state.get("dominant", "neutral")
@@ -41,7 +48,6 @@ def generate_inner_thought_impl(
         else:
             emotion_hint = "你情绪平平，就正常聊，没什么特别的感觉。"
 
-    runtime_settings = character_runtime_settings_fn(config if isinstance(config, dict) else {})
     demo_stable = bool(runtime_settings.get("enabled", False) and runtime_settings.get("demo_stable", False))
 
     if demo_stable:

@@ -1,4 +1,5 @@
 import copy
+import json
 
 import config
 
@@ -18,6 +19,32 @@ def test_default_asr_values_match_voice_troubleshooting_recommendation():
     assert asr["low_confidence_threshold"] == 0.48
     assert asr["hotword_replacements"]["心语"] == "馨语AI桌宠"
     assert asr["hotword_replacements"]["新语"] == "馨语AI桌宠"
+
+
+def test_default_asr_language_mode_is_auto_with_optional_local_paths():
+    asr = config.DEFAULT_CONFIG["asr"]
+
+    assert asr["input_language_mode"] == "auto"
+    assert asr["vosk_model_paths"] == {"zh-CN": "", "en-US": ""}
+
+
+def test_sanitized_client_config_exposes_only_safe_asr_language_mode_not_model_paths():
+    cfg = copy.deepcopy(config.DEFAULT_CONFIG)
+    cfg["asr"]["input_language_mode"] = "EN-us"
+    cfg["asr"]["vosk_model_paths"] = {"en-US": "D:/private/models/english"}
+
+    sanitized = config.sanitize_client_config(cfg)
+
+    assert sanitized["asr"]["input_language_mode"] == "en"
+    assert "vosk_model_paths" not in sanitized["asr"]
+    assert "D:/private/models/english" not in json.dumps(sanitized, ensure_ascii=False)
+
+
+def test_sanitized_client_config_clamps_invalid_asr_language_mode_to_auto():
+    cfg = copy.deepcopy(config.DEFAULT_CONFIG)
+    cfg["asr"]["input_language_mode"] = "surprise-language"
+
+    assert config.sanitize_client_config(cfg)["asr"]["input_language_mode"] == "auto"
 
 
 def test_sanitized_client_config_preserves_low_asr_threshold():

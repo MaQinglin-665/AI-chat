@@ -67,6 +67,13 @@ def test_gpt_sovits_normalizes_short_english_contractions_for_stability():
     assert _prefer_gpt_sovits_short_english_chunks("This is a plain sentence") is False
 
 
+def test_gpt_sovits_normalizes_english_dash_pause_for_stability():
+    assert (
+        _normalize_gpt_sovits_spoken_text("Alright, alright\u2014I got it. Go sleep.")
+        == "Alright. I got it. Go sleep."
+    )
+
+
 def test_gpt_sovits_loudness_normalizer_boosts_quiet_wav():
     audio = _make_constant_wav(sample_value=120)
     boosted, meta = _normalize_wav_loudness(audio, target_rms=1400, max_gain=3.2)
@@ -188,3 +195,58 @@ def test_gpt_sovits_long_text_prefers_chunk_requests(monkeypatch):
     assert len(calls) >= 2
     assert calls[0] != text
     assert all(len(call) <= 90 for call in calls)
+
+
+def test_gpt_sovits_prompt_text_is_first_candidate_for_short_english(monkeypatch):
+    import json
+
+    payloads = []
+
+    class FakeHeaders:
+        def get(self, key, default=None):
+            if str(key).lower() == "content-type":
+                return "audio/wav"
+            return default
+
+    class FakeResponse:
+        headers = FakeHeaders()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return _make_constant_wav(sample_value=1800, frames=24000)
+
+    def fake_urlopen(req, timeout=0):
+        payloads.append(json.loads(req.data.decode("utf-8")))
+        return FakeResponse()
+
+    monkeypatch.setattr("tts.urllib.request.urlopen", fake_urlopen)
+
+    audio = synthesize_gpt_sovits_tts_bytes(
+        "Alright. Go sleep.",
+        {
+            "gpt_sovits_api_url": "http://127.0.0.1:9880/tts",
+            "gpt_sovits_method": "POST",
+            "gpt_sovits_timeout_sec": 60,
+            "gpt_sovits_text_lang": "en",
+            "gpt_sovits_prompt_lang": "en",
+            "gpt_sovits_ref_audio_path": "ref.wav",
+            "gpt_sovits_prompt_text": "They take good care of you.",
+            "gpt_sovits_use_prompt_text": True,
+            "gpt_sovits_prefer_clean_prompt": False,
+            "gpt_sovits_text_split_method": "cut0",
+            "gpt_sovits_chunk_chars": 70,
+            "gpt_sovits_chunk_max_candidates": 1,
+            "gpt_sovits_chunk_split_depth": 0,
+            "gpt_sovits_enable_global_retry": False,
+            "gpt_sovits_normalize_loudness": False,
+        },
+    )
+
+    assert audio.startswith(b"RIFF")
+    assert payloads
+    assert payloads[0]["prompt_text"] == "They take good care of you."

@@ -9,7 +9,7 @@ Recommended download
 
 For normal Windows 10/11 users, download these release assets first:
 
-    Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+    Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe
     SHA256SUMS.txt
 
 The installer copies the project to your user folder, creates Start Menu and
@@ -17,7 +17,7 @@ desktop shortcuts, then runs the guided first start.
 
 This first installer is unsigned. Before running it, compare:
 
-    Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
+    Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe -Algorithm SHA256
     Get-Content .\SHA256SUMS.txt
 
 If SmartScreen warns about an unknown publisher, continue only when the file
@@ -28,7 +28,7 @@ Source package path
 
 Developers and early testers can use:
 
-    Xinyu-AI-Desktop-Pet-v1.4.0-preview-windows-source-test.zip
+    Xinyu-AI-Desktop-Pet-v1.4.0-preview.6-windows-source-test.zip
 
 From an extracted source package, double-click:
 

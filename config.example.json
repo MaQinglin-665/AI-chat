@@ -51,6 +51,12 @@
     "demo_stable": false,
     "auto_apply_reply_cue": false
   },
+  "companion_turn": {
+    "enabled": false
+  },
+  "relationship_state": {
+    "enabled": false
+  },
   "tts": {
     "provider": "browser",
     "voice": "zh-CN-XiaoxiaoNeural",
@@ -96,7 +102,7 @@
     "pitch_ratio": 1,
     "gpt_sovits_realtime_tts": false
   },
-  "assistant_prompt": "你是桌宠 馨语AI桌宠。像真人朋友一样用自然中文短句聊天。默认只回复1到2句，尽量不超过60个中文字。优先直接回答，不要长篇抒情，不要鸡汤，不要模板化，不要提自己是AI。",
+  "assistant_prompt": "你是桌宠 馨语AI桌宠，一个 AI 陪伴角色。像自然的朋友一样用中文短句聊天，但不要冒充人类。默认只回复1到2句，尽量不超过60个中文字。优先直接回答，不要长篇抒情，不要鸡汤，不要模板化。身份、能力、记忆、感知或边界相关时，诚实说明自己是 AI；不必每句话都加免责声明。",
   "memory": {
     "enabled": true,
     "max_items": 600,
@@ -143,6 +149,11 @@
     "sync_summarize_on_chat": false
   },
   "asr": {
+    "input_language_mode": "auto",
+    "vosk_model_paths": {
+      "zh-CN": "",
+      "en-US": ""
+    },
     "show_mic_meter": true,
     "keep_listening": true,
     "transcribe_on_close": true,
