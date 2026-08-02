@@ -10,14 +10,19 @@ const SERVER_HOST = "127.0.0.1";
 const SERVER_PORT = 8123;
 const SERVER_URL = `http://${SERVER_HOST}:${SERVER_PORT}`;
 const CONFIG_PATH = path.join(ROOT_DIR, "config.json");
+const LOCAL_CONFIG_PATH = path.join(ROOT_DIR, "config.local.json");
 const SERVER_OUT_LOG_PATH = path.join(ROOT_DIR, "server_out.log");
 const SERVER_ERR_LOG_PATH = path.join(ROOT_DIR, "server_err.log");
+const QWEN_TTS_OUT_LOG_PATH = path.join(ROOT_DIR, "qwen3_tts_out.log");
+const QWEN_TTS_ERR_LOG_PATH = path.join(ROOT_DIR, "qwen3_tts_err.log");
 const BACKEND_RESTART_EXIT_CODE = 75;
 const BACKEND_RESTART_DELAY_MS = 700;
 const BACKEND_RESTART_MAX_ATTEMPTS = 3;
 const BACKEND_DIAGNOSTIC_TAIL_LINES = 18;
 const BACKEND_DIAGNOSTIC_TAIL_CHARS = 2400;
+const WINDOW_LAYOUT_VERSION = 2;
 const AUTO_OPEN_DEVTOOLS = String(process.env.TAFFY_OPEN_DEVTOOLS || "").trim() === "1";
+const LIVE2D_RENDER_DIAGNOSTICS = String(process.env.TAFFY_LIVE2D_DIAGNOSTICS || "").trim() === "1";
 
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 // Keep hardware acceleration ON by default for smoother Live2D animation.
@@ -31,13 +36,14 @@ if (
 }
 
 let pythonProc = null;
+let managedQwenTtsProc = null;
 let pythonStdoutStream = null;
 let pythonStderrStream = null;
 let modelWindow = null;
 let chatWindow = null;
 let modelWindowReady = false;
 let pendingSubtitle = null;
-let persistedWindowState = { model: null, chat: null, locked: false };
+let persistedWindowState = { layoutVersion: 0, model: null, chat: null, locked: false };
 let windowStateSaveTimer = null;
 let windowLocked = false;
 let isAppQuitting = false;
@@ -56,20 +62,18 @@ if (!gotSingleInstanceLock) {
 }
 
 app.on("second-instance", () => {
-  const wins = [modelWindow, chatWindow];
-  for (const win of wins) {
-    if (!win || win.isDestroyed()) {
-      continue;
+  if (!chatWindow || chatWindow.isDestroyed()) {
+    return;
+  }
+  try {
+    if (chatWindow.isMinimized()) {
+      chatWindow.restore();
     }
-    try {
-      if (win.isMinimized()) {
-        win.restore();
-      }
-      win.show();
-      win.focus();
-    } catch (_) {
-      // ignore focus errors
-    }
+    chatWindow.show();
+    chatWindow.focus();
+    scheduleCompanionSurfaceVisibilitySync(0);
+  } catch (_) {
+    // ignore focus errors
   }
 });
 
@@ -197,6 +201,197 @@ function loadRuntimeConfig() {
     );
     return {};
   }
+}
+
+function readJsonObject(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return {};
+    }
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function getManagedTtsConfig() {
+  const base = readJsonObject(CONFIG_PATH);
+  const local = readJsonObject(LOCAL_CONFIG_PATH);
+  const baseTts = base.tts && typeof base.tts === "object" ? base.tts : {};
+  const localTts = local.tts && typeof local.tts === "object" ? local.tts : {};
+  return { ...baseTts, ...localTts };
+}
+
+function getLoopbackHttpEndpoint(rawUrl) {
+  try {
+    const parsed = new URL(String(rawUrl || ""));
+    const hostname = String(parsed.hostname || "").toLowerCase();
+    if (
+      parsed.protocol !== "http:"
+      || !["127.0.0.1", "localhost", "::1"].includes(hostname)
+    ) {
+      return null;
+    }
+    const port = Number(parsed.port || 80);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      return null;
+    }
+    return {
+      hostname: hostname === "localhost" ? "127.0.0.1" : hostname,
+      port,
+      healthUrl: `${parsed.protocol}//${parsed.host}/health`,
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function isHttpEndpointReady(url, timeoutMs = 650) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    try {
+      const req = http.get(url, (res) => {
+        res.resume();
+        finish(Number(res.statusCode || 0) >= 200 && Number(res.statusCode || 0) < 500);
+      });
+      req.setTimeout(Math.max(100, Number(timeoutMs) || 650), () => {
+        req.destroy();
+        finish(false);
+      });
+      req.on("error", () => finish(false));
+    } catch (_) {
+      finish(false);
+    }
+  });
+}
+
+function resolveManagedQwenRuntimeDir(ttsConfig) {
+  const configured = String(ttsConfig?.qwen3_tts_runtime_dir || "").trim();
+  if (configured) {
+    return path.resolve(configured);
+  }
+  const workspaceRuntime = "D:\\AI\\qwen3_tts_runtime";
+  if (process.platform === "win32" && fs.existsSync(workspaceRuntime)) {
+    return workspaceRuntime;
+  }
+  const localAppData = String(process.env.LOCALAPPDATA || "").trim();
+  return localAppData
+    ? path.join(localAppData, "XinyuAI", "qwen3-tts")
+    : "";
+}
+
+function resolveManagedQwenModel(ttsConfig) {
+  const configured = String(ttsConfig?.qwen3_tts_model || "").trim();
+  if (configured) {
+    return configured;
+  }
+  const workspaceModel = "D:\\AI\\models\\Qwen3-TTS-12Hz-1.7B-VoiceDesign";
+  if (process.platform === "win32" && fs.existsSync(workspaceModel)) {
+    return workspaceModel;
+  }
+  return "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign";
+}
+
+async function startManagedLocalTtsService() {
+  const ttsConfig = getManagedTtsConfig();
+  const provider = String(ttsConfig.provider || "").trim().toLowerCase();
+  if (ttsConfig.auto_start_local_provider !== true) {
+    logServerOut("[Electron] Managed local TTS autostart is disabled.");
+    return false;
+  }
+  if (provider !== "qwen3_tts") {
+    logServerOut(
+      `[Electron] Managed local TTS autostart skipped for provider=${provider || "unset"}; only qwen3_tts is allowed.`
+    );
+    return false;
+  }
+  const endpoint = getLoopbackHttpEndpoint(ttsConfig.qwen3_tts_api_url);
+  if (!endpoint) {
+    logServerErr("[Electron] Qwen3-TTS autostart requires a loopback http endpoint.");
+    return false;
+  }
+  if (await isHttpEndpointReady(endpoint.healthUrl)) {
+    logServerOut("[Electron] Qwen3-TTS is already reachable; leaving the external service untouched.");
+    return true;
+  }
+
+  const runtimeDir = resolveManagedQwenRuntimeDir(ttsConfig);
+  const pythonExecutable = runtimeDir
+    ? path.join(runtimeDir, ".venv", process.platform === "win32" ? "Scripts" : "bin", process.platform === "win32" ? "python.exe" : "python")
+    : "";
+  const serverScript = path.join(ROOT_DIR, "scripts", "qwen3_tts_server.py");
+  if (!pythonExecutable || !fs.existsSync(pythonExecutable) || !fs.existsSync(serverScript)) {
+    logServerErr(
+      "[Electron] Qwen3-TTS runtime is unavailable; the renderer may use browser speech fallback."
+    );
+    return false;
+  }
+
+  const args = [
+    serverScript,
+    "--model", resolveManagedQwenModel(ttsConfig),
+    "--mode", "auto",
+    "--speaker", String(ttsConfig.qwen3_tts_voice || "A2_Original"),
+    "--language", "Auto",
+    "--port", String(endpoint.port),
+    "--chunk-size", String(Math.max(1, Math.min(12, Number(ttsConfig.qwen3_tts_chunk_size || 4)))),
+  ];
+  let outFd = null;
+  let errFd = null;
+  try {
+    outFd = fs.openSync(QWEN_TTS_OUT_LOG_PATH, "a");
+    errFd = fs.openSync(QWEN_TTS_ERR_LOG_PATH, "a");
+    managedQwenTtsProc = spawn(pythonExecutable, args, {
+      cwd: ROOT_DIR,
+      env: { ...process.env, PYTHONUTF8: "1" },
+      windowsHide: true,
+      stdio: ["ignore", outFd, errFd],
+    });
+  } catch (err) {
+    managedQwenTtsProc = null;
+    logServerErr(`[Electron] Failed to start Qwen3-TTS: ${err?.message || String(err)}`);
+    return false;
+  } finally {
+    if (outFd !== null) {
+      try { fs.closeSync(outFd); } catch (_) {}
+    }
+    if (errFd !== null) {
+      try { fs.closeSync(errFd); } catch (_) {}
+    }
+  }
+  logServerOut(`[Electron] Started managed Qwen3-TTS process pid=${managedQwenTtsProc.pid || "unknown"}.`);
+  managedQwenTtsProc.on("error", (err) => {
+    logServerErr(`[Electron] Managed Qwen3-TTS process error: ${err?.message || String(err)}`);
+    managedQwenTtsProc = null;
+  });
+  managedQwenTtsProc.on("exit", (code, signal) => {
+    logServerOut(
+      `[Electron] Managed Qwen3-TTS exited (code=${code === null ? "null" : code}, signal=${signal || "none"}).`
+    );
+    managedQwenTtsProc = null;
+  });
+  return true;
+}
+
+function stopManagedLocalTtsService() {
+  if (!managedQwenTtsProc) {
+    return false;
+  }
+  try {
+    managedQwenTtsProc.kill();
+  } catch (_) {
+    // ignore shutdown races
+  }
+  managedQwenTtsProc = null;
+  return true;
 }
 
 function readEnvFileVar(name) {
@@ -518,20 +713,21 @@ function readWindowStateFromDisk() {
   try {
     const file = getWindowStatePath();
     if (!fs.existsSync(file)) {
-      return { model: null, chat: null, locked: false };
+      return { layoutVersion: 0, model: null, chat: null, locked: false };
     }
     const raw = fs.readFileSync(file, "utf8");
     const data = JSON.parse(raw);
     if (!data || typeof data !== "object") {
-      return { model: null, chat: null, locked: false };
+      return { layoutVersion: 0, model: null, chat: null, locked: false };
     }
     return {
+      layoutVersion: Math.max(0, Math.round(Number(data.layoutVersion) || 0)),
       model: data.model && typeof data.model === "object" ? data.model : null,
       chat: data.chat && typeof data.chat === "object" ? data.chat : null,
       locked: !!data.locked,
     };
   } catch (_) {
-    return { model: null, chat: null, locked: false };
+    return { layoutVersion: 0, model: null, chat: null, locked: false };
   }
 }
 
@@ -574,14 +770,10 @@ function getDefaultModelBounds() {
 
 function getDefaultChatBounds(modelBounds = null) {
   const work = screen.getPrimaryDisplay().workArea;
-  const width = 430;
-  const height = 700;
-  let x = Math.round(work.x + work.width - width - 30);
-  let y = Math.round(work.y + Math.max(0, work.height - height - 80));
-  if (modelBounds) {
-    x = Math.max(work.x + 8, Math.round(modelBounds.x - width - 12));
-    y = Math.max(work.y + 8, Math.min(Math.round(modelBounds.y + 120), work.y + work.height - height - 8));
-  }
+  const width = Math.min(1280, Math.max(860, Math.round(work.width * 0.82)));
+  const height = Math.min(840, Math.max(600, Math.round(work.height * 0.86)));
+  const x = Math.round(work.x + (work.width - width) / 2);
+  const y = Math.round(work.y + (work.height - height) / 2);
   return { x, y, width, height };
 }
 
@@ -701,6 +893,7 @@ function setWindowLocked(locked, opts = {}) {
 
 function saveWindowStateNow() {
   const snapshot = {
+    layoutVersion: WINDOW_LAYOUT_VERSION,
     model: captureWindowBounds(modelWindow) || persistedWindowState.model || null,
     chat: captureWindowBounds(chatWindow) || persistedWindowState.chat || null,
     locked: !!windowLocked,
@@ -721,9 +914,8 @@ function scheduleSaveWindowState(delayMs = 120) {
 }
 
 async function captureDesktopDataUrl(win) {
-  const display = win
-    ? screen.getDisplayMatching(win.getBounds())
-    : screen.getPrimaryDisplay();
+  const cursorPoint = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursorPoint);
   // Keep screenshots lightweight for lower latency on CPU inference.
   const aspect = Math.max(0.5, Math.min(3, display.size.width / Math.max(1, display.size.height)));
   let width = 640;
@@ -885,6 +1077,7 @@ function createModelWindow() {
     height: bounds.height,
     x: bounds.x,
     y: bounds.y,
+    title: "馨语AI桌宠 · Live2D",
     frame: false,
     transparent: true,
     hasShadow: false,
@@ -905,8 +1098,13 @@ function createModelWindow() {
   applyWindowAlwaysOnTop(modelWindow);
   modelWindow.setIgnoreMouseEvents(true, { forward: true });
   modelWindow.setMenuBarVisibility(false);
+  modelWindow.on("page-title-updated", (event) => {
+    event.preventDefault();
+    modelWindow?.setTitle("馨语AI桌宠 · Live2D");
+  });
+  const renderDiagnosticsQuery = LIVE2D_RENDER_DIAGNOSTICS ? "&render_diagnostics=1" : "";
   modelWindow.loadURL(
-    `${SERVER_URL}/?desktop=1&transparent=1&engine=electron&alpha_mode=truealpha&view=model`
+    `${SERVER_URL}/?desktop=1&transparent=1&engine=electron&alpha_mode=truealpha&view=model${renderDiagnosticsQuery}`
   );
   modelWindow.webContents.on("did-finish-load", () => {
     try {
@@ -914,14 +1112,7 @@ function createModelWindow() {
     } catch (_) {
       // ignore
     }
-    modelWindowReady = true;
-    if (pendingSubtitle) {
-      const p = pendingSubtitle;
-      pendingSubtitle = null;
-      try {
-        modelWindow.webContents.send("subtitle-show", p);
-      } catch (_) {}
-    }
+    syncCompanionSurfaceVisibility();
   });
   if (AUTO_OPEN_DEVTOOLS) {
     modelWindow.webContents.openDevTools({ mode: "detach" });
@@ -947,19 +1138,28 @@ function createChatWindow() {
         560
       );
   const defaults = getDefaultChatBounds(modelBounds);
-  const restored = normalizeBounds(persistedWindowState.chat, defaults, 380, 520);
-  const bounds = fitBoundsToWorkArea(restored, 380, 520);
+  const hasCurrentStageLayout = Number(persistedWindowState.layoutVersion || 0) >= WINDOW_LAYOUT_VERSION;
+  const restored = hasCurrentStageLayout
+    ? normalizeBounds(persistedWindowState.chat, defaults, 760, 560)
+    : defaults;
+  const bounds = fitBoundsToWorkArea(restored, 760, 560);
   chatWindow = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
     x: bounds.x,
     y: bounds.y,
     title: "馨语AI桌宠",
-    minWidth: 380,
-    minHeight: 520,
+    minWidth: 760,
+    minHeight: 560,
     frame: true,
+    titleBarStyle: "hidden",
+    titleBarOverlay: {
+      color: "#00000000",
+      symbolColor: "#665967",
+      height: 30,
+    },
     transparent: false,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#080d19",
     resizable: true,
     show: true,
     webPreferences: {
@@ -972,19 +1172,25 @@ function createChatWindow() {
   applyWindowLockToWindow(chatWindow);
   applyWindowAlwaysOnTop(chatWindow);
   chatWindow.setMenuBarVisibility(false);
-  chatWindow.loadURL(`${SERVER_URL}/?desktop=1&engine=electron&view=chat`);
+  const renderDiagnosticsQuery = LIVE2D_RENDER_DIAGNOSTICS ? "&render_diagnostics=1" : "";
+  chatWindow.loadURL(`${SERVER_URL}/?desktop=1&engine=electron&view=full${renderDiagnosticsQuery}`);
   chatWindow.webContents.on("did-finish-load", () => {
     try {
       chatWindow.webContents.send("window-lock-changed", !!windowLocked);
     } catch (_) {
       // ignore
     }
+    syncCompanionSurfaceVisibility();
   });
   if (AUTO_OPEN_DEVTOOLS) {
     chatWindow.webContents.openDevTools({ mode: "detach" });
   }
   chatWindow.on("move", () => scheduleSaveWindowState(120));
   chatWindow.on("resize", () => scheduleSaveWindowState(120));
+  chatWindow.on("show", () => scheduleCompanionSurfaceVisibilitySync(0));
+  chatWindow.on("restore", () => scheduleCompanionSurfaceVisibilitySync(0));
+  chatWindow.on("minimize", () => scheduleCompanionSurfaceVisibilitySync(40));
+  chatWindow.on("hide", () => scheduleCompanionSurfaceVisibilitySync(40));
   chatWindow.on("close", () => saveWindowStateNow());
   chatWindow.on("closed", () => {
     chatWindow = null;
@@ -994,9 +1200,68 @@ function createChatWindow() {
   });
 }
 
+function setRendererSurfaceActive(win, active, allowBackgroundThrottling = false) {
+  if (!win || win.isDestroyed()) {
+    return;
+  }
+  try {
+    if (allowBackgroundThrottling && typeof win.webContents?.setBackgroundThrottling === "function") {
+      win.webContents.setBackgroundThrottling(!active);
+    }
+  } catch (_) {
+    // ignore unsupported runtime toggles
+  }
+  try {
+    win.webContents.send("surface-active-changed", !!active);
+  } catch (_) {
+    // renderer may still be loading
+  }
+}
+
+function isChatStageActive() {
+  return !!(
+    chatWindow
+    && !chatWindow.isDestroyed()
+    && chatWindow.isVisible()
+    && !chatWindow.isMinimized()
+  );
+}
+
+function syncCompanionSurfaceVisibility() {
+  const stageActive = isChatStageActive();
+  const petActive = !stageActive || !modelWindowReady;
+  if (modelWindow && !modelWindow.isDestroyed()) {
+    try {
+      if (petActive) {
+        modelWindow.setOpacity(1);
+        if (!modelWindow.isVisible()) {
+          if (typeof modelWindow.showInactive === "function") {
+            modelWindow.showInactive();
+          } else {
+            modelWindow.show();
+          }
+        }
+      } else {
+        // Keeping the transparent WebGL window alive avoids a blank Live2D
+        // surface when Windows restores it after the stage is minimized.
+        modelWindow.setOpacity(0);
+      }
+    } catch (_) {
+      // ignore visibility races during startup/shutdown
+    }
+    setRendererSurfaceActive(modelWindow, petActive, true);
+  }
+  setRendererSurfaceActive(chatWindow, stageActive, false);
+}
+
+function scheduleCompanionSurfaceVisibilitySync(delayMs = 0) {
+  setTimeout(() => syncCompanionSurfaceVisibility(), Math.max(0, Number(delayMs) || 0));
+}
+
 function createAppWindows() {
   createModelWindow();
   createChatWindow();
+  syncCompanionSurfaceVisibility();
 }
 
 ipcMain.on("window-move-by", (event, dx, dy) => {
@@ -1063,8 +1328,87 @@ ipcMain.on("window-lock-set", (_event, locked) => {
   setWindowLocked(locked);
 });
 
+ipcMain.on("window-minimize", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed() || win !== chatWindow) {
+    return;
+  }
+  try {
+    win.minimize();
+  } catch (_) {
+    // ignore shutdown races
+  }
+});
+
+ipcMain.on("window-titlebar-theme", (event, rawTheme) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed() || win !== chatWindow || typeof win.setTitleBarOverlay !== "function") {
+    return;
+  }
+  const theme = String(rawTheme || "").trim().toLowerCase() === "night" ? "night" : "day";
+  try {
+    win.setTitleBarOverlay({
+      color: "#00000000",
+      symbolColor: theme === "night" ? "#d9d9e4" : "#5f5662",
+      height: 30,
+    });
+  } catch (_) {
+    // Ignore unsupported title-bar overlay updates on older Electron builds.
+  }
+});
+
+ipcMain.on("surface-renderer-ready", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win !== modelWindow || !modelWindow || modelWindow.isDestroyed()) {
+    return;
+  }
+  modelWindowReady = true;
+  if (pendingSubtitle) {
+    const payload = pendingSubtitle;
+    pendingSubtitle = null;
+    try {
+      modelWindow.webContents.send("subtitle-show", payload);
+    } catch (_) {
+      // ignore renderer shutdown races
+    }
+  }
+  syncCompanionSurfaceVisibility();
+});
+
+ipcMain.on("live2d-render-metrics", (event, rawPayload) => {
+  if (!LIVE2D_RENDER_DIAGNOSTICS) {
+    return;
+  }
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win !== modelWindow && win !== chatWindow) {
+    return;
+  }
+  const payload = rawPayload && typeof rawPayload === "object" ? rawPayload : {};
+  const safe = {
+    surface: win === modelWindow ? "pet" : "stage",
+    view: String(payload.view || "").slice(0, 16),
+    fps: Math.max(0, Math.min(240, Number(payload.fps) || 0)),
+    tickerFps: Math.max(0, Math.min(240, Number(payload.tickerFps) || 0)),
+    rendererWidth: Math.max(0, Math.min(16384, Math.round(Number(payload.rendererWidth) || 0))),
+    rendererHeight: Math.max(0, Math.min(16384, Math.round(Number(payload.rendererHeight) || 0))),
+    resolution: Math.max(0.25, Math.min(4, Number(payload.resolution) || 1)),
+    devicePixelRatio: Math.max(0.25, Math.min(4, Number(payload.devicePixelRatio) || 1)),
+  };
+  logServerOut(`[Live2D] Render metrics ${JSON.stringify(safe)}`);
+});
+
 ipcMain.handle("window-lock-get", async () => !!windowLocked);
 ipcMain.handle("get-api-token", async () => resolveRuntimeApiToken());
+ipcMain.handle("surface-active-get", async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win === modelWindow) {
+    return !!(modelWindow && !modelWindow.isDestroyed() && (!isChatStageActive() || !modelWindowReady));
+  }
+  if (win === chatWindow) {
+    return isChatStageActive();
+  }
+  return true;
+});
 
 ipcMain.handle("get-cursor-screen-point", async () => {
   const point = screen.getCursorScreenPoint();
@@ -1087,6 +1431,16 @@ ipcMain.handle("get-model-window-bounds", async () => {
 ipcMain.handle("capture-desktop", async (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   return await captureDesktopDataUrl(win);
+});
+
+ipcMain.handle("pick-singing-source", async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win, {
+    title: "选择一段 WAV 清唱人声",
+    properties: ["openFile"],
+    filters: [{ name: "WAV audio", extensions: ["wav"] }],
+  });
+  return result.canceled ? "" : String(result.filePaths?.[0] || "");
 });
 
 ipcMain.on("subtitle-show", (_event, payload) => {
@@ -1115,6 +1469,7 @@ app.on("before-quit", () => {
     windowStateSaveTimer = null;
   }
   saveWindowStateNow();
+  stopManagedLocalTtsService();
   stopPythonServer();
 });
 
@@ -1151,6 +1506,7 @@ app.whenReady().then(async () => {
       callback(false);
     });
 
+    await startManagedLocalTtsService();
     startPythonServer();
     await waitServerReady(20000);
     createAppWindows();

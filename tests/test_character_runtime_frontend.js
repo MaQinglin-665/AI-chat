@@ -349,15 +349,18 @@ function createMemoryStorage(initial = {}) {
   });
 
   const protectedResult = controller.handleUserSpeechStart({ reason: "local_asr_speech_start" });
-  assert.strictEqual(protectedResult, false, "important assistant speech should resist the first speech-start interruption");
-  assert.strictEqual(state.chatBusy, true, "protected interruption should not cancel the active assistant turn");
-  assert.strictEqual(stopped, 0, "protected interruption should not stop audio playback");
-  assert.strictEqual(aborted, 0, "protected interruption should not abort the chat request");
-  assert.ok(events.some((item) => item.event === "important_speech_protected"), "protected interruption should be observable in TTS debug events");
-  assert.ok(statuses.some((text) => text.includes("重要")), "protected interruption should surface a compact status hint");
+  assert.strictEqual(protectedResult, false, "unclassified speech start should wait for semantic confirmation");
+  assert.strictEqual(state.chatBusy, true, "a possible backchannel should not cancel the active assistant turn");
+  assert.strictEqual(stopped, 0, "a possible backchannel should not stop audio playback");
+  assert.strictEqual(aborted, 0, "a possible backchannel should not abort the chat request");
+  assert.ok(events.some((item) => item.event === "voice_barge_in_candidate"), "pending semantic interruption should be observable in TTS debug events");
+  assert.strictEqual(statuses.length, 0, "a possible backchannel should not publish an interruption status");
 
-  const forcedResult = controller.interruptActiveChatTurn("voice_transcript", { bypassProtection: true });
-  assert.strictEqual(forcedResult, true, "forced interruption should still be able to cut in after the protected beat");
+  const forcedResult = controller.handleUserSpeechStart({
+    reason: "voice_transcript_confirmed",
+    confirmedTranscript: true
+  });
+  assert.strictEqual(forcedResult, true, "a semantically confirmed voice turn should cut in immediately");
   assert.strictEqual(state.chatBusy, false, "forced interruption should clear the active assistant turn");
   assert.strictEqual(stopped, 1, "forced interruption should stop audio playback");
   assert.strictEqual(aborted, 1, "forced interruption should abort the active chat request");
@@ -893,6 +896,54 @@ function createMemoryStorage(initial = {}) {
   assert.ok(callbackInterjection.reasons.includes("stage_callback"), "stage callback should be explicit in the interjection reason list");
   assert.strictEqual(callbackInterjection.director.decision, "callback", "stage memory interjections should be marked as callbacks");
   assert.strictEqual(callbackInterjection.director.thought_type, "callback", "stage memory interjections should expose a callback thought type");
+}
+
+{
+  const now = Date.now();
+  const state = {
+    autoChatTuning: {
+      triggerBaseThreshold: 1.3,
+      appInteractionBonus: 0.4,
+      appInteractionWindowMs: 120000
+    },
+    lastUserMessageAt: now - 70 * 1000,
+    lastAutoChatAt: 0,
+    chatRecords: [
+      { role: "user", content: "This desk plan still feels unfinished.", timestamp: now - 70 * 1000 }
+    ]
+  };
+  const controller = autoChatController.createController({
+    state,
+    documentObject: { activeElement: null },
+    constants: {
+      AUTO_CHAT_TOPIC_RE: /desk|plan/i,
+      AUTO_CHAT_ASK_RE: /[?\uFF1F]\s*$/,
+      AUTO_CHAT_REASON_PRIORITY: ["stage_pause", "topic_hot"]
+    }
+  });
+
+  const beforeInteraction = controller.analyzeAutoChatContext();
+  assert.strictEqual(beforeInteraction.interactionBoosted, false, "conversation relevance alone should not claim an app interaction boost");
+  assert.strictEqual(beforeInteraction.shouldTrigger, false, "the guarded example should remain below threshold without an engagement signal");
+  assert.strictEqual(controller.recordContextualInteraction("tap", now), true, "tap should be accepted as an app-local interaction signal");
+  const afterTap = controller.analyzeAutoChatContext();
+  assert.strictEqual(afterTap.interactionType, "tap", "the recent app-local signal should remain inspectable");
+  assert.strictEqual(afterTap.interactionBoosted, true, "a tap may boost an already substantive conversation thread");
+  assert.ok(afterTap.reasons.includes("app_interaction"), "the score should disclose that app interaction contributed");
+  assert.strictEqual(afterTap.shouldTrigger, true, "the bounded signal may advance a worthwhile pending aside");
+
+  state.contextualInteractionAt = now - 121000;
+  const afterExpiry = controller.analyzeAutoChatContext();
+  assert.strictEqual(afterExpiry.interactionBoosted, false, "stale app-local signals must expire");
+  assert.strictEqual(afterExpiry.shouldTrigger, false, "an expired signal must not keep proactive speech eligible");
+  assert.strictEqual(controller.recordContextualInteraction("screen_capture", now), false, "observation-like event names should not enter the app-local signal boundary");
+
+  state.chatRecords = [];
+  state.lastUserMessageAt = now - 70 * 1000;
+  controller.recordContextualInteraction("focus", now);
+  const contentFreeFocus = controller.analyzeAutoChatContext();
+  assert.strictEqual(contentFreeFocus.interactionBoosted, false, "focus alone must not invent a conversation topic");
+  assert.strictEqual(contentFreeFocus.shouldTrigger, false, "content-free app focus should remain silent");
 }
 
 {
@@ -2701,7 +2752,8 @@ assert.ok(
     && source.includes("MOTION_RUNTIME_CONTROLLER.createController")
     && source.includes("function getMotionRuntimeController()")
     && source.includes("function maybePlayTalkGesture(text, style = \"neutral\") { return getMotionRuntimeController().maybePlayTalkGesture(text, style); }")
-    && source.includes("async function playEmotion(text, opts = {}) { return getMotionRuntimeController().playEmotion(text, opts); }")
+    && source.includes("async function playEmotion(text, opts = {}) {")
+    && source.includes("return getMotionRuntimeController().playEmotion(text, opts);")
     && source.includes("function getLive2DRuntimeController()")
     && source.includes("async function initLive2D() { return getLive2DRuntimeController().initLive2D(); }")
     && source.includes("RUNTIME_EVENT_BINDER.bindRuntimeEvents")
@@ -3013,12 +3065,23 @@ assert.strictEqual(
 {
   const messages = [];
   const handlers = localCommandExecutor.createLocalCommandHandlers({
-    appendMessage: (role, text) => messages.push({ role, text }),
+    appendMessage: (role, text, options) => messages.push({ role, text, options }),
     listPendingReminders: () => [],
     formatReminderTime: () => "10:00"
   });
   handlers.reminder_list({ text: "/reminders", alias: "/reminders" });
   assert.ok(typeof messages[0]?.text === "string", "local command executor should handle reminder list output through injected dependencies");
+  assert.strictEqual(messages[0]?.options?.category, undefined, "reminder output should remain eligible for normal chat history");
+}
+{
+  const messages = [];
+  const handlers = localCommandExecutor.createLocalCommandHandlers({
+    appendMessage: (role, text, options) => messages.push({ role, text, options }),
+    buildTTSDebugReport: () => "TTS debug:\nrecentEvents=none"
+  });
+  handlers.tts_debug();
+  assert.strictEqual(messages[0]?.options?.category, "system", "debug output should be classified as system information");
+  assert.strictEqual(messages[0]?.options?.persist, false, "debug output should not enter chat history");
 }
 {
   const feedbacks = [];
@@ -3336,7 +3399,7 @@ assert.ok(
     && diagnosticsRuntimeControllerSource.includes("doctorDiagnostics.buildReport")
     && doctorSource.includes("function buildAdvice")
     && source.includes("runDoctorAndAppendReport()")
-    && diagnosticsRuntimeControllerSource.includes('row?.classList?.add("doctor-report")')
+    && !diagnosticsRuntimeControllerSource.includes('row?.classList?.add("doctor-report")')
     && chatDomSource.includes("doctorBtn: documentObject.getElementById(\"doctor-btn\")")
     && indexSource.includes('id="doctor-btn"')
     && indexSource.includes('<script src="./doctorDiagnostics.js"></script>')
@@ -3544,8 +3607,9 @@ assert.ok(
   "TTS audio analyser should react quickly enough for mouth closures"
 );
 assert.ok(
-  /const hasLiveAudio\s*=\s*audioPlaying && !!state\.ttsAudioAnalyser;/.test(live2dExpressionControllerSource),
-  "mouth animation should prefer live audio when an analyser is available"
+  live2dExpressionControllerSource.includes("state.ttsPcmAudioAnalyserActive === true")
+    && live2dExpressionControllerSource.includes("|| !!state.ttsAudioAnalyser"),
+  "mouth animation should prefer either streaming PCM or buffered live audio when an analyser is available"
 );
 assert.ok(
   /if \(hasLiveAudio\) \{[\s\S]*?const voiced = rawLevel > 0\.035[\s\S]*?target = 0;[\s\S]*?state\.speechMouthOpen = 0;[\s\S]*?return state\.speechMouthOpen;/.test(live2dExpressionControllerSource),
@@ -3627,7 +3691,7 @@ assert.ok(
   "server TTS completion should release on success and hard-stop on failure"
 );
 assert.ok(
-  /progressTimer\s*=\s*window\.setInterval\(async \(\) => \{[\s\S]*?performance\.now\(\) - lastProgressAt < 2800[\s\S]*?playAudioByContext\(blob,\s*contextPlaybackDebugContext(?:,\s*notifyPlaybackStart)?\)/.test(ttsPlaybackControllerSource),
+  /progressTimer\s*=\s*window\.setInterval\(async \(\) => \{[\s\S]*?performance\.now\(\) - lastProgressAt < 2800[\s\S]*?playAudioByContext\(blob,\s*contextPlaybackDebugContext(?:,\s*notifyPlaybackStart)?(?:,\s*onPlaybackProgress)?\)/.test(ttsPlaybackControllerSource),
   "server TTS should fall back when HTML audio stops advancing"
 );
 assert.ok(
@@ -3886,9 +3950,11 @@ assert.ok(
   "chat.js should expose memory/learning chain debug state"
 );
 assert.ok(
-  localCommandExecutorSource.includes('append(deps, deps.buildTranslateDebugReport(), { enableTranslation: false })')
-    && localCommandExecutorSource.includes('append(deps, "Translation debug panel enabled.", { enableTranslation: false })'),
-  "translation debug command responses should not recursively trigger assistant translation"
+  localCommandExecutorSource.includes('appendSystem(deps, deps.buildTranslateDebugReport(), { enableTranslation: false })')
+    && localCommandExecutorSource.includes('appendSystem(deps, "Translation debug panel enabled.", { enableTranslation: false })')
+    && localCommandExecutorSource.includes('category: "system"')
+    && localCommandExecutorSource.includes('persist: false'),
+  "translation debug command responses should stay transient and not recursively trigger assistant translation"
 );
 assert.ok(
   source.includes("function installTranslateDebugBridge()")
@@ -3946,7 +4012,9 @@ assert.ok(
     && chatReplyControllerSource.includes('recordTTSDebugEvent(isAuto ? "proactive_reply_suppressed" : "chat_turn_wait_failed"')
     && chatReplyControllerSource.includes("scheduleAutoChatInterjectionAfterTurn")
     && chatReplyControllerSource.includes("if (!isAuto)")
-    && /if \(speechTurn\.interrupt \|\| !isAssistantSpeechActive\(\)\) \{[\s\S]*?stopAllAudioPlayback\(\);/.test(chatReplyControllerSource),
+    && chatReplyControllerSource.includes("if (!preservePriorSpeech && (speechTurn.interrupt || !isAssistantSpeechActive())) {")
+    && chatReplyControllerSource.includes("        stopAllAudioPlayback();")
+    && chatReplyControllerSource.includes("const preservePriorSpeech = opts.preservePriorSpeech === true;"),
   "assistant requests should respect non-interrupting speech turn-taking and suppress proactive overlap"
 );
 assert.ok(

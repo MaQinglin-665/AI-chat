@@ -58,54 +58,63 @@
     }
   }
 
+  function appendSystem(deps, text, options = {}) {
+    append(deps, text, {
+      ...options,
+      category: "system",
+      persist: false,
+      enableFeedback: false
+    });
+  }
+
   function createLocalCommandHandlers(depsInput = {}) {
     const deps = depsInput && typeof depsInput === "object" ? depsInput : {};
     return {
       mic_debug: async () => {
-        append(deps, await deps.buildMicDebugReport(), { enableTranslation: false });
+        appendSystem(deps, await deps.buildMicDebugReport(), { enableTranslation: false });
       },
       tts_debug: () => {
-        append(deps, deps.buildTTSDebugReport(), { enableTranslation: false });
+        appendSystem(deps, deps.buildTTSDebugReport(), { enableTranslation: false });
       },
       doctor: async () => {
         await deps.runDoctorAndAppendReport();
       },
       tts_debug_on: () => {
         deps.toggleTTSDebugPanel(true);
-        append(deps, "TTS debug panel enabled.", { enableTranslation: false });
+        appendSystem(deps, "TTS debug panel enabled.", { enableTranslation: false });
       },
       tts_debug_off: () => {
         deps.toggleTTSDebugPanel(false);
-        append(deps, "TTS debug panel disabled.", { enableTranslation: false });
+        appendSystem(deps, "TTS debug panel disabled.", { enableTranslation: false });
       },
       followup_status: () => {
         deps.toggleFollowupReadinessPanel(true);
-        append(deps, deps.buildFollowupReadinessReport(), { enableTranslation: false });
+        appendSystem(deps, deps.buildFollowupReadinessReport(), { enableTranslation: false });
       },
       translate_debug: () => {
-        append(deps, deps.buildTranslateDebugReport(), { enableTranslation: false });
+        appendSystem(deps, deps.buildTranslateDebugReport(), { enableTranslation: false });
       },
       translate_debug_on: () => {
         deps.toggleTranslateDebugPanel(true);
-        append(deps, "Translation debug panel enabled.", { enableTranslation: false });
+        appendSystem(deps, "Translation debug panel enabled.", { enableTranslation: false });
       },
       translate_debug_off: () => {
         deps.toggleTranslateDebugPanel(false);
-        append(deps, "Translation debug panel disabled.", { enableTranslation: false });
+        appendSystem(deps, "Translation debug panel disabled.", { enableTranslation: false });
       },
       memory_debug: async () => {
         try {
           const snapshot = await deps.reloadMemoryDebugData();
-          append(deps, deps.buildMemoryDebugReport(snapshot), { enableTranslation: false });
+          appendSystem(deps, deps.buildMemoryDebugReport(snapshot), { enableTranslation: false });
         } catch (err) {
-          append(deps, `Memory debug unavailable: ${err.message || err}`, { enableTranslation: false });
+          appendSystem(deps, `Memory debug unavailable: ${err.message || err}`, { enableTranslation: false });
         }
       },
       brain_debug: () => {
-        append(deps, deps.buildCharacterBrainDebugReport(), { enableTranslation: false });
+        appendSystem(deps, deps.buildCharacterBrainDebugReport(), { enableTranslation: false });
       },
       turn_debug: () => {
-        append(deps, deps.buildTurnDebugReport(), { enableTranslation: false });
+        appendSystem(deps, deps.buildTurnDebugReport(), { enableTranslation: false });
       },
       emotion_report: async () => {
         const report = deps.buildEmotionReportText();

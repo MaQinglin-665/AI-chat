@@ -252,3 +252,21 @@ def test_short_pcm_skips_model_loading(monkeypatch):
         "language_selection_ambiguous": False,
     }
     assert fake_vosk.model_calls == []
+
+
+def test_preload_vosk_models_warms_only_available_configured_languages(tmp_path, monkeypatch):
+    zh = tmp_path / "zh"
+    zh.mkdir()
+    missing_en = tmp_path / "missing-en"
+    fake_vosk = _FakeVosk({"zh": _result("你好", 0.9)})
+    monkeypatch.setattr(asr, "vosk", fake_vosk)
+
+    loaded = asr.preload_vosk_models(
+        {
+            "input_language_mode": "auto",
+            "vosk_model_paths": {"zh-CN": str(zh), "en-US": str(missing_en)},
+        }
+    )
+
+    assert loaded == ("zh-CN",)
+    assert fake_vosk.model_calls == [str(zh)]

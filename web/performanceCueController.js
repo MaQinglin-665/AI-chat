@@ -1,7 +1,7 @@
 (function (root) {
   "use strict";
 
-  const VALID_EMOTIONS = ["neutral", "happy", "playful", "sad", "anxious", "angry", "surprised", "thinking"];
+  const VALID_EMOTIONS = ["neutral", "happy", "playful", "excited", "shy", "hurt", "sad", "anxious", "angry", "surprised", "serious", "thinking"];
   const VALID_ACTIONS = ["none", "nod", "think", "happy_idle", "wave", "shake_head", "surprised"];
   const VALID_VOICE_STYLES = ["neutral", "soft", "cheerful", "teasing", "serious", "curious", "warm"];
   const VALID_TALK_STYLES = ["neutral", "playful", "comfort", "steady", "clear"];
@@ -10,10 +10,14 @@
     neutral: { live2dMood: "idle", talkStyle: "neutral", voiceStyle: "neutral", gestureProfile: "neutral", motionStrength: 1.22, bodyBoost: 1.0, beatBoost: 0.92, expressionBoost: 1.0, holdMs: 900, pulseBoost: 0.22, pulseMs: 190 },
     happy: { live2dMood: "happy", talkStyle: "playful", voiceStyle: "cheerful", gestureProfile: "bright", motionStrength: 1.64, bodyBoost: 1.14, beatBoost: 1.22, expressionBoost: 1.12, holdMs: 1150, pulseBoost: 0.34, pulseMs: 220 },
     playful: { live2dMood: "happy", talkStyle: "playful", voiceStyle: "teasing", gestureProfile: "bright", motionStrength: 1.82, bodyBoost: 1.22, beatBoost: 1.32, expressionBoost: 1.18, holdMs: 1200, pulseBoost: 0.38, pulseMs: 230 },
+    excited: { live2dMood: "happy", talkStyle: "playful", voiceStyle: "cheerful", gestureProfile: "bright", motionStrength: 1.94, bodyBoost: 1.28, beatBoost: 1.4, expressionBoost: 1.24, holdMs: 1050, pulseBoost: 0.44, pulseMs: 210 },
+    shy: { live2dMood: "happy", talkStyle: "comfort", voiceStyle: "soft", gestureProfile: "shy", motionStrength: 1.08, bodyBoost: 0.84, beatBoost: 0.72, expressionBoost: 1.16, holdMs: 1450, pulseBoost: 0.2, pulseMs: 250 },
+    hurt: { live2dMood: "sad", talkStyle: "comfort", voiceStyle: "soft", gestureProfile: "soft", motionStrength: 0.94, bodyBoost: 0.74, beatBoost: 0.62, expressionBoost: 1.14, holdMs: 1600, pulseBoost: 0.18, pulseMs: 280 },
     sad: { live2dMood: "sad", talkStyle: "comfort", voiceStyle: "soft", gestureProfile: "soft", motionStrength: 0.98, bodyBoost: 0.78, beatBoost: 0.68, expressionBoost: 1.08, holdMs: 1500, pulseBoost: 0.2, pulseMs: 260 },
     anxious: { live2dMood: "sad", talkStyle: "comfort", voiceStyle: "soft", gestureProfile: "soft", motionStrength: 1.06, bodyBoost: 0.84, beatBoost: 0.78, expressionBoost: 1.14, holdMs: 1450, pulseBoost: 0.24, pulseMs: 230 },
     angry: { live2dMood: "angry", talkStyle: "steady", voiceStyle: "serious", gestureProfile: "steady", motionStrength: 1.5, bodyBoost: 1.08, beatBoost: 1.08, expressionBoost: 1.2, holdMs: 1250, pulseBoost: 0.32, pulseMs: 190 },
     surprised: { live2dMood: "surprised", talkStyle: "clear", voiceStyle: "curious", gestureProfile: "bright", motionStrength: 1.74, bodyBoost: 1.18, beatBoost: 1.28, expressionBoost: 1.24, holdMs: 1050, pulseBoost: 0.4, pulseMs: 210 },
+    serious: { live2dMood: "idle", talkStyle: "steady", voiceStyle: "serious", gestureProfile: "steady", motionStrength: 1.16, bodyBoost: 0.92, beatBoost: 0.82, expressionBoost: 1.02, holdMs: 1200, pulseBoost: 0.2, pulseMs: 230 },
     thinking: { live2dMood: "thinking", talkStyle: "clear", voiceStyle: "curious", gestureProfile: "curious", motionStrength: 1.34, bodyBoost: 0.96, beatBoost: 0.9, expressionBoost: 1.1, holdMs: 1300, pulseBoost: 0.26, pulseMs: 240 }
   };
 
@@ -22,6 +26,32 @@
     medium: 1,
     high: 1.16
   };
+
+  const MOTION_MODE_SCALE = {
+    low: 0.9,
+    medium: 1,
+    high: 1.22
+  };
+
+  const HIYORI_AUTHORED_MOTIONS = Object.freeze({
+    happy: Object.freeze({ group: "EmotionHappy", file: "hiyori_m06.motion3.json", durationMs: 5370, cooldownMs: 6500 }),
+    playful: Object.freeze({ group: "EmotionPlayful", file: "hiyori_m08.motion3.json", durationMs: 2100, cooldownMs: 3300 }),
+    excited: Object.freeze({ group: "EmotionHappy", file: "hiyori_m06.motion3.json", durationMs: 5370, cooldownMs: 6500 }),
+    shy: Object.freeze({ group: "EmotionShy", file: "hiyori_m05.motion3.json", durationMs: 8570, cooldownMs: 11000 }),
+    hurt: Object.freeze({ group: "EmotionSad", file: "hiyori_m10.motion3.json", durationMs: 4170, cooldownMs: 6500 }),
+    sad: Object.freeze({ group: "EmotionSad", file: "hiyori_m10.motion3.json", durationMs: 4170, cooldownMs: 6500 }),
+    anxious: Object.freeze({ group: "EmotionSad", file: "hiyori_m10.motion3.json", durationMs: 4170, cooldownMs: 6500 }),
+    angry: Object.freeze({ group: "EmotionAngry", file: "hiyori_m09.motion3.json", durationMs: 1600, cooldownMs: 3000 }),
+    surprised: Object.freeze({ group: "EmotionSurprised", file: "hiyori_m07.motion3.json", durationMs: 1900, cooldownMs: 2800 })
+  });
+
+  const HIYORI_AUTHORED_ACTIONS = Object.freeze({
+    wave: Object.freeze({ group: "EmotionHappy", file: "hiyori_m06.motion3.json", durationMs: 5370, cooldownMs: 6500 }),
+    nod: Object.freeze({ group: "FlickDown", file: "hiyori_m04.motion3.json", durationMs: 4430, cooldownMs: 5000 }),
+    think: Object.freeze({ group: "Thinking", file: "hiyori_thinking_01.motion3.json", durationMs: 2800, cooldownMs: 4200 }),
+    happy_idle: Object.freeze({ group: "EmotionHappy", file: "hiyori_m06.motion3.json", durationMs: 5370, cooldownMs: 6500 }),
+    surprised: Object.freeze({ group: "EmotionSurprised", file: "hiyori_m07.motion3.json", durationMs: 1900, cooldownMs: 2800 })
+  });
 
   function clampNumber(value, fallback, min, max) {
     const numeric = Number(value);
@@ -45,6 +75,10 @@
       joy: "happy",
       cheerful: "happy",
       teasing: "playful",
+      embarrassed: "shy",
+      bashful: "shy",
+      aggrieved: "hurt",
+      wounded: "hurt",
       worry: "anxious",
       worried: "anxious",
       nervous: "anxious",
@@ -90,6 +124,35 @@
     return VALID_TALK_STYLES.includes(raw) ? raw : fallback || "neutral";
   }
 
+  function resolveHiyoriAuthoredMotion(emotionValue, actionValue, intensityValue) {
+    const emotion = normalizePerformanceCueEmotion(emotionValue);
+    const action = normalizeAction(actionValue || "none");
+    const intensity = normalizePerformanceCueIntensity(intensityValue || "medium");
+    const explicit = HIYORI_AUTHORED_ACTIONS[action] || null;
+    if (explicit) {
+      return {
+        ...explicit,
+        emotion,
+        action,
+        reason: "explicit_action"
+      };
+    }
+    // A semantic-only action such as shake_head should retain its dedicated
+    // procedural choreography instead of being replaced by a generic emotion.
+    if (action !== "none" || intensity !== "high") {
+      return null;
+    }
+    const emotional = HIYORI_AUTHORED_MOTIONS[emotion] || null;
+    return emotional
+      ? {
+          ...emotional,
+          emotion,
+          action,
+          reason: "high_intensity_emotion"
+        }
+      : null;
+  }
+
   function normalizeCompanionPerformancePlan(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
@@ -115,11 +178,15 @@
     if (moodEmotion !== "neutral") return moodEmotion;
     if (!source) return "neutral";
     if (/[？?].*[！!]|[！!].*[？?]|真的假的|真的吗|不会吧|欸/.test(source)) return "surprised";
-    if (/哈哈|开心|太好了|好耶|nice|great/i.test(source)) return "happy";
+    if (/好耶|做到了|成功了|太棒了|so excited|we did it/i.test(source)) return "excited";
+    if (/哈哈|开心|太好了|nice|great/i.test(source)) return "happy";
     if (/嘿嘿|逗你|开玩笑|哼哼/.test(source)) return "playful";
+    if (/害羞|脸红|不好意思啦|别这么看/.test(source)) return "shy";
+    if (/委屈|欺负人|有点受伤|不公平/.test(source)) return "hurt";
     if (/担心|焦虑|不太妙|糟糕/.test(source)) return "anxious";
     if (/难过|抱歉|对不起|遗憾/.test(source)) return "sad";
     if (/生气|别这样|不行|过分/.test(source)) return "angry";
+    if (/认真说|说正经的|重点是|必须|务必/.test(source)) return "serious";
     if (/想一下|我看看|让我想|分析一下|maybe|think/i.test(source)) return "thinking";
     return "neutral";
   }
@@ -150,7 +217,8 @@
     const intensity = companionPlan
       ? companionPlan.intensity
       : normalizePerformanceCueIntensity(runtime?.intensity || input.intensity || "medium");
-    const scale = INTENSITY_SCALE[intensity] || 1;
+    const motionMode = normalizePerformanceCueIntensity(input.motionIntensity || "medium");
+    const scale = (INTENSITY_SCALE[intensity] || 1) * (MOTION_MODE_SCALE[motionMode] || 1);
     const voiceStyle = companionPlan
       ? companionPlan.voiceStyle
       : normalizeVoiceStyle(runtime?.voice_style || replyCue?.voiceStyle || profile.voiceStyle, profile.voiceStyle);
@@ -160,13 +228,14 @@
       profile.talkStyle
     );
     const motionStrength = clampNumber(profile.motionStrength * scale, 1.48, 0.7, 2.2);
-    return {
+    const cue = {
       version: 1,
       source,
       emotion,
       live2dMood: profile.live2dMood,
       action: companionPlan ? companionPlan.action : normalizeAction(runtime?.action || input.action || "none"),
       intensity,
+      motionMode,
       talkStyle,
       voiceStyle,
       speech: {
@@ -184,6 +253,8 @@
         gestureProfile: profile.gestureProfile
       }
     };
+    cue.authoredMotion = resolveHiyoriAuthoredMotion(cue.emotion, cue.action, cue.intensity);
+    return cue;
   }
 
   function resolvePerformanceCueMotionPlan(cue = null) {
@@ -210,7 +281,11 @@
       anxious: ["Flick@Body", "FlickDown"],
       angry: ["Tap@Body", "FlickDown"]
     };
-    const groups = (explicitGroups[action] || emotionalGroups[emotion] || []).slice();
+    const authoredMotion = resolveHiyoriAuthoredMotion(emotion, action, intensity);
+    const legacyGroups = (explicitGroups[action] || emotionalGroups[emotion] || []).slice();
+    const groups = authoredMotion
+      ? [authoredMotion.group, ...legacyGroups.filter((group) => group !== authoredMotion.group)]
+      : legacyGroups;
     const explicitAction = action !== "none";
     const shouldTrigger = groups.length > 0 && (explicitAction || intensity === "high");
     const profile = EMOTION_PROFILES[emotion] || EMOTION_PROFILES.neutral;
@@ -225,16 +300,20 @@
       motionCue: action,
       motionRole: emotion,
       priority: explicitAction ? 5 : 4,
-      cooldownMs: 900
+      cooldownMs: authoredMotion?.cooldownMs || 900,
+      authoredMotion
     };
   }
 
   const api = {
     EMOTION_PROFILES,
+    HIYORI_AUTHORED_MOTIONS,
+    HIYORI_AUTHORED_ACTIONS,
     buildPerformanceCue,
     normalizeCompanionPerformancePlan,
     normalizePerformanceCueEmotion,
     normalizePerformanceCueIntensity,
+    resolveHiyoriAuthoredMotion,
     resolvePerformanceCueMotionPlan
   };
 

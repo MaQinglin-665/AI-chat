@@ -362,13 +362,22 @@ function testModalCssLayer() {
   assert.ok(/position:\s*relative/.test(dialogBlock[1]));
 }
 
-function testConfigSwitchStylesheetLoadedLast() {
+function testConfigSwitchStylesheetLayeredBeforeControlCenter() {
   const html = fs.readFileSync(INDEX_HTML, "utf8");
   const stylesheetHrefs = Array.from(html.matchAll(/<link\s+[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g))
     .map((match) => match[1]);
   assert.ok(stylesheetHrefs.includes("./base.css"), "base stylesheet should be present");
   assert.ok(stylesheetHrefs.includes("./configSwitch.css"), "config switch stylesheet should be linked");
-  assert.strictEqual(stylesheetHrefs[stylesheetHrefs.length - 1], "./configSwitch.css");
+  assert.ok(stylesheetHrefs.includes("./stage.css"), "stage stylesheet should be linked");
+  assert.ok(stylesheetHrefs.includes("./controlCenter.css"), "unified control center stylesheet should be linked");
+  assert.ok(stylesheetHrefs.includes("./xinyuDisplayFont.css"), "offline display font should be linked");
+  assert.ok(stylesheetHrefs.includes("./kawaiiTheme.css"), "kawaii theme stylesheet should be linked");
+  assert.ok(stylesheetHrefs.includes("./phosphorIcons.css"), "reusable SVG icon stylesheet should be linked");
+  assert.ok(stylesheetHrefs.indexOf("./configSwitch.css") < stylesheetHrefs.indexOf("./stage.css"));
+  assert.ok(stylesheetHrefs.indexOf("./stage.css") < stylesheetHrefs.indexOf("./controlCenter.css"));
+  assert.ok(stylesheetHrefs.indexOf("./controlCenter.css") < stylesheetHrefs.indexOf("./xinyuDisplayFont.css"));
+  assert.ok(stylesheetHrefs.indexOf("./kawaiiTheme.css") < stylesheetHrefs.indexOf("./phosphorIcons.css"));
+  assert.strictEqual(stylesheetHrefs[stylesheetHrefs.length - 1], "./phosphorIcons.css");
 }
 
 function testLive2dReportCss() {
@@ -381,15 +390,15 @@ function testLive2dReportCss() {
 function testChineseUiCopy() {
   const html = fs.readFileSync(INDEX_HTML, "utf8");
   for (const text of [
-    "模型 / 语音配置",
+    "模型与语音",
     "聊天模型",
-    "语音合成",
+    "语音",
     "预设",
     "接口地址",
     "密钥变量名",
     "测试模型",
-    "测试语音",
-    "保存配置"
+    "试听声音",
+    "保存设置"
   ]) {
     assert.ok(html.includes(text), `config switch UI should include Chinese label: ${text}`);
   }
@@ -411,7 +420,7 @@ async function main() {
   testFormInitializationAndPresetSwitch();
   testOpenCloseModalLayerState();
   testModalCssLayer();
-  testConfigSwitchStylesheetLoadedLast();
+  testConfigSwitchStylesheetLayeredBeforeControlCenter();
   testLive2dReportCss();
   testChineseUiCopy();
   await testSavePayloadAndReload();

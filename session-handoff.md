@@ -1,5 +1,459 @@
 # Session Handoff
 
+## Latest Session Update: Autonomous Desktop Awareness and Control v1 (2026-08-01)
+
+- Status: implementation and full local validation complete; Electron restart and subjective desktop-use acceptance remain.
+- New `desktop_agent.py` captures the monitor containing the mouse cursor only after the model calls `observe_screen`. Local thumbnail fingerprints can wake an optional autonomous consideration after a material scene change but are never uploaded on their own.
+- `tools.py` now provides observation, desktop context, bounded window control, clipboard, and visible input adapters. The dynamic prompt block in `app.py` tells Xinyu only about currently enabled capabilities. The cloud vision response is compact, treats on-screen text as untrusted, and can leave the companion silent.
+- `agent_actions.py` confirms window close, submission/send/login/payment/install/delete/unknown-target input, and unsafe Enter. Ordinary navigation, selection, playback, window control, drafting, and search remain autonomous. Do not weaken these checks by trusting a model-provided risk label.
+- The current scene cache lives under ignored `.local-tools`; only model-selected, non-sensitive, rate-limited text observations can be saved by `obsidian_knowledge.py` to `D:\馨语记忆库`. Never persist raw screenshots, passwords, tokens, or API keys.
+- Private `config.json` enables the feature for this user: `observe.autonomous_enabled=true`, `vision_model=gemini-3-flash`, and desktop tool flags. Public defaults/examples remain disabled. `config.local.json` still has an older `allow_shell=true` override; it was pre-existing and not expanded by this feature.
+- Verification: cursor-screen capture and foreground-window context smoke passed; a real cloud-vision smoke returned structured scene data. Full `scripts\test-local.ps1` passed: `629` Python tests, all Node tests, Python syntax `146`, JavaScript syntax `169`, secret scan `637`; only existing pydub/audioop deprecation warning.
+- Next session: restart Electron/Python service so new Electron and frontend code loads. With active companionship enabled, make a material screen change and wait through the two-minute cooldown; verify Xinyu may observe but does not have to comment. Then test one safe visible action and confirm a send/close action produces a confirmation card. Do not commit/push or touch unrelated dirty changes or `.bak` files.
+
+## Latest Session Update: Social and Evolving Self Cognition v1 (2026-07-30)
+
+- Status: implementation and focused verification complete.
+- New module `social_cognition.py`; runtime data is local under `D:\馨语记忆库\09-社会关系`. The graph starts empty except for Xinyu's evolving self node and learns people from actual desktop/QQ interactions.
+- Identity links are evidence-weighted: distinct accounts remain distinct by default; an explicit matching alias can associate them. Explicitly introduced friend/family/colleague relationships become graph edges.
+- `app.py` injects a bounded current-person/self block and exposes `GET /api/social_cognition`; `memory.py` records social evidence asynchronously after eligible manual turns.
+- Ordinary chat content is not duplicated into the graph; only explicit identity/relationship evidence is previewed. Preserve the existing knowledge, memory, relationship, QQ, and companion-life stores.
+- Verification complete: focused suite `33 passed`; full Python suite `624 passed` across three command-window-safe partitions; all Node frontend tests passed; Python syntax `144`, JavaScript syntax `168`, secret scan `634`, JSON validation and scoped diff checks passed. Only the existing `pydub/audioop` deprecation warning remains.
+- Do not commit/push or touch unrelated dirty changes and `.bak` files.
+
+## QQ social identity cloud deployment checkpoint (2026-07-28)
+
+- The existing Tencent Cloud AstrBot v4.25 + NapCat environment loads `astrbot_plugin_taffy_qq_bridge`; its compatibility fallback uses Quart when newer AstrBot web helpers are unavailable. Its plugin path is `/api/plug/astrbot_plugin_taffy_qq_bridge`.
+- The local bridge supports `bridge_auth_mode: "tailnet"`: no bridge bearer secret is sent, but the cloud service must bind to localhost and be exposed exclusively by Tailscale Serve to a trusted tailnet. The old bearer-token mode remains compatible. The cloud plugin, compose override, and a persistent v4.25 dashboard middleware override are applied; only `/api/plug/astrbot_plugin_taffy_qq_bridge/*` is exempted while tailnet mode is active. A desktop read-only poll returned HTTP 200. Do not reuse any token previously shown in a terminal.
+- Tencent Cloud console is authoritative for this instance's public IP: `175.178.199.245` (not the earlier, incorrect `.192.245` value). Its firewall already permits public TCP 80 and 443. The cloud Nginx has a timestamped backup and a validated HTTP ACME vhost for `175-178-199-245.nip.io`; it returns 404 locally as intended. The Certbot image is cached through the DaoCloud mirror, but ACME cannot issue for that `nip.io` hostname because Tencent domain protection returns an HTTP 566 web-block response. Leave this unused public ACME vhost in place until a user-controlled domain is available; do not use it for the QQ bridge.
+- Tailscale v1.98.9 is installed and signed in on both the desktop and the cloud Ubuntu host. The desktop can reach AstrBot's plugin route through the server's Tailscale IPv4 and receives the expected 401 before AstrBot authentication. Use the private URL `http://<cloud-tailscale-ip>:6185/api/plug/astrbot_plugin_taffy_qq_bridge` in the QQ identity configuration; this traffic is encrypted by the tailnet and requires no public domain, HTTPS proxy, or public AstrBot-port firewall rule.
+- No QQ message was sent. Do not inspect, echo, commit, or log any existing cloud secrets, QQ sessions, AstrBot key, or bridge token. Keep all existing dirty work and `.bak` files untouched; do not commit or push.
+
+## Latest Session Update: Local RVC Singing Entry v1 (2026-07-28)
+
+- Status: integrated locally and smoke-tested. The `更多 → 唱歌试音` button opens an Electron WAV picker, posts only its explicit local selection to the protected loopback backend, and plays the converted result from an external output directory.
+- Main files: `singing.py`, `scripts/rvc_singing_convert.py`, `electron/main.js`, `electron/preload.js`, `web/singingController.js`, and `app.py`. The configured second singer is `singer_bv1vegq6zesq_v1.pth` with its own IVF210 index.
+- RVC is still a 25-epoch PM-F0 preview model. Inputs must be clear WAV a cappella recordings. No source samples, weights, external paths, or user configuration may be committed. Qwen3-TTS remains stopped unless the user chooses to restart it.
+
+## Current Work: Companion Life Growth and Meaningful Proactive Presence v2 (2026-07-28)
+
+- Status: first implementation is complete and focused tests pass; manual runtime observation remains.
+- New `companion_life.py` stores small local growth state inside `D:\馨语记忆库` and adds `08-内心日记`. It records only every sixth eligible interaction, so it does not simulate a dramatic internal monologue every turn.
+- `app.py` injects soft long-term interests on normal chats and source-aware silence-or-share guidance for automatic chats. `memory.py` calls it asynchronously after a normal interaction.
+- Do not turn this into a fixed persona rule or a timer. Next refinement should inspect real proactive messages, then improve source ranking, explicit user-edit control, and semantic topic extraction. Preserve all dirty changes and `.bak` files; do not commit/push.
+
+## Latest Session Update: Obsidian Autonomous Knowledge Base v1 (2026-07-28)
+
+- Status: implementation, real vault migration, and full local verification are complete.
+- New module: `obsidian_knowledge.py`. It owns `D:\馨语记忆库`, an Obsidian-readable Markdown vault. Markdown is the editable source of truth; `.xinyu-knowledge-index.json` is a regenerable local retrieval cache and must not be hand-edited.
+- Migration copied distilled core memory, profile/relationship summaries, and structured relationship state only. It intentionally did not copy the raw 600-item `memory.json` transcript. Existing memory files and every `.bak` file were left intact.
+- Private `config.json` now contains an ignored `knowledge_base` section enabled for this user, with the vault path, four-item/520-character prompt budget, and opt-in background learning enabled. Do not expose or commit `config.json`.
+- Chat prompt integration is in `app.py`; protected local APIs are `GET /api/knowledge/status`, `POST /api/knowledge/sync`, and `POST /api/knowledge/migrate`.
+- Background learning currently uses only the small public Wikipedia random-summary endpoint, saves material as `unverified`, and sleeps a random 6-14 hours. It never runs in the chat request path. Broader search providers, semantic local embeddings/Qdrant indexing, an Obsidian UI panel, and autonomous personality-evolution promotion remain separate follow-up work.
+- Verification: focused knowledge/memory/chat tests -> `72 passed`; full Python suite -> `601 passed` across three command-window-safe partitions; all Node frontend tests passed; Python syntax `135`, JavaScript syntax `165`, and secret scan `622` passed. The only warning was the existing third-party `pydub/audioop` deprecation.
+- Preserve unrelated dirty work and all `.bak` files. Do not commit, push, or merge.
+
+## Current Work: QQ Social Identity via AstrBot/OneBot v1 (2026-07-28)
+
+- Status: the cloud text bridge is deployed and verified. The local QQ identity is configured and enabled with a user-provided private-contact allowlist, no groups, and text-only replies. Starting the desktop pet will begin inbound polling and may produce a reply to an eligible queued QQ message, so treat launch as an external-message activation step.
+- Main files: `qq_identity.py`, `app.py`, `app_chat_route.py`, `web/qqIdentityController.js`, `web/qqIdentity.css`, `integrations/astrbot_plugin_taffy_qq_bridge/`, and `docs/qq-identity-astrbot.md`.
+- Runtime contract: AstrBot/NapCat transports only. The desktop pet owns LLM/persona/memory; QQ-originated events cannot invoke local tools. Cloud messages queue during desktop downtime and expire locally after the configured age.
+- Verification: focused QQ identity tests passed (`7 passed`), and the final `scripts\test-local.ps1` passed with `607` Python tests, all Node frontend tests, Python syntax `140` files, JavaScript syntax `166` files, and secret scan `628` files.
+- Do not add tokens, QQ sessions, QR data, or the plugin `data/` queue to Git. Tailnet mode needs no bridge token; keep bearer tokens only for explicitly selected legacy token mode.
+- Text is the only active QQ modality. Before enabling voice or autonomous proactive outreach, implement and manually test the OneBot media path and a delivery policy. Keep all existing unrelated dirty changes and `.bak` files intact; do not commit, push, or merge.
+
+## Current Work: Authorized Singing Voice RVC Trial v1 (2026-07-28)
+
+- User authorized two distinct singers for local training only. Use exclusively `D:\视频\03_素材库\01_音频\菲比\02_待人工筛选\BV1hPizBSE1K_人声训练片段_v3_14秒合规` and `D:\视频\03_素材库\01_音频\菲比\02_待人工筛选\BV1VeGq6ZEsq_人声训练片段_v3_14秒合规`. They are accompaniment-separated and must be trained as separate voices, never pooled.
+- User approved temporarily stopping Qwen3-TTS to free GPU memory. The two local Qwen server processes were stopped; use `scripts\start-qwen3-tts.ps1` to restore it after the trial. Do not stop Electron or unrelated services.
+- Use an external workspace for RVC runtime, copied inputs, checkpoints, models, indexes, and audition output. Do not commit voice samples, weights, checkpoints, paths, or credentials. The first pass is an evaluation of RVC conversion quality; it must not silently replace the existing speech-TTS provider.
+- Status: complete preview trial. Separate local models: `assets\weights\singer_bv1hpizbse1k_e25.pth` plus its `IVF265` index, and `assets\weights\singer_bv1vegq6zesq_v1.pth` plus its `IVF210` index, all under `D:\AI\rvc_singing_runtime`. Both have a successful cross-conversion audition in `D:\AI\voice_auditions\rvc_singing_trials`.
+- Quality boundary: these are only 25-epoch / about-three-minute-per-singer previews, trained with `pm` F0 after RMVPE download was unavailable. Do not claim final fidelity. Let the user listen first; then either continue the selected singer from its checkpoint with more epochs and preferably RMVPE, or collect more clean authorized source audio.
+- Runtime state: user asked to close resource-heavy applications. Douyin, WeChat, Chrome, Wallpaper Engine, desktop-pet Electron processes, and paused Qwen download processes were closed. Qwen3-TTS remains stopped; do not automatically restart it. The user can later restore it with `scripts\start-qwen3-tts.ps1` after they choose to resume normal desktop-pet use.
+
+## Latest Session Update: Local Desktop Agent Foundation v1 on 2026-07-28
+
+- Status: implementation and full local verification complete.
+- Existing `tools.py` was extended instead of replaced. The private runtime now enables existing file/search/image/safe-command tooling; `open_url` accepts only `http(s)` URLs, `launch_app` delegates local application/file/folder/registered-URI opening to the OS, and `delete_path` is confirmation-only.
+- New `agent_actions.py` owns bounded local pending approvals plus audit events. The LLM can request an action but cannot self-approve it: overwrite, deletion, high-risk system commands, and future login/payment/submission adapters return a one-time confirmation ID, valid for 15 minutes.
+- `POST /api/agent/confirm` redeems or cancels an approval under the existing API-token/origin guard; `GET /api/agent/actions` returns safe pending/audit state. `web/toolMetaView.js` now renders Confirm/Cancel buttons, and `web/chat.js` calls the protected confirmation route.
+- Scope limitation: Playwright/browser-use/OpenHands were researched but not embedded yet. This slice opens URLs and lays the permission/execution contract; full DOM browsing, third-party login flows, and arbitrary desktop-app control need dedicated adapters and verification before being enabled.
+- Verification: focused suite `139 passed`; full `scripts\test-local.ps1` passed with `590` Python tests, all Node frontend tests, Python syntax `130` files, JavaScript syntax `164` files, and secret scan `612` files. JSON validation and scoped `git diff --check` passed.
+- Preserve all `.bak` files and unrelated dirty work. Do not commit, push, or merge.
+
+## Latest Session Update: Xinyu Shared Experience Continuity v1 on 2026-07-28
+
+- Status: implementation and full local verification complete.
+- New file: `shared_experience.py`. It records only existing high-confidence episodic core-memory candidates that describe a concrete shared action, decision, milestone, or relationship-relevant event. No second extraction LLM call is made.
+- Prompt behavior: regular turns see a shared moment only on lexical relevance. Proactive turns may see one most-recent moment only after the configured 24-hour recall cooldown, and the model is told not to turn it into a reminder or proof of closeness.
+- Safety: local state is bounded to 36 records, de-duplicated, and rejects sensitive strings, markup/stage directions, garbled text, and low-signal non-episodic candidates.
+- Private runtime change: `config.local.json` is set to Chinese-primary with a few natural English short words permitted, and the persona override no longer asks for English-first replies. Restart Electron to load this private configuration; do not commit it.
+- Verification: focused suite `90 passed`; full `scripts\test-local.ps1` passed with `587` Python tests, all Node frontend tests, Python syntax `128` files, JavaScript syntax `164` files, and secret scan `610` files. `python -m json.tool config.example.json`, `python -m json.tool config.local.json`, and scoped `git diff --check` passed.
+- Preserve all `.bak` files and unrelated dirty work. Do not commit, push, or merge.
+
+## Latest Session Update: Xinyu Meaningful Surprise Character v1 (2026-07-28)
+
+- User wants surprise, self-direction, and occasional original thoughts or news-like observations—not a deterministic quirky persona or cryptic non sequiturs. A plain "下午好" must not produce unexplained keyboard/cursor/pixel commentary.
+- The effective ignored `config.local.json` prompt was replaced. It now allows meaningful independent ideas only when they have a clear premise, understandable value, and a real opening for conversation; it rejects deliberate topic loss, knowingly defended errors, forced incompleteness, invented current news, and ornamental desktop imagery.
+- Default configuration and `companion_dialogue_policy.py` now mirror this direction. `character_brain.py` assigns `performance_bit=none` for plain/non-desktop messages, while preserving optional desktop flavor when the user actually discusses desktop objects or runtime behavior.
+- Regression coverage verifies the default prompt, the model-direct policy, no forced greeting desktop bit, and preserved relevant desktop behavior. Focused `100` tests pass; full `scripts\test-local.ps1` passes with `584` Python tests, all Node tests, Python syntax `126`, JavaScript syntax `164`, and secret scan `608`. Only the existing pydub `audioop` deprecation warning remains.
+- Reload the Python backend or restart Electron once after this change so it reads `config.local.json`. Do not commit `config.local.json`, unrelated dirty work, or any `.bak` file.
+
+## Latest Session Update: Xinyu A2 Original Bilingual VoiceDesign v1 (2026-07-28)
+
+- The accepted target is A2: the earlier clear and milk-sweet A direction, made only a tiny step more mature and a little more energetic. The user accepted its Chinese result and strongly preferred the English rendition.
+- Default local runtime is now `D:\AI\models\Qwen3-TTS-12Hz-1.7B-VoiceDesign`, display voice `A2_Original`, port `9881`. Both the main `model.safetensors` and speech tokenizer were verified against official SHA-256 values before use.
+- The service detects VoiceDesign from the loaded model path or an explicit `--mode`. VoiceDesign calls `generate_voice_design_streaming` with the bounded A2 instruction and fixed generation seed/settings. Legacy CustomVoice paths still call `generate_custom_voice_streaming` with supported speakers and `Ono_Anna`.
+- Default `Auto` requests now infer monolingual Chinese or English from the actual text, reproducing the accepted language-specific pronunciation prompts. Explicit supported languages are canonicalized; arbitrary values cannot enter the instruction.
+- Direct health reports CUDA, `voice_mode=voice_design`, `voice_design=true`, `speaker=A2_Original`, and streaming. Measured first audio: cold Chinese about `3146 ms`, warm Chinese about `359 ms`, warm English about `282 ms`. Language-aware local Whisper recovered the full smoke text; no smoke WAV clipped.
+- A stable fixed seed and bounded description reduce drift but VoiceDesign is still generative, so native Electron listening should watch identity consistency across unrelated sentences and mixed-language turns. Only one large local TTS model should remain resident on the 8 GB GPU.
+- Verification passes: focused `76` Python TTS/config tests plus Qwen, config-switch, stream-queue, and playback-start frontend checks; full `scripts\test-local.ps1` passed with `582` Python tests, all Node frontend tests, Python syntax `126`, JavaScript syntax `164`, and secret scan `608`. The only warning is the existing third-party pydub `audioop` deprecation.
+- Preserve all unrelated dirty work and every `.bak` file. Do not commit or push.
+
+## Latest Session Update: Semantic Emotive Voice and Live2D Performance Sync v1 (2026-07-27)
+
+- The user selected a Neuro-sama-like direction: playful, cute, energetic, intentionally anime rather than human-realistic. Speech should continuously carry restrained body/head life; strong emotion actions may occur every `2-3 s` at meaningful highlights but must not repeat or steal focus.
+- Replies now expose a compatible per-sentence `performance_segments` contract alongside the existing whole-turn plan. Supported semantic states are neutral, happy, playful, excited, shy, hurt, sad, anxious, angry, surprised, serious, and thinking.
+- The segment cue now survives the complete path: semantic resolution -> numeric prosody and allowlisted Qwen fields -> synthesis -> real audible playback start -> expression/body/action. The prior serialized-request branch that replaced segment prosody with `null` is fixed.
+- Qwen3-TTS 1.7B CustomVoice uses bounded fixed delivery instructions. 0.6B remains a valid low-latency fallback and never receives unsupported `instruct`. Prewarm audio is discarded when its text matches but its final semantic signature does not.
+- Hiyori mappings use its verified expressions, motion groups, and parameter IDs only. Its parameter director owns semantic gesture cooldowns, so a rejected repeated action cannot fall through to a duplicate generic motion. No additional `requestAnimationFrame` or resident animation loop was added.
+- Full `scripts\test-local.ps1` passes: `573` Python tests, all Node tests, Python syntax `126`, JavaScript syntax `163`, and secret scan `607`; only the existing pydub `audioop` deprecation warning remains.
+- Current runtime is deliberately usable during the large model download: Qwen 0.6B is healthy on CUDA at `127.0.0.1:9881`, streaming enabled, `emotion_instruction=false`. ModelScope is downloading 1.7B into `D:\AI\models\Qwen3-TTS-12Hz-1.7B-CustomVoice`. When complete, stop the fallback service and run `scripts\start-qwen3-tts.ps1`; it automatically prefers that local 1.7B directory and health should report `emotion_instruction=true`.
+- Required manual Electron pass after 1.7B activation: compare playful/serious/shy/hurt/surprised sentences, watch that expression changes begin with sound, interrupt a multi-sentence reply, repeat the same strong emotion, and judge latency/action density. Preserve unrelated dirty work and every `.bak`; do not commit or push.
+
+## Latest Session Update: Punctuation-Only ASR Guard v1 (2026-07-27)
+
+- The user confirmed that silence produced a visible user card containing only `。`, after which the LLM replied.
+- Logs show an ASR result with `text_chars=1` followed by a chat request with `user_chars=1`; this was not a real semantic transcript.
+- All frontend ASR entry paths now require at least one Unicode letter or number before live-turn classification. Pure punctuation cannot interrupt, enter a merge window, queue a voice turn, create a card, or call the LLM. The rejection is retained locally as `punctuation_only` debug evidence.
+- Normal multilingual text, numbers, fillers such as `嗯`, and hidden paralinguistic cues remain compatible.
+- Focused local/bilingual ASR, no-barge queue, and free-chat tests pass. The complete `scripts\test-local.ps1` gate passes with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`; the only warning is the existing pydub `audioop` deprecation. Restart Electron while leaving persistent SenseVoice/Qwen warm, then leave the microphone open briefly without speaking and confirm no card appears.
+- Electron restarted successfully with root PID `100056` and backend PID `64696` listening on `127.0.0.1:8123`. Persistent SenseVoice `9890` remains ready and Qwen `9881` remains loaded on CUDA with streaming enabled.
+- Preserve unrelated dirty work and every `.bak` file. Do not commit or push.
+
+## Latest Session Update: Ordered Continuation Ownership Fix (2026-07-27)
+
+- Real field failure: two spoken sentences led to three independent assistant cards; the first card was left as instant text without speech, the second was cut off midway, and the third took over.
+- Logs showed three overlapping chat streams and two client-side aborts while Qwen synthesis remained healthy. The fault was renderer turn ownership, not ASR audio capture or Qwen generation.
+- An ASR-confirmed ordinary continuation is now authoritative even if the prior turn is currently thinking or between audio segments. `requestAssistantReply()` no longer downgrades it using an instantaneous speaking check and no longer globally stops audio when that preserved chain happens to look idle.
+- Explicit stop/correction requests still use the existing immediate cancellation path. Ordinary continuation cards remain independent visible records but their LLM/TTS work is delivered in order.
+- Focused companion-turn, local-ASR, stream queue/completeness, server cancellation, and stage regressions pass. The complete `scripts\test-local.ps1` gate passes with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`; the only warning is the existing pydub `audioop` deprecation. Restart Electron and field-test three ordinary independent cards plus one explicit stop.
+- Electron restarted successfully with root PID `106048` and backend PID `135684` listening on `127.0.0.1:8123`. Persistent SenseVoice `9890` remains ready on ONNX INT8 and Qwen `9881` remains loaded on CUDA with streaming enabled.
+- Preserve unrelated dirty work and every `.bak` file. Do not commit or push.
+
+## Latest Session Update: Speech Delivery Coherence v1 (2026-07-27)
+
+- The user approved optimizing pause, subtitle sync, and delivery together. Target behavior is natural conversation, text slightly ahead of speech (`200-500 ms`), and cute/lively energy without forced verbal fillers. Voice/timbre work is explicitly deferred to the next goal.
+- PCM streaming, HTML Audio, and AudioContext fallback now publish optional generation/session-fenced playback progress. Ordered continuation cards use the measured clock with a `350 ms` text lead instead of exposing the whole reply or relying only on fixed CSS duration.
+- After prior speech ends, the next ordinary continuation adds only a cancellable `80-280 ms` punctuation/style-aware breath. Stop/correction behavior remains immediate and no older audio session is revived.
+- Stable companion prewarm now uses the selected mood/style prosody rather than neutral synthesis, improving the handoff between its prefix and later tail without adding text.
+- Focused regressions pass. The complete `scripts\test-local.ps1` gate passes with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`; the only warning is the existing third-party pydub `audioop` deprecation. Restart Electron without stopping the persistent SenseVoice/Qwen services, then field-test two ordinary consecutive replies: judge the boundary breath, whether text stays roughly one short phrase ahead, and whether the second opening sounds connected.
+- Electron was restarted successfully: root PID `130416`, backend PID `61980`, listening on authenticated `127.0.0.1:8123`. SenseVoice `9890` remains `ready` on ONNX INT8 and Qwen `9881` remains loaded on CUDA with streaming enabled.
+- Preserve all unrelated dirty work and `.bak` files. Do not commit or push.
+
+## Latest Session Update: Ordered Continuation Delivery v1 (2026-07-27)
+
+- The user confirmed that two ordinary assistant replies produced from continuous speech must both be spoken in order. Only an explicit stop or correction may cancel older queued speech. The second reply should carry a connected tone, and its text should appear progressively just ahead of its own audio.
+- Root cause: assigning every new reply a fresh `streamSpeakSession` made the old session stale. Its visible text could finalize while queued audio was skipped in favor of the newer session.
+- Substantive speech that began during assistant activity now carries an ordered-continuation marker through the ASR queue. It waits for the old model request, not the old audio, so the next LLM reply and Qwen prewarm can proceed while the earlier reply remains audible.
+- The new reply does not reset the old stream queue. After the actual prior speech boundary, it activates its own session and immediately reuses prewarmed audio. A stuck playback state has a bounded 45-second handoff; semantic stop/correction retains the existing immediate abort path.
+- Continuation text stays hidden while waiting. Actual playback start restarts the character reveal, with a longer bounded delay range for large deltas; finalization preserves the animation instead of replacing it with the full paragraph.
+- Normal first-turn model-direct Qwen speech keeps its low-latency streamed-text path; only marked cross-reply continuation waits for prior audio.
+- Focused regressions pass. The complete `scripts\test-local.ps1` gate passes with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`; the only warning is the existing third-party pydub `audioop` deprecation.
+- Electron restarted successfully. The app listens on `127.0.0.1:8123`; persistent SenseVoice `9890` remains ready and Qwen `9881` remains loaded on CUDA.
+- Field-test two ordinary continuation replies plus one explicit correction.
+- Preserve all unrelated dirty work and `.bak` files. Do not commit or push.
+
+## Latest Session Update: Natural Conversation Handoff v1 (2026-07-27)
+
+- The user rejected one fixed interruption rule. Desired behavior is content-dependent, similar to natural conversation: some speech should stop the assistant immediately, some should wait for a meaningful sentence boundary, and short acknowledgements may not stop it at all.
+- The cancellation path previously removed the unfinished assistant row. The TTS session was safely cancelled, but already visible/heard wording was absent from history, making the replacement reply feel like a new question-answer pair.
+- A non-empty interrupted draft is now finalized synchronously with `…`, persisted before the replacement user turn, and protected from stale catch cleanup. The incomplete row has no rating controls. New stale audio remains cancelled exactly as before.
+- Confirmed correction/stop kinds bypass protection; ordinary substantive speech can finish only the existing bounded key segment. Backchannels remain hidden. Sanitized interruption context tells the current LLM to infer the conversational relationship, avoid repeating heard wording, and choose among yield, integrate, briefly resume, answer latest, or abandon the old thought.
+- The next assistant card remains a separate message but carries a continuation class with tighter spacing and quieter chrome.
+- Older confirmed-speech callers without a semantic kind retain immediate interruption. The active local ASR path supplies typed semantic decisions, and the prompt still prioritizes a latest message that genuinely needs a direct response.
+- Focused regressions pass. The complete `scripts\test-local.ps1` gate passes with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`; the only warning is the existing third-party pydub `audioop` deprecation.
+- Electron restarted successfully. The app listens on `127.0.0.1:8123`; persistent SenseVoice `9890` remains ready and Qwen `9881` remains loaded on CUDA.
+- Field-test one mid-sentence correction, one additive supplement, and one “嗯”.
+- Preserve all unrelated dirty work and `.bak` files. Do not commit or push.
+
+## Latest Session Update: Thinking-Phase Continuous Listening v1 (2026-07-27)
+
+- The user confirmed the desired GPT-Live-like rule: the microphone remains active while the assistant thinks or speaks; substantive new speech replaces the stale turn, while short “嗯/哦/对” acknowledgements stay hidden and do not interrupt.
+- The implementation was already present in `web/localAsrController.js` and `web/chatReplyController.js`, but the ignored active profile had `conversation_mode.interrupt_tts_on_user_speech=false`. That caused `sendAssistantTurn()` to suspend recognition as soon as `chatBusy` began.
+- `config.local.json` now enables the existing full-duplex setting. Public defaults remain enabled, explicit legacy no-barge configurations remain compatible, and no private configuration is committed.
+- `tests/test_local_asr_frontend.js` now proves with `chatBusy=true` that assistant thinking cannot acquire a microphone pause lease or stop recognition in full-duplex mode.
+- Focused regressions passed. The complete `scripts\test-local.ps1` gate passed with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`; the only warning is the existing third-party pydub `audioop` deprecation.
+- Electron restarted successfully with the corrected profile. The app is listening on `127.0.0.1:8123`; the independent SenseVoice `9890` service remains ready and Qwen `9881` remains loaded on CUDA.
+- Field-test by speaking a substantive second sentence while the first turn shows thinking, then use a short “嗯” during speech to confirm it remains a hidden backchannel.
+- Preserve all unrelated dirty work and `.bak` files. Do not commit or push.
+
+## Latest Session Update: Voice-First Reply Latency v1 (2026-07-27)
+
+- The user confirmed restart-to-first-ASR remains about one second, then selected the next target: actual streamed reply text should appear continuously, stay only slightly ahead of speech, and ideally begin with audio in `1–2 s`.
+- Logs prove the bottleneck is the configured remote `claude-haiku-4-5-A` relay, not ASR or Qwen. Recent first deltas were `5.9–10.5 s`; SenseVoice was `135–567 ms`, and Qwen first chunks were `234–902 ms`.
+- Minimal/full controlled probes were about `2.37 s` and `3.2–5.0 s` to first token. Other advertised relay routes were unavailable, returned no visible text, or were key-budget blocked, so do not silently switch the user's chat model.
+- `conversation_mode.voice_low_latency_enabled=true` is enabled only in ignored `config.local.json`. Voice requests use the compact dialogue and character-brain blocks plus four recent history items; typed turns and legacy configs retain the full prompt.
+- Prompt size measured about `4054` characters with four recent messages versus about `6997` for the prior zero-history full prompt. One real compact request reached first text in `2498 ms`; the external relay still prevents a truthful hard `1–2 s` guarantee.
+- `web/chatMessageController.js` appends new characters in lightweight arrival spans, and `web/stage.css` supplies the subtle motion/caret plus reduced-motion fallback. Finalization flattens the text back to the normal stable message DOM.
+- Qwen continues to start only from stable punctuation boundaries through the existing cancellable exactly-once stream queue. Do not re-enable the synthetic 850 ms waiting voice hint; it was intentionally disabled because it can race the real reply.
+- Focused checks passed (`172` Python tests plus stage, companion-turn, and Qwen frontend checks). The complete `scripts/test-local.ps1` gate passed with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`; the only warning is the existing third-party pydub `audioop` deprecation.
+- Restart Electron once for a real voice timing and visual pass. Preserve all unrelated dirty work and `.bak` files; do not commit or push.
+
+## Latest Session Update: Persistent SenseVoice Service v1 (2026-07-27)
+
+- The user restarted the desktop pet and initially saw a 100% peak with no visible transcript. Logs showed valid roughly 2.2-second PCM and successful 13/20-character recognition, but cold SenseVoice initialization delayed the first requests by about 60 and 37 seconds. After warmup, the user's real microphone transcript appeared in about one second.
+- Final recognition now prefers an independent managed service at `127.0.0.1:9890`, so Electron restarts no longer unload the recognizer. The default runtime is official `funasr-onnx` SenseVoiceSmall INT8 in `D:\AI\sensevoice_runtime`; model weights stay in the user ModelScope cache.
+- Warm adapter evidence is `394 ms` for the existing English reference sample. The ONNX service measured about `553 MB` working set and `1.26 GB` private memory; the rejected PyTorch persistent service reached about `5.15 GB` private memory.
+- If the service is warming or unavailable, `local_asr_provider.py` immediately uses Vosk and does not cold-load an in-process model. Setting `sensevoice_service_enabled=false` preserves the legacy in-process route for old/private configurations.
+- `app.schedule_local_asr_warmup()` probes, detached-starts, and polls the service without blocking the UI. The service is loopback-only, accepts bounded PCM in memory, serializes inference, and never persists microphone audio.
+- Focused ASR/config/health/service validation passed (`79 passed`). The complete `scripts\test-local.ps1` gate passed with `559` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`; the only warning is the existing third-party pydub `audioop` deprecation.
+- The independent service remained `ready` with runtime `onnx-int8` on port `9890` after validation. Next field check: restart Electron without stopping the service, open the microphone immediately, and confirm the first natural Chinese/English phrase still appears in about one second.
+- Preserve all unrelated dirty work and `.bak` files; do not commit or push.
+
+## Latest Session Update: Semantic Full-Duplex Voice v1 (2026-07-26)
+
+- The user accepted these rules: microphone capture remains active while ASR/LLM/TTS work; consecutive phrases are merged in order; “嗯嗯/哦/啊” are hidden backchannels; substantive speech, correction, negation, and stop commands interrupt immediately after semantic confirmation.
+- `web/localAsrController.js` no longer interrupts on the first VAD frame. It publishes a non-destructive candidate, classifies the finalized transcript, retains recent backchannel tone privately, and calls the existing interruption boundary only for confirmed meaningful turns.
+- A full-duplex burst uses a 520 ms final merge delay. If another utterance starts while a transcript is pending, the flush is held up to the existing 10-second sentence safety bound and rescheduled when the next final transcript arrives. Multiple parts remain ordered and enter one replacement assistant request.
+- `web/chatReplyController.js` records `voice_barge_in_candidate` without stopping playback, while `confirmedTranscript=true` immediately aborts the active chat stream and TTS through the existing generation/session cancellation logic.
+- Focused voice queue, ASR, character runtime, no-barge-in, bilingual, stream TTS, and cancellation regressions pass. The complete `scripts\test-local.ps1` gate passes with 550 Python tests, all Node frontend tests, 121 Python syntax files, 162 JavaScript syntax files, and 597 secret-scan files; the one warning is the third-party pydub `audioop` deprecation. Restart Electron, then field-test: start a long assistant reply, say “嗯嗯” once, and afterward interrupt with two connected phrases.
+- Electron was restarted and `/api/asr/status` reached `provider=auto`, `status=ready`, `required=false`. The next required evidence is the user's real-microphone test of one backchannel followed by a two-phrase substantive interruption.
+- Preserve all unrelated dirty work and `.bak` files. Do not commit, push, or change private keys/models/audio samples.
+
+## Latest Session Update: Hidden Paralinguistic Understanding v1 (2026-07-26)
+
+- The accepted behavior is hidden-only: nonsemantic sounds should affect the assistant's understanding but must not appear as synthetic user messages or be written into visible conversation memory.
+- `local_asr_provider.py` now parses raw SenseVoice language, emotion, and acoustic-event tags before text cleanup. It also computes bounded voiced ratio and pitch stability, suppresses known subtitle-template hallucinations, and suppresses very short semantic guesses when stable voiced audio conflicts with a non-speech event.
+- `app_asr_route.py` returns only allowlisted paralinguistic fields. `web/localAsrController.js` preserves those fields beside ordinary speech, or creates one hidden/nonremembered voice turn for a meaningful pure cue. `web/chatReplyController.js` and `app_chat_context.py` sanitize the metadata again and instruct the LLM to treat it as uncertain tone rather than literal words or a precise inferred intention.
+- The real environment had FunASR 1.0.27 despite `requirements-asr.txt` requiring 1.3.22 or newer. It was upgraded to FunASR 1.3.29, fixing the cached SenseVoiceSmall class-registration failure. Cached model paths are selected directly to avoid repeated ModelScope update checks.
+- The ignored private `config.json` now selects `provider=auto`, keeps Paraformer streaming disabled, and enables SenseVoice final refinement plus the existing loopback Whisper fallback. Do not commit this private configuration.
+- A local 1.6-second humming-like smoke sample now returns no visible text and a hidden neutral/BGM/nonverbal cue. Cold initialization was about 14.7 seconds and hot inference about 0.36 seconds, so `app.schedule_local_asr_warmup()` loads SenseVoice on a daemon for non-Vosk profiles without disabling the microphone or blocking other UI.
+- Electron was restarted after enabling the ignored local override. The authenticated status endpoint reached `provider=auto`, `status=ready`, and `required=false`; a hot authenticated PCM smoke completed in 0.466 seconds with no visible text and the expected hidden SenseVoice cue.
+- Focused tests pass. The complete `scripts\test-local.ps1` gate passes with 550 Python tests, all Node frontend tests, 121 Python syntax files, 162 JavaScript syntax files, and 597 secret-scan files; the one warning is a third-party pydub `audioop` deprecation. Restart Electron, then ask the user to test one normal sentence followed by a separate 1-2 second hum. Do not claim arbitrary humming-intent understanding: the current layer recognizes uncertain tone/event/vocalization context.
+- Preserve every unrelated dirty change and `.bak` file. Do not commit, push, or modify private model/audio assets.
+
+## Latest Session Update: Voice Runtime Latency and Fallback Recovery v1 (2026-07-26)
+
+- Latest runtime evidence at about 17:26 showed Vosk ready in roughly four seconds, followed by two successful `/api/asr_pcm` responses and no `/api/chat_stream`; both recognition results were therefore empty. The current problem is no longer a stuck HTTP request.
+- `web/index.html`, `web/chatDom.js`, `web/stage.css`, and `web/localAsrController.js` add a composer-owned voice feedback pill that is independent of the icon-only microphone and the responsive-hidden header status. It shows initialization, listening, actual level movement, recognition, muted input, and a persistent empty-result warning.
+- `app_asr_route.py` now emits safe numeric ASR performance diagnostics (`audio_ms`, RMS, peak, provider, text length, elapsed milliseconds) without logging or persisting microphone audio. Use the first new `[ASR][PERF]` line after restart to distinguish silent/wrong input from recognizer failure.
+- `local_asr_provider.py` supports an explicitly enabled, loopback-only faster-whisper fallback after empty/failed Vosk recognition. The existing service at `127.0.0.1:9889` uses faster-whisper `small`, CPU int8, and was warmed successfully; its process working set was about 350 MB after warmup. The ignored `config.json` enables it, selects Chinese input, disables FunASR streaming/refinement, uses a 10-second sentence cap, and lowers the threshold to `0.0022`.
+- Complete validation passes: `scripts\test-local.ps1` reports 546 Python tests, all Node frontend tests, 121 Python syntax files, 162 JavaScript syntax files, and 597 secret-scan files. The 39 warnings are existing third-party deprecations. Restart Electron once and ask for one natural sentence; do not claim field completion until the meter moves and a transcript appears.
+- Electron was restarted once after validation. Read-only native visual QA confirmed the new idle voice label and meter track are visible in the real Live2D stage and do not overlap the composer or utility rail; no microphone input was activated by automation.
+- Follow-up field evidence showed the first composer-relative feedback could still disappear at the user's full-screen/device-scale layout. `web/phosphorIcons.css` now supplies the final ID-specific, fixed-position visibility guarantee. `web/localAsrController.js` shows live percentage plus selected device and promotes muted/no-frame watchdog failures into the same visible surface.
+- The follow-up screenshot had the microphone still open and generated no new `/api/asr_pcm`, so it proved that speech segmentation had not fired but did not yet prove submitted PCM was silent. The prior question about the header green dot was not diagnostic because that dot is not bound to `micLevel`. Use the new feedback text after the latest restart: percentage movement proves capture; “没有收到音频帧” proves the Web Audio callback is stalled; 0% with a named device proves frames exist but are effectively silent.
+- The second correction was restarted and visually verified without activating the microphone. The complete gate remains green at 546 Python tests plus all Node, syntax, and secret checks.
+- The user subsequently confirmed real speech now transcribes. The remaining complaint was aesthetic: the full-width “点击麦克风开始说话” track was visually heavy. `web/index.html`, `web/chatDom.js`, `web/localAsrController.js`, `web/stage.css`, and the final `web/phosphorIcons.css` now implement a hidden-when-closed compact waveform capsule with seven live level-driven colored bars, a small percentage, clear processing/error states, and reduced-motion behavior.
+- The compact waveform preserves the viewport-level anti-clipping guarantee and device/error diagnostics through its title and status text. Complete validation remains 546 Python tests, all Node frontend tests, 121 Python syntax files, 162 JavaScript syntax files, and 597 secret-scan files.
+- The user accepted immediate app startup with an explicit temporary voice-initialization state. `app.py` now tracks the Vosk warmup lifecycle and serves a path-free `/api/asr/status`; `web/localAsrController.js` polls it, disables only the microphone while warming, labels the button “语音初始化中”, and automatically restores “开麦: 关” plus a “语音已就绪” status when ready.
+- Do not reintroduce a fixed user-facing wait. Other app features remain usable during warmup, and local Vosk opening is guarded until readiness is confirmed. The latest full gate passes with 542 Python tests, all Node frontend tests, 121 Python syntax files, 162 JavaScript syntax files, and 597 secret-scan files.
+- Latest field retest is not yet accepted: the user restarted Electron, spoke naturally, waited, closed the microphone, and still saw no transcript. Runtime logs eventually recorded one `/api/asr_pcm` HTTP 200 at 16:54:09 after expensive SenseVoice/Vosk cold loading, so the request path existed but its latency and empty/unused result were unacceptable.
+- `web/stage.css` now exposes the meter in the main `view-full` Live2D stage as a compact composer-adjacent pill. `web/localAsrController.js` retains RMS with manual-capture frames and trims long silence around the detected speech region before close-time transcription.
+- The ignored `config.local.json` now uses `provider=vosk`, `final_refine_enabled=false`, `streaming_enabled=false`, and `speech_threshold=0.0022`. Public defaults remain compatible. `asr.preload_vosk_models()` and `app.schedule_local_asr_warmup()` load available configured Vosk models on a daemon after server startup, moving the one-time cold load out of the first utterance.
+- Full validation passes with 541 Python tests, all Node frontend tests, 121 Python syntax files, 162 JavaScript syntax files, and 597 secret-scan files. Keep `voice-runtime-latency-recovery-v1` in progress until the user restarts, allows roughly 15 seconds for initial warmup, confirms visible meter movement, and receives a transcript.
+- Real-user evidence confirmed that audio capture and transcription now work, but feedback and latency still felt wrong. The microphone meter was being hidden by `web/kawaiiTheme.css`, and the 2.2-second maximum capture forced a normal sentence into several `/api/asr_pcm` jobs. The meter is visible again; new defaults use a 10-second safety cap and a 420 ms Silero release window.
+- `config.py`, `config.example.json`, the configuration UI, and troubleshooting docs carry the same new defaults. Explicit legacy values remain supported, and the sanitizer accepts up to 15 seconds. The ignored private profile opts into `max_speech_ms=10000`, `silero_vad_redemption_ms=420`, and keeps preview streaming disabled.
+- The Silero regression is fixed and verified in the real Electron renderer. Root cause was CSP rejecting ONNX WebAssembly compilation; `web/index.html` now permits the narrow `'wasm-unsafe-eval'` source while continuing to reject general `'unsafe-eval'`.
+- `web/sileroVadAdapter.js` reuses one loaded MicVAD controller, runs ORT WASM with one thread, cools down failed starts for 120 seconds, and preserves energy detection for any session where Silero was late or unavailable.
+- `web/localAsrController.js` aborts stale streaming-preview fetches before final PCM transcription and waits only 450 ms for an already-running final result before using the bounded manual-close snapshot. This prevents the former request burst and duplicate aborted final requests.
+- `local_asr_provider.py` records bounded model-load failures so repeated HTTP requests fall back to Vosk without repeating expensive FunASR initialization. `app_asr_route.py` treats renderer cancellation as a normal disconnected client rather than attempting a second socket write.
+- The ignored `config.local.json` uses `streaming_enabled=false`, `final_refine_enabled=true`, and a 120-second model-failure cooldown for the user's lower-resource runtime. Do not commit that private file; public defaults still expose Paraformer streaming.
+- Earlier native proof showed no Silero warning and HTTP 200 for the V5 model, ORT runtime, WASM, and VAD worklet. A later attempt to refresh the already-running Electron window was stopped after the captured handle rejected activation twice; restart the app before validating the visible meter and final timing with one natural 3–6 second sentence.
+- Full validation passes with 540 Python tests, all Node frontend tests, 121 Python syntax files, 162 JavaScript syntax files, and 597 secret-scan files; 39 third-party deprecation warnings remain non-failing.
+- Preserve all unrelated dirty changes and every `.bak` file. No commit, push, PR, merge, model asset, API key, or private voice sample was created. Resume the deferred progressive-disclosure frontend optimization only after the user confirms one real sentence transcribes promptly.
+
+## Latest Session Update: Natural Companion and Voice Continuity v1 (2026-07-26)
+
+- The combined companionship and voice-stability objective is code-complete. Default replies remain English. The preview and private local profiles enable bounded, low-frequency continuation; legacy configurations remain opt-in and the existing “主动陪伴” control can disable it for the current session.
+- `web/sileroVadAdapter.js` integrates the permissively licensed `@ricky0123/vad-web` v5 model with the existing MediaStream. `web/localAsrController.js` uses its speech events when ready and otherwise retains energy VAD, FunASR/Vosk fallback, and one-shot manual-close transcription.
+- `app.py` serves only fixed allowlisted VAD/ORT runtime assets below `/runtime/vad/`; traversal and unknown runtime names remain unavailable. The dependency versions are pinned in `package.json` and notices are recorded in `THIRD_PARTY_NOTICES.md`.
+- `web/ttsPlaybackController.js` performs bounded same-voice GPT-SoVITS startup retries before any explicitly configured browser fallback. Do not weaken the existing turn/generation/segment ledger: it is the exactly-once boundary that prevents replay while recovering an undelivered tail.
+- Complete validation passes: 538 Python tests, all Node frontend tests, 121 Python syntax files, 162 JavaScript syntax files, 597 secret-scan files, static VAD asset 200/404 probes, and zero npm audit vulnerabilities. The 39 warnings are non-failing third-party deprecations.
+- Next recommended check is a native Electron listening session with the user's actual microphone and private GPT-SoVITS endpoint. Tune Silero positive/negative thresholds or the 720 ms redemption window only from observed clipped or prematurely split phrases.
+- Preserve the large unrelated dirty worktree and every `.bak` file. `config.local.json` contains ignored private opt-in settings and must not be committed. No commit, push, PR, merge, model asset, API key, or private voice sample was created.
+
+## Latest Session Update: Desktop Pet Presence Anchor Follow (2026-07-20)
+
+- `web/live2dLayoutController.js` owns `syncPetPresenceAnchor()`, which converts renderer coordinates through the canvas client rect and publishes screen-space X/Y CSS variables only in the desktop model view.
+- The helper runs after initial placement/clamping and in all model-position drag paths. It intentionally does not run from the idle-motion frame loop, so the badge follows deliberate placement without bobbing with subtle Live2D animation.
+- `web/stage.css` places the fixed-size badge 10 px below `--pet-presence-y` and clamps it inside the viewport. Wheel zoom does not scale or resize the badge.
+- `tests/test_drag_logic.js` covers the new screen-coordinate conversion and scale independence. Restart Electron and perform one native drag near the top and bottom edges for final hardware/window-scale visual confirmation; preserve unrelated work and every `.bak` file.
+- Full validation passes: 533 Python tests, all Node frontend tests, 120 Python syntax files, 160 JavaScript syntax files, and 594 secret-scan files. No commit, push, or merge was made.
+
+## Latest Session Update: Independent History Lanes and Compact Header (2026-07-20)
+
+- `web/index.html` now contains `user-chat-log` and `assistant-chat-log` inside the existing `chat-log` shell. `web/chatDom.js` exposes them, and `web/chatMessageController.js` routes full-stage rows and time dividers by role while retaining the chronological shared log in `view-chat`.
+- The full-stage lanes have independent `overflow-y`, contained wheel propagation, subtle interaction-only scrollbars, and a non-interactive center gap for Live2D. New messages auto-scroll only their own role lane. Existing stored history and sticker records require no migration.
+- `web/phosphorIcons.css` reduces the large header to 76 px and pins every `.message-time` node to the card's upper-right corner with readable day/night contrast. The existing collapse control still hides and restores both lanes together.
+- Browser verification covered desktop geometry, real left-lane wheel isolation, card timestamps including a sticker, collapse/expand, and the standalone chat fallback. Restart Electron before native review; preserve all unrelated dirty work and every `.bak` file.
+- Complete verification passes: 533 Python tests, all Node frontend tests, 120 Python syntax files, 160 JavaScript syntax files, 594 secret-scan files, JSON parsing, and `git diff --check`. The browser surface was fixed at 1280 x 720; narrow-layout behavior remains covered by the existing CSS fallback and automated contracts but should receive a later native narrow-window visual pass if that layout becomes a priority.
+
+## Latest Session Update: Selected Day Theme Sun Icon (2026-07-20)
+
+- `web/index.html` already contained the local Phosphor `sun.svg`; the defect was a final CSS rule that hid all theme images and only restored the selected night icon. `web/phosphorIcons.css` now also restores the selected day icon.
+- The day glyph is 17 x 17 px, white, centered beside the label with a 6 px gap, and uses a restrained berry drop shadow. Automatic mode and the selected-night moon treatment remain unchanged.
+- Browser interaction verified day -> night -> day switching, correct `aria-pressed` state, visible icons in both selected states, and no horizontal overflow. `tests/test_stage_frontend.js` protects the asset and selector; the full local gate passes with 533 Python tests, all Node frontend tests, 120 Python syntax files, 160 JavaScript syntax files, and 594 secret-scan files.
+- Restart Electron before reviewing this renderer-only update. Preserve all unrelated dirty work and every `.bak` file; no commit, push, or merge was made.
+
+## Latest Session Update: More Launcher Readability Refinement (2026-07-20)
+
+- The user screenshot exposed a real cascade bug: `controlCenter.css` supplied dark `--cc-ink` text while `kawaiiTheme.css` changed the More launcher to a dark berry surface. `web/phosphorIcons.css`, the final visual layer, now explicitly owns launcher text, icon, border, hover, focus, switch, and disabled-state contrast.
+- Enabled buttons measure 14 px / 650 with `rgb(249, 229, 238)` text on the berry panel. Disabled Electron-only desktop actions remain readable but visibly secondary; section labels use 12 px / 750 and the launcher header uses a readable system font.
+- Desktop browser verification measured a 560 x 314 launcher with zero overflow. The 390 px layout measured 366 x 511 and remained fully readable. The actual More → Schedule → Close interaction path passed.
+- `tests/test_button_value_ui.js` now guards final-layer contrast ownership, readable label size, light action text, and a distinct disabled selector. Focused stage/control-center checks and the complete Node frontend suite pass.
+- Restart Electron before native review. Preserve all unrelated dirty work and every `.bak` file; no commit, push, or merge was made.
+
+## Latest Session Update: Voice Composer Proportion Refinement (2026-07-20)
+
+- `web/phosphorIcons.css`, the intentional final visual layer, now overrides the large-screen composer to 960 x 74 with a 54 px microphone, 54 px input, and 94 x 54 send action. The three controls share one center line and use an 8 px gap.
+- The microphone keeps the real local SVG state assets but no longer has a redundant inner ring. Closed day mode is a quiet white surface with a berry icon; closed night mode is dark rose; open mode remains clearly pink and illuminated.
+- The input field has a calmer border/focus treatment, 32 px embedded attachment/sticker controls, and system text typography. Mobile uses a 362 x 64 shell at 390 px viewport width with zero body overflow.
+- Browser verification covered desktop day/night and 390 x 844 day mode; input focus and typing work. Stage, stage-theme, control-center, and the complete Node suite pass, along with the secret scan, JSON parse, and `git diff --check`.
+- Restart Electron before native review because this is a stylesheet-only renderer change. Preserve all unrelated dirty work and every `.bak` file; no commit, push, or merge was made.
+
+## Latest Session Update: Desktop SVG States and Sticker Clearance (2026-07-20)
+
+- `web/index.html` now uses real local SVG elements for the microphone's closed/open states, selected night moon, cat-ear marks, stage motifs, brand badge, and conversation identity. `web/localAsrController.js` updates `.mic-state-label`, `aria-label`, and `title` without replacing the icon nodes.
+- `web/phosphorIcons.css` is still the last-loaded visual layer. At 1694 x 945 it measures the composer at 1020 x 90, microphone at 64 x 64, utility capsule at 330 x 59, with zero horizontal overflow. The utility remains at the lower right.
+- Sticker cards are desktop-content-sized and `flex: 0 0 auto`; their images use `max-width: 100%`, intrinsic aspect ratio, and bounded height. The expanded conversation rail ends at y=751 while the utility capsule begins at y=762, so right-aligned content has an 11 px vertical safety gap.
+- Browser interaction sent the built-in “惊讶” sticker through the real picker. Its 224 x 224 illustration was fully contained by a 253 x 274 card and did not overlap the utility capsule. Per the user's latest instruction, this follow-up intentionally did not reopen or retune mobile layouts.
+- SVG sources are the official MIT-licensed Phosphor Core and Tabler Icons repositories; both licenses are stored beside the assets. Do not replace these icons with emoji or CSS-drawn glyphs.
+- Verification passes: nine focused checks, the complete Node suite, `scripts\test-local.ps1` (533 Python tests, 120 Python syntax files, 160 JavaScript syntax files, 594 secret-scan files), four JSON parses, required ten-module Python compilation, 44 SVG XML parses, and `git diff --check`. The 40 warnings are third-party deprecations.
+- Preserve all unrelated dirty work, every `.bak` file, centered Live2D behavior, configuration compatibility, and technical-message history isolation. No commit, push, or merge was made.
+
+## Latest Session Update: Manual-close Voice Capture Fallback (2026-07-20)
+
+- Field evidence from `/micdebug` showed the user intentionally uses the microphone as click-to-record: click once, speak, click again to finish. The previous close path only retained frames that VAD had already classified as speech, so a missed VAD decision produced no transcript.
+- `web/localAsrController.js` now keeps a separate, bounded 30-second PCM capture for the active microphone session. On manual close, it force-transcribes that capture when no transcript was accepted; if normal VAD/streaming recognition already accepted speech, the full recording is not submitted again.
+- `web/chatState.js` owns the bounded capture and duplicate-guard state. `tests/test_local_asr_frontend.js` covers a deliberately below-threshold recording, forced close snapshot, minimum duration, and duplicate prevention.
+- The current merged config already has `asr.transcribe_on_close=true`. The complete local gate passes: 533 Python tests, all Node frontend tests, 120 Python syntax files, 160 JavaScript syntax files, 593 secret-scan files, and `git diff --check`.
+- The user must restart Electron before retesting because these changes are in renderer JavaScript. Preserve all unrelated dirty changes and every `.bak` file; no commit, push, or merge was made.
+
+## Latest Session Update: Reusable Rounded SVG Icons and Reference Fidelity (2026-07-20)
+
+- `web/phosphorIcons.css` is the final visual layer. It maps local Phosphor SVGs to stage and control-center actions, repairs the microphone, and adds a native-aspect fidelity breakpoint without changing runtime behavior.
+- `web/assets/icons/phosphor` contains 35 regular-weight SVGs, a reuse README, and the upstream MIT license. Source is the official `phosphor-icons/core` repository; do not replace these with emoji or platform-dependent font glyphs.
+- The reported microphone collision is fixed by hiding the stage composer's legacy cat-ear pseudo-elements, clipping all button rings to one circular control, and overriding the legacy standalone-chat music-note rule with the same complete microphone SVG.
+- Browser proof at 1694 x 945 measured: header 1658 x 88, message 456 x 118, composer 1040 x 104, utility rail 330 x 63, body overflow 0 x 0. Day, night, 1280 desktop, 390 mobile, 900 standalone chat, More, and model/voice control-center states were also inspected.
+- Keep `phosphorIcons.css` after `kawaiiTheme.css` in `web/index.html`; the order is intentional because it resolves legacy high-specificity visual conflicts without altering feature JavaScript.
+- Focused and complete verification passes: 533 Python tests, all Node frontend tests, 120 Python syntax files, 160 JavaScript syntax files, 593 secret-scan files, SVG XML validation, JSON validation, required Python compilation, and diff checks. The 40 Python warnings are third-party deprecations.
+- Preserve all existing unrelated dirty work, every `.bak` file, the centered Live2D character, configuration compatibility, and technical-message history isolation. No commit, push, or merge was made.
+
+## Latest Session Update: Hybrid Local Realtime ASR v1 (2026-07-19)
+
+- `local_asr_provider.py` adds the optional local recognition provider: Paraformer produces bounded ordered partials and SenseVoiceSmall produces the final utterance, with lazy model loading, serialized inference, session expiry, and automatic Vosk fallback.
+- `app_asr_route.py`, `app.py`, `config.py`, and `web/localAsrController.js` carry the new stream lifecycle without allowing renderer-selected model paths. Partial text only previews into an otherwise empty composer and cannot overwrite user typing or a newer microphone session.
+- Health diagnostics, safe client configuration, Windows setup/model-preload scripts, example configuration, troubleshooting documentation, and focused Python/Node coverage were added. Raw microphone audio remains local and model assets remain outside the repository.
+- The complete local gate passes: 533 Python tests, all Node frontend tests, 120 Python syntax files, 160 JavaScript syntax files, 590 secret-scan files, and `git diff --check`.
+- Runtime installation is not complete in Electron's `.venv`: the NVIDIA CUDA PyTorch wheel download exceeded the available execution window and its scoped residual installer was stopped. The system Python has a CPU FunASR installation, but Electron intentionally continues selecting `.venv`; therefore Vosk remains active until `scripts\setup-local-asr.ps1 -Device cuda` completes successfully.
+- Preserve all unrelated dirty changes and every `.bak` file. No model asset, private configuration, commit, push, or merge was added.
+
+## Latest Session Update: Cute Anime Livestream Visual System (2026-07-19)
+
+- The accepted concept remains in the local Codex generated-image cache (outside the repository). It establishes a friendly anime-livestream direction with a centered character, compact expressive header, conversation rail, utility cluster, and voice-first composer.
+- `web/kawaiiTheme.css` applies the shared berry, sakura, cream, lilac, mint, and ink system to the complete stage, standalone chat, launcher, and all five control-center pages. It also supplies restrained code-native icons and motifs without adding a render loop.
+- `web/xinyuDisplayFont.css` embeds a 19 KB offline WOFF2 subset as `Xinyu Kawaii Display`; `web/assets/fonts/ZCOOL-KuaiLe-OFL.txt` preserves the source font license. Body copy intentionally remains on the existing readable system stack.
+- `web/controlCenterShell.js` now centers the selected narrow-screen navigation destination after the existing stable two-frame page handoff. All five destinations remain reachable at 390 px without exposing the stage or producing body overflow.
+- Browser visual and interaction checks passed in 1694 x 945 day/night, 900 x 800 standalone chat, and 390 x 844 stage/control-center layouts. A typed draft survived page changes, advanced settings remained reachable, and the diagnostics destination revealed itself after navigation.
+- Focused tests and the complete local gate pass: 533 Python tests, all Node frontend tests, 120 Python syntax files, 160 JavaScript syntax files, and 590 secret-scan files; 40 third-party deprecation warnings are non-failing. The already-running Electron renderer must be restarted to load the new stylesheet and embedded font before native visual acceptance.
+- Preserve the current technical-message history isolation, every unrelated dirty change, and all `.bak` files. No commit, push, or merge was made.
+
+## Latest Session Update: Control Center Continuity and Core-task Focus (2026-07-19)
+
+- `web/controlCenterShell.js` now owns a persistent themed backplane, immediate navigation selection, a two-frame page-switch handoff, and visibility observation for schedule, persona, model/voice, memory, and diagnostics.
+- Progressive disclosure now includes schedule execution type, persona interests/relationship details, memory undo/debug tools, the existing model/voice technical fields, and diagnostic raw reports. No feature or data binding was removed.
+- `web/controlCenter.css` refines selected navigation, typography, spacing, radii, day/night materials, reduced motion, and narrow-screen action rows; `web/index.html` identifies the persona preferences section for disclosure.
+- Browser visual and interaction checks passed in day, night, and 390 x 844 modes without horizontal overflow. Native Electron kept Live2D centered and switched model/voice to diagnostics over a continuous shell; because the existing renderer did not accept hot reload, final collapsed defaults were verified in the reloaded browser instead.
+- Focused tests and the complete local gate pass: 524 Python tests, all Node frontend tests, 117 Python syntax files, 160 JavaScript syntax files, and 582 secret-scan files.
+- Preserve the current technical-message history isolation: system diagnostics must not enter history, while ordinary chat, proactive companion replies, and reminders still do. Preserve all unrelated dirty work and every `.bak` file. No commit, push, or merge was made.
+
+## Latest Session Update: Hiyori Motion Ownership and Stage Detail Refinement (2026-07-19)
+
+- `web/hiyoriPerformanceDirector.js` no longer forces a minimum animation step. Mode/emotion/speech blends are refresh-rate independent, slower on release, and stable under duplicate same-time samples.
+- `web/live2dExpressionController.js` now applies a smoothly reduced legacy-body compatibility gain only for Hiyori head/torso/shoulder channels, then restores full gain before the Hiyori director and listening layers. This prevents simultaneous full-amplitude motion systems from making the new gestures feel rigid.
+- `web/stage.css` refines the accepted interface rather than changing topology: denser history cards, 58 px centered microphone, 90 px calmer send control, 940 px composer cap, and utility-lane clearance beginning at 1400 px.
+- Focused automated tests and the complete local gate pass: 524 Python tests, all Node tests, Python syntax 117, JavaScript syntax 158, and secret scan 579. Next action: ask the user for one native Electron screenshot and motion judgment. Do not control the user's computer for visual inspection.
+- Remaining risk: the preferred legacy/director mix is perceptual. If motion is still too strong or too quiet, tune the four ownership targets before altering authored action curves or renderer cadence.
+
+## Latest Session Update: Live2D Wheel Hit-area Precision and State Recovery (2026-07-18)
+
+- Completed `live2d-wheel-hit-area-v1`: `web/live2dLayoutController.js` now checks `isPointOverVisibleModelArea(e.clientX, e.clientY)` before consuming a wheel event, so the right history rail and other stage UI no longer resize the model.
+- `tests/test_drag_logic.js` verifies both the conservative guard and that it precedes `e.preventDefault()`.
+- Focused wheel/render/stage tests passed. The complete `scripts\test-local.ps1` gate passed before the external state-file overwrite: 524 Python tests, all Node tests, Python syntax 117, JavaScript syntax 158, secret scan 579, and clean diff check.
+- Recovery note: `feature_list.json`, `progress.md`, and `session-handoff.md` were found as all-zero files after a concurrent external process stopped. They were rebuilt from `HEAD` and successful Codex patch logs. The files are readable and JSON-valid again, but some older uncommitted narrative may be absent.
+- Manual verification remains user-driven: reload Electron, confirm wheel over history cards leaves model scale unchanged, then confirm wheel directly over visible Hiyori still scales within the existing bounds.
+- Preserve all unrelated dirty work and `.bak` files; no commit, push, merge, model asset change, or renderer cadence change was made.
+
+## Latest Session Update: Hiyori Native-motion Fluidity Parity (2026-07-17)
+
+- Semantic nod, shake, lean, back-lean, and happy-bounce actions were lengthened and reshaped with zero-velocity curves to approach Hiyori's authored-motion fluidity.
+- Speech uses a continuous energy drive and staggered head/shoulder/torso phase offsets rather than identical per-frame channel timing.
+- Existing priorities, cooldowns, 190 ms interruption fade, fallback behavior, model assets, and frame cadence are preserved.
+
+## Active Feature: Electron Stage Runtime Coordination v1 (2026-07-16)
+
+- Status: in progress.
+- Goal: run the real Electron app, inspect native stage/pet behavior, remove duplicate visible or high-frequency Live2D work, and polish issues found only in the native shell.
+- Preserve: the accepted character-centered stage, transparent click-through desktop pet, speech/performance bridge, security defaults, and unrelated `.bak` files.
+- Next step: launch the development Electron app, capture both native window states, then implement the smallest lifecycle coordination supported by observed evidence.
+
+## Latest Completed Feature: Electron Stage Runtime Coordination v1 (2026-07-16)
+
+- Status: complete and fully verified.
+- Result: native stage and transparent pet surfaces now have an explicit renderer-ready lifecycle. Stage mode keeps the detached WebGL surface alive at zero opacity with its ticker stopped; `桌宠` or `Alt+Shift+P` minimizes the stage and resumes the pet without the blank-canvas failure observed during the first native pass.
+- Restore path: a second app launch restores/focuses only the stage and returns the pet to its inactive state. Legacy narrow stage bounds migrate once through window layout version 2.
+- Native evidence: real configured Hiyori rendering was inspected in the landscape stage, transparent desktop-pet mode with presence badge, and restored stage. No duplicate character was visually present in stage mode.
+- Files touched for this feature: `electron/main.js`, `electron/preload.js`, `web/appStartupController.js`, `web/desktopControlBinder.js`, `web/index.html`, `web/chatDom.js`, `tests/test_stage_frontend.js`, `feature_list.json`, `progress.md`, and `session-handoff.md`.
+- Verification: focused tests passed; full `scripts\test-local.ps1` passed with 524 Python tests, full Node suite, Python syntax 117 files, JavaScript syntax 152 files, and secret scan 572 files.
+- Manual follow-up: with the selected LLM and TTS endpoints available, run one playful spoken turn and one serious spoken turn across stage/pet switching. Confirm audible continuity, subtitle timing, and model-specific clipping. Unrelated `.bak` files remain untouched.
+- Next session recommendation: use the existing latency diagnostics to calibrate one complete real text-and-voice loop before introducing any new proactive behavior.
+
+## Active Feature: Automatic TTS Failover and Recovery v1 (2026-07-16)
+
+- Status: in progress.
+- Goal: keep the companion audible when GPT-SoVITS is offline, avoid blocking each utterance on a known outage, and return to the configured provider after a bounded successful recovery attempt.
+- UX contract: browser fallback and provider restoration are automatic; transitions use status text only and never open a modal.
+- Safety boundary: public fallback remains default-off; no provider, permission, observation, tool, CORS, token, or security default changes.
+- Next step: add circuit-state fields and sanitized recovery timing, update direct playback behavior, cover cancellation/stale/failure/recovery paths, then run the complete local verification gate.
+
+## Latest Completed Feature: Automatic TTS Failover and Recovery v1 (2026-07-16)
+
+- Status: complete and fully verified.
+- Result: the personal profile now falls back from offline GPT-SoVITS to browser speech, suppresses repeated server waits for 15 seconds, and returns to GPT-SoVITS only after successful server audio playback. Realtime segment enqueueing respects the same circuit.
+- UX: fallback/recovery uses brief status text only. There are no dialogs and no provider setting is rewritten.
+- Files touched: `config.py`, `config.example.json`, `web/chatState.js`, `web/appConfigController.js`, `web/ttsPlaybackController.js`, `web/streamTtsQueueController.js`, `web/chat.js`, `tests/test_config_asr_defaults.py`, `tests/test_tts_failover_recovery_frontend.js`, `tests/test_stream_tts_queue_frontend.js`, `scripts/run_node_tests.js`, `feature_list.json`, `progress.md`, and `session-handoff.md`. Ignored `config.local.json` changed privately.
+- Verification: focused tests passed; full `scripts\test-local.ps1` passed with 524 Python tests, full Node suite, Python syntax 117 files, JavaScript syntax 153 files, and secret scan 573 files. The restarted app loaded fallback=true and a 15-second recovery interval while GPT-SoVITS port 9880 remained offline.
+- Manual follow-up: listen to one browser-fallback turn now, then start GPT-SoVITS and listen again after 15 seconds. Judge installed system-voice quality, first-sound delay, recovery status, subtitle timing, and Live2D mouth/motion sync.
+- Next session recommendation: compare the same short playful and serious lines across browser and GPT-SoVITS using the existing latency diagnostics before tuning more timing constants.
+
+## Active Feature: Live2D Render Performance v1 (2026-07-16)
+
+- Status: in progress.
+- Goal: improve perceived model smoothness before any further frontend restyle.
+- Observed risk: PIXI Application rendering and pixi-live2d shared-ticker updates currently use separate clocks, so inactive surfaces may still update and the active surface can suffer unnecessary scheduling overhead.
+- Preserve: current Hiyori asset, exaggerated motion settings, stage/pet lifecycle, drag/tap behavior, provider choices, and all privacy/security defaults.
+- Next step: add one synchronized ticker path and lightweight native render telemetry, then measure the real Electron stage and run focused/full regressions.
+
+## Latest Completed Feature: Stage-centered Companion Frontend v1 (2026-07-16)
+
+- Status: complete and fully verified.
+- Result: the main Electron window is now a character-first full Live2D stage with left/right conversation rails and a floating composer. The transparent desktop pet has coordinated presence/subtitle styling and remains click-through.
+- Files touched for this feature: `electron/main.js`, `web/index.html`, `web/stage.css`, `web/chatDom.js`, `web/appStartupController.js`, `web/live2dLayoutController.js`, `tests/test_stage_frontend.js`, `tests/test_config_switch_frontend.js`, `scripts/run_node_tests.js`, and the three state artifacts.
+- Browser verification: real Hiyori rendering and existing history were inspected at 1280x720; more drawer, sticker panel, text input, and model/voice settings opened successfully. Seven visible first-pass mismatches were corrected.
+- Verification: `scripts\test-local.ps1` passed with 524 Python tests, the full Node suite, Python syntax 117, JavaScript syntax 152, and secret scan 572. Scoped and repository `git diff --check` passed.
+- Manual follow-up: launch Electron and compare a playful spoken turn and serious spoken turn for clipping, subtitle placement, and whether the detached pet remains visually comfortable on the user's actual desktop. No model asset, provider, permission, observation, tool, or security default changed.
+
+## Active Feature: Stage-centered Companion Frontend v1 (2026-07-16)
+
+- Status: in progress.
+- Accepted concept: the dark character-centered stage concept generated and approved in the current task.
+- Goal: replace the narrow white chat panel with a dark character-first Live2D stage, orbit recent turns around the center, simplify the composer/control hierarchy, and coordinate the model-only desktop pet treatment.
+- Preserve: all existing functional IDs, voice/chat workflows, transparent click-through pet behavior, security defaults, and unrelated `.bak` files.
+- Next step: add the stage shell/CSS, adapt Electron chat bounds and view mode, then run browser fidelity and interaction checks before the full verification gate.
+
+# Session Handoff
+
 Last Updated: 2026-07-11
 
 ## Current Objective
@@ -109,6 +563,8 @@ No coding feature is currently active. The last two frontend speech-stability sl
 - Known follow-up is tracked as pending `stream-tts-delivery-completeness-v1`: recover a failed later stream tail without duplicating speech that already played.
 
 ## Current State
+
+- Active feature: `stream-tts-delivery-completeness-v1`. Audit the existing realtime queue and final speech watchdog first; recovery may speak only the known-undelivered final tail, must never replay actual delivered segments, and must remain blocked for interrupted/stale sessions. Keep TTS provider, permissions, private configuration, and network behavior unchanged.
 
 - No active feature is open after the latest speech-stability pass. Browser generation continuity and cancelled playback settlement are complete and fully verified.
 - Next recommended work: run a real Electron split/full-window experience pass for Browser TTS, server-to-Browser fallback, no-barge-in interruption, and Live2D speech motion timing. Use the result to open the next small feature in `feature_list.json` before coding.
@@ -652,6 +1108,63 @@ Current status: complete and Electron-smoke verified.
 - Source package and NSIS installer smoke checks passed after all changes.
 - Only remaining advisory is external/local GPT-SoVITS availability; no code or safety default was changed to override the user's provider choice.
 
+## 2026-07-10 Release Privacy Scan v1
+
+- Status: complete.
+- Sanitized 61 real Windows user-home references across `progress.md`, `session-handoff.md`, and Live2D plan/spec documents.
+- Secret scan passed across 536 files; private-path fixture remains enforced.
+- Full `scripts/test-local.ps1` gate passed.
+
+## 2026-07-10 Release Advisory Semantics v1
+
+- Status: complete.
+- Default release gate now reports optional demo-service blockers as warnings; `-RequireDemoReadiness` preserves strict failure behavior.
+- Runtime acceptance tests passed (`20 passed`), and the default release gate passed with GPT-SoVITS offline.
+
+## 2026-07-10 First-Run Package and Installer Verification
+
+- Source-package smoke passed, including clean bootstrap and safe-default validation.
+- Installer smoke passed, including NSIS output, source zip, SHA256SUMS and release asset documentation.
+- No package code changes were needed.
+
+## 2026-07-10 Local HTTP Request Bounds v1
+
+- Status: complete.
+- `app.py` centralizes request-body validation with route-specific limits.
+- Integration tests passed (`67 passed`), including 413 and invalid Content-Length behavior.
+
+## 2026-07-10 Chat Developer Diagnostics Lazy Loading v1
+
+- Status: complete.
+- Default chat skips `followupReadinessPanelController.js` (212,498 bytes); developer mode still loads it through `devFeatureLoader.js`.
+- Node suite and Electron UI smoke passed.
+
+## 2026-07-10 Renderer Content Security Policy v1
+
+- Status: complete.
+- Added CSP without `unsafe-eval`, externalized early bootstrap, and vendored the official Pixi 6.5.8 CSP compatibility patch.
+- Electron smoke passed with Live2D rendered and no CSP security warning.
+
+## 2026-07-10 Electron Dependency Security v1
+
+- Status: complete.
+- Electron is locked to 39.8.10; npm audit reports 0 vulnerabilities.
+- Full Node tests and Electron UI smoke passed.
+
+## 2026-07-10 Local Data Durability v1
+
+- Status: complete.
+- Backup-aware reads now cover interaction, core, short-term and emotion state; emotion writes are atomic with previous-version backup.
+- Targeted persistence tests passed (`38 passed`).
+- `character-performance-cue-v1` is restored as the active feature after this audit sequence.
+
+## 2026-07-10 Complete Audit Remediation Verification
+
+- All implemented audit fixes passed the final local gate (`436` Python tests plus all frontend/syntax/privacy checks).
+- npm audit reports 0 vulnerabilities; Electron 39 smoke passed.
+- Source package and NSIS installer smoke checks passed after all changes.
+- Only remaining advisory is external/local GPT-SoVITS availability; no code or safety default was changed to override the user's provider choice.
+
 ## Latest Session Update: Companion Speech Prewarm v1 Completed on 2026-07-11
 
 - Result: opt-in model-direct companion turns using GPT-SoVITS can start one server-TTS request for a complete stable draft sentence while the model continues streaming. The audio remains silent until the canonical final turn confirms that exact prefix; then it plays once and only the remaining tail is synthesized normally.
@@ -686,6 +1199,30 @@ Current status: complete and Electron-smoke verified.
 - Manual follow-up: install/configure a local English Vosk model in private `config.local.json`, then speak one full Chinese sentence and one full English sentence with the microphone open. Do not claim rapid code-switching support or enable browser/cloud fallback automatically.
 - Recommended next feature: select the next remaining end-to-end experience gap from the current audit, prioritizing real configured-model conversation and voice/Live2D evidence rather than changing private settings or rebuilding derived summaries.
 
+## Current Objective: Private Bilingual Voice Input v1
+
+- Status: in progress.
+- Scope: add optional local Chinese/English Vosk model configuration and whole-utterance auto selection; preserve the existing Chinese setup if no English model is configured.
+- Safety boundaries: do not touch `config.local.json`, do not download models, do not expose local paths to the client, and do not enable browser/cloud ASR as a new fallback.
+- Limitation to retain in user-facing docs: rapid Chinese-English code-switching inside one utterance is not guaranteed by two monolingual Vosk models.
+
+## Latest Session Update: Private Bilingual Voice Input v1 Completed on 2026-07-11
+
+- `asr.py` now supports optional local Chinese/English model paths, one whole-utterance auto choice, CJK-only spacing compaction, bounded two-model caching, and a conservative near-tie policy that enters the existing low-confidence confirmation path.
+- `app_asr_route.py` passes only server-side ASR configuration to the structured transcriber. Request JSON cannot choose model paths; API and health payloads do not reveal private local paths.
+- The frontend accepts safe language/confidence metadata and applies ambiguity to its existing confirmation flow. Explicit English browser recognition works when `input_language_mode` is `en`; automatic browser wake switching is deliberately not claimed.
+- Files added for regression coverage: `tests\test_asr.py`, `tests\test_app_health_asr.py`, and `tests\test_bilingual_local_asr_frontend.js`.
+- Verification: focused suite `39 passed`; full `scripts\test-local.ps1` passed with `505` Python tests, all Node frontend tests, syntax and secret checks; public encoding, JSON validation, and scoped diff check passed.
+- Manual follow-up: install/configure a local English Vosk model in private `config.local.json`, then speak one full Chinese sentence and one full English sentence with the microphone open. Do not claim rapid code-switching support or enable browser/cloud fallback automatically.
+- Recommended next feature: select the next remaining end-to-end experience gap from the current audit, prioritizing real configured-model conversation and voice/Live2D evidence rather than changing private settings or rebuilding derived summaries.
+
+## Current Objective: Realtime TTS Performance Sync v1
+
+- Status: in progress.
+- Scope: fix the realtime queued server-TTS path so talk gesture and performance timeline begin only at real audible playback, using the existing `onPlaybackStart` contract already proven by the companion speech prewarm path.
+- Preserve: pending/thinking pre-reaction, direct fallback, companion-turn behavior, user-selected provider/config, and all privacy/safety defaults.
+- Test priority: no gesture/timeline on text enqueue or blob readiness; one start at actual playback; no start for stale/cancelled/failed segments.
+
 ## Current Objective: Realtime TTS Performance Sync v1
 
 - Status: in progress.
@@ -700,3 +1237,238 @@ Current status: complete and Electron-smoke verified.
 - Verification: targeted diagnostics/playback/lazy-loading tests, full Node suite, and `scripts\test-local.ps1` all passed (`519` Python tests; Python syntax `117`; JavaScript syntax `149`; secret scan `568`).
 - Manual check: open a real Electron developer session, click `体验延迟`, and compare one Browser TTS and one GPT-SoVITS/fallback turn against perceived first sound. No measurements are persisted or exported.
 - Next session recommendation: create one provider-capability-gated true-streaming-audio feature based on the measured bottleneck. Preserve provider choice, fallback policy, privacy/security defaults, and the existing actual-playback performance contract.
+
+## Latest Session Update: Hiyori Daily Conversation Gestures v1 on 2026-07-19
+
+- Status: implementation and focused verification complete; real Electron perceptual check remains.
+- Files touched in this slice: `web/hiyoriPerformanceDirector.js`, `web/chat.js`, `tests/test_hiyori_performance_director_frontend.js`, `docs/hiyori-performance-director.md`, and the three state artifacts.
+- Added restrained actions for attentive listening, single/double acknowledgement, gentle disagreement, thought entry/resolution, care, shyness, speech emphasis, and sentence release. Timeline cue aliases now reach the Hiyori semantic director; unsupported/non-Hiyori paths still use Cubism motions.
+- Focused action, performance-cue, free-chat, stage, syntax, and scoped whitespace tests passed.
+- The first full Node run exposed a brittle exact-source check for the formerly one-line `playEmotion` wrapper. The test now accepts the intentional multi-line Hiyori routing wrapper and still proves fallback delegation to `motionRuntimeController`.
+- Full `scripts\test-local.ps1` passed with `524` Python tests, all Node frontend tests, Python syntax `117`, JavaScript syntax `158`, and secret scan `579`.
+- Next session: have the user test natural daily chat in Electron and report which of listening, thought transition, care, emphasis, or sentence release is too weak/strong. Tune amplitudes from that evidence; do not add rig-dependent hand poses without a `.cmo3` source.
+
+## Latest Session Update: Hiyori Transition Continuity Pass on 2026-07-19
+
+- Status: implementation and full local verification complete; real Electron perceptual tuning remains.
+- `web/hiyoriPerformanceDirector.js` now applies one elapsed-time critically damped mixer after all mode, emotion, speech, semantic-action, crossfade, and idle contributions are composed.
+- Channel response is intentionally staggered: face/eyes respond first, head follows, torso/shoulder settle more slowly, and arms/hands/secondary motion are slowest. Speech raises head/torso response slightly without bypassing inertia.
+- Tests cover the entire idle/listen/think/speak/idle chain, speech release momentum, duplicate timestamps, 60/120 Hz convergence, and existing semantic action behavior.
+- No extra ticker, interval, renderer work, model asset, private configuration, or `.bak` file was added or changed.
+- Full `scripts\test-local.ps1` passed with `524` Python tests, all Node frontend tests, Python syntax `117`, JavaScript syntax `158`, and secret scan `579`.
+- Next session: use real Electron perception to tune only `channelResponseRate()` values if a transition is still too heavy or too loose.
+
+## Latest Session Update: Stage Header Refinement v2 on 2026-07-19
+
+- Status: complete, including iterative native Electron day/night verification.
+- Accepted concept: `<CODEX_HOME>/generated_images/019f6ba6-9db1-7900-af62-ce3a41139137/exec-92d682e8-ad2b-4bc8-86b5-5c6ff9d6a6a3.png`.
+- `electron/main.js` now uses a hidden title bar with native overlay controls; `electron/preload.js` and `web/stageThemeController.js` synchronize native symbol contrast with the effective room without changing room-selection behavior.
+- `web/index.html` adds the app-owned draggable title surface. `web/stage.css` reduces the rail to 56px, removes sharp separators and white blocks, softens materials, and keeps the center selector fully visible inside the rail's containing block.
+- Tests protect the integrated title surface, compact materials, centered selector, Electron overlay contract, and day/night title synchronization.
+- Full local validation passed with `524` Python tests, all Node tests, Python syntax `117`, JavaScript syntax `158`, secret scan `579`, and clean scoped whitespace checks.
+- Native Electron remains open in automatic room mode. Existing unrelated dirty work and `.bak` files were not modified.
+
+## Latest Session Update: Stage Header Refinement v1 on 2026-07-19
+
+- Status: complete, including native Electron screenshot review.
+- Accepted concept: `<CODEX_HOME>/generated_images/019f6ba6-9db1-7900-af62-ce3a41139137/exec-fed49a89-bbe9-44fb-9fe0-e38eebb7b2c7.png`.
+- `web/stage.css` now renders one coherent 70px top rail around the unchanged three-zone structure. Day/night materials, nested theme selector, left brand/status hierarchy, right enabled controls, and responsive spacing were refined.
+- `tests/test_stage_frontend.js` now protects the unified rail, both material variants, centered selector, semantic status signal, and quiet day enabled state.
+- Focused stage/theme/button tests and scoped whitespace checks passed.
+- Full `scripts\test-local.ps1` passed with `524` Python tests, all Node frontend tests, Python syntax `117`, JavaScript syntax `158`, and secret scan `579`.
+- Native Electron result: after the user explicitly authorized opening the app, the real 1290x860 day-stage window confirmed the 70px rail, outer margins, vertical centering, left density, centered theme switch, right-button weight, unobstructed Live2D subject, and non-overlapping bottom composer. The day palette is deliberately low-contrast and can be deepened later if the user wants a stronger visual hierarchy.
+- Existing dirty work and `.bak` files must remain untouched.
+
+## Latest Session Update: Unified Control Center UI v1 on 2026-07-19
+
+- Status: complete, including Image2 concept selection, desktop/narrow browser QA, native Electron QA, and the full local gate.
+- Concept reference: `C:/Users/MQL/.codex/generated_images/019f6ba6-9db1-7900-af62-ce3a41139137/exec-ff8dde34-20f4-466a-b0e7-67c449c31267.png`.
+- Main implementation files: `web/controlCenter.css`, `web/controlCenterShell.js`, `web/index.html`, `web/diagnosticsRuntimeController.js`, `web/advancedActionBinder.js`, `web/chatDom.js`, `web/chat.js`, and `electron/main.js`.
+- The More launcher and all five feature pages now use one refined warm translucent shell. Schedule, persona, model/voice, memory management, and diagnostics retain all existing controls and data behavior.
+- Diagnostics opens a dedicated running/result page and continues to append its text report to chat. Desktop toggle buttons now expose their actual pressed state.
+- Browser checks covered all five page routes and a 680x760 narrow layout. Native Electron checks covered stage launch, centered Live2D, the non-overlapping More launcher, and model/voice configuration rendering with real local values.
+- Full validation passed: `524` Python tests, all Node tests (including the new control-center contract), Python syntax `117`, JavaScript syntax `160`, secret scan `582`, JSON checks, and `git diff --check`.
+- The Electron process remains open for user review. Existing unrelated dirty work and every `.bak` file remain untouched; nothing was committed, pushed, or merged.
+
+## Latest Session Update: Control Center Progressive Disclosure on 2026-07-19
+
+- Status: implementation, browser fidelity loop, targeted tests, and full local gate complete.
+- Accepted concept: `C:/Users/MQL/.codex/generated_images/019f6ba6-9db1-7900-af62-ce3a41139137/exec-67668576-1273-4369-a52e-d4cadf1b59bd.png`.
+- Main files: `web/controlCenter.css`, `web/controlCenterShell.js`, `web/index.html`, `web/storageController.js`, `web/diagnosticsRuntimeController.js`, `web/advancedActionBinder.js`, `tests/test_control_center_frontend.js`, and `tests/test_config_switch_frontend.js`.
+- Default control-center pages now prioritize common choices; technical configuration, bulk tools, relationship detail, and raw reports use a consistent `高级设置` disclosure. Day/night colors are explicit and no longer inherit washed-out legacy config surfaces.
+- Navigation handoff has no delayed empty frame. Diagnostics stays inside its page and no longer writes technical status/report rows into chat; legacy self-check rows are filtered on history load.
+- Browser proof: common/advanced states, day/night palettes, config-to-persona continuity, diagnostics isolation (`0` report rows before and after a real self-check), and 390x844 overflow metrics passed.
+- Full gate: `524` Python tests, all Node tests, Python syntax `117`, JavaScript syntax `160`, secret scan `582`.
+- Remaining manual check: reload the already-open native Electron stage and capture model/voice plus diagnostics. Computer Use selected the correct window but could not capture it because Windows did not report a foreground process id. Do not use stale coordinates.
+- Existing unrelated dirty changes and all `.bak` files remain untouched; nothing was committed, pushed, or merged.
+
+## Latest Session Update: Qwen3-TTS Low-Latency Trial v1 on 2026-07-27
+
+- Status: implementation, isolated runtime installation, live CUDA service validation, project-adapter benchmarking, focused regressions, and the full local gate are complete. Real Electron listening remains.
+- Runtime: `D:\AI\qwen3_tts_runtime\.venv` contains the optional runtime and the Hugging Face cache contains `Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice`. The repository contains no model weights or user voice samples. Start with `scripts\start-qwen3-tts.ps1`; default endpoint is `http://127.0.0.1:9881/v1/audio/speech`.
+- Temporary voice: `Vivian`, chosen only for bilingual architecture/latency evaluation. Do not start formal Xinyu voice design, recording, cloning, or training until the user says the broader optimization phase is finished.
+- Latency evidence after warmup: direct service Chinese first audio `214-388 ms`, English `241-330 ms`; calls through `tts.open_server_tts_stream` measured `331 ms` Chinese and `232 ms` English. Short total synthesis was roughly `1.0-1.7 s`.
+- Resource boundary: with Qwen and the desktop workload active, GPU memory was about `6002/7900 MB`; do not keep GPT-SoVITS and Qwen resident together on this 8 GB laptop GPU. The GPT-SoVITS API on port `9880` was deliberately stopped for the trial; its config fields remain unchanged for rollback.
+- Integration: Qwen uses the existing generation/session-fenced PCM stream queue, cancellation, actual-playback callbacks, and final delivery recovery. `web/chatReplyController.js` streams before companion finalization only for `qwen3_tts + model_direct_reply`; the backend contract proves final `spoken_text` equals emitted deltas. Other providers and reply pipelines still wait.
+- Private runtime config now selects `qwen3_tts` with the local endpoint and Vivian. Restart the Electron app once so sanitized frontend state reloads; the already warmed Qwen service can stay running.
+- Checks passed: Qwen Python suite plus related config/TTS/health tests (`48 passed`), Qwen frontend, character runtime, and realtime TTS queue checks. Full `scripts\test-local.ps1` passed with `553` Python tests, all Node frontend tests, Python syntax `123`, JavaScript syntax `163`, and secret scan `602`; JSON validation and scoped whitespace checks passed.
+- Next: restart Electron once, then conduct a real listening pass for Chinese, English, mixed-language pronunciation, sentence joins, interruption cancellation, and UI/frame responsiveness. Preserve all `.bak` files and unrelated dirty work; do not commit or push.
+
+## Latest Session Update: Technical Message History Isolation on 2026-07-19
+
+- Status: implementation, browser interaction proof, focused tests, and full Node frontend suite complete.
+- Main files: `web/chatMessageController.js`, `web/storageController.js`, `web/localCommandExecutor.js`, `web/configSwitchController.js`, `web/characterDiagnosticsController.js`, `web/appStartupController.js`, `web/live2dRuntimeController.js`, `web/chatReplyController.js`, `tests/test_control_center_frontend.js`, and `tests/test_character_runtime_frontend.js`.
+- System/technical output is now explicitly transient and cannot be committed by the shared message controller. Legacy assistant-side diagnostic, test, debug, startup, and transport-error records are removed during history load.
+- Ordinary conversation, proactive companion replies, emotion reports, and reminders remain normal history. Configuration tests continue to report inside the model/voice page instead of producing chat cards.
+- Browser proof: `/ttsdebug` created one temporary system row, wrote neither command nor report to storage, and disappeared after reload (`systemRows=0`).
+- Focused control-center, character-runtime, config-switch, JavaScript syntax, and full Node frontend tests passed. Full `scripts\\test-local.ps1` also passed with `524` Python tests, all Node frontend tests, Python syntax `117`, JavaScript syntax `160`, and secret scan `582`.
+- Existing unrelated dirty changes and all `.bak` files remain untouched; nothing was committed, pushed, or merged.
+
+## Latest Session Update: Inline Sticker and Translation Persistence v1 on 2026-07-27
+
+- Status: implementation and full local verification complete. Electron has been restarted with the new renderer; user visual confirmation remains.
+- `web/chatMessageController.js` now persists assistant translations on text records, restores them during history rendering, and backfills eligible old records through the existing translation service.
+- Stickers related to a text turn now live in that text record's bounded `stickers` array and render after the words as `1.85em` inline images. Both user and assistant paths use the same rule. A small standalone fallback remains for sticker-only turns.
+- `web/storageController.js` migrates legacy standalone stickers to the nearest prior same-role text record and persists the normalized history representation.
+- `web/base.css`, `web/kawaiiTheme.css`, `web/stage.css`, and `web/phosphorIcons.css` provide the inline sticker treatment, compact fallback, and refined CJK-aware message typography without changing the existing stage layout or card architecture.
+- Regression coverage is in `tests/test_sticker_frontend.js` and `tests/test_stage_frontend.js`. `node scripts\run_node_tests.js` passes, and `scripts\test-local.ps1` passes with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`.
+- Preserve all `.bak` files and unrelated dirty work. Do not commit, push, or merge without an explicit later request.
+
+## Latest Session Update: Compact Character Prompt and Personality Calibration v1 on 2026-07-27
+
+- Status: implementation, configured-provider probes, focused regressions, JSON checks, scoped whitespace checks, and the full local gate are complete.
+- Files touched for this slice: `app.py`, `character_brain.py`, `character_brain_intent_strategy.py`, `companion_dialogue_policy.py`, `humanize.py`, `llm_runtime.py`, `config.py`, `config.example.json`, `config.preview.example.json`, `tests/test_character_brain.py`, `tests/test_natural_character_dialogue.py`, `tests/test_preview_experience_profile.py`, and the three state artifacts.
+- Result: model-direct text and voice turns now receive a compact social director rather than the full performance-state dump. One canonical dialogue contract and one small turn-direction block replace overlapping language/style/humanization rules.
+- Personality target: mischievous, opinionated, relevant but surprising, capable of sharp teasing, and quietly caring beneath pushback. Reply length and shape stay adaptive; no fixed one-to-three-sentence rule or compulsory joke/question pattern was introduced.
+- Preserved: private configuration, manual persona, wakeup/profile memory, structured relationship state, relevant dynamic memory, experience feedback, safety boundaries, tool capability contracts, companion-turn metadata, Live2D/TTS performance metadata, and legacy non-model-direct behavior.
+- Budget evidence: the same private no-history comfort probe moved from about `2053` to `1234` `cl100k_base` system tokens (`39.9%` reduction). Relevant coding memory can raise a turn to about `1547` tokens and remains intentionally available.
+- Latency evidence: paired three-turn median moved from about `15.0 s` to `14.0 s`, but a minimal prompt still required roughly `16.2-18.0 s` to first content. Treat the configured upstream provider/stream path as the dominant remaining bottleneck.
+- Provider limitation: Chinese input arrived at the configured upstream as question marks even with a minimal system prompt. Do not attribute Chinese nonsense replies to this prompt calibration; investigate provider/input compatibility as a separate feature if the user requests it.
+- Verification: focused suite `315 passed`; full `scripts\test-local.ps1` passed with `575` Python tests, all Node frontend tests, Python syntax `126`, JavaScript syntax `163`, and secret scan `607`. JSON validation and scoped `git diff --check` passed.
+- Next session: restart Electron and do a real English personality pass. If the user wants Chinese conversation, first open a separate provider/input-encoding investigation. Preserve all unrelated dirty work and every `.bak` file; nothing was committed or pushed.
+
+## Latest Session Update: Semantic Emotive Hiyori Authored-Motion Sync v1 on 2026-07-27
+
+- Status: implementation and full local verification complete; native Electron listening/visual acceptance remains.
+- Core mapping: `EmotionShy -> m05`, `EmotionHappy -> m06`, `EmotionSurprised -> m07`, `EmotionPlayful -> m08`, `EmotionAngry -> m09`, and `EmotionSad -> m10`. The new names duplicate references to the existing verified local files; no third-party motion asset was imported.
+- Runtime: `web/performanceCueController.js` resolves high-intensity emotion and compatible explicit actions deterministically. `web/chat.js` and `web/appStartupController.js` dispatch from actual playback start in same-window and split-window modes. `web/motionRuntimeController.js` owns keyed cooldown and playback-generation metadata.
+- Layering: `web/live2dExpressionController.js` suppresses competing semantic one-shots for authored cues, reduces procedural head/body/arm gain during the measured motion window, preserves facial/speech detail, and stops the owned motion on interruption.
+- Preview: in the Live2D renderer console, use `__TAFFY_HIYORI_MOTION_PREVIEW__.emotions` and `__TAFFY_HIYORI_MOTION_PREVIEW__.play("playful")` to audition one emotion. Normal cooldown rules still apply.
+- Verification: authored-motion focused test, performance cue, continuous director, actual playback guard, the complete Node suite, model JSON, JavaScript syntax, scoped whitespace, and `scripts\test-local.ps1` all pass. Full gate totals: `575` Python tests; Python syntax `126`; JavaScript syntax `164`; secret scan `608`.
+- Manual next step: restart/reload Electron, then test at least playful, surprised, happy, shy, angry, and sad speech plus one interruption. Pay special attention to long `m05` (8.57s) and `m06` (5.37s). If they overstay the spoken line, tune their trigger eligibility/cooldown or author shorter exported variants; do not abruptly crop the original motion without visual evidence.
+- Preserve every `.bak` file and unrelated dirty change. Nothing was committed or pushed.
+
+## Latest Session Update: Xinyu Stable Natural Emotion v5 on 2026-07-28
+
+- Status: stable cute-baseline emotion profile implemented; three-emotion continuity audition and content checks complete; user listening confirmation remains.
+- Runtime rule: V7's fictional five-to-seven-year-old cute lively identity is always the baseline. Emotion may add only small keyword, emphasis, pacing, and ending changes; it may not create a new persona or pitch range.
+- All emotions were softened, `high` is capped at moderate, and dark/obsessive/possessive/sinister/yandere-like delivery is forbidden.
+- Tested generation stability constants are temperature `0.72`, top-k `35`, top-p `0.9`, and repetition penalty `1.05`.
+- Audition: `D:\AI\voice_auditions\xinyu_natural_emotion_v8\V8_stable_cute_natural_emotion.wav`, external to the repository. Playful, thinking, and warm-happy segments measured about `342/317/301 Hz` median voiced F0, retained their Chinese content, and produced no clipping.
+- Verification: focused Qwen/TTS suite `25 passed`; full `scripts\test-local.ps1` passed with `577` Python tests, all Node frontend tests, Python syntax `126`, JavaScript syntax `164`, and secret scan `608`. JSON and scoped whitespace checks passed.
+- Preserve every `.bak` file and unrelated dirty change. Nothing was committed or pushed.
+
+## Latest Session Update: Xinyu Younger Cuter Child Voice v4 on 2026-07-28
+
+- Status: complete and user-accepted. The formal 1.7B service now targets a fictional five-to-seven-year-old child voice; V7 audition and fixed-language bilingual checks are complete.
+- Audition: `D:\AI\voice_auditions\xinyu_child_voice_v7\V7_younger_cuter_child.wav`, external to the repository. It is `11.0 s`, `24 kHz`, normalized to `-25.0 dBFS`, peaks at `-4.37 dBFS`, and has no clipped samples.
+- Character sound: very small soft-light timbre, clean high placement, round innocent resonance, milk-sweet warmth, lively curiosity, tiny quick reactions, bouncy rhythm, bright pitch movement, and extra-cute endings.
+- Guardrails remain: exact wording/order, stable pronunciation, no baby talk, harsh squeakiness, adult sultriness, inserted vocalizations, metallic texture, robotic delivery, or digital effects.
+- Fixed-language Whisper recovered English exactly and Chinese substantially intact, with `啦`/`了` as the only notable normalization.
+- Verification: focused Qwen/TTS suite `24 passed`; full `scripts\test-local.ps1` passed with `576` Python tests, all Node frontend tests, Python syntax `126`, JavaScript syntax `164`, and secret scan `608`. JSON and scoped whitespace checks passed.
+- Preserve every `.bak` file and unrelated dirty change. Nothing was committed or pushed.
+
+## Latest Session Update: Xinyu Young Lively Child Voice v3 on 2026-07-28
+
+- Status: the formal profile and live 1.7B service now target a fictional nine-to-eleven-year-old child voice; final audition and language-aware content checks are complete; user listening confirmation remains.
+- Audition: `D:\AI\voice_auditions\xinyu_child_voice_v6\V6_young_lively_child.wav`, external to the repository. It is `14.62 s`, `24 kHz`, normalized to `-25.0 dBFS`, peaks at `-3.15 dBFS`, and has no clipped samples.
+- Character sound: small, light, clean high placement, rounded youthful resonance, milk-sweet warmth, lively curiosity, playful energy, buoyant rhythm, and expressive childlike endings.
+- Guardrails: no baby talk, harsh squeakiness, nasality, adult sultriness, inserted humming/squeals/giggles/gasps, metallic texture, robotic delivery, or digital effects.
+- QA: Chinese segments were substantially intact. English was exact when Whisper used explicit English mode; auto mode misclassified the strongly childlike English voice as Chinese, so acoustic validation should remain language-aware.
+- Verification: focused Qwen/TTS suite `24 passed`; full `scripts\test-local.ps1` passed with `576` Python tests, all Node frontend tests, Python syntax `126`, JavaScript syntax `164`, and secret scan `608`. JSON and scoped whitespace checks passed.
+- Preserve every `.bak` file and unrelated dirty change. Nothing was committed or pushed.
+
+## Latest Session Update: Xinyu Exaggerated Anime Moe Voice v2 on 2026-07-28
+
+- Status: high-intensity anime-moe delivery profile implemented; final audition and bilingual content checks complete; user listening confirmation remains.
+- Audition: `D:\AI\voice_auditions\xinyu_anime_moe_v5\final\V5_final_exaggerated_anime_moe.wav`, external to the repository. It is `11.98 s`, `24 kHz`, normalized to `-25.0 dBFS`, peaks at `-6.18 dBFS`, and has no clipped samples.
+- Runtime voice remains the original-character stack: Qwen3-TTS 1.7B CustomVoice + `Ono_Anna` + bounded project-owned delivery instruction. The stronger profile raises sweetness, youthfulness, anime intonation, bounce, and playful endings without importing or imitating an identifiable voice.
+- Correctness guard: the instruction forbids added humming, squeals, giggles, gasps, filler vowels, metallic texture, and robotic effects. CustomVoice uses `non_streaming_mode=True` for official full-text conditioning while the HTTP response remains incremental PCM.
+- Important diagnostic lesson: never pipe literal Chinese source through Windows PowerShell into Python for acoustic validation. Use Unicode escapes or a UTF-8 file. The earlier laughter-only results were generated from corrupted question-mark input; official Hugging Face SHA-256 checks for both model files passed.
+- Local Whisper recovered the final Chinese lines substantially intact and the English line with one `think`/`thank` near-homophone. Manual listening is still required to judge whether the exaggeration level is desirable.
+- Verification: focused Qwen/TTS suite `24 passed`; full `scripts\test-local.ps1` passed with `576` Python tests, all Node frontend tests, Python syntax `126`, JavaScript syntax `164`, and secret scan `608`. JSON and scoped whitespace checks passed.
+- Preserve every `.bak` file and unrelated dirty change. Nothing was committed or pushed.
+
+## Latest Session Update: Xinyu Childlike Original Voice v1 on 2026-07-27
+
+- Status: implementation, focused tests, full local verification, and direct 1.7B service smoke checks are complete. Native Electron listening acceptance remains.
+- Accepted acoustic target: `D:\AI\voice_auditions\xinyu_childlike_v4\B4_childlike_playful.wav` (external audition artifact, not packaged). It is an original childlike character direction rather than an imitation of an identifiable voice.
+- Formal runtime: `Qwen3-TTS-12Hz-1.7B-CustomVoice`, speaker `Ono_Anna`, bounded childlike/nimble/playful delivery instruction, CUDA streaming, and semantic emotion instructions.
+- Compatibility: legacy Qwen `default`/`auto` voice values map to `Ono_Anna`; explicit speaker choices still pass through; GPT-SoVITS, Browser TTS, and the Qwen 0.6B fallback were not removed.
+- Direct service evidence: health reports `speaker=Ono_Anna` and `emotion_instruction=true`; warm first audio was about `392 ms` Chinese and `290 ms` English. Expect a one-time cold Chinese path warmup around four seconds after starting 1.7B.
+- Verification: focused suite `24 passed`; Qwen frontend and config-switch tests passed; full `scripts\test-local.ps1` passed with `576` Python tests, all Node frontend tests, Python syntax `126`, JavaScript syntax `164`, and secret scan `608`. JSON and scoped whitespace checks passed.
+- Next step: reload Electron, test several Chinese/English emotional turns, and judge identity consistency plus end-to-end completion latency. Keep only one local TTS engine resident on the 8 GB GPU.
+- Preserve every `.bak` file and unrelated dirty change. Nothing was committed or pushed.
+
+## Latest Session Update: Independent Conversation Lane Collapse v1 on 2026-07-28
+
+- Status: implementation, persisted-state behavior, unread behavior, browser visual QA, frontend regressions, and the full local gate are complete.
+- UX: model history is now the left lane with a left-edge arrow; user history is the right lane with a right-edge arrow. The controls stay available when their lane is hidden, and the existing whole-rail collapse remains unchanged.
+- Behavior: lanes collapse independently, hidden lanes do not auto-expand for new messages, unread counts are bounded to `99`, and expanding clears the corresponding count. Conversation records and LLM history are never removed.
+- Persistence: `web/storageController.js` stores `collapsed` and `unread` per role in `taffy_conversation_lane_state_v1`; malformed or legacy storage falls back safely.
+- Message integration: normal messages, streamed assistant rows, and sticker events notify the lane once without counting restored history as new.
+- Main files: `web/index.html`, `web/chatDom.js`, `web/chatState.js`, `web/storageController.js`, `web/desktopControlBinder.js`, `web/chatMessageController.js`, `web/chat.js`, `web/stage.css`, `web/phosphorIcons.css`, and `tests/test_stage_frontend.js`.
+- Browser QA: both buttons were unique and operable; independent `aria-expanded` values and rail classes changed correctly; with both lanes collapsed, computed visibility was hidden and the stage background remained unobstructed.
+- Full verification passed: `576` Python tests, all Node frontend tests, Python syntax `126`, JavaScript syntax `164`, and secret scan `608`.
+- The temporary browser-QA backend was stopped after inspection. The separately running Qwen3-TTS service was not changed.
+- Preserve unrelated dirty changes and all `.bak` files. Nothing was committed or pushed.
+
+## Latest Session Update: Natural Voice Participation and Visible Thinking v1 on 2026-07-30
+
+- Status: implementation and full local verification complete; live subjective microphone tuning remains.
+- Behavior: when `natural_conversation.enabled=true` on a voice turn, Xinyu privately chooses a reply, quiet micro-reaction, deferred thought, or silence. Reply turns choose quick/normal/deep thinking depth; no-reply turns create no empty assistant card and no TTS request.
+- Presentation: the existing pre-reaction and thinking performance phases remain visible while model output is buffered. A quiet reaction can enqueue a restrained listening/thinking motion. Existing full-duplex cancellation remains the interruption path.
+- Privacy/continuity: private control tags are stripped server-side before chat, memory, and TTS. Non-replied speech keeps only a bounded in-memory ambient summary/topic hint with a configured TTL; it is not written as hidden chain-of-thought or raw long-term memory.
+- Compatibility: tracked defaults remain disabled; the ignored private `config.local.json` is enabled. Typed chat and missing legacy settings keep the prior always-reply path.
+- Main files: `natural_conversation.py`, `companion_dialogue_policy.py`, `app_chat_route.py`, `app_chat_context.py`, `config.py`, config examples, `docs/config.html`, `web/chatApi.js`, `web/chatReplyController.js`, `web/chatState.js`, `web/appConfigController.js`, and focused tests.
+- Verification: `scripts\test-local.ps1` passed with `617` Python tests, all Node frontend tests, Python syntax `142`, JavaScript syntax `167`, and secret scan `631`; JSON and scoped whitespace checks passed.
+- Next Session: restart/reload the local Python service and Electron renderer, then speak a small live matrix: direct question, casual statement, unfinished self-talk, humming/filler, emotional disclosure, and an interruption during a deep thinking pause. Tune delays or prompt wording only from observed behavior.
+- Preserve all unrelated dirty changes and every `.bak` file. Nothing was committed or pushed.
+
+## Latest Session Update: Qwen3-TTS Exclusive Managed Autostart on 2026-07-30
+
+- Status: implementation, focused tests, full local validation, and real runtime lifecycle verification are complete.
+- Behavior: with the private opt-in enabled, opening the desktop pet starts Qwen3-TTS and closing it stops only the Qwen process that Electron owns. The public default remains off for backward compatibility.
+- Exclusivity: the managed launcher accepts only `qwen3_tts`; it contains no GPT-SoVITS `api_v2.py` launch path and never selects GPT as automatic fallback. Qwen failure continues into the existing browser-voice fallback and visible failure handling.
+- Local runtime: the ignored private configuration uses `D:\AI\models\Qwen3-TTS-12Hz-1.7B-VoiceDesign`, `A2_Original`, and port `9881`. Health reported `model_loaded=true`, CUDA, VoiceDesign, streaming, and emotion-instruction support.
+- Cleanup: the stale standalone GPT-SoVITS service from an older session was stopped; port `9880` remained free and did not return after Electron/Qwen restart.
+- Main tracked files: `electron/main.js`, `config.py`, `config.example.json`, `config.preview.example.json`, `tests/test_qwen3_tts.py`, `tests/test_qwen3_tts_frontend.js`, and feature/session state documents.
+- Verification: focused backend suite `40 passed`; Qwen frontend checks passed; full `scripts\test-local.ps1` passed with `620` Python tests, all Node frontend tests, Python syntax `142`, JavaScript syntax `168`, and secret scan `632`.
+- Diagnostic note: the Qwen virtual environment inherits its Python 3.10 interpreter from a directory named `GPTSoVits`. This is only the interpreter origin; the actual service command is `qwen3_tts_server.py` and the loaded model is Qwen3-TTS.
+- Preserve all unrelated dirty changes and every `.bak` file. Nothing was committed or pushed.
+
+## Latest Session Update: Continuous Conversation Awareness on 2026-07-30
+
+- Status: implementation, focused regressions, full local verification, and runtime restart are complete. `companion-life-growth-v2` is now marked complete.
+- Behavior: with active companionship enabled, a quiet/deferred voice turn can remain as one short-lived candidate and be reconsidered after a natural delay. New user speech supersedes it; current user speech/typing and assistant thinking/speech defer it; disabling active companionship clears it.
+- Model ownership: automatic reconsideration opts into the same private natural-participation contract, so Xinyu may speak, react, defer again, or stay silent. Silence is not counted as a proactive success and creates no visible card, TTS, or durable raw memory.
+- Bounds: lightweight local pulses run at randomized 3.5–7.5 second intervals, but model calls occur only for a due candidate. Candidates expire after 90 seconds and repeated model defer is bounded.
+- Main files: `natural_conversation.py`, `app_chat_route.py`, `web/autoChatController.js`, `web/chatReplyController.js`, `web/chatState.js`, `web/chat.js`, `tests/test_natural_conversation.py`, `tests/test_app_chat_route.py`, `tests/test_conversation_awareness_frontend.js`, and `scripts/run_node_tests.js`.
+- Verification: focused backend suite `27 passed`; focused Node checks passed; full `scripts\test-local.ps1` passed with `619` Python tests, all Node tests, Python syntax `142`, JavaScript syntax `168`, and secret scan `632`. JSON and scoped whitespace checks passed.
+- Runtime: new Electron PID `47924`, local backend PID `61912`, and `/healthz` returned `ok`; SenseVoice was preserved.
+- Next Session: live-test with active companionship on: make a casual statement that earns silence/defer, wait up to 30 seconds, speak again during the wait, and observe whether Xinyu naturally drops, delays, or voices the afterthought. Tune only from real over-speaking, under-speaking, or interruption evidence.
+- Preserve all unrelated dirty changes and every `.bak` file. Nothing was committed or pushed.
+
+## Latest Session Update: Continuous Reply Voice and Live2D Face Sync v1 on 2026-07-30
+
+- Status: implementation, focused regressions, and the full local gate are complete. Real Electron listening/visual acceptance remains.
+- Root causes fixed:
+  - local speech cues could expire without clearing the applied exp3 expression;
+  - streaming Qwen PCM bypassed the analyser used by Live2D mouth motion;
+  - model-direct streaming and voice timelines could split one reply into independent Qwen synthesis requests.
+- Runtime behavior: Qwen now uses one finalized full-reply request by default, preserving one bounded emotion/style through-line and one character identity. Streaming audio remains incremental and cancellable after synthesis begins.
+- Live2D behavior: PCM BufferSources connect to a reusable analyser, then the audio destination. Existing frame sampling drives `ParamMouthOpenY` from the audible waveform. Playback completion uses a 380ms expression release and restores `neutral`; cancellation/failure clears immediately.
+- Compatibility: `tts.qwen3_tts_reply_continuity` defaults to `true`; set it to `false` only to restore legacy early sentence streaming. GPT-SoVITS segmented delivery is unchanged. No new animation loop, model asset, external motion, or runtime dependency was added.
+- Verification: focused suites passed; full `scripts\test-local.ps1` passed with `620` Python tests, all Node frontend tests, Python syntax `142`, JavaScript syntax `168`, and secret scan `632`.
+- Next session: reload Electron, then test one multi-clause reply similar to the reported screenshot, playful/happy and serious/sad contrasts, silent punctuation gaps, and interruption mid-speech. If the mouth is too weak/strong, tune analyser normalization rather than reintroducing synthetic-only cadence. If the voice is still discontinuous, capture the exact generated WAV and request metadata before changing the stable identity prompt.
+- Preserve all unrelated dirty changes and every `.bak` file. Nothing was committed or pushed.

@@ -49,10 +49,27 @@
       busyText: "\u81ea\u68c0\u4e2d",
       run: deps.runDoctorAndAppendReport,
       onError: (err) => {
-        call(deps.appendMessage, "assistant", `Doctor failed: ${err?.message || err}`, { enableTranslation: false });
         call(deps.setStatus, "\u6545\u969c\u81ea\u68c0\u5931\u8d25");
       }
     });
+
+    bindAsyncButton(ui.doctorRerunBtn, {
+      defaultText: "重新检查",
+      busyText: "检查中",
+      run: deps.runDoctorAndAppendReport,
+      onError: (err) => {
+        call(deps.setStatus, `故障自检失败: ${err?.message || err}`);
+      }
+    });
+
+    if (ui.doctorCloseBtn) {
+      ui.doctorCloseBtn.addEventListener("click", () => call(deps.closeDoctorPanel));
+    }
+    if (ui.doctorModal) {
+      ui.doctorModal.addEventListener("click", (event) => {
+        if (event.target === ui.doctorModal) call(deps.closeDoctorPanel);
+      });
+    }
 
     bindAsyncButton(ui.characterRehearsalBtn, {
       defaultText: "\u89d2\u8272\u8bd5\u6f14",

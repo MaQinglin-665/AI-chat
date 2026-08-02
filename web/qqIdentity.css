@@ -1,0 +1,53 @@
+.qq-identity-dialog {
+  max-width: 900px;
+}
+
+.qq-identity-id-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 26px;
+  padding: 4px 0;
+}
+
+.qq-identity-id-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 10px;
+  border: 1px solid rgba(85, 120, 170, 0.28);
+  border-radius: 999px;
+  color: #28466f;
+  background: rgba(232, 241, 255, 0.72);
+  font-size: 13px;
+}
+
+.qq-identity-id-chip button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #46658d;
+  background: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 18px;
+}
+
+.qq-identity-id-chip button:hover {
+  color: #a13b3b;
+  background: #fff;
+}
+
+.qq-identity-empty {
+  color: #7b8798;
+  font-size: 13px;
+}
+
+.qq-identity-audit {
+  max-height: 250px;
+  overflow: auto;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}

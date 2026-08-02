@@ -99,6 +99,33 @@
     return /^[A-Za-z0-9_-]{16,128}$/.test(deliveryId) ? deliveryId : "";
   }
 
+  function normalizeConversationDecision(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw) || Number(raw.version) !== 1) {
+      return null;
+    }
+    const mode = String(raw.mode || "").trim().toLowerCase();
+    if (!["reply", "silence", "micro_reaction", "defer"].includes(mode)) {
+      return null;
+    }
+    const thinkingLevel = ["quick", "normal", "deep"].includes(
+      String(raw.thinking_level || "").trim().toLowerCase()
+    )
+      ? String(raw.thinking_level).trim().toLowerCase()
+      : "normal";
+    const reaction = ["thinking", "soft_ack", "curious", "concerned"].includes(
+      String(raw.reaction || "").trim().toLowerCase()
+    )
+      ? String(raw.reaction).trim().toLowerCase()
+      : "";
+    return {
+      version: 1,
+      mode,
+      thinking_level: thinkingLevel,
+      thinking_delay_ms: Math.max(0, Math.min(5000, Math.round(Number(raw.thinking_delay_ms) || 0))),
+      reaction
+    };
+  }
+
   async function attemptDeliveredTurnAck(authFetch, deliveryId, options = {}) {
     const safeDeliveryId = normalizeDeliveryId(deliveryId);
     if (!safeDeliveryId || typeof authFetch !== "function") {
@@ -379,6 +406,9 @@
       ? context.onCompanionTurn
       : () => {};
     const onDeliveryId = typeof context.onDeliveryId === "function" ? context.onDeliveryId : () => {};
+    const onConversationDecision = typeof context.onConversationDecision === "function"
+      ? context.onConversationDecision
+      : () => {};
     const perfHooks = context.perfHooks || null;
     const getNow = typeof context.now === "function" ? context.now : nowMs;
 
@@ -422,6 +452,7 @@
         doneReply = evt.reply;
       }
       if (evt.type === "done") {
+        onConversationDecision(normalizeConversationDecision(evt.conversation_decision));
         const nextDeliveryId = normalizeDeliveryId(evt.delivery_id);
         if (nextDeliveryId && !deliveryId) {
           deliveryId = nextDeliveryId;
@@ -551,6 +582,9 @@
       ? options.onCompanionTurn
       : () => {};
     const onDeliveryId = typeof options.onDeliveryId === "function" ? options.onDeliveryId : () => {};
+    const onConversationDecision = typeof options.onConversationDecision === "function"
+      ? options.onConversationDecision
+      : () => {};
     const signal = options.signal || null;
     const requestInit = buildChatRequestInit(payload, { signal });
 
@@ -572,6 +606,7 @@
       const text = String(directData.reply || "");
       const deliveryId = normalizeDeliveryId(directData?.delivery_id);
       const companionTurn = normalizeCompanionTurn(directData?.turn, text);
+      onConversationDecision(normalizeConversationDecision(directData?.conversation_decision));
       onCharacterBrainDecision(directData?.character_brain);
       if (companionTurn) {
         onCompanionTurn(companionTurn);
@@ -670,6 +705,7 @@
         onCharacterBrainDecision,
         onCompanionTurn,
         onDeliveryId,
+        onConversationDecision,
         perfHooks,
         now: getNow,
         firstDeltaTimeoutMs
@@ -694,6 +730,7 @@
   const api = {
     buildChatRequestInit,
     normalizeCompanionTurn,
+    normalizeConversationDecision,
     normalizeDeliveryId,
     attemptDeliveredTurnAck,
     acknowledgeDeliveredTurn,

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:* http://localhost:*; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:* http://localhost:*; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
   <title>馨语AI桌宠</title>
   <link rel="stylesheet" href="./base.css">
   <link rel="stylesheet" href="./chat.css">
@@ -12,21 +12,101 @@
   <link rel="stylesheet" href="./onboarding.css">
   <link rel="stylesheet" href="./desktop.css">
   <link rel="stylesheet" href="./configSwitch.css">
+  <link rel="stylesheet" href="./qqIdentity.css">
+  <link rel="stylesheet" href="./stage.css">
+  <link rel="stylesheet" href="./controlCenter.css">
+  <link rel="stylesheet" href="./xinyuDisplayFont.css">
+  <link rel="stylesheet" href="./kawaiiTheme.css">
+  <link rel="stylesheet" href="./phosphorIcons.css">
+  <link rel="preload" href="./assets/stage-rooms/day-room-v1.webp" as="image" type="image/webp">
+  <link rel="preload" href="./assets/stage-rooms/night-room-v1.webp" as="image" type="image/webp">
 </head>
 <body>
   <script src="./earlyViewBootstrap.js"></script>
+  <header class="app-titlebar" aria-label="&#x99A8;&#x8BED;AI&#x684C;&#x5BA0;">
+    <span class="app-titlebar-mark" aria-hidden="true"></span>
+    <span class="app-titlebar-name">&#x99A8;&#x8BED;AI&#x684C;&#x5BA0;</span>
+  </header>
+  <div class="stage-scene" aria-hidden="true">
+    <div class="stage-room-background stage-room-background-day"></div>
+    <div class="stage-room-background stage-room-background-night"></div>
+    <div class="stage-room-tone"></div>
+    <div class="stage-room-atmosphere"></div>
+    <div class="stage-scene-grid"></div>
+    <div class="stage-scene-halo"></div>
+    <div class="stage-scene-floor"></div>
+    <div class="stage-interaction-anchors">
+      <i data-stage-anchor="window"></i>
+      <i data-stage-anchor="microphone"></i>
+      <i data-stage-anchor="sofa"></i>
+      <i data-stage-anchor="guitar"></i>
+    </div>
+  </div>
+  <div class="kawaii-stage-decor" aria-hidden="true">
+    <img class="kawaii-doodle kawaii-doodle-star" src="./assets/icons/phosphor/star.svg" alt="">
+    <img class="kawaii-doodle kawaii-doodle-note" src="./assets/icons/phosphor/music-notes.svg" alt="">
+    <img class="kawaii-doodle kawaii-doodle-heart" src="./assets/icons/phosphor/heart-straight.svg" alt="">
+    <img class="kawaii-doodle kawaii-doodle-spark" src="./assets/icons/phosphor/sparkle.svg" alt="">
+    <img class="kawaii-doodle kawaii-doodle-cat" src="./assets/icons/tabler/cat.svg" alt="">
+    <img class="kawaii-doodle kawaii-doodle-flower" src="./assets/icons/phosphor/flower-lotus.svg" alt="">
+  </div>
+
+  <div id="doctor-modal" class="doctor-modal" hidden>
+    <div id="doctor-dialog" class="doctor-dialog" role="dialog" aria-modal="true" aria-labelledby="doctor-title" data-control-center-page="doctor">
+      <header class="doctor-head">
+        <div class="doctor-head-copy">
+          <span class="doctor-kicker">SYSTEM CARE</span>
+          <strong id="doctor-title">故障自检</strong>
+          <p>检查聊天模型、语音服务与角色运行状态，并给出可以直接执行的修复建议。</p>
+        </div>
+        <div class="doctor-head-actions">
+          <button id="doctor-rerun-btn" type="button">重新检查</button>
+          <button id="doctor-close-btn" type="button" aria-label="关闭故障自检">关闭</button>
+        </div>
+      </header>
+      <main class="doctor-body">
+        <section class="doctor-overview" aria-live="polite">
+          <span id="doctor-state-dot" class="doctor-state-dot" aria-hidden="true"></span>
+          <div>
+            <strong id="doctor-state-title">等待检查</strong>
+            <p id="doctor-state-copy">点击“开始检查”，快速确认当前服务链路。</p>
+          </div>
+        </section>
+        <section class="doctor-report-card">
+          <div class="doctor-report-head">
+            <strong>检查结果</strong>
+            <span>本地运行诊断</span>
+          </div>
+          <pre id="doctor-report-output" class="doctor-report-output">尚未运行故障自检。</pre>
+        </section>
+      </main>
+    </div>
+  </div>
   <canvas id="live2d-canvas"></canvas>
   <div id="thinking-cue-bubble" class="thinking-cue-bubble" aria-hidden="true" hidden>?</div>
   <div id="live2d-emotion-overlay-layer" class="live2d-emotion-overlay-layer" aria-hidden="true" hidden></div>
+  <div class="pet-presence" aria-live="polite">
+    <span class="pet-presence-signal" aria-hidden="true"></span>
+    <span class="pet-presence-copy">
+      <strong>XINYU</strong>
+      <span id="pet-presence-mode">待机</span>
+    </span>
+  </div>
 
   <section class="panel">
     <section class="hero-card">
+      <span class="hero-svg-ears hero-svg-ears-left" aria-hidden="true"><img src="./assets/icons/tabler/cat.svg" alt=""></span>
+      <span class="hero-svg-ears hero-svg-ears-right" aria-hidden="true"><img src="./assets/icons/tabler/cat.svg" alt=""></span>
       <div class="hero-avatar" aria-hidden="true">
         <img id="hero-avatar-img" src="./assets/assistant_avatar_ref.png?v=2" alt="馨语AI桌宠头像" />
       </div>
       <div class="hero-main">
         <div class="hero-head">
           <div class="hero-meta">
+            <span class="xinyu-stage-brand-mark" aria-hidden="true">
+              <img class="xinyu-stage-brand-cat" src="./assets/icons/tabler/cat.svg" alt="">
+              <img class="xinyu-stage-brand-wave" src="./assets/icons/phosphor/waveform.svg" alt="">
+            </span>
             <strong id="assistant-name">馨语AI桌宠</strong>
             <p class="hero-tagline">你的桌面伙伴，随时懂你 ✨</p>
             <span id="status">待机</span>
@@ -34,6 +114,11 @@
             <div id="reply-character-chip" class="reply-character-chip" title="上一句回复的角色表现">上一句角色表现 · 待回复</div>
           </div>
           <button id="translation-chip-btn" type="button" aria-pressed="true" title="隐藏会话翻译">会话翻译已显示</button>
+          <div class="stage-theme-switch" role="group" aria-label="直播间背景：自动">
+            <button type="button" data-stage-theme-mode="auto" aria-pressed="true" title="按本地时间自动切换"><img src="./assets/icons/phosphor/sparkle.svg" alt=""><span>自动</span></button>
+            <button type="button" data-stage-theme-mode="day" aria-pressed="false" title="切换到日间陪伴房"><img src="./assets/icons/phosphor/sun.svg" alt=""><span>日间</span></button>
+            <button type="button" data-stage-theme-mode="night" aria-pressed="false" title="切换到夜间直播房"><img src="./assets/icons/phosphor/moon-stars.svg" alt=""><span>夜间</span></button>
+          </div>
         </div>
         <div id="mic-meter-wrap" class="mic-meter-wrap" aria-live="off">
           <span class="mic-label">Mic</span>
@@ -45,7 +130,50 @@
       </div>
     </section>
 
-    <div id="chat-log" class="chat-log" aria-live="polite"></div>
+    <div id="conversation-rail" class="conversation-rail" aria-label="对话历史">
+      <div class="conversation-identity" aria-hidden="true">
+        <img src="./assets/icons/tabler/cat.svg" alt="">
+        <span>馨语 · 陪伴中</span>
+        <img src="./assets/icons/phosphor/paw-print.svg" alt="">
+      </div>
+      <button
+        id="conversation-collapse-btn"
+        class="conversation-collapse-btn"
+        type="button"
+        aria-label="收起对话历史"
+        aria-controls="chat-log"
+        aria-expanded="true"
+        title="收起对话历史"
+      ></button>
+      <button
+        id="assistant-lane-toggle"
+        class="conversation-lane-toggle conversation-lane-toggle-assistant"
+        type="button"
+        aria-label="收起模型历史对话"
+        aria-controls="assistant-chat-log"
+        aria-expanded="true"
+        title="收起模型历史对话"
+      >
+        <span class="conversation-lane-toggle-label" aria-hidden="true">模型</span>
+        <span class="conversation-lane-unread" aria-hidden="true" hidden></span>
+      </button>
+      <button
+        id="user-lane-toggle"
+        class="conversation-lane-toggle conversation-lane-toggle-user"
+        type="button"
+        aria-label="收起我的历史对话"
+        aria-controls="user-chat-log"
+        aria-expanded="true"
+        title="收起我的历史对话"
+      >
+        <span class="conversation-lane-toggle-label" aria-hidden="true">我</span>
+        <span class="conversation-lane-unread" aria-hidden="true" hidden></span>
+      </button>
+      <div id="chat-log" class="chat-log" aria-live="polite">
+        <div id="user-chat-log" class="chat-lane chat-lane-user" aria-label="你的消息记录"></div>
+        <div id="assistant-chat-log" class="chat-lane chat-lane-assistant" aria-label="馨语的消息记录"></div>
+      </div>
+    </div>
 
     <div id="attachment-preview" class="attachment-preview" hidden></div>
 
@@ -72,12 +200,23 @@
       </section>
     </div>
 
-    <div class="row controls">
-      <button id="attach-btn" type="button" title="添加图片或文件" aria-label="添加图片或文件">+</button>
+    <div class="row controls stage-composer" aria-label="消息输入">
+      <div id="stage-voice-feedback" class="stage-voice-feedback" role="status" aria-live="polite" data-state="idle" hidden>
+        <span id="stage-voice-meter-fill" class="stage-voice-wave" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </span>
+        <span id="stage-voice-feedback-text" class="stage-voice-feedback-text">聆听中</span>
+        <span id="stage-voice-level-value" class="stage-voice-level-value" aria-hidden="true">0%</span>
+      </div>
+      <button id="mic-btn" class="stage-composer-mic" type="button" aria-label="开麦: 关">
+        <img class="mic-state-icon mic-state-icon-off" src="./assets/icons/phosphor/microphone-slash.svg" alt="">
+        <img class="mic-state-icon mic-state-icon-on" src="./assets/icons/phosphor/microphone.svg" alt="">
+        <span class="mic-state-label">开麦: 关</span>
+      </button>
       <div class="chat-input-wrap">
+        <button id="attach-btn" type="button" title="添加图片或文件" aria-label="添加图片或文件">+</button>
         <input id="chat-input" type="text" placeholder="和我说点什么..." />
         <button id="sticker-btn" class="chat-input-icon-btn" type="button" title="表情包" aria-label="打开表情包" aria-expanded="false">&#9786;</button>
-        <span class="chat-input-icons" aria-hidden="true">&#10023;</span>
       </div>
       <button id="send-btn" type="button">发送</button>
     </div>
@@ -91,12 +230,12 @@
     <input id="sticker-import-input" type="file" hidden multiple accept="image/png,image/jpeg,image/webp,image/gif" />
 
     <div class="row controls action-buttons primary-actions">
-      <button id="mic-btn" type="button">开麦: 关</button>
       <button id="speak-btn" type="button">语音: 开</button>
       <button id="subtitle-toggle-btn" type="button">字幕: 开</button>
     </div>
 
     <div class="row controls action-buttons utility-actions">
+      <button id="pet-mode-btn" type="button" title="最小化舞台并回到桌宠（Alt+Shift+P）">桌宠</button>
       <button id="help-btn" type="button">上手</button>
       <button id="more-btn" type="button" aria-expanded="false" aria-controls="advanced-actions">更多</button>
     </div>
@@ -107,9 +246,14 @@
         <button id="schedule-btn" type="button">日程</button>
         <button id="persona-btn" type="button">人设卡</button>
         <button id="config-switch-btn" type="button">模型 / 语音</button>
+        <button id="singing-convert-btn" type="button" title="选择一段本地 WAV 清唱，转换为馨语的试唱音色">唱歌试音</button>
+        <button id="singing-song-bushuo-btn" type="button">唱《不说》</button>
+        <button id="singing-song-yuai-btn" type="button">唱《雨爱》</button>
+        <button id="qq-identity-btn" type="button">QQ 身份</button>
         <button id="learning-review-btn" type="button">记忆管理</button>
         <button id="doctor-btn" type="button">故障自检</button>
       </div>
+      <p id="singing-convert-status" class="config-switch-status" aria-live="polite"></p>
       <div class="advanced-actions-group" aria-label="桌面功能">
         <span class="advanced-actions-title">桌面</span>
         <button id="lock-btn" type="button">桌面锁定: 关</button>
@@ -173,8 +317,8 @@
     <div class="config-switch-dialog" role="dialog" aria-modal="true" aria-labelledby="config-switch-title">
       <div class="config-switch-head">
         <div class="config-switch-head-copy">
-          <strong id="config-switch-title">模型 / 语音配置</strong>
-          <p>常用模型和语音服务的一键切换。API Key 只写入 .env，界面不会再次显示真实密钥。</p>
+          <strong id="config-switch-title">模型与语音</strong>
+          <p>选择聊天模型、声音和 Live2D 角色。常用设置完成后即可使用。</p>
         </div>
         <button id="config-switch-close-btn" class="config-switch-close-btn" type="button" aria-label="关闭配置面板" title="关闭">×</button>
       </div>
@@ -228,7 +372,7 @@
         </section>
 
         <section class="config-switch-section">
-          <div class="config-switch-section-title">语音合成</div>
+          <div class="config-switch-section-title">语音</div>
           <div class="config-switch-grid">
             <label class="config-switch-field">
               <span>语音服务</span>
@@ -236,6 +380,7 @@
                 <option value="browser">浏览器语音</option>
                 <option value="edge_tts">Edge TTS</option>
                 <option value="gpt_sovits">GPT-SoVITS</option>
+                <option value="qwen3_tts">Qwen3-TTS</option>
                 <option value="volcengine_tts">Volcengine TTS</option>
               </select>
             </label>
@@ -258,6 +403,14 @@
               <span>GPT-SoVITS Timeout</span>
               <input id="config-switch-gpt-sovits-timeout" type="number" min="1" max="180" step="1" />
             </label>
+            <label id="config-switch-qwen3-tts-row" class="config-switch-field config-switch-field-wide">
+              <span>Qwen3-TTS 地址</span>
+              <input id="config-switch-qwen3-tts-url" type="url" spellcheck="false" />
+            </label>
+            <label id="config-switch-qwen3-tts-timeout-row" class="config-switch-field">
+              <span>Qwen3-TTS Timeout</span>
+              <input id="config-switch-qwen3-tts-timeout" type="number" min="1" max="180" step="1" />
+            </label>
             <label id="config-switch-volcengine-url-row" class="config-switch-field config-switch-field-wide">
               <span>Volcengine API URL</span>
               <input id="config-switch-volcengine-url" type="url" spellcheck="false" />
@@ -274,10 +427,10 @@
         </section>
 
         <section class="config-switch-section">
-          <div class="config-switch-section-title">Live2D 模型</div>
+          <div class="config-switch-section-title">Live2D 角色</div>
           <div class="config-switch-grid">
             <label class="config-switch-field">
-              <span>Detected Model</span>
+              <span>当前角色</span>
               <select id="config-switch-live2d-preset">
                 <option value="__custom_live2d__">Custom path</option>
               </select>
@@ -305,11 +458,110 @@
 
       <div class="config-switch-actions">
         <button id="config-switch-test-llm-btn" type="button">测试模型</button>
-        <button id="config-switch-test-tts-btn" type="button">测试语音</button>
+        <button id="config-switch-test-tts-btn" type="button">试听声音</button>
         <button id="config-switch-test-live2d-btn" type="button">检查模型</button>
-        <button id="config-switch-save-btn" class="config-switch-primary-btn" type="button">保存配置</button>
+        <button id="config-switch-save-btn" class="config-switch-primary-btn" type="button">保存设置</button>
       </div>
       <div id="config-switch-status" class="config-switch-status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div id="qq-identity-modal" class="config-switch-modal qq-identity-modal" hidden>
+    <div class="config-switch-dialog qq-identity-dialog" role="dialog" aria-modal="true" aria-labelledby="qq-identity-title" data-control-center-page="qq">
+      <div class="config-switch-head">
+        <div class="config-switch-head-copy">
+          <strong id="qq-identity-title">QQ 身份</strong>
+          <p>桌宠以自己的 QQ 小号长期社交；AstrBot / OneBot 只负责收发，回复仍使用桌宠的人格、记忆和默认文字模式。</p>
+        </div>
+        <button id="qq-identity-close-btn" class="config-switch-close-btn" type="button" aria-label="关闭 QQ 身份设置" title="关闭">×</button>
+      </div>
+      <div class="config-switch-body">
+        <section class="config-switch-section">
+          <div class="config-switch-section-title">身份与云端桥接</div>
+          <div class="config-switch-grid">
+            <label class="config-switch-check config-switch-field-wide">
+              <input id="qq-identity-enabled" type="checkbox" />
+              <span>启用 QQ 身份（启用前请确认已在腾讯云完成 QQ 登录与桥接插件部署）</span>
+            </label>
+            <label class="config-switch-field">
+              <span>桌宠在 QQ 的称呼</span>
+              <input id="qq-identity-display-name" type="text" maxlength="60" spellcheck="false" />
+            </label>
+            <label class="config-switch-field">
+              <span>桌宠 QQ 号</span>
+              <input id="qq-identity-number" type="text" inputmode="numeric" maxlength="20" spellcheck="false" />
+            </label>
+            <label class="config-switch-field config-switch-field-wide">
+              <span>腾讯云桥接地址</span>
+              <input id="qq-identity-cloud-url" type="url" spellcheck="false" placeholder="https://.../astrbot_plugin_taffy_qq_bridge" />
+            </label>
+            <label class="config-switch-field">
+              <span>桥接认证方式</span>
+              <select id="qq-identity-auth-mode">
+                <option value="token">Token（默认）</option>
+                <option value="tailnet">仅 Tailscale 私网</option>
+              </select>
+            </label>
+            <label class="config-switch-field">
+              <span>桥接 Token 环境变量</span>
+              <input id="qq-identity-token-env" type="text" maxlength="64" spellcheck="false" value="TAFFY_QQ_BRIDGE_TOKEN" />
+            </label>
+            <label class="config-switch-field">
+              <span>AstrBot API Key 环境变量</span>
+              <input id="qq-identity-astrbot-api-key-env" type="text" maxlength="64" spellcheck="false" value="ASTRBOT_QQ_BRIDGE_API_KEY" />
+            </label>
+            <label class="config-switch-field">
+              <span>离线队列最长保留（分钟）</span>
+              <input id="qq-identity-queue-age" type="number" min="5" max="10080" step="1" value="1440" />
+            </label>
+          </div>
+          <p class="config-switch-note">Token 只从本机 .env 和腾讯云容器环境读取，界面不会保存或显示 Token。QQ 消息不能调用桌面、文件、Shell、浏览器或支付工具。</p>
+        </section>
+
+        <section class="config-switch-section">
+          <div class="config-switch-section-title">允许处理的联系人与群</div>
+          <div class="config-switch-grid">
+            <label class="config-switch-field">
+              <span>联系人 QQ 号</span>
+              <input id="qq-identity-contact-input" type="text" inputmode="numeric" maxlength="20" spellcheck="false" />
+            </label>
+            <button id="qq-identity-add-contact" type="button">添加联系人</button>
+            <div id="qq-identity-contacts" class="qq-identity-id-list config-switch-field-wide" aria-live="polite"></div>
+            <label class="config-switch-field">
+              <span>QQ群号</span>
+              <input id="qq-identity-group-input" type="text" inputmode="numeric" maxlength="20" spellcheck="false" />
+            </label>
+            <button id="qq-identity-add-group" type="button">添加群</button>
+            <div id="qq-identity-groups" class="qq-identity-id-list config-switch-field-wide" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <section class="config-switch-section">
+          <div class="config-switch-section-title">主动消息边界</div>
+          <div class="config-switch-grid">
+            <label class="config-switch-check">
+              <input id="qq-identity-quiet-enabled" type="checkbox" checked />
+              <span>启用静默时段</span>
+            </label>
+            <label class="config-switch-field"><span>开始小时</span><input id="qq-identity-quiet-start" type="number" min="0" max="23" step="1" value="23" /></label>
+            <label class="config-switch-field"><span>结束小时</span><input id="qq-identity-quiet-end" type="number" min="0" max="23" step="1" value="8" /></label>
+            <label class="config-switch-field"><span>每个会话冷却（分钟）</span><input id="qq-identity-cooldown" type="number" min="5" max="1440" step="1" value="180" /></label>
+            <label class="config-switch-field"><span>每天最多主动消息</span><input id="qq-identity-daily-limit" type="number" min="0" max="30" step="1" value="3" /></label>
+          </div>
+          <p class="config-switch-note">默认只发文字。语音回复必须由你在桌面端明确要求；桌宠离线时不自动回复，恢复后才处理仍未过期的队列消息。</p>
+        </section>
+
+        <section class="config-switch-section">
+          <div class="config-switch-section-title">最近 QQ 收发记录</div>
+          <div id="qq-identity-audit" class="config-switch-live2d-report qq-identity-audit">尚未读取记录。</div>
+        </section>
+      </div>
+      <div class="config-switch-actions">
+        <button id="qq-identity-refresh-btn" type="button">刷新状态</button>
+        <button id="qq-identity-clear-history-btn" type="button">清除本机记录</button>
+        <button id="qq-identity-save-btn" class="config-switch-primary-btn" type="button">保存 QQ 设置</button>
+      </div>
+      <div id="qq-identity-status" class="config-switch-status" aria-live="polite"></div>
     </div>
   </div>
 
@@ -540,7 +792,7 @@
           </div>
         </section>
 
-        <section class="persona-section">
+        <section class="persona-section persona-preferences-section">
           <div class="persona-section-title">
             <span class="persona-section-icon" aria-hidden="true">♡</span>
             <span>兴趣与互动偏好</span>
@@ -801,6 +1053,8 @@
   </aside>
 
   <template id="taffy-view-script-manifest">
+  <script src="./stageThemeController.js"></script>
+  <script src="./controlCenterShell.js"></script>
   <script src="./chatState.js"></script>
   <script src="./chatDom.js"></script>
   <script src="./debugPanelController.js"></script>
@@ -811,6 +1065,7 @@
   <script src="./relationshipStateController.js"></script>
   <script src="./reminderScheduleController.js"></script>
   <script src="./emotionStatsController.js"></script>
+  <script src="./sileroVadAdapter.js"></script>
   <script src="./localAsrController.js"></script>
   <script src="./turnTakingDirector.js"></script>
   <script src="./autoChatController.js"></script>
@@ -820,9 +1075,11 @@
   <script src="./grayTrialReportController.js"></script>
   <script src="./grayTrialCharacterPanelController.js"></script>
   <script src="./apiClient.js"></script>
+  <script src="./singingController.js"></script>
   <script src="./chatApi.js"></script>
   <script src="./speechText.js"></script>
   <script src="./ttsApi.js"></script>
+  <script src="./ttsPcmStream.js"></script>
   <script src="./attachmentModel.js"></script>
   <script src="./attachmentController.js"></script>
   <script src="./stickerModel.js"></script>
@@ -838,6 +1095,7 @@
   <script src="./performanceAuditController.js"></script>
   <script src="./performanceCueController.js"></script>
   <script src="./hiyoriEmotionOverlayController.js"></script>
+  <script src="./hiyoriPerformanceDirector.js"></script>
   <script src="./performanceTimelineController.js"></script>
   <script src="./streamTtsQueueController.js"></script>
   <script src="./ttsPlaybackController.js"></script>
@@ -887,6 +1145,7 @@
   <script src="./chatRuntimeDebugBridgeBoundary.js"></script>
   <script src="./chat.js"></script>
   <script src="./configSwitchController.js"></script>
+  <script src="./qqIdentityController.js"></script>
   <script src="./firstRunWizardController.js"></script>
   <script src="./app.js"></script>
   </template>

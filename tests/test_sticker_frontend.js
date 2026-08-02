@@ -9,6 +9,7 @@ const zlib = require("zlib");
 const ROOT = path.resolve(__dirname, "..");
 const INDEX_HTML = path.join(ROOT, "web", "index.html");
 const BASE_CSS = path.join(ROOT, "web", "base.css");
+const PHOSPHOR_CSS = path.join(ROOT, "web", "phosphorIcons.css");
 const CHAT_STATE_JS = path.join(ROOT, "web", "chatState.js");
 const CHAT_DOM_JS = path.join(ROOT, "web", "chatDom.js");
 const CHAT_INPUT_BINDER_JS = path.join(ROOT, "web", "chatInputBinder.js");
@@ -20,6 +21,7 @@ const MANIFEST_JSON = path.join(ROOT, "web", "assets", "stickers", "default", "m
 
 const html = fs.readFileSync(INDEX_HTML, "utf8");
 const baseCssSource = fs.readFileSync(BASE_CSS, "utf8");
+const phosphorCssSource = fs.readFileSync(PHOSPHOR_CSS, "utf8");
 const chatStateSource = fs.readFileSync(CHAT_STATE_JS, "utf8");
 const chatDomSource = fs.readFileSync(CHAT_DOM_JS, "utf8");
 const chatInputBinderSource = fs.readFileSync(CHAT_INPUT_BINDER_JS, "utf8");
@@ -213,9 +215,11 @@ function testStickerHelpers() {
 function testStickerMessageHistoryStaysOutOfLlmHistory() {
   const state = { chatRecords: [], history: [] };
   const chatLog = createElement("div");
+  const userChatLog = createElement("div");
+  const assistantChatLog = createElement("div");
   const controller = chatMessageController.createController({
     state,
-    ui: { chatLog },
+    ui: { chatLog, userChatLog, assistantChatLog },
     documentObject: createDocument(),
     resolveStickerPayload: (sticker) => ({
       ...sticker,
@@ -223,6 +227,7 @@ function testStickerMessageHistoryStaysOutOfLlmHistory() {
     })
   });
 
+  controller.appendMessage("user", "\u6211\u4eca\u5929\u5f88\u5f00\u5fc3", { timestamp: 900, syncHistory: true });
   controller.appendStickerMessage("user", {
     id: "happy",
     source: "default",
@@ -231,9 +236,93 @@ function testStickerMessageHistoryStaysOutOfLlmHistory() {
   controller.appendMessage("assistant", "\u597d\u8036", { timestamp: 1100, syncHistory: true });
   controller.syncConversationHistoryFromChatRecords();
 
-  assert.strictEqual(state.chatRecords[0].kind, "sticker");
-  assert.deepStrictEqual(state.history, [{ role: "assistant", content: "\u597d\u8036" }]);
-  assert.ok(chatLog.children.some((child) => String(child.className || "").includes("sticker-message")));
+  assert.strictEqual(state.chatRecords[0].kind, undefined);
+  assert.strictEqual(state.chatRecords[0].stickers[0].id, "happy");
+  assert.deepStrictEqual(state.history, [
+    { role: "user", content: "\u6211\u4eca\u5929\u5f88\u5f00\u5fc3" },
+    { role: "assistant", content: "\u597d\u8036" }
+  ]);
+  assert.ok(!userChatLog.children.some((child) => String(child.className || "").includes("sticker-message")));
+  assert.ok(assistantChatLog.children.some((child) => String(child.className || "").includes("assistant")));
+  assert.strictEqual(chatLog.children.length, 0, "the shared history shell should not receive role messages directly");
+  const userRow = userChatLog.children.find((child) => String(child.className || "").includes("user"));
+  assert.ok(userRow.querySelector(".inline-sticker-img"), "stickers should sit inline after the matching message text");
+}
+
+async function testTranslationPersistsAndRestoresWithHistory() {
+  const state = { chatRecords: [], history: [] };
+  const chatLog = createElement("div");
+  const userChatLog = createElement("div");
+  const assistantChatLog = createElement("div");
+  let saveCount = 0;
+  const controller = chatMessageController.createController({
+    state,
+    ui: { chatLog, userChatLog, assistantChatLog },
+    documentObject: createDocument(),
+    shouldShowAssistantTranslation: () => true,
+    fetchChatTranslation: async () => "\u4eca\u665a\u597d\u597d\u4f11\u606f",
+    saveChatHistory: () => { saveCount += 1; }
+  });
+
+  controller.appendMessage("assistant", "Rest well tonight.", { timestamp: 1200 });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.strictEqual(state.chatRecords[0].translation, "\u4eca\u665a\u597d\u597d\u4f11\u606f");
+  assert.ok(saveCount >= 2, "translation completion should persist the enriched chat record");
+
+  state.chatRecords = [{
+    role: "assistant",
+    content: "Rest well tonight.",
+    translation: "\u4eca\u665a\u597d\u597d\u4f11\u606f",
+    timestamp: 1200
+  }];
+  controller.renderChatHistoryFromState();
+  const restored = assistantChatLog.children.find((child) => String(child.className || "").includes("assistant"));
+  assert.strictEqual(
+    restored.querySelector(".content-translation").textContent,
+    "\u4e2d\u8bd1\uff1a\u4eca\u665a\u597d\u597d\u4f11\u606f",
+    "saved translations should be visible immediately after history restoration"
+  );
+
+  const migrated = controller.coalesceInlineStickerRecords([
+    { role: "assistant", content: "Hi", timestamp: 1 },
+    {
+      role: "assistant",
+      kind: "sticker",
+      content: "[sticker]",
+      sticker: { id: "happy", label: "\u5f00\u5fc3" },
+      timestamp: 2
+    }
+  ]);
+  assert.strictEqual(migrated.length, 1, "legacy adjacent sticker records should migrate into their text message");
+  assert.strictEqual(migrated[0].stickers[0].id, "happy");
+}
+
+function testStandaloneChatKeepsChronologicalSharedLog() {
+  const documentObject = createDocument();
+  documentObject.body = createElement("body");
+  documentObject.body.className = "view-chat";
+  const chatLog = createElement("div");
+  const userChatLog = createElement("div");
+  const assistantChatLog = createElement("div");
+  chatLog.appendChild(userChatLog);
+  chatLog.appendChild(assistantChatLog);
+  const controller = chatMessageController.createController({
+    state: { chatRecords: [], history: [] },
+    ui: { chatLog, userChatLog, assistantChatLog },
+    documentObject
+  });
+
+  controller.appendMessage("user", "one", { persist: false, timestamp: 1000 });
+  controller.appendMessage("assistant", "two", { persist: false, timestamp: 1100 });
+
+  assert.strictEqual(userChatLog.children.length, 0, "standalone chat should not split messages into stage lanes");
+  assert.strictEqual(assistantChatLog.children.length, 0, "standalone chat should keep one chronological surface");
+  assert.deepStrictEqual(
+    chatLog.children.slice(2).map((child) => child.className),
+    ["message user", "message assistant"],
+    "standalone chat should preserve chronological message order"
+  );
 }
 
 async function testStickerControllerSendModes() {
@@ -304,6 +393,11 @@ function testScriptAndDomWiring() {
     "sticker previews and sent sticker messages should avoid flat color blocks"
   );
   assert.ok(
+    /\.inline-sticker-img \{[\s\S]*?width: 1\.85em;[\s\S]*?animation: inline-sticker-arrive/.test(baseCssSource)
+      && /body\.view-full \.message\.sticker-message \{[\s\S]*?max-width: 92px !important;/.test(phosphorCssSource),
+    "stickers should use a small animated inline treatment with a compact legacy fallback"
+  );
+  assert.ok(
     /\.sticker-respond-toggle input\[type="checkbox"\] \{[\s\S]*?appearance: none;[\s\S]*?width: 18px;[\s\S]*?box-shadow: none;/.test(baseCssSource)
       && /\.sticker-respond-toggle input\[type="checkbox"\]:checked \{[\s\S]*?background: #2f74d6;/.test(baseCssSource),
     "sticker response checkbox should use compact custom styling instead of native long focus chrome"
@@ -319,6 +413,8 @@ async function main() {
   testDefaultStickerManifestAndAssets();
   testStickerHelpers();
   testStickerMessageHistoryStaysOutOfLlmHistory();
+  await testTranslationPersistsAndRestoresWithHistory();
+  testStandaloneChatKeepsChronologicalSharedLog();
   await testStickerControllerSendModes();
   testScriptAndDomWiring();
   console.log("Sticker frontend checks passed.");

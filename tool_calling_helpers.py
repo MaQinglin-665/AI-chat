@@ -31,6 +31,13 @@ def build_tool_meta_payload(tool_payloads):
         if args:
             item["args"] = args
         if item["ok"]:
+            if result.get("pending_confirmation") is True:
+                item["pending_confirmation"] = True
+                item["confirmation_id"] = str(result.get("confirmation_id", "")).strip()
+                item["summary"] = str(result.get("summary", "")).strip()[:500]
+                item["expires_at"] = str(result.get("expires_at", "")).strip()[:64]
+                items.append(item)
+                continue
             if tool_name in {"write_file", "replace_in_file", "read_file"}:
                 path = str(result.get("path", "")).strip()
                 if path:
@@ -75,7 +82,9 @@ def render_tool_execution_summary(tool_payloads, max_chars=1800, tool_meta_marke
         tool_name = str(payload.get("tool", "")).strip() or "unknown_tool"
         if payload.get("ok"):
             result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
-            if tool_name == "write_file":
+            if result.get("pending_confirmation") is True:
+                lines.append(f"{idx}. 此操作需要确认：{str(result.get('summary', '')).strip()}")
+            elif tool_name == "write_file":
                 lines.append(f"{idx}. 已写入文件：{result.get('path', '')}")
             elif tool_name == "replace_in_file":
                 lines.append(

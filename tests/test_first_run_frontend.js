@@ -220,6 +220,10 @@ function testHtmlAndCssWired() {
   assert.ok(earlyViewBootstrap.includes("document.body.classList.add(className)"), "startup script should add classes to body early");
   assert.ok(html.includes('http-equiv="Content-Security-Policy"'), "index should define a renderer CSP");
   assert.ok(!html.includes("'unsafe-eval'"), "renderer CSP should not allow unsafe-eval");
+  assert.ok(
+    html.includes("'wasm-unsafe-eval'"),
+    "renderer CSP should narrowly allow local ONNX WebAssembly compilation"
+  );
   assert.ok(css.includes(".panel .hero-avatar {"), "base CSS should guard hero avatar before view-chat is applied");
   assert.ok(css.includes(".panel .hero-avatar > img"), "base CSS should constrain hero avatar image before startup JS completes");
 }

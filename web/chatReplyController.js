@@ -50,6 +50,7 @@
     const updateConversationFollowupState = typeof deps.updateConversationFollowupState === "function" ? deps.updateConversationFollowupState : () => {};
     const maybeSendAssistantMoodSticker = typeof deps.maybeSendAssistantMoodSticker === "function" ? deps.maybeSendAssistantMoodSticker : () => null;
     const scheduleAutoChatInterjectionAfterTurn = typeof deps.scheduleAutoChatInterjectionAfterTurn === "function" ? deps.scheduleAutoChatInterjectionAfterTurn : () => null;
+    const queueConversationAwarenessAfterTurn = typeof deps.queueConversationAwarenessAfterTurn === "function" ? deps.queueConversationAwarenessAfterTurn : () => null;
     const recordEmotion = typeof deps.recordEmotion === "function" ? deps.recordEmotion : () => {};
     const previewAssistantReplyCharacterCueCandidate = typeof deps.previewAssistantReplyCharacterCueCandidate === "function" ? deps.previewAssistantReplyCharacterCueCandidate : () => null;
     const maybeAutoApplyAssistantReplyCharacterCueCandidate = typeof deps.maybeAutoApplyAssistantReplyCharacterCueCandidate === "function" ? deps.maybeAutoApplyAssistantReplyCharacterCueCandidate : () => null;
@@ -159,6 +160,7 @@
         : () => null;
     let characterRuntimeMetadataForReply = null;
     let companionTurnForReply = null;
+    let conversationDecisionForReply = null;
 
     function rememberCharacterRuntimeMetadataForReply(metadata) {
       const adjusted = applyPerformanceControlsToRuntimeHint(metadata, state.characterBrainLastDecision);
@@ -182,6 +184,30 @@
       return turn;
     }
 
+    function rememberConversationDecisionForReply(decision) {
+      if (!decision || typeof decision !== "object" || Array.isArray(decision)) {
+        conversationDecisionForReply = null;
+        return null;
+      }
+      const mode = String(decision.mode || "").trim().toLowerCase();
+      if (!["reply", "silence", "micro_reaction", "defer"].includes(mode)) {
+        conversationDecisionForReply = null;
+        return null;
+      }
+      conversationDecisionForReply = {
+        version: 1,
+        mode,
+        thinking_level: String(decision.thinking_level || "normal"),
+        thinking_delay_ms: Math.max(
+          0,
+          Math.min(5000, Math.round(Number(decision.thinking_delay_ms) || 0))
+        ),
+        reaction: String(decision.reaction || "")
+      };
+      state.naturalConversationDecision = conversationDecisionForReply;
+      return conversationDecisionForReply;
+    }
+
     function isCompanionSpeechPrewarmEligible() {
       return state.speakingEnabled !== false
         && state.companionTurnEnabled === true
@@ -190,6 +216,14 @@
         && typeof requestServerTTSBlobWithRetry === "function"
         && typeof playAudioBlob === "function"
         && typeof AbortController === "function";
+    }
+
+    function canStreamBeforeCompanionTurnFinalizes() {
+      return state.speakingEnabled !== false
+        && state.companionTurnEnabled === true
+        && state.modelDirectReply === true
+        && String(state.ttsProvider || "").toLowerCase() === "qwen3_tts"
+        && state.qwen3TtsReplyContinuity === false;
     }
 
     function extractStableCompanionSpeechPrefix(value) {
@@ -246,6 +280,8 @@
         sessionId: Number(context.sessionId || 0),
         playbackGeneration: Number(context.playbackGeneration || state.ttsPlaybackGeneration || 0),
         traceId: String(context.traceId || state.activePerfTraceId || "").trim(),
+        prosody: context.prosody && typeof context.prosody === "object" ? context.prosody : null,
+        performanceSignature: String(context.performanceSignature || ""),
         startedPerfMs: performance.now(),
         controller,
         aborted: false,
@@ -275,7 +311,7 @@
         sessionId: prewarm.sessionId,
         text: prewarm.text
       });
-      prewarm.promise = requestServerTTSBlobWithRetry(prewarm.text, null, {
+      prewarm.promise = requestServerTTSBlobWithRetry(prewarm.text, prewarm.prosody, {
         retries: 0,
         retryDelayMs: Number(state.ttsServerRetryDelayMs),
         timeoutMs: Number(state.ttsServerRequestTimeoutMs),
@@ -320,8 +356,10 @@
         return null;
       }
       const speechText = String(context.speechText || "").trim();
+      const performanceSignature = String(context.performanceSignature || "");
       if (
         !speechText.startsWith(prewarm.text)
+        || (performanceSignature && performanceSignature !== prewarm.performanceSignature)
         || Number(context.turnId || 0) !== prewarm.turnId
         || Number(context.sessionId || 0) !== prewarm.sessionId
         || Number(context.playbackGeneration || state.ttsPlaybackGeneration || 0) !== prewarm.playbackGeneration
@@ -354,6 +392,64 @@
         tail: speechText.slice(prewarm.text.length).trim(),
         startedPerfMs: prewarm.startedPerfMs
       };
+    }
+
+    function normalizePerformanceSegmentText(text) {
+      return String(text || "").replace(/\s+/g, "").trim();
+    }
+
+    function findCompanionSegmentPerformance(turn, text) {
+      const segments = Array.isArray(turn?.performance_segments) ? turn.performance_segments : [];
+      const needle = normalizePerformanceSegmentText(text);
+      const fallback = turn?.performance && typeof turn.performance === "object"
+        ? turn.performance
+        : null;
+      if (!needle) return fallback;
+      const exact = segments.find((segment) => (
+        normalizePerformanceSegmentText(segment?.text) === needle
+      ));
+      if (exact?.performance && typeof exact.performance === "object") {
+        return exact.performance;
+      }
+      const containing = segments.find((segment) => {
+        const candidate = normalizePerformanceSegmentText(segment?.text);
+        return candidate && (candidate.includes(needle) || needle.includes(candidate));
+      });
+      return containing?.performance && typeof containing.performance === "object"
+        ? containing.performance
+        : fallback;
+    }
+
+    function buildSegmentPerformanceCue(text, context = {}) {
+      const performancePlan = findCompanionSegmentPerformance(context.companionTurn, text);
+      return buildPerformanceCue({
+        replyText: String(text || ""),
+        mood: context.mood || detectMood(text),
+        talkStyle: context.talkStyle || "neutral",
+        runtimeMetadata: performancePlan || context.runtimeMetadata || null,
+        performancePlan,
+        motionIntensity: state.motionIntensity
+      });
+    }
+
+    function mergePerformanceCueProsody(prosody, cue) {
+      const base = prosody && typeof prosody === "object" ? prosody : {};
+      if (!cue || typeof cue !== "object") return base;
+      return {
+        ...base,
+        emotion: String(cue.emotion || "neutral"),
+        intensity: String(cue.intensity || "medium"),
+        voice_style: String(cue.voiceStyle || "neutral")
+      };
+    }
+
+    function performanceCueSignature(cue) {
+      if (!cue || typeof cue !== "object") return "";
+      return [
+        String(cue.emotion || "neutral"),
+        String(cue.intensity || "medium"),
+        String(cue.voiceStyle || "neutral")
+      ].join(":");
     }
 
     function getSpeechAnimationClockNow() {
@@ -965,6 +1061,41 @@
       };
     }
 
+    function buildInterruptedVisibleText(value) {
+      const text = String(value || "").trim();
+      if (!text) {
+        return "";
+      }
+      const withoutTrailingEllipsis = text.replace(/(?:\.{3}|…)+\s*$/u, "").trimEnd();
+      return `${withoutTrailingEllipsis || text}…`;
+    }
+
+    function finalizeInterruptedAssistantMessage() {
+      const row = state.activeAssistantMessageRow;
+      if (!row || row.dataset?.interruptionFinalized === "true") {
+        return false;
+      }
+      const interruptedText = buildInterruptedVisibleText(state.activeAssistantDraftText);
+      if (!interruptedText) {
+        return false;
+      }
+      const timestamp = Date.now();
+      const rowDataset = row.dataset || (row.dataset = {});
+      rowDataset.interruptionFinalized = "true";
+      row.classList?.add?.("is-interrupted");
+      row.querySelector?.(".message-feedback")?.remove?.();
+      finalizePendingMessageRow(row, "assistant", interruptedText, {
+        timestamp,
+        persist: true,
+        enableTranslation: false
+      });
+      rememberMessage("assistant", interruptedText, { timestamp });
+      state.conversationLastAssistantAt = timestamp;
+      state.activeAssistantDraftText = interruptedText;
+      state.activeAssistantMessageRow = null;
+      return true;
+    }
+
     function normalizeInputModality(value, fallback = "text") {
       const key = String(value || fallback || "text").trim().toLowerCase().replace(/-/g, "_");
       if (key === "voice" || key === "speech" || key === "asr" || key === "mic" || key === "microphone") {
@@ -978,19 +1109,58 @@
 
     function normalizeAsrConversationContext(value = null) {
       const raw = value && typeof value === "object" && !Array.isArray(value) ? value : null;
-      if (!raw || raw.needs_confirmation !== true) {
+      if (!raw) {
+        return null;
+      }
+      const paralinguisticRaw = raw.paralinguistic
+        && typeof raw.paralinguistic === "object"
+        && !Array.isArray(raw.paralinguistic)
+        ? raw.paralinguistic
+        : null;
+      const allowedEmotions = new Set([
+        "angry", "disgusted", "fearful", "happy", "neutral", "sad", "surprised", "unknown"
+      ]);
+      const allowedCues = new Set([
+        "nonverbal_vocalization", "laughter", "crying", "cough", "sneeze", "breath"
+      ]);
+      const allowedEvents = new Set([
+        "speech", "laughter", "crying", "cough", "sneeze", "breath", "applause", "bgm", "music"
+      ]);
+      let paralinguistic = null;
+      if (paralinguisticRaw) {
+        const emotion = String(paralinguisticRaw.emotion || "unknown").trim().toLowerCase();
+        const cueType = String(paralinguisticRaw.cue_type || "").trim().toLowerCase();
+        const events = (Array.isArray(paralinguisticRaw.events) ? paralinguisticRaw.events : [])
+          .map((item) => String(item || "").trim().toLowerCase())
+          .filter((item, index, all) => allowedEvents.has(item) && all.indexOf(item) === index)
+          .slice(0, 6);
+        paralinguistic = {
+          emotion: allowedEmotions.has(emotion) ? emotion : "unknown",
+          events,
+          cue_type: allowedCues.has(cueType) ? cueType : "",
+          voiced: paralinguisticRaw.voiced === true,
+          voiced_ratio: Math.max(0, Math.min(1, Number(paralinguisticRaw.voiced_ratio) || 0)),
+          pitch_stability: Math.max(0, Math.min(1, Number(paralinguisticRaw.pitch_stability) || 0)),
+          meaningful: paralinguisticRaw.meaningful === true
+        };
+      }
+      if (raw.needs_confirmation !== true && !paralinguistic) {
         return null;
       }
       const confidence = Number(raw.confidence);
-      return {
+      const context = {
         version: 1,
         source: cleanConversationContextText(raw.source || "voice_transcript", 48),
         raw_text: cleanConversationContextText(raw.raw_text, 160),
         final_text: cleanConversationContextText(raw.final_text, 160),
         confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0,
         reason: cleanConversationContextText(raw.reason || raw.confidence_reason, 80),
-        needs_confirmation: true
+        needs_confirmation: raw.needs_confirmation === true
       };
+      if (paralinguistic) {
+        context.paralinguistic = paralinguistic;
+      }
+      return context;
     }
 
     function isChatTurnCancelled(turnId, abortController = null, err = null) {
@@ -1029,6 +1199,7 @@
       }
       const controller = state.chatAbortController;
       const interruptedContext = rememberInterruptedAssistantContext(reason, activeTurnId, hadAssistantSpeech);
+      const interruptedMessagePreserved = finalizeInterruptedAssistantMessage();
       clearPerformancePhase({ turnId: activeTurnId, reason: "chat_turn_interrupted" });
       state.activeChatTurnId = 0;
       state.chatAbortController = null;
@@ -1064,6 +1235,7 @@
         turnId: activeTurnId,
         speechActive: hadAssistantSpeech,
         contextCaptured: !!interruptedContext,
+        visiblePartialPreserved: interruptedMessagePreserved,
         turnAction: String(protectedSpeech.turnDecision?.action || "interrupt_now"),
         turnReason: String(protectedSpeech.turnDecision?.reason || protectedSpeech.reason || ""),
         segmentRole: String(protectedSpeech.segmentRole || "")
@@ -1078,22 +1250,19 @@
       if (!state.chatBusy && !isAssistantSpeechActive()) {
         return false;
       }
-      const protectedSpeech = shouldProtectImportantAssistantSpeech(input?.reason || "user_speech_start");
-      if (protectedSpeech.protect) {
-        recordTTSDebugEvent("important_speech_protected", {
+      if (input?.confirmedTranscript !== true) {
+        recordTTSDebugEvent("voice_barge_in_candidate", {
           reason: String(input?.reason || "user_speech_start"),
-          waitMs: Number(protectedSpeech.waitMs || 0),
-          policy: String(protectedSpeech.policy || ""),
-          intent: String(protectedSpeech.intent || ""),
-          segmentId: Number(protectedSpeech.segmentIndex || 0),
-          segmentRole: String(protectedSpeech.segmentRole || ""),
-          turnAction: String(protectedSpeech.turnDecision?.action || "finish_key_sentence"),
-          source: "speech_start"
+          source: "speech_start",
+          semanticConfirmationPending: true
         });
-        setStatus("我先把这句重要的说完...");
         return false;
       }
-      return interruptActiveChatTurn(input?.reason || "user_speech_start", { bypassProtection: true });
+      const kind = String(input?.kind || "").trim().toLowerCase();
+      const mustYieldImmediately = !kind || kind === "stop" || kind === "correction";
+      return interruptActiveChatTurn(input?.reason || "user_speech_start", {
+        bypassProtection: mustYieldImmediately
+      });
     }
 
     function waitForSpeechTurnIdle(timeoutMs = 14000) {
@@ -1116,6 +1285,43 @@
         };
         tick();
       });
+    }
+
+    function resolveOrderedContinuationBreathMs(currentText = "", style = "neutral") {
+      const history = Array.isArray(state.history) ? state.history : [];
+      const current = String(currentText || "").trim();
+      let prior = "";
+      let skippedCurrent = false;
+      for (let i = history.length - 1; i >= 0; i -= 1) {
+        const item = history[i];
+        if (String(item?.role || "") !== "assistant") continue;
+        const text = String(item?.content || "").trim();
+        if (!skippedCurrent && current && text === current) {
+          skippedCurrent = true;
+          continue;
+        }
+        prior = text;
+        break;
+      }
+      const styleKey = String(style || "neutral").trim().toLowerCase();
+      let pause = 145;
+      if (/(?:\.{2,}|\u2026|\u3002{2,})$/.test(prior)) pause += 80;
+      else if (/[?\uFF1F]$/.test(prior)) pause += 45;
+      else if (/[!\uFF01]$/.test(prior)) pause -= 25;
+      else if (/[,，、;；:]$/.test(prior)) pause -= 35;
+      if (["comfort", "soft", "warm", "thinking"].includes(styleKey)) pause += 30;
+      if (["playful", "cheerful", "teasing", "happy"].includes(styleKey)) pause -= 20;
+      return Math.max(80, Math.min(280, Math.round(pause)));
+    }
+
+    async function waitOrderedContinuationBreath(currentText, style, signal = null) {
+      const waitMs = resolveOrderedContinuationBreathMs(currentText, style);
+      const endAt = Date.now() + waitMs;
+      while (Date.now() < endAt) {
+        if (signal?.aborted === true) return false;
+        await new Promise((resolve) => window.setTimeout(resolve, Math.min(20, endAt - Date.now())));
+      }
+      return true;
     }
 
     function waitForChatTurnIdle(timeoutMs = 1200) {
@@ -1264,9 +1470,15 @@
           return requests[index];
         }
         const segment = String(segments[index] || "").trim();
-        const prosody = applyVoiceDirectorProsody(
-          buildSpeakProsody(segment, context.mood, false, context.prosodyStyle),
-          voiceDirector
+        const segmentPerformanceCue = typeof context.performanceCueForText === "function"
+          ? context.performanceCueForText(segment)
+          : (context.performanceCue || null);
+        const prosody = mergePerformanceCueProsody(
+          applyVoiceDirectorProsody(
+            buildSpeakProsody(segment, context.mood, false, context.prosodyStyle),
+            voiceDirector
+          ),
+          segmentPerformanceCue
         );
         const startedAt = performance.now();
         requests[index] = requestServerTTSBlobWithRetry(segment, prosody, {
@@ -1279,8 +1491,24 @@
           sessionId,
           kind: "segmented_prefetch"
         })
-          .then((blob) => ({ ok: true, blob, segment, index, startedAt, readyAt: performance.now() }))
-          .catch((error) => ({ ok: false, error, segment, index, startedAt, readyAt: performance.now() }));
+          .then((blob) => ({
+            ok: true,
+            blob,
+            segment,
+            segmentPerformanceCue,
+            index,
+            startedAt,
+            readyAt: performance.now()
+          }))
+          .catch((error) => ({
+            ok: false,
+            error,
+            segment,
+            segmentPerformanceCue,
+            index,
+            startedAt,
+            readyAt: performance.now()
+          }));
         return requests[index];
       };
 
@@ -1326,21 +1554,25 @@
             prefetch: true
           });
           const fallbackOk = await speak(result.segment || segments[i], {
-            prosody: applyVoiceDirectorProsody(
-              buildSpeakProsody(result.segment || segments[i], context.mood, false, context.prosodyStyle),
-              voiceDirector
+            prosody: mergePerformanceCueProsody(
+              applyVoiceDirectorProsody(
+                buildSpeakProsody(result.segment || segments[i], context.mood, false, context.prosodyStyle),
+                voiceDirector
+              ),
+              result.segmentPerformanceCue
             ),
             interrupt: context.interrupt === true && i === 0,
             mood: context.mood,
             style: context.talkStyle,
             voiceStyle: context.prosodyStyle,
             perfTraceId: context.traceId,
-            performanceCue: context.performanceCue || null,
+            performanceCue: result.segmentPerformanceCue || context.performanceCue || null,
             playbackGeneration,
             preserveTurnPlaybackGeneration: context.preserveTurnPlaybackGeneration === true,
             sessionId,
             signal: context.signal || null,
-            onPlaybackStart: context.onPlaybackStart
+            onPlaybackStart: context.onPlaybackStart,
+            onPlaybackProgress: context.onPlaybackProgress
           });
           if (fallbackOk !== false) {
             spokenCount += 1;
@@ -1357,8 +1589,9 @@
             playbackGeneration,
             sessionId: context.sessionId,
             segmentId: i + 1,
-            performanceCue: context.performanceCue || null,
-            onPlaybackStart: context.onPlaybackStart
+            performanceCue: result.segmentPerformanceCue || context.performanceCue || null,
+            onPlaybackStart: context.onPlaybackStart,
+            onPlaybackProgress: context.onPlaybackProgress
           });
           recordPerformanceAuditEvent("tts_segment", {
             mode,
@@ -1375,7 +1608,7 @@
         }
         if (i < segments.length - 1) {
           const keepGoing = await waitVoiceDirectorPause(
-            Math.min(40, Number(voiceTimeline.inter_segment_pause_ms) || 0),
+            Math.min(180, Number(voiceTimeline.inter_segment_pause_ms) || 0),
             context.sessionId,
             context.signal || null,
             playbackGeneration
@@ -1429,15 +1662,21 @@
       const speechPlan = activateAssistantSpeechPlan(
         buildAssistantSpeechPlan(text, voiceTimeline, state.characterBrainLastDecision, safeSegments)
       );
-      const useSegmented = voiceTimeline?.enabled === true && safeSegments.length > 1;
+      const qwenContinuousReply = String(state.ttsProvider || "").toLowerCase() === "qwen3_tts"
+        && state.qwen3TtsReplyContinuity !== false;
+      const useSegmented = !qwenContinuousReply
+        && voiceTimeline?.enabled === true
+        && safeSegments.length > 1;
       const usePrefetchSegmented = canPrefetchServerVoiceSegments(voiceTimeline, safeSegments);
       const mode = usePrefetchSegmented
         ? `${context.mode || "direct"}_prefetch_segmented`
-        : (useSegmented ? `${context.mode || "direct"}_segmented` : (context.mode || "direct"));
+        : (useSegmented
+          ? `${context.mode || "direct"}_segmented`
+          : (qwenContinuousReply ? `${context.mode || "direct"}_continuous_reply` : (context.mode || "direct")));
       const fallbackReason = String(voiceTimeline?.fallback_reason || "none");
       const voiceSegmentAudit = {
         mode,
-        segments: safeSegments.length,
+        segments: useSegmented || usePrefetchSegmented ? safeSegments.length : 1,
         delivery: String(voiceTimeline?.delivery || voiceDirector?.delivery || "none"),
         pace: String(voiceTimeline?.pace || voiceDirector?.pace || "none"),
         pause_profile: String(voiceTimeline?.pause_profile || voiceDirector?.pause_profile || "none"),
@@ -1451,9 +1690,15 @@
       if (!useSegmented) {
         recordPerformanceAuditEvent("voice_segment_plan", voiceSegmentAudit);
         setActiveAssistantSpeechSegment(1, text);
-        const prosody = applyVoiceDirectorProsody(
-          buildSpeakProsody(text, context.mood, false, context.prosodyStyle),
-          voiceDirector
+        const segmentPerformanceCue = typeof context.performanceCueForText === "function"
+          ? context.performanceCueForText(text)
+          : performanceCue;
+        const prosody = mergePerformanceCueProsody(
+          applyVoiceDirectorProsody(
+            buildSpeakProsody(text, context.mood, false, context.prosodyStyle),
+            voiceDirector
+          ),
+          segmentPerformanceCue
         );
         const ok = await speak(text, {
           prosody,
@@ -1462,12 +1707,13 @@
           style: context.talkStyle,
           voiceStyle: context.prosodyStyle,
           perfTraceId: context.traceId,
-          performanceCue,
+          performanceCue: segmentPerformanceCue,
           playbackGeneration: context.playbackGeneration,
           preserveTurnPlaybackGeneration: context.preserveTurnPlaybackGeneration === true,
           sessionId: context.sessionId,
           signal: context.signal || null,
-          onPlaybackStart: notifyPlaybackStart
+          onPlaybackStart: notifyPlaybackStart,
+          onPlaybackProgress: context.onPlaybackProgress
         });
         if (ok !== false) {
           recordPerformanceAuditEvent("tts_segment", { mode, index: 1, segments: safeSegments.length, ok: true });
@@ -1506,9 +1752,15 @@
           continue;
         }
         setActiveAssistantSpeechSegment(i + 1, segment);
-        const prosody = applyVoiceDirectorProsody(
-          buildSpeakProsody(segment, context.mood, false, context.prosodyStyle),
-          voiceDirector
+        const segmentPerformanceCue = typeof context.performanceCueForText === "function"
+          ? context.performanceCueForText(segment)
+          : performanceCue;
+        const prosody = mergePerformanceCueProsody(
+          applyVoiceDirectorProsody(
+            buildSpeakProsody(segment, context.mood, false, context.prosodyStyle),
+            voiceDirector
+          ),
+          segmentPerformanceCue
         );
         const ok = await speak(segment, {
           prosody,
@@ -1517,12 +1769,13 @@
           style: context.talkStyle,
           voiceStyle: context.prosodyStyle,
           perfTraceId: context.traceId,
-          performanceCue,
+          performanceCue: segmentPerformanceCue,
           playbackGeneration: context.playbackGeneration,
           preserveTurnPlaybackGeneration: context.preserveTurnPlaybackGeneration === true,
           sessionId: context.sessionId,
-          signal: context.signal || null,
-          onPlaybackStart: notifyPlaybackStart
+            signal: context.signal || null,
+            onPlaybackStart: notifyPlaybackStart,
+            onPlaybackProgress: context.onPlaybackProgress
         });
         recordPerformanceAuditEvent("tts_segment", {
           mode,
@@ -1597,6 +1850,12 @@
           }
           return rememberCompanionTurnForReply(turn);
         },
+        onConversationDecision: (decision) => {
+          if (turnId && !isCurrentChatTurn(turnId)) {
+            return null;
+          }
+          return rememberConversationDecisionForReply(decision);
+        },
         onDeliveryId: (deliveryId) => {
           if (turnId && !isCurrentChatTurn(turnId)) {
             return null;
@@ -1604,6 +1863,9 @@
           return onDeliveryId(deliveryId);
         },
         preferStream: state.conversationMode.chatStreamEnabled !== false,
+        firstDeltaTimeoutMs: state.naturalConversation?.enabled === true
+          ? 30000
+          : 12000,
         perfHooks,
         perfLog,
         now: () => performance.now(),
@@ -1617,7 +1879,12 @@
         return false;
       }
       const isAuto = !!opts.auto;
-      const allowActiveInterrupt = opts.interruptActive === true || (opts.interruptActive !== false && !isAuto);
+      // The ASR turn manager owns this decision. Do not downgrade an explicitly
+      // ordered continuation during a thinking-only phase or the tiny silence
+      // between audio segments; both are valid parts of the prior delivery chain.
+      const preservePriorSpeech = opts.preservePriorSpeech === true;
+      const allowActiveInterrupt = !preservePriorSpeech
+        && (opts.interruptActive === true || (opts.interruptActive !== false && !isAuto));
       if (allowActiveInterrupt && (state.chatBusy || isAssistantSpeechActive())) {
         const interruptReason = opts.interruptReason || "new_user_turn";
         const protectedSpeech = shouldProtectImportantAssistantSpeech(interruptReason);
@@ -1661,15 +1928,19 @@
       const silentError = !!opts.silentError;
       const skipDesktopAttach = opts.skipDesktopAttach === true;
       const forceTools = opts.forceTools === true;
+      const toolsOptional = opts.toolsOptional === true;
       const inputModality = isAuto
         ? "auto"
         : normalizeInputModality(opts.inputModality || opts.input_modality, "text");
-      const speechTurn = await waitForNonInterruptingSpeechTurn({
-        auto: isAuto,
-        interruptTts: opts.interruptTts === true || allowActiveInterrupt,
-        dropIfSpeaking: opts.dropIfSpeaking === true,
-        speechTurnWaitMs: opts.speechTurnWaitMs
-      });
+      const naturalParticipation = isAuto && opts.naturalParticipation === true;
+      const speechTurn = preservePriorSpeech
+        ? { ready: true, interrupt: false, waited: false, reason: "ordered_continuation" }
+        : await waitForNonInterruptingSpeechTurn({
+            auto: isAuto,
+            interruptTts: opts.interruptTts === true || allowActiveInterrupt,
+            dropIfSpeaking: opts.dropIfSpeaking === true,
+            speechTurnWaitMs: opts.speechTurnWaitMs
+          });
       if (!speechTurn.ready) {
         recordTTSDebugEvent(isAuto ? "proactive_reply_suppressed" : "chat_turn_wait_failed", {
           result: speechTurn.reason || "speaking",
@@ -1689,6 +1960,8 @@
       }
       characterRuntimeMetadataForReply = null;
       companionTurnForReply = null;
+      conversationDecisionForReply = null;
+      state.naturalConversationDecision = null;
       const chatPerfTraceId = createPerfTraceId("chat");
       const chatPerfStartPerfMs = performance.now();
       const chatPerfStartWallMs = Date.now();
@@ -1795,19 +2068,32 @@
       let latencyHintTimer = 0;
       let streamSpeechSettlement = null;
       const streamSpeakSession = nextStreamSpeakSession();
-      const useStreamSpeak = shouldUseStreamSpeak();
-      const waitForCompanionTurn = state.companionTurnEnabled === true;
-      if (speechTurn.interrupt || !isAssistantSpeechActive()) {
+      const useStreamSpeak = shouldUseStreamSpeak() && !preservePriorSpeech;
+      // Qwen defaults to one finalized request so punctuation and adjacent
+      // clauses share the same voice identity and emotional through-line.
+      // The legacy low-latency sentence stream remains available only when
+      // qwen3_tts_reply_continuity is explicitly disabled.
+      const normalTurnWaitsForCompanionEnvelope = state.companionTurnEnabled === true
+        && !canStreamBeforeCompanionTurnFinalizes();
+      const waitForCompanionTurn = preservePriorSpeech || normalTurnWaitsForCompanionEnvelope;
+      if (!preservePriorSpeech && (speechTurn.interrupt || !isAssistantSpeechActive())) {
         stopAllAudioPlayback();
       }
       clearPerformanceTimelineTimers();
-      state.streamSpeakSession = streamSpeakSession;
-      state.streamSpeakQueue = [];
-      state.streamSpeakBuffer = "";
-      state.streamSpeakLastEnqueueSession = 0;
-      state.streamSpeakDelivery = null;
+      if (!preservePriorSpeech) {
+        state.streamSpeakSession = streamSpeakSession;
+        state.streamSpeakQueue = [];
+        state.streamSpeakBuffer = "";
+        state.streamSpeakLastEnqueueSession = 0;
+        state.streamSpeakDelivery = null;
+      }
       let streamActualPlaybackEvent = null;
       let streamPlaybackTimelineHandler = null;
+      const performanceCueForStreamText = (segmentText) => buildSegmentPerformanceCue(segmentText, {
+        companionTurn: companionTurnForReply,
+        mood: detectMood(segmentText),
+        talkStyle: state.currentTalkStyle || talkStyle
+      });
       const streamPlaybackGeneration = Number(state.ttsPlaybackGeneration || 0);
       const isCurrentStreamPlayback = () => (
         Number(state.streamSpeakSession || 0) === Number(streamSpeakSession || 0)
@@ -1838,7 +2124,13 @@
         }
         return true;
       };
-      if (shouldPlayLatencyHint(isAuto, useStreamSpeak)) {
+      if (
+        shouldPlayLatencyHint(isAuto, useStreamSpeak)
+        && !(
+          inputModality === "voice"
+          && state.naturalConversation?.enabled === true
+        )
+      ) {
         latencyHintTimer = window.setTimeout(async () => {
           if (!isCurrentChatTurn(turnId) || !state.chatBusy || gotFirstDelta) {
             return;
@@ -1904,7 +2196,9 @@
           })),
           auto: isAuto,
           input_modality: inputModality,
+          natural_participation: naturalParticipation,
           force_tools: forceTools,
+          tools_optional: toolsOptional,
           client_capabilities: {
             delivered_turn_receipt_v1: true
           },
@@ -1930,6 +2224,29 @@
         if (asrContext) {
           conversationContext.asr = asrContext;
         }
+        const ambient = state.naturalConversationAmbient;
+        const ambientTtlMs = Math.max(
+          30000,
+          Math.min(
+            900000,
+            Number(state.naturalConversation?.ambientContextTtlMs) || 180000
+          )
+        );
+        if (
+          (inputModality === "voice" || naturalParticipation)
+          && state.naturalConversation?.enabled === true
+          && state.naturalConversation?.rememberAmbientContext !== false
+          && ambient
+          && typeof ambient === "object"
+          && Date.now() - Number(ambient.recorded_at || 0) <= ambientTtlMs
+        ) {
+          conversationContext.ambient = ambient;
+        } else if (
+          ambient
+          && Date.now() - Number(ambient.recorded_at || 0) > ambientTtlMs
+        ) {
+          state.naturalConversationAmbient = null;
+        }
         if (Object.keys(conversationContext).length) {
           payload.conversation_context = conversationContext;
         }
@@ -1950,8 +2267,13 @@
         throwIfChatTurnCancelled(turnId, chatAbortController);
         assistantRow = appendMessage("assistant", "", {
           persist: false,
-          hideTimestamp: true
+          hideTimestamp: true,
+          continuation: !!interruptionContext || preservePriorSpeech
         });
+        if (preservePriorSpeech) {
+          assistantRow?.classList?.add?.("is-awaiting-speech");
+        }
+        state.activeAssistantMessageRow = assistantRow;
         const streamed = await streamAssistantReply(payload, (delta) => {
           if (isChatTurnCancelled(turnId, chatAbortController)) {
             return;
@@ -1982,20 +2304,36 @@
             : "";
           visibleStreamReply = nextVisibleStreamReply;
           state.activeAssistantDraftText = visibleStreamReply;
-          setMessageText(assistantRow, visibleStreamReply, { enableTranslation: false });
-          if (!companionSpeechPrewarm && waitForCompanionTurn) {
+          setMessageText(assistantRow, visibleStreamReply, {
+            enableTranslation: false,
+            streamAppend: true
+          });
+          if (!companionSpeechPrewarm && waitForCompanionTurn && isCompanionSpeechPrewarmEligible()) {
+            const prewarmText = extractStableCompanionSpeechPrefix(visibleStreamReply);
+            const prewarmCue = performanceCueForStreamText(prewarmText);
             companionSpeechPrewarm = startCompanionSpeechPrewarm(visibleStreamReply, {
               turnId,
               sessionId: streamSpeakSession,
               playbackGeneration: Number(state.ttsPlaybackGeneration || 0),
               traceId: chatPerfTraceId,
-              chatSignal: chatAbortController?.signal || null
+              chatSignal: chatAbortController?.signal || null,
+              prosody: mergePerformanceCueProsody(
+                buildSpeakProsody(
+                  prewarmText,
+                  detectMood(prewarmText),
+                  false,
+                  talkStyle
+                ),
+                prewarmCue
+              ),
+              performanceSignature: performanceCueSignature(prewarmCue)
             });
           }
           if (useStreamSpeak && !waitForCompanionTurn) {
             feedStreamSpeakDelta(visibleDelta, streamSpeakSession, talkStyle, {
               onPlaybackStart: handleStreamPlaybackStart,
-              signal: chatAbortController?.signal || null
+              signal: chatAbortController?.signal || null,
+              performanceCueForText: performanceCueForStreamText
             });
           }
           setStatus(isAuto ? "主动陪伴中..." : "思考中...");
@@ -2037,6 +2375,82 @@
         reply = reply.trim();
         const parsedReply = parseToolMetaFromText(reply);
         const visibleReply = normalizeAssistantVisibleText(parsedReply.visibleText);
+        const naturalMode = String(conversationDecisionForReply?.mode || "reply");
+        if (
+          !visibleReply
+          && ["silence", "micro_reaction", "defer"].includes(naturalMode)
+        ) {
+          clearThinkingMotionTimer();
+          clearPerformanceTimelineTimers();
+          if (assistantRow && !assistantRowFinalized) {
+            try {
+              assistantRow.remove();
+            } catch (_) {
+              // An absent transient row is already the desired result.
+            }
+          }
+          if (state.activeAssistantMessageRow === assistantRow) {
+            state.activeAssistantMessageRow = null;
+          }
+          const reaction = String(conversationDecisionForReply?.reaction || "");
+          if (naturalMode === "micro_reaction" || naturalMode === "defer") {
+            const actionIntent = reaction === "soft_ack" ? "listen" : "thinking";
+            enqueueActionIntent(actionIntent, {
+              text: userDisplayText,
+              style: talkStyle,
+              mood: reaction === "concerned" ? "sad" : "thinking",
+              combo: false
+            });
+            publishPerformancePhase({
+              turnId,
+              phase: "quiet_reaction",
+              actionIntent,
+              actionStyle: talkStyle,
+              actionMood: reaction === "concerned" ? "sad" : "thinking",
+              motionCue: reaction === "soft_ack" ? "listen" : "thinking_nod",
+              motionRole: "quiet_reaction",
+              combo: false,
+              beats: 1,
+              emphasis: naturalMode === "defer" ? 0.24 : 0.16,
+              priority: 2,
+              cooldownMs: 1400
+            });
+          }
+          if (!isAuto && state.naturalConversation?.rememberAmbientContext !== false) {
+            const moodHint = initialMood && initialMood !== "idle"
+              ? `The user sounded ${initialMood} while speaking casually.`
+              : "The user made a casual voice remark that did not need an immediate answer.";
+            state.naturalConversationAmbient = {
+              version: 1,
+              mode: naturalMode,
+              summary: naturalMode === "defer"
+                ? `${moodHint} Xinyu chose to keep listening and may connect it naturally later.`
+                : moodHint,
+              topic_hint: String(userDisplayText || "").replace(/\s+/g, " ").trim().slice(0, 80),
+              reaction,
+              recorded_at: Date.now()
+            };
+          }
+          if (!isAuto) {
+            queueConversationAwarenessAfterTurn({
+              userText: userDisplayText,
+              mode: naturalMode,
+              reaction,
+              mood: initialMood,
+              talkStyle,
+              brainSnapshot: state.characterBrainLastDecision,
+              userTimestamp
+            });
+          }
+          recordTTSDebugEvent("natural_conversation_no_reply", {
+            mode: naturalMode,
+            reaction,
+            thinkingLevel: String(conversationDecisionForReply?.thinking_level || "normal"),
+            thinkingDelayMs: Number(conversationDecisionForReply?.thinking_delay_ms || 0)
+          });
+          setStatus("待机");
+          return true;
+        }
         if (!visibleReply) {
           throw new Error("模型没有返回内容");
         }
@@ -2044,9 +2458,13 @@
         const assistantTimestamp = Date.now();
         finalizePendingMessageRow(assistantRow, "assistant", visibleReply, {
           timestamp: assistantTimestamp,
-          persist: true
+          persist: true,
+          deferStreamFlatten: preservePriorSpeech
         });
         assistantRowFinalized = true;
+        if (state.activeAssistantMessageRow === assistantRow) {
+          state.activeAssistantMessageRow = null;
+        }
         if (deliveryIdForReply && !deliveryAcknowledged && isCurrentChatTurn(turnId)) {
           deliveryAcknowledged = true;
           if (deliveryAckQueue) {
@@ -2119,7 +2537,8 @@
           runtimeMetadata: performanceMetadataForReply,
           performancePlan: activeCompanionTurn?.performance || null,
           replyCue: replyCueApply,
-          characterBrain: state.characterBrainLastDecision
+          characterBrain: state.characterBrainLastDecision,
+          motionIntensity: state.motionIntensity
         });
         const runtimeVoiceStyle = normalizeRuntimeVoiceStyleForSpeech(
           performanceCue?.voiceStyle || performanceMetadataForReply?.voice_style
@@ -2301,7 +2720,8 @@
           }
           flushStreamSpeak(streamSpeakSession, finalTalkStyle, {
             onPlaybackStart: handleStreamPlaybackStart,
-            signal: chatAbortController?.signal || null
+            signal: chatAbortController?.signal || null,
+            performanceCueForText: performanceCueForStreamText
           });
           const hadStreamSegments = state.streamSpeakLastEnqueueSession === streamSpeakSession;
           if (hadStreamSegments && state.streamSpeakPlayedSession === streamSpeakSession) {
@@ -2335,6 +2755,7 @@
               prosodyStyle: finalProsodyStyle,
               traceId: chatPerfTraceId,
               performanceCue: performanceCue || null,
+              performanceCueForText: performanceCueForStreamText,
               sessionId: streamSpeakSession,
               playbackGeneration: Number(state.ttsPlaybackGeneration || 0),
               preserveTurnPlaybackGeneration: true,
@@ -2357,16 +2778,85 @@
           }
         } else {
           const speechText = activeCompanionTurn?.spoken_text || buildStableSpeakText(visibleReply) || visibleReply;
+          if (preservePriorSpeech) {
+            const priorSpeechFinished = await waitForSpeechTurnIdle(45000);
+            throwIfChatTurnCancelled(turnId, chatAbortController);
+            if (!priorSpeechFinished && isAssistantSpeechActive()) {
+              recordTTSDebugEvent("ordered_continuation_wait_timeout", {
+                traceId: chatPerfTraceId,
+                sessionId: streamSpeakSession,
+                result: "forced_handoff"
+              });
+              stopAllAudioPlayback();
+            }
+            const breathStartedAt = performance.now();
+            const breathCompleted = await waitOrderedContinuationBreath(
+              visibleReply,
+              finalTalkStyle,
+              chatAbortController?.signal || null
+            );
+            throwIfChatTurnCancelled(turnId, chatAbortController);
+            if (!breathCompleted) {
+              throw makeChatTurnInterruptedError();
+            }
+            recordTTSDebugEvent("ordered_continuation_breath", {
+              traceId: chatPerfTraceId,
+              sessionId: streamSpeakSession,
+              waitMs: Math.round(performance.now() - breathStartedAt),
+              style: finalTalkStyle
+            });
+            state.streamSpeakSession = streamSpeakSession;
+            state.streamSpeakQueue = [];
+            state.streamSpeakBuffer = "";
+            state.streamSpeakLastEnqueueSession = 0;
+            state.streamSpeakDelivery = null;
+          }
           const confirmedPrewarm = await takeConfirmedCompanionSpeechPrewarm(companionSpeechPrewarm, {
             hasCanonicalTurn: !!activeCompanionTurn,
             speechText,
             turnId,
             sessionId: streamSpeakSession,
-            playbackGeneration: Number(state.ttsPlaybackGeneration || 0)
+            playbackGeneration: Number(state.ttsPlaybackGeneration || 0),
+            performanceSignature: performanceCueSignature(performanceCueForStreamText(
+              extractStableCompanionSpeechPrefix(speechText)
+            ))
           });
           throwIfChatTurnCancelled(turnId, chatAbortController);
           const directPlaybackGeneration = Number(state.ttsPlaybackGeneration || 0);
           let directSpeechPerformanceStarted = false;
+          let orderedContinuationRevealStarted = false;
+          let orderedContinuationVisibleChars = 0;
+          const revealOrderedContinuationProgress = (event = {}) => {
+            if (
+              !preservePriorSpeech
+              || !orderedContinuationRevealStarted
+              || !isCurrentChatTurn(turnId)
+              || Number(state.streamSpeakSession || 0) !== Number(streamSpeakSession || 0)
+            ) {
+              return;
+            }
+            const spokenSegment = String(event.text || "").trim();
+            const durationMs = Math.max(1, Number(event.durationMs) || 0);
+            if (!spokenSegment || durationMs <= 1) return;
+            const leadMs = 350;
+            const ratio = Math.max(0, Math.min(1, (Number(event.elapsedMs || 0) + leadMs) / durationMs));
+            let segmentStart = visibleReply.indexOf(spokenSegment, Math.max(0, orderedContinuationVisibleChars - 2));
+            if (segmentStart < 0) {
+              segmentStart = Math.min(visibleReply.length, orderedContinuationVisibleChars);
+            }
+            const desiredChars = Math.min(
+              visibleReply.length,
+              segmentStart + Math.max(1, Math.ceil(spokenSegment.length * ratio))
+            );
+            if (desiredChars <= orderedContinuationVisibleChars) return;
+            orderedContinuationVisibleChars = desiredChars;
+            const revealedText = visibleReply.slice(0, desiredChars);
+            state.activeAssistantDraftText = revealedText;
+            setMessageText(assistantRow, revealedText, {
+              enableTranslation: false,
+              streamAppend: true
+            });
+          };
           const startDirectSpeechPerformance = (event = {}) => {
             const textOnlyDelivery = String(event?.source || "") === "text_reply";
             const eventPlaybackGeneration = Number(event.playbackGeneration || directPlaybackGeneration);
@@ -2382,6 +2872,12 @@
               return false;
             }
             directSpeechPerformanceStarted = true;
+            if (preservePriorSpeech && !orderedContinuationRevealStarted) {
+              orderedContinuationRevealStarted = true;
+              assistantRow?.classList?.remove?.("is-awaiting-speech");
+              setMessageText(assistantRow, "", { enableTranslation: false });
+              revealOrderedContinuationProgress(event);
+            }
             runTimelineSpeechStart();
             if (!performanceTimeline && !textOnlyDelivery) {
               maybePlayTalkGesture(confirmedPrewarm?.prefix || speechText || visibleReply, finalTalkStyle);
@@ -2405,14 +2901,15 @@
               playbackGeneration: directPlaybackGeneration,
               sessionId: streamSpeakSession,
               segmentId: 1,
-              performanceCue: performanceCue || null,
+              performanceCue: performanceCueForStreamText(confirmedPrewarm.prefix) || performanceCue || null,
               onPlaybackStart: (event) => {
                 recordPerformanceAuditEvent("tts_start", {
                   mode: "companion_turn_prewarm",
                   source: String(event?.source || "server_tts")
                 });
                 startDirectSpeechPerformance(event);
-              }
+              },
+              onPlaybackProgress: revealOrderedContinuationProgress
             });
             recordPerformanceAuditEvent("tts_segment", {
               mode: "companion_turn_prewarm",
@@ -2431,11 +2928,13 @@
                 prosodyStyle: finalProsodyStyle,
                 traceId: chatPerfTraceId,
                 performanceCue: null,
+                performanceCueForText: performanceCueForStreamText,
                 sessionId: streamSpeakSession,
                 playbackGeneration: directPlaybackGeneration,
                 preserveTurnPlaybackGeneration: true,
                 signal: chatAbortController?.signal || null,
-                onPlaybackStart: startDirectSpeechPerformance
+                onPlaybackStart: startDirectSpeechPerformance,
+                onPlaybackProgress: revealOrderedContinuationProgress
               });
             }
             recordPerformanceAuditEvent("tts_end", {
@@ -2453,11 +2952,13 @@
               prosodyStyle: finalProsodyStyle,
               traceId: chatPerfTraceId,
               performanceCue: performanceCue || null,
+              performanceCueForText: performanceCueForStreamText,
               sessionId: streamSpeakSession,
               playbackGeneration: directPlaybackGeneration,
               preserveTurnPlaybackGeneration: true,
               signal: chatAbortController?.signal || null,
-              onPlaybackStart: startDirectSpeechPerformance
+              onPlaybackStart: startDirectSpeechPerformance,
+              onPlaybackProgress: revealOrderedContinuationProgress
             });
           }
           // Text-only replies are already visibly delivered. Give the same
@@ -2466,6 +2967,10 @@
           // the newest assistant response.
           if (useSilentPerformanceCue && isCurrentChatTurn(turnId)) {
             state.conversationLastTtsFinishedAt = Date.now();
+          }
+          if (preservePriorSpeech && orderedContinuationRevealStarted) {
+            state.activeAssistantDraftText = visibleReply;
+            setMessageText(assistantRow, visibleReply, { enableTranslation: true });
           }
           throwIfChatTurnCancelled(turnId, chatAbortController);
           if (directSpeechPerformanceStarted || useSilentPerformanceCue) {
@@ -2509,7 +3014,11 @@
             clearPerformanceTimelineTimers();
             finishPerformanceAudit({ status: "interrupted", lastEvent: "interrupted" });
           }
-          if (assistantRow && !assistantRowFinalized) {
+          if (
+            assistantRow
+            && !assistantRowFinalized
+            && assistantRow.dataset?.interruptionFinalized !== "true"
+          ) {
             try {
               assistantRow.remove();
             } catch (_) {
@@ -2545,7 +3054,7 @@
         }
         if (!silentError) {
           const msg = buildChatFailureDoctorHint(err);
-          appendMessage("assistant", msg);
+          appendMessage("assistant", msg, { category: "system", persist: false, enableFeedback: false });
         }
         setStatus("请求失败");
         return false;
@@ -2582,6 +3091,9 @@
           state.activeAssistantDraftText = "";
           state.activeAssistantUserText = "";
           state.activeAssistantTurnStartedAt = 0;
+          if (state.activeAssistantMessageRow === assistantRow) {
+            state.activeAssistantMessageRow = null;
+          }
           if (!isAssistantSpeechActive()) {
             clearAssistantSpeechPlan();
           }
@@ -2610,6 +3122,13 @@
       }
       ui.chatInput.value = "";
       const text = rawText || "请帮我看看我发的附件。";
+      const singingSong = window.TaffySinging?.matchSong?.(text);
+      if (singingSong && !pending.length) {
+        appendMessage("user", text, { enableTranslation: false });
+        appendMessage("assistant", `好呀，我来唱《${singingSong.title}》。`, { enableTranslation: false });
+        await window.TaffySinging.performSong(singingSong.id, singingSong.title);
+        return;
+      }
       const consumed = await handleLocalCommand(text);
       if (consumed) {
         setStatus("待机");

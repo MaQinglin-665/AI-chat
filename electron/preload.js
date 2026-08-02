@@ -3,11 +3,17 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   moveWindowBy: (dx, dy) => ipcRenderer.send("window-move-by", dx, dy),
   resizeWindow: (w, h) => ipcRenderer.send("window-resize", w, h),
+  minimizeWindow: () => ipcRenderer.send("window-minimize"),
+  setTitleBarTheme: (theme) => ipcRenderer.send("window-titlebar-theme", theme),
   beginWindowDrag: () => ipcRenderer.send("window-drag-begin"),
   endWindowDrag: () => ipcRenderer.send("window-drag-end"),
   captureDesktop: () => ipcRenderer.invoke("capture-desktop"),
+  pickSingingSource: () => ipcRenderer.invoke("pick-singing-source"),
   setWindowLock: (locked) => ipcRenderer.send("window-lock-set", !!locked),
   getWindowLock: () => ipcRenderer.invoke("window-lock-get"),
+  getSurfaceActive: () => ipcRenderer.invoke("surface-active-get"),
+  reportSurfaceReady: () => ipcRenderer.send("surface-renderer-ready"),
+  reportLive2DRenderMetrics: (payload) => ipcRenderer.send("live2d-render-metrics", payload || {}),
   getApiToken: () => ipcRenderer.invoke("get-api-token"),
   getCursorScreenPoint: () => ipcRenderer.invoke("get-cursor-screen-point"),
   getModelWindowBounds: () => ipcRenderer.invoke("get-model-window-bounds"),
@@ -44,6 +50,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => {
       try {
         ipcRenderer.removeListener("window-lock-changed", handler);
+      } catch (_) {
+        // ignore
+      }
+    };
+  },
+  onSurfaceActiveChanged: (callback) => {
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+    const handler = (_event, active) => callback(!!active);
+    ipcRenderer.on("surface-active-changed", handler);
+    return () => {
+      try {
+        ipcRenderer.removeListener("surface-active-changed", handler);
       } catch (_) {
         // ignore
       }

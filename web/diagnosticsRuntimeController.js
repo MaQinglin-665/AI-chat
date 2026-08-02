@@ -383,11 +383,54 @@
       });
     }
 
+    function getDoctorPanelElements() {
+      const documentObject = root.document;
+      return {
+        modal: documentObject?.getElementById?.("doctor-modal"),
+        dialog: documentObject?.getElementById?.("doctor-dialog"),
+        title: documentObject?.getElementById?.("doctor-state-title"),
+        copy: documentObject?.getElementById?.("doctor-state-copy"),
+        output: documentObject?.getElementById?.("doctor-report-output")
+      };
+    }
+
+    function openDoctorPanel() {
+      const { modal } = getDoctorPanelElements();
+      if (!modal) return false;
+      modal.hidden = false;
+      root.document?.body?.classList?.add?.("doctor-open");
+      return true;
+    }
+
+    function closeDoctorPanel() {
+      const { modal } = getDoctorPanelElements();
+      if (!modal) return false;
+      modal.hidden = true;
+      root.document?.body?.classList?.remove?.("doctor-open");
+      return true;
+    }
+
+    function setDoctorPanelState(stateName, titleText, copyText, reportText = null) {
+      const elements = getDoctorPanelElements();
+      if (elements.dialog?.dataset) elements.dialog.dataset.doctorState = stateName;
+      if (elements.title) elements.title.textContent = titleText;
+      if (elements.copy) elements.copy.textContent = copyText;
+      if (elements.output && reportText !== null) elements.output.textContent = String(reportText || "");
+    }
+
     async function runDoctorAndAppendReport() {
-      appendMessage("assistant", "正在自检聊天、语音和角色接入状态...", { enableTranslation: false });
+      openDoctorPanel();
+      setDoctorPanelState("running", "正在检查运行链路", "正在确认聊天模型、语音服务与角色接入状态…", "检查正在运行，请稍候…");
       setStatus("故障自检中...");
-      const row = appendMessage("assistant", await runDoctorDiagnostics(), { enableTranslation: false });
-      row?.classList?.add("doctor-report");
+      try {
+        const report = await runDoctorDiagnostics();
+        setDoctorPanelState("complete", "检查完成", "结果已更新；异常项会给出可以直接执行的处理建议。", report);
+        return report;
+      } catch (err) {
+        const message = err?.message || String(err || "未知错误");
+        setDoctorPanelState("error", "检查未完成", "诊断过程遇到错误，请确认本地服务后重试。", `故障自检失败\n\n${message}`);
+        throw err;
+      }
     }
 
     function buildChatFailureDoctorHint(err) {
@@ -409,6 +452,9 @@
       const lines = [
         "Mic debug:",
         `mode=${state.asrMode}`,
+        `provider=${state.asrProvider || "auto"}`,
+        `streamingConfigured=${state.asrStreamingEnabled !== false}`,
+        `streamingActive=${state.localAsrStreamingEnabled === true}`,
         `micOpen=${state.micOpen}`,
         `localRunning=${state.localAsrRunning}`,
         `context=${ctx ? ctx.state : "none"}`,
@@ -538,6 +584,9 @@
       runDoctorJsonFetch,
       runDoctorDiagnostics,
       runDoctorAndAppendReport,
+      openDoctorPanel,
+      closeDoctorPanel,
+      setDoctorPanelState,
       buildChatFailureDoctorHint,
       buildMicDebugReport,
       installTTSDebugBridge,

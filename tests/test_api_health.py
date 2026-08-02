@@ -966,3 +966,24 @@ def test_startup_self_check_reports_safe_character_runtime_summary():
     serialized = "\n".join(findings)
     assert "SecretStartupPersona" not in serialized
     assert "startup secret style" not in serialized
+
+
+def test_local_asr_warmup_status_exposes_readiness_without_model_paths():
+    with app._LOCAL_ASR_WARMUP_LOCK:
+        app._LOCAL_ASR_WARMUP.update(
+            status="ready",
+            provider="vosk",
+            loaded_languages=("zh-CN",),
+            error="",
+        )
+
+    payload = app.get_local_asr_warmup_status()
+
+    assert payload == {
+        "status": "ready",
+        "provider": "vosk",
+        "required": True,
+        "ready": True,
+        "loaded_languages": ["zh-CN"],
+        "error": "",
+    }

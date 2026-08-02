@@ -130,7 +130,10 @@ function createBrowserSpeechController({
   autoEnd = true,
   utterances = [],
   cancelCounter = { count: 0 },
-  playbackStarts = []
+  playbackStarts = [],
+  animationCalls = [],
+  timerQueue = null,
+  omitStartEvent = false
 } = {}) {
   const state = {
     ttsPlaybackGeneration: 7,
@@ -149,16 +152,27 @@ function createBrowserSpeechController({
       },
       speak(utterance) {
         utterances.push(utterance);
+        this.speaking = true;
         if (autoEnd) {
           Promise.resolve().then(() => {
-            utterance.onstart?.();
+            if (!omitStartEvent) utterance.onstart?.();
+            this.speaking = false;
             utterance.onend?.();
           });
         }
-      }
+      },
+      speaking: false
     },
-    setTimeout: () => 0,
-    clearTimeout() {}
+    setTimeout(callback, delay) {
+      if (!Array.isArray(timerQueue)) return 0;
+      const id = timerQueue.length + 1;
+      timerQueue.push({ id, callback, delay, cleared: false });
+      return id;
+    },
+    clearTimeout(id) {
+      const timer = Array.isArray(timerQueue) ? timerQueue.find((item) => item.id === id) : null;
+      if (timer) timer.cleared = true;
+    }
   };
   const controller = ttsPlaybackController.createController({
     state,
@@ -171,14 +185,50 @@ function createBrowserSpeechController({
       pitch_ratio: 1,
       volume_ratio: 1
     }),
-    beginSpeechPerformance: () => {},
+    beginSpeechAnimation: (...args) => animationCalls.push(args),
     finishSpeechAnimation: () => {},
     endSpeechAnimation: () => {},
     showSubtitleText: () => {},
     hideSubtitleText: () => {},
     setStatus: () => {}
   });
-  return { controller, state, utterances, cancelCounter, playbackStarts };
+  return { controller, state, utterances, cancelCounter, playbackStarts, animationCalls, windowObject };
+}
+
+async function testBrowserSpeakingStateStartsAnimationWhenOnstartIsMissing() {
+  await withFakeBrowserSpeech(async () => {
+    const utterances = [];
+    const timerQueue = [];
+    const animationCalls = [];
+    const starts = [];
+    const { controller, windowObject } = createBrowserSpeechController({
+      autoEnd: false,
+      utterances,
+      timerQueue,
+      animationCalls,
+      omitStartEvent: true
+    });
+    const playback = controller.speak("audible fallback", {
+      force: true,
+      playbackGeneration: 7,
+      preserveTurnPlaybackGeneration: true,
+      onPlaybackStart: (event) => starts.push(event)
+    });
+    await Promise.resolve();
+    assert.strictEqual(animationCalls.length, 0, "browser speech must not animate before event or speaking-state evidence");
+    const probe = timerQueue.find((item) => item.delay === 40 && !item.cleared);
+    assert.ok(probe, "browser speech should schedule a short actual-start probe");
+    probe.callback();
+    assert.strictEqual(animationCalls.length, 1, "the speaking state should recover mouth/body animation when onstart is missing");
+    assert.strictEqual(starts.length, 1, "the fallback start detector should announce actual playback exactly once");
+    assert.strictEqual(starts[0].source, "browser_tts");
+    utterances[0].onstart?.();
+    assert.strictEqual(animationCalls.length, 1, "a delayed onstart event must not restart the animation");
+    assert.strictEqual(starts.length, 1, "a delayed onstart event must not announce playback twice");
+    windowObject.speechSynthesis.speaking = false;
+    utterances[0].onend?.();
+    assert.strictEqual(await playback, true);
+  });
 }
 
 async function testBrowserPreserveTurnGenerationKeepsSameTurnCallbacksCurrent() {
@@ -409,6 +459,7 @@ async function testCancelledAudioContextPlaybackSettlesPromptly() {
 async function main() {
   await testAudioContextStartFailureDoesNotAnnouncePlayback();
   await testBrowserPreserveTurnGenerationKeepsSameTurnCallbacksCurrent();
+  await testBrowserSpeakingStateStartsAnimationWhenOnstartIsMissing();
   await testStaleBrowserCallbacksCannotCancelNewerSpeech();
   await testCancelledHtmlAudioPlaybackSettlesPromptly();
   await testCancelledAudioContextPlaybackSettlesPromptly();

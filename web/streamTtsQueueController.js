@@ -13,12 +13,21 @@
     const requestServerTTSBlob = typeof deps.requestServerTTSBlob === "function" ? deps.requestServerTTSBlob : async () => null;
     const setStatus = typeof deps.setStatus === "function" ? deps.setStatus : () => {};
     const playAudioBlob = typeof deps.playAudioBlob === "function" ? deps.playAudioBlob : async () => false;
+    const playServerTTSStream = typeof deps.playServerTTSStream === "function"
+      ? deps.playServerTTSStream
+      : async () => ({ ok: false, started: false, cancelled: false });
     const isCurrentTTSPlaybackGeneration = typeof deps.isCurrentTTSPlaybackGeneration === "function" ? deps.isCurrentTTSPlaybackGeneration : () => true;
     const splitStreamSpeakSegments = typeof deps.splitStreamSpeakSegments === "function" ? deps.splitStreamSpeakSegments : () => ({ segments: [], rest: "" });
     const maybePlayTalkGesture = typeof deps.maybePlayTalkGesture === "function" ? deps.maybePlayTalkGesture : () => {};
     const buildStableSpeakText = typeof deps.buildStableSpeakText === "function" ? deps.buildStableSpeakText : (text) => String(text || "").trim();
     const sanitizeSpeakText = typeof deps.sanitizeSpeakText === "function" ? deps.sanitizeSpeakText : (text) => String(text || "").trim();
     const speak = typeof deps.speak === "function" ? deps.speak : async () => false;
+    const shouldAttemptServerTTS = typeof deps.shouldAttemptServerTTS === "function"
+      ? deps.shouldAttemptServerTTS
+      : () => true;
+    const markServerTTSRecovered = typeof deps.markServerTTSRecovered === "function"
+      ? deps.markServerTTSRecovered
+      : () => {};
     const createServerTTSRequestScope = typeof deps.createServerTTSRequestScope === "function"
       ? deps.createServerTTSRequestScope
       : () => null;
@@ -31,11 +40,12 @@
         state.streamSpeakEnabled
         && state.streamSpeakMode === "realtime"
         && (state.ttsProvider !== "gpt_sovits" || state.gptSovitsRealtimeTTS)
+        && shouldAttemptServerTTS()
       );
     }
 
     function shouldSerializeStreamTTSRequests() {
-      return state.ttsProvider === "gpt_sovits";
+      return state.ttsProvider === "gpt_sovits" || state.ttsProvider === "qwen3_tts";
     }
 
     function getStreamSpeakDelivery(sessionId, playbackGeneration = state.ttsPlaybackGeneration, create = false) {
@@ -427,14 +437,14 @@
       if (item.blobPromise) {
         return item.blobPromise;
       }
-      const prosody = shouldSerializeStreamTTSRequests()
-        ? null
-        : item.prosody || buildSpeakProsody(
-          item.text,
-          detectMood(item.text),
-          true,
-          item.style || state.currentTalkStyle || "neutral"
-        );
+      // Serializing GPU-backed providers controls request concurrency only.
+      // It must not erase the segment's semantic emotion or numeric prosody.
+      const prosody = item.prosody || buildSpeakProsody(
+        item.text,
+        detectMood(item.text),
+        true,
+        item.style || state.currentTalkStyle || "neutral"
+      );
       item.prosody = prosody;
       recordTTSDebugEvent("stream_request_start", {
         traceId: item.traceId,
@@ -475,15 +485,32 @@
       if (!cleaned) {
         return;
       }
+      const performanceCue = typeof playbackOptions?.performanceCueForText === "function"
+        ? playbackOptions.performanceCueForText(cleaned)
+        : (playbackOptions?.performanceCue || null);
+      const semanticProsody = performanceCue && typeof performanceCue === "object"
+        ? {
+            emotion: String(performanceCue.emotion || "neutral"),
+            intensity: String(performanceCue.intensity || "medium"),
+            voice_style: String(performanceCue.voiceStyle || "neutral")
+          }
+        : {};
       const item = {
         text: cleaned,
         sessionId,
-        prosody,
+        prosody: {
+          ...(prosody && typeof prosody === "object" ? prosody : {}),
+          ...semanticProsody
+        },
         style,
+        performanceCue,
         playbackGeneration: Number(state.ttsPlaybackGeneration || 0),
         blobPromise: null,
         onPlaybackStart: typeof playbackOptions?.onPlaybackStart === "function"
           ? playbackOptions.onPlaybackStart
+          : null,
+        onPlaybackProgress: typeof playbackOptions?.onPlaybackProgress === "function"
+          ? playbackOptions.onPlaybackProgress
           : null,
         playbackStartNotified: false,
         signal: playbackOptions?.signal || null,
@@ -546,7 +573,8 @@
         sessionId: Number(item.sessionId || 0),
         segmentId: Number(item.segmentId || 0),
         playbackGeneration: Number(item.playbackGeneration || 0),
-        text: item.text
+        text: item.text,
+        performanceCue: item.performanceCue || null
       };
       recordTTSDebugEvent("stream_playback_start", {
         traceId: item.traceId,
@@ -555,7 +583,9 @@
         text: item.text,
         source: String(event?.source || "server_tts")
       });
-      maybePlayTalkGesture(item.text, item.style || state.currentTalkStyle || "neutral");
+      if (!item.performanceCue) {
+        maybePlayTalkGesture(item.text, item.style || state.currentTalkStyle || "neutral");
+      }
       if (typeof item.onPlaybackStart === "function") {
         try {
           item.onPlaybackStart(playbackEvent);
@@ -673,6 +703,52 @@
       return null;
     }
 
+    function resolveStreamSegmentPauseMs(item = null) {
+      const text = String(item?.text || "").trim();
+      const style = String(item?.style || state.currentTalkStyle || "neutral").trim().toLowerCase();
+      const base = Math.max(30, Math.min(240, Number(state.streamInterSegmentPauseMs) || 95));
+      let pause = base;
+      if (/(?:\.{2,}|\u2026|\u3002{2,})$/.test(text)) {
+        pause += 80;
+      } else if (/[?\uFF1F]$/.test(text)) {
+        pause += 35;
+      } else if (/[!\uFF01]$/.test(text)) {
+        pause -= 25;
+      } else if (/[,\uFF0C\u3001;\uFF1B:]$/.test(text)) {
+        pause -= 40;
+      }
+      if (["comfort", "soft", "warm"].includes(style)) {
+        pause += 35;
+      } else if (["playful", "cheerful", "teasing"].includes(style)) {
+        pause -= 18;
+      } else if (["clear", "steady", "serious"].includes(style)) {
+        pause += 10;
+      }
+      return Math.max(30, Math.min(240, Math.round(pause)));
+    }
+
+    async function waitStreamSegmentPause(item, sessionId, elapsedMs = 0, requestedPauseMs = null) {
+      const targetPause = Number.isFinite(Number(requestedPauseMs))
+        ? Math.max(0, Number(requestedPauseMs))
+        : resolveStreamSegmentPauseMs(item);
+      const remaining = Math.max(0, targetPause - Math.max(0, Number(elapsedMs) || 0));
+      if (!remaining) {
+        return true;
+      }
+      const end = Date.now() + remaining;
+      while (Date.now() < end) {
+        if (
+          Number(sessionId || 0) !== Number(state.streamSpeakSession || 0)
+          || !isCurrentTTSPlaybackGeneration(item?.playbackGeneration)
+          || item?.requestScope?.signal?.aborted === true
+        ) {
+          return false;
+        }
+        await new Promise((resolve) => setTimeout(resolve, Math.min(18, Math.max(1, end - Date.now()))));
+      }
+      return true;
+    }
+
     async function runStreamSpeakQueue() {
       if (state.streamSpeakWorking) {
         recordTTSDebugEvent("stream_run_skip_busy");
@@ -720,6 +796,71 @@
               result: "delivery_blocked"
             });
             break;
+          }
+          if (Number(current.streamPacingPauseMs || 0) > 0) {
+            setStreamSpeakDeliveryStatus(current, "requesting", { active: false });
+            const pacingElapsedMs = Math.max(0, Number(current.streamPacingElapsedMs || 0));
+            const pacingPauseMs = Math.max(0, Number(current.streamPacingPauseMs || 0));
+            current.streamPacingPauseMs = 0;
+            current.streamPacingElapsedMs = 0;
+            if (!(await waitStreamSegmentPause(current, activeSession, pacingElapsedMs, pacingPauseMs))) {
+              requestCancelled = true;
+              break;
+            }
+          }
+          const useIncrementalPcmStream = (
+            state.ttsProvider === "gpt_sovits"
+            && state.gptSovitsStreamPlayback === true
+          ) || (
+            state.ttsProvider === "qwen3_tts"
+            && state.qwen3TtsStreamPlayback !== false
+          );
+          if (useIncrementalPcmStream) {
+            setStreamSpeakDeliveryStatus(current, "requesting", { active: false });
+            const streamResult = await playServerTTSStream(current.text, {
+              interrupt: false,
+              prosody: current.prosody || buildSpeakProsody(current.text, detectMood(current.text), false, current.style),
+              mood: detectMood(current.text),
+              style: current.style || state.currentTalkStyle || "neutral",
+              performanceCue: current.performanceCue || null,
+              perfTraceId: current.traceId || state.activePerfTraceId || "",
+              segmentId: current.segmentId,
+              sessionId: activeSession,
+              playbackGeneration: current.playbackGeneration,
+              signal: current.requestScope?.signal || null,
+              onPlaybackStart: (event) => notifyStreamSpeakPlaybackStart(current, event),
+              onPlaybackProgress: current.onPlaybackProgress
+            });
+            if (streamResult?.ok === true) {
+              markServerTTSRecovered();
+              setStreamSpeakDeliveryStatus(current, "completed", { active: false });
+              const nextWaitStartedAt = Date.now();
+              const next = dequeueStreamSpeakItem(activeSession) || await waitNextStreamSpeakItem(
+                activeSession,
+                state.chatBusy ? idleWaitMs : 180
+              );
+              if (next) {
+                next.streamPacingPauseMs = resolveStreamSegmentPauseMs(current);
+                next.streamPacingElapsedMs = Date.now() - nextWaitStartedAt;
+              }
+              current = next;
+              continue;
+            }
+            if (streamResult?.cancelled === true) {
+              requestCancelled = true;
+              break;
+            }
+            if (streamResult?.started === true) {
+              markStreamSpeakDeliveryFailure(current, "stream_playback_failed_after_start");
+              break;
+            }
+            recordTTSDebugEvent("pcm_stream_queue_buffered_fallback", {
+              traceId: current.traceId,
+              sessionId: activeSession,
+              segmentId: current.segmentId,
+              result: "fallback_before_start",
+              error: String(streamResult?.error || "")
+            });
           }
           setStreamSpeakDeliveryStatus(current, "requesting", { active: false });
           let currentBlob = null;
@@ -826,11 +967,13 @@
               text: playingItem.text,
               mood: detectMood(playingItem.text),
               style: playingItem.style || state.currentTalkStyle || "neutral",
+              performanceCue: playingItem.performanceCue || null,
               perfTraceId: playingItem.traceId || state.activePerfTraceId || "",
               segmentId: playingItem.segmentId,
               sessionId: activeSession,
               playbackGeneration: playingItem.playbackGeneration,
-              onPlaybackStart: (event) => notifyStreamSpeakPlaybackStart(playingItem, event)
+              onPlaybackStart: (event) => notifyStreamSpeakPlaybackStart(playingItem, event),
+              onPlaybackProgress: playingItem.onPlaybackProgress
             });
           } catch (err) {
             recordTTSDebugEvent("stream_playback_throw", {
@@ -858,10 +1001,15 @@
           if (!playbackOk) {
             markStreamSpeakDeliveryFailure(playingItem, "playback_failed_after_start");
           } else {
+            markServerTTSRecovered();
             setStreamSpeakDeliveryStatus(playingItem, "completed", { active: false });
           }
           if (isStreamSpeakDeliveryBlocked(activeSession, playingItem.playbackGeneration)) {
             break;
+          }
+          if (next) {
+            next.streamPacingPauseMs = resolveStreamSegmentPauseMs(playingItem);
+            next.streamPacingElapsedMs = 0;
           }
           current = next || await waitNextStreamSpeakItem(
             activeSession,
@@ -1121,6 +1269,8 @@
       discardQueuedStreamSpeakItems,
       ensureStreamSpeakQueueRunning,
       waitNextStreamSpeakItem,
+      resolveStreamSegmentPauseMs,
+      waitStreamSegmentPause,
       runStreamSpeakQueue,
       feedStreamSpeakDelta,
       flushStreamSpeak,

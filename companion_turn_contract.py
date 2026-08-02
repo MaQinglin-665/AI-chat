@@ -7,7 +7,10 @@ stable payload for clients that coordinate subtitle, voice, and Live2D.
 
 from __future__ import annotations
 
-from companion_performance_director import infer_model_direct_performance
+from companion_performance_director import (
+    infer_model_direct_performance,
+    split_performance_segments,
+)
 
 
 CONTRACT_VERSION = 1
@@ -15,10 +18,14 @@ VALID_EMOTIONS = {
     "neutral",
     "happy",
     "playful",
+    "excited",
+    "shy",
+    "hurt",
     "sad",
     "anxious",
     "angry",
     "surprised",
+    "serious",
     "thinking",
 }
 VALID_ACTIONS = {
@@ -74,6 +81,12 @@ def _normalize_emotion(value) -> str:
         "think": "thinking",
         "surprise": "surprised",
         "annoyed": "angry",
+        "excited": "excited",
+        "shy": "shy",
+        "embarrassed": "shy",
+        "hurt": "hurt",
+        "aggrieved": "hurt",
+        "serious": "serious",
     }
     normalized = aliases.get(_clean_key(value), _clean_key(value))
     return normalized if normalized in VALID_EMOTIONS else "neutral"
@@ -162,8 +175,23 @@ def build_companion_turn(
         modality = "auto" if is_auto else "text"
 
     performance = _select_explicit_performance(runtime_metadata, character_brain)
-    if performance is None and is_model_direct_reply_enabled(config):
+    performance_segments = split_performance_segments(
+        text,
+        baseline=performance,
+    )
+    model_direct = is_model_direct_reply_enabled(config)
+    if performance is None and model_direct:
         performance = infer_model_direct_performance(text)
+    if performance is None and model_direct:
+        performance = next(
+            (
+                segment.get("performance")
+                for segment in performance_segments
+                if isinstance(segment.get("performance"), dict)
+                and segment["performance"].get("emotion") != "neutral"
+            ),
+            None,
+        )
     return {
         "version": CONTRACT_VERSION,
         "id": safe_turn_id,
@@ -172,5 +200,7 @@ def build_companion_turn(
         "mode": "auto" if is_auto else "reply",
         "input_modality": modality,
         "performance": performance,
-        "source": "model_direct" if is_model_direct_reply_enabled(config) else "reply_pipeline",
+        "performance_segments_version": 1,
+        "performance_segments": performance_segments,
+        "source": "model_direct" if model_direct else "reply_pipeline",
     }

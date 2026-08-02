@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from asr import get_vosk_model_availability
+from local_asr_provider import get_local_asr_capability
 
 from character_runtime import (
     evaluate_backend_entry_guard,
@@ -16,6 +17,7 @@ from config import (
     OLLAMA_DEFAULT_BASE_URL,
     OPENAI_DEFAULT_BASE_URL,
     OPENAI_DEFAULT_KEY_ENV,
+    QWEN3_TTS_DEFAULT_API_URL,
     SERVER_TTS_PROVIDERS,
     TTS_DEFAULT_PROVIDER,
     VOLCENGINE_ACCESS_TOKEN_ENV,
@@ -229,7 +231,10 @@ def build_tts_health_summary(config):
 
     if provider not in SERVER_TTS_PROVIDERS:
         errors.append(f"Unsupported tts.provider: {provider or '(empty)'}.")
-        actions.append("Use browser for first run, or edge_tts, gpt_sovits, or volcengine_tts for server TTS.")
+        actions.append(
+            "Use browser for first run, or edge_tts, gpt_sovits, qwen3_tts, "
+            "or volcengine_tts for server TTS."
+        )
     elif provider == "edge_tts":
         installed = importlib.util.find_spec("edge_tts") is not None
         details["edge_tts_installed"] = installed
@@ -246,6 +251,28 @@ def build_tts_health_summary(config):
             actions.append("Set tts.gpt_sovits_api_url to the running GPT-SoVITS /tts endpoint.")
         else:
             actions.append("Make sure GPT-SoVITS is running before using /api/tts.")
+    elif provider == "qwen3_tts":
+        raw_url = str(tts_cfg.get("qwen3_tts_api_url", "") or "").strip()
+        _, _, url_error = parse_http_url(
+            raw_url,
+            default_url=QWEN3_TTS_DEFAULT_API_URL,
+        )
+        details["api_url_configured"] = bool(raw_url)
+        details["api_url_display"] = safe_url_display(
+            raw_url,
+            default_url=QWEN3_TTS_DEFAULT_API_URL,
+        )
+        if url_error:
+            errors.append("tts.qwen3_tts_api_url is missing or invalid.")
+            actions.append(
+                "Set tts.qwen3_tts_api_url to the local OpenAI-compatible "
+                "Qwen3-TTS speech endpoint."
+            )
+        else:
+            actions.append(
+                "Make sure the isolated Qwen3-TTS service is running before "
+                "using /api/tts."
+            )
     elif provider in {"volcengine_tts", "volcengine"}:
         app_id_env = str(
             tts_cfg.get("app_id_env", VOLCENGINE_APP_ID_ENV) or VOLCENGINE_APP_ID_ENV
@@ -299,6 +326,7 @@ def build_asr_health_summary(config):
     actions = []
     vosk_installed = importlib.util.find_spec("vosk") is not None
     availability = get_vosk_model_availability(asr_cfg)
+    local_capability = get_local_asr_capability(asr_cfg)
     language_models = availability["languages"]
     language_mode = availability["input_language_mode"]
     chinese = language_models["zh-CN"]
@@ -313,6 +341,11 @@ def build_asr_health_summary(config):
     if not vosk_installed:
         warnings.append("vosk is not installed; /api/asr_pcm transcription will fail.")
         actions.append("Run python -m pip install -r requirements.txt.")
+    if local_capability["provider"] == "funasr_hybrid" and not local_capability["hybrid_available"]:
+        warnings.append("FunASR hybrid provider is selected but its optional dependencies are unavailable; Vosk fallback remains active.")
+        actions.append("Run scripts/setup-local-asr.ps1 to install and preload the private local ASR models.")
+    elif local_capability["provider"] == "auto" and not local_capability["hybrid_available"]:
+        actions.append("Optional: run scripts/setup-local-asr.ps1 to enable Paraformer streaming and SenseVoice final refinement.")
     if language_mode != "en-US" and not chinese["available"]:
         warnings.append("Chinese Vosk model directory was not found.")
         actions.append("Install a local Chinese Vosk model under models/vosk, or set VOSK_MODEL_PATH.")
@@ -345,6 +378,12 @@ def build_asr_health_summary(config):
             },
         },
         "bilingual_local_ready": bool(chinese["available"] and english["available"]),
+        "provider": local_capability["provider"],
+        "funasr_installed": local_capability["funasr_installed"],
+        "torch_installed": local_capability["torch_installed"],
+        "hybrid_local_ready": local_capability["hybrid_available"],
+        "streaming_local_ready": local_capability["streaming_available"],
+        "final_refine_ready": local_capability["final_refine_available"],
         "wake_word_enabled": parse_bool_flag(asr_cfg.get("wake_word_enabled", True), True),
         "wake_word_count": wake_word_count,
         "messages": errors + warnings,

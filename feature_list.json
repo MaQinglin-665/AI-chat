@@ -1,6 +1,1025 @@
 {
   "features": [
     {
+      "id": "continuous-reply-voice-face-sync-v1",
+      "name": "Continuous reply voice and Live2D face sync v1",
+      "description": "Keep one Qwen3-TTS reply in a coherent vocal performance while driving Live2D mouth movement from audible PCM and reliably releasing speech expressions.",
+      "status": "complete",
+      "dependencies": [
+        "Qwen3-TTS streaming PCM playback",
+        "Web Audio analyser",
+        "Live2D performance cue controller"
+      ],
+      "scope": [
+        "Synthesize a finalized Qwen3-TTS reply as one continuous request by default",
+        "Keep character identity stable while allowing bounded reply-level emotion and style direction",
+        "Route the actual streaming PCM signal through the existing Live2D audio-level sampler",
+        "Release non-neutral speech expressions smoothly after audible playback ends",
+        "Preserve legacy segmented delivery behind an explicit compatibility setting"
+      ],
+      "done_criteria": [
+        "Adjacent clauses in one finalized Qwen3-TTS reply are not independently synthesized by default",
+        "Streaming PCM playback exposes an analyser node used by Live2D mouth animation",
+        "A speech expression returns to neutral after its bounded release instead of remaining locked",
+        "Cancellation and stale playback generations cannot keep the mouth or expression active",
+        "Focused frontend and Python tests plus scripts/test-local.ps1 pass"
+      ]
+    },
+    {
+      "id": "authorized-singing-voice-rvc-trial-v1",
+      "name": "Authorized singing voice RVC trial v1",
+      "description": "Train two separately authorized, isolated singing-voice conversion models outside the repository and evaluate whether they are suitable for a later local singing feature.",
+      "status": "complete",
+      "dependencies": [
+        "RVC local CUDA runtime",
+        "per-singer authorized isolated vocal clips",
+        "GPU time with Qwen3-TTS paused"
+      ],
+      "scope": [
+        "Use only the two user-designated v3 compliant vocal-clip directories",
+        "Keep each singer in a distinct dataset, experiment, model, and index",
+        "Copy source clips into an external local training workspace without adding voice samples or weights to the repository",
+        "Run a bounded first-pass RVC training/evaluation and record quality limits",
+        "Do not replace the existing speech TTS runtime or enable a public voice-cloning feature"
+      ],
+      "done_criteria": [
+        "Two distinct local RVC experiment artifacts exist outside the repository",
+        "No source samples, checkpoints, model weights, credentials, or private paths are committed",
+        "Each model is evaluated with a local test conversion before any runtime integration decision",
+        "Qwen3-TTS remains independently restartable through the existing script after training",
+        "Repository state artifacts document the result and remaining quality risks"
+      ]
+    },
+    {
+      "id": "local-rvc-singing-entry-v1",
+      "name": "Local RVC singing entry v1",
+      "description": "Offer an explicit local WAV-to-authorized-RVC-singer conversion entry without changing ordinary text TTS.",
+      "status": "complete",
+      "dependencies": ["authorized-singing-voice-rvc-trial-v1", "Electron local file picker"],
+      "scope": ["WAV-only local input", "private runtime paths", "external output directory", "no network upload"],
+      "done_criteria": ["Selected authorized singer converts an explicit WAV selection", "normal TTS remains unchanged", "public config remains disabled"]
+    },
+    {
+      "id": "local-desktop-agent-foundation-v1",
+      "name": "Local desktop Agent foundation v1",
+      "description": "Turn Xinyu's existing tool layer into a voice/text-driven local Agent foundation with explicit approval boundaries and visible action records.",
+      "status": "complete",
+      "dependencies": [
+        "OpenAI-compatible tool calling",
+        "local API authentication",
+        "chat tool metadata cards"
+      ],
+      "scope": [
+        "Enable the existing local file, search, image, and safe development-command tools in the private runtime configuration",
+        "Add browser URL opening and confirmed local deletion adapters",
+        "Require a one-time UI confirmation for file overwrite, deletion, high-risk system commands, account login, payments, and external submission adapters",
+        "Persist bounded local pending approvals and an audit trail without storing secrets",
+        "Expose approve/cancel action cards through the authenticated local backend",
+        "Keep configuration defaults disabled for existing installations and retain workspace-root boundaries"
+      ],
+      "done_criteria": [
+        "An LLM-proposed destructive action cannot execute until an authenticated UI confirmation redeems it",
+        "Cancellation and expiry make an approval impossible to reuse",
+        "Non-dangerous existing tools continue to execute directly under their existing allowlists",
+        "Browser URL opening rejects non-http(s) schemes",
+        "Focused and full local verification pass"
+      ]
+    },
+    {
+      "id": "autonomous-desktop-awareness-and-control-v1",
+      "name": "Autonomous desktop awareness and control v1",
+      "description": "Let Xinyu decide when to inspect the mouse-screen display, retain only model-selected durable context, and perform bounded local desktop actions with explicit high-risk approval.",
+      "status": "complete",
+      "dependencies": [
+        "local-desktop-agent-foundation-v1",
+        "OpenAI-compatible vision input",
+        "Obsidian autonomous knowledge base v1"
+      ],
+      "scope": [
+        "Capture only the display containing the current mouse cursor when the model calls observe_screen",
+        "Use a local change fingerprint only to wake optional model consideration; do not upload frames unless observation is selected",
+        "Expose a dynamic prompt capability block that reflects actually enabled observation and desktop tools",
+        "Persist a bounded local current-scene cache and write only model-selected, non-sensitive durable observations to the local vault",
+        "Support desktop context/window/clipboard and bounded visible input actions while routing close, submit, send, login, payment, install, delete, unknown-target, and unsafe Enter actions through the existing confirmation flow",
+        "Keep public configuration disabled and enable the user's private runtime explicitly"
+      ],
+      "done_criteria": [
+        "A model can observe the correct cursor display through a vision-capable cloud model without a fixed screenshot upload interval",
+        "An observation does not require speech or action and its current context is safely available to a later turn",
+        "Durable screen memory stores text only, is importance/rate limited, and rejects credential-like content",
+        "Ordinary bounded desktop actions can execute while high-risk actions create a one-time confirmation",
+        "Focused and full local validation pass"
+      ]
+    },
+    {
+      "id": "xinyu-shared-experience-continuity-v1",
+      "name": "Xinyu shared-experience continuity v1",
+      "description": "Retain a small, selective set of real shared milestones so Xinyu can recall them naturally without turning chat into a diary or a reminder system.",
+      "status": "complete",
+      "dependencies": [
+        "core memory extraction",
+        "relationship state",
+        "model-direct companion dialogue"
+      ],
+      "scope": [
+        "Derive shared experiences only from existing high-confidence episodic core-memory candidates, without adding an LLM request",
+        "Store a bounded local, deduplicated record of concrete joint milestones",
+        "Inject a recalled moment only when related to the current user message, or at most once per configured proactive cooldown",
+        "Reject sensitive, garbled, stage-direction, and prompt-like content",
+        "Keep recall as soft context rather than a claim of intimacy or an obligatory callback",
+        "Set the private active persona to Chinese-primary with only occasional short English words"
+      ],
+      "done_criteria": [
+        "Ordinary conversation does not create a shared-experience diary entry",
+        "Relevant user turns can receive a safe shared-milestone prompt block",
+        "Proactive recall is cooldown limited and requires a natural reason",
+        "No extra memory-model call is introduced on the chat hot path",
+        "Focused and full local verification pass"
+      ]
+    },
+    {
+      "id": "xinyu-meaningful-surprise-character-v1",
+      "name": "Xinyu meaningful surprise character v1",
+      "description": "Preserve Xinyu's self-directed, surprising companion personality while removing forced cryptic desktop imagery and unrelated randomness from ordinary conversation.",
+      "status": "complete",
+      "dependencies": [
+        "character-brain-v1",
+        "model-direct-companion-dialogue-v1"
+      ],
+      "scope": [
+        "Let Xinyu occasionally share a meaningful independent observation, idea, or clearly framed news-like thought",
+        "Require each surprise to have a clear premise, understandable meaning, or real conversational opening",
+        "Do not force keyboard, cursor, pixel, process, or pseudo-news imagery into plain greetings and ordinary chat",
+        "Retain desktop imagery when the user actually brings up a relevant desktop topic",
+        "Keep creativity model-owned rather than replacing it with a rigid template",
+        "Preserve safety, identity, task-help, comfort, and existing character-runtime compatibility"
+      ],
+      "done_criteria": [
+        "A plain greeting receives no automatically selected desktop performance bit",
+        "Model-direct prompts explicitly allow meaningful independent thoughts and reject empty surrealism",
+        "Actual private local prompt no longer instructs unrelated association, deliberate topic loss, or stubbornly defended errors",
+        "Desktop-specific conversation still retains optional relevant flavor",
+        "Focused and full local verification pass"
+      ]
+    },
+    {
+      "id": "xinyu-a2-original-voice-design-v1",
+      "name": "Xinyu A2 original bilingual VoiceDesign v1",
+      "description": "Promote the accepted A2 Chinese and English auditions into the default local Qwen3-TTS runtime while retaining automatic CustomVoice compatibility.",
+      "status": "complete",
+      "dependencies": [
+        "xinyu-stable-natural-emotion-v5",
+        "qwen3-tts-low-latency-trial-v1"
+      ],
+      "scope": [
+        "Default fresh installs and local starts to the verified 1.7B VoiceDesign model",
+        "Use one bounded project-owned A2 instruction with a subtly older six-to-eight-year-old anime-child direction",
+        "Keep the accepted clear, milk-sweet character core while adding a small amount of sunny energy",
+        "Infer Chinese or English from single-language text so runtime prompts match the accepted auditions",
+        "Ignore arbitrary language and voice-prompt injection values",
+        "Automatically retain the existing CustomVoice and Ono_Anna path when a legacy model is loaded",
+        "Keep GPT-SoVITS, Browser TTS, and existing OpenAI-compatible speech requests unchanged"
+      ],
+      "done_criteria": [
+        "Health reports voice_mode=voice_design and speaker=A2_Original",
+        "Warm Chinese and English first audio remain below one second on the validated machine",
+        "Chinese and English smoke text is recovered intact by language-aware local ASR",
+        "Generated smoke audio has safe loudness and no clipping",
+        "Legacy CustomVoice model names still resolve to the old generation path",
+        "Focused and full local verification pass"
+      ]
+    },
+    {
+      "id": "xinyu-stable-natural-emotion-v5",
+      "name": "Xinyu stable natural emotion v5",
+      "description": "Keep the accepted cute lively child baseline stable while reducing theatrical emotion, yandere-like coloring, and cross-segment vocal jumps.",
+      "status": "complete",
+      "dependencies": [
+        "xinyu-younger-cuter-child-voice-v4",
+        "semantic-emotive-performance-sync-v1"
+      ],
+      "scope": [
+        "Treat emotion as a small keyword or sentence-ending accent rather than a new persona",
+        "Keep happy, playful, shy, hurt, sad, anxious, angry, surprised, serious, and thinking variations conversational",
+        "Cap high intensity at moderate readable variation",
+        "Reject dark, obsessive, possessive, sinister, and yandere-like delivery",
+        "Reduce CustomVoice sampling variance across adjacent segments",
+        "Validate multi-emotion pitch continuity, content integrity, loudness, and clipping"
+      ],
+      "done_criteria": [
+        "Cute and lively remains the audible baseline across different emotions",
+        "High-intensity emotion is not theatrical or extreme",
+        "Adjacent emotional segments remain inside one child-voice pitch region",
+        "Chinese test lines remain substantially complete",
+        "Focused and full local verification pass"
+      ]
+    },
+    {
+      "id": "xinyu-younger-cuter-child-voice-v4",
+      "name": "Xinyu younger cuter child voice v4",
+      "description": "Lower the perceived character age to roughly five to seven while increasing innocent, lively, milk-sweet cuteness without losing intelligibility.",
+      "status": "complete",
+      "dependencies": [
+        "xinyu-young-lively-child-voice-v3",
+        "semantic-emotive-performance-sync-v1"
+      ],
+      "scope": [
+        "Use an unmistakably little-child rather than teenage vocal identity",
+        "Strengthen the small soft-light timbre, clean high placement, round innocent resonance, and milk-sweet warmth",
+        "Use tiny quick reactions, bright animated pitch movement, buoyant rhythm, and extra-cute endings",
+        "Preserve exact wording and stable pronunciation without baby talk or harsh squeakiness",
+        "Validate Chinese and English independently with fixed-language local ASR",
+        "Keep the original-character boundary and all existing provider fallbacks"
+      ],
+      "done_criteria": [
+        "The audition reads younger and cuter than V6",
+        "Chinese and English test lines remain substantially complete",
+        "The output has safe loudness and no clipping",
+        "Focused and full local verification pass",
+        "The running service uses the V7 child-voice baseline"
+      ]
+    },
+    {
+      "id": "xinyu-young-lively-child-voice-v3",
+      "name": "Xinyu young lively child voice v3",
+      "description": "Recalibrate the formal voice from exaggerated anime-girl stylization to a clear, lively, milk-sweet fictional child character perceived around nine to eleven years old.",
+      "status": "complete",
+      "dependencies": [
+        "xinyu-exaggerated-anime-moe-voice-v2",
+        "semantic-emotive-performance-sync-v1"
+      ],
+      "scope": [
+        "Use a clearly childlike rather than adult vocal identity",
+        "Target a small light timbre, clean high placement, rounded youthful resonance, and milk-sweet warmth",
+        "Keep reactions bright, curious, playful, and naturally energetic",
+        "Preserve stable pronunciation without baby talk, harsh squeakiness, or adult sultriness",
+        "Validate Chinese and English content separately with language-aware local ASR",
+        "Keep the original-character boundary and existing provider compatibility"
+      ],
+      "done_criteria": [
+        "The audition reads as a nine-to-eleven-year-old fictional character rather than a young adult",
+        "Chinese and English test lines remain substantially complete",
+        "The output has safe loudness and no clipping",
+        "Focused and full local verification pass",
+        "The running service uses the new child-voice baseline"
+      ]
+    },
+    {
+      "id": "xinyu-exaggerated-anime-moe-voice-v2",
+      "name": "Xinyu exaggerated anime moe voice v2",
+      "description": "Increase the accepted childlike voice's pitch impression, sweetness, youthful character, animated intonation, and playful endings without sacrificing spoken-word integrity.",
+      "status": "complete",
+      "dependencies": [
+        "xinyu-childlike-original-voice-v1",
+        "semantic-emotive-performance-sync-v1"
+      ],
+      "scope": [
+        "Use an unmistakably anime-style moe girl delivery profile",
+        "Strengthen high, sweet, youthful placement and lively rising or falling endings",
+        "Forbid inserted humming, squeals, giggles, gasps, and filler vowels",
+        "Keep Qwen CustomVoice full-text conditioning while retaining incremental audio delivery",
+        "Validate Chinese and English content with local ASR before perceptual handoff",
+        "Keep old TTS providers, explicit speakers, and Qwen 0.6B fallback compatible"
+      ],
+      "done_criteria": [
+        "The new audition is audibly more anime-stylized than B4",
+        "Chinese and English test lines remain substantially complete",
+        "The output has safe loudness and no clipping",
+        "Focused and full local verification pass",
+        "The running 1.7B service uses the new delivery profile"
+      ]
+    },
+    {
+      "id": "xinyu-childlike-original-voice-v1",
+      "name": "Xinyu childlike original voice v1",
+      "description": "Promote the accepted B4 audition into the default Qwen3-TTS character voice while preserving explicit legacy speaker choices and the low-resource fallback.",
+      "status": "complete",
+      "dependencies": [
+        "qwen3-tts-low-latency-trial-v1",
+        "semantic-emotive-performance-sync-v1"
+      ],
+      "scope": [
+        "Use the 1.7B CustomVoice runtime and Ono_Anna preset as the accepted voice foundation",
+        "Apply a bounded original childlike, nimble, playful, cute delivery profile",
+        "Avoid metallic, robotic, nasal, squeaky, or breathy delivery",
+        "Map legacy default and auto Qwen voice values to the accepted character voice",
+        "Keep explicit Qwen speaker selections and the 0.6B low-resource fallback compatible",
+        "Do not package audition audio, model weights, private configuration, or reference samples"
+      ],
+      "done_criteria": [
+        "Fresh Qwen3-TTS configuration defaults to Ono_Anna and the 1.7B CustomVoice model",
+        "Legacy voice default resolves to Ono_Anna without editing private configuration",
+        "Semantic emotion and style cues extend the stable childlike character baseline",
+        "Focused tests and the full local verification gate pass",
+        "The running local service is restored with the accepted formal voice"
+      ]
+    },
+    {
+      "id": "semantic-emotive-performance-sync-v1",
+      "name": "Semantic emotive voice and Live2D performance sync v1",
+      "description": "Make each audible reply segment carry one compatible semantic emotion plan across Qwen3-TTS or GPT-SoVITS delivery and Hiyori expression, body, and gesture performance.",
+      "status": "complete",
+      "dependencies": [
+        "speech-delivery-coherence-v1",
+        "realtime-tts-performance-sync-v1",
+        "hiyori-motion-ownership-and-stage-detail-v1",
+        "qwen3-tts-low-latency-trial-v1"
+      ],
+      "scope": [
+        "Add a backward-compatible segment performance contract without changing visible reply ownership",
+        "Support Qwen3-TTS 1.7B allowlisted natural-language delivery instructions while retaining the 0.6B low-latency fallback",
+        "Carry segment emotion through synthesis, actual playback start, expression, body response, and cancellation",
+        "Use only verified Hiyori parameters, expressions, and motion groups",
+        "Keep strong gestures sparse, cancellable, deduplicated, and cooldown-bound",
+        "Preserve old configuration, GPT-SoVITS, Browser TTS, unsupported-model fallback, and current render cadence"
+      ],
+      "done_criteria": [
+        "Playful, excited, shy, hurt, surprised, angry, serious, thinking, happy, sad, anxious, and neutral segments resolve deterministically without exposing metadata",
+        "Qwen3-TTS 1.7B receives a bounded allowlisted delivery instruction and 0.6B remains compatible",
+        "A segment expression or gesture cannot begin before its real audible playback callback",
+        "Interrupted, stale, or consecutive speech cannot replay or retain an obsolete segment cue",
+        "Repeated strong gestures are suppressed while continuous subtle speech-linked body motion remains active",
+        "Missing TTS emotion capability, expression, motion, or Live2D parameter degrades safely",
+        "Focused and complete local verification pass with manual acoustic and native Electron risks recorded"
+      ]
+    },
+    {
+      "id": "punctuation-only-asr-guard-v1",
+      "name": "Punctuation-only ASR guard v1",
+      "description": "Prevent silence hallucinations such as a lone Chinese full stop from becoming visible user turns or triggering the LLM.",
+      "status": "complete",
+      "dependencies": [
+        "persistent SenseVoice service",
+        "semantic full-duplex voice",
+        "ASR transcript merge queue"
+      ],
+      "scope": [
+        "Require at least one Unicode letter or number after ASR whitespace cleanup",
+        "Drop punctuation-only output before live-turn classification, interruption, merge scheduling, and chat queue insertion",
+        "Record a local punctuation_only debug reason without creating a user card or LLM request",
+        "Preserve Chinese, English, multilingual letters, numbers, fillers, and hidden paralinguistic metadata"
+      ],
+      "done_criteria": [
+        "A lone 。 or equivalent punctuation cannot interrupt an assistant turn",
+        "Punctuation-only output cannot enter the pending merge or microphone queues",
+        "No user message card or chat request is created",
+        "Real semantic transcripts continue through the existing ASR flow",
+        "Focused and complete local verification pass"
+      ]
+    },
+    {
+      "id": "speech-delivery-coherence-v1",
+      "name": "Speech delivery coherence v1",
+      "description": "Make consecutive assistant speech feel like one natural conversation by combining a bounded breathing beat, real audio-clock subtitle reveal, and consistent restrained prosody.",
+      "status": "complete",
+      "dependencies": [
+        "ordered-continuation-delivery-v1",
+        "Qwen3-TTS low-latency streaming",
+        "realtime text delta rendering"
+      ],
+      "scope": [
+        "Expose PCM, HTML Audio, and AudioContext playback progress without changing provider or configuration defaults",
+        "Reveal an ordered continuation from the real playback clock with text leading speech by about 350 milliseconds",
+        "Insert only an 80-280 millisecond punctuation- and style-aware breathing beat between complete assistant replies",
+        "Carry the selected mood/style prosody into companion speech prewarm instead of synthesizing the prefix with neutral parameters",
+        "Treat an ASR-confirmed ordered continuation as delivery-chain ownership across thinking phases and inter-segment silence instead of rechecking only instantaneous speaking state",
+        "Preserve stop/correction cancellation, reduced-motion behavior, and legacy callers without progress hooks"
+      ],
+      "done_criteria": [
+        "Continuation text does not appear as a full paragraph before its audio",
+        "Audio progress hooks cannot interrupt or invalidate playback",
+        "Two ordinary replies retain order with a short content-aware transition rather than an arbitrary long gap",
+        "A third ordinary continuation cannot cancel the first LLM draft or invalidate the second reply midway through playback",
+        "Prewarmed Qwen speech uses the same restrained delivery profile as the canonical reply",
+        "Focused and complete local verification pass with manual acoustic risks recorded"
+      ]
+    },
+    {
+      "id": "ordered-continuation-delivery-v1",
+      "name": "Ordered continuation delivery v1",
+      "description": "Keep ordinary multi-turn companion replies in audible order and reveal continuation text near actual playback instead of letting a newer TTS session skip earlier speech.",
+      "status": "complete",
+      "dependencies": [
+        "natural-conversation-handoff-v1",
+        "Qwen3-TTS low-latency streaming",
+        "semantic full-duplex voice",
+        "realtime text delta rendering"
+      ],
+      "scope": [
+        "Tag substantive speech captured during an assistant turn as an ordered continuation while keeping correction and stop semantics immediate",
+        "Defer a continuation request only until the prior LLM turn finishes, then generate and prewarm its speech while prior audio remains audible",
+        "Switch TTS sessions only after the earlier speech boundary instead of invalidating the older queue",
+        "Hide waiting continuation text and restart its progressive character reveal from actual playback start",
+        "Keep final text slightly ahead of speech and preserve reduced-motion, stale-session, and old caller behavior"
+      ],
+      "done_criteria": [
+        "A later ordinary reply cannot play before or cancel an earlier audible reply",
+        "A continuation generated during prior audio speaks exactly once after that audio settles",
+        "Explicit correction and stop paths retain immediate cancellation",
+        "Large or whole-response text deltas do not flatten into an instant paragraph",
+        "Focused and complete verification pass with manual acoustic risks recorded"
+      ]
+    },
+    {
+      "id": "natural-conversation-handoff-v1",
+      "name": "Natural conversation handoff v1",
+      "description": "Preserve visible and spoken continuity across semantic barge-ins so full-duplex voice feels like one evolving conversation rather than discarded question-answer pairs.",
+      "status": "complete",
+      "dependencies": [
+        "semantic-full-duplex-voice-v1",
+        "interruptible chat streaming",
+        "cancellable stream TTS queue",
+        "conversation interruption context"
+      ],
+      "scope": [
+        "Finalize a partially streamed assistant message with a natural ellipsis before cancelling its stale LLM and TTS work",
+        "Retain the heard assistant fragment in conversation history and tell the next model turn not to repeat it",
+        "Let ordinary substantive speech respect a bounded important-sentence boundary while corrections and stop commands yield immediately",
+        "Mark the replacement assistant message as a visual continuation while retaining separate message records",
+        "Preserve hidden backchannels, explicit no-barge mode, stream cancellation, and old configuration compatibility"
+      ],
+      "done_criteria": [
+        "Interrupted assistant text remains visible instead of being removed or overwritten",
+        "The preserved fragment ends with an ellipsis and is ordered before the user's replacement turn in model history",
+        "The next reply can integrate, resume, answer, or leave the old thought unfinished based on actual content",
+        "Stale queued audio never resumes after a semantic interruption",
+        "Focused and complete local validation pass with field risks recorded"
+      ]
+    },
+    {
+      "id": "voice-runtime-latency-recovery-v1",
+      "name": "Voice runtime latency and fallback recovery v1",
+      "description": "Repair the Silero fallback regression, prevent local ASR preview work from delaying final transcription, and reduce repeated model/runtime loading after microphone use.",
+      "status": "complete",
+      "dependencies": [
+        "natural-companion-voice-continuity-v1",
+        "hybrid-local-realtime-asr-v1"
+      ],
+      "scope": [
+        "Keep energy-based speech detection active for the full microphone session when Silero initialization is unavailable or completes after speech has begun",
+        "Reuse a successfully initialized Silero controller across microphone reopen cycles and cool down failed initialization attempts",
+        "Cancel stale Paraformer preview requests before authoritative final PCM transcription",
+        "Cache failed FunASR model loads for a bounded period so repeated requests fall back immediately instead of repeatedly loading or downloading a model",
+        "Preserve manual-close transcription and old configuration compatibility",
+        "Use a lower-resource local profile without changing the public streaming-capable default",
+        "Keep live microphone level feedback visible in the active chat theme",
+        "Avoid force-splitting ordinary natural sentences into multiple queued final requests",
+        "Expose live microphone feedback on the main Live2D stage and trim long silence from manual-close fallback audio",
+        "Warm the selected local Vosk model outside the first utterance on the low-resource private profile",
+        "Show composer-level listening, level, recognition, and empty-result feedback independently of icon-only button labels",
+        "Allow an opt-in loopback-only faster-whisper service to recover empty Vosk results without sending audio off-device",
+        "Replace the always-visible full-width microphone track with a compact mic-open-only multicolor waveform"
+      ],
+      "done_criteria": [
+        "Silero failure cannot suppress energy-detector frames or manual-close transcription",
+        "Reopening the microphone does not recreate a successfully loaded Silero ONNX model",
+        "Queued preview chunks stop issuing requests after cancellation and cannot block final transcription",
+        "A failed FunASR model load is attempted once during its cooldown and Vosk remains available",
+        "Intentional request cancellation does not produce a second response write to a closed socket",
+        "The microphone meter remains visible and updates from the existing analyser/frame path",
+        "The default final-ASR capture can hold a natural sentence for up to ten seconds before a safety split",
+        "The main stage shows live microphone level feedback and manual close sends a speech-focused PCM window",
+        "The private Vosk profile avoids FunASR loading and starts model warmup before the first utterance",
+        "The app remains usable during warmup, the microphone reports initialization explicitly, and enables itself when the backend reports ready",
+        "The main composer shows live level movement and never drops an empty ASR response without visible feedback",
+        "When explicitly configured, an empty Vosk result can fall back to a loopback-only Whisper endpoint while legacy configs keep the existing path",
+        "Closing the microphone hides voice feedback, while opening it shows seven level-driven colored bars with reduced-motion support",
+        "Focused voice tests and scripts/test-local.ps1 pass"
+      ]
+    },
+    {
+      "id": "persistent-sensevoice-service-v1",
+      "name": "Persistent SenseVoice service v1",
+      "description": "Keep the high-quality final recognizer warm across Electron restarts without making the desktop process carry a multi-gigabyte PyTorch model.",
+      "status": "complete",
+      "dependencies": [
+        "voice-runtime-latency-recovery-v1",
+        "hybrid-local-realtime-asr-v1",
+        "Vosk fallback"
+      ],
+      "scope": [
+        "Run SenseVoiceSmall-onnx INT8 in an isolated loopback-only service that survives Electron restarts",
+        "Start and health-check the service from the existing background ASR warmup lifecycle",
+        "Fall back immediately to Vosk while the service is warming or unavailable instead of cold-loading SenseVoice inside the request",
+        "Bound audio payload duration, serialize inference, avoid audio persistence, and keep model paths out of client configuration",
+        "Preserve the old in-process SenseVoice path when the persistent service is explicitly disabled"
+      ],
+      "done_criteria": [
+        "A warm final transcription completes in about one second or less on the target machine",
+        "Restarting Electron does not unload the warmed SenseVoice model",
+        "The ONNX service uses materially less memory than the previous PyTorch process",
+        "Service failure retains working Vosk transcription without a long request stall",
+        "Focused tests, full local verification, setup instructions, license boundaries, and field evidence are recorded"
+      ]
+    },
+    {
+      "id": "voice-first-reply-latency-v1",
+      "name": "Voice-first reply latency v1",
+      "description": "Reduce transcription-to-first-text and first-audio delay while presenting assistant text as a continuous stream that stays only slightly ahead of speech.",
+      "status": "complete",
+      "dependencies": [
+        "persistent-sensevoice-service-v1",
+        "model-direct companion turn contract",
+        "Qwen3-TTS low-latency streaming",
+        "realtime text delta rendering"
+      ],
+      "scope": [
+        "Use an opt-in compact prompt profile only for voice turns while preserving identity, relationship, continuity, safety, interruption, and reply-shape guidance",
+        "Limit voice-turn recent history without changing typed conversation or old configuration behavior",
+        "Append new streamed characters with a restrained arrival motion instead of repainting and reanimating the entire reply",
+        "Show a small semantic streaming caret and honor reduced-motion preferences",
+        "Keep Qwen synthesis at the first stable speakable boundary and preserve cancellation, exactly-once delivery, and companion finalization"
+      ],
+      "done_criteria": [
+        "Voice prompt size is materially smaller than the full text-turn prompt",
+        "First visible text appears on the first real model delta without waiting for the complete reply",
+        "New text feels continuous and remains readable in day, night, and reduced-motion modes",
+        "Speech starts from the first stable clause without replaying or speaking mutable text",
+        "Measured provider limits and end-to-end field latency are recorded honestly",
+        "Focused regressions and scripts/test-local.ps1 pass"
+      ]
+    },
+    {
+      "id": "natural-companion-voice-continuity-v1",
+      "name": "Natural companion and voice continuity v1",
+      "description": "Make the default-English desktop companion feel less like isolated question-answer turns while improving microphone boundary detection and preserving complete, exactly-once GPT-SoVITS delivery without eagerly changing character voice.",
+      "status": "complete",
+      "dependencies": [
+        "natural-character-dialogue-v1",
+        "conversation-flow-v1",
+        "hybrid-local-realtime-asr-v1",
+        "automatic-tts-failover-recovery-v1",
+        "stream-tts-delivery-completeness-v1"
+      ],
+      "scope": [
+        "Keep English as the default reply language while allowing the model to continue genuine open conversational threads without habitual support-agent questions",
+        "Enable an explicit low-interruption follow-up profile with bounded delay, cooldown, topic repetition, and a user-facing off switch",
+        "Integrate an optional local Silero VAD browser adapter from the permissively licensed ricky0123/vad project while preserving the existing energy detector and FunASR/Vosk fallback paths",
+        "Prefer same-voice GPT-SoVITS retry and recovery over immediate browser-voice fallback",
+        "Track finalized TTS segments by turn, generation, and segment so recovery cannot replay already delivered speech or omit the remaining tail",
+        "Preserve old configuration behavior when new keys or optional VAD assets are absent"
+      ],
+      "done_criteria": [
+        "A configured low-interruption follow-up can add at most one short optional continuation after an emotionally meaningful or visibly open thread and remains disabled under legacy configuration",
+        "Default English reply behavior remains unchanged and proactive prompts do not fabricate desktop observation, memories, or human experience",
+        "Silero VAD speech-start and speech-end events can drive microphone segmentation when its local assets are available, with deterministic fallback to the current energy detector when unavailable or disabled",
+        "Short pauses inside one utterance do not submit duplicate ASR turns and manual close still force-transcribes one bounded capture",
+        "GPT-SoVITS failures retry the same provider and preserve the character voice before any explicitly configured browser fallback",
+        "Each accepted assistant turn is audibly delivered at most once per segment and a recovery speaks only the undelivered tail",
+        "Focused regression coverage and scripts/test-local.ps1 pass, or any environment-only limitation is documented"
+      ]
+    },
+    {
+      "id": "phosphor-icon-system-and-reference-fidelity-v2",
+      "name": "Reusable rounded SVG icon system and reference-fidelity pass v2",
+      "description": "Replace mixed glyphs and fragile masks with reusable local Phosphor and Tabler SVG assets, make microphone state unmistakable, contain sticker messages, and bring the desktop stage proportions materially closer to the accepted anime-livestream concept.",
+      "status": "complete",
+      "dependencies": [
+        "anime-livestream-visual-system-v1",
+        "control-center-continuity-and-core-focus-v2"
+      ],
+      "scope": [
+        "Bundle curated MIT-licensed Phosphor and Tabler SVG assets with their licenses for offline reuse",
+        "Use one rounded icon language for microphone, subtitles, speech, attachment, sticker, send, stage utilities, advanced actions, and control-center navigation",
+        "Use separate microphone and microphone-slash SVG elements plus a restrained live glow so open and closed states are visibly different",
+        "Remove the composer cat-ear collision and use reusable SVG cat ears, moon, cat, heart, star, flower, and music-note motifs instead of CSS-drawn symbols",
+        "Scale the desktop header, message cards, composer, and utility rail to the accepted 1694 by 945 concept",
+        "Contain sent sticker illustrations inside compact cards and reserve a desktop message-safe area above the lower-right utility capsule",
+        "Preserve all existing labels, actions, data bindings, progressive disclosure, Live2D layout behavior, and reduced-motion support"
+      ],
+      "done_criteria": [
+        "The microphone renders as one complete centered SVG and switches to a distinct illuminated SVG state when open",
+        "The microphone, text field, and send action share one optical axis with a lighter closed state and no redundant inner ring",
+        "The More launcher uses readable high-contrast typography and clearly distinguishes available actions from disabled desktop-only controls",
+        "The selected day theme exposes a centered sun icon while preserving the existing night moon icon and compact switch proportions",
+        "The desktop header remains compact, user and assistant history lanes scroll independently, and every message card keeps a readable top-right timestamp",
+        "The accepted concept's native aspect has matching header, message, utility, and composer topology without overflow",
+        "Sent sticker illustrations remain inside their message cards and cannot be covered by the lower-right utility capsule",
+        "Stage and control-center high-frequency actions use consistent local SVG icons",
+        "Desktop day and night stage states are visually verified at the native aspect ratio",
+        "Focused and complete automated verification pass"
+      ]
+    },
+    {
+      "id": "anime-livestream-visual-system-v1",
+      "name": "Cute anime livestream visual system v1",
+      "description": "Unify the full desktop-pet experience around a friendly anime livestream visual language while preserving existing behavior, data bindings, and rendering performance.",
+      "status": "complete",
+      "dependencies": [
+        "control-center-continuity-and-core-focus-v2",
+        "stage-header-refinement-v2",
+        "existing day and night room assets"
+      ],
+      "scope": [
+        "Preserve the centered Live2D character, room assets, conversation behavior, configuration compatibility, and technical-message history isolation",
+        "Introduce one sakura, berry, lilac, mint, cream, and ink color system across the stage, standalone chat, launcher, and control center",
+        "Bundle an offline OFL display-font subset for expressive headings while keeping comfortable system fonts for body copy",
+        "Create a restrained cat-ear, waveform, heart, star, music, calendar, persona, memory, and self-check icon language",
+        "Keep all five control-center destinations reachable on narrow screens and reveal the active destination after navigation",
+        "Use CSS-only decorative motion with reduced-motion support and no additional Live2D render or ticker work"
+      ],
+      "done_criteria": [
+        "The running interface materially matches the accepted concept at its native aspect ratio",
+        "Day, night, standalone chat, 390-pixel stage, and narrow control-center layouts remain readable without body overflow",
+        "The display font loads without a runtime network request and its license is included",
+        "All five control-center pages remain reachable and the active narrow-screen navigation item is visible",
+        "Focused and complete automated verification pass"
+      ]
+    },
+    {
+      "id": "control-center-continuity-and-core-focus-v2",
+      "name": "Control center continuity and core-task focus v2",
+      "description": "Keep one stable control-center shell during navigation and make every page lead with the ordinary user's most common task while progressively disclosing technical tools.",
+      "status": "complete",
+      "dependencies": [
+        "unified-control-center-ui-v1",
+        "technical-message-history-isolation"
+      ],
+      "scope": [
+        "Keep a persistent themed backplane behind page transitions so the Live2D stage never flashes through",
+        "Apply the same core-first and advanced-disclosure model to schedule, persona, model and voice, memory, and diagnostics",
+        "Move schedule execution type, persona preference and relationship details, memory debug and undo tools, configuration internals, and raw diagnostic reports behind restrained disclosure controls",
+        "Refine typography, spacing, card hierarchy, navigation selection, mobile overflow, and day/night contrast without changing data bindings",
+        "Preserve configuration compatibility, Live2D placement, render cadence, and technical-message history isolation"
+      ],
+      "done_criteria": [
+        "Navigation changes keep a continuous shell and exactly one functional page visible",
+        "Each of the five control-center pages opens on its clearest common task",
+        "Every hidden low-frequency control remains reachable through an explicit advanced disclosure",
+        "Desktop day, desktop night, narrow viewport, and native Electron navigation are visually checked",
+        "Focused and complete automated verification pass"
+      ]
+    },
+    {
+      "id": "stage-header-refinement-v2",
+      "name": "Compact integrated Electron stage header v2",
+      "description": "Replace the mismatched native title strip and oversized sharp-edged header with one compact, theme-aware Electron title surface and a softer unified control rail.",
+      "status": "complete",
+      "dependencies": [
+        "Refined unified stage header v1",
+        "Electron titleBarOverlay",
+        "native day and night screenshot verification"
+      ],
+      "scope": [
+        "Integrate the native Windows title area into the stage visual system while preserving native window controls",
+        "Reduce header height, border weight, control size, and nested pill clutter",
+        "Keep identity, status, translation, room mode, voice, and subtitle controls in their existing left/center/right order",
+        "Synchronize native window-control contrast with the effective day or night room",
+        "Do not alter Live2D placement, history cards, composer, utility controls, or render cadence"
+      ],
+      "done_criteria": [
+        "The pale system title strip no longer clashes with the stage",
+        "No sharp rectangular status or translation blocks remain in the header",
+        "The room selector remains fully visible and optically centered",
+        "Day, night, automatic mode, and native window controls work in Electron",
+        "Focused and complete automated verification pass"
+      ]
+    },
+    {
+      "id": "stage-header-refinement-v1",
+      "name": "Refined unified stage header v1",
+      "description": "Keep the existing left/center/right stage-header information architecture while replacing the disconnected pills with one refined anime livestream companion control rail.",
+      "status": "complete",
+      "dependencies": [
+        "Stage control usability v1",
+        "day/night room themes",
+        "native Electron screenshot verification"
+      ],
+      "scope": [
+        "Preserve left identity/status, centered room selector, and right voice/subtitle controls",
+        "Use one restrained warm-ivory or ink-glass header shell with quieter nested controls",
+        "Improve optical alignment, hierarchy, icon consistency, enabled states, hover, focus, and responsive spacing",
+        "Do not alter Live2D placement, history cards, composer, utility controls, theme behavior, or renderer cadence"
+      ],
+      "done_criteria": [
+        "Header reads as one coherent rail instead of three unrelated floating pills",
+        "Day and night variants retain readable contrast and restrained active states",
+        "Existing room, voice, subtitle, status, and translation interactions remain functional",
+        "Focused and complete automated verification pass",
+        "User Electron screenshot confirms alignment and visual hierarchy"
+      ]
+    },
+    {
+      "id": "hiyori-motion-ownership-and-stage-detail-v1",
+      "name": "Hiyori motion ownership and stage detail refinement v1",
+      "description": "Make procedural Hiyori performance follow real elapsed time, prevent legacy body motion from stacking at full amplitude, and refine the accepted stage UI without changing its information architecture.",
+      "status": "complete",
+      "dependencies": [
+        "Hiyori native-motion fluidity parity v1",
+        "Stage control usability v1",
+        "real Electron screenshot feedback"
+      ],
+      "scope": [
+        "Keep mode, emotion, and speech blends independent of display refresh rate and duplicate samples",
+        "Apply one critically damped final-channel transition mixer across idle, listen, think, speak, semantic actions, and release",
+        "Give Hiyori semantic actions primary ownership of head, torso, and shoulder channels while retaining a reduced legacy compatibility layer",
+        "Add a restrained daily-conversation gesture library for listening, acknowledging, thinking, caring, shyness, phrase emphasis, and sentence release",
+        "Route recognized Hiyori timeline micro-cues through the semantic director while preserving built-in motion fallback for unsupported cues and models",
+        "Refine history-card density, composer proportions, microphone alignment, send hierarchy, and medium-width utility clearance",
+        "Preserve original Cubism motion playback, renderer cadence, existing controls, and the accepted character-centered layout"
+      ],
+      "done_criteria": [
+        "60 Hz and 120 Hz simulations converge to the same motion blend state",
+        "Duplicate samples at one timestamp do not advance animation state",
+        "Idle/listen/think/speak hand-offs retain momentum, avoid one-frame channel drops, and converge at 60 Hz and 120 Hz",
+        "Daily gestures start and end at rest, remain frame-continuous, and retain action priority, cooldown, and interruption crossfade behavior",
+        "Timeline micro-cues trigger Hiyori semantic actions without disabling non-Hiyori Cubism motion fallback",
+        "Focused and complete automated verification pass",
+        "User screenshot confirms the native Electron proportions and alignment"
+      ]
+    },
+    {
+      "id": "live2d-wheel-hit-area-v1",
+      "name": "Live2D wheel hit-area precision v1",
+      "description": "Restrict wheel-based model scaling to the visible character hotzone so scrolling over history cards and surrounding stage UI cannot resize Hiyori.",
+      "status": "complete",
+      "dependencies": [
+        "Live2D layout controller",
+        "visible model drag hotzone"
+      ],
+      "scope": [
+        "Gate model wheel scaling with the existing conservative visible-character hit test",
+        "Do not consume wheel events outside the character hotzone",
+        "Preserve model scale bounds, drag behavior, render cadence, and unsupported-model behavior"
+      ],
+      "done_criteria": [
+        "Wheel input over history cards does not resize the model",
+        "Wheel input directly over the visible character still resizes the model",
+        "The hit-test guard runs before preventDefault",
+        "Focused and complete local verification pass"
+      ]
+    },
+    {
+      "id": "stage-control-usability-v1",
+      "name": "Stage control usability v1",
+      "description": "Make the approved stage controls visually coherent and reliably interactive in native Electron, with a concept-faithful voice-first composer.",
+      "status": "complete",
+      "dependencies": [
+        "Stage day and night rooms v1",
+        "existing chat, attachment, sticker, microphone, voice, and subtitle bindings"
+      ],
+      "scope": [
+        "Bind automatic, day, and night controls directly and remove the slow full-screen switch feeling",
+        "Move the existing microphone control into the composer without duplicating voice state",
+        "Place attachment and sticker actions inside the input field and preserve their existing workflows",
+        "Restyle send, broadcast, and utility controls with accessible focus and active states",
+        "Verify native Electron clicking, typing, attachment opening, sticker opening, and theme switching"
+      ],
+      "done_criteria": [
+        "Day and night switch immediately and reliably in native Electron",
+        "The composer matches the approved microphone-input-send hierarchy and all controls remain functional",
+        "Keyboard focus, compact layout, and reduced-motion states remain usable",
+        "Focused and full verification evidence plus any remaining native risks are recorded"
+      ]
+    },
+    {
+      "id": "unified-control-center-ui-v1",
+      "name": "Unified control center UI v1",
+      "description": "Upgrade the More launcher and all five feature surfaces into one refined day/night-aware control center with progressive disclosure for ordinary users.",
+      "status": "complete",
+      "dependencies": [
+        "Stage control usability v1",
+        "existing schedule, persona, config switch, memory review, and doctor workflows"
+      ],
+      "scope": [
+        "Use an Image2 concept to define one warm translucent anime-companion visual system",
+        "Share a compact navigation shell across schedule, persona, model/voice, memory, and diagnostics",
+        "Keep common choices visible by default and place technical fields behind one consistent advanced-settings disclosure",
+        "Keep diagnostics status and reports inside the dedicated self-check page instead of inserting technical reports into chat history",
+        "Classify model tests, voice tests, debug reports, startup/runtime failures, and other technical notices as transient system messages while preserving ordinary conversation, proactive companion replies, and reminders",
+        "Switch between control-center pages without exposing the stage for an intermediate frame",
+        "Refine the More launcher, desktop switch semantics, light/night materials, and narrow-window layout",
+        "Preserve every existing form field, button, data binding, Live2D layer, and fallback path"
+      ],
+      "done_criteria": [
+        "All five feature pages share one coherent information hierarchy, default to common tasks, and remain fully operable",
+        "The More launcher no longer overlaps the composer and exposes accessible switch state",
+        "Browser day/night, desktop, narrow-window, page-switching, diagnostics-isolation, and transient-system-history checks pass",
+        "Focused tests and the full local validation gate pass"
+      ]
+    },
+    {
+      "id": "hiyori-native-motion-fluidity-v1",
+      "name": "Hiyori native-motion fluidity parity v1",
+      "description": "Retune procedural semantic gestures to follow the unhurried spline timing of Hiyori's authored Cubism motions instead of short, mechanical runtime pulses.",
+      "status": "complete",
+      "dependencies": [
+        "Hiyori continuous performance director",
+        "Hiyori authored motion timing",
+        "real Electron speech playback"
+      ],
+      "scope": [
+        "Keep the existing semantic action set, priorities, cooldowns, and 190 ms interruption crossfade",
+        "Use zero-velocity phase and envelope curves for procedural gestures",
+        "Match action duration to the lower bound of Hiyori's authored 30 FPS motions",
+        "Do not change model assets, renderer cadence, speech providers, or unsupported-model fallback"
+      ],
+      "done_criteria": [
+        "All semantic actions last at least as long as Hiyori's shortest authored motion",
+        "Action channels start and end at rest without visible velocity corners",
+        "Happy bounce has continuous ground-contact curves instead of absolute-sine cusps",
+        "Focused tests and real Electron recordings confirm trigger, release, and render behavior"
+      ]
+    },
+    {
+      "id": "hiyori-continuous-performance-v1",
+      "name": "Hiyori continuous performance director v1",
+      "description": "Add one coordinated parameter-level performance director for Hiyori covering continuous speech linkage, listen/think/speak poses, five readable emotions, semantic gestures, blending/conflict control, and non-repeating idle life.",
+      "status": "complete",
+      "dependencies": [
+        "Hiyori runtime parameter set",
+        "Live2D expression and motion controllers",
+        "speech playback and listening presence lifecycle"
+      ],
+      "scope": [
+        "Use existing Hiyori parameters and runtime assets only",
+        "Coordinate rather than replace current TTS, expression, and built-in motion paths",
+        "Keep behavior safe for unsupported model parameters",
+        "Do not modify or redistribute the Hiyori model design"
+      ],
+      "done_criteria": [
+        "Speech continuously links head, shoulder, and body motion to audible energy",
+        "Listen, think, and speak have distinct smoothly blended poses",
+        "Happy, sad, angry, surprised, and thinking performances are parameter-distinct",
+        "Nod, shake, lean forward, lean back, and happy bounce have bounded semantic envelopes",
+        "Priority, cooldown, fade, and speech/listening conflict rules are covered by tests",
+        "Idle variants avoid immediate repetition and remain bounded over long sessions",
+        "Focused and repository validation evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "local-data-durability-v1",
+      "name": "Local data durability and recovery",
+      "description": "Audit and harden local JSON persistence so interrupted writes do not silently destroy user memory, persona or configuration data.",
+      "status": "complete",
+      "dependencies": [
+        "memory.py persistence helpers",
+        "persona/config state writers",
+        "existing local data formats"
+      ],
+      "scope": [
+        "Preserve existing JSON formats",
+        "Use atomic replace for durable writes where missing",
+        "Keep recoverable backups for user-owned state"
+      ],
+      "done_criteria": [
+        "Core user data writes are atomic",
+        "Corrupt primary files can recover from a valid backup where appropriate",
+        "Existing memory/config tests pass with new durability tests",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "electron-dependency-security-v1",
+      "name": "Electron dependency security",
+      "description": "Resolve the high-severity npm audit finding with the smallest compatible Electron upgrade and verify desktop behavior.",
+      "status": "complete",
+      "dependencies": [
+        "package.json and package-lock.json",
+        "Electron main/preload APIs",
+        "installer and UI smoke workflows"
+      ],
+      "scope": [
+        "Identify the exact advisory before upgrading",
+        "Avoid unrelated dependency additions",
+        "Retest Electron windows, preload bridge and packaging"
+      ],
+      "done_criteria": [
+        "npm audit reports no high-severity findings",
+        "Electron and Node frontend smoke tests pass",
+        "Package metadata remains consistent",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "renderer-content-security-policy-v1",
+      "name": "Renderer content security policy",
+      "description": "Add a restrictive local-web CSP for Electron chat and model renderers without breaking Live2D, audio, images or local API requests.",
+      "status": "complete",
+      "dependencies": [
+        "web/index.html",
+        "Pixi/Live2D runtime",
+        "local HTTP API and blob/data media"
+      ],
+      "scope": [
+        "Do not enable unsafe-eval",
+        "Allow only resources required by current local functionality",
+        "Verify both chat and model windows in Electron"
+      ],
+      "done_criteria": [
+        "Electron no longer reports a missing or unsafe-eval CSP warning",
+        "Chat UI and Live2D render successfully",
+        "Local API, blob audio and data/blob images remain allowed",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "chat-diagnostics-lazy-load-v1",
+      "name": "Chat developer diagnostics lazy loading",
+      "description": "Stop loading large developer-only readiness panels in normal chat sessions while preserving core proactive companionship logic and existing developer flags.",
+      "status": "complete",
+      "dependencies": [
+        "devFeatureLoader.js",
+        "follow-up scheduler core controllers",
+        "advanced diagnostics controls"
+      ],
+      "scope": [
+        "Move only proven developer-panel code behind the existing flag",
+        "Keep proactive scheduling and character cue generation available in normal chat",
+        "Do not alter developer flag semantics"
+      ],
+      "done_criteria": [
+        "Normal chat does not load the readiness panel controller",
+        "Developer chat still loads and operates the readiness panel",
+        "Normal chat and Electron smoke tests pass",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "local-http-request-bounds-v1",
+      "name": "Local HTTP request body bounds",
+      "description": "Prevent malformed or oversized local API requests from causing unbounded memory reads while preserving normal chat, audio, and attachment workflows.",
+      "status": "complete",
+      "dependencies": [
+        "app.py HTTP request handler",
+        "chat, ASR, TTS, attachment and configuration routes"
+      ],
+      "scope": [
+        "Reject invalid and oversized Content-Length before reading the body",
+        "Use route-appropriate limits",
+        "Keep API token and loopback security behavior unchanged"
+      ],
+      "done_criteria": [
+        "Oversized JSON and binary requests receive a bounded 413 response",
+        "Invalid Content-Length receives a controlled 400 response",
+        "Normal API route tests remain green",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "release-advisory-semantics-v1",
+      "name": "Release advisory semantics",
+      "description": "Keep optional demo-service availability visible without making the default release gate depend on transient local services.",
+      "status": "complete",
+      "dependencies": [
+        "scripts/check_release_readiness.ps1",
+        "scripts/check_demo_readiness.py"
+      ],
+      "scope": [
+        "Do not modify the user's TTS provider or fallback preference",
+        "Keep a strict opt-in path for public demo recording",
+        "Default release validation must remain deterministic"
+      ],
+      "done_criteria": [
+        "Default release gate reports unavailable demo services without failing",
+        "Strict demo readiness mode still fails on blockers",
+        "Acceptance tests cover both paths",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "release-privacy-scan-v1",
+      "name": "Release privacy and secret-scan reliability",
+      "description": "Make release privacy checks distinguish real private artifacts from safe repository documentation while keeping secret detection fail-closed.",
+      "status": "complete",
+      "dependencies": [
+        "scripts/check_secrets.py",
+        "release documentation and state artifacts"
+      ],
+      "scope": [
+        "Do not weaken API-key or credential detection",
+        "Detect user-specific absolute paths that would leak in packaged artifacts",
+        "Keep repository state documentation practical for local development"
+      ],
+      "done_criteria": [
+        "Secret scan passes on safe tracked project content",
+        "Synthetic credentials and private path fixtures are still rejected",
+        "Release checks no longer fail solely on documented verification paths",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "hermetic-test-stability-v1",
+      "name": "Hermetic local test stability",
+      "description": "Remove workstation credential dependencies from local probe tests without weakening production authentication checks.",
+      "status": "complete",
+      "dependencies": [
+        "MiMo lightweight probe tests",
+        "production LLM authentication guard"
+      ],
+      "scope": [
+        "Keep production API-key validation unchanged",
+        "Use explicit fake credentials only inside tests",
+        "Make the full Python suite reproducible on a clean machine"
+      ],
+      "done_criteria": [
+        "MiMo reasoning-budget probe test passes without environment API keys",
+        "Missing-key production guard tests still pass",
+        "Full Python test suite passes",
+        "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
       "id": "local-data-durability-v1",
       "name": "Local data durability and recovery",
       "description": "Audit and harden local JSON persistence so interrupted writes do not silently destroy user memory, persona or configuration data.",
@@ -411,6 +1430,33 @@
       ]
     },
     {
+      "id": "hybrid-local-realtime-asr-v1",
+      "name": "Hybrid local realtime ASR v1",
+      "description": "Use local Paraformer streaming previews and SenseVoiceSmall final refinement with automatic Vosk fallback for stable private voice input.",
+      "status": "complete",
+      "dependencies": [
+        "local PCM microphone and VAD lifecycle",
+        "bilingual voice input v1",
+        "ASR confidence, hotword, and voice-turn merge pipeline"
+      ],
+      "scope": [
+        "Add an optional lazy-loaded FunASR provider without blocking startup when its dependencies or models are unavailable",
+        "Stream bounded PCM chunks to a server-owned Paraformer session and show non-destructive partial text while the user speaks",
+        "Refine each completed utterance with SenseVoiceSmall before sending it through the existing correction and conversation pipeline",
+        "Fall back automatically to the existing Vosk implementation on dependency, model, runtime, or streaming failure",
+        "Keep raw microphone audio local, model configuration server-side, and Live2D rendering/timing unchanged",
+        "Provide a Windows setup path for the optional local models without committing model assets"
+      ],
+      "done_criteria": [
+        "Paraformer partial text is session ordered, bounded, and cannot overwrite user typing or survive a stale microphone session",
+        "SenseVoiceSmall final text enters the existing hotword, confidence, merge, interruption, and chat flow exactly once",
+        "Closing the microphone forces one bounded full-session transcription when VAD missed the utterance, without duplicating a transcript already accepted during the session",
+        "Missing or failing FunASR components transparently retain working Vosk voice input",
+        "Configuration and health diagnostics expose safe provider capability without leaking local paths",
+        "Focused backend/frontend tests and the full local validation gate pass"
+      ]
+    },
+    {
       "id": "realtime-tts-performance-sync-v1",
       "name": "Realtime TTS performance sync v1",
       "description": "Keep streamed server-TTS speech, Live2D talk gestures, and performance timelines synchronized to actual audible playback instead of mutable text or queued synthesis work.",
@@ -713,6 +1759,29 @@
       ]
     },
     {
+      "id": "turn-playback-generation-continuity-v1",
+      "name": "Per-turn browser playback generation continuity v1",
+      "description": "Keep actual Browser TTS and server-to-browser fallback playback events attached to their current assistant turn so canonical Live2D speech timing is not discarded as stale.",
+      "status": "complete",
+      "dependencies": [
+        "chat reply playback lifecycle",
+        "ttsPlaybackController browser speech callbacks",
+        "canonical performance timeline and split-window speech bridge"
+      ],
+      "scope": [
+        "Preserve a current turn's identity across the expected Browser TTS generation increment",
+        "Cover direct Browser TTS and server-TTS fallback-to-browser delivery",
+        "Retain strict rejection for interrupted, superseded, stale-session, and genuinely old playback callbacks",
+        "Do not change TTS providers, provider configuration, backend routes, memory, permissions, or model assets"
+      ],
+      "done_criteria": [
+        "Actual Browser TTS playback starts one canonical speech timeline and post-settle path for the current turn",
+        "Server-to-browser fallback receives the same current-turn performance lifecycle",
+        "Interrupted or superseded Browser callbacks cannot revive an old turn",
+        "Focused playback/turn/bridge regressions and full verification evidence are recorded"
+      ]
+    },
+    {
       "id": "cancelled-playback-settlement-v1",
       "name": "Cancelled playback promise settlement v1",
       "description": "Settle cancelled audio playback promises promptly so interrupted or superseded speech cannot hold microphone pause leases or chat-turn cleanup for the old timeout window.",
@@ -756,6 +1825,436 @@
         "Fallback, cancellation, failure, and missing-stage states are distinguishable without conversation content",
         "Normal non-developer views do not load the diagnostics module or show its control",
         "Focused diagnostics regressions and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "realtime-tts-performance-sync-v1",
+      "name": "Realtime TTS performance sync v1",
+      "description": "Keep streamed server-TTS speech, Live2D talk gestures, and performance timelines synchronized to actual audible playback instead of mutable text or queued synthesis work.",
+      "status": "complete",
+      "dependencies": [
+        "stream TTS queue",
+        "TTS playback onPlaybackStart contract",
+        "companion performance timeline"
+      ],
+      "scope": [
+        "Carry a once-only actual-playback callback through each realtime queue item",
+        "Start speaking motion and speech timeline only after HTML audio onplay or AudioContext source.start",
+        "Keep pre-reaction/thinking available while synthesis is pending",
+        "Discard cancelled, failed, stale, or interrupted segments without triggering speaking motion",
+        "Do not change TTS providers, private configuration, permissions, or network behavior"
+      ],
+      "done_criteria": [
+        "Enqueueing text or receiving a TTS blob does not start talk gestures or speech timeline",
+        "The first real playback event starts the stream speech timeline and talk gesture exactly once",
+        "Late, failed, cancelled, and stale realtime segments cannot start a speaking performance",
+        "Direct and companion-turn speech paths remain compatible",
+        "Focused realtime queue/performance tests and full verification evidence are recorded"
+      ]
+    },
+    {
+      "id": "stage-centered-frontend-v1",
+      "name": "Stage-centered companion frontend v1",
+      "description": "Turn the full companion window into a character-first Live2D stage with conversation orbiting the character, while giving the transparent desktop pet a coordinated presence treatment.",
+      "status": "complete",
+      "dependencies": [
+        "existing split-window Electron shell",
+        "existing Live2D renderer",
+        "existing chat, voice, sticker, attachment, and settings controls"
+      ],
+      "scope": [
+        "Use the accepted generated concept as the visual contract without shipping a fake high-fidelity character image",
+        "Make the real Live2D character the visual center of the full conversation window",
+        "Place recent user and assistant messages on readable side rails and keep the composer visually anchored below the character",
+        "Coordinate the model-only desktop pet state, subtitles, listening, thinking, and speaking presence with the stage design",
+        "Preserve existing control IDs, workflows, security defaults, and narrow-window fallback behavior"
+      ],
+      "done_criteria": [
+        "The Electron companion window opens at a stage-appropriate size with the real Live2D renderer visible",
+        "Desktop messages leave a clear center lane for the character and collapse into a readable single column at narrow widths",
+        "The composer, microphone, voice, subtitles, more menu, attachments, stickers, and settings remain usable",
+        "The transparent desktop pet remains unobtrusive and gains clear listening, thinking, speaking, and subtitle presentation",
+        "Browser screenshots, at least five concept-fidelity corrections, focused regressions, and the full local verification gate are recorded"
+      ]
+    },
+    {
+      "id": "electron-stage-runtime-coordination-v1",
+      "name": "Electron stage runtime coordination v1",
+      "description": "Validate and polish the real Electron stage and desktop-pet lifecycle so the two Live2D surfaces feel intentional and do not waste rendering work or visually duplicate the character.",
+      "status": "complete",
+      "dependencies": [
+        "stage-centered-frontend-v1",
+        "split-window Electron shell",
+        "desktop speech and performance bridge"
+      ],
+      "scope": [
+        "Run and inspect the real Electron windows rather than relying only on browser rendering",
+        "Coordinate stage visibility, minimized behavior, and transparent desktop-pet visibility",
+        "Avoid unnecessary duplicate Live2D rendering while preserving speech and presence continuity",
+        "Polish stage and pet presentation issues revealed by native-window inspection",
+        "Preserve provider, permission, observation, tool, and security defaults"
+      ],
+      "done_criteria": [
+        "The stage opens with correct native sizing and no visually duplicated character",
+        "Minimizing the stage reveals the desktop pet and restoring it returns to the stage cleanly",
+        "Hidden surfaces do not continue high-frequency rendering unnecessarily",
+        "Core chat, voice, subtitle, more, and desktop-pet interactions remain available",
+        "The desktop-pet presence badge follows the model foot anchor during dragging while retaining a scale-independent size",
+        "Native screenshots, focused regressions, and the full local verification gate are recorded"
+      ]
+    },
+    {
+      "id": "automatic-tts-failover-recovery-v1",
+      "name": "Automatic TTS failover and recovery v1",
+      "description": "Keep voice interaction available when the selected server TTS is temporarily offline, then return to it automatically without disruptive dialogs.",
+      "status": "complete",
+      "dependencies": [
+        "server TTS browser fallback",
+        "actual-playback callbacks",
+        "status presence UI"
+      ],
+      "scope": [
+        "Use browser speech after a real server TTS failure when fallback is explicitly enabled",
+        "Avoid retrying a known-offline provider on every utterance",
+        "Probe recovery on a bounded interval and switch back after successful audio playback",
+        "Report fallback and recovery through concise status text without modal dialogs",
+        "Keep public fallback default off and preserve provider, privacy, and security choices"
+      ],
+      "done_criteria": [
+        "An unavailable GPT-SoVITS service falls back to browser speech instead of leaving the character silent",
+        "Fallback utterances do not repeatedly wait for the unavailable server inside the recovery interval",
+        "A later successful provider attempt clears fallback state and restores GPT-SoVITS automatically",
+        "Cancellation and stale-generation requests never trigger fallback or recovery transitions",
+        "Focused and full verification evidence plus remaining manual risks are recorded"
+      ]
+    },
+    {
+      "id": "live2d-render-performance-v1",
+      "name": "Live2D render performance v1",
+      "description": "Make the real Electron Live2D stage visibly smoother by removing duplicate animation clocks, reducing unnecessary GPU work, and recording native frame evidence before the visual redesign.",
+      "status": "complete",
+      "dependencies": [
+        "Electron stage runtime coordination v1",
+        "PIXI Live2D runtime",
+        "surface active-state bridge"
+      ],
+      "scope": [
+        "Measure active stage ticker FPS and renderer pixel dimensions in the real Electron app",
+        "Drive Live2D model updates from the application ticker instead of an independent shared ticker",
+        "Ensure inactive stage or pet surfaces stop both rendering and model parameter updates",
+        "Use an explicit high-performance WebGL preference and avoid unnecessary multisample antialiasing",
+        "Preserve motion amplitude, model assets, interaction behavior, and security defaults"
+      ],
+      "done_criteria": [
+        "The active model uses one synchronized animation/render clock",
+        "Stopping an inactive surface ticker also stops its Live2D model updates",
+        "Native diagnostics report stable active FPS and bounded renderer resolution",
+        "Motion, drag, stage/pet switching, and existing runtime tests remain valid",
+        "Focused and full verification evidence plus remaining hardware-dependent risks are recorded"
+      ]
+    },
+    {
+      "id": "hidden-paralinguistic-understanding-v1",
+      "name": "Hidden paralinguistic understanding v1",
+      "description": "Understand emotion and nonverbal vocal cues without fabricating visible transcript text or exposing detector metadata in chat history.",
+      "status": "complete",
+      "dependencies": [
+        "SenseVoiceSmall final recognition",
+        "local PCM voice capture",
+        "private conversation context"
+      ],
+      "scope": [
+        "Preserve SenseVoice emotion and acoustic-event tags before rich-text cleanup",
+        "Measure bounded voiced-ratio and pitch-stability features for stable humming-like audio",
+        "Suppress subtitle-template and very-short semantic hallucinations when acoustic evidence indicates a nonverbal cue",
+        "Pass emotion, event, and vocalization cues to the LLM as sanitized private context",
+        "Never render or remember synthetic nonverbal placeholders as user chat messages",
+        "Keep Vosk and loopback Whisper fallback behavior available when SenseVoice cannot load"
+      ],
+      "done_criteria": [
+        "A stable humming-like sample produces hidden nonverbal context and no fabricated visible transcript",
+        "SenseVoice laughter, crying, cough, sneeze, breath, and emotion tags survive the ASR route allowlist",
+        "Ordinary recognized speech remains visible and can carry private tone context",
+        "Legacy configurations and fallback providers remain compatible",
+        "Focused tests, full local verification, and remaining perceptual risks are recorded"
+      ]
+    },
+    {
+      "id": "semantic-full-duplex-voice-v1",
+      "name": "Semantic full-duplex voice v1",
+      "description": "Keep listening while ASR, LLM, and TTS are active; preserve consecutive user speech in order while distinguishing acknowledgements from real interruptions.",
+      "status": "complete",
+      "dependencies": [
+        "Hidden paralinguistic understanding v1",
+        "interruptible chat streaming",
+        "cancellable stream TTS queue",
+        "continuous local microphone capture"
+      ],
+      "scope": [
+        "Treat VAD speech start as a non-destructive interruption candidate",
+        "Keep short acknowledgements such as 嗯嗯, 哦, and 啊 as hidden backchannels",
+        "Interrupt active LLM and TTS only after a substantive, correction, or stop transcript is confirmed",
+        "Extend the pending merge hold while the user is actively speaking",
+        "Merge consecutive finalized phrases in order before starting one replacement reply",
+        "Keep microphone capture active during assistant speech when the existing barge-in setting is enabled",
+        "Keep the active private companion profile listening while chatBusy marks the assistant as thinking",
+        "Preserve legacy no-barge-in queuing and cancellation behavior"
+      ],
+      "done_criteria": [
+        "Short acknowledgements do not stop assistant speech or create visible user messages",
+        "Substantive speech, corrections, and stop commands cancel the active reply and audio",
+        "Two or more consecutive finalized phrases are retained in order and sent as one merged voice turn",
+        "ASR can continue capturing while another utterance is transcribing",
+        "The active full-duplex profile does not acquire a microphone pause lease during the thinking phase",
+        "Focused and complete local validation pass with field risks recorded"
+      ]
+    },
+    {
+      "id": "qwen3-tts-low-latency-trial-v1",
+      "name": "Qwen3-TTS low-latency trial v1",
+      "description": "Add an optional isolated Qwen3-TTS streaming provider and let model-direct companion speech begin at stable streamed sentence boundaries instead of waiting for the final companion envelope.",
+      "status": "complete",
+      "dependencies": [
+        "semantic-full-duplex-voice-v1",
+        "cancellable PCM stream playback",
+        "model-direct companion turn contract",
+        "optional faster-qwen3-tts runtime"
+      ],
+      "scope": [
+        "Keep Qwen3-TTS dependencies and model weights outside the main application environment and repository",
+        "Expose an OpenAI-compatible local streaming speech service with Vivian as a temporary bilingual evaluation voice",
+        "Reuse playback-generation, session cancellation, delivery recovery, and actual-playback timing contracts",
+        "Start Qwen speech before final companion metadata only when model-direct guarantees streamed and spoken text identity",
+        "Keep GPT-SoVITS, Browser TTS, old configuration, and explicit fallback behavior compatible",
+        "Defer the final original Xinyu voice dataset and training work until the remaining experience optimization is complete"
+      ],
+      "done_criteria": [
+        "Qwen3-TTS can be selected without changing existing GPT-SoVITS configuration",
+        "Chinese and English audio stream through the project adapter with measured sub-400 ms warm first-audio latency on the target RTX 5060 Laptop GPU",
+        "Model-direct companion replies can begin speech from stable streamed text without duplicate final playback",
+        "Cancellation, stale-generation protection, and non-model-direct finalization gates remain intact",
+        "Focused tests, full local verification, resource limits, rollback behavior, and manual perceptual risks are recorded"
+      ]
+    },
+    {
+      "id": "inline-sticker-translation-persistence-v1",
+      "name": "Inline sticker and translation persistence v1",
+      "description": "Keep message cards typographically coherent, place stickers beside their related text, and restore visible assistant translations after restart.",
+      "status": "complete",
+      "dependencies": [
+        "persistent chat history",
+        "assistant translation service",
+        "user and assistant sticker messages"
+      ],
+      "scope": [
+        "Persist successful assistant translations with their source chat record",
+        "Render stored translations immediately after history restoration and backfill old untranslated eligible records",
+        "Store related stickers on text records and render them as restrained inline images",
+        "Migrate legacy standalone sticker records to the nearest prior same-role text record when possible",
+        "Keep sticker-only fallback records compact and preserve text-only LLM conversation history",
+        "Use a legible CJK-aware system text stack without changing role-label identity"
+      ],
+      "done_criteria": [
+        "Translated assistant records remain visibly translated after restart",
+        "Old eligible records without a stored translation can fetch and persist one",
+        "User and assistant stickers follow text at approximately two text lines in size instead of filling a card",
+        "Legacy sticker-only history remains readable and compatible",
+        "Focused frontend tests and the full local verification gate pass"
+      ]
+    },
+    {
+      "id": "compact-character-prompt-personality-calibration-v1",
+      "name": "Compact character prompt and personality calibration v1",
+      "description": "Reduce repeated model-direct prompt instructions while keeping Xinyu mischievous, relevant, quietly caring, memory-aware, safe, and compatible with existing tools and performance metadata.",
+      "status": "complete",
+      "dependencies": [
+        "natural-character-dialogue-v1",
+        "relationship-growth-v1",
+        "memory-continuity-v1",
+        "model-direct companion turn contract"
+      ],
+      "scope": [
+        "Use a compact model-visible social director while keeping full backend and frontend performance metadata",
+        "Merge repeated model-direct language, style, humanization, and reply-shape instructions",
+        "Keep response length and structure adaptive instead of imposing a fixed sentence template",
+        "Calibrate playful unpredictability, relevant tangents, sharper teasing, and understated care",
+        "Preserve dynamic memory, relationship state, safety boundaries, tools, language selection, and old configuration compatibility",
+        "Measure prompt budget and configured-provider latency without exposing private prompt or memory content"
+      ],
+      "done_criteria": [
+        "The current no-history system prompt is at least 30 percent smaller under the same private configuration",
+        "Compact guidance retains intent, continuity, improv, banter, follow-up, safety, and grounding signals",
+        "Completed-action statements are not misclassified as unresolved help requests",
+        "Model-direct prompts contain one canonical language rule and no fixed casual sentence-count rule",
+        "Focused character, memory, relationship, tool, and chat regressions pass",
+        "Full local verification and honest latency limitations are recorded"
+      ]
+    },
+    {
+      "id": "independent-conversation-lane-collapse-v1",
+      "name": "Independent conversation lane collapse v1",
+      "description": "Let the user independently hide model and user history lanes from persistent edge controls so the Live2D stage background can stay visually quiet without deleting conversation records.",
+      "status": "complete",
+      "dependencies": [
+        "split conversation history lanes",
+        "local frontend preference storage",
+        "stage conversation rail"
+      ],
+      "scope": [
+        "Place a model-history arrow on the left edge and a user-history arrow on the right edge",
+        "Hide only the selected lane while leaving the other lane and all conversation records intact",
+        "Keep collapsed lanes closed when new messages arrive and show a bounded unread badge",
+        "Persist independent collapsed states and unread counts across Electron restarts",
+        "Preserve the existing whole-history collapse control and narrow-layout compatibility"
+      ],
+      "done_criteria": [
+        "Either lane can collapse and expand without changing the other lane",
+        "New messages increment the hidden lane badge without auto-expanding it",
+        "Expanding a lane clears its unread badge",
+        "Both hidden lanes reveal the stage background and keep Live2D and composer controls unobstructed",
+        "Frontend regression tests, browser interaction checks, and the full local verification gate pass"
+      ]
+    },
+    {
+      "id": "qq-social-identity-astrbot-onebot-v1",
+      "name": "QQ social identity through AstrBot and OneBot v1",
+      "description": "Let the desktop pet treat an allowlisted QQ small account as its own persistent social identity while AstrBot/NapCat only transport OneBot messages.",
+      "status": "in_progress",
+      "dependencies": [
+        "existing Tencent Cloud AstrBot + NapCatQQ/OneBot v11 deployment",
+        "a private Tailscale tailnet or separate cloud and desktop bearer-token environment variables",
+        "allowlisted QQ contacts or groups"
+      ],
+      "scope": [
+        "Keep the desktop project's LLM, persona, memory, and safety boundaries as the sole conversation brain",
+        "Queue inbound OneBot text events in AstrBot and poll them from the desktop without a public desktop callback",
+        "Expose a disabled-by-default QQ identity configuration page and bounded local audit records",
+        "Support a private-tailnet-only bridge mode while retaining the original bearer-token mode",
+        "Allow only explicit desktop text-send instructions to previously routed allowlisted targets",
+        "Never persist QQ credentials, tokens, QR codes, sessions, or plugin queue data in the repository"
+      ],
+      "done_criteria": [
+        "Text bridge is deployed and manually verified against the user's cloud AstrBot/NapCat instance",
+        "Allowlist, offline expiry, local-audit clearing, and tool blocking are exercised end to end",
+        "QQ media workflow and autonomous outreach policy are separately designed and verified before enablement"
+      ]
+    },
+    {
+      "id": "obsidian-autonomous-knowledge-v1",
+      "name": "Obsidian autonomous knowledge base v1",
+      "description": "Give Xinyu a separate local Obsidian vault for distilled long-term memories and cautious, low-frequency autonomous learning without expanding every chat prompt.",
+      "status": "complete",
+      "dependencies": [
+        "existing core memory and relationship state",
+        "local Obsidian-compatible Markdown vault",
+        "opt-in public network access"
+      ],
+      "scope": [
+        "Migrate distilled core/profile/relationship memories into D:\\馨语记忆库 without moving raw transcripts",
+        "Treat user-edited Markdown as the knowledge source of truth and refresh the local retrieval index on edit",
+        "Inject only a bounded set of relevant local knowledge snippets into ordinary chat",
+        "Keep unverified web material clearly marked and out of factual certainty claims",
+        "Run free public-source learning only after explicit private configuration opt-in"
+      ],
+      "done_criteria": [
+        "The vault is created and legacy distilled memory is copied without deleting legacy memory files",
+        "Manual Obsidian edits are visible to the next relevant chat retrieval",
+        "Prompt injection remains bounded and irrelevant turns receive no knowledge block",
+        "Background learning is opt-in, low-frequency, and provenance-tagged",
+        "Focused tests and the full local verification gate pass"
+      ]
+    },
+    {
+      "id": "companion-life-growth-v2",
+      "name": "Companion life growth and meaningful proactive presence v2",
+      "description": "Build an inspectable slow-growth layer so proactive companionship is motivated by real shared context rather than a timer.",
+      "status": "complete",
+      "dependencies": ["obsidian-autonomous-knowledge-v1", "existing proactive chat runtime"],
+      "scope": [
+        "Write sparse private local reflections and gradual interest signals",
+        "Inject growth context without replacing the core character identity",
+        "Require a concrete source for automatic companion speech and explicitly allow silence",
+        "Run a bounded conversation-awareness pulse only while active companionship is enabled",
+        "Let deferred or quiet voice turns be reconsidered after a natural delay without forcing speech"
+      ],
+      "done_criteria": [
+        "Life state and journal are local, inspectable, and bounded",
+        "Ordinary and automatic prompt paths use the life context without increasing raw-history injection",
+        "A deferred voice turn can become a later thought, remain silent, or expire when the conversational moment has passed",
+        "User speech, typing, assistant speech, and disabling active companionship safely defer or stop awareness work",
+        "Focused regression tests pass"
+      ]
+    },
+    {
+      "id": "natural-voice-participation-v1",
+      "name": "Natural voice participation and visible thinking v1",
+      "description": "Let Xinyu decide when to reply, quietly react, defer, or remain silent while showing a content-sensitive thinking presence instead of answering every recognized utterance.",
+      "status": "complete",
+      "dependencies": [
+        "model-direct companion dialogue",
+        "semantic full-duplex voice",
+        "Live2D performance phases",
+        "conversation continuity context"
+      ],
+      "scope": [
+        "Add a private model control contract for reply, micro-reaction, defer, and silence",
+        "Buffer control output so private markers never reach visible chat, memory, or TTS",
+        "Use model-selected quick, normal, or deep thinking timing with visible Live2D thinking motion",
+        "Keep a bounded short-lived ambient residue for the next meaningful voice turn",
+        "Preserve typed-chat behavior and all legacy configurations unless explicitly enabled",
+        "Expose the opt-in behavior in the configuration center"
+      ],
+      "done_criteria": [
+        "Direct questions and requests can reply normally without exposing control metadata",
+        "A voice turn may finish with no assistant card or TTS while retaining a quiet reaction",
+        "Deferred ambient context expires and cannot become long-term raw transcript memory",
+        "Thinking delay remains interruptible through the existing full-duplex cancellation path",
+        "Focused regressions and scripts/test-local.ps1 pass"
+      ]
+    },
+    {
+      "id": "social-self-cognition-v1",
+      "name": "Social and evolving self cognition v1",
+      "description": "Let Xinyu gradually recognize people across accounts, understand relationships between them, and evolve her own self-understanding without fixed per-person profile forms.",
+      "status": "complete",
+      "dependencies": ["obsidian-autonomous-knowledge-v1", "relationship-state-v1", "QQ identity bridge"],
+      "scope": [
+        "Create evidence-weighted people, account, relationship, event and self nodes",
+        "Keep uncertain identity links as hypotheses and merge accounts only with explicit evidence",
+        "Allow natural use of linked social knowledge without claiming a hidden profile lookup",
+        "Inject only the current person's compact social context and evolving self narrative"
+      ],
+      "done_criteria": [
+        "Desktop and QQ accounts create distinct people without linking evidence",
+        "Matching explicit identity evidence can associate multiple accounts with one person",
+        "Explicitly introduced relationships are stored and recalled",
+        "Self-understanding remains locally inspectable and can evolve with interests",
+        "Focused identity, relationship, QQ and chat-context regressions pass"
+      ]
+    },
+    {
+      "id": "qwen3-tts-exclusive-autostart-v1",
+      "name": "Qwen3-TTS exclusive managed autostart v1",
+      "description": "Let Electron start and stop the selected local Qwen3-TTS service without launching or automatically falling back to GPT-SoVITS.",
+      "status": "complete",
+      "dependencies": [
+        "existing Qwen3-TTS isolated runtime",
+        "Electron backend process lifecycle",
+        "browser speech fallback"
+      ],
+      "scope": [
+        "Autostart only Qwen3-TTS when the explicit local-provider switch is enabled",
+        "Never autostart GPT-SoVITS or switch to it after Qwen3-TTS failure",
+        "Use browser speech as the configured runtime fallback while showing the existing failure state",
+        "Stop only the Qwen3-TTS process owned by the current Electron instance",
+        "Preserve manual GPT-SoVITS selection and all legacy configurations"
+      ],
+      "done_criteria": [
+        "Starting the desktop pet launches Qwen3-TTS when selected and locally available",
+        "Closing the desktop pet releases the Qwen3-TTS process it started",
+        "Qwen3-TTS failure does not start or select GPT-SoVITS",
+        "Old configurations without the autostart switch retain their prior behavior",
+        "Focused regressions and the full local verification gate pass"
       ]
     },
     {

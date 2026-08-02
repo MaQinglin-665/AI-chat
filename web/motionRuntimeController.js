@@ -254,6 +254,14 @@
       const cooldownMs = Number.isFinite(Number(opts.cooldownMs))
         ? Number(opts.cooldownMs)
         : state.motionCooldownMs;
+      const keyedCooldown = String(opts.motionCooldownKey || "").trim();
+      const now = performance.now();
+      if (
+        keyedCooldown
+        && now < Number(state.motionKeyedCooldowns?.[keyedCooldown] || 0)
+      ) {
+        return false;
+      }
       if (!canPlayMotion(cooldownMs, force)) {
         return false;
       }
@@ -270,11 +278,34 @@
       for (const group of groups) {
         const ok = await playMotionGroup(group, priority);
         if (ok) {
+          if (keyedCooldown) {
+            if (!state.motionKeyedCooldowns || typeof state.motionKeyedCooldowns !== "object") {
+              state.motionKeyedCooldowns = {};
+            }
+            state.motionKeyedCooldowns[keyedCooldown] = now + Math.max(120, Number(cooldownMs) || 0);
+          }
+          const authoredMotion = opts.authoredMotion && typeof opts.authoredMotion === "object"
+            ? opts.authoredMotion
+            : null;
+          if (authoredMotion?.group === group) {
+            const durationMs = Math.max(240, Math.round(Number(authoredMotion.durationMs) || 0));
+            state.hiyoriAuthoredMotion = {
+              group,
+              file: String(authoredMotion.file || ""),
+              emotion: String(authoredMotion.emotion || opts.motionRole || ""),
+              action: String(authoredMotion.action || opts.motionCue || ""),
+              playbackGeneration: Number(opts.playbackGeneration || 0),
+              startedAt: now,
+              until: now + durationMs
+            };
+            state.hiyoriAuthoredMotionUntil = now + durationMs;
+          }
           state.lastMotionDirectorDispatch = {
             group,
             source,
             motionCue: String(opts.motionCue || ""),
             motionRole: String(opts.motionRole || ""),
+            authored: authoredMotion?.group === group,
             at: Date.now()
           };
           return true;
@@ -313,6 +344,7 @@
       const model = state.model;
       const style = normalizeTalkStyle(opts.style || state.currentTalkStyle || "neutral");
       const intent = String(opts.intent || opts.source || "idle").toLowerCase();
+      const amplitudeScale = clampNumber(Number(getMotionIntensityPreset()?.amplitudeScale) || 1, 0.72, 1.55);
       const start = performance.now();
       const duration = intent === "reply" ? 980 : (intent === "talk" ? 760 : 1120);
       const bx = state.baseTransform.x;
@@ -327,37 +359,37 @@
         const pulse = Math.sin(p * Math.PI);
 
         if (mood === "happy") {
-          model.y = by - Math.abs(wave) * 26 * swayBias;
-          model.x = bx + wave * 7 * swayBias;
-          model.scale.set(bs * (1 + Math.abs(wave) * 0.06));
-          model.rotation = wave * 0.038 * tiltBias;
+          model.y = by - Math.abs(wave) * 26 * swayBias * amplitudeScale;
+          model.x = bx + wave * 7 * swayBias * amplitudeScale;
+          model.scale.set(bs * (1 + Math.abs(wave) * 0.06 * amplitudeScale));
+          model.rotation = wave * 0.038 * tiltBias * amplitudeScale;
         } else if (mood === "sad") {
-          model.y = by + p * 18;
-          model.x = bx - pulse * 4;
-          model.scale.set(bs * (1 - p * 0.05));
-          model.rotation = -0.06 * tiltBias;
+          model.y = by + p * 18 * amplitudeScale;
+          model.x = bx - pulse * 4 * amplitudeScale;
+          model.scale.set(bs * (1 - p * 0.05 * amplitudeScale));
+          model.rotation = -0.06 * tiltBias * amplitudeScale;
         } else if (mood === "angry") {
-          model.x = bx + wave * 14;
-          model.y = by - Math.abs(Math.sin(p * Math.PI * 5)) * 6;
-          model.rotation = wave * 0.05 * tiltBias;
+          model.x = bx + wave * 14 * amplitudeScale;
+          model.y = by - Math.abs(Math.sin(p * Math.PI * 5)) * 6 * amplitudeScale;
+          model.rotation = wave * 0.05 * tiltBias * amplitudeScale;
         } else if (mood === "surprised") {
-          model.y = by - pulse * 12;
-          model.scale.set(bs * (1 + Math.abs(wave) * 0.1));
-          model.rotation = wave * 0.018;
+          model.y = by - pulse * 12 * amplitudeScale;
+          model.scale.set(bs * (1 + Math.abs(wave) * 0.1 * amplitudeScale));
+          model.rotation = wave * 0.018 * amplitudeScale;
         } else if (intent === "talk") {
           const bounce = Math.sin(p * Math.PI * 8);
-          model.x = bx + wave * 18 * swayBias;
-          model.y = by + bounce * 6 - Math.abs(wave) * 18;
-          model.rotation = wave * 0.044 * tiltBias;
+          model.x = bx + wave * 18 * swayBias * amplitudeScale;
+          model.y = by + (bounce * 6 - Math.abs(wave) * 18) * amplitudeScale;
+          model.rotation = wave * 0.044 * tiltBias * amplitudeScale;
         } else if (intent === "thinking") {
-          model.x = bx + Math.sin(p * Math.PI * 2) * 5;
-          model.y = by - pulse * 6;
-          model.rotation = -0.025;
+          model.x = bx + Math.sin(p * Math.PI * 2) * 5 * amplitudeScale;
+          model.y = by - pulse * 6 * amplitudeScale;
+          model.rotation = -0.025 * amplitudeScale;
         } else {
-          model.x = bx + wave * 3 * swayBias;
+          model.x = bx + wave * 3 * swayBias * amplitudeScale;
           model.y = by;
           model.scale.set(bs);
-          model.rotation = wave * 0.012;
+          model.rotation = wave * 0.012 * amplitudeScale;
         }
 
         if (p < 1) {

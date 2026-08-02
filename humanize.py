@@ -399,6 +399,34 @@ def build_human_prompt_block(user_message, safe_history, is_auto=False, *, allow
         lines.append("如果是你主动开口，要像突然想到就说一句，别像提醒播报，也别像任务通知。")
     return "\n".join(lines)
 
+
+def build_model_direct_turn_prompt_block(style_name, safe_history, is_auto=False):
+    style = normalize_style_name(style_name)
+    tone_map = {
+        "comfort": "Notice the feeling; care through grounded attention, with teasing softened rather than erased.",
+        "clear": "Be decisive and concrete; personality may color the answer but must not obscure it.",
+        "playful": "Let one relevant odd angle or sharp little tease emerge if it feels earned.",
+        "steady": "Stay composed and compact; use dry wit only if it fits naturally.",
+        "neutral": "Choose the rhythm and angle freely from the actual conversational moment.",
+    }
+    lines = [
+        "[Turn direction]",
+        tone_map.get(style, tone_map["neutral"]),
+        "Do not force a preset structure; the reply may be tiny, winding, blunt, or reflective as long as it remains coherent and relevant.",
+    ]
+    recent = _collect_recent_assistant_replies(safe_history, limit=2)
+    recent_openings = []
+    for item in recent:
+        compact = re.sub(r"\s+", " ", str(item or "")).strip()
+        if compact:
+            recent_openings.append(compact[:24])
+    if recent_openings:
+        lines.append("Avoid echoing these recent openings: " + " | ".join(recent_openings))
+    if is_auto:
+        lines.append("This is an unprompted thought: make it easy to ignore, never a notification or demand.")
+    return "\n".join(lines)
+
+
 def split_tool_meta_suffix(text):
     safe = str(text or "")
     if TOOL_META_MARKER not in safe:
@@ -863,6 +891,15 @@ def build_prompt_with_style(config, user_message, safe_history, base_prompt, is_
         if auto_mode
         else manual_style
     )
+    if _is_model_direct_reply_enabled(config):
+        turn_block = build_model_direct_turn_prompt_block(
+            style_name,
+            safe_history,
+            is_auto=is_auto,
+        )
+        prompt = merge_prompt_with_memory(base_prompt, turn_block)
+        time_block = build_time_awareness_block()
+        return merge_prompt_with_memory(prompt, time_block)
     style_block = build_style_prompt_block(style_name)
     prompt = merge_prompt_with_memory(base_prompt, style_block)
     human_block = build_human_prompt_block(

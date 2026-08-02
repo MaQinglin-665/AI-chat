@@ -34,10 +34,22 @@ This document is a practical release checklist, not legal advice. Before publish
 
 Python and Node dependencies are installed from package managers during setup and are not vendored by this repository. Their licenses remain governed by their upstream packages.
 
+Voice-boundary dependencies added for the optional local microphone path:
+
+| Package | License | Purpose / source |
+| --- | --- | --- |
+| `@ricky0123/vad-web` | ISC | Browser microphone adapter for Silero VAD. Source: https://github.com/ricky0123/vad |
+| `onnxruntime-web` | MIT | Local WebAssembly inference runtime used by the VAD adapter. Source: https://github.com/microsoft/onnxruntime |
+| Silero VAD ONNX model distributed by `@ricky0123/vad-web` | MIT | Local voice-activity model. Source: https://github.com/snakers4/silero-vad |
+| `faster-qwen3-tts` | MIT | Optional isolated CUDA streaming runtime for the Qwen3-TTS provider. It is installed separately and is not bundled. Source: https://github.com/andimarafioti/faster-qwen3-tts |
+| Qwen3-TTS model/code | Apache-2.0 | Optional local TTS model family. Model weights are downloaded into the user's model cache and must not be committed or packaged. Source: https://github.com/QwenLM/Qwen3-TTS |
+| `funasr-onnx` | MIT | Optional isolated ONNX runtime for the persistent loopback SenseVoice service. It is installed separately and is not bundled. Source: https://github.com/modelscope/FunASR |
+| SenseVoice / SenseVoiceSmall-onnx | Model-specific upstream terms | Optional local ASR model. Weights are downloaded into the user's ModelScope cache and must not be committed or packaged. Verify the current model-card terms before redistribution. Source: https://github.com/FunAudioLLM/SenseVoice |
+
 Useful references:
 
 - Node package metadata: `package-lock.json`
-- Python dependency list: `requirements.txt`, `requirements-dev.txt`
+- Python dependency list: `requirements.txt`, `requirements-dev.txt`, `requirements-asr.txt`, `requirements-asr-service.txt`
 - Docs tooling metadata: `docs/package.json`, `docs/package-lock.json`
 
 ## Release Packaging Rule

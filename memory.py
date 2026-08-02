@@ -14,6 +14,7 @@ import memory_correction
 import memory_debug
 import memory_selection
 import memory_store
+import shared_experience
 from relationship_state import record_relationship_interaction
 from memory_text import (
     extract_explicit_memory_text as _extract_explicit_memory_text,
@@ -222,6 +223,10 @@ def get_memory_settings(config):
         "mem0_embedding_model": str(raw.get("mem0_embedding_model", "text-embedding-v3") or "text-embedding-v3").strip() or "text-embedding-v3",
         "mem0_embedding_dims": _clamp_int(raw.get("mem0_embedding_dims", 1024), 1024, 128, 4096),
     }
+
+
+def build_shared_experience_prompt_block(config, user_message, *, is_auto=False):
+    return shared_experience.build_prompt_block(config, user_message, is_auto=is_auto)
 
 
 def load_memory_items():
@@ -2136,6 +2141,10 @@ def _extract_and_store_core_memory(config, record):
         base_debug["reason"] = "core_memory_disabled"
         _set_last_core_memory_debug(base_debug)
         return base_debug
+    try:
+        shared_experience.record_from_core_candidates(config, candidates)
+    except Exception:
+        logger.debug("record shared experience memory failed", exc_info=True)
     if is_lightweight_checkin_message(user):
         base_debug["reason"] = "lightweight_checkin"
         _set_last_core_memory_debug(base_debug)
@@ -4185,6 +4194,11 @@ def remember_interaction(
 ):
     settings = get_memory_settings(config)
     if is_auto:
+        try:
+            from companion_life import record_proactive_reply
+            record_proactive_reply(config, assistant_reply)
+        except Exception:
+            logger.debug("record proactive reply feedback seed failed", exc_info=True)
         return
 
     try:
@@ -4305,3 +4319,24 @@ def remember_interaction(
             args=(config,),
             daemon=True,
         ).start()
+
+    # Obsidian remains a readable copy of distilled memory, never a second raw
+    # transcript.  Delay and debounce this so async extraction and chat latency
+    # remain independent of filesystem work.
+    try:
+        from obsidian_knowledge import schedule_legacy_memory_sync
+        schedule_legacy_memory_sync(config)
+    except Exception:
+        logger.debug("schedule Obsidian memory sync failed", exc_info=True)
+    try:
+        from companion_life import record_interaction as record_companion_life
+        from companion_life import learn_proactive_feedback
+        learn_proactive_feedback(config, user)
+        threading.Thread(target=record_companion_life, args=(config, user, assistant), daemon=True).start()
+    except Exception:
+        logger.debug("record companion life state failed", exc_info=True)
+    try:
+        from social_cognition import observe_interaction
+        threading.Thread(target=observe_interaction, args=(config, user, assistant), kwargs={"interaction_id": interaction_id}, daemon=True).start()
+    except Exception:
+        logger.debug("record social cognition failed", exc_info=True)

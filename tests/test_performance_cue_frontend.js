@@ -22,6 +22,7 @@ const HIYORI_OVERLAY_DIR = path.dirname(HIYORI_OVERLAY_MANIFEST);
 
 const cueController = require(PERFORMANCE_CUE_JS);
 const live2dExpressionController = require(LIVE2D_EXPRESSION_CONTROLLER_JS);
+const motionRuntimeController = require(MOTION_RUNTIME_CONTROLLER_JS);
 const appStartupController = require(APP_STARTUP_CONTROLLER_JS);
 const ttsPlaybackController = require(TTS_PLAYBACK_CONTROLLER_JS);
 const hiyoriEmotionOverlayController = require(HIYORI_EMOTION_OVERLAY_CONTROLLER_JS);
@@ -205,6 +206,67 @@ assert.strictEqual(typeof hiyoriEmotionOverlayController.createController, "func
 }
 
 {
+  const input = {
+    replyText: "That is absurdly funny.",
+    mood: "happy",
+    talkStyle: "playful",
+    runtimeMetadata: {
+      emotion: "happy",
+      action: "happy_idle",
+      intensity: "medium",
+      voice_style: "cheerful"
+    }
+  };
+  const normal = cueController.buildPerformanceCue({ ...input, motionIntensity: "normal" });
+  const expressive = cueController.buildPerformanceCue({ ...input, motionIntensity: "high" });
+  assert.strictEqual(normal.motionMode, "medium", "normal configured motion should preserve the existing amplitude");
+  assert.strictEqual(expressive.motionMode, "high", "high configured motion should be visible in the bounded cue");
+  assert.ok(expressive.speech.motionStrength > normal.speech.motionStrength, "high motion mode should amplify speech motion");
+  assert.ok(expressive.speech.bodyBoost > normal.speech.bodyBoost, "high motion mode should amplify body response");
+  assert.ok(expressive.speech.expressionBoost > normal.speech.expressionBoost, "high motion mode should amplify expression response");
+}
+
+{
+  function peakHappyFallback(amplitudeScale) {
+    let now = 0;
+    const frames = [];
+    const model = {
+      x: 0,
+      y: 0,
+      rotation: 0,
+      scale: { value: 1, set(value) { this.value = value; } }
+    };
+    const state = {
+      model,
+      animating: false,
+      baseTransform: { x: 0, y: 0, scale: 1 },
+      currentTalkStyle: "playful"
+    };
+    const controller = motionRuntimeController.createController({
+      state,
+      windowObject: {},
+      performanceObject: { now: () => now },
+      requestAnimationFrame: (callback) => frames.push(callback),
+      getMotionIntensityPreset: () => ({ amplitudeScale })
+    });
+    assert.strictEqual(controller.animateFallback("happy", { style: "playful" }), true);
+    let peak = 0;
+    while (frames.length && now <= 1400) {
+      const frame = frames.shift();
+      now += 80;
+      frame(now);
+      peak = Math.max(peak, Math.abs(model.y));
+    }
+    return peak;
+  }
+
+  const normalPeak = peakHappyFallback(1);
+  const expressivePeak = peakHappyFallback(1.38);
+  assert.ok(normalPeak > 20, "normal fallback should retain a readable transform reaction");
+  assert.ok(expressivePeak > normalPeak * 1.3, "high motion mode should visibly amplify fallback transform distance");
+}
+
+{
   const cue = cueController.buildPerformanceCue({
     replyText: "This is wonderful and exciting!",
     mood: "happy",
@@ -270,7 +332,20 @@ assert.strictEqual(typeof hiyoriEmotionOverlayController.createController, "func
 }
 
 {
-  const emotions = ["neutral", "happy", "playful", "sad", "anxious", "angry", "surprised", "thinking"];
+  const emotions = [
+    "neutral",
+    "happy",
+    "playful",
+    "excited",
+    "shy",
+    "hurt",
+    "sad",
+    "anxious",
+    "angry",
+    "surprised",
+    "serious",
+    "thinking"
+  ];
   for (const emotion of emotions) {
     const cue = cueController.buildPerformanceCue({
       replyText: "测试",
@@ -346,6 +421,71 @@ assert.strictEqual(typeof hiyoriEmotionOverlayController.createController, "func
   assert.deepStrictEqual(expressionCalls, ["angry"], "performance cue should call the model-level exp3 expression");
   assert.strictEqual(state.live2dExpressionLast?.name, "angry", "performance cue should record the selected model expression");
   assert.ok(Number(state.live2dExpressionLast?.at || 0) >= now, "selected model expression should include a timestamp");
+}
+
+{
+  let now = 2000;
+  const expressionCalls = [];
+  const state = {
+    expressionEnabled: true,
+    model: {
+      expression(name) {
+        expressionCalls.push(name);
+        return true;
+      },
+      internalModel: { coreModel: {} }
+    },
+    currentTalkStyle: "neutral",
+    speechMotionBlend: 0,
+    moodExpressionSmoothed: { happy: 0, sad: 0, angry: 0, surprised: 0 }
+  };
+  const controller = live2dExpressionController.createController({
+    state,
+    performanceObject: { now: () => now },
+    isSpeechMotionActive: () => false,
+    isSpeakingNow: () => false
+  });
+  controller.applySpeechPerformanceCue({
+    emotion: "angry",
+    live2dMood: "angry",
+    intensity: "medium",
+    holdMs: 5000
+  });
+  controller.finishSpeechAnimation();
+  assert.ok(state.speechPerformanceCueUntil <= now + 380, "audible completion should bound the remaining expression hold");
+  now += 400;
+  controller.applyStyleExpressionLayer();
+  assert.deepStrictEqual(
+    expressionCalls,
+    ["angry", "neutral"],
+    "an expired local speech cue should actively restore neutral instead of leaving exp3 locked"
+  );
+  assert.strictEqual(state.speechPerformanceCue, null);
+}
+
+{
+  let now = 3000;
+  const samples = new Uint8Array(128);
+  for (let i = 0; i < samples.length; i += 1) {
+    samples[i] = i % 2 === 0 ? 96 : 160;
+  }
+  const state = {
+    ttsAudioLevel: 0,
+    ttsPcmAudioAnalyserActive: true,
+    ttsPcmAudioAnalyser: {
+      getByteTimeDomainData(target) {
+        target.set(samples);
+      }
+    },
+    ttsPcmAudioAnalyserData: new Uint8Array(128)
+  };
+  const controller = live2dExpressionController.createController({
+    state,
+    performanceObject: { now: () => now }
+  });
+  assert.ok(controller.sampleTTSAudioLevel() > 0.5, "streaming PCM analyser energy should drive Live2D mouth level");
+  assert.ok(state.ttsAudioRawLevel > 0.5);
+  assert.strictEqual(state.ttsAudioLastVoiceAt, now);
 }
 
 function createEmotionFrameSampler({ emotion, text, action = "none", style = "neutral", seed = 2.1 }) {
@@ -1646,9 +1786,10 @@ function createEmotionFrameSampler({ emotion, text, action = "none", style = "ne
   });
   assert.strictEqual(motionCall?.mood, "happy", "model page should trigger a visible built-in motion for high happy cue");
   assert.ok(
-    Array.isArray(motionCall?.opts?.groups) && motionCall.opts.groups.includes("FlickUp"),
-    "high happy cue should prefer the visible FlickUp motion group"
+    Array.isArray(motionCall?.opts?.groups) && motionCall.opts.groups[0] === "EmotionHappy",
+    "high happy cue should prefer the deterministic authored Hiyori motion group"
   );
+  assert.strictEqual(motionCall?.opts?.authoredMotion?.file, "hiyori_m06.motion3.json", "split model window should retain authored motion metadata");
 }
 
 {
@@ -1955,10 +2096,18 @@ if (fs.existsSync(LIVE2D_EXPRESSION_CONTROLLER_JS)) {
   assert.ok(source.includes("function applySpeechPerformanceAccent("), "Live2D expression controller should include a visible cue accent layer");
   assert.ok(source.includes("hiyoriEmotionOverlayController"), "Live2D expression controller should accept the Hiyori overlay dependency");
   assert.ok(source.includes("opts.performanceCue"), "beginSpeechAnimation should accept cue options");
+  assert.ok(
+    source.includes('normalized.motionOwnership = "semantic"'),
+    "verified Hiyori semantic actions should claim motion ownership and keep cooldown rejections authoritative"
+  );
 }
 
 if (fs.existsSync(TTS_PLAYBACK_CONTROLLER_JS)) {
   const source = fs.readFileSync(TTS_PLAYBACK_CONTROLLER_JS, "utf8");
+  assert.ok(
+    source.includes('appliedPerformanceCue?.motionOwnership !== "semantic"'),
+    "actual playback should not stack a fixed Cubism motion over a Hiyori-owned semantic action"
+  );
   assert.ok(source.includes("performanceCue: opts.performanceCue || null"), "TTS playback should carry cue options");
   assert.ok(source.includes("performanceCue: speechPerformanceCue"), "audio playback should pass cue into beginSpeechAnimation");
   assert.ok(source.includes("function beginSpeechPerformance("), "TTS playback should centralize actual-start expression and motion dispatch");

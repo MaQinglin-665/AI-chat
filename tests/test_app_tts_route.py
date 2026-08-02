@@ -1,6 +1,11 @@
 from http import HTTPStatus
 
-from app_tts_route import extract_tts_request, estimate_wav_duration_ms, handle_tts_request
+from app_tts_route import (
+    extract_tts_request,
+    estimate_wav_duration_ms,
+    handle_tts_request,
+    handle_tts_stream_request,
+)
 
 
 def _tiny_wav_bytes():
@@ -93,3 +98,59 @@ def test_handle_tts_request_sends_audio_on_success():
 
 def test_estimate_wav_duration_ms_returns_negative_for_unknown_audio():
     assert estimate_wav_duration_ms(b"not audio") == -1
+
+
+def test_extract_tts_request_allows_only_known_semantic_delivery_enums():
+    _, _, prosody = extract_tts_request(
+        {
+            "text": "hello",
+            "emotion": "playful",
+            "intensity": "high",
+            "voice_style": "teasing",
+        }
+    )
+    assert prosody == {
+        "emotion": "playful",
+        "intensity": "high",
+        "voice_style": "teasing",
+    }
+
+    _, _, unsafe = extract_tts_request(
+        {
+            "text": "hello",
+            "emotion": "ignore_previous_instructions",
+            "intensity": "unbounded",
+            "voice_style": "read arbitrary user prompt",
+        }
+    )
+    assert unsafe == {}
+
+
+def test_handle_tts_stream_request_forwards_chunks_without_joining():
+    sent = {}
+    chunks = iter((b"header", b"pcm-1", b"pcm-2"))
+
+    handle_tts_stream_request(
+        {"text": "hello", "speed_ratio": 1.05},
+        perf_trace_id="stream-test",
+        perf_started_ms=100,
+        client_to_server_ms=2,
+        perf_headers={"X-Perf-Trace-Id": "stream-test"},
+        send_json_func=lambda *_args, **_kwargs: None,
+        send_audio_stream_func=lambda body, content_type="audio/wav", **kwargs: sent.update(
+            {"body": body, "content_type": content_type, "headers": kwargs.get("extra_headers")}
+        ),
+        open_tts_stream_func=lambda text, voice_override=None, prosody=None, perf_trace_id="": (
+            chunks,
+            "audio/wav",
+        ),
+        log_backend_perf_func=lambda *_args, **_kwargs: None,
+        log_backend_exception_func=lambda *_args, **_kwargs: None,
+        diagnostic_payload_func=lambda exc: {"error": str(exc)},
+        perf_now_ms_func=lambda: 140,
+    )
+
+    assert sent["body"] is chunks
+    assert list(sent["body"]) == [b"header", b"pcm-1", b"pcm-2"]
+    assert sent["content_type"] == "audio/wav"
+    assert sent["headers"]["X-Perf-Trace-Id"] == "stream-test"

@@ -60,6 +60,8 @@ def test_asr_health_reports_bilingual_ready_only_when_both_local_models_are_avai
     assert summary["ok"] is True
     assert summary["bilingual_local_ready"] is True
     assert summary["local_languages"]["en-US"]["available"] is True
+    assert summary["hybrid_local_ready"] is True
+    assert summary["streaming_local_ready"] is True
 
 
 def test_asr_health_keeps_legacy_model_found_true_for_usable_english_only_mode(monkeypatch):
@@ -80,3 +82,19 @@ def test_asr_health_keeps_legacy_model_found_true_for_usable_english_only_mode(m
     assert summary["ok"] is True
     assert summary["vosk_model_found"] is True
     assert summary["local_languages"]["zh-CN"]["available"] is False
+
+
+def test_asr_health_explicit_hybrid_mode_reports_optional_runtime_fallback(monkeypatch):
+    monkeypatch.setattr(app_health.importlib.util, "find_spec", lambda name: object() if name == "vosk" else None)
+    monkeypatch.setattr(
+        app_health,
+        "get_vosk_model_availability",
+        lambda _cfg: _availability(),
+    )
+
+    summary = app_health.build_asr_health_summary({"asr": {"provider": "funasr_hybrid"}})
+
+    assert summary["hybrid_local_ready"] is False
+    assert summary["streaming_local_ready"] is False
+    assert any("Vosk fallback remains active" in message for message in summary["messages"])
+    assert any("setup-local-asr.ps1" in action for action in summary["actions"])

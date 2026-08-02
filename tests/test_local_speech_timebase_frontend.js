@@ -25,10 +25,19 @@ const autoChatController = require(path.join(ROOT, "web", "autoChatController.js
 
   assert.strictEqual(
     controller.handleUserSpeechStart({ reason: "local_speech_timebase_test" }),
-    true,
-    "a visible local speech-release window should remain interruptible even when wall and performance clocks differ"
+    false,
+    "an unclassified speech candidate should not interrupt a visible local speech-release window"
   );
-  assert.strictEqual(stops, 1, "the active visual speech window should flow through the existing interruption path");
+  assert.strictEqual(stops, 0, "an unclassified candidate should not stop the active visual speech window");
+  assert.strictEqual(
+    controller.handleUserSpeechStart({
+      reason: "local_speech_timebase_test",
+      confirmedTranscript: true
+    }),
+    true,
+    "a semantically confirmed local voice turn should remain interruptible when wall and performance clocks differ"
+  );
+  assert.strictEqual(stops, 1, "the confirmed voice turn should flow through the existing interruption path");
 
   state.speechAnimUntil = perfNow + 80;
   assert.strictEqual(

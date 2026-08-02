@@ -10,6 +10,10 @@
     "start:docs": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-docs.ps1",
     "check:docs": "npm --prefix docs run check:all"
   },
+  "dependencies": {
+    "@ricky0123/vad-web": "0.0.30",
+    "onnxruntime-web": "1.27.0"
+  },
   "devDependencies": {
     "electron": "39.8.10"
   }

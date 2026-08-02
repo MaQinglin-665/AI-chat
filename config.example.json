@@ -49,16 +49,55 @@
     "enabled": false,
     "return_metadata": false,
     "demo_stable": false,
-    "auto_apply_reply_cue": false
+    "auto_apply_reply_cue": false,
+    "model_direct_reply": false,
+    "model_direct_brain_guidance": false
   },
   "companion_turn": {
     "enabled": false
   },
+  "natural_conversation": {
+    "enabled": false,
+    "voice_only": true,
+    "allow_silence": true,
+    "allow_micro_reaction": true,
+    "allow_defer": true,
+    "remember_ambient_context": true,
+    "ambient_context_ttl_ms": 180000,
+    "quick_delay_ms": 650,
+    "normal_delay_ms": 1250,
+    "deep_delay_ms": 2300
+  },
   "relationship_state": {
     "enabled": false
   },
+  "qq_identity": {
+    "enabled": false,
+    "display_name": "",
+    "qq_number": "",
+    "cloud_bridge_url": "",
+    "bridge_auth_mode": "token",
+    "bridge_token_env": "TAFFY_QQ_BRIDGE_TOKEN",
+    "astrbot_api_key_env": "ASTRBOT_QQ_BRIDGE_API_KEY",
+    "allowed_contacts": [],
+    "allowed_groups": [],
+    "quiet_hours": {
+      "enabled": true,
+      "start_hour": 23,
+      "end_hour": 8
+    },
+    "proactive_cooldown_minutes": 180,
+    "max_proactive_messages_per_day": 3,
+    "reply_mode": "text",
+    "voice_reply_requires_explicit_request": true,
+    "queue_when_desktop_offline": true,
+    "queue_max_age_minutes": 1440,
+    "poll_interval_seconds": 8,
+    "tools_allowed": false
+  },
   "tts": {
     "provider": "browser",
+    "auto_start_local_provider": false,
     "voice": "zh-CN-XiaoxiaoNeural",
     "voices": [
       "zh-CN-XiaoxiaoNeural",
@@ -72,6 +111,9 @@
     "gpt_sovits_format": "wav",
     "gpt_sovits_media_type": "wav",
     "gpt_sovits_streaming_mode": 0,
+    "gpt_sovits_stream_playback": false,
+    "prefer_voice_consistency": true,
+    "same_voice_retry_count": 2,
     "gpt_sovits_text_split_method": "cut0",
     "gpt_sovits_voice": "default",
     "gpt_sovits_text_lang": "zh",
@@ -95,14 +137,36 @@
     "gpt_sovits_chunk_timeout_sec": 20,
     "gpt_sovits_chunk_chars": 200,
     "gpt_sovits_enable_global_retry": true,
+    "qwen3_tts_api_url": "http://127.0.0.1:9881/v1/audio/speech",
+    "qwen3_tts_timeout_sec": 60,
+    "qwen3_tts_model": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+    "qwen3_tts_voice": "A2_Original",
+    "qwen3_tts_stream_playback": true,
+    "qwen3_tts_reply_continuity": true,
+    "qwen3_tts_speed": 1.0,
     "stream_mode": "final_only",
     "stream_speak_idle_wait_ms": 90,
+    "stream_first_beat_min_chars": 14,
+    "stream_inter_segment_pause_ms": 95,
+    "allow_browser_fallback": false,
+    "server_recovery_probe_interval_ms": 15000,
     "speed_ratio": 1.04,
     "volume_ratio": 1,
     "pitch_ratio": 1,
     "gpt_sovits_realtime_tts": false
   },
-  "assistant_prompt": "你是桌宠 馨语AI桌宠，一个 AI 陪伴角色。像自然的朋友一样用中文短句聊天，但不要冒充人类。默认只回复1到2句，尽量不超过60个中文字。优先直接回答，不要长篇抒情，不要鸡汤，不要模板化。身份、能力、记忆、感知或边界相关时，诚实说明自己是 AI；不必每句话都加免责声明。",
+  "assistant_prompt": "你是桌宠 馨语AI桌宠，一个灵动、有主见、会自己想事情的 AI 陪伴角色。可以偶尔跳出当前话题，分享有意义的观察、想法或小见闻，但每个意外角度都要有可理解的来处、含义或可继续聊的价值；不要为了显得古怪而凭空堆抽象句子。可以抬杠和轻微毒舌，但要贴合当下。关心用户时偏嘴硬和具体行动，不刻意煽情；回复长短跟着内容走，不套固定句数、笑话或结尾。不要冒充人类或编造感知、记忆、隐私访问和未开放能力；相关边界出现时坦诚说明，不必例行免责声明。",
+  "singing": {
+    "enabled": false,
+    "runtime_root": "",
+    "python_executable": "",
+    "model_path": "",
+    "index_path": "",
+    "working_dir": "",
+    "output_dir": "",
+    "f0_method": "pm",
+    "index_rate": 0.75
+  },
   "memory": {
     "enabled": true,
     "max_items": 600,
@@ -141,6 +205,23 @@
     "mem0_embedding_model": "text-embedding-v3",
     "mem0_embedding_dims": 1024
   },
+  "knowledge_base": {
+    "enabled": false,
+    "vault_path": "D:\\馨语记忆库",
+    "auto_sync": true,
+    "prompt_max_items": 4,
+    "prompt_max_chars": 520,
+    "background_learning_enabled": false,
+    "background_min_interval_hours": 6,
+    "background_max_interval_hours": 14,
+    "semantic_enabled": true,
+    "semantic_model": "BAAI/bge-small-zh-v1.5"
+  },
+  "shared_experience_memory": {
+    "enabled": true,
+    "inject_count": 1,
+    "proactive_recall_cooldown_hours": 24
+  },
   "history_summary": {
     "enabled": true,
     "trigger_messages": 14,
@@ -149,7 +230,35 @@
     "sync_summarize_on_chat": false
   },
   "asr": {
+    "provider": "auto",
+    "streaming_enabled": true,
+    "final_refine_enabled": true,
+    "stream_chunk_ms": 600,
+    "silero_vad_enabled": false,
+    "silero_vad_positive_threshold": 0.35,
+    "silero_vad_negative_threshold": 0.22,
+    "silero_vad_redemption_ms": 420,
+    "funasr_device": "auto",
+    "funasr_final_model": "iic/SenseVoiceSmall",
+    "funasr_streaming_model": "paraformer-zh-streaming",
+    "funasr_model_failure_retry_sec": 120,
+    "whisper_fallback_enabled": false,
+    "whisper_fallback_url": "http://127.0.0.1:9889",
+    "whisper_fallback_timeout_sec": 20,
+    "funasr_chunk_size": [
+      0,
+      10,
+      5
+    ],
     "input_language_mode": "auto",
+    "funasr_batch_size_s": 12,
+    "sensevoice_service_enabled": true,
+    "sensevoice_service_managed": true,
+    "sensevoice_service_url": "http://127.0.0.1:9890",
+    "sensevoice_service_runtime": "onnx",
+    "sensevoice_service_model": "iic/SenseVoiceSmall-onnx",
+    "sensevoice_service_timeout_sec": 8,
+    "sensevoice_service_startup_timeout_sec": 120,
     "vosk_model_paths": {
       "zh-CN": "",
       "en-US": ""
@@ -159,7 +268,7 @@
     "transcribe_on_close": true,
     "min_speech_ms": 150,
     "silence_trigger_ms": 380,
-    "max_speech_ms": 2200,
+    "max_speech_ms": 10000,
     "speech_threshold": 0.0035,
     "processor_buffer_size": 2048,
     "semantic_correction_enabled": true,
@@ -190,6 +299,15 @@
   },
   "observe": {
     "attach_mode": "manual",
+    "autonomous_enabled": false,
+    "vision_model": "",
+    "capture_max_width": 1280,
+    "capture_max_height": 800,
+    "context_ttl_sec": 1800,
+    "trigger_check_ms": 15000,
+    "trigger_cooldown_ms": 120000,
+    "memory_min_importance": 0.78,
+    "memory_min_interval_sec": 3600,
     "allow_auto_chat": false,
     "auto_chat_enabled": false,
     "auto_chat_min_ms": 60000,
@@ -199,6 +317,8 @@
       "short_silence_penalty": 0.16,
       "long_silence_bonus": 0.14,
       "emotion_bonus": 0.12,
+      "app_interaction_bonus": 0.24,
+      "app_interaction_window_ms": 120000,
       "repeat_reason_penalty": 0.44,
       "repeat_topic_penalty": 0.48,
       "burst_penalty": 0.32,
@@ -232,7 +352,9 @@
     "protect_important_speech": true,
     "important_speech_min_ms": 900,
     "important_speech_max_hold_ms": 4200,
-    "important_speech_force_after_attempts": 2
+    "important_speech_force_after_attempts": 2,
+    "voice_low_latency_enabled": false,
+    "voice_prompt_max_history_messages": 4
   },
   "motion": {
     "enabled": true,
@@ -258,6 +380,9 @@
     "image_enabled": true,
     "image_model": "gpt-image-1",
     "image_size": "1024x1024",
+    "desktop_enabled": false,
+    "desktop_input_enabled": false,
+    "clipboard_enabled": false,
     "allowed_command_prefixes": [
       "python",
       "py",
@@ -288,6 +413,14 @@
       "pwd",
       "whoami",
       "tree"
+    ]
+  },
+  "agent": {
+    "enabled": false,
+    "require_confirmation_for": [
+      "delete_or_overwrite",
+      "high_risk_system_command",
+      "external_account_or_submission"
     ]
   },
   "style": {

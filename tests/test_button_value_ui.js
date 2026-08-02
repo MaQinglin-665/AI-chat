@@ -8,6 +8,7 @@ const path = require("path");
 const ROOT = path.resolve(__dirname, "..");
 const INDEX_HTML = path.join(ROOT, "web", "index.html");
 const BASE_CSS = path.join(ROOT, "web", "base.css");
+const PHOSPHOR_CSS = path.join(ROOT, "web", "phosphorIcons.css");
 const CHAT_DOM_JS = path.join(ROOT, "web", "chatDom.js");
 const ADVANCED_ACTION_BINDER_JS = path.join(ROOT, "web", "advancedActionBinder.js");
 const DESKTOP_CONTROL_BINDER_JS = path.join(ROOT, "web", "desktopControlBinder.js");
@@ -17,6 +18,7 @@ const CHARACTER_DIAGNOSTICS_CONTROLLER_JS = path.join(ROOT, "web", "characterDia
 
 const html = fs.readFileSync(INDEX_HTML, "utf8");
 const css = fs.readFileSync(BASE_CSS, "utf8");
+const phosphorCss = fs.readFileSync(PHOSPHOR_CSS, "utf8");
 const chatDomSource = fs.readFileSync(CHAT_DOM_JS, "utf8");
 const advancedBinderSource = fs.readFileSync(ADVANCED_ACTION_BINDER_JS, "utf8");
 const desktopBinderSource = fs.readFileSync(DESKTOP_CONTROL_BINDER_JS, "utf8");
@@ -139,6 +141,10 @@ function testSafetyCopyAndStyles() {
   assert.ok(css.includes("animation: none !important;"), "more panel should render at full opacity without animation flicker");
   assert.ok(css.includes(".message-feedback-btn"), "assistant feedback controls should have dedicated styling");
   assert.ok(css.includes("grid-template-columns: repeat(3, minmax(0, 1fr))"), "primary controls should use a cleaner three-button grid");
+  assert.ok(phosphorCss.includes("More launcher readability"), "the final visual layer should own launcher contrast");
+  assert.ok(phosphorCss.includes("color: #f9e5ee !important;"), "enabled launcher actions should use readable light text on the berry panel");
+  assert.ok(phosphorCss.includes("font-size: 14px !important;"), "launcher action labels should not regress to the former tiny text");
+  assert.ok(phosphorCss.includes("button:disabled"), "disabled launcher actions should retain a distinct readable state");
 
   const malformedContentLines = css.split(/\r?\n/).filter((line) => {
     if (!/content:\s*"/.test(line)) {

@@ -34,9 +34,10 @@ def build_reply_prompt(
         base_prompt,
         is_auto=is_auto,
     )
-    lang_block = build_reply_language_block_fn(config)
-    if lang_block:
-        prompt = merge_prompt_with_memory_fn(prompt, lang_block)
+    if not is_model_direct_reply_enabled(config):
+        lang_block = build_reply_language_block_fn(config)
+        if lang_block:
+            prompt = merge_prompt_with_memory_fn(prompt, lang_block)
     stable_behavior_block = build_demo_stable_reply_behavior_block_fn(config)
     if stable_behavior_block:
         prompt = merge_prompt_with_memory_fn(prompt, stable_behavior_block)

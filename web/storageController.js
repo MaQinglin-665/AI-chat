@@ -6,6 +6,7 @@
     emotion: "taffy_emotion_stats_v1",
     dailyGreeting: "taffy_daily_greeting_v1",
     chatHistory: "taffy_chat_history_v2",
+    conversationLaneState: "taffy_conversation_lane_state_v1",
     chatTranslationVisible: "taffy_chat_translation_visible_v1",
     subtitleEnabled: "taffy_subtitle_enabled_v1",
     subtitlePosition: "taffy_subtitle_position_v1",
@@ -36,6 +37,40 @@
   function call(fn, ...args) {
     return typeof fn === "function" ? fn(...args) : undefined;
   }
+
+  const SYSTEM_HISTORY_PREFIXES = Object.freeze([
+    "正在自检聊天、语音和角色接入状态",
+    "故障自检完成：",
+    "故障自检失败",
+    "模型测试：",
+    "语音测试",
+    "角色试演：",
+    "角色试演的语音没有成功",
+    "语音开关当前是关闭状态",
+    "角色调优建议",
+    "角色闭环测试流程",
+    "启动错误:",
+    "错误:",
+    "Mic debug:",
+    "TTS debug:",
+    "TTS debug panel",
+    "Translation debug:",
+    "Translation debug panel",
+    "Memory debug",
+    "Character brain",
+    "Brain debug:",
+    "Turn debug:",
+    "Follow-up",
+    "灰度 readiness"
+  ]);
+
+  function isSystemHistoryRecord(record) {
+    if (record?.role !== "assistant") return false;
+    const content = String(record?.content || "").trim();
+    return SYSTEM_HISTORY_PREFIXES.some((prefix) => content.startsWith(prefix));
+  }
+
+  const isLegacyDoctorHistoryRecord = isSystemHistoryRecord;
 
   function loadReminders(state = {}, deps = {}) {
     const storage = getStorage(deps);
@@ -148,11 +183,25 @@
       return;
     }
     const normalizeChatRecord = deps.normalizeChatRecord;
+    const coalesceInlineStickerRecords = deps.coalesceInlineStickerRecords;
     const parseMessageTimestamp = deps.parseMessageTimestamp;
     const trimChatRecords = deps.trimChatRecords;
+    const normalizedRecords = parsed
+      .map((item) => typeof normalizeChatRecord === "function" ? normalizeChatRecord(item) : item)
+      .filter(Boolean)
+      .filter((item) => !isSystemHistoryRecord(item));
+    const migratedRecords = typeof coalesceInlineStickerRecords === "function"
+      ? coalesceInlineStickerRecords(normalizedRecords)
+      : normalizedRecords;
     state.chatRecords = typeof trimChatRecords === "function"
-      ? trimChatRecords(parsed.map((item) => call(normalizeChatRecord, item)).filter(Boolean))
-      : parsed;
+      ? trimChatRecords(migratedRecords)
+      : migratedRecords;
+    if (
+      typeof deps.saveChatHistory === "function"
+      && JSON.stringify(state.chatRecords) !== JSON.stringify(parsed)
+    ) {
+      call(deps.saveChatHistory);
+    }
     const lastUserRecord = [...state.chatRecords].reverse().find((item) => item?.role === "user");
     if (lastUserRecord) {
       const ts = call(parseMessageTimestamp, lastUserRecord.timestamp);
@@ -165,6 +214,47 @@
     }
     call(deps.syncConversationHistoryFromChatRecords);
     call(deps.renderChatHistoryFromState);
+  }
+
+  function sanitizeConversationLaneState(value) {
+    const raw = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const collapsed = raw.collapsed && typeof raw.collapsed === "object" ? raw.collapsed : {};
+    const unread = raw.unread && typeof raw.unread === "object" ? raw.unread : {};
+    return {
+      collapsed: {
+        assistant: collapsed.assistant === true,
+        user: collapsed.user === true
+      },
+      unread: {
+        assistant: Math.max(0, Math.min(99, Math.floor(Number(unread.assistant) || 0))),
+        user: Math.max(0, Math.min(99, Math.floor(Number(unread.user) || 0)))
+      }
+    };
+  }
+
+  function loadConversationLaneState(state = {}, deps = {}) {
+    const storage = getStorage(deps);
+    const raw = storage ? storage.getItem(STORAGE_KEYS.conversationLaneState) : "";
+    const restored = sanitizeConversationLaneState(safeParseJSON(raw, {}));
+    state.conversationLaneCollapsed = restored.collapsed;
+    state.conversationLaneUnread = restored.unread;
+    return restored;
+  }
+
+  function saveConversationLaneState(state = {}, deps = {}) {
+    const storage = getStorage(deps);
+    if (!storage) {
+      return;
+    }
+    const value = sanitizeConversationLaneState({
+      collapsed: state.conversationLaneCollapsed,
+      unread: state.conversationLaneUnread
+    });
+    try {
+      storage.setItem(STORAGE_KEYS.conversationLaneState, JSON.stringify(value));
+    } catch (_) {
+      // ignore storage quota failures
+    }
   }
 
   function saveBoolean(key, value, deps = {}) {
@@ -713,12 +803,18 @@
   const api = {
     STORAGE_KEYS,
     safeParseJSON,
+    SYSTEM_HISTORY_PREFIXES,
+    isSystemHistoryRecord,
+    isLegacyDoctorHistoryRecord,
     loadReminders,
     saveReminders,
     loadDailyGreetingState,
     saveDailyGreetingState,
     saveChatHistory,
     loadChatHistory,
+    sanitizeConversationLaneState,
+    loadConversationLaneState,
+    saveConversationLaneState,
     saveChatTranslationVisibility,
     loadChatTranslationVisibility,
     saveSubtitleEnabled,

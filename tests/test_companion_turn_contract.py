@@ -31,22 +31,23 @@ def test_companion_turn_preserves_text_and_only_exposes_allowed_performance_fiel
         character_brain={"prompt": "must not leak"},
     )
 
-    assert turn == {
-        "version": 1,
-        "id": "chat-123",
-        "reply_text": text,
-        "spoken_text": text,
-        "mode": "reply",
-        "input_modality": "voice",
-        "performance": {
-            "emotion": "angry",
-            "action": "think",
-            "intensity": "medium",
-            "voice_style": "neutral",
-            "source": "character_runtime",
-        },
-        "source": "model_direct",
+    assert turn["version"] == 1
+    assert turn["id"] == "chat-123"
+    assert turn["reply_text"] == text
+    assert turn["spoken_text"] == text
+    assert turn["mode"] == "reply"
+    assert turn["input_modality"] == "voice"
+    assert turn["performance"] == {
+        "emotion": "angry",
+        "action": "think",
+        "intensity": "medium",
+        "voice_style": "neutral",
+        "source": "character_runtime",
     }
+    assert turn["performance_segments_version"] == 1
+    assert len(turn["performance_segments"]) == 1
+    assert turn["performance_segments"][0]["performance"]["emotion"] == "angry"
+    assert turn["source"] == "model_direct"
     serialized = repr(turn)
     assert "private" not in serialized
     assert "history" not in serialized
@@ -100,6 +101,26 @@ def test_model_direct_companion_turn_keeps_ambiguous_reply_unplanned():
     )
 
     assert turn["performance"] is None
+    assert turn["performance_segments"][0]["performance"]["emotion"] == "neutral"
+
+
+def test_model_direct_companion_turn_exposes_per_sentence_performance_without_changing_text():
+    text = "嘿嘿，骗你的。认真说，必须先保存文件。"
+    turn = build_companion_turn(
+        {
+            "companion_turn": {"enabled": True},
+            "character_runtime": {"model_direct_reply": True},
+        },
+        text,
+        turn_id="chat-segments",
+    )
+
+    assert turn["reply_text"] == text
+    assert turn["spoken_text"] == text
+    assert [item["performance"]["emotion"] for item in turn["performance_segments"]] == [
+        "playful",
+        "serious",
+    ]
 
 
 def test_companion_turn_returns_none_when_disabled_or_blank():

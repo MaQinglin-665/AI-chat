@@ -7,8 +7,10 @@
     const console = deps.consoleObject || root.console || { warn() {} };
     const AbortControllerImpl = window.AbortController || root.AbortController;
     const performance = deps.performanceObject || window.performance || root.performance || { now: () => Date.now() };
+    const wallNow = typeof deps.wallNow === "function" ? deps.wallNow : () => Date.now();
     const authFetch = typeof deps.authFetch === "function" ? deps.authFetch : async () => { throw new Error("authFetch is not available"); };
     const TTS_API = deps.ttsApi || {};
+    const PCM_STREAM = deps.ttsPcmStream || root.TaffyTTSPcmStream || {};
     const perfLog = typeof deps.perfLog === "function" ? deps.perfLog : () => {};
     const setStatus = typeof deps.setStatus === "function" ? deps.setStatus : () => {};
     const waitMs = typeof deps.waitMs === "function" ? deps.waitMs : (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
@@ -32,6 +34,50 @@
     const isCurrentTTSPlaybackGeneration = typeof deps.isCurrentTTSPlaybackGeneration === "function" ? deps.isCurrentTTSPlaybackGeneration : () => true;
     const buildSpeakProsody = typeof deps.buildSpeakProsody === "function" ? deps.buildSpeakProsody : () => null;
     const clampNumber = typeof deps.clampNumber === "function" ? deps.clampNumber : (v, min, max) => Math.min(max, Math.max(min, Number(v) || 0));
+
+    function getServerRecoveryProbeIntervalMs() {
+      return Math.max(
+        5000,
+        Math.min(120000, Math.round(Number(state.ttsServerRecoveryProbeIntervalMs) || 15000))
+      );
+    }
+
+    function shouldAttemptServerTTS() {
+      if (!state.serverTTSFallbackToBrowser || state.ttsServerFallbackActive !== true) {
+        return true;
+      }
+      return wallNow() >= Math.max(0, Number(state.ttsServerNextRecoveryProbeAt) || 0);
+    }
+
+    function markServerTTSFallback(reason = "") {
+      const wasActive = state.ttsServerFallbackActive === true;
+      state.ttsServerFallbackActive = true;
+      state.ttsServerAvailable = false;
+      state.ttsServerNextRecoveryProbeAt = wallNow() + getServerRecoveryProbeIntervalMs();
+      if (!wasActive) {
+        setStatus("已临时切换到系统语音");
+        recordTTSDebugEvent("server_tts_fallback_enter", {
+          provider: String(state.ttsProvider || ""),
+          reason: String(reason || state.ttsServerLastError || ""),
+          nextProbeAt: Number(state.ttsServerNextRecoveryProbeAt || 0)
+        });
+      }
+    }
+
+    function markServerTTSRecovered() {
+      const wasActive = state.ttsServerFallbackActive === true;
+      state.ttsServerFallbackActive = false;
+      state.ttsServerNextRecoveryProbeAt = 0;
+      state.ttsServerAvailable = true;
+      state.ttsServerFailStreak = 0;
+      state.ttsServerLastError = "";
+      if (wasActive) {
+        setStatus("GPT-SoVITS 语音已恢复");
+        recordTTSDebugEvent("server_tts_fallback_recovered", {
+          provider: String(state.ttsProvider || "")
+        });
+      }
+    }
 
     function getServerTTSRequestScopes() {
       if (!Array.isArray(state.ttsServerRequestScopes)) {
@@ -170,8 +216,8 @@
       const performanceCue = opts.performanceCue && typeof opts.performanceCue === "object"
         ? opts.performanceCue
         : null;
-      beginSpeechAnimation(text, mood, style, opts);
-      if (performanceCue) {
+      const appliedPerformanceCue = beginSpeechAnimation(text, mood, style, opts);
+      if (performanceCue && appliedPerformanceCue?.motionOwnership !== "semantic") {
         try {
           triggerPerformanceCueMotion(performanceCue, context);
         } catch (_) {
@@ -352,11 +398,30 @@
         let started = false;
         let settled = false;
         let unregisterCancelWaiter = null;
+        let startupProbeTimer = 0;
+        let startupDeadlineTimer = 0;
+        const browserSetTimeout = typeof window.setTimeout === "function"
+          ? window.setTimeout.bind(window)
+          : root.setTimeout.bind(root);
+        const browserClearTimeout = typeof window.clearTimeout === "function"
+          ? window.clearTimeout.bind(window)
+          : root.clearTimeout.bind(root);
+        const clearStartupTimers = () => {
+          if (startupProbeTimer) {
+            browserClearTimeout(startupProbeTimer);
+            startupProbeTimer = 0;
+          }
+          if (startupDeadlineTimer) {
+            browserClearTimeout(startupDeadlineTimer);
+            startupDeadlineTimer = 0;
+          }
+        };
         const settle = (ok) => {
           if (settled) {
             return false;
           }
           settled = true;
+          clearStartupTimers();
           if (unregisterCancelWaiter) {
             unregisterCancelWaiter();
             unregisterCancelWaiter = null;
@@ -367,17 +432,22 @@
         unregisterCancelWaiter = registerPlaybackCancelWaiter("browser_tts", () => {
           settle(false);
         });
-        utterance.onstart = () => {
+        const markBrowserSpeechStarted = (startSignal = "event") => {
+          if (started || settled) {
+            return started;
+          }
           if (!isCurrentBrowserPlayback()) {
             settle(false);
-            return;
+            return false;
           }
           started = true;
+          clearStartupTimers();
           state.ttsDebugAudioStartedAt = performance.now();
           state.ttsDebugAudioEndedAt = 0;
           perfLog("tts", "browser_play_start", {
             traceId: String(opts.perfTraceId || state.activePerfTraceId || ""),
-            ttsProvider: "browser"
+            ttsProvider: "browser",
+            startSignal
           });
           if (opts.sessionId) {
             state.streamSpeakPlayedSession = Number(opts.sessionId || 0);
@@ -404,6 +474,25 @@
           });
           showSubtitleText(cleaned);
           setStatus("语音中...");
+          return true;
+        };
+        const probeBrowserSpeechStart = () => {
+          startupProbeTimer = 0;
+          if (started || settled) {
+            return;
+          }
+          if (!isCurrentBrowserPlayback()) {
+            settle(false);
+            return;
+          }
+          if (window.speechSynthesis?.speaking === true) {
+            markBrowserSpeechStarted("speaking_state");
+            return;
+          }
+          startupProbeTimer = browserSetTimeout(probeBrowserSpeechStart, 60);
+        };
+        utterance.onstart = () => {
+          markBrowserSpeechStarted("event");
         };
         utterance.onend = () => {
           if (settled) return;
@@ -447,8 +536,12 @@
           }
           window.speechSynthesis.resume();
           window.speechSynthesis.speak(utterance);
+          // Chromium on Windows can occasionally start audible speech without
+          // delivering onstart. Poll the authoritative speaking state so the
+          // mouth/body performance still begins only after real playback.
+          startupProbeTimer = browserSetTimeout(probeBrowserSpeechStart, 40);
           // Guard against engines that fail silently (no onstart fired).
-          setTimeout(() => {
+          startupDeadlineTimer = browserSetTimeout(() => {
             if (settled) return;
             if (!isCurrentBrowserPlayback()) {
               settle(false);
@@ -563,6 +656,180 @@
       }
     }
 
+    async function playServerTTSStream(text, opts = {}) {
+      const cleaned = sanitizeSpeakText(text);
+      const playbackGeneration = Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0);
+      const result = { ok: false, started: false, cancelled: false, error: "" };
+      const streamProviderEnabled = (
+        state.ttsProvider === "gpt_sovits"
+        && state.gptSovitsStreamPlayback === true
+      ) || (
+        state.ttsProvider === "qwen3_tts"
+        && state.qwen3TtsStreamPlayback !== false
+      );
+      if (
+        !cleaned
+        || !streamProviderEnabled
+        || typeof TTS_API.requestServerTTSStream !== "function"
+        || typeof PCM_STREAM.playPcmStream !== "function"
+      ) {
+        return result;
+      }
+      const scope = createServerTTSRequestScope({
+        signal: opts.signal || null,
+        kind: "pcm_stream",
+        sessionId: Number(opts.sessionId || 0),
+        playbackGeneration,
+        traceId: String(opts.perfTraceId || state.activePerfTraceId || "")
+      });
+      let stream = null;
+      let unregisterCancelWaiter = null;
+      try {
+        const sameVoiceRetries = state.preferVoiceConsistency === true
+          ? Math.max(0, Math.min(4, Number(state.sameVoiceRetryCount) || 0))
+          : 0;
+        let requestAttempt = 0;
+        while (!stream) {
+          try {
+            stream = await TTS_API.requestServerTTSStream(cleaned, opts.prosody || null, {
+              authFetch,
+              sanitizeSpeakText,
+              traceId: String(opts.perfTraceId || state.activePerfTraceId || ""),
+              timeoutMs: Number(state.ttsServerRequestTimeoutMs || 14000),
+              voice: state.ttsServerVoice,
+              signal: scope?.signal || opts.signal || null,
+              wallNow: () => Date.now()
+            });
+          } catch (err) {
+            if (
+              isServerTTSRequestCancelled(err, { signal: scope?.signal || opts.signal })
+              || requestAttempt >= sameVoiceRetries
+            ) {
+              throw err;
+            }
+            requestAttempt += 1;
+            const delayMs = Math.max(
+              80,
+              Math.min(
+                3000,
+                Math.round((Number(state.ttsServerRetryDelayMs) || 220) * requestAttempt)
+              )
+            );
+            recordTTSDebugEvent("pcm_stream_same_voice_retry", {
+              traceId: String(opts.perfTraceId || state.activePerfTraceId || ""),
+              sessionId: Number(opts.sessionId || 0),
+              result: "retry",
+              error: String(err?.message || err || ""),
+              attempt: requestAttempt,
+              delayMs
+            });
+            await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+          }
+        }
+        if (!stream || !isCurrentTTSPlaybackGeneration(playbackGeneration)) {
+          result.cancelled = true;
+          await stream?.close?.(true);
+          return result;
+        }
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        if (!state.ttsAudioContext && AudioContextCtor) state.ttsAudioContext = new AudioContextCtor();
+        const context = state.ttsAudioContext;
+        if (!context) throw new Error("AudioContext is unavailable for streaming TTS");
+        if (
+          typeof context.createAnalyser === "function"
+          && (!state.ttsPcmAudioAnalyser || state.ttsPcmAudioAnalyser.context !== context)
+        ) {
+          state.ttsPcmAudioAnalyser = context.createAnalyser();
+          state.ttsPcmAudioAnalyser.fftSize = 256;
+          state.ttsPcmAudioAnalyser.smoothingTimeConstant = 0.12;
+          state.ttsPcmAudioAnalyserData = new Uint8Array(state.ttsPcmAudioAnalyser.frequencyBinCount);
+          state.ttsPcmAudioAnalyser.connect(context.destination);
+        }
+        state.ttsPcmAudioAnalyserActive = !!state.ttsPcmAudioAnalyser;
+        unregisterCancelWaiter = registerPlaybackCancelWaiter("pcm_stream", () => {
+          result.cancelled = true;
+          abortServerTTSRequestScope(scope, "playback_stopped");
+          stream?.close?.(true);
+        });
+        const playback = await PCM_STREAM.playPcmStream(stream.reader, {
+          audioContext: context,
+          outputNode: state.ttsPcmAudioAnalyser || context.destination,
+          source: `${state.ttsProvider}_pcm_stream`,
+          signal: scope?.signal || stream.signal || opts.signal || null,
+          onPlaybackStart: (event = {}) => {
+            if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) return;
+            result.started = true;
+            state.ttsContextSpeaking = true;
+            state.streamSpeakPlayedSession = Number(opts.sessionId || 0);
+            beginSpeechPerformance(cleaned, opts.mood || detectMood(cleaned), opts.style || state.currentTalkStyle || "neutral", {
+              performanceCue: opts.performanceCue || null
+            }, {
+              source: `${state.ttsProvider}_pcm_stream`,
+              playbackGeneration,
+              sessionId: Number(opts.sessionId || 0)
+            });
+            showSubtitleText(cleaned);
+            setStatus("语音中...");
+            perfLog("tts", "pcm_stream_play_start", {
+              traceId: String(opts.perfTraceId || state.activePerfTraceId || ""),
+              ttsProvider: state.ttsProvider
+            });
+            opts.onPlaybackStart?.({
+              ...event,
+              playbackGeneration,
+              sessionId: Number(opts.sessionId || 0)
+            });
+          },
+          onPlaybackProgress: (event = {}) => {
+            if (!isCurrentTTSPlaybackGeneration(playbackGeneration)) return;
+            opts.onPlaybackProgress?.({
+              ...event,
+              text: cleaned,
+              playbackGeneration,
+              sessionId: Number(opts.sessionId || 0)
+            });
+          }
+        });
+        result.started = result.started || playback?.started === true;
+        result.cancelled = result.cancelled || playback?.cancelled === true;
+        result.ok = playback?.ok === true && isCurrentTTSPlaybackGeneration(playbackGeneration);
+        if (result.ok) {
+          state.conversationLastTtsFinishedAt = Date.now();
+          finishSpeechAnimation();
+          hideSubtitleText();
+          setStatus("待机");
+        } else if (result.started) {
+          endSpeechAnimation();
+          hideSubtitleText();
+        }
+        perfLog("tts", "pcm_stream_play_end", {
+          traceId: String(opts.perfTraceId || state.activePerfTraceId || ""),
+          result: result.ok ? "ok" : (result.cancelled ? "cancelled" : "fail")
+        });
+        return result;
+      } catch (err) {
+        result.cancelled = isServerTTSRequestCancelled(err, { signal: scope?.signal || opts.signal });
+        result.error = String(err?.message || err || "");
+        if (result.started) {
+          endSpeechAnimation();
+          hideSubtitleText();
+        }
+        recordTTSDebugEvent("pcm_stream_fail", {
+          traceId: String(opts.perfTraceId || state.activePerfTraceId || ""),
+          sessionId: Number(opts.sessionId || 0),
+          result: result.cancelled ? "cancelled" : "fail",
+          error: result.error
+        });
+        return result;
+      } finally {
+        state.ttsContextSpeaking = false;
+        state.ttsPcmAudioAnalyserActive = false;
+        if (unregisterCancelWaiter) unregisterCancelWaiter();
+        await stream?.close?.(result.cancelled || !result.ok);
+        releaseServerTTSRequestScope(scope);
+      }
+    }
+
     async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) {
       if (typeof TTS_API.requestServerTTSBlobWithRetry !== "function") {
         throw new Error("ttsApi retry helper is not available");
@@ -601,7 +868,7 @@
       }
     }
 
-    async function playAudioByContext(blob, debugContext = {}, onPlaybackStart = null) {
+    async function playAudioByContext(blob, debugContext = {}, onPlaybackStart = null, onPlaybackProgress = null) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx || !blob) {
         recordTTSDebugEvent("context_unavailable", debugContext);
@@ -661,6 +928,7 @@
         await new Promise((resolve) => {
           let resolved = false;
           let unregisterCancelWaiter = null;
+          let contextProgressTimer = 0;
           const resolveOnce = () => {
             if (resolved) {
               return;
@@ -669,6 +937,10 @@
             if (unregisterCancelWaiter) {
               unregisterCancelWaiter();
               unregisterCancelWaiter = null;
+            }
+            if (contextProgressTimer) {
+              clearInterval(contextProgressTimer);
+              contextProgressTimer = 0;
             }
             resolve();
           };
@@ -690,6 +962,7 @@
             return;
           }
           source.start(0);
+          const contextStartedAt = Number(ctx.currentTime || 0);
           contextPlaybackStarted = true;
           state.ttsContextSpeaking = true;
           markedSpeaking = true;
@@ -714,11 +987,33 @@
               onPlaybackStart({
                 source: "context_tts",
                 playbackGeneration,
-                sessionId: Number(debugContext.sessionId || 0)
+                sessionId: Number(debugContext.sessionId || 0),
+                durationMs
               });
             } catch (_) {
               // Optional playback hooks must not interrupt speech.
             }
+          }
+          if (typeof onPlaybackProgress === "function") {
+            contextProgressTimer = window.setInterval(() => {
+              if (resolved || !isCurrentTTSPlaybackGeneration(playbackGeneration)) return;
+              const elapsedMs = Math.max(0, Math.min(
+                durationMs,
+                Math.round((Number(ctx.currentTime || 0) - contextStartedAt) * 1000)
+              ));
+              try {
+                onPlaybackProgress({
+                  source: "context_tts",
+                  text: String(debugContext.speechText || debugContext.text || ""),
+                  elapsedMs,
+                  durationMs,
+                  playbackGeneration,
+                  sessionId: Number(debugContext.sessionId || 0)
+                });
+              } catch (_) {
+                // Subtitle timing hooks must never interrupt audio.
+              }
+            }, 50);
           }
           const contextSpeechText = sanitizeSpeakText(debugContext.speechText || debugContext.text || "");
           if (contextSpeechText) {
@@ -862,6 +1157,9 @@
       const onPlaybackStart = typeof opts.onPlaybackStart === "function"
         ? opts.onPlaybackStart
         : null;
+      const onPlaybackProgress = typeof opts.onPlaybackProgress === "function"
+        ? opts.onPlaybackProgress
+        : null;
       const url = URL.createObjectURL(blob);
       const audioPlaybackToken = Number(state.ttsAudioPlaybackToken || 0) + 1;
       state.ttsAudioPlaybackToken = audioPlaybackToken;
@@ -880,6 +1178,7 @@
         let failTimer = 0;
         let startupTimer = 0;
         let progressTimer = 0;
+        let subtitleProgressTimer = 0;
         let fallbackSpeechStarted = false;
         let playbackStartNotified = false;
         const notifyPlaybackStart = (source) => {
@@ -891,7 +1190,10 @@
             onPlaybackStart({
               source,
               playbackGeneration,
-              sessionId: Number(debugContext.sessionId || 0)
+              sessionId: Number(debugContext.sessionId || 0),
+              durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
+                ? Math.round(audio.duration * 1000)
+                : 0
             });
           } catch (_) {
             // Optional playback hooks must not interrupt speech.
@@ -959,6 +1261,10 @@
           if (progressTimer) {
             clearInterval(progressTimer);
             progressTimer = 0;
+          }
+          if (subtitleProgressTimer) {
+            clearInterval(subtitleProgressTimer);
+            subtitleProgressTimer = 0;
           }
           if (!isCurrentTTSPlaybackGeneration(playbackGeneration) || !isCurrentHtmlAudioPlayback()) {
             recordTTSDebugEvent("audio_stale_skip", {
@@ -1032,7 +1338,7 @@
             return;
           }
           beginFallbackSpeech();
-          const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart);
+          const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart, onPlaybackProgress);
           done(!!ok);
         };
         audio.oncanplay = () => recordTTSAudioEvent("audio_canplay", audio, debugContext);
@@ -1078,6 +1384,29 @@
             clearInterval(progressTimer);
             progressTimer = 0;
           }
+          if (subtitleProgressTimer) {
+            clearInterval(subtitleProgressTimer);
+            subtitleProgressTimer = 0;
+          }
+          if (typeof onPlaybackProgress === "function") {
+            subtitleProgressTimer = window.setInterval(() => {
+              if (settled || !isCurrentHtmlAudioPlayback()) return;
+              try {
+                onPlaybackProgress({
+                  source: "server_tts",
+                  text: speechText,
+                  elapsedMs: Math.max(0, Math.round(Number(audio.currentTime || 0) * 1000)),
+                  durationMs: Number.isFinite(Number(audio.duration)) && audio.duration > 0
+                    ? Math.round(audio.duration * 1000)
+                    : 0,
+                  playbackGeneration,
+                  sessionId: Number(debugContext.sessionId || 0)
+                });
+              } catch (_) {
+                // Subtitle timing hooks must never interrupt audio.
+              }
+            }, 50);
+          }
           // Some environments resolve play() but never advance currentTime.
           let lastProgressAt = performance.now();
           let lastCurrentTime = Number(audio.currentTime || 0);
@@ -1107,7 +1436,7 @@
               return;
             }
             beginFallbackSpeech();
-            const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart);
+            const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart, onPlaybackProgress);
             done(!!ok);
           }, 650);
           beginSpeechPerformance(speechText, speechMood, speechStyle, {
@@ -1142,7 +1471,7 @@
                   return;
                 }
                 beginFallbackSpeech();
-                const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart);
+                const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart, onPlaybackProgress);
                 done(!!ok);
               });
             }
@@ -1166,7 +1495,7 @@
             return;
           }
           beginFallbackSpeech();
-          const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart);
+          const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart, onPlaybackProgress);
           done(!!ok);
         });
         armFailTimer(45000);
@@ -1182,7 +1511,7 @@
               return;
             }
             beginFallbackSpeech();
-            const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart);
+            const ok = await playAudioByContext(blob, contextPlaybackDebugContext, notifyPlaybackStart, onPlaybackProgress);
             done(!!ok);
           }
         }, 3200);
@@ -1224,6 +1553,28 @@
           traceId: perfTraceId || "(none)",
           textChars: cleaned.length
         });
+        if (state.gptSovitsStreamPlayback === true && opts.allowStreamPlayback !== false) {
+          const streamResult = await playServerTTSStream(cleaned, {
+            ...opts,
+            perfTraceId,
+            playbackGeneration
+          });
+          if (streamResult.ok) return true;
+          if (streamResult.cancelled) {
+            if (opts.requestOutcome && typeof opts.requestOutcome === "object") opts.requestOutcome.cancelled = true;
+            return false;
+          }
+          if (streamResult.started) {
+            // Never replay an utterance after any streaming audio may have been heard.
+            return false;
+          }
+          recordTTSDebugEvent("pcm_stream_buffered_fallback", {
+            traceId: perfTraceId || "(none)",
+            sessionId: Number(opts.sessionId || 0),
+            result: "fallback_before_start",
+            error: streamResult.error || ""
+          });
+        }
         const blob = await requestServerTTSBlobWithRetry(cleaned, opts.prosody || null, {
           retries: Number.isFinite(Number(opts.retries))
             ? Number(opts.retries)
@@ -1267,7 +1618,8 @@
           perfSpeakStartedPerfMs: speakStartedPerfMs,
           playbackGeneration,
           sessionId: Number(opts.sessionId || 0),
-          onPlaybackStart: typeof opts.onPlaybackStart === "function" ? opts.onPlaybackStart : null
+          onPlaybackStart: typeof opts.onPlaybackStart === "function" ? opts.onPlaybackStart : null,
+          onPlaybackProgress: typeof opts.onPlaybackProgress === "function" ? opts.onPlaybackProgress : null
         });
       } catch (err) {
         if (isServerTTSRequestCancelled(err, opts)) {
@@ -1301,7 +1653,9 @@
         state.ttsServerAvailable = false;
         state.ttsServerFailStreak = Math.max(0, Number(state.ttsServerFailStreak) || 0) + 1;
         state.ttsServerLastError = String(err?.message || err || "");
-        setStatus("语音服务未就绪");
+        if (!state.serverTTSFallbackToBrowser) {
+          setStatus("语音服务未就绪");
+        }
         return false;
       }
     }
@@ -1316,12 +1670,16 @@
         playbackGeneration: Number(opts.playbackGeneration || state.ttsPlaybackGeneration || 0)
       };
       if (isServerTTSProvider(state.ttsProvider)) {
-        // Always retry even if a previous call failed - GPT-SoVITS may have started later.
+        if (!shouldAttemptServerTTS()) {
+          recordTTSDebugEvent("server_tts_recovery_probe_deferred", {
+            provider: String(state.ttsProvider || ""),
+            nextProbeAt: Number(state.ttsServerNextRecoveryProbeAt || 0)
+          });
+          return await speakByBrowser(text, speakOpts);
+        }
         const ok = await speakByServer(text, speakOpts);
         if (ok) {
-          state.ttsServerAvailable = true;
-          state.ttsServerFailStreak = 0;
-          state.ttsServerLastError = "";
+          markServerTTSRecovered();
           return true;
         }
         if (requestOutcome.cancelled === true || speakOpts.signal?.aborted === true) {
@@ -1352,6 +1710,7 @@
         const lastErrLower = lastErr.toLowerCase();
         const immediateBrowserFallback =
           state.ttsProvider === "gpt_sovits" ||
+          state.ttsProvider === "qwen3_tts" ||
           lastErrLower.includes("connection failed") ||
           lastErrLower.includes("network") ||
           lastErrLower.includes("timeout") ||
@@ -1359,6 +1718,7 @@
           lastErrLower.includes("empty audio") ||
           /^http\s+5\d\d$/i.test(lastErr);
         if (immediateBrowserFallback) {
+          markServerTTSFallback(lastErr);
           console.warn("Server TTS immediate fallback -> browser TTS", {
             provider: state.ttsProvider,
             streak: failStreak,
@@ -1392,6 +1752,7 @@
           return false;
         }
         // Server TTS failed: fallback to browser speech when enabled.
+        markServerTTSFallback(lastErr);
         console.warn("Server TTS fallback -> browser TTS", {
           provider: state.ttsProvider,
           streak: failStreak,
@@ -1417,8 +1778,12 @@
       abortServerTTSRequests,
       requestServerTTSBlob,
       requestServerTTSBlobWithRetry,
+      playServerTTSStream,
       playAudioByContext,
       playAudioBlob,
+      shouldAttemptServerTTS,
+      markServerTTSFallback,
+      markServerTTSRecovered,
       speakByServer,
       speakByBrowser,
       speak

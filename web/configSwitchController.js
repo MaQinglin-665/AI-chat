@@ -47,6 +47,14 @@
       gpt_sovits_api_url: "http://127.0.0.1:9880/tts"
     },
     {
+      id: "qwen3_tts",
+      label: "Qwen3-TTS",
+      provider: "qwen3_tts",
+      voice: "A2_Original",
+      qwen3_tts_api_url: "http://127.0.0.1:9881/v1/audio/speech",
+      qwen3_tts_model: "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
+    },
+    {
       id: "volcengine_tts",
       label: "Volcengine TTS",
       provider: "volcengine_tts",
@@ -91,6 +99,10 @@
       gptSovitsUrl: byId("config-switch-gpt-sovits-url"),
       gptSovitsTimeoutRow: byId("config-switch-gpt-sovits-timeout-row"),
       gptSovitsTimeout: byId("config-switch-gpt-sovits-timeout"),
+      qwen3TtsRow: byId("config-switch-qwen3-tts-row"),
+      qwen3TtsUrl: byId("config-switch-qwen3-tts-url"),
+      qwen3TtsTimeoutRow: byId("config-switch-qwen3-tts-timeout-row"),
+      qwen3TtsTimeout: byId("config-switch-qwen3-tts-timeout"),
       volcengineUrlRow: byId("config-switch-volcengine-url-row"),
       volcengineUrl: byId("config-switch-volcengine-url"),
       volcengineClusterRow: byId("config-switch-volcengine-cluster-row"),
@@ -322,12 +334,19 @@
     function updateTtsFields() {
       const provider = getValue(ui.ttsProvider) || "browser";
       const isGptSovits = provider === "gpt_sovits";
+      const isQwen3Tts = provider === "qwen3_tts";
       const isVolcengine = provider === "volcengine_tts" || provider === "volcengine";
       if (ui.gptSovitsRow) {
         ui.gptSovitsRow.hidden = !isGptSovits;
       }
       if (ui.gptSovitsTimeoutRow) {
         ui.gptSovitsTimeoutRow.hidden = !isGptSovits;
+      }
+      if (ui.qwen3TtsRow) {
+        ui.qwen3TtsRow.hidden = !isQwen3Tts;
+      }
+      if (ui.qwen3TtsTimeoutRow) {
+        ui.qwen3TtsTimeoutRow.hidden = !isQwen3Tts;
       }
       if (ui.volcengineUrlRow) {
         ui.volcengineUrlRow.hidden = !isVolcengine;
@@ -344,6 +363,15 @@
       }
       if (isGptSovits && !getValue(ui.gptSovitsTimeout)) {
         setValue(ui.gptSovitsTimeout, "60");
+      }
+      if (isQwen3Tts && !getValue(ui.qwen3TtsUrl)) {
+        setValue(
+          ui.qwen3TtsUrl,
+          preset.qwen3_tts_api_url || "http://127.0.0.1:9881/v1/audio/speech"
+        );
+      }
+      if (isQwen3Tts && !getValue(ui.qwen3TtsTimeout)) {
+        setValue(ui.qwen3TtsTimeout, "60");
       }
       if (isVolcengine && !getValue(ui.volcengineUrl)) {
         setValue(ui.volcengineUrl, preset.api_url || "https://openspeech.bytedance.com/api/v1/tts");
@@ -379,6 +407,8 @@
       setValue(ui.ttsVoice, preset.voice || "");
       setValue(ui.gptSovitsUrl, preset.gpt_sovits_api_url || "");
       setValue(ui.gptSovitsTimeout, "60");
+      setValue(ui.qwen3TtsUrl, preset.qwen3_tts_api_url || "");
+      setValue(ui.qwen3TtsTimeout, "60");
       setValue(ui.volcengineUrl, preset.api_url || "");
       setValue(ui.volcengineCluster, preset.cluster || "");
       updateTtsFields();
@@ -461,6 +491,8 @@
       setValue(ui.ttsVoice, tts.voice || findTtsPreset(tts.provider || "browser")?.voice || "");
       setValue(ui.gptSovitsUrl, tts.gpt_sovits_api_url || "http://127.0.0.1:9880/tts");
       setValue(ui.gptSovitsTimeout, tts.gpt_sovits_timeout_sec || "60");
+      setValue(ui.qwen3TtsUrl, tts.qwen3_tts_api_url || "http://127.0.0.1:9881/v1/audio/speech");
+      setValue(ui.qwen3TtsTimeout, tts.qwen3_tts_timeout_sec || "60");
       setValue(ui.ttsStreamMode, ["final_only", "realtime"].includes(tts.stream_mode) ? tts.stream_mode : "realtime");
       setValue(ui.volcengineUrl, tts.api_url || "https://openspeech.bytedance.com/api/v1/tts");
       setValue(ui.volcengineCluster, tts.cluster || "volcano_icl");
@@ -503,6 +535,8 @@
           stream_mode: getValue(ui.ttsStreamMode) || "realtime",
           gpt_sovits_api_url: getValue(ui.gptSovitsUrl),
           gpt_sovits_timeout_sec: getNumberValue(ui.gptSovitsTimeout, 60, 1, 180),
+          qwen3_tts_api_url: getValue(ui.qwen3TtsUrl),
+          qwen3_tts_timeout_sec: getNumberValue(ui.qwen3TtsTimeout, 60, 1, 180),
           api_url: getValue(ui.volcengineUrl),
           cluster: getValue(ui.volcengineCluster),
           allow_browser_fallback: ui.ttsBrowserFallback?.checked === true
@@ -592,7 +626,6 @@
         });
         const elapsed = Math.round(Number(data.elapsed_ms) || 0);
         setText(ui.status, data.ok === true ? `模型测试通过（${elapsed}ms）。` : "模型测试未返回文本。");
-        appendMessage("assistant", `模型测试：${data.ok === true ? "通过" : "失败"}（${elapsed}ms）`, { enableTranslation: false });
         return data;
       } finally {
         setBusy([ui.testLlmBtn], false);
@@ -634,7 +667,6 @@
           });
           await playAudioBlob(blob);
           setText(ui.status, "当前表单语音测试通过，已播放测试音频。");
-          appendMessage("assistant", "语音测试通过：当前表单配置可以生成音频。", { enableTranslation: false });
           return { ok: true };
         }
         if (typeof runVoiceTestAndAppendReport === "function") {

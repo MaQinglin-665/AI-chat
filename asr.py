@@ -159,6 +159,21 @@ def get_vosk_model(model_root=None):
     return cached
 
 
+def preload_vosk_models(asr_config=None):
+    cfg = asr_config if isinstance(asr_config, dict) else {}
+    paths = resolve_vosk_model_paths(cfg)
+    mode = normalize_vosk_language_mode(cfg.get("input_language_mode", "auto"))
+    languages = (mode,) if mode in VOSK_LANGUAGES else VOSK_LANGUAGES
+    loaded = []
+    for language in languages:
+        path = paths.get(language)
+        if not path or not Path(path).is_dir():
+            continue
+        get_vosk_model(path)
+        loaded.append(language)
+    return tuple(loaded)
+
+
 def _transcribe_with_model(pcm16_bytes, sample_rate, model, language):
     recognizer = vosk.KaldiRecognizer(model, float(sample_rate))
     if hasattr(recognizer, "SetWords"):

@@ -13,11 +13,42 @@
     const detectMood = typeof deps.detectMood === "function" ? deps.detectMood : () => "idle";
     const isSpeechMotionActive = typeof deps.isSpeechMotionActive === "function" ? deps.isSpeechMotionActive : () => false;
     const isSpeakingNow = typeof deps.isSpeakingNow === "function" ? deps.isSpeakingNow : () => false;
+    const resolveHiyoriAuthoredMotion = typeof deps.resolveHiyoriAuthoredMotion === "function"
+      ? deps.resolveHiyoriAuthoredMotion
+      : () => null;
     const hiyoriEmotionOverlayController = deps.hiyoriEmotionOverlayController || null;
+    const hiyoriPerformanceDirectorApi = deps.hiyoriPerformanceDirector || {};
+    const hiyoriPerformanceDirector = typeof hiyoriPerformanceDirectorApi.createController === "function"
+      ? hiyoriPerformanceDirectorApi.createController({ state, performanceObject: performance })
+      : null;
     const LIVE2D_EXPRESSION_TUNING = deps.live2dExpressionTuning || {};
     const STYLE_EXPRESSION_PROFILE = deps.styleExpressionProfile || LIVE2D_EXPRESSION_TUNING.STYLE_EXPRESSION_PROFILE || { neutral: { mouthForm: 0, cheek: 0, eyeSmile: 0, browY: 0, browAngle: 0, headX: 0, headY: 0, bodyX: 0, floatScale: 1 } };
     const MOTION_INTENSITY_PRESETS = deps.motionIntensityPresets || { normal: { idleIntervalScale: 1, talkChance: 1, comboChance: 0.4, tapChance: 1, listenChance: 0.8, thinkingComboChance: 0.46, idleComboChance: 0.3, replyAccentChance: 0.42, talkMaxBeats: 3 } };
     const MODEL_MOTION_PROFILES = deps.modelMotionProfiles || {};
+    const parameterIndexCache = new WeakMap();
+
+    function getCachedParameterIndex(core, id) {
+      if (!core || !id || typeof core.getParameterIndex !== "function") {
+        return -1;
+      }
+      let cache = parameterIndexCache.get(core);
+      if (!cache) {
+        cache = new Map();
+        parameterIndexCache.set(core, cache);
+      }
+      if (cache.has(id)) {
+        return cache.get(id);
+      }
+      try {
+        const index = Number(core.getParameterIndex(id));
+        const resolved = Number.isInteger(index) && index >= 0 ? index : -1;
+        cache.set(id, resolved);
+        return resolved;
+      } catch (_) {
+        cache.set(id, -1);
+        return -1;
+      }
+    }
 
     function normalizeMotionIntensity(level) {
       const x = String(level || "normal").trim().toLowerCase();
@@ -64,6 +95,73 @@
 
     function getCoreModel() {
       return state.model?.internalModel?.coreModel || null;
+    }
+
+    function isHiyoriPerformanceProfile() {
+      return String(state.modelProfileName || detectModelProfileName()) === "hiyori_pro_t11";
+    }
+
+    function requestPerformanceMode(mode, opts = {}) {
+      if (!hiyoriPerformanceDirector || !isHiyoriPerformanceProfile()) {
+        return "idle";
+      }
+      return hiyoriPerformanceDirector.requestMode(mode, opts);
+    }
+
+    function triggerSemanticAction(action, opts = {}) {
+      if (!hiyoriPerformanceDirector || !isHiyoriPerformanceProfile()) {
+        return false;
+      }
+      return hiyoriPerformanceDirector.triggerAction(action, opts);
+    }
+
+    function applyHiyoriPerformanceLayer(core, context = {}) {
+      if (!core || !hiyoriPerformanceDirector || !isHiyoriPerformanceProfile()) {
+        return null;
+      }
+      const sample = hiyoriPerformanceDirector.sample(context);
+      const now = Number(context.now || performance.now());
+      const authoredMotionActive = now <= Number(state.hiyoriAuthoredMotionUntil || 0)
+        && (
+          !Number(state.hiyoriAuthoredMotion?.playbackGeneration || 0)
+          || Number(state.hiyoriAuthoredMotion.playbackGeneration) === Number(state.ttsPlaybackGeneration || 0)
+        );
+      for (const id in (sample.parameters || {})) {
+        const value = sample.parameters[id];
+        const face = /Eye|Brow|Mouth|Cheek/.test(id);
+        const gain = authoredMotionActive
+          ? (face ? 0.28 : (/Arm|Hand/.test(id) ? 0.08 : 0.1))
+          : (face ? 0.48 : (/Arm|Hand/.test(id) ? 0.34 : 0.52));
+        safeAddParamValue(core, id, value, gain);
+      }
+      const debugSignature = `${sample.mode}|${sample.emotion}|${sample.action}|${sample.outgoingAction}|${sample.idle}`;
+      const debugDue = debugSignature !== String(state.hiyoriPerformanceDebugSignature || "")
+        || Number(sample.at || 0) - Number(state.hiyoriPerformanceDebugSampledAt || 0) >= 120;
+      if (debugDue) {
+        const channels = {};
+        for (const id of [
+          "ParamAngleX", "ParamAngleY", "ParamAngleZ",
+          "ParamBodyAngleX", "ParamBodyAngleY", "ParamBodyAngleZ", "ParamShoulder",
+          "ParamEyeLOpen", "ParamEyeLSmile", "ParamBrowLY", "ParamMouthForm", "ParamCheek"
+        ]) {
+          if (Object.prototype.hasOwnProperty.call(sample.parameters || {}, id)) {
+            channels[id] = Number(Number(sample.parameters[id] || 0).toFixed(4));
+          }
+        }
+        state.hiyoriPerformanceDebugSignature = debugSignature;
+        state.hiyoriPerformanceDebugSampledAt = Number(sample.at || 0);
+        state.hiyoriPerformanceDebug = {
+          mode: sample.mode,
+          emotion: sample.emotion,
+          action: sample.action,
+          outgoingAction: sample.outgoingAction,
+          idle: sample.idle,
+          parameterCount: sample.parameterCount,
+          channels,
+          at: sample.at
+        };
+      }
+      return sample;
     }
 
     function getListeningPresenceState(now = performance.now()) {
@@ -143,8 +241,19 @@
         return;
       }
       const d = Number(delta);
-      const w = Number.isFinite(Number(weight)) ? Number(weight) : 1;
+      const bodyChannel = /^(?:ParamAngle[XYZ]|ParamBodyAngle[XYZ]|ParamShoulder|ParamArmL[AB]|ParamArmR[AB]|ParamHand[LR])$/.test(id);
+      const legacyBodyMix = bodyChannel
+        ? clampNumber(Number(state.hiyoriLegacyBodyMix ?? 1), 0, 1)
+        : 1;
+      const w = (Number.isFinite(Number(weight)) ? Number(weight) : 1) * legacyBodyMix;
       try {
+        if (typeof core.addParameterValueByIndex === "function") {
+          const index = getCachedParameterIndex(core, id);
+          if (index >= 0) {
+            core.addParameterValueByIndex(index, d, w);
+            return;
+          }
+        }
         if (typeof core.addParameterValueById === "function") {
           core.addParameterValueById(id, d, w);
           return;
@@ -171,6 +280,20 @@
       let apiTarget = v;
       try {
         if (
+          typeof core.getParameterValueByIndex === "function"
+          && typeof core.setParameterValueByIndex === "function"
+          && getCachedParameterIndex(core, id) >= 0
+        ) {
+          const index = getCachedParameterIndex(core, id);
+          if (w >= 0.999) {
+            apiTarget = v;
+          } else {
+            const cur = Number(core.getParameterValueByIndex(index) || 0);
+            apiTarget = cur + (v - cur) * w;
+          }
+          core.setParameterValueByIndex(index, apiTarget, 1);
+          apiApplied = true;
+        } else if (
           typeof core.getParameterValueById === "function"
           && typeof core.setParameterValueById === "function"
         ) {
@@ -190,7 +313,13 @@
       }
       if (apiApplied) {
         try {
-          if (typeof core.getParameterValueById === "function") {
+          const index = getCachedParameterIndex(core, id);
+          if (index >= 0 && typeof core.getParameterValueByIndex === "function") {
+            const after = Number(core.getParameterValueByIndex(index));
+            if (Number.isFinite(after) && Math.abs(after - apiTarget) <= 0.0015) {
+              return;
+            }
+          } else if (typeof core.getParameterValueById === "function") {
             const after = Number(core.getParameterValueById(id));
             if (Number.isFinite(after) && Math.abs(after - apiTarget) <= 0.0015) {
               return;
@@ -223,6 +352,15 @@
         return NaN;
       }
       try {
+        if (typeof core.getParameterValueByIndex === "function") {
+          const index = getCachedParameterIndex(core, id);
+          if (index >= 0) {
+            const v = Number(core.getParameterValueByIndex(index));
+            if (Number.isFinite(v)) {
+              return v;
+            }
+          }
+        }
         if (typeof core.getParameterValueById === "function") {
           const v = Number(core.getParameterValueById(id));
           if (Number.isFinite(v)) {
@@ -396,9 +534,9 @@
       const emotion = String(cue.emotion || "neutral");
       const intensity = String(cue.intensity || "medium");
       const intensityGain = intensity === "high" ? 0.46 : (intensity === "low" ? -0.28 : 0);
-      const emotionGain = ["happy", "playful", "surprised"].includes(emotion)
+      const emotionGain = ["happy", "playful", "excited", "surprised"].includes(emotion)
         ? 0.34
-        : (["sad", "anxious"].includes(emotion) ? -0.18 : 0.06);
+        : (["hurt", "sad", "anxious"].includes(emotion) ? -0.18 : 0.06);
       const explicitVisibleMotion = Number(cue.visibleMotion);
       const visibleMotion = Number.isFinite(explicitVisibleMotion)
         ? clampNumber(explicitVisibleMotion, 0.65, 3.2)
@@ -413,6 +551,9 @@
             0.65,
             3.2
           );
+      const resolvedAuthoredMotion = cue.authoredMotion && typeof cue.authoredMotion === "object"
+        ? cue.authoredMotion
+        : resolveHiyoriAuthoredMotion(emotion, cue.action || "none", intensity);
       return {
         version: 1,
         emotion,
@@ -426,7 +567,15 @@
         visibleMotion,
         holdMs: Math.max(500, Math.min(2200, Math.round(Number(speech.holdMs ?? cue.holdMs) || 900))),
         pulseBoost: clampNumber(Number(speech.pulseBoost ?? cue.pulseBoost) || 0.28, 0.12, 0.62),
-        pulseMs: Math.max(120, Math.min(480, Math.round(Number(speech.pulseMs ?? cue.pulseMs) || 220)))
+        pulseMs: Math.max(120, Math.min(480, Math.round(Number(speech.pulseMs ?? cue.pulseMs) || 220))),
+        authoredMotion: resolvedAuthoredMotion && typeof resolvedAuthoredMotion === "object"
+          ? {
+              group: String(resolvedAuthoredMotion.group || ""),
+              file: String(resolvedAuthoredMotion.file || ""),
+              durationMs: Math.max(0, Math.round(Number(resolvedAuthoredMotion.durationMs) || 0)),
+              cooldownMs: Math.max(0, Math.round(Number(resolvedAuthoredMotion.cooldownMs) || 0))
+            }
+          : null
       };
     }
 
@@ -448,6 +597,12 @@
         joy: "happy",
         cheerful: "happy",
         smile: "happy",
+        excited: "happy",
+        shy: "playful",
+        embarrassed: "playful",
+        hurt: "sad",
+        aggrieved: "sad",
+        serious: "neutral",
         curious: "thinking",
         think: "thinking",
         worry: "anxious",
@@ -548,7 +703,11 @@
       const now = performance.now();
       const expressionMoodAliases = {
         playful: "happy",
-        anxious: "sad"
+        excited: "happy",
+        shy: "happy",
+        hurt: "sad",
+        anxious: "sad",
+        serious: "neutral"
       };
       const expressionMoodRaw = String(normalized.live2dMood || normalized.emotion || "idle");
       const expressionMood = ["happy", "sad", "angry", "surprised", "thinking"].includes(expressionMoodRaw)
@@ -587,6 +746,51 @@
       if (normalized.pulseBoost > 0) {
         triggerExpressionPulse(normalized.live2dMood || normalized.emotion || "neutral", normalized.pulseBoost, normalized.pulseMs);
       }
+      const semanticSignature = `${normalized.emotion}|${normalized.action}|${normalized.intensity}`;
+      if (state.hiyoriSemanticCueSignature !== semanticSignature || now - Number(state.hiyoriSemanticCueAt || 0) > 320) {
+        state.hiyoriSemanticCueSignature = semanticSignature;
+        state.hiyoriSemanticCueAt = now;
+        const semanticCandidate = normalized.action !== "none"
+          ? normalized.action
+          : (
+              normalized.emotion === "surprised"
+                ? "lean_back"
+                : (["happy", "excited"].includes(normalized.emotion) && normalized.intensity === "high")
+                  ? "happy_bounce"
+                  : normalized.emotion === "shy"
+                    ? "shy_glance"
+                    : normalized.emotion === "hurt"
+                      ? "care_lean"
+                      : ""
+            );
+        if (semanticCandidate) {
+          const hiyoriProfile = isHiyoriPerformanceProfile();
+          // Verified authored Hiyori motion3 files own the large body/arm
+          // gesture. The parameter director remains a subtle speech layer and
+          // must not start a competing semantic pose for the same cue.
+          if (hiyoriProfile && normalized.authoredMotion?.group) {
+            normalized.motionOwnership = "authored";
+          } else if (hiyoriProfile) {
+            normalized.motionOwnership = "semantic";
+            triggerSemanticAction(semanticCandidate, {
+              now,
+              priority: normalized.intensity === "high" ? 4 : 3,
+              intensity: normalized.intensity === "high" ? 1.25 : (normalized.intensity === "low" ? 0.72 : 1),
+              source: "speech_cue"
+            });
+          } else {
+            triggerSemanticAction(semanticCandidate, {
+              now,
+              priority: normalized.intensity === "high" ? 4 : 3,
+              intensity: normalized.intensity === "high" ? 1.25 : (normalized.intensity === "low" ? 0.72 : 1),
+              source: "speech_cue"
+            });
+          }
+        }
+      }
+      if (normalized.emotion === "thinking") {
+        requestPerformanceMode("think", { now, holdMs: normalized.holdMs });
+      }
       applyLive2DModelExpression(selectModelExpressionName(normalized), "performance_cue");
       return normalized;
     }
@@ -611,7 +815,11 @@
       const cue = state.speechPerformanceCue && typeof state.speechPerformanceCue === "object"
         ? state.speechPerformanceCue
         : null;
-      if (!cue || now > Number(state.speechPerformanceCueUntil || 0)) {
+      if (!cue) {
+        return null;
+      }
+      if (now > Number(state.speechPerformanceCueUntil || 0)) {
+        clearSpeechPerformanceCue();
         return null;
       }
       return cue;
@@ -644,7 +852,7 @@
       const emotion = String(cue.emotion || "neutral");
       const seed = Number.isFinite(Number(state.speechAnimSeed)) ? Number(state.speechAnimSeed) : 0.8;
       const styleBoost = style === "playful" ? 1.18 : (style === "clear" ? 1.08 : (style === "comfort" ? 0.78 : 1));
-      const isBright = ["happy", "playful", "surprised"].includes(emotion);
+      const isBright = ["happy", "playful", "excited", "surprised"].includes(emotion);
       const attackT = phase === "attack" ? clampNumber(phaseAge / 360, 0, 1) : 0;
       const attackPop = Math.sin(attackT * Math.PI);
       const thinkingSnapT = emotion === "thinking" && phase === "attack"
@@ -664,7 +872,7 @@
         0,
         1.45
       );
-      const slowEmotionDamp = ["sad", "anxious"].includes(emotion) ? 0.58 : 1;
+      const slowEmotionDamp = ["hurt", "sad", "anxious"].includes(emotion) ? 0.58 : 1;
       const bodySwing = wave * (1.4 + visibleMotion * 1.08) * envelope * bodyBoost * slowEmotionDamp;
       const bodyLift = (0.72 + bounce * 0.9 + attackPop * 1.12) * visibleMotion * envelope * 0.62 * slowEmotionDamp;
       const headCounter = -wave * (0.92 + visibleMotion * 0.52) * envelope * slowEmotionDamp;
@@ -686,8 +894,8 @@
       if (emotion !== "thinking") {
         restoreSpeechEmotionPartPose(core);
       }
-      if (emotion === "happy" || emotion === "playful") {
-        const playfulGain = emotion === "playful" ? 1.16 : 1;
+      if (emotion === "happy" || emotion === "playful" || emotion === "excited") {
+        const playfulGain = emotion === "excited" ? 1.28 : (emotion === "playful" ? 1.16 : 1);
         const tease = emotion === "playful" ? Math.sin(now / 310 + seed * 1.21) : 0;
         safeAddParamValue(core, "ParamEyeLSmile", 0.98 * poseGain, 0.96);
         safeAddParamValue(core, "ParamEyeRSmile", 0.98 * poseGain, 0.96);
@@ -783,27 +991,54 @@
         safeAddParamValue(core, "ParamArmRB", (3.05 + clench * 0.86) * poseGain, 0.64);
         safeAddParamValue(core, "ParamHandL", (2.15 + clench * 0.92) * poseGain, 0.76);
         safeAddParamValue(core, "ParamHandR", (-2.15 - clench * 0.92) * poseGain, 0.76);
-      } else if (emotion === "sad" || emotion === "anxious") {
+      } else if (emotion === "shy") {
+        const shyGlance = Math.sin(now / 430 + seed * 0.77);
+        safeAddParamValue(core, "ParamEyeLSmile", 0.58 * poseGain, 0.72);
+        safeAddParamValue(core, "ParamEyeRSmile", 0.58 * poseGain, 0.72);
+        safeAddParamValue(core, "ParamCheek", 1.15 * poseGain, 0.9);
+        safeAddParamValue(core, "ParamMouthForm", 0.28 * poseGain, 0.62);
+        safeAddParamValue(core, "ParamEyeBallX", -0.48 * poseGain + shyGlance * 0.12, 0.48);
+        safeAddParamValue(core, "ParamEyeBallY", -0.14 * poseGain, 0.42);
+        safeAddParamValue(core, "ParamAngleX", -2.4 * poseGain, 0.42);
+        safeAddParamValue(core, "ParamAngleZ", -4.1 * poseGain + shyGlance * 0.5, 0.48);
+        safeAddParamValue(core, "ParamBodyAngleX", -1.2 * poseGain, 0.38);
+        safeAddParamValue(core, "ParamBodyAngleZ", 2.2 * poseGain, 0.42);
+        safeAddParamValue(core, "ParamShoulder", 0.24 * poseGain, 0.48);
+        safeAddParamValue(core, "ParamArmLA", -1.15 * poseGain, 0.34);
+        safeAddParamValue(core, "ParamArmRA", 1.15 * poseGain, 0.34);
+      } else if (emotion === "hurt" || emotion === "sad" || emotion === "anxious") {
         const anxiousGain = emotion === "anxious" ? 1.14 : 1;
         const slowTension = Math.sin(now / 360 + seed * 0.72);
         const inward = 0.62 + bounce * 0.22;
         safeAddParamValue(core, "ParamEyeLSmile", -0.24 * poseGain, 0.6);
         safeAddParamValue(core, "ParamEyeRSmile", -0.24 * poseGain, 0.6);
-        safeAddParamValue(core, "ParamBrowLY", emotion === "sad" ? -0.48 * poseGain : -0.22 * poseGain, 0.72);
-        safeAddParamValue(core, "ParamBrowRY", emotion === "sad" ? -0.48 * poseGain : -0.22 * poseGain, 0.72);
+        const loweredBrow = emotion === "anxious" ? -0.22 : (emotion === "hurt" ? -0.62 : -0.48);
+        safeAddParamValue(core, "ParamBrowLY", loweredBrow * poseGain, 0.72);
+        safeAddParamValue(core, "ParamBrowRY", loweredBrow * poseGain, 0.72);
         safeAddParamValue(core, "ParamBrowLForm", -0.36 * poseGain, 0.62);
         safeAddParamValue(core, "ParamBrowRForm", -0.36 * poseGain, 0.62);
         safeAddParamValue(core, "ParamMouthForm", -0.52 * poseGain, 0.72);
         safeAddParamValue(core, "ParamEyeBallY", -0.18 * poseGain, 0.42);
-        safeAddParamValue(core, "ParamAngleY", (emotion === "sad" ? 2.2 : 1.2) * poseGain, 0.42);
+        safeAddParamValue(core, "ParamAngleY", (emotion === "anxious" ? 1.2 : 2.2) * poseGain, 0.42);
         safeAddParamValue(core, "ParamBodyAngleX", (-1.75 - inward * 0.7) * poseGain, 0.42);
-        safeAddParamValue(core, "ParamShoulder", (emotion === "sad" ? -0.36 : 0.78 + Math.abs(slowTension) * 0.24) * poseGain * anxiousGain, 0.58);
+        safeAddParamValue(core, "ParamShoulder", (emotion === "anxious" ? 0.78 + Math.abs(slowTension) * 0.24 : -0.36) * poseGain * anxiousGain, 0.58);
         safeAddParamValue(core, "ParamArmLA", (-0.72 - inward * 0.36) * poseGain * anxiousGain, 0.34);
         safeAddParamValue(core, "ParamArmRA", (0.72 + inward * 0.36) * poseGain * anxiousGain, 0.34);
         safeAddParamValue(core, "ParamArmLB", (emotion === "anxious" ? 1.95 + Math.abs(slowTension) * 0.58 : 0.52) * poseGain, 0.44);
         safeAddParamValue(core, "ParamArmRB", (emotion === "anxious" ? -1.95 - Math.abs(slowTension) * 0.58 : -0.52) * poseGain, 0.44);
         safeAddParamValue(core, "ParamHandL", (emotion === "anxious" ? 0.74 + Math.abs(slowTension) * 0.3 : 0.18) * poseGain, 0.4);
         safeAddParamValue(core, "ParamHandR", (emotion === "anxious" ? -0.74 - Math.abs(slowTension) * 0.3 : -0.18) * poseGain, 0.4);
+      } else if (emotion === "serious") {
+        safeAddParamValue(core, "ParamEyeLOpen", 0.08 * poseGain, 0.54);
+        safeAddParamValue(core, "ParamEyeROpen", 0.08 * poseGain, 0.54);
+        safeAddParamValue(core, "ParamBrowLY", -0.24 * poseGain, 0.62);
+        safeAddParamValue(core, "ParamBrowRY", -0.24 * poseGain, 0.62);
+        safeAddParamValue(core, "ParamBrowLAngle", -0.2 * poseGain, 0.58);
+        safeAddParamValue(core, "ParamBrowRAngle", 0.2 * poseGain, 0.58);
+        safeAddParamValue(core, "ParamMouthForm", -0.16 * poseGain, 0.5);
+        safeAddParamValue(core, "ParamAngleY", -0.72 * poseGain, 0.38);
+        safeAddParamValue(core, "ParamBodyAngleY", 0.84 * poseGain, 0.4);
+        safeAddParamValue(core, "ParamShoulder", 0.14 * poseGain, 0.42);
       } else if (isBright) {
         const faceGain = expressionBoost * envelope;
         safeAddParamValue(core, "ParamCheek", 0.22 * faceGain, 0.64);
@@ -850,9 +1085,24 @@
       if (speechPerformanceCue?.live2dMood) {
         state.speechAnimMood = speechPerformanceCue.live2dMood;
       }
+      return speechPerformanceCue;
     }
 
     function endSpeechAnimation() {
+      const authoredMotion = state.hiyoriAuthoredMotion;
+      const authoredGeneration = Number(authoredMotion?.playbackGeneration || 0);
+      if (
+        authoredMotion
+        && (!authoredGeneration || authoredGeneration === Number(state.ttsPlaybackGeneration || 0))
+      ) {
+        try {
+          state.model?.internalModel?.motionManager?._stopAllMotions?.();
+        } catch (_) {
+          // Interruption cleanup is best-effort; audio cancellation must win.
+        }
+      }
+      state.hiyoriAuthoredMotion = null;
+      state.hiyoriAuthoredMotionUntil = 0;
       state.speechAnimUntil = 0;
       state.speechAnimStartedAt = 0;
       state.speechAnimDurationMs = 0;
@@ -872,6 +1122,7 @@
       const now = performance.now();
       const releaseMs = 260;
       const holdMs = 900;
+      const expressionReleaseMs = 380;
       state.speechAnimUntil = now + releaseMs;
       state.speechMouthTarget = 0;
       state.speechMouthUpdatedAt = now;
@@ -880,6 +1131,22 @@
       state.ttsAudioRms = 0;
       state.ttsAudioLastVoiceAt = 0;
       state.moodHoldUntil = Math.max(Number(state.moodHoldUntil || 0), now + holdMs);
+      if (state.speechPerformanceCue) {
+        state.speechPerformanceCueUntil = Math.min(
+          Number(state.speechPerformanceCueUntil || now + expressionReleaseMs),
+          now + expressionReleaseMs
+        );
+      }
+      if (state.speechEmotionPose) {
+        state.speechEmotionPoseUntil = Math.min(
+          Number(state.speechEmotionPoseUntil || now + expressionReleaseMs),
+          now + expressionReleaseMs
+        );
+      }
+      state.moodExpressionWeightUntil = Math.min(
+        Number(state.moodExpressionWeightUntil || now + expressionReleaseMs),
+        now + expressionReleaseMs
+      );
     }
 
     function ensureMicroMotionState(now = performance.now()) {
@@ -1016,8 +1283,11 @@
     }
 
     function sampleTTSAudioLevel() {
-      const analyser = state.ttsAudioAnalyser;
-      const data = state.ttsAudioAnalyserData;
+      const usePcmAnalyser = state.ttsPcmAudioAnalyserActive === true
+        && state.ttsPcmAudioAnalyser
+        && state.ttsPcmAudioAnalyserData;
+      const analyser = usePcmAnalyser ? state.ttsPcmAudioAnalyser : state.ttsAudioAnalyser;
+      const data = usePcmAnalyser ? state.ttsPcmAudioAnalyserData : state.ttsAudioAnalyserData;
       if (!analyser || !data || !data.length) {
         state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
         state.ttsAudioRawLevel = 0;
@@ -1080,6 +1350,34 @@
         1
       );
       state.speechMotionBlend = motionBlend;
+      const hiyoriOwnsBody = isHiyoriPerformanceProfile() && !!hiyoriPerformanceDirector;
+      const hiyoriActionActive = !!(
+        state.hiyoriDirector?.action
+        || state.hiyoriDirector?.outgoingAction
+      );
+      const hiyoriAuthoredMotionActive = now <= Number(state.hiyoriAuthoredMotionUntil || 0)
+        && (
+          !Number(state.hiyoriAuthoredMotion?.playbackGeneration || 0)
+          || Number(state.hiyoriAuthoredMotion.playbackGeneration) === Number(state.ttsPlaybackGeneration || 0)
+        );
+      const hiyoriModeActive = Number(listeningPresence.blend || 0) > 0.035
+        || (!speaking && (
+          String(state.speechAnimMood || "") === "thinking"
+          || (state.chatBusy === true && Number(state.speechAnimUntil || 0) <= now)
+        ));
+      const legacyBodyMixTarget = !hiyoriOwnsBody
+        ? 1
+        : (hiyoriAuthoredMotionActive ? 0.14 : (hiyoriActionActive ? 0.16 : (speaking ? 0.22 : (hiyoriModeActive ? 0.3 : 0.58))));
+      const legacyBodyMixPrevious = Number.isFinite(Number(state.hiyoriLegacyBodyMixSmoothed))
+        ? Number(state.hiyoriLegacyBodyMixSmoothed)
+        : legacyBodyMixTarget;
+      const legacyBodyMixFollow = 1 - Math.pow(1 - 0.085, dtFrames);
+      state.hiyoriLegacyBodyMixSmoothed = clampNumber(
+        legacyBodyMixPrevious + (legacyBodyMixTarget - legacyBodyMixPrevious) * legacyBodyMixFollow,
+        0.14,
+        1
+      );
+      state.hiyoriLegacyBodyMix = state.hiyoriLegacyBodyMixSmoothed;
       const smoothMotionOutput = (name, target, opts = {}) => {
         const key = `motion_smooth_${name}`;
         let prev = Number(state[key]);
@@ -1572,6 +1870,23 @@
         safeAddParamValue(core, "ParamArmLA", -0.04, 0.08);
         safeAddParamValue(core, "ParamArmRA", 0.04, 0.08);
       }
+      // The legacy micro-motion layer has now contributed its reduced base.
+      // Restore full weight before the Hiyori director and listening layers so
+      // their authored ownership is not attenuated by the compatibility mix.
+      state.hiyoriLegacyBodyMix = 1;
+      applyHiyoriPerformanceLayer(core, {
+        now,
+        speaking,
+        listeningBlend: listeningPresence.blend,
+        thinking: !speaking && !listeningPresence.effective && (
+          String(state.speechAnimMood || "") === "thinking"
+          || (state.chatBusy === true && Number(state.speechAnimUntil || 0) <= now)
+        ),
+        emotion: speechPerformanceCue?.emotion || state.speechAnimMood || "idle",
+        audioLevel: Number(state.ttsAudioLevel) || 0,
+        bodyEnergy: Number(state.speechBodyEnergy) || 0,
+        allowIdle: !state.dragData && !state.windowDragActive && !state.chatBusy
+      });
       applyListeningPresenceLayer(core, now, listeningPresence);
     }
 
@@ -1589,7 +1904,10 @@
         return state.speechMouthOpen;
       }
       const liveLevel = sampleTTSAudioLevel();
-      const hasLiveAudio = audioPlaying && !!state.ttsAudioAnalyser;
+      const hasLiveAudio = audioPlaying && (
+        (state.ttsPcmAudioAnalyserActive === true && !!state.ttsPcmAudioAnalyser)
+        || !!state.ttsAudioAnalyser
+      );
       const start = Number(state.speechAnimStartedAt || now);
       const duration = Math.max(260, Number(state.speechAnimDurationMs) || 1000);
       const progress = clampNumber((now - start) / duration, 0, 1.3);
@@ -1849,6 +2167,10 @@
       getActiveModelMotionProfile,
       getActiveModelCadence,
       getCoreModel,
+      isHiyoriPerformanceProfile,
+      requestPerformanceMode,
+      triggerSemanticAction,
+      applyHiyoriPerformanceLayer,
       getListeningPresenceState,
       applyListeningPresenceLayer,
       safeAddParamValue,

@@ -37,7 +37,8 @@ function makeController({
   resumeMicAfterAssistant = () => false,
   acknowledgeDeliveredTurnImpl = null,
   deliveryAckQueue = null,
-  getPendingDeliveryReceiptIds = () => []
+  getPendingDeliveryReceiptIds = () => [],
+  stopAllAudioPlaybackImpl = null
 }) {
   const state = chatState.createInitialState();
   state.companionTurnEnabled = companionTurnEnabled;
@@ -59,6 +60,7 @@ function makeController({
   const clearedPerformancePhases = [];
   const deliveryAcks = [];
   const deliveryLifecycle = [];
+  const stoppedAudio = [];
   const chatApi = {
     async streamAssistantReply(_payload, onDelta, options) {
       if (typeof streamAssistantReplyImpl === "function") {
@@ -189,7 +191,12 @@ function makeController({
     },
     maybePlayTalkGesture: typeof maybePlayTalkGesture === "function" ? maybePlayTalkGesture : () => {},
     setStatus: () => {},
-    stopAllAudioPlayback: () => {},
+    stopAllAudioPlayback: () => {
+      stoppedAudio.push(Date.now());
+      if (typeof stopAllAudioPlaybackImpl === "function") {
+        stopAllAudioPlaybackImpl();
+      }
+    },
     stopWakeWordListener: () => {},
     pauseMicForAssistant,
     resumeMicAfterAssistant,
@@ -229,7 +236,8 @@ function makeController({
     publishedPerformancePhases,
     clearedPerformancePhases,
     deliveryAcks,
-    deliveryLifecycle
+    deliveryLifecycle,
+    stoppedAudio
   };
 }
 
@@ -603,7 +611,7 @@ function makeCompanionTurn(text) {
   };
 }
 
-async function testCompanionPrewarmReusesOnlyConfirmedExactPrefix() {
+async function testCompanionPrewarmRequiresConfirmedTextAndSemanticCue() {
   const stablePrefix = "The first stable sentence is ready.";
   const finalReply = `${stablePrefix} The second part follows.`;
   const prewarmAudio = { size: 48, id: "prewarm-audio" };
@@ -646,13 +654,15 @@ async function testCompanionPrewarmReusesOnlyConfirmedExactPrefix() {
   streamOptions.onCompanionTurn(makeCompanionTurn(finalReply));
   stream.resolve(finalReply);
   assert.strictEqual(await request, true);
-  assert.strictEqual(harness.played.length, 1, "the confirmed prefix should reuse the prefetched blob once");
-  assert.strictEqual(harness.played[0].blob, prewarmAudio);
-  assert.strictEqual(harness.played[0].options.text, stablePrefix);
+  assert.strictEqual(
+    harness.played.length,
+    0,
+    "matching text with a different final emotion must discard the stale prewarm audio"
+  );
   assert.deepStrictEqual(
     harness.spoken.map((item) => item.text),
-    ["The second part follows."],
-    "only the remaining canonical tail should use normal speech"
+    [finalReply],
+    "the full canonical reply should be synthesized again with its confirmed emotion"
   );
 }
 
@@ -1100,6 +1110,71 @@ async function testCancelledOrFailedDeliveryNeverBreaksVisibleChat() {
   assert.strictEqual(failedAckHarness.rows.at(-1).text, "Visible despite ack failure.");
 }
 
+async function testOrderedContinuationWaitsForPriorAudioWithoutDroppingReply() {
+  const reply = "Second thought continues naturally after the first reply.";
+  const harness = makeController({
+    companionTurnEnabled: false,
+    emitTurn: false,
+    modelDirectReply: true,
+    ttsProvider: "qwen3_tts",
+    setTimeoutImpl: setTimeout,
+    clearTimeoutImpl: clearTimeout,
+    streamAssistantReplyImpl: async (_payload, onDelta) => {
+      onDelta(reply);
+      return reply;
+    }
+  });
+  harness.state.ttsContextSpeaking = true;
+  const request = harness.controller.requestAssistantReply("one more thing", {
+    showUser: false,
+    rememberUser: false,
+    rememberAssistant: false,
+    preservePriorSpeech: true,
+    interruptActive: false,
+    interruptTts: false
+  });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.strictEqual(harness.spoken.length, 0, "the later reply must not jump ahead of audible prior speech");
+  harness.state.ttsContextSpeaking = false;
+  assert.strictEqual(await request, true);
+  assert.strictEqual(harness.spoken.length, 1, "the later reply should speak once after the prior audio boundary");
+  assert.strictEqual(harness.spoken[0].text, reply);
+}
+
+async function testOrderedContinuationSurvivesThinkingAndSegmentSilence() {
+  const reply = "The queued thought still belongs after the earlier reply.";
+  const harness = makeController({
+    companionTurnEnabled: false,
+    emitTurn: false,
+    modelDirectReply: true,
+    ttsProvider: "qwen3_tts",
+    setTimeoutImpl: setTimeout,
+    clearTimeoutImpl: clearTimeout,
+    streamAssistantReplyImpl: async (_payload, onDelta) => {
+      onDelta(reply);
+      return reply;
+    }
+  });
+  harness.state.ttsContextSpeaking = false;
+  harness.state.streamSpeakWorking = false;
+  harness.state.speechPhase = "idle";
+  assert.strictEqual(await harness.controller.requestAssistantReply("and another thing", {
+    showUser: false,
+    rememberUser: false,
+    rememberAssistant: false,
+    preservePriorSpeech: true,
+    interruptActive: false,
+    interruptTts: false
+  }), true);
+  assert.strictEqual(
+    harness.stoppedAudio.length,
+    0,
+    "an explicit continuation must not invalidate the delivery chain during a thinking phase or segment gap"
+  );
+  assert.strictEqual(harness.spoken.length, 1);
+  assert.strictEqual(harness.spoken[0].text, reply);
+}
+
 async function main() {
   await testCompanionTurnDefersRealtimeTtsUntilFinalPlan();
   await testLegacyStreamKeepsRealtimeDeltaPath();
@@ -1110,7 +1185,7 @@ async function main() {
   await testBrowserVoiceTimelinePreservesTurnGenerationAcrossSegments();
   await testFailedDirectSpeechCannotStartSpeechTimelineOrGesture();
   await testLateStreamTimelineAttachesToNextActualSegment();
-  await testCompanionPrewarmReusesOnlyConfirmedExactPrefix();
+  await testCompanionPrewarmRequiresConfirmedTextAndSemanticCue();
   await testCompanionPrewarmMismatchFallsBackWithoutStaleAudio();
   await testFailedCompanionPrewarmUsesFinalSpeechOnce();
   await testInterruptedCompanionPrewarmAbortsAndLateBlobCannotPlay();
@@ -1122,6 +1197,8 @@ async function main() {
   await testDeliveredReplyAcknowledgesOnlyAfterVisibleFinalization();
   await testDeliveredReplyQueuesReceiptAndCarriesPendingBarrierIds();
   await testCancelledOrFailedDeliveryNeverBreaksVisibleChat();
+  await testOrderedContinuationWaitsForPriorAudioWithoutDroppingReply();
+  await testOrderedContinuationSurvivesThinkingAndSegmentSilence();
   console.log("Companion turn frontend contract checks passed.");
 }
 

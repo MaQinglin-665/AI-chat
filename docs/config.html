@@ -520,7 +520,7 @@
                 </label>
                 <label class="field switch-field">
                   <span>关闭硬件加速</span>
-                  <input type="checkbox" data-path="desktop.disable_hardware_acceleration" checked>
+                  <input type="checkbox" data-path="desktop.disable_hardware_acceleration">
                 </label>
                 <label class="field">
                   <span>宽度</span>
@@ -776,6 +776,28 @@
             <article id="cfg-asr" class="config-group card-like" data-advanced-section="true">
               <h2>ASR 与桌面观察</h2>
               <div class="field-grid three-col">
+                <label class="field">
+                  <span>本地语音识别</span>
+                  <select data-path="asr.provider">
+                    <option value="auto" selected>自动（FunASR，不可用时回退 Vosk）</option>
+                    <option value="funasr_hybrid">FunASR 高质量</option>
+                    <option value="vosk">Vosk 轻量模式</option>
+                  </select>
+                </label>
+                <label class="field switch-field">
+                  <span>实时显示识别文字</span>
+                  <input type="checkbox" data-path="asr.streaming_enabled" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>句尾高质量复核</span>
+                  <input type="checkbox" data-path="asr.final_refine_enabled" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>Silero 智能断句</span>
+                  <input type="checkbox" data-path="asr.silero_vad_enabled">
+                </label>
+              </div>
+              <div class="field-grid three-col">
                 <label class="field switch-field">
                   <span>显示麦克风电平</span>
                   <input type="checkbox" data-path="asr.show_mic_meter" checked>
@@ -802,7 +824,7 @@
                 </label>
                 <label class="field">
                   <span>max_speech_ms</span>
-                  <input type="number" min="1" data-path="asr.max_speech_ms" value="2200">
+                  <input type="number" min="1" data-path="asr.max_speech_ms" value="10000">
                 </label>
                 <label class="field">
                   <span>speech_threshold <em id="v_asr_threshold">0.0085</em></span>
@@ -811,6 +833,18 @@
                 <label class="field">
                   <span>processor_buffer_size</span>
                   <input type="number" min="256" step="256" data-path="asr.processor_buffer_size" value="2048">
+                </label>
+                <label class="field">
+                  <span>Silero 开始阈值</span>
+                  <input type="number" min="0.15" max="0.9" step="0.01" data-path="asr.silero_vad_positive_threshold" value="0.35">
+                </label>
+                <label class="field">
+                  <span>Silero 结束阈值</span>
+                  <input type="number" min="0.05" max="0.8" step="0.01" data-path="asr.silero_vad_negative_threshold" value="0.22">
+                </label>
+                <label class="field">
+                  <span>Silero 续接等待 ms</span>
+                  <input type="number" min="240" max="1800" step="20" data-path="asr.silero_vad_redemption_ms" value="420">
                 </label>
                 <label class="field col-span-3">
                   <span>唤醒词（逗号或换行分隔）</span>
@@ -861,6 +895,23 @@ xinyu
                 <label class="field col-span-3">
                   <span>问候 Prompt</span>
                   <textarea rows="2" data-path="observe.daily_greeting_prompt">请你像桌宠一样主动向我说早安，简短自然地问好，再给我一句鼓励的话，控制在两三句内，不要模板化。</textarea>
+                </label>
+                <label class="field switch-field">
+                  <span>启用自然语音参与</span>
+                  <input type="checkbox" data-path="natural_conversation.enabled">
+                  <small class="field-note">启用后，语音轮次可由角色自主选择回复、微反应、延后或保持沉默；文字输入仍保持原有必答行为。</small>
+                </label>
+                <label class="field switch-field">
+                  <span>允许安静微反应</span>
+                  <input type="checkbox" data-path="natural_conversation.allow_micro_reaction" checked>
+                </label>
+                <label class="field switch-field">
+                  <span>记住短期对话余韵</span>
+                  <input type="checkbox" data-path="natural_conversation.remember_ambient_context" checked>
+                </label>
+                <label class="field">
+                  <span>普通思考停顿 ms</span>
+                  <input type="number" min="500" max="3000" step="50" data-path="natural_conversation.normal_delay_ms" value="1250">
                 </label>
               </div>
             </article>

@@ -42,20 +42,46 @@
       state.ttsProvider = String(ttsCfg.provider || "browser").toLowerCase();
       state.modelProfileName = detectModelProfileName();
       state.gptSovitsRealtimeTTS = ttsCfg.gpt_sovits_realtime_tts === true;
+      state.gptSovitsStreamPlayback = ttsCfg.gpt_sovits_stream_playback === true;
+      state.qwen3TtsStreamPlayback = ttsCfg.qwen3_tts_stream_playback !== false;
+      state.qwen3TtsReplyContinuity = ttsCfg.qwen3_tts_reply_continuity !== false;
+      state.preferVoiceConsistency = ttsCfg.prefer_voice_consistency !== false;
+      state.sameVoiceRetryCount = Math.max(
+        0,
+        Math.min(4, Math.round(Number(ttsCfg.same_voice_retry_count ?? 2)))
+      );
       state.streamSpeakMode = String(ttsCfg.stream_mode || "realtime").toLowerCase();
       state.serverTTSFallbackToBrowser = ttsCfg.allow_browser_fallback === true;
       const retryCountCfg = Number(ttsCfg.server_retry_count);
       const fallbackFailThresholdCfg = Number(ttsCfg.server_fallback_fail_threshold);
+      const recoveryProbeIntervalCfg = Number(ttsCfg.server_recovery_probe_interval_ms);
       const retryDelayCfg = Number(ttsCfg.server_retry_delay_ms);
       const timeoutCfg = Number(ttsCfg.server_request_timeout_ms);
       const streamIdleWaitCfg = Number(ttsCfg.stream_speak_idle_wait_ms);
+      const streamFirstBeatCfg = Number(ttsCfg.stream_first_beat_min_chars);
+      const streamPauseCfg = Number(ttsCfg.stream_inter_segment_pause_ms);
       const isSovits = state.ttsProvider === "gpt_sovits";
       state.ttsServerRetryCount = Number.isFinite(retryCountCfg)
         ? Math.max(0, Math.min(4, Math.round(retryCountCfg)))
         : (isSovits ? 2 : 1);
+      if (isSovits && state.preferVoiceConsistency) {
+        state.ttsServerRetryCount = Math.max(
+          state.ttsServerRetryCount,
+          state.sameVoiceRetryCount
+        );
+      }
       state.ttsServerFallbackFailThreshold = Number.isFinite(fallbackFailThresholdCfg)
         ? Math.max(1, Math.min(8, Math.round(fallbackFailThresholdCfg)))
         : (isSovits ? 1 : 2);
+      if (isSovits && state.preferVoiceConsistency) {
+        state.ttsServerFallbackFailThreshold = Math.max(
+          state.ttsServerFallbackFailThreshold,
+          Math.min(8, state.ttsServerRetryCount + 1)
+        );
+      }
+      state.ttsServerRecoveryProbeIntervalMs = Number.isFinite(recoveryProbeIntervalCfg)
+        ? Math.max(5000, Math.min(120000, Math.round(recoveryProbeIntervalCfg)))
+        : 15000;
       state.ttsServerRetryDelayMs = Number.isFinite(retryDelayCfg)
         ? Math.max(60, Math.min(3000, Math.round(retryDelayCfg)))
         : 220;
@@ -69,8 +95,16 @@
       state.streamSpeakIdleWaitMs = Number.isFinite(streamIdleWaitCfg)
         ? Math.max(30, Math.min(220, Math.round(streamIdleWaitCfg)))
         : 90;
+      state.streamFirstBeatMinChars = Number.isFinite(streamFirstBeatCfg)
+        ? Math.max(8, Math.min(40, Math.round(streamFirstBeatCfg)))
+        : 14;
+      state.streamInterSegmentPauseMs = Number.isFinite(streamPauseCfg)
+        ? Math.max(30, Math.min(240, Math.round(streamPauseCfg)))
+        : 95;
       state.ttsServerFailStreak = 0;
       state.ttsServerLastError = "";
+      state.ttsServerFallbackActive = false;
+      state.ttsServerNextRecoveryProbeAt = 0;
       if (!["final_only", "realtime"].includes(state.streamSpeakMode)) {
         state.streamSpeakMode = "realtime";
       }
@@ -84,6 +118,7 @@
       const asrCfg = state.config?.asr || {};
       const observeCfg = state.config?.observe || {};
       const conversationCfg = state.config?.conversation_mode || {};
+      const naturalConversationCfg = state.config?.natural_conversation || {};
       const historySummaryCfg = state.config?.history_summary || {};
       const styleCfg = state.config?.style || {};
       const motionCfg = state.config?.motion || {};
@@ -93,6 +128,30 @@
         runtimeCfg.enabled === true && runtimeCfg.auto_apply_reply_cue === true;
       state.modelDirectReply = runtimeCfg.model_direct_reply === true;
       state.companionTurnEnabled = companionTurnCfg.enabled === true;
+      state.asrProvider = ["auto", "funasr_hybrid", "vosk"].includes(String(asrCfg.provider || "auto"))
+        ? String(asrCfg.provider || "auto")
+        : "auto";
+      state.localAsrWarmupRequired = state.asrProvider === "vosk";
+      state.localAsrWarmupStatus = state.localAsrWarmupRequired ? "warming" : "not_required";
+      state.asrStreamingEnabled = asrCfg.streaming_enabled !== false;
+      state.asrFinalRefineEnabled = asrCfg.final_refine_enabled !== false;
+      state.asrStreamChunkMs = Math.round(
+        clampNumber(Number(asrCfg.stream_chunk_ms || 600), 320, 1200)
+      );
+      state.sileroVadEnabled = asrCfg.silero_vad_enabled === true;
+      state.sileroVadPositiveThreshold = clampNumber(
+        Number(asrCfg.silero_vad_positive_threshold ?? 0.35),
+        0.15,
+        0.9
+      );
+      state.sileroVadNegativeThreshold = clampNumber(
+        Number(asrCfg.silero_vad_negative_threshold ?? 0.22),
+        0.05,
+        Math.max(0.05, state.sileroVadPositiveThreshold - 0.02)
+      );
+      state.sileroVadRedemptionMs = Math.round(
+        clampNumber(Number(asrCfg.silero_vad_redemption_ms ?? 420), 240, 1800)
+      );
       state.showMicMeter = asrCfg.show_mic_meter !== false;
       state.micKeepListening = asrCfg.keep_listening !== false;
       state.asrTranscribeOnClose = asrCfg.transcribe_on_close !== false;
@@ -103,7 +162,7 @@
         clampNumber(Number(asrCfg.silence_trigger_ms || 380), 180, 1200)
       );
       state.localAsrMaxSpeechMs = Math.round(
-        clampNumber(Number(asrCfg.max_speech_ms || 2400), 1000, 6000)
+        clampNumber(Number(asrCfg.max_speech_ms || 10000), 1000, 15000)
       );
       state.localAsrSpeechThreshold = clampNumber(
         Number(asrCfg.speech_threshold || 0.0035),
@@ -145,6 +204,16 @@
         }
       }
       state.observeAllowAutoChat = observeCfg.allow_auto_chat === true;
+      state.observeAutonomousEnabled = observeCfg.autonomous_enabled === true;
+      if (state.observeAutonomousEnabled) {
+        state.observeDesktop = true;
+      }
+      state.observeTriggerCheckMs = Math.round(
+        clampNumber(Number(observeCfg.trigger_check_ms || 15000), 5000, 120000)
+      );
+      state.observeTriggerCooldownMs = Math.round(
+        clampNumber(Number(observeCfg.trigger_cooldown_ms || 120000), 60000, 1800000)
+      );
       state.conversationMode = {
         enabled: conversationCfg.enabled === true,
         chatStreamEnabled: conversationCfg.chat_stream_enabled !== false,
@@ -185,6 +254,26 @@
           clampNumber(Number(conversationCfg.important_speech_force_after_attempts ?? 2), 1, 4)
         )
       };
+      state.naturalConversation = {
+        enabled: naturalConversationCfg.enabled === true,
+        voiceOnly: naturalConversationCfg.voice_only !== false,
+        allowSilence: naturalConversationCfg.allow_silence !== false,
+        allowMicroReaction: naturalConversationCfg.allow_micro_reaction !== false,
+        allowDefer: naturalConversationCfg.allow_defer !== false,
+        rememberAmbientContext: naturalConversationCfg.remember_ambient_context !== false,
+        ambientContextTtlMs: Math.round(
+          clampNumber(Number(naturalConversationCfg.ambient_context_ttl_ms ?? 180000), 30000, 900000)
+        ),
+        quickDelayMs: Math.round(
+          clampNumber(Number(naturalConversationCfg.quick_delay_ms ?? 650), 200, 1600)
+        ),
+        normalDelayMs: Math.round(
+          clampNumber(Number(naturalConversationCfg.normal_delay_ms ?? 1250), 500, 3000)
+        ),
+        deepDelayMs: Math.round(
+          clampNumber(Number(naturalConversationCfg.deep_delay_ms ?? 2300), 900, 5000)
+        )
+      };
       if (!(Number(state.proactiveSchedulerStartedAt || 0) > 0)) {
         state.proactiveSchedulerStartedAt = Date.now();
       }
@@ -212,6 +301,18 @@
           Number(autoChatTuningCfg.emotion_bonus ?? 0.12),
           0,
           0.8
+        ),
+        appInteractionBonus: clampNumber(
+          Number(autoChatTuningCfg.app_interaction_bonus ?? 0.24),
+          0,
+          0.6
+        ),
+        appInteractionWindowMs: Math.round(
+          clampNumber(
+            Number(autoChatTuningCfg.app_interaction_window_ms ?? (2 * 60 * 1000)),
+            15 * 1000,
+            10 * 60 * 1000
+          )
         ),
         repeatReasonPenalty: clampNumber(
           Number(autoChatTuningCfg.repeat_reason_penalty ?? 0.44),

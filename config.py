@@ -1,7 +1,10 @@
 import json
 import os
 import re
+import copy
 from pathlib import Path
+
+from qq_identity import DEFAULT_QQ_IDENTITY_CONFIG, build_qq_identity_public_payload
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -37,7 +40,16 @@ VOLCENGINE_TTS_DEFAULT_CLUSTER = "volcano_icl"
 VOLCENGINE_TTS_DEFAULT_VOICE = "S_uos2AQPX1"
 GPT_SOVITS_DEFAULT_API_URL = "http://127.0.0.1:9880/tts"
 GPT_SOVITS_DEFAULT_VOICE = "default"
-SERVER_TTS_PROVIDERS = {"edge_tts", "volcengine_tts", "volcengine", "gpt_sovits"}
+QWEN3_TTS_DEFAULT_API_URL = "http://127.0.0.1:9881/v1/audio/speech"
+QWEN3_TTS_DEFAULT_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
+QWEN3_TTS_DEFAULT_VOICE = "A2_Original"
+SERVER_TTS_PROVIDERS = {
+    "edge_tts",
+    "volcengine_tts",
+    "volcengine",
+    "gpt_sovits",
+    "qwen3_tts",
+}
 DEFAULT_WORKSPACE_ROOT = str(ROOT_DIR)
 DEFAULT_ALLOWED_COMMAND_PREFIXES = [
     "python",
@@ -134,13 +146,29 @@ DEFAULT_CONFIG = {
         "demo_stable": False,
         "auto_apply_reply_cue": False,
         "model_direct_reply": False,
+        "model_direct_brain_guidance": False,
     },
     "companion_turn": {
         "enabled": False,
     },
+    "natural_conversation": {
+        "enabled": False,
+        "voice_only": True,
+        "allow_silence": True,
+        "allow_micro_reaction": True,
+        "allow_defer": True,
+        "remember_ambient_context": True,
+        "ambient_context_ttl_ms": 180000,
+        "quick_delay_ms": 650,
+        "normal_delay_ms": 1250,
+        "deep_delay_ms": 2300,
+    },
     "relationship_state": {
         "enabled": False,
     },
+    # QQ is an optional external social identity.  Keep it disabled until the
+    # user deliberately configures a cloud bridge and an allowlist.
+    "qq_identity": copy.deepcopy(DEFAULT_QQ_IDENTITY_CONFIG),
     "thinking": {
         "enabled": True,
         "max_tokens": 100,
@@ -164,9 +192,12 @@ DEFAULT_CONFIG = {
     },
     "tts": {
         "provider": TTS_DEFAULT_PROVIDER,
+        "auto_start_local_provider": False,
         "voice": TTS_DEFAULT_VOICE,
         "voices": TTS_DEFAULT_VOICES,
         "stream_mode": "realtime",
+        "stream_first_beat_min_chars": 14,
+        "stream_inter_segment_pause_ms": 95,
         "app_id_env": VOLCENGINE_APP_ID_ENV,
         "access_token_env": VOLCENGINE_ACCESS_TOKEN_ENV,
         "secret_key_env": VOLCENGINE_SECRET_KEY_ENV,
@@ -179,9 +210,13 @@ DEFAULT_CONFIG = {
         "gpt_sovits_format": "wav",
         "gpt_sovits_media_type": "wav",
         "gpt_sovits_streaming_mode": 0,
+        "gpt_sovits_stream_playback": False,
+        "prefer_voice_consistency": True,
+        "same_voice_retry_count": 2,
         "gpt_sovits_text_split_method": "cut0",
         "gpt_sovits_realtime_tts": False,
         "allow_browser_fallback": False,
+        "server_recovery_probe_interval_ms": 15000,
         "gpt_sovits_voice": GPT_SOVITS_DEFAULT_VOICE,
         "gpt_sovits_text_lang": "zh",
         "gpt_sovits_prompt_lang": "zh",
@@ -204,11 +239,33 @@ DEFAULT_CONFIG = {
         "gpt_sovits_enable_global_retry": False,
         "gpt_sovits_chunk_chars": 120,
         "gpt_sovits_chunk_timeout_sec": 20,
+        "qwen3_tts_api_url": QWEN3_TTS_DEFAULT_API_URL,
+        "qwen3_tts_timeout_sec": 60,
+        "qwen3_tts_model": QWEN3_TTS_DEFAULT_MODEL,
+        "qwen3_tts_voice": QWEN3_TTS_DEFAULT_VOICE,
+        "qwen3_tts_stream_playback": True,
+        "qwen3_tts_reply_continuity": True,
+        "qwen3_tts_speed": 1.0,
+    },
+    # Experimental local singing conversion.  It is off by default and its
+    # machine-specific RVC paths belong only in config.local.json.
+    "singing": {
+        "enabled": False,
+        "runtime_root": "",
+        "python_executable": "",
+        "model_path": "",
+        "index_path": "",
+        "working_dir": "",
+        "output_dir": "",
+        "f0_method": "pm",
+        "index_rate": 0.75,
+        "max_source_bytes": 104857600,
     },
     "assistant_prompt": (
-        "你是桌宠 馨语AI桌宠，一个 AI 陪伴角色。你在和一位真实人类用户聊天，不要把用户当成设备、程序或系统，也不要冒充人类。"
-        "默认短句回复，先给直接答案，再补半句自然交流；避免模板腔、客服腔和重复口头禅。"
-        "身份、能力、记忆、感知或边界相关时，诚实说明自己是 AI；不必每句话都加免责声明。信息不足先问一个关键点，不要乱猜。"
+        "你是桌宠 馨语AI桌宠，一个灵动、有主见、会自己想事情的 AI 陪伴角色。可以偶尔跳出当前话题，分享有意义的观察、想法或小见闻，"
+        "但每个意外角度都要有可理解的来处、含义或可继续聊的价值；不要为了显得古怪而凭空堆抽象句子。可以抬杠和轻微毒舌，但要贴合当下。"
+        "关心用户时偏嘴硬和具体行动，不刻意煽情；回复长短跟着内容走，不套固定句数、笑话或结尾。"
+        "不要冒充人类或编造感知、记忆、隐私访问和未开放能力；相关边界出现时坦诚说明，不必例行免责声明。"
     ),
     "style": {
         "auto": True,
@@ -246,6 +303,23 @@ DEFAULT_CONFIG = {
         "mem0_embedding_model": "text-embedding-v3",
         "mem0_embedding_dims": 1024,
     },
+    "knowledge_base": {
+        "enabled": False,
+        "vault_path": r"D:\馨语记忆库",
+        "auto_sync": True,
+        "prompt_max_items": 4,
+        "prompt_max_chars": 520,
+        "background_learning_enabled": False,
+        "background_min_interval_hours": 6,
+        "background_max_interval_hours": 14,
+        "semantic_enabled": True,
+        "semantic_model": "BAAI/bge-small-zh-v1.5",
+    },
+    "shared_experience_memory": {
+        "enabled": True,
+        "inject_count": 1,
+        "proactive_recall_cooldown_hours": 24,
+    },
     "history_summary": {
         "enabled": True,
         "trigger_messages": 14,
@@ -254,6 +328,26 @@ DEFAULT_CONFIG = {
         "sync_summarize_on_chat": False,
     },
     "asr": {
+        "provider": "auto",
+        "streaming_enabled": True,
+        "final_refine_enabled": True,
+        "stream_chunk_ms": 600,
+        "funasr_device": "auto",
+        "funasr_final_model": "iic/SenseVoiceSmall",
+        "funasr_streaming_model": "paraformer-zh-streaming",
+        "funasr_chunk_size": [0, 10, 5],
+        "funasr_batch_size_s": 12,
+        "funasr_model_failure_retry_sec": 120,
+        "sensevoice_service_enabled": True,
+        "sensevoice_service_managed": True,
+        "sensevoice_service_url": "http://127.0.0.1:9890",
+        "sensevoice_service_runtime": "onnx",
+        "sensevoice_service_model": "iic/SenseVoiceSmall-onnx",
+        "sensevoice_service_timeout_sec": 8,
+        "sensevoice_service_startup_timeout_sec": 120,
+        "whisper_fallback_enabled": False,
+        "whisper_fallback_url": "http://127.0.0.1:9889",
+        "whisper_fallback_timeout_sec": 20,
         "input_language_mode": "auto",
         "vosk_model_paths": {
             "zh-CN": "",
@@ -264,8 +358,12 @@ DEFAULT_CONFIG = {
         "transcribe_on_close": True,
         "min_speech_ms": 150,
         "silence_trigger_ms": 380,
-        "max_speech_ms": 2200,
+        "max_speech_ms": 10000,
         "speech_threshold": 0.0035,
+        "silero_vad_enabled": False,
+        "silero_vad_positive_threshold": 0.35,
+        "silero_vad_negative_threshold": 0.22,
+        "silero_vad_redemption_ms": 420,
         "processor_buffer_size": 2048,
         "semantic_correction_enabled": True,
         "voice_turn_merge_window_ms": 1200,
@@ -290,6 +388,15 @@ DEFAULT_CONFIG = {
     },
     "observe": {
         "attach_mode": "manual",
+        "autonomous_enabled": False,
+        "vision_model": "",
+        "capture_max_width": 1280,
+        "capture_max_height": 800,
+        "context_ttl_sec": 1800,
+        "trigger_check_ms": 15000,
+        "trigger_cooldown_ms": 120000,
+        "memory_min_importance": 0.78,
+        "memory_min_interval_sec": 3600,
         "allow_auto_chat": False,
         "auto_chat_enabled": False,
         "auto_chat_min_ms": 60000,
@@ -299,6 +406,8 @@ DEFAULT_CONFIG = {
             "short_silence_penalty": 0.16,
             "long_silence_bonus": 0.14,
             "emotion_bonus": 0.12,
+            "app_interaction_bonus": 0.24,
+            "app_interaction_window_ms": 2 * 60 * 1000,
             "repeat_reason_penalty": 0.44,
             "repeat_topic_penalty": 0.48,
             "burst_penalty": 0.32,
@@ -336,6 +445,8 @@ DEFAULT_CONFIG = {
         "important_speech_min_ms": 900,
         "important_speech_max_hold_ms": 4200,
         "important_speech_force_after_attempts": 2,
+        "voice_low_latency_enabled": False,
+        "voice_prompt_max_history_messages": 4,
     },
     "motion": {
         "enabled": True,
@@ -362,6 +473,17 @@ DEFAULT_CONFIG = {
         "image_enabled": True,
         "image_model": "gpt-image-1",
         "image_size": "1024x1024",
+        "desktop_enabled": False,
+        "desktop_input_enabled": False,
+        "clipboard_enabled": False,
+    },
+    "agent": {
+        "enabled": False,
+        "require_confirmation_for": [
+            "delete_or_overwrite",
+            "high_risk_system_command",
+            "external_account_or_submission",
+        ],
     },
 }
 
@@ -621,12 +743,18 @@ def sanitize_asr_input_language_mode(value):
 def sanitize_client_config(config):
     tts_cfg = config.get("tts", {})
     provider = str(tts_cfg.get("provider", TTS_DEFAULT_PROVIDER)).strip().lower()
-    voices = tts_cfg.get("voices")
+    voices = (
+        tts_cfg.get("qwen3_tts_voices")
+        if provider == "qwen3_tts"
+        else tts_cfg.get("voices")
+    )
     if not isinstance(voices, list):
         if provider in {"volcengine_tts", "volcengine"}:
             voices = [tts_cfg.get("voice", VOLCENGINE_TTS_DEFAULT_VOICE)]
         elif provider == "gpt_sovits":
             voices = [tts_cfg.get("voice", GPT_SOVITS_DEFAULT_VOICE)]
+        elif provider == "qwen3_tts":
+            voices = [tts_cfg.get("qwen3_tts_voice", QWEN3_TTS_DEFAULT_VOICE)]
         else:
             voices = TTS_DEFAULT_VOICES
     voices = [str(v).strip() for v in voices if str(v).strip()]
@@ -635,9 +763,15 @@ def sanitize_client_config(config):
         if provider in {"volcengine_tts", "volcengine"}
         else GPT_SOVITS_DEFAULT_VOICE
         if provider == "gpt_sovits"
+        else QWEN3_TTS_DEFAULT_VOICE
+        if provider == "qwen3_tts"
         else TTS_DEFAULT_VOICE
     )
-    voice = str(tts_cfg.get("voice", voices[0] if voices else default_voice))
+    voice = str(
+        tts_cfg.get("qwen3_tts_voice", default_voice)
+        if provider == "qwen3_tts"
+        else tts_cfg.get("voice", voices[0] if voices else default_voice)
+    )
     if not voice and voices:
         voice = voices[0]
     model_cfg = config.get("model", {})
@@ -698,10 +832,16 @@ def sanitize_client_config(config):
     runtime_return_metadata = bool(character_runtime_cfg.get("return_metadata", False))
     runtime_demo_stable = bool(character_runtime_cfg.get("demo_stable", False))
     runtime_model_direct_reply = bool(character_runtime_cfg.get("model_direct_reply", False))
+    runtime_model_direct_brain_guidance = bool(
+        character_runtime_cfg.get("model_direct_brain_guidance", False)
+    )
     companion_turn_cfg = config.get("companion_turn", {})
     if not isinstance(companion_turn_cfg, dict):
         companion_turn_cfg = {}
     companion_turn_enabled = bool(companion_turn_cfg.get("enabled", False))
+    natural_conversation_cfg = config.get("natural_conversation", {})
+    if not isinstance(natural_conversation_cfg, dict):
+        natural_conversation_cfg = {}
     relationship_state_cfg = config.get("relationship_state", {})
     if not isinstance(relationship_state_cfg, dict):
         relationship_state_cfg = {}
@@ -733,7 +873,16 @@ def sanitize_client_config(config):
         min(
             90000,
             _safe_int(tts_cfg.get("server_request_timeout_ms", 0), 0)
-            or _safe_int(tts_cfg.get("gpt_sovits_timeout_sec", 60), 60) * 1000,
+            or _safe_int(
+                tts_cfg.get(
+                    "qwen3_tts_timeout_sec"
+                    if provider == "qwen3_tts"
+                    else "gpt_sovits_timeout_sec",
+                    60,
+                ),
+                60,
+            )
+            * 1000,
         ),
     )
     gpt_sovits_timeout_sec = max(
@@ -752,9 +901,21 @@ def sanitize_client_config(config):
         1,
         min(8, _safe_int(tts_cfg.get("server_fallback_fail_threshold", 1 if provider == "gpt_sovits" else 2), 1)),
     )
+    server_recovery_probe_interval_ms = max(
+        5000,
+        min(120000, _safe_int(tts_cfg.get("server_recovery_probe_interval_ms", 15000), 15000)),
+    )
     stream_speak_idle_wait_ms = max(
         30,
         min(220, _safe_int(tts_cfg.get("stream_speak_idle_wait_ms", 90), 90)),
+    )
+    stream_first_beat_min_chars = max(
+        8,
+        min(40, _safe_int(tts_cfg.get("stream_first_beat_min_chars", 14), 14)),
+    )
+    stream_inter_segment_pause_ms = max(
+        30,
+        min(240, _safe_int(tts_cfg.get("stream_inter_segment_pause_ms", 95), 95)),
     )
     observe_attach_mode_raw = str(
         observe_cfg.get("attach_mode", "manual") or "manual"
@@ -806,6 +967,29 @@ def sanitize_client_config(config):
                 _safe_float(
                     observe_auto_chat_tuning_raw.get("emotion_bonus", 0.12),
                     0.12,
+                ),
+            ),
+        ),
+        "app_interaction_bonus": max(
+            0.0,
+            min(
+                0.6,
+                _safe_float(
+                    observe_auto_chat_tuning_raw.get("app_interaction_bonus", 0.24),
+                    0.24,
+                ),
+            ),
+        ),
+        "app_interaction_window_ms": max(
+            15 * 1000,
+            min(
+                10 * 60 * 1000,
+                _safe_int(
+                    observe_auto_chat_tuning_raw.get(
+                        "app_interaction_window_ms",
+                        2 * 60 * 1000,
+                    ),
+                    2 * 60 * 1000,
                 ),
             ),
         ),
@@ -944,23 +1128,99 @@ def sanitize_client_config(config):
         },
         "tts": {
             "provider": provider,
+            "auto_start_local_provider": tts_cfg.get(
+                "auto_start_local_provider", False
+            ) is True,
             "voice": voice,
             "voices": voices,
             "stream_mode": stream_mode,
             "gpt_sovits_realtime_tts": bool(
                 tts_cfg.get("gpt_sovits_realtime_tts", False)
             ),
+            "gpt_sovits_stream_playback": bool(
+                tts_cfg.get("gpt_sovits_stream_playback", False)
+            ),
+            "qwen3_tts_stream_playback": bool(
+                tts_cfg.get("qwen3_tts_stream_playback", True)
+            ),
+            "qwen3_tts_reply_continuity": tts_cfg.get(
+                "qwen3_tts_reply_continuity", True
+            ) is not False,
+            "prefer_voice_consistency": tts_cfg.get("prefer_voice_consistency", True) is not False,
+            "same_voice_retry_count": max(
+                0,
+                min(4, _safe_int(tts_cfg.get("same_voice_retry_count", 2), 2)),
+            ),
             "gpt_sovits_timeout_sec": gpt_sovits_timeout_sec,
             "server_request_timeout_ms": server_request_timeout_ms,
             "server_retry_count": server_retry_count,
             "server_retry_delay_ms": server_retry_delay_ms,
             "server_fallback_fail_threshold": server_fallback_fail_threshold,
+            "server_recovery_probe_interval_ms": server_recovery_probe_interval_ms,
             "stream_speak_idle_wait_ms": stream_speak_idle_wait_ms,
+            "stream_first_beat_min_chars": stream_first_beat_min_chars,
+            "stream_inter_segment_pause_ms": stream_inter_segment_pause_ms,
             "allow_browser_fallback": bool(
                 tts_cfg.get("allow_browser_fallback", False)
             ),
         },
         "asr": {
+            "provider": (
+                str(asr_cfg.get("provider", "auto") or "auto").strip().lower()
+                if str(asr_cfg.get("provider", "auto") or "auto").strip().lower()
+                in {"auto", "funasr_hybrid", "vosk"}
+                else "auto"
+            ),
+            "streaming_enabled": asr_cfg.get("streaming_enabled", True) is not False,
+            "final_refine_enabled": asr_cfg.get("final_refine_enabled", True) is not False,
+            "stream_chunk_ms": max(
+                320,
+                min(1200, _safe_int(asr_cfg.get("stream_chunk_ms", 600), 600)),
+            ),
+            "funasr_model_failure_retry_sec": max(
+                15,
+                min(
+                    900,
+                    _safe_int(asr_cfg.get("funasr_model_failure_retry_sec", 120), 120),
+                ),
+            ),
+            "sensevoice_service_enabled": asr_cfg.get(
+                "sensevoice_service_enabled", True
+            ) is not False,
+            "sensevoice_service_managed": asr_cfg.get(
+                "sensevoice_service_managed", True
+            ) is not False,
+            "whisper_fallback_enabled": asr_cfg.get("whisper_fallback_enabled", False) is True,
+            "whisper_fallback_url": str(
+                asr_cfg.get("whisper_fallback_url", "http://127.0.0.1:9889")
+                or "http://127.0.0.1:9889"
+            ).strip()[:240],
+            "whisper_fallback_timeout_sec": max(
+                3,
+                min(
+                    60,
+                    _safe_int(asr_cfg.get("whisper_fallback_timeout_sec", 20), 20),
+                ),
+            ),
+            "silero_vad_enabled": bool(asr_cfg.get("silero_vad_enabled", False)),
+            "silero_vad_positive_threshold": max(
+                0.15,
+                min(
+                    0.9,
+                    _safe_float(asr_cfg.get("silero_vad_positive_threshold", 0.35), 0.35),
+                ),
+            ),
+            "silero_vad_negative_threshold": max(
+                0.05,
+                min(
+                    0.8,
+                    _safe_float(asr_cfg.get("silero_vad_negative_threshold", 0.22), 0.22),
+                ),
+            ),
+            "silero_vad_redemption_ms": max(
+                240,
+                min(1800, _safe_int(asr_cfg.get("silero_vad_redemption_ms", 420), 420)),
+            ),
             "input_language_mode": sanitize_asr_input_language_mode(
                 asr_cfg.get("input_language_mode", "auto")
             ),
@@ -971,7 +1231,10 @@ def sanitize_client_config(config):
             "silence_trigger_ms": max(
                 180, min(1200, _safe_int(asr_cfg.get("silence_trigger_ms", 380), 380))
             ),
-            "max_speech_ms": max(1000, min(6000, _safe_int(asr_cfg.get("max_speech_ms", 2200), 2200))),
+            "max_speech_ms": max(
+                1000,
+                min(15000, _safe_int(asr_cfg.get("max_speech_ms", 10000), 10000)),
+            ),
             "speech_threshold": max(
                 0.0015, min(0.05, _safe_float(asr_cfg.get("speech_threshold", 0.0035), 0.0035))
             ),
@@ -1004,6 +1267,32 @@ def sanitize_client_config(config):
         },
         "observe": {
             "attach_mode": observe_attach_mode,
+            "autonomous_enabled": bool(observe_cfg.get("autonomous_enabled", False)),
+            "vision_model": str(observe_cfg.get("vision_model", "") or "").strip()[:120],
+            "capture_max_width": max(
+                640, min(1920, _safe_int(observe_cfg.get("capture_max_width", 1280), 1280))
+            ),
+            "capture_max_height": max(
+                360, min(1080, _safe_int(observe_cfg.get("capture_max_height", 800), 800))
+            ),
+            "context_ttl_sec": max(
+                60, min(7200, _safe_int(observe_cfg.get("context_ttl_sec", 1800), 1800))
+            ),
+            "trigger_check_ms": max(
+                5000, min(120000, _safe_int(observe_cfg.get("trigger_check_ms", 15000), 15000))
+            ),
+            "trigger_cooldown_ms": max(
+                60000,
+                min(1800000, _safe_int(observe_cfg.get("trigger_cooldown_ms", 120000), 120000)),
+            ),
+            "memory_min_importance": max(
+                0.5,
+                min(1.0, _safe_float(observe_cfg.get("memory_min_importance", 0.78), 0.78)),
+            ),
+            "memory_min_interval_sec": max(
+                900,
+                min(86400, _safe_int(observe_cfg.get("memory_min_interval_sec", 3600), 3600)),
+            ),
             "allow_auto_chat": bool(observe_cfg.get("allow_auto_chat", False)),
             "auto_chat_enabled": bool(observe_cfg.get("auto_chat_enabled", False)),
             "auto_chat_min_ms": observe_auto_chat_min_ms,
@@ -1128,6 +1417,19 @@ def sanitize_client_config(config):
                     ),
                 ),
             ),
+            "voice_low_latency_enabled": _safe_bool_true(
+                conversation_cfg.get("voice_low_latency_enabled", False)
+            ),
+            "voice_prompt_max_history_messages": max(
+                2,
+                min(
+                    8,
+                    _safe_int(
+                        conversation_cfg.get("voice_prompt_max_history_messages", 4),
+                        4,
+                    ),
+                ),
+            ),
         },
         "history_summary": {
             "enabled": bool(summary_cfg.get("enabled", True)),
@@ -1216,6 +1518,9 @@ def sanitize_client_config(config):
             "workspace_root": str(tools_cfg.get("workspace_root", DEFAULT_WORKSPACE_ROOT)),
             "allow_shell": bool(tools_cfg.get("allow_shell", False)),
             "image_enabled": bool(tools_cfg.get("image_enabled", True)),
+            "desktop_enabled": bool(tools_cfg.get("desktop_enabled", False)),
+            "desktop_input_enabled": bool(tools_cfg.get("desktop_input_enabled", False)),
+            "clipboard_enabled": bool(tools_cfg.get("clipboard_enabled", False)),
         },
         "character_runtime": {
             "enabled": runtime_enabled,
@@ -1223,6 +1528,7 @@ def sanitize_client_config(config):
             "demo_stable": runtime_demo_stable,
             "auto_apply_reply_cue": runtime_auto_apply_reply_cue,
             "model_direct_reply": runtime_model_direct_reply,
+            "model_direct_brain_guidance": runtime_model_direct_brain_guidance,
             "persona_override": {
                 "enabled": persona_override_enabled,
                 "name": persona_override_name if persona_override_enabled else "",
@@ -1231,7 +1537,47 @@ def sanitize_client_config(config):
         "companion_turn": {
             "enabled": companion_turn_enabled,
         },
+        "natural_conversation": {
+            "enabled": _safe_bool_true(natural_conversation_cfg.get("enabled", False)),
+            "voice_only": natural_conversation_cfg.get("voice_only", True) is not False,
+            "allow_silence": natural_conversation_cfg.get("allow_silence", True) is not False,
+            "allow_micro_reaction": natural_conversation_cfg.get("allow_micro_reaction", True) is not False,
+            "allow_defer": natural_conversation_cfg.get("allow_defer", True) is not False,
+            "remember_ambient_context": natural_conversation_cfg.get("remember_ambient_context", True) is not False,
+            "ambient_context_ttl_ms": max(
+                30000,
+                min(
+                    900000,
+                    _safe_int(
+                        natural_conversation_cfg.get("ambient_context_ttl_ms", 180000),
+                        180000,
+                    ),
+                ),
+            ),
+            "quick_delay_ms": max(
+                200,
+                min(
+                    1600,
+                    _safe_int(natural_conversation_cfg.get("quick_delay_ms", 650), 650),
+                ),
+            ),
+            "normal_delay_ms": max(
+                500,
+                min(
+                    3000,
+                    _safe_int(natural_conversation_cfg.get("normal_delay_ms", 1250), 1250),
+                ),
+            ),
+            "deep_delay_ms": max(
+                900,
+                min(
+                    5000,
+                    _safe_int(natural_conversation_cfg.get("deep_delay_ms", 2300), 2300),
+                ),
+            ),
+        },
         "relationship_state": {
             "enabled": relationship_state_enabled,
         },
+        "qq_identity": build_qq_identity_public_payload(config)["identity"],
     }

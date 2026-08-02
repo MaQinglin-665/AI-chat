@@ -156,18 +156,93 @@ def sanitize_conversation_context_text(value, max_len=360):
 def sanitize_asr_context(raw):
     if not isinstance(raw, dict):
         return None
+    paralinguistic_raw = (
+        raw.get("paralinguistic")
+        if isinstance(raw.get("paralinguistic"), dict)
+        else None
+    )
+    paralinguistic = None
+    if paralinguistic_raw:
+        allowed_emotions = {
+            "angry",
+            "disgusted",
+            "fearful",
+            "happy",
+            "neutral",
+            "sad",
+            "surprised",
+            "unknown",
+        }
+        allowed_events = {
+            "speech",
+            "laughter",
+            "crying",
+            "cough",
+            "sneeze",
+            "breath",
+            "applause",
+            "bgm",
+            "music",
+        }
+        allowed_cues = {
+            "nonverbal_vocalization",
+            "laughter",
+            "crying",
+            "cough",
+            "sneeze",
+            "breath",
+        }
+        emotion = sanitize_context_key(
+            paralinguistic_raw.get("emotion"),
+            "unknown",
+            24,
+        )
+        cue_type = sanitize_context_key(
+            paralinguistic_raw.get("cue_type"),
+            "",
+            32,
+        )
+        events = []
+        source_events = (
+            paralinguistic_raw.get("events")
+            if isinstance(paralinguistic_raw.get("events"), list)
+            else []
+        )
+        for value in source_events:
+            event = sanitize_context_key(value, "", 24)
+            if event in allowed_events and event not in events:
+                events.append(event)
+            if len(events) >= 6:
+                break
+        try:
+            voiced_ratio = float(paralinguistic_raw.get("voiced_ratio") or 0)
+        except (TypeError, ValueError):
+            voiced_ratio = 0
+        try:
+            pitch_stability = float(paralinguistic_raw.get("pitch_stability") or 0)
+        except (TypeError, ValueError):
+            pitch_stability = 0
+        paralinguistic = {
+            "emotion": emotion if emotion in allowed_emotions else "unknown",
+            "events": events,
+            "cue_type": cue_type if cue_type in allowed_cues else "",
+            "voiced": paralinguistic_raw.get("voiced") is True,
+            "voiced_ratio": max(0.0, min(1.0, voiced_ratio)),
+            "pitch_stability": max(0.0, min(1.0, pitch_stability)),
+            "meaningful": paralinguistic_raw.get("meaningful") is True,
+        }
     raw_text = sanitize_conversation_context_text(raw.get("raw_text"), 160)
     final_text = sanitize_conversation_context_text(
         raw.get("final_text") or raw.get("text"),
         160,
     )
-    if not raw_text and not final_text:
+    if not raw_text and not final_text and not paralinguistic:
         return None
     try:
         confidence = float(raw.get("confidence") or 0)
     except (TypeError, ValueError):
         confidence = 0
-    return {
+    context = {
         "version": 1,
         "source": re.sub(
             r"[^a-z0-9_-]+",
@@ -185,6 +260,9 @@ def sanitize_asr_context(raw):
         ).strip("_")[:80],
         "needs_confirmation": raw.get("needs_confirmation") is True,
     }
+    if paralinguistic:
+        context["paralinguistic"] = paralinguistic
+    return context
 
 
 def sanitize_context_key(value, default="", max_len=64):
@@ -194,6 +272,31 @@ def sanitize_context_key(value, default="", max_len=64):
         str(value or "").strip().lower(),
     ).strip("_")
     return (key or default)[: max(1, int(max_len or 64))]
+
+
+def sanitize_ambient_context(raw):
+    if not isinstance(raw, dict):
+        return None
+    mode = sanitize_context_key(raw.get("mode"), "", 24)
+    if mode not in {"silence", "micro_reaction", "defer"}:
+        return None
+    summary = sanitize_conversation_context_text(raw.get("summary"), 180)
+    topic_hint = sanitize_conversation_context_text(raw.get("topic_hint"), 80)
+    reaction = sanitize_context_key(raw.get("reaction"), "", 24)
+    try:
+        recorded_at = int(float(raw.get("recorded_at") or 0))
+    except (TypeError, ValueError):
+        recorded_at = 0
+    if not summary and not topic_hint:
+        return None
+    return {
+        "version": 1,
+        "mode": mode,
+        "summary": summary,
+        "topic_hint": topic_hint,
+        "reaction": reaction,
+        "recorded_at": max(0, recorded_at),
+    }
 
 
 def detect_barge_in_reply_policy(user_message):
@@ -384,6 +487,11 @@ def sanitize_conversation_context(raw, user_message=""):
     asr = sanitize_asr_context(raw.get("asr") if isinstance(raw.get("asr"), dict) else None)
     if asr:
         out["asr"] = asr
+    ambient = sanitize_ambient_context(
+        raw.get("ambient") if isinstance(raw.get("ambient"), dict) else None
+    )
+    if ambient:
+        out["ambient"] = ambient
     return out or None
 
 
@@ -419,7 +527,7 @@ def build_conversation_context_prompt_block(context, user_message=""):
         )
         lines.insert(
             3,
-            "Answer the latest user message first. Do not restart the interrupted answer unless the user asks. Keep the next reply compact and coherent.",
+            "Answer the latest user message first when it needs a direct response. Otherwise use the fast reply policy as a hint, infer the conversational relationship from the actual words, and decide naturally whether to yield, fold it into the current thought, briefly acknowledge and resume, or leave the old answer unfinished. Never repeat wording the user already heard.",
         )
         lines.append(
             f"Interruption reason: {interruption['reason']}; speech_active={str(interruption['speech_active']).lower()}."
@@ -454,9 +562,15 @@ def build_conversation_context_prompt_block(context, user_message=""):
         )
     asr = safe.get("asr")
     if isinstance(asr, dict):
-        lines.append(
-            "The latest user message came from speech recognition. If ASR confidence is low, first confirm the likely meaning naturally instead of over-answering."
+        paralinguistic = (
+            asr.get("paralinguistic")
+            if isinstance(asr.get("paralinguistic"), dict)
+            else None
         )
+        if asr.get("final_text") or asr.get("raw_text"):
+            lines.append(
+                "The latest user message came from speech recognition. If ASR confidence is low, first confirm the likely meaning naturally instead of over-answering."
+            )
         lines.append(
             f"ASR confidence={asr['confidence']:.2f}; needs_confirmation={str(asr['needs_confirmation']).lower()}; reason={asr['reason'] or 'none'}."
         )
@@ -464,4 +578,27 @@ def build_conversation_context_prompt_block(context, user_message=""):
             lines.append(f"ASR final text excerpt: {asr['final_text']}")
         if asr["raw_text"] and asr["raw_text"] != asr["final_text"]:
             lines.append(f"ASR raw text excerpt: {asr['raw_text']}")
+        if paralinguistic:
+            events = ",".join(paralinguistic.get("events") or []) or "none"
+            lines.append(
+                "Private paralinguistic cue: "
+                f"type={paralinguistic.get('cue_type') or 'none'}; "
+                f"emotion={paralinguistic.get('emotion') or 'unknown'}; "
+                f"events={events}; "
+                f"voiced={str(paralinguistic.get('voiced') is True).lower()}; "
+                f"pitch_stability={float(paralinguistic.get('pitch_stability') or 0):.2f}."
+            )
+            lines.append(
+                "Treat this cue as uncertain tone/context, not literal words. Respond naturally without naming the detector, metadata, or inventing a precise meaning."
+            )
+    ambient = safe.get("ambient")
+    if isinstance(ambient, dict):
+        lines.append(
+            "Recent ambient continuity: the previous voice fragment was heard but did not require an immediate spoken reply. "
+            "Use it only as soft conversational residue; do not apologize for the silence or force a callback."
+        )
+        if ambient.get("summary"):
+            lines.append(f"Ambient state summary: {ambient['summary']}")
+        if ambient.get("topic_hint"):
+            lines.append(f"Ambient topic hint: {ambient['topic_hint']}")
     return "\n".join(lines)

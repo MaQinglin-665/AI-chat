@@ -60,6 +60,120 @@ async function main() {
   assert.ok(requestBody.audio_base64);
   assert.strictEqual(requestBody.sample_rate, 16000);
 
+  const streamRequests = [];
+  const streamInput = { value: "" };
+  const streamState = {
+    micOpen: true,
+    micSession: 9,
+    asrProvider: "auto",
+    asrStreamingEnabled: true,
+    asrStreamChunkMs: 600,
+    localAsrStreamingSessionId: "",
+    localAsrStreamingBuffers: [],
+    localAsrStreamingBufferedMs: 0
+  };
+  const streamController = localAsr.createController({
+    state: streamState,
+    ui: { chatInput: streamInput },
+    authFetch: async (url, options) => {
+      const body = JSON.parse(options.body);
+      streamRequests.push({ url, body });
+      const partials = {
+        start: { enabled: true, provider: "paraformer", partial_text: "" },
+        append: { enabled: true, provider: "paraformer", partial_text: "你好" },
+        finish: { enabled: true, provider: "paraformer", partial_text: "你好 Live2D", final: true },
+        cancel: { enabled: true, provider: "paraformer", partial_text: "" }
+      };
+      return { ok: true, async json() { return partials[body.action]; } };
+    },
+    windowObject: {
+      btoa: (value) => Buffer.from(value, "binary").toString("base64"),
+      Uint8Array,
+      Int16Array,
+      Float32Array,
+      AbortController
+    }
+  });
+  assert.strictEqual(streamController.beginLocalAsrStreaming(9), true);
+  streamController.queueLocalAsrStreamingFrame(new Int16Array(9600).fill(12), 600, 9);
+  await streamState.localAsrStreamingRequestChain;
+  assert.strictEqual(streamInput.value, "你好", "Paraformer partial text should appear while the user is speaking");
+  streamInput.value = "manual typing";
+  assert.strictEqual(
+    streamController.updateLocalAsrStreamingPreview("不应覆盖", 9),
+    false,
+    "streaming ASR must not overwrite user typing"
+  );
+  assert.strictEqual(streamInput.value, "manual typing");
+  streamController.flushLocalAsrStreamingChunk(true, 9);
+  await streamState.localAsrStreamingRequestChain;
+  assert.deepStrictEqual(
+    streamRequests.map((item) => item.body.action),
+    ["start", "append", "finish"],
+    "stream events should remain session ordered"
+  );
+  assert.ok(
+    streamRequests.every((item) => !Object.prototype.hasOwnProperty.call(item.body, "provider")),
+    "the renderer must not select server-side models or providers"
+  );
+  assert.strictEqual(streamState.localAsrStreamingSessionId, "", "a finalized stream must release its session id");
+
+  const cancelledActions = [];
+  let releaseStreamingStart;
+  const blockedStart = new Promise((resolve) => {
+    releaseStreamingStart = resolve;
+  });
+  const cancelledState = {
+    micOpen: true,
+    micSession: 10,
+    asrProvider: "auto",
+    asrStreamingEnabled: true,
+    asrStreamChunkMs: 600,
+    localAsrStreamingSessionId: "",
+    localAsrStreamingBuffers: [],
+    localAsrStreamingBufferedMs: 0
+  };
+  const cancelledController = localAsr.createController({
+    state: cancelledState,
+    ui: { chatInput: { value: "" } },
+    authFetch: async (_url, options) => {
+      const body = JSON.parse(options.body);
+      cancelledActions.push(body.action);
+      if (body.action === "start") {
+        await blockedStart;
+        if (options.signal?.aborted) {
+          throw Object.assign(new Error("aborted"), { name: "AbortError" });
+        }
+      }
+      return {
+        ok: true,
+        async json() {
+          return { enabled: true, provider: "paraformer", partial_text: "" };
+        }
+      };
+    },
+    windowObject: {
+      btoa: (value) => Buffer.from(value, "binary").toString("base64"),
+      Uint8Array,
+      Int16Array,
+      Float32Array,
+      AbortController
+    }
+  });
+  cancelledController.beginLocalAsrStreaming(10);
+  await Promise.resolve();
+  cancelledController.queueLocalAsrStreamingFrame(new Int16Array(9600).fill(12), 600, 10);
+  cancelledController.queueLocalAsrStreamingFrame(new Int16Array(9600).fill(12), 600, 10);
+  const queuedPreviewChain = cancelledState.localAsrStreamingRequestChain;
+  cancelledController.cancelLocalAsrStreaming();
+  releaseStreamingStart();
+  await queuedPreviewChain;
+  assert.deepStrictEqual(
+    cancelledActions,
+    ["start", "cancel"],
+    "cancelling a stream must prevent queued preview chunks from reaching the backend"
+  );
+
   const sent = [];
   const ambiguityController = localAsr.createController({
     state: {

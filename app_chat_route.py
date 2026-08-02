@@ -1,12 +1,28 @@
 from http import HTTPStatus
+import time
 
 from companion_turn_contract import is_model_direct_reply_enabled
+from natural_conversation import (
+    is_natural_conversation_enabled,
+    parse_natural_conversation_output,
+    public_natural_conversation_decision,
+)
 
 
 CHAT_ROUTES = {"/api/chat", "/api/chat_stream"}
 PRE_FINALIZED_STREAM_SENTINEL = "\x00PRE_FINALIZED\x00"
 DELIVERED_TURN_RECEIPT_CAPABILITY = "delivered_turn_receipt_v1"
 MAX_PENDING_DELIVERY_RECEIPTS = 8
+
+
+def _iter_natural_reply_chunks(text, max_chars=14):
+    """Re-stream a buffered model-direct reply without exposing control tags."""
+    source = str(text or "")
+    width = max(4, min(32, int(max_chars or 14)))
+    for start in range(0, len(source), width):
+        chunk = source[start : start + width]
+        if chunk:
+            yield chunk
 
 
 def _has_delivered_turn_receipt_capability(body):
@@ -83,6 +99,12 @@ def _build_chat_config(
     )
     resolved = dict(chat_config or {})
     resolved["_input_modality"] = input_modality
+    resolved["_natural_participation"] = bool(
+        is_auto and isinstance(body, dict) and body.get("natural_participation") is True
+    )
+    resolved["_tools_optional"] = bool(
+        isinstance(body, dict) and body.get("tools_optional") is True
+    )
 
     auto_kind = clean_experience_text_func(body.get("auto_kind"), 40).lower()
     character_experience_profile = sanitize_character_experience_profile_func(
@@ -254,6 +276,8 @@ def _handle_chat_stream_request(
     begin_sse_func(perf_trace_id)
 
     full_parts = []
+    natural_buffering = is_natural_conversation_enabled(chat_config)
+    natural_decision = None
     already_finalized = False
     first_delta_ms = -1
     delta_chunks = 0
@@ -278,9 +302,16 @@ def _handle_chat_stream_request(
             delta_chars += len(chunk)
             if first_delta_ms < 0:
                 first_delta_ms = perf_now_ms_func() - llm_started_ms
-            send_sse_func({"type": "delta", "text": chunk})
+            if not natural_buffering:
+                send_sse_func({"type": "delta", "text": chunk})
         model_direct_reply = is_model_direct_reply_enabled(chat_config)
         raw_stream_reply = "".join(full_parts)
+        if natural_buffering:
+            natural_decision = parse_natural_conversation_output(
+                raw_stream_reply,
+                chat_config,
+            )
+            raw_stream_reply = str(natural_decision.get("reply_text") or "")
         final_reply = raw_stream_reply if model_direct_reply else raw_stream_reply.strip()
         runtime_meta = None
         finalize_started_ms = perf_now_ms_func()
@@ -317,7 +348,23 @@ def _handle_chat_stream_request(
                 final_reply,
             )
         runtime_ms = perf_now_ms_func() - runtime_started_ms
+        public_natural_decision = public_natural_conversation_decision(
+            natural_decision
+        )
+        if natural_buffering and final_reply:
+            target_delay_ms = int(
+                (public_natural_decision or {}).get("thinking_delay_ms") or 0
+            )
+            elapsed_ms = perf_now_ms_func() - llm_started_ms
+            remaining_ms = max(0, min(5000, target_delay_ms - elapsed_ms))
+            if remaining_ms:
+                time.sleep(remaining_ms / 1000.0)
+            first_delta_ms = perf_now_ms_func() - llm_started_ms
+            for visible_chunk in _iter_natural_reply_chunks(final_reply):
+                send_sse_func({"type": "delta", "text": visible_chunk})
         done_payload = {"type": "done", "reply": final_reply}
+        if public_natural_decision is not None:
+            done_payload["conversation_decision"] = public_natural_decision
         if runtime_meta is not None:
             done_payload["character_runtime"] = runtime_meta
         brain_payload = None if model_direct_reply else build_character_brain_response_payload_func(chat_config)
@@ -334,20 +381,22 @@ def _handle_chat_stream_request(
         )
         if companion_turn is not None:
             done_payload["turn"] = companion_turn
-        delivery_id = _stage_delivered_turn(
-            chat_config,
-            user_message,
-            history,
-            final_reply,
-            is_auto=is_auto,
-            interaction_id=perf_trace_id,
-            remember_interaction_func=remember_interaction_func,
-            update_character_brain_session_state_func=update_character_brain_session_state_func,
-            get_history_summary_settings_func=get_history_summary_settings_func,
-            sanitize_history_func=sanitize_history_func,
-            stage_delivered_turn_func=stage_delivered_turn_func,
-            defer_until_delivery=delivery_receipt_enabled,
-        )
+        delivery_id = ""
+        if str(final_reply or "").strip():
+            delivery_id = _stage_delivered_turn(
+                chat_config,
+                user_message,
+                history,
+                final_reply,
+                is_auto=is_auto,
+                interaction_id=perf_trace_id,
+                remember_interaction_func=remember_interaction_func,
+                update_character_brain_session_state_func=update_character_brain_session_state_func,
+                get_history_summary_settings_func=get_history_summary_settings_func,
+                sanitize_history_func=sanitize_history_func,
+                stage_delivered_turn_func=stage_delivered_turn_func,
+                defer_until_delivery=delivery_receipt_enabled,
+            )
         if delivery_id:
             done_payload["delivery_id"] = delivery_id
         send_sse_func(done_payload)
@@ -423,6 +472,10 @@ def _handle_chat_request(
             force_tools=force_tools,
             config=chat_config,
         )
+        natural_decision = None
+        if is_natural_conversation_enabled(chat_config):
+            natural_decision = parse_natural_conversation_output(reply, chat_config)
+            reply = str(natural_decision.get("reply_text") or "")
         if not is_model_direct_reply_enabled(chat_config):
             reply = apply_demo_stable_identity_fallback_func(
                 chat_config, user_message, reply
@@ -437,6 +490,11 @@ def _handle_chat_request(
             reply = apply_character_brain_reply_text_func(chat_config, user_message, reply)
         runtime_ms = perf_now_ms_func() - runtime_started_ms
         payload = {"reply": str(reply or "")}
+        public_natural_decision = public_natural_conversation_decision(
+            natural_decision
+        )
+        if public_natural_decision is not None:
+            payload["conversation_decision"] = public_natural_decision
         if runtime_meta is not None:
             payload["character_runtime"] = runtime_meta
         brain_payload = None if model_direct_reply else build_character_brain_response_payload_func(chat_config)
@@ -453,20 +511,22 @@ def _handle_chat_request(
         )
         if companion_turn is not None:
             payload["turn"] = companion_turn
-        delivery_id = _stage_delivered_turn(
-            chat_config,
-            user_message,
-            history,
-            reply,
-            is_auto=is_auto,
-            interaction_id=perf_trace_id,
-            remember_interaction_func=remember_interaction_func,
-            update_character_brain_session_state_func=update_character_brain_session_state_func,
-            get_history_summary_settings_func=get_history_summary_settings_func,
-            sanitize_history_func=sanitize_history_func,
-            stage_delivered_turn_func=stage_delivered_turn_func,
-            defer_until_delivery=delivery_receipt_enabled,
-        )
+        delivery_id = ""
+        if str(reply or "").strip():
+            delivery_id = _stage_delivered_turn(
+                chat_config,
+                user_message,
+                history,
+                reply,
+                is_auto=is_auto,
+                interaction_id=perf_trace_id,
+                remember_interaction_func=remember_interaction_func,
+                update_character_brain_session_state_func=update_character_brain_session_state_func,
+                get_history_summary_settings_func=get_history_summary_settings_func,
+                sanitize_history_func=sanitize_history_func,
+                stage_delivered_turn_func=stage_delivered_turn_func,
+                defer_until_delivery=delivery_receipt_enabled,
+            )
         if delivery_id:
             payload["delivery_id"] = delivery_id
         send_json_func(payload, extra_headers=perf_headers)
@@ -533,6 +593,7 @@ def handle_chat_route(
     log_backend_perf_func,
     diagnostic_payload_func,
     perf_now_ms_func,
+    process_desktop_qq_command_func=None,
 ):
     delivery_receipt_enabled = _has_delivered_turn_receipt_capability(body)
     if delivery_receipt_enabled:
@@ -570,6 +631,11 @@ def handle_chat_route(
             extra_headers=perf_headers,
         )
         return
+
+    if not is_auto and callable(process_desktop_qq_command_func):
+        desktop_qq_result = process_desktop_qq_command_func(user_message)
+        if isinstance(desktop_qq_result, dict) and desktop_qq_result.get("matched"):
+            chat_config["_qq_desktop_command_result"] = str(desktop_qq_result.get("prompt_note", ""))[:1200]
 
     if not isinstance(history, list):
         history = []

@@ -5707,7 +5707,7 @@ body.view-chat .message.sticker-message {
 
 body.view-chat .message.sticker-message .content,
 body.view-chat .message .content.sticker-content {
-  padding: 6px;
+  padding: 5px 7px;
   background: transparent;
   border: 0;
   box-shadow: none;
@@ -5715,11 +5715,49 @@ body.view-chat .message .content.sticker-content {
 
 .sticker-message-img {
   display: block;
-  width: min(170px, 42vw);
+  width: 2.7em;
+  max-width: 52px;
   aspect-ratio: 1;
   object-fit: contain;
   border-radius: 0;
-  filter: drop-shadow(0 8px 12px rgba(42, 59, 104, 0.16));
+  filter: drop-shadow(0 4px 7px rgba(42, 59, 104, 0.16));
+}
+
+.inline-sticker-group {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.16em;
+  margin-inline-start: 0.28em;
+  vertical-align: -0.42em;
+  white-space: nowrap;
+}
+
+.inline-sticker-img {
+  display: inline-block;
+  width: 1.85em;
+  height: 1.85em;
+  object-fit: contain;
+  border-radius: 0;
+  filter: drop-shadow(0 3px 5px rgba(48, 43, 78, 0.18));
+  transform-origin: 50% 80%;
+  animation: inline-sticker-arrive 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.inline-sticker-missing {
+  color: inherit;
+  font-size: 0.78em;
+  opacity: 0.7;
+}
+
+@keyframes inline-sticker-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(0.22em) scale(0.78) rotate(-4deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0);
+  }
 }
 
 .sticker-missing {
@@ -5741,7 +5779,7 @@ body.view-chat .message .content.sticker-content {
   }
 
   .sticker-message-img {
-    width: min(148px, 48vw);
+    width: 2.55em;
   }
 }
 

@@ -248,6 +248,17 @@ assert.ok(
   "GPT-SoVITS stream segmentation should avoid tiny standalone chunks"
 );
 
+const earlyCompleteBeat = speechText.splitStreamSpeakSegments(
+  "Tiny plan ready.",
+  { flush: false, style: "playful", provider: "gpt_sovits", firstBeatMinChars: 14 }
+);
+assert.deepStrictEqual(
+  earlyCompleteBeat.segments,
+  ["Tiny plan ready."],
+  "a configured complete first beat should start GPT-SoVITS before the old 30-character threshold"
+);
+assert.strictEqual(earlyCompleteBeat.rest, "");
+
 const prosody = speechText.buildSpeakProsody("太好了！", "happy", true, "playful");
 assert.strictEqual(typeof prosody.speed_ratio, "number");
 assert.strictEqual(typeof prosody.pitch_ratio, "number");

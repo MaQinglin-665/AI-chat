@@ -6,6 +6,7 @@ from tts import (
     _replace_en_words_for_tts,
     _wav_amplitude_stats,
     synthesize_gpt_sovits_tts_bytes,
+    open_gpt_sovits_tts_stream,
 )
 
 
@@ -250,3 +251,55 @@ def test_gpt_sovits_prompt_text_is_first_candidate_for_short_english(monkeypatch
     assert audio.startswith(b"RIFF")
     assert payloads
     assert payloads[0]["prompt_text"] == "They take good care of you."
+
+
+def test_gpt_sovits_stream_opens_incremental_wav_without_buffering(monkeypatch):
+    import json
+
+    captured = {}
+
+    class FakeHeaders:
+        def get(self, key, default=None):
+            return "audio/wav" if key.lower() == "content-type" else default
+
+    class FakeResponse:
+        headers = FakeHeaders()
+
+        def __init__(self):
+            self.parts = [b"RIFF-stream-header", b"pcm-one", b"pcm-two", b""]
+            self.closed = False
+
+        def read(self, _size=-1):
+            return self.parts.pop(0)
+
+        def close(self):
+            self.closed = True
+
+    response = FakeResponse()
+
+    def fake_urlopen(request, timeout=0):
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        captured["timeout"] = timeout
+        return response
+
+    monkeypatch.setattr("tts.urllib.request.urlopen", fake_urlopen)
+    chunks, content_type = open_gpt_sovits_tts_stream(
+        "Hello there.",
+        config_override={
+            "tts": {
+                "provider": "gpt_sovits",
+                "gpt_sovits_stream_playback": True,
+                "gpt_sovits_streaming_mode": 2,
+                "gpt_sovits_api_url": "http://127.0.0.1:9880/tts",
+                "gpt_sovits_prompt_lang": "en",
+                "gpt_sovits_ref_audio_path": "ref.wav",
+            }
+        },
+    )
+
+    assert content_type == "audio/wav"
+    assert list(chunks) == [b"RIFF-stream-header", b"pcm-one", b"pcm-two"]
+    assert response.closed is True
+    assert captured["payload"]["streaming_mode"] == 2
+    assert captured["payload"]["media_type"] == "wav"
+    assert captured["payload"]["parallel_infer"] is False

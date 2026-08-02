@@ -3,6 +3,7 @@ import os
 import sys
 import random
 import secrets
+import subprocess
 import threading
 import time
 from datetime import datetime
@@ -22,6 +23,7 @@ except Exception:
 
 from config import (
     CONFIG_PATH,
+    LOCAL_CONFIG_PATH,
     DEFAULT_CONFIG,
     DiagnosticError,
     EXAMPLE_CONFIG_PATH,
@@ -36,7 +38,17 @@ from config import (
     sanitize_hotword_replacements,
     validate_live2d_model_path,
 )
+from qq_identity import (
+    QQBridgeRuntime,
+    QQ_IDENTITY_STATE_FILENAME,
+    build_qq_identity_prompt_block,
+    build_qq_identity_public_payload,
+    get_qq_identity_config,
+    parse_explicit_desktop_qq_send,
+    save_qq_identity_config,
+)
 import memory as _memory_module
+import desktop_agent
 from memory import (
     build_memory_prompt_block,
     get_core_memories_for_review,
@@ -46,6 +58,7 @@ from memory import (
     build_manual_persona_card_block,
     build_persona_memory_block,
     build_relationship_memory_block,
+    build_shared_experience_prompt_block,
     load_manual_persona_card,
     remember_interaction,
     save_manual_persona_card,
@@ -60,6 +73,15 @@ from relationship_state import (
     is_relationship_state_feature_enabled,
     update_relationship_state,
 )
+from obsidian_knowledge import (
+    build_prompt_block as build_knowledge_prompt_block,
+    migrate_existing_memories as migrate_knowledge_memories,
+    status as get_knowledge_status,
+    start_background_learner,
+    sync_vault as sync_knowledge_vault,
+)
+from companion_life import build_life_prompt_block, get_proactive_material, growth_history, restore_growth_snapshot, life_status, consolidate_life, companion_decision
+from social_cognition import build_prompt_block as build_social_cognition_prompt_block, public_state as get_social_cognition_state
 
 
 def _missing_learning_review_feature(*_args, **_kwargs):
@@ -99,11 +121,13 @@ undo_last_learning_review_action = getattr(
     "undo_last_learning_review_action",
     _missing_learning_review_feature,
 )
-from tts import synthesize_tts_audio
+from tts import open_server_tts_stream, synthesize_tts_audio
 from tools import (
+    confirm_agent_action,
     get_tools_settings,
     should_use_work_tools,
 )
+import agent_actions
 
 from llm_client import (
     call_ollama,
@@ -142,8 +166,17 @@ from emotion import (
 
 from asr import (
     guess_audio_content_type,
+    preload_vosk_models,
     transcribe_pcm16_with_vosk,
     transcribe_pcm16_with_vosk_result,
+)
+from local_asr_provider import (
+    append_funasr_stream_audio,
+    cancel_funasr_stream_session,
+    get_sensevoice_service_status,
+    preload_funasr_final_model,
+    start_funasr_stream_session,
+    transcribe_pcm16_with_local_fallback_result,
 )
 from character_runtime import (
     preview_backend_entry_noop_adapter,
@@ -152,6 +185,7 @@ from character_runtime import (
 from character_brain import (
     apply_character_brain_reply_constraints,
     build_character_brain_decision,
+    build_compact_character_brain_prompt_block,
     build_character_brain_prompt_block,
     build_character_brain_public_snapshot,
     decay_brain_session_state,
@@ -195,7 +229,7 @@ from app_diagnostics import (
     safe_int_value as _safe_int_value,
     wall_now_ms as _wall_now_ms,
 )
-from app_asr_route import handle_asr_pcm_request
+from app_asr_route import handle_asr_pcm_request, handle_asr_stream_request
 import app_chat_context as _chat_context
 from app_chat_route import CHAT_ROUTES, handle_chat_route
 from companion_turn_contract import build_companion_turn
@@ -208,7 +242,8 @@ from app_config_route import (
     handle_config_post_route,
 )
 from app_translate_route import handle_translate_request
-from app_tts_route import handle_tts_request
+from app_tts_route import handle_tts_request, handle_tts_stream_request
+from singing import convert_catalog_song, convert_selected_wav, public_status as get_singing_status, read_output as read_singing_output
 from config_switch import (
     build_config_switch_payload,
     build_config_switch_test_config,
@@ -286,6 +321,14 @@ from time_awareness import (
 _SUMMARY_CACHE_LOCK = threading.Lock()
 _HISTORY_SUMMARY_CACHE = {"key": "", "summary": ""}
 _DELIVERED_TURN_REGISTRY = DeliveredTurnRegistry()
+_LOCAL_ASR_WARMUP_LOCK = threading.Lock()
+_LOCAL_ASR_WARMUP = {
+    "status": "idle",
+    "provider": "",
+    "loaded_languages": (),
+    "error": "",
+}
+_QQ_BRIDGE_RUNTIME = None
 RUNTIME_RESTART_EXIT_CODE = 75
 API_TOKEN_HEADER = "X-Taffy-Token"
 API_TOKEN_ENV_DEFAULT = "TAFFY_API_TOKEN"
@@ -493,6 +536,210 @@ def schedule_runtime_restart(delay_sec=0.35):
 
     thread = threading.Thread(target=_restart_later, daemon=True, name="taffy-runtime-restart")
     thread.start()
+
+
+def schedule_local_asr_warmup(config=None):
+    cfg = config if isinstance(config, dict) else load_config()
+    asr_cfg = cfg.get("asr", {}) if isinstance(cfg, dict) else {}
+    if not isinstance(asr_cfg, dict):
+        asr_cfg = {}
+    provider = str(asr_cfg.get("provider", "auto") or "auto").strip().lower()
+    if provider != "vosk":
+        with _LOCAL_ASR_WARMUP_LOCK:
+            _LOCAL_ASR_WARMUP.update(
+                status="warming",
+                provider=provider,
+                loaded_languages=(),
+                error="",
+            )
+
+        def _warm_sensevoice():
+            try:
+                if asr_cfg.get("sensevoice_service_enabled", True) is not False:
+                    status = get_sensevoice_service_status(asr_cfg)
+                    if (
+                        status.get("available") is not True
+                        and asr_cfg.get("sensevoice_service_managed", True) is not False
+                    ):
+                        raw_url = str(
+                            asr_cfg.get(
+                                "sensevoice_service_url",
+                                "http://127.0.0.1:9890",
+                            )
+                            or "http://127.0.0.1:9890"
+                        ).strip()
+                        parsed = urllib.parse.urlparse(raw_url)
+                        if (
+                            parsed.scheme != "http"
+                            or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+                        ):
+                            raise RuntimeError(
+                                "Managed SenseVoice service requires a loopback URL."
+                            )
+                        service_script = ROOT_DIR / "scripts" / "sensevoice_service.py"
+                        service_log = ROOT_DIR / "sensevoice_service.log"
+                        port = int(parsed.port or 9890)
+                        bundled_runtime_python = (
+                            ROOT_DIR.parent
+                            / "sensevoice_runtime"
+                            / ".venv"
+                            / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+                        )
+                        service_python = (
+                            str(bundled_runtime_python)
+                            if bundled_runtime_python.is_file()
+                            else sys.executable
+                        )
+                        configured_service_runtime = str(
+                            asr_cfg.get("sensevoice_service_runtime", "onnx")
+                            or "onnx"
+                        ).strip().lower()
+                        service_runtime = (
+                            configured_service_runtime
+                            if configured_service_runtime != "onnx"
+                            or bundled_runtime_python.is_file()
+                            else "pytorch"
+                        )
+                        command = [
+                            service_python,
+                            str(service_script),
+                            "--host",
+                            "127.0.0.1",
+                            "--port",
+                            str(port),
+                            "--model",
+                            str(
+                                asr_cfg.get(
+                                    "sensevoice_service_model",
+                                    "iic/SenseVoiceSmall-onnx",
+                                )
+                                or "iic/SenseVoiceSmall-onnx"
+                            ),
+                            "--runtime",
+                            service_runtime,
+                            "--device",
+                            str(asr_cfg.get("funasr_device", "auto") or "auto"),
+                        ]
+                        popen_kwargs = {
+                            "cwd": str(ROOT_DIR),
+                            "stdin": subprocess.DEVNULL,
+                            "env": {**os.environ, "PYTHONUNBUFFERED": "1"},
+                            "close_fds": True,
+                        }
+                        if os.name == "nt":
+                            popen_kwargs["creationflags"] = (
+                                subprocess.CREATE_NEW_PROCESS_GROUP
+                                | subprocess.DETACHED_PROCESS
+                            )
+                        else:
+                            popen_kwargs["start_new_session"] = True
+                        with service_log.open("ab") as log_file:
+                            subprocess.Popen(
+                                command,
+                                stdout=log_file,
+                                stderr=subprocess.STDOUT,
+                                **popen_kwargs,
+                            )
+                    try:
+                        startup_timeout = float(
+                            asr_cfg.get("sensevoice_service_startup_timeout_sec", 120)
+                            or 120
+                        )
+                    except (TypeError, ValueError):
+                        startup_timeout = 120.0
+                    deadline = time.monotonic() + max(10.0, min(240.0, startup_timeout))
+                    while time.monotonic() < deadline:
+                        status = get_sensevoice_service_status(asr_cfg)
+                        if status.get("ready") is True:
+                            break
+                        if status.get("status") == "error":
+                            raise RuntimeError(
+                                f"SenseVoice service warmup failed: {status.get('error', '')}"
+                            )
+                        time.sleep(0.5)
+                    else:
+                        raise RuntimeError("SenseVoice service warmup timed out.")
+                    warmup_provider = "sensevoice_service"
+                else:
+                    preload_funasr_final_model(asr_cfg)
+                    warmup_provider = provider
+                with _LOCAL_ASR_WARMUP_LOCK:
+                    _LOCAL_ASR_WARMUP.update(
+                        status="ready",
+                        provider=warmup_provider,
+                        loaded_languages=(),
+                        error="",
+                    )
+                print(f"[ASR] SenseVoice warmup ready: {warmup_provider}")
+            except Exception as exc:
+                with _LOCAL_ASR_WARMUP_LOCK:
+                    _LOCAL_ASR_WARMUP.update(
+                        status="error",
+                        provider=provider,
+                        loaded_languages=(),
+                        error=type(exc).__name__,
+                    )
+                _log_backend_exception(
+                    "ASR",
+                    exc,
+                    extra="background SenseVoice warmup failed; Vosk/Whisper fallback remains available",
+                )
+
+        thread = threading.Thread(
+            target=_warm_sensevoice,
+            daemon=True,
+            name="taffy-sensevoice-warmup",
+        )
+        thread.start()
+        return thread
+    with _LOCAL_ASR_WARMUP_LOCK:
+        _LOCAL_ASR_WARMUP.update(
+            status="warming",
+            provider="vosk",
+            loaded_languages=(),
+            error="",
+        )
+
+    def _warm_vosk():
+        try:
+            loaded = preload_vosk_models(asr_cfg)
+            with _LOCAL_ASR_WARMUP_LOCK:
+                _LOCAL_ASR_WARMUP.update(
+                    status="ready",
+                    provider="vosk",
+                    loaded_languages=tuple(loaded),
+                    error="",
+                )
+            if loaded:
+                print(f"[ASR] Vosk warmup ready: {','.join(loaded)}")
+        except Exception as exc:
+            with _LOCAL_ASR_WARMUP_LOCK:
+                _LOCAL_ASR_WARMUP.update(
+                    status="error",
+                    provider="vosk",
+                    loaded_languages=(),
+                    error=type(exc).__name__,
+                )
+            _log_backend_exception("ASR", exc, extra="background Vosk warmup failed")
+
+    thread = threading.Thread(target=_warm_vosk, daemon=True, name="taffy-asr-warmup")
+    thread.start()
+    return thread
+
+
+def get_local_asr_warmup_status():
+    with _LOCAL_ASR_WARMUP_LOCK:
+        snapshot = dict(_LOCAL_ASR_WARMUP)
+    status = str(snapshot.get("status", "idle") or "idle")
+    provider = str(snapshot.get("provider", "") or "")
+    return {
+        "status": status,
+        "provider": provider,
+        "required": provider == "vosk",
+        "ready": status in {"ready", "not_required"},
+        "loaded_languages": list(snapshot.get("loaded_languages", ()) or ()),
+        "error": str(snapshot.get("error", "") or ""),
+    }
 
 
 def summarize_older_history(
@@ -740,10 +987,21 @@ def _is_model_direct_reply_enabled(config):
     return isinstance(settings, dict) and settings.get("model_direct_reply") is True
 
 
+def _is_model_direct_brain_guidance_enabled(config):
+    if not isinstance(config, dict):
+        return False
+    settings = config.get("character_runtime")
+    return (
+        isinstance(settings, dict)
+        and settings.get("model_direct_reply") is True
+        and settings.get("model_direct_brain_guidance") is True
+    )
+
+
 def _ensure_character_brain_decision(config, user_message, history, *, is_auto=False):
     if not isinstance(config, dict):
         return config
-    if _is_model_direct_reply_enabled(config):
+    if _is_model_direct_reply_enabled(config) and not _is_model_direct_brain_guidance_enabled(config):
         config.pop("_character_brain_decision", None)
         config.pop("_character_brain_response_decision", None)
         return config
@@ -777,6 +1035,23 @@ def _ensure_character_brain_decision(config, user_message, history, *, is_auto=F
 def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto=False):
     history_settings = get_history_summary_settings(config)
     keep_recent = int(history_settings.get("keep_recent_messages", 8))
+    conversation_mode = (
+        config.get("conversation_mode", {})
+        if isinstance(config.get("conversation_mode"), dict)
+        else {}
+    )
+    voice_low_latency = (
+        config.get("_input_modality") == "voice"
+        and conversation_mode.get("voice_low_latency_enabled") is True
+    )
+    if voice_low_latency:
+        keep_recent = max(
+            2,
+            min(
+                keep_recent,
+                int(conversation_mode.get("voice_prompt_max_history_messages", 4) or 4),
+            ),
+        )
     safe_history = sanitize_history(history, max_items=keep_recent)
     lightweight_checkin = is_lightweight_checkin_message(user_message)
     manual_persona_block = "" if lightweight_checkin else build_manual_persona_card_block()
@@ -789,6 +1064,9 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto
     relationship_block = "" if lightweight_checkin or relationship_state_feature_enabled else build_relationship_memory_block()
     relationship_state_block = "" if lightweight_checkin else build_relationship_state_prompt_block(config)
     assistant_prompt = config.get("assistant_prompt", "")
+    qq_identity_block = build_qq_identity_prompt_block(config)
+    if qq_identity_block:
+        assistant_prompt = merge_prompt_with_memory(assistant_prompt, qq_identity_block)
     if manual_persona_block:
         assistant_prompt = merge_prompt_with_memory(manual_persona_block, assistant_prompt)
     if wakeup_block:
@@ -801,10 +1079,32 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto
         assistant_prompt = merge_prompt_with_memory(relationship_state_block, assistant_prompt)
     memory_block = "" if lightweight_checkin else build_memory_prompt_block(config, user_message, safe_history)
     base_prompt = merge_prompt_with_memory(assistant_prompt, memory_block)
-    dialogue_policy = build_model_direct_dialogue_policy(config)
+    knowledge_block = "" if lightweight_checkin else build_knowledge_prompt_block(config, user_message, safe_history)
+    if knowledge_block:
+        base_prompt = merge_prompt_with_memory(base_prompt, knowledge_block)
+    life_block = build_life_prompt_block(config, is_auto=is_auto)
+    if life_block:
+        base_prompt = merge_prompt_with_memory(base_prompt, life_block)
+    social_block = "" if lightweight_checkin else build_social_cognition_prompt_block(config)
+    if social_block:
+        base_prompt = merge_prompt_with_memory(base_prompt, social_block)
+    desktop_capability_block = desktop_agent.build_prompt_block(config)
+    if desktop_capability_block:
+        base_prompt = merge_prompt_with_memory(base_prompt, desktop_capability_block)
+    shared_experience_block = "" if lightweight_checkin else build_shared_experience_prompt_block(
+        config,
+        user_message,
+        is_auto=is_auto,
+    )
+    if shared_experience_block:
+        base_prompt = merge_prompt_with_memory(base_prompt, shared_experience_block)
+    dialogue_policy = build_model_direct_dialogue_policy(
+        config,
+        compact=voice_low_latency,
+    )
     if dialogue_policy:
         base_prompt = merge_prompt_with_memory(base_prompt, dialogue_policy)
-    if not _is_model_direct_reply_enabled(config):
+    if not _is_model_direct_reply_enabled(config) or _is_model_direct_brain_guidance_enabled(config):
         session_state = config.get("_character_brain_session_state") if isinstance(config, dict) else None
         if isinstance(config, dict) and not isinstance(session_state, dict):
             session_state = _get_character_brain_session_state()
@@ -820,7 +1120,11 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto
         )
         if isinstance(config, dict):
             config["_character_brain_decision"] = brain_decision
-        brain_block = build_character_brain_prompt_block(brain_decision)
+        brain_block = (
+            build_compact_character_brain_prompt_block(brain_decision)
+            if voice_low_latency or _is_model_direct_reply_enabled(config)
+            else build_character_brain_prompt_block(brain_decision)
+        )
         if brain_block:
             base_prompt = merge_prompt_with_memory(base_prompt, brain_block)
     conversation_context_block = _build_conversation_context_prompt_block(
@@ -834,8 +1138,15 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto
     )
     if experience_block:
         base_prompt = merge_prompt_with_memory(base_prompt, experience_block)
+    history_prompt_config = config
+    if voice_low_latency:
+        history_prompt_config = dict(config)
+        history_prompt_config["history_summary"] = {
+            **history_settings,
+            "keep_recent_messages": keep_recent,
+        }
     base_prompt, safe_history = build_prompt_with_history_summary(
-        config=config,
+        config=history_prompt_config,
         llm_cfg=llm_cfg,
         provider=provider,
         history=history,
@@ -973,9 +1284,53 @@ def call_openai_compatible_with_tools(llm_cfg, config, messages):
     )
 
 
+VAD_WEB_DIST_DIR = ROOT_DIR / "node_modules" / "@ricky0123" / "vad-web" / "dist"
+ORT_WEB_DIST_DIR = ROOT_DIR / "node_modules" / "onnxruntime-web" / "dist"
+VAD_RUNTIME_ASSET_NAMES = {
+    "bundle.min.js",
+    "silero_vad_legacy.onnx",
+    "silero_vad_v5.onnx",
+    "vad.worklet.bundle.min.js",
+}
+ORT_RUNTIME_ASSET_NAMES = {
+    "ort.wasm.min.js",
+    "ort-wasm-simd-threaded.asyncify.mjs",
+    "ort-wasm-simd-threaded.asyncify.wasm",
+    "ort-wasm-simd-threaded.jsep.mjs",
+    "ort-wasm-simd-threaded.jsep.wasm",
+    "ort-wasm-simd-threaded.jspi.mjs",
+    "ort-wasm-simd-threaded.jspi.wasm",
+    "ort-wasm-simd-threaded.mjs",
+    "ort-wasm-simd-threaded.wasm",
+}
+
+
+def _resolve_optional_vad_runtime_asset(request_path):
+    path_only = urllib.parse.urlsplit(str(request_path or "")).path
+    if path_only.startswith("/runtime/vad/ort/"):
+        name = path_only.removeprefix("/runtime/vad/ort/")
+        base = ORT_WEB_DIST_DIR
+        allowed = ORT_RUNTIME_ASSET_NAMES
+    elif path_only.startswith("/runtime/vad/"):
+        name = path_only.removeprefix("/runtime/vad/")
+        base = VAD_WEB_DIST_DIR
+        allowed = VAD_RUNTIME_ASSET_NAMES
+    else:
+        return None
+    if not name or "/" in name or "\\" in name or name not in allowed:
+        return None
+    return base / name
+
+
 class PetHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(WEB_DIR), **kwargs)
+
+    def translate_path(self, path):
+        optional_asset = _resolve_optional_vad_runtime_asset(path)
+        if optional_asset is not None:
+            return str(optional_asset)
+        return super().translate_path(path)
 
     def log_message(self, fmt, *args):  # noqa: N802
         # Suppress Unicode encode errors on Windows GBK console.
@@ -1104,11 +1459,28 @@ class PetHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(audio_bytes)
 
+    def _send_audio_stream(self, chunks, content_type="audio/wav", status=HTTPStatus.OK, extra_headers=None):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Connection", "close")
+        if isinstance(extra_headers, dict):
+            for key, value in extra_headers.items():
+                k = str(key or "").strip()
+                if k:
+                    self.send_header(k, str(value or ""))
+        self.end_headers()
+        self.close_connection = True
+        for chunk in chunks:
+            if not chunk:
+                continue
+            self.wfile.write(chunk)
+            self.wfile.flush()
+
     def _request_body_limit(self, path_only=None):
         route = str(path_only or self.path.split("?", 1)[0] or "")
         if route in {"/api/chat", "/api/chat_stream"}:
             return CHAT_JSON_BODY_LIMIT_BYTES
-        if route == "/api/asr_pcm":
+        if route in {"/api/asr_pcm", "/api/asr_stream"}:
             return ASR_JSON_BODY_LIMIT_BYTES
         return DEFAULT_JSON_BODY_LIMIT_BYTES
 
@@ -1313,6 +1685,42 @@ class PetHandler(SimpleHTTPRequestHandler):
         if path_only == "/api/health":
             self._send_json(self._build_health_payload(detailed=True))
             return
+        if path_only == "/api/agent/actions":
+            self._send_json(agent_actions.public_state())
+            return
+        if path_only == "/api/qq/identity":
+            try:
+                payload = build_qq_identity_public_payload(load_config())
+                payload["runtime"] = _get_qq_bridge_runtime().status()
+                self._send_json(payload)
+            except Exception as exc:
+                _log_backend_exception("QQ", exc, extra="GET /api/qq/identity failed")
+                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        if path_only == "/api/qq/identity/history":
+            try:
+                runtime = _get_qq_bridge_runtime()
+                self._send_json({"ok": True, "items": runtime.store.audit()})
+            except Exception as exc:
+                _log_backend_exception("QQ", exc, extra="GET /api/qq/identity/history failed")
+                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        if path_only == "/api/asr/status":
+            self._send_json(get_local_asr_warmup_status())
+            return
+        if path_only == "/api/singing/status":
+            self._send_json(get_singing_status(load_config()))
+            return
+        if path_only.startswith("/api/singing/output/"):
+            try:
+                name = urllib.parse.unquote(path_only.rsplit("/", 1)[-1])
+                output = read_singing_output(load_config(), name)
+                self._send_audio(output.read_bytes(), content_type="audio/wav")
+            except FileNotFoundError:
+                self._send_json({"ok": False, "error": "Not found"}, status=HTTPStatus.NOT_FOUND)
+            except Exception as exc:
+                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
         if path_only == "/api/character_runtime/backend_entry":
             try:
                 self._send_json(self._build_character_runtime_backend_entry_payload())
@@ -1398,12 +1806,32 @@ class PetHandler(SimpleHTTPRequestHandler):
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 )
             return
+        if path_only == "/api/knowledge/status":
+            try:
+                self._send_json(get_knowledge_status(load_config()))
+            except Exception as exc:
+                _log_backend_exception("KNOWLEDGE", exc, extra="GET /api/knowledge/status failed")
+                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        if path_only == "/api/life/proactive":
+            try:
+                self._send_json(get_proactive_material(load_config()))
+            except Exception as exc:
+                _log_backend_exception("LIFE", exc, extra="GET /api/life/proactive failed")
+                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        if path_only == "/api/life/history":
+            self._send_json({"ok": True, "items": growth_history(load_config())}); return
+        if path_only == "/api/life/status":
+            payload = life_status(load_config()); payload["decision"] = companion_decision(load_config()); self._send_json(payload); return
         return super().do_GET()
 
     def do_POST(self):
         path_only = self.path.split("?", 1)[0]
         if self._reject_disallowed_origin(path_only):
             return
+        if path_only == "/api/social_cognition":
+            self._send_json(get_social_cognition_state(load_config())); return
         if self._reject_invalid_api_token(path_only):
             return
         if path_only in CONFIG_POST_RAW_JSON_ROUTES:
@@ -1415,6 +1843,31 @@ class PetHandler(SimpleHTTPRequestHandler):
             if not ok:
                 return
             self._handle_config_post_route(path_only, body)
+            return
+        if path_only == "/api/qq/identity":
+            body, ok = self._read_json_body(
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
+                return
+            try:
+                payload = save_qq_identity_config(body, local_config_path=LOCAL_CONFIG_PATH)
+                payload["runtime"] = _get_qq_bridge_runtime().status()
+                self._send_json(payload)
+            except ValueError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            except Exception as exc:
+                _log_backend_exception("QQ", exc, extra="POST /api/qq/identity failed")
+                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        if path_only == "/api/qq/identity/history/clear":
+            try:
+                _get_qq_bridge_runtime().store.clear_local_records()
+                self._send_json({"ok": True})
+            except Exception as exc:
+                _log_backend_exception("QQ", exc, extra="POST /api/qq/identity/history/clear failed")
+                self._send_json({"ok": False, "error": "Unable to clear local QQ records."}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
             return
         if path_only == "/api/runtime/restart":
             body, ok = self._read_json_body(
@@ -1467,6 +1920,28 @@ class PetHandler(SimpleHTTPRequestHandler):
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 )
             return
+        if path_only in {"/api/knowledge/sync", "/api/knowledge/migrate"}:
+            _body, ok = self._read_json_body(
+                allow_empty=True,
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
+                return
+            try:
+                cfg = load_config()
+                payload = migrate_knowledge_memories(cfg) if path_only.endswith("/migrate") else sync_knowledge_vault(cfg)
+                self._send_json(payload, status=HTTPStatus.OK if payload.get("ok") else HTTPStatus.BAD_REQUEST)
+            except Exception as exc:
+                _log_backend_exception("KNOWLEDGE", exc, extra=f"POST {path_only} failed")
+                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        if path_only == "/api/life/restore":
+            body, ok = self._read_json_body(invalid_payload={"ok": False, "error": "Invalid JSON body."}, path_only=path_only)
+            if ok: self._send_json(restore_growth_snapshot(load_config(), str((body or {}).get("snapshot_id", ""))))
+            return
+        if path_only == "/api/life/consolidate":
+            self._send_json(consolidate_life(load_config())); return
         if path_only == "/api/learning/promote":
             body, ok = self._read_json_body(
                 invalid_payload={"ok": False, "error": "Invalid JSON body."},
@@ -1610,12 +2085,38 @@ class PetHandler(SimpleHTTPRequestHandler):
             payload = _acknowledge_delivered_turn(delivery_id)
             self._send_json(payload, status=_delivery_ack_http_status(payload))
             return
+        if path_only == "/api/agent/confirm":
+            body, ok = self._read_json_body(
+                invalid_payload={"ok": False, "error": "Invalid JSON body."},
+                path_only=path_only,
+            )
+            if not ok:
+                return
+            try:
+                cfg = load_config()
+                payload = confirm_agent_action(
+                    body.get("confirmation_id", "") if isinstance(body, dict) else "",
+                    approve=bool(body.get("approve", False)) if isinstance(body, dict) else False,
+                    config=cfg,
+                    llm_cfg=cfg.get("llm", {}) if isinstance(cfg, dict) else {},
+                    http_post_json_fn=http_post_json,
+                    is_local_url_fn=is_local_url,
+                )
+                self._send_json(payload, status=HTTPStatus.OK if payload.get("ok") else HTTPStatus.BAD_REQUEST)
+            except Exception as exc:
+                _log_backend_exception("AGENT", exc, extra="POST /api/agent/confirm failed")
+                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
         if path_only not in {
             "/api/chat",
             "/api/chat_stream",
             "/api/tts",
+            "/api/tts_stream",
             "/api/translate",
             "/api/asr_pcm",
+            "/api/asr_stream",
+            "/api/singing/convert",
+            "/api/singing/catalog/perform",
             "/api/persona_card",
             *CONFIG_POST_PERF_ROUTES,
         }:
@@ -1632,7 +2133,7 @@ class PetHandler(SimpleHTTPRequestHandler):
         perf_started_ms = _perf_now_ms()
         if path_only in {"/api/chat", "/api/chat_stream"}:
             perf_trace_id = _resolve_perf_trace_id(body, default_prefix="chat")
-        elif path_only == "/api/tts":
+        elif path_only in {"/api/tts", "/api/tts_stream"}:
             perf_trace_id = _resolve_perf_trace_id(body, default_prefix="tts")
         elif path_only == "/api/translate":
             perf_trace_id = _resolve_perf_trace_id(body, default_prefix="translate")
@@ -1681,6 +2182,46 @@ class PetHandler(SimpleHTTPRequestHandler):
                 log_backend_exception_func=_log_backend_exception,
                 diagnostic_payload_func=_diagnostic_payload,
                 perf_now_ms_func=_perf_now_ms,
+                process_desktop_qq_command_func=_process_explicit_desktop_qq_command,
+            )
+            return
+
+        if path_only == "/api/singing/convert":
+            try:
+                source_path = body.get("source_path", "") if isinstance(body, dict) else ""
+                payload = convert_selected_wav(load_config(), source_path)
+                payload["output_url"] = "/api/singing/output/" + urllib.parse.quote(payload["output_name"])
+                self._send_json(payload)
+            except Exception as exc:
+                _log_backend_exception("SINGING", exc, extra="POST /api/singing/convert failed")
+                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        if path_only == "/api/singing/catalog/perform":
+            try:
+                song_id = body.get("song_id", "") if isinstance(body, dict) else ""
+                payload = convert_catalog_song(load_config(), song_id)
+                payload["output_url"] = "/api/singing/output/" + urllib.parse.quote(payload["output_name"])
+                self._send_json(payload)
+            except Exception as exc:
+                _log_backend_exception("SINGING", exc, extra="POST /api/singing/catalog/perform failed")
+                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        if path_only == "/api/tts_stream":
+            handle_tts_stream_request(
+                body,
+                perf_trace_id=perf_trace_id,
+                perf_started_ms=perf_started_ms,
+                client_to_server_ms=client_to_server_ms,
+                perf_headers=perf_headers,
+                send_json_func=self._send_json,
+                send_audio_stream_func=self._send_audio_stream,
+                open_tts_stream_func=open_server_tts_stream,
+                log_backend_perf_func=_log_backend_perf,
+                log_backend_exception_func=_log_backend_exception,
+                diagnostic_payload_func=_diagnostic_payload,
+                perf_now_ms_func=_perf_now_ms,
             )
             return
 
@@ -1713,11 +2254,25 @@ class PetHandler(SimpleHTTPRequestHandler):
                 send_json_func=self._send_json,
                 load_config_func=load_config,
                 transcribe_pcm16_func=transcribe_pcm16_with_vosk,
-                transcribe_pcm16_result_func=transcribe_pcm16_with_vosk_result,
+                transcribe_pcm16_result_func=transcribe_pcm16_with_local_fallback_result,
                 sanitize_hotword_replacements_func=sanitize_hotword_replacements,
                 apply_hotword_replacements_func=apply_hotword_replacements,
                 log_backend_exception_func=_log_backend_exception,
                 diagnostic_payload_func=_diagnostic_payload,
+                log_backend_perf_func=_log_backend_perf,
+                perf_now_ms_func=_perf_now_ms,
+            )
+            return
+
+        if path_only == "/api/asr_stream":
+            handle_asr_stream_request(
+                body,
+                send_json_func=self._send_json,
+                load_config_func=load_config,
+                start_stream_func=start_funasr_stream_session,
+                append_stream_func=append_funasr_stream_audio,
+                cancel_stream_func=cancel_funasr_stream_session,
+                log_backend_exception_func=_log_backend_exception,
             )
             return
 
@@ -1765,6 +2320,75 @@ class PetHandler(SimpleHTTPRequestHandler):
 
 def ensure_config_hint():
     return _ensure_config_hint(CONFIG_PATH, EXAMPLE_CONFIG_PATH)
+
+
+def _process_qq_bridge_event(event, history):
+    """Run an authorized QQ turn through the desktop pet's own brain.
+
+    AstrBot supplies transport metadata only.  The copied configuration forces
+    tools off even if the desktop user has enabled optional tools elsewhere.
+    """
+    if not isinstance(event, dict):
+        return None
+    message = str(event.get("text", "") or "").strip()
+    if not message:
+        return None
+    config = load_config()
+    settings = get_qq_identity_config(config)
+    if not settings.get("enabled"):
+        return None
+    turn_config = dict(config)
+    turn_config["_qq_current_event"] = dict(event)
+    turn_config["tools"] = {**dict(config.get("tools") or {}), "enabled": False, "allow_shell": False}
+    turn_config["agent"] = {**dict(config.get("agent") or {}), "enabled": False}
+    reply = str(
+        call_llm(
+            message,
+            history if isinstance(history, list) else [],
+            is_auto=False,
+            force_tools=False,
+            config=turn_config,
+        )
+        or ""
+    ).strip()
+    if reply:
+        try:
+            remember_interaction(config, message, reply, is_auto=False, interaction_id=f"qq:{event.get('event_id', '')}")
+        except Exception:
+            # QQ delivery remains useful even if optional memory persistence is
+            # temporarily unavailable.
+            pass
+    return reply or None
+
+
+def _process_explicit_desktop_qq_command(message):
+    """Execute only a clearly-worded desktop request to send an allowlisted QQ text."""
+    command = parse_explicit_desktop_qq_send(message)
+    if not command:
+        return None
+    result = _get_qq_bridge_runtime().send_explicit_desktop_text(**command)
+    if result.get("ok"):
+        peer = result["target_id"]
+        kind = "QQ群" if result["target_type"] == "group" else "QQ 联系人"
+        return {
+            "matched": True,
+            "prompt_note": f"The user explicitly instructed you to send a text to {kind} {peer}. It was delivered successfully. Confirm it briefly without revealing routing metadata.",
+        }
+    return {
+        "matched": True,
+        "prompt_note": f"The user explicitly instructed a QQ text send, but it was not delivered: {result.get('error', 'unknown error')}. State the real reason briefly and do not claim it was sent.",
+    }
+
+
+def _get_qq_bridge_runtime():
+    global _QQ_BRIDGE_RUNTIME
+    if _QQ_BRIDGE_RUNTIME is None:
+        _QQ_BRIDGE_RUNTIME = QQBridgeRuntime(
+            load_config=load_config,
+            process_event=_process_qq_bridge_event,
+            state_path=ROOT_DIR / QQ_IDENTITY_STATE_FILENAME,
+        )
+    return _QQ_BRIDGE_RUNTIME
 
 
 def run_startup_self_check(config):
@@ -1824,6 +2448,10 @@ def build_server():
             ) from exc
         raise
     url = f"http://{host}:{port}"
+    _get_qq_bridge_runtime().start()
+    # The learner is opt-in and runs independently of chat/TTS.  Starting it
+    # here keeps a slow public-source fetch out of the request path.
+    start_background_learner(config)
     return httpd, url, open_browser
 
 
@@ -1838,6 +2466,7 @@ def run(open_browser_override=None):
     if open_browser_override is not None:
         open_browser = bool(open_browser_override)
     print(f"Desktop pet server running at {url}")
+    schedule_local_asr_warmup()
     if open_browser:
         webbrowser.open(url)
     httpd.serve_forever()

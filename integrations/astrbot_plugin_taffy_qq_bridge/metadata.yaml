@@ -1,0 +1,10 @@
+name: astrbot_plugin_taffy_qq_bridge
+display_name: Taffy QQ Desktop Bridge
+desc: Queues OneBot QQ events for a local Taffy desktop pet and sends its text replies back through AstrBot.
+short_desc: Cloud QQ transport for the local desktop pet brain.
+version: v0.1.0
+author: Xinyu Desktop Pet contributors
+repo: ""
+support_platforms:
+  - aiocqhttp
+astrbot_version: ">=4.18.0"

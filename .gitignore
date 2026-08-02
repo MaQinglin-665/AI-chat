@@ -27,6 +27,10 @@ relationship_state.tmp
 memory_summary.json
 memory_session.json
 memory_core.json
+memory_shared_experiences.json
+agent_actions.json
+qq_identity_state.json
+integrations/astrbot_plugin_taffy_qq_bridge/data/
 
 # Temporary audio files
 tmp_*.wav

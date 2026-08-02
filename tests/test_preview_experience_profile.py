@@ -20,19 +20,22 @@ def test_preview_profile_activates_the_intended_personal_companion_contract():
 
     assert cfg["assistant_reply_language"] == "en"
     assert cfg["character_runtime"]["model_direct_reply"] is True
+    assert cfg["character_runtime"]["model_direct_brain_guidance"] is True
     assert cfg["companion_turn"]["enabled"] is True
     assert cfg["relationship_state"]["enabled"] is True
     assert cfg["conversation_mode"]["chat_stream_enabled"] is True
 
     prompt = cfg["assistant_prompt"]
-    assert "The user may write in Chinese or English" in prompt
-    assert "natural spoken English by default" in prompt
+    assert "mischievous, opinionated, unpredictable" in prompt
+    assert "surprising but relevant angles" in prompt
+    assert "fixed joke, sentence count, or closing pattern" in prompt
     assert "Do not say you are an AI unless directly asked" not in prompt
-    assert "be candid that you are AI" in prompt
+    assert "You are AI, not human" in prompt
 
     policy = build_model_direct_dialogue_policy(cfg)
-    assert "The user may write in Chinese or English" in policy
-    assert "reply in natural spoken English by default" in policy
+    assert "Use natural spoken English by default" in policy
+    assert "switch to Chinese only" in policy
+    assert "not empty surrealism or unrelated randomness" in policy
 
 
 def test_preview_profile_keeps_client_visible_safety_defaults():
@@ -42,10 +45,15 @@ def test_preview_profile_keeps_client_visible_safety_defaults():
     assert cfg["tts"]["provider"] == "browser"
     assert cfg["tts"]["allow_browser_fallback"] is True
     assert cfg["observe"]["attach_mode"] == "manual"
-    assert cfg["observe"]["allow_auto_chat"] is False
-    assert cfg["observe"]["auto_chat_enabled"] is False
+    assert cfg["observe"]["allow_auto_chat"] is True
+    assert cfg["observe"]["auto_chat_enabled"] is True
+    assert cfg["observe"]["auto_chat_min_ms"] >= 60000
+    assert cfg["conversation_mode"]["proactive_enabled"] is True
+    assert cfg["conversation_mode"]["proactive_scheduler_enabled"] is True
+    assert cfg["conversation_mode"]["max_followups_per_window"] == 1
     assert cfg["tools"] == {"enabled": False, "allow_shell": False}
     assert client_cfg["character_runtime"]["model_direct_reply"] is True
+    assert client_cfg["character_runtime"]["model_direct_brain_guidance"] is True
     assert client_cfg["companion_turn"]["enabled"] is True
     assert client_cfg["relationship_state"]["enabled"] is True
 

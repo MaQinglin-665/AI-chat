@@ -1349,6 +1349,7 @@ async function runDoctorTimed(label, fn) { return getDiagnosticsRuntimeControlle
 async function runDoctorJsonFetch(url, init = {}, timeoutMs = 12000) { return getDiagnosticsRuntimeController().runDoctorJsonFetch(url, init, timeoutMs); }
 async function runDoctorDiagnostics() { return getDiagnosticsRuntimeController().runDoctorDiagnostics(); }
 async function runDoctorAndAppendReport() { return getDiagnosticsRuntimeController().runDoctorAndAppendReport(); }
+function closeDoctorPanel() { return getDiagnosticsRuntimeController().closeDoctorPanel(); }
 function buildChatFailureDoctorHint(err) { return getDiagnosticsRuntimeController().buildChatFailureDoctorHint(err); }
 const CHARACTER_TUNING = window.TaffyCharacterTuning || {};
 const CHARACTER_BRAIN_DEBUG = window.TaffyCharacterBrainDebug || {};
@@ -1496,6 +1497,9 @@ function buildAutoChatInterjectionDebugReport() {
   const pendingThought = state.turnTakingPendingThoughtBurst && typeof state.turnTakingPendingThoughtBurst === "object"
     ? state.turnTakingPendingThoughtBurst
     : null;
+  const awareness = state.conversationAwarenessPending && typeof state.conversationAwarenessPending === "object"
+    ? state.conversationAwarenessPending
+    : null;
   return [
     "Auto Thought",
     `enabled=${state.autoChatEnabled === true ? "yes" : "no"}; pending_timer=${state.autoChatInterjectionTimer ? "yes" : "no"}; last_ok=${state.autoChatInterjectionLastOk === true ? "yes" : "no"}`,
@@ -1508,6 +1512,7 @@ function buildAutoChatInterjectionDebugReport() {
     turnTaking
       ? `turn_taking=${String(turnTaking.decision || "hold")}; reason=${String(turnTaking.reason || "none")}; queued=${turnTaking.queued === true ? "yes" : "no"}; retry=${turnTaking.retry === true ? "yes" : "no"}; pressure=${Number(turnTaking.conversation_pressure || 0).toFixed(2)}/3; pending=${pendingThought ? String(pendingThought.thought_type || "none") : "none"}`
       : "turn_taking=none",
+    `awareness=${String(state.conversationAwarenessLastResult || "idle")}; pending=${awareness ? String(awareness.mode || awareness.source || "yes") : "none"}; attempts=${awareness ? Number(awareness.reconsiderations || 0) : 0}`,
     `motion_dispatch=${String(state.autoChatInterjectionLastMotion || "none")}`,
     `topic=${topic}`,
     `scheduled=${fmtTime(state.autoChatInterjectionLastScheduledAt)}; attempted=${fmtTime(state.autoChatInterjectionLastAttemptAt)}; dispatched=${fmtTime(state.autoChatInterjectionLastDispatchAt)}; success=${fmtTime(state.autoChatInterjectionLastAt)}`,
@@ -1746,6 +1751,7 @@ const LIVE2D_RUNTIME_CONTROLLER = window.TaffyLive2DRuntimeController || {};
 const LIVE2D_LAYOUT_CONTROLLER = window.TaffyLive2DLayoutController || {};
 const LIVE2D_EXPRESSION_CONTROLLER = window.TaffyLive2DExpressionController || {};
 const HIYORI_EMOTION_OVERLAY_CONTROLLER = window.TaffyHiyoriEmotionOverlayController || {};
+const HIYORI_PERFORMANCE_DIRECTOR = window.TaffyHiyoriPerformanceDirector || {};
 const CHAT_CONTROLLER_DELEGATES = window.TaffyChatControllerDelegates || {};
 const CHAT_TTS_BOUNDARY = window.TaffyChatTtsBoundary || {};
 const CHAT_LIVE2D_BOUNDARY = window.TaffyChatLive2DBoundary || {};
@@ -1823,6 +1829,31 @@ async function authFetch(input, init = {}) {
   }
   return fetch(input, init);
 }
+
+window.addEventListener("taffy-agent-confirm", async (event) => {
+  const detail = event?.detail || {};
+  const button = detail.button;
+  try {
+    const response = await authFetch("/api/agent/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        confirmation_id: String(detail.confirmationId || ""),
+        approve: detail.approve === true
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(String(payload?.error || "确认失败"));
+    }
+    if (button) button.textContent = detail.approve ? "已执行" : "已取消";
+  } catch (error) {
+    if (button) {
+      button.disabled = false;
+      button.textContent = String(error?.message || "确认失败").slice(0, 80);
+    }
+  }
+});
 
 async function acknowledgeDeliveredTurn(deliveryId) {
   const chatApi = window.TaffyModules?.chatApi || {};
@@ -1966,6 +1997,7 @@ const WAITING_VOICE_HINTS = [
 ];
 const MOTION_INTENSITY_PRESETS = {
   low: {
+    amplitudeScale: 0.82,
     idleIntervalScale: 1.35,
     talkChance: 0.55,
     comboChance: 0.18,
@@ -1977,6 +2009,7 @@ const MOTION_INTENSITY_PRESETS = {
     talkMaxBeats: 2
   },
   normal: {
+    amplitudeScale: 1.0,
     idleIntervalScale: 1.0,
     talkChance: 0.9,
     comboChance: 0.46,
@@ -1988,6 +2021,7 @@ const MOTION_INTENSITY_PRESETS = {
     talkMaxBeats: 4
   },
   high: {
+    amplitudeScale: 1.38,
     idleIntervalScale: 0.76,
     talkChance: 1.0,
     comboChance: 0.64,
@@ -2152,7 +2186,11 @@ function finalizeDesktopDrag() {
 
 function isServerTTSProvider(provider) {
   const p = String(provider || "").toLowerCase();
-  return p === "edge_tts" || p === "gpt_sovits" || p === "volcengine_tts" || p === "volcengine";
+  return p === "edge_tts"
+    || p === "gpt_sovits"
+    || p === "qwen3_tts"
+    || p === "volcengine_tts"
+    || p === "volcengine";
 }
 
 function setStatus(text) {
@@ -2199,6 +2237,17 @@ function saveDailyGreetingState() {
 
 let chatMessageController = null;
 
+function noteConversationLaneMessage(role) {
+  if (typeof DESKTOP_CONTROL_BINDER.noteConversationLaneMessage !== "function") {
+    return false;
+  }
+  return DESKTOP_CONTROL_BINDER.noteConversationLaneMessage(ui, {
+    state,
+    windowObject: window,
+    storageController: STORAGE_CONTROLLER
+  }, role);
+}
+
 function getChatMessageController() {
   if (!chatMessageController && typeof CHAT_MESSAGE_CONTROLLER.createController === "function") {
     chatMessageController = CHAT_MESSAGE_CONTROLLER.createController({
@@ -2215,6 +2264,7 @@ function getChatMessageController() {
       shouldShowAssistantTranslation: _shouldShowAssistantTranslation,
       resolveStickerPayload,
       recordCharacterPerformanceFeedback,
+      onConversationLaneMessage: noteConversationLaneMessage,
       setStatus,
       saveChatHistory: saveChatHistoryToStorage
     });
@@ -2819,6 +2869,7 @@ function bindAdvancedActionControls() {
     toggleFollowupReadinessPanel,
     updateFollowupCharacterChip,
     runDoctorAndAppendReport,
+    closeDoctorPanel,
     runVoiceTestAndAppendReport,
     runCharacterRehearsalAndAppendReport,
     runCharacterTuningAndAppendReport,
@@ -2835,6 +2886,7 @@ function updateSpeakButton() {
     return;
   }
   ui.speakBtn.textContent = state.speakingEnabled ? "\u8bed\u97f3\u5f00" : "\u8bed\u97f3\u5173";
+  ui.speakBtn.setAttribute("aria-pressed", state.speakingEnabled ? "true" : "false");
 }
 
 function bindChatInputControls() {
@@ -2883,6 +2935,7 @@ function bindDesktopControlButtons() {
     setAdvancedActionsExpanded,
     enqueueActionIntent,
     scheduleIdleMotionLoop,
+    storageController: STORAGE_CONTROLLER,
     setStatus
   });
 }
@@ -3029,10 +3082,12 @@ function updateObserveButton() {
   }
   if (!state.desktopCanCapture) {
     ui.observeBtn.disabled = true;
+    ui.observeBtn.setAttribute("aria-pressed", "false");
     ui.observeBtn.textContent = "观察桌面: 不可用";
     return;
   }
   ui.observeBtn.disabled = false;
+  ui.observeBtn.setAttribute("aria-pressed", state.observeDesktop ? "true" : "false");
   ui.observeBtn.textContent = state.observeDesktop ? "观察桌面: 开" : "观察桌面: 关";
 }
 
@@ -3047,10 +3102,12 @@ function updateLockButton() {
     typeof window.electronAPI.setWindowLock === "function";
   if (!available) {
     ui.lockBtn.disabled = true;
+    ui.lockBtn.setAttribute("aria-pressed", "false");
     ui.lockBtn.textContent = "桌面锁定: 不可用";
     return;
   }
   ui.lockBtn.disabled = false;
+  ui.lockBtn.setAttribute("aria-pressed", state.windowLocked ? "true" : "false");
   ui.lockBtn.textContent = state.windowLocked ? "桌面锁定: 开" : "桌面锁定: 关";
 }
 
@@ -3122,6 +3179,7 @@ function updateAutoChatButton() {
   if (!ui.autoChatBtn) {
     return;
   }
+  ui.autoChatBtn.setAttribute("aria-pressed", state.autoChatEnabled ? "true" : "false");
   ui.autoChatBtn.textContent = state.autoChatEnabled ? "主动陪伴: 开" : "主动陪伴: 关";
 }
 
@@ -3376,6 +3434,10 @@ function getAutoChatController() {
       setStatus,
       parseMessageTimestamp,
       requestAssistantReply,
+      getProactiveMaterial: async () => {
+        const response = await authFetch("/api/life/proactive");
+        return response.ok ? response.json() : { has_material: false };
+      },
       enqueueActionIntent,
       triggerExpressionPulse,
       constants: {
@@ -3443,12 +3505,20 @@ function analyzeAutoChatContext() {
   return getAutoChatController().analyzeAutoChatContext();
 }
 
+function recordContextualInteraction(type = "tap") {
+  return getAutoChatController().recordContextualInteraction(type);
+}
+
 function buildAutoChatPrompt(context = null) {
   return getAutoChatController().buildAutoChatPrompt(context);
 }
 
 function scheduleAutoChatInterjectionAfterTurn(context = {}) {
   return getAutoChatController().scheduleTurnInterjection(context);
+}
+
+function queueConversationAwarenessAfterTurn(context = {}) {
+  return getAutoChatController().queueConversationAwareness(context);
 }
 
 function scheduleNextAutoChat() {
@@ -3997,7 +4067,8 @@ function createLive2DExpressionBoundaryDeps() {
     normalizeTalkStyle,
     detectMood,
     isSpeechMotionActive,
-      isSpeakingNow,
+    isSpeakingNow,
+    resolveHiyoriAuthoredMotion: PERFORMANCE_CUE_CONTROLLER.resolveHiyoriAuthoredMotion,
       hiyoriEmotionOverlayController:
         typeof HIYORI_EMOTION_OVERLAY_CONTROLLER.createController === "function"
           ? HIYORI_EMOTION_OVERLAY_CONTROLLER.createController({
@@ -4007,6 +4078,7 @@ function createLive2DExpressionBoundaryDeps() {
               performanceObject: performance
             })
           : null,
+      hiyoriPerformanceDirector: HIYORI_PERFORMANCE_DIRECTOR,
       live2dExpressionTuning: LIVE2D_EXPRESSION_TUNING,
     styleExpressionProfile: STYLE_EXPRESSION_PROFILE,
     motionIntensityPresets: MOTION_INTENSITY_PRESETS,
@@ -4052,6 +4124,7 @@ function createLive2DLayoutBoundaryDeps() {
     triggerTapMotion,
     finalizeDesktopDrag,
     stopDesktopWindowDrag,
+    recordContextualInteraction,
     tapMaxDurationMs: TAP_MAX_DURATION_MS,
     tapMoveThreshold: TAP_MOVE_THRESHOLD
   };
@@ -4113,6 +4186,8 @@ function sampleTTSAudioLevel() { return getLive2DExpressionController().sampleTT
 function updateMicroMotionLayer() { return getLive2DExpressionController().updateMicroMotionLayer(); }
 function getSpeechAnimationMouthOpen() { return getLive2DExpressionController().getSpeechAnimationMouthOpen(); }
 function applyStyleExpressionLayer() { return getLive2DExpressionController().applyStyleExpressionLayer(); }
+function requestLive2DPerformanceMode(mode, opts = {}) { return getLive2DExpressionController().requestPerformanceMode?.(mode, opts); }
+function triggerLive2DSemanticAction(action, opts = {}) { return getLive2DExpressionController().triggerSemanticAction?.(action, opts); }
 
 function buildPerformanceCue(input = {}) {
   return typeof PERFORMANCE_CUE_CONTROLLER.buildPerformanceCue === "function"
@@ -4141,6 +4216,39 @@ function triggerPerformanceCueMotion(cue = null, context = {}) {
     return false;
   }
   state._lastFullPerformanceCueMotionKey = key;
+  const semanticCandidate = plan.action || plan.motionCue || plan.emotion;
+  const semanticName = typeof HIYORI_PERFORMANCE_DIRECTOR.normalizeAction === "function"
+    ? HIYORI_PERFORMANCE_DIRECTOR.normalizeAction(semanticCandidate)
+    : "";
+  const hiyoriProfile = getLive2DExpressionController().isHiyoriPerformanceProfile?.() === true;
+  const hiyoriAuthoredMotion = hiyoriProfile && plan.authoredMotion?.group
+    ? plan.authoredMotion
+    : null;
+  if (hiyoriAuthoredMotion) {
+    Promise.resolve(tryBuiltInMotion(plan.mood || "idle", {
+      source: "performance_cue",
+      motionCue: plan.motionCue || "",
+      motionRole: plan.motionRole || "",
+      groups: plan.groups,
+      preserveGroupOrder: true,
+      force: true,
+      cooldownMs: plan.cooldownMs,
+      motionCooldownKey: `hiyori:${hiyoriAuthoredMotion.group}`,
+      priority: plan.priority,
+      allowFallback: false,
+      authoredMotion: hiyoriAuthoredMotion,
+      playbackGeneration: Number(context.playbackGeneration || state.ttsPlaybackGeneration || 0)
+    })).catch(() => {});
+    return true;
+  }
+  const hiyoriSemanticOnly = !!semanticName && hiyoriProfile;
+  if (hiyoriSemanticOnly) {
+    return triggerLive2DSemanticAction(semanticName, {
+      priority: plan.priority,
+      intensity: plan.intensity === "high" ? 1.28 : (plan.intensity === "low" ? 0.72 : 1),
+      source: "performance_cue"
+    }) === true;
+  }
   Promise.resolve(tryBuiltInMotion(plan.mood || "idle", {
     source: "performance_cue",
     motionCue: plan.motionCue || "",
@@ -4153,6 +4261,31 @@ function triggerPerformanceCueMotion(cue = null, context = {}) {
     allowFallback: false
   })).catch(() => {});
   return true;
+}
+
+function installHiyoriMotionPreviewBridge() {
+  window.__TAFFY_HIYORI_MOTION_PREVIEW__ = Object.freeze({
+    emotions: Object.freeze(["happy", "playful", "excited", "shy", "hurt", "sad", "anxious", "angry", "surprised"]),
+    play(emotion) {
+      const normalizedEmotion = typeof PERFORMANCE_CUE_CONTROLLER.normalizePerformanceCueEmotion === "function"
+        ? PERFORMANCE_CUE_CONTROLLER.normalizePerformanceCueEmotion(emotion)
+        : String(emotion || "neutral");
+      const cue = buildPerformanceCue({
+        performancePlan: {
+          emotion: normalizedEmotion,
+          action: "none",
+          intensity: "high",
+          voice_style: "neutral"
+        },
+        motionIntensity: state.motionIntensity || "normal"
+      });
+      return triggerPerformanceCueMotion(cue, {
+        sessionId: `hiyori-preview:${normalizedEmotion}:${Date.now()}`,
+        playbackGeneration: Number(state.ttsPlaybackGeneration || 0)
+      });
+    }
+  });
+  return window.__TAFFY_HIYORI_MOTION_PREVIEW__;
 }
 
 function applySpeechPerformanceCue(cue = null) {
@@ -4263,6 +4396,12 @@ async function runActionQueue() {
 }
 
 function enqueueActionIntent(intent, context = {}) {
+  const modeByIntent = { listen: "listen", thinking: "think", talk: "speak", reply: "speak" };
+  if (modeByIntent[String(intent || "").toLowerCase()]) {
+    requestLive2DPerformanceMode(modeByIntent[String(intent || "").toLowerCase()], {
+      holdMs: intent === "thinking" ? 2600 : 900
+    });
+  }
   const controller = getActionPlanController();
   if (typeof controller.enqueueActionIntent === "function") {
     controller.enqueueActionIntent(intent, context);
@@ -4280,6 +4419,7 @@ function createTTSPlaybackBoundaryDeps() {
     performanceObject: performance,
     authFetch,
     ttsApi: TTS_API,
+    ttsPcmStream: window.TaffyTTSPcmStream || {},
     perfLog,
     setStatus,
     waitMs,
@@ -4318,6 +4458,9 @@ function createStreamTtsQueueBoundaryDeps() {
     createServerTTSRequestScope,
     setStatus,
     playAudioBlob,
+    playServerTTSStream,
+    shouldAttemptServerTTS,
+    markServerTTSRecovered,
     isCurrentTTSPlaybackGeneration,
     splitStreamSpeakSegments,
     maybePlayTalkGesture,
@@ -4391,6 +4534,9 @@ async function requestServerTTSBlob(text, prosody = null, requestOpts = {}) { re
 async function requestServerTTSBlobWithRetry(text, prosody = null, opts = {}) { return getTTSPlaybackController().requestServerTTSBlobWithRetry(text, prosody, opts); }
 async function playAudioByContext(blob, debugContext = {}) { return getTTSPlaybackController().playAudioByContext(blob, debugContext); }
 async function playAudioBlob(blob, opts = {}) { return getTTSPlaybackController().playAudioBlob(blob, opts); }
+async function playServerTTSStream(text, opts = {}) { return getTTSPlaybackController().playServerTTSStream(text, opts); }
+function shouldAttemptServerTTS() { return getTTSPlaybackController().shouldAttemptServerTTS(); }
+function markServerTTSRecovered() { return getTTSPlaybackController().markServerTTSRecovered(); }
 async function speakByServer(text, opts = {}) { return getTTSPlaybackController().speakByServer(text, opts); }
 async function speakByBrowser(text, opts = {}) { return getTTSPlaybackController().speakByBrowser(text, opts); }
 async function speak(text, opts = {}) { return getTTSPlaybackController().speak(text, opts); }
@@ -4592,7 +4738,27 @@ async function tryBuiltInMotion(mood, opts = {}) { return getMotionRuntimeContro
 function animateFallback(mood, opts = {}) { return getMotionRuntimeController().animateFallback(mood, opts); }
 function triggerTapMotion() { return getMotionRuntimeController().triggerTapMotion(); }
 function maybePlayTalkGesture(text, style = "neutral") { return getMotionRuntimeController().maybePlayTalkGesture(text, style); }
-async function playEmotion(text, opts = {}) { return getMotionRuntimeController().playEmotion(text, opts); }
+async function playEmotion(text, opts = {}) {
+  // Timeline micro-cues are already semantic. On Hiyori, keep them on the
+  // parameter director so an authored full-body motion cannot fight the
+  // listening/speaking layers for the same head and torso channels.
+  const semanticName = typeof HIYORI_PERFORMANCE_DIRECTOR.normalizeAction === "function"
+    ? HIYORI_PERFORMANCE_DIRECTOR.normalizeAction(opts.motionCue || "")
+    : "";
+  if (
+    semanticName
+    && state.model
+    && state.motionEnabled
+    && getLive2DExpressionController().isHiyoriPerformanceProfile?.() === true
+  ) {
+    return triggerLive2DSemanticAction(semanticName, {
+      priority: Number.isFinite(Number(opts.priority)) ? Number(opts.priority) : undefined,
+      intensity: opts.motionRole === "pre_reaction" ? 0.72 : 0.88,
+      source: `timeline:${String(opts.motionCue || semanticName)}`
+    }) === true;
+  }
+  return getMotionRuntimeController().playEmotion(text, opts);
+}
 
 
 function switchVoice() { return getVoiceRuntimeController().switchVoice(); }
@@ -4616,7 +4782,11 @@ function stopWakeWordListener(hardStop = false) { return getWakeWordController()
 function scheduleWakeWordStart(delayMs = 0) { return getWakeWordController().scheduleWakeWordStart(delayMs); }
 function wakeTranscriptHit(text) { return getWakeWordController().wakeTranscriptHit(text); }
 function setupWakeWordRecognition(RecognitionCtor) { return getWakeWordController().setupWakeWordRecognition(RecognitionCtor); }
-function setupSpeechRecognition() { return getWakeWordController().setupSpeechRecognition(); }
+function setupSpeechRecognition() {
+  const result = getWakeWordController().setupSpeechRecognition();
+  getLocalAsrController().startLocalAsrWarmupPolling();
+  return result;
+}
 
 let chatReplyController = null;
 
@@ -4663,6 +4833,7 @@ function createChatReplyControllerDeps() {
     updateConversationFollowupState,
     maybeSendAssistantMoodSticker,
     scheduleAutoChatInterjectionAfterTurn,
+    queueConversationAwarenessAfterTurn,
     recordEmotion,
     previewAssistantReplyCharacterCueCandidate,
     maybeAutoApplyAssistantReplyCharacterCueCandidate,
@@ -4830,6 +5001,10 @@ function bindUI() {
   bindSubtitleDragHandle();
   renderOnboardingStep();
   initStickerPanel();
+  if (!state.contextualInteractionFocusBound) {
+    state.contextualInteractionFocusBound = true;
+    window.addEventListener("focus", () => recordContextualInteraction("focus"));
+  }
 
   bindChatInputControls();
   bindDesktopControlButtons();
@@ -4894,6 +5069,7 @@ function getAppStartupController() {
       installCharacterRuntimeDebugBridge,
       installTTSDebugBridge,
       installTranslateDebugBridge,
+      installHiyoriMotionPreviewBridge,
       closeLearningReviewDrawer,
       resetActionSystem,
       stopIdleMotionLoop,

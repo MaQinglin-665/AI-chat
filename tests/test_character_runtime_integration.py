@@ -269,6 +269,7 @@ def test_model_direct_http_turn_preserves_reply_and_skips_legacy_brain_runtime(m
         "enabled": True,
         "return_metadata": True,
         "model_direct_reply": True,
+        "model_direct_brain_guidance": True,
     }
     cfg["companion_turn"] = {"enabled": True}
     monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: "  bilingual: 你好 / hello  ")

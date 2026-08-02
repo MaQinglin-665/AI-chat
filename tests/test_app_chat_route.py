@@ -1,11 +1,30 @@
 from http import HTTPStatus
 
-from app_chat_route import PRE_FINALIZED_STREAM_SENTINEL, handle_chat_route
+from app_chat_route import PRE_FINALIZED_STREAM_SENTINEL, _build_chat_config, handle_chat_route
 from app_delivered_turn import DeliveredTurnRegistry
 from companion_turn_contract import build_companion_turn
 
 
 RECEIPT_CAPABILITY = {"client_capabilities": {"delivered_turn_receipt_v1": True}}
+
+
+def test_auto_awareness_opt_in_stays_private_to_resolved_chat_config():
+    resolved = _build_chat_config(
+        {
+            "auto": True,
+            "natural_participation": True,
+        },
+        {"natural_conversation": {"enabled": True}},
+        "private proactive prompt",
+        sanitize_input_modality_func=lambda _value, is_auto=False: "auto" if is_auto else "text",
+        clean_experience_text_func=lambda value, limit: str(value or "")[:limit],
+        sanitize_character_experience_profile_func=lambda _value: None,
+        sanitize_auto_thought_burst_func=lambda _value: None,
+        sanitize_conversation_context_func=lambda _value, _message: None,
+    )
+
+    assert resolved["_input_modality"] == "auto"
+    assert resolved["_natural_participation"] is True
 
 
 class RouteRecorder:
@@ -482,7 +501,17 @@ def test_model_direct_reply_keeps_text_and_adds_turn_without_legacy_metadata():
     assert payload["delivery_id"] == "delivery_receipt_0000000000000001"
     assert "character_runtime" not in payload
     assert "character_brain" not in payload
-    assert payload["turn"] == {
+    turn = payload["turn"]
+    assert {key: turn[key] for key in (
+        "version",
+        "id",
+        "reply_text",
+        "spoken_text",
+        "mode",
+        "input_modality",
+        "performance",
+        "source",
+    )} == {
         "version": 1,
         "id": "chat_test",
         "reply_text": "  Let me think for a second.  ",
@@ -498,6 +527,10 @@ def test_model_direct_reply_keeps_text_and_adds_turn_without_legacy_metadata():
         },
         "source": "model_direct",
     }
+    assert turn["performance_segments_version"] == 1
+    assert len(turn["performance_segments"]) == 1
+    assert turn["performance_segments"][0]["text"] == "Let me think for a second."
+    assert turn["performance_segments"][0]["performance"]["emotion"] == "thinking"
     assert recorder.remembered == []
     assert recorder.sessions == []
     recorder.commit_latest_delivery()
@@ -558,3 +591,67 @@ def test_handle_chat_stream_sends_error_event_on_llm_failure():
     }
     assert recorder.exceptions
     assert any(kwargs.get("stage") == "fail" for _args, kwargs in recorder.perf)
+
+
+def test_natural_voice_silence_returns_decision_without_persisting_assistant():
+    recorder = RouteRecorder()
+    config = {
+        "llm": {"provider": "openai"},
+        "character_runtime": {"model_direct_reply": True},
+        "natural_conversation": {
+            "enabled": True,
+            "voice_only": True,
+            "allow_silence": True,
+        },
+    }
+
+    _handle(
+        "/api/chat",
+        {
+            "message": "我随便哼两句。",
+            "input_modality": "voice",
+            **RECEIPT_CAPABILITY,
+        },
+        recorder,
+        load_config_func=lambda: config,
+        call_llm_func=lambda *_args, **_kwargs: "[[TAFFY_SILENCE]]",
+    )
+
+    payload = recorder.json[-1]["data"]
+    assert payload["reply"] == ""
+    assert payload["conversation_decision"]["mode"] == "silence"
+    assert "delivery_id" not in payload
+    assert recorder.remembered == []
+    assert recorder.sessions == []
+    assert recorder.staged == []
+
+
+def test_natural_voice_stream_buffers_and_strips_private_reply_control():
+    recorder = RouteRecorder()
+    config = {
+        "llm": {"provider": "openai"},
+        "character_runtime": {"model_direct_reply": True},
+        "natural_conversation": {
+            "enabled": True,
+            "voice_only": True,
+            "quick_delay_ms": 200,
+        },
+    }
+
+    _handle(
+        "/api/chat_stream",
+        {"message": "星语，你怎么看？", "input_modality": "voice"},
+        recorder,
+        load_config_func=lambda: config,
+        call_llm_stream_func=lambda *_args, **_kwargs: iter(
+            ["[[TAFFY_REPLY:quick]]", "我想了一下，可以试试。"]
+        ),
+    )
+
+    deltas = [item["text"] for item in recorder.sse if item.get("type") == "delta"]
+    done = next(item for item in recorder.sse if item.get("type") == "done")
+    assert "".join(deltas) == "我想了一下，可以试试。"
+    assert all("TAFFY_" not in item for item in deltas)
+    assert done["reply"] == "我想了一下，可以试试。"
+    assert done["conversation_decision"]["mode"] == "reply"
+    assert done["conversation_decision"]["thinking_level"] == "quick"

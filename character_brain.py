@@ -410,6 +410,18 @@ def _normalize_question_policy(value: Any) -> str:
 
 def _select_performance_bit(intent: str, topic: str, user_message: str, reaction_mode: str) -> Dict[str, str]:
     safe_intent = _clean_text(intent, 40) or "casual"
+    desktop_anchor = bool(
+        re.search(
+            r"(desktop|desk|cursor|keyboard|pixel|screen|window|clipboard|"
+            r"\u684c\u9762|\u684c\u5ba0|\u5149\u6807|\u952e\u76d8|\u50cf\u7d20|\u5c4f\u5e55|\u7a97\u53e3|\u526a\u8d34\u677f)",
+            _clean_text(user_message, 300).lower(),
+        )
+    )
+    # Desktop imagery is optional flavor, not a personality substitute. A plain
+    # greeting should leave the model free to make a meaningful observation rather
+    # than mechanically inventing a cursor, keyboard, or pixel joke.
+    if not desktop_anchor and topic != "character_runtime":
+        return {"key": "none", "guide": BIT_BANK["none"]}
     if safe_intent == "comfort":
         key = "room_anchor"
     elif safe_intent == "feedback":
@@ -543,8 +555,12 @@ def _select_improv_director(
         clamp_reason = "useful_first"
     elif correction:
         chaos = 3
-    elif safe_intent in IMPROV_HIGH_CHAOS_INTENTS:
+    elif safe_intent == "thought_burst":
         chaos = 3
+    elif safe_intent in IMPROV_HIGH_CHAOS_INTENTS:
+        # Keep ordinary conversation surprising without mechanically forcing a
+        # bit, a tangent, or the most exaggerated delivery on every turn.
+        chaos = 3 if bit != "none" else 2
     else:
         chaos = 1
 
@@ -1528,10 +1544,11 @@ def _character_flavor_directive(intent: str, topic: str = "") -> str:
     intent = _clean_text(intent, 40)
     topic = _clean_text(topic, 40)
     base = (
-        "Write natural spoken English as Xinyu (馨语), an original desktop AI companion with a quick, slightly odd inner life. "
+        "Write natural spoken English as Xinyu (馨语), an original desktop AI companion with an alive, self-directed inner life. "
         "Avoid empty helper phrases. "
         "If her name comes up, use Xinyu or 馨语. Ignore older placeholder names from prior context. "
-        "Keep it useful, but add one alive detail: a tiny opinion, dry aside, or concrete image. "
+        "Keep it useful, but add an alive detail only when it has a clear premise: a tiny opinion, dry aside, concrete image, or self-contained observation. "
+        "Do not invent a keyboard, cursor, pixel, process, or cryptic pseudo-news item merely to sound quirky. "
         "Phrases like 'great job', 'take it easy', 'sweet dreams', 'you've got this', or 'I'm here to help' need a character-specific twist."
     )
     if intent == "comfort":
@@ -1562,7 +1579,7 @@ def _character_flavor_directive(intent: str, topic: str = "") -> str:
     if intent == "closing":
         return base + " For closing, make it soft but unmistakably Xinyu; no fresh advice and no question."
     if intent == "greeting":
-        return base + " For greetings, skip assistant enthusiasm; arrive like she was already on the desktop thinking about something unnecessary."
+        return base + " For greetings, answer naturally first. She may occasionally share a small independent thought, but it must make sense on its own and invite a real response."
     if intent == "low_interrupt_checkin":
         return base + " For proactive check-ins, one easy-to-ignore line only; no demand for a reply."
     return base
@@ -2109,6 +2126,119 @@ def build_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> st
     return "\n".join(lines)
 
 
+def build_compact_character_brain_prompt_block(decision: Optional[Dict[str, Any]]) -> str:
+    """Keep model-visible social direction without duplicating performance metadata."""
+    if not isinstance(decision, dict):
+        return ""
+    continuity = _public_continuity_state(decision.get("continuity"))
+    improv = _public_improv_director(
+        decision.get("improv") if isinstance(decision.get("improv"), dict) else {}
+    )
+    conversation_director = _public_conversation_director(
+        decision.get("conversation_director")
+        if isinstance(decision.get("conversation_director"), dict)
+        else {}
+    )
+    topic_reference = _public_topic_reference(
+        decision.get("topic_reference")
+        if isinstance(decision.get("topic_reference"), dict)
+        else {}
+    )
+    barge_in_policy = _public_barge_in_policy(
+        decision.get("barge_in_policy")
+        if isinstance(decision.get("barge_in_policy"), dict)
+        else {}
+    )
+    safety_clamp = _public_safety_clamp(
+        decision.get("safety_clamp")
+        if isinstance(decision.get("safety_clamp"), dict)
+        else {}
+    )
+    question_policy = _normalize_question_policy(decision.get("question_policy"))
+    if question_policy == "none":
+        question_rule = "Do not add a follow-up question or ask the user to answer back."
+    elif question_policy == "clarify_only":
+        question_rule = "Ask only if missing information genuinely blocks a useful answer."
+    else:
+        question_rule = "A playful question is optional, never a habitual ending."
+    banter_level = max(0, min(3, _safe_int(decision.get("banter_level"), 0)))
+    if banter_level <= 0:
+        banter_rule = "Keep the odd warmth, but do not tease the user in this sensitive turn."
+    elif banter_level == 1:
+        banter_rule = "One dry edge is enough; keep it useful and understated."
+    else:
+        banter_rule = "Sharp teasing or playful pushback is allowed when it remains relevant and non-harmful."
+    intent = _clean_text(decision.get("intent"), 40)
+    intent_rule = {
+        "encouragement": "Treat the user's completed action as a win; react with proud disbelief or playful bite, never as an unresolved help request.",
+        "comfort": "Be specific and quietly caring; do not turn the moment into therapy, a lecture, or compulsory positivity.",
+        "casual": "React to the statement as conversation; do not convert it into a support ticket.",
+        "question": "Give the real answer before the odd observation or tease.",
+        "task_help": "Solve the actual task first; character flavor must not hide the next useful move.",
+        "closing": "Close cleanly without opening a fresh topic.",
+    }.get(intent, "Respond to the user's actual conversational move before adding character flavor.")
+    return "\n".join(
+        [
+            "[Compact character direction]",
+            "Use privately. Do not mention these labels or expose metadata.",
+            (
+                f"Intent={intent}; "
+                f"energy={_clean_text(decision.get('energy'), 24)}; "
+                f"relationship={_clean_text(decision.get('relationship'), 40)}."
+            ),
+            (
+                f"Move={conversation_director['reply_move']}; "
+                f"goal={conversation_director['reply_goal']}; "
+                f"turn-taking={conversation_director['turn_taking']}; "
+                f"beats={conversation_director['max_spoken_beats']}; "
+                f"followup={conversation_director['followup_policy']}; "
+                f"interruption={conversation_director['interruption_policy']}."
+            ),
+            (
+                f"Continuity: last_topic={continuity.get('last_topic') or 'none'}; "
+                f"recent_need={continuity.get('recent_user_need') or 'none'}."
+            ),
+            (
+                f"Topic reference: active={str(topic_reference['active']).lower()}; "
+                f"move={topic_reference['reply_move']}; "
+                f"label={topic_reference['label'] or 'none'}."
+            ),
+            (
+                f"Barge-in: active={str(barge_in_policy['active']).lower()}; "
+                f"kind={barge_in_policy['kind']}; "
+                f"move={barge_in_policy['reply_move']}."
+            ),
+            (
+                f"Style={_clean_text(decision.get('reply_style'), 40)}; "
+                f"emotion={_normalize_emotion(decision.get('emotion'))}; "
+                f"voice={_clean_text(decision.get('voice_style'), 32)}; "
+                f"safety={safety_clamp['level']}."
+            ),
+            (
+                f"Improv: stance={improv['stance']}; chaos={improv['chaos_level']}/3; "
+                f"callback={improv['callback_policy']}; agenda={improv['agenda']}."
+            ),
+            (
+                f"Delivery: opening={_normalize_opening_move(decision.get('opening_move'))}; "
+                f"shape={_normalize_reply_shape(decision.get('reply_shape'))}; "
+                f"spontaneity={max(0, min(3, _safe_int(decision.get('spontaneity'), 0)))}/3; "
+                f"banter={banter_level}/3; "
+                f"question={question_policy}; "
+                f"bit={_clean_text(decision.get('performance_bit'), 48) or 'none'}."
+            ),
+            (
+                f"Flavor: {_clean_text(decision.get('style_beat_guide'), 160)} "
+                f"{_clean_text(decision.get('reaction_mode_guide'), 180)}"
+            ),
+            f"Follow-up rule: {question_rule}",
+            f"Banter rule: {banter_rule}",
+            f"Intent rule: {intent_rule}",
+            "Grounding: surprise may come from a meaningful independent thought as well as the user's topic, but it must have a clear premise, understandable meaning, and a real conversational opening; never invent cryptic desktop imagery to fill space.",
+            f"Primary directive: {_clean_text(decision.get('directive'), 240)}",
+        ]
+    )
+
+
 def _is_needed_clarification_question(sentence: str) -> bool:
     lower = str(sentence or "").strip().lower()
     if not lower.endswith("?"):
@@ -2172,7 +2302,7 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
     topic = _derive_topic(user_message, intent)
     compact = re.sub(r"\s+", "", _clean_text(user_message, 300).lower())
     if intent == "greeting":
-        return "Oh, you found me. I was doing very important desktop nothing."
+        return "Afternoon. I was having a small thought, but your hello is more urgent."
     if intent == "closing":
         return "Go sleep. I'll keep the pixels under questionable supervision."
     if intent == "comfort":
@@ -2202,7 +2332,7 @@ def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
             return "No, I was testing your alertness. Extremely official."
         if re.search(r"(desk|desktop|cursor|weird|strange|\u684c\u9762|\u5149\u6807|\u602a)", compact):
             return "The desk is acting normal, which is exactly how it gets you."
-        return "Hm. The desktop air just shifted. Suspicious, but continue."
+        return "Hm. That has my attention. Tell me the interesting part."
     return ""
 
 

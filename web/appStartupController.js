@@ -425,8 +425,13 @@
           preserveGroupOrder: true,
           force: true,
           cooldownMs: plan.cooldownMs,
+          motionCooldownKey: plan.authoredMotion?.group
+            ? `hiyori:${plan.authoredMotion.group}`
+            : "",
           priority: plan.priority,
-          allowFallback: false
+          allowFallback: false,
+          authoredMotion: plan.authoredMotion || null,
+          playbackGeneration: Number(data.playbackGeneration || state.ttsPlaybackGeneration || 0)
         });
       } catch (_) {
         // Motion playback is optional; parameter fallback still applies.
@@ -752,6 +757,62 @@
       }
     }
 
+    function applyRendererSurfaceActive(active) {
+      const next = active !== false;
+      state.rendererSurfaceActive = next;
+      window.document?.body?.classList?.toggle?.("surface-inactive", !next);
+      const ticker = state.pixiApp?.ticker;
+      if (!ticker) {
+        return;
+      }
+      try {
+        if (next) {
+          ticker.start?.();
+        } else {
+          ticker.stop?.();
+        }
+      } catch (_) {
+        // keep the conversation runtime alive even if a renderer cannot be paused
+      }
+    }
+
+    async function installRendererSurfaceBridge() {
+      const api = window.electronAPI;
+      if (!api) {
+        applyRendererSurfaceActive(true);
+        return;
+      }
+      if (typeof state.surfaceActiveUnsubscribe === "function") {
+        state.surfaceActiveUnsubscribe();
+      }
+      state.surfaceActiveUnsubscribe = typeof api.onSurfaceActiveChanged === "function"
+        ? api.onSurfaceActiveChanged((active) => applyRendererSurfaceActive(active))
+        : null;
+      if (typeof state.surfaceVisibilityUnsubscribe === "function") {
+        state.surfaceVisibilityUnsubscribe();
+      }
+      const documentObject = window.document;
+      const handleVisibilityChange = () => applyRendererSurfaceActive(documentObject?.hidden !== true);
+      documentObject?.addEventListener?.("visibilitychange", handleVisibilityChange);
+      state.surfaceVisibilityUnsubscribe = () => {
+        documentObject?.removeEventListener?.("visibilitychange", handleVisibilityChange);
+      };
+      let active = true;
+      if (typeof api.getSurfaceActive === "function") {
+        try {
+          active = await api.getSurfaceActive();
+        } catch (_) {
+          active = true;
+        }
+      }
+      applyRendererSurfaceActive(active);
+      try {
+        api.reportSurfaceReady?.();
+      } catch (_) {
+        // ignore shutdown races
+      }
+    }
+
     function bindRuntimeBridges() {
       deps.bindRuntimeEvents?.();
       deps.installCharacterRuntimeWindowBridge?.();
@@ -761,6 +822,7 @@
       deps.installCharacterRuntimeDebugBridge?.();
       deps.installTTSDebugBridge?.();
       deps.installTranslateDebugBridge?.();
+      deps.installHiyoriMotionPreviewBridge?.();
     }
 
     async function main() {
@@ -774,6 +836,7 @@
           await loadModelStartupPreferences();
           await deps.ensureLive2DRuntime?.();
           await deps.initLive2D?.();
+          await installRendererSurfaceBridge();
           deps.startModelMouseGazePolling?.();
           startModelSpeechBroadcastListener();
           setStatus("待机");
@@ -790,14 +853,15 @@
 
         await deps.ensureLive2DRuntime?.();
         await deps.initLive2D?.();
-        startChatRuntimeShell();
+        await installRendererSurfaceBridge();
+        startChatRuntimeShell({ broadcastSpeech: state.desktopMode === true });
         if (state.model) {
           setStatus("待机");
         }
       } catch (err) {
         consoleObject.error(err);
         setStatus("启动失败");
-        appendMessage("assistant", `启动错误: ${err.message}`);
+        appendMessage("assistant", `启动错误: ${err.message}`, { category: "system", persist: false, enableFeedback: false });
       }
     }
 
@@ -825,6 +889,22 @@
           // ignore
         }
         state.windowLockUnsubscribe = null;
+      }
+      if (typeof state.surfaceActiveUnsubscribe === "function") {
+        try {
+          state.surfaceActiveUnsubscribe();
+        } catch (_) {
+          // ignore
+        }
+        state.surfaceActiveUnsubscribe = null;
+      }
+      if (typeof state.surfaceVisibilityUnsubscribe === "function") {
+        try {
+          state.surfaceVisibilityUnsubscribe();
+        } catch (_) {
+          // ignore
+        }
+        state.surfaceVisibilityUnsubscribe = null;
       }
     }
 
