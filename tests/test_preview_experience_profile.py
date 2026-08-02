@@ -1,6 +1,9 @@
 import json
+import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 from companion_dialogue_policy import build_model_direct_dialogue_policy
 from config import sanitize_client_config
@@ -67,6 +70,7 @@ def test_preview_apply_script_preserves_credentials_while_merging_the_profile():
     assert "No API key was written by this script." in script
 
 
+@pytest.mark.skipif(shutil.which("powershell") is None, reason="requires Windows PowerShell")
 def test_preview_apply_script_merges_the_current_experience_without_overwriting_llm(tmp_path):
     local_path = tmp_path / "config.local.json"
     local_path.write_text(

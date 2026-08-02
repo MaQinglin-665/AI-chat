@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -27,6 +28,10 @@ audit_v16 = _load_script("audit_v16_performance")
 
 
 def _assert_powershell_script_parses(script_name):
+    if shutil.which("powershell") is None:
+        import pytest
+
+        pytest.skip("requires Windows PowerShell")
     script_path = SCRIPTS / script_name
     script_literal = str(script_path).replace("'", "''")
     proc = subprocess.run(

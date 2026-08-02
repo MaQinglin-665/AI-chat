@@ -336,13 +336,13 @@ if (mismatches.length) {
     if ([string]$previewCfg.observe.attach_mode -eq "auto") {
         Write-Fail "Preview config should not enable automatic desktop observation."
     }
-    if ($previewCfg.observe.allow_auto_chat -eq $true -or $previewCfg.observe.auto_chat_enabled -eq $true) {
-        Write-Fail "Preview config should keep proactive/auto chat disabled by default."
+    if ($previewCfg.observe.allow_auto_chat -ne $true -or $previewCfg.observe.auto_chat_enabled -ne $true) {
+        Write-Fail "Preview config should enable its explicit low-frequency proactive/auto chat experience."
     }
     if ($previewCfg.tools.enabled -eq $true -or $previewCfg.tools.allow_shell -eq $true) {
         Write-Fail "Preview config should keep tools and shell disabled."
     }
-    Write-Ok "Preview experience config smoke kept LLM settings and safety defaults"
+    Write-Ok "Preview experience config smoke kept LLM settings and explicit preview defaults"
 
     Invoke-Step "Parse first-chat smoke script" @(
         "powershell",
