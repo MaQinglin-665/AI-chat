@@ -13,6 +13,7 @@ const tests = [
   "tests/test_hiyori_authored_motion_frontend.js",
   "tests/test_hiyori_performance_director_frontend.js",
   "tests/test_tts_playback_start_frontend.js",
+  "tests/test_behavior_director_frontend.js",
   "tests/test_tts_failover_recovery_frontend.js",
   "tests/test_gpt_sovits_streaming_playback_frontend.js",
   "tests/test_qwen3_tts_frontend.js",

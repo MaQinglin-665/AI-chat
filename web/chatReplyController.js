@@ -8,6 +8,15 @@
     const performance = deps.performanceObject || window.performance || root.performance || { now: () => Date.now() };
     const AbortController = window.AbortController || root.AbortController;
     const authFetch = typeof deps.authFetch === "function" ? deps.authFetch : async () => { throw new Error("authFetch is not available"); };
+
+    function reportBehaviorEvent(type, metadata = {}) {
+      // Observability must never delay, cancel, or alter audible playback.
+      Promise.resolve(authFetch("/api/behavior/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, metadata })
+      })).catch(() => {});
+    }
     const acknowledgeDeliveredTurn = typeof deps.acknowledgeDeliveredTurn === "function"
       ? deps.acknowledgeDeliveredTurn
       : async () => false;
@@ -137,7 +146,17 @@
     const executePerformanceTimelinePhase = typeof deps.executePerformanceTimelinePhase === "function" ? deps.executePerformanceTimelinePhase : () => false;
     const schedulePerformanceTimelineSpeechBeats = typeof deps.schedulePerformanceTimelineSpeechBeats === "function" ? deps.schedulePerformanceTimelineSpeechBeats : () => 0;
     const startPerformanceAudit = typeof deps.startPerformanceAudit === "function" ? deps.startPerformanceAudit : () => null;
-    const recordPerformanceAuditEvent = typeof deps.recordPerformanceAuditEvent === "function" ? deps.recordPerformanceAuditEvent : () => null;
+    const recordPerformanceAuditEventRaw = typeof deps.recordPerformanceAuditEvent === "function" ? deps.recordPerformanceAuditEvent : () => null;
+    const recordPerformanceAuditEvent = (type, detail = {}) => {
+      const result = recordPerformanceAuditEventRaw(type, detail);
+      if (type === "tts_end") {
+        reportBehaviorEvent("tts_finished", {
+          source: String(detail?.source || "playback"),
+          reason: String(detail?.reason || (detail?.ok === false ? "not_played" : "completed"))
+        });
+      }
+      return result;
+    };
     const finishPerformanceAudit = typeof deps.finishPerformanceAudit === "function" ? deps.finishPerformanceAudit : () => null;
     const persistCharacterBrainSnapshot = typeof deps.persistCharacterBrainSnapshot === "function" ? deps.persistCharacterBrainSnapshot : () => {};
     const triggerExpressionPulse = typeof deps.triggerExpressionPulse === "function" ? deps.triggerExpressionPulse : () => {};
@@ -1643,6 +1662,10 @@
         recordPerformanceAuditEvent("tts_start", {
           mode,
           source: String(event?.source || "server_tts")
+        });
+        reportBehaviorEvent("tts_started", {
+          source: String(event?.source || "server_tts"),
+          interaction_id: String(context.traceId || "").slice(0, 80)
         });
         if (typeof context.onPlaybackStart === "function") {
           try {

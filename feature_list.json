@@ -1,6 +1,29 @@
 {
   "features": [
     {
+      "id": "companion-event-bus-behavior-director-v1",
+      "name": "Companion event bus and behavior director v1",
+      "description": "Unify bounded companion runtime signals and produce explainable, non-executing behavior suggestions before any later scheduling changes.",
+      "status": "complete",
+      "dependencies": [
+        "companion-life-growth-v2",
+        "natural-voice-participation-v1",
+        "qq-social-identity-astrbot-onebot-v1"
+      ],
+      "scope": [
+        "Keep a metadata-only bounded local event stream for chat, voice, desktop-context, TTS lifecycle and QQ routing signals",
+        "Produce only stay-quiet, micro-reaction, or prepare-proactive suggestions",
+        "Do not create an autonomous send, tool, desktop-control, or QQ-outreach path",
+        "Preserve legacy behavior when behavior_director is disabled"
+      ],
+      "done_criteria": [
+        "Chat and QQ turns emit auditable bounded events without retaining text",
+        "Director suggestions respect active speech and a post-TTS settle window",
+        "A grounded proactive suggestion requires existing life material",
+        "Diagnostics and focused regression tests are available"
+      ]
+    },
+    {
       "id": "continuous-reply-voice-face-sync-v1",
       "name": "Continuous reply voice and Live2D face sync v1",
       "description": "Keep one Qwen3-TTS reply in a coherent vocal performance while driving Live2D mouth movement from audible PCM and reliably releasing speech expressions.",

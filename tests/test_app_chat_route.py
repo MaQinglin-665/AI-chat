@@ -37,6 +37,7 @@ class RouteRecorder:
         self.remembered = []
         self.sessions = []
         self.staged = []
+        self.events = []
         self.now = 100
 
     def send_json(self, data, status=HTTPStatus.OK, extra_headers=None):
@@ -89,6 +90,9 @@ class RouteRecorder:
         self.staged.append(commit)
         return f"delivery_receipt_{len(self.staged):016d}"
 
+    def publish_event(self, event_type, metadata):
+        self.events.append((event_type, metadata))
+
     def commit_latest_delivery(self):
         self.staged[-1]()
 
@@ -124,6 +128,7 @@ def _deps(recorder, **overrides):
         "log_backend_perf_func": recorder.log_perf,
         "diagnostic_payload_func": lambda exc: {"error": str(exc)},
         "perf_now_ms_func": recorder.perf_now,
+        "publish_event_func": recorder.publish_event,
     }
     deps.update(overrides)
     return deps
@@ -150,6 +155,16 @@ def test_handle_chat_route_rejects_empty_message():
     assert recorder.json[-1]["data"] == {"error": "message cannot be empty."}
     assert recorder.json[-1]["headers"] == {"X-Perf-Trace-Id": "chat_test"}
     assert recorder.remembered == []
+
+
+def test_handle_chat_route_publishes_safe_turn_events_without_changing_reply():
+    recorder = RouteRecorder()
+
+    _handle("/api/chat", {"message": "hello", "input_modality": "voice"}, recorder)
+
+    assert recorder.json[-1]["data"]["reply"] == "reply"
+    assert [event[0] for event in recorder.events] == ["user_chat", "voice_turn", "assistant_reply"]
+    assert recorder.events[0][1]["modality"] == "voice"
 
 
 def test_handle_chat_route_rejects_non_string_image_data_url():

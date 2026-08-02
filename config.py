@@ -448,6 +448,11 @@ DEFAULT_CONFIG = {
         "voice_low_latency_enabled": False,
         "voice_prompt_max_history_messages": 4,
     },
+    "behavior_director": {
+        "enabled": False,
+        "event_window_ms": 300000,
+        "quiet_after_tts_ms": 8000,
+    },
     "motion": {
         "enabled": True,
         "cooldown_ms": 1200,
@@ -742,6 +747,9 @@ def sanitize_asr_input_language_mode(value):
 
 def sanitize_client_config(config):
     tts_cfg = config.get("tts", {})
+    behavior_director_cfg = config.get("behavior_director", {})
+    if not isinstance(behavior_director_cfg, dict):
+        behavior_director_cfg = {}
     provider = str(tts_cfg.get("provider", TTS_DEFAULT_PROVIDER)).strip().lower()
     voices = (
         tts_cfg.get("qwen3_tts_voices")
@@ -1430,6 +1438,11 @@ def sanitize_client_config(config):
                     ),
                 ),
             ),
+        },
+        "behavior_director": {
+            "enabled": _safe_bool_true(behavior_director_cfg.get("enabled", False)),
+            "event_window_ms": max(30000, min(1800000, _safe_int(behavior_director_cfg.get("event_window_ms", 300000), 300000))),
+            "quiet_after_tts_ms": max(1000, min(120000, _safe_int(behavior_director_cfg.get("quiet_after_tts_ms", 8000), 8000))),
         },
         "history_summary": {
             "enabled": bool(summary_cfg.get("enabled", True)),

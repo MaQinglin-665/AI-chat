@@ -49,6 +49,8 @@ from qq_identity import (
 )
 import memory as _memory_module
 import desktop_agent
+from companion_events import CompanionEventBus
+from behavior_director import decide as decide_behavior
 from memory import (
     build_memory_prompt_block,
     get_core_memories_for_review,
@@ -329,6 +331,7 @@ _LOCAL_ASR_WARMUP = {
     "error": "",
 }
 _QQ_BRIDGE_RUNTIME = None
+_COMPANION_EVENT_BUS = CompanionEventBus()
 RUNTIME_RESTART_EXIT_CODE = 75
 API_TOKEN_HEADER = "X-Taffy-Token"
 API_TOKEN_ENV_DEFAULT = "TAFFY_API_TOKEN"
@@ -1815,7 +1818,17 @@ class PetHandler(SimpleHTTPRequestHandler):
             return
         if path_only == "/api/life/proactive":
             try:
-                self._send_json(get_proactive_material(load_config()))
+                cfg = load_config()
+                payload = get_proactive_material(cfg)
+                director = decide_behavior(cfg, _COMPANION_EVENT_BUS.snapshot(), life_material=payload)
+                payload["behavior_director"] = director
+                # Disabled keeps every legacy proactive decision unchanged. When
+                # explicitly enabled, the director can only suppress an existing
+                # automatic attempt; it never manufactures a reason to speak.
+                if director.get("reason") != "disabled" and director.get("action") != "prepare_proactive":
+                    payload["has_material"] = False
+                    payload.setdefault("reasons", []).append(f"behavior_director:{director.get('reason', 'hold')}")
+                self._send_json(payload)
             except Exception as exc:
                 _log_backend_exception("LIFE", exc, extra="GET /api/life/proactive failed")
                 self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -1824,6 +1837,15 @@ class PetHandler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "items": growth_history(load_config())}); return
         if path_only == "/api/life/status":
             payload = life_status(load_config()); payload["decision"] = companion_decision(load_config()); self._send_json(payload); return
+        if path_only == "/api/behavior/status":
+            cfg = load_config()
+            snapshot = _COMPANION_EVENT_BUS.snapshot()
+            self._send_json({
+                "ok": True,
+                "event_snapshot": snapshot,
+                "director": decide_behavior(cfg, snapshot, life_material=get_proactive_material(cfg)),
+            })
+            return
         return super().do_GET()
 
     def do_POST(self):
@@ -2115,6 +2137,7 @@ class PetHandler(SimpleHTTPRequestHandler):
             "/api/translate",
             "/api/asr_pcm",
             "/api/asr_stream",
+            "/api/behavior/event",
             "/api/singing/convert",
             "/api/singing/catalog/perform",
             "/api/persona_card",
@@ -2156,6 +2179,22 @@ class PetHandler(SimpleHTTPRequestHandler):
                     _diagnostic_payload(exc),
                     status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
+            return
+
+        if path_only == "/api/behavior/event":
+            raw_type = body.get("type", "") if isinstance(body, dict) else ""
+            metadata = body.get("metadata", {}) if isinstance(body, dict) else {}
+            event = _COMPANION_EVENT_BUS.publish(raw_type, metadata)
+            if event is None:
+                self._send_json({"ok": False, "error": "Unsupported behavior event."}, status=HTTPStatus.BAD_REQUEST)
+                return
+            cfg = load_config()
+            snapshot = _COMPANION_EVENT_BUS.snapshot()
+            self._send_json({
+                "ok": True,
+                "event": event,
+                "director": decide_behavior(cfg, snapshot, life_material=get_proactive_material(cfg)),
+            })
             return
 
         if path_only in CONFIG_POST_PERF_ROUTES:
@@ -2222,6 +2261,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                 log_backend_exception_func=_log_backend_exception,
                 diagnostic_payload_func=_diagnostic_payload,
                 perf_now_ms_func=_perf_now_ms,
+                publish_event_func=_COMPANION_EVENT_BUS.publish,
             )
             return
 
@@ -2333,6 +2373,7 @@ def _process_qq_bridge_event(event, history):
     message = str(event.get("text", "") or "").strip()
     if not message:
         return None
+    _COMPANION_EVENT_BUS.publish("qq_inbound", {"source": "qq", "modality": "text", "interaction_id": f"qq:{event.get('event_id', '')}"})
     config = load_config()
     settings = get_qq_identity_config(config)
     if not settings.get("enabled"):
@@ -2352,6 +2393,7 @@ def _process_qq_bridge_event(event, history):
         or ""
     ).strip()
     if reply:
+        _COMPANION_EVENT_BUS.publish("assistant_reply", {"source": "qq", "interaction_id": f"qq:{event.get('event_id', '')}"})
         try:
             remember_interaction(config, message, reply, is_auto=False, interaction_id=f"qq:{event.get('event_id', '')}")
         except Exception:

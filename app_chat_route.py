@@ -271,6 +271,7 @@ def _handle_chat_stream_request(
     log_backend_perf_func,
     diagnostic_payload_func,
     perf_now_ms_func,
+    publish_event_func=None,
 ):
     del body
     begin_sse_func(perf_trace_id)
@@ -400,6 +401,8 @@ def _handle_chat_stream_request(
         if delivery_id:
             done_payload["delivery_id"] = delivery_id
         send_sse_func(done_payload)
+        if final_reply and callable(publish_event_func):
+            publish_event_func("assistant_reply", {"source": "chat_stream", "is_auto": is_auto, "interaction_id": perf_trace_id})
         log_backend_perf_func(
             "CHAT_STREAM",
             perf_trace_id,
@@ -461,6 +464,7 @@ def _handle_chat_request(
     log_backend_perf_func,
     diagnostic_payload_func,
     perf_now_ms_func,
+    publish_event_func=None,
 ):
     try:
         llm_started_ms = perf_now_ms_func()
@@ -530,6 +534,8 @@ def _handle_chat_request(
         if delivery_id:
             payload["delivery_id"] = delivery_id
         send_json_func(payload, extra_headers=perf_headers)
+        if reply and callable(publish_event_func):
+            publish_event_func("assistant_reply", {"source": "chat", "is_auto": is_auto, "interaction_id": perf_trace_id})
         log_backend_perf_func(
             "CHAT",
             perf_trace_id,
@@ -594,6 +600,7 @@ def handle_chat_route(
     diagnostic_payload_func,
     perf_now_ms_func,
     process_desktop_qq_command_func=None,
+    publish_event_func=None,
 ):
     delivery_receipt_enabled = _has_delivered_turn_receipt_capability(body)
     if delivery_receipt_enabled:
@@ -631,6 +638,15 @@ def handle_chat_route(
             extra_headers=perf_headers,
         )
         return
+
+    if callable(publish_event_func):
+        source = "auto" if is_auto else "chat"
+        metadata = {"source": source, "modality": chat_config.get("_input_modality", "text"), "is_auto": is_auto, "interaction_id": perf_trace_id}
+        publish_event_func("user_chat", metadata)
+        if metadata["modality"] == "voice":
+            publish_event_func("voice_turn", metadata)
+        if isinstance(chat_config.get("_conversation_context"), dict):
+            publish_event_func("desktop_observed", {"source": "chat_context", "has_context": True, "interaction_id": perf_trace_id})
 
     if not is_auto and callable(process_desktop_qq_command_func):
         desktop_qq_result = process_desktop_qq_command_func(user_message)
@@ -700,6 +716,7 @@ def handle_chat_route(
             log_backend_perf_func=log_backend_perf_func,
             diagnostic_payload_func=diagnostic_payload_func,
             perf_now_ms_func=perf_now_ms_func,
+            publish_event_func=publish_event_func,
         )
         return
 
@@ -731,4 +748,5 @@ def handle_chat_route(
         log_backend_perf_func=log_backend_perf_func,
         diagnostic_payload_func=diagnostic_payload_func,
         perf_now_ms_func=perf_now_ms_func,
+        publish_event_func=publish_event_func,
     )

@@ -1334,6 +1334,14 @@ Current status: complete and Electron-smoke verified.
 - Regression coverage is in `tests/test_sticker_frontend.js` and `tests/test_stage_frontend.js`. `node scripts\run_node_tests.js` passes, and `scripts\test-local.ps1` passes with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`.
 - Preserve all `.bak` files and unrelated dirty work. Do not commit, push, or merge without an explicit later request.
 
+## Latest Session Update: Companion Event Bus and Behavior Director v1 on 2026-08-02
+
+- Status: first safe integration is complete and locally verified. `personal-stable-2026-08-02` remains the baseline tag before this work; the working branch now has uncommitted event-bus changes only.
+- Main files: `companion_events.py`, `behavior_director.py`, `app.py`, `app_chat_route.py`, `config.py`, `config.example.json`, `tests/test_companion_events.py`, `tests/test_app_chat_route.py`, and state artifacts.
+- Contract: events are bounded metadata only. The director does not execute actions; a suggestion is never authorization to send QQ, speak, use tools, or observe the desktop.
+- Verification: focused backend suite `48 passed`; all Node tests, Python syntax `149`, JavaScript syntax `170`, and secret scan `641` passed. Full wrapper exceeded the 64-second external command cap after starting, so do not describe that wrapper as passed.
+- Next session: live-test the active-companionship timing with the director explicitly enabled; tune only evidence-backed timing values. Preserve all `.bak` files and unrelated changes.
+
 ## Latest Session Update: Compact Character Prompt and Personality Calibration v1 on 2026-07-27
 
 - Status: implementation, configured-provider probes, focused regressions, JSON checks, scoped whitespace checks, and the full local gate are complete.

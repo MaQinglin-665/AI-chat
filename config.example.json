@@ -356,6 +356,11 @@
     "voice_low_latency_enabled": false,
     "voice_prompt_max_history_messages": 4
   },
+  "behavior_director": {
+    "enabled": false,
+    "event_window_ms": 300000,
+    "quiet_after_tts_ms": 8000
+  },
   "motion": {
     "enabled": true,
     "cooldown_ms": 1200,

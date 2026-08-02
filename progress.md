@@ -2065,6 +2065,15 @@ Last Updated: 2026-07-11
   - JSON validation and scoped `git diff --check` passed.
 - Known v1 limits: retrieval is deliberately local Chinese-aware keyword matching rather than a newly downloaded embedding model; the first free learner source is Wikipedia random summaries and remains labelled `待核实`. Broader source adapters, semantic local embeddings/Qdrant, and a dedicated knowledge-management UI can be added later without changing the vault format.
 - Feature status: complete. No commits or pushes were made; unrelated dirty changes and all `.bak` files were preserved.
+## Companion Event Bus and Behavior Director v1 (2026-08-02, complete)
+
+- Added `companion_events.py`: a process-local, bounded metadata-only event stream. It deliberately omits message content, screenshots, credentials, tool arguments, and raw desktop data.
+- Added `behavior_director.py`: an explainable, non-executing suggestion layer. It can return `stay_quiet`, `micro_reaction`, or `prepare_proactive`; it respects active/just-finished TTS and requires existing companion-life material before suggesting proactive preparation.
+- Integrated desktop chat (including voice modality and supplied desktop context), QQ inbound/reply turns, and actual frontend playback start/finish reporting. `GET /api/behavior/status` and authenticated `POST /api/behavior/event` expose only bounded diagnostics and accepted lifecycle metadata.
+- Compatibility and safety: `behavior_director.enabled` defaults to `false`; it does not send a message, invoke an LLM, call a tool, observe the desktop, or bypass the existing companion-life/turn-taking/QQ gates.
+- Verification Evidence: focused companion-event/chat/API tests passed (`48 passed`); all Node frontend tests passed; Python syntax `149`, JavaScript syntax `170`, and secret scan `641` files passed. The monolithic `scripts\test-local.ps1` exceeded this environment's 64-second external-command limit; its equivalent project checks were run successfully in a bounded invocation.
+- When explicitly enabled, the existing proactive-material endpoint accepts only a grounded `prepare_proactive` suggestion; active speech or the post-TTS settle window can suppress an automatic attempt, but never create one. Remaining field work is subjective timing calibration with the existing turn-taking controller.
+
 ## Companion Life Growth and Meaningful Proactive Presence v2 (2026-07-28, in progress)
 
 - Added `companion_life.py`. It keeps a local, inspectable `D:\馨语记忆库\.xinyu-life-state.json` and writes only one sparse daily-style reflection per six eligible conversations under `08-内心日记`; there is no hidden LLM reflection call and no per-turn fabricated emotion.
