@@ -2065,6 +2065,24 @@ Last Updated: 2026-07-11
   - JSON validation and scoped `git diff --check` passed.
 - Known v1 limits: retrieval is deliberately local Chinese-aware keyword matching rather than a newly downloaded embedding model; the first free learner source is Wikipedia random summaries and remains labelled `待核实`. Broader source adapters, semantic local embeddings/Qdrant, and a dedicated knowledge-management UI can be added later without changing the vault format.
 - Feature status: complete. No commits or pushes were made; unrelated dirty changes and all `.bak` files were preserved.
+## Companion Event Ordering and Consumption Fix (2026-08-03, candidate baseline)
+
+- 状态：候选基线。
+- 自动化测试与静态检查已通过。
+- 真实 Electron 行为验收尚未进行。
+- 当前不能称为 personal stable 版本。
+- Replaced window-membership checks with latest-event ordering. The newest TTS lifecycle event now owns speaking/settle state, and voice participation compares the newest `voice_turn` against the newest `assistant_reply`.
+- Every accepted event receives a thread-safe process-local monotonic `sequence`; rejected event types do not advance it, and clearing the bounded event deque does not reset it.
+- Director decisions now expose `trigger_sequence`. A thread-safe process-local cursor is applied only at `/api/life/proactive`, so repeated polling cannot reuse the same grounded trigger; status inspection remains non-consuming and the disabled path preserves legacy `has_material` behavior.
+- Frontend TTS telemetry remains best-effort and non-blocking. Both synchronous transport exceptions and rejected promises are isolated from playback.
+- Verification Evidence: `scripts\test-local.ps1` passed with `641` Python tests, all Node frontend tests, Python syntax `149`, JavaScript syntax `170`, and secret scan `641`; CI-style `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` also passed `641` tests. Docs publish checks and all `4` Playwright smoke tests passed. No local Linux runner was available, so Ubuntu execution was not claimed; the Linux workflow uses the same passing pytest/Node/quality commands and the modified files contain no Windows-only dependency.
+- 待验收（不可写为已通过）：
+  1. TTS 开始和结束后的实际冷却行为。
+  2. 新语音被回复后不产生额外微反应。
+  3. 相同桌面事件不会重复生成主动建议。
+  4. 自动主动发言不会形成自循环。
+  5. 多次查询行为状态不会提前消费主动建议。
+
 ## Companion Event Bus and Behavior Director v1 (2026-08-02, complete)
 
 - Added `companion_events.py`: a process-local, bounded metadata-only event stream. It deliberately omits message content, screenshots, credentials, tool arguments, and raw desktop data.

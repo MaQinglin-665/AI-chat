@@ -49,12 +49,15 @@ class CompanionEventBus:
     def __init__(self, max_events=96):
         self._events = deque(maxlen=max(16, min(240, int(max_events or 96))))
         self._lock = RLock()
+        self._sequence = 0
 
     def publish(self, event_type, metadata=None, *, now_ms=None):
         event = _clean_event(event_type, metadata, now_ms)
         if event is None:
             return None
         with self._lock:
+            self._sequence += 1
+            event["sequence"] = self._sequence
             self._events.append(event)
         return dict(event)
 

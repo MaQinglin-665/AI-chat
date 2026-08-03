@@ -50,7 +50,7 @@ from qq_identity import (
 import memory as _memory_module
 import desktop_agent
 from companion_events import CompanionEventBus
-from behavior_director import decide as decide_behavior
+from behavior_director import BehaviorDecisionCursor, decide as decide_behavior
 from memory import (
     build_memory_prompt_block,
     get_core_memories_for_review,
@@ -332,6 +332,7 @@ _LOCAL_ASR_WARMUP = {
 }
 _QQ_BRIDGE_RUNTIME = None
 _COMPANION_EVENT_BUS = CompanionEventBus()
+_BEHAVIOR_DECISION_CURSOR = BehaviorDecisionCursor()
 RUNTIME_RESTART_EXIT_CODE = 75
 API_TOKEN_HEADER = "X-Taffy-Token"
 API_TOKEN_ENV_DEFAULT = "TAFFY_API_TOKEN"
@@ -1821,6 +1822,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                 cfg = load_config()
                 payload = get_proactive_material(cfg)
                 director = decide_behavior(cfg, _COMPANION_EVENT_BUS.snapshot(), life_material=payload)
+                director = _BEHAVIOR_DECISION_CURSOR.consume(director)
                 payload["behavior_director"] = director
                 # Disabled keeps every legacy proactive decision unchanged. When
                 # explicitly enabled, the director can only suppress an existing

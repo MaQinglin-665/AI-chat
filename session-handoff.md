@@ -1334,6 +1334,23 @@ Current status: complete and Electron-smoke verified.
 - Regression coverage is in `tests/test_sticker_frontend.js` and `tests/test_stage_frontend.js`. `node scripts\run_node_tests.js` passes, and `scripts\test-local.ps1` passes with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`.
 - Preserve all `.bak` files and unrelated dirty work. Do not commit, push, or merge without an explicit later request.
 
+## Latest Session Update: Event Ordering and Consumption Fix on 2026-08-03
+
+- 状态：候选基线。
+- 自动化测试与静态检查已通过。
+- 真实 Electron 行为验收尚未进行。
+- 当前不能称为 personal stable 版本。
+- Changed runtime files: `companion_events.py`, `behavior_director.py`, `app.py`, and `web/chatReplyController.js`; tests: `tests/test_companion_events.py` and `tests/test_behavior_director_frontend.js`; state records updated as required.
+- Semantics: sequence is process-local and monotonic; newest TTS event determines speaking/settle state; newest voice/reply order determines unanswered voice; only `/api/life/proactive` consumes a `prepare_proactive` trigger sequence.
+- Verification: final full local gate `641 passed`, all Node tests, syntax `149/170`, secrets `641`; CI-style pytest also passed `641`; docs publish and `4` browser smoke tests passed. Linux runner was unavailable locally and no push was permitted, so remote Actions were not triggered.
+- 待验收（不可写为已通过）：
+  1. TTS 开始和结束后的实际冷却行为。
+  2. 新语音被回复后不产生额外微反应。
+  3. 相同桌面事件不会重复生成主动建议。
+  4. 自动主动发言不会形成自循环。
+  5. 多次查询行为状态不会提前消费主动建议。
+- Remaining risk: process restart intentionally resets both event sequence and consumption cursor; an accepted trigger is at-most-once per process, so a crash between consumption and downstream dispatch may drop that suggestion rather than replay it.
+
 ## Latest Session Update: Companion Event Bus and Behavior Director v1 on 2026-08-02
 
 - Status: first safe integration is complete and locally verified. `personal-stable-2026-08-02` remains the baseline tag before this work; the working branch now has uncommitted event-bus changes only.

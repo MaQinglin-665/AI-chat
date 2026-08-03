@@ -11,11 +11,15 @@
 
     function reportBehaviorEvent(type, metadata = {}) {
       // Observability must never delay, cancel, or alter audible playback.
-      Promise.resolve(authFetch("/api/behavior/event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, metadata })
-      })).catch(() => {});
+      try {
+        Promise.resolve(authFetch("/api/behavior/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type, metadata })
+        })).catch(() => {});
+      } catch (_) {
+        // A synchronous transport failure is telemetry-only as well.
+      }
     }
     const acknowledgeDeliveredTurn = typeof deps.acknowledgeDeliveredTurn === "function"
       ? deps.acknowledgeDeliveredTurn
