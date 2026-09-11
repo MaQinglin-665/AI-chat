@@ -2361,3 +2361,6 @@ Last Updated: 2026-07-11
 - Fixed prior test failures: compacted redundant dialogue-policy phrasing while retaining explicit AI identity; stylesheet checks now allow scene layers; waveform assertion checks only its actual container.
 - Verification: 672 Python tests passed (one upstream audioop deprecation warning), all Node suites passed, docs publish checks and 4 Playwright smoke tests passed. Python syntax 156 files, JS syntax 183 files, secret scan 671 tracked text files passed. Required JSON parsing and Python compilation passed; staged whitespace checks passed; README/index direct local links resolve.
 - No new installer/tag or main merge. Code publication/PR is the next operation. Known low-risk limitations remain model latency, finite GPT/Claude sprite coverage and user-managed service compatibility.
+
+
+Publication completed 2026-09-11: code commit 101d3e0 pushed to origin/codex/desktop-companion-update-20260911; review PR https://github.com/MaQinglin-665/AI-chat/pull/209 created against main. No merge, installer or tag created. About/homepage/topics verified via GitHub API. Full local verification is recorded above.

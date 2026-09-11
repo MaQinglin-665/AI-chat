@@ -1662,3 +1662,6 @@ Ran real configured Terra on 5 synthetic scenarios; all post-fix schema and scen
 
 ## 2026-09-11 publication checkout
 Prepared codex/desktop-companion-update-20260911 in D:/AI/galgame-publish-20260911 for user's expanded all-public-changes scope. Full gates pass (672 Python, Node all, website 4 browser tests, syntax and secrets). About/homepage/topics updated. README refreshed. Original checkout untouched. Pending push/PR; do not merge main automatically. See latest progress entry and docs/source-update-2026-09.md.
+
+
+Publication completed 2026-09-11: code commit 101d3e0 pushed to origin/codex/desktop-companion-update-20260911; review PR https://github.com/MaQinglin-665/AI-chat/pull/209 created against main. No merge, installer or tag created. About/homepage/topics verified via GitHub API. Full local verification is recorded above.
