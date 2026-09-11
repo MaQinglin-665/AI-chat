@@ -1665,3 +1665,5 @@ Prepared codex/desktop-companion-update-20260911 in D:/AI/galgame-publish-202609
 
 
 Publication completed 2026-09-11: code commit 101d3e0 pushed to origin/codex/desktop-companion-update-20260911; review PR https://github.com/MaQinglin-665/AI-chat/pull/209 created against main. No merge, installer or tag created. About/homepage/topics verified via GitHub API. Full local verification is recorded above.
+
+2026-09-11 merge follow-up: user explicitly authorized merging PR #209. Fixed CI-only desktop test dependency and prompt-budget overflow; full local Python suite 672 passed and required pre-push checks passed. Next: push this fix, wait for fresh Linux/Windows and all other CI gates, then merge matching tested HEAD through GitHub. Do not bypass failed checks or modify the original dirty checkout.

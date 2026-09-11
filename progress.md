@@ -2364,3 +2364,9 @@ Last Updated: 2026-07-11
 
 
 Publication completed 2026-09-11: code commit 101d3e0 pushed to origin/codex/desktop-companion-update-20260911; review PR https://github.com/MaQinglin-665/AI-chat/pull/209 created against main. No merge, installer or tag created. About/homepage/topics verified via GitHub API. Full local verification is recorded above.
+
+## 2026-09-11 — PR #209 merge preparation (explicitly authorized)
+- Fixed CI portability in tests/test_desktop_agent.py by mocking safe foreground-window context before the mocked screenshot. Production privacy gating remains unchanged.
+- Condensed redundant full/voice dialogue guidance in companion_dialogue_policy.py to leave prompt-budget margin; retained behavior contracts and existing budget assertions.
+- Verification Evidence: full python -m pytest -q: 672 passed, one existing audioop deprecation warning. Required JSON and py_compile gates passed; secret scan passed (671 files). Previous head already passed Node, quality and docs CI; await fresh complete Linux/Windows CI before merging.
+- User explicitly requested merge of PR #209. No direct main push, force push, release or installer publication. Original working checkout remains untouched.

@@ -44,6 +44,11 @@ def test_observe_screen_is_model_selected_and_caches_scene(monkeypatch, tmp_path
     monkeypatch.setattr(desktop_agent, "STATE_PATH", tmp_path / "awareness.json")
     monkeypatch.setattr(
         desktop_agent,
+        "get_desktop_context",
+        lambda: {"foreground": {"process": "Code", "title": "Editor"}, "windows": []},
+    )
+    monkeypatch.setattr(
+        desktop_agent,
         "capture_cursor_screen",
         lambda **_kwargs: {
             "data_url": "data:image/jpeg;base64,ZmFrZQ==",

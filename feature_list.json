@@ -7,7 +7,7 @@
       "scope": [
         "Publish completed public workspace changes",
         "Refresh README and repository metadata",
-        "Run full release checks; open review PR without merging main"
+        "Run full release checks; open review PR and merge only after explicit user authorization and passing CI"
       ],
       "done_criteria": [
         "Public branch pushed and verified",
