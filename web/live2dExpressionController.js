@@ -2109,8 +2109,12 @@
       }
       if (sadBlend > 0.001) {
         const g = sadBlend * gain * sadCuePoseScale;
-        safeAddParamValue(core, "ParamEyeLOpen", -0.34 * g, 0.85);
-        safeAddParamValue(core, "ParamEyeROpen", -0.34 * g, 0.85);
+        // Sadness should read through brows, mouth, and posture. A small
+        // breathing variation may soften the eyes, but sustained speech must
+        // leave enough eye openness for normal gaze and blink animation.
+        const sadEyeSoftness = (0.035 + (Math.sin(now / 640) * 0.5 + 0.5) * 0.035) * g;
+        safeAddParamValue(core, "ParamEyeLOpen", -sadEyeSoftness, 0.58);
+        safeAddParamValue(core, "ParamEyeROpen", -sadEyeSoftness, 0.58);
         safeAddParamValue(core, "ParamBrowLY", -0.3 * g, 0.82);
         safeAddParamValue(core, "ParamBrowRY", -0.3 * g, 0.82);
         safeAddParamValue(core, "ParamBrowLForm", -0.32 * g, 0.76);

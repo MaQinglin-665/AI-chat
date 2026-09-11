@@ -3,7 +3,7 @@
 
   function createInitialState() {
     return {
-      activeTab: "candidates",
+      activeTab: "core",
       debugSnapshot: null,
       candidates: [],
       samples: [],
@@ -17,7 +17,7 @@
         inject_count: 0,
         promotion_min_support: 1
       },
-      sortMode: "score_desc",
+      sortMode: "updated_desc",
       loading: false
     };
   }
@@ -138,9 +138,9 @@
         ui.learningFilterKeyword.value = "";
       }
       if (ui.learningSortMode) {
-        ui.learningSortMode.value = "score_desc";
+        ui.learningSortMode.value = "updated_desc";
       }
-      state.sortMode = "score_desc";
+      state.sortMode = "updated_desc";
       renderLearningReviewList();
     }
 
@@ -220,10 +220,10 @@
         ui.learningStatCandidates.textContent = String(stats.candidates);
       }
       if (ui.learningStatSamples) {
-        ui.learningStatSamples.textContent = String(stats.samples);
+        ui.learningStatSamples.textContent = String(stats.pinned || 0);
       }
       if (ui.learningStatShort) {
-        ui.learningStatShort.textContent = String(stats.short || 0);
+        ui.learningStatShort.textContent = String(stats.important || 0);
       }
       if (ui.learningStatCore) {
         ui.learningStatCore.textContent = String(stats.core || 0);
@@ -250,6 +250,15 @@
         return;
       }
       const tab = state.activeTab === "samples" ? "samples" : (state.activeTab === "short" ? "short" : (state.activeTab === "core" ? "core" : "candidates"));
+      if (ui.memoryCreateCard) {
+        ui.memoryCreateCard.hidden = tab !== "core";
+      }
+      if (ui.learningReviewUndoBtn) {
+        ui.learningReviewUndoBtn.hidden = tab === "core";
+      }
+      if (ui.learningBatchPromoteBtn) {
+        ui.learningBatchPromoteBtn.hidden = tab !== "candidates";
+      }
       const filteredItems = getLearningFilteredItems();
       ui.learningReviewList.hidden = false;
       if (ui.learningDebugPanel) {
@@ -432,14 +441,33 @@
         return;
       }
       if (tab === "core") {
+        const card = sourceElement?.closest?.(".learning-item") || null;
+        if (action === "begin_edit" || action === "cancel_edit") {
+          card?.classList?.toggle("is-editing", action === "begin_edit");
+          return;
+        }
         if (action === "pin" || action === "unpin") {
           await updateCoreMemoryEntries(action, { ids: [id] });
           return;
         }
         if (action === "edit") {
-          const card = sourceElement?.closest?.(".learning-item") || null;
           const textarea = card?.querySelector?.(".core-memory-edit") || null;
-          await updateCoreMemoryEntries("edit", { ids: [id], patch: { text: textarea?.value || "" } });
+          const kind = card?.querySelector?.(".core-memory-kind") || null;
+          const category = card?.querySelector?.(".core-memory-category") || null;
+          const tags = card?.querySelector?.(".core-memory-tags") || null;
+          const importance = card?.querySelector?.(".core-memory-importance") || null;
+          const confidence = card?.querySelector?.(".core-memory-confidence") || null;
+          await updateCoreMemoryEntries("edit", {
+            ids: [id],
+            patch: {
+              text: textarea?.value || "",
+              kind: kind?.value || "semantic",
+              category: category?.value || "stable_fact",
+              tags: tags?.value || "",
+              importance: importance?.value,
+              confidence: confidence?.value
+            }
+          });
           return;
         }
         if (action === "weight_up") {
@@ -474,6 +502,34 @@
       if (action === "keep") {
         await updateLearningEntries("keep", { pool: tab, ids: [id] });
       }
+    }
+
+    async function createCoreMemoryFromForm() {
+      const text = String(ui.memoryCreateText?.value || "").trim();
+      if (text.length < 4) {
+        setStatus("请至少输入 4 个字的长期记忆");
+        ui.memoryCreateText?.focus?.();
+        return null;
+      }
+      const payload = await updateCoreMemoryEntries("create", {
+        patch: {
+          text,
+          kind: ui.memoryCreateKind?.value || "semantic",
+          category: ui.memoryCreateCategory?.value || "stable_fact",
+          tags: ui.memoryCreateTags?.value || "",
+          importance: 0.75,
+          confidence: 0.9,
+          pinned: ui.memoryCreatePinned?.checked === true
+        }
+      });
+      if (payload?.ok === false) {
+        setStatus(payload.error || "新增长期记忆失败");
+        return payload;
+      }
+      ui.memoryCreateForm?.reset?.();
+      if (ui.memoryCreateForm) ui.memoryCreateForm.hidden = true;
+      ui.memoryCreateToggleBtn?.setAttribute?.("aria-expanded", "false");
+      return payload;
     }
 
     async function runLearningBatchAction(action) {
@@ -541,6 +597,7 @@
         getFilteredItems: getLearningFilteredItems,
         runBatchAction: runLearningBatchAction,
         runSingleAction: runLearningSingleAction,
+        createCoreMemory: createCoreMemoryFromForm,
         render: renderLearningReviewList,
         onError: setStatus
       });
@@ -576,6 +633,7 @@
       closeLearningReviewDrawer,
       toggleLearningReviewDrawer,
       runLearningSingleAction,
+      createCoreMemoryFromForm,
       runLearningBatchAction,
       applyLearningQuickSettings,
       bindLearningReviewControls

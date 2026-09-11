@@ -2,7 +2,8 @@
 
 The language model may choose a reply, a visible micro-reaction, a deferred
 thought, or silence. Control tags are removed before chat text, memory, and TTS
-see the result. Missing or malformed tags always degrade to a normal reply.
+see the result. Missing or malformed tags normally degrade to a reply; private
+desktop-attention wakes fail closed to silence so raw system state cannot leak.
 """
 
 from __future__ import annotations
@@ -18,6 +19,18 @@ CONTROL_PREFIX_RE = re.compile(
 
 VALID_REPLY_DEPTHS = {"quick", "normal", "deep"}
 VALID_REACTIONS = {"thinking", "soft_ack", "curious", "concerned"}
+
+GENERIC_DESKTOP_WAKE_RE = re.compile(
+    r"(?:"
+    r"something\s+(?:changed|shifted|happened).{0,36}(?:screen|desktop)"
+    r"|(?:screen|desktop).{0,24}(?:changed|shifted)"
+    r"|want\s+me\s+to\s+(?:take\s+a\s+look|look|check)"
+    r"|should\s+i\s+(?:take\s+a\s+look|look|check)"
+    r"|(?:屏幕|桌面).{0,16}(?:变了|变化|有变化|动了)"
+    r"|(?:要不要|需要我|让我).{0,12}(?:看看|看一下|检查)"
+    r")",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def get_natural_conversation_settings(config) -> dict:
@@ -50,10 +63,12 @@ def get_natural_conversation_settings(config) -> dict:
 
 def is_natural_conversation_enabled(config) -> bool:
     settings = get_natural_conversation_settings(config)
-    if not settings["enabled"]:
-        return False
+    # Explicit one-turn participation lets an automatic attention wake resolve
+    # privately to silence. Ordinary chat remains governed by public settings.
     if bool((config or {}).get("_natural_participation")):
         return True
+    if not settings["enabled"]:
+        return False
     if not settings["voice_only"]:
         return True
     return str((config or {}).get("_input_modality") or "").strip().lower() == "voice"
@@ -72,7 +87,7 @@ def build_natural_conversation_prompt_block(config) -> str:
         allowed.append("[[TAFFY_DEFER]] when the thought may matter later but not now")
     if settings["allow_silence"]:
         allowed.append("[[TAFFY_SILENCE]] when a human companion would simply keep listening")
-    return (
+    contract = (
         "[Natural voice participation contract]\n"
         "This is continuous companionship, not mandatory question-answering. "
         "First decide whether you genuinely have something worth saying now.\n"
@@ -86,6 +101,13 @@ def build_natural_conversation_prompt_block(config) -> str:
         "Choose quick for an immediate simple response, normal for ordinary thought, and deep only when real reflection is useful. "
         "Never quote, explain, or imitate these control tags in the spoken reply."
     )
+    if str((config or {}).get("_character_auto_kind") or "").strip().lower() == "desktop_attention_wake":
+        contract += (
+            "\nThis turn is a private desktop-attention wake, not a user question. "
+            "Do not announce that the screen changed or ask whether you should look. "
+            "Choose silence unless a specific grounded observation is genuinely worth saying."
+        )
+    return contract
 
 
 def _delay_for_depth(settings, depth):
@@ -97,6 +119,24 @@ def _delay_for_depth(settings, depth):
             }.get(depth, "normal_delay_ms")
         ]
     )
+
+
+def _is_desktop_attention_wake(config) -> bool:
+    return (
+        str((config or {}).get("_character_auto_kind") or "").strip().lower()
+        == "desktop_attention_wake"
+    )
+
+
+def _silent_desktop_wake_decision(default, settings) -> dict:
+    return {
+        **default,
+        "mode": "silence",
+        "thinking_level": "quick",
+        "thinking_delay_ms": _delay_for_depth(settings, "quick"),
+        "reply_text": "",
+        "controlled": True,
+    }
 
 
 def parse_natural_conversation_output(text, config) -> dict:
@@ -116,6 +156,8 @@ def parse_natural_conversation_output(text, config) -> dict:
         return default
     match = CONTROL_PREFIX_RE.match(source)
     if not match:
+        if _is_desktop_attention_wake(config):
+            return _silent_desktop_wake_decision(default, settings)
         return default
 
     mode = match.group("mode").lower()
@@ -124,7 +166,11 @@ def parse_natural_conversation_output(text, config) -> dict:
     if mode == "reply":
         depth = detail if detail in VALID_REPLY_DEPTHS else "normal"
         if not body:
+            if _is_desktop_attention_wake(config):
+                return _silent_desktop_wake_decision(default, settings)
             return default
+        if _is_desktop_attention_wake(config) and GENERIC_DESKTOP_WAKE_RE.search(body):
+            return _silent_desktop_wake_decision(default, settings)
         return {
             **default,
             "thinking_level": depth,

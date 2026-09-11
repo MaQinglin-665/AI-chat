@@ -95,3 +95,25 @@ def test_migration_is_idempotent_and_does_not_repeat_changelog_noise():
             assert knowledge.migrate_existing_memories(config)["migrated"] == 0
         changelog = vault / "99-变更日志" / "自动同步.md"
         assert len(changelog.read_text(encoding="utf-8").splitlines()) == 1
+
+
+def test_search_ignores_legacy_core_mirrors_but_keeps_user_notes():
+    with tempfile.TemporaryDirectory() as tmp:
+        vault = Path(tmp) / "vault"
+        config = _config(vault)
+        knowledge.ensure_vault(config)
+        folder = vault / "01-关于用户"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "legacy.md").write_text(
+            "---\nid: legacy\nstatus: active\norigin: legacy_core_memory\n---\n\n用户喜欢薄荷茶。\n",
+            encoding="utf-8",
+        )
+        (folder / "manual.md").write_text(
+            "---\nid: manual\nstatus: active\n---\n\n用户喜欢薄荷茶，也喜欢安静的音乐。\n",
+            encoding="utf-8",
+        )
+        knowledge.sync_vault(config)
+
+        results = knowledge.search_knowledge(config, "用户喜欢薄荷茶")
+
+        assert [item["id"] for item in results] == ["manual"]

@@ -34,10 +34,10 @@
       ParamHandL: 0.18
     },
     speak: {
-      ParamAngleY: -0.35,
-      ParamBodyAngleX: 0.35,
-      ParamBodyAngleY: 0.75,
-      ParamShoulder: 0.055
+      ParamAngleY: -0.5,
+      ParamBodyAngleX: 0.52,
+      ParamBodyAngleY: 1.08,
+      ParamShoulder: 0.085
     }
   };
 
@@ -54,8 +54,6 @@
       ParamShoulder: 0.06
     },
     sad: {
-      ParamEyeLOpen: -0.13,
-      ParamEyeROpen: -0.13,
       ParamBrowLY: -0.13,
       ParamBrowRY: -0.13,
       ParamBrowLForm: -0.15,
@@ -669,7 +667,10 @@
           + Math.sin(now / 510 + seedPhase * 0.63) * 0.22;
         const shoulderCadence = Math.sin((now - 55) / 238 + seedPhase * 0.91);
         const bodyPhrase = Math.sin((now - 105) / 720 + seedPhase * 0.7);
-        const driveTarget = clamp(0.18 + audio * 0.58 + energy * 0.3, 0, 1.2);
+        // Keep a VTuber-like upper-body presence throughout audible speech.
+        // Real audio still controls the energy, while the floor prevents long
+        // clauses from looking frozen between syllable peaks.
+        const driveTarget = clamp(0.3 + audio * 0.62 + energy * 0.38, 0, 1.35);
         const driveFollow = 1 - Math.pow(
           1 - (driveTarget > Number(director.speechDrive || 0) ? 0.1 : 0.055),
           dtFrames
@@ -677,16 +678,20 @@
         director.speechDrive = clamp(
           Number(director.speechDrive || 0) + (driveTarget - Number(director.speechDrive || 0)) * driveFollow,
           0,
-          1.2
+          1.35
         );
         const drive = director.speechDrive;
+        const audioAccent = Math.max(0, audio - 0.08);
+        const armCadence = shoulderCadence * 0.22 - bodyPhrase * 0.14;
         addPose(parameters, {
-          ParamAngleY: (-0.48 - Math.max(0, headCadence) * 0.92) * drive,
-          ParamAngleZ: headCadence * 0.82 * drive,
-          ParamBodyAngleX: bodyPhrase * 0.58 * drive,
-          ParamBodyAngleY: (0.82 + Math.max(0, shoulderCadence) * 1.25) * drive,
-          ParamBodyAngleZ: bodyPhrase * 1.08 * drive,
-          ParamShoulder: (0.04 + Math.max(0, shoulderCadence) * 0.035 + Math.max(0, audio - 0.12) * 0.14) * drive
+          ParamAngleY: (-0.68 - Math.max(0, headCadence) * 1.24) * drive,
+          ParamAngleZ: headCadence * 1.16 * drive,
+          ParamBodyAngleX: bodyPhrase * 0.86 * drive,
+          ParamBodyAngleY: (1.16 + Math.max(0, shoulderCadence) * 1.72 + audioAccent * 0.48) * drive,
+          ParamBodyAngleZ: bodyPhrase * 1.72 * drive,
+          ParamShoulder: (0.075 + Math.max(0, shoulderCadence) * 0.065 + audioAccent * 0.2) * drive,
+          ParamArmLA: armCadence * drive,
+          ParamArmRA: -armCadence * drive
         });
       } else if (Number(director.speechDrive || 0) > 0.0001) {
         const releaseFollow = 1 - Math.pow(1 - 0.055, dtFrames);

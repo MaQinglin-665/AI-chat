@@ -377,7 +377,8 @@ function testConfigSwitchStylesheetLayeredBeforeControlCenter() {
   assert.ok(stylesheetHrefs.indexOf("./stage.css") < stylesheetHrefs.indexOf("./controlCenter.css"));
   assert.ok(stylesheetHrefs.indexOf("./controlCenter.css") < stylesheetHrefs.indexOf("./xinyuDisplayFont.css"));
   assert.ok(stylesheetHrefs.indexOf("./kawaiiTheme.css") < stylesheetHrefs.indexOf("./phosphorIcons.css"));
-  assert.strictEqual(stylesheetHrefs[stylesheetHrefs.length - 1], "./phosphorIcons.css");
+  assert.ok(stylesheetHrefs.indexOf("./phosphorIcons.css") < stylesheetHrefs.indexOf("./sceneExperience.css"), "scene polish follows the shared icon layer");
+  assert.ok(stylesheetHrefs.includes("./galgame.css"));
 }
 
 function testLive2dReportCss() {

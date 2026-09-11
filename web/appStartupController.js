@@ -87,7 +87,7 @@
         ? source.phasePlan
         : source;
       const phase = cleanPerformancePhaseToken(source.phase || plan.phase, "pre_reaction");
-      if (!["pre_reaction", "thinking_wait"].includes(phase) || plan.suppressed === true || source.suppressed === true) {
+      if (!["pre_reaction", "thinking_wait", "behavior_intent"].includes(phase) || plan.suppressed === true || source.suppressed === true) {
         return null;
       }
       const rawIntent = cleanPerformancePhaseToken(plan.actionIntent || source.actionIntent, "none");

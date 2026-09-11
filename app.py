@@ -51,6 +51,13 @@ import memory as _memory_module
 import desktop_agent
 from companion_events import CompanionEventBus
 from behavior_director import BehaviorDecisionCursor, decide as decide_behavior
+from interaction_mind import (
+    build_prompt as build_interaction_mind_prompt,
+    get_settings as get_interaction_mind_settings,
+    load_state as load_interaction_mind_state,
+    parse_decision as parse_interaction_mind_decision,
+    record_feedback as record_interaction_mind_feedback,
+)
 from memory import (
     build_memory_prompt_block,
     get_core_memories_for_review,
@@ -245,7 +252,6 @@ from app_config_route import (
 )
 from app_translate_route import handle_translate_request
 from app_tts_route import handle_tts_request, handle_tts_stream_request
-from singing import convert_catalog_song, convert_selected_wav, public_status as get_singing_status, read_output as read_singing_output
 from config_switch import (
     build_config_switch_payload,
     build_config_switch_test_config,
@@ -295,7 +301,7 @@ from reply_behavior import (
 )
 from llm_response_utils import split_text_for_stream
 from inner_thought import generate_inner_thought_impl
-from llm_runtime import call_llm_impl, call_llm_stream_impl
+from llm_runtime import call_llm_impl, call_llm_stream_impl, resolve_runtime_provider
 from llm_tool_calls import (
     build_chat_completions_tool_defs as _build_chat_completions_tool_defs_impl,
     build_responses_tool_defs as _build_responses_tool_defs_impl,
@@ -1220,6 +1226,45 @@ def call_llm(user_message, history, image_data_url=None, is_auto=False, force_to
     )
 
 
+def _run_interaction_mind(config, snapshot):
+    """Make one private cloud decision without reply finalizers or tool execution."""
+    settings = get_interaction_mind_settings(config)
+    preference = load_interaction_mind_state(config)
+    if not settings["enabled"]:
+        return {
+            "ok": True,
+            "enabled": False,
+            "decision": {
+                "version": 1,
+                "action": "wait",
+                "confidence": 0.0,
+                "interaction_open": False,
+                "reason_code": "respect_user_space",
+                "topic_anchor": "",
+                "utterance_intent": "",
+                "wait_ms": settings["pulse_max_ms"],
+            },
+            "preference": preference,
+        }
+    llm_cfg_raw = config.get("llm", {}) if isinstance(config, dict) else {}
+    llm_cfg = dict(_build_reply_llm_cfg(config, llm_cfg_raw))
+    llm_cfg["max_tokens"] = min(320, max(160, int(llm_cfg.get("max_tokens", 220) or 220)))
+    llm_cfg["temperature"] = min(0.7, max(0.1, float(llm_cfg.get("temperature", 0.45) or 0.45)))
+    _ensure_llm_auth_ready(llm_cfg)
+    prompt = build_interaction_mind_prompt(snapshot, preference)
+    provider = resolve_runtime_provider(llm_cfg_raw)
+    if provider in {"openai", "openai-compatible", "openai_compatible"}:
+        raw = call_openai_compatible(llm_cfg, build_openai_messages(prompt, [], "Decide now."))
+    else:
+        raw = call_ollama(llm_cfg, build_ollama_messages(prompt, [], "Decide now."))
+    return {
+        "ok": True,
+        "enabled": True,
+        "decision": parse_interaction_mind_decision(raw, config, preference=preference),
+        "preference": preference,
+    }
+
+
 def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
     yield from call_llm_stream_impl(
         user_message,
@@ -1712,19 +1757,6 @@ class PetHandler(SimpleHTTPRequestHandler):
         if path_only == "/api/asr/status":
             self._send_json(get_local_asr_warmup_status())
             return
-        if path_only == "/api/singing/status":
-            self._send_json(get_singing_status(load_config()))
-            return
-        if path_only.startswith("/api/singing/output/"):
-            try:
-                name = urllib.parse.unquote(path_only.rsplit("/", 1)[-1])
-                output = read_singing_output(load_config(), name)
-                self._send_audio(output.read_bytes(), content_type="audio/wav")
-            except FileNotFoundError:
-                self._send_json({"ok": False, "error": "Not found"}, status=HTTPStatus.NOT_FOUND)
-            except Exception as exc:
-                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.BAD_REQUEST)
-            return
         if path_only == "/api/character_runtime/backend_entry":
             try:
                 self._send_json(self._build_character_runtime_backend_entry_payload())
@@ -2140,8 +2172,7 @@ class PetHandler(SimpleHTTPRequestHandler):
             "/api/asr_pcm",
             "/api/asr_stream",
             "/api/behavior/event",
-            "/api/singing/convert",
-            "/api/singing/catalog/perform",
+            "/api/interaction/mind",
             "/api/persona_card",
             *CONFIG_POST_PERF_ROUTES,
         }:
@@ -2170,6 +2201,19 @@ class PetHandler(SimpleHTTPRequestHandler):
             0,
         )
         client_to_server_ms = _wall_now_ms() - client_send_wall_ms if client_send_wall_ms > 0 else -1
+
+        if path_only == "/api/interaction/mind":
+            try:
+                cfg = load_config()
+                snapshot = body.get("snapshot", {}) if isinstance(body, dict) else {}
+                self._send_json(_run_interaction_mind(cfg, snapshot))
+            except Exception as exc:
+                _log_backend_exception("INTERACTION_MIND", exc, extra="POST /api/interaction/mind failed")
+                self._send_json(
+                    {"ok": False, **_diagnostic_payload(exc)},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
 
         if path_only == "/api/persona_card":
             try:
@@ -2223,30 +2267,7 @@ class PetHandler(SimpleHTTPRequestHandler):
                 log_backend_exception_func=_log_backend_exception,
                 diagnostic_payload_func=_diagnostic_payload,
                 perf_now_ms_func=_perf_now_ms,
-                process_desktop_qq_command_func=_process_explicit_desktop_qq_command,
             )
-            return
-
-        if path_only == "/api/singing/convert":
-            try:
-                source_path = body.get("source_path", "") if isinstance(body, dict) else ""
-                payload = convert_selected_wav(load_config(), source_path)
-                payload["output_url"] = "/api/singing/output/" + urllib.parse.quote(payload["output_name"])
-                self._send_json(payload)
-            except Exception as exc:
-                _log_backend_exception("SINGING", exc, extra="POST /api/singing/convert failed")
-                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.BAD_REQUEST)
-            return
-
-        if path_only == "/api/singing/catalog/perform":
-            try:
-                song_id = body.get("song_id", "") if isinstance(body, dict) else ""
-                payload = convert_catalog_song(load_config(), song_id)
-                payload["output_url"] = "/api/singing/output/" + urllib.parse.quote(payload["output_name"])
-                self._send_json(payload)
-            except Exception as exc:
-                _log_backend_exception("SINGING", exc, extra="POST /api/singing/catalog/perform failed")
-                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.BAD_REQUEST)
             return
 
         if path_only == "/api/tts_stream":
@@ -2263,7 +2284,6 @@ class PetHandler(SimpleHTTPRequestHandler):
                 log_backend_exception_func=_log_backend_exception,
                 diagnostic_payload_func=_diagnostic_payload,
                 perf_now_ms_func=_perf_now_ms,
-                publish_event_func=_COMPANION_EVENT_BUS.publish,
             )
             return
 
@@ -2319,6 +2339,11 @@ class PetHandler(SimpleHTTPRequestHandler):
             return
 
         if path_only in CHAT_ROUTES:
+            if isinstance(body, dict) and body.get("auto") is not True:
+                try:
+                    record_interaction_mind_feedback(load_config(), body.get("message", ""))
+                except Exception:
+                    pass
             handle_chat_route(
                 path_only,
                 body,

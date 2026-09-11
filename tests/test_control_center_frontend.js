@@ -9,6 +9,7 @@ const ROOT = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
 const html = read("web/index.html");
 const css = read("web/controlCenter.css");
+const polishCss = read("web/controlCenterPolish.css");
 const kawaiiCss = read("web/kawaiiTheme.css");
 const phosphorCss = read("web/phosphorIcons.css");
 const shellSource = read("web/controlCenterShell.js");
@@ -37,6 +38,7 @@ function testUnifiedPageRegistry() {
 
 function testControlCenterMarkupAndLayering() {
   assert.ok(html.includes('href="./controlCenter.css"'));
+  assert.ok(html.includes('href="./controlCenterPolish.css"'));
   assert.ok(html.includes('src="./controlCenterShell.js"'));
   for (const id of [
     "doctor-modal", "doctor-dialog", "doctor-rerun-btn", "doctor-close-btn",
@@ -96,6 +98,27 @@ function testContinuousPageShellContract() {
   assert.ok(css.includes(".control-center-backplane-shell"));
   assert.ok(css.includes("body.control-center-switching .control-center-shell"));
   assert.ok(css.includes("z-index: 119"), "stable backplane should stay directly below feature surfaces");
+  let closeClicks = 0;
+  shell.closeSurface({
+    querySelector(selector) {
+      assert.ok(selector.includes("#qq-identity-close-btn"), "QQ must participate in unified page switching");
+      return { click() { closeClicks += 1; } };
+    }
+  });
+  assert.strictEqual(closeClicks, 1, "the current surface should close before the target page opens");
+  assert.ok(
+    shellSource.indexOf("closeSurface(surface);") < shellSource.indexOf("targetButton.click();"),
+    "page switching should close the current surface before opening the target"
+  );
+}
+
+function testReadabilityLayerContract() {
+  assert.ok(polishCss.includes("--cc-label: #ead9e2"), "night labels should use a readable high-contrast token");
+  assert.ok(polishCss.includes(".config-switch-check"), "legacy pale check rows should receive the unified dark surface");
+  assert.ok(polishCss.includes(".qq-identity-id-chip"), "QQ identity chips should follow the control-center palette");
+  assert.ok(polishCss.includes(":disabled"), "disabled controls should remain visibly readable");
+  assert.ok(polishCss.includes("-webkit-text-fill-color"), "Chromium disabled fields should keep the intended text color");
+  assert.ok(polishCss.includes("prefers-reduced-motion: reduce"), "control-center feedback should honor reduced motion");
 }
 
 function testDoctorWorkflowContract() {
@@ -165,6 +188,7 @@ testControlCenterMarkupAndLayering();
 testVisualSystemContract();
 testProgressiveDisclosureContract();
 testContinuousPageShellContract();
+testReadabilityLayerContract();
 testDoctorWorkflowContract();
 testSystemMessagesStayOutOfHistory();
 testDesktopToggleSemantics();

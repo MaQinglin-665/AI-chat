@@ -798,9 +798,9 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(gate.allowShell, false, "auto chat brain gate should not allow shell execution");
   assert.strictEqual(gate.allowToolCall, false, "auto chat brain gate should not allow tool calls");
   assert.ok(prompt.includes("low_interrupt_checkin") && prompt.includes("no desktop observation") && prompt.includes("no shell"), "auto chat prompt should carry the brain safety guard");
-  assert.ok(prompt.includes("Reply in English only.") && prompt.includes("Use exactly one short sentence."), "auto chat prompt should preserve the English one-line character setting");
-  assert.ok(prompt.includes("live stage aside") && prompt.includes("not a customer-service follow-up"), "auto chat prompt should bias proactive replies toward stage asides instead of service follow-ups");
-  assert.ok(!/[\u4e00-\u9fff]/.test(prompt), "auto chat prompt should not mix Chinese instructions into the English-only character output path");
+  assert.ok(prompt.includes("primary language and register") && prompt.includes("natural length and shape"), "auto chat prompt should inherit conversational language without a fixed sentence template");
+  assert.ok(prompt.includes("companion continuing a shared moment") && prompt.includes("not like a notification or service prompt"), "auto chat prompt should bias proactive replies toward human continuity instead of service follow-ups");
+  assert.ok(!prompt.includes("Reply in English only.") && !prompt.includes("Use exactly one short sentence."), "auto chat prompt should not force a language or sentence-count template");
   assert.ok(controller.buildAutoChatTriggerExplanation({ primaryReason: "long_silence", topicHint: "demo" }).includes("demo"), "auto chat should expose a compact trigger explanation");
   assert.strictEqual(controller.shouldAttachDesktopImage("look at the screen", true), false, "auto chat should not attach desktop images without explicit auto permission");
   assert.strictEqual(controller.shouldAttachDesktopImage("look at the screen", false), true, "manual chat may attach desktop images when observation is already enabled");
@@ -815,6 +815,7 @@ function createMemoryStorage(initial = {}) {
       scoreJitter: 0
     },
     lastUserMessageAt: now - 70 * 1000,
+    conversationLastHandledUserAt: now - 70 * 1000,
     lastAutoChatAt: 0,
     chatRecords: [
       { role: "user", content: "This desk feels weird.", timestamp: now - 70 * 1000 }
@@ -862,9 +863,9 @@ function createMemoryStorage(initial = {}) {
   assert.strictEqual(interjection.director.max_sentences, 4, "tiny-rant thought bursts should allow a few short beats");
   assert.strictEqual(interjection.director.motion_cue, "side_eye", "stage interjections should plan a visible side-eye motion cue");
   const interjectionPrompt = controller.buildAutoChatPrompt(interjection);
-  assert.ok(interjectionPrompt.includes("sudden thought burst") && interjectionPrompt.includes("thinking out loud"), "turn interjection prompt should frame the line as Xinyu's own thought burst");
+  assert.ok(interjectionPrompt.includes("thought that genuinely grew") && interjectionPrompt.includes("spontaneous interjection between friends"), "turn interjection prompt should frame the line as Xinyu's own thought burst");
   assert.ok(interjectionPrompt.includes("Interjection director: decision=interject") && interjectionPrompt.includes("thought_type=tiny_rant") && interjectionPrompt.includes("motion=side_eye"), "turn interjection prompt should carry the director execution plan");
-  assert.ok(interjectionPrompt.includes("2-4 short beats") && !interjectionPrompt.includes("Use exactly one short sentence."), "thought burst prompt should not force every interjection into a one-liner");
+  assert.ok(interjectionPrompt.includes("natural length and shape") && !interjectionPrompt.includes("Use exactly one short sentence."), "thought burst prompt should not force every interjection into a one-liner");
   assert.strictEqual(controller.executeInterjectionDirectorMotion(interjection), true, "interjection director should dispatch a safe motion cue");
   assert.ok(interjectionMotionCalls.some((call) => call[0] === "action" && call[1] === "listen" && call[2]?.motionRole === "interjection_reaction" && call[2]?.motionCue === "side_eye"), "interjection motion should land on the action plan as a director reaction");
   assert.ok(interjection.delayMs >= 450 && interjection.delayMs <= 1600, "turn interjection should feel immediate enough to notice during manual testing");
@@ -907,6 +908,7 @@ function createMemoryStorage(initial = {}) {
       appInteractionWindowMs: 120000
     },
     lastUserMessageAt: now - 70 * 1000,
+    conversationLastHandledUserAt: now - 70 * 1000,
     lastAutoChatAt: 0,
     chatRecords: [
       { role: "user", content: "This desk plan still feels unfinished.", timestamp: now - 70 * 1000 }
@@ -2324,7 +2326,7 @@ assert.strictEqual(
   );
   assert.deepStrictEqual(
     learningReviewModel.buildLearningStats(learningState, 1),
-    { candidates: 2, samples: 1, short: 1, core: 1, visible: 1, selected: 1, activePoolLabel: "候选池" },
+    { candidates: 2, samples: 1, short: 1, core: 1, pinned: 1, important: 1, visible: 1, selected: 1, activePoolLabel: "待整理" },
     "learning model should build memory pool overview stats"
   );
   learningState.activeTab = "short";
@@ -2451,6 +2453,14 @@ assert.strictEqual(
     });
     assert.strictEqual(rendered, 1, "learning review view should render visible memory pool items");
     assert.strictEqual(container.children[0].classList.contains("is-collapsed"), false, "memory cards should be expanded by default");
+    const coreContainer = createElement("div");
+    learningReviewView.renderLearningReviewItems(coreContainer, [learningState.coreMemories[0]], {
+      document: doc,
+      model: learningReviewModel,
+      tab: "core"
+    });
+    assert.ok(coreContainer.children[0].querySelector(".core-memory-readonly"), "core memory cards should be readable without entering edit mode");
+    assert.ok(coreContainer.children[0].querySelector(".core-memory-editor"), "core memory cards should provide an explicit edit mode");
     assert.ok(container.children[0].querySelector(".learning-item-preview"), "memory cards should show concrete pool details");
     assert.ok(container.children[0].querySelector(".learning-item-actions"), "memory cards should keep useful review actions");
   }
@@ -2775,7 +2785,10 @@ assert.ok(
     && learningReviewBinderSource.includes("runSingleAction")
     && learningReviewBinderSource.includes("learningTabShort")
     && learningReviewBinderSource.includes("learningTabCore")
+    && learningReviewBinderSource.includes("createCoreMemory")
     && learningReviewControllerSource.includes("function createInitialState")
+    && learningReviewControllerSource.includes('activeTab: "core"')
+    && learningReviewControllerSource.includes("async function createCoreMemoryFromForm")
     && learningReviewControllerSource.includes("function renderLearningReviewList")
     && learningReviewControllerSource.includes("async function reloadLearningReviewData")
     && learningReviewControllerSource.includes("function bindLearningReviewControls")

@@ -1752,6 +1752,7 @@ const LIVE2D_LAYOUT_CONTROLLER = window.TaffyLive2DLayoutController || {};
 const LIVE2D_EXPRESSION_CONTROLLER = window.TaffyLive2DExpressionController || {};
 const HIYORI_EMOTION_OVERLAY_CONTROLLER = window.TaffyHiyoriEmotionOverlayController || {};
 const HIYORI_PERFORMANCE_DIRECTOR = window.TaffyHiyoriPerformanceDirector || {};
+const BEHAVIOR_PERFORMANCE_BRIDGE = window.TaffyBehaviorPerformanceBridge || {};
 const CHAT_CONTROLLER_DELEGATES = window.TaffyChatControllerDelegates || {};
 const CHAT_TTS_BOUNDARY = window.TaffyChatTtsBoundary || {};
 const CHAT_LIVE2D_BOUNDARY = window.TaffyChatLive2DBoundary || {};
@@ -2330,11 +2331,15 @@ function toggleChatTranslationVisibility() {
 
 function setAdvancedActionsExpanded(expanded) {
   const open = !!expanded;
+  if (open) {
+    window.__taffyStageThemeController?.setMenuOpen?.(false);
+  }
   if (ui.advancedActions) {
     ui.advancedActions.hidden = !open;
   }
   if (ui.moreBtn) {
     ui.moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    ui.moreBtn.setAttribute("aria-label", open ? "收起更多陪伴功能" : "展开更多陪伴功能");
     ui.moreBtn.textContent = open ? "收起" : "更多";
   }
 }
@@ -3438,6 +3443,15 @@ function getAutoChatController() {
         const response = await authFetch("/api/life/proactive");
         return response.ok ? response.json() : { has_material: false };
       },
+      getInteractionMindDecision: async (snapshot = {}) => {
+        const response = await authFetch("/api/interaction/mind", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ snapshot })
+        });
+        return response.ok ? response.json() : { ok: false, enabled: false };
+      },
+      applyBehaviorPerformanceDecision,
       enqueueActionIntent,
       triggerExpressionPulse,
       constants: {
@@ -4189,6 +4203,34 @@ function applyStyleExpressionLayer() { return getLive2DExpressionController().ap
 function requestLive2DPerformanceMode(mode, opts = {}) { return getLive2DExpressionController().requestPerformanceMode?.(mode, opts); }
 function triggerLive2DSemanticAction(action, opts = {}) { return getLive2DExpressionController().triggerSemanticAction?.(action, opts); }
 
+let behaviorPerformanceBridge = null;
+
+function getBehaviorPerformanceBridge() {
+  if (!behaviorPerformanceBridge && typeof BEHAVIOR_PERFORMANCE_BRIDGE.createController === "function") {
+    behaviorPerformanceBridge = BEHAVIOR_PERFORMANCE_BRIDGE.createController({
+      state,
+      performanceObject: performance,
+      requestPerformanceMode: requestLive2DPerformanceMode,
+      triggerSemanticAction: triggerLive2DSemanticAction,
+      triggerExpressionPulse,
+      publishPerformancePhase: publishSplitWindowPerformancePhase,
+      isSpeakingNow,
+      isSpeechMotionActive,
+      isUserListening: () => ["armed", "hearing", "release"].includes(String(state.listeningPresencePhase || "idle"))
+    });
+  }
+  return behaviorPerformanceBridge || BEHAVIOR_PERFORMANCE_BRIDGE;
+}
+
+function applyBehaviorPerformanceDecision(decision = null) {
+  const controller = getBehaviorPerformanceBridge();
+  try {
+    return typeof controller.apply === "function" ? controller.apply(decision) : false;
+  } catch (_) {
+    return false;
+  }
+}
+
 function buildPerformanceCue(input = {}) {
   return typeof PERFORMANCE_CUE_CONTROLLER.buildPerformanceCue === "function"
     ? PERFORMANCE_CUE_CONTROLLER.buildPerformanceCue(input)
@@ -4914,7 +4956,7 @@ function invokeChatReplyController(methodName, args = [], fallback) {
 
 async function streamAssistantReply(payload, onDelta, perfHooks = null) { return invokeChatReplyController("streamAssistantReply", [payload, onDelta, perfHooks]); }
 async function requestAssistantReply(text, opts = {}) { return invokeChatReplyController("requestAssistantReply", [text, opts]); }
-function interruptActiveChatTurn(reason = "user_input") { return invokeChatReplyController("interruptActiveChatTurn", [reason]); }
+function interruptActiveChatTurn(reason = "user_input", options = {}) { return invokeChatReplyController("interruptActiveChatTurn", [reason, options]); }
 function handleUserSpeechStart(input = {}) { return invokeChatReplyController("handleUserSpeechStart", [input]); }
 async function sendChat() { return invokeChatReplyController("sendChat"); }
 

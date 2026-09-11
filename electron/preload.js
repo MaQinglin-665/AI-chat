@@ -8,7 +8,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   beginWindowDrag: () => ipcRenderer.send("window-drag-begin"),
   endWindowDrag: () => ipcRenderer.send("window-drag-end"),
   captureDesktop: () => ipcRenderer.invoke("capture-desktop"),
-  pickSingingSource: () => ipcRenderer.invoke("pick-singing-source"),
   setWindowLock: (locked) => ipcRenderer.send("window-lock-set", !!locked),
   getWindowLock: () => ipcRenderer.invoke("window-lock-get"),
   getSurfaceActive: () => ipcRenderer.invoke("surface-active-get"),

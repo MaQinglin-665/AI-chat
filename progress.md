@@ -1,5 +1,54 @@
 # Progress
 
+## Light Utility Selection v1 (2026-08-09)
+
+- Replaced the dark-on-dark utility selection shown in the Electron screenshot with one light-pink capsule and dark-berry icon/text treatment.
+- Applied the same visual contract to Desktop hover/focus and to the persistent expanded states of Scene and More. Earlier divider and More-specific rules can no longer square or darken the selected capsule.
+- Added a restrained one-pixel hover lift, compact press response, precise-pointer gating, and reduced-motion fallback without changing button behavior or menu structure.
+- Verification remains risk-scaled for this CSS-only correction: focused frontend tests, JSON validation, secret scan, and scoped whitespace checks; the full local gate is not repeated.
+
+## State-Linked Stage Motion v1 (2026-08-08)
+
+- Retired the continuous header and composer sweep/breathing light after visual feedback that it felt monotonous. The stage is calm at rest; only real microphone/listening activity keeps animated bars, while focus, hover, and press remain direct interaction feedback.
+- Replaced both angular Tabler-cat treatments. The header now uses the rounder filled Phosphor cat with a small four-point sparkle; the lower-left anchor is a soft cat sticker composed from the same Phosphor family with a tiny heart accent.
+- Corrected the first implementation after real Electron feedback: a broad direct-child positioning rule had pulled the header's absolute cat-ear decoration into normal layout, causing the large pink artifact and header misalignment. The motion layer now assigns stacking only to named content and controls without changing their positioning model.
+- Removed the redundant clipped cat-ear pair from the wide header; the existing waveform-and-cat brand mark remains the single clean identity. Reduced-motion mode now retains an opacity-only rim breath rather than disabling every visible idle response.
+- Raised idle visibility substantially. The header and composer now retain a continuous slow light pass plus a breathing inner rim even before microphone or LLM activity begins; active states still accelerate or soften that same motion language.
+- Added one final motion layer for the top presence rail and bottom voice-first composer while preserving the existing pink-purple anime glass visual identity.
+- Reused the real `idle`, `listening`, `thinking`, `speaking`, and `error` presence states. Idle now breathes gently; listening exposes compact activity bars and a faster light pass; thinking uses a slower processing flow; speaking adds a softer reply rhythm.
+- The composer now lifts on focus, follows live voice/LLM states with light flow, promotes Send when text is ready, and gives explicit hover and press feedback without capturing pointer input.
+- Added an operating-system reduced-motion fallback. Motion uses transform and opacity for moving layers and avoids blanket transitions.
+- Verification is intentionally risk-scaled: focused stage tests, JSON validation, secret scan, scoped whitespace checks, and visual browser QA only; the full local gate is not repeated for this UI-only change.
+
+## Control-Center Readability and Navigation Fix v1 (2026-08-07)
+
+- Fixed the unified sidebar path from QQ Identity: its close control was missing from the shared surface selector, so navigation highlight changed while the QQ page remained above the destination. Switching now closes the current surface first and opens the target second.
+- Added a final control-center readability layer for every page. Labels, helper copy, inputs, placeholders, buttons, disabled states, checkbox rows, and QQ identity chips now use one high-contrast berry palette in both day and night modes.
+- Preserved the existing pink-purple glass identity, information architecture, page labels, form fields, and feature behavior. No external UI dependency was introduced.
+- Focused control-center syntax and frontend contract tests pass. The unrelated existing memory-search copy assertion in `test_button_value_ui.js` still fails and was not changed as part of this task.
+
+## Four-Phase Time Scene and Motion Layer v1 (2026-08-07)
+
+- Expanded the stage from day/night into four automatic local-time scenes: morning `05:00-09:00`, day `09:00-17:00`, dusk `17:00-20:00`, and night `20:00-05:00`.
+- The header is now a passive current-scene/time status. The lower `上手` launcher was replaced by `场景`, which opens Auto plus four manual choices; a manual choice stays active until Auto is selected again.
+- Morning and dusk reuse the existing room artwork through scene-specific lighting and color treatment. Added layered glass depth, moving light, ambient motes, gentle decorative motion, scene transitions, and interaction feedback while retaining the existing pink-purple anime style.
+- Generated and integrated `night-room-v2.webp` from the approved image-generation candidate. It preserves the day room's camera, furniture, and central Live2D-safe area while adding a real indigo starry exterior, cool window moonlight, and restrained warm shelf lighting.
+- Night now uses the dedicated same-room illustration instead of flattening the day image with a gray-blue CSS filter. Runtime overlays were reduced so the painted light and detail remain visible, while the Live2D character stays bright above the room layers. The old night asset remains untouched.
+- Generated and integrated `morning-room-v1.webp` and `dusk-room-v1.webp` with the same camera, furniture, and central character-safe composition. Morning uses pale blue and sakura-pink dawn light; dusk uses coral sunset, lavender shadows, and warm shelf lighting.
+- The stage now crossfades between four dedicated same-room illustrations. Morning and dusk no longer depend on heavy color overlays, so their painted lighting remains intact while the existing ambient motion stays subtle.
+- Preserved the existing storage key and old `auto`, `day`, and `night` values. The early bootstrap applies the selected scene before normal startup to avoid a mismatched first frame.
+- Visual QA passed for morning, dusk, night, and the expanded scene menu. Focused frontend tests cover timing boundaries, persistence, markup, motion, and reduced-motion behavior.
+
+## More Launcher Readability Fix (2026-08-07)
+
+- The expanded More launcher now changes its label to `收起`, announces the state to assistive technology, and uses a dedicated high-contrast berry capsule so its icon and text remain readable on the night-stage surface.
+- The three desktop toggles now reserve a wider right-side inset and render their track and circular thumb without the former inset-shadow overlap.
+
+## Singing Feature Retirement (2026-08-07)
+
+- User requested removal of all in-app singing functions. The desktop entries, natural-language song interception, Electron picker bridge, backend routes, public defaults, and private runtime configuration were removed.
+- The separate authorized RVC trial artifacts and source directories remain outside the repository and are no longer reachable from the desktop pet. They were deliberately not deleted.
+
 ## Local RVC Singing Entry v1 (2026-07-28)
 
 - Added a separate opt-in desktop entry: choose one local WAV a cappella vocal, convert it using the user-selected second authorized RVC model, then play the local WAV result. The authorized catalog maps `不说` and `雨爱` to their respective ordered vocal clips. It does not replace conversational Qwen3-TTS and does not upload source audio.
@@ -389,6 +438,16 @@
 # Progress
 
 Last Updated: 2026-07-11
+
+## Behavior Director to Live2D Performance Bridge v1 (2026-08-03, candidate baseline)
+
+- 状态：候选基线。自动化测试与静态检查已通过；真实 Electron 行为验收尚未进行，当前不能称为 personal stable 版本。
+- Added `web/behaviorPerformanceBridge.js`: an in-memory, allowlisted bridge that accepts only `phase`, `emotion`, `gesture`, `intensity`, and a `200–5000ms` `hold_ms`. It never receives arbitrary Live2D parameters, model paths, motion groups, or expression paths.
+- `behavior_director.py` now emits low-risk intents only for unanswered-voice micro reactions, grounded proactive preparation, and post-TTS settling. Quiet/no-grounded and disabled decisions remain non-performing.
+- The existing `/api/life/proactive` consumer is the sole frontend entry: `web/autoChatController.js` applies the returned consumed decision. `/api/behavior/status` remains diagnostic-only and cannot trigger presentation.
+- Priority: real user listening and actual reply/TTS semantic performance win; stale/duplicate sequences are consumed without replay; settling makes an idle handoff without a new gesture. The bridge calls only existing semantic mode/action, expression pulse, and revisioned split-window phase APIs.
+- Verification Evidence: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-local.ps1` passed with `643` Python tests, all Node frontend tests (including the bridge test), Python syntax `149`, JavaScript syntax `172`, and secret scan `643`.
+- 待真实 Electron 验收（不可写为已通过）：用户聆听时嘴巴闭合；未回复语音仅触发一次轻微反应；准备主动发言先呈现思考姿态；实际 TTS 由回复语义接管；TTS 后平滑回 idle；重复轮询、自动主动发言、分窗口和模型未加载/通信失败均不得造成重复动作或影响聊天/语音。
 
 ## Current Objective
 
@@ -2156,6 +2215,73 @@ Last Updated: 2026-07-11
   - `feature_list.json` and `config.example.json` validate as JSON.
 - Manual acceptance still required: reload Electron and listen/watch a multi-clause Chinese reply, a playful reply, a subdued reply, and one interrupted reply. Judge perceived identity continuity, emotional suitability, lip closure on pauses, and whether the face releases naturally.
 - No commits or pushes were made. Unrelated dirty changes and every `.bak` file were preserved.
+
+## Desktop Visible-Log Launcher v1 (2026-08-07, complete)
+
+- Added `scripts\start-desktop-pet.ps1`, a Windows-safe ASCII PowerShell launcher that verifies project files, local Qwen managed-start configuration, the repository Node/npm runtime, and existing local endpoints before starting Electron.
+- The launcher does not create a second backend/TTS ownership path. Electron remains responsible for starting `app.py`, starting or reusing Qwen3-TTS, and shutting down only the processes it owns.
+- Created `%USERPROFILE%\Desktop\馨语AI桌宠（日志启动）.lnk`. It opens a normal, persistent PowerShell window and launches the repository script with `-NoExit`; its icon uses the installed Electron executable.
+- Verification: launcher `-CheckOnly` preflight passed and the saved shortcut target, arguments, working directory, and icon were read back successfully.
+- No private configuration, `.bak` file, unrelated modification, commit, or push was changed.
+
+## TTS Route Dispatch Integrity v1 (2026-08-07, complete)
+
+- Diagnosed the reported browser voice as a backend fallback, not a failed Qwen launch. Qwen health was already `model_loaded=true` on CUDA, while both `/api/tts` and `/api/tts_stream` raised `TypeError` before synthesis because unrelated dispatcher keywords had leaked into the TTS handler calls.
+- Removed only the two unsupported keywords from `app.py`; QQ and behavior-event integrations remain in their own routes.
+- Added an AST/signature regression test so every keyword passed by the app dispatcher must be accepted by the corresponding TTS handler.
+- Gracefully restarted Electron through its main window and relaunched it with the desktop shortcut. Authenticated end-to-end verification returned valid `RIFF` WAV data from both streaming (`92,204` bytes) and buffered (`38,444` bytes) Qwen routes.
+- Focused route tests passed (`7 passed`). The preceding full run passed `644` Python tests and all frontend tests; after correcting the documentation-only private path, the targeted secret scan passed across `641` files, JSON validation, Python compilation, and scoped whitespace checks passed. The redundant second full run was intentionally stopped because no runtime code changed after those successful stages.
+- No `.bak` file, private token, unrelated modification, commit, or push was changed.
+
+## Dynamic Sad Speech Eyes v1 (2026-08-07, complete)
+
+- Diagnosed the speech-only half-closed eyes from a real sad Qwen request. Three sustained layers accumulated on the same parameters: sad exp3 (`-0.22`), runtime mood pose (previously up to `-0.34`), and Hiyori director sad pose (`-0.13`), plus occasional semantic action offsets.
+- Removed direct eyelid ownership from `sad.exp3.json` and the director sad pose. Runtime sadness now uses only a small time-varying eye-softness offset; brows, mouth, cheek, head angle, shoulders, and body posture retain the emotional read.
+- Normal blink and gaze remain authoritative, so eyes can open naturally throughout a sad line instead of holding one sleepy frame.
+- Focused `test_performance_cue_frontend.js` and `test_hiyori_performance_director_frontend.js` passed together with JavaScript syntax, expression JSON, and scoped whitespace checks. No redundant full gate was run for this bounded visual tuning.
+- No `.bak` file, unrelated modification, commit, or push was changed.
+
+## VTuber Continuous Speech Body v1 (2026-08-07, complete)
+
+- Increased the Hiyori speak-mode baseline and audio-responsive speech drive so long clauses maintain a clearly visible upper-body presence instead of only moving at isolated peaks.
+- Strengthened head/torso counter-motion, forward body rhythm, shoulder response, and slow torso sway. Added a small opposing left/right arm cadence derived from the same smoothed speech phase; no new ticker, loop, or repeated motion3 gesture was introduced.
+- Existing real PCM audio energy still raises movement above the continuous floor. Existing smoothing, interruption cancellation, phase release, authored-motion ownership, and cooldown behavior remain unchanged.
+- Added focused range assertions for torso sway, head counter-rhythm, bilateral arm involvement, and average shoulder presence. Hiyori director and performance cue tests plus JavaScript syntax and scoped whitespace checks passed.
+- Full gate intentionally omitted for this bounded frontend tuning by user preference. No `.bak`, unrelated change, commit, or push was touched.
+
+## Human-Grounded Proactive Continuity v1 (2026-08-07, complete)
+
+- Root cause: a raw desktop fingerprint change was promoted directly into a visible proactive prompt, whose hardcoded English and one-sentence wording encouraged a system-status line. At the same time, automatic scheduling had no durable in-process distinction between an unanswered latest user turn and a turn intentionally resolved with silence or defer.
+- Conversation continuity now wins over ambient triggers. The controller retains the full bounded latest user anchor until a visible reply or intentional natural-conversation decision handles it; desktop attention waits behind that anchor.
+- Desktop fingerprint changes are now private attention wakes, not speaking reasons. They may lead to a real observation, but generic screen-change announcements and permission-to-look questions resolve to silence, including malformed model output that omits the private control tag.
+- Ordinary and automatic prompts no longer force English, an exact sentence count, or generic companion-stage wording. They inherit the recent conversational language and established relationship/personality. Instruction-like chat is interpreted as human intent; concrete tasks still use the existing tools and confirmation boundaries.
+- Verification: focused Python coverage passed (`43 passed`); relevant natural-conversation, conversation-awareness, desktop-awareness, and character-runtime Node suites passed. The full gate passed all `646` Python tests and every Node suite through desktop awareness, then stopped at the unrelated pre-existing `test_config_switch_frontend.js` stylesheet-order assertion (`sceneExperience.css` versus `phosphorIcons.css`). All remaining Node suites were run separately and passed; Python syntax (`147` files), JavaScript syntax (`171` files), secret scan (`642` files), JSON validation, and `git diff --check` passed. The unrelated stylesheet work was deliberately not modified.
+- Real Electron acceptance is still required for: replying to a prompt-like Chinese chat message, remaining silent after an uninteresting desktop change, mentioning a concrete observed error when genuinely useful, and confirming that intentional silence does not later replay the same user turn.
+- No commit or push was made. Unrelated dirty changes, private configuration, and every `.bak` file were preserved.
+
+## Unified Interaction Mind v1 (2026-08-07, complete)
+
+- Added a private cloud judgment layer for active interactions. After a normal handled turn, silence, micro-reaction, or defer, one bounded pulse asks the configured cloud model whether the living interaction should speak, ask a follow-up, briefly interrupt, observe, recall, research, wait, or close.
+- Existing scores and regexes remain cheap candidate evidence and hard safety filters; they no longer decide the semantic continuation of an active interaction. The mind receives only bounded recent text, timing/activity flags, candidate reason codes, and capability availability.
+- The mind returns JSON containing a compact action, confidence, open/closed state, reason code, topic anchor, visible-response intention, and next wait. It never generates the final visible line, directly executes a tool, stores hidden reasoning, or receives screenshots/tokens/tool parameters.
+- A normal visible reply now opens a bounded interaction pulse. `wait` can keep it alive with a model-selected delay; `close` ends it. New user speech supersedes stale context. Observation, recall, and research reuse the existing tool path and confirmation boundaries.
+- High-confidence `interrupt` may pass the user-speaking gate only when grounded by a sufficiently long live ASR partial. Explicit phrases such as “让我说完” increase a compact long-term interruption-aversion value; permissive feedback cools it gradually. The original sentence is not retained in this state.
+- Compatibility: the explicit `interaction_mind.enabled` default is off, but it becomes active under the existing user opt-in `observe.auto_chat_enabled`. Disabling active companionship therefore stops the pulse and cloud calls. Provider failures fall back to the previous bounded behavior instead of blocking ordinary chat.
+- Verification: focused unified-mind, natural-conversation, character-policy, and chat-route backend suite passed (`47 passed`); focused interaction-awareness, natural-conversation, desktop-awareness, and character-runtime Node suites passed. The full gate passed all `652` Python tests and every Node suite through relationship state, then stopped at the unrelated existing `test_config_switch_frontend.js` stylesheet-order assertion (`controlCenterPolish.css` versus `phosphorIcons.css`). All remaining Node suites passed separately; Python syntax (`149` files), JavaScript syntax (`171` files), secret scan (`645` files), both JSON validations, and `git diff --check` passed.
+- Real Electron acceptance remains: assess follow-up relevance, natural interaction closure, interruption rarity, behavior after “让我说完”, optional screen/memory/search grounding, cloud-call rate, and whether TTS/ASR coexist cleanly during a permitted interruption.
+- No commit or push was made. Unrelated dirty changes, private configuration, and every `.bak` file were preserved.
+
+## Long-Term Memory Manager v1 (2026-08-07, complete)
+
+- Changed Memory Management from an audit-first screen to a curated long-term-memory homepage. It now opens on searchable, sortable formal memories and summarizes total, pinned, high-importance, pending, and visible counts.
+- Added manual long-term-memory creation plus explicit read-only/edit modes for text, kind, category, tags, importance, and confidence. Existing pin, weighting, batch, and delete actions still persist immediately through `memory_core.json`.
+- Kept the existing candidate audit workflow as `待整理` with its organized records alongside it. Short-term memory and Debug remain internally compatible but are hidden from ordinary navigation.
+- Added backend `create` support using existing normalization, safety checks, locking, and atomic save behavior. Exact duplicate manual entries are rejected.
+- Excluded Obsidian notes marked `origin: legacy_core_memory` from knowledge search. Those compatibility files are not deleted, but can no longer duplicate or resurrect a core memory after the authoritative entry is edited or removed.
+- Verification: focused memory/knowledge tests passed (`53 passed`); character runtime and unified control-center frontend checks passed; touched JavaScript syntax checks passed.
+- Real Electron visual automation was attempted, but the installed Windows-control runtime exposed an incompatible API and could not attach reliably. Fresh-load visual confirmation remains required for drawer spacing and responsive layout.
+- Full gate result: all `648` Python tests passed and every Node suite passed except the pre-existing unrelated stylesheet-order assertion in `test_config_switch_frontend.js` (`controlCenterPolish.css` versus `phosphorIcons.css`). All suites after that blocker were run separately and passed; Python syntax (`147` files), JavaScript syntax (`171` files), secret scan (`644` files), JSON validation, and scoped whitespace checks passed.
+- No `.bak`, unrelated modification, commit, or push was touched.
 ## Social and Evolving Self Cognition v1 Completed on 2026-07-30
 
 - Added `social_cognition.py`, backed by `D:\馨语记忆库\09-社会关系\社会认知图.json`. It models people, accounts, explicit relationships, bounded identity evidence, interaction events, and Xinyu's evolving self narrative rather than requiring a fixed profile form for every person.
@@ -2187,3 +2313,51 @@ Last Updated: 2026-07-11
   - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-local.ps1` passed: `629` Python tests, all Node frontend tests, Python syntax `146`, JavaScript syntax `169`, and secret scan `637`.
   - `feature_list.json`, configuration JSON, and `git diff --check` passed.
 - Manual acceptance: restart Electron, enable the private configuration, work on a visibly changing screen for several minutes, then check that Xinyu observes only when useful, stays quiet when appropriate, and requests confirmation before any consequential action. No commit or push was made; unrelated dirty changes and every `.bak` file remain untouched.
+
+## Galgame Dialogue v1 (2026-09-05, complete)
+
+- Added an optional full-screen Galgame mode. The normal desktop pet remains available through the return button.
+- Free-text replies are split into short sentences, typed character by character, and advanced only by the user's click. Every advance synchronously stops the old audio and aborts stale work before the next sentence begins.
+- Added six transparent Deep Blue maid-character sprites: neutral, happy, shy, confused, annoyed, and sad. The current room background is intentionally reused until the deferred preset scene library is produced.
+- Chat integration uses the existing versioned companion-turn segment metadata only when its finalized text matches the visible sentence exactly; otherwise it falls back safely. Exit, replacement messages, late replies, IME composition, mute, and focus restoration are guarded.
+- Verification: Galgame player and chat-integration tests passed; targeted natural-conversation, TTS-cancellation, companion-turn, and character-runtime frontend tests passed. Browser verification exercised input, all six expressions, advancing, mute, and exit. Authenticated local Qwen3-TTS returned `200 audio/wav` (153,644 bytes) using a happy voice request.
+- The complete Node runner still stops at the project’s existing `test_config_switch_frontend.js` stylesheet-order assertion. It was not changed because it predates and is unrelated to this feature. No private settings, user samples, unrelated dirty work, commit, or push were changed.
+
+
+## 2026-09-06 — Galgame character context and playback transport
+- Completed focused feature `galgame-character-context-v2` on `codex/galgame-dialogue-v1`.
+- Request-local allowlisted personas: DeepSeek sunny/energetic, Claude elegant classical noble lady, GPT decisive/capable. Shared final LLM prompt appends character instruction after legacy contracts; saved config is unchanged, auto/non-Galgame requests omit it.
+- Preserve and validate per-sentence performance through chat API (Python Unicode offsets), respect server boundaries, preserve unplanned reply tail. Thinking/surprise/playfulness keep actual sprite identities; compatible actions refine neutral/happy poses.
+- Controller fixes missing name ID, character-switch cancellation, character-specific alt, real asset preloads, select keyboard focus, and validated scene selection. Character context includes current scene/time/lock for subsequent director implementation, but this does NOT implement automatic scene transitions.
+- Files: galgame_context.py; app_chat_route.py; llm_runtime.py; web/chatReplyController.js; web/chatApi.js; web/galgamePlayer.js; web/galgameController.js; tests/test_galgame_context.py; tests/test_galgame_performance_transport.js; tests/test_galgame_chat_integration.js; feature_list.json; progress.md; session-handoff.md. app.py was temporarily edited then our edits removed; its inherited changes remain untouched.
+- Verification Evidence: pytest selected context/route/contract/natural-dialogue suites: 46 passed, 1 existing structural prompt-budget failure (709 vs <700). Reproduced identical failure with new personality builder replaced by empty output in process, without modifying files. Four Node suites passed: galgame_player, galgame_chat_integration, galgame_performance_transport, chat_api_frontend. Python compilation passed for three modified Python modules.
+- No real provider calls or browser/TTS listening performed; persona style needs live model evaluation. GPT/Claude still have only neutral/happy/thinking variants and fall back for unsupported poses. Semantic director and genuine early stream playback remain backlog, not claimed complete.
+- Another conversation owns web/galgame.css and web/galgamePresentation.js; neither modified. Presentation hook exists but is not yet integrated/loaded in index.html. No commit/push/private configuration changes.
+
+
+## 2026-09-06 — Galgame semantic direction and incremental playback
+- Implemented `galgame-semantic-direction-v2`: optional request-local JSONL streaming protocol produces sentence text plus model-selected emotion/action/real sprite ID/scene suggestion. Finite allowlists, line/count limits, exact scene evidence, high confidence, non-event guards, one scene transition per turn and manual scene lock. Private JSON never enters displayed text/TTS/memory. Provider format retry allowed only before any sentence is delivered.
+- Routed validated sentence metadata on SSE deltas into a cancellable incremental player. First sentence starts before completion; next stops current voice and waits if no next sentence; finish validates exact canonical text and prevents duplicate replay; cancel/character-switch/exit rejects stale appends. Final companion contract now carries the same validated model performance.
+- Integrated existing separately maintained galgamePresentation.js into index manifest and controller preload/commit hooks. Added initial local-time room choice, automatic/fixed scene toggle, allowlisted image preloading with load timeout, scene cancellation revisions, canceled-switch selector reset and unknown-total progress indicator.
+- Files changed: new galgame_director.py; llm_runtime.py; app_chat_route.py; web/chatApi.js; web/chatReplyController.js; web/galgamePlayer.js; web/galgameController.js; web/index.html (one script include); scripts/run_node_tests.js; tests/test_galgame_director.py; tests/test_galgame_stream_player.js; tests/test_galgame_stream_integration.js; tests/test_galgame_chat_integration.js; tests/galgame-browser-fixture.html; tests/galgame-browser-fixture.js; tests/serve_galgame_fixture.py; feature_list.json/progress.md/session-handoff.md. Did not change other conversation's galgame.css or galgamePresentation.js, nor private config/assets.
+- Verification Evidence: focused Python director/context/route/contract 44 passed after final change. Full Python run: 669 passed, 1 existing natural dialogue prompt-budget failure 709 vs <700 (before last extra runtime test was added). Node runner passed all six Galgame suites plus request/API/turn tests, stopped at known stylesheet-order failure in test_config_switch_frontend.js. Ran all 22 later suites separately: 21 passed, test_local_asr_frontend.js fails existing stage waveform markup assertion; this turn only added a script to index, no waveform or stage changes. Python syntax 155 files and JS syntax 182 files passed.
+- Browser QA with actual assets and deterministic local streaming fixture: Claude switch, automatic park background, fixed library scene remains during next turn, partial typewriter text, manual next, exit during GPT transition, and reloaded streaming progress `1 / 1+` verified. Browser used mocked replies and silent speech, not live provider/TTS. Fixture server is a localhost-only optional test helper serving public web assets.
+- Limitations: semantic correctness depends on model instruction compliance; conservative scene guard can leave current scene unchanged. GPT/Claude have only three actual sprite variants, use neutral if unavailable. Tools/unsupported streaming transport keep original buffered fallback. Does not claim perfect emotion matching or fully green repository checks. No commit or push.
+
+
+## 2026-09-06 — Live Galgame acceptance and discovered fixes
+- Completed galgame-live-acceptance using 5 synthetic messages against configured gpt-5.6-terra without private memories/history/tools. All post-fix replies parsed; all scene expectations passed. First sentences 7.48–16.75s. Before correction: 12.22s and 96.48s first sentences, GPT failed after 142.59s.
+- Discovered ordinary output cap 220 tokens; added request-local direction_llm_config (2048 cap with high-output enabled only for structured Galgame stream). Preserved saved config. Raised Galgame frontend first-sentence timeout to 45s, and prevented hidden ordinary-chat retry on an already-connected directed stream failure before its first sentence.
+- Actual local Qwen3 synthetic phrase produced 24kHz WAV, 3.36s audio, 6.17s synthesis. Did not listen/evaluate sound quality or claim desktop playback verification.
+- Files this turn: galgame_director.py, llm_runtime.py, web/chatReplyController.js, web/chatApi.js, scripts/eval_galgame_live.py, scripts/run_node_tests.js, tests/test_galgame_director.py, tests/test_galgame_stream_integration.js, tests/test_galgame_live_resilience.js, docs/galgame-live-acceptance.md/json, docs/galgame-live-acceptance-before.json, state files.
+- Evidence: 37 targeted Python tests; Node stream integration, live resilience, chat API, chat integration passed; modified Python/JS syntax checks passed. No whole-suite rerun; previous unrelated failures persist. No changes to private configuration, assets, CSS/presentation ownership, or model selection. No push.
+- Limitations: minimal isolated model prompts tested, not all production memory/runtime prompt layers; provider speed variable; character style sampled only; GPT/Claude sprite coverage limited. Report explicitly distinguishes audio validity from listening QA.
+
+
+## 2026-09-11 — Consolidated GitHub source publication
+- User explicitly expanded publication scope beyond Galgame to all completed public workspace changes and GitHub presentation. Prepared an isolated checkout on codex/desktop-companion-update-20260911; original working tree and all private files remain intact.
+- Includes character/scene streaming, interaction decisions, long-term memory manager, privacy guards, four-phase stage and control center work, plus current removal of experimental singing paths. Only actual runtime art included; no cutout experiments or private backups.
+- README now explains both companion modes, source-vs-installer status, service boundaries and character examples. Added docs/source-update-2026-09.md. Updated repository About, homepage and seven topics through authenticated GitHub API.
+- Fixed prior test failures: compacted redundant dialogue-policy phrasing while retaining explicit AI identity; stylesheet checks now allow scene layers; waveform assertion checks only its actual container.
+- Verification: 672 Python tests passed (one upstream audioop deprecation warning), all Node suites passed, docs publish checks and 4 Playwright smoke tests passed. Python syntax 156 files, JS syntax 183 files, secret scan 671 tracked text files passed. Required JSON parsing and Python compilation passed; staged whitespace checks passed; README/index direct local links resolve.
+- No new installer/tag or main merge. Code publication/PR is the next operation. Known low-risk limitations remain model latency, finite GPT/Claude sprite coverage and user-managed service compatibility.

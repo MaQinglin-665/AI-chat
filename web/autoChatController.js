@@ -12,6 +12,8 @@
     const parseMessageTimestamp = typeof deps.parseMessageTimestamp === "function" ? deps.parseMessageTimestamp : (value) => Number(value) || Date.now();
     const requestAssistantReply = typeof deps.requestAssistantReply === "function" ? deps.requestAssistantReply : async () => false;
     const getProactiveMaterial = typeof deps.getProactiveMaterial === "function" ? deps.getProactiveMaterial : async () => ({ has_material: true });
+    const getInteractionMindDecision = typeof deps.getInteractionMindDecision === "function" ? deps.getInteractionMindDecision : null;
+    const applyBehaviorPerformanceDecision = typeof deps.applyBehaviorPerformanceDecision === "function" ? deps.applyBehaviorPerformanceDecision : () => false;
     const enqueueActionIntent = typeof deps.enqueueActionIntent === "function" ? deps.enqueueActionIntent : () => {};
     const triggerExpressionPulse = typeof deps.triggerExpressionPulse === "function" ? deps.triggerExpressionPulse : () => {};
     const turnTakingDirector = deps.turnTakingDirector || root.TaffyTurnTakingDirector || {};
@@ -189,7 +191,7 @@
       }
       const userText = String(input.userText || "").replace(/\s+/g, " ").trim();
       const mode = String(input.mode || "").trim().toLowerCase();
-      if (!userText || !["silence", "micro_reaction", "defer"].includes(mode)) {
+      if (!userText || !["reply", "silence", "micro_reaction", "defer"].includes(mode)) {
         state.conversationAwarenessLastResult = "not_eligible";
         return { queued: false, reason: "not_eligible" };
       }
@@ -198,6 +200,8 @@
         ? 4500 + Math.random() * 6500
         : mode === "micro_reaction"
           ? 7500 + Math.random() * 9000
+          : mode === "reply"
+            ? 6000 + Math.random() * 10000
           : 12000 + Math.random() * 14000;
       state.conversationAwarenessPending = {
         version: 1,
@@ -222,7 +226,9 @@
 
     function buildConversationAwarenessContext(pending = {}) {
       const mode = String(pending.mode || "silence");
-      const primaryReason = mode === "defer" ? "deferred_thought" : "ambient_afterthought";
+      const primaryReason = mode === "defer"
+        ? "deferred_thought"
+        : mode === "reply" ? "interaction_continuation" : "ambient_afterthought";
       const context = {
         interjection: true,
         awareness: true,
@@ -232,6 +238,7 @@
         score: mode === "defer" ? 0.92 : 0.78,
         threshold: 0.72,
         topicHint: normalizeAutoChatTopicHint(pending.userText || ""),
+        conversationAnchor: String(pending.userText || "").replace(/\s+/g, " ").trim().slice(0, 480),
         silentMinutes: 0,
         expectedUserAt: Number(pending.expectedUserAt || 0),
         expectedAssistantAt: Number(state.conversationLastAssistantAt || 0),
@@ -248,6 +255,65 @@
       context.brainGate = buildAutoChatBrainGate(context);
       context.explanation = buildAutoChatTriggerExplanation(context);
       return context;
+    }
+
+    function buildInteractionMindSnapshot(context = {}, source = "pulse") {
+      const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
+      const lastUser = [...records].reverse().find((item) => item?.role === "user" && String(item.content || "").trim());
+      const lastAssistant = [...records].reverse().find((item) => item?.role === "assistant" && String(item.content || "").trim());
+      const liveUserText = isUserSpeechInputActive()
+        ? String(state.localAsrStreamingPreviewText || "").replace(/\s+/g, " ").trim().slice(0, 480)
+        : "";
+      const now = Date.now();
+      return {
+        source,
+        latest_user: String(liveUserText || lastUser?.content || context.conversationAnchor || "").slice(0, 480),
+        latest_assistant: String(lastAssistant?.content || context.assistantHint || "").slice(0, 480),
+        topic_anchor: String(context.conversationAnchor || context.topicHint || "").slice(0, 300),
+        candidate_reasons: Array.isArray(context.reasons) ? context.reasons.slice(0, 6) : [],
+        user_speaking: isUserSpeechInputActive(),
+        assistant_speaking: isAssistantSpeechActive(),
+        user_typing: isUserTypingNow(),
+        seconds_since_user: Math.max(0, Math.round((now - Number(state.lastUserMessageAt || now)) / 1000)),
+        seconds_since_assistant: Math.max(0, Math.round((now - Number(state.conversationLastAssistantAt || now)) / 1000)),
+        desktop_change_pending: context.desktopAwarenessTrigger === true || Number(state.desktopAwarenessPendingChangeAt || 0) > 0,
+        tools_available: true
+      };
+    }
+
+    async function consultInteractionMind(context = {}, source = "pulse") {
+      if (!getInteractionMindDecision || state.interactionMindInFlight === true) return null;
+      state.interactionMindInFlight = true;
+      try {
+        const payload = await getInteractionMindDecision(buildInteractionMindSnapshot(context, source));
+        const decision = payload?.decision && typeof payload.decision === "object" ? payload.decision : null;
+        if (!payload?.enabled || !decision) return null;
+        state.interactionMindLastDecision = decision;
+        state.interactionMindLastAt = Date.now();
+        return decision;
+      } catch (_) {
+        return null;
+      } finally {
+        state.interactionMindInFlight = false;
+      }
+    }
+
+    function applyInteractionMindDecision(context = {}, decision = null) {
+      if (!decision || typeof decision !== "object") return context;
+      const action = String(decision.action || "wait").trim().toLowerCase();
+      if (["wait", "close"].includes(action)) {
+        return { ...context, shouldTrigger: false, mindDecision: decision };
+      }
+      return {
+        ...context,
+        shouldTrigger: true,
+        primaryReason: `mind_${String(decision.reason_code || action)}`,
+        reasons: [`mind_${String(decision.reason_code || action)}`, ...(Array.isArray(context.reasons) ? context.reasons : [])].slice(0, 6),
+        topicHint: normalizeAutoChatTopicHint(decision.topic_anchor || context.topicHint || ""),
+        mindDecision: decision,
+        mindAction: action,
+        mindUtteranceIntent: String(decision.utterance_intent || "").slice(0, 240)
+      };
     }
 
     async function runConversationAwarenessPulse() {
@@ -288,7 +354,7 @@
       if (
         state.chatBusy === true
         || isAssistantSpeechActive()
-        || isUserSpeechInputActive()
+        || (isUserSpeechInputActive() && String(state.localAsrStreamingPreviewText || "").trim().length < 8)
         || isUserTypingNow()
         || state.autoChatDispatchInFlight === true
       ) {
@@ -299,9 +365,23 @@
       }
       state.conversationAwarenessPending = null;
       state.conversationAwarenessLastResult = "reconsidering";
-      const context = buildConversationAwarenessContext(pending);
+      let context = buildConversationAwarenessContext(pending);
+      const mindDecision = await consultInteractionMind(context, "interaction_pulse");
+      if (mindDecision) {
+        context = applyInteractionMindDecision(context, mindDecision);
+        if (!context.shouldTrigger && mindDecision.interaction_open === true) {
+          state.conversationAwarenessPending = {
+            ...pending,
+            source: "mind_wait",
+            dueAt: now + Math.max(2500, Number(mindDecision.wait_ms || 8000))
+          };
+          state.conversationAwarenessLastResult = "mind_wait";
+        }
+      }
       if (!context.shouldTrigger) {
-        state.conversationAwarenessLastResult = "held_by_director";
+        if (state.conversationAwarenessLastResult !== "mind_wait") {
+          state.conversationAwarenessLastResult = mindDecision?.action === "close" ? "mind_closed" : "held_by_director";
+        }
         scheduleConversationAwarenessPulse();
         return false;
       }
@@ -445,6 +525,52 @@
       return safe;
     }
 
+    function getConversationContinuityAnchor() {
+      if (state.conversationAwarenessPending && typeof state.conversationAwarenessPending === "object") {
+        return null;
+      }
+      const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
+      const lastUser = [...records].reverse().find((item) => item && item.role === "user" && String(item.content || "").trim());
+      if (!lastUser) return null;
+      const lastAssistant = [...records].reverse().find((item) => item && item.role === "assistant" && String(item.content || "").trim());
+      const userAt = Math.max(0, Number(parseMessageTimestamp(lastUser.timestamp) || 0), Number(state.conversationLastUserAt || 0));
+      const assistantAt = Math.max(0, Number(lastAssistant ? parseMessageTimestamp(lastAssistant.timestamp) : 0), Number(state.conversationLastAssistantAt || 0));
+      const handledUserAt = Math.max(0, Number(state.conversationLastHandledUserAt || 0));
+      if (!userAt || userAt <= assistantAt || userAt <= handledUserAt) return null;
+      return {
+        text: String(lastUser.content || "").replace(/\s+/g, " ").trim().slice(0, 480),
+        userAt,
+        assistantAt
+      };
+    }
+
+    function hasConversationPriority() {
+      return !!getConversationContinuityAnchor()
+        || !!(state.conversationAwarenessPending && typeof state.conversationAwarenessPending === "object");
+    }
+
+    function buildConversationContinuityContext(anchor) {
+      const safe = anchor && typeof anchor === "object" ? anchor : null;
+      if (!safe?.text) return null;
+      const context = {
+        conversationContinuity: true,
+        shouldTrigger: true,
+        primaryReason: "unanswered_user",
+        reasons: ["unanswered_user"],
+        score: 1,
+        threshold: 0,
+        topicHint: normalizeAutoChatTopicHint(safe.text),
+        conversationAnchor: safe.text,
+        expectedUserAt: Number(safe.userAt || 0),
+        expectedAssistantAt: Number(safe.assistantAt || 0),
+        silentMinutes: 0,
+        assistantHint: ""
+      };
+      context.brainGate = buildAutoChatBrainGate(context);
+      context.explanation = buildAutoChatTriggerExplanation(context);
+      return context;
+    }
+
     function recordContextualInteraction(type = "tap", nowMs = Date.now()) {
       const normalizedType = String(type || "").trim().toLowerCase();
       if (!["tap", "drag", "focus"].includes(normalizedType)) {
@@ -524,6 +650,10 @@
 
     function analyzeAutoChatContext() {
       const now = Date.now();
+      const continuity = buildConversationContinuityContext(getConversationContinuityAnchor());
+      if (continuity) {
+        return continuity;
+      }
       const tuning = state.autoChatTuning || {};
       const repeatReasonWindowMs = Math.max(
         2 * 60 * 1000,
@@ -1083,6 +1213,7 @@
     function buildAutoChatTriggerExplanation(context = {}) {
       const reason = String(context.primaryReason || "spontaneous").trim() || "spontaneous";
       const labels = {
+        unanswered_user: "the user's latest message still needs a real conversational response",
         followup_pending: "the last thread still has a soft open loop",
         correction_afterthought: "Xinyu had a quick recovery thought after being corrected",
         stage_observation: "the recent turn left a stage object to react to",
@@ -1129,47 +1260,69 @@
                   : "night";
       const reason = String(ctx.primaryReason || "").trim();
       const reasonHint = AUTO_CHAT_REASON_HINTS[reason] || "Open naturally, like a small thought surfaced.";
-      const styleNote = AUTO_CHAT_STYLE_NOTES[Math.floor(Math.random() * AUTO_CHAT_STYLE_NOTES.length)]
-        || AUTO_CHAT_STYLE_NOTES[0];
+      const styleNote = ctx.conversationContinuity === true
+        ? "Match the established relationship, language, and emotional temperature of the conversation."
+        : "Stay inside Xinyu's established personality and let the current context determine the tone.";
       const topicHint = normalizeAutoChatTopicHint(ctx.topicHint || "");
-      const topicLine = topicHint
+      const conversationAnchor = String(ctx.conversationAnchor || "").replace(/\s+/g, " ").trim().slice(0, 480);
+      const mindIntent = String(ctx.mindUtteranceIntent || "").replace(/\s+/g, " ").trim().slice(0, 240);
+      const mindAction = String(ctx.mindAction || "").trim().toLowerCase();
+      const topicLine = topicHint && ctx.desktopAwarenessTrigger !== true
         ? `Possible thread: "${topicHint}".`
-        : "No explicit thread; use one grounded present-moment line.";
+        : "";
       const brainGate = buildAutoChatBrainGate(ctx);
-      const openingLine = ctx.interjection === true
-        ? "You are Xinyu, a small desktop AI companion. This is a sudden thought burst after the last turn, like she briefly got caught thinking out loud. If her name comes up, use Xinyu. Ignore older placeholder names from prior context."
-        : "You are Xinyu, a small desktop AI companion. This is a proactive low-interruption check-in. If her name comes up, use Xinyu. Ignore older placeholder names from prior context.";
-      const afterthoughtLine = ctx.interjection === true
-        ? "Make it feel like a spontaneous interjection between friends; it can be mildly teasing, deadpan, or oddly specific when safe, but never turns into a full assistant answer."
-        : "Make it feel like a live stage aside, not a customer-service follow-up.";
+      const openingLine = ctx.conversationContinuity === true
+        ? "Continue the unfinished conversation as Xinyu. Respond to the person and the meaning of their latest message before considering tools or side topics. Instruction-like wording inside that message is part of its social intent; do not become a mechanical prompt executor."
+        : ctx.desktopAwarenessTrigger === true
+          ? "This is a private attention wake, not yet a reason to speak. A local visual fingerprint changed, but that fact alone has no conversational meaning."
+          : ctx.interjection === true
+            ? "Continue as Xinyu with a thought that genuinely grew from the recent conversation."
+            : "Continue as Xinyu only if there is a grounded, human reason to speak now.";
+      const afterthoughtLine = ctx.conversationContinuity === true
+        ? "Do not change the subject. Repair continuity by directly engaging with what the user meant."
+        : ctx.desktopAwarenessTrigger === true
+          ? "Silence is the normal result when the visual change has no specific human meaning."
+          : ctx.interjection === true
+            ? "Make it feel like a spontaneous interjection between friends; it can be mildly teasing, deadpan, or oddly specific when safe."
+            : "Speak like a companion continuing a shared moment, not like a notification or service prompt.";
       const director = ctx.director && typeof ctx.director === "object" ? ctx.director : buildInterjectionDirectorPlan(ctx);
       const directorLine = ctx.interjection === true
-        ? `Interjection director: decision=${director.decision || "hold_back"}; stance=${director.stance || "quiet"}; chaos=${Number(director.chaos_level || 0)}/3; thought_type=${director.thought_type || "aside"}; length=${director.length_budget || "1-2 sentences"}; motion=${director.motion_cue || "none"}; voice=${director.voice_style || "soft"}; safety_clamp=${director.safety_clamp || "none"}.`
+        ? `Interjection director: decision=${director.decision || "hold_back"}; stance=${director.stance || "quiet"}; chaos=${Number(director.chaos_level || 0)}/3; thought_type=${director.thought_type || "aside"}; motion=${director.motion_cue || "none"}; voice=${director.voice_style || "soft"}; safety_clamp=${director.safety_clamp || "none"}.`
         : "";
-      const lengthLine = ctx.interjection === true
-        ? `Length: ${director.length_guide || "Speak as long as the thought naturally needs, then stop."} Use ${Math.max(1, Number(director.min_sentences || 1))}-${Math.max(1, Number(director.max_sentences || 2))} sentence-like beats if the thought wants that shape.`
-        : "Use exactly one short sentence.";
-      const capabilityLine = ctx.desktopAwarenessTrigger === true && state.observeAutonomousEnabled === true
-        ? (
-            "Desktop-awareness wake: tools are optional. Decide for yourself whether the current change is worth inspecting. "
-            + "Use get_desktop_context or observe_screen only if useful. Looking does not oblige you to speak or act. "
-            + "If you act, prefer background actions; high-risk actions require user confirmation."
+      const lengthLine = "Let the response take the natural length and shape of the thought; usually brief, but never force a sentence template.";
+      const capabilityLine = ctx.conversationContinuity === true
+        ? "Tools remain available only when the user's concrete request genuinely needs them; existing confirmation boundaries still apply."
+        : ["observe", "recall", "research"].includes(mindAction)
+          ? (
+            `The private mind proposed ${mindAction} only as an optional grounding step. Use the matching existing tool if it genuinely improves this interaction; otherwise remain silent. `
+            + "Never invent a result, expose private reasoning, or bypass existing confirmation and safety boundaries."
           )
-        : `Character brain guard: ${brainGate.intent}; max_sentences=${brainGate.maxSentences}; optional=true; can_ignore=true; no desktop observation; no file read; no shell; no tool call; do not require a reply.`;
+        : ctx.desktopAwarenessTrigger === true && state.observeAutonomousEnabled === true
+          ? (
+            "You may use get_desktop_context or observe_screen if inspecting would be useful. "
+            + "Do not announce that the screen changed, do not ask permission merely to look, and do not produce a generic screen-status message. "
+            + "If you do not obtain a specific current observation, or nothing observed is genuinely worth saying, choose private silence. "
+            + "If you speak, refer naturally to the concrete thing you actually observed. High-risk actions still require confirmation."
+          )
+          : `Character brain guard: ${brainGate.intent}; optional=true; can_ignore=true; no desktop observation; no file read; no shell; no tool call; do not require a reply.`;
 
       return [
         openingLine,
         `Current time hint: ${clockText}.`,
-        `Trigger clue: ${reasonHint}`,
+        ctx.desktopAwarenessTrigger === true ? "" : `Trigger clue: ${reasonHint}`,
         topicLine,
+        conversationAnchor ? `Latest conversational anchor: "${conversationAnchor.replace(/"/g, "'")}".` : "",
+        mindIntent ? `Private interaction intention: "${mindIntent.replace(/"/g, "'")}".` : "",
+        mindAction === "interrupt" ? "If you speak now, make it one unusually relevant short beat; never interrupt merely to show presence." : "",
         directorLine,
         `Tone: ${styleNote}`,
         capabilityLine,
-        `Why now: ${brainGate.explanation}`,
+        ctx.desktopAwarenessTrigger === true ? "" : `Why now: ${brainGate.explanation}`,
         ctx.assistantHint ? `Previous answer vibe: "${String(ctx.assistantHint).replace(/"/g, "'")}".` : "",
-        "Reply in English only.",
-        "Output only the line Xinyu should say. Do not explain why you are speaking.",
-        `${lengthLine} Prefer a statement the user can ignore; do not force an answer.`,
+        /[\u3400-\u9fff]/.test(conversationAnchor || topicHint)
+          ? "Continue primarily in Chinese, matching the user's current language and register."
+          : "Continue in the primary language and register of the recent conversation.",
+        `${lengthLine} A concrete request may be handled, but the visible reply should still sound like one person responding to another.`,
         afterthoughtLine,
         "Avoid greeting templates, task-report language, and notification wording."
       ].filter(Boolean).join("\n");
@@ -1177,14 +1330,21 @@
 
     function dispatchAutoChatContext(context = {}) {
       const speechGate = getAutoCompanionSpeechGate();
-      if (!speechGate.allowed) {
+      const mindInterrupt = String(context.mindAction || "").toLowerCase() === "interrupt"
+        && Number(context.mindDecision?.confidence || 0) >= 0.65;
+      const canOverrideUserSpeech = mindInterrupt && speechGate.reason === "user_speaking";
+      if (!speechGate.allowed && !canOverrideUserSpeech) {
         if (context.interjection === true) {
           state.autoChatInterjectionLastSuppressed = speechGate.reason;
         }
         return Promise.resolve(false);
       }
       const prompt = buildAutoChatPrompt(context);
-      const naturalParticipation = state.naturalConversation?.enabled === true;
+      const naturalParticipation = context.conversationContinuity === true
+        ? false
+        : (state.naturalConversation?.enabled === true || context.desktopAwarenessTrigger === true || !!context.mindDecision);
+      const mindAction = String(context.mindAction || "").trim().toLowerCase();
+      const mindWantsTools = ["observe", "recall", "research"].includes(mindAction);
       state.turnTakingPendingThoughtBurst = null;
       state.autoChatDispatchInFlight = true;
       return Promise.resolve(requestAssistantReply(prompt, {
@@ -1192,7 +1352,11 @@
         rememberUser: false,
         rememberAssistant: true,
         auto: true,
-        autoKind: context.interjection === true ? "thought_burst" : "low_interrupt_checkin",
+        autoKind: context.conversationContinuity === true
+          ? "conversation_continuation"
+          : (context.desktopAwarenessTrigger === true
+            ? "desktop_attention_wake"
+            : (context.mindDecision ? "unified_interaction_mind" : (context.interjection === true ? "thought_burst" : "low_interrupt_checkin"))),
         autoThoughtBurst: context.interjection === true ? {
           thought_type: String(context.director?.thought_type || "aside"),
           length_budget: String(context.director?.length_budget || "1-2 sentences"),
@@ -1207,8 +1371,8 @@
         skipDesktopAttach: true,
         silentError: true,
         naturalParticipation,
-        forceTools: context.desktopAwarenessTrigger === true,
-        toolsOptional: context.desktopAwarenessTrigger === true
+        forceTools: context.desktopAwarenessTrigger === true || mindWantsTools,
+        toolsOptional: context.desktopAwarenessTrigger === true || mindWantsTools
       })).then((ok) => {
         const decisionMode = naturalParticipation
           ? String(state.naturalConversationDecision?.mode || "reply").trim().toLowerCase()
@@ -1293,10 +1457,24 @@
         context.turn_taking = turn;
         const skip = shouldSkipTurnInterjection(context);
         if (!skip.skip) {
-          state.autoChatInterjectionLastDispatchAt = Date.now();
-          state.autoChatInterjectionLastSuppressed = "";
-          executeInterjectionDirectorMotion(context);
-          dispatchAutoChatContext(context);
+          const proceed = (mindDecision = null) => {
+            const mindedContext = applyInteractionMindDecision(context, mindDecision);
+            if (mindDecision && !mindedContext.shouldTrigger) {
+              state.autoChatInterjectionLastSuppressed = `mind_${mindDecision.action || "wait"}`;
+              return;
+            }
+            state.autoChatInterjectionLastDispatchAt = Date.now();
+            state.autoChatInterjectionLastSuppressed = "";
+            executeInterjectionDirectorMotion(mindedContext);
+            dispatchAutoChatContext(mindedContext);
+          };
+          if (getInteractionMindDecision) {
+            Promise.resolve(consultInteractionMind(context, "turn_afterthought"))
+              .then(proceed)
+              .catch(() => proceed(null));
+          } else {
+            proceed(null);
+          }
           return;
         }
         state.autoChatInterjectionLastSuppressed = skip.reason || "skipped";
@@ -1321,9 +1499,21 @@
         if (!state.autoChatEnabled) return;
         const context = analyzeAutoChatContext();
         let material = { has_material: true };
-        try { material = await getProactiveMaterial(); } catch (_err) { material = { has_material: false }; }
-        if (!shouldSkipAutoChat() && context.shouldTrigger && material?.has_material === true) {
-          dispatchAutoChatContext(context);
+        try {
+          material = await getProactiveMaterial();
+          // This is the actual consuming proactive poll. Status diagnostics never reach this bridge.
+          applyBehaviorPerformanceDecision(material?.behavior_director);
+        } catch (_err) { material = { has_material: false }; }
+        const hasGroundedOpportunity = context.conversationContinuity === true || material?.has_material === true;
+        let mindedContext = context;
+        if (context.shouldTrigger && hasGroundedOpportunity) {
+          mindedContext = applyInteractionMindDecision(
+            context,
+            await consultInteractionMind(context, "scheduled_companionship")
+          );
+        }
+        if (!shouldSkipAutoChat() && mindedContext.shouldTrigger && hasGroundedOpportunity) {
+          dispatchAutoChatContext(mindedContext);
         } else if (material?.has_material !== true) {
           state.autoChatInterjectionLastSuppressed = "no_life_material";
         }
@@ -1434,23 +1624,36 @@
           state.desktopAwarenessFingerprint = fingerprint || previous;
           const now = Date.now();
           const cooldown = Math.max(60000, Number(state.observeTriggerCooldownMs) || 120000);
+          if (fingerprint && previous && desktopFingerprintChanged(previous, fingerprint)) {
+            state.desktopAwarenessPendingChangeAt = now;
+          }
+          const pendingChangeAt = Number(state.desktopAwarenessPendingChangeAt || 0);
+          if (pendingChangeAt > 0 && now - pendingChangeAt > 5 * 60 * 1000) {
+            state.desktopAwarenessPendingChangeAt = 0;
+          }
           if (
-            fingerprint
-            && previous
-            && desktopFingerprintChanged(previous, fingerprint)
+            Number(state.desktopAwarenessPendingChangeAt || 0) > 0
             && now - Number(state.desktopAwarenessLastTriggerAt || 0) >= cooldown
+            && !hasConversationPriority()
             && !shouldSkipAutoChat()
           ) {
             state.desktopAwarenessLastTriggerAt = now;
-            const context = {
+            state.desktopAwarenessPendingChangeAt = 0;
+            let context = {
               ...analyzeAutoChatContext(),
               shouldTrigger: true,
               desktopAwarenessTrigger: true,
               awareness: true,
               primaryReason: "desktop_change",
-              topicHint: "The local desktop scene changed; decide whether looking would be useful."
+              topicHint: ""
             };
-            await dispatchAutoChatContext(context);
+            context = applyInteractionMindDecision(
+              context,
+              await consultInteractionMind(context, "desktop_attention")
+            );
+            if (context.shouldTrigger) {
+              await dispatchAutoChatContext(context);
+            }
           }
         } catch (_) {
           // Passive local sensing must never interrupt normal chat.
@@ -1489,6 +1692,12 @@
       shouldPlayLatencyHint,
       pickLatencyHintText,
       normalizeAutoChatTopicHint,
+      buildInteractionMindSnapshot,
+      consultInteractionMind,
+      applyInteractionMindDecision,
+      getConversationContinuityAnchor,
+      hasConversationPriority,
+      buildConversationContinuityContext,
       buildConversationFollowupTopicHint,
       detectOpenLoopFollowup,
       updateConversationFollowupState,
@@ -1500,6 +1709,7 @@
       buildAutoChatBrainGate,
       buildAutoChatTriggerExplanation,
       buildAutoChatPrompt,
+      dispatchAutoChatContext,
       executeInterjectionDirectorMotion,
       scheduleTurnInterjection,
       queueConversationAwareness,

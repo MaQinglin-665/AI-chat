@@ -31,6 +31,19 @@
     return btn;
   }
 
+  function createSelectField(doc, className, value, options) {
+    const select = doc.createElement("select");
+    select.className = className;
+    (options || []).forEach(([optionValue, label]) => {
+      const option = doc.createElement("option");
+      option.value = optionValue;
+      option.textContent = label;
+      option.selected = optionValue === value;
+      select.appendChild(option);
+    });
+    return select;
+  }
+
   function formatLearningDate(item = {}) {
     const raw = String(item.updated_at || item.created_at || "").trim();
     if (!raw) {
@@ -165,9 +178,21 @@
         preview.appendChild(createTextLine(doc, "learning-item-line", "\u8f6e\u6b21\uff1a", `${item.last_seen_turn || 0} / TTL ${item.ttl_turns || 0}`));
         preview.appendChild(createTextLine(doc, "learning-item-line", "\u89e6\u53d1\u539f\u8bdd\uff1a", item.user_preview || "-"));
       } else if (tab === "core") {
-        preview.appendChild(createTextLine(doc, "learning-item-line", "\u7c7b\u578b\uff1a", `${item.kind || "semantic"} / ${item.category || "stable_fact"}`));
+        const categoryLabels = {
+          stable_fact: "稳定事实",
+          user_preference: "用户偏好",
+          relationship: "相处方式",
+          project_context: "项目背景",
+          recent_event: "近期事件"
+        };
+        const kindLabel = item.kind === "episodic" ? "具体事件" : "长期事实";
+        preview.appendChild(createTextLine(doc, "learning-item-line core-memory-readonly", "\u7c7b\u578b\uff1a", `${kindLabel} / ${categoryLabels[item.category] || item.category || "稳定事实"}`));
+        preview.appendChild(createTextLine(doc, "learning-item-line learning-item-pattern core-memory-readonly", "\u8bb0\u5fc6\u5185\u5bb9\uff1a", item.text || item.compressed_pattern || "-"));
+        if (Array.isArray(item.tags) && item.tags.length) {
+          preview.appendChild(createTextLine(doc, "learning-item-line core-memory-readonly", "标签：", item.tags.join("、")));
+        }
         const editLine = doc.createElement("div");
-        editLine.className = "learning-item-line learning-item-pattern";
+        editLine.className = "learning-item-line learning-item-pattern core-memory-editor";
         const editLabel = doc.createElement("strong");
         editLabel.textContent = "\u8bb0\u5fc6\u5185\u5bb9\uff1a";
         const textarea = doc.createElement("textarea");
@@ -177,8 +202,42 @@
         editLine.appendChild(editLabel);
         editLine.appendChild(textarea);
         preview.appendChild(editLine);
-        preview.appendChild(createTextLine(doc, "learning-item-line", "\u6765\u6e90\uff1a", item.source || "-"));
-        preview.appendChild(createTextLine(doc, "learning-item-line", "\u89e6\u53d1\u539f\u8bdd\uff1a", item.user_preview || "-"));
+        const editGrid = doc.createElement("div");
+        editGrid.className = "core-memory-editor core-memory-edit-grid";
+        editGrid.appendChild(createSelectField(doc, "core-memory-kind", item.kind, [
+          ["semantic", "长期事实"], ["episodic", "具体事件"]
+        ]));
+        editGrid.appendChild(createSelectField(doc, "core-memory-category", item.category, [
+          ["stable_fact", "稳定事实"], ["user_preference", "用户偏好"],
+          ["relationship", "相处方式"], ["project_context", "项目背景"],
+          ["recent_event", "近期事件"]
+        ]));
+        const tagsInput = doc.createElement("input");
+        tagsInput.className = "core-memory-tags";
+        tagsInput.type = "text";
+        tagsInput.placeholder = "标签（逗号分隔）";
+        tagsInput.value = Array.isArray(item.tags) ? item.tags.join(", ") : "";
+        editGrid.appendChild(tagsInput);
+        const importanceInput = doc.createElement("input");
+        importanceInput.className = "core-memory-importance";
+        importanceInput.type = "number";
+        importanceInput.min = "0";
+        importanceInput.max = "1";
+        importanceInput.step = "0.05";
+        importanceInput.value = String(item.importance ?? 0.55);
+        importanceInput.setAttribute("aria-label", "重要度");
+        editGrid.appendChild(importanceInput);
+        const confidenceInput = doc.createElement("input");
+        confidenceInput.className = "core-memory-confidence";
+        confidenceInput.type = "number";
+        confidenceInput.min = "0";
+        confidenceInput.max = "1";
+        confidenceInput.step = "0.05";
+        confidenceInput.value = String(item.confidence ?? 0.55);
+        confidenceInput.setAttribute("aria-label", "置信度");
+        editGrid.appendChild(confidenceInput);
+        preview.appendChild(editGrid);
+        preview.appendChild(createTextLine(doc, "learning-item-line core-memory-readonly", "\u6765\u6e90\uff1a", item.source === "manual" ? "手动添加" : (item.source || "对话沉淀")));
       } else {
         preview.appendChild(createTextLine(doc, "learning-item-line", "\u7528\u6237\u539f\u8bdd\uff1a", item.user_preview || "-"));
         preview.appendChild(createTextLine(doc, "learning-item-line", "\u684c\u5ba0\u56de\u590d\uff1a", item.assistant_preview || "-"));
@@ -196,15 +255,17 @@
       if (tab === "short") {
         actions.appendChild(createActionButton(doc, item, "\u4fdd\u5b58\u4fee\u6539", "edit", "is-promote"));
       } else if (tab === "core") {
-        actions.appendChild(createActionButton(doc, item, item.pinned ? "\u53d6\u6d88\u56fa\u5b9a" : "\u56fa\u5b9a", item.pinned ? "unpin" : "pin", "is-keep"));
-        actions.appendChild(createActionButton(doc, item, "\u4fdd\u5b58\u4fee\u6539", "edit", "is-promote"));
+        actions.appendChild(createActionButton(doc, item, item.pinned ? "\u53d6\u6d88\u56fa\u5b9a" : "\u56fa\u5b9a", item.pinned ? "unpin" : "pin", "is-keep core-memory-readonly"));
+        actions.appendChild(createActionButton(doc, item, "编辑", "begin_edit", "is-promote core-memory-readonly"));
+        actions.appendChild(createActionButton(doc, item, "保存修改", "edit", "is-promote core-memory-editor"));
+        actions.appendChild(createActionButton(doc, item, "取消", "cancel_edit", "core-memory-editor"));
       } else if (tab === "candidates") {
         actions.appendChild(createActionButton(doc, item, "\u91c7\u7528\u5230\u6b63\u5f0f\u6c60", "promote", "is-promote"));
         actions.appendChild(createActionButton(doc, item, "\u5148\u7559\u7740", "keep", "is-keep"));
       }
-      actions.appendChild(createActionButton(doc, item, "\u66f4\u5e38\u7528", "weight_up", "is-up"));
-      actions.appendChild(createActionButton(doc, item, "\u5c11\u7528", "weight_down", "is-down"));
-      actions.appendChild(createActionButton(doc, item, "\u5220\u9664", "delete", "danger"));
+      actions.appendChild(createActionButton(doc, item, "\u66f4\u5e38\u7528", "weight_up", tab === "core" ? "is-up core-memory-readonly" : "is-up"));
+      actions.appendChild(createActionButton(doc, item, "\u5c11\u7528", "weight_down", tab === "core" ? "is-down core-memory-readonly" : "is-down"));
+      actions.appendChild(createActionButton(doc, item, "\u5220\u9664", "delete", tab === "core" ? "danger core-memory-readonly" : "danger"));
 
       const body = doc.createElement("div");
       body.className = "learning-item-body";

@@ -3432,6 +3432,8 @@ def _apply_short_term_memory_patch(item, patch):
             for tag in tags[:8]
             if normalize_memory_text(tag, max_len=24)
         ]
+    if "pinned" in safe_patch:
+        updated["pinned"] = bool(safe_patch.get("pinned"))
     if "salience" in safe_patch:
         try:
             updated["salience"] = round(max(0.0, min(1.0, float(safe_patch.get("salience", updated.get("salience", 0)) or 0))), 4)
@@ -3553,7 +3555,39 @@ def update_core_memory_entries(config, *, action, ids=None, delta=0.0, patch=Non
     now = datetime.now().isoformat(timespec="seconds")
     with MEMORY_LOCK:
         items = load_core_memory_items()
-        if action_key == "delete":
+        if action_key == "create":
+            safe_patch = patch if isinstance(patch, dict) else {}
+            text = normalize_memory_text(safe_patch.get("text", ""), max_len=260)
+            if len(text) < 4:
+                return {"ok": False, "error": "Core memory create rejected: empty_text"}
+            inferred_kind, inferred_category = _classify_core_memory_text(text)
+            seed = {
+                "id": _make_core_memory_id(inferred_kind, inferred_category, text),
+                "kind": inferred_kind,
+                "category": inferred_category,
+                "text": text,
+                "source": "manual",
+                "status": "active",
+                "importance": 0.75,
+                "confidence": 0.9,
+                "tags": [],
+                "created_at": now,
+                "updated_at": now,
+                "pinned": False,
+                "origin": {},
+            }
+            created, reason = _apply_core_memory_patch(seed, safe_patch)
+            if created is None:
+                return {"ok": False, "error": f"Core memory create rejected: {reason}"}
+            normalized_text = str(created.get("text", "")).casefold()
+            if any(str(item.get("text", "")).casefold() == normalized_text for item in items):
+                return {"ok": False, "error": "Core memory create rejected: duplicate_text"}
+            existing_ids = {str(item.get("id", "")).strip() for item in items}
+            while str(created.get("id", "")).strip() in existing_ids:
+                created["id"] = _make_core_memory_id(created.get("kind"), created.get("category"), text)
+            items.append(created)
+            changed = 1
+        elif action_key == "delete":
             before = len(items)
             items = [item for item in items if str(item.get("id", "")).strip() not in wanted]
             changed = before - len(items)

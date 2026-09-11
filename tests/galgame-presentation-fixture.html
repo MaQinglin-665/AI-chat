@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Galgame 呈现验证</title>
+  <link rel="stylesheet" href="../web/galgame.css">
+</head>
+<body>
+  <section id="galgame-mode" aria-label="Galgame 呈现验证">
+    <header class="galgame-top">
+      <strong>深蓝 · 对话</strong>
+      <label class="galgame-character-label">角色<select><option>深蓝</option></select></label>
+      <label class="galgame-scene-label">场景<select><option>夜间房间</option></select></label>
+      <button type="button">语音：开</button><button type="button">返回舞台</button>
+    </header>
+    <img id="galgame-sprite" alt="测试角色" src="../web/assets/galgame-deepblue-v2/neutral-v2.png">
+    <div class="galgame-dialogue">
+      <strong class="galgame-name">深蓝</strong>
+      <div class="galgame-line"><p id="galgame-text">正在逐字显示的对白，会保留一个安静的光标。</p><button id="galgame-next" type="button" aria-label="下一句">▶</button></div>
+      <span id="galgame-status">模拟页面，不连接模型或语音。</span>
+      <form id="galgame-form"><input id="galgame-input" placeholder="输入内容不会触发跳句"><button type="submit">发送</button></form>
+    </div>
+  </section>
+  <aside style="position:fixed;z-index:9100;top:8px;left:8px;display:flex;gap:6px">
+    <button id="fixture-success" type="button">正常切换</button><button id="fixture-fail" type="button">模拟加载失败</button><button id="fixture-rapid" type="button">连续切换</button>
+  </aside>
+  <script src="../web/galgamePresentation.js"></script>
+  <script>
+    (() => {
+      const sprite = document.getElementById('galgame-sprite');
+      const status = document.getElementById('galgame-status');
+      const sources = ['../web/assets/galgame-deepblue-v2/happy-v2.png', '../web/assets/galgame-deepblue-v2/thinking-v2.png'];
+      const preload = (src) => new Promise((resolve, reject) => { const image = new Image(); image.onload = () => resolve({src, image}); image.onerror = reject; image.src = src; });
+      const swap = (src) => window.TaffyGalgamePresentation.transitionCharacter({ load: () => preload(src), commit: ({src: prepared}) => { sprite.src = prepared; } });
+      document.getElementById('fixture-success').onclick = async () => { status.textContent = (await swap(sources[0])) ? '正常切换通过' : '正常切换失败'; };
+      document.getElementById('fixture-fail').onclick = async () => { status.textContent = (await swap('./does-not-exist.png')) ? '失败用例异常' : '加载失败后已保留原角色'; };
+      document.getElementById('fixture-rapid').onclick = async () => { void swap(sources[0]); status.textContent = (await swap(sources[1])) ? '连续切换仅展示最后选择' : '连续切换失败'; };
+    })();
+  </script>
+</body>
+</html>

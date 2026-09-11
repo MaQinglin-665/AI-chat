@@ -60,7 +60,12 @@ def test_behavior_director_holds_immediately_after_tts_finishes():
     bus = CompanionEventBus()
     bus.publish("tts_finished", {"source": "frontend"}, now_ms=100)
 
-    assert decide(cfg, bus.snapshot(now_ms=500), now_ms=500)["reason"] == "post_tts_settle"
+    decision = decide(cfg, bus.snapshot(now_ms=500), now_ms=500)
+
+    assert decision["reason"] == "post_tts_settle"
+    assert decision["performance_intent"] == {
+        "phase": "settling", "emotion": "neutral", "gesture": "none", "intensity": "low", "hold_ms": 5000,
+    }
 
 
 def test_latest_tts_finish_replaces_old_started_state_after_cooldown():
@@ -87,6 +92,9 @@ def test_new_voice_after_old_reply_is_unanswered():
 
     assert decision["action"] == "micro_reaction"
     assert decision["trigger_sequence"] == voice["sequence"]
+    assert decision["performance_intent"] == {
+        "phase": "listening", "emotion": "thinking", "gesture": "nod", "intensity": "low", "hold_ms": 900,
+    }
 
 
 def test_reply_after_voice_clears_unanswered_voice_state():
@@ -110,6 +118,9 @@ def test_prepare_proactive_trigger_is_consumed_once():
 
     assert first["action"] == "prepare_proactive"
     assert first["trigger_sequence"] == trigger["sequence"]
+    assert first["performance_intent"] == {
+        "phase": "preparing", "emotion": "thinking", "gesture": "think", "intensity": "low", "hold_ms": 1200,
+    }
     assert second == {
         "action": "stay_quiet",
         "reason": "trigger_already_consumed",
@@ -131,3 +142,20 @@ def test_auto_generated_chat_is_not_a_new_grounded_proactive_trigger():
     )
 
     assert decision["reason"] == "no_grounded_impulse"
+    assert "performance_intent" not in decision
+
+
+def test_behavior_intents_are_fixed_allowlisted_data_only():
+    cfg = {"behavior_director": {"enabled": True}}
+    bus = CompanionEventBus()
+    bus.publish("voice_turn", {}, now_ms=100)
+
+    intent = decide(cfg, bus.snapshot(now_ms=200), now_ms=200)["performance_intent"]
+
+    assert set(intent) == {"phase", "emotion", "gesture", "intensity", "hold_ms"}
+    assert 200 <= intent["hold_ms"] <= 5000
+    assert {"path", "parameter", "motion_group", "expression_file"}.isdisjoint(intent)
+
+
+def test_disabled_director_does_not_emit_a_performance_intent():
+    assert "performance_intent" not in decide({}, {"events": []}, now_ms=100)

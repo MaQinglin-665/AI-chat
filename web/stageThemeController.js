@@ -2,7 +2,14 @@
   "use strict";
 
   const STORAGE_KEY = "taffy.stage-room.v1";
-  const MODES = Object.freeze(["auto", "day", "night"]);
+  const SCENES = Object.freeze(["morning", "day", "dusk", "night"]);
+  const MODES = Object.freeze(["auto", ...SCENES]);
+  const SCENE_META = Object.freeze({
+    morning: Object.freeze({ label: "清晨", baseRoom: "day" }),
+    day: Object.freeze({ label: "白天", baseRoom: "day" }),
+    dusk: Object.freeze({ label: "黄昏", baseRoom: "day" }),
+    night: Object.freeze({ label: "夜晚", baseRoom: "night" })
+  });
   const INTERACTION_ANCHORS = Object.freeze(["window", "microphone", "sofa", "guitar"]);
 
   function normalizeMode(value) {
@@ -18,14 +25,24 @@
     return `${year}-${month}-${day}`;
   }
 
-  function resolveAutomaticRoom(dateLike) {
+  function resolveAutomaticScene(dateLike) {
     const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
     const hour = date.getHours();
-    return hour >= 7 && hour < 19 ? "day" : "night";
+    if (hour >= 5 && hour < 9) return "morning";
+    if (hour >= 9 && hour < 17) return "day";
+    if (hour >= 17 && hour < 20) return "dusk";
+    return "night";
+  }
+
+  function resolveBaseRoom(scene) {
+    return SCENE_META[String(scene || "")]?.baseRoom || "night";
+  }
+
+  function resolveAutomaticRoom(dateLike) {
+    return resolveBaseRoom(resolveAutomaticScene(dateLike));
   }
 
   function resolveStoredPreference(rawValue, dateLike) {
-    const now = dateLike instanceof Date ? dateLike : new Date(dateLike);
     let value = rawValue;
     if (typeof rawValue === "string") {
       try {
@@ -39,29 +56,32 @@
       return { mode: "auto", selectedLocalDate: "" };
     }
     const selectedLocalDate = String(value?.selectedLocalDate || "");
-    if (selectedLocalDate !== getLocalDateKey(now)) {
-      return { mode: "auto", selectedLocalDate: "" };
-    }
     return { mode, selectedLocalDate };
   }
 
   function getNextTransitionAt(dateLike, mode = "auto") {
     const now = dateLike instanceof Date ? new Date(dateLike.getTime()) : new Date(dateLike);
     const next = new Date(now.getTime());
-    if (normalizeMode(mode) !== "auto") {
-      next.setHours(24, 0, 0, 0);
-      return next;
-    }
+    if (normalizeMode(mode) !== "auto") return null;
     const hour = now.getHours();
-    if (hour < 7) {
-      next.setHours(7, 0, 0, 0);
-    } else if (hour < 19) {
-      next.setHours(19, 0, 0, 0);
+    if (hour < 5) {
+      next.setHours(5, 0, 0, 0);
+    } else if (hour < 9) {
+      next.setHours(9, 0, 0, 0);
+    } else if (hour < 17) {
+      next.setHours(17, 0, 0, 0);
+    } else if (hour < 20) {
+      next.setHours(20, 0, 0, 0);
     } else {
       next.setDate(next.getDate() + 1);
-      next.setHours(7, 0, 0, 0);
+      next.setHours(5, 0, 0, 0);
     }
     return next;
+  }
+
+  function formatLocalTime(dateLike) {
+    const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
   }
 
   function createController({
@@ -73,10 +93,14 @@
     setTitleBarTheme = (room) => root.electronAPI?.setTitleBarTheme?.(room)
   } = {}) {
     let preference = { mode: "auto", selectedLocalDate: "" };
+    let effectiveScene = "night";
     let effectiveRoom = "night";
     let transitionTimer = 0;
+    let clockTimer = 0;
     let started = false;
     let boundModeButtons = [];
+    let boundMenuToggle = null;
+    let menuOpen = false;
 
     function readPreference() {
       let stored = null;
@@ -106,25 +130,38 @@
       }
     }
 
-    function updateControls() {
+    function updateControls(currentDate = now()) {
       const buttons = documentObject?.querySelectorAll?.("[data-stage-theme-mode]") || [];
       for (const button of buttons) {
         const active = normalizeMode(button.dataset?.stageThemeMode) === preference.mode;
         button.setAttribute?.("aria-pressed", active ? "true" : "false");
         button.classList?.toggle?.("is-active", active);
       }
-      const group = documentObject?.querySelector?.(".stage-theme-switch");
-      group?.setAttribute?.(
+      const sceneMeta = SCENE_META[effectiveScene] || SCENE_META.night;
+      const status = documentObject?.querySelector?.("#stage-time-status");
+      status?.setAttribute?.("data-scene", effectiveScene);
+      status?.setAttribute?.(
         "aria-label",
-        `直播间背景：${preference.mode === "auto" ? "自动" : preference.mode === "day" ? "日间" : "夜间"}`
+        `${sceneMeta.label}场景，本地时间 ${formatLocalTime(currentDate)}${preference.mode === "auto" ? "，自动切换" : "，手动锁定"}`
       );
+      const label = documentObject?.querySelector?.("#stage-time-label");
+      const clock = documentObject?.querySelector?.("#stage-time-clock");
+      if (label) label.textContent = sceneMeta.label;
+      if (clock) clock.textContent = formatLocalTime(currentDate);
+
+      const menu = documentObject?.querySelector?.("#stage-scene-menu");
+      if (menu) menu.hidden = !menuOpen;
+      const toggle = documentObject?.querySelector?.("#scene-btn");
+      toggle?.setAttribute?.("aria-expanded", menuOpen ? "true" : "false");
+      toggle?.setAttribute?.("aria-label", menuOpen ? "收起场景选择" : "打开场景选择");
     }
 
     function emitChange(previousRoom, source) {
       const view = documentObject?.defaultView || root;
       const detail = Object.freeze({
-        version: 1,
+        version: 2,
         mode: preference.mode,
+        scene: effectiveScene,
         room: effectiveRoom,
         previousRoom,
         source: String(source || "refresh"),
@@ -146,10 +183,24 @@
       if (typeof setTimeoutFn !== "function") return;
       const current = now();
       const target = getNextTransitionAt(current, preference.mode);
+      if (!target) return;
       const delay = Math.min(2147483000, Math.max(250, target.getTime() - current.getTime() + 80));
       transitionTimer = setTimeoutFn(() => {
         transitionTimer = 0;
         refresh("clock");
+      }, delay);
+    }
+
+    function scheduleClock() {
+      if (clockTimer && typeof clearTimeoutFn === "function") clearTimeoutFn(clockTimer);
+      clockTimer = 0;
+      if (typeof setTimeoutFn !== "function") return;
+      const current = now();
+      const delay = Math.max(250, 60000 - (current.getSeconds() * 1000 + current.getMilliseconds()) + 40);
+      clockTimer = setTimeoutFn(() => {
+        clockTimer = 0;
+        updateControls(now());
+        scheduleClock();
       }, delay);
     }
 
@@ -161,12 +212,15 @@
         writePreference();
       }
       const previousRoom = effectiveRoom;
-      effectiveRoom = preference.mode === "auto"
-        ? resolveAutomaticRoom(current)
+      const previousScene = effectiveScene;
+      effectiveScene = preference.mode === "auto"
+        ? resolveAutomaticScene(current)
         : preference.mode;
+      effectiveRoom = resolveBaseRoom(effectiveScene);
       const body = documentObject?.body;
       if (body) {
         body.dataset.stageRoom = effectiveRoom;
+        body.dataset.stageScene = effectiveScene;
         body.dataset.stageRoomMode = preference.mode;
       }
       try {
@@ -174,12 +228,13 @@
       } catch (_) {
         // Native title-bar theming is optional outside Electron.
       }
-      updateControls();
+      updateControls(current);
       scheduleTransition();
-      if (previousRoom !== effectiveRoom || source === "start" || source === "manual") {
+      scheduleClock();
+      if (previousScene !== effectiveScene || previousRoom !== effectiveRoom || source === "start" || source === "manual") {
         emitChange(previousRoom, source);
       }
-      return { mode: preference.mode, room: effectiveRoom };
+      return { mode: preference.mode, scene: effectiveScene, room: effectiveRoom };
     }
 
     function setMode(nextMode) {
@@ -188,8 +243,34 @@
         mode,
         selectedLocalDate: mode === "auto" ? "" : getLocalDateKey(now())
       };
+      menuOpen = false;
       writePreference();
       return refresh("manual");
+    }
+
+    function setMenuOpen(open) {
+      menuOpen = open === true;
+      updateControls(now());
+      return menuOpen;
+    }
+
+    function handleMenuToggleClick(event) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      if (!menuOpen && typeof root.setAdvancedActionsExpanded === "function") {
+        root.setAdvancedActionsExpanded(false);
+      }
+      setMenuOpen(!menuOpen);
+    }
+
+    function handleDocumentPointerDown(event) {
+      if (!menuOpen) return;
+      if (event?.target?.closest?.("#stage-scene-menu, #scene-btn")) return;
+      setMenuOpen(false);
+    }
+
+    function handleDocumentKeyDown(event) {
+      if (menuOpen && String(event?.key || "") === "Escape") setMenuOpen(false);
     }
 
     function handleModeButtonClick(event) {
@@ -210,6 +291,9 @@
       for (const button of boundModeButtons) {
         button.addEventListener?.("click", handleModeButtonClick);
       }
+      boundMenuToggle?.removeEventListener?.("click", handleMenuToggleClick);
+      boundMenuToggle = documentObject?.querySelector?.("#scene-btn") || null;
+      boundMenuToggle?.addEventListener?.("click", handleMenuToggleClick);
     }
 
     function handleVisibilityChange() {
@@ -233,6 +317,7 @@
       return Object.freeze({
         version: 1,
         name: normalizedName,
+        scene: effectiveScene,
         room: effectiveRoom,
         x,
         y,
@@ -247,20 +332,28 @@
       readPreference();
       bindModeButtons();
       documentObject?.addEventListener?.("visibilitychange", handleVisibilityChange);
+      documentObject?.addEventListener?.("pointerdown", handleDocumentPointerDown);
+      documentObject?.addEventListener?.("keydown", handleDocumentKeyDown);
       return refresh("start");
     }
 
     function stop() {
       started = false;
       documentObject?.removeEventListener?.("visibilitychange", handleVisibilityChange);
+      documentObject?.removeEventListener?.("pointerdown", handleDocumentPointerDown);
+      documentObject?.removeEventListener?.("keydown", handleDocumentKeyDown);
       for (const button of boundModeButtons) {
         button.removeEventListener?.("click", handleModeButtonClick);
       }
       boundModeButtons = [];
+      boundMenuToggle?.removeEventListener?.("click", handleMenuToggleClick);
+      boundMenuToggle = null;
       if (transitionTimer && typeof clearTimeoutFn === "function") {
         clearTimeoutFn(transitionTimer);
       }
       transitionTimer = 0;
+      if (clockTimer && typeof clearTimeoutFn === "function") clearTimeoutFn(clockTimer);
+      clockTimer = 0;
     }
 
     return {
@@ -268,20 +361,26 @@
       stop,
       refresh,
       setMode,
+      setMenuOpen,
       getInteractionAnchor,
-      getState: () => Object.freeze({ mode: preference.mode, room: effectiveRoom })
+      getState: () => Object.freeze({ mode: preference.mode, scene: effectiveScene, room: effectiveRoom })
     };
   }
 
   const api = {
     STORAGE_KEY,
+    SCENES,
     MODES,
+    SCENE_META,
     INTERACTION_ANCHORS,
     normalizeMode,
     getLocalDateKey,
+    resolveAutomaticScene,
+    resolveBaseRoom,
     resolveAutomaticRoom,
     resolveStoredPreference,
     getNextTransitionAt,
+    formatLocalTime,
     createController
   };
 

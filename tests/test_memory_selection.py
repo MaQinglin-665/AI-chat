@@ -408,6 +408,44 @@ def test_core_memory_review_update_delete_pin_and_edit(monkeypatch, tmp_path):
     assert deleted["core_memories"] == []
 
 
+def test_core_memory_review_can_create_manual_memory_for_next_prompt(monkeypatch, tmp_path):
+    _patch_core_memory_path(monkeypatch, tmp_path)
+    created = memory.update_core_memory_entries(
+        _config(core_inject_count=3, learning_samples_enabled=False, mem0_enabled=False),
+        action="create",
+        patch={
+            "text": "用户希望桌宠说话时语气与身体动作自然联动。",
+            "kind": "semantic",
+            "category": "user_preference",
+            "tags": ["桌宠", "表现"],
+            "importance": 0.88,
+            "confidence": 0.96,
+            "pinned": True,
+        },
+    )
+
+    assert created["ok"] is True
+    assert len(created["core_memories"]) == 1
+    item = created["core_memories"][0]
+    assert item["source"] == "manual"
+    assert item["category"] == "user_preference"
+    assert item["importance"] == 0.88
+    prompt = memory.build_memory_prompt_block(
+        _config(core_inject_count=3, learning_samples_enabled=False, mem0_enabled=False),
+        "桌宠说话表现应该怎样？",
+        [],
+    )
+    assert "语气与身体动作自然联动" in prompt
+
+    duplicate = memory.update_core_memory_entries(
+        _config(),
+        action="create",
+        patch={"text": "用户希望桌宠说话时语气与身体动作自然联动。"},
+    )
+    assert duplicate["ok"] is False
+    assert "duplicate_text" in duplicate["error"]
+
+
 def test_short_term_memory_tracks_current_task_and_supports_followup(monkeypatch, tmp_path):
     memory_path = tmp_path / "memory.json"
     short_path = _patch_short_memory_path(monkeypatch, tmp_path)

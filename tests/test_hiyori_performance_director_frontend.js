@@ -155,6 +155,28 @@ function advanceWithSamples(harness, durationMs, context = {}) {
   assert.ok(speakStrong.parameters.ParamShoulder > speakQuiet.parameters.ParamShoulder, "speech shoulder linkage should grow with audible energy");
   assert.ok(speakStrong.parameters.ParamBodyAngleY > speakQuiet.parameters.ParamBodyAngleY, "speech body linkage should grow with audible energy");
 
+  const presenceHarness = createHarness();
+  presenceHarness.controller.sample({ now: presenceHarness.now });
+  const presenceSamples = [];
+  for (let i = 0; i < 90; i += 1) {
+    presenceHarness.advance(16);
+    presenceSamples.push(presenceHarness.controller.sample({
+      now: presenceHarness.now,
+      speaking: true,
+      audioLevel: 0.55,
+      bodyEnergy: 0.72
+    }).parameters);
+  }
+  const channelRange = (key) => {
+    const values = presenceSamples.map((pose) => Number(pose[key]) || 0);
+    return Math.max(...values) - Math.min(...values);
+  };
+  const meanShoulder = presenceSamples.reduce((sum, pose) => sum + (Number(pose.ParamShoulder) || 0), 0) / presenceSamples.length;
+  assert.ok(channelRange("ParamBodyAngleZ") >= 1.25, "continuous speech should keep a readable torso sway range");
+  assert.ok(channelRange("ParamAngleZ") >= 0.8, "continuous speech should keep a readable counter-moving head rhythm");
+  assert.ok(channelRange("ParamArmLA") >= 0.12 && channelRange("ParamArmRA") >= 0.12, "continuous speech should softly involve both arms");
+  assert.ok(meanShoulder >= 0.07, "continuous speech should retain visible shoulder presence between audio peaks");
+
   const rampHarness = createHarness();
   rampHarness.controller.sample({ now: rampHarness.now });
   rampHarness.advance(16);
@@ -360,6 +382,10 @@ function advanceWithSamples(harness, durationMs, context = {}) {
   }
   assert.ok(signatures.happy.ParamMouthForm > 0, "happy should smile");
   assert.ok(signatures.sad.ParamMouthForm < 0 && signatures.sad.ParamShoulder < 0, "sad should lower mouth and shoulders");
+  assert.ok(
+    Math.abs(signatures.sad.ParamEyeLOpen || 0) <= 0.03,
+    "sad should leave sustained eyelid openness to the blink layer instead of holding a sleepy face"
+  );
   assert.ok(signatures.angry.ParamBrowLY < 0 && signatures.angry.ParamShoulder > 0, "angry should lower brows and tense shoulders");
   assert.ok((signatures.surprised.ParamEyeLOpen || 0) > (signatures.happy.ParamEyeLOpen || 0), "surprised should open eyes more than happy");
   assert.ok(signatures.thinking.ParamEyeBallX < 0 && signatures.thinking.ParamAngleZ < 0, "thinking should glance aside and tilt");

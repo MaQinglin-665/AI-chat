@@ -1,4 +1,4 @@
-# 馨语桌宠
+# 馨语桌宠 · Xinyu Desktop Pet
 
 <p align="center">
   <img src="docs/assets/preview-chat.png" alt="馨语桌宠预览图" width="760">
@@ -13,19 +13,46 @@
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-111827"></a>
 </p>
 
-馨语桌宠是一个开源 Windows 桌面 AI 伙伴 / 桌面 AI VTuber 实验项目。
+**让 AI 以角色的方式陪在桌面上。**
 
-它把 `Electron + Python 本地服务 + Live2D + LLM 对话 + TTS/ASR + 情绪动作反馈` 组合到桌面上，探索一个能聊天、能说话、能表达情绪、低打扰陪伴的角色体验。
+馨语桌宠是面向 Windows 的开源 AI 桌面伙伴实验项目。你可以让 Live2D 角色待在桌面，用文字或语音交流；也可以进入 Galgame 模式，在场景、立绘与逐句台词中继续对话。
 
-当前项目仍处于 `MVP / 开源孵化` 阶段，不是成熟商业产品。项目可以提到受 AI VTuber 与 Neuro-sama-like 交互方向启发，但它不是任何项目的克隆或复刻。
+项目使用 Electron 与 Python 本地服务，支持用户配置的语言模型和语音服务。它仍处于 **MVP / 预览阶段**：响应速度、语音质量与角色表现依赖所用模型、服务和素材，不承诺全天候自主陪伴或完美的情绪理解。
 
-English summary: Xinyu Desktop Pet is an open-source Windows desktop AI companion / AI VTuber MVP. It ships no cloud model, hosted endpoint, or API key; users configure their own model provider.
+English: An experimental Windows AI companion with Live2D and visual-novel dialogue, speech, editable memory, and optional context-aware interaction. Bring your own model and voice services.
 
-- 最新预览版：[v1.4.0-preview.6](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6)
-- 首次安装指南：[docs/first-install.md](docs/first-install.md)
-- 模型选择指南：[docs/model-selection.md](docs/model-selection.md)
-- 首跑反馈模板：[docs/first-run-feedback.md](docs/first-run-feedback.md)
-- 项目网站：[maqinglin-665.github.io/AI-chat](https://maqinglin-665.github.io/AI-chat/)
+[下载安装](#直接下载) · [首次配置](docs/first-install.md) · [模型选择](docs/model-selection.md) · [项目网站](https://maqinglin-665.github.io/AI-chat/) · [反馈问题](https://github.com/MaQinglin-665/AI-chat/issues)
+
+## 两种陪伴方式
+
+| 桌面 Live2D | Galgame 对话 |
+| --- | --- |
+| 透明桌面窗口、语音与情绪动作反馈 | 场景背景、透明立绘、逐句台词 |
+| 本地时间场景与可选的低打扰主动回应 | 自由输入、逐字显示、逐句朗读、手动推进 |
+| 长期记忆可查看、编辑、固定和删除 | 切换人物时淡出至黑屏，载入后重新亮起 |
+
+<p align="center">
+  <img src="web/assets/galgame-deepblue-v2/happy-v2.png" alt="DeepSeek 阳光角色立绘示例" height="250">
+  <img src="web/assets/galgame-characters/claude/neutral-v3.png" alt="Claude 典雅角色立绘示例" height="250">
+  <img src="web/assets/galgame-characters/gpt/neutral-v2.png" alt="GPT 果断角色立绘示例" height="250">
+</p>
+<p align="center"><sub>项目中的非官方角色立绘示例；实际可选表情以现有素材为准。</sub></p>
+
+Galgame 当前提供三种角色风格：DeepSeek 阳光活泼，Claude 典雅从容，GPT 果断能干。模型会为每句回复选择已有的表情、动作和场景；未来计划、假设或引用不应被当作已经发生的换景。手动选择背景后可以锁定，也可以恢复自动判断。
+
+> 这些是项目中的角色扮演设定与非官方拟人形象，不代表相关公司的官方角色。GPT、Claude 的现有立绘只有日常、开心、思考几类，其他情绪会使用可用素材保底。
+
+## 本轮源码更新
+
+- **对话与表演同步**：逐句生成、打字机显示和朗读；跳句、退出或换人会取消旧播放。Galgame 使用独立的结构化输出预算，避免普通短回复限制截断动作信息。
+- **更自然的交流**：调整角色说话风格，增加结合当前对话状态决定回应或等待的可选交互逻辑。
+- **可管理的长期记忆**：创建、编辑、固定与删除记忆，查看待整理内容；修正后续检索仍命中被删除内容的问题。
+- **场景与界面**：晨间、白天、黄昏、夜间场景选择，舞台动效和控制中心整理。
+- **桌面上下文边界**：加强密码、登录等敏感界面的上下文过滤；桌面感知仍需显式开启，过滤并不等同于保证识别所有敏感内容。
+
+上述内容描述本更新分支的源码，**不表示历史安装包已包含这些功能**。最近发布的安装包仍为 [v1.4.0-preview.6](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6)；本轮没有创建新安装包或新版本标签。
+
+模型实测与限制见 [Galgame 验收记录](docs/galgame-live-acceptance.md)，本轮变更范围见 [源码更新说明](docs/source-update-2026-09.md)。
 
 ## 直接下载
 
@@ -51,15 +78,12 @@ RELEASE-ASSETS.md
 - 想研究 Electron 桌面 UI、Python 本地服务、LLM、TTS/ASR、Live2D 串联方式的开发者。
 - 愿意接受预览版限制，并反馈首跑、模型兼容、语音链路、角色体验问题的早期测试者。
 
-## 当前能力
+## 数据与服务
 
-- Live2D 桌宠渲染与 Electron 透明桌面窗口。
-- 文本对话，支持 OpenAI-compatible、OpenAI、Ollama 等用户自选模型。
-- TTS / ASR 语音交互链路，首跑推荐 Browser / Edge TTS。
-- 情绪状态、动作映射、角色运行时 cue。
-- 记忆系统、短期舞台记忆与可审核学习样本。
-- 低风险主动反馈与状态中心。
-- 可选桌面上下文辅助回复，默认关闭，需要用户显式启用。
+- 模型支持 OpenAI-compatible、OpenAI、Ollama 等配置方式，仓库不附带 API Key 或托管模型。
+- 语音支持 TTS / ASR；不同提供商的环境要求与效果不同。首次配置可参考 [安装指南](docs/first-install.md)。
+- 配置、记忆与本地服务运行在你的电脑上；使用云端模型或语音服务时，相应请求会发送到你配置的服务，并非所有处理都离线完成。
+- 桌面感知与工具能力均为可选项；只在了解数据去向与权限后启用。
 
 ## 快速开始
 

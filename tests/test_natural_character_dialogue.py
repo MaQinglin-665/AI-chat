@@ -35,6 +35,13 @@ def test_model_direct_dialogue_policy_is_honest_bilingual_and_grounded():
     assert "not empty surrealism or unrelated randomness" in policy
     assert "self-initiated thought" in policy
     assert "understated and practical" in policy
+    assert "human intent" in policy
+    assert "not parser input" in policy
+    assert "familiar friend" in policy
+    assert "including for technical and work questions" in policy
+    assert "Never restate the request" in policy
+    assert "offer of more help" in policy
+    assert "add only the detail needed for accuracy" in policy
     assert "Taffy" not in policy
 
 
@@ -55,7 +62,25 @@ def test_compact_voice_dialogue_policy_keeps_identity_and_fast_first_beat():
     assert "complete speakable beat early" in compact
     assert "Never invent human senses" in compact
     assert "without using a fixed joke" in compact
+    assert "human intent" in compact
+    assert "familiar friend" in compact
+    assert "service acknowledgements" in compact
     assert len(compact) < len(full) * 0.6
+
+
+def test_legacy_human_prompt_keeps_complex_work_chat_short_and_familiar():
+    prompt = humanize.build_human_prompt_block(
+        "请详细分析这个 Python 报错并给我修复步骤",
+        [],
+        allow_random=False,
+    )
+
+    assert "熟人之间" in prompt
+    assert "技术和工作问题也保持这种口吻" in prompt
+    assert "不要复述用户的问题" in prompt
+    assert "话说完就停" in prompt
+    assert "先给结论" in prompt
+    assert "4-6句" not in prompt
 
 
 def test_model_direct_dialogue_policy_keeps_configured_language_compatibility():

@@ -24,6 +24,15 @@ STATE_PATH = LOCAL_DIR / "desktop_awareness.json"
 CAPTURE_PATH = LOCAL_DIR / "desktop-observation.jpg"
 _LOCK = threading.RLock()
 
+# These checks are deliberately local and happen before any image is captured
+# for a cloud vision request. They are a privacy boundary, not a prompt hint.
+_SENSITIVE_FOREGROUND_RE = re.compile(
+    r"(?:1password|bitwarden|keepass|lastpass|dashlane|password|密码|口令|密钥|"
+    r"wallet|metamask|ledger|银行|bank|支付|pay(?:ment)?|财务|证券|trading|"
+    r"incognito|inprivate|private browsing|无痕|隐私浏览)",
+    re.IGNORECASE,
+)
+
 
 def _powershell(script: str, timeout: int = 12) -> str:
     encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
@@ -174,6 +183,34 @@ $windows = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Obj
         return json.loads(raw.splitlines()[-1])
     except Exception as exc:
         raise RuntimeError("Desktop context returned invalid data.") from exc
+
+
+def is_sensitive_foreground_context(context: dict[str, Any], config: dict[str, Any] | None = None) -> bool:
+    """Locally decide whether the current desktop must never be observed."""
+    foreground = context.get("foreground") if isinstance(context, dict) else {}
+    foreground = foreground if isinstance(foreground, dict) else {}
+    windows = context.get("windows") if isinstance(context, dict) else []
+    windows = windows if isinstance(windows, list) else []
+    candidates = [foreground, *[item for item in windows[:40] if isinstance(item, dict)]]
+    observe_cfg = config.get("observe") if isinstance(config, dict) else {}
+    extra = observe_cfg.get("sensitive_app_patterns") if isinstance(observe_cfg, dict) else []
+    extra = extra if isinstance(extra, list) else []
+    for window in candidates:
+        process = str(window.get("process") or "")[:240]
+        title = str(window.get("title") or "")[:500]
+        source = f"{process}\n{title}"
+        if _SENSITIVE_FOREGROUND_RE.search(source):
+            return True
+        for item in extra[:32]:
+            pattern = str(item or "").strip()
+            if not pattern or len(pattern) > 120:
+                continue
+            try:
+                if re.search(pattern, source, re.IGNORECASE):
+                    return True
+            except re.error:
+                continue
+    return False
 
 
 def control_window(action: str, handle: int) -> dict[str, Any]:

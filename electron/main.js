@@ -1433,16 +1433,6 @@ ipcMain.handle("capture-desktop", async (event) => {
   return await captureDesktopDataUrl(win);
 });
 
-ipcMain.handle("pick-singing-source", async (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  const result = await dialog.showOpenDialog(win, {
-    title: "选择一段 WAV 清唱人声",
-    properties: ["openFile"],
-    filters: [{ name: "WAV audio", extensions: ["wav"] }],
-  });
-  return result.canceled ? "" : String(result.filePaths?.[0] || "");
-});
-
 ipcMain.on("subtitle-show", (_event, payload) => {
   if (!modelWindow || modelWindow.isDestroyed()) return;
   if (!modelWindowReady) {

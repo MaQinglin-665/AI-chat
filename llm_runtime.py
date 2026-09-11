@@ -1,5 +1,6 @@
 from config import OLLAMA_DEFAULT_MODEL
 from companion_turn_contract import is_model_direct_reply_enabled
+from galgame_context import build_galgame_personality_prompt
 
 
 OPENAI_COMPATIBLE_PROVIDERS = {"openai", "openai-compatible", "openai_compatible"}
@@ -41,7 +42,11 @@ def build_reply_prompt(
     stable_behavior_block = build_demo_stable_reply_behavior_block_fn(config)
     if stable_behavior_block:
         prompt = merge_prompt_with_memory_fn(prompt, stable_behavior_block)
-    return apply_character_runtime_prompt_contract_fn(config, prompt)
+    prompt = apply_character_runtime_prompt_contract_fn(config, prompt)
+    galgame_prompt = "" if is_auto else build_galgame_personality_prompt(config)
+    if galgame_prompt:
+        prompt = merge_prompt_with_memory_fn(prompt, galgame_prompt)
+    return prompt
 
 
 def call_llm_impl(
@@ -278,6 +283,27 @@ def call_llm_stream_impl(
         for chunk in split_text_for_stream_fn(reply):
             yield chunk
         return
+
+    from galgame_context import sanitize_galgame_context
+    from galgame_director import build_direction_prompt, directed_stream, direction_llm_config
+    galgame = sanitize_galgame_context(config.get("_galgame_context"))
+    if galgame and not is_auto:
+        llm_cfg = direction_llm_config(llm_cfg)
+        prompt = merged_prompt + build_direction_prompt(galgame)
+        factories = []
+        if provider in OPENAI_COMPATIBLE_PROVIDERS:
+            messages = build_openai_messages_fn(prompt=prompt, safe_history=safe_history,
+                user_message=user_message, image_data_url=image_data_url)
+            factories = [lambda: iter_openai_chat_stream_fn(llm_cfg, messages),
+                         lambda: iter_openai_responses_stream_fn(llm_cfg, messages)]
+        elif provider == "ollama" and not image_data_url and callable(iter_ollama_chat_stream_fn):
+            messages = [{"role": "system", "content": prompt}, *safe_history,
+                        {"role": "user", "content": user_message}]
+            model = str(llm_cfg.get("text_model") or llm_cfg.get("model") or OLLAMA_DEFAULT_MODEL)
+            factories = [lambda: iter_ollama_chat_stream_fn(llm_cfg, messages, model_override=model)]
+        if factories:
+            yield from directed_stream(factories, galgame, user_message, config)
+            return
 
     if provider in OPENAI_COMPATIBLE_PROVIDERS:
         messages = build_openai_messages_fn(

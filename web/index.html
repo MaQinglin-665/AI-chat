@@ -18,8 +18,14 @@
   <link rel="stylesheet" href="./xinyuDisplayFont.css">
   <link rel="stylesheet" href="./kawaiiTheme.css">
   <link rel="stylesheet" href="./phosphorIcons.css">
+  <link rel="stylesheet" href="./sceneExperience.css">
+  <link rel="stylesheet" href="./controlCenterPolish.css">
+  <link rel="stylesheet" href="./galgame.css">
+  <link rel="stylesheet" href="./stageMotion.css">
   <link rel="preload" href="./assets/stage-rooms/day-room-v1.webp" as="image" type="image/webp">
-  <link rel="preload" href="./assets/stage-rooms/night-room-v1.webp" as="image" type="image/webp">
+  <link rel="preload" href="./assets/stage-rooms/morning-room-v1.webp" as="image" type="image/webp">
+  <link rel="preload" href="./assets/stage-rooms/dusk-room-v1.webp" as="image" type="image/webp">
+  <link rel="preload" href="./assets/stage-rooms/night-room-v2.webp" as="image" type="image/webp">
 </head>
 <body>
   <script src="./earlyViewBootstrap.js"></script>
@@ -29,9 +35,13 @@
   </header>
   <div class="stage-scene" aria-hidden="true">
     <div class="stage-room-background stage-room-background-day"></div>
+    <div class="stage-room-background stage-room-background-morning"></div>
+    <div class="stage-room-background stage-room-background-dusk"></div>
     <div class="stage-room-background stage-room-background-night"></div>
     <div class="stage-room-tone"></div>
     <div class="stage-room-atmosphere"></div>
+    <div class="stage-scene-light" aria-hidden="true"></div>
+    <div class="stage-scene-motes" aria-hidden="true"></div>
     <div class="stage-scene-grid"></div>
     <div class="stage-scene-halo"></div>
     <div class="stage-scene-floor"></div>
@@ -47,7 +57,7 @@
     <img class="kawaii-doodle kawaii-doodle-note" src="./assets/icons/phosphor/music-notes.svg" alt="">
     <img class="kawaii-doodle kawaii-doodle-heart" src="./assets/icons/phosphor/heart-straight.svg" alt="">
     <img class="kawaii-doodle kawaii-doodle-spark" src="./assets/icons/phosphor/sparkle.svg" alt="">
-    <img class="kawaii-doodle kawaii-doodle-cat" src="./assets/icons/tabler/cat.svg" alt="">
+    <span class="kawaii-doodle kawaii-doodle-cat" aria-hidden="true"></span>
     <img class="kawaii-doodle kawaii-doodle-flower" src="./assets/icons/phosphor/flower-lotus.svg" alt="">
   </div>
 
@@ -95,6 +105,7 @@
 
   <section class="panel">
     <section class="hero-card">
+      <span class="stage-state-pulse" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       <span class="hero-svg-ears hero-svg-ears-left" aria-hidden="true"><img src="./assets/icons/tabler/cat.svg" alt=""></span>
       <span class="hero-svg-ears hero-svg-ears-right" aria-hidden="true"><img src="./assets/icons/tabler/cat.svg" alt=""></span>
       <div class="hero-avatar" aria-hidden="true">
@@ -104,8 +115,8 @@
         <div class="hero-head">
           <div class="hero-meta">
             <span class="xinyu-stage-brand-mark" aria-hidden="true">
-              <img class="xinyu-stage-brand-cat" src="./assets/icons/tabler/cat.svg" alt="">
-              <img class="xinyu-stage-brand-wave" src="./assets/icons/phosphor/waveform.svg" alt="">
+              <img class="xinyu-stage-brand-cat" src="./assets/icons/phosphor/cat.svg" alt="">
+              <span class="xinyu-stage-brand-spark" aria-hidden="true"></span>
             </span>
             <strong id="assistant-name">馨语AI桌宠</strong>
             <p class="hero-tagline">你的桌面伙伴，随时懂你 ✨</p>
@@ -114,10 +125,10 @@
             <div id="reply-character-chip" class="reply-character-chip" title="上一句回复的角色表现">上一句角色表现 · 待回复</div>
           </div>
           <button id="translation-chip-btn" type="button" aria-pressed="true" title="隐藏会话翻译">会话翻译已显示</button>
-          <div class="stage-theme-switch" role="group" aria-label="直播间背景：自动">
-            <button type="button" data-stage-theme-mode="auto" aria-pressed="true" title="按本地时间自动切换"><img src="./assets/icons/phosphor/sparkle.svg" alt=""><span>自动</span></button>
-            <button type="button" data-stage-theme-mode="day" aria-pressed="false" title="切换到日间陪伴房"><img src="./assets/icons/phosphor/sun.svg" alt=""><span>日间</span></button>
-            <button type="button" data-stage-theme-mode="night" aria-pressed="false" title="切换到夜间直播房"><img src="./assets/icons/phosphor/moon-stars.svg" alt=""><span>夜间</span></button>
+          <div id="stage-time-status" class="stage-time-status" data-scene="night" aria-live="polite" aria-label="夜晚场景">
+            <span class="stage-time-glyph" aria-hidden="true"></span>
+            <span id="stage-time-label" class="stage-time-label">夜晚</span>
+            <time id="stage-time-clock" class="stage-time-clock">00:00</time>
           </div>
         </div>
         <div id="mic-meter-wrap" class="mic-meter-wrap" aria-live="off">
@@ -236,9 +247,38 @@
 
     <div class="row controls action-buttons utility-actions">
       <button id="pet-mode-btn" type="button" title="最小化舞台并回到桌宠（Alt+Shift+P）">桌宠</button>
-      <button id="help-btn" type="button">上手</button>
+      <button id="scene-btn" type="button" aria-expanded="false" aria-controls="stage-scene-menu" aria-label="打开场景选择">场景</button>
       <button id="more-btn" type="button" aria-expanded="false" aria-controls="advanced-actions">更多</button>
     </div>
+
+    <section id="stage-scene-menu" class="stage-scene-menu" aria-label="选择时间场景" hidden>
+      <header class="stage-scene-menu-head">
+        <span>时间场景</span>
+        <small>自动跟随本地时间，也可持续锁定</small>
+      </header>
+      <div class="stage-scene-options" role="group" aria-label="时间场景模式">
+        <button class="stage-scene-option stage-scene-option-auto" type="button" data-stage-theme-mode="auto" aria-pressed="true">
+          <img src="./assets/icons/phosphor/sparkle.svg" alt="">
+          <span><strong>自动</strong><small>跟随本地时间</small></span>
+        </button>
+        <button class="stage-scene-option" type="button" data-stage-theme-mode="morning" aria-pressed="false">
+          <img src="./assets/icons/phosphor/sun.svg" alt="">
+          <span><strong>清晨</strong><small>05:00 - 09:00</small></span>
+        </button>
+        <button class="stage-scene-option" type="button" data-stage-theme-mode="day" aria-pressed="false">
+          <img src="./assets/icons/phosphor/sun.svg" alt="">
+          <span><strong>白天</strong><small>09:00 - 17:00</small></span>
+        </button>
+        <button class="stage-scene-option" type="button" data-stage-theme-mode="dusk" aria-pressed="false">
+          <img src="./assets/icons/phosphor/clock.svg" alt="">
+          <span><strong>黄昏</strong><small>17:00 - 20:00</small></span>
+        </button>
+        <button class="stage-scene-option" type="button" data-stage-theme-mode="night" aria-pressed="false">
+          <img src="./assets/icons/phosphor/moon-stars.svg" alt="">
+          <span><strong>夜晚</strong><small>20:00 - 05:00</small></span>
+        </button>
+      </div>
+    </section>
 
     <div id="advanced-actions" class="row controls action-buttons advanced-actions" hidden>
       <div class="advanced-actions-group" aria-label="常用功能">
@@ -246,14 +286,10 @@
         <button id="schedule-btn" type="button">日程</button>
         <button id="persona-btn" type="button">人设卡</button>
         <button id="config-switch-btn" type="button">模型 / 语音</button>
-        <button id="singing-convert-btn" type="button" title="选择一段本地 WAV 清唱，转换为馨语的试唱音色">唱歌试音</button>
-        <button id="singing-song-bushuo-btn" type="button">唱《不说》</button>
-        <button id="singing-song-yuai-btn" type="button">唱《雨爱》</button>
         <button id="qq-identity-btn" type="button">QQ 身份</button>
         <button id="learning-review-btn" type="button">记忆管理</button>
         <button id="doctor-btn" type="button">故障自检</button>
       </div>
-      <p id="singing-convert-status" class="config-switch-status" aria-live="polite"></p>
       <div class="advanced-actions-group" aria-label="桌面功能">
         <span class="advanced-actions-title">桌面</span>
         <button id="lock-btn" type="button">桌面锁定: 关</button>
@@ -894,7 +930,7 @@
         <span class="learning-title-badge" aria-hidden="true">&#10003;</span>
         <div class="learning-title-copy">
           <strong>记忆管理</strong>
-          <p>查看桌宠从对话里沉淀出的记忆，决定哪些可以进入正式池。</p>
+          <p>查看和维护会真正参与后续对话的长期记忆。</p>
         </div>
       </div>
       <div class="learning-review-head-actions">
@@ -916,55 +952,101 @@
     <div class="learning-review-toolbar">
       <section class="learning-card learning-memory-overview" aria-label="记忆池概览">
         <div class="learning-overview-item">
-          <span>候选池</span>
-          <strong id="learning-stat-candidates">0</strong>
-          <small>待确认</small>
-        </div>
-        <div class="learning-overview-item">
-          <span>正式池</span>
-          <strong id="learning-stat-samples">0</strong>
-          <small>会参与回复</small>
-        </div>
-        <div class="learning-overview-item">
-          <span>短期记忆</span>
-          <strong id="learning-stat-short">0</strong>
-          <small>当前会话</small>
-        </div>
-        <div class="learning-overview-item">
           <span>长期记忆</span>
           <strong id="learning-stat-core">0</strong>
-          <small>事实与事件</small>
+          <small>会参与相关回复</small>
+        </div>
+        <div class="learning-overview-item">
+          <span>已固定</span>
+          <strong id="learning-stat-samples">0</strong>
+          <small>优先保留</small>
+        </div>
+        <div class="learning-overview-item">
+          <span>高重要度</span>
+          <strong id="learning-stat-short">0</strong>
+          <small>重要度 ≥ 0.8</small>
+        </div>
+        <div class="learning-overview-item">
+          <span>待整理</span>
+          <strong id="learning-stat-candidates">0</strong>
+          <small>审核候选</small>
         </div>
         <div class="learning-overview-item">
           <span>当前显示</span>
           <strong id="learning-stat-visible">0</strong>
-          <small id="learning-active-pool-label">候选池</small>
+          <small id="learning-active-pool-label">长期记忆</small>
         </div>
       </section>
 
       <section class="learning-card learning-section learning-pool-card">
-        <div class="learning-review-tabs" role="tablist" aria-label="学习池切换">
-          <button id="learning-tab-candidates" class="learning-tab is-active" type="button" role="tab" aria-selected="true">
-            <span class="learning-btn-icon" aria-hidden="true">&#128101;</span>
-            <span>候选池</span>
-          </button>
-          <button id="learning-tab-samples" class="learning-tab" type="button" role="tab" aria-selected="false">
-            <span class="learning-btn-icon" aria-hidden="true">&#9813;</span>
-            <span>正式池</span>
-          </button>
-          <button id="learning-tab-short" class="learning-tab" type="button" role="tab" aria-selected="false">
-            <span class="learning-btn-icon" aria-hidden="true">&#8987;</span>
-            <span>短期记忆</span>
-          </button>
-          <button id="learning-tab-core" class="learning-tab" type="button" role="tab" aria-selected="false">
+        <div class="learning-review-tabs" role="tablist" aria-label="记忆视图切换">
+          <button id="learning-tab-core" class="learning-tab is-active" type="button" role="tab" aria-selected="true">
             <span class="learning-btn-icon" aria-hidden="true">&#128214;</span>
             <span>长期记忆</span>
           </button>
-          <button id="learning-tab-debug" class="learning-tab" type="button" role="tab" aria-selected="false" data-dev-feature="diagnostics">
+          <button id="learning-tab-candidates" class="learning-tab" type="button" role="tab" aria-selected="false">
+            <span class="learning-btn-icon" aria-hidden="true">&#128101;</span>
+            <span>待整理</span>
+          </button>
+          <button id="learning-tab-samples" class="learning-tab" type="button" role="tab" aria-selected="false">
+            <span class="learning-btn-icon" aria-hidden="true">&#9813;</span>
+            <span>整理记录</span>
+          </button>
+          <button id="learning-tab-short" class="learning-tab" type="button" role="tab" aria-selected="false" hidden>
+            <span class="learning-btn-icon" aria-hidden="true">&#8987;</span>
+            <span>短期记忆</span>
+          </button>
+          <button id="learning-tab-debug" class="learning-tab" type="button" role="tab" aria-selected="false" data-dev-feature="diagnostics" hidden>
             <span class="learning-btn-icon" aria-hidden="true">&#9881;</span>
             <span>Debug</span>
           </button>
         </div>
+      </section>
+
+      <section id="memory-create-card" class="learning-card learning-section memory-create-card">
+        <div class="learning-section-title learning-section-title-inline">
+          <span>
+            <span class="learning-section-icon" aria-hidden="true">&#43;</span>
+            <strong>手动记住</strong>
+          </span>
+          <button id="memory-create-toggle-btn" class="learning-btn-with-icon" type="button" aria-expanded="false">
+            <span>新增一条记忆</span>
+          </button>
+        </div>
+        <form id="memory-create-form" class="memory-create-form" hidden>
+          <label class="learning-field memory-create-text">
+            <span class="learning-field-title">希望桌宠长期记住什么</span>
+            <textarea id="memory-create-text" maxlength="260" required placeholder="例如：用户更喜欢自然、连贯、不过度夸张的表达。"></textarea>
+          </label>
+          <div class="memory-create-grid">
+            <label class="learning-field">
+              <span class="learning-field-title">类型</span>
+              <select id="memory-create-kind">
+                <option value="semantic">长期事实</option>
+                <option value="episodic">具体事件</option>
+              </select>
+            </label>
+            <label class="learning-field">
+              <span class="learning-field-title">分类</span>
+              <select id="memory-create-category">
+                <option value="stable_fact">稳定事实</option>
+                <option value="user_preference">用户偏好</option>
+                <option value="relationship">相处方式</option>
+                <option value="project_context">项目背景</option>
+                <option value="recent_event">近期事件</option>
+              </select>
+            </label>
+            <label class="learning-field">
+              <span class="learning-field-title">标签（逗号分隔）</span>
+              <input id="memory-create-tags" type="text" maxlength="120" placeholder="偏好, 表达风格">
+            </label>
+          </div>
+          <div class="memory-create-actions">
+            <label class="learning-select-all"><input id="memory-create-pinned" type="checkbox"><span>固定这条记忆</span></label>
+            <button id="memory-create-cancel-btn" class="learning-btn-with-icon" type="button">取消</button>
+            <button class="learning-btn-with-icon is-primary" type="submit">保存并立即生效</button>
+          </div>
+        </form>
       </section>
 
       <section class="learning-card learning-section learning-filter-card">
@@ -980,7 +1062,7 @@
             <span class="learning-field-title">关键词</span>
             <div class="learning-input-with-icon">
               <span class="learning-inline-icon" aria-hidden="true">&#9906;</span>
-              <input id="learning-filter-keyword" type="text" placeholder="搜索用户原话、回复或提炼记忆">
+              <input id="learning-filter-keyword" type="text" placeholder="搜索记忆内容、分类或标签">
             </div>
           </label>
           <label class="learning-field">
@@ -1075,7 +1157,6 @@
   <script src="./grayTrialReportController.js"></script>
   <script src="./grayTrialCharacterPanelController.js"></script>
   <script src="./apiClient.js"></script>
-  <script src="./singingController.js"></script>
   <script src="./chatApi.js"></script>
   <script src="./speechText.js"></script>
   <script src="./ttsApi.js"></script>
@@ -1096,6 +1177,7 @@
   <script src="./performanceCueController.js"></script>
   <script src="./hiyoriEmotionOverlayController.js"></script>
   <script src="./hiyoriPerformanceDirector.js"></script>
+  <script src="./behaviorPerformanceBridge.js"></script>
   <script src="./performanceTimelineController.js"></script>
   <script src="./streamTtsQueueController.js"></script>
   <script src="./ttsPlaybackController.js"></script>
@@ -1144,6 +1226,9 @@
   <script src="./chatConfigBoundary.js"></script>
   <script src="./chatRuntimeDebugBridgeBoundary.js"></script>
   <script src="./chat.js"></script>
+  <script src="./galgamePlayer.js"></script>
+  <script src="./galgameController.js"></script>
+  <script src="./galgamePresentation.js"></script>
   <script src="./configSwitchController.js"></script>
   <script src="./qqIdentityController.js"></script>
   <script src="./firstRunWizardController.js"></script>

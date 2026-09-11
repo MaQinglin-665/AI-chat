@@ -1,6 +1,303 @@
 {
   "features": [
     {
+      "id": "github-source-refresh-20260911",
+      "name": "Consolidated companion source update and GitHub presentation",
+      "status": "in_progress",
+      "scope": [
+        "Publish completed public workspace changes",
+        "Refresh README and repository metadata",
+        "Run full release checks; open review PR without merging main"
+      ],
+      "done_criteria": [
+        "Public branch pushed and verified",
+        "README and About refreshed",
+        "Full test gates recorded; private files excluded"
+      ]
+    },
+    {
+      "id": "galgame-live-acceptance",
+      "name": "Live Galgame model acceptance",
+      "status": "complete",
+      "scope": [
+        "Synthetic live persona/scene cases without private history",
+        "Correct issues demonstrated by live responses"
+      ],
+      "done_criteria": [
+        "Live results recorded with limitations",
+        "Any discovered regressions tested"
+      ]
+    },
+    {
+      "id": "galgame-character-context-v2",
+      "name": "Galgame request-local personalities and reliable per-sentence playback",
+      "status": "complete",
+      "scope": [
+        "Validated character context on real chat requests",
+        "Preserve sentence performance contract",
+        "Cancel stale playback on character change"
+      ],
+      "done_criteria": [
+        "Three distinct personas reach prompt construction without changing saved configuration",
+        "Sentence performance survives API normalization",
+        "Character switching cancels active speech and requests",
+        "Targeted regression tests pass"
+      ]
+    },
+    {
+      "id": "galgame-semantic-direction-v2",
+      "name": "Galgame semantic scene and sentence direction with incremental playback",
+      "status": "complete",
+      "dependencies": [
+        "galgame-character-context-v2"
+      ],
+      "scope": [
+        "Semantic scene transitions with manual override and time continuity",
+        "Model-driven allowlisted emotional and action decisions",
+        "Incremental model sentence delivery synchronized with speech",
+        "Integrate independently maintained character fade presentation"
+      ],
+      "done_criteria": [
+        "Mentioned, negated, hypothetical locations do not trigger travel",
+        "Validated sentence plans align with visible text and real assets",
+        "Playback starts before full model response and cancels stale work",
+        "Browser and regression verification"
+      ],
+      "limitations": [
+        "Live provider semantic quality and audible TTS not evaluated; browser used deterministic fixture",
+        "Tool-enabled and unsupported streaming-provider paths retain existing buffered fallback",
+        "GPT and Claude currently only neutral/happy/thinking poses",
+        "Existing unrelated full-suite failures recorded in progress.md"
+      ]
+    },
+    {
+      "id": "galgame-dialogue-v1",
+      "name": "Optional Galgame dialogue with emotion sprites",
+      "status": "complete",
+      "dependencies": [
+        "existing chat and TTS",
+        "approved six emotion sprites"
+      ],
+      "scope": [
+        "Optional scene mode",
+        "Typed chat",
+        "Manual sentence advance with immediate audio cancellation",
+        "Emotion sprite switching",
+        "Reuse current room art until new scenes are supplied"
+      ],
+      "done_criteria": [
+        "Existing desktop mode remains available",
+        "Each click cancels current speech and advances one sentence",
+        "Abort and exit cannot leak stale audio",
+        "Six sprites render over backgrounds",
+        "Focused tests and browser workflow verified"
+      ]
+    },
+    {
+      "id": "light-utility-selection-v1",
+      "name": "Light utility selection v1",
+      "description": "Unify the desktop, scene, and more launchers around a readable light-pink selected capsule instead of the former dark-on-dark state.",
+      "status": "complete",
+      "dependencies": [
+        "existing lower utility rail",
+        "scene and more aria-expanded state",
+        "pink-purple glass visual system"
+      ],
+      "scope": [
+        "Use the same light-pink capsule and dark-berry content for desktop hover or focus and for expanded scene or more launchers",
+        "Preserve a fully rounded capsule when earlier utility-divider styles are active",
+        "Add restrained lift and press feedback with precise-pointer and reduced-motion safeguards"
+      ],
+      "done_criteria": [
+        "Desktop hover or keyboard focus is light and readable",
+        "Scene and More remain light and readable while their panels are expanded",
+        "Focused stage-motion, JSON, secret, and whitespace checks pass"
+      ]
+    },
+    {
+      "id": "state-linked-stage-motion-v1",
+      "name": "State-linked stage feedback v1",
+      "description": "Keep the stage calm at rest while preserving real microphone volume bars, state borders, and direct interaction feedback, with a cuter unified cat mascot treatment.",
+      "status": "complete",
+      "dependencies": [
+        "existing presence state mapping",
+        "voice-first stage composer",
+        "pink-purple glass visual system"
+      ],
+      "scope": [
+        "Replace the angular layered cat-and-wave marks with rounder Phosphor cat compositions",
+        "Expose listening and speaking activity through compact animated bars",
+        "Remove continuous header and composer sweep or breathing light effects",
+        "Retain input-ready, focus, hover, and pressed feedback without blocking controls",
+        "Provide a complete reduced-motion fallback"
+      ],
+      "done_criteria": [
+        "The resting header and composer contain no continuous sweep or breathing light",
+        "Real listening and speaking states retain the compact animated volume bars",
+        "Typed input visibly promotes the send action",
+        "Focused motion contract, JSON, secret, and whitespace checks pass"
+      ]
+    },
+    {
+      "id": "long-term-memory-manager-v1",
+      "name": "Long-term memory manager v1",
+      "description": "Make curated long-term memory the default memory-management surface while retaining the existing review workflow as a secondary pending-organizing view.",
+      "status": "complete",
+      "dependencies": [
+        "core memory store",
+        "learning review drawer",
+        "Obsidian compatibility migration"
+      ],
+      "scope": [
+        "Default to a searchable and sortable long-term memory overview",
+        "Create, edit, pin, weight, and delete curated memories with immediate persistence",
+        "Keep candidate review available as Pending organizing and hide short-term/debug pools from ordinary navigation",
+        "Exclude legacy core-memory mirrors from knowledge retrieval to prevent stale duplicate recall"
+      ],
+      "done_criteria": [
+        "Opening Memory Management shows curated long-term memories first",
+        "Manual creation and edits are available through explicit forms rather than permanent textareas",
+        "The next relevant conversation reads the updated core-memory file and deleted legacy mirrors are not retrieved",
+        "Focused memory, knowledge, runtime frontend, syntax, JSON, and whitespace checks pass"
+      ]
+    },
+    {
+      "id": "control-center-readability-navigation-fix-v1",
+      "name": "Control-center readability and navigation fix v1",
+      "description": "Restore reliable page switching from the QQ identity surface and unify readable control states across the complete pink-purple control center.",
+      "status": "complete",
+      "dependencies": [
+        "unified control-center shell",
+        "existing page launch buttons",
+        "pink-purple glass visual system"
+      ],
+      "scope": [
+        "Close the active QQ surface before opening another control-center page",
+        "Keep labels, helper copy, inputs, placeholders, buttons, and disabled controls readable in day and night palettes",
+        "Replace legacy pale-blue checkbox rows and QQ identity chips with the unified berry palette",
+        "Retain keyboard focus and reduced-motion behavior"
+      ],
+      "done_criteria": [
+        "QQ identity participates in the same close-and-open navigation flow as every other page",
+        "The selected navigation page matches the visible content page",
+        "All control-center pages share high-contrast semantic color tokens",
+        "Focused control-center syntax and frontend tests pass"
+      ]
+    },
+    {
+      "id": "four-phase-time-scene-motion-v1",
+      "name": "Four-phase time scene and motion layer v1",
+      "description": "Evolve the existing pink-purple anime glass stage into automatic morning, day, dusk, and night scenes with a persistent manual override and richer ambient motion.",
+      "status": "complete",
+      "dependencies": [
+        "four same-room generated time-scene artworks",
+        "stage theme controller",
+        "desktop utility capsule"
+      ],
+      "scope": [
+        "Resolve four local-time phases at 05:00, 09:00, 17:00, and 20:00",
+        "Keep manual scene selection active until the user explicitly returns to Auto",
+        "Show only passive current-scene and time status in the header",
+        "Replace the lower onboarding launcher with a four-phase scene picker",
+        "Reuse existing room artwork through lighting, atmosphere, glass depth, and interaction motion"
+      ],
+      "done_criteria": [
+        "Old auto, day, and night preferences remain compatible",
+        "All four phases preserve one recognizable room composition with dedicated morning, day, dusk, and night renderings",
+        "Scene transitions and ambient effects respect reduced-motion preferences",
+        "Focused scene, stage, and button frontend tests pass",
+        "Morning, dusk, night, and the scene picker pass local visual QA"
+      ]
+    },
+    {
+      "id": "vtuber-continuous-speech-body-v1",
+      "name": "VTuber continuous speech body v1",
+      "description": "Give Hiyori a clearly visible, audio-responsive VTuber-style upper-body rhythm throughout speech without repeated one-shot gestures.",
+      "status": "complete",
+      "dependencies": [
+        "Hiyori performance director",
+        "real TTS audio energy",
+        "existing Live2D frame update"
+      ],
+      "scope": [
+        "Raise the bounded speech-presence floor for long clauses",
+        "Strengthen counter-moving head, torso, shoulder, and subtle arm cadence",
+        "Keep audio energy responsive smoothing and existing cancellation/release behavior"
+      ],
+      "done_criteria": [
+        "Speech retains visible shoulder presence between syllable peaks",
+        "Head and torso maintain distinct counter-moving ranges",
+        "Both arms receive subtle opposing cadence rather than repeated large gestures",
+        "Focused Hiyori and performance cue tests pass"
+      ]
+    },
+    {
+      "id": "dynamic-sad-speech-eyes-v1",
+      "name": "Dynamic sad speech eyes v1",
+      "description": "Keep sad speech expressive without holding Hiyori in a half-closed sleepy eye pose for the entire utterance.",
+      "status": "complete",
+      "dependencies": [
+        "Hiyori exp3 expressions",
+        "Live2D expression layer",
+        "Hiyori performance director"
+      ],
+      "scope": [
+        "Remove sustained eyelid closure ownership from the sad exp3 asset and director pose",
+        "Retain a small time-varying eye softness while preserving normal blink and gaze",
+        "Keep sadness readable through brows, mouth, cheek, head, and body posture"
+      ],
+      "done_criteria": [
+        "Sad exp3 does not directly own ParamEyeLOpen or ParamEyeROpen",
+        "Sad director pose does not impose a sustained closed-eye offset",
+        "Runtime sad eye softness varies over time and remains bounded",
+        "Focused performance cue and Hiyori director tests pass"
+      ]
+    },
+    {
+      "id": "tts-route-dispatch-integrity-v1",
+      "name": "TTS route dispatch integrity v1",
+      "description": "Prevent backend TTS route signature drift from silently forcing the renderer onto browser speech fallback.",
+      "status": "complete",
+      "dependencies": [
+        "app.py HTTP dispatcher",
+        "app_tts_route.py",
+        "Qwen3-TTS managed service"
+      ],
+      "scope": [
+        "Remove unrelated keyword arguments from buffered and streaming TTS route dispatch",
+        "Add a signature-conformance regression test for both TTS handlers",
+        "Verify both authenticated routes return real WAV audio after restart"
+      ],
+      "done_criteria": [
+        "POST /api/tts_stream returns audio/wav instead of raising TypeError",
+        "POST /api/tts returns audio/wav instead of raising TypeError",
+        "Dispatcher keyword arguments remain a subset of each route handler signature",
+        "Qwen health reports a loaded CUDA model and frontend config selects qwen3_tts"
+      ]
+    },
+    {
+      "id": "desktop-visible-log-launcher-v1",
+      "name": "Desktop visible-log launcher v1",
+      "description": "Start Electron, the Python backend, and managed Qwen3-TTS from one desktop shortcut while keeping a visible diagnostics window.",
+      "status": "complete",
+      "dependencies": [
+        "Electron managed backend lifecycle",
+        "Qwen3-TTS managed autostart",
+        "Windows PowerShell shortcut"
+      ],
+      "scope": [
+        "Add a repository-owned PowerShell launcher with configuration and runtime preflight",
+        "Create a desktop shortcut that leaves the PowerShell log window visible",
+        "Reuse already-running managed services instead of adding a competing startup path"
+      ],
+      "done_criteria": [
+        "The desktop shortcut targets the repository launcher",
+        "Launcher preflight verifies required project files, npm, and managed Qwen configuration",
+        "Electron remains the single owner of Python backend and Qwen service lifecycle",
+        "Failure output and Qwen log paths remain visible for diagnosis"
+      ]
+    },
+    {
       "id": "companion-event-bus-behavior-director-v1",
       "name": "Companion event bus and behavior director v1",
       "description": "Unify bounded companion runtime signals and produce explainable, non-executing behavior suggestions before any later scheduling changes.",
@@ -76,11 +373,23 @@
     {
       "id": "local-rvc-singing-entry-v1",
       "name": "Local RVC singing entry v1",
-      "description": "Offer an explicit local WAV-to-authorized-RVC-singer conversion entry without changing ordinary text TTS.",
-      "status": "complete",
-      "dependencies": ["authorized-singing-voice-rvc-trial-v1", "Electron local file picker"],
-      "scope": ["WAV-only local input", "private runtime paths", "external output directory", "no network upload"],
-      "done_criteria": ["Selected authorized singer converts an explicit WAV selection", "normal TTS remains unchanged", "public config remains disabled"]
+      "description": "Retired at the user's request. The desktop app no longer exposes local singing conversion, and ordinary text TTS remains unchanged.",
+      "status": "retired",
+      "dependencies": [
+        "authorized-singing-voice-rvc-trial-v1",
+        "Electron local file picker"
+      ],
+      "scope": [
+        "historical local prototype only",
+        "no desktop entry",
+        "no backend endpoint",
+        "no runtime configuration"
+      ],
+      "done_criteria": [
+        "Singing controls and routes are removed",
+        "normal TTS remains unchanged",
+        "external prototype files stay outside the repository"
+      ]
     },
     {
       "id": "local-desktop-agent-foundation-v1",
@@ -812,6 +1121,7 @@
         "Classify model tests, voice tests, debug reports, startup/runtime failures, and other technical notices as transient system messages while preserving ordinary conversation, proactive companion replies, and reminders",
         "Switch between control-center pages without exposing the stage for an intermediate frame",
         "Refine the More launcher, desktop switch semantics, light/night materials, and narrow-window layout",
+        "Keep the expanded More launcher label and icon readable, with an explicit collapse label, accessible state, and contained desktop toggles",
         "Preserve every existing form field, button, data binding, Live2D layer, and fallback path"
       ],
       "done_criteria": [
@@ -2192,7 +2502,10 @@
       "name": "Companion life growth and meaningful proactive presence v2",
       "description": "Build an inspectable slow-growth layer so proactive companionship is motivated by real shared context rather than a timer.",
       "status": "complete",
-      "dependencies": ["obsidian-autonomous-knowledge-v1", "existing proactive chat runtime"],
+      "dependencies": [
+        "obsidian-autonomous-knowledge-v1",
+        "existing proactive chat runtime"
+      ],
       "scope": [
         "Write sparse private local reflections and gradual interest signals",
         "Inject growth context without replacing the core character identity",
@@ -2240,7 +2553,11 @@
       "name": "Social and evolving self cognition v1",
       "description": "Let Xinyu gradually recognize people across accounts, understand relationships between them, and evolve her own self-understanding without fixed per-person profile forms.",
       "status": "complete",
-      "dependencies": ["obsidian-autonomous-knowledge-v1", "relationship-state-v1", "QQ identity bridge"],
+      "dependencies": [
+        "obsidian-autonomous-knowledge-v1",
+        "relationship-state-v1",
+        "QQ identity bridge"
+      ],
       "scope": [
         "Create evidence-weighted people, account, relationship, event and self nodes",
         "Keep uncertain identity links as hypotheses and merge accounts only with explicit evidence",
@@ -2278,6 +2595,80 @@
         "Qwen3-TTS failure does not start or select GPT-SoVITS",
         "Old configurations without the autostart switch retain their prior behavior",
         "Focused regressions and the full local verification gate pass"
+      ]
+    },
+    {
+      "id": "behavior-director-live2d-performance-bridge-v1",
+      "name": "Behavior director to Live2D performance bridge v1",
+      "description": "Apply a small allowlisted visual intent from actually consumed behavior decisions through the existing Live2D and split-window performance controllers.",
+      "status": "complete",
+      "dependencies": [
+        "companion-event-bus-behavior-director-v1",
+        "split-window-performance-phase-bridge-v1",
+        "hiyori continuous performance director"
+      ],
+      "scope": [
+        "Emit only fixed phase, emotion, gesture, intensity, and bounded hold_ms values from the behavior director",
+        "Apply consumed proactive decisions through existing semantic-action, expression, mode, and phase-broadcast APIs",
+        "Preserve actual user listening and reply/TTS semantic performance as higher-priority owners",
+        "Keep status queries read-only and retain default-disabled behavior-director compatibility"
+      ],
+      "done_criteria": [
+        "A valid trigger sequence is applied once per renderer process and stale sequences are ignored",
+        "Micro-reaction, proactive preparation, and post-TTS settling use only bounded non-speech presentation",
+        "Detached model windows receive one revisioned existing performance-phase update",
+        "Focused bridge regressions and the full local verification gate pass"
+      ]
+    },
+    {
+      "id": "human-grounded-proactive-continuity-v1",
+      "name": "Human-grounded proactive continuity v1",
+      "description": "Keep automatic companionship anchored to the latest human turn and prevent raw desktop change signals from becoming generic system-like speech.",
+      "status": "complete",
+      "dependencies": [
+        "continuous-conversation-awareness-v1",
+        "autonomous-desktop-awareness-v1",
+        "natural-voice-participation-v1"
+      ],
+      "scope": [
+        "Prioritize an unhandled latest user turn over ambient desktop or life triggers",
+        "Treat instruction-like conversational wording as human intent rather than parser input",
+        "Use raw desktop fingerprint changes only as private attention wakes",
+        "Allow silence unless an actual grounded desktop observation is worth sharing",
+        "Suppress generic desktop-status speech even when model control formatting is malformed"
+      ],
+      "done_criteria": [
+        "A newer unhandled user turn remains the next conversation anchor",
+        "Intentional silence or defer marks that turn handled without creating an assistant message",
+        "Desktop change never directly produces a generic screen-changed or permission-to-look line",
+        "Concrete user tasks retain existing tool and confirmation safety boundaries",
+        "Focused regressions pass and any unrelated full-gate blocker is recorded without expanding scope"
+      ]
+    },
+    {
+      "id": "unified-interaction-mind-v1",
+      "name": "Unified interaction mind v1",
+      "description": "Use one private cloud judgment loop to decide whether an active human interaction should continue, deepen, pause, close, interrupt briefly, or seek grounding through existing capabilities.",
+      "status": "complete",
+      "dependencies": [
+        "human-grounded-proactive-continuity-v1",
+        "natural-voice-participation-v1",
+        "autonomous-desktop-awareness-v1",
+        "existing tool confirmation boundaries"
+      ],
+      "scope": [
+        "Keep a bounded cloud mind pulse alive after every handled human turn while active companionship is enabled",
+        "Let semantic momentum and relationship timing decide whether the interaction remains open",
+        "Unify follow-up, afterthought, desktop attention, memory recall, research, waiting, and closure decisions",
+        "Allow only high-confidence grounded interruptions and learn explicit requests for less interruption",
+        "Persist only compact preference and decision conclusions, never hidden reasoning or raw screen data"
+      ],
+      "done_criteria": [
+        "A normal reply can lead to a model-owned follow-up without a fixed semantic timeout",
+        "Wait keeps the bounded interaction pulse alive and close ends it",
+        "Observation, recall, and research remain optional and retain existing safety confirmation boundaries",
+        "Explicit let-me-finish feedback raises the future interruption threshold",
+        "Malformed or low-confidence private decisions safely degrade to waiting"
       ]
     },
     {

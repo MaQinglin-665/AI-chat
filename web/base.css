@@ -6252,6 +6252,74 @@ body.view-chat #more-btn[aria-expanded="true"] {
   line-height: 1.45;
 }
 
+.memory-create-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.memory-create-form[hidden],
+.core-memory-editor {
+  display: none !important;
+}
+
+.memory-create-text textarea {
+  width: 100%;
+  min-height: 82px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid rgba(150, 169, 216, 0.3);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #263b68;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.memory-create-grid,
+.core-memory-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.memory-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.memory-create-actions .learning-select-all {
+  margin-right: auto;
+}
+
+.learning-item.is-editing .core-memory-editor {
+  display: grid !important;
+}
+
+.learning-item.is-editing .core-memory-readonly {
+  display: none !important;
+}
+
+.core-memory-edit-grid select,
+.core-memory-edit-grid input {
+  min-width: 0;
+  height: 36px;
+  padding: 0 9px;
+  border: 1px solid rgba(150, 169, 216, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #263b68;
+}
+
+@media (max-width: 760px) {
+  .memory-create-grid,
+  .core-memory-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .learning-item-actions button {
   height: 30px !important;
   border-radius: 999px !important;

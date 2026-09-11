@@ -76,6 +76,36 @@
       });
     }
 
+    const setCreateFormOpen = (open) => {
+      if (ui.memoryCreateForm) {
+        ui.memoryCreateForm.hidden = open !== true;
+      }
+      ui.memoryCreateToggleBtn?.setAttribute?.("aria-expanded", String(open === true));
+      if (open) {
+        ui.memoryCreateText?.focus?.();
+      }
+    };
+
+    if (ui.memoryCreateToggleBtn) {
+      ui.memoryCreateToggleBtn.addEventListener("click", () => {
+        setCreateFormOpen(ui.memoryCreateForm?.hidden === true);
+      });
+    }
+
+    if (ui.memoryCreateCancelBtn) {
+      ui.memoryCreateCancelBtn.addEventListener("click", () => {
+        ui.memoryCreateForm?.reset?.();
+        setCreateFormOpen(false);
+      });
+    }
+
+    if (ui.memoryCreateForm) {
+      ui.memoryCreateForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await guarded(() => call(deps.createCoreMemory), deps.onError, "新增长期记忆失败");
+      });
+    }
+
     for (const filterInput of [
       ui.learningFilterScore,
       ui.learningFilterConfidence,
@@ -90,9 +120,9 @@
     }
 
     if (ui.learningSortMode) {
-      ui.learningSortMode.value = String(state.sortMode || "score_desc");
+      ui.learningSortMode.value = String(state.sortMode || "updated_desc");
       ui.learningSortMode.addEventListener("change", () => {
-        state.sortMode = String(ui.learningSortMode?.value || "score_desc");
+        state.sortMode = String(ui.learningSortMode?.value || "updated_desc");
         call(deps.render);
       });
     }

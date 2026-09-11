@@ -100,6 +100,8 @@ body.view-full #pet-mode-btn::before,
 body.view-chat #pet-mode-btn::before { --ph-icon: var(--ph-cat); }
 body.view-full #help-btn::before,
 body.view-chat #help-btn::before { --ph-icon: var(--ph-book); }
+body.view-full #scene-btn::before,
+body.view-chat #scene-btn::before { --ph-icon: var(--ph-clock); }
 body.view-full #more-btn::before,
 body.view-chat #more-btn::before { --ph-icon: var(--ph-list); }
 
@@ -257,6 +259,20 @@ body.view-full #persona-btn::before,
 body.view-chat #persona-btn::before { --ph-icon: var(--ph-person); }
 body.view-full #config-switch-btn::before,
 body.view-chat #config-switch-btn::before { --ph-icon: var(--ph-waveform); }
+body.view-full #qq-identity-btn::before,
+body.view-chat #qq-identity-btn::before {
+  content: "🐧" !important;
+  display: grid !important;
+  place-items: center;
+  background: transparent !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+  color: initial !important;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif !important;
+  font-size: 19px !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+}
 body.view-full #learning-review-btn::before,
 body.view-chat #learning-review-btn::before { --ph-icon: var(--ph-memory); }
 body.view-full #doctor-btn::before,
@@ -281,6 +297,21 @@ body.view-chat #auto-chat-btn::before { --ph-icon: var(--ph-heart); }
   background: currentColor !important;
   -webkit-mask: var(--cc-local-icon) center / contain no-repeat !important;
   mask: var(--cc-local-icon) center / contain no-repeat !important;
+}
+
+.control-center-nav-item[data-glyph="penguin"] .control-center-nav-icon {
+  display: grid !important;
+  place-items: center;
+  background: transparent !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+}
+
+.control-center-nav-item[data-glyph="penguin"] .control-center-nav-icon::before {
+  content: "🐧";
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .control-center-advanced-toggle-icon {
@@ -1567,14 +1598,46 @@ body.view-full .advanced-actions-group > button::before {
 body.view-full .advanced-actions-group > button:hover:not(:disabled) {
   color: #fff8fb !important;
   border-color: rgba(247, 147, 190, 0.54) !important;
+  border-radius: 999px !important;
   background: rgba(239, 105, 164, 0.14) !important;
   transform: translateY(-1px);
 }
 
 body.view-full .advanced-actions-group > button:focus-visible {
   outline: 0 !important;
+  border-radius: 999px !important;
   border-color: rgba(255, 178, 211, 0.78) !important;
   box-shadow: 0 0 0 3px rgba(239, 105, 164, 0.16) !important;
+}
+
+body.view-full .advanced-actions-group > button:active:not(:disabled),
+body.view-full .utility-actions > button:active:not(:disabled) {
+  border-radius: 999px !important;
+  transform: translateY(0) scale(0.985) !important;
+}
+
+body.view-full .utility-actions > button:hover:not(:disabled),
+body.view-full .utility-actions > button:focus-visible {
+  border-radius: 999px !important;
+  background: rgba(239, 105, 164, 0.16) !important;
+}
+
+/* More launcher readability: an expanded drawer must remain clearly legible. */
+body.view-full #more-btn[aria-expanded="true"] {
+  color: #fff8fb !important;
+  border-color: rgba(255, 178, 211, 0.7) !important;
+  border-radius: 999px !important;
+  background: rgba(239, 105, 164, 0.28) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 238, 247, 0.22), 0 6px 16px rgba(61, 13, 40, 0.18) !important;
+}
+
+body.view-full #more-btn[aria-expanded="true"]::before {
+  color: #fff8fb !important;
+  opacity: 1 !important;
+}
+
+body.view-full #more-btn[aria-expanded="true"]:hover:not(:disabled) {
+  background: rgba(239, 105, 164, 0.38) !important;
 }
 
 body.view-full .advanced-actions-group > button:disabled {
@@ -1589,21 +1652,28 @@ body.view-full .advanced-actions-group > button:disabled {
 body.view-full .advanced-actions-group > button:disabled::before { opacity: 0.46 !important; }
 
 body.view-full .advanced-actions-group:nth-child(2) button {
-  padding-right: 54px !important;
+  padding-right: 70px !important;
 }
 
+/* Toggle switch containment: keep the track inset and render the thumb as a real circle. */
 body.view-full .advanced-actions-group:nth-child(2) button::after {
-  right: 14px !important;
-  width: 32px !important;
-  height: 18px !important;
-  background: rgba(238, 198, 215, 0.24) !important;
-  border-color: rgba(255, 220, 235, 0.12) !important;
-  box-shadow: inset 13px 0 0 2px rgba(255, 250, 252, 0.92) !important;
+  right: 16px !important;
+  width: 42px !important;
+  height: 22px !important;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 221, 235, 0.22) !important;
+  background:
+    radial-gradient(circle at 10px 50%, rgba(255, 249, 252, 0.96) 0 8px, transparent 8.6px),
+    rgba(112, 70, 96, 0.64) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 238, 247, 0.12), 0 2px 5px rgba(20, 4, 14, 0.16) !important;
 }
 
 body.view-full .advanced-actions-group:nth-child(2) button[aria-pressed="true"]::after {
-  background: #e96ca2 !important;
-  box-shadow: inset -13px 0 0 2px #fff !important;
+  border-color: rgba(255, 211, 230, 0.56) !important;
+  background:
+    radial-gradient(circle at calc(100% - 10px) 50%, #fff9fc 0 8px, transparent 8.6px),
+    linear-gradient(135deg, #f77fb4, #e45f9a) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 239, 247, 0.28), 0 2px 6px rgba(110, 20, 63, 0.22) !important;
 }
 
 body.view-full .advanced-actions-group:nth-child(2) button:disabled::after {

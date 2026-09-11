@@ -232,7 +232,7 @@
     }
 
     function isCompanionSpeechPrewarmEligible() {
-      return state.speakingEnabled !== false
+      return !window.TaffyGalgame?.isActive?.() && state.speakingEnabled !== false
         && state.companionTurnEnabled === true
         && state.modelDirectReply === true
         && String(state.ttsProvider || "").toLowerCase() === "gpt_sovits"
@@ -1889,8 +1889,8 @@
           }
           return onDeliveryId(deliveryId);
         },
-        preferStream: state.conversationMode.chatStreamEnabled !== false,
-        firstDeltaTimeoutMs: state.naturalConversation?.enabled === true
+        preferStream: state.conversationMode.chatStreamEnabled !== false || !!payload.galgame,
+        firstDeltaTimeoutMs: payload.galgame ? 45000 : state.naturalConversation?.enabled === true
           ? 30000
           : 12000,
         perfHooks,
@@ -1906,6 +1906,8 @@
         return false;
       }
       const isAuto = !!opts.auto;
+      // Manual page reading must not be displaced by an unsolicited turn.
+      if (isAuto && window.TaffyGalgame?.isActive?.()) return false;
       // The ASR turn manager owns this decision. Do not downgrade an explicitly
       // ordered continuation during a thinking-only phase or the tiny silence
       // between audio segments; both are valid parts of the prior delivery chain.
@@ -2095,7 +2097,7 @@
       let latencyHintTimer = 0;
       let streamSpeechSettlement = null;
       const streamSpeakSession = nextStreamSpeakSession();
-      const useStreamSpeak = shouldUseStreamSpeak() && !preservePriorSpeech;
+      const useStreamSpeak = shouldUseStreamSpeak() && !preservePriorSpeech && !window.TaffyGalgame?.isActive?.();
       // Qwen defaults to one finalized request so punctuation and adjacent
       // clauses share the same voice identity and emotional through-line.
       // The legacy low-latency sentence stream remains available only when
@@ -2152,7 +2154,7 @@
         return true;
       };
       if (
-        shouldPlayLatencyHint(isAuto, useStreamSpeak)
+        !window.TaffyGalgame?.isActive?.() && shouldPlayLatencyHint(isAuto, useStreamSpeak)
         && !(
           inputModality === "voice"
           && state.naturalConversation?.enabled === true
@@ -2204,6 +2206,7 @@
         });
       }, 520);
 
+      let galgameStream = null;
       try {
         throwIfChatTurnCancelled(turnId, chatAbortController);
         let imageDataUrl = imageDataUrlOverride;
@@ -2235,6 +2238,10 @@
           _perf_trace_id: chatPerfTraceId,
           _perf_client_send_ts_ms: chatPerfStartWallMs
         };
+        if (!isAuto && window.TaffyGalgame?.isActive?.()) {
+          const galgameContext = window.TaffyGalgame.getContext?.();
+          if (galgameContext) payload.galgame = galgameContext;
+        }
         const interruptionContext = isAuto ? null : takeInterruptedAssistantContext();
         const asrContext = isAuto ? null : normalizeAsrConversationContext(opts.asrContext || opts.asr_context);
         const conversationContext = {};
@@ -2301,9 +2308,19 @@
           assistantRow?.classList?.add?.("is-awaiting-speech");
         }
         state.activeAssistantMessageRow = assistantRow;
-        const streamed = await streamAssistantReply(payload, (delta) => {
+        const streamed = await streamAssistantReply(payload, (delta, directedSegment) => {
           if (isChatTurnCancelled(turnId, chatAbortController)) {
             return;
+          }
+          if (directedSegment && window.TaffyGalgame?.isActive?.()) {
+            if (!galgameStream) galgameStream = window.TaffyGalgame.beginStream?.({
+              signal: chatAbortController?.signal, stop: stopAllAudioPlayback,
+              speak: (part, options) => speak(part, {...options, mood: options.emotion,
+                talkStyle, sessionId: streamSpeakSession, perfTraceId: chatPerfTraceId})
+            });
+            if (galgameStream && !galgameStream.append(directedSegment)) {
+              throw new Error("逐句对话顺序异常，请重试");
+            }
           }
           if (!gotFirstDelta) {
             gotFirstDelta = true;
@@ -2459,6 +2476,10 @@
             };
           }
           if (!isAuto) {
+            state.conversationLastHandledUserAt = Math.max(
+              Number(state.conversationLastHandledUserAt || 0),
+              Number(userTimestamp || 0)
+            );
             queueConversationAwarenessAfterTurn({
               userText: userDisplayText,
               mode: naturalMode,
@@ -2535,6 +2556,21 @@
         });
         if (rememberAssistant) {
           rememberMessage("assistant", visibleReply, { timestamp: assistantTimestamp });
+        }
+        if (!isAuto) {
+          state.conversationLastHandledUserAt = Math.max(
+            Number(state.conversationLastHandledUserAt || 0),
+            Number(userTimestamp || 0)
+          );
+          queueConversationAwarenessAfterTurn({
+            userText: userDisplayText,
+            mode: "reply",
+            reaction: "",
+            mood: "",
+            talkStyle: state.talkStyle || "",
+            userTimestamp,
+            brainSnapshot: state.characterBrainSnapshot || null
+          });
         }
         state.conversationLastAssistantAt = assistantTimestamp;
         updateConversationFollowupState(visibleReply);
@@ -2690,7 +2726,28 @@
         } else {
           enqueueActionIntent("reply", { text: visibleReply, style: finalTalkStyle, mood, combo: true });
         }
-        if (useStreamSpeak && !waitForCompanionTurn) {
+        if (window.TaffyGalgame?.isActive?.()) {
+          const streamMatches = galgameStream?.finish(visibleReply);
+          const galgameDelivered = streamMatches ? await galgameStream.done : await window.TaffyGalgame.playReply(visibleReply, {
+            emotion: performanceCue?.emotion || mood,
+            performanceSegments: activeCompanionTurn?.performance_segments,
+            signal: chatAbortController?.signal,
+            stop: stopAllAudioPlayback,
+            speak: (part, options) => speak(part, {
+              ...options,
+              mood: options.emotion,
+              talkStyle: finalTalkStyle,
+              sessionId: streamSpeakSession,
+              perfTraceId: chatPerfTraceId
+            })
+          });
+          // Exit and a newer user turn abort this signal. Do not let the
+          // old async player callback continue its success path afterwards.
+          throwIfChatTurnCancelled(turnId, chatAbortController);
+          if (galgameDelivered !== false) {
+            state.conversationLastTtsFinishedAt = Date.now();
+          }
+        } else if (useStreamSpeak && !waitForCompanionTurn) {
           let streamSpeechPerformanceStarted = false;
           const startStreamSpeechPerformance = (event = {}) => {
             const eventPlaybackGeneration = Number(event.playbackGeneration || streamPlaybackGeneration);
@@ -3020,6 +3077,7 @@
         setStatus("待机");
         return true;
       } catch (err) {
+        galgameStream?.cancel();
         const interrupted = isChatTurnCancelled(turnId, chatAbortController, err);
         if (interrupted) {
           perfLog("chat", "interrupted", {
@@ -3149,13 +3207,6 @@
       }
       ui.chatInput.value = "";
       const text = rawText || "请帮我看看我发的附件。";
-      const singingSong = window.TaffySinging?.matchSong?.(text);
-      if (singingSong && !pending.length) {
-        appendMessage("user", text, { enableTranslation: false });
-        appendMessage("assistant", `好呀，我来唱《${singingSong.title}》。`, { enableTranslation: false });
-        await window.TaffySinging.performSong(singingSong.id, singingSong.title);
-        return;
-      }
       const consumed = await handleLocalCommand(text);
       if (consumed) {
         setStatus("待机");

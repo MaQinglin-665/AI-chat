@@ -5,6 +5,28 @@ from threading import RLock
 from time import time
 
 
+_INTENT_PHASES = frozenset({"idle", "listening", "thinking", "preparing", "speaking", "settling"})
+_INTENT_EMOTIONS = frozenset({"neutral", "happy", "playful", "sad", "anxious", "surprised", "serious", "thinking"})
+_INTENT_GESTURES = frozenset({"none", "nod", "think", "wave", "shake_head", "surprised"})
+_INTENT_INTENSITIES = frozenset({"low", "medium", "high"})
+
+
+def _performance_intent(phase, emotion="neutral", gesture="none", intensity="low", hold_ms=900):
+    """Create the only behavior-to-renderer contract; never accept runtime input."""
+    safe_phase = phase if phase in _INTENT_PHASES else "idle"
+    safe_emotion = emotion if emotion in _INTENT_EMOTIONS else "neutral"
+    safe_gesture = gesture if gesture in _INTENT_GESTURES else "none"
+    safe_intensity = intensity if intensity in _INTENT_INTENSITIES else "low"
+    safe_hold = max(200, min(5_000, int(hold_ms or 900)))
+    return {
+        "phase": safe_phase,
+        "emotion": safe_emotion,
+        "gesture": safe_gesture,
+        "intensity": safe_intensity,
+        "hold_ms": safe_hold,
+    }
+
+
 def _now_ms():
     return int(time() * 1000)
 
@@ -103,6 +125,9 @@ def decide(config, event_snapshot, *, life_material=None, now_ms=None):
                 "reason": "post_tts_settle",
                 "event_count": len(recent),
                 "trigger_sequence": _event_sequence(latest_tts),
+                "performance_intent": _performance_intent(
+                    "settling", hold_ms=settings["quiet_after_tts_ms"]
+                ),
             }
     latest_voice = _latest_event(recent, {"voice_turn"})
     latest_reply = _latest_event(recent, {"assistant_reply"})
@@ -115,6 +140,7 @@ def decide(config, event_snapshot, *, life_material=None, now_ms=None):
             "reason": "unanswered_voice_presence",
             "event_count": len(recent),
             "trigger_sequence": _event_sequence(latest_voice),
+            "performance_intent": _performance_intent("listening", "thinking", "nod", "low", 900),
         }
     material = life_material if isinstance(life_material, dict) else {}
     grounded_candidates = [
@@ -129,5 +155,6 @@ def decide(config, event_snapshot, *, life_material=None, now_ms=None):
             "event_count": len(recent),
             "trigger_sequence": _event_sequence(grounded_event),
             "material_reasons": list(material.get("reasons") or [])[:3],
+            "performance_intent": _performance_intent("preparing", "thinking", "think", "low", 1200),
         }
     return {"action": "stay_quiet", "reason": "no_grounded_impulse", "event_count": len(recent)}

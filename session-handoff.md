@@ -1,5 +1,64 @@
 # Session Handoff
 
+## Latest Session Update: Light Utility Selection v1 (2026-08-09)
+
+- The final `web/stageMotion.css` layer now owns the lower utility rail's selected feedback. Desktop hover/focus and expanded Scene/More use `#ffd3e5` with `#71334f`; do not restore the dark expanded-More treatment from `phosphorIcons.css`.
+- Scene and More continue to derive their persistent state from `aria-expanded="true"`. Desktop has no persistent panel state, so its corresponding feedback is hover, keyboard focus, and press.
+- Capsule rounding is intentionally forced in the final layer because an earlier sibling-divider rule sets utility buttons to square corners. Fine-pointer hover lifts by one pixel; reduced-motion removes the press transform.
+- Continue using the user's risk-scaled verification rule for small UI corrections; do not repeat `scripts\\test-local.ps1` by default.
+
+## Latest Session Update: State-Linked Stage Motion v1 (2026-08-08)
+
+- Latest visual direction supersedes the earlier idle-motion notes: continuous `.stage-state-aurora` and `.composer-state-flow` layers are removed. Do not restore idle sweep or rim-breathing effects unless requested again.
+- Keep actual audio feedback: `.stage-state-pulse` still animates only for listening/speaking, and the existing microphone meter remains unchanged.
+- The top and lower-left mascot marks now compose existing Phosphor cat, star-four, and heart assets. Do not revert them to the angular Tabler cat.
+- Day/dusk and night browser QA passed at the default desktop viewport. Both mascot marks are visible and readable; `.stage-state-aurora` and `.composer-state-flow` counts are zero, and the resting header/composer report no running animation.
+- Real Electron feedback exposed and corrected a header regression: never restore the removed `.hero-card > :not(...) { position: relative; }` rule. It overrides the absolute positioning of `.hero-svg-ears` and creates a large pink artifact at the left of the header.
+- The redundant `.hero-svg-ears` pair is now hidden in the final motion layer because it protruded into the native titlebar at the user's wide Electron size. The actual `.xinyu-stage-brand-mark` remains visible.
+- Idle motion is intentionally visible now: both `.stage-state-aurora::before` and `.composer-state-flow::before` travel continuously, while their `::after` layers breathe at the rim. Active presence states only change the rhythm.
+- Status: implementation, focused validation, and local browser QA are complete; restart Electron for subjective motion acceptance with the real backend states.
+- `web/stageMotion.css` is the final stage-only motion layer. It reads the existing `body[data-presence]` values and microphone/input states; do not add a parallel JavaScript animation state machine.
+- The header aurora and activity bars, plus the composer flow layer, are decorative and pointer-transparent. Real controls remain above them through explicit stacking.
+- State rhythm is deliberate: idle is slow and quiet, listening is fastest, thinking is slower, and speaking is soft. Error is static rather than repeatedly shaking.
+- The time chip animation must retain `translateX(-50%)` because the chip is centered with `left: 50%`.
+- Reduced-motion users keep color and border state changes while looping and interaction transforms stop.
+- Continue using risk-scaled checks for small UI work; do not rerun the full local gate unless the scope or risk changes.
+- Focused stage tests, JSON validation, the repository secret scan, scoped whitespace checks, and 1280×720 visual QA passed. The static preview's expected `/config.json` error was not treated as a runtime regression.
+- Post-feedback QA also passed at 1920×1080 and 700×900: the pink titlebar artifact is gone, there is no horizontal overflow, and both idle sweep transforms plus rim opacity values changed across two captured frames. Night listening showed the activity bars and active microphone correctly.
+
+## Latest Session Update: Control-Center Readability and Navigation Fix v1 (2026-08-07)
+
+- Status: implementation and focused verification complete; restart Electron and verify the real backend-connected control center visually.
+- Root cause of the stuck sidebar was in `controlCenterShell.closeSurface`: `#qq-identity-close-btn` was absent, leaving QQ content above the newly selected page. Keep QQ in the unified close selector and keep the order as close current surface, then click the target launcher.
+- `web/controlCenterPolish.css` loads last and is the authoritative readability layer for control-center content. It overrides legacy pale-blue checkbox rows and QQ chips without deleting their base styles.
+- Night tokens use bright neutral text over warm berry-charcoal surfaces; day tokens use dark berry text over soft pink-white surfaces. Disabled controls remain visibly disabled without lowering text contrast to illegibility.
+- Focused `test_control_center_frontend.js` and JavaScript syntax checks pass. `test_button_value_ui.js` currently has an unrelated pre-existing assertion mismatch for the memory-search placeholder copy; do not alter memory behavior as part of this control-center fix.
+- Full static browser interaction was limited because `/config.json` is unavailable under a plain local file server, so final subjective visual acceptance should be done after restarting the real Electron app.
+
+## Latest Session Update: Four-Phase Time Scene and Motion Layer v1 (2026-08-07)
+
+- Status: implementation and local visual QA complete; restart Electron for subjective acceptance in the real desktop stage.
+- Automatic scene boundaries are morning `05:00`, day `09:00`, dusk `17:00`, and night `20:00`. Manual selections persist until the user returns to Auto; do not restore the former next-day expiry behavior.
+- The header now only reports the current scene and local time. The lower utility capsule owns the `场景` launcher and four-phase picker; the former `上手` launcher is intentionally absent, but the internal onboarding modal remains available to existing code paths.
+- `web/sceneExperience.css` remains the final motion and atmosphere layer, while `night-room-v2.webp` is now the authoritative night illustration. It preserves the day room's composition so time changes feel like the same place rather than a different apartment.
+- Night keeps `data-stage-room="night"` for dark UI and native titlebar compatibility and now displays `night-room-v2.webp` directly. The old `night-room-v1.webp` is retained but no longer referenced; do not delete it without explicit approval.
+- The accepted night direction is a clear deep-blue starry exterior with cool window moonlight, restrained warm shelf lighting, and a bright Live2D character. Avoid reintroducing a heavy CSS color-grade over the generated artwork.
+- `morning-room-v1.webp` and `dusk-room-v1.webp` are also authoritative generated time-scene assets. Morning is pale blue/pink dawn; dusk is coral/lavender sunset with warm shelves. All four backgrounds share the same room geometry and central Live2D-safe area.
+- Scene switching now crossfades dedicated `.stage-room-background-morning`, `-day`, `-dusk`, and `-night` layers. Keep runtime tone/light overlays restrained so they do not flatten the painted source lighting.
+- Compatibility: storage remains `taffy.stage-room.v1`, and legacy `auto`, `day`, and `night` values remain valid. `data-stage-room` still resolves to day/night for older Electron/titlebar and palette consumers; new styling should key from `data-stage-scene`.
+- Verification is intentionally risk-scaled per user direction: focused Node frontend tests, JavaScript syntax checks, JSON validation, scoped diff checks, and the repository secret scan. Do not rerun the full local gate by default for this UI-only change.
+
+## Latest Session Update: More Launcher Readability Fix (2026-08-07)
+
+- Expanded More state now says `收起` and has an explicit accessible label. A dedicated high-contrast capsule rule prevents the dark-on-dark launcher text shown in the supplied night-stage screenshot.
+- The desktop toggle is a contained 42-by-22px track with a true circular thumb and a fixed right inset. Keep this rule in the final `phosphorIcons.css` visual layer so lower-level control-center styles cannot reintroduce the overlap.
+- Verification is intentionally risk-scaled: run `node tests/test_button_value_ui.js`, JSON validation, and `python scripts/check_secrets.py`; do not default to the full local gate for this small visual fix.
+
+## Latest Session Update: Singing Feature Retirement (2026-08-07)
+
+- User requested removal of all in-app singing functions. The more-menu controls, text-command interception, WAV picker IPC, loopback routes, and singing configuration were removed. Normal speech TTS is unchanged.
+- Do not delete the separate authorized source material, external RVC prototype, models, indexes, or local audition output without a new explicit request. They remain outside the repository and are no longer wired into the desktop pet.
+
 ## Latest Session Update: Autonomous Desktop Awareness and Control v1 (2026-08-01)
 
 - Status: implementation and full local validation complete; Electron restart and subjective desktop-use acceptance remain.
@@ -1334,6 +1393,15 @@ Current status: complete and Electron-smoke verified.
 - Regression coverage is in `tests/test_sticker_frontend.js` and `tests/test_stage_frontend.js`. `node scripts\run_node_tests.js` passes, and `scripts\test-local.ps1` passes with `563` Python tests, all Node frontend tests, Python syntax `125`, JavaScript syntax `163`, and secret scan `606`.
 - Preserve all `.bak` files and unrelated dirty work. Do not commit, push, or merge without an explicit later request.
 
+## Latest Session Update: Behavior Director to Live2D Performance Bridge v1 on 2026-08-03
+
+- 状态：候选基线；自动化验证已完成。真实 Electron 行为验收尚未进行，不能称为 personal stable 版本。
+- New `web/behaviorPerformanceBridge.js` is the only behavior-presentation adapter. It validates a fixed `performance_intent`, de-duplicates monotonic trigger sequences in memory, and calls existing Hiyori semantic mode/action, expression pulse, and split-window phase interfaces only.
+- Backend emits intents only for `micro_reaction/unanswered_voice_presence`, `prepare_proactive/grounded_life_material`, and `stay_quiet/post_tts_settle`; default-disabled and ordinary quiet decisions have no intent. The existing proactive poll applies the consumed decision; `/api/behavior/status` stays read-only.
+- Priority: real user listening and actual reply/TTS semantic performance preempt behavior intents; settling performs only an idle handoff. No arbitrary Live2D Core parameter, motion path, model path, WebSocket, dependency, database, or background thread was introduced.
+- Verification: `scripts\test-local.ps1` passed: `643` Python tests, all Node frontend tests, Python syntax `149`, JavaScript syntax `172`, and secret scan `643`.
+- 待真实 Electron 验收（不可写为已通过）：自然聆听且嘴巴闭合；一次未回复语音微反应；准备姿态；TTS 语义接管；结束后回 idle；轮询不重播；自动主动发言不自循环；分窗口不双播；模型未加载或通信失败不影响聊天与语音。
+
 ## Latest Session Update: Event Ordering and Consumption Fix on 2026-08-03
 
 - 状态：候选基线。
@@ -1497,3 +1565,100 @@ Current status: complete and Electron-smoke verified.
 - Verification: focused suites passed; full `scripts\test-local.ps1` passed with `620` Python tests, all Node frontend tests, Python syntax `142`, JavaScript syntax `168`, and secret scan `632`.
 - Next session: reload Electron, then test one multi-clause reply similar to the reported screenshot, playful/happy and serious/sad contrasts, silent punctuation gaps, and interruption mid-speech. If the mouth is too weak/strong, tune analyser normalization rather than reintroducing synthetic-only cadence. If the voice is still discontinuous, capture the exact generated WAV and request metadata before changing the stable identity prompt.
 - Preserve all unrelated dirty changes and every `.bak` file. Nothing was committed or pushed.
+
+## Latest Session Update: Desktop Visible-Log Launcher v1 on 2026-08-07
+
+- Status: complete. Desktop shortcut: `%USERPROFILE%\Desktop\馨语AI桌宠（日志启动）.lnk`.
+- The shortcut opens Windows PowerShell with `-NoExit` and runs `scripts\start-desktop-pet.ps1`; the window intentionally remains visible for startup and failure diagnostics.
+- The launcher validates required project files, `config.local.json` managed-Qwen settings, the repository npm runtime, and existing backend/Qwen health endpoints. It then invokes the existing `npm run start:electron` entry.
+- Electron remains authoritative for the Python backend and Qwen3-TTS lifecycle, including existing-service reuse and single-instance behavior. No separate permanent service or startup task was introduced.
+- Verification: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start-desktop-pet.ps1 -CheckOnly` passed; the `.lnk` properties were read back successfully.
+- Preserve all unrelated dirty changes and every `.bak` file. Nothing was committed or pushed.
+
+## Latest Session Update: TTS Route Dispatch Integrity v1 on 2026-08-07
+
+- Status: root cause fixed, Electron restarted, and real buffered/streaming Qwen requests verified.
+- Symptom: renderer used browser speech even though Qwen was healthy. Backend logs showed `handle_tts_request() got an unexpected keyword argument 'process_desktop_qq_command_func'` and `handle_tts_stream_request() got an unexpected keyword argument 'publish_event_func'`.
+- Fix: removed those unrelated dispatcher keywords from the two TTS calls in `app.py`. Added an AST/signature test in `tests/test_app_tts_route.py` to prevent future route-signature drift.
+- Runtime proof: sanitized frontend config reports `provider=qwen3_tts`, stream playback and reply continuity enabled; Qwen health reports loaded CUDA VoiceDesign; authenticated `/api/tts_stream` and `/api/tts` both returned HTTP 200 `audio/wav` with `RIFF` headers.
+- Electron was closed through `CloseMainWindow()` and relaunched through the desktop shortcut, so the active Python backend contains the fix.
+- Verification: route-focused tests `7 passed`; the full Python (`644`) and complete Node stages passed. After a documentation-only path correction, the targeted secret scan passed across `641` files together with JSON, Python compile, and scoped whitespace checks; the redundant repeat of the full suites was stopped by user preference.
+- Preserve unrelated dirty changes and every `.bak` file. Nothing was committed or pushed.
+
+## Latest Session Update: Dynamic Sad Speech Eyes v1 on 2026-08-07
+
+- Status: bounded visual fix and focused verification complete; native Electron observation remains.
+- Root cause: sad speech stacked eyelid-closing values from the exp3 asset, runtime mood expression, and Hiyori director. The combined offset held both eyes at the screenshot's half-closed shape for the whole utterance.
+- Fix: sad exp3 and director no longer own eyelid openness. Runtime sad eye softness is small and sinusoidally varied; dynamic blink/gaze remain active. Sadness still uses brows, mouth, cheek, head, shoulder, and body channels.
+- Verification: performance cue and continuous director frontend tests passed; JS syntax, expression JSON, and scoped whitespace checks passed. Full gate intentionally omitted for this small visual-only change by user preference.
+- Restart Electron before judging. Test the same sad multi-clause line and confirm the eyes remain mostly open, still blink, and do not lose the sad brow/posture read.
+- Preserve unrelated dirty changes and every `.bak` file. Nothing was committed or pushed.
+
+## Latest Session Update: VTuber Continuous Speech Body v1 on 2026-08-07
+
+- Status: implementation and focused verification complete; native Electron visual acceptance remains.
+- Direction: user chose continuous VTuber-like shoulder and upper-body rhythm rather than one or two larger gestures per reply.
+- Runtime: Hiyori speak mode now has a stronger bounded posture; `speechDrive` keeps a higher floor and scales with real audio/body energy. Head, torso, shoulder, body depth, and subtle opposing arms move on related but non-identical phases.
+- Safety/performance: uses the existing director sample inside the existing Live2D frame update. No additional animation loop, permanent timer, model asset, or dependency was added. Existing smoothing, cancellation, release, and one-shot cooldowns remain authoritative.
+- Verification: focused Hiyori director and performance cue frontend tests passed; added range checks prove continuous torso/head/arm/shoulder presence. JS syntax and scoped whitespace checks passed. Full gate intentionally omitted for this small visual tuning.
+- Restart Electron, then test one 10-15 second neutral reply and one energetic reply. Confirm continuous presence is obvious but not twitchy or stronger than facial/lip-sync communication.
+- Preserve unrelated dirty changes and every `.bak` file. Nothing was committed or pushed.
+
+## Latest Session Update: Human-Grounded Proactive Continuity v1 on 2026-08-07
+
+- Status: implementation and focused regressions complete. The full local gate passed `646` Python tests and all relevant Node suites, but remains globally blocked by an unrelated existing stylesheet-order assertion in `test_config_switch_frontend.js`; the rest of the Node suites and all syntax/secret/JSON/whitespace checks passed separately. Native Electron conversational acceptance remains.
+- The reported line, `Something shifted on your screen—want me to take a look, or are we good?`, came from a raw desktop fingerprint trigger combined with a hardcoded English, exactly-one-sentence automatic prompt. It was not grounded in an actual visual observation and could supersede the user's preceding conversational turn.
+- Automatic scheduling now gives an unhandled latest user message priority. A visible assistant reply, silence, micro-reaction, or defer marks it handled; failed or missing completion leaves it available for a bounded continuity repair.
+- Desktop changes now create only a private pending attention signal. The model may observe through the existing tools, remain silent, or mention something specific and grounded. Backend fail-closed parsing suppresses generic screen-change/status/permission-to-look output for `desktop_attention_wake` turns.
+- Direct and automatic dialogue prompts now read instruction-like messages as social/human intent while preserving concrete task execution and every existing tool confirmation boundary. Automatic prompt language follows the recent conversation rather than forcing English.
+- Manual acceptance still required after Electron reload: reproduce the Chinese prompt-like message, verify a natural reply; make a meaningless desktop change and verify silence; expose a concrete harmless error and judge any grounded observation; confirm intentional silence does not later repeat the same turn.
+- Preserve unrelated dirty changes, private configuration, and every `.bak` file. Do not commit or push without a new explicit request.
+
+## Latest Session Update: Galgame Dialogue v1 on 2026-09-05
+
+- Status: implementation and focused verification complete. Branch: `codex/galgame-dialogue-v1`. Do not reset or broadly stage the worktree: it contains substantial pre-existing dirty work.
+- User-facing behavior: enter via the new `Galgame` utility action, type freely, and click `▶` to stop the current voice immediately and show the next sentence. `语音：关` mutes only the active Galgame session. `返回舞台` cancels the active work and restores the normal desktop pet.
+- Assets: `web/assets/galgame/` contains six processed transparent portraits. They retain the approved source RGB and use locally produced alpha. Reuse `night-room-v2.webp` until the user asks to build the deferred preset scene library.
+- Reliability: `web/galgamePlayer.js` versions every run and sentence. `web/galgameController.js` guards exit, stale replies, IME, focus, keyboard navigation, mute and replacement. Chat integration suppresses normal whole-reply speech and auto-followups while this mode owns the turn.
+- Validation: the two dedicated Galgame Node tests passed, selected chat/TTS/runtime Node tests passed, an IAB fixture traversed all six expressions, and authenticated local Qwen3-TTS returned `200 audio/wav` for an emotion-bearing request. The full Node runner is still blocked by the old stylesheet-order assertion in `test_config_switch_frontend.js`; preserve that unrelated failure.
+- Before any later extension, decide whether to add a true model-produced per-sentence performance plan. Current `performance_segments` are a compatible deterministic plan with exact-text gating, not a claim of perfect semantic understanding. Do not commit or push without an explicit request.
+
+## Latest Session Update: Unified Interaction Mind v1 on 2026-08-07
+
+- Status: implementation and focused regressions complete. The full gate passed `652` Python tests and every relevant Node suite, then was globally blocked by an unrelated existing stylesheet-order assertion in `test_config_switch_frontend.js`; all later Node and static/security checks passed separately. Native Electron interaction acceptance remains.
+- `interaction_mind.py` owns the bounded private cloud decision contract and compact interruption preference. It persists only `interruption_aversion`, a reason label, and timestamp in the existing vault; no hidden chain-of-thought or source utterance is stored.
+- Active companionship now opens a cloud mind pulse after every handled human turn. The model owns semantic continuation and closure through `speak`, `ask_followup`, `interrupt`, `observe`, `recall`, `research`, `wait`, and `close`; local rules remain activity/cost/safety gates and candidate evidence.
+- `POST /api/interaction/mind` calls the configured provider directly with no tools and no reply finalizer, parses a strict bounded decision, and exposes no private prompt or raw model reasoning. Visible generation remains the normal character path.
+- Tool-seeking mind actions are optional proposals routed through existing tools and high-risk confirmations. Desktop change alone remains insufficient. Low confidence and malformed model output degrade to waiting.
+- A high-confidence interruption can use the live ASR partial as grounding. Explicit requests to let the user finish raise the stored threshold; ordinary conversation is never copied into this preference file.
+- Manual matrix: ordinary reply followed by relevant follow-up; naturally closed topic; model-selected wait then continuation; live speech that should and should not be interrupted; “让我说完”; useful versus useless desktop change; memory recall; web research; provider failure.
+- Preserve unrelated dirty changes, private configuration, and every `.bak` file. Do not commit or push without a new explicit request.
+
+## Latest Session Update: Long-Term Memory Manager v1 on 2026-08-07
+
+- Status: implementation and focused automated verification complete; native Electron layout acceptance remains.
+- Memory Management now opens on curated long-term memory rather than the audit candidate pool. It supports search, sorting, overview counts, manual creation, explicit edit mode, pinning, weighting, batch actions, and deletion.
+- Existing audit behavior remains available as `待整理` and `整理记录`. Short-term memory and Debug are still code-compatible but hidden from the normal memory-management navigation.
+- Core-memory create/edit/delete operations persist directly to the authoritative store and therefore affect the next relevant prompt. Manual creation reuses existing validation, locking, normalization, and atomic persistence; duplicate text is rejected.
+- Knowledge retrieval now ignores non-authoritative Obsidian notes marked `origin: legacy_core_memory`, preventing a deleted or edited core memory from resurfacing through an old migration mirror. No vault notes were removed.
+- Verification: focused Python memory and Obsidian suites passed (`53 passed`). The full gate passed all `648` Python tests and all Node suites except the unrelated pre-existing `test_config_switch_frontend.js` stylesheet-order assertion; all later Node suites passed separately. Python syntax (`147`), JavaScript syntax (`171`), secret scan (`644`), JSON, and scoped whitespace checks passed.
+- The installed Windows UI-control runtime could list the Electron window but could not attach with its documented API, so visually inspect the freshly loaded drawer: default `长期记忆`, create form, edit/cancel mode, `待整理` switch, and narrow-window layout.
+- Preserve unrelated dirty changes, private configuration, and every `.bak` file. Do not commit or push without a new explicit request.
+
+
+## 2026-09-06 Galgame logic continuation
+Completed `galgame-character-context-v2`; see latest progress entry for files and test evidence. Three personas now travel controller -> chat payload -> sanitized request config -> llm_runtime.build_reply_prompt. Per-sentence performance no longer disappears in chatApi; player respects canonical segment boundaries and preserves tails. Character changes cancel chat and voice and no longer crash on missing name ID. No modifications to other conversation's CSS/presentation files.
+Next: `galgame-semantic-direction-v2` backlog is still outstanding. Design validated model scene/action decisions with finite asset IDs and manual lock, then incremental per-sentence transport/player (current player still begins after full reply). Existing `performance_segments` uses deterministic companion_performance_director, NOT model semantic reasoning. Current GPT/Claude asset coverage limits expressiveness. Integrate TaffyGalgamePresentation transitionCharacter after implementing preload/cancel-safe commit; module is currently not included in main script manifest. Keep external style work intact. One natural dialogue prompt-budget regression remains 709 vs <700, reproduced with personality hook disabled. No live provider/browser verification this turn. No push.
+
+
+## Latest: 2026-09-06 semantic Galgame integration complete
+Supersedes preceding backlog note: model JSONL director, sentence SSE metadata, incremental player, automatic/fixed scenes and preload-safe black character transition are implemented. See latest progress for exact file list and verification. Core path: llm_runtime -> galgame_director.directed_stream -> app_chat_route delta.galgame -> chatApi onDelta(text, segment) -> chatReplyController beginStream/finish -> galgamePlayer. Do not replace model plan with keyword director. No edits to external CSS/presentation module.
+Next acceptance: run actual configured model and audible TTS through three personas, especially negation/comfort/hypothetical location and failures. Browser fixture confirms mechanics only. More GPT/Claude sprites remain an asset limitation, not something semantic logic can invent. Full regression known failures: prompt budget 709/<700, stylesheet ordering, local-ASR waveform markup. Preserve all unrelated dirty state and private .bak/config files. No push or deployment this session.
+
+
+## Latest: live Galgame acceptance 2026-09-06
+Ran real configured Terra on 5 synthetic scenarios; all post-fix schema and scene checks pass. Read docs/galgame-live-acceptance.md/json. Fixed Galgame output budget (ordinary 220 tokens too small for JSONL): direction_llm_config clones to 2048; first sentence timeout 45s; no hidden ordinary-chat retry after connected directed stream failure. New regression tests pass. Saved config untouched. Local TTS synthetic WAV valid (24kHz,3.36s) but not listened to. Further work should target full production UI/model/TTS listening and broaden GPT/Claude assets, not repeat this small isolated model test as proof of perfection. Prior full-suite unrelated failures remain. No commit/push.
+
+
+## 2026-09-11 publication checkout
+Prepared codex/desktop-companion-update-20260911 in D:/AI/galgame-publish-20260911 for user's expanded all-public-changes scope. Full gates pass (672 Python, Node all, website 4 browser tests, syntax and secrets). About/homepage/topics updated. README refreshed. Original checkout untouched. Pending push/PR; do not merge main automatically. See latest progress entry and docs/source-update-2026-09.md.

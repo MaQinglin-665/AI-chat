@@ -41,12 +41,46 @@ def test_voice_only_contract_does_not_change_typed_chat():
 
 
 def test_opted_in_auto_awareness_can_use_natural_participation_contract():
-    config = _config()
+    config = _config(enabled=False)
     config["_input_modality"] = "auto"
     config["_natural_participation"] = True
 
     assert is_natural_conversation_enabled(config) is True
     assert "[[TAFFY_SILENCE]]" in build_natural_conversation_prompt_block(config)
+
+
+def test_desktop_attention_wake_is_private_and_fail_closed_for_generic_status():
+    config = _config(enabled=False)
+    config.update(
+        {
+            "_input_modality": "auto",
+            "_natural_participation": True,
+            "_character_auto_kind": "desktop_attention_wake",
+        }
+    )
+
+    prompt = build_natural_conversation_prompt_block(config)
+    malformed = parse_natural_conversation_output(
+        "Something shifted on your screen—want me to take a look?",
+        config,
+    )
+    tagged_generic = parse_natural_conversation_output(
+        "[[TAFFY_REPLY:quick]] Your screen changed. Want me to look?",
+        config,
+    )
+    grounded = parse_natural_conversation_output(
+        "[[TAFFY_REPLY:quick]] 你的终端里出现了一条红色的 ModuleNotFoundError。",
+        config,
+    )
+
+    assert "private desktop-attention wake" in prompt
+    assert "not a user question" in prompt
+    assert malformed["mode"] == "silence"
+    assert malformed["reply_text"] == ""
+    assert tagged_generic["mode"] == "silence"
+    assert tagged_generic["reply_text"] == ""
+    assert grounded["mode"] == "reply"
+    assert "ModuleNotFoundError" in grounded["reply_text"]
 
 
 def test_reply_control_is_stripped_and_depth_selects_delay():

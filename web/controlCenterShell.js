@@ -5,7 +5,7 @@
     { key: "schedule", label: "日程", targetId: "schedule-btn", glyph: "calendar" },
     { key: "persona", label: "人设卡", targetId: "persona-btn", glyph: "person" },
     { key: "config", label: "模型 / 语音", targetId: "config-switch-btn", glyph: "voice" },
-    { key: "qq", label: "QQ 身份", targetId: "qq-identity-btn", glyph: "message" },
+    { key: "qq", label: "QQ 身份", targetId: "qq-identity-btn", glyph: "penguin" },
     { key: "memory", label: "记忆管理", targetId: "learning-review-btn", glyph: "memory" },
     { key: "doctor", label: "故障自检", targetId: "doctor-btn", glyph: "shield" }
   ]);
@@ -166,7 +166,7 @@
 
   function closeSurface(surface) {
     const closeButton = surface?.querySelector?.(
-      "#schedule-close-btn, #persona-close-btn, #config-switch-close-btn, #learning-review-close-btn, #doctor-close-btn"
+      "#schedule-close-btn, #persona-close-btn, #config-switch-close-btn, #qq-identity-close-btn, #learning-review-close-btn, #doctor-close-btn"
     );
     closeButton?.click?.();
   }
@@ -199,8 +199,8 @@
         const targetButton = documentObject.getElementById(page.targetId);
         if (!targetButton) return;
         beginPageSwitch(documentObject, page.key);
-        targetButton.click();
         closeSurface(surface);
+        targetButton.click();
         finishPageSwitch(documentObject);
       });
       pageList.appendChild(button);
@@ -294,6 +294,7 @@
     PROGRESSIVE_PAGES,
     SURFACE_CONTAINER_SELECTORS,
     hasVisibleSurface,
+    closeSurface,
     enhanceControlCenter
   };
   root.TaffyControlCenterShell = api;

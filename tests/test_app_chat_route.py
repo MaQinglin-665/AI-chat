@@ -27,6 +27,24 @@ def test_auto_awareness_opt_in_stays_private_to_resolved_chat_config():
     assert resolved["_natural_participation"] is True
 
 
+def test_auto_kind_is_kept_only_in_private_resolved_chat_config():
+    resolved = _build_chat_config(
+        {
+            "auto": True,
+            "auto_kind": "desktop_attention_wake",
+        },
+        {},
+        "private desktop wake",
+        sanitize_input_modality_func=lambda _value, is_auto=False: "auto" if is_auto else "text",
+        clean_experience_text_func=lambda value, limit: str(value or "")[:limit],
+        sanitize_character_experience_profile_func=lambda _value: None,
+        sanitize_auto_thought_burst_func=lambda _value: None,
+        sanitize_conversation_context_func=lambda _value, _message: None,
+    )
+
+    assert resolved["_character_auto_kind"] == "desktop_attention_wake"
+
+
 class RouteRecorder:
     def __init__(self):
         self.json = []

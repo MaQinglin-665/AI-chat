@@ -865,7 +865,7 @@ assert.ok(
   indexSource.includes('id="stage-voice-feedback"')
     && indexSource.includes('id="stage-voice-meter-fill"')
     && indexSource.includes('id="stage-voice-level-value"')
-    && (indexSource.match(/<i><\/i>/g) || []).length === 7
+    && ((indexSource.match(/id="stage-voice-meter-fill"[^>]*>([\s\S]*?)<\/span>/)?.[1] || "").match(/<i><\/i>/g) || []).length === 7
     && stageSource.includes("body.view-full .stage-voice-feedback")
     && localAsrSource.includes('ui.stageVoiceMeterFill.querySelectorAll?.("i")'),
   "the main stage composer must expose independent visible voice status and live level feedback"

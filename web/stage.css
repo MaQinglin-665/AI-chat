@@ -112,8 +112,16 @@ body.desktop-mode.view-full[data-stage-room="day"] .app-titlebar-mark {
   background-image: url("./assets/stage-rooms/day-room-v1.webp");
 }
 
+.stage-room-background-morning {
+  background-image: url("./assets/stage-rooms/morning-room-v1.webp");
+}
+
+.stage-room-background-dusk {
+  background-image: url("./assets/stage-rooms/dusk-room-v1.webp");
+}
+
 .stage-room-background-night {
-  background-image: url("./assets/stage-rooms/night-room-v1.webp");
+  background-image: url("./assets/stage-rooms/night-room-v2.webp");
 }
 
 body[data-stage-room="day"] .stage-room-background-day,

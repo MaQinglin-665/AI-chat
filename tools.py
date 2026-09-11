@@ -808,6 +808,12 @@ def tool_observe_screen(args, settings, config, llm_cfg):
     observe_cfg = config.get("observe", {}) if isinstance(config, dict) else {}
     if not isinstance(observe_cfg, dict) or observe_cfg.get("autonomous_enabled") is not True:
         raise RuntimeError("Autonomous desktop observation is disabled.")
+    # Inspect local foreground metadata first. Never capture or transmit an
+    # image while a password, payment, banking, wallet, or private-browsing
+    # window is active.
+    foreground_context = desktop_agent.get_desktop_context()
+    if desktop_agent.is_sensitive_foreground_context(foreground_context, config):
+        raise RuntimeError("Desktop observation is paused while a sensitive window is active.")
     capture = desktop_agent.capture_cursor_screen(
         max_width=observe_cfg.get("capture_max_width", 1280),
         max_height=observe_cfg.get("capture_max_height", 800),

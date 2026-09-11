@@ -90,8 +90,35 @@
       mode: String(rawTurn.mode || "reply"),
       input_modality: String(rawTurn.input_modality || "text"),
       performance,
+      ...(Array.isArray(rawTurn.performance_segments) ? {
+        performance_segments_version: 1,
+        performance_segments: normalizePerformanceSegments(rawTurn.performance_segments, canonicalReply)
+      } : {}),
       source: String(rawTurn.source || "")
     };
+  }
+
+  function normalizePerformanceSegments(rawSegments, reply) {
+    if (!Array.isArray(rawSegments)) return [];
+    const chars = Array.from(reply); // Server offsets count Unicode code points.
+    const result = [];
+    let previousEnd = 0;
+    for (const raw of rawSegments.slice(0, 24)) {
+      if (!raw || !Number.isInteger(raw.start) || !Number.isInteger(raw.end)
+        || raw.start < previousEnd || raw.end <= raw.start || raw.end > chars.length
+        || typeof raw.text !== "string" || chars.slice(raw.start, raw.end).join("") !== raw.text) return [];
+      const p = raw.performance;
+      result.push({ index: result.length, start: raw.start, end: raw.end, text: raw.text,
+        performance: p && typeof p === "object" && !Array.isArray(p) ? {
+          emotion: typeof p.emotion === "string" ? p.emotion : "neutral",
+          action: typeof p.action === "string" ? p.action : "none",
+          ...(typeof p.sprite === "string" ? {sprite: p.sprite} : {}),
+          intensity: typeof p.intensity === "string" ? p.intensity : "low",
+          voice_style: typeof p.voice_style === "string" ? p.voice_style : "neutral"
+        } : null });
+      previousEnd = raw.end;
+    }
+    return result;
   }
 
   function normalizeDeliveryId(value) {
@@ -446,7 +473,11 @@
           }
         }
         fullText += evt.text;
-        onDelta(evt.text);
+        const segment = evt.galgame;
+        const directed = segment && typeof segment === "object" && segment.text === evt.text
+          && Number.isInteger(segment.index) && segment.index >= 0 && segment.index < 24
+          ? segment : null;
+        onDelta(evt.text, directed);
       }
       if (evt.type === "done" && typeof evt.reply === "string" && evt.reply.trim()) {
         doneReply = evt.reply;
@@ -717,6 +748,11 @@
         throw err || makeAbortError();
       }
       if (!err || err.seenFirstDelta !== true) {
+        if (payload?.galgame?.enabled === true) {
+          // A slow sentence may still be generating server-side. Do not issue a
+          // second model request and silently lose its scene/performance contract.
+          throw new Error("本次逐句对话等待过久或连接中断，请重新发送消息。");
+        }
         perfLog("chat", "stream_fallback", {
           reason: "stream_read_error_before_delta",
           error: String(err?.message || err || "")

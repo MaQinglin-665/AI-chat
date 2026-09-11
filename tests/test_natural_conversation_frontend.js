@@ -126,6 +126,7 @@ const chatReplyController = require("../web/chatReplyController.js");
   assert.strictEqual(ok, true);
   assert.strictEqual(assistantRow.removed, true);
   assert.strictEqual(remembered.some((item) => item.role === "assistant"), false);
+  assert.ok(state.conversationLastHandledUserAt > 0);
   assert.strictEqual(state.naturalConversationAmbient.mode, "micro_reaction");
   assert.ok(debug.some((item) => item.event === "natural_conversation_no_reply"));
 })().then(() => {

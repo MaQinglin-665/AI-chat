@@ -1,11 +1,35 @@
 from http import HTTPStatus
 
+import ast
+import inspect
+from pathlib import Path
+
 from app_tts_route import (
     extract_tts_request,
     estimate_wav_duration_ms,
     handle_tts_request,
     handle_tts_stream_request,
 )
+
+
+def test_app_tts_dispatch_keywords_match_route_signatures():
+    app_source = Path(__file__).resolve().parents[1] / "app.py"
+    tree = ast.parse(app_source.read_text(encoding="utf-8"))
+    route_functions = {
+        "handle_tts_request": handle_tts_request,
+        "handle_tts_stream_request": handle_tts_stream_request,
+    }
+    calls = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            continue
+        if node.func.id in route_functions:
+            calls[node.func.id] = {item.arg for item in node.keywords if item.arg}
+
+    assert calls.keys() == route_functions.keys()
+    for name, route_func in route_functions.items():
+        accepted = set(inspect.signature(route_func).parameters)
+        assert calls[name] <= accepted, f"{name} received unsupported keywords: {calls[name] - accepted}"
 
 
 def _tiny_wav_bytes():

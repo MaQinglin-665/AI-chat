@@ -92,3 +92,9 @@ dist/
 
 # Editor files
 .editorconfig
+
+# Private runtime backups and local visual experiments
+*.bak
+tests/artifacts/
+web/assets/galgame-characters/**/*-test.png
+web/assets/galgame-characters/**/*-preview.png

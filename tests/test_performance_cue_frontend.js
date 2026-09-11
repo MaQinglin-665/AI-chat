@@ -68,6 +68,11 @@ assert.strictEqual(typeof hiyoriEmotionOverlayController.createController, "func
     return typeof param?.Value === "number" ? param.Value : 0;
   };
   const expressionAbsSum = (name, ids) => ids.reduce((sum, id) => sum + Math.abs(expressionParam(name, id)), 0);
+  assert.strictEqual(
+    expressionByName.sad.Parameters.some((item) => item.Id === "ParamEyeLOpen" || item.Id === "ParamEyeROpen"),
+    false,
+    "sad exp3 should leave eyelid openness to dynamic gaze and blink control during speech"
+  );
   assert.ok(
     expressionParam("angry", "ParamBrowLY") <= -1.35 && expressionParam("angry", "ParamBrowRY") <= -1.35,
     "angry exp3 should use a happy-level obvious lowered-brow pose"

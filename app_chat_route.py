@@ -2,6 +2,7 @@ from http import HTTPStatus
 import time
 
 from companion_turn_contract import is_model_direct_reply_enabled
+from galgame_context import sanitize_galgame_context
 from natural_conversation import (
     is_natural_conversation_enabled,
     parse_natural_conversation_output,
@@ -98,6 +99,13 @@ def _build_chat_config(
         is_auto=is_auto,
     )
     resolved = dict(chat_config or {})
+    resolved.pop("_galgame_context", None)
+    resolved.pop("_galgame_stream_segments", None)
+    galgame_context = sanitize_galgame_context(body.get("galgame"))
+    if galgame_context and not is_auto:
+        resolved["_galgame_context"] = galgame_context
+        natural = resolved.get("natural_conversation")
+        resolved["natural_conversation"] = {**(natural if isinstance(natural, dict) else {}), "enabled": False}
     resolved["_input_modality"] = input_modality
     resolved["_natural_participation"] = bool(
         is_auto and isinstance(body, dict) and body.get("natural_participation") is True
@@ -107,6 +115,8 @@ def _build_chat_config(
     )
 
     auto_kind = clean_experience_text_func(body.get("auto_kind"), 40).lower()
+    if is_auto and auto_kind:
+        resolved["_character_auto_kind"] = auto_kind
     character_experience_profile = sanitize_character_experience_profile_func(
         body.get("character_experience_profile")
     )
@@ -115,7 +125,6 @@ def _build_chat_config(
         resolved["_character_experience_profile"] = character_experience_profile
     if is_auto and auto_kind == "thought_burst":
         resolved = dict(resolved or {})
-        resolved["_character_auto_kind"] = "thought_burst"
         resolved["_character_auto_thought_burst"] = sanitize_auto_thought_burst_func(
             body.get("auto_thought_burst")
         )
@@ -304,8 +313,12 @@ def _handle_chat_stream_request(
             if first_delta_ms < 0:
                 first_delta_ms = perf_now_ms_func() - llm_started_ms
             if not natural_buffering:
-                send_sse_func({"type": "delta", "text": chunk})
-        model_direct_reply = is_model_direct_reply_enabled(chat_config)
+                event = {"type": "delta", "text": chunk}
+                directed = chat_config.get("_galgame_stream_segments")
+                if directed and directed[-1]["text"] == chunk:
+                    event["galgame"] = directed[-1]
+                send_sse_func(event)
+        model_direct_reply = is_model_direct_reply_enabled(chat_config) or bool(chat_config.get("_galgame_stream_segments"))
         raw_stream_reply = "".join(full_parts)
         if natural_buffering:
             natural_decision = parse_natural_conversation_output(
@@ -381,6 +394,18 @@ def _handle_chat_stream_request(
             character_brain=brain_payload,
         )
         if companion_turn is not None:
+            directed = chat_config.get("_galgame_stream_segments")
+            if directed and "".join(item["text"] for item in directed) == final_reply:
+                offset = 0
+                segments = []
+                for item in directed:
+                    end = offset + len(item["text"])
+                    segments.append({**item, "start": offset, "end": end})
+                    offset = end
+                companion_turn["performance_segments"] = segments
+                companion_turn["performance_segments_version"] = 1
+                companion_turn["performance"] = directed[0]["performance"]
+                companion_turn["source"] = "galgame_model"
             done_payload["turn"] = companion_turn
         delivery_id = ""
         if str(final_reply or "").strip():

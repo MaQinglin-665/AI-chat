@@ -11,6 +11,7 @@ const indexSource = read("web", "index.html");
 const stageCss = read("web", "stage.css");
 const kawaiiCss = read("web", "kawaiiTheme.css");
 const phosphorCss = read("web", "phosphorIcons.css");
+const sceneExperienceCss = read("web", "sceneExperience.css");
 const displayFontCss = read("web", "xinyuDisplayFont.css");
 const electronSource = read("electron", "main.js");
 const startupSource = read("web", "appStartupController.js");
@@ -23,6 +24,7 @@ const chatReplySource = read("web", "chatReplyController.js");
 assert.ok(indexSource.includes('href="./stage.css"'), "stage stylesheet should load after the legacy component styles");
 assert.ok(indexSource.includes('href="./kawaiiTheme.css"'), "the anime livestream visual layer should load after the structural styles");
 assert.ok(indexSource.includes('href="./phosphorIcons.css"'), "the reusable rounded icon layer should load last");
+assert.ok(indexSource.includes('href="./sceneExperience.css"'), "the four-phase scene experience should load as the final visual layer");
 assert.ok(indexSource.includes('href="./xinyuDisplayFont.css"'), "the offline display font should be available");
 assert.ok(indexSource.includes('class="kawaii-stage-decor"'), "the stage should expose restrained decorative motifs");
 assert.ok(indexSource.includes('class="xinyu-stage-brand-mark"'), "the stage brand should use real reusable SVG assets");
@@ -35,6 +37,10 @@ assert.ok(indexSource.includes('src="./assets/icons/tabler/cat.svg"'), "cat mark
 assert.ok(indexSource.includes('src="./assets/icons/phosphor/heart-straight.svg"'), "decorative hearts should use an SVG asset instead of a font glyph");
 assert.ok(indexSource.includes('class="conversation-identity"'), "the conversation identity should be code-native copy with SVG cat and paw marks");
 assert.ok(indexSource.includes('class="stage-scene"'), "the companion stage should have a non-interactive scene layer");
+assert.ok(indexSource.includes('id="stage-time-status"'), "the header should expose the current scene and local time as passive status");
+assert.ok(indexSource.includes('id="scene-btn"'), "the lower utility capsule should expose the scene picker");
+assert.ok(!indexSource.includes('id="help-btn"'), "the former onboarding launcher should not compete with the scene picker");
+assert.ok(indexSource.includes('id="stage-scene-menu"'), "the four-phase scene picker should be present in the stage markup");
 assert.ok(indexSource.includes('id="pet-presence-mode"'), "the desktop pet should expose its current presence state");
 assert.ok(indexSource.includes('id="pet-mode-btn"'), "the stage should offer an explicit transition back to desktop-pet mode");
 assert.ok(indexSource.includes('class="row controls stage-composer"'), "the stage should expose one voice-first composer");
@@ -129,6 +135,12 @@ assert.ok(
 assert.ok(phosphorCss.includes("overscroll-behavior: contain"), "each history lane should contain wheel scrolling independently");
 assert.ok(phosphorCss.includes('body.view-full .message .message-time'), "every stage message type should share the visible top-right time treatment");
 assert.ok(fs.existsSync(path.join(root, "web", "assets", "icons", "phosphor", "LICENSE.txt")), "the icon license should be bundled with the assets");
+
+assert.ok(sceneExperienceCss.includes('body[data-stage-scene="morning"]'), "morning should have a dedicated lighting treatment");
+assert.ok(sceneExperienceCss.includes('body[data-stage-scene="dusk"]'), "dusk should have a dedicated lighting treatment");
+assert.ok(sceneExperienceCss.includes(".stage-scene-menu"), "the final visual layer should style the scene picker as a glass panel");
+assert.ok(sceneExperienceCss.includes("@keyframes scene-motes-drift"), "the environment should expose ambient scene movement");
+assert.ok(sceneExperienceCss.includes("@media (prefers-reduced-motion: reduce)"), "the richer scene motion should retain a reduced-motion fallback");
 
 assert.ok(stageCss.includes("body.view-full .panel"), "full view should use the stage shell");
 assert.ok(stageCss.includes("align-self: flex-start !important"), "user turns should remain independent left-side cards");

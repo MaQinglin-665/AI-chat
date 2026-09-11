@@ -416,6 +416,12 @@ def search_knowledge(config: dict | None, query: str, *, limit: int | None = Non
     scored = []
     for item in items:
         meta = item.get("meta") if isinstance(item.get("meta"), dict) else {}
+        # These notes are compatibility mirrors of memory_core.json.  The core
+        # memory pipeline already injects the authoritative record, so searching
+        # the mirror would duplicate it and could resurrect stale text after a
+        # user edits or deletes the record in Memory Management.
+        if str(meta.get("origin", "")).strip().lower() == "legacy_core_memory":
+            continue
         if str(meta.get("status", "active")) in {"archived", "deleted", "rejected"}:
             continue
         if str(meta.get("superseded_by", "")).strip():

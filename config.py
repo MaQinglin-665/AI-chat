@@ -247,22 +247,10 @@ DEFAULT_CONFIG = {
         "qwen3_tts_reply_continuity": True,
         "qwen3_tts_speed": 1.0,
     },
-    # Experimental local singing conversion.  It is off by default and its
-    # machine-specific RVC paths belong only in config.local.json.
-    "singing": {
-        "enabled": False,
-        "runtime_root": "",
-        "python_executable": "",
-        "model_path": "",
-        "index_path": "",
-        "working_dir": "",
-        "output_dir": "",
-        "f0_method": "pm",
-        "index_rate": 0.75,
-        "max_source_bytes": 104857600,
-    },
     "assistant_prompt": (
-        "你是桌宠 馨语AI桌宠，一个灵动、有主见、会自己想事情的 AI 陪伴角色。可以偶尔跳出当前话题，分享有意义的观察、想法或小见闻，"
+        "你是桌宠 馨语AI桌宠，是用户熟悉、自然、有点调皮但不黏人的 AI 陪伴角色。默认像熟人闲聊一样说短句，先说结论或眼下最有用的一步；"
+        "工作和技术问题也保持这种口吻，只补足准确性真正需要的信息。不要复述用户的问题，不用礼貌确认开场，不例行总结、揽活或用问句收尾。"
+        "可以偶尔跳出当前话题，分享有意义的观察、想法或小见闻，"
         "但每个意外角度都要有可理解的来处、含义或可继续聊的价值；不要为了显得古怪而凭空堆抽象句子。可以抬杠和轻微毒舌，但要贴合当下。"
         "关心用户时偏嘴硬和具体行动，不刻意煽情；回复长短跟着内容走，不套固定句数、笑话或结尾。"
         "不要冒充人类或编造感知、记忆、隐私访问和未开放能力；相关边界出现时坦诚说明，不必例行免责声明。"
@@ -390,6 +378,7 @@ DEFAULT_CONFIG = {
         "attach_mode": "manual",
         "autonomous_enabled": False,
         "vision_model": "",
+        "sensitive_app_patterns": [],
         "capture_max_width": 1280,
         "capture_max_height": 800,
         "context_ttl_sec": 1800,
@@ -452,6 +441,13 @@ DEFAULT_CONFIG = {
         "enabled": False,
         "event_window_ms": 300000,
         "quiet_after_tts_ms": 8000,
+    },
+    "interaction_mind": {
+        "enabled": False,
+        "min_confidence": 0.58,
+        "interrupt_confidence": 0.82,
+        "pulse_min_ms": 6000,
+        "pulse_max_ms": 16000,
     },
     "motion": {
         "enabled": True,
@@ -1277,6 +1273,11 @@ def sanitize_client_config(config):
             "attach_mode": observe_attach_mode,
             "autonomous_enabled": bool(observe_cfg.get("autonomous_enabled", False)),
             "vision_model": str(observe_cfg.get("vision_model", "") or "").strip()[:120],
+            "sensitive_app_patterns": [
+                str(item or "").strip()[:120]
+                for item in (observe_cfg.get("sensitive_app_patterns") or [])[:32]
+                if str(item or "").strip()
+            ] if isinstance(observe_cfg.get("sensitive_app_patterns"), list) else [],
             "capture_max_width": max(
                 640, min(1920, _safe_int(observe_cfg.get("capture_max_width", 1280), 1280))
             ),

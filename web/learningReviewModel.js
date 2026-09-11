@@ -266,7 +266,7 @@
       return `${pool}\u5f53\u524d\u663e\u793a ${Math.max(0, Number(visibleCount) || 0)} \u6761\u3002\u8fd9\u91cc\u4fdd\u5b58\u5f53\u524d\u4f1a\u8bdd\u7684\u8bdd\u9898\u3001\u4efb\u52a1\u548c\u672a\u5b8c\u6210\u4e8b\u9879\uff0c\u4f1a\u968f\u8f6e\u6b21\u81ea\u7136\u8fc7\u671f\u3002`;
     }
     if (target.activeTab === "core") {
-      return `${pool}\u5f53\u524d\u663e\u793a ${Math.max(0, Number(visibleCount) || 0)} \u6761\u3002\u8fd9\u91cc\u4fdd\u5b58\u7a33\u5b9a\u4e8b\u5b9e\u3001\u4e8b\u4ef6\u548c\u9879\u76ee\u8fdb\u5c55\uff0c\u4f1a\u5728\u76f8\u5173\u5bf9\u8bdd\u4e2d\u5c11\u91cf\u53c2\u4e0e\u56de\u590d\u3002`;
+      return `${pool}\u5f53\u524d\u663e\u793a ${Math.max(0, Number(visibleCount) || 0)} \u6761\u3002\u65b0\u589e\u3001\u7f16\u8f91\u6216\u5220\u9664\u540e\u4f1a\u7acb\u5373\u5f71\u54cd\u4e0b\u4e00\u6b21\u76f8\u5173\u5bf9\u8bdd\u3002`;
     }
     return `${pool}\u5f53\u524d\u663e\u793a ${Math.max(0, Number(visibleCount) || 0)} \u6761\u3002\u5019\u9009\u6c60\u7528\u6765\u5ba1\u6838\u65b0\u6c89\u6dc0\u7684\u4e92\u52a8\u504f\u597d\uff0c\u6b63\u5f0f\u6c60\u4f1a\u5728\u76f8\u5173\u5bf9\u8bdd\u4e2d\u53c2\u4e0e\u56de\u590d\u3002\u77ed\u671f\u8bb0\u5fc6 ${short} \u6761\uff0c\u957f\u671f\u8bb0\u5fc6 ${core} \u6761\u3002`;
   }
@@ -277,6 +277,8 @@
     const samples = Array.isArray(target.samples) ? target.samples.length : 0;
     const short = Array.isArray(target.shortMemories) ? target.shortMemories.length : 0;
     const core = Array.isArray(target.coreMemories) ? target.coreMemories.length : 0;
+    const pinned = Array.isArray(target.coreMemories) ? target.coreMemories.filter((item) => item?.pinned === true).length : 0;
+    const important = Array.isArray(target.coreMemories) ? target.coreMemories.filter((item) => Number(item?.importance || 0) >= 0.8).length : 0;
     const selected = target.activeTab === "short"
       ? (target.selectedShort instanceof Set ? target.selectedShort.size : 0)
       : target.activeTab === "core"
@@ -289,9 +291,11 @@
       samples,
       short,
       core,
+      pinned,
+      important,
       visible: Math.max(0, Number(visibleCount) || 0),
       selected,
-      activePoolLabel: target.activeTab === "samples" ? "\u6b63\u5f0f\u6c60" : (target.activeTab === "short" ? "\u77ed\u671f\u8bb0\u5fc6" : (target.activeTab === "core" ? "\u957f\u671f\u8bb0\u5fc6" : "\u5019\u9009\u6c60"))
+      activePoolLabel: target.activeTab === "samples" ? "\u6574\u7406\u8bb0\u5f55" : (target.activeTab === "short" ? "\u77ed\u671f\u8bb0\u5fc6" : (target.activeTab === "core" ? "\u957f\u671f\u8bb0\u5fc6" : "\u5f85\u6574\u7406"))
     };
   }
 
