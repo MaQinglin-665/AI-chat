@@ -13,8 +13,31 @@
     const triggerTapMotion = typeof deps.triggerTapMotion === "function" ? deps.triggerTapMotion : () => {};
     const finalizeDesktopDrag = typeof deps.finalizeDesktopDrag === "function" ? deps.finalizeDesktopDrag : () => {};
     const stopDesktopWindowDrag = typeof deps.stopDesktopWindowDrag === "function" ? deps.stopDesktopWindowDrag : () => {};
+    const recordContextualInteraction = typeof deps.recordContextualInteraction === "function"
+      ? deps.recordContextualInteraction
+      : () => false;
     const tapMaxDurationMs = Number.isFinite(Number(deps.tapMaxDurationMs)) ? Number(deps.tapMaxDurationMs) : 280;
     const tapMoveThreshold = Number.isFinite(Number(deps.tapMoveThreshold)) ? Number(deps.tapMoveThreshold) : 8;
+
+    function syncPetPresenceAnchor(model = state.model) {
+      if (!model || !state.desktopMode || state.uiView !== "model") {
+        return null;
+      }
+      const renderer = state.pixiApp?.renderer;
+      const canvas = state.pixiApp?.view;
+      const rw = Number(renderer?.width) || 0;
+      const rh = Number(renderer?.height) || 0;
+      const rect = canvas?.getBoundingClientRect?.() || null;
+      const scaleX = rect && rw > 0 && Number(rect.width) > 0 ? Number(rect.width) / rw : 1;
+      const scaleY = rect && rh > 0 && Number(rect.height) > 0 ? Number(rect.height) / rh : 1;
+      const offsetX = Number(rect?.left) || 0;
+      const offsetY = Number(rect?.top) || 0;
+      const x = offsetX + (Number(model.x) || (rw * 0.5)) * scaleX;
+      const y = offsetY + (Number(model.y) || (rh * 0.9)) * scaleY;
+      document?.documentElement?.style?.setProperty?.("--pet-presence-x", `${x}px`);
+      document?.documentElement?.style?.setProperty?.("--pet-presence-y", `${y}px`);
+      return { x, y };
+    }
 
     function placeModel() {
       if (!state.model || !state.pixiApp) {
@@ -47,7 +70,9 @@
       // Fallback to a conservative scale when runtime reports odd initial size.
       let scale = 0.28;
       if (baseHeight) {
-        const targetHeight = h * 0.76;
+        // Reserve the stage header and composer lanes while keeping the avatar
+        // dominant. The personal model scale still applies after this fit.
+        const targetHeight = h * (state.uiView === "full" ? 0.86 : 0.76);
         scale = Math.max(0.08, Math.min(1.4, targetHeight / baseHeight));
       } else if (baseWidth) {
         const targetWidth = w * 0.34;
@@ -64,6 +89,9 @@
         }
         model.x = state.modelPosX;
         model.y = state.modelPosY;
+      } else if (state.uiView === "full") {
+        model.x = w * 0.5;
+        model.y = h * 0.965;
       } else {
         model.x = w * (state.modelConfig?.x_ratio ?? 0.26);
         model.y = h * (state.modelConfig?.y_ratio ?? 0.96);
@@ -77,6 +105,7 @@
         clampModelVisibleInViewport(model);
         state.modelPosX = Number(model.x) || (w * 0.5);
         state.modelPosY = Number(model.y) || (h * 0.9);
+        syncPetPresenceAnchor(model);
       }
       state.layoutWidth = w;
       state.layoutHeight = h;
@@ -111,6 +140,9 @@
       }
       if (!Number.isFinite(Number(model.alpha)) || model.alpha < 0.98) {
         model.alpha = 1;
+      }
+      if (state.desktopMode && state.uiView === "model") {
+        syncPetPresenceAnchor(model);
       }
     }
 
@@ -272,23 +304,76 @@
     function setupClickthroughHitTest() {
       if (state.desktopBridge !== "electron") return;
       if (typeof window.electronAPI?.setClickthrough !== "function") return;
+      // Only the detached pet window should pass empty pixels through to the
+      // desktop. The full stage contains real controls outside the Live2D
+      // bounds, so enabling click-through there makes the room and composer
+      // intermittently lose their first click in Electron.
+      if (state.uiView !== "model") {
+        window.electronAPI.setClickthrough(false);
+        return;
+      }
+      if (state.clickthroughHitTestReady) return;
+      state.clickthroughHitTestReady = true;
       let lastClickthrough = true;
-      document.addEventListener("mousemove", (e) => {
-        if (state.windowDragActive || state.subtitleDragPointerId) {
-          if (lastClickthrough) {
-            window.electronAPI.setClickthrough(false);
-            lastClickthrough = false;
-          }
-          return;
-        }
-        const over = isPointOverVisibleModelArea(e.clientX, e.clientY)
-          || isPointOverSubtitleDragHandle(e.clientX, e.clientY);
-        const want = !over;
+      const setClickthrough = (want) => {
         if (want !== lastClickthrough) {
           lastClickthrough = want;
           window.electronAPI.setClickthrough(want);
         }
+      };
+      const isDragActive = () => !!(state.dragData || state.windowDragActive || state.subtitleDragPointerId);
+      const updateFromClientPoint = (clientX, clientY) => {
+        if (isDragActive()) {
+          setClickthrough(false);
+          return;
+        }
+        const over = isPointOverVisibleModelArea(clientX, clientY)
+          || isPointOverSubtitleDragHandle(clientX, clientY);
+        setClickthrough(!over);
+      };
+      document.addEventListener("mousemove", (e) => {
+        updateFromClientPoint(e.clientX, e.clientY);
       });
+      if (
+        typeof window.electronAPI?.getCursorScreenPoint !== "function" ||
+        typeof window.electronAPI?.getModelWindowBounds !== "function" ||
+        state.clickthroughHitTestTimer
+      ) {
+        return;
+      }
+      let busy = false;
+      state.clickthroughHitTestTimer = window.setInterval(async () => {
+        if (busy) {
+          return;
+        }
+        busy = true;
+        try {
+          const [cursor, bounds] = await Promise.all([
+            window.electronAPI.getCursorScreenPoint(),
+            window.electronAPI.getModelWindowBounds()
+          ]);
+          if (!cursor || !bounds) {
+            return;
+          }
+          const width = Number(bounds.width) || 0;
+          const height = Number(bounds.height) || 0;
+          const clientX = Number(cursor.x) - Number(bounds.x);
+          const clientY = Number(cursor.y) - Number(bounds.y);
+          if (
+            !Number.isFinite(clientX) || !Number.isFinite(clientY) ||
+            width <= 0 || height <= 0 ||
+            clientX < -1 || clientY < -1 ||
+            clientX > width + 1 || clientY > height + 1
+          ) {
+            setClickthrough(!isDragActive());
+            return;
+          }
+          updateFromClientPoint(clientX, clientY);
+        } catch (_) {
+        } finally {
+          busy = false;
+        }
+      }, 50);
     }
 
     function startModelMouseGazePolling() {
@@ -351,11 +436,15 @@ function attachDrag(model) {
       return;
     }
     const elapsed = performance.now() - downAt;
-    const shouldTap = !state.pointerDragMoved && elapsed <= tapMaxDurationMs;
+    const wasDrag = state.pointerDragMoved === true;
+    const shouldTap = !wasDrag && elapsed <= tapMaxDurationMs;
     state.lastPointerDownAt = 0;
     state.pointerDragMoved = false;
     if (shouldTap) {
+      recordContextualInteraction("tap");
       triggerTapMotion();
+    } else if (wasDrag) {
+      recordContextualInteraction("drag");
     }
   };
 
@@ -430,6 +519,7 @@ function attachDrag(model) {
         state.model.y = state.modelPosY;
         state.baseTransform.x = state.modelPosX;
         state.baseTransform.y = state.modelPosY;
+        syncPetPresenceAnchor(state.model);
         state.suspendRelayoutUntil = performance.now() + 240;
       };
       document.addEventListener("pointermove", onDocMove);
@@ -476,6 +566,7 @@ function attachDrag(model) {
         state.model.y = py;
         state.baseTransform.x = px;
         state.baseTransform.y = py;
+        syncPetPresenceAnchor(state.model);
       };
 
       const cleanupBrowser = () => {
@@ -590,13 +681,18 @@ function attachDrag(model) {
     }
     state.baseTransform.x = model.x;
     state.baseTransform.y = model.y;
+    syncPetPresenceAnchor(model);
   });
 
   const canvas = state.pixiApp?.view;
   if (canvas) {
     canvas.addEventListener("wheel", (e) => {
-      e.preventDefault();
       if (!state.model) return;
+      // The stage canvas spans behind the conversation rails and controls.
+      // Only consume the wheel when the pointer is actually over the narrow
+      // visible-character hotzone; elsewhere the page/history keeps the wheel.
+      if (!isPointOverVisibleModelArea(e.clientX, e.clientY)) return;
+      e.preventDefault();
       const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
       const currentScale = Number(state.model.scale?.x) || 1;
       const newScale = Math.max(0.05, Math.min(4.0, currentScale * factor));
@@ -613,6 +709,7 @@ function attachDrag(model) {
     return {
       placeModel,
       clampModelVisibleInViewport,
+      syncPetPresenceAnchor,
       handleWindowResize,
       getModelInteractiveBounds,
       isPointInModelDragHotzone,

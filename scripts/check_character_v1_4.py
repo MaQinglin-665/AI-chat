@@ -7,9 +7,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.node_runtime import resolve_node_command
+
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return ROOT
 
 
 def _run(label: str, command: list[str], root: Path) -> int:
@@ -23,6 +29,7 @@ def _run(label: str, command: list[str], root: Path) -> int:
 
 def main() -> int:
     root = _repo_root()
+    node = resolve_node_command("node")
     checks = [
         (
             "Python syntax",
@@ -43,10 +50,10 @@ def main() -> int:
                 "tests/test_reply_language_guard.py",
             ],
         ),
-        ("Frontend character runtime checks", ["node", "tests/test_character_runtime_frontend.js"]),
-        ("Frontend chat API checks", ["node", "tests/test_chat_api_frontend.js"]),
-        ("Frontend speech text checks", ["node", "tests/test_speech_text_frontend.js"]),
-        ("Frontend TTS API checks", ["node", "tests/test_tts_api_frontend.js"]),
+        ("Frontend character runtime checks", [*node, "tests/test_character_runtime_frontend.js"]),
+        ("Frontend chat API checks", [*node, "tests/test_chat_api_frontend.js"]),
+        ("Frontend speech text checks", [*node, "tests/test_speech_text_frontend.js"]),
+        ("Frontend TTS API checks", [*node, "tests/test_tts_api_frontend.js"]),
     ]
 
     failures: list[str] = []

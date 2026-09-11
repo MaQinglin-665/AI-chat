@@ -1,0 +1,203 @@
+{
+  "model": "gpt-5.6-terra",
+  "synthetic_only": true,
+  "results": [
+    {
+      "character": "deepblue",
+      "case": "comfort",
+      "input": "我今天面试失败了，很难过。别说太棒了，也别劝我立刻振作。明天或许去公园，今天先待在房间里。",
+      "expected_scene": null,
+      "first_sentence_seconds": 16.75,
+      "reply": "面试失败真的会让人很难受，今天不用急着把情绪整理好，我先陪你待一会儿。明天去不去公园可以等明天再决定，今晚就安心留在房间里，什么都不急着处理。",
+      "segments": [
+        {
+          "index": 0,
+          "text": "面试失败真的会让人很难受，今天不用急着把情绪整理好，我先陪你待一会儿。",
+          "performance": {
+            "emotion": "sad",
+            "action": "none",
+            "sprite": "listening",
+            "source": "galgame_model"
+          },
+          "scene": null
+        },
+        {
+          "index": 1,
+          "text": "明天去不去公园可以等明天再决定，今晚就安心留在房间里，什么都不急着处理。",
+          "performance": {
+            "emotion": "serious",
+            "action": "nod",
+            "sprite": "sad",
+            "source": "galgame_model"
+          },
+          "scene": null
+        }
+      ],
+      "scene_check": true,
+      "ok": true,
+      "elapsed_seconds": 18.98
+    },
+    {
+      "character": "claude",
+      "case": "comfort",
+      "input": "我今天面试失败了，很难过。别说太棒了，也别劝我立刻振作。明天或许去公园，今天先待在房间里。",
+      "expected_scene": null,
+      "first_sentence_seconds": 10.2,
+      "reply": "听起来，这次面试的失败让你今天确实很难过；我不会急着劝你振作，也不会把它轻描淡写地说成一件好事。今晚就留在房间里也很好，不必现在为明天作出决定；先让自己安静地缓一缓，难过本身也值得被好好容纳。至于明天的公园，可以等你醒来后再看心情决定；此刻，你不需要证明自己已经没事了。",
+      "segments": [
+        {
+          "index": 0,
+          "text": "听起来，这次面试的失败让你今天确实很难过；我不会急着劝你振作，也不会把它轻描淡写地说成一件好事。",
+          "performance": {
+            "emotion": "sad",
+            "action": "none",
+            "sprite": "neutral",
+            "source": "galgame_model"
+          },
+          "scene": null
+        },
+        {
+          "index": 1,
+          "text": "今晚就留在房间里也很好，不必现在为明天作出决定；先让自己安静地缓一缓，难过本身也值得被好好容纳。",
+          "performance": {
+            "emotion": "anxious",
+            "action": "nod",
+            "sprite": "neutral",
+            "source": "galgame_model"
+          },
+          "scene": null
+        },
+        {
+          "index": 2,
+          "text": "至于明天的公园，可以等你醒来后再看心情决定；此刻，你不需要证明自己已经没事了。",
+          "performance": {
+            "emotion": "neutral",
+            "action": "none",
+            "sprite": "neutral",
+            "source": "galgame_model"
+          },
+          "scene": null
+        }
+      ],
+      "scene_check": true,
+      "ok": true,
+      "elapsed_seconds": 16.08
+    },
+    {
+      "character": "gpt",
+      "case": "comfort",
+      "input": "我今天面试失败了，很难过。别说太棒了，也别劝我立刻振作。明天或许去公园，今天先待在房间里。",
+      "expected_scene": null,
+      "first_sentence_seconds": 7.48,
+      "reply": "面试失败确实很难受，尤其是你已经认真准备过之后；今天难过是合理的，不需要立刻把自己调整好。那就先待在房间里，允许自己安静下来，不复盘、不责怪自己，也不用急着证明这次失败代表什么。明天如果想去公园，就把它当成换口气，不必当成振作任务；今晚先照顾好自己，吃点东西、喝水，能休息就够了。",
+      "segments": [
+        {
+          "index": 0,
+          "text": "面试失败确实很难受，尤其是你已经认真准备过之后；今天难过是合理的，不需要立刻把自己调整好。",
+          "performance": {
+            "emotion": "sad",
+            "action": "none",
+            "sprite": "neutral",
+            "source": "galgame_model"
+          },
+          "scene": null
+        },
+        {
+          "index": 1,
+          "text": "那就先待在房间里，允许自己安静下来，不复盘、不责怪自己，也不用急着证明这次失败代表什么。",
+          "performance": {
+            "emotion": "serious",
+            "action": "nod",
+            "sprite": "neutral",
+            "source": "galgame_model"
+          },
+          "scene": null
+        },
+        {
+          "index": 2,
+          "text": "明天如果想去公园，就把它当成换口气，不必当成振作任务；今晚先照顾好自己，吃点东西、喝水，能休息就够了。",
+          "performance": {
+            "emotion": "neutral",
+            "action": "none",
+            "sprite": "neutral",
+            "source": "galgame_model"
+          },
+          "scene": null
+        }
+      ],
+      "scene_check": true,
+      "ok": true,
+      "elapsed_seconds": 10.73
+    },
+    {
+      "character": "deepblue",
+      "case": "arrival",
+      "input": "现在是春天的白天，我们已经走进公园，在长椅边坐下了。你想说什么？",
+      "expected_scene": "park-spring",
+      "first_sentence_seconds": 8.14,
+      "reply": "春天的风刚刚好，坐在这里看树影晃来晃去，感觉脑子都被悄悄重启了。你想先聊点什么？最近发生的事、接下来的计划，或者就一起发会儿呆也行。",
+      "segments": [
+        {
+          "index": 0,
+          "text": "春天的风刚刚好，坐在这里看树影晃来晃去，感觉脑子都被悄悄重启了。",
+          "performance": {
+            "emotion": "happy",
+            "action": "nod",
+            "sprite": "happy",
+            "source": "galgame_model"
+          },
+          "scene": "park-spring"
+        },
+        {
+          "index": 1,
+          "text": "你想先聊点什么？最近发生的事、接下来的计划，或者就一起发会儿呆也行。",
+          "performance": {
+            "emotion": "playful",
+            "action": "wave",
+            "sprite": "playful",
+            "source": "galgame_model"
+          },
+          "scene": null
+        }
+      ],
+      "scene_check": true,
+      "ok": true,
+      "elapsed_seconds": 9.86
+    },
+    {
+      "character": "claude",
+      "case": "quoted_arrival",
+      "input": "小说里写着‘我们已经到了公园’，但我们现在还在房间里。聊聊这句话吧。",
+      "expected_scene": null,
+      "first_sentence_seconds": 9.7,
+      "reply": "这句话写下的是小说中的既定叙述，而不是我们此刻亲身经历的事实；文字可以先行抵达，现实却仍停留在房间里。因此，它更像一扇被叙事推开的门：我们可以谈论公园、想象公园，却不能仅凭这句话便说自己已经站在那里。",
+      "segments": [
+        {
+          "index": 0,
+          "text": "这句话写下的是小说中的既定叙述，而不是我们此刻亲身经历的事实；文字可以先行抵达，现实却仍停留在房间里。",
+          "performance": {
+            "emotion": "thinking",
+            "action": "think",
+            "sprite": "thinking",
+            "source": "galgame_model"
+          },
+          "scene": null
+        },
+        {
+          "index": 1,
+          "text": "因此，它更像一扇被叙事推开的门：我们可以谈论公园、想象公园，却不能仅凭这句话便说自己已经站在那里。",
+          "performance": {
+            "emotion": "neutral",
+            "action": "none",
+            "sprite": "neutral",
+            "source": "galgame_model"
+          },
+          "scene": null
+        }
+      ],
+      "scene_check": true,
+      "ok": true,
+      "elapsed_seconds": 12.34
+    }
+  ]
+}

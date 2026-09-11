@@ -7,9 +7,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.node_runtime import resolve_node_command
+
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return ROOT
 
 
 def _run(label: str, command: list[str], root: Path) -> int:
@@ -23,13 +29,14 @@ def _run(label: str, command: list[str], root: Path) -> int:
 
 def main() -> int:
     root = _repo_root()
+    node = resolve_node_command("node")
     checks = [
         ("Python tests", [sys.executable, "-m", "pytest"]),
-        ("Frontend runtime metadata checks", ["node", "tests/test_character_runtime_frontend.js"]),
-        ("Frontend API client checks", ["node", "tests/test_api_client_frontend.js"]),
-        ("Frontend chat API checks", ["node", "tests/test_chat_api_frontend.js"]),
-        ("Frontend speech text checks", ["node", "tests/test_speech_text_frontend.js"]),
-        ("Frontend TTS API checks", ["node", "tests/test_tts_api_frontend.js"]),
+        ("Frontend runtime metadata checks", [*node, "tests/test_character_runtime_frontend.js"]),
+        ("Frontend API client checks", [*node, "tests/test_api_client_frontend.js"]),
+        ("Frontend chat API checks", [*node, "tests/test_chat_api_frontend.js"]),
+        ("Frontend speech text checks", [*node, "tests/test_speech_text_frontend.js"]),
+        ("Frontend TTS API checks", [*node, "tests/test_tts_api_frontend.js"]),
         ("Python syntax", [sys.executable, "scripts/check_python_syntax.py"]),
         ("JavaScript syntax", [sys.executable, "scripts/check_js_syntax.py"]),
         ("Secret scan", [sys.executable, "scripts/check_secrets.py"]),

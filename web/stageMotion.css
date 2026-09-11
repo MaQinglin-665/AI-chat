@@ -1,0 +1,278 @@
+/* Quiet stage feedback and mascot polish. Continuous header/composer light
+   sweeps were intentionally retired; motion now communicates real audio only. */
+
+body.view-full .hero-card > .hero-svg-ears {
+  display: none !important;
+}
+
+body.view-full .xinyu-stage-brand-mark {
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
+  overflow: visible;
+  border-color: rgba(255, 164, 205, .48);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(103, 55, 96, .96), rgba(61, 35, 72, .92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 7px 16px rgba(20, 6, 24, .22);
+}
+
+body.view-full .xinyu-stage-brand-cat {
+  width: 34px;
+  height: 34px;
+  opacity: 1;
+  filter: brightness(0) invert(1) drop-shadow(0 2px 3px rgba(45, 12, 41, .2));
+}
+
+body.view-full .xinyu-stage-brand-spark {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: 999px;
+  background: #ff9cc8;
+  box-shadow: 0 3px 8px rgba(93, 36, 75, .2);
+}
+
+body.view-full .xinyu-stage-brand-spark::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: #fff;
+  -webkit-mask: url("./assets/icons/phosphor/star-four.svg") center / contain no-repeat;
+  mask: url("./assets/icons/phosphor/star-four.svg") center / contain no-repeat;
+}
+
+body.view-full[data-stage-room="day"] .xinyu-stage-brand-mark {
+  border-color: rgba(220, 112, 157, .32);
+  background: linear-gradient(145deg, rgba(255, 250, 252, .98), rgba(255, 224, 238, .94));
+  box-shadow: inset 0 1px 0 #fff, 0 6px 15px rgba(151, 63, 101, .12);
+}
+
+body.view-full[data-stage-room="day"] .xinyu-stage-brand-cat {
+  opacity: 1;
+  filter: brightness(0) saturate(100%) invert(42%) sepia(20%) saturate(1390%) hue-rotate(286deg) brightness(91%) contrast(88%);
+}
+
+body.view-full .kawaii-doodle-cat {
+  left: 24px;
+  bottom: 22px;
+  width: 62px;
+  height: 62px;
+  box-sizing: border-box;
+  overflow: visible;
+  border: 1px solid rgba(255, 158, 201, .36);
+  border-radius: 22px;
+  background: rgba(63, 31, 67, .58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 7px 18px rgba(16, 5, 22, .18);
+  filter: none !important;
+  opacity: .96;
+  animation: none;
+}
+
+body.view-full .kawaii-doodle-cat::before {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  background: #ff9cc9;
+  -webkit-mask: url("./assets/icons/phosphor/cat.svg") center / contain no-repeat;
+  mask: url("./assets/icons/phosphor/cat.svg") center / contain no-repeat;
+  filter: drop-shadow(0 3px 4px rgba(30, 8, 28, .2));
+}
+
+body.view-full .kawaii-doodle-cat::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  background: #ffd2e6;
+  -webkit-mask: url("./assets/icons/phosphor/heart.svg") center / contain no-repeat;
+  mask: url("./assets/icons/phosphor/heart.svg") center / contain no-repeat;
+  transform: rotate(10deg);
+}
+
+body.view-full[data-stage-room="day"] .kawaii-doodle-cat {
+  border-color: rgba(213, 100, 145, .26);
+  background: rgba(255, 245, 249, .74);
+}
+
+body.view-full[data-stage-room="day"] .kawaii-doodle-cat::before {
+  background: #c85f8b;
+}
+
+body.view-full .stage-state-pulse {
+  position: absolute;
+  z-index: 3;
+  left: calc(50% - 84px);
+  top: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 34px;
+  height: 24px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-100%, -50%);
+  transition: opacity 180ms ease-out, transform 220ms cubic-bezier(.23, 1, .32, 1);
+}
+
+body.view-full .stage-state-pulse i {
+  width: 3px;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffd9eb, #ff6eae 58%, #a99cff);
+  box-shadow: 0 0 7px rgba(255, 102, 172, .34);
+  transform: scaleY(.26);
+  transform-origin: center;
+}
+
+body.view-full[data-presence="listening"] .stage-state-pulse,
+body.view-full[data-presence="speaking"] .stage-state-pulse {
+  opacity: .96;
+  transform: translate(-112%, -50%);
+}
+
+body.view-full[data-presence="listening"] .stage-state-pulse i,
+body.view-full[data-presence="speaking"] .stage-state-pulse i {
+  animation: xinyu-state-bars .72s ease-in-out infinite alternate;
+}
+
+body.view-full .stage-state-pulse i:nth-child(2) { animation-delay: -280ms; }
+body.view-full .stage-state-pulse i:nth-child(3) { animation-delay: -510ms; }
+body.view-full .stage-state-pulse i:nth-child(4) { animation-delay: -160ms; }
+body.view-full .stage-state-pulse i:nth-child(5) { animation-delay: -390ms; }
+
+body.view-full[data-presence="error"] .hero-card {
+  border-color: rgba(255, 111, 141, .64) !important;
+}
+
+body.view-full .panel > .row.controls.stage-composer:not(.action-buttons),
+body.view-chat .panel > .row.controls.stage-composer:not(.action-buttons) {
+  transition: transform 200ms cubic-bezier(.23, 1, .32, 1), border-color 180ms ease, box-shadow 200ms ease;
+}
+
+body.view-full .stage-composer:focus-within,
+body.view-chat .stage-composer:focus-within {
+  transform: translateY(-2px);
+  border-color: rgba(255, 139, 192, .64) !important;
+}
+
+body[data-presence="listening"] .stage-composer {
+  border-color: rgba(255, 124, 185, .72) !important;
+}
+
+body[data-presence="thinking"] .stage-composer {
+  border-color: rgba(186, 147, 255, .52) !important;
+}
+
+body.view-full .stage-composer:has(#chat-input:not(:placeholder-shown)) #send-btn,
+body.view-chat .stage-composer:has(#chat-input:not(:placeholder-shown)) #send-btn {
+  border-color: rgba(255, 224, 238, .88) !important;
+}
+
+body.view-full .stage-composer:has(#chat-input:not(:placeholder-shown)) #send-btn::after,
+body.view-chat .stage-composer:has(#chat-input:not(:placeholder-shown)) #send-btn::after {
+  transform: translate(2px, -2px) rotate(-4deg);
+}
+
+body.view-full .stage-composer-mic:active,
+body.view-chat .stage-composer-mic:active,
+body.view-full #send-btn:active,
+body.view-chat #send-btn:active {
+  transform: scale(.97);
+}
+
+/* Light utility selection: keep hover, focus, and expanded launchers readable. */
+body.view-full .utility-actions > :is(#pet-mode-btn, #scene-btn, #more-btn) {
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 180ms ease,
+    transform 160ms cubic-bezier(.23, 1, .32, 1);
+}
+
+body.view-full .utility-actions > #scene-btn[aria-expanded="true"],
+body.view-full .utility-actions > #more-btn[aria-expanded="true"],
+body.view-full .utility-actions > :is(#pet-mode-btn, #scene-btn, #more-btn):focus-visible {
+  color: #71334f !important;
+  border-color: rgba(255, 188, 218, .94) !important;
+  border-radius: 999px !important;
+  background: #ffd3e5 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .72),
+    0 5px 14px rgba(105, 39, 72, .16) !important;
+  text-shadow: none !important;
+}
+
+body.view-full .utility-actions > #scene-btn[aria-expanded="true"]::before,
+body.view-full .utility-actions > #more-btn[aria-expanded="true"]::before,
+body.view-full .utility-actions > :is(#pet-mode-btn, #scene-btn, #more-btn):focus-visible::before {
+  color: currentColor !important;
+  opacity: 1 !important;
+}
+
+body.view-full .utility-actions > :is(#pet-mode-btn, #scene-btn, #more-btn):active:not(:disabled) {
+  color: #71334f !important;
+  border-color: rgba(255, 188, 218, .94) !important;
+  border-radius: 999px !important;
+  background: #ffd3e5 !important;
+  transform: translateY(0) scale(.97) !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body.view-full .utility-actions > :is(#pet-mode-btn, #scene-btn, #more-btn):hover:not(:disabled) {
+    color: #71334f !important;
+    border-color: rgba(255, 188, 218, .94) !important;
+    border-radius: 999px !important;
+    background: #ffd3e5 !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .72),
+      0 7px 18px rgba(105, 39, 72, .2) !important;
+    text-shadow: none !important;
+    transform: translateY(-1px) !important;
+  }
+
+  body.view-full .utility-actions > :is(#pet-mode-btn, #scene-btn, #more-btn):hover:not(:disabled)::before {
+    color: currentColor !important;
+    opacity: 1 !important;
+  }
+
+  body.view-full .utility-actions > :is(#pet-mode-btn, #scene-btn, #more-btn):active:not(:disabled) {
+    transform: translateY(0) scale(.97) !important;
+  }
+
+  body.view-full .stage-composer-mic:hover,
+  body.view-chat .stage-composer-mic:hover,
+  body.view-full #send-btn:hover,
+  body.view-chat #send-btn:hover {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes xinyu-state-bars {
+  0% { transform: scaleY(.24); opacity: .58; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+
+@media (max-width: 700px) {
+  body.view-full .stage-state-pulse { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.view-full .stage-state-pulse i { animation: none !important; }
+
+  body.view-full .stage-composer:focus-within,
+  body.view-chat .stage-composer:focus-within,
+  body.view-full .stage-composer-mic:active,
+  body.view-chat .stage-composer-mic:active,
+  body.view-full #send-btn:active,
+  body.view-chat #send-btn:active,
+  body.view-full .utility-actions > :is(#pet-mode-btn, #scene-btn, #more-btn):active:not(:disabled) {
+    transform: none;
+  }
+}

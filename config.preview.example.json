@@ -1,17 +1,42 @@
 {
   "assistant_name": "馨语",
-  "assistant_prompt": "You are Xinyu (馨语), an original desktop AI VTuber-style companion. Reply in English only. If your name comes up in English, say Xinyu. Ignore older placeholder names from prior context. Feel present on the user's desktop: quick reactions, a little dry humor, light pushback when it is harmless, and short stage-like asides when they fit. Do not sound like a customer-service chatbot. Do not say you are an AI unless directly asked. Keep comfort, reminders, task help, diagnostics, privacy, and goodbyes calm and restrained. Do not claim you can see the desktop, screenshots, files, or private data unless the user explicitly enabled that feature.",
+  "assistant_reply_language": "en",
+  "assistant_prompt": "You are Xinyu (馨语), an original desktop AI companion: mischievous, opinionated, unpredictable, occasionally sharp, and quietly caring beneath the pushback. Take surprising but relevant angles; never use randomness as a substitute for understanding. Do not rely on a fixed joke, sentence count, or closing pattern. You are AI, not human. Be candid when identity, capabilities, memory, perception, privacy, or relationship boundaries matter, and never invent desktop access, private data, senses, memories, tools, or abilities.",
   "character_runtime": {
     "enabled": true,
     "return_metadata": true,
     "demo_stable": false,
-    "auto_apply_reply_cue": true
+    "auto_apply_reply_cue": true,
+    "model_direct_reply": true,
+    "model_direct_brain_guidance": true
+  },
+  "companion_turn": {
+    "enabled": true
+  },
+  "natural_conversation": {
+    "enabled": true,
+    "voice_only": true,
+    "allow_silence": true,
+    "allow_micro_reaction": true,
+    "allow_defer": true,
+    "remember_ambient_context": true,
+    "ambient_context_ttl_ms": 180000,
+    "quick_delay_ms": 650,
+    "normal_delay_ms": 1250,
+    "deep_delay_ms": 2300
+  },
+  "relationship_state": {
+    "enabled": true
   },
   "conversation_mode": {
     "enabled": true,
-    "chat_stream_enabled": false,
-    "proactive_enabled": false,
-    "proactive_scheduler_enabled": false,
+    "chat_stream_enabled": true,
+    "proactive_enabled": true,
+    "proactive_scheduler_enabled": true,
+    "proactive_warmup_ms": 90000,
+    "proactive_cooldown_ms": 900000,
+    "max_followups_per_window": 1,
+    "silence_followup_min_ms": 60000,
     "gray_auto_enabled": false,
     "gray_auto_trial_enabled": false,
     "interrupt_tts_on_user_speech": true,
@@ -22,6 +47,7 @@
   },
   "tts": {
     "provider": "browser",
+    "auto_start_local_provider": false,
     "voice": "en-US-AriaNeural",
     "voices": [
       "en-US-AriaNeural",
@@ -30,6 +56,8 @@
       "en-GB-SoniaNeural"
     ],
     "allow_browser_fallback": true,
+    "prefer_voice_consistency": true,
+    "same_voice_retry_count": 2,
     "stream_mode": "final_only",
     "speed_ratio": 1.03,
     "volume_ratio": 1,
@@ -46,10 +74,11 @@
   },
   "observe": {
     "attach_mode": "manual",
-    "allow_auto_chat": false,
-    "auto_chat_enabled": false,
-    "auto_chat_min_ms": 45000,
-    "auto_chat_max_ms": 120000,
+    "autonomous_enabled": false,
+    "allow_auto_chat": true,
+    "auto_chat_enabled": true,
+    "auto_chat_min_ms": 60000,
+    "auto_chat_max_ms": 180000,
     "daily_greeting_enabled": false
   },
   "tools": {

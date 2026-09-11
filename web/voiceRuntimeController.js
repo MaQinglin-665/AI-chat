@@ -24,8 +24,9 @@
       const cfg = state.config?.tts || {};
       const isVolcengine = state.ttsProvider === "volcengine_tts" || state.ttsProvider === "volcengine";
       const isGptSovits = state.ttsProvider === "gpt_sovits";
+      const isQwen3Tts = state.ttsProvider === "qwen3_tts";
       const list = Array.isArray(cfg.voices) ? cfg.voices.filter(Boolean) : [];
-      const fallback = (isVolcengine || isGptSovits)
+      const fallback = (isVolcengine || isGptSovits || isQwen3Tts)
         ? [cfg.voice]
         : [
           cfg.voice,

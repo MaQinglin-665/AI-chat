@@ -33,6 +33,14 @@ function makeReplyController(state, events, counters = {}) {
     discardQueuedStreamSpeakItems: () => { counters.discarded = (counters.discarded || 0) + 1; },
     clearPerformanceTimelineTimers: () => { counters.clearedTimeline = (counters.clearedTimeline || 0) + 1; },
     clearThinkingMotionTimer: () => { counters.clearedThinking = (counters.clearedThinking || 0) + 1; },
+    finalizePendingMessageRow: (row, role, text, options) => {
+      counters.finalized = { row, role, text, options };
+      row.text = String(text || "");
+    },
+    rememberMessage: (role, content, options) => {
+      counters.remembered = counters.remembered || [];
+      counters.remembered.push({ role, content, options });
+    },
     recordTTSDebugEvent: (event, payload) => events.push({ event, payload }),
     setStatus: (text) => events.push({ event: "status", payload: String(text || "") })
   });
@@ -80,6 +88,12 @@ function makeReplyController(state, events, counters = {}) {
   state.chatAbortController = makeAbortController(aborts);
   state.ttsContextSpeaking = true;
   state.activeAssistantDraftText = "Important: do not put API keys or tokens into logs.";
+  state.activeAssistantMessageRow = {
+    dataset: {},
+    classList: { add(value) { this.value = value; } },
+    querySelector() { return null; },
+    remove() { counters.rowRemoved = (counters.rowRemoved || 0) + 1; }
+  };
   state.activeAssistantTurnStartedAt = Date.now();
   state.characterBrainLastDecision = {
     intent: "task_help",
@@ -111,20 +125,38 @@ function makeReplyController(state, events, counters = {}) {
   assert.strictEqual(
     controller.handleUserSpeechStart({ reason: "local_asr_speech_start" }),
     false,
-    "voice barge-in should let protected key speech finish first"
+    "unclassified speech start should wait for semantic confirmation"
   );
   assert.strictEqual(state.chatBusy, true, "protected voice barge-in should not cancel active reply");
   assert.strictEqual(aborts.count, 0, "protected voice barge-in should not abort the request");
-  assert.ok(events.some((item) => item.event === "important_speech_protected"), "protected barge-in should be debuggable");
+  assert.ok(events.some((item) => item.event === "voice_barge_in_candidate"), "pending semantic barge-in should be debuggable");
 
   assert.strictEqual(
-    controller.interruptActiveChatTurn("manual_text_input", { bypassProtection: true }),
-    true,
-    "manual text input should still be able to interrupt when explicitly forced"
+    controller.handleUserSpeechStart({
+      reason: "voice_transcript_confirmed",
+      confirmedTranscript: true,
+      kind: "substantive"
+    }),
+    false,
+    "ordinary substantive speech should let a protected key sentence reach its boundary"
   );
-  assert.strictEqual(state.chatBusy, false, "forced text interruption should clear active turn");
-  assert.strictEqual(aborts.count, 1, "forced text interruption should abort stale request");
-  assert.strictEqual(counters.stopped, 1, "forced text interruption should stop stale audio");
+  assert.strictEqual(aborts.count, 0, "content-aware protection should not abort the key sentence immediately");
+
+  assert.strictEqual(
+    controller.handleUserSpeechStart({
+      reason: "voice_correction",
+      confirmedTranscript: true,
+      kind: "correction"
+    }),
+    true,
+    "a confirmed correction should make the assistant yield immediately"
+  );
+  assert.strictEqual(state.chatBusy, false, "confirmed correction should clear the active turn");
+  assert.strictEqual(aborts.count, 1, "confirmed correction should abort the stale request");
+  assert.strictEqual(counters.stopped, 1, "confirmed correction should stop stale audio");
+  assert.ok(counters.finalized.text.endsWith("…"), "visible interrupted text should be preserved with an ellipsis");
+  assert.strictEqual(counters.rowRemoved || 0, 0, "preserved interrupted text must not be removed");
+  assert.strictEqual(counters.remembered[0].role, "assistant", "the heard assistant fragment should remain in conversation history");
 }
 
 {

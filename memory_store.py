@@ -20,12 +20,7 @@ def normalize_interaction_items(items, *, normalize_text, looks_garbled, looks_s
 
 
 def load_interaction_items(path, *, normalize_text, looks_garbled, looks_stagey):
-    if not path.exists():
-        return []
-    try:
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-    except Exception:
-        return []
+    data = safe_load_json_file(path, [])
     if not isinstance(data, list):
         return []
     return normalize_interaction_items(
@@ -65,22 +60,38 @@ def save_interaction_items(path, items, *, normalize_text, looks_garbled, looks_
 
 
 def safe_load_json_file(path, fallback):
-    try:
-        if not path.exists():
-            return fallback
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-        return data if data is not None else fallback
-    except Exception:
-        return fallback
+    candidates = (path, path.with_suffix(".bak"))
+    for candidate in candidates:
+        try:
+            if not candidate.exists():
+                continue
+            data = json.loads(candidate.read_text(encoding="utf-8-sig"))
+            if data is not None:
+                return data
+        except Exception:
+            continue
+    return fallback
 
 
-def safe_save_json_file(path, payload):
+def safe_save_json_file(path, payload, *, keep_backup=True):
     tmp_path = path.with_suffix(".tmp")
+    bak_path = path.with_suffix(".bak")
+    previous = None
+    if keep_backup and path.exists():
+        try:
+            previous = path.read_bytes()
+        except Exception:
+            previous = None
     tmp_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     tmp_path.replace(path)
+    if previous is not None:
+        try:
+            bak_path.write_bytes(previous)
+        except Exception:
+            pass
 
 
 def tail_jsonl(path, limit=5):

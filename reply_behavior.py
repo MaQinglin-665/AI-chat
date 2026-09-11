@@ -24,7 +24,7 @@ def build_reply_language_block(config):
             "- Do not include a Chinese translation in the main reply. The UI translation layer handles Chinese separately.\n"
             "- Answer the user's latest message directly and contextually before anything else.\n"
             "- Do not explain language or translation rules unless the user asks about language or translation.\n"
-            "- Switch to Chinese only if the user explicitly asks: 'reply in Chinese', 'use Chinese', or equivalent."
+            "- Switch to Chinese only if the user explicitly asks: 'reply in Chinese', 'use Chinese', '用中文回答', '请用中文', or an equivalent clear request."
         )
     if lang == "zh":
         return (
@@ -120,9 +120,16 @@ def apply_demo_stable_identity_fallback(config, user_message, reply_text, get_ch
     return f"I'm {override_name}, your desktop companion."
 
 
+def _is_mimo_reasoning_model(llm_cfg):
+    model = str((llm_cfg or {}).get("model", "") or "").strip().lower()
+    base_url = str((llm_cfg or {}).get("base_url", "") or "").strip().lower()
+    return model.startswith("mimo-") or "xiaomimimo.com" in base_url
+
+
 def build_reply_llm_cfg(config, llm_cfg, get_character_runtime_settings_func):
     safe_cfg = dict(llm_cfg or {})
-    if not is_demo_stable_enabled(config, get_character_runtime_settings_func):
+    needs_reasoning_budget = _is_mimo_reasoning_model(safe_cfg)
+    if not is_demo_stable_enabled(config, get_character_runtime_settings_func) and not needs_reasoning_budget:
         return safe_cfg
 
     raw_budget = safe_cfg.get("max_output_tokens", safe_cfg.get("max_tokens", 120))

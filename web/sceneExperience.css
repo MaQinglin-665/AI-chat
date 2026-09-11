@@ -1,0 +1,498 @@
+/* Four-phase time scene and motion layer. Existing room art stays authoritative. */
+:root {
+  --stage-room-transition: 1100ms cubic-bezier(0.16, 1, 0.3, 1);
+  --scene-accent: #ed6fa8;
+  --scene-accent-soft: rgba(237, 111, 168, 0.18);
+  --scene-glass-line: rgba(255, 184, 216, 0.28);
+  --scene-status-bg: rgba(26, 14, 31, 0.62);
+  --scene-status-text: #fff5fa;
+  --scene-menu-bg: rgba(30, 15, 35, 0.9);
+  --scene-menu-card: rgba(255, 237, 246, 0.07);
+}
+
+body[data-stage-room="day"] {
+  --scene-status-bg: rgba(255, 248, 251, 0.7);
+  --scene-status-text: #6c314c;
+  --scene-menu-bg: rgba(255, 246, 250, 0.92);
+  --scene-menu-card: rgba(255, 255, 255, 0.58);
+}
+
+body[data-stage-scene="morning"] {
+  --scene-accent: #ec7fa9;
+  --scene-accent-soft: rgba(236, 127, 169, 0.2);
+  --scene-glass-line: rgba(255, 174, 199, 0.4);
+}
+
+body[data-stage-scene="dusk"] {
+  --scene-accent: #e669a5;
+  --scene-accent-soft: rgba(230, 105, 165, 0.24);
+  --scene-glass-line: rgba(244, 139, 190, 0.42);
+  --scene-status-bg: rgba(69, 29, 57, 0.7);
+  --scene-status-text: #fff3f9;
+  --scene-menu-bg: rgba(55, 24, 48, 0.92);
+  --scene-menu-card: rgba(255, 233, 244, 0.08);
+}
+
+body[data-stage-scene="night"] {
+  --scene-accent: #9daeff;
+  --scene-accent-soft: rgba(126, 145, 255, 0.2);
+  --scene-glass-line: rgba(149, 166, 255, 0.34);
+  --scene-status-bg: rgba(12, 18, 48, 0.78);
+  --scene-status-text: #eef2ff;
+  --scene-menu-bg: rgba(13, 17, 43, 0.94);
+  --scene-menu-card: rgba(194, 205, 255, 0.07);
+}
+
+.stage-room-background,
+.stage-room-tone,
+.stage-room-atmosphere,
+.stage-scene-light,
+.stage-scene-motes,
+.stage-scene-halo,
+.stage-scene-floor {
+  transition:
+    opacity var(--stage-room-transition),
+    transform var(--stage-room-transition),
+    filter var(--stage-room-transition),
+    background var(--stage-room-transition),
+    border-color var(--stage-room-transition),
+    box-shadow var(--stage-room-transition);
+}
+
+body[data-stage-scene] .stage-room-background-day,
+body[data-stage-scene] .stage-room-background-morning,
+body[data-stage-scene] .stage-room-background-dusk,
+body[data-stage-scene] .stage-room-background-night {
+  opacity: 0;
+}
+
+body[data-stage-scene="morning"] .stage-room-background-morning,
+body[data-stage-scene="day"] .stage-room-background-day,
+body[data-stage-scene="dusk"] .stage-room-background-dusk,
+body[data-stage-scene="night"] .stage-room-background-night {
+  opacity: 1;
+  transform: scale(1.006);
+  filter: none;
+}
+
+.stage-scene-light,
+.stage-scene-motes {
+  position: absolute;
+  inset: -8%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.stage-scene-light {
+  opacity: 0.54;
+  transform: translate3d(0, 0, 0) scale(1.04);
+  background:
+    radial-gradient(ellipse at 24% 18%, rgba(255, 197, 223, 0.24), transparent 38%),
+    linear-gradient(116deg, transparent 18%, rgba(244, 177, 219, 0.08) 35%, transparent 53%);
+  mix-blend-mode: screen;
+  animation: scene-light-breathe 10s ease-in-out infinite;
+}
+
+.stage-scene-motes {
+  opacity: 0.46;
+  background-image:
+    radial-gradient(circle at 12% 28%, rgba(255, 224, 238, 0.9) 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 73% 19%, rgba(255, 184, 217, 0.72) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 86% 68%, rgba(240, 171, 226, 0.72) 0 1.3px, transparent 2px),
+    radial-gradient(circle at 38% 78%, rgba(255, 234, 244, 0.78) 0 1.1px, transparent 1.8px);
+  background-size: 210px 190px, 290px 250px, 340px 290px, 260px 230px;
+  animation: scene-motes-drift 20s linear infinite;
+}
+
+body[data-stage-scene="morning"] .stage-room-tone {
+  background:
+    linear-gradient(108deg, rgba(194, 205, 255, 0.06), transparent 38%, rgba(255, 220, 235, 0.05) 68%, transparent),
+    linear-gradient(180deg, rgba(49, 57, 103, 0.05), transparent 34%, rgba(104, 72, 105, 0.07));
+}
+
+body[data-stage-scene="morning"] .stage-scene-light {
+  opacity: 0.24;
+  background:
+    radial-gradient(ellipse at 20% 14%, rgba(217, 226, 255, 0.28), transparent 38%),
+    linear-gradient(112deg, transparent 18%, rgba(255, 201, 225, 0.1) 35%, transparent 55%);
+}
+
+body[data-stage-scene="day"] .stage-scene-light {
+  opacity: 0.48;
+  background:
+    radial-gradient(ellipse at 28% 18%, rgba(255, 251, 238, 0.38), transparent 40%),
+    linear-gradient(118deg, transparent 24%, rgba(255, 220, 236, 0.12) 42%, transparent 60%);
+}
+
+body[data-stage-scene="dusk"] .stage-room-tone {
+  background:
+    radial-gradient(circle at 22% 28%, rgba(255, 157, 111, 0.1), transparent 38%),
+    radial-gradient(circle at 72% 17%, rgba(151, 95, 204, 0.08), transparent 44%),
+    linear-gradient(180deg, rgba(39, 16, 48, 0.06), transparent 48%, rgba(47, 17, 38, 0.12));
+}
+
+body[data-stage-scene="dusk"] .stage-scene-light {
+  opacity: 0.28;
+  background:
+    radial-gradient(ellipse at 17% 28%, rgba(255, 168, 118, 0.22), transparent 38%),
+    linear-gradient(118deg, transparent 18%, rgba(237, 116, 185, 0.08) 39%, transparent 58%);
+}
+
+body.view-full[data-stage-scene="dusk"] .hero-card {
+  color: #fff4f9 !important;
+  border-color: rgba(247, 145, 194, 0.34) !important;
+  background: rgba(60, 25, 50, 0.74) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 222, 238, 0.12), 0 14px 36px rgba(42, 11, 34, 0.18) !important;
+}
+
+body.view-full[data-stage-scene="dusk"] #assistant-name,
+body.view-full[data-stage-scene="dusk"] #status,
+body.view-full[data-stage-scene="dusk"] #translation-chip-btn,
+body.view-full[data-stage-scene="dusk"] .primary-actions > button {
+  color: #fff3f9 !important;
+}
+
+body.view-full[data-stage-scene="dusk"] #translation-chip-btn,
+body.view-full[data-stage-scene="dusk"] .primary-actions > button {
+  border-color: rgba(255, 181, 215, 0.18) !important;
+  background: rgba(255, 231, 242, 0.08) !important;
+}
+
+body[data-stage-scene="night"] .stage-scene-light {
+  opacity: 0.3;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(121, 158, 255, 0.2), transparent 38%),
+    linear-gradient(112deg, transparent 12%, rgba(116, 148, 255, 0.1) 30%, transparent 48%);
+}
+
+body[data-stage-scene="night"] .stage-room-tone {
+  background:
+    radial-gradient(ellipse at 18% 20%, rgba(73, 111, 218, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(3, 8, 27, 0.12), transparent 44%, rgba(2, 6, 21, 0.2));
+}
+
+body[data-stage-scene="night"] .stage-room-atmosphere {
+  opacity: 0.46;
+  background-image:
+    radial-gradient(circle at 11% 31%, rgba(175, 205, 255, 0.86) 0 1px, transparent 2px),
+    radial-gradient(circle at 82% 22%, rgba(154, 178, 255, 0.76) 0 1px, transparent 2px),
+    radial-gradient(circle at 73% 73%, rgba(191, 166, 255, 0.7) 0 1px, transparent 2px),
+    radial-gradient(circle at 26% 82%, rgba(129, 189, 255, 0.64) 0 1px, transparent 2px);
+}
+
+body[data-stage-scene="night"] .stage-scene-motes {
+  opacity: 0.38;
+  background-image:
+    radial-gradient(circle at 12% 28%, rgba(220, 232, 255, 0.92) 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 73% 19%, rgba(151, 180, 255, 0.78) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 86% 68%, rgba(189, 167, 255, 0.72) 0 1.3px, transparent 2px),
+    radial-gradient(circle at 38% 78%, rgba(201, 220, 255, 0.82) 0 1.1px, transparent 1.8px);
+  animation-duration: 15s;
+}
+
+body[data-stage-scene="night"] .stage-scene-halo {
+  border-color: rgba(124, 156, 255, 0.2);
+  box-shadow: 0 0 110px rgba(69, 102, 220, 0.14), inset 0 0 76px rgba(103, 137, 255, 0.08);
+}
+
+body[data-stage-scene="night"] .stage-scene-floor {
+  border-color: rgba(117, 151, 255, 0.16);
+  box-shadow: 0 0 90px rgba(48, 76, 171, 0.12);
+}
+
+body[data-stage-scene="morning"] .kawaii-doodle {
+  color: #ff93b8 !important;
+  animation-duration: 4.6s;
+}
+
+body[data-stage-scene="dusk"] .kawaii-doodle {
+  color: #ff86ba !important;
+  animation-duration: 5.8s;
+}
+
+body[data-stage-scene="night"] .kawaii-doodle {
+  color: #a9b7ff !important;
+  animation-duration: 6.4s;
+}
+
+.stage-scene-halo {
+  animation: scene-halo-breathe 8s ease-in-out infinite;
+}
+
+.stage-scene-floor {
+  animation: scene-floor-breathe 7s ease-in-out infinite;
+}
+
+.stage-time-status {
+  display: none;
+}
+
+body.view-full .stage-time-status {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 14px 0 11px;
+  color: var(--scene-status-text);
+  border: 1px solid var(--scene-glass-line);
+  border-radius: 999px;
+  background: var(--scene-status-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 8px 24px rgba(23, 6, 19, 0.12);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.stage-time-glyph {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: var(--scene-accent);
+  background: currentColor;
+  -webkit-mask: url("./assets/icons/phosphor/moon-stars.svg") center / contain no-repeat;
+  mask: url("./assets/icons/phosphor/moon-stars.svg") center / contain no-repeat;
+  animation: scene-status-pulse 3.6s ease-in-out infinite;
+}
+
+.stage-time-status[data-scene="morning"] .stage-time-glyph,
+.stage-time-status[data-scene="day"] .stage-time-glyph {
+  -webkit-mask-image: url("./assets/icons/phosphor/sun.svg");
+  mask-image: url("./assets/icons/phosphor/sun.svg");
+}
+
+.stage-time-status[data-scene="dusk"] .stage-time-glyph {
+  -webkit-mask-image: url("./assets/icons/phosphor/clock.svg");
+  mask-image: url("./assets/icons/phosphor/clock.svg");
+}
+
+.stage-time-label {
+  font-size: 13px;
+  font-weight: 760;
+  letter-spacing: 0.04em;
+}
+
+.stage-time-clock {
+  min-width: 38px;
+  color: color-mix(in srgb, currentColor 72%, transparent);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+body.view-full #scene-btn::before,
+body.view-chat #scene-btn::before {
+  --ph-icon: var(--ph-clock);
+}
+
+body.view-full #scene-btn[aria-expanded="true"] {
+  color: #fff8fb !important;
+  border-radius: 999px !important;
+  background: rgba(237, 111, 168, 0.3) !important;
+}
+
+.stage-scene-menu {
+  position: fixed;
+  right: 24px;
+  bottom: 190px;
+  z-index: 44;
+  width: min(360px, calc(100vw - 32px));
+  padding: 16px;
+  color: var(--scene-status-text);
+  border: 1px solid var(--scene-glass-line);
+  border-radius: 22px;
+  background: var(--scene-menu-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 20px 58px rgba(21, 5, 18, 0.3);
+  backdrop-filter: blur(28px) saturate(145%);
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
+  animation: scene-menu-arrive 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  pointer-events: auto;
+}
+
+.stage-scene-menu[hidden] {
+  display: none !important;
+}
+
+.stage-scene-menu-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 2px 12px;
+}
+
+.stage-scene-menu-head > span {
+  font-size: 15px;
+  font-weight: 780;
+}
+
+.stage-scene-menu-head > small {
+  color: color-mix(in srgb, currentColor 68%, transparent);
+  font-size: 10px;
+}
+
+.stage-scene-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stage-scene-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 9px 12px;
+  color: inherit;
+  border: 1px solid color-mix(in srgb, var(--scene-glass-line) 70%, transparent);
+  border-radius: 16px;
+  background: var(--scene-menu-card);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  text-align: left;
+  transition: color 180ms ease, border-color 180ms ease, background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.stage-scene-option-auto {
+  grid-column: 1 / -1;
+}
+
+.stage-scene-option img {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  opacity: 0.74;
+  filter: none;
+}
+
+.stage-scene-option > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stage-scene-option strong {
+  font-size: 13px;
+  font-weight: 740;
+}
+
+.stage-scene-option small {
+  color: color-mix(in srgb, currentColor 58%, transparent);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.stage-scene-option:hover {
+  border-color: color-mix(in srgb, var(--scene-accent) 65%, transparent);
+  background: color-mix(in srgb, var(--scene-accent-soft) 86%, var(--scene-menu-card));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 8px 20px rgba(50, 10, 34, 0.12);
+  transform: translateY(-2px);
+}
+
+.stage-scene-option:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.stage-scene-option[aria-pressed="true"] {
+  color: #fff9fc;
+  border-color: color-mix(in srgb, var(--scene-accent) 76%, white 8%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--scene-accent) 82%, #bd4f80), var(--scene-accent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 10px 24px rgba(118, 27, 70, 0.2);
+}
+
+.stage-scene-option[aria-pressed="true"] img {
+  opacity: 1;
+  filter: brightness(0) invert(1);
+}
+
+body.view-full .message:last-child {
+  animation: scene-message-arrive 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+body.view-full .utility-actions > button,
+body.view-full .primary-actions > button {
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease !important;
+}
+
+body.view-full .utility-actions > button:hover,
+body.view-full .primary-actions > button:hover {
+  transform: translateY(-2px) scale(1.015);
+}
+
+@keyframes scene-light-breathe {
+  0%, 100% { opacity: 0.42; transform: translate3d(-0.6%, 0, 0) scale(1.04); }
+  50% { opacity: 0.72; transform: translate3d(0.8%, -0.5%, 0) scale(1.07); }
+}
+
+@keyframes scene-motes-drift {
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(1.2%, -1.5%, 0); }
+  100% { transform: translate3d(0, -3%, 0); }
+}
+
+@keyframes scene-halo-breathe {
+  0%, 100% { opacity: 0.42; transform: translate(-50%, -50%) scale(0.98); }
+  50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.045); }
+}
+
+@keyframes scene-floor-breathe {
+  0%, 100% { opacity: 0.58; transform: translateX(-50%) scaleX(0.96); }
+  50% { opacity: 0.86; transform: translateX(-50%) scaleX(1.04); }
+}
+
+@keyframes scene-status-pulse {
+  0%, 100% { opacity: 0.72; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes scene-menu-arrive {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.97); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes scene-message-arrive {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@media (max-width: 700px) {
+  body.view-full .stage-time-status {
+    height: 36px;
+    padding-inline: 10px;
+  }
+
+  .stage-time-clock {
+    display: none;
+  }
+
+  .stage-scene-menu {
+    right: 12px;
+    bottom: 178px;
+    width: calc(100vw - 24px);
+    padding: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-scene-light,
+  .stage-scene-motes,
+  .stage-scene-halo,
+  .stage-scene-floor,
+  .stage-time-glyph,
+  .stage-scene-menu,
+  body.view-full .message:last-child {
+    animation: none !important;
+  }
+
+  .stage-room-background,
+  .stage-room-tone,
+  .stage-room-atmosphere,
+  .stage-scene-light,
+  .stage-scene-motes {
+    transition-duration: 1ms !important;
+  }
+}

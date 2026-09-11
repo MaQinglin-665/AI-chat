@@ -7,8 +7,11 @@ const assert = require("assert");
 
 const LIVE2D_LAYOUT_JS = path.resolve(__dirname, "..", "web", "live2dLayoutController.js");
 const DESKTOP_WINDOW_JS = path.resolve(__dirname, "..", "web", "desktopWindowController.js");
+const STAGE_CSS = path.resolve(__dirname, "..", "web", "stage.css");
 const live2dLayoutSource = fs.readFileSync(LIVE2D_LAYOUT_JS, "utf8");
 const desktopWindowSource = fs.readFileSync(DESKTOP_WINDOW_JS, "utf8");
+const stageCssSource = fs.readFileSync(STAGE_CSS, "utf8");
+const live2dLayoutController = require(LIVE2D_LAYOUT_JS);
 const dragSource = `${live2dLayoutSource}\n${desktopWindowSource}`;
 const TAP_MOVE_THRESHOLD = 10;
 
@@ -30,6 +33,16 @@ function staticChecks() {
   );
   ensureSourceContains(
     live2dLayoutSource,
+    'recordContextualInteraction("tap")',
+    "A completed model tap records an app-local engagement signal"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    'recordContextualInteraction("drag")',
+    "A completed model drag records an app-local engagement signal"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
     "state.desktopMode && state.desktopBridge === \"electron\"",
     "Electron desktop bridge condition exists in pointerdown flow"
   );
@@ -45,7 +58,7 @@ function staticChecks() {
   );
   ensureSourceContains(
     live2dLayoutSource,
-    "|| isPointOverSubtitleDragHandle(e.clientX, e.clientY);",
+    "|| isPointOverSubtitleDragHandle(clientX, clientY);",
     "Electron click-through hit test keeps subtitle drag handle interactive"
   );
   ensureSourceContains(
@@ -55,8 +68,43 @@ function staticChecks() {
   );
   ensureSourceContains(
     live2dLayoutSource,
+    "state.dragData || state.windowDragActive || state.subtitleDragPointerId",
+    "Electron click-through stays disabled while model dragging"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "state.clickthroughHitTestTimer = window.setInterval(async () => {",
+    "Electron click-through has cursor polling fallback"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "window.electronAPI.getCursorScreenPoint()",
+    "Electron click-through polling reads global cursor position"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "window.electronAPI.getModelWindowBounds()",
+    "Electron click-through polling maps cursor into model window bounds"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
     "isPointInModelDragHotzone(x, y, bounds)",
     "Visible-area hit test uses segmented drag hotzone"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "if (!isPointOverVisibleModelArea(e.clientX, e.clientY)) return;",
+    "Wheel scaling is limited to the visible character hotzone"
+  );
+  const wheelListenerAt = live2dLayoutSource.indexOf('canvas.addEventListener("wheel"');
+  const wheelHotzoneAt = live2dLayoutSource.indexOf(
+    "if (!isPointOverVisibleModelArea(e.clientX, e.clientY)) return;",
+    wheelListenerAt
+  );
+  const wheelPreventAt = live2dLayoutSource.indexOf("e.preventDefault();", wheelListenerAt);
+  assert.ok(
+    wheelListenerAt >= 0 && wheelHotzoneAt > wheelListenerAt && wheelPreventAt > wheelHotzoneAt,
+    "Wheel outside the model must return before preventDefault so history scrolling remains available"
   );
   ensureSourceContains(
     desktopWindowSource,
@@ -97,6 +145,21 @@ function staticChecks() {
     live2dLayoutSource,
     "state.suspendRelayoutUntil = performance.now() + 240;",
     "Electron desktop drag keeps relayout suspension"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    "syncPetPresenceAnchor(state.model);",
+    "Electron document drag keeps the presence badge anchored to the model"
+  );
+  ensureSourceContains(
+    live2dLayoutSource,
+    'setProperty?.("--pet-presence-y"',
+    "Presence anchor publishes a vertical screen coordinate"
+  );
+  ensureSourceContains(
+    stageCssSource,
+    "calc(var(--pet-presence-y",
+    "Presence badge uses the model foot coordinate instead of a fixed bottom offset"
   );
   ensureSourceContains(
     live2dLayoutSource,
@@ -367,6 +430,37 @@ test("electron document move updates model/world coordinates", () => {
   assertApproxEqual(h.state.baseTransform.x, 103);
   assertApproxEqual(h.state.baseTransform.y, 98);
   assert.strictEqual(h.state.pointerDragMoved, true);
+});
+
+test("presence badge converts renderer coordinates to screen coordinates without model scale", () => {
+  const cssValues = {};
+  const model = { x: 400, y: 600, scale: { x: 2.5, y: 2.5 } };
+  const controller = live2dLayoutController.createController({
+    state: {
+      desktopMode: true,
+      uiView: "model",
+      model,
+      pixiApp: {
+        renderer: { width: 800, height: 800 },
+        view: {
+          getBoundingClientRect: () => ({ left: 10, top: 20, width: 400, height: 400 })
+        }
+      }
+    },
+    documentObject: {
+      documentElement: {
+        style: {
+          setProperty(name, value) { cssValues[name] = value; }
+        }
+      }
+    }
+  });
+
+  const anchor = controller.syncPetPresenceAnchor(model);
+  assert.deepStrictEqual(anchor, { x: 210, y: 320 });
+  assert.strictEqual(cssValues["--pet-presence-x"], "210px");
+  assert.strictEqual(cssValues["--pet-presence-y"], "320px");
+  assert.strictEqual(model.scale.x, 2.5, "badge anchoring must not change model or badge scale");
 });
 
 test("stopDesktopWindowDrag resets drag flags and accumulators", () => {

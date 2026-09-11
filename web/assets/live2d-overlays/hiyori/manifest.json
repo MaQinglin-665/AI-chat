@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "character": "hiyori_pro_t11",
+  "emotions": {
+    "thinking": {
+      "durationMs": 1900,
+      "entry": "snap",
+      "assets": [
+        {
+          "id": "thinking-focus-lines",
+          "file": "thinking-focus-lines.png",
+          "placement": "mark thinking-focus-lines"
+        },
+        {
+          "id": "thinking-ellipsis",
+          "file": "thinking-ellipsis.png",
+          "placement": "mark thinking-ellipsis"
+        }
+      ]
+    },
+    "angry": {
+      "durationMs": 1700,
+      "entry": "snap",
+      "assets": [
+        {
+          "id": "angry-impact-lines",
+          "file": "angry-impact-lines.png",
+          "placement": "mark angry-impact-lines"
+        },
+        {
+          "id": "angry-mark",
+          "file": "angry-mark.png",
+          "placement": "mark angry-mark"
+        }
+      ]
+    },
+    "surprised": {
+      "durationMs": 1250,
+      "entry": "pop",
+      "assets": [
+        {
+          "id": "surprised-spark",
+          "file": "surprised-spark.png",
+          "placement": "mark surprised-spark"
+        }
+      ]
+    }
+  }
+}

@@ -7,7 +7,7 @@ if /I "%~1"=="--no-wait" set "NO_WAIT=1"
 
 set "GPT_SOVITS_DIR=D:\AI\GPT-SoVITS"
 set "GPT_SOVITS_PORT=9880"
-set "CONDA_EXE=C:\Users\MQL\miniconda3\Scripts\conda.exe"
+set "CONDA_EXE="
 set "CONDA_ENV=GPTSoVits"
 set "ENV_PYTHON="
 for %%p in (
@@ -15,7 +15,21 @@ for %%p in (
   "%USERPROFILE%\miniconda3\envs\GPTSoVits\python.exe"
   "%GPT_SOVITS_DIR%\runtime\python.exe"
 ) do (
-  if not defined ENV_PYTHON if exist %%~p set "ENV_PYTHON=%%~p"
+    if not defined ENV_PYTHON if exist %%~p set "ENV_PYTHON=%%~p"
+)
+
+for %%c in (
+  "%USERPROFILE%\miniconda3\Scripts\conda.exe"
+  "%USERPROFILE%\anaconda3\Scripts\conda.exe"
+  "%ProgramData%\miniconda3\Scripts\conda.exe"
+  "%ProgramData%\anaconda3\Scripts\conda.exe"
+) do (
+  if not defined CONDA_EXE if exist %%~c set "CONDA_EXE=%%~c"
+)
+if not defined CONDA_EXE (
+  for /f "delims=" %%c in ('where conda.exe 2^>nul') do (
+    if not defined CONDA_EXE set "CONDA_EXE=%%~c"
+  )
 )
 
 set "GPT_RUNNING="
@@ -37,8 +51,8 @@ if defined ENV_PYTHON (
   echo Starting local GPT-SoVITS API on port %GPT_SOVITS_PORT% using %ENV_PYTHON%...
   start "GPT-SoVITS API" /min cmd /k "cd /d ""%GPT_SOVITS_DIR%"" && ""%ENV_PYTHON%"" api_v2.py -a 127.0.0.1 -p %GPT_SOVITS_PORT% -c GPT_SoVITS/configs/tts_infer.yaml"
 ) else (
-  if not exist "%CONDA_EXE%" (
-    echo Warning: Python for %CONDA_ENV% not found and conda not found at %CONDA_EXE%
+  if not defined CONDA_EXE (
+    echo Warning: Python for %CONDA_ENV% not found and conda.exe was not found.
     exit /b 0
   )
   echo Starting local GPT-SoVITS API on port %GPT_SOVITS_PORT% via conda...

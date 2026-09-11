@@ -1,16 +1,20 @@
 {
   "name": "xinyu-ai-desktop-pet",
   "productName": "馨语AI桌宠",
-  "version": "1.4.0-preview",
+  "version": "1.4.0-preview.6",
   "private": true,
-  "description": "馨语AI桌宠 / Xinyu Desktop Pet: Live2D desktop AI companion with local Python backend and transparent Electron window",
+  "description": "馨语桌宠 / Xinyu Desktop Pet: experimental Windows AI companion with Live2D, visual-novel dialogue, speech and editable memory",
   "main": "electron/main.js",
   "scripts": {
     "start:electron": "electron electron/main.js",
     "start:docs": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-docs.ps1",
     "check:docs": "npm --prefix docs run check:all"
   },
+  "dependencies": {
+    "@ricky0123/vad-web": "0.0.30",
+    "onnxruntime-web": "1.27.0"
+  },
   "devDependencies": {
-    "electron": "^28.2.0"
+    "electron": "39.8.10"
   }
 }

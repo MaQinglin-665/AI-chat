@@ -11,6 +11,9 @@ from pathlib import Path
 
 TEXT_SUFFIXES = {
     ".py",
+    ".bat",
+    ".ps1",
+    ".sh",
     ".js",
     ".mjs",
     ".cjs",
@@ -57,6 +60,10 @@ JSON_ASSIGNMENT_PATTERNS = [
     re.compile(r'"api_token"\s*:\s*"([^"]+)"'),
 ]
 
+PRIVATE_LOCAL_PATH_PATTERNS = [
+    re.compile(r"\b[A-Za-z]:\\Users\\[^\\\s`'\"<>]+\\"),
+]
+
 SAFE_VALUE_FRAGMENTS = (
     "",
     "your_",
@@ -83,7 +90,7 @@ def _should_skip(rel: Path) -> bool:
 
 def _iter_text_files(root: Path):
     try:
-        result = subprocess.run(
+        tracked = subprocess.run(
             ["git", "ls-files"],
             cwd=root,
             check=True,
@@ -92,14 +99,34 @@ def _iter_text_files(root: Path):
             encoding="utf-8",
             errors="replace",
         )
-        candidates = [root / line for line in result.stdout.splitlines() if line.strip()]
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        candidates = [
+            root / line
+            for output in (tracked.stdout, untracked.stdout)
+            for line in output.splitlines()
+            if line.strip()
+        ]
+        candidates.extend(root.glob("*.py"))
     except Exception:
         candidates = root.rglob("*")
 
+    seen = set()
     for path in candidates:
         if not path.is_file():
             continue
         rel = path.relative_to(root)
+        rel_key = rel.as_posix().lower()
+        if rel_key in seen:
+            continue
+        seen.add(rel_key)
         if _should_skip(rel):
             continue
         if path.suffix.lower() not in TEXT_SUFFIXES and path.name not in {".env", ".env.example"}:
@@ -142,6 +169,11 @@ def _scan_lines(rel: Path, text: str):
             value = m.group(1)
             if _looks_like_real_secret(value):
                 failures.append(f"{rel.as_posix()}:{idx} looks like committed API key/token")
+
+        for pat in PRIVATE_LOCAL_PATH_PATTERNS:
+            if pat.search(raw_line):
+                failures.append(f"{rel.as_posix()}:{idx} private local Windows user path")
+                break
     return failures
 
 

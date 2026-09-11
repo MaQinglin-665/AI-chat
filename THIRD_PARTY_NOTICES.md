@@ -11,6 +11,7 @@ This document is a practical release checklist, not legal advice. Before publish
 | Paths | Component | Notice |
 | --- | --- | --- |
 | `web/vendor/pixi.min.js`, `docs/live2d/vendor/pixi.min.js` | PixiJS | PixiJS is distributed under the MIT license. Keep upstream license notices when redistributing. Source: https://github.com/pixijs/pixijs |
+| `web/vendor/pixi-unsafe-eval.min.js` | `@pixi/unsafe-eval` 6.5.8 | Official PixiJS CSP compatibility patch, distributed under the MIT license. It replaces runtime-generated uniform sync functions so Pixi can run where `unsafe-eval` is blocked. Source: https://www.npmjs.com/package/@pixi/unsafe-eval |
 | `web/vendor/cubism4.min.js`, `docs/live2d/vendor/cubism4.min.js` | Live2D Cubism Framework for Web | Governed by Live2D Cubism SDK terms. Keep Live2D notices and verify the current SDK agreement before redistribution. Source: https://www.live2d.com/en/sdk/download/web/ |
 | `web/vendor/live2dcubismcore.min.js`, `docs/live2d/vendor/live2dcubismcore.min.js` | Live2D Cubism Core | Governed by Live2D Cubism SDK terms. Keep Live2D notices and verify the current SDK agreement before redistribution. Source: https://www.live2d.com/en/sdk/about/ |
 
@@ -33,10 +34,22 @@ This document is a practical release checklist, not legal advice. Before publish
 
 Python and Node dependencies are installed from package managers during setup and are not vendored by this repository. Their licenses remain governed by their upstream packages.
 
+Voice-boundary dependencies added for the optional local microphone path:
+
+| Package | License | Purpose / source |
+| --- | --- | --- |
+| `@ricky0123/vad-web` | ISC | Browser microphone adapter for Silero VAD. Source: https://github.com/ricky0123/vad |
+| `onnxruntime-web` | MIT | Local WebAssembly inference runtime used by the VAD adapter. Source: https://github.com/microsoft/onnxruntime |
+| Silero VAD ONNX model distributed by `@ricky0123/vad-web` | MIT | Local voice-activity model. Source: https://github.com/snakers4/silero-vad |
+| `faster-qwen3-tts` | MIT | Optional isolated CUDA streaming runtime for the Qwen3-TTS provider. It is installed separately and is not bundled. Source: https://github.com/andimarafioti/faster-qwen3-tts |
+| Qwen3-TTS model/code | Apache-2.0 | Optional local TTS model family. Model weights are downloaded into the user's model cache and must not be committed or packaged. Source: https://github.com/QwenLM/Qwen3-TTS |
+| `funasr-onnx` | MIT | Optional isolated ONNX runtime for the persistent loopback SenseVoice service. It is installed separately and is not bundled. Source: https://github.com/modelscope/FunASR |
+| SenseVoice / SenseVoiceSmall-onnx | Model-specific upstream terms | Optional local ASR model. Weights are downloaded into the user's ModelScope cache and must not be committed or packaged. Verify the current model-card terms before redistribution. Source: https://github.com/FunAudioLLM/SenseVoice |
+
 Useful references:
 
 - Node package metadata: `package-lock.json`
-- Python dependency list: `requirements.txt`, `requirements-dev.txt`
+- Python dependency list: `requirements.txt`, `requirements-dev.txt`, `requirements-asr.txt`, `requirements-asr-service.txt`
 - Docs tooling metadata: `docs/package.json`, `docs/package-lock.json`
 
 ## Release Packaging Rule

@@ -56,7 +56,7 @@ function Get-TrackedRootPythonFiles {
             )
         }
     } catch {
-        # Fall back below when git is unavailable.
+        return @()
     }
 
     return @(
@@ -64,6 +64,122 @@ function Get-TrackedRootPythonFiles {
             ForEach-Object { $_.Name } |
             Sort-Object -Unique
     )
+}
+
+function Get-CurrentRootPythonFiles {
+    return @(
+        Get-ChildItem -LiteralPath $RepoRoot -File -Filter "*.py" |
+            ForEach-Object { $_.Name } |
+            Sort-Object -Unique
+    )
+}
+
+function Get-PackageRootPythonFiles {
+    return @(
+        @(
+            Get-TrackedRootPythonFiles
+            Get-CurrentRootPythonFiles
+        ) |
+            Where-Object { $_ } |
+            Sort-Object -Unique
+    )
+}
+
+function Get-TrackedPackagePathSet {
+    $set = @{}
+    try {
+        $files = git -C $RepoRoot ls-files 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            foreach ($file in $files) {
+                $relative = ([string]$file).Trim().Replace("\", "/")
+                if ($relative) {
+                    $set[$relative.ToLowerInvariant()] = $true
+                }
+            }
+        }
+    } catch {
+        return $set
+    }
+    return $set
+}
+
+function Test-IsTrackedOrTrackedAncestorPackagePath {
+    param(
+        [string]$RelativePath,
+        [hashtable]$TrackedPathSet
+    )
+
+    $relative = ([string]$RelativePath).Trim().TrimEnd("/").Replace("\", "/")
+    if (-not $relative) {
+        return $true
+    }
+    $key = $relative.ToLowerInvariant()
+    if ($TrackedPathSet.ContainsKey($key)) {
+        return $true
+    }
+    $prefix = $key + "/"
+    foreach ($tracked in $TrackedPathSet.Keys) {
+        if (([string]$tracked).StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-StageRelativePath {
+    param(
+        [string]$PackageRoot,
+        [string]$FullPath
+    )
+
+    $rootPath = [System.IO.Path]::GetFullPath([string]$PackageRoot).TrimEnd("\")
+    $rootPrefix = $rootPath + "\"
+    $full = [System.IO.Path]::GetFullPath($FullPath)
+    if ($full -eq $rootPath) {
+        return ""
+    }
+    if (-not $full.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Package path is outside staging root: $full"
+    }
+    return $full.Substring($rootPrefix.Length).Replace("\", "/")
+}
+
+function Remove-IgnoredPackagePaths {
+    param([string]$PackageRoot)
+
+    $trackedPathSet = Get-TrackedPackagePathSet
+    $packageRootPath = [System.IO.Path]::GetFullPath((Resolve-Path $PackageRoot)).TrimEnd("\")
+    $packageRootPrefix = $packageRootPath + "\"
+    $ignored = @(
+        Get-ChildItem -LiteralPath $PackageRoot -Force -Recurse |
+            ForEach-Object {
+                $relative = Get-StageRelativePath $PackageRoot $_.FullName
+                if (-not $relative) {
+                    return
+                }
+                if (Test-IsTrackedOrTrackedAncestorPackagePath $relative $trackedPathSet) {
+                    return
+                }
+                git -C $RepoRoot -c core.quotePath=false check-ignore -q -- $relative 2>$null
+                if ($LASTEXITCODE -eq 0) {
+                    $relative
+                }
+            } |
+            Sort-Object -Unique
+    )
+    if ($ignored.Count -eq 0) {
+        return
+    }
+
+    foreach ($relative in @($ignored | Sort-Object Length -Descending)) {
+        $full = [System.IO.Path]::GetFullPath((Join-Path $packageRootPath $relative))
+        if ($full -eq $packageRootPath -or -not $full.StartsWith($packageRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Refusing to remove package path outside staging root: $relative"
+        }
+        if (Test-Path -LiteralPath $full) {
+            Remove-Item -LiteralPath $full -Recurse -Force
+        }
+    }
 }
 
 $packageVersion = Get-PackageVersion
@@ -84,7 +200,7 @@ if (Test-Path $zipPath) {
 }
 New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
 
-$trackedRootPythonFiles = @(Get-TrackedRootPythonFiles)
+$packageRootPythonFiles = @(Get-PackageRootPythonFiles)
 
 $pathsToCopy = @(
     ".env.example",
@@ -122,11 +238,12 @@ $pathsToCopy = @(
     "web"
 )
 
-foreach ($path in @($pathsToCopy + $trackedRootPythonFiles)) {
+foreach ($path in @($pathsToCopy + $packageRootPythonFiles)) {
     Copy-PathIfExists $path $stageRoot
 }
 
 $runtimeDirs = @(
+    ".local-tools",
     ".venv",
     ".pytest_cache",
     "docs\node_modules",
@@ -161,6 +278,8 @@ foreach ($file in $runtimeFiles) {
 Get-ChildItem -LiteralPath $stageRoot -Directory -Recurse -Force |
     Where-Object { $_.Name -eq "__pycache__" } |
     ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+
+Remove-IgnoredPackagePaths $stageRoot
 
 Compress-Archive -LiteralPath $stageRoot -DestinationPath $zipPath -Force
 

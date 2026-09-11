@@ -51,6 +51,7 @@ def test_chat_context_sanitizes_interruptions_without_secret_leaks():
     assert interruption["turn_manager"]["protected_key_sentence"] is True
     assert interruption["reply_policy"]["kind"] == "shorten"
     assert "Barge-in reply policy: kind=shorten" in block
+    assert "Never repeat wording the user already heard." in block
     assert "SHOULD_NOT_LEAK" not in block
     assert "SECRET_VALUE" not in block
     assert "sk-1234567890abcdef" not in block
@@ -82,6 +83,33 @@ def test_chat_context_keeps_asr_confirmation_signal():
     assert "[redacted]" in block
 
 
+def test_chat_context_keeps_paralinguistic_cue_private_without_visible_text():
+    context = app_chat_context.sanitize_conversation_context(
+        {
+            "asr": {
+                "source": "voice_paralinguistic",
+                "needs_confirmation": False,
+                "paralinguistic": {
+                    "emotion": "sad",
+                    "events": ["speech"],
+                    "cue_type": "nonverbal_vocalization",
+                    "voiced": True,
+                    "voiced_ratio": 0.8,
+                    "pitch_stability": 0.9,
+                    "meaningful": True,
+                },
+            }
+        }
+    )
+    block = app_chat_context.build_conversation_context_prompt_block(context)
+
+    assert context["asr"]["final_text"] == ""
+    assert context["asr"]["paralinguistic"]["emotion"] == "sad"
+    assert "Private paralinguistic cue" in block
+    assert "not literal words" in block
+    assert "inventing a precise meaning" in block
+
+
 def test_chat_context_clamps_character_experience_and_thought_burst():
     profile = app_chat_context.sanitize_character_experience_profile(
         {
@@ -111,3 +139,24 @@ def test_chat_context_clamps_character_experience_and_thought_burst():
     assert burst["min_sentences"] == 4
     assert burst["max_sentences"] == 4
     assert burst["length_budget"] == "4-4 sentences"
+
+
+def test_chat_context_keeps_bounded_ambient_residue_without_forcing_callback():
+    context = app_chat_context.sanitize_conversation_context(
+        {
+            "ambient": {
+                "mode": "defer",
+                "summary": "The user sounded relaxed while speaking casually.",
+                "topic_hint": "maybe I will draw later",
+                "reaction": "thinking",
+                "recorded_at": 123456,
+            }
+        }
+    )
+    block = app_chat_context.build_conversation_context_prompt_block(context)
+
+    assert context["ambient"]["mode"] == "defer"
+    assert context["ambient"]["reaction"] == "thinking"
+    assert "Recent ambient continuity" in block
+    assert "do not apologize for the silence" in block
+    assert "maybe I will draw later" in block

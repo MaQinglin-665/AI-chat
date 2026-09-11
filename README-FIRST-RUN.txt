@@ -9,12 +9,12 @@ Normal Windows users
 
 Download from the GitHub release:
 
-    Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe
+    Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe
     SHA256SUMS.txt
 
 Verify the installer before running:
 
-    Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.exe -Algorithm SHA256
+    Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe -Algorithm SHA256
     Get-Content .\SHA256SUMS.txt
 
 The first public installer is unsigned. SmartScreen may show an unknown

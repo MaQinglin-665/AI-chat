@@ -13,15 +13,13 @@ import urllib.request
 import uuid
 import wave
 
-try:
-    import audioop as _audioop
-except ImportError:
-    _audioop = None  # Python 3.13+ removed audioop; graceful degradation
-
 from config import (
     DiagnosticError,
     GPT_SOVITS_DEFAULT_API_URL,
     GPT_SOVITS_DEFAULT_VOICE,
+    QWEN3_TTS_DEFAULT_API_URL,
+    QWEN3_TTS_DEFAULT_MODEL,
+    QWEN3_TTS_DEFAULT_VOICE,
     ROOT_DIR,
     SERVER_TTS_PROVIDERS,
     TTS_DEFAULT_PROVIDER,
@@ -33,6 +31,15 @@ from config import (
     VOLCENGINE_TTS_DEFAULT_CLUSTER,
     VOLCENGINE_TTS_DEFAULT_VOICE,
     load_config,
+)
+from tts_audio import (
+    pcm_lin2lin,
+    pcm_max,
+    pcm_mul,
+    pcm_ratecv,
+    pcm_rms,
+    pcm_tomono,
+    pcm_tostereo,
 )
 
 try:
@@ -89,6 +96,11 @@ def _normalize_gpt_sovits_spoken_text(text):
         src.replace("_", " ")
         .replace("/", " ")
         .replace("\\", " ")
+        .replace("\u2014", ". ")
+        .replace("\u2013", ". ")
+        .replace("\u2012", ". ")
+        .replace("\u2011", "-")
+        .replace("\u2010", "-")
     )
     speak = re.sub(r"[\u2600-\u27BF\uE000-\uF8FF\U0001F300-\U0001FAFF]", " ", speak)
 
@@ -116,6 +128,13 @@ def _normalize_gpt_sovits_spoken_text(text):
         speak = re.sub(r"\s+([,.!?;:])", r"\1", speak)
         speak = re.sub(r"([,.!?;:])(?=[^\s])", r"\1 ", speak)
         speak = re.sub(r"[,;:]\s+", ". ", speak)
+        for marker in ("alright", "okay", "ok", "yeah"):
+            speak = re.sub(
+                rf"\b({marker})[.!?,]?\s+\1\b[.!?,]?",
+                r"\1.",
+                speak,
+                flags=re.I,
+            )
         speak = re.sub(r"\s+", " ", speak).strip()
 
     return speak[:600]
@@ -590,24 +609,19 @@ def _concat_wav_audio_bytes(chunks):
         ch, sw, sr, _comp, _comp_name = cur
         pcm = frames
         try:
-            if _audioop is not None:
-                if sw != target_sw:
-                    pcm = _audioop.lin2lin(pcm, sw, target_sw)
-                    sw = target_sw
-                if ch != target_ch:
-                    if ch == 2 and target_ch == 1:
-                        pcm = _audioop.tomono(pcm, sw, 0.5, 0.5)
-                    elif ch == 1 and target_ch == 2:
-                        pcm = _audioop.tostereo(pcm, sw, 1.0, 1.0)
-                    else:
-                        raise RuntimeError("Unsupported channel conversion")
-                    ch = target_ch
-                if sr != target_sr:
-                    pcm, _ = _audioop.ratecv(pcm, sw, ch, sr, target_sr, None)
-            else:
-                # audioop unavailable (Python 3.13+): skip mismatched chunks
-                if cur != params:
-                    continue
+            if sw != target_sw:
+                pcm = pcm_lin2lin(pcm, sw, target_sw)
+                sw = target_sw
+            if ch != target_ch:
+                if ch == 2 and target_ch == 1:
+                    pcm = pcm_tomono(pcm, sw, 0.5, 0.5)
+                elif ch == 1 and target_ch == 2:
+                    pcm = pcm_tostereo(pcm, sw, 1.0, 1.0)
+                else:
+                    raise RuntimeError("Unsupported channel conversion")
+                ch = target_ch
+            if sr != target_sr:
+                pcm = pcm_ratecv(pcm, sw, ch, sr, target_sr)
         except Exception:
             # Skip incompatible chunk instead of failing the whole reply.
             if cur != params:
@@ -706,8 +720,6 @@ def _normalize_wav_loudness(
     peak_limit=26000,
     max_rms=4200.0,
 ):
-    if _audioop is None:
-        return audio_bytes, None
     if not isinstance(audio_bytes, (bytes, bytearray)) or len(audio_bytes) < 44:
         return audio_bytes, None
     data = bytes(audio_bytes)
@@ -721,8 +733,8 @@ def _normalize_wav_loudness(
         if sample_width != 2 or not frames:
             return audio_bytes, None
 
-        peak_before = int(_audioop.max(frames, sample_width) or 0)
-        rms_before = float(_audioop.rms(frames, sample_width) or 0.0)
+        peak_before = int(pcm_max(frames, sample_width) or 0)
+        rms_before = float(pcm_rms(frames, sample_width) or 0.0)
         if peak_before <= 0 or rms_before <= 0:
             return audio_bytes, {
                 "changed": False,
@@ -756,9 +768,9 @@ def _normalize_wav_loudness(
                 "rms_after": rms_before,
             }
 
-        boosted = _audioop.mul(frames, sample_width, gain)
-        peak_after = int(_audioop.max(boosted, sample_width) or 0)
-        rms_after = float(_audioop.rms(boosted, sample_width) or 0.0)
+        boosted = pcm_mul(frames, sample_width, gain)
+        peak_after = int(pcm_max(boosted, sample_width) or 0)
+        rms_after = float(pcm_rms(boosted, sample_width) or 0.0)
         out = io.BytesIO()
         with wave.open(out, "wb") as wf_out:
             wf_out.setparams(params)
@@ -966,7 +978,7 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
         tts_cfg.get("gpt_sovits_max_loudness_gain", 3.2), 3.2
     )
     max_rms = _safe_float(tts_cfg.get("gpt_sovits_max_rms", 4200), 4200)
-    prefer_clean_prompt = _safe_bool(tts_cfg.get("gpt_sovits_prefer_clean_prompt", True), True)
+    prefer_clean_prompt = _safe_bool(tts_cfg.get("gpt_sovits_prefer_clean_prompt", False), False)
     chunk_max_candidates = max(
         1, min(4, _safe_int(tts_cfg.get("gpt_sovits_chunk_max_candidates", 2), 2))
     )
@@ -1467,6 +1479,388 @@ def synthesize_gpt_sovits_tts_bytes(text, tts_cfg, voice_override=None, prosody=
     return audio
 
 
+def open_gpt_sovits_tts_stream(
+    text,
+    voice_override=None,
+    prosody=None,
+    perf_trace_id="",
+    config_override=None,
+    chunk_bytes=16384,
+):
+    """Open the verified api_v2 streaming WAV contract without buffering it."""
+    config = config_override if isinstance(config_override, dict) else load_config()
+    tts_cfg = config.get("tts", {}) if isinstance(config, dict) else {}
+    provider = str(tts_cfg.get("provider", TTS_DEFAULT_PROVIDER) or "").strip().lower()
+    if provider != "gpt_sovits":
+        raise RuntimeError("Streaming playback is only available for GPT-SoVITS.")
+    if not _safe_bool(tts_cfg.get("gpt_sovits_stream_playback", False), False):
+        raise RuntimeError("GPT-SoVITS streaming playback is not enabled.")
+
+    safe_text = _normalize_gpt_sovits_spoken_text(_replace_en_words_for_tts(text))
+    safe_text = normalize_tts_text(safe_text)
+    if not safe_text:
+        raise RuntimeError("TTS text is empty.")
+    api_url = str(tts_cfg.get("gpt_sovits_api_url") or tts_cfg.get("api_url") or GPT_SOVITS_DEFAULT_API_URL).strip()
+    if not api_url:
+        raise RuntimeError("GPT-SoVITS API URL is empty.")
+    method = str(tts_cfg.get("gpt_sovits_method", "POST") or "POST").strip().upper()
+    if method not in {"POST", "GET"}:
+        method = "POST"
+    timeout_sec = max(8, min(180, _safe_int(tts_cfg.get("gpt_sovits_timeout_sec", 60), 60)))
+    stream_mode = _safe_int(tts_cfg.get("gpt_sovits_streaming_mode", 1), 1)
+    if stream_mode not in {1, 2, 3}:
+        stream_mode = 1
+    prosody = prosody if isinstance(prosody, dict) else {}
+    speed = max(0.6, min(1.8, _safe_float(prosody.get("speed_ratio", tts_cfg.get("gpt_sovits_speed", 1.0)), 1.0)))
+    payload = {
+        "text": safe_text,
+        "text_lang": _detect_text_lang(safe_text),
+        "prompt_lang": str(tts_cfg.get("gpt_sovits_prompt_lang", "zh") or "zh").strip(),
+        "media_type": "wav",
+        "streaming_mode": stream_mode,
+        "return_fragment": stream_mode == 1,
+        "text_split_method": str(tts_cfg.get("gpt_sovits_text_split_method", "cut0") or "cut0").strip(),
+        "speed_factor": speed,
+        "top_k": max(1, _safe_int(tts_cfg.get("gpt_sovits_top_k", 8), 8)),
+        "top_p": max(0.5, min(0.98, _safe_float(tts_cfg.get("gpt_sovits_top_p", 0.78), 0.78))),
+        "temperature": max(0.1, min(1.2, _safe_float(tts_cfg.get("gpt_sovits_temperature", 0.36), 0.36))),
+        "repetition_penalty": max(1.0, min(1.35, _safe_float(tts_cfg.get("gpt_sovits_repetition_penalty", 1.08), 1.08))),
+        "seed": _safe_int(tts_cfg.get("gpt_sovits_seed", 0), 0),
+        "parallel_infer": False,
+        "split_bucket": False,
+        "batch_size": 1,
+    }
+    voice = str(voice_override or tts_cfg.get("voice") or tts_cfg.get("gpt_sovits_voice") or "").strip()
+    if voice:
+        payload["voice"] = voice
+        payload["speaker"] = voice
+    if tts_cfg.get("gpt_sovits_use_prompt_text"):
+        prompt_text = str(tts_cfg.get("gpt_sovits_prompt_text") or "").strip()
+        if prompt_text:
+            payload["prompt_text"] = prompt_text
+    ref_audio = str(
+        tts_cfg.get("gpt_sovits_ref_audio_path")
+        or tts_cfg.get("gpt_sovits_fallback_ref_audio_path")
+        or ""
+    ).strip()
+    if ref_audio:
+        ref_path = Path(ref_audio)
+        if not ref_path.is_absolute():
+            ref_path = ROOT_DIR / ref_path
+        payload["ref_audio_path"] = str(ref_path.resolve()).replace("\\", "/")
+
+    headers = {"Accept": "audio/wav,audio/*,application/octet-stream", "User-Agent": "xinyu-ai-desktop-pet/1.0"}
+    api_key = str(tts_cfg.get("gpt_sovits_api_key", "") or "").strip()
+    api_key_header = str(tts_cfg.get("gpt_sovits_api_key_header", "Authorization") or "Authorization").strip()
+    if api_key:
+        token = api_key
+        if api_key_header.lower() == "authorization" and not token.lower().startswith("bearer "):
+            token = f"Bearer {token}"
+        headers[api_key_header] = token
+    if method == "GET":
+        query = urllib.parse.urlencode(payload, doseq=True)
+        request = urllib.request.Request(url=f"{api_url}{'&' if '?' in api_url else '?'}{query}", headers=headers, method="GET")
+    else:
+        headers["Content-Type"] = "application/json"
+        request = urllib.request.Request(
+            url=api_url,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+    try:
+        response = urllib.request.urlopen(request, timeout=timeout_sec)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"GPT-SoVITS streaming HTTP {exc.code}: {detail}") from exc
+    except urllib.error.URLError as exc:
+        _raise_gpt_sovits_connection_diagnostic(exc, api_url)
+
+    content_type = str(response.headers.get("Content-Type", "audio/wav") or "audio/wav").split(";", 1)[0].strip().lower()
+    if content_type not in {"audio/wav", "audio/x-wav", "application/octet-stream"}:
+        response.close()
+        raise RuntimeError(f"Unsupported GPT-SoVITS streaming content type: {content_type}")
+    read_size = max(1024, min(65536, _safe_int(chunk_bytes, 16384)))
+    trace_id = _sanitize_perf_trace_id(perf_trace_id)
+
+    def _iter_chunks():
+        total = 0
+        try:
+            while True:
+                chunk = response.read(read_size)
+                if not chunk:
+                    break
+                total += len(chunk)
+                yield chunk
+        finally:
+            response.close()
+            _log_tts_perf("TTS_GPT_SOVITS_STREAM", trace_id, stage="closed", audio_bytes=total)
+
+    _log_tts_perf("TTS_GPT_SOVITS_STREAM", trace_id, stage="opened", streaming_mode=stream_mode)
+    return _iter_chunks(), "audio/wav"
+
+
+def _qwen3_semantic_prosody(prosody):
+    source = prosody if isinstance(prosody, dict) else {}
+    allowed = {
+        "emotion": {
+            "neutral", "happy", "playful", "excited", "shy", "hurt", "sad",
+            "anxious", "angry", "surprised", "serious", "thinking",
+        },
+        "intensity": {"low", "medium", "high"},
+        "voice_style": {
+            "neutral", "soft", "cheerful", "teasing", "serious", "curious", "warm",
+        },
+    }
+    result = {}
+    for key, values in allowed.items():
+        value = str(source.get(key) or "").strip().lower().replace("-", "_")
+        if value in values:
+            result[key] = value
+    return result
+
+
+def _build_qwen3_tts_request(text, tts_cfg, voice_override=None, prosody=None):
+    safe_text = normalize_tts_text(text)
+    if not safe_text:
+        raise RuntimeError("TTS text is empty.")
+    api_url = str(
+        tts_cfg.get("qwen3_tts_api_url")
+        or tts_cfg.get("api_url")
+        or QWEN3_TTS_DEFAULT_API_URL
+    ).strip()
+    if not api_url:
+        raise RuntimeError("Qwen3-TTS API URL is empty.")
+    prosody = prosody if isinstance(prosody, dict) else {}
+    speed = max(
+        0.6,
+        min(
+            1.8,
+            _safe_float(
+                prosody.get(
+                    "speed_ratio",
+                    tts_cfg.get("qwen3_tts_speed", 1.0),
+                ),
+                1.0,
+            ),
+        ),
+    )
+    configured_voice = (
+        voice_override
+        or tts_cfg.get("qwen3_tts_voice")
+        or tts_cfg.get("voice")
+        or QWEN3_TTS_DEFAULT_VOICE
+    )
+    voice = str(configured_voice).strip()
+    if voice.lower() in {"", "default", "auto"}:
+        voice = QWEN3_TTS_DEFAULT_VOICE
+    payload = {
+        "model": str(
+            tts_cfg.get("qwen3_tts_model")
+            or QWEN3_TTS_DEFAULT_MODEL
+        ).strip(),
+        "input": safe_text,
+        "voice": voice or QWEN3_TTS_DEFAULT_VOICE,
+        "response_format": "wav",
+        "speed": speed,
+    }
+    payload.update(_qwen3_semantic_prosody(prosody))
+    headers = {
+        "Accept": "audio/wav,audio/*,application/octet-stream",
+        "Content-Type": "application/json",
+        "User-Agent": "xinyu-ai-desktop-pet/1.0",
+    }
+    api_key = str(tts_cfg.get("qwen3_tts_api_key", "") or "").strip()
+    if api_key:
+        headers["Authorization"] = (
+            api_key
+            if api_key.lower().startswith("bearer ")
+            else f"Bearer {api_key}"
+        )
+    timeout_sec = max(
+        8,
+        min(180, _safe_int(tts_cfg.get("qwen3_tts_timeout_sec", 60), 60)),
+    )
+    request = urllib.request.Request(
+        url=api_url,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    return safe_text, request, timeout_sec
+
+
+def _open_qwen3_tts_response(text, tts_cfg, voice_override=None, prosody=None):
+    safe_text, request, timeout_sec = _build_qwen3_tts_request(
+        text,
+        tts_cfg,
+        voice_override=voice_override,
+        prosody=prosody,
+    )
+    try:
+        response = urllib.request.urlopen(request, timeout=timeout_sec)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"Qwen3-TTS HTTP {exc.code}: {detail}") from exc
+    except urllib.error.URLError as exc:
+        reason = getattr(exc, "reason", exc)
+        raise RuntimeError(
+            "Qwen3-TTS service is unavailable. "
+            f"Check tts.qwen3_tts_api_url and start the local service. Detail: {reason}"
+        ) from exc
+    content_type = str(
+        response.headers.get("Content-Type", "audio/wav") or "audio/wav"
+    ).split(";", 1)[0].strip().lower()
+    if content_type not in {
+        "audio/wav",
+        "audio/x-wav",
+        "application/octet-stream",
+    }:
+        detail = response.read(4096).decode("utf-8", errors="ignore")
+        response.close()
+        raise RuntimeError(
+            f"Unsupported Qwen3-TTS content type: {content_type}. {detail}"
+        )
+    return safe_text, response
+
+
+def synthesize_qwen3_tts_bytes(
+    text,
+    tts_cfg,
+    voice_override=None,
+    prosody=None,
+    perf_trace_id="",
+):
+    trace_id = _sanitize_perf_trace_id(perf_trace_id)
+    started_ms = _perf_now_ms()
+    safe_text, response = _open_qwen3_tts_response(
+        text,
+        tts_cfg,
+        voice_override=voice_override,
+        prosody=prosody,
+    )
+    try:
+        audio = response.read()
+    finally:
+        response.close()
+    if (
+        isinstance(audio, bytes)
+        and len(audio) >= 44
+        and audio[:4] == b"RIFF"
+        and audio[8:12] == b"WAVE"
+    ):
+        data_index = audio.find(b"data", 12, min(len(audio), 512))
+        if data_index >= 0 and data_index + 8 <= len(audio):
+            repaired = bytearray(audio)
+            repaired[4:8] = max(0, len(repaired) - 8).to_bytes(4, "little")
+            repaired[data_index + 4 : data_index + 8] = max(
+                0,
+                len(repaired) - data_index - 8,
+            ).to_bytes(4, "little")
+            audio = bytes(repaired)
+    if not audio or not _looks_like_audio_bytes(audio):
+        raise RuntimeError("Qwen3-TTS returned empty or invalid audio.")
+    _log_tts_perf(
+        "TTS_QWEN3",
+        trace_id,
+        stage="done",
+        total_ms=_perf_now_ms() - started_ms,
+        text_chars=len(safe_text),
+        audio_bytes=len(audio),
+    )
+    return audio
+
+
+def open_qwen3_tts_stream(
+    text,
+    voice_override=None,
+    prosody=None,
+    perf_trace_id="",
+    config_override=None,
+    chunk_bytes=8192,
+):
+    config = config_override if isinstance(config_override, dict) else load_config()
+    tts_cfg = config.get("tts", {}) if isinstance(config, dict) else {}
+    provider = str(
+        tts_cfg.get("provider", TTS_DEFAULT_PROVIDER) or ""
+    ).strip().lower()
+    if provider != "qwen3_tts":
+        raise RuntimeError("Qwen3-TTS streaming requires tts.provider=qwen3_tts.")
+    if not _safe_bool(tts_cfg.get("qwen3_tts_stream_playback", True), True):
+        raise RuntimeError("Qwen3-TTS streaming playback is not enabled.")
+    trace_id = _sanitize_perf_trace_id(perf_trace_id)
+    started_ms = _perf_now_ms()
+    safe_text, response = _open_qwen3_tts_response(
+        text,
+        tts_cfg,
+        voice_override=voice_override,
+        prosody=prosody,
+    )
+    read_size = max(1024, min(65536, _safe_int(chunk_bytes, 8192)))
+
+    def _iter_chunks():
+        total = 0
+        first_chunk = True
+        try:
+            while True:
+                chunk = response.read(read_size)
+                if not chunk:
+                    break
+                if first_chunk:
+                    first_chunk = False
+                    _log_tts_perf(
+                        "TTS_QWEN3_STREAM",
+                        trace_id,
+                        stage="first_chunk",
+                        first_chunk_ms=_perf_now_ms() - started_ms,
+                        text_chars=len(safe_text),
+                    )
+                total += len(chunk)
+                yield chunk
+        finally:
+            response.close()
+            _log_tts_perf(
+                "TTS_QWEN3_STREAM",
+                trace_id,
+                stage="closed",
+                total_ms=_perf_now_ms() - started_ms,
+                audio_bytes=total,
+            )
+
+    _log_tts_perf("TTS_QWEN3_STREAM", trace_id, stage="opened")
+    return _iter_chunks(), "audio/wav"
+
+
+def open_server_tts_stream(
+    text,
+    voice_override=None,
+    prosody=None,
+    perf_trace_id="",
+    config_override=None,
+):
+    config = config_override if isinstance(config_override, dict) else load_config()
+    provider = str(
+        config.get("tts", {}).get("provider", TTS_DEFAULT_PROVIDER) or ""
+    ).strip().lower()
+    if provider == "gpt_sovits":
+        return open_gpt_sovits_tts_stream(
+            text,
+            voice_override=voice_override,
+            prosody=prosody,
+            perf_trace_id=perf_trace_id,
+            config_override=config,
+        )
+    if provider == "qwen3_tts":
+        return open_qwen3_tts_stream(
+            text,
+            voice_override=voice_override,
+            prosody=prosody,
+            perf_trace_id=perf_trace_id,
+            config_override=config,
+        )
+    raise RuntimeError(f"Streaming playback is unavailable for TTS provider: {provider}")
+
+
 _EN_TO_CN_PHONETIC = {
     "ai": "诶爱",
     "ok": "欧凯",
@@ -1561,6 +1955,15 @@ def synthesize_tts_audio(text, voice_override=None, prosody=None, perf_trace_id=
             audio_bytes=len(audio or b""),
         )
         return audio
+
+    if provider == "qwen3_tts":
+        return synthesize_qwen3_tts_bytes(
+            text=safe_text,
+            tts_cfg=tts_cfg,
+            voice_override=voice_override,
+            prosody=prosody,
+            perf_trace_id=perf_trace,
+        )
 
     if provider in {"volcengine_tts", "volcengine"}:
         volc_started_ms = _perf_now_ms()

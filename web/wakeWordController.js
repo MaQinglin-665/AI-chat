@@ -10,6 +10,18 @@
     const scheduleMicRecognitionStart = typeof deps.scheduleMicRecognitionStart === "function" ? deps.scheduleMicRecognitionStart : () => {};
     const enqueueMicTranscript = typeof deps.enqueueMicTranscript === "function" ? deps.enqueueMicTranscript : () => {};
     const toggleMicOpen = typeof deps.toggleMicOpen === "function" ? deps.toggleMicOpen : async () => {};
+    const handleUserSpeechStart = typeof deps.handleUserSpeechStart === "function" ? deps.handleUserSpeechStart : () => false;
+    const setListeningPresence = typeof deps.setListeningPresence === "function" ? deps.setListeningPresence : () => false;
+    const clearListeningPresence = typeof deps.clearListeningPresence === "function" ? deps.clearListeningPresence : () => false;
+
+    function getBrowserRecognitionLanguage() {
+      // Web Speech cannot reliably auto-detect Chinese and English in one live
+      // recognizer. Auto keeps the historic Chinese fallback; local Vosk handles
+      // whole-utterance automatic choice when both local models are available.
+      return String(state.asrInputLanguageMode || "auto").trim().toLowerCase() === "en"
+        ? "en-US"
+        : "zh-CN";
+    }
 
     function clearWakeRestartTimer() {
       if (!state.wakeRestartTimer) {
@@ -88,7 +100,7 @@
         return;
       }
       const wake = new RecognitionCtor();
-      wake.lang = "zh-CN";
+      wake.lang = getBrowserRecognitionLanguage();
       wake.continuous = true;
       wake.interimResults = false;
       wake.maxAlternatives = 1;
@@ -151,7 +163,9 @@
       }
 
       const recog = new Recognition();
-      recog.lang = "zh-CN";
+      let recognitionSession = 0;
+      let speechStartedForSession = 0;
+      recog.lang = getBrowserRecognitionLanguage();
       recog.continuous = true;
       recog.interimResults = false;
       recog.maxAlternatives = 1;
@@ -160,6 +174,8 @@
         state.recognitionActive = true;
         state.micRetryCount = 0;
         if (state.micOpen && state.micSuspendDepth === 0) {
+          recognitionSession = Number(state.micSession || 0);
+          setListeningPresence("armed", { sessionId: recognitionSession });
           setStatus("开麦中...");
         }
         updateMicButton();
@@ -169,8 +185,12 @@
         const code = String(event?.error || "");
         if (code === "not-allowed" || code === "service-not-allowed") {
           state.micOpen = false;
+          recognitionSession = 0;
+          speechStartedForSession = 0;
+          clearListeningPresence({ force: true });
           setStatus("麦克风权限被拒绝");
         } else if (code === "audio-capture") {
+          clearListeningPresence({ force: true });
           state.micRetryCount = Math.min(8, state.micRetryCount + 1);
           setStatus("麦克风不可用，请检查设备");
         } else if (code === "network") {
@@ -184,15 +204,44 @@
       };
       recog.onend = () => {
         state.recognitionActive = false;
+        speechStartedForSession = 0;
+        recognitionSession = 0;
         if (state.micOpen && state.micSuspendDepth === 0) {
+          setListeningPresence("armed", { sessionId: state.micSession });
           scheduleMicRecognitionStart(220);
           setStatus("开麦中...");
         } else {
+          clearListeningPresence({ force: true });
           setStatus("待机");
         }
         updateMicButton();
       };
+      recog.onspeechstart = () => {
+        const sessionId = Number(state.micSession || 0);
+        if (!state.micOpen || state.micSuspendDepth > 0 || !sessionId || recognitionSession !== sessionId) {
+          return;
+        }
+        speechStartedForSession = sessionId;
+        setListeningPresence("hearing", { sessionId, level: 0.6 });
+        handleUserSpeechStart({ reason: "browser_asr_speech_start" });
+      };
+      recog.onspeechend = () => {
+        const sessionId = Number(state.micSession || 0);
+        if (!state.micOpen || state.micSuspendDepth > 0 || !sessionId || recognitionSession !== sessionId) {
+          return;
+        }
+        setListeningPresence("release", { sessionId });
+      };
       recog.onresult = (event) => {
+        const sessionId = Number(state.micSession || 0);
+        if (
+          !state.micOpen
+          || state.micSuspendDepth > 0
+          || !sessionId
+          || recognitionSession !== sessionId
+        ) {
+          return;
+        }
         for (let i = event.resultIndex || 0; i < (event.results?.length || 0); i++) {
           const result = event.results[i];
           if (!result || !result.isFinal) {
@@ -200,7 +249,12 @@
           }
           const transcript = result?.[0]?.transcript?.trim();
           if (transcript) {
-            enqueueMicTranscript(transcript, state.micSession);
+            if (speechStartedForSession !== sessionId) {
+              setListeningPresence("hearing", { sessionId, level: 0.6 });
+              handleUserSpeechStart({ reason: "browser_asr_result" });
+            }
+            enqueueMicTranscript(transcript, sessionId);
+            setListeningPresence("release", { sessionId });
           }
         }
       };
@@ -217,7 +271,7 @@
       updateMicButton();
     }
 
-    return { clearWakeRestartTimer, shouldRunWakeWordListener, stopWakeWordListener, scheduleWakeWordStart, wakeTranscriptHit, setupWakeWordRecognition, setupSpeechRecognition };
+    return { clearWakeRestartTimer, shouldRunWakeWordListener, stopWakeWordListener, scheduleWakeWordStart, wakeTranscriptHit, setupWakeWordRecognition, setupSpeechRecognition, getBrowserRecognitionLanguage };
   }
 
   const api = { createController };

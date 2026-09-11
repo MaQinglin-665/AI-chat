@@ -187,12 +187,19 @@ def score_user_intents(user_message: str, *, is_auto: bool = False) -> Dict[str,
         text,
     )
     add_if(r"(done|finished|completed|shipped|fixed|madeit|wrappedup)", "encouragement", 65)
+    if re.search(
+        r"\b(i|we)\s+(just\s+)?(fixed|finished|completed|shipped|made it|wrapped up)\b",
+        lower,
+    ):
+        scores["encouragement"] += 75
     add_if(
         r"(\u505a\u5b8c\u4e86|\u5b8c\u6210\u4e86|\u641e\u5b9a\u4e86|\u4fee\u597d\u4e86|\u7ed3\u675f\u4e86)",
         "encouragement",
         65,
         text,
     )
+    if re.search(r"(\u6211|\u6211\u4eec).{0,8}(\u521a|\u7ec8\u4e8e)?.{0,6}(\u505a\u5b8c\u4e86|\u5b8c\u6210\u4e86|\u641e\u5b9a\u4e86|\u4fee\u597d\u4e86|\u89e3\u51b3\u4e86)", text):
+        scores["encouragement"] += 75
     add_if(r"\b(hello|hi|hey|good morning|good evening|are you there)\b", "greeting", 60, lower)
     add_if(r"(\u4f60\u597d|\u65e9\u5b89|\u665a\u5b89|\u5728\u5417)", "greeting", 60, text)
     add_if(r"(encourage|encourageme|cheerme|cheermeup|needapush|motivateme|peptalk)", "encouragement", 95)

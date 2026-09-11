@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RepoRoot
+. (Join-Path $PSScriptRoot "node-runtime.ps1")
 
 function Resolve-PythonCommand {
     if (Get-Command python -ErrorAction SilentlyContinue) {
@@ -42,7 +43,7 @@ if (-not $SkipPytest) {
 }
 
 if (-not $SkipNodeTests) {
-    Invoke-Step "Run Node frontend tests" @("node", "scripts/run_node_tests.js")
+    Invoke-Step "Run Node frontend tests" (@(Resolve-ProjectNodeCommand -Tool "node") + @("scripts/run_node_tests.js"))
 }
 
 Invoke-Step "Check Python syntax" (@($python) + @("scripts/check_python_syntax.py"))

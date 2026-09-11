@@ -2,6 +2,7 @@
   "use strict";
 
   const DEVELOPER_FEATURE_SCRIPTS = [
+    "./companionExperienceDiagnostics.js",
     "./character-runtime-debug-bridge.js",
     "./live2d-expression-tuning.js",
     "./ttsDebugReport.js",
@@ -11,7 +12,8 @@
     "./grayTrialCharacterModel.js",
     "./grayTrialAutoRuntimeSwitchModel.js",
     "./followupReadinessView.js",
-    "./grayTrialCharacterView.js"
+    "./grayTrialCharacterView.js",
+    "./followupReadinessPanelController.js"
   ];
 
   function readStorageFlag(storage) {

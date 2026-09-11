@@ -1,8 +1,10 @@
 import copy
+import http.client
 import json
 import tempfile
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 from contextlib import contextmanager
 from pathlib import Path
@@ -57,6 +59,45 @@ def _chat_payload(message="hello"):
     return {"message": message, "history": []}
 
 
+def _post_with_declared_length(base_url, path, declared_length):
+    parsed = urllib.parse.urlsplit(base_url)
+    connection = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=3)
+    try:
+        connection.putrequest("POST", path)
+        connection.putheader("Content-Type", "application/json")
+        connection.putheader("Content-Length", str(declared_length))
+        connection.endheaders()
+        response = connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8") or "{}")
+        return int(response.status), payload
+    finally:
+        connection.close()
+
+
+def test_local_api_rejects_oversized_body_before_read(monkeypatch):
+    cfg = _build_test_config()
+    with _run_server_with_config(monkeypatch, cfg) as base_url:
+        status, payload = _post_with_declared_length(
+            base_url,
+            "/api/chat",
+            app.CHAT_JSON_BODY_LIMIT_BYTES + 1,
+        )
+
+    assert status == 413
+    assert payload["ok"] is False
+    assert payload["error"] == "Request body too large."
+    assert payload["max_body_bytes"] == app.CHAT_JSON_BODY_LIMIT_BYTES
+
+
+def test_local_api_rejects_invalid_content_length(monkeypatch):
+    cfg = _build_test_config()
+    with _run_server_with_config(monkeypatch, cfg) as base_url:
+        status, payload = _post_with_declared_length(base_url, "/api/chat", "not-a-number")
+
+    assert status == 400
+    assert payload == {"ok": False, "error": "Invalid Content-Length header."}
+
+
 def test_lightweight_llm_probe_caps_timeout_without_long_doctor_wait(monkeypatch):
     captured = {}
     cfg = _build_test_config()
@@ -84,6 +125,48 @@ def test_lightweight_llm_probe_caps_timeout_without_long_doctor_wait(monkeypatch
     assert captured["payload"]["max_tokens"] == 8
     assert captured["timeout"] == 12
     assert captured["attempts"] == 1
+
+
+def test_lightweight_llm_probe_allows_mimo_reasoning_budget(monkeypatch):
+    captured = {}
+    cfg = _build_test_config()
+    cfg["llm"] = {
+        "provider": "openai-compatible",
+        "base_url": "https://token-plan-cn.xiaomimimo.com/v1",
+        "model": "mimo-v2.5-pro",
+        "request_timeout": 45,
+        "api_key": "test-mimo-key",
+    }
+
+    def fake_http_post_json(url, payload, **kwargs):
+        captured["url"] = url
+        captured["payload"] = payload
+        captured["timeout"] = kwargs.get("timeout")
+        captured["headers"] = kwargs.get("headers")
+        if int(payload.get("max_tokens", 0)) <= 8:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "reasoning_content": "thinking before visible text",
+                        },
+                        "finish_reason": "length",
+                    }
+                ]
+            }
+        return {"choices": [{"message": {"content": "OK"}, "finish_reason": "stop"}]}
+
+    monkeypatch.setattr(app, "http_post_json", fake_http_post_json)
+
+    result = app._run_lightweight_llm_probe(cfg)
+
+    assert result["ok"] is True
+    assert result["model"] == "mimo-v2.5-pro"
+    assert captured["url"] == "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
+    assert captured["payload"]["max_tokens"] == 256
+    assert captured["timeout"] == 45
+    assert captured["headers"] == {"Authorization": "Bearer test-mimo-key"}
 
 
 def _post_stream_events(url, payload):
@@ -180,6 +263,70 @@ def test_default_runtime_off_keeps_original_reply(monkeypatch):
     assert "directive" not in brain
 
 
+def test_model_direct_http_turn_preserves_reply_and_skips_legacy_brain_runtime(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "return_metadata": True,
+        "model_direct_reply": True,
+        "model_direct_brain_guidance": True,
+    }
+    cfg["companion_turn"] = {"enabled": True}
+    monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: "  bilingual: 你好 / hello  ")
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, payload = _post_json(f"{base}/api/chat", _chat_payload("hi"))
+
+    assert status == 200
+    assert payload["reply"] == "  bilingual: 你好 / hello  "
+    assert "character_runtime" not in payload
+    assert "character_brain" not in payload
+    assert payload["turn"]["reply_text"] == payload["reply"]
+    assert payload["turn"]["spoken_text"] == payload["reply"]
+    assert payload["turn"]["source"] == "model_direct"
+
+
+def test_model_direct_stream_turn_matches_all_emitted_deltas(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {"model_direct_reply": True}
+    cfg["companion_turn"] = {"enabled": True}
+
+    def _fake_stream(*_args, **_kwargs):
+        yield "  model"
+        yield " stream  "
+
+    monkeypatch.setattr(app, "call_llm_stream", _fake_stream)
+
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        status, events = _post_stream_events(f"{base}/api/chat_stream", _chat_payload("hi"))
+
+    assert status == 200
+    delta_text = "".join(evt.get("text", "") for evt in events if evt.get("type") == "delta")
+    done = next(evt for evt in events if evt.get("type") == "done")
+    assert delta_text == "  model stream  "
+    assert done["reply"] == delta_text
+    assert done["turn"]["reply_text"] == delta_text
+    assert done["turn"]["spoken_text"] == delta_text
+    assert "character_runtime" not in done
+    assert "character_brain" not in done
+
+
+def test_model_direct_mode_skips_legacy_json_runtime_prompt_contract(monkeypatch):
+    cfg = _build_test_config()
+    cfg["character_runtime"] = {
+        "enabled": True,
+        "return_metadata": True,
+        "model_direct_reply": True,
+    }
+    captured = _capture_openai_prompt_in_call_llm(monkeypatch, cfg, raw_reply="model text")
+
+    result = app.call_llm("hi", [], config=cfg)
+
+    assert result == "model text"
+    assert captured["prompt"] == "BASE_PROMPT"
+    assert "json" not in captured["prompt"].lower()
+
+
 def test_chat_stream_done_payload_includes_safe_character_brain(monkeypatch):
     cfg = _build_test_config()
 
@@ -207,8 +354,21 @@ def test_chat_payload_includes_compact_character_brain_continuity(monkeypatch):
     with _run_server_with_config(monkeypatch, cfg) as base:
         status1, payload1 = _post_json(
             f"{base}/api/chat",
-            {"message": "I feel really sad.", "history": []},
+            {
+                "message": "I feel really sad.",
+                "history": [],
+                "client_capabilities": {"delivered_turn_receipt_v1": True},
+            },
         )
+        assert status1 == 200
+        delivery_id = payload1.get("delivery_id")
+        assert isinstance(delivery_id, str) and delivery_id
+        ack_status, ack_payload = _post_json(
+            f"{base}/api/chat/delivery_ack",
+            {"delivery_id": delivery_id},
+        )
+        assert ack_status == 200
+        assert ack_payload.get("status") == "committed"
         status2, payload2 = _post_json(
             f"{base}/api/chat",
             {
@@ -228,7 +388,9 @@ def test_chat_payload_includes_compact_character_brain_continuity(monkeypatch):
     assert isinstance(continuity, dict)
     assert brain.get("intent") == "comfort"
     assert continuity.get("recent_user_need") == "reassurance"
-    assert continuity.get("same_need_turns") == 2
+    # Terminal metadata describes the last confirmed state used to plan this
+    # reply. This reply advances persistence only after its own delivery ACK.
+    assert continuity.get("same_need_turns") == 1
     raw = json.dumps(brain, ensure_ascii=False).lower()
     assert "raw history" not in raw
     assert "secret" not in raw
@@ -453,10 +615,22 @@ def test_chat_payload_resolves_topic_followup_from_previous_turn(monkeypatch):
     monkeypatch.setattr(app, "call_llm", lambda *args, **kwargs: "compact reply")
 
     with _run_server_with_config(monkeypatch, cfg) as base:
-        first_status, _first_payload = _post_json(
+        first_status, first_payload = _post_json(
             f"{base}/api/chat",
-            _chat_payload("Let's tune ASR and Live2D motion next."),
+            {
+                **_chat_payload("Let's tune ASR and Live2D motion next."),
+                "client_capabilities": {"delivered_turn_receipt_v1": True},
+            },
         )
+        assert first_status == 200
+        delivery_id = first_payload.get("delivery_id")
+        assert isinstance(delivery_id, str) and delivery_id
+        ack_status, ack_payload = _post_json(
+            f"{base}/api/chat/delivery_ack",
+            {"delivery_id": delivery_id},
+        )
+        assert ack_status == 200
+        assert ack_payload.get("status") == "committed"
         second_status, second_payload = _post_json(
             f"{base}/api/chat",
             _chat_payload("Continue that one, but shorter."),
@@ -641,6 +815,26 @@ def test_reply_llm_cfg_non_stable_keeps_original_budget_and_flags():
     assert "allow_high_output_tokens" not in tuned
     assert "retry_on_length" not in tuned
     assert "length_retry_max_output_tokens" not in tuned
+
+
+def test_reply_llm_cfg_mimo_budget_is_boosted_without_demo_stable():
+    cfg = _build_test_config()
+    cfg["llm"] = {
+        "provider": "openai-compatible",
+        "base_url": "https://token-plan-cn.xiaomimimo.com/v1",
+        "model": "mimo-v2.5-pro",
+        "max_output_tokens": 120,
+    }
+    cfg["character_runtime"] = {"enabled": True, "demo_stable": False}
+
+    tuned = app._build_reply_llm_cfg(cfg, cfg["llm"])
+
+    assert int(tuned.get("max_output_tokens", 0)) >= 600
+    assert tuned.get("allow_high_output_tokens") is True
+    assert tuned.get("retry_on_length") is True
+    assert int(tuned.get("length_retry_max_output_tokens", 0)) >= int(
+        tuned.get("max_output_tokens", 0)
+    )
 
 
 def test_call_llm_stable_passes_boosted_budget_to_final_reply(monkeypatch):

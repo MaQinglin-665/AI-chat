@@ -8,7 +8,9 @@ const path = require("path");
 const ROOT = path.resolve(__dirname, "..");
 const INDEX_HTML = path.join(ROOT, "web", "index.html");
 const BASE_CSS = path.join(ROOT, "web", "base.css");
+const PHOSPHOR_CSS = path.join(ROOT, "web", "phosphorIcons.css");
 const CHAT_DOM_JS = path.join(ROOT, "web", "chatDom.js");
+const CHAT_JS = path.join(ROOT, "web", "chat.js");
 const ADVANCED_ACTION_BINDER_JS = path.join(ROOT, "web", "advancedActionBinder.js");
 const DESKTOP_CONTROL_BINDER_JS = path.join(ROOT, "web", "desktopControlBinder.js");
 const CHAT_MESSAGE_CONTROLLER_JS = path.join(ROOT, "web", "chatMessageController.js");
@@ -17,7 +19,9 @@ const CHARACTER_DIAGNOSTICS_CONTROLLER_JS = path.join(ROOT, "web", "characterDia
 
 const html = fs.readFileSync(INDEX_HTML, "utf8");
 const css = fs.readFileSync(BASE_CSS, "utf8");
+const phosphorCss = fs.readFileSync(PHOSPHOR_CSS, "utf8");
 const chatDomSource = fs.readFileSync(CHAT_DOM_JS, "utf8");
+const chatSource = fs.readFileSync(CHAT_JS, "utf8");
 const advancedBinderSource = fs.readFileSync(ADVANCED_ACTION_BINDER_JS, "utf8");
 const desktopBinderSource = fs.readFileSync(DESKTOP_CONTROL_BINDER_JS, "utf8");
 const chatMessageControllerSource = fs.readFileSync(CHAT_MESSAGE_CONTROLLER_JS, "utf8");
@@ -139,6 +143,17 @@ function testSafetyCopyAndStyles() {
   assert.ok(css.includes("animation: none !important;"), "more panel should render at full opacity without animation flicker");
   assert.ok(css.includes(".message-feedback-btn"), "assistant feedback controls should have dedicated styling");
   assert.ok(css.includes("grid-template-columns: repeat(3, minmax(0, 1fr))"), "primary controls should use a cleaner three-button grid");
+  assert.ok(phosphorCss.includes("More launcher readability"), "the final visual layer should own launcher contrast");
+  assert.ok(phosphorCss.includes("color: #f9e5ee !important;"), "enabled launcher actions should use readable light text on the berry panel");
+  assert.ok(phosphorCss.includes("font-size: 14px !important;"), "launcher action labels should not regress to the former tiny text");
+  assert.ok(phosphorCss.includes("button:disabled"), "disabled launcher actions should retain a distinct readable state");
+  assert.ok(phosphorCss.includes("More launcher readability"), "expanded more launcher should retain its dedicated contrast guard");
+  assert.ok(phosphorCss.includes("Toggle switch containment"), "desktop toggles should retain their inset containment rule");
+  assert.ok(phosphorCss.includes("radial-gradient(circle at 10px 50%"), "desktop toggles should render a circular off-state thumb");
+  assert.ok(phosphorCss.includes('#more-btn[aria-expanded="true"]'), "expanded more launcher should have a dedicated visual state");
+  assert.ok(chatDomSource.includes('moreBtn: documentObject.getElementById("more-btn")'), "more launcher should remain wired into the renderer DOM");
+  assert.ok(chatSource.includes('ui.moreBtn.textContent = open ? "收起" : "更多";'), "more launcher label should reflect drawer state");
+  assert.ok(chatSource.includes('ui.moreBtn.setAttribute("aria-label", open ? "收起更多陪伴功能" : "展开更多陪伴功能");'), "more launcher should expose its state to assistive technology");
 
   const malformedContentLines = css.split(/\r?\n/).filter((line) => {
     if (!/content:\s*"/.test(line)) {
@@ -185,14 +200,15 @@ function testAssistantFeedbackButtonsCallExistingHandler() {
 }
 
 function testMemoryAndPersonaSurfaces() {
-  assert.ok(html.includes('id="learning-stat-candidates"'), "memory management should show candidate pool stats");
-  assert.ok(html.includes('id="learning-stat-samples"'), "memory management should show official pool stats");
-  assert.ok(html.includes('id="learning-stat-short"'), "memory management should show short-term memory stats");
-  assert.ok(html.includes('id="learning-stat-core"'), "memory management should show true memory stats");
-  assert.ok(html.includes('id="learning-tab-short"'), "memory management should expose short-term memory tab");
-  assert.ok(html.includes('id="learning-tab-core"'), "memory management should expose true memory tab");
+  assert.ok(html.includes('id="learning-stat-candidates"'), "memory management should show pending review stats");
+  assert.ok(html.includes('id="learning-stat-samples"'), "memory management should show pinned memory stats");
+  assert.ok(html.includes('id="learning-stat-short"'), "memory management should show high-importance memory stats");
+  assert.ok(html.includes('id="learning-stat-core"'), "memory management should show long-term memory stats");
+  assert.ok(html.includes('id="learning-tab-short"') && html.includes('id="learning-tab-short" class="learning-tab" type="button" role="tab" aria-selected="false" hidden'), "short-term memory should stay hidden from ordinary navigation");
+  assert.ok(html.includes('id="learning-tab-core" class="learning-tab is-active"'), "long-term memory should be the default tab");
   assert.ok(html.includes('id="learning-stat-visible"'), "memory management should show filtered visible count");
-  assert.ok(html.includes("搜索用户原话、回复或提炼记忆"), "memory management search should match actual pool content");
+  assert.ok(html.includes("搜索记忆内容、分类或标签"), "memory management search should match long-term memory content");
+  assert.ok(html.includes('id="memory-create-form"'), "memory management should allow manual long-term memory creation");
   assert.ok(!html.includes('id="learning-quick-inject"'), "memory management should hide engineering quick settings from normal users");
   assert.ok(!html.includes('id="learning-quick-support"'), "memory management should hide promotion support tuning from normal users");
   assert.ok(!html.includes("inject_count"), "memory management UI should not expose backend field names");

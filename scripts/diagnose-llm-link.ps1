@@ -1,6 +1,6 @@
 param(
     [string]$BaseUrl,
-    [int]$TimeoutSec = 14,
+    [int]$TimeoutSec = 60,
     [switch]$Json,
     [switch]$SoftFail
 )

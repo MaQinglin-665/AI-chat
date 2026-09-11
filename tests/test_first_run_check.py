@@ -94,6 +94,11 @@ def test_check_tools_reports_missing_python_dependency(monkeypatch):
     )
     monkeypatch.setattr(
         first_run,
+        "resolve_node_command",
+        lambda tool: [tool],
+    )
+    monkeypatch.setattr(
+        first_run,
         "_run_version",
         lambda command: (0, "v22.0.0" if command[0] == "node" else "10.0.0"),
     )
@@ -108,6 +113,29 @@ def test_check_tools_reports_missing_python_dependency(monkeypatch):
 
     assert any("missing-package" in warning for warning in reporter.warnings)
     assert not reporter.failures
+
+
+def test_check_tools_uses_project_node_resolver(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(
+        first_run,
+        "resolve_node_command",
+        lambda tool: [f"local-{tool}"],
+    )
+    monkeypatch.setattr(
+        first_run,
+        "_run_version",
+        lambda command: calls.append(command) or (0, "v22.22.3" if "node" in command[0] else "10.9.8"),
+    )
+    monkeypatch.setattr(first_run.importlib.util, "find_spec", lambda _name: object())
+
+    reporter = first_run.Reporter()
+    first_run.check_tools(reporter)
+
+    assert ["local-node", "--version"] in calls
+    assert ["local-npm", "--version"] in calls
+    assert not any("Node.js 20 or 22 LTS" in warning for warning in reporter.warnings)
 
 
 def test_check_llm_fails_for_remote_openai_compatible_without_key(monkeypatch):

@@ -10,6 +10,7 @@
   subtitleToggleBtn: documentObject.getElementById("subtitle-toggle-btn"),
   moreBtn: documentObject.getElementById("more-btn"),
   helpBtn: documentObject.getElementById("help-btn"),
+  petModeBtn: documentObject.getElementById("pet-mode-btn"),
   helpModal: documentObject.getElementById("help-modal"),
   helpCloseBtn: documentObject.getElementById("help-close-btn"),
   helpOpenOnboardingBtn: documentObject.getElementById("help-open-onboarding-btn"),
@@ -27,7 +28,13 @@
   onboardingQuickBtn: documentObject.getElementById("onboarding-quick-btn"),
   onboardingAdvancedBtn: documentObject.getElementById("onboarding-advanced-btn"),
   advancedActions: documentObject.getElementById("advanced-actions"),
+  conversationRail: documentObject.getElementById("conversation-rail"),
+  conversationCollapseBtn: documentObject.getElementById("conversation-collapse-btn"),
+  assistantLaneToggle: documentObject.getElementById("assistant-lane-toggle"),
+  userLaneToggle: documentObject.getElementById("user-lane-toggle"),
   chatLog: documentObject.getElementById("chat-log"),
+  userChatLog: documentObject.getElementById("user-chat-log"),
+  assistantChatLog: documentObject.getElementById("assistant-chat-log"),
   attachmentPreview: documentObject.getElementById("attachment-preview"),
   stickerPanel: documentObject.getElementById("sticker-panel"),
   stickerBtn: documentObject.getElementById("sticker-btn"),
@@ -54,6 +61,10 @@
   micMeterWrap: documentObject.getElementById("mic-meter-wrap"),
   micMeterFill: documentObject.getElementById("mic-meter-fill"),
   micMeterText: documentObject.getElementById("mic-meter-text"),
+  stageVoiceFeedback: documentObject.getElementById("stage-voice-feedback"),
+  stageVoiceFeedbackText: documentObject.getElementById("stage-voice-feedback-text"),
+  stageVoiceMeterFill: documentObject.getElementById("stage-voice-meter-fill"),
+  stageVoiceLevelValue: documentObject.getElementById("stage-voice-level-value"),
   scheduleModal: documentObject.getElementById("schedule-modal"),
   scheduleCloseBtn: documentObject.getElementById("schedule-close-btn"),
   scheduleDatetime: documentObject.getElementById("schedule-datetime"),
@@ -85,10 +96,29 @@
   personaReplyStyle: documentObject.getElementById("persona-reply-style"),
   personaCompanionshipStyle: documentObject.getElementById("persona-companionship-style"),
   personaSaveBtn: documentObject.getElementById("persona-save-btn"),
+  relationshipStateSummary: documentObject.getElementById("relationship-state-summary"),
+  relationshipStateUpdated: documentObject.getElementById("relationship-state-updated"),
+  relationshipStateEnabled: documentObject.getElementById("relationship-state-enabled"),
+  relationshipStateAddress: documentObject.getElementById("relationship-state-address"),
+  relationshipStateReplyLength: documentObject.getElementById("relationship-state-reply-length"),
+  relationshipStateAdviceStyle: documentObject.getElementById("relationship-state-advice-style"),
+  relationshipStateTeasing: documentObject.getElementById("relationship-state-teasing"),
+  relationshipStateReloadBtn: documentObject.getElementById("relationship-state-reload-btn"),
+  relationshipStateSaveBtn: documentObject.getElementById("relationship-state-save-btn"),
+  relationshipStateResetBtn: documentObject.getElementById("relationship-state-reset-btn"),
+  relationshipStateStatus: documentObject.getElementById("relationship-state-status"),
   learningReviewBtn: documentObject.getElementById("learning-review-btn"),
+  experienceDiagnosticsBtn: documentObject.getElementById("experience-diagnostics-btn"),
   followupReadinessBtn: documentObject.getElementById("followup-readiness-btn"),
   configSwitchBtn: documentObject.getElementById("config-switch-btn"),
   doctorBtn: documentObject.getElementById("doctor-btn"),
+  doctorModal: documentObject.getElementById("doctor-modal"),
+  doctorDialog: documentObject.getElementById("doctor-dialog"),
+  doctorCloseBtn: documentObject.getElementById("doctor-close-btn"),
+  doctorRerunBtn: documentObject.getElementById("doctor-rerun-btn"),
+  doctorStateTitle: documentObject.getElementById("doctor-state-title"),
+  doctorStateCopy: documentObject.getElementById("doctor-state-copy"),
+  doctorReportOutput: documentObject.getElementById("doctor-report-output"),
   characterRehearsalBtn: documentObject.getElementById("character-rehearsal-btn"),
   characterTuningBtn: documentObject.getElementById("character-tuning-btn"),
   followupCharacterChip: documentObject.getElementById("followup-character-chip"),
@@ -102,6 +132,15 @@
   learningTabShort: documentObject.getElementById("learning-tab-short"),
   learningTabCore: documentObject.getElementById("learning-tab-core"),
   learningTabDebug: documentObject.getElementById("learning-tab-debug"),
+  memoryCreateCard: documentObject.getElementById("memory-create-card"),
+  memoryCreateToggleBtn: documentObject.getElementById("memory-create-toggle-btn"),
+  memoryCreateForm: documentObject.getElementById("memory-create-form"),
+  memoryCreateText: documentObject.getElementById("memory-create-text"),
+  memoryCreateKind: documentObject.getElementById("memory-create-kind"),
+  memoryCreateCategory: documentObject.getElementById("memory-create-category"),
+  memoryCreateTags: documentObject.getElementById("memory-create-tags"),
+  memoryCreatePinned: documentObject.getElementById("memory-create-pinned"),
+  memoryCreateCancelBtn: documentObject.getElementById("memory-create-cancel-btn"),
   learningReloadBtn: documentObject.getElementById("learning-reload-btn"),
   learningFilterScore: documentObject.getElementById("learning-filter-score"),
   learningFilterConfidence: documentObject.getElementById("learning-filter-confidence"),
@@ -136,8 +175,28 @@
   }
 
   function setStatus(ui, text) {
+    const safe = String(text || "");
     if (ui && ui.status) {
-      ui.status.textContent = text;
+      ui.status.textContent = safe;
+    }
+    const documentObject = ui?.status?.ownerDocument || root.document;
+    const presenceMode = documentObject?.getElementById?.("pet-presence-mode");
+    if (presenceMode) {
+      presenceMode.textContent = safe || "待机";
+    }
+    const normalized = safe.toLowerCase();
+    let presence = "idle";
+    if (/失败|错误|不可用|failed|error|unavailable/.test(normalized)) {
+      presence = "error";
+    } else if (/启动|连接|加载|思考|生成|thinking|loading|starting|connecting/.test(normalized)) {
+      presence = "thinking";
+    } else if (/开麦|聆听|录音|识别|listening|hearing|recording/.test(normalized)) {
+      presence = "listening";
+    } else if (/播放|说话|朗读|speaking|playing/.test(normalized)) {
+      presence = "speaking";
+    }
+    if (documentObject?.body?.dataset) {
+      documentObject.body.dataset.presence = presence;
     }
   }
 

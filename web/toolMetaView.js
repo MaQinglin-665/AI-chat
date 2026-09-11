@@ -10,6 +10,7 @@
     if (tool === "search_text") return "文本搜索";
     if (tool === "run_command") return "命令执行";
     if (tool === "generate_image") return "图片生成";
+    if (item?.pending_confirmation) return "需要确认";
     return tool || "工具结果";
   }
 
@@ -17,6 +18,9 @@
     const tool = String(item?.tool || "").trim();
     if (!item?.ok) {
       return String(item?.error || "执行失败").trim() || "执行失败";
+    }
+    if (item?.pending_confirmation) {
+      return String(item?.summary || "此操作需要你的确认").trim();
     }
     if (tool === "write_file") {
       return `${String(item?.path || "").trim()}${item?.chars_written ? ` · ${item.chars_written} 字符` : ""}`;
@@ -75,6 +79,26 @@
 
       card.appendChild(title);
       card.appendChild(summary);
+
+      if (item?.pending_confirmation && String(item?.confirmation_id || "").trim()) {
+        card.classList.add("is-pending-confirmation");
+        const actions = doc.createElement("div");
+        actions.className = "tool-card-actions";
+        for (const approve of [true, false]) {
+          const button = doc.createElement("button");
+          button.type = "button";
+          button.className = approve ? "tool-card-confirm" : "tool-card-cancel";
+          button.textContent = approve ? "确认执行" : "取消";
+          button.addEventListener("click", () => {
+            button.disabled = true;
+            root.dispatchEvent(new CustomEvent("taffy-agent-confirm", {
+              detail: { confirmationId: String(item.confirmation_id), approve, button }
+            }));
+          });
+          actions.appendChild(button);
+        }
+        card.appendChild(actions);
+      }
 
       const tool = String(item?.tool || "");
       if (item?.ok && String(item?.path || "").trim() && ["read_file", "write_file", "replace_in_file"].includes(tool)) {

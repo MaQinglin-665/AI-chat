@@ -8,6 +8,13 @@ from memory import merge_prompt_with_memory
 
 TOOL_META_MARKER = "[[TAFFY_TOOL_META]]"
 
+
+def _is_model_direct_reply_enabled(config):
+    if not isinstance(config, dict):
+        return False
+    settings = config.get("character_runtime")
+    return isinstance(settings, dict) and settings.get("model_direct_reply") is True
+
 DEFAULT_HUMANIZE_SETTINGS = {
     "enabled": True,
     "strip_fillers": True,
@@ -113,6 +120,20 @@ def is_mostly_chinese_text(text):
 
 def is_explicit_chinese_reply_request(user_message):
     safe = str(user_message or "").lower()
+    chinese_markers = (
+        "\u7528\u4e2d\u6587",
+        "\u4e2d\u6587\u56de\u7b54",
+        "\u4e2d\u6587\u56de\u590d",
+        "\u4e2d\u6587\u56de\u8986",
+        "\u8bf7\u7528\u4e2d\u6587",
+        "\u7528\u7b80\u4f53\u4e2d\u6587",
+        "\u7528\u7e41\u4f53\u4e2d\u6587",
+        "\u8bf4\u4e2d\u6587",
+    )
+    if any(marker in safe for marker in chinese_markers) or re.search(
+        r"(?:answer|reply|respond|speak|use)\s+(?:in\s+)?chinese", safe
+    ):
+        return True
     return bool(
         re.search(r"(用中文|中文回答|回复中文|说中文|請用中文|请用中文|answer in chinese|reply in chinese|use chinese)", safe)
     )
@@ -292,7 +313,7 @@ def infer_context_style(user_message, safe_history, is_auto=False):
         return "neutral"
     return best[0]
 
-def infer_reply_density(user_message, safe_history, is_auto=False):
+def infer_reply_density(user_message, safe_history, is_auto=False, *, allow_random=True):
     text = str(user_message or "").strip()
     if is_auto:
         return "brief"
@@ -306,9 +327,10 @@ def infer_reply_density(user_message, safe_history, is_auto=False):
     question_marks = len(re.findall(r"[?？]", text))
     if question_marks >= 2:
         return "normal"
-    # Add Neuro-style unpredictability: occasionally override density
-    r = random.random()
-    if not is_auto:
+    # Legacy non-direct dialogue may keep a small novelty bias. Model-direct
+    # companion dialogue must be deterministic from the user's actual need.
+    if allow_random and not is_auto:
+        r = random.random()
         if r < 0.15:
             return "brief"     # 15% chance of ultra-short reply
         elif r > 0.88:
@@ -319,8 +341,8 @@ def build_style_prompt_block(style_name):
     style = normalize_style_name(style_name)
     base = (
         "回复风格要求：有自己的想法和态度，不是什么都附和。"
-        "长度跟着话题走，无聊的一句带过，有意思的可以多说。"
-        "说话自然有个性，可以吐槽、反问、跑题、接梗。"
+        "默认像熟人聊天那样用短句，先说眼下最有用的内容；复杂问题也先给结论，再用短段补足必要信息。"
+        "说话自然有个性，可以偶尔吐槽、反问、抬杠或接梗，但别为了表演性格耽误正事。"
     )
     style_map = {
         "comfort": "语气温和，先接住对方的感受。",
@@ -331,20 +353,27 @@ def build_style_prompt_block(style_name):
     }
     return f"{base}\n当前语境风格：{style}\n{style_map.get(style, style_map['neutral'])}"
 
-def build_human_prompt_block(user_message, safe_history, is_auto=False):
-    density = infer_reply_density(user_message, safe_history, is_auto=is_auto)
+def build_human_prompt_block(user_message, safe_history, is_auto=False, *, allow_random=True):
+    density = infer_reply_density(
+        user_message,
+        safe_history,
+        is_auto=is_auto,
+        allow_random=allow_random,
+    )
     user_text = str(user_message or "").strip()
     lines = [
-        "像真人聊天一样回复，语气自然，有自己的态度和想法。",
-        "不要用客服腔、总结腔、教科书腔。",
-        "可以吐槽、反问、抬杠、跑题，像真人一样有个性。",
+        "把这一轮当成熟人之间的随口聊天：自然、直接，有自己的态度和想法。",
+        "默认用短句，先给对方此刻最需要的结论或下一步；技术和工作问题也保持这种口吻。",
+        "不要复述用户的问题，不要用‘好的’‘当然可以’‘没问题’做礼貌确认，也不要用‘下面是’‘总之’‘希望能帮到你’组织答案。",
+        "不要在结尾例行总结、主动揽下一项工作或问‘还需要什么吗’。话说完就停。",
+        "可以偶尔轻轻吐槽、反问、抬杠或接梗，但必须贴着当前话题，别每句都硬塞。",
         "不要引用不存在的前文，不确定就先问一句。",
         "不要每次都以问句结尾。大部分时候直接把话说完就行，像真人一样有时候就是陈述。只有真的好奇才追问。",
     ]
     density_map = {
         "brief": "这轮极简回复，1句话甚至几个字就够了，像随口嘟囔。",
-        "normal": "这轮正常聊，2-3句，自然展开。",
-        "expanded": "这轮话多一点，可以展开讲、跑题、自言自语，4-6句都行。",
+        "normal": "这轮用2-3个短句自然说清，别铺垫。",
+        "expanded": "这轮需要多给信息，但仍要先给结论，再用短段或必要的清单补充；准确说完就停，别写成教程开场白。",
     }
     lines.append(density_map.get(density, density_map["normal"]))
     if re.fullmatch(r"(在吗|在嘛|在不在|在么|喂|嗨|hi|hello)[!！?？]*", user_text, re.I):
@@ -371,6 +400,34 @@ def build_human_prompt_block(user_message, safe_history, is_auto=False):
     if is_auto:
         lines.append("如果是你主动开口，要像突然想到就说一句，别像提醒播报，也别像任务通知。")
     return "\n".join(lines)
+
+
+def build_model_direct_turn_prompt_block(style_name, safe_history, is_auto=False):
+    style = normalize_style_name(style_name)
+    tone_map = {
+        "comfort": "Notice the feeling; care through grounded attention, with teasing softened rather than erased.",
+        "clear": "Be decisive and concrete; personality may color the answer but must not obscure it.",
+        "playful": "Let one relevant odd angle or sharp little tease emerge if it feels earned.",
+        "steady": "Stay composed and compact; use dry wit only if it fits naturally.",
+        "neutral": "Choose the rhythm and angle freely from the actual conversational moment.",
+    }
+    lines = [
+        "[Turn direction]",
+        tone_map.get(style, tone_map["neutral"]),
+        "Do not force a preset structure; the reply may be tiny, winding, blunt, or reflective as long as it remains coherent and relevant.",
+    ]
+    recent = _collect_recent_assistant_replies(safe_history, limit=2)
+    recent_openings = []
+    for item in recent:
+        compact = re.sub(r"\s+", " ", str(item or "")).strip()
+        if compact:
+            recent_openings.append(compact[:24])
+    if recent_openings:
+        lines.append("Avoid echoing these recent openings: " + " | ".join(recent_openings))
+    if is_auto:
+        lines.append("This is an unprompted thought: make it easy to ignore, never a notification or demand.")
+    return "\n".join(lines)
+
 
 def split_tool_meta_suffix(text):
     safe = str(text or "")
@@ -770,6 +827,13 @@ def apply_question_ending_limiter(reply, safe_history):
     return adjusted + meta
 
 def finalize_assistant_reply(config, llm_cfg, provider, user_message, safe_history, reply, is_auto=False):
+    # Model-direct mode deliberately keeps the model's visible wording. The
+    # route still owns error handling and empty-reply checks, but humanization,
+    # language replacement and diversity rewrites must not silently change a
+    # streamed reply after its first delta has reached the user.
+    if _is_model_direct_reply_enabled(config):
+        raw_reply = str(reply or "")
+        return raw_reply if raw_reply.strip() else ""
     settings = get_humanize_settings(config)
     final_reply = str(reply or "").strip()
     if not final_reply:
@@ -829,13 +893,27 @@ def build_prompt_with_style(config, user_message, safe_history, base_prompt, is_
         if auto_mode
         else manual_style
     )
+    if _is_model_direct_reply_enabled(config):
+        turn_block = build_model_direct_turn_prompt_block(
+            style_name,
+            safe_history,
+            is_auto=is_auto,
+        )
+        prompt = merge_prompt_with_memory(base_prompt, turn_block)
+        time_block = build_time_awareness_block()
+        return merge_prompt_with_memory(prompt, time_block)
     style_block = build_style_prompt_block(style_name)
     prompt = merge_prompt_with_memory(base_prompt, style_block)
-    human_block = build_human_prompt_block(user_message, safe_history, is_auto=prompt_auto)
+    human_block = build_human_prompt_block(
+        user_message,
+        safe_history,
+        is_auto=prompt_auto,
+        allow_random=not _is_model_direct_reply_enabled(config),
+    )
     if is_thought_burst:
         human_block += (
             "\nThis automatic turn is a thought burst: it may be longer than one sentence when the thought needs it, "
-            "but it must still sound like Taffy thinking out loud, not a task notification."
+            "but it must still sound like the assistant thinking out loud, not a task notification."
         )
     prompt = merge_prompt_with_memory(prompt, human_block)
     # 时间感知：让模型知道现在几点，语气自动适配

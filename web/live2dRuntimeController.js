@@ -23,6 +23,72 @@
     const clampNumber = typeof deps.clampNumber === "function" ? deps.clampNumber : (v, min, max) => Math.min(max, Math.max(min, Number(v) || 0));
     const handleWindowResize = typeof deps.handleWindowResize === "function" ? deps.handleWindowResize : () => {};
 
+    function configureApplicationTicker(app) {
+      const ticker = app?.ticker;
+      if (!ticker) {
+        return;
+      }
+      ticker.maxFPS = 60;
+      ticker.minFPS = 30;
+      ticker.speed = 1;
+    }
+
+    function attachSynchronizedModelUpdate(model) {
+      const ticker = state.pixiApp?.ticker;
+      if (!ticker || !model || typeof model.update !== "function") {
+        return;
+      }
+      model.autoUpdate = false;
+      const priority = Number(window.PIXI?.UPDATE_PRIORITY?.HIGH) || 25;
+      ticker.add(() => {
+        if (state.model !== model || state.rendererSurfaceActive === false) {
+          return;
+        }
+        const deltaMs = Math.max(0, Math.min(50, Number(ticker.deltaMS) || (1000 / 60)));
+        model.update(deltaMs);
+      }, null, priority);
+    }
+
+    function installRenderDiagnostics() {
+      let enabled = false;
+      try {
+        enabled = new URLSearchParams(String(window.location?.search || "")).get("render_diagnostics") === "1";
+      } catch (_) {
+        enabled = false;
+      }
+      const ticker = state.pixiApp?.ticker;
+      if (!enabled || !ticker) {
+        return;
+      }
+      let sampleStartedAt = performance.now();
+      let sampleFrames = 0;
+      let samplesSent = 0;
+      ticker.add(() => {
+        sampleFrames += 1;
+        const now = performance.now();
+        const elapsedMs = now - sampleStartedAt;
+        if (elapsedMs < 2000 || samplesSent >= 5) {
+          return;
+        }
+        const renderer = state.pixiApp?.renderer || {};
+        const payload = {
+          view: String(state.uiView || ""),
+          fps: Math.round((sampleFrames * 100000) / elapsedMs) / 100,
+          tickerFps: Math.round((Number(ticker.FPS) || 0) * 100) / 100,
+          rendererWidth: Math.round(Number(renderer.width) || 0),
+          rendererHeight: Math.round(Number(renderer.height) || 0),
+          resolution: Number(renderer.resolution) || 1,
+          devicePixelRatio: Number(window.devicePixelRatio) || 1
+        };
+        state.live2dRenderMetrics = payload;
+        window.__TAFFY_LIVE2D_RENDER_METRICS__ = payload;
+        window.electronAPI?.reportLive2DRenderMetrics?.(payload);
+        sampleStartedAt = now;
+        sampleFrames = 0;
+        samplesSent += 1;
+      });
+    }
+
     function loadScript(src, isReady) {
       return new Promise((resolve, reject) => {
         if (typeof isReady === "function" && isReady()) {
@@ -51,6 +117,11 @@
         "/vendor/pixi.min.js",
         () => typeof window.PIXI !== "undefined"
       );
+
+      if (!window.__TAFFY_PIXI_CSP_PATCHED__) {
+        await loadScript("/vendor/pixi-unsafe-eval.min.js");
+        window.__TAFFY_PIXI_CSP_PATCHED__ = true;
+      }
 
       await loadScript(
         "/vendor/live2dcubismcore.min.js",
@@ -87,7 +158,7 @@
         return;
       }
       state.live2dGuideShown = true;
-      appendMessage("assistant", guideText);
+      appendMessage("assistant", guideText, { category: "system", persist: false, enableFeedback: false });
     }
 
     function patchCoreModelUpdate(model) {
@@ -168,12 +239,12 @@
 
       if (!window.Live2DCubismCore) {
         setStatus("CubismCore 缺失");
-        appendMessage("assistant", "Cubism 核心未加载，请强制刷新（Ctrl+F5）。");
+        appendMessage("assistant", "Cubism 核心未加载，请强制刷新（Ctrl+F5）。", { category: "system", persist: false, enableFeedback: false });
         return;
       }
       if (!window.PIXI || !window.PIXI.live2d || !window.PIXI.live2d.Live2DModel) {
         setStatus("Live2D 运行时缺失");
-        appendMessage("assistant", "Live2D 运行时未加载，请强制刷新（Ctrl+F5）。");
+        appendMessage("assistant", "Live2D 运行时未加载，请强制刷新（Ctrl+F5）。", { category: "system", persist: false, enableFeedback: false });
         return;
       }
       state.pixiApp = new window.PIXI.Application({
@@ -181,12 +252,18 @@
         autoStart: true,
         resizeTo: window,
         backgroundAlpha: 0,
-        antialias: true
+        antialias: false,
+        autoDensity: true,
+        resolution: 1,
+        powerPreference: "high-performance",
+        preserveDrawingBuffer: false
       });
+      configureApplicationTicker(state.pixiApp);
+      installRenderDiagnostics();
 
       const { Live2DModel } = window.PIXI.live2d;
       try {
-        const model = await Live2DModel.from(state.config.model_path);
+        const model = await Live2DModel.from(state.config.model_path, { autoUpdate: false });
         state.model = model;
         window.__petModel = model;
         setModelMotionDefinitions(model);
@@ -196,6 +273,7 @@
         setupClickthroughHitTest();
         scheduleIdleMotionLoop();
         patchCoreModelUpdate(model);
+        attachSynchronizedModelUpdate(model);
         addFloatTicker();
 
         const i = model.internalModel || {};
@@ -239,6 +317,9 @@
     return {
       loadScript,
       ensureLive2DRuntime,
+      configureApplicationTicker,
+      attachSynchronizedModelUpdate,
+      installRenderDiagnostics,
       initLive2D
     };
   }

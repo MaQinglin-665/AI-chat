@@ -22,6 +22,51 @@
     });
   }
 
+  function createTTSAbortError() {
+    const err = new Error("TTS request aborted");
+    err.name = "AbortError";
+    err.aborted = true;
+    err.retriable = false;
+    return err;
+  }
+
+  function isTTSAbortError(err) {
+    return err?.aborted === true || err?.name === "AbortError";
+  }
+
+  function awaitWithTTSAbort(value, signal = null) {
+    if (signal?.aborted === true) {
+      return Promise.reject(createTTSAbortError());
+    }
+    if (!signal || typeof signal.addEventListener !== "function") {
+      return Promise.resolve(value);
+    }
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const settle = (callback, value) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        try {
+          signal.removeEventListener("abort", onAbort);
+        } catch (_) {
+          // ignore
+        }
+        callback(value);
+      };
+      const onAbort = () => settle(reject, createTTSAbortError());
+      signal.addEventListener("abort", onAbort, { once: true });
+      Promise.resolve()
+        .then(() => value)
+        .then((result) => settle(resolve, result), (error) => settle(reject, error));
+    });
+  }
+
+  function waitForTTSRetry(wait, ms, signal = null) {
+    return awaitWithTTSAbort(Promise.resolve().then(() => wait(ms)), signal);
+  }
+
   function normalizeTTSRequestTimeoutMs(value) {
     return Math.max(
       1500,
@@ -42,6 +87,15 @@
       if (typeof p.rate === "string" && p.rate.trim()) payload.rate = p.rate.trim();
       if (typeof p.pitch === "string" && p.pitch.trim()) payload.pitch = p.pitch.trim();
       if (typeof p.volume === "string" && p.volume.trim()) payload.volume = p.volume.trim();
+      const semanticEnums = {
+        emotion: ["neutral", "happy", "playful", "excited", "shy", "hurt", "sad", "anxious", "angry", "surprised", "serious", "thinking"],
+        intensity: ["low", "medium", "high"],
+        voice_style: ["neutral", "soft", "cheerful", "teasing", "serious", "curious", "warm"]
+      };
+      for (const [key, allowed] of Object.entries(semanticEnums)) {
+        const value = String(p[key] || "").trim().toLowerCase().replace(/-/g, "_");
+        if (allowed.includes(value)) payload[key] = value;
+      }
     }
     return payload;
   }
@@ -120,6 +174,12 @@
       return null;
     }
 
+    const externalSignal = requestOpts.signal && typeof requestOpts.signal === "object"
+      ? requestOpts.signal
+      : null;
+    if (externalSignal?.aborted === true) {
+      throw createTTSAbortError();
+    }
     const perfLog = typeof requestOpts.perfLog === "function" ? requestOpts.perfLog : defaultPerfLog;
     const getNow = typeof requestOpts.now === "function" ? requestOpts.now : nowMs;
     const getWallNow = typeof requestOpts.wallNow === "function" ? requestOpts.wallNow : wallMs;
@@ -143,21 +203,46 @@
     const AbortControllerImpl = requestOpts.AbortController || root.AbortController;
     const controller = (typeof AbortControllerImpl !== "undefined") ? new AbortControllerImpl() : null;
     let timeoutHandle = 0;
+    let removeExternalAbortListener = null;
+    if (controller && externalSignal) {
+      const abortFromExternalSignal = () => {
+        try {
+          controller.abort();
+        } catch (_) {
+          // ignore
+        }
+      };
+      if (externalSignal.aborted) {
+        abortFromExternalSignal();
+      } else if (typeof externalSignal.addEventListener === "function") {
+        externalSignal.addEventListener("abort", abortFromExternalSignal, { once: true });
+        removeExternalAbortListener = () => {
+          try {
+            externalSignal.removeEventListener("abort", abortFromExternalSignal);
+          } catch (_) {
+            // ignore
+          }
+        };
+      }
+    }
     if (controller) {
       timeoutHandle = root.setTimeout(() => controller.abort(), timeoutMs);
     }
 
     let resp;
     try {
-      resp = await authFetch("/api/tts", {
+      resp = await awaitWithTTSAbort(authFetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-        signal: controller ? controller.signal : undefined
-      });
+        signal: controller ? controller.signal : (externalSignal || undefined)
+      }), externalSignal);
     } catch (err) {
-      const msg = err?.name === "AbortError"
-        ? `TTS request timeout (${timeoutMs}ms)`
+      const externallyAborted = externalSignal?.aborted === true;
+      const msg = externallyAborted
+        ? "TTS request aborted"
+        : err?.name === "AbortError"
+          ? `TTS request timeout (${timeoutMs}ms)`
         : String(err?.message || "TTS request failed");
       perfLog("tts", "request_fail", {
         traceId: perfTraceId || "(none)",
@@ -165,20 +250,32 @@
         error: msg
       });
       const wrapped = new Error(msg);
-      wrapped.retriable = true;
+      wrapped.name = externallyAborted ? "AbortError" : "Error";
+      wrapped.aborted = externallyAborted;
+      wrapped.retriable = !externallyAborted;
       throw wrapped;
     } finally {
       if (timeoutHandle) {
         root.clearTimeout(timeoutHandle);
       }
+      if (removeExternalAbortListener) {
+        removeExternalAbortListener();
+      }
+    }
+
+    if (externalSignal?.aborted === true) {
+      throw createTTSAbortError();
     }
 
     if (!resp.ok) {
       let detail = `HTTP ${resp.status}`;
       try {
-        const data = await resp.json();
+        const data = await awaitWithTTSAbort(resp.json(), externalSignal);
         if (data?.error) detail = data.error;
-      } catch (_) {
+      } catch (err) {
+        if (externalSignal?.aborted === true || isTTSAbortError(err)) {
+          throw createTTSAbortError();
+        }
         // ignore
       }
       const err = new Error(detail);
@@ -193,7 +290,29 @@
       throw err;
     }
 
-    const { blob, mime } = await normalizeAudioBlob(await resp.blob(), requestOpts);
+    let normalizedAudio = null;
+    try {
+      const rawBlob = await awaitWithTTSAbort(resp.blob(), externalSignal);
+      if (externalSignal?.aborted === true) {
+        throw createTTSAbortError();
+      }
+      normalizedAudio = await awaitWithTTSAbort(normalizeAudioBlob(rawBlob, requestOpts), externalSignal);
+      if (externalSignal?.aborted === true) {
+        throw createTTSAbortError();
+      }
+    } catch (err) {
+      if (externalSignal?.aborted === true || isTTSAbortError(err)) {
+        const abortError = createTTSAbortError();
+        perfLog("tts", "request_fail", {
+          traceId: perfTraceId || "(none)",
+          elapsedMs: Math.round(getNow() - ttsReqStartedPerfMs),
+          error: abortError.message
+        });
+        throw abortError;
+      }
+      throw err;
+    }
+    const { blob, mime } = normalizedAudio;
     const responseTraceId =
       typeof resp.headers?.get === "function" ? String(resp.headers.get("X-Perf-Trace-Id") || "") : "";
     perfLog("tts", "response_ok", {
@@ -216,6 +335,9 @@
     const wait = typeof opts.wait === "function" ? opts.wait : waitMs;
     let attempt = 0;
     while (true) {
+      if (opts.signal?.aborted === true) {
+        throw createTTSAbortError();
+      }
       try {
         return await requestServerTTSBlob(text, prosody, {
           ...opts,
@@ -223,8 +345,14 @@
           traceId: opts.traceId
         });
       } catch (err) {
+        if (opts.signal?.aborted === true || isTTSAbortError(err)) {
+          throw createTTSAbortError();
+        }
         if (attempt >= maxRetries || !isRetriableTTSError(err)) {
           throw err;
+        }
+        if (opts.signal?.aborted === true) {
+          throw createTTSAbortError();
         }
         const nextWaitMs = Math.round(retryDelayMs * (1 + attempt * 0.85));
         if (typeof opts.onRetry === "function") {
@@ -234,20 +362,118 @@
             error: err
           });
         }
-        await wait(nextWaitMs);
+        await waitForTTSRetry(wait, nextWaitMs, opts.signal || null);
+        if (opts.signal?.aborted === true) {
+          throw createTTSAbortError();
+        }
         attempt += 1;
       }
     }
+  }
+
+  async function requestServerTTSStream(text, prosody = null, requestOpts = {}) {
+    const authFetch = requestOpts.authFetch;
+    if (typeof authFetch !== "function") throw new Error("authFetch is required");
+    const sanitizeSpeakText = typeof requestOpts.sanitizeSpeakText === "function"
+      ? requestOpts.sanitizeSpeakText
+      : (value) => String(value || "").trim();
+    const cleaned = sanitizeSpeakText(text);
+    if (!cleaned) return null;
+    const externalSignal = requestOpts.signal || null;
+    if (externalSignal?.aborted) throw createTTSAbortError();
+    const AbortControllerImpl = requestOpts.AbortController || root.AbortController;
+    const controller = typeof AbortControllerImpl !== "undefined" ? new AbortControllerImpl() : null;
+    const timeoutMs = normalizeTTSRequestTimeoutMs(requestOpts.timeoutMs);
+    let timeoutHandle = 0;
+    let removeExternalAbort = null;
+    const cleanup = () => {
+      if (timeoutHandle) root.clearTimeout(timeoutHandle);
+      timeoutHandle = 0;
+      if (removeExternalAbort) removeExternalAbort();
+      removeExternalAbort = null;
+    };
+    if (controller) {
+      timeoutHandle = root.setTimeout(() => controller.abort(), timeoutMs);
+      if (externalSignal?.addEventListener) {
+        const onAbort = () => controller.abort();
+        externalSignal.addEventListener("abort", onAbort, { once: true });
+        removeExternalAbort = () => externalSignal.removeEventListener("abort", onAbort);
+      }
+    }
+    const payload = buildServerTTSPayload(cleaned, { prosody, voice: requestOpts.voice });
+    const traceId = String(requestOpts.traceId || "").trim();
+    if (traceId) {
+      payload._perf_trace_id = traceId;
+      payload._perf_client_send_ts_ms = typeof requestOpts.wallNow === "function" ? requestOpts.wallNow() : wallMs();
+    }
+    let response;
+    try {
+      response = await authFetch("/api/tts_stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: controller ? controller.signal : (externalSignal || undefined)
+      });
+    } catch (err) {
+      cleanup();
+      if (externalSignal?.aborted || err?.name === "AbortError") throw createTTSAbortError();
+      throw err;
+    }
+    if (!response.ok) {
+      cleanup();
+      let detail = `HTTP ${response.status}`;
+      try {
+        const data = await response.json();
+        if (data?.error) detail = data.error;
+      } catch (_) {}
+      const err = new Error(detail);
+      err.httpStatus = Number(response.status || 0);
+      err.retriable = err.httpStatus >= 500 || err.httpStatus === 408 || err.httpStatus === 429;
+      throw err;
+    }
+    if (!response.body || typeof response.body.getReader !== "function") {
+      cleanup();
+      throw new Error("Streaming TTS response body is unavailable");
+    }
+    const rawReader = response.body.getReader();
+    const reader = {
+      async read() {
+        const part = await rawReader.read();
+        if (part?.done) cleanup();
+        return part;
+      },
+      async cancel(reason) {
+        cleanup();
+        return rawReader.cancel?.(reason);
+      }
+    };
+    let closed = false;
+    return {
+      reader,
+      signal: controller ? controller.signal : externalSignal,
+      contentType: String(response.headers?.get?.("Content-Type") || "audio/wav"),
+      traceId: String(response.headers?.get?.("X-Perf-Trace-Id") || traceId),
+      async close(cancel = false) {
+        if (closed) return;
+        closed = true;
+        if (cancel) {
+          try { await reader.cancel("playback_cancelled"); } catch (_) {}
+        }
+        cleanup();
+      }
+    };
   }
 
   const api = {
     buildServerTTSPayload,
     inferAudioMime,
     isRetriableTTSError,
+    createTTSAbortError,
     normalizeTTSRequestTimeoutMs,
     normalizeAudioBlob,
     requestServerTTSBlob,
-    requestServerTTSBlobWithRetry
+    requestServerTTSBlobWithRetry,
+    requestServerTTSStream
   };
 
   const ns = (root.TaffyModules = root.TaffyModules || {});

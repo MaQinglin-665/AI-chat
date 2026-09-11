@@ -8,6 +8,7 @@ const path = require("path");
 const FIRST_RUN_JS = path.resolve(__dirname, "..", "web", "firstRunWizardController.js");
 const INDEX_HTML = path.resolve(__dirname, "..", "web", "index.html");
 const BASE_CSS = path.resolve(__dirname, "..", "web", "base.css");
+const EARLY_VIEW_BOOTSTRAP_JS = path.resolve(__dirname, "..", "web", "earlyViewBootstrap.js");
 const firstRun = require(FIRST_RUN_JS);
 
 function createClassList() {
@@ -201,6 +202,7 @@ async function testProbeFailureKeepsSavedStateReadable() {
 function testHtmlAndCssWired() {
   const html = fs.readFileSync(INDEX_HTML, "utf8");
   const css = fs.readFileSync(BASE_CSS, "utf8");
+  const earlyViewBootstrap = fs.readFileSync(EARLY_VIEW_BOOTSTRAP_JS, "utf8");
   for (const text of [
     "首次模型配置",
     "Provider 类型",
@@ -213,6 +215,17 @@ function testHtmlAndCssWired() {
   }
   assert.ok(css.includes(".first-run-modal"), "first-run modal CSS should exist");
   assert.ok(css.includes("z-index: 10080"), "first-run modal should sit above other overlays");
+  assert.ok(html.includes('<script src="./earlyViewBootstrap.js"></script>'), "startup should load the early view bootstrap before panel paint");
+  assert.ok(earlyViewBootstrap.includes("const classes = [`view-${view}`]"), "startup script should derive the view class");
+  assert.ok(earlyViewBootstrap.includes("document.body.classList.add(className)"), "startup script should add classes to body early");
+  assert.ok(html.includes('http-equiv="Content-Security-Policy"'), "index should define a renderer CSP");
+  assert.ok(!html.includes("'unsafe-eval'"), "renderer CSP should not allow unsafe-eval");
+  assert.ok(
+    html.includes("'wasm-unsafe-eval'"),
+    "renderer CSP should narrowly allow local ONNX WebAssembly compilation"
+  );
+  assert.ok(css.includes(".panel .hero-avatar {"), "base CSS should guard hero avatar before view-chat is applied");
+  assert.ok(css.includes(".panel .hero-avatar > img"), "base CSS should constrain hero avatar image before startup JS completes");
 }
 
 async function main() {

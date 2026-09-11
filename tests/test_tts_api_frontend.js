@@ -119,10 +119,113 @@ async function testHttpErrorAndRetry() {
   assert.strictEqual(result.type, "audio/mpeg");
 }
 
+async function testCallerAbortStopsRequestWithoutRetry() {
+  const controller = new AbortController();
+  let attempts = 0;
+  const waits = [];
+  const pendingFetch = new Promise((_resolve, reject) => {
+    controller.signal.addEventListener("abort", () => {
+      const err = new Error("aborted by caller");
+      err.name = "AbortError";
+      reject(err);
+    }, { once: true });
+  });
+  const request = ttsApi.requestServerTTSBlobWithRetry("hello", null, {
+    authFetch: async () => {
+      attempts += 1;
+      return pendingFetch;
+    },
+    sanitizeSpeakText: (value) => value,
+    perfLog: () => {},
+    retries: 3,
+    retryDelayMs: 60,
+    wait: async (ms) => waits.push(ms),
+    signal: controller.signal
+  });
+
+  await Promise.resolve();
+  controller.abort();
+  await assert.rejects(
+    () => request,
+    (error) => error?.name === "AbortError" && error?.aborted === true && error?.retriable === false
+  );
+  assert.strictEqual(attempts, 1, "caller cancellation must not begin a retry");
+  assert.deepStrictEqual(waits, [], "caller cancellation must not enter retry backoff");
+}
+
+async function testCallerAbortDuringRetryBackoff() {
+  const controller = new AbortController();
+  let attempts = 0;
+  let releaseWait = null;
+  let markWaitStarted = null;
+  const waitStarted = new Promise((resolve) => { markWaitStarted = resolve; });
+  const request = ttsApi.requestServerTTSBlobWithRetry("hello", null, {
+    authFetch: async () => {
+      attempts += 1;
+      return makeResponse(503, new Blob(["x"]), { error: "busy" });
+    },
+    sanitizeSpeakText: (value) => value,
+    perfLog: () => {},
+    retries: 2,
+    retryDelayMs: 60,
+    wait: () => new Promise((resolve) => {
+      releaseWait = resolve;
+      markWaitStarted();
+    }),
+    signal: controller.signal
+  });
+
+  await waitStarted;
+  controller.abort();
+  await assert.rejects(
+    () => request,
+    (error) => error?.name === "AbortError" && error?.aborted === true && error?.retriable === false
+  );
+  assert.strictEqual(attempts, 1, "cancellation during backoff must prevent the next attempt");
+  releaseWait();
+}
+
+async function testCallerAbortDuringAudioBodyRead() {
+  const controller = new AbortController();
+  let releaseBody = null;
+  let markBodyStarted = null;
+  const bodyStarted = new Promise((resolve) => { markBodyStarted = resolve; });
+  const logs = [];
+  const request = ttsApi.requestServerTTSBlob("hello", null, {
+    authFetch: async () => ({
+      ok: true,
+      status: 200,
+      blob: () => new Promise((resolve) => {
+        releaseBody = resolve;
+        markBodyStarted();
+      }),
+      headers: { get: () => "" }
+    }),
+    sanitizeSpeakText: (value) => value,
+    perfLog: (...args) => logs.push(args),
+    signal: controller.signal
+  });
+
+  await bodyStarted;
+  controller.abort();
+  await assert.rejects(
+    () => request,
+    (error) => error?.name === "AbortError" && error?.aborted === true && error?.retriable === false
+  );
+  releaseBody(new Blob(["late audio"], { type: "audio/mpeg" }));
+  assert.ok(
+    !logs.some((entry) => entry[1] === "response_ok"),
+    "an aborted body read must not report a successful TTS response"
+  );
+}
+
 async function main() {
   await testPayloadAndMime();
   await testRequestSuccess();
   await testHttpErrorAndRetry();
+  await testCallerAbortStopsRequestWithoutRetry();
+  await testCallerAbortDuringRetryBackoff();
+  await testCallerAbortDuringAudioBodyRead();
   console.log("TTS API frontend checks passed.");
 }
 

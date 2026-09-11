@@ -53,7 +53,7 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert "Voice director:" in block
     assert "Xinyu" in block
     assert "older placeholder names" in block
-    assert "slightly odd inner life" in block
+    assert "alive, self-directed inner life" in block
     assert "empty helper phrases" in block
     assert decision["style_beat"]
     assert decision["reaction_mode"]
@@ -61,6 +61,40 @@ def test_character_brain_prompt_block_is_private_guidance():
     assert decision["reply_shape"]
     assert decision["question_policy"]
     assert decision["conversation_director"]["mode"]
+
+
+def test_compact_voice_brain_prompt_preserves_social_direction_at_lower_cost():
+    decision = character_brain.build_character_brain_decision(
+        user_message="I am a little tired today.",
+        config={"_input_modality": "voice"},
+    )
+    full = character_brain.build_character_brain_prompt_block(decision)
+    compact = character_brain.build_compact_character_brain_prompt_block(decision)
+
+    assert "Compact character direction" in compact
+    assert "Move=" in compact
+    assert "Continuity:" in compact
+    assert "Barge-in:" in compact
+    assert "Improv:" in compact
+    assert "Delivery:" in compact
+    assert "Follow-up rule:" in compact
+    assert "Banter rule:" in compact
+    assert "Intent rule:" in compact
+    assert "Grounding:" in compact
+    assert "Primary directive:" in compact
+    assert len(compact) < len(full) * 0.65
+
+
+def test_completed_bug_statement_is_celebrated_instead_of_treated_as_a_help_request():
+    decision = character_brain.build_character_brain_decision(
+        user_message="I just fixed an embarrassingly stupid bug.",
+    )
+
+    assert decision["intent"] == "encouragement"
+    assert decision["banter_level"] >= 1
+    assert decision["question_policy"] == "none"
+    compact = character_brain.build_compact_character_brain_prompt_block(decision)
+    assert "never as an unresolved help request" in compact
 
 
 def test_character_brain_style_beat_rotates_with_continuity():
@@ -145,14 +179,27 @@ def test_character_brain_improv_director_high_chaos_only_for_safe_play_scenes():
     correction = character_brain.build_character_brain_decision(user_message="You were wrong.")
     encouragement = character_brain.build_character_brain_decision(user_message="I finished it.")
 
-    for decision in (casual, question, correction, encouragement):
-        assert decision["improv"]["chaos_level"] == 3
+    assert casual["improv"]["chaos_level"] == 3
+    assert casual["spontaneity"] == 3
+    assert casual["banter_level"] == 3
+    for decision in (question, encouragement):
+        assert decision["improv"]["chaos_level"] == 2
         assert decision["safety_clamp"]["level"] == "none"
-        assert decision["spontaneity"] == 3
-        assert decision["banter_level"] == 3
+        assert decision["spontaneity"] <= 2
+        assert decision["banter_level"] <= 2
 
+    assert correction["improv"]["chaos_level"] == 3
     assert correction["improv"]["stance"] == "mock_defensive_repair"
     assert correction["improv"]["agenda"] == "repair_the_bit"
+
+
+def test_character_brain_does_not_force_desktop_bits_for_plain_greetings():
+    greeting = character_brain.build_character_brain_decision(user_message="下午好")
+
+    assert greeting["performance_bit"] == "none"
+    assert greeting["improv"]["callback_policy"] == "none"
+    compact = character_brain.build_compact_character_brain_prompt_block(greeting)
+    assert "meaningful independent thought" in compact
 
 
 def test_character_brain_improv_director_clamps_protected_intents():
@@ -1247,7 +1294,7 @@ def test_character_brain_reply_constraints_replace_bland_character_replies():
         "Hey there! I'm right here, ready for some chat.",
         greeting,
         user_message="Hi Xinyu, are you there?",
-    ) == "Oh, you found me. I was doing very important desktop nothing."
+    ) == "Afternoon. I was having a small thought, but your hello is more urgent."
     assert character_brain.apply_character_brain_reply_constraints(
         "Sure thing!",
         voice_test,
@@ -1612,7 +1659,7 @@ def test_character_brain_stage_memory_tracks_callback_and_decays():
         assert softened["stage_recent_callback"] == ""
 
 
-def test_character_brain_rotates_performance_bit_away_from_recent_stage_memory():
+def test_character_brain_does_not_force_stage_bits_for_non_desktop_encouragement():
     first = character_brain.build_character_brain_decision(user_message="I finished it.")
     recent_bit = first["performance_bit"]
     repeated_state = {
@@ -1627,9 +1674,9 @@ def test_character_brain_rotates_performance_bit_away_from_recent_stage_memory()
         session_state=repeated_state,
     )
 
-    assert recent_bit != "none"
-    assert second["performance_bit"] != recent_bit
-    assert second["performance_bit_guide"] == character_brain.BIT_BANK[second["performance_bit"]]
+    assert recent_bit == "none"
+    assert second["performance_bit"] == "none"
+    assert second["improv"]["callback_policy"] == "none"
 
 
 def test_character_brain_stage_memory_marks_corrections_temporarily():

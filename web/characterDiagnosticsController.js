@@ -6,6 +6,12 @@
     const characterTuning = deps.characterTuning || root.TaffyCharacterTuning || {};
     const characterExperienceController = deps.characterExperienceController || null;
     const appendMessage = typeof deps.appendMessage === "function" ? deps.appendMessage : () => null;
+    const appendSystemMessage = (role, text, options = {}) => appendMessage(role, text, {
+      ...options,
+      category: "system",
+      persist: false,
+      enableFeedback: false
+    });
     const setStatus = typeof deps.setStatus === "function" ? deps.setStatus : () => {};
     const buildSpeakProsody = typeof deps.buildSpeakProsody === "function" ? deps.buildSpeakProsody : () => null;
     const speak = typeof deps.speak === "function" ? deps.speak : async () => false;
@@ -20,12 +26,12 @@
 
     async function runVoiceTestAndAppendReport() {
       const sample = "这是语音测试。如果你听到我说话，说明语音链路正常。";
-      appendMessage("assistant", sample);
+      appendSystemMessage("assistant", sample);
       setStatus("语音测试中...");
       const prosody = buildSpeakProsody(sample, "idle", false, "steady");
       const ok = await speak(sample, { force: true, interrupt: true, prosody });
       if (!ok) {
-        appendMessage(
+        appendSystemMessage(
           "assistant",
           "语音测试没有成功。请打开“模型 / 语音”里的“测试语音”，或输入 /ttsdebug 查看最近一次语音状态。",
           { enableTranslation: false }
@@ -73,10 +79,10 @@
       state.followupCharacterRuntimeLastReplyCandidate = candidate;
       state.followupCharacterRuntimeLastReplyAutoApply = apply;
       updateReplyCharacterChip(candidate, apply);
-      appendMessage("assistant", `角色试演：${preset.label}\n${preset.sample}`, { enableTranslation: false });
+      appendSystemMessage("assistant", `角色试演：${preset.label}\n${preset.sample}`, { enableTranslation: false });
       setStatus(`角色试演：${preset.label}`);
       if (!state.speakingEnabled) {
-        appendMessage("assistant", "语音开关当前是关闭状态，这次只测试了表情和动作。", { enableTranslation: false });
+        appendSystemMessage("assistant", "语音开关当前是关闭状态，这次只测试了表情和动作。", { enableTranslation: false });
         return true;
       }
       const prosody = buildSpeakProsody(preset.sample, preset.mood, false, voiceStyle);
@@ -89,7 +95,7 @@
         voiceStyle
       });
       if (!ok) {
-        appendMessage("assistant", "角色试演的语音没有成功。可以先打开“模型 / 语音”里的“测试语音”，或点“故障自检”确认语音服务。", {
+        appendSystemMessage("assistant", "角色试演的语音没有成功。可以先打开“模型 / 语音”里的“测试语音”，或点“故障自检”确认语音服务。", {
           enableTranslation: false
         });
         setStatus("角色试演语音失败");
@@ -110,7 +116,7 @@
     function recordCharacterPerformanceFeedback(rating = "good", note = "") {
       const summary = getLatestCharacterPerformanceSummary();
       if (!summary) {
-        appendMessage("assistant", "还没有可评价的角色表现。先正常聊一句，再在 AI 回复旁点“表现不错”或“需要调整”。", { enableTranslation: false, enableFeedback: false });
+        appendSystemMessage("assistant", "还没有可评价的角色表现。先正常聊一句，再在 AI 回复旁点“表现不错”或“需要调整”。", { enableTranslation: false });
         setStatus("暂无角色表现可反馈");
         return null;
       }
@@ -130,7 +136,7 @@
         && typeof characterExperienceController.recordFeedback === "function"
           ? characterExperienceController.recordFeedback(feedback)
           : null;
-      appendMessage(
+      appendSystemMessage(
         "assistant",
         [
           typeof characterTuning.buildFeedbackMessage === "function"
@@ -163,7 +169,7 @@
     }
 
     function runCharacterTuningAndAppendReport() {
-      const row = appendMessage("assistant", buildCharacterTuningReport(), { enableTranslation: false });
+      const row = appendSystemMessage("assistant", buildCharacterTuningReport(), { enableTranslation: false });
       row?.classList?.add("doctor-report");
       setStatus("角色调优建议已生成");
     }
@@ -175,7 +181,7 @@
     }
 
     function appendCharacterWorkflowGuide() {
-      const row = appendMessage("assistant", buildCharacterWorkflowGuide(), { enableTranslation: false });
+      const row = appendSystemMessage("assistant", buildCharacterWorkflowGuide(), { enableTranslation: false });
       row?.classList?.add("doctor-report");
       setStatus("角色流程已显示");
     }

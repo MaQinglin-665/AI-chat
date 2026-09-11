@@ -48,6 +48,10 @@ def _patch_learning_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(memory, "LEARNING_STATE_PATH", state_path)
     monkeypatch.setattr(memory, "LEARNING_AUDIT_LOG_PATH", audit_path)
     monkeypatch.setattr(memory, "LEARNING_SHADOW_LOG_PATH", shadow_path)
+    monkeypatch.setattr(memory, "MEMORY_RECALL_SUPPRESSIONS_PATH", tmp_path / "memory_recall_suppressions.json")
+    monkeypatch.setattr(memory, "MEMORY_SUMMARY_PATH", tmp_path / "memory_summary.json")
+    monkeypatch.setattr(memory, "PROFILE_MEMORY_PATH", tmp_path / "memory_profile.json")
+    monkeypatch.setattr(memory, "RELATIONSHIP_MEMORY_PATH", tmp_path / "memory_relationship.json")
     return candidates_path, samples_path, state_path
 
 
@@ -55,6 +59,10 @@ def _patch_core_memory_path(monkeypatch, tmp_path):
     core_path = tmp_path / "memory_core.json"
     core_path.write_text('{"schema_version":1,"items":[]}', encoding="utf-8")
     monkeypatch.setattr(memory, "CORE_MEMORY_PATH", core_path)
+    monkeypatch.setattr(memory, "MEMORY_RECALL_SUPPRESSIONS_PATH", tmp_path / "memory_recall_suppressions.json")
+    monkeypatch.setattr(memory, "MEMORY_SUMMARY_PATH", tmp_path / "memory_summary.json")
+    monkeypatch.setattr(memory, "PROFILE_MEMORY_PATH", tmp_path / "memory_profile.json")
+    monkeypatch.setattr(memory, "RELATIONSHIP_MEMORY_PATH", tmp_path / "memory_relationship.json")
     return core_path
 
 
@@ -63,6 +71,40 @@ def _patch_short_memory_path(monkeypatch, tmp_path):
     short_path.write_text('{"schema_version":1,"turn_index":0,"items":[]}', encoding="utf-8")
     monkeypatch.setattr(memory, "SHORT_TERM_MEMORY_PATH", short_path)
     return short_path
+
+
+def _patch_recall_suppression_path(monkeypatch, tmp_path):
+    path = tmp_path / "memory_recall_suppressions.json"
+    monkeypatch.setattr(memory, "MEMORY_RECALL_SUPPRESSIONS_PATH", path)
+    return path
+
+
+def test_core_memory_recovers_from_valid_backup(monkeypatch, tmp_path):
+    core_path = _patch_core_memory_path(monkeypatch, tmp_path)
+    core_path.write_text("{corrupt", encoding="utf-8")
+    core_path.with_suffix(".bak").write_text(
+        '{"schema_version":1,"items":[{"id":"mem_backup","kind":"semantic","category":"stable_fact","text":"User likes tea","status":"active"}]}',
+        encoding="utf-8",
+    )
+
+    items = memory.load_core_memory_items()
+
+    assert [item["id"] for item in items] == ["mem_backup"]
+    assert items[0]["text"] == "User likes tea"
+
+
+def test_short_term_memory_recovers_from_valid_backup(monkeypatch, tmp_path):
+    short_path = _patch_short_memory_path(monkeypatch, tmp_path)
+    short_path.write_text("{corrupt", encoding="utf-8")
+    short_path.with_suffix(".bak").write_text(
+        '{"schema_version":1,"turn_index":4,"items":[{"id":"short_backup","kind":"current_task","text":"Finish report","status":"active","last_seen_turn":4,"ttl_turns":16}]}',
+        encoding="utf-8",
+    )
+
+    items = memory.load_short_term_memory_items({"short_ttl_turns": 16})
+
+    assert [item["id"] for item in items] == ["short_backup"]
+    assert items[0]["text"] == "Finish report"
 
 
 def test_low_signal_reply_does_not_inject_recent_memory(monkeypatch):
@@ -108,7 +150,7 @@ def test_relevant_memory_is_selected_without_unrelated_recent_padding(monkeypatc
     monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [])
 
     selected = memory.select_memory_items_for_prompt(
-        _config(inject_recent=2, inject_relevant=2),
+        _config(inject_recent=2, inject_relevant=2, core_enabled=False),
         "How is project alpha local asr going?",
         [],
     )
@@ -122,7 +164,7 @@ def test_explicit_memory_request_can_fallback_to_recent_memory(monkeypatch):
     monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [])
 
     selected = memory.select_memory_items_for_prompt(
-        _config(inject_recent=1, inject_relevant=1),
+        _config(inject_recent=1, inject_relevant=1, core_enabled=False),
         "What do you remember?",
         [],
     )
@@ -162,11 +204,11 @@ def test_memory_debug_snapshot_includes_last_selection(monkeypatch):
     monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [])
 
     selected = memory.select_memory_items_for_prompt(
-        _config(inject_recent=1, inject_relevant=1),
+        _config(inject_recent=1, inject_relevant=1, core_enabled=False),
         "What do you remember?",
         [],
     )
-    snapshot = memory.get_memory_debug_snapshot(_config())
+    snapshot = memory.get_memory_debug_snapshot(_config(core_enabled=False))
 
     assert selected == [recent]
     assert snapshot["ok"] is True
@@ -366,6 +408,44 @@ def test_core_memory_review_update_delete_pin_and_edit(monkeypatch, tmp_path):
     assert deleted["core_memories"] == []
 
 
+def test_core_memory_review_can_create_manual_memory_for_next_prompt(monkeypatch, tmp_path):
+    _patch_core_memory_path(monkeypatch, tmp_path)
+    created = memory.update_core_memory_entries(
+        _config(core_inject_count=3, learning_samples_enabled=False, mem0_enabled=False),
+        action="create",
+        patch={
+            "text": "用户希望桌宠说话时语气与身体动作自然联动。",
+            "kind": "semantic",
+            "category": "user_preference",
+            "tags": ["桌宠", "表现"],
+            "importance": 0.88,
+            "confidence": 0.96,
+            "pinned": True,
+        },
+    )
+
+    assert created["ok"] is True
+    assert len(created["core_memories"]) == 1
+    item = created["core_memories"][0]
+    assert item["source"] == "manual"
+    assert item["category"] == "user_preference"
+    assert item["importance"] == 0.88
+    prompt = memory.build_memory_prompt_block(
+        _config(core_inject_count=3, learning_samples_enabled=False, mem0_enabled=False),
+        "桌宠说话表现应该怎样？",
+        [],
+    )
+    assert "语气与身体动作自然联动" in prompt
+
+    duplicate = memory.update_core_memory_entries(
+        _config(),
+        action="create",
+        patch={"text": "用户希望桌宠说话时语气与身体动作自然联动。"},
+    )
+    assert duplicate["ok"] is False
+    assert "duplicate_text" in duplicate["error"]
+
+
 def test_short_term_memory_tracks_current_task_and_supports_followup(monkeypatch, tmp_path):
     memory_path = tmp_path / "memory.json"
     short_path = _patch_short_memory_path(monkeypatch, tmp_path)
@@ -406,6 +486,110 @@ def test_short_term_memory_tracks_current_task_and_supports_followup(monkeypatch
     assert "短期记忆" in block
     assert "短期和长期记忆分层" in block
     assert memory.LAST_MEMORY_DEBUG["short_reason"] == "selected"
+
+
+def test_pure_short_followups_refresh_real_task_without_creating_generic_memory(monkeypatch, tmp_path):
+    memory_path = tmp_path / "memory.json"
+    short_path = _patch_short_memory_path(monkeypatch, tmp_path)
+    core_path = _patch_core_memory_path(monkeypatch, tmp_path)
+    _patch_learning_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(memory, "MEMORY_PATH", memory_path)
+    monkeypatch.setattr(memory.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [])
+    monkeypatch.setattr(memory, "_call_summary_llm", lambda *_args: '{"memories":[]}')
+
+    cfg = _config(
+        mem0_enabled=False,
+        learning_candidates_enabled=False,
+        short_enabled=True,
+        short_inject_count=1,
+        short_ttl_turns=2,
+        core_enabled=True,
+        core_extraction_enabled=True,
+        memory_consolidation_enabled=True,
+        memory_consolidation_min_support=2,
+        summary_trigger_every=100,
+    )
+    memory.remember_interaction(
+        cfg,
+        "Implement reliable voice pause leases for no-barge-in TTS.",
+        "I will implement the voice pause lease flow first.",
+    )
+    for index, followup in enumerate(("continue", "next step", "continue"), start=1):
+        memory.remember_interaction(
+            cfg,
+            followup,
+            f"Continuing the voice pause lease work, step {index}.",
+        )
+
+    short_store = memory._safe_load_json_file(short_path, {})
+    current_tasks = [item for item in short_store["items"] if item.get("kind") == "current_task"]
+    core_store = memory._safe_load_json_file(core_path, {})
+    block = memory.build_memory_prompt_block(cfg, "continue", [])
+
+    assert len(current_tasks) == 1
+    assert "voice pause leases" in current_tasks[0]["text"]
+    assert current_tasks[0]["last_seen_turn"] == 4
+    assert "voice pause leases" in block
+    assert "current_task: continue" not in block.lower()
+    assert core_store["items"] == []
+    assert memory.LAST_SHORT_TERM_MEMORY_DEBUG["reason"] == "short_followup_refreshed"
+    assert memory.LAST_CORE_MEMORY_DEBUG["reason"] == "short_followup"
+
+
+def test_short_followup_skips_legacy_generic_task_anchor(monkeypatch, tmp_path):
+    short_path = _patch_short_memory_path(monkeypatch, tmp_path)
+    short_path.write_text(
+        """
+{
+  "schema_version": 1,
+  "turn_index": 4,
+  "items": [
+    {
+      "id": "short_real_task",
+      "kind": "current_task",
+      "text": "Current task: finish voice pause leases",
+      "salience": 0.78,
+      "last_seen_turn": 3,
+      "ttl_turns": 8,
+      "status": "active"
+    },
+    {
+      "id": "short_generic_continue",
+      "kind": "current_task",
+      "text": "Current task: continue",
+      "salience": 0.99,
+      "last_seen_turn": 4,
+      "ttl_turns": 8,
+      "status": "active"
+    }
+  ]
+}
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        memory,
+        "load_memory_items",
+        lambda: [_item("2026-01-01T10:00:00", "old continue task", "stale transcript should not return")],
+    )
+    monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [])
+
+    block = memory.build_memory_prompt_block(
+        _config(
+            mem0_enabled=False,
+            learning_samples_enabled=False,
+            core_enabled=False,
+            short_enabled=True,
+            short_inject_count=1,
+        ),
+        "continue",
+        [],
+    )
+
+    assert "finish voice pause leases" in block
+    assert "Current task: continue" not in block
+    assert "stale transcript should not return" not in block
 
 
 def test_repeated_short_term_memory_consolidates_to_core(monkeypatch, tmp_path):
@@ -545,6 +729,286 @@ def test_memory_forget_deletes_matching_core_memory(monkeypatch, tmp_path):
     assert store["items"] == []
     assert memory.LAST_MEMORY_CORRECTION_DEBUG["status"] == "applied"
     assert memory.LAST_MEMORY_CORRECTION_DEBUG["action"] == "forget"
+
+
+def test_forget_prevents_old_raw_mem0_learning_and_derived_memory_recall(monkeypatch, tmp_path):
+    memory_path = tmp_path / "memory.json"
+    core_path = _patch_core_memory_path(monkeypatch, tmp_path)
+    short_path = _patch_short_memory_path(monkeypatch, tmp_path)
+    _candidates_path, samples_path, _state_path = _patch_learning_paths(monkeypatch, tmp_path)
+    suppression_path = _patch_recall_suppression_path(monkeypatch, tmp_path)
+    wakeup_path = tmp_path / "memory_summary.json"
+    profile_path = tmp_path / "memory_profile.json"
+    relationship_path = tmp_path / "memory_relationship.json"
+    monkeypatch.setattr(memory, "MEMORY_PATH", memory_path)
+    monkeypatch.setattr(memory, "MEMORY_SUMMARY_PATH", wakeup_path)
+    monkeypatch.setattr(memory, "PROFILE_MEMORY_PATH", profile_path)
+    monkeypatch.setattr(memory, "RELATIONSHIP_MEMORY_PATH", relationship_path)
+    monkeypatch.setattr(memory.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(memory, "_call_summary_llm", lambda *_args: '{"memories":[]}')
+    monkeypatch.setattr(memory, "_remember_interaction_mem0", lambda *_args: None)
+    monkeypatch.setattr(
+        memory,
+        "_search_mem0_items",
+        lambda *_args: [_item("2026-01-01T10:00:00", "Mem0 says the project is OldName.", "OldName is remembered")],
+    )
+    memory_path.write_text(
+        '[{"ts":"2026-01-01T10:00:00","user":"My project is OldName.","assistant":"I will remember OldName."}]',
+        encoding="utf-8",
+    )
+    old_source_hash = memory._memory_source_hash("My project is OldName.", "I will remember OldName.")
+    core_path.write_text(
+        '{"schema_version":1,"items":[{"id":"mem_old","kind":"semantic","category":"project_context","text":"My project is OldName.","importance":0.8,"confidence":0.9,"status":"active"}]}',
+        encoding="utf-8",
+    )
+    short_path.write_text(
+        '{"schema_version":1,"turn_index":1,"items":[{"id":"short_old","kind":"current_task","text":"Current task: OldName project","salience":0.8,"last_seen_turn":1,"ttl_turns":16,"status":"active"}]}',
+        encoding="utf-8",
+    )
+    samples_path.write_text(
+        f'[{"{"}"id":"learned_old","source":"learned","status":"active","user_preview":"My project is OldName.","assistant_preview":"I will remember OldName.","source_turn_hashes":["{old_source_hash}"],"compressed_pattern":"The project is called OldName.","score":0.9,"confidence":0.9,"support_count":2{"}"}]',
+        encoding="utf-8",
+    )
+    for path in (wakeup_path, profile_path, relationship_path):
+        path.write_text('{"summary":"OldName should never reappear."}', encoding="utf-8")
+
+    cfg = _config(
+        mem0_enabled=True,
+        learning_candidates_enabled=False,
+        learning_samples_enabled=True,
+        learning_inject_count=1,
+        short_enabled=True,
+        core_enabled=True,
+        core_extraction_enabled=False,
+        memory_correction_enabled=True,
+        summary_trigger_every=100,
+    )
+    memory.remember_interaction(cfg, "Forget the memory about OldName.", "Okay, I will forget it.")
+
+    block = memory.build_memory_prompt_block(cfg, "What do you remember about OldName?", [])
+    samples = memory._safe_load_json_file(samples_path, [])
+    suppressions = memory._safe_load_json_file(suppression_path, {})
+    raw_items = memory._safe_load_json_file(memory_path, [])
+
+    assert "OldName" not in block
+    assert memory._safe_load_json_file(core_path, {})["items"] == []
+    assert all("OldName" not in item.get("text", "") for item in memory._safe_load_json_file(short_path, {})["items"])
+    assert samples[0]["status"] == "active"
+    assert all("Forget the memory" not in item.get("user", "") for item in raw_items)
+    assert suppressions["items"]
+    assert "OldName" not in suppression_path.read_text(encoding="utf-8")
+    assert "OldName should never reappear" in wakeup_path.read_text(encoding="utf-8")
+    assert "OldName should never reappear" in profile_path.read_text(encoding="utf-8")
+    assert "OldName should never reappear" in relationship_path.read_text(encoding="utf-8")
+    assert memory.build_wakeup_summary_block() == ""
+    assert memory.build_persona_memory_block() == ""
+    assert memory.build_relationship_memory_block() == ""
+
+
+def test_correction_prevents_old_raw_and_mem0_memory_from_reappearing(monkeypatch, tmp_path):
+    memory_path = tmp_path / "memory.json"
+    core_path = _patch_core_memory_path(monkeypatch, tmp_path)
+    _patch_short_memory_path(monkeypatch, tmp_path)
+    _patch_learning_paths(monkeypatch, tmp_path)
+    _patch_recall_suppression_path(monkeypatch, tmp_path)
+    monkeypatch.setattr(memory, "MEMORY_PATH", memory_path)
+    monkeypatch.setattr(memory.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(memory, "_call_summary_llm", lambda *_args: '{"memories":[]}')
+    monkeypatch.setattr(memory, "_remember_interaction_mem0", lambda *_args: None)
+    monkeypatch.setattr(
+        memory,
+        "_search_mem0_items",
+        lambda *_args: [_item("2026-01-01T10:00:00", "My project is OldName.", "I will remember OldName.")],
+    )
+    memory_path.write_text(
+        '[{"ts":"2026-01-01T10:00:00","user":"My project is OldName.","assistant":"I will remember OldName."}]',
+        encoding="utf-8",
+    )
+    core_path.write_text(
+        '{"schema_version":1,"items":[{"id":"mem_old","kind":"semantic","category":"project_context","text":"My project is OldName.","importance":0.8,"confidence":0.9,"status":"active","origin":{"user_preview":"My project is OldName.","assistant_preview":"I will remember OldName."}}]}',
+        encoding="utf-8",
+    )
+
+    cfg = _config(
+        mem0_enabled=True,
+        learning_candidates_enabled=False,
+        short_enabled=False,
+        core_enabled=True,
+        core_extraction_enabled=False,
+        memory_correction_enabled=True,
+        summary_trigger_every=100,
+    )
+    memory.remember_interaction(cfg, "You remembered wrong, my project should be NewName.", "Corrected.")
+
+    block = memory.build_memory_prompt_block(cfg, "What do you remember about OldName?", [])
+
+    assert "OldName" not in block
+    assert "NewName" in memory._safe_load_json_file(core_path, {})["items"][0]["text"]
+
+
+def test_correction_suppresses_only_the_matching_source_turn(monkeypatch, tmp_path):
+    memory_path = tmp_path / "memory.json"
+    core_path = _patch_core_memory_path(monkeypatch, tmp_path)
+    _patch_short_memory_path(monkeypatch, tmp_path)
+    _candidates_path, samples_path, _state_path = _patch_learning_paths(monkeypatch, tmp_path)
+    suppression_path = _patch_recall_suppression_path(monkeypatch, tmp_path)
+    old_turn = _item("2026-01-01T10:00:00", "My project is OldName.", "I will remember OldName.")
+    preference_turn = _item("2026-01-02T10:00:00", "I prefer short answers.", "I will keep answers brief.")
+    old_source_hash = memory._memory_source_hash_from_item(old_turn)
+    preference_source_hash = memory._memory_source_hash_from_item(preference_turn)
+    monkeypatch.setattr(memory, "MEMORY_PATH", memory_path)
+    monkeypatch.setattr(memory.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(memory, "_call_summary_llm", lambda *_args: '{"memories":[]}')
+    monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [old_turn, preference_turn])
+    memory_path.write_text(
+        '[{"ts":"2026-01-01T10:00:00","user":"My project is OldName.","assistant":"I will remember OldName."},{"ts":"2026-01-02T10:00:00","user":"I prefer short answers.","assistant":"I will keep answers brief."}]',
+        encoding="utf-8",
+    )
+    core_path.write_text(
+        '{"schema_version":1,"items":[{"id":"mem_old","kind":"semantic","category":"project_context","text":"My project is OldName.","importance":0.8,"confidence":0.9,"status":"active","origin":{"user_preview":"My project is OldName.","assistant_preview":"I will remember OldName."}},{"id":"mem_short","kind":"semantic","category":"user_preference","text":"I prefer short answers.","importance":0.8,"confidence":0.9,"status":"active","origin":{"user_preview":"I prefer short answers.","assistant_preview":"I will keep answers brief."}}]}',
+        encoding="utf-8",
+    )
+    samples_path.write_text(
+        f'[{"{"}"id":"learned_old","source":"learned","status":"active","user_preview":"My project is OldName.","assistant_preview":"I will remember OldName.","source_turn_hashes":["{old_source_hash}"],"compressed_pattern":"The project is called OldName.","score":0.9,"confidence":0.9{"}"},{"{"}"id":"learned_short","source":"learned","status":"active","user_preview":"I prefer short answers.","assistant_preview":"I will keep answers brief.","source_turn_hashes":["{preference_source_hash}"],"compressed_pattern":"Keep answers concise.","score":0.9,"confidence":0.9{"}"}]',
+        encoding="utf-8",
+    )
+    cfg = _config(
+        mem0_enabled=True,
+        learning_candidates_enabled=False,
+        learning_samples_enabled=True,
+        learning_inject_count=1,
+        short_enabled=False,
+        core_enabled=True,
+        core_extraction_enabled=False,
+        memory_correction_enabled=True,
+        summary_trigger_every=100,
+    )
+
+    memory.remember_interaction(cfg, "You remembered wrong, my project should be NewName.", "Corrected.")
+
+    old_block = memory.build_memory_prompt_block(cfg, "What do you remember about OldName?", [])
+    preference_block = memory.build_memory_prompt_block(cfg, "What do you remember about short answers?", [])
+    core_items = memory._safe_load_json_file(core_path, {})["items"]
+    samples = memory._safe_load_json_file(samples_path, [])
+    suppressions = memory._safe_load_json_file(suppression_path, {})
+
+    assert "OldName" not in old_block
+    assert "short answers" in preference_block
+    assert any(item["id"] == "mem_short" and "short answers" in item["text"] for item in core_items)
+    assert all(item["status"] == "active" for item in samples)
+    assert len(suppressions["items"]) == 1
+    assert "OldName" not in suppression_path.read_text(encoding="utf-8")
+
+
+def test_explicit_memory_write_restores_a_forgotten_fact_as_a_new_source(monkeypatch, tmp_path):
+    memory_path = tmp_path / "memory.json"
+    core_path = _patch_core_memory_path(monkeypatch, tmp_path)
+    _patch_short_memory_path(monkeypatch, tmp_path)
+    _patch_learning_paths(monkeypatch, tmp_path)
+    suppression_path = _patch_recall_suppression_path(monkeypatch, tmp_path)
+    monkeypatch.setattr(memory, "MEMORY_PATH", memory_path)
+    monkeypatch.setattr(memory.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [])
+    monkeypatch.setattr(
+        memory,
+        "_call_summary_llm",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("explicit memory writes must not call the LLM")),
+    )
+    memory_path.write_text(
+        '[{"ts":"2026-01-01T10:00:00","user":"My project is OldName.","assistant":"I will remember OldName."}]',
+        encoding="utf-8",
+    )
+    core_path.write_text(
+        '{"schema_version":1,"items":[{"id":"mem_old","kind":"semantic","category":"project_context","text":"My project is OldName.","importance":0.8,"confidence":0.9,"status":"active"}]}',
+        encoding="utf-8",
+    )
+    cfg = _config(
+        mem0_enabled=False,
+        learning_candidates_enabled=False,
+        short_enabled=False,
+        core_enabled=True,
+        core_extraction_enabled=True,
+        memory_correction_enabled=True,
+        summary_trigger_every=100,
+    )
+
+    memory.remember_interaction(cfg, "Forget the memory about OldName.", "Okay, I will forget it.")
+    assert "OldName" not in memory.build_memory_prompt_block(cfg, "What do you remember about OldName?", [])
+
+    memory.remember_interaction(
+        cfg,
+        "Please remember that my project is OldName.",
+        "I will remember that.",
+    )
+
+    suppressions = memory._safe_load_json_file(suppression_path, {})
+    raw_items = memory._safe_load_json_file(memory_path, [])
+    block = memory.build_memory_prompt_block(cfg, "What do you remember about OldName?", [])
+
+    assert suppressions["items"]
+    assert all("source_hashes" in item for item in suppressions["items"])
+    assert "OldName" in block
+    assert all("Forget the memory" not in item.get("user", "") for item in raw_items)
+    assert any("OldName" in item.get("text", "") for item in memory._safe_load_json_file(core_path, {})["items"])
+
+
+def test_source_suppression_keeps_shared_word_memories_available(monkeypatch, tmp_path):
+    _patch_recall_suppression_path(monkeypatch, tmp_path)
+    blue_turn = {"user": "I like blue.", "assistant": "Okay."}
+    green_turn = {"user": "I like green.", "assistant": "Okay."}
+    source_hash = memory._memory_source_hash_from_item(blue_turn)
+
+    assert memory._record_memory_recall_suppression({source_hash}, action="forget") == 1
+    assert memory._is_memory_source_suppressed(blue_turn)
+    assert not memory._is_memory_source_suppressed(green_turn)
+
+
+def test_source_suppression_keeps_chinese_shared_phrase_memories_available(monkeypatch, tmp_path):
+    _patch_recall_suppression_path(monkeypatch, tmp_path)
+    tea_turn = {"user": "我喜欢喝茶。", "assistant": "好的。"}
+    coding_turn = {"user": "我喜欢编程。", "assistant": "好的。"}
+    source_hash = memory._memory_source_hash_from_item(tea_turn)
+
+    assert memory._record_memory_recall_suppression({source_hash}, action="forget") == 1
+    assert memory._is_memory_source_suppressed(tea_turn)
+    assert not memory._is_memory_source_suppressed(coding_turn)
+
+
+def test_explicit_forget_suppresses_raw_and_mem0_when_core_memory_is_disabled(monkeypatch, tmp_path):
+    memory_path = tmp_path / "memory.json"
+    _patch_recall_suppression_path(monkeypatch, tmp_path)
+    old_turn = _item("2026-01-01T10:00:00", "My project is OldName.", "I will remember OldName.")
+    monkeypatch.setattr(memory, "MEMORY_PATH", memory_path)
+    monkeypatch.setattr(memory, "_search_mem0_items", lambda *_args: [old_turn])
+    memory_path.write_text(
+        '[{"ts":"2026-01-01T10:00:00","user":"My project is OldName.","assistant":"I will remember OldName."}]',
+        encoding="utf-8",
+    )
+    cfg = _config(
+        mem0_enabled=True,
+        learning_candidates_enabled=False,
+        short_enabled=False,
+        core_enabled=False,
+        core_extraction_enabled=False,
+        memory_correction_enabled=True,
+        summary_trigger_every=100,
+    )
+
+    memory.remember_interaction(cfg, "Forget the memory about OldName.", "Okay, I will forget it.")
+
+    assert memory.build_memory_prompt_block(cfg, "What do you remember about OldName?", []) == ""
+    assert memory.LAST_MEMORY_CORRECTION_DEBUG["status"] == "applied"
+    assert memory.LAST_MEMORY_CORRECTION_DEBUG["suppressed_sources"] >= 1
+
+
+def test_derived_memory_summary_save_keeps_a_backup(tmp_path):
+    summary_path = tmp_path / "memory_summary.json"
+    summary_path.write_text('{"summary":"previous"}', encoding="utf-8")
+
+    memory._save_json_summary(summary_path, {"summary": "replacement"})
+
+    assert '"summary":"previous"' in summary_path.with_suffix(".bak").read_text(encoding="utf-8")
+    assert memory._safe_load_json_file(summary_path, {})["summary"] == "replacement"
 
 
 def test_correction_turn_does_not_inject_stale_core_memory(monkeypatch, tmp_path):
@@ -869,6 +1333,8 @@ def test_remember_interaction_generates_learning_candidate(monkeypatch, tmp_path
     assert candidates[0]["status"] == "candidate"
     assert candidates[0]["category"] == "user_preference"
     assert candidates[0]["support_count"] == 1
+    assert len(candidates[0]["source_turn_hashes"]) == 1
+    assert len(candidates[0]["source_turn_hashes"][0]) == 64
     assert "先给重点" in candidates[0]["compressed_pattern"]
     assert memory.LAST_LEARNING_EXTRACTION_DEBUG["status"] == "stored"
 

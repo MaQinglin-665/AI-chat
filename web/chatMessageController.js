@@ -73,6 +73,72 @@
       return divider;
     }
 
+    function shouldUseSeparateMessageLanes() {
+      const bodyClassList = documentObject?.body?.classList;
+      const isFullStage = bodyClassList && typeof bodyClassList.contains === "function"
+        ? bodyClassList.contains("view-full")
+        : true;
+      return Boolean(isFullStage && ui.userChatLog && ui.assistantChatLog);
+    }
+
+    function getMessageLane(role) {
+      if (shouldUseSeparateMessageLanes() && role === "user") {
+        return ui.userChatLog;
+      }
+      if (shouldUseSeparateMessageLanes() && role !== "user") {
+        return ui.assistantChatLog;
+      }
+      return ui.chatLog || null;
+    }
+
+    function getMessageLaneForRow(row, fallbackRole = "assistant") {
+      const role = row?.classList?.contains?.("user") ? "user" : fallbackRole;
+      return getMessageLane(role);
+    }
+
+    function scrollMessageLane(role) {
+      const lane = getMessageLane(role);
+      if (lane) {
+        lane.scrollTop = lane.scrollHeight;
+      }
+    }
+
+    function notifyConversationLaneMessage(row, role, text) {
+      const content = String(text || "").trim();
+      if (
+        !row
+        || !content
+        || row.dataset?.messageCategory === "system"
+        || row.dataset?.conversationLaneNotified === "1"
+      ) {
+        return false;
+      }
+      if (row.dataset) {
+        row.dataset.conversationLaneNotified = "1";
+      }
+      if (typeof deps.onConversationLaneMessage === "function") {
+        deps.onConversationLaneMessage(role === "user" ? "user" : "assistant");
+      }
+      return true;
+    }
+
+    function findPreviousRoleRecord(role) {
+      const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
+      for (let index = records.length - 1; index >= 0; index -= 1) {
+        if (records[index]?.role === role) {
+          return records[index];
+        }
+      }
+      return null;
+    }
+
+    function appendTimeDivider(role, timestamp) {
+      const lane = getMessageLane(role);
+      if (lane) {
+        lane.appendChild(createTimeDivider(timestamp));
+      }
+    }
+
     function trimChatRecords(records) {
       const list = Array.isArray(records) ? records : [];
       if (list.length <= maxChatHistoryRecords) {
@@ -110,6 +176,20 @@
       };
     }
 
+    function normalizeStoredTranslation(value) {
+      return String(value || "").trim().slice(0, 1600);
+    }
+
+    function normalizeInlineStickers(value) {
+      if (!Array.isArray(value)) {
+        return [];
+      }
+      return value
+        .map(normalizeStickerPayload)
+        .filter((sticker) => sticker.id || sticker.url)
+        .slice(-6);
+    }
+
     function normalizeChatRecord(item) {
       if (!item || typeof item !== "object") {
         return null;
@@ -133,11 +213,45 @@
       if (!content) {
         return null;
       }
-      return {
+      const record = {
         role,
         content,
         timestamp: parseMessageTimestamp(item.timestamp || item.created_at || item.time)
       };
+      const translation = normalizeStoredTranslation(item.translation);
+      const stickers = normalizeInlineStickers(item.stickers);
+      if (translation && translation !== content) {
+        record.translation = translation;
+      }
+      if (stickers.length) {
+        record.stickers = stickers;
+      }
+      return record;
+    }
+
+    function coalesceInlineStickerRecords(records) {
+      const output = [];
+      for (const item of Array.isArray(records) ? records : []) {
+        if (item?.kind !== "sticker") {
+          output.push(item);
+          continue;
+        }
+        const target = [...output].reverse().find((candidate) => (
+          candidate
+          && candidate.kind !== "sticker"
+          && candidate.role === item.role
+          && String(candidate.content || "").trim()
+        ));
+        if (!target) {
+          output.push(item);
+          continue;
+        }
+        target.stickers = normalizeInlineStickers([
+          ...(Array.isArray(target.stickers) ? target.stickers : []),
+          item.sticker
+        ]);
+      }
+      return output;
     }
 
     function _ensureMessageTranslationEl(row) {
@@ -169,6 +283,33 @@
       el.hidden = true;
     }
 
+    function _persistMessageTranslation(row, sourceText, translatedText) {
+      const source = String(sourceText || "").trim();
+      const translated = normalizeStoredTranslation(translatedText);
+      if (!row || !source || !translated || translated === source) {
+        return;
+      }
+      row.dataset.persistedTranslation = translated;
+      const timestamp = parseMessageTimestamp(row.dataset.timestamp);
+      const role = row.classList.contains("user") ? "user" : "assistant";
+      const record = [...(Array.isArray(state.chatRecords) ? state.chatRecords : [])]
+        .reverse()
+        .find((item) => (
+          item
+          && item.kind !== "sticker"
+          && item.role === role
+          && String(item.content || "").trim() === source
+          && parseMessageTimestamp(item.timestamp) === timestamp
+        ));
+      if (!record || record.translation === translated) {
+        return;
+      }
+      record.translation = translated;
+      if (typeof deps.saveChatHistory === "function") {
+        deps.saveChatHistory();
+      }
+    }
+
     function _renderAssistantTranslation(row, visibleText, options = {}) {
       if (!row || !row.classList.contains("assistant")) {
         return;
@@ -189,12 +330,20 @@
       if (!translationEl) {
         return;
       }
+      const stored = normalizeStoredTranslation(options.storedTranslation);
+      if (stored && stored !== safe) {
+        translationEl.textContent = `\u4e2d\u8bd1\uff1a${stored}`;
+        translationEl.hidden = false;
+        _persistMessageTranslation(row, safe, stored);
+        return;
+      }
       const cached = typeof deps.readChatTranslationCache === "function"
         ? deps.readChatTranslationCache(safe)
         : "";
       if (cached && cached !== safe) {
         translationEl.textContent = `\u4e2d\u8bd1\uff1a${cached}`;
         translationEl.hidden = false;
+        _persistMessageTranslation(row, safe, cached);
         return;
       }
       const requestId = String(++chatTranslationSeq);
@@ -206,7 +355,7 @@
         ? deps.fetchChatTranslation
         : async () => "";
       fetchChatTranslation(safe).then((zh) => {
-        if (!row.isConnected || row.dataset.translationReqId !== requestId) {
+        if (row.isConnected === false || row.dataset.translationReqId !== requestId) {
           return;
         }
         const translated = String(zh || "").trim();
@@ -217,7 +366,36 @@
         }
         translationEl.textContent = `\u4e2d\u8bd1\uff1a${translated}`;
         translationEl.hidden = false;
+        _persistMessageTranslation(row, safe, translated);
       });
+    }
+
+    function appendInlineSticker(target, stickerInput) {
+      if (!target) {
+        return null;
+      }
+      const sticker = resolveStickerPayload(stickerInput);
+      let group = target.querySelector?.(".inline-sticker-group");
+      if (!group) {
+        group = documentObject.createElement("span");
+        group.className = "inline-sticker-group";
+        group.setAttribute("aria-label", "\u968f\u6587\u8868\u60c5");
+        target.appendChild(group);
+      }
+      const url = String(sticker.url || sticker.dataUrl || "").trim();
+      if (url) {
+        const img = documentObject.createElement("img");
+        img.className = "inline-sticker-img";
+        img.alt = sticker.label || sticker.name || "\u8868\u60c5\u5305";
+        img.src = url;
+        group.appendChild(img);
+        return img;
+      }
+      const missing = documentObject.createElement("span");
+      missing.className = "inline-sticker-missing";
+      missing.textContent = sticker.label ? `[\u8868\u60c5: ${sticker.label}]` : "\u8868\u60c5";
+      group.appendChild(missing);
+      return missing;
     }
 
     function applyMessagePayload(row, text, options = {}) {
@@ -228,7 +406,48 @@
       const payload = typeof deps.parseToolMetaFromText === "function"
         ? deps.parseToolMetaFromText(text)
         : { visibleText: String(text || ""), meta: null };
-      target.textContent = String(payload.visibleText || "");
+      const visibleText = String(payload.visibleText || "");
+      const currentText = String(target.dataset.messageText || target.textContent || "");
+      const canAppendStream = (
+        options.streamAppend === true
+        && row.classList.contains("assistant")
+        && visibleText.startsWith(currentText)
+        && visibleText.length > currentText.length
+        && typeof documentObject.createElement === "function"
+        && typeof documentObject.createTextNode === "function"
+        && typeof target.appendChild === "function"
+      );
+      if (canAppendStream) {
+        const delta = visibleText.slice(currentText.length);
+        let animatedIndex = 0;
+        for (const character of Array.from(delta)) {
+          if (/\s/.test(character)) {
+            target.appendChild(documentObject.createTextNode(character));
+            continue;
+          }
+          const token = documentObject.createElement("span");
+          token.className = "stream-text-arrival";
+          token.textContent = character;
+          token.style.animationDelay = `${Math.min(6000, animatedIndex * 55)}ms`;
+          token.addEventListener?.("animationend", () => {
+            token.classList.add("is-settled");
+          }, { once: true });
+          target.appendChild(token);
+          animatedIndex += 1;
+        }
+        row.classList.add("is-streaming");
+      } else {
+        target.textContent = visibleText;
+        if (options.streamAppend !== true) {
+          row.classList.remove("is-streaming");
+        }
+      }
+      target.dataset.messageText = visibleText;
+      if (options.streamAppend !== true) {
+        for (const sticker of normalizeInlineStickers(options.stickers)) {
+          appendInlineSticker(target, sticker);
+        }
+      }
       if (row.classList.contains("assistant")) {
         if (typeof deps.renderToolMetaCards === "function") {
           deps.renderToolMetaCards(row, payload.meta);
@@ -335,6 +554,9 @@
     function createMessageRow(role, text, options = {}) {
       const row = documentObject.createElement("div");
       row.className = `message ${role}`;
+      if (options.continuation === true) {
+        row.classList.add("is-conversation-continuation");
+      }
       if (options.kind === "sticker") {
         row.className += " sticker-message";
       }
@@ -356,11 +578,14 @@
         }
       }
       row.appendChild(timeEl);
+      row.dataset.timestamp = String(parseMessageTimestamp(options.timestamp || Date.now()));
       if (options.kind === "sticker") {
         applyStickerPayload(row, options.sticker || text);
       } else {
         applyMessagePayload(row, text, {
-          enableTranslation: options.enableTranslation !== false
+          enableTranslation: options.enableTranslation !== false,
+          storedTranslation: options.storedTranslation,
+          stickers: options.stickers
         });
       }
       if (options.hideTimestamp !== true) {
@@ -371,9 +596,15 @@
 
     function setMessageText(row, text, options = {}) {
       applyMessagePayload(row, text, options);
-      if (ui.chatLog) {
-        ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
+      if (row?.parentNode) {
+        notifyConversationLaneMessage(
+          row,
+          row.classList?.contains?.("user") ? "user" : "assistant",
+          text
+        );
       }
+      const lane = getMessageLaneForRow(row);
+      if (lane) lane.scrollTop = lane.scrollHeight;
     }
 
     function commitMessageRecord(role, text, options = {}) {
@@ -383,9 +614,17 @@
       }
       const timestamp = parseMessageTimestamp(options.timestamp);
       const record = { role: role === "user" ? "user" : "assistant", content, timestamp };
-      const previous = state.chatRecords.length ? state.chatRecords[state.chatRecords.length - 1] : null;
-      if (ui.chatLog && shouldInsertTimeDivider(previous?.timestamp || 0, timestamp)) {
-        ui.chatLog.appendChild(createTimeDivider(timestamp));
+      const translation = normalizeStoredTranslation(options.translation);
+      const stickers = normalizeInlineStickers(options.stickers);
+      if (translation && translation !== content) {
+        record.translation = translation;
+      }
+      if (stickers.length) {
+        record.stickers = stickers;
+      }
+      const previous = findPreviousRoleRecord(record.role);
+      if (shouldInsertTimeDivider(previous?.timestamp || 0, timestamp)) {
+        appendTimeDivider(record.role, timestamp);
       }
       state.chatRecords.push(record);
       state.chatRecords = trimChatRecords(state.chatRecords);
@@ -418,9 +657,9 @@
         },
         timestamp
       };
-      const previous = state.chatRecords.length ? state.chatRecords[state.chatRecords.length - 1] : null;
-      if (ui.chatLog && shouldInsertTimeDivider(previous?.timestamp || 0, timestamp)) {
-        ui.chatLog.appendChild(createTimeDivider(timestamp));
+      const previous = findPreviousRoleRecord(record.role);
+      if (shouldInsertTimeDivider(previous?.timestamp || 0, timestamp)) {
+        appendTimeDivider(record.role, timestamp);
       }
       state.chatRecords.push(record);
       state.chatRecords = trimChatRecords(state.chatRecords);
@@ -432,29 +671,67 @@
 
     function appendMessage(role, text, options = {}) {
       const timestamp = parseMessageTimestamp(options.timestamp);
+      const isSystemMessage = options.category === "system";
       const row = createMessageRow(role, text, {
         timestamp,
         hideTimestamp: options.hideTimestamp === true,
+        continuation: options.continuation === true,
         enableFeedback: options.enableFeedback !== false,
-        enableTranslation: options.enableTranslation !== false
+        enableTranslation: options.enableTranslation !== false,
+        storedTranslation: options.storedTranslation,
+        stickers: options.stickers
       });
-      if (options.persist !== false) {
-        commitMessageRecord(role, text, {
+      if (options.persist !== false && !isSystemMessage) {
+        const record = commitMessageRecord(role, text, {
           timestamp,
-          syncHistory: options.syncHistory === true
+          syncHistory: options.syncHistory === true,
+          translation: options.storedTranslation || row.dataset.persistedTranslation,
+          stickers: options.stickers
         });
-      } else if (ui.chatLog && options.insertDivider && shouldInsertTimeDivider(options.previousTimestamp || 0, timestamp)) {
-        ui.chatLog.appendChild(createTimeDivider(timestamp));
+        if (record && row.dataset.persistedTranslation && !record.translation) {
+          record.translation = row.dataset.persistedTranslation;
+          deps.saveChatHistory?.();
+        }
+      } else if (options.insertDivider && shouldInsertTimeDivider(options.previousTimestamp || 0, timestamp)) {
+        appendTimeDivider(role, timestamp);
       }
-      if (ui.chatLog) {
-        ui.chatLog.appendChild(row);
-        ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
+      const lane = getMessageLane(role);
+      if (lane) {
+        if (isSystemMessage) row.dataset.messageCategory = "system";
+        lane.appendChild(row);
+        notifyConversationLaneMessage(row, role, text);
+        scrollMessageLane(role);
       }
       return row;
     }
 
     function appendStickerMessage(role, sticker, options = {}) {
       const timestamp = parseMessageTimestamp(options.timestamp);
+      const normalizedRole = role === "user" ? "user" : "assistant";
+      const lane = getMessageLane(normalizedRole);
+      const laneChildren = Array.from(lane?.children || []);
+      const targetRow = laneChildren.reverse().find((candidate) => (
+        candidate?.classList?.contains(normalizedRole)
+        && candidate.dataset?.messageKind !== "sticker"
+        && candidate.querySelector?.(".content")
+      ));
+      const targetRecord = [...(Array.isArray(state.chatRecords) ? state.chatRecords : [])]
+        .reverse()
+        .find((item) => item?.role === normalizedRole && item.kind !== "sticker" && String(item.content || "").trim());
+      if (targetRow && targetRecord) {
+        const resolved = normalizeStickerPayload(sticker);
+        targetRecord.stickers = normalizeInlineStickers([
+          ...(Array.isArray(targetRecord.stickers) ? targetRecord.stickers : []),
+          resolved
+        ]);
+        appendInlineSticker(targetRow.querySelector(".content"), resolved);
+        if (options.persist !== false && typeof deps.saveChatHistory === "function") {
+          deps.saveChatHistory();
+        }
+        deps.onConversationLaneMessage?.(normalizedRole);
+        scrollMessageLane(normalizedRole);
+        return targetRow;
+      }
       const row = createMessageRow(role, "", {
         kind: "sticker",
         sticker,
@@ -468,12 +745,13 @@
           timestamp,
           content: options.content
         });
-      } else if (ui.chatLog && options.insertDivider && shouldInsertTimeDivider(options.previousTimestamp || 0, timestamp)) {
-        ui.chatLog.appendChild(createTimeDivider(timestamp));
+      } else if (options.insertDivider && shouldInsertTimeDivider(options.previousTimestamp || 0, timestamp)) {
+        appendTimeDivider(role, timestamp);
       }
-      if (ui.chatLog) {
-        ui.chatLog.appendChild(row);
-        ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
+      if (lane) {
+        lane.appendChild(row);
+        notifyConversationLaneMessage(row, normalizedRole, options.content || sticker?.label || "sticker");
+        scrollMessageLane(role);
       }
       return row;
     }
@@ -488,16 +766,36 @@
         return;
       }
       const timestamp = parseMessageTimestamp(options.timestamp);
-      setMessageText(row, content, {
-        enableTranslation: options.enableTranslation !== false
-      });
+      const contentTarget = row.querySelector?.(".content");
+      const keepAnimatedStream = row.classList?.contains?.("is-streaming")
+        && String(contentTarget?.textContent || "") === content;
+      if (!keepAnimatedStream) {
+        setMessageText(row, content, {
+          enableTranslation: options.enableTranslation !== false
+        });
+      } else if (options.deferStreamFlatten !== true) {
+        window.setTimeout(() => {
+          if (!row.isConnected) {
+            return;
+          }
+          setMessageText(row, content, {
+            enableTranslation: options.enableTranslation !== false
+          });
+        }, 6300);
+      }
       setMessageTimestamp(row, timestamp);
-      if (options.persist !== false) {
-        const previous = state.chatRecords.length ? state.chatRecords[state.chatRecords.length - 1] : null;
+      if (options.persist !== false && options.category !== "system") {
+        const normalizedRole = role === "user" ? "user" : "assistant";
+        const previous = findPreviousRoleRecord(normalizedRole);
         if (shouldInsertTimeDivider(previous?.timestamp || 0, timestamp)) {
           row.parentNode?.insertBefore(createTimeDivider(timestamp), row);
         }
-        state.chatRecords.push({ role: role === "user" ? "user" : "assistant", content, timestamp });
+        const record = { role: normalizedRole, content, timestamp };
+        const translation = normalizeStoredTranslation(row.dataset.persistedTranslation);
+        if (translation && translation !== content) {
+          record.translation = translation;
+        }
+        state.chatRecords.push(record);
         state.chatRecords = trimChatRecords(state.chatRecords);
         if (typeof deps.saveChatHistory === "function") {
           deps.saveChatHistory();
@@ -506,9 +804,7 @@
           syncConversationHistoryFromChatRecords();
         }
       }
-      if (ui.chatLog) {
-        ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
-      }
+      scrollMessageLane(role);
     }
 
     function rememberMessage(role, content, options = {}) {
@@ -524,12 +820,18 @@
       if (!ui.chatLog) {
         return;
       }
-      ui.chatLog.innerHTML = "";
-      let previousTs = 0;
+      if (shouldUseSeparateMessageLanes()) {
+        ui.userChatLog.innerHTML = "";
+        ui.assistantChatLog.innerHTML = "";
+      } else {
+        ui.chatLog.innerHTML = "";
+      }
+      const previousTs = { user: 0, assistant: 0 };
       for (const item of state.chatRecords) {
         const timestamp = parseMessageTimestamp(item.timestamp);
-        if (shouldInsertTimeDivider(previousTs, timestamp)) {
-          ui.chatLog.appendChild(createTimeDivider(timestamp));
+        const role = item.role === "user" ? "user" : "assistant";
+        if (shouldInsertTimeDivider(previousTs[role], timestamp)) {
+          appendTimeDivider(role, timestamp);
         }
         const row = item.kind === "sticker"
           ? createMessageRow(item.role, item.content, {
@@ -542,12 +844,15 @@
           : createMessageRow(item.role, item.content, {
             timestamp,
             enableFeedback: item.role === "assistant",
-            enableTranslation: false
+            enableTranslation: true,
+            storedTranslation: item.translation,
+            stickers: item.stickers
           });
-        ui.chatLog.appendChild(row);
-        previousTs = timestamp;
+        getMessageLane(role)?.appendChild(row);
+        previousTs[role] = timestamp;
       }
-      ui.chatLog.scrollTop = ui.chatLog.scrollHeight;
+      scrollMessageLane("user");
+      scrollMessageLane("assistant");
     }
 
     function loadChatHistoryFromStorage() {
@@ -555,10 +860,12 @@
         deps.storageController.loadChatHistory(state, {
           windowObject: deps.windowObject || root,
           normalizeChatRecord,
+          coalesceInlineStickerRecords,
           parseMessageTimestamp,
           trimChatRecords,
           syncConversationHistoryFromChatRecords,
-          renderChatHistoryFromState
+          renderChatHistoryFromState,
+          saveChatHistory: deps.saveChatHistory
         });
       }
     }
@@ -572,7 +879,9 @@
       trimChatRecords,
       syncConversationHistoryFromChatRecords,
       normalizeStickerPayload,
+      normalizeInlineStickers,
       normalizeChatRecord,
+      coalesceInlineStickerRecords,
       renderChatHistoryFromState,
       loadChatHistoryFromStorage,
       applyMessagePayload,

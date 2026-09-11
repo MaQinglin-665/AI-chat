@@ -71,13 +71,76 @@
       return browserSpeaking || audioSpeaking || contextSpeaking;
     }
 
+    function isListeningPresenceActive() {
+      const phase = String(state.listeningPresencePhase || "idle").toLowerCase();
+      const sessionId = Number(state.listeningPresenceSession || 0);
+      if (!sessionId || !["armed", "hearing", "release"].includes(phase)) {
+        return false;
+      }
+      if (state.uiView !== "model") {
+        return true;
+      }
+      const updatedAt = Number(state._broadcastListeningUpdatedAt || 0);
+      return updatedAt > 0 && Date.now() - updatedAt <= 1200;
+    }
+
+    function isActualAssistantAudioActive(now = performance.now()) {
+      if (state.uiView !== "model") {
+        return isSpeakingNow();
+      }
+      const updatedAt = Number(state._broadcastSpeechUpdatedAt || 0);
+      const age = Number(now || performance.now()) - updatedAt;
+      return state._broadcastAssistantAudioActive === true
+        && updatedAt > 0
+        && age >= -80
+        && age <= 900;
+    }
+
+    function clearStaleBroadcastSpeechState(now = performance.now()) {
+      if (state.uiView !== "model") {
+        return false;
+      }
+      const t = Number(now || performance.now());
+      const updatedAt = Number(state._broadcastSpeechUpdatedAt || 0);
+      const animUntil = Number(state._broadcastSpeechExpiresAt || state.speechAnimUntil || 0);
+      if (!updatedAt || t - updatedAt <= 900 || t <= animUntil + 180) {
+        return false;
+      }
+      state._broadcastSpeaking = false;
+      state._broadcastAssistantAudioActive = false;
+      state._broadcastSpeechExpiresAt = 0;
+      state.speechAnimUntil = 0;
+      state.speechAnimStartedAt = 0;
+      state.speechAnimDurationMs = 0;
+      state.speechMouthOpen = 0;
+      state.ttsAudioLevel = 0;
+      state.moodHoldUntil = 0;
+      if (state._broadcastSpeechCueOwned === true) {
+        state._broadcastSpeechCueExpiresAt = Math.min(
+          Number(state._broadcastSpeechCueExpiresAt || t),
+          t
+        );
+      }
+      return true;
+    }
+
+    function shouldDeferMotionForListening(opts = {}, now = performance.now()) {
+      return isListeningPresenceActive()
+        && opts.userInitiated !== true
+        && !isActualAssistantAudioActive(now);
+    }
+
     function isSpeechMotionActive(now = performance.now()) {
       if (state.uiView === "model") {
         const t = Number(now || performance.now());
         const updatedAt = Number(state._broadcastSpeechUpdatedAt || 0);
-        const animUntil = Number(state.speechAnimUntil || 0);
+        const animUntil = Number(state._broadcastSpeechExpiresAt || state.speechAnimUntil || 0);
         if (updatedAt > 0 && t - updatedAt > 900) {
-          return t <= animUntil + 180;
+          if (t <= animUntil + 180) {
+            return true;
+          }
+          clearStaleBroadcastSpeechState(t);
+          return false;
         }
         if (state._broadcastSpeaking) {
           return true;
@@ -103,7 +166,10 @@
       if (state.dragData || state.windowDragActive || state.animating) {
         return true;
       }
-      if (state.chatBusy || isSpeakingNow()) {
+      if (state.chatBusy || isSpeakingNow() || (state.uiView === "model" && isSpeechMotionActive())) {
+        return true;
+      }
+      if (shouldDeferMotionForListening()) {
         return true;
       }
       return false;
@@ -177,32 +243,69 @@
       if (state.dragData || state.windowDragActive) {
         return false;
       }
+      if (shouldDeferMotionForListening(opts)) {
+        return false;
+      }
       const source = String(opts.source || "emotion");
       const allowFallback = opts.allowFallback !== false;
       const priority = Number.isFinite(Number(opts.priority)) ? Number(opts.priority) : 3;
       const force = !!opts.force;
+      const preserveGroupOrder = !!opts.preserveGroupOrder;
       const cooldownMs = Number.isFinite(Number(opts.cooldownMs))
         ? Number(opts.cooldownMs)
         : state.motionCooldownMs;
+      const keyedCooldown = String(opts.motionCooldownKey || "").trim();
+      const now = performance.now();
+      if (
+        keyedCooldown
+        && now < Number(state.motionKeyedCooldowns?.[keyedCooldown] || 0)
+      ) {
+        return false;
+      }
       if (!canPlayMotion(cooldownMs, force)) {
         return false;
       }
       const explicitGroups = uniqueMotionGroups(opts.groups);
       const groups = (explicitGroups.length ? explicitGroups : pickMoodMotionGroups(mood, source))
-        .filter((group) => getMotionCount(group) > 0)
-        .sort((a, b) => {
+        .filter((group) => getMotionCount(group) > 0);
+      if (!preserveGroupOrder) {
+        groups.sort((a, b) => {
           if (a === state.lastMotionGroup) return 1;
           if (b === state.lastMotionGroup) return -1;
           return 0;
         });
+      }
       for (const group of groups) {
         const ok = await playMotionGroup(group, priority);
         if (ok) {
+          if (keyedCooldown) {
+            if (!state.motionKeyedCooldowns || typeof state.motionKeyedCooldowns !== "object") {
+              state.motionKeyedCooldowns = {};
+            }
+            state.motionKeyedCooldowns[keyedCooldown] = now + Math.max(120, Number(cooldownMs) || 0);
+          }
+          const authoredMotion = opts.authoredMotion && typeof opts.authoredMotion === "object"
+            ? opts.authoredMotion
+            : null;
+          if (authoredMotion?.group === group) {
+            const durationMs = Math.max(240, Math.round(Number(authoredMotion.durationMs) || 0));
+            state.hiyoriAuthoredMotion = {
+              group,
+              file: String(authoredMotion.file || ""),
+              emotion: String(authoredMotion.emotion || opts.motionRole || ""),
+              action: String(authoredMotion.action || opts.motionCue || ""),
+              playbackGeneration: Number(opts.playbackGeneration || 0),
+              startedAt: now,
+              until: now + durationMs
+            };
+            state.hiyoriAuthoredMotionUntil = now + durationMs;
+          }
           state.lastMotionDirectorDispatch = {
             group,
             source,
             motionCue: String(opts.motionCue || ""),
             motionRole: String(opts.motionRole || ""),
+            authored: authoredMotion?.group === group,
             at: Date.now()
           };
           return true;
@@ -234,10 +337,14 @@
       if (!state.model || state.animating || state.dragData || state.windowDragActive) {
         return false;
       }
+      if (shouldDeferMotionForListening(opts)) {
+        return false;
+      }
       state.animating = true;
       const model = state.model;
       const style = normalizeTalkStyle(opts.style || state.currentTalkStyle || "neutral");
       const intent = String(opts.intent || opts.source || "idle").toLowerCase();
+      const amplitudeScale = clampNumber(Number(getMotionIntensityPreset()?.amplitudeScale) || 1, 0.72, 1.55);
       const start = performance.now();
       const duration = intent === "reply" ? 980 : (intent === "talk" ? 760 : 1120);
       const bx = state.baseTransform.x;
@@ -252,37 +359,37 @@
         const pulse = Math.sin(p * Math.PI);
 
         if (mood === "happy") {
-          model.y = by - Math.abs(wave) * 26 * swayBias;
-          model.x = bx + wave * 7 * swayBias;
-          model.scale.set(bs * (1 + Math.abs(wave) * 0.06));
-          model.rotation = wave * 0.038 * tiltBias;
+          model.y = by - Math.abs(wave) * 26 * swayBias * amplitudeScale;
+          model.x = bx + wave * 7 * swayBias * amplitudeScale;
+          model.scale.set(bs * (1 + Math.abs(wave) * 0.06 * amplitudeScale));
+          model.rotation = wave * 0.038 * tiltBias * amplitudeScale;
         } else if (mood === "sad") {
-          model.y = by + p * 18;
-          model.x = bx - pulse * 4;
-          model.scale.set(bs * (1 - p * 0.05));
-          model.rotation = -0.06 * tiltBias;
+          model.y = by + p * 18 * amplitudeScale;
+          model.x = bx - pulse * 4 * amplitudeScale;
+          model.scale.set(bs * (1 - p * 0.05 * amplitudeScale));
+          model.rotation = -0.06 * tiltBias * amplitudeScale;
         } else if (mood === "angry") {
-          model.x = bx + wave * 14;
-          model.y = by - Math.abs(Math.sin(p * Math.PI * 5)) * 6;
-          model.rotation = wave * 0.05 * tiltBias;
+          model.x = bx + wave * 14 * amplitudeScale;
+          model.y = by - Math.abs(Math.sin(p * Math.PI * 5)) * 6 * amplitudeScale;
+          model.rotation = wave * 0.05 * tiltBias * amplitudeScale;
         } else if (mood === "surprised") {
-          model.y = by - pulse * 12;
-          model.scale.set(bs * (1 + Math.abs(wave) * 0.1));
-          model.rotation = wave * 0.018;
+          model.y = by - pulse * 12 * amplitudeScale;
+          model.scale.set(bs * (1 + Math.abs(wave) * 0.1 * amplitudeScale));
+          model.rotation = wave * 0.018 * amplitudeScale;
         } else if (intent === "talk") {
           const bounce = Math.sin(p * Math.PI * 8);
-          model.x = bx + wave * 18 * swayBias;
-          model.y = by + bounce * 6 - Math.abs(wave) * 18;
-          model.rotation = wave * 0.044 * tiltBias;
+          model.x = bx + wave * 18 * swayBias * amplitudeScale;
+          model.y = by + (bounce * 6 - Math.abs(wave) * 18) * amplitudeScale;
+          model.rotation = wave * 0.044 * tiltBias * amplitudeScale;
         } else if (intent === "thinking") {
-          model.x = bx + Math.sin(p * Math.PI * 2) * 5;
-          model.y = by - pulse * 6;
-          model.rotation = -0.025;
+          model.x = bx + Math.sin(p * Math.PI * 2) * 5 * amplitudeScale;
+          model.y = by - pulse * 6 * amplitudeScale;
+          model.rotation = -0.025 * amplitudeScale;
         } else {
-          model.x = bx + wave * 3 * swayBias;
+          model.x = bx + wave * 3 * swayBias * amplitudeScale;
           model.y = by;
           model.scale.set(bs);
-          model.rotation = wave * 0.012;
+          model.rotation = wave * 0.012 * amplitudeScale;
         }
 
         if (p < 1) {
@@ -302,7 +409,7 @@
     }
 
     function triggerTapMotion() {
-      enqueueActionIntent("tap", { combo: true });
+      enqueueActionIntent("tap", { combo: true, userInitiated: true });
     }
 
     function maybePlayTalkGesture(text, style = "neutral") {
@@ -349,6 +456,9 @@
     }
 
     async function playEmotion(text, opts = {}) {
+      if (shouldDeferMotionForListening(opts)) {
+        return false;
+      }
       const mood = detectMood(text);
       const played = await tryBuiltInMotion(mood, opts);
       if (played) {
@@ -367,6 +477,10 @@
       setModelMotionDefinitions,
       stopIdleMotionLoop,
       isSpeakingNow,
+      isListeningPresenceActive,
+      isActualAssistantAudioActive,
+      clearStaleBroadcastSpeechState,
+      shouldDeferMotionForListening,
       isSpeechMotionActive,
       shouldSkipIdleMotion,
       scheduleIdleMotionLoop,

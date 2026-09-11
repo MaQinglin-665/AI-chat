@@ -10,7 +10,19 @@ TTS_PROSODY_KEYS = (
     "rate",
     "pitch",
     "volume",
+    "emotion",
+    "intensity",
+    "voice_style",
 )
+
+TTS_EMOTIONS = {
+    "neutral", "happy", "playful", "excited", "shy", "hurt", "sad",
+    "anxious", "angry", "surprised", "serious", "thinking",
+}
+TTS_INTENSITIES = {"low", "medium", "high"}
+TTS_VOICE_STYLES = {
+    "neutral", "soft", "cheerful", "teasing", "serious", "curious", "warm",
+}
 
 
 def extract_tts_request(body):
@@ -21,6 +33,18 @@ def extract_tts_request(body):
     for key in TTS_PROSODY_KEYS:
         if key in payload:
             prosody[key] = payload.get(key)
+    for key, allowed in (
+        ("emotion", TTS_EMOTIONS),
+        ("intensity", TTS_INTENSITIES),
+        ("voice_style", TTS_VOICE_STYLES),
+    ):
+        if key not in prosody:
+            continue
+        value = str(prosody.get(key) or "").strip().lower().replace("-", "_")
+        if value in allowed:
+            prosody[key] = value
+        else:
+            prosody.pop(key, None)
     return text, voice, prosody
 
 
@@ -122,3 +146,65 @@ def handle_tts_request(
             status=HTTPStatus.INTERNAL_SERVER_ERROR,
             extra_headers=perf_headers,
         )
+
+
+def handle_tts_stream_request(
+    body,
+    *,
+    perf_trace_id,
+    perf_started_ms,
+    client_to_server_ms,
+    perf_headers,
+    send_json_func,
+    send_audio_stream_func,
+    open_tts_stream_func,
+    log_backend_perf_func,
+    log_backend_exception_func,
+    diagnostic_payload_func,
+    perf_now_ms_func,
+):
+    text, voice, prosody = extract_tts_request(body)
+    log_backend_perf_func(
+        "TTS_STREAM",
+        perf_trace_id,
+        stage="request_received",
+        client_to_server_ms=client_to_server_ms,
+        text_chars=len(text),
+    )
+    if not text:
+        send_json_func(
+            {"error": "text cannot be empty."},
+            status=HTTPStatus.BAD_REQUEST,
+            extra_headers=perf_headers,
+        )
+        return
+    response_started = False
+    try:
+        chunks, content_type = open_tts_stream_func(
+            text,
+            voice_override=voice,
+            prosody=prosody,
+            perf_trace_id=perf_trace_id,
+        )
+        response_started = True
+        send_audio_stream_func(chunks, content_type=content_type, extra_headers=perf_headers)
+        log_backend_perf_func(
+            "TTS_STREAM",
+            perf_trace_id,
+            stage="response_closed",
+            total_ms=perf_now_ms_func() - perf_started_ms,
+        )
+    except (BrokenPipeError, ConnectionResetError):
+        log_backend_perf_func("TTS_STREAM", perf_trace_id, stage="client_disconnected")
+    except Exception as exc:
+        log_backend_exception_func(
+            "TTS_STREAM",
+            exc,
+            extra=f"/api/tts_stream failed | text_len={len(text)}",
+        )
+        if not response_started:
+            send_json_func(
+                diagnostic_payload_func(exc),
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                extra_headers=perf_headers,
+            )

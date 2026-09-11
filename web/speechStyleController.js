@@ -145,7 +145,8 @@
       return speechText.splitStreamSpeakSegments(buffer, {
         flush,
         style: state.currentTalkStyle || "neutral",
-        provider: state.ttsProvider || ""
+        provider: state.ttsProvider || "",
+        firstBeatMinChars: state.streamFirstBeatMinChars
       });
     }
     return { segments: [], rest: String(buffer || "") };

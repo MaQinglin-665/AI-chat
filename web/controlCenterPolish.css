@@ -1,0 +1,201 @@
+/* Final control-center readability layer. Keeps the established berry glass
+   identity while preventing legacy light components from leaking into it. */
+.control-center-shell {
+  --cc-ink: #fff5fa;
+  --cc-label: #ead9e2;
+  --cc-muted: #d2bec9;
+  --cc-faint: #b8a2ae;
+  --cc-page: #18121e;
+  --cc-rail: #211528;
+  --cc-card: #2a1e31;
+  --cc-field: #151019;
+  --cc-line: rgba(247, 170, 203, 0.2);
+  --cc-line-strong: rgba(247, 170, 203, 0.36);
+  color-scheme: dark;
+}
+
+body[data-stage-room="day"] .control-center-shell {
+  --cc-ink: #3f2030;
+  --cc-label: #5f394c;
+  --cc-muted: #705264;
+  --cc-faint: #876c7a;
+  --cc-page: #fff9fb;
+  --cc-rail: #fff1f6;
+  --cc-card: #fff5f8;
+  --cc-field: #fffdfd;
+  --cc-line: rgba(167, 74, 114, 0.18);
+  --cc-line-strong: rgba(167, 74, 114, 0.32);
+  color-scheme: light;
+}
+
+.control-center-content,
+.control-center-content p,
+.control-center-content li,
+.control-center-content output,
+.control-center-content pre {
+  color: var(--cc-ink);
+}
+
+.control-center-content label > span,
+.control-center-content .config-switch-section-title,
+.control-center-content .schedule-list-title,
+.control-center-content .persona-section-title,
+.control-center-content .learning-section-title,
+.control-center-content .learning-section-title strong,
+.control-center-content .learning-field-title {
+  color: var(--cc-label) !important;
+}
+
+.control-center-content :is(
+  .config-switch-note,
+  .config-switch-live2d-report,
+  .config-switch-status,
+  .learning-section-hint,
+  .learning-review-summary,
+  .relationship-state-intro,
+  .relationship-state-status,
+  .schedule-empty-desc
+) {
+  color: var(--cc-muted) !important;
+  font-size: 12px !important;
+  line-height: 1.65 !important;
+}
+
+.control-center-content input,
+.control-center-content select,
+.control-center-content textarea {
+  color: var(--cc-ink) !important;
+  -webkit-text-fill-color: var(--cc-ink);
+  background: var(--cc-field) !important;
+  border-color: var(--cc-line-strong) !important;
+}
+
+.control-center-content input::placeholder,
+.control-center-content textarea::placeholder {
+  color: var(--cc-faint) !important;
+  opacity: 1;
+}
+
+.control-center-content :is(input, select, textarea):focus {
+  border-color: var(--cc-accent-strong) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cc-accent) 22%, transparent) !important;
+}
+
+.control-center-content button {
+  color: var(--cc-ink) !important;
+  background: color-mix(in srgb, var(--cc-card) 90%, var(--cc-accent) 10%) !important;
+  border-color: var(--cc-line-strong) !important;
+}
+
+.control-center-content button:hover:not(:disabled) {
+  color: var(--cc-ink) !important;
+  background: color-mix(in srgb, var(--cc-card) 82%, var(--cc-accent) 18%) !important;
+}
+
+.control-center-content :is(
+  .config-switch-primary-btn,
+  .persona-primary-btn,
+  #schedule-save-btn,
+  #doctor-rerun-btn,
+  #qq-identity-save-btn
+) {
+  color: #351322 !important;
+  background: #f39abd !important;
+  border-color: #ffc2d9 !important;
+  font-weight: 750 !important;
+}
+
+.config-switch-check {
+  min-height: 54px !important;
+  padding: 13px 15px !important;
+  color: var(--cc-ink) !important;
+  background: color-mix(in srgb, var(--cc-field) 88%, var(--cc-accent) 12%) !important;
+  border: 1px solid var(--cc-line-strong) !important;
+  border-radius: 13px !important;
+}
+
+.config-switch-check > span {
+  color: var(--cc-label) !important;
+  font-weight: 650 !important;
+  line-height: 1.55 !important;
+}
+
+.config-switch-check input[type="checkbox"] {
+  width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  flex: 0 0 18px !important;
+  padding: 0 !important;
+  accent-color: #ef79a8 !important;
+}
+
+.control-center-content :is(input, select, textarea):disabled {
+  color: var(--cc-muted) !important;
+  -webkit-text-fill-color: var(--cc-muted) !important;
+  background: color-mix(in srgb, var(--cc-field) 82%, var(--cc-card) 18%) !important;
+  border-color: var(--cc-line) !important;
+  opacity: 1 !important;
+  cursor: not-allowed;
+}
+
+.control-center-content button:disabled {
+  color: var(--cc-faint) !important;
+  background: var(--cc-field) !important;
+  border-color: var(--cc-line) !important;
+  opacity: 0.78 !important;
+  cursor: not-allowed;
+}
+
+.config-switch-check input:disabled + span {
+  color: var(--cc-muted) !important;
+  opacity: 1 !important;
+}
+
+.qq-identity-id-chip {
+  min-height: 34px;
+  padding: 5px 7px 5px 12px !important;
+  color: var(--cc-ink) !important;
+  background: color-mix(in srgb, var(--cc-card) 78%, var(--cc-accent) 22%) !important;
+  border-color: var(--cc-line-strong) !important;
+  font-weight: 650;
+}
+
+.qq-identity-id-chip button {
+  width: 24px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  padding: 0 !important;
+  color: var(--cc-label) !important;
+  background: color-mix(in srgb, var(--cc-field) 78%, var(--cc-accent) 22%) !important;
+  border: 1px solid var(--cc-line) !important;
+  border-radius: 999px !important;
+}
+
+.qq-identity-empty,
+.qq-identity-audit {
+  color: var(--cc-muted) !important;
+}
+
+.control-center-nav-item:not([aria-current="page"]) {
+  color: var(--cc-muted) !important;
+}
+
+.control-center-nav-item:not([aria-current="page"]):hover {
+  color: var(--cc-ink) !important;
+}
+
+.control-center-nav-item:active,
+.control-center-content button:active:not(:disabled) {
+  transform: translateY(1px) scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control-center-nav-item,
+  .control-center-content button,
+  .control-center-content input,
+  .control-center-content select,
+  .control-center-content textarea {
+    transition: none !important;
+  }
+}

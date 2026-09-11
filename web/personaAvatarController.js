@@ -19,6 +19,7 @@
     const closeSchedulePanel = typeof deps.closeSchedulePanel === "function" ? deps.closeSchedulePanel : () => {};
     const isLearningReviewOpen = typeof deps.isLearningReviewOpen === "function" ? deps.isLearningReviewOpen : () => false;
     const closeLearningReviewDrawer = typeof deps.closeLearningReviewDrawer === "function" ? deps.closeLearningReviewDrawer : () => {};
+    const loadRelationshipState = typeof deps.loadRelationshipState === "function" ? deps.loadRelationshipState : () => Promise.resolve(null);
     const File = window.File || root.File;
     const FileReader = window.FileReader || root.FileReader;
     const HTMLImageElement = window.HTMLImageElement || root.HTMLImageElement;
@@ -377,6 +378,9 @@
       }
       ui.personaModal.hidden = false;
       applyPersonaCardToForm(state.personaCard || PERSONA_CARD_DEFAULT);
+      Promise.resolve(loadRelationshipState()).catch((err) => {
+        console.warn("load relationship state failed:", err);
+      });
       if (ui.personaCharacterName) {
         ui.personaCharacterName.focus();
       }

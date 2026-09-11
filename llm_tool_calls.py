@@ -20,9 +20,11 @@ from tools import WORK_TOOL_DEFS, _openai_auth_headers, execute_work_tool, get_t
 
 TOOL_META_MARKER = "[[TAFFY_TOOL_META]]"
 TOOL_INTRO = (
-    "When user asks for file/code/command/image tasks, use tools. "
-    "For regular chat, reply directly without tools. "
-    "Always explain briefly what you changed after tool actions."
+    "Use tools for requested work and, when autonomous desktop awareness is enabled, "
+    "only when observing or acting would materially improve the current turn. "
+    "Observation alone never requires speaking or acting. For regular chat, reply directly. "
+    "Never bypass a pending confirmation or claim an action succeeded before its tool result. "
+    "After state-changing tool actions, briefly explain what changed."
 )
 
 
@@ -94,7 +96,11 @@ def call_openai_chat_completions_with_tools(
             "stream": False,
             "max_tokens": tuning["max_output_tokens"],
             "tools": chat_tools,
-            "tool_choice": "required" if not executed_payloads else "auto",
+            "tool_choice": (
+                "auto"
+                if config.get("_tools_optional") is True
+                else ("required" if not executed_payloads else "auto")
+            ),
         }
         data = http_post_json_fn(
             f"{base_url}/chat/completions", payload, headers=headers, timeout=90
@@ -224,7 +230,11 @@ def call_openai_compatible_with_tools(
             "presence_penalty": tuning["presence_penalty"],
             "max_output_tokens": tuning["max_output_tokens"],
             "tools": responses_tools,
-            "tool_choice": "required" if not executed_payloads else "auto",
+            "tool_choice": (
+                "auto"
+                if config.get("_tools_optional") is True
+                else ("required" if not executed_payloads else "auto")
+            ),
             "text": {
                 "format": {"type": "text"},
                 "verbosity": tuning["verbosity"],

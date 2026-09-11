@@ -16,6 +16,9 @@ from config import (
     OPENAI_DEFAULT_BASE_URL,
     OPENAI_DEFAULT_KEY_ENV,
     OPENAI_DEFAULT_MODEL,
+    QWEN3_TTS_DEFAULT_API_URL,
+    QWEN3_TTS_DEFAULT_MODEL,
+    QWEN3_TTS_DEFAULT_VOICE,
     TTS_DEFAULT_VOICE,
     VOLCENGINE_ACCESS_TOKEN_ENV,
     VOLCENGINE_APP_ID_ENV,
@@ -103,6 +106,15 @@ TTS_PRESETS = {
         "provider": "gpt_sovits",
         "voice": "default",
         "gpt_sovits_api_url": GPT_SOVITS_DEFAULT_API_URL,
+        "server_tts_provider": True,
+    },
+    "qwen3_tts": {
+        "id": "qwen3_tts",
+        "label": "Qwen3-TTS",
+        "provider": "qwen3_tts",
+        "voice": QWEN3_TTS_DEFAULT_VOICE,
+        "qwen3_tts_api_url": QWEN3_TTS_DEFAULT_API_URL,
+        "qwen3_tts_model": QWEN3_TTS_DEFAULT_MODEL,
         "server_tts_provider": True,
     },
 }
@@ -542,7 +554,12 @@ def _build_tts_current(tts_cfg):
         stream_mode = "final_only"
     return {
         "provider": provider if provider in ALLOWED_TTS_PROVIDERS else "browser",
-        "voice": str(cfg.get("voice", "") or "").strip(),
+        "voice": str(
+            cfg.get("qwen3_tts_voice", QWEN3_TTS_DEFAULT_VOICE)
+            if provider == "qwen3_tts"
+            else cfg.get("voice", "")
+            or ""
+        ).strip(),
         "gpt_sovits_api_url": safe_url_display(
             cfg.get("gpt_sovits_api_url", ""),
             default_url=GPT_SOVITS_DEFAULT_API_URL,
@@ -554,6 +571,14 @@ def _build_tts_current(tts_cfg):
         "cluster": str(cfg.get("cluster", VOLCENGINE_TTS_DEFAULT_CLUSTER) or VOLCENGINE_TTS_DEFAULT_CLUSTER).strip(),
         "stream_mode": stream_mode,
         "gpt_sovits_timeout_sec": max(1, min(180, _safe_int(cfg.get("gpt_sovits_timeout_sec", 60), 60))),
+        "qwen3_tts_api_url": safe_url_display(
+            cfg.get("qwen3_tts_api_url", ""),
+            default_url=QWEN3_TTS_DEFAULT_API_URL,
+        ),
+        "qwen3_tts_timeout_sec": max(
+            1,
+            min(180, _safe_int(cfg.get("qwen3_tts_timeout_sec", 60), 60)),
+        ),
         "allow_browser_fallback": bool(cfg.get("allow_browser_fallback", False)),
     }
 
@@ -667,7 +692,7 @@ def _normalize_tts_update(raw):
         raise DiagnosticError(
             code="config_switch_invalid_tts_provider",
             reason=f"Unsupported TTS provider: {provider or '(empty)'}",
-            solution="Use browser, edge_tts, gpt_sovits, or volcengine_tts.",
+            solution="Use browser, edge_tts, gpt_sovits, qwen3_tts, or volcengine_tts.",
             config_key="tts.provider",
         )
     preset = TTS_PRESETS[provider]
@@ -693,6 +718,22 @@ def _normalize_tts_update(raw):
             1,
             min(180, _safe_int(body.get("gpt_sovits_timeout_sec"), 60)),
         )
+    if provider == "qwen3_tts":
+        update["qwen3_tts_api_url"] = _normalize_http_url(
+            body.get("qwen3_tts_api_url") or preset["qwen3_tts_api_url"],
+            default_url=preset["qwen3_tts_api_url"],
+            config_key="tts.qwen3_tts_api_url",
+        )
+        update["qwen3_tts_timeout_sec"] = max(
+            1,
+            min(180, _safe_int(body.get("qwen3_tts_timeout_sec"), 60)),
+        )
+        update["qwen3_tts_model"] = _clean_text(
+            body.get("qwen3_tts_model") or preset["qwen3_tts_model"],
+            160,
+        )
+        update["qwen3_tts_voice"] = voice or QWEN3_TTS_DEFAULT_VOICE
+        update["qwen3_tts_stream_playback"] = stream_mode == "realtime"
     if provider == "volcengine_tts":
         update["api_url"] = _normalize_http_url(
             body.get("api_url") or preset["api_url"],

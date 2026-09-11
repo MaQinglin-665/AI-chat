@@ -218,7 +218,9 @@ curl http://127.0.0.1:8123/api/health -H "X-Taffy-Token: <your-token>"
 
 - `vosk_installed`
 - `vosk_model_found`
-- `vosk_model_path`
+- `input_language_mode`
+- `local_languages`（仅显示中英文模型是否已配置/可用，不返回本地路径）
+- `bilingual_local_ready`
 - `wake_word_enabled`
 - `wake_word_count`
 - `messages`

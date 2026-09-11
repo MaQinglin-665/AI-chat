@@ -189,7 +189,11 @@ def call_openai_compatible(llm_cfg, messages):
                 )
 
             # Stable demo fallback: if reply is clipped by token budget, retry once with a larger budget.
-            if content and finish_reason == "length" and bool(llm_cfg.get("retry_on_length", False)):
+            if (
+                finish_reason == "length"
+                and (content or reasoning_content)
+                and _safe_bool(llm_cfg.get("retry_on_length", False), False)
+            ):
                 retry_payload = dict(payload)
                 token_key = apply_chat_completion_token_limit(retry_payload, llm_cfg, tuning)
                 try:

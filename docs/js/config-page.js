@@ -1588,7 +1588,7 @@
             auto_chat_enabled: false
           },
           asr: {
-            max_speech_ms: 1600,
+            max_speech_ms: 10000,
             silence_trigger_ms: 260
           }
         }

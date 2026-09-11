@@ -571,7 +571,10 @@
     const strongTerminal = "。！？!?\n";
     const softTerminal = "，,";
     const englishStream = isMostlyEnglishText(src);
-    const minEnglishFirstSegmentLen = isGptSovits ? 30 : 18;
+    const configuredFirstBeat = clampNumber(Number(options.firstBeatMinChars) || 14, 8, 40);
+    const minEnglishFirstSegmentLen = isGptSovits
+      ? configuredFirstBeat
+      : Math.min(18, configuredFirstBeat);
     let start = 0;
 
     for (let i = 0; i < src.length; i++) {
