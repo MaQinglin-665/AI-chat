@@ -2,6 +2,24 @@
   "active_task": null,
   "features": [
     {
+      "id": "stream-lifecycle-stability-v1",
+      "name": "Streaming reply lifecycle stability",
+      "description": "Prevent mixed replies after partial failures, honor terminal events and bound first-text wait despite heartbeats.",
+      "status": "complete",
+      "dependencies": [],
+      "scope": [
+        "LLM stream fallback integrity",
+        "Terminal event handling",
+        "Frontend first-text deadline and reader cleanup"
+      ],
+      "done_criteria": [
+        "Partial failures never splice a replacement answer",
+        "Terminal packets finish without waiting for socket close",
+        "Heartbeats cannot reset first-text deadline",
+        "Reader resources released and complete local gate passes"
+      ]
+    },
+    {
       "id": "live2d-expressive-speech-v1",
       "name": "Expressive semantic and audio-linked Live2D speech",
       "description": "Distinct speech delivery postures and bounded audio accents for the Hiyori model, preserving authored motion and legacy configuration.",

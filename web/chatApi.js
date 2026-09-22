@@ -515,11 +515,18 @@
     const decoder = new TextDecoder("utf-8");
     const lineHandler = createStreamLineHandler(context);
     const firstDeltaTimeoutMs = Math.max(0, Math.round(Number(context.firstDeltaTimeoutMs) || 0));
+    const getNow = typeof context.now === "function" ? context.now : nowMs;
+    const firstDeltaDeadline = getNow() + firstDeltaTimeoutMs;
+    let reachedEOF = false;
     let buffer = "";
 
     const readNextChunk = async () => {
       if (!firstDeltaTimeoutMs || lineHandler.hasSeenFirstDelta()) {
         return await reader.read();
+      }
+      const remainingMs = firstDeltaDeadline - getNow();
+      if (remainingMs <= 0) {
+        throw new Error(`LLM stream produced no text within ${firstDeltaTimeoutMs}ms`);
       }
       let timer = 0;
       try {
@@ -528,7 +535,7 @@
           new Promise((_, reject) => {
             timer = setTimeout(() => {
               reject(new Error(`LLM stream produced no text within ${firstDeltaTimeoutMs}ms`));
-            }, firstDeltaTimeoutMs);
+            }, remainingMs);
           })
         ]);
       } finally {
@@ -542,6 +549,8 @@
       while (true) {
         const { value, done } = await readNextChunk();
         if (done) {
+          reachedEOF = true;
+          buffer += decoder.decode();
           break;
         }
         buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
@@ -573,14 +582,21 @@
       } catch (_) {
         // ignore
       }
-      if (!err.seenFirstDelta && typeof reader.cancel === "function") {
+      throw err;
+    } finally {
+      if (!reachedEOF && typeof reader.cancel === "function") {
         try {
-          await reader.cancel();
+          // A stalled cancellation must not delay completion or error reporting.
+          Promise.resolve(reader.cancel()).catch(() => {});
         } catch (_) {
           // ignore
         }
       }
-      throw err;
+      try {
+        if (typeof reader.releaseLock === "function") reader.releaseLock();
+      } catch (_) {
+        // Cleanup must not replace the reply or original error.
+      }
     }
     return {
       reply: lineHandler.getReply(),

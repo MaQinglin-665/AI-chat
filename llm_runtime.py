@@ -320,7 +320,9 @@ def call_llm_stream_impl(
                     streamed = True
                     yield chunk
         except Exception:
-            streamed = False
+            # Once delivered, partial text must never be spliced with a new answer.
+            if streamed:
+                raise
         if streamed:
             return
 
@@ -330,7 +332,9 @@ def call_llm_stream_impl(
                     streamed = True
                     yield chunk
         except Exception:
-            streamed = False
+            # Once delivered, partial text must never be spliced with a new answer.
+            if streamed:
+                raise
         if streamed:
             return
 
@@ -354,7 +358,9 @@ def call_llm_stream_impl(
                     streamed = True
                     yield chunk
         except Exception:
-            streamed = False
+            # Once delivered, partial text must never be spliced with a new answer.
+            if streamed:
+                raise
         if streamed:
             return
 

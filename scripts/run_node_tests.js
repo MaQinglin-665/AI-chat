@@ -27,6 +27,7 @@ const tests = [
   "tests/test_gpt_sovits_streaming_playback_frontend.js",
   "tests/test_qwen3_tts_frontend.js",
   "tests/test_chat_api_frontend.js",
+  "tests/test_chat_stream_lifecycle.js",
   "tests/test_companion_turn_contract_frontend.js",
   "tests/test_natural_conversation_frontend.js",
   "tests/test_conversation_awareness_frontend.js",

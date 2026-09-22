@@ -87,7 +87,9 @@ def iter_openai_chat_stream(llm_cfg, messages):
                 if not line or not line.startswith("data:"):
                     continue
                 data_str = line[5:].strip()
-                if not data_str or data_str == "[DONE]":
+                if data_str == "[DONE]":
+                    return
+                if not data_str:
                     continue
                 try:
                     data = json.loads(data_str)
@@ -165,7 +167,9 @@ def iter_openai_responses_stream(llm_cfg, messages):
                 if not line or not line.startswith("data:"):
                     continue
                 data_str = line[5:].strip()
-                if not data_str or data_str == "[DONE]":
+                if data_str == "[DONE]":
+                    return
+                if not data_str:
                     continue
                 try:
                     evt = json.loads(data_str)
@@ -257,11 +261,11 @@ def iter_ollama_chat_stream(llm_cfg, messages, model_override=None):
                 if isinstance(content, str) and content:
                     yielded_any = True
                     yield content
-                    continue
-                response = data.get("response")
-                if isinstance(response, str) and response:
-                    yielded_any = True
-                    yield response
+                else:
+                    response = data.get("response")
+                    if isinstance(response, str) and response:
+                        yielded_any = True
+                        yield response
                 if data.get("done") is True:
                     return
     except urllib.error.HTTPError as exc:
