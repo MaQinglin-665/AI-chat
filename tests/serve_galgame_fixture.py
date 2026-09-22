@@ -11,7 +11,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         fixtures = {"/__galgame_check.html": "galgame-browser-fixture.html",
-                    "/__galgame_check.js": "galgame-browser-fixture.js"}
+                    "/__galgame_check.js": "galgame-browser-fixture.js",
+                    "/__live2d_expressive.html": "live2d-expressive-fixture.html",
+                    "/__live2d_expressive.js": "live2d-expressive-fixture.js"}
         if self.path in fixtures:
             data = (ROOT / "tests" / fixtures[self.path]).read_bytes()
             self.send_response(200)

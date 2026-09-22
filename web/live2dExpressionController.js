@@ -153,6 +153,9 @@
         state.hiyoriPerformanceDebug = {
           mode: sample.mode,
           emotion: sample.emotion,
+          delivery: sample.delivery,
+          speechAccent: sample.speechAccent,
+          speechAccentCount: sample.speechAccentCount,
           action: sample.action,
           outgoingAction: sample.outgoingAction,
           idle: sample.idle,
@@ -1089,6 +1092,7 @@
     }
 
     function endSpeechAnimation() {
+      hiyoriPerformanceDirector?.stopSpeech?.();
       const authoredMotion = state.hiyoriAuthoredMotion;
       const authoredGeneration = Number(authoredMotion?.playbackGeneration || 0);
       if (
@@ -1883,6 +1887,10 @@
           || (state.chatBusy === true && Number(state.speechAnimUntil || 0) <= now)
         ),
         emotion: speechPerformanceCue?.emotion || state.speechAnimMood || "idle",
+        intensity: speechPerformanceCue?.intensity || "medium",
+        motionIntensity: normalizeMotionIntensity(state.motionIntensity),
+        audioActive: listeningPresence.assistantAudioActive,
+        playbackGeneration: state.ttsPlaybackGeneration,
         audioLevel: Number(state.ttsAudioLevel) || 0,
         bodyEnergy: Number(state.speechBodyEnergy) || 0,
         allowIdle: !state.dragData && !state.windowDragActive && !state.chatBusy

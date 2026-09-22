@@ -2,6 +2,31 @@
   "active_task": null,
   "features": [
     {
+      "id": "live2d-expressive-speech-v1",
+      "name": "Expressive semantic and audio-linked Live2D speech",
+      "description": "Distinct speech delivery postures and bounded audio accents for the Hiyori model, preserving authored motion and legacy configuration.",
+      "status": "complete",
+      "dependencies": [
+        "vtuber-continuous-speech-body-v1"
+      ],
+      "scope": [
+        "Hiyori semantic delivery posture",
+        "Audio-linked emphasis and pause release",
+        "Existing motion intensity and cancellation compatibility"
+      ],
+      "done_criteria": [
+        "Different semantic moods produce distinct bounded speech postures",
+        "Audio accents follow rising energy with cooldown and stop after cancellation",
+        "Authored gestures retain priority and unsupported models retain existing behavior",
+        "Regression tests and visual fixture evidence recorded with limitations"
+      ],
+      "limitations": [
+        "Hiyori-specific; other rigs retain existing behavior.",
+        "Semantic accuracy depends on existing reply cues; audio accents detect energy rises, not word-aligned linguistic stress.",
+        "Browser visual QA uses simulated audio; full Electron and real TTS listening acceptance remains pending."
+      ]
+    },
+    {
       "id": "project-harness-audit-20260922",
       "name": "Project progress and agent workflow audit",
       "description": "Reconcile source progress with current evidence and improve agent instructions, handoff and the project workflow skill without runtime changes.",

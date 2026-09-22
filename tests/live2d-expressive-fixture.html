@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live2D 语言联动验证</title>
+<style>body{margin:0;background:#eee9f1;color:#30283a;font:16px system-ui}main{display:flex;gap:24px;max-width:1050px;margin:auto;padding:24px}aside{width:320px}canvas{background:#faf8fc;border-radius:18px}button,select{font:inherit;padding:9px;margin:4px}p{line-height:1.65}output{display:block;white-space:pre-wrap;font:13px monospace}h1{font-size:24px}@media(max-width:950px){main{display:block;padding:12px}aside{width:auto}#stage{float:left;width:55%;margin-right:16px}canvas{max-width:100%;height:auto}h1{font-size:20px}}</style>
+</head><body><main><div id="stage"></div><aside>
+<h1>语言与动作联动</h1><p>真实 Hiyori 模型＋模拟台词和音量。不连接模型或语音服务，不代表真实听评。</p>
+<label>台词情绪 <select id="emotion"><option value="playful">得意 / 俏皮</option><option value="excited">兴奋</option><option value="shy">害羞</option><option value="thinking">疑惑 / 思考</option><option value="sad">难过</option><option value="surprised">惊讶</option><option value="serious">认真</option></select></label>
+<p id="line"></p><label>动作幅度 <select id="intensity"><option value="normal">正常</option><option value="high">活泼</option><option value="low">轻柔</option></select></label>
+<p><button id="play">开始说话</button><button id="pause">句中停顿</button><button id="stop">打断</button></p>
+<output id="status">加载真实模型…</output>
+</aside></main>
+<script src="/vendor/pixi.min.js"></script><script src="/vendor/pixi-unsafe-eval.min.js"></script>
+<script src="/vendor/live2dcubismcore.min.js"></script><script src="/vendor/cubism4.min.js"></script>
+<script src="/hiyoriPerformanceDirector.js"></script><script src="/live2dExpressionController.js"></script>
+<script src="/__live2d_expressive.js"></script></body></html>
