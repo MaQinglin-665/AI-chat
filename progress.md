@@ -2428,3 +2428,13 @@ Publication completed 2026-09-11: code commit 101d3e0 pushed to origin/codex/des
 - Verification Evidence: all Node frontend suites passed; JavaScript syntax188 files passed (includes ignored temporary launch files); latest production-web Electron smoke ok=true, doctor coreOk=true, decorative image bounds zero. config.example.json/package.json JSON and required ten-module Python compile passed. No new full Python suite or installer validation.
 - Runtime audit completed with explicit remaining gates: variable external model latency, manual listening, microphone interruption, full main-window interaction and hours-long stability. Native desktop tool failed initialization, so existing Electron test CLI and screenshot inspection used; no claim of manual desktop acceptance. No push, merge, deployment or permanent daily-provider changes.
 - Final diff/secret checks passed (684 files scanned). Local feature-branch commit only; no credentials or runtime artifacts staged.
+
+
+## 2026-09-22 — Refined anime split-chat UI (complete)
+
+- User chose existing anime/pink-purple direction with less decoration and clearer chat. Baseline7628ea9, branch codex/refined-chat-ui-20260922, existing isolated worktree. Applied openai-frontend-design as an extension of explicitly provided existing visual constraints; no new concept/image assets required.
+- Added scoped chatPolish.css and index stylesheet link. Compact header, flexible transcript, consistent bubbles/feedback/toggles, compact persistent controls, scrollable More overlay and matching scene menu. Preserved existing avatar/assets/actions and full-stage/model/Galgame isolation.
+- Fixed compact-stage collapse rule leaking into narrow split-chat; added behavioral coverage in test_stage_frontend.js. Full Node test runner passed, including new cases. JS syntax passed; no Python runtime edits or newly claimed Python full regression.
+- IAB evidence:800x900 header249px→125px and conversation220px→547px;390x740 no horizontal overflow, send within viewport, More overlay fits. Clicked send, speech/translation switches, collapse/expand, More and dusk scene.1200x800 full stage renders Hiyori and normal controls without warnings/errors. Preview uses demo replies, not real provider/audio validation.
+- Visual iteration fixed oversize header, fixed conversation height, mismatched light controls, cropped More panel and collapse state mismatch. Final source/file/limit details in docs/refined-chat-ui.md. Original daily checkout and credentials untouched. No push, packaging, merge or deployment.
+- Final diff check and secret scan passed (686 files). Closed task preview tabs/server and removed only this task-created config/startup/log files. Local feature-branch commit only.

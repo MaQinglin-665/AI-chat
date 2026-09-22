@@ -2,6 +2,22 @@
   "active_task": null,
   "features": [
     {
+      "id": "refined-chat-ui-v1",
+      "name": "Refined anime chat interface",
+      "description": "Preserve existing character art and pink-purple palette while reducing chrome and prioritizing readable chat.",
+      "status": "complete",
+      "dependencies": [],
+      "scope": [
+        "Split-chat layout and responsive sizing",
+        "Preserve existing controls and stage modes"
+      ],
+      "done_criteria": [
+        "More space for messages at desktop and narrow widths",
+        "Existing send, toggles, more and scene controls remain usable",
+        "Browser visual and interaction checks completed"
+      ]
+    },
+    {
       "id": "daily-runtime-acceptance-v1",
       "name": "Daily Electron runtime acceptance",
       "description": "Bounded real-runtime audit and UI/acceptance fixes completed; variable model latency, listening and long-duration acceptance remain pending.",
