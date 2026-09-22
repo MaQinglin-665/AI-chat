@@ -2,6 +2,24 @@
   "active_task": null,
   "features": [
     {
+      "id": "memory-log-tail-efficiency-v1",
+      "name": "Bound recent memory log reads",
+      "description": "Read recent learning audit/shadow entries from the tail without loading the complete LF/CRLF log.",
+      "status": "complete",
+      "dependencies": [],
+      "scope": [
+        "Read-only JSONL tail access",
+        "Nonpositive limit handling",
+        "Old log format compatibility"
+      ],
+      "done_criteria": [
+        "Large generated log reads only tail bytes for recent entries",
+        "Zero and negative limits return no items",
+        "Unicode, BOM, CRLF, malformed and empty records covered",
+        "Memory regressions pass without private data"
+      ]
+    },
+    {
       "id": "stream-lifecycle-stability-v1",
       "name": "Streaming reply lifecycle stability",
       "description": "Prevent mixed replies after partial failures, honor terminal events and bound first-text wait despite heartbeats.",
