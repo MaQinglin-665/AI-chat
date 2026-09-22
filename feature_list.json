@@ -1,8 +1,30 @@
 {
+  "active_task": null,
   "features": [
+    {
+      "id": "project-harness-audit-20260922",
+      "name": "Project progress and agent workflow audit",
+      "description": "Reconcile source progress with current evidence and improve agent instructions, handoff and the project workflow skill without runtime changes.",
+      "status": "complete",
+      "dependencies": [
+        "github-source-refresh-20260911"
+      ],
+      "scope": [
+        "Audit current source baseline and development guidance",
+        "Clarify task ownership and verification levels",
+        "Archive stale handoff and add a project-specific local skill"
+      ],
+      "done_criteria": [
+        "Remote baseline and current regression results recorded",
+        "Current handoff and roadmap entry agree with evidence",
+        "Guidance links, state JSON and local skill validation pass",
+        "Existing unrelated working trees and private runtime data preserved"
+      ]
+    },
     {
       "id": "github-source-refresh-20260911",
       "name": "Consolidated companion source update and GitHub presentation",
+      "description": "Consolidate public source changes and repository presentation; source merge is separate from installer release.",
       "status": "complete",
       "scope": [
         "Publish completed public workspace changes",
@@ -18,6 +40,7 @@
     {
       "id": "galgame-live-acceptance",
       "name": "Live Galgame model acceptance",
+      "description": "Verify five isolated live-model cases and audio validity, without claiming full Electron playback or listening acceptance.",
       "status": "complete",
       "scope": [
         "Synthetic live persona/scene cases without private history",
@@ -31,6 +54,7 @@
     {
       "id": "galgame-character-context-v2",
       "name": "Galgame request-local personalities and reliable per-sentence playback",
+      "description": "Carry request-local personas and sentence performance through the chat path while preserving cancellation.",
       "status": "complete",
       "scope": [
         "Validated character context on real chat requests",
@@ -47,6 +71,7 @@
     {
       "id": "galgame-semantic-direction-v2",
       "name": "Galgame semantic scene and sentence direction with incremental playback",
+      "description": "Validate model-directed sentence and scene metadata and play incremental replies with conservative scene guards.",
       "status": "complete",
       "dependencies": [
         "galgame-character-context-v2"
@@ -64,15 +89,16 @@
         "Browser and regression verification"
       ],
       "limitations": [
-        "Live provider semantic quality and audible TTS not evaluated; browser used deterministic fixture",
-        "Tool-enabled and unsupported streaming-provider paths retain existing buffered fallback",
-        "GPT and Claude currently only neutral/happy/thinking poses",
-        "Existing unrelated full-suite failures recorded in progress.md"
+        "Isolated live-model cases and valid WAV generation were evaluated later; see docs/galgame-live-acceptance.md. Full Electron playback and listening quality remain unverified.",
+        "Tool-enabled and unsupported streaming-provider paths retain existing buffered fallback.",
+        "GPT and Claude currently only have neutral/happy/thinking poses.",
+        "Historical full-suite failures were resolved on the merged baseline; 672 Python tests and the Node runner passed again on 2026-09-22. See docs/project-audit-2026-09-22.md."
       ]
     },
     {
       "id": "galgame-dialogue-v1",
       "name": "Optional Galgame dialogue with emotion sprites",
+      "description": "Provide optional sprite-based dialogue while retaining desktop mode and cancellable sentence playback.",
       "status": "complete",
       "dependencies": [
         "existing chat and TTS",
@@ -1353,178 +1379,6 @@
       ]
     },
     {
-      "id": "local-data-durability-v1",
-      "name": "Local data durability and recovery",
-      "description": "Audit and harden local JSON persistence so interrupted writes do not silently destroy user memory, persona or configuration data.",
-      "status": "complete",
-      "dependencies": [
-        "memory.py persistence helpers",
-        "persona/config state writers",
-        "existing local data formats"
-      ],
-      "scope": [
-        "Preserve existing JSON formats",
-        "Use atomic replace for durable writes where missing",
-        "Keep recoverable backups for user-owned state"
-      ],
-      "done_criteria": [
-        "Core user data writes are atomic",
-        "Corrupt primary files can recover from a valid backup where appropriate",
-        "Existing memory/config tests pass with new durability tests",
-        "Verification evidence is recorded in progress.md"
-      ]
-    },
-    {
-      "id": "electron-dependency-security-v1",
-      "name": "Electron dependency security",
-      "description": "Resolve the high-severity npm audit finding with the smallest compatible Electron upgrade and verify desktop behavior.",
-      "status": "complete",
-      "dependencies": [
-        "package.json and package-lock.json",
-        "Electron main/preload APIs",
-        "installer and UI smoke workflows"
-      ],
-      "scope": [
-        "Identify the exact advisory before upgrading",
-        "Avoid unrelated dependency additions",
-        "Retest Electron windows, preload bridge and packaging"
-      ],
-      "done_criteria": [
-        "npm audit reports no high-severity findings",
-        "Electron and Node frontend smoke tests pass",
-        "Package metadata remains consistent",
-        "Verification evidence is recorded in progress.md"
-      ]
-    },
-    {
-      "id": "renderer-content-security-policy-v1",
-      "name": "Renderer content security policy",
-      "description": "Add a restrictive local-web CSP for Electron chat and model renderers without breaking Live2D, audio, images or local API requests.",
-      "status": "complete",
-      "dependencies": [
-        "web/index.html",
-        "Pixi/Live2D runtime",
-        "local HTTP API and blob/data media"
-      ],
-      "scope": [
-        "Do not enable unsafe-eval",
-        "Allow only resources required by current local functionality",
-        "Verify both chat and model windows in Electron"
-      ],
-      "done_criteria": [
-        "Electron no longer reports a missing or unsafe-eval CSP warning",
-        "Chat UI and Live2D render successfully",
-        "Local API, blob audio and data/blob images remain allowed",
-        "Verification evidence is recorded in progress.md"
-      ]
-    },
-    {
-      "id": "chat-diagnostics-lazy-load-v1",
-      "name": "Chat developer diagnostics lazy loading",
-      "description": "Stop loading large developer-only readiness panels in normal chat sessions while preserving core proactive companionship logic and existing developer flags.",
-      "status": "complete",
-      "dependencies": [
-        "devFeatureLoader.js",
-        "follow-up scheduler core controllers",
-        "advanced diagnostics controls"
-      ],
-      "scope": [
-        "Move only proven developer-panel code behind the existing flag",
-        "Keep proactive scheduling and character cue generation available in normal chat",
-        "Do not alter developer flag semantics"
-      ],
-      "done_criteria": [
-        "Normal chat does not load the readiness panel controller",
-        "Developer chat still loads and operates the readiness panel",
-        "Normal chat and Electron smoke tests pass",
-        "Verification evidence is recorded in progress.md"
-      ]
-    },
-    {
-      "id": "local-http-request-bounds-v1",
-      "name": "Local HTTP request body bounds",
-      "description": "Prevent malformed or oversized local API requests from causing unbounded memory reads while preserving normal chat, audio, and attachment workflows.",
-      "status": "complete",
-      "dependencies": [
-        "app.py HTTP request handler",
-        "chat, ASR, TTS, attachment and configuration routes"
-      ],
-      "scope": [
-        "Reject invalid and oversized Content-Length before reading the body",
-        "Use route-appropriate limits",
-        "Keep API token and loopback security behavior unchanged"
-      ],
-      "done_criteria": [
-        "Oversized JSON and binary requests receive a bounded 413 response",
-        "Invalid Content-Length receives a controlled 400 response",
-        "Normal API route tests remain green",
-        "Verification evidence is recorded in progress.md"
-      ]
-    },
-    {
-      "id": "release-advisory-semantics-v1",
-      "name": "Release advisory semantics",
-      "description": "Keep optional demo-service availability visible without making the default release gate depend on transient local services.",
-      "status": "complete",
-      "dependencies": [
-        "scripts/check_release_readiness.ps1",
-        "scripts/check_demo_readiness.py"
-      ],
-      "scope": [
-        "Do not modify the user's TTS provider or fallback preference",
-        "Keep a strict opt-in path for public demo recording",
-        "Default release validation must remain deterministic"
-      ],
-      "done_criteria": [
-        "Default release gate reports unavailable demo services without failing",
-        "Strict demo readiness mode still fails on blockers",
-        "Acceptance tests cover both paths",
-        "Verification evidence is recorded in progress.md"
-      ]
-    },
-    {
-      "id": "release-privacy-scan-v1",
-      "name": "Release privacy and secret-scan reliability",
-      "description": "Make release privacy checks distinguish real private artifacts from safe repository documentation while keeping secret detection fail-closed.",
-      "status": "complete",
-      "dependencies": [
-        "scripts/check_secrets.py",
-        "release documentation and state artifacts"
-      ],
-      "scope": [
-        "Do not weaken API-key or credential detection",
-        "Detect user-specific absolute paths that would leak in packaged artifacts",
-        "Keep repository state documentation practical for local development"
-      ],
-      "done_criteria": [
-        "Secret scan passes on safe tracked project content",
-        "Synthetic credentials and private path fixtures are still rejected",
-        "Release checks no longer fail solely on documented verification paths",
-        "Verification evidence is recorded in progress.md"
-      ]
-    },
-    {
-      "id": "hermetic-test-stability-v1",
-      "name": "Hermetic local test stability",
-      "description": "Remove workstation credential dependencies from local probe tests without weakening production authentication checks.",
-      "status": "complete",
-      "dependencies": [
-        "MiMo lightweight probe tests",
-        "production LLM authentication guard"
-      ],
-      "scope": [
-        "Keep production API-key validation unchanged",
-        "Use explicit fake credentials only inside tests",
-        "Make the full Python suite reproducible on a clean machine"
-      ],
-      "done_criteria": [
-        "MiMo reasoning-budget probe test passes without environment API keys",
-        "Missing-key production guard tests still pass",
-        "Full Python test suite passes",
-        "Verification evidence is recorded in progress.md"
-      ]
-    },
-    {
       "id": "frontend-runtime-efficiency-v1",
       "name": "Frontend view loading and idle runtime efficiency",
       "description": "Reduce default frontend script work and idle cross-window speech traffic while preserving the current chat/model URLs and behavior.",
@@ -2092,29 +1946,6 @@
       ]
     },
     {
-      "id": "turn-playback-generation-continuity-v1",
-      "name": "Per-turn browser playback generation continuity v1",
-      "description": "Keep actual Browser TTS and server-to-browser fallback playback events attached to their current assistant turn so canonical Live2D speech timing is not discarded as stale.",
-      "status": "complete",
-      "dependencies": [
-        "chat reply playback lifecycle",
-        "ttsPlaybackController browser speech callbacks",
-        "canonical performance timeline and split-window speech bridge"
-      ],
-      "scope": [
-        "Preserve a current turn's identity across the expected Browser TTS generation increment",
-        "Cover direct Browser TTS and server-TTS fallback-to-browser delivery",
-        "Retain strict rejection for interrupted, superseded, stale-session, and genuinely old playback callbacks",
-        "Do not change TTS providers, provider configuration, backend routes, memory, permissions, or model assets"
-      ],
-      "done_criteria": [
-        "Actual Browser TTS playback starts one canonical speech timeline and post-settle path for the current turn",
-        "Server-to-browser fallback receives the same current-turn performance lifecycle",
-        "Interrupted or superseded Browser callbacks cannot revive an old turn",
-        "Focused playback/turn/bridge regressions and full verification evidence are recorded"
-      ]
-    },
-    {
       "id": "cancelled-playback-settlement-v1",
       "name": "Cancelled playback promise settlement v1",
       "description": "Settle cancelled audio playback promises promptly so interrupted or superseded speech cannot hold microphone pause leases or chat-turn cleanup for the old timeout window.",
@@ -2158,31 +1989,6 @@
         "Fallback, cancellation, failure, and missing-stage states are distinguishable without conversation content",
         "Normal non-developer views do not load the diagnostics module or show its control",
         "Focused diagnostics regressions and full verification evidence are recorded"
-      ]
-    },
-    {
-      "id": "realtime-tts-performance-sync-v1",
-      "name": "Realtime TTS performance sync v1",
-      "description": "Keep streamed server-TTS speech, Live2D talk gestures, and performance timelines synchronized to actual audible playback instead of mutable text or queued synthesis work.",
-      "status": "complete",
-      "dependencies": [
-        "stream TTS queue",
-        "TTS playback onPlaybackStart contract",
-        "companion performance timeline"
-      ],
-      "scope": [
-        "Carry a once-only actual-playback callback through each realtime queue item",
-        "Start speaking motion and speech timeline only after HTML audio onplay or AudioContext source.start",
-        "Keep pre-reaction/thinking available while synthesis is pending",
-        "Discard cancelled, failed, stale, or interrupted segments without triggering speaking motion",
-        "Do not change TTS providers, private configuration, permissions, or network behavior"
-      ],
-      "done_criteria": [
-        "Enqueueing text or receiving a TTS blob does not start talk gestures or speech timeline",
-        "The first real playback event starts the stream speech timeline and talk gesture exactly once",
-        "Late, failed, cancelled, and stale realtime segments cannot start a speaking performance",
-        "Direct and companion-turn speech paths remain compatible",
-        "Focused realtime queue/performance tests and full verification evidence are recorded"
       ]
     },
     {
