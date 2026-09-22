@@ -320,6 +320,8 @@ async function getChatInfo(win) {
       advancedHidden: !!byId("advanced-actions")?.hidden,
       onboardingHidden: !!byId("onboarding-modal")?.hidden,
       inputRect: rect(byId("chat-input")),
+      conversationDecorations: Array.from(document.querySelectorAll(".conversation-identity img"))
+        .map(rect),
       logText: byId("chat-log")?.innerText?.slice(-1200) || ""
     };
   })()`);
@@ -730,8 +732,9 @@ async function runV14DemoSmoke(win, results) {
   const scenes = [];
   for (const scene of V14_DEMO_SCENES) {
     const before = await sendInput(win, scene.input);
-    const messages = await waitForAssistantMessage(win, before, "", 70000, `v1.4 demo scene ${scene.id}`);
+    await waitForAssistantMessage(win, before, "", 70000, `v1.4 demo scene ${scene.id}`);
     await waitForChatIdle(win, 45000);
+    const messages = await getAssistantMessages(win);
     const reply = String(messages[messages.length - 1] || "");
     const snapshot = await getLastBrainSnapshot(win);
     scenes.push(buildV14DemoSceneReport(scene, reply, snapshot));
@@ -762,9 +765,15 @@ async function runDebugCommandSmoke(win, results) {
   };
   await waitForChatIdle(win, 15000);
 
-  const beforeDoctor = await sendInput(win, "/doctor");
-  const doctorMessages = await waitForAssistantMessage(win, beforeDoctor, "故障自检完成", 45000, "/doctor report");
-  const doctorText = String(doctorMessages[doctorMessages.length - 1] || doctorMessages.join("\n"));
+  await sendInput(win, "/doctor");
+  // Diagnostics now finish in their own panel, not as an assistant message.
+  const doctorPanel = await poll(win, `(() => ({
+    visible: document.getElementById("doctor-modal")?.hidden === false,
+    state: document.getElementById("doctor-dialog")?.dataset?.doctorState || "",
+    report: document.getElementById("doctor-report-output")?.textContent || ""
+  }))()`, value => value?.visible && ["complete", "error"].includes(value.state),
+  55000, "/doctor panel report");
+  const doctorText = String(doctorPanel.report || "");
   const doctorTokenLeak = /(?:api[_-]?key|token)\s*[:=]\s*[\w.-]{12,}/i.test(doctorText);
   results.doctor = {
     ok: doctorText.includes("故障自检完成") && !doctorTokenLeak,
@@ -772,16 +781,22 @@ async function runDebugCommandSmoke(win, results) {
     tokenLeak: doctorTokenLeak,
     reportTail: doctorText.slice(-1000)
   };
+  await evalIn(win, `document.getElementById("doctor-close-btn")?.click()`);
 }
 
 async function runChatSmoke(win, results) {
   if (!SKIP_CHAT && CHAT_TEXT) {
+    const startedAt = Date.now();
     const beforeChat = await sendInput(win, CHAT_TEXT);
-    const messages = await waitForAssistantMessage(win, beforeChat, "", REAL_CHAT_REPLY_TIMEOUT_MS, "normal chat reply");
+    await waitForAssistantMessage(win, beforeChat, "", REAL_CHAT_REPLY_TIMEOUT_MS, "normal chat reply");
+    const firstVisibleMs = Date.now() - startedAt;
     await waitForChatIdle(win, 30000);
+    const messages = await getAssistantMessages(win);
     const lastAssistant = String(messages[messages.length - 1] || "");
     results.normalChat = {
       ok: !isErrorReply(lastAssistant),
+      firstVisibleMs,
+      completedMs: Date.now() - startedAt,
       lastAssistant: lastAssistant.slice(0, 1000)
     };
     results.screenshots.push(await capture(win, "chat-after-normal-message.png"));
@@ -913,6 +928,9 @@ async function main() {
     if (!results.chat.chatInput || !results.chat.sendBtn || !results.chat.chatLog) {
       failures.push("chat controls missing");
     }
+    if ((results.chat.conversationDecorations || []).some(rect => rect.width > 40 || rect.height > 40)) {
+      failures.push("oversized conversation decoration obscures the chat history");
+    }
     if (
       !results.morePanel?.advanced
       || results.morePanel.advanced.hidden
@@ -953,6 +971,9 @@ async function main() {
     }
     if (!results.doctor.ok || results.doctor.tokenLeak) {
       failures.push("/doctor report missing or leaked sensitive token-like text");
+    }
+    if (results.chatTextSent && !results.doctor.coreOk) {
+      failures.push("real model/voice diagnostics reported an unhealthy dependency");
     }
     if (!results.feedback.goodResponded || !results.feedback.badResponded) {
       failures.push("feedback buttons did not respond");

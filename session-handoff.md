@@ -2,28 +2,23 @@
 
 ## Current state — 2026-09-22
 
-- 当前任务 `memory-log-tail-efficiency-v1` 已完成，active_task null。
-- 目录 `D:/AI/ai_desktop_pet_harness_20260922`；分支 `codex/memory-log-read-efficiency-20260922`；基线 `887bc80`。
-- 前轮文档审查 `732957b`、Live2D 联动 `f28553c`、对话流修复 `887bc80` 均为本地提交。本轮没有推送、合并、发布或替换正在运行的桌宠。
-- 原日常脏工作区及私人配置/记忆保持原状。
+- 本轮 `daily-runtime-acceptance-v1` 限定范围审查及修复完成，active_task null；日常响应稳定性未判定通过。
+- 目录 `D:/AI/ai_desktop_pet_harness_20260922`；分支 `codex/daily-runtime-acceptance-20260922`；基线 `6c85822`。
+- 前轮本地提交：文档 732957b、Live2D f28553c、流完整性 887bc80、记忆日志 6c85822。均未推送/部署。
 
-## Files touched
+## Files touched / Evidence
 
-- `memory_store.py`：从日志末尾分块读取最近记录，修复零/负数限制返回全量。
-- `tests/test_memory_store_tail.py`：读取预算、BOM、换行、长行、多字节、异常记录回归。
-- `docs/memory-log-efficiency-2026-09-22.md`、`feature_list.json`、`progress.md`、本文件：证据及续接状态。
+- web/phosphorIcons.css：修复分离聊天窗口放大装饰图遮挡消息。
+- scripts/electron_ui_smoke.js：适配独立自检面板、检查真实依赖与图片尺寸、重新读取流式最终回复、记录耗时。
+- docs/daily-runtime-acceptance-2026-09-22.md 及三份状态文件：完整证据与限制。
+- 生产 Electron 启动成功，真实 LLM 多轮返回、Qwen3-TTS 生成非静音音频，流中断后的新请求恢复成功；最终 Electron smoke ok=true。
+- 全 Node 套件与 JS 语法通过。未修改 Python 运行时，不重复声称新的 Python 全量结果。
+- 测试进程已关闭，8123/9881 无监听；本轮 config.json/.env 副本已删除。原日常工作区/凭据/记忆未覆盖。忽略目录 tmp_ui_smoke 保留本轮截图、合成测试音频及本地日志。
 
-## Verification Evidence
+## Remaining acceptance
 
-- 修改前 3 项回归失败、9 项通过；修改后相关记忆/Obsidian 回归 69 项通过。其后补充长行测试，新增套件共 15 项全部通过。
-- 12,650,018 字节合成日志取末两条时读取不超过 8,192 字节，未使用私人数据。
-- Python 语法 158 文件通过；最终 JSON、差异与秘密扫描记录见 progress.md。
-- 本轮没有重新运行全量前端/整机门禁；前轮 679 项 Python 与全前端通过仅为历史证据。
-
-## Limits / Next Session
-
-- 纯 CR 旧日志兼容但仍扫描全文件；超长记录的读取量由记录长度决定。读取不是并发写入的强一致快照。
-- 未修改备份和写入逻辑，未改变配置格式，未升级依赖。其他模块阅读不等于完整验收。
-- 真实 Electron + LLM + TTS 听评和安装包验收仍待完成。不要用隔离代码覆盖日常工作区的未提交功能或私人配置。
-- 先前报告：docs/runtime-stability-audit-2026-09-22.md、docs/live2d-expressive-speech.md、docs/project-audit-2026-09-22.md。
-- QQ 仍 in_progress，发布首跑仍 maintenance；不自动开展历史事项。
+- 模型连接波动显著：曾约 10 秒断连，完整回复有约 10 秒到一分钟以上；最新轮 33.7 秒。单轮成功不能当作稳定验收。
+- 比较模型/连接需用户选择，不永久改变日常模型。当前配置 character_runtime 未开启，本轮不证明全部动作联动在实际配置生效。
+- 麦克风打断、人工听评、音画同步、小时级运行及安装包验收仍待完成。HTTP 取消测试不等于真实说话打断。
+- 桌面控制工具初始化失败，用仓库 Electron 脚本验证并检查截图；脚本的窗口 IPC 是测试替身，生产窗口操作未全覆盖。
+- QQ 和旧发布事项保持原状态；不要自动开展或覆盖原脏工作区。

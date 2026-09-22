@@ -2,6 +2,24 @@
   "active_task": null,
   "features": [
     {
+      "id": "daily-runtime-acceptance-v1",
+      "name": "Daily Electron runtime acceptance",
+      "description": "Bounded real-runtime audit and UI/acceptance fixes completed; variable model latency, listening and long-duration acceptance remain pending.",
+      "status": "complete",
+      "dependencies": [],
+      "scope": [
+        "Isolated production Electron startup",
+        "Real LLM and TTS acceptance",
+        "Cancellation and repeated-turn readiness",
+        "Repair split-chat decoration overflow and stale smoke diagnostics"
+      ],
+      "done_criteria": [
+        "Real runtime results recorded without exposing credentials",
+        "Any discovered blockers fixed or explicitly left pending",
+        "No daily memory/configuration overwritten"
+      ]
+    },
+    {
       "id": "memory-log-tail-efficiency-v1",
       "name": "Bound recent memory log reads",
       "description": "Read recent learning audit/shadow entries from the tail without loading the complete LF/CRLF log.",
