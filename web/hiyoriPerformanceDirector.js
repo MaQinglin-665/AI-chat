@@ -563,6 +563,7 @@
           mode: "idle",
           requestedMode: "idle",
           requestedModeUntil: 0,
+          requestedModeSource: "",
           modeWeights: { idle: 1, listen: 0, think: 0, speak: 0 },
           emotionWeights: { happy: 0, sad: 0, angry: 0, surprised: 0, thinking: 0 },
           action: null,
@@ -614,6 +615,7 @@
       const director = ensureState(now);
       director.requestedMode = normalizeMode(mode);
       director.requestedModeUntil = now + clamp(Number(opts.holdMs) || 0, 0, 12000);
+      director.requestedModeSource = String(opts.source || "runtime");
       return director.requestedMode;
     }
 
@@ -869,6 +871,21 @@
       const director = ensureState();
       director.speechRhythm = createSpeechRhythm();
       director.deliveryWeights = {};
+      const cancelledNames = new Set();
+      for (const slot of ["action", "outgoingAction"]) {
+        if (director[slot]?.source === "speech_cue") {
+          cancelledNames.add(director[slot].name);
+          director[slot] = null;
+        }
+      }
+      for (const name of cancelledNames) {
+        if (director.action?.name !== name) delete director.cooldowns[name];
+      }
+      if (director.requestedModeSource === "speech_cue") {
+        director.requestedMode = "idle";
+        director.requestedModeUntil = 0;
+        director.requestedModeSource = "";
+      }
       // Keep channel inertia: interruption releases smoothly instead of snapping.
     }
 

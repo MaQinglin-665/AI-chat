@@ -693,14 +693,12 @@
     }
 
     function applySpeechPerformanceCue(cue = null) {
+      // Direct cues are finite reactions. Only beginSpeechAnimation binds a
+      // cue to real playback; receiving a cue alone cannot keep it alive.
+      state.speechPerformancePlaybackGeneration = null;
       const normalized = normalizeSpeechPerformanceCue(cue);
       if (!normalized) {
-        state.speechPerformanceCue = null;
-        state.speechPerformanceCueUntil = 0;
-        state.speechEmotionPose = null;
-        state.speechEmotionPoseUntil = 0;
-        setThinkingCueSymbolVisible(false, 0);
-        clearHiyoriEmotionOverlay();
+        clearSpeechPerformanceCue();
         return null;
       }
       const now = performance.now();
@@ -792,7 +790,7 @@
         }
       }
       if (normalized.emotion === "thinking") {
-        requestPerformanceMode("think", { now, holdMs: normalized.holdMs });
+        requestPerformanceMode("think", { now, holdMs: normalized.holdMs, source: "speech_cue" });
       }
       applyLive2DModelExpression(selectModelExpressionName(normalized), "performance_cue");
       return normalized;
@@ -821,6 +819,15 @@
       if (!cue) {
         return null;
       }
+      const playbackOwned = state.uiView !== "model"
+        && state.speechPerformancePlaybackGeneration != null
+        && Number(state.speechPerformancePlaybackGeneration) === Number(state.ttsPlaybackGeneration || 0);
+      if (playbackOwned && isSpeakingNow()) {
+        // A short semantic hold must not expire halfway through a long WAV or
+        // PCM stream. Remote windows still obey the sender's bounded lease.
+        state.speechPerformanceCueUntil = Math.max(Number(state.speechPerformanceCueUntil || 0), now + 900);
+        state.speechEmotionPoseUntil = Math.max(Number(state.speechEmotionPoseUntil || 0), now + 900);
+      }
       if (now > Number(state.speechPerformanceCueUntil || 0)) {
         clearSpeechPerformanceCue();
         return null;
@@ -829,6 +836,30 @@
     }
 
     function clearSpeechPerformanceCue() {
+      // Model-only windows receive cue clears through the broadcast bridge,
+      // without calling the local audio controller's endSpeechAnimation.
+      hiyoriPerformanceDirector?.stopSpeech?.();
+      const authoredMotion = state.hiyoriAuthoredMotion;
+      if (authoredMotion) {
+        const manager = (state.hiyoriAuthoredMotionModel || state.model)?.internalModel?.motionManager;
+        try {
+          // The public method also resets Cubism's pending reservation, so a
+          // lazy-loaded clip cannot begin after its speech has been cancelled.
+          if (typeof manager?.stopAllMotions === "function") manager.stopAllMotions();
+          else manager?._stopAllMotions?.();
+        } catch (_) {
+          // Expression cleanup must remain safe when a model is unloading.
+        }
+        const cooldownKey = authoredMotion.cooldownKey || `hiyori:${authoredMotion.group}`;
+        if (state.motionKeyedCooldowns) delete state.motionKeyedCooldowns[cooldownKey];
+      }
+      state.hiyoriAuthoredMotionToken = Number(state.hiyoriAuthoredMotionToken || 0) + 1;
+      state.hiyoriAuthoredMotion = null;
+      state.hiyoriAuthoredMotionModel = null;
+      state.hiyoriAuthoredMotionUntil = 0;
+      state.hiyoriSemanticCueSignature = "";
+      state.hiyoriSemanticCueAt = 0;
+      state.speechPerformancePlaybackGeneration = null;
       state.speechPerformanceCue = null;
       state.speechPerformanceCueUntil = 0;
       state.speechPerformanceAccentDebug = null;
@@ -1085,6 +1116,9 @@
       state.speechAnimStyle = normalizeTalkStyle(style || state.currentTalkStyle || "neutral");
       state.speechAnimMood = String(mood || detectMood(cleaned) || "idle");
       const speechPerformanceCue = applySpeechPerformanceCue(opts.performanceCue || null);
+      if (speechPerformanceCue && state.uiView !== "model") {
+        state.speechPerformancePlaybackGeneration = Number(state.ttsPlaybackGeneration || 0);
+      }
       if (speechPerformanceCue?.live2dMood) {
         state.speechAnimMood = speechPerformanceCue.live2dMood;
       }
@@ -1093,20 +1127,8 @@
 
     function endSpeechAnimation() {
       hiyoriPerformanceDirector?.stopSpeech?.();
-      const authoredMotion = state.hiyoriAuthoredMotion;
-      const authoredGeneration = Number(authoredMotion?.playbackGeneration || 0);
-      if (
-        authoredMotion
-        && (!authoredGeneration || authoredGeneration === Number(state.ttsPlaybackGeneration || 0))
-      ) {
-        try {
-          state.model?.internalModel?.motionManager?._stopAllMotions?.();
-        } catch (_) {
-          // Interruption cleanup is best-effort; audio cancellation must win.
-        }
-      }
-      state.hiyoriAuthoredMotion = null;
-      state.hiyoriAuthoredMotionUntil = 0;
+      state.hiyoriSemanticCueSignature = "";
+      state.hiyoriSemanticCueAt = 0;
       state.speechAnimUntil = 0;
       state.speechAnimStartedAt = 0;
       state.speechAnimDurationMs = 0;
@@ -1123,6 +1145,7 @@
     }
 
     function finishSpeechAnimation() {
+      state.speechPerformancePlaybackGeneration = null;
       const now = performance.now();
       const releaseMs = 260;
       const holdMs = 900;
@@ -2193,6 +2216,7 @@
       estimateSpeechAnimationDurationMs,
       beginSpeechAnimation,
       applySpeechPerformanceCue,
+      getActiveSpeechPerformanceCue,
       clearSpeechPerformanceCue,
       endSpeechAnimation,
       finishSpeechAnimation,

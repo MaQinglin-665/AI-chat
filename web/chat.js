@@ -4337,6 +4337,10 @@ function applySpeechPerformanceCue(cue = null) {
     : null;
 }
 
+function getActiveSpeechPerformanceCue(now = performance.now()) {
+  return getLive2DExpressionController().getActiveSpeechPerformanceCue(now);
+}
+
 let actionPlanControllerInstance = null;
 
 function getActionPlanController() {
@@ -5101,6 +5105,7 @@ function getAppStartupController() {
       isSpeechMotionActive,
       isSpeakingNow,
       getSpeechAnimationMouthOpen,
+      getActiveSpeechPerformanceCue,
       applySpeechPerformanceCue,
       resolvePerformanceCueMotionPlan,
       tryBuiltInMotion,

@@ -2,6 +2,25 @@
   "active_task": null,
   "features": [
     {
+      "id": "speech-performance-lifecycle-v1",
+      "name": "Bind speech performance to audible playback",
+      "description": "Review reusable GitHub frameworks and keep sentence delivery alive during playback while cancelling only speech-owned gestures.",
+      "status": "complete",
+      "dependencies": ["live2d-expressive-speech-v1"],
+      "scope": [
+        "GitHub source and license comparison",
+        "Long sentence cue lifetime and split-window propagation",
+        "Speech-owned gesture cancellation and next sentence readiness"
+      ],
+      "done_criteria": [
+        "Reuse decisions cite checked upstream source and licenses",
+        "Audible long sentences retain their delivery without renewing stale remote packets",
+        "Cancellation stops old authored and semantic speech motions while preserving independent reactions",
+        "Next sentence can perform the same cue and lifecycle regressions pass",
+        "Actual-model visual validation and remaining listening limits are recorded"
+      ]
+    },
+    {
       "id": "refined-chat-ui-v1",
       "name": "Refined anime chat interface",
       "description": "Preserve existing character art and pink-purple palette while reducing chrome and prioritizing readable chat.",
