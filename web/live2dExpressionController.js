@@ -119,13 +119,14 @@
       if (!core || !hiyoriPerformanceDirector || !isHiyoriPerformanceProfile()) {
         return null;
       }
-      const sample = hiyoriPerformanceDirector.sample(context);
       const now = Number(context.now || performance.now());
       const authoredMotionActive = now <= Number(state.hiyoriAuthoredMotionUntil || 0)
         && (
           !Number(state.hiyoriAuthoredMotion?.playbackGeneration || 0)
           || Number(state.hiyoriAuthoredMotion.playbackGeneration) === Number(state.ttsPlaybackGeneration || 0)
         );
+      const sample = hiyoriPerformanceDirector.sample({ ...context, authoredMotionActive,
+        speechGestureAllowed: context.speechGestureAllowed !== false && state.motionEnabled !== false });
       for (const id in (sample.parameters || {})) {
         const value = sample.parameters[id];
         const face = /Eye|Brow|Mouth|Cheek/.test(id);
@@ -156,6 +157,9 @@
           delivery: sample.delivery,
           speechAccent: sample.speechAccent,
           speechAccentCount: sample.speechAccentCount,
+          speechGesture: sample.speechGesture,
+          speechGestureCount: sample.speechGestureCount,
+          speechGestureRestUntil: sample.speechGestureRestUntil,
           action: sample.action,
           outgoingAction: sample.outgoingAction,
           idle: sample.idle,

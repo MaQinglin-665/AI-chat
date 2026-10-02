@@ -21,6 +21,7 @@ const tests = [
   "tests/test_hiyori_performance_director_frontend.js",
   "tests/test_live2d_expressive_speech.js",
   "tests/test_speech_performance_lifecycle.js",
+  "tests/test_speech_gesture_variation.js",
   "tests/test_tts_playback_start_frontend.js",
   "tests/test_behavior_director_frontend.js",
   "tests/test_behavior_performance_bridge_frontend.js",

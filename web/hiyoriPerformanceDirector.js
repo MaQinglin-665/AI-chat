@@ -28,6 +28,69 @@
     return DELIVERY_KEYS.includes(key) ? key : "neutral";
   }
 
+  const SPEECH_GESTURE_POSES = {
+    nod: { ParamAngleY: -3.4, ParamBodyAngleY: 2, ParamShoulder: 0.08 },
+    small_nod: { ParamAngleY: -1.8, ParamBodyAngleY: 1.2, ParamShoulder: 0.05 },
+    question_tilt: { ParamAngleZ: -3.5, ParamAngleX: 1.2, ParamBodyAngleX: -0.6, ParamBodyAngleZ: 0.7 },
+    open_explain: { ParamBodyAngleY: 1.8, ParamShoulder: 0.08, ParamArmLA: 0.75, ParamArmRA: -0.45 },
+    light_lift: { ParamAngleY: -1.4, ParamBodyAngleY: 2.6, ParamShoulder: 0.16, ParamArmLA: 0.6, ParamArmRA: -0.6 },
+    soft_lean: { ParamAngleY: 1.1, ParamBodyAngleY: 1.4, ParamBodyAngleX: -0.5, ParamShoulder: -0.025 }
+  };
+  const SPEECH_GESTURE_POOLS = {
+    neutral: ["nod", "open_explain", "question_tilt"],
+    happy: ["light_lift", "open_explain", "nod"],
+    excited: ["light_lift", "open_explain", "nod"],
+    playful: ["question_tilt", "light_lift", "open_explain"],
+    thinking: ["question_tilt", "small_nod", "open_explain"],
+    serious: ["open_explain", "nod"],
+    surprised: ["question_tilt", "small_nod"],
+    angry: ["nod", "open_explain"],
+    sad: ["soft_lean", "small_nod"],
+    hurt: ["soft_lean", "small_nod"],
+    anxious: ["soft_lean", "small_nod"],
+    shy: ["soft_lean", "small_nod"]
+  };
+
+  function createSpeechGestures() {
+    return { active: null, history: [], restUntil: 0, lastRhythmCount: 0, count: 0 };
+  }
+
+  function sampleSpeechGesture(gestures, rhythm, delivery, now, active, blocked) {
+    if (!active) {
+      gestures.active = null;
+      gestures.lastRhythmCount = 0;
+      return 0;
+    }
+    if (gestures.active && (now >= gestures.active.endsAt || gestures.active.delivery !== delivery || blocked)) {
+      gestures.active = null;
+    }
+    if (rhythm.count !== gestures.lastRhythmCount) {
+      // Consume every detected rise, even while resting or an explicit motion
+      // owns the model. Skipped emphasis must never play late in a quiet gap.
+      gestures.lastRhythmCount = rhythm.count;
+      if (!blocked && now >= gestures.restUntil) {
+        const pool = SPEECH_GESTURE_POOLS[delivery] || SPEECH_GESTURE_POOLS.neutral;
+        const recent = gestures.history.slice(-2);
+        let choices = pool.filter((name) => !recent.includes(name));
+        if (!choices.length) choices = pool.filter((name) => name !== recent.at(-1));
+        if (!choices.length) choices = pool;
+        const name = choices[0];
+        const soft = ["sad", "hurt", "anxious", "shy"].includes(delivery);
+        const bright = ["happy", "playful", "excited"].includes(delivery);
+        gestures.active = { name, delivery, startedAt: rhythm.lastBeatAt, endsAt: rhythm.lastBeatAt + 620,
+          strength: rhythm.strength * (soft ? 0.32 : (bright ? 1.2 : 0.85)) };
+        gestures.restUntil = now + (soft ? 1900 : 1500);
+        gestures.history.push(name);
+        gestures.history = gestures.history.slice(-6);
+        gestures.count += 1;
+      }
+    }
+    const gesture = gestures.active;
+    const phase = gesture ? (now - gesture.startedAt) / 620 : -1;
+    return phase >= 0 && phase < 1
+      ? Math.pow(Math.sin(Math.PI * phase), 2) * gesture.strength : 0;
+  }
+
   function createSpeechRhythm() {
     return { fast: 0, floor: 0, armed: true, lastBeatAt: -Infinity, strength: 0, count: 0, hasSignal: false };
   }
@@ -577,6 +640,7 @@
           speechDrive: 0,
           deliveryWeights: {},
           speechRhythm: createSpeechRhythm(),
+          speechGestures: createSpeechGestures(),
           channelStates: {},
           rejectedActions: 0
         };
@@ -708,13 +772,20 @@
       const audible = context.audioActive === undefined ? context.speaking === true : context.audioActive === true;
       const speechActive = mode === "speak" && audible;
       const generation = context.playbackGeneration;
+      const gestures = director.speechGestures || (director.speechGestures = createSpeechGestures());
       if (generation !== undefined && generation !== director.playbackGeneration) {
         director.speechRhythm = createSpeechRhythm();
+        gestures.active = null;
+        gestures.lastRhythmCount = 0;
         director.playbackGeneration = generation;
       }
       const rhythm = director.speechRhythm || (director.speechRhythm = createSpeechRhythm());
       const audio = clamp(Number(context.audioLevel) || 0, 0, 1);
       const beat = sampleSpeechRhythm(rhythm, audio, now, elapsedMs, speechActive);
+      const gestureBlocked = context.authoredMotionActive === true || context.speechGestureAllowed === false
+        || !!(director.action && now < director.action.endsAt)
+        || !!(director.outgoingAction && now < director.outgoingAction.releaseEndsAt);
+      const gestureWeight = sampleSpeechGesture(gestures, rhythm, delivery, now, speechActive, gestureBlocked);
       const deliveryWeights = director.deliveryWeights || (director.deliveryWeights = {});
       updateWeights(deliveryWeights, speechActive ? delivery : "neutral", DELIVERY_KEYS,
         1 - Math.exp(-Math.min(elapsedMs, 120) / 180), 1 - Math.exp(-Math.min(elapsedMs, 120) / 260));
@@ -736,19 +807,7 @@
         addPose(parameters, DELIVERY_POSES[key], (deliveryWeights[key] || 0) * motionGain * deliveryIntensity);
       }
       if (speechActive) {
-        // A steady loud sound produces one accent, not a repeated gesture.
-        // Quiet/comforting delivery retains readable posture without bouncing.
-        const soft = ["sad", "hurt", "anxious", "shy"].includes(delivery);
-        const bright = ["happy", "playful", "excited"].includes(delivery);
-        const accent = beat * motionGain * deliveryIntensity * (soft ? 0.32 : (bright ? 1.2 : 0.85));
-        addPose(parameters, {
-          ParamAngleY: -3.4 * accent,
-          ParamAngleZ: (delivery === "playful" ? -2.2 : 0.8) * accent,
-          ParamBodyAngleY: (delivery === "surprised" ? -2.7 : 2.8) * accent,
-          ParamShoulder: 0.12 * accent,
-          ParamArmLA: 0.55 * accent,
-          ParamArmRA: -0.45 * accent
-        });
+        addPose(parameters, SPEECH_GESTURE_POSES[gestures.active?.name], gestureWeight * motionGain * deliveryIntensity);
       }
 
       if (mode === "speak" && audible) {
@@ -854,6 +913,10 @@
         delivery,
         speechAccent: beat,
         speechAccentCount: rhythm.count,
+        speechGesture: gestures.active?.name || "",
+        speechGestureCount: gestures.count,
+        speechGestureRestUntil: gestures.restUntil,
+        speechGestureHistory: gestures.history.slice(),
         action: director.action?.name || "",
         outgoingAction: director.outgoingAction?.name || "",
         idle: director.idleActive?.name || "",
@@ -871,6 +934,10 @@
       const director = ensureState();
       director.speechRhythm = createSpeechRhythm();
       director.deliveryWeights = {};
+      if (director.speechGestures) {
+        director.speechGestures.active = null;
+        director.speechGestures.lastRhythmCount = 0;
+      }
       const cancelledNames = new Set();
       for (const slot of ["action", "outgoingAction"]) {
         if (director[slot]?.source === "speech_cue") {
@@ -893,6 +960,8 @@
   }
 
   const api = {
+    SPEECH_GESTURE_POSES,
+    SPEECH_GESTURE_POOLS,
     MODES,
     EMOTIONS,
     MODE_POSES,

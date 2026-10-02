@@ -2,6 +2,26 @@
   "active_task": null,
   "features": [
     {
+      "id": "speech-gesture-variation-v1",
+      "name": "Speech gesture variation and rest windows",
+      "description": "Choose bounded delivery-aware gestures from real audio rises, retain short rest and recent history across sentences, and validate fixed local TTS lines.",
+      "status": "complete",
+      "dependencies": ["speech-performance-lifecycle-v1"],
+      "scope": [
+        "Hiyori audio-linked gesture variety and recent repetition reduction",
+        "Rest windows without delaying speech",
+        "Preserve explicit motion, lip sync and interruption ownership",
+        "Fixed-line local TTS and real-model verification"
+      ],
+      "done_criteria": [
+        "Delivery-specific gesture selection varies during speech without repeating the previous gesture",
+        "Short sentences and playback generation changes cannot bypass rest windows",
+        "Silence, interruption and explicit motions do not queue stale gestures",
+        "Old configuration and existing regression tests remain compatible",
+        "Real audio samples or concrete generation limitations are recorded without claiming human listening QA"
+      ]
+    },
+    {
       "id": "speech-performance-lifecycle-v1",
       "name": "Bind speech performance to audible playback",
       "description": "Review reusable GitHub frameworks and keep sentence delivery alive during playback while cancelling only speech-owned gestures.",
