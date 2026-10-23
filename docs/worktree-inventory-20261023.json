@@ -1,0 +1,90 @@
+[
+  {
+    "path": "D:/AI/ai_desktop_pet",
+    "head": "b56dbfe14f46b4c7e9305b085fffb70856fe5143",
+    "merged_into_verified_main": true,
+    "changed_entries": 104,
+    "ignored_entries": 21510,
+    "action": "retained: preserve existing paths, local data and branch work"
+  },
+  {
+    "path": "<user-home>/.config/superpowers/worktrees/ai_desktop_pet/xinyu-original-live2d-v1",
+    "head": "77ed829764607d4b72917bf132ffff850af632e3",
+    "merged_into_verified_main": true,
+    "changed_entries": 0,
+    "ignored_entries": 1041,
+    "action": "retained: preserve existing paths, local data and branch work"
+  },
+  {
+    "path": "D:/AI/_persona_clean",
+    "head": "48f368bfb603d7da41c4efa8775199f3ec02f89b",
+    "merged_into_verified_main": false,
+    "changed_entries": 0,
+    "ignored_entries": 32,
+    "action": "retained: preserve existing paths, local data and branch work"
+  },
+  {
+    "path": "D:/AI/ai_desktop_pet_github_workflow_cleanup",
+    "head": "3120e5a41b4b5eea1329b27e78be17ff55dd023f",
+    "merged_into_verified_main": false,
+    "changed_entries": 0,
+    "ignored_entries": 0,
+    "action": "retained: preserve existing paths, local data and branch work"
+  },
+  {
+    "path": "D:/AI/ai_desktop_pet_harness_20260922",
+    "head": "e6b847adcaeff0d600a42488116cdc3756444e13",
+    "merged_into_verified_main": false,
+    "changed_entries": 0,
+    "ignored_entries": 452,
+    "action": "retained: preserve existing paths, local data and branch work"
+  },
+  {
+    "path": "D:/AI/ai_desktop_pet_publish_20260911",
+    "head": "b56dbfe14f46b4c7e9305b085fffb70856fe5143",
+    "merged_into_verified_main": true,
+    "changed_entries": 73,
+    "ignored_entries": 212,
+    "action": "retained: preserve existing paths, local data and branch work"
+  },
+  {
+    "path": "D:/AI/ai_desktop_pet_readiness_20261023",
+    "head": "2cf8d342592cdffdefa10067ff11dcbbfbd4a0a6",
+    "merged_into_verified_main": true,
+    "changed_entries": 31,
+    "ignored_entries": 228,
+    "action": "retained: preserve existing paths, local data and branch work"
+  },
+  {
+    "path": "D:/AI/ai_desktop_pet_sticker_publish",
+    "head": "0c345593ded1a3ebfc09430c89c969e3061c553f",
+    "merged_into_verified_main": true,
+    "changed_entries": 0,
+    "ignored_entries": 0,
+    "action": "removed clean merged worktree; branch codex/sticker-pack-ui retained; restore with git worktree add <original-path> codex/sticker-pack-ui"
+  },
+  {
+    "path": "D:/AI/ai_desktop_pet_task054",
+    "head": "90378c341e9e7d3f459fe0b91af3a5206f8009e2",
+    "merged_into_verified_main": false,
+    "changed_entries": 0,
+    "ignored_entries": 1,
+    "action": "retained: preserve existing paths, local data and branch work"
+  },
+  {
+    "path": "D:/AI/ai_desktop_pet_voice_interrupt",
+    "head": "d1424452421741fa685683f449a4694c4dea034d",
+    "merged_into_verified_main": true,
+    "changed_entries": 4,
+    "ignored_entries": 0,
+    "action": "retained: preserve existing paths, local data and branch work"
+  },
+  {
+    "path": "D:/AI/galgame-publish-20260911",
+    "head": "7297f2137eb5ada05a006d2142bc4b16b2d0cf84",
+    "merged_into_verified_main": true,
+    "changed_entries": 0,
+    "ignored_entries": 837,
+    "action": "retained: preserve existing paths, local data and branch work"
+  }
+]

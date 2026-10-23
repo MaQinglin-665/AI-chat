@@ -96,9 +96,28 @@ def safe_save_json_file(path, payload, *, keep_backup=True):
 
 def tail_jsonl(path, limit=5):
     try:
-        if not path.exists():
+        limit = max(0, int(limit))
+        if not limit:
             return []
-        lines = path.read_text(encoding="utf-8-sig").splitlines()[-max(0, int(limit)):]
+        # Audit logs grow throughout use. Read backwards until the requested
+        # physical lines are complete, rather than loading the entire history.
+        with path.open("rb") as stream:
+            stream.seek(0, 2)
+            position = stream.tell()
+            chunks = []
+            newline_count = 0
+            while position > 0 and newline_count <= limit:
+                size = min(position, 4096)
+                position -= size
+                stream.seek(position)
+                chunk = stream.read(size)
+                chunks.append(chunk)
+                newline_count += chunk.count(b"\n")
+        data = b"".join(reversed(chunks))
+        if position > 0:
+            # The first chunk may begin inside a UTF-8 character or JSON record.
+            data = data.split(b"\n", 1)[1]
+        lines = data.decode("utf-8-sig").splitlines()[-limit:]
     except Exception:
         return []
     out = []

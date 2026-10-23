@@ -1,6 +1,11 @@
 (function (root) {
   "use strict";
 
+  // ~21 ms at 48 kHz: long enough for a stable speech envelope, short enough
+  // to follow syllables. (256 samples read through a frequencyBinCount-sized
+  // buffer only covered ~2.7 ms, so the mouth flickered with the waveform.)
+  const TTS_LEVEL_FFT_SIZE = 1024;
+
   function createController(deps = {}) {
     const state = deps.state || {};
     const window = deps.windowObject || root;
@@ -119,13 +124,14 @@
       if (!core || !hiyoriPerformanceDirector || !isHiyoriPerformanceProfile()) {
         return null;
       }
-      const sample = hiyoriPerformanceDirector.sample(context);
       const now = Number(context.now || performance.now());
       const authoredMotionActive = now <= Number(state.hiyoriAuthoredMotionUntil || 0)
         && (
           !Number(state.hiyoriAuthoredMotion?.playbackGeneration || 0)
           || Number(state.hiyoriAuthoredMotion.playbackGeneration) === Number(state.ttsPlaybackGeneration || 0)
         );
+      const sample = hiyoriPerformanceDirector.sample({ ...context, authoredMotionActive,
+        speechGestureAllowed: context.speechGestureAllowed !== false && state.motionEnabled !== false });
       for (const id in (sample.parameters || {})) {
         const value = sample.parameters[id];
         const face = /Eye|Brow|Mouth|Cheek/.test(id);
@@ -153,6 +159,12 @@
         state.hiyoriPerformanceDebug = {
           mode: sample.mode,
           emotion: sample.emotion,
+          delivery: sample.delivery,
+          speechAccent: sample.speechAccent,
+          speechAccentCount: sample.speechAccentCount,
+          speechGesture: sample.speechGesture,
+          speechGestureCount: sample.speechGestureCount,
+          speechGestureRestUntil: sample.speechGestureRestUntil,
           action: sample.action,
           outgoingAction: sample.outgoingAction,
           idle: sample.idle,
@@ -690,14 +702,12 @@
     }
 
     function applySpeechPerformanceCue(cue = null) {
+      // Direct cues are finite reactions. Only beginSpeechAnimation binds a
+      // cue to real playback; receiving a cue alone cannot keep it alive.
+      state.speechPerformancePlaybackGeneration = null;
       const normalized = normalizeSpeechPerformanceCue(cue);
       if (!normalized) {
-        state.speechPerformanceCue = null;
-        state.speechPerformanceCueUntil = 0;
-        state.speechEmotionPose = null;
-        state.speechEmotionPoseUntil = 0;
-        setThinkingCueSymbolVisible(false, 0);
-        clearHiyoriEmotionOverlay();
+        clearSpeechPerformanceCue();
         return null;
       }
       const now = performance.now();
@@ -789,7 +799,7 @@
         }
       }
       if (normalized.emotion === "thinking") {
-        requestPerformanceMode("think", { now, holdMs: normalized.holdMs });
+        requestPerformanceMode("think", { now, holdMs: normalized.holdMs, source: "speech_cue" });
       }
       applyLive2DModelExpression(selectModelExpressionName(normalized), "performance_cue");
       return normalized;
@@ -818,6 +828,15 @@
       if (!cue) {
         return null;
       }
+      const playbackOwned = state.uiView !== "model"
+        && state.speechPerformancePlaybackGeneration != null
+        && Number(state.speechPerformancePlaybackGeneration) === Number(state.ttsPlaybackGeneration || 0);
+      if (playbackOwned && isSpeakingNow()) {
+        // A short semantic hold must not expire halfway through a long WAV or
+        // PCM stream. Remote windows still obey the sender's bounded lease.
+        state.speechPerformanceCueUntil = Math.max(Number(state.speechPerformanceCueUntil || 0), now + 900);
+        state.speechEmotionPoseUntil = Math.max(Number(state.speechEmotionPoseUntil || 0), now + 900);
+      }
       if (now > Number(state.speechPerformanceCueUntil || 0)) {
         clearSpeechPerformanceCue();
         return null;
@@ -826,6 +845,30 @@
     }
 
     function clearSpeechPerformanceCue() {
+      // Model-only windows receive cue clears through the broadcast bridge,
+      // without calling the local audio controller's endSpeechAnimation.
+      hiyoriPerformanceDirector?.stopSpeech?.();
+      const authoredMotion = state.hiyoriAuthoredMotion;
+      if (authoredMotion) {
+        const manager = (state.hiyoriAuthoredMotionModel || state.model)?.internalModel?.motionManager;
+        try {
+          // The public method also resets Cubism's pending reservation, so a
+          // lazy-loaded clip cannot begin after its speech has been cancelled.
+          if (typeof manager?.stopAllMotions === "function") manager.stopAllMotions();
+          else manager?._stopAllMotions?.();
+        } catch (_) {
+          // Expression cleanup must remain safe when a model is unloading.
+        }
+        const cooldownKey = authoredMotion.cooldownKey || `hiyori:${authoredMotion.group}`;
+        if (state.motionKeyedCooldowns) delete state.motionKeyedCooldowns[cooldownKey];
+      }
+      state.hiyoriAuthoredMotionToken = Number(state.hiyoriAuthoredMotionToken || 0) + 1;
+      state.hiyoriAuthoredMotion = null;
+      state.hiyoriAuthoredMotionModel = null;
+      state.hiyoriAuthoredMotionUntil = 0;
+      state.hiyoriSemanticCueSignature = "";
+      state.hiyoriSemanticCueAt = 0;
+      state.speechPerformancePlaybackGeneration = null;
       state.speechPerformanceCue = null;
       state.speechPerformanceCueUntil = 0;
       state.speechPerformanceAccentDebug = null;
@@ -1082,6 +1125,9 @@
       state.speechAnimStyle = normalizeTalkStyle(style || state.currentTalkStyle || "neutral");
       state.speechAnimMood = String(mood || detectMood(cleaned) || "idle");
       const speechPerformanceCue = applySpeechPerformanceCue(opts.performanceCue || null);
+      if (speechPerformanceCue && state.uiView !== "model") {
+        state.speechPerformancePlaybackGeneration = Number(state.ttsPlaybackGeneration || 0);
+      }
       if (speechPerformanceCue?.live2dMood) {
         state.speechAnimMood = speechPerformanceCue.live2dMood;
       }
@@ -1089,20 +1135,9 @@
     }
 
     function endSpeechAnimation() {
-      const authoredMotion = state.hiyoriAuthoredMotion;
-      const authoredGeneration = Number(authoredMotion?.playbackGeneration || 0);
-      if (
-        authoredMotion
-        && (!authoredGeneration || authoredGeneration === Number(state.ttsPlaybackGeneration || 0))
-      ) {
-        try {
-          state.model?.internalModel?.motionManager?._stopAllMotions?.();
-        } catch (_) {
-          // Interruption cleanup is best-effort; audio cancellation must win.
-        }
-      }
-      state.hiyoriAuthoredMotion = null;
-      state.hiyoriAuthoredMotionUntil = 0;
+      hiyoriPerformanceDirector?.stopSpeech?.();
+      state.hiyoriSemanticCueSignature = "";
+      state.hiyoriSemanticCueAt = 0;
       state.speechAnimUntil = 0;
       state.speechAnimStartedAt = 0;
       state.speechAnimDurationMs = 0;
@@ -1114,11 +1149,13 @@
       state.ttsAudioRawLevel = 0;
       state.ttsAudioRms = 0;
       state.ttsAudioLastVoiceAt = 0;
+      state.ttsAudioLevelHistory = [];
       state.moodHoldUntil = performance.now() + 1500;
       clearSpeechPerformanceCue();
     }
 
     function finishSpeechAnimation() {
+      state.speechPerformancePlaybackGeneration = null;
       const now = performance.now();
       const releaseMs = 260;
       const holdMs = 900;
@@ -1130,6 +1167,7 @@
       state.ttsAudioRawLevel = 0;
       state.ttsAudioRms = 0;
       state.ttsAudioLastVoiceAt = 0;
+      state.ttsAudioLevelHistory = [];
       state.moodHoldUntil = Math.max(Number(state.moodHoldUntil || 0), now + holdMs);
       if (state.speechPerformanceCue) {
         state.speechPerformanceCueUntil = Math.min(
@@ -1270,9 +1308,9 @@
         }
         if (!state.ttsAudioAnalyser) {
         state.ttsAudioAnalyser = state.ttsAudioContext.createAnalyser();
-        state.ttsAudioAnalyser.fftSize = 256;
+        state.ttsAudioAnalyser.fftSize = TTS_LEVEL_FFT_SIZE;
         state.ttsAudioAnalyser.smoothingTimeConstant = 0.12;
-          state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.frequencyBinCount);
+          state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.fftSize);
           state.ttsAudioSourceNode.connect(state.ttsAudioAnalyser);
           state.ttsAudioAnalyser.connect(state.ttsAudioContext.destination);
         }
@@ -1280,6 +1318,42 @@
       } catch (_) {
         return false;
       }
+    }
+
+    // Analyser data runs ahead of what the listener hears by the device output
+    // latency. Hold recent levels and read the one that is audible now.
+    const OUTPUT_LATENCY_MIN_MS = 25;
+    const OUTPUT_LATENCY_MAX_MS = 350;
+
+    function getAudibleOutputLatencyMs(context) {
+      const seconds = Number(context?.outputLatency);
+      const fallback = Number(context?.baseLatency);
+      const latencyMs = (Number.isFinite(seconds) && seconds > 0 ? seconds : (Number.isFinite(fallback) ? fallback : 0)) * 1000;
+      if (!(latencyMs >= OUTPUT_LATENCY_MIN_MS)) {
+        return 0;
+      }
+      return Math.min(OUTPUT_LATENCY_MAX_MS, latencyMs);
+    }
+
+    function delayLevelForOutputLatency(level, context, now = performance.now()) {
+      const latencyMs = getAudibleOutputLatencyMs(context);
+      const history = Array.isArray(state.ttsAudioLevelHistory) ? state.ttsAudioLevelHistory : [];
+      state.ttsAudioLevelHistory = history;
+      state.ttsAudioOutputLatencyMs = latencyMs;
+      if (!latencyMs) {
+        history.length = 0;
+        return level;
+      }
+      history.push({ at: now, level });
+      const audibleAt = now - latencyMs;
+      // Keep one sample at or before the audible instant; drop older ones.
+      while (history.length > 1 && history[1].at <= audibleAt) {
+        history.shift();
+      }
+      if (history.length > 240) {
+        history.splice(0, history.length - 240);
+      }
+      return history[0].at <= audibleAt ? history[0].level : 0;
     }
 
     function sampleTTSAudioLevel() {
@@ -1302,7 +1376,10 @@
           sum += centered * centered;
         }
         const rms = Math.sqrt(sum / data.length);
-        const normalized = clampNumber((rms - 0.006) / 0.095, 0, 1);
+        const normalized = delayLevelForOutputLatency(
+          clampNumber((rms - 0.006) / 0.095, 0, 1),
+          analyser.context
+        );
         const smoothing = normalized > state.ttsAudioLevel ? 0.88 : 0.78;
         state.ttsAudioRawLevel = normalized;
         state.ttsAudioRms = rms;
@@ -1883,6 +1960,10 @@
           || (state.chatBusy === true && Number(state.speechAnimUntil || 0) <= now)
         ),
         emotion: speechPerformanceCue?.emotion || state.speechAnimMood || "idle",
+        intensity: speechPerformanceCue?.intensity || "medium",
+        motionIntensity: normalizeMotionIntensity(state.motionIntensity),
+        audioActive: listeningPresence.assistantAudioActive,
+        playbackGeneration: state.ttsPlaybackGeneration,
         audioLevel: Number(state.ttsAudioLevel) || 0,
         bodyEnergy: Number(state.speechBodyEnergy) || 0,
         allowIdle: !state.dragData && !state.windowDragActive && !state.chatBusy
@@ -2185,6 +2266,7 @@
       estimateSpeechAnimationDurationMs,
       beginSpeechAnimation,
       applySpeechPerformanceCue,
+      getActiveSpeechPerformanceCue,
       clearSpeechPerformanceCue,
       endSpeechAnimation,
       finishSpeechAnimation,

@@ -1,4 +1,4 @@
-﻿# AGENTS.md
+# AGENTS.md
 
 ## Project Context
 
@@ -41,7 +41,7 @@ When modifying this repository:
 
 Before writing code:
 
-1. Read this file, `feature_list.json` / `progress.md` if present, and the relevant docs for the current feature.
+1. Read this file, current `session-handoff.md`, the active entry in `feature_list.json`, and the tail of `progress.md`. Read `docs/archive/` only for relevant historical questions.
 2. Check `git status --short --branch` and identify unrelated local changes before editing.
 3. Pick one active feature from `feature_list.json`; if the task does not match it, update the state files first.
 4. Ask clarifying questions one at a time for product/design ambiguity until the goal, scope, and success criteria are clear.

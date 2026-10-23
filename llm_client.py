@@ -1,3 +1,4 @@
+from llm_deadline import LLMTransportError, remaining, network_chunks
 import json
 import os
 import time
@@ -41,8 +42,8 @@ def http_post_json(url, payload, headers=None, timeout=60, attempts=3):
     if not str(req_headers.get("User-Agent", "")).strip():
         req_headers["User-Agent"] = get_llm_user_agent()
 
-    # Retry transient upstream/network failures to reduce visible chat errors.
-    # This is especially useful for proxy relays that occasionally close sockets.
+    # Retry only transient HTTP status failures, within the shared turn budget.
+    # Connection failures are terminal; another endpoint cannot repair the network.
     try:
         attempts = int(attempts)
     except (TypeError, ValueError):
@@ -58,15 +59,16 @@ def http_post_json(url, payload, headers=None, timeout=60, attempts=3):
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                body = resp.read().decode("utf-8")
+            for response_body in network_chunks(urllib.request.urlopen, req, timeout):
+                body = response_body.decode("utf-8")
                 last_exc = None
                 break
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="ignore")
+            detail = str(exc.reason)
+            exc.close()
             retryable = exc.code in {408, 409, 425, 429} or 500 <= int(exc.code) < 600
             if retryable and attempt < attempts:
-                time.sleep(0.8 * attempt)
+                time.sleep(min(0.8 * attempt, remaining()))
                 continue
             raise RuntimeError(f"LLM HTTP {exc.code}: {detail}") from exc
         except (
@@ -79,10 +81,7 @@ def http_post_json(url, payload, headers=None, timeout=60, attempts=3):
             OSError,
         ) as exc:
             last_exc = exc
-            if attempt < attempts:
-                time.sleep(0.8 * attempt)
-                continue
-            raise RuntimeError(f"LLM connection failed: {exc}") from exc
+            raise LLMTransportError("LLM connection failed: 网络好像断了，请检查网络或模型服务。") from exc
 
     if last_exc is not None:
         raise RuntimeError(f"LLM connection failed: {last_exc}")
@@ -128,7 +127,17 @@ def get_openai_tuning(llm_cfg):
     }
 
 
+def apply_chat_provider_options(payload, llm_cfg):
+    # Official DeepSeek defaults to thinking. Desktop conversation, including
+    # probes and tool calls, uses non-thinking mode for prompt spoken replies.
+    from urllib.parse import urlsplit
+    if urlsplit(str((llm_cfg or {}).get("base_url", ""))).hostname == "api.deepseek.com":
+        payload["thinking"] = {"type": "disabled"}
+    return payload
+
+
 def apply_chat_completion_token_limit(payload, llm_cfg, tuning):
+    apply_chat_provider_options(payload, llm_cfg)
     token_key = (
         "max_completion_tokens"
         if _safe_bool((llm_cfg or {}).get("use_max_completion_tokens", False), False)
@@ -218,6 +227,8 @@ def call_openai_compatible(llm_cfg, messages):
                     retry_content = normalize_text_content(retry_message.get("content", ""))
                     if retry_content:
                         return retry_content
+    except LLMTransportError:
+        raise
     except RuntimeError as exc:
         # Some relays do not return standard chat-completions JSON.
         chat_error = exc

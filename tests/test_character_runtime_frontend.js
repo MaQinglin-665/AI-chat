@@ -2683,9 +2683,9 @@ assert.ok(
     && indexSource.includes('<script src="./autoChatController.js"></script>')
     && indexSource.includes('<script src="./runtimeMetadataController.js"></script>')
     && indexSource.includes('<script src="./diagnosticsRuntimeController.js"></script>')
-    && indexSource.includes('<script src="./followupDebugController.js"></script>')
-    && indexSource.includes('<script src="./grayTrialReportController.js"></script>')
-    && indexSource.includes('<script src="./grayTrialCharacterPanelController.js"></script>')
+    && devFeatureLoaderSource.includes('"./followupDebugController.js"')
+    && devFeatureLoaderSource.includes('"./grayTrialReportController.js"')
+    && devFeatureLoaderSource.includes('"./grayTrialCharacterPanelController.js"')
     && !indexSource.includes('<script src="./followupReadinessPanelController.js"></script>')
     && devFeatureLoaderSource.includes('"./followupReadinessPanelController.js"')
     && indexSource.includes('<script src="./speechStyleController.js"></script>')
@@ -2711,9 +2711,9 @@ assert.ok(
     && indexSource.indexOf('<script src="./localAsrController.js"></script>') < indexSource.indexOf('<script src="./autoChatController.js"></script>')
     && indexSource.indexOf('<script src="./autoChatController.js"></script>') < indexSource.indexOf('<script src="./runtimeMetadataController.js"></script>')
     && indexSource.indexOf('<script src="./runtimeMetadataController.js"></script>') < indexSource.indexOf('<script src="./diagnosticsRuntimeController.js"></script>')
-    && indexSource.indexOf('<script src="./diagnosticsRuntimeController.js"></script>') < indexSource.indexOf('<script src="./followupDebugController.js"></script>')
-    && indexSource.indexOf('<script src="./followupDebugController.js"></script>') < indexSource.indexOf('<script src="./grayTrialReportController.js"></script>')
-    && indexSource.indexOf('<script src="./grayTrialReportController.js"></script>') < indexSource.indexOf('<script src="./grayTrialCharacterPanelController.js"></script>')
+    && indexSource.indexOf('<script src="./diagnosticsRuntimeController.js"></script>') < indexSource.indexOf('<script src="./devFeatureLoader.js"></script>')
+    && devFeatureLoaderSource.indexOf('"./followupDebugController.js"') < devFeatureLoaderSource.indexOf('"./grayTrialReportController.js"')
+    && devFeatureLoaderSource.indexOf('"./grayTrialReportController.js"') < devFeatureLoaderSource.indexOf('"./grayTrialCharacterPanelController.js"')
     && indexSource.indexOf('<script src="./subtitleController.js"></script>') < indexSource.indexOf('<script src="./speechStyleController.js"></script>')
     && indexSource.indexOf('<script src="./speechStyleController.js"></script>') < indexSource.indexOf('<script src="./emotionMoodController.js"></script>')
     && indexSource.indexOf('<script src="./emotionMoodController.js"></script>') < indexSource.indexOf('<script src="./actionPlanController.js"></script>')
@@ -3818,9 +3818,9 @@ assert.ok(
     && performanceTimelineControllerSource.includes("recordPerformanceAuditEvent")
     && performanceTimelineControllerSource.includes("function toPublicTimelineSummary")
     && indexSource.includes('<script src="./performanceAuditController.js"></script>')
-    && indexSource.includes('<script src="./performanceTimelineController.js"></script>')
-    && indexSource.indexOf('<script src="./performanceAuditController.js"></script>') < indexSource.indexOf('<script src="./performanceTimelineController.js"></script>')
-    && indexSource.indexOf('<script src="./performanceTimelineController.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
+    && devFeatureLoaderSource.includes('"./performanceTimelineController.js"')
+    && indexSource.indexOf('<script src="./performanceAuditController.js"></script>') < indexSource.indexOf('<script src="./devFeatureLoader.js"></script>')
+    && indexSource.indexOf('<script src="./devFeatureLoader.js"></script>') < indexSource.indexOf('<script src="./chat.js"></script>'),
   "chat replies should route brain performance controls through the front-end performance timeline and audit"
 );
 assert.ok(

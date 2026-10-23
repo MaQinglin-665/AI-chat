@@ -6,6 +6,7 @@ const path = require("path");
 
 const root = path.resolve(__dirname, "..");
 const tests = [
+  "tests/test_readiness_resources.js",
   "tests/test_galgame_player.js",
   "tests/test_galgame_chat_integration.js",
   "tests/test_galgame_performance_transport.js",
@@ -19,13 +20,18 @@ const tests = [
   "tests/test_performance_cue_frontend.js",
   "tests/test_hiyori_authored_motion_frontend.js",
   "tests/test_hiyori_performance_director_frontend.js",
+  "tests/test_live2d_expressive_speech.js",
+  "tests/test_speech_performance_lifecycle.js",
+  "tests/test_speech_gesture_variation.js",
   "tests/test_tts_playback_start_frontend.js",
+  "tests/test_lip_sync_bridge_frontend.js",
   "tests/test_behavior_director_frontend.js",
   "tests/test_behavior_performance_bridge_frontend.js",
   "tests/test_tts_failover_recovery_frontend.js",
   "tests/test_gpt_sovits_streaming_playback_frontend.js",
   "tests/test_qwen3_tts_frontend.js",
   "tests/test_chat_api_frontend.js",
+  "tests/test_chat_stream_lifecycle.js",
   "tests/test_companion_turn_contract_frontend.js",
   "tests/test_natural_conversation_frontend.js",
   "tests/test_conversation_awareness_frontend.js",

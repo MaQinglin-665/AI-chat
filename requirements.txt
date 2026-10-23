@@ -1,6 +1,8 @@
-edge-tts
-mem0ai
-pywebview
-qdrant-client
-sentence-transformers>=3.0,<4
-vosk
+# Direct versions plus the clean-install Windows x64 / Python 3.12 closure.
+-c requirements-win-py312-constraints.txt
+edge-tts==6.1.12
+mem0ai==1.0.11
+pywebview==6.1
+qdrant-client==1.17.1
+sentence-transformers==3.4.1
+vosk==0.3.45

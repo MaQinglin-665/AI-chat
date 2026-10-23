@@ -183,7 +183,7 @@ assert.ok(electronSource.includes('ipcMain.on("surface-renderer-ready"'), "the p
 assert.ok(electronSource.includes('ipcMain.on("window-minimize"'), "the stage should expose a native minimize transition for pet mode");
 assert.ok(electronSource.includes('if (chatWindow.isMinimized())'), "a second launch should restore the stage");
 assert.ok(!electronSource.includes('const wins = [modelWindow, chatWindow]'), "a second launch should not force both Live2D surfaces visible");
-assert.ok(electronSource.includes("!stageActive || !modelWindowReady"), "the pet should stay active until its renderer reports ready");
+assert.ok(electronSource.includes("const petActive = !stageActive;"), "the inactive pet should defer model loading until the stage is hidden");
 assert.ok(electronSource.includes("scheduleCompanionSurfaceVisibilitySync(40)"), "native minimize should sync after its window state settles");
 assert.ok(electronSource.includes('win.webContents.send("surface-active-changed"'), "native visibility should reach the renderer");
 assert.ok(startupSource.includes("broadcastSpeech: state.desktopMode === true"), "desktop full view should keep the detached pet performance in sync");
@@ -272,6 +272,26 @@ assert.strictEqual(conversationClasses.has("is-collapsed"), true, "conversation 
 conversationClick();
 assert.strictEqual(conversationAttrs["aria-expanded"], "true", "conversation history should expand on the next click");
 assert.strictEqual(conversationClasses.has("is-collapsed"), false, "conversation history should restore the unified rail");
+
+for (const splitChat of [true, false]) {
+  const attrs = { "aria-expanded": "true" };
+  desktopControlBinder.bindUtilityControls({
+    conversationRail: { classList: { toggle() {} } },
+    conversationCollapseBtn: {
+      getAttribute(name) { return attrs[name]; },
+      setAttribute(name, value) { attrs[name] = value; },
+      addEventListener() {}
+    }
+  }, {
+    windowObject: {
+      addEventListener() {},
+      matchMedia: () => ({ matches: true }),
+      document: { body: { classList: { contains: name => splitChat && name === "view-chat" } } }
+    }
+  });
+  assert.strictEqual(attrs["aria-expanded"], splitChat ? "true" : "false",
+    "narrow split-chat must remain readable while compact stage keeps its collapsed default");
+}
 
 function createLaneToggle() {
   const attrs = {};
