@@ -127,7 +127,17 @@ def get_openai_tuning(llm_cfg):
     }
 
 
+def apply_chat_provider_options(payload, llm_cfg):
+    # Official DeepSeek defaults to thinking. Desktop conversation, including
+    # probes and tool calls, uses non-thinking mode for prompt spoken replies.
+    from urllib.parse import urlsplit
+    if urlsplit(str((llm_cfg or {}).get("base_url", ""))).hostname == "api.deepseek.com":
+        payload["thinking"] = {"type": "disabled"}
+    return payload
+
+
 def apply_chat_completion_token_limit(payload, llm_cfg, tuning):
+    apply_chat_provider_options(payload, llm_cfg)
     token_key = (
         "max_completion_tokens"
         if _safe_bool((llm_cfg or {}).get("use_max_completion_tokens", False), False)

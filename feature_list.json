@@ -3,7 +3,7 @@
     {
       "id": "motion-voice-integration-20261023",
       "name": "Merge speech gestures and apply lip-sync bridge fix",
-      "status": "in_progress",
+      "status": "completed",
       "scope": [
         "Merge harness into readiness preserving transport/resource fixes",
         "Apply supplied lip-sync patch",
@@ -13,7 +13,8 @@
         "Merge full gate passes",
         "Lip-sync and full Node tests pass",
         "Private settings and daily workspace remain unchanged"
-      ]
+      ],
+      "verification": "727 Python tests after merge; dedicated lip-sync and all Node tests passed. Hardware listening acceptance remains manual."
     },
     {
       "id": "speech-gesture-variation-v1",
@@ -287,6 +288,6 @@
       ]
     }
   ],
-  "active_task": "motion-voice-integration-20261023",
+  "active_task": "deepseek-preview7-release",
   "completed_archive": "docs/archive/features-completed-2026-10-23.json"
 }

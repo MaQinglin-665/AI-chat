@@ -3,7 +3,7 @@ import json
 import os
 
 from config import OPENAI_DEFAULT_BASE_URL, OPENAI_DEFAULT_KEY_ENV, OPENAI_DEFAULT_MODEL
-from llm_client import call_openai_compatible, get_openai_tuning, http_post_json, is_local_url
+from llm_client import apply_chat_provider_options, call_openai_compatible, get_openai_tuning, http_post_json, is_local_url
 from llm_response_utils import (
     convert_messages_to_responses_input,
     extract_response_output_text,
@@ -103,6 +103,7 @@ def call_openai_chat_completions_with_tools(
                 else ("required" if not executed_payloads else "auto")
             ),
         }
+        apply_chat_provider_options(payload, llm_cfg)
         data = http_post_json_fn(
             f"{base_url}/chat/completions", payload, headers=headers, timeout=90
         )

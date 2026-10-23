@@ -44,3 +44,13 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 
 ### Lip-sync bridge
 - Applied supplied bridge patch, manually preserving lazy renderer in startup. Dedicated lip-sync test and all Node suites passed. Real Bluetooth/wired playback and minimized-window listening still require device acceptance.
+
+## 2026-10-23 — DeepSeek official / preview.7
+- Latest user authorization supersedes earlier no-push instructions: publish feature branch and preview.7, do not merge main.
+- Both supplied task stages committed: 1ae3b89, be1e9f9, cba0fb2.
+- Default example and config-center preset use official HTTPS DeepSeek Flash; chat, stream, probe and tool requests disable default thinking. Existing provider configurations remain supported. Key only read from environment; ignored local runtime config selects the bundled Hiyori sample and official API. Original daily worktree untouched.
+- Final code checks: 734 Python tests, all Node suites, syntax/encoding/secret checks passed. Character quality gate passed (169 targeted Python tests and frontend checks).
+- Initial runtime preflight found the intentional public model placeholder; configuring the local bundled sample fixed it. Preflight passed with 4 environment warnings; demo advisory passed with 3 opt-in warnings. No claim of a zero-warning full gate.
+- First-run package smoke passed. NSIS installer/source zip built; SHA256, zip integrity, private-file exclusions, official empty-key config, PE header and manifest checked.
+- Three synthetic live official streams: first_delta_ms 4062/2109/2187; delta_chunks 10/36/34. Median first visible delta 2187 ms. No personal conversation sent.
+- Remaining limitations: real Bluetooth/wired/minimized-window listening acceptance, clean dependency installation, unsigned installer. These are disclosed in release notes.

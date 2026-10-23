@@ -6,6 +6,7 @@ import time
 
 from config import OLLAMA_DEFAULT_BASE_URL, OLLAMA_DEFAULT_MODEL
 from llm_deadline import transport_scope
+from llm_client import apply_chat_provider_options
 
 
 def is_mimo_probe_target(llm_cfg):
@@ -90,6 +91,7 @@ def run_lightweight_llm_probe_impl(
             "max_tokens": probe_token_budget,
             "stream": False,
         }
+        apply_chat_provider_options(payload, llm_cfg)
         reply = ""
         empty_attempts = resolve_empty_content_probe_attempts(llm_cfg)
         for attempt_idx in range(empty_attempts):
