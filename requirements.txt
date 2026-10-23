@@ -1,4 +1,5 @@
-# Direct versions recorded from the existing Windows environment.
+# Direct versions plus the clean-install Windows x64 / Python 3.12 closure.
+-c requirements-win-py312-constraints.txt
 edge-tts==6.1.12
 mem0ai==1.0.11
 pywebview==6.1

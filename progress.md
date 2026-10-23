@@ -54,3 +54,25 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 - First-run package smoke passed. NSIS installer/source zip built; SHA256, zip integrity, private-file exclusions, official empty-key config, PE header and manifest checked.
 - Three synthetic live official streams: first_delta_ms 4062/2109/2187; delta_chunks 10/36/34. Median first visible delta 2187 ms. No personal conversation sent.
 - Remaining limitations: real Bluetooth/wired/minimized-window listening acceptance, clean dependency installation, unsigned installer. These are disclosed in release notes.
+
+## 2026-10-24 — Clean dependency validation (started)
+- User selected handoff task 1; new branch codex/clean-dependency-validation-20261024 from 86a93ca on codex/developer-readiness-20261023. Fresh checkout has no unrelated changes.
+- Read AGENTS.md, session-handoff.md, docs/handoff/README.md, feature_list.json and current progress before implementation.
+- Validate README setup with an empty local venv and fresh Node dependencies; no existing desktop configuration, credentials, memories or voice samples copied. Main is not checked out or pushed.
+
+### Implementation and initial evidence
+- Original six runtime pins plus pytest installed successfully in a new isolated CPython 3.12.9 venv on Windows 11 x64; pip 26.2.2. All six runtime modules and pytest import successfully; pip check passes. Project-local Node 22.23.4/npm 10.9.9 and Electron 39.8.10 installed. Wheel cache was reused; no system site packages inherited.
+- Fixed missing local-Node support in the batch launch path, BOM JSON written by Windows PowerShell 5.1 setup, validation using global Python, and unlocked npm install. Added dependency consistency/import gate and 84 platform-scoped version constraints. Empty-environment dry resolution exactly matches all 84 installed versions. No new third-party dependency.
+- First full local gate: 738 Python tests (one Hugging Face symlink cache warning), every Node suite, Python/JS syntax and secret scan passed. Nine targeted setup tests pass, including the two subsequently added encoding regressions. Required JSON and ten-module compilation pass. Final full gate pending after final source changes.
+- Actual fresh Electron/configuration wizard and backend observed. Setup-generated JSON now passes Node JSON.parse. The user explicitly authorized reusing their existing Harness local connection only after initial no-key installation validation; ignored local config/.env now point to that service. Model probe and first_chat_smoke.ps1 -NoStartServer passed; /api/chat returned a two-character reply. No credentials or private runtime files staged.
+- Existing plain frontend controller-loading failure (syncProactiveSchedulerPolling on null) reproduced from the selected source branch; recorded as a separate follow-up in the report. Bluetooth/wired/minimized-window listening, microphone and long-duration acceptance remain untested.
+
+### Final local Verification Evidence
+- scripts/test-local.ps1: **740 passed** (67.05 s), every Node suite passed, Python syntax 165 files, JavaScript syntax 191 files, secret scan 714 tracked text files passed; doctor reports zero warnings. First baseline run had one Hugging Face symlink-cache warning; no cold-cache claim.
+- PowerShell setup replay writes both generated configurations without BOM; actual Node JSON.parse succeeds. pip check remains clean, and all 84 package versions exactly match the --ignore-installed resolution.
+- Both required JSON documents parsed and the ten required Python modules compiled; git diff --check passed. New local model configuration and all runtime/log/venv/tool directories confirmed ignored. Documentation browser gate pending a project-local Chromium download.
+
+### Documentation gate and completion
+- Contributor-required docs/check:all passed: publish check and 4 Chromium smoke tests (9.4 s). The first attempt correctly exposed an absent Playwright browser; installed Chromium headless into ignored project-local tools and reran successfully. Node emitted only the existing NO_COLOR/FORCE_COLOR warning.
+- All 18 staged files belong to this task; no unrelated source changes, secrets, local model settings, logs, environment packages or generated artifacts included. Parent readiness task now records clean dependencies as verified for Windows x64/Python 3.12, while frontend and manual device acceptance remain separate.
+- Feature complete; one focused commit and authorized feature-branch push/PR to main follow. No direct main update, force push, merge or release. The PR must state it inherits open draft #210 from the requested starting branch.

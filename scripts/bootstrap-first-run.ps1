@@ -267,7 +267,7 @@ function Update-ModelPathIfObvious {
     if ($models.Count -eq 1) {
         $relative = $models[0].FullName.Substring($modelsDir.Length).TrimStart("\", "/").Replace("\", "/")
         $config.model_path = "/models/$relative"
-        $config | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $configPath -Encoding UTF8
+        [System.IO.File]::WriteAllText($configPath, ($config | ConvertTo-Json -Depth 30), (New-Object System.Text.UTF8Encoding($false)))
         Write-Ok "Set model_path to /models/$relative"
         Add-SummaryLine "OK" "Detected one Live2D model and set model_path to /models/$relative."
         return
@@ -407,6 +407,9 @@ if (-not $SkipPythonDeps) {
     if ($Dev) {
         Invoke-Step "Install development/test Python dependencies" @($VenvPython, "-m", "pip", "install", "-r", "requirements-dev.txt")
     }
+    $dependencyCheckArgs = @($VenvPython, "scripts\check_python_dependencies.py")
+    if ($Dev) { $dependencyCheckArgs += "--dev" }
+    Invoke-Step "Verify Python dependency consistency and imports" $dependencyCheckArgs
     Add-SummaryLine "OK" "Python dependencies installed into .venv."
 } else {
     Write-InfoLine "Skipping Python dependency install."
@@ -414,8 +417,11 @@ if (-not $SkipPythonDeps) {
 }
 
 if (-not $SkipNodeInstall) {
-    $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
-    Invoke-Step "Install Node/Electron dependencies" @($script:NpmCommand, "install", "--no-fund", "--no-audit")
+    if (-not $env:ELECTRON_MIRROR) {
+        $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+    }
+    $npmInstallMode = if (Test-Path (Join-Path $RepoRoot "package-lock.json")) { "ci" } else { "install" }
+    Invoke-Step "Install Node/Electron dependencies" @($script:NpmCommand, $npmInstallMode, "--no-fund", "--no-audit")
     Add-SummaryLine "OK" "Node/Electron dependencies installed."
 } else {
     Write-InfoLine "Skipping Node dependency install."
