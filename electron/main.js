@@ -1,3 +1,4 @@
+const { appendRotating, createRotatingLog } = require("./rotatingLog");
 const { app, BrowserWindow, ipcMain, screen, desktopCapturer, session, dialog } = require("electron");
 const { spawn, spawnSync } = require("child_process");
 const http = require("http");
@@ -80,7 +81,7 @@ app.on("second-instance", () => {
 function appendServerLogLine(filePath, message) {
   try {
     const line = `[${new Date().toISOString()}] ${String(message || "").trim()}\n`;
-    fs.appendFileSync(filePath, line, "utf8");
+    appendRotating(filePath, line);
   } catch (_) {
     // ignore
   }
@@ -96,8 +97,8 @@ function logServerErr(message) {
 
 function openPythonLogStreams() {
   closePythonLogStreams();
-  pythonStdoutStream = fs.createWriteStream(SERVER_OUT_LOG_PATH, { flags: "a" });
-  pythonStderrStream = fs.createWriteStream(SERVER_ERR_LOG_PATH, { flags: "a" });
+  pythonStdoutStream = createRotatingLog(SERVER_OUT_LOG_PATH);
+  pythonStderrStream = createRotatingLog(SERVER_ERR_LOG_PATH);
 }
 
 function closePythonLogStreams() {
@@ -1229,7 +1230,7 @@ function isChatStageActive() {
 
 function syncCompanionSurfaceVisibility() {
   const stageActive = isChatStageActive();
-  const petActive = !stageActive || !modelWindowReady;
+  const petActive = !stageActive;
   if (modelWindow && !modelWindow.isDestroyed()) {
     try {
       if (petActive) {
@@ -1402,7 +1403,7 @@ ipcMain.handle("get-api-token", async () => resolveRuntimeApiToken());
 ipcMain.handle("surface-active-get", async (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win === modelWindow) {
-    return !!(modelWindow && !modelWindow.isDestroyed() && (!isChatStageActive() || !modelWindowReady));
+    return !!(modelWindow && !modelWindow.isDestroyed() && !isChatStageActive());
   }
   if (win === chatWindow) {
     return isChatStageActive();

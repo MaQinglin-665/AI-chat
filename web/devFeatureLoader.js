@@ -2,6 +2,10 @@
   "use strict";
 
   const DEVELOPER_FEATURE_SCRIPTS = [
+    "./followupDebugController.js",
+    "./grayTrialReportController.js",
+    "./grayTrialCharacterPanelController.js",
+    "./performanceTimelineController.js",
     "./companionExperienceDiagnostics.js",
     "./character-runtime-debug-bridge.js",
     "./live2d-expression-tuning.js",

@@ -1382,13 +1382,12 @@ class PetHandler(SimpleHTTPRequestHandler):
         return super().translate_path(path)
 
     def log_message(self, fmt, *args):  # noqa: N802
-        # Suppress Unicode encode errors on Windows GBK console.
-        try:
-            super().log_message(fmt, *args)
-        except (UnicodeEncodeError, UnicodeDecodeError):
-            pass
-        except Exception:
-            pass
+        # Access logging is opt-in; diagnostics retain their explicit logger.
+        if os.environ.get("TAFFY_HTTP_ACCESS_LOG") == "1":
+            try:
+                print("[HTTP] " + (fmt % args), flush=True)
+            except (UnicodeError, OSError):
+                pass
 
     def _get_security_settings(self):
         try:
@@ -1465,10 +1464,14 @@ class PetHandler(SimpleHTTPRequestHandler):
         return True
 
     def end_headers(self):
-        # Avoid stale JS/CSS/runtime files from browser cache during rapid iteration.
-        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-        self.send_header("Pragma", "no-cache")
-        self.send_header("Expires", "0")
+        path_only = urllib.parse.urlsplit(getattr(self, "path", "/")).path
+        public_asset = os.path.splitext(path_only)[1].lower() in {
+            ".js", ".css", ".png", ".jpg", ".webp", ".svg", ".woff2", ".moc3", ".wasm"
+        }
+        if public_asset and not path_only.startswith("/api/") and os.environ.get("TAFFY_DEV_NO_CACHE") != "1":
+            self.send_header("Cache-Control", "private, no-cache")
+        else:
+            self.send_header("Cache-Control", "no-store")
         allow_origin = self._allow_origin_value()
         if allow_origin:
             self.send_header("Access-Control-Allow-Origin", allow_origin)
@@ -1720,169 +1723,22 @@ class PetHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        path_only = self.path.split("?", 1)[0]
-        if path_only == "/healthz":
-            self._send_json(self._build_health_payload(detailed=False))
-            return
-        if self._reject_disallowed_origin(path_only):
-            return
-        if self._reject_invalid_api_token(path_only):
-            return
-        if path_only in CONFIG_GET_ROUTES:
-            self._handle_config_get_route(path_only)
-            return
-        if path_only == "/api/health":
-            self._send_json(self._build_health_payload(detailed=True))
-            return
-        if path_only == "/api/agent/actions":
-            self._send_json(agent_actions.public_state())
-            return
-        if path_only == "/api/qq/identity":
-            try:
-                payload = build_qq_identity_public_payload(load_config())
-                payload["runtime"] = _get_qq_bridge_runtime().status()
-                self._send_json(payload)
-            except Exception as exc:
-                _log_backend_exception("QQ", exc, extra="GET /api/qq/identity failed")
-                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-            return
-        if path_only == "/api/qq/identity/history":
-            try:
-                runtime = _get_qq_bridge_runtime()
-                self._send_json({"ok": True, "items": runtime.store.audit()})
-            except Exception as exc:
-                _log_backend_exception("QQ", exc, extra="GET /api/qq/identity/history failed")
-                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-            return
-        if path_only == "/api/asr/status":
-            self._send_json(get_local_asr_warmup_status())
-            return
-        if path_only == "/api/character_runtime/backend_entry":
-            try:
-                self._send_json(self._build_character_runtime_backend_entry_payload())
-            except Exception as exc:
-                _log_backend_exception("CONFIG", exc, extra="GET /api/character_runtime/backend_entry failed")
-                self._send_json(
-                    _diagnostic_payload(exc),
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/runtime/restart":
-            self._send_json(
-                {"ok": False, "error": "Method not allowed. Please use POST."},
-                status=HTTPStatus.METHOD_NOT_ALLOWED,
-            )
-            return
-        if path_only == "/api/persona_card":
-            self._send_json(load_manual_persona_card())
-            return
-        if path_only == "/api/relationship_state":
-            try:
-                cfg = load_config()
-                self._send_json(get_relationship_state_for_client(cfg))
-            except Exception as exc:
-                _log_backend_exception("RELATIONSHIP", exc, extra="GET /api/relationship_state failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/learning/candidates":
-            try:
-                cfg = load_config()
-                self._send_json(get_learning_candidates_for_review(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="GET /api/learning/candidates failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/learning/samples":
-            try:
-                cfg = load_config()
-                self._send_json(get_learning_samples_for_review(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="GET /api/learning/samples failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/memory/core":
-            try:
-                cfg = load_config()
-                self._send_json(get_core_memories_for_review(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="GET /api/memory/core failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/memory/short":
-            try:
-                cfg = load_config()
-                self._send_json(get_short_term_memories_for_review(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="GET /api/memory/short failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/memory/debug":
-            try:
-                cfg = load_config()
-                self._send_json(get_memory_debug_snapshot(cfg))
-            except Exception as exc:
-                _log_backend_exception("MEMORY", exc, extra="GET /api/memory/debug failed")
-                self._send_json(
-                    {"ok": False, **_diagnostic_payload(exc)},
-                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                )
-            return
-        if path_only == "/api/knowledge/status":
-            try:
-                self._send_json(get_knowledge_status(load_config()))
-            except Exception as exc:
-                _log_backend_exception("KNOWLEDGE", exc, extra="GET /api/knowledge/status failed")
-                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-            return
-        if path_only == "/api/life/proactive":
-            try:
-                cfg = load_config()
-                payload = get_proactive_material(cfg)
-                director = decide_behavior(cfg, _COMPANION_EVENT_BUS.snapshot(), life_material=payload)
-                director = _BEHAVIOR_DECISION_CURSOR.consume(director)
-                payload["behavior_director"] = director
-                # Disabled keeps every legacy proactive decision unchanged. When
-                # explicitly enabled, the director can only suppress an existing
-                # automatic attempt; it never manufactures a reason to speak.
-                if director.get("reason") != "disabled" and director.get("action") != "prepare_proactive":
-                    payload["has_material"] = False
-                    payload.setdefault("reasons", []).append(f"behavior_director:{director.get('reason', 'hold')}")
-                self._send_json(payload)
-            except Exception as exc:
-                _log_backend_exception("LIFE", exc, extra="GET /api/life/proactive failed")
-                self._send_json({"ok": False, **_diagnostic_payload(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
-            return
-        if path_only == "/api/life/history":
-            self._send_json({"ok": True, "items": growth_history(load_config())}); return
-        if path_only == "/api/life/status":
-            payload = life_status(load_config()); payload["decision"] = companion_decision(load_config()); self._send_json(payload); return
-        if path_only == "/api/behavior/status":
-            cfg = load_config()
-            snapshot = _COMPANION_EVENT_BUS.snapshot()
-            self._send_json({
-                "ok": True,
-                "event_snapshot": snapshot,
-                "director": decide_behavior(cfg, snapshot, life_material=get_proactive_material(cfg)),
-            })
-            return
-        return super().do_GET()
+        try:
+            return self._do_GET()
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            self.close_connection = True
+
+    def _do_GET(self):
+        from app_get_routes import dispatch_get
+        return dispatch_get(self, globals())
 
     def do_POST(self):
+        try:
+            return self._do_POST()
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            self.close_connection = True
+
+    def _do_POST(self):
         path_only = self.path.split("?", 1)[0]
         if self._reject_disallowed_origin(path_only):
             return
