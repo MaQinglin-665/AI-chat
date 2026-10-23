@@ -1,6 +1,179 @@
 {
   "features": [
     {
+      "id": "motion-voice-integration-20261023",
+      "name": "Merge speech gestures and apply lip-sync bridge fix",
+      "status": "in_progress",
+      "scope": [
+        "Merge harness into readiness preserving transport/resource fixes",
+        "Apply supplied lip-sync patch",
+        "Separate validated local commits; no push"
+      ],
+      "done_criteria": [
+        "Merge full gate passes",
+        "Lip-sync and full Node tests pass",
+        "Private settings and daily workspace remain unchanged"
+      ]
+    },
+    {
+      "id": "speech-gesture-variation-v1",
+      "name": "Speech gesture variation and rest windows",
+      "description": "Choose bounded delivery-aware gestures from real audio rises, retain short rest and recent history across sentences, and validate fixed local TTS lines.",
+      "status": "complete",
+      "dependencies": [
+        "speech-performance-lifecycle-v1"
+      ],
+      "scope": [
+        "Hiyori audio-linked gesture variety and recent repetition reduction",
+        "Rest windows without delaying speech",
+        "Preserve explicit motion, lip sync and interruption ownership",
+        "Fixed-line local TTS and real-model verification"
+      ],
+      "done_criteria": [
+        "Delivery-specific gesture selection varies during speech without repeating the previous gesture",
+        "Short sentences and playback generation changes cannot bypass rest windows",
+        "Silence, interruption and explicit motions do not queue stale gestures",
+        "Old configuration and existing regression tests remain compatible",
+        "Real audio samples or concrete generation limitations are recorded without claiming human listening QA"
+      ]
+    },
+    {
+      "id": "speech-performance-lifecycle-v1",
+      "name": "Bind speech performance to audible playback",
+      "description": "Review reusable GitHub frameworks and keep sentence delivery alive during playback while cancelling only speech-owned gestures.",
+      "status": "complete",
+      "dependencies": [
+        "live2d-expressive-speech-v1"
+      ],
+      "scope": [
+        "GitHub source and license comparison",
+        "Long sentence cue lifetime and split-window propagation",
+        "Speech-owned gesture cancellation and next sentence readiness"
+      ],
+      "done_criteria": [
+        "Reuse decisions cite checked upstream source and licenses",
+        "Audible long sentences retain their delivery without renewing stale remote packets",
+        "Cancellation stops old authored and semantic speech motions while preserving independent reactions",
+        "Next sentence can perform the same cue and lifecycle regressions pass",
+        "Actual-model visual validation and remaining listening limits are recorded"
+      ]
+    },
+    {
+      "id": "refined-chat-ui-v1",
+      "name": "Refined anime chat interface",
+      "description": "Preserve existing character art and pink-purple palette while reducing chrome and prioritizing readable chat.",
+      "status": "complete",
+      "dependencies": [],
+      "scope": [
+        "Split-chat layout and responsive sizing",
+        "Preserve existing controls and stage modes"
+      ],
+      "done_criteria": [
+        "More space for messages at desktop and narrow widths",
+        "Existing send, toggles, more and scene controls remain usable",
+        "Browser visual and interaction checks completed"
+      ]
+    },
+    {
+      "id": "daily-runtime-acceptance-v1",
+      "name": "Daily Electron runtime acceptance",
+      "description": "Bounded real-runtime audit and UI/acceptance fixes completed; variable model latency, listening and long-duration acceptance remain pending.",
+      "status": "complete",
+      "dependencies": [],
+      "scope": [
+        "Isolated production Electron startup",
+        "Real LLM and TTS acceptance",
+        "Cancellation and repeated-turn readiness",
+        "Repair split-chat decoration overflow and stale smoke diagnostics"
+      ],
+      "done_criteria": [
+        "Real runtime results recorded without exposing credentials",
+        "Any discovered blockers fixed or explicitly left pending",
+        "No daily memory/configuration overwritten"
+      ]
+    },
+    {
+      "id": "memory-log-tail-efficiency-v1",
+      "name": "Bound recent memory log reads",
+      "description": "Read recent learning audit/shadow entries from the tail without loading the complete LF/CRLF log.",
+      "status": "complete",
+      "dependencies": [],
+      "scope": [
+        "Read-only JSONL tail access",
+        "Nonpositive limit handling",
+        "Old log format compatibility"
+      ],
+      "done_criteria": [
+        "Large generated log reads only tail bytes for recent entries",
+        "Zero and negative limits return no items",
+        "Unicode, BOM, CRLF, malformed and empty records covered",
+        "Memory regressions pass without private data"
+      ]
+    },
+    {
+      "id": "stream-lifecycle-stability-v1",
+      "name": "Streaming reply lifecycle stability",
+      "description": "Prevent mixed replies after partial failures, honor terminal events and bound first-text wait despite heartbeats.",
+      "status": "complete",
+      "dependencies": [],
+      "scope": [
+        "LLM stream fallback integrity",
+        "Terminal event handling",
+        "Frontend first-text deadline and reader cleanup"
+      ],
+      "done_criteria": [
+        "Partial failures never splice a replacement answer",
+        "Terminal packets finish without waiting for socket close",
+        "Heartbeats cannot reset first-text deadline",
+        "Reader resources released and complete local gate passes"
+      ]
+    },
+    {
+      "id": "live2d-expressive-speech-v1",
+      "name": "Expressive semantic and audio-linked Live2D speech",
+      "description": "Distinct speech delivery postures and bounded audio accents for the Hiyori model, preserving authored motion and legacy configuration.",
+      "status": "complete",
+      "dependencies": [
+        "vtuber-continuous-speech-body-v1"
+      ],
+      "scope": [
+        "Hiyori semantic delivery posture",
+        "Audio-linked emphasis and pause release",
+        "Existing motion intensity and cancellation compatibility"
+      ],
+      "done_criteria": [
+        "Different semantic moods produce distinct bounded speech postures",
+        "Audio accents follow rising energy with cooldown and stop after cancellation",
+        "Authored gestures retain priority and unsupported models retain existing behavior",
+        "Regression tests and visual fixture evidence recorded with limitations"
+      ],
+      "limitations": [
+        "Hiyori-specific; other rigs retain existing behavior.",
+        "Semantic accuracy depends on existing reply cues; audio accents detect energy rises, not word-aligned linguistic stress.",
+        "Browser visual QA uses simulated audio; full Electron and real TTS listening acceptance remains pending."
+      ]
+    },
+    {
+      "id": "project-harness-audit-20260922",
+      "name": "Project progress and agent workflow audit",
+      "description": "Reconcile source progress with current evidence and improve agent instructions, handoff and the project workflow skill without runtime changes.",
+      "status": "complete",
+      "dependencies": [
+        "github-source-refresh-20260911"
+      ],
+      "scope": [
+        "Audit current source baseline and development guidance",
+        "Clarify task ownership and verification levels",
+        "Archive stale handoff and add a project-specific local skill"
+      ],
+      "done_criteria": [
+        "Remote baseline and current regression results recorded",
+        "Current handoff and roadmap entry agree with evidence",
+        "Guidance links, state JSON and local skill validation pass",
+        "Existing unrelated working trees and private runtime data preserved"
+      ]
+    },
+    {
       "id": "llm-transport-timing-20261023",
       "name": "Stream idle timing and LAN/opt-in HTTP transport",
       "status": "complete",
@@ -114,6 +287,6 @@
       ]
     }
   ],
-  "active_task": null,
+  "active_task": "motion-voice-integration-20261023",
   "completed_archive": "docs/archive/features-completed-2026-10-23.json"
 }

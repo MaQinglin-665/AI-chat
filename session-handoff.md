@@ -1,6 +1,9 @@
 # Session handoff
 
 ## Current task
+Motion/voice integration from CODEX-TASK-2-motion-voice.md is in progress. Harness merge passed 727 Python tests, all Node suites, syntax and secrets scans. Merge harness first, run full gate and commit locally; only then apply lip-sync patch and test/commit. Preserve current transport/lazy-renderer changes.
+
+## Prior task
 Applied the supplied CODEX-TASK.md transport timing patch on 863dd16 in `codex/developer-readiness-20261023`.
 Directory: D:/AI/ai_desktop_pet_readiness_20261023.
 Changed runtime files: llm_deadline.py, llm_probe.py, llm_diagnostics.py, config.example.json and tests/test_llm_deadline.py. Developer guide and state records updated to match.

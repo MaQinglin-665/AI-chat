@@ -143,6 +143,13 @@ def test_https_redirect_cannot_downgrade_even_when_http_allowed():
 
 
 def test_http_retries_share_remaining_budget(monkeypatch):
+    # Windows timer granularity can wake a 40 ms sleep early; use a controlled
+    # clock so this checks the shared budget rather than scheduler precision.
+    clock = [100.0]
+    monkeypatch.setattr(budget.time, "monotonic", lambda: clock[0])
+    def advance(seconds):
+        clock[0] += seconds + 0.000001
+    monkeypatch.setattr(llm_client.time, "sleep", advance)
     calls = []
     def unavailable(request, timeout):
         calls.append(timeout)

@@ -261,11 +261,11 @@ def iter_ollama_chat_stream(llm_cfg, messages, model_override=None):
             if isinstance(content, str) and content:
                 yielded_any = True
                 yield content
-                continue
-            response = data.get("response")
-            if isinstance(response, str) and response:
-                yielded_any = True
-                yield response
+            else:
+                response = data.get("response")
+                if isinstance(response, str) and response:
+                    yielded_any = True
+                    yield response
             if data.get("done") is True:
                 return
     except urllib.error.HTTPError as exc:

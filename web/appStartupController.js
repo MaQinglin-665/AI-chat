@@ -541,20 +541,14 @@
             state._broadcastSpeechCueOwned = true;
             state._broadcastSpeechCueExpiresAt = timing.cueExpiresAt;
             state._broadcastSpeechCueKey = cueKey;
-            if (cueChanged) {
+            if (cueChanged || !state.speechPerformanceCue) {
               deps.applySpeechPerformanceCue(data.performanceCue);
             }
             if (Number(state.speechPerformanceCueUntil || 0) > 0) {
-              state.speechPerformanceCueUntil = Math.min(
-                Number(state.speechPerformanceCueUntil || 0),
-                timing.cueExpiresAt
-              );
+              state.speechPerformanceCueUntil = timing.cueExpiresAt;
             }
             if (Number(state.speechEmotionPoseUntil || 0) > 0) {
-              state.speechEmotionPoseUntil = Math.min(
-                Number(state.speechEmotionPoseUntil || 0),
-                timing.cueExpiresAt
-              );
+              state.speechEmotionPoseUntil = timing.cueExpiresAt;
             }
             if (Number(state.moodHoldUntil || 0) > 0) {
               const limits = [Number(state.moodHoldUntil || 0), timing.cueExpiresAt];
@@ -593,12 +587,14 @@
             revision: Math.max(0, Number(state.listeningPresenceRevision || 0)),
             phase: listeningActive ? listeningPhase : "idle"
           };
+          // The chat renderer may have no model to sample the expression
+          // layer. Renew its playback-owned cue before publishing the lease.
+          const performanceCue = typeof deps.getActiveSpeechPerformanceCue === "function"
+            ? deps.getActiveSpeechPerformanceCue(now)
+            : state.speechPerformanceCue && (
+                !Number(state.speechPerformanceCueUntil || 0) || now <= Number(state.speechPerformanceCueUntil)
+              ) ? state.speechPerformanceCue : null;
           const performanceCueUntil = Number(state.speechPerformanceCueUntil || 0);
-          const performanceCue = state.speechPerformanceCue && (
-            !performanceCueUntil || now <= performanceCueUntil
-          )
-            ? state.speechPerformanceCue
-            : null;
           const performanceCueDeadline = performanceCue
             ? (performanceCueUntil > 0
               ? performanceCueUntil

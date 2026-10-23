@@ -273,6 +273,26 @@ conversationClick();
 assert.strictEqual(conversationAttrs["aria-expanded"], "true", "conversation history should expand on the next click");
 assert.strictEqual(conversationClasses.has("is-collapsed"), false, "conversation history should restore the unified rail");
 
+for (const splitChat of [true, false]) {
+  const attrs = { "aria-expanded": "true" };
+  desktopControlBinder.bindUtilityControls({
+    conversationRail: { classList: { toggle() {} } },
+    conversationCollapseBtn: {
+      getAttribute(name) { return attrs[name]; },
+      setAttribute(name, value) { attrs[name] = value; },
+      addEventListener() {}
+    }
+  }, {
+    windowObject: {
+      addEventListener() {},
+      matchMedia: () => ({ matches: true }),
+      document: { body: { classList: { contains: name => splitChat && name === "view-chat" } } }
+    }
+  });
+  assert.strictEqual(attrs["aria-expanded"], splitChat ? "true" : "false",
+    "narrow split-chat must remain readable while compact stage keeps its collapsed default");
+}
+
 function createLaneToggle() {
   const attrs = {};
   const classes = new Set();

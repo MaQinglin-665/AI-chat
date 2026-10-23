@@ -211,9 +211,19 @@
       return true;
     }
 
-    async function playMotionGroup(group, priority = 3) {
+    async function playMotionGroup(group, priority = 3, opts = {}) {
       if (!state.model || !group) {
         return false;
+      }
+      const model = state.model;
+      const dispatchRevision = Number(state.motionDispatchRevision || 0) + 1;
+      state.motionDispatchRevision = dispatchRevision;
+      const isCurrent = typeof opts.isCurrent === "function" ? opts.isCurrent : () => state.model === model;
+      const previousAuthoredMotion = !opts.authoredMotion ? state.hiyoriAuthoredMotion : null;
+      if (previousAuthoredMotion) {
+        // Fence old pending speech callbacks now, but commit ownership
+        // transfer only after the independent motion actually succeeds.
+        state.hiyoriAuthoredMotionToken = Number(state.hiyoriAuthoredMotionToken || 0) + 1;
       }
       const count = getMotionCount(group);
       if (count <= 0) {
@@ -225,8 +235,26 @@
         candidates = [...candidates.slice(seed), ...candidates.slice(0, seed)];
       }
       for (const idx of candidates) {
+        if (!isCurrent()) return false;
         try {
-          await state.model.motion(group, idx, priority);
+          const played = await model.motion(group, idx, priority);
+          if (!isCurrent()) {
+            // A cancelled lazy load may resolve late. Only stop its captured
+            // model if no newer dispatch on that model has taken ownership.
+            if (state.model !== model || Number(state.motionDispatchRevision) === dispatchRevision) {
+              const manager = model.internalModel?.motionManager;
+              if (typeof manager?.stopAllMotions === "function") manager.stopAllMotions();
+              else manager?._stopAllMotions?.();
+            }
+            return false;
+          }
+          if (played === false) continue;
+          if (previousAuthoredMotion && state.hiyoriAuthoredMotion === previousAuthoredMotion
+            && Number(state.motionDispatchRevision) === dispatchRevision) {
+            state.hiyoriAuthoredMotion = null;
+            state.hiyoriAuthoredMotionModel = null;
+            state.hiyoriAuthoredMotionUntil = 0;
+          }
           state.lastMotionGroup = group;
           return true;
         } catch (_) {
@@ -255,6 +283,16 @@
         ? Number(opts.cooldownMs)
         : state.motionCooldownMs;
       const keyedCooldown = String(opts.motionCooldownKey || "").trim();
+      const model = state.model;
+      const authoredMotion = opts.authoredMotion && typeof opts.authoredMotion === "object"
+        ? opts.authoredMotion : null;
+      const speechOwned = source === "performance_cue" && !!authoredMotion?.group;
+      const playbackGeneration = Number(opts.playbackGeneration ?? state.ttsPlaybackGeneration ?? 0);
+      const motionToken = speechOwned ? Number(state.hiyoriAuthoredMotionToken || 0) + 1 : 0;
+      const isCurrent = () => state.model === model && (!speechOwned || (
+        Number(state.hiyoriAuthoredMotionToken || 0) === motionToken
+        && (state.uiView === "model" || playbackGeneration === Number(state.ttsPlaybackGeneration || 0))
+      ));
       const now = performance.now();
       if (
         keyedCooldown
@@ -276,7 +314,22 @@
         });
       }
       for (const group of groups) {
-        const ok = await playMotionGroup(group, priority);
+        if (speechOwned) {
+          if (state.uiView !== "model" && playbackGeneration !== Number(state.ttsPlaybackGeneration || 0)) return false;
+          state.hiyoriAuthoredMotionToken = motionToken;
+          const durationMs = Math.max(240, Math.round(Number(authoredMotion.durationMs) || 0));
+          state.hiyoriAuthoredMotion = {
+            group, file: String(authoredMotion.file || ""),
+            emotion: String(authoredMotion.emotion || opts.motionRole || ""),
+            action: String(authoredMotion.action || opts.motionCue || ""),
+            playbackGeneration, startedAt: now, until: now + durationMs,
+            cooldownKey: keyedCooldown
+          };
+          state.hiyoriAuthoredMotionModel = model;
+          state.hiyoriAuthoredMotionUntil = now + durationMs;
+        }
+        const ok = await playMotionGroup(group, priority, { isCurrent, authoredMotion: speechOwned ? authoredMotion : null });
+        if (!isCurrent()) return false;
         if (ok) {
           if (keyedCooldown) {
             if (!state.motionKeyedCooldowns || typeof state.motionKeyedCooldowns !== "object") {
@@ -284,10 +337,7 @@
             }
             state.motionKeyedCooldowns[keyedCooldown] = now + Math.max(120, Number(cooldownMs) || 0);
           }
-          const authoredMotion = opts.authoredMotion && typeof opts.authoredMotion === "object"
-            ? opts.authoredMotion
-            : null;
-          if (authoredMotion?.group === group) {
+          if (!speechOwned && authoredMotion?.group === group) {
             const durationMs = Math.max(240, Math.round(Number(authoredMotion.durationMs) || 0));
             state.hiyoriAuthoredMotion = {
               group,
@@ -310,6 +360,14 @@
           };
           return true;
         }
+      }
+      if (speechOwned && isCurrent()) {
+        // Failed loads/priority reservations never acquired the model. Do not
+        // let their pending record stop an unrelated clip during cue cleanup.
+        state.hiyoriAuthoredMotionToken = motionToken + 1;
+        state.hiyoriAuthoredMotion = null;
+        state.hiyoriAuthoredMotionModel = null;
+        state.hiyoriAuthoredMotionUntil = 0;
       }
       if (!allowFallback) {
         return false;
