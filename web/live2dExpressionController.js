@@ -1,6 +1,11 @@
 (function (root) {
   "use strict";
 
+  // ~21 ms at 48 kHz: long enough for a stable speech envelope, short enough
+  // to follow syllables. (256 samples read through a frequencyBinCount-sized
+  // buffer only covered ~2.7 ms, so the mouth flickered with the waveform.)
+  const TTS_LEVEL_FFT_SIZE = 1024;
+
   function createController(deps = {}) {
     const state = deps.state || {};
     const window = deps.windowObject || root;
@@ -1144,6 +1149,7 @@
       state.ttsAudioRawLevel = 0;
       state.ttsAudioRms = 0;
       state.ttsAudioLastVoiceAt = 0;
+      state.ttsAudioLevelHistory = [];
       state.moodHoldUntil = performance.now() + 1500;
       clearSpeechPerformanceCue();
     }
@@ -1161,6 +1167,7 @@
       state.ttsAudioRawLevel = 0;
       state.ttsAudioRms = 0;
       state.ttsAudioLastVoiceAt = 0;
+      state.ttsAudioLevelHistory = [];
       state.moodHoldUntil = Math.max(Number(state.moodHoldUntil || 0), now + holdMs);
       if (state.speechPerformanceCue) {
         state.speechPerformanceCueUntil = Math.min(
@@ -1301,9 +1308,9 @@
         }
         if (!state.ttsAudioAnalyser) {
         state.ttsAudioAnalyser = state.ttsAudioContext.createAnalyser();
-        state.ttsAudioAnalyser.fftSize = 256;
+        state.ttsAudioAnalyser.fftSize = TTS_LEVEL_FFT_SIZE;
         state.ttsAudioAnalyser.smoothingTimeConstant = 0.12;
-          state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.frequencyBinCount);
+          state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.fftSize);
           state.ttsAudioSourceNode.connect(state.ttsAudioAnalyser);
           state.ttsAudioAnalyser.connect(state.ttsAudioContext.destination);
         }
@@ -1311,6 +1318,42 @@
       } catch (_) {
         return false;
       }
+    }
+
+    // Analyser data runs ahead of what the listener hears by the device output
+    // latency. Hold recent levels and read the one that is audible now.
+    const OUTPUT_LATENCY_MIN_MS = 25;
+    const OUTPUT_LATENCY_MAX_MS = 350;
+
+    function getAudibleOutputLatencyMs(context) {
+      const seconds = Number(context?.outputLatency);
+      const fallback = Number(context?.baseLatency);
+      const latencyMs = (Number.isFinite(seconds) && seconds > 0 ? seconds : (Number.isFinite(fallback) ? fallback : 0)) * 1000;
+      if (!(latencyMs >= OUTPUT_LATENCY_MIN_MS)) {
+        return 0;
+      }
+      return Math.min(OUTPUT_LATENCY_MAX_MS, latencyMs);
+    }
+
+    function delayLevelForOutputLatency(level, context, now = performance.now()) {
+      const latencyMs = getAudibleOutputLatencyMs(context);
+      const history = Array.isArray(state.ttsAudioLevelHistory) ? state.ttsAudioLevelHistory : [];
+      state.ttsAudioLevelHistory = history;
+      state.ttsAudioOutputLatencyMs = latencyMs;
+      if (!latencyMs) {
+        history.length = 0;
+        return level;
+      }
+      history.push({ at: now, level });
+      const audibleAt = now - latencyMs;
+      // Keep one sample at or before the audible instant; drop older ones.
+      while (history.length > 1 && history[1].at <= audibleAt) {
+        history.shift();
+      }
+      if (history.length > 240) {
+        history.splice(0, history.length - 240);
+      }
+      return history[0].at <= audibleAt ? history[0].level : 0;
     }
 
     function sampleTTSAudioLevel() {
@@ -1333,7 +1376,10 @@
           sum += centered * centered;
         }
         const rms = Math.sqrt(sum / data.length);
-        const normalized = clampNumber((rms - 0.006) / 0.095, 0, 1);
+        const normalized = delayLevelForOutputLatency(
+          clampNumber((rms - 0.006) / 0.095, 0, 1),
+          analyser.context
+        );
         const smoothing = normalized > state.ttsAudioLevel ? 0.88 : 0.78;
         state.ttsAudioRawLevel = normalized;
         state.ttsAudioRms = rms;

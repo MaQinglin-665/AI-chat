@@ -41,3 +41,6 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 - Full gate pending before merge commit. No private configuration or daily workspace edits.
 
 - Merge validation: 727 Python tests and all Node tests passed; syntax 161 Python/190 JavaScript and secret scan 704 files passed. Budget retry test now uses a controlled clock to avoid Windows timer granularity failures.
+
+### Lip-sync bridge
+- Applied supplied bridge patch, manually preserving lazy renderer in startup. Dedicated lip-sync test and all Node suites passed. Real Bluetooth/wired playback and minimized-window listening still require device acceptance.

@@ -1,6 +1,11 @@
 (function (root) {
   "use strict";
 
+  // ~21 ms at 48 kHz: long enough for a stable speech envelope, short enough
+  // to follow syllables. (256 samples read through a frequencyBinCount-sized
+  // buffer only covered ~2.7 ms, so the mouth flickered with the waveform.)
+  const TTS_LEVEL_FFT_SIZE = 1024;
+
   function createController(deps = {}) {
     const state = deps.state || {};
     const window = deps.windowObject || root;
@@ -740,9 +745,9 @@
           && (!state.ttsPcmAudioAnalyser || state.ttsPcmAudioAnalyser.context !== context)
         ) {
           state.ttsPcmAudioAnalyser = context.createAnalyser();
-          state.ttsPcmAudioAnalyser.fftSize = 256;
+          state.ttsPcmAudioAnalyser.fftSize = TTS_LEVEL_FFT_SIZE;
           state.ttsPcmAudioAnalyser.smoothingTimeConstant = 0.12;
-          state.ttsPcmAudioAnalyserData = new Uint8Array(state.ttsPcmAudioAnalyser.frequencyBinCount);
+          state.ttsPcmAudioAnalyserData = new Uint8Array(state.ttsPcmAudioAnalyser.fftSize);
           state.ttsPcmAudioAnalyser.connect(context.destination);
         }
         state.ttsPcmAudioAnalyserActive = !!state.ttsPcmAudioAnalyser;
@@ -918,9 +923,9 @@
         state.ttsContextBufferSource = source;
         if (!state.ttsAudioAnalyser || state.ttsAudioAnalyser.context !== ctx) {
           state.ttsAudioAnalyser = ctx.createAnalyser();
-          state.ttsAudioAnalyser.fftSize = 256;
+          state.ttsAudioAnalyser.fftSize = TTS_LEVEL_FFT_SIZE;
           state.ttsAudioAnalyser.smoothingTimeConstant = 0.12;
-          state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.frequencyBinCount);
+          state.ttsAudioAnalyserData = new Uint8Array(state.ttsAudioAnalyser.fftSize);
         }
         source.connect(state.ttsAudioAnalyser);
         state.ttsAudioAnalyser.connect(gain);

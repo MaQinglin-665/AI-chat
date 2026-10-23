@@ -664,7 +664,10 @@
             || Number(state.ttsAudioLevel || 0) > 0.01
             || !!performanceCue
             || now <= Number(state.speechAnimUntil || 0);
-          if (active) {
+          if (active && state.rendererSurfaceActive === false) {
+            state._speechBroadcastScheduleKind = "hidden_speech";
+            state._speechBroadcastTimer = setTimeoutFn(chatSpeechBroadcastLoop, 16);
+          } else if (active) {
             state._speechBroadcastScheduleKind = "animation";
             state._speechBroadcastTimer = requestAnimationFrameFn(chatSpeechBroadcastLoop);
           } else if (performancePhase) {
@@ -769,7 +772,11 @@
 
     function applyRendererSurfaceActive(active) {
       const next = active !== false;
+      const changed = state.rendererSurfaceActive !== next;
       state.rendererSurfaceActive = next;
+      if (changed && state._speechBroadcastScheduleKind === "animation") {
+        requestChatSpeechBroadcastNow();
+      }
       window.document?.body?.classList?.toggle?.("surface-inactive", !next);
       if (next && state._lazyRendererEnabled && !rendererInitialized) {
         ensureVisibleRenderer().then(() => applyRendererSurfaceActive(state.rendererSurfaceActive))

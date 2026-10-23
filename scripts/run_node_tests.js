@@ -24,6 +24,7 @@ const tests = [
   "tests/test_speech_performance_lifecycle.js",
   "tests/test_speech_gesture_variation.js",
   "tests/test_tts_playback_start_frontend.js",
+  "tests/test_lip_sync_bridge_frontend.js",
   "tests/test_behavior_director_frontend.js",
   "tests/test_behavior_performance_bridge_frontend.js",
   "tests/test_tts_failover_recovery_frontend.js",

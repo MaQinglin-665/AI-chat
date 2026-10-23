@@ -1,6 +1,7 @@
 # Session handoff
 
 ## Current task
+Both supplied tasks are implemented and automated checks passed. User now authorizes switching to DeepSeek official API, pushing the feature branch and publishing preview.7. Do not merge main. Device listening acceptance remains outstanding.
 Motion/voice integration from CODEX-TASK-2-motion-voice.md is in progress. Harness merge passed 727 Python tests, all Node suites, syntax and secrets scans. Merge harness first, run full gate and commit locally; only then apply lip-sync patch and test/commit. Preserve current transport/lazy-renderer changes.
 
 ## Prior task
