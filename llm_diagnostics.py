@@ -147,6 +147,24 @@ def diagnose_llm_exception(exc, llm_cfg):
             detail=raw,
         )
 
+    if "allow_insecure_http" in lower:
+        return DiagnosticError(
+            code="llm_insecure_http_blocked",
+            reason="LLM 地址使用了不加密的 HTTP，API Key 和聊天内容会明文传输，已拦截。",
+            solution="请改用服务商提供的 https:// 地址；确认要继续使用 HTTP 时，可设置 llm.allow_insecure_http = true（本机和局域网地址不受限制）。",
+            config_key="llm.base_url",
+            detail=raw,
+        )
+
+    if "模型输出中断" in raw:
+        return DiagnosticError(
+            code="llm_stream_stalled",
+            reason="模型输出到一半中断了，长时间没有收到新内容。",
+            solution="请稍后重试；网络较慢时可调大 llm.stream_idle_timeout_sec。",
+            config_key="llm.stream_idle_timeout_sec",
+            detail=raw,
+        )
+
     if looks_like_timeout_error(lower):
         return DiagnosticError(
             code="llm_connection_timeout",

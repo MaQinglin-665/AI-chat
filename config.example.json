@@ -44,7 +44,10 @@
     "max_output_tokens": 72,
     "verbosity": "low",
     "reasoning_effort": "",
-    "turn_timeout_sec": 30
+    "turn_timeout_sec": 30,
+    "stream_idle_timeout_sec": 15,
+    "stream_max_sec": 180,
+    "allow_insecure_http": false
   },
   "character_runtime": {
     "enabled": false,

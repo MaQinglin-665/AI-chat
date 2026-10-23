@@ -1,13 +1,16 @@
 # Session handoff
 
 ## Current task
-Developer readiness, eleven-item audit. Implementation and automated verification prepared on `codex/developer-readiness-20261023`, based on verified GitHub main `2cf8d34`.
+Applied the supplied CODEX-TASK.md transport timing patch on 863dd16 in `codex/developer-readiness-20261023`.
 Directory: D:/AI/ai_desktop_pet_readiness_20261023.
-Details and files: [audit](docs/readiness-audit-20261023.md); setup: [developer guide](docs/developer-sharing.md).
+Changed runtime files: llm_deadline.py, llm_probe.py, llm_diagnostics.py, config.example.json and tests/test_llm_deadline.py. Developer guide and state records updated to match.
+Status: patch implementation and automated acceptance complete. Focused tests: 48 passed; full local gate: 705 Python tests, all Node suites, syntax and secrets checks passed. Required JSON and compilation checks also passed. One local commit on top of 863dd16; no push.
+No private configuration changes, push, merge, harness integration or original-workspace edits.
+Historical readiness audit: [audit](docs/readiness-audit-20261023.md); setup: [developer guide](docs/developer-sharing.md).
 History: [archive](docs/archive/2026-10-23-session-handoff.md).
 
 ## Remaining acceptance
-- User was asked for provider's documented HTTPS endpoint; original port failed unauthenticated TLS handshake. Remote HTTP is now rejected before sending credentials. Do not silently change private config or disable TLS validation.
+- User decides whether to use the provider HTTPS endpoint or explicitly opt into remote HTTP with llm.allow_insecure_http. This task changes no private setting. LAN/local HTTP is now accepted; HTTPS downgrade remains blocked.
 - Clean dependency resolution/install failed at package download timeout. Direct pins are recorded, not a verified full transitive lock.
 - Real Electron minimize/restore, actual voice and real model checks remain unverified. Mock and unit tests are not equivalent.
 - Do not publish/merge or change repo visibility on assumptions. No main edits; original daily development changes retained.
@@ -19,4 +22,4 @@ History: [archive](docs/archive/2026-10-23-session-handoff.md).
 - Shared .git/info/exclude now protects *.bak and *.tmp in original daily worktree as well.
 
 ## Next
-Read progress.md for final automated verification. Resolve HTTPS endpoint, retry isolated dependency installation, then perform real two-window/voice acceptance before treating sharing readiness as complete.
+After automated checks, manually verify a real model response lasting over 30 seconds and unavailable-service behavior. First-byte transport timing is not the same as visible dialogue timing; reasoning models still need real acceptance. Retry isolated dependency installation and real two-window/voice acceptance separately. Never infer authorization to enable insecure HTTP or merge the harness branch.

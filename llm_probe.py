@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 
 from config import OLLAMA_DEFAULT_BASE_URL, OLLAMA_DEFAULT_MODEL
+from llm_deadline import transport_scope
 
 
 def is_mimo_probe_target(llm_cfg):
@@ -33,6 +34,14 @@ def resolve_empty_content_probe_attempts(llm_cfg):
     return 2 if is_mimo_probe_target(llm_cfg) else 1
 
 
+def _scoped_http_post(http_post_json_func, llm_cfg):
+    """Apply this config's transport policy (e.g. llm.allow_insecure_http) to probe requests."""
+    def post(*args, **kwargs):
+        with transport_scope(llm_cfg):
+            return http_post_json_func(*args, **kwargs)
+    return post
+
+
 def run_lightweight_llm_probe_impl(
     config,
     *,
@@ -55,6 +64,7 @@ def run_lightweight_llm_probe_impl(
     llm_cfg["max_tokens"] = probe_token_budget
     llm_cfg["max_output_tokens"] = probe_token_budget
     llm_cfg["request_timeout"] = resolve_probe_request_timeout(llm_cfg, safe_int_value_func)
+    http_post_json_func = _scoped_http_post(http_post_json_func, llm_cfg)
     provider = resolve_llm_provider_func(llm_cfg)
     started = time.monotonic()
     messages = [

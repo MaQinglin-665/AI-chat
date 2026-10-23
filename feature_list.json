@@ -1,6 +1,35 @@
 {
   "features": [
     {
+      "id": "llm-transport-timing-20261023",
+      "name": "Stream idle timing and LAN/opt-in HTTP transport",
+      "status": "complete",
+      "dependencies": [
+        "developer-readiness-20261023"
+      ],
+      "scope": [
+        "Apply supplied transport timing patch on 863dd16",
+        "Run focused and full local validation",
+        "Local commit only; no private configuration changes"
+      ],
+      "done_criteria": [
+        "48 focused tests pass",
+        "Full local gate and required JSON checks pass",
+        "State and documentation reflect new defaults"
+      ],
+      "verification": [
+        "48 focused tests passed",
+        "705 full Python tests passed",
+        "Full Node suite, syntax and secret checks passed",
+        "Required JSON parsing and Python compilation passed"
+      ],
+      "manual_acceptance": [
+        "Real model stream longer than 30 seconds",
+        "Unavailable service response timing",
+        "User chooses provider HTTPS or explicit HTTP opt-in"
+      ]
+    },
+    {
       "id": "developer-readiness-20261023",
       "name": "Developer sharing reliability: eleven-item audit",
       "status": "in_progress",
@@ -85,6 +114,6 @@
       ]
     }
   ],
-  "active_task": "developer-readiness-20261023",
+  "active_task": null,
   "completed_archive": "docs/archive/features-completed-2026-10-23.json"
 }
