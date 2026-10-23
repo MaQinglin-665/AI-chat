@@ -150,9 +150,9 @@ def diagnose_llm_exception(exc, llm_cfg):
     if looks_like_timeout_error(lower):
         return DiagnosticError(
             code="llm_connection_timeout",
-            reason="连接 LLM 服务超时。",
-            solution="请检查服务负载与网络状况，必要时增大 llm.request_timeout。",
-            config_key="llm.request_timeout",
+            reason="网络好像断了，模型服务未在本轮时限内响应。",
+            solution="请检查网络或模型服务后重试；本轮请求共用 llm.turn_timeout_sec 时限。",
+            config_key="llm.turn_timeout_sec",
             detail=raw,
         )
 

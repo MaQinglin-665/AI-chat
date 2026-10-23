@@ -442,6 +442,8 @@ def _handle_chat_stream_request(
             total_ms=perf_now_ms_func() - perf_started_ms,
             pre_finalized=already_finalized,
         )
+    except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+        return
     except Exception as exc:
         diagnosed = diagnose_llm_exception_func(exc, chat_config.get("llm", {}))
         log_backend_exception_func("CHAT_STREAM", diagnosed, extra="/api/chat_stream failed")
@@ -570,6 +572,8 @@ def _handle_chat_request(
             total_ms=perf_now_ms_func() - perf_started_ms,
             reply_chars=len(str(reply or "")),
         )
+    except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+        return
     except Exception as exc:
         diagnosed = diagnose_llm_exception_func(exc, chat_config.get("llm", {}))
         log_backend_exception_func("CHAT", diagnosed, extra="/api/chat failed")

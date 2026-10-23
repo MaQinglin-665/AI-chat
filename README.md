@@ -87,6 +87,8 @@ RELEASE-ASSETS.md
 
 ## 快速开始
 
+开发者自行配置 API Key 试用当前源码，请先阅读 [开发者源码试用](docs/developer-sharing.md)。
+
 ### 1. 普通 Windows 用户下载安装器
 
 在 release 页面优先下载：

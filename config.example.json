@@ -43,7 +43,8 @@
     "api_key": "",
     "max_output_tokens": 72,
     "verbosity": "low",
-    "reasoning_effort": ""
+    "reasoning_effort": "",
+    "turn_timeout_sec": 30
   },
   "character_runtime": {
     "enabled": false,

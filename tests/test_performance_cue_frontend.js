@@ -2043,7 +2043,7 @@ if (fs.existsSync(MOTION_RUNTIME_CONTROLLER_JS)) {
 if (fs.existsSync(INDEX_HTML)) {
   const indexSource = fs.readFileSync(INDEX_HTML, "utf8");
   const perfCueScript = '<script src="./performanceCueController.js"></script>';
-  const timelineScript = '<script src="./performanceTimelineController.js"></script>';
+  const timelineScript = '<script src="./devFeatureLoader.js"></script>';
   const overlayScript = '<script src="./hiyoriEmotionOverlayController.js"></script>';
   assert.ok(indexSource.includes(perfCueScript), "index should load performance cue controller");
   assert.ok(

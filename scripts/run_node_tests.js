@@ -6,6 +6,7 @@ const path = require("path");
 
 const root = path.resolve(__dirname, "..");
 const tests = [
+  "tests/test_readiness_resources.js",
   "tests/test_galgame_player.js",
   "tests/test_galgame_chat_integration.js",
   "tests/test_galgame_performance_transport.js",

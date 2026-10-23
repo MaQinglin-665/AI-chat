@@ -757,10 +757,29 @@
       }
     }
 
+    let rendererReadyPromise = null;
+    let rendererInitialized = false;
+    async function ensureVisibleRenderer() {
+      if (!rendererReadyPromise) {
+        rendererReadyPromise = (async () => {
+          await deps.ensureLive2DRuntime?.();
+          await deps.initLive2D?.();
+          rendererInitialized = true;
+          if (state.uiView === "model") deps.startModelMouseGazePolling?.();
+        })().catch((error) => { rendererReadyPromise = null; throw error; });
+      }
+      await rendererReadyPromise;
+    }
+
     function applyRendererSurfaceActive(active) {
       const next = active !== false;
       state.rendererSurfaceActive = next;
       window.document?.body?.classList?.toggle?.("surface-inactive", !next);
+      if (next && state._lazyRendererEnabled && !rendererInitialized) {
+        ensureVisibleRenderer().then(() => applyRendererSurfaceActive(state.rendererSurfaceActive))
+          .catch((error) => { consoleObject.error(error); setStatus("Renderer unavailable"); });
+        return;
+      }
       const ticker = state.pixiApp?.ticker;
       if (!ticker) {
         return;
@@ -792,7 +811,12 @@
         state.surfaceVisibilityUnsubscribe();
       }
       const documentObject = window.document;
-      const handleVisibilityChange = () => applyRendererSurfaceActive(documentObject?.hidden !== true);
+      const handleVisibilityChange = async () => {
+        const active = typeof api.getSurfaceActive === "function"
+          ? await api.getSurfaceActive().catch(() => false)
+          : documentObject?.hidden !== true;
+        applyRendererSurfaceActive(active);
+      };
       documentObject?.addEventListener?.("visibilitychange", handleVisibilityChange);
       state.surfaceVisibilityUnsubscribe = () => {
         documentObject?.removeEventListener?.("visibilitychange", handleVisibilityChange);
@@ -834,10 +858,9 @@
 
         if (state.uiView === "model") {
           await loadModelStartupPreferences();
-          await deps.ensureLive2DRuntime?.();
-          await deps.initLive2D?.();
+          state._lazyRendererEnabled = true;
           await installRendererSurfaceBridge();
-          deps.startModelMouseGazePolling?.();
+          if (state.rendererSurfaceActive !== false) await ensureVisibleRenderer();
           startModelSpeechBroadcastListener();
           setStatus("待机");
           return;
@@ -851,9 +874,9 @@
           return;
         }
 
-        await deps.ensureLive2DRuntime?.();
-        await deps.initLive2D?.();
+        state._lazyRendererEnabled = true;
         await installRendererSurfaceBridge();
+        if (state.rendererSurfaceActive !== false) await ensureVisibleRenderer();
         startChatRuntimeShell({ broadcastSpeech: state.desktopMode === true });
         if (state.model) {
           setStatus("待机");

@@ -353,7 +353,7 @@ def test_delivered_turn_stays_uncommitted_when_terminal_json_write_fails():
     assert len(recorder.staged) == 1
     assert recorder.remembered == []
     assert recorder.sessions == []
-    assert writes[-1]["status"] == HTTPStatus.INTERNAL_SERVER_ERROR
+    assert len(writes) == 1  # Do not write an error to a disconnected renderer.
 
 
 def test_delivered_turn_stays_uncommitted_when_terminal_sse_write_fails():
@@ -375,7 +375,7 @@ def test_delivered_turn_stays_uncommitted_when_terminal_sse_write_fails():
     assert len(recorder.staged) == 1
     assert recorder.remembered == []
     assert recorder.sessions == []
-    assert recorder.sse[-1]["type"] == "error"
+    assert not any(event["type"] == "error" for event in recorder.sse)
 
 
 def test_delivered_turn_commit_uses_current_session_not_request_snapshot():

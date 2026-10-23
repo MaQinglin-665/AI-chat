@@ -1,3 +1,4 @@
+from llm_deadline import LLMTransportError, network_chunks
 import json
 import os
 import socket
@@ -80,37 +81,39 @@ def iter_openai_chat_stream(llm_cfg, messages):
     try:
         started_at = time.monotonic()
         yielded_any = False
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            for raw_line in resp:
-                _raise_if_no_stream_delta(started_at, timeout, yielded_any)
-                line = raw_line.decode("utf-8", errors="ignore").strip()
-                if not line or not line.startswith("data:"):
+        for raw_line in network_chunks(urllib.request.urlopen, req, timeout, stream=True):
+            _raise_if_no_stream_delta(started_at, timeout, yielded_any)
+            line = raw_line.decode("utf-8", errors="ignore").strip()
+            if not line or not line.startswith("data:"):
+                continue
+            data_str = line[5:].strip()
+            if data_str == "[DONE]":
+                return
+            if not data_str:
+                continue
+            try:
+                data = json.loads(data_str)
+            except Exception:
+                continue
+            choices = data.get("choices") or []
+            for choice in choices:
+                delta = choice.get("delta") or {}
+                content = delta.get("content")
+                if isinstance(content, str) and content:
+                    yielded_any = True
+                    yield content
                     continue
-                data_str = line[5:].strip()
-                if not data_str or data_str == "[DONE]":
-                    continue
-                try:
-                    data = json.loads(data_str)
-                except Exception:
-                    continue
-                choices = data.get("choices") or []
-                for choice in choices:
-                    delta = choice.get("delta") or {}
-                    content = delta.get("content")
-                    if isinstance(content, str) and content:
-                        yielded_any = True
-                        yield content
-                        continue
-                    if isinstance(content, list):
-                        for part in content:
-                            if not isinstance(part, dict):
-                                continue
-                            text = part.get("text")
-                            if isinstance(text, str) and text:
-                                yielded_any = True
-                                yield text
+                if isinstance(content, list):
+                    for part in content:
+                        if not isinstance(part, dict):
+                            continue
+                        text = part.get("text")
+                        if isinstance(text, str) and text:
+                            yielded_any = True
+                            yield text
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
+        detail = str(exc.reason)
+        exc.close()
         raise RuntimeError(f"LLM HTTP {exc.code}: {detail}") from exc
     except (
         urllib.error.URLError,
@@ -121,7 +124,7 @@ def iter_openai_chat_stream(llm_cfg, messages):
         BrokenPipeError,
         OSError,
     ) as exc:
-        raise RuntimeError(f"LLM connection failed: {exc}") from exc
+        raise LLMTransportError("LLM connection failed: 网络好像断了，请检查网络或模型服务。") from exc
 
 
 def iter_openai_responses_stream(llm_cfg, messages):
@@ -158,40 +161,42 @@ def iter_openai_responses_stream(llm_cfg, messages):
     try:
         started_at = time.monotonic()
         yielded_any = False
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            for raw_line in resp:
-                _raise_if_no_stream_delta(started_at, timeout, yielded_any)
-                line = raw_line.decode("utf-8", errors="ignore").strip()
-                if not line or not line.startswith("data:"):
-                    continue
-                data_str = line[5:].strip()
-                if not data_str or data_str == "[DONE]":
-                    continue
-                try:
-                    evt = json.loads(data_str)
-                except Exception:
-                    continue
+        for raw_line in network_chunks(urllib.request.urlopen, req, timeout, stream=True):
+            _raise_if_no_stream_delta(started_at, timeout, yielded_any)
+            line = raw_line.decode("utf-8", errors="ignore").strip()
+            if not line or not line.startswith("data:"):
+                continue
+            data_str = line[5:].strip()
+            if data_str == "[DONE]":
+                return
+            if not data_str:
+                continue
+            try:
+                evt = json.loads(data_str)
+            except Exception:
+                continue
 
-                evt_type = str(evt.get("type") or "")
-                if evt_type == "response.output_text.delta":
-                    delta = evt.get("delta")
-                    if isinstance(delta, str) and delta:
-                        yielded_any = True
-                        yield delta
-                    continue
+            evt_type = str(evt.get("type") or "")
+            if evt_type == "response.output_text.delta":
+                delta = evt.get("delta")
+                if isinstance(delta, str) and delta:
+                    yielded_any = True
+                    yield delta
+                continue
 
-                if evt_type == "response.completed":
-                    return
+            if evt_type == "response.completed":
+                return
 
-                if evt_type in {"response.failed", "response.incomplete"}:
-                    detail = evt.get("response") or evt
-                    raise RuntimeError(f"Responses stream failed: {detail}")
+            if evt_type in {"response.failed", "response.incomplete"}:
+                detail = evt.get("response") or evt
+                raise RuntimeError(f"Responses stream failed: {detail}")
 
-                if evt_type in {"error", "response.error"}:
-                    detail = evt.get("error") or evt.get("message") or str(evt)
-                    raise RuntimeError(f"Responses stream error: {detail}")
+            if evt_type in {"error", "response.error"}:
+                detail = evt.get("error") or evt.get("message") or str(evt)
+                raise RuntimeError(f"Responses stream error: {detail}")
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
+        detail = str(exc.reason)
+        exc.close()
         raise RuntimeError(f"LLM HTTP {exc.code}: {detail}") from exc
     except (
         urllib.error.URLError,
@@ -202,7 +207,7 @@ def iter_openai_responses_stream(llm_cfg, messages):
         BrokenPipeError,
         OSError,
     ) as exc:
-        raise RuntimeError(f"LLM connection failed: {exc}") from exc
+        raise LLMTransportError("LLM connection failed: 网络好像断了，请检查网络或模型服务。") from exc
 
 
 def iter_ollama_chat_stream(llm_cfg, messages, model_override=None):
@@ -240,32 +245,32 @@ def iter_ollama_chat_stream(llm_cfg, messages, model_override=None):
     try:
         started_at = time.monotonic()
         yielded_any = False
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            for raw_line in resp:
-                _raise_if_no_stream_delta(started_at, timeout, yielded_any)
-                line = raw_line.decode("utf-8", errors="ignore").strip()
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                except Exception:
-                    continue
-                if isinstance(data.get("error"), str) and data["error"].strip():
-                    raise RuntimeError(f"Ollama error: {data['error']}")
-                message = data.get("message") or {}
-                content = message.get("content")
-                if isinstance(content, str) and content:
-                    yielded_any = True
-                    yield content
-                    continue
-                response = data.get("response")
-                if isinstance(response, str) and response:
-                    yielded_any = True
-                    yield response
-                if data.get("done") is True:
-                    return
+        for raw_line in network_chunks(urllib.request.urlopen, req, timeout, stream=True):
+            _raise_if_no_stream_delta(started_at, timeout, yielded_any)
+            line = raw_line.decode("utf-8", errors="ignore").strip()
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(data.get("error"), str) and data["error"].strip():
+                raise RuntimeError(f"Ollama error: {data['error']}")
+            message = data.get("message") or {}
+            content = message.get("content")
+            if isinstance(content, str) and content:
+                yielded_any = True
+                yield content
+                continue
+            response = data.get("response")
+            if isinstance(response, str) and response:
+                yielded_any = True
+                yield response
+            if data.get("done") is True:
+                return
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
+        detail = str(exc.reason)
+        exc.close()
         raise RuntimeError(f"LLM HTTP {exc.code}: {detail}") from exc
     except (
         urllib.error.URLError,
@@ -276,4 +281,4 @@ def iter_ollama_chat_stream(llm_cfg, messages, model_override=None):
         BrokenPipeError,
         OSError,
     ) as exc:
-        raise RuntimeError(f"LLM connection failed: {exc}") from exc
+        raise LLMTransportError("LLM connection failed: 网络好像断了，请检查网络或模型服务。") from exc

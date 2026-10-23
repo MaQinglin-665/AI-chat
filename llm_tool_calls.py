@@ -1,3 +1,4 @@
+from llm_deadline import LLMTransportError
 import json
 import os
 
@@ -199,6 +200,8 @@ def call_openai_compatible_with_tools(
             http_post_json_fn=http_post_json_fn,
             execute_work_tool_fn=execute_work_tool_fn,
         )
+    except LLMTransportError:
+        raise
     except Exception:
         pass
 
@@ -248,6 +251,8 @@ def call_openai_compatible_with_tools(
             data = http_post_json_fn(
                 f"{base_url}/responses", payload, headers=headers, timeout=150
             )
+        except LLMTransportError:
+            raise
         except Exception:
             if executed_payloads:
                 return render_tool_execution_summary(

@@ -178,3 +178,18 @@ def test_handle_tts_stream_request_forwards_chunks_without_joining():
     assert list(sent["body"]) == [b"header", b"pcm-1", b"pcm-2"]
     assert sent["content_type"] == "audio/wav"
     assert sent["headers"]["X-Perf-Trace-Id"] == "stream-test"
+
+
+def test_aborted_audio_stream_is_not_logged_as_error():
+    errors = []
+    def disconnected(*args, **kwargs): raise ConnectionAbortedError("client stopped")
+    handle_tts_stream_request(
+        {"text":"hello"}, perf_trace_id="abort", perf_started_ms=0,
+        client_to_server_ms=0, perf_headers={}, send_json_func=disconnected,
+        send_audio_stream_func=disconnected,
+        open_tts_stream_func=lambda *args, **kwargs:(iter([b"audio"]), "audio/wav"),
+        log_backend_perf_func=lambda *args, **kwargs:None,
+        log_backend_exception_func=lambda *args, **kwargs:errors.append(args),
+        diagnostic_payload_func=lambda exc:{"error":str(exc)}, perf_now_ms_func=lambda:1,
+    )
+    assert not errors
