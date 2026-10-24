@@ -1,3 +1,4 @@
+from llm_deadline import LLMTransportError
 """Bounded JSON-lines direction. Only validated dialogue leaves this module."""
 import json
 import math
@@ -120,6 +121,8 @@ def directed_stream(iterators, context, user_message, config):
                 yield segment["text"]
             return
         except Exception as exc:
+            if isinstance(exc, LLMTransportError):
+                raise
             if delivered:
                 raise RuntimeError("Galgame 对话中断，请重新发送消息。") from exc
             last_error = exc

@@ -98,3 +98,10 @@ dist/
 tests/artifacts/
 web/assets/galgame-characters/**/*-test.png
 web/assets/galgame-characters/**/*-preview.png
+
+# Temporary private state and rotated runtime logs
+*.tmp
+*.log.*
+
+.local-*-result.txt
+.local-dependency-resolution.*

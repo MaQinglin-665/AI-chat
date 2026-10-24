@@ -235,7 +235,8 @@
         ui.conversationCollapseBtn.setAttribute("aria-label", nextExpanded ? "收起对话历史" : "展开对话历史");
         ui.conversationCollapseBtn.setAttribute("title", nextExpanded ? "收起对话历史" : "展开对话历史");
       };
-      const compactStage = windowObject.matchMedia?.("(max-width: 820px)")?.matches === true;
+      const splitChat = windowObject.document?.body?.classList?.contains("view-chat") === true;
+      const compactStage = !splitChat && windowObject.matchMedia?.("(max-width: 820px)")?.matches === true;
       setConversationRailExpanded(
         ui.conversationCollapseBtn.getAttribute("aria-expanded") !== "false" && !compactStage
       );

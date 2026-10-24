@@ -125,6 +125,8 @@ def handle_tts_request(
             audio_bytes=len(audio),
             audio_duration_ms=estimate_wav_duration_ms(audio),
         )
+    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+        return
     except Exception as exc:
         log_backend_perf_func(
             "TTS",
@@ -194,7 +196,7 @@ def handle_tts_stream_request(
             stage="response_closed",
             total_ms=perf_now_ms_func() - perf_started_ms,
         )
-    except (BrokenPipeError, ConnectionResetError):
+    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
         log_backend_perf_func("TTS_STREAM", perf_trace_id, stage="client_disconnected")
     except Exception as exc:
         log_backend_exception_func(

@@ -1,1 +1,8 @@
 /* Schedule panel styles are progressively moved from base.css. */
+
+.schedule-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

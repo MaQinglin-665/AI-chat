@@ -1,6 +1,10 @@
 (function (root) {
   "use strict";
 
+  const reminderUtils = root.TaffyReminderUtils || (
+    typeof module !== "undefined" && module.exports ? require("./reminderUtils.js") : {}
+  );
+
   function defaultNormalizeRepeat(repeat) {
     return String(repeat || "").toLowerCase() === "daily" ? "daily" : "once";
   }
@@ -46,8 +50,9 @@
       return { ok: false, reason: "missing_text", focus: "text", message: "请先写下让馨语AI桌宠做什么" };
     }
 
-    let dueAt = new Date(rawDate).getTime();
-    if (!Number.isFinite(dueAt)) {
+    let dueAt = typeof reminderUtils.parseLocalDateTime === "function"
+      ? reminderUtils.parseLocalDateTime(rawDate) : 0;
+    if (!Number.isFinite(dueAt) || !dueAt) {
       return { ok: false, reason: "invalid_time", focus: "time", message: "日程时间格式无效" };
     }
 

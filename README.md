@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6"><img alt="version" src="https://img.shields.io/badge/version-v1.4.0--preview.6-6f5bd5"></a>
+  <a href="https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.7"><img alt="version" src="https://img.shields.io/badge/version-v1.4.0--preview.7-6f5bd5"></a>
   <img alt="status" src="https://img.shields.io/badge/status-MVP%20preview-f59e0b">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-2563eb">
   <img alt="python" src="https://img.shields.io/badge/Python-3.10%2B-3776ab">
@@ -44,13 +44,15 @@ Galgame 当前提供三种角色风格：DeepSeek 阳光活泼，Claude 典雅�
 
 ## 本轮源码更新
 
+- **官方 DeepSeek 配置**：新安装默认使用 `https://api.deepseek.com` 和 `deepseek-flash`，采用非思考模式。请填写自己的 API Key；旧用户配置保持兼容。
+
 - **对话与表演同步**：逐句生成、打字机显示和朗读；跳句、退出或换人会取消旧播放。Galgame 使用独立的结构化输出预算，避免普通短回复限制截断动作信息。
 - **更自然的交流**：调整角色说话风格，增加结合当前对话状态决定回应或等待的可选交互逻辑。
 - **可管理的长期记忆**：创建、编辑、固定与删除记忆，查看待整理内容；修正后续检索仍命中被删除内容的问题。
 - **场景与界面**：晨间、白天、黄昏、夜间场景选择，舞台动效和控制中心整理。
 - **桌面上下文边界**：加强密码、登录等敏感界面的上下文过滤；桌面感知仍需显式开启，过滤并不等同于保证识别所有敏感内容。
 
-上述内容描述本更新分支的源码，**不表示历史安装包已包含这些功能**。最近发布的安装包仍为 [v1.4.0-preview.6](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6)；本轮没有创建新安装包或新版本标签。
+本轮预览版为 [v1.4.0-preview.7](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.7)，包含响应超时、说话动作、后台口型和首次配置改进。详见 [preview.7 说明](docs/release-notes-v1.4.0-preview.7.md)。
 
 模型实测与限制见 [Galgame 验收记录](docs/galgame-live-acceptance.md)，本轮变更范围见 [源码更新说明](docs/source-update-2026-09.md)。
 
@@ -58,12 +60,12 @@ Galgame 当前提供三种角色风格：DeepSeek 阳光活泼，Claude 典雅�
 
 如果你只是想试用，不需要先访问项目网站，直接打开 GitHub Release：
 
-[下载 v1.4.0-preview.6](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.6)
+[下载 v1.4.0-preview.7](https://github.com/MaQinglin-665/AI-chat/releases/tag/v1.4.0-preview.7)
 
 普通 Windows 用户优先下载这 3 个文件：
 
 ```text
-Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.7.exe
 SHA256SUMS.txt
 RELEASE-ASSETS.md
 ```
@@ -87,12 +89,14 @@ RELEASE-ASSETS.md
 
 ## 快速开始
 
+开发者自行配置 API Key 试用当前源码，请先阅读 [开发者源码试用](docs/developer-sharing.md)。
+
 ### 1. 普通 Windows 用户下载安装器
 
 在 release 页面优先下载：
 
 ```text
-Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe
+Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.7.exe
 SHA256SUMS.txt
 RELEASE-ASSETS.md
 ```
@@ -102,7 +106,7 @@ RELEASE-ASSETS.md
 首发安装器未签名。运行前建议先校验 SHA256：
 
 ```powershell
-Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.6.exe -Algorithm SHA256
+Get-FileHash .\Xinyu-AI-Desktop-Pet-Setup-v1.4.0-preview.7.exe -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt
 ```
 
@@ -115,7 +119,7 @@ Get-Content .\SHA256SUMS.txt
 需要看源码或参与开发时，下载 release 里的源码测试包：
 
 ```text
-Xinyu-AI-Desktop-Pet-v1.4.0-preview.6-windows-source-test.zip
+Xinyu-AI-Desktop-Pet-v1.4.0-preview.7-windows-source-test.zip
 ```
 
 解压后确认根目录至少包含：
@@ -203,6 +207,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 .\install_first_run.bat
 ```
 
+Windows x64 / Python 3.12 使用已验证的间接依赖约束，安装后会检查依赖一致性和实际导入。开发者可用 `scripts\bootstrap-first-run.ps1 -Dev` 同时安装测试依赖；启动与本地检查支持项目内的 Node 和 `.venv`。验证记录与已知限制见 [全新环境依赖验证](docs/clean-dependency-validation-20261024.md)。
+
 ## 常用命令
 
 开发者本地验证：
@@ -246,6 +252,7 @@ config.py      配置加载与安全默认值
 - 常见问题与排障：[docs/troubleshooting.md](docs/troubleshooting.md)
 - 后端健康接口：[docs/backend-health.md](docs/backend-health.md)
 - 可视化配置中心：[docs/config.html](docs/config.html)
+- 日程指令与失败重试：[docs/reminder-reliability.md](docs/reminder-reliability.md)
 
 后端启动后可以访问：
 

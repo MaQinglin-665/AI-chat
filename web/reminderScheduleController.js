@@ -23,6 +23,9 @@
     const closePersonaPanel = typeof deps.closePersonaPanel === "function" ? deps.closePersonaPanel : () => {};
     const isLearningReviewOpen = typeof deps.isLearningReviewOpen === "function" ? deps.isLearningReviewOpen : () => false;
     const closeLearningReviewDrawer = typeof deps.closeLearningReviewDrawer === "function" ? deps.closeLearningReviewDrawer : () => {};
+    const inFlightReminders = new Set();
+    const nowMs = typeof deps.now === "function" ? deps.now : () => Date.now();
+    const retryDelaysMs = [30000, 120000];
     function getLocalDateKey(date = new Date()) {
       const y = date.getFullYear();
       const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -83,7 +86,7 @@
     function buildReminderTypeLabel(item) {
       return typeof REMINDER_UTILS.buildReminderTypeLabel === "function"
         ? REMINDER_UTILS.buildReminderTypeLabel(item)
-        : "????";
+        : "普通提醒";
     }
 
     function buildDefaultScheduleDateTimeValue() {
@@ -140,7 +143,15 @@
         buildReminderDisplayTime,
         onRemove: (item) => {
           const ok = removeReminderById(item?.id);
-          setStatus(ok ? "?????" : "??????");
+          setStatus(ok ? "已删除日程" : "未找到该日程");
+        },
+        onRetry: (item) => {
+          if (inFlightReminders.has(item.id) || !state.reminders.includes(item)) return;
+          delete item.retryAttempts;
+          delete item.retryAt;
+          delete item.retryPaused;
+          saveRemindersToStorage();
+          setStatus(`已安排重试日程 #${item.id}`);
         }
       }, document);
     }
@@ -193,9 +204,9 @@
           normalizeReminderMode,
           shiftReminderToNextDay
         })
-        : { ok: false, message: "???????", focus: "time" };
+        : { ok: false, message: "日程功能尚未就绪，请重新打开窗口", focus: "time" };
       if (!draft.ok) {
-        setStatus(draft.message || "??????");
+        setStatus(draft.message || "日程设置无效，请检查时间和内容");
         if (draft.focus === "text") {
           ui.scheduleTask.focus();
         } else {
@@ -207,7 +218,7 @@
       const id = addReminder(draft.text, draft.dueAt, { mode: draft.mode, repeat: draft.repeat });
       ui.scheduleTask.value = "";
       ui.scheduleDatetime.value = buildDefaultScheduleDateTimeValue();
-      setStatus(`????? #${id}`);
+      setStatus(`已添加日程 #${id}`);
     }
 
     function loadEmotionStats() {
@@ -293,49 +304,73 @@
       if (normalizeReminderRepeat(item.repeat) === "daily") {
         item.done = false;
         item.dueAt = shiftReminderToNextDay(item.dueAt);
+        if (item.dueAt <= nowMs()) {
+          item.dueAt = normalizeDailyReminderDueAt(item.dueAt, nowMs());
+          if (item.dueAt <= nowMs()) item.dueAt = shiftReminderToNextDay(item.dueAt);
+        }
       } else {
         item.done = true;
       }
     }
 
     function startAssistantReminder(item) {
-      if (!item || state.chatBusy) {
+      if (!item || state.chatBusy || inFlightReminders.size || item.retryPaused
+          || Number(item.retryAt) > nowMs()) {
         return false;
       }
-      const snapshot = {
-        dueAt: Number(item.dueAt) || Date.now(),
-        done: !!item.done
-      };
       const scheduleLabel = buildReminderDisplayTime(item);
       const taskText = String(item.text || "").trim();
       const reminderMode = normalizeReminderMode(item.mode);
       if (!taskText) {
         return false;
       }
-      markReminderTriggered(item);
+      const attempts = Math.max(0, Math.floor(Number(item.retryAttempts) || 0));
+      // An interrupted final attempt must not gain another automatic attempt on reload.
+      if (attempts >= 3 || (reminderMode === "tool" && attempts > 0)) {
+        item.retryPaused = true;
+        saveRemindersToStorage();
+        return false;
+      }
+      inFlightReminders.add(item.id);
+      item.retryAttempts = attempts + 1;
+      item.retryAt = nowMs() + retryDelaysMs[0];
       saveRemindersToStorage();
       const promptPrefix = reminderMode === "tool"
         ? `（日程工具任务：${scheduleLabel}）请直接完成这项任务；如果涉及文件、代码、命令或图片，请优先调用工具再给我简短汇报。`
         : `（日程任务：${scheduleLabel}）`;
-      requestAssistantReply(`${promptPrefix}${taskText}`, {
+      Promise.resolve().then(() => requestAssistantReply(`${promptPrefix}${taskText}`, {
         showUser: false,
         rememberUser: false,
         rememberAssistant: false,
         auto: true,
         silentError: true,
         forceTools: reminderMode === "tool"
-      }).then((ok) => {
+      })).then((ok) => {
+        if (!state.reminders.includes(item)) return;
         if (ok) {
+          markReminderTriggered(item);
+          delete item.retryAttempts;
+          delete item.retryAt;
+          delete item.retryPaused;
+          saveRemindersToStorage();
           return;
         }
-        item.dueAt = snapshot.dueAt;
-        item.done = snapshot.done;
-        saveRemindersToStorage();
+        failReminder();
       }).catch(() => {
-        item.dueAt = snapshot.dueAt;
-        item.done = snapshot.done;
-        saveRemindersToStorage();
+        failReminder();
+      }).finally(() => {
+        inFlightReminders.delete(item.id);
       });
+
+      function failReminder() {
+        if (!state.reminders.includes(item)) return;
+        item.retryPaused = reminderMode === "tool" || item.retryAttempts >= 3;
+        item.retryAt = item.retryPaused ? 0 : nowMs() + retryDelaysMs[item.retryAttempts - 1];
+        setStatus(item.retryPaused
+          ? `日程 #${item.id} 执行失败，已暂停；可在日程中手动重试`
+          : `日程 #${item.id} 执行失败，将稍后重试`);
+        saveRemindersToStorage();
+      }
       return true;
     }
 
@@ -347,12 +382,13 @@
       if (state.chatBusy) {
         return;
       }
-      const now = Date.now();
+      const now = nowMs();
       let assistantItem = null;
       for (const item of state.reminders) {
         if (!item || item.done) {
           continue;
         }
+        if (item.retryPaused || Number(item.retryAt) > now) continue;
         if ((Number(item.dueAt) || 0) > now) {
           continue;
         }

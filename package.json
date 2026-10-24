@@ -1,7 +1,7 @@
 {
   "name": "xinyu-ai-desktop-pet",
   "productName": "馨语AI桌宠",
-  "version": "1.4.0-preview.6",
+  "version": "1.4.0-preview.7",
   "private": true,
   "description": "馨语桌宠 / Xinyu Desktop Pet: experimental Windows AI companion with Live2D, visual-novel dialogue, speech and editable memory",
   "main": "electron/main.js",
