@@ -5,6 +5,18 @@
     return typeof options.now === "function" ? Number(options.now()) : Date.now();
   }
 
+  function parseLocalDateTime(raw) {
+    const match = String(raw || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})[t\s]+(\d{1,2}):(\d{2})$/i);
+    if (!match) return 0;
+    const [year, month, day, hour, minute] = match.slice(1).map(Number);
+    if (year < 1000 || month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return 0;
+    const date = new Date(year, month - 1, day, hour, minute, 0, 0);
+    // Date silently normalizes impossible dates (February 30, skipped local hours).
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day
+        || date.getHours() !== hour || date.getMinutes() !== minute) return 0;
+    return date.getTime();
+  }
+
   function parseReminderWhen(rawWhen, options = {}) {
     const src = String(rawWhen || "").trim().toLowerCase();
     if (!src) {
@@ -13,7 +25,8 @@
     const now = getNow(options);
     const rel = src.match(/^(\d{1,4})\s*(s|sec|secs|second|seconds|秒|m|min|mins|minute|minutes|分|分钟|h|hr|hrs|hour|hours|时|小时)$/i);
     if (rel) {
-      const amount = Math.max(1, Number(rel[1]) || 0);
+      const amount = Number(rel[1]);
+      if (amount <= 0) return 0;
       const unit = String(rel[2] || "").toLowerCase();
       if (["s", "sec", "secs", "second", "seconds", "秒"].includes(unit)) {
         return now + amount * 1000;
@@ -25,8 +38,9 @@
     }
     const hm = src.match(/^(\d{1,2}):(\d{2})$/);
     if (hm) {
-      const hh = Math.max(0, Math.min(23, Number(hm[1]) || 0));
-      const mm = Math.max(0, Math.min(59, Number(hm[2]) || 0));
+      const hh = Number(hm[1]);
+      const mm = Number(hm[2]);
+      if (hh > 23 || mm > 59) return 0;
       const dt = new Date(now);
       dt.setHours(hh, mm, 0, 0);
       if (dt.getTime() <= now) {
@@ -34,16 +48,7 @@
       }
       return dt.getTime();
     }
-    const full = src.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})$/);
-    if (full) {
-      const y = Number(full[1]) || 0;
-      const mo = Math.max(1, Math.min(12, Number(full[2]) || 1)) - 1;
-      const d = Math.max(1, Math.min(31, Number(full[3]) || 1));
-      const hh = Math.max(0, Math.min(23, Number(full[4]) || 0));
-      const mm = Math.max(0, Math.min(59, Number(full[5]) || 0));
-      return new Date(y, mo, d, hh, mm, 0, 0).getTime();
-    }
-    return 0;
+    return parseLocalDateTime(src);
   }
 
   function formatReminderTime(ts, options = {}) {
@@ -107,6 +112,7 @@
   }
 
   const api = {
+    parseLocalDateTime,
     parseReminderWhen,
     formatReminderTime,
     normalizeReminderMode,

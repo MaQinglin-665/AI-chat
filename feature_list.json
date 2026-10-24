@@ -1,6 +1,39 @@
 {
   "features": [
     {
+      "id": "reminder-reliability-20261024",
+      "name": "Reliable reminder dates and bounded scheduled execution retries",
+      "status": "complete",
+      "dependencies": [
+        "clean-dependency-validation-20261024"
+      ],
+      "scope": [
+        "Strict local reminder dates and full-date commands",
+        "Readable schedule status",
+        "Persisted bounded retries and manual recovery"
+      ],
+      "done_criteria": [
+        "Advertised full-date command creates the intended reminder",
+        "Invalid dates are rejected without silent adjustment",
+        "Failed scheduled replies cannot retry every polling tick or overlap",
+        "Retry state survives reload and offers manual recovery",
+        "Focused regressions, full local gate and browser schedule flow pass"
+      ],
+      "description": "Fix reproduced reminder defects after project capability review; preserve existing behavior and security defaults.",
+      "verification": [
+        "740 Python tests passed (84.52 s), all 56 Node frontend suites including new reminder regressions passed",
+        "Python syntax 165 files, JavaScript syntax 194 files and secret scan 716 files passed; required JSON/ten-module compilation and diff checks passed",
+        "Docs publish check and four Chromium smoke tests passed (7.1 s)",
+        "Isolated Chromium source fixture and actual installed assets: create schedule, restore paused state, manual retry and multiple polling ticks passed with simulated offline API",
+        "Seven installed frontend files backed up and synchronized; hashes verified; private configuration and startup manifest unchanged"
+      ],
+      "limitations": [
+        "Source normal startup still has the inherited separate controller-loading issue; source browser fixture uses installed startup manifest only",
+        "No real-model scheduled tasks, microphone/audio-device or hour-long acceptance in this task",
+        "Cross-window scheduling ownership is not changed; daily failures stay paused until manual recovery"
+      ]
+    },
+    {
       "id": "clean-dependency-validation-20261024",
       "name": "Clean Windows dependency installation and startup validation",
       "status": "complete",
@@ -319,6 +352,6 @@
       ]
     }
   ],
-  "active_task": "clean-dependency-validation-20261024",
+  "active_task": "reminder-reliability-20261024",
   "completed_archive": "docs/archive/features-completed-2026-10-23.json"
 }
