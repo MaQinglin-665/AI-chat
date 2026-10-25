@@ -327,8 +327,8 @@ if (mismatches.length) {
     if ($previewCfg.character_runtime.model_direct_reply -ne $true -or $previewCfg.companion_turn.enabled -ne $true) {
         Write-Fail "Preview config should enable the model-direct canonical companion-turn experience."
     }
-    if ($previewCfg.relationship_state.enabled -ne $true -or [string]$previewCfg.assistant_reply_language -ne "en") {
-        Write-Fail "Preview config should enable structured relationship continuity and English-by-default replies."
+    if ($previewCfg.relationship_state.enabled -ne $true -or [string]$previewCfg.assistant_reply_language -ne "auto") {
+        Write-Fail "Preview config should enable structured relationship continuity and follow-user-language replies."
     }
     if ([string]$previewCfg.assistant_prompt -match "Do not say you are an AI unless directly asked") {
         Write-Fail "Preview config should keep the companion candid about its AI identity when relevant."
