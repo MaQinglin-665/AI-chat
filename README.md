@@ -252,6 +252,7 @@ config.py      配置加载与安全默认值
 - 常见问题与排障：[docs/troubleshooting.md](docs/troubleshooting.md)
 - 后端健康接口：[docs/backend-health.md](docs/backend-health.md)
 - 可视化配置中心：[docs/config.html](docs/config.html)
+- 日程指令与失败重试：[docs/reminder-reliability.md](docs/reminder-reliability.md)
 
 后端启动后可以访问：
 

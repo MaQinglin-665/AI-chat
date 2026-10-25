@@ -78,8 +78,31 @@
     main.appendChild(text);
     main.appendChild(meta);
     main.appendChild(time);
+    if (item.retryPaused || Number(item.retryAt) > 0) {
+      const retryStatus = doc.createElement("div");
+      retryStatus.className = "schedule-item-time";
+      retryStatus.setAttribute("role", "status");
+      retryStatus.textContent = item.retryPaused
+        ? (normalizeMode(item.mode) === "tool"
+          ? "执行失败或中断，自动重试已暂停；重试前请检查执行结果。"
+          : "自动重试已暂停，可手动重试。")
+        : `已尝试 ${Number(item.retryAttempts) || 1} 次，稍后自动重试。`;
+      main.appendChild(retryStatus);
+    }
     row.appendChild(main);
-    row.appendChild(delBtn);
+    const actions = doc.createElement("div");
+    actions.className = "schedule-item-actions";
+    if ((item.retryPaused || Number(item.retryAt) > 0) && typeof helpers.onRetry === "function") {
+      const retryBtn = doc.createElement("button");
+      retryBtn.type = "button";
+      retryBtn.className = "schedule-delete-btn";
+      retryBtn.textContent = "重试";
+      retryBtn.setAttribute("aria-label", `重试日程：${String(item.text || "").trim()}`);
+      retryBtn.addEventListener("click", () => helpers.onRetry(item));
+      actions.appendChild(retryBtn);
+    }
+    actions.appendChild(delBtn);
+    row.appendChild(actions);
     container.appendChild(row);
   }
 

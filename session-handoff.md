@@ -1,6 +1,14 @@
 # Session handoff
 
-## Current task — clean dependency validation (2026-10-24)
+## Completed task — reminder reliability (2026-10-24)
+- Branch codex/reminder-reliability-20261024 from b62f759 (#211), inheriting readiness #210. User selected this scope after capability review and reproducible evidence.
+- Strict local date/command parsing; readable status; single-flight AI reminders with 30s/120s backoff and 3 attempts; tool failure/interruption pauses; persisted retry state and manual recovery; daily catch-up bounded.
+- Full gate passed: 740 Python tests, 56 Node suites, syntax/secrets/doctor; required JSON/compile/diff checks. Docs publish and four Chromium smoke tests pass. Evidence: progress.md and docs/reminder-reliability.md.
+- Installed seven frontend files with baseline checks, original backups and hash verification. No private config, memory or startup-manifest changes. No installed app window was running; next opening loads the updated files.
+- Both source-fixture and installed-asset Chromium reminder flows passed against simulated APIs. Source fixture reuses only installed startup manifest because the inherited source-only controller issue remains separate. No real-model schedule/audio/hour-long acceptance claimed.
+- Next: commit, push this feature branch and open its PR to main; do not merge or push main. Further work should separately address source startup loading or real-device acceptance.
+
+## Completed prerequisite — clean dependency validation (2026-10-24)
 
 - Source: codex/developer-readiness-20261023 at 86a93ca; new branch codex/clean-dependency-validation-20261024. User requests a PR to main; no direct main push or merge.
 - Fresh Windows 11 x64 / Python 3.12.9 venv and project-local Node 22.23.4; installs, pip check and actual imports pass. Runtime/dev closure constrained to 84 verified versions for this platform only. Node lockfile is unchanged.
