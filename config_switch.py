@@ -38,6 +38,15 @@ FIRST_RUN_DEFAULT_KEY_ENV = "TAFFY_LLM_API_KEY"
 FIRST_RUN_ALLOWED_PROVIDERS = {"openai-compatible", "openai", "ollama"}
 
 LLM_PRESETS = {
+    "deepseek": {
+        "id": "deepseek",
+        "label": "DeepSeek official",
+        "provider": "openai-compatible",
+        "base_url": "https://api.deepseek.com",
+        "model": "deepseek-flash",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "requires_api_key": True,
+    },
     "dashscope": {
         "id": "dashscope",
         "label": "DashScope / Qwen",
@@ -636,7 +645,7 @@ def _normalize_llm_update(raw):
         raise DiagnosticError(
             code="config_switch_invalid_llm_provider",
             reason=f"Unsupported LLM preset: {preset_id or '(empty)'}",
-            solution="Use dashscope, openai, ollama, or custom_openai_compatible.",
+            solution="Use deepseek, dashscope, openai, ollama, or custom_openai_compatible.",
             config_key="llm.provider",
         )
     preset = LLM_PRESETS[preset_id]

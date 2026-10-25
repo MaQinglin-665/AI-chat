@@ -541,20 +541,14 @@
             state._broadcastSpeechCueOwned = true;
             state._broadcastSpeechCueExpiresAt = timing.cueExpiresAt;
             state._broadcastSpeechCueKey = cueKey;
-            if (cueChanged) {
+            if (cueChanged || !state.speechPerformanceCue) {
               deps.applySpeechPerformanceCue(data.performanceCue);
             }
             if (Number(state.speechPerformanceCueUntil || 0) > 0) {
-              state.speechPerformanceCueUntil = Math.min(
-                Number(state.speechPerformanceCueUntil || 0),
-                timing.cueExpiresAt
-              );
+              state.speechPerformanceCueUntil = timing.cueExpiresAt;
             }
             if (Number(state.speechEmotionPoseUntil || 0) > 0) {
-              state.speechEmotionPoseUntil = Math.min(
-                Number(state.speechEmotionPoseUntil || 0),
-                timing.cueExpiresAt
-              );
+              state.speechEmotionPoseUntil = timing.cueExpiresAt;
             }
             if (Number(state.moodHoldUntil || 0) > 0) {
               const limits = [Number(state.moodHoldUntil || 0), timing.cueExpiresAt];
@@ -593,12 +587,14 @@
             revision: Math.max(0, Number(state.listeningPresenceRevision || 0)),
             phase: listeningActive ? listeningPhase : "idle"
           };
+          // The chat renderer may have no model to sample the expression
+          // layer. Renew its playback-owned cue before publishing the lease.
+          const performanceCue = typeof deps.getActiveSpeechPerformanceCue === "function"
+            ? deps.getActiveSpeechPerformanceCue(now)
+            : state.speechPerformanceCue && (
+                !Number(state.speechPerformanceCueUntil || 0) || now <= Number(state.speechPerformanceCueUntil)
+              ) ? state.speechPerformanceCue : null;
           const performanceCueUntil = Number(state.speechPerformanceCueUntil || 0);
-          const performanceCue = state.speechPerformanceCue && (
-            !performanceCueUntil || now <= performanceCueUntil
-          )
-            ? state.speechPerformanceCue
-            : null;
           const performanceCueDeadline = performanceCue
             ? (performanceCueUntil > 0
               ? performanceCueUntil
@@ -668,7 +664,10 @@
             || Number(state.ttsAudioLevel || 0) > 0.01
             || !!performanceCue
             || now <= Number(state.speechAnimUntil || 0);
-          if (active) {
+          if (active && state.rendererSurfaceActive === false) {
+            state._speechBroadcastScheduleKind = "hidden_speech";
+            state._speechBroadcastTimer = setTimeoutFn(chatSpeechBroadcastLoop, 16);
+          } else if (active) {
             state._speechBroadcastScheduleKind = "animation";
             state._speechBroadcastTimer = requestAnimationFrameFn(chatSpeechBroadcastLoop);
           } else if (performancePhase) {
@@ -757,10 +756,33 @@
       }
     }
 
+    let rendererReadyPromise = null;
+    let rendererInitialized = false;
+    async function ensureVisibleRenderer() {
+      if (!rendererReadyPromise) {
+        rendererReadyPromise = (async () => {
+          await deps.ensureLive2DRuntime?.();
+          await deps.initLive2D?.();
+          rendererInitialized = true;
+          if (state.uiView === "model") deps.startModelMouseGazePolling?.();
+        })().catch((error) => { rendererReadyPromise = null; throw error; });
+      }
+      await rendererReadyPromise;
+    }
+
     function applyRendererSurfaceActive(active) {
       const next = active !== false;
+      const changed = state.rendererSurfaceActive !== next;
       state.rendererSurfaceActive = next;
+      if (changed && state._speechBroadcastScheduleKind === "animation") {
+        requestChatSpeechBroadcastNow();
+      }
       window.document?.body?.classList?.toggle?.("surface-inactive", !next);
+      if (next && state._lazyRendererEnabled && !rendererInitialized) {
+        ensureVisibleRenderer().then(() => applyRendererSurfaceActive(state.rendererSurfaceActive))
+          .catch((error) => { consoleObject.error(error); setStatus("Renderer unavailable"); });
+        return;
+      }
       const ticker = state.pixiApp?.ticker;
       if (!ticker) {
         return;
@@ -792,7 +814,12 @@
         state.surfaceVisibilityUnsubscribe();
       }
       const documentObject = window.document;
-      const handleVisibilityChange = () => applyRendererSurfaceActive(documentObject?.hidden !== true);
+      const handleVisibilityChange = async () => {
+        const active = typeof api.getSurfaceActive === "function"
+          ? await api.getSurfaceActive().catch(() => false)
+          : documentObject?.hidden !== true;
+        applyRendererSurfaceActive(active);
+      };
       documentObject?.addEventListener?.("visibilitychange", handleVisibilityChange);
       state.surfaceVisibilityUnsubscribe = () => {
         documentObject?.removeEventListener?.("visibilitychange", handleVisibilityChange);
@@ -834,10 +861,9 @@
 
         if (state.uiView === "model") {
           await loadModelStartupPreferences();
-          await deps.ensureLive2DRuntime?.();
-          await deps.initLive2D?.();
+          state._lazyRendererEnabled = true;
           await installRendererSurfaceBridge();
-          deps.startModelMouseGazePolling?.();
+          if (state.rendererSurfaceActive !== false) await ensureVisibleRenderer();
           startModelSpeechBroadcastListener();
           setStatus("待机");
           return;
@@ -851,9 +877,9 @@
           return;
         }
 
-        await deps.ensureLive2DRuntime?.();
-        await deps.initLive2D?.();
+        state._lazyRendererEnabled = true;
         await installRendererSurfaceBridge();
+        if (state.rendererSurfaceActive !== false) await ensureVisibleRenderer();
         startChatRuntimeShell({ broadcastSpeech: state.desktopMode === true });
         if (state.model) {
           setStatus("待机");

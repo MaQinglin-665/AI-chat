@@ -3,6 +3,14 @@
 
   const DEFAULT_LLM_PRESETS = [
     {
+      id: "deepseek",
+      label: "DeepSeek official",
+      provider: "openai-compatible",
+      base_url: "https://api.deepseek.com",
+      model: "deepseek-flash",
+      api_key_env: "DEEPSEEK_API_KEY"
+    },
+    {
       id: "dashscope",
       label: "DashScope / Qwen",
       provider: "openai-compatible",

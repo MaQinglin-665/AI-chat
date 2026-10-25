@@ -1,3 +1,4 @@
+from llm_deadline import LLMTransportError, turn_budget
 from config import OLLAMA_DEFAULT_MODEL
 from companion_turn_contract import is_model_direct_reply_enabled
 from galgame_context import build_galgame_personality_prompt
@@ -49,6 +50,7 @@ def build_reply_prompt(
     return prompt
 
 
+@turn_budget
 def call_llm_impl(
     user_message,
     history,
@@ -217,6 +219,7 @@ def call_llm_impl(
     )
 
 
+@turn_budget
 def call_llm_stream_impl(
     user_message,
     history,
@@ -319,7 +322,9 @@ def call_llm_stream_impl(
                 if isinstance(chunk, str) and chunk:
                     streamed = True
                     yield chunk
-        except Exception:
+        except Exception as exc:
+            if isinstance(exc, LLMTransportError) or streamed:
+                raise
             streamed = False
         if streamed:
             return
@@ -329,7 +334,9 @@ def call_llm_stream_impl(
                 if isinstance(chunk, str) and chunk:
                     streamed = True
                     yield chunk
-        except Exception:
+        except Exception as exc:
+            if isinstance(exc, LLMTransportError) or streamed:
+                raise
             streamed = False
         if streamed:
             return
@@ -353,7 +360,9 @@ def call_llm_stream_impl(
                 if isinstance(chunk, str) and chunk:
                     streamed = True
                     yield chunk
-        except Exception:
+        except Exception as exc:
+            if isinstance(exc, LLMTransportError) or streamed:
+                raise
             streamed = False
         if streamed:
             return
