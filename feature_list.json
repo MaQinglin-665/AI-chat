@@ -1,5 +1,6 @@
 {
   "features": [
+    {"id":"visual-polish-v1","name":"夜间房间界面统一与精简","status":"completed","dependencies":["stage-feedback-onboarding-v1"],"done_criteria":["三个尺寸五类界面前后截图","统一令牌与无障碍开关","完整本地验证通过；本地提交、不推送"]},
     {
       "id": "stage-feedback-onboarding-v1",
       "name": "窄屏对话、舞台状态、新手引导与隔离体验实例",

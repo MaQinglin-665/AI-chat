@@ -3,12 +3,12 @@
   function install() {
     if (!root.TaffyGalgamePlayer || document.getElementById("galgame-mode")) return;
     const launcher = document.createElement("button");
-    launcher.id = "galgame-open"; launcher.type = "button"; launcher.textContent = "Galgame";
+    launcher.id = "galgame-open"; launcher.type = "button"; launcher.textContent = "剧情对话"; launcher.title = "剧情对话"; launcher.setAttribute("aria-label", "剧情对话");
     document.querySelector(".utility-actions")?.append(launcher);
     const host = document.createElement("section");
     host.id = "galgame-mode"; host.hidden = true;
     host.setAttribute("role", "dialog"); host.setAttribute("aria-modal", "true"); host.setAttribute("aria-label", "Galgame 对话");
-    host.innerHTML = `<header class="galgame-top"><strong id="galgame-title">深蓝 · 对话</strong><label class="galgame-character-label">角色<select id="galgame-character" aria-label="选择 Galgame 角色"><option value="deepblue">深蓝</option><option value="gpt">GPT</option><option value="claude">Claude</option></select></label><label class="galgame-scene-label">场景<select id="galgame-scene" aria-label="选择 Galgame 场景"><option value="night-room-v2">夜间房间</option><option value="bedroom-morning">晨间卧室</option><option value="classroom-day">晴日教室</option><option value="school-rooftop-sunset">黄昏天台</option><option value="cafe-rain">雨夜咖啡馆</option><option value="bookstore">暮色书店</option><option value="park-spring">春日公园</option><option value="city-street-night">夜晚街道</option><option value="beach-dawn">黎明海边</option><option value="shrine-autumn">秋日神社</option><option value="library-evening">夜读图书馆</option></select></label><button id="galgame-auto-scene" type="button" aria-pressed="true">场景：自动</button><button id="galgame-voice" type="button">语音：开</button><button id="galgame-exit" type="button">返回舞台</button></header>
+    host.innerHTML = `<header class="galgame-top"><strong id="galgame-title">深蓝 · 对话</strong><label class="galgame-character-label">角色<select id="galgame-character" aria-label="选择 Galgame 角色"><option value="deepblue">深蓝</option><option value="gpt">GPT</option><option value="claude">Claude</option></select></label><label class="galgame-scene-label">场景<select id="galgame-scene" aria-label="选择 Galgame 场景"><option value="night-room-v2">夜间房间</option><option value="bedroom-morning">晨间卧室</option><option value="classroom-day">晴日教室</option><option value="school-rooftop-sunset">黄昏天台</option><option value="cafe-rain">雨夜咖啡馆</option><option value="bookstore">暮色书店</option><option value="park-spring">春日公园</option><option value="city-street-night">夜晚街道</option><option value="beach-dawn">黎明海边</option><option value="shrine-autumn">秋日神社</option><option value="library-evening">夜读图书馆</option></select></label><button id="galgame-auto-scene" type="button" aria-pressed="true" title="自动场景" aria-label="自动场景">自动场景</button><button id="galgame-voice" type="button" title="语音" aria-label="语音" aria-pressed="true">语音</button><button id="galgame-exit" type="button">返回舞台</button></header>
       <img id="galgame-sprite" src="./assets/galgame/neutral.png" alt="深蓝，日常表情">
       <div class="galgame-dialogue"><strong id="galgame-name" class="galgame-name">深蓝</strong><div class="galgame-line"><p id="galgame-text">今天想和我聊些什么？</p><button id="galgame-next" type="button" aria-label="停止当前语音并进入下一句" disabled>▶</button></div>
       <span id="galgame-status" role="status">输入消息，开始对话</span><form id="galgame-form"><input id="galgame-input" aria-label="输入消息" placeholder="输入你想说的话…" autocomplete="off"><button type="submit">发送</button></form></div>`;
@@ -98,7 +98,7 @@
       }
       enabled = true; host.hidden = false;
       muted = petState.speakingEnabled === false;
-      el("galgame-voice").textContent = muted ? "语音：关" : "语音：开";
+      el("galgame-voice").setAttribute("aria-pressed", String(!muted));
       document.body.classList.add("galgame-active");
       inertNodes = Array.from(document.body.children).filter(n => n !== host && !["SCRIPT", "TEMPLATE", "LINK"].includes(n.tagName)).map(n => [n, n.inert]);
       inertNodes.forEach(([node]) => { node.inert = true; });
@@ -142,19 +142,19 @@
       const next = String(event.target.value || "");
       if (!scenes.has(next)) return;
       sceneLocked = true;
-      el("galgame-auto-scene").textContent = "场景：固定";
+      el("galgame-auto-scene").textContent = "自动场景";
       el("galgame-auto-scene").setAttribute("aria-pressed", "false");
       void applyScene(next, true).then(ok => { if (!ok && enabled) el("galgame-scene").value = scene; });
     });
     el("galgame-auto-scene")?.addEventListener("click", () => {
       sceneLocked = !sceneLocked; sceneRevision++;
-      el("galgame-auto-scene").textContent = sceneLocked ? "场景：固定" : "场景：自动";
+      el("galgame-auto-scene").textContent = "自动场景";
       el("galgame-auto-scene").setAttribute("aria-pressed", String(!sceneLocked));
     });
     el("galgame-next").addEventListener("click", player.next);
     el("galgame-voice").addEventListener("click", () => {
       muted = !muted; if (muted) player.stopVoice();
-      el("galgame-voice").textContent = muted ? "语音：关" : "语音：开";
+      el("galgame-voice").setAttribute("aria-pressed", String(!muted));
     });
     let composing = false;
     el("galgame-input").addEventListener("compositionstart", () => { composing = true; });

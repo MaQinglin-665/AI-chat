@@ -182,8 +182,8 @@
     const brand = documentObject.createElement("div");
     brand.className = "control-center-brand";
     brand.innerHTML = [
-      '<img src="./assets/assistant_avatar_ref.png?v=2" alt="">',
-      '<span><strong>馨语AI桌宠</strong><small>控制中心</small></span>'
+      '<img src="./assets/icons/phosphor/cat.svg" alt="">',
+      '<span><strong>馨语</strong><small>控制中心</small></span>'
     ].join("");
     nav.appendChild(brand);
 

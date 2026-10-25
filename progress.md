@@ -125,3 +125,15 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 - Verification Evidence: scripts/test-local.ps1 complete: 784 passed, 1 skipped (Windows symlink permission), one existing audioop warning, all Node suites, Python syntax 175 files/JS 197 files and secret scan 736 files. Browser regression script passed at 774/516 widths, each lane 0px before and 206px after, collapses/states/input tested. Ignored before/after screenshots in tmp_ui_smoke. See docs/stage-feedback-verification.md.
 - Only after full gate passed, started isolated_experience.py hidden/detached, no Electron. PID 37668 serves 127.0.0.1:8124; /healthz and persona/task/first-run endpoints return 200. Real DeepSeek probe ok in 1531ms. Real browser idle, no JS errors. Six synthetic workspace files and all persistent data under repository-external stage4-experience-20261024; no daily private configuration read. Final launcher also validates persistence paths and disables managed ASR; syntax and live startup verified.
 - Instance stays running until user says 体验结束. Stop command and exact data paths in session-handoff.md / external instance.json. No push/PR. Prior handoff archived; feature completed and awaiting user experience feedback.
+
+
+## 2026-10-24 — task 5 visual-polish-v1
+
+- Branch codex/visual-polish-v1 from task 4 cf94872; local commit only, no push/PR.
+- Central night-room tokens; single composer and top icon actions; accessible toggle presentation; adaptive control-center cards and cat branding; Chinese labels and window/shortcut/installer naming; matching Galgame controls. Approval layout prioritizes plan details.
+- No backend, chat.js/chatReplyController.js or rendering/motion/lipsync changes. Layout module only exports CSS light-anchor coordinates.
+- Verification Evidence: scripts/test-local.ps1 passed (784 Python, 1 Windows symlink skip; all Node suites including new presentation/contrast checks; 175 Python/201 JS syntax; secret scan). Two config report assertions translated, none removed.
+- Real Edge browser matrix passed at 800x600, 1280x800, 1920x1080: toolbar, state toggles, keyboard focus, provider-specific visibility, grid overflow, Galgame and reduced motion. Final focus-color adjustment verified by the same browser matrix. Muted contrast 7.99:1 / 7.16:1.
+- 45 ignored screenshots in tmp_ui_smoke/visual-polish; docs/visual-polish-verification.md indexes the required 30 plus 15 detail captures. Synthetic approval fixture; no real task execution or fresh Electron/audio acceptance claimed.
+- Shortcut PowerShell syntax and NSIS Chinese-name template compile passed with minimal synthetic payload; no installation or daily shortcut mutations.
+- 8124 isolated instance remains running, PID 37668, healthz 200, loopback only; no daily instance changes. Claude can review on refresh. Existing backend followups remain backlog.

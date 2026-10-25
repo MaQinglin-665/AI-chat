@@ -106,6 +106,11 @@
       }
       model.visible = true;
       model.alpha = 1;
+      // Presentation anchor only; does not change the model transform or motion.
+      if (state.uiView === "full") {
+        document?.documentElement?.style?.setProperty?.("--stage-character-x", `${model.x}px`);
+        document?.documentElement?.style?.setProperty?.("--stage-character-y", `${model.y - model.height * 0.5}px`);
+      }
       if (state.desktopMode && state.uiView === "model") {
         clampModelVisibleInViewport(model);
         state.modelPosX = Number(model.x) || (w * 0.5);

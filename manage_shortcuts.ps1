@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet("install", "enable_autostart", "disable_autostart")]
     [string]$Action = "install"
 )
@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 
 $projectDir = $PSScriptRoot
 $launcherVbs = Join-Path $projectDir "launch_taffy.vbs"
-$shortcutName = "馨语AI桌宠.lnk"
+$shortcutName = "馨语桌宠.lnk"
 $wscriptExe = Join-Path $env:SystemRoot "System32\wscript.exe"
 
 if (-not (Test-Path -LiteralPath $launcherVbs)) {
@@ -35,7 +35,7 @@ function New-DesktopPetShortcut {
     $shortcut.TargetPath = $wscriptExe
     $shortcut.Arguments = '"' + $launcherVbs + '"'
     $shortcut.WorkingDirectory = $projectDir
-    $shortcut.Description = "Launch 馨语AI桌宠"
+    $shortcut.Description = "Launch 馨语桌宠"
     $shortcut.IconLocation = "$wscriptExe,0"
     $shortcut.Save()
 }
@@ -49,20 +49,39 @@ function Remove-ShortcutIfExists {
     }
 }
 
+# Migrate only links owned by this checkout; unrelated installations stay intact.
+function Remove-LegacyOwnedShortcuts {
+    param([string]$Directory)
+    $shell = New-Object -ComObject WScript.Shell
+    foreach ($oldName in @("馨语AI桌宠.lnk", "Taffy Desktop Pet.lnk")) {
+        $oldPath = Join-Path $Directory $oldName
+        if (Test-Path -LiteralPath $oldPath) {
+            $link = $shell.CreateShortcut($oldPath)
+            if ($link.TargetPath -eq $wscriptExe -and $link.Arguments -eq ('"' + $launcherVbs + '"')) {
+                Remove-ShortcutIfExists -Path $oldPath
+            }
+        }
+    }
+}
+
 switch ($Action) {
     "install" {
         New-DesktopPetShortcut -Path $desktopShortcut
         New-DesktopPetShortcut -Path $startMenuShortcut
+        Remove-LegacyOwnedShortcuts -Directory $desktopDir
+        Remove-LegacyOwnedShortcuts -Directory $programsDir
         Write-Host "Shortcuts created:"
         Write-Host " - Desktop: $desktopShortcut"
         Write-Host " - Start Menu: $startMenuShortcut"
     }
     "enable_autostart" {
         New-DesktopPetShortcut -Path $startupShortcut
+        Remove-LegacyOwnedShortcuts -Directory $startupDir
         Write-Host "Autostart enabled: $startupShortcut"
     }
     "disable_autostart" {
         Remove-ShortcutIfExists -Path $startupShortcut
+        Remove-LegacyOwnedShortcuts -Directory $startupDir
         Write-Host "Autostart disabled."
     }
 }

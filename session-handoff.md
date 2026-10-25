@@ -1,26 +1,24 @@
 # Session handoff
 
-## Current task: stage feedback / onboarding completed; isolated experience RUNNING
+## Current task: task 5 visual polish complete — local commit only
 
-Date: 2026-10-24 (America/Los_Angeles).
-Branch: codex/stage-feedback-onboarding-v1, created from origin/codex/external-agent-codex-cli-v1 at f7b06a0. Fetch was unavailable (DNS); this origin ref is the exact head pushed in the preceding task. No push or PR authorized for task 4. User requests local commit and a running browser-only instance.
+Date: 2026-10-24 (America/Los_Angeles). Branch `codex/visual-polish-v1`, based on task 4 `codex/stage-feedback-onboarding-v1` at `cf94872`. No push/PR/main modification.
 
-## Changes
+## Results / files
 
-- Narrow conversation rail gets a definite height; fixes zero-height absolute chat grid while preserving lane collapse.
-- New stage feedback module/CSS: 600ms no-first-text wait, errors/auth guidance and doctor action, request generation guard, one-time startup warning. API auth logic remains intact. No chat.js/chatReplyController.js edits.
-- Onboarding has one primary action, secondary configuration/skip links, first step clears the input area and focuses input; first-run config avoids stacked guide overlays.
-- Galgame uses Phosphor book mask; full-stage model reserves header/composer/toolbar space. Narrow opacity .82 is intentional ambience and remains unchanged.
-- scripts/isolated_experience.py constructs configuration without loading daily config/.env and checks persistent paths before server startup.
+Central tokens + visualPolish CSS and display controller; top toolbar, one composer, quiet room/halo, responsive control center, cat avatar, Chinese labels, matching Galgame and naming/installer templates. Full touched-file list and screenshot index: docs/visual-polish-verification.md.
+
+No backend or chat.js/chatReplyController.js changes. Live2D layout only exports two CSS properties; no transforms/rendering/motion/lipsync behavior changes.
 
 ## Verification
 
-- scripts/test-local.ps1 passed: 784 Python tests, 1 Windows symlink-privilege skip, one existing audioop warning; all Node tests, Python/JS syntax and secret scan. New frontend state tests included.
-- Real Edge with synthetic API: 774px/516px lanes both 0px before -> 206px after; collapse, states/clear/auth, startup warning and usable input with guide verified.
-- Real isolated browser: status idle, no page JS errors, no failure banner. Real DeepSeek lightweight probe succeeded in 1531ms.
-- Before/after screenshots are ignored under tmp_ui_smoke/. See docs/stage-feedback-verification.md for names/causes; docs/first-install.md describes the new flow.
+- Full scripts/test-local.ps1: 784 passed, 1 Windows symlink skip; all Node suites; Python/JS syntax and secrets passed. Existing doctor warnings documented in report.
+- Real Edge three sizes × five views; toggle round-trips, lamp keyboard focus, provider rows, no horizontal settings overflow, custom-styled selects and reduced motion passed.
+- 45 ignored PNGs at tmp_ui_smoke/visual-polish/. Approval is synthetic; not new real external-agent/Electron/audio acceptance.
+- PowerShell shortcut syntax and NSIS template compilation with synthetic payload passed; no real install.
 
 ## Live instance — leave running
+
 
 - URL: http://127.0.0.1:8124/?view=full ; health: http://127.0.0.1:8124/healthz (200).
 - PID: 37668, listening only 127.0.0.1:8124. No Electron started and daily pet not stopped.
@@ -31,8 +29,9 @@ Branch: codex/stage-feedback-onboarding-v1, created from origin/codex/external-a
 - Stop command: taskkill /PID 37668 /T /F. Confirm PID still belongs to isolated_experience.py before using it after a long delay.
 - Only after user says 体验结束: stop owned process tree, verify it is stopped, then resolve and verify the exact test root remains under D:/AI/.tools before cleanup. Do not touch other test roots or daily data. Do not automatically stop at turn end.
 
+
 ## Next / limitations
 
-Wait for user experience feedback. No push, PR, main update or automatic rebase. Task brief says rebase after #213 merges; that remains a future step, not performed here.
-The two accepted external-agent verification improvements remain backlog, unchanged. See feature_list.json. Synthetic browser tests do not prove every TTS provider or Windows packaging case. Screen captures are intentionally untracked.
-Earlier handoff preserved at docs/archive/2026-10-24-external-agent-published-handoff.md.
+Claude should visually review the running isolated instance after refresh. Do not push or open PR. Wait for user feedback. Screenshots are untracked and available only on this machine. Installer/shortcut real installation not tested; legacy themes remain under a centralized final layer. Two external-agent verification followups stay backlog.
+
+Task 4 handoff archived at docs/archive/2026-10-24-stage-feedback-handoff.md; previous publication handoff remains in its prior archive. Do not automatically rebase or stop the experience instance.

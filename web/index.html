@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:* http://localhost:*; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
-  <title>馨语AI桌宠</title>
+  <title>馨语桌宠</title>
   <link rel="stylesheet" href="./base.css">
   <link rel="stylesheet" href="./chat.css">
   <link rel="stylesheet" href="./externalAgent.css">
@@ -25,6 +25,8 @@
   <link rel="stylesheet" href="./galgame.css">
   <link rel="stylesheet" href="./stageMotion.css">
   <link rel="stylesheet" href="./chatPolish.css">
+  <link rel="stylesheet" href="./tokens.css">
+  <link rel="stylesheet" href="./visualPolish.css">
   <link rel="preload" href="./assets/stage-rooms/day-room-v1.webp" as="image" type="image/webp">
   <link rel="preload" href="./assets/stage-rooms/morning-room-v1.webp" as="image" type="image/webp">
   <link rel="preload" href="./assets/stage-rooms/dusk-room-v1.webp" as="image" type="image/webp">
@@ -32,9 +34,9 @@
 </head>
 <body>
   <script src="./earlyViewBootstrap.js"></script>
-  <header class="app-titlebar" aria-label="&#x99A8;&#x8BED;AI&#x684C;&#x5BA0;">
+  <header class="app-titlebar" aria-label="&#x99A8;&#x8BED;&#x684C;&#x5BA0;">
     <span class="app-titlebar-mark" aria-hidden="true"></span>
-    <span class="app-titlebar-name">&#x99A8;&#x8BED;AI&#x684C;&#x5BA0;</span>
+    <span class="app-titlebar-name">&#x99A8;&#x8BED;&#x684C;&#x5BA0;</span>
   </header>
   <div class="stage-scene" aria-hidden="true">
     <div class="stage-room-background stage-room-background-day"></div>
@@ -112,7 +114,7 @@
       <span class="hero-svg-ears hero-svg-ears-left" aria-hidden="true"><img src="./assets/icons/tabler/cat.svg" alt=""></span>
       <span class="hero-svg-ears hero-svg-ears-right" aria-hidden="true"><img src="./assets/icons/tabler/cat.svg" alt=""></span>
       <div class="hero-avatar" aria-hidden="true">
-        <img id="hero-avatar-img" src="./assets/assistant_avatar_ref.png?v=2" alt="馨语AI桌宠头像" />
+        <img id="hero-avatar-img" src="./assets/icons/phosphor/cat.svg" alt="馨语桌宠头像" />
       </div>
       <div class="hero-main">
         <div class="hero-head">
@@ -121,7 +123,7 @@
               <img class="xinyu-stage-brand-cat" src="./assets/icons/phosphor/cat.svg" alt="">
               <span class="xinyu-stage-brand-spark" aria-hidden="true"></span>
             </span>
-            <strong id="assistant-name">馨语AI桌宠</strong>
+            <strong id="assistant-name">馨语桌宠</strong>
             <p class="hero-tagline">你的桌面伙伴，随时懂你 ✨</p>
             <span id="status">待机</span>
             <div id="followup-character-chip" class="followup-character-chip" title="当前续话角色状态">安静陪伴 · idle</div>
@@ -341,7 +343,7 @@
           <input id="first-run-api-key-env" type="text" spellcheck="false" value="TAFFY_LLM_API_KEY" />
         </label>
         <label class="first-run-field">
-          <span>API Key</span>
+          <span>接口密钥</span>
           <input id="first-run-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="只保存到本地 .env" />
         </label>
       </div>
@@ -404,7 +406,7 @@
               <input id="config-switch-llm-api-key-env" type="text" spellcheck="false" />
             </label>
             <label class="config-switch-field">
-              <span>API Key</span>
+              <span>接口密钥</span>
               <input id="config-switch-llm-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="留空则保留已有密钥" />
             </label>
           </div>
@@ -421,18 +423,18 @@
                 <option value="edge_tts">Edge TTS</option>
                 <option value="gpt_sovits">GPT-SoVITS</option>
                 <option value="qwen3_tts">Qwen3-TTS</option>
-                <option value="volcengine_tts">Volcengine TTS</option>
+                <option value="volcengine_tts">火山引擎语音</option>
               </select>
             </label>
             <label class="config-switch-field">
-              <span>音色 / Voice</span>
+              <span>音色</span>
               <input id="config-switch-tts-voice" type="text" spellcheck="false" />
             </label>
             <label class="config-switch-field">
-              <span>Stream Mode</span>
+              <span>播报方式</span>
               <select id="config-switch-tts-stream-mode">
-                <option value="realtime">Realtime</option>
-                <option value="final_only">Final only</option>
+                <option value="realtime">实时播报</option>
+                <option value="final_only">完整回复后播报</option>
               </select>
             </label>
             <label id="config-switch-gpt-sovits-row" class="config-switch-field config-switch-field-wide">
@@ -440,7 +442,7 @@
               <input id="config-switch-gpt-sovits-url" type="url" spellcheck="false" />
             </label>
             <label id="config-switch-gpt-sovits-timeout-row" class="config-switch-field">
-              <span>GPT-SoVITS Timeout</span>
+              <span>语音超时（秒）</span>
               <input id="config-switch-gpt-sovits-timeout" type="number" min="1" max="180" step="1" />
             </label>
             <label id="config-switch-qwen3-tts-row" class="config-switch-field config-switch-field-wide">
@@ -448,15 +450,15 @@
               <input id="config-switch-qwen3-tts-url" type="url" spellcheck="false" />
             </label>
             <label id="config-switch-qwen3-tts-timeout-row" class="config-switch-field">
-              <span>Qwen3-TTS Timeout</span>
+              <span>语音超时（秒）</span>
               <input id="config-switch-qwen3-tts-timeout" type="number" min="1" max="180" step="1" />
             </label>
             <label id="config-switch-volcengine-url-row" class="config-switch-field config-switch-field-wide">
-              <span>Volcengine API URL</span>
+              <span>火山引擎接口地址</span>
               <input id="config-switch-volcengine-url" type="url" spellcheck="false" />
             </label>
             <label id="config-switch-volcengine-cluster-row" class="config-switch-field">
-              <span>Volcengine Cluster</span>
+              <span>火山引擎集群</span>
               <input id="config-switch-volcengine-cluster" type="text" spellcheck="false" />
             </label>
             <label class="config-switch-check">
@@ -472,7 +474,7 @@
             <label class="config-switch-field">
               <span>当前角色</span>
               <select id="config-switch-live2d-preset">
-                <option value="__custom_live2d__">Custom path</option>
+                <option value="__custom_live2d__">自定义模型</option>
               </select>
             </label>
             <label class="config-switch-field config-switch-field-wide">
@@ -647,7 +649,7 @@
   <div id="onboarding-modal" class="onboarding-modal" hidden>
     <div class="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-step-title">
       <div class="onboarding-head">
-        <strong>欢迎来到馨语AI桌宠</strong>
+        <strong>欢迎来到馨语桌宠</strong>
         <button class="onboarding-secondary" id="onboarding-skip-btn" class="onboarding-skip-btn" type="button">稍后再说</button>
       </div>
       <p class="onboarding-brand-copy">让你的桌面，不止会动，也会懂你。</p>
@@ -655,7 +657,7 @@
         <span id="onboarding-progress-bar" class="onboarding-progress-bar"></span>
       </div>
       <div id="onboarding-step-index" class="onboarding-step-index">1 / 4</div>
-      <h3 id="onboarding-step-title" class="onboarding-step-title">先和馨语AI桌宠打个招呼</h3>
+      <h3 id="onboarding-step-title" class="onboarding-step-title">先和馨语桌宠打个招呼</h3>
       <p id="onboarding-step-desc" class="onboarding-step-desc"></p>
       <p id="onboarding-step-tip" class="onboarding-step-tip"></p>
       <div id="onboarding-path-split" class="onboarding-path-split">
@@ -761,7 +763,7 @@
           <div class="persona-basic-grid">
             <div class="persona-avatar-block">
               <div class="persona-avatar-frame">
-                <img id="persona-avatar-preview" class="persona-avatar-sync" src="./assets/assistant_avatar_ref.png?v=2" alt="人设头像预览" />
+                <img id="persona-avatar-preview" class="persona-avatar-sync" src="./assets/icons/phosphor/cat.svg" alt="人设头像预览" />
               </div>
               <input id="persona-avatar-input" type="file" accept="image/*" hidden />
               <div class="persona-avatar-actions">
@@ -1266,5 +1268,6 @@
     <span class="subtitle-zh"></span>
     <button id="subtitle-drag-handle" class="subtitle-drag-handle" type="button" aria-label="拖动字幕位置" title="拖动字幕位置">拖动</button>
   </div>
+  <script src="./visualPolishController.js"></script>
 </body>
 </html>

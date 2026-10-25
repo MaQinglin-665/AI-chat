@@ -4,7 +4,7 @@
   const DEFAULT_LLM_PRESETS = [
     {
       id: "deepseek",
-      label: "DeepSeek official",
+      label: "DeepSeek 官方",
       provider: "openai-compatible",
       base_url: "https://api.deepseek.com",
       model: "deepseek-flash",
@@ -12,7 +12,7 @@
     },
     {
       id: "dashscope",
-      label: "DashScope / Qwen",
+      label: "阿里云百炼 / 通义千问",
       provider: "openai-compatible",
       base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
       model: "qwen-plus",
@@ -28,7 +28,7 @@
     },
     {
       id: "ollama",
-      label: "Ollama local",
+      label: "Ollama 本地",
       provider: "ollama",
       base_url: "http://127.0.0.1:11434",
       model: "qwen2.5:7b",
@@ -36,7 +36,7 @@
     },
     {
       id: "custom_openai_compatible",
-      label: "Custom OpenAI-compatible",
+      label: "自定义兼容接口",
       provider: "openai-compatible",
       base_url: "http://127.0.0.1:8000/v1",
       model: "gpt-4o-mini",
@@ -45,7 +45,7 @@
   ];
 
   const DEFAULT_TTS_PRESETS = [
-    { id: "browser", label: "Browser voice", provider: "browser", voice: "zh-CN-XiaoxiaoNeural" },
+    { id: "browser", label: "浏览器语音", provider: "browser", voice: "zh-CN-XiaoxiaoNeural" },
     { id: "edge_tts", label: "Edge TTS", provider: "edge_tts", voice: "zh-CN-XiaoxiaoNeural" },
     {
       id: "gpt_sovits",
@@ -64,7 +64,7 @@
     },
     {
       id: "volcengine_tts",
-      label: "Volcengine TTS",
+      label: "火山引擎语音",
       provider: "volcengine_tts",
       voice: "S_uos2AQPX1",
       api_url: "https://openspeech.bytedance.com/api/v1/tts",
@@ -73,6 +73,11 @@
   ];
 
   const LIVE2D_CUSTOM_ID = "__custom_live2d__";
+
+  function displayLabel(value) {
+    const labels = {"DeepSeek official": "DeepSeek 官方", "DashScope / Qwen": "阿里云百炼 / 通义千问", "Ollama local": "Ollama 本地", "Custom OpenAI-compatible": "自定义兼容接口", "Browser voice": "浏览器语音", "Volcengine TTS": "火山引擎语音"};
+    return labels[value] || value;
+  }
 
   function clean(value) {
     return String(value || "").trim();
@@ -169,7 +174,7 @@
     for (const item of items) {
       const option = (select.ownerDocument || root.document).createElement("option");
       option.value = getValueFn(item);
-      option.textContent = getLabelFn(item);
+      option.textContent = displayLabel(getLabelFn(item));
       select.appendChild(option);
     }
     if (items.some((item) => getValueFn(item) === current)) {
@@ -284,8 +289,8 @@
         setText(
           ui.live2dReport,
           path
-            ? "Live2D report: click Check model to inspect motion groups and expressions."
-            : "Live2D report: choose a model to inspect motion groups and expressions."
+            ? "点击“检查模型”，查看动作组与表情。"
+            : "选择模型后可查看动作组与表情。"
         );
         ui.live2dReport.classList?.toggle("config-switch-live2d-report-warning", false);
         return;
@@ -296,17 +301,17 @@
         : [];
       const warnings = Array.isArray(compatibility.warnings) ? compatibility.warnings.filter(Boolean) : [];
       const parts = [
-        `Motion groups: ${summarizeNamedItems(source.motion_groups)}`,
-        `Expressions: ${summarizeNamedItems(source.expressions)}`
+        `动作组： ${summarizeNamedItems(source.motion_groups)}`,
+        `表情： ${summarizeNamedItems(source.expressions)}`
       ];
       if (missing.length) {
-        parts.push(`Missing families: ${missing.join(", ")}`);
+        parts.push(`缺少动作类型： ${missing.join(", ")}`);
       }
       if (warnings.length) {
-        parts.push(`Warnings: ${warnings.join(", ")}`);
+        parts.push(`提示： ${warnings.join(", ")}`);
       }
       if (!missing.length && !warnings.length) {
-        parts.push("Compatibility: ready");
+        parts.push("兼容性检查已通过");
       }
       setText(ui.live2dReport, parts.join("\n"));
       ui.live2dReport.classList?.toggle("config-switch-live2d-report-warning", missing.length > 0 || warnings.length > 0);
@@ -327,13 +332,13 @@
       if (currentPath && !hasCurrent) {
         items.push({
           id: currentPath,
-          label: `Current custom: ${currentPath}`,
+          label: `当前自定义模型： ${currentPath}`,
           model_path: currentPath
         });
       }
       items.push({
         id: LIVE2D_CUSTOM_ID,
-        label: "Custom path",
+        label: "自定义模型",
         model_path: ""
       });
       return items;
@@ -439,11 +444,11 @@
       const envName = getValue(ui.llmApiKeyEnv) || current.api_key_env || "";
       const configured = current.api_key_configured === true;
       if (!fromSummary) {
-        setText(ui.keyStatus, envName ? `当前密钥变量：${envName}。如需更换，可填写新的 API Key。` : "Ollama 本地模型不需要 API Key。");
+        setText(ui.keyStatus, envName ? `当前密钥变量：${envName}。如需更换，可填写新的接口密钥。` : "Ollama 本地模型不需要接口密钥。");
         return;
       }
       if (!envName) {
-        setText(ui.keyStatus, "当前预设不需要 API Key。");
+        setText(ui.keyStatus, "当前预设不需要接口密钥。");
       } else if (configured) {
         setText(ui.keyStatus, `已检测到 ${envName}。留空即可继续使用已有密钥。`);
       } else {
@@ -459,9 +464,9 @@
       const ttsVoice = getValue(ui.ttsVoice) || ttsPreset?.voice || "-";
       const live2dPath = getValue(ui.live2dModelPath);
       const live2dModel = findLive2dModel(live2dPath);
-      setText(ui.summaryLlm, `${llmPreset?.label || llmPreset?.id || "Custom"} / ${llmModel}`);
-      setText(ui.summaryTts, `${ttsPreset?.label || ttsProvider} / ${ttsVoice}`);
-      setText(ui.summaryLive2d, live2dModel?.label || live2dPath || "Not set");
+      setText(ui.summaryLlm, `${displayLabel(llmPreset?.label || llmPreset?.id || "自定义")} / ${llmModel}`);
+      setText(ui.summaryTts, `${displayLabel(ttsPreset?.label || ttsProvider)} / ${ttsVoice}`);
+      setText(ui.summaryLive2d, live2dModel?.label || live2dPath || "未设置");
       updateLive2dReportFromForm();
     }
 
