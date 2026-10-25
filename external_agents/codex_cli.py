@@ -86,7 +86,7 @@ def health(config):
         roots = allowed_roots(cfg)
         validate_home(cfg, roots)
         if not key_from_config(config):
-            raise AgentError("key_missing", "请在 .env 中配置 llm.api_key_env 指定的 DeepSeek Key。")
+            raise AgentError("key_missing", "请在 .env 中配置 external_agent.api_key_env 指定的 DeepSeek Key。")
         result["configuration_complete"] = True
     except AgentError as exc:
         result.update(ok=not enabled, severity="error" if enabled else "warning", messages=[str(exc)])
@@ -151,7 +151,7 @@ class CodexCLI:
             raise AgentError("platform_unverified", "此实验版本仅启用已验证的 Windows 沙箱。")
         version_check(self.command)
         if not self.key:
-            raise AgentError("key_missing", "缺少 DeepSeek Key，请检查 .env 与 llm.api_key_env。")
+            raise AgentError("key_missing", "缺少 DeepSeek Key，请检查 .env 与 external_agent.api_key_env。")
         home = validate_home(self.cfg, allowed_roots(self.cfg))
         home.mkdir(parents=True, exist_ok=True)
         run_home = home / ("run-" + uuid.uuid4().hex)

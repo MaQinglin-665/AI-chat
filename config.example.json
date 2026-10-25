@@ -2,6 +2,7 @@
   "external_agent": {
     "enabled": false,
     "provider": "codex_cli",
+    "api_key_env": "DEEPSEEK_API_KEY",
     "codex_path": "",
     "codex_home": "%LOCALAPPDATA%/XinyuDesktopPet/external-agent/codex",
     "model": "deepseek-flash",

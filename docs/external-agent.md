@@ -19,6 +19,7 @@ npm install --prefix <独立工具目录> @openai/codex@0.164.0
   "external_agent": {
     "enabled": false,
     "provider": "codex_cli",
+    "api_key_env": "DEEPSEEK_API_KEY",
     "codex_path": "",
     "codex_home": "%LOCALAPPDATA%/XinyuDesktopPet/external-agent/codex",
     "model": "deepseek-flash",
@@ -33,7 +34,7 @@ npm install --prefix <独立工具目录> @openai/codex@0.164.0
 
 `codex_home` 默认位于应用数据目录，必须与系统临时目录、仓库、授权工作目录及现有 `~/.codex` 分离。每个阶段创建专用子目录，写入无 Key 的 config.toml、官方模型目录快照与计划 schema；结束后清理该运行目录。不会改用户原有 Codex 配置。`preferred_auth_method` 不写入配置。
 
-Key 复用 `llm.api_key_env` 指向的环境变量，`.env` 由现有配置加载器读取。为兼容已有配置，原 `llm.api_key` 仍可解析，但请优先使用环境变量；适配器不把 Key 写到新文件。模型请求只使用 DeepSeek 官方 HTTPS Responses 地址；执行环境过滤凭据类变量，Key 不传给命令行参数。目录与 API 请求须由本机可信用户配置。
+Key 优先从 `external_agent.api_key_env` 指定的环境变量读取，默认 `DEEPSEEK_API_KEY`；`.env` 由现有配置加载器读取。只有 `llm.base_url` 的主机名精确等于 `api.deepseek.com` 时，才允许回退到原有 `llm.api_key` 或 `llm.api_key_env`。聊天使用其他服务商时，其 Key 绝不会被本适配器复用。适配器不把 Key 写到新文件；模型请求只使用 DeepSeek 官方 HTTPS Responses 地址。执行环境过滤凭据类变量，Key 不传给命令行参数。
 
 `max_minutes` 是每次规划/执行阶段的时限，`plan_ttl_minutes` 是批准窗口；两者须大于 0 且不超过 120 分钟。
 

@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
+from urllib.parse import urlsplit
 
 PROJECT = Path(__file__).resolve().parents[1]
 MIN_VERSION = (0, 164, 0)
@@ -21,7 +22,7 @@ def default_home():
 
 def defaults():
     return dict(enabled=False, provider="codex_cli", codex_path="", codex_home=default_home(),
-                model="deepseek-flash", allowed_roots=[], max_minutes=15, plan_ttl_minutes=15)
+                api_key_env="DEEPSEEK_API_KEY", model="deepseek-flash", allowed_roots=[], max_minutes=15, plan_ttl_minutes=15)
 
 
 def inside(path, root):
@@ -100,8 +101,19 @@ def validate_workdir(value, cfg):
 
 
 def key_from_config(config):
+    external = config.get("external_agent", {})
+    external = external if isinstance(external, dict) else {}
+    key = os.environ.get(str(external.get("api_key_env") or "DEEPSEEK_API_KEY"), "").strip()
+    if key:
+        return key
     llm = config.get("llm", {})
-    # Match the existing LLM resolution, without ever persisting this value.
+    if not isinstance(llm, dict):
+        return ""
+    try:
+        if urlsplit(str(llm.get("base_url") or "")).hostname != "api.deepseek.com":
+            return ""
+    except ValueError:
+        return ""
     return str(llm.get("api_key") or os.environ.get(str(llm.get("api_key_env") or "DEEPSEEK_API_KEY"), "")).strip()
 
 

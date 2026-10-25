@@ -27,6 +27,7 @@ def setup(tmp_path, monkeypatch):
     monkeypatch.setattr(agent_actions, "STATE_PATH", tmp_path / "audit.json")
     monkeypatch.setenv("EXTERNAL_TEST_CREDENTIAL", "example-secret-never-log")
     cfg = {"external_agent": {**policy.defaults(), "enabled": True,
+           "api_key_env": "EXTERNAL_TEST_CREDENTIAL",
            "codex_home": str(tmp_path / "private-home"), "codex_path": str(FIXTURES / "fake_codex.py"),
            "allowed_roots": [str(work)], "max_minutes": 1},
            "llm": {"api_key_env": "EXTERNAL_TEST_CREDENTIAL"}}
@@ -201,3 +202,28 @@ def test_disabled_all_methods(setup):
     for call in (lambda: m.create_task("x", str(work)), lambda: m.get_task("id"), lambda: m.approve("id"), lambda: m.cancel("id"), m.list_tasks):
         with pytest.raises(policy.AgentError) as exc: call()
         assert exc.value.code == "disabled"
+
+
+@pytest.mark.parametrize("url", ["https://api.openai.com/v1", "https://api.deepseek.com.evil.example", "https://evil.example/api.deepseek.com", "https://api.deepseek.com@evil.example", "", "http://[invalid"])
+def test_other_provider_credential_never_reused(monkeypatch, url):
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setenv("OTHER_PROVIDER_CREDENTIAL", "example-other-provider")
+    cfg = {"llm": {"base_url": url, "api_key": "example-inline-other", "api_key_env": "OTHER_PROVIDER_CREDENTIAL"}}
+    assert policy.key_from_config(cfg) == ""
+    cfg["llm"].pop("api_key")
+    assert policy.key_from_config(cfg) == ""
+
+
+def test_dedicated_key_precedence_and_exact_deepseek_fallback(monkeypatch):
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setenv("CHAT_CREDENTIAL", "example-chat")
+    cfg = {"llm": {"base_url": "https://api.deepseek.com/v1", "api_key_env": "CHAT_CREDENTIAL"}}
+    assert policy.key_from_config(cfg) == "example-chat"
+    cfg["llm"]["api_key"] = "example-inline"
+    assert policy.key_from_config(cfg) == "example-inline"
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "example-dedicated")
+    assert policy.key_from_config(cfg) == "example-dedicated"
+    cfg["external_agent"] = {"api_key_env": "CUSTOM_AGENT_CREDENTIAL"}
+    monkeypatch.setenv("CUSTOM_AGENT_CREDENTIAL", "example-custom")
+    cfg["llm"]["base_url"] = "https://other.example"
+    assert policy.key_from_config(cfg) == "example-custom"
