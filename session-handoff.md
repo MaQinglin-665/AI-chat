@@ -9,10 +9,13 @@ User now authorizes pushing exactly codex/stage-feedback-onboarding-v1, codex/vi
 - Copied requested docs/avatar-intent-interface.md byte-identically (SHA256 7ABB45D3E2FB868D2969CC53E7189763231F7AB4A2BC3296B9A626A0B8FC6DAF); design document only, no avatar implementation added.
 - Tests and acceptance details in progress.md. Task 6 evidence remains docs/experience-fixes-verification.md; historical provider_failed remains unreproduced.
 
-## Publication / cleanup pending
+## Publication and cleanup outcome
 
-Initial GitHub DNS lookup and ls-remote timed out. Retry normal push after local commit; do not invent remote success or force-push. Create and attach draft only after head exists remotely.
+- Repair commit: 38e1da3. All tests passed; final secret scan 752 files. Browser matrix passed with actual message renderer and actual user-message append (synthetic content; no new model/audio acceptance).
+- Two normal `git push origin codex/stage-feedback-onboarding-v1 codex/visual-polish-v1 codex/experience-fixes-v1` attempts failed: Could not resolve host github.com. No remote write confirmed. No draft PR created because the head could not be published. Prepared description: tmp_ui_smoke/task6/pr-body.md (ignored local file).
+- Owned 8124 process tree stopped successfully (5620 and child 48768); no listener remains. Daily 8123 untouched.
+- Cleanup command was rejected by automatic approval review with `blocked by policy` (no more specific reason). All three directories remain: D:/AI/.tools/stage4-experience-20261024/workspace, workspace-task6-run1, workspace-task6-run2. User authorized deleting ONLY those; isolated configuration/chat history, screenshots and other backups must stay. Do not claim cleanup completed or try to bypass the policy via another shell/tool.
 
-After publication attempts, stop owned isolated_experience.py on 8124 (last PID 5620, verify ownership). User explicitly chose cleanup ONLY of D:/AI/.tools/stage4-experience-20261024/workspace, workspace-task6-run1, workspace-task6-run2. Preserve isolated configuration/chat history, repository screenshots, other backups and daily 8123. Verify exact resolved paths and no link traversal before recursive deletion. Record outcome in this handoff.
+## Next
 
-Previous handoff archived at docs/archive/2026-10-25-experience-fixes-handoff.md. Two backend verification followups remain backlog. No automatic merge.
+When GitHub DNS recovers, rerun required pre-push checks and secret scan, push exactly the three named branches (no force/main), create draft head codex/experience-fixes-v1 / base codex/external-agent-codex-cli-v1, and attach it. No merge. The three test directories still need authorized cleanup once the policy restriction is resolved. Historical provider_failed root cause remains unknown. Previous handoff archived at docs/archive/2026-10-25-experience-fixes-handoff.md; two backend followups stay backlog.
