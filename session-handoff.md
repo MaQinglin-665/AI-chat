@@ -1,33 +1,33 @@
 # Session handoff
 
-## Current task: external agent stage 1 completed
+## Current task: external agent stage 2
 
 Date: 2026-10-24 (America/Los_Angeles).
-Repository: readiness checkout; branch `codex/external-agent-codex-cli-v1`, based on `86a93ca`.
-Stage 0 is committed separately as `12fb134` with the user-requested message.
-Stage 1 backend is complete and locally validated. Final backend commit follows this record. No push, PR, merge or stage 2.
+Branch: `codex/external-agent-codex-cli-v1` in the readiness checkout.
+User authorized stage 2 and local commits only. No push, PR, merge or release.
 
-## Implementation
+## Commits and implementation
 
-- Single active task: planning -> awaiting_approval -> executing -> completed/failed/cancelled/expired.
-- Independent CLI >=0.164.0, dedicated application-data codex_home, per-run config/catalog, environment Key only, Windows unelevated sandbox and never approval policy.
-- Ephemeral read-only schema planning means approved execution uses a new exec with the approved plan. Plan events are optional. item.error is warning; top-level error/turn.failed fails the task. Process/timeout/output failures are separate lifecycle failures.
-- Four task endpoints behind existing origin/token checks; disabled by default. Approval TTL, metadata-only events/audit, health and doctor added.
-- Cancellation uses taskkill /T /F with Windows kill-on-close job protection. Release the task slot after cleanup.
+- Stage 0 `12fb134`; stage 1 `3338c92`; separate credential review fix `ea32bab`.
+- Dedicated `external_agent.api_key_env` takes priority; LLM fallback requires exact DeepSeek hostname.
+- New explicit task UI, full plan card, guarded one-time phase speech, result and out_of_plan display; old generic approvals cannot consume external tasks.
+- Metadata manifests before/after execution, relative-path diff and audit; only verified clean success can enter shared experience. Cleanup failure leaves the slot occupied and does not claim stable verification.
+- Added authenticated GET task-list/allowed-root endpoint; existing create/query/approve/cancel unchanged.
+- Main frontend logic is in new externalAgentController.js and CSS. chat.js has 12 changed lines; chatReplyController.js unchanged.
+- Three required controller scripts restored in full-page manifest after real startup failure; developer readiness panel remains conditional.
 
-## Evidence
+## Verification evidence
 
-- Full scripts/test-local.ps1 passed: 764 Python tests; all Node tests; Python/JS syntax and secret scan passed. JSON and ten-module compilation checks passed.
-- Real CLI/DeepSeek invalid key -> authentication_failed in 3.02s; no credential in outputs/audit/events/disk.
-- Real planning/approval/execution: two synthetic files organized without preapproval writes or content changes; 59.97s total, 24 progress events.
-- Cancellation with a fixed synthetic approved plan and real CLI execution: 12 observed processes; zero residuals and directory writes over 10s.
-- Details: docs/external-agent-backend-verification.md; usage: docs/external-agent.md; stage 0: docs/external-agent-codex-spike.md.
+- Python: 784 passed, 1 skipped (Windows symlink creation privilege), one existing audioop warning. Full Node suite passed, including dedicated external-task tests.
+- Real Electron/DeepSeek organization: 31s planning + 47s execution, 22 progress events, files preserved, no out_of_plan, shared experience recorded.
+- Real UI refusal preserved source files. Real running cancellation: 10 observed process identities, zero residuals or new writes over 10s; UI displayed cancelled and actual file changes.
+- Browser TTS start/end events for planning, approval, execution and completion; user confirmed planning/confirmation speech heard clearly.
+- Detailed scope and limitations: docs/external-agent-stage2-verification.md. Full local gate result is recorded in progress.md before final commit.
 
-## Boundaries and next session
+## Boundaries and next step
 
-STOP after reporting local commits. User must authorize stage 2 before any frontend/voice work. Do not push or open a PR.
-Windows unelevated does not provide full read isolation, and approved-command scope remains prompt-based. Only trusted disposable directories should be enabled. Task state is in memory, no restart recovery; other devices/CLI versions require revalidation.
-Global CLI remains 0.133.0, intentionally untouched. Real checks use repository-external isolated 0.164.0; no real key or private runtime config was committed.
-Doctor warnings: missing private config.json, Node 25 rather than LTS, old global CLI while feature disabled.
-Files: external_agent.py; external_agents/; app_external_agent.py and small app routing edits; config/approval/event/health/doctor integration; two test modules and fake CLI; docs/state. No web, voice, memory.py or character_brain.py changes.
-Earlier handoff is preserved at docs/archive/2026-10-24-external-agent-stage0-handoff.md.
+Report local commit, then stop for user review. Do not push or create a PR.
+Acceptance used real Electron renderer/backend in an isolated launcher; production main/preload IPC and packaged startup are not fully covered. No new claim for other TTS providers or CLI versions.
+Metadata comparison is post-execution, not rollback or content hashing; concurrent writes and preserved metadata limit detection. Windows unelevated is not full read isolation. Task/manifest state is memory-only. Voice approval is not implemented.
+Feature remains default-off, isolated CLI 0.164.0 is the verified minimum; old global CLI untouched. Private config/keys and daily pet instance are not part of the commit.
+Previous handoff archived at docs/archive/2026-10-24-external-agent-stage1-handoff.md.

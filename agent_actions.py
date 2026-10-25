@@ -142,7 +142,7 @@ def create_pending(name, args, reason, summary, *, ttl_minutes=None):
     return record
 
 
-def consume_pending(confirmation_id):
+def consume_pending(confirmation_id, *, exclude_tools=()):
     key = _safe_text(confirmation_id, 120)
     if not key:
         return None
@@ -155,7 +155,7 @@ def consume_pending(confirmation_id):
         for row in pending:
             if not isinstance(row, dict) or row.get("expires_at", "") <= now:
                 continue
-            if row.get("id") == key and chosen is None:
+            if row.get("id") == key and chosen is None and row.get("tool") not in exclude_tools:
                 chosen = row
             else:
                 kept.append(row)
@@ -164,8 +164,8 @@ def consume_pending(confirmation_id):
     return chosen
 
 
-def cancel_pending(confirmation_id):
-    row = consume_pending(confirmation_id)
+def cancel_pending(confirmation_id, *, exclude_tools=()):
+    row = consume_pending(confirmation_id, exclude_tools=exclude_tools)
     if row:
         append_audit(row, status="cancelled")
     return row
@@ -202,6 +202,8 @@ def public_state():
     now = _now_iso()
     for row in state.get("pending", []) if isinstance(state.get("pending"), list) else []:
         if not isinstance(row, dict) or row.get("expires_at", "") <= now:
+            continue
+        if row.get("tool") == "external_agent_task":
             continue
         pending.append({key: row.get(key, "") for key in ("id", "tool", "reason", "summary", "created_at", "expires_at")})
     return {"ok": True, "pending": pending, "audit": state.get("audit", [])[-20:]}

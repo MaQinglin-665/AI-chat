@@ -1,0 +1,16 @@
+.external-agent-modal[hidden] { display: none !important; }
+.external-agent-modal { position: fixed; inset: 0; z-index: 1800; display: grid; place-items: center; background: #201b2444; }
+.external-agent-dialog { width: min(1050px, 94vw); max-height: 90vh; overflow: auto; padding: 24px; background: var(--cc-page, #fffaf7); color: var(--text, #302833); border-radius: 18px; }
+.external-agent-dialog label { display: block; margin: 14px 0; }
+.external-agent-dialog textarea, .external-agent-dialog select { display: block; width: 100%; box-sizing: border-box; margin-top: 6px; }
+.external-agent-dialog textarea { min-height: 90px; }
+.external-agent-dialog li { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
+.external-agent-danger { color: #ae253b; font-weight: 650; }
+.external-agent-actions { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0; }
+.external-agent-dialog .control-center-content { overflow-y: auto; padding: 22px; }
+.external-agent-dialog .control-center-content > * { flex-shrink: 0; }
+.external-agent-dialog #external-agent-close { align-self: flex-end; }
+.external-agent-dialog .control-center-content .external-agent-danger,
+.external-agent-dialog .control-center-content .external-agent-danger li { color: #ae253b; }
+body[data-stage-room="night"] .external-agent-dialog .control-center-content .external-agent-danger,
+body[data-stage-room="night"] .external-agent-dialog .control-center-content .external-agent-danger li { color: #ff9bab; }

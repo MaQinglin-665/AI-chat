@@ -2,6 +2,7 @@
   "use strict";
 
   const MODEL_EXCLUDED_SCRIPTS = Object.freeze([
+    "./externalAgentController.js",
     "./debugPanelController.js",
     "./chatMessageController.js",
     "./onboardingController.js",

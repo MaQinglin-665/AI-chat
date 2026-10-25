@@ -544,7 +544,7 @@ function startProactiveSchedulerPolling() {
 }
 
 function syncProactiveSchedulerPolling() {
-  return getFollowupDebugController().syncProactiveSchedulerPolling();
+  return getFollowupDebugController()?.syncProactiveSchedulerPolling();
 }
 
 function buildTTSDebugReport() {
@@ -4962,7 +4962,11 @@ async function streamAssistantReply(payload, onDelta, perfHooks = null) { return
 async function requestAssistantReply(text, opts = {}) { return invokeChatReplyController("requestAssistantReply", [text, opts]); }
 function interruptActiveChatTurn(reason = "user_input", options = {}) { return invokeChatReplyController("interruptActiveChatTurn", [reason, options]); }
 function handleUserSpeechStart(input = {}) { return invokeChatReplyController("handleUserSpeechStart", [input]); }
-async function sendChat() { return invokeChatReplyController("sendChat"); }
+let externalAgentController = null;
+async function sendChat() {
+  if (externalAgentController?.offerDelegation(ui.chatInput.value)) { ui.chatInput.value = ""; return; }
+  return invokeChatReplyController("sendChat");
+}
 
 function snapshotPendingLocalAsr() {
   const chunks = Array.isArray(state.localAsrBuffers) ? state.localAsrBuffers.slice() : [];
@@ -5052,6 +5056,10 @@ function bindUI() {
     window.addEventListener("focus", () => recordContextualInteraction("focus"));
   }
 
+  externalAgentController ||= window.TaffyExternalAgent?.createController({
+    document, authFetch, state, speak,
+    emotion: (phase) => enqueueActionIntent(["planning", "awaiting_approval", "executing"].includes(phase) ? "thinking" : "listen")
+  });
   bindChatInputControls();
   bindDesktopControlButtons();
 

@@ -7,6 +7,7 @@
     { key: "config", label: "模型 / 语音", targetId: "config-switch-btn", glyph: "voice" },
     { key: "qq", label: "QQ 身份", targetId: "qq-identity-btn", glyph: "penguin" },
     { key: "memory", label: "记忆管理", targetId: "learning-review-btn", glyph: "memory" },
+    { key: "external-agent", label: "交给馨语去做", targetId: "external-agent-btn", glyph: "shield" },
     { key: "doctor", label: "故障自检", targetId: "doctor-btn", glyph: "shield" }
   ]);
 
@@ -16,6 +17,7 @@
     [".config-switch-dialog", "config"],
     [".qq-identity-dialog", "qq"],
     [".learning-review-drawer", "memory"],
+    [".external-agent-dialog", "external-agent"],
     [".doctor-dialog", "doctor"]
   ]);
 
@@ -86,6 +88,7 @@
     ".config-switch-modal",
     ".qq-identity-modal",
     ".learning-review-drawer",
+    ".external-agent-modal",
     ".doctor-modal"
   ]);
 
@@ -166,7 +169,7 @@
 
   function closeSurface(surface) {
     const closeButton = surface?.querySelector?.(
-      "#schedule-close-btn, #persona-close-btn, #config-switch-close-btn, #qq-identity-close-btn, #learning-review-close-btn, #doctor-close-btn"
+      "#schedule-close-btn, #persona-close-btn, #config-switch-close-btn, #qq-identity-close-btn, #learning-review-close-btn, #doctor-close-btn, #external-agent-close"
     );
     closeButton?.click?.();
   }

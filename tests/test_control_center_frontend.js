@@ -25,9 +25,9 @@ const storage = require(path.join(ROOT, "web", "storageController.js"));
 
 function testUnifiedPageRegistry() {
   assert.deepStrictEqual(shell.PAGES.map((page) => page.key), [
-    "schedule", "persona", "config", "qq", "memory", "doctor"
+    "schedule", "persona", "config", "qq", "memory", "external-agent", "doctor"
   ]);
-  assert.strictEqual(shell.SURFACES.length, 6);
+  assert.strictEqual(shell.SURFACES.length, 7);
   for (const selector of [
     ".schedule-dialog", ".persona-dialog", ".config-switch-dialog",
     ".qq-identity-dialog", ".learning-review-drawer", ".doctor-dialog"

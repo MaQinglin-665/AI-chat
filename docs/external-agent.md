@@ -55,13 +55,13 @@ Key 优先从 `external_agent.api_key_env` 指定的环境变量读取，默认 
 
 ## 审批、进度与诊断
 
-规划使用 read-only、ephemeral 和 `--output-schema`，完整计划随查询结果返回。创建 `external_agent_task` 审批时，摘要列出修改和删除数量；`approval_warnings` 单独给出删除清单、高风险和网络需求，留给第 2 阶段展示。
+规划使用 read-only、ephemeral 和 `--output-schema`，完整计划随查询结果返回。创建 `external_agent_task` 审批时，摘要列出修改和删除数量；`approval_warnings` 单独给出删除清单、高风险和网络需求，在专用确认卡片中完整展示。
 
 规划使用 ephemeral，因此批准后新开 workspace-write exec，把批准的计划原文传入，要求只做已批准事项、遇到计划外操作停止。第 0 阶段验证的 resume 权限切换仍有效，但没有把不可恢复的 ephemeral 会话误当作可恢复会话。
 
 进度只来自 command_execution、file_change、agent_message；不依赖可选的计划更新事件。item.error 记作非致命警告，顶层 error/turn.failed 判为任务失败。异常退出、缺少 turn.completed、无效计划、超时是独立失败原因；取消不是成功完成。
 
-审计只记录目标摘要、状态和文件数量；事件总线只包含任务 id、阶段和计数，不包含模型消息、命令或文件内容。原始 stdout/stderr 不转发给 API、审计或应用日志，提供商错误转换为固定可读说明。
+审计只记录目标摘要、状态、文件数量以及核对结果中的相对路径；事件总线只包含任务 id、阶段和计数，不包含模型消息、命令或文件内容。原始 stdout/stderr 不转发给 API、审计或应用日志，提供商错误转换为固定可读说明。
 
 `GET /api/health` 的 checks.external_agent 以及 doctor 检查安装、版本、Key 是否配置、目录是否合法。不实际请求模型、不自动安装、不打印 Key；功能关闭时缺少 CLI 不影响其他功能启动。
 
@@ -77,4 +77,21 @@ Windows 沿用实测的 unelevated 沙箱和 never 审批策略。取消/超时�
 
 `external_agents/deepseek-models.json` 是第 0 阶段保存的 [DeepSeek 官方模型目录](https://api-docs.deepseek.com/quick_start/agent_integrations/codex/)原样快照，SHA256 为 `d19f90bfbde3d40172b74bb6c00949848fb6757b674be569d4d305a753a888e2`。每次运行复制它，不运行远端安装脚本；修改快照或升级 CLI 后应重新验证兼容性与沙箱。
 
-第 0 阶段证据见 [验证报告](external-agent-codex-spike.md)。后端测试使用假的 CLI 回放真实 JSONL，补充顶层 error/turn.failed 注入，并覆盖拒绝、过期、取消、超时、路径链接、并发、禁用接口和 token/来源守卫。真实无效 Key 与合成文件整理结果在 progress.md 中记录。前端/语音验证不属于第 1 阶段，不宣称已经完成。
+第 0 阶段证据见 [验证报告](external-agent-codex-spike.md)。后端测试使用假的 CLI 回放真实 JSONL，补充顶层 error/turn.failed 注入，并覆盖拒绝、过期、取消、超时、路径链接、并发、禁用接口和 token/来源守卫。真实无效 Key 与合成文件整理结果在 progress.md 中记录。第 2 阶段实测范围见 external-agent-stage2-verification.md。
+
+
+## 委托、确认与结果
+
+在控制中心选择「交给馨语去做」，填写任务并选择已授权目录。聊天中的明确委托只打开此入口，不创建或批准任务。点击「生成计划（不执行）」才开始只读规划；卡片完整列出步骤、files_to_delete、files_to_modify、files_to_create 和 commands。删除清单使用醒目样式，高风险、需要联网分别提示。批准不会放宽联网限制。只支持点击批准，语音确认尚未接入。
+
+外部任务不显示在通用工具审批列表；旧确认接口不能批准、拒绝或消费 external_agent_task。专用批准/取消按钮分别调用对应 task 接口。新增 GET `/api/agent/task` 返回规范化的 allowed_roots 与进程内任务列表，同样受 token、来源和 enabled 检查保护。重开入口可找回本服务仍在运行的任务；关闭窗口不会取消。
+
+每个阶段最多播报一句，重复进度事件不会触发重复播报。静音时尊重静音；开麦、对话处理、现有语音播放期间推迟播报，阶段更新会替换旧的待播信息。沿用现有 TTS、字幕和 Live2D 动作链路，不抢占对话。结束时展示真实文件变更；发现计划外修改、删除或新增，单列 out_of_plan 并明确播报提醒。共同经历启用且本次核对无计划外变更、无未观察到的计划项时，写入一句目标摘要；不存储文件内容。
+
+## 文件核对的含义与限制
+
+执行开始前和 CLI 清理结束后，各记录一份进程内清单：相对路径、大小、纳秒修改时间、类型。新增/删除包含目录；目录自身时间变化不算独立文件修改。按每条路径与批准清单匹配，不把一个目录当作任意子文件修改/删除的授权。结果包括 created、modified、deleted、out_of_plan、counts、out_of_plan_count、planned_not_observed。成功、失败和取消后的变更都会尽量核对；清单读取失败会明确报告，执行前读取失败则不启动 CLI。
+
+清单最多 20,000 项、每次扫描最多约 15 秒（文件系统调用阻塞本身不受此计时器抢占）。不读取内容、不跟随符号链接或 Windows reparse point；发现待遍历目录变成链接则拒绝核验。清单留在进程内，终态审计只保存数量和相对路径，重启后没有原始清单恢复。
+
+这是事后核对，不是回滚或命令拦截。大小与修改时间均被保留的内容变化可能无法发现；并发外部写入也可能计入差异。它不能补足 Windows unelevated 的读取隔离限制，因此仍只应用于可信、独占的测试工作目录。CLI 完成状态表示执行进程完成，不能忽略 out_of_plan 或 planned_not_observed 提醒。

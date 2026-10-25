@@ -1,6 +1,6 @@
 """External task routes, called only after the existing origin/token guards."""
 import re
-from external_agents.policy import AgentError
+from external_agents.policy import AgentError, allowed_roots
 
 
 def handles(path):
@@ -14,6 +14,10 @@ def dispatch(handler, method, path, manager):
         if not match:
             raise AgentError("route_missing", "接口不存在。", 404)
         task_id, action = match.groups()
+        if method == "GET" and not task_id:
+            _, cfg = manager._config()
+            handler._send_json({"ok": True, "allowed_roots": [str(path) for path in allowed_roots(cfg)], "tasks": manager.list_tasks()})
+            return
         if method == "GET" and task_id and not action:
             task = manager.get_task(task_id)
         elif method == "POST" and not task_id:

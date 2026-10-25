@@ -16,6 +16,7 @@ def test_routes_auth_origin_disabled_and_flow(monkeypatch, tmp_path):
     monkeypatch.setattr(agent_actions, "STATE_PATH", tmp_path / "audit.json")
     monkeypatch.setenv("TAFFY_API_TOKEN_TEST", "example-token")
     cfg = _build_test_config()
+    cfg["shared_experience_memory"] = {"enabled": False}
     cfg["server"]["require_api_token"] = True
     cfg["external_agent"] = {**policy.defaults(), "codex_home": str(tmp_path / "private-home"), "allowed_roots": [str(work)]}
     manager = ExternalAgentManager(lambda: cfg, adapter_factory=Immediate)
@@ -30,7 +31,10 @@ def test_routes_auth_origin_disabled_and_flow(monkeypatch, tmp_path):
         for suffix in ("", "/" + dummy + "/approve", "/" + dummy + "/cancel"):
             assert _post_json(create + suffix, body, headers)[0] == 403
         assert _request_json(create + "/" + dummy, headers)[0] == 403
+        assert _request_json(create, headers)[0] == 403
         cfg["external_agent"]["enabled"] = True
+        status, options = _request_json(create, headers)
+        assert status == 200 and options["allowed_roots"] == [str(work)]
         status, response = _post_json(create, body, headers)
         assert status == 202
         task_id = response["task"]["id"]

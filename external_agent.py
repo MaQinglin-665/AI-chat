@@ -9,6 +9,8 @@ import time
 import uuid
 
 import agent_actions
+import shared_experience
+from external_agents.file_manifest import snapshot, compare
 from companion_events import CompanionEventBus
 from external_agents.codex_cli import CodexCLI, PLAN_SCHEMA
 from external_agents.policy import AgentError, inside, key_from_config, redact, settings, validate_workdir
@@ -30,7 +32,8 @@ def validate_plan(plan, workdir, key):
         if field.startswith("files_"):
             for value in values:
                 target = Path(value)
-                if not value or "\x00" in value or target.is_absolute() or ".." in target.parts or ":" in value:
+                if (not value or any(ord(c) < 32 or c in '<>:"|?*' for c in value)
+                        or target.is_absolute() or ".." in target.parts):
                     raise AgentError("plan_path_denied", "计划中的文件必须使用工作目录内的相对路径。")
                 try:
                     resolved = (workdir / target).resolve()
@@ -90,7 +93,7 @@ class ExternalAgentManager:
             task["error"] = {"code": error.code, "message": str(error)}
         self.actions.append_audit({"tool": "external_agent_task", "summary": task["goal_summary"],
                                    "args": {"task_id": task["id"], **self._counts(task)}}, status=state,
-                                  result=self._counts(task))
+                                  result={**self._counts(task), **({"changes": task["changes"]} if "changes" in task else {})})
         if state in {"awaiting_approval", "completed", "failed", "cancelled"}:
             self._publish(task, "agent_task_" + state)
 
@@ -143,11 +146,16 @@ class ExternalAgentManager:
                 else:
                     task["progress_count"] += 1
                 self._publish(task, "agent_task_progress")
+        before = None
+        work = None
         try:
             config, cfg = self._config()
             work = validate_workdir(task["workdir"], cfg)
             if task["_cancel"].is_set():
                 raise AgentError("cancelled", "任务已取消。")
+            if not planning:
+                before = snapshot(work)
+                task["_manifest_before"] = before
             # Use the configuration approved for this phase, not later model/key changes.
             result = self.adapter_factory(task["_config"]).run(goal=task["_goal"], workdir=work,
                     cancel=task["_cancel"], emit=emit, plan=None if planning else task["plan"])
@@ -172,10 +180,25 @@ class ExternalAgentManager:
                     task["_timer"] = timer
                     timer.start()
                 else:
+                    self._verify_files(task, work, before)
+                    before = None
                     self._transition(task, "completed")
+                    try:
+                        task["shared_experience_recorded"] = bool(shared_experience.record_from_core_candidates(
+                            task["_config"], [{"kind": "episodic", "category": "recent_event",
+                            "text": "一起完成了外部任务：" + task["goal_summary"][:90]}])) if not task["changes"]["out_of_plan_count"] and not any(task["changes"]["planned_not_observed"].values()) else False
+                    except Exception:
+                        task["shared_experience_recorded"] = False
         except Exception as exc:
             error = exc if isinstance(exc, AgentError) else AgentError("execution_failed", "外部任务未能完成，请检查本机配置后重试。")
             with self.lock:
+                if before is not None and error.code == "cancel_failed":
+                    task["verification_error"] = "进程清理未确认完成，无法提供稳定的执行后文件核对结果。"
+                elif before is not None:
+                    try:
+                        self._verify_files(task, work, before)
+                    except AgentError as verification_error:
+                        task["verification_error"] = str(verification_error)
                 # Release the single-task slot only after adapter cleanup finishes.
                 state = "cancelled" if error.code == "cancelled" else "failed"
                 try:
@@ -189,6 +212,12 @@ class ExternalAgentManager:
                 if task["status"] in TERMINAL:
                     task.pop("_config", None)
                     task.pop("_goal", None)
+
+    def _verify_files(self, task, work, before):
+        after = snapshot(work)
+        task["_manifest_after"] = after
+        task["changes"] = json.loads(redact(json.dumps(compare(before, after, task["plan"]), ensure_ascii=False),
+                                           key_from_config(task["_config"])))
 
     def _expire(self, task_id):
         with self.lock:

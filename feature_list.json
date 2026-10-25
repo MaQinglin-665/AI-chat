@@ -1,6 +1,22 @@
 {
   "features": [
     {
+      "id": "external-agent-codex-cli-stage2",
+      "name": "Explicit task UI, companionship and file-change verification",
+      "status": "completed",
+      "dependencies": [
+        "external-agent-codex-cli-stage1"
+      ],
+      "scope": [
+        "Stage 2 and review-requested file verification; local commits only"
+      ],
+      "done_criteria": [
+        "Full plan approval and generic approval isolation",
+        "Metadata manifests, out-of-plan audit and tests",
+        "Non-interrupting voice, shared experience and real Electron acceptance"
+      ]
+    },
+    {
       "id": "external-agent-codex-cli-stage1",
       "name": "External Codex CLI backend with explicit approval",
       "status": "completed",

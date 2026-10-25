@@ -190,7 +190,7 @@ class CodexCLI:
                  "-c", "sandbox_workspace_write.exclude_slash_tmp=true"]
         if plan is None:
             args += ["--output-schema", str(home / "plan-schema.json")]
-            prompt = "只制定计划，不修改文件。只检查当前工作目录内的文件，不读取环境变量、凭据或外部目录。文件清单使用相对路径。不要执行计划中的命令。输出符合 schema 的计划。用户目标：\n" + goal
+            prompt = "只制定计划，不修改文件。只检查当前工作目录内的文件，不读取环境变量、凭据或外部目录。文件清单每项必须是单个准确的相对路径，禁止箭头、通配符或说明文字。移动/重命名必须把旧路径列入 files_to_delete（仅表示该路径消失），把新路径及新建目录分别列入 files_to_create，原地修改才列入 files_to_modify。summary 与 steps 说明移动保留内容。不要执行计划中的命令。输出符合 schema 的计划。用户目标：\n" + goal
         else:
             prompt = "执行以下用户已批准的计划。只做计划里列出的事，遇到计划外操作就停下并说明。只访问当前工作目录内的数据，不读取凭据或环境变量。不得自行提升权限。批准计划原文：\n" + json.dumps(plan, ensure_ascii=False)
         args += ["-"]

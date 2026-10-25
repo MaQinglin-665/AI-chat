@@ -996,9 +996,9 @@ def confirm_agent_action(
 ):
     """Redeem a pending local approval exactly once from the authenticated UI."""
     record = (
-        agent_actions.consume_pending(confirmation_id)
+        agent_actions.consume_pending(confirmation_id, exclude_tools={"external_agent_task"})
         if approve
-        else agent_actions.cancel_pending(confirmation_id)
+        else agent_actions.cancel_pending(confirmation_id, exclude_tools={"external_agent_task"})
     )
     if not record:
         return {"ok": False, "error": "Approval not found or expired."}

@@ -23,6 +23,8 @@ English: An experimental Windows AI companion with Live2D and visual-novel dialo
 
 [下载安装](#直接下载) · [首次配置](docs/first-install.md) · [模型选择](docs/model-selection.md) · [项目网站](https://maqinglin-665.github.io/AI-chat/) · [反馈问题](https://github.com/MaQinglin-665/AI-chat/issues)
 
+通过「交给馨语去做」委托本机 Codex：先查看完整计划并批准，再执行与核对文件变更（**实验性，默认关闭**）。[配置与风险说明](docs/external-agent.md)。
+
 ## 两种陪伴方式
 
 | 桌面 Live2D | Galgame 对话 |

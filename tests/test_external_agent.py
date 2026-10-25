@@ -31,6 +31,7 @@ def setup(tmp_path, monkeypatch):
            "codex_home": str(tmp_path / "private-home"), "codex_path": str(FIXTURES / "fake_codex.py"),
            "allowed_roots": [str(work)], "max_minutes": 1},
            "llm": {"api_key_env": "EXTERNAL_TEST_CREDENTIAL"}}
+    cfg["shared_experience_memory"] = {"enabled": False}
     return cfg, work
 
 
@@ -60,7 +61,7 @@ def test_approval_flow_and_metadata_only(setup):
     task = m.create_task("整理文件", str(work))
     awaiting = wait_state(m, task["id"], {"awaiting_approval"})
     assert awaiting["plan"] == PLAN and awaiting["warning_count"] == 1
-    assert agent_actions.public_state()["pending"][0]["tool"] == "external_agent_task"
+    assert agent_actions.public_state()["pending"] == []
     with pytest.raises(policy.AgentError, match="已有任务"):
         m.create_task("第二个任务", str(work))
     m.approve(task["id"])
