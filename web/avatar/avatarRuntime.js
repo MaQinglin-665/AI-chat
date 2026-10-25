@@ -72,11 +72,13 @@
       } catch (_) { /* Do not turn arbitrary metadata into active links. */ }
     }
   }
-  function frameFromState(state, now) {
+  function frameFromState(state, now, wallNow = Date.now()) {
     const remote = state.uiView === "model";
     const fresh = !remote || (now - Number(state._broadcastSpeechUpdatedAt || 0) < 900);
     const level = fresh ? clamp(state.ttsAudioLevel) : 0;
-    return { now, mode: level > 0.02 ? "speak" : "idle",
+    const age = wallNow - Number(state.conversationLastAssistantAt || 0);
+    const preparingSpeech = age >= 0 && age < (root.XinyuVRMRenderer?.EXPRESSION?.prepareMs || 0);
+    return { now, preparingSpeech, mode: level > 0.02 ? "speak" : "idle",
       face: state.speechEmotionPose?.emotion || state.speechAnimMood || "neutral", faceIntensity: 0.6,
       mouth: { open: level, vowel: null } };
   }
@@ -84,7 +86,7 @@
     root.document.body.dataset.avatarReady = "false";
     if (state.avatarRuntime) state.avatarRuntime.dispose();
     else state.avatarRenderer?.dispose();
-    const renderer = root.XinyuVRMRenderer.createRenderer({ canvas });
+    const renderer = root.XinyuVRMRenderer.createRenderer({ canvas, view: state.uiView });
     await renderer.load(source);
     state.avatarRenderer = renderer;
     root.__xinyuAvatarRenderer = renderer;
@@ -95,7 +97,7 @@
       root.document.body.classList.add("transparent-mode", "alpha-true");
     }
     let disposed = false, raf = 0, wakeTimer = 0, lastFrame = 0, gaze = null, intent = {}, cursorBusy = false;
-    let lastClickthrough = null;
+    let lastClickthrough = null, prepareUntil = 0, lastReplyAt = Number(state.conversationLastAssistantAt || 0);
     const clickthrough = value => {
       if (value !== lastClickthrough) { root.electronAPI?.setClickthrough?.(value); lastClickthrough = value; }
     };
@@ -115,6 +117,7 @@
     const leave = () => { gaze = null; };
     const apply = (data) => {
       if (!data || typeof data !== "object") return;
+      if (data.prepare) prepareUntil = root.performance.now() + root.XinyuVRMRenderer.EXPRESSION.prepareMs;
       if (data.stop) renderer.stopAction();
       if (typeof data.action === "string") renderer.playAction(data.action, { intensity: data.intensity });
       if (data.frame && typeof data.frame === "object") intent = { ...data.frame };
@@ -145,7 +148,13 @@
       }
       raf = root.requestAnimationFrame(tick);
       if (state.uiView !== "model") root.sampleTTSAudioLevel?.();
+      const replyAt = Number(state.conversationLastAssistantAt || 0);
+      if (state.uiView !== "model" && replyAt !== lastReplyAt) {
+        lastReplyAt = replyAt;
+        if (frameFromState(state, now).preparingSpeech) channel?.postMessage({ prepare: true });
+      }
       const frame = { ...frameFromState(state, now), gaze, ...intent, now };
+      frame.preparingSpeech ||= now < prepareUntil;
       const quality = root.XinyuVRMRenderer.QUALITY;
       const fps = frame.mouth?.open > 0.02 || renderer.isAnimating() ? quality.activeFps : quality.idleFps;
       const interval = 1000 / fps, elapsed = now - lastFrame;

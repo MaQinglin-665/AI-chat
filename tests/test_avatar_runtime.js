@@ -3,10 +3,13 @@ const fs = require('node:fs');
 const assert = require('node:assert/strict');
 (async () => {
   let next=0, disposed=0, updates=0;
+  const posted=[];
   const raf=new Map(), timers=new Map(), intervals=new Map(), listeners=new Map();
   const add=(m,fn)=>{m.set(++next,fn);return next;};
   const root={document:{hidden:false,body:{dataset:{}},getElementById:()=>null,addEventListener:()=>{}},
-    XinyuVRMRenderer:{QUALITY:{idleFps:20,activeFps:30},createRenderer:()=>({load:async()=>{},dispose:()=>disposed++,update:()=>updates++,isAnimating:()=>false,hitTest:()=>false})},
+    performance:{now:()=>1500},
+    BroadcastChannel:class {postMessage(data){posted.push(data);}close(){}},
+    XinyuVRMRenderer:{EXPRESSION:{prepareMs:1100},QUALITY:{idleFps:20,activeFps:30},createRenderer:()=>({load:async()=>{},dispose:()=>disposed++,update:()=>updates++,isAnimating:()=>false,hitTest:()=>false})},
     addEventListener:(n,fn)=>{if(!listeners.has(n))listeners.set(n,new Set());listeners.get(n).add(fn);},
     removeEventListener:(n,fn)=>listeners.get(n)?.delete(fn),
     requestAnimationFrame:fn=>add(raf,fn),cancelAnimationFrame:id=>raf.delete(id),
@@ -28,6 +31,9 @@ const assert = require('node:assert/strict');
   state.rendererSurfaceActive=true;
   const wakes=[...timers.values()];timers.clear();wakes.forEach(fn=>fn());frame(1400);
   assert.equal(updates,before+1);
+  state.conversationLastAssistantAt=Date.now();frame(1500);
+  assert.equal(posted.length,1);assert.equal(posted[0].prepare,true);
+  frame(1600);assert.equal(posted.length,1,"reply preparation is broadcast once");
   await start();assert.equal(disposed,1);assert.equal(raf.size,1);
   assert.equal(listeners.get('pointermove').size,1,'restart removes prior listeners');
   state.avatarRuntime.dispose();state.avatarRuntime.dispose();

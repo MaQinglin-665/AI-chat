@@ -15,8 +15,46 @@
     seed: 23017
   });
   const QUALITY = Object.freeze({ pixelBudget: 900000, minDpr: 1, maxDpr: 1.25, idleFps: 20, activeFps: 30 });
-  const CAMERA = Object.freeze({ fov: 30, bottom: 0.40, top: 1.16, face: 0.91, faceScreenY: 1 / 3 });
-  const LIGHT = Object.freeze({ ambient: 0.55, key: 1.10, fill: 0.4 });
+  const CAMERA = Object.freeze({ fov: 27, eyeLift: 0.035, bottom: 0.40, top: 1.16, face: 0.91, faceScreenY: 1 / 3 });
+  const STANCE = Object.freeze({ yaw: 15 * Math.PI / 180, headReturn: 0.9,
+    hipShift: 0.012, hipTilt: 0.035, shoulderTilt: -0.025, shoulderDrop: 0.004,
+    forwardArm: 0.14, forwardElbow: 0.18, fingerCurl: [0.13, 0.22, 0.30], thumbCurl: [0.08, 0.12, 0.16] });
+  const EXPRESSION = Object.freeze({ idleSmile: 0.18, preparingSmile: 0.28, prepareMs: 1100,
+    saccadePeriod: 3.7, saccadeHold: 0.32, saccadeTravel: 0.045, saccadeX: 0.045, saccadeY: 0.018 });
+  const LIGHT = Object.freeze({
+    room: { sky: 0x8c7bb8, ground: 0x30283d, ambient: 0.45, keyColor: 0xffd9a8, key: 0.85,
+      fillColor: 0x8c7bb8, fill: 0.18, rimColor: 0xd496df, rim: 0.55, exposure: 0.86, saturation: 0.88 },
+    pet: { sky: 0xffffff, ground: 0x6f7893, ambient: 0.55, keyColor: 0xffffff, key: 1.10,
+      fillColor: 0xffffff, fill: 0.4, rimColor: 0xe5dff2, rim: 0.15, exposure: 1, saturation: 1 },
+    keyPosition: [1, 1.6, 1.8], fillPosition: [-1.2, 1.2, 1.4], rimPosition: [-0.8, 1.3, -1.4],
+    targetHeight: 0.8, luminance: [0.2126, 0.7152, 0.0722]
+  });
+  const FINGERS = Object.freeze(["Index", "Middle", "Ring", "Little"]);
+  const PHALANGES = Object.freeze(["Proximal", "Intermediate", "Distal"]);
+  function saccadeAt(seconds, seed = MOTION.seed) {
+    const cycle = Math.floor(seconds / EXPRESSION.saccadePeriod);
+    const age = seconds - cycle * EXPRESSION.saccadePeriod;
+    const start = randomAt(seed, cycle + 2000) * (EXPRESSION.saccadePeriod - EXPRESSION.saccadeHold);
+    const t = age - start;
+    const weight = Math.max(0, Math.min(1, t / EXPRESSION.saccadeTravel,
+      (EXPRESSION.saccadeHold - t) / EXPRESSION.saccadeTravel));
+    return { x: (randomAt(seed, cycle + 3000) * 2 - 1) * EXPRESSION.saccadeX * weight,
+      y: (randomAt(seed, cycle + 4000) * 2 - 1) * EXPRESSION.saccadeY * weight };
+  }
+  function gradeRoomMaterials(scene, preset) {
+    if (preset.exposure === 1 && preset.saturation === 1) return;
+    scene.traverse(node => { for (const material of [].concat(node.material || [])) {
+      if (!material.isMToonMaterial) continue;
+      const previous = material.onBeforeCompile;
+      material.onBeforeCompile = function(shader, renderer) {
+        previous.call(this, shader, renderer);
+        shader.fragmentShader = shader.fragmentShader.replace("#include <tonemapping_fragment>",
+          `gl_FragColor.rgb = mix(vec3(dot(gl_FragColor.rgb, vec3(${LIGHT.luminance.join(",")}))), gl_FragColor.rgb, ${preset.saturation.toFixed(4)}) * ${preset.exposure.toFixed(4)};\n#include <tonemapping_fragment>`);
+      };
+      material.customProgramCacheKey = () => `xinyu-room-${preset.exposure}-${preset.saturation}`;
+      material.needsUpdate = true;
+    }});
+  }
   const VOWELS = { a: "aa", i: "ih", u: "ou", e: "ee", o: "oh" };
   const FACES = { happy: "happy", angry: "angry", sad: "sad", thinking: "relaxed",
     shy: "relaxed", smug: "happy", sleepy: "relaxed", surprised: "surprised" };
@@ -47,22 +85,33 @@
     const speech = clamp(level), small = smallMotionAt(t, seed);
     const pose = {};
     const node = n => (pose[n] ||= { x: 0, y: 0, z: 0, px: 0, py: 0, scaleY: 1 });
-    node("hips").px = sway * height * MOTION.weightShift;
-    node("hips").z = sway * MOTION.hipRoll;
-    node("spine").z = -sway * MOTION.spineCounter;
+    node("hips").px = (STANCE.hipShift + sway * MOTION.weightShift) * height;
+    node("hips").y = STANCE.yaw;
+    node("hips").z = (STANCE.hipTilt + sway * MOTION.hipRoll) * facing;
+    node("spine").z = (STANCE.shoulderTilt - sway * MOTION.spineCounter) * facing;
     node("spine").x = (breath * MOTION.spineBreath + speech * MOTION.speechLean) * facing;
     node("chest").x = (breath * MOTION.chestBreath + speech * MOTION.speechLean * MOTION.chestSpeechRatio) * facing;
     node("chest").scaleY = 1 + breath * MOTION.chestExpansion;
-    node("head").y = (Math.sin(t * 0.51 + phase) + Math.sin(t * 0.83) * MOTION.headYawSecondary) * MOTION.headYaw;
+    node("head").y = -STANCE.yaw * STANCE.headReturn + (Math.sin(t * 0.51 + phase) + Math.sin(t * 0.83) * MOTION.headYawSecondary) * MOTION.headYaw;
     node("head").z = (Math.sin(t * 0.37) + Math.sin(t * 0.91 + phase) * MOTION.headTiltSecondary) * MOTION.headTilt;
     node("head").x = (Math.sin(t * 0.63 + phase) * MOTION.headPitch + Math.sin(t * 7.1) * speech * MOTION.speechNod) * facing;
     for (const [side, sign] of [["left", -1], ["right", 1]]) {
-      node(side + "Shoulder").py = breath * height * MOTION.shoulderRise;
+      node(side + "Shoulder").py = (breath * MOTION.shoulderRise - STANCE.shoulderDrop) * height;
       node(side + "UpperArm").z = sign * facing * (MOTION.armDrop + breath * MOTION.armSway + sway * MOTION.armSway * sign);
       node(side + "UpperArm").x = (Math.sin(t * 0.8 + sign) * MOTION.armSway + speech * MOTION.speechArm) * facing;
       node(side + "LowerArm").y = sign * MOTION.elbowBend * facing;
       node(side + "LowerArm").z = sign * MOTION.elbowInward * facing;
       node(side + "Hand").z = sign * MOTION.wristRelax * facing;
+      if (side === "left") {
+        node(side + "UpperArm").x -= STANCE.forwardArm * facing;
+        node(side + "LowerArm").y = -sign * (MOTION.elbowBend + STANCE.forwardElbow) * facing;
+      }
+      for (const finger of FINGERS) PHALANGES.forEach((joint, index) => {
+        node(side + finger + joint).z = sign * facing * STANCE.fingerCurl[index];
+      });
+      ["Metacarpal", "Proximal", "Distal"].forEach((joint, index) => {
+        node(side + "Thumb" + joint).y = sign * facing * STANCE.thumbCurl[index];
+      });
     }
     if (small) {
       const w = small.weight * small.direction;
@@ -92,7 +141,10 @@
   }
   function cameraFraming(minY, height, faceY = minY + height * CAMERA.face) {
     const span = height * (CAMERA.top - CAMERA.bottom);
-    return { targetY: faceY - span * (0.5 - CAMERA.faceScreenY), distance: span / (2 * Math.tan(CAMERA.fov * Math.PI / 360)) };
+    const distance = span / (2 * Math.tan(CAMERA.fov * Math.PI / 360));
+    const cameraY = faceY + height * CAMERA.eyeLift;
+    const tilt = Math.atan2(cameraY - faceY, distance) + Math.atan((0.5 - CAMERA.faceScreenY) * 2 * Math.tan(CAMERA.fov * Math.PI / 360));
+    return { targetY: cameraY - distance * Math.tan(tilt), cameraY, distance };
   }
   function hitSegments(x, y, segments) {
     return segments.some(s => {
@@ -110,8 +162,7 @@
     const supports = name => typeof name === "string" && !!expressions?.getExpression?.(name);
     const set = (name, value) => { if (supports(name)) expressions.setValue(name, clamp(value)); };
     const bone = name => vrm.humanoid?.getNormalizedBoneNode?.(name);
-    const names = ["hips", "head", "chest", "spine", "leftShoulder", "rightShoulder",
-      "leftUpperArm", "rightUpperArm", "leftLowerArm", "rightLowerArm", "leftHand", "rightHand"];
+    const names = Object.keys(poseAt(0).bones);
     const rest = new Map(names.map(name => [name, { rotation: bone(name)?.rotation?.clone?.(),
       position: bone(name)?.position?.clone?.(), scale: bone(name)?.scale?.clone?.() }]));
     const vowelNames = [...new Set(Object.values(vowels))], faceNames = [...new Set(Object.values(faces))];
@@ -152,14 +203,16 @@
       const vowel = mouth.vowel == null ? vowels.a : (Object.hasOwn(vowels, mouth.vowel) ? vowels[mouth.vowel] : null);
       if (vowel) set(vowel, mouth.open);
       for (const name of faceNames) set(name, 0);
-      if (Object.hasOwn(faces, frame.face)) set(faces[frame.face], frame.faceIntensity ?? 0.6);
+      if (Object.hasOwn(faces, frame.face) && frame.face !== "neutral") set(faces[frame.face], frame.faceIntensity ?? 0.6);
+      else if (!frame.face || frame.face === "neutral") set(supports("relaxed") ? "relaxed" : "happy",
+        frame.preparingSpeech ? EXPRESSION.preparingSmile : EXPRESSION.idleSmile);
       const blinkCycle = Math.floor(elapsed / 4500);
       const blinkPhase = (elapsed - blinkCycle * 4500 - 2000 - randomAt(seed, blinkCycle + 1000) * 1200) / 160;
       set("blink", frame.blinkSuppressed || blinkPhase < 0 || blinkPhase > 1 ? 0 : Math.sin(blinkPhase * Math.PI));
       if (vrm.lookAt?.target?.position) {
-        const gaze = frame.gaze, t = elapsed / 1000;
-        vrm.lookAt.target.position.set(gaze ? clamp(gaze.x, -1, 1) * height * MOTION.gazeX : Math.sin(t * 0.35) * height * MOTION.gazeIdle,
-          height * MOTION.gazeHeight + (gaze ? clamp(gaze.y, -1, 1) * height * MOTION.gazeY : 0), height * MOTION.gazeDistance);
+        const gaze = frame.gaze, t = elapsed / 1000, glance = saccadeAt(t, seed);
+        vrm.lookAt.target.position.set((gaze ? clamp(gaze.x, -1, 1) * MOTION.gazeX : 0) * height + glance.x * height,
+          height * MOTION.gazeHeight + ((gaze ? clamp(gaze.y, -1, 1) * MOTION.gazeY : 0) + glance.y) * height, height * MOTION.gazeDistance);
       }
       if (frame.speechGesture && ["nod", "small_nod"].includes(frame.speechGesture.name) && bone("head")) {
         bone("head").rotation.x += Math.sin(clamp(frame.speechGesture.phase) * Math.PI) * MOTION.smallNod * facing;
@@ -242,15 +295,20 @@
       const eye = vrm.humanoid?.getRawBoneNode?.("leftEye");
       const faceY = eye ? eye.getWorldPosition(projection).y : box.min.y + height * CAMERA.face;
       const framing = cameraFraming(box.min.y, height, faceY);
-      camera.position.set(0, framing.targetY, framing.distance);
+      camera.position.set(0, framing.cameraY, framing.distance);
       camera.lookAt(0, framing.targetY, 0);
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x6f7893, LIGHT.ambient));
-      for (const [x, intensity] of [[-1, LIGHT.key], [1.2, LIGHT.fill]]) {
-        const light = new THREE.DirectionalLight(0xffffff, intensity);
-        light.position.set(height * x, box.min.y + height * 1.6, height * 1.8);
-        light.target.position.set(0, box.min.y + height * 0.8, 0);
+      const preset = options.view === "full" ? LIGHT.room : LIGHT.pet;
+      scene.add(new THREE.HemisphereLight(preset.sky, preset.ground, preset.ambient));
+      for (const [position, color, intensity] of [
+        [LIGHT.keyPosition, preset.keyColor, preset.key], [LIGHT.fillPosition, preset.fillColor, preset.fill],
+        [LIGHT.rimPosition, preset.rimColor, preset.rim]
+      ]) {
+        const light = new THREE.DirectionalLight(color, intensity);
+        light.position.set(height * position[0], box.min.y + height * position[1], height * position[2]);
+        light.target.position.set(0, box.min.y + height * LIGHT.targetHeight, 0);
         light.castShadow = false; scene.add(light, light.target);
       }
+      gradeRoomMaterials(vrm.scene, preset);
       renderer = new THREE.WebGLRenderer({ canvas, alpha: true, premultipliedAlpha: true, antialias: true, powerPreference: "low-power" });
       renderer.setClearColor(0x000000, 0);
       renderer.shadowMap.enabled = false;
@@ -309,7 +367,7 @@
     };
   }
   const api = { createRenderer, createIntentDriver, poseAt, smallMotionAt, randomAt,
-    pixelRatioFor, cameraFraming, hitSegments, smoothCutoutEdges, MOTION, QUALITY, CAMERA, LIGHT };
+    pixelRatioFor, cameraFraming, hitSegments, smoothCutoutEdges, saccadeAt, gradeRoomMaterials, STANCE, EXPRESSION, MOTION, QUALITY, CAMERA, LIGHT };
   root.XinyuVRMRenderer = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

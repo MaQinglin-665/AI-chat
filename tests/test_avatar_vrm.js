@@ -76,8 +76,10 @@ for (let i=1;i<100;i++) {
 }
 for (const h of [0.5,1.6,2.4]) {
   const framing=cameraFraming(0,h);
-  const span=2*framing.distance*Math.tan(30*Math.PI/360);
-  assert(Math.abs((0.5-(h*0.91-framing.targetY)/span)-1/3)<1e-10);
+  const tilt=Math.atan2(framing.cameraY-framing.targetY,framing.distance);
+  const eyeAngle=Math.atan2(framing.cameraY-h*0.91,framing.distance);
+  assert(framing.cameraY>h*0.91);
+  assert(Math.abs(0.5-Math.tan(tilt-eyeAngle)/(2*Math.tan(27*Math.PI/360))-1/3)<1e-10);
 }
 for (const [w,h] of [[480,720],[1380,898],[1708,1068]]) {
   const ratio=pixelRatioFor(w,h,1.5);
@@ -90,8 +92,8 @@ console.log("Standing pose, action recovery, deterministic motion, camera and co
 
 // Numeric snapshot contains only generated bone offsets, never model data.
 const snapshot = poseAt(12345,{seed:42}).bones;
-assert.deepEqual(Object.values(snapshot.head).map(v=>+v.toFixed(6)), [0.000443,-0.070794,-0.035889,0,0,1]);
-assert.deepEqual(Object.values(snapshot.hips).map(v=>+v.toFixed(6)), [0,0,-0.009666,-0.007733,0.002311,1]);
+assert.deepEqual(Object.values(snapshot.head).map(v=>+v.toFixed(6)), [0.000443,-0.306413,-0.035889,0,0,1]);
+assert.deepEqual(Object.values(snapshot.hips).map(v=>+v.toFixed(6)), [0,0.261799,0.025334,0.011467,0.002311,1]);
 
 const { smoothCutoutEdges } = require("../web/avatar/vrmRenderer.js");
 const cutout={alphaTest:0.5,transparent:false}, outline={alphaTest:0.5,transparent:false,isOutline:true};
@@ -102,3 +104,20 @@ smoothCutoutEdges(scene,4);
 assert.equal(cutout.alphaToCoverage,true);assert.equal(outline.alphaToCoverage,true);
 assert.equal(blend.alphaToCoverage,undefined);assert.equal(opaque.alphaToCoverage,undefined);
 assert.equal(outline.isOutline,true,'retain authored MToon outline');
+
+const { STANCE, EXPRESSION, LIGHT, saccadeAt, gradeRoomMaterials } = require("../web/avatar/vrmRenderer.js");
+assert.equal(poseAt(0).bones.hips.y,STANCE.yaw);
+assert(poseAt(0).bones.leftIndexDistal.z < poseAt(0).bones.leftIndexProximal.z);
+assert(poseAt(0).bones.leftShoulder.py<0);
+assert(Math.abs(poseAt(0).bones.leftLowerArm.y) > Math.abs(poseAt(0).bones.rightLowerArm.y));
+assert.deepEqual(saccadeAt(5,42),saccadeAt(5,42));
+assert(saccadeAt(0).x===0);
+driver.update({now:3000,face:"neutral"});assert.equal(values.relaxed,EXPRESSION.idleSmile);
+driver.update({now:3050,face:"neutral",preparingSpeech:true});assert.equal(values.relaxed,EXPRESSION.preparingSmile);
+assert.equal(frameFromState({conversationLastAssistantAt:1000},0,1100).preparingSpeech,true);
+assert.equal(frameFromState({conversationLastAssistantAt:1000},0,9999).preparingSpeech,false);
+const mat={isMToonMaterial:true,onBeforeCompile(){}};
+const matScene={traverse:fn=>fn({material:mat})};
+gradeRoomMaterials(matScene,LIGHT.pet);assert.equal(mat.needsUpdate,undefined);
+gradeRoomMaterials(matScene,LIGHT.room);const shader={fragmentShader:"#include <tonemapping_fragment>"};mat.onBeforeCompile(shader);
+assert(shader.fragmentShader.includes("0.8600"));assert(shader.fragmentShader.includes("#include <tonemapping_fragment>"));
