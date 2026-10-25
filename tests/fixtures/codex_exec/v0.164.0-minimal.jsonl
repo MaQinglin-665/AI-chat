@@ -1,0 +1,6 @@
+{"type": "thread.started", "thread_id": "01a170e2-ca39-7662-bcba-c50f066dc9c9"}
+{"type": "item.completed", "item": {"id": "item_0", "type": "error", "message": "Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\n  user (<CODEX_HOME>\\config.toml): `preferred_auth_method` is ignored."}}
+{"type": "item.completed", "item": {"id": "item_1", "type": "error", "message": "Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\n  user (<CODEX_HOME>\\config.toml): `preferred_auth_method` is ignored."}}
+{"type": "turn.started"}
+{"type": "item.completed", "item": {"id": "item_2", "type": "agent_message", "text": "{\"result\":\"STAGE0_OK\"}"}}
+{"type": "turn.completed", "usage": {"input_tokens": 9252, "cached_input_tokens": 0, "cache_write_input_tokens": 0, "output_tokens": 36, "reasoning_output_tokens": 27}}

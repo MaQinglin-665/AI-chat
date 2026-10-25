@@ -1,6 +1,14 @@
 {
   "features": [
     {
+      "id": "external-agent-codex-cli-stage0",
+      "name": "Verify external Codex CLI prerequisites before implementation",
+      "status": "completed",
+      "scope": ["Stage 0 only; wait for user confirmation before stages 1 and 2"],
+      "done_criteria": ["Real DeepSeek minimum task succeeds", "Windows sandbox write boundaries and process-tree cancellation verified", "Sanitized real JSONL fixtures recorded; plan-update events optional by user instruction"],
+      "verification": "Stage 0 passed under user-revised scope on isolated CLI 0.164.0 (minimum verified integration baseline). DeepSeek/schema/env_key, read-only deny, workspace inside-write/outside-deny, persistent read-only-to-workspace-write resume passed. Cancellation of two active writers: taskkill /T /F exit 0, 13 observed process identities, zero residuals or file changes for 15 seconds. Seven sanitized fixtures, 59 events. preferred_auth_method removed. Top-level error/turn.failed classification documented but not separately fault-injected. No stage 1/2, commit or push. See docs/external-agent-codex-spike.md."
+    },
+    {
       "id": "motion-voice-integration-20261023",
       "name": "Merge speech gestures and apply lip-sync bridge fix",
       "status": "completed",

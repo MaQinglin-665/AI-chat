@@ -54,3 +54,32 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 - First-run package smoke passed. NSIS installer/source zip built; SHA256, zip integrity, private-file exclusions, official empty-key config, PE header and manifest checked.
 - Three synthetic live official streams: first_delta_ms 4062/2109/2187; delta_chunks 10/36/34. Median first visible delta 2187 ms. No personal conversation sent.
 - Remaining limitations: real Bluetooth/wired/minimized-window listening acceptance, clean dependency installation, unsigned installer. These are disclosed in release notes.
+
+## 2026-10-24 — External Codex CLI stage 0
+
+- Scope: prerequisite verification only, on `codex/external-agent-codex-cli-v1` from verified unmerged PR #210 head `86a93ca`. No runtime changes, commits or pushes.
+- Verification Evidence: `codex --version` reports 0.133.0; exec and resume help succeed and list the requested exec options. Official DeepSeek catalog minimum is 0.144.0. Actual minimal exec with an isolated CODEX_HOME, environment Key, output schema and read-only sandbox exits 1: unknown reasoning effort variant `max` while parsing catalog; no stdout events or final message.
+- Stopped at first prerequisite failure as instructed. Sandbox enforcement, JSONL fixtures and cancellation remain unverified, not passed. Temporary-home helper warning also recorded.
+- Files: spike report and three state documents. Risks/next: incompatible CLI; user confirmation required before further stages, and stage 0 must pass first. See `docs/external-agent-codex-spike.md`.
+- Closeout: diff whitespace and feature JSON checks passed; secret scan passed (709 files). Temporary configuration/catalog/schema removed individually after batch cleanup was policy-blocked; zero files remain in probe directory. No Key persisted. Full application suites not run for documentation-only changes.
+
+### Stage 0 round 2 — isolated CLI installation blocked
+
+- User authorized installing only @openai/codex@0.164.0 into a repository-external prefix, a non-temporary isolated CODEX_HOME, and a full rerun including sandbox-switch resume. No commits/pushes or stage 1 implementation.
+- Verification Evidence: npm install with the explicit isolated prefix, no retries and 30-second fetch timeout exited 1: `getaddrinfo ENOTFOUND registry.npmjs.org`. Stopped at this failure per instruction; no DNS/proxy changes or alternative registry attempts.
+- No new runtime checks, credentials use, fixtures or sandbox results. Global package version remains 0.133.0. No CLI version qualifies as a fully validated minimum yet.
+- Updated spike report and three state documents; awaiting user direction to resolve installation networking before retrying stage 0.
+
+### Stage 0 round 3 — runtime prerequisites pass, event coverage blocks
+
+- Authorized retry installed isolated @openai/codex@0.164.0 successfully; absolute-path --version confirms 0.164.0, global package remains 0.133.0. Only isolated launcher used for model probes, with dedicated non-temp CODEX_HOME and environment-only Key; original official catalog unchanged.
+- Verification Evidence: minimal schema response STAGE0_OK exit 0; original helper warning absent. Read-only Set-Content denied (exit 1, no file); workspace inside write succeeds and outside write denied (exit 1, no file). Persistent read-only thread resumed with exec parent --sandbox workspace-write and -C; same thread_id, real RESUME_OK write succeeds.
+- Event probe creates file through apply_patch and verifies via shell, but model reports update_plan unavailable and no plan-update event is emitted. Stopped per user instruction; no top-level error/turn.failed sample or cancellation test yet. Six sanitized fixtures contain 55 real events; all lines parse, no absolute paths or actual Key present.
+- Non-blocking warnings recorded in spike report. Full stage 0 is not complete; 0.164.0 is a partially validated baseline, not yet an accepted minimum. No stage 1/2 changes, commits or pushes.
+
+### Stage 0 final acceptance — cancellation verified
+
+- User changed plan-update events to optional/non-blocking; plans come from output schema and progress from command_execution/file_change/agent_message. Recorded item.error as warning, top-level error/turn.failed as event-level failure; no dedicated top-level failure injection claimed.
+- Removed ignored preferred_auth_method from dedicated repository-external config. Actual cancellation run has no ignored-setting warning; Key remains environment-only.
+- Verification Evidence: real CLI/DeepSeek launched 180-second parent+child Python writers. Both counters advanced before cancellation. taskkill on launcher root with /T /F returned 0. Tracked 13 process identities with PID/create time and unique-marker scan. For 15 seconds after termination, zero residuals and zero changes to directory file set/hash/size/mtime; collector finished. Cancellation passed.
+- Seven sanitized fixtures / 59 real JSONL events now retained. Stage 0 completed for user-revised scope; minimum verified integration baseline 0.164.0, global 0.133.0 untouched. No application runtime changes, commit, push, or stage 1/2 work.
