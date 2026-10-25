@@ -1,0 +1,4 @@
+{"type": "thread.started", "thread_id": "01a17124-c47b-7f30-b17c-ca7e5cd59f3e"}
+{"type": "turn.started"}
+{"type": "item.completed", "item": {"id": "item_0", "type": "agent_message", "text": "I’m starting the specified foreground command once and will leave it running until the external controller terminates it."}}
+{"type": "item.started", "item": {"id": "item_1", "type": "command_execution", "command": "\"<USER_HOME>\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command \"& '<USER_HOME>\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe' '<WORKSPACE>\\\\cancel-8016d8bdc7f9.py'\"", "aggregated_output": "", "exit_code": null, "status": "in_progress"}}

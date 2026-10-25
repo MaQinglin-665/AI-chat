@@ -23,6 +23,8 @@ English: An experimental Windows AI companion with Live2D and visual-novel dialo
 
 [下载安装](#直接下载) · [首次配置](docs/first-install.md) · [模型选择](docs/model-selection.md) · [项目网站](https://maqinglin-665.github.io/AI-chat/) · [反馈问题](https://github.com/MaQinglin-665/AI-chat/issues)
 
+通过「交给馨语去做」委托本机 Codex：先查看完整计划并批准，再执行与核对文件变更（**实验性，默认关闭**）。[配置与风险说明](docs/external-agent.md)。
+
 ## 两种陪伴方式
 
 | 桌面 Live2D | Galgame 对话 |
@@ -43,6 +45,8 @@ Galgame 当前提供三种角色风格：DeepSeek 阳光活泼，Claude 典雅�
 > 这些是项目中的角色扮演设定与非官方拟人形象，不代表相关公司的官方角色。GPT、Claude 的现有立绘只有日常、开心、思考几类，其他情绪会使用可用素材保底。
 
 ## 本轮源码更新
+
+- **外部执行手后端（实验性，默认关闭）**：可通过显式审批调度独立 Codex CLI；当前仅有后端接口，控制中心和语音入口尚未接入。见[配置与边界说明](docs/external-agent.md)。
 
 - **官方 DeepSeek 配置**：新安装默认使用 `https://api.deepseek.com` 和 `deepseek-flash`，采用非思考模式。请填写自己的 API Key；旧用户配置保持兼容。
 

@@ -7,6 +7,7 @@
   <title>馨语AI桌宠</title>
   <link rel="stylesheet" href="./base.css">
   <link rel="stylesheet" href="./chat.css">
+  <link rel="stylesheet" href="./externalAgent.css">
   <link rel="stylesheet" href="./persona.css">
   <link rel="stylesheet" href="./schedule.css">
   <link rel="stylesheet" href="./onboarding.css">
@@ -289,6 +290,7 @@
         <button id="config-switch-btn" type="button">模型 / 语音</button>
         <button id="qq-identity-btn" type="button">QQ 身份</button>
         <button id="learning-review-btn" type="button">记忆管理</button>
+        <button id="external-agent-btn" type="button">交给馨语去做</button>
         <button id="doctor-btn" type="button">故障自检</button>
       </div>
       <div class="advanced-actions-group" aria-label="桌面功能">
@@ -1135,9 +1137,26 @@
     <div id="learning-debug-panel" class="learning-debug-panel" hidden></div>
   </aside>
 
+  <div id="external-agent-modal" class="external-agent-modal" hidden>
+    <section class="external-agent-dialog" role="dialog" aria-modal="true" aria-labelledby="external-agent-title">
+      <h2 id="external-agent-title">交给馨语去做</h2>
+      <button id="external-agent-close" type="button">关闭</button>
+      <p>实验性，默认关闭。先生成计划；只有你批准后才会修改文件。关闭窗口不会取消任务。</p>
+      <label>要做什么<textarea id="external-agent-goal" maxlength="8000" placeholder="例如：把散乱文件按类型整理到子文件夹"></textarea></label>
+      <label>已授权工作目录<select id="external-agent-workdir"></select></label>
+      <button id="external-agent-create" type="button">生成计划（不执行）</button>
+      <p id="external-agent-error" role="alert" class="external-agent-danger"></p>
+      <div id="external-agent-result" aria-live="polite"></div>
+      <div class="external-agent-actions">
+        <button id="external-agent-approve" type="button" hidden>批准以上完整计划并执行</button>
+        <button id="external-agent-cancel" type="button" hidden>拒绝 / 取消任务</button>
+      </div>
+    </section>
+  </div>
   <template id="taffy-view-script-manifest">
   <script src="./stageThemeController.js"></script>
   <script src="./controlCenterShell.js"></script>
+  <script src="./externalAgentController.js"></script>
   <script src="./chatState.js"></script>
   <script src="./chatDom.js"></script>
   <script src="./debugPanelController.js"></script>
@@ -1154,6 +1173,9 @@
   <script src="./autoChatController.js"></script>
   <script src="./runtimeMetadataController.js"></script>
   <script src="./diagnosticsRuntimeController.js"></script>
+  <script src="./followupDebugController.js"></script>
+  <script src="./grayTrialReportController.js"></script>
+  <script src="./grayTrialCharacterPanelController.js"></script>
   <script src="./apiClient.js"></script>
   <script src="./chatApi.js"></script>
   <script src="./speechText.js"></script>

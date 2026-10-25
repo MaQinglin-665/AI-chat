@@ -55,6 +55,70 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 - Three synthetic live official streams: first_delta_ms 4062/2109/2187; delta_chunks 10/36/34. Median first visible delta 2187 ms. No personal conversation sent.
 - Remaining limitations: real Bluetooth/wired/minimized-window listening acceptance, clean dependency installation, unsigned installer. These are disclosed in release notes.
 
+## 2026-10-24 — External Codex CLI stage 0
+
+- Scope: prerequisite verification only, on `codex/external-agent-codex-cli-v1` from verified unmerged PR #210 head `86a93ca`. No runtime changes, commits or pushes.
+- Verification Evidence: `codex --version` reports 0.133.0; exec and resume help succeed and list the requested exec options. Official DeepSeek catalog minimum is 0.144.0. Actual minimal exec with an isolated CODEX_HOME, environment Key, output schema and read-only sandbox exits 1: unknown reasoning effort variant `max` while parsing catalog; no stdout events or final message.
+- Stopped at first prerequisite failure as instructed. Sandbox enforcement, JSONL fixtures and cancellation remain unverified, not passed. Temporary-home helper warning also recorded.
+- Files: spike report and three state documents. Risks/next: incompatible CLI; user confirmation required before further stages, and stage 0 must pass first. See `docs/external-agent-codex-spike.md`.
+- Closeout: diff whitespace and feature JSON checks passed; secret scan passed (709 files). Temporary configuration/catalog/schema removed individually after batch cleanup was policy-blocked; zero files remain in probe directory. No Key persisted. Full application suites not run for documentation-only changes.
+
+### Stage 0 round 2 — isolated CLI installation blocked
+
+- User authorized installing only @openai/codex@0.164.0 into a repository-external prefix, a non-temporary isolated CODEX_HOME, and a full rerun including sandbox-switch resume. No commits/pushes or stage 1 implementation.
+- Verification Evidence: npm install with the explicit isolated prefix, no retries and 30-second fetch timeout exited 1: `getaddrinfo ENOTFOUND registry.npmjs.org`. Stopped at this failure per instruction; no DNS/proxy changes or alternative registry attempts.
+- No new runtime checks, credentials use, fixtures or sandbox results. Global package version remains 0.133.0. No CLI version qualifies as a fully validated minimum yet.
+- Updated spike report and three state documents; awaiting user direction to resolve installation networking before retrying stage 0.
+
+### Stage 0 round 3 — runtime prerequisites pass, event coverage blocks
+
+- Authorized retry installed isolated @openai/codex@0.164.0 successfully; absolute-path --version confirms 0.164.0, global package remains 0.133.0. Only isolated launcher used for model probes, with dedicated non-temp CODEX_HOME and environment-only Key; original official catalog unchanged.
+- Verification Evidence: minimal schema response STAGE0_OK exit 0; original helper warning absent. Read-only Set-Content denied (exit 1, no file); workspace inside write succeeds and outside write denied (exit 1, no file). Persistent read-only thread resumed with exec parent --sandbox workspace-write and -C; same thread_id, real RESUME_OK write succeeds.
+- Event probe creates file through apply_patch and verifies via shell, but model reports update_plan unavailable and no plan-update event is emitted. Stopped per user instruction; no top-level error/turn.failed sample or cancellation test yet. Six sanitized fixtures contain 55 real events; all lines parse, no absolute paths or actual Key present.
+- Non-blocking warnings recorded in spike report. Full stage 0 is not complete; 0.164.0 is a partially validated baseline, not yet an accepted minimum. No stage 1/2 changes, commits or pushes.
+
+### Stage 0 final acceptance — cancellation verified
+
+- User changed plan-update events to optional/non-blocking; plans come from output schema and progress from command_execution/file_change/agent_message. Recorded item.error as warning, top-level error/turn.failed as event-level failure; no dedicated top-level failure injection claimed.
+- Removed ignored preferred_auth_method from dedicated repository-external config. Actual cancellation run has no ignored-setting warning; Key remains environment-only.
+- Verification Evidence: real CLI/DeepSeek launched 180-second parent+child Python writers. Both counters advanced before cancellation. taskkill on launcher root with /T /F returned 0. Tracked 13 process identities with PID/create time and unique-marker scan. For 15 seconds after termination, zero residuals and zero changes to directory file set/hash/size/mtime; collector finished. Cancellation passed.
+- Seven sanitized fixtures / 59 real JSONL events now retained. Stage 0 completed for user-revised scope; minimum verified integration baseline 0.164.0, global 0.133.0 untouched. No application runtime changes, commit, push, or stage 1/2 work.
+
+## 2026-10-24 — External agent stage 1 backend
+
+- User authorized stage 0 commit then backend-only implementation and local commits, no push/PR or stage 2. Stage 0 commit `12fb134` uses the exact requested message; precommit gate passed (734 Python and all Node tests).
+- Added explicit task state machine, ephemeral read-only schema planning, approved new execution, private per-run CODEX_HOME and original official model catalog, environment-only key transport, CLI >=0.164.0 gate, Windows taskkill tree cleanup plus kill-on-close job protection, sanitized warning/failure handling, bounded metadata events and audits.
+- Added four authenticated task endpoints, configurable approval TTL, external_agent defaults (including codex_home), health/doctor diagnostics and usage documentation. No frontend, speech, memory or character_brain edits.
+- Verification Evidence: final scripts/test-local.ps1 passed: 764 Python tests (91.04s; one existing audioop deprecation warning), all Node tests, Python syntax 172 files, JS syntax 191 files, secret scan 721 files. Required JSON parsing and ten-module compilation passed; diff whitespace check passed. Doctor has three non-blocking environment warnings documented in the acceptance report.
+- Real final-adapter acceptance: invalid key -> authentication_failed in 3.02s, fixed readable error, no key in outputs/audit/events/disk, zero run directories left. Real planning plus approved organization: 22.06s planning / 59.97s total, two synthetic files moved with content preserved, no preapproval writes, 24 progress events. Fixed synthetic approval plus real CLI execution cancellation: 12 tracked processes, zero residuals or writes for 10s. No voice or frontend claim.
+- Risks: Windows unelevated write boundary is not full read isolation; plan-only command scope is prompt-based; no restart persistence; networking remains restricted. See docs/external-agent-backend-verification.md. Original handoff archived; current handoff identifies stage 2 as waiting for user confirmation.
+
+## 2026-10-24 — Review fix: provider-scoped credential resolution
+
+- User authorized a separate fix commit before stage 2. Added external_agent.api_key_env (DEEPSEEK_API_KEY default), dedicated environment value first. LLM credentials are eligible only when parsed base_url hostname equals api.deepseek.com; lookalikes, other providers, missing/invalid URLs cannot fall back.
+- Updated example/configuration docs and diagnostics; tests cover dedicated/custom variable precedence, exact-host inline/environment fallback and other-provider exclusion. Full precommit gate follows.
+- Verification Evidence: scripts/test-local.ps1 passed: 771 Python tests, all Node suites, Python/JavaScript syntax and secret scan. No global CLI changes, push or PR.
+
+## 2026-10-24 — External agent stage 2 UI and verified results
+
+- User authorized stage 2 following the separate credential fix commit ea32bab; local commits only. Added explicit task form/full approval card, guarded phase speech, actual file-change results and shared-experience summary. Chat delegation only opens the form. Generic tool approval routes cannot consume external tasks.
+- Added metadata-only file manifests and exact per-path comparison, out_of_plan and unobserved-plan reporting, relative-path/count audit; cleanup failure cannot claim a stable post-run snapshot. New authenticated GET task list/allowed roots. Invalid nonliteral plan paths are rejected.
+- Main frontend work is in new externalAgentController.js/CSS. Minimal chat.js integration; chatReplyController.js unchanged. Real startup required restoring three controller script imports; readiness developer panel remains conditional. Fixed full-card scroll compression. Source-string test failure from CRLF was resolved by preserving chat.js LF line endings.
+- Verification Evidence: final scripts/test-local.ps1 passed: 784 Python tests, 1 skipped (Windows symlink creation privilege), one existing audioop deprecation warning; all Node suites; Python syntax 174 files, JS syntax 193 files, secret scan 730 tracked files. Standalone node scripts/run_node_tests.js also passed. Example/package JSON parsing, ten-module compilation and diff whitespace checks passed. Doctor warnings remain private config absent, Node non-LTS and intentionally unchanged old global CLI while disabled.
+- Real Electron renderer + real backend + isolated CLI 0.164.0/DeepSeek: explicit chat request did not create task; UI refusal preserved synthetic source files; approved organization took 31s planning/47s execution with 22 events, contents preserved, zero out_of_plan/missing-plan items and shared experience recorded. All four phase speech start/end events observed; user confirmed planning/confirmation speech heard clearly.
+- Real UI running cancellation interrupted a 120-second writer: 10 observed process identities, no residuals and no further writes over 10s; status cancelled, only expected heartbeat file created (175 bytes), 8 events. Final page reload starts normally.
+- Acceptance scope: isolated Electron launcher, not complete production main/preload or packaged app acceptance. Metadata diff does not hash contents or roll back; Windows sandbox is not full read isolation; voice approval and restart recovery are not implemented. See docs/external-agent-stage2-verification.md. No private key/config/audio samples committed. Next: report local stage 2 commit and stop for review, no push/PR.
+
+## 2026-10-24 — Stage 2 accepted; draft PR preparation
+
+- User approved stage 2 and authorized feature-branch push/draft PR, no merge or main push. Recorded two backlog items in feature_list.json and session-handoff.md: move directory scanning outside the manager lock; recognize newly created ancestors of planned files without broadening unrelated descendant permissions. No runtime changes in this update.
+- GitHub connector confirms PR #210 is open/draft/unmerged, head 86a93ca; base for this draft is codex/developer-readiness-20261023. CLI API request failed connectivity; connector metadata succeeded.
+- Verification Evidence: check_secrets.py passed (730 files); config.example.json, package.json and feature_list.json parse; required ten Python modules compile; diff whitespace check passed. Prior accepted runtime gate remains 784 Python passes/1 Windows privilege skip, all Node tests/syntax passed. Documentation-only update does not rerun model acceptance.
+
+- Publication outcome: normal feature-branch push failed twice because github.com could not resolve; explicit DNS lookup timed out. No remote write or PR creation confirmed. Local documentation commit 9a597f0 retained; handoff records exact retry scope.
+
+- Publication retry succeeded: feature branch pushed, #210 still unmerged; draft PR #213 created with readiness base using authenticated gh after connector write permission failure. Stage 0–2 real/automated evidence, default-off experimental status and deferred limitations included. Required push checks and secret scan passed again. No merge/main push.
+
 ## 2026-10-24 — Clean dependency validation (started)
 - User selected handoff task 1; new branch codex/clean-dependency-validation-20261024 from 86a93ca on codex/developer-readiness-20261023. Fresh checkout has no unrelated changes.
 - Read AGENTS.md, session-handoff.md, docs/handoff/README.md, feature_list.json and current progress before implementation.
@@ -92,3 +156,9 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 - Real isolated Chromium checked source with an explicitly declared installed startup-manifest fixture, then actual installed files after synchronization: readable save status, paused-state reload, manual retry and no extra requests during repeated polling ticks. Simulated 503 interfaces only; no real LLM calls. Screenshots/JSON stay outside Git in outputs.
 - Seven reviewed frontend files synchronized to D:/app/DesktopPet after normalized baseline comparison and original byte backups under outputs/backups/reminder-reliability-20261024-181229; hashes verified. No private config, token, memory or startup-manifest changes. No running installed pet window was found; changes apply when next opened.
 - User selected only reminder reliability. Source startup blocker, learning/focus features and real microphone/audio/long-duration acceptance remain separate. All fourteen task files are scoped to implementation, tests, docs and required state. Commit/feature-branch push and PR follow; no main update or merge.
+
+## 2026-10-25 — Ordered integration, PR #213
+
+- User authorizes merge commits in order #210/#211/#212/#213/#214. First three merged after passing checks. Merge origin/main 2be017b into external-agent branch; only feature_list.json, progress.md and session-handoff.md conflicted. Union feature IDs; retain main's completed clean dependency evidence using three-way comparison, both progress blocks, and both archived handoffs. Runtime files merged automatically. Full local gate pending; stop on failure.
+
+- PR #213 integration verification: full scripts/test-local.ps1 passed, all Node suites plus Python/JS syntax and secret scan passed; raw log tmp_ui_smoke/task6/merge-213-tests.log (ignored). Normal merge commit/push next; CI remains required before PR merge.

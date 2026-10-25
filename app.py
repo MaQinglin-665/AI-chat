@@ -137,6 +137,8 @@ from tools import (
     should_use_work_tools,
 )
 import agent_actions
+import external_agent
+import app_external_agent
 
 from llm_client import (
     call_ollama,
@@ -1745,6 +1747,10 @@ class PetHandler(SimpleHTTPRequestHandler):
         if path_only == "/api/social_cognition":
             self._send_json(get_social_cognition_state(load_config())); return
         if self._reject_invalid_api_token(path_only):
+            return
+        if app_external_agent.handles(path_only):
+            app_external_agent.dispatch(self, "POST", path_only,
+                external_agent.get_manager(config_loader=lambda: load_config(), bus=_COMPANION_EVENT_BUS))
             return
         if path_only in CONFIG_POST_RAW_JSON_ROUTES:
             body, ok = self._read_json_body(

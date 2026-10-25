@@ -21,6 +21,12 @@ ALLOWED_EVENT_TYPES = frozenset(
         "desktop_observed",
         "qq_inbound",
         "qq_outbound",
+        "agent_task_planned",
+        "agent_task_awaiting_approval",
+        "agent_task_progress",
+        "agent_task_completed",
+        "agent_task_failed",
+        "agent_task_cancelled",
     }
 )
 
@@ -35,6 +41,19 @@ def _clean_event(event_type, metadata=None, now_ms=None):
         return None
     raw = metadata if isinstance(metadata, dict) else {}
     event = {"type": event_type, "at_ms": int(now_ms or _now_ms())}
+    if event_type.startswith("agent_task_"):
+        import re
+        task_id = raw.get("task_id", "")
+        if isinstance(task_id, str) and re.fullmatch(r"[a-f0-9]{32}", task_id):
+            event["task_id"] = task_id
+        phase = raw.get("phase")
+        if phase in {"planning", "awaiting_approval", "executing", "completed", "failed", "cancelled", "expired"}:
+            event["phase"] = phase
+        for key in ("create_count", "modify_count", "delete_count", "progress_count", "warning_count"):
+            value = raw.get(key)
+            if type(value) is int and value >= 0:
+                event[key] = min(value, 1000000)
+        return event
     for key in ("source", "modality", "reason", "interaction_id"):
         value = str(raw.get(key, "") or "").strip()
         if value:

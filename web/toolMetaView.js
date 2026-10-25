@@ -53,7 +53,7 @@
       return;
     }
     const existing = row.querySelector(".tool-meta");
-    const items = Array.isArray(meta?.items) ? meta.items : [];
+    const items = Array.isArray(meta?.items) ? meta.items.filter(item => item?.tool !== "external_agent_task") : [];
     if (!items.length) {
       if (existing) {
         existing.remove();

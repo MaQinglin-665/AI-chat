@@ -1,0 +1,9 @@
+{"type": "thread.started", "thread_id": "01a170e4-9df1-79e0-9cae-b3d1e8449a9e"}
+{"type": "item.completed", "item": {"id": "item_0", "type": "error", "message": "Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\n  user (<CODEX_HOME>\\config.toml): `preferred_auth_method` is ignored."}}
+{"type": "item.completed", "item": {"id": "item_1", "type": "error", "message": "Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\n  user (<CODEX_HOME>\\config.toml): `preferred_auth_method` is ignored."}}
+{"type": "turn.started"}
+{"type": "item.completed", "item": {"id": "item_2", "type": "agent_message", "text": "I’m making the single requested PowerShell write with workspace-write permission."}}
+{"type": "item.started", "item": {"id": "item_3", "type": "command_execution", "command": "\"<USER_HOME>\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command \"Set-Content -LiteralPath '<WORKSPACE>\\\\resumed-marker.txt' -Value 'RESUME_OK'\"", "aggregated_output": "", "exit_code": null, "status": "in_progress"}}
+{"type": "item.completed", "item": {"id": "item_3", "type": "command_execution", "command": "\"<USER_HOME>\\\\.cache\\\\codex-runtimes\\\\codex-primary-runtime\\\\dependencies\\\\native\\\\powershell\\\\pwsh.exe\" -Command \"Set-Content -LiteralPath '<WORKSPACE>\\\\resumed-marker.txt' -Value 'RESUME_OK'\"", "aggregated_output": "", "exit_code": 0, "status": "completed"}}
+{"type": "item.completed", "item": {"id": "item_4", "type": "agent_message", "text": "Success. The single PowerShell command wrote `RESUME_OK` to `<WORKSPACE>\\resumed-marker.txt` and exited with code 0."}}
+{"type": "turn.completed", "usage": {"input_tokens": 39720, "cached_input_tokens": 38656, "cache_write_input_tokens": 0, "output_tokens": 592, "reasoning_output_tokens": 145}}
