@@ -13,22 +13,26 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", required=True)
     parser.add_argument("--codex-path", required=True)
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--port", type=int, default=8124)
     args = parser.parse_args()
     data = Path(args.data_dir).resolve()
     if data == REPO or REPO in data.parents or data == Path.home() or data == Path(data.anchor):
         parser.error("Use a new repository-external test directory")
     if data.exists():
-        parser.error("Test directory already exists; choose a new one to avoid daily data")
+        metadata_path = data / "instance.json"
+        if not args.resume or not metadata_path.is_file() or Path(json.loads(metadata_path.read_text(encoding="utf-8"))["data_dir"]).resolve() != data:
+            parser.error("Existing data requires --resume and matching isolated instance metadata")
     if not os.environ.get("DEEPSEEK_API_KEY"):
         parser.error("DEEPSEEK_API_KEY environment variable is required")
-    data.mkdir(parents=True)
+    data.mkdir(parents=True, exist_ok=True)
     work = data / "workspace"
-    work.mkdir()
+    work.mkdir(exist_ok=True)
     for name, text in {"hello.txt": "Hello, test world.\n", "notes.txt": "Disposable sample notes.\n",
                        "sales.csv": "item,count\napple,3\n", "colors.csv": "name,hex\nblue,0000ff\n",
                        "README.md": "# Test workspace\nSynthetic files only.\n", "ideas.md": "# Ideas\nOrganize these samples.\n"}.items():
-        (work / name).write_text(text, encoding="utf-8")
+        if not args.resume:
+            (work / name).write_text(text, encoding="utf-8")
     os.chdir(data)
     sys.path.insert(0, str(REPO))
     import config
@@ -39,7 +43,7 @@ def main():
                        "EXAMPLE_CONFIG_PATH": "config.example.json", "ENV_PATH": ".env",
                        "MEMORY_PATH": "memory.json", "MEMORY_SUMMARY_PATH": "memory_summary.json"}.items():
         setattr(config, attr, data / name)
-    cfg.update(onboarding_completed=True, model_path="/models/hiyori_pro_t11/hiyori_pro_t11.model3.json")
+    cfg.update(assistant_name="馨语", assistant_reply_language="auto", onboarding_completed=True, model_path="/models/hiyori_pro_t11/hiyori_pro_t11.model3.json")
     cfg["server"].update(host="127.0.0.1", port=args.port, require_api_token=False, open_browser=False)
     cfg["llm"].update(provider="openai-compatible", base_url="https://api.deepseek.com", model="deepseek-flash", api_key="", api_key_env="DEEPSEEK_API_KEY")
     cfg["tts"].update(provider="browser", auto_start_local_provider=False, gpt_sovits_fallback_ref_audio_path="")

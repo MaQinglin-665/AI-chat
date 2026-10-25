@@ -132,6 +132,9 @@
     }
 
 
+    window.document?.addEventListener?.("xinyu:user-message", () => {
+      if (isOnboardingOpen() && Number(state.onboardingStepIndex || 0) === 0) moveOnboardingStep(1);
+    });
     return {
       isHelpOpen,
       isOnboardingOpen,

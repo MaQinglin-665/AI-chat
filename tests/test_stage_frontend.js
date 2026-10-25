@@ -154,7 +154,8 @@ assert.ok(stageCss.includes('width: min(940px, calc(100vw - 330px))'), "wide sta
 assert.ok(stageCss.includes('@media (max-width: 1400px)'), "medium stages should move utility actions above the composer before overlap begins");
 assert.ok(stageCss.includes('width: min(780px, calc(100vw - 360px))'), "native-width stages should preserve a separate utility lane");
 assert.ok(stageCss.includes('.conversation-rail.is-collapsed'), "the unified conversation rail should have a compact collapsed state");
-assert.ok(read("web", "desktopControlBinder.js").includes('matchMedia?.("(max-width: 820px)")'), "compact stages should start with history collapsed to protect the character");
+assert.ok(read("web", "desktopControlBinder.js").includes('setConversationRailExpanded(stored !== "false")'), "first open should show replies; only an explicit saved collapse hides the rail");
+assert.ok(read("web", "desktopControlBinder.js").includes('setItem("xinyu.conversation.expanded", String(nextExpanded))'), "manual collapse preference should persist");
 assert.ok(stageCss.includes('.stage-composer-mic[aria-pressed="true"]'), "active microphone state should be visually explicit");
 assert.ok(stageCss.includes('.primary-actions > button[aria-pressed="true"]'), "broadcast controls should expose selected state");
 assert.ok(stageCss.includes('min-height: 56px !important'), "the refined header should use one compact full-width rail");
@@ -273,7 +274,7 @@ conversationClick();
 assert.strictEqual(conversationAttrs["aria-expanded"], "true", "conversation history should expand on the next click");
 assert.strictEqual(conversationClasses.has("is-collapsed"), false, "conversation history should restore the unified rail");
 
-for (const splitChat of [true, false]) {
+for (const splitChat of [true, false]) for (const stored of [null, "true", "false"]) {
   const attrs = { "aria-expanded": "true" };
   desktopControlBinder.bindUtilityControls({
     conversationRail: { classList: { toggle() {} } },
@@ -286,11 +287,12 @@ for (const splitChat of [true, false]) {
     windowObject: {
       addEventListener() {},
       matchMedia: () => ({ matches: true }),
+      localStorage: { getItem: () => stored },
       document: { body: { classList: { contains: name => splitChat && name === "view-chat" } } }
     }
   });
-  assert.strictEqual(attrs["aria-expanded"], splitChat ? "true" : "false",
-    "narrow split-chat must remain readable while compact stage keeps its collapsed default");
+  assert.strictEqual(attrs["aria-expanded"], stored === "false" ? "false" : "true",
+    "both narrow views default to readable replies and honor a saved manual collapse");
 }
 
 function createLaneToggle() {

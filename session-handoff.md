@@ -1,37 +1,28 @@
 # Session handoff
 
-## Current task: task 5 visual polish complete — local commit only
+## Task 6 experience fixes — local only
 
-Date: 2026-10-24 (America/Los_Angeles). Branch `codex/visual-polish-v1`, based on task 4 `codex/stage-feedback-onboarding-v1` at `cf94872`. No push/PR/main modification.
+Branch `codex/experience-fixes-v1`, based on task 5 `541f881`. Do not push or create PR. Task 5 handoff archived at docs/archive/2026-10-24-visual-polish-handoff.md.
 
-## Results / files
+## Results / touched files
 
-Central tokens + visualPolish CSS and display controller; top toolbar, one composer, quiet room/halo, responsive control center, cat avatar, Chinese labels, matching Galgame and naming/installer templates. Full touched-file list and screenshot index: docs/visual-polish-verification.md.
+Chinese model replies survive the brain guards; sentence-level removal and one corrected model retry replace stock persona answers. Auto language follows user; explicit English setting remains. Default expanded conversation with persistent manual collapse; independent latest-reply bubble; narrow layout and dark onboarding. Move-aware task cards and metadata verification, sanitized provider diagnostic details, sticky status and one retry button. Full module and test list: docs/experience-fixes-verification.md.
 
-No backend or chat.js/chatReplyController.js changes. Live2D layout only exports two CSS properties; no transforms/rendering/motion/lipsync behavior changes.
+## Evidence and unresolved issue
 
-## Verification
+Final gate evidence is recorded in progress.md and verification report. Real DeepSeek five Chinese turns recorded verbatim. Original failed external-task wording rerun with independent Codex 0.164.0: six moves, two new directories, no out_of_plan or missing operation. Historical provider_failed did NOT reproduce; old logs discarded the details, so original cause remains unknown. Do not claim that root cause was fixed. Diagnostic details now support the next failure investigation.
 
-- Full scripts/test-local.ps1: 784 passed, 1 Windows symlink skip; all Node suites; Python/JS syntax and secrets passed. Existing doctor warnings documented in report.
-- Real Edge three sizes × five views; toggle round-trips, lamp keyboard focus, provider rows, no horizontal settings overflow, custom-styled selects and reduced motion passed.
-- 45 ignored PNGs at tmp_ui_smoke/visual-polish/. Approval is synthetic; not new real external-agent/Electron/audio acceptance.
-- PowerShell shortcut syntax and NSIS template compilation with synthetic payload passed; no real install.
+Browser matrix uses real Edge with synthetic messages/task cards; no new Electron or human audio acceptance. Seven ignored screenshots in tmp_ui_smoke/task6/. Metadata-only move inference is not a content hash. Two previously accepted backend followups remain backlog (scan outside lock; planned parent directory handling).
 
-## Live instance — leave running
+## Running isolated instance — keep alive
 
+- http://127.0.0.1:8124/?view=full ; /healthz 200, loopback only.
+- Latest code restarted, PID 5620. Stop: `taskkill /PID 5620 /T /F` (verify process ownership if PID may be stale).
+- Data root D:/AI/.tools/stage4-experience-20261024, persistence stays isolated; daily 8123 untouched.
+- workspace restored to hello.txt, notes.txt, sales.csv, colors.csv, README.md, ideas.md, original bytes checked, no child folders.
+- Execution evidence archived in sibling workspace-task6-run1 / workspace-task6-run2; no deletion needed.
+- Key only from environment, CLI 0.164.0 independent installation; global CLI unchanged.
 
-- URL: http://127.0.0.1:8124/?view=full ; health: http://127.0.0.1:8124/healthz (200).
-- PID: 37668, listening only 127.0.0.1:8124. No Electron started and daily pet not stopped.
-- Data root: D:/AI/.tools/stage4-experience-20261024 (outside repository).
-- Workspace: data root/workspace; hello.txt, notes.txt, sales.csv, colors.csv, README.md, ideas.md are six disposable synthetic files.
-- Only this instance has require_api_token=false; official DeepSeek environment Key, browser TTS, isolated Codex CLI 0.164.0 and allowed_roots limited to workspace.
-- instance.json in data root lists PID/address and verified persistence paths (memory/relationship/learning/audit/emotion/shared experience/desktop state); vault and mem0 also point inside data root.
-- Stop command: taskkill /PID 37668 /T /F. Confirm PID still belongs to isolated_experience.py before using it after a long delay.
-- Only after user says 体验结束: stop owned process tree, verify it is stopped, then resolve and verify the exact test root remains under D:/AI/.tools before cleanup. Do not touch other test roots or daily data. Do not automatically stop at turn end.
+## Next
 
-
-## Next / limitations
-
-Claude should visually review the running isolated instance after refresh. Do not push or open PR. Wait for user feedback. Screenshots are untracked and available only on this machine. Installer/shortcut real installation not tested; legacy themes remain under a centralized final layer. Two external-agent verification followups stay backlog.
-
-Task 4 handoff archived at docs/archive/2026-10-24-stage-feedback-handoff.md; previous publication handoff remains in its prior archive. Do not automatically rebase or stop the experience instance.
+Claude/user review the running instance. Do not automatically stop it, push, or claim historical provider root cause resolved. If failure recurs, inspect the sanitized task.error.detail and local debug log. Only clean test roots after user ends the experience.

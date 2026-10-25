@@ -516,7 +516,7 @@
         }
       }
       const configuredName = String(state.config?.assistant_name || "").trim();
-      return configuredName || fallbackName;
+      return ["馨语AI桌宠", "馨语桌宠"].includes(configuredName) ? "馨语" : configuredName || fallbackName;
     }
 
     function createAssistantFeedbackControls() {
@@ -670,6 +670,7 @@
     }
 
     function appendMessage(role, text, options = {}) {
+      if (role === "user" && options.persist !== false && root.CustomEvent) documentObject.dispatchEvent?.(new root.CustomEvent("xinyu:user-message"));
       const timestamp = parseMessageTimestamp(options.timestamp);
       const isSystemMessage = options.category === "system";
       const row = createMessageRow(role, text, {

@@ -8,7 +8,7 @@
     if (task.changes?.out_of_plan_count) return "核对时发现了计划外的文件变更，请先查看单独列出的清单；这次不能当作完全按计划完成。";
     if (task.status === "completed" && task.changes?.planned_not_observed && Object.values(task.changes.planned_not_observed).some(items => items.length)) return "执行结束了，但有些计划中的变更没有观察到，请检查结果清单。";
     if (task.verification_error) return "这次没能完整核对文件变更，请查看结果，暂时不要把它当作已核验完成。";
-    if (task.status === "awaiting_approval") return `我打算新增 ${plan.files_to_create.length} 项、修改 ${plan.files_to_modify.length} 项、删除 ${plan.files_to_delete.length} 项，请查看完整计划，再决定是否批准。`;
+    if (task.status === "awaiting_approval") return `我打算移动 ${(task.planned_moves||[]).length} 项、新增 ${plan.files_to_create.length-(task.planned_moves||[]).length} 项、修改 ${plan.files_to_modify.length} 项、删除 ${plan.files_to_delete.length-(task.planned_moves||[]).length} 项，请查看完整计划，再决定是否批准。`;
     return { planning: "我先看看怎么做，等你批准后再动手。", executing: "收到，我开始按你批准的计划执行。", completed: "执行结束了，实际变更已经列出来，我们一起看看。", failed: `这次没能完成。${task.error?.message || "请查看错误说明。"}`, cancelled: "任务已停止，已发生的文件变更请查看核对结果。", expired: "这份计划已经过期，需要重新规划。" }[task.status];
   }
   function createNarrator({ state, speak, emotion = () => {} }) {
@@ -32,28 +32,35 @@
     container.replaceChildren();
     const add = (tag, text, cls = "") => { const el = doc.createElement(tag); el.textContent = text; el.className = cls; container.appendChild(el); return el; };
     const list = (title, items, danger = false) => {
+      danger = danger && !!items?.length;
       add("h4", title, danger ? "external-agent-danger" : "");
       const ul = add("ul", "", danger ? "external-agent-danger" : "");
       for (const value of items?.length ? items : ["无"]) { const li = doc.createElement("li"); li.textContent = value; ul.appendChild(li); }
     };
     if (!task) return;
-    add("h3", labels[task.status] || task.status);
+    const status = add("header", labels[task.status] || task.status, "external-agent-state");
+    if(task.error){const error=doc.createElement("p");error.className="external-agent-danger";error.textContent=task.error.message + (task.error.detail?.message ? "："+task.error.detail.message : "");status.appendChild(error);}
+    if(task.status==="failed") { const retry=doc.createElement("button");retry.type="button";retry.textContent="重新规划";retry.addEventListener("click",()=>doc.getElementById?.("external-agent-create")?.click());status.appendChild(retry); }
     add("p", task.workdir);
     if (task.plan) {
       add("p", task.plan.summary);
       if (task.plan.risk === "high") add("p", "高风险：请仔细核对每一项操作。", "external-agent-danger");
       if (task.plan.needs_network) add("p", "计划需要网络：当前执行环境可能拒绝联网，批准不会放宽网络限制。", "external-agent-danger");
       list("步骤", task.plan.steps);
-      list("将删除的文件 / 目录", task.plan.files_to_delete, true);
+      const moves=task.planned_moves || [];
+      list("将移动的文件",moves.map(m=>`${m.from} → ${m.to}`));
+      list("将删除的文件 / 目录", task.plan.files_to_delete.filter(p=>!moves.some(m=>m.from===p)), true);
       list("将修改的文件", task.plan.files_to_modify);
-      list("将新增的文件 / 目录", task.plan.files_to_create);
-      list("将执行的命令", task.plan.commands);
+      list("将新增的文件 / 目录", task.plan.files_to_create.filter(p=>!(task.planned_moves||[]).some(m=>m.to===p)));
+      const details=add("details", "");const summary=doc.createElement("summary");summary.textContent="技术细节：将执行的命令";details.appendChild(summary);
+      for(const command of task.plan.commands){const pre=doc.createElement("pre");pre.textContent=command;details.appendChild(pre);}
     }
-    if (task.error) add("p", task.error.message, "external-agent-danger");
+
     if (task.verification_error) add("p", task.verification_error, "external-agent-danger");
     if (task.changes) {
       add("h3", "执行前后核对");
-      for (const [key, title] of [["created", "实际新增"], ["modified", "实际修改"], ["deleted", "实际删除"]]) list(title, task.changes[key], key === "deleted");
+      list("观察到的移动（按文件元数据核对）",(task.changes.moved||[]).map(m=>`${m.from} → ${m.to}`));
+      for (const [key, title] of [["created", "实际新增"], ["modified", "实际修改"], ["deleted", "实际删除"]]) list(title, task.changes[key].filter(p=>!(task.changes.moved||[]).some(m=>key==="deleted"?m.from===p:key==="created"?m.to===p:false)), key === "deleted");
       const missing = task.changes.planned_not_observed;
       if (missing && Object.values(missing).some(items => items.length)) {
         for (const [key, title] of [["created", "计划新增但未观察到"], ["modified", "计划修改但未观察到"], ["deleted", "计划删除但未观察到"]]) list(title, missing[key]);
@@ -63,7 +70,8 @@
         for (const [key, title] of [["created", "计划外新增"], ["modified", "计划外修改"], ["deleted", "计划外删除"]]) list(title, task.changes.out_of_plan[key], true);
       }
     }
-    add("p", `进度事件 ${task.progress_count || 0} · 警告 ${task.warning_count || 0}`);
+    add("p", task.status === "executing" ? "正在按批准的计划整理文件…" : task.status === "planning" ? "正在查看工作目录里的文件…" : task.status === "awaiting_approval" ? "请逐项核对计划，再决定是否批准。" : task.status === "completed" ? "执行已结束，请查看文件核对结果。" : "任务已停止，可重新规划。");
+    if(task.warning_count)add("p", "执行期间有提示，请查看核对结果。");
   }
   function createController({ document: doc = root.document, authFetch, state, speak, emotion, interval = root.setInterval }) {
     const modal = doc.getElementById("external-agent-modal");
@@ -78,12 +86,14 @@
       return data;
     }
     function draw() {
+      if(modal.dataset)modal.dataset.taskStatus=task?.status || "new";
       const signature = JSON.stringify(task);
       if (signature !== rendered) { renderTask(doc, el("result"), task); rendered = signature; }
       el("approve").hidden = task?.status !== "awaiting_approval";
       el("cancel").hidden = !task || terminal.has(task.status);
       el("approve").disabled = requestBusy;
       el("cancel").disabled = requestBusy || !!task?.cancel_requested;
+      el("create").textContent = task?.status === "failed" ? "重新规划" : "生成计划（不执行）";
       el("create").disabled = requestBusy || !!(task && !terminal.has(task.status)) || !el("workdir").value;
       if (task) narrator.update(task);
     }

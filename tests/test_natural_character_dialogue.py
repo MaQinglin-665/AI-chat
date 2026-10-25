@@ -90,7 +90,7 @@ def test_model_direct_dialogue_policy_keeps_configured_language_compatibility():
     auto_cfg.pop("assistant_reply_language")
 
     assert "natural Simplified Chinese" in build_model_direct_dialogue_policy(zh_cfg)
-    assert "Understand Chinese or English" in build_model_direct_dialogue_policy(auto_cfg)
+    assert "Follow the language of the latest user message" in build_model_direct_dialogue_policy(auto_cfg)
 
 
 def test_model_direct_base_prompt_includes_one_canonical_policy(monkeypatch):

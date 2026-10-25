@@ -10,9 +10,9 @@ MIN_VERSION = (0, 164, 0)
 
 
 class AgentError(ValueError):
-    def __init__(self, code, message, status=400):
+    def __init__(self, code, message, status=400, detail=None):
         super().__init__(message)
-        self.code, self.status = code, status
+        self.code, self.status, self.detail = code, status, detail
 
 
 def default_home():
@@ -117,8 +117,11 @@ def key_from_config(config):
     return str(llm.get("api_key") or os.environ.get(str(llm.get("api_key_env") or "DEEPSEEK_API_KEY"), "")).strip()
 
 
-def redact(text, key=""):
+def redact(text, key="", *, paths=False):
     value = str(text)
     if key:
         value = value.replace(key, "[REDACTED]")
-    return re.sub(r"(?i)(?:sk-[\w-]{8,}|Bearer\s+\S+)", "[REDACTED]", value)
+    value = re.sub(r"(?i)(?:sk-[\w-]{8,}|Bearer\s+\S+)", "[REDACTED]", value)
+    if paths:
+        value = re.sub(r'(?:[A-Za-z]:[\\/]|(?<![:\w/])/|\\\\)[^\s\"<>|]*', "[PATH]", value)
+    return value

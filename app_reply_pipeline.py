@@ -84,6 +84,7 @@ def apply_character_brain_reply_text(
     *,
     apply_character_brain_reply_constraints_func,
     enforce_reply_language_func,
+    regenerate_reply_func=None,
 ):
     if not isinstance(config, dict):
         return str(reply or "")
@@ -97,6 +98,17 @@ def apply_character_brain_reply_text(
         decision,
         user_message=user_message,
     )
+    if not constrained and str(reply or "").strip():
+        if regenerate_reply_func is None:
+            raise ValueError("回复需要重新生成，但当前调用未提供重试能力")
+        try:
+            regenerated = regenerate_reply_func()
+        except Exception:
+            from character_brain import _fallback_reply_for_intent
+            return _fallback_reply_for_intent((decision or {}).get("intent", "question"), user_message)
+        constrained = apply_character_brain_reply_constraints_func(regenerated, decision, user_message=user_message)
+        if not constrained:
+            raise ValueError("模型重试后仍未给出有效回答，请重试")
     enforced = enforce_reply_language_func(config, user_message, constrained)
     if enforced != constrained:
         return apply_character_brain_reply_constraints_func(
