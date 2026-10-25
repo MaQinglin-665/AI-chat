@@ -603,6 +603,8 @@ def build_health_payload(
     payload["checks"]["llm"] = build_llm_health_summary(cfg)
     payload["checks"]["tts"] = build_tts_health_summary(cfg)
     payload["checks"]["asr"] = build_asr_health_summary(cfg)
+    from external_agents.codex_cli import health as external_agent_health
+    payload["checks"]["external_agent"] = external_agent_health(cfg)
     payload["readiness"] = build_readiness_summary(payload["checks"])
     payload["security"] = {
         "require_api_token": bool(security.get("require_api_token", False)),

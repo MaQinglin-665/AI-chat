@@ -32,6 +32,10 @@ def dispatch_get(self, context):
         return
     if self._reject_invalid_api_token(path_only):
         return
+    if context["app_external_agent"].handles(path_only):
+        context["app_external_agent"].dispatch(self, "GET", path_only,
+            context["external_agent"].get_manager(config_loader=lambda: load_config(), bus=_COMPANION_EVENT_BUS))
+        return
     if path_only in CONFIG_GET_ROUTES:
         self._handle_config_get_route(path_only)
         return

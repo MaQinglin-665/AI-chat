@@ -121,7 +121,7 @@ def risk_for_action(name, args):
     return False, "", ""
 
 
-def create_pending(name, args, reason, summary):
+def create_pending(name, args, reason, summary, *, ttl_minutes=None):
     now = _now()
     record = {
         "id": secrets.token_urlsafe(18),
@@ -130,7 +130,7 @@ def create_pending(name, args, reason, summary):
         "reason": _safe_text(reason, 80),
         "summary": _safe_text(summary, 500),
         "created_at": now.isoformat(timespec="seconds"),
-        "expires_at": (now + timedelta(minutes=PENDING_TTL_MINUTES)).isoformat(timespec="seconds"),
+        "expires_at": (now + timedelta(minutes=PENDING_TTL_MINUTES if ttl_minutes is None else ttl_minutes)).isoformat(timespec="seconds"),
     }
     with LOCK:
         state = _load()

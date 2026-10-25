@@ -153,6 +153,23 @@ if (-not $gitVersion) {
 
 Write-Host ""
 if ($script:ErrorCount -eq 0) {
+    $externalCheck = & python scripts/check_external_agent.py 2>&1
+    $externalExit = $LASTEXITCODE
+    if ($externalExit -ne 0) {
+        Write-Fail "External agent configuration check failed: $externalCheck"
+        exit 1
+    }
+    try {
+        $externalState = ($externalCheck | Out-String) | ConvertFrom-Json
+        if ($externalState.configuration_complete) {
+            Write-Ok "External Codex CLI: $($externalState.version) (minimum 0.164.0)."
+        } else {
+            Write-WarnLine "External agent is disabled or incomplete: $($externalState.messages -join ' ')"
+        }
+    } catch {
+        Write-Fail "External agent doctor returned an invalid result."
+        exit 1
+    }
     Write-Ok "Doctor finished with $script:WarnCount warning(s)."
     if ($Strict -and $script:WarnCount -gt 0) {
         exit 1

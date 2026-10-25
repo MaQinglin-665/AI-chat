@@ -1,6 +1,15 @@
 {
   "features": [
     {
+      "id": "external-agent-codex-cli-stage1",
+      "name": "External Codex CLI backend with explicit approval",
+      "status": "completed",
+      "dependencies": ["external-agent-codex-cli-stage0"],
+      "scope": ["Backend only; no frontend, speech, push or PR"],
+      "done_criteria": ["Disabled-by-default authenticated endpoints and bounded task state machine", "Isolated provider configuration, path validation, version gate and process-tree cancellation", "Fixture replay, failure injection, full validation and real invalid-key acceptance"],
+      "verification": "764 Python tests and all Node suites passed. Real isolated CLI 0.164.0 invalid-key failure 3.02s, real planning/approved file organization 59.97s, real execution cancellation: 12 observed processes, zero residuals/writes over 10s. See docs/external-agent-backend-verification.md for scope and sandbox read-isolation limitations. Local commits only; stage 2 not started."
+    },
+    {
       "id": "external-agent-codex-cli-stage0",
       "name": "Verify external Codex CLI prerequisites before implementation",
       "status": "completed",

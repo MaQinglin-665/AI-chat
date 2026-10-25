@@ -5,6 +5,7 @@ import copy
 from pathlib import Path
 
 from qq_identity import DEFAULT_QQ_IDENTITY_CONFIG, build_qq_identity_public_payload
+from external_agents.policy import defaults as external_agent_defaults
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -104,6 +105,7 @@ REQUIRE_API_TOKEN_DEFAULT = any(_env_flag(key, False) for key in RELEASE_MODE_EN
 
 
 DEFAULT_CONFIG = {
+    "external_agent": external_agent_defaults(),
     "onboarding_completed": False,
     "assistant_name": "馨语AI桌宠",
     "model_path": "/models/your_model/model3.json",
