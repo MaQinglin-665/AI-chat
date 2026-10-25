@@ -102,6 +102,8 @@
     }
 
     function open() {
+      const guide = documentObject?.getElementById?.("onboarding-modal");
+      if (guide) guide.hidden = true;
       if (ui.modal) {
         ui.modal.hidden = false;
       }

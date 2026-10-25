@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./base.css">
   <link rel="stylesheet" href="./chat.css">
   <link rel="stylesheet" href="./externalAgent.css">
+  <link rel="stylesheet" href="./stageFeedback.css">
   <link rel="stylesheet" href="./persona.css">
   <link rel="stylesheet" href="./schedule.css">
   <link rel="stylesheet" href="./onboarding.css">
@@ -647,7 +648,7 @@
     <div class="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-step-title">
       <div class="onboarding-head">
         <strong>欢迎来到馨语AI桌宠</strong>
-        <button id="onboarding-skip-btn" class="onboarding-skip-btn" type="button">稍后再说</button>
+        <button class="onboarding-secondary" id="onboarding-skip-btn" class="onboarding-skip-btn" type="button">稍后再说</button>
       </div>
       <p class="onboarding-brand-copy">让你的桌面，不止会动，也会懂你。</p>
       <div class="onboarding-progress">
@@ -661,7 +662,7 @@
         <p class="onboarding-path-label">首次建议先“立即体验”，稳定后再进入“高级配置”。</p>
         <div class="onboarding-path-actions">
           <button id="onboarding-quick-btn" type="button">立即体验（推荐）</button>
-          <button id="onboarding-advanced-btn" type="button">高级配置</button>
+          <button class="onboarding-secondary" id="onboarding-advanced-btn" type="button">高级配置</button>
         </div>
       </div>
       <div class="onboarding-actions">
@@ -1153,7 +1154,13 @@
       </div>
     </section>
   </div>
+  <aside id="stage-feedback" class="stage-feedback" role="status" aria-live="polite" hidden>
+    <p id="stage-feedback-text"></p>
+    <button id="stage-feedback-doctor" type="button">故障自检</button>
+    <button id="stage-feedback-dismiss" type="button" aria-label="关闭状态提示">关闭</button>
+  </aside>
   <template id="taffy-view-script-manifest">
+  <script src="./stageFeedbackController.js"></script>
   <script src="./stageThemeController.js"></script>
   <script src="./controlCenterShell.js"></script>
   <script src="./externalAgentController.js"></script>

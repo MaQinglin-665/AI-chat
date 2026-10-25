@@ -189,7 +189,7 @@ assert.ok(electronSource.includes('win.webContents.send("surface-active-changed"
 assert.ok(startupSource.includes("broadcastSpeech: state.desktopMode === true"), "desktop full view should keep the detached pet performance in sync");
 assert.ok(startupSource.includes("ticker.stop?.()"), "inactive Live2D surfaces should stop their render ticker");
 assert.ok(startupSource.includes('addEventListener?.("visibilitychange"'), "document visibility should backstop native surface messages");
-assert.ok(layoutSource.includes('state.uiView === "full" ? 0.86 : 0.76'), "full view should fit the real model between the broadcast bar and composer");
+assert.ok(layoutSource.includes('stageBottom - 100') && layoutSource.includes('model.y = stageBottom'), "full view should reserve header and composer clearance");
 assert.ok(layoutSource.includes('model.x = w * 0.5'), "full view should center the real Live2D model");
 assert.ok(layoutSource.includes('if (state.uiView !== "model")'), "the full Electron stage should never enable desktop click-through");
 assert.ok(layoutSource.includes('window.electronAPI.setClickthrough(false);'), "the stage should explicitly keep native controls interactive");

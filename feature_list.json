@@ -1,6 +1,13 @@
 {
   "features": [
     {
+      "id": "stage-feedback-onboarding-v1",
+      "name": "窄屏对话、舞台状态、新手引导与隔离体验实例",
+      "status": "completed",
+      "dependencies": ["external-agent-codex-cli-stage2"],
+      "done_criteria": ["窄屏可见最近对话且折叠行为不变", "等待/错误/鉴权与启动失败的舞台反馈", "单主按钮引导、视觉原因核对及前后截图", "完整测试通过后启动数据隔离的本机浏览器体验实例"]
+    },
+    {
       "id": "external-agent-verification-followups",
       "name": "外部任务文件核对：锁范围与新建父目录识别",
       "status": "backlog",

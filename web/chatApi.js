@@ -606,7 +606,7 @@
     };
   }
 
-  async function streamAssistantReply(payload, onDelta, options = {}) {
+  async function streamAssistantReplyImpl(payload, onDelta, options = {}) {
     const authFetch = options.authFetch;
     if (typeof authFetch !== "function") {
       throw new Error("authFetch is required");
@@ -777,6 +777,23 @@
       }
       throw err;
     }
+  }
+
+  async function streamAssistantReply(payload, onDelta, options = {}) {
+    const feedback = root.TaffyStageFeedback;
+    const id = feedback?.begin();
+    try {
+      const result = await streamAssistantReplyImpl(payload, (text, ...args) => {
+        if (text) feedback?.received(id);
+        onDelta?.(text, ...args);
+      }, options);
+      feedback?.received(id);
+      return result;
+    } catch (err) {
+      if (isAbortLikeError(err, options.signal)) feedback?.received(id);
+      else feedback?.failed(id, err);
+      throw err;
+    } finally { feedback?.finish(id); }
   }
 
   const api = {
