@@ -1,0 +1,170 @@
+(function (root) {
+  "use strict";
+  const clamp = (v) => Math.max(0, Math.min(1, Number(v) || 0));
+  function formatConditions(conditions = {}) {
+    const labels = { licenseName: "许可证", allowedUserName: "可使用者", avatarPermission: "可使用者",
+      violentUssageName: "暴力内容", sexualUssageName: "色情内容", commercialUssageName: "商业使用",
+      commercialUsage: "商业使用", creditNotation: "署名要求", allowRedistribution: "再分发",
+      modification: "修改", allowExcessivelyViolentUsage: "过度暴力内容", allowExcessivelySexualUsage: "色情内容",
+      allowPoliticalOrReligiousUsage: "政治 / 宗教内容", allowAntisocialOrHateUsage: "反社会 / 仇恨内容",
+      thirdPartyLicenses: "其他素材许可" };
+    const values = { true: "允许", false: "不允许", Allow: "允许", Disallow: "不允许", Other: "作者自定义条件（请查看完整许可）",
+      Everyone: "所有人", everyone: "所有人", OnlyAuthor: "仅作者", onlyAuthor: "仅作者", required: "必须署名",
+      unnecessary: "无需署名", necessary: "必须署名", disallow: "不允许", allow: "允许", personalNonProfit: "仅个人非商业使用",
+      personalProfit: "允许个人商业使用", corporation: "允许企业商业使用", prohibit: "禁止修改", allowModification: "允许修改" };
+    const lines = Object.entries(conditions).filter(([key]) => labels[key]).map(([key, value]) => `${labels[key]}：${values[String(value)] ?? String(value)}`);
+    // VRoid Hub encodes additional terms in its license URL. Display only explicit fields.
+    try {
+      const url = new URL(conditions.otherLicenseUrl);
+      if (url.hostname === "hub.vroid.com" && url.pathname === "/license") {
+        const terms = { allowed_to_use_user: "可使用者", characterization_allowed_user: "角色扮演使用者",
+          corporate_commercial_use: "企业商业使用", personal_commercial_use: "个人商业使用",
+          credit: "署名要求", modification: "修改", redistribution: "再分发",
+          sexual_expression: "色情内容", violent_expression: "暴力内容" };
+        lines.push("", "VRoid Hub 模型数据使用条件：");
+        for (const [key, label] of Object.entries(terms)) {
+          if (url.searchParams.has(key)) {
+            const value = url.searchParams.get(key);
+            lines.push(`${label}：${values[value] ?? value}`);
+          }
+        }
+      }
+    } catch (_) { /* Missing/non-URL license metadata is not an error. */ }
+    return lines.join("\n");
+  }
+  async function describe() {
+    const response = await (root.authFetch || root.fetch)("/api/avatar", { cache: "no-store" });
+    if (!response.ok) throw new Error("VRM 无法读取，请检查模型路径和允许目录。");
+    return response.json();
+  }
+  function showMetadata(info) {
+    const panel = root.document?.getElementById("avatar-model-info");
+    if (!panel) return;
+    panel.hidden = info.kind !== "vrm";
+    if (panel.hidden) return;
+    const meta = info.metadata || {};
+    panel.querySelector("[data-avatar-name]").textContent = meta.name || "未提供名称";
+    panel.querySelector("[data-avatar-authors]").textContent = (meta.authors || []).join("、") || "未提供作者";
+    const sources = panel.querySelector("[data-avatar-sources]");
+    sources.replaceChildren();
+    for (const value of [meta.source, ...(meta.references || [])]) {
+      try {
+        const url = new URL(value);
+        if (!["http:", "https:"].includes(url.protocol)) continue;
+        const a = root.document.createElement("a");
+        a.href = url.href; a.textContent = url.href; a.target = "_blank"; a.rel = "noopener noreferrer";
+        sources.append(a, root.document.createElement("br"));
+      } catch (_) { /* Metadata is untrusted display data. */ }
+    }
+    if (!sources.childNodes.length) sources.textContent = "模型未提供来源链接";
+    panel.querySelector("[data-avatar-conditions]").textContent =
+      (meta.readme ? `${meta.readme}\n\n` : "") +
+      (formatConditions(meta.conditions) || "未提供使用条件，请向作者核实。");
+    const links = panel.querySelector("[data-avatar-license-links]");
+    links.replaceChildren();
+    for (const value of [meta.conditions?.licenseUrl, meta.conditions?.otherLicenseUrl, meta.conditions?.otherPermissionUrl]) {
+      try {
+        const url = new URL(value);
+        if (!["http:", "https:"].includes(url.protocol)) continue;
+        const a = root.document.createElement("a");
+        a.href = url.href; a.textContent = "查看作者提供的完整使用条件"; a.target = "_blank"; a.rel = "noopener noreferrer";
+        links.append(a, root.document.createElement("br"));
+      } catch (_) { /* Do not turn arbitrary metadata into active links. */ }
+    }
+  }
+  function frameFromState(state, now) {
+    const remote = state.uiView === "model";
+    const fresh = !remote || (now - Number(state._broadcastSpeechUpdatedAt || 0) < 900);
+    const level = fresh ? clamp(state.ttsAudioLevel) : 0;
+    return { now, mode: level > 0.02 ? "speak" : "idle",
+      face: state.speechEmotionPose?.emotion || state.speechAnimMood || "neutral", faceIntensity: 0.6,
+      mouth: { open: level, vowel: null } };
+  }
+  async function start({ state, canvas, source, setStatus }) {
+    state.avatarRenderer?.dispose();
+    const renderer = root.XinyuVRMRenderer.createRenderer({ canvas });
+    await renderer.load(source);
+    state.avatarRenderer = renderer;
+    root.__xinyuAvatarRenderer = renderer;
+    showMetadata(source);
+    root.document.body.dataset.avatarKind = "vrm";
+    if (state.uiView === "model") {
+      root.document.documentElement.classList.add("transparent-mode", "alpha-true");
+      root.document.body.classList.add("transparent-mode", "alpha-true");
+    }
+    let disposed = false, raf = 0, lastFrame = 0, gaze = null, intent = {}, cursorBusy = false;
+    let dragging = false;
+    const pointer = (event) => {
+      const rect = canvas.getBoundingClientRect();
+      gaze = { x: ((event.clientX - rect.left) / rect.width - 0.5) * 2,
+        y: (0.5 - (event.clientY - rect.top) / rect.height) * 2 };
+      if (state.uiView === "model") root.electronAPI?.setClickthrough?.(!dragging && !renderer.hitTest(event.clientX, event.clientY));
+    };
+    const down = (event) => {
+      if (event.button === 0 && !state.windowLocked && renderer.hitTest(event.clientX, event.clientY)) {
+        dragging = true; root.electronAPI?.beginWindowDrag?.();
+      }
+    };
+    const up = () => { dragging = false; root.electronAPI?.endWindowDrag?.(); };
+    const leave = () => { gaze = null; };
+    const apply = (data) => {
+      if (!data || typeof data !== "object") return;
+      if (data.stop) renderer.stopAction();
+      if (typeof data.action === "string") renderer.playAction(data.action, { intensity: data.intensity });
+      if (data.frame && typeof data.frame === "object") intent = { ...data.frame };
+    };
+    const event = (e) => apply(e.detail);
+    const channel = typeof root.BroadcastChannel === "function" ? new root.BroadcastChannel("xinyu-avatar-intent") : null;
+    if (channel) channel.onmessage = (e) => apply(e.data);
+    root.addEventListener("avatar-intent", event);
+    root.addEventListener("pointermove", pointer);
+    root.addEventListener("pointerleave", leave);
+    canvas.addEventListener("pointerdown", down); root.addEventListener("pointerup", up);
+    // Reuse the detached-window cursor bridge; no camera or desktop capture.
+    const cursorTimer = root.setInterval(async () => {
+      if (disposed || cursorBusy || state.rendererSurfaceActive === false || state.uiView !== "model") return;
+      const api = root.electronAPI;
+      if (!api?.getCursorScreenPoint || !api?.getModelWindowBounds) return;
+      cursorBusy = true;
+      try {
+        const [cursor, bounds] = await Promise.all([api.getCursorScreenPoint(), api.getModelWindowBounds()]);
+        if (!disposed && cursor && bounds) pointer({ clientX: cursor.x - bounds.x, clientY: cursor.y - bounds.y });
+      } catch (_) { /* Window may be closing. */ } finally { cursorBusy = false; }
+    }, 100);
+    function tick(now) {
+      if (disposed) return;
+      raf = root.requestAnimationFrame(tick);
+      if (state.rendererSurfaceActive === false || root.document.hidden || now - lastFrame < 1000 / 30) return;
+      lastFrame = now;
+      if (state.uiView !== "model") root.sampleTTSAudioLevel?.();
+      renderer.update({ ...frameFromState(state, now), gaze, ...intent, now });
+    }
+    const dispose = () => {
+      disposed = true; root.cancelAnimationFrame(raf); root.clearInterval(cursorTimer); channel?.close();
+      root.removeEventListener("avatar-intent", event); root.removeEventListener("pointermove", pointer);
+      root.removeEventListener("pointerleave", leave); root.removeEventListener("beforeunload", dispose);
+      canvas.removeEventListener("pointerdown", down); root.removeEventListener("pointerup", up); up();
+      renderer.dispose();
+    };
+    root.addEventListener("beforeunload", dispose, { once: true });
+    raf = root.requestAnimationFrame(tick);
+    setStatus?.("VRM 模型已就绪");
+    return { renderer, dispose };
+  }
+  function installPanel() {
+    const panel = root.document?.getElementById("avatar-model-info");
+    if (!panel) return;
+    describe().then(showMetadata).catch(() => {});
+    panel.querySelectorAll("[data-avatar-action]").forEach((button) => button.addEventListener("click", () => {
+      const data = { action: button.dataset.avatarAction };
+      root.dispatchEvent(new CustomEvent("avatar-intent", { detail: data }));
+      if (typeof root.BroadcastChannel === "function") {
+        const channel = new root.BroadcastChannel("xinyu-avatar-intent"); channel.postMessage(data); channel.close();
+      }
+    }));
+  }
+  const api = { describe, showMetadata, formatConditions, frameFromState, start };
+  root.XinyuAvatarRuntime = api;
+  if (root.document) root.document.addEventListener("DOMContentLoaded", installPanel, { once: true });
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+})(typeof window !== "undefined" ? window : globalThis);

@@ -105,3 +105,8 @@ web/assets/galgame-characters/**/*-preview.png
 
 .local-*-result.txt
 .local-dependency-resolution.*
+
+# Private avatar models and local-only captures
+models_local/
+*.vrm
+*.vrma

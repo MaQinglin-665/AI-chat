@@ -266,3 +266,12 @@ Full scripts/test-local.ps1 passed (log tmp_ui_smoke/task6/merge-213-tests.log).
 Verification Evidence: targeted pytest tests/test_request_body_drain.py tests/test_api_health.py: 38 passed. Includes 30 large unauthorized POSTs, 30 disallowed-origin POSTs, missing configured token, byte limit, invalid length, duplicate/chunked framing, truncation and timeout coverage. Full gate pending.
 
 Verification Evidence: full scripts/test-local.ps1 passed (809 Python passed, 2 skipped; Node suites, Python/JavaScript syntax and secret scan passed). Required config.example.json/package.json parsing and py_compile passed. Ignored log: tmp_ui_smoke/task6/drain-body-full-tests.log. Next: push scoped fix, open PR and require all CI before merge; rerun full gate on final main. Remaining risk: invalid, oversized or stalled clients are closed rather than guaranteed a complete rejection response.
+
+
+## 2026-10-25 — VRM basic renderer
+
+Based on fetched origin/main 5b20358; local main divergence preserved. Added restricted read-only avatar API, pinned local three.js/three-vrm vendor, independent intent renderer/runtime, attribution UI and synthetic tests. Private model remains outside repo, screenshots only in ignored tmp_ui_smoke/avatar-vrm.
+
+Verification Evidence: Node fake VRM mapping/actions/fallback passed; Python path/meta tests 13 passed, 1 symlink privilege skip, including real Windows junction rejection. Isolated Electron 39.8.10 VRM0 render/alpha/actions/amplitude/metadata verified, Hiyori regression rendered. Performance and limitations in docs/avatar-vrm-basic.md. Full gate and packaging checks pending. No dialogue/memory/external-agent changes; no private configuration accessed. Draft PR only.
+
+Final Verification Evidence: scripts/test-local.ps1 passed: 825 passed/3 skipped, all Node suites, Python/JS syntax, secret scan. scripts/check_first_run_package.ps1 passed, including preview defaults and source package smoke. JSON/py_compile pre-push checks passed. Final test logs and all model captures only in ignored tmp_ui_smoke/avatar-vrm. Next: draft PR and user Windows review; no merge authorization.

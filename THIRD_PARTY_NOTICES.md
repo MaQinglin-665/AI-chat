@@ -15,6 +15,20 @@ This document is a practical release checklist, not legal advice. Before publish
 | `web/vendor/cubism4.min.js`, `docs/live2d/vendor/cubism4.min.js` | Live2D Cubism Framework for Web | Governed by Live2D Cubism SDK terms. Keep Live2D notices and verify the current SDK agreement before redistribution. Source: https://www.live2d.com/en/sdk/download/web/ |
 | `web/vendor/live2dcubismcore.min.js`, `docs/live2d/vendor/live2dcubismcore.min.js` | Live2D Cubism Core | Governed by Live2D Cubism SDK terms. Keep Live2D notices and verify the current SDK agreement before redistribution. Source: https://www.live2d.com/en/sdk/about/ |
 
+## Local VRM browser runtime
+
+`web/vendor/vrm/vrm-vendor.js` bundles **three.js 0.180.0** (including GLTFLoader)
+and **@pixiv/three-vrm 3.4.4**. Both are MIT licensed. Their full notices are
+`web/vendor/vrm/THREE-LICENSE.txt` and `web/vendor/vrm/THREE-VRM-LICENSE.txt`.
+Upstream sources: https://github.com/mrdoob/three.js/tree/r180 and
+https://github.com/pixiv/three-vrm/tree/v3.4.4 . Packages were obtained from the npm
+registry at these exact versions, not from a runtime CDN. Rebuild with
+`scripts/build_vrm_vendor.cjs` and esbuild **0.25.11** (build-time only, MIT).
+The browser loads only the bundled local file. No VRM/VRMA model data is bundled.
+User models retain their own attribution and use restrictions, displayed from
+VRM metadata and an optional adjacent README.txt; this project does not grant
+rights to redistribute those models.
+
 ## Live2D Sample Models
 
 | Paths | Asset | Notice |

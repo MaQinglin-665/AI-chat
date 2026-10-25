@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' http://127.0.0.1:* http://localhost:*; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' blob: http://127.0.0.1:* http://localhost:*; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
   <title>馨语桌宠</title>
   <link rel="stylesheet" href="./base.css">
   <link rel="stylesheet" href="./chat.css">
@@ -367,6 +367,15 @@
       </div>
 
       <div class="config-switch-body">
+        <section id="avatar-model-info" class="config-switch-section" hidden aria-label="当前角色模型信息">
+          <h3>当前角色模型 · VRM</h3>
+          <p>名称：<strong data-avatar-name></strong></p>
+          <p>作者：<span data-avatar-authors></span></p>
+          <p>来源：<span data-avatar-sources></span></p>
+          <details><summary>模型数据使用条件</summary><pre data-avatar-conditions style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:12rem;overflow:auto"></pre><p data-avatar-license-links></p></details>
+          <button type="button" data-avatar-action="wave">挥手</button>
+          <button type="button" data-avatar-action="nod">点头</button>
+        </section>
         <div class="config-switch-summary" aria-live="polite">
           <div class="config-switch-summary-item">
             <span>LLM</span>
@@ -1227,6 +1236,8 @@
   <script src="./live2dLayoutController.js"></script>
   <script src="./live2dExpressionController.js"></script>
   <script src="./live2dRuntimeController.js"></script>
+  <script src="./avatar/vrmRenderer.js"></script>
+  <script src="./avatar/avatarRuntime.js"></script>
   <script src="./runtimeEventBinder.js"></script>
   <script src="./desktopBridge.js"></script>
   <script src="./onboarding.js"></script>

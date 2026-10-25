@@ -1,15 +1,13 @@
 # Session handoff
 
-## API rejection body drain (2026-10-25)
+## VRM renderer basic (2026-10-25)
 
-Branch: codex/fix-api-reject-drain-body, based on main b9d9354c237b43e353d066a97ef7309e2434267f. PR #214 merged with all Linux and Windows checks green. Earlier integration handoff preserved in docs/archive/2026-10-25-before-api-drain-handoff.md.
+Branch codex/avatar-vrm-basic, based on origin/main 5b20358 (PR #215 merged and final main gate passed 809/2). Local main had an unrelated 0a06554 commit; preserved it and created this branch from fetched origin/main instead of resetting/merging that history. User authorizes push and draft PR only; NEVER merge this PR without new user approval.
 
-User authorizes a bounded request-body drain before token/origin denial, tests, push and a PR, then merge commit only after all CI passes. No force push, direct main push, branch deletion, tags, releases or private configuration changes. Stop on unexpected test/CI failure. DNS push failures: retry at 10-second intervals, at most five attempts.
+Scope: independent avatar asset reader and renderer, local pinned vendor bundle, minimal GET dispatcher/Live2D initializer hooks, attribution panel, tests and docs. No dialogue, memory, external execution or private config changes. New config is documented only, no config*.json files touched. Model data remains outside repository; screenshots and validation harness in ignored tmp_ui_smoke/avatar-vrm. Do not commit these or copy the model into repo/packages.
 
-Files touched: app.py, tests/test_api_health.py, tests/test_request_body_drain.py and these state records. Drain is limited to 1 MiB and a two-second deadline; invalid/oversized/ambiguous framing closes the connection without reading. No authorization defaults changed. Targeted tests: 38 passed, including 30 unauthorized 64-KiB POSTs and 30 disallowed-origin POSTs with complete JSON responses.
+Evidence so far: synthetic path/meta tests 13 passed, 1 Windows symlink-privilege skip (real Windows junction regression passed); Node fake VRM tests passed. Isolated Electron 39.8.10 real VRM0 render, transparency, wave/nod, amplitude bridge and attribution checked. Hiyori without avatar config rendered. CPU/GPU evidence and limits in docs/avatar-vrm-basic.md. Real VRM1 and full desktop LLM/TTS remain manual verification; no private config used. Existing model-window unload learning-panel exception also reproduces with Hiyori and is not changed.
 
-Verification Evidence: full scripts/test-local.ps1 passed: 809 Python passed, 2 skipped; Node suites, Python/JavaScript syntax and secret scan passed. Required JSON and py_compile checks passed. Log: ignored tmp_ui_smoke/task6/drain-body-full-tests.log.
+Final local verification: scripts/test-local.ps1 passed (825 passed, 3 skipped; Node/syntax/secrets passed); scripts/check_first_run_package.ps1 passed. Required pre-push JSON and py_compile passed. Final logs are ignored tmp_ui_smoke/avatar-vrm/full-tests-final.log and package-check-final.log.
 
-Next: submit PR to main, require all CI then --merge --admin. Fetch merged main and rerun scripts/test-local.ps1. Final report must include both merge hashes and final main hash.
-
-Limitations: malformed, oversized or stalled clients may still see connection closure; stable JSON delivery regression covers complete bounded bodies. Prior external-agent metadata verification followups and blocked isolated-directory cleanup remain unchanged.
+Next: push this branch and open draft PR to main. Stop for user visual review. Network failures retry every 10 seconds, up to five attempts. Ask user before any dialogue/memory/external-execution change or private config/key access.
