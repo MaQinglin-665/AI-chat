@@ -1933,3 +1933,6 @@ body.view-full .stream-text-arrival.is-settled {
     transform: none !important;
   }
 }
+
+/* VRM already has scene lighting; a full-canvas CSS shadow adds a costly compositor pass. */
+body.view-full[data-avatar-kind="vrm"] #live2d-canvas { filter: none !important; }

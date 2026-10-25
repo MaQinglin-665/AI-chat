@@ -41,7 +41,7 @@ GLB 必须内嵌资源，加载器拒绝外部纹理/缓冲区 URL。
 - `web/avatar/vrmRenderer.js` 暴露 `createRenderer`，实现 load/dispose/capabilities/update/playAction/stopAction。
 - 三方依赖固定为 three.js 0.180.0、@pixiv/three-vrm 3.4.4，本地 bundle 按需加载，不使用 CDN。
   许可证及重建方式见 THIRD_PARTY_NOTICES.md、scripts/build_vrm_vendor.cjs。
-- 眨眼、鼠标视线、呼吸、轻微摇摆和库内 SpringBone 每帧更新；限制为约 30 FPS、最大 DPR 1.5。
+- 眨眼、鼠标视线、呼吸、轻微摇摆和库内 SpringBone 每帧更新；空闲 20 FPS、说话/显式动作 30 FPS；按画布大小限制 90 万渲染像素，最大 DPR 1.25。
   隐藏窗口暂停更新，dispose 释放纹理、几何体、渲染器和 WebGL context。
 - mouth.open 复用现有音量值；vowel 为 null/缺省时驱动 aa，a/i/u/e/o 分别映射 aa/ih/ou/ee/oh。
 - happy/angry/sad/surprised 对应同名表情；thinking/shy/sleepy 使用 relaxed，smug 使用 happy。
@@ -77,6 +77,6 @@ GPU Engine 浮点计数器中这些进程的 3D 引擎占用求和。
 说话阶段通过已有 BroadcastChannel 注入起伏音量，未调用真实 LLM/TTS；不包含语音合成负载。
 数字仅代表本机隔离窗口，不是所有模型/硬件的性能承诺。
 现有模型窗口关闭时学习面板清理异常在 Hiyori 上也复现，本任务未改学习/记忆模块。
-完整桌宠主进程、真实聊天语音和用户视觉满意度仍留给 Windows 人工验收。
+以上为基础版的历史隔离测试。完整桌宠主进程已在后续性能修复中实测，见 [性能与动作复测](avatar-vrm-performance.md)；真实聊天语音和用户视觉满意度仍留给 Windows 人工验收。
 
 最终本地门禁：scripts/test-local.ps1 全部通过（825 passed、3 skipped；全部 Node、语法及秘密扫描通过）；scripts/check_first_run_package.ps1 通过。未修改默认配置或私人配置。

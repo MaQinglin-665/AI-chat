@@ -11,3 +11,14 @@ Evidence so far: synthetic path/meta tests 13 passed, 1 Windows symlink-privileg
 Final local verification: scripts/test-local.ps1 passed (825 passed, 3 skipped; Node/syntax/secrets passed); scripts/check_first_run_package.ps1 passed. Required pre-push JSON and py_compile passed. Final logs are ignored tmp_ui_smoke/avatar-vrm/full-tests-final.log and package-check-final.log.
 
 Next: push this branch and open draft PR to main. Stop for user visual review. Network failures retry every 10 seconds, up to five attempts. Ask user before any dialogue/memory/external-execution change or private config/key access.
+
+
+## VRM performance/motion follow-up (2026-10-25)
+
+PR #216 already exists and is a draft. User now authorizes fixing performance and natural motion, committing and pushing this same branch, but NOT merging. Earlier basic-stage notes above are historical.
+
+Current implementation replaces expensive desktop raycast with 12 projected bone capsules, adds dynamic pixel budget/20 FPS idle/30 FPS speech, runtime restart cleanup and inactive suspension. Deterministic seeded standing/idle/speech/actions, height-based camera and two-light setup are in vrmRenderer.js; amplitudes at top. Scope excludes dialogue, memory, external execution and private configuration. Private model unchanged.
+
+Real full Electron before/after results and limitations: docs/avatar-vrm-performance.md. All captures/scripts/raw measurements in ignored tmp_ui_smoke/avatar-vrm-polish; NEVER commit or publish model images. Before/after pet screenshots, after-speaking.png, after-small-motion.png, visual-full.png. GPU/CPU samples use simulated amplitude, not actual TTS. Existing learning-panel unload error remains outside scope. Runtime tests registered in scripts/run_node_tests.js; final full gate and network status to be recorded below.
+
+Final follow-up verification: scripts/test-local.ps1 passed (825 passed, 3 skipped; registered runtime lifecycle suite and all Node tests passed, syntax/secrets passed). Required JSON/py_compile checks passed. Evidence: ignored tmp_ui_smoke/avatar-vrm-polish/full-tests-final.log. GitHub API connection failed five attempts, with 10-second retry intervals; stopped network operations. Changes committed locally; push/PR description update remains pending. Do not mark PR ready or merge. Resume with normal push of codex/avatar-vrm-basic and verify #216 is still draft.

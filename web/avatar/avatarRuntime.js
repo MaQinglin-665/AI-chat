@@ -81,7 +81,8 @@
       mouth: { open: level, vowel: null } };
   }
   async function start({ state, canvas, source, setStatus }) {
-    state.avatarRenderer?.dispose();
+    if (state.avatarRuntime) state.avatarRuntime.dispose();
+    else state.avatarRenderer?.dispose();
     const renderer = root.XinyuVRMRenderer.createRenderer({ canvas });
     await renderer.load(source);
     state.avatarRenderer = renderer;
@@ -92,13 +93,17 @@
       root.document.documentElement.classList.add("transparent-mode", "alpha-true");
       root.document.body.classList.add("transparent-mode", "alpha-true");
     }
-    let disposed = false, raf = 0, lastFrame = 0, gaze = null, intent = {}, cursorBusy = false;
+    let disposed = false, raf = 0, wakeTimer = 0, lastFrame = 0, gaze = null, intent = {}, cursorBusy = false;
+    let lastClickthrough = null;
+    const clickthrough = value => {
+      if (value !== lastClickthrough) { root.electronAPI?.setClickthrough?.(value); lastClickthrough = value; }
+    };
     let dragging = false;
     const pointer = (event) => {
       const rect = canvas.getBoundingClientRect();
       gaze = { x: ((event.clientX - rect.left) / rect.width - 0.5) * 2,
         y: (0.5 - (event.clientY - rect.top) / rect.height) * 2 };
-      if (state.uiView === "model") root.electronAPI?.setClickthrough?.(!dragging && !renderer.hitTest(event.clientX, event.clientY));
+      if (state.uiView === "model") clickthrough(!dragging && !renderer.hitTest(event.clientX, event.clientY));
     };
     const down = (event) => {
       if (event.button === 0 && !state.windowLocked && renderer.hitTest(event.clientX, event.clientY)) {
@@ -121,7 +126,7 @@
     root.addEventListener("pointerleave", leave);
     canvas.addEventListener("pointerdown", down); root.addEventListener("pointerup", up);
     // Reuse the detached-window cursor bridge; no camera or desktop capture.
-    const cursorTimer = root.setInterval(async () => {
+    const cursorTimer = state.uiView === "model" ? root.setInterval(async () => {
       if (disposed || cursorBusy || state.rendererSurfaceActive === false || state.uiView !== "model") return;
       const api = root.electronAPI;
       if (!api?.getCursorScreenPoint || !api?.getModelWindowBounds) return;
@@ -130,17 +135,27 @@
         const [cursor, bounds] = await Promise.all([api.getCursorScreenPoint(), api.getModelWindowBounds()]);
         if (!disposed && cursor && bounds) pointer({ clientX: cursor.x - bounds.x, clientY: cursor.y - bounds.y });
       } catch (_) { /* Window may be closing. */ } finally { cursorBusy = false; }
-    }, 100);
+    }, 100) : null;
     function tick(now) {
       if (disposed) return;
+      if (state.rendererSurfaceActive === false || root.document.hidden) {
+        wakeTimer = root.setTimeout(() => { raf = root.requestAnimationFrame(tick); }, 250);
+        return;
+      }
       raf = root.requestAnimationFrame(tick);
-      if (state.rendererSurfaceActive === false || root.document.hidden || now - lastFrame < 1000 / 30) return;
-      lastFrame = now;
       if (state.uiView !== "model") root.sampleTTSAudioLevel?.();
-      renderer.update({ ...frameFromState(state, now), gaze, ...intent, now });
+      const frame = { ...frameFromState(state, now), gaze, ...intent, now };
+      const quality = root.XinyuVRMRenderer.QUALITY;
+      const fps = frame.mouth?.open > 0.02 || renderer.isAnimating() ? quality.activeFps : quality.idleFps;
+      const interval = 1000 / fps, elapsed = now - lastFrame;
+      if (elapsed < interval) return;
+      lastFrame = now - elapsed % interval;
+      renderer.update(frame);
     }
+
     const dispose = () => {
-      disposed = true; root.cancelAnimationFrame(raf); root.clearInterval(cursorTimer); channel?.close();
+      if (disposed) return;
+      disposed = true; root.clearTimeout(wakeTimer); root.cancelAnimationFrame(raf); root.clearInterval(cursorTimer); channel?.close();
       root.removeEventListener("avatar-intent", event); root.removeEventListener("pointermove", pointer);
       root.removeEventListener("pointerleave", leave); root.removeEventListener("beforeunload", dispose);
       canvas.removeEventListener("pointerdown", down); root.removeEventListener("pointerup", up); up();
@@ -149,7 +164,8 @@
     root.addEventListener("beforeunload", dispose, { once: true });
     raf = root.requestAnimationFrame(tick);
     setStatus?.("VRM 模型已就绪");
-    return { renderer, dispose };
+    state.avatarRuntime = { renderer, dispose };
+    return state.avatarRuntime;
   }
   function installPanel() {
     const panel = root.document?.getElementById("avatar-model-info");
