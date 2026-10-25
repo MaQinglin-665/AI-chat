@@ -1,5 +1,38 @@
 {
   "features": [
+    {
+      "id": "avatar-live2d-stage1",
+      "name": "Live2D adapter prerequisite stage: launcher recovery and official Cubism Core compatibility",
+      "status": "in_progress",
+      "scope": [
+        "Stage 1 only; two independent implementation commits after required interface is available",
+        "Restore friendly installation failure guidance without reverting portable Node/venv support",
+        "Upgrade only user-provided official Core after license/redistribution verification; retain Hiyori behavior"
+      ],
+      "done_criteria": [
+        "Read AGENTS.md and docs/avatar-intent-interface.md",
+        "Commit launcher error recovery independently",
+        "Commit official Core compatibility independently after Hiyori/full test validation",
+        "Stop for user confirmation before stage 2; no push or PR in stage 1"
+      ],
+      "blockers": [
+        "User must personally accept official SDK license and supply downloaded SDK/Core; no mirror Core download",
+        "Mao official download also reserved to the user; model integration remains stage 3"
+      ],
+      "verification": [
+        "Refreshed main and created friend/avatar-live2d-adapter; no existing local changes",
+        "Actual Hiyori fixture rendered with Core version integer 67239938, latest moc version 4, pixi-live2d-display 0.4.0",
+        "Four before-change Hiyori screenshots and two official source/consent screenshots saved outside Git; no page errors",
+        "Updated branch to main 5b20358; required avatar intent interface v1 read; four Hiyori/Core baseline hashes remain unchanged",
+        "Seven launcher tests passed: no-global-Node startup, npm ci/install error guidance and preserved mirror, real batch pause and exit-code propagation",
+        "Full scripts/test-local.ps1 passed: 812 Python passed, 2 skipped; Node suites, Python/JavaScript syntax and secret scan passed"
+      ],
+      "limitations": [
+        "Launcher recovery implemented and validated; Core/model resources still pending; no push or renderer changes",
+        "Screenshots use real existing model with simulated audio, not live TTS or hardware listening acceptance"
+      ],
+      "launcher_status": "independent local launcher commit complete; seven targeted Windows tests and full local gate passed"
+    },
     {"id":"api-reject-drain-body","name":"Drain bounded request bodies before API rejection","status":"in_progress","notes":["Implementation and full local validation passed: 809 passed, 2 skipped; awaiting PR CI and final main verification"],"done_criteria":["Bounded drain before token/origin denial without changing authorization","30 consecutive large unauthorized POSTs return JSON without connection errors","Full local tests and Linux/Windows CI pass before merge"]},
     {"id":"experience-final-polish","name":"单步引导、消息排版及草稿发布","status":"in_progress","notes":["修复与完整测试已通过，本地38e1da3","重试后三分支已推送，草稿PR #214，base为external-agent分支","8124已停止；三个目录清理再次被自动审批策略拒绝，仍保留"],"dependencies":["experience-fixes-v1"],"done_criteria":["首句结束引导、时间戳和反馈交互修复","全部测试及秘密扫描","三分支推送与草稿 PR","停止8124并仅清理三个工作目录"]},
     {"id":"experience-fixes-v1","name":"任务6：中文回答与可见性优先的体验修复","status":"completed","limitations":["历史 provider_failed 原因未知，同原文重跑成功；诊断缺失已修复，不能声称历史根因已定位"],"dependencies":["visual-polish-v1"],"done_criteria":["P0语言守卫修复与回复可见","布局及外部任务诊断修复","完整测试、真实中文五轮与执行复现","重启8124恢复六个样例并保持运行"]},
@@ -425,6 +458,6 @@
       ]
     }
   ],
-  "active_task": "deepseek-preview7-release",
+  "active_task": "avatar-live2d-stage1",
   "completed_archive": "docs/archive/features-completed-2026-10-23.json"
 }

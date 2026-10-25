@@ -266,3 +266,28 @@ Full scripts/test-local.ps1 passed (log tmp_ui_smoke/task6/merge-213-tests.log).
 Verification Evidence: targeted pytest tests/test_request_body_drain.py tests/test_api_health.py: 38 passed. Includes 30 large unauthorized POSTs, 30 disallowed-origin POSTs, missing configured token, byte limit, invalid length, duplicate/chunked framing, truncation and timeout coverage. Full gate pending.
 
 Verification Evidence: full scripts/test-local.ps1 passed (809 Python passed, 2 skipped; Node suites, Python/JavaScript syntax and secret scan passed). Required config.example.json/package.json parsing and py_compile passed. Ignored log: tmp_ui_smoke/task6/drain-body-full-tests.log. Next: push scoped fix, open PR and require all CI before merge; rerun full gate on final main. Remaining risk: invalid, oversized or stalled clients are closed rather than guaranteed a complete rejection response.
+
+
+## 2026-10-25 — Avatar Live2D stage 1 preparation
+- User requests official Core/Mao sources, staged independent commits and explicit waits; no main push/force push/merge, no dialogue/memory/external-agent changes, large-file splitting paused.
+- Refreshed main to 3611e57 and created friend/avatar-live2d-adapter. Single-branch clone required explicit main fetch/local tracking setup. Required avatar-intent-interface.md absent from main and targeted local D:/AI search; requested branch/path before implementation.
+- git log -p identifies b62f759 (#211) moving npm work into start-electron.ps1. Batch failure pause is still present; npm-specific friendly guidance was lost at the delegated helper boundary. No runtime modifications yet.
+- Verification Evidence: actual bundled Hiyori rendered in isolated Chromium using existing fixture and simulated audio; no page errors. Core=67239938, latest moc=4, Pixi=6.5.8, pixi-live2d-display=0.4.0. Saved idle/playful/thinking/sad screenshots plus version/source hashes and two official-page screenshots outside Git at outputs/avatar-live2d-stage1.
+- Official SDK and Mao pages opened for user handoff; SDK download disabled pending personal license acceptance. No acceptance, download, Core execution/replacement, model resources, commit or push. Prepared C:/Users/Feng2/Documents/Codex/Live2D-downloads for user-supplied archives.
+- Only state artifacts updated pending required document and official resources. Full tests are not claimed; run before each implementation commit.
+
+### Required interface available; launcher recovery started
+- User identifies merged #214/main 5b20358. Saved own three state changes as stash 9bd2080, fast-forwarded the feature branch, then restored only the own preparation entry/log against latest state (preparation patch remains outside Git). Upstream history/state preserved.
+- Read interface v1 completely. Stage 1 only; no renderer/mapping, dialogue, memory or external-agent edits. User-supplied official SDK/Core remains absent, so independent launcher repair proceeds first.
+- Hiyori/Core/director/expression baseline hashes all match after main update. Launcher recovery must retain portable Node, npm ci/install selection and supplied mirror, report npm failure in Chinese and keep batch failure pause/exit status.
+
+### Stage 1 / change 1 — launcher failure recovery
+- Restored npm-specific Chinese repair guidance in the delegated helper, including command-resolution failures. Helper is UTF-8 with BOM so Windows PowerShell 5.1 reads Chinese correctly. Existing project-local Node resolution, npm ci/install selection and supplied/default mirror behavior stay intact.
+- start_electron.bat captures the helper exit code, handles all nonzero exits, retains pause after guidance and propagates the original status. History showed the previous positive-failure pause was already present, so this is verified preservation rather than claiming a missing pause was found.
+- Targeted tests/test_node_runtime.py: 7 passed in 2.01 s. Actual isolated npm.cmd failures verify Chinese text, lockfile ci versus install, preserved mirror; actual cmd.exe batch execution reaches pause and returns 37. Existing project-local Node/no global Node check passes. No real npm install or app launch.
+- No Core replacement or Live2D parameter changes. Full local gate pending before the independent launcher commit.
+
+### Stage 1 / change 1 — full verification complete
+- Verification Evidence: scripts/test-local.ps1 completed successfully: 812 Python passed, 2 skipped in 102.97 s; Node suites, Python syntax (180 files), JavaScript syntax (204 files), secret scan (764 files) all passed. Log is outside Git at work/avatar-stage1-launcher-full-tests.log. No runtime edits after this gate.
+- User supplied CubismEditor5.exe under D:/app/Live2D Cubism 5.3. Metadata confirms Editor 5.3; targeted directory search found no Web Core/SDK archive. Core work remains blocked on the official SDK for Web ZIP personally downloaded with license acceptance. No Editor launch, third-party Core download or model asset changes.
+- Independent local launcher commit completed on friend/avatar-live2d-adapter; stage 1 remains in progress until official Core compatibility is validated and committed separately. Stop before stage 2; no push or PR.
