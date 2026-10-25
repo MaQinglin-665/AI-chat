@@ -81,6 +81,7 @@
       mouth: { open: level, vowel: null } };
   }
   async function start({ state, canvas, source, setStatus }) {
+    root.document.body.dataset.avatarReady = "false";
     if (state.avatarRuntime) state.avatarRuntime.dispose();
     else state.avatarRenderer?.dispose();
     const renderer = root.XinyuVRMRenderer.createRenderer({ canvas });
@@ -164,6 +165,7 @@
     root.addEventListener("beforeunload", dispose, { once: true });
     raf = root.requestAnimationFrame(tick);
     setStatus?.("VRM 模型已就绪");
+    root.document.body.dataset.avatarReady = "true";
     state.avatarRuntime = { renderer, dispose };
     return state.avatarRuntime;
   }

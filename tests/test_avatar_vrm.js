@@ -81,7 +81,8 @@ for (const h of [0.5,1.6,2.4]) {
 }
 for (const [w,h] of [[480,720],[1380,898],[1708,1068]]) {
   const ratio=pixelRatioFor(w,h,1.5);
-  assert(w*h*ratio*ratio<=QUALITY.pixelBudget+1e-6); assert(ratio<=QUALITY.maxDpr);
+  assert(w*h*ratio*ratio<=Math.max(QUALITY.pixelBudget,w*h)+1e-6);
+  assert(ratio>=1); assert(ratio<=QUALITY.maxDpr);
 }
 assert(hitSegments(12,50,[{ax:10,ay:10,bx:10,by:90,radius:5}]));
 assert(!hitSegments(20,50,[{ax:10,ay:10,bx:10,by:90,radius:5}]));
@@ -91,3 +92,13 @@ console.log("Standing pose, action recovery, deterministic motion, camera and co
 const snapshot = poseAt(12345,{seed:42}).bones;
 assert.deepEqual(Object.values(snapshot.head).map(v=>+v.toFixed(6)), [0.000443,-0.070794,-0.035889,0,0,1]);
 assert.deepEqual(Object.values(snapshot.hips).map(v=>+v.toFixed(6)), [0,0,-0.009666,-0.007733,0.002311,1]);
+
+const { smoothCutoutEdges } = require("../web/avatar/vrmRenderer.js");
+const cutout={alphaTest:0.5,transparent:false}, outline={alphaTest:0.5,transparent:false,isOutline:true};
+const blend={alphaTest:0.5,transparent:true}, opaque={alphaTest:0,transparent:false};
+const scene={traverse:fn=>[{material:[cutout,outline]},{material:blend},{material:opaque},{}].forEach(fn)};
+smoothCutoutEdges(scene,0); assert.equal(cutout.alphaToCoverage,undefined);
+smoothCutoutEdges(scene,4);
+assert.equal(cutout.alphaToCoverage,true);assert.equal(outline.alphaToCoverage,true);
+assert.equal(blend.alphaToCoverage,undefined);assert.equal(opaque.alphaToCoverage,undefined);
+assert.equal(outline.isOutline,true,'retain authored MToon outline');

@@ -231,6 +231,7 @@
     }
 
     async function initLive2D() {
+      document.body.dataset.avatarReady = "false";
       const canvas = document.getElementById("live2d-canvas");
       if (state.avatarSource?.kind === "vrm") {
         await window.XinyuAvatarRuntime.start({ state, canvas, source: state.avatarSource, setStatus });
@@ -303,6 +304,7 @@
         });
         maybeTightFitDesktopWindow();
         setStatus(info);
+        document.body.dataset.avatarReady = "true";
       } catch (err) {
         console.error(err);
         stopIdleMotionLoop();

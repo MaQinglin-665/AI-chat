@@ -41,7 +41,7 @@ GLB 必须内嵌资源，加载器拒绝外部纹理/缓冲区 URL。
 - `web/avatar/vrmRenderer.js` 暴露 `createRenderer`，实现 load/dispose/capabilities/update/playAction/stopAction。
 - 三方依赖固定为 three.js 0.180.0、@pixiv/three-vrm 3.4.4，本地 bundle 按需加载，不使用 CDN。
   许可证及重建方式见 THIRD_PARTY_NOTICES.md、scripts/build_vrm_vendor.cjs。
-- 眨眼、鼠标视线、呼吸、轻微摇摆和库内 SpringBone 每帧更新；空闲 20 FPS、说话/显式动作 30 FPS；按画布大小限制 90 万渲染像素，最大 DPR 1.25。
+- 眨眼、鼠标视线、呼吸、轻微摇摆和库内 SpringBone 每帧更新；空闲 20 FPS、说话/显式动作 30 FPS；以 90 万像素为软预算，DPR 限制在 1.0–1.25；启用 MSAA 和裁切贴图覆盖率抗锯齿。
   隐藏窗口暂停更新，dispose 释放纹理、几何体、渲染器和 WebGL context。
 - mouth.open 复用现有音量值；vowel 为 null/缺省时驱动 aa，a/i/u/e/o 分别映射 aa/ih/ou/ee/oh。
 - happy/angry/sad/surprised 对应同名表情；thinking/shy/sleepy 使用 relaxed，smug 使用 happy。

@@ -14,9 +14,9 @@
     gazeX: 0.5, gazeY: 0.3, gazeIdle: 0.12, gazeHeight: 0.9, gazeDistance: 2,
     seed: 23017
   });
-  const QUALITY = Object.freeze({ pixelBudget: 900000, maxDpr: 1.25, idleFps: 20, activeFps: 30 });
+  const QUALITY = Object.freeze({ pixelBudget: 900000, minDpr: 1, maxDpr: 1.25, idleFps: 20, activeFps: 30 });
   const CAMERA = Object.freeze({ fov: 30, bottom: 0.40, top: 1.16, face: 0.91, faceScreenY: 1 / 3 });
-  const LIGHT = Object.freeze({ ambient: 0.65, key: 1.35, fill: 0.4 });
+  const LIGHT = Object.freeze({ ambient: 0.55, key: 1.10, fill: 0.4 });
   const VOWELS = { a: "aa", i: "ih", u: "ou", e: "ee", o: "oh" };
   const FACES = { happy: "happy", angry: "angry", sad: "sad", thinking: "relaxed",
     shy: "relaxed", smug: "happy", sleepy: "relaxed", surprised: "surprised" };
@@ -88,7 +88,7 @@
     return { bones: pose, smallMotion: small };
   }
   function pixelRatioFor(width, height, dpr = 1) {
-    return Math.min(Math.max(0.1, dpr), QUALITY.maxDpr, Math.sqrt(QUALITY.pixelBudget / Math.max(1, width * height)));
+    return Math.max(QUALITY.minDpr, Math.min(Math.max(0.1, dpr), QUALITY.maxDpr, Math.sqrt(QUALITY.pixelBudget / Math.max(1, width * height))));
   }
   function cameraFraming(minY, height, faceY = minY + height * CAMERA.face) {
     const span = height * (CAMERA.top - CAMERA.bottom);
@@ -174,6 +174,19 @@
       }) };
   }
 
+  function smoothCutoutEdges(scene, samples) {
+    // MSAA alone smooths geometry, not alpha-tested hair/clothing textures.
+    // Preserve authored colors/outlines and blended materials; soften only cutout coverage.
+    scene.traverse(node => {
+      for (const material of [].concat(node.material || [])) {
+        if (material.alphaTest > 0 && !material.transparent && samples > 0) {
+          material.alphaToCoverage = true;
+          material.needsUpdate = true;
+        }
+      }
+    });
+  }
+
   function createRenderer(options = {}) {
     const vendor = options.vendor || root.XinyuVRMVendor;
     let vrm = null, driver = null, renderer = null, scene = null, camera = null, generation = 0;
@@ -238,11 +251,13 @@
         light.target.position.set(0, box.min.y + height * 0.8, 0);
         light.castShadow = false; scene.add(light, light.target);
       }
-      renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: "low-power" });
+      renderer = new THREE.WebGLRenderer({ canvas, alpha: true, premultipliedAlpha: true, antialias: true, powerPreference: "low-power" });
       renderer.setClearColor(0x000000, 0);
       renderer.shadowMap.enabled = false;
       renderer.setPixelRatio(pixelRatioFor(canvas.clientWidth || 400, canvas.clientHeight || 600, root.devicePixelRatio || 1));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
+      const gl = renderer.getContext();
+      smoothCutoutEdges(vrm.scene, gl.getParameter(gl.SAMPLES));
       driver = createIntentDriver(vrm, source.mapping || {}, { height, seed: options.seed });
       loadedAt = root.performance?.now?.() || 0; loadMs = loadedAt - began;
     }
@@ -287,13 +302,14 @@
       stopAction: () => driver?.stopAction(),
       isAnimating: () => driver?.isAnimating() || false,
       metrics: () => ({ loadMs, loadedAt, frames, pixelRatio: renderer?.getPixelRatio(),
+        antialias: renderer?.getContext().getContextAttributes()?.antialias,
         drawCalls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles, smallMotion: driver?.motionState() }),
       // Reserved for a later animation loader; never silently fetch arbitrary files.
       loadAnimation: async () => false
     };
   }
   const api = { createRenderer, createIntentDriver, poseAt, smallMotionAt, randomAt,
-    pixelRatioFor, cameraFraming, hitSegments, MOTION, QUALITY, CAMERA, LIGHT };
+    pixelRatioFor, cameraFraming, hitSegments, smoothCutoutEdges, MOTION, QUALITY, CAMERA, LIGHT };
   root.XinyuVRMRenderer = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

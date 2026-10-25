@@ -60,3 +60,46 @@ RGBA 基础纹理估算约 146.5 MiB，含 mipmap 约 195.3 MiB；这只是尺�
 真实 VRM1 视觉效果仍未验证；学习面板既有卸载异常没有改动。
 截图与采样脚本/原始 JSON 只保留在被忽略的 `tmp_ui_smoke/avatar-vrm-polish/`，不提交或公开模型画面。
 全量测试结果见本次 progress/session-handoff 记录。PR #216 保持草稿，等待用户 Windows 视觉验收。
+
+
+## 边缘与桌宠展示修复（095c47f 后续）
+
+前面的性能表记录 095c47f 阶段，以下是其后的同机对比，不能混用。
+透明背景采用 premultipliedAlpha=true、黑色清屏 alpha=0；这原本就是 Three 的预乘默认值，
+没有证据表明伪影来自错误清屏。主要可见问题是 DPR 约 0.702、未开 MSAA 时细 MToon 描边
+和裁切透明贴图发生欠采样。保留作者的 MToon 描边参数、颜色与贴图，改用显式预乘透明、MSAA、
+DPR 下限 1.0，并仅对 alphaTest>0 的非混合材质启用 alphaToCoverage（需要实际 MSAA samples>0）。
+不改模型文件、源贴图、透明混合材质，也没有新增后处理依赖。描边仍存在，目标是平滑而非删掉模型原有线条。
+90 万像素现为软预算：大窗口在 DPR=1 时可超过它，换取边缘清晰度。
+
+共用页面 web/index.html 的 kawaii-stage-decor 包含星星、音符、爱心、闪光、猫和莲花。
+原 visualPolish.css 仅隐藏 view=full，chatPolish.css 隐藏 view=chat；遗漏了 view=model。
+现按视图隐藏整个装饰层，VRM/Hiyori 都适用。桌宠状态条移到左下角空白处、不再跟随角色脚部，
+文本改为“馨语”。VRM 和 Hiyori 加载成功均设置 avatarReady，3 秒后开始 400ms 淡出；
+减少动态效果偏好下则 3 秒后直接隐藏。主光 1.35→1.10，环境光 0.65→0.55，补光不变；
+不对脸部材质单独改色，保留模型固有肤色差异。
+
+### 实测
+
+真实 Electron 桌宠 1708×1068 CSS 像素，每阶段预热后采样约 10 秒，CPU/GPU/工作集定义同上。
+修复前为 095c47f；中间阶段用于区分更高分辨率的增量成本。
+
+| 配置 | 待机 FPS | GPU 3D | CPU | 工作集 MiB |
+| --- | ---: | ---: | ---: | ---: |
+| 修复前，DPR 0.702，无 MSAA，有装饰 | 20.16 | 2.97% | 2.29% | 1395.7 |
+| MSAA、去装饰，仍 DPR 0.702 | 20.04 | 0.62% | 1.26% | 1392.1 |
+| 最终：MSAA、裁切覆盖率、DPR 1.0、去装饰 | 19.93 | 0.86% | 1.15% | 1372.4 |
+
+最终 WebGL 实际 antialias=true，画布 1708×1068，28 draw calls、85,121 triangles。
+GPU 总开销降低包含移除动画装饰及状态条的贡献，不能归因于抗锯齿让渲染更快。
+短采样不代表所有设备；不支持 MSAA 的设备会跳过覆盖率处理。
+
+真实 Hiyori 回归：未改私人配置，通过测试请求拦截选择 Live2D；就绪时状态条 label=馨语、left=12px、
+decor display=none、opacity=1，3.6 秒后 opacity=0/visibility=hidden。
+真实 VRM 最终截图确认无装饰/常驻状态条，局部对比确认脸、衣服轮廓不再明显呈断续像素线。
+纯 Node 测试覆盖 DPR 下限、裁切/混合材质区别、无 MSAA 时不启用覆盖率及就绪标记。
+
+截图只在忽略目录 tmp_ui_smoke/avatar-vrm-polish，禁止提交或在 PR 上传：
+edge-before-edge.png / edge-final-edge.png 为相同局部截取（540×975，设备像素），兼作脸部光照对比；
+edge-before-pet.png / edge-final-pet.png 为完整透明桌宠，hiyori-clean.png 为 Live2D 回归。
+模型不进入仓库；没有改聊天、记忆、外部执行、私人配置或声音链路。

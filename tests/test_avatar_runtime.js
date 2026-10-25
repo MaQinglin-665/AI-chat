@@ -18,6 +18,7 @@ const assert = require('node:assert/strict');
   const start=()=>root.XinyuAvatarRuntime.start({state,canvas,source:{kind:'vrm'}});
   const frame=now=>{const callbacks=[...raf.values()];raf.clear();callbacks.forEach(fn=>fn(now));};
   await start();
+  assert.equal(root.document.body.dataset.avatarReady,"true");
   for(let t=0;t<=1000;t+=10)frame(t);
   assert.equal(updates,20);
   assert.equal(intervals.size,0,'full window does not poll detached cursor');
