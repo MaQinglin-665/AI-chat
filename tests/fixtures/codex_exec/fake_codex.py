@@ -5,16 +5,19 @@ from pathlib import Path
 import sys
 import time
 
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
 if "--version" in sys.argv:
     print("codex-cli " + os.environ.get("FAKE_VERSION", "0.164.0"))
     raise SystemExit(0)
-sys.stdin.read()
+sys.stdin.buffer.read()
 mode = os.environ.get("FAKE_MODE", "replay")
 if mode == "hang":
     import subprocess
-    subprocess.Popen([sys.executable, "-c", "import time; from pathlib import Path\nfor i in range(1200):\n Path('fake-child-heartbeat.txt').write_text(str(i)); time.sleep(.05)"])
+    subprocess.Popen([sys.executable, "-c", "import time; from pathlib import Path\nfor i in range(1200):\n Path('fake-child-heartbeat.txt').write_text(str(i), encoding='utf-8'); time.sleep(.05)"])
     while True:
-        Path("fake-heartbeat.txt").write_text(str(time.time()))
+        Path("fake-heartbeat.txt").write_text(str(time.time()), encoding="utf-8")
         time.sleep(.05)
 if mode in {"error", "turn.failed"}:
     print(json.dumps({"type": mode, "error": {"message": "401 Unauthorized " + os.environ.get("XINYU_DEEPSEEK_API_KEY", "")}}))

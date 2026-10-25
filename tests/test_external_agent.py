@@ -18,6 +18,10 @@ PLAN = dict(summary="整理文件", steps=["检查文件"], files_to_create=["ne
             files_to_delete=[], commands=[], risk="low", needs_network=False)
 
 
+# 这些测试由 Windows CI 任务覆盖，其他平台改为验证执行被拒绝
+windows_only = pytest.mark.skipif(os.name != "nt", reason="external execution is verified on Windows only")
+
+
 @pytest.fixture
 def setup(tmp_path, monkeypatch):
     work = tmp_path / "work"
@@ -69,7 +73,7 @@ def test_approval_flow_and_metadata_only(setup):
     assert result["progress_count"] == 2 and agent_actions.public_state()["pending"] == []
     with pytest.raises(policy.AgentError):
         m.approve(task["id"])
-    state = json.loads(agent_actions.STATE_PATH.read_text())
+    state = json.loads(agent_actions.STATE_PATH.read_text(encoding="utf-8"))
     assert [v["status"] for v in state["audit"]] == ["planning", "awaiting_approval", "executing", "completed"]
     raw = json.dumps(bus.snapshot())
     assert "整理" not in raw and "secret" not in raw and "new.txt" not in raw
@@ -91,6 +95,7 @@ def test_reject_and_expire(setup):
     with pytest.raises(policy.AgentError): m.approve(task["id"])
 
 
+@windows_only
 @pytest.mark.parametrize("mode", ["error", "turn.failed"])
 def test_top_level_failure_and_no_key_leak(setup, monkeypatch, caplog, mode):
     cfg, work = setup
@@ -104,6 +109,7 @@ def test_top_level_failure_and_no_key_leak(setup, monkeypatch, caplog, mode):
     assert not list(Path(cfg["external_agent"]["codex_home"]).glob("run-*"))
 
 
+@windows_only
 @pytest.mark.parametrize("fixture", sorted(p.name for p in FIXTURES.glob("*.jsonl")))
 def test_real_fixture_replay_through_fake_executable(setup, monkeypatch, fixture):
     cfg, work = setup
@@ -120,6 +126,7 @@ def test_real_fixture_replay_through_fake_executable(setup, monkeypatch, fixture
     assert "command" not in json.dumps(emitted).replace("command_execution", "")
 
 
+@windows_only
 @pytest.mark.parametrize("cancel", [True, False])
 def test_running_cancel_and_timeout(setup, monkeypatch, cancel):
     cfg, work = setup
@@ -228,3 +235,12 @@ def test_dedicated_key_precedence_and_exact_deepseek_fallback(monkeypatch):
     monkeypatch.setenv("CUSTOM_AGENT_CREDENTIAL", "example-custom")
     cfg["llm"]["base_url"] = "https://other.example"
     assert policy.key_from_config(cfg) == "example-custom"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="non-Windows refusal path")
+def test_non_windows_execution_is_refused(setup):
+    cfg, work = setup
+    m = ExternalAgentManager(lambda: cfg)
+    task = m.create_task("整理", str(work))
+    result = wait_state(m, task["id"], {"failed"})
+    assert result["error"]["code"] == "platform_unverified"

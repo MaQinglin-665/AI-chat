@@ -10,6 +10,10 @@ Set-Location $RepoRoot
 . (Join-Path $PSScriptRoot "node-runtime.ps1")
 
 function Resolve-PythonCommand {
+    $venvPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+    if (Test-Path -LiteralPath $venvPython -PathType Leaf) {
+        return @($venvPython)
+    }
     if (Get-Command python -ErrorAction SilentlyContinue) {
         return @("python")
     }

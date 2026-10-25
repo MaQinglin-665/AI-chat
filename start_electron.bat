@@ -47,21 +47,7 @@ rem Do not kill port 8123 here.
 rem Each Electron instance manages its own backend lifecycle, and force-killing
 rem the port on re-launch can terminate an already-running healthy backend.
 
-if not exist node_modules\electron\dist\electron.exe (
-  echo Installing Electron runtime...
-  set "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/"
-  npm install --no-fund --no-audit
-  if errorlevel 1 (
-    echo.
-    echo npm install failed. Check your network, npm mirror, or Node.js version.
-    echo You can also run:
-    echo   powershell -ExecutionPolicy Bypass -File scripts\setup-dev.ps1
-    pause
-    exit /b 1
-  )
-)
-
-node node_modules\electron\cli.js electron\main.js
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start-electron.ps1
 if errorlevel 1 (
   echo.
   echo Electron exited with an error.

@@ -158,3 +158,102 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 - Final outcome: local repair commit 38e1da3. Two normal pushes failed with github.com DNS resolution error; no remote success or PR claimed. Prepared PR body retained locally. Owned 8124 process tree stopped (5620/48768); no listener remains. Automatic approval review rejected the combined recursive cleanup command with blocked by policy before execution; all three authorized cleanup targets remain, configuration/history/screenshots untouched. Publication and cleanup remain pending; no workaround deletion attempted.
 
 - Publication retry: required JSON/compile checks and secrets752 passed; all three specified feature branches pushed normally. Connector PR creation returned403; authenticated gh created draft #214 against codex/external-agent-codex-cli-v1, attached to task. No merge/main push. 8124 remains stopped. Resolved and checked the three cleanup paths (no reparse links); explicit literal-path removal was still rejected by automatic policy. Directories retained; cleanup remains the only pending requested action.
+
+## 2026-10-24 — Clean dependency validation (started)
+- User selected handoff task 1; new branch codex/clean-dependency-validation-20261024 from 86a93ca on codex/developer-readiness-20261023. Fresh checkout has no unrelated changes.
+- Read AGENTS.md, session-handoff.md, docs/handoff/README.md, feature_list.json and current progress before implementation.
+- Validate README setup with an empty local venv and fresh Node dependencies; no existing desktop configuration, credentials, memories or voice samples copied. Main is not checked out or pushed.
+
+### Implementation and initial evidence
+- Original six runtime pins plus pytest installed successfully in a new isolated CPython 3.12.9 venv on Windows 11 x64; pip 26.2.2. All six runtime modules and pytest import successfully; pip check passes. Project-local Node 22.23.4/npm 10.9.9 and Electron 39.8.10 installed. Wheel cache was reused; no system site packages inherited.
+- Fixed missing local-Node support in the batch launch path, BOM JSON written by Windows PowerShell 5.1 setup, validation using global Python, and unlocked npm install. Added dependency consistency/import gate and 84 platform-scoped version constraints. Empty-environment dry resolution exactly matches all 84 installed versions. No new third-party dependency.
+- First full local gate: 738 Python tests (one Hugging Face symlink cache warning), every Node suite, Python/JS syntax and secret scan passed. Nine targeted setup tests pass, including the two subsequently added encoding regressions. Required JSON and ten-module compilation pass. Final full gate pending after final source changes.
+- Actual fresh Electron/configuration wizard and backend observed. Setup-generated JSON now passes Node JSON.parse. The user explicitly authorized reusing their existing Harness local connection only after initial no-key installation validation; ignored local config/.env now point to that service. Model probe and first_chat_smoke.ps1 -NoStartServer passed; /api/chat returned a two-character reply. No credentials or private runtime files staged.
+- Existing plain frontend controller-loading failure (syncProactiveSchedulerPolling on null) reproduced from the selected source branch; recorded as a separate follow-up in the report. Bluetooth/wired/minimized-window listening, microphone and long-duration acceptance remain untested.
+
+### Final local Verification Evidence
+- scripts/test-local.ps1: **740 passed** (67.05 s), every Node suite passed, Python syntax 165 files, JavaScript syntax 191 files, secret scan 714 tracked text files passed; doctor reports zero warnings. First baseline run had one Hugging Face symlink-cache warning; no cold-cache claim.
+- PowerShell setup replay writes both generated configurations without BOM; actual Node JSON.parse succeeds. pip check remains clean, and all 84 package versions exactly match the --ignore-installed resolution.
+- Both required JSON documents parsed and the ten required Python modules compiled; git diff --check passed. New local model configuration and all runtime/log/venv/tool directories confirmed ignored. Documentation browser gate pending a project-local Chromium download.
+
+### Documentation gate and completion
+- Contributor-required docs/check:all passed: publish check and 4 Chromium smoke tests (9.4 s). The first attempt correctly exposed an absent Playwright browser; installed Chromium headless into ignored project-local tools and reran successfully. Node emitted only the existing NO_COLOR/FORCE_COLOR warning.
+- All 18 staged files belong to this task; no unrelated source changes, secrets, local model settings, logs, environment packages or generated artifacts included. Parent readiness task now records clean dependencies as verified for Windows x64/Python 3.12, while frontend and manual device acceptance remain separate.
+- Feature complete; one focused commit and authorized feature-branch push/PR to main follow. No direct main update, force push, merge or release. The PR must state it inherits open draft #210 from the requested starting branch.
+
+
+## 2026-10-24 — Reminder reliability (started)
+- User requested a complete project capability review before optimization, then explicitly selected reminder reliability after seeing concrete reproductions.
+- Independent branch codex/reminder-reliability-20261024 starts at b62f759; initial tree clean. Existing dependency PR remains unchanged.
+- Indexed 709 first-party tracked text files (204337 lines; excludes vendor/model assets); inspected backend/frontend module interfaces, route and command wiring, state, docs and tests. This is structural coverage plus focused source review, not a claim of line-by-line semantic review of every historical file.
+- Reproduced full-date command rejection, invalid clock/calendar acceptance, literal question-mark save status and immediate repeat attempts in both installed and cloned code. Isolated Chromium confirms the installed page reaches idle and saves a schedule with the broken status; clone normal startup has the separately documented controller-loading blocker.
+- Scope: reminder date parsing, user-visible status, bounded persisted retry and manual recovery. No new model, learning feature, security defaults or private data changes.
+
+### Reminder Verification Evidence and delivery
+- Focused reminder behavioral regressions pass: strict dates, full-date/spaced-unit commands, save status, 30s/120s retry delays and 3-attempt budget, persisted pause/deadline, manual recovery, single-flight, sync failure, removal, tool pause and daily catch-up. Existing button/free-chat/control-center regressions pass.
+- Final scripts/test-local.ps1 completed: 740 Python tests passed in 84.52 s; all 56 Node suites passed; syntax 165 Python / 194 JavaScript files; secret scan 716 files; doctor zero warnings. The first sandboxed run failed due to restricted temporary-directory/socket access; rerun with normal local permissions passed. Required JSON, ten Python compilations and diff checks passed.
+- Contributor docs check:all passed: publish check and 4 Chromium smoke tests in 7.1 s; existing NO_COLOR/FORCE_COLOR warnings only.
+- Real isolated Chromium checked source with an explicitly declared installed startup-manifest fixture, then actual installed files after synchronization: readable save status, paused-state reload, manual retry and no extra requests during repeated polling ticks. Simulated 503 interfaces only; no real LLM calls. Screenshots/JSON stay outside Git in outputs.
+- Seven reviewed frontend files synchronized to D:/app/DesktopPet after normalized baseline comparison and original byte backups under outputs/backups/reminder-reliability-20261024-181229; hashes verified. No private config, token, memory or startup-manifest changes. No running installed pet window was found; changes apply when next opened.
+- User selected only reminder reliability. Source startup blocker, learning/focus features and real microphone/audio/long-duration acceptance remain separate. All fourteen task files are scoped to implementation, tests, docs and required state. Commit/feature-branch push and PR follow; no main update or merge.
+
+## 2026-10-25 — Ordered integration, PR #213
+
+- User authorizes merge commits in order #210/#211/#212/#213/#214. First three merged after passing checks. Merge origin/main 2be017b into external-agent branch; only feature_list.json, progress.md and session-handoff.md conflicted. Union feature IDs; retain main's completed clean dependency evidence using three-way comparison, both progress blocks, and both archived handoffs. Runtime files merged automatically. Full local gate pending; stop on failure.
+
+- PR #213 integration verification: full scripts/test-local.ps1 passed, all Node suites plus Python/JS syntax and secret scan passed; raw log tmp_ui_smoke/task6/merge-213-tests.log (ignored). Normal merge commit/push next; CI remains required before PR merge.
+
+## 2026-10-25 — Ordered integration, PR #214
+
+- #213 merged as 3611e5747b2e33a53b5013249c475d5243099a9b after all Linux/Windows checks passed. Test-only encoding fix 2c13028: cp1252 simulation 49 passed/2 skipped, full local gate 790 passed/2 skipped; no product changes for CI fixes.
+- Merge origin/main into experience-fixes-v1: only progress.md and session-handoff.md conflicted. Both progress blocks retained; both handoffs archived; feature_list.json merged automatically and JSON verified. Full local gate pending; stop on any failure.
+
+### Preserved pre-integration handoff: experience
+
+<details>
+<summary>Historical record; current merge authorization takes precedence</summary>
+
+# Session handoff
+
+## Final experience polish and publication
+
+User now authorizes pushing exactly codex/stage-feedback-onboarding-v1, codex/visual-polish-v1 and codex/experience-fixes-v1, then a draft PR from experience-fixes-v1 to codex/external-agent-codex-cli-v1. No main push or merge.
+
+- Single greeting-only onboarding ends and persists completion on the first user message; no previous button. Technical steps moved to docs/config.html.
+- Message timestamp participates in layout; optional feedback and decorative heart appear on hover/focus. Assistant rows are keyboard-focusable.
+- Copied requested docs/avatar-intent-interface.md byte-identically (SHA256 7ABB45D3E2FB868D2969CC53E7189763231F7AB4A2BC3296B9A626A0B8FC6DAF); design document only, no avatar implementation added.
+- Tests and acceptance details in progress.md. Task 6 evidence remains docs/experience-fixes-verification.md; historical provider_failed remains unreproduced.
+
+## Publication and cleanup outcome (retry succeeded for publication)
+
+- Repair commit: 38e1da3. All tests passed; final secret scan 752 files. Browser matrix passed with actual message renderer and actual user-message append (synthetic content; no new model/audio acceptance).
+- Retry: all three specified branches pushed successfully. Draft PR #214 created via authenticated gh after connector returned 403; attached to this task. URL https://github.com/MaQinglin-665/AI-chat/pull/214 ; head codex/experience-fixes-v1, base codex/external-agent-codex-cli-v1. No main push, force push or merge.
+- Owned 8124 process tree stopped successfully (5620 and child 48768); no listener remains. Daily 8123 untouched.
+- Cleanup command was rejected by automatic approval review with `blocked by policy` (no more specific reason). All three directories remain: D:/AI/.tools/stage4-experience-20261024/workspace, workspace-task6-run1, workspace-task6-run2. User authorized deleting ONLY those; isolated configuration/chat history, screenshots and other backups must stay. Do not claim cleanup completed or try to bypass the policy via another shell/tool.
+
+## Next
+
+Draft #214 awaits review. The three test directories still need cleanup once the automatic policy restriction is resolved; a retry with separately verified literal paths was again rejected, so all three remain. Do not bypass the restriction or delete the parent data root. Historical provider_failed root cause remains unknown. Previous handoff archived at docs/archive/2026-10-25-experience-fixes-handoff.md; two backend followups stay backlog.
+
+</details>
+
+### Preserved pre-integration handoff: main-external-agent
+
+<details>
+<summary>Historical record; current merge authorization takes precedence</summary>
+
+# Session handoff
+
+## Ordered merge integration — PR #213
+
+User authorizes merge commits via gh --merge --admin, no squash/rebase/force push/branch deletion/tag/release. main protection enforce_admins=false verified. #210 merged 71c9ebb; #211 merged 256eff8; #212 merged 2be017b, each after all PR checks passed. #213 base changed to main; integrating origin/main into codex/external-agent-codex-cli-v1.
+
+Only feature_list.json, progress.md and this handoff conflicted. Feature IDs unioned; main's completed dependency validation retained by three-way comparison; both progress blocks retained. Prior handoffs archived at docs/archive/2026-10-25-integration-external-agent-handoff.md and docs/archive/2026-10-25-integration-main-reminders-handoff.md. Historical no-merge directions are superseded by this user request.
+
+Full scripts/test-local.ps1 passed (log tmp_ui_smoke/task6/merge-213-tests.log). Next: commit merge, required pre-push checks and secret scan, normal push; ready #213, wait for ALL CI checks, then merge commit. Then repeat for experience PR #214 and test latest main. Stop on any non-state code conflict or test/CI failure. No unrelated implementation changes. Earlier external-agent verification improvements remain backlog.
+
+</details>
+
+- Authorized flaky-test check: ten isolated runs all passed (10/10). Full gate retry pending. Manual conflict-resolution edits are limited to progress.md and session-handoff.md; original handoff records retained above rather than adding archive files.
+
+- Authorized #214 gate passed: repeated flaky case 10/10; full scripts/test-local.ps1 795 passed/2 skipped, all Node suites, Python180/JS204 syntax and secrets762 passed. No runtime changes for this merge; submit merge and require CI before #214 merge. Connection rejection/body-drain repair is authorized only on a new branch after #214.
