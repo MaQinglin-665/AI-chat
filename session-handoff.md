@@ -1,6 +1,17 @@
 # Session handoff
 
-## Current state
+## Current task — clean dependency validation (2026-10-24)
+
+- Source: codex/developer-readiness-20261023 at 86a93ca; new branch codex/clean-dependency-validation-20261024. User requests a PR to main; no direct main push or merge.
+- Fresh Windows 11 x64 / Python 3.12.9 venv and project-local Node 22.23.4; installs, pip check and actual imports pass. Runtime/dev closure constrained to 84 verified versions for this platform only. Node lockfile is unchanged.
+- Fixed project-local Node launch, setup JSON BOM, project-venv test selection; bootstrap verifies imports/metadata and uses npm ci while respecting a supplied mirror.
+- Final complete local gate passed: 740 Python tests, all Node suites, Python/JS syntax and secret scan. Nine targeted setup regressions pass. Docs publish check and all four Chromium smoke tests passed. Implementation/validation are complete; push this task branch and open its PR to main, then stop without merging. Evidence and platform/manual limits: docs/clean-dependency-validation-20261024.md and progress.md.
+- Files touched: requirements.txt, new requirements-win-py312-constraints.txt; scripts/bootstrap-first-run.ps1, apply-preview-experience-config.ps1, test-local.ps1, new start-electron.ps1 and check_python_dependencies.py; start_electron.bat; three setup test modules; README/developer-sharing/handoff/report and state files.
+- User subsequently authorized reusing their existing Harness local model connection in ignored configuration. Probe and real first-chat smoke pass. No keys or private data are committed.
+- Known remaining frontend blocker: normal mode fails on null syncProactiveSchedulerPolling controller; this is separate from the dependency/install fixes. Next work should address controller loading on its own branch, plus the earlier manual audio/microphone/long-duration acceptance.
+- This branch inherits the unmerged readiness/preview.7 work from its requested starting point. PR targets main as requested; its description must disclose the dependency on PR #210. Do not merge automatically.
+
+## Prior release state
 Directory: D:/AI/ai_desktop_pet_readiness_20261023.
 Branch: codex/developer-readiness-20261023. Main remains unchanged.
 Both supplied tasks completed and committed separately: 1ae3b89 timing/transport, be1e9f9 harness merge, cba0fb2 lip-sync bridge.

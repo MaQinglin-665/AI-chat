@@ -33,7 +33,8 @@ preview.7 已经包含以下内容，不要重复做：
 每一项都单独开一个分支、单独发一个 PR。
 
 1. **全新环境依赖验证**
-   在干净的 Windows 环境（或新建的 venv）里，按 README 从零安装并启动一次，记录缺了哪些包、版本冲突和报错，然后修复安装脚本或 `requirements*.txt`。目前只固定了直接依赖，间接依赖还没有锁定。
+   在干净的 Windows 环境（或新建的 venv）里，按 README 从零安装并启动一次，记录缺了哪些包、版本冲突和报错，然后修复安装脚本或 `requirements*.txt`。本次执行前只固定了直接依赖，间接依赖尚未锁定。
+   2026-10-24 已在新的 Windows x64 / Python 3.12 venv 完成安装、真实导入、后端与首句验证，并补充此平台的间接依赖约束和安装入口修复；详见 [验证记录](../clean-dependency-validation-20261024.md)。普通前端仍有既有控制器加载错误，其他平台及听评未验收。
 2. **拆分超大文件**
    `memory.py`（175KB）、`character_brain.py`（143KB）、`web/followupReadinessPanelController.js`（212KB）、`web/chat.js`（198KB）、`web/chatReplyController.js`（145KB）。每个 PR 只拆一个模块，只做机械移动，不改行为，现有测试必须全部通过。
 3. **清理远端旧分支和 PR**

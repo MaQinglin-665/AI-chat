@@ -25,5 +25,5 @@ Key 保存在本机 `.env`，其他本地覆盖写入 `config.local.json`。不�
 
 ## 验证与限制
 
-直接依赖已固定版本。完整依赖解析结果和测试证据见 [修复审查](readiness-audit-20261023.md)。
+直接依赖已固定版本；Windows x64 / Python 3.12 还自动使用全新 venv 验证后的间接依赖约束。bootstrap 会运行 `pip check` 和真实模块导入，有 lockfile 时使用 `npm ci`。完整过程、启动脚本修复、验证范围及尚存的前端启动问题见 [全新环境依赖验证](clean-dependency-validation-20261024.md)。其他平台和 Python 版本未纳入这次验证，不能视为已锁定或验收。
 本轮不发布安装包，不改变 `main`，不包含作者的真实模型 Key、私有模型文件或声音样本。

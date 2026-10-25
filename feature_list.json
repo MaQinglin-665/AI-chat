@@ -1,6 +1,37 @@
 {
   "features": [
     {
+      "id": "clean-dependency-validation-20261024",
+      "name": "Clean Windows dependency installation and startup validation",
+      "status": "complete",
+      "dependencies": [
+        "developer-readiness-20261023"
+      ],
+      "scope": [
+        "Fresh checkout and isolated Python 3.12 virtual environment",
+        "README bootstrap, Node/Electron installation and initial startup",
+        "Fix only dependency manifests or installation workflow blockers; record reproducible evidence"
+      ],
+      "done_criteria": [
+        "Runtime and development dependencies install in a fresh venv and pip check succeeds",
+        "README setup and isolated initial startup verified without private data or model credentials",
+        "Full local gate and required pre-push checks pass",
+        "Evidence, remaining manual limitations and handoff updated; feature PR targets main without pushing main"
+      ],
+      "implementation_status": "complete",
+      "verification": [
+        "Fresh CPython 3.12.9 Windows x64 venv; runtime and dev install, pip check and actual imports pass",
+        "84 package version constraints match empty-environment resolution",
+        "Final local gate: 740 Python tests and all Node suites; syntax and secrets checks pass",
+        "Actual Electron first-run wizard/backend startup; authorized Harness model probe and first-chat smoke pass",
+        "Docs check:all: publish check plus four real Chromium smoke tests passed"
+      ],
+      "limitations": [
+        "Plain frontend has an inherited null syncProactiveSchedulerPolling controller; separate follow-up",
+        "Other platforms/Python versions, optional ASR services, audio devices and long-duration acceptance not verified"
+      ]
+    },
+    {
       "id": "motion-voice-integration-20261023",
       "name": "Merge speech gestures and apply lip-sync bridge fix",
       "status": "completed",
@@ -219,9 +250,9 @@
       "implementation_status": "complete",
       "remaining_acceptance": [
         "Provider HTTPS endpoint confirmation",
-        "Clean isolated dependency installation",
         "Real Electron two-window and voice acceptance"
-      ]
+      ],
+      "clean_dependency_verification": "Completed for Windows x64 / Python 3.12 in clean-dependency-validation-20261024; other platform and frontend/audio acceptance remains separate."
     },
     {
       "id": "local-rvc-singing-entry-v1",
@@ -288,6 +319,6 @@
       ]
     }
   ],
-  "active_task": "deepseek-preview7-release",
+  "active_task": "clean-dependency-validation-20261024",
   "completed_archive": "docs/archive/features-completed-2026-10-23.json"
 }
