@@ -116,3 +116,5 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 - Verification Evidence: check_secrets.py passed (730 files); config.example.json, package.json and feature_list.json parse; required ten Python modules compile; diff whitespace check passed. Prior accepted runtime gate remains 784 Python passes/1 Windows privilege skip, all Node tests/syntax passed. Documentation-only update does not rerun model acceptance.
 
 - Publication outcome: normal feature-branch push failed twice because github.com could not resolve; explicit DNS lookup timed out. No remote write or PR creation confirmed. Local documentation commit 9a597f0 retained; handoff records exact retry scope.
+
+- Publication retry succeeded: feature branch pushed, #210 still unmerged; draft PR #213 created with readiness base using authenticated gh after connector write permission failure. Stage 0–2 real/automated evidence, default-off experimental status and deferred limitations included. Required push checks and secret scan passed again. No merge/main push.

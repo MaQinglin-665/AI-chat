@@ -44,3 +44,7 @@ User explicitly requested recording these only in this update. Runtime behavior 
 ## Publication blocker
 
 Follow-up documentation committed as 9a597f0. Two normal git push attempts failed with `Could not resolve host: github.com`; an explicit DNS lookup also timed out. GitHub connector metadata reads work, but the local Git commits have not been uploaded. No draft PR was created. Next: restore normal GitHub DNS/connectivity, rerun required push checks, push only codex/external-agent-codex-cli-v1, recheck #210 and create the authorized draft with stage 0–2 evidence and the two deferred items. No merge/main push.
+
+## Publication retry succeeded
+
+Feature branch pushed successfully on user-requested retry. Draft PR: https://github.com/MaQinglin-665/AI-chat/pull/213, base codex/developer-readiness-20261023 (#210 rechecked unmerged). Secret scan, required JSON checks and compilation passed again. Connector PR creation returned 403; authenticated GitHub CLI created the draft successfully. The earlier DNS blocker is resolved. Next: wait for review; do not merge or push main. Both verification improvements remain backlog only.
