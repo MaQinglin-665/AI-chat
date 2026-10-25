@@ -13,12 +13,12 @@ from test_external_agent import setup, PLAN, Immediate, wait_state
 
 
 def test_manifest_metadata_and_exact_plan(tmp_path):
-    (tmp_path / "keep.txt").write_text("private contents")
-    (tmp_path / "remove.txt").write_text("private contents")
+    (tmp_path / "keep.txt").write_text("private contents", encoding="utf-8")
+    (tmp_path / "remove.txt").write_text("private contents", encoding="utf-8")
     before = snapshot(tmp_path)
-    (tmp_path / "keep.txt").write_text("changed private contents")
+    (tmp_path / "keep.txt").write_text("changed private contents", encoding="utf-8")
     (tmp_path / "remove.txt").unlink()
-    (tmp_path / "new.txt").write_text("new private contents")
+    (tmp_path / "new.txt").write_text("new private contents", encoding="utf-8")
     after = snapshot(tmp_path)
     changes = compare(before, after, PLAN)
     assert changes["created"] == ["new.txt"]
@@ -32,7 +32,7 @@ def test_manifest_metadata_and_exact_plan(tmp_path):
 
 
 def test_inventory_limit_and_symlink(tmp_path):
-    (tmp_path / "a").write_text("x")
+    (tmp_path / "a").write_text("x", encoding="utf-8")
     with pytest.raises(AgentError, match="上限"):
         snapshot(tmp_path, max_entries=0)
     root = tmp_path / "work"
@@ -47,13 +47,13 @@ def test_inventory_limit_and_symlink(tmp_path):
 @pytest.mark.parametrize("failure", [False, True])
 def test_manager_verifies_changes_on_success_and_failure(setup, failure):
     cfg, work = setup
-    (work / "untouched.txt").write_text("private contents")
+    (work / "untouched.txt").write_text("private contents", encoding="utf-8")
     class Writer(Immediate):
         def run(self, **kw):
             if kw["plan"] is None:
                 return copy.deepcopy(PLAN)
-            (work / "untouched.txt").write_text("unexpected modification")
-            (work / "new.txt").write_text("approved")
+            (work / "untouched.txt").write_text("unexpected modification", encoding="utf-8")
+            (work / "new.txt").write_text("approved", encoding="utf-8")
             if failure:
                 raise AgentError("cancelled", "任务已取消。")
     m = ExternalAgentManager(lambda: cfg, adapter_factory=Writer)
@@ -62,7 +62,7 @@ def test_manager_verifies_changes_on_success_and_failure(setup, failure):
     m.approve(task["id"])
     result = wait_state(m, task["id"], {"cancelled" if failure else "completed"})
     assert result["changes"]["out_of_plan"]["modified"] == ["untouched.txt"]
-    audit = json.loads(agent_actions.STATE_PATH.read_text())
+    audit = json.loads(agent_actions.STATE_PATH.read_text(encoding="utf-8"))
     assert audit["audit"][-1]["result"]["changes"] == result["changes"]
     assert "private contents" not in json.dumps(audit)
     assert "unexpected modification" not in json.dumps(audit)
@@ -76,7 +76,7 @@ def test_shared_experience_summary_only(setup, monkeypatch, tmp_path):
     class ApprovedWriter(Immediate):
         def run(self, **kw):
             if kw["plan"] is not None:
-                (work / "new.txt").write_text("synthetic")
+                (work / "new.txt").write_text("synthetic", encoding="utf-8")
             return super().run(**kw)
     m = ExternalAgentManager(lambda: cfg, adapter_factory=ApprovedWriter)
     task = m.create_task("整理测试文件", str(work))

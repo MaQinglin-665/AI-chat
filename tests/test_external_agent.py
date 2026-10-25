@@ -73,7 +73,7 @@ def test_approval_flow_and_metadata_only(setup):
     assert result["progress_count"] == 2 and agent_actions.public_state()["pending"] == []
     with pytest.raises(policy.AgentError):
         m.approve(task["id"])
-    state = json.loads(agent_actions.STATE_PATH.read_text())
+    state = json.loads(agent_actions.STATE_PATH.read_text(encoding="utf-8"))
     assert [v["status"] for v in state["audit"]] == ["planning", "awaiting_approval", "executing", "completed"]
     raw = json.dumps(bus.snapshot())
     assert "整理" not in raw and "secret" not in raw and "new.txt" not in raw
