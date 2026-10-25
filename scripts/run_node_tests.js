@@ -47,6 +47,7 @@ const tests = [
   "tests/test_first_run_frontend.js",
   "tests/test_frontend_runtime_efficiency.js",
   "tests/test_live2d_render_performance_frontend.js",
+  "tests/test_live2d_core_compatibility.js",
   "tests/test_stage_frontend.js",
   "tests/test_stage_feedback_frontend.js",
   "tests/test_stage_theme_frontend.js",
