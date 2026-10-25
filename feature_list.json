@@ -1,6 +1,17 @@
 {
   "features": [
     {
+      "id": "external-agent-verification-followups",
+      "name": "外部任务文件核对：锁范围与新建父目录识别",
+      "status": "backlog",
+      "dependencies": ["external-agent-codex-cli-stage2"],
+      "scope": ["第 2 阶段审核确认的后续改进；本次只记录，不修改运行逻辑"],
+      "done_criteria": [
+        "_verify_files 先在锁外扫描目录，再加锁写回结果；覆盖查询和取消不会被扫描持锁阻塞的测试",
+        "计划内文件的新建上级目录视为计划内，避免 out_of_plan 误报；不放宽对父目录下其他文件修改或删除的授权，补充测试"
+      ]
+    },
+    {
       "id": "external-agent-codex-cli-stage2",
       "name": "Explicit task UI, companionship and file-change verification",
       "status": "completed",

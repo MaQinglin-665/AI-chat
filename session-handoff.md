@@ -4,7 +4,7 @@
 
 Date: 2026-10-24 (America/Los_Angeles).
 Branch: `codex/external-agent-codex-cli-v1` in the readiness checkout.
-User authorized stage 2 and local commits only. No push, PR, merge or release.
+Stage 2 reviewed and accepted. User now authorizes pushing this feature branch and creating a draft PR only; no merge, main push or release.
 
 ## Commits and implementation
 
@@ -26,8 +26,17 @@ User authorized stage 2 and local commits only. No push, PR, merge or release.
 
 ## Boundaries and next step
 
-Report local commit, then stop for user review. Do not push or create a PR.
+PR #210 checked on 2026-10-24: open, draft, unmerged. Target the draft PR at `codex/developer-readiness-20261023`; use main only if #210 has merged before creation. After creating the draft, report its URL and stop; do not merge or push main.
 Acceptance used real Electron renderer/backend in an isolated launcher; production main/preload IPC and packaged startup are not fully covered. No new claim for other TTS providers or CLI versions.
 Metadata comparison is post-execution, not rollback or content hashing; concurrent writes and preserved metadata limit detection. Windows unelevated is not full read isolation. Task/manifest state is memory-only. Voice approval is not implemented.
 Feature remains default-off, isolated CLI 0.164.0 is the verified minimum; old global CLI untouched. Private config/keys and daily pet instance are not part of the commit.
 Previous handoff archived at docs/archive/2026-10-24-external-agent-stage1-handoff.md.
+
+## Accepted follow-ups — not fixed in this PR
+
+Tracked as `external-agent-verification-followups` (backlog) in feature_list.json:
+
+1. `_verify_files` currently scans the directory while holding the manager lock and may block queries/cancellation. Follow-up: scan first outside the lock, then acquire the lock to publish results; add concurrency coverage.
+2. Newly created parent directories of planned files should count as in-plan, avoiding false-positive `out_of_plan`. Preserve exact authorization for other descendant modifications/deletions; add regression coverage.
+
+User explicitly requested recording these only in this update. Runtime behavior is unchanged.
