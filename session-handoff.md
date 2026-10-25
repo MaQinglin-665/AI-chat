@@ -1,5 +1,11 @@
 # Session handoff
 
+## Published stage 1 checkpoint — draft PR #217 (2026-10-25)
+- User explicitly requested GitHub upload after the local stage 1 report. Pushed friend/avatar-live2d-adapter normally and created draft PR https://github.com/MaQinglin-665/AI-chat/pull/217 to main; attached to this task. Implementation commits are 6adf36b and 2f3500b. A state-only publication checkpoint follows those two independent implementation commits.
+- This later instruction authorizes branch publication despite the earlier stage 1 no-push checkpoint. It does not authorize stage 2/3, ready-for-review, main push, force push or merge. PR describes current Core staying unchanged, new Core/model/screenshots excluded, limited display compatibility and all local validation.
+- Before push, JSON/py_compile and actual vendored UMD regression passed again; prior complete local gate remains 812 Python passed/2 skipped plus 60 Node suites and syntax/secrets. New Core remains outside Git. No need to rerun runtime tests for this state-only checkpoint.
+- Next: verify the final branch/PR head and CI snapshot, then wait for author/user review and explicit stage 2 approval. Do not follow historical merge authorizations preserved below.
+
 ## Current task — Live2D stage 1 checkpoint: display fixed, new Core stays local (2026-10-25)
 - Branch friend/avatar-live2d-adapter now based on main 5b20358. AGENTS.md and docs/avatar-intent-interface.md v1 read. Prior preparation records preserved via stash 9bd2080 plus an external patch; only own entries restored onto current state.
 - User scope: stage 1 has two independent commits (launcher guidance, then official Core compatibility), then stop for confirmation. No stage 2/3 yet. Pause large-file splitting. No main push/force push/self-merge; no dialogue/memory/external-agent implementation edits.
