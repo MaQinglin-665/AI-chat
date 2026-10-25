@@ -40,3 +40,7 @@ Tracked as `external-agent-verification-followups` (backlog) in feature_list.jso
 2. Newly created parent directories of planned files should count as in-plan, avoiding false-positive `out_of_plan`. Preserve exact authorization for other descendant modifications/deletions; add regression coverage.
 
 User explicitly requested recording these only in this update. Runtime behavior is unchanged.
+
+## Publication blocker
+
+Follow-up documentation committed as 9a597f0. Two normal git push attempts failed with `Could not resolve host: github.com`; an explicit DNS lookup also timed out. GitHub connector metadata reads work, but the local Git commits have not been uploaded. No draft PR was created. Next: restore normal GitHub DNS/connectivity, rerun required push checks, push only codex/external-agent-codex-cli-v1, recheck #210 and create the authorized draft with stage 0–2 evidence and the two deferred items. No merge/main push.
