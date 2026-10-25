@@ -154,7 +154,8 @@ assert.ok(stageCss.includes('width: min(940px, calc(100vw - 330px))'), "wide sta
 assert.ok(stageCss.includes('@media (max-width: 1400px)'), "medium stages should move utility actions above the composer before overlap begins");
 assert.ok(stageCss.includes('width: min(780px, calc(100vw - 360px))'), "native-width stages should preserve a separate utility lane");
 assert.ok(stageCss.includes('.conversation-rail.is-collapsed'), "the unified conversation rail should have a compact collapsed state");
-assert.ok(read("web", "desktopControlBinder.js").includes('matchMedia?.("(max-width: 820px)")'), "compact stages should start with history collapsed to protect the character");
+assert.ok(read("web", "desktopControlBinder.js").includes('setConversationRailExpanded(stored !== "false")'), "first open should show replies; only an explicit saved collapse hides the rail");
+assert.ok(read("web", "desktopControlBinder.js").includes('setItem("xinyu.conversation.expanded", String(nextExpanded))'), "manual collapse preference should persist");
 assert.ok(stageCss.includes('.stage-composer-mic[aria-pressed="true"]'), "active microphone state should be visually explicit");
 assert.ok(stageCss.includes('.primary-actions > button[aria-pressed="true"]'), "broadcast controls should expose selected state");
 assert.ok(stageCss.includes('min-height: 56px !important'), "the refined header should use one compact full-width rail");
@@ -189,7 +190,7 @@ assert.ok(electronSource.includes('win.webContents.send("surface-active-changed"
 assert.ok(startupSource.includes("broadcastSpeech: state.desktopMode === true"), "desktop full view should keep the detached pet performance in sync");
 assert.ok(startupSource.includes("ticker.stop?.()"), "inactive Live2D surfaces should stop their render ticker");
 assert.ok(startupSource.includes('addEventListener?.("visibilitychange"'), "document visibility should backstop native surface messages");
-assert.ok(layoutSource.includes('state.uiView === "full" ? 0.86 : 0.76'), "full view should fit the real model between the broadcast bar and composer");
+assert.ok(layoutSource.includes('stageBottom - 100') && layoutSource.includes('model.y = stageBottom'), "full view should reserve header and composer clearance");
 assert.ok(layoutSource.includes('model.x = w * 0.5'), "full view should center the real Live2D model");
 assert.ok(layoutSource.includes('if (state.uiView !== "model")'), "the full Electron stage should never enable desktop click-through");
 assert.ok(layoutSource.includes('window.electronAPI.setClickthrough(false);'), "the stage should explicitly keep native controls interactive");
@@ -273,7 +274,7 @@ conversationClick();
 assert.strictEqual(conversationAttrs["aria-expanded"], "true", "conversation history should expand on the next click");
 assert.strictEqual(conversationClasses.has("is-collapsed"), false, "conversation history should restore the unified rail");
 
-for (const splitChat of [true, false]) {
+for (const splitChat of [true, false]) for (const stored of [null, "true", "false"]) {
   const attrs = { "aria-expanded": "true" };
   desktopControlBinder.bindUtilityControls({
     conversationRail: { classList: { toggle() {} } },
@@ -286,11 +287,12 @@ for (const splitChat of [true, false]) {
     windowObject: {
       addEventListener() {},
       matchMedia: () => ({ matches: true }),
+      localStorage: { getItem: () => stored },
       document: { body: { classList: { contains: name => splitChat && name === "view-chat" } } }
     }
   });
-  assert.strictEqual(attrs["aria-expanded"], splitChat ? "true" : "false",
-    "narrow split-chat must remain readable while compact stage keeps its collapsed default");
+  assert.strictEqual(attrs["aria-expanded"], stored === "false" ? "false" : "true",
+    "both narrow views default to readable replies and honor a saved manual collapse");
 }
 
 function createLaneToggle() {

@@ -1,0 +1,9 @@
+.stage-feedback { position: fixed; z-index: 45; left: 50%; bottom: 170px; transform: translateX(-50%); width: min(440px, calc(100vw - 32px)); padding: 12px 16px; border-radius: 14px; background: var(--stage-surface-strong, #242031); color: var(--stage-text, white); border: 1px solid var(--stage-line, #777); box-sizing: border-box; }
+.stage-feedback[hidden] { display: none; }
+.stage-feedback p { margin: 0 0 8px; line-height: 1.5; }
+.stage-feedback button { cursor: pointer; margin-right: 10px; }
+body.view-model .stage-feedback { display: none; }
+.onboarding-modal.is-chat-tip { background: none; backdrop-filter: none; pointer-events: none; align-items: flex-end; padding-bottom: 170px; }
+.onboarding-modal.is-chat-tip .onboarding-dialog { pointer-events: auto; width: min(420px, calc(100vw - 24px)); max-height: 45vh; overflow-y: auto; }
+.onboarding-modal .onboarding-secondary { background: none !important; border: 0 !important; box-shadow: none !important; color: #425a85 !important; text-decoration: underline; font-size: 12px; }
+.onboarding-modal.is-chat-tip .onboarding-progress, .onboarding-modal.is-chat-tip .onboarding-step-index, .onboarding-modal.is-chat-tip .onboarding-path-label { display: none; }

@@ -635,7 +635,7 @@ function buildPythonProcessEnv(pythonExecutable) {
 
 function buildBackendCrashMessage(codeLabel, extraMessage = "") {
   let message =
-    `馨语AI桌宠后端意外退出 (code: ${codeLabel})\n` +
+    `馨语桌宠后端意外退出 (code: ${codeLabel})\n` +
     "请查看 server_err.log 了解详情。\n\n" +
     "常见原因：Python 版本不匹配、缺少依赖库。";
   if (extraMessage) {
@@ -647,7 +647,7 @@ function buildBackendCrashMessage(codeLabel, extraMessage = "") {
 function reportBackendFatal(message) {
   if (!backendFailureShown) {
     backendFailureShown = true;
-    dialog.showErrorBox("馨语AI桌宠后端错误", message);
+    dialog.showErrorBox("馨语桌宠后端错误", message);
   }
   if (!isAppQuitting) {
     isAppQuitting = true;
@@ -1078,7 +1078,7 @@ function createModelWindow() {
     height: bounds.height,
     x: bounds.x,
     y: bounds.y,
-    title: "馨语AI桌宠 · Live2D",
+    title: "馨语桌宠 · Live2D",
     frame: false,
     transparent: true,
     hasShadow: false,
@@ -1101,7 +1101,7 @@ function createModelWindow() {
   modelWindow.setMenuBarVisibility(false);
   modelWindow.on("page-title-updated", (event) => {
     event.preventDefault();
-    modelWindow?.setTitle("馨语AI桌宠 · Live2D");
+    modelWindow?.setTitle("馨语桌宠 · Live2D");
   });
   const renderDiagnosticsQuery = LIVE2D_RENDER_DIAGNOSTICS ? "&render_diagnostics=1" : "";
   modelWindow.loadURL(
@@ -1149,7 +1149,7 @@ function createChatWindow() {
     height: bounds.height,
     x: bounds.x,
     y: bounds.y,
-    title: "馨语AI桌宠",
+    title: "馨语桌宠",
     minWidth: 760,
     minHeight: 560,
     frame: true,

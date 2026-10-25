@@ -18,7 +18,7 @@
     title.textContent = "还没有日程";
     const desc = doc.createElement("div");
     desc.className = "schedule-empty-desc";
-    desc.textContent = "你可以设置某个时间点让馨语AI桌宠主动说话、提醒你，或直接执行工具任务。";
+    desc.textContent = "你可以设置某个时间点让馨语主动说话、提醒你，或直接执行工具任务。";
     empty.appendChild(title);
     empty.appendChild(desc);
     container.appendChild(empty);

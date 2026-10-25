@@ -20,7 +20,7 @@ def _reply_language_rule(config) -> str:
         return "Use natural Simplified Chinese unless the user clearly asks for another language."
     if raw in {"en", "english"}:
         return "Use natural spoken English by default; switch to Chinese only when the user clearly asks."
-    return "Understand Chinese or English; use natural spoken English by default unless the user clearly requests another language."
+    return "Follow the language of the latest user message: reply in Chinese to Chinese, English to English, unless explicitly requested otherwise."
 
 
 def build_model_direct_dialogue_policy(config, *, compact=False) -> str:

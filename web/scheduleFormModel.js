@@ -47,7 +47,7 @@
       return { ok: false, reason: "missing_time", focus: "time", message: "请先选择执行时间" };
     }
     if (!text) {
-      return { ok: false, reason: "missing_text", focus: "text", message: "请先写下让馨语AI桌宠做什么" };
+      return { ok: false, reason: "missing_text", focus: "text", message: "请先写下让馨语做什么" };
     }
 
     let dueAt = typeof reminderUtils.parseLocalDateTime === "function"

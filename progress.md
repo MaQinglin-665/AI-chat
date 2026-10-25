@@ -119,6 +119,46 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 
 - Publication retry succeeded: feature branch pushed, #210 still unmerged; draft PR #213 created with readiness base using authenticated gh after connector write permission failure. Stage 0–2 real/automated evidence, default-off experimental status and deferred limitations included. Required push checks and secret scan passed again. No merge/main push.
 
+## 2026-10-24 — Task 4 stage feedback and isolated browser experience
+
+- Created codex/stage-feedback-onboarding-v1 from last-pushed origin external-agent head f7b06a0 (fresh fetch DNS unavailable). Implemented narrow grid height, independent 600ms stage feedback/auth/doctor/startup notice, unobstructed single-primary onboarding, Galgame Phosphor icon and composer-aware model fit. Kept intentional narrow opacity .82; no model alpha issue found. No chat.js/chatReplyController.js changes.
+- Verification Evidence: scripts/test-local.ps1 complete: 784 passed, 1 skipped (Windows symlink permission), one existing audioop warning, all Node suites, Python syntax 175 files/JS 197 files and secret scan 736 files. Browser regression script passed at 774/516 widths, each lane 0px before and 206px after, collapses/states/input tested. Ignored before/after screenshots in tmp_ui_smoke. See docs/stage-feedback-verification.md.
+- Only after full gate passed, started isolated_experience.py hidden/detached, no Electron. PID 37668 serves 127.0.0.1:8124; /healthz and persona/task/first-run endpoints return 200. Real DeepSeek probe ok in 1531ms. Real browser idle, no JS errors. Six synthetic workspace files and all persistent data under repository-external stage4-experience-20261024; no daily private configuration read. Final launcher also validates persistence paths and disables managed ASR; syntax and live startup verified.
+- Instance stays running until user says 体验结束. Stop command and exact data paths in session-handoff.md / external instance.json. No push/PR. Prior handoff archived; feature completed and awaiting user experience feedback.
+
+
+## 2026-10-24 — task 5 visual-polish-v1
+
+- Branch codex/visual-polish-v1 from task 4 cf94872; local commit only, no push/PR.
+- Central night-room tokens; single composer and top icon actions; accessible toggle presentation; adaptive control-center cards and cat branding; Chinese labels and window/shortcut/installer naming; matching Galgame controls. Approval layout prioritizes plan details.
+- No backend, chat.js/chatReplyController.js or rendering/motion/lipsync changes. Layout module only exports CSS light-anchor coordinates.
+- Verification Evidence: scripts/test-local.ps1 passed (784 Python, 1 Windows symlink skip; all Node suites including new presentation/contrast checks; 175 Python/201 JS syntax; secret scan). Two config report assertions translated, none removed.
+- Real Edge browser matrix passed at 800x600, 1280x800, 1920x1080: toolbar, state toggles, keyboard focus, provider-specific visibility, grid overflow, Galgame and reduced motion. Final focus-color adjustment verified by the same browser matrix. Muted contrast 7.99:1 / 7.16:1.
+- 45 ignored screenshots in tmp_ui_smoke/visual-polish; docs/visual-polish-verification.md indexes the required 30 plus 15 detail captures. Synthetic approval fixture; no real task execution or fresh Electron/audio acceptance claimed.
+- Shortcut PowerShell syntax and NSIS Chinese-name template compile passed with minimal synthetic payload; no installation or daily shortcut mutations.
+- 8124 isolated instance remains running, PID 37668, healthz 200, loopback only; no daily instance changes. Claude can review on refresh. Existing backend followups remain backlog.
+
+
+## 2026-10-25 — Task 6 experience fixes
+
+- codex/experience-fixes-v1 from visual-polish 541f881; local commit only, no push/PR. P0 Chinese model-answer preservation, one correction retry, language-following defaults and persistent visible replies; responsive/dark onboarding improvements; move-aware external task results and sanitized failure diagnostics. Modules and screenshot index in docs/experience-fixes-verification.md; no unrelated files changed.
+- Verification Evidence: full scripts/test-local.ps1 passed: 789 Python passed, 1 Windows symlink skip, existing audioop warning; all Node suites; Python 179 / JS 203 syntax checks; secret scan 750 files. Existing doctor warnings: missing private config.json, Node 25, old global CLI (isolated runtime uses independent 0.164.0). Updated obsolete fixed-line/default-collapse assertions to reflect task 6; retained metadata, shape, English-mode and security coverage.
+- Edge browser matrix at 1024x768 / 774x1208 passed: initial expansion, saved collapse, latest reply visible after 16 seconds, nonoverlapping lanes, dark onboarding, move / failure cards, no JS errors. Synthetic UI messages/errors; no new Electron or audio acceptance. Seven ignored screenshots in tmp_ui_smoke/task6.
+- Real DeepSeek Chinese five-turn transcript recorded. Exact historical external-task wording rerun successfully with six moves, two directories, no out_of_plan/missing changes. Historical provider_failed remains unreproduced; original cause unknown because old diagnostics were discarded. Diagnostic gap fixed, original root cause NOT claimed fixed. Metadata inference does not hash contents; earlier lock/parent-directory backlog retained.
+- Restarted latest isolated 8124, PID 5620, loopback and healthz 200; daily 8123 untouched. Restored six initial samples byte-for-byte from archived execution files. Preserved workspace-task6-run1/run2 evidence. Keep running for review; stop command in handoff. No keys/private config/screenshots staged.
+
+
+## 2026-10-25 — Final onboarding/message polish and publication preparation
+
+- First user message completes the single-step greeting guide and persists seen state; previous button hidden. Moved technical steps to docs/config.html. Fixed timestamp flow/grid placement, hover/focus-only feedback/heart and keyboard focus on assistant messages. Copied avatar-intent-interface.md exactly as requested; no avatar runtime implementation.
+- Verification Evidence: full scripts/test-local.ps1 passed, 789 Python / 1 skip, all Node tests, Python179/JS203 syntax and secret scan751. Updated onboarding unit test covers first-message dismissal/persistence/no reopen. Browser regression now uses actual message-row renderer, checks timestamp bounding boxes and hover/focus at both viewport sizes, and invokes actual message append for guide dismissal. Browser result recorded below after completion.
+- Authorized three feature branch pushes and experience draft PR against external-agent branch; no main/merge. GitHub DNS preflight failed; actual push still pending. Cleanup scope explicitly restricted to workspace and its two run archives, not isolated configuration/history or screenshots.
+- Browser matrix passed in real Edge at 1024x768 and 774x1208: actual rendered message timestamp below content; feedback and heart hidden by default, revealed on hover/focus; first appended user message closes guide and marks seen; no previous button. Synthetic messages/task endpoints; no fresh model/audio acceptance.
+
+- Final outcome: local repair commit 38e1da3. Two normal pushes failed with github.com DNS resolution error; no remote success or PR claimed. Prepared PR body retained locally. Owned 8124 process tree stopped (5620/48768); no listener remains. Automatic approval review rejected the combined recursive cleanup command with blocked by policy before execution; all three authorized cleanup targets remain, configuration/history/screenshots untouched. Publication and cleanup remain pending; no workaround deletion attempted.
+
+- Publication retry: required JSON/compile checks and secrets752 passed; all three specified feature branches pushed normally. Connector PR creation returned403; authenticated gh created draft #214 against codex/external-agent-codex-cli-v1, attached to task. No merge/main push. 8124 remains stopped. Resolved and checked the three cleanup paths (no reparse links); explicit literal-path removal was still rejected by automatic policy. Directories retained; cleanup remains the only pending requested action.
+
 ## 2026-10-24 — Clean dependency validation (started)
 - User selected handoff task 1; new branch codex/clean-dependency-validation-20261024 from 86a93ca on codex/developer-readiness-20261023. Fresh checkout has no unrelated changes.
 - Read AGENTS.md, session-handoff.md, docs/handoff/README.md, feature_list.json and current progress before implementation.
@@ -162,3 +202,58 @@ History: [archive](docs/archive/2026-10-23-progress.md).
 - User authorizes merge commits in order #210/#211/#212/#213/#214. First three merged after passing checks. Merge origin/main 2be017b into external-agent branch; only feature_list.json, progress.md and session-handoff.md conflicted. Union feature IDs; retain main's completed clean dependency evidence using three-way comparison, both progress blocks, and both archived handoffs. Runtime files merged automatically. Full local gate pending; stop on failure.
 
 - PR #213 integration verification: full scripts/test-local.ps1 passed, all Node suites plus Python/JS syntax and secret scan passed; raw log tmp_ui_smoke/task6/merge-213-tests.log (ignored). Normal merge commit/push next; CI remains required before PR merge.
+
+## 2026-10-25 — Ordered integration, PR #214
+
+- #213 merged as 3611e5747b2e33a53b5013249c475d5243099a9b after all Linux/Windows checks passed. Test-only encoding fix 2c13028: cp1252 simulation 49 passed/2 skipped, full local gate 790 passed/2 skipped; no product changes for CI fixes.
+- Merge origin/main into experience-fixes-v1: only progress.md and session-handoff.md conflicted. Both progress blocks retained; both handoffs archived; feature_list.json merged automatically and JSON verified. Full local gate pending; stop on any failure.
+
+### Preserved pre-integration handoff: experience
+
+<details>
+<summary>Historical record; current merge authorization takes precedence</summary>
+
+# Session handoff
+
+## Final experience polish and publication
+
+User now authorizes pushing exactly codex/stage-feedback-onboarding-v1, codex/visual-polish-v1 and codex/experience-fixes-v1, then a draft PR from experience-fixes-v1 to codex/external-agent-codex-cli-v1. No main push or merge.
+
+- Single greeting-only onboarding ends and persists completion on the first user message; no previous button. Technical steps moved to docs/config.html.
+- Message timestamp participates in layout; optional feedback and decorative heart appear on hover/focus. Assistant rows are keyboard-focusable.
+- Copied requested docs/avatar-intent-interface.md byte-identically (SHA256 7ABB45D3E2FB868D2969CC53E7189763231F7AB4A2BC3296B9A626A0B8FC6DAF); design document only, no avatar implementation added.
+- Tests and acceptance details in progress.md. Task 6 evidence remains docs/experience-fixes-verification.md; historical provider_failed remains unreproduced.
+
+## Publication and cleanup outcome (retry succeeded for publication)
+
+- Repair commit: 38e1da3. All tests passed; final secret scan 752 files. Browser matrix passed with actual message renderer and actual user-message append (synthetic content; no new model/audio acceptance).
+- Retry: all three specified branches pushed successfully. Draft PR #214 created via authenticated gh after connector returned 403; attached to this task. URL https://github.com/MaQinglin-665/AI-chat/pull/214 ; head codex/experience-fixes-v1, base codex/external-agent-codex-cli-v1. No main push, force push or merge.
+- Owned 8124 process tree stopped successfully (5620 and child 48768); no listener remains. Daily 8123 untouched.
+- Cleanup command was rejected by automatic approval review with `blocked by policy` (no more specific reason). All three directories remain: D:/AI/.tools/stage4-experience-20261024/workspace, workspace-task6-run1, workspace-task6-run2. User authorized deleting ONLY those; isolated configuration/chat history, screenshots and other backups must stay. Do not claim cleanup completed or try to bypass the policy via another shell/tool.
+
+## Next
+
+Draft #214 awaits review. The three test directories still need cleanup once the automatic policy restriction is resolved; a retry with separately verified literal paths was again rejected, so all three remain. Do not bypass the restriction or delete the parent data root. Historical provider_failed root cause remains unknown. Previous handoff archived at docs/archive/2026-10-25-experience-fixes-handoff.md; two backend followups stay backlog.
+
+</details>
+
+### Preserved pre-integration handoff: main-external-agent
+
+<details>
+<summary>Historical record; current merge authorization takes precedence</summary>
+
+# Session handoff
+
+## Ordered merge integration — PR #213
+
+User authorizes merge commits via gh --merge --admin, no squash/rebase/force push/branch deletion/tag/release. main protection enforce_admins=false verified. #210 merged 71c9ebb; #211 merged 256eff8; #212 merged 2be017b, each after all PR checks passed. #213 base changed to main; integrating origin/main into codex/external-agent-codex-cli-v1.
+
+Only feature_list.json, progress.md and this handoff conflicted. Feature IDs unioned; main's completed dependency validation retained by three-way comparison; both progress blocks retained. Prior handoffs archived at docs/archive/2026-10-25-integration-external-agent-handoff.md and docs/archive/2026-10-25-integration-main-reminders-handoff.md. Historical no-merge directions are superseded by this user request.
+
+Full scripts/test-local.ps1 passed (log tmp_ui_smoke/task6/merge-213-tests.log). Next: commit merge, required pre-push checks and secret scan, normal push; ready #213, wait for ALL CI checks, then merge commit. Then repeat for experience PR #214 and test latest main. Stop on any non-state code conflict or test/CI failure. No unrelated implementation changes. Earlier external-agent verification improvements remain backlog.
+
+</details>
+
+- Authorized flaky-test check: ten isolated runs all passed (10/10). Full gate retry pending. Manual conflict-resolution edits are limited to progress.md and session-handoff.md; original handoff records retained above rather than adding archive files.
+
+- Authorized #214 gate passed: repeated flaky case 10/10; full scripts/test-local.ps1 795 passed/2 skipped, all Node suites, Python180/JS204 syntax and secrets762 passed. No runtime changes for this merge; submit merge and require CI before #214 merge. Connection rejection/body-drain repair is authorized only on a new branch after #214.

@@ -1705,3 +1705,6 @@ body.view-full .advanced-actions-group:nth-child(2) button:disabled::after {
 @media (min-width: 1200px) and (min-height: 820px) {
   body.view-full .conversation-identity { top: 92px; }
 }
+
+/* The Galgame action uses the same masked Phosphor icon as other actions. */
+#galgame-open::before { --ph-icon: var(--ph-book); }

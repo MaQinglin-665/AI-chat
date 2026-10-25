@@ -228,20 +228,20 @@
     }
 
     if (ui.conversationCollapseBtn && ui.conversationRail) {
-      const setConversationRailExpanded = (expanded) => {
+      const setConversationRailExpanded = (expanded, persist = false) => {
         const nextExpanded = expanded === true;
         ui.conversationRail.classList.toggle("is-collapsed", !nextExpanded);
+        ui.conversationCollapseBtn.textContent = nextExpanded ? "隐藏对话" : "显示对话";
+        if (persist) { try { windowObject.localStorage?.setItem("xinyu.conversation.expanded", String(nextExpanded)); } catch (_) {} }
         ui.conversationCollapseBtn.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
         ui.conversationCollapseBtn.setAttribute("aria-label", nextExpanded ? "收起对话历史" : "展开对话历史");
         ui.conversationCollapseBtn.setAttribute("title", nextExpanded ? "收起对话历史" : "展开对话历史");
       };
-      const splitChat = windowObject.document?.body?.classList?.contains("view-chat") === true;
-      const compactStage = !splitChat && windowObject.matchMedia?.("(max-width: 820px)")?.matches === true;
-      setConversationRailExpanded(
-        ui.conversationCollapseBtn.getAttribute("aria-expanded") !== "false" && !compactStage
-      );
+      let stored;
+      try { stored = windowObject.localStorage?.getItem("xinyu.conversation.expanded"); } catch (_) {}
+      setConversationRailExpanded(stored !== "false");
       ui.conversationCollapseBtn.addEventListener("click", () => {
-        setConversationRailExpanded(ui.conversationCollapseBtn.getAttribute("aria-expanded") !== "true");
+        setConversationRailExpanded(ui.conversationCollapseBtn.getAttribute("aria-expanded") !== "true", true);
       });
     }
 

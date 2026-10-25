@@ -454,12 +454,23 @@ def _apply_character_runtime_reply(config, raw_reply):
 
 
 def _apply_character_brain_reply_text(config, user_message, reply):
+    def regenerate():
+        corrected = dict(config)
+        corrected["tools"] = {**config.get("tools", {}), "enabled": False}
+        corrected["assistant_prompt"] = str(config.get("assistant_prompt", "")) + (
+            "\nCorrection: answer the latest user question directly. Follow the configured reply language; in auto mode follow the user. "
+            "Do not mention unrelated scene instructions, saving work, closing tabs or timers. "
+            "Do not substitute a stock persona line for the answer."
+        )
+        raw = call_llm(user_message, [], config=corrected, force_tools=False)
+        return _apply_character_runtime_reply(corrected, raw)[0]
     return _apply_character_brain_reply_text_impl(
         config,
         user_message,
         reply,
         apply_character_brain_reply_constraints_func=apply_character_brain_reply_constraints,
         enforce_reply_language_func=enforce_reply_language,
+        regenerate_reply_func=regenerate,
     )
 
 

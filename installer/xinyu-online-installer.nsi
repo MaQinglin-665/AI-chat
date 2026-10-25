@@ -1,4 +1,4 @@
-Unicode true
+﻿Unicode true
 RequestExecutionLevel user
 
 !include "MUI2.nsh"
@@ -13,15 +13,15 @@ RequestExecutionLevel user
   !define OUT_FILE "Xinyu-AI-Desktop-Pet-Setup.exe"
 !endif
 
-!define APP_NAME "Xinyu AI Desktop Pet"
+!define APP_NAME "馨语桌宠"
 !define APP_PUBLISHER "AI-chat open-source preview"
-!define START_MENU_DIR "Xinyu AI Desktop Pet"
+!define START_MENU_DIR "馨语桌宠"
 
 Name "${APP_NAME}"
 Caption "${APP_NAME} ${APP_VERSION}"
 OutFile "${OUT_FILE}"
 InstallDir "$LOCALAPPDATA\XinyuAI\DesktopPet"
-BrandingText "Xinyu AI Desktop Pet MVP preview"
+BrandingText "馨语桌宠 · 实验预览版"
 ShowInstDetails show
 ShowUninstDetails show
 
@@ -32,7 +32,7 @@ ShowUninstDetails show
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
-!insertmacro MUI_LANGUAGE "English"
+!insertmacro MUI_LANGUAGE "SimpChinese"
 
 Section "Install"
   SetShellVarContext current
@@ -42,10 +42,10 @@ Section "Install"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
   CreateDirectory "$SMPROGRAMS\${START_MENU_DIR}"
-  CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\Xinyu Guided First Run.lnk" "$INSTDIR\install_and_start.bat" "" "$INSTDIR\install_and_start.bat" 0 SW_SHOWNORMAL "" "Prepare dependencies and start Xinyu"
-  CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\Start Xinyu.lnk" "$INSTDIR\start_electron.bat" "" "$INSTDIR\start_electron.bat" 0 SW_SHOWNORMAL "" "Start Xinyu AI Desktop Pet"
-  CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\Uninstall Xinyu.lnk" "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$DESKTOP\Xinyu AI Desktop Pet.lnk" "$INSTDIR\start_electron.bat" "" "$INSTDIR\start_electron.bat" 0 SW_SHOWMINIMIZED "" "Start Xinyu AI Desktop Pet"
+  CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\馨语首次设置.lnk" "$INSTDIR\install_and_start.bat" "" "$INSTDIR\install_and_start.bat" 0 SW_SHOWNORMAL "" "准备依赖并启动馨语"
+  CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\馨语桌宠.lnk" "$INSTDIR\start_electron.bat" "" "$INSTDIR\start_electron.bat" 0 SW_SHOWNORMAL "" "启动馨语桌宠"
+  CreateShortcut "$SMPROGRAMS\${START_MENU_DIR}\卸载馨语桌宠.lnk" "$INSTDIR\Uninstall.exe"
+  CreateShortcut "$DESKTOP\馨语桌宠.lnk" "$INSTDIR\start_electron.bat" "" "$INSTDIR\start_electron.bat" 0 SW_SHOWMINIMIZED "" "启动馨语桌宠"
 
   IfSilent skip_guided_first_run
   ExecShell "open" "$INSTDIR\install_and_start.bat"
@@ -54,10 +54,10 @@ SectionEnd
 
 Section "Uninstall"
   SetShellVarContext current
-  Delete "$DESKTOP\Xinyu AI Desktop Pet.lnk"
-  Delete "$SMPROGRAMS\${START_MENU_DIR}\Xinyu Guided First Run.lnk"
-  Delete "$SMPROGRAMS\${START_MENU_DIR}\Start Xinyu.lnk"
-  Delete "$SMPROGRAMS\${START_MENU_DIR}\Uninstall Xinyu.lnk"
+  Delete "$DESKTOP\馨语桌宠.lnk"
+  Delete "$SMPROGRAMS\${START_MENU_DIR}\馨语首次设置.lnk"
+  Delete "$SMPROGRAMS\${START_MENU_DIR}\馨语桌宠.lnk"
+  Delete "$SMPROGRAMS\${START_MENU_DIR}\卸载馨语桌宠.lnk"
   RMDir "$SMPROGRAMS\${START_MENU_DIR}"
   RMDir /r "$INSTDIR"
 SectionEnd

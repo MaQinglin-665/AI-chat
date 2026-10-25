@@ -10,7 +10,7 @@ import uuid
 
 import agent_actions
 import shared_experience
-from external_agents.file_manifest import snapshot, compare
+from external_agents.file_manifest import snapshot, compare, planned_moves
 from companion_events import CompanionEventBus
 from external_agents.codex_cli import CodexCLI, PLAN_SCHEMA
 from external_agents.policy import AgentError, inside, key_from_config, redact, settings, validate_workdir
@@ -91,6 +91,9 @@ class ExternalAgentManager:
         task["updated_at"] = self.clock()
         if error:
             task["error"] = {"code": error.code, "message": str(error)}
+            if error.detail:
+                task["error"]["detail"] = {"type": str(error.detail.get("type", ""))[:40], "http_status": error.detail.get("http_status"),
+                    "message": redact(error.detail.get("message", ""), key_from_config(task.get("_config", {})), paths=True)[:200]}
         self.actions.append_audit({"tool": "external_agent_task", "summary": task["goal_summary"],
                                    "args": {"task_id": task["id"], **self._counts(task)}}, status=state,
                                   result={**self._counts(task), **({"changes": task["changes"]} if "changes" in task else {})})
@@ -164,6 +167,7 @@ class ExternalAgentManager:
                     raise AgentError("cancelled", "任务已取消。")
                 if planning:
                     task["plan"] = validate_plan(result, work, key_from_config(task["_config"]))
+                    task["planned_moves"] = planned_moves(task["plan"])
                     self._publish(task, "agent_task_planned")
                     counts = self._counts(task)
                     summary = f'{task["plan"]["summary"]}；修改 {counts["modify_count"]} 个，删除 {counts["delete_count"]} 个'
@@ -172,7 +176,7 @@ class ExternalAgentManager:
                         ttl_minutes=cfg["plan_ttl_minutes"])
                     task["confirmation_id"] = pending["id"]
                     task["expires_at"] = self.clock() + cfg["plan_ttl_minutes"] * 60
-                    task["approval_warnings"] = {"deletes": list(task["plan"]["files_to_delete"]),
+                    task["approval_warnings"] = {"deletes": [p for p in task["plan"]["files_to_delete"] if p not in {m["from"] for m in task["planned_moves"]}],
                         "high_risk": task["plan"]["risk"] == "high", "needs_network": task["plan"]["needs_network"]}
                     self._transition(task, "awaiting_approval")
                     timer = threading.Timer(cfg["plan_ttl_minutes"] * 60, self._expire, args=(task["id"],))

@@ -675,9 +675,9 @@ def test_chat_payload_applies_brain_reply_text_constraints(monkeypatch):
     assert brain["output_constraints"]["allow_followup_question"] is False
 
 
-def test_chat_payload_reapplies_brain_constraints_after_english_fallback(monkeypatch):
+def test_chat_payload_preserves_chinese_task_answer_in_auto_mode(monkeypatch):
     cfg = _build_test_config()
-    cfg["assistant_reply_language"] = "en"
+    cfg["assistant_reply_language"] = "auto"
     monkeypatch.setattr(
         app,
         "call_llm",
@@ -691,7 +691,7 @@ def test_chat_payload_reapplies_brain_constraints_after_english_fallback(monkeyp
         )
 
     assert status == 200
-    assert payload.get("reply") == "One tiny step. Ten minutes. No grand destiny ceremony."
+    assert payload.get("reply") == "好的，先放松一下。"
     assert payload.get("character_brain", {}).get("intent") == "task_help"
 
 

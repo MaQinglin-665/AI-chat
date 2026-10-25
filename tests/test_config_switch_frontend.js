@@ -213,8 +213,8 @@ function testFormInitializationAndPresetSwitch() {
   assert.strictEqual(ui.live2dPreset.value, "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json");
   assert.strictEqual(ui.live2dModelPath.value, "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json");
   assert.strictEqual(ui.live2dScale.value, "1.1");
-  assert.ok(ui.live2dReport.textContent.includes("Motion groups: Idle(3), Tap@Body(1)"));
-  assert.ok(ui.live2dReport.textContent.includes("Missing families: speech"));
+  assert.ok(ui.live2dReport.textContent.includes("动作组： Idle(3), Tap@Body(1)"));
+  assert.ok(ui.live2dReport.textContent.includes("缺少动作类型： speech"));
   assert.strictEqual(ui.live2dReport.classList.contains("config-switch-live2d-report-warning"), true);
   assert.ok(ui.summaryLlm.textContent.includes("qwen-plus"));
   assert.ok(ui.summaryTts.textContent.includes("GPT-SoVITS"));

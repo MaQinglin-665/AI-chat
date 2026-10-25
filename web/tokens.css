@@ -1,0 +1,14 @@
+:root {
+  --night-base: #1A1224;
+  --night-panel: rgba(26, 18, 36, .85);
+  --night-raised: #271B33;
+  --ink: #F4EAF3;
+  --ink-muted: #B8A6BE;
+  --sakura: #FF8DB7;
+  --lamp: #F3C27A;
+  --line: rgba(244, 234, 243, .10);
+  --radius-panel: 20px;
+  --radius-control: 12px;
+  --radius-pill: 999px;
+  --font-ui: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+}

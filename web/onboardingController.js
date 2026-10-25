@@ -70,9 +70,13 @@
         const ratio = total > 1 ? index / (total - 1) : 1;
         ui.onboardingProgressBar.style.width = `${Math.round(ratio * 100)}%`;
       }
+      if (ui.onboardingQuickBtn) ui.onboardingQuickBtn.hidden = true;
+      ui.onboardingModal?.classList?.toggle("is-chat-tip", index === 0);
+      if (index === 0) ui.chatInput?.focus?.();
       const atLast = index >= total - 1;
       if (ui.onboardingPrevBtn) {
         ui.onboardingPrevBtn.disabled = index <= 0;
+        ui.onboardingPrevBtn.hidden = index <= 0;
       }
       if (ui.onboardingNextBtn) {
         ui.onboardingNextBtn.hidden = atLast;
@@ -87,6 +91,7 @@
         return;
       }
       ui.onboardingModal.hidden = true;
+      ui.chatInput?.focus?.();
       if (options.markSeen) {
         state.onboardingSeen = true;
         saveOnboardingSeenToStorage(true);
@@ -128,6 +133,9 @@
     }
 
 
+    window.document?.addEventListener?.("xinyu:user-message", () => {
+      if (isOnboardingOpen()) closeOnboardingModal({ markSeen: true });
+    });
     return {
       isHelpOpen,
       isOnboardingOpen,

@@ -887,6 +887,7 @@
       } catch (err) {
         consoleObject.error(err);
         setStatus("启动失败");
+        window.TaffyStageFeedback?.startupFailure(err);
         appendMessage("assistant", `启动错误: ${err.message}`, { category: "system", persist: false, enableFeedback: false });
       }
     }

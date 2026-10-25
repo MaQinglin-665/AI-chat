@@ -147,6 +147,18 @@
   }
 
   async function authFetch(input, init = {}) {
+    try {
+      const response = await authFetchImpl(input, init);
+      if (isApiRequestTarget(input) && (response.status === 401 || response.status >= 500))
+        root.TaffyStageFeedback?.startupFailure(`HTTP ${response.status}`);
+      return response;
+    } catch (err) {
+      if (isApiRequestTarget(input) && err?.name !== "AbortError") root.TaffyStageFeedback?.startupFailure(err);
+      throw err;
+    }
+  }
+
+  async function authFetchImpl(input, init = {}) {
     const fetchImpl = getFetch();
     if (!isApiRequestTarget(input)) {
       return fetchImpl(input, init);

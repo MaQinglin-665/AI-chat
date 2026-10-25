@@ -1,0 +1,152 @@
+/* Final presentation layer: old themes remain for compatibility, tokens win here. */
+body, body :is(button,input,select,textarea,label,p,span,strong,small,h1,h2,h3,h4,div,a) {
+  font-family: var(--font-ui) !important;
+}
+body .assistant-name, body #galgame-name { font-family: var(--xinyu-display), var(--font-ui) !important; }
+body :is(button,input,select,textarea,a,[tabindex]):focus-visible {
+  outline: 2px solid var(--lamp) !important; outline-offset: 3px;
+}
+body :is(button,input,select,textarea) { border-radius: var(--radius-control); }
+body :is(button,input,select,textarea) { box-shadow: none !important; text-shadow: none !important; }
+body :is(input,select,textarea) { accent-color: var(--lamp); }
+body.view-full .stage-room-background { filter: brightness(.82) blur(1.5px); }
+body.view-full :is(.stage-room-tone,.stage-room-atmosphere,.stage-scene-light,.stage-scene-motes,.stage-scene-grid,.stage-scene-floor,.kawaii-stage-decor),
+body.view-full .conversation-rail::before, body.view-full .utility-actions::before,
+body.view-full .xinyu-stage-brand-spark { display: none !important; }
+body.view-full .stage-scene-halo {
+  display: block; position: fixed; left: var(--stage-character-x,50vw); top: var(--stage-character-y,50vh);
+  width: min(65vw,660px); height: min(85vh,740px); transform: translate(-50%,-50%);
+  background: radial-gradient(ellipse, color-mix(in srgb,var(--lamp) 13%,transparent),transparent 68%) !important;
+  border: 0 !important; box-shadow: none !important; filter: none !important; animation: none !important;
+}
+body.view-full .hero-card { background: var(--night-panel) !important; border: 1px solid var(--line) !important; box-shadow: none !important; border-radius: var(--radius-panel) !important; }
+body.view-full .xinyu-stage-brand-mark { background: var(--night-raised) !important; border-color: var(--line); box-shadow: none !important; }
+body.view-full .assistant-name { color: var(--ink) !important; text-shadow: none !important; font-size: 22px !important; }
+body.view-full .primary-actions, body.view-full .utility-actions {
+  position: fixed !important; top: 30px !important; bottom: auto !important; left: auto !important;
+  display: flex !important; gap: 6px !important; width: auto !important; padding: 0 !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important; transform: none !important; z-index: 35;
+}
+body.view-full .primary-actions { right: 218px !important; }
+body.view-full .utility-actions { right: 26px !important; }
+body.view-full .panel :is(.primary-actions,.utility-actions) > button {
+  display: inline-flex !important; align-items: center; justify-content: center;
+  min-width: 40px !important; width: 40px !important; height: 40px !important; min-height: 40px !important;
+  padding: 0 !important; font-size: 0 !important; border-radius: var(--radius-pill) !important;
+  color: var(--ink-muted) !important; background: var(--night-raised) !important; border: 1px solid var(--line) !important;
+}
+body.view-full .panel :is(.primary-actions,.utility-actions) > button::before { margin: 0 !important; width: 20px !important; height: 20px !important; }
+body.view-full .panel :is(.primary-actions,.utility-actions) > button[aria-pressed="true"],
+body.view-full .panel :is(.primary-actions,.utility-actions) > button[aria-expanded="true"] { color: var(--lamp) !important; }
+body.view-full .panel > .row.controls:not(.action-buttons) { background: var(--night-panel) !important; border: 1px solid var(--line) !important; box-shadow: none !important; border-radius: var(--radius-panel) !important; }
+body.view-full .panel > .row.controls:not(.action-buttons)::before,
+body.view-full .panel > .row.controls:not(.action-buttons)::after { display: none !important; }
+body.view-full .panel :is(input,textarea) { background: var(--night-raised) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+body.view-full .advanced-actions { top: 86px !important; bottom: auto !important; background: var(--night-panel) !important; border: 1px solid var(--line) !important; border-radius: var(--radius-panel) !important; box-shadow: none !important; max-height: calc(100vh - 190px); overflow: auto; }
+body.view-full .advanced-actions button { white-space: nowrap; color: var(--ink) !important; background: var(--night-raised) !important; border: 1px solid var(--line) !important; text-shadow: none !important; }
+body.view-full .advanced-actions button[aria-pressed="true"] { color: var(--lamp) !important; }
+.visual-unavailable { color: var(--ink-muted) !important; font-size: 12px; line-height: 1.6; margin: 4px 0; }
+body .control-center-shell, body[data-stage-room] .control-center-shell {
+  --cc-page: var(--night-base); --cc-rail: var(--night-base); --cc-card: var(--night-raised); --cc-field: var(--night-base);
+  --cc-ink: var(--ink); --cc-label: var(--ink); --cc-muted: var(--ink-muted); --cc-faint: var(--ink-muted);
+  --cc-line: var(--line); --cc-line-strong: var(--line); --cc-accent: var(--lamp); --cc-accent-strong: var(--lamp);
+  color-scheme: dark; border-radius: var(--radius-panel) !important; box-shadow: none !important;
+}
+body .control-center-brand img { background: transparent !important; border: 0 !important; padding: 8px; box-sizing: border-box; filter: brightness(0) invert(1); }
+body .control-center-shell .config-switch-body { grid-template-columns: repeat(auto-fit,minmax(280px,1fr)) !important; }
+body .control-center-shell .config-switch-summary { grid-template-columns: repeat(auto-fit,minmax(160px,1fr)) !important; }
+body .config-switch-summary-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+body .control-center-shell :is(input,select,textarea) { min-width: 0; max-width: 100%; border-radius: var(--radius-control) !important; }
+body .control-center-shell .config-switch-section { border-radius: var(--radius-panel) !important; }
+body .control-center-content button { background-image: none !important; }
+body :is(.config-switch-field,.config-switch-section)[hidden] { display: none !important; }
+body #galgame-mode :is(button,select,input) { appearance: none; color: var(--ink); background: var(--night-raised); border: 1px solid var(--line); border-radius: var(--radius-control); box-shadow: none; }
+body #galgame-mode select { padding: 8px 30px 8px 12px; background-image: url('./assets/icons/phosphor/caret-down.svg'); background-repeat: no-repeat; background-position: right 8px center; background-size: 14px; }
+body .galgame-top { background: var(--night-panel); color: var(--ink); border-bottom: 1px solid var(--line); gap: 10px; flex-wrap: wrap; }
+body .galgame-dialogue { background: var(--night-panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-panel); box-shadow: none; }
+body .galgame-name { color: var(--night-base); background: var(--sakura); border-radius: var(--radius-pill); }
+body #galgame-status { color: var(--ink-muted); }
+body #galgame-mode :is(#galgame-voice,#galgame-auto-scene) { font-size: 0; width: 40px; height: 40px; padding: 8px; }
+body #galgame-mode :is(#galgame-voice,#galgame-auto-scene)::before { content: ''; display: block; width: 22px; height: 22px; background: currentColor; mask: var(--ph-speaker) center/contain no-repeat; }
+body #galgame-mode #galgame-auto-scene::before { mask-image: var(--ph-clock); }
+body #galgame-mode button[aria-pressed="true"] { color: var(--lamp); }
+body .external-agent-dialog { background: var(--night-base); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-panel); }
+body .external-agent-dialog :is(input,textarea,select,button) { background: var(--night-raised); color: var(--ink); border: 1px solid var(--line); }
+body .external-agent-danger { color: #ffb5b5; }
+body #external-agent-result .external-agent-danger { border-left: 3px solid currentColor; padding-left: 12px; }
+body #send-btn, body .control-center-content #config-switch-save-btn, body #external-agent-approve, body #galgame-form button {
+  background: var(--sakura) !important; color: var(--night-base) !important; border: 0 !important; box-shadow: none !important; text-shadow: none !important; border-radius: var(--radius-control) !important;
+}
+body .control-center-content #config-switch-save-btn { min-height: 40px; height: auto; padding: 10px 18px !important; flex: 0 0 auto; font-size: 14px !important; }
+@media(max-width: 900px) {
+  body .control-center-shell { grid-template-columns: 160px minmax(0,1fr) !important; }
+  body .control-center-nav { width: auto !important; min-width: 0; }
+  body .control-center-shell .config-switch-body { padding: 16px !important; }
+}
+@media(max-width: 600px) {
+  body.view-full .primary-actions, body.view-full .utility-actions { top: 84px !important; }
+  body.view-full .advanced-actions { top: 132px !important; }
+  body .control-center-shell { grid-template-columns: minmax(0,1fr) !important; }
+  body .control-center-shell .config-switch-body { grid-template-columns: minmax(0,1fr) !important; }
+}
+@media(prefers-reduced-motion: reduce) {
+  body .stage-scene *, body .stage-scene-halo { animation: none !important; transition: none !important; }
+}
+
+/* Specific legacy ID rules must not override the shared presentation. */
+html body.visual-polish :is(button,input,select,textarea,label,p,span,strong,small,h1,h2,h3,h4,div,a) { font-family: var(--font-ui) !important; }
+html body.visual-polish #assistant-name, html body.visual-polish #galgame-name { font-family: var(--xinyu-display),var(--font-ui) !important; }
+body.view-full #assistant-name { color: var(--ink) !important; text-shadow: none !important; font-size: 22px !important; }
+body.view-full .primary-actions #speak-btn, body.view-full .primary-actions #subtitle-toggle-btn { display: inline-flex !important; }
+body.view-full .conversation-identity, body.view-full .stage-scene-halo::before, body.view-full .stage-scene-halo::after { display: none !important; }
+body.view-full #status { display: inline-flex !important; color: var(--ink-muted) !important; font-size: 12px !important; position: static !important; }
+body.view-full #status::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--lamp); margin-right: 6px; }
+body.view-full .stage-time-status { left: auto !important; right: 316px !important; transform: none !important; background: transparent !important; border: 0 !important; color: var(--ink-muted) !important; box-shadow: none !important; }
+body.view-full .stage-time-clock { color: var(--ink-muted) !important; }
+body.view-full #send-btn, body.view-full #send-btn:hover { background: var(--sakura) !important; color: var(--night-base) !important; border: 0 !important; }
+body.visual-polish .control-center-shell .control-center-nav-item[aria-current="page"] { background: var(--night-raised) !important; color: var(--lamp) !important; box-shadow: none !important; border-color: var(--line) !important; }
+body.visual-polish .control-center-shell .control-center-brand { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+body.visual-polish .control-center-content #config-switch-save-btn { min-height: 40px !important; height: 40px !important; min-width: 100px !important; }
+body.visual-polish .control-center-content :is(input,select) { min-height: 40px !important; height: 40px !important; padding: 8px 12px !important; }
+body.visual-polish .control-center-content input[type="checkbox"] { min-height: 16px !important; height: 16px !important; }
+body.visual-polish .control-center-content .config-switch-field { gap: 6px !important; }
+body.view-full .stage-scene-menu { top: 86px !important; bottom: auto !important; background: var(--night-base) !important; color: var(--ink); }
+body.view-full .stage-scene-option { background: var(--night-raised) !important; box-shadow: none !important; border: 1px solid var(--line) !important; color: var(--ink); }
+body.view-full .stage-scene-option[aria-pressed="true"] { color: var(--lamp) !important; border-color: var(--lamp) !important; }
+body.view-full .stage-scene-option small { color: var(--ink-muted) !important; }
+@media(max-width:600px) { body.view-full .stage-time-status { right: 20px !important; } }
+
+body.visual-polish .control-center-brand strong { white-space: nowrap; font-size: 14px !important; }
+body.visual-polish .control-center-brand { padding-left: 0 !important; padding-right: 0 !important; gap: 8px; }
+body.visual-polish .control-center-brand img { flex-shrink: 0; box-shadow: none !important; }
+body.visual-polish .control-center-content :is(h2,h3,strong) { color: var(--ink) !important; text-shadow: none !important; }
+body.view-full .panel #more-btn[aria-expanded="true"],body.view-full .panel #scene-btn[aria-expanded="true"] { background: var(--night-raised) !important; color: var(--lamp) !important; }
+body.view-full .panel #external-agent-btn::before { --ph-icon: var(--ph-shield); }
+body.view-full .advanced-actions-title,body.view-full .advanced-actions-heading { color: var(--ink-muted) !important; }
+body.view-full .advanced-actions button::before { color: var(--ink-muted) !important; }
+body.view-full .advanced-actions button[aria-pressed="true"]::after { background: var(--lamp) !important; }
+@media(min-width:700px) and (max-width:900px) {
+ body.visual-polish .control-center-shell { grid-template-columns:140px minmax(0,1fr) !important; }
+ body.visual-polish .control-center-shell .config-switch-body { padding:12px !important; }
+ body.visual-polish .control-center-nav { padding:20px 8px !important; }
+ body.visual-polish .control-center-nav-item { padding:0 8px !important; gap:6px; font-size:12px !important; }
+ body.visual-polish .control-center-brand strong { font-size:12px !important; }
+}
+
+body.view-full .hero-card::before, body.view-full .hero-card::after { display: none !important; }
+body.visual-polish .control-center-shell .config-switch-section { grid-column: auto !important; }
+body #galgame-mode button:not(#galgame-next),body #galgame-mode button:not(#galgame-next):hover { background: var(--night-raised); border-color: var(--line); border-radius: var(--radius-control); }
+body #galgame-mode .galgame-top :is(strong,label) { color: var(--ink); text-shadow: none; }
+body #galgame-mode #galgame-form button { background: var(--sakura) !important; }
+/* An approval screen prioritizes the proposed changes; the next-task form returns on completion. */
+body .external-agent-dialog:has(#external-agent-approve:not([hidden])) .control-center-content > label,
+body .external-agent-dialog:has(#external-agent-approve:not([hidden])) #external-agent-create { display: none !important; }
+
+html body.visual-polish :is(button,input,select,textarea,a,[tabindex]):focus-visible,
+body.visual-polish.view-full .panel :is(button,input,select,textarea):focus-visible,
+body.visual-polish #translation-chip-btn:focus-visible {
+ outline: 2px solid var(--lamp) !important; outline-offset: 3px !important;
+}
+body.visual-polish.view-full .utility-actions > :is(#pet-mode-btn,#scene-btn,#more-btn):focus-visible {
+ background:var(--night-raised) !important; color:var(--lamp) !important; border-color:var(--line) !important;
+}

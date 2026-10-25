@@ -67,12 +67,17 @@
       const baseHeight = baseHeightCandidates.find((n) => Number.isFinite(n) && n > 1) || null;
       const baseWidth = baseWidthCandidates.find((n) => Number.isFinite(n) && n > 1) || null;
 
+      // Keep full-stage feet above both the composer and its action toolbar.
+      const composer = document?.querySelector?.(".panel > .row.controls:not(.action-buttons)")?.getBoundingClientRect?.();
+      const canvas = state.pixiApp.view?.getBoundingClientRect?.();
+      const bottomReserve = state.uiView === "full" ? Math.max(170, composer && canvas ? (canvas.bottom - composer.top + 64) * h / canvas.height : 170) : 0;
+      const stageBottom = Math.max(h * 0.45, h - bottomReserve);
       // Fallback to a conservative scale when runtime reports odd initial size.
       let scale = 0.28;
       if (baseHeight) {
         // Reserve the stage header and composer lanes while keeping the avatar
         // dominant. The personal model scale still applies after this fit.
-        const targetHeight = h * (state.uiView === "full" ? 0.86 : 0.76);
+        const targetHeight = (state.uiView === "full" ? Math.max(120, stageBottom - 100) : h * 0.76);
         scale = Math.max(0.08, Math.min(1.4, targetHeight / baseHeight));
       } else if (baseWidth) {
         const targetWidth = w * 0.34;
@@ -91,7 +96,7 @@
         model.y = state.modelPosY;
       } else if (state.uiView === "full") {
         model.x = w * 0.5;
-        model.y = h * 0.965;
+        model.y = stageBottom;
       } else {
         model.x = w * (state.modelConfig?.x_ratio ?? 0.26);
         model.y = h * (state.modelConfig?.y_ratio ?? 0.96);
@@ -101,6 +106,11 @@
       }
       model.visible = true;
       model.alpha = 1;
+      // Presentation anchor only; does not change the model transform or motion.
+      if (state.uiView === "full") {
+        document?.documentElement?.style?.setProperty?.("--stage-character-x", `${model.x}px`);
+        document?.documentElement?.style?.setProperty?.("--stage-character-y", `${model.y - model.height * 0.5}px`);
+      }
       if (state.desktopMode && state.uiView === "model") {
         clampModelVisibleInViewport(model);
         state.modelPosX = Number(model.x) || (w * 0.5);

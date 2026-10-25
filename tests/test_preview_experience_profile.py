@@ -21,7 +21,7 @@ def _load_preview_config():
 def test_preview_profile_activates_the_intended_personal_companion_contract():
     cfg = _load_preview_config()
 
-    assert cfg["assistant_reply_language"] == "en"
+    assert cfg["assistant_reply_language"] == "auto"
     assert cfg["character_runtime"]["model_direct_reply"] is True
     assert cfg["character_runtime"]["model_direct_brain_guidance"] is True
     assert cfg["companion_turn"]["enabled"] is True
@@ -36,8 +36,8 @@ def test_preview_profile_activates_the_intended_personal_companion_contract():
     assert "You are AI, not human" in prompt
 
     policy = build_model_direct_dialogue_policy(cfg)
-    assert "Use natural spoken English by default" in policy
-    assert "switch to Chinese only" in policy
+    assert "Follow the language of the latest user message" in policy
+    assert "Chinese to Chinese" in policy
     assert "not empty surrealism or unrelated randomness" in policy
 
 

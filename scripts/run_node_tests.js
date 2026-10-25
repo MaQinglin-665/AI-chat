@@ -6,6 +6,7 @@ const path = require("path");
 
 const root = path.resolve(__dirname, "..");
 const tests = [
+  "tests/test_visual_polish_frontend.js",
   "tests/test_external_agent_frontend.js",
   "tests/test_readiness_resources.js",
   "tests/test_galgame_player.js",
@@ -47,6 +48,7 @@ const tests = [
   "tests/test_frontend_runtime_efficiency.js",
   "tests/test_live2d_render_performance_frontend.js",
   "tests/test_stage_frontend.js",
+  "tests/test_stage_feedback_frontend.js",
   "tests/test_stage_theme_frontend.js",
   "tests/test_drag_logic.js",
   "tests/test_local_asr_frontend.js",

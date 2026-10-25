@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 import queue
@@ -14,7 +15,7 @@ import threading
 import time
 import uuid
 
-from .policy import AgentError, MIN_VERSION, allowed_roots, key_from_config, settings, validate_home
+from .policy import AgentError, MIN_VERSION, allowed_roots, key_from_config, settings, validate_home, redact
 from .process_guard import ProcessGuard
 
 PLAN_SCHEMA = {
@@ -96,7 +97,7 @@ def health(config):
     return result
 
 
-def parse_event(line):
+def parse_event(line, key=""):
     """Return metadata only; text/commands/provider errors are never forwarded."""
     try:
         value = json.loads(line)
@@ -108,7 +109,12 @@ def parse_event(line):
     if kind in {"error", "turn.failed"}:
         raw = json.dumps(value).lower()
         auth = any(s in raw for s in ("401", "unauthorized", "authentication", "invalid api key", "invalid_api_key"))
-        return {"kind": "failure", "code": "authentication_failed" if auth else "provider_failed"}
+        error = value.get("error") or value
+        message = error.get("message", "") if isinstance(error, dict) else str(error)
+        status = re.search(r"\b([45]\d{2})\b", str(message))
+        return {"kind": "failure", "code": "authentication_failed" if auth else "provider_failed",
+                "detail": {"type": kind, "http_status": int(status[1]) if status else (error.get("status_code") if isinstance(error, dict) and isinstance(error.get("status_code"), int) else None),
+                           "message": redact(message, key, paths=True)[:200]}}
     if kind == "turn.completed":
         return {"kind": "completed"}
     if kind in {"item.started", "item.updated", "item.completed"}:
@@ -214,7 +220,7 @@ class CodexCLI:
                     line = proc.stdout.readline(MAX_LINE + 1)
                     if not line:
                         break
-                    item = parse_event(line) if len(line) <= MAX_LINE else {"kind": "warning", "code": "line_too_long"}
+                    item = parse_event(line, self.key) if len(line) <= MAX_LINE else {"kind": "warning", "code": "line_too_long"}
                     while not stop.is_set():
                         try:
                             messages.put(item, timeout=.1)
@@ -252,15 +258,18 @@ class CodexCLI:
                 if event is None:
                     break
                 if event["kind"] == "failure":
-                    failure = event["code"]
+                    failure = event
                     break
                 if event["kind"] == "completed":
                     completed = True
                 if event["kind"] in {"warning", "progress"}:
                     emit(event)
             if failure:
-                message = "DeepSeek 身份验证失败，请检查 Key 是否有效。" if failure == "authentication_failed" else "Codex 服务返回任务失败，请检查模型服务后重试。"
-                raise AgentError(failure, message)
+                message = "DeepSeek 身份验证失败，请检查 Key 是否有效。" if failure["code"] == "authentication_failed" else "Codex 服务返回任务失败，请检查模型服务后重试。"
+                detail = dict(failure.get("detail") or {})
+                detail["message"] = redact(detail.get("message", ""), self.key, paths=True)[:200]
+                logging.getLogger(__name__).warning("External agent failure: %s", detail)
+                raise AgentError(failure["code"], message, detail=detail)
             remaining = max(.1, deadline - time.monotonic())
             try:
                 code = proc.wait(timeout=min(remaining, 5))

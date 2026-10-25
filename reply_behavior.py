@@ -32,7 +32,7 @@ def build_reply_language_block(config):
             "- 默认使用简体中文自然回复。\n"
             "- 仅在用户明确要求英文时再切换英文。"
         )
-    return ""
+    return "Reply in the language of the latest user message: Chinese for Chinese, English for English, unless explicitly requested otherwise."
 
 
 def is_demo_stable_enabled(config, get_character_runtime_settings_func):

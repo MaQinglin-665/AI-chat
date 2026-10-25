@@ -197,7 +197,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 .\start_electron.bat
 ```
 
-`prepare_preview_environment.bat` 会准备依赖、初始化本地配置，并应用预览体验配置：支持中文或英文输入、默认自然英文回复、在身份和能力边界相关时坦诚说明自己是 AI，同时保留安全默认值。
+`prepare_preview_environment.bat` 会准备依赖、初始化本地配置，并应用预览体验配置：支持中文或英文输入、默认跟随用户语言回复（中文输入用中文、英文输入用英文）、在身份和能力边界相关时坦诚说明自己是 AI，同时保留安全默认值。
 
 `configure-llm.ps1` 会把 provider / base URL / model 写入 `config.local.json`，把 API key 写入 `.env`，不会把真实 Key 写进 JSON 配置。
 

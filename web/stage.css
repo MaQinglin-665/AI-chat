@@ -1811,6 +1811,7 @@ body.view-chat .hero-tagline {
     bottom: auto !important;
     left: auto !important;
     width: min(320px, calc(100vw - 24px)) !important;
+    height: min(420px, calc(100vh - 280px)) !important;
     max-height: min(420px, calc(100vh - 280px)) !important;
   }
 

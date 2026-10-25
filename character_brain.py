@@ -2299,6 +2299,8 @@ def _drop_intent_mismatched_sentences(sentences: List[str], intent: str) -> List
 
 
 def _fallback_reply_for_intent(intent: str, user_message: str = "") -> str:
+    if _contains_cjk_text(user_message):
+        return "刚才没能连接上模型，暂时无法回答。请稍后再试。"
     topic = _derive_topic(user_message, intent)
     compact = re.sub(r"\s+", "", _clean_text(user_message, 300).lower())
     if intent == "greeting":
@@ -2439,6 +2441,10 @@ def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str
     lower = re.sub(r"\s+", " ", _normalize_smart_punctuation(text).strip().lower())
     if not lower:
         return False
+    # English style heuristics are not a language classifier. Chinese content is valid.
+    if _contains_cjk_text(text):
+        return False
+
     compact_user = re.sub(r"\s+", "", _clean_text(user_message, 300).lower())
     is_correction = _is_correction_message(user_message)
     user_asked_advice = bool(re.search(r"(whatshouldido|whatdoido|whatnext|nextstep|helpme|advice)", compact_user))
@@ -2448,8 +2454,6 @@ def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str
             lower,
         )
     )
-    if _contains_cjk_text(text):
-        return True
     if intent == "feedback" or _is_style_feedback_message(user_message):
         if _contains_performance_bit_language(text):
             return True
@@ -2459,6 +2463,8 @@ def _looks_like_scene_policy_violation(text: str, intent: str, user_message: str
             return True
         return False
     if is_correction:
+        if _contains_cjk_text(text):
+            return False
         if task_bleed:
             return True
         if re.search(r"\b(i apologize|sorry for the confusion|you'?re right|my bad|wrong|mistake|incorrect|alertness|official)\b", lower):
@@ -2742,7 +2748,7 @@ def _reply_quality_deps() -> Dict[str, Any]:
         "looks_like_bland_character_reply": _looks_like_bland_character_reply,
         "looks_like_scene_policy_violation": _looks_like_scene_policy_violation,
         "looks_like_context_bleed_reply": _looks_like_context_bleed_reply,
-        "fallback_reply_for_intent": _fallback_reply_for_intent,
+        "fallback_reply_for_intent": lambda *_args: "",
         "remove_unwanted_questions": _remove_unwanted_questions,
         "filter_policy_closers": _filter_policy_closers,
         "compact_one_liner": _compact_one_liner,
@@ -2836,7 +2842,7 @@ def apply_character_brain_reply_constraints(
     user_message: str = "",
 ) -> str:
     visible, meta = _split_tool_meta_suffix(str(reply or ""))
-    original = _normalize_reply_text_spacing(visible)
+    original = str(visible).strip() if _contains_cjk_text(visible) else _normalize_reply_text_spacing(visible)
     if not original or not isinstance(decision, dict):
         return (original or str(visible or "").strip()) + meta
 
@@ -2852,159 +2858,40 @@ def apply_character_brain_reply_constraints(
         if isinstance(decision.get("context_bleed_guard"), dict)
         else {}
     )
-    sentences = _split_reply_sentences(original)
-    before_sentence_count = len(sentences)
-    removed_context_bleed = False
-    context_bleed_sensitive = intent in {"greeting", "casual", "question", "encouragement", "comfort", "closing", "task_help"}
-    if _looks_like_scene_policy_violation(original, intent, user_message):
-        fallback = _fallback_reply_for_intent(intent, user_message)
-        if fallback:
-            constrained = _normalize_reply_text_spacing(fallback)
-            _record_performance_execution(
-                decision,
-                reply_shape=reply_shape,
-                question_policy=question_policy,
-                original=original,
-                constrained=constrained,
-                removed_followup=False,
-                removed_bit=False,
-                removed_context_bleed=True,
-                before_sentence_count=before_sentence_count,
-                after_sentence_count=len(_split_reply_sentences(constrained)),
-                reply_quality=_assess_reply_quality(
-                    constrained,
-                    decision,
-                    user_message=user_message,
-                    original=original,
-                ),
-            )
-            return constrained + meta
-    if (context_bleed_guard.get("active") is True or context_bleed_sensitive) and _looks_like_context_bleed_reply(original, intent, user_message):
-        fallback = _fallback_reply_for_intent(intent, user_message)
-        if fallback:
-            constrained = _normalize_reply_text_spacing(fallback)
-            _record_performance_execution(
-                decision,
-                reply_shape=reply_shape,
-                question_policy=question_policy,
-                original=original,
-                constrained=constrained,
-                removed_followup=False,
-                removed_bit=False,
-                removed_context_bleed=True,
-                before_sentence_count=before_sentence_count,
-                after_sentence_count=len(_split_reply_sentences(constrained)),
-                reply_quality=_assess_reply_quality(
-                    constrained,
-                    decision,
-                    user_message=user_message,
-                    original=original,
-                ),
-            )
-            return constrained + meta
-    sentences = _remove_unwanted_questions(
-        sentences,
-        allow_followup=bool(constraints.get("allow_followup_question", False)),
-        clarify_only=bool(constraints.get("clarify_only_when_needed", False)),
-    )
-    after_question_count = len(sentences)
-    sentences = _filter_policy_closers(sentences, question_policy=question_policy)
-    after_policy_count = len(sentences)
-    sentences = _filter_unsafe_bits_for_intent(sentences, intent)
-    after_safe_bit_count = len(sentences)
-    if reply_shape in {"answer_then_bit", "bit_then_answer"}:
-        sentences = _drop_generic_preamble(sentences)
-    before_intent_filter = list(sentences)
-    sentences = _drop_intent_mismatched_sentences(sentences, intent)
-    if sentences == before_intent_filter and intent in {"comfort", "closing"}:
-        joined = " ".join(sentences).strip()
-        if any(
-            marker in joined.lower()
-            for marker in ("every no", "closer to yes", "keep going", "stay strong", "every line of code")
-        ):
-            fallback = _fallback_reply_for_intent(intent, user_message)
-            if fallback:
-                return _normalize_reply_text_spacing(fallback) + meta
-    shape_limit = _shape_sentence_limit(reply_shape, intent, max_sentences)
-    constrained = " ".join(sentences[:shape_limit]).strip()
-    if reply_shape == "one_liner":
-        constrained = _compact_one_liner(constrained)
-    if intent == "closing" and _looks_like_bland_character_reply(original, intent):
-        fallback = _fallback_reply_for_intent(intent, user_message)
-        if fallback:
-            constrained = fallback
-    if intent == "task_help" and (
-        _derive_topic(user_message, intent) == "planning" or _is_next_step_request(user_message)
-    ) and _looks_like_vague_planning_reply(constrained):
-        fallback = _fallback_reply_for_intent(intent, user_message)
-        if fallback:
-            constrained = fallback
-    if intent == "task_help" and _contains_performance_bit_language(constrained) and _looks_like_vague_planning_reply(constrained):
-        fallback = _fallback_reply_for_intent(intent, user_message)
-        if fallback:
-            constrained = fallback
-    if intent == "task_help" and _derive_topic(user_message, intent) == "character_runtime":
-        if not re.search(r"\b(voice|sound|sentence|ending|end|test|machine|vanish|audio)\b", constrained.lower()):
-            fallback = _fallback_reply_for_intent(intent, user_message)
-            if fallback:
-                constrained = fallback
-    if (context_bleed_guard.get("active") is True or context_bleed_sensitive) and _looks_like_context_bleed_reply(constrained, intent, user_message):
-        fallback = _fallback_reply_for_intent(intent, user_message)
-        if fallback:
-            constrained = fallback
-            removed_context_bleed = True
-    if _looks_like_scene_policy_violation(constrained, intent, user_message):
-        fallback = _fallback_reply_for_intent(intent, user_message)
-        if fallback:
-            constrained = fallback
-            removed_context_bleed = True
-    if _looks_like_bland_character_reply(constrained, intent):
-        fallback = _fallback_reply_for_intent(intent, user_message)
-        if fallback:
-            constrained = fallback
-    if not constrained:
-        constrained = _fallback_reply_for_intent(intent, user_message) or original
-    constrained = _normalize_reply_text_spacing(constrained)
-    constrained = _repair_unbalanced_reply_punctuation(constrained)
-    stage_callback = _stage_callback_execution_plan(
-        constrained,
-        decision,
-        intent=intent,
-        reply_shape=reply_shape,
-        max_sentences=max_sentences,
-        user_message=user_message,
-    )
-    constrained = _normalize_reply_text_spacing(stage_callback.get("text") or constrained)
-    constrained, reply_quality = _apply_reply_quality_repair(
-        constrained,
-        decision,
-        user_message=user_message,
-        original=original,
-    )
-    if reply_quality["repair_actions"] and stage_callback.get("added") is True:
-        stage_callback = {
-            **stage_callback,
-            "added": False,
-            "suppressed": "quality_repair",
-        }
+    sentences = [part for part in re.split(r"(?<=[.!?。！？])\s*", original) if part.strip()]
+    # Guard only offending sentences. Never replace model-owned answers with a persona script.
+    safe = [sentence for sentence in sentences
+            if not _looks_like_scene_policy_violation(sentence, intent, user_message)
+            and not _looks_like_context_bleed_reply(sentence, intent, user_message)]
+    removed = len(safe) != len(sentences)
+    constrained = " ".join(safe).strip() if removed else original
+    before = len(safe)
+    if constrained and not _contains_cjk_text(constrained):
+        safe = _remove_unwanted_questions(safe, allow_followup=bool(constraints.get("allow_followup_question", False)), clarify_only=bool(constraints.get("clarify_only_when_needed", False)))
+        safe = _filter_policy_closers(safe, question_policy=question_policy)
+        safe = _filter_unsafe_bits_for_intent(safe, intent)
+        safe = _drop_intent_mismatched_sentences(safe, intent)
+        constrained = " ".join(safe[:_shape_sentence_limit(reply_shape, intent, max_sentences)]).strip()
+        if reply_shape == "one_liner":
+            constrained = _compact_one_liner(constrained)
+    if not _contains_cjk_text(constrained):
+        constrained = _repair_unbalanced_reply_punctuation(constrained)
+    callback = _stage_callback_execution_plan(constrained, decision, intent=intent, reply_shape=reply_shape, max_sentences=max_sentences, user_message=user_message) if constrained and not _contains_cjk_text(constrained) else {}
+    constrained = callback.get("text") or constrained
+    quality = _assess_reply_quality(constrained, decision, user_message=user_message, original=original)
+    if constrained and not _contains_cjk_text(constrained):
+        constrained, quality = _apply_reply_quality_repair(constrained, decision, user_message=user_message, original=original)
+    decision["needs_reply_regeneration"] = not bool(constrained)
     _record_performance_execution(
-        decision,
-        reply_shape=reply_shape,
-        question_policy=question_policy,
-        original=original,
-        constrained=constrained,
-        removed_followup=(
-            after_question_count < before_sentence_count
-            or after_policy_count < after_question_count
-        ),
-        removed_bit=after_safe_bit_count < after_policy_count,
-        removed_context_bleed=removed_context_bleed,
-        before_sentence_count=before_sentence_count,
-        after_sentence_count=len(_split_reply_sentences(constrained)),
-        stage_callback=stage_callback,
-        reply_quality=reply_quality,
+        decision, reply_shape=reply_shape, question_policy=question_policy,
+        original=original, constrained=constrained, removed_followup=len(safe) < before,
+        removed_bit=len(safe) < before, removed_context_bleed=removed,
+        stage_callback=callback,
+        before_sentence_count=len(sentences), after_sentence_count=len(_split_reply_sentences(constrained)),
+        reply_quality=quality,
     )
-    return constrained + meta
+    return (constrained + meta) if constrained else ""
+
 
 
 def build_character_brain_public_snapshot(
