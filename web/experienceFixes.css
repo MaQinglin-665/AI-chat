@@ -46,3 +46,20 @@ body .onboarding-dialog #onboarding-next-btn,body .onboarding-dialog #onboarding
 body .onboarding-dialog .onboarding-secondary { color:var(--ink-muted) !important; }
 body #external-agent-modal[data-task-status="failed"] #external-agent-create { display:none !important; }
 body .external-agent-state button { background:var(--sakura) !important; color:var(--night-base) !important; }
+
+/* Keep metadata in flow, and reveal optional feedback without moving the text. */
+body:is(.view-full,.view-chat) .message .message-time {
+  position:static !important; inset:auto !important; display:block !important;
+  float:none !important; align-self:flex-end; grid-column:1 / -1 !important; grid-row:auto !important;
+  flex:0 0 auto; margin:8px 0 0 !important; width:auto !important;
+  text-align:right; white-space:nowrap; padding-right:22px;
+}
+body .message .message-time[hidden] { display:none !important; }
+body .message .message-feedback, body.view-full .message::after {
+  visibility:hidden; opacity:0 !important; pointer-events:none;
+}
+body .message:is(:hover,:focus-within) .message-feedback,
+body.view-full .message:is(:hover,:focus-within)::after {
+  visibility:visible; opacity:1 !important; pointer-events:auto;
+}
+body .message:focus-visible { outline:2px solid var(--sakura); outline-offset:3px; }

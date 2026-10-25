@@ -554,6 +554,7 @@
     function createMessageRow(role, text, options = {}) {
       const row = documentObject.createElement("div");
       row.className = `message ${role}`;
+      if (role === "assistant") row.tabIndex = 0;
       if (options.continuation === true) {
         row.classList.add("is-conversation-continuation");
       }

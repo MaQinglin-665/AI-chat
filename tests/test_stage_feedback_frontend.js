@@ -21,8 +21,10 @@ const old=feedback.begin(); id=feedback.begin(); feedback.failed(old,'HTTP 401')
 feedback.received(id);
 let opened=false;doc.getElementById('doctor-btn').click=()=>opened=true;elements['stage-feedback-doctor'].click();assert(opened);
 const onboarding=require('../web/onboardingController');
-const ui={onboardingModal:{hidden:true,classList:{toggle(){}}},chatInput:{focus(){this.focused=true;}},onboardingNextBtn:{},onboardingQuickBtn:{},onboardingDoneBtn:{}};
-const state={};const guide=onboarding.createController({state,ui,onboardingSteps:[{title:'chat'},{title:'voice'}]});
-guide.openOnboardingModal();assert(ui.chatInput.focused);assert(ui.onboardingQuickBtn.hidden);assert(!ui.onboardingNextBtn.hidden);assert(ui.onboardingDoneBtn.hidden);
-guide.moveOnboardingStep(1);assert(ui.onboardingNextBtn.hidden);assert(!ui.onboardingDoneBtn.hidden);
-console.log('Stage waiting/error/auth, clearing, startup deduplication, doctor and single-primary onboarding passed.');
+const ui={onboardingModal:{hidden:true,classList:{toggle(){}}},chatInput:{focus(){this.focused=true;}},onboardingPrevBtn:{},onboardingNextBtn:{},onboardingQuickBtn:{},onboardingDoneBtn:{}};
+const state={};let messageSent, saved=false;
+const guide=onboarding.createController({state,ui,onboardingSteps:[{title:'chat'}],saveOnboardingSeenToStorage(value){saved=value;},windowObject:{document:{addEventListener(name,handler){if(name==='xinyu:user-message')messageSent=handler;}}}});
+guide.openOnboardingModal();assert(ui.chatInput.focused);assert(ui.onboardingQuickBtn.hidden);assert(ui.onboardingNextBtn.hidden);assert(ui.onboardingPrevBtn.hidden);assert(!ui.onboardingDoneBtn.hidden);
+messageSent();assert(ui.onboardingModal.hidden,'first message must close the guide before the reply');assert(state.onboardingSeen && saved);
+guide.maybeAutoOpenOnboarding();assert(ui.onboardingModal.hidden,'completed guide must not reopen automatically');
+console.log('Stage feedback and first-message onboarding completion passed.');

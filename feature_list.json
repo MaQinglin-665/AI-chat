@@ -1,5 +1,6 @@
 {
   "features": [
+    {"id":"experience-final-polish","name":"单步引导、消息排版及草稿发布","status":"in_progress","dependencies":["experience-fixes-v1"],"done_criteria":["首句结束引导、时间戳和反馈交互修复","全部测试及秘密扫描","三分支推送与草稿 PR","停止8124并仅清理三个工作目录"]},
     {"id":"experience-fixes-v1","name":"任务6：中文回答与可见性优先的体验修复","status":"completed","limitations":["历史 provider_failed 原因未知，同原文重跑成功；诊断缺失已修复，不能声称历史根因已定位"],"dependencies":["visual-polish-v1"],"done_criteria":["P0语言守卫修复与回复可见","布局及外部任务诊断修复","完整测试、真实中文五轮与执行复现","重启8124恢复六个样例并保持运行"]},
     {"id":"visual-polish-v1","name":"夜间房间界面统一与精简","status":"completed","dependencies":["stage-feedback-onboarding-v1"],"done_criteria":["三个尺寸五类界面前后截图","统一令牌与无障碍开关","完整本地验证通过；本地提交、不推送"]},
     {

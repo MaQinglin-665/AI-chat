@@ -76,6 +76,7 @@
       const atLast = index >= total - 1;
       if (ui.onboardingPrevBtn) {
         ui.onboardingPrevBtn.disabled = index <= 0;
+        ui.onboardingPrevBtn.hidden = index <= 0;
       }
       if (ui.onboardingNextBtn) {
         ui.onboardingNextBtn.hidden = atLast;
@@ -133,7 +134,7 @@
 
 
     window.document?.addEventListener?.("xinyu:user-message", () => {
-      if (isOnboardingOpen() && Number(state.onboardingStepIndex || 0) === 0) moveOnboardingStep(1);
+      if (isOnboardingOpen()) closeOnboardingModal({ markSeen: true });
     });
     return {
       isHelpOpen,
