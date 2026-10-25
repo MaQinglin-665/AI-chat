@@ -166,6 +166,30 @@ def test_healthz_is_public_even_when_api_token_required(monkeypatch):
         assert payload_api.get("error") == "Invalid API token."
 
 
+def test_large_rejected_posts_return_json_without_connection_errors(monkeypatch):
+    cfg = _build_test_config()
+    cfg["server"]["require_api_token"] = True
+    monkeypatch.setenv("TAFFY_API_TOKEN_TEST", "token-reject-test")
+    body = {"padding": "x" * 65536}
+    with _run_server_with_config(monkeypatch, cfg) as base:
+        for _ in range(30):
+            status, payload = _post_json(f"{base}/api/config/switch", body)
+            assert status == 401
+            assert payload == {"ok": False, "error": "Invalid API token."}
+        for _ in range(30):
+            status, payload = _post_json(
+                f"{base}/api/config/switch", body,
+                headers={"Origin": "https://untrusted.example", "X-Taffy-Token": "token-reject-test"},
+            )
+            assert status == 403
+            assert payload == {"ok": False, "error": "Origin not allowed."}
+        monkeypatch.delenv("TAFFY_API_TOKEN_TEST")
+        status, payload = _post_json(f"{base}/api/config/switch", body)
+        assert status == 503
+        assert payload["ok"] is False
+        assert "not configured" in payload["error"]
+
+
 def test_api_health_requires_valid_token_when_enabled(monkeypatch):
     cfg = _build_test_config()
     cfg["server"]["require_api_token"] = True

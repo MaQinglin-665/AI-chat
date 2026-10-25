@@ -257,3 +257,12 @@ Full scripts/test-local.ps1 passed (log tmp_ui_smoke/task6/merge-213-tests.log).
 - Authorized flaky-test check: ten isolated runs all passed (10/10). Full gate retry pending. Manual conflict-resolution edits are limited to progress.md and session-handoff.md; original handoff records retained above rather than adding archive files.
 
 - Authorized #214 gate passed: repeated flaky case 10/10; full scripts/test-local.ps1 795 passed/2 skipped, all Node suites, Python180/JS204 syntax and secrets762 passed. No runtime changes for this merge; submit merge and require CI before #214 merge. Connection rejection/body-drain repair is authorized only on a new branch after #214.
+
+
+## 2026-10-25 — API rejection body drain
+
+#214 merged as b9d9354 after all Linux/Windows CI passed. New branch codex/fix-api-reject-drain-body starts from that main. Added bounded drain before origin/token rejection; 1 MiB maximum, two-second deadline and fail-closed framing checks. No private settings or authorization changes.
+
+Verification Evidence: targeted pytest tests/test_request_body_drain.py tests/test_api_health.py: 38 passed. Includes 30 large unauthorized POSTs, 30 disallowed-origin POSTs, missing configured token, byte limit, invalid length, duplicate/chunked framing, truncation and timeout coverage. Full gate pending.
+
+Verification Evidence: full scripts/test-local.ps1 passed (809 Python passed, 2 skipped; Node suites, Python/JavaScript syntax and secret scan passed). Required config.example.json/package.json parsing and py_compile passed. Ignored log: tmp_ui_smoke/task6/drain-body-full-tests.log. Next: push scoped fix, open PR and require all CI before merge; rerun full gate on final main. Remaining risk: invalid, oversized or stalled clients are closed rather than guaranteed a complete rejection response.

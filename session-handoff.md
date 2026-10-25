@@ -1,13 +1,15 @@
 # Session handoff
 
-## Ordered integration — PR #214
+## API rejection body drain (2026-10-25)
 
-User authorizes merge commits only, after full local tests and ALL CI checks. No squash/rebase/force push/main push/branch deletion/tag/release. #210 merged 71c9ebb, #211 256eff8, #212 2be017b, #213 3611e57. #213 Linux/Windows CI passed after test-only platform and UTF-8 fixes; product code not modified to bypass platform refusal.
+Branch: codex/fix-api-reject-drain-body, based on main b9d9354c237b43e353d066a97ef7309e2434267f. PR #214 merged with all Linux and Windows checks green. Earlier integration handoff preserved in docs/archive/2026-10-25-before-api-drain-handoff.md.
 
-#214 base is main. Integrating origin/main 3611e57 into codex/experience-fixes-v1. Only progress.md and session-handoff.md conflicted; both histories preserved. Feature JSON auto-merged and parses with unique IDs. Both prior handoffs are preserved in progress.md under Preserved pre-integration handoff; no extra archive files added for this merge. Runtime files auto-merged without conflict.
+User authorizes a bounded request-body drain before token/origin denial, tests, push and a PR, then merge commit only after all CI passes. No force push, direct main push, branch deletion, tags, releases or private configuration changes. Stop on unexpected test/CI failure. DNS push failures: retry at 10-second intervals, at most five attempts.
 
-Full gate passed: 795 Python passed/2 skipped and all remaining checks; formerly flaky API case passed 10/10. Next: commit merge, pre-push checks/secrets and normal push, ready #214, wait for ALL CI then gh pr merge 214 --merge --admin. Final full gate on latest origin/main. Stop on any test/CI failure or non-state conflict. Prior no-merge instructions in archives are superseded by explicit user authorization.
+Files touched: app.py, tests/test_api_health.py, tests/test_request_body_drain.py and these state records. Drain is limited to 1 MiB and a two-second deadline; invalid/oversized/ambiguous framing closes the connection without reading. No authorization defaults changed. Targeted tests: 38 passed, including 30 unauthorized 64-KiB POSTs and 30 disallowed-origin POSTs with complete JSON responses.
 
-Existing limitations: historical provider_failed cause unknown; metadata-only change verification; lock scope and new parent directory handling remain backlog. 8124 stopped; three test directories remain due automatic deletion-policy rejection. No cleanup workaround authorized.
+Verification Evidence: full scripts/test-local.ps1 passed: 809 Python passed, 2 skipped; Node suites, Python/JavaScript syntax and secret scan passed. Required JSON and py_compile checks passed. Log: ignored tmp_ui_smoke/task6/drain-body-full-tests.log.
 
-After #214 merges, user authorizes codex/fix-api-reject-drain-body from latest main: bounded request-body drain before origin/token denial, 30 large unauthorized POST regression, complete tests and reviewed green CI before merge commit. Then full tests on latest main. Only the known API case may receive one CI rerun under this authorization.
+Next: submit PR to main, require all CI then --merge --admin. Fetch merged main and rerun scripts/test-local.ps1. Final report must include both merge hashes and final main hash.
+
+Limitations: malformed, oversized or stalled clients may still see connection closure; stable JSON delivery regression covers complete bounded bodies. Prior external-agent metadata verification followups and blocked isolated-directory cleanup remain unchanged.

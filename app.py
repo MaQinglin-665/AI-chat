@@ -1425,6 +1425,49 @@ class PetHandler(SimpleHTTPRequestHandler):
                 return normalized
         return ""
 
+    def _drain_request_body(self, limit=1_048_576):
+        # Unread body bytes can turn a Windows socket close into a TCP reset.
+        lengths = self.headers.get_all("Content-Length", [])
+        raw_length = lengths[0].strip() if len(lengths) == 1 else ""
+        if self.headers.get("Transfer-Encoding") or len(lengths) > 1:
+            self.close_connection = True
+            return
+        if not lengths:
+            return
+        if not raw_length.isascii() or not raw_length.isdecimal():
+            self.close_connection = True
+            return
+        try:
+            remaining = int(raw_length)
+        except ValueError:
+            self.close_connection = True
+            return
+        if remaining > limit:
+            self.close_connection = True
+            return
+        if not remaining:
+            return
+        previous_timeout = self.connection.gettimeout()
+        deadline = time.monotonic() + 2.0
+        try:
+            while remaining:
+                timeout = deadline - time.monotonic()
+                if timeout <= 0:
+                    self.close_connection = True
+                    return
+                self.connection.settimeout(
+                    min(timeout, previous_timeout) if previous_timeout is not None else timeout
+                )
+                chunk = self.rfile.read1(min(remaining, 65536))
+                if not chunk:
+                    self.close_connection = True
+                    return
+                remaining -= len(chunk)
+        except OSError:
+            self.close_connection = True
+        finally:
+            self.connection.settimeout(previous_timeout)
+
     def _reject_disallowed_origin(self, path_only):
         if not str(path_only or "").startswith("/api/"):
             return False
@@ -1433,6 +1476,8 @@ class PetHandler(SimpleHTTPRequestHandler):
             return False
         if self._allow_origin_value():
             return False
+        if self.command in {"POST", "PUT", "PATCH", "DELETE"}:
+            self._drain_request_body()
         self._send_json(
             {"ok": False, "error": "Origin not allowed."},
             status=HTTPStatus.FORBIDDEN,
@@ -1456,6 +1501,8 @@ class PetHandler(SimpleHTTPRequestHandler):
             return False
         expected = str(settings.get("expected_api_token", "") or "").strip()
         if not expected:
+            if self.command in {"POST", "PUT", "PATCH", "DELETE"}:
+                self._drain_request_body()
             self._send_json(
                 {
                     "ok": False,
@@ -1470,6 +1517,8 @@ class PetHandler(SimpleHTTPRequestHandler):
         provided = self._extract_request_api_token()
         if provided and secrets.compare_digest(provided, expected):
             return False
+        if self.command in {"POST", "PUT", "PATCH", "DELETE"}:
+            self._drain_request_body()
         self._send_json(
             {"ok": False, "error": "Invalid API token."},
             status=HTTPStatus.UNAUTHORIZED,
