@@ -159,7 +159,7 @@
         append(deps, ok ? "\u5df2\u53d6\u6d88\u63d0\u9192\u3002" : "\u672a\u627e\u5230\u8be5\u63d0\u9192 ID\u3002");
       },
       reminder_add: (command) => {
-        const m = getRest(command).match(/^(\S+)\s+(.+)$/);
+        const m = getRest(command).match(/^(\d{4}-\d{2}-\d{2}[t\s]+\d{1,2}:\d{2}|\d{1,4}\s*(?:[a-z]+|秒|分钟|分|小时|时)|\S+)\s+(.+)$/i);
         if (!m) {
           append(deps, "\u683c\u5f0f\u793a\u4f8b\uff1a/\u63d0\u9192 10m \u5f00\u4f1a  \u6216  /\u63d0\u9192 21:30 \u559d\u6c34");
           return;
@@ -168,6 +168,10 @@
         const remindText = String(m[2] || "").trim();
         if (!dueAt || !remindText) {
           append(deps, "\u63d0\u9192\u65f6\u95f4\u683c\u5f0f\u65e0\u6548\u3002\u652f\u6301 10m / 30s / 21:30 / 2026-04-12 09:00");
+          return;
+        }
+        if (dueAt <= Date.now()) {
+          append(deps, "提醒时间需要晚于当前，请重新设置。");
           return;
         }
         const id = deps.addReminder(remindText, dueAt);

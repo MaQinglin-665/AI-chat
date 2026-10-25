@@ -126,7 +126,7 @@ $preview = Read-JsonObject $PreviewConfigPath
 $local = Read-JsonObject $LocalConfigPath
 Merge-PreviewObject $local $preview
 
-$local | ConvertTo-Json -Depth 80 | Set-Content -LiteralPath $LocalConfigPath -Encoding UTF8
+[System.IO.File]::WriteAllText($LocalConfigPath, ($local | ConvertTo-Json -Depth 80), (New-Object System.Text.UTF8Encoding($false)))
 
 Write-Ok "Applied Xinyu preview experience settings to config.local.json"
 Write-InfoLine "Existing LLM provider/base URL/model/api_key_env were preserved when present."

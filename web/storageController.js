@@ -95,6 +95,10 @@
       const text = String(item.text || "").trim();
       const mode = call(deps.normalizeReminderMode, item.mode);
       const repeat = call(deps.normalizeReminderRepeat, item.repeat);
+      const retryAttempts = Math.min(3, Math.max(0, Math.floor(Number(item.retryAttempts) || 0)));
+      const retryAt = Number.isFinite(Number(item.retryAt)) ? Math.max(0, Number(item.retryAt)) : 0;
+      const hasRetryState = mode !== "reminder" && (retryAttempts > 0 || retryAt > 0 || item.retryPaused === true);
+      const retryPaused = item.retryPaused === true || retryAttempts >= 3 || (mode === "tool" && retryAttempts > 0);
       let done = !!item.done;
       let nextDueAt = dueAt;
       if (!id || !dueAt || !text) {
@@ -102,14 +106,17 @@
       }
       if (repeat === "daily") {
         done = false;
-        nextDueAt = call(deps.normalizeDailyReminderDueAt, dueAt, now);
+        // Preserve the failed occurrence and its retry budget across restarts.
+        if (!hasRetryState) nextDueAt = call(deps.normalizeDailyReminderDueAt, dueAt, now);
       } else if (done && dueAt < now - 86400000) {
         continue;
       }
       if (done !== !!item.done || nextDueAt !== dueAt || mode !== item.mode || repeat !== item.repeat) {
         changed = true;
       }
-      restored.push({ id, dueAt: nextDueAt, text, done, mode, repeat });
+      const restoredItem = { id, dueAt: nextDueAt, text, done, mode, repeat };
+      if (hasRetryState) Object.assign(restoredItem, { retryAttempts, retryAt, retryPaused });
+      restored.push(restoredItem);
       if (id > maxId) {
         maxId = id;
       }

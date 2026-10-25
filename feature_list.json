@@ -4,8 +4,12 @@
       "id": "external-agent-verification-followups",
       "name": "外部任务文件核对：锁范围与新建父目录识别",
       "status": "backlog",
-      "dependencies": ["external-agent-codex-cli-stage2"],
-      "scope": ["第 2 阶段审核确认的后续改进；本次只记录，不修改运行逻辑"],
+      "dependencies": [
+        "external-agent-codex-cli-stage2"
+      ],
+      "scope": [
+        "第 2 阶段审核确认的后续改进；本次只记录，不修改运行逻辑"
+      ],
       "done_criteria": [
         "_verify_files 先在锁外扫描目录，再加锁写回结果；覆盖查询和取消不会被扫描持锁阻塞的测试",
         "计划内文件的新建上级目录视为计划内，避免 out_of_plan 误报；不放宽对父目录下其他文件修改或删除的授权，补充测试"
@@ -31,17 +35,31 @@
       "id": "external-agent-codex-cli-stage1",
       "name": "External Codex CLI backend with explicit approval",
       "status": "completed",
-      "dependencies": ["external-agent-codex-cli-stage0"],
-      "scope": ["Backend only; no frontend, speech, push or PR"],
-      "done_criteria": ["Disabled-by-default authenticated endpoints and bounded task state machine", "Isolated provider configuration, path validation, version gate and process-tree cancellation", "Fixture replay, failure injection, full validation and real invalid-key acceptance"],
+      "dependencies": [
+        "external-agent-codex-cli-stage0"
+      ],
+      "scope": [
+        "Backend only; no frontend, speech, push or PR"
+      ],
+      "done_criteria": [
+        "Disabled-by-default authenticated endpoints and bounded task state machine",
+        "Isolated provider configuration, path validation, version gate and process-tree cancellation",
+        "Fixture replay, failure injection, full validation and real invalid-key acceptance"
+      ],
       "verification": "764 Python tests and all Node suites passed. Real isolated CLI 0.164.0 invalid-key failure 3.02s, real planning/approved file organization 59.97s, real execution cancellation: 12 observed processes, zero residuals/writes over 10s. See docs/external-agent-backend-verification.md for scope and sandbox read-isolation limitations. Local commits only; stage 2 not started."
     },
     {
       "id": "external-agent-codex-cli-stage0",
       "name": "Verify external Codex CLI prerequisites before implementation",
       "status": "completed",
-      "scope": ["Stage 0 only; wait for user confirmation before stages 1 and 2"],
-      "done_criteria": ["Real DeepSeek minimum task succeeds", "Windows sandbox write boundaries and process-tree cancellation verified", "Sanitized real JSONL fixtures recorded; plan-update events optional by user instruction"],
+      "scope": [
+        "Stage 0 only; wait for user confirmation before stages 1 and 2"
+      ],
+      "done_criteria": [
+        "Real DeepSeek minimum task succeeds",
+        "Windows sandbox write boundaries and process-tree cancellation verified",
+        "Sanitized real JSONL fixtures recorded; plan-update events optional by user instruction"
+      ],
       "verification": "Stage 0 passed under user-revised scope on isolated CLI 0.164.0 (minimum verified integration baseline). DeepSeek/schema/env_key, read-only deny, workspace inside-write/outside-deny, persistent read-only-to-workspace-write resume passed. Cancellation of two active writers: taskkill /T /F exit 0, 13 observed process identities, zero residuals or file changes for 15 seconds. Seven sanitized fixtures, 59 events. preferred_auth_method removed. Top-level error/turn.failed classification documented but not separately fault-injected. No stage 1/2, commit or push. See docs/external-agent-codex-spike.md."
     },
     {
@@ -263,9 +281,9 @@
       "implementation_status": "complete",
       "remaining_acceptance": [
         "Provider HTTPS endpoint confirmation",
-        "Clean isolated dependency installation",
         "Real Electron two-window and voice acceptance"
-      ]
+      ],
+      "clean_dependency_verification": "Completed for Windows x64 / Python 3.12 in clean-dependency-validation-20261024; other platform and frontend/audio acceptance remains separate."
     },
     {
       "id": "local-rvc-singing-entry-v1",
@@ -329,6 +347,70 @@
         "Release checks pass or failures are documented",
         "No secrets or private runtime artifacts are packaged",
         "Verification evidence is recorded in progress.md"
+      ]
+    },
+    {
+      "id": "reminder-reliability-20261024",
+      "name": "Reliable reminder dates and bounded scheduled execution retries",
+      "status": "complete",
+      "dependencies": [
+        "clean-dependency-validation-20261024"
+      ],
+      "scope": [
+        "Strict local reminder dates and full-date commands",
+        "Readable schedule status",
+        "Persisted bounded retries and manual recovery"
+      ],
+      "done_criteria": [
+        "Advertised full-date command creates the intended reminder",
+        "Invalid dates are rejected without silent adjustment",
+        "Failed scheduled replies cannot retry every polling tick or overlap",
+        "Retry state survives reload and offers manual recovery",
+        "Focused regressions, full local gate and browser schedule flow pass"
+      ],
+      "description": "Fix reproduced reminder defects after project capability review; preserve existing behavior and security defaults.",
+      "verification": [
+        "740 Python tests passed (84.52 s), all 56 Node frontend suites including new reminder regressions passed",
+        "Python syntax 165 files, JavaScript syntax 194 files and secret scan 716 files passed; required JSON/ten-module compilation and diff checks passed",
+        "Docs publish check and four Chromium smoke tests passed (7.1 s)",
+        "Isolated Chromium source fixture and actual installed assets: create schedule, restore paused state, manual retry and multiple polling ticks passed with simulated offline API",
+        "Seven installed frontend files backed up and synchronized; hashes verified; private configuration and startup manifest unchanged"
+      ],
+      "limitations": [
+        "Source normal startup still has the inherited separate controller-loading issue; source browser fixture uses installed startup manifest only",
+        "No real-model scheduled tasks, microphone/audio-device or hour-long acceptance in this task",
+        "Cross-window scheduling ownership is not changed; daily failures stay paused until manual recovery"
+      ]
+    },
+    {
+      "id": "clean-dependency-validation-20261024",
+      "name": "Clean Windows dependency installation and startup validation",
+      "status": "complete",
+      "dependencies": [
+        "developer-readiness-20261023"
+      ],
+      "scope": [
+        "Fresh checkout and isolated Python 3.12 virtual environment",
+        "README bootstrap, Node/Electron installation and initial startup",
+        "Fix only dependency manifests or installation workflow blockers; record reproducible evidence"
+      ],
+      "done_criteria": [
+        "Runtime and development dependencies install in a fresh venv and pip check succeeds",
+        "README setup and isolated initial startup verified without private data or model credentials",
+        "Full local gate and required pre-push checks pass",
+        "Evidence, remaining manual limitations and handoff updated; feature PR targets main without pushing main"
+      ],
+      "implementation_status": "complete",
+      "verification": [
+        "Fresh CPython 3.12.9 Windows x64 venv; runtime and dev install, pip check and actual imports pass",
+        "84 package version constraints match empty-environment resolution",
+        "Final local gate: 740 Python tests and all Node suites; syntax and secrets checks pass",
+        "Actual Electron first-run wizard/backend startup; authorized Harness model probe and first-chat smoke pass",
+        "Docs check:all: publish check plus four real Chromium smoke tests passed"
+      ],
+      "limitations": [
+        "Plain frontend has an inherited null syncProactiveSchedulerPolling controller; separate follow-up",
+        "Other platforms/Python versions, optional ASR services, audio devices and long-duration acceptance not verified"
       ]
     }
   ],

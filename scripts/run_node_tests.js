@@ -42,6 +42,7 @@ const tests = [
   "tests/test_config_switch_frontend.js",
   "tests/test_control_center_frontend.js",
   "tests/test_free_chat_regression.js",
+  "tests/test_reminder_reliability.js",
   "tests/test_first_run_frontend.js",
   "tests/test_frontend_runtime_efficiency.js",
   "tests/test_live2d_render_performance_frontend.js",

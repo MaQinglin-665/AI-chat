@@ -211,6 +211,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\first_chat_smoke.ps1
 .\install_first_run.bat
 ```
 
+Windows x64 / Python 3.12 使用已验证的间接依赖约束，安装后会检查依赖一致性和实际导入。开发者可用 `scripts\bootstrap-first-run.ps1 -Dev` 同时安装测试依赖；启动与本地检查支持项目内的 Node 和 `.venv`。验证记录与已知限制见 [全新环境依赖验证](docs/clean-dependency-validation-20261024.md)。
+
 ## 常用命令
 
 开发者本地验证：
@@ -254,6 +256,7 @@ config.py      配置加载与安全默认值
 - 常见问题与排障：[docs/troubleshooting.md](docs/troubleshooting.md)
 - 后端健康接口：[docs/backend-health.md](docs/backend-health.md)
 - 可视化配置中心：[docs/config.html](docs/config.html)
+- 日程指令与失败重试：[docs/reminder-reliability.md](docs/reminder-reliability.md)
 
 后端启动后可以访问：
 
