@@ -324,6 +324,15 @@
       }
       if (state.clickthroughHitTestReady) return;
       state.clickthroughHitTestReady = true;
+      let disposed = false;
+      const mousemove = e => updateFromClientPoint(e.clientX, e.clientY);
+      const dispose = () => {
+        disposed = true;
+        document.removeEventListener?.("mousemove", mousemove);
+        window.clearInterval?.(state.clickthroughHitTestTimer);
+        state.clickthroughHitTestTimer = null;
+        state.clickthroughHitTestReady = false;
+      };
       let lastClickthrough = true;
       const setClickthrough = (want) => {
         if (want !== lastClickthrough) {
@@ -341,15 +350,13 @@
           || isPointOverSubtitleDragHandle(clientX, clientY);
         setClickthrough(!over);
       };
-      document.addEventListener("mousemove", (e) => {
-        updateFromClientPoint(e.clientX, e.clientY);
-      });
+      document.addEventListener("mousemove", mousemove);
       if (
         typeof window.electronAPI?.getCursorScreenPoint !== "function" ||
         typeof window.electronAPI?.getModelWindowBounds !== "function" ||
         state.clickthroughHitTestTimer
       ) {
-        return;
+        return dispose;
       }
       let busy = false;
       state.clickthroughHitTestTimer = window.setInterval(async () => {
@@ -362,7 +369,7 @@
             window.electronAPI.getCursorScreenPoint(),
             window.electronAPI.getModelWindowBounds()
           ]);
-          if (!cursor || !bounds) {
+          if (disposed || !cursor || !bounds) {
             return;
           }
           const width = Number(bounds.width) || 0;
@@ -384,6 +391,7 @@
           busy = false;
         }
       }, 50);
+      return dispose;
     }
 
     function startModelMouseGazePolling() {
@@ -431,6 +439,16 @@
     }
 
 function attachDrag(model) {
+  const removals = new Set();
+  const listen = (target, name, listener, options) => {
+    target.addEventListener(name, listener, options);
+    const remove = () => {
+      target.removeEventListener?.(name, listener, options);
+      removals.delete(remove);
+    };
+    removals.add(remove);
+    return remove;
+  };
   if (state.useNativeWindowDrag) {
     // In model-only Electron window, rely on native drag region for stability.
     model.interactive = false;
@@ -497,7 +515,7 @@ function attachDrag(model) {
       const grabOffsetY = (Number(state.modelPosY) || Number(state.model?.y) || 0) - Number(start.y || 0);
       const onDocMove = (ev) => {
         if (!state.dragData || !state.model) {
-          document.removeEventListener("pointermove", onDocMove);
+          removeDocMove();
           return;
         }
         const canvas = state.pixiApp?.view;
@@ -532,14 +550,12 @@ function attachDrag(model) {
         syncPetPresenceAnchor(state.model);
         state.suspendRelayoutUntil = performance.now() + 240;
       };
-      document.addEventListener("pointermove", onDocMove);
+      const removeDocMove = listen(document, "pointermove", onDocMove);
       const cleanup = () => {
-        document.removeEventListener("pointermove", onDocMove);
-        document.removeEventListener("pointerup", cleanup);
-        window.removeEventListener("pointerup", cleanup);
+        removeDocMove(); removeDocUp(); removeWindowUp();
       };
-      document.addEventListener("pointerup", cleanup);
-      window.addEventListener("pointerup", cleanup);
+      const removeDocUp = listen(document, "pointerup", cleanup);
+      const removeWindowUp = listen(window, "pointerup", cleanup);
     } else if (!state.desktopMode) {
       // 浏览器模式：document 级监听，保证鼠标移出模型区域后拖动不中断
       state.browserDragActive = true;
@@ -581,16 +597,14 @@ function attachDrag(model) {
 
       const cleanupBrowser = () => {
         state.browserDragActive = false;
-        document.removeEventListener("pointermove", onDocMoveBrowser);
-        document.removeEventListener("pointerup", cleanupBrowser);
-        window.removeEventListener("pointerup", cleanupBrowser);
+        removeBrowserMove(); removeBrowserDocUp(); removeBrowserWindowUp();
         maybeTriggerTapAction();
         model.cursor = "grab";
       };
 
-      document.addEventListener("pointermove", onDocMoveBrowser);
-      document.addEventListener("pointerup", cleanupBrowser);
-      window.addEventListener("pointerup", cleanupBrowser);
+      const removeBrowserMove = listen(document, "pointermove", onDocMoveBrowser);
+      const removeBrowserDocUp = listen(document, "pointerup", cleanupBrowser);
+      const removeBrowserWindowUp = listen(window, "pointerup", cleanupBrowser);
     }
   });
   model.on("pointerup", () => {
@@ -651,8 +665,8 @@ function attachDrag(model) {
     state.pointerDragMoved = false;
     model.cursor = "grab";
   };
-  window.addEventListener("mouseup", releaseDrag);
-  window.addEventListener("blur", releaseDrag);
+  listen(window, "mouseup", releaseDrag);
+  listen(window, "blur", releaseDrag);
 
   model.on("pointermove", (e) => {
     if (!state.dragData) {
@@ -696,7 +710,7 @@ function attachDrag(model) {
 
   const canvas = state.pixiApp?.view;
   if (canvas) {
-    canvas.addEventListener("wheel", (e) => {
+    listen(canvas, "wheel", (e) => {
       if (!state.model) return;
       // The stage canvas spans behind the conversation rails and controls.
       // Only consume the wheel when the pointer is actually over the narrow
@@ -714,6 +728,12 @@ function attachDrag(model) {
       }
     }, { passive: false });
   }
+  return () => {
+    for (const remove of [...removals]) remove();
+    state.dragData = null; state.browserDragActive = false;
+    if (state.windowDragActive) stopDesktopWindowDrag();
+    state.windowDragActive = false;
+  };
 }
 
     return {

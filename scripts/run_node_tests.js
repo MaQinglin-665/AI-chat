@@ -9,6 +9,8 @@ const tests = [
   "tests/test_avatar_vrm.js",
   "tests/test_avatar_scene.js",
   "tests/test_avatar_runtime.js",
+  "tests/test_live2d_avatar_adapter.js",
+  "tests/test_live2d_mapping_sequence.js",
   "tests/test_visual_polish_frontend.js",
   "tests/test_external_agent_frontend.js",
   "tests/test_readiness_resources.js",

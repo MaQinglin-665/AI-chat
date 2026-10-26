@@ -245,7 +245,28 @@
     });
   }
 
+  function startClock(renderer, produceFrame, { state }, host = root) {
+    let disposed = false, raf = 0, wakeTimer = 0, lastFrame = 0;
+    function tick(now) {
+      if (disposed) return;
+      if (state.rendererSurfaceActive === false || host.document.hidden) {
+        wakeTimer = host.setTimeout(() => { raf = host.requestAnimationFrame(tick); }, 250);
+        return;
+      }
+      raf = host.requestAnimationFrame(tick);
+      if (state.uiView !== "model") host.sampleTTSAudioLevel?.();
+      const frame = produceFrame(now);
+      const fps = frame.mouth?.open > 0.02 || renderer.isAnimating?.() ? QUALITY.activeFps : QUALITY.idleFps;
+      const interval = 1000 / fps, elapsed = now - lastFrame;
+      if (elapsed < interval) return;
+      lastFrame = now - elapsed % interval;
+      renderer.update(frame);
+    }
+    raf = host.requestAnimationFrame(tick);
+    return () => { disposed = true; host.clearTimeout(wakeTimer); host.cancelAnimationFrame(raf); };
+  }
   function createRenderer(options = {}) {
+    let stopOwnedClock = () => {};
     const vendor = options.vendor || root.XinyuVRMVendor;
     let vrm = null, driver = null, renderer = null, scene = null, camera = null, generation = 0;
     const canvas = options.canvas;
@@ -272,6 +293,7 @@
       ["rightUpperLeg", "rightLowerLeg", 0.06], ["rightLowerLeg", "rightFoot", 0.045]
     ];
     function dispose() {
+      stopOwnedClock(); stopOwnedClock = () => {};
       generation += 1;
       room?.dispose(); room = null; undoGrade?.(); undoGrade = null; legacyLights = null;
       if (root.document?.body) root.document.body.dataset.avatarScene = "none";
@@ -375,7 +397,12 @@
       return x >= rect.left && y >= rect.top && x <= rect.right && y <= rect.bottom
         && hitSegments(x - rect.left, y - rect.top, hitAreas);
     }
-    return { kind: "vrm", load, dispose, update, hitTest, setScene,
+    const avatar = { kind: "vrm", load, dispose, update, hitTest, setScene,
+      prepareMs: EXPRESSION.prepareMs, startClock(produce, options) {
+        stopOwnedClock();
+        stopOwnedClock = startClock(avatar, produce, options);
+        return stopOwnedClock;
+      },
       capabilities: () => driver?.capabilities() || { vowels: false, faces: [], actions: [], vrma: false },
       playAction: (...args) => driver?.playAction(...args) || false,
       stopAction: () => driver?.stopAction(),
@@ -387,8 +414,9 @@
       // Reserved for a later animation loader; never silently fetch arbitrary files.
       loadAnimation: async () => false
     };
+    return avatar;
   }
-  const api = { createRenderer, createIntentDriver, poseAt, smallMotionAt, randomAt,
+  const api = { createRenderer, startClock, createIntentDriver, poseAt, smallMotionAt, randomAt,
     pixelRatioFor, cameraFraming, hitSegments, smoothCutoutEdges, saccadeAt, gradeRoomMaterials, STANCE, EXPRESSION, MOTION, QUALITY, CAMERA, LIGHT };
   root.XinyuVRMRenderer = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

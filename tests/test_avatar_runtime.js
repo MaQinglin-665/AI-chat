@@ -1,6 +1,7 @@
 const vm = require('node:vm');
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
+const vrmClock = require('../web/avatar/vrmRenderer.js').startClock;
 (async () => {
   let next=0, disposed=0, updates=0;
   const posted=[];
@@ -9,7 +10,11 @@ const assert = require('node:assert/strict');
   const root={document:{hidden:false,body:{dataset:{}},getElementById:()=>null,addEventListener:()=>{}},
     performance:{now:()=>1500},
     BroadcastChannel:class {postMessage(data){posted.push(data);}close(){}},
-    XinyuVRMRenderer:{EXPRESSION:{prepareMs:1100},QUALITY:{idleFps:20,activeFps:30},createRenderer:()=>({load:async()=>{},dispose:()=>disposed++,update:()=>updates++,isAnimating:()=>false,hitTest:()=>false})},
+    XinyuVRMRenderer:{EXPRESSION:{prepareMs:1100},QUALITY:{idleFps:20,activeFps:30},createRenderer:()=>{
+      const renderer={load:async()=>{},dispose:()=>disposed++,update:()=>updates++,isAnimating:()=>false,hitTest:()=>false};
+      renderer.startClock=(produce,options)=>vrmClock(renderer,produce,options,root);
+      return renderer;
+    }},
     addEventListener:(n,fn)=>{if(!listeners.has(n))listeners.set(n,new Set());listeners.get(n).add(fn);},
     removeEventListener:(n,fn)=>listeners.get(n)?.delete(fn),
     requestAnimationFrame:fn=>add(raf,fn),cancelAnimationFrame:id=>raf.delete(id),

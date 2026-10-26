@@ -1,9 +1,11 @@
 # Session handoff
 
-## Current — approved stage 2 implementation (Core6 first)
-- Author explicitly approved the proposal and a separate application-only Core6 commit. Documentation Core/display must remain unchanged. The original Pixi clock and full parameter-write order are mandatory; same-Core exact comparison cannot be relaxed. Prior stop/proposal-only instructions below are superseded by this approval.
-- Core6/THIRD_PARTY_NOTICES and state changes pass full scripts/test-local.ps1 (838 Python passed/3 skipped, all 63 Node files, Python183/JS213 syntax, secrets788). Commit independently, then capture old controllers under committed Core6 before mapping + single avatarRuntime selection/frame/events with renderer-owned clocks. No renderer RAF writing Live2D parameters; keep old hit/drag/clickthrough paths.
-- Finish with full gate, normal push to existing draft PR217, then stop for Windows review. No model/config/secrets, dialogue/memory/external-agent changes, docs vendor replacement, force push, main push or PR merge.
+## Current — stage 2 implemented, final gate/publication
+- Author approved the plan and Core6. Independent Core commit b39ab99 precedes mapping; docs/live2d/vendor Core/display stay byte-identical. Older proposal-only/Core-local stops below are historical and superseded.
+- Implemented one avatarRuntime factory/frame/events path, Live2D six-method adapter and JSON parameter/pose/channel mapping. Renderer-owned clocks preserve Pixi HIGH update, style -> micro -> Core order; VRM RAF/20/30 FPS/hidden suspension moved intact. Original Live2D hit/drag/clickthrough retained with cleanup. No Live2D parameter RAF.
+- Exact b39ab99 Git blob references are pinned in tests/fixtures/live2d-before-mapping. Actual Core6 Node test passes 5280 frames/394224 complete calls and snapshots; real Pixi browser passes 1030 frames/167741 calls/snapshots, four identical canvas PNG hashes and ten real reload disposals. Unknown/missing/custom mappings, direct/shared intents and 100 drag releases/active-drag disposal pass. Never relax strict equality.
+- Final complete scripts/test-local.ps1 passed after implementation and mapping review (838 Python/3 skipped, 65 Node suites, Python183/JS221 syntax, secrets800). Docs check:all passes four browser cases; required JSON/py_compile/vendor hashes pass. Logs outside Git in work/avatar-stage2-*.log. Report docs/avatar-live2d-stage2-verification.md; screenshots outside Git at outputs/avatar-live2d-stage2-implementation and competition capture directory.
+- Next commit implementation/state, normal push to existing #217 and rewrite PR as implemented stage2. Keep draft and stop for author Windows review. No model/private assets, docs vendor, dialogue/memory/external-agent changes; no main/force push/merge; no stage3.
 
 ## Current authorization - Live2D stage 2 (2026-10-26)
 - User confirms stage 1 passed author review and authorizes stage 2. Merge latest main, preserving both Live2D and VRM records. Only four expected conflicts occurred and were resolved without dropping either side.

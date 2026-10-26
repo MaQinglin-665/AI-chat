@@ -40,13 +40,15 @@
       }
       model.autoUpdate = false;
       const priority = Number(window.PIXI?.UPDATE_PRIORITY?.HIGH) || 25;
-      ticker.add(() => {
+      const update = () => {
         if (state.model !== model || state.rendererSurfaceActive === false) {
           return;
         }
         const deltaMs = Math.max(0, Math.min(50, Number(ticker.deltaMS) || (1000 / 60)));
         model.update(deltaMs);
-      }, null, priority);
+      };
+      ticker.add(update, null, priority);
+      return () => ticker.remove?.(update, null);
     }
 
     function installRenderDiagnostics() {
@@ -63,7 +65,7 @@
       let sampleStartedAt = performance.now();
       let sampleFrames = 0;
       let samplesSent = 0;
-      ticker.add(() => {
+      const diagnose = () => {
         sampleFrames += 1;
         const now = performance.now();
         const elapsedMs = now - sampleStartedAt;
@@ -86,7 +88,9 @@
         sampleStartedAt = now;
         sampleFrames = 0;
         samplesSent += 1;
-      });
+      };
+      ticker.add(diagnose);
+      return () => ticker.remove?.(diagnose);
     }
 
     function loadScript(src, isReady) {
@@ -120,6 +124,7 @@
           return;
         }
       }
+      await window.XinyuLive2DMapping?.ready();
       await loadScript(
         "/vendor/pixi.min.js",
         () => typeof window.PIXI !== "undefined"
@@ -168,7 +173,7 @@
       appendMessage("assistant", guideText, { category: "system", persist: false, enableFeedback: false });
     }
 
-    function patchCoreModelUpdate(model) {
+    function patchCoreModelUpdate(model, beforeCoreUpdate) {
       const coreModel = model.internalModel && model.internalModel.coreModel;
       if (!coreModel || typeof coreModel.update !== "function") {
         return;
@@ -176,15 +181,18 @@
       const originalUpdate = coreModel.update.bind(coreModel);
       coreModel.update = function () {
         if (state.model === model && !state.dragData && !state.windowDragActive) {
-          applyStyleExpressionLayer();
-          updateMicroMotionLayer();
+          const runLayers = () => { applyStyleExpressionLayer(); updateMicroMotionLayer(); };
+          if (beforeCoreUpdate) beforeCoreUpdate(runLayers);
+          else runLayers();
         }
         return originalUpdate();
       };
+      return () => { coreModel.update = originalUpdate; };
     }
 
     function addFloatTicker() {
-      state.pixiApp.ticker.add(() => {
+      const ticker = state.pixiApp.ticker;
+      const float = () => {
         if (!state.model) {
           return;
         }
@@ -203,7 +211,9 @@
           state.model.rotation = Number.isFinite(floatRot) ? floatRot : 0;
           state.model.y = Number.isFinite(floatY) ? floatY : state.baseTransform.y;
         }
-      });
+      };
+      ticker.add(float);
+      return () => ticker.remove?.(float);
     }
 
     function maybeTightFitDesktopWindow() {
@@ -231,13 +241,18 @@
     }
 
     async function initLive2D() {
+      const canvas = document.getElementById("live2d-canvas");
+      const runtime = window.XinyuAvatarRuntime || (typeof require === "function"
+        ? require("./avatar/avatarRuntime.js").createRuntime(Object.assign(Object.create(window), { document })) : null);
+      if (!runtime) throw new Error("Avatar runtime missing");
+      return runtime.start({ state, canvas, source: state.avatarSource, setStatus,
+        live2dLifecycle: { load: loadLive2D } });
+    }
+
+    async function loadLive2D({ path, beforeCoreUpdate }) {
       document.body.dataset.avatarReady = "false";
       const canvas = document.getElementById("live2d-canvas");
-      if (state.avatarSource?.kind === "vrm") {
-        await window.XinyuAvatarRuntime.start({ state, canvas, source: state.avatarSource, setStatus });
-        return;
-      }
-      const rawModelPath = String(state.config?.model_path || "").trim();
+      const rawModelPath = String(path || "").trim();
       const normalizedModelPath = rawModelPath.replace(/\\/g, "/").toLowerCase();
       const live2dPathMissing = !rawModelPath || normalizedModelPath.includes("your_model");
 
@@ -246,18 +261,18 @@
           "未配置 Live2D 模型",
           "还没有检测到可用的 Live2D 模型。你可以先直接聊天体验；随后把模型放到 web/models 目录，并在 config.json 设置 model_path（示例：/models/hiyori/hiyori.model3.json）。"
         );
-        return;
+        return null;
       }
 
       if (!window.Live2DCubismCore) {
         setStatus("CubismCore 缺失");
         appendMessage("assistant", "Cubism 核心未加载，请强制刷新（Ctrl+F5）。", { category: "system", persist: false, enableFeedback: false });
-        return;
+        return null;
       }
       if (!window.PIXI || !window.PIXI.live2d || !window.PIXI.live2d.Live2DModel) {
         setStatus("Live2D 运行时缺失");
         appendMessage("assistant", "Live2D 运行时未加载，请强制刷新（Ctrl+F5）。", { category: "system", persist: false, enableFeedback: false });
-        return;
+        return null;
       }
       state.pixiApp = new window.PIXI.Application({
         view: canvas,
@@ -271,22 +286,33 @@
         preserveDrawingBuffer: false
       });
       configureApplicationTicker(state.pixiApp);
-      installRenderDiagnostics();
+      const cleanups = [installRenderDiagnostics()];
+      const app = state.pixiApp;
+      let model;
+      const dispose = () => {
+        for (const cleanup of cleanups.splice(0).reverse()) cleanup?.();
+        stopIdleMotionLoop();
+        window.removeEventListener?.("resize", handleWindowResize);
+        if (state.model === model) state.model = null;
+        if (window.__petModel === model) window.__petModel = null;
+        if (state.pixiApp === app) state.pixiApp = null;
+        app.destroy?.(false, { children: true, texture: true, baseTexture: true });
+      };
 
       const { Live2DModel } = window.PIXI.live2d;
       try {
-        const model = await Live2DModel.from(state.config.model_path, { autoUpdate: false });
+        model = await Live2DModel.from(path, { autoUpdate: false });
         state.model = model;
         window.__petModel = model;
         setModelMotionDefinitions(model);
         state.pixiApp.stage.addChild(model);
         placeModel();
-        attachDrag(model);
-        setupClickthroughHitTest();
+        cleanups.push(attachDrag(model));
+        cleanups.push(setupClickthroughHitTest());
         scheduleIdleMotionLoop();
-        patchCoreModelUpdate(model);
-        attachSynchronizedModelUpdate(model);
-        addFloatTicker();
+        cleanups.push(patchCoreModelUpdate(model, beforeCoreUpdate));
+        cleanups.push(attachSynchronizedModelUpdate(model));
+        cleanups.push(addFloatTicker());
 
         const i = model.internalModel || {};
         const info = `模型已就绪（${Math.round(model.width)}x${Math.round(model.height)}，动作组 ${state.availableMotionGroups.length}）`;
@@ -307,7 +333,7 @@
         document.body.dataset.avatarReady = "true";
       } catch (err) {
         console.error(err);
-        stopIdleMotionLoop();
+        dispose();
         const detail = String(err?.message || err || "").trim();
         const missingFile = /not\s*found|failed\s*to\s*fetch|404|enoent/i.test(detail);
         if (missingFile) {
@@ -315,16 +341,17 @@
             "未找到 Live2D 模型",
             `未找到 Live2D 模型文件：${rawModelPath || "(空)"}。请确认模型文件已放在 web/models 下，并把 config.json 的 model_path 指向 .model3.json 文件。`
           );
-          return;
+          return null;
         }
         showLive2DSetupGuide(
           "模型加载失败，请检查 model_path",
           "Live2D 初始化失败。你可以先继续使用聊天功能，再检查 model_path 是否指向可访问的 .model3.json 文件。"
         );
-        return;
+        return null;
       }
 
       window.addEventListener("resize", handleWindowResize);
+      return { model, app, dispose };
     }
 
     return {

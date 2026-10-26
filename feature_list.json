@@ -23,15 +23,21 @@
         "Merged origin/main 2356ddb as 97ceb92; only the four authorized conflict files; all content/VRM notices retained",
         "Read VRM basic/room docs, intent interface and actual runtime; four targeted Node groups passed",
         "Both actual repository Core4 and temporary official Core6: all 63 existing Node files passed; original Core restored",
-        "Browser Hiyori works with both; fixed-input visible differences 49/13/6 pixels, max geometry delta 0.0000012069940567016602"
+        "Browser Hiyori works with both; fixed-input visible differences 49/13/6 pixels, max geometry delta 0.0000012069940567016602",
+        "Core6 separately committed as b39ab99; docs Core/display byte-identical to prior checkpoint",
+        "Same actual Core6: 5280 frames/394224 ordered calls plus per-frame snapshots strictly equal to pinned b39ab99 Git blobs",
+        "Real Pixi browser: 1030 frames/167741 ordered calls strictly equal; four before/after canvas PNG hashes identical; ten reloads dispose resources",
+        "Custom/missing mappings, unknown/direct intents, unified events, 100 drag completions and disposal during drag pass; no Live2D RAF added",
+        "Final full scripts/test-local.ps1: 838 Python passed/3 skipped, all 65 Node suites, Python183/JS221 syntax, secrets800; docs check:all four cases and JSON/py_compile passed"
       ],
-      "next": "Commit Core6 plus notice independently, capture Core6 pre-mapping writes, then implement shared runtime and mapping; update draft PR217 and stop for Windows review.",
+      "next": "Publish to existing draft PR217, then stop for author Windows appearance/drag/clickthrough review; stage3 remains deferred.",
       "historical_blockers": [
         "Current runtime is VRM-specific; user requires a proposal before structural integration",
         "Core4/Core6 fixed-input pixels are close but not identical; author must decide acceptance before any Core commit"
       ],
       "blockers": [],
-      "author_approval": "Author approved plan and Core6 inclusion; no approximation in same-Core mapping acceptance."
+      "author_approval": "Author approved plan and Core6 inclusion; no approximation in same-Core mapping acceptance.",
+      "implementation_status": "implemented and validated; publish draft PR217 and await Windows review"
     },
     {
       "id": "avatar-live2d-stage1",
