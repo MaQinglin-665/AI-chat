@@ -465,3 +465,16 @@ CI repair: Node painted test duplicated pytest invocation, but Linux Node job in
 
 
 Verification Evidence for #224 merge: scripts/test-local.ps1 passed (876 passed, 3 skipped, 1 warning; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed. Ignored logs: tmp_ui_smoke/avatar-vrm-polish/merge224-local.log and merge224-package.log. Three state-file conflicts resolved by retaining both histories and both feature entries; active task stays avatar-brain-driven-v1. No code conflicts or extra product fixes. Next: normal push, ready, all CI, authorized merge commit, then stop awaiting user notice about #217.
+
+
+## 2026-10-26 — Backend context/quota task started
+
+User explicitly authorized these backend-only phase-2 items before #217. New branch codex/avatar-brain-context-v1 from 2b67452. Reuse existing chat history/delivery and memory retrieval, sanitize before prompt; durable local daily/hourly quota with graceful storage fallback. No renderer changes, no private configuration changes, no real model needed.
+
+### 2026-10-26 — avatar-brain-context-v1 Verification Evidence
+- Implemented bounded last-three-turn extractive context and up to two local relevant memories; explicit recall query uses existing selector. Confirmed delivery updates context; no extra model call.
+- Daily and rolling-hour counters plus cooldown persist atomically in user app data; restart/day rollover/corrupt/unwritable fallback tested. Files and locks ignored; no private content stored.
+- Targeted: 67 passed; new suite: 32 passed. Final scripts/test-local.ps1: 908 passed, 3 skipped, 1 audioop deprecation warning; all Node, syntax and secret checks passed. First-run package smoke passed including both new modules. Initial fake Windows user-path fixture triggered secret scan; changed fixture to generic test path and reran full gate successfully.
+- Logs (ignored): tmp_ui_smoke/avatar-vrm-polish/brain-context-local.log and brain-context-package.log. Required JSON/compile checks passed. No real API calls or frontend acceptance.
+- Risks: conservative filtering drops technical topics; summaries are excerpts, not semantic summaries; restart awaits chat history delivery. Disk fallback only preserves in-process quotas. Env-Key-only behavior documented.
+- Local main remains 0a0655464b2fe31ab648f58902af7114a16a2393; private config hash unchanged; renderer files untouched. Push feature branch and draft PR only; no merge, wait for #217 before remaining phase 2.
