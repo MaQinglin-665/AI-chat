@@ -26,14 +26,14 @@
       for(const g of geometries){const attr=g.getAttribute(key);if(attr)values.set(attr.array,offset);offset+=g.attributes.position.count*size;}
       result.setAttribute(key,new T.BufferAttribute(values,size));}return result;
   }
-  async function load({vendor,scene,ramp,alive=()=>true,fetchModel}){
+  async function load({vendor,scene,ramp,alive=()=>true,fetchModel,items=ITEMS}){
     const T=vendor.THREE, pieces=[], originals=new Set(),textures=new Set();let atlas=null,merged=null,material=null;
     const disposeOriginal=()=>{for(const r of originals)r.dispose?.();for(const t of textures)if(t!==atlas)t.dispose();originals.clear();textures.clear();};
     try{
       const manager=new T.LoadingManager();manager.setURLModifier(url=>localURL(url,root.location?.origin||"http://localhost"));
       const loader=new vendor.GLTFLoader(manager);
       // Sequential loading shares one atlas material and bounds transient memory; fallback stays visible throughout.
-      for(const item of ITEMS){
+      for(const item of items){
         const gltf=await (fetchModel?fetchModel(item):loader.loadAsync(BASE+item.file+".gltf"));
         const model=gltf.scene;model.updateMatrixWorld(true);
         model.traverse(n=>{if(n.geometry)originals.add(n.geometry);for(const m of [].concat(n.material||[])){originals.add(m);for(const v of Object.values(m))if(v?.isTexture)textures.add(v);if(!atlas&&m.map)atlas=m.map;}});

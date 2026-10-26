@@ -34,3 +34,11 @@ assert.equal(S.tableElbow([0,2,0],[0,1,0],.2,.2,.74,[1,0]),null);
 
 const layout=require('../web/avatar/vrmScene').layout();
 for(const [id,name]of [['sofa-seat','rest'],['chair-seat','desk']]){const item=layout.items.find(i=>i.id===id);assert(Math.abs(item.position[1]+item.size[1]/2-S.SEATS[name].surface)<1e-6,'procedural fallback has the same seat surface');}
+
+// Preset-specific measured sofa/chair surfaces reuse exactly the same solver.
+const paintedSeats=require('../web/avatar/vrmHandpainted').layout().seats;
+for(const version of ['0','1'])for(const [upper,lower]of [[.23,.23],[.52,.59]])for(const activity of ['rest','desk']){
+ const {root,vrm}=fake(upper,lower,version),profile=S.measure(T,vrm,root,0),seat=paintedSeats[activity];root.rotation.y=seat.yaw;
+ const result=S.apply({T,vrm,avatarRoot:root,profile,activity,seats:paintedSeats,weight:1});
+ assert(Math.abs(result.hip[1]-profile.padding-seat.surface)<1e-6);for(const leg of Object.values(result.legs))assert(Math.abs(leg.ankle[1]-leg.floor)<1e-6);
+}

@@ -99,7 +99,7 @@
       return value;
     };
   }
-  function create({ THREE: T, scene, floorY = 0, period = "night", seed = ROOM.seed, vendor, furnitureModule = root.XinyuVRMFurniture }) {
+  function create({ THREE: T, scene, floorY = 0, period = "night", seed = ROOM.seed, vendor, furnitureModule = root.XinyuVRMFurniture, preset = "room", handpaintedModule = root.XinyuVRMHandpainted }) {
     const group = new T.Group(), resources = new Set();
     const own = value => { resources.add(value); return value; };
     group.position.y = floorY; scene.add(group);
@@ -188,7 +188,7 @@
     const color = (target, key, t) => target.copy(a.setHex(LIGHTS.night[key])).lerp(b.setHex(LIGHTS.day[key]), t);
     function update(nextPeriod, now, cameraZ = 2.5) {
       if (disposed) return;
-      day = blend(nextPeriod, now); skyMaterial.uniforms.day.value = day;
+      day = blend(nextPeriod, now); painted?.update(day); skyMaterial.uniforms.day.value = day;
       // Keep depth separation anchored to the avatar plane, including inspection pullbacks.
       fog.near = Math.max(0, cameraZ) + ROOM.fogNear; fog.far = Math.max(0, cameraZ) + ROOM.fogFar;
       const mix = key => LIGHTS.night[key] + (LIGHTS.day[key] - LIGHTS.night[key]) * day;
@@ -200,14 +200,26 @@
       glow.color.setHex(0xffd9a8).multiplyScalar(1 - day * 0.65);
       color(fog.color, "fog", day); scene.background.copy(fog.color);
     }
-    let furniture = null;
-    const ready = vendor && furnitureModule ? furnitureModule.load({vendor,scene:group,ramp,alive:()=>!disposed}).then(result=>{
+    let furniture = null, painted = null, effectivePreset = "room", activeLayout = layout(seed);
+    const legacyChildren = [...group.children].filter(n=>n!==shadow && !footShadows.includes(n));
+    const furnitureReady = vendor && furnitureModule ? furnitureModule.load({vendor,scene:group,ramp,alive:()=>!disposed}).then(result=>{
       if(disposed) { result?.dispose(); return false; }
       furniture=result; if(result) fallback.forEach(mesh=>{mesh.visible=false;}); return !!result;
     }) : Promise.resolve(false);
+    const ready = furnitureReady.then(async loaded=>{
+      if(preset!=="handpainted" || !handpaintedModule || disposed)return loaded;
+      const result=await handpaintedModule.load({vendor,scene:group,alive:()=>!disposed});
+      if(disposed){result?.dispose();return false;}
+      if(!result)return false;
+      painted=result;effectivePreset="handpainted";activeLayout=result.layout;
+      legacyChildren.forEach(n=>{n.visible=false;});if(furniture?.mesh)furniture.mesh.visible=false;
+      sun.position.set(activeLayout.lights.sun[0],floorY+activeLayout.lights.sun[1],activeLayout.lights.sun[2]);
+      lamps.forEach((l,i)=>l.position.set(activeLayout.lights.lamps[i][0],floorY+activeLayout.lights.lamps[i][1],activeLayout.lights.lamps[i][2]));
+      painted.update(day);return true;
+    });
     update(period, 0);
-    return { update, ready, setFootPositions(points) { footShadows.forEach((mesh,i)=>{mesh.visible=!!points?.[i];if(mesh.visible)mesh.position.set(points[i][0],.035,points[i][2]);}); }, setAvatarPosition(x,z) { shadow.position.x=x; shadow.position.z=z; }, metrics: () => ({ day, furnitureLoaded: !!furniture, batches: batches.size, resources: resources.size }), dispose() {
-      if (disposed) return; disposed = true; furniture?.dispose();
+    return { update, ready, getLayout:()=>activeLayout, setFootPositions(points) { footShadows.forEach((mesh,i)=>{mesh.visible=!!points?.[i];if(mesh.visible)mesh.position.set(points[i][0],.035,points[i][2]);}); }, setAvatarPosition(x,z) { shadow.position.x=x; shadow.position.z=z; }, metrics: () => ({ day, preset:effectivePreset, requestedPreset:preset, bloomSources:painted?.glows.map(n=>n.name)||[], furnitureLoaded: !!furniture, batches: batches.size, resources: resources.size }), dispose() {
+      if (disposed) return; disposed = true; painted?.dispose(); furniture?.dispose();
       scene.remove(group, ambient, sun, sun.target, ...lamps); scene.fog = oldFog; scene.background = oldBackground;
       for (const resource of resources) resource.dispose?.(); resources.clear(); group.clear();
     } };

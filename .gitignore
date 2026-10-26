@@ -37,6 +37,7 @@ tmp_*.wav
 debug_*.wav
 *.bin
 !web/vendor/scenes/kaykit-furniture/*.bin
+!web/vendor/scenes/hand-painted-room/scene.bin
 
 # Local diagnostic smoke-test artifacts
 api_tts_*.txt

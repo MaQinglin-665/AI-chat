@@ -262,6 +262,7 @@
     let projection = null, avatarRoot = null, world = null, worldState = null, cameraHome = null, follow = [0,0,0], worldTime = null, book = null;
     const worldModule = options.worldModule || root.XinyuVRMWorld;
     const seating = options.seatingModule || root.XinyuVRMSeating;
+    let activeLayout=null;
     let seatProfile=null,seatMetrics=null,cameraKey=null,cameraStart=null,cameraSince=0,backSince=null;
     let room = null, legacyLights = null, undoGrade = null, floorY = 0;
     const roomModule = options.roomModule || root.XinyuVRMScene;
@@ -276,11 +277,17 @@
       const useRoom = roomModule?.enabled(options.view, value);
       if (legacyLights) legacyLights.visible = !useRoom;
       if (useRoom) {
-        room = roomModule.create({ THREE: vendor.THREE, vendor, scene, height: modelHeight, floorY, period: period() });
-        world = worldModule?.create({seed: options.seed,emit: detail=>{
+        room = roomModule.create({ THREE: vendor.THREE, vendor, scene, height: modelHeight, floorY, period: period(), preset:value });
+        const currentRoom=room;
+        function startWorld(){
+        world?.dispose();activeLayout=currentRoom.getLayout?.()||{};
+        world = worldModule?.create({seed: options.seed,layout:activeLayout,emit: detail=>{
           root.console?.debug?.("avatar-world-event", detail);
           if(root.CustomEvent) root.dispatchEvent?.(new root.CustomEvent("avatar-world-event",{detail}));
         }});
+        }
+        startWorld();
+        currentRoom.ready?.then(loaded=>{if(room===currentRoom && loaded && currentRoom.metrics?.().preset==="handpainted"){startWorld();cameraKey=null;worldTime=null;}});
       }
       else undoGrade = gradeRoomMaterials(vrm.scene, options.view === "full" ? LIGHT.room : LIGHT.pet);
       if (root.document?.body) root.document.body.dataset.avatarScene = useRoom ? "room" : "none";
@@ -388,7 +395,8 @@
       const T=vendor.THREE;
       if(!pose.hands || !worldModule.CONTACT)return;
       const activity=seating?.active(worldState);
-      seatMetrics=seating?.apply({T,vrm,avatarRoot,profile:seatProfile,activity,weight:pose.weight,floorY});
+      const deskSeat=(activeLayout?.seats||seating?.SEATS)?.desk, deskForward=deskSeat?[Math.sin(deskSeat.yaw),Math.cos(deskSeat.yaw)]:[1,0];
+      seatMetrics=seating?.apply({T,vrm,avatarRoot,profile:seatProfile,seats:activeLayout?.seats||seating.SEATS,activity,weight:pose.weight,floorY});
       const contacts={...pose.hands};
       if(seatMetrics){
         for(const side of ['left','right']){
@@ -398,8 +406,8 @@
           if(activity==='desk'){
             if(side==='left'){
               vrm.humanoid.getNormalizedBoneNode('head').getWorldPosition(target);
-              target.y-=WORLD_VISUAL.chinDrop;target.x+=WORLD_VISUAL.chinForward;
-            }else {target.set(seating.SEATS.desk.hip[0]+WORLD_VISUAL.deskHand[0],floorY+WORLD_VISUAL.deskHand[1],seating.SEATS.desk.hip[1]+WORLD_VISUAL.deskHand[2]);}
+              target.y-=WORLD_VISUAL.chinDrop;target.x+=deskForward[0]*WORLD_VISUAL.chinForward;target.z+=deskForward[1]*WORLD_VISUAL.chinForward;
+            }else {target.set(deskSeat.hip[0]+deskForward[0]*WORLD_VISUAL.deskHand[0]-deskForward[1]*WORLD_VISUAL.deskHand[2],floorY+deskSeat.table+(WORLD_VISUAL.deskHand[1]-seating.SEATS.desk.table),deskSeat.hip[1]+deskForward[1]*WORLD_VISUAL.deskHand[0]+deskForward[0]*WORLD_VISUAL.deskHand[2]);}
           }
           contacts[side]=avatarRoot.worldToLocal(target).toArray();
         }
@@ -413,12 +421,12 @@
         if(activity==='desk' && side==='left' && seatMetrics){
           const upper=vrm.humanoid.getNormalizedBoneNode('leftUpperArm'),lower=vrm.humanoid.getNormalizedBoneNode('leftLowerArm');
           const shoulder=upper.getWorldPosition(new T.Vector3()),elbow=lower.getWorldPosition(new T.Vector3()),hand=end.getWorldPosition(new T.Vector3());
-          const point=seating.tableElbow(shoulder.toArray(),target.toArray(),shoulder.distanceTo(elbow),elbow.distanceTo(hand),floorY+seating.SEATS.desk.table+WORLD_VISUAL.elbowPadding,[1,0]);
+          const point=seating.tableElbow(shoulder.toArray(),target.toArray(),shoulder.distanceTo(elbow),elbow.distanceTo(hand),floorY+(activeLayout?.seats||seating.SEATS).desk.table+WORLD_VISUAL.elbowPadding,deskForward);
           if(point){
             const bend=new T.Vector3(...point).lerpVectors(elbow,new T.Vector3(...point),pose.weight);
             seating.rotateTo(T,upper,lower,bend);seating.rotateTo(T,lower,end,target);
             const finger=vrm.humanoid.getNormalizedBoneNode('leftMiddleProximal');
-            if(finger)seating.rotateTo(T,end,finger,end.getWorldPosition(new T.Vector3()).add(new T.Vector3(.1,0,0)));
+            if(finger)seating.rotateTo(T,end,finger,end.getWorldPosition(new T.Vector3()).add(new T.Vector3(deskForward[0]*.1,0,deskForward[1]*.1)));
             seatMetrics.elbow=lower.getWorldPosition(new T.Vector3()).toArray();seatMetrics.chinHand=end.getWorldPosition(new T.Vector3()).toArray();seatMetrics.chinTarget=target.toArray();continue;
           }
           seatMetrics.elbowUnreachable=true;
@@ -470,7 +478,7 @@
       driver.update(frame);
       room?.setFootPositions?.(seatMetrics ? Object.values(seatMetrics.legs).map(l=>l.ankle) : null);
       if(world && seating){
-        const actual=avatarRoot.position,active=worldState.name!=='accompany',preset=seating.CAMERAS[worldState.name]||seating.CAMERAS.idle;
+        const actual=avatarRoot.position,active=worldState.name!=='accompany',preset=(activeLayout?.cameras||seating.CAMERAS)[worldState.name]||(activeLayout?.cameras||seating.CAMERAS).idle;
         const key=active?worldState.name:'accompany';
         const aim=[actual.x,active?actual.y+modelHeight*preset.height:cameraHome.targetY+actual.y,actual.z];
         const goal=active?[actual.x+preset.offset[0],aim[1]+preset.offset[1],actual.z+preset.offset[2]]:[actual.x,cameraHome.cameraY+actual.y,cameraHome.distance+actual.z];

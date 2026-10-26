@@ -30,7 +30,7 @@
   const LIMITS = Object.freeze({ minX: -2.72, maxX: 2.72, minZ: -2.72, maxZ: 1.7 });
   const distance = (a,b) => Math.hypot(a[0]-b[0],a[1]-b[1]);
   function rect(o, margin = TUNING.radius) { return [o.x-o.w/2-margin,o.z-o.d/2-margin,o.x+o.w/2+margin,o.z+o.d/2+margin]; }
-  function free(p, obstacles = OBSTACLES) { return p[0]>=LIMITS.minX && p[0]<=LIMITS.maxX && p[1]>=LIMITS.minZ && p[1]<=LIMITS.maxZ && !obstacles.some(o=>{
+  function free(p, obstacles = OBSTACLES, limits = LIMITS) { return p[0]>=limits.minX && p[0]<=limits.maxX && p[1]>=limits.minZ && p[1]<=limits.maxZ && !obstacles.some(o=>{
     const r=rect(o);return p[0]>r[0]&&p[0]<r[2]&&p[1]>r[1]&&p[1]<r[3]; }); }
   function clear(a,b,obstacles=OBSTACLES) {
     // Slab intersection against inflated boxes, not frame-dependent point samples.
@@ -39,10 +39,10 @@
         else {const t1=(r[k]-a[k])/d,t2=(r[k+2]-a[k])/d;lo=Math.max(lo,Math.min(t1,t2));hi=Math.min(hi,Math.max(t1,t2));}}
       return lo<hi && hi>0 && lo<1; });
   }
-  function path(start, end, obstacles=OBSTACLES) {
-    if(!free(start,obstacles)||!free(end,obstacles))return [];
+  function path(start, end, obstacles=OBSTACLES, limits=LIMITS) {
+    if(!free(start,obstacles,limits)||!free(end,obstacles,limits))return [];
     const nodes=[start,end];
-    for(const o of obstacles){const r=rect(o,TUNING.radius+0.012);for(const p of [[r[0],r[1]],[r[2],r[1]],[r[0],r[3]],[r[2],r[3]]])if(free(p,obstacles))nodes.push(p);}
+    for(const o of obstacles){const r=rect(o,TUNING.radius+0.012);for(const p of [[r[0],r[1]],[r[2],r[1]],[r[0],r[3]],[r[2],r[3]]])if(free(p,obstacles,limits))nodes.push(p);}
     const costs=nodes.map(()=>Infinity), prev=[], done=new Set();costs[0]=0;
     while(done.size<nodes.length){let i=-1;nodes.forEach((_,j)=>{if(!done.has(j)&&(i<0||costs[j]<costs[i]))i=j;});
       if(i<0||!Number.isFinite(costs[i]))return [];if(i===1)break;done.add(i);
@@ -51,19 +51,20 @@
     const result=[end];for(let i=1;i!==0;){i=prev[i];if(i===undefined)return [];result.unshift(nodes[i]);}return result;
   }
   function rng(seed){let x=seed>>>0;return ()=>{x=(Math.imul(x,1664525)+1013904223)>>>0;return x/4294967296;};}
-  function create({ seed=TUNING.seed, emit=()=>{} }={}) {
+  function create({ seed=TUNING.seed, emit=()=>{}, layout={} }={}) {
+    const points=layout.activityPoints||POINTS, obstacles=layout.obstacles||OBSTACLES, limits=layout.limits||LIMITS, cameras=layout.cameras;
     const random=rng(seed), range=(a,b)=>a+random()*(b-a);
-    let position=[0,0], yaw=0, name="accompany", previous="", phase="idle", route=[], last=null,
+    let position=[...points.accompany], yaw=0, name="accompany", previous="", phase="idle", route=[], last=null,
       now=0, next=range(TUNING.activityMin,TUNING.activityMax), began=0, blend=0, hold=0, busy=false, wait=0, poseName="accompany", poseAge=0;
     function event(stage, activity){emit({type:"activity",name:activity,stage});}
     function end(){if(name!=="accompany")event("end",name);}
-    function begin(activity){if(!Object.hasOwn(POINTS,activity))return false;
-      const planned=path(position,POINTS[activity]);if(!planned.length)return false;
-      end();previous=name;name=activity;route=planned.slice(1);phase=route.length&&distance(position,POINTS[name])>.02?"walk":"activity";
+    function begin(activity){if(!Object.hasOwn(points,activity))return false;
+      const planned=path(position,points[activity],obstacles,limits);if(!planned.length)return false;
+      end();previous=name;name=activity;route=planned.slice(1);phase=route.length&&distance(position,points[name])>.02?"walk":"activity";
       began=now;next=now+range(TUNING.activityMin,TUNING.activityMax);event("start",name);return true;}
     function interact(){
       if(!busy){wait=range(TUNING.resumeMin,TUNING.resumeMax);end();previous=name;name="accompany";
-        route=distance(position,POINTS.accompany)<=TUNING.returnDistance?path(position,POINTS.accompany).slice(1):[];
+        route=distance(position,points.accompany)<=TUNING.returnDistance?path(position,points.accompany,obstacles,limits).slice(1):[];
         phase=route.length?"walk":"respond";}
       busy=true;hold=now+wait;
     }
@@ -81,7 +82,7 @@
         targetYaw=Math.atan2(target[0]-position[0],target[1]-position[1]);
         const step=Math.min(d,TUNING.speed*dt);if(d>0)position=position.map((v,i)=>v+(target[i]-v)*step/d);
         if(d<=TUNING.speed*dt+.005){position=[...target];route.shift();if(!route.length){phase=name==="accompany"?"respond":"activity";began=now;}}
-      } else if(name!=="accompany")targetYaw={window:2.60,books:-2.60,rest:Math.PI/2,desk:Math.PI/2}[name]||0;
+      } else if(name!=="accompany")targetYaw=cameras?.[name]?.yaw ?? {window:2.60,books:-2.60,rest:Math.PI/2,desk:Math.PI/2}[name]??0;
       const angle=Math.atan2(Math.sin(targetYaw-yaw),Math.cos(targetYaw-yaw));yaw+=Math.sign(angle)*Math.min(Math.abs(angle),dt*TUNING.turnSpeed);
       const desired=!route.length&&name!=="accompany"?1:0;
       if(desired){poseName=name;poseAge=(now-began)/1000;}blend+=Math.sign(desired-blend)*Math.min(Math.abs(desired-blend),dt*1000/TUNING.blendMs);

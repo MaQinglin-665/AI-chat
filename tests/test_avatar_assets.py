@@ -111,7 +111,7 @@ def test_unconfigured_avatar_preserves_live2d():
     assert handler.result == {"kind": "live2d"}
 
 
-@pytest.mark.parametrize("setting, expected", [(None, "room"), ("room", "room"), ("none", "none"), ("invalid", "room")])
+@pytest.mark.parametrize("setting, expected", [(None, "room"), ("room", "room"), ("none", "none"), ("handpainted", "handpainted"), ("invalid", "room")])
 def test_scene_setting_is_bounded(tmp_path, monkeypatch, setting, expected):
     class Handler:
         def _send_json(self, result):

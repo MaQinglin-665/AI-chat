@@ -41,8 +41,8 @@
     const parent=node.parent.getWorldQuaternion(new T.Quaternion()),q=new T.Quaternion().setFromUnitVectors(a,b);
     q.premultiply(parent.clone().invert()).multiply(parent);node.quaternion.premultiply(q);node.updateMatrixWorld(true);
   }
-  function apply({T,vrm,avatarRoot,profile,activity,weight,floorY=0}){
-    const seat=SEATS[activity];if(!seat||!profile||weight<=0)return null;
+  function apply({T,vrm,avatarRoot,profile,activity,weight,floorY=0,seats=SEATS}){
+    const seat=seats[activity];if(!seat||!profile||weight<=0)return null;
     const bone=n=>vrm.humanoid.getNormalizedBoneNode(n),hips=bone('hips');avatarRoot.updateMatrixWorld(true);
     const before=hips.getWorldPosition(new T.Vector3()),wanted=new T.Vector3(seat.hip[0],floorY+seat.surface+profile.padding,seat.hip[1]);
     avatarRoot.position.add(wanted.sub(before).multiplyScalar(weight));avatarRoot.updateMatrixWorld(true);

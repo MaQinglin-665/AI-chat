@@ -1,3 +1,5 @@
+> 新增可选手绘预设：见 [avatar-room-handpainted.md](avatar-room-handpainted.md)。默认仍为 room。以下保留 KayKit/初版记录。
+
 # 房间生活感 v1
 
 仅完整窗口的 VRM + room 启用日常活动。scene=none、透明桌宠和 Hiyori 沿用原有行为。
