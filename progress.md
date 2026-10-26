@@ -1117,3 +1117,9 @@ Verification Evidence for #224 merge: scripts/test-local.ps1 passed (876 passed,
 
 ### 收尾期间新合入 #224 的补检
 main 在收尾期间前进到 `2b67452`，已通过 `38f0497` 补入 #217；上游脑控第一期代码原样保留，没有开始第二期。最终完整门禁 **896 Python 通过 / 3 跳过，73 Node 测试文件，语法191/241，秘密扫描843**；首次运行打包检查通过。同 Core6 Node5280/394224/42场景及浏览器1030/167741完整序列再次严格一致，四组PNG哈希及十次重载检查通过。原38.4秒录像仍对应相同 Hiyori 渲染代码（新上游未修改渲染器）。
+
+
+## 2026-10-26 — Author requests latest PR217 revalidation, later work gated
+- Author viewed02–04 and confirms clear improvement. Their visual estimate~0.5s is qualitative, previous controlled1370ms reference/370ms early measurement retained as distinct fixture data. Resent standalone01Hiyori38.4s link in chat; no direct recipient channel, do not claim external delivery.
+- Read AGENTS/state; cleanfriend/avatar-live2d-adapter0c08c3d. Explicit mainfetch updated2b67452->1ab5d38 (#227 merged); #225 API stillopen/draft. #217open/ready/unmerged, #226open/ready/unmerged. Reopen closeout: merge latestmain, preserve upstreamVRM/scene behavior, strict tests+allVRM/room/camera/backdrop/full/package then normalpush/allCI; ambiguous conflicts need author decision.
+- #226sync/tests/ready and separateMao stage3 only after author merging217. No model/defaultVRM/config/key commits; no selfmerge/main/forcepush. Networkpush failures retry10s/max5.

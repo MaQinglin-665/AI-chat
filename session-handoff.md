@@ -1,3 +1,9 @@
+# Current — author requests fresh PR217 synchronization and full CI
+- Latest authorization: resend separate01 Hiyori38.4s video, then prioritize #217 latest-main merge/strict+all VRM-room-camera-background/full/package tests, normal push/ready and allLinux+WindowsCI; author merges, never self-merge/force/main push. Stop and ask if conflict choice ambiguous.
+- Fetchedmain1ab5d38 includes#221/#224/#227. GitHub#225 stillopen/draft, not merged; leave it out until onmain. Original217ready/open/unmerged0c08c3d. PR226ready/open/unmerged943b690; do not sync it until author merges217. Separate friend/avatar-live2d-mao also waits; do not initiate stage3 now. No model/defaultVRM task; officialCC0Sendagaya stays ignoredmodels_local only.
+- Separate01 localMP4 link provided in chat; no direct author receiving channel available, so do not claim delivered externally. File outputs/馨语桌宠_录像分享包_20261026/01_Hiyori功能检查_约38秒_无声.mp4 hash matches original.
+- Next mergeorigin/main and preserve upstream product behavior exactly; current upstream difference is#227 backend/state/package/tests, no renderer/scene changes. Update verification evidence after actual reruns. Older authorizations below are historical.
+
 # Publication checkpoint — PR217 includes new main #224
 - Latest main2b67452 also merged38f0497. Final full896Python/3skipped,73Node,syntax191/241,secrets843;package and required JSON/compile pass. Exact Node5280/394224/42 and browser1030/167741 complete sequences strictly equal again. Hiyori code/video unchanged by #224. Publish normal push; ready; author decides merge. Then separate lipsync branch from2b67452. No brain phase2.
 
