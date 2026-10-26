@@ -91,9 +91,6 @@ assert.equal(P.stationaryPose(50000,false,-1).bones.leftUpperArm.z,-P.stationary
   calls=[];failAt=1;assert.throws(()=>room.render(renderer,camera,avatar));assert.equal(bound,null);assert.equal(avatar.visible,true);assert.equal(clearAlpha,.3);
   calls=[];failAt=2;assert.throws(()=>room.render(renderer,camera,avatar));assert.equal(bound,null);assert.equal(avatar.visible,true);
   room.dispose();room.dispose();assert.equal([...disposed.values()].reduce((a,b)=>a+b),2);assert.equal(live,0);
-  // Exercise real backend validation from Node too; use only temporary fixture files.
-  const {spawnSync}=require("node:child_process");
-  const result=spawnSync(process.env.PYTHON || "python",["-m","pytest","-q","tests/test_avatar_backdrops.py"],{cwd:require("node:path").join(__dirname,".."),encoding:"utf8",env:{...process.env,PYTEST_DISABLE_PLUGIN_AUTOLOAD:"1"}});
-  assert.equal(result.status,0,result.stdout+result.stderr);
-  console.log("[OK] Painted cover/anchor, camera projection, stationary poses, light transitions, bounded/late textures, fallback and backend paths.");
+  // Backend path/security cases run in the independent Python suite.
+  console.log("[OK] Painted cover/anchor, camera projection, stationary poses, light transitions, bounded/late textures, fallback and render-target lifecycle.");
 })().catch(error=>{console.error(error);process.exitCode=1;});

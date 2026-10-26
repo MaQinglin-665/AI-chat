@@ -435,3 +435,5 @@ User accepted visuals and authorized merge after local/package/CI checks. Integr
 - 加强黄昏时的逆光轮廓。
 
 Verification Evidence: camera/motion/locomotion/painted targeted Node tests pass. Full test-local passed (841 passed, 3 skipped; all Node/syntax/secrets), with PYTEST_ADDOPTS=--ignore=tmp_ui_smoke to avoid collecting old ignored test fixtures. First-run package smoke passed. Merged real VRM0 night capture: natural lowered-arm idle, fixed painted camera across 12s sampled updates; no page/shader errors. Evidence tmp_ui_smoke/painted-polish/merged-night.png and merged.json. No camera algorithm edits.
+
+CI repair: Node painted test duplicated pytest invocation, but Linux Node job intentionally has no pytest dependency. Removed only that nested invocation; unchanged test_avatar_backdrops.py remains in Python/Windows/full gates. Targeted Node and Python backdrop suites rechecked.
