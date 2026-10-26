@@ -2,6 +2,7 @@ from llm_deadline import LLMTransportError, turn_budget
 from config import OLLAMA_DEFAULT_MODEL
 from companion_turn_contract import is_model_direct_reply_enabled
 from galgame_context import build_galgame_personality_prompt
+from avatar_brain_protocol import extract_reply, prompt as avatar_prompt, reply_llm_config
 
 
 OPENAI_COMPATIBLE_PROVIDERS = {"openai", "openai-compatible", "openai_compatible"}
@@ -47,6 +48,8 @@ def build_reply_prompt(
     galgame_prompt = "" if is_auto else build_galgame_personality_prompt(config)
     if galgame_prompt:
         prompt = merge_prompt_with_memory_fn(prompt, galgame_prompt)
+    if config.get("_avatar_brain_world") and not galgame_prompt:
+        prompt = merge_prompt_with_memory_fn(prompt, avatar_prompt(config["_avatar_brain_world"]))
     return prompt
 
 
@@ -91,7 +94,7 @@ def call_llm_impl(
     if not should_reply_fn(user_message, config=config, is_auto=is_auto):
         return ""
     llm_cfg_raw = config.get("llm", {})
-    llm_cfg = build_reply_llm_cfg_fn(config, llm_cfg_raw)
+    llm_cfg = reply_llm_config(build_reply_llm_cfg_fn(config, llm_cfg_raw), config)
     provider = resolve_runtime_provider(llm_cfg_raw)
     ensure_llm_auth_ready_fn(llm_cfg)
 
@@ -150,6 +153,7 @@ def call_llm_impl(
                 raw_reply = call_openai_compatible_with_tools_fn(llm_cfg, config, messages)
             else:
                 raw_reply = call_openai_compatible_fn(llm_cfg, messages)
+            raw_reply = extract_reply(raw_reply, config)
             final = finalize_assistant_reply_fn(
                 config,
                 llm_cfg,
@@ -195,6 +199,7 @@ def call_llm_impl(
         )
         try:
             raw_reply = call_ollama_fn(llm_cfg, messages, model_override=selected_model)
+            raw_reply = extract_reply(raw_reply, config)
             final = finalize_assistant_reply_fn(
                 config,
                 llm_cfg,
@@ -249,7 +254,7 @@ def call_llm_stream_impl(
     if not isinstance(config, dict):
         config = load_config_fn()
     llm_cfg_raw = config.get("llm", {})
-    llm_cfg = build_reply_llm_cfg_fn(config, llm_cfg_raw)
+    llm_cfg = reply_llm_config(build_reply_llm_cfg_fn(config, llm_cfg_raw), config)
     provider = resolve_runtime_provider(llm_cfg_raw)
     ensure_llm_auth_ready_fn(llm_cfg)
 

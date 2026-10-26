@@ -591,7 +591,37 @@ def _handle_chat_request(
         )
 
 
-def handle_chat_route(
+def handle_chat_route(path_only, body, *, avatar_brain_service=None, **kwargs):
+    """Keep the legacy route untouched when the optional service is absent."""
+    if avatar_brain_service is None:
+        return _handle_chat_route_impl(path_only, body, **kwargs)
+    holder = {}
+
+    def prepare(config):
+        result = avatar_brain_service.prepare_chat(config)
+        holder["config"] = result
+        return result
+
+    def sender(original):
+        def send(payload, *args, **options):
+            if isinstance(payload, dict) and "reply" in payload and payload.get("type", "done") == "done":
+                try:
+                    plan = avatar_brain_service.reply_plan(holder.get("config", {}))
+                    if plan is not None:
+                        payload = {**payload, "avatar_brain": plan}
+                except Exception:
+                    pass  # Optional decisions cannot fail normal chat/delivery.
+            return original(payload, *args, **options)
+        return send
+
+    kwargs["send_json_func"] = sender(kwargs["send_json_func"])
+    kwargs["send_sse_func"] = sender(kwargs["send_sse_func"])
+    kwargs["prepare_avatar_config"] = prepare
+    with avatar_brain_service.chat_turn():
+        return _handle_chat_route_impl(path_only, body, **kwargs)
+
+
+def _handle_chat_route_impl(
     path_only,
     body,
     *,
@@ -630,6 +660,7 @@ def handle_chat_route(
     perf_now_ms_func,
     process_desktop_qq_command_func=None,
     publish_event_func=None,
+    prepare_avatar_config=None,
 ):
     delivery_receipt_enabled = _has_delivered_turn_receipt_capability(body)
     if delivery_receipt_enabled:
@@ -713,6 +744,8 @@ def handle_chat_route(
         history,
         is_auto=is_auto,
     )
+    if callable(prepare_avatar_config) and not is_auto:
+        chat_config = prepare_avatar_config(chat_config)
 
     if path_only == "/api/chat_stream":
         _handle_chat_stream_request(

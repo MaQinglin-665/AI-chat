@@ -426,6 +426,18 @@ Deferred TODO, explicitly not fixed this task:
 Merge publication blocked: #222 push failed all five attempts, with 10s spacing (TLS handshake failures and port-443 timeouts). Local merge a05c690 and gate record 44b3a01 retained; no conflicts. #222 was not marked ready or merged; final latest-origin/main test is pending its merge. #220 merge a0bdce4 is complete. User push command: git -C D:/AI/ai_desktop_pet_readiness_20261023 push origin codex/avatar-motion-camera-v1 . After success resume ready/check all CI/merge #222, then detached origin/main final test. No further network attempts.
 
 
+## 2026-10-26 — Avatar brain phase 1 started
+
+User explicitly authorizes backend dialogue integration; phase 2 deferred until #217. Branch from ee3de6e, local main/private config unchanged. Scope: bounded world state, action whitelist, same-call reply actions, proactive frequency limits, confirmed existing memory, fake-model tests and console-only debug entry. No avatarRuntime/vrmRenderer edits. Git fetch succeeded with command-local system proxy; global configuration unchanged.
+
+
+## 2026-10-26 — Avatar brain phase 1 verification
+
+Implemented authenticated bounded world/think/poll/ACK routes, closed 3D action schema, same-call reply suffix filtering, environment-key-only proactive calls, timer/event triggers with interval/hour/day limits, stale/inflight/input/scene/period cancellation, and explicit confirmation in the existing memory store. Debugger only sends/logs; never executes or ACKs. Original random activity/rendering unchanged. Two protected renderer files untouched; local main remains 0a06554; private config hash matches prior baseline.
+
+Verification Evidence: final scripts/test-local.ps1 passed (865 passed, 3 skipped, 1 warning; all Node, Python/JS syntax and secret scan passed); final scripts/check_first_run_package.ps1 passed, including new module/debugger package presence. Added 35 fake-model Python cases including real local authenticated HTTP, provider/runtime/reply routing and temporary-file memory roundtrip; Node debugger opt-in/no-execution check passed. Required JSON/ten-module compile and diff checks passed. Logs ignored under tmp_ui_smoke/avatar-vrm-polish/brain-phase1-{final,package}.log.
+
+No real DeepSeek/TTS/ASR/renderer execution or 10-minute video; these are phase 2 after #217. Offline prompt 2429 chars/world302, estimated 700–1000 input +100–250 output tokens (cap480), daily default0–24 calls/~$0.0079–0.0144 at official peak uncached Flash rates. Not measured billing. Process-local limits reset on backend restart; receipts trust the authenticated local client; no frontend delivery/executor yet. See docs/avatar-brain-actions.md. Publish feature branch as draft only; no merge/main push.
 ## 2026-10-26 — PR #221 accepted integration
 
 User accepted visuals and authorized merge after local/package/CI checks. Integrating origin/main ee3de6e (#220/#222 merged). User explicitly approved the sole non-state conflict: retain walking and painted metrics in vrmRenderer.js; camera algorithm unchanged.
@@ -437,3 +449,19 @@ User accepted visuals and authorized merge after local/package/CI checks. Integr
 Verification Evidence: camera/motion/locomotion/painted targeted Node tests pass. Full test-local passed (841 passed, 3 skipped; all Node/syntax/secrets), with PYTEST_ADDOPTS=--ignore=tmp_ui_smoke to avoid collecting old ignored test fixtures. First-run package smoke passed. Merged real VRM0 night capture: natural lowered-arm idle, fixed painted camera across 12s sampled updates; no page/shader errors. Evidence tmp_ui_smoke/painted-polish/merged-night.png and merged.json. No camera algorithm edits.
 
 CI repair: Node painted test duplicated pytest invocation, but Linux Node job intentionally has no pytest dependency. Removed only that nested invocation; unchanged test_avatar_backdrops.py remains in Python/Windows/full gates. Targeted Node and Python backdrop suites rechecked.
+
+
+## 2026-10-26 — #224 审核通过，准备合并
+
+按用户授权合入最新 origin/main 79ee80f；仅 feature_list.json、progress.md、session-handoff.md 冲突。两边记录全部保留，功能列表合并为合法 JSON，active_task 保持 avatar-brain-driven-v1。没有代码冲突，也不额外修改从 main 合入的产品代码。本地 main 和私人配置不动。两项本地门禁和最新提交的 Linux/Windows CI 通过后，用 merge commit 合并 #224。
+
+### 第二期必做项（本次只记录，不实现）
+
+- 主动思考的提示词加入最近 3 轮对话的简短摘要（约 300 字以内）和 1～2 条相关记忆，让主动话语接上之前聊的内容。
+- 每日调用计数持久化到本地状态文件；该文件不进仓库，重启后不清零。
+- 文档明确写明：主动思考只使用环境变量里的 Key；Key 只写在配置文件里时，主动思考不会启用。
+
+合并后停止，必须等待用户通知 #217 已合并，再开始第二期。
+
+
+Verification Evidence for #224 merge: scripts/test-local.ps1 passed (876 passed, 3 skipped, 1 warning; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed. Ignored logs: tmp_ui_smoke/avatar-vrm-polish/merge224-local.log and merge224-package.log. Three state-file conflicts resolved by retaining both histories and both feature entries; active task stays avatar-brain-driven-v1. No code conflicts or extra product fixes. Next: normal push, ready, all CI, authorized merge commit, then stop awaiting user notice about #217.

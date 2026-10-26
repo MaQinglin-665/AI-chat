@@ -4218,6 +4218,26 @@ def build_relationship_memory_block():
     return f"你和用户的关系记忆：{summary}"
 
 
+def remember_avatar_event(config, text):
+    """Confirmed 3D experience in the existing short-term store, not a user utterance.
+
+    Reuses its enable flag, lock, retention, deletion and prompt retrieval. No
+    relationship counter, inferred user preference, or separate memory database.
+    """
+    settings = get_memory_settings(config)
+    if not settings["enabled"]:
+        return
+    text = normalize_memory_text(text, max_len=240)
+    if not text:
+        return
+    with MEMORY_LOCK:
+        items = load_memory_items()
+        items.append({"ts": datetime.now().isoformat(timespec="seconds"),
+                      "user": "[已确认的3D世界事件，非用户发言]", "assistant": text,
+                      "source": "avatar_world_confirmed"})
+        save_memory_items(items[-settings["max_items"]:])
+
+
 def remember_interaction(
     config,
     user_message,

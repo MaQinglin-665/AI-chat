@@ -243,6 +243,8 @@ from app_diagnostics import (
 from app_asr_route import handle_asr_pcm_request, handle_asr_stream_request
 import app_chat_context as _chat_context
 from app_chat_route import CHAT_ROUTES, handle_chat_route
+import app_avatar_brain
+from avatar_brain_protocol import filter_stream as filter_avatar_stream
 from companion_turn_contract import build_companion_turn
 from companion_dialogue_policy import build_model_direct_dialogue_policy
 from app_config_route import (
@@ -1279,7 +1281,7 @@ def _run_interaction_mind(config, snapshot):
 
 
 def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, force_tools=False, config=None):
-    yield from call_llm_stream_impl(
+    chunks = call_llm_stream_impl(
         user_message,
         history,
         image_data_url=image_data_url,
@@ -1304,6 +1306,7 @@ def call_llm_stream(user_message, history, image_data_url=None, is_auto=False, f
         iter_openai_responses_stream_fn=iter_openai_responses_stream,
         iter_ollama_chat_stream_fn=iter_ollama_chat_stream,
     )
+    yield from filter_avatar_stream(chunks, config or {})
 
 
 def render_tool_execution_summary(tool_payloads, max_chars=1800):
@@ -1808,6 +1811,9 @@ class PetHandler(SimpleHTTPRequestHandler):
             self._send_json(get_social_cognition_state(load_config())); return
         if self._reject_invalid_api_token(path_only):
             return
+        if path_only in app_avatar_brain.ROUTES:
+            app_avatar_brain.dispatch(self, path_only, app_avatar_brain.get_service(load_config))
+            return
         if app_external_agent.handles(path_only):
             app_external_agent.dispatch(self, "POST", path_only,
                 external_agent.get_manager(config_loader=lambda: load_config(), bus=_COMPANION_EVENT_BUS))
@@ -2269,6 +2275,7 @@ class PetHandler(SimpleHTTPRequestHandler):
             handle_chat_route(
                 path_only,
                 body,
+                avatar_brain_service=app_avatar_brain.get_service(load_config),
                 perf_trace_id=perf_trace_id,
                 perf_started_ms=perf_started_ms,
                 client_to_server_ms=client_to_server_ms,
