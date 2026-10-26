@@ -1,7 +1,7 @@
 # Session handoff — Room life v1 (2026-10-25)
 
 Branch codex/avatar-room-life-v1, based on origin/main 2356ddb (PR #218 merged). Local main remains 0a06554.
-Implementation and final full tests complete. Next: push branch, create draft PR to main, stop for user visual review. Never merge automatically.
+Implementation 0c34e34 and final full tests complete; branch pushed, draft PR #219 targets main. Next: wait for user Windows visual review. Never merge automatically.
 
 Changed: vrmFurniture.js local CC0 subset loader + one toon mesh; vrmWorld.js deterministic activities/routes/poses;
 vrmScene.js fallback and layout metadata; vrmRenderer.js locomotion/contact solving/book/follow camera; avatarRuntime.js input/busy/speech signals;

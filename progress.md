@@ -350,3 +350,5 @@ No page exceptions. Ten room toggles stable at 28 geometries / 47 textures. Idle
 CPU 3.28→3.32%, GPU 5.32→5.04%, draws 38→36, working set 959→970 MiB. Evidence/report docs/avatar-room-life.md.
 Limitations: real VRM1 and live ASR/LLM/TTS not exercised; procedural poses lack foot IK/full-body collisions, unusual outfits/heights may need tuning;
 no installer exe built. Existing night face-fill follow-up remains deferred. Only draft PR, user appearance review next; do not merge.
+
+Published implementation 0c34e34 on codex/avatar-room-life-v1; draft PR #219 targets main. Final package recheck passed. Private config hash unchanged. Waiting for user visual review; no merge.
