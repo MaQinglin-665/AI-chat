@@ -1,7 +1,7 @@
 # 2.5D 手绘背景（painted）
 
 依赖 PR #220 的 handpainted 前置实现；两者是不同预设。默认仍为 room。
-仅完整陪伴窗口的 VRM 启用 painted；透明桌宠、Live2D、none 和两个 3D 房间保留原行为。
+仅完整陪伴窗口的 VRM 启用 painted；透明桌宠、none 和两个 3D 房间保留原行为。Hiyori 可独立选择卧室背景，默认关闭，见下节。
 
 ## 本地配置与素材
 
@@ -26,9 +26,9 @@
 API 只有三个固定图片端点，经过现有来源与 token 检查；不接受请求指定文件路径，也不向客户端暴露磁盘路径。
 PNG 限制 64 MiB / 64M 像素。配置不合法不会读取其他目录。
 缺图按请求时段优先、再 night/dusk/day 查找；灯光跟随实际返回图的时段。
-全缺、请求失败或解码失败时用仓库的纯色占位 PNG。无 backdrop 配置同样使用占位图。
+本地目录全缺或未配置 backdrop 时，使用仓库内置卧室背景；内置图片也缺失时退回纯色占位 PNG。请求失败或解码失败仍由前端显示占位图。
 
-房间图片和 VRM 均由用户提供，未纳入仓库、源码包或 PR；没有推断 AI 图片的使用许可。
+卧室背景经用户明确授权纳入仓库及源码包（web/assets/backgrounds/bedroom）；素材来源与哈希见同目录 README.md 和 manifest.json。VRM 仍为本地私人文件，不提交。
 更换高清图片保持文件名和构图即可，重新进入场景后读取新文件；相机与锚点使用比例坐标，不依赖旧分辨率。
 如果更换构图，须重新校准，不承诺自动估计透视。
 
@@ -126,3 +126,9 @@ tests/test_avatar_backdrops.py 验证目录/链接边界、缺图回退、PNG �
 | tests/test_external_agent.py；tests/test_external_agent_routes.py | 仅临时测试夹具隔离，未改外部执行产品代码 |
 | scripts/run_node_tests.js；scripts/check_first_run_package.ps1 | 门禁注册、占位图打包完整性 |
 | docs/avatar-room-painted.md；feature_list.json；progress.md；session-handoff.md | 使用说明、状态与验证证据 |
+
+## Hiyori 陪伴背景开关
+
+在「模型与语音」中打开「Hiyori 陪伴背景 → 使用手绘卧室背景」。默认关闭，设置仅存本机浏览器/Electron 的 localStorage；不改 config.local.json。只在 Live2D 完整陪伴窗口显示；切换到透明桌宠、聊天窗口或 VRM 时移除图层，关闭后恢复原有背景。
+
+复用已有时间场景：自动模式按本地时间切换，清晨使用 day.png，手动锁定时跟随已有场景选择。图片按比例 cover、以 56%/86% 为裁切参考，切换约 2.6 秒淡入淡出；加载失败恢复原背景。只保留当前及下一张图片节点，退出时清理监听器、计时器和图片。Live2D 人物的缩放、动作、光照与渲染代码不变。资源增量约 29 MB，首次打开需要读取并解码原始 PNG。

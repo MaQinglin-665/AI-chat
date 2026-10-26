@@ -1,0 +1,7 @@
+/* This independent layer never changes Live2D rendering or the transparent pet window. */
+#hiyori-backdrop { display: none; position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+body.view-full:not(.transparent-mode):not([data-avatar-kind="vrm"])[data-hiyori-backdrop="true"] #hiyori-backdrop { display: block; }
+body.view-full:not(.transparent-mode):not([data-avatar-kind="vrm"])[data-hiyori-backdrop="true"] .stage-scene { visibility: hidden; }
+.hiyori-backdrop-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 56% 86%; opacity: 0; transition: opacity 2600ms ease; }
+.hiyori-backdrop-image.is-visible { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .hiyori-backdrop-image { transition: none; } }

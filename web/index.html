@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="./tokens.css">
   <link rel="stylesheet" href="./visualPolish.css">
   <link rel="stylesheet" href="./experienceFixes.css">
+  <link rel="stylesheet" href="./hiyoriBackdrop.css">
   <link rel="preload" href="./assets/stage-rooms/day-room-v1.webp" as="image" type="image/webp">
   <link rel="preload" href="./assets/stage-rooms/morning-room-v1.webp" as="image" type="image/webp">
   <link rel="preload" href="./assets/stage-rooms/dusk-room-v1.webp" as="image" type="image/webp">
@@ -39,6 +40,7 @@
     <span class="app-titlebar-mark" aria-hidden="true"></span>
     <span class="app-titlebar-name">&#x99A8;&#x8BED;&#x684C;&#x5BA0;</span>
   </header>
+  <div id="hiyori-backdrop" aria-hidden="true"></div>
   <div class="stage-scene" aria-hidden="true">
     <div class="stage-room-background stage-room-background-day"></div>
     <div class="stage-room-background stage-room-background-morning"></div>
@@ -367,6 +369,11 @@
       </div>
 
       <div class="config-switch-body">
+        <section id="hiyori-backdrop-options" class="config-switch-section" hidden>
+          <h3>Hiyori 陪伴背景</h3>
+          <label><input type="checkbox" id="hiyori-backdrop-enabled" /> 使用手绘卧室背景</label>
+          <p>默认关闭。开启后随时间场景切换；仅在陪伴窗口显示，桌宠保持透明。</p>
+        </section>
         <section id="avatar-model-info" class="config-switch-section" hidden aria-label="当前角色模型信息">
           <h3>当前角色模型 · VRM</h3>
           <p>名称：<strong data-avatar-name></strong></p>
@@ -1179,6 +1186,7 @@
   <template id="taffy-view-script-manifest">
   <script src="./stageFeedbackController.js"></script>
   <script src="./stageThemeController.js"></script>
+  <script src="./hiyoriBackdrop.js"></script>
   <script src="./controlCenterShell.js"></script>
   <script src="./externalAgentController.js"></script>
   <script src="./chatState.js"></script>
