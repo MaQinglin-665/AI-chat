@@ -43,9 +43,13 @@
   }
   function gradeRoomMaterials(scene, preset) {
     if (preset.exposure === 1 && preset.saturation === 1) return;
+    const restore = [], seen = new Set();
     scene.traverse(node => { for (const material of [].concat(node.material || [])) {
-      if (!material.isMToonMaterial) continue;
+      if (!material.isMToonMaterial || seen.has(material)) continue;
+      seen.add(material);
       const previous = material.onBeforeCompile;
+      const previousKey = material.customProgramCacheKey;
+      restore.push(() => { material.onBeforeCompile = previous; material.customProgramCacheKey = previousKey; material.needsUpdate = true; });
       material.onBeforeCompile = function(shader, renderer) {
         previous.call(this, shader, renderer);
         shader.fragmentShader = shader.fragmentShader.replace("#include <tonemapping_fragment>",
@@ -54,6 +58,7 @@
       material.customProgramCacheKey = () => `xinyu-room-${preset.exposure}-${preset.saturation}`;
       material.needsUpdate = true;
     }});
+    return () => restore.forEach(fn => fn());
   }
   const VOWELS = { a: "aa", i: "ih", u: "ou", e: "ee", o: "oh" };
   const FACES = { happy: "happy", angry: "angry", sad: "sad", thinking: "relaxed",
@@ -246,6 +251,18 @@
     const canvas = options.canvas;
     let modelHeight = 1.6, hitAreas = [], loadMs = 0, loadedAt = 0, frames = 0;
     let projection = null;
+    let room = null, legacyLights = null, undoGrade = null, floorY = 0;
+    const roomModule = options.roomModule || root.XinyuVRMScene;
+    const period = () => root.document?.body?.dataset.stageRoom || "night";
+    function setScene(value) {
+      if (!scene) return;
+      room?.dispose(); room = null; undoGrade?.(); undoGrade = null;
+      const useRoom = roomModule?.enabled(options.view, value);
+      if (legacyLights) legacyLights.visible = !useRoom;
+      if (useRoom) room = roomModule.create({ THREE: vendor.THREE, scene, height: modelHeight, floorY, period: period() });
+      else undoGrade = gradeRoomMaterials(vrm.scene, options.view === "full" ? LIGHT.room : LIGHT.pet);
+      if (root.document?.body) root.document.body.dataset.avatarScene = useRoom ? "room" : "none";
+    }
     const hitBones = [
       ["head", "head", 0.075], ["neck", "hips", 0.10],
       ["leftUpperArm", "leftLowerArm", 0.045], ["leftLowerArm", "leftHand", 0.04],
@@ -256,6 +273,8 @@
     ];
     function dispose() {
       generation += 1;
+      room?.dispose(); room = null; undoGrade?.(); undoGrade = null; legacyLights = null;
+      if (root.document?.body) root.document.body.dataset.avatarScene = "none";
       driver?.stopAction();
       if (vrm) vendor.VRMUtils.deepDispose(vrm.scene);
       renderer?.dispose(); renderer?.forceContextLoss();
@@ -298,7 +317,8 @@
       camera.position.set(0, framing.cameraY, framing.distance);
       camera.lookAt(0, framing.targetY, 0);
       const preset = options.view === "full" ? LIGHT.room : LIGHT.pet;
-      scene.add(new THREE.HemisphereLight(preset.sky, preset.ground, preset.ambient));
+      floorY = box.min.y; legacyLights = new THREE.Group(); scene.add(legacyLights);
+      legacyLights.add(new THREE.HemisphereLight(preset.sky, preset.ground, preset.ambient));
       for (const [position, color, intensity] of [
         [LIGHT.keyPosition, preset.keyColor, preset.key], [LIGHT.fillPosition, preset.fillColor, preset.fill],
         [LIGHT.rimPosition, preset.rimColor, preset.rim]
@@ -306,9 +326,9 @@
         const light = new THREE.DirectionalLight(color, intensity);
         light.position.set(height * position[0], box.min.y + height * position[1], height * position[2]);
         light.target.position.set(0, box.min.y + height * LIGHT.targetHeight, 0);
-        light.castShadow = false; scene.add(light, light.target);
+        light.castShadow = false; legacyLights.add(light, light.target);
       }
-      gradeRoomMaterials(vrm.scene, preset);
+      setScene(source.scene);
       renderer = new THREE.WebGLRenderer({ canvas, alpha: true, premultipliedAlpha: true, antialias: true, powerPreference: "low-power" });
       renderer.setClearColor(0x000000, 0);
       renderer.shadowMap.enabled = false;
@@ -344,6 +364,7 @@
       if (canvas.width !== Math.floor(width * ratio) || canvas.height !== Math.floor(height * ratio)) {
         renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix();
       }
+      room?.update(period(), frame.now ?? root.performance.now(), camera.position.z);
       driver.update(frame); renderer.render(scene, camera); frames += 1;
       updateHitAreas(width, height);
     }
@@ -354,14 +375,15 @@
       return x >= rect.left && y >= rect.top && x <= rect.right && y <= rect.bottom
         && hitSegments(x - rect.left, y - rect.top, hitAreas);
     }
-    return { kind: "vrm", load, dispose, update, hitTest,
+    return { kind: "vrm", load, dispose, update, hitTest, setScene,
       capabilities: () => driver?.capabilities() || { vowels: false, faces: [], actions: [], vrma: false },
       playAction: (...args) => driver?.playAction(...args) || false,
       stopAction: () => driver?.stopAction(),
       isAnimating: () => driver?.isAnimating() || false,
       metrics: () => ({ loadMs, loadedAt, frames, pixelRatio: renderer?.getPixelRatio(),
         antialias: renderer?.getContext().getContextAttributes()?.antialias,
-        drawCalls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles, smallMotion: driver?.motionState() }),
+        drawCalls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles, smallMotion: driver?.motionState(),
+        room: room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
       // Reserved for a later animation loader; never silently fetch arbitrary files.
       loadAnimation: async () => false
     };

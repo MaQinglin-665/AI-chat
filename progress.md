@@ -303,3 +303,30 @@ Verification Evidence: final scripts/test-local.ps1 passed (825 Python passed, 3
 ## 2026-10-25 — PR #216 accepted, merge preparation
 
 User passed visual review and explicitly authorized --merge --admin after required gates, superseding draft-only restriction. Fetched origin successfully on fourth attempt after TLS errors. Latest origin/main 5b20358 already contained in avatar branch; git merge reported up-to-date, no conflicts. Verification Evidence: scripts/test-local.ps1 passed (825 passed, 3 skipped; all Node/syntax/secrets); scripts/check_first_run_package.ps1 passed. Logs in ignored tmp_ui_smoke/avatar-vrm-polish/merge-local-tests.log and merge-package-check.log. Acceptance-only state update; no runtime changes. Next: ready PR, all current-head Linux/Windows CI green, merge commit, then final exact origin/main gate. Preserve unrelated local main commit 0a06554; no reset or private config modification.
+
+
+## 2026-10-25 — Procedural VRM room v1
+
+Fetched origin/main and verified PR #216 merge a08e0c4 ancestor; created codex/avatar-3d-room-v1. User explicitly asked to preserve local main/0a06554; remote architecture branch is exactly that commit, no edits. Added independent seeded room data/build/disposal, five instanced Toon batches, generated sky/ramp/contact shadow, bounded room/none API field, existing stageRoom day/night transition. Full VRM hides painted stage only with room active; transparent pet and Hiyori retain old paths. No dialogue/memory/external execution/Live2D renderer/private model/config changes.
+
+Verification Evidence: Node deterministic layout/bounds/day-night/no-request checks, real Three no-WebGL ten-cycle resource disposal and fake renderer gating. Actual Electron VRM0: 20.00 -> 19.97 FPS, CPU 4.45 -> 3.85%, GPU 4.93 -> 4.92%, draw calls 28 -> 34. Ten room/none cycles return geometry/textures to 20/45, no sustained post-GC JS heap growth. Six requested captures plus baseline saved only in ignored tmp_ui_smoke/avatar-vrm-polish; Hiyori stays live2d with original background. Report docs/avatar-3d-room.md. Initial full gate 829 passed/3 skipped, Node/syntax/secrets passed; first-run package passed. Final gate after shared-material restoration test passed: 829 passed/3 skipped, all Node/syntax/secrets. Required JSON/py_compile pre-push checks passed. Draft PR only; user Windows appearance review next.
+
+
+## 2026-10-25 — Room metre scale, depth and daylight
+
+User reviewed #218 and requested physical proportions/composition. Removed avatar-height scaling, explicit furniture dimensions in metres, wall 3m behind avatar and side furnishings 2–2.65m behind. Added clean head backdrop, square wall joins/ceiling/skirting, partial distant pink crowns, moon/star sizes/clouds, brighter warm daytime with non-shadow-mapped sun patch. No private/model/Live2D/dialogue/memory/external execution changes.
+
+Verification Evidence: scripts/test-local.ps1 passed 829/3, all Node/syntax/secrets; dimensions/book range/backdrop/depth/unscaled-height tests added and ten-cycle disposal passes. Actual full and pulled-back Electron VRM0 night/day captures inspected, only in ignored tmp_ui_smoke/avatar-vrm-polish/metres-*.png. Full idle 19.98 FPS, CPU 4.21%, GPU 5.19%, 38 draw calls, within 1.5x original GPU budget. Required pre-push JSON/py_compile passed. Dimensions and limitations docs/avatar-3d-room.md. Draft #218 only, user appearance acceptance next.
+
+
+## 2026-10-25 — PR #218 visual acceptance and merge preparation
+
+User passed visual acceptance and explicitly authorized merge commit (--merge --admin) after local/package gates and all Linux/Windows CI pass. Fetched origin; latest origin/main already contained, no merge conflicts. Local main and private config remain untouched.
+
+### Follow-up backlog (explicitly deferred, not fixed in this merge)
+
+- 房间偏空：后续考虑增加书桌、床、墙面装饰。
+- 夜晚人物脸部补光。
+- 将落地灯从窗前移到窗户一侧。
+
+Verification Evidence: fresh scripts/test-local.ps1 passed (829 passed, 3 skipped; all Node/syntax/secrets); scripts/check_first_run_package.ps1 passed. Required JSON/py_compile checks passed. Logs ignored under tmp_ui_smoke/avatar-vrm-polish/merge218-*.log. After CI, merge PR #218 then test exact latest origin/main in detached HEAD, preserving local main.

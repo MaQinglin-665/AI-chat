@@ -1,5 +1,7 @@
 # VRM 基础渲染器
 
+完整窗口的程序生成 3D 房间、`avatar.scene` 开关及性能证据见 [3D 房间第一版](avatar-3d-room.md)。
+
 本功能仅提供本地 VRM 0.x / 1.0 渲染和基础表演，沿用
 [Avatar Intent Interface v1](avatar-intent-interface.md)。未配置 `avatar`，
 或继续使用旧 `model_path` 时，仍走原 Live2D 初始化流程。
