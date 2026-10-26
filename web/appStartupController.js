@@ -532,6 +532,7 @@
           state._broadcastSpeaking = !!data.speaking;
           state._broadcastAssistantAudioActive = data.assistantAudioActive === true;
           state.ttsAudioLevel = Number(data.audioLevel) || 0;
+          state.ttsAudioAnalysisAvailable = data.audioAnalysisAvailable === true;
           state.ttsVowel = state.ttsAudioLevel > 0.02 && ["a", "i", "u", "e", "o"].includes(data.vowel) ? data.vowel : null;
           state.ttsVowelConfidence = state.ttsVowel && Number.isFinite(data.vowelConfidence) ? Math.max(0, Math.min(1, data.vowelConfidence)) : 0;
           applyBroadcastListeningPresence(data.listening);
@@ -625,6 +626,7 @@
               : 0,
             animDurationMs: state.speechAnimDurationMs || 0,
             audioLevel: state.ttsAudioLevel || 0,
+            audioAnalysisAvailable: !!state.ttsAudioAnalyser || (state.ttsPcmAudioAnalyserActive === true && !!state.ttsPcmAudioAnalyser),
             vowel: state.ttsAudioLevel > 0.02 ? state.ttsVowel || null : null,
             vowelConfidence: state.ttsVowelConfidence || 0,
             moodHoldExpiresAtEpochMs: toBridgeEpoch(state.moodHoldUntil, now, wallNow),

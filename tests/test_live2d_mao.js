@@ -23,6 +23,13 @@ function spectrum(f1, f2) {
   estimator.sample(audio, analyser, 0, 180, 50); assert.equal(audio.ttsVowel, null);
   assert.equal(runtime.frameFromState({ ttsAudioLevel: .8, ttsVowel: "i" }, 123).mouth.vowel, "i");
   assert.equal(runtime.frameFromState({ uiView: "model", ttsAudioLevel: .8, ttsVowel: "i", _broadcastSpeechUpdatedAt: 1 }, 2000).mouth.vowel, null);
+  const speech = { avatarMapping: mapping, speechMouthOpen: .6, ttsAudioLevel: 0 };
+  assert.equal(runtime.frameFromState(speech, 123).mouth.open, .6, "browser TTS retains existing opening envelope");
+  assert.equal(runtime.frameFromState({ ...speech, ttsAudioAnalyser: {} }, 123).mouth.open, 0, "analysed silence must stay closed");
+  assert.equal(runtime.frameFromState({ ...speech, uiView: "model", _broadcastSpeechUpdatedAt: 100, ttsAudioAnalysisAvailable: true }, 123).mouth.open, 0);
+  assert.equal(runtime.frameFromState({ ...speech, uiView: "model", _broadcastSpeechUpdatedAt: 100 }, 123).mouth.open, .6);
+  assert.equal(runtime.frameFromState({ ...speech, uiView: "model", _broadcastSpeechUpdatedAt: 100 }, 2000).mouth.open, 0);
+  assert.equal(runtime.frameFromState({ ...speech, avatarMapping: { id: "hiyori" } }, 123).mouth.open, 0);
   const writes = [], native = [];
   const core = Object.fromEntries(["setParameterValueById", "addParameterValueById", "multiplyParameterValueById", "setPartOpacityById"].map(name => [name, (...args) => writes.push([name,...args])]));
   const model = { internalModel: { coreModel: core, motionManager: { stopAllMotions() { native.push("stop"); } } }, motion(...args) { native.push(args); } };

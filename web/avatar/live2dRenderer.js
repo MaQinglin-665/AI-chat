@@ -32,7 +32,10 @@
       state.avatarMapping = mapping;
       resource = await lifecycle.load({ ...source, mapping, beforeCoreUpdate(runLayers) {
         // Called only at the original pre-Core hook, inside the Pixi model tick.
-        if (mapping.driver === "mapped" && state.uiView !== "model") host.sampleTTSAudioLevel?.();
+        if (mapping.driver === "mapped" && state.uiView !== "model") {
+          host.sampleTTSAudioLevel?.();
+          if (!state.ttsAudioAnalyser && !(state.ttsPcmAudioAnalyserActive && state.ttsPcmAudioAnalyser)) host.getSpeechAnimationMouthOpen?.();
+        }
         clock?.(host.performance.now());
         if (mapping.driver === "mapped") driver?.update(sanitize(state.avatarIntentFrame));
         else runLayers();

@@ -83,6 +83,16 @@ const server = http.createServer((req, res) => {
       const values = await page.evaluate(name => QA.capture({ face: "happy", faceIntensity: .5, mouth: { open: 0 }, speechGesture: { name, phase: .5 } }, "手臂手势：" + name), gesture);
       await page.screenshot({ path: path.join(output, `gesture-${gesture}.png`) }); evidence.cases.push({ name: `gesture-${gesture}`, values });
     }
+    evidence.browserTtsFallback = await page.evaluate(async () => {
+      QA.state.speechMouthOpen = .6; QA.state.ttsAudioLevel = 0;
+      const browser = await QA.capture({}, '无频谱浏览器语音张合回退');
+      QA.state.ttsAudioAnalyser = {};
+      const silence = await QA.capture({}, '有音频分析时静音闭嘴');
+      delete QA.state.ttsAudioAnalyser; QA.state.speechMouthOpen = 0;
+      return { browserOpen: browser.ParamA, analysedSilence: silence.ParamA };
+    });
+    assert.equal(evidence.browserTtsFallback.browserOpen, Math.fround(.6));
+    assert.equal(evidence.browserTtsFallback.analysedSilence, 0);
     evidence.motions = [];
     for (const name of ["sentence_release", "thoughtful_glance", "nod", "happy_bounce", "attentive_tilt", "speak_emphasis", "poked", "shy_glance"]) {
       assert.equal(await page.evaluate(name => QA.motion(name), name), true); evidence.motions.push(name);

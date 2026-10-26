@@ -76,7 +76,13 @@
   function frameFromState(state, now, wallNow = Date.now(), prepareMs = 1100) {
     const remote = state.uiView === "model";
     const fresh = !remote || (now - Number(state._broadcastSpeechUpdatedAt || 0) < 900);
-    const level = fresh ? clamp(state.ttsAudioLevel) : 0;
+    let level = fresh ? clamp(state.ttsAudioLevel) : 0;
+    const analysed = remote ? state.ttsAudioAnalysisAvailable === true
+      : !!state.ttsAudioAnalyser || (state.ttsPcmAudioAnalyserActive === true && !!state.ttsPcmAudioAnalyser);
+    // Browser speech synthesis exposes no spectrum. Use its existing portable
+    // mouth envelope only for mapped Live2D and only without real audio analysis;
+    // genuine analysed silence must remain closed. Hiyori/VRM stay unchanged.
+    if (fresh && state.avatarMapping?.driver === "mapped" && !analysed) level = Math.max(level, clamp(state.speechMouthOpen));
     const age = wallNow - Number(state.conversationLastAssistantAt || 0);
     const preparingSpeech = age >= 0 && age < prepareMs;
     return { now, preparingSpeech, mode: level > 0.02 ? "speak" : "idle",
