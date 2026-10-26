@@ -35,8 +35,19 @@ console.log('[OK] Hiyori default-off, periods, bounded plates, stale loads, fail
 const values={}, style={setProperty:(k,v)=>values[k]=v};
 B.syncFoot({model:{x:500,y:700,height:600},renderer:{width:1000,height:800},canvas:{getBoundingClientRect:()=>({left:10,top:20,width:500,height:400})},style});
 assert.equal(values['--hiyori-foot-x'],'260px');assert.equal(values['--hiyori-foot-y'],'361px');
-assert.equal(values['--hiyori-shadow-width'],'45px');
+assert.equal(values['--hiyori-shadow-width'],'57px');
 assert(B.LOOKS.night.opacity<B.LOOKS.day.opacity);assert(B.LOOKS.dusk.width>B.LOOKS.day.width);assert(B.LOOKS.dusk.dx>0 && B.LOOKS.dusk.dy>0);
 const fs=require('node:fs');const html=fs.readFileSync('web/index.html','utf8');
 assert(html.indexOf('id="hiyori-backdrop-enabled"')>html.indexOf('id="config-switch-modal"'));
 assert(!html.includes('使用手绘卧室背景'));
+
+for(const look of Object.values(B.LOOKS)) assert(look.saturation>=.9);
+assert(B.LOOKS.night.brightness>=.75 && B.LOOKS.night.brightness<=.85);
+assert(B.LOOKS.night.tint[2]>B.LOOKS.night.tint[1]);assert(B.LOOKS.dusk.tint[0]>B.LOOKS.dusk.tint[2]);
+let clock=0, queue=new Map(), next=0, matrix='';
+const tint=B.createTint({setAttribute:(_,v)=>matrix=v},{now:()=>clock,setTimer:f=>{queue.set(++next,f);return next},clearTimer:i=>queue.delete(i)});
+const advance=t=>{clock=t;const callbacks=[...queue.values()];queue.clear();callbacks.forEach(f=>f());};
+tint.to(B.LOOKS.night.tint);advance(1300);const halfway=matrix;assert.notEqual(halfway,B.matrixValues(B.LOOKS.night.tint));
+tint.to(B.LOOKS.dusk.tint);assert.equal(matrix,halfway,'interrupted transition keeps current tint');advance(3900);
+assert.equal(matrix,B.matrixValues(B.LOOKS.dusk.tint));assert.equal(matrix.split(' ')[18],'1','alpha preserved');
+tint.to(B.LOOKS.night.tint);tint.reset();assert.equal(queue.size,0);assert.equal(matrix,B.matrixValues([1,1,1]));
