@@ -376,6 +376,22 @@ Verification Evidence: targeted Node layout/path/local-only/fallback/async-dispo
 Real Electron VRM0: same-camera room/handpainted, day/night panoramas, four activities, forced missing-scene fallback and ten room/none/handpainted cycles; no page exceptions. Stable resources: room 28 geometries/47 textures; handpainted 41/60. Draws 36 vs 42 at companion view, activity views 38–47. No fresh CPU/GPU timing benchmark claimed. Ignored evidence: tmp_ui_smoke/avatar-vrm-polish/handpainted-*.png, handpainted-acceptance.json, handpainted-tour.mp4 (35s silent). Original scene.bin and 15 base-color images hash-identical to download; private config hash unchanged.
 Limitations: fixed painted shadows/reflections, visible cutaway boundaries, inherited stiff/airborne hand contacts, no arbitrary outfit collisions or real VRM1 visual check. Default room unchanged. Await user visual review via draft PR only; no merge.
 
+## 2026-10-26 — Painted backdrop implementation
+
+User authorized b22d4ef (PR #220) prerequisite. Fast-forwarded only this committed head; other thread motion/camera changes excluded. Work exclusively in ai_desktop_pet_painted with copied dependencies. Draft PR must target main and begin with dependency notice. Merge origin/main after #220 only; stop on conflicts outside three state files.
+
+Verification Evidence: final scripts/test-local.ps1 passed: 841 passed, 3 skipped; all Node suites, Python/JS syntax and secrets passed. scripts/check_first_run_package.ps1 passed again with explicit painted code/placeholder presence and placeholder hash. Initial 19 unrelated test failures came from disposable work/home paths inside the checkout; fixed only two test fixtures by giving them a sibling synthetic protected-project, preserving security assertions and product policy.
+Actual isolated Electron VRM0 on loopback 8137 with a separate ignored test-config.json, no config.local.json/LLM: night/dusk/day, metre grid, 1920x1080/1280x800/480x800, 30.000s MP4, setting-driven reflection disposal and room/handpainted/none/pet regression. No page errors. Captures/video/config/logs remain ignored in tmp_ui_smoke/painted. All supplied PNGs currently 2560x1440; no source asset/model copied into tracked paths.
+Lifecycle: ten initial scene cycles and further four batches of ten. GPU counts stable at 25 geometries / 48 textures; four major-GC heap samples 7197120, 6709132, 6818676, 6967892 bytes (6.40–6.86 MiB), final below first. Short-run evidence only, not an absolute long-term leak guarantee. Reflection off releases its target.
+Shared integration files: avatar_assets.py, app_get_routes.py, web/avatar/vrmRenderer.js, web/avatar/avatarRuntime.js, web/avatar/vrmWorld.js, web/index.html, web/stage.css. Camera-follow block unchanged; dedicated paintedCamera object. Full 21-file list and calibration limitations in docs/avatar-room-painted.md. No dialogue/memory/external-execution product code or Live2D renderer modified.
+Remote fetch recovered; #220 is OPEN at b22d4ef, origin/main remains 0542d04. Draft PR to main must start with dependency notice. After #220 merges, merge origin/main only if conflicts limited to three state files; never auto-merge this PR.
+
+## 2026-10-26 — PR #221 integration polish
+
+User accepted perspective/scale/crop; requested stronger contact/reflection, directional period lighting, avatar-only softness/glow/grading and before/after/detail captures. Same branch/worktree; do not alter camera calibration. Baseline 7aeb26b; #220 still open.
+Implementation: stronger two-foot contact cores and directional soft shadows; reflection opacity night/dusk/day 0.20/0.24/0.19, softened and floor-tinted with downward fade. Corrected window/lamp screen directions, period grading, 0.75 CSS px avatar-only softness and faint halo. Accepted fixed camera/crop unchanged. Only shared code change this revision is vrmRenderer.js painted render dispatch; avatarRuntime and camera-follow untouched.
+Verification Evidence: scripts/test-local.ps1 passed (841 Python passed, 3 skipped; all Node, syntax and secrets checks). Actual isolated Electron VRM0: same-pose 1920x1080 before/after for all periods and 3x feet/edge crops, final shader/page errors empty. Outer background columns 0:700 unchanged pixel-for-pixel in all periods. Twenty additional scene cycles: stable 26 geometries / 49 textures; two major-GC samples 6677384 and 6835904 bytes. Settings disable releases reflection target; room/handpainted/none/pet smoke passed. Actual painted frame has 50 draws across reflection/avatar/composite passes (16+28+6), not only the final pass count of 6.
+Evidence remains ignored under tmp_ui_smoke/painted-polish (after-final-*.png, before-*.png, acceptance.json, test-local.log). Extra full-resolution MSAA avatar buffer increases GPU memory/render cost; no hardware-wide performance or long-run leak guarantee. No private assets/config committed. PR #221 remains draft pending visual review; prerequisite #220 merge condition unchanged.
 ## 2026-10-26 — Camera/motion task started, network pause
 
 User authorized inclusion of unmerged #220 into new codex/avatar-motion-camera-v1 branch; origin/main 0542d04 -> b22d4ef, local main unchanged. Both baseline 35s silent recordings captured in ignored tmp_ui_smoke/avatar-vrm-polish/motion-before-{room,handpainted}.mp4. Camera diagnosis: animated avatarRoot and seat corrections feed frame-by-frame camera targets after the old transition completes. Partial root-only damped/dead-zone/activity-lock camera added; not yet acceptance-tested.
@@ -422,3 +438,30 @@ Implemented authenticated bounded world/think/poll/ACK routes, closed 3D action 
 Verification Evidence: final scripts/test-local.ps1 passed (865 passed, 3 skipped, 1 warning; all Node, Python/JS syntax and secret scan passed); final scripts/check_first_run_package.ps1 passed, including new module/debugger package presence. Added 35 fake-model Python cases including real local authenticated HTTP, provider/runtime/reply routing and temporary-file memory roundtrip; Node debugger opt-in/no-execution check passed. Required JSON/ten-module compile and diff checks passed. Logs ignored under tmp_ui_smoke/avatar-vrm-polish/brain-phase1-{final,package}.log.
 
 No real DeepSeek/TTS/ASR/renderer execution or 10-minute video; these are phase 2 after #217. Offline prompt 2429 chars/world302, estimated 700–1000 input +100–250 output tokens (cap480), daily default0–24 calls/~$0.0079–0.0144 at official peak uncached Flash rates. Not measured billing. Process-local limits reset on backend restart; receipts trust the authenticated local client; no frontend delivery/executor yet. See docs/avatar-brain-actions.md. Publish feature branch as draft only; no merge/main push.
+## 2026-10-26 — PR #221 accepted integration
+
+User accepted visuals and authorized merge after local/package/CI checks. Integrating origin/main ee3de6e (#220/#222 merged). User explicitly approved the sole non-state conflict: retain walking and painted metrics in vrmRenderer.js; camera algorithm unchanged.
+
+待办（另开任务）：
+- 高清背景到位后拉近陪伴视角，让人物更大。
+- 加强黄昏时的逆光轮廓。
+
+Verification Evidence: camera/motion/locomotion/painted targeted Node tests pass. Full test-local passed (841 passed, 3 skipped; all Node/syntax/secrets), with PYTEST_ADDOPTS=--ignore=tmp_ui_smoke to avoid collecting old ignored test fixtures. First-run package smoke passed. Merged real VRM0 night capture: natural lowered-arm idle, fixed painted camera across 12s sampled updates; no page/shader errors. Evidence tmp_ui_smoke/painted-polish/merged-night.png and merged.json. No camera algorithm edits.
+
+CI repair: Node painted test duplicated pytest invocation, but Linux Node job intentionally has no pytest dependency. Removed only that nested invocation; unchanged test_avatar_backdrops.py remains in Python/Windows/full gates. Targeted Node and Python backdrop suites rechecked.
+
+
+## 2026-10-26 — #224 审核通过，准备合并
+
+按用户授权合入最新 origin/main 79ee80f；仅 feature_list.json、progress.md、session-handoff.md 冲突。两边记录全部保留，功能列表合并为合法 JSON，active_task 保持 avatar-brain-driven-v1。没有代码冲突，也不额外修改从 main 合入的产品代码。本地 main 和私人配置不动。两项本地门禁和最新提交的 Linux/Windows CI 通过后，用 merge commit 合并 #224。
+
+### 第二期必做项（本次只记录，不实现）
+
+- 主动思考的提示词加入最近 3 轮对话的简短摘要（约 300 字以内）和 1～2 条相关记忆，让主动话语接上之前聊的内容。
+- 每日调用计数持久化到本地状态文件；该文件不进仓库，重启后不清零。
+- 文档明确写明：主动思考只使用环境变量里的 Key；Key 只写在配置文件里时，主动思考不会启用。
+
+合并后停止，必须等待用户通知 #217 已合并，再开始第二期。
+
+
+Verification Evidence for #224 merge: scripts/test-local.ps1 passed (876 passed, 3 skipped, 1 warning; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed. Ignored logs: tmp_ui_smoke/avatar-vrm-polish/merge224-local.log and merge224-package.log. Three state-file conflicts resolved by retaining both histories and both feature entries; active task stays avatar-brain-driven-v1. No code conflicts or extra product fixes. Next: normal push, ready, all CI, authorized merge commit, then stop awaiting user notice about #217.
