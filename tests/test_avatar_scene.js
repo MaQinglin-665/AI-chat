@@ -7,6 +7,21 @@ const room = require("../web/avatar/vrmScene.js");
 assert.deepEqual(room.layout(216), room.layout(216));
 assert.notDeepEqual(room.layout(216), room.layout(217));
 const data = room.layout();
+assert.deepEqual(room.FURNITURE.shelf.size, [1.05, 1.8, 0.32]);
+assert.equal(room.FURNITURE.lamp.size[1], 1.5);
+assert.equal(room.FURNITURE.lamp.size[0], 0.35);
+assert.deepEqual(room.FURNITURE.window.size.slice(0, 2), [1.2, 1.4]);
+assert.equal(room.FURNITURE.window.sill, 0.9);
+for (const item of data.items.filter(i => i.id.startsWith("book-"))) {
+  assert(item.size[1] >= 0.2 && item.size[1] <= 0.28);
+  assert(item.position[2] < -1.5);
+}
+for (const item of data.items.filter(i => /^(shelf|lamp)-/.test(i.id))) {
+  assert(Math.abs(item.position[0]) - item.size[0] / 2 > 0.7, "keep the head backdrop clear");
+  assert(item.position[2] <= -1.5 && item.position[2] >= -3);
+}
+assert(data.items.filter(i => i.blossom).every(i => i.position[2] < -6 && i.color === 0xffb7cf));
+assert(room.LIGHTS.day.ambient > room.LIGHTS.night.ambient * 2);
 assert.equal(new Set(data.items.map(i => i.id)).size, data.items.length);
 for (const item of data.items) for (let axis = 0; axis < 3; axis++) {
   assert(item.size[axis] > 0);
@@ -32,7 +47,9 @@ const scene = new T.Scene();
 const originalFog = new T.Fog(0xffffff, 1, 3), background = new T.Color(0x112233);
 scene.fog = originalFog; scene.background = background;
 for (let cycle = 0; cycle < 10; cycle++) {
-  const instance = room.create({ THREE: T, scene });
+  const instance = room.create({ THREE: T, scene, height: cycle % 2 ? 1.5 : 1.8 });
+  const group = scene.children.find(n => n.isGroup);
+  assert.equal(group.scale.x, 1, "furniture metres must not scale with avatar height");
   const resources = new Set();
   scene.traverse(node => {
     if (node.isInstancedMesh) resources.add(node);

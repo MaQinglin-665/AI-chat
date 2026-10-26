@@ -364,7 +364,7 @@
       if (canvas.width !== Math.floor(width * ratio) || canvas.height !== Math.floor(height * ratio)) {
         renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix();
       }
-      room?.update(period(), frame.now ?? root.performance.now());
+      room?.update(period(), frame.now ?? root.performance.now(), camera.position.z);
       driver.update(frame); renderer.render(scene, camera); frames += 1;
       updateHitAreas(width, height);
     }
