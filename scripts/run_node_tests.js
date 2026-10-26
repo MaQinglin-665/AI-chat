@@ -10,6 +10,8 @@ const tests = [
   "tests/test_avatar_scene.js",
   "tests/test_avatar_world.js",
   "tests/test_avatar_seating.js",
+  "tests/test_avatar_motion_camera.js",
+  "tests/test_avatar_locomotion.js",
   "tests/test_avatar_handpainted.js",
   "tests/test_avatar_runtime.js",
   "tests/test_visual_polish_frontend.js",

@@ -197,6 +197,11 @@
         const offset = {x:0,y:0,z:0,px:0,py:0,scaleY:1,...pose.bones[name]};
         const world = frame.worldPose;
         if(world?.bones[name]) for(const [key,value] of Object.entries(world.bones[name])) offset[key] += (value-offset[key])*world.weight;
+        if(world){
+          if(name==='head')offset.y+=(world.turnHead||0);
+          if(name==='spine')offset.y+=(world.turnChest||0);
+          if(name==='chest')offset.x+=(world.prepare||0)*facing;
+        }
         if (!n || !base.rotation) continue;
         n.rotation.copy(base.rotation);
         if (base.position) n.position.copy(base.position);
@@ -259,11 +264,12 @@
     let vrm = null, driver = null, renderer = null, scene = null, camera = null, generation = 0;
     const canvas = options.canvas;
     let modelHeight = 1.6, hitAreas = [], loadMs = 0, loadedAt = 0, frames = 0;
-    let projection = null, avatarRoot = null, world = null, worldState = null, cameraHome = null, follow = [0,0,0], worldTime = null, book = null;
+    let projection = null, avatarRoot = null, world = null, worldState = null, cameraHome = null, worldTime = null, book = null;
     const worldModule = options.worldModule || root.XinyuVRMWorld;
     const seating = options.seatingModule || root.XinyuVRMSeating;
-    let activeLayout=null;
-    let seatProfile=null,seatMetrics=null,cameraKey=null,cameraStart=null,cameraSince=0,backSince=null;
+    let activeLayout=null,walkMetrics=null;
+    const locomotion=(options.locomotionModule||root.XinyuVRMLocomotion)?.create();
+    let seatProfile=null,seatMetrics=null,cameraController=null,backSince=null;
     let room = null, legacyLights = null, undoGrade = null, floorY = 0;
     const roomModule = options.roomModule || root.XinyuVRMScene;
     const period = () => root.document?.body?.dataset.stageRoom || "night";
@@ -271,7 +277,7 @@
       if (!scene) return;
       room?.dispose(); room = null; world?.dispose(); world=null; worldState=null; worldTime=null;
       if(avatarRoot){avatarRoot.position.set(0,0,0);avatarRoot.rotation.y=0;}
-      follow=[0,0,0]; cameraKey=null;backSince=null;seatMetrics=null; if(book) book.visible=false;
+      cameraController=null;backSince=null;seatMetrics=null;locomotion?.reset();walkMetrics=null; if(book) book.visible=false;
       if(cameraHome && camera){camera.position.set(0,cameraHome.cameraY,cameraHome.distance);camera.lookAt(0,cameraHome.targetY,0);}
       undoGrade?.(); undoGrade = null;
       const useRoom = roomModule?.enabled(options.view, value);
@@ -287,7 +293,7 @@
         }});
         }
         startWorld();
-        currentRoom.ready?.then(loaded=>{if(room===currentRoom && loaded && currentRoom.metrics?.().preset==="handpainted"){startWorld();cameraKey=null;worldTime=null;}});
+        currentRoom.ready?.then(loaded=>{if(room===currentRoom && loaded && currentRoom.metrics?.().preset==="handpainted"){startWorld();cameraController=null;worldTime=null;}});
       }
       else undoGrade = gradeRoomMaterials(vrm.scene, options.view === "full" ? LIGHT.room : LIGHT.pet);
       if (root.document?.body) root.document.body.dataset.avatarScene = useRoom ? "room" : "none";
@@ -304,7 +310,7 @@
       generation += 1;
       room?.dispose(); room = null; world?.dispose(); world=null; worldState=null; worldTime=null;
       if(avatarRoot){avatarRoot.position.set(0,0,0);avatarRoot.rotation.y=0;}
-      follow=[0,0,0]; cameraKey=null;backSince=null;seatMetrics=null; if(book) book.visible=false;
+      cameraController=null;backSince=null;seatMetrics=null;locomotion?.reset();walkMetrics=null; if(book) book.visible=false;
       if(cameraHome && camera){camera.position.set(0,cameraHome.cameraY,cameraHome.distance);camera.lookAt(0,cameraHome.targetY,0);}
       undoGrade?.(); undoGrade = null; legacyLights = null;
       if (root.document?.body) root.document.body.dataset.avatarScene = "none";
@@ -397,6 +403,7 @@
       const activity=seating?.active(worldState);
       const deskSeat=(activeLayout?.seats||seating?.SEATS)?.desk, deskForward=deskSeat?[Math.sin(deskSeat.yaw),Math.cos(deskSeat.yaw)]:[1,0];
       seatMetrics=seating?.apply({T,vrm,avatarRoot,profile:seatProfile,seats:activeLayout?.seats||seating.SEATS,activity,weight:pose.weight,floorY});
+      walkMetrics=locomotion?.apply({T,vrm,avatarRoot,profile:seatProfile,state:worldState,floorY,rotateTo:seating.rotateTo});
       const contacts={...pose.hands};
       if(seatMetrics){
         for(const side of ['left','right']){
@@ -469,7 +476,7 @@
             }
           }else backSince=null;
         }
-        frame={...frame,worldPose:pose,worldOrigin:target,worldGaze:worldState.name==="accompany"?null:[target[0]+Math.sin(worldState.yaw)*WORLD_VISUAL.gazeDistance,modelHeight*WORLD_VISUAL.gazeHeight+target[1],target[2]+Math.cos(worldState.yaw)*WORLD_VISUAL.gazeDistance],
+        frame={...frame,worldPose:pose,worldOrigin:target,worldGaze:worldState.name==="accompany"?null:[target[0]+Math.sin(worldState.gazeYaw??worldState.yaw)*WORLD_VISUAL.gazeDistance,modelHeight*WORLD_VISUAL.gazeHeight+target[1],target[2]+Math.cos(worldState.gazeYaw??worldState.yaw)*WORLD_VISUAL.gazeDistance],
           solveContacts:()=>solveContacts(pose)};
         if(book)book.visible=pose.book && pose.weight>.8;
         room?.setAvatarPosition?.(target[0],target[2]);
@@ -478,13 +485,20 @@
       driver.update(frame);
       room?.setFootPositions?.(seatMetrics ? Object.values(seatMetrics.legs).map(l=>l.ankle) : null);
       if(world && seating){
-        const actual=avatarRoot.position,active=worldState.name!=='accompany',preset=(activeLayout?.cameras||seating.CAMERAS)[worldState.name]||(activeLayout?.cameras||seating.CAMERAS).idle;
-        const key=active?worldState.name:'accompany';
-        const aim=[actual.x,active?actual.y+modelHeight*preset.height:cameraHome.targetY+actual.y,actual.z];
-        const goal=active?[actual.x+preset.offset[0],aim[1]+preset.offset[1],actual.z+preset.offset[2]]:[actual.x,cameraHome.cameraY+actual.y,cameraHome.distance+actual.z];
-        if(cameraKey!==key){cameraKey=key;cameraSince=now;const dir=new vendor.THREE.Vector3();camera.getWorldDirection(dir);cameraStart=[...camera.position.toArray(),...camera.position.clone().addScaledVector(dir,cameraHome.distance).toArray()];}
-        const values=seating.cameraBlend(cameraStart,[...goal,...aim],now-cameraSince);
-        camera.position.set(...values.slice(0,3));camera.lookAt(...values.slice(3));
+        const active=worldState.name!=='accompany', preset=(activeLayout?.cameras||seating.CAMERAS)[worldState.name]||(activeLayout?.cameras||seating.CAMERAS).idle;
+        const cameraModule=options.cameraModule || root.XinyuVRMCamera;
+        if(cameraModule){
+          cameraController ||= cameraModule.create([...camera.position.toArray(),0,cameraHome.targetY,0]);
+          const seated=(activeLayout?.seats||seating.SEATS)[worldState.name];
+          const locked=active && !worldState.moving && worldState.phase==='activity';
+          // Seated framing uses immutable measured stature and the layout seat, not contact-solver corrections.
+          const rootHeight=locked && seated && seatProfile ? floorY+seated.surface+seatProfile.padding-seatProfile.hipsY : 0;
+          const position=locked && seated ? seated.hip : worldState.position;
+          const height=active ? rootHeight+modelHeight*preset.height : cameraHome.targetY;
+          const offset=active ? preset.offset : [0,cameraHome.cameraY-cameraHome.targetY,cameraHome.distance];
+          const values=cameraController.update({now,position,height,offset,key:worldState.name+(locked?':locked':':travel'),locked});
+          camera.position.set(...values.slice(0,3));camera.lookAt(...values.slice(3));
+        }
       }
       renderer.render(scene, camera); frames += 1;
       updateHitAreas(width, height);
@@ -504,7 +518,7 @@
       metrics: () => ({ loadMs, loadedAt, frames, pixelRatio: renderer?.getPixelRatio(),
         antialias: renderer?.getContext().getContextAttributes()?.antialias,
         drawCalls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles, smallMotion: driver?.motionState(),
-        seating: seatMetrics, world: worldState, room: room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
+        walking:walkMetrics, seating: seatMetrics, world: worldState, room: room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
       // Reserved for a later animation loader; never silently fetch arbitrary files.
       loadAnimation: async () => false
     };

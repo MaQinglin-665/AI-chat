@@ -375,3 +375,36 @@ Branch codex/avatar-room-handpainted-v1 from origin/main 0542d04; local main/pri
 Verification Evidence: targeted Node layout/path/local-only/fallback/async-disposal and synthetic seated-contact tests pass. Final scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node suites, Python/JS syntax and secrets passed). scripts/check_first_run_package.ps1 passed, including every new asset/license/change-notice hash. Initial package check exposed the global *.bin ignore: added an exact scene.bin exception and rechecked successfully.
 Real Electron VRM0: same-camera room/handpainted, day/night panoramas, four activities, forced missing-scene fallback and ten room/none/handpainted cycles; no page exceptions. Stable resources: room 28 geometries/47 textures; handpainted 41/60. Draws 36 vs 42 at companion view, activity views 38–47. No fresh CPU/GPU timing benchmark claimed. Ignored evidence: tmp_ui_smoke/avatar-vrm-polish/handpainted-*.png, handpainted-acceptance.json, handpainted-tour.mp4 (35s silent). Original scene.bin and 15 base-color images hash-identical to download; private config hash unchanged.
 Limitations: fixed painted shadows/reflections, visible cutaway boundaries, inherited stiff/airborne hand contacts, no arbitrary outfit collisions or real VRM1 visual check. Default room unchanged. Await user visual review via draft PR only; no merge.
+
+## 2026-10-26 — Camera/motion task started, network pause
+
+User authorized inclusion of unmerged #220 into new codex/avatar-motion-camera-v1 branch; origin/main 0542d04 -> b22d4ef, local main unchanged. Both baseline 35s silent recordings captured in ignored tmp_ui_smoke/avatar-vrm-polish/motion-before-{room,handpainted}.mp4. Camera diagnosis: animated avatarRoot and seat corrections feed frame-by-frame camera targets after the old transition completes. Partial root-only damped/dead-zone/activity-lock camera added; not yet acceptance-tested.
+Verification Evidence: node --check for camera and renderer, git diff --check passed. Full tests not run. CMU official terms allow commercial-product inclusion but prohibit direct data resale; BVH converter adds no restrictions. Download of local-only walk evaluation failed with connection resets after five attempts 10s apart. Paused under network rule; no motion changes, full gate, after evidence, commit, push or PR.
+
+## 2026-10-26 — Camera stability and procedural motion
+
+User explicitly deferred CMU 2a after failed download; no data evaluated or integrated. Retained user-authorized #220 dependency in codex/avatar-motion-camera-v1, local main/private config unchanged. Camera now consumes logical horizontal root and immutable stature/seat measurements, with analytical critical damping, dead zone and activity lock. Added collision-checked corner arcs/curvature braking, acceleration, layered turns, 700ms eased transitions, seeded variation, distance-based gait and measured planted-foot IK. Real departure testing exposed sideways predicted landings during the initial turn; fixed by using neutral hip width, finishing the initial turn before stepping and predicting along the travel heading. Release knee clearance with the foot constraint while stopping.
+
+Verification Evidence: scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node, syntax and secrets); final rerun after last clearance tuning also passed, same gate log. Package smoke passed including local scene assets/licenses. New tests cover dead zone/activity lock, fixed and moving 20/30Hz results, all-pairs safe curved paths and direction-rate bound, pose/bone continuity, seeded traces, VRM0/1 long/short-leg foot planting and neutral-width regression. Simulated camera max jitter 6.608mm -> 0mm (limit 0.1mm); path max 1.517rad/s < 2.2. Private config hash unchanged.
+
+Real Electron VRM0: both presets, same fixed 30Hz timeline (rest, desk, window, input interruption), four 45s silent before/after videos at 10fps. Replaced uneven wall-clock screenshot capture with native capturePage; these are controlled-render comparisons, not performance measurements. No page exceptions; steady seated camera adjacent 1s sample delta room 6.073mm -> 0, handpainted 6.008mm -> 0. Both after clips have 14 walking samples with reach error zero. Ignored evidence tmp_ui_smoke/avatar-vrm-polish/motion-{before,after}-{room,handpainted}.mp4 and JPG/JSON samples. No media/model in Git.
+
+Limits: real VRM1 not visually verified; procedural gait/full-body clothing collision and inherited hand contacts remain limited. See docs/avatar-motion-camera.md for exact scope, failed CMU URL and local future task. Next: draft PR to main, wait for user; no merge.
+
+Publication result: implementation cbdf497 committed locally. git push -u origin codex/avatar-motion-camera-v1 failed all five attempts (10s spacing): two TLS handshake failures, three port-443 timeouts. No draft PR created and no further retries. Code/tests/captures complete; handoff records the exact user push command and next draft-PR step. Local main remains 0a06554; private config hash unchanged. No force push/main push/merge.
+
+Publication resumed: user confirmed successful push. Verified remote branch and PR head daa5971; created draft PR #222 to main via local gh after connector creation permission 403. https://github.com/MaQinglin-665/AI-chat/pull/222 . Attached to the task. State changed from publish_blocked to awaiting_visual_review; prior implementation/test evidence unchanged. No merge, main push, private-config edit or media upload. Await user appearance review.
+
+## 2026-10-26 — Accepted #220 / #222 sequential merge
+
+User accepted #222 and authorized merge commits in order, without modifying local main/private config. #220 already contained latest origin/main 0542d04; no conflicts. Verification Evidence: fresh scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed; gh pr checks 220 all green including Python Tests and Windows Compatibility. Marked ready, merged with --merge --admin: a0bdce4fcb8d85dd784438a88b96736c705a1bda.
+
+Fetched and merged origin/main containing #220 into codex/avatar-motion-camera-v1; no conflicts. Now validating #222 with both local gates, then normal push/ready/all CI/merge commit, then full local test on latest origin/main with detached HEAD. Local main remains 0a06554. No product-code changes this task.
+
+Deferred TODO, explicitly not fixed this task:
+- 镜头切换时画面卡顿。
+- 动作仍偏机械。
+
+#222 local Verification Evidence: scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed; required JSON/compilation and diff checks passed. Only the three state files changed after the conflict-free merge. Proceed to normal push, ready, all CI and merge gate.
+
+Merge publication blocked: #222 push failed all five attempts, with 10s spacing (TLS handshake failures and port-443 timeouts). Local merge a05c690 and gate record 44b3a01 retained; no conflicts. #222 was not marked ready or merged; final latest-origin/main test is pending its merge. #220 merge a0bdce4 is complete. User push command: git -C D:/AI/ai_desktop_pet_readiness_20261023 push origin codex/avatar-motion-camera-v1 . After success resume ready/check all CI/merge #222, then detached origin/main final test. No further network attempts.
