@@ -2006,6 +2006,12 @@
     function getSpeechAnimationMouthOpen() {
       if (state.avatarIntentOverrides?.mouth) return state.avatarIntentOverrides.mouth.open;
       const now = performance.now();
+      if (!state.ttsAudioAnalyser && !(state.ttsPcmAudioAnalyserActive && state.ttsPcmAudioAnalyser)) {
+        const sync = window.XinyuBrowserLipSync || root.XinyuBrowserLipSync
+          || (typeof require === "function" ? require("./avatar/browserLipSync.js") : null);
+        const browserOpen = sync?.sample(state, now);
+        if (Number.isFinite(browserOpen)) { state.speechMouthOpen = browserOpen; return browserOpen; }
+      }
       const audioPlaying = isSpeakingNow();
       const speaking = isSpeechMotionActive(now);
       const activeUntil = Number(state.speechAnimUntil || 0);

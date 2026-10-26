@@ -16,6 +16,14 @@
     const authFetch = typeof deps.authFetch === "function" ? deps.authFetch : async () => { throw new Error("authFetch is not available"); };
     const TTS_API = deps.ttsApi || {};
     const PCM_STREAM = deps.ttsPcmStream || root.TaffyTTSPcmStream || {};
+    const browserLipSync = window.XinyuBrowserLipSync || root.XinyuBrowserLipSync
+      || (typeof require === "function" ? require("./avatar/browserLipSync.js") : null);
+    function wakeMouthBroadcast() {
+      if (browserLipSync?.enabled(state) && typeof window.dispatchEvent === "function") {
+        const EventImpl = window.Event || root.Event;
+        if (EventImpl) window.dispatchEvent(new EventImpl("avatar-mouth-playback"));
+      }
+    }
     const perfLog = typeof deps.perfLog === "function" ? deps.perfLog : () => {};
     const setStatus = typeof deps.setStatus === "function" ? deps.setStatus : () => {};
     const waitMs = typeof deps.waitMs === "function" ? deps.waitMs : (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
@@ -400,6 +408,8 @@
         utterance.volume = Number.isFinite(volumeRatio)
           ? clampNumber(volumeRatio, 0.45, 1.0)
           : 1.0;
+        browserLipSync?.begin(state, { token: browserPlaybackToken, generation: playbackGeneration,
+          rate: utterance.rate, delayMs: state.config?.avatar?.browser_lip_sync_delay_ms }, performance.now());
         let started = false;
         let settled = false;
         let unregisterCancelWaiter = null;
@@ -426,6 +436,8 @@
             return false;
           }
           settled = true;
+          browserLipSync?.stop(state, browserPlaybackToken, ok ? "ended" : "cancelled");
+          wakeMouthBroadcast();
           clearStartupTimers();
           if (unregisterCancelWaiter) {
             unregisterCancelWaiter();
@@ -446,6 +458,7 @@
             return false;
           }
           started = true;
+          browserLipSync?.start(state, browserPlaybackToken, performance.now(), startSignal);
           clearStartupTimers();
           state.ttsDebugAudioStartedAt = performance.now();
           state.ttsDebugAudioEndedAt = 0;
@@ -479,6 +492,7 @@
           });
           showSubtitleText(cleaned);
           setStatus("语音中...");
+          wakeMouthBroadcast();
           return true;
         };
         const probeBrowserSpeechStart = () => {
@@ -497,7 +511,21 @@
           startupProbeTimer = browserSetTimeout(probeBrowserSpeechStart, 60);
         };
         utterance.onstart = () => {
+          if (!settled && isCurrentBrowserPlayback()) browserLipSync?.start(state, browserPlaybackToken, performance.now(), "event");
           markBrowserSpeechStarted("event");
+          if (!settled && isCurrentBrowserPlayback()) wakeMouthBroadcast();
+        };
+        utterance.onboundary = (event) => {
+          if (!settled && isCurrentBrowserPlayback()) browserLipSync?.boundary(state, browserPlaybackToken, performance.now(), event);
+          if (!settled && isCurrentBrowserPlayback()) wakeMouthBroadcast();
+        };
+        utterance.onpause = () => {
+          if (!settled && isCurrentBrowserPlayback()) browserLipSync?.pause(state, browserPlaybackToken, performance.now());
+          if (!settled && isCurrentBrowserPlayback()) wakeMouthBroadcast();
+        };
+        utterance.onresume = () => {
+          if (!settled && isCurrentBrowserPlayback()) browserLipSync?.resume(state, browserPlaybackToken, performance.now());
+          if (!settled && isCurrentBrowserPlayback()) wakeMouthBroadcast();
         };
         utterance.onend = () => {
           if (settled) return;

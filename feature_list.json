@@ -1,6 +1,35 @@
 {
   "features": [
     {
+      "id": "avatar-mao-browser-lip-sync",
+      "name": "Mao browser speech mouth starts and ends with actual playback",
+      "status": "completed",
+      "dependencies": [
+        "avatar-live2d-mao-stage3"
+      ],
+      "scope": [
+        "User reports mouth starts before audio and stops before audio ends",
+        "Only playback event/mouth timing/bridge and related tests; preserve Hiyori exact same-input writes",
+        "Use actual browser utterance lifecycle instead of clamped estimated sentence duration; no provider/key/dialogue/memory/external execution changes",
+        "Back up and update actual local installation; retain ready PR217 without merge/main/force push"
+      ],
+      "done_criteria": [
+        "Reproduce early onset and frozen tail with deterministic playback clock",
+        "Event-owned start/end, pause/resume/cancel/stale utterance handling, bounded startup calibration",
+        "Long speech keeps moving; analysed silence/Hiyori exact regressions and local checks pass",
+        "Deploy corrected local avatar playback path and normal push same PR if still open"
+      ],
+      "next": "Normal push existing open ready PR217, then user listens to a long sentence. Actual audible offset has not been measured;120ms is initial calibration and can be adjusted0..500ms.",
+      "verification": [
+        "Reproduced old actual controllers: before-onstart mouth0.0122708; long-speech tailVariation0 while synthesis still speaking",
+        "New production-controller tests cover actual-event onset, bounded120ms delay,30s speech vs800ms estimate, pause/resume/boundary/end/error/cancel/stale callbacks and immediate original speech bridge wake/cleanup",
+        "Actual Core6/Mao callback timeline: pending/start-guard/pause/end parameter0; long-speech variation0.6621486134827137;16 captures/8 native motions/auth21/unauth401/no JS errors",
+        "Complete scripts/test-local.ps1:849 Python passed/3 skipped;67 Node suites;Python184/JS228 syntax;secrets810;docs4 browser checks and required JSON/py_compile pass",
+        "Hiyori strict same-Core Node5280frames/394224calls and browser1030frames/167741calls/snapshots/four PNG hashes unchanged",
+        "Installed6 bounded files after backup;6 private files preserved;5 served assets hash-match; model ready/Mao/Core6/132/no errors after restart; no private config edit"
+      ]
+    },
+    {
       "id": "avatar-live2d-mao-stage3",
       "name": "Official local Mao: vowel estimator, faces, gestures and configuration",
       "status": "completed",

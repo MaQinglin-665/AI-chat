@@ -688,6 +688,8 @@
           }
         }
         state._speechBroadcastTick = chatSpeechBroadcastLoop;
+        state._speechBroadcastPlaybackWake = () => requestChatSpeechBroadcastNow();
+        window.addEventListener?.("avatar-mouth-playback", state._speechBroadcastPlaybackWake);
         chatSpeechBroadcastLoop();
       } catch (_) {
         state._speechBroadcastRunning = false;
@@ -696,6 +698,8 @@
     }
 
     function stopChatSpeechBroadcastLoop() {
+      if (state._speechBroadcastPlaybackWake) window.removeEventListener?.("avatar-mouth-playback", state._speechBroadcastPlaybackWake);
+      state._speechBroadcastPlaybackWake = null;
       state._speechBroadcastRunning = false;
       state._speechBroadcastPerformancePhase = null;
       state._speechBroadcastPerformancePhaseExpiresAt = 0;

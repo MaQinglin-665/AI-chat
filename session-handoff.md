@@ -1,5 +1,21 @@
 # Session handoff
 
+## Current — browser mouth timing fixed and installed; user listening feedback next
+- User reports mouth starts before audio and freezes before sentence finishes. Reproduced old controllers: before-onstart mouth0.0122708; long-speech tailVariation0 while synthesis still speaking. Added browserLipSync.js gated to mapped Live2D/Mao: actual utterance start/end/error/pause/resume/boundary owns mouth, no estimated sentence-duration clamp; token/generation fences. Default120ms start compensation, configurable avatar.browser_lip_sync_delay_ms0..500; not a measured device latency. Hiyori/analysed-audio path unchanged.
+- TTS lifecycle events wake the existing taffy-speech loop immediately via avatar-mouth-playback event; no second avatar frame/render clock. Same shared runtime, original Pixi pre-Core writes. New helper script tag, bounded public delay config and regression tests only; no dialogue/memory/external execution implementation changes.
+- Verification Evidence: full scripts/test-local.ps1 passes849Python/3skipped,67Node,syntax184/228,secrets810;docs4 and required JSON/py_compile pass. Hiyori strict Node5280/394224 and browser1030/167741 calls/snapshots/four PNG pairs unchanged. Real Core6/Mao callback simulation: pending/guard/pause/end0, late speech variation0.662;16 captures/8 actual motions/21 auth resources/unauth401/no JS errors. Logs work/avatar-mouth-sync-*.log; evidence outputs/avatar-mouth-sync/mao-evidence.json. No claim of live audio measurement.
+- Actual D:/app/DesktopPet updated/restarted:6 bounded playback/mouth/config/index files, original private config/keys/data/model assets preserved;5 served public assets hash-match, delay120, actual model page ready/Mao/Core6/132/no script errors. Rollback/evidence outputs/installed-mouth-sync. Current original app may hide independent pet while chat stage visible.
+- Next normal push this focused follow-up to still-open ready #217, then stop for user to listen to a long sentence. Async feedback question pending; do not claim perceived audio alignment without their answer. If still early increase the local avatar delay, if late decrease; do not change provider or keys without request. No main/force push/PR merge.
+
+# Session handoff
+
+## Current — user requests Mao speech/mouth synchronization fix
+- User reports both early mouth onset and frozen/closed mouth while speech is still playing. New authorized work supersedes prior review stop only for this bounded playback/mouth fix. Keep dialogue, memory, external execution and all credentials unchanged.
+- Current branch1a3885a clean. Read AGENTS/state and playback/expression/bridge/runtime. Existing tests and strict Node5280/394224 baseline pass. Browser fallback uses a sentence-duration-clamped pseudo-syllable curve and synthesis.speaking can precede onstart; investigate/reproduce these instead of adding a blanket sentence delay.
+- Next reproduce actual callback/timeline behavior, implement event-owned mapped-Live2D mouth timing with long-speech/pause/end/cancel/stale tests, preserve Hiyori exact regression, update local D:/app/DesktopPet after backup and normal push same open PR217. No new model assets/config/secret changes, merge/main/force push.
+
+# Session handoff
+
 ## Current — stage3 published, PR217 ready; author Windows review next
 - Final follow-up corrects browser TTS without spectrum: mapped Live2D uses the existing mouth envelope only when no analyser exists, broadcasts analysis availability, keeps analysed silence and stale packets closed. Full849/3 +66Node +syntax184/226 +secrets808 +docs4 pass; actual Mao fallback and Hiyori1030/167741 strict comparison pass again. Installed app updated/restarted and ready/Mao reverified. Follow-up remains on same ready PR; author Windows review next.
 - User approved stage3 and local Mao switch. Implementation9657a30de1083ef060a0b87429349253d7a21320 pushed normally to friend/avatar-live2d-adapter. Existing PR217 title/body updated, verified open/non-draft/unmerged/base main. Python/Node/Docs/Quality CI succeeded; Windows was running at publication. No main/force push/merge.
