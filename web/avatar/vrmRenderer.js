@@ -266,9 +266,13 @@
     let seatProfile=null,seatMetrics=null,cameraKey=null,cameraStart=null,cameraSince=0,backSince=null;
     let room = null, legacyLights = null, undoGrade = null, floorY = 0;
     const roomModule = options.roomModule || root.XinyuVRMScene;
+    const paintedModule = options.paintedModule || root.XinyuVRMPainted;
+    let painted = null, paintedCamera = null, paintedSettings = {};
+    const paintedPeriod = () => paintedModule.periodAt(root.document?.body?.dataset.stageScene);
     const period = () => root.document?.body?.dataset.stageRoom || "night";
     function setScene(value) {
       if (!scene) return;
+      painted?.dispose(); painted = null; paintedCamera = null;
       room?.dispose(); room = null; world?.dispose(); world=null; worldState=null; worldTime=null;
       if(avatarRoot){avatarRoot.position.set(0,0,0);avatarRoot.rotation.y=0;}
       follow=[0,0,0]; cameraKey=null;backSince=null;seatMetrics=null; if(book) book.visible=false;
@@ -276,7 +280,11 @@
       undoGrade?.(); undoGrade = null;
       const useRoom = roomModule?.enabled(options.view, value);
       if (legacyLights) legacyLights.visible = !useRoom;
-      if (useRoom) {
+      if (useRoom && value === "painted" && paintedModule) {
+        paintedCamera = new vendor.THREE.PerspectiveCamera(42, 1, .01, 100);
+        painted = paintedModule.create({ THREE: vendor.THREE, scene, floorY, period: paintedPeriod(), settings: paintedSettings,
+          fetch: options.fetch || root.authFetch || root.fetch });
+      } else if (useRoom) {
         room = roomModule.create({ THREE: vendor.THREE, vendor, scene, height: modelHeight, floorY, period: period(), preset:value });
         const currentRoom=room;
         function startWorld(){
@@ -290,7 +298,7 @@
         currentRoom.ready?.then(loaded=>{if(room===currentRoom && loaded && currentRoom.metrics?.().preset==="handpainted"){startWorld();cameraKey=null;worldTime=null;}});
       }
       else undoGrade = gradeRoomMaterials(vrm.scene, options.view === "full" ? LIGHT.room : LIGHT.pet);
-      if (root.document?.body) root.document.body.dataset.avatarScene = useRoom ? "room" : "none";
+      if (root.document?.body) root.document.body.dataset.avatarScene = painted ? "painted" : useRoom ? "room" : "none";
     }
     const hitBones = [
       ["head", "head", 0.075], ["neck", "hips", 0.10],
@@ -302,6 +310,7 @@
     ];
     function dispose() {
       generation += 1;
+      painted?.dispose(); painted = null; paintedCamera = null;
       room?.dispose(); room = null; world?.dispose(); world=null; worldState=null; worldTime=null;
       if(avatarRoot){avatarRoot.position.set(0,0,0);avatarRoot.rotation.y=0;}
       follow=[0,0,0]; cameraKey=null;backSince=null;seatMetrics=null; if(book) book.visible=false;
@@ -364,6 +373,7 @@
       const hand=vrm.humanoid?.getRawBoneNode?.("rightHand");
       if(hand){book=new THREE.Mesh(new THREE.BoxGeometry(...WORLD_VISUAL.bookSize),new THREE.MeshToonMaterial({color:WORLD_VISUAL.bookColor}));book.position.set(...WORLD_VISUAL.bookPosition);book.visible=false;hand.add(book);}
       seatProfile=seating?.measure(THREE,vrm,avatarRoot,floorY);
+      paintedSettings = source.painted || {};
       setScene(source.scene);
       renderer = new THREE.WebGLRenderer({ canvas, alpha: true, premultipliedAlpha: true, antialias: true, powerPreference: "low-power" });
       renderer.setClearColor(0x000000, 0);
@@ -375,7 +385,8 @@
       driver = createIntentDriver(vrm, source.mapping || {}, { height, seed: options.seed });
       loadedAt = root.performance?.now?.() || 0; loadMs = loadedAt - began;
     }
-    function updateHitAreas(width, height) {
+    function updateHitAreas(width, height, cameraOverride = camera) {
+      const camera = cameraOverride;
       const pixelsPerUnit = height / (2 * Math.tan(camera.fov * Math.PI / 360) * (cameraHome?.distance || camera.position.z));
       const points = new Map();
       for (const [a, b] of hitBones) for (const name of [a, b]) {
@@ -475,6 +486,10 @@
         room?.setAvatarPosition?.(target[0],target[2]);
       }
       room?.update(period(), now, camera.position.z);
+      if (painted) {
+        avatarRoot.rotation.y = painted.avatarYaw();
+        frame = { ...frame, worldPose: paintedModule.stationaryPose(now, frame.interaction || frame.mode === "speak" || frame.preparingSpeech, vrm.meta?.metaVersion === "0" ? -1 : 1) };
+      }
       driver.update(frame);
       room?.setFootPositions?.(seatMetrics ? Object.values(seatMetrics.legs).map(l=>l.ankle) : null);
       if(world && seating){
@@ -486,8 +501,13 @@
         const values=seating.cameraBlend(cameraStart,[...goal,...aim],now-cameraSince);
         camera.position.set(...values.slice(0,3));camera.lookAt(...values.slice(3));
       }
-      renderer.render(scene, camera); frames += 1;
-      updateHitAreas(width, height);
+      if (painted) {
+        painted.update(paintedPeriod(), now); painted.resizeCamera(paintedCamera, width, height);
+        painted.setFootPositions(["leftFoot", "rightFoot"].map(name => vrm.humanoid?.getRawBoneNode?.(name)?.getWorldPosition(new vendor.THREE.Vector3()).toArray()));
+        painted.renderReflection(renderer, paintedCamera, avatarRoot);
+      }
+      renderer.render(scene, paintedCamera || camera); frames += 1;
+      updateHitAreas(width, height, paintedCamera || camera);
     }
     function hitTest(x, y) {
       if (!vrm || !camera) return false;
@@ -497,6 +517,7 @@
         && hitSegments(x - rect.left, y - rect.top, hitAreas);
     }
     return { kind: "vrm", load, dispose, update, hitTest, setScene,
+      setPaintedOptions: value => { paintedSettings = { ...paintedSettings, ...value }; painted?.setOptions(value); },
       capabilities: () => ({ ...(driver?.capabilities() || { vowels: false, faces: [], actions: [], vrma: false }), fullBody: !!world, locomotion: !!world }),
       playAction: (...args) => driver?.playAction(...args) || false,
       stopAction: () => driver?.stopAction(),
@@ -504,7 +525,7 @@
       metrics: () => ({ loadMs, loadedAt, frames, pixelRatio: renderer?.getPixelRatio(),
         antialias: renderer?.getContext().getContextAttributes()?.antialias,
         drawCalls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles, smallMotion: driver?.motionState(),
-        seating: seatMetrics, world: worldState, room: room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
+        seating: seatMetrics, world: worldState, room: painted?.metrics() || room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
       // Reserved for a later animation loader; never silently fetch arbitrary files.
       loadAnimation: async () => false
     };

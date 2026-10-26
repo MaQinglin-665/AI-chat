@@ -52,6 +52,12 @@
   }
   function rng(seed){let x=seed>>>0;return ()=>{x=(Math.imul(x,1664525)+1013904223)>>>0;return x/4294967296;};}
   function create({ seed=TUNING.seed, emit=()=>{}, layout={} }={}) {
+    // Explicit empty activity points means a backdrop, not the default furnished room.
+    if (layout.activityPoints && !Object.hasOwn(layout.activityPoints, "accompany")) {
+      const snapshot = () => ({ position: [0, 0], yaw: 0, name: "accompany", phase: "idle", route: [],
+        moving: false, blend: 0, age: 0, time: 0, holdUntil: 0 });
+      return { update: snapshot, snapshot, begin: () => false, interrupt() {}, dispose() {} };
+    }
     const points=layout.activityPoints||POINTS, obstacles=layout.obstacles||OBSTACLES, limits=layout.limits||LIMITS, cameras=layout.cameras;
     const random=rng(seed), range=(a,b)=>a+random()*(b-a);
     let position=[...points.accompany], yaw=0, name="accompany", previous="", phase="idle", route=[], last=null,

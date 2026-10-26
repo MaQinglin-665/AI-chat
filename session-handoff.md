@@ -1,10 +1,13 @@
-# Hand-painted room preset — 2026-10-26
+# Painted backdrop — 2026-10-26
 
-Branch codex/avatar-room-handpainted-v1 from origin/main 0542d04; local main 0a06554 and private config/model unchanged.
-Scope: coexist with default KayKit room and none; shared scene lifecycle, world scheduling/paths, seated contacts and cameras.
-Asset license.txt verifies CC BY 4.0, OzerGokmen; copied only geometry/base-color maps/attribution. Original private VRM never included.
-Read docs/avatar-room-handpainted.md for scale/cutaway details and verification.
-Touched: avatar_assets.py scene enum; avatar renderer/scene/world/seating/furniture integration and new handpainted module; tests/package check and notices/state docs. No dialogue, memory or external-execution changes.
-Verification: full gate 830 passed/3 skipped plus all Node/syntax/secrets; first-run package hash checks passed after exact public scene.bin ignore exception. Real Electron both presets/day/night/four activities, ten stable resource cycles and forced-load-failure fallback; no page errors. Ignored handpainted-*.png and handpainted-tour.mp4 (35s). Private config hash unchanged.
-Limitations: baked lighting/reflections, cutaway shell and inherited hand-pose issues; real VRM1 not visually tested.
-Next: user visual review of draft PR; default room unchanged. Do not merge.
+Workspace D:/AI/ai_desktop_pet_painted; branch codex/avatar-painted-backdrop-v1; user-authorized base b22d4ef (PR #220). Other thread's uncommitted motion/camera work excluded.
+
+Implementation: independent vrmPainted.js owns local plates, anchored cover and fixed camera, lighting/crossfade, shadows/reflection and stationary idle. Local PNG routes reuse allowed directory/link rules. Default room and other renderers preserved.
+Shared merge surfaces: avatar_assets.py, app_get_routes.py, vrmRenderer.js (independent camera, no follow algorithm edits), avatarRuntime.js (two controls), vrmWorld.js (empty activity points), index.html, stage.css. Full file list in docs/avatar-room-painted.md.
+
+Verification: 841 Python passed / 3 skipped, all Node/syntax/secrets and first-run package gates passed. Two external-agent test fixtures isolate a synthetic protected project for workspace-contained temp files; no policy product changes. Real isolated Electron VRM0: three periods, metre grid, three sizes, settings, room/handpainted/none/pet; no page errors; 40 additional toggles stable GPU resources and bounded batch heap. 30.000s MP4 and all PNGs ignored under tmp_ui_smoke/painted. No real LLM/TTS/VRM1 or long-duration test.
+
+Private models/backgrounds/config remain outside Git. No config.local.json read; test configuration and loopback 8137 are isolated. Screenshots must not be uploaded to PR.
+
+Next: draft PR visual review. Base main; first description line exactly: 依赖 #220，需在 #220 合并后再合并
+#220 remains OPEN as of verification. Once merged, merge origin/main into this branch; stop if any conflict outside feature_list.json, progress.md, session-handoff.md. Never force push, push main or merge this PR.

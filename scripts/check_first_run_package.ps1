@@ -136,6 +136,7 @@ try {
         "config.preview.example.json",
         "app_brain_session.py",
         "app_health.py",
+        "avatar_backdrops.py",
         "app_reply_pipeline.py",
         "app_startup.py",
         "first_run.py",
@@ -149,6 +150,8 @@ try {
         "requirements.txt",
         "tts_audio.py",
         "web",
+        "web\avatar\vrmPainted.js",
+        "web\assets\painted-placeholder.png",
         "web\vendor\pixi-unsafe-eval.min.js",
         "web\vendor\scenes\kaykit-furniture\License.txt",
         "web\vendor\scenes\kaykit-furniture\furniturebits_texture.png",
@@ -157,6 +160,11 @@ try {
     )
     foreach ($path in $requiredPaths) {
         Assert-PathExists $packageRoot.FullName $path
+    }
+    $paintedPlaceholder = "web\assets\painted-placeholder.png"
+    if ((Get-FileHash -LiteralPath (Join-Path $RepoRoot $paintedPlaceholder)).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $packageRoot.FullName $paintedPlaceholder)).Hash) {
+        throw "Packaged painted placeholder differs."
     }
 
     # Every selected public furniture dependency and original license must survive packaging byte-for-byte.
