@@ -19,7 +19,7 @@
         "Long speech keeps moving; analysed silence/Hiyori exact regressions and local checks pass",
         "Deploy corrected local avatar playback path and normal push same PR if still open"
       ],
-      "next": "Fix50ef8c9 published to ready/open/unmerged PR217; wait for user long-sentence listening feedback and author Windows review. Initial120ms delay is configurable0..500; no further key/provider/model changes.",
+      "next": "User listening check passed; preserve current120ms. Author still reviews remaining Windows interaction/appearance and PR217; no further mouth tuning unless a new issue is reported.",
       "verification": [
         "Reproduced old actual controllers: before-onstart mouth0.0122708; long-speech tailVariation0 while synthesis still speaking",
         "New production-controller tests cover actual-event onset, bounded120ms delay,30s speech vs800ms estimate, pause/resume/boundary/end/error/cancel/stale callbacks and immediate original speech bridge wake/cleanup",
@@ -27,7 +27,8 @@
         "Complete scripts/test-local.ps1:849 Python passed/3 skipped;67 Node suites;Python184/JS228 syntax;secrets810;docs4 browser checks and required JSON/py_compile pass",
         "Hiyori strict same-Core Node5280frames/394224calls and browser1030frames/167741calls/snapshots/four PNG hashes unchanged",
         "Installed6 bounded files after backup;6 private files preserved;5 served assets hash-match; model ready/Mao/Core6/132/no errors after restart; no private config edit",
-        "Implementation50ef8c9 pushed normally to existing PR217, description updated and open/ready/unmerged verified; listening feedback pending."
+        "Implementation50ef8c9 pushed normally to existing PR217, description updated and open/ready/unmerged verified; listening feedback pending.",
+        "2026-10-26 actual user listening confirmation: \"基本对齐，结尾也跟上了\". Keep current120ms setting; qualitative feedback, not an instrumented latency measurement."
       ]
     },
     {

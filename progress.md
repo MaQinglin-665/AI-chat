@@ -449,3 +449,7 @@ User confirms replacing the local Hiyori character with Mao and authorizes origi
 - Installed6 bounded files after backup, restarted actual desktop app, private config/env/data/model assets preserved;5served asset hashes match, actual page ready/Mao/Core6/132/no errors, delay120ms. Backup outputs/installed-mouth-sync. Asked user to listen to a long sentence; no perceptual/device alignment claimed before their feedback. Next normal push still-open ready PR217; author/user review, no merge/main/force push.
 
 - Publication Evidence: implementation50ef8c9 pushed normally to existing #217; PR description updated with root cause, actual lifecycle/120ms calibration and full verification, and open/ready/unmerged status verified. User listening feedback remains pending; no claim of measured or perfect audible alignment. This following publication checkpoint only changes state records.
+
+
+## 2026-10-26 — Actual listening feedback confirmed
+- User listened to the updated local application and explicitly reports “基本对齐，结尾也跟上了”. Keep the current120ms browser-mouth compensation; no further code, configuration or model changes. This closes the listening feedback item, while remaining author Windows interaction/appearance/PR review is separate. Qualitative confirmation does not imply measured exact latency. Verification: state JSON parses; state-only update requires no repeated product tests.

@@ -1,11 +1,11 @@
 # Session handoff
 
-## Current — browser mouth timing fixed and installed; user listening feedback next
+## Current — user listening confirms mouth timing; preserve120ms
 - User reports mouth starts before audio and freezes before sentence finishes. Reproduced old controllers: before-onstart mouth0.0122708; long-speech tailVariation0 while synthesis still speaking. Added browserLipSync.js gated to mapped Live2D/Mao: actual utterance start/end/error/pause/resume/boundary owns mouth, no estimated sentence-duration clamp; token/generation fences. Default120ms start compensation, configurable avatar.browser_lip_sync_delay_ms0..500; not a measured device latency. Hiyori/analysed-audio path unchanged.
 - TTS lifecycle events wake the existing taffy-speech loop immediately via avatar-mouth-playback event; no second avatar frame/render clock. Same shared runtime, original Pixi pre-Core writes. New helper script tag, bounded public delay config and regression tests only; no dialogue/memory/external execution implementation changes.
 - Verification Evidence: full scripts/test-local.ps1 passes849Python/3skipped,67Node,syntax184/228,secrets810;docs4 and required JSON/py_compile pass. Hiyori strict Node5280/394224 and browser1030/167741 calls/snapshots/four PNG pairs unchanged. Real Core6/Mao callback simulation: pending/guard/pause/end0, late speech variation0.662;16 captures/8 actual motions/21 auth resources/unauth401/no JS errors. Logs work/avatar-mouth-sync-*.log; evidence outputs/avatar-mouth-sync/mao-evidence.json. No claim of live audio measurement.
 - Actual D:/app/DesktopPet updated/restarted:6 bounded playback/mouth/config/index files, original private config/keys/data/model assets preserved;5 served public assets hash-match, delay120, actual model page ready/Mao/Core6/132/no script errors. Rollback/evidence outputs/installed-mouth-sync. Current original app may hide independent pet while chat stage visible.
-- Implementation50ef8c9 pushed normally to #217; description updated and open/ready/unmerged verified. Next stop for user to listen to a long sentence. Async feedback question pending; do not claim perceived audio alignment without their answer. If still early increase the local avatar delay, if late decrease; do not change provider or keys without request. No main/force push/PR merge.
+- Implementation50ef8c9 and publication31597e1 pushed normally to #217; verified open/ready/unmerged. On2026-10-26 user listened and confirms "基本对齐，结尾也跟上了". Keep120ms; do not retune without a new report. This is subjective listening confirmation, not measured exact latency or full author Windows acceptance. Next author reviews remaining interaction/appearance and decides merge. No main/force push/PR merge.
 
 # Session handoff
 
