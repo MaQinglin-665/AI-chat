@@ -10,18 +10,14 @@
         "avatar-3d-room-v1"
       ],
       "scope": [
-        "User confirms stage 1 author acceptance; preserve VRM during main merge",
-        "One avatarRuntime factory, frameFromState and avatar-intent path; no parallel selector",
-        "Core 6 local comparison only, no Core/model upload; preserve Hiyori numeric behavior"
+        "Approved shared avatar runtime factory/frame/events; renderers own clocks, Live2D keeps Pixi ticker and write order",
+        "Web Core6 upgrade in a separate commit before mapping; documentation runtimes unchanged",
+        "Exact complete parameter-write sequences under the same Core6; stop on any mismatch"
       ],
       "done_criteria": [
         "Author confirms the shared runtime clock/lifecycle proposal before implementation",
         "Mapping-based Live2D renderer and exact old/new parameter write snapshots",
         "Full local/VRM regressions pass; publish draft PR and wait for Windows review"
-      ],
-      "blockers": [
-        "Current runtime is VRM-specific; user requires a proposal before structural integration",
-        "Core4/Core6 fixed-input pixels are close but not identical; author must decide acceptance before any Core commit"
       ],
       "verification": [
         "Merged origin/main 2356ddb as 97ceb92; only the four authorized conflict files; all content/VRM notices retained",
@@ -29,7 +25,13 @@
         "Both actual repository Core4 and temporary official Core6: all 63 existing Node files passed; original Core restored",
         "Browser Hiyori works with both; fixed-input visible differences 49/13/6 pixels, max geometry delta 0.0000012069940567016602"
       ],
-      "next": "Stop implementation per user condition; review proposal/report in existing draft PR #217; only merge and documentation checkpoint, no adapter/mapping implemented"
+      "next": "Commit Core6 plus notice independently, capture Core6 pre-mapping writes, then implement shared runtime and mapping; update draft PR217 and stop for Windows review.",
+      "historical_blockers": [
+        "Current runtime is VRM-specific; user requires a proposal before structural integration",
+        "Core4/Core6 fixed-input pixels are close but not identical; author must decide acceptance before any Core commit"
+      ],
+      "blockers": [],
+      "author_approval": "Author approved plan and Core6 inclusion; no approximation in same-Core mapping acceptance."
     },
     {
       "id": "avatar-live2d-stage1",

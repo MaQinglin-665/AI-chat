@@ -1,5 +1,10 @@
 # Session handoff
 
+## Current — approved stage 2 implementation (Core6 first)
+- Author explicitly approved the proposal and a separate application-only Core6 commit. Documentation Core/display must remain unchanged. The original Pixi clock and full parameter-write order are mandatory; same-Core exact comparison cannot be relaxed. Prior stop/proposal-only instructions below are superseded by this approval.
+- Core6/THIRD_PARTY_NOTICES and state changes pass full scripts/test-local.ps1 (838 Python passed/3 skipped, all 63 Node files, Python183/JS213 syntax, secrets788). Commit independently, then capture old controllers under committed Core6 before mapping + single avatarRuntime selection/frame/events with renderer-owned clocks. No renderer RAF writing Live2D parameters; keep old hit/drag/clickthrough paths.
+- Finish with full gate, normal push to existing draft PR217, then stop for Windows review. No model/config/secrets, dialogue/memory/external-agent changes, docs vendor replacement, force push, main push or PR merge.
+
 ## Current authorization - Live2D stage 2 (2026-10-26)
 - User confirms stage 1 passed author review and authorizes stage 2. Merge latest main, preserving both Live2D and VRM records. Only four expected conflicts occurred and were resolved without dropping either side.
 - Next read docs/avatar-vrm-basic.md, docs/avatar-3d-room.md and web/avatar/avatarRuntime.js before designing changes. Use its single renderer selection path, frameFromState and avatar-intent events. If unsuitable, stop with a proposal instead of a broad rewrite.
