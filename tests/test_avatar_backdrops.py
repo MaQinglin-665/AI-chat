@@ -93,3 +93,45 @@ def test_endpoint_is_behind_existing_auth_checks():
     code = Path("app_get_routes.py").read_text(encoding="utf-8")
     assert code.index("_reject_invalid_api_token") < code.index("avatar_backdrops.dispatch")
     assert code.index("_reject_disallowed_origin") < code.index("avatar_backdrops.dispatch")
+
+
+def test_bundled_default_and_local_override(tmp_path):
+    bundled = tmp_path / "web/assets/backgrounds/bedroom"
+    bundled.mkdir(parents=True)
+    (bundled / "day.webp").write_bytes(b"fixture")
+    cfg = {"avatar": {"kind": "vrm"}}
+    assert backdrops.select(cfg, tmp_path, "night") == (bundled / "day.webp", "day")
+    (bundled / "night.webp").write_bytes(b"fixture")
+    assert backdrops.select(cfg, tmp_path, "night") == (bundled / "night.webp", "night")
+    directory, cfg = setup(tmp_path)
+    (directory / "dusk.png").write_bytes(b"local")
+    assert backdrops.select(cfg, tmp_path, "night") == (directory / "dusk.png", "dusk")
+
+
+def test_bundled_assets_manifest():
+    import hashlib
+    import json
+    import struct
+    directory = Path("web/assets/backgrounds/bedroom")
+    manifest = json.loads((directory / "manifest.json").read_text())
+    assert set(manifest) == {"day.webp", "dusk.webp", "night.webp"}
+    for name, digest in manifest.items():
+        data = (directory / name).read_bytes()
+        assert hashlib.sha256(data).hexdigest() == digest
+        assert data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+        width, height = (n & 0x3fff for n in struct.unpack("<HH", data[26:30]))
+        assert width > 0 and height > 0 and width * height <= backdrops.MAX_PIXELS
+
+
+def test_bundled_link_rejected(tmp_path, monkeypatch):
+    monkeypatch.setattr(backdrops, "_is_link", lambda p: p.name == "bedroom")
+    with pytest.raises(AvatarPathError):
+        backdrops.select({"avatar": {"kind": "vrm"}}, tmp_path, "day")
+
+
+def test_bundled_webp_stream():
+    handler = Handler()
+    backdrops.dispatch(handler, {"avatar": {"kind": "vrm"}}, Path.cwd(), "/api/avatar/backdrop/night.png")
+    assert handler.status == 200
+    assert handler.headers["Content-Type"] == "image/webp"
+    assert handler.wfile.getvalue() == Path("web/assets/backgrounds/bedroom/night.webp").read_bytes()

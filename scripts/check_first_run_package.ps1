@@ -167,6 +167,14 @@ try {
     foreach ($path in $requiredPaths) {
         Assert-PathExists $packageRoot.FullName $path
     }
+    foreach ($assetName in @("day.webp", "dusk.webp", "night.webp", "manifest.json", "README.md")) {
+        $relative = "web\assets\backgrounds\bedroom\$assetName"
+        Assert-PathExists $packageRoot.FullName $relative
+        if ((Get-FileHash -LiteralPath (Join-Path $RepoRoot $relative)).Hash -ne
+            (Get-FileHash -LiteralPath (Join-Path $packageRoot.FullName $relative)).Hash) {
+            throw "Packaged bedroom background differs: $assetName"
+        }
+    }
     $paintedPlaceholder = "web\assets\painted-placeholder.png"
     if ((Get-FileHash -LiteralPath (Join-Path $RepoRoot $paintedPlaceholder)).Hash -ne
         (Get-FileHash -LiteralPath (Join-Path $packageRoot.FullName $paintedPlaceholder)).Hash) {
