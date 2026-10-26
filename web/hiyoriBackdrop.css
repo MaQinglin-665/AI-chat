@@ -1,0 +1,20 @@
+/* This independent layer never changes Live2D rendering or the transparent pet window. */
+#hiyori-backdrop { display: none; position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+body.view-full:not(.transparent-mode):not([data-avatar-kind="vrm"])[data-hiyori-backdrop="true"] #hiyori-backdrop { display: block; }
+body.view-full:not(.transparent-mode):not([data-avatar-kind="vrm"])[data-hiyori-backdrop="true"] .stage-scene { visibility: hidden; }
+.hiyori-backdrop-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 56% 86%; opacity: 0; transition: opacity 2600ms ease; }
+.hiyori-backdrop-image.is-visible { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .hiyori-backdrop-image { transition: none; } }
+
+/* All appearance tuning is in hiyoriBackdrop.js LOOKS/SHADOW. Canvas pixels are untouched. */
+body.view-full:not(.transparent-mode):not([data-avatar-kind="vrm"]) #live2d-canvas { transition: filter 2600ms ease; }
+body.view-full:not(.transparent-mode):not([data-avatar-kind="vrm"])[data-hiyori-backdrop="true"] #live2d-canvas { filter: var(--hiyori-filter); }
+#hiyori-contact-shadow { display: none; position: fixed; pointer-events: none; z-index: 0;
+  left: var(--hiyori-foot-x, -1000px); top: var(--hiyori-foot-y, -1000px);
+  width: var(--hiyori-shadow-width, 0px); height: var(--hiyori-shadow-depth, 0px);
+  border-radius: 50%; background: radial-gradient(ellipse, rgba(24,12,28,.95) 0%, rgba(32,15,28,.55) 38%, transparent 74%);
+  opacity: var(--hiyori-shadow-opacity, 0); transform-origin: 50% 50%;
+  transform: translate(calc(-50% + var(--hiyori-shadow-dx, 0) * 100%), calc(-50% + var(--hiyori-shadow-dy, 0) * 100%)) scale(var(--hiyori-shadow-scale-x, 1), var(--hiyori-shadow-scale-y, 1));
+  transition: opacity 2600ms ease, transform 2600ms ease; }
+body.view-full:not(.transparent-mode):not([data-avatar-kind="vrm"])[data-hiyori-backdrop="true"] #hiyori-contact-shadow { display: block; }
+@media (prefers-reduced-motion: reduce) { body #live2d-canvas, #hiyori-contact-shadow { transition: none !important; } }

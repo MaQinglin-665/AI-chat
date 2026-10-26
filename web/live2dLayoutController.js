@@ -19,7 +19,14 @@
     const tapMaxDurationMs = Number.isFinite(Number(deps.tapMaxDurationMs)) ? Number(deps.tapMaxDurationMs) : 280;
     const tapMoveThreshold = Number.isFinite(Number(deps.tapMoveThreshold)) ? Number(deps.tapMoveThreshold) : 8;
 
+    function syncBackdropFoot(model = state.model) {
+      if (state.uiView !== "full") return;
+      root.XinyuHiyoriBackdrop?.syncFoot({ model, renderer: state.pixiApp?.renderer,
+        canvas: state.pixiApp?.view, style: document?.documentElement?.style });
+    }
+
     function syncPetPresenceAnchor(model = state.model) {
+      syncBackdropFoot(model);
       if (!model || !state.desktopMode || state.uiView !== "model") {
         return null;
       }
@@ -106,6 +113,7 @@
       }
       model.visible = true;
       model.alpha = 1;
+      syncBackdropFoot(model);
       // Presentation anchor only; does not change the model transform or motion.
       if (state.uiView === "full") {
         document?.documentElement?.style?.setProperty?.("--stage-character-x", `${model.x}px`);
@@ -708,6 +716,7 @@ function attachDrag(model) {
       const newScale = Math.max(0.05, Math.min(4.0, currentScale * factor));
       state.model.scale.set(newScale);
       state.baseTransform.scale = newScale;
+      syncBackdropFoot(state.model);
       const baseAuto = newScale / Math.max(0.001, Number(state.modelConfig?.scale) || 1);
       if (Number.isFinite(baseAuto) && baseAuto > 0) {
         state.modelConfig.scale = newScale / baseAuto;

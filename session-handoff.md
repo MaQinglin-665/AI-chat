@@ -1,7 +1,5 @@
-# Painted accepted integration — 2026-10-26
+# Backdrop assets v2 — 2026-10-26
 
-Worktree ai_desktop_pet_painted; branch codex/avatar-painted-backdrop-v1. User accepted #221 and authorized main integration, full tests/package, post-merge night screenshot, ready/CI/admin merge, evidence preservation and worktree removal. Main ee3de6e includes #220/#222. Only extra conflict is metrics in vrmRenderer.js; user approved retaining walking plus painted metrics. Camera algorithm untouched. Prior handoffs archived.
+Workspace D:/AI/ai_desktop_pet_backdrop; branch codex/backdrop-assets-v2 from main 79ee80f. Do not touch original readiness worktree. User requires clean ancestry excluding #223 original PNGs, WebP q88–92, accurate AI wording, control-center default-off switch, CSS-only Hiyori period filters and layout-following contact shadow. Preserve #223 branch; after new draft PR opens comment replacement URL and close #223 without merge. Test 8138, ignored captures, no private config/LLM.
 
-Next: run camera/motion/painted tests, full gates, verify natural idle and fixed painted camera. Preserve ignored evidence before removal. Then create codex/backdrop-assets-v1 from latest main, commit authorized backgrounds and add default-off Hiyori background switch. Never read private config or use 8123.
-
-Targeted/full/package gates and merged night capture passed; fixed camera verified across 12s. Next: push integration, mark ready and wait all Linux/Windows CI before authorized admin merge.
+Implementation complete; full gate 845/3, package smoke and isolated Hiyori visual checks passed. All screenshots under ignored tmp_ui_smoke/backdrop-v2. WebP total 1,787,060 bytes; original resolution and quality90. Next: publish replacement draft, explicitly comment replacement link then close #223 (no merge). Keep raw PNG history out; verify original blob IDs not reachable from new HEAD.

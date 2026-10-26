@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="./tokens.css">
   <link rel="stylesheet" href="./visualPolish.css">
   <link rel="stylesheet" href="./experienceFixes.css">
+  <link rel="stylesheet" href="./hiyoriBackdrop.css">
   <link rel="preload" href="./assets/stage-rooms/day-room-v1.webp" as="image" type="image/webp">
   <link rel="preload" href="./assets/stage-rooms/morning-room-v1.webp" as="image" type="image/webp">
   <link rel="preload" href="./assets/stage-rooms/dusk-room-v1.webp" as="image" type="image/webp">
@@ -39,6 +40,8 @@
     <span class="app-titlebar-mark" aria-hidden="true"></span>
     <span class="app-titlebar-name">&#x99A8;&#x8BED;&#x684C;&#x5BA0;</span>
   </header>
+  <div id="hiyori-backdrop" aria-hidden="true"></div>
+  <div id="hiyori-contact-shadow" aria-hidden="true"></div>
   <div class="stage-scene" aria-hidden="true">
     <div class="stage-room-background stage-room-background-day"></div>
     <div class="stage-room-background stage-room-background-morning"></div>
@@ -367,6 +370,11 @@
       </div>
 
       <div class="config-switch-body">
+        <section id="hiyori-backdrop-options" class="config-switch-section" hidden>
+          <h3>Hiyori 场景</h3>
+          <label class="config-switch-check"><input type="checkbox" id="hiyori-backdrop-enabled" /><span>卧室背景</span></label>
+          <p>默认关闭。开启后随时间场景切换；仅在陪伴窗口显示，桌宠保持透明。</p>
+        </section>
         <section id="avatar-model-info" class="config-switch-section" hidden aria-label="当前角色模型信息">
           <h3>当前角色模型 · VRM</h3>
           <p>名称：<strong data-avatar-name></strong></p>
@@ -376,7 +384,7 @@
           <button type="button" data-avatar-action="wave">挥手</button>
           <button type="button" data-avatar-action="nod">点头</button>
           <fieldset id="painted-scene-options" hidden>
-            <legend>手绘背景</legend>
+            <legend>AI 卧室背景</legend>
             <label><input type="checkbox" id="painted-reflection" checked /> 地板淡倒影</label>
             <label><input type="checkbox" id="painted-grid" /> 校准用米制网格</label>
           </fieldset>
@@ -1179,6 +1187,7 @@
   <template id="taffy-view-script-manifest">
   <script src="./stageFeedbackController.js"></script>
   <script src="./stageThemeController.js"></script>
+  <script src="./hiyoriBackdrop.js"></script>
   <script src="./controlCenterShell.js"></script>
   <script src="./externalAgentController.js"></script>
   <script src="./chatState.js"></script>
