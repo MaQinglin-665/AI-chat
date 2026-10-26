@@ -32,6 +32,10 @@ def dispatch_get(self, context):
         return
     if self._reject_invalid_api_token(path_only):
         return
+    if path_only in {"/api/avatar", "/api/avatar/model.vrm"}:
+        import avatar_assets
+        avatar_assets.dispatch(self, load_config(), context["ROOT_DIR"], path_only)
+        return
     if context["app_external_agent"].handles(path_only):
         context["app_external_agent"].dispatch(self, "GET", path_only,
             context["external_agent"].get_manager(config_loader=lambda: load_config(), bus=_COMPANION_EVENT_BUS))

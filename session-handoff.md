@@ -1,5 +1,14 @@
 # Session handoff
 
+## Current authorization - Live2D stage 2 (2026-10-26)
+- User confirms stage 1 passed author review and authorizes stage 2. Merge latest main, preserving both Live2D and VRM records. Only four expected conflicts occurred and were resolved without dropping either side.
+- Next read docs/avatar-vrm-basic.md, docs/avatar-3d-room.md and web/avatar/avatarRuntime.js before designing changes. Use its single renderer selection path, frameFromState and avatar-intent events. If unsuitable, stop with a proposal instead of a broad rewrite.
+- Evaluate Core 6 locally with before/after screenshots and Node results, report honestly; no Core commit until author confirmation. Mapping-only Hiyori behavior preservation, draft PR and stop for Windows review. No model/private assets, dialogue/memory/external-agent implementation changes, main push, force push or PR merge.
+
+## Preserved Live2D checkpoint history
+
+# Session handoff
+
 ## Current follow-up — PR #217 Windows output encoding (2026-10-26)
 - User asks to check the PR. At head f641cbf both Windows jobs failed the three new launcher tests because CP437 redirected output replaced Chinese with question marks; exit 37 and batch pause still worked. Python/Linux, Node, docs and quality jobs passed. PR stays draft/open/unmerged, with no reviews or comments.
 - Narrow repair: scripts/start-electron.ps1 sets UTF-8 only when stdout is redirected; source BOM retained and interactive settings untouched. tests/test_node_runtime.py now exercises actual helper and batch failures under CP437/CP936/UTF-8. Explicit -Command wrapper exit preserves the tested original code; batch starts in a checkout path containing spaces.
@@ -40,3 +49,16 @@ Verification Evidence: full scripts/test-local.ps1 passed: 809 Python passed, 2 
 Next: submit PR to main, require all CI then --merge --admin. Fetch merged main and rerun scripts/test-local.ps1. Final report must include both merge hashes and final main hash.
 
 Limitations: malformed, oversized or stalled clients may still see connection closure; stable JSON delivery regression covers complete bounded bodies. Prior external-agent metadata verification followups and blocked isolated-directory cleanup remain unchanged.
+
+
+## Preserved upstream VRM and room handoff
+
+# Session handoff — VRM room proportions (2026-10-25)
+
+Branch codex/avatar-3d-room-v1, User passed PR #218 visual acceptance and authorized merge commit on 2026-10-25 after fresh local/package gates and all Linux/Windows CI pass. Prior 91102ef introduced the room; user requested metre-scale furniture/depth/daylight corrections. Local main and 0a06554 remain untouched. Prior handoff archived in docs/archive/session-handoff-room-before-metres-20261025.md.
+
+Changed vrmScene.js to metres independent of avatar height: shelf 1.8m, lamp 1.5m with 0.35m shade, window 1.2x1.4m with 0.9m sill. Wall z=-3m, furnishings z=-2/-2.65m, clean head backdrop. Added ceiling/skirting, distant partial pink crowns, moon/mixed-size stars/clouds, warm brighter daytime and procedural floor sunlight patch. Square wall seams prevent sky leaks; avatar-relative fog stays stable in wide inspection views. vrmRenderer only forwards camera depth. No dialogue/memory/external execution/Live2D/private config/model changes.
+
+Verification: scripts/test-local.ps1 passed 829/3, all Node/syntax/secrets. Added metre dimensions, book range, clear backdrop, distance and unscaled-height tests; ten-cycle resource disposal still passes. Actual Electron VRM0 full/wide night/day captures inspected, ignored tmp_ui_smoke/avatar-vrm-polish/metres-{night,day}-{full,wide}.png. Temporary test-only camera pullback; no product camera change. Full idle 19.98 FPS, CPU 4.21%, GPU 5.19%, 38 draws, within baseline budget. Full dimensions and limitations docs/avatar-3d-room.md. First-run package not repeated: no defaults/installer changes; initial room version passed it.
+
+Fresh merge gates passed: 829/3 plus Node/syntax/secrets; first-run package passed. Next: push acceptance notes, ready PR, all CI green, merge with --merge --admin, then test exact latest origin/main detached. Preserve local main/0a06554 and config.local.json. Three visual follow-ups recorded in progress.md are explicitly deferred. No model screenshots uploaded.

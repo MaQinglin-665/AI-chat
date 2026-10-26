@@ -28,3 +28,9 @@ const tokens=fs.readFileSync("web/tokens.css","utf8");
 function luminance(token){const hex=tokens.match(new RegExp(`--${token}: #([0-9A-Fa-f]{6})`))[1];return [0,2,4].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);}
 for(const background of ["night-base","night-raised"]){const contrast=(luminance("ink-muted")+.05)/(luminance(background)+.05);assert.ok(contrast>=4.5);console.log(`${background} muted contrast ${contrast.toFixed(2)}:1`);}
 console.log("visual presentation state and contrast checks passed");
+
+const polish=fs.readFileSync("web/visualPolish.css","utf8");
+assert.match(polish,/body\.view-model \.kawaii-stage-decor\s*\{\s*display: none !important/);
+assert.match(polish,/pet-ready-fade 400ms ease 3s forwards/);
+assert.match(polish,/body\.view-model \.pet-presence\s*\{\s*left: 12px; top: auto; bottom: 12px/);
+assert(!fs.readFileSync("web/index.html","utf8").includes("<strong>XINYU</strong>"));

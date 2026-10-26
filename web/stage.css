@@ -91,6 +91,11 @@ body.desktop-mode.view-full[data-stage-room="day"] .app-titlebar-mark {
   background: #080d19;
 }
 
+/* Only the procedural VRM room replaces the painted stage. Hiyori and scene=none retain it. */
+body.view-full[data-avatar-kind="vrm"][data-avatar-scene="room"] .stage-scene {
+  display: none;
+}
+
 .stage-room-background,
 .stage-room-tone,
 .stage-room-atmosphere,
@@ -1933,3 +1938,6 @@ body.view-full .stream-text-arrival.is-settled {
     transform: none !important;
   }
 }
+
+/* VRM already has scene lighting; a full-canvas CSS shadow adds a costly compositor pass. */
+body.view-full[data-avatar-kind="vrm"] #live2d-canvas { filter: none !important; }

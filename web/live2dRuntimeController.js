@@ -113,6 +113,13 @@
     }
 
     async function ensureLive2DRuntime() {
+      if (window.XinyuAvatarRuntime) {
+        state.avatarSource = await window.XinyuAvatarRuntime.describe();
+        if (state.avatarSource.kind === "vrm") {
+          await loadScript("/vendor/vrm/vrm-vendor.js", () => !!window.XinyuVRMVendor);
+          return;
+        }
+      }
       await loadScript(
         "/vendor/pixi.min.js",
         () => typeof window.PIXI !== "undefined"
@@ -224,7 +231,12 @@
     }
 
     async function initLive2D() {
+      document.body.dataset.avatarReady = "false";
       const canvas = document.getElementById("live2d-canvas");
+      if (state.avatarSource?.kind === "vrm") {
+        await window.XinyuAvatarRuntime.start({ state, canvas, source: state.avatarSource, setStatus });
+        return;
+      }
       const rawModelPath = String(state.config?.model_path || "").trim();
       const normalizedModelPath = rawModelPath.replace(/\\/g, "/").toLowerCase();
       const live2dPathMissing = !rawModelPath || normalizedModelPath.includes("your_model");
@@ -292,6 +304,7 @@
         });
         maybeTightFitDesktopWindow();
         setStatus(info);
+        document.body.dataset.avatarReady = "true";
       } catch (err) {
         console.error(err);
         stopIdleMotionLoop();

@@ -50,6 +50,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Local VRM browser runtime
+
+`web/vendor/vrm/vrm-vendor.js` bundles **three.js 0.180.0** (including GLTFLoader)
+and **@pixiv/three-vrm 3.4.4**. Both are MIT licensed. Their full notices are
+`web/vendor/vrm/THREE-LICENSE.txt` and `web/vendor/vrm/THREE-VRM-LICENSE.txt`.
+Upstream sources: https://github.com/mrdoob/three.js/tree/r180 and
+https://github.com/pixiv/three-vrm/tree/v3.4.4 . Packages were obtained from the npm
+registry at these exact versions, not from a runtime CDN. Rebuild with
+`scripts/build_vrm_vendor.cjs` and esbuild **0.25.11** (build-time only, MIT).
+The browser loads only the bundled local file. No VRM/VRMA model data is bundled.
+User models retain their own attribution and use restrictions, displayed from
+VRM metadata and an optional adjacent README.txt; this project does not grant
+rights to redistribute those models.
+
 ## Live2D Sample Models
 
 | Paths | Asset | Notice |
