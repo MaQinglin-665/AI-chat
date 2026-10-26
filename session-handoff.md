@@ -11,3 +11,8 @@ CMU 2a: skipped by explicit user instruction after connection-reset retries. Not
 Files: vrmCamera/vrmLocomotion new; vrmWorld, vrmRenderer, vrmSeating, index wiring; two Node suites/runner; report, room-life link and state. Prior handoff archived at docs/archive/session-handoff-handpainted-20261026.md.
 
 Next: publish feature branch and draft PR to main after final gate, then wait for user visual review. Do not merge; #220 remains a separate draft. Limits: real VRM1 not visually tested, no full-body/clothing collisions, existing desk/window hands still deferred. Recordings are controlled rendering, not a performance benchmark or live speech acceptance.
+
+## Publication blocker
+Implementation commit cbdf497 is locally complete and validated. Normal push failed five times, 10 seconds between attempts (GitHub TLS handshake resets and port-443 timeouts). Remote feature branch was not established; draft PR not created. Stop further network retries under the user's rule.
+User can run: git -C D:/AI/ai_desktop_pet_readiness_20261023 push -u origin codex/avatar-motion-camera-v1
+After push succeeds: create a draft PR to main, explicitly note included unmerged #220, attach it to this task, and stop for user review. Do not merge or change local main/private configuration.
