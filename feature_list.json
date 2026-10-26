@@ -3,7 +3,7 @@
     {
       "id": "avatar-live2d-pr217-closeout",
       "name": "Rebase integration boundary and exact Hiyori video for PR217",
-      "status": "in_progress",
+      "status": "completed",
       "dependencies": [
         "avatar-live2d-stage2",
         "avatar-painted-backdrop-v1"
@@ -20,13 +20,14 @@
         "Dedicated Hiyori inspection video delivered locally; no model/private assets committed",
         "Existing PR217 updated/pushed/ready; separate main-based lipsync branch next"
       ],
-      "next": "Merge latest main, rerun both exact tests/all VRM-room-camera-background/full/package gates, normal push and wait all Linux/Windows CI; author merges. PR226 and separate Mao stage3 wait for author merging217.",
+      "next": "Normalpush/ready and await all exact-head Linux+WindowsCI, notify author inPR217; author must view01 and merge. PR226/Mao wait for author merging217.",
       "verification": [
         "Merged latest main79ee80f (#221/#222) as8d514b7; retained both VRM and Live2D integration.",
         "Exact same-Core Node5280frames/394224calls/42scenes; browser1030frames/167741calls, all snapshots/four PNG pairs identical and10 reloads clean.",
         "Full scripts/test-local.ps1:861 Python passed/3 skipped,72 Node files,syntax186/239,secrets834;docs4,package smoke,JSON/py_compile pass.",
         "Dedicated38.4s silent realHiyori/Pixi/Core6 video retained outsideGit; browser fixture is not native Windows/liveTTS acceptance.",
-        "Prior browser mouth fix removed from PR217 product via normal inverse patches; installed120ms preserved locally; new independent main-based PR required."
+        "Prior browser mouth fix removed from PR217 product via normal inverse patches; installed120ms preserved locally; new independent main-based PR required.",
+        "2026-10-26 main1ab5d38/#227 mergedf73125f;full928Python/3skip/73Node,syntax194/241,secrets847;strict5280/394224/browser1030/167741;9VRMNode+32Python/1skip;package/JSON/compile pass.01 separately provided,user forwards.#225 stilldraft.No later work before217 author merge."
       ]
     },
     {

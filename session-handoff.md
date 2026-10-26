@@ -1,3 +1,9 @@
+# Current — PR217 latest-main gates passed; publish and await all CI
+- Merged main1ab5d38/#227 asf73125f; #221/#224 included. #225 stilldraft/unmerged atfetch. Only3state conflicts preserved both histories; no product conflict/behavior choice. VRM beyond approved clock movement +8scene/camera/background modules matchmain byte-for-byte.
+- Verification Evidence: exactadapter+sequence Node5280/394224/42, browser1030/167741/fourPNGpairs/10reloads;9VRM Node +32Python/1skip asset/backdrop; full928Python/3skipped/73Node,syntax194/241,secrets847;package/JSON/py_compile passed. Logswork/pr217-main227-* outsideGit.
+- Standalone01Hiyori38.4sMP4 supplied, user explicitly forwards it. Author has not yet confirmed viewing01; required before merge. Author already viewed02–04. No model/media/private config/key changes. Existing installed120ms untouched.
+- Next normalpush friend/avatar-live2d-adapter, ready217, wait everyLinux+WindowsCI on exacthead and notifyauthor inPRcomment. Never selfmerge/main/forcepush. Networkpush retry10s/max5. Then stop until author merges217; no226sync/Mao stage3/defaultVRM task yet. This supersedes historical authorization text below.
+
 # Current — author requests fresh PR217 synchronization and full CI
 - Latest authorization: resend separate01 Hiyori38.4s video, then prioritize #217 latest-main merge/strict+all VRM-room-camera-background/full/package tests, normal push/ready and allLinux+WindowsCI; author merges, never self-merge/force/main push. Stop and ask if conflict choice ambiguous.
 - Fetchedmain1ab5d38 includes#221/#224/#227. GitHub#225 stillopen/draft, not merged; leave it out until onmain. Original217ready/open/unmerged0c08c3d. PR226ready/open/unmerged943b690; do not sync it until author merges217. Separate friend/avatar-live2d-mao also waits; do not initiate stage3 now. No model/defaultVRM task; officialCC0Sendagaya stays ignoredmodels_local only.

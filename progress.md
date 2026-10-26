@@ -1145,3 +1145,14 @@ User explicitly authorized these backend-only phase-2 items before #217. New bra
 - TODO（本次不修）：avatar_brain_context.py 的 PRIVATE 正则过于保守；`[a-z]:`、`\.[a-z]...`、`配置`、`路径` 等模式会误伤日常聊天（如“电脑配置”、英文“note:”），导致摘要为空。以后改为只遮盖命中的片段，或只匹配真正像 Key、路径的格式，并补充误伤用例测试。
 - After merge, stop and wait for the user's notice that #217 has merged before frontend phase 2.
 - Verification Evidence: fresh scripts/test-local.ps1 passed (908 passed, 3 skipped, 1 warning; all Node/syntax/secrets passed); scripts/check_first_run_package.ps1 passed. Required JSON and compile checks passed. Ignored logs: tmp_ui_smoke/avatar-vrm-polish/merge227-local.log and merge227-package.log. No product code changed. Ready for normal push and CI-gated authorized merge.
+
+
+### 作者新一轮同步与验收（main #227）
+2026-10-26：显式fetch最新main `1ab5d38`（含#221/#224/#227），合并为 `f73125f`。#225截至本轮获取仍open/draft，尚不在main，未提前带入。仅三个状态文件冲突，全部保留双方记录；产品代码无冲突，无需取舍任何VRM/场景行为。
+
+- `test_live2d_avatar_adapter.js` 和 `test_live2d_mapping_sequence.js` 通过：Core6同输入 **5,280帧 / 394,224次完整调用 / 42场景**严格一致。实际Pixi浏览器 **1,030帧 / 167,741次调用**严格一致，四组PNG相同、十次重载清理通过。
+- main既有VRM/场景专项9个Node文件全部通过；`test_avatar_assets.py` / `test_avatar_backdrops.py` **32通过/1跳过**。VRM renderer仅含已批准的渲染器时钟归属/清理平移；剔除这几段明确平移后其余源码与main逐字节相同，另外8个VRM房间/镜头/背景模块逐字节相同，未改数值或逻辑。本地证据 `outputs/pr217-main227/vrm-main-parity.json`。
+- 完整 `scripts/test-local.ps1`：**928 Python通过 / 3跳过，73 Node文件，语法Python194 / JS241，秘密扫描847**；`scripts/check_first_run_package.ps1`、必需JSON/py_compile通过。环境doctor有一项既有低版本可选CodexCLI提示，外部代理未启用；全部门禁通过，本轮不改外部执行配置。
+- 01 Hiyori录像（约38.4秒，无声）已在聊天单独补发，用户明确“我来转发”。不声称作者已收到或观看；它仍是作者合并前必看项。02–04作者已看过，用户确认改进明显。录像/模型/私密配置未提交。
+
+本检查点随后正常push/ready并等待该提交的Linux与Windows全部CI通过，再在PR评论中通知作者；远端结果以GitHub及仓库外ci-final.json为准。任何PR均不自行合并。#226同步及后续Mao分支工作等作者合并#217；官方CC0Sendagaya仅本地，不作为本次默认角色变更。
