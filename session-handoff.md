@@ -1,5 +1,12 @@
 # Session handoff
 
+## Current — stage3 published, PR217 ready; author Windows review next
+- User approved stage3 and local Mao switch. Implementation9657a30de1083ef060a0b87429349253d7a21320 pushed normally to friend/avatar-live2d-adapter. Existing PR217 title/body updated, verified open/non-draft/unmerged/base main. Python/Node/Docs/Quality CI succeeded; Windows was running at publication. No main/force push/merge.
+- Complete local gate and exact Hiyori/actual Mao evidence recorded below and in docs/avatar-live2d-mao.md. Local app installed/restarted; old installed CSP blob incompatibility fixed; actual backend model page ready/Mao/Core6/132 parameters/no JS errors with authentication. Independent desktop pet hides while chat stage is visible; minimize chat to reveal it. Model/config/screenshots remain local, competition directory contains30 labeled captures.
+- Stop here. Author must review original Windows appearance, real voice, drag/clickthrough/window switching and decide merge. No additional implementation authorized beyond this completed scope. Do not treat historical phase holds or older main-merge permissions as current work.
+
+# Session handoff
+
 ## Current — stage3 implemented and installed; publication next
 - User explicitly approved stage3 and local Mao switch. Official local assets remain ignored; no new vendor/Core changes. Shared runtime/Pixi pre-Core path retained; Hiyori legacy layers never run for Mao.
 - Added bounded authenticated manifest resources, private Blob loader with instance-local Pixi URL workaround, Mao mapping/driver, conservative five-vowel estimator and validated original speech bridge fields. Unknown intents ignored. Eight official expressions/motions and three A-arm gestures mapped; actual authored motion semantics and small arm ranges documented honestly in docs/avatar-live2d-mao.md. UI attribution retained.

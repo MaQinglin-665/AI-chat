@@ -3,7 +3,7 @@
     {
       "id": "avatar-live2d-mao-stage3",
       "name": "Official local Mao: vowel estimator, faces, gestures and configuration",
-      "status": "in_progress",
+      "status": "completed",
       "dependencies": [
         "avatar-live2d-stage2"
       ],
@@ -20,19 +20,20 @@
         "Local screenshots: five vowels, eight expressions, three gestures; actual installed Mao shown",
         "Push existing PR217 and change draft to ready; no merge/main/force push"
       ],
-      "next": "Commit only reviewed stage3 code/docs/state, normal push to existing PR217, mark ready for author Windows review; no merge.",
+      "next": "PR217 is published and ready; stop for author Windows appearance, drag, clickthrough and real voice review. Author decides merge.",
       "verification": [
         "Full scripts/test-local.ps1: 849 Python passed/3 skipped; all 66 Node suites; Python184/JS226 syntax; secrets807 (final docs scan808)",
         "Hiyori same-Core exact: 5280 Node frames/394224 calls; real Pixi 1030 frames/167741 calls, snapshots and four PNG pairs identical; ten reload cleanups",
         "Real local Mao: five vowels/eight faces/three arms, eight native motions actually loaded and played, 21 authenticated resources and unauthorized401, no page errors",
         "Actual D:/app/DesktopPet installed page loads Mao/Core6/132 parameters with authentication after minimal old-CSP blob backport; desktop app restarted",
-        "Official assets/private config/screenshots outside Git; 30 genuine competition captures with descriptions and hashes; docs four browser cases and required JSON/py_compile pass"
+        "Official assets/private config/screenshots outside Git; 30 genuine competition captures with descriptions and hashes; docs four browser cases and required JSON/py_compile pass",
+        "Implementation9657a30 pushed normally; PR217 verified open, non-draft, unmerged, base main. Python/Node/Docs/Quality CI succeeded; Windows was running at publication."
       ]
     },
     {
       "id": "avatar-live2d-stage2",
       "name": "Live2D adapter through the shared avatar runtime",
-      "status": "in_progress",
+      "status": "completed",
       "dependencies": [
         "avatar-live2d-stage1",
         "avatar-vrm-basic",
@@ -60,7 +61,7 @@
         "Final full scripts/test-local.ps1: 838 Python passed/3 skipped, all 65 Node suites, Python183/JS221 syntax, secrets800; docs check:all four cases and JSON/py_compile passed",
         "Implementation 94a9fca pushed normally to friend/avatar-live2d-adapter; PR217 verified open/draft/unmerged, base main; initial Node/Docs/Quality CI success"
       ],
-      "next": "Author Windows appearance/drag/clickthrough review of draft PR217; do not start stage3 or merge without confirmation.",
+      "next": "User confirmed proceeding to stage3; completed adapter preserved by strict regressions. Final integrated Windows review remains with author.",
       "historical_blockers": [
         "Current runtime is VRM-specific; user requires a proposal before structural integration",
         "Core4/Core6 fixed-input pixels are close but not identical; author must decide acceptance before any Core commit"
