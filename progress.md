@@ -1113,3 +1113,7 @@ Verification Evidence for #224 merge: scripts/test-local.ps1 passed (876 passed,
 
 ## 2026-10-26 — PR217 also synchronized with newly merged #224
 - Main advanced to2b67452 during closeout. Retained incoming backend unchanged, both state histories and the new Node debugger test; no brain phase2 implemented. Rerunning complete gate and exact Core6 comparison before normal push.
+
+
+### 收尾期间新合入 #224 的补检
+main 在收尾期间前进到 `2b67452`，已通过 `38f0497` 补入 #217；上游脑控第一期代码原样保留，没有开始第二期。最终完整门禁 **896 Python 通过 / 3 跳过，73 Node 测试文件，语法191/241，秘密扫描843**；首次运行打包检查通过。同 Core6 Node5280/394224/42场景及浏览器1030/167741完整序列再次严格一致，四组PNG哈希及十次重载检查通过。原38.4秒录像仍对应相同 Hiyori 渲染代码（新上游未修改渲染器）。

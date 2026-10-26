@@ -1,3 +1,6 @@
+# Publication checkpoint — PR217 includes new main #224
+- Latest main2b67452 also merged38f0497. Final full896Python/3skipped,73Node,syntax191/241,secrets843;package and required JSON/compile pass. Exact Node5280/394224/42 and browser1030/167741 complete sequences strictly equal again. Hiyori code/video unchanged by #224. Publish normal push; ready; author decides merge. Then separate lipsync branch from2b67452. No brain phase2.
+
 # Current — PR217 verified for publication; shared lipsync separate
 
 - Priority1 complete locally on friend/avatar-live2d-adapter: explicit latest main79ee80f (#221/#222) merged8d514b7, VRM/Live2D/notices/state histories retained. Prior browser timing prototype removed from product through normal inverse patches; original installed120ms remains working locally.
