@@ -352,3 +352,9 @@ Limitations: real VRM1 and live ASR/LLM/TTS not exercised; procedural poses lack
 no installer exe built. Existing night face-fill follow-up remains deferred. Only draft PR, user appearance review next; do not merge.
 
 Published implementation 0c34e34 on codex/avatar-room-life-v1; draft PR #219 targets main. Final package recheck passed. Private config hash unchanged. Waiting for user visual review; no merge.
+
+## 2026-10-25 — PR #219 seated contact and camera revision
+
+Measured sofa/chair surfaces (0.310/0.342m), measured leg lengths and constrained hip/ankle contacts replace the old height-only seating. Lap hands and desk elbow/chin support, 1.8s activity cameras, bounded back-facing glances and runtime purple furniture tint added. Procedural fallback seats match the same surfaces; source assets unchanged.
+Verification Evidence: final scripts/test-local.ps1 passed: 829 passed, 3 skipped; all Node suites, Python/JS syntax and secrets passed. New synthetic VRM0/1 short/long-leg tests preserve bone lengths and seat/floor contacts; real Electron VRM0 contacts <1mm, desk elbow 0.7645m vs 0.765m target. No page exceptions; ten room toggles stable. Sofa/desk front and side, four activity views and 35s silent seated-tour.mp4 are ignored under tmp_ui_smoke/avatar-vrm-polish. Capture-only active-surface override avoids existing background pause.
+Limitations: no real VRM1 model acceptance or arbitrary outfit collision guarantee; extreme unreachable desk proportions are reported. Updated draft #219 awaits user visual review; no merge. Local main and private config/model untouched.

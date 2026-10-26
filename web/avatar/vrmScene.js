@@ -3,13 +3,13 @@
   // All positions and sizes are metres, independent of the avatar's height.
   // Bounds include the outdoor alcove; the interior back wall is at z=-3.
   const ROOM = Object.freeze({ min: [-3, -0.06, -8.1], max: [3, 3, 2], transitionMs: 2500,
-    seed: 216, fogNear: 1, fogFar: 14, shadowSize: [0.65, 0.38], saturation: 0.80 });
+    seed: 216, fogNear: 1, fogFar: 14, shadowSize: [0.65, 0.38], footShadowSize:[.30,.20], saturation: 0.80 });
   const FURNITURE = Object.freeze({
     window: { position: [-1.35, 1.6, -3], size: [1.2, 1.4, 0.12], sill: 0.9 },
     shelf: { position: [1.45, 0.9, -2.65], size: [1.05, 1.8, 0.32] },
     lamp: { position: [-2.35, 0.75, -2.18], size: [0.35, 1.5, 0.35] },
     rug: { position: [0, 0.014, -0.1], size: [1.8, 0.025, 1.2] },
-    cushion: { position: [-2.13, .48, .2], size: [0.45, 0.2, 0.4] }
+    cushion: { position: [-2.13, .39, .2], size: [0.45, 0.2, 0.4] }
   });
   const PALETTE = Object.freeze({ wall: 0xc5bccd, floor: 0xb8a79e, wood: 0xa58e99,
     trim: 0xe5d5da, curtain: 0xb9a2c2, rug: 0xb9a8c0, leaf: 0x8ba592, pot: 0xd5b3b9 });
@@ -78,16 +78,16 @@
     // Whole-object fallback remains visible until every selected local asset is ready.
     box("desk-top", [1.82,.71,-.15], [1.15,.06,.65], PALETTE.wood);
     for(const x of [1.32,2.32]) for(const z of [-.4,.1]) box("desk-leg-"+x+"-"+z,[x,.35,z],[.06,.7,.06],PALETTE.wood);
-    box("chair-seat",[.98,.43,.15],[.5,.08,.5],PALETTE.wood);
-    box("chair-back",[.76,.67,.15],[.06,.38,.5],PALETTE.wood);
-    for(const x of [.79,1.17]) for(const z of [-.04,.34]) box("chair-leg-"+x+"-"+z,[x,.21,z],[.05,.42,.05],PALETTE.wood);
-    box("sofa-seat",[-2.13,.27,-.3],[.85,.46,1.7],PALETTE.curtain);
-    box("sofa-back",[-2.48,.58,-.3],[.15,.36,1.7],PALETTE.curtain);
-    for(const z of [-1.08,.48]) box("sofa-arm-"+z,[-2.13,.56,z],[.85,.22,.14],PALETTE.curtain);
+    box("chair-seat",[.98,.302,.15],[.5,.08,.5],PALETTE.wood);
+    box("chair-back",[.76,.60,.15],[.06,.52,.5],PALETTE.wood);
+    for(const x of [.79,1.17]) for(const z of [-.04,.34]) box("chair-leg-"+x+"-"+z,[x,.131,z],[.05,.262,.05],PALETTE.wood);
+    box("sofa-seat",[-2.13,.155,-.3],[.85,.31,1.7],PALETTE.curtain);
+    box("sofa-back",[-2.48,.535,-.3],[.15,.45,1.7],PALETTE.curtain);
+    for(const z of [-1.08,.48]) box("sofa-arm-"+z,[-2.13,.46,z],[.85,.30,.14],PALETTE.curtain);
     box("picture0",[.25,2.09,-2.94],[.42,.34,.035],PALETTE.trim);
     box("picture1",[.78,2.19,-2.94],[.25,.28,.035],PALETTE.curtain);
     for(const item of items) item.furniture = /^(shelf|book|strip|lamp|pot|leaf|rug|cushion|desk|chair|sofa|picture)/.test(item.id);
-    return { bounds: { min: [...ROOM.min], max: [...ROOM.max] }, items, models: root.XinyuVRMFurniture?.ITEMS || [], activityPoints: root.XinyuVRMWorld?.POINTS || {}, obstacles: root.XinyuVRMWorld?.OBSTACLES || [] };
+    return { bounds: { min: [...ROOM.min], max: [...ROOM.max] }, items, seats: root.XinyuVRMSeating?.SEATS || {}, cameras: root.XinyuVRMSeating?.CAMERAS || {}, models: root.XinyuVRMFurniture?.ITEMS || [], activityPoints: root.XinyuVRMWorld?.POINTS || {}, obstacles: root.XinyuVRMWorld?.OBSTACLES || [] };
   }
   function transition(initial = "night") {
     let value = initial === "day" ? 1 : 0, from = value, target = value, start = 0;
@@ -173,6 +173,7 @@
     const shadow = new T.Mesh(own(new T.PlaneGeometry(...ROOM.shadowSize)),
       own(new T.MeshBasicMaterial({ map: shadowMap, transparent: true, depthWrite: false })));
     shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.035; group.add(shadow);
+    const footShadows=[0,1].map(()=>{const foot=new T.Mesh(own(new T.PlaneGeometry(...ROOM.footShadowSize)),shadow.material);foot.rotation.x=-Math.PI/2;foot.visible=false;group.add(foot);return foot;});
     const ambient = new T.AmbientLight(); scene.add(ambient);
     const sun = new T.DirectionalLight(); sun.position.set(-1.35, floorY + 2.3, -3);
     sun.target.position.set(0, floorY + 0.6, 0); scene.add(sun, sun.target);
@@ -205,7 +206,7 @@
       furniture=result; if(result) fallback.forEach(mesh=>{mesh.visible=false;}); return !!result;
     }) : Promise.resolve(false);
     update(period, 0);
-    return { update, ready, setAvatarPosition(x,z) { shadow.position.x=x; shadow.position.z=z; }, metrics: () => ({ day, furnitureLoaded: !!furniture, batches: batches.size, resources: resources.size }), dispose() {
+    return { update, ready, setFootPositions(points) { footShadows.forEach((mesh,i)=>{mesh.visible=!!points?.[i];if(mesh.visible)mesh.position.set(points[i][0],.035,points[i][2]);}); }, setAvatarPosition(x,z) { shadow.position.x=x; shadow.position.z=z; }, metrics: () => ({ day, furnitureLoaded: !!furniture, batches: batches.size, resources: resources.size }), dispose() {
       if (disposed) return; disposed = true; furniture?.dispose();
       scene.remove(group, ambient, sun, sun.target, ...lamps); scene.fog = oldFog; scene.background = oldBackground;
       for (const resource of resources) resource.dispose?.(); resources.clear(); group.clear();

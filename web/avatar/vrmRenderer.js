@@ -14,7 +14,7 @@
     gazeX: 0.5, gazeY: 0.3, gazeIdle: 0.12, gazeHeight: 0.9, gazeDistance: 2,
     seed: 23017
   });
-  const WORLD_VISUAL = Object.freeze({bookSize:[.13,.018,.19],bookPosition:[0,-.025,.055],bookColor:0x9f7fa9,gazeDistance:2,gazeHeight:.9});
+  const WORLD_VISUAL = Object.freeze({bookSize:[.13,.018,.19],bookPosition:[0,-.025,.055],bookColor:0x9f7fa9,gazeDistance:2,gazeHeight:.9,chinDrop:.04,chinForward:.07,lapLift:.045,elbowPadding:.025,deskHand:[.32,.775,.08],lookSpine:.65,lookHead:1.1});
   const QUALITY = Object.freeze({ pixelBudget: 900000, minDpr: 1, maxDpr: 1.25, idleFps: 20, activeFps: 30 });
   const CAMERA = Object.freeze({ fov: 27, eyeLift: 0.035, bottom: 0.40, top: 1.16, face: 0.91, faceScreenY: 1 / 3 });
   const STANCE = Object.freeze({ yaw: 15 * Math.PI / 180, headReturn: 0.9,
@@ -261,6 +261,8 @@
     let modelHeight = 1.6, hitAreas = [], loadMs = 0, loadedAt = 0, frames = 0;
     let projection = null, avatarRoot = null, world = null, worldState = null, cameraHome = null, follow = [0,0,0], worldTime = null, book = null;
     const worldModule = options.worldModule || root.XinyuVRMWorld;
+    const seating = options.seatingModule || root.XinyuVRMSeating;
+    let seatProfile=null,seatMetrics=null,cameraKey=null,cameraStart=null,cameraSince=0,backSince=null;
     let room = null, legacyLights = null, undoGrade = null, floorY = 0;
     const roomModule = options.roomModule || root.XinyuVRMScene;
     const period = () => root.document?.body?.dataset.stageRoom || "night";
@@ -268,7 +270,7 @@
       if (!scene) return;
       room?.dispose(); room = null; world?.dispose(); world=null; worldState=null; worldTime=null;
       if(avatarRoot){avatarRoot.position.set(0,0,0);avatarRoot.rotation.y=0;}
-      follow=[0,0,0]; if(book) book.visible=false;
+      follow=[0,0,0]; cameraKey=null;backSince=null;seatMetrics=null; if(book) book.visible=false;
       if(cameraHome && camera){camera.position.set(0,cameraHome.cameraY,cameraHome.distance);camera.lookAt(0,cameraHome.targetY,0);}
       undoGrade?.(); undoGrade = null;
       const useRoom = roomModule?.enabled(options.view, value);
@@ -295,7 +297,7 @@
       generation += 1;
       room?.dispose(); room = null; world?.dispose(); world=null; worldState=null; worldTime=null;
       if(avatarRoot){avatarRoot.position.set(0,0,0);avatarRoot.rotation.y=0;}
-      follow=[0,0,0]; if(book) book.visible=false;
+      follow=[0,0,0]; cameraKey=null;backSince=null;seatMetrics=null; if(book) book.visible=false;
       if(cameraHome && camera){camera.position.set(0,cameraHome.cameraY,cameraHome.distance);camera.lookAt(0,cameraHome.targetY,0);}
       undoGrade?.(); undoGrade = null; legacyLights = null;
       if (root.document?.body) root.document.body.dataset.avatarScene = "none";
@@ -354,6 +356,7 @@
       }
       const hand=vrm.humanoid?.getRawBoneNode?.("rightHand");
       if(hand){book=new THREE.Mesh(new THREE.BoxGeometry(...WORLD_VISUAL.bookSize),new THREE.MeshToonMaterial({color:WORLD_VISUAL.bookColor}));book.position.set(...WORLD_VISUAL.bookPosition);book.visible=false;hand.add(book);}
+      seatProfile=seating?.measure(THREE,vrm,avatarRoot,floorY);
       setScene(source.scene);
       renderer = new THREE.WebGLRenderer({ canvas, alpha: true, premultipliedAlpha: true, antialias: true, powerPreference: "low-power" });
       renderer.setClearColor(0x000000, 0);
@@ -384,12 +387,42 @@
     function solveContacts(pose) {
       const T=vendor.THREE;
       if(!pose.hands || !worldModule.CONTACT)return;
-      for(const [side,p] of Object.entries(pose.hands)){
+      const activity=seating?.active(worldState);
+      seatMetrics=seating?.apply({T,vrm,avatarRoot,profile:seatProfile,activity,weight:pose.weight,floorY});
+      const contacts={...pose.hands};
+      if(seatMetrics){
+        for(const side of ['left','right']){
+          const thigh=vrm.humanoid.getNormalizedBoneNode(side+'UpperLeg').getWorldPosition(new T.Vector3());
+          const knee=vrm.humanoid.getNormalizedBoneNode(side+'LowerLeg').getWorldPosition(new T.Vector3());
+          const target=thigh.lerp(knee,.65);target.y+=WORLD_VISUAL.lapLift;
+          if(activity==='desk'){
+            if(side==='left'){
+              vrm.humanoid.getNormalizedBoneNode('head').getWorldPosition(target);
+              target.y-=WORLD_VISUAL.chinDrop;target.x+=WORLD_VISUAL.chinForward;
+            }else {target.set(seating.SEATS.desk.hip[0]+WORLD_VISUAL.deskHand[0],floorY+WORLD_VISUAL.deskHand[1],seating.SEATS.desk.hip[1]+WORLD_VISUAL.deskHand[2]);}
+          }
+          contacts[side]=avatarRoot.worldToLocal(target).toArray();
+        }
+      }
+      for(const [side,p] of Object.entries(contacts)){
         const end=vrm.humanoid?.getNormalizedBoneNode?.(side+"Hand");
         if(!end?.getWorldPosition)continue;
         avatarRoot.updateMatrixWorld(true);
         const target=avatarRoot.localToWorld(new T.Vector3(...p)),current=end.getWorldPosition(new T.Vector3());
         target.lerpVectors(current,target,pose.weight);
+        if(activity==='desk' && side==='left' && seatMetrics){
+          const upper=vrm.humanoid.getNormalizedBoneNode('leftUpperArm'),lower=vrm.humanoid.getNormalizedBoneNode('leftLowerArm');
+          const shoulder=upper.getWorldPosition(new T.Vector3()),elbow=lower.getWorldPosition(new T.Vector3()),hand=end.getWorldPosition(new T.Vector3());
+          const point=seating.tableElbow(shoulder.toArray(),target.toArray(),shoulder.distanceTo(elbow),elbow.distanceTo(hand),floorY+seating.SEATS.desk.table+WORLD_VISUAL.elbowPadding,[1,0]);
+          if(point){
+            const bend=new T.Vector3(...point).lerpVectors(elbow,new T.Vector3(...point),pose.weight);
+            seating.rotateTo(T,upper,lower,bend);seating.rotateTo(T,lower,end,target);
+            const finger=vrm.humanoid.getNormalizedBoneNode('leftMiddleProximal');
+            if(finger)seating.rotateTo(T,end,finger,end.getWorldPosition(new T.Vector3()).add(new T.Vector3(.1,0,0)));
+            seatMetrics.elbow=lower.getWorldPosition(new T.Vector3()).toArray();seatMetrics.chinHand=end.getWorldPosition(new T.Vector3()).toArray();seatMetrics.chinTarget=target.toArray();continue;
+          }
+          seatMetrics.elbowUnreachable=true;
+        }
         for(let i=0;i<worldModule.CONTACT.iterations;i++){
           if(end.getWorldPosition(current).distanceTo(target)<worldModule.CONTACT.epsilon)break;
           for(const joint of ["LowerArm","UpperArm"]){
@@ -419,16 +452,33 @@
         avatarRoot.position.set(worldState.position[0]+pose.offset[0],pose.y,worldState.position[1]+pose.offset[1]);
         avatarRoot.rotation.y=worldState.yaw;
         const target=[avatarRoot.position.x,avatarRoot.position.y,avatarRoot.position.z];
-        follow=follow.map((v,i)=>v+(target[i]-v)*(1-Math.exp(-worldModule.TUNING.cameraRate*dt)));
-        camera.position.set(follow[0],cameraHome.cameraY+follow[1],cameraHome.distance+follow[2]);
-        camera.lookAt(follow[0],cameraHome.targetY+follow[1],follow[2]);
+        if(seating && worldState.moving){
+          const cameraAngle=Math.atan2(camera.position.x-target[0],camera.position.z-target[2]);
+          const delta=Math.atan2(Math.sin(cameraAngle-worldState.yaw),Math.cos(cameraAngle-worldState.yaw));
+          if(Math.abs(delta)>Math.PI/2){backSince??=now;
+            if(now-backSince>seating.SETTINGS.backLimit*1000){const sign=Math.sign(delta)*seating.glance((now-backSince)/1000);pose.bones.spine={y:sign*WORLD_VISUAL.lookSpine};pose.bones.head={y:sign*WORLD_VISUAL.lookHead};
+              if(now-backSince>(seating.SETTINGS.backLimit+seating.SETTINGS.glanceDuration)*1000)backSince=now;
+            }
+          }else backSince=null;
+        }
         frame={...frame,worldPose:pose,worldOrigin:target,worldGaze:worldState.name==="accompany"?null:[target[0]+Math.sin(worldState.yaw)*WORLD_VISUAL.gazeDistance,modelHeight*WORLD_VISUAL.gazeHeight+target[1],target[2]+Math.cos(worldState.yaw)*WORLD_VISUAL.gazeDistance],
           solveContacts:()=>solveContacts(pose)};
         if(book)book.visible=pose.book && pose.weight>.8;
         room?.setAvatarPosition?.(target[0],target[2]);
       }
       room?.update(period(), now, camera.position.z);
-      driver.update(frame); renderer.render(scene, camera); frames += 1;
+      driver.update(frame);
+      room?.setFootPositions?.(seatMetrics ? Object.values(seatMetrics.legs).map(l=>l.ankle) : null);
+      if(world && seating){
+        const actual=avatarRoot.position,active=worldState.name!=='accompany',preset=seating.CAMERAS[worldState.name]||seating.CAMERAS.idle;
+        const key=active?worldState.name:'accompany';
+        const aim=[actual.x,active?actual.y+modelHeight*preset.height:cameraHome.targetY+actual.y,actual.z];
+        const goal=active?[actual.x+preset.offset[0],aim[1]+preset.offset[1],actual.z+preset.offset[2]]:[actual.x,cameraHome.cameraY+actual.y,cameraHome.distance+actual.z];
+        if(cameraKey!==key){cameraKey=key;cameraSince=now;const dir=new vendor.THREE.Vector3();camera.getWorldDirection(dir);cameraStart=[...camera.position.toArray(),...camera.position.clone().addScaledVector(dir,cameraHome.distance).toArray()];}
+        const values=seating.cameraBlend(cameraStart,[...goal,...aim],now-cameraSince);
+        camera.position.set(...values.slice(0,3));camera.lookAt(...values.slice(3));
+      }
+      renderer.render(scene, camera); frames += 1;
       updateHitAreas(width, height);
     }
     function hitTest(x, y) {
@@ -446,7 +496,7 @@
       metrics: () => ({ loadMs, loadedAt, frames, pixelRatio: renderer?.getPixelRatio(),
         antialias: renderer?.getContext().getContextAttributes()?.antialias,
         drawCalls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles, smallMotion: driver?.motionState(),
-        world: worldState, room: room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
+        seating: seatMetrics, world: worldState, room: room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
       // Reserved for a later animation loader; never silently fetch arbitrary files.
       loadAnimation: async () => false
     };

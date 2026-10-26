@@ -81,7 +81,7 @@
         targetYaw=Math.atan2(target[0]-position[0],target[1]-position[1]);
         const step=Math.min(d,TUNING.speed*dt);if(d>0)position=position.map((v,i)=>v+(target[i]-v)*step/d);
         if(d<=TUNING.speed*dt+.005){position=[...target];route.shift();if(!route.length){phase=name==="accompany"?"respond":"activity";began=now;}}
-      } else if(name!=="accompany")targetYaw={window:Math.PI,books:Math.PI,rest:Math.PI/2,desk:Math.PI/2}[name]||0;
+      } else if(name!=="accompany")targetYaw={window:2.60,books:-2.60,rest:Math.PI/2,desk:Math.PI/2}[name]||0;
       const angle=Math.atan2(Math.sin(targetYaw-yaw),Math.cos(targetYaw-yaw));yaw+=Math.sign(angle)*Math.min(Math.abs(angle),dt*TUNING.turnSpeed);
       const desired=!route.length&&name!=="accompany"?1:0;
       if(desired){poseName=name;poseAge=(now-began)/1000;}blend+=Math.sign(desired-blend)*Math.min(Math.abs(desired-blend),dt*1000/TUNING.blendMs);
