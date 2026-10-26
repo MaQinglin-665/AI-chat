@@ -32,6 +32,10 @@ def dispatch_get(self, context):
         return
     if self._reject_invalid_api_token(path_only):
         return
+    if path_only in {"/api/avatar/backdrop/night.png", "/api/avatar/backdrop/dusk.png", "/api/avatar/backdrop/day.png"}:
+        import avatar_backdrops
+        avatar_backdrops.dispatch(self, load_config(), context["ROOT_DIR"], path_only)
+        return
     if path_only in {"/api/avatar", "/api/avatar/model.vrm"} or path_only.startswith("/api/avatar/live2d/"):
         import avatar_assets
         avatar_assets.dispatch(self, load_config(), context["ROOT_DIR"], path_only)

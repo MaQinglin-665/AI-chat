@@ -3,13 +3,13 @@
   // All positions and sizes are metres, independent of the avatar's height.
   // Bounds include the outdoor alcove; the interior back wall is at z=-3.
   const ROOM = Object.freeze({ min: [-3, -0.06, -8.1], max: [3, 3, 2], transitionMs: 2500,
-    seed: 216, fogNear: 1, fogFar: 14, shadowSize: [0.65, 0.38], saturation: 0.80 });
+    seed: 216, fogNear: 1, fogFar: 14, shadowSize: [0.65, 0.38], footShadowSize:[.30,.20], saturation: 0.80 });
   const FURNITURE = Object.freeze({
     window: { position: [-1.35, 1.6, -3], size: [1.2, 1.4, 0.12], sill: 0.9 },
     shelf: { position: [1.45, 0.9, -2.65], size: [1.05, 1.8, 0.32] },
-    lamp: { position: [-1.6, 0.75, -2], size: [0.35, 1.5, 0.35] },
+    lamp: { position: [-2.35, 0.75, -2.18], size: [0.35, 1.5, 0.35] },
     rug: { position: [0, 0.014, -0.1], size: [1.8, 0.025, 1.2] },
-    cushion: { position: [0.9, 0.1, -1.7], size: [0.45, 0.2, 0.4] }
+    cushion: { position: [-2.13, .39, .2], size: [0.45, 0.2, 0.4] }
   });
   const PALETTE = Object.freeze({ wall: 0xc5bccd, floor: 0xb8a79e, wood: 0xa58e99,
     trim: 0xe5d5da, curtain: 0xb9a2c2, rug: 0xb9a8c0, leaf: 0x8ba592, pot: 0xd5b3b9 });
@@ -69,13 +69,25 @@
     add("lamp-base", "cylinder", [lx, 0.025, lz], [0.28, 0.05, 0.28], PALETTE.wood);
     add("lamp-stem", "cylinder", [lx, 0.68, lz], [0.02, 1.31, 0.02], PALETTE.trim);
     add("lamp-shade", "shade", [lx, 1.37, lz], [0.35, 0.26, 0.35], 0xe7cebf);
-    for (const [i, x, y, z] of [[0, -2.5, 0.12, -2.6], [1, 1.7, 1.9, -2.65]]) {
+    for (const [i, x, y, z] of [[0, -2.5, 0.12, -2.6], [1, 2.12, .86, -.32]]) {
       add("pot-" + i, "cylinder", [x, y, z], [0.2, 0.2, 0.2], PALETTE.pot);
       for (let j = 0; j < 5; j++) add("leaf-" + i + "-" + j, "sphere",
         [x + Math.sin(j * 2) * 0.08, y + 0.18 + rand() * 0.04, z + Math.cos(j * 2) * 0.07], [0.14, 0.24, 0.1], PALETTE.leaf);
     }
     add("cushion", "sphere", FURNITURE.cushion.position, FURNITURE.cushion.size, 0xc997bd);
-    return { bounds: { min: [...ROOM.min], max: [...ROOM.max] }, items };
+    // Whole-object fallback remains visible until every selected local asset is ready.
+    box("desk-top", [1.82,.71,-.15], [1.15,.06,.65], PALETTE.wood);
+    for(const x of [1.32,2.32]) for(const z of [-.4,.1]) box("desk-leg-"+x+"-"+z,[x,.35,z],[.06,.7,.06],PALETTE.wood);
+    box("chair-seat",[.98,.302,.15],[.5,.08,.5],PALETTE.wood);
+    box("chair-back",[.76,.60,.15],[.06,.52,.5],PALETTE.wood);
+    for(const x of [.79,1.17]) for(const z of [-.04,.34]) box("chair-leg-"+x+"-"+z,[x,.131,z],[.05,.262,.05],PALETTE.wood);
+    box("sofa-seat",[-2.13,.155,-.3],[.85,.31,1.7],PALETTE.curtain);
+    box("sofa-back",[-2.48,.535,-.3],[.15,.45,1.7],PALETTE.curtain);
+    for(const z of [-1.08,.48]) box("sofa-arm-"+z,[-2.13,.46,z],[.85,.30,.14],PALETTE.curtain);
+    box("picture0",[.25,2.09,-2.94],[.42,.34,.035],PALETTE.trim);
+    box("picture1",[.78,2.19,-2.94],[.25,.28,.035],PALETTE.curtain);
+    for(const item of items) item.furniture = /^(shelf|book|strip|lamp|pot|leaf|rug|cushion|desk|chair|sofa|picture)/.test(item.id);
+    return { bounds: { min: [...ROOM.min], max: [...ROOM.max] }, items, seats: root.XinyuVRMSeating?.SEATS || {}, cameras: root.XinyuVRMSeating?.CAMERAS || {}, models: root.XinyuVRMFurniture?.ITEMS || [], activityPoints: root.XinyuVRMWorld?.POINTS || {}, obstacles: root.XinyuVRMWorld?.OBSTACLES || [] };
   }
   function transition(initial = "night") {
     let value = initial === "day" ? 1 : 0, from = value, target = value, start = 0;
@@ -87,7 +99,7 @@
       return value;
     };
   }
-  function create({ THREE: T, scene, floorY = 0, period = "night", seed = ROOM.seed }) {
+  function create({ THREE: T, scene, floorY = 0, period = "night", seed = ROOM.seed, vendor, furnitureModule = root.XinyuVRMFurniture, preset = "room", handpaintedModule = root.XinyuVRMHandpainted }) {
     const group = new T.Group(), resources = new Set();
     const own = value => { resources.add(value); return value; };
     group.position.y = floorY; scene.add(group);
@@ -106,9 +118,9 @@
     rounded.computeVertexNormals();
     const geometries = { box: rounded, panel: own(new T.BoxGeometry(1, 1, 1)), sphere: own(new T.IcosahedronGeometry(0.5, 1)),
       cylinder: own(new T.CylinderGeometry(0.5, 0.5, 1, 10)), shade: own(new T.CylinderGeometry(0.32, 0.5, 1, 12)) };
-    const batches = new Map();
+    const batches = new Map(), fallback = [];
     for (const item of layout(seed).items) {
-      const key = item.shape + (item.glow ? "-glow" : item.blossom ? "-blossom" : "");
+      const key = (item.furniture ? "furniture-" : "") + item.shape + (item.glow ? "-glow" : item.blossom ? "-blossom" : "");
       if (!batches.has(key)) batches.set(key, []);
       batches.get(key).push(item);
     }
@@ -121,6 +133,7 @@
         if (!item.glow && !item.blossom) color.lerp(new T.Color().setScalar(color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722), 1 - ROOM.saturation);
         mesh.setMatrixAt(index, matrix.matrix); mesh.setColorAt(index, color);
       });
+      if(items[0].furniture) fallback.push(mesh);
       mesh.instanceMatrix.needsUpdate = true; group.add(mesh); own(mesh);
     }
     const skyMaterial = own(new T.ShaderMaterial({ uniforms: { day: { value: period === "day" ? 1 : 0 } },
@@ -160,10 +173,11 @@
     const shadow = new T.Mesh(own(new T.PlaneGeometry(...ROOM.shadowSize)),
       own(new T.MeshBasicMaterial({ map: shadowMap, transparent: true, depthWrite: false })));
     shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.035; group.add(shadow);
+    const footShadows=[0,1].map(()=>{const foot=new T.Mesh(own(new T.PlaneGeometry(...ROOM.footShadowSize)),shadow.material);foot.rotation.x=-Math.PI/2;foot.visible=false;group.add(foot);return foot;});
     const ambient = new T.AmbientLight(); scene.add(ambient);
     const sun = new T.DirectionalLight(); sun.position.set(-1.35, floorY + 2.3, -3);
     sun.target.position.set(0, floorY + 0.6, 0); scene.add(sun, sun.target);
-    const lamps = [[1.45, 1.3, -2.46], [1.45, 0.46, -2.46], [-1.6, 1.36, -2]].map(p => {
+    const lamps = [[1.45, 1.3, -2.46], [1.45, 0.46, -2.46], [-2.35, 1.36, -2.18]].map(p => {
       const light = new T.PointLight(0xffd9a8, 0, 4, 2);
       light.position.set(p[0], floorY + p[1], p[2]); scene.add(light); return light;
     });
@@ -174,7 +188,7 @@
     const color = (target, key, t) => target.copy(a.setHex(LIGHTS.night[key])).lerp(b.setHex(LIGHTS.day[key]), t);
     function update(nextPeriod, now, cameraZ = 2.5) {
       if (disposed) return;
-      day = blend(nextPeriod, now); skyMaterial.uniforms.day.value = day;
+      day = blend(nextPeriod, now); painted?.update(day); skyMaterial.uniforms.day.value = day;
       // Keep depth separation anchored to the avatar plane, including inspection pullbacks.
       fog.near = Math.max(0, cameraZ) + ROOM.fogNear; fog.far = Math.max(0, cameraZ) + ROOM.fogFar;
       const mix = key => LIGHTS.night[key] + (LIGHTS.day[key] - LIGHTS.night[key]) * day;
@@ -186,9 +200,26 @@
       glow.color.setHex(0xffd9a8).multiplyScalar(1 - day * 0.65);
       color(fog.color, "fog", day); scene.background.copy(fog.color);
     }
+    let furniture = null, painted = null, effectivePreset = "room", activeLayout = layout(seed);
+    const legacyChildren = [...group.children].filter(n=>n!==shadow && !footShadows.includes(n));
+    const furnitureReady = vendor && furnitureModule ? furnitureModule.load({vendor,scene:group,ramp,alive:()=>!disposed}).then(result=>{
+      if(disposed) { result?.dispose(); return false; }
+      furniture=result; if(result) fallback.forEach(mesh=>{mesh.visible=false;}); return !!result;
+    }) : Promise.resolve(false);
+    const ready = furnitureReady.then(async loaded=>{
+      if(preset!=="handpainted" || !handpaintedModule || disposed)return loaded;
+      const result=await handpaintedModule.load({vendor,scene:group,alive:()=>!disposed});
+      if(disposed){result?.dispose();return false;}
+      if(!result)return false;
+      painted=result;effectivePreset="handpainted";activeLayout=result.layout;
+      legacyChildren.forEach(n=>{n.visible=false;});if(furniture?.mesh)furniture.mesh.visible=false;
+      sun.position.set(activeLayout.lights.sun[0],floorY+activeLayout.lights.sun[1],activeLayout.lights.sun[2]);
+      lamps.forEach((l,i)=>l.position.set(activeLayout.lights.lamps[i][0],floorY+activeLayout.lights.lamps[i][1],activeLayout.lights.lamps[i][2]));
+      painted.update(day);return true;
+    });
     update(period, 0);
-    return { update, metrics: () => ({ day, batches: batches.size, resources: resources.size }), dispose() {
-      if (disposed) return; disposed = true;
+    return { update, ready, getLayout:()=>activeLayout, setFootPositions(points) { footShadows.forEach((mesh,i)=>{mesh.visible=!!points?.[i];if(mesh.visible)mesh.position.set(points[i][0],.035,points[i][2]);}); }, setAvatarPosition(x,z) { shadow.position.x=x; shadow.position.z=z; }, metrics: () => ({ day, preset:effectivePreset, requestedPreset:preset, bloomSources:painted?.glows.map(n=>n.name)||[], furnitureLoaded: !!furniture, batches: batches.size, resources: resources.size }), dispose() {
+      if (disposed) return; disposed = true; painted?.dispose(); furniture?.dispose();
       scene.remove(group, ambient, sun, sun.target, ...lamps); scene.fog = oldFog; scene.background = oldBackground;
       for (const resource of resources) resource.dispose?.(); resources.clear(); group.clear();
     } };

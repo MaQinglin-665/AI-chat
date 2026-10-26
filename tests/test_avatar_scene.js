@@ -73,7 +73,7 @@ const source = fs.readFileSync(path.join(__dirname, "../web/avatar/vrmScene.js")
 assert(!/\b(fetch|XMLHttpRequest|WebSocket|require|import|TextureLoader|FileLoader)\s*\(/.test(source));
 assert(!/https?:|file:/.test(source));
 const renderer = fs.readFileSync(path.join(__dirname, "../web/avatar/vrmRenderer.js"), "utf8");
-assert(renderer.includes('if (useRoom) room = roomModule.create'));
+assert(/if \(useRoom\)\s*\{?\s*room = roomModule.create/.test(renderer));
 assert(renderer.includes('dataset.stageRoom')); // consume the existing controller's decision
 const { gradeRoomMaterials, LIGHT } = require("../web/avatar/vrmRenderer.js");
 const originalCompile = () => {}, originalKey = () => "original";
@@ -108,5 +108,6 @@ console.log("[OK] Seeded room bounds, day/night transition, batching and ten-cyc
   full.setScene("none"); assert.equal(released, 1);
   await full.load({}); assert.equal(created, 2); full.dispose(); assert.equal(released, 2);
   const pet = make("model"); await pet.load({ scene: "room" }); assert.equal(created, 2); pet.dispose();
+  const alternate = make("full"); await alternate.load({ scene: "handpainted" }); assert.equal(created, 3); alternate.setScene("none"); assert.equal(released, 3); alternate.dispose();
   console.log("[OK] Renderer room gate: defaults, none, transparent pet and disposal.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

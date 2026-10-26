@@ -1,3 +1,21 @@
+# Current — PR217 closeout first; shared lipsync gets a separate main-based PR
+
+- User explicitly reprioritizes #217: sync latest main including #221, preserve exact same-Core Hiyori write sequence, push/ready and deliver a dedicated Hiyori inspection video. Do not start LLM task phase2 before #217 is merged by its author.
+- Explicit main fetch was necessary because remote.origin.fetch only tracks two collaborator branches. Updated origin/main2356ddb ->79ee80f (#221), including ee3de6e/#222. Resolved eight merge conflicts by retaining both local Live2D factory/owned clocks and incoming VRM painted/input/world/camera functions, all third-party entries and both state histories. No main push/force push/PR merge.
+- Next remove previously mixed lipsync-only product changes from #217 through normal inverse commits (preserve history and local installed120ms), run strict/full/package checks and record Hiyori video. Then create friend/lipsync-fix directly from latest origin/main; preserve FFT1024,25–350ms latency policy and hidden timer; test Hiyori/Mao/VRM before/after. No model/private assets committed.
+
+## Preserved latest-main handoff
+
+# Painted accepted integration — 2026-10-26
+
+Worktree ai_desktop_pet_painted; branch codex/avatar-painted-backdrop-v1. User accepted #221 and authorized main integration, full tests/package, post-merge night screenshot, ready/CI/admin merge, evidence preservation and worktree removal. Main ee3de6e includes #220/#222. Only extra conflict is metrics in vrmRenderer.js; user approved retaining walking plus painted metrics. Camera algorithm untouched. Prior handoffs archived.
+
+Next: run camera/motion/painted tests, full gates, verify natural idle and fixed painted camera. Preserve ignored evidence before removal. Then create codex/backdrop-assets-v1 from latest main, commit authorized backgrounds and add default-off Hiyori background switch. Never read private config or use 8123.
+
+Targeted/full/package gates and merged night capture passed; fixed camera verified across 12s. Next: push integration, mark ready and wait all Linux/Windows CI before authorized admin merge.
+
+## Preserved collaborator handoff
+
 # Session handoff
 
 ## Current — user listening confirms mouth timing; preserve120ms

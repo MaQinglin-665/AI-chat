@@ -268,6 +268,8 @@ Verification Evidence: targeted pytest tests/test_request_body_drain.py tests/te
 Verification Evidence: full scripts/test-local.ps1 passed (809 Python passed, 2 skipped; Node suites, Python/JavaScript syntax and secret scan passed). Required config.example.json/package.json parsing and py_compile passed. Ignored log: tmp_ui_smoke/task6/drain-body-full-tests.log. Next: push scoped fix, open PR and require all CI before merge; rerun full gate on final main. Remaining risk: invalid, oversized or stalled clients are closed rather than guaranteed a complete rejection response.
 
 
+
+## Preserved Live2D collaborator progress
 ## 2026-10-25 — Avatar Live2D stage 1 preparation
 - User requests official Core/Mao sources, staged independent commits and explicit waits; no main push/force push/merge, no dialogue/memory/external-agent changes, large-file splitting paused.
 - Refreshed main to 3611e57 and created friend/avatar-live2d-adapter. Single-branch clone required explicit main fetch/local tracking setup. Required avatar-intent-interface.md absent from main and targeted local D:/AI search; requested branch/path before implementation.
@@ -453,3 +455,174 @@ User confirms replacing the local Hiyori character with Mao and authorizes origi
 
 ## 2026-10-26 — Actual listening feedback confirmed
 - User listened to the updated local application and explicitly reports “基本对齐，结尾也跟上了”. Keep the current120ms browser-mouth compensation; no further code, configuration or model changes. This closes the listening feedback item, while remaining author Windows interaction/appearance/PR review is separate. Qualitative confirmation does not imply measured exact latency. Verification: state JSON parses; state-only update requires no repeated product tests.
+
+## Integrated latest main progress (#220/#221/#222)
+## 2026-10-25 — VRM basic renderer
+
+Based on fetched origin/main 5b20358; local main divergence preserved. Added restricted read-only avatar API, pinned local three.js/three-vrm vendor, independent intent renderer/runtime, attribution UI and synthetic tests. Private model remains outside repo, screenshots only in ignored tmp_ui_smoke/avatar-vrm.
+
+Verification Evidence: Node fake VRM mapping/actions/fallback passed; Python path/meta tests 13 passed, 1 symlink privilege skip, including real Windows junction rejection. Isolated Electron 39.8.10 VRM0 render/alpha/actions/amplitude/metadata verified, Hiyori regression rendered. Performance and limitations in docs/avatar-vrm-basic.md. Full gate and packaging checks pending. No dialogue/memory/external-agent changes; no private configuration accessed. Draft PR only.
+
+Final Verification Evidence: scripts/test-local.ps1 passed: 825 passed/3 skipped, all Node suites, Python/JS syntax, secret scan. scripts/check_first_run_package.ps1 passed, including preview defaults and source package smoke. JSON/py_compile pre-push checks passed. Final test logs and all model captures only in ignored tmp_ui_smoke/avatar-vrm. Next: draft PR and user Windows review; no merge authorization.
+
+
+## 2026-10-25 — VRM performance and deterministic motion
+
+Diagnosed real full/pet Electron windows before editing. Pet full-mesh hit testing averaged 101.75ms, consuming almost the entire renderer thread; replaced with projected bone capsules (~0.012ms). Added 900k pixel budget, 20/30 FPS cadence, inactive suspension and runtime cleanup. Added 72-degree standing arms, deterministic seeded idle/speech/small motions, action recovery, height-based framing and key/fill lighting. No model/private config/dialogue/memory/external-execution changes.
+
+Verification Evidence: actual full-window idle GPU 15.99% to 6.97%; pet idle 6.27 to 20.20 FPS and simulated speech 6.46 to 29.97 FPS. Memory essentially unchanged; pet GPU increased with restored frame rate. Read-only texture inspection: 36, max 2048x2048, no resizing needed. Full report docs/avatar-vrm-performance.md. Private before/after/speaking/small-motion captures only in ignored tmp_ui_smoke/avatar-vrm-polish. First full gate passed 825/3; runtime lifecycle test subsequently registered in Node runner, final gate pending. PR #216 must remain draft; user visual review next.
+
+Final follow-up verification: scripts/test-local.ps1 passed (825 passed, 3 skipped; registered runtime lifecycle suite and all Node tests passed, syntax/secrets passed). Required JSON/py_compile checks passed. Evidence: ignored tmp_ui_smoke/avatar-vrm-polish/full-tests-final.log. GitHub API connection failed five attempts, with 10-second retry intervals; stopped network operations. Changes committed locally; push/PR description update remains pending. Do not mark PR ready or merge. Resume with normal push of codex/avatar-vrm-basic and verify #216 is still draft.
+
+
+## 2026-10-25 — VRM edges and detached pet presentation
+
+Smoothed VRM cutout/outline edges using MSAA, explicit premultiplied transparent output and DPR >=1; retained authored MToon outline/color. Reduced key/ambient lights. Located missed decorations in index.html/kawaii-stage-decor: full/chat already hide them, model did not. visualPolish.css now hides the same layer in both VRM/Hiyori pet views, positions the Chinese status label at bottom-left, and fades it three seconds after readiness. Model files and private configs untouched; model SHA-256 unchanged.
+
+Verification Evidence: real Electron at 1708x1068, idle 20.16 -> 19.93 FPS, GPU 2.97% -> 0.86%, including removed animation/compositor cost. Both VRM and Hiyori real windows: decoration display none, label 馨语, left 12px, ready opacity 1 -> 0 after 3.6s. Local-only before/after edge+lighting captures and measurements in ignored tmp_ui_smoke/avatar-vrm-polish. Full report docs/avatar-vrm-performance.md. First full test run exposed missing document.body in the old fake Live2D test; fixture corrected and readiness assertion added. Final scripts/test-local.ps1 passed: 825 passed/3 skipped, all Node, syntax, secret scan; required JSON/py_compile passed. PR #216 verified open/draft; normal push authorized, no merge.
+
+
+## 2026-10-25 — VRM room integration and relaxed stance
+
+Added separate room/transparent-pet light presets, room-only shader brightness/saturation grading, 15-degree body turn with head return and asymmetric relaxed posture/fingers, idle smile/deterministic saccades/reply preparation, and elevated 27-degree framing. New tuning in vrmRenderer.js constants. avatarRuntime reads existing reply timestamps and uses its existing channel; no dialogue/voice/history changes. Audited the user-selected stored record: role=user matches the rendered label; source provenance is unavailable, so no speculative history migration or role fix performed. Private content not copied into tracked artifacts.
+
+Verification Evidence: final scripts/test-local.ps1 passed (825 Python passed, 3 skipped; all Node, syntax and secret checks passed). New tests cover framing projection, finger/pose recovery, material isolation, smile/saccades and one-shot reply preparation broadcast. Real Electron VRM0 full before/after and neutral-pet captures inspected in ignored tmp_ui_smoke/avatar-vrm-polish/room-*.png. Baseline renderer served from 321fc17 only by test interception. Model hash unchanged. Required JSON/py_compile checks passed. No new real VRM1 or live LLM/TTS acceptance claimed. PR #216 remains draft for user review.
+
+
+## 2026-10-25 — PR #216 accepted, merge preparation
+
+User passed visual review and explicitly authorized --merge --admin after required gates, superseding draft-only restriction. Fetched origin successfully on fourth attempt after TLS errors. Latest origin/main 5b20358 already contained in avatar branch; git merge reported up-to-date, no conflicts. Verification Evidence: scripts/test-local.ps1 passed (825 passed, 3 skipped; all Node/syntax/secrets); scripts/check_first_run_package.ps1 passed. Logs in ignored tmp_ui_smoke/avatar-vrm-polish/merge-local-tests.log and merge-package-check.log. Acceptance-only state update; no runtime changes. Next: ready PR, all current-head Linux/Windows CI green, merge commit, then final exact origin/main gate. Preserve unrelated local main commit 0a06554; no reset or private config modification.
+
+
+## 2026-10-25 — Procedural VRM room v1
+
+Fetched origin/main and verified PR #216 merge a08e0c4 ancestor; created codex/avatar-3d-room-v1. User explicitly asked to preserve local main/0a06554; remote architecture branch is exactly that commit, no edits. Added independent seeded room data/build/disposal, five instanced Toon batches, generated sky/ramp/contact shadow, bounded room/none API field, existing stageRoom day/night transition. Full VRM hides painted stage only with room active; transparent pet and Hiyori retain old paths. No dialogue/memory/external execution/Live2D renderer/private model/config changes.
+
+Verification Evidence: Node deterministic layout/bounds/day-night/no-request checks, real Three no-WebGL ten-cycle resource disposal and fake renderer gating. Actual Electron VRM0: 20.00 -> 19.97 FPS, CPU 4.45 -> 3.85%, GPU 4.93 -> 4.92%, draw calls 28 -> 34. Ten room/none cycles return geometry/textures to 20/45, no sustained post-GC JS heap growth. Six requested captures plus baseline saved only in ignored tmp_ui_smoke/avatar-vrm-polish; Hiyori stays live2d with original background. Report docs/avatar-3d-room.md. Initial full gate 829 passed/3 skipped, Node/syntax/secrets passed; first-run package passed. Final gate after shared-material restoration test passed: 829 passed/3 skipped, all Node/syntax/secrets. Required JSON/py_compile pre-push checks passed. Draft PR only; user Windows appearance review next.
+
+
+## 2026-10-25 — Room metre scale, depth and daylight
+
+User reviewed #218 and requested physical proportions/composition. Removed avatar-height scaling, explicit furniture dimensions in metres, wall 3m behind avatar and side furnishings 2–2.65m behind. Added clean head backdrop, square wall joins/ceiling/skirting, partial distant pink crowns, moon/star sizes/clouds, brighter warm daytime with non-shadow-mapped sun patch. No private/model/Live2D/dialogue/memory/external execution changes.
+
+Verification Evidence: scripts/test-local.ps1 passed 829/3, all Node/syntax/secrets; dimensions/book range/backdrop/depth/unscaled-height tests added and ten-cycle disposal passes. Actual full and pulled-back Electron VRM0 night/day captures inspected, only in ignored tmp_ui_smoke/avatar-vrm-polish/metres-*.png. Full idle 19.98 FPS, CPU 4.21%, GPU 5.19%, 38 draw calls, within 1.5x original GPU budget. Required pre-push JSON/py_compile passed. Dimensions and limitations docs/avatar-3d-room.md. Draft #218 only, user appearance acceptance next.
+
+
+## 2026-10-25 — PR #218 visual acceptance and merge preparation
+
+User passed visual acceptance and explicitly authorized merge commit (--merge --admin) after local/package gates and all Linux/Windows CI pass. Fetched origin; latest origin/main already contained, no merge conflicts. Local main and private config remain untouched.
+
+### Follow-up backlog (explicitly deferred, not fixed in this merge)
+
+- 房间偏空：后续考虑增加书桌、床、墙面装饰。
+- 夜晚人物脸部补光。
+- 将落地灯从窗前移到窗户一侧。
+
+Verification Evidence: fresh scripts/test-local.ps1 passed (829 passed, 3 skipped; all Node/syntax/secrets); scripts/check_first_run_package.ps1 passed. Required JSON/py_compile checks passed. Logs ignored under tmp_ui_smoke/avatar-vrm-polish/merge218-*.log. After CI, merge PR #218 then test exact latest origin/main in detached HEAD, preserving local main.
+
+
+## 2026-10-25 — Room life v1
+
+Created codex/avatar-room-life-v1 from origin/main 2356ddb (merged #218), preserving local main 0a06554.
+Verified local KayKit Furniture Bits 1.0 FREE original CC0 1.0 license; selected 10 glTF + matching bin + shared atlas + license only.
+Added metre-scale toon-batched furniture with allowlisted local loading/procedural fallback, desk/chair/sofa/decor; four-layer shelves avoid oversized books.
+Added deterministic 60–180s day/night-weighted activities, radius-inflated visibility-graph paths, walk/sit/hand contacts/book prop, smooth camera follow,
+input/send/hearing/busy interruption and 20–40s resume. Avatar-only integration; no dialogue, memory, external execution, Live2D or private-config edits.
+
+Verification Evidence: final scripts/test-local.ps1 passed (829 passed, 3 skipped; all Node/syntax/secrets).
+New Node checks: all-pairs paths, free activity points, determinism, interruption/resume, smooth standing, local dependency allowlist,
+failed/cancelled loads, merged toon assets and resource cleanup; runtime signals/listener disposal covered.
+scripts/check_first_run_package.ps1 passed, verifies all selected furniture and license bytes in the install source package.
+Required pre-push JSON/py_compile checks passed. Actual Electron VRM0 four activities, walking, input interruption, day/night wide captures:
+ignored tmp_ui_smoke/avatar-vrm-polish/life-*.png; 35s silent life-tour.mp4, test-only accelerated activity selection.
+No page exceptions. Ten room toggles stable at 28 geometries / 47 textures. Idle baseline→new: FPS 19.99→19.98,
+CPU 3.28→3.32%, GPU 5.32→5.04%, draws 38→36, working set 959→970 MiB. Evidence/report docs/avatar-room-life.md.
+Limitations: real VRM1 and live ASR/LLM/TTS not exercised; procedural poses lack foot IK/full-body collisions, unusual outfits/heights may need tuning;
+no installer exe built. Existing night face-fill follow-up remains deferred. Only draft PR, user appearance review next; do not merge.
+
+Published implementation 0c34e34 on codex/avatar-room-life-v1; draft PR #219 targets main. Final package recheck passed. Private config hash unchanged. Waiting for user visual review; no merge.
+
+## 2026-10-25 — PR #219 seated contact and camera revision
+
+Measured sofa/chair surfaces (0.310/0.342m), measured leg lengths and constrained hip/ankle contacts replace the old height-only seating. Lap hands and desk elbow/chin support, 1.8s activity cameras, bounded back-facing glances and runtime purple furniture tint added. Procedural fallback seats match the same surfaces; source assets unchanged.
+Verification Evidence: final scripts/test-local.ps1 passed: 829 passed, 3 skipped; all Node suites, Python/JS syntax and secrets passed. New synthetic VRM0/1 short/long-leg tests preserve bone lengths and seat/floor contacts; real Electron VRM0 contacts <1mm, desk elbow 0.7645m vs 0.765m target. No page exceptions; ten room toggles stable. Sofa/desk front and side, four activity views and 35s silent seated-tour.mp4 are ignored under tmp_ui_smoke/avatar-vrm-polish. Capture-only active-surface override avoids existing background pause.
+Limitations: no real VRM1 model acceptance or arbitrary outfit collision guarantee; extreme unreachable desk proportions are reported. Updated draft #219 awaits user visual review; no merge. Local main and private config/model untouched.
+
+## 2026-10-26 — PR #219 visual acceptance and merge gate
+
+User accepted the visuals and authorized merge commit after local/package and Linux/Windows CI gates. Fetched origin/main 2356ddb; already contained by this branch, no merge conflicts. Local main remains 0a06554; private config unchanged.
+
+Deferred TODO (explicitly not fixed this round):
+- 书桌前平放在桌上的那只手太僵。
+- 窗边伸手时手部悬空。
+
+Verification Evidence: scripts/test-local.ps1 passed (829 passed, 3 skipped; all Node suites, Python/JS syntax and secrets passed); scripts/check_first_run_package.ps1 passed. Required JSON/ten-module compilation, secrets and diff checks passed. Next: push, mark #219 ready, wait for all CI, merge with --merge --admin, and test latest origin/main without moving local main.
+
+## 2026-10-26 — Optional hand-painted room preset
+
+Branch codex/avatar-room-handpainted-v1 from origin/main 0542d04; local main/private config unchanged. Read both room documents and original asset license.txt (CC BY 4.0, OzerGokmen). Added attributed local base-color assets, measured 0.014m/source-unit scale, runtime cutaway/coffee-table removal, preset layout and KayKit chair. Shared room lifecycle, day/night, scheduler, seat solver and camera pipeline; room remains default.
+Verification Evidence: targeted Node layout/path/local-only/fallback/async-disposal and synthetic seated-contact tests pass. Final scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node suites, Python/JS syntax and secrets passed). scripts/check_first_run_package.ps1 passed, including every new asset/license/change-notice hash. Initial package check exposed the global *.bin ignore: added an exact scene.bin exception and rechecked successfully.
+Real Electron VRM0: same-camera room/handpainted, day/night panoramas, four activities, forced missing-scene fallback and ten room/none/handpainted cycles; no page exceptions. Stable resources: room 28 geometries/47 textures; handpainted 41/60. Draws 36 vs 42 at companion view, activity views 38–47. No fresh CPU/GPU timing benchmark claimed. Ignored evidence: tmp_ui_smoke/avatar-vrm-polish/handpainted-*.png, handpainted-acceptance.json, handpainted-tour.mp4 (35s silent). Original scene.bin and 15 base-color images hash-identical to download; private config hash unchanged.
+Limitations: fixed painted shadows/reflections, visible cutaway boundaries, inherited stiff/airborne hand contacts, no arbitrary outfit collisions or real VRM1 visual check. Default room unchanged. Await user visual review via draft PR only; no merge.
+
+## 2026-10-26 — Painted backdrop implementation
+
+User authorized b22d4ef (PR #220) prerequisite. Fast-forwarded only this committed head; other thread motion/camera changes excluded. Work exclusively in ai_desktop_pet_painted with copied dependencies. Draft PR must target main and begin with dependency notice. Merge origin/main after #220 only; stop on conflicts outside three state files.
+
+Verification Evidence: final scripts/test-local.ps1 passed: 841 passed, 3 skipped; all Node suites, Python/JS syntax and secrets passed. scripts/check_first_run_package.ps1 passed again with explicit painted code/placeholder presence and placeholder hash. Initial 19 unrelated test failures came from disposable work/home paths inside the checkout; fixed only two test fixtures by giving them a sibling synthetic protected-project, preserving security assertions and product policy.
+Actual isolated Electron VRM0 on loopback 8137 with a separate ignored test-config.json, no config.local.json/LLM: night/dusk/day, metre grid, 1920x1080/1280x800/480x800, 30.000s MP4, setting-driven reflection disposal and room/handpainted/none/pet regression. No page errors. Captures/video/config/logs remain ignored in tmp_ui_smoke/painted. All supplied PNGs currently 2560x1440; no source asset/model copied into tracked paths.
+Lifecycle: ten initial scene cycles and further four batches of ten. GPU counts stable at 25 geometries / 48 textures; four major-GC heap samples 7197120, 6709132, 6818676, 6967892 bytes (6.40–6.86 MiB), final below first. Short-run evidence only, not an absolute long-term leak guarantee. Reflection off releases its target.
+Shared integration files: avatar_assets.py, app_get_routes.py, web/avatar/vrmRenderer.js, web/avatar/avatarRuntime.js, web/avatar/vrmWorld.js, web/index.html, web/stage.css. Camera-follow block unchanged; dedicated paintedCamera object. Full 21-file list and calibration limitations in docs/avatar-room-painted.md. No dialogue/memory/external-execution product code or Live2D renderer modified.
+Remote fetch recovered; #220 is OPEN at b22d4ef, origin/main remains 0542d04. Draft PR to main must start with dependency notice. After #220 merges, merge origin/main only if conflicts limited to three state files; never auto-merge this PR.
+
+## 2026-10-26 — PR #221 integration polish
+
+User accepted perspective/scale/crop; requested stronger contact/reflection, directional period lighting, avatar-only softness/glow/grading and before/after/detail captures. Same branch/worktree; do not alter camera calibration. Baseline 7aeb26b; #220 still open.
+Implementation: stronger two-foot contact cores and directional soft shadows; reflection opacity night/dusk/day 0.20/0.24/0.19, softened and floor-tinted with downward fade. Corrected window/lamp screen directions, period grading, 0.75 CSS px avatar-only softness and faint halo. Accepted fixed camera/crop unchanged. Only shared code change this revision is vrmRenderer.js painted render dispatch; avatarRuntime and camera-follow untouched.
+Verification Evidence: scripts/test-local.ps1 passed (841 Python passed, 3 skipped; all Node, syntax and secrets checks). Actual isolated Electron VRM0: same-pose 1920x1080 before/after for all periods and 3x feet/edge crops, final shader/page errors empty. Outer background columns 0:700 unchanged pixel-for-pixel in all periods. Twenty additional scene cycles: stable 26 geometries / 49 textures; two major-GC samples 6677384 and 6835904 bytes. Settings disable releases reflection target; room/handpainted/none/pet smoke passed. Actual painted frame has 50 draws across reflection/avatar/composite passes (16+28+6), not only the final pass count of 6.
+Evidence remains ignored under tmp_ui_smoke/painted-polish (after-final-*.png, before-*.png, acceptance.json, test-local.log). Extra full-resolution MSAA avatar buffer increases GPU memory/render cost; no hardware-wide performance or long-run leak guarantee. No private assets/config committed. PR #221 remains draft pending visual review; prerequisite #220 merge condition unchanged.
+## 2026-10-26 — Camera/motion task started, network pause
+
+User authorized inclusion of unmerged #220 into new codex/avatar-motion-camera-v1 branch; origin/main 0542d04 -> b22d4ef, local main unchanged. Both baseline 35s silent recordings captured in ignored tmp_ui_smoke/avatar-vrm-polish/motion-before-{room,handpainted}.mp4. Camera diagnosis: animated avatarRoot and seat corrections feed frame-by-frame camera targets after the old transition completes. Partial root-only damped/dead-zone/activity-lock camera added; not yet acceptance-tested.
+Verification Evidence: node --check for camera and renderer, git diff --check passed. Full tests not run. CMU official terms allow commercial-product inclusion but prohibit direct data resale; BVH converter adds no restrictions. Download of local-only walk evaluation failed with connection resets after five attempts 10s apart. Paused under network rule; no motion changes, full gate, after evidence, commit, push or PR.
+
+## 2026-10-26 — Camera stability and procedural motion
+
+User explicitly deferred CMU 2a after failed download; no data evaluated or integrated. Retained user-authorized #220 dependency in codex/avatar-motion-camera-v1, local main/private config unchanged. Camera now consumes logical horizontal root and immutable stature/seat measurements, with analytical critical damping, dead zone and activity lock. Added collision-checked corner arcs/curvature braking, acceleration, layered turns, 700ms eased transitions, seeded variation, distance-based gait and measured planted-foot IK. Real departure testing exposed sideways predicted landings during the initial turn; fixed by using neutral hip width, finishing the initial turn before stepping and predicting along the travel heading. Release knee clearance with the foot constraint while stopping.
+
+Verification Evidence: scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node, syntax and secrets); final rerun after last clearance tuning also passed, same gate log. Package smoke passed including local scene assets/licenses. New tests cover dead zone/activity lock, fixed and moving 20/30Hz results, all-pairs safe curved paths and direction-rate bound, pose/bone continuity, seeded traces, VRM0/1 long/short-leg foot planting and neutral-width regression. Simulated camera max jitter 6.608mm -> 0mm (limit 0.1mm); path max 1.517rad/s < 2.2. Private config hash unchanged.
+
+Real Electron VRM0: both presets, same fixed 30Hz timeline (rest, desk, window, input interruption), four 45s silent before/after videos at 10fps. Replaced uneven wall-clock screenshot capture with native capturePage; these are controlled-render comparisons, not performance measurements. No page exceptions; steady seated camera adjacent 1s sample delta room 6.073mm -> 0, handpainted 6.008mm -> 0. Both after clips have 14 walking samples with reach error zero. Ignored evidence tmp_ui_smoke/avatar-vrm-polish/motion-{before,after}-{room,handpainted}.mp4 and JPG/JSON samples. No media/model in Git.
+
+Limits: real VRM1 not visually verified; procedural gait/full-body clothing collision and inherited hand contacts remain limited. See docs/avatar-motion-camera.md for exact scope, failed CMU URL and local future task. Next: draft PR to main, wait for user; no merge.
+
+Publication result: implementation cbdf497 committed locally. git push -u origin codex/avatar-motion-camera-v1 failed all five attempts (10s spacing): two TLS handshake failures, three port-443 timeouts. No draft PR created and no further retries. Code/tests/captures complete; handoff records the exact user push command and next draft-PR step. Local main remains 0a06554; private config hash unchanged. No force push/main push/merge.
+
+Publication resumed: user confirmed successful push. Verified remote branch and PR head daa5971; created draft PR #222 to main via local gh after connector creation permission 403. https://github.com/MaQinglin-665/AI-chat/pull/222 . Attached to the task. State changed from publish_blocked to awaiting_visual_review; prior implementation/test evidence unchanged. No merge, main push, private-config edit or media upload. Await user appearance review.
+
+## 2026-10-26 — Accepted #220 / #222 sequential merge
+
+User accepted #222 and authorized merge commits in order, without modifying local main/private config. #220 already contained latest origin/main 0542d04; no conflicts. Verification Evidence: fresh scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed; gh pr checks 220 all green including Python Tests and Windows Compatibility. Marked ready, merged with --merge --admin: a0bdce4fcb8d85dd784438a88b96736c705a1bda.
+
+Fetched and merged origin/main containing #220 into codex/avatar-motion-camera-v1; no conflicts. Now validating #222 with both local gates, then normal push/ready/all CI/merge commit, then full local test on latest origin/main with detached HEAD. Local main remains 0a06554. No product-code changes this task.
+
+Deferred TODO, explicitly not fixed this task:
+- 镜头切换时画面卡顿。
+- 动作仍偏机械。
+
+#222 local Verification Evidence: scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed; required JSON/compilation and diff checks passed. Only the three state files changed after the conflict-free merge. Proceed to normal push, ready, all CI and merge gate.
+
+Merge publication blocked: #222 push failed all five attempts, with 10s spacing (TLS handshake failures and port-443 timeouts). Local merge a05c690 and gate record 44b3a01 retained; no conflicts. #222 was not marked ready or merged; final latest-origin/main test is pending its merge. #220 merge a0bdce4 is complete. User push command: git -C D:/AI/ai_desktop_pet_readiness_20261023 push origin codex/avatar-motion-camera-v1 . After success resume ready/check all CI/merge #222, then detached origin/main final test. No further network attempts.
+
+
+## 2026-10-26 — PR #221 accepted integration
+
+User accepted visuals and authorized merge after local/package/CI checks. Integrating origin/main ee3de6e (#220/#222 merged). User explicitly approved the sole non-state conflict: retain walking and painted metrics in vrmRenderer.js; camera algorithm unchanged.
+
+待办（另开任务）：
+- 高清背景到位后拉近陪伴视角，让人物更大。
+- 加强黄昏时的逆光轮廓。
+
+Verification Evidence: camera/motion/locomotion/painted targeted Node tests pass. Full test-local passed (841 passed, 3 skipped; all Node/syntax/secrets), with PYTEST_ADDOPTS=--ignore=tmp_ui_smoke to avoid collecting old ignored test fixtures. First-run package smoke passed. Merged real VRM0 night capture: natural lowered-arm idle, fixed painted camera across 12s sampled updates; no page/shader errors. Evidence tmp_ui_smoke/painted-polish/merged-night.png and merged.json. No camera algorithm edits.
+
+CI repair: Node painted test duplicated pytest invocation, but Linux Node job intentionally has no pytest dependency. Removed only that nested invocation; unchanged test_avatar_backdrops.py remains in Python/Windows/full gates. Targeted Node and Python backdrop suites rechecked.

@@ -114,4 +114,32 @@ Useful references:
 
 Mao Niziiro is an official Live2D Inc. sample from Cubism SDK for Web 5-r.5, acquired from https://www.live2d.com/en/sdk/download/web/ . Model files are not included in this repository or its source packages. Local use follows the [Free Material License](https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html) and [Sample Model Terms](https://www.live2d.com/eula/live2d-sample-model-terms_en.html); see [local setup and attribution](docs/avatar-live2d-mao.md). The local renderer displays the required sample-model credit and links. Mapping expression/motion names does not transfer ownership of the character to this project.
 
+### KayKit: Furniture Bits 1.0 (FREE subset)
+
+- Author: Kay Lousberg.
+- Source: https://kaylousberg.itch.io/furniture-bits
+- License: Creative Commons Zero 1.0 Universal (CC0); original `License.txt` is included unchanged.
+- Location: `web/vendor/scenes/kaykit-furniture/`.
+- Selected glTF models and their required binary meshes: decorated shelf, standing lamp, cactus,
+  oval rug, pillow, table, chair, couch and two picture frames; one shared `furniturebits_texture.png`.
+  The complete asset pack is not redistributed. These licensed room assets are distinct from private VRM avatars.
+
 Preview source-test packages should include this notice file. Do not add new sample models, generated images, reference audio, screenshots, or demo videos to the package unless their source and redistribution boundary are recorded here.
+
+## Stylized Hand-Painted room — OzerGokmen
+
+This work is based on "Stylized Hand-Painted room" by OzerGokmen.
+Source: https://sketchfab.com/3d-models/stylized-hand-painted-room-53f5744bfe89424995eed0cce43fb427
+Author: https://sketchfab.com/OzerGokmen
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+Original author-supplied notice: license.txt. No endorsement by the original author is implied.
+
+Changes in Xinyu (2026-10-26):
+- Retain original scene.bin and 15 base-color textures byte-for-byte. All supplied images are 2048x2048; no resizing was required.
+- Remove normal/metallic-roughness references from scene.gltf; omit those unused maps. Retained unused image slots redirect to a packaged base-color image.
+- Runtime uniform scale 0.014 metres/source unit and floor offset -20.46 * 0.014 metres.
+- Clone/transformed geometry for a cutaway: omit front/right shell and high ceiling triangles; omit the central coffee table and its small props to create a walking aisle.
+- Replace PBR materials with unlit base-color materials; apply interpolated cool/night and warm/day tint. Tag window and pendant-light meshes as future bloom sources; no bloom effect yet.
+- Add a separate CC0 KayKit chair. Character, camera, lights, paths and animation are application additions, not part of the original work.
+- Original download outside the repository remains unchanged.

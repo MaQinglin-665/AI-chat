@@ -1,6 +1,7 @@
 (function (root) {
   "use strict";
   function createRuntime(root) {
+  const INPUT_HOLD_MS = 1000;
   const clamp = (v) => Math.max(0, Math.min(1, Number(v) || 0));
   function formatConditions(conditions = {}) {
     const labels = { licenseName: "许可证", allowedUserName: "可使用者", avatarPermission: "可使用者",
@@ -109,6 +110,18 @@
     state.avatarRenderer = renderer;
     root.__xinyuAvatarRenderer = renderer;
     showMetadata({ ...source, metadata: source.metadata || renderer.metadata });
+    const paintedPanel = root.document.getElementById("painted-scene-options");
+    if (paintedPanel) paintedPanel.hidden = source.scene !== "painted" || state.uiView !== "full";
+    const paintedControls = ["reflection", "grid"].map(name => {
+      const input = root.document.getElementById("painted-" + name);
+      if (!input) return null;
+      let value = source.painted?.[name] ?? (name === "reflection");
+      try { const saved = root.localStorage?.getItem("xinyu.painted." + name); if (saved !== null && saved !== undefined) value = saved === "true"; } catch (_) { /* Storage can be unavailable. */ }
+      input.checked = value; renderer.setPaintedOptions?.({ [name]: value });
+      const change = () => { renderer.setPaintedOptions?.({ [name]: input.checked });
+        try { root.localStorage?.setItem("xinyu.painted." + name, String(input.checked)); } catch (_) { /* Session-only setting. */ } };
+      input.addEventListener("change", change); return () => input.removeEventListener("change", change);
+    });
     root.document.body.dataset.avatarKind = source.kind;
     if (state.uiView === "model") {
       root.document.documentElement.classList.add("transparent-mode", "alpha-true");
@@ -119,7 +132,9 @@
     const clickthrough = value => {
       if (value !== lastClickthrough) { root.electronAPI?.setClickthrough?.(value); lastClickthrough = value; }
     };
-    let dragging = false;
+    let dragging = false, inputUntil = 0;
+    const input = e => { if(e.target?.id === "chat-input" || e.target?.closest?.("#send-btn")) inputUntil=root.performance.now()+INPUT_HOLD_MS; };
+    for(const name of ["input","keydown","click"]) root.addEventListener(name,input);
     const pointer = (event) => {
       const rect = canvas.getBoundingClientRect();
       gaze = { x: ((event.clientX - rect.left) / rect.width - 0.5) * 2,
@@ -169,6 +184,7 @@
       }
       const frame = { ...frameFromState(state, now, Date.now(), prepareMs), gaze, ...intent, now };
       frame.preparingSpeech ||= now < prepareUntil;
+      frame.interaction = now < inputUntil || state.chatBusy === true || ["hearing","release"].includes(state.listeningPresencePhase) || frame.mouth?.open > .02;
       return frame;
     };
     const stopClock = renderer.startClock?.(now => {
@@ -180,6 +196,8 @@
 
     const dispose = () => {
       if (disposed) return;
+      for (const name of ["input","keydown","click"]) root.removeEventListener(name,input);
+      paintedControls.forEach(cleanup => cleanup?.());
       disposed = true; stopClock(); root.clearInterval?.(cursorTimer); channel?.close();
       root.removeEventListener?.("avatar-intent", event); root.removeEventListener?.("beforeunload", dispose);
       if (!renderer.ownsPointer) {

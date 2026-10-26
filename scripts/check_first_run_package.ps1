@@ -136,6 +136,7 @@ try {
         "config.preview.example.json",
         "app_brain_session.py",
         "app_health.py",
+        "avatar_backdrops.py",
         "app_reply_pipeline.py",
         "app_startup.py",
         "first_run.py",
@@ -149,10 +150,42 @@ try {
         "requirements.txt",
         "tts_audio.py",
         "web",
-        "web\vendor\pixi-unsafe-eval.min.js"
+        "web\avatar\vrmPainted.js",
+        "web\assets\painted-placeholder.png",
+        "web\vendor\pixi-unsafe-eval.min.js",
+        "web\vendor\scenes\kaykit-furniture\License.txt",
+        "web\vendor\scenes\kaykit-furniture\furniturebits_texture.png",
+        "web\vendor\scenes\kaykit-furniture\couch.gltf",
+        "web\vendor\scenes\kaykit-furniture\couch.bin"
     )
     foreach ($path in $requiredPaths) {
         Assert-PathExists $packageRoot.FullName $path
+    }
+    $paintedPlaceholder = "web\assets\painted-placeholder.png"
+    if ((Get-FileHash -LiteralPath (Join-Path $RepoRoot $paintedPlaceholder)).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $packageRoot.FullName $paintedPlaceholder)).Hash) {
+        throw "Packaged painted placeholder differs."
+    }
+
+    # Every selected public furniture dependency and original license must survive packaging byte-for-byte.
+    $furnitureRelative = "web\vendor\scenes\kaykit-furniture"
+    foreach ($asset in Get-ChildItem -LiteralPath (Join-Path $RepoRoot $furnitureRelative) -File) {
+        $packagedAsset = Join-Path $packageRoot.FullName (Join-Path $furnitureRelative $asset.Name)
+        Assert-PathExists $packageRoot.FullName (Join-Path $furnitureRelative $asset.Name)
+        if ((Get-FileHash -LiteralPath $asset.FullName).Hash -ne (Get-FileHash -LiteralPath $packagedAsset).Hash) {
+            throw "Packaged furniture asset differs: $($asset.Name)"
+        }
+    }
+
+    # Include the CC BY room, every local texture and the attribution/change notice.
+    $roomRelative = "web\vendor\scenes\hand-painted-room"
+    $roomSource = Join-Path $RepoRoot $roomRelative
+    foreach ($asset in Get-ChildItem -LiteralPath $roomSource -Recurse -File) {
+        $relative = Join-Path $roomRelative $asset.FullName.Substring($roomSource.Length + 1)
+        Assert-PathExists $packageRoot.FullName $relative
+        if ((Get-FileHash -LiteralPath $asset.FullName).Hash -ne (Get-FileHash -LiteralPath (Join-Path $packageRoot.FullName $relative)).Hash) {
+            throw "Packaged hand-painted room asset differs: $relative"
+        }
     }
 
     $forbiddenPaths = @(
