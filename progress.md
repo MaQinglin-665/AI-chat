@@ -426,6 +426,18 @@ Deferred TODO, explicitly not fixed this task:
 Merge publication blocked: #222 push failed all five attempts, with 10s spacing (TLS handshake failures and port-443 timeouts). Local merge a05c690 and gate record 44b3a01 retained; no conflicts. #222 was not marked ready or merged; final latest-origin/main test is pending its merge. #220 merge a0bdce4 is complete. User push command: git -C D:/AI/ai_desktop_pet_readiness_20261023 push origin codex/avatar-motion-camera-v1 . After success resume ready/check all CI/merge #222, then detached origin/main final test. No further network attempts.
 
 
+## 2026-10-26 — Avatar brain phase 1 started
+
+User explicitly authorizes backend dialogue integration; phase 2 deferred until #217. Branch from ee3de6e, local main/private config unchanged. Scope: bounded world state, action whitelist, same-call reply actions, proactive frequency limits, confirmed existing memory, fake-model tests and console-only debug entry. No avatarRuntime/vrmRenderer edits. Git fetch succeeded with command-local system proxy; global configuration unchanged.
+
+
+## 2026-10-26 — Avatar brain phase 1 verification
+
+Implemented authenticated bounded world/think/poll/ACK routes, closed 3D action schema, same-call reply suffix filtering, environment-key-only proactive calls, timer/event triggers with interval/hour/day limits, stale/inflight/input/scene/period cancellation, and explicit confirmation in the existing memory store. Debugger only sends/logs; never executes or ACKs. Original random activity/rendering unchanged. Two protected renderer files untouched; local main remains 0a06554; private config hash matches prior baseline.
+
+Verification Evidence: final scripts/test-local.ps1 passed (865 passed, 3 skipped, 1 warning; all Node, Python/JS syntax and secret scan passed); final scripts/check_first_run_package.ps1 passed, including new module/debugger package presence. Added 35 fake-model Python cases including real local authenticated HTTP, provider/runtime/reply routing and temporary-file memory roundtrip; Node debugger opt-in/no-execution check passed. Required JSON/ten-module compile and diff checks passed. Logs ignored under tmp_ui_smoke/avatar-vrm-polish/brain-phase1-{final,package}.log.
+
+No real DeepSeek/TTS/ASR/renderer execution or 10-minute video; these are phase 2 after #217. Offline prompt 2429 chars/world302, estimated 700–1000 input +100–250 output tokens (cap480), daily default0–24 calls/~$0.0079–0.0144 at official peak uncached Flash rates. Not measured billing. Process-local limits reset on backend restart; receipts trust the authenticated local client; no frontend delivery/executor yet. See docs/avatar-brain-actions.md. Publish feature branch as draft only; no merge/main push.
 ## 2026-10-26 — PR #221 accepted integration
 
 User accepted visuals and authorized merge after local/package/CI checks. Integrating origin/main ee3de6e (#220/#222 merged). User explicitly approved the sole non-state conflict: retain walking and painted metrics in vrmRenderer.js; camera algorithm unchanged.
@@ -451,3 +463,44 @@ Scope: WebP resources/manifest/source notice, backend fixed bundled WebP respons
 User approved asset size/settings, requested preserved Hiyori colors, stronger sunset warmth and visible soft contact. Replaced hue rotation/sepia/desaturation with brightness/saturation plus alpha-preserving sRGB diagonal matrix; smooth 2600ms interpolation cancels cleanly. Enlarged/deepened shadow with closest-side gradient to avoid a hard oval edge. Private real-Hiyori screenshots and 3x face/clothes/feet crops in tmp_ui_smoke/backdrop-color; no renderer/layout/camera or image asset changes.
 
 Verification Evidence: full scripts/test-local.ps1 passed (845 passed / 3 skipped; all Node/syntax/secrets). New tests assert saturation floor, night brightness range, RGB direction, alpha preservation, intermediate/interrupted tint continuity and timer cleanup. Actual isolated 8138 Hiyori: three period full frames plus 3x face/clothes and feet crops, zero page errors. Visually retained brown hair, cream cardigan and blue ribbon; warm dusk and soft visible contact core reviewed. No image assets or branch ancestry changes; #225 remains draft.
+
+## 2026-10-26 — #224 审核通过，准备合并
+
+按用户授权合入最新 origin/main 79ee80f；仅 feature_list.json、progress.md、session-handoff.md 冲突。两边记录全部保留，功能列表合并为合法 JSON，active_task 保持 avatar-brain-driven-v1。没有代码冲突，也不额外修改从 main 合入的产品代码。本地 main 和私人配置不动。两项本地门禁和最新提交的 Linux/Windows CI 通过后，用 merge commit 合并 #224。
+
+### 第二期必做项（本次只记录，不实现）
+
+- 主动思考的提示词加入最近 3 轮对话的简短摘要（约 300 字以内）和 1～2 条相关记忆，让主动话语接上之前聊的内容。
+- 每日调用计数持久化到本地状态文件；该文件不进仓库，重启后不清零。
+- 文档明确写明：主动思考只使用环境变量里的 Key；Key 只写在配置文件里时，主动思考不会启用。
+
+合并后停止，必须等待用户通知 #217 已合并，再开始第二期。
+
+
+Verification Evidence for #224 merge: scripts/test-local.ps1 passed (876 passed, 3 skipped, 1 warning; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed. Ignored logs: tmp_ui_smoke/avatar-vrm-polish/merge224-local.log and merge224-package.log. Three state-file conflicts resolved by retaining both histories and both feature entries; active task stays avatar-brain-driven-v1. No code conflicts or extra product fixes. Next: normal push, ready, all CI, authorized merge commit, then stop awaiting user notice about #217.
+
+
+## 2026-10-26 — Backend context/quota task started
+
+User explicitly authorized these backend-only phase-2 items before #217. New branch codex/avatar-brain-context-v1 from 2b67452. Reuse existing chat history/delivery and memory retrieval, sanitize before prompt; durable local daily/hourly quota with graceful storage fallback. No renderer changes, no private configuration changes, no real model needed.
+
+### 2026-10-26 — avatar-brain-context-v1 Verification Evidence
+- Implemented bounded last-three-turn extractive context and up to two local relevant memories; explicit recall query uses existing selector. Confirmed delivery updates context; no extra model call.
+- Daily and rolling-hour counters plus cooldown persist atomically in user app data; restart/day rollover/corrupt/unwritable fallback tested. Files and locks ignored; no private content stored.
+- Targeted: 67 passed; new suite: 32 passed. Final scripts/test-local.ps1: 908 passed, 3 skipped, 1 audioop deprecation warning; all Node, syntax and secret checks passed. First-run package smoke passed including both new modules. Initial fake Windows user-path fixture triggered secret scan; changed fixture to generic test path and reran full gate successfully.
+- Logs (ignored): tmp_ui_smoke/avatar-vrm-polish/brain-context-local.log and brain-context-package.log. Required JSON/compile checks passed. No real API calls or frontend acceptance.
+- Risks: conservative filtering drops technical topics; summaries are excerpts, not semantic summaries; restart awaits chat history delivery. Disk fallback only preserves in-process quotas. Env-Key-only behavior documented.
+- Local main remains 0a0655464b2fe31ab648f58902af7114a16a2393; private config hash unchanged; renderer files untouched. Push feature branch and draft PR only; no merge, wait for #217 before remaining phase 2.
+
+### 2026-10-26 — PR #227 merge preparation and deferred TODO
+- User approved #227 for merge after fresh local/package and Linux/Windows CI gates. Fetched origin/main 2b67452; already contained, no conflicts. Local main and private configuration remain untouched.
+- TODO（本次不修）：avatar_brain_context.py 的 PRIVATE 正则过于保守；`[a-z]:`、`\.[a-z]...`、`配置`、`路径` 等模式会误伤日常聊天（如“电脑配置”、英文“note:”），导致摘要为空。以后改为只遮盖命中的片段，或只匹配真正像 Key、路径的格式，并补充误伤用例测试。
+- After merge, stop and wait for the user's notice that #217 has merged before frontend phase 2.
+- Verification Evidence: fresh scripts/test-local.ps1 passed (908 passed, 3 skipped, 1 warning; all Node/syntax/secrets passed); scripts/check_first_run_package.ps1 passed. Required JSON and compile checks passed. Ignored logs: tmp_ui_smoke/avatar-vrm-polish/merge227-local.log and merge227-package.log. No product code changed. Ready for normal push and CI-gated authorized merge.
+
+
+## 2026-10-26 — #225 accepted merge
+
+User accepted #225 and authorized merge after fresh local/package and all Linux/Windows CI. Integrated origin/main 1ab5d38 (#224/#227); only three state files conflicted, both feature records/log histories preserved. No product code conflict or extra implementation change. After merge preserve ignored screenshots in original readiness tmp_ui_smoke, remove only backdrop worktree if clean, stop on policy rejection and end this task.
+
+Verification Evidence: fresh scripts/test-local.ps1 passed (912 passed, 3 skipped; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed including WebP hashes. Ignored logs: tmp_ui_smoke/backdrop-color/merge225-local.log and merge225-package.log. State conflicts only; no extra product changes. Proceed to push, ready, all CI, authorized merge and evidence/worktree cleanup.

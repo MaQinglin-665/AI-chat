@@ -15,7 +15,10 @@ def normalize_interaction_items(items, *, normalize_text, looks_garbled, looks_s
             continue
         if looks_stagey(assistant):
             continue
-        serializable.append({"ts": ts, "user": user, "assistant": assistant})
+        record = {"ts": ts, "user": user, "assistant": assistant}
+        if item.get("source") == "avatar_world_confirmed":
+            record["source"] = "avatar_world_confirmed"
+        serializable.append(record)
     return serializable
 
 

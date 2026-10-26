@@ -105,6 +105,8 @@ REQUIRE_API_TOKEN_DEFAULT = any(_env_flag(key, False) for key in RELEASE_MODE_EN
 
 
 DEFAULT_CONFIG = {
+    "avatar": {"brain": {"enabled": False, "mode": "daily", "daily_limit": 24,
+                           "night_actions_only": True}},
     "external_agent": external_agent_defaults(),
     "onboarding_completed": False,
     "assistant_name": "馨语AI桌宠",
