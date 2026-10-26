@@ -16,4 +16,7 @@ Hip/ankle baseline errors <1mm; desk elbow ~0.7645m vs 0.765m target including s
 VRM1 is synthetic skeleton coverage, not a real VRM1 model. No full-body cloth collision guarantee for arbitrary outfits/proportions.
 
 Final full gate passed: 829 Python passed / 3 skipped; all Node suites, syntax and secrets passed.
-Next: retain draft PR #219 and wait for user visual review. Do not merge.
+Update 2026-10-26: user visual acceptance passed and explicitly authorized #219 merge after fresh full/package and Linux/Windows CI gates. origin/main 2356ddb already contained; no conflicts.
+Deferred, not fixed: stiff hand resting on desk; floating hand when reaching at window.
+Fresh 2026-10-26 full gate: 829 passed / 3 skipped, all Node/syntax/secrets passed; first-run package gate passed.
+Next: push, mark ready, merge with --merge --admin after all CI passes, then test latest origin/main detached. Keep local main and config.local.json unchanged.

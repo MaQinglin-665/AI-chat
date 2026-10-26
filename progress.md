@@ -358,3 +358,13 @@ Published implementation 0c34e34 on codex/avatar-room-life-v1; draft PR #219 tar
 Measured sofa/chair surfaces (0.310/0.342m), measured leg lengths and constrained hip/ankle contacts replace the old height-only seating. Lap hands and desk elbow/chin support, 1.8s activity cameras, bounded back-facing glances and runtime purple furniture tint added. Procedural fallback seats match the same surfaces; source assets unchanged.
 Verification Evidence: final scripts/test-local.ps1 passed: 829 passed, 3 skipped; all Node suites, Python/JS syntax and secrets passed. New synthetic VRM0/1 short/long-leg tests preserve bone lengths and seat/floor contacts; real Electron VRM0 contacts <1mm, desk elbow 0.7645m vs 0.765m target. No page exceptions; ten room toggles stable. Sofa/desk front and side, four activity views and 35s silent seated-tour.mp4 are ignored under tmp_ui_smoke/avatar-vrm-polish. Capture-only active-surface override avoids existing background pause.
 Limitations: no real VRM1 model acceptance or arbitrary outfit collision guarantee; extreme unreachable desk proportions are reported. Updated draft #219 awaits user visual review; no merge. Local main and private config/model untouched.
+
+## 2026-10-26 — PR #219 visual acceptance and merge gate
+
+User accepted the visuals and authorized merge commit after local/package and Linux/Windows CI gates. Fetched origin/main 2356ddb; already contained by this branch, no merge conflicts. Local main remains 0a06554; private config unchanged.
+
+Deferred TODO (explicitly not fixed this round):
+- 书桌前平放在桌上的那只手太僵。
+- 窗边伸手时手部悬空。
+
+Verification Evidence: scripts/test-local.ps1 passed (829 passed, 3 skipped; all Node suites, Python/JS syntax and secrets passed); scripts/check_first_run_package.ps1 passed. Required JSON/ten-module compilation, secrets and diff checks passed. Next: push, mark #219 ready, wait for all CI, merge with --merge --admin, and test latest origin/main without moving local main.
