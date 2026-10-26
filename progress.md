@@ -317,3 +317,16 @@ Verification Evidence: Node deterministic layout/bounds/day-night/no-request che
 User reviewed #218 and requested physical proportions/composition. Removed avatar-height scaling, explicit furniture dimensions in metres, wall 3m behind avatar and side furnishings 2–2.65m behind. Added clean head backdrop, square wall joins/ceiling/skirting, partial distant pink crowns, moon/star sizes/clouds, brighter warm daytime with non-shadow-mapped sun patch. No private/model/Live2D/dialogue/memory/external execution changes.
 
 Verification Evidence: scripts/test-local.ps1 passed 829/3, all Node/syntax/secrets; dimensions/book range/backdrop/depth/unscaled-height tests added and ten-cycle disposal passes. Actual full and pulled-back Electron VRM0 night/day captures inspected, only in ignored tmp_ui_smoke/avatar-vrm-polish/metres-*.png. Full idle 19.98 FPS, CPU 4.21%, GPU 5.19%, 38 draw calls, within 1.5x original GPU budget. Required pre-push JSON/py_compile passed. Dimensions and limitations docs/avatar-3d-room.md. Draft #218 only, user appearance acceptance next.
+
+
+## 2026-10-25 — PR #218 visual acceptance and merge preparation
+
+User passed visual acceptance and explicitly authorized merge commit (--merge --admin) after local/package gates and all Linux/Windows CI pass. Fetched origin; latest origin/main already contained, no merge conflicts. Local main and private config remain untouched.
+
+### Follow-up backlog (explicitly deferred, not fixed in this merge)
+
+- 房间偏空：后续考虑增加书桌、床、墙面装饰。
+- 夜晚人物脸部补光。
+- 将落地灯从窗前移到窗户一侧。
+
+Verification Evidence: fresh scripts/test-local.ps1 passed (829 passed, 3 skipped; all Node/syntax/secrets); scripts/check_first_run_package.ps1 passed. Required JSON/py_compile checks passed. Logs ignored under tmp_ui_smoke/avatar-vrm-polish/merge218-*.log. After CI, merge PR #218 then test exact latest origin/main in detached HEAD, preserving local main.
