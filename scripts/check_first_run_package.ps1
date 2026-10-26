@@ -169,6 +169,17 @@ try {
         }
     }
 
+    # Include the CC BY room, every local texture and the attribution/change notice.
+    $roomRelative = "web\vendor\scenes\hand-painted-room"
+    $roomSource = Join-Path $RepoRoot $roomRelative
+    foreach ($asset in Get-ChildItem -LiteralPath $roomSource -Recurse -File) {
+        $relative = Join-Path $roomRelative $asset.FullName.Substring($roomSource.Length + 1)
+        Assert-PathExists $packageRoot.FullName $relative
+        if ((Get-FileHash -LiteralPath $asset.FullName).Hash -ne (Get-FileHash -LiteralPath (Join-Path $packageRoot.FullName $relative)).Hash) {
+            throw "Packaged hand-painted room asset differs: $relative"
+        }
+    }
+
     $forbiddenPaths = @(
         ".env",
         ".local-tools",

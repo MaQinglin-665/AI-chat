@@ -1,3 +1,5 @@
+> 新增可选手绘预设：见 [avatar-room-handpainted.md](avatar-room-handpainted.md)。默认仍为 room。以下保留 KayKit/初版记录。
+
 # VRM 程序生成房间 v1
 
 > 后续房间生活感版本已加入本地 CC0 家具与活动调度，见 [avatar-room-life.md](avatar-room-life.md)。下文保留初版实现和性能基线。
