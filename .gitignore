@@ -110,5 +110,7 @@ web/assets/galgame-characters/**/*-preview.png
 
 # Private avatar models and local-only captures
 models_local/
+avatar-brain-usage.json
+avatar-brain-usage.lock
 *.vrm
 *.vrma
