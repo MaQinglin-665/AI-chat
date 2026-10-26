@@ -93,3 +93,37 @@ def test_endpoint_is_behind_existing_auth_checks():
     code = Path("app_get_routes.py").read_text(encoding="utf-8")
     assert code.index("_reject_invalid_api_token") < code.index("avatar_backdrops.dispatch")
     assert code.index("_reject_disallowed_origin") < code.index("avatar_backdrops.dispatch")
+
+
+def test_bundled_default_and_local_override(tmp_path):
+    bundled = tmp_path / "web/assets/backgrounds/bedroom"
+    bundled.mkdir(parents=True)
+    (bundled / "day.png").write_bytes(b"fixture")
+    cfg = {"avatar": {"kind": "vrm"}}
+    assert backdrops.select(cfg, tmp_path, "night") == (bundled / "day.png", "day")
+    (bundled / "night.png").write_bytes(b"fixture")
+    assert backdrops.select(cfg, tmp_path, "night") == (bundled / "night.png", "night")
+    directory, cfg = setup(tmp_path)
+    (directory / "dusk.png").write_bytes(b"local")
+    assert backdrops.select(cfg, tmp_path, "night") == (directory / "dusk.png", "dusk")
+
+
+def test_bundled_assets_manifest():
+    import hashlib
+    import json
+    import struct
+    directory = Path("web/assets/backgrounds/bedroom")
+    manifest = json.loads((directory / "manifest.json").read_text())
+    assert set(manifest) == {"day.png", "dusk.png", "night.png"}
+    for name, digest in manifest.items():
+        data = (directory / name).read_bytes()
+        assert hashlib.sha256(data).hexdigest() == digest
+        assert data[:8] == b"\x89PNG\r\n\x1a\n"
+        width, height = struct.unpack(">II", data[16:24])
+        assert width > 0 and height > 0 and width * height <= backdrops.MAX_PIXELS
+
+
+def test_bundled_link_rejected(tmp_path, monkeypatch):
+    monkeypatch.setattr(backdrops, "_is_link", lambda p: p.name == "bedroom")
+    with pytest.raises(AvatarPathError):
+        backdrops.select({"avatar": {"kind": "vrm"}}, tmp_path, "day")

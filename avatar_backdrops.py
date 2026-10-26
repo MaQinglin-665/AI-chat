@@ -52,6 +52,14 @@ def select(config, root, period):
                 raise AvatarPathError("Backdrop images must not be links.")
             if candidate.is_file():
                 return candidate, name
+    # Bundled files are fixed application assets, never an HTTP-supplied path.
+    bundled = Path(root) / "web/assets/backgrounds/bedroom"
+    for name in [period, *[p for p in PERIODS if p != period]]:
+        candidate = bundled / (name + ".png")
+        if any(_is_link(part) for part in [candidate, *candidate.parents]):
+            raise AvatarPathError("Bundled backdrop must not contain links.")
+        if candidate.is_file():
+            return candidate, name
     return Path(root) / "web/assets/painted-placeholder.png", period
 
 
