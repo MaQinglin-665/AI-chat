@@ -805,6 +805,20 @@
         "Process-local daily budget resets on restart; default disabled; draft PR only",
         "User approved #224 merge; latest main 79ee80f integrated with only three state-file conflicts; local/package gates passed (876 passed, 3 skipped). Phase 2 mandatory additions recorded in progress.md; wait for user notice after #217."
       ]
+    },
+    {
+      "id": "avatar-brain-context-v1",
+      "name": "Backend proactive context and durable usage limits",
+      "status": "complete",
+      "done_criteria": [
+        "Sanitized last-three-turn <=300-character summary and <=2 existing memory matches",
+        "Persist daily/rolling-hour quotas across restart; corrupt/unwritable storage falls back to memory",
+        "Fake model, privacy, restart and full/package verification; draft PR only"
+      ],
+      "notes": [
+        "No avatarRuntime.js or vrmRenderer.js changes; remaining frontend phase 2 waits for #217",
+        "908 passed, 3 skipped, 1 warning; all Node/syntax/secrets and first-run package checks passed; fake model only; draft PR delivery"
+      ]
     }
   ]
 }

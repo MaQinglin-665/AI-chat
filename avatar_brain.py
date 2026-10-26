@@ -1,7 +1,7 @@
 """Phase-1 decision service. Produces plans; has no renderer/tool executor."""
 from __future__ import annotations
 
-from collections import OrderedDict, deque
+from collections import OrderedDict
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime
@@ -12,6 +12,8 @@ import time
 import uuid
 
 from avatar_brain_protocol import number, parse_decision, prompt, sanitize_world
+from avatar_brain_context import build_context, recent_history
+from avatar_brain_usage import UsageBudget
 
 LOG = logging.getLogger(__name__)
 MODE_LIMITS = {"quiet": (900, 2), "daily": (300, 6), "streamer": (60, 20)}
@@ -39,9 +41,12 @@ def settings(config):
 
 class AvatarBrain:
     def __init__(self, config_loader, model, remember, *, clock=time.monotonic,
-                 day=lambda: datetime.now().date().isoformat()):
+                 day=lambda: datetime.now().date().isoformat(), usage=None, context_builder=build_context):
         self.config_loader, self.model, self.remember = config_loader, model, remember
         self.clock, self.day = clock, day
+        self.usage = usage if usage is not None else UsageBudget(clock=clock, day=day)
+        self.context_builder = context_builder
+        self.history = []
         self.lock = threading.RLock()
         self.world = None
         self.reason = "idle"
@@ -49,14 +54,27 @@ class AvatarBrain:
         self.epoch = 0
         self.busy = 0
         self.inflight = False
-        self.last = -float("inf")
         self.next = 0
-        self.calls = deque()
-        self.daily = 0
-        self.date = self.day()
         self.plans = OrderedDict()
         self.stop_event = threading.Event()
         self.thread = None
+
+    @property
+    def daily(self):
+        return self.usage.state["daily"]
+
+    def observe_history(self, history, config):
+        if settings(config)["enabled"]:
+            cleaned = recent_history(history)
+            with self.lock:
+                self.history = cleaned
+
+    def delivered_turn(self, config, user, reply, *, is_auto=False):
+        if is_auto or not settings(config)["enabled"]:
+            return
+        with self.lock:
+            self.history = recent_history([*self.history, {"role": "user", "content": user},
+                                           {"role": "assistant", "content": reply}])
 
     def _fresh(self, now):
         return bool(self.world and now - self.updated <= WORLD_TTL and self.world["scene"] != "none")
@@ -157,6 +175,7 @@ class AvatarBrain:
                 return None
             interval = MODE_LIMITS[settings(config)["mode"]][0]
             self.next = max(self.next, self.clock() + max(interval, decision["next_think_after_sec"]))
+            self.usage.defer(max(interval, decision["next_think_after_sec"]))
             return self._publish(decision, "reply")
 
     def poll(self):
@@ -168,29 +187,29 @@ class AvatarBrain:
                                            if x["plan"]["status"] != "completed"]}
 
     def think(self, reason=None):
-        """Reserve budget before the call; failure still counts. Never hold lock during I/O."""
+        """Reserve budget before the call; failure counts. Model/retrieval run outside lock."""
         config = self.config_loader()
         policy = settings(config)
         with self.lock:
             now = self.clock()
-            if self.day() != self.date:
-                self.date, self.daily = self.day(), 0
-            while self.calls and now - self.calls[0] >= 3600:
-                self.calls.popleft()
             interval, hourly = MODE_LIMITS[policy["mode"]]
             if (not policy["enabled"] or self.inflight or self._blocked(now) or now < self.next
-                    or now - self.last < interval or len(self.calls) >= hourly or self.daily >= policy["daily_limit"]
                     or self.world["idle_sec"] < MIN_IDLE_SECONDS):
                 return {"ok": True, "decision": None}
+            if not self.usage.reserve(interval=interval, hourly=hourly, daily=policy["daily_limit"]):
+                return {"ok": True, "decision": None}
             self.inflight = True
-            self.last = now
-            self.calls.append(now)
-            self.daily += 1
             epoch, world = self.epoch, deepcopy(self.world)
+            history = deepcopy(self.history)
             reason = reason if isinstance(reason, str) else self.reason
             self.reason = "idle"
         try:
-            text = self.model(config, prompt(world, proactive=True), reason if reason in {"idle", "period_changed", "user_returned"} else "idle")
+            try:
+                context = self.context_builder(config, history)
+            except Exception:
+                context = ""
+            text = self.model(config, prompt(world, proactive=True) + context,
+                              reason if reason in {"idle", "period_changed", "user_returned"} else "idle")
             decision = parse_decision(text, world, proactive=True)
             if policy["night_actions_only"] and world["period"] == "night":
                 decision["say"] = ""
@@ -202,6 +221,7 @@ class AvatarBrain:
                 if current_policy["night_actions_only"] and self.world["period"] == "night":
                     decision["say"] = ""
                 self.next = self.clock() + max(interval, decision["next_think_after_sec"])
+                self.usage.defer(max(interval, decision["next_think_after_sec"]))
                 if not decision["say"] and not decision["actions"]:
                     return {"ok": True, "decision": None}
                 return {"ok": True, "decision": self._publish(decision, "proactive")}

@@ -146,6 +146,8 @@ try {
         "llm_runtime.py",
         "avatar_brain.py",
         "avatar_brain_protocol.py",
+        "avatar_brain_context.py",
+        "avatar_brain_usage.py",
         "app_avatar_brain.py",
         "web\avatar\avatarBrainDebug.js",
         "memory_text.py",

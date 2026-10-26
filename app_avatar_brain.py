@@ -4,6 +4,7 @@ import threading
 
 from avatar_brain import AvatarBrain
 from avatar_brain_protocol import MAX_WORLD_BYTES
+from avatar_brain_usage import UsageBudget, default_usage_path
 
 ROUTES = frozenset({"/api/avatar/brain/world", "/api/avatar/brain/think",
                     "/api/avatar/brain/poll", "/api/avatar/brain/ack"})
@@ -23,7 +24,7 @@ def call_model(config, prompt, reason):
                request_timeout=12, turn_timeout_sec=12)
     policy = build_model_direct_dialogue_policy({**config, "character_runtime": {
         **config.get("character_runtime", {}), "model_direct_reply": True}})
-    # No history, private config, tools, or arbitrary user-provided persona strings in this call.
+    # Prompt contains only bounded, privacy-filtered context, never raw history/config/tools.
     messages = [{"role": "system", "content": policy + "\n" + prompt},
                 {"role": "user", "content": "Decide whether to act now. Trigger: " + reason}]
 
@@ -41,7 +42,8 @@ def get_service(config_loader):
     with _lock:
         if _service is None:
             from memory import remember_avatar_event
-            _service = AvatarBrain(config_loader, call_model, remember_avatar_event)
+            _service = AvatarBrain(config_loader, call_model, remember_avatar_event,
+                                   usage=UsageBudget(default_usage_path()))
         return _service
 
 

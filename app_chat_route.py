@@ -598,6 +598,8 @@ def handle_chat_route(path_only, body, *, avatar_brain_service=None, **kwargs):
     holder = {}
 
     def prepare(config):
+        history = _drop_duplicate_current_user_history_item(body.get("history", []), str(body.get("message", "")).strip())
+        avatar_brain_service.observe_history(history, config)
         result = avatar_brain_service.prepare_chat(config)
         holder["config"] = result
         return result
@@ -617,6 +619,18 @@ def handle_chat_route(path_only, body, *, avatar_brain_service=None, **kwargs):
     kwargs["send_json_func"] = sender(kwargs["send_json_func"])
     kwargs["send_sse_func"] = sender(kwargs["send_sse_func"])
     kwargs["prepare_avatar_config"] = prepare
+    original_remember = kwargs["remember_interaction_func"]
+
+    def remember(config, user, reply, *, is_auto=False, **options):
+        result = original_remember(config, user, reply, is_auto=is_auto, **options)
+        # Called by the existing delivered-turn commit, not when a reply is merely generated.
+        try:
+            avatar_brain_service.delivered_turn(config, user, reply, is_auto=is_auto)
+        except Exception:
+            pass  # Optional context must not change existing delivery success.
+        return result
+
+    kwargs["remember_interaction_func"] = remember
     with avatar_brain_service.chat_turn():
         return _handle_chat_route_impl(path_only, body, **kwargs)
 
