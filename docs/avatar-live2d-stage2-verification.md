@@ -47,3 +47,16 @@ node scripts/qa_live2d_adapter.cjs
 本轮本地截图和 `browser-exact-evidence.json` 保存在仓库外 `outputs/avatar-live2d-stage2-implementation/`；其中创作过程截图另整理到 `outputs/比赛材料/04_创作过程截图/`。
 
 完整本地门禁结果见 `progress.md` 最新 Verification Evidence。剩余验收是作者在 Windows 桌面窗口检查 Hiyori 的实际观感、拖拽、穿透和模型窗口切换。PR 保持草稿；本阶段不提交模型/贴图/moc3，不涉及 Mao 元音、表情或手势接入，不改对话、记忆或 external_agent 实现。
+
+
+## 最新 main 合并后的收尾验收（2026-10-26）
+
+按作者最新要求，#217 现在提交为可审查状态，由作者决定合并。上文的阶段 2 草稿检查点仅保留为历史记录；Mao 后续实现见 `avatar-live2d-mao.md`。
+
+- 显式获取并合并 `origin/main` 的 `79ee80f`（含 `ee3de6e`、#221/#222），合并提交 `8d514b7`。保留新 VRM 输入、房间、镜头、绘景设置及全部第三方声明；Live2D 继续使用原 Pixi ticker，未新增参数 RAF。
+- 将此前混入的浏览器口型时序修复以普通逆向提交移出本 PR，历史不重写。它将在直接从 main 创建的独立分支验证 Hiyori/Mao/VRM；已安装桌宠的 120ms 修复和用户听感结果保留在本机。
+- 合并后重新执行同 Core 6 严格对照：Node **5,280 帧 / 394,224 次完整调用 / 42 场景**，浏览器 **1,030 帧 / 167,741 次完整调用**。完整顺序、参数/部件快照逐项严格相等，四组 PNG 哈希相同，十次实际重载清理通过。未采用近似容差。
+- 完整 `scripts/test-local.ps1`：**861 Python 通过、3 跳过；72 Node 测试文件；Python 186 / JavaScript 239 个文件语法通过；834 个文件秘密扫描通过**。Docs 四项浏览器检查、首次运行打包检查、必需 JSON/py_compile 均通过。合并发现的 VRM 绘景控件注册限制在 VRM 分支，避免 Live2D 误注册；完整门禁随后通过。
+- 单独录制 Hiyori 检查录像：`Hiyori-PR217检查录像.mp4`，约 **38.4 秒**。真实 Pixi/Core/Hiyori，包含待机、倾听、思考、说话、点头、原生动作、拖拽和释放；这是隔离浏览器中的受控意图演示，无音频，不冒充 Windows 原生窗口或真实 TTS 同步验收。
+
+录像、截图、逐项证据仅在本机 `outputs/pr217-closeout/`；未提交模型、贴图、moc3、私密配置或录屏。原生 Windows 的外观、命中/拖拽/穿透和真实语音仍由作者验收。大模型驱动任务第二期必须等作者合并 #217 后才开始。

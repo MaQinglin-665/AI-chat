@@ -1,8 +1,10 @@
-# Current — PR217 closeout first; shared lipsync gets a separate main-based PR
+# Current — PR217 verified for publication; shared lipsync separate
 
-- User explicitly reprioritizes #217: sync latest main including #221, preserve exact same-Core Hiyori write sequence, push/ready and deliver a dedicated Hiyori inspection video. Do not start LLM task phase2 before #217 is merged by its author.
-- Explicit main fetch was necessary because remote.origin.fetch only tracks two collaborator branches. Updated origin/main2356ddb ->79ee80f (#221), including ee3de6e/#222. Resolved eight merge conflicts by retaining both local Live2D factory/owned clocks and incoming VRM painted/input/world/camera functions, all third-party entries and both state histories. No main push/force push/PR merge.
-- Next remove previously mixed lipsync-only product changes from #217 through normal inverse commits (preserve history and local installed120ms), run strict/full/package checks and record Hiyori video. Then create friend/lipsync-fix directly from latest origin/main; preserve FFT1024,25–350ms latency policy and hidden timer; test Hiyori/Mao/VRM before/after. No model/private assets committed.
+- Priority1 complete locally on friend/avatar-live2d-adapter: explicit latest main79ee80f (#221/#222) merged8d514b7, VRM/Live2D/notices/state histories retained. Prior browser timing prototype removed from product through normal inverse patches; original installed120ms remains working locally.
+- Verification Evidence: exact Core6 Node5280/394224/42scenes and browser1030/167741 ordered calls/snapshots strictly equal; four identical PNG pairs/ten reloads. Full861Python/3skipped,72Node,syntax186/239,secrets834;docs4/package/JSON/py_compile passed. Final guard confines painted controls to VRM.
+- Dedicated realHiyori/Pixi/Core6 silent controlled-browser inspection video38.4s at outputs/pr217-closeout/Hiyori-PR217检查录像.mp4; reviewed clear/visible. No native Windows or realTTS timing claim, no media/models/private assets committed.
+- Next publish normal commit/push, update existing PR217 body/ready and deliver video, then create friend/lipsync-fix directly from freshly fetched main. Do not merge/main/force push. LLM task phase2 waits for author merging#217.
+- Shared lipsync: preserve existing FFT1024/25–350ms output latency policy/hidden timer. Generalize event-owned browser mouth across Hiyori/Mao/VRM, test/record before-after separately; strict adapter snapshots belong only to217. Prototype patches outsideGit outputs/lipsync-separated. User has noVRM: first verify official VRoid help CC0 for AvatarSampleD–G or SendagayaShino; neverA–C/privateauthorVRM, model underignored models_local only. User reconfirms priorityHiyori first.
 
 ## Preserved latest-main handoff
 

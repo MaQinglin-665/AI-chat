@@ -300,14 +300,12 @@ function testStaleProjectionClearsWithoutTouchingLocalFullViewAudio() {
 
 function main() {
   const vowels = makeModelHarness();
-  vowels.send(makeSpeechPacket({ vowel: "e", vowelConfidence: .8, audioAnalysisAvailable: true }));
-  assert.strictEqual(vowels.state.ttsAudioAnalysisAvailable, true);
+  vowels.send(makeSpeechPacket({ vowel: "e", vowelConfidence: .8 }));
   assert.strictEqual(vowels.state.ttsVowel, "e");
   assert.strictEqual(vowels.state.ttsVowelConfidence, .8);
   vowels.send(makeSpeechPacket({ speechRevision: 2, vowel: "invalid", vowelConfidence: Infinity }));
   assert.strictEqual(vowels.state.ttsVowel, null);
   assert.strictEqual(vowels.state.ttsVowelConfidence, 0);
-  assert.strictEqual(vowels.state.ttsAudioAnalysisAvailable, false, "old packets retain browser mouth fallback");
   vowels.send(makeSpeechPacket({ speechRevision: 3, vowel: "a", audioLevel: 0 }));
   assert.strictEqual(vowels.state.ttsVowel, null);
   testSenderUsesPortableExpiryContract();

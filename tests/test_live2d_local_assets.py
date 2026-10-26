@@ -88,11 +88,7 @@ def test_avatar_config_overrides_legacy_placeholder(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "ROOT_DIR", tmp_path)
     assert config.validate_live2d_model_path(cfg) == folder / "Mao.model3.json"
     public = config.sanitize_client_config(cfg)["avatar"]
-    assert public == {"kind": "live2d", "mapping": "web/avatar/mappings/mao.json", "browser_lip_sync_delay_ms": 120}
-    cfg["avatar"]["browser_lip_sync_delay_ms"] = 9999
-    assert config.sanitize_client_config(cfg)["avatar"]["browser_lip_sync_delay_ms"] == 500
-    cfg["avatar"]["browser_lip_sync_delay_ms"] = -1
-    assert config.sanitize_client_config(cfg)["avatar"]["browser_lip_sync_delay_ms"] == 0
+    assert public == {"kind": "live2d", "mapping": "web/avatar/mappings/mao.json"}
     cfg["avatar"]["path"] = "models_local/Missing.model3.json"
     with pytest.raises(config.DiagnosticError):
         config.validate_live2d_model_path(cfg)

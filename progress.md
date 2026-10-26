@@ -626,3 +626,16 @@ User accepted visuals and authorized merge after local/package/CI checks. Integr
 Verification Evidence: camera/motion/locomotion/painted targeted Node tests pass. Full test-local passed (841 passed, 3 skipped; all Node/syntax/secrets), with PYTEST_ADDOPTS=--ignore=tmp_ui_smoke to avoid collecting old ignored test fixtures. First-run package smoke passed. Merged real VRM0 night capture: natural lowered-arm idle, fixed painted camera across 12s sampled updates; no page/shader errors. Evidence tmp_ui_smoke/painted-polish/merged-night.png and merged.json. No camera algorithm edits.
 
 CI repair: Node painted test duplicated pytest invocation, but Linux Node job intentionally has no pytest dependency. Removed only that nested invocation; unchanged test_avatar_backdrops.py remains in Python/Windows/full gates. Targeted Node and Python backdrop suites rechecked.
+
+
+## 2026-10-26 — PR217 prioritized; shared lipsync separated
+- Explicitly fetched main because origin refspec omitted it; merged79ee80f (#221 plus ee3de6e/#222) as8d514b7, retaining painted controls, VRM input/world/camera and renderer-owned clocks. Resolved8 conflicts preserving both notices/state histories; no force/main push/merge of PR.
+- User requires mouth fixes in a separate main-based PR. Applied normal product-only inverse patches for50ef8c9 and1a3885a, retaining all history and installed120ms/user listening result locally. Saved exact prototypes outsideGit at outputs/lipsync-separated. New#217 baseline contains adapter/Core/Mao model integration, not browser timing/fallback changes. Pending strict/full/package checks and dedicated Hiyori video; LLM phase2 still prohibited before#217 merge.
+
+
+## 2026-10-26 — PR217 latest-main closeout verified
+- Changes: normal inverse patches isolate previous browser mouth timing from adapter/Core/Mao work; optional QA recording produces a dedicated Hiyori inspection video. VRM painted controls now register only for VRM, preserving upstream functions without touching Hiyori's ticker/write ordering.
+- Verification Evidence: merged main79ee80f (#221/#222) via8d514b7; exact Node5280frames/394224calls/42scenes and actual browser1030frames/167741calls, full ordered writes and parameter/part snapshots strictly identical, four identical PNG pairs, ten reload cleanups. Final browser rerun after painted guard also passes.
+- Complete scripts/test-local.ps1 passes861Python/3skipped,72Node,syntax186/239,secrets834. Docs check:all4 and scripts/check_first_run_package.ps1 pass; required JSON and py_compile pass. Logs outsideGit work/pr217-closeout-*.log. Initial full gate caught painted controls on Live2D mock; fixed renderer guard and reran full gate successfully.
+- Local evidence: outputs/pr217-closeout/Hiyori-PR217检查录像.mp4,38.4s/960frames/25fps, reviewed visible Hiyori. Silent controlled realPixi/Core browser fixture, not native Windows/live speech or a performance measurement. No media/model/private data committed. Original installed120ms mouth fix preserved while separate main-based PR is prepared.
+- Next: normal push existing branch, update #217 to ready, deliver dedicated video; author reviews/merges. Then separate shared lipsync branch directly from latest main. No main/force push/PR merge; LLM task phase2 waits for author merge.

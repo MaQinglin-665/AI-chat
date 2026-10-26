@@ -1138,8 +1138,6 @@ def sanitize_client_config(config):
         "model_path": config.get("model_path", DEFAULT_CONFIG["model_path"]),
         "avatar": {
             "kind": "vrm" if isinstance(config.get("avatar"), dict) and config["avatar"].get("kind") == "vrm" else "live2d",
-            "browser_lip_sync_delay_ms": max(0, min(500, _safe_int(config.get("avatar", {}).get("browser_lip_sync_delay_ms", 120), 120)))
-            if isinstance(config.get("avatar"), dict) else 120,
             # The lazy chat renderer needs the mapping to enable audio vowels;
             # local model paths and allowed directories stay server-side.
             "mapping": str(config.get("avatar", {}).get("mapping", ""))[:512]

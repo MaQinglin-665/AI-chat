@@ -14,7 +14,7 @@ const html = `<!doctype html><meta charset="utf-8"><title>馨语桌宠 · Mao �
 <canvas id="live2d-canvas"></canvas><aside><h1>馨语桌宠 · Mao</h1><p>阶段 3 · 官方模型本机接入<br>统一意图入口 / 原有 Pixi 时钟</p><output id="status">加载中…</output></aside><footer>模型 © Live2D Inc. / Mao Niziiro<br>使用遵循 Live2D Free Material License 与 Sample Model Terms。此处是本地独立验证场景。</footer>
 <script>window.virtualNow=1000;Object.defineProperty(performance,'now',{value:()=>virtualNow});window.requestAnimationFrame=()=>1;window.cancelAnimationFrame=()=>{};
 window.authFetch=(url,options={})=>fetch(url,{...options,headers:{...options.headers,'X-Local-Model-Test':'authenticated'}});</script>
-${["vendor/pixi.min.js", "vendor/pixi-unsafe-eval.min.js", "vendor/live2dcubismcore.min.js", "vendor/cubism4.min.js", "avatar/live2dMapping.js", "avatar/vowelEstimator.js", "avatar/browserLipSync.js", "avatar/live2dAssets.js", "avatar/live2dModelDriver.js", "live2dExpressionController.js", "ttsPlaybackController.js", "live2dRuntimeController.js", "avatar/live2dRenderer.js", "avatar/avatarRuntime.js"].map(f => `<script src="/${f}"></script>`).join("")}
+${["vendor/pixi.min.js", "vendor/pixi-unsafe-eval.min.js", "vendor/live2dcubismcore.min.js", "vendor/cubism4.min.js", "avatar/live2dMapping.js", "avatar/vowelEstimator.js", "avatar/live2dAssets.js", "avatar/live2dModelDriver.js", "live2dRuntimeController.js", "avatar/live2dRenderer.js", "avatar/avatarRuntime.js"].map(f => `<script src="/${f}"></script>`).join("")}
 <script>(async()=>{try{
 const state={uiView:'full',config:{},baseTransform:{x:780,y:450,rotation:0},availableMotionGroups:[],ttsAudioLevel:0};
 const controller=TaffyLive2DRuntimeController.createController({state,windowObject:window,documentObject:document,setModelMotionDefinitions(m){state.availableMotionGroups=Object.keys(m.internalModel.motionManager.definitions);},
@@ -36,27 +36,6 @@ window.QA={state,core,async capture(frame,label){
  try{if(!state.avatarRenderer.playAction(name)||!await pending)throw Error('motion failed '+name);
  for(let i=0;i<25;i++){virtualNow+=1000/60;state.model.update(1000/60);state.pixiApp.renderer.render(state.pixiApp.stage);}return true;}
  finally{state.model.motion=original;}
-},async browserPlayback(){
- const oldGetter=window.getSpeechAnimationMouthOpen;let utterance;
- const synthesis={speaking:false,resume(){},cancel(){this.speaking=false;},speak(value){utterance=value;this.speaking=true;}};
- const host={speechSynthesis:synthesis,setTimeout:()=>0,clearTimeout(){},XinyuBrowserLipSync};
- const mouth=TaffyLive2DExpressionController.createController({state,windowObject:host,performanceObject:performance,isSpeakingNow:()=>synthesis.speaking,isSpeechMotionActive:()=>synthesis.speaking});
- const playback=TaffyTTSPlaybackController.createController({state,windowObject:host,performanceObject:performance,
-  isCurrentTTSPlaybackGeneration:value=>value===state.ttsPlaybackGeneration,buildSpeakProsody:()=>({}),
-  beginSpeechAnimation:(text,mood,style)=>mouth.beginSpeechAnimation(text,mood,style,{durationMs:500}),
-  finishSpeechAnimation:mouth.finishSpeechAnimation,endSpeechAnimation:mouth.endSpeechAnimation});
- const tick=()=>{virtualNow+=1000/60;state.model.update(1000/60);state.pixiApp.renderer.render(state.pixiApp.stage);return renderedValues.ParamA;};
- window.getSpeechAnimationMouthOpen=mouth.getSpeechAnimationMouthOpen;
- window.dispatchEvent(new CustomEvent('avatar-intent',{detail:{frame:{}}}));
- state.ttsPlaybackGeneration=42;state.speakingEnabled=true;
- try{
-  const pending=playback.speakOnceWithVoice('Long actual speech, short animation estimate.',null,{force:true,playbackGeneration:42});
-  const pendingMouth=tick();utterance.onstart();const guardedMouth=tick();
-  virtualNow+=4000;const tail=[];for(let i=0;i<80;i++)tail.push(tick());
-  utterance.onpause();const pausedMouth=tick();virtualNow+=500;utterance.onresume();
-  synthesis.speaking=false;utterance.onend();const endedMouth=tick();await pending;
-  return {pendingMouth,guardedMouth,tailVariation:Math.max(...tail)-Math.min(...tail),pausedMouth,endedMouth};
- }finally{window.getSpeechAnimationMouthOpen=oldGetter;}
 }};
 window.QAReady=true;
 }catch(e){window.QAError=e.stack;console.error(e);}})();</script>`;
@@ -104,26 +83,10 @@ const server = http.createServer((req, res) => {
       const values = await page.evaluate(name => QA.capture({ face: "happy", faceIntensity: .5, mouth: { open: 0 }, speechGesture: { name, phase: .5 } }, "手臂手势：" + name), gesture);
       await page.screenshot({ path: path.join(output, `gesture-${gesture}.png`) }); evidence.cases.push({ name: `gesture-${gesture}`, values });
     }
-    evidence.browserTtsFallback = await page.evaluate(async () => {
-      QA.state.speechMouthOpen = .6; QA.state.ttsAudioLevel = 0;
-      const browser = await QA.capture({}, '无频谱浏览器语音张合回退');
-      QA.state.ttsAudioAnalyser = {};
-      const silence = await QA.capture({}, '有音频分析时静音闭嘴');
-      delete QA.state.ttsAudioAnalyser; QA.state.speechMouthOpen = 0;
-      return { browserOpen: browser.ParamA, analysedSilence: silence.ParamA };
-    });
-    assert.equal(evidence.browserTtsFallback.browserOpen, Math.fround(.6));
-    assert.equal(evidence.browserTtsFallback.analysedSilence, 0);
     evidence.motions = [];
     for (const name of ["sentence_release", "thoughtful_glance", "nod", "happy_bounce", "attentive_tilt", "speak_emphasis", "poked", "shy_glance"]) {
       assert.equal(await page.evaluate(name => QA.motion(name), name), true); evidence.motions.push(name);
     }
-    evidence.browserPlayback = await page.evaluate(() => QA.browserPlayback());
-    assert.equal(evidence.browserPlayback.pendingMouth, 0);
-    assert.equal(evidence.browserPlayback.guardedMouth, 0);
-    assert.ok(evidence.browserPlayback.tailVariation > .3);
-    assert.equal(evidence.browserPlayback.pausedMouth, 0);
-    assert.equal(evidence.browserPlayback.endedMouth, 0);
     await page.evaluate(() => { QA.state.avatarRuntime.dispose(); QA.state.avatarRuntime.dispose(); });
     assert.deepEqual(evidence.errors, []); evidence.authorizedResources = authorized; evidence.unauthorizedRejected = rejected;
     fs.writeFileSync(path.join(output, "mao-evidence.json"), JSON.stringify(evidence, null, 2));

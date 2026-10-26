@@ -1,6 +1,34 @@
 {
   "features": [
     {
+      "id": "avatar-live2d-pr217-closeout",
+      "name": "Rebase integration boundary and exact Hiyori video for PR217",
+      "status": "completed",
+      "dependencies": [
+        "avatar-live2d-stage2",
+        "avatar-painted-backdrop-v1"
+      ],
+      "scope": [
+        "Priority1 per user: latest main79ee80f including#221/#222, exact Core6 Hiyori, dedicated video, normal push and ready; author merges",
+        "Remove previously mixed lipsync product changes by inverse patch; preserve history and local installed120ms until independent shared PR",
+        "Do not start LLM task phase2 before author merges#217"
+      ],
+      "done_criteria": [
+        "Latest main merged with VRM features retained",
+        "Strict Node and browser complete ordered-write snapshots and full/package checks pass",
+        "Dedicated Hiyori inspection video delivered locally; no model/private assets committed",
+        "Existing PR217 updated/pushed/ready; separate main-based lipsync branch next"
+      ],
+      "next": "Normal push/ready PR217 and deliver local Hiyori video; author reviews/merges. Shared lipsync proceeds only in a separate main-based branch.",
+      "verification": [
+        "Merged latest main79ee80f (#221/#222) as8d514b7; retained both VRM and Live2D integration.",
+        "Exact same-Core Node5280frames/394224calls/42scenes; browser1030frames/167741calls, all snapshots/four PNG pairs identical and10 reloads clean.",
+        "Full scripts/test-local.ps1:861 Python passed/3 skipped,72 Node files,syntax186/239,secrets834;docs4,package smoke,JSON/py_compile pass.",
+        "Dedicated38.4s silent realHiyori/Pixi/Core6 video retained outsideGit; browser fixture is not native Windows/liveTTS acceptance.",
+        "Prior browser mouth fix removed from PR217 product via normal inverse patches; installed120ms preserved locally; new independent main-based PR required."
+      ]
+    },
+    {
       "id": "avatar-mao-browser-lip-sync",
       "name": "Mao browser speech mouth starts and ends with actual playback",
       "status": "completed",

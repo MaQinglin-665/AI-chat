@@ -77,13 +77,7 @@
   function frameFromState(state, now, wallNow = Date.now(), prepareMs = 1100) {
     const remote = state.uiView === "model";
     const fresh = !remote || (now - Number(state._broadcastSpeechUpdatedAt || 0) < 900);
-    let level = fresh ? clamp(state.ttsAudioLevel) : 0;
-    const analysed = remote ? state.ttsAudioAnalysisAvailable === true
-      : !!state.ttsAudioAnalyser || (state.ttsPcmAudioAnalyserActive === true && !!state.ttsPcmAudioAnalyser);
-    // Browser speech synthesis exposes no spectrum. Use its existing portable
-    // mouth envelope only for mapped Live2D and only without real audio analysis;
-    // genuine analysed silence must remain closed. Hiyori/VRM stay unchanged.
-    if (fresh && state.avatarMapping?.driver === "mapped" && !analysed) level = Math.max(level, clamp(state.speechMouthOpen));
+    const level = fresh ? clamp(state.ttsAudioLevel) : 0;
     const age = wallNow - Number(state.conversationLastAssistantAt || 0);
     const preparingSpeech = age >= 0 && age < prepareMs;
     return { now, preparingSpeech, mode: level > 0.02 ? "speak" : "idle",
@@ -112,7 +106,7 @@
     showMetadata({ ...source, metadata: source.metadata || renderer.metadata });
     const paintedPanel = root.document.getElementById("painted-scene-options");
     if (paintedPanel) paintedPanel.hidden = source.scene !== "painted" || state.uiView !== "full";
-    const paintedControls = ["reflection", "grid"].map(name => {
+    const paintedControls = source.kind === "vrm" ? ["reflection", "grid"].map(name => {
       const input = root.document.getElementById("painted-" + name);
       if (!input) return null;
       let value = source.painted?.[name] ?? (name === "reflection");
@@ -121,7 +115,7 @@
       const change = () => { renderer.setPaintedOptions?.({ [name]: input.checked });
         try { root.localStorage?.setItem("xinyu.painted." + name, String(input.checked)); } catch (_) { /* Session-only setting. */ } };
       input.addEventListener("change", change); return () => input.removeEventListener("change", change);
-    });
+    }) : [];
     root.document.body.dataset.avatarKind = source.kind;
     if (state.uiView === "model") {
       root.document.documentElement.classList.add("transparent-mode", "alpha-true");

@@ -30,9 +30,9 @@ for(const name of ['addParameterValueByIndex','addParameterValueById','setParame
 const modelUpdate=state.model.update;state.model.update=function(...args){writes.push(['model.update',...args]);return modelUpdate.apply(this,args);};
 window.QA={state,controller,core,
 async motion(){await state.model.motion(state.availableMotionGroups[0],0,3);state.hiyoriAuthoredMotionUntil=virtualNow+3000;state.hiyoriAuthoredMotion={playbackGeneration:state.ttsPlaybackGeneration};},
-run({name,count,begin,action,mode,drag,active=true}){
+run({name,count,begin,action,mode,drag,active=true,holdSpeech=false}){
  if(begin){speaking=true;controller.beginSpeechAnimation('Let us think, pause, and answer!', 'idle','neutral',{durationMs:30000,performanceCue:{emotion:begin,action:'none',speech:{holdMs:500}}});}
- else speaking=false;
+ else if(!holdSpeech)speaking=false;
  if(action)controller.triggerSemanticAction(action,{now:virtualNow,force:true});
  state.dragData=drag?{}:null;state.rendererSurfaceActive=active;
  const frames=[];
@@ -69,6 +69,34 @@ let frames=0,writes=0;for(const scenario of [{name:'idle',count:180},{name:'list
  await pages[i].screenshot({path:path.join(out,scenario.name+(i?'-after-process':'-before-process')+'.png')});}
  assert.equal(hashes[0],hashes[1],'canvas PNG differs: '+scenario.name);evidence.cases.push({name:scenario.name,pngSha256:hashes[0],exact:true});}
  console.log('EXACT '+scenario.name+' '+a.length+' frames');}
+// Optional dedicated inspection recording, separate from strict assertions.
+// Fixed logical steps are paced in wall time; this is visual review, not an FPS
+// benchmark or native Windows desktop/audio capture.
+if(process.env.AVATAR_QA_RECORD==='1'){
+ const context=await browser.newContext({viewport:{width:1150,height:850},deviceScaleFactor:1,
+  recordVideo:{dir:path.join(out,'recording'),size:{width:1150,height:850}}});
+ const page=await context.newPage();
+ page.on('pageerror',error=>evidence.errors.push(error.stack));
+ await page.goto('http://127.0.0.1:'+server.address().port+'/qa',{waitUntil:'networkidle'});
+ await page.waitForFunction(()=>window.QAReady||window.QAError,null,{polling:100,timeout:30000});
+ assert.equal(await page.evaluate(()=>window.QAError),undefined);
+ await page.evaluate(()=>{document.querySelector('h1').textContent='Hiyori · #217 检查录像';
+  document.querySelector('aside p').textContent='最新 main 合并后 · 原 Pixi 时钟 / Core6';});
+ const scenes=[{name:'待机 / idle',seconds:3},{name:'倾听 / listen',seconds:3,mode:'listen'},
+  {name:'思考 / think',seconds:3,mode:'think'},{name:'说话 / playful',seconds:5,begin:'playful'},
+  {name:'点头 / nod_double',seconds:3,action:'nod_double'},{name:'官方动作 / authored motion',seconds:4,native:true},
+  {name:'拖拽期间 / drag guard',seconds:2,drag:true},{name:'恢复 / release',seconds:3}];
+ for(const scene of scenes)await page.evaluate(async(scene)=>{
+  if(scene.native)await QA.motion();
+  for(let i=0;i<scene.seconds*30;i++){
+   QA.run({...scene,count:2,begin:i===0?scene.begin:undefined,action:i===0?scene.action:undefined,
+    holdSpeech:!!scene.begin,active:true});
+   await new Promise(resolve=>setTimeout(resolve,33));
+  }
+ },scene);
+ const video=page.video();await context.close();await video.saveAs(path.join(out,'hiyori-pr217-inspection.webm'));
+ evidence.recording={file:'hiyori-pr217-inspection.webm',scenes,scope:'Silent controlled real-Pixi/Core Hiyori inspection; isolated browser, not native desktop or real speech capture.'};
+}
 // Reload the real renderer ten times on the same canvas, exercising texture,
 // model, ticker and DOM cleanup rather than only a fake renderer lifecycle.
 evidence.reloads=await pages[1].evaluate(async()=>{
