@@ -39,6 +39,7 @@
       ],
       "launcher_status": "independent local launcher commit 6adf36b complete; seven targeted Windows tests and full local gate passed",
       "display_status": "compatibility commit 2f3500b pushed; browser pixel comparison and full local gate passed; awaiting stage 1 confirmation, keeping new Core local",
+      "ci_followup": "Reproduced PR Windows CP437 Chinese output loss; repaired redirected output only. 13 launcher tests and full gate pass (818 Python passed/2 skipped, 60 Node suites, syntax/secrets). Updated same draft PR; consult GitHub for current CI state.",
       "publication": {
         "pull_request": "https://github.com/MaQinglin-665/AI-chat/pull/217",
         "draft": true,

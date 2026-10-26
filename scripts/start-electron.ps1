@@ -1,4 +1,9 @@
 ﻿$ErrorActionPreference = "Stop"
+# An English Windows host can otherwise replace Chinese with '?' in captured
+# output. Keep interactive console settings intact; only use UTF-8 for pipes.
+if ([Console]::IsOutputRedirected) {
+    [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+}
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RepoRoot
 . (Join-Path $PSScriptRoot "node-runtime.ps1")

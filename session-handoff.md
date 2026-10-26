@@ -1,5 +1,10 @@
 # Session handoff
 
+## Current follow-up — PR #217 Windows output encoding (2026-10-26)
+- User asks to check the PR. At head f641cbf both Windows jobs failed the three new launcher tests because CP437 redirected output replaced Chinese with question marks; exit 37 and batch pause still worked. Python/Linux, Node, docs and quality jobs passed. PR stays draft/open/unmerged, with no reviews or comments.
+- Narrow repair: scripts/start-electron.ps1 sets UTF-8 only when stdout is redirected; source BOM retained and interactive settings untouched. tests/test_node_runtime.py now exercises actual helper and batch failures under CP437/CP936/UTF-8. Explicit -Command wrapper exit preserves the tested original code; batch starts in a checkout path containing spaces.
+- Verification Evidence: reproduced all three CP437 failures before the product fix; all 13 targeted tests pass after it. Full scripts/test-local.ps1 passes: 818 Python passed/2 skipped, 60 Node suites, Python181/JS205 syntax and secrets766. JSON/py_compile and BOM checks pass. Log outside Git at work/avatar-pr217-encoding-full-tests.log. Commit/push this repair to the same draft PR, consult GitHub for current CI state and wait for the new checks before reporting success. No stage 2, Core/model upload, main push, force push or merge.
+
 ## Published stage 1 checkpoint — draft PR #217 (2026-10-25)
 - User explicitly requested GitHub upload after the local stage 1 report. Pushed friend/avatar-live2d-adapter normally and created draft PR https://github.com/MaQinglin-665/AI-chat/pull/217 to main; attached to this task. Implementation commits are 6adf36b and 2f3500b. A state-only publication checkpoint follows those two independent implementation commits.
 - This later instruction authorizes branch publication despite the earlier stage 1 no-push checkpoint. It does not authorize stage 2/3, ready-for-review, main push, force push or merge. PR describes current Core staying unchanged, new Core/model/screenshots excluded, limited display compatibility and all local validation.

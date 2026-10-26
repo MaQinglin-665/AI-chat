@@ -106,15 +106,18 @@ def _launcher_output(result):
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell launcher")
 @pytest.mark.parametrize("lockfile,mode", [(True, "ci"), (False, "install")])
-def test_npm_failure_reports_chinese_guidance_preserves_mode_and_mirror(tmp_path, monkeypatch, lockfile, mode):
+@pytest.mark.parametrize("code_page", [437, 936, 65001])
+def test_npm_failure_reports_chinese_guidance_preserves_mode_and_mirror(tmp_path, monkeypatch, lockfile, mode, code_page):
     shell = shutil.which("powershell")
     if not shell:
         pytest.skip("Windows PowerShell is required")
     root, node_home = _npm_failure_checkout(tmp_path, lockfile=lockfile)
     monkeypatch.delenv("TAFFY_NODE_HOME", raising=False)
     monkeypatch.setenv("ELECTRON_MIRROR", "https://example.test/electron/")
+    script = str(root / "scripts/start-electron.ps1").replace("'", "''")
+    command = f"[Console]::OutputEncoding = [Text.Encoding]::GetEncoding({code_page}); & '{script}'; exit $LASTEXITCODE"
     result = subprocess.run(
-        [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(root / "scripts/start-electron.ps1")],
+        [shell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
         capture_output=True, timeout=30, check=False, creationflags=subprocess.CREATE_NO_WINDOW,
     )
     output = _launcher_output(result)
@@ -127,7 +130,8 @@ def test_npm_failure_reports_chinese_guidance_preserves_mode_and_mirror(tmp_path
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows batch pause integration")
-def test_batch_npm_failure_reaches_pause_and_preserves_exit_code(tmp_path, monkeypatch):
+@pytest.mark.parametrize("code_page", [437, 936, 65001])
+def test_batch_npm_failure_reaches_pause_and_preserves_exit_code(tmp_path, monkeypatch, code_page):
     shell = shutil.which("powershell")
     if not shell:
         pytest.skip("Windows PowerShell is required")
@@ -143,11 +147,12 @@ def test_batch_npm_failure_reaches_pause_and_preserves_exit_code(tmp_path, monke
     # Reproduce double-click failure without requiring global Node or installing anything.
     monkeypatch.setenv("PATH", os.pathsep.join([str(Path(shell).parent), str(Path(os.environ["SystemRoot"]) / "System32")]))
     result = subprocess.run(
-        [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", str(root / "start_electron.bat")],
-        input=b"\n", capture_output=True, timeout=30, check=False, creationflags=subprocess.CREATE_NO_WINDOW,
+        [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", f"chcp {code_page} & call start_electron.bat"],
+        cwd=root, input=b"\n", capture_output=True, timeout=30, check=False, creationflags=subprocess.CREATE_NO_WINDOW,
     )
     output = _launcher_output(result)
     assert result.returncode == 37, output
+    assert str(code_page) in output, output
     assert "npm 安装失败" in output
     assert "Review the error and installation guidance above" in output
     assert "press any key" in output.lower() or "按任意键" in output, output
