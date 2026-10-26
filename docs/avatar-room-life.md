@@ -1,3 +1,5 @@
+> 后续镜头稳定与程序步态改进：[avatar-motion-camera.md](avatar-motion-camera.md)。
+
 > 新增可选手绘预设：见 [avatar-room-handpainted.md](avatar-room-handpainted.md)。默认仍为 room。以下保留 KayKit/初版记录。
 
 # 房间生活感 v1

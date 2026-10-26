@@ -31,7 +31,7 @@
     const legs={};
     for(const side of ['left','right']){
       const thigh=pos(side+'UpperLeg'),knee=pos(side+'LowerLeg'),ankle=pos(side+'Foot');if(!thigh||!knee||!ankle)return null;
-      legs[side]={upper:thigh.distanceTo(knee),lower:knee.distanceTo(ankle),ankle:Math.max(SETTINGS.ankleMin,ankle.y-floorY),
+      legs[side]={lateral:avatarRoot.worldToLocal(thigh.clone()).x,upper:thigh.distanceTo(knee),lower:knee.distanceTo(ankle),ankle:Math.max(SETTINGS.ankleMin,ankle.y-floorY),
         footRotation:bone(side+'Foot').getWorldQuaternion(new T.Quaternion())};
     }
     return {hipsY:hips.y,legs,padding:Math.min(legs.left.upper,legs.right.upper)*SETTINGS.pelvisPadding};

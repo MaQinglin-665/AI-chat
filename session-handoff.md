@@ -1,10 +1,13 @@
-# Hand-painted room preset — 2026-10-26
+# Camera and motion — 2026-10-26
 
-Branch codex/avatar-room-handpainted-v1 from origin/main 0542d04; local main 0a06554 and private config/model unchanged.
-Scope: coexist with default KayKit room and none; shared scene lifecycle, world scheduling/paths, seated contacts and cameras.
-Asset license.txt verifies CC BY 4.0, OzerGokmen; copied only geometry/base-color maps/attribution. Original private VRM never included.
-Read docs/avatar-room-handpainted.md for scale/cutaway details and verification.
-Touched: avatar_assets.py scene enum; avatar renderer/scene/world/seating/furniture integration and new handpainted module; tests/package check and notices/state docs. No dialogue, memory or external-execution changes.
-Verification: full gate 830 passed/3 skipped plus all Node/syntax/secrets; first-run package hash checks passed after exact public scene.bin ignore exception. Real Electron both presets/day/night/four activities, ten stable resource cycles and forced-load-failure fallback; no page errors. Ignored handpainted-*.png and handpainted-tour.mp4 (35s). Private config hash unchanged.
-Limitations: baked lighting/reflections, cutaway shell and inherited hand-pose issues; real VRM1 not visually tested.
-Next: user visual review of draft PR; default room unchanged. Do not merge.
+Branch codex/avatar-motion-camera-v1 from origin/main 0542d04, with user-authorized #220 b22d4ef included for both presets. Local main 0a06554 unchanged; private config hash unchanged. No private model/media committed. No dialogue, memory, external-execution or Live2D changes.
+
+Implemented root-only critical spring/dead-zone camera, fixed activity targets; safe rounded routes with curvature braking, layered turning, 700ms eased pose transitions, seeded speed/amplitude/pause variation, distance-based gait and measured planted-foot IK. Report: docs/avatar-motion-camera.md.
+
+Verification: full local gate (830 passed, 3 skipped; all Node/syntax/secrets), plus package smoke passed. Final gate rerun after last gait-clearance tuning passed; see ignored motion-full-tests.log. Camera simulation jitter 6.608mm -> 0 at 20 FPS, 0.1mm threshold; all-pairs trajectory max 1.517rad/s < 2.2; synthetic VRM0/1 short/long legs stable. Real Electron VRM0 both presets: fixed 30Hz simulation/10fps capture, four 45s before/after videos, no page errors; stable seated camera sample delta 6.073/6.008mm -> zero. After videos each have 14 walking samples with no unreachable foot targets. Captures/probes in ignored tmp_ui_smoke/avatar-vrm-polish.
+
+CMU 2a: skipped by explicit user instruction after connection-reset retries. Not evaluated. Actual attempted URL and future D:/AI/local-assets/mocap/cmu/ workflow documented; no data integrated.
+
+Files: vrmCamera/vrmLocomotion new; vrmWorld, vrmRenderer, vrmSeating, index wiring; two Node suites/runner; report, room-life link and state. Prior handoff archived at docs/archive/session-handoff-handpainted-20261026.md.
+
+Next: publish feature branch and draft PR to main after final gate, then wait for user visual review. Do not merge; #220 remains a separate draft. Limits: real VRM1 not visually tested, no full-body/clothing collisions, existing desk/window hands still deferred. Recordings are controlled rendering, not a performance benchmark or live speech acceptance.
