@@ -1,15 +1,11 @@
-# Session handoff
+# Session handoff — VRM scene integration (2026-10-25)
 
-## API rejection body drain (2026-10-25)
+Branch codex/avatar-vrm-basic. User passed visual acceptance and explicitly authorized PR #216 merge with --merge --admin on 2026-10-25, after local/package checks and all Linux/Windows CI pass. This supersedes earlier draft-only restrictions. Previous handoff archived in docs/archive/session-handoff-avatar-vrm-before-room-20261025.md.
 
-Branch: codex/fix-api-reject-drain-body, based on main b9d9354c237b43e353d066a97ef7309e2434267f. PR #214 merged with all Linux and Windows checks green. Earlier integration handoff preserved in docs/archive/2026-10-25-before-api-drain-handoff.md.
+Changed vrmRenderer.js: separate LIGHT.room/LIGHT.pet, warm upper-right key, violet environment/pink rim, in-shader room-only desaturation/exposure; 15-degree body turn and head return, asymmetric hip/shoulder stance, relaxed shoulders/arm/fingers; neutral 0.18 smile, deterministic saccades, 27-degree elevated camera. All new tuning is at file top. avatarRuntime passes view and reads existing assistant timestamp, broadcasts a brief preparation expression; no chat-generation/voice/history modifications. Tests/docs and feature state updated.
 
-User authorizes a bounded request-body drain before token/origin denial, tests, push and a PR, then merge commit only after all CI passes. No force push, direct main push, branch deletion, tags, releases or private configuration changes. Stop on unexpected test/CI failure. DNS push failures: retry at 10-second intervals, at most five attempts.
+User authorized closing/restarting the existing Electron instance. Actual VRM0 before/after screenshots: ignored tmp_ui_smoke/avatar-vrm-polish/room-before-full.png, room-after-full.png, room-after-pet.png. Before uses a test-only route serving committed 321fc17 renderer, without reverting source. Never upload model images. Model SHA-256 unchanged. Real VRM1 appearance and live LLM/TTS preparation timing remain unverified.
 
-Files touched: app.py, tests/test_api_health.py, tests/test_request_body_drain.py and these state records. Drain is limited to 1 MiB and a two-second deadline; invalid/oversized/ambiguous framing closes the connection without reading. No authorization defaults changed. Targeted tests: 38 passed, including 30 unauthorized 64-KiB POSTs and 30 disallowed-origin POSTs with complete JSON responses.
+The user-requested record audit found the selected stored message already has role=user and UI maps it consistently. No matching assistant record or role-flip path found. History does not retain keyboard/ASR provenance, so do not claim which input source generated it. No private chat content/record copied into tracked files or edited.
 
-Verification Evidence: full scripts/test-local.ps1 passed: 809 Python passed, 2 skipped; Node suites, Python/JavaScript syntax and secret scan passed. Required JSON and py_compile checks passed. Log: ignored tmp_ui_smoke/task6/drain-body-full-tests.log.
-
-Next: submit PR to main, require all CI then --merge --admin. Fetch merged main and rerun scripts/test-local.ps1. Final report must include both merge hashes and final main hash.
-
-Limitations: malformed, oversized or stalled clients may still see connection closure; stable JSON delivery regression covers complete bounded bodies. Prior external-agent metadata verification followups and blocked isolated-directory cleanup remain unchanged.
+Verification: targeted pose/finger/camera/room-grading/saccade/smile and one-time preparation broadcast tests pass. Full validation result recorded in progress.md; logs ignored under tmp_ui_smoke/avatar-vrm-polish/room-tests-final.log. Merge preparation: git fetch origin succeeded after TLS retries; origin/main 5b20358 is already contained, so no merge/conflicts. scripts/test-local.ps1 passed (825/3), scripts/check_first_run_package.ps1 passed. Push acceptance state, mark ready, wait all CI, merge commit, then validate exact newest origin/main. Local main contains an unrelated 0a06554 commit: preserve it and test origin/main in detached HEAD rather than resetting it. No direct main push, force push, model or private config changes.

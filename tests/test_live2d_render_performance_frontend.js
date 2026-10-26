@@ -72,6 +72,7 @@ async function run() {
     addEventListener() {}
   };
   const documentObject = {
+    body: { dataset: {} },
     getElementById: () => ({ id: "live2d-canvas" })
   };
   const controller = runtimeModule.createController({
@@ -93,6 +94,7 @@ async function run() {
   });
 
   await controller.initLive2D();
+  assert.strictEqual(documentObject.body.dataset.avatarReady, "true");
 
   assert.strictEqual(applicationOptions.antialias, false, "full-window Live2D should not pay for redundant MSAA");
   assert.strictEqual(applicationOptions.powerPreference, "high-performance");

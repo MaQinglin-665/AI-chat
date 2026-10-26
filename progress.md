@@ -266,3 +266,40 @@ Full scripts/test-local.ps1 passed (log tmp_ui_smoke/task6/merge-213-tests.log).
 Verification Evidence: targeted pytest tests/test_request_body_drain.py tests/test_api_health.py: 38 passed. Includes 30 large unauthorized POSTs, 30 disallowed-origin POSTs, missing configured token, byte limit, invalid length, duplicate/chunked framing, truncation and timeout coverage. Full gate pending.
 
 Verification Evidence: full scripts/test-local.ps1 passed (809 Python passed, 2 skipped; Node suites, Python/JavaScript syntax and secret scan passed). Required config.example.json/package.json parsing and py_compile passed. Ignored log: tmp_ui_smoke/task6/drain-body-full-tests.log. Next: push scoped fix, open PR and require all CI before merge; rerun full gate on final main. Remaining risk: invalid, oversized or stalled clients are closed rather than guaranteed a complete rejection response.
+
+
+## 2026-10-25 — VRM basic renderer
+
+Based on fetched origin/main 5b20358; local main divergence preserved. Added restricted read-only avatar API, pinned local three.js/three-vrm vendor, independent intent renderer/runtime, attribution UI and synthetic tests. Private model remains outside repo, screenshots only in ignored tmp_ui_smoke/avatar-vrm.
+
+Verification Evidence: Node fake VRM mapping/actions/fallback passed; Python path/meta tests 13 passed, 1 symlink privilege skip, including real Windows junction rejection. Isolated Electron 39.8.10 VRM0 render/alpha/actions/amplitude/metadata verified, Hiyori regression rendered. Performance and limitations in docs/avatar-vrm-basic.md. Full gate and packaging checks pending. No dialogue/memory/external-agent changes; no private configuration accessed. Draft PR only.
+
+Final Verification Evidence: scripts/test-local.ps1 passed: 825 passed/3 skipped, all Node suites, Python/JS syntax, secret scan. scripts/check_first_run_package.ps1 passed, including preview defaults and source package smoke. JSON/py_compile pre-push checks passed. Final test logs and all model captures only in ignored tmp_ui_smoke/avatar-vrm. Next: draft PR and user Windows review; no merge authorization.
+
+
+## 2026-10-25 — VRM performance and deterministic motion
+
+Diagnosed real full/pet Electron windows before editing. Pet full-mesh hit testing averaged 101.75ms, consuming almost the entire renderer thread; replaced with projected bone capsules (~0.012ms). Added 900k pixel budget, 20/30 FPS cadence, inactive suspension and runtime cleanup. Added 72-degree standing arms, deterministic seeded idle/speech/small motions, action recovery, height-based framing and key/fill lighting. No model/private config/dialogue/memory/external-execution changes.
+
+Verification Evidence: actual full-window idle GPU 15.99% to 6.97%; pet idle 6.27 to 20.20 FPS and simulated speech 6.46 to 29.97 FPS. Memory essentially unchanged; pet GPU increased with restored frame rate. Read-only texture inspection: 36, max 2048x2048, no resizing needed. Full report docs/avatar-vrm-performance.md. Private before/after/speaking/small-motion captures only in ignored tmp_ui_smoke/avatar-vrm-polish. First full gate passed 825/3; runtime lifecycle test subsequently registered in Node runner, final gate pending. PR #216 must remain draft; user visual review next.
+
+Final follow-up verification: scripts/test-local.ps1 passed (825 passed, 3 skipped; registered runtime lifecycle suite and all Node tests passed, syntax/secrets passed). Required JSON/py_compile checks passed. Evidence: ignored tmp_ui_smoke/avatar-vrm-polish/full-tests-final.log. GitHub API connection failed five attempts, with 10-second retry intervals; stopped network operations. Changes committed locally; push/PR description update remains pending. Do not mark PR ready or merge. Resume with normal push of codex/avatar-vrm-basic and verify #216 is still draft.
+
+
+## 2026-10-25 — VRM edges and detached pet presentation
+
+Smoothed VRM cutout/outline edges using MSAA, explicit premultiplied transparent output and DPR >=1; retained authored MToon outline/color. Reduced key/ambient lights. Located missed decorations in index.html/kawaii-stage-decor: full/chat already hide them, model did not. visualPolish.css now hides the same layer in both VRM/Hiyori pet views, positions the Chinese status label at bottom-left, and fades it three seconds after readiness. Model files and private configs untouched; model SHA-256 unchanged.
+
+Verification Evidence: real Electron at 1708x1068, idle 20.16 -> 19.93 FPS, GPU 2.97% -> 0.86%, including removed animation/compositor cost. Both VRM and Hiyori real windows: decoration display none, label 馨语, left 12px, ready opacity 1 -> 0 after 3.6s. Local-only before/after edge+lighting captures and measurements in ignored tmp_ui_smoke/avatar-vrm-polish. Full report docs/avatar-vrm-performance.md. First full test run exposed missing document.body in the old fake Live2D test; fixture corrected and readiness assertion added. Final scripts/test-local.ps1 passed: 825 passed/3 skipped, all Node, syntax, secret scan; required JSON/py_compile passed. PR #216 verified open/draft; normal push authorized, no merge.
+
+
+## 2026-10-25 — VRM room integration and relaxed stance
+
+Added separate room/transparent-pet light presets, room-only shader brightness/saturation grading, 15-degree body turn with head return and asymmetric relaxed posture/fingers, idle smile/deterministic saccades/reply preparation, and elevated 27-degree framing. New tuning in vrmRenderer.js constants. avatarRuntime reads existing reply timestamps and uses its existing channel; no dialogue/voice/history changes. Audited the user-selected stored record: role=user matches the rendered label; source provenance is unavailable, so no speculative history migration or role fix performed. Private content not copied into tracked artifacts.
+
+Verification Evidence: final scripts/test-local.ps1 passed (825 Python passed, 3 skipped; all Node, syntax and secret checks passed). New tests cover framing projection, finger/pose recovery, material isolation, smile/saccades and one-shot reply preparation broadcast. Real Electron VRM0 full before/after and neutral-pet captures inspected in ignored tmp_ui_smoke/avatar-vrm-polish/room-*.png. Baseline renderer served from 321fc17 only by test interception. Model hash unchanged. Required JSON/py_compile checks passed. No new real VRM1 or live LLM/TTS acceptance claimed. PR #216 remains draft for user review.
+
+
+## 2026-10-25 — PR #216 accepted, merge preparation
+
+User passed visual review and explicitly authorized --merge --admin after required gates, superseding draft-only restriction. Fetched origin successfully on fourth attempt after TLS errors. Latest origin/main 5b20358 already contained in avatar branch; git merge reported up-to-date, no conflicts. Verification Evidence: scripts/test-local.ps1 passed (825 passed, 3 skipped; all Node/syntax/secrets); scripts/check_first_run_package.ps1 passed. Logs in ignored tmp_ui_smoke/avatar-vrm-polish/merge-local-tests.log and merge-package-check.log. Acceptance-only state update; no runtime changes. Next: ready PR, all current-head Linux/Windows CI green, merge commit, then final exact origin/main gate. Preserve unrelated local main commit 0a06554; no reset or private config modification.

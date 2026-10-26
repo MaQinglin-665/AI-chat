@@ -150,3 +150,18 @@ body.visual-polish #translation-chip-btn:focus-visible {
 body.visual-polish.view-full .utility-actions > :is(#pet-mode-btn,#scene-btn,#more-btn):focus-visible {
  background:var(--night-raised) !important; color:var(--lamp) !important; border-color:var(--line) !important;
 }
+
+/* The same decorative layer was removed from full/chat views; detached pets need the rule too. */
+body.view-model .kawaii-stage-decor { display: none !important; }
+body.view-model .pet-presence {
+  left: 12px; top: auto; bottom: 12px; transform: none;
+  max-width: calc(50vw - 24px); min-width: 0;
+  opacity: 1;
+}
+body.view-model[data-avatar-ready="true"] .pet-presence {
+  animation: pet-ready-fade 400ms ease 3s forwards;
+}
+@keyframes pet-ready-fade { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  body.view-model[data-avatar-ready="true"] .pet-presence { animation-duration: 1ms; }
+}
