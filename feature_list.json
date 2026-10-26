@@ -1,9 +1,40 @@
 {
   "features": [
     {
+      "id": "avatar-live2d-stage2",
+      "name": "Live2D adapter through the shared avatar runtime",
+      "status": "in_progress",
+      "dependencies": [
+        "avatar-live2d-stage1",
+        "avatar-vrm-basic",
+        "avatar-3d-room-v1"
+      ],
+      "scope": [
+        "User confirms stage 1 author acceptance; preserve VRM during main merge",
+        "One avatarRuntime factory, frameFromState and avatar-intent path; no parallel selector",
+        "Core 6 local comparison only, no Core/model upload; preserve Hiyori numeric behavior"
+      ],
+      "done_criteria": [
+        "Author confirms the shared runtime clock/lifecycle proposal before implementation",
+        "Mapping-based Live2D renderer and exact old/new parameter write snapshots",
+        "Full local/VRM regressions pass; publish draft PR and wait for Windows review"
+      ],
+      "blockers": [
+        "Current runtime is VRM-specific; user requires a proposal before structural integration",
+        "Core4/Core6 fixed-input pixels are close but not identical; author must decide acceptance before any Core commit"
+      ],
+      "verification": [
+        "Merged origin/main 2356ddb as 97ceb92; only the four authorized conflict files; all content/VRM notices retained",
+        "Read VRM basic/room docs, intent interface and actual runtime; four targeted Node groups passed",
+        "Both actual repository Core4 and temporary official Core6: all 63 existing Node files passed; original Core restored",
+        "Browser Hiyori works with both; fixed-input visible differences 49/13/6 pixels, max geometry delta 0.0000012069940567016602"
+      ],
+      "next": "Stop implementation per user condition; review proposal/report in existing draft PR #217; only merge and documentation checkpoint, no adapter/mapping implemented"
+    },
+    {
       "id": "avatar-live2d-stage1",
       "name": "Live2D adapter prerequisite stage: launcher recovery and official Cubism Core compatibility",
-      "status": "in_progress",
+      "status": "completed",
       "scope": [
         "Stage 1 only; two independent implementation commits after required interface is available",
         "Restore friendly installation failure guidance without reverting portable Node/venv support",
@@ -15,10 +46,7 @@
         "Commit display compatibility independently after Hiyori/full test validation; new Core redistribution remains deferred by the user",
         "Stop for user confirmation before stage 2; user subsequently authorized publishing the stage 1 branch and draft PR"
       ],
-      "blockers": [
-        "Before committing Core, clarify project publication/redistribution permission: official Expandable Application terms may apply; SDK consent alone does not establish this",
-        "New Core is deliberately not included in Git; stage 1 checkpoint needs user confirmation before stage 2"
-      ],
+      "blockers": [],
       "verification": [
         "Refreshed main and created friend/avatar-live2d-adapter; no existing local changes",
         "Actual Hiyori fixture rendered with Core version integer 67239938, latest moc version 4, pixi-live2d-display 0.4.0",
@@ -46,7 +74,12 @@
         "base": "main",
         "head": "friend/avatar-live2d-adapter",
         "next": "Await review and explicit stage 2 confirmation; no merge or new Core redistribution"
-      }
+      },
+      "historical_blockers": [
+        "Before committing Core, clarify project publication/redistribution permission: official Expandable Application terms may apply; SDK consent alone does not establish this",
+        "New Core is deliberately not included in Git; stage 1 checkpoint needs user confirmation before stage 2"
+      ],
+      "author_review": "User confirms stage 1 author acceptance on 2026-10-26; new Core still not committed."
     },
     {"id":"avatar-3d-room-v1","name":"Procedural VRM room","status":"complete","notes":["User visual acceptance passed; PR #218 merge authorized after fresh local/package and CI gates","Metre-scale revision: full idle GPU 5.19 percent, 38 draws; baseline 4.93 percent; resource disposal tests pass","Private model/config unchanged; captures ignored; no real VRM1 visual acceptance"],"done_criteria":["Seeded local-only room and shared time-of-day transition","VRM room/none and transparent pet; unchanged Hiyori","GPU <= 1.5x baseline, draw calls < 120, ten-cycle disposal check","Full tests, first-run package, draft PR and private captures"]},
     {"id":"avatar-vrm-basic","name":"Local VRM renderer using avatar intent v1","status":"complete","notes":["User visual acceptance passed on 2026-10-25; merge commit of PR #216 explicitly authorized","Latest origin/main already contained; no conflicts; full local gate 825 passed/3 skipped and first-run package check passed","Private model/config remain local; real VRM1 and live LLM/TTS preparation timing retain documented limitations"],"done_criteria":["Local pinned runtimes and VRM0/1 intent mapping","Restricted model paths and attribution UI","Tests and local Windows rendering/performance evidence","Draft PR only; user visual review before merge"]},
@@ -475,6 +508,6 @@
       ]
     }
   ],
-  "active_task": "avatar-live2d-stage1",
+  "active_task": "avatar-live2d-stage2",
   "completed_archive": "docs/archive/features-completed-2026-10-23.json"
 }
