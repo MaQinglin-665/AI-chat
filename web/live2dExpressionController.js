@@ -5,6 +5,7 @@
   // to follow syllables. (256 samples read through a frequencyBinCount-sized
   // buffer only covered ~2.7 ms, so the mouth flickered with the waveform.)
   const TTS_LEVEL_FFT_SIZE = 1024;
+  const browserLipSync = root.XinyuBrowserLipSync || (typeof require === "function" ? require("./avatar/browserLipSync.js") : null);
 
   function createController(deps = {}) {
     const state = deps.state || {};
@@ -1973,6 +1974,12 @@
 
     function getSpeechAnimationMouthOpen() {
       const now = performance.now();
+      const browserMouth = browserLipSync?.sample(state, now);
+      if (browserMouth != null) {
+        state.speechMouthOpen = browserMouth;
+        state.speechMouthUpdatedAt = now;
+        return browserMouth;
+      }
       const audioPlaying = isSpeakingNow();
       const speaking = isSpeechMotionActive(now);
       const activeUntil = Number(state.speechAnimUntil || 0);

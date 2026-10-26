@@ -1,5 +1,6 @@
 (function (root) {
   "use strict";
+  const browserLipSync = root.XinyuBrowserLipSync || (typeof require === "function" ? require("./avatar/browserLipSync.js") : null);
 
   function createController(deps = {}) {
     const state = deps.state || {};
@@ -532,6 +533,7 @@
           state._broadcastSpeaking = !!data.speaking;
           state._broadcastAssistantAudioActive = data.assistantAudioActive === true;
           state.ttsAudioLevel = Number(data.audioLevel) || 0;
+          state.ttsBrowserMouthActive = data.browserMouthActive === true;
           applyBroadcastListeningPresence(data.listening);
           applyBroadcastPerformancePhase(data, receivedPerfNow, receivedWallNow);
           const cueIsFresh = timing.cueExpiresAt > receivedPerfNow;
@@ -578,6 +580,9 @@
           const mouthOpen = deps.getSpeechAnimationMouthOpen?.() || 0;
           const now = getPerfNow();
           const wallNow = getWallNow();
+          const browserMouthActive = browserLipSync?.sample(state, now) != null;
+          const browserPlaybackActive = browserMouthActive
+            && ["pending", "playing", "paused"].includes(state.avatarBrowserSpeech?.phase);
           const listeningPhase = String(state.listeningPresencePhase || "idle").toLowerCase();
           const listeningActive = Number(state.listeningPresenceSession || 0) > 0
             && ["armed", "hearing", "release"].includes(listeningPhase);
@@ -617,12 +622,18 @@
             speechStyle,
             speaking,
             assistantAudioActive: deps.isSpeakingNow?.() === true,
-            speechExpiresAtEpochMs: toBridgeEpoch(state.speechAnimUntil, now, wallNow),
+            // A real utterance can outlast the estimated animation duration.
+            // Renew the existing bridge lease while it owns playback; otherwise
+            // the detached model rejects valid tail packets as expired.
+            speechExpiresAtEpochMs: toBridgeEpoch(browserPlaybackActive
+              ? Math.max(Number(state.speechAnimUntil || 0), now + 500)
+              : state.speechAnimUntil, now, wallNow),
             speechStartedAtEpochMs: speechStartedAt > 0
               ? Math.round(wallNow - Math.max(0, now - speechStartedAt))
               : 0,
             animDurationMs: state.speechAnimDurationMs || 0,
             audioLevel: state.ttsAudioLevel || 0,
+            browserMouthActive,
             moodHoldExpiresAtEpochMs: toBridgeEpoch(state.moodHoldUntil, now, wallNow),
             performanceCueExpiresAtEpochMs: performanceCue
               ? toBridgeEpoch(performanceCueDeadline, now, wallNow)
@@ -682,6 +693,8 @@
           }
         }
         state._speechBroadcastTick = chatSpeechBroadcastLoop;
+        state._speechBroadcastPlaybackWake = () => requestChatSpeechBroadcastNow();
+        window.addEventListener?.("avatar-mouth-playback", state._speechBroadcastPlaybackWake);
         chatSpeechBroadcastLoop();
       } catch (_) {
         state._speechBroadcastRunning = false;
@@ -690,6 +703,8 @@
     }
 
     function stopChatSpeechBroadcastLoop() {
+      if (state._speechBroadcastPlaybackWake) window.removeEventListener?.("avatar-mouth-playback", state._speechBroadcastPlaybackWake);
+      state._speechBroadcastPlaybackWake = null;
       state._speechBroadcastRunning = false;
       state._speechBroadcastPerformancePhase = null;
       state._speechBroadcastPerformancePhaseExpiresAt = 0;

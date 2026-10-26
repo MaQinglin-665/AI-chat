@@ -14,10 +14,58 @@
 
 本 PR 直接从 main2b67452 创建，与 #217 的 Core/适配/Mao 提交分离。保留既有 AudioContext.outputLatency/baseLatency 的25ms下限/350ms上限、FFT1024、隐藏窗口16ms定时广播；不新增渲染时钟，不修改对话、记忆或外部执行。
 
-## 待完成的验收
+## 验收安排（完成结果见后文）
 
 三种真实本地模型的前后对比、长句/结束/暂停/取消/过期帧测试、完整本地门禁。Mao 尚属于 #217，验收页可使用固定 #217 文件的隔离组合环境，这些文件不会加入本 PR。
 
 模型选用官方 CC0 的 Sendagaya Shino（千驮谷筱）：[官方总说明](https://vroid.pixiv.help/hc/en-us/articles/4402614652569)、[模型单独条款](https://vroid.pixiv.help/hc/en-us/articles/360013482714-Sendagaya-Shino)、[官方主页](https://hub.vroid.com/en/users/36144806)、[下载镜像](https://opengameart.org/content/vroid-studio-cc0-models)。模型及 source.json 放在被忽略的 models_local/，本 PR 不提交。
 
 #217 的严格同输入参数序列是适配层平移的验收；本 PR 有意改变嘴型时机，不复制或放宽那套测试。最终报告将明确新加/更新的时序断言及原因。
+
+
+## 实现结果（2026-10-26）
+
+- `web/avatar/browserLipSync.js` 是共用的系统语音估计张合：等待实际开始，默认补偿120ms（`tts.browser_lip_sync_delay_ms`，0～500）；真实结束/错误/取消关闭，暂停/恢复及单调边界事件校准节奏，token/代次拒绝旧回调。没有事件时保留引擎状态兜底，采用至少300ms的保守开始门限；这仍是缺少PCM时的估计，不能保证逐音素同步。
+- 原表达控制器仅在当前浏览器语音拥有嘴型时使用新信号；服务器音频开始会清除浏览器所有权。残留的旧分析器不能提前打开新的系统语音嘴型。`avatarRuntime.frameFromState` 将同一信号交给 VRM，未来 #217 的 Mao 同样使用这一行选择逻辑。
+- 原 `taffy-speech` 广播增加经过布尔验证的 `browserMouthActive` 字段；开始/暂停/结束事件只唤醒原广播循环。实际长句持续播放时续期原500ms嘴型租约，避免独立模型窗口把超出估计时长的尾段帧丢掉。保留原有异步时钟换算、过期帧关闭及隐藏窗口16ms计时器，无新增渲染RAF。
+- 原分析路径未修改：outputLatency优先、baseLatency回退，低于25ms忽略、最大350ms；FFT1024，音量历史延迟及静音尾段、finish清理仍由原测试验证。
+
+## 三种真实模型对比
+
+三个本机视频均为14.6秒、20fps、292帧，左右分别修改前/后，附同一段12.2秒本地中文系统语音。参考音轨在1370ms开始；事件为1000ms入队、1250ms onstart，并模拟120ms音频启动差。视频使用实际模型与实际控制器/驱动读取嘴型参数，时间由测试控制，并非原生应用的实时语音录屏或设备延迟测量。
+
+| 模型 | 修改前 | 修改后 |
+| --- | --- | --- |
+| Hiyori | 语音张合信号1000ms已非零，比参考音轨早370ms；4～8秒信号变化范围0（冻结） | 首次采样到张合1400ms，比参考音轨晚30ms；尾段变化范围0.650747，实际模型嘴型也变化 |
+| Mao | 无频谱时公共帧嘴型参数一直0 | 同一开始门限和连续尾段；实际ParamA随信号变化，结束为0 |
+| VRM / Sendagaya Shino | 无频谱时aa参数一直0 | 同一开始门限和连续尾段；实际aa随信号变化，结束为0 |
+
+20fps采样间隔50ms；上述370/30ms只描述这一确定性测试。Hiyori原表情/待机也会写入微小嘴部参数，不能把“参数首次非零”当作语音开始；上表使用共享语音张合信号衡量起点。三段均无页面错误，逐帧数据/截图及合成视频保留在仓库外 `outputs/lipsync-comparison/`，已查看等待、发声中和结尾画面。
+
+Mao 由固定 `0c08c3d`（#217）的模型驱动/映射和Core6组成隔离组合验收页。此PR没有合并#217、复制其产品适配层或改变Core；两个版本的对比使用同一Core。作者合并#217后，整合时保留本PR的frameFromState嘴型选择，不能被旧的RMS-only那一行覆盖。
+
+VRM本地文件：`models_local/Sendagaya_Shino.vrm`，SHA256 `f11b2648e7e588ae171ad1c32e465f84e5b130b1d1789e3a3702946c0981d2a9`。镜像ZIP SHA256 `ff85ff42c1d041fd66dabdb36761a98557d7b55199f635769f3698a41c0a3696`。官方模型专属页面明确CC0；镜像内嵌Hub条款链接原样保留，未修改资源。生产路径解析器已验证以下配置可读取本地模型，不改用户当前角色：
+
+```json
+{"avatar":{"kind":"vrm","path":"models_local/Sendagaya_Shino.vrm"}}
+```
+
+## 自动检查和测试变化
+
+- 完整 `scripts/test-local.ps1`：**882 Python通过 / 3跳过；70 Node测试文件；Python190 / JS230个文件语法检查；秘密扫描824**。
+- 首次运行打包、Docs四项浏览器检查、必需JSON/py_compile通过；模型/录像/私密配置/Key均未提交或打包。
+- 新增 `test_browser_lip_sync.js`：三种配置的排队/实际开始/120ms门限、30秒长句、暂停/恢复/边界、结束/错误/取消/旧回调/代次、旧分析器、跨窗口时钟及长句租约、分析静音/过期包。新增Python配置六个边界用例。
+- **未更新任何已有参数快照，未复制、删除或放宽#217的严格对照。** 现有 `test_lip_sync_bridge_frontend.js` 和 `test_split_window_speech_timebase_frontend.js` 保持原文件且通过。新的时序断言有意把浏览器“排队已开嘴/长句曲线固定”改为“等待开始门限/持续变化至实际结束”；这属于本PR行为变更。
+
+## 复现和剩余检查
+
+```powershell
+node tests/test_browser_lip_sync.js
+node tests/test_lip_sync_bridge_frontend.js
+python -m pytest -q tests/test_browser_lip_sync_config.py
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-local.ps1
+```
+
+已有docs Playwright/Chromium及本地三种模型时，`node scripts/qa_shared_lipsync.cjs` 生成左右对比JPEG序列和JSON；可用环境变量LIPSYNC_QA_OUTPUT改变输出目录，LIPSYNC_QA_SMOKE=1仅检查加载，LIPSYNC_QA_MODELS选择模型，LIPSYNC_QA_BASE/ADAPTER指定已存在的Git参考。视频使用相同参考WAV补1370ms静音再与20fps图像序列合成；不向应用接入合成音轨。
+
+本机已安装的Mao/120ms工作版本保持原样，没有把#217的回退版本覆盖安装。作者仍需在Windows原生应用听三种角色的实际设备声音，验证开始/结束与窗口切换；本次不声称完成该人工听感验收。不自行合并任一PR，不启动脑控第二期。

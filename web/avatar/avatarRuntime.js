@@ -1,5 +1,6 @@
 (function (root) {
   "use strict";
+  const browserLipSync = root.XinyuBrowserLipSync || (typeof require === "function" ? require("./browserLipSync.js") : null);
   const INPUT_HOLD_MS = 1000;
   const clamp = (v) => Math.max(0, Math.min(1, Number(v) || 0));
   function formatConditions(conditions = {}) {
@@ -76,7 +77,7 @@
   function frameFromState(state, now, wallNow = Date.now()) {
     const remote = state.uiView === "model";
     const fresh = !remote || (now - Number(state._broadcastSpeechUpdatedAt || 0) < 900);
-    const level = fresh ? clamp(state.ttsAudioLevel) : 0;
+    const level = fresh ? (browserLipSync?.mouthLevel(state, now, state.ttsAudioLevel) ?? clamp(state.ttsAudioLevel)) : 0;
     const age = wallNow - Number(state.conversationLastAssistantAt || 0);
     const preparingSpeech = age >= 0 && age < (root.XinyuVRMRenderer?.EXPRESSION?.prepareMs || 0);
     return { now, preparingSpeech, mode: level > 0.02 ? "speak" : "idle",

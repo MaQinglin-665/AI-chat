@@ -3,7 +3,7 @@
     {
       "id": "avatar-shared-lipsync-fix",
       "name": "Shared playback-owned mouth timing for Hiyori, Mao and VRM",
-      "status": "in_progress",
+      "status": "completed",
       "scope": [
         "Separate friend/lipsync-fix directly from main2b67452; no adapter/Mao dependency commits in this PR",
         "Preserve outputLatency/baseLatency25–350ms,FFT1024,hidden timer and original render clocks",
@@ -15,7 +15,14 @@
         "Real Hiyori/Mao/VRM before-after local comparison clips; official CC0 local-only VRM",
         "Full checks, normal push, separate PR; no merge/main/force push"
       ],
-      "next": "Publish diagnosis first, implement shared playback timing, test and record all three model paths."
+      "next": "Publish implementation to existing independent PR226 for author review; Windows real-device listening remains manual. No PR merge/main/force push or brain phase2.",
+      "verification": [
+        "Full882Python/3skipped,70Node,syntax190/230,secrets824;docs4/package/JSON/py_compile passed.",
+        "Real Hiyori/Mao/CC0SendagayaShino:3 side-by-side14.6s/292frame/20fps local clips with same reference voice; shared tail variation0->0.650747; actual parameters move, no page errors.",
+        "Controlled reference starts1370ms:old signal1000ms,new1400ms;not measured real-device offsets. OfficialCC0/local model source and SHA recorded,ignored/not committed.",
+        "Unchanged latency/FFT1024/hidden timer and split-clock regressions pass; no existing snapshots updated or PR217 strict tests copied/relaxed.",
+        "Separate main2b67452 branch; #217 already ready at0c08c3d; original local installed120ms unchanged."
+      ]
     },
     {"id": "avatar-brain-driven-v1", "name": "Avatar brain phase 1: backend decisions", "status": "complete", "done_criteria": ["Bounded authenticated world state and action validation", "Same-call reply actions and bounded proactive decisions", "Delivery-confirmed existing memory, fake model end-to-end tests", "Full local/package gates, draft PR only"], "notes": ["Phase 2 deferred until #217 merges; do not edit avatarRuntime.js or vrmRenderer.js", "No actions executed by phase-1 console debugger; plans are not experiences", "Phase 1 verified: 865 passed/3 skipped, all Node/syntax/secrets and package checks passed", "Only fake model/world exercised; no real API, voice, movement or cost measurement", "Process-local daily budget resets on restart; default disabled; draft PR only", "User approved #224 merge; latest main 79ee80f integrated with only three state-file conflicts; local/package gates passed (876 passed, 3 skipped). Phase 2 mandatory additions recorded in progress.md; wait for user notice after #217."]},
     {"id":"avatar-painted-backdrop-v1","name":"Local 2.5D painted backdrop","status":"complete","dependencies":["avatar-room-handpainted-v1 / PR #220"],"done_criteria":["Fixed calibrated camera and anchored cover","Three synchronized periods; bounded textures; local path security","Stationary idle, contact shadow and optional reflection","Node/Python/full/package gates and private screenshots/30s video","Draft PR to main with dependency notice; no merge"],"verification":["841 Python passed / 3 skipped; all Node, syntax and secret checks passed","First-run source package including original placeholder passed","Isolated Electron VRM0: periods/grid/three sizes/30-second video; actual settings and room/handpainted/none/pet regression","40 scene cycles: stable 25 geometries / 48 textures; four major-GC samples 6.40–6.86 MiB; no page errors","PR #221 polish: full local gate 841 passed / 3 skipped; all Node/syntax/secrets passed","Same-pose three-period before/after and 3x feet/edge captures; no shader/page errors; outer background pixels unchanged","20 additional scene cycles: stable 26 geometries / 49 textures, major-GC heap 6677384 and 6835904 bytes; reflection toggle and room/handpainted/none/pet regression passed","User visually accepted #221; integrating merged #220/#222 and running final gates"],"limitations":["No real VRM1, live voice or long-duration acceptance","Avatar-only MSAA/composite buffer adds GPU memory and rendering cost; no long-run or hardware-wide performance claim"]},
