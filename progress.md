@@ -408,3 +408,17 @@ Deferred TODO, explicitly not fixed this task:
 #222 local Verification Evidence: scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed; required JSON/compilation and diff checks passed. Only the three state files changed after the conflict-free merge. Proceed to normal push, ready, all CI and merge gate.
 
 Merge publication blocked: #222 push failed all five attempts, with 10s spacing (TLS handshake failures and port-443 timeouts). Local merge a05c690 and gate record 44b3a01 retained; no conflicts. #222 was not marked ready or merged; final latest-origin/main test is pending its merge. #220 merge a0bdce4 is complete. User push command: git -C D:/AI/ai_desktop_pet_readiness_20261023 push origin codex/avatar-motion-camera-v1 . After success resume ready/check all CI/merge #222, then detached origin/main final test. No further network attempts.
+
+
+## 2026-10-26 — Avatar brain phase 1 started
+
+User explicitly authorizes backend dialogue integration; phase 2 deferred until #217. Branch from ee3de6e, local main/private config unchanged. Scope: bounded world state, action whitelist, same-call reply actions, proactive frequency limits, confirmed existing memory, fake-model tests and console-only debug entry. No avatarRuntime/vrmRenderer edits. Git fetch succeeded with command-local system proxy; global configuration unchanged.
+
+
+## 2026-10-26 — Avatar brain phase 1 verification
+
+Implemented authenticated bounded world/think/poll/ACK routes, closed 3D action schema, same-call reply suffix filtering, environment-key-only proactive calls, timer/event triggers with interval/hour/day limits, stale/inflight/input/scene/period cancellation, and explicit confirmation in the existing memory store. Debugger only sends/logs; never executes or ACKs. Original random activity/rendering unchanged. Two protected renderer files untouched; local main remains 0a06554; private config hash matches prior baseline.
+
+Verification Evidence: final scripts/test-local.ps1 passed (865 passed, 3 skipped, 1 warning; all Node, Python/JS syntax and secret scan passed); final scripts/check_first_run_package.ps1 passed, including new module/debugger package presence. Added 35 fake-model Python cases including real local authenticated HTTP, provider/runtime/reply routing and temporary-file memory roundtrip; Node debugger opt-in/no-execution check passed. Required JSON/ten-module compile and diff checks passed. Logs ignored under tmp_ui_smoke/avatar-vrm-polish/brain-phase1-{final,package}.log.
+
+No real DeepSeek/TTS/ASR/renderer execution or 10-minute video; these are phase 2 after #217. Offline prompt 2429 chars/world302, estimated 700–1000 input +100–250 output tokens (cap480), daily default0–24 calls/~$0.0079–0.0144 at official peak uncached Flash rates. Not measured billing. Process-local limits reset on backend restart; receipts trust the authenticated local client; no frontend delivery/executor yet. See docs/avatar-brain-actions.md. Publish feature branch as draft only; no merge/main push.
