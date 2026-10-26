@@ -394,3 +394,15 @@ Limits: real VRM1 not visually verified; procedural gait/full-body clothing coll
 Publication result: implementation cbdf497 committed locally. git push -u origin codex/avatar-motion-camera-v1 failed all five attempts (10s spacing): two TLS handshake failures, three port-443 timeouts. No draft PR created and no further retries. Code/tests/captures complete; handoff records the exact user push command and next draft-PR step. Local main remains 0a06554; private config hash unchanged. No force push/main push/merge.
 
 Publication resumed: user confirmed successful push. Verified remote branch and PR head daa5971; created draft PR #222 to main via local gh after connector creation permission 403. https://github.com/MaQinglin-665/AI-chat/pull/222 . Attached to the task. State changed from publish_blocked to awaiting_visual_review; prior implementation/test evidence unchanged. No merge, main push, private-config edit or media upload. Await user appearance review.
+
+## 2026-10-26 — Accepted #220 / #222 sequential merge
+
+User accepted #222 and authorized merge commits in order, without modifying local main/private config. #220 already contained latest origin/main 0542d04; no conflicts. Verification Evidence: fresh scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed; gh pr checks 220 all green including Python Tests and Windows Compatibility. Marked ready, merged with --merge --admin: a0bdce4fcb8d85dd784438a88b96736c705a1bda.
+
+Fetched and merged origin/main containing #220 into codex/avatar-motion-camera-v1; no conflicts. Now validating #222 with both local gates, then normal push/ready/all CI/merge commit, then full local test on latest origin/main with detached HEAD. Local main remains 0a06554. No product-code changes this task.
+
+Deferred TODO, explicitly not fixed this task:
+- 镜头切换时画面卡顿。
+- 动作仍偏机械。
+
+#222 local Verification Evidence: scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed; required JSON/compilation and diff checks passed. Only the three state files changed after the conflict-free merge. Proceed to normal push, ready, all CI and merge gate.
