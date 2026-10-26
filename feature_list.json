@@ -28,16 +28,17 @@
         "Same actual Core6: 5280 frames/394224 ordered calls plus per-frame snapshots strictly equal to pinned b39ab99 Git blobs",
         "Real Pixi browser: 1030 frames/167741 ordered calls strictly equal; four before/after canvas PNG hashes identical; ten reloads dispose resources",
         "Custom/missing mappings, unknown/direct intents, unified events, 100 drag completions and disposal during drag pass; no Live2D RAF added",
-        "Final full scripts/test-local.ps1: 838 Python passed/3 skipped, all 65 Node suites, Python183/JS221 syntax, secrets800; docs check:all four cases and JSON/py_compile passed"
+        "Final full scripts/test-local.ps1: 838 Python passed/3 skipped, all 65 Node suites, Python183/JS221 syntax, secrets800; docs check:all four cases and JSON/py_compile passed",
+        "Implementation 94a9fca pushed normally to friend/avatar-live2d-adapter; PR217 verified open/draft/unmerged, base main; initial Node/Docs/Quality CI success"
       ],
-      "next": "Publish to existing draft PR217, then stop for author Windows appearance/drag/clickthrough review; stage3 remains deferred.",
+      "next": "Author Windows appearance/drag/clickthrough review of draft PR217; do not start stage3 or merge without confirmation.",
       "historical_blockers": [
         "Current runtime is VRM-specific; user requires a proposal before structural integration",
         "Core4/Core6 fixed-input pixels are close but not identical; author must decide acceptance before any Core commit"
       ],
       "blockers": [],
       "author_approval": "Author approved plan and Core6 inclusion; no approximation in same-Core mapping acceptance.",
-      "implementation_status": "implemented and validated; publish draft PR217 and await Windows review"
+      "implementation_status": "published to draft PR217; awaiting author Windows review"
     },
     {
       "id": "avatar-live2d-stage1",

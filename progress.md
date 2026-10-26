@@ -409,3 +409,9 @@ Verification Evidence: fresh scripts/test-local.ps1 passed (829 passed, 3 skippe
 - Report docs/avatar-live2d-stage2-verification.md and reproducible scripts/qa_live2d_adapter.cjs. Keep #217 draft after normal branch push; stop for Windows appearance/interaction review. No stage3, model/private files, dialogue/memory/external-agent edits, main/force push or merge.
 
 - Final Verification Evidence: complete scripts/test-local.ps1 after final mapping/interface/listener review passes: 838 Python passed/3 skipped, all 65 Node files, Python183/JS221 syntax, secrets800. Final log work/avatar-stage2-final-full-tests.log. Required JSON/py_compile, docs check:all four cases and docs-vendor byte/hash checks pass. Ready to commit and publish to #217 as draft; author Windows review remains the next stop.
+
+
+## 2026-10-26 — Stage 2 draft publication checkpoint
+- Published separate Core6 b39ab99 and implementation 94a9fca546d4ecbb2e5e390ad1f62a20f24ff173 by normal push to friend/avatar-live2d-adapter. Updated existing https://github.com/MaQinglin-665/AI-chat/pull/217 title/body around implemented stage2 and strict results; verified open/draft/unmerged, base main. Attached PR to this task.
+- Verification Evidence: implementation-head GitHub Node Frontend Tests, Docs Publish and Smoke, Quality Checks succeeded; Python Tests and Windows Compatibility were in progress when checked. Complete local gate and exact sequence evidence recorded above. This checkpoint changes only state records; no new implementation requiring a repeated full local run.
+- Next: keep draft and wait for author Windows appearance, drag, clickthrough and model-window review. No stage3, main/force push or PR merge; no unrelated/private/model/screenshot changes.

@@ -1,11 +1,11 @@
 # Session handoff
 
-## Current — stage 2 implemented, final gate/publication
+## Current — stage 2 published as draft; Windows review next
 - Author approved the plan and Core6. Independent Core commit b39ab99 precedes mapping; docs/live2d/vendor Core/display stay byte-identical. Older proposal-only/Core-local stops below are historical and superseded.
 - Implemented one avatarRuntime factory/frame/events path, Live2D six-method adapter and JSON parameter/pose/channel mapping. Renderer-owned clocks preserve Pixi HIGH update, style -> micro -> Core order; VRM RAF/20/30 FPS/hidden suspension moved intact. Original Live2D hit/drag/clickthrough retained with cleanup. No Live2D parameter RAF.
 - Exact b39ab99 Git blob references are pinned in tests/fixtures/live2d-before-mapping. Actual Core6 Node test passes 5280 frames/394224 complete calls and snapshots; real Pixi browser passes 1030 frames/167741 calls/snapshots, four identical canvas PNG hashes and ten real reload disposals. Unknown/missing/custom mappings, direct/shared intents and 100 drag releases/active-drag disposal pass. Never relax strict equality.
 - Final complete scripts/test-local.ps1 passed after implementation and mapping review (838 Python/3 skipped, 65 Node suites, Python183/JS221 syntax, secrets800). Docs check:all passes four browser cases; required JSON/py_compile/vendor hashes pass. Logs outside Git in work/avatar-stage2-*.log. Report docs/avatar-live2d-stage2-verification.md; screenshots outside Git at outputs/avatar-live2d-stage2-implementation and competition capture directory.
-- Next commit implementation/state, normal push to existing #217 and rewrite PR as implemented stage2. Keep draft and stop for author Windows review. No model/private assets, docs vendor, dialogue/memory/external-agent changes; no main/force push/merge; no stage3.
+- Implementation 94a9fca and independent Core6 b39ab99 pushed normally to friend/avatar-live2d-adapter. PR217 title/body updated and verified open/draft/unmerged with base main; initial Node/Docs/Quality CI passed, Python/Windows were running at publication. This state-only checkpoint records publication. Next stop for author Windows review; keep draft. No model/private assets, docs vendor, dialogue/memory/external-agent changes; no main/force push/merge; no stage3.
 
 ## Current authorization - Live2D stage 2 (2026-10-26)
 - User confirms stage 1 passed author review and authorizes stage 2. Merge latest main, preserving both Live2D and VRM records. Only four expected conflicts occurred and were resolved without dropping either side.
