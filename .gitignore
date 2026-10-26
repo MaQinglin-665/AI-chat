@@ -36,6 +36,7 @@ integrations/astrbot_plugin_taffy_qq_bridge/data/
 tmp_*.wav
 debug_*.wav
 *.bin
+!web/vendor/scenes/kaykit-furniture/*.bin
 
 # Local diagnostic smoke-test artifacts
 api_tts_*.txt

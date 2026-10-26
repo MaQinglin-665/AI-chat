@@ -1,9 +1,22 @@
-# Session handoff — VRM room proportions (2026-10-25)
+# Session handoff — Room life seating / camera revision (2026-10-25)
 
-Branch codex/avatar-3d-room-v1, User passed PR #218 visual acceptance and authorized merge commit on 2026-10-25 after fresh local/package gates and all Linux/Windows CI pass. Prior 91102ef introduced the room; user requested metre-scale furniture/depth/daylight corrections. Local main and 0a06554 remain untouched. Prior handoff archived in docs/archive/session-handoff-room-before-metres-20261025.md.
+Branch codex/avatar-room-life-v1; existing draft PR #219. User requested explicit seat contacts, medium side cameras and purple/pink furniture colors.
+Local main/0a06554 and private config/model remain untouched. Previous handoff archived in docs/archive/session-handoff-room-life-before-seating-20261025.md.
 
-Changed vrmScene.js to metres independent of avatar height: shelf 1.8m, lamp 1.5m with 0.35m shade, window 1.2x1.4m with 0.9m sill. Wall z=-3m, furnishings z=-2/-2.65m, clean head backdrop. Added ceiling/skirting, distant partial pink crowns, moon/mixed-size stars/clouds, warm brighter daytime and procedural floor sunlight patch. Square wall seams prevent sky leaks; avatar-relative fog stays stable in wide inspection views. vrmRenderer only forwards camera depth. No dialogue/memory/external execution/Live2D/private config/model changes.
+Implementation: vrmSeating.js owns seat surfaces, measured leg lengths, floor contact solver, table elbow intersection and camera presets/easing.
+Renderer blends seat constraints, lap hands / chin support, 1.8s camera transition and a glance after 6s back-facing travel.
+Scene exposes seat/camera layout, adds foot contact shadows and aligns procedural fallback seat heights. Furniture vertex tint shader preserves original atlas/glTF/bin and one merged furniture draw.
+Tests add short/long-leg Three skeletons in both VRM orientations, bone length/contact checks, table reachability, leaving-seat gate, camera direction/easing and fallback alignment.
+No dialogue/memory/Live2D/external execution/private-config changes.
 
-Verification: scripts/test-local.ps1 passed 829/3, all Node/syntax/secrets. Added metre dimensions, book range, clear backdrop, distance and unscaled-height tests; ten-cycle resource disposal still passes. Actual Electron VRM0 full/wide night/day captures inspected, ignored tmp_ui_smoke/avatar-vrm-polish/metres-{night,day}-{full,wide}.png. Temporary test-only camera pullback; no product camera change. Full idle 19.98 FPS, CPU 4.21%, GPU 5.19%, 38 draws, within baseline budget. Full dimensions and limitations docs/avatar-3d-room.md. First-run package not repeated: no defaults/installer changes; initial room version passed it.
+Real Electron VRM0: four activity viewpoints, sofa/desk front and side, contact metrics and room resource cycling.
+Ignored evidence tmp_ui_smoke/avatar-vrm-polish/seated-*.png/json/log; seated-tour.mp4 (35s silent, test-selected activities).
+Capture-only runtime override keeps rendererSurfaceActive to avoid the existing background pause; product pause behavior unchanged.
+Hip/ankle baseline errors <1mm; desk elbow ~0.7645m vs 0.765m target including sleeve padding. No page exceptions.
+VRM1 is synthetic skeleton coverage, not a real VRM1 model. No full-body cloth collision guarantee for arbitrary outfits/proportions.
 
-Fresh merge gates passed: 829/3 plus Node/syntax/secrets; first-run package passed. Next: push acceptance notes, ready PR, all CI green, merge with --merge --admin, then test exact latest origin/main detached. Preserve local main/0a06554 and config.local.json. Three visual follow-ups recorded in progress.md are explicitly deferred. No model screenshots uploaded.
+Final full gate passed: 829 Python passed / 3 skipped; all Node suites, syntax and secrets passed.
+Update 2026-10-26: user visual acceptance passed and explicitly authorized #219 merge after fresh full/package and Linux/Windows CI gates. origin/main 2356ddb already contained; no conflicts.
+Deferred, not fixed: stiff hand resting on desk; floating hand when reaching at window.
+Fresh 2026-10-26 full gate: 829 passed / 3 skipped, all Node/syntax/secrets passed; first-run package gate passed.
+Next: push, mark ready, merge with --merge --admin after all CI passes, then test latest origin/main detached. Keep local main and config.local.json unchanged.

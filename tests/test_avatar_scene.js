@@ -73,7 +73,7 @@ const source = fs.readFileSync(path.join(__dirname, "../web/avatar/vrmScene.js")
 assert(!/\b(fetch|XMLHttpRequest|WebSocket|require|import|TextureLoader|FileLoader)\s*\(/.test(source));
 assert(!/https?:|file:/.test(source));
 const renderer = fs.readFileSync(path.join(__dirname, "../web/avatar/vrmRenderer.js"), "utf8");
-assert(renderer.includes('if (useRoom) room = roomModule.create'));
+assert(/if \(useRoom\)\s*\{?\s*room = roomModule.create/.test(renderer));
 assert(renderer.includes('dataset.stageRoom')); // consume the existing controller's decision
 const { gradeRoomMaterials, LIGHT } = require("../web/avatar/vrmRenderer.js");
 const originalCompile = () => {}, originalKey = () => "original";
