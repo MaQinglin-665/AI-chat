@@ -15,3 +15,8 @@ Current merge task: user accepted #222, authorized #220 then #222 with merge com
 Deferred next task (do not fix now): camera-switch frame stutter; motion still mechanical. Other limits remain in docs/avatar-motion-camera.md. After the merge/final-test gates finish, wait for the next user task.
 
 Publication: user completed the push after the five network failures. Remote head daa5971 verified when creating draft #222; implementation cbdf497. GitHub connector creation returned integration-permission 403; authenticated local gh successfully created the draft. PR attached to the task. No product changes or test reruns for this publication-only update.
+
+## Current blocker: #222 push
+All five normal push attempts failed (10s intervals, TLS handshake / TCP443 timeout). Stop retrying. #220 is merged at a0bdce4fcb8d85dd784438a88b96736c705a1bda. #222 local main-merge a05c690 had no conflicts; both local gates passed, recorded in 44b3a01. It has not yet been marked ready/merged. User should run:
+`git -C D:/AI/ai_desktop_pet_readiness_20261023 push origin codex/avatar-motion-camera-v1`
+After confirmed push, continue gh pr ready 222, wait for all latest-head CI, gh pr merge 222 --merge --admin, fetch and switch --detach origin/main, run scripts/test-local.ps1. Report both merge SHAs and final test. Local main/private config unchanged. No product fixes in this task.

@@ -406,3 +406,5 @@ Deferred TODO, explicitly not fixed this task:
 - 动作仍偏机械。
 
 #222 local Verification Evidence: scripts/test-local.ps1 passed (830 passed, 3 skipped; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed; required JSON/compilation and diff checks passed. Only the three state files changed after the conflict-free merge. Proceed to normal push, ready, all CI and merge gate.
+
+Merge publication blocked: #222 push failed all five attempts, with 10s spacing (TLS handshake failures and port-443 timeouts). Local merge a05c690 and gate record 44b3a01 retained; no conflicts. #222 was not marked ready or merged; final latest-origin/main test is pending its merge. #220 merge a0bdce4 is complete. User push command: git -C D:/AI/ai_desktop_pet_readiness_20261023 push origin codex/avatar-motion-camera-v1 . After success resume ready/check all CI/merge #222, then detached origin/main final test. No further network attempts.
