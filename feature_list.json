@@ -1,6 +1,35 @@
 {
   "features": [
     {
+      "id": "avatar-live2d-mao-stage3",
+      "name": "Official local Mao: vowel estimator, faces, gestures and configuration",
+      "status": "in_progress",
+      "dependencies": [
+        "avatar-live2d-stage2"
+      ],
+      "scope": [
+        "User confirmed stage3 and local character switch on 2026-10-26",
+        "Official SDK Mao stays in ignored models_local/Mao; no assets/Core/vendor changes in this phase",
+        "Same shared runtime/Pixi clock; retain exact Hiyori regression and VRM behavior",
+        "Bounded model resource serving, five-vowel spectral fallback, eight faces/motions and three arm gestures",
+        "Local full gate, screenshots outside Git, deploy locally, push PR217 and mark ready; author merges only"
+      ],
+      "done_criteria": [
+        "Official local Mao and safe config switch with legacy compatibility",
+        "Vowel estimator/silence/fallback, mapping and switch tests; full local checks pass",
+        "Local screenshots: five vowels, eight expressions, three gestures; actual installed Mao shown",
+        "Push existing PR217 and change draft to ready; no merge/main/force push"
+      ],
+      "next": "Commit only reviewed stage3 code/docs/state, normal push to existing PR217, mark ready for author Windows review; no merge.",
+      "verification": [
+        "Full scripts/test-local.ps1: 849 Python passed/3 skipped; all 66 Node suites; Python184/JS226 syntax; secrets807 (final docs scan808)",
+        "Hiyori same-Core exact: 5280 Node frames/394224 calls; real Pixi 1030 frames/167741 calls, snapshots and four PNG pairs identical; ten reload cleanups",
+        "Real local Mao: five vowels/eight faces/three arms, eight native motions actually loaded and played, 21 authenticated resources and unauthorized401, no page errors",
+        "Actual D:/app/DesktopPet installed page loads Mao/Core6/132 parameters with authentication after minimal old-CSP blob backport; desktop app restarted",
+        "Official assets/private config/screenshots outside Git; 30 genuine competition captures with descriptions and hashes; docs four browser cases and required JSON/py_compile pass"
+      ]
+    },
+    {
       "id": "avatar-live2d-stage2",
       "name": "Live2D adapter through the shared avatar runtime",
       "status": "in_progress",

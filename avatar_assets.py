@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import struct
+from urllib.parse import quote, unquote
 
 
 class AvatarPathError(ValueError):
@@ -56,6 +57,69 @@ def resolve_asset(config, root, *, animation=None):
     return resolved
 
 
+LIVE2D_PREFIX = "/api/avatar/live2d/"
+
+
+def resolve_live2d(config, root):
+    """Use the same explicit local-directory boundary as VRM, without exposing paths."""
+    avatar = config.get("avatar", {})
+    if not isinstance(avatar, dict) or avatar.get("kind") != "live2d":
+        raise AvatarPathError("Local Live2D is not enabled.")
+    candidate = _clean_path(avatar.get("path"))
+    if not str(candidate).lower().endswith(".model3.json"):
+        raise AvatarPathError("Expected a .model3.json manifest.")
+    # Reuse link/junction and allowed-directory checks, with a private extension policy.
+    candidate = candidate if candidate.is_absolute() else Path(root) / candidate
+    roots = [Path(root).resolve() / "models_local"]
+    directories = avatar.get("allowed_directories", [])
+    if not isinstance(directories, list):
+        raise AvatarPathError("Allowed directories must be a list.")
+    for raw in directories:
+        directory = _clean_path(raw)
+        if not directory.is_absolute():
+            raise AvatarPathError("Allowed directories must be absolute.")
+        roots.append(directory)
+    for item in [candidate, *roots]:
+        if any(_is_link(part) for part in [item, *item.parents]):
+            raise AvatarPathError("Avatar paths must not contain links or junctions.")
+    candidate = candidate.resolve(strict=True)
+    if not candidate.is_file() or not any(candidate.is_relative_to(p.resolve()) for p in roots):
+        raise AvatarPathError("Avatar is outside allowed directories.")
+    return candidate
+
+
+def live2d_resources(config, root):
+    """Whitelist only typed resources explicitly referenced by the configured manifest."""
+    manifest = resolve_live2d(config, root)
+    if manifest.stat().st_size > 1024 * 1024:
+        raise AvatarPathError("Manifest is too large.")
+    data = json.loads(manifest.read_text(encoding="utf-8-sig"))
+    refs = data["FileReferences"]
+    resources = {manifest.name: manifest}
+    entries = [(refs.get("Moc"), ".moc3"), (refs.get("Physics"), ".physics3.json"),
+               (refs.get("Pose"), ".pose3.json")]
+    entries += [(v, ".png") for v in refs.get("Textures", [])]
+    entries += [(v["File"], ".exp3.json") for v in refs.get("Expressions", [])]
+    entries += [(v["File"], ".motion3.json") for group in refs.get("Motions", {}).values() for v in group]
+    if len(entries) > 256:
+        raise AvatarPathError("Too many model resources.")
+    for name, suffix in entries:
+        if name is None:
+            continue
+        if (not isinstance(name, str) or not name or any(c in name for c in "\\:%?#\x00")
+                or name.startswith("/") or any(p in ("", ".", "..") for p in name.split("/"))
+                or not name.lower().endswith(suffix)):
+            raise AvatarPathError("Invalid model resource reference.")
+        path = manifest.parent / name
+        if any(_is_link(part) for part in [path, *path.parents]):
+            raise AvatarPathError("Model resources must not contain links or junctions.")
+        path = path.resolve(strict=True)
+        if not path.is_relative_to(manifest.parent) or not path.is_file() or path.stat().st_size > 64 * 1024 * 1024:
+            raise AvatarPathError("Model resource is outside its directory or too large.")
+        resources[name] = path
+    return manifest, resources
+
+
 def metadata(path):
     """Read bounded GLB metadata only; never return textures or model content."""
     with Path(path).open("rb") as stream:
@@ -99,7 +163,32 @@ def metadata(path):
 def dispatch(handler, config, root, route):
     avatar = config.get("avatar", {})
     if route == "/api/avatar" and (not isinstance(avatar, dict) or avatar.get("kind") != "vrm"):
-        handler._send_json({"kind": "live2d"})
+        if isinstance(avatar, dict) and avatar.get("kind") == "live2d" and avatar.get("path"):
+            try:
+                manifest, _ = live2d_resources(config, root)
+                handler._send_json({"kind": "live2d", "path": LIVE2D_PREFIX + quote(manifest.name),
+                                    "mapping": avatar.get("mapping") or "/avatar/mappings/mao.json"})
+            except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                handler._send_json({"kind": "live2d", "error": "Live2D unavailable: check avatar.path and model resources."}, status=400)
+        else:
+            handler._send_json({"kind": "live2d"})
+        return
+    if route.startswith(LIVE2D_PREFIX):
+        try:
+            _, resources = live2d_resources(config, root)
+            path = resources[unquote(route[len(LIVE2D_PREFIX):])]
+            with path.open("rb") as stream:
+                handler.send_response(200)
+                handler.send_header("Content-Type", "image/png" if path.suffix.lower() == ".png" else
+                                    "application/json" if path.suffix.lower() == ".json" else "application/octet-stream")
+                handler.send_header("Content-Length", str(os.fstat(stream.fileno()).st_size))
+                handler.send_header("X-Content-Type-Options", "nosniff")
+                handler.send_header("Cache-Control", "no-store")
+                handler.end_headers()
+                while chunk := stream.read(65536):
+                    handler.wfile.write(chunk)
+        except (OSError, ValueError, TypeError, KeyError, AttributeError):
+            handler._send_json({"error": "Live2D resource unavailable."}, status=400)
         return
     try:
         path = resolve_asset(config, root)

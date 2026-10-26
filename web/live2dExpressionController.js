@@ -1377,12 +1377,17 @@
     }
 
     function sampleTTSAudioLevel() {
+      const vowelsEnabled = state.avatarMapping?.capabilities?.vowels
+        || (state.config?.avatar?.kind === "live2d" && ["web/avatar/mappings/mao.json", "/avatar/mappings/mao.json"].includes(state.config.avatar.mapping));
       const usePcmAnalyser = state.ttsPcmAudioAnalyserActive === true
         && state.ttsPcmAudioAnalyser
         && state.ttsPcmAudioAnalyserData;
       const analyser = usePcmAnalyser ? state.ttsPcmAudioAnalyser : state.ttsAudioAnalyser;
       const data = usePcmAnalyser ? state.ttsPcmAudioAnalyserData : state.ttsAudioAnalyserData;
       if (!analyser || !data || !data.length) {
+        if (vowelsEnabled && state.uiView !== "model") {
+          state.ttsVowel = null; state.ttsVowelConfidence = 0; state.ttsVowelHistory = [];
+        }
         state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
         state.ttsAudioRawLevel = 0;
         state.ttsAudioRms = 0;
@@ -1407,7 +1412,11 @@
           state.ttsAudioLastVoiceAt = performance.now();
         }
         state.ttsAudioLevel += (normalized - state.ttsAudioLevel) * smoothing;
+        if (vowelsEnabled) {
+          window.XinyuVowelEstimator?.sample(state, analyser, rms, performance.now(), state.ttsAudioOutputLatencyMs);
+        }
       } catch (_) {
+        if (vowelsEnabled) { state.ttsVowel = null; state.ttsVowelConfidence = 0; }
         state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
         state.ttsAudioRawLevel = 0;
         state.ttsAudioRms = 0;

@@ -577,6 +577,15 @@ def resolve_live2d_model_path(model_path):
 
 def validate_live2d_model_path(config):
     cfg = config if isinstance(config, dict) else {}
+    avatar = cfg.get("avatar", {})
+    if isinstance(avatar, dict) and avatar.get("kind") == "live2d" and avatar.get("path"):
+        from avatar_assets import resolve_live2d
+        try:
+            return resolve_live2d(cfg, ROOT_DIR)
+        except (OSError, ValueError, TypeError) as exc:
+            raise DiagnosticError(code="live2d_path_invalid", reason="本地 Live2D 模型路径无效。",
+                                  solution="请将完整模型放在 models_local，并检查 avatar.path 和允许目录。",
+                                  config_key="avatar.path") from exc
     raw_model_path = str(cfg.get("model_path", "") or "").strip()
     if not raw_model_path:
         raise DiagnosticError(
@@ -1127,6 +1136,13 @@ def sanitize_client_config(config):
         "onboarding_completed": bool(config.get("onboarding_completed", False)),
         "assistant_name": config.get("assistant_name", "Mochi"),
         "model_path": config.get("model_path", DEFAULT_CONFIG["model_path"]),
+        "avatar": {
+            "kind": "vrm" if isinstance(config.get("avatar"), dict) and config["avatar"].get("kind") == "vrm" else "live2d",
+            # The lazy chat renderer needs the mapping to enable audio vowels;
+            # local model paths and allowed directories stay server-side.
+            "mapping": str(config.get("avatar", {}).get("mapping", ""))[:512]
+            if isinstance(config.get("avatar"), dict) and isinstance(config["avatar"].get("mapping", ""), str) else "",
+        },
         "model": {
             "scale": model_scale,
             "x_ratio": x_ratio,

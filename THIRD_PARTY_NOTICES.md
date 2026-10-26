@@ -110,4 +110,8 @@ Useful references:
 
 ## Release Packaging Rule
 
+### Optional local Mao sample model
+
+Mao Niziiro is an official Live2D Inc. sample from Cubism SDK for Web 5-r.5, acquired from https://www.live2d.com/en/sdk/download/web/ . Model files are not included in this repository or its source packages. Local use follows the [Free Material License](https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html) and [Sample Model Terms](https://www.live2d.com/eula/live2d-sample-model-terms_en.html); see [local setup and attribution](docs/avatar-live2d-mao.md). The local renderer displays the required sample-model credit and links. Mapping expression/motion names does not transfer ownership of the character to this project.
+
 Preview source-test packages should include this notice file. Do not add new sample models, generated images, reference audio, screenshots, or demo videos to the package unless their source and redistribution boundary are recorded here.

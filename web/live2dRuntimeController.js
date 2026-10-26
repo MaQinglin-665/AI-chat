@@ -300,8 +300,19 @@
       };
 
       const { Live2DModel } = window.PIXI.live2d;
+      let assets;
       try {
-        model = await Live2DModel.from(path, { autoUpdate: false });
+        assets = await window.XinyuLive2DAssets?.prepare(path);
+        cleanups.push(() => assets?.dispose());
+        let settings = path;
+        if (assets) {
+          settings = new window.PIXI.live2d.Cubism4ModelSettings(assets.settings);
+          // Pixi 6's legacy url.resolve corrupts blob:http:// into blob:http//.
+          // Override only this private settings instance, never the shared vendor.
+          const resolve = settings.resolveURL.bind(settings);
+          settings.resolveURL = file => file.startsWith("blob:") ? file : resolve(file);
+        }
+        model = await Live2DModel.from(settings, { autoUpdate: false });
         state.model = model;
         window.__petModel = model;
         setModelMotionDefinitions(model);
@@ -351,7 +362,7 @@
       }
 
       window.addEventListener("resize", handleWindowResize);
-      return { model, app, dispose };
+      return { model, app, dispose, expressions: assets?.expressions };
     }
 
     return {

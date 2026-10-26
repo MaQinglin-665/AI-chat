@@ -35,13 +35,13 @@
   }
   async function describe() {
     const response = await (root.authFetch || root.fetch)("/api/avatar", { cache: "no-store" });
-    if (!response.ok) throw new Error("VRM 无法读取，请检查模型路径和允许目录。");
+    if (!response.ok) throw new Error("角色模型无法读取，请检查模型路径和允许目录。");
     return response.json();
   }
   function showMetadata(info) {
     const panel = root.document?.getElementById("avatar-model-info");
     if (!panel) return;
-    panel.hidden = info.kind !== "vrm";
+    panel.hidden = info.kind !== "vrm" && !info.metadata;
     if (panel.hidden) return;
     const meta = info.metadata || {};
     panel.querySelector("[data-avatar-name]").textContent = meta.name || "未提供名称";
@@ -81,7 +81,7 @@
     const preparingSpeech = age >= 0 && age < prepareMs;
     return { now, preparingSpeech, mode: level > 0.02 ? "speak" : "idle",
       face: state.speechEmotionPose?.emotion || state.speechAnimMood || "neutral", faceIntensity: 0.6,
-      mouth: { open: level, vowel: null } };
+      mouth: { open: level, vowel: fresh && level > 0.02 && ["a", "i", "u", "e", "o"].includes(state.ttsVowel) ? state.ttsVowel : null } };
   }
   function normalizeSource(source, config = {}) {
     if (source?.kind === "vrm") return source;
@@ -102,7 +102,7 @@
     } catch (error) { renderer.dispose(); throw error; }
     state.avatarRenderer = renderer;
     root.__xinyuAvatarRenderer = renderer;
-    showMetadata(source);
+    showMetadata({ ...source, metadata: source.metadata || renderer.metadata });
     root.document.body.dataset.avatarKind = source.kind;
     if (state.uiView === "model") {
       root.document.documentElement.classList.add("transparent-mode", "alpha-true");
@@ -196,7 +196,7 @@
   function installPanel() {
     const panel = root.document?.getElementById("avatar-model-info");
     if (!panel) return;
-    describe().then(showMetadata).catch(() => {});
+    describe().then(info => showMetadata({ ...info, metadata: info.metadata || root.__xinyuAvatarRenderer?.metadata })).catch(() => {});
     panel.querySelectorAll("[data-avatar-action]").forEach((button) => button.addEventListener("click", () => {
       const data = { action: button.dataset.avatarAction };
       root.dispatchEvent(new CustomEvent("avatar-intent", { detail: data }));

@@ -532,6 +532,8 @@
           state._broadcastSpeaking = !!data.speaking;
           state._broadcastAssistantAudioActive = data.assistantAudioActive === true;
           state.ttsAudioLevel = Number(data.audioLevel) || 0;
+          state.ttsVowel = state.ttsAudioLevel > 0.02 && ["a", "i", "u", "e", "o"].includes(data.vowel) ? data.vowel : null;
+          state.ttsVowelConfidence = state.ttsVowel && Number.isFinite(data.vowelConfidence) ? Math.max(0, Math.min(1, data.vowelConfidence)) : 0;
           applyBroadcastListeningPresence(data.listening);
           applyBroadcastPerformancePhase(data, receivedPerfNow, receivedWallNow);
           const cueIsFresh = timing.cueExpiresAt > receivedPerfNow;
@@ -623,6 +625,8 @@
               : 0,
             animDurationMs: state.speechAnimDurationMs || 0,
             audioLevel: state.ttsAudioLevel || 0,
+            vowel: state.ttsAudioLevel > 0.02 ? state.ttsVowel || null : null,
+            vowelConfidence: state.ttsVowelConfidence || 0,
             moodHoldExpiresAtEpochMs: toBridgeEpoch(state.moodHoldUntil, now, wallNow),
             performanceCueExpiresAtEpochMs: performanceCue
               ? toBridgeEpoch(performanceCueDeadline, now, wallNow)

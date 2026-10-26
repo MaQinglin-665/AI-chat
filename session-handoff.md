@@ -1,5 +1,19 @@
 # Session handoff
 
+## Current — stage3 implemented and installed; publication next
+- User explicitly approved stage3 and local Mao switch. Official local assets remain ignored; no new vendor/Core changes. Shared runtime/Pixi pre-Core path retained; Hiyori legacy layers never run for Mao.
+- Added bounded authenticated manifest resources, private Blob loader with instance-local Pixi URL workaround, Mao mapping/driver, conservative five-vowel estimator and validated original speech bridge fields. Unknown intents ignored. Eight official expressions/motions and three A-arm gestures mapped; actual authored motion semantics and small arm ranges documented honestly in docs/avatar-live2d-mao.md. UI attribution retained.
+- Verification Evidence: scripts/test-local.ps1 passed 849 Python/3 skipped, 66 Node suites, Python184/JS226 syntax, secrets807; final doc-inclusive scan808. SameCore Hiyori Node5280 frames/394224 full calls and browser1030/167741 calls/snapshots strictly identical, four identical PNG pairs, ten reload disposals. Real Mao16 captures, all8 native motions actually played,21 authenticated resources, unauth401; docs4 smoke and required JSON/py_compile pass. Logs outside Git in work/avatar-stage3-*.log and avatar-mao-browser.log.
+- Local D:/app/DesktopPet updated with13 minimal avatar files, official models_local/Mao and only config.local.json avatar preference. Other keys/private files preserved, executable/config rollback copies outside Git at outputs/installed-avatar-mao-update. Initial empty renderer caused by old installed connect-src missing blob; narrowly backported upstream policy, restarted, actual served model page verifies ready/Core6/Mao/132 parameters/no JS errors. This is isolated browser evidence, not native desktop capture. Original app hides independent pet while chat stage is visible.
+- Competition captures now30 with manifest/descriptions outside Git; new17 include16 model checks plus actual installed page. Clearly credit Live2D sample art and distinguish explicit test intents from real voice.
+- Next: normal commit/push existing branch, update #217 and mark ready, then stop for author Windows drag/clickthrough/voice/appearance review. Do not merge/main/force push. No dialogue/memory/external-agent implementation edits, model/private files or screenshots staged. Historical holds below are superseded by explicit stage3 confirmation.
+
+# Session handoff
+
+## Current — user confirmed stage3 / local Mao switch
+- User explicitly confirms proceeding after learning the desktop is still Hiyori. Prior stage3 hold is superseded. Implement original stage3 scope, update the actual local install, push #217 and mark ready for author review; no merge. Model assets/config/secrets/screenshots remain local only. Preserve exact Hiyori writes and original Pixi clock.
+- Official SDK Web5-r.5 contains Mao (five vowels, 8 expressions/8 motions); inspect sample-specific terms and rig before mapping. Need bounded read-only manifest resources for ignored models_local/Mao; keep auth/link/traversal boundaries. No dialogue/memory/external-agent changes.
+
 ## Current — stage 2 published as draft; Windows review next
 - Author approved the plan and Core6. Independent Core commit b39ab99 precedes mapping; docs/live2d/vendor Core/display stay byte-identical. Older proposal-only/Core-local stops below are historical and superseded.
 - Implemented one avatarRuntime factory/frame/events path, Live2D six-method adapter and JSON parameter/pose/channel mapping. Renderer-owned clocks preserve Pixi HIGH update, style -> micro -> Core order; VRM RAF/20/30 FPS/hidden suspension moved intact. Original Live2D hit/drag/clickthrough retained with cleanup. No Live2D parameter RAF.
