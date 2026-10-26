@@ -1,3 +1,10 @@
+# Current — shared lipsync, separate main-based branch
+- Priority #217 completed: latest main2b67452/#224 included, pushed0c08c3d, verified open/ready/unmerged. Exact Node5280/394224 and browser1030/167741 strict, final896Python/3skipped/73Node,syntax191/241,secrets843/package pass. Dedicated38.4s Hiyori video delivered locally. Author merges; no brain phase2.
+- New friend/lipsync-fix starts directly at main2b67452. Scope shared playback/mouth/bridge only, preserving FFT1024,25–350ms output-latency compensation and hidden timer. Do not copy #217 adapter commits or strict mapping baselines into this PR. Existing installed120ms listening pass remains local.
+- User symptoms: mouth before sound, freezes before long speech ends; exact device offset not measured. Earlier120ms browser compensation subjectively accepted. Actual browser onstart/onend owns mouth; global speaking may precede onstart; old clamped estimated duration freezes late curve.
+- Official Sendagaya Shino model-specific help explicitly CC0; mirror downloaded local models_local/Sendagaya_Shino.vrm, source JSON ignored. Never author's private model or AvatarSampleA–C. Mao comparison uses isolated #217 overlay, not PR dependency. Next publish diagnosis first, implement/test/record all three, full gates and separate PR.
+
+## Preserved incoming main handoff (historical)
 # PR #224 accepted merge — 2026-10-26
 
 User approved phase 1 and authorized merge commit after latest main integration, local/package gates and all Linux/Windows CI. Latest origin/main 79ee80f merged with conflicts ONLY in the three state files. Both histories preserved below; this current instruction supersedes their prior next-step text. No phase-2 implementation. Local main/private config must remain unchanged.

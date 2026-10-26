@@ -465,3 +465,9 @@ CI repair: Node painted test duplicated pytest invocation, but Linux Node job in
 
 
 Verification Evidence for #224 merge: scripts/test-local.ps1 passed (876 passed, 3 skipped, 1 warning; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed. Ignored logs: tmp_ui_smoke/avatar-vrm-polish/merge224-local.log and merge224-package.log. Three state-file conflicts resolved by retaining both histories and both feature entries; active task stays avatar-brain-driven-v1. No code conflicts or extra product fixes. Next: normal push, ready, all CI, authorized merge commit, then stop awaiting user notice about #217.
+
+
+## 2026-10-26 — Shared lipsync starts separately after PR217 closeout
+- Priority1 complete: #217 latest main2b67452 included, pushed0c08c3d/open/ready/unmerged; exact Hiyori Node5280/394224/browser1030/167741 and full896Python/3skipped/73Node/package pass. Dedicated38.4s Hiyori video delivered to user. No brain phase2 started.
+- New branch friend/lipsync-fix directly from origin/main2b67452. Read AGENTS/current state/playback/expression/bridge/runtime. Preserve existing output latency/FFT/hidden timer; shared browser lifecycle fix across Hiyori/Mao/VRM, separate PR diagnosis before implementation. No dialogue/memory/external implementation changes.
+- CC0 Verification Evidence: official https://vroid.pixiv.help/hc/en-us/articles/360013482714-Sendagaya-Shino explicitly CC0, consistent with user's official overview. Local mirror https://opengameart.org/sites/default/files/sendagaya_shino.zip SHA256ff85ff42c1d041fd66dabdb36761a98557d7b55199f635769f3698a41c0a3696; extractedVRMf11b2648e7e588ae171ad1c32e465f84e5b130b1d1789e3a3702946c0981d2a9. Name/official/mirror/embedded terms recorded in ignored models_local/Sendagaya_Shino.source.json; both paths verified ignored, no model commit.
