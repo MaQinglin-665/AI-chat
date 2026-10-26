@@ -8,13 +8,34 @@
     height: 1.92, distance: 4.6, pitch: 12, yaw: -40.5, gridYaw: 0 });
   const CALIBRATION = Object.freeze({ night: bedroom(), dusk: bedroom(), day: bedroom() });
   const LIGHTS = Object.freeze({
-    night: { ambient: .48, ambientColor: 0x9586c4, key: 1.65, keyColor: 0xffbb7d,
-      keyPosition: [2.3, 2.0, -.9], rim: 1.05, rimColor: 0x91baff, rimPosition: [-3, 2.5, -2], shadow: .30, reflection: .105 },
-    dusk: { ambient: .65, ambientColor: 0xf1b1b6, key: 2.0, keyColor: 0xffbc78,
-      keyPosition: [-3, 2.5, -1], rim: .32, rimColor: 0xffcfb3, rimPosition: [2, 2, 0], shadow: .32, reflection: .09 },
-    day: { ambient: .85, ambientColor: 0xfff1e2, key: 1.7, keyColor: 0xfff1dc,
-      keyPosition: [-3, 3.5, -1], rim: .25, rimColor: 0xd8e6ff, rimPosition: [2, 2, 0], shadow: .22, reflection: .075 }
+    night: { ambient: .24, ambientColor: 0x9586c4, key: 2.15, keyColor: 0xffbc80,
+      keyPosition: [.9, 2, 1.6], rim: 1.05, rimColor: 0x8cb8ff, rimPosition: [-1, 2.7, -3.5], shadow: .36, reflection: .20 },
+    dusk: { ambient: .28, ambientColor: 0xe8a09a, key: 1.7, keyColor: 0xffa64f,
+      keyPosition: [-1, 2.7, -3.5], rim: 1.8, rimColor: 0xffc278, rimPosition: [-1.8, 2.2, -3.2], shadow: .48, reflection: .24 },
+    day: { ambient: .72, ambientColor: 0xffeddb, key: 1.8, keyColor: 0xffe8cf,
+      keyPosition: [-1.8, 3.5, -2.6], rim: .35, rimColor: 0xffedcf, rimPosition: [-1, 3, -3.5], shadow: .42, reflection: .19 }
   });
+  // CSS pixels, metres and linear-light color multipliers. No full-frame blur.
+  const SURFACE = Object.freeze({ softnessPx: .75, haloRadiusPx: 4, rimWidthPx: 1.4,
+    reflectionBlurPx: 1.1, reflectionFade: .46, reflectionTint: .24, reflectionMaxWidth: 960,
+    contactSize: [.46, .64], shadowWidth: 1.05, samples: 4 });
+  const LOOKS = Object.freeze({
+    night: { saturation: .90, exposure: .88, temperature: [1.05,.96,.98], shadowTint: [.91,.87,1.16],
+      shadowMix: .26, sideContrast: .23, leftRim: .14, rightRim: .25, leftColor: 0x8bbaff, rightColor: 0xffc48b,
+      halo: .035, haloColor: 0xe7b6c8, floorColor: 0x844441, contact: .56, shadowLength: 1.35, shadowOffset: .22 },
+    dusk: { saturation: .92, exposure: .66, temperature: [1.08,.94,.86], shadowTint: [1.12,.84,.91],
+      shadowMix: .22, sideContrast: -.13, leftRim: .46, rightRim: .06, leftColor: 0xffb34f, rightColor: 0xffcd9c,
+      halo: .055, haloColor: 0xffbd78, floorColor: 0xe67938, contact: .72, shadowLength: 2.5, shadowOffset: .86 },
+    day: { saturation: .94, exposure: 1.0, temperature: [1.03,1.0,.96], shadowTint: [1.03,.98,.94],
+      shadowMix: .12, sideContrast: -.05, leftRim: .14, rightRim: .04, leftColor: 0xffe1b9, rightColor: 0xffe8cf,
+      halo: .022, haloColor: 0xffe4c4, floorColor: 0xeeb882, contact: .66, shadowLength: 1.6, shadowOffset: .34 }
+  });
+  const gradeShader = `uniform float saturation,exposure,shadowMix,sideContrast,footX;
+    uniform vec3 temperature,shadowTint;
+    vec3 grade(vec3 rgb,vec2 uv){float l=dot(rgb,vec3(.2126,.7152,.0722));
+      rgb=mix(vec3(l),rgb,saturation)*temperature*exposure;
+      rgb*=mix(vec3(1.),shadowTint,shadowMix*(1.-smoothstep(.04,.40,l)));
+      return rgb*(1.+clamp((uv.x-footX)/.045,-1.,1.)*sideContrast);}`;
   const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
   const smooth = t => { t = clamp(t); return t * t * (3 - 2 * t); };
   function periodAt(scene, hour = new Date().getHours()) {
@@ -111,27 +132,55 @@
     const colorA = new T.Color(), colorB = new T.Color();
     const shadowMaterial = own(new T.ShaderMaterial({ transparent: true, depthWrite: false,
       uniforms: { strength: { value: .3 } }, vertexShader: "varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
-      fragmentShader: "varying vec2 vUv;uniform float strength;void main(){float d=length((vUv-.5)*2.);gl_FragColor=vec4(.09,.055,.13,pow(max(0.,1.-d),2.)*strength);}" }));
-    const shadow = new T.Mesh(own(new T.PlaneGeometry(1.25, 1.9)), shadowMaterial);
+      fragmentShader: "varying vec2 vUv;uniform float strength;void main(){float d=length((vUv-.5)*2.);float a=exp(-3.5*d*d)*(1.-smoothstep(.75,1.,d));gl_FragColor=vec4(.07,.045,.09,a*strength);}" }));
+    const contactMaterial = own(shadowMaterial.clone());
+    const shadow = new T.Mesh(own(new T.PlaneGeometry(SURFACE.shadowWidth, 1)), shadowMaterial);
     shadow.rotation.x = -Math.PI / 2; shadow.position.y = floorY + .002; group.add(shadow);
     const feet = [-.09, .09].map(x => {
-      const foot = new T.Mesh(own(new T.PlaneGeometry(.25, .4)), shadowMaterial);
+      const foot = new T.Mesh(own(new T.PlaneGeometry(...SURFACE.contactSize)), contactMaterial);
       foot.rotation.x = -Math.PI / 2; foot.position.set(x, floorY + .003, 0); group.add(foot); return foot;
     });
     const grid = new T.GridHelper(16, 16, 0x44ffff, 0x44ffff); own(grid.geometry); own(grid.material);
     grid.position.y = floorY + .008; grid.material.transparent = true; grid.material.opacity = .45; grid.material.depthWrite = false;
     grid.visible = settings.grid === true; group.add(grid);
-    let target = null;
+    let target = null, avatarTarget = null, renderStats = null;
+    const lookUniforms = { saturation: { value: 1 }, exposure: { value: 1 }, temperature: { value: new T.Vector3(1,1,1) },
+      shadowTint: { value: new T.Vector3(1,1,1) }, shadowMix: { value: 0 }, sideContrast: { value: 0 }, footX: { value: .56 }, footY: { value: .14 } };
     const reflectionUniforms = { image: { value: fallback }, pixel: { value: new T.Vector2(1 / 640, 1 / 360) },
-      strength: { value: .1 }, footY: { value: .14 } };
+      strength: { value: .2 }, floorTint: { value: new T.Color() }, ...lookUniforms };
     const reflection = new T.Mesh(own(new T.PlaneGeometry(2, 2)), own(new T.ShaderMaterial({
       transparent: true, depthTest: false, depthWrite: false, uniforms: reflectionUniforms, vertexShader: vertex,
-      fragmentShader: `varying vec2 vUv;uniform sampler2D image;uniform vec2 pixel;uniform float strength,footY;
-        void main(){vec4 c=vec4(0.);for(int x=-1;x<=1;x++){for(int y=-1;y<=1;y++){c+=texture2D(image,vUv+vec2(float(x),float(y))*pixel*1.4);}}
-        c/=9.;float fade=clamp(1.-(footY-vUv.y)/.28,0.,1.);gl_FragColor=vec4(c.rgb,c.a*strength*fade*fade);
+      fragmentShader: `varying vec2 vUv;uniform sampler2D image;uniform vec2 pixel;uniform float strength,footY;uniform vec3 floorTint;
+        ${gradeShader}
+        void main(){vec4 c=vec4(0.);for(int x=-1;x<=1;x++){for(int y=-1;y<=1;y++){c+=texture2D(image,vUv+vec2(float(x),float(y))*pixel*${SURFACE.reflectionBlurPx.toFixed(4)});}}
+        c/=9.;float fade=clamp(1.-(footY-vUv.y)/${SURFACE.reflectionFade.toFixed(4)},0.,1.);
+        vec3 rgb=grade(c.rgb/max(c.a,.001),vUv);vec3 tint=clamp(floorTint/max(dot(floorTint,vec3(.2126,.7152,.0722)),.01),.4,2.);
+        rgb*=mix(vec3(1.),tint,${SURFACE.reflectionTint.toFixed(4)});gl_FragColor=vec4(rgb,c.a*strength*fade);
         #include <colorspace_fragment>
         }` })));
     reflection.frustumCulled = false; reflection.renderOrder = -90; group.add(reflection);
+    const compositeUniforms = { image: { value: fallback }, pixel: { value: new T.Vector2() },
+      leftRim: { value: 0 }, rightRim: { value: 0 }, leftColor: { value: new T.Color() }, rightColor: { value: new T.Color() },
+      halo: { value: 0 }, haloColor: { value: new T.Color() }, ...lookUniforms };
+    const composite = new T.Mesh(own(new T.PlaneGeometry(2, 2)), own(new T.ShaderMaterial({
+      transparent: true, depthTest: false, depthWrite: false, uniforms: compositeUniforms, vertexShader: vertex,
+      fragmentShader: `varying vec2 vUv;uniform sampler2D image;uniform vec2 pixel;uniform float leftRim,rightRim,halo,footY;
+        uniform vec3 leftColor,rightColor,haloColor;${gradeShader}
+        vec4 blur(float radius){vec4 c=texture2D(image,vUv)*4.;
+          c+=(texture2D(image,vUv+pixel*vec2(radius,0.))+texture2D(image,vUv-pixel*vec2(radius,0.))
+            +texture2D(image,vUv+pixel*vec2(0.,radius))+texture2D(image,vUv-pixel*vec2(0.,radius)))*2.;
+          c+=texture2D(image,vUv+pixel*vec2(radius,radius))+texture2D(image,vUv+pixel*vec2(-radius,radius))
+            +texture2D(image,vUv+pixel*vec2(radius,-radius))+texture2D(image,vUv-pixel*vec2(radius,radius));return c/16.;}
+        void main(){vec4 c=blur(${SURFACE.softnessPx.toFixed(4)});vec3 rgb=grade(c.rgb/max(c.a,.001),vUv);
+          float left=max(0.,c.a-texture2D(image,vUv+pixel*vec2(-${SURFACE.rimWidthPx.toFixed(4)},.4)).a);
+          float right=max(0.,c.a-texture2D(image,vUv+pixel*vec2(${SURFACE.rimWidthPx.toFixed(4)},.4)).a);
+          float rimMask=smoothstep(footY+.01,footY+.08,vUv.y);
+          rgb+=(leftColor*left*leftRim+rightColor*right*rightRim)*rimMask;
+          float glow=blur(${SURFACE.haloRadiusPx.toFixed(4)}).a*halo*(1.-c.a)*rimMask;float alpha=c.a+glow;
+          gl_FragColor=vec4((rgb*c.a+haloColor*glow)/max(alpha,.001),alpha);
+          #include <colorspace_fragment>
+        }` })));
+    composite.frustumCulled = false; composite.renderOrder = 100; composite.visible = false; group.add(composite);
     function resizeCamera(camera, width, height) {
       const plate = state?.current, cal = CALIBRATION[plate?.period || periodAt(period)];
       const iw = plate?.width || 1672, ih = plate?.height || 941;
@@ -149,6 +198,7 @@
       m[5] *= sy; m[9] = m[9] * sy - (2 * crop.y + crop.h - ih) / crop.h;
       camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
       grid.rotation.y = cal.gridYaw; reflectionUniforms.footY.value = 1 - crop.anchor[1];
+      lookUniforms.footX.value = crop.anchor[0];
       cameraData = { position: camera.position.toArray(), fov: camera.fov, crop, calibration: cal };
       for (const [slot, item] of [["A", state?.current], ["B", state?.next || state?.current]]) {
         const c = cover(item?.width || 1672, item?.height || 941, width, height, CALIBRATION[item?.period || periodAt(period)].anchor);
@@ -164,6 +214,13 @@
       const a = LIGHTS[state.current?.period || periodAt(period)], b = LIGHTS[state.next?.period || state.current?.period || periodAt(period)], t = state.blend;
       const mix = name => a[name] + (b[name] - a[name]) * t;
       const color = (out, name) => out.copy(colorA.setHex(a[name])).lerp(colorB.setHex(b[name]), t);
+      const lookA = LOOKS[state.current?.period || periodAt(period)], lookB = LOOKS[state.next?.period || state.current?.period || periodAt(period)];
+      const look = name => lookA[name] + (lookB[name] - lookA[name]) * t;
+      for (const name of ["saturation", "exposure", "shadowMix", "sideContrast"]) lookUniforms[name].value = look(name);
+      for (const name of ["temperature", "shadowTint"]) lookUniforms[name].value.set(...lookA[name].map((v,i)=>v+(lookB[name][i]-v)*t));
+      for (const name of ["leftRim", "rightRim", "halo"]) compositeUniforms[name].value = look(name);
+      for (const name of ["leftColor", "rightColor", "haloColor"]) compositeUniforms[name].value.copy(colorA.setHex(lookA[name])).lerp(colorB.setHex(lookB[name]),t);
+      reflectionUniforms.floorTint.value.copy(colorA.setHex(lookA.floorColor)).lerp(colorB.setHex(lookB.floorColor),t);
       ambient.intensity = mix("ambient"); color(ambient.color, "ambientColor");
       for (const [light, name] of [[key, "key"], [rim, "rim"]]) {
         light.intensity = mix(name); color(light.color, name + "Color");
@@ -171,20 +228,24 @@
         light.position.set(p[0], floorY + p[1], p[2]); light.target.position.set(0, floorY + .8, 0);
       }
       shadowMaterial.uniforms.strength.value = mix("shadow");
+      contactMaterial.uniforms.strength.value = look("contact");
       shadow.rotation.z = Math.atan2(-key.position.x, -key.position.z);
-      shadow.position.x = -key.position.x * .065; shadow.position.z = -key.position.z * .065;
+      shadow.scale.y = look("shadowLength");
+      const direction = Math.hypot(key.position.x, key.position.z);
+      shadow.position.x = -key.position.x / direction * look("shadowOffset"); shadow.position.z = -key.position.z / direction * look("shadowOffset");
       reflectionUniforms.strength.value = mix("reflection"); reflection.visible = reflectionOn && !!target;
-      illumination = { ambient: ambient.intensity, key: key.intensity, rim: rim.intensity, shadow: mix("shadow") };
+      illumination = { ambient: ambient.intensity, key: key.intensity, rim: rim.intensity, shadow: mix("shadow"),
+        contact: look("contact"), shadowLength: look("shadowLength"), reflection: mix("reflection"), saturation: look("saturation"), exposure: look("exposure") };
     }
     function renderReflection(renderer, camera, avatar) {
       if (!reflectionOn || disposed) return;
-      const size = renderer.getSize(new T.Vector2()), w = Math.min(960, Math.ceil(size.x / 2)), h = Math.max(1, Math.round(w * size.y / size.x));
+      const size = renderer.getSize(new T.Vector2()), w = Math.min(SURFACE.reflectionMaxWidth, Math.ceil(size.x / 2)), h = Math.max(1, Math.round(w * size.y / size.x));
       if (!target) target = new T.WebGLRenderTarget(w, h, { depthBuffer: true });
       if (target.width !== w || target.height !== h) target.setSize(w, h);
       reflectionUniforms.image.value = target.texture; reflectionUniforms.pixel.value.set(1 / w, 1 / h);
       const saved = { target: renderer.getRenderTarget(), scale: avatar.scale.y, y: avatar.position.y,
         background: scene.background, alpha: renderer.getClearAlpha(), color: renderer.getClearColor(new T.Color()) };
-      const visible = [background, reflection, shadow, grid, ...feet].map(n => [n, n.visible]);
+      const visible = [background, reflection, composite, shadow, grid, ...feet].map(n => [n, n.visible]);
       try {
         visible.forEach(([n]) => { n.visible = false; });
         avatar.scale.y = -saved.scale; avatar.position.y = 2 * floorY - saved.y; avatar.updateMatrixWorld(true);
@@ -195,8 +256,32 @@
         visible.forEach(([n, value]) => { n.visible = value; }); reflection.visible = true;
       }
     }
+    function render(renderer, camera, avatar) {
+      if (disposed) return;
+      renderReflection(renderer, camera, avatar);
+      const reflectionCalls = reflectionOn ? (renderer.info?.render.calls || 0) : 0;
+      const size = renderer.getDrawingBufferSize(new T.Vector2()), css = renderer.getSize(new T.Vector2());
+      if (!avatarTarget) avatarTarget = new T.WebGLRenderTarget(size.x, size.y, { samples: SURFACE.samples });
+      if (avatarTarget.width !== size.x || avatarTarget.height !== size.y) avatarTarget.setSize(size.x,size.y);
+      compositeUniforms.image.value = avatarTarget.texture; compositeUniforms.pixel.value.set(1/css.x,1/css.y);
+      const saved = { target: renderer.getRenderTarget(), alpha: renderer.getClearAlpha(), color: renderer.getClearColor(new T.Color()), avatar: avatar.visible };
+      const visible = [background, reflection, composite, shadow, grid, ...feet].map(n=>[n,n.visible]);
+      try {
+        visible.forEach(([n])=>{n.visible=false;});
+        renderer.setRenderTarget(avatarTarget); renderer.setClearColor(0,0); renderer.clear(); renderer.render(scene,camera);
+        const avatarCalls = renderer.info?.render.calls || 0;
+        renderer.setRenderTarget(saved.target); renderer.setClearColor(saved.color,saved.alpha);
+        visible.forEach(([n,value])=>{n.visible=value;}); composite.visible=true; avatar.visible=false;
+        renderer.render(scene,camera);
+        const compositeCalls = renderer.info?.render.calls || 0;
+        renderStats = { reflectionCalls, avatarCalls, compositeCalls, total: reflectionCalls + avatarCalls + compositeCalls };
+      } finally {
+        avatar.visible=saved.avatar; visible.forEach(([n,value])=>{n.visible=value;});
+        renderer.setRenderTarget(saved.target); renderer.setClearColor(saved.color,saved.alpha);
+      }
+    }
     update(period, 0);
-    return { ready: plates.ready, update, resizeCamera, renderReflection,
+    return { ready: plates.ready, update, resizeCamera, render,
       avatarYaw: () => CALIBRATION[state?.current?.period || periodAt(period)].yaw * Math.PI / 180,
       setFootPositions: points => feet.forEach((foot, i) => { if (points[i]) foot.position.set(points[i][0], floorY + .003, points[i][2]); }),
       getLayout: () => ({ activityPoints: {}, obstacles: [], stationary: true }),
@@ -205,13 +290,14 @@
           if (!reflectionOn && target) { target.dispose(); target = null; reflectionUniforms.image.value = fallback; } } },
       metrics: () => ({ preset: "painted", period: state?.current?.period, next: state?.next?.period, blend: state?.blend,
         pending: state?.pending, error: state?.error, textures: Number(!!state?.current) + Number(!!state?.next),
-        reflection: reflectionOn, grid: grid.visible, camera: cameraData, illumination }),
-      dispose() { if (disposed) return; disposed = true; abort.abort(); plates.dispose(); target?.dispose(); target = null;
+        reflection: reflectionOn, grid: grid.visible, camera: cameraData, illumination, renderStats,
+        surface: { softnessPx: SURFACE.softnessPx, haloRadiusPx: SURFACE.haloRadiusPx, avatarTarget: avatarTarget ? [avatarTarget.width,avatarTarget.height] : null } }),
+      dispose() { if (disposed) return; disposed = true; abort.abort(); plates.dispose(); target?.dispose(); target = null; avatarTarget?.dispose(); avatarTarget = null;
         scene.remove(group); group.clear(); scene.background = oldBackground; scene.fog = oldFog;
         resources.forEach(item => item.dispose()); resources.clear(); }
     };
   }
-  const api = { PERIODS, TIMING, CALIBRATION, LIGHTS, periodAt, cover, localURL, smooth, createPlates, stationaryPose, create };
+  const api = { PERIODS, TIMING, CALIBRATION, LIGHTS, SURFACE, LOOKS, periodAt, cover, localURL, smooth, createPlates, stationaryPose, create };
   root.XinyuVRMPainted = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -504,9 +504,9 @@
       if (painted) {
         painted.update(paintedPeriod(), now); painted.resizeCamera(paintedCamera, width, height);
         painted.setFootPositions(["leftFoot", "rightFoot"].map(name => vrm.humanoid?.getRawBoneNode?.(name)?.getWorldPosition(new vendor.THREE.Vector3()).toArray()));
-        painted.renderReflection(renderer, paintedCamera, avatarRoot);
-      }
-      renderer.render(scene, paintedCamera || camera); frames += 1;
+        painted.render(renderer, paintedCamera, avatarRoot);
+      } else renderer.render(scene, camera);
+      frames += 1;
       updateHitAreas(width, height, paintedCamera || camera);
     }
     function hitTest(x, y) {

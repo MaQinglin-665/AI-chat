@@ -17,6 +17,18 @@ assert.equal(P.periodAt("morning"),"day"); assert.equal(P.periodAt("auto",17),"d
 assert.equal(P.periodAt("auto",20),"night"); assert.equal(P.periodAt("auto",5),"day");
 assert(P.LIGHTS.night.keyPosition[0]>0 && P.LIGHTS.night.rimPosition[0]<0);
 assert(P.LIGHTS.day.keyPosition[0]<0 && P.LIGHTS.dusk.keyPosition[0]<0);
+for(const period of P.PERIODS) assert(P.LIGHTS[period].reflection>=.15 && P.LIGHTS[period].reflection<=.25);
+assert(P.SURFACE.softnessPx>=.5 && P.SURFACE.softnessPx<=1);
+assert(P.LOOKS.night.contact<P.LOOKS.dusk.contact);
+assert(P.LOOKS.dusk.shadowLength>P.LOOKS.day.shadowLength);
+assert(P.LOOKS.dusk.exposure<P.LOOKS.day.exposure);
+assert(P.LOOKS.dusk.leftRim>P.LOOKS.day.leftRim && P.LOOKS.night.rightRim>P.LOOKS.night.leftRim);
+// Check light directions in the accepted camera coordinates, not only world X.
+const yaw=P.CALIBRATION.dusk.yaw*Math.PI/180;
+const screenDirection=([x,y,z])=>[x*Math.cos(yaw)-z*Math.sin(yaw),x*Math.sin(yaw)+z*Math.cos(yaw)];
+const sunlight=screenDirection(P.LIGHTS.dusk.keyPosition);
+assert(sunlight[0]<0 && sunlight[1]<0,"dusk light left/back; its shadow right/front");
+assert(screenDirection(P.LIGHTS.night.keyPosition)[0]>0);
 const stationary=W.create({layout:{activityPoints:{},obstacles:[]}});
 for(let i=0;i<1000;i++){const s=stationary.update(i*10000);assert.deepEqual(s.position,[0,0]);assert.equal(s.moving,false);assert.equal(stationary.begin("window"),false);}
 for(let t=0;t<200000;t+=500){const pose=P.stationaryPose(t,false);assert.equal(pose.y,0);assert.deepEqual(pose.offset,[0,0]);assert(pose.weight>=0 && pose.weight<=1);}
@@ -60,6 +72,25 @@ assert.equal(P.stationaryPose(50000,false,-1).bones.leftUpperArm.z,-P.stationary
     assert.deepEqual(requests,[P.localURL("night"),"/assets/painted-placeholder.png"]);room.dispose();
   }
   assert.equal(closed,2);delete global.createImageBitmap;
+  // Real Three render targets + a renderer spy: isolate the avatar, preserve
+  // caller state on every pass/failure, release both GPU targets exactly once.
+  const scene=new T.Scene(),avatar=new T.Group(),camera=new T.PerspectiveCamera();scene.add(avatar);
+  const room=P.create({THREE:T,scene,loadTexture:async name=>plate(name)});await room.ready;room.update("night",0);
+  room.resizeCamera(camera,1280,800);
+  let bound=null,clearAlpha=.3,color=new T.Color(0x112233),calls=[],failAt=0;const targets=new Set(),disposed=new Map();
+  const renderer={info:{render:{calls:4}},getSize:v=>v.set(1280,800),getDrawingBufferSize:v=>v.set(1600,1000),
+    getRenderTarget:()=>bound,setRenderTarget:t=>{bound=t;if(t&&!targets.has(t)){targets.add(t);disposed.set(t,0);t.addEventListener("dispose",()=>disposed.set(t,disposed.get(t)+1));}},
+    getClearAlpha:()=>clearAlpha,getClearColor:v=>v.copy(color),setClearColor:(v,a)=>{color.set(v);clearAlpha=a;},clear(){},
+    render(){calls.push({bound,visible:avatar.visible,y:avatar.scale.y});if(failAt && calls.length===failAt)throw Error("render failed");}};
+  room.render(renderer,camera,avatar);assert.equal(calls.length,3);
+  assert.equal(calls[0].y,-1);assert.equal(calls[1].y,1);assert.equal(calls[2].visible,false);
+  assert.equal(avatar.visible,true);assert.equal(avatar.scale.y,1);assert.equal(bound,null);assert.equal(clearAlpha,.3);
+  assert.equal(color.getHex(),0x112233);assert.equal(targets.size,2);assert.deepEqual(room.metrics().surface.avatarTarget,[1600,1000]);
+  room.setOptions({reflection:false});assert.equal([...disposed.values()].reduce((a,b)=>a+b),1);
+  calls=[];room.render(renderer,camera,avatar);assert.equal(calls.length,2);assert.equal(targets.size,2);
+  calls=[];failAt=1;assert.throws(()=>room.render(renderer,camera,avatar));assert.equal(bound,null);assert.equal(avatar.visible,true);assert.equal(clearAlpha,.3);
+  calls=[];failAt=2;assert.throws(()=>room.render(renderer,camera,avatar));assert.equal(bound,null);assert.equal(avatar.visible,true);
+  room.dispose();room.dispose();assert.equal([...disposed.values()].reduce((a,b)=>a+b),2);assert.equal(live,0);
   // Exercise real backend validation from Node too; use only temporary fixture files.
   const {spawnSync}=require("node:child_process");
   const result=spawnSync(process.env.PYTHON || "python",["-m","pytest","-q","tests/test_avatar_backdrops.py"],{cwd:require("node:path").join(__dirname,".."),encoding:"utf8",env:{...process.env,PYTEST_DISABLE_PLUGIN_AUTOLOAD:"1"}});

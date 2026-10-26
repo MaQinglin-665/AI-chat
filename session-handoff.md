@@ -11,3 +11,9 @@ Private models/backgrounds/config remain outside Git. No config.local.json read;
 
 Next: draft PR visual review. Base main; first description line exactly: 依赖 #220，需在 #220 合并后再合并
 #220 remains OPEN as of verification. Once merged, merge origin/main into this branch; stop if any conflict outside feature_list.json, progress.md, session-handoff.md. Never force push, push main or merge this PR.
+
+## PR #221 follow-up: integration polish
+
+User accepted calibration/cropping; preserve them. This revision strengthens contact/reflection and period lighting, adds avatar-only 0.75px softness/faint halo and grading. Constants in vrmPainted.js; only shared change is vrmRenderer.js painted render dispatch, no avatarRuntime/camera-follow edits. Updated tests cover multipass state restoration and target disposal.
+Full local gate passed: 841 Python / 3 skipped, all Node/syntax/secrets. Isolated real VRM0 before/after three periods, feet/edge closeups in tmp_ui_smoke/painted-polish/after-final-*.png and before-*.png. Final shader/page errors empty; background outer pixels unchanged. Twenty more scene cycles stable 26 geometries / 49 textures; major-GC heap 6677384 / 6835904 bytes. Reflection setting disposal and room/handpainted/none/pet smoke passed. Added MSAA target costs GPU memory; no hardware-wide/long-duration performance claim.
+Next: user visual review of draft https://github.com/MaQinglin-665/AI-chat/pull/221. Keep dependency notice and #220 merge constraints above. Screenshots remain local and ignored.
