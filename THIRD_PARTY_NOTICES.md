@@ -68,4 +68,14 @@ Useful references:
 
 ## Release Packaging Rule
 
+### KayKit: Furniture Bits 1.0 (FREE subset)
+
+- Author: Kay Lousberg.
+- Source: https://kaylousberg.itch.io/furniture-bits
+- License: Creative Commons Zero 1.0 Universal (CC0); original `License.txt` is included unchanged.
+- Location: `web/vendor/scenes/kaykit-furniture/`.
+- Selected glTF models and their required binary meshes: decorated shelf, standing lamp, cactus,
+  oval rug, pillow, table, chair, couch and two picture frames; one shared `furniturebits_texture.png`.
+  The complete asset pack is not redistributed. These licensed room assets are distinct from private VRM avatars.
+
 Preview source-test packages should include this notice file. Do not add new sample models, generated images, reference audio, screenshots, or demo videos to the package unless their source and redistribution boundary are recorded here.

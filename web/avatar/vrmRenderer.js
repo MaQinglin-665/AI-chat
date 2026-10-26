@@ -14,6 +14,7 @@
     gazeX: 0.5, gazeY: 0.3, gazeIdle: 0.12, gazeHeight: 0.9, gazeDistance: 2,
     seed: 23017
   });
+  const WORLD_VISUAL = Object.freeze({bookSize:[.13,.018,.19],bookPosition:[0,-.025,.055],bookColor:0x9f7fa9,gazeDistance:2,gazeHeight:.9});
   const QUALITY = Object.freeze({ pixelBudget: 900000, minDpr: 1, maxDpr: 1.25, idleFps: 20, activeFps: 30 });
   const CAMERA = Object.freeze({ fov: 27, eyeLift: 0.035, bottom: 0.40, top: 1.16, face: 0.91, faceScreenY: 1 / 3 });
   const STANCE = Object.freeze({ yaw: 15 * Math.PI / 180, headReturn: 0.9,
@@ -167,7 +168,7 @@
     const supports = name => typeof name === "string" && !!expressions?.getExpression?.(name);
     const set = (name, value) => { if (supports(name)) expressions.setValue(name, clamp(value)); };
     const bone = name => vrm.humanoid?.getNormalizedBoneNode?.(name);
-    const names = Object.keys(poseAt(0).bones);
+    const names = [...Object.keys(poseAt(0).bones), "leftUpperLeg", "rightUpperLeg", "leftLowerLeg", "rightLowerLeg", "leftFoot", "rightFoot"];
     const rest = new Map(names.map(name => [name, { rotation: bone(name)?.rotation?.clone?.(),
       position: bone(name)?.position?.clone?.(), scale: bone(name)?.scale?.clone?.() }]));
     const vowelNames = [...new Set(Object.values(vowels))], faceNames = [...new Set(Object.values(faces))];
@@ -192,7 +193,10 @@
       const pose = poseAt(elapsed, { seed, facing, height, level: frame.mouth?.open || 0, action });
       lastSmallMotion = pose.smallMotion;
       for (const name of names) {
-        const n = bone(name), base = rest.get(name), offset = pose.bones[name];
+        const n = bone(name), base = rest.get(name);
+        const offset = {x:0,y:0,z:0,px:0,py:0,scaleY:1,...pose.bones[name]};
+        const world = frame.worldPose;
+        if(world?.bones[name]) for(const [key,value] of Object.entries(world.bones[name])) offset[key] += (value-offset[key])*world.weight;
         if (!n || !base.rotation) continue;
         n.rotation.copy(base.rotation);
         if (base.position) n.position.copy(base.position);
@@ -222,6 +226,11 @@
       if (frame.speechGesture && ["nod", "small_nod"].includes(frame.speechGesture.name) && bone("head")) {
         bone("head").rotation.x += Math.sin(clamp(frame.speechGesture.phase) * Math.PI) * MOTION.smallNod * facing;
       }
+      if(frame.worldOrigin && vrm.lookAt?.target?.position) {
+        const p=vrm.lookAt.target.position; p.x+=frame.worldOrigin[0];p.y+=frame.worldOrigin[1];p.z+=frame.worldOrigin[2];
+      }
+      if(frame.worldGaze && vrm.lookAt?.target?.position) vrm.lookAt.target.position.set(...frame.worldGaze);
+      if(frame.solveContacts) frame.solveContacts();
       vrm.update?.(delta);
     }
     return { update, playAction, stopAction, isAnimating: () => !!action,
@@ -250,16 +259,27 @@
     let vrm = null, driver = null, renderer = null, scene = null, camera = null, generation = 0;
     const canvas = options.canvas;
     let modelHeight = 1.6, hitAreas = [], loadMs = 0, loadedAt = 0, frames = 0;
-    let projection = null;
+    let projection = null, avatarRoot = null, world = null, worldState = null, cameraHome = null, follow = [0,0,0], worldTime = null, book = null;
+    const worldModule = options.worldModule || root.XinyuVRMWorld;
     let room = null, legacyLights = null, undoGrade = null, floorY = 0;
     const roomModule = options.roomModule || root.XinyuVRMScene;
     const period = () => root.document?.body?.dataset.stageRoom || "night";
     function setScene(value) {
       if (!scene) return;
-      room?.dispose(); room = null; undoGrade?.(); undoGrade = null;
+      room?.dispose(); room = null; world?.dispose(); world=null; worldState=null; worldTime=null;
+      if(avatarRoot){avatarRoot.position.set(0,0,0);avatarRoot.rotation.y=0;}
+      follow=[0,0,0]; if(book) book.visible=false;
+      if(cameraHome && camera){camera.position.set(0,cameraHome.cameraY,cameraHome.distance);camera.lookAt(0,cameraHome.targetY,0);}
+      undoGrade?.(); undoGrade = null;
       const useRoom = roomModule?.enabled(options.view, value);
       if (legacyLights) legacyLights.visible = !useRoom;
-      if (useRoom) room = roomModule.create({ THREE: vendor.THREE, scene, height: modelHeight, floorY, period: period() });
+      if (useRoom) {
+        room = roomModule.create({ THREE: vendor.THREE, vendor, scene, height: modelHeight, floorY, period: period() });
+        world = worldModule?.create({seed: options.seed,emit: detail=>{
+          root.console?.debug?.("avatar-world-event", detail);
+          if(root.CustomEvent) root.dispatchEvent?.(new root.CustomEvent("avatar-world-event",{detail}));
+        }});
+      }
       else undoGrade = gradeRoomMaterials(vrm.scene, options.view === "full" ? LIGHT.room : LIGHT.pet);
       if (root.document?.body) root.document.body.dataset.avatarScene = useRoom ? "room" : "none";
     }
@@ -273,12 +293,16 @@
     ];
     function dispose() {
       generation += 1;
-      room?.dispose(); room = null; undoGrade?.(); undoGrade = null; legacyLights = null;
+      room?.dispose(); room = null; world?.dispose(); world=null; worldState=null; worldTime=null;
+      if(avatarRoot){avatarRoot.position.set(0,0,0);avatarRoot.rotation.y=0;}
+      follow=[0,0,0]; if(book) book.visible=false;
+      if(cameraHome && camera){camera.position.set(0,cameraHome.cameraY,cameraHome.distance);camera.lookAt(0,cameraHome.targetY,0);}
+      undoGrade?.(); undoGrade = null; legacyLights = null;
       if (root.document?.body) root.document.body.dataset.avatarScene = "none";
       driver?.stopAction();
       if (vrm) vendor.VRMUtils.deepDispose(vrm.scene);
       renderer?.dispose(); renderer?.forceContextLoss();
-      vrm = driver = renderer = scene = camera = null;
+      vrm = driver = renderer = scene = camera = avatarRoot = book = cameraHome = null;
       hitAreas = []; projection = null; frames = 0;
     }
     async function load(source = {}) {
@@ -305,7 +329,7 @@
       vrm = loaded;
       VRMUtils.rotateVRM0(vrm);
       scene = new THREE.Scene();
-      scene.add(vrm.scene);
+      avatarRoot = new THREE.Group(); avatarRoot.add(vrm.scene); scene.add(avatarRoot);
       if (vrm.lookAt) { vrm.lookAt.target = new THREE.Object3D(); scene.add(vrm.lookAt.target); }
       camera = new THREE.PerspectiveCamera(CAMERA.fov, 1, 0.01, 100);
       const box = new THREE.Box3().setFromObject(vrm.scene);
@@ -313,7 +337,7 @@
       modelHeight = height; projection = new THREE.Vector3();
       const eye = vrm.humanoid?.getRawBoneNode?.("leftEye");
       const faceY = eye ? eye.getWorldPosition(projection).y : box.min.y + height * CAMERA.face;
-      const framing = cameraFraming(box.min.y, height, faceY);
+      const framing = cameraFraming(box.min.y, height, faceY); cameraHome=framing;
       camera.position.set(0, framing.cameraY, framing.distance);
       camera.lookAt(0, framing.targetY, 0);
       const preset = options.view === "full" ? LIGHT.room : LIGHT.pet;
@@ -328,6 +352,8 @@
         light.target.position.set(0, box.min.y + height * LIGHT.targetHeight, 0);
         light.castShadow = false; legacyLights.add(light, light.target);
       }
+      const hand=vrm.humanoid?.getRawBoneNode?.("rightHand");
+      if(hand){book=new THREE.Mesh(new THREE.BoxGeometry(...WORLD_VISUAL.bookSize),new THREE.MeshToonMaterial({color:WORLD_VISUAL.bookColor}));book.position.set(...WORLD_VISUAL.bookPosition);book.visible=false;hand.add(book);}
       setScene(source.scene);
       renderer = new THREE.WebGLRenderer({ canvas, alpha: true, premultipliedAlpha: true, antialias: true, powerPreference: "low-power" });
       renderer.setClearColor(0x000000, 0);
@@ -340,7 +366,7 @@
       loadedAt = root.performance?.now?.() || 0; loadMs = loadedAt - began;
     }
     function updateHitAreas(width, height) {
-      const pixelsPerUnit = height / (2 * Math.tan(camera.fov * Math.PI / 360) * camera.position.z);
+      const pixelsPerUnit = height / (2 * Math.tan(camera.fov * Math.PI / 360) * (cameraHome?.distance || camera.position.z));
       const points = new Map();
       for (const [a, b] of hitBones) for (const name of [a, b]) {
         if (points.has(name)) continue;
@@ -355,6 +381,27 @@
         return start && end ? [{ ax: start.x, ay: start.y, bx: end.x, by: end.y, radius: radius * modelHeight * pixelsPerUnit }] : [];
       });
     }
+    function solveContacts(pose) {
+      const T=vendor.THREE;
+      if(!pose.hands || !worldModule.CONTACT)return;
+      for(const [side,p] of Object.entries(pose.hands)){
+        const end=vrm.humanoid?.getNormalizedBoneNode?.(side+"Hand");
+        if(!end?.getWorldPosition)continue;
+        avatarRoot.updateMatrixWorld(true);
+        const target=avatarRoot.localToWorld(new T.Vector3(...p)),current=end.getWorldPosition(new T.Vector3());
+        target.lerpVectors(current,target,pose.weight);
+        for(let i=0;i<worldModule.CONTACT.iterations;i++){
+          if(end.getWorldPosition(current).distanceTo(target)<worldModule.CONTACT.epsilon)break;
+          for(const joint of ["LowerArm","UpperArm"]){
+            const node=vrm.humanoid.getNormalizedBoneNode(side+joint);if(!node?.parent)continue;
+            const origin=node.getWorldPosition(new T.Vector3());
+            const a=end.getWorldPosition(new T.Vector3()).sub(origin).normalize(),b=target.clone().sub(origin).normalize();
+            const parent=node.parent.getWorldQuaternion(new T.Quaternion()),delta=new T.Quaternion().setFromUnitVectors(a,b);
+            delta.premultiply(parent.clone().invert()).multiply(parent);node.quaternion.premultiply(delta);node.updateMatrixWorld(true);
+          }
+        }
+      }
+    }
     function update(frame) {
       if (!driver || !renderer) return;
       const width = Math.max(1, canvas.clientWidth || root.innerWidth || 400);
@@ -364,7 +411,23 @@
       if (canvas.width !== Math.floor(width * ratio) || canvas.height !== Math.floor(height * ratio)) {
         renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix();
       }
-      room?.update(period(), frame.now ?? root.performance.now(), camera.position.z);
+      const now=frame.now ?? root.performance.now();
+      if(world && avatarRoot){
+        const dt=Math.max(0,Math.min((now-(worldTime??now))/1000,.1));worldTime=now;
+        worldState=world.update(now,{period:period(),interaction:!!frame.interaction || frame.mode==="speak" || !!frame.preparingSpeech});
+        const pose=worldModule.pose(worldState,modelHeight,vrm.meta?.metaVersion==="0"?-1:1);
+        avatarRoot.position.set(worldState.position[0]+pose.offset[0],pose.y,worldState.position[1]+pose.offset[1]);
+        avatarRoot.rotation.y=worldState.yaw;
+        const target=[avatarRoot.position.x,avatarRoot.position.y,avatarRoot.position.z];
+        follow=follow.map((v,i)=>v+(target[i]-v)*(1-Math.exp(-worldModule.TUNING.cameraRate*dt)));
+        camera.position.set(follow[0],cameraHome.cameraY+follow[1],cameraHome.distance+follow[2]);
+        camera.lookAt(follow[0],cameraHome.targetY+follow[1],follow[2]);
+        frame={...frame,worldPose:pose,worldOrigin:target,worldGaze:worldState.name==="accompany"?null:[target[0]+Math.sin(worldState.yaw)*WORLD_VISUAL.gazeDistance,modelHeight*WORLD_VISUAL.gazeHeight+target[1],target[2]+Math.cos(worldState.yaw)*WORLD_VISUAL.gazeDistance],
+          solveContacts:()=>solveContacts(pose)};
+        if(book)book.visible=pose.book && pose.weight>.8;
+        room?.setAvatarPosition?.(target[0],target[2]);
+      }
+      room?.update(period(), now, camera.position.z);
       driver.update(frame); renderer.render(scene, camera); frames += 1;
       updateHitAreas(width, height);
     }
@@ -376,14 +439,14 @@
         && hitSegments(x - rect.left, y - rect.top, hitAreas);
     }
     return { kind: "vrm", load, dispose, update, hitTest, setScene,
-      capabilities: () => driver?.capabilities() || { vowels: false, faces: [], actions: [], vrma: false },
+      capabilities: () => ({ ...(driver?.capabilities() || { vowels: false, faces: [], actions: [], vrma: false }), fullBody: !!world, locomotion: !!world }),
       playAction: (...args) => driver?.playAction(...args) || false,
       stopAction: () => driver?.stopAction(),
-      isAnimating: () => driver?.isAnimating() || false,
+      isAnimating: () => worldState?.moving || driver?.isAnimating() || false,
       metrics: () => ({ loadMs, loadedAt, frames, pixelRatio: renderer?.getPixelRatio(),
         antialias: renderer?.getContext().getContextAttributes()?.antialias,
         drawCalls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles, smallMotion: driver?.motionState(),
-        room: room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
+        world: worldState, room: room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
       // Reserved for a later animation loader; never silently fetch arbitrary files.
       loadAnimation: async () => false
     };

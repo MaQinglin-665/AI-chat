@@ -330,3 +330,23 @@ User passed visual acceptance and explicitly authorized merge commit (--merge --
 - 将落地灯从窗前移到窗户一侧。
 
 Verification Evidence: fresh scripts/test-local.ps1 passed (829 passed, 3 skipped; all Node/syntax/secrets); scripts/check_first_run_package.ps1 passed. Required JSON/py_compile checks passed. Logs ignored under tmp_ui_smoke/avatar-vrm-polish/merge218-*.log. After CI, merge PR #218 then test exact latest origin/main in detached HEAD, preserving local main.
+
+
+## 2026-10-25 — Room life v1
+
+Created codex/avatar-room-life-v1 from origin/main 2356ddb (merged #218), preserving local main 0a06554.
+Verified local KayKit Furniture Bits 1.0 FREE original CC0 1.0 license; selected 10 glTF + matching bin + shared atlas + license only.
+Added metre-scale toon-batched furniture with allowlisted local loading/procedural fallback, desk/chair/sofa/decor; four-layer shelves avoid oversized books.
+Added deterministic 60–180s day/night-weighted activities, radius-inflated visibility-graph paths, walk/sit/hand contacts/book prop, smooth camera follow,
+input/send/hearing/busy interruption and 20–40s resume. Avatar-only integration; no dialogue, memory, external execution, Live2D or private-config edits.
+
+Verification Evidence: final scripts/test-local.ps1 passed (829 passed, 3 skipped; all Node/syntax/secrets).
+New Node checks: all-pairs paths, free activity points, determinism, interruption/resume, smooth standing, local dependency allowlist,
+failed/cancelled loads, merged toon assets and resource cleanup; runtime signals/listener disposal covered.
+scripts/check_first_run_package.ps1 passed, verifies all selected furniture and license bytes in the install source package.
+Required pre-push JSON/py_compile checks passed. Actual Electron VRM0 four activities, walking, input interruption, day/night wide captures:
+ignored tmp_ui_smoke/avatar-vrm-polish/life-*.png; 35s silent life-tour.mp4, test-only accelerated activity selection.
+No page exceptions. Ten room toggles stable at 28 geometries / 47 textures. Idle baseline→new: FPS 19.99→19.98,
+CPU 3.28→3.32%, GPU 5.32→5.04%, draws 38→36, working set 959→970 MiB. Evidence/report docs/avatar-room-life.md.
+Limitations: real VRM1 and live ASR/LLM/TTS not exercised; procedural poses lack foot IK/full-body collisions, unusual outfits/heights may need tuning;
+no installer exe built. Existing night face-fill follow-up remains deferred. Only draft PR, user appearance review next; do not merge.

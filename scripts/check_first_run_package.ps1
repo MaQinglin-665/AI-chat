@@ -149,10 +149,24 @@ try {
         "requirements.txt",
         "tts_audio.py",
         "web",
-        "web\vendor\pixi-unsafe-eval.min.js"
+        "web\vendor\pixi-unsafe-eval.min.js",
+        "web\vendor\scenes\kaykit-furniture\License.txt",
+        "web\vendor\scenes\kaykit-furniture\furniturebits_texture.png",
+        "web\vendor\scenes\kaykit-furniture\couch.gltf",
+        "web\vendor\scenes\kaykit-furniture\couch.bin"
     )
     foreach ($path in $requiredPaths) {
         Assert-PathExists $packageRoot.FullName $path
+    }
+
+    # Every selected public furniture dependency and original license must survive packaging byte-for-byte.
+    $furnitureRelative = "web\vendor\scenes\kaykit-furniture"
+    foreach ($asset in Get-ChildItem -LiteralPath (Join-Path $RepoRoot $furnitureRelative) -File) {
+        $packagedAsset = Join-Path $packageRoot.FullName (Join-Path $furnitureRelative $asset.Name)
+        Assert-PathExists $packageRoot.FullName (Join-Path $furnitureRelative $asset.Name)
+        if ((Get-FileHash -LiteralPath $asset.FullName).Hash -ne (Get-FileHash -LiteralPath $packagedAsset).Hash) {
+            throw "Packaged furniture asset differs: $($asset.Name)"
+        }
     }
 
     $forbiddenPaths = @(

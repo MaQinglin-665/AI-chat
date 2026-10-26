@@ -1,3 +1,21 @@
+# Session handoff — Room life v1 (2026-10-25)
+
+Branch codex/avatar-room-life-v1, based on origin/main 2356ddb (PR #218 merged). Local main remains 0a06554.
+Implementation and final full tests complete. Next: push branch, create draft PR to main, stop for user visual review. Never merge automatically.
+
+Changed: vrmFurniture.js local CC0 subset loader + one toon mesh; vrmWorld.js deterministic activities/routes/poses;
+vrmScene.js fallback and layout metadata; vrmRenderer.js locomotion/contact solving/book/follow camera; avatarRuntime.js input/busy/speech signals;
+index script tags; Node tests/runner; first-run package asset/license verification; notices/docs/state and narrow vendor-bin gitignore exception.
+Only selected KayKit files are bundled. Private VRM/config untouched; no dialogue/memory/Live2D/external execution edits.
+
+Verification: final scripts/test-local.ps1 829 passed / 3 skipped, all Node/syntax/secrets; first-run package passed including byte-for-byte furniture and license.
+Pre-push JSON/py_compile passed. Real Electron VRM0 no page exceptions; four activities, walking, input interruption, day/night wide screenshots;
+10 room toggles stable 28 geometries / 47 textures. Baseline/new idle GPU 5.32/5.04%, FPS ~20, draws 38/36, CPU 3.28/3.32%.
+Ignored evidence tmp_ui_smoke/avatar-vrm-polish/life-*.png/json/log and life-tour.mp4 (35 seconds, no audio, test-selected activities).
+Full details and measured boundaries docs/avatar-room-life.md. Real VRM1/live ASR/LLM/TTS not tested; no full-body collision/foot IK; no installer exe built.
+
+## Previous handoff (historical; #218 is now merged)
+
 # Session handoff — VRM room proportions (2026-10-25)
 
 Branch codex/avatar-3d-room-v1, User passed PR #218 visual acceptance and authorized merge commit on 2026-10-25 after fresh local/package gates and all Linux/Windows CI pass. Prior 91102ef introduced the room; user requested metre-scale furniture/depth/daylight corrections. Local main and 0a06554 remain untouched. Prior handoff archived in docs/archive/session-handoff-room-before-metres-20261025.md.

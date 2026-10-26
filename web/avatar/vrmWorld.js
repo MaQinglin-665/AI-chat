@@ -1,0 +1,139 @@
+(function(root) {
+  "use strict";
+  const TUNING = Object.freeze({ seed: 218, activityMin: 60000, activityMax: 180000,
+    resumeMin: 20000, resumeMax: 40000, speed: 0.48, radius: 0.22, blendMs: 1400,
+    turnSpeed: 2.2, returnDistance: 1.8, strideHz: 1.35, legSwing: 0.38, armSwing: 0.18,
+    walkBounce: 0.016, cameraRate: 2.0, cameraTravel: 0.7, sitLower: 0.29,
+    lookBackPeriod: 11, reachDuration: 3.0, poseSway: 0.025, readTurn: 0.12, reachHeight:.85, reachDistance:.5, kneeSwing: .45, armRest: 1.25,
+    windowArm: -.9, windowArmSide: -.8, windowElbow: .4, windowHeadHz:.4, windowHeadYaw:.15,
+    windowLookBackAt:8, windowLookBackYaw:1.1, windowHeadPitch:.08,
+    readRightArm:-.95, readRightSide:.5, reachLift:.7, readRightElbow:-1.15,
+    readLeftArm:-.75, readLeftSide:-.65, readLeftElbow:1.1, readHeadPitch:.25, pageHz:1.8,
+    sitThigh:-1.42, sitKnee:1.35, sitSwayHz:.8, sitHeadHz:.7, sitHeadPitch:.12,
+    sitLeftArm:-.7, sitLeftSide:-.6, sitLeftElbow:1.3, sitRightArm:-.9, sitRightSide:.7, sitRightElbow:-1.25,
+    restOffset:-.6, deskOffset:.56, writeHz:3, writeWrist:.08, stretchHz:.5, stretchRaise:3.4, stretchChest:-.12,
+    yawnArm:-.65, yawnSide:.8, yawnElbow:-1.8, yawnHead:-.12, humHz:2, humHip:.07, humHead:.1, humPhase:.4 });
+  // Hand contacts in avatar-local metres; height ratios handle different avatars.
+  const CONTACT = Object.freeze({ window:[[-.16,.9,.55]], books:[[-.13,.74,.30],[.13,.74,.30]],
+    rest:[[-.14,.64,.25],[.14,.64,.25]], desk:[[-.11,.84,.12],[.14,.74,.48]],
+    yawn:[[.02,.88,.12]], iterations:8, epsilon:.003 });
+  const POINTS = Object.freeze({ accompany: [0, 0], window: [-1.35, -2.28], books: [1.45, -1.98],
+    rest: [-1.22, -0.3], desk: [0.42, 0.15], stretch: [0, 0], yawn: [0, 0], hum: [0, 0] });
+  const OBSTACLES = Object.freeze([
+    { id: "shelf", x: 1.45, z: -2.65, w: 1.05, d: 0.36 },
+    { id: "lamp", x: -2.35, z: -2.18, w: 0.35, d: 0.35 },
+    { id: "plant", x: -2.55, z: -2.65, w: 0.3, d: 0.3 },
+    { id: "sofa", x: -2.13, z: -0.3, w: 0.85, d: 1.7 },
+    { id: "desk", x: 1.82, z: -0.15, w: 1.15, d: 0.65 },
+    { id: "chair", x: 0.98, z: 0.15, w: 0.5, d: 0.5 }
+  ]);
+  const LIMITS = Object.freeze({ minX: -2.72, maxX: 2.72, minZ: -2.72, maxZ: 1.7 });
+  const distance = (a,b) => Math.hypot(a[0]-b[0],a[1]-b[1]);
+  function rect(o, margin = TUNING.radius) { return [o.x-o.w/2-margin,o.z-o.d/2-margin,o.x+o.w/2+margin,o.z+o.d/2+margin]; }
+  function free(p, obstacles = OBSTACLES) { return p[0]>=LIMITS.minX && p[0]<=LIMITS.maxX && p[1]>=LIMITS.minZ && p[1]<=LIMITS.maxZ && !obstacles.some(o=>{
+    const r=rect(o);return p[0]>r[0]&&p[0]<r[2]&&p[1]>r[1]&&p[1]<r[3]; }); }
+  function clear(a,b,obstacles=OBSTACLES) {
+    // Slab intersection against inflated boxes, not frame-dependent point samples.
+    return !obstacles.some(o=>{ const r=rect(o);let lo=0,hi=1;
+      for(let k=0;k<2;k++){const d=b[k]-a[k];if(Math.abs(d)<1e-9){if(a[k]<=r[k]||a[k]>=r[k+2])return false;}
+        else {const t1=(r[k]-a[k])/d,t2=(r[k+2]-a[k])/d;lo=Math.max(lo,Math.min(t1,t2));hi=Math.min(hi,Math.max(t1,t2));}}
+      return lo<hi && hi>0 && lo<1; });
+  }
+  function path(start, end, obstacles=OBSTACLES) {
+    if(!free(start,obstacles)||!free(end,obstacles))return [];
+    const nodes=[start,end];
+    for(const o of obstacles){const r=rect(o,TUNING.radius+0.012);for(const p of [[r[0],r[1]],[r[2],r[1]],[r[0],r[3]],[r[2],r[3]]])if(free(p,obstacles))nodes.push(p);}
+    const costs=nodes.map(()=>Infinity), prev=[], done=new Set();costs[0]=0;
+    while(done.size<nodes.length){let i=-1;nodes.forEach((_,j)=>{if(!done.has(j)&&(i<0||costs[j]<costs[i]))i=j;});
+      if(i<0||!Number.isFinite(costs[i]))return [];if(i===1)break;done.add(i);
+      nodes.forEach((p,j)=>{const c=costs[i]+distance(nodes[i],p);if(!done.has(j)&&c<costs[j]&&clear(nodes[i],p,obstacles)){costs[j]=c;prev[j]=i;}});
+    }
+    const result=[end];for(let i=1;i!==0;){i=prev[i];if(i===undefined)return [];result.unshift(nodes[i]);}return result;
+  }
+  function rng(seed){let x=seed>>>0;return ()=>{x=(Math.imul(x,1664525)+1013904223)>>>0;return x/4294967296;};}
+  function create({ seed=TUNING.seed, emit=()=>{} }={}) {
+    const random=rng(seed), range=(a,b)=>a+random()*(b-a);
+    let position=[0,0], yaw=0, name="accompany", previous="", phase="idle", route=[], last=null,
+      now=0, next=range(TUNING.activityMin,TUNING.activityMax), began=0, blend=0, hold=0, busy=false, wait=0, poseName="accompany", poseAge=0;
+    function event(stage, activity){emit({type:"activity",name:activity,stage});}
+    function end(){if(name!=="accompany")event("end",name);}
+    function begin(activity){if(!Object.hasOwn(POINTS,activity))return false;
+      const planned=path(position,POINTS[activity]);if(!planned.length)return false;
+      end();previous=name;name=activity;route=planned.slice(1);phase=route.length&&distance(position,POINTS[name])>.02?"walk":"activity";
+      began=now;next=now+range(TUNING.activityMin,TUNING.activityMax);event("start",name);return true;}
+    function interact(){
+      if(!busy){wait=range(TUNING.resumeMin,TUNING.resumeMax);end();previous=name;name="accompany";
+        route=distance(position,POINTS.accompany)<=TUNING.returnDistance?path(position,POINTS.accompany).slice(1):[];
+        phase=route.length?"walk":"respond";}
+      busy=true;hold=now+wait;
+    }
+    function choose(period){const choices=["window","books","rest","desk","stretch","yawn","hum"];
+      const weights=period==="night"?[1,4,4,3,1,3,1]:[3,2,2,2,3,1,3];
+      const list=choices.map((n,i)=>[n,n===name||n===previous?0:weights[i]]);let roll=random()*list.reduce((s,v)=>s+v[1],0);
+      for(const [n,w] of list){roll-=w;if(roll<0)return n;}return "window";}
+    function update(time, { interaction=false, period="night" }={}) {
+      now=time;const dt=Math.max(0,Math.min((now-(last??now))/1000,.1));last=now;
+      if(interaction)interact();else if(busy){busy=false;hold=now+wait;}
+      if(!interaction&&hold&&now>=hold){hold=0;begin(choose(period));}
+      else if(!interaction&&!hold&&now>=next)begin(choose(period));
+      let moving=false,targetYaw=0;
+      if(route.length && blend===0){const target=route[0],d=distance(position,target);moving=d>.005;
+        targetYaw=Math.atan2(target[0]-position[0],target[1]-position[1]);
+        const step=Math.min(d,TUNING.speed*dt);if(d>0)position=position.map((v,i)=>v+(target[i]-v)*step/d);
+        if(d<=TUNING.speed*dt+.005){position=[...target];route.shift();if(!route.length){phase=name==="accompany"?"respond":"activity";began=now;}}
+      } else if(name!=="accompany")targetYaw={window:Math.PI,books:Math.PI,rest:Math.PI/2,desk:Math.PI/2}[name]||0;
+      const angle=Math.atan2(Math.sin(targetYaw-yaw),Math.cos(targetYaw-yaw));yaw+=Math.sign(angle)*Math.min(Math.abs(angle),dt*TUNING.turnSpeed);
+      const desired=!route.length&&name!=="accompany"?1:0;
+      if(desired){poseName=name;poseAge=(now-began)/1000;}blend+=Math.sign(desired-blend)*Math.min(Math.abs(desired-blend),dt*1000/TUNING.blendMs);
+      return { position:[...position],yaw,name,poseName,poseAge,phase,moving,blend,age:(now-began)/1000,time:now/1000,holdUntil:hold };
+    }
+    return { update, begin, interrupt:interact, snapshot:()=>({position:[...position],name,phase,route:route.map(p=>[...p]),holdUntil:hold}), dispose:end };
+  }
+  function pose(state,height=1.6,facing=1) {
+    const bones={}, add=(n,v)=>bones[n]=v;const t=state.poseAge ?? state.age,s=Math.sin(state.time*TUNING.strideHz*Math.PI*2);
+    const activity=state.poseName || state.name;
+    let y=0,offset=[0,0],book=false;
+    if(state.moving){
+      for(const [side,sign] of [["left",1],["right",-1]]){
+        add(side+"UpperLeg",{x:s*sign*TUNING.legSwing*facing});add(side+"LowerLeg",{x:Math.max(0,-s*sign)*TUNING.kneeSwing*facing});
+        add(side+"UpperArm",{x:-s*sign*TUNING.armSwing*facing,z:(side==="left"?-1:1)*TUNING.armRest*facing});}
+      y=Math.abs(s)*TUNING.walkBounce;
+    } else if(activity==="window"){
+      add("leftUpperArm",{x:TUNING.windowArm*facing,z:TUNING.windowArmSide*facing});add("leftLowerArm",{y:TUNING.windowElbow*facing});
+      add("head",{y:Math.sin(t*TUNING.windowHeadHz)*TUNING.windowHeadYaw+(t%TUNING.lookBackPeriod>TUNING.windowLookBackAt?TUNING.windowLookBackYaw:0),x:TUNING.windowHeadPitch*facing});
+    } else if(activity==="books"){
+      const reach=Math.max(0,1-t/TUNING.reachDuration);book=reach===0;
+      add("rightUpperArm",{x:TUNING.readRightArm*facing,z:(TUNING.readRightSide-reach*TUNING.reachLift)*facing});add("rightLowerArm",{y:TUNING.readRightElbow*facing});
+      add("leftUpperArm",{x:TUNING.readLeftArm*facing,z:TUNING.readLeftSide*facing});add("leftLowerArm",{y:TUNING.readLeftElbow*facing});add("head",{x:TUNING.readHeadPitch*facing});
+      add("rightHand",{z:Math.sin(t*TUNING.pageHz)*TUNING.readTurn});
+    } else if(activity==="rest"||activity==="desk"){
+      y=-height*TUNING.sitLower;offset=activity==="rest"?[TUNING.restOffset,0]:[TUNING.deskOffset,0];
+      for(const side of ["left","right"]){add(side+"UpperLeg",{x:TUNING.sitThigh*facing});add(side+"LowerLeg",{x:TUNING.sitKnee*facing});}
+      add("hips",{y:0,z:Math.sin(t*TUNING.sitSwayHz)*TUNING.poseSway});
+      add("leftUpperArm",{x:TUNING.sitLeftArm*facing,z:TUNING.sitLeftSide*facing});add("leftLowerArm",{y:TUNING.sitLeftElbow*facing});
+      add("rightUpperArm",{x:TUNING.sitRightArm*facing,z:TUNING.sitRightSide*facing});add("rightLowerArm",{y:TUNING.sitRightElbow*facing});
+      add("head",{x:TUNING.sitHeadPitch*facing,z:Math.sin(t*TUNING.sitHeadHz)*TUNING.poseSway});
+      if(activity==="desk")add("rightHand",{z:Math.sin(t*TUNING.writeHz)*TUNING.writeWrist});
+    } else if(activity==="stretch"){
+      const rise=.5+.5*Math.sin(t*TUNING.stretchHz);add("leftUpperArm",{z:(-TUNING.armRest+rise*TUNING.stretchRaise)*facing});add("rightUpperArm",{z:(TUNING.armRest-rise*TUNING.stretchRaise)*facing});
+      add("chest",{x:TUNING.stretchChest*rise*facing});
+    } else if(activity==="yawn"){
+      add("rightUpperArm",{x:TUNING.yawnArm*facing,z:TUNING.yawnSide*facing});add("rightLowerArm",{y:TUNING.yawnElbow*facing});add("head",{x:TUNING.yawnHead*facing});
+    } else if(activity==="hum"){add("hips",{y:0,z:Math.sin(t*TUNING.humHz)*TUNING.humHip});add("head",{z:Math.sin(t*TUNING.humHz+TUNING.humPhase)*TUNING.humHead});}
+    const hands={};
+    if(!state.moving && CONTACT[activity]){
+      CONTACT[activity].forEach((p,i)=>{const side=activity==="yawn"?"right":i===0?"left":"right";
+        hands[side]=[p[0],activity==="window"?p[1]:activity==="desk"&&i===1?p[1]-y:p[1]*height,p[2]];
+        if(activity==="books" && side==="right"){
+          const reach=Math.max(0,1-t/TUNING.reachDuration);
+          hands[side][1]+=(height*TUNING.reachHeight-hands[side][1])*reach;
+          hands[side][2]+=(TUNING.reachDistance-hands[side][2])*reach;
+        }
+      });
+    }
+    return { bones, hands, y:y*(state.moving?1:state.blend),offset:offset.map(v=>v*state.blend),book,
+      weight:state.moving?1:state.blend };
+  }
+  const api={TUNING,CONTACT,POINTS,OBSTACLES,LIMITS,free,clear,path,create,pose,distance};root.XinyuVRMWorld=api;
+  if(typeof module!=="undefined"&&module.exports)module.exports=api;
+})(typeof window!=="undefined"?window:globalThis);

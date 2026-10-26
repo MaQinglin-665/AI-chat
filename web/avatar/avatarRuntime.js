@@ -1,5 +1,6 @@
 (function (root) {
   "use strict";
+  const INPUT_HOLD_MS = 1000;
   const clamp = (v) => Math.max(0, Math.min(1, Number(v) || 0));
   function formatConditions(conditions = {}) {
     const labels = { licenseName: "许可证", allowedUserName: "可使用者", avatarPermission: "可使用者",
@@ -101,7 +102,9 @@
     const clickthrough = value => {
       if (value !== lastClickthrough) { root.electronAPI?.setClickthrough?.(value); lastClickthrough = value; }
     };
-    let dragging = false;
+    let dragging = false, inputUntil = 0;
+    const input = e => { if(e.target?.id === "chat-input" || e.target?.closest?.("#send-btn")) inputUntil=root.performance.now()+INPUT_HOLD_MS; };
+    for(const name of ["input","keydown","click"]) root.addEventListener(name,input);
     const pointer = (event) => {
       const rect = canvas.getBoundingClientRect();
       gaze = { x: ((event.clientX - rect.left) / rect.width - 0.5) * 2,
@@ -155,6 +158,7 @@
       }
       const frame = { ...frameFromState(state, now), gaze, ...intent, now };
       frame.preparingSpeech ||= now < prepareUntil;
+      frame.interaction = now < inputUntil || state.chatBusy === true || ["hearing","release"].includes(state.listeningPresencePhase) || frame.mouth?.open > .02;
       const quality = root.XinyuVRMRenderer.QUALITY;
       const fps = frame.mouth?.open > 0.02 || renderer.isAnimating() ? quality.activeFps : quality.idleFps;
       const interval = 1000 / fps, elapsed = now - lastFrame;
@@ -165,7 +169,7 @@
 
     const dispose = () => {
       if (disposed) return;
-      disposed = true; root.clearTimeout(wakeTimer); root.cancelAnimationFrame(raf); root.clearInterval(cursorTimer); channel?.close();
+      disposed = true; for(const name of ["input","keydown","click"]) root.removeEventListener(name,input); root.clearTimeout(wakeTimer); root.cancelAnimationFrame(raf); root.clearInterval(cursorTimer); channel?.close();
       root.removeEventListener("avatar-intent", event); root.removeEventListener("pointermove", pointer);
       root.removeEventListener("pointerleave", leave); root.removeEventListener("beforeunload", dispose);
       canvas.removeEventListener("pointerdown", down); root.removeEventListener("pointerup", up); up();
