@@ -111,6 +111,18 @@ def test_unconfigured_avatar_preserves_live2d():
     assert handler.result == {"kind": "live2d"}
 
 
+@pytest.mark.parametrize("setting, expected", [(None, "room"), ("room", "room"), ("none", "none"), ("invalid", "room")])
+def test_scene_setting_is_bounded(tmp_path, monkeypatch, setting, expected):
+    class Handler:
+        def _send_json(self, result):
+            self.result = result
+    monkeypatch.setattr(assets, "resolve_asset", lambda *args: tmp_path / "synthetic.vrm")
+    monkeypatch.setattr(assets, "metadata", lambda *args: {})
+    handler = Handler()
+    assets.dispatch(handler, {"avatar": {"kind": "vrm", "scene": setting}}, tmp_path, "/api/avatar")
+    assert handler.result["scene"] == expected
+
+
 @pytest.mark.parametrize("payload", [[], {"extensions": []}, {"extensions": {"VRM": []}}])
 def test_malformed_metadata_is_rejected(tmp_path, payload):
     data = json.dumps(payload).encode()

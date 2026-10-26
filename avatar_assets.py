@@ -105,6 +105,7 @@ def dispatch(handler, config, root, route):
         path = resolve_asset(config, root)
         if route == "/api/avatar":
             handler._send_json({"kind": "vrm", "path": "/api/avatar/model.vrm", "metadata": metadata(path),
+                                "scene": "none" if avatar.get("scene") == "none" else "room",
                                 "mapping": avatar.get("mapping", {}) if isinstance(avatar.get("mapping"), dict) else {}})
             return
         # No user-supplied URL filename: only the configured model is served.

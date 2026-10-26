@@ -7,6 +7,7 @@ const path = require("path");
 const root = path.resolve(__dirname, "..");
 const tests = [
   "tests/test_avatar_vrm.js",
+  "tests/test_avatar_scene.js",
   "tests/test_avatar_runtime.js",
   "tests/test_visual_polish_frontend.js",
   "tests/test_external_agent_frontend.js",
