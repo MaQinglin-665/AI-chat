@@ -375,6 +375,11 @@
           <details><summary>模型数据使用条件</summary><pre data-avatar-conditions style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:12rem;overflow:auto"></pre><p data-avatar-license-links></p></details>
           <button type="button" data-avatar-action="wave">挥手</button>
           <button type="button" data-avatar-action="nod">点头</button>
+          <fieldset id="painted-scene-options" hidden>
+            <legend>手绘背景</legend>
+            <label><input type="checkbox" id="painted-reflection" checked /> 地板淡倒影</label>
+            <label><input type="checkbox" id="painted-grid" /> 校准用米制网格</label>
+          </fieldset>
         </section>
         <div class="config-switch-summary" aria-live="polite">
           <div class="config-switch-summary-item">
@@ -1243,6 +1248,7 @@
   <script src="./avatar/vrmLocomotion.js"></script>
   <script src="./avatar/vrmHandpainted.js"></script>
   <script src="./avatar/vrmScene.js"></script>
+  <script src="./avatar/vrmPainted.js"></script>
   <script src="./avatar/vrmRenderer.js"></script>
   <script src="./avatar/avatarRuntime.js"></script>
   <script src="./runtimeEventBinder.js"></script>

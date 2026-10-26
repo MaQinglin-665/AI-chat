@@ -26,6 +26,11 @@ windows_only = pytest.mark.skipif(os.name != "nt", reason="external execution is
 def setup(tmp_path, monkeypatch):
     work = tmp_path / "work"
     work.mkdir()
+    # Keep the protected-project boundary testable even with --basetemp inside
+    # the checkout. Work/home/project remain separate disposable siblings.
+    protected_project = tmp_path / "protected-project"
+    protected_project.mkdir()
+    monkeypatch.setattr(policy, "PROJECT", protected_project)
     # Tests may use pytest's disposable directory as a private home; production may not.
     monkeypatch.setattr(policy.tempfile, "gettempdir", lambda: str(tmp_path / "system-temp"))
     monkeypatch.setattr(agent_actions, "STATE_PATH", tmp_path / "audit.json")

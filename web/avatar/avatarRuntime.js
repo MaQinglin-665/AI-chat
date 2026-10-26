@@ -92,6 +92,18 @@
     state.avatarRenderer = renderer;
     root.__xinyuAvatarRenderer = renderer;
     showMetadata(source);
+    const paintedPanel = root.document.getElementById("painted-scene-options");
+    if (paintedPanel) paintedPanel.hidden = source.scene !== "painted" || state.uiView !== "full";
+    const paintedControls = ["reflection", "grid"].map(name => {
+      const input = root.document.getElementById("painted-" + name);
+      if (!input) return null;
+      let value = source.painted?.[name] ?? (name === "reflection");
+      try { const saved = root.localStorage?.getItem("xinyu.painted." + name); if (saved !== null && saved !== undefined) value = saved === "true"; } catch (_) { /* Storage can be unavailable. */ }
+      input.checked = value; renderer.setPaintedOptions?.({ [name]: value });
+      const change = () => { renderer.setPaintedOptions?.({ [name]: input.checked });
+        try { root.localStorage?.setItem("xinyu.painted." + name, String(input.checked)); } catch (_) { /* Session-only setting. */ } };
+      input.addEventListener("change", change); return () => input.removeEventListener("change", change);
+    });
     root.document.body.dataset.avatarKind = "vrm";
     if (state.uiView === "model") {
       root.document.documentElement.classList.add("transparent-mode", "alpha-true");
@@ -170,6 +182,7 @@
     const dispose = () => {
       if (disposed) return;
       disposed = true; for(const name of ["input","keydown","click"]) root.removeEventListener(name,input); root.clearTimeout(wakeTimer); root.cancelAnimationFrame(raf); root.clearInterval(cursorTimer); channel?.close();
+      paintedControls.forEach(cleanup => cleanup?.());
       root.removeEventListener("avatar-intent", event); root.removeEventListener("pointermove", pointer);
       root.removeEventListener("pointerleave", leave); root.removeEventListener("beforeunload", dispose);
       canvas.removeEventListener("pointerdown", down); root.removeEventListener("pointerup", up); up();

@@ -12,6 +12,9 @@ from test_external_agent import Immediate
 def test_routes_auth_origin_disabled_and_flow(monkeypatch, tmp_path):
     work = tmp_path / "work"
     work.mkdir()
+    protected_project = tmp_path / "protected-project"
+    protected_project.mkdir()
+    monkeypatch.setattr(policy, "PROJECT", protected_project)
     monkeypatch.setattr(policy.tempfile, "gettempdir", lambda: str(tmp_path / "system-temp"))
     monkeypatch.setattr(agent_actions, "STATE_PATH", tmp_path / "audit.json")
     monkeypatch.setenv("TAFFY_API_TOKEN_TEST", "example-token")
