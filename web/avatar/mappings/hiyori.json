@@ -1,0 +1,416 @@
+{
+  "version": 1,
+  "id": "hiyori",
+  "params": {
+    "angleX": "ParamAngleX",
+    "angleY": "ParamAngleY",
+    "angleZ": "ParamAngleZ",
+    "armLA": "ParamArmLA",
+    "armLB": "ParamArmLB",
+    "armRA": "ParamArmRA",
+    "armRB": "ParamArmRB",
+    "bodyAngleX": "ParamBodyAngleX",
+    "bodyAngleY": "ParamBodyAngleY",
+    "bodyAngleZ": "ParamBodyAngleZ",
+    "breath": "ParamBreath",
+    "browLAngle": "ParamBrowLAngle",
+    "browLForm": "ParamBrowLForm",
+    "browLX": "ParamBrowLX",
+    "browLY": "ParamBrowLY",
+    "browRAngle": "ParamBrowRAngle",
+    "browRForm": "ParamBrowRForm",
+    "browRX": "ParamBrowRX",
+    "browRY": "ParamBrowRY",
+    "cheek": "ParamCheek",
+    "eyeBallX": "ParamEyeBallX",
+    "eyeBallY": "ParamEyeBallY",
+    "eyeLOpen": "ParamEyeLOpen",
+    "eyeLSmile": "ParamEyeLSmile",
+    "eyeROpen": "ParamEyeROpen",
+    "eyeRSmile": "ParamEyeRSmile",
+    "hairAhoge": "ParamHairAhoge",
+    "hairBack": "ParamHairBack",
+    "hairFront": "ParamHairFront",
+    "handL": "ParamHandL",
+    "handLB": "ParamHandLB",
+    "handR": "ParamHandR",
+    "handRB": "ParamHandRB",
+    "mouthForm": "ParamMouthForm",
+    "mouthOpenY": "ParamMouthOpenY",
+    "ribbon": "ParamRibbon",
+    "shoulder": "ParamShoulder",
+    "skirt": "ParamSkirt",
+    "skirt2": "ParamSkirt2"
+  },
+  "parts": {
+    "armA": "PartArmA",
+    "armB": "PartArmB"
+  },
+  "capabilities": {
+    "vowels": false,
+    "armGestures": [],
+    "fullBody": false,
+    "locomotion": false
+  },
+  "faces": {
+    "neutral": {
+      "delivery": "neutral"
+    },
+    "happy": {
+      "delivery": "happy"
+    },
+    "sad": {
+      "delivery": "sad"
+    },
+    "angry": {
+      "delivery": "angry"
+    },
+    "surprised": {
+      "delivery": "surprised"
+    },
+    "thinking": {
+      "delivery": "thinking"
+    },
+    "shy": {
+      "delivery": "shy"
+    }
+  },
+  "actions": {
+    "nod": {
+      "type": "procedural",
+      "name": "nod"
+    },
+    "nod_double": {
+      "type": "procedural",
+      "name": "nod_double"
+    },
+    "shake": {
+      "type": "procedural",
+      "name": "shake"
+    },
+    "attentive_tilt": {
+      "type": "procedural",
+      "name": "attentive_tilt"
+    },
+    "thoughtful_glance": {
+      "type": "procedural",
+      "name": "thoughtful_glance"
+    },
+    "thought_resolve": {
+      "type": "procedural",
+      "name": "thought_resolve"
+    },
+    "lean_forward": {
+      "type": "procedural",
+      "name": "lean_forward"
+    },
+    "lean_back": {
+      "type": "procedural",
+      "name": "lean_back"
+    },
+    "care_lean": {
+      "type": "procedural",
+      "name": "care_lean"
+    },
+    "shy_glance": {
+      "type": "procedural",
+      "name": "shy_glance"
+    },
+    "speak_emphasis": {
+      "type": "procedural",
+      "name": "speak_emphasis"
+    },
+    "sentence_release": {
+      "type": "procedural",
+      "name": "sentence_release"
+    },
+    "happy_bounce": {
+      "type": "procedural",
+      "name": "happy_bounce"
+    }
+  },
+  "deliveryPoses": {
+    "happy": {
+      "angleZ": 2.4,
+      "bodyAngleY": 1.4,
+      "armLA": 0.6,
+      "armRA": -0.6
+    },
+    "playful": {
+      "angleZ": -4.2,
+      "angleX": 2.1,
+      "bodyAngleZ": 1.8,
+      "eyeBallX": 0.12,
+      "armLA": 0.9
+    },
+    "excited": {
+      "angleY": -2.6,
+      "bodyAngleY": 3.2,
+      "shoulder": 0.16,
+      "armLA": 1.1,
+      "armRA": -1.1
+    },
+    "shy": {
+      "angleY": 2.2,
+      "angleZ": 3.6,
+      "bodyAngleX": -1.2,
+      "eyeBallX": -0.18,
+      "armLA": 0.55,
+      "handL": 0.25
+    },
+    "hurt": {
+      "angleY": 1.8,
+      "angleZ": -2.4,
+      "bodyAngleY": -1.4,
+      "shoulder": -0.07
+    },
+    "sad": {
+      "angleY": 2.8,
+      "bodyAngleY": -1.8,
+      "shoulder": -0.1
+    },
+    "anxious": {
+      "angleZ": -2.8,
+      "bodyAngleX": -1.5,
+      "shoulder": 0.06,
+      "armLA": 0.45,
+      "armRA": -0.3
+    },
+    "angry": {
+      "angleY": -1.6,
+      "bodyAngleY": 2.4,
+      "shoulder": 0.12,
+      "armLA": -0.8,
+      "armRA": 0.8
+    },
+    "surprised": {
+      "angleY": -3.6,
+      "bodyAngleY": -2.8,
+      "shoulder": 0.18,
+      "armLA": 0.85,
+      "armRA": -0.85
+    },
+    "serious": {
+      "angleY": -1.1,
+      "bodyAngleY": 1.8,
+      "armRA": -0.65,
+      "handR": -0.2
+    },
+    "thinking": {
+      "angleZ": -4.5,
+      "bodyAngleX": -1.4,
+      "eyeBallX": -0.16,
+      "armLA": 0.8,
+      "handL": 0.3
+    }
+  },
+  "modePoses": {
+    "idle": {},
+    "listen": {
+      "eyeLOpen": 0.08,
+      "eyeROpen": 0.08,
+      "browLY": 0.055,
+      "browRY": 0.055,
+      "angleY": -0.8,
+      "angleZ": 0.65,
+      "bodyAngleX": 0.45,
+      "bodyAngleY": 0.5,
+      "shoulder": 0.045
+    },
+    "think": {
+      "eyeBallX": -0.18,
+      "eyeBallY": 0.1,
+      "browLY": 0.13,
+      "browRY": -0.08,
+      "browLAngle": 0.06,
+      "browRAngle": -0.04,
+      "mouthForm": -0.12,
+      "angleY": 1.1,
+      "angleZ": -2.2,
+      "bodyAngleX": -1.15,
+      "bodyAngleY": -0.55,
+      "armLA": 0.36,
+      "armLB": 0.3,
+      "handL": 0.18
+    },
+    "speak": {
+      "angleY": -0.5,
+      "bodyAngleX": 0.52,
+      "bodyAngleY": 1.08,
+      "shoulder": 0.085
+    }
+  },
+  "emotionPoses": {
+    "happy": {
+      "eyeLSmile": 0.2,
+      "eyeRSmile": 0.2,
+      "mouthForm": 0.25,
+      "cheek": 0.16,
+      "browLY": 0.06,
+      "browRY": 0.06,
+      "angleZ": 0.75,
+      "bodyAngleY": 0.7,
+      "shoulder": 0.06
+    },
+    "sad": {
+      "browLY": -0.13,
+      "browRY": -0.13,
+      "browLForm": -0.15,
+      "browRForm": -0.15,
+      "mouthForm": -0.22,
+      "angleY": 2.2,
+      "bodyAngleX": -1.4,
+      "bodyAngleY": -0.9,
+      "shoulder": -0.09
+    },
+    "angry": {
+      "eyeLOpen": 0.08,
+      "eyeROpen": 0.08,
+      "browLY": -0.18,
+      "browRY": -0.18,
+      "browLAngle": -0.12,
+      "browRAngle": 0.12,
+      "mouthForm": -0.2,
+      "bodyAngleY": 0.9,
+      "shoulder": 0.12,
+      "armLA": -0.12,
+      "armRA": 0.12
+    },
+    "surprised": {
+      "eyeLOpen": 0.25,
+      "eyeROpen": 0.25,
+      "browLY": 0.2,
+      "browRY": 0.2,
+      "mouthForm": -0.1,
+      "angleY": -2.1,
+      "bodyAngleY": -1.25,
+      "shoulder": 0.14,
+      "hairAhoge": 0.18
+    },
+    "thinking": {
+      "eyeBallX": -0.16,
+      "eyeBallY": 0.1,
+      "browLY": 0.1,
+      "browRY": -0.08,
+      "mouthForm": -0.14,
+      "angleZ": -1.4,
+      "bodyAngleX": -0.8
+    }
+  },
+  "speechGesturePoses": {
+    "nod": {
+      "angleY": -3.4,
+      "bodyAngleY": 2,
+      "shoulder": 0.08
+    },
+    "small_nod": {
+      "angleY": -1.8,
+      "bodyAngleY": 1.2,
+      "shoulder": 0.05
+    },
+    "question_tilt": {
+      "angleZ": -3.5,
+      "angleX": 1.2,
+      "bodyAngleX": -0.6,
+      "bodyAngleZ": 0.7
+    },
+    "open_explain": {
+      "bodyAngleY": 1.8,
+      "shoulder": 0.08,
+      "armLA": 0.75,
+      "armRA": -0.45
+    },
+    "light_lift": {
+      "angleY": -1.4,
+      "bodyAngleY": 2.6,
+      "shoulder": 0.16,
+      "armLA": 0.6,
+      "armRA": -0.6
+    },
+    "soft_lean": {
+      "angleY": 1.1,
+      "bodyAngleY": 1.4,
+      "bodyAngleX": -0.5,
+      "shoulder": -0.025
+    }
+  },
+  "channelGroups": {
+    "face": [
+      "browLAngle",
+      "browLForm",
+      "browLX",
+      "browLY",
+      "browRAngle",
+      "browRForm",
+      "browRX",
+      "browRY",
+      "cheek",
+      "eyeBallX",
+      "eyeBallY",
+      "eyeLOpen",
+      "eyeLSmile",
+      "eyeROpen",
+      "eyeRSmile",
+      "mouthForm",
+      "mouthOpenY"
+    ],
+    "arm": [
+      "armLA",
+      "armLB",
+      "armRA",
+      "armRB",
+      "handL",
+      "handLB",
+      "handR",
+      "handRB"
+    ],
+    "bodyAdd": [
+      "angleX",
+      "angleY",
+      "angleZ",
+      "armLA",
+      "armLB",
+      "armRA",
+      "armRB",
+      "bodyAngleX",
+      "bodyAngleY",
+      "bodyAngleZ",
+      "handL",
+      "handR",
+      "shoulder"
+    ],
+    "mouthOpen": [
+      "mouthOpenY"
+    ],
+    "head": [
+      "angleX",
+      "angleY",
+      "angleZ"
+    ],
+    "torso": [
+      "bodyAngleX",
+      "bodyAngleY",
+      "bodyAngleZ",
+      "breath",
+      "shoulder"
+    ],
+    "limb": [
+      "armLA",
+      "armLB",
+      "armRA",
+      "armRB",
+      "handL",
+      "handLB",
+      "handR",
+      "handRB"
+    ],
+    "secondary": [
+      "hairAhoge",
+      "hairBack",
+      "hairFront",
+      "ribbon",
+      "skirt",
+      "skirt2"
+    ]
+  }
+}

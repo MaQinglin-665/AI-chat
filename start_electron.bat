@@ -48,11 +48,13 @@ rem Each Electron instance manages its own backend lifecycle, and force-killing
 rem the port on re-launch can terminate an already-running healthy backend.
 
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start-electron.ps1
-if errorlevel 1 (
+set "LAUNCH_EXIT_CODE=%errorlevel%"
+if not "%LAUNCH_EXIT_CODE%"=="0" (
   echo.
-  echo Electron exited with an error.
+  echo Electron startup or dependency installation failed.
+  echo Review the error and installation guidance above before closing this window.
   echo Run this for a fuller local validation:
   echo   powershell -ExecutionPolicy Bypass -File scripts\test-local.ps1
   pause
-  exit /b 1
+  exit /b %LAUNCH_EXIT_CODE%
 )

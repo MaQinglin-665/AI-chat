@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "kind": "live2d",
+  "id": "mao",
+  "model": "Mao/Mao.model3.json",
+  "driver": "mapped",
+  "params": {
+    "angleX": "ParamAngleX", "angleY": "ParamAngleY", "angleZ": "ParamAngleZ",
+    "bodyX": "ParamBodyAngleX", "bodyY": "ParamBodyAngleY", "bodyZ": "ParamBodyAngleZ",
+    "eyeBallX": "ParamEyeBallX", "eyeBallY": "ParamEyeBallY",
+    "eyeLOpen": "ParamEyeLOpen", "eyeROpen": "ParamEyeROpen",
+    "mouthOpen": "ParamA", "vowels": { "a": "ParamA", "i": "ParamI", "u": "ParamU", "e": "ParamE", "o": "ParamO" },
+    "breath": "ParamBreath", "cheek": "ParamCheek",
+    "armL1": "ParamArmLA01", "armL2": "ParamArmLA02", "armL3": "ParamArmLA03",
+    "armR1": "ParamArmRA01", "armR2": "ParamArmRA02", "armR3": "ParamArmRA03",
+    "handL": "ParamHandLA", "handR": "ParamHandRA"
+  },
+  "parts": { "armLA": "PartArmLA", "armLB": "PartArmLB", "armRA": "PartArmRA", "armRB": "PartArmRB" },
+  "capabilities": { "vowels": true, "armGestures": ["open_explain", "wave", "light_lift"], "fullBody": false, "locomotion": false },
+  "faces": { "neutral": "exp_01", "happy": "exp_02", "sleepy": "exp_03", "smug": "exp_04", "sad": "exp_05", "shy": "exp_06", "surprised": "exp_07", "angry": "exp_08", "thinking": "exp_01" },
+  "modePoses": { "idle": {}, "listen": {"angleY": 1.5}, "think": {"angleZ": 3.5}, "speak": {} },
+  "deliveryPoses": { "neutral": {}, "happy": {"angleZ": -3}, "playful": {"angleZ": -4.2}, "excited": {"bodyY": 1}, "shy": {"angleY": -4}, "hurt": {"angleY": -3}, "sad": {"angleY": -4}, "anxious": {"angleZ": 2}, "angry": {"angleY": 2}, "surprised": {"angleY": 4}, "serious": {"angleX": 0}, "thinking": {"angleZ": 4} },
+  "speechGesturePoses": {
+    "nod": {"angleY": -8}, "small_nod": {"angleY": -4}, "question_tilt": {"angleZ": 7}, "soft_lean": {"bodyX": 2},
+    "open_explain": {"armL1": 20, "armL2": -12, "armL3": -12, "armR1": 20, "armR2": -12, "armR3": 12},
+    "light_lift": {"armL1": 10, "armL2": -7, "armL3": -5, "armR1": 10, "armR2": -7, "armR3": 5},
+    "wave": {"armR1": 30, "armR2": -20, "armR3": 18}
+  },
+  "actions": {
+    "sentence_release": {"motion": ["Idle", 0]}, "thoughtful_glance": {"motion": ["Idle", 1]},
+    "nod": {"motion": ["TapBody", 0]}, "happy_bounce": {"motion": ["TapBody", 1]},
+    "attentive_tilt": {"motion": ["TapBody", 2]}, "speak_emphasis": {"motion": ["TapBody", 3]},
+    "poked": {"motion": ["TapBody", 4]}, "shy_glance": {"motion": ["TapBody", 5]},
+    "wave": {"gesture": "wave", "durationMs": 1600}
+  },
+  "metadata": {
+    "name": "Mao Niziiro / 虹色まお",
+    "authors": ["Live2D Inc."],
+    "source": "https://www.live2d.com/en/learn/sample/",
+    "conditions": { "licenseName": "Live2D Free Material License + Sample Model Terms", "creditNotation": "required", "licenseUrl": "https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html", "otherLicenseUrl": "https://www.live2d.com/eula/live2d-sample-model-terms_en.html" },
+    "readme": "This content uses sample data owned and copyrighted by Live2D Inc. The sample data are utilized in accordance with terms and conditions set by Live2D Inc. This content itself is created at the author’s sole discretion."
+  }
+}

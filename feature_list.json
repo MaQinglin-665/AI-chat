@@ -649,6 +649,231 @@
         "Plain frontend has an inherited null syncProactiveSchedulerPolling controller; separate follow-up",
         "Other platforms/Python versions, optional ASR services, audio devices and long-duration acceptance not verified"
       ]
+    },
+    {
+      "id": "avatar-live2d-pr217-closeout",
+      "name": "Rebase integration boundary and exact Hiyori video for PR217",
+      "status": "completed",
+      "dependencies": [
+        "avatar-live2d-stage2",
+        "avatar-painted-backdrop-v1"
+      ],
+      "scope": [
+        "Priority1 per user: latest main79ee80f including#221/#222, exact Core6 Hiyori, dedicated video, normal push and ready; author merges",
+        "Remove previously mixed lipsync product changes by inverse patch; preserve history and local installed120ms until independent shared PR",
+        "Do not start LLM task phase2 before author merges#217",
+        "Latest user: sync main1ab5d38/#227; #225 still open/draft, do not merge it. Main VRM/scene numeric behavior authoritative; stop on ambiguous conflicts.",
+        "2026-10-27: main1012e13 now includes225 bedroom background; resolve reported PR217 conflict, preserve main scene behavior, rerun strict/full/package and all CI.226/Mao remain gated."
+      ],
+      "done_criteria": [
+        "Latest main merged with VRM features retained",
+        "Strict Node and browser complete ordered-write snapshots and full/package checks pass",
+        "Dedicated Hiyori inspection video delivered locally; no model/private assets committed",
+        "Existing PR217 updated/pushed/ready; separate main-based lipsync branch next"
+      ],
+      "next": "Normalpush/ready, waitallCI and verifyGitHubnoConflicts/latestmainancestor, notifyauthor; authorviews01andmerges.226/Mao remain gated.",
+      "verification": [
+        "Merged latest main79ee80f (#221/#222) as8d514b7; retained both VRM and Live2D integration.",
+        "Exact same-Core Node5280frames/394224calls/42scenes; browser1030frames/167741calls, all snapshots/four PNG pairs identical and10 reloads clean.",
+        "Full scripts/test-local.ps1:861 Python passed/3 skipped,72 Node files,syntax186/239,secrets834;docs4,package smoke,JSON/py_compile pass.",
+        "Dedicated38.4s silent realHiyori/Pixi/Core6 video retained outsideGit; browser fixture is not native Windows/liveTTS acceptance.",
+        "Prior browser mouth fix removed from PR217 product via normal inverse patches; installed120ms preserved locally; new independent main-based PR required.",
+        "2026-10-26 main1ab5d38/#227 mergedf73125f;full928Python/3skip/73Node,syntax194/241,secrets847;strict5280/394224/browser1030/167741;9VRMNode+32Python/1skip;package/JSON/compile pass.01 separately provided,user forwards.#225 stilldraft.No later work before217 author merge.",
+        "2026-10-27:main1012e13/#225merged82ea405,ancestry0;state3conflictsonly/fullpreservation;strict5280/394224/browser1030/167741;10Node+36Python/1skip;full932/3skip/74Node,syntax194/243,secrets853;package/JSON/compilepass. MainbedroomandVRMsourceparityverified. AwaitremoteCI/mergeability before successnotification."
+      ]
+    },
+    {
+      "id": "avatar-mao-browser-lip-sync",
+      "name": "Mao browser speech mouth starts and ends with actual playback",
+      "status": "completed",
+      "dependencies": [
+        "avatar-live2d-mao-stage3"
+      ],
+      "scope": [
+        "User reports mouth starts before audio and stops before audio ends",
+        "Only playback event/mouth timing/bridge and related tests; preserve Hiyori exact same-input writes",
+        "Use actual browser utterance lifecycle instead of clamped estimated sentence duration; no provider/key/dialogue/memory/external execution changes",
+        "Back up and update actual local installation; retain ready PR217 without merge/main/force push"
+      ],
+      "done_criteria": [
+        "Reproduce early onset and frozen tail with deterministic playback clock",
+        "Event-owned start/end, pause/resume/cancel/stale utterance handling, bounded startup calibration",
+        "Long speech keeps moving; analysed silence/Hiyori exact regressions and local checks pass",
+        "Deploy corrected local avatar playback path and normal push same PR if still open"
+      ],
+      "next": "User listening check passed; preserve current120ms. Author still reviews remaining Windows interaction/appearance and PR217; no further mouth tuning unless a new issue is reported.",
+      "verification": [
+        "Reproduced old actual controllers: before-onstart mouth0.0122708; long-speech tailVariation0 while synthesis still speaking",
+        "New production-controller tests cover actual-event onset, bounded120ms delay,30s speech vs800ms estimate, pause/resume/boundary/end/error/cancel/stale callbacks and immediate original speech bridge wake/cleanup",
+        "Actual Core6/Mao callback timeline: pending/start-guard/pause/end parameter0; long-speech variation0.6621486134827137;16 captures/8 native motions/auth21/unauth401/no JS errors",
+        "Complete scripts/test-local.ps1:849 Python passed/3 skipped;67 Node suites;Python184/JS228 syntax;secrets810;docs4 browser checks and required JSON/py_compile pass",
+        "Hiyori strict same-Core Node5280frames/394224calls and browser1030frames/167741calls/snapshots/four PNG hashes unchanged",
+        "Installed6 bounded files after backup;6 private files preserved;5 served assets hash-match; model ready/Mao/Core6/132/no errors after restart; no private config edit",
+        "Implementation50ef8c9 pushed normally to existing PR217, description updated and open/ready/unmerged verified; listening feedback pending.",
+        "2026-10-26 actual user listening confirmation: \"基本对齐，结尾也跟上了\". Keep current120ms setting; qualitative feedback, not an instrumented latency measurement."
+      ]
+    },
+    {
+      "id": "avatar-live2d-mao-stage3",
+      "name": "Official local Mao: vowel estimator, faces, gestures and configuration",
+      "status": "completed",
+      "dependencies": [
+        "avatar-live2d-stage2"
+      ],
+      "scope": [
+        "User confirmed stage3 and local character switch on 2026-10-26",
+        "Official SDK Mao stays in ignored models_local/Mao; no assets/Core/vendor changes in this phase",
+        "Same shared runtime/Pixi clock; retain exact Hiyori regression and VRM behavior",
+        "Bounded model resource serving, five-vowel spectral fallback, eight faces/motions and three arm gestures",
+        "Local full gate, screenshots outside Git, deploy locally, push PR217 and mark ready; author merges only"
+      ],
+      "done_criteria": [
+        "Official local Mao and safe config switch with legacy compatibility",
+        "Vowel estimator/silence/fallback, mapping and switch tests; full local checks pass",
+        "Local screenshots: five vowels, eight expressions, three gestures; actual installed Mao shown",
+        "Push existing PR217 and change draft to ready; no merge/main/force push"
+      ],
+      "next": "PR217 is published and ready; stop for author Windows appearance, drag, clickthrough and real voice review. Author decides merge.",
+      "verification": [
+        "Full scripts/test-local.ps1: 849 Python passed/3 skipped; all 66 Node suites; Python184/JS226 syntax; secrets807 (final docs scan808)",
+        "Hiyori same-Core exact: 5280 Node frames/394224 calls; real Pixi 1030 frames/167741 calls, snapshots and four PNG pairs identical; ten reload cleanups",
+        "Real local Mao: five vowels/eight faces/three arms, eight native motions actually loaded and played, 21 authenticated resources and unauthorized401, no page errors",
+        "Actual D:/app/DesktopPet installed page loads Mao/Core6/132 parameters with authentication after minimal old-CSP blob backport; desktop app restarted",
+        "Official assets/private config/screenshots outside Git; 30 genuine competition captures with descriptions and hashes; docs four browser cases and required JSON/py_compile pass",
+        "Implementation9657a30 pushed normally; PR217 verified open, non-draft, unmerged, base main. Python/Node/Docs/Quality CI succeeded; Windows was running at publication.",
+        "Final browser-TTS follow-up: no-spectrum portable mouth envelope vs analysed silence/stale remote tested; full849/3,66Node,syntax184/226,secrets808,docs4 pass; real Mao fallback assertions and Hiyori1030/167741 strict comparison pass; installed app updated/restarted/reverified."
+      ]
+    },
+    {
+      "id": "avatar-live2d-stage2",
+      "name": "Live2D adapter through the shared avatar runtime",
+      "status": "completed",
+      "dependencies": [
+        "avatar-live2d-stage1",
+        "avatar-vrm-basic",
+        "avatar-3d-room-v1"
+      ],
+      "scope": [
+        "Approved shared avatar runtime factory/frame/events; renderers own clocks, Live2D keeps Pixi ticker and write order",
+        "Web Core6 upgrade in a separate commit before mapping; documentation runtimes unchanged",
+        "Exact complete parameter-write sequences under the same Core6; stop on any mismatch"
+      ],
+      "done_criteria": [
+        "Author confirms the shared runtime clock/lifecycle proposal before implementation",
+        "Mapping-based Live2D renderer and exact old/new parameter write snapshots",
+        "Full local/VRM regressions pass; publish draft PR and wait for Windows review"
+      ],
+      "verification": [
+        "Merged origin/main 2356ddb as 97ceb92; only the four authorized conflict files; all content/VRM notices retained",
+        "Read VRM basic/room docs, intent interface and actual runtime; four targeted Node groups passed",
+        "Both actual repository Core4 and temporary official Core6: all 63 existing Node files passed; original Core restored",
+        "Browser Hiyori works with both; fixed-input visible differences 49/13/6 pixels, max geometry delta 0.0000012069940567016602",
+        "Core6 separately committed as b39ab99; docs Core/display byte-identical to prior checkpoint",
+        "Same actual Core6: 5280 frames/394224 ordered calls plus per-frame snapshots strictly equal to pinned b39ab99 Git blobs",
+        "Real Pixi browser: 1030 frames/167741 ordered calls strictly equal; four before/after canvas PNG hashes identical; ten reloads dispose resources",
+        "Custom/missing mappings, unknown/direct intents, unified events, 100 drag completions and disposal during drag pass; no Live2D RAF added",
+        "Final full scripts/test-local.ps1: 838 Python passed/3 skipped, all 65 Node suites, Python183/JS221 syntax, secrets800; docs check:all four cases and JSON/py_compile passed",
+        "Implementation 94a9fca pushed normally to friend/avatar-live2d-adapter; PR217 verified open/draft/unmerged, base main; initial Node/Docs/Quality CI success"
+      ],
+      "next": "User confirmed proceeding to stage3; completed adapter preserved by strict regressions. Final integrated Windows review remains with author.",
+      "historical_blockers": [
+        "Current runtime is VRM-specific; user requires a proposal before structural integration",
+        "Core4/Core6 fixed-input pixels are close but not identical; author must decide acceptance before any Core commit"
+      ],
+      "blockers": [],
+      "author_approval": "Author approved plan and Core6 inclusion; no approximation in same-Core mapping acceptance.",
+      "implementation_status": "published to draft PR217; awaiting author Windows review"
+    },
+    {
+      "id": "avatar-live2d-stage1",
+      "name": "Live2D adapter prerequisite stage: launcher recovery and official Cubism Core compatibility",
+      "status": "completed",
+      "scope": [
+        "Stage 1 only; two independent implementation commits after required interface is available",
+        "Restore friendly installation failure guidance without reverting portable Node/venv support",
+        "Validate official Core locally with a minimal display compatibility patch; retain Hiyori behavior; new Core remains outside Git at user's request"
+      ],
+      "done_criteria": [
+        "Read AGENTS.md and docs/avatar-intent-interface.md",
+        "Commit launcher error recovery independently",
+        "Commit display compatibility independently after Hiyori/full test validation; new Core redistribution remains deferred by the user",
+        "Stop for user confirmation before stage 2; user subsequently authorized publishing the stage 1 branch and draft PR"
+      ],
+      "blockers": [],
+      "verification": [
+        "Refreshed main and created friend/avatar-live2d-adapter; no existing local changes",
+        "Actual Hiyori fixture rendered with Core version integer 67239938, latest moc version 4, pixi-live2d-display 0.4.0",
+        "Four before-change Hiyori screenshots and two official source/consent screenshots saved outside Git; no page errors",
+        "Updated branch to main 5b20358; required avatar intent interface v1 read; four Hiyori/Core baseline hashes remain unchanged",
+        "Seven launcher tests passed: no-global-Node startup, npm ci/install error guidance and preserved mirror, real batch pause and exit-code propagation",
+        "Full scripts/test-local.ps1 passed for launcher commit: 812 Python passed, 2 skipped; Node suites, Python/JavaScript syntax and secret scan passed",
+        "User confirmed both SDK agreements at action time; official SDK Web 5-r.5 ZIP downloaded outside Git; SHA256 67064a7fb1812cf502f5c4a03bfe12cc638c75a621bb4acf06bb28763df06ba0",
+        "Isolated old/new Core probe: new Core integer 100663297 supports moc version 6 and decodes bundled Mao moc5 (132 parameters, 262 drawables); current display 0.4.0 throws in doDrawModel and shows blank Hiyori",
+        "Core-only Hiyori comparison across three parameter inputs: 17544 scalars; max absolute geometry difference 0.0000012069940567016602",
+        "Patched display 0.4.0+ai-chat.core6.1 renders Hiyori on Core 4 and 6, and SDK Mao on Core 6, with no page errors; old-Core Hiyori pixel hashes are identical to upstream for all three fixed inputs",
+        "Actual vendored UMD Node regression passed; reproducible patch matches shipped bytes, is idempotent and rejects tampering; second full scripts/test-local.ps1 passed: 812 Python passed, 2 skipped, Node/syntax/secrets passed"
+      ],
+      "limitations": [
+        "New Core and SDK samples remain outside Git; repository Core is unchanged; display compatibility only, no avatar adapter/mapping",
+        "This local PixiJS 6 compatibility build does not implement Cubism 5.3 offscreen effects; affected models fail with a clear error",
+        "Screenshots use real existing model with simulated audio, not live TTS or hardware listening acceptance"
+      ],
+      "launcher_status": "independent local launcher commit 6adf36b complete; seven targeted Windows tests and full local gate passed",
+      "display_status": "compatibility commit 2f3500b pushed; browser pixel comparison and full local gate passed; awaiting stage 1 confirmation, keeping new Core local",
+      "ci_followup": "Reproduced PR Windows CP437 Chinese output loss; repaired redirected output only. 13 launcher tests and full gate pass (818 Python passed/2 skipped, 60 Node suites, syntax/secrets). Updated same draft PR; consult GitHub for current CI state.",
+      "publication": {
+        "pull_request": "https://github.com/MaQinglin-665/AI-chat/pull/217",
+        "draft": true,
+        "base": "main",
+        "head": "friend/avatar-live2d-adapter",
+        "next": "Await review and explicit stage 2 confirmation; no merge or new Core redistribution"
+      },
+      "historical_blockers": [
+        "Before committing Core, clarify project publication/redistribution permission: official Expandable Application terms may apply; SDK consent alone does not establish this",
+        "New Core is deliberately not included in Git; stage 1 checkpoint needs user confirmation before stage 2"
+      ],
+      "author_review": "User confirms stage 1 author acceptance on 2026-10-26; new Core still not committed."
+    },
+    {
+      "id": "avatar-brain-context-v1",
+      "name": "Backend proactive context and durable usage limits",
+      "status": "complete",
+      "done_criteria": [
+        "Sanitized last-three-turn <=300-character summary and <=2 existing memory matches",
+        "Persist daily/rolling-hour quotas across restart; corrupt/unwritable storage falls back to memory",
+        "Fake model, privacy, restart and full/package verification; draft PR only"
+      ],
+      "notes": [
+        "No avatarRuntime.js or vrmRenderer.js changes; remaining frontend phase 2 waits for #217",
+        "908 passed, 3 skipped, 1 warning; all Node/syntax/secrets and first-run package checks passed; fake model only; draft PR delivery"
+      ]
+    },
+    {
+      "id": "backdrop-assets-v2",
+      "name": "Compressed AI bedroom backgrounds and Hiyori CSS integration",
+      "status": "complete",
+      "dependencies": [
+        "merged #221"
+      ],
+      "done_criteria": [
+        "Clean main-based ancestry excludes original PNG blobs",
+        "Quality-90 WebP at original size with before/after visual comparison",
+        "Control-center default-off bedroom switch; period canvas filters and layout-following shadow",
+        "Full gates, draft replacement PR, comment and close #223 without merge"
+      ],
+      "verification": [
+        "845 Python passed / 3 skipped; full Node/syntax/secrets and package smoke passed",
+        "q90 WebP: night 597636, dusk 572028, day 617396 bytes, all 2560x1440",
+        "Same-pose PNG/WebP and three-period appearance pairs; no noticeable normal-size difference; zero page errors",
+        "Real layout/control-center fixture verified default-off, foot coordinate resize/position sync, disable restores baseline filter, pet exclusion",
+        "#225 color follow-up: alpha-preserving sRGB matrix, saturation >= 1; interruption/reset tests and full gate 845/3 passed; three periods with 3x face/clothes/feet crops",
+        "User accepted #225; main 1ab5d38 integrated with only state conflicts; fresh full gate 912 passed, 3 skipped and package smoke passed"
+      ],
+      "limitations": [
+        "Lossy compression, not pixel identical",
+        "3 percent model-bottom inset calibrated for shipped Hiyori; other models may need adjustment",
+        "CSS grading is global canvas tint, not physically directional lighting"
+      ]
     }
   ],
   "active_task": "avatar-shared-lipsync-fix",
