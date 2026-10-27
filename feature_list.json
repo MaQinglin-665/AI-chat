@@ -1,6 +1,26 @@
 {
   "features": [
-    {"id": "avatar-brain-executor-v1", "name": "VRM adaptive frames and brain action execution", "status": "completed", "done_criteria": ["Separate adaptive-frame commit, VRM only", "Sequential interruptible actions with terminal ACK and scene restrictions", "Full/CI checks and real 10-minute private acceptance; draft PR only", "Pre-merge empty-reply and camera baseline diagnosis; 3-minute labeled replay"]},
+    {
+      "id": "brain-gesture-vocab-v1",
+      "name": "Connect model gesture vocabulary to brain executor",
+      "status": "in_progress",
+      "done_criteria": [
+        "Capability-bounded vocabulary and scene-specific gaze",
+        "Promise outcomes and AbortSignal; preserve VRM fallback",
+        "Full tests and two real daily five-minute model recordings; draft PR only"
+      ]
+    },
+    {
+      "id": "avatar-brain-executor-v1",
+      "name": "VRM adaptive frames and brain action execution",
+      "status": "completed",
+      "done_criteria": [
+        "Separate adaptive-frame commit, VRM only",
+        "Sequential interruptible actions with terminal ACK and scene restrictions",
+        "Full/CI checks and real 10-minute private acceptance; draft PR only",
+        "Pre-merge empty-reply and camera baseline diagnosis; 3-minute labeled replay"
+      ]
+    },
     {
       "id": "live2d-model-onboarding-template",
       "name": "New Live2D mapping template and model-reference validator in CI",
@@ -945,5 +965,5 @@
       ]
     }
   ],
-  "active_task": "avatar-brain-executor-v1"
+  "active_task": "brain-gesture-vocab-v1"
 }

@@ -9,7 +9,7 @@
       const scene=r?.kind==='live2d'?'live2d':m.room?.preset||'none';
       const places=['room','handpainted'].includes(scene)?Object.keys(layout.activityPoints||{}):[];
       return {kind:r?.kind||'none',scene,position:w.position||[0,0],activity:w.name||'accompany',places,
-        activities:places.filter(x=>x!=='accompany'),gestures:r?.capabilities?.().actions||[],
+        activities:places.filter(x=>x!=='accompany'),gestures:(r?.kind==='live2d'?r?.capabilities?.().gestures:r?.capabilities?.().actions)||[],
         period:root.document.body.dataset.stageRoom||'night',idle_sec:Math.floor((Date.now()-lastInput)/1000),
         typing:Date.now()<inputUntil,speaking:!!(state.chatBusy||state.ttsContextSpeaking||state.streamSpeakWorking||state.speechPhase==='speaking'),events};
     }
@@ -55,8 +55,13 @@
           return true;
         }
         if(action.type==='wait')return wait(action.duration_sec*1000,signal);
-        if(action.type==='gesture'){if(!r.playAction(action.name))return false;await wait(1800,signal);r.stopAction();return true;}
+        if(action.type==='gesture'){
+          if(typeof r.playGesture==='function')return await r.playGesture(action.name,{signal});
+          if(!r.playAction?.(action.name))return false;
+          try{await wait(1800,signal);return true;}finally{r.stopAction?.();}
+        }
         if(action.type==='look_at'){
+          if(r.kind==='live2d')return r.lookAt?.(action.target)||{status:'unsupported'};
           if(r.kind==='vrm'&&['room','handpainted'].includes(snapshot().scene)){
             if(!r.lookAtWorld?.(action.target))return false;await wait(400,signal);return true;
           }

@@ -1329,3 +1329,19 @@ Verification Evidence（本次叠加同步）：从更新后的PR229分支8a9ec9
 ## 2026-10-27 — PR231 accepted main integration
 Merged origin/main d2ab533 after PR228 (501f00f), PR229 (a674d0e), PR230 (d2ab533). Only feature_list.json, progress.md, session-handoff.md conflicted: retained both histories and feature entries, kept executor active. Product/test changes auto-merged; no manual runtime edits.
 Verification Evidence: scripts/test-local.ps1 passed: 950 Python / 3 skipped, all Node suites, Python196/JavaScript255 syntax, secrets879. Hiyori actual model validation passed; Mao/template structure-only because models absent. Required public JSON and py_compile gates passed. Next normal push, ready PR231, all current-head CI, authorized merge commit; keep original brain_exec and local main/private config unchanged.
+
+## 2026-10-27 — brain-gesture-vocab-v1 started
+Independent worktree ai_desktop_pet_vocab from origin/main 5669e8a. node_modules copied; no npm ci. Read unified vocabulary contract. No renderer/mapping changes or private configuration access; real validation uses independent config/port and environment key.
+
+### Gesture vocabulary implementation and evidence
+Protocol capability intersection + scene gaze, Promise statuses/AbortSignal/VRM fallback; no renderer/mapping edits. Verification Evidence: final full test-local with isolated D TEMP/TMP:969 Python/3skip,82 Node,syntax/secrets; prior C-temp disk exhaustion and Torch native failure retained in ignored logs, no related product changes. Hiyori real daily300.906s/4calls/4374tokens/5completed gesture ACKs, no real gaze action; video331.52s fully decoded, final screenshot timeout documented. Mao blocked on accessible manifest path; draft only, not complete dual-model acceptance. Report docs/avatar-brain-gesture-vocab.md.
+
+### Mao model and real verification follow-up
+User provided official local Mao and authorized ignored copy. Actual mapping modelChecked:true/no errors or warnings. Daily five-minute run304.52s video,9responses/5753tokens,no page errors but abstain text and no terminal ACKs: not passed as execution. Additional65.397s real-model diagnostic (no product changes) completed wave then look_at left,2ACKs,1response/1044tokens. Both videos decode; local only. Details/limitations in docs/avatar-brain-gesture-vocab.md. Original e60b1bc all CI green. Draft232 remains unmerged; no model/config/media committed.
+
+## PR232 pre-merge reply/claim repair started
+Author authorized narrow abstain filtering, ordinary-reply prompt/body guard and fixed claim refusal diagnostics. Saved raw Mao responses contain standalone abstain tags without brain blocks. Preserve model renderers/mappings/private config. Reproduce lifecycle with isolated synthetic replay then real five-minute run; no claim about old missing receipts without evidence.
+
+Verification Evidence: PR232 reply/claim repairs complete; full D TEMP/TMP test-local978 Python/3skip,82 Node,syntax/secrets pass. Narrow streaming abstain filter, explicit normal-body prompt, error on control-only normal reply; safe fixed claim diagnostics/expiry tombstones. Saved-response four-turn replay8actions completed, historical missing claim not reproduced. Push/CI then same-four-message real Mao5minute run required.
+
+PR232 repair follow-up:10ef902 fullLinux/WindowsCI passed before realMao run. Same4prompts/daily300.953s:4nonempty replies,raw/display abstain0,1plan wave/nod2completedACKs,no rejected/unresolved plan,0page errors.4calls4496tokens~$0.000191652. Video304.12s full decode; private localonly. Historical think/tilt_head never claimed but original reason not recoverable; four-turn replay8complete, no fabricated root cause. Report updated; draft only, no merge.
