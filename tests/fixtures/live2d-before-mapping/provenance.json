@@ -1,0 +1,10 @@
+{
+  "commit": "b39ab99",
+  "core": "06.00.0001",
+  "coreSha256": "8741f739779b5d5210872bd3d7d99f0f1e56e6c87409e7d26d6bb4b80aa1ef47",
+  "sha256": {
+    "hiyoriPerformanceDirector.js": "56ed6d2dddfe31567c09420a4619ed06c915752b468a6bf221d80e5f77ca9db9",
+    "live2dExpressionController.js": "a65ddfada481cdc179277de721df90a5576188aeb56a9ed02149d4ebd048ea08",
+    "live2dRuntimeController.js": "dd74f6deabb1a138ea9ac21f147c68df34559a1df6ccb6217b3a3a3643f5c197"
+  }
+}

@@ -96,7 +96,7 @@ function staticChecks() {
     "if (!isPointOverVisibleModelArea(e.clientX, e.clientY)) return;",
     "Wheel scaling is limited to the visible character hotzone"
   );
-  const wheelListenerAt = live2dLayoutSource.indexOf('canvas.addEventListener("wheel"');
+  const wheelListenerAt = live2dLayoutSource.indexOf('listen(canvas, "wheel"');
   const wheelHotzoneAt = live2dLayoutSource.indexOf(
     "if (!isPointOverVisibleModelArea(e.clientX, e.clientY)) return;",
     wheelListenerAt
@@ -123,12 +123,12 @@ function staticChecks() {
   );
   ensureSourceContains(
     live2dLayoutSource,
-    "document.addEventListener(\"pointermove\", onDocMove);",
+    "listen(document, \"pointermove\", onDocMove);",
     "Electron branch registers document pointermove listener"
   );
   ensureSourceContains(
     live2dLayoutSource,
-    "document.removeEventListener(\"pointermove\", onDocMove);",
+    "removeDocMove();",
     "Electron branch removes document pointermove listener on cleanup"
   );
   ensureSourceContains(

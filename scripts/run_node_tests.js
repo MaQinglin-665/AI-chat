@@ -7,6 +7,7 @@ const path = require("path");
 const root = path.resolve(__dirname, "..");
 const tests = [
   "tests/test_avatar_brain_debug.js",
+  "tests/test_live2d_mao.js",
   "tests/test_avatar_vrm.js",
   "tests/test_avatar_scene.js",
   "tests/test_avatar_world.js",
@@ -17,6 +18,8 @@ const tests = [
   "tests/test_avatar_painted.js",
   "tests/test_hiyori_backdrop.js",
   "tests/test_avatar_runtime.js",
+  "tests/test_live2d_avatar_adapter.js",
+  "tests/test_live2d_mapping_sequence.js",
   "tests/test_visual_polish_frontend.js",
   "tests/test_external_agent_frontend.js",
   "tests/test_readiness_resources.js",
@@ -58,6 +61,7 @@ const tests = [
   "tests/test_first_run_frontend.js",
   "tests/test_frontend_runtime_efficiency.js",
   "tests/test_live2d_render_performance_frontend.js",
+  "tests/test_live2d_core_compatibility.js",
   "tests/test_stage_frontend.js",
   "tests/test_stage_feedback_frontend.js",
   "tests/test_stage_theme_frontend.js",

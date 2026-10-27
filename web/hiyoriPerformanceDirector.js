@@ -1,25 +1,18 @@
 (function (root) {
   "use strict";
 
+  function createImplementation(mapping) {
+  const mapped = mappingApi.resolve(mapping);
+  const P = new Proxy(mapped.params, { get: (params, key) => params[key] || "" });
+  const validIds = new Set(Object.values(mapped.params));
+
   const MODES = ["idle", "listen", "think", "speak"];
   const EMOTIONS = ["happy", "sad", "angry", "surprised", "thinking"];
 
   // Sentence-level delivery stays richer than the five legacy face moods.
   // These additive poses use existing Hiyori rig channels, never mouth-open
   // or eyelid channels owned by lip sync and blinking.
-  const DELIVERY_POSES = {
-    happy: { ParamAngleZ: 2.4, ParamBodyAngleY: 1.4, ParamArmLA: 0.6, ParamArmRA: -0.6 },
-    playful: { ParamAngleZ: -4.2, ParamAngleX: 2.1, ParamBodyAngleZ: 1.8, ParamEyeBallX: 0.12, ParamArmLA: 0.9 },
-    excited: { ParamAngleY: -2.6, ParamBodyAngleY: 3.2, ParamShoulder: 0.16, ParamArmLA: 1.1, ParamArmRA: -1.1 },
-    shy: { ParamAngleY: 2.2, ParamAngleZ: 3.6, ParamBodyAngleX: -1.2, ParamEyeBallX: -0.18, ParamArmLA: 0.55, ParamHandL: 0.25 },
-    hurt: { ParamAngleY: 1.8, ParamAngleZ: -2.4, ParamBodyAngleY: -1.4, ParamShoulder: -0.07 },
-    sad: { ParamAngleY: 2.8, ParamBodyAngleY: -1.8, ParamShoulder: -0.1 },
-    anxious: { ParamAngleZ: -2.8, ParamBodyAngleX: -1.5, ParamShoulder: 0.06, ParamArmLA: 0.45, ParamArmRA: -0.3 },
-    angry: { ParamAngleY: -1.6, ParamBodyAngleY: 2.4, ParamShoulder: 0.12, ParamArmLA: -0.8, ParamArmRA: 0.8 },
-    surprised: { ParamAngleY: -3.6, ParamBodyAngleY: -2.8, ParamShoulder: 0.18, ParamArmLA: 0.85, ParamArmRA: -0.85 },
-    serious: { ParamAngleY: -1.1, ParamBodyAngleY: 1.8, ParamArmRA: -0.65, ParamHandR: -0.2 },
-    thinking: { ParamAngleZ: -4.5, ParamBodyAngleX: -1.4, ParamEyeBallX: -0.16, ParamArmLA: 0.8, ParamHandL: 0.3 }
-  };
+  const DELIVERY_POSES = mapped.poses(mapping.deliveryPoses);
   const DELIVERY_KEYS = Object.keys(DELIVERY_POSES);
 
   function normalizeDelivery(value) {
@@ -28,14 +21,7 @@
     return DELIVERY_KEYS.includes(key) ? key : "neutral";
   }
 
-  const SPEECH_GESTURE_POSES = {
-    nod: { ParamAngleY: -3.4, ParamBodyAngleY: 2, ParamShoulder: 0.08 },
-    small_nod: { ParamAngleY: -1.8, ParamBodyAngleY: 1.2, ParamShoulder: 0.05 },
-    question_tilt: { ParamAngleZ: -3.5, ParamAngleX: 1.2, ParamBodyAngleX: -0.6, ParamBodyAngleZ: 0.7 },
-    open_explain: { ParamBodyAngleY: 1.8, ParamShoulder: 0.08, ParamArmLA: 0.75, ParamArmRA: -0.45 },
-    light_lift: { ParamAngleY: -1.4, ParamBodyAngleY: 2.6, ParamShoulder: 0.16, ParamArmLA: 0.6, ParamArmRA: -0.6 },
-    soft_lean: { ParamAngleY: 1.1, ParamBodyAngleY: 1.4, ParamBodyAngleX: -0.5, ParamShoulder: -0.025 }
-  };
+  const SPEECH_GESTURE_POSES = mapped.poses(mapping.speechGesturePoses);
   const SPEECH_GESTURE_POOLS = {
     neutral: ["nod", "open_explain", "question_tilt"],
     happy: ["light_lift", "open_explain", "nod"],
@@ -120,100 +106,9 @@
       : 0;
   }
 
-  const MODE_POSES = {
-    idle: {},
-    listen: {
-      ParamEyeLOpen: 0.08,
-      ParamEyeROpen: 0.08,
-      ParamBrowLY: 0.055,
-      ParamBrowRY: 0.055,
-      ParamAngleY: -0.8,
-      ParamAngleZ: 0.65,
-      ParamBodyAngleX: 0.45,
-      ParamBodyAngleY: 0.5,
-      ParamShoulder: 0.045
-    },
-    think: {
-      ParamEyeBallX: -0.18,
-      ParamEyeBallY: 0.1,
-      ParamBrowLY: 0.13,
-      ParamBrowRY: -0.08,
-      ParamBrowLAngle: 0.06,
-      ParamBrowRAngle: -0.04,
-      ParamMouthForm: -0.12,
-      ParamAngleY: 1.1,
-      ParamAngleZ: -2.2,
-      ParamBodyAngleX: -1.15,
-      ParamBodyAngleY: -0.55,
-      ParamArmLA: 0.36,
-      ParamArmLB: 0.3,
-      ParamHandL: 0.18
-    },
-    speak: {
-      ParamAngleY: -0.5,
-      ParamBodyAngleX: 0.52,
-      ParamBodyAngleY: 1.08,
-      ParamShoulder: 0.085
-    }
-  };
+  const MODE_POSES = mapped.poses(mapping.modePoses);
 
-  const EMOTION_POSES = {
-    happy: {
-      ParamEyeLSmile: 0.2,
-      ParamEyeRSmile: 0.2,
-      ParamMouthForm: 0.25,
-      ParamCheek: 0.16,
-      ParamBrowLY: 0.06,
-      ParamBrowRY: 0.06,
-      ParamAngleZ: 0.75,
-      ParamBodyAngleY: 0.7,
-      ParamShoulder: 0.06
-    },
-    sad: {
-      ParamBrowLY: -0.13,
-      ParamBrowRY: -0.13,
-      ParamBrowLForm: -0.15,
-      ParamBrowRForm: -0.15,
-      ParamMouthForm: -0.22,
-      ParamAngleY: 2.2,
-      ParamBodyAngleX: -1.4,
-      ParamBodyAngleY: -0.9,
-      ParamShoulder: -0.09
-    },
-    angry: {
-      ParamEyeLOpen: 0.08,
-      ParamEyeROpen: 0.08,
-      ParamBrowLY: -0.18,
-      ParamBrowRY: -0.18,
-      ParamBrowLAngle: -0.12,
-      ParamBrowRAngle: 0.12,
-      ParamMouthForm: -0.2,
-      ParamBodyAngleY: 0.9,
-      ParamShoulder: 0.12,
-      ParamArmLA: -0.12,
-      ParamArmRA: 0.12
-    },
-    surprised: {
-      ParamEyeLOpen: 0.25,
-      ParamEyeROpen: 0.25,
-      ParamBrowLY: 0.2,
-      ParamBrowRY: 0.2,
-      ParamMouthForm: -0.1,
-      ParamAngleY: -2.1,
-      ParamBodyAngleY: -1.25,
-      ParamShoulder: 0.14,
-      ParamHairAhoge: 0.18
-    },
-    thinking: {
-      ParamEyeBallX: -0.16,
-      ParamEyeBallY: 0.1,
-      ParamBrowLY: 0.1,
-      ParamBrowRY: -0.08,
-      ParamMouthForm: -0.14,
-      ParamAngleZ: -1.4,
-      ParamBodyAngleX: -0.8
-    }
-  };
+  const EMOTION_POSES = mapped.poses(mapping.emotionPoses);
 
   const ACTION_SPECS = {
     nod: { durationMs: 1960, attackMs: 360, releaseMs: 520, priority: 3, cooldownMs: 520 },
@@ -336,6 +231,7 @@
       return target;
     }
     for (const [id, raw] of Object.entries(pose)) {
+      if (!validIds.has(id)) continue;
       const value = Number(raw);
       if (!Number.isFinite(value)) {
         continue;
@@ -347,12 +243,12 @@
 
   function channelResponseRate(id, mode = "idle") {
     const key = String(id || "");
-    if (/MouthOpen/.test(key)) return 15;
-    if (/Eye|Brow|Mouth|Cheek/.test(key)) return 12.5;
-    if (/^ParamAngle/.test(key)) return mode === "speak" ? 10.8 : 9.4;
-    if (/Body|Shoulder|Breath|Bust/.test(key)) return mode === "speak" ? 8.8 : 7.6;
-    if (/Arm|Hand|Leg/.test(key)) return 6.6;
-    if (/Hair|Ribbon|Skirt/.test(key)) return 6.2;
+    if (mapped.has("mouthOpen", key)) return 15;
+    if (mapped.has("face", key)) return 12.5;
+    if (mapped.has("head", key)) return mode === "speak" ? 10.8 : 9.4;
+    if (mapped.has("torso", key)) return mode === "speak" ? 8.8 : 7.6;
+    if (mapped.has("limb", key)) return 6.6;
+    if (mapped.has("secondary", key)) return 6.2;
     return 8;
   }
 
@@ -437,121 +333,121 @@
       const headStroke = gestureStroke(p, 1);
       const bodyStroke = gestureStroke(shiftedPhase(raw, 0.04), 1);
       const shoulderStroke = gestureStroke(shiftedPhase(raw, 0.065), 1);
-      pose.ParamAngleY = -7.0 * headStroke * staggeredEnvelope(raw, e, 0, 0.045);
-      pose.ParamBodyAngleY = -1.75 * bodyStroke * staggeredEnvelope(raw, e, 0.04, 0);
-      pose.ParamShoulder = 0.055 * Math.abs(shoulderStroke) * staggeredEnvelope(raw, e, 0.065, 0.015);
+      pose[P.angleY] = -7.0 * headStroke * staggeredEnvelope(raw, e, 0, 0.045);
+      pose[P.bodyAngleY] = -1.75 * bodyStroke * staggeredEnvelope(raw, e, 0.04, 0);
+      pose[P.shoulder] = 0.055 * Math.abs(shoulderStroke) * staggeredEnvelope(raw, e, 0.065, 0.015);
     } else if (name === "nod_double") {
       const headStroke = gestureStroke(p, 2);
       const bodyStroke = gestureStroke(shiftedPhase(raw, 0.055), 2);
       const shoulderStroke = gestureStroke(shiftedPhase(raw, 0.085), 2);
-      pose.ParamAngleY = -5.4 * headStroke * staggeredEnvelope(raw, e, 0, 0.055);
-      pose.ParamBodyAngleY = -1.05 * bodyStroke * staggeredEnvelope(raw, e, 0.055, 0.01);
-      pose.ParamShoulder = 0.045 * Math.abs(shoulderStroke) * staggeredEnvelope(raw, e, 0.085, 0.025);
+      pose[P.angleY] = -5.4 * headStroke * staggeredEnvelope(raw, e, 0, 0.055);
+      pose[P.bodyAngleY] = -1.05 * bodyStroke * staggeredEnvelope(raw, e, 0.055, 0.01);
+      pose[P.shoulder] = 0.045 * Math.abs(shoulderStroke) * staggeredEnvelope(raw, e, 0.085, 0.025);
     } else if (name === "shake") {
       const eyeStroke = gestureStroke(p, 2);
       const headStroke = gestureStroke(shiftedPhase(raw, 0.015), 2);
       const bodyStroke = gestureStroke(shiftedPhase(raw, 0.07), 2);
-      pose.ParamEyeBallX = -0.1 * eyeStroke * staggeredEnvelope(raw, e, 0, 0.065);
-      pose.ParamAngleX = 7.6 * headStroke * staggeredEnvelope(raw, e, 0.015, 0.035);
-      pose.ParamAngleZ = 1.15 * headStroke * staggeredEnvelope(raw, e, 0.025, 0.025);
-      pose.ParamBodyAngleX = 1.55 * bodyStroke * staggeredEnvelope(raw, e, 0.07, 0);
+      pose[P.eyeBallX] = -0.1 * eyeStroke * staggeredEnvelope(raw, e, 0, 0.065);
+      pose[P.angleX] = 7.6 * headStroke * staggeredEnvelope(raw, e, 0.015, 0.035);
+      pose[P.angleZ] = 1.15 * headStroke * staggeredEnvelope(raw, e, 0.025, 0.025);
+      pose[P.bodyAngleX] = 1.55 * bodyStroke * staggeredEnvelope(raw, e, 0.07, 0);
     } else if (name === "attentive_tilt") {
       const hold = staggeredEnvelope(raw, e, 0, 0);
-      pose.ParamEyeLOpen = 0.055 * hold;
-      pose.ParamEyeROpen = 0.055 * hold;
-      pose.ParamEyeBallX = 0.075 * staggeredEnvelope(raw, e, 0.02, 0.02);
-      pose.ParamBrowLY = 0.045 * staggeredEnvelope(raw, e, 0.035, 0.025);
-      pose.ParamBrowRY = 0.045 * staggeredEnvelope(raw, e, 0.035, 0.025);
-      pose.ParamAngleZ = 2.45 * staggeredEnvelope(raw, e, 0.045, 0.035);
-      pose.ParamAngleY = -0.85 * staggeredEnvelope(raw, e, 0.075, 0.055);
-      pose.ParamBodyAngleX = 0.72 * staggeredEnvelope(raw, e, 0.09, 0.035);
-      pose.ParamBodyAngleY = 0.9 * staggeredEnvelope(raw, e, 0.11, 0.025);
-      pose.ParamShoulder = 0.045 * staggeredEnvelope(raw, e, 0.12, 0.02);
+      pose[P.eyeLOpen] = 0.055 * hold;
+      pose[P.eyeROpen] = 0.055 * hold;
+      pose[P.eyeBallX] = 0.075 * staggeredEnvelope(raw, e, 0.02, 0.02);
+      pose[P.browLY] = 0.045 * staggeredEnvelope(raw, e, 0.035, 0.025);
+      pose[P.browRY] = 0.045 * staggeredEnvelope(raw, e, 0.035, 0.025);
+      pose[P.angleZ] = 2.45 * staggeredEnvelope(raw, e, 0.045, 0.035);
+      pose[P.angleY] = -0.85 * staggeredEnvelope(raw, e, 0.075, 0.055);
+      pose[P.bodyAngleX] = 0.72 * staggeredEnvelope(raw, e, 0.09, 0.035);
+      pose[P.bodyAngleY] = 0.9 * staggeredEnvelope(raw, e, 0.11, 0.025);
+      pose[P.shoulder] = 0.045 * staggeredEnvelope(raw, e, 0.12, 0.02);
     } else if (name === "thoughtful_glance") {
       const hold = staggeredEnvelope(raw, e, 0, 0);
-      pose.ParamEyeBallX = -0.22 * hold;
-      pose.ParamEyeBallY = 0.08 * staggeredEnvelope(raw, e, 0.015, 0.02);
-      pose.ParamBrowLY = 0.075 * staggeredEnvelope(raw, e, 0.035, 0.03);
-      pose.ParamBrowRY = -0.045 * staggeredEnvelope(raw, e, 0.035, 0.03);
-      pose.ParamMouthForm = -0.055 * staggeredEnvelope(raw, e, 0.045, 0.025);
-      pose.ParamAngleX = -1.25 * staggeredEnvelope(raw, e, 0.055, 0.04);
-      pose.ParamAngleY = 0.75 * staggeredEnvelope(raw, e, 0.075, 0.045);
-      pose.ParamAngleZ = -1.7 * staggeredEnvelope(raw, e, 0.085, 0.035);
-      pose.ParamBodyAngleX = -0.62 * staggeredEnvelope(raw, e, 0.115, 0.02);
-      pose.ParamArmLA = 0.22 * staggeredEnvelope(raw, e, 0.12, 0.015);
-      pose.ParamHandL = 0.12 * staggeredEnvelope(raw, e, 0.135, 0.01);
+      pose[P.eyeBallX] = -0.22 * hold;
+      pose[P.eyeBallY] = 0.08 * staggeredEnvelope(raw, e, 0.015, 0.02);
+      pose[P.browLY] = 0.075 * staggeredEnvelope(raw, e, 0.035, 0.03);
+      pose[P.browRY] = -0.045 * staggeredEnvelope(raw, e, 0.035, 0.03);
+      pose[P.mouthForm] = -0.055 * staggeredEnvelope(raw, e, 0.045, 0.025);
+      pose[P.angleX] = -1.25 * staggeredEnvelope(raw, e, 0.055, 0.04);
+      pose[P.angleY] = 0.75 * staggeredEnvelope(raw, e, 0.075, 0.045);
+      pose[P.angleZ] = -1.7 * staggeredEnvelope(raw, e, 0.085, 0.035);
+      pose[P.bodyAngleX] = -0.62 * staggeredEnvelope(raw, e, 0.115, 0.02);
+      pose[P.armLA] = 0.22 * staggeredEnvelope(raw, e, 0.12, 0.015);
+      pose[P.handL] = 0.12 * staggeredEnvelope(raw, e, 0.135, 0.01);
     } else if (name === "thought_resolve") {
       const lift = staggeredEnvelope(raw, e, 0, 0);
       const nodStroke = gestureStroke(shiftedPhase(raw, 0.12), 1);
-      pose.ParamEyeBallX = 0.13 * lift;
-      pose.ParamEyeBallY = -0.035 * lift;
-      pose.ParamBrowLY = 0.055 * lift;
-      pose.ParamBrowRY = 0.055 * lift;
-      pose.ParamMouthForm = 0.075 * staggeredEnvelope(raw, e, 0.035, 0.02);
-      pose.ParamAngleY = -2.7 * nodStroke * staggeredEnvelope(raw, e, 0.12, 0.035);
-      pose.ParamAngleZ = 1.0 * staggeredEnvelope(raw, e, 0.055, 0.035);
-      pose.ParamBodyAngleY = 1.1 * staggeredEnvelope(raw, e, 0.085, 0.02);
-      pose.ParamShoulder = 0.05 * staggeredEnvelope(raw, e, 0.1, 0.015);
+      pose[P.eyeBallX] = 0.13 * lift;
+      pose[P.eyeBallY] = -0.035 * lift;
+      pose[P.browLY] = 0.055 * lift;
+      pose[P.browRY] = 0.055 * lift;
+      pose[P.mouthForm] = 0.075 * staggeredEnvelope(raw, e, 0.035, 0.02);
+      pose[P.angleY] = -2.7 * nodStroke * staggeredEnvelope(raw, e, 0.12, 0.035);
+      pose[P.angleZ] = 1.0 * staggeredEnvelope(raw, e, 0.055, 0.035);
+      pose[P.bodyAngleY] = 1.1 * staggeredEnvelope(raw, e, 0.085, 0.02);
+      pose[P.shoulder] = 0.05 * staggeredEnvelope(raw, e, 0.1, 0.015);
     } else if (name === "lean_forward") {
-      pose.ParamBodyAngleY = 4.8 * staggeredEnvelope(raw, e, 0, 0);
-      pose.ParamBodyAngleX = 1.15 * staggeredEnvelope(raw, e, 0.025, 0.01);
-      pose.ParamShoulder = 0.12 * staggeredEnvelope(raw, e, 0.04, 0.025);
-      pose.ParamAngleY = -2.15 * staggeredEnvelope(raw, e, 0.065, 0.055);
+      pose[P.bodyAngleY] = 4.8 * staggeredEnvelope(raw, e, 0, 0);
+      pose[P.bodyAngleX] = 1.15 * staggeredEnvelope(raw, e, 0.025, 0.01);
+      pose[P.shoulder] = 0.12 * staggeredEnvelope(raw, e, 0.04, 0.025);
+      pose[P.angleY] = -2.15 * staggeredEnvelope(raw, e, 0.065, 0.055);
     } else if (name === "lean_back") {
-      pose.ParamBodyAngleY = -4.8 * staggeredEnvelope(raw, e, 0, 0);
-      pose.ParamBodyAngleX = -1.05 * staggeredEnvelope(raw, e, 0.02, 0.01);
-      pose.ParamShoulder = 0.1 * staggeredEnvelope(raw, e, 0.035, 0.025);
-      pose.ParamAngleY = 2.4 * staggeredEnvelope(raw, e, 0.06, 0.055);
-      pose.ParamEyeLOpen = 0.08 * staggeredEnvelope(raw, e, 0.085, 0.075);
-      pose.ParamEyeROpen = 0.08 * staggeredEnvelope(raw, e, 0.085, 0.075);
+      pose[P.bodyAngleY] = -4.8 * staggeredEnvelope(raw, e, 0, 0);
+      pose[P.bodyAngleX] = -1.05 * staggeredEnvelope(raw, e, 0.02, 0.01);
+      pose[P.shoulder] = 0.1 * staggeredEnvelope(raw, e, 0.035, 0.025);
+      pose[P.angleY] = 2.4 * staggeredEnvelope(raw, e, 0.06, 0.055);
+      pose[P.eyeLOpen] = 0.08 * staggeredEnvelope(raw, e, 0.085, 0.075);
+      pose[P.eyeROpen] = 0.08 * staggeredEnvelope(raw, e, 0.085, 0.075);
     } else if (name === "care_lean") {
       const hold = staggeredEnvelope(raw, e, 0, 0);
-      pose.ParamEyeLOpen = -0.035 * hold;
-      pose.ParamEyeROpen = -0.035 * hold;
-      pose.ParamBrowLY = 0.065 * hold;
-      pose.ParamBrowRY = 0.065 * hold;
-      pose.ParamMouthForm = 0.065 * staggeredEnvelope(raw, e, 0.025, 0.02);
-      pose.ParamAngleY = 1.0 * staggeredEnvelope(raw, e, 0.035, 0.045);
-      pose.ParamAngleZ = -1.55 * staggeredEnvelope(raw, e, 0.045, 0.035);
-      pose.ParamBodyAngleY = 2.65 * staggeredEnvelope(raw, e, 0.075, 0.02);
-      pose.ParamBodyAngleX = -0.55 * staggeredEnvelope(raw, e, 0.095, 0.015);
-      pose.ParamShoulder = -0.045 * staggeredEnvelope(raw, e, 0.11, 0.01);
+      pose[P.eyeLOpen] = -0.035 * hold;
+      pose[P.eyeROpen] = -0.035 * hold;
+      pose[P.browLY] = 0.065 * hold;
+      pose[P.browRY] = 0.065 * hold;
+      pose[P.mouthForm] = 0.065 * staggeredEnvelope(raw, e, 0.025, 0.02);
+      pose[P.angleY] = 1.0 * staggeredEnvelope(raw, e, 0.035, 0.045);
+      pose[P.angleZ] = -1.55 * staggeredEnvelope(raw, e, 0.045, 0.035);
+      pose[P.bodyAngleY] = 2.65 * staggeredEnvelope(raw, e, 0.075, 0.02);
+      pose[P.bodyAngleX] = -0.55 * staggeredEnvelope(raw, e, 0.095, 0.015);
+      pose[P.shoulder] = -0.045 * staggeredEnvelope(raw, e, 0.11, 0.01);
     } else if (name === "shy_glance") {
       const hold = staggeredEnvelope(raw, e, 0, 0);
-      pose.ParamCheek = 0.13 * hold;
-      pose.ParamEyeLOpen = -0.075 * hold;
-      pose.ParamEyeROpen = -0.075 * hold;
-      pose.ParamEyeBallX = 0.18 * hold;
-      pose.ParamEyeBallY = 0.1 * hold;
-      pose.ParamBrowLY = 0.045 * hold;
-      pose.ParamBrowRY = 0.045 * hold;
-      pose.ParamMouthForm = 0.08 * hold;
-      pose.ParamAngleX = 1.25 * staggeredEnvelope(raw, e, 0.045, 0.04);
-      pose.ParamAngleY = 1.85 * staggeredEnvelope(raw, e, 0.055, 0.035);
-      pose.ParamAngleZ = 1.55 * staggeredEnvelope(raw, e, 0.075, 0.025);
-      pose.ParamBodyAngleX = 0.65 * staggeredEnvelope(raw, e, 0.1, 0.015);
-      pose.ParamShoulder = 0.035 * staggeredEnvelope(raw, e, 0.12, 0.01);
+      pose[P.cheek] = 0.13 * hold;
+      pose[P.eyeLOpen] = -0.075 * hold;
+      pose[P.eyeROpen] = -0.075 * hold;
+      pose[P.eyeBallX] = 0.18 * hold;
+      pose[P.eyeBallY] = 0.1 * hold;
+      pose[P.browLY] = 0.045 * hold;
+      pose[P.browRY] = 0.045 * hold;
+      pose[P.mouthForm] = 0.08 * hold;
+      pose[P.angleX] = 1.25 * staggeredEnvelope(raw, e, 0.045, 0.04);
+      pose[P.angleY] = 1.85 * staggeredEnvelope(raw, e, 0.055, 0.035);
+      pose[P.angleZ] = 1.55 * staggeredEnvelope(raw, e, 0.075, 0.025);
+      pose[P.bodyAngleX] = 0.65 * staggeredEnvelope(raw, e, 0.1, 0.015);
+      pose[P.shoulder] = 0.035 * staggeredEnvelope(raw, e, 0.12, 0.01);
     } else if (name === "speak_emphasis") {
       const stroke = gestureStroke(p, 1);
       const torso = staggeredEnvelope(raw, e, 0, 0);
-      pose.ParamBodyAngleY = 2.35 * torso;
-      pose.ParamBodyAngleX = 0.65 * staggeredEnvelope(raw, e, 0.035, 0.02);
-      pose.ParamAngleY = -2.25 * stroke * staggeredEnvelope(raw, e, 0.075, 0.04);
-      pose.ParamAngleZ = 0.65 * stroke * staggeredEnvelope(raw, e, 0.085, 0.035);
-      pose.ParamShoulder = 0.085 * staggeredEnvelope(raw, e, 0.055, 0.025);
-      pose.ParamArmLA = 0.16 * staggeredEnvelope(raw, e, 0.095, 0.015);
-      pose.ParamArmRA = -0.16 * staggeredEnvelope(raw, e, 0.095, 0.015);
+      pose[P.bodyAngleY] = 2.35 * torso;
+      pose[P.bodyAngleX] = 0.65 * staggeredEnvelope(raw, e, 0.035, 0.02);
+      pose[P.angleY] = -2.25 * stroke * staggeredEnvelope(raw, e, 0.075, 0.04);
+      pose[P.angleZ] = 0.65 * stroke * staggeredEnvelope(raw, e, 0.085, 0.035);
+      pose[P.shoulder] = 0.085 * staggeredEnvelope(raw, e, 0.055, 0.025);
+      pose[P.armLA] = 0.16 * staggeredEnvelope(raw, e, 0.095, 0.015);
+      pose[P.armRA] = -0.16 * staggeredEnvelope(raw, e, 0.095, 0.015);
     } else if (name === "sentence_release") {
       const release = staggeredEnvelope(raw, e, 0, 0);
-      pose.ParamEyeLOpen = -0.035 * release;
-      pose.ParamEyeROpen = -0.035 * release;
-      pose.ParamMouthForm = 0.04 * release;
-      pose.ParamAngleY = 0.65 * staggeredEnvelope(raw, e, 0.035, 0.04);
-      pose.ParamAngleZ = -0.55 * staggeredEnvelope(raw, e, 0.055, 0.03);
-      pose.ParamBodyAngleY = -0.8 * staggeredEnvelope(raw, e, 0.075, 0.02);
-      pose.ParamBodyAngleX = -0.45 * staggeredEnvelope(raw, e, 0.085, 0.015);
-      pose.ParamShoulder = -0.075 * staggeredEnvelope(raw, e, 0.1, 0.01);
-      pose.ParamBreath = 0.11 * staggeredEnvelope(raw, e, 0.115, 0);
+      pose[P.eyeLOpen] = -0.035 * release;
+      pose[P.eyeROpen] = -0.035 * release;
+      pose[P.mouthForm] = 0.04 * release;
+      pose[P.angleY] = 0.65 * staggeredEnvelope(raw, e, 0.035, 0.04);
+      pose[P.angleZ] = -0.55 * staggeredEnvelope(raw, e, 0.055, 0.03);
+      pose[P.bodyAngleY] = -0.8 * staggeredEnvelope(raw, e, 0.075, 0.02);
+      pose[P.bodyAngleX] = -0.45 * staggeredEnvelope(raw, e, 0.085, 0.015);
+      pose[P.shoulder] = -0.075 * staggeredEnvelope(raw, e, 0.1, 0.01);
+      pose[P.breath] = 0.11 * staggeredEnvelope(raw, e, 0.115, 0);
     } else if (name === "happy_bounce") {
       const pulse = Math.sin(p * Math.PI * 2);
       const life = Math.sin(p * Math.PI);
@@ -564,15 +460,15 @@
       const side = Math.sin(p * Math.PI * 2) * life * life * bodyEnvelope;
       const headSide = Math.sin(headPhase * Math.PI * 2) * headLife * headLife
         * staggeredEnvelope(raw, e, 0.055, 0.045);
-      pose.ParamBodyAngleY = 5.0 * bounce;
-      pose.ParamAngleY = -2.2 * headBounce;
-      pose.ParamBodyAngleZ = 1.8 * side;
-      pose.ParamAngleZ = 1.2 * headSide;
-      pose.ParamShoulder = 0.17 * pulse * pulse * staggeredEnvelope(raw, e, 0.025, 0.015);
-      pose.ParamEyeLSmile = 0.16 * e;
-      pose.ParamEyeRSmile = 0.16 * e;
-      pose.ParamMouthForm = 0.18 * e;
-      pose.ParamHairAhoge = 0.18 * headBounce;
+      pose[P.bodyAngleY] = 5.0 * bounce;
+      pose[P.angleY] = -2.2 * headBounce;
+      pose[P.bodyAngleZ] = 1.8 * side;
+      pose[P.angleZ] = 1.2 * headSide;
+      pose[P.shoulder] = 0.17 * pulse * pulse * staggeredEnvelope(raw, e, 0.025, 0.015);
+      pose[P.eyeLSmile] = 0.16 * e;
+      pose[P.eyeRSmile] = 0.16 * e;
+      pose[P.mouthForm] = 0.18 * e;
+      pose[P.hairAhoge] = 0.18 * headBounce;
     }
     return pose;
   }
@@ -583,33 +479,33 @@
     const wave = Math.sin(p * Math.PI * 2);
     const pose = {};
     if (name === "soft_breath") {
-      pose.ParamBreath = 0.18 * e;
-      pose.ParamShoulder = 0.035 * e;
+      pose[P.breath] = 0.18 * e;
+      pose[P.shoulder] = 0.035 * e;
     } else if (name === "glance_left") {
-      pose.ParamEyeBallX = -0.24 * e;
-      pose.ParamAngleX = -1.2 * e;
+      pose[P.eyeBallX] = -0.24 * e;
+      pose[P.angleX] = -1.2 * e;
     } else if (name === "glance_right") {
-      pose.ParamEyeBallX = 0.24 * e;
-      pose.ParamAngleX = 1.2 * e;
+      pose[P.eyeBallX] = 0.24 * e;
+      pose[P.angleX] = 1.2 * e;
     } else if (name === "head_tilt_left") {
-      pose.ParamAngleZ = -1.7 * e;
-      pose.ParamBodyAngleX = -0.35 * e;
+      pose[P.angleZ] = -1.7 * e;
+      pose[P.bodyAngleX] = -0.35 * e;
     } else if (name === "head_tilt_right") {
-      pose.ParamAngleZ = 1.7 * e;
-      pose.ParamBodyAngleX = 0.35 * e;
+      pose[P.angleZ] = 1.7 * e;
+      pose[P.bodyAngleX] = 0.35 * e;
     } else if (name === "weight_shift") {
-      pose.ParamBodyAngleX = 0.8 * wave;
-      pose.ParamBodyAngleZ = 1.25 * wave;
-      pose.ParamShoulder = 0.035 * wave;
+      pose[P.bodyAngleX] = 0.8 * wave;
+      pose[P.bodyAngleZ] = 1.25 * wave;
+      pose[P.shoulder] = 0.035 * wave;
     } else if (name === "shoulder_release") {
-      pose.ParamShoulder = -0.07 * e;
-      pose.ParamBodyAngleY = -0.55 * e;
-      pose.ParamAngleY = 0.35 * e;
+      pose[P.shoulder] = -0.07 * e;
+      pose[P.bodyAngleY] = -0.55 * e;
+      pose[P.angleY] = 0.35 * e;
     } else if (name === "tiny_bob") {
       const bob = Math.abs(Math.sin(p * Math.PI * 2 + seed * 0.01)) * e;
-      pose.ParamBodyAngleY = 1.1 * bob;
-      pose.ParamAngleY = -0.65 * bob;
-      pose.ParamHairAhoge = 0.08 * bob;
+      pose[P.bodyAngleY] = 1.1 * bob;
+      pose[P.angleY] = -0.65 * bob;
+      pose[P.hairAhoge] = 0.08 * bob;
     }
     return pose;
   }
@@ -742,6 +638,7 @@
     }
 
     function resolveMode(context, director, now) {
+      if (MODES.includes(context.mode)) return context.mode;
       if (context.speaking) return "speak";
       if (Number(context.listeningBlend || 0) > 0.035) return "listen";
       if (context.thinking) return "think";
@@ -785,7 +682,8 @@
       const gestureBlocked = context.authoredMotionActive === true || context.speechGestureAllowed === false
         || !!(director.action && now < director.action.endsAt)
         || !!(director.outgoingAction && now < director.outgoingAction.releaseEndsAt);
-      const gestureWeight = sampleSpeechGesture(gestures, rhythm, delivery, now, speechActive, gestureBlocked);
+      const autoGestureWeight = sampleSpeechGesture(gestures, rhythm, delivery, now, speechActive, gestureBlocked);
+      const gestureWeight = context.speechGesture === undefined ? autoGestureWeight : 0;
       const deliveryWeights = director.deliveryWeights || (director.deliveryWeights = {});
       updateWeights(deliveryWeights, speechActive ? delivery : "neutral", DELIVERY_KEYS,
         1 - Math.exp(-Math.min(elapsedMs, 120) / 180), 1 - Math.exp(-Math.min(elapsedMs, 120) / 260));
@@ -799,10 +697,10 @@
 
       const parameters = {};
       for (const key of MODES) addPose(parameters, MODE_POSES[key], director.modeWeights[key]);
-      for (const key of EMOTIONS) addPose(parameters, EMOTION_POSES[key], director.emotionWeights[key]);
+      for (const key of EMOTIONS) addPose(parameters, EMOTION_POSES[key], director.emotionWeights[key] * (context.faceIntensity ?? 1));
 
       const motionGain = context.motionIntensity === "low" ? 0.45 : (context.motionIntensity === "high" ? 1.3 : 1);
-      const deliveryIntensity = context.intensity === "low" ? 0.65 : (context.intensity === "high" ? 1.15 : 1);
+      const deliveryIntensity = context.deliveryIntensity ?? (context.intensity === "low" ? 0.65 : (context.intensity === "high" ? 1.15 : 1));
       for (const key of DELIVERY_KEYS) {
         addPose(parameters, DELIVERY_POSES[key], (deliveryWeights[key] || 0) * motionGain * deliveryIntensity);
       }
@@ -839,14 +737,14 @@
         const audioAccent = Math.max(0, audio - 0.08);
         const armCadence = shoulderCadence * 0.22 - bodyPhrase * 0.14;
         addPose(parameters, {
-          ParamAngleY: (-0.68 - Math.max(0, headCadence) * 1.24) * drive,
-          ParamAngleZ: headCadence * 1.16 * drive,
-          ParamBodyAngleX: bodyPhrase * 0.86 * drive,
-          ParamBodyAngleY: (1.16 + Math.max(0, shoulderCadence) * 1.72 + audioAccent * 0.48) * drive,
-          ParamBodyAngleZ: bodyPhrase * 1.72 * drive,
-          ParamShoulder: (0.075 + Math.max(0, shoulderCadence) * 0.065 + audioAccent * 0.2) * drive,
-          ParamArmLA: armCadence * drive,
-          ParamArmRA: -armCadence * drive
+          [P.angleY]: (-0.68 - Math.max(0, headCadence) * 1.24) * drive,
+          [P.angleZ]: headCadence * 1.16 * drive,
+          [P.bodyAngleX]: bodyPhrase * 0.86 * drive,
+          [P.bodyAngleY]: (1.16 + Math.max(0, shoulderCadence) * 1.72 + audioAccent * 0.48) * drive,
+          [P.bodyAngleZ]: bodyPhrase * 1.72 * drive,
+          [P.shoulder]: (0.075 + Math.max(0, shoulderCadence) * 0.065 + audioAccent * 0.2) * drive,
+          [P.armLA]: armCadence * drive,
+          [P.armRA]: -armCadence * drive
         });
       } else if (Number(director.speechDrive || 0) > 0.0001) {
         const releaseFollow = 1 - Math.pow(1 - 0.055, dtFrames);
@@ -905,6 +803,9 @@
         }
       }
 
+      if (context.speechGesture?.name && SPEECH_GESTURE_POSES[context.speechGesture.name]) {
+        addPose(parameters, SPEECH_GESTURE_POSES[context.speechGesture.name], Math.pow(Math.sin(Math.PI * clamp(context.speechGesture.phase, 0, 1)), 2));
+      }
       const smoothedParameters = smoothParameterChannels(director, parameters, elapsedMs, mode);
       director.lastSample = {
         at: now,
@@ -985,6 +886,31 @@
     createController
   };
 
+  return api;
+  }
+
+  const mappingApi = root.XinyuLive2DMapping || (typeof require === "function" ? require("./avatar/live2dMapping.js") : null);
+  let defaultApi;
+  const current = () => defaultApi || (defaultApi = createImplementation(mappingApi.getDefault()));
+  const api = {};
+  for (const name of ["normalizeDelivery", "normalizeMode", "normalizeEmotion", "normalizeAction", "smootherstep", "shiftedPhase", "staggeredEnvelope", "actionEnvelope", "sampleAction", "sampleIdleVariant", "channelResponseRate", "smoothParameterChannels"]) {
+    api[name] = (...args) => current()[name](...args);
+  }
+  for (const name of ["SPEECH_GESTURE_POSES", "SPEECH_GESTURE_POOLS", "MODES", "EMOTIONS", "MODE_POSES", "EMOTION_POSES", "DELIVERY_POSES", "ACTION_SPECS", "ACTION_ALIASES", "IDLE_VARIANTS"]) {
+    Object.defineProperty(api, name, { enumerable: true, get: () => current()[name] });
+  }
+  api.createController = (deps = {}) => {
+    let controller, selected;
+    const get = () => {
+      const mapping = deps.mapping || deps.state?.avatarMapping || mappingApi.getDefault();
+      if (!controller || selected !== mapping) {
+        selected = mapping;
+        controller = createImplementation(mapping).createController(deps);
+      }
+      return controller;
+    };
+    return Object.fromEntries(["ensureState", "requestMode", "triggerAction", "sample", "reset", "stopSpeech"].map(name => [name, (...args) => get()[name](...args)]));
+  };
   root.TaffyHiyoriPerformanceDirector = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

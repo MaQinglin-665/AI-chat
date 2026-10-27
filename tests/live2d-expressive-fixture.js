@@ -2,6 +2,7 @@
 (async function () {
   const status = document.getElementById("status");
   try {
+    await XinyuLive2DMapping.ready();
     const app = new PIXI.Application({ width: 600, height: 760, backgroundAlpha: 0, antialias: true });
     document.getElementById("stage").appendChild(app.view);
     const model = await PIXI.live2d.Live2DModel.from("/models/hiyori_pro_t11/hiyori_pro_t11.model3.json", { autoInteract: false });

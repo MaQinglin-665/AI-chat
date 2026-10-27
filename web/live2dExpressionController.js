@@ -16,8 +16,12 @@
     const sanitizeSpeakText = typeof deps.sanitizeSpeakText === "function" ? deps.sanitizeSpeakText : (text) => String(text || "").trim();
     const normalizeTalkStyle = typeof deps.normalizeTalkStyle === "function" ? deps.normalizeTalkStyle : (style) => String(style || "neutral").trim() || "neutral";
     const detectMood = typeof deps.detectMood === "function" ? deps.detectMood : () => "idle";
-    const isSpeechMotionActive = typeof deps.isSpeechMotionActive === "function" ? deps.isSpeechMotionActive : () => false;
-    const isSpeakingNow = typeof deps.isSpeakingNow === "function" ? deps.isSpeakingNow : () => false;
+    const legacySpeechMotionActive = typeof deps.isSpeechMotionActive === "function" ? deps.isSpeechMotionActive : () => false;
+    const isSpeechMotionActive = now => state.avatarIntentOverrides?.mode !== undefined
+      ? state.avatarIntentOverrides.mode === "speak" : legacySpeechMotionActive(now);
+    const legacySpeakingNow = typeof deps.isSpeakingNow === "function" ? deps.isSpeakingNow : () => false;
+    const isSpeakingNow = () => state.avatarIntentOverrides?.mode !== undefined
+      ? state.avatarIntentOverrides.mode === "speak" : legacySpeakingNow();
     const resolveHiyoriAuthoredMotion = typeof deps.resolveHiyoriAuthoredMotion === "function"
       ? deps.resolveHiyoriAuthoredMotion
       : () => null;
@@ -31,6 +35,11 @@
     const MOTION_INTENSITY_PRESETS = deps.motionIntensityPresets || { normal: { idleIntervalScale: 1, talkChance: 1, comboChance: 0.4, tapChance: 1, listenChance: 0.8, thinkingComboChance: 0.46, idleComboChance: 0.3, replyAccentChance: 0.42, talkMaxBeats: 3 } };
     const MODEL_MOTION_PROFILES = deps.modelMotionProfiles || {};
     const parameterIndexCache = new WeakMap();
+    const mappingApi = window.XinyuLive2DMapping || root.XinyuLive2DMapping
+      || (typeof require === "function" ? require("./avatar/live2dMapping.js") : null);
+    const mapped = () => mappingApi.resolve(deps.mapping || state.avatarMapping || mappingApi.getDefault());
+    const P = new Proxy({}, { get: (_, name) => mapped().params[name] || "" });
+
 
     function getCachedParameterIndex(core, id) {
       if (!core || !id || typeof core.getParameterIndex !== "function") {
@@ -77,7 +86,7 @@
     }
 
     function detectModelProfileName() {
-      const modelPath = String(state.config?.model_path || "").trim().toLowerCase();
+      const modelPath = String(state.avatarSource?.path || state.config?.avatar?.path || state.config?.model_path || "").trim().toLowerCase();
       for (const key of Object.keys(MODEL_MOTION_PROFILES)) {
         if (modelPath.includes(key.toLowerCase())) {
           return key;
@@ -130,14 +139,23 @@
           !Number(state.hiyoriAuthoredMotion?.playbackGeneration || 0)
           || Number(state.hiyoriAuthoredMotion.playbackGeneration) === Number(state.ttsPlaybackGeneration || 0)
         );
-      const sample = hiyoriPerformanceDirector.sample({ ...context, authoredMotionActive,
+      const intent = state.avatarIntentOverrides || {};
+      const explicit = {};
+      if (intent.mode !== undefined) Object.assign(explicit, { mode: intent.mode, speaking: intent.mode === "speak", listeningBlend: intent.mode === "listen" ? 1 : 0,
+        thinking: intent.mode === "think", audioActive: intent.mode === "speak" });
+      if (intent.delivery || intent.face) explicit.emotion = intent.delivery || intent.face;
+      if (intent.deliveryIntensity !== undefined) explicit.deliveryIntensity = intent.deliveryIntensity;
+      if (intent.faceIntensity !== undefined) explicit.faceIntensity = intent.faceIntensity;
+      if (intent.speechGesture !== undefined) explicit.speechGesture = intent.speechGesture;
+      if (intent.energy !== undefined) explicit.bodyEnergy = intent.energy;
+      const sample = hiyoriPerformanceDirector.sample({ ...context, ...explicit, authoredMotionActive,
         speechGestureAllowed: context.speechGestureAllowed !== false && state.motionEnabled !== false });
       for (const id in (sample.parameters || {})) {
         const value = sample.parameters[id];
-        const face = /Eye|Brow|Mouth|Cheek/.test(id);
+        const face = mapped().has("face", id);
         const gain = authoredMotionActive
-          ? (face ? 0.28 : (/Arm|Hand/.test(id) ? 0.08 : 0.1))
-          : (face ? 0.48 : (/Arm|Hand/.test(id) ? 0.34 : 0.52));
+          ? (face ? 0.28 : (mapped().has("arm", id) ? 0.08 : 0.1))
+          : (face ? 0.48 : (mapped().has("arm", id) ? 0.34 : 0.52));
         safeAddParamValue(core, id, value, gain);
       }
       const debugSignature = `${sample.mode}|${sample.emotion}|${sample.action}|${sample.outgoingAction}|${sample.idle}`;
@@ -146,9 +164,9 @@
       if (debugDue) {
         const channels = {};
         for (const id of [
-          "ParamAngleX", "ParamAngleY", "ParamAngleZ",
-          "ParamBodyAngleX", "ParamBodyAngleY", "ParamBodyAngleZ", "ParamShoulder",
-          "ParamEyeLOpen", "ParamEyeLSmile", "ParamBrowLY", "ParamMouthForm", "ParamCheek"
+          P.angleX, P.angleY, P.angleZ,
+          P.bodyAngleX, P.bodyAngleY, P.bodyAngleZ, P.shoulder,
+          P.eyeLOpen, P.eyeLSmile, P.browLY, P.mouthForm, P.cheek
         ]) {
           if (Object.prototype.hasOwnProperty.call(sample.parameters || {}, id)) {
             channels[id] = Number(Number(sample.parameters[id] || 0).toFixed(4));
@@ -202,7 +220,9 @@
         : phase === "armed"
           ? 0.34
           : 0;
-      const target = pending && !assistantAudioActive ? phaseTarget : 0;
+      const target = state.avatarIntentOverrides?.mode !== undefined
+        ? (state.avatarIntentOverrides.mode === "listen" ? 0.82 : 0)
+        : (pending && !assistantAudioActive ? phaseTarget : 0);
       const previous = clampNumber(Number(state.listeningPresenceBlend) || 0, 0, 1);
       const previousAt = Number(state.listeningPresenceVisualUpdatedAt || now);
       const dtFrames = clampNumber((now - previousAt) / 16.6667, 0.5, 3);
@@ -233,16 +253,16 @@
       const gain = clampNumber(current.blend * (1 + levelBoost), 0, 1);
       // Intentionally parameter-only: an attentive listener needs a readable
       // head/eye/body shift, not a speaking mouth or a repeated arm gesture.
-      safeAddParamValue(core, "ParamEyeLOpen", 0.14 * gain, 0.72);
-      safeAddParamValue(core, "ParamEyeROpen", 0.14 * gain, 0.72);
-      safeAddParamValue(core, "ParamBrowLY", 0.115 * gain, 0.68);
-      safeAddParamValue(core, "ParamBrowRY", 0.115 * gain, 0.68);
-      safeAddParamValue(core, "ParamEyeBallY", -0.10 * gain, 0.64);
-      safeAddParamValue(core, "ParamAngleY", -1.55 * gain, 0.58);
-      safeAddParamValue(core, "ParamAngleZ", 0.78 * gain, 0.56);
-      safeAddParamValue(core, "ParamBodyAngleX", 0.54 * gain, 0.5);
-      safeAddParamValue(core, "ParamShoulder", 0.078 * gain, 0.44);
-      safeSetParamValue(core, "ParamMouthOpenY", 0, 1);
+      safeAddParamValue(core, P.eyeLOpen, 0.14 * gain, 0.72);
+      safeAddParamValue(core, P.eyeROpen, 0.14 * gain, 0.72);
+      safeAddParamValue(core, P.browLY, 0.115 * gain, 0.68);
+      safeAddParamValue(core, P.browRY, 0.115 * gain, 0.68);
+      safeAddParamValue(core, P.eyeBallY, -0.10 * gain, 0.64);
+      safeAddParamValue(core, P.angleY, -1.55 * gain, 0.58);
+      safeAddParamValue(core, P.angleZ, 0.78 * gain, 0.56);
+      safeAddParamValue(core, P.bodyAngleX, 0.54 * gain, 0.5);
+      safeAddParamValue(core, P.shoulder, 0.078 * gain, 0.44);
+      safeSetParamValue(core, P.mouthOpenY, 0, 1);
       state.speechMouthOpen = 0;
       state.speechMouthTarget = 0;
       return current;
@@ -253,7 +273,7 @@
         return;
       }
       const d = Number(delta);
-      const bodyChannel = /^(?:ParamAngle[XYZ]|ParamBodyAngle[XYZ]|ParamShoulder|ParamArmL[AB]|ParamArmR[AB]|ParamHand[LR])$/.test(id);
+      const bodyChannel = mapped().has("bodyAdd", id);
       const legacyBodyMix = bodyChannel
         ? clampNumber(Number(state.hiyoriLegacyBodyMix ?? 1), 0, 1)
         : 1;
@@ -435,8 +455,8 @@
       if (state.speechEmotionPartPose !== "thinking") {
         return;
       }
-      safeSetPartOpacity(core, "PartArmA", 1);
-      safeSetPartOpacity(core, "PartArmB", 0);
+      safeSetPartOpacity(core, mapped().parts.armA, 1);
+      safeSetPartOpacity(core, mapped().parts.armB, 0);
       state.speechEmotionPartPose = null;
     }
 
@@ -922,12 +942,12 @@
       const headNod = (-0.52 + bounce * 0.92 + attackPop * 0.58) * visibleMotion * envelope * 0.42 * slowEmotionDamp;
       const shoulderLift = (0.09 + bounce * 0.14 + attackPop * 0.08) * visibleMotion * envelope * beatBoost * slowEmotionDamp;
       const sideLean = counterWave * (0.32 + visibleMotion * 0.24) * envelope * slowEmotionDamp;
-      safeAddParamValue(core, "ParamBodyAngleZ", bodySwing, 0.82);
-      safeAddParamValue(core, "ParamBodyAngleY", bodyLift, 0.72);
-      safeAddParamValue(core, "ParamBodyAngleX", sideLean, 0.46);
-      safeAddParamValue(core, "ParamAngleZ", headCounter, 0.66);
-      safeAddParamValue(core, "ParamAngleY", headNod, 0.58);
-      safeAddParamValue(core, "ParamShoulder", shoulderLift, 0.72);
+      safeAddParamValue(core, P.bodyAngleZ, bodySwing, 0.82);
+      safeAddParamValue(core, P.bodyAngleY, bodyLift, 0.72);
+      safeAddParamValue(core, P.bodyAngleX, sideLean, 0.46);
+      safeAddParamValue(core, P.angleZ, headCounter, 0.66);
+      safeAddParamValue(core, P.angleY, headNod, 0.58);
+      safeAddParamValue(core, P.shoulder, shoulderLift, 0.72);
       const poseGain = clampNumber(
         expressionBoost * envelope * (0.72 + visibleMotion * 0.32),
         0,
@@ -940,152 +960,152 @@
       if (emotion === "happy" || emotion === "playful" || emotion === "excited") {
         const playfulGain = emotion === "excited" ? 1.28 : (emotion === "playful" ? 1.16 : 1);
         const tease = emotion === "playful" ? Math.sin(now / 310 + seed * 1.21) : 0;
-        safeAddParamValue(core, "ParamEyeLSmile", 0.98 * poseGain, 0.96);
-        safeAddParamValue(core, "ParamEyeRSmile", 0.98 * poseGain, 0.96);
-        safeAddParamValue(core, "ParamMouthForm", 0.92 * poseGain, 0.82);
-        safeAddParamValue(core, "ParamCheek", 0.7 * poseGain, 0.88);
-        safeAddParamValue(core, "ParamBrowLY", 0.26 * poseGain, 0.82);
-        safeAddParamValue(core, "ParamBrowRY", 0.26 * poseGain, 0.82);
-        safeAddParamValue(core, "ParamBodyAngleY", (0.72 + bounce * 0.76 + attackPop * 0.42) * poseGain * playfulGain, 0.48);
-        safeAddParamValue(core, "ParamShoulder", (0.42 + bounce * 0.34 + attackPop * 0.18) * poseGain * playfulGain, 0.62);
-        safeAddParamValue(core, "ParamAngleX", tease * 1.35 * poseGain, 0.34);
-        safeAddParamValue(core, "ParamEyeBallX", tease * 0.44 * poseGain, 0.42);
-        safeAddParamValue(core, "ParamArmLA", (-1.95 + armWave * 0.52 - tease * 0.32) * poseGain * playfulGain, 0.48);
-        safeAddParamValue(core, "ParamArmRA", (1.68 - armWave * 0.48 + tease * 0.26) * poseGain * playfulGain, 0.48);
-        safeAddParamValue(core, "ParamArmLB", (1.32 + bounce * 0.82 + attackPop * 0.22) * poseGain * playfulGain, 0.4);
-        safeAddParamValue(core, "ParamArmRB", (-1.12 - bounce * 0.66 - attackPop * 0.18) * poseGain * playfulGain, 0.4);
-        safeAddParamValue(core, "ParamHandL", (0.92 + bounce * 0.48) * poseGain * playfulGain, 0.58);
-        safeAddParamValue(core, "ParamHandR", (-0.74 - bounce * 0.4) * poseGain * playfulGain, 0.58);
+        safeAddParamValue(core, P.eyeLSmile, 0.98 * poseGain, 0.96);
+        safeAddParamValue(core, P.eyeRSmile, 0.98 * poseGain, 0.96);
+        safeAddParamValue(core, P.mouthForm, 0.92 * poseGain, 0.82);
+        safeAddParamValue(core, P.cheek, 0.7 * poseGain, 0.88);
+        safeAddParamValue(core, P.browLY, 0.26 * poseGain, 0.82);
+        safeAddParamValue(core, P.browRY, 0.26 * poseGain, 0.82);
+        safeAddParamValue(core, P.bodyAngleY, (0.72 + bounce * 0.76 + attackPop * 0.42) * poseGain * playfulGain, 0.48);
+        safeAddParamValue(core, P.shoulder, (0.42 + bounce * 0.34 + attackPop * 0.18) * poseGain * playfulGain, 0.62);
+        safeAddParamValue(core, P.angleX, tease * 1.35 * poseGain, 0.34);
+        safeAddParamValue(core, P.eyeBallX, tease * 0.44 * poseGain, 0.42);
+        safeAddParamValue(core, P.armLA, (-1.95 + armWave * 0.52 - tease * 0.32) * poseGain * playfulGain, 0.48);
+        safeAddParamValue(core, P.armRA, (1.68 - armWave * 0.48 + tease * 0.26) * poseGain * playfulGain, 0.48);
+        safeAddParamValue(core, P.armLB, (1.32 + bounce * 0.82 + attackPop * 0.22) * poseGain * playfulGain, 0.4);
+        safeAddParamValue(core, P.armRB, (-1.12 - bounce * 0.66 - attackPop * 0.18) * poseGain * playfulGain, 0.4);
+        safeAddParamValue(core, P.handL, (0.92 + bounce * 0.48) * poseGain * playfulGain, 0.58);
+        safeAddParamValue(core, P.handR, (-0.74 - bounce * 0.4) * poseGain * playfulGain, 0.58);
       } else if (emotion === "surprised") {
         const cueAge = Math.max(0, now - Number(state.speechAnimStartedAt || now));
         const recoil = Math.sin(clampNumber(cueAge / 560, 0, 1) * Math.PI);
         const settle = Math.sin(now / 260 + seed * 0.6) * 0.18;
-        safeAddParamValue(core, "ParamEyeLOpen", 0.9 * poseGain, 0.94);
-        safeAddParamValue(core, "ParamEyeROpen", 0.9 * poseGain, 0.94);
-        safeAddParamValue(core, "ParamBrowLY", 0.72 * poseGain, 0.9);
-        safeAddParamValue(core, "ParamBrowRY", 0.72 * poseGain, 0.9);
-        safeAddParamValue(core, "ParamBrowLForm", 0.34 * poseGain, 0.78);
-        safeAddParamValue(core, "ParamBrowRForm", 0.34 * poseGain, 0.78);
-        safeAddParamValue(core, "ParamMouthForm", -0.56 * poseGain, 0.78);
-        safeDriveParamValue(core, "ParamMouthOpenY", clampNumber(0.42 * poseGain, 0, 0.92), 0.76);
-        safeAddParamValue(core, "ParamAngleY", (-2.8 * recoil + settle) * poseGain, 0.58);
-        safeAddParamValue(core, "ParamBodyAngleX", (-3.4 * recoil + settle * 0.8) * poseGain, 0.58);
-        safeAddParamValue(core, "ParamShoulder", (0.42 + recoil * 0.34) * poseGain, 0.5);
-        safeAddParamValue(core, "ParamArmLA", (-1.55 - recoil * 0.7) * poseGain, 0.38);
-        safeAddParamValue(core, "ParamArmRA", (1.55 + recoil * 0.7) * poseGain, 0.38);
-        safeAddParamValue(core, "ParamArmLB", (0.82 + recoil * 0.44) * poseGain, 0.34);
-        safeAddParamValue(core, "ParamArmRB", (-0.82 - recoil * 0.44) * poseGain, 0.34);
-        safeAddParamValue(core, "ParamHandL", 0.58 * poseGain, 0.44);
-        safeAddParamValue(core, "ParamHandR", -0.58 * poseGain, 0.44);
+        safeAddParamValue(core, P.eyeLOpen, 0.9 * poseGain, 0.94);
+        safeAddParamValue(core, P.eyeROpen, 0.9 * poseGain, 0.94);
+        safeAddParamValue(core, P.browLY, 0.72 * poseGain, 0.9);
+        safeAddParamValue(core, P.browRY, 0.72 * poseGain, 0.9);
+        safeAddParamValue(core, P.browLForm, 0.34 * poseGain, 0.78);
+        safeAddParamValue(core, P.browRForm, 0.34 * poseGain, 0.78);
+        safeAddParamValue(core, P.mouthForm, -0.56 * poseGain, 0.78);
+        safeDriveParamValue(core, P.mouthOpenY, clampNumber(0.42 * poseGain, 0, 0.92), 0.76);
+        safeAddParamValue(core, P.angleY, (-2.8 * recoil + settle) * poseGain, 0.58);
+        safeAddParamValue(core, P.bodyAngleX, (-3.4 * recoil + settle * 0.8) * poseGain, 0.58);
+        safeAddParamValue(core, P.shoulder, (0.42 + recoil * 0.34) * poseGain, 0.5);
+        safeAddParamValue(core, P.armLA, (-1.55 - recoil * 0.7) * poseGain, 0.38);
+        safeAddParamValue(core, P.armRA, (1.55 + recoil * 0.7) * poseGain, 0.38);
+        safeAddParamValue(core, P.armLB, (0.82 + recoil * 0.44) * poseGain, 0.34);
+        safeAddParamValue(core, P.armRB, (-0.82 - recoil * 0.44) * poseGain, 0.34);
+        safeAddParamValue(core, P.handL, 0.58 * poseGain, 0.44);
+        safeAddParamValue(core, P.handR, -0.58 * poseGain, 0.44);
       } else if (emotion === "thinking") {
         const armPartWeight = clampNumber(0.74 + poseGain * 0.1, 0, 1);
         const reactionGain = clampNumber((thinkingSnap * 1.25 + Math.abs(thinkingJitter) * 0.32) * poseGain, 0, 3.4);
-        safeSetPartOpacity(core, "PartArmA", Math.max(0.02, 1 - armPartWeight * 1.12));
-        safeSetPartOpacity(core, "PartArmB", armPartWeight);
+        safeSetPartOpacity(core, mapped().parts.armA, Math.max(0.02, 1 - armPartWeight * 1.12));
+        safeSetPartOpacity(core, mapped().parts.armB, armPartWeight);
         state.speechEmotionPartPose = "thinking";
-        safeAddParamValue(core, "ParamEyeLSmile", -0.16 * poseGain, 0.62);
-        safeAddParamValue(core, "ParamEyeRSmile", -0.16 * poseGain, 0.62);
-        safeAddParamValue(core, "ParamBrowLY", 0.68 * poseGain, 0.82);
-        safeAddParamValue(core, "ParamBrowRY", -0.4 * poseGain, 0.76);
-        safeAddParamValue(core, "ParamBrowLAngle", -0.62 * poseGain, 0.82);
-        safeAddParamValue(core, "ParamBrowRAngle", 0.48 * poseGain, 0.8);
-        safeAddParamValue(core, "ParamMouthForm", -0.58 * poseGain, 0.78);
-        safeAddParamValue(core, "ParamEyeBallX", -0.44 * poseGain, 0.58);
-        safeAddParamValue(core, "ParamEyeBallY", 0.26 * poseGain, 0.54);
-        safeAddParamValue(core, "ParamAngleX", (-4.6 * thinkingSnap + thinkingJitter * 1.6) * poseGain, 0.78);
-        safeAddParamValue(core, "ParamAngleY", (1.2 * thinkingSnap - thinkingJitter * 0.9) * poseGain, 0.54);
-        safeAddParamValue(core, "ParamAngleZ", -8.4 * poseGain, 0.66);
-        safeAddParamValue(core, "ParamAngleZ", (3.1 * thinkingSnap + thinkingJitter * 1.1) * poseGain, 0.5);
-        safeAddParamValue(core, "ParamAngleY", 2.8 * poseGain, 0.48);
-        safeAddParamValue(core, "ParamBodyAngleX", -5.2 * poseGain, 0.64);
-        safeAddParamValue(core, "ParamBodyAngleY", (2.1 * thinkingSnap - thinkingJitter * 0.7) * poseGain, 0.52);
-        safeAddParamValue(core, "ParamBodyAngleZ", -4.4 * poseGain, 0.54);
-        safeAddParamValue(core, "ParamBodyAngleZ", (2.8 * thinkingSnap + thinkingJitter * 0.9) * poseGain, 0.42);
-        safeAddParamValue(core, "ParamShoulder", (0.42 + bounce * 0.22) * poseGain, 0.62);
-        safeAddParamValue(core, "ParamShoulder", (0.22 * thinkingSnap + Math.abs(thinkingJitter) * 0.08) * poseGain, 0.6);
-        safeAddParamValue(core, "ParamArmLA", (-4.2 + armWave * 0.48) * poseGain, 0.62);
-        safeAddParamValue(core, "ParamArmRA", (0.9 - armWave * 0.28) * poseGain, 0.38);
-        safeAddParamValue(core, "ParamArmLB", (7.4 + bounce * 0.9) * poseGain + reactionGain * 0.64, 0.72);
-        safeAddParamValue(core, "ParamArmRB", (-0.72 - bounce * 0.26) * poseGain, 0.34);
-        safeAddParamValue(core, "ParamHandL", (0.72 + bounce * 0.22) * poseGain, 0.74);
-        safeAddParamValue(core, "ParamHandR", -0.42 * poseGain, 0.38);
-        safeAddParamValue(core, "ParamHandLB", (-7.2 - bounce * 1.2) * poseGain - reactionGain * 0.82, 0.72);
-        safeAddParamValue(core, "ParamHandRB", (-4.8 - bounce * 0.8) * poseGain - reactionGain * 0.42, 0.58);
+        safeAddParamValue(core, P.eyeLSmile, -0.16 * poseGain, 0.62);
+        safeAddParamValue(core, P.eyeRSmile, -0.16 * poseGain, 0.62);
+        safeAddParamValue(core, P.browLY, 0.68 * poseGain, 0.82);
+        safeAddParamValue(core, P.browRY, -0.4 * poseGain, 0.76);
+        safeAddParamValue(core, P.browLAngle, -0.62 * poseGain, 0.82);
+        safeAddParamValue(core, P.browRAngle, 0.48 * poseGain, 0.8);
+        safeAddParamValue(core, P.mouthForm, -0.58 * poseGain, 0.78);
+        safeAddParamValue(core, P.eyeBallX, -0.44 * poseGain, 0.58);
+        safeAddParamValue(core, P.eyeBallY, 0.26 * poseGain, 0.54);
+        safeAddParamValue(core, P.angleX, (-4.6 * thinkingSnap + thinkingJitter * 1.6) * poseGain, 0.78);
+        safeAddParamValue(core, P.angleY, (1.2 * thinkingSnap - thinkingJitter * 0.9) * poseGain, 0.54);
+        safeAddParamValue(core, P.angleZ, -8.4 * poseGain, 0.66);
+        safeAddParamValue(core, P.angleZ, (3.1 * thinkingSnap + thinkingJitter * 1.1) * poseGain, 0.5);
+        safeAddParamValue(core, P.angleY, 2.8 * poseGain, 0.48);
+        safeAddParamValue(core, P.bodyAngleX, -5.2 * poseGain, 0.64);
+        safeAddParamValue(core, P.bodyAngleY, (2.1 * thinkingSnap - thinkingJitter * 0.7) * poseGain, 0.52);
+        safeAddParamValue(core, P.bodyAngleZ, -4.4 * poseGain, 0.54);
+        safeAddParamValue(core, P.bodyAngleZ, (2.8 * thinkingSnap + thinkingJitter * 0.9) * poseGain, 0.42);
+        safeAddParamValue(core, P.shoulder, (0.42 + bounce * 0.22) * poseGain, 0.62);
+        safeAddParamValue(core, P.shoulder, (0.22 * thinkingSnap + Math.abs(thinkingJitter) * 0.08) * poseGain, 0.6);
+        safeAddParamValue(core, P.armLA, (-4.2 + armWave * 0.48) * poseGain, 0.62);
+        safeAddParamValue(core, P.armRA, (0.9 - armWave * 0.28) * poseGain, 0.38);
+        safeAddParamValue(core, P.armLB, (7.4 + bounce * 0.9) * poseGain + reactionGain * 0.64, 0.72);
+        safeAddParamValue(core, P.armRB, (-0.72 - bounce * 0.26) * poseGain, 0.34);
+        safeAddParamValue(core, P.handL, (0.72 + bounce * 0.22) * poseGain, 0.74);
+        safeAddParamValue(core, P.handR, -0.42 * poseGain, 0.38);
+        safeAddParamValue(core, P.handLB, (-7.2 - bounce * 1.2) * poseGain - reactionGain * 0.82, 0.72);
+        safeAddParamValue(core, P.handRB, (-4.8 - bounce * 0.8) * poseGain - reactionGain * 0.42, 0.58);
       } else if (emotion === "angry") {
         const angerPulse = Math.sin(now / 260 + seed * 0.88);
         const clenchPulse = Math.sin(now / 310 + seed * 0.51) * 0.5 + 0.5;
         const clench = 1 + clenchPulse * 0.58 + attackPop * 0.18;
-        safeAddParamValue(core, "ParamEyeLOpen", -0.18 * poseGain, 0.82);
-        safeAddParamValue(core, "ParamEyeROpen", -0.18 * poseGain, 0.82);
-        safeAddParamValue(core, "ParamBrowLY", -1.25 * poseGain, 0.98);
-        safeAddParamValue(core, "ParamBrowRY", -1.25 * poseGain, 0.98);
-        safeAddParamValue(core, "ParamBrowLAngle", -0.92 * poseGain, 0.96);
-        safeAddParamValue(core, "ParamBrowRAngle", 0.92 * poseGain, 0.96);
-        safeAddParamValue(core, "ParamBrowLForm", 0.46 * poseGain, 0.82);
-        safeAddParamValue(core, "ParamBrowRForm", 0.46 * poseGain, 0.82);
-        safeAddParamValue(core, "ParamMouthForm", -1.65 * poseGain, 0.98);
-        safeAddParamValue(core, "ParamAngleZ", (-2.3 + angerPulse * 0.96) * poseGain, 0.56);
-        safeAddParamValue(core, "ParamBodyAngleY", (1.6 + clenchPulse * 0.58 + attackPop * 0.32) * poseGain, 0.56);
-        safeAddParamValue(core, "ParamBodyAngleZ", (2.55 - angerPulse * 0.86) * poseGain, 0.54);
-        safeAddParamValue(core, "ParamShoulder", (0.72 + clenchPulse * 0.24 + attackPop * 0.18) * poseGain, 0.72);
-        safeAddParamValue(core, "ParamArmLA", (-4.25 + angerPulse * 0.28) * poseGain, 0.66);
-        safeAddParamValue(core, "ParamArmRA", (4.25 - angerPulse * 0.28) * poseGain, 0.66);
-        safeAddParamValue(core, "ParamArmLB", (-3.05 - clench * 0.86) * poseGain, 0.64);
-        safeAddParamValue(core, "ParamArmRB", (3.05 + clench * 0.86) * poseGain, 0.64);
-        safeAddParamValue(core, "ParamHandL", (2.15 + clench * 0.92) * poseGain, 0.76);
-        safeAddParamValue(core, "ParamHandR", (-2.15 - clench * 0.92) * poseGain, 0.76);
+        safeAddParamValue(core, P.eyeLOpen, -0.18 * poseGain, 0.82);
+        safeAddParamValue(core, P.eyeROpen, -0.18 * poseGain, 0.82);
+        safeAddParamValue(core, P.browLY, -1.25 * poseGain, 0.98);
+        safeAddParamValue(core, P.browRY, -1.25 * poseGain, 0.98);
+        safeAddParamValue(core, P.browLAngle, -0.92 * poseGain, 0.96);
+        safeAddParamValue(core, P.browRAngle, 0.92 * poseGain, 0.96);
+        safeAddParamValue(core, P.browLForm, 0.46 * poseGain, 0.82);
+        safeAddParamValue(core, P.browRForm, 0.46 * poseGain, 0.82);
+        safeAddParamValue(core, P.mouthForm, -1.65 * poseGain, 0.98);
+        safeAddParamValue(core, P.angleZ, (-2.3 + angerPulse * 0.96) * poseGain, 0.56);
+        safeAddParamValue(core, P.bodyAngleY, (1.6 + clenchPulse * 0.58 + attackPop * 0.32) * poseGain, 0.56);
+        safeAddParamValue(core, P.bodyAngleZ, (2.55 - angerPulse * 0.86) * poseGain, 0.54);
+        safeAddParamValue(core, P.shoulder, (0.72 + clenchPulse * 0.24 + attackPop * 0.18) * poseGain, 0.72);
+        safeAddParamValue(core, P.armLA, (-4.25 + angerPulse * 0.28) * poseGain, 0.66);
+        safeAddParamValue(core, P.armRA, (4.25 - angerPulse * 0.28) * poseGain, 0.66);
+        safeAddParamValue(core, P.armLB, (-3.05 - clench * 0.86) * poseGain, 0.64);
+        safeAddParamValue(core, P.armRB, (3.05 + clench * 0.86) * poseGain, 0.64);
+        safeAddParamValue(core, P.handL, (2.15 + clench * 0.92) * poseGain, 0.76);
+        safeAddParamValue(core, P.handR, (-2.15 - clench * 0.92) * poseGain, 0.76);
       } else if (emotion === "shy") {
         const shyGlance = Math.sin(now / 430 + seed * 0.77);
-        safeAddParamValue(core, "ParamEyeLSmile", 0.58 * poseGain, 0.72);
-        safeAddParamValue(core, "ParamEyeRSmile", 0.58 * poseGain, 0.72);
-        safeAddParamValue(core, "ParamCheek", 1.15 * poseGain, 0.9);
-        safeAddParamValue(core, "ParamMouthForm", 0.28 * poseGain, 0.62);
-        safeAddParamValue(core, "ParamEyeBallX", -0.48 * poseGain + shyGlance * 0.12, 0.48);
-        safeAddParamValue(core, "ParamEyeBallY", -0.14 * poseGain, 0.42);
-        safeAddParamValue(core, "ParamAngleX", -2.4 * poseGain, 0.42);
-        safeAddParamValue(core, "ParamAngleZ", -4.1 * poseGain + shyGlance * 0.5, 0.48);
-        safeAddParamValue(core, "ParamBodyAngleX", -1.2 * poseGain, 0.38);
-        safeAddParamValue(core, "ParamBodyAngleZ", 2.2 * poseGain, 0.42);
-        safeAddParamValue(core, "ParamShoulder", 0.24 * poseGain, 0.48);
-        safeAddParamValue(core, "ParamArmLA", -1.15 * poseGain, 0.34);
-        safeAddParamValue(core, "ParamArmRA", 1.15 * poseGain, 0.34);
+        safeAddParamValue(core, P.eyeLSmile, 0.58 * poseGain, 0.72);
+        safeAddParamValue(core, P.eyeRSmile, 0.58 * poseGain, 0.72);
+        safeAddParamValue(core, P.cheek, 1.15 * poseGain, 0.9);
+        safeAddParamValue(core, P.mouthForm, 0.28 * poseGain, 0.62);
+        safeAddParamValue(core, P.eyeBallX, -0.48 * poseGain + shyGlance * 0.12, 0.48);
+        safeAddParamValue(core, P.eyeBallY, -0.14 * poseGain, 0.42);
+        safeAddParamValue(core, P.angleX, -2.4 * poseGain, 0.42);
+        safeAddParamValue(core, P.angleZ, -4.1 * poseGain + shyGlance * 0.5, 0.48);
+        safeAddParamValue(core, P.bodyAngleX, -1.2 * poseGain, 0.38);
+        safeAddParamValue(core, P.bodyAngleZ, 2.2 * poseGain, 0.42);
+        safeAddParamValue(core, P.shoulder, 0.24 * poseGain, 0.48);
+        safeAddParamValue(core, P.armLA, -1.15 * poseGain, 0.34);
+        safeAddParamValue(core, P.armRA, 1.15 * poseGain, 0.34);
       } else if (emotion === "hurt" || emotion === "sad" || emotion === "anxious") {
         const anxiousGain = emotion === "anxious" ? 1.14 : 1;
         const slowTension = Math.sin(now / 360 + seed * 0.72);
         const inward = 0.62 + bounce * 0.22;
-        safeAddParamValue(core, "ParamEyeLSmile", -0.24 * poseGain, 0.6);
-        safeAddParamValue(core, "ParamEyeRSmile", -0.24 * poseGain, 0.6);
+        safeAddParamValue(core, P.eyeLSmile, -0.24 * poseGain, 0.6);
+        safeAddParamValue(core, P.eyeRSmile, -0.24 * poseGain, 0.6);
         const loweredBrow = emotion === "anxious" ? -0.22 : (emotion === "hurt" ? -0.62 : -0.48);
-        safeAddParamValue(core, "ParamBrowLY", loweredBrow * poseGain, 0.72);
-        safeAddParamValue(core, "ParamBrowRY", loweredBrow * poseGain, 0.72);
-        safeAddParamValue(core, "ParamBrowLForm", -0.36 * poseGain, 0.62);
-        safeAddParamValue(core, "ParamBrowRForm", -0.36 * poseGain, 0.62);
-        safeAddParamValue(core, "ParamMouthForm", -0.52 * poseGain, 0.72);
-        safeAddParamValue(core, "ParamEyeBallY", -0.18 * poseGain, 0.42);
-        safeAddParamValue(core, "ParamAngleY", (emotion === "anxious" ? 1.2 : 2.2) * poseGain, 0.42);
-        safeAddParamValue(core, "ParamBodyAngleX", (-1.75 - inward * 0.7) * poseGain, 0.42);
-        safeAddParamValue(core, "ParamShoulder", (emotion === "anxious" ? 0.78 + Math.abs(slowTension) * 0.24 : -0.36) * poseGain * anxiousGain, 0.58);
-        safeAddParamValue(core, "ParamArmLA", (-0.72 - inward * 0.36) * poseGain * anxiousGain, 0.34);
-        safeAddParamValue(core, "ParamArmRA", (0.72 + inward * 0.36) * poseGain * anxiousGain, 0.34);
-        safeAddParamValue(core, "ParamArmLB", (emotion === "anxious" ? 1.95 + Math.abs(slowTension) * 0.58 : 0.52) * poseGain, 0.44);
-        safeAddParamValue(core, "ParamArmRB", (emotion === "anxious" ? -1.95 - Math.abs(slowTension) * 0.58 : -0.52) * poseGain, 0.44);
-        safeAddParamValue(core, "ParamHandL", (emotion === "anxious" ? 0.74 + Math.abs(slowTension) * 0.3 : 0.18) * poseGain, 0.4);
-        safeAddParamValue(core, "ParamHandR", (emotion === "anxious" ? -0.74 - Math.abs(slowTension) * 0.3 : -0.18) * poseGain, 0.4);
+        safeAddParamValue(core, P.browLY, loweredBrow * poseGain, 0.72);
+        safeAddParamValue(core, P.browRY, loweredBrow * poseGain, 0.72);
+        safeAddParamValue(core, P.browLForm, -0.36 * poseGain, 0.62);
+        safeAddParamValue(core, P.browRForm, -0.36 * poseGain, 0.62);
+        safeAddParamValue(core, P.mouthForm, -0.52 * poseGain, 0.72);
+        safeAddParamValue(core, P.eyeBallY, -0.18 * poseGain, 0.42);
+        safeAddParamValue(core, P.angleY, (emotion === "anxious" ? 1.2 : 2.2) * poseGain, 0.42);
+        safeAddParamValue(core, P.bodyAngleX, (-1.75 - inward * 0.7) * poseGain, 0.42);
+        safeAddParamValue(core, P.shoulder, (emotion === "anxious" ? 0.78 + Math.abs(slowTension) * 0.24 : -0.36) * poseGain * anxiousGain, 0.58);
+        safeAddParamValue(core, P.armLA, (-0.72 - inward * 0.36) * poseGain * anxiousGain, 0.34);
+        safeAddParamValue(core, P.armRA, (0.72 + inward * 0.36) * poseGain * anxiousGain, 0.34);
+        safeAddParamValue(core, P.armLB, (emotion === "anxious" ? 1.95 + Math.abs(slowTension) * 0.58 : 0.52) * poseGain, 0.44);
+        safeAddParamValue(core, P.armRB, (emotion === "anxious" ? -1.95 - Math.abs(slowTension) * 0.58 : -0.52) * poseGain, 0.44);
+        safeAddParamValue(core, P.handL, (emotion === "anxious" ? 0.74 + Math.abs(slowTension) * 0.3 : 0.18) * poseGain, 0.4);
+        safeAddParamValue(core, P.handR, (emotion === "anxious" ? -0.74 - Math.abs(slowTension) * 0.3 : -0.18) * poseGain, 0.4);
       } else if (emotion === "serious") {
-        safeAddParamValue(core, "ParamEyeLOpen", 0.08 * poseGain, 0.54);
-        safeAddParamValue(core, "ParamEyeROpen", 0.08 * poseGain, 0.54);
-        safeAddParamValue(core, "ParamBrowLY", -0.24 * poseGain, 0.62);
-        safeAddParamValue(core, "ParamBrowRY", -0.24 * poseGain, 0.62);
-        safeAddParamValue(core, "ParamBrowLAngle", -0.2 * poseGain, 0.58);
-        safeAddParamValue(core, "ParamBrowRAngle", 0.2 * poseGain, 0.58);
-        safeAddParamValue(core, "ParamMouthForm", -0.16 * poseGain, 0.5);
-        safeAddParamValue(core, "ParamAngleY", -0.72 * poseGain, 0.38);
-        safeAddParamValue(core, "ParamBodyAngleY", 0.84 * poseGain, 0.4);
-        safeAddParamValue(core, "ParamShoulder", 0.14 * poseGain, 0.42);
+        safeAddParamValue(core, P.eyeLOpen, 0.08 * poseGain, 0.54);
+        safeAddParamValue(core, P.eyeROpen, 0.08 * poseGain, 0.54);
+        safeAddParamValue(core, P.browLY, -0.24 * poseGain, 0.62);
+        safeAddParamValue(core, P.browRY, -0.24 * poseGain, 0.62);
+        safeAddParamValue(core, P.browLAngle, -0.2 * poseGain, 0.58);
+        safeAddParamValue(core, P.browRAngle, 0.2 * poseGain, 0.58);
+        safeAddParamValue(core, P.mouthForm, -0.16 * poseGain, 0.5);
+        safeAddParamValue(core, P.angleY, -0.72 * poseGain, 0.38);
+        safeAddParamValue(core, P.bodyAngleY, 0.84 * poseGain, 0.4);
+        safeAddParamValue(core, P.shoulder, 0.14 * poseGain, 0.42);
       } else if (isBright) {
         const faceGain = expressionBoost * envelope;
-        safeAddParamValue(core, "ParamCheek", 0.22 * faceGain, 0.64);
-        safeAddParamValue(core, "ParamMouthForm", 0.24 * faceGain, 0.52);
+        safeAddParamValue(core, P.cheek, 0.22 * faceGain, 0.64);
+        safeAddParamValue(core, P.mouthForm, 0.24 * faceGain, 0.52);
       }
       state.speechPerformanceAccentDebug = {
         visibleMotion: Number(visibleMotion.toFixed(2)),
@@ -1260,15 +1280,15 @@
       const now2 = now || performance.now();
       const holding = now2 < Number(state.moodHoldUntil || 0);
       const speakingNow = isSpeechMotionActive(now2);
-      const activeMood = (holding || speakingNow)
+      const activeMood = state.avatarIntentOverrides?.face || ((holding || speakingNow)
         ? String(state.speechAnimMood || "idle")
-        : "idle";
+        : "idle");
       const prev = state.moodExpressionSmoothed && typeof state.moodExpressionSmoothed === "object"
         ? state.moodExpressionSmoothed
         : { happy: 0, sad: 0, angry: 0, surprised: 0, thinking: 0 };
       const target = { happy: 0, sad: 0, angry: 0, surprised: 0, thinking: 0 };
       if (activeMood in target) {
-        target[activeMood] = 1;
+        target[activeMood] = state.avatarIntentOverrides?.faceIntensity ?? 1;
       }
       const last = Number(state.moodExpressionUpdatedAt || 0);
       if (last > 0 && now2 - last < 1) {
@@ -1357,12 +1377,17 @@
     }
 
     function sampleTTSAudioLevel() {
+      const vowelsEnabled = state.avatarMapping?.capabilities?.vowels
+        || (state.config?.avatar?.kind === "live2d" && ["web/avatar/mappings/mao.json", "/avatar/mappings/mao.json"].includes(state.config.avatar.mapping));
       const usePcmAnalyser = state.ttsPcmAudioAnalyserActive === true
         && state.ttsPcmAudioAnalyser
         && state.ttsPcmAudioAnalyserData;
       const analyser = usePcmAnalyser ? state.ttsPcmAudioAnalyser : state.ttsAudioAnalyser;
       const data = usePcmAnalyser ? state.ttsPcmAudioAnalyserData : state.ttsAudioAnalyserData;
       if (!analyser || !data || !data.length) {
+        if (vowelsEnabled && state.uiView !== "model") {
+          state.ttsVowel = null; state.ttsVowelConfidence = 0; state.ttsVowelHistory = [];
+        }
         state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
         state.ttsAudioRawLevel = 0;
         state.ttsAudioRms = 0;
@@ -1387,7 +1412,11 @@
           state.ttsAudioLastVoiceAt = performance.now();
         }
         state.ttsAudioLevel += (normalized - state.ttsAudioLevel) * smoothing;
+        if (vowelsEnabled) {
+          window.XinyuVowelEstimator?.sample(state, analyser, rms, performance.now(), state.ttsAudioOutputLatencyMs);
+        }
       } catch (_) {
+        if (vowelsEnabled) { state.ttsVowel = null; state.ttsVowelConfidence = 0; }
         state.ttsAudioLevel += (0 - state.ttsAudioLevel) * 0.42;
         state.ttsAudioRawLevel = 0;
         state.ttsAudioRms = 0;
@@ -1412,7 +1441,8 @@
       const style = normalizeTalkStyle(state.currentTalkStyle || state.expressionStyle || "neutral");
       const speechPerformanceCue = getActiveSpeechPerformanceCue(now);
       const cueMotionActive = !!speechPerformanceCue;
-      const speaking = isSpeechMotionActive(now) || cueMotionActive;
+      const speaking = state.avatarIntentOverrides?.mode !== undefined
+        ? state.avatarIntentOverrides.mode === "speak" : (isSpeechMotionActive(now) || cueMotionActive);
       state.speechPerformanceCueMotionActive = cueMotionActive;
       const dtFrames = speaking
         ? clampNumber(rawDtFrames, 0.86, 1.16)
@@ -1598,9 +1628,9 @@
       state.mouseGazeCurrentY += (state.mouseGazeTargetY - state.mouseGazeCurrentY) * 0.06;
       const mouseWeight = state.uiView === "model" ? 0.65 : 0;
       const saccadeWeight = 1 - mouseWeight;
-      const finalGazeX = state.mouseGazeCurrentX * mouseWeight + state.microGazeCurrentX * saccadeWeight;
-      const finalGazeY = state.mouseGazeCurrentY * mouseWeight + state.microGazeCurrentY * saccadeWeight;
-      const breath = Math.sin(now / 1050 + state.microBreathSeed) * 0.5 + 0.5;
+      const finalGazeX = state.avatarIntentOverrides?.gaze?.x ?? (state.mouseGazeCurrentX * mouseWeight + state.microGazeCurrentX * saccadeWeight);
+      const finalGazeY = state.avatarIntentOverrides?.gaze?.y ?? (state.mouseGazeCurrentY * mouseWeight + state.microGazeCurrentY * saccadeWeight);
+      const breath = state.avatarIntentOverrides?.breath ?? (Math.sin(now / 1050 + state.microBreathSeed) * 0.5 + 0.5);
       const sway = Math.sin(now / 860 + state.microBreathSeed * 0.7);
       const ribbon = Math.sin(now / 930 + state.microBreathSeed * 1.3);
       const hair = Math.sin(now / 780 + state.microBreathSeed * 1.9);
@@ -1778,33 +1808,35 @@
       });
       const idleLifeGain = cueMotionActive ? 0.45 : 1;
       const idleSeed = Number(state.microBreathSeed) || 0;
-      safeAddParamValue(core, "ParamEyeLOpen", -blink * 0.82, 0.96);
-      safeAddParamValue(core, "ParamEyeROpen", -blink * 0.82, 0.96);
-      safeAddParamValue(core, "ParamEyeBallX", finalGazeX, 0.45);
-      safeAddParamValue(core, "ParamEyeBallY", finalGazeY, 0.45);
-      safeAddParamValue(core, "ParamAngleX", finalGazeX * 5.8, 0.18);
-      safeAddParamValue(core, "ParamAngleY", angleYBase, 0.18);
-      safeAddParamValue(core, "ParamAngleZ", angleZBase, 0.12);
-      safeAddParamValue(core, "ParamBodyAngleX", bodyXBase, 0.13);
-      safeAddParamValue(core, "ParamBodyAngleY", bodyYBase, 0.13);
-      safeAddParamValue(core, "ParamBodyAngleZ", bodyZBase, 0.64);
-      safeAddParamValue(core, "ParamBodyAngleY", Math.sin(now / 1150 + idleSeed * 0.3) * 0.38 * idleLifeGain, 0.18);
-      safeAddParamValue(core, "ParamAngleY", Math.sin(now / 980 + idleSeed * 0.7) * 0.32 * idleLifeGain, 0.16);
-      safeAddParamValue(core, "ParamBodyAngleX", Math.sin(now / 1420 + idleSeed * 0.5) * 0.22 * idleLifeGain, 0.14);
-      safeAddParamValue(core, "ParamBreath", 0.22 + breath * 0.42, 0.2);
-      safeAddParamValue(core, "ParamShoulder", shoulderBase, 0.14);
+      if (!state.avatarIntentOverrides?.blinkSuppressed) {
+        safeAddParamValue(core, P.eyeLOpen, -blink * 0.82, 0.96);
+        safeAddParamValue(core, P.eyeROpen, -blink * 0.82, 0.96);
+      }
+      safeAddParamValue(core, P.eyeBallX, finalGazeX, 0.45);
+      safeAddParamValue(core, P.eyeBallY, finalGazeY, 0.45);
+      safeAddParamValue(core, P.angleX, finalGazeX * 5.8, 0.18);
+      safeAddParamValue(core, P.angleY, angleYBase, 0.18);
+      safeAddParamValue(core, P.angleZ, angleZBase, 0.12);
+      safeAddParamValue(core, P.bodyAngleX, bodyXBase, 0.13);
+      safeAddParamValue(core, P.bodyAngleY, bodyYBase, 0.13);
+      safeAddParamValue(core, P.bodyAngleZ, bodyZBase, 0.64);
+      safeAddParamValue(core, P.bodyAngleY, Math.sin(now / 1150 + idleSeed * 0.3) * 0.38 * idleLifeGain, 0.18);
+      safeAddParamValue(core, P.angleY, Math.sin(now / 980 + idleSeed * 0.7) * 0.32 * idleLifeGain, 0.16);
+      safeAddParamValue(core, P.bodyAngleX, Math.sin(now / 1420 + idleSeed * 0.5) * 0.22 * idleLifeGain, 0.14);
+      safeAddParamValue(core, P.breath, 0.22 + breath * 0.42, 0.2);
+      safeAddParamValue(core, P.shoulder, shoulderBase, 0.14);
       if (speaking && upperSpeechEnvelopeOut > 0.04) {
-        safeAddParamValue(core, "ParamAngleY", upperTalkWaveOut * 1.9, 0.36);
-        safeAddParamValue(core, "ParamAngleZ", upperTalkWaveOut * 0.95, 0.3);
-        safeAddParamValue(core, "ParamShoulder", upperShoulderLiftOut, 0.46);
+        safeAddParamValue(core, P.angleY, upperTalkWaveOut * 1.9, 0.36);
+        safeAddParamValue(core, P.angleZ, upperTalkWaveOut * 0.95, 0.3);
+        safeAddParamValue(core, P.shoulder, upperShoulderLiftOut, 0.46);
       }
       applySpeechPerformanceAccent(core, speechPerformanceCue, now, motionBlend, phase, phaseAge, style);
-      safeAddParamValue(core, "ParamHairAhoge", hairAhogeSpring, 0.16);
-      safeAddParamValue(core, "ParamHairFront", hairFrontSpring, 0.12);
-      safeAddParamValue(core, "ParamHairBack", hairBackSpring, 0.1);
-      safeAddParamValue(core, "ParamRibbon", ribbonSpring, 0.1);
-      safeAddParamValue(core, "ParamSkirt", skirtSpring, 0.08);
-      safeAddParamValue(core, "ParamSkirt2", skirt2Spring, 0.08);
+      safeAddParamValue(core, P.hairAhoge, hairAhogeSpring, 0.16);
+      safeAddParamValue(core, P.hairFront, hairFrontSpring, 0.12);
+      safeAddParamValue(core, P.hairBack, hairBackSpring, 0.1);
+      safeAddParamValue(core, P.ribbon, ribbonSpring, 0.1);
+      safeAddParamValue(core, P.skirt, skirtSpring, 0.08);
+      safeAddParamValue(core, P.skirt2, skirt2Spring, 0.08);
       if (motionBlend > 0.06 && bodyEnergy > 0.02) {
         const e = bodyEnergy;
         const eShaped = Math.tanh(e * 1.45) / Math.tanh(1.45);
@@ -1849,12 +1881,12 @@
           fall: 0.16,
           maxStep: 0.08
         });
-        safeAddParamValue(core, "ParamBodyAngleZ", bodyZEnergyAdd, 0.84);
-        safeAddParamValue(core, "ParamBodyAngleX", bodyXEnergyAdd, 0.5);
-        safeAddParamValue(core, "ParamAngleZ", angleZEnergyAdd, 0.64);
-        safeAddParamValue(core, "ParamAngleY", angleYEnergyAdd, 0.4);
-        safeAddParamValue(core, "ParamBodyAngleY", bodyYEnergyAdd, 0.6);
-        safeAddParamValue(core, "ParamShoulder", shoulderEnergyAdd, 0.52);
+        safeAddParamValue(core, P.bodyAngleZ, bodyZEnergyAdd, 0.84);
+        safeAddParamValue(core, P.bodyAngleX, bodyXEnergyAdd, 0.5);
+        safeAddParamValue(core, P.angleZ, angleZEnergyAdd, 0.64);
+        safeAddParamValue(core, P.angleY, angleYEnergyAdd, 0.4);
+        safeAddParamValue(core, P.bodyAngleY, bodyYEnergyAdd, 0.6);
+        safeAddParamValue(core, P.shoulder, shoulderEnergyAdd, 0.52);
         if (beatNod > 0.02) {
           const beatAngleYAdd = smoothMotionOutput("param_angle_y_beat_add", beatNod * 4.1 * motionGain, {
             rise: 0.22,
@@ -1875,9 +1907,9 @@
               maxStep: 0.06
             }
           );
-          safeAddParamValue(core, "ParamAngleY", beatAngleYAdd, 0.52);
-          safeAddParamValue(core, "ParamBodyAngleY", beatBodyYAdd, 0.54);
-          safeAddParamValue(core, "ParamShoulder", beatShoulderAdd, 0.5);
+          safeAddParamValue(core, P.angleY, beatAngleYAdd, 0.52);
+          safeAddParamValue(core, P.bodyAngleY, beatBodyYAdd, 0.54);
+          safeAddParamValue(core, P.shoulder, beatShoulderAdd, 0.5);
         }
       }
 
@@ -1885,67 +1917,67 @@
         const t = clampNumber(phaseAge / 300, 0, 1);
         const attackCurve = Math.sin(t * Math.PI);
         const a = attackCurve * 0.8;
-        safeAddParamValue(core, "ParamBodyAngleY", a * 2.2, 0.5);
-        safeAddParamValue(core, "ParamAngleY", -a * 1.8, 0.45);
-        safeAddParamValue(core, "ParamShoulder", a * 0.15, 0.4);
+        safeAddParamValue(core, P.bodyAngleY, a * 2.2, 0.5);
+        safeAddParamValue(core, P.angleY, -a * 1.8, 0.45);
+        safeAddParamValue(core, P.shoulder, a * 0.15, 0.4);
       }
 
       if (phase === "release") {
         const t = clampNumber(1 - phaseAge / 600, 0, 1);
         const r = t * 0.5;
-        safeAddParamValue(core, "ParamBodyAngleY", r * 1.2, 0.4);
-        safeAddParamValue(core, "ParamAngleY", -r * 0.8, 0.35);
+        safeAddParamValue(core, P.bodyAngleY, r * 1.2, 0.4);
+        safeAddParamValue(core, P.angleY, -r * 0.8, 0.35);
       }
       if (happyBlend > 0.001) {
         const g = happyBlend * moodGain;
-        safeAddParamValue(core, "ParamCheek", (0.12 + breath * 0.05) * g, 0.42);
-        safeAddParamValue(core, "ParamBrowLForm", 0.18 * g, 0.42);
-        safeAddParamValue(core, "ParamBrowRForm", 0.18 * g, 0.42);
-        safeAddParamValue(core, "ParamAngleX", 1.2 * g, 0.28);
+        safeAddParamValue(core, P.cheek, (0.12 + breath * 0.05) * g, 0.42);
+        safeAddParamValue(core, P.browLForm, 0.18 * g, 0.42);
+        safeAddParamValue(core, P.browRForm, 0.18 * g, 0.42);
+        safeAddParamValue(core, P.angleX, 1.2 * g, 0.28);
       }
       if (sadBlend > 0.001) {
         const g = sadBlend * moodGain;
-        safeAddParamValue(core, "ParamAngleY", 0.32 * g, 0.36);
-        safeAddParamValue(core, "ParamShoulder", -0.18 * g, 0.3);
-        safeAddParamValue(core, "ParamBrowLX", -0.08 * g, 0.32);
-        safeAddParamValue(core, "ParamBrowRX", 0.08 * g, 0.32);
-        safeAddParamValue(core, "ParamBrowLForm", -0.22 * g, 0.36);
-        safeAddParamValue(core, "ParamBrowRForm", -0.22 * g, 0.36);
-        safeAddParamValue(core, "ParamBodyAngleX", -0.24 * g, 0.28);
+        safeAddParamValue(core, P.angleY, 0.32 * g, 0.36);
+        safeAddParamValue(core, P.shoulder, -0.18 * g, 0.3);
+        safeAddParamValue(core, P.browLX, -0.08 * g, 0.32);
+        safeAddParamValue(core, P.browRX, 0.08 * g, 0.32);
+        safeAddParamValue(core, P.browLForm, -0.22 * g, 0.36);
+        safeAddParamValue(core, P.browRForm, -0.22 * g, 0.36);
+        safeAddParamValue(core, P.bodyAngleX, -0.24 * g, 0.28);
       }
       if (angryBlend > 0.001) {
         const g = angryBlend * moodGain;
-        safeAddParamValue(core, "ParamBrowLY", -0.22 * g, 0.44);
-        safeAddParamValue(core, "ParamBrowRY", -0.22 * g, 0.44);
-        safeAddParamValue(core, "ParamBrowLAngle", -0.16 * g, 0.4);
-        safeAddParamValue(core, "ParamBrowRAngle", 0.16 * g, 0.4);
-        safeAddParamValue(core, "ParamEyeLOpen", 0.08 * g, 0.3);
-        safeAddParamValue(core, "ParamEyeROpen", 0.08 * g, 0.3);
-        safeAddParamValue(core, "ParamBodyAngleZ", Math.sin(now / 120) * 4 * g, 0.3);
+        safeAddParamValue(core, P.browLY, -0.22 * g, 0.44);
+        safeAddParamValue(core, P.browRY, -0.22 * g, 0.44);
+        safeAddParamValue(core, P.browLAngle, -0.16 * g, 0.4);
+        safeAddParamValue(core, P.browRAngle, 0.16 * g, 0.4);
+        safeAddParamValue(core, P.eyeLOpen, 0.08 * g, 0.3);
+        safeAddParamValue(core, P.eyeROpen, 0.08 * g, 0.3);
+        safeAddParamValue(core, P.bodyAngleZ, Math.sin(now / 120) * 4 * g, 0.3);
       }
       if (surprisedBlend > 0.001) {
         const g = surprisedBlend * moodGain;
-        safeAddParamValue(core, "ParamHairAhoge", 0.32 * g, 0.34);
-        safeAddParamValue(core, "ParamEyeLOpen", 0.24 * g, 0.42);
-        safeAddParamValue(core, "ParamEyeROpen", 0.24 * g, 0.42);
-        safeAddParamValue(core, "ParamBrowLY", 0.22 * g, 0.4);
-        safeAddParamValue(core, "ParamBrowRY", 0.22 * g, 0.4);
-        safeAddParamValue(core, "ParamAngleY", -0.22 * g, 0.28);
+        safeAddParamValue(core, P.hairAhoge, 0.32 * g, 0.34);
+        safeAddParamValue(core, P.eyeLOpen, 0.24 * g, 0.42);
+        safeAddParamValue(core, P.eyeROpen, 0.24 * g, 0.42);
+        safeAddParamValue(core, P.browLY, 0.22 * g, 0.4);
+        safeAddParamValue(core, P.browRY, 0.22 * g, 0.4);
+        safeAddParamValue(core, P.angleY, -0.22 * g, 0.28);
       }
       if (!listeningPresence.effective && style === "comfort") {
-        safeAddParamValue(core, "ParamHandL", 0.06 + breath * 0.04, 0.1);
-        safeAddParamValue(core, "ParamHandR", -0.05 - breath * 0.03, 0.1);
-        safeAddParamValue(core, "ParamArmLB", 0.08, 0.08);
-        safeAddParamValue(core, "ParamArmRB", -0.06, 0.08);
+        safeAddParamValue(core, P.handL, 0.06 + breath * 0.04, 0.1);
+        safeAddParamValue(core, P.handR, -0.05 - breath * 0.03, 0.1);
+        safeAddParamValue(core, P.armLB, 0.08, 0.08);
+        safeAddParamValue(core, P.armRB, -0.06, 0.08);
       } else if (!listeningPresence.effective && style === "playful") {
-        safeAddParamValue(core, "ParamHandL", 0.08 + sway * 0.06, 0.11);
-        safeAddParamValue(core, "ParamHandR", 0.08 - sway * 0.06, 0.11);
-        safeAddParamValue(core, "ParamArmLA", sway * 0.14, 0.08);
-        safeAddParamValue(core, "ParamArmRA", -sway * 0.14, 0.08);
+        safeAddParamValue(core, P.handL, 0.08 + sway * 0.06, 0.11);
+        safeAddParamValue(core, P.handR, 0.08 - sway * 0.06, 0.11);
+        safeAddParamValue(core, P.armLA, sway * 0.14, 0.08);
+        safeAddParamValue(core, P.armRA, -sway * 0.14, 0.08);
       } else if (!listeningPresence.effective && style === "steady") {
-        safeAddParamValue(core, "ParamShoulder", breath * 0.1, 0.12);
-        safeAddParamValue(core, "ParamArmLA", -0.04, 0.08);
-        safeAddParamValue(core, "ParamArmRA", 0.04, 0.08);
+        safeAddParamValue(core, P.shoulder, breath * 0.1, 0.12);
+        safeAddParamValue(core, P.armLA, -0.04, 0.08);
+        safeAddParamValue(core, P.armRA, 0.04, 0.08);
       }
       // The legacy micro-motion layer has now contributed its reduced base.
       // Restore full weight before the Hiyori director and listening layers so
@@ -1972,6 +2004,7 @@
     }
 
     function getSpeechAnimationMouthOpen() {
+      if (state.avatarIntentOverrides?.mouth) return state.avatarIntentOverrides.mouth.open;
       const now = performance.now();
       const audioPlaying = isSpeakingNow();
       const speaking = isSpeechMotionActive(now);
@@ -2110,7 +2143,8 @@
       const profile = getStyleExpressionProfile(style);
       const now = performance.now();
       const activeSpeechCue = getActiveSpeechPerformanceCue(now);
-      const speaking = isSpeechMotionActive(now) || !!activeSpeechCue;
+      const speaking = state.avatarIntentOverrides?.mode !== undefined
+        ? state.avatarIntentOverrides.mode === "speak" : (isSpeechMotionActive(now) || !!activeSpeechCue);
       const motionBlend = clampNumber(Number(state.speechMotionBlend) || 0, 0, 1);
       const speakingQuiet = state.motionQuietDuringSpeech && speaking;
       const moodBlend = getSmoothedMoodExpression(now);
@@ -2146,9 +2180,9 @@
           state.speechMouthOpen = 0;
         }
       }
-      const mouthOpen = state.uiView === "model"
+      const mouthOpen = state.avatarIntentOverrides?.mouth?.open ?? (state.uiView === "model"
         ? Number(state.speechMouthOpen) || 0
-        : getSpeechAnimationMouthOpen();
+        : getSpeechAnimationMouthOpen());
 
       const surpriseMouthBoost = surprisedBlend > 0.001
         ? (0.34 + 0.38 * motionBlend) * surprisedBlend * gain
@@ -2166,27 +2200,27 @@
       state.speechMouthTarget = mouthTarget;
       state.speechMouthUpdatedAt = now;
 
-      safeAddParamValue(core, "ParamMouthForm", profile.mouthForm * gain, 0.9);
-      safeDriveParamValue(core, "ParamMouthOpenY", mouthTarget, 0.84 + motionBlend * 0.14);
-      safeAddParamValue(core, "ParamCheek", profile.cheek * gain, 0.9);
-      safeAddParamValue(core, "ParamEyeLSmile", profile.eyeSmile * gain, 0.9);
-      safeAddParamValue(core, "ParamEyeRSmile", profile.eyeSmile * gain, 0.9);
-      safeAddParamValue(core, "ParamBrowLY", profile.browY * gain, 0.9);
-      safeAddParamValue(core, "ParamBrowRY", profile.browY * gain, 0.9);
-      safeAddParamValue(core, "ParamBrowLAngle", profile.browAngle * gain, 0.9);
-      safeAddParamValue(core, "ParamBrowRAngle", -profile.browAngle * gain, 0.9);
-      safeAddParamValue(core, "ParamAngleX", profile.headX * gain, 0.82);
-      safeAddParamValue(core, "ParamAngleY", profile.headY * gain, 0.82);
-      safeAddParamValue(core, "ParamBodyAngleX", profile.bodyX * gain, 0.76);
+      safeAddParamValue(core, P.mouthForm, profile.mouthForm * gain, 0.9);
+      safeDriveParamValue(core, P.mouthOpenY, mouthTarget, 0.84 + motionBlend * 0.14);
+      safeAddParamValue(core, P.cheek, profile.cheek * gain, 0.9);
+      safeAddParamValue(core, P.eyeLSmile, profile.eyeSmile * gain, 0.9);
+      safeAddParamValue(core, P.eyeRSmile, profile.eyeSmile * gain, 0.9);
+      safeAddParamValue(core, P.browLY, profile.browY * gain, 0.9);
+      safeAddParamValue(core, P.browRY, profile.browY * gain, 0.9);
+      safeAddParamValue(core, P.browLAngle, profile.browAngle * gain, 0.9);
+      safeAddParamValue(core, P.browRAngle, -profile.browAngle * gain, 0.9);
+      safeAddParamValue(core, P.angleX, profile.headX * gain, 0.82);
+      safeAddParamValue(core, P.angleY, profile.headY * gain, 0.82);
+      safeAddParamValue(core, P.bodyAngleX, profile.bodyX * gain, 0.76);
       if (happyBlend > 0.001) {
         const g = happyBlend * gain;
-        safeAddParamValue(core, "ParamEyeLSmile", 0.4 * g, 0.85);
-        safeAddParamValue(core, "ParamEyeRSmile", 0.4 * g, 0.85);
-        safeAddParamValue(core, "ParamMouthForm", 0.5 * g, 0.85);
-        safeAddParamValue(core, "ParamCheek", 0.4 * g, 0.8);
-        safeAddParamValue(core, "ParamBrowLY", 0.15 * g, 0.7);
-        safeAddParamValue(core, "ParamBrowRY", 0.15 * g, 0.7);
-        safeAddParamValue(core, "ParamAngleX", 3.0 * g, 0.5);
+        safeAddParamValue(core, P.eyeLSmile, 0.4 * g, 0.85);
+        safeAddParamValue(core, P.eyeRSmile, 0.4 * g, 0.85);
+        safeAddParamValue(core, P.mouthForm, 0.5 * g, 0.85);
+        safeAddParamValue(core, P.cheek, 0.4 * g, 0.8);
+        safeAddParamValue(core, P.browLY, 0.15 * g, 0.7);
+        safeAddParamValue(core, P.browRY, 0.15 * g, 0.7);
+        safeAddParamValue(core, P.angleX, 3.0 * g, 0.5);
       }
       if (sadBlend > 0.001) {
         const g = sadBlend * gain * sadCuePoseScale;
@@ -2194,53 +2228,53 @@
         // breathing variation may soften the eyes, but sustained speech must
         // leave enough eye openness for normal gaze and blink animation.
         const sadEyeSoftness = (0.035 + (Math.sin(now / 640) * 0.5 + 0.5) * 0.035) * g;
-        safeAddParamValue(core, "ParamEyeLOpen", -sadEyeSoftness, 0.58);
-        safeAddParamValue(core, "ParamEyeROpen", -sadEyeSoftness, 0.58);
-        safeAddParamValue(core, "ParamBrowLY", -0.3 * g, 0.82);
-        safeAddParamValue(core, "ParamBrowRY", -0.3 * g, 0.82);
-        safeAddParamValue(core, "ParamBrowLForm", -0.32 * g, 0.76);
-        safeAddParamValue(core, "ParamBrowRForm", -0.32 * g, 0.76);
-        safeAddParamValue(core, "ParamBrowLAngle", 0.22 * g, 0.72);
-        safeAddParamValue(core, "ParamBrowRAngle", -0.22 * g, 0.72);
-        safeAddParamValue(core, "ParamMouthForm", -0.68 * g, 0.86);
-        safeDriveParamValue(core, "ParamMouthOpenY", 0.02, 0.5);
-        safeAddParamValue(core, "ParamAngleY", 4.8 * g, 0.54);
-        safeAddParamValue(core, "ParamBodyAngleX", -3.4 * g, 0.42);
+        safeAddParamValue(core, P.eyeLOpen, -sadEyeSoftness, 0.58);
+        safeAddParamValue(core, P.eyeROpen, -sadEyeSoftness, 0.58);
+        safeAddParamValue(core, P.browLY, -0.3 * g, 0.82);
+        safeAddParamValue(core, P.browRY, -0.3 * g, 0.82);
+        safeAddParamValue(core, P.browLForm, -0.32 * g, 0.76);
+        safeAddParamValue(core, P.browRForm, -0.32 * g, 0.76);
+        safeAddParamValue(core, P.browLAngle, 0.22 * g, 0.72);
+        safeAddParamValue(core, P.browRAngle, -0.22 * g, 0.72);
+        safeAddParamValue(core, P.mouthForm, -0.68 * g, 0.86);
+        safeDriveParamValue(core, P.mouthOpenY, 0.02, 0.5);
+        safeAddParamValue(core, P.angleY, 4.8 * g, 0.54);
+        safeAddParamValue(core, P.bodyAngleX, -3.4 * g, 0.42);
       }
       if (angryBlend > 0.001) {
         const g = angryBlend * gain;
-        safeAddParamValue(core, "ParamBrowLY", -0.35 * g, 0.9);
-        safeAddParamValue(core, "ParamBrowRY", -0.35 * g, 0.9);
-        safeAddParamValue(core, "ParamBrowLAngle", -0.2 * g, 0.85);
-        safeAddParamValue(core, "ParamBrowRAngle", 0.2 * g, 0.85);
-        safeAddParamValue(core, "ParamEyeLOpen", 0.1 * g, 0.7);
-        safeAddParamValue(core, "ParamEyeROpen", 0.1 * g, 0.7);
-        safeAddParamValue(core, "ParamMouthForm", -0.35 * g, 0.85);
-        safeAddParamValue(core, "ParamBodyAngleZ", Math.sin(now / 120) * 4 * g, 0.3);
+        safeAddParamValue(core, P.browLY, -0.35 * g, 0.9);
+        safeAddParamValue(core, P.browRY, -0.35 * g, 0.9);
+        safeAddParamValue(core, P.browLAngle, -0.2 * g, 0.85);
+        safeAddParamValue(core, P.browRAngle, 0.2 * g, 0.85);
+        safeAddParamValue(core, P.eyeLOpen, 0.1 * g, 0.7);
+        safeAddParamValue(core, P.eyeROpen, 0.1 * g, 0.7);
+        safeAddParamValue(core, P.mouthForm, -0.35 * g, 0.85);
+        safeAddParamValue(core, P.bodyAngleZ, Math.sin(now / 120) * 4 * g, 0.3);
       }
       if (thinkingBlend > 0.001) {
         const g = thinkingBlend * gain;
-        safeAddParamValue(core, "ParamEyeLSmile", -0.08 * g, 0.46);
-        safeAddParamValue(core, "ParamEyeRSmile", -0.08 * g, 0.46);
-        safeAddParamValue(core, "ParamBrowLY", 0.22 * g, 0.54);
-        safeAddParamValue(core, "ParamBrowRY", -0.16 * g, 0.5);
-        safeAddParamValue(core, "ParamMouthForm", -0.28 * g, 0.72);
-        safeAddParamValue(core, "ParamEyeBallX", -0.22 * g, 0.48);
-        safeAddParamValue(core, "ParamEyeBallY", 0.12 * g, 0.42);
-        safeAddParamValue(core, "ParamAngleZ", -2.4 * g, 0.44);
-        safeAddParamValue(core, "ParamBodyAngleX", -1.25 * g, 0.34);
+        safeAddParamValue(core, P.eyeLSmile, -0.08 * g, 0.46);
+        safeAddParamValue(core, P.eyeRSmile, -0.08 * g, 0.46);
+        safeAddParamValue(core, P.browLY, 0.22 * g, 0.54);
+        safeAddParamValue(core, P.browRY, -0.16 * g, 0.5);
+        safeAddParamValue(core, P.mouthForm, -0.28 * g, 0.72);
+        safeAddParamValue(core, P.eyeBallX, -0.22 * g, 0.48);
+        safeAddParamValue(core, P.eyeBallY, 0.12 * g, 0.42);
+        safeAddParamValue(core, P.angleZ, -2.4 * g, 0.44);
+        safeAddParamValue(core, P.bodyAngleX, -1.25 * g, 0.34);
       }
       if (surprisedBlend > 0.001) {
         const g = surprisedBlend * gain;
-        safeAddParamValue(core, "ParamEyeLOpen", 0.55 * g, 0.92);
-        safeAddParamValue(core, "ParamEyeROpen", 0.55 * g, 0.92);
-        safeAddParamValue(core, "ParamBrowLY", 0.42 * g, 0.88);
-        safeAddParamValue(core, "ParamBrowRY", 0.42 * g, 0.88);
-        safeAddParamValue(core, "ParamBrowLForm", 0.26 * g, 0.72);
-        safeAddParamValue(core, "ParamBrowRForm", 0.26 * g, 0.72);
-        safeAddParamValue(core, "ParamMouthForm", -0.34 * g, 0.78);
-        safeDriveParamValue(core, "ParamMouthOpenY", clampNumber(0.28 * g, 0, 0.55), 0.62);
-        safeAddParamValue(core, "ParamAngleY", -3.8 * g, 0.52);
+        safeAddParamValue(core, P.eyeLOpen, 0.55 * g, 0.92);
+        safeAddParamValue(core, P.eyeROpen, 0.55 * g, 0.92);
+        safeAddParamValue(core, P.browLY, 0.42 * g, 0.88);
+        safeAddParamValue(core, P.browRY, 0.42 * g, 0.88);
+        safeAddParamValue(core, P.browLForm, 0.26 * g, 0.72);
+        safeAddParamValue(core, P.browRForm, 0.26 * g, 0.72);
+        safeAddParamValue(core, P.mouthForm, -0.34 * g, 0.78);
+        safeDriveParamValue(core, P.mouthOpenY, clampNumber(0.28 * g, 0, 0.55), 0.62);
+        safeAddParamValue(core, P.angleY, -3.8 * g, 0.52);
       }
     }
 
