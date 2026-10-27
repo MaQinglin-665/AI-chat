@@ -92,3 +92,18 @@ def test_avatar_config_overrides_legacy_placeholder(tmp_path, monkeypatch):
     cfg["avatar"]["path"] = "models_local/Missing.model3.json"
     with pytest.raises(config.DiagnosticError):
         config.validate_live2d_model_path(cfg)
+
+
+@pytest.mark.parametrize("missing", ["folder", "Mao.model3.json", "Mao.moc3", "texture.png", "face.exp3.json"])
+def test_missing_local_model_is_a_controlled_error(tmp_path, missing):
+    cfg, folder, _ = fixture(tmp_path)
+    if missing == "folder":
+        cfg["avatar"]["path"] = "models_local/Absent/Mao.model3.json"
+    else:
+        (folder / missing).unlink()
+    for route in ["/api/avatar", assets.LIVE2D_PREFIX + "Mao.moc3"]:
+        handler = Handler()
+        assets.dispatch(handler, cfg, tmp_path, route)
+        assert handler.status == 400
+        assert "unavailable" in handler.data["error"]
+        assert str(tmp_path) not in str(handler.data)

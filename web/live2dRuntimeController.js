@@ -118,7 +118,15 @@
 
     async function ensureLive2DRuntime() {
       if (window.XinyuAvatarRuntime) {
-        state.avatarSource = await window.XinyuAvatarRuntime.describe();
+        state.avatarLoadUnavailable = false;
+        try { state.avatarSource = await window.XinyuAvatarRuntime.describe(); }
+        catch (error) {
+          if (state.config?.avatar?.kind !== "live2d") throw error;
+          state.avatarLoadUnavailable = true;
+          showLive2DSetupGuide("本地 Live2D 模型不可用",
+            "请检查 models_local 中的模型目录是否存在，并补齐 .model3.json、moc3、贴图及清单引用的文件。avatar.path 应指向模型清单；保持原目录结构，补齐后刷新。聊天功能仍可使用。");
+          return;
+        }
         if (state.avatarSource.kind === "vrm") {
           await loadScript("/vendor/vrm/vrm-vendor.js", () => !!window.XinyuVRMVendor);
           return;
@@ -241,6 +249,7 @@
     }
 
     async function initLive2D() {
+      if (state.avatarLoadUnavailable) return null;
       const canvas = document.getElementById("live2d-canvas");
       const runtime = window.XinyuAvatarRuntime || (typeof require === "function"
         ? require("./avatar/avatarRuntime.js").createRuntime(Object.assign(Object.create(window), { document })) : null);
@@ -346,6 +355,11 @@
         console.error(err);
         dispose();
         const detail = String(err?.message || err || "").trim();
+        if (rawModelPath.startsWith("/api/avatar/live2d/")) {
+          showLive2DSetupGuide("本地 Live2D 资源加载失败",
+            "请检查 models_local 中的模型清单、moc3、贴图和其他引用文件是否完整，确认 avatar.path 指向 .model3.json，补齐后刷新。聊天功能仍可使用。");
+          return null;
+        }
         const missingFile = /not\s*found|failed\s*to\s*fetch|404|enoent/i.test(detail);
         if (missingFile) {
           showLive2DSetupGuide(

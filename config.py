@@ -195,6 +195,7 @@ DEFAULT_CONFIG = {
         ],
     },
     "tts": {
+        "browser_lip_sync_delay_ms": 120,
         "provider": TTS_DEFAULT_PROVIDER,
         "auto_start_local_provider": False,
         "voice": TTS_DEFAULT_VOICE,
@@ -1151,6 +1152,8 @@ def sanitize_client_config(config):
             "y_ratio": y_ratio,
         },
         "tts": {
+            "browser_lip_sync_delay_ms": max(0, min(500, _safe_int(
+                tts_cfg.get("browser_lip_sync_delay_ms", 120), 120))),
             "provider": provider,
             "auto_start_local_provider": tts_cfg.get(
                 "auto_start_local_provider", False

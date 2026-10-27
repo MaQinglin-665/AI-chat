@@ -1124,6 +1124,25 @@ Verification Evidence: full scripts/test-local.ps1 passed (845 passed / 3 skippe
 Verification Evidence for #224 merge: scripts/test-local.ps1 passed (876 passed, 3 skipped, 1 warning; all Node/syntax/secrets), scripts/check_first_run_package.ps1 passed. Ignored logs: tmp_ui_smoke/avatar-vrm-polish/merge224-local.log and merge224-package.log. Three state-file conflicts resolved by retaining both histories and both feature entries; active task stays avatar-brain-driven-v1. No code conflicts or extra product fixes. Next: normal push, ready, all CI, authorized merge commit, then stop awaiting user notice about #217.
 
 
+## 2026-10-26 — Shared lipsync starts separately after PR217 closeout
+- Priority1 complete: #217 latest main2b67452 included, pushed0c08c3d/open/ready/unmerged; exact Hiyori Node5280/394224/browser1030/167741 and full896Python/3skipped/73Node/package pass. Dedicated38.4s Hiyori video delivered to user. No brain phase2 started.
+- New branch friend/lipsync-fix directly from origin/main2b67452. Read AGENTS/current state/playback/expression/bridge/runtime. Preserve existing output latency/FFT/hidden timer; shared browser lifecycle fix across Hiyori/Mao/VRM, separate PR diagnosis before implementation. No dialogue/memory/external implementation changes.
+- CC0 Verification Evidence: official https://vroid.pixiv.help/hc/en-us/articles/360013482714-Sendagaya-Shino explicitly CC0, consistent with user's official overview. Local mirror https://opengameart.org/sites/default/files/sendagaya_shino.zip SHA256ff85ff42c1d041fd66dabdb36761a98557d7b55199f635769f3698a41c0a3696; extractedVRMf11b2648e7e588ae171ad1c32e465f84e5b130b1d1789e3a3702946c0981d2a9. Name/official/mirror/embedded terms recorded in ignored models_local/Sendagaya_Shino.source.json; both paths verified ignored, no model commit.
+
+
+## 2026-10-26 — Shared lipsync implementation and verification complete
+- Existing independent draft#226 recorded symptoms/root causes first. Generic browser lifecycle helper now controls pending/start/120ms/pause/resume/boundary/end/error/cancel/stale token/generation; expression and shared frame select same mouth. Server playback clears browser ownership; additive validated bridge flag preserves analysed silence. No new render clock, dialogue/memory/external execution changes.
+- Found additional actual tail failure: bridge rejects speaking packets whose estimated duration has expired. Renew original500ms lease while actual browser playback owns speech; two-controller/different-clock test proves long tail accepted. Existing FFT1024,25–350ms latency history and hidden16ms timer files/behavior preserved.
+- Verification Evidence: scripts/test-local.ps1 complete882Python passed/3skipped,70Node suites,syntax190/230,secrets824;package smoke/docs4/required JSON/py_compile pass. New6 Python configuration cases and shared lifecycle/bridge tests. No existing parameter snapshots updated, no PR217 strict tests copied/deleted/relaxed; mouth time changes belong only to this PR.
+- Three actual local models rendered before/after: Hiyori/Mao/CC0SendagayaShino, each292frames/20fps/14.6s, identical12.2s local system voice reference offset1370ms. Source events1000queue/1250start+120ms; old speech signal first1000ms, new1400ms; old4–8s variation0,new0.650747, actual mouth parameters vary and end closes;no page errors. These are controlled browser replay plus reference audio, not nativeWindows/hardware delay measurements. Hiyori retains normal idle-expression mouth writes; onset measured from speech signal. Frames reviewed and MP4 audio verified non-silent. Media/data remain outputs/lipsync-comparison outsideGit.
+- Model source/terms/hash documented in docs/avatar-lipsync-fix.md and ignoredmodels_local sourceJSON. Production resolver accepts requestedVRM config. Mao validation uses fixed0c08c3d adapter overlay only inQA, no adapter/Core/model commits here. Installed120ms untouched. Next normal push existing#226, update report/ready for author real-device review; do not merge/main/force push or start brain phase2.
+
+
+## 2026-10-27 — PR217 author-merged; shared lipsync synchronization starts
+- API/fetchconfirm217mergedintomain9d09edc,226open/unmerged943b690. Currentbranchclean, readAGENTS/state/intentdoc. Userauthorizes226sync/newCI thenWindowslisteningbeforemerge. No privateconfig/model/installedapp changes.
+- Branchinventory: nofriend/avatar-live2d-mao locally/remotely; onlyoriginoriginalrepo, nofork. FoundationMao alreadyincludedin217/main; tolduserclearly. Userapprovednewmain-based Mao acceptance/fixesPR for5vowels/8faces/3gestures/configswitch after226priority, no duplicateimplementation.
+- Preserve existinglatencyFFTtimer/runtime and mainvowels, explicitoverrides. Rerunactualthree-modelsharedlip and full/package, normalpush/allCI, no selfmerge/main/forcepush;pushnetwork10s/max5. Strict217snapshotsnotredefinedforintentionalbrowsermouthtimingchange.
+
 ## 2026-10-26 — PR217 also synchronized with newly merged #224
 - Main advanced to2b67452 during closeout. Retained incoming backend unchanged, both state histories and the new Node debugger test; no brain phase2 implemented. Rerunning complete gate and exact Core6 comparison before normal push.
 
@@ -1208,3 +1227,105 @@ Independent worktree from 9d09edc; dependencies copied with robocopy. No npm ci/
 - Exact failed provider response replay restores speech plus 3 actions. Fresh night/window A/B after fix: 0/5 empty in each group. Raw synthetic-response evidence is ignored and never committed.
 - Base/main vs PR rest-to-books camera trace identical: both cross the left wall for 343/3600 frames. Existing camera collision/occlusion and close framing are deferred, not changed here. New go_to standing-at-seat framing fixed by explicit poseEnabled; sit/random compatibility retained.
 - Full local validation: 939 passed, 3 skipped, all Node/syntax/secrets passed. See docs/avatar-brain-executor-review.md for the bounded real-video test; final CI remains visible in draft PR231. Do not merge.
+
+
+## 2026-10-27 — 独立 Mao 验收开始
+#217 已由作者合并为 main9d09edc。#226已同步该main并推送8723067，全部10项Linux/Windows CI成功且无冲突，已通知用户实际试听，未自行合并。当前新分支friend/avatar-live2d-mao直接从最新origin/main建立，没有fork，也不包含未合并的226。基础Mao适配已随217进入main，本任务只补实际五元音、8表情、3手势、动作和配置切换验收，修复复现问题；保存本地证据后独立PR。模型/私密配置/媒体/Key不提交，不改对话/记忆/外部执行，不覆盖本机安装。
+
+
+## 2026-10-27 — 新 main 上的独立 Mao 验收
+
+`friend/avatar-live2d-mao` 直接从作者合入 #217 后的 `origin/main 9d09edc` 建立。此前没有独立 Mao 分支或 fork；基础适配已在 main，本次仅补验收和复现问题修复，不包含未合并的 #226 共享口型改动。
+
+- **发现并修复加载取消结果错误**：`load()` 等待映射期间调用 `dispose()`，原实现返回 `undefined`，而公共 runtime 仅把 `false` 视为加载失败；等待模型资源时取消，也会在资源到达后创建驱动并返回成功。现在在两次映射等待及模型资源等待后检查取消状态，明确返回 `false`；迟到资源只释放一次，不创建驱动。新增三个确定性回归，修复前可复现失败。正常 Pixi tick、pre-Core 更新顺序和参数数值不改。
+- **真实模型验收加强**：五元音逐通道断言；无可靠元音/非法元音回退 A、静音五通道清零；8 个官方表情逐条核对实际 Core 调用的参数 ID、Blend 和值，并确认参数存在；3 个手势各取 0/.25/.5/.75/1 五个阶段，检查实际六个臂参数存在、在模型范围内、峰值移动、起落归位，解释/轻抬幅度不同。另验证 `wave` 一次性动作自然到期和 `stopAction` 归位，以及 8 个官方动作实际加载播放。
+- **真实配置切换**：明确 `avatar` Mao 与旧 `model_path` Hiyori 连续往返两轮，检查映射/能力正确、旧模型和 Pixi 实例销毁、通道和意图监听各只剩一个。Mao 的 20 个 Blob 在切回 Hiyori 时归零；最后清理后模型、Blob、通道、resize/intent/unload 监听全部归零。配置只在独立测试页内存中构造，未读写私人配置。
+- **本地证据**：20 张截图（5 元音、8 表情、3 手势、4 切换）与 `mao-evidence.json` 位于仓库外 `outputs/mao-acceptance/`，已查看画面。隔离测试页使用真实本地官方模型、Pixi/Core；资源预读采用测试页鉴权头，63 次授权请求成功、1 次未授权请求返回 401，零页面脚本异常。该头仅用于独立验收服务器，不能代替应用 API 的鉴权安全测试；后者由已有 Python 回归覆盖。
+- **Verification Evidence**：`scripts/test-local.ps1` 全部通过：932 Python / 3 跳过、74 个 Node 文件，Python194 / JS243 语法、853 文件密钥扫描通过；`scripts/check_first_run_package.ps1`、必需 JSON/py_compile 通过。继承 main 的 Hiyori 严格测试随全量门禁通过（5280 帧/394224 调用/42 场景），未修改任何严格对照快照或基线。Python 资源路径、配置优先级测试已随全量执行；初次受限环境定向执行因临时目录权限失败，完整正常权限门禁中通过。
+
+重跑真实模型验收前，须本地有官方 Mao 完整资源和原 Hiyori 示例（`web/models/hiyori_pro_t11/`）。执行 `node scripts/qa_live2d_mao.cjs`，或用 `AVATAR_QA_OUTPUT` 指定仓库外证据目录。模型均由使用者自行取得，不随 PR、测试或截图包分发。截图页保留 Live2D 署名；Mao 手势受模型绑定约束，是小幅摆臂。受控输入验收不代表真实人声元音识别率，也不是 Windows 原生拖拽/穿透/真实语音试听；这些仍由作者在 Windows 上检查，#226 另行试听合并。
+
+修改仅为 `live2dRenderer.js` 取消检查、`test_live2d_mao.js` 回归、`qa_live2d_mao.cjs` 验收断言及本报告/三份状态记录。未改映射、Core、VRM/场景、对话、记忆、外部执行或本机安装；未提交模型、媒体、私密配置或 Key。正常推送独立 PR，由作者审查合并，不自行合并。
+
+
+## 发布检查点 — PR #228
+已正常推送 friend/avatar-live2d-mao 并创建可审查 PR：https://github.com/MaQinglin-665/AI-chat/pull/228 （base main9d09edc）。仅7个预期文件；本地工作区干净，未提交模型/配置/媒体。最终真实QA输出20截图/4切换/63授权/1拒绝/0页面异常，截图包仅本地。Linux/Windows CI 的最终状态以 PR 当前提交检查和仓库外 outputs/mao-acceptance/ci-final.json 为准；需要全部成功且无冲突才报告可实机检查，不自行合并。#226 的8723067已全部CI成功，用户试听待定。
+
+
+## 2026-10-27 — Live2D 长线任务
+阶段0复核main仍9d09edc，#2268723067包含main且10项CI全成功，无冲突，已通知。阶段1在现有#228补纯映射手臂效果、同Core完整写序列严格对照、缺模型回归与有声40s场景录像。随后从228分支建立动作词表分支，先文档Draft PR再实现；最后从其分支建立新模型模板/校验CI独立PR。允许前一PR开出后继续，不自行合并；每PR记录堆叠依赖、共享代码改动、测试/录像/限制并等Linux与WindowsCI。无配置/Key/模型/媒体提交，无VRM/房间/后端brain改动，不读取私人配置。
+
+
+## 长线阶段1补齐 — 2026-10-27
+- 手臂部件选择与摆动从 driver 的专用名字判断迁到 `mao.json` 的 `speechGestureEffects`，driver 只解释通用 parts/partParameters/oscillations。未改数值和调用顺序。
+- 冻结 main9d09edc 的 driver/mapping 原字节及 SHA256；同组1440帧完整序列/全部参数与部件快照严格一致：CI协议25850调用，本机真实Core6/Mao181030调用，无容差。CI不下载Mao，本机模型存在才加跑真实模型；两类证据分开报告。旧Hiyori严格基线不变。
+- 缺目录、清单、moc3、贴图、表情五种条件回归；前端在本地模型描述失败或资源加载失败时显示 models_local/清单/资源/avatar.path/刷新指引，返回null、保留聊天，不吞VRM错误。共享代码仅live2dRuntimeController的本地Live2D失败提示/短路，未改路由/ws或其他渲染器。
+- 40秒/800帧/20fps本机真实Pixi/Core录像：idle/listen/think、五元音（放大口型）、3手势、8表情、真实指针拖拽/松手恢复。带本机SAPI场景/元音音轨；这是受控映射展示，不是原生Windows TTS延迟测量。画面含场景名和Live2D署名；没有模型/媒体进git。
+- 全量scripts/test-local.ps1：937Python通过/3跳过，76Node文件，语法194/246，secrets859；首次运行包和必需JSON/py_compile通过。第一次全量发生一次无关external_agent HTTP本机连接中止，未改其代码；完整重跑通过。20截图/4切换/63授权/1拒绝/0页面错误及拖拽移动断言通过。
+- 录像已作为原仓库的**草稿验收附件**保存，需作者登录并有仓库写权限查看；不发布产品release。链接：https://github.com/MaQinglin-665/AI-chat/releases/tag/untagged-d2ff791d304d9886571a
+- 已知限制：合成频谱/受控元音不能证明真实人声识别率；Mao手势受原模型绑定约束；原生Windows穿透与真实语音仍由作者检查。#226独立且CI已绿，不混入本分支。
+
+
+## 长线阶段2 — 先行接口 Draft
+从阶段1 friend/avatar-live2d-mao9406ea4建立friend/live2d-action-vocab，PR base使用前一分支以便独立审阅，#228先合并后再切换base/syncmain。先提交docs/live2d-action-vocabulary.md的接口/词表/结果/打断/坐标约定并开Draft，随后才实现。此检查点不宣称功能完成。未改VRM/场景/后端brain，后续共享runtime仅增加可选转发/原事件字段，PR单独说明。
+
+
+## 阶段2实现检查点 — #229
+先以2aac49f发布接口文档Draft229，再实现live2dGestures及两模型10词映射。Promise区分completed/interrupted/unsupported/failed，最新支持调用替换、取消/停止/卸载/超时均结束；lookAt支持user/方向/reset/CSS屏幕坐标，参数写入只走原pre-Core。没有手势时严格Hiyori5280/394224、Mao1440/181030保持。共享avatarRuntime仅加可选转发/原事件gesture/look_at字段；无VRM/房间/brain/ws/路由改动。
+Verification Evidence：完整937Python/3skip/77Node，语法194/248，secrets862；首次运行包、必需JSON/compile通过，新增原事件转发断言另行通过。真实Hiyori/Mao各10词全部Promise完成，各311帧15.55秒有声录像，Core前每词口型范围至少0.545592/0.502619；截图已看，口型特写位置已校正。录像已上传原仓库草稿附件（非产品发布，作者登录写权限可见），文件Hiyori-vocabulary-final-20261027.mp4、Mao-vocabulary-final-20261027.mp4。模型/媒体/配置/Key未入git。
+下一步正常push229并等当前提交Linux/WindowsCI；保留Draft供作者接口审阅，依赖228先合并。然后从当前分支建立独立新模型模板/校验CI PR，仍不自行合并。
+
+
+## 长线阶段3开始
+从已推送的friend/live2d-action-vocab da948e7建立friend/live2d-model-template，base依赖229（229依赖228）。只做接入文档/映射模板/校验脚本/CI及测试，不修改渲染器/VRM/房间/brain。校验明确区分无模型的结构检查与实际moc参数、manifest动作组检查，不下载模型或读取私密配置。前两阶段已发布，CI分别独立核对，作者按序合并。
+
+
+## 长线阶段3完成检查点 — 模板与CI校验
+新增docs/live2d-new-model-guide.md、mappings/template.json、scripts/validate_live2d_mapping.js及错误引用回归；Linux质量门禁、Windows兼容门禁和test-local都运行--all。无运行时/VRM/房间/后端brain/路由/ws改动。
+校验1MiB JSON结构/别名/姿态/词表时长与口型所有权；显式模型或本地可用模型时用已有Core读取实际moc参数/部件，并检查清单表达式/动作组/下标/完整资源及路径边界。无本地模型时明确STRUCTURE_ONLY/modelChecked:false，不下载模型、不读取私人配置、不作许可判断。模板只是四词示例，未支持词省略后unsupported。
+Verification Evidence：本机真实Hiyori/Mao引用全部通过；模板配真实Hiyori通过；故意不存在的Mao参数与动作组均按预期exit1。错误JSON/参数别名/组/下标/表情/部件/嘴型/路径/缺资源回归通过。完整test-local937Python/3skip/78Node，语法194/250，secrets866；首次运行包/必需JSON/py_compile通过，后增metadata错误断言单独通过。模板无模型只结构通过，明确未作模型检查。参考代码/模型资源/私密配置不新增提交。
+阶段1 #2289406ea4、阶段2 #229da948e7当前Linux/WindowsCI均全成功，均未合并；229保留Draft给作者接口审阅。阶段3从229分支独立堆叠PR，按228→229→本PR顺序合并，父分支合并后同步main/调整base。录像复用前两阶段草稿审查附件（本PR无视觉变更），不声称新录制。下一步推送/创建PR/全CI后停下，作者验收合并，不force/mainpush。
+
+
+## 三阶段 PR 已发布 — 最终接手记录
+- 阶段0：#226 friend/lipsync-fix8723067，包含main9d09edc，全部Linux/WindowsCI成功；等待用户Windows试听，未合并。
+- 阶段1：#228 friend/avatar-live2d-mao9406ea4，base main，纯映射/缺模型/严格对照/40秒有声录像，全部CI成功。
+- 阶段2：#229 friend/live2d-action-vocab da948e7，base friend/avatar-live2d-mao；先文档Draft2aac49f再实现10词/Promise/lookAt，两模型完整录像，全部CI成功。保留Draft供作者接口审阅。
+- 阶段3：#230 friend/live2d-model-template，base friend/live2d-action-vocab；接入指南/模板/真实参数与动作引用校验/CI。完整937Python/3skip/78Node、打包/JSON/compile、本地实际Hiyori/Mao及反例校验通过。
+- 最终CI以各PR当前head检查及仓库外outputs/live2d-longline/stage{1,2,3}/ci-final.json为准。重启时先核对当前head/main及CI，不创建重复PR、不自己合并。作者按228→229→230顺序合并；父PR合并后同步最新main并调整子PR base，不force push。
+- 录像位于原仓库草稿验收附件（需作者登录写权限，未发布产品）：https://github.com/MaQinglin-665/AI-chat/releases/tag/untagged-d2ff791d304d9886571a 。Mao-stage1-40s-20261027.mp4、Hiyori-vocabulary-final-20261027.mp4、Mao-vocabulary-final-20261027.mp4；都是受控真实模型演示/本机SAPI音轨，不冒充原生设备语音时延验收。模型/私密配置/Key/日志/媒体未提交，无VRM/房间/后端brain改动。
+- 下一步只等当前提交全CI完成并报告，再由作者进行Windows实际语音、拖拽/穿透与接口/许可审查；没有授权自动合并或继续其他任务。
+
+## 2026-10-27 — #217 已合并后的实际统一入口复验
+
+#217由作者合并为main `9d09edc` 后，本分支正常merge为 `3aafe90`。旧文中的2b67452基线/0c08c3d临时组合页是历史验收；当前已直接使用main中的Hiyori/Mao/VRM真实代码，QA删除了Mao runtime字符串替换。PR相对当前main的产品diff仅包含共享口型修复及配置字段。
+
+- 冲突为三份状态记录，以及avatarRuntime构造入口和appStartup两组互补字段。保留main统一工厂、渲染器自己的时钟、五元音字段与显式意图优先级，同时保留#226浏览器口型选择、事件唤醒和长句500ms租约。表达控制器自动合并后确认显式mouth意图优先于浏览器估计。
+- 发现并修复组合边界：服务器音频切换到系统语音后，旧分析器的元音值可能残留。当前浏览器语音只产生张合、vowel=null；分析音频的五元音路径保持，广播的接收/发送和公共帧都有所有权判断。新增优先级和音频源切换回归，原FFT1024、25–350ms输出延迟、隐藏16ms计时器保留。
+- 三种真实本地模型各292帧/14.6秒前后复验通过，实际模型参数持续变化且尾段信号范围0.650747，结束关闭，无页面错误。已查看发声中画面，视频重新合成在仓库外outputs/pr226-main217/，使用相同参考音轨和受控时钟；不是原生Windows设备延迟测量。Mao不再依赖未合并文件或临时覆盖。
+- 完整scripts/test-local.ps1：**938Python通过/3跳过，75Node文件，语法Python195/JS246，秘密扫描858**；打包、必需JSON/py_compile通过。口型桥、跨窗口时钟、Mao映射/元音相关测试通过。
+- **未更新任何已有参数快照**。新增/扩展的是test_browser_lip_sync.js对显式意图、浏览器元音置空、残留分析器、长句跨窗口租约等时序断言。main继承的严格映射测试原文件/基线保留，随完整门禁执行并通过，但不作为“有意改变嘴型时机后仍等价”的证明。test_lip_sync_bridge_frontend.js、test_split_window_speech_timebase_frontend.js与main逐字节相同。
+
+后续正常push并等待该提交Linux/WindowsCI全部通过，用户将在自己的Windows实际听过后再由作者决定合并；不自行合并或更改本机安装。随后另从最新main建立friend/avatar-live2d-mao，用户已确认范围为真实五元音、8表情、3手势及配置切换验收/发现问题修复。Mao基础实现已在main，当前无fork远端，也没有曾经推送过独立Mao分支。
+
+## 2026-10-27 — PR #228 按叠加顺序同步（本次指令）
+作者已合并 #226；最新 origin/main 为 d63d077。本分支 friend/avatar-live2d-mao 使用 merge 同步；保留三个状态文件双方任务与验证历史，不改写产品逻辑、测试快照或基线。本次记录优先于历史中的待合并 #226 等旧指令。
+下一步：本地检查后正常推送，按 #228 → #229 → #230 传播合并并核对各自当前提交 Linux/Windows CI。不 rebase、不 force push、不推 main、不自行合并 PR。
+
+Verification Evidence（本次叠加同步）：main d63d077 merged; scripts/test-local.ps1 全部通过：943 Python/3 skip，77 Node 文件，语法195/249，secrets864；Hiyori严格5280帧/394224调用，Mao协议1440/25850及真实Core6/Mao1440/181030，完整顺序与快照均严格一致；first-run package、公开样例JSON与py_compile通过。初次沙箱权限/临时路径失败后正常Windows权限重跑通过。日志 work/live2d-stack-228-full-retry.log、live2d-stack-228-package-retry.log；既有快照和基线未改，待正常推送及当前提交CI。
+
+## 2026-10-27 — PR #229 按叠加顺序同步（本次指令）
+作者已合并 #226；最新 origin/main 为 d63d077。本分支 friend/live2d-action-vocab 使用 merge 同步；保留三个状态文件双方任务与验证历史，不改写产品逻辑、测试快照或基线。本次记录优先于历史中的待合并 #226 等旧指令。
+下一步：本地检查后正常推送，按 #228 → #229 → #230 传播合并并核对各自当前提交 Linux/Windows CI。不 rebase、不 force push、不推 main、不自行合并 PR。
+
+Verification Evidence（本次叠加同步）：从更新后的PR228分支65e5266执行merge，含main d63d077；仅progress/session两份状态冲突，保留双方记录，运行时代码自动合并。Python源码与已验证943/3skip的228完全相同；本分支test-local -SkipPytest的全部78 Node、语法195/251、secrets867通过，包括词表/共享口型及Hiyori5280/394224、Mao1440/25850与本机181030严格对照；first-run package、样例JSON、py_compile通过。既有快照未改；日志work/live2d-stack-229-*.log。待正常push/当前head Linux+WindowsCI，作者按序合并。
+
+## 2026-10-27 — PR #230 按叠加顺序同步（本次指令）
+作者已合并 #226；最新 origin/main 为 d63d077。本分支 friend/live2d-model-template 使用 merge 同步；保留三个状态文件双方任务与验证历史，不改写产品逻辑、测试快照或基线。本次记录优先于历史中的待合并 #226 等旧指令。
+下一步：本地检查后正常推送，按 #228 → #229 → #230 传播合并并核对各自当前提交 Linux/Windows CI。不 rebase、不 force push、不推 main、不自行合并 PR。
+
+Verification Evidence（本次叠加同步）：从更新后的PR229分支8a9ec9e执行merge，含main d63d077；仅progress/session两份状态冲突，保留双方历史，无代码手工取舍。Python源码与已验证943/3skip的228完全相同；test-local -SkipPytest全部79 Node文件、语法195/253、secrets871、真实Hiyori/Mao参数引用与模板结构校验通过；first-run package、样例JSON、py_compile通过。Hiyori5280/394224、Mao协议1440/25850及实际Core6/Mao181030严格序列通过，旧fixture/快照未改。日志work/live2d-stack-230-*.log。待正常push/三条当前head Linux+WindowsCI；作者228→229→230合并，不自动合并。
+
+## 2026-10-27 — PR231 accepted main integration
+Merged origin/main d2ab533 after PR228 (501f00f), PR229 (a674d0e), PR230 (d2ab533). Only feature_list.json, progress.md, session-handoff.md conflicted: retained both histories and feature entries, kept executor active. Product/test changes auto-merged; no manual runtime edits.
+Verification Evidence: scripts/test-local.ps1 passed: 950 Python / 3 skipped, all Node suites, Python196/JavaScript255 syntax, secrets879. Hiyori actual model validation passed; Mao/template structure-only because models absent. Required public JSON and py_compile gates passed. Next normal push, ready PR231, all current-head CI, authorized merge commit; keep original brain_exec and local main/private config unchanged.

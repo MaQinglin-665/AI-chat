@@ -1,6 +1,7 @@
 (function (root) {
   "use strict";
   function createRuntime(root) {
+  const browserLipSync = root.XinyuBrowserLipSync || (typeof require === "function" ? require("./browserLipSync.js") : null);
   const INPUT_HOLD_MS = 1000;
   const clamp = (v) => Math.max(0, Math.min(1, Number(v) || 0));
   function formatConditions(conditions = {}) {
@@ -77,12 +78,13 @@
   function frameFromState(state, now, wallNow = Date.now(), prepareMs = 1100) {
     const remote = state.uiView === "model";
     const fresh = !remote || (now - Number(state._broadcastSpeechUpdatedAt || 0) < 900);
-    const level = fresh ? clamp(state.ttsAudioLevel) : 0;
+    const browserOwned = remote ? state.ttsBrowserMouthActive === true : browserLipSync?.sample(state, now) != null;
+    const level = fresh ? (browserLipSync?.mouthLevel(state, now, state.ttsAudioLevel) ?? clamp(state.ttsAudioLevel)) : 0;
     const age = wallNow - Number(state.conversationLastAssistantAt || 0);
     const preparingSpeech = age >= 0 && age < prepareMs;
     return { now, preparingSpeech, mode: level > 0.02 ? "speak" : "idle",
       face: state.speechEmotionPose?.emotion || state.speechAnimMood || "neutral", faceIntensity: 0.6,
-      mouth: { open: level, vowel: fresh && level > 0.02 && ["a", "i", "u", "e", "o"].includes(state.ttsVowel) ? state.ttsVowel : null } };
+      mouth: { open: level, vowel: fresh && !browserOwned && level > 0.02 && ["a", "i", "u", "e", "o"].includes(state.ttsVowel) ? state.ttsVowel : null } };
   }
   function normalizeSource(source, config = {}) {
     if (source?.kind === "vrm") return source;
@@ -147,6 +149,9 @@
       if (data.prepare) prepareUntil = root.performance.now() + (renderer.prepareMs ?? factory.EXPRESSION?.prepareMs ?? 0);
       if (data.stop) renderer.stopAction();
       if (typeof data.action === "string") renderer.playAction(data.action, { intensity: data.intensity });
+      const gesture = data.type === "gesture" ? data.name : data.gesture;
+      if (typeof gesture === "string") renderer.playGesture?.(gesture, { intensity: data.intensity });
+      if (data.type === "look_at" || Object.hasOwn(data, "look_at")) renderer.lookAt?.(data.type === "look_at" ? data.target : data.look_at);
       if (data.frame && typeof data.frame === "object") intent = { ...data.frame };
     };
     const event = (e) => apply(e.detail);
@@ -208,7 +213,9 @@
     root.addEventListener("beforeunload", dispose, { once: true });
     if (source.kind === "vrm") setStatus?.("VRM 模型已就绪");
     root.document.body.dataset.avatarReady = "true";
-    state.avatarRuntime = { renderer, dispose };
+    state.avatarRuntime = { renderer, dispose,
+      playGesture(name, options) { return renderer.playGesture?.(name, options) || Promise.resolve({ name, status: "unsupported", durationMs: 0 }); },
+      lookAt(target) { return renderer.lookAt?.(target) || { status: "unsupported" }; } };
     return state.avatarRuntime;
   }
   function installPanel() {

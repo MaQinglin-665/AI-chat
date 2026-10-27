@@ -26,6 +26,8 @@ const vrmClock = require('../web/avatar/vrmRenderer.js').startClock;
   const start=()=>root.XinyuAvatarRuntime.start({state,canvas,source:{kind:'vrm'}});
   const frame=now=>{const callbacks=[...raf.values()];raf.clear();callbacks.forEach(fn=>fn(now));};
   await start();
+  assert.equal((await state.avatarRuntime.playGesture('nod')).status,'unsupported');
+  assert.equal(state.avatarRuntime.lookAt('left').status,'unsupported');
   assert.equal(root.document.body.dataset.avatarReady,"true");
   for(let t=0;t<=1000;t+=10)frame(t);
   assert.equal(updates,51,'initial three-second active window; 10ms synthetic rAF samples');

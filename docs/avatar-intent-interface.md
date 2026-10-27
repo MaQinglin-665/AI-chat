@@ -19,6 +19,10 @@
 
 模型不支持的取值，由渲染器选择最接近的替代，或者直接忽略，**不能报错**。
 
+Live2D 的可等待手势扩展、固定10词、结果状态及视线坐标约定见 [统一动作词表 v1](live2d-action-vocabulary.md)。原 `playAction` 和本页意图帧仍保持兼容；新执行器可 await `avatarRuntime.playGesture`，不需要知道模型参数名。
+
+接入其他 Live2D 模型时，使用[新模型接入指南与映射模板](live2d-new-model-guide.md)，先做结构/真实模型引用校验，再做严格回归和实际画面验收。
+
 ## 渲染器接口（JavaScript）
 
 ```js

@@ -4,7 +4,7 @@
   const directorApi = () => root.TaffyHiyoriPerformanceDirector || (typeof require === "function" ? require("../hiyoriPerformanceDirector.js") : null);
   const unit = value => Math.max(0, Math.min(1, Number(value)));
   function createRenderer({ state, lifecycle, host = root } = {}) {
-    let mapping, resource, clock, driver, disposed = false;
+    let mapping, resource, clock, driver, gestures, disposed = false;
     function sanitize(frame) {
       const value = {};
       if (!frame || typeof frame !== "object") return value;
@@ -20,6 +20,7 @@
       if (frame.speechGesture === null) value.speechGesture = null;
       else if (Object.hasOwn(mapping.speechGesturePoses || {}, frame.speechGesture?.name) && Number.isFinite(frame.speechGesture.phase)) {
         value.speechGesture = { name: frame.speechGesture.name, phase: unit(frame.speechGesture.phase) };
+        if (Number.isFinite(frame.speechGesture.intensity)) value.speechGesture.intensity = unit(frame.speechGesture.intensity);
       }
       if (typeof frame.blinkSuppressed === "boolean") value.blinkSuppressed = frame.blinkSuppressed;
       return value;
@@ -27,21 +28,38 @@
     async function load(source = {}) {
       if (disposed) throw new Error("Live2D renderer is disposed");
       mapping = await mappingApi.load(source.mapping || mappingApi.DEFAULT_PATH);
-      if (disposed) return;
+      if (disposed) return false;
       await mappingApi.ready();
+      if (disposed) return false;
       state.avatarMapping = mapping;
       resource = await lifecycle.load({ ...source, mapping, beforeCoreUpdate(runLayers) {
         // Called only at the original pre-Core hook, inside the Pixi model tick.
         if (mapping.driver === "mapped" && state.uiView !== "model") host.sampleTTSAudioLevel?.();
         clock?.(host.performance.now());
-        if (mapping.driver === "mapped") driver?.update(sanitize(state.avatarIntentFrame));
-        else runLayers();
+        const sample = gestures?.sample();
+        const originalFrame = state.avatarIntentFrame, originalOverrides = state.avatarIntentOverrides;
+        try {
+          if (sample) {
+            state.avatarIntentFrame = { ...originalFrame, ...sample.frame };
+            state.avatarIntentOverrides = { ...originalOverrides, ...sample.frame };
+          }
+          if (mapping.driver === "mapped") driver?.update(sanitize(state.avatarIntentFrame));
+          else runLayers();
+          for (const [id, value] of sample?.parameters || []) resource?.model?.internalModel.coreModel.addParameterValueById(id, value);
+        } finally {
+          state.avatarIntentFrame = originalFrame; state.avatarIntentOverrides = originalOverrides;
+        }
       } });
+      // A model may finish fetching after its renderer was cancelled. Release
+      // that resource and report failure before constructing a driver/runtime.
+      if (disposed) { resource?.dispose(); resource = null; return false; }
       if (mapping.driver === "mapped" && resource?.model) {
         const api = host.XinyuLive2DModelDriver || (typeof require === "function" ? require("./live2dModelDriver.js") : null);
         driver = api.create({ mapping, model: resource.model, expressions: resource.expressions, now: () => host.performance.now() });
       }
-      if (disposed) resource?.dispose();
+      const gesturesApi = host.XinyuLive2DGestures || root.XinyuLive2DGestures || (typeof require === "function" ? require("./live2dGestures.js") : null);
+      if (resource && gesturesApi) gestures = gesturesApi.create({ mapping, state, host,
+        canvas: resource.app?.view || host.document?.getElementById?.("live2d-canvas"), stopLegacy: stopAction });
       return resource !== null;
     }
     function update(frame = {}, options = {}) {
@@ -62,6 +80,7 @@
         .triggerAction(action.name, { intensity: Number.isFinite(intensity) ? unit(intensity) : 1, source: "avatar-intent" });
     }
     function stopAction() {
+      gestures?.stop();
       driver?.stopAction();
       if (!state.hiyoriDirector) return;
       state.hiyoriDirector.action = null;
@@ -70,12 +89,15 @@
     function dispose() {
       if (disposed) return;
       disposed = true; clock = null;
-      driver?.dispose(); resource?.dispose();
+      gestures?.dispose(); driver?.dispose(); resource?.dispose();
       delete state.avatarIntentFrame; delete state.avatarIntentOverrides;
     }
     return { kind: "live2d", load, dispose, update, playAction, stopAction,
+      playGesture(name, options) { return gestures && !disposed ? gestures.playGesture(name, options) : Promise.resolve({ name, status: "failed", reason: "not_ready", durationMs: 0 }); },
+      lookAt(target) { return gestures && !disposed ? gestures.lookAt(target) : { status: "failed", reason: "not_ready" }; },
       capabilities: () => ({ vowels: false, armGestures: [], fullBody: false, locomotion: false,
-        ...mapping?.capabilities, faces: Object.keys(mapping?.faces || {}), actions: Object.keys(mapping?.actions || {}) }),
+        ...mapping?.capabilities, gestures: Object.keys(mapping?.gestureVocabulary || {}), lookAt: true,
+        faces: Object.keys(mapping?.faces || {}), actions: Object.keys(mapping?.actions || {}) }),
       get metadata() { return mapping?.metadata; },
       startClock(produceFrame) { clock = produceFrame; return () => { clock = null; }; },
       // Pointer behavior stays with the original Live2D layout controller.

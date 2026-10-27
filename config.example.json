@@ -111,6 +111,7 @@
     "tools_allowed": false
   },
   "tts": {
+    "browser_lip_sync_delay_ms": 120,
     "provider": "browser",
     "auto_start_local_provider": false,
     "voice": "zh-CN-XiaoxiaoNeural",

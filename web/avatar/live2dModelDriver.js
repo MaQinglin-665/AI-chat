@@ -12,11 +12,15 @@
       if (!values) return;
       const weight = Math.sin(Math.PI * unit(phase)) ** 2 * unit(intensity);
       pose(values, weight);
-      if (["open_explain", "wave", "light_lift"].includes(name)) {
-        for (const [alias, value] of Object.entries({ armLA: 1, armRA: 1, armLB: 0, armRB: 0 })) {
-          if (parts[alias]) { core.setPartOpacityById(parts[alias], value); set(parts[alias], value); }
+      const effects = mapping.speechGestureEffects?.[name];
+      for (const [alias, value] of Object.entries(effects?.parts || {})) {
+        if (parts[alias]) {
+          core.setPartOpacityById(parts[alias], value);
+          if (effects.partParameters) set(parts[alias], value);
         }
-        if (name === "wave") add(params.armR3, Math.sin(phase * Math.PI * 8) * 12 * weight);
+      }
+      for (const item of effects?.oscillations || []) {
+        add(params[item.param], Math.sin(phase * Math.PI * (item.cycles * 2)) * item.amplitude * weight);
       }
     }
     function update(frame = {}) {
@@ -42,7 +46,7 @@
       const vowels = params.vowels || {};
       for (const [name, id] of Object.entries(vowels)) set(id, open > 0.02 && (vowel ? name === vowel : id === params.mouthOpen) ? open : 0);
       if (!Object.keys(vowels).length) set(params.mouthOpen, open);
-      if (frame.speechGesture) gesture(frame.speechGesture.name, frame.speechGesture.phase);
+      if (frame.speechGesture) gesture(frame.speechGesture.name, frame.speechGesture.phase, frame.speechGesture.intensity ?? 1);
       if (action) {
         const phase = (now() - action.started) / action.duration;
         if (phase >= 1) action = null;
