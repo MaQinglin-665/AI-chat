@@ -20,7 +20,7 @@
         "Real official Mao:5 vowels/3fallbacks,8 expressions/8native motions,3gestures×5phases,wave expiry/stop and 4Mao-Hiyori config switches;63authorized/1denied,no page errors;20local screenshots",
         "Full932Python/3skip/74Node,syntax194/243,secrets853;package/JSON/py_compilepass;strict5280frames/394224calls/42scenarios,baseline unchanged"
       ],
-      "next": "Normalpush/create separate PR, wait Linux/Windows CI; author Windows check and merge.226 already CIgreen, user listening pending."
+      "next": "PR228 published on original repository, no fork; verify current-head Linux/Windows CI via GitHub/ci-final.json, then author Windows check and merge.2268723067 CIgreen, user listening pending."
     },
     {
       "id": "avatar-live2d-pr217-closeout",

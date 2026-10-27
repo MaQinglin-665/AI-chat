@@ -1,3 +1,9 @@
+# Current — Mao PR #228 已发布，作者 Windows 检查后合并
+## 发布检查点 — PR #228
+已正常推送 friend/avatar-live2d-mao 并创建可审查 PR：https://github.com/MaQinglin-665/AI-chat/pull/228 （base main9d09edc）。仅7个预期文件；本地工作区干净，未提交模型/配置/媒体。最终真实QA输出20截图/4切换/63授权/1拒绝/0页面异常，截图包仅本地。Linux/Windows CI 的最终状态以 PR 当前提交检查和仓库外 outputs/mao-acceptance/ci-final.json 为准；需要全部成功且无冲突才报告可实机检查，不自行合并。#226 的8723067已全部CI成功，用户试听待定。
+
+完整本地与打包门禁证据见下方。重启时检查 PR 当前 head 的全部 CI；不要重复创建 Mao PR，也不要推送或合并 main。
+
 # Current — Mao 独立验收本地完成，待推送与 CI
 - 分支 friend/avatar-live2d-mao 直接基于 main9d09edc，不含未合并226。取消加载三种等待边界回归通过；只改取消检查，不改正常时钟/参数顺序。
 - 真实 Mao 五元音/3回退、8表情/8动作、3手势×5阶段和wave停止/到期通过；Mao/Hiyori配置两轮切换、实例/Blob/事件清理通过，零脚本错误，20张截图仅本地 outputs/mao-acceptance。
