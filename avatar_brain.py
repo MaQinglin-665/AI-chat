@@ -271,7 +271,7 @@ class AvatarBrain:
                 if plan["status"] == "invalidated" and status == "completed":
                     continue
                 reason = outcome.get("reason")
-                if not isinstance(reason, str) or reason not in {"done", "unsupported", "invalid", "timeout", "user_input", "scene_changed", "disabled", "error", "disposed"}:
+                if not isinstance(reason, str) or reason not in {"done", "unsupported", "invalid", "timeout", "user_input", "scene_changed", "disabled", "error", "disposed", "not_ready", "invalid_input", "invalid_mapping", "aborted", "replaced", "clock_stalled", "invalid_target", "stopped", "invalid_result"}:
                     reason = "error"
                 terminal[index] = {"status": status, "reason": reason}
                 if status == "completed":

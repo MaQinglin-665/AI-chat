@@ -10,7 +10,11 @@
     if(a.type==='go_to'&&!world.places.includes(a.target))return 'invalid';
     if(a.type==='activity'&&!world.activities.includes(a.name))return 'invalid';
     if(a.type==='gesture'&&!world.gestures.includes(a.name))return 'unsupported';
-    if(a.type==='look_at'&&a.target!=='user'&&!world.places.includes(a.target))return 'invalid';
+    if(a.type==='look_at'){
+      const targets=world.kind==='live2d'?['user','left','right','up','down']:
+        world.kind==='vrm'&&['room','handpainted'].includes(world.scene)?['user',...world.places]:['user'];
+      if(!targets.includes(a.target))return 'invalid';
+    }
     if(['activity','wait'].includes(a.type)&&(!Number.isFinite(a.duration_sec)||a.duration_sec<0||a.duration_sec>LIMITS.maxDuration))return 'invalid';
     return null;
   }
@@ -47,7 +51,13 @@
           const invalid=validate(action,nowWorld);
           if(invalid){await emit(plan.id,i,'skipped',invalid);continue;}
           let status='completed',reason='done';
-          try{const result=await run(action,abort.signal);if(result===false){status='skipped';reason='unsupported';}}
+          try{const result=await run(action,abort.signal);if(result===false){status='skipped';reason='unsupported';}
+            else if(result&&typeof result==='object'){
+              if(result.status==='unsupported'){status='skipped';reason='unsupported';}
+              else if(['completed','interrupted','failed'].includes(result.status)){
+                status=result.status;reason=typeof result.reason==='string'&&/^[a-z_]{1,48}$/.test(result.reason)?result.reason:status==='completed'?'done':'error';
+              }else{status='failed';reason='invalid_result';}
+            }}
           catch(error){status='failed';reason=error?.message==='timeout'?'timeout':'error';}
           if(abort.signal.aborted){status='interrupted';reason=item.reason;}
           item.done.add(i);await emit(plan.id,i,status,reason);

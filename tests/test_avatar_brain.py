@@ -308,3 +308,21 @@ def test_user_turn_delay_and_completed_plan_not_reoffered(rig):
     now[0] += 301
     service.update_world(world())
     assert service.think()["decision"] is None
+
+
+@pytest.mark.parametrize("name", ["nod", "small_nod", "nod_double", "wave", "stretch", "yawn", "shake_head", "think", "happy", "surprised", "shy", "sad", "tilt_head", "idle_reset"])
+def test_model_gesture_vocabulary(name):
+    w = sanitize_world(world(scene="live2d", gestures=[name, "execute_file"]))
+    assert w["gestures"] == [name]
+    action = {"type": "gesture", "name": name}
+    assert validate_decision({"actions": [action]}, w)["actions"] == [action]
+    assert validate_decision({"actions": [action]}, {**w, "gestures": []})["actions"] == []
+
+
+@pytest.mark.parametrize("target", ["left", "right", "up", "down"])
+def test_scene_specific_gaze(target):
+    action = {"type": "look_at", "target": target}
+    assert validate_decision({"actions": [action]}, world(scene="live2d"))["actions"] == [action]
+    assert validate_decision({"actions": [action]}, world())["actions"] == []
+    assert validate_decision({"actions": [{"type": "look_at", "target": "window"}]}, world(scene="live2d"))["actions"] == []
+    assert "Live2D look_at supports user/left/right/up/down" in prompt(world(scene="live2d"))

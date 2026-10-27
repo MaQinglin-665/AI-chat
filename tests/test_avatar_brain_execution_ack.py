@@ -43,3 +43,15 @@ def test_reply_survives_busy_heartbeats_and_runs_with_its_speech():
     assert service.poll()['plans'][0]['id'] == plan['id']
     service.update_world(world(typing=True, idle_sec=0))
     assert service.poll()['plans'] == []
+
+
+def test_renderer_failure_reason_is_preserved_without_raw_details():
+    service = AvatarBrain(config, lambda *a: json.dumps(decision()), lambda *a: None)
+    service.update_world(world())
+    plan = service.think()['decision']
+    service.acknowledge(plan['id'], started=True)
+    service.acknowledge(plan['id'], outcomes=[{'index': 0, 'status': 'failed', 'reason': 'clock_stalled'},
+                                            {'index': 1, 'status': 'failed', 'reason': 'private detail'}])
+    terminal = service.plans[plan['id']]['outcomes']
+    assert terminal[0]['reason'] == 'clock_stalled'
+    assert terminal[1]['reason'] == 'error'
