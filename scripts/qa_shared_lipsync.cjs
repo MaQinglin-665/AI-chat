@@ -1,10 +1,10 @@
 "use strict";
 // Local-only deterministic playback comparison. No account, private config or
-// remote TTS access. Real models stay ignored; #217 overlay never enters this PR.
+// remote TTS access. Real models stay ignored; both sides use merged main assets.
 const fs = require("node:fs"), path = require("node:path"), http = require("node:http");
 const { execFileSync } = require("node:child_process"), assert = require("node:assert/strict");
 const repo = path.resolve(__dirname, ".."), out = process.env.LIPSYNC_QA_OUTPUT || path.join(repo, "tmp_ui_smoke/shared-lipsync");
-const baseRef = process.env.LIPSYNC_QA_BASE || "2b67452", adapterRef = process.env.LIPSYNC_QA_ADAPTER || "0c08c3d";
+const baseRef = process.env.LIPSYNC_QA_BASE || "9d09edc", adapterRef = process.env.LIPSYNC_QA_ADAPTER || baseRef;
 process.env.PLAYWRIGHT_BROWSERS_PATH ||= path.join(repo, ".local-tools/playwright-browsers");
 const { chromium } = require(path.join(repo, "docs/node_modules/@playwright/test"));
 const audioDuration = Number(process.env.LIPSYNC_QA_AUDIO_SECONDS || 12.199818594104308), fps = 20;
@@ -23,10 +23,11 @@ function html(model, before) {
 <script>window.virtualNow=1000;Object.defineProperty(performance,'now',{value:()=>virtualNow});window.requestAnimationFrame=()=>1;window.cancelAnimationFrame=()=>{};
 Object.defineProperty(window,'speechSynthesis',{value:{speaking:false,resume(){},cancel(){this.speaking=false},speak(u){this.speaking=true;window.utterance=u}}});
 window.SpeechSynthesisUtterance=class{constructor(text){this.text=text}};</script>
-${["vendor/pixi.min.js", "vendor/pixi-unsafe-eval.min.js", "vendor/live2dcubismcore.min.js", "vendor/cubism4.min.js", "vendor/vrm/vrm-vendor.js", "avatar/vrmRenderer.js", "avatar/live2dModelDriver.js"].map(f=>`<script src="/shared/${f}"></script>`).join("")}
+${["vendor/pixi.min.js", "vendor/pixi-unsafe-eval.min.js", "vendor/live2dcubismcore.min.js", "vendor/cubism4.min.js", "vendor/vrm/vrm-vendor.js", "avatar/vrmRenderer.js", "avatar/live2dMapping.js", "avatar/live2dModelDriver.js"].map(f=>`<script src="/shared/${f}"></script>`).join("")}
 ${before ? "" : '<script src="/after/avatar/browserLipSync.js"></script>'}
 ${files.map(f=>`<script src="/${side}/${f}?model=${model}"></script>`).join("")}
 <script>(async()=>{try{
+await XinyuLive2DMapping.ready();
 const modelKind=${JSON.stringify(model)},before=${before},canvas=document.getElementById('canvas');
 const state={uiView:'full',config:{tts:{browser_lip_sync_delay_ms:120}},ttsPlaybackGeneration:1,speakingEnabled:true,expressionEnabled:true,motionEnabled:true,expressionStrength:1,ttsAudioLevel:0,speechMouthOpen:0,speechMotionBlend:1,currentTalkStyle:'neutral',baseTransform:{x:320,y:600,rotation:0},availableMotionGroups:[],modelProfileName:'hiyori_pro_t11'};
 const mouth=TaffyLive2DExpressionController.createController({state,windowObject:window,performanceObject:performance,isSpeakingNow:()=>speechSynthesis.speaking,isSpeechMotionActive:()=>speechSynthesis.speaking});
@@ -80,13 +81,10 @@ const server=http.createServer((req,res)=>{
   else if(parts[0]==='local'){const name=parts.slice(1).join('/');assert(name==='Sendagaya_Shino.vrm'||name.startsWith('Mao/'));data=fs.readFileSync(path.join(repo,'models_local',name));type=/\.json$/.test(name)?'application/json':/\.png$/.test(name)?'image/png':'application/octet-stream'}
   else if(parts[0]==='hiyori'){data=fs.readFileSync(path.join(repo,'web/models/hiyori_pro_t11',...parts.slice(1)));type=/\.json$/.test(req.url)?'application/json':/\.png$/.test(req.url)?'image/png':'application/octet-stream'}
   else if(parts[0]==='shared'){data=git(adapterRef,'web/'+parts.slice(1).join('/'));if(req.url.endsWith('.json'))type='application/json'}
+  else if(parts[0]==='avatar'&&parts[1]==='mappings'){assert(['hiyori.json','mao.json'].includes(parts[2]));data=git(adapterRef,'web/'+parts.join('/'));type='application/json'}
   else if(parts[0]==='before'||parts[0]==='after'){
    const file='web/'+parts.slice(1).join('/'),before=parts[0]==='before';
    data=before?git(baseRef,file):fs.readFileSync(path.join(repo,file));
-   if(file==='web/avatar/avatarRuntime.js'&&url.searchParams.get('model')==='mao'){
-    data=git(adapterRef,file).toString();
-    if(!before)data=data.replace('  function createRuntime(root) {','  function createRuntime(root) {\n  const browserLipSync = root.XinyuBrowserLipSync;').replace('const level = fresh ? clamp(state.ttsAudioLevel) : 0;','const level = fresh ? browserLipSync.mouthLevel(state, now, state.ttsAudioLevel) : 0;');
-   }
   }else{res.writeHead(404);res.end();return}
   res.writeHead(200,{'Content-Type':type});res.end(data);
  }catch(error){res.writeHead(500);res.end(String(error.message))}

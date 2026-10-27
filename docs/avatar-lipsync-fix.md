@@ -69,3 +69,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-local.ps1
 已有docs Playwright/Chromium及本地三种模型时，`node scripts/qa_shared_lipsync.cjs` 生成左右对比JPEG序列和JSON；可用环境变量LIPSYNC_QA_OUTPUT改变输出目录，LIPSYNC_QA_SMOKE=1仅检查加载，LIPSYNC_QA_MODELS选择模型，LIPSYNC_QA_BASE/ADAPTER指定已存在的Git参考。视频使用相同参考WAV补1370ms静音再与20fps图像序列合成；不向应用接入合成音轨。
 
 本机已安装的Mao/120ms工作版本保持原样，没有把#217的回退版本覆盖安装。作者仍需在Windows原生应用听三种角色的实际设备声音，验证开始/结束与窗口切换；本次不声称完成该人工听感验收。不自行合并任一PR，不启动脑控第二期。
+
+
+## 2026-10-27 — #217 已合并后的实际统一入口复验
+
+#217由作者合并为main `9d09edc` 后，本分支正常merge为 `3aafe90`。旧文中的2b67452基线/0c08c3d临时组合页是历史验收；当前已直接使用main中的Hiyori/Mao/VRM真实代码，QA删除了Mao runtime字符串替换。PR相对当前main的产品diff仅包含共享口型修复及配置字段。
+
+- 冲突为三份状态记录，以及avatarRuntime构造入口和appStartup两组互补字段。保留main统一工厂、渲染器自己的时钟、五元音字段与显式意图优先级，同时保留#226浏览器口型选择、事件唤醒和长句500ms租约。表达控制器自动合并后确认显式mouth意图优先于浏览器估计。
+- 发现并修复组合边界：服务器音频切换到系统语音后，旧分析器的元音值可能残留。当前浏览器语音只产生张合、vowel=null；分析音频的五元音路径保持，广播的接收/发送和公共帧都有所有权判断。新增优先级和音频源切换回归，原FFT1024、25–350ms输出延迟、隐藏16ms计时器保留。
+- 三种真实本地模型各292帧/14.6秒前后复验通过，实际模型参数持续变化且尾段信号范围0.650747，结束关闭，无页面错误。已查看发声中画面，视频重新合成在仓库外outputs/pr226-main217/，使用相同参考音轨和受控时钟；不是原生Windows设备延迟测量。Mao不再依赖未合并文件或临时覆盖。
+- 完整scripts/test-local.ps1：**938Python通过/3跳过，75Node文件，语法Python195/JS246，秘密扫描858**；打包、必需JSON/py_compile通过。口型桥、跨窗口时钟、Mao映射/元音相关测试通过。
+- **未更新任何已有参数快照**。新增/扩展的是test_browser_lip_sync.js对显式意图、浏览器元音置空、残留分析器、长句跨窗口租约等时序断言。main继承的严格映射测试原文件/基线保留，随完整门禁执行并通过，但不作为“有意改变嘴型时机后仍等价”的证明。test_lip_sync_bridge_frontend.js、test_split_window_speech_timebase_frontend.js与main逐字节相同。
+
+后续正常push并等待该提交Linux/WindowsCI全部通过，用户将在自己的Windows实际听过后再由作者决定合并；不自行合并或更改本机安装。随后另从最新main建立friend/avatar-live2d-mao，用户已确认范围为真实五元音、8表情、3手势及配置切换验收/发现问题修复。Mao基础实现已在main，当前无fork远端，也没有曾经推送过独立Mao分支。

@@ -40,6 +40,9 @@ function harness(kind = "hiyori") {
     const pending = h.start(), utterance = h.utterances[0];
     assert.equal(h.synth.speaking, true);
     assert.equal(h.sample(1100), 0, "pending engine state cannot open mouth before onstart");
+    h.state.avatarIntentOverrides = { mouth: { open: .73, vowel: "i" } };
+    assert.equal(h.sample(1100), .73, "explicit intent retains main's precedence over browser timing");
+    delete h.state.avatarIntentOverrides;
     h.setNow(2000); utterance.onstart();
     assert.ok(h.posted.length > 1, "playback events must wake idle250ms speech bridge immediately");
     assert.equal(h.sample(2119), 0, "respect bounded device-start delay");
@@ -108,6 +111,14 @@ function harness(kind = "hiyori") {
     assert.equal(runtime.frameFromState(modelState, 1100).mouth.open, 0, "analysed silence must not inherit browser fallback");
     modelState.ttsBrowserMouthActive = "true";
     assert.equal(runtime.frameFromState(modelState, 1100).mouth.open, 0, "only an explicit validated browser flag owns remote mouth");
+    modelState.ttsAudioLevel = .7; modelState.ttsVowel = "i";
+    assert.equal(runtime.frameFromState(modelState, 1100).mouth.vowel, "i", "main analysed vowel path stays available");
+    modelState.ttsBrowserMouthActive = true;
+    assert.equal(runtime.frameFromState(modelState, 1100).mouth.vowel, null, "browser speech cannot inherit an old analysed vowel");
+    const switched = { ttsBrowserPlaybackToken: 1, ttsPlaybackGeneration: 1, ttsAudioLevel: .9, ttsVowel: "o" };
+    sync.begin(switched, { token: 1, generation: 1, delayMs: 120 }, 1000); sync.start(switched, 1, 1250);
+    assert.ok(runtime.frameFromState(switched, 1500).mouth.open > .01);
+    assert.equal(runtime.frameFromState(switched, 1500).mouth.vowel, null, "local shared frame clears stale server vowel after provider change");
     for (const delayMs of [-50, 0, 120, 500, 900]) {
       const state = { ttsBrowserPlaybackToken: 1, ttsPlaybackGeneration: 1 };
       sync.begin(state, { token: 1, generation: 1, delayMs }, 0); sync.start(state, 1, 250);
