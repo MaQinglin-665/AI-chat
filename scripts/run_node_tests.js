@@ -12,6 +12,7 @@ const tests = [
   "tests/test_live2d_mao_sequence.js",
   "tests/test_live2d_missing_model.js",
   "tests/test_live2d_gestures.js",
+  "tests/test_live2d_mapping_validator.js",
   "tests/test_avatar_vrm.js",
   "tests/test_avatar_scene.js",
   "tests/test_avatar_world.js",

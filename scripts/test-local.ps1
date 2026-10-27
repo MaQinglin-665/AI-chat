@@ -54,5 +54,7 @@ Invoke-Step "Check Python syntax" (@($python) + @("scripts/check_python_syntax.p
 Invoke-Step "Check JavaScript syntax" (@($python) + @("scripts/check_js_syntax.py"))
 Invoke-Step "Check committed secrets" (@($python) + @("scripts/check_secrets.py"))
 
+Invoke-Step "Validate Live2D mappings and available model references" (@(Resolve-ProjectNodeCommand -Tool "node") + @("scripts/validate_live2d_mapping.js", "--all"))
+
 Write-Host ""
 Write-Host "[OK] Local validation complete." -ForegroundColor Green

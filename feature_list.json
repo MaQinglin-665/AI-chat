@@ -1,6 +1,25 @@
 {
   "features": [
     {
+      "id": "live2d-model-onboarding-template",
+      "name": "New Live2D mapping template and model-reference validator in CI",
+      "status": "completed",
+      "dependencies": [
+        "live2d-action-vocabulary"
+      ],
+      "done_criteria": [
+        "Document local model placement, permissions, mapping, exact comparisons and recordings",
+        "Reusable mapping template; JSON/alias/action validation and actual model parameter/group reference checks",
+        "Validator in Linux/Windows CI, regression/full/package gates, independent stacked PR"
+      ],
+      "verification": [
+        "ActualCore references Hiyori/Mao pass; template-realHiyori pass; invalid actual Mao param/motion fail with exit1; malformed schema/path/missing and metadata tests pass",
+        "Full937/3skip/78Node,syntax194/250,secrets866,package/JSON/compile pass; CI Linux+Windows validator added; no model download/config reads",
+        "2026-10-27 stacked merge sync: 从更新后的PR229分支8a9ec9e执行merge，含main d63d077；仅progress/session两份状态冲突，保留双方历史，无代码手工取舍。Python源码与已验证943/3skip的228完全相同；test-local -SkipPytest全部79 Node文件、语法195/253、secrets871、真实Hiyori/Mao参数引用与模板结构校验通过；first-run package、样例JSON、py_compile通过。Hiyori5280/394224、Mao协议1440/25850及实际Core6/Mao181030严格序列通过，旧fixture/快照未改。日志work/live2d-stack-230-*.log。待正常push/三条当前head Linux+WindowsCI；作者228→229→230合并，不自动合并。"
+      ],
+      "next": "Normal push PR230, verify current-head Linux/Windows CI; author merges 228 -> 229 -> 230. Main d63d077 integrated; no self merge."
+    },
+    {
       "id": "live2d-action-vocabulary",
       "name": "Live2D model-independent gesture vocabulary and lookAt",
       "status": "completed",
@@ -925,5 +944,5 @@
       ]
     }
   ],
-  "active_task": "live2d-action-vocabulary"
+  "active_task": "live2d-model-onboarding-template"
 }

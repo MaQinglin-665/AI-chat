@@ -38,6 +38,9 @@ jobs:
       - name: Run secret scan
         run: python scripts/check_secrets.py
 
+      - name: Validate Live2D mapping structure and available model references
+        run: node scripts/validate_live2d_mapping.js --all
+
   python-tests:
     name: Python Tests
     runs-on: ubuntu-latest
@@ -108,6 +111,9 @@ jobs:
       - name: Run source-test first-run package smoke
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_first_run_package.ps1
+
+      - name: Validate Live2D mapping structure and available model references (Windows)
+        run: node scripts/validate_live2d_mapping.js --all
 
       - name: Install NSIS
         shell: powershell

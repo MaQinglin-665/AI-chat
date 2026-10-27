@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "kind": "live2d",
+  "id": "new-model-template",
+  "model": "NewModel/NewModel.model3.json",
+  "driver": "mapped",
+  "params": {
+    "angleX": "ParamAngleX",
+    "angleY": "ParamAngleY",
+    "angleZ": "ParamAngleZ",
+    "eyeBallX": "ParamEyeBallX",
+    "eyeBallY": "ParamEyeBallY",
+    "mouthOpen": "ParamMouthOpenY"
+  },
+  "parts": {},
+  "capabilities": { "vowels": false, "armGestures": [], "fullBody": false, "locomotion": false },
+  "faces": {},
+  "modePoses": { "idle": {}, "listen": { "angleY": 1.5 }, "think": { "angleZ": 3 }, "speak": {} },
+  "deliveryPoses": { "neutral": {} },
+  "speechGesturePoses": { "nod": { "angleY": -5 } },
+  "actions": {},
+  "gestureVocabulary": {
+    "nod": { "durationMs": 900, "keyframes": [
+      { "at": 0, "values": { "angleY": 0 } },
+      { "at": 0.45, "values": { "angleY": -5 } },
+      { "at": 1, "values": { "angleY": 0 } }
+    ] },
+    "shake_head": { "durationMs": 1200, "keyframes": [
+      { "at": 0, "values": { "angleX": 0 } },
+      { "at": 0.25, "values": { "angleX": -7 } },
+      { "at": 0.7, "values": { "angleX": 7 } },
+      { "at": 1, "values": { "angleX": 0 } }
+    ] },
+    "tilt_head": { "durationMs": 1200, "keyframes": [
+      { "at": 0, "values": { "angleZ": 0 } },
+      { "at": 0.45, "values": { "angleZ": 6 } },
+      { "at": 1, "values": { "angleZ": 0 } }
+    ] },
+    "idle_reset": { "durationMs": 0 }
+  },
+  "metadata": {
+    "name": "请填写模型名称",
+    "authors": ["请填写模型作者"],
+    "source": "",
+    "conditions": { "licenseName": "请核对许可并填写", "creditNotation": "required" },
+    "readme": "接入者须自行核对使用、演示和再分发权限；此模板不授予任何模型权利。"
+  }
+}

@@ -1,4 +1,37 @@
 # Current — 三条 Live2D PR 顺序同步
+## 2026-10-27 — PR #230 按叠加顺序同步（本次指令）
+作者已合并 #226；最新 origin/main 为 d63d077。本分支 friend/live2d-model-template 使用 merge 同步；保留三个状态文件双方任务与验证历史，不改写产品逻辑、测试快照或基线。本次记录优先于历史中的待合并 #226 等旧指令。
+下一步：本地检查后正常推送，按 #228 → #229 → #230 传播合并并核对各自当前提交 Linux/Windows CI。不 rebase、不 force push、不推 main、不自行合并 PR。
+
+以下为保留的历史记录；本次同步指令优先。
+
+# Current — 长线三阶段已发布，作者按228→229→230验收合并
+## 三阶段 PR 已发布 — 最终接手记录
+- 阶段0：#226 friend/lipsync-fix8723067，包含main9d09edc，全部Linux/WindowsCI成功；等待用户Windows试听，未合并。
+- 阶段1：#228 friend/avatar-live2d-mao9406ea4，base main，纯映射/缺模型/严格对照/40秒有声录像，全部CI成功。
+- 阶段2：#229 friend/live2d-action-vocab da948e7，base friend/avatar-live2d-mao；先文档Draft2aac49f再实现10词/Promise/lookAt，两模型完整录像，全部CI成功。保留Draft供作者接口审阅。
+- 阶段3：#230 friend/live2d-model-template，base friend/live2d-action-vocab；接入指南/模板/真实参数与动作引用校验/CI。完整937Python/3skip/78Node、打包/JSON/compile、本地实际Hiyori/Mao及反例校验通过。
+- 最终CI以各PR当前head检查及仓库外outputs/live2d-longline/stage{1,2,3}/ci-final.json为准。重启时先核对当前head/main及CI，不创建重复PR、不自己合并。作者按228→229→230顺序合并；父PR合并后同步最新main并调整子PR base，不force push。
+- 录像位于原仓库草稿验收附件（需作者登录写权限，未发布产品）：https://github.com/MaQinglin-665/AI-chat/releases/tag/untagged-d2ff791d304d9886571a 。Mao-stage1-40s-20261027.mp4、Hiyori-vocabulary-final-20261027.mp4、Mao-vocabulary-final-20261027.mp4；都是受控真实模型演示/本机SAPI音轨，不冒充原生设备语音时延验收。模型/私密配置/Key/日志/媒体未提交，无VRM/房间/后端brain改动。
+- 下一步只等当前提交全CI完成并报告，再由作者进行Windows实际语音、拖拽/穿透与接口/许可审查；没有授权自动合并或继续其他任务。
+
+历史证据保留如下。
+
+# Current — 三阶段本地完成，阶段3待发布/CI
+## 长线阶段3完成检查点 — 模板与CI校验
+新增docs/live2d-new-model-guide.md、mappings/template.json、scripts/validate_live2d_mapping.js及错误引用回归；Linux质量门禁、Windows兼容门禁和test-local都运行--all。无运行时/VRM/房间/后端brain/路由/ws改动。
+校验1MiB JSON结构/别名/姿态/词表时长与口型所有权；显式模型或本地可用模型时用已有Core读取实际moc参数/部件，并检查清单表达式/动作组/下标/完整资源及路径边界。无本地模型时明确STRUCTURE_ONLY/modelChecked:false，不下载模型、不读取私人配置、不作许可判断。模板只是四词示例，未支持词省略后unsupported。
+Verification Evidence：本机真实Hiyori/Mao引用全部通过；模板配真实Hiyori通过；故意不存在的Mao参数与动作组均按预期exit1。错误JSON/参数别名/组/下标/表情/部件/嘴型/路径/缺资源回归通过。完整test-local937Python/3skip/78Node，语法194/250，secrets866；首次运行包/必需JSON/py_compile通过，后增metadata错误断言单独通过。模板无模型只结构通过，明确未作模型检查。参考代码/模型资源/私密配置不新增提交。
+阶段1 #2289406ea4、阶段2 #229da948e7当前Linux/WindowsCI均全成功，均未合并；229保留Draft给作者接口审阅。阶段3从229分支独立堆叠PR，按228→229→本PR顺序合并，父分支合并后同步main/调整base。录像复用前两阶段草稿审查附件（本PR无视觉变更），不声称新录制。下一步推送/创建PR/全CI后停下，作者验收合并，不force/mainpush。
+
+
+# Current — 阶段3模板与CI校验
+## 长线阶段3开始
+从已推送的friend/live2d-action-vocab da948e7建立friend/live2d-model-template，base依赖229（229依赖228）。只做接入文档/映射模板/校验脚本/CI及测试，不修改渲染器/VRM/房间/brain。校验明确区分无模型的结构检查与实际moc参数、manifest动作组检查，不下载模型或读取私密配置。前两阶段已发布，CI分别独立核对，作者按序合并。
+
+下一步实现校验与模板，运行真实Hiyori/Mao及错误引用回归，再完整门禁/独立PR/全CI，不自行合并。
+
+# Current — 三条 Live2D PR 顺序同步
 ## 2026-10-27 — PR #229 按叠加顺序同步（本次指令）
 作者已合并 #226；最新 origin/main 为 d63d077。本分支 friend/live2d-action-vocab 使用 merge 同步；保留三个状态文件双方任务与验证历史，不改写产品逻辑、测试快照或基线。本次记录优先于历史中的待合并 #226 等旧指令。
 下一步：本地检查后正常推送，按 #228 → #229 → #230 传播合并并核对各自当前提交 Linux/Windows CI。不 rebase、不 force push、不推 main、不自行合并 PR。
@@ -386,3 +419,5 @@ Fresh #225 merge validation: 912 passed, 3 skipped; all Node/syntax/secrets and 
 Verification Evidence（本次叠加同步）：main d63d077 merged; scripts/test-local.ps1 全部通过：943 Python/3 skip，77 Node 文件，语法195/249，secrets864；Hiyori严格5280帧/394224调用，Mao协议1440/25850及真实Core6/Mao1440/181030，完整顺序与快照均严格一致；first-run package、公开样例JSON与py_compile通过。初次沙箱权限/临时路径失败后正常Windows权限重跑通过。日志 work/live2d-stack-228-full-retry.log、live2d-stack-228-package-retry.log；既有快照和基线未改，待正常推送及当前提交CI。
 
 Verification Evidence（本次叠加同步）：从更新后的PR228分支65e5266执行merge，含main d63d077；仅progress/session两份状态冲突，保留双方记录，运行时代码自动合并。Python源码与已验证943/3skip的228完全相同；本分支test-local -SkipPytest的全部78 Node、语法195/251、secrets867通过，包括词表/共享口型及Hiyori5280/394224、Mao1440/25850与本机181030严格对照；first-run package、样例JSON、py_compile通过。既有快照未改；日志work/live2d-stack-229-*.log。待正常push/当前head Linux+WindowsCI，作者按序合并。
+
+Verification Evidence（本次叠加同步）：从更新后的PR229分支8a9ec9e执行merge，含main d63d077；仅progress/session两份状态冲突，保留双方历史，无代码手工取舍。Python源码与已验证943/3skip的228完全相同；test-local -SkipPytest全部79 Node文件、语法195/253、secrets871、真实Hiyori/Mao参数引用与模板结构校验通过；first-run package、样例JSON、py_compile通过。Hiyori5280/394224、Mao协议1440/25850及实际Core6/Mao181030严格序列通过，旧fixture/快照未改。日志work/live2d-stack-230-*.log。待正常push/三条当前head Linux+WindowsCI；作者228→229→230合并，不自动合并。
