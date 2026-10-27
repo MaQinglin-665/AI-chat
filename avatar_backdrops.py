@@ -52,6 +52,14 @@ def select(config, root, period):
                 raise AvatarPathError("Backdrop images must not be links.")
             if candidate.is_file():
                 return candidate, name
+    # Bundled files are fixed application assets, never an HTTP-supplied path.
+    bundled = Path(root) / "web/assets/backgrounds/bedroom"
+    for name in [period, *[p for p in PERIODS if p != period]]:
+        candidate = bundled / (name + ".webp")
+        if any(_is_link(part) for part in [candidate, *candidate.parents]):
+            raise AvatarPathError("Bundled backdrop must not contain links.")
+        if candidate.is_file():
+            return candidate, name
     return Path(root) / "web/assets/painted-placeholder.png", period
 
 
@@ -60,15 +68,25 @@ def dispatch(handler, config, root, route):
         path, period = select(config, root, ROUTES[route])
         with path.open("rb") as stream:
             size = os.fstat(stream.fileno()).st_size
-            header = stream.read(24)
-            if size > MAX_BYTES or len(header) < 24 or header[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
-                raise AvatarPathError("Invalid or oversized backdrop PNG.")
-            width, height = struct.unpack(">II", header[16:24])
+            header = stream.read(40)
+            if size > MAX_BYTES:
+                raise AvatarPathError("Oversized backdrop.")
+            if path.suffix == ".webp":
+                # Bundled quality-90 WebP uses the lossy VP8 bitstream; local overrides remain PNG.
+                if len(header) < 30 or header[:4] != b"RIFF" or header[8:16] != b"WEBPVP8 " or header[23:26] != b"\x9d\x01\x2a":
+                    raise AvatarPathError("Invalid bundled WebP.")
+                width, height = (n & 0x3fff for n in struct.unpack("<HH", header[26:30]))
+                mime = "image/webp"
+            else:
+                if len(header) < 24 or header[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
+                    raise AvatarPathError("Invalid backdrop PNG.")
+                width, height = struct.unpack(">II", header[16:24])
+                mime = "image/png"
             if not width or not height or width * height > MAX_PIXELS:
                 raise AvatarPathError("Invalid backdrop dimensions.")
             stream.seek(0)
             handler.send_response(200)
-            for key, value in (("Content-Type", "image/png"), ("Content-Length", str(size)),
+            for key, value in (("Content-Type", mime), ("Content-Length", str(size)),
                                ("X-Content-Type-Options", "nosniff"), ("Cache-Control", "no-store"),
                                ("X-Backdrop-Period", period)):
                 handler.send_header(key, value)

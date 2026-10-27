@@ -143,3 +143,7 @@ Changes in Xinyu (2026-10-26):
 - Replace PBR materials with unlit base-color materials; apply interpolated cool/night and warm/day tint. Tag window and pendant-light meshes as future bloom sources; no bloom effect yet.
 - Add a separate CC0 KayKit chair. Character, camera, lights, paths and animation are application additions, not part of the original work.
 - Original download outside the repository remains unchanged.
+
+## AI-generated bedroom background images
+
+Files: `web/assets/backgrounds/bedroom/{day,dusk,night}.webp`. User-provided AI-generated images, authorized by the user for repository publication and application packaging on 2026-10-26. Converted from local PNG originals to quality-90 WebP at 2560×1440; originals are not included. Provenance and SHA-256 manifest are beside the assets. This note does not independently verify the generating platform terms or assert a separate CC0 license. These images are unrelated to the CC BY 3D room preset `handpainted`.

@@ -821,6 +821,34 @@
         "No avatarRuntime.js or vrmRenderer.js changes; remaining frontend phase 2 waits for #217",
         "908 passed, 3 skipped, 1 warning; all Node/syntax/secrets and first-run package checks passed; fake model only; draft PR delivery"
       ]
+    },
+    {
+      "id": "backdrop-assets-v2",
+      "name": "Compressed AI bedroom backgrounds and Hiyori CSS integration",
+      "status": "complete",
+      "dependencies": [
+        "merged #221"
+      ],
+      "done_criteria": [
+        "Clean main-based ancestry excludes original PNG blobs",
+        "Quality-90 WebP at original size with before/after visual comparison",
+        "Control-center default-off bedroom switch; period canvas filters and layout-following shadow",
+        "Full gates, draft replacement PR, comment and close #223 without merge"
+      ],
+      "verification": [
+        "845 Python passed / 3 skipped; full Node/syntax/secrets and package smoke passed",
+        "q90 WebP: night 597636, dusk 572028, day 617396 bytes, all 2560x1440",
+        "Same-pose PNG/WebP and three-period appearance pairs; no noticeable normal-size difference; zero page errors",
+        "Real layout/control-center fixture verified default-off, foot coordinate resize/position sync, disable restores baseline filter, pet exclusion",
+        "#225 color follow-up: alpha-preserving sRGB matrix, saturation >= 1; interruption/reset tests and full gate 845/3 passed; three periods with 3x face/clothes/feet crops",
+        "User accepted #225; main 1ab5d38 integrated with only state conflicts; fresh full gate 912 passed, 3 skipped and package smoke passed"
+      ],
+      "limitations": [
+        "Lossy compression, not pixel identical",
+        "3 percent model-bottom inset calibrated for shipped Hiyori; other models may need adjustment",
+        "CSS grading is global canvas tint, not physically directional lighting"
+      ]
     }
-  ]
+  ],
+  "active_task": "avatar-live2d-pr217-closeout"
 }
