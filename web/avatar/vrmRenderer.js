@@ -15,7 +15,8 @@
     seed: 23017
   });
   const WORLD_VISUAL = Object.freeze({bookSize:[.13,.018,.19],bookPosition:[0,-.025,.055],bookColor:0x9f7fa9,gazeDistance:2,gazeHeight:.9,chinDrop:.04,chinForward:.07,lapLift:.045,elbowPadding:.025,deskHand:[.32,.775,.08],lookSpine:.65,lookHead:1.1});
-  const QUALITY = Object.freeze({ pixelBudget: 900000, minDpr: 1, maxDpr: 1.25, idleFps: 20, activeFps: 30 });
+  const QUALITY = Object.freeze({ pixelBudget: 900000, minDpr: 1, maxDpr: 1.25, idleFps: 25, activeFps: 60,
+    idleDelayMs: 3000, frameToleranceMs: 0.5, cameraMotionEpsilon: 0.00001 });
   const CAMERA = Object.freeze({ fov: 27, eyeLift: 0.035, bottom: 0.40, top: 1.16, face: 0.91, faceScreenY: 1 / 3 });
   const STANCE = Object.freeze({ yaw: 15 * Math.PI / 180, headReturn: 0.9,
     hipShift: 0.012, hipTilt: 0.035, shoulderTilt: -0.025, shoulderDrop: 0.004,
@@ -259,8 +260,21 @@
     });
   }
 
+  function createFramePacer() {
+    let lastActive = null, lastRender = null, wasActive = false;
+    return { step(now, active) {
+      if (lastActive === null || active) lastActive = now;
+      const fps = now - lastActive < QUALITY.idleDelayMs ? QUALITY.activeFps : QUALITY.idleFps;
+      const wake = active && !wasActive; wasActive = active;
+      const due = lastRender === null || wake || now - lastRender + QUALITY.frameToleranceMs >= 1000 / fps;
+      // Keep the simulation timestamp intact on rate changes; never reset the camera/world clock.
+      if (due) lastRender = now;
+      return { fps, due };
+    } };
+  }
   function startClock(renderer, produceFrame, { state }, host = root) {
     let disposed = false, raf = 0, wakeTimer = 0, lastFrame = 0;
+    const pacer = createFramePacer();
     function tick(now) {
       if (disposed) return;
       if (state.rendererSurfaceActive === false || host.document.hidden) {
@@ -270,10 +284,12 @@
       raf = host.requestAnimationFrame(tick);
       if (state.uiView !== "model") host.sampleTTSAudioLevel?.();
       const frame = produceFrame(now);
-      const fps = frame.mouth?.open > 0.02 || renderer.isAnimating?.() ? QUALITY.activeFps : QUALITY.idleFps;
-      const interval = 1000 / fps, elapsed = now - lastFrame;
-      if (elapsed < interval) return;
-      lastFrame = now - elapsed % interval;
+      const active = !!(frame.mode === "speak" || frame.preparingSpeech || frame.interaction || frame.mouth?.open > 0.02
+        || state.ttsContextSpeaking || state.streamSpeakWorking || state.speechPhase === "speaking"
+        || state.dragData || state.windowDragActive || renderer.isAnimating?.());
+      const cadence = pacer.step(now, active);
+      if (!cadence.due) return;
+      lastFrame = now;
       renderer.update(frame);
     }
     raf = host.requestAnimationFrame(tick);
@@ -562,7 +578,12 @@
       capabilities: () => ({ ...(driver?.capabilities() || { vowels: false, faces: [], actions: [], vrma: false }), fullBody: !!world, locomotion: !!world }),
       playAction: (...args) => driver?.playAction(...args) || false,
       stopAction: () => driver?.stopAction(),
-      isAnimating: () => worldState?.moving || driver?.isAnimating() || false,
+      isAnimating: () => {
+        const c = cameraController?.snapshot();
+        return !!(worldState?.moving || ["prepare", "walk", "rise"].includes(worldState?.phase)
+          || (worldState?.blend > 0 && worldState.blend < 1) || driver?.isAnimating()
+          || c?.value.some((v,i) => Math.abs(v-c.goal[i]) + Math.abs(c.velocity[i]) > QUALITY.cameraMotionEpsilon));
+      },
       metrics: () => ({ loadMs, loadedAt, frames, pixelRatio: renderer?.getPixelRatio(),
         antialias: renderer?.getContext().getContextAttributes()?.antialias,
         drawCalls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles, smallMotion: driver?.motionState(),
@@ -572,7 +593,7 @@
     };
     return avatar;
   }
-  const api = { createRenderer, startClock, createIntentDriver, poseAt, smallMotionAt, randomAt,
+  const api = { createRenderer, startClock, createFramePacer, createIntentDriver, poseAt, smallMotionAt, randomAt,
     pixelRatioFor, cameraFraming, hitSegments, smoothCutoutEdges, saccadeAt, gradeRoomMaterials, STANCE, EXPRESSION, MOTION, QUALITY, CAMERA, LIGHT };
   root.XinyuVRMRenderer = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

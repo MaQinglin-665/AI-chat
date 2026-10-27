@@ -178,7 +178,7 @@
       }
       const frame = { ...frameFromState(state, now, Date.now(), prepareMs), gaze, ...intent, now };
       frame.preparingSpeech ||= now < prepareUntil;
-      frame.interaction = now < inputUntil || state.chatBusy === true || ["hearing","release"].includes(state.listeningPresencePhase) || frame.mouth?.open > .02;
+      frame.interaction = dragging || now < inputUntil || state.chatBusy === true || ["hearing","release"].includes(state.listeningPresencePhase) || frame.mouth?.open > .02;
       return frame;
     };
     const stopClock = renderer.startClock?.(now => {
