@@ -1,3 +1,17 @@
+# Current — 三阶段本地完成，阶段3待发布/CI
+## 长线阶段3完成检查点 — 模板与CI校验
+新增docs/live2d-new-model-guide.md、mappings/template.json、scripts/validate_live2d_mapping.js及错误引用回归；Linux质量门禁、Windows兼容门禁和test-local都运行--all。无运行时/VRM/房间/后端brain/路由/ws改动。
+校验1MiB JSON结构/别名/姿态/词表时长与口型所有权；显式模型或本地可用模型时用已有Core读取实际moc参数/部件，并检查清单表达式/动作组/下标/完整资源及路径边界。无本地模型时明确STRUCTURE_ONLY/modelChecked:false，不下载模型、不读取私人配置、不作许可判断。模板只是四词示例，未支持词省略后unsupported。
+Verification Evidence：本机真实Hiyori/Mao引用全部通过；模板配真实Hiyori通过；故意不存在的Mao参数与动作组均按预期exit1。错误JSON/参数别名/组/下标/表情/部件/嘴型/路径/缺资源回归通过。完整test-local937Python/3skip/78Node，语法194/250，secrets866；首次运行包/必需JSON/py_compile通过，后增metadata错误断言单独通过。模板无模型只结构通过，明确未作模型检查。参考代码/模型资源/私密配置不新增提交。
+阶段1 #2289406ea4、阶段2 #229da948e7当前Linux/WindowsCI均全成功，均未合并；229保留Draft给作者接口审阅。阶段3从229分支独立堆叠PR，按228→229→本PR顺序合并，父分支合并后同步main/调整base。录像复用前两阶段草稿审查附件（本PR无视觉变更），不声称新录制。下一步推送/创建PR/全CI后停下，作者验收合并，不force/mainpush。
+
+
+# Current — 阶段3模板与CI校验
+## 长线阶段3开始
+从已推送的friend/live2d-action-vocab da948e7建立friend/live2d-model-template，base依赖229（229依赖228）。只做接入文档/映射模板/校验脚本/CI及测试，不修改渲染器/VRM/房间/brain。校验明确区分无模型的结构检查与实际moc参数、manifest动作组检查，不下载模型或读取私密配置。前两阶段已发布，CI分别独立核对，作者按序合并。
+
+下一步实现校验与模板，运行真实Hiyori/Mao及错误引用回归，再完整门禁/独立PR/全CI，不自行合并。
+
 # Current — 阶段2实现完成，229待push/CI；接阶段3模板
 ## 阶段2实现检查点 — #229
 先以2aac49f发布接口文档Draft229，再实现live2dGestures及两模型10词映射。Promise区分completed/interrupted/unsupported/failed，最新支持调用替换、取消/停止/卸载/超时均结束；lookAt支持user/方向/reset/CSS屏幕坐标，参数写入只走原pre-Core。没有手势时严格Hiyori5280/394224、Mao1440/181030保持。共享avatarRuntime仅加可选转发/原事件gesture/look_at字段；无VRM/房间/brain/ws/路由改动。

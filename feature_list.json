@@ -1,6 +1,24 @@
 {
   "features": [
     {
+      "id": "live2d-model-onboarding-template",
+      "name": "New Live2D mapping template and model-reference validator in CI",
+      "status": "completed",
+      "dependencies": [
+        "live2d-action-vocabulary"
+      ],
+      "done_criteria": [
+        "Document local model placement, permissions, mapping, exact comparisons and recordings",
+        "Reusable mapping template; JSON/alias/action validation and actual model parameter/group reference checks",
+        "Validator in Linux/Windows CI, regression/full/package gates, independent stacked PR"
+      ],
+      "verification": [
+        "ActualCore references Hiyori/Mao pass; template-realHiyori pass; invalid actual Mao param/motion fail with exit1; malformed schema/path/missing and metadata tests pass",
+        "Full937/3skip/78Node,syntax194/250,secrets866,package/JSON/compile pass; CI Linux+Windows validator added; no model download/config reads"
+      ],
+      "next": "Push independent stacked template PR base229; all CI then author merges228->229->template.226 is CIgreen, user listens; no selfmerge."
+    },
+    {
       "id": "live2d-action-vocabulary",
       "name": "Live2D model-independent gesture vocabulary and lookAt",
       "status": "completed",
@@ -897,5 +915,5 @@
       ]
     }
   ],
-  "active_task": "live2d-action-vocabulary"
+  "active_task": "live2d-model-onboarding-template"
 }
