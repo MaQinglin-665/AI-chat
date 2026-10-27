@@ -161,43 +161,59 @@ def prompt(world, *, proactive=False):
 
 
 class ReplyFilter:
-    """Incremental trailing-control filter; ordinary text retains exact characters."""
+    """Remove bounded control blocks wherever emitted, preserving surrounding text."""
     def __init__(self, config):
         self.config = config
         self.pending = ""
         self.control = None
         self.oversize = False
 
-    def feed(self, text):
-        if self.control is not None:
-            if len(self.control) + len(text) <= MAX_MODEL_CHARS:
-                self.control += text
-            else:
-                self.oversize = True
-            return ""
-        self.pending += text
-        index = self.pending.find(OPEN)
-        if index >= 0:
-            visible, rest = self.pending[:index], self.pending[index + len(OPEN):]
-            self.pending = ""
-            self.control = ""
-            self.feed(rest)
-            return visible
+    @staticmethod
+    def _partial(text, marker):
         keep = 0
-        for length in range(1, min(len(OPEN), len(self.pending) + 1)):
-            if self.pending.endswith(OPEN[:length]):
+        for length in range(1, min(len(marker), len(text) + 1)):
+            if text.endswith(marker[:length]):
                 keep = length
-        visible = self.pending[:-keep] if keep else self.pending
-        self.pending = self.pending[-keep:] if keep else ""
-        return visible
+        return keep
+
+    def _append_control(self, text):
+        if not self.oversize and len(self.control) + len(text) <= MAX_MODEL_CHARS:
+            self.control += text
+        else:
+            self.oversize = True
+
+    def feed(self, text):
+        self.pending += text
+        visible = []
+        while self.pending:
+            marker = CLOSE if self.control is not None else OPEN
+            index = self.pending.find(marker)
+            if index >= 0:
+                part, self.pending = self.pending[:index], self.pending[index + len(marker):]
+                if self.control is None:
+                    visible.append(part)
+                    self.control, self.oversize = "", False
+                else:
+                    self._append_control(part)
+                    if not self.oversize:
+                        decision = parse_decision(self.control, self.config["_avatar_brain_world"])
+                        decision["say"] = ""
+                        self.config["_avatar_brain_result"] = decision
+                    self.control = None
+                continue
+            keep = self._partial(self.pending, marker)
+            part = self.pending[:-keep] if keep else self.pending
+            self.pending = self.pending[-keep:] if keep else ""
+            if self.control is None:
+                visible.append(part)
+            else:
+                self._append_control(part)
+            break
+        return "".join(visible)
 
     def finish(self):
-        control = self.control.rstrip() if self.control is not None else None
-        if control is not None and not self.oversize and control.endswith(CLOSE):
-            decision = parse_decision(control[:-len(CLOSE)], self.config["_avatar_brain_world"])
-            decision["say"] = ""
-            self.config["_avatar_brain_result"] = decision
-        return self.pending
+        # An unterminated control block remains hidden, including a partial close tag.
+        return self.pending if self.control is None else ""
 
 
 def extract_reply(text, config):

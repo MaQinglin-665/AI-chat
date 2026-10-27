@@ -11,3 +11,8 @@ Real DeepSeek daily acceptance: complete 600-second run in 612.56-second local-o
 Private evidence: tmp_ui_smoke/brain-executor/acceptance.json and video/page@cdaf0c9269238c004d33ea5a04a27d95.webm. Never upload these model-bearing images/videos to the PR. Earlier trial folders are failed/discarded evidence, not final acceptance.
 
 Draft PR only, do not merge. Author visual review and follow-up diagnosis of empty model replies remain. Preserve inherited pending PRIVATE-regex false-positive follow-up; do not expand scope into that change here.
+
+## PR231 pre-merge follow-up (current)
+Read docs/avatar-brain-executor-review.md. The earlier empty-reply uncertainty is resolved for a reproduced case: provider emitted plan before normal speech; ReplyFilter swallowed the trailing text. Fixed, chunk-boundary regressions pass, recorded raw replay restores 3 actions and speech. Ordinary A/B 0/5 each, extra night/window before fix 1/5 empty; after fix A/B 0/5 each. No private config was used.
+
+Existing rest-to-books camera crosses the left wall identically on baseline and PR; no furniture occlusion avoidance exists. Deferred under user's scope. Only new go_to-versus-sit camera framing changed (poseEnabled). Full test gate now 939 passed / 3 skipped, all Node/syntax/secrets pass. New 3-minute browser recording explicitly labels a fixed QA go_to/wait/sit plan and contains real DeepSeek chat; don't claim that fixture was model-selected. Evidence under tmp_ui_smoke/brain-executor-review, never upload private VRM media. Keep PR draft and wait for author.

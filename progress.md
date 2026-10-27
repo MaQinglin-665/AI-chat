@@ -1202,3 +1202,9 @@ Independent worktree from 9d09edc; dependencies copied with robocopy. No npm ci/
 - 935 Python tests passed / 3 skipped; all Node, syntax/secrets, source-package, installer, docs publish and 4 browser smoke tests passed. CI on 1ebd5ea was entirely green; final-head CI checked in draft PR.
 - Real daily run: 612.56s local-only video, 5 requests, 4550 tokens; 8 completed actions and 1 user interruption. No action timeout/browser exception. Two chat replies showed empty-model-content errors before a successful third reply; not hidden as a successful speech test.
 - Report: docs/avatar-brain-executor.md. Private media remains ignored. No user config/model changes, no main update, no merge. Author visual acceptance pending.
+
+### 2026-10-27 — PR231 pre-merge reply/camera review
+- Ordinary chat A/B 5+5: no empty output. Original request A/B 5+5: no empty output. Night/window reproduction: 1/5 empty with brain enabled; provider content had normal speech AFTER the control block, finish_reason=stop. ReplyFilter swallowed that speech. Fixed bounded block parsing for stream and non-stream, with every-boundary regression tests.
+- Exact failed provider response replay restores speech plus 3 actions. Fresh night/window A/B after fix: 0/5 empty in each group. Raw synthetic-response evidence is ignored and never committed.
+- Base/main vs PR rest-to-books camera trace identical: both cross the left wall for 343/3600 frames. Existing camera collision/occlusion and close framing are deferred, not changed here. New go_to standing-at-seat framing fixed by explicit poseEnabled; sit/random compatibility retained.
+- Full local validation: 939 passed, 3 skipped, all Node/syntax/secrets passed. See docs/avatar-brain-executor-review.md for the bounded real-video test; final CI remains visible in draft PR231. Do not merge.

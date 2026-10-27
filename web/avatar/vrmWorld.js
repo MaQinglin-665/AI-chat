@@ -152,7 +152,7 @@
         else phase=rawBlend>0?"rise":speed>MOTION.minSpeed?"walk":"prepare";
       }
       const moving=speed>MOTION.minSpeed;
-      return {position:[...position],yaw,name,poseName,poseAge,phase,moving,blend,age:(now-began)/1000,time:now/1000,holdUntil:hold,
+      return {position:[...position],yaw,name,poseName,poseAge,poseEnabled,phase,moving,blend,age:(now-began)/1000,time:now/1000,holdUntil:hold,
         speed,travel,gait:travel/MOTION.strideLength*Math.PI*2,variation:{...variation},headTurn,chestTurn,gazeYaw,pathYaw};
     }
     return { update, begin, interrupt:interact,

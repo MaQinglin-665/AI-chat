@@ -2,6 +2,13 @@
   "use strict";
   // Radians and model-height ratios. Keep all motion/quality tuning here.
   const ACTION_ARRIVAL_METERS = 0.04;
+  function worldCameraSeat(state, seats) {
+    // go_to only reaches a point; it must not frame a seated body before sit/activity.
+    return state?.poseEnabled === false ? null : seats?.[state?.name];
+  }
+  function worldCameraKey(state, locked) {
+    return state.name + (locked ? ':locked' : ':travel') + (state.poseEnabled === false ? ':standing' : '');
+  }
   function worldActionComplete(state, action, layout) {
     if (!state || state.moving) return false;
     if (action.type === "stand") return state.blend === 0;
@@ -558,14 +565,14 @@
         const cameraModule=options.cameraModule || root.XinyuVRMCamera;
         if(cameraModule){
           cameraController ||= cameraModule.create([...camera.position.toArray(),0,cameraHome.targetY,0]);
-          const seated=(activeLayout?.seats||seating.SEATS)[worldState.name];
+          const seated=worldCameraSeat(worldState,activeLayout?.seats||seating.SEATS);
           const locked=active && !worldState.moving && worldState.phase==='activity';
           // Seated framing uses immutable measured stature and the layout seat, not contact-solver corrections.
           const rootHeight=locked && seated && seatProfile ? floorY+seated.surface+seatProfile.padding-seatProfile.hipsY : 0;
           const position=locked && seated ? seated.hip : worldState.position;
           const height=active ? rootHeight+modelHeight*preset.height : cameraHome.targetY;
           const offset=active ? preset.offset : [0,cameraHome.cameraY-cameraHome.targetY,cameraHome.distance];
-          const values=cameraController.update({now,position,height,offset,key:worldState.name+(locked?':locked':':travel'),locked});
+          const values=cameraController.update({now,position,height,offset,key:worldCameraKey(worldState,locked),locked});
           camera.position.set(...values.slice(0,3));camera.lookAt(...values.slice(3));
         }
       }
@@ -622,7 +629,7 @@
     };
     return avatar;
   }
-  const api = { createRenderer, startClock, createFramePacer, worldActionComplete, createIntentDriver, poseAt, smallMotionAt, randomAt,
+  const api = { createRenderer, startClock, createFramePacer, worldActionComplete, worldCameraSeat, worldCameraKey, createIntentDriver, poseAt, smallMotionAt, randomAt,
     pixelRatioFor, cameraFraming, hitSegments, smoothCutoutEdges, saccadeAt, gradeRoomMaterials, STANCE, EXPRESSION, MOTION, QUALITY, CAMERA, LIGHT };
   root.XinyuVRMRenderer = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

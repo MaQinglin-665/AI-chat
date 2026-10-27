@@ -1,6 +1,6 @@
 {
   "features": [
-    {"id": "avatar-brain-executor-v1", "name": "VRM adaptive frames and brain action execution", "status": "completed", "done_criteria": ["Separate adaptive-frame commit, VRM only", "Sequential interruptible actions with terminal ACK and scene restrictions", "Full/CI checks and real 10-minute private acceptance; draft PR only"]},
+    {"id": "avatar-brain-executor-v1", "name": "VRM adaptive frames and brain action execution", "status": "completed", "done_criteria": ["Separate adaptive-frame commit, VRM only", "Sequential interruptible actions with terminal ACK and scene restrictions", "Full/CI checks and real 10-minute private acceptance; draft PR only", "Pre-merge empty-reply and camera baseline diagnosis; 3-minute labeled replay"]},
     {
       "id": "avatar-live2d-pr217-closeout",
       "name": "Rebase integration boundary and exact Hiyori video for PR217",
