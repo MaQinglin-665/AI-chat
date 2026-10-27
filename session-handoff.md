@@ -1,3 +1,15 @@
+# Current — 长线三阶段已发布，作者按228→229→230验收合并
+## 三阶段 PR 已发布 — 最终接手记录
+- 阶段0：#226 friend/lipsync-fix8723067，包含main9d09edc，全部Linux/WindowsCI成功；等待用户Windows试听，未合并。
+- 阶段1：#228 friend/avatar-live2d-mao9406ea4，base main，纯映射/缺模型/严格对照/40秒有声录像，全部CI成功。
+- 阶段2：#229 friend/live2d-action-vocab da948e7，base friend/avatar-live2d-mao；先文档Draft2aac49f再实现10词/Promise/lookAt，两模型完整录像，全部CI成功。保留Draft供作者接口审阅。
+- 阶段3：#230 friend/live2d-model-template，base friend/live2d-action-vocab；接入指南/模板/真实参数与动作引用校验/CI。完整937Python/3skip/78Node、打包/JSON/compile、本地实际Hiyori/Mao及反例校验通过。
+- 最终CI以各PR当前head检查及仓库外outputs/live2d-longline/stage{1,2,3}/ci-final.json为准。重启时先核对当前head/main及CI，不创建重复PR、不自己合并。作者按228→229→230顺序合并；父PR合并后同步最新main并调整子PR base，不force push。
+- 录像位于原仓库草稿验收附件（需作者登录写权限，未发布产品）：https://github.com/MaQinglin-665/AI-chat/releases/tag/untagged-d2ff791d304d9886571a 。Mao-stage1-40s-20261027.mp4、Hiyori-vocabulary-final-20261027.mp4、Mao-vocabulary-final-20261027.mp4；都是受控真实模型演示/本机SAPI音轨，不冒充原生设备语音时延验收。模型/私密配置/Key/日志/媒体未提交，无VRM/房间/后端brain改动。
+- 下一步只等当前提交全CI完成并报告，再由作者进行Windows实际语音、拖拽/穿透与接口/许可审查；没有授权自动合并或继续其他任务。
+
+历史证据保留如下。
+
 # Current — 三阶段本地完成，阶段3待发布/CI
 ## 长线阶段3完成检查点 — 模板与CI校验
 新增docs/live2d-new-model-guide.md、mappings/template.json、scripts/validate_live2d_mapping.js及错误引用回归；Linux质量门禁、Windows兼容门禁和test-local都运行--all。无运行时/VRM/房间/后端brain/路由/ws改动。

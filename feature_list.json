@@ -16,7 +16,7 @@
         "ActualCore references Hiyori/Mao pass; template-realHiyori pass; invalid actual Mao param/motion fail with exit1; malformed schema/path/missing and metadata tests pass",
         "Full937/3skip/78Node,syntax194/250,secrets866,package/JSON/compile pass; CI Linux+Windows validator added; no model download/config reads"
       ],
-      "next": "Push independent stacked template PR base229; all CI then author merges228->229->template.226 is CIgreen, user listens; no selfmerge."
+      "next": "PR230 published base229 (base228); check current-head CI via GitHub/ci-final evidence, author reviews/merges228->229->230.226 independently waits Windows listening; no new PR/selfmerge."
     },
     {
       "id": "live2d-action-vocabulary",
