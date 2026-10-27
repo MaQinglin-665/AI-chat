@@ -412,5 +412,249 @@
       "skirt",
       "skirt2"
     ]
+  },
+  "gestureVocabulary": {
+    "nod": {
+      "durationMs": 900,
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleY": 0
+          }
+        },
+        {
+          "at": 0.45,
+          "values": {
+            "angleY": -7
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleY": 0
+          }
+        }
+      ]
+    },
+    "shake_head": {
+      "durationMs": 1200,
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleX": 0
+          }
+        },
+        {
+          "at": 0.2,
+          "values": {
+            "angleX": -9
+          }
+        },
+        {
+          "at": 0.5,
+          "values": {
+            "angleX": 9
+          }
+        },
+        {
+          "at": 0.8,
+          "values": {
+            "angleX": -7
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleX": 0
+          }
+        }
+      ]
+    },
+    "wave": {
+      "durationMs": 1600,
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "armRA": 0,
+            "handR": 0
+          }
+        },
+        {
+          "at": 0.2,
+          "values": {
+            "armRA": 20,
+            "handR": -12
+          }
+        },
+        {
+          "at": 0.45,
+          "values": {
+            "armRA": 16,
+            "handR": 12
+          }
+        },
+        {
+          "at": 0.7,
+          "values": {
+            "armRA": 20,
+            "handR": -12
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "armRA": 0,
+            "handR": 0
+          }
+        }
+      ]
+    },
+    "think": {
+      "durationMs": 1800,
+      "face": "thinking",
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleZ": 0
+          }
+        },
+        {
+          "at": 0.35,
+          "values": {
+            "angleZ": 5
+          }
+        },
+        {
+          "at": 0.7,
+          "values": {
+            "angleZ": 5
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleZ": 0
+          }
+        }
+      ]
+    },
+    "happy": {
+      "durationMs": 1600,
+      "face": "happy",
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleY": 0
+          }
+        },
+        {
+          "at": 0.4,
+          "values": {
+            "angleY": 3
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleY": 0
+          }
+        }
+      ]
+    },
+    "surprised": {
+      "durationMs": 1000,
+      "face": "surprised"
+    },
+    "shy": {
+      "durationMs": 1600,
+      "face": "shy",
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleY": 0
+          }
+        },
+        {
+          "at": 0.35,
+          "values": {
+            "angleY": -4
+          }
+        },
+        {
+          "at": 0.7,
+          "values": {
+            "angleY": -4
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleY": 0
+          }
+        }
+      ]
+    },
+    "sad": {
+      "durationMs": 1800,
+      "face": "sad",
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleY": 0
+          }
+        },
+        {
+          "at": 0.35,
+          "values": {
+            "angleY": -5
+          }
+        },
+        {
+          "at": 0.7,
+          "values": {
+            "angleY": -5
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleY": 0
+          }
+        }
+      ]
+    },
+    "tilt_head": {
+      "durationMs": 1200,
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleZ": 0
+          }
+        },
+        {
+          "at": 0.45,
+          "values": {
+            "angleZ": 9
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleZ": 0
+          }
+        }
+      ]
+    },
+    "idle_reset": {
+      "durationMs": 0
+    }
   }
 }

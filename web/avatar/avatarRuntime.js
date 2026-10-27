@@ -149,6 +149,9 @@
       if (data.prepare) prepareUntil = root.performance.now() + (renderer.prepareMs ?? factory.EXPRESSION?.prepareMs ?? 0);
       if (data.stop) renderer.stopAction();
       if (typeof data.action === "string") renderer.playAction(data.action, { intensity: data.intensity });
+      const gesture = data.type === "gesture" ? data.name : data.gesture;
+      if (typeof gesture === "string") renderer.playGesture?.(gesture, { intensity: data.intensity });
+      if (data.type === "look_at" || Object.hasOwn(data, "look_at")) renderer.lookAt?.(data.type === "look_at" ? data.target : data.look_at);
       if (data.frame && typeof data.frame === "object") intent = { ...data.frame };
     };
     const event = (e) => apply(e.detail);
@@ -210,7 +213,9 @@
     root.addEventListener("beforeunload", dispose, { once: true });
     if (source.kind === "vrm") setStatus?.("VRM 模型已就绪");
     root.document.body.dataset.avatarReady = "true";
-    state.avatarRuntime = { renderer, dispose };
+    state.avatarRuntime = { renderer, dispose,
+      playGesture(name, options) { return renderer.playGesture?.(name, options) || Promise.resolve({ name, status: "unsupported", durationMs: 0 }); },
+      lookAt(target) { return renderer.lookAt?.(target) || { status: "unsupported" }; } };
     return state.avatarRuntime;
   }
   function installPanel() {

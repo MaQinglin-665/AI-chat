@@ -75,5 +75,213 @@
     "source": "https://www.live2d.com/en/learn/sample/",
     "conditions": { "licenseName": "Live2D Free Material License + Sample Model Terms", "creditNotation": "required", "licenseUrl": "https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html", "otherLicenseUrl": "https://www.live2d.com/eula/live2d-sample-model-terms_en.html" },
     "readme": "This content uses sample data owned and copyrighted by Live2D Inc. The sample data are utilized in accordance with terms and conditions set by Live2D Inc. This content itself is created at the author’s sole discretion."
+  },
+  "gestureVocabulary": {
+    "nod": {
+      "durationMs": 900,
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleY": 0
+          }
+        },
+        {
+          "at": 0.45,
+          "values": {
+            "angleY": -7
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleY": 0
+          }
+        }
+      ]
+    },
+    "shake_head": {
+      "durationMs": 1200,
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleX": 0
+          }
+        },
+        {
+          "at": 0.2,
+          "values": {
+            "angleX": -9
+          }
+        },
+        {
+          "at": 0.5,
+          "values": {
+            "angleX": 9
+          }
+        },
+        {
+          "at": 0.8,
+          "values": {
+            "angleX": -7
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleX": 0
+          }
+        }
+      ]
+    },
+    "wave": {
+      "durationMs": 1600,
+      "speechGesture": "wave"
+    },
+    "think": {
+      "durationMs": 1800,
+      "face": "thinking",
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleZ": 0
+          }
+        },
+        {
+          "at": 0.35,
+          "values": {
+            "angleZ": 5
+          }
+        },
+        {
+          "at": 0.7,
+          "values": {
+            "angleZ": 5
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleZ": 0
+          }
+        }
+      ]
+    },
+    "happy": {
+      "durationMs": 1600,
+      "face": "happy",
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleY": 0
+          }
+        },
+        {
+          "at": 0.4,
+          "values": {
+            "angleY": 3
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleY": 0
+          }
+        }
+      ]
+    },
+    "surprised": {
+      "durationMs": 1000,
+      "face": "surprised"
+    },
+    "shy": {
+      "durationMs": 1600,
+      "face": "shy",
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleY": 0
+          }
+        },
+        {
+          "at": 0.35,
+          "values": {
+            "angleY": -4
+          }
+        },
+        {
+          "at": 0.7,
+          "values": {
+            "angleY": -4
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleY": 0
+          }
+        }
+      ]
+    },
+    "sad": {
+      "durationMs": 1800,
+      "face": "sad",
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleY": 0
+          }
+        },
+        {
+          "at": 0.35,
+          "values": {
+            "angleY": -5
+          }
+        },
+        {
+          "at": 0.7,
+          "values": {
+            "angleY": -5
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleY": 0
+          }
+        }
+      ]
+    },
+    "tilt_head": {
+      "durationMs": 1200,
+      "keyframes": [
+        {
+          "at": 0,
+          "values": {
+            "angleZ": 0
+          }
+        },
+        {
+          "at": 0.45,
+          "values": {
+            "angleZ": 9
+          }
+        },
+        {
+          "at": 1,
+          "values": {
+            "angleZ": 0
+          }
+        }
+      ]
+    },
+    "idle_reset": {
+      "durationMs": 0
+    }
   }
 }

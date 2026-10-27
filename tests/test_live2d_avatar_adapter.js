@@ -114,7 +114,9 @@ const hiyori = mappingApi.getDefault();
     XinyuLive2DRenderer: { createRenderer: () => ({ kind: "live2d", ownsPointer: true, prepareMs: 0,
       load: async source => { liveLoads++; assert.equal(source.path, "/legacy"); }, dispose() {},
       startClock(produce) { clock = produce; return () => { clock = null; }; }, update: (frame, options) => updates.push([frame, options]),
-      playAction(name) { root.action = name; }, stopAction() {} }) },
+      playAction(name) { root.action = name; }, stopAction() {},
+      playGesture(name) { root.gesture = name; return Promise.resolve({ name, status: "completed" }); },
+      lookAt(target) { root.look = target; return { status: "completed" }; } }) },
     XinyuVRMRenderer: { createRenderer() { vrmLoads++; } } };
   vm.runInNewContext(fs.readFileSync(require.resolve("../web/avatar/avatarRuntime.js"), "utf8"), { window: root });
   const s = { config: { model_path: "/legacy" }, uiView: "full", ttsAudioLevel: .4 };
@@ -130,6 +132,11 @@ const hiyori = mappingApi.getDefault();
     assert.equal(updates.at(-1)[1].overrides.face, "happy"); assert.equal(root.action, "nod");
     root.channel.onmessage({ data: { frame: { delivery: "shy" } } }); clock(1500);
     assert.equal(updates.at(-1)[1].overrides.delivery, "shy");
+    for (const fn of listeners.get("avatar-intent")) fn({ detail: { type: "gesture", name: "wave" } });
+    assert.equal(root.gesture, "wave");
+    root.channel.onmessage({ data: { type: "look_at", target: "left" } }); assert.equal(root.look, "left");
+    assert.equal((await runtime.playGesture("nod")).status, "completed");
+    assert.equal(runtime.lookAt("reset").status, "completed");
     runtime.dispose(); runtime.dispose();
     assert.equal(clock, null); assert.equal(channels, 0); assert.equal(listeners.get("avatar-intent").size, 0);
   }

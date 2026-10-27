@@ -25,12 +25,15 @@ const add=window.addEventListener.bind(window),remove=window.removeEventListener
 window.addEventListener=(name,fn,...args)=>{if(['resize','avatar-intent','beforeunload'].includes(name)){
  if(!qaResources.listeners.has(name))qaResources.listeners.set(name,new Set());qaResources.listeners.get(name).add(fn);}return add(name,fn,...args);};
 window.removeEventListener=(name,fn,...args)=>{qaResources.listeners.get(name)?.delete(fn);return remove(name,fn,...args);};</script>
-${["vendor/pixi.min.js", "vendor/pixi-unsafe-eval.min.js", "vendor/live2dcubismcore.min.js", "vendor/cubism4.min.js", "avatar/live2dMapping.js", "avatar/vowelEstimator.js", "avatar/live2dAssets.js", "avatar/live2dModelDriver.js", "live2dLayoutController.js", "live2dRuntimeController.js", "avatar/live2dRenderer.js", "avatar/avatarRuntime.js"].map(f => `<script src="/${f}"></script>`).join("")}
+${["vendor/pixi.min.js", "vendor/pixi-unsafe-eval.min.js", "vendor/live2dcubismcore.min.js", "vendor/cubism4.min.js", "avatar/live2dMapping.js", "avatar/vowelEstimator.js", "avatar/live2dAssets.js", "avatar/live2dModelDriver.js", "avatar/live2dGestures.js", "hiyoriPerformanceDirector.js", "live2dExpressionController.js", "live2dLayoutController.js", "live2dRuntimeController.js", "avatar/live2dRenderer.js", "avatar/avatarRuntime.js"].map(f => `<script src="/${f}"></script>`).join("")}
 <script>(async()=>{try{
-const state={uiView:'full',config:{},baseTransform:{x:780,y:450,rotation:0},availableMotionGroups:[],ttsAudioLevel:0};
+const state={uiView:'full',config:{},baseTransform:{x:780,y:450,rotation:0},availableMotionGroups:[],ttsAudioLevel:0,
+ expressionEnabled:true,expressionStrength:1,motionEnabled:true,ttsPlaybackGeneration:1,speechMouthOpen:0,currentTalkStyle:'neutral'};
+const expression=TaffyLive2DExpressionController.createController({state,hiyoriPerformanceDirector:TaffyHiyoriPerformanceDirector,isSpeechMotionActive:()=>state.ttsAudioLevel>.01,isSpeakingNow:()=>state.ttsAudioLevel>.01});
 const layout=TaffyLive2DLayoutController.createController({state,windowObject:window,documentObject:document,performanceObject:performance});
 const controller=TaffyLive2DRuntimeController.createController({state,windowObject:window,documentObject:document,setModelMotionDefinitions(m){state.availableMotionGroups=Object.keys(m.internalModel.motionManager.definitions);},
  attachDrag:layout.attachDrag,
+ applyStyleExpressionLayer:expression.applyStyleExpressionLayer,updateMicroMotionLayer:expression.updateMicroMotionLayer,
  placeModel(){const m=state.model;m.anchor.set(.5,.5);m.scale.set(Math.min(570/m.width,820/m.height));m.position.set(780,450);state.baseTransform={x:780,y:450,rotation:0};},setStatus(t){document.getElementById('status').textContent=t;}});
 state.avatarSource={kind:'live2d',path:'/api/avatar/live2d/Mao.model3.json',mapping:'/avatar/mappings/mao.json'};
 await controller.initLive2D();if(!state.model)throw Error('Mao load failed');state.pixiApp.stop();
@@ -41,13 +44,15 @@ for(const method of ['setParameterValueById','addParameterValueById','multiplyPa
 }
 let renderedValues;const coreUpdate=core._model.update.bind(core._model);core._model.update=()=>{
  renderedValues=Object.fromEntries(core._model.parameters.ids.map((id,i)=>[id,core._model.parameters.values[i]]));return coreUpdate();};
-window.QA={state,core,step(frame,label){
+window.QA={state,core,beginGesture(name){window.QAGesturePromise=state.avatarRuntime.playGesture(name);return true;},step(frame,label){
  window.dispatchEvent(new CustomEvent('avatar-intent',{detail:{frame}}));
  for(let i=0;i<3;i++){virtualNow+=1000/60;state.model.update(1000/60);state.pixiApp.renderer.render(state.pixiApp.stage);}
  const zoom=document.getElementById('mouth-zoom');zoom.style.display=frame.mode==='speak'?'block':'none';
- if(frame.mode==='speak')zoom.getContext('2d').drawImage(state.pixiApp.view,735,225,90,70,0,0,270,210);
+ if(frame.mode==='speak')zoom.getContext('2d').drawImage(state.pixiApp.view,735,state.avatarMapping.id==='hiyori'?170:225,90,70,0,0,270,210);
  document.getElementById('status').textContent=label+'\\n真实 Pixi/Core · 受控意图录像';
- return {x:state.model.x,y:state.model.y,dragging:!!state.dragData};
+ const currentCore=state.model.internalModel.coreModel,params=state.avatarMapping.params;
+ const mouthIds=Object.values(params.vowels||{}),snapshot=state.qaRenderedValues||renderedValues;
+ return {x:state.model.x,y:state.model.y,dragging:!!state.dragData,mouth:mouthIds.length?Math.max(...mouthIds.map(id=>snapshot[id])):snapshot[params.mouthOpenY]};
 },async capture(frame,label){
  state.avatarRenderer.stopAction();state.model.internalModel.motionManager.stopAllMotions();
  window.dispatchEvent(new CustomEvent('avatar-intent',{detail:{frame}}));
@@ -75,6 +80,8 @@ window.QA={state,core,step(frame,label){
  :{model_path:'/models/hiyori_pro_t11/hiyori_pro_t11.model3.json'};
  const runtime=await controller.initLive2D();
  if(!runtime||!state.model)throw Error('configuration switch failed: '+kind);
+ const currentCore=state.model.internalModel.coreModel,update=currentCore._model.update.bind(currentCore._model);
+ currentCore._model.update=()=>{const p=currentCore._model.parameters;state.qaRenderedValues=Object.fromEntries(p.ids.map((id,i)=>[id,p.values[i]]));return update();};
  state.pixiApp.stop();virtualNow+=1000/60;state.model.update(1000/60);state.pixiApp.renderer.render(state.pixiApp.stage);
  document.querySelector('h1').textContent='配置切换 · '+kind;
  document.querySelector('aside p').textContent=kind==='mao'?'明确 avatar 配置 / 官方 Mao':'旧 model_path 配置 / Hiyori';
@@ -220,6 +227,30 @@ const server = http.createServer((req, res) => {
       else assert.ok(result.blobs > 0, "Mao config reload uses authenticated private blobs");
       await page.screenshot({ path: path.join(output, `switch-${evidence.switches.length + 1}-${kind}.png`) });
       evidence.switches.push({ kind, ...result });
+    }
+    if (process.argv.includes("--vocabulary")) {
+      evidence.vocabulary = {};
+      for (const kind of ["hiyori", "mao"]) {
+        await page.evaluate(kind => QA.switchConfig(kind), kind);
+        const folder = path.join(output, `vocabulary-${kind}`); fs.mkdirSync(folder, { recursive: true });
+        const vocabulary = JSON.parse(fs.readFileSync(path.join(repo, `web/avatar/mappings/${kind}.json`))).gestureVocabulary;
+        const cases = []; let index = 0;
+        for (const [name, spec] of Object.entries(vocabulary)) {
+          await page.evaluate(name => QA.beginGesture(name), name);
+          const mouths = [];
+          for (let i = 0; i < Math.max(12, Math.ceil((spec.durationMs + 250) / 50)); i++) {
+            const frame = { mode: "speak", mouth: { open: .15 + .7 * Math.abs(Math.sin(index * .63)), vowel: ["a","i","u","e","o"][Math.floor(index / 8) % 5] } };
+            const sample = await page.evaluate(([frame, label]) => QA.step(frame, label), [frame, `词表 / ${name} / 说话中`]); mouths.push(sample.mouth);
+            await page.screenshot({ path: path.join(folder, `frame-${String(index++).padStart(4,"0")}.jpg`), type: "jpeg", quality: 85 });
+          }
+          const result = await page.evaluate(() => window.QAGesturePromise);
+          assert.equal(result.status, "completed", `${kind}/${name}: actual renderer Promise completes`);
+          const mouthRange = Math.max(...mouths) - Math.min(...mouths);
+          assert.ok(mouthRange > .01, `${kind}/${name}: actual mouth continues during gesture`);
+          cases.push({ name, result, mouthRange });
+        }
+        evidence.vocabulary[kind] = { frames: index, fps: 20, cases };
+      }
     }
     evidence.cleanup = await page.evaluate(() => QA.dispose());
     assert.equal(evidence.cleanup.blobs, 0); assert.equal(evidence.cleanup.channels, 0); assert.equal(evidence.cleanup.model, null);

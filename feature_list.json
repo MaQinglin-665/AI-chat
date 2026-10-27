@@ -1,6 +1,27 @@
 {
   "features": [
     {
+      "id": "live2d-action-vocabulary",
+      "name": "Live2D model-independent gesture vocabulary and lookAt",
+      "status": "completed",
+      "dependencies": [
+        "avatar-live2d-mao-acceptance"
+      ],
+      "done_criteria": [
+        "Publish contract-only Draft PR before implementation",
+        "Bounded Promise results, replacement/cancel/reset, safe lookAt; mapping-only two-model vocabulary",
+        "Speech mouth remains active during gestures; two real-model vocabulary recordings",
+        "Full Linux/Windows CI; no self merge or forbidden resources"
+      ],
+      "verification": [
+        "Contract Draft2292aac49f before implementation",
+        "All20 model/word results +replacement/cancel/reset/dispose/clock watchdog/invalid mapping/gaze/mouth ownership passed; actual2x311frames 15.55s/audio; min mouth ranges .545592/.502619",
+        "Full937/3skip/77Node,syntax194/248,secrets862;package/JSON/compile pass;strict fixtures unchanged",
+        "2026-10-27 stacked merge sync: 从更新后的PR228分支65e5266执行merge，含main d63d077；仅progress/session两份状态冲突，保留双方记录，运行时代码自动合并。Python源码与已验证943/3skip的228完全相同；本分支test-local -SkipPytest的全部78 Node、语法195/251、secrets867通过，包括词表/共享口型及Hiyori5280/394224、Mao1440/25850与本机181030严格对照；first-run package、样例JSON、py_compile通过。既有快照未改；日志work/live2d-stack-229-*.log。待正常push/当前head Linux+WindowsCI，作者按序合并。"
+      ],
+      "next": "Normal push PR229, verify current-head Linux/Windows CI; author merges 228 -> 229 -> 230. Main d63d077 integrated; no self merge."
+    },
+    {
       "id": "avatar-live2d-mao-acceptance",
       "name": "Mao real-model acceptance and discovered fixes",
       "status": "completed",
@@ -904,5 +925,5 @@
       ]
     }
   ],
-  "active_task": "avatar-live2d-mao-acceptance"
+  "active_task": "live2d-action-vocabulary"
 }

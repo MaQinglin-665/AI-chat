@@ -1,4 +1,24 @@
 # Current — 三条 Live2D PR 顺序同步
+## 2026-10-27 — PR #229 按叠加顺序同步（本次指令）
+作者已合并 #226；最新 origin/main 为 d63d077。本分支 friend/live2d-action-vocab 使用 merge 同步；保留三个状态文件双方任务与验证历史，不改写产品逻辑、测试快照或基线。本次记录优先于历史中的待合并 #226 等旧指令。
+下一步：本地检查后正常推送，按 #228 → #229 → #230 传播合并并核对各自当前提交 Linux/Windows CI。不 rebase、不 force push、不推 main、不自行合并 PR。
+
+以下为保留的历史记录；本次同步指令优先。
+
+# Current — 阶段2实现完成，229待push/CI；接阶段3模板
+## 阶段2实现检查点 — #229
+先以2aac49f发布接口文档Draft229，再实现live2dGestures及两模型10词映射。Promise区分completed/interrupted/unsupported/failed，最新支持调用替换、取消/停止/卸载/超时均结束；lookAt支持user/方向/reset/CSS屏幕坐标，参数写入只走原pre-Core。没有手势时严格Hiyori5280/394224、Mao1440/181030保持。共享avatarRuntime仅加可选转发/原事件gesture/look_at字段；无VRM/房间/brain/ws/路由改动。
+Verification Evidence：完整937Python/3skip/77Node，语法194/248，secrets862；首次运行包、必需JSON/compile通过，新增原事件转发断言另行通过。真实Hiyori/Mao各10词全部Promise完成，各311帧15.55秒有声录像，Core前每词口型范围至少0.545592/0.502619；截图已看，口型特写位置已校正。录像已上传原仓库草稿附件（非产品发布，作者登录写权限可见），文件Hiyori-vocabulary-final-20261027.mp4、Mao-vocabulary-final-20261027.mp4。模型/媒体/配置/Key未入git。
+下一步正常push229并等当前提交Linux/WindowsCI；保留Draft供作者接口审阅，依赖228先合并。然后从当前分支建立独立新模型模板/校验CI PR，仍不自行合并。
+
+
+# Current — 阶段2先开文档Draft，再实现词表
+## 长线阶段2 — 先行接口 Draft
+从阶段1 friend/avatar-live2d-mao9406ea4建立friend/live2d-action-vocab，PR base使用前一分支以便独立审阅，#228先合并后再切换base/syncmain。先提交docs/live2d-action-vocabulary.md的接口/词表/结果/打断/坐标约定并开Draft，随后才实现。此检查点不宣称功能完成。未改VRM/场景/后端brain，后续共享runtime仅增加可选转发/原事件字段，PR单独说明。
+
+下一步确认远端Draft创建成功，才添加通用Live2D手势控制器/映射/测试/两模型录像。阶段1CI单独在运行；不自行合并任何PR。
+
+# Current — 三条 Live2D PR 顺序同步
 ## 2026-10-27 — PR #228 按叠加顺序同步（本次指令）
 作者已合并 #226；最新 origin/main 为 d63d077。本分支 friend/avatar-live2d-mao 使用 merge 同步；保留三个状态文件双方任务与验证历史，不改写产品逻辑、测试快照或基线。本次记录优先于历史中的待合并 #226 等旧指令。
 下一步：本地检查后正常推送，按 #228 → #229 → #230 传播合并并核对各自当前提交 Linux/Windows CI。不 rebase、不 force push、不推 main、不自行合并 PR。
@@ -364,3 +384,5 @@ Fresh validation passed: 908 passed, 3 skipped, 1 warning; all Node/syntax/secre
 Fresh #225 merge validation: 912 passed, 3 skipped; all Node/syntax/secrets and first-run package smoke passed. Await push/ready/CI-gated merge and final cleanup.
 
 Verification Evidence（本次叠加同步）：main d63d077 merged; scripts/test-local.ps1 全部通过：943 Python/3 skip，77 Node 文件，语法195/249，secrets864；Hiyori严格5280帧/394224调用，Mao协议1440/25850及真实Core6/Mao1440/181030，完整顺序与快照均严格一致；first-run package、公开样例JSON与py_compile通过。初次沙箱权限/临时路径失败后正常Windows权限重跑通过。日志 work/live2d-stack-228-full-retry.log、live2d-stack-228-package-retry.log；既有快照和基线未改，待正常推送及当前提交CI。
+
+Verification Evidence（本次叠加同步）：从更新后的PR228分支65e5266执行merge，含main d63d077；仅progress/session两份状态冲突，保留双方记录，运行时代码自动合并。Python源码与已验证943/3skip的228完全相同；本分支test-local -SkipPytest的全部78 Node、语法195/251、secrets867通过，包括词表/共享口型及Hiyori5280/394224、Mao1440/25850与本机181030严格对照；first-run package、样例JSON、py_compile通过。既有快照未改；日志work/live2d-stack-229-*.log。待正常push/当前head Linux+WindowsCI，作者按序合并。
