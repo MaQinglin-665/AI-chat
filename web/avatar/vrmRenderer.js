@@ -1,6 +1,17 @@
 (function (root) {
   "use strict";
   // Radians and model-height ratios. Keep all motion/quality tuning here.
+  const ACTION_ARRIVAL_METERS = 0.04;
+  function worldActionComplete(state, action, layout) {
+    if (!state || state.moving) return false;
+    if (action.type === "stand") return state.blend === 0;
+    if (action.type === "go_to") {
+      const target = layout?.activityPoints?.[action.target];
+      return !!target && state.blend === 0 &&
+        Math.hypot(state.position[0]-target[0], state.position[1]-target[1]) <= ACTION_ARRIVAL_METERS;
+    }
+    return state.phase === "activity" && state.blend >= .999;
+  }
   const MOTION = Object.freeze({
     armDrop: 72 * Math.PI / 180, elbowBend: 0.18, elbowInward: 0.055, wristRelax: 0.065,
     chestBreath: 0.032, spineBreath: 0.018, chestExpansion: 0.009, shoulderRise: 0.0025,
@@ -594,10 +605,7 @@
         return world.begin(action.target||action.name,{pose:action.type!=="go_to"});
       },
       worldActionDone(action){
-        if(!worldState)return false;
-        if(action.type==="stand")return worldState.blend===0 && !worldState.moving;
-        return !worldState.moving && worldState.phase==="activity" &&
-          (action.type==="go_to" ? worldState.blend===0 : worldState.blend>=.999);
+        return worldActionComplete(worldState, action, activeLayout);
       },
       isAnimating: () => {
         const c = cameraController?.snapshot();
@@ -614,7 +622,7 @@
     };
     return avatar;
   }
-  const api = { createRenderer, startClock, createFramePacer, createIntentDriver, poseAt, smallMotionAt, randomAt,
+  const api = { createRenderer, startClock, createFramePacer, worldActionComplete, createIntentDriver, poseAt, smallMotionAt, randomAt,
     pixelRatioFor, cameraFraming, hitSegments, smoothCutoutEdges, saccadeAt, gradeRoomMaterials, STANCE, EXPRESSION, MOTION, QUALITY, CAMERA, LIGHT };
   root.XinyuVRMRenderer = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

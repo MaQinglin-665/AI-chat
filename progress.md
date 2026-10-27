@@ -1193,3 +1193,12 @@ Verification Evidence: fresh scripts/test-local.ps1 passed (912 passed, 3 skippe
 - 完整scripts/test-local.ps1：**932Python通过/3跳过，74Node文件，语法Python194/JS243，秘密扫描853**；scripts/check_first_run_package.ps1、必需JSON/py_compile通过。没有读取私人配置或覆盖本机安装。
 
 本检查点随后正常push/ready，等待新提交全部Linux+WindowsCI，并核对GitHub不再CONFLICTING及远端main未再次前进后通知作者。01已单独交用户转发，作者仍需观看后决定合并；不自行合并。#226和Mao后续仍等作者合并217，Sendagaya仅本地models_local。没有提交模型/录像/私密配置/Key，无force/mainpush；本次WebP是已经合入main的项目背景资源。
+
+## 2026-10-27 — avatar-brain-executor-v1 started
+Independent worktree from 9d09edc; dependencies copied with robocopy. No npm ci/private config. Two implementation commits; draft PR, no merge.
+
+### Avatar brain phase 2 verification
+- VRM adaptive cadence committed separately (5125627); executor/terminal ACK integration (1ebd5ea), plus companion-point arrival regression fix.
+- 935 Python tests passed / 3 skipped; all Node, syntax/secrets, source-package, installer, docs publish and 4 browser smoke tests passed. CI on 1ebd5ea was entirely green; final-head CI checked in draft PR.
+- Real daily run: 612.56s local-only video, 5 requests, 4550 tokens; 8 completed actions and 1 user interruption. No action timeout/browser exception. Two chat replies showed empty-model-content errors before a successful third reply; not hidden as a successful speech test.
+- Report: docs/avatar-brain-executor.md. Private media remains ignored. No user config/model changes, no main update, no merge. Author visual acceptance pending.
