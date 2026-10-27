@@ -26,6 +26,42 @@
     "light_lift": {"armL1": 10, "armL2": -7, "armL3": -5, "armR1": 10, "armR2": -7, "armR3": 5},
     "wave": {"armR1": 30, "armR2": -20, "armR3": 18}
   },
+  "speechGestureEffects": {
+    "open_explain": {
+      "parts": {
+        "armLA": 1,
+        "armRA": 1,
+        "armLB": 0,
+        "armRB": 0
+      },
+      "partParameters": true
+    },
+    "wave": {
+      "parts": {
+        "armLA": 1,
+        "armRA": 1,
+        "armLB": 0,
+        "armRB": 0
+      },
+      "partParameters": true,
+      "oscillations": [
+        {
+          "param": "armR3",
+          "amplitude": 12,
+          "cycles": 4
+        }
+      ]
+    },
+    "light_lift": {
+      "parts": {
+        "armLA": 1,
+        "armRA": 1,
+        "armLB": 0,
+        "armRB": 0
+      },
+      "partParameters": true
+    }
+  },
   "actions": {
     "sentence_release": {"motion": ["Idle", 0]}, "thoughtful_glance": {"motion": ["Idle", 1]},
     "nod": {"motion": ["TapBody", 0]}, "happy_bounce": {"motion": ["TapBody", 1]},

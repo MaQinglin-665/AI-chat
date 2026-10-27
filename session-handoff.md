@@ -1,3 +1,45 @@
+# Current — 三条 Live2D PR 顺序同步
+## 2026-10-27 — PR #228 按叠加顺序同步（本次指令）
+作者已合并 #226；最新 origin/main 为 d63d077。本分支 friend/avatar-live2d-mao 使用 merge 同步；保留三个状态文件双方任务与验证历史，不改写产品逻辑、测试快照或基线。本次记录优先于历史中的待合并 #226 等旧指令。
+下一步：本地检查后正常推送，按 #228 → #229 → #230 传播合并并核对各自当前提交 Linux/Windows CI。不 rebase、不 force push、不推 main、不自行合并 PR。
+
+以下为保留的历史记录；本次同步指令优先。
+
+# Current — 长线阶段1已补齐，#228推送/CI后进入词表Draft
+## 长线阶段1补齐 — 2026-10-27
+- 手臂部件选择与摆动从 driver 的专用名字判断迁到 `mao.json` 的 `speechGestureEffects`，driver 只解释通用 parts/partParameters/oscillations。未改数值和调用顺序。
+- 冻结 main9d09edc 的 driver/mapping 原字节及 SHA256；同组1440帧完整序列/全部参数与部件快照严格一致：CI协议25850调用，本机真实Core6/Mao181030调用，无容差。CI不下载Mao，本机模型存在才加跑真实模型；两类证据分开报告。旧Hiyori严格基线不变。
+- 缺目录、清单、moc3、贴图、表情五种条件回归；前端在本地模型描述失败或资源加载失败时显示 models_local/清单/资源/avatar.path/刷新指引，返回null、保留聊天，不吞VRM错误。共享代码仅live2dRuntimeController的本地Live2D失败提示/短路，未改路由/ws或其他渲染器。
+- 40秒/800帧/20fps本机真实Pixi/Core录像：idle/listen/think、五元音（放大口型）、3手势、8表情、真实指针拖拽/松手恢复。带本机SAPI场景/元音音轨；这是受控映射展示，不是原生Windows TTS延迟测量。画面含场景名和Live2D署名；没有模型/媒体进git。
+- 全量scripts/test-local.ps1：937Python通过/3跳过，76Node文件，语法194/246，secrets859；首次运行包和必需JSON/py_compile通过。第一次全量发生一次无关external_agent HTTP本机连接中止，未改其代码；完整重跑通过。20截图/4切换/63授权/1拒绝/0页面错误及拖拽移动断言通过。
+- 录像已作为原仓库的**草稿验收附件**保存，需作者登录并有仓库写权限查看；不发布产品release。链接：https://github.com/MaQinglin-665/AI-chat/releases/tag/untagged-d2ff791d304d9886571a
+- 已知限制：合成频谱/受控元音不能证明真实人声识别率；Mao手势受原模型绑定约束；原生Windows穿透与真实语音仍由作者检查。#226独立且CI已绿，不混入本分支。
+
+下一步从friend/avatar-live2d-mao建立friend/live2d-action-vocab，先提交接口词表文档开Draft再实现；随后从其分支建立模板/校验CI PR。各PR堆叠依赖单独说明；作者合并，不force/mainpush。
+
+# Current — Live2D 长线，阶段1补全#228
+## 2026-10-27 — Live2D 长线任务
+阶段0复核main仍9d09edc，#2268723067包含main且10项CI全成功，无冲突，已通知。阶段1在现有#228补纯映射手臂效果、同Core完整写序列严格对照、缺模型回归与有声40s场景录像。随后从228分支建立动作词表分支，先文档Draft PR再实现；最后从其分支建立新模型模板/校验CI独立PR。允许前一PR开出后继续，不自行合并；每PR记录堆叠依赖、共享代码改动、测试/录像/限制并等Linux与WindowsCI。无配置/Key/模型/媒体提交，无VRM/房间/后端brain改动，不读取私人配置。
+
+# Current — Mao PR #228 已发布，作者 Windows 检查后合并
+## 发布检查点 — PR #228
+已正常推送 friend/avatar-live2d-mao 并创建可审查 PR：https://github.com/MaQinglin-665/AI-chat/pull/228 （base main9d09edc）。仅7个预期文件；本地工作区干净，未提交模型/配置/媒体。最终真实QA输出20截图/4切换/63授权/1拒绝/0页面异常，截图包仅本地。Linux/Windows CI 的最终状态以 PR 当前提交检查和仓库外 outputs/mao-acceptance/ci-final.json 为准；需要全部成功且无冲突才报告可实机检查，不自行合并。#226 的8723067已全部CI成功，用户试听待定。
+
+完整本地与打包门禁证据见下方。重启时检查 PR 当前 head 的全部 CI；不要重复创建 Mao PR，也不要推送或合并 main。
+
+# Current — Mao 独立验收本地完成，待推送与 CI
+- 分支 friend/avatar-live2d-mao 直接基于 main9d09edc，不含未合并226。取消加载三种等待边界回归通过；只改取消检查，不改正常时钟/参数顺序。
+- 真实 Mao 五元音/3回退、8表情/8动作、3手势×5阶段和wave停止/到期通过；Mao/Hiyori配置两轮切换、实例/Blob/事件清理通过，零脚本错误，20张截图仅本地 outputs/mao-acceptance。
+- 完整932Python/3skip/74Node、语法194/243、secrets853、package/JSON/compile通过。Hiyori严格5280/394224/42保持，快照未改。
+- 下一步：正常push本分支并开独立PR到main、附到当前聊天，等待Linux/Windows CI；作者Windows实机检查后合并。不得自行合并/main/force push；网络push失败间隔10秒最多5次。
+- #226 已推送8723067/可审查，Linux/Windows全部10项CI成功且无冲突，用户已被告知可试听；不把226混入Mao，不覆盖安装，不提交模型/媒体/私人配置/Key。旧记录保留如下。
+
+# Current — Mao 验收与发现问题修复
+## 2026-10-27 — 独立 Mao 验收开始
+#217 已由作者合并为 main9d09edc。#226已同步该main并推送8723067，全部10项Linux/Windows CI成功且无冲突，已通知用户实际试听，未自行合并。当前新分支friend/avatar-live2d-mao直接从最新origin/main建立，没有fork，也不包含未合并的226。基础Mao适配已随217进入main，本任务只补实际五元音、8表情、3手势、动作和配置切换验收，修复复现问题；保存本地证据后独立PR。模型/私密配置/媒体/Key不提交，不改对话/记忆/外部执行，不覆盖本机安装。
+
+下一步：在真实本地Mao上补强断言并测试配置切换；先复现再修复。完整本地/打包检查后正常push并开独立PR，作者Windows检查后合并。旧记录保留如下。
+
 # Current — PR226 sync verified; publish/CI then main-based Mao acceptance
 - #217author-mergedmain9d09edc, normalmergeinto226as3aafe90. Resolvedstate3+runtime/startup complementaryconflicts, keptmainfactory/clocks/vowels/explicitintentprecedence and sharedlip/bridge lease. Fixed staleanalysedvowel leaking into browserTTS;browsermouthhasvowelnull, analysedpathpreserved.
 - Full938Python/3skip/75Node,syntax195/246,secrets858;package/JSON/compilepassed. All3realmodel comparison292frames/14.6s each,actualparametersvary/endclose,nopageerrors;currentmain directcode,noMaooverlay. Evidenceoutputs/pr226-main217, logwork/pr226-main217-*. Existingstrictfixtures/snapshotsandlipbridge/splitclocktestfilesunchanged;newtimingtestscoverintendedchanges.
@@ -320,3 +362,5 @@ User approved #227. Latest origin/main 2b67452 is already contained; no conflict
 Fresh validation passed: 908 passed, 3 skipped, 1 warning; all Node/syntax/secrets and first-run package smoke passed. Evidence in merge227-local.log / merge227-package.log under ignored tmp_ui_smoke/avatar-vrm-polish. Next: push, ready, await CI, authorized merge, stop.
 
 Fresh #225 merge validation: 912 passed, 3 skipped; all Node/syntax/secrets and first-run package smoke passed. Await push/ready/CI-gated merge and final cleanup.
+
+Verification Evidence（本次叠加同步）：main d63d077 merged; scripts/test-local.ps1 全部通过：943 Python/3 skip，77 Node 文件，语法195/249，secrets864；Hiyori严格5280帧/394224调用，Mao协议1440/25850及真实Core6/Mao1440/181030，完整顺序与快照均严格一致；first-run package、公开样例JSON与py_compile通过。初次沙箱权限/临时路径失败后正常Windows权限重跑通过。日志 work/live2d-stack-228-full-retry.log、live2d-stack-228-package-retry.log；既有快照和基线未改，待正常推送及当前提交CI。
