@@ -1,6 +1,7 @@
 (function (root) {
   "use strict";
   function createRuntime(root) {
+  const browserLipSync = root.XinyuBrowserLipSync || (typeof require === "function" ? require("./browserLipSync.js") : null);
   const INPUT_HOLD_MS = 1000;
   const clamp = (v) => Math.max(0, Math.min(1, Number(v) || 0));
   function formatConditions(conditions = {}) {
@@ -77,12 +78,13 @@
   function frameFromState(state, now, wallNow = Date.now(), prepareMs = 1100) {
     const remote = state.uiView === "model";
     const fresh = !remote || (now - Number(state._broadcastSpeechUpdatedAt || 0) < 900);
-    const level = fresh ? clamp(state.ttsAudioLevel) : 0;
+    const browserOwned = remote ? state.ttsBrowserMouthActive === true : browserLipSync?.sample(state, now) != null;
+    const level = fresh ? (browserLipSync?.mouthLevel(state, now, state.ttsAudioLevel) ?? clamp(state.ttsAudioLevel)) : 0;
     const age = wallNow - Number(state.conversationLastAssistantAt || 0);
     const preparingSpeech = age >= 0 && age < prepareMs;
     return { now, preparingSpeech, mode: level > 0.02 ? "speak" : "idle",
       face: state.speechEmotionPose?.emotion || state.speechAnimMood || "neutral", faceIntensity: 0.6,
-      mouth: { open: level, vowel: fresh && level > 0.02 && ["a", "i", "u", "e", "o"].includes(state.ttsVowel) ? state.ttsVowel : null } };
+      mouth: { open: level, vowel: fresh && !browserOwned && level > 0.02 && ["a", "i", "u", "e", "o"].includes(state.ttsVowel) ? state.ttsVowel : null } };
   }
   function normalizeSource(source, config = {}) {
     if (source?.kind === "vrm") return source;

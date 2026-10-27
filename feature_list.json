@@ -16,9 +16,10 @@
       "verification": [
         "Contract Draft2292aac49f before implementation",
         "All20 model/word results +replacement/cancel/reset/dispose/clock watchdog/invalid mapping/gaze/mouth ownership passed; actual2x311frames 15.55s/audio; min mouth ranges .545592/.502619",
-        "Full937/3skip/77Node,syntax194/248,secrets862;package/JSON/compile pass;strict fixtures unchanged"
+        "Full937/3skip/77Node,syntax194/248,secrets862;package/JSON/compile pass;strict fixtures unchanged",
+        "2026-10-27 stacked merge sync: 从更新后的PR228分支65e5266执行merge，含main d63d077；仅progress/session两份状态冲突，保留双方记录，运行时代码自动合并。Python源码与已验证943/3skip的228完全相同；本分支test-local -SkipPytest的全部78 Node、语法195/251、secrets867通过，包括词表/共享口型及Hiyori5280/394224、Mao1440/25850与本机181030严格对照；first-run package、样例JSON、py_compile通过。既有快照未改；日志work/live2d-stack-229-*.log。待正常push/当前head Linux+WindowsCI，作者按序合并。"
       ],
-      "next": "Push229; verify all current-head Linux/WindowsCI; keepDraft for author interface review; then stacked template/validation CI PR."
+      "next": "Normal push PR229, verify current-head Linux/Windows CI; author merges 228 -> 229 -> 230. Main d63d077 integrated; no self merge."
     },
     {
       "id": "avatar-live2d-mao-acceptance",
@@ -42,9 +43,10 @@
       "verification": [
         "Real official Mao:5 vowels/3fallbacks,8 expressions/8native motions,3gestures×5phases,wave expiry/stop and 4Mao-Hiyori config switches;63authorized/1denied,no page errors;20local screenshots",
         "Full932Python/3skip/74Node,syntax194/243,secrets853;package/JSON/py_compilepass;strict5280frames/394224calls/42scenarios,baseline unchanged",
-        "Longline stage1: strict1440/25850protocol+1440/181030realCoreMao, missing5resources/guide tests; audible40s800frames w/realdrag, local+draftrelease media; full937/3skip/76Node,syntax194/246,secrets859,packagepass"
+        "Longline stage1: strict1440/25850protocol+1440/181030realCoreMao, missing5resources/guide tests; audible40s800frames w/realdrag, local+draftrelease media; full937/3skip/76Node,syntax194/246,secrets859,packagepass",
+        "2026-10-27 stacked merge sync: main d63d077 merged; scripts/test-local.ps1 全部通过：943 Python/3 skip，77 Node 文件，语法195/249，secrets864；Hiyori严格5280帧/394224调用，Mao协议1440/25850及真实Core6/Mao1440/181030，完整顺序与快照均严格一致；first-run package、公开样例JSON与py_compile通过。初次沙箱权限/临时路径失败后正常Windows权限重跑通过。日志 work/live2d-stack-228-full-retry.log、live2d-stack-228-package-retry.log；既有快照和基线未改，待正常推送及当前提交CI。"
       ],
-      "next": "Push228 and monitor current-head Linux/WindowsCI; start stacked action-vocab docs Draft then implement; author Windows checks/merges."
+      "next": "Normal push PR228, verify current-head Linux/Windows CI; author merges 228 -> 229 -> 230. Main d63d077 integrated; no self merge."
     },
     {
       "id": "avatar-live2d-pr217-closeout",
@@ -894,6 +896,32 @@
         "Lossy compression, not pixel identical",
         "3 percent model-bottom inset calibrated for shipped Hiyori; other models may need adjustment",
         "CSS grading is global canvas tint, not physically directional lighting"
+      ]
+    },
+    {
+      "id": "avatar-shared-lipsync-fix",
+      "name": "Shared playback-owned mouth timing for Hiyori, Mao and VRM",
+      "status": "completed",
+      "scope": [
+        "Separate friend/lipsync-fix directly from main2b67452; no adapter/Mao dependency commits in this PR",
+        "Preserve outputLatency/baseLatency25–350ms,FFT1024,hidden timer and original render clocks",
+        "Browser utterance lifecycle replaces early/global speaking and estimated-duration mouth fallback",
+        "2026-10-27 author merged217 asmain9d09edc; integrate actual unifiedLive2D/Mao frommain, rerun shared lipsync/three-model/full/package and all CI, wait user Windows listening before author merge."
+      ],
+      "done_criteria": [
+        "PR first documents symptoms, honest timing bounds and root causes",
+        "Event lifecycle, long tail, cancellation/stale/pause plus analysed audio and bridge regressions",
+        "Real Hiyori/Mao/VRM before-after local comparison clips; official CC0 local-only VRM",
+        "Full checks, normal push, separate PR; no merge/main/force push"
+      ],
+      "next": "Author merged PR226 into main d63d077; historical verification retained. No further lipsync work requested.",
+      "verification": [
+        "Full882Python/3skipped,70Node,syntax190/230,secrets824;docs4/package/JSON/py_compile passed.",
+        "Real Hiyori/Mao/CC0SendagayaShino:3 side-by-side14.6s/292frame/20fps local clips with same reference voice; shared tail variation0->0.650747; actual parameters move, no page errors.",
+        "Controlled reference starts1370ms:old signal1000ms,new1400ms;not measured real-device offsets. OfficialCC0/local model source and SHA recorded,ignored/not committed.",
+        "Unchanged latency/FFT1024/hidden timer and split-clock regressions pass; no existing snapshots updated or PR217 strict tests copied/relaxed.",
+        "Separate main2b67452 branch; #217 already ready at0c08c3d; original local installed120ms unchanged.",
+        "2026-10-27 main9d09edcmerged3aafe90;real3modelcurrentcode/nooverlay passes;full938/3skip/75Node,syntax195/246,secrets858;package/JSON/compilepass;existingfixtures/snapshotsunchanged,newexplicitprecedence+provider-vowelisolation assertions."
       ]
     }
   ],
