@@ -86,10 +86,16 @@ class AvatarBrain:
         world = sanitize_world(raw)
         with self.lock:
             old = self.world
-            if (not old or old["scene"] != world["scene"] or old["period"] != world["period"] or world["typing"] or world["speaking"]
-                    or world["idle_sec"] < old["idle_sec"]):
+            context_changed = not old or old["scene"] != world["scene"] or old["period"] != world["period"]
+            input_changed = bool(old and (world["idle_sec"] < old["idle_sec"] or (world["typing"] and not old["typing"])))
+            speech_started = bool(world["speaking"] and (not old or not old["speaking"]))
+            # A reply's own busy/speech heartbeat must not invalidate its actions.
+            if context_changed or input_changed or (speech_started and not self.busy):
                 self.epoch += 1
-                self.plans.clear()
+                for item in self.plans.values():
+                    plan = item["plan"]
+                    if context_changed or input_changed or (plan["status"] != "executing" and plan["source"] != "reply"):
+                        item["plan"]["status"] = "invalidated"
             self.world, self.updated = world, self.clock()
             reason = "idle"
             if old and old["period"] != world["period"]:
@@ -97,7 +103,8 @@ class AvatarBrain:
             elif old and old["idle_sec"] >= 600 and world["idle_sec"] < MIN_IDLE_SECONDS:
                 reason = "user_returned"
             self.reason = reason if reason != "idle" else self.reason
-            return {"ok": True, "world": deepcopy(world), "trigger": reason}
+            return {"ok": True, "world": deepcopy(world), "trigger": reason,
+                    "enabled": settings(self.config_loader())["enabled"]}
 
     def start(self):
         if not settings(self.config_loader())["enabled"]:
@@ -125,7 +132,8 @@ class AvatarBrain:
             self.epoch += 1
             if self.world:
                 self.world["idle_sec"] = 0
-            self.plans.clear()  # A user turn invalidates undelivered autonomous proposals.
+            for item in self.plans.values():
+                item["plan"]["status"] = "invalidated"
         try:
             yield
         finally:
@@ -181,10 +189,12 @@ class AvatarBrain:
     def poll(self):
         with self.lock:
             self._prune(self.clock())
-            if not settings(self.config_loader())["enabled"] or self._blocked(self.clock()):
+            if (not settings(self.config_loader())["enabled"] or not self._fresh(self.clock())
+                    or self.busy or self.world["typing"]):
                 return {"ok": True, "plans": []}
             return {"ok": True, "plans": [deepcopy(x["plan"]) for x in self.plans.values()
-                                           if x["plan"]["status"] != "completed"]}
+                                           if x["plan"]["status"] == "planned"
+                                           and (not self.world["speaking"] or x["plan"]["source"] == "reply")]}
 
     def think(self, reason=None):
         """Reserve budget before the call; failure counts. Model/retrieval run outside lock."""
@@ -233,7 +243,7 @@ class AvatarBrain:
             with self.lock:
                 self.inflight = False
 
-    def acknowledge(self, ident, *, speech_delivered=False, action_indices=()):
+    def acknowledge(self, ident, *, speech_delivered=False, action_indices=(), outcomes=(), started=False):
         """Only explicit delivery/completion receipts may persist real experiences."""
         if not isinstance(ident, str) or len(ident) != 32:
             return {"ok": False, "error": "unknown_plan"}
@@ -244,6 +254,36 @@ class AvatarBrain:
             if not item or not settings(self.config_loader())["enabled"]:
                 return {"ok": False, "error": "unknown_plan"}
             plan, acked = item["plan"], item["acked"]
+            if started is True:
+                if plan["status"] != "planned":
+                    return {"ok": False, "error": "plan_unavailable"}
+                plan["status"] = "executing"
+                return {"ok": True, "recorded": 0}
+            terminal = item.setdefault("outcomes", {})
+            for outcome in (outcomes if isinstance(outcomes, list) else [])[:9]:
+                if not isinstance(outcome, dict):
+                    continue
+                index, status = outcome.get("index"), outcome.get("status")
+                if type(index) is not int or not -1 <= index < len(plan["actions"]) or index in terminal:
+                    continue
+                if not isinstance(status, str) or status not in {"completed", "failed", "interrupted", "skipped"}:
+                    continue
+                if plan["status"] == "invalidated" and status == "completed":
+                    continue
+                reason = outcome.get("reason")
+                if not isinstance(reason, str) or reason not in {"done", "unsupported", "invalid", "timeout", "user_input", "scene_changed", "disabled", "error", "disposed"}:
+                    reason = "error"
+                terminal[index] = {"status": status, "reason": reason}
+                if status == "completed":
+                    if index == -1:
+                        speech_delivered = True
+                    else:
+                        action_indices = [*(action_indices if isinstance(action_indices, list) else []), index]
+                else:
+                    acked.add("speech" if index == -1 else index)
+                LOG.info("avatar_brain_ack status=%s reason=%s", status, reason)
+            if plan["status"] == "invalidated":
+                speech_delivered, action_indices = False, []
             if speech_delivered is True and plan["say"] and "speech" not in acked:
                 records.append(("speech", "主动说过：" + plan["say"]))
             indices = action_indices[:8] if isinstance(action_indices, list) else []

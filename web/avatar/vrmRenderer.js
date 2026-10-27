@@ -305,6 +305,7 @@
     const worldModule = options.worldModule || root.XinyuVRMWorld;
     const seating = options.seatingModule || root.XinyuVRMSeating;
     let activeLayout=null,walkMetrics=null;
+    let brainControlled=false,brainGaze=null;
     const locomotion=(options.locomotionModule||root.XinyuVRMLocomotion)?.create();
     let seatProfile=null,seatMetrics=null,cameraController=null,backSince=null;
     let room = null, legacyLights = null, undoGrade = null, floorY = 0;
@@ -511,7 +512,7 @@
       const now=frame.now ?? root.performance.now();
       if(world && avatarRoot){
         const dt=Math.max(0,Math.min((now-(worldTime??now))/1000,.1));worldTime=now;
-        worldState=world.update(now,{period:period(),interaction:!!frame.interaction || frame.mode==="speak" || !!frame.preparingSpeech});
+        worldState=world.update(now,{period:period(),interaction:!brainControlled && (!!frame.interaction || frame.mode==="speak" || !!frame.preparingSpeech)});
         const pose=worldModule.pose(worldState,modelHeight,vrm.meta?.metaVersion==="0"?-1:1);
         avatarRoot.position.set(worldState.position[0]+pose.offset[0],pose.y,worldState.position[1]+pose.offset[1]);
         avatarRoot.rotation.y=worldState.yaw;
@@ -534,6 +535,10 @@
       if (painted) {
         avatarRoot.rotation.y = painted.avatarYaw();
         frame = { ...frame, worldPose: paintedModule.stationaryPose(now, frame.interaction || frame.mode === "speak" || frame.preparingSpeech, vrm.meta?.metaVersion === "0" ? -1 : 1) };
+      }
+      if(brainGaze && world){
+        const point=activeLayout?.activityPoints?.[brainGaze];
+        frame={...frame,worldGaze:brainGaze==='user'?camera.position.toArray():point?[point[0],modelHeight*.9,point[1]]:null};
       }
       driver.update(frame);
       room?.setFootPositions?.(seatMetrics ? Object.values(seatMetrics.legs).map(l=>l.ankle) : null);
@@ -578,6 +583,22 @@
       capabilities: () => ({ ...(driver?.capabilities() || { vowels: false, faces: [], actions: [], vrma: false }), fullBody: !!world, locomotion: !!world }),
       playAction: (...args) => driver?.playAction(...args) || false,
       stopAction: () => driver?.stopAction(),
+      setBrainControl(value){brainControlled=!!value;if(!value)brainGaze=null;world?.setControlled?.(value);},
+      lookAtWorld(target){brainGaze=target;return target==='user'||!!activeLayout?.activityPoints?.[target];},
+      interruptBrain(){brainControlled=false;brainGaze=null;world?.setControlled?.(false);world?.interrupt();driver?.stopAction();},
+      worldLayout:()=>activeLayout,
+      beginWorldAction(action){
+        if(!world || !["room","handpainted"].includes(room?.metrics()?.preset))return false;
+        if(action.type==="stand")return world.stand();
+        if(action.type==="sit")return world.begin(["rest","desk"].includes(worldState?.name)?worldState.name:"rest");
+        return world.begin(action.target||action.name,{pose:action.type!=="go_to"});
+      },
+      worldActionDone(action){
+        if(!worldState)return false;
+        if(action.type==="stand")return worldState.blend===0 && !worldState.moving;
+        return !worldState.moving && worldState.phase==="activity" &&
+          (action.type==="go_to" ? worldState.blend===0 : worldState.blend>=.999);
+      },
       isAnimating: () => {
         const c = cameraController?.snapshot();
         return !!(worldState?.moving || ["prepare", "walk", "rise"].includes(worldState?.phase)

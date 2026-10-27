@@ -40,7 +40,7 @@ def sanitize_world(raw):
         raise ValueError("invalid_world")
     if len(json.dumps(raw, ensure_ascii=False).encode("utf-8")) > MAX_WORLD_BYTES:
         raise ValueError("world_too_large")
-    if not member(raw.get("scene"), {"room", "handpainted", "none"}):
+    if not member(raw.get("scene"), {"room", "handpainted", "painted", "live2d", "none"}):
         raise ValueError("invalid_scene")
     # All strings are closed enums. Unknown fields (including config/key/path) are discarded.
     places = subset(raw.get("places"), PLACES)

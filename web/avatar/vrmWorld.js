@@ -91,9 +91,10 @@
     const plan=end=>smoothPath(path(position,end,obstacles,limits),obstacles,limits).slice(1).filter(p=>distance(position,p)>MOTION.arrival);
     function event(stage, activity){emit({type:"activity",name:activity,stage});}
     function end(){if(name!=="accompany")event("end",name);}
-    function begin(activity){if(!Object.hasOwn(points,activity))return false;
+    let controlled=false, poseEnabled=true;
+    function begin(activity,{pose=true}={}){if(!Object.hasOwn(points,activity))return false;
       const planned=path(position,points[activity],obstacles,limits);if(!planned.length)return false;
-      end();previous=name;name=activity;route=plan(points[activity]);phase=route.length?"prepare":"activity";
+      end();previous=name;name=activity;poseEnabled=pose;route=plan(points[activity]);phase=route.length?"prepare":"activity";
       turnAge=0;variation={speed:range(1-MOTION.speedVariation,1+MOTION.speedVariation),amplitude:range(1-MOTION.amplitudeVariation,1+MOTION.amplitudeVariation),pause:range(MOTION.pauseMin,MOTION.pauseMax)};
       began=now;next=now+range(TUNING.activityMin,TUNING.activityMax);event("start",name);return true;}
     function interact(){
@@ -109,12 +110,12 @@
     function update(time, { interaction=false, period="night" }={}) {
       now=time;const dt=Math.max(0,Math.min((now-(last??now))/1000,.1));last=now;
       if(interaction)interact();else if(busy){busy=false;hold=now+wait;}
-      if(!interaction&&hold&&now>=hold){hold=0;begin(choose(period));}
-      else if(!interaction&&!hold&&now>=next)begin(choose(period));
+      if(!controlled&&!interaction&&hold&&now>=hold){hold=0;begin(choose(period));}
+      else if(!controlled&&!interaction&&!hold&&now>=next)begin(choose(period));
       // Small fixed substeps keep acceleration and heading limits stable at 20/30 Hz.
       const count=Math.max(1,Math.ceil(dt/MOTION.integrationStep)),stepDt=dt/count;
       for(let step=0;step<count;step++){
-        const canPose=!route.length&&speed<MOTION.minSpeed&&name!=="accompany";
+        const canPose=poseEnabled&&!route.length&&speed<MOTION.minSpeed&&name!=="accompany";
         const samePose=poseName===name;
         const desired=canPose&&(samePose||rawBlend===0)?1:0;
         if(desired&&!samePose){poseName=name;began=now;}
@@ -154,7 +155,10 @@
       return {position:[...position],yaw,name,poseName,poseAge,phase,moving,blend,age:(now-began)/1000,time:now/1000,holdUntil:hold,
         speed,travel,gait:travel/MOTION.strideLength*Math.PI*2,variation:{...variation},headTurn,chestTurn,gazeYaw,pathYaw};
     }
-    return { update, begin, interrupt:interact, snapshot:()=>({position:[...position],name,phase,route:route.map(p=>[...p]),holdUntil:hold}), dispose:end };
+    return { update, begin, interrupt:interact,
+      setControlled(value){controlled=!!value;if(!controlled){next=now+range(TUNING.resumeMin,TUNING.resumeMax);}},
+      stand(){end();name="accompany";route=[];phase="respond";poseEnabled=false;return true;},
+      snapshot:()=>({position:[...position],name,phase,route:route.map(p=>[...p]),holdUntil:hold}), dispose:end };
   }
   function pose(state,height=1.6,facing=1) {
     const bones={}, add=(n,v)=>bones[n]=v;const t=state.poseAge ?? state.age,s=Math.sin(state.gait??state.time*TUNING.strideHz*Math.PI*2);

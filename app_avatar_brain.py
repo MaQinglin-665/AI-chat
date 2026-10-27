@@ -70,7 +70,8 @@ def dispatch(handler, path, service):
             result = service.think(body.get("reason", "idle"))
         elif path.endswith("/ack"):
             result = service.acknowledge(body.get("id"), speech_delivered=body.get("speech_delivered"),
-                                         action_indices=body.get("action_indices"))
+                                         action_indices=body.get("action_indices"), outcomes=body.get("outcomes"),
+                                         started=body.get("started"))
         else:
             result = service.poll()
         handler._send_json(result)
