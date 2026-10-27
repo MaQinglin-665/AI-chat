@@ -1335,3 +1335,6 @@ Independent worktree ai_desktop_pet_vocab from origin/main 5669e8a. node_modules
 
 ### Gesture vocabulary implementation and evidence
 Protocol capability intersection + scene gaze, Promise statuses/AbortSignal/VRM fallback; no renderer/mapping edits. Verification Evidence: final full test-local with isolated D TEMP/TMP:969 Python/3skip,82 Node,syntax/secrets; prior C-temp disk exhaustion and Torch native failure retained in ignored logs, no related product changes. Hiyori real daily300.906s/4calls/4374tokens/5completed gesture ACKs, no real gaze action; video331.52s fully decoded, final screenshot timeout documented. Mao blocked on accessible manifest path; draft only, not complete dual-model acceptance. Report docs/avatar-brain-gesture-vocab.md.
+
+### Mao model and real verification follow-up
+User provided official local Mao and authorized ignored copy. Actual mapping modelChecked:true/no errors or warnings. Daily five-minute run304.52s video,9responses/5753tokens,no page errors but abstain text and no terminal ACKs: not passed as execution. Additional65.397s real-model diagnostic (no product changes) completed wave then look_at left,2ACKs,1response/1044tokens. Both videos decode; local only. Details/limitations in docs/avatar-brain-gesture-vocab.md. Original e60b1bc all CI green. Draft232 remains unmerged; no model/config/media committed.
