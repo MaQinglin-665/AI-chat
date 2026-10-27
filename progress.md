@@ -1156,3 +1156,8 @@ User explicitly authorized these backend-only phase-2 items before #217. New bra
 - 01 Hiyori录像（约38.4秒，无声）已在聊天单独补发，用户明确“我来转发”。不声称作者已收到或观看；它仍是作者合并前必看项。02–04作者已看过，用户确认改进明显。录像/模型/私密配置未提交。
 
 本检查点随后正常push/ready并等待该提交的Linux与Windows全部CI通过，再在PR评论中通知作者；远端结果以GitHub及仓库外ci-final.json为准。任何PR均不自行合并。#226同步及后续Mao分支工作等作者合并#217；官方CC0Sendagaya仅本地，不作为本次默认角色变更。
+
+
+## 2026-10-27 — PR217 latest-main conflict follow-up
+- User reports21727301c0greenCIbutCONFLICTING aftermain1012e13/#225. ReadAGENTS/currentstate, confirmedcleancorrectbranch, fetched1ab5d38->1012e13. Mainaddsbedroomassets/Hiyori backdropcontroller/layout hook/docs/tests/package; no privateconfigread/installedappchanges.
+- Reopen217closeout only: merge/preserve mainVRM/scene behavior, stop on ambiguousconflicts, strict+allVRM/backdrop/full/package thennormalpush/allCI/authornotification. #226/Mao remain gated on author merging217. No force/mainpush/selfmerge/model/privateconfig/key commits; networkpush10s/max5.

@@ -3,7 +3,7 @@
     {
       "id": "avatar-live2d-pr217-closeout",
       "name": "Rebase integration boundary and exact Hiyori video for PR217",
-      "status": "completed",
+      "status": "in_progress",
       "dependencies": [
         "avatar-live2d-stage2",
         "avatar-painted-backdrop-v1"
@@ -12,7 +12,8 @@
         "Priority1 per user: latest main79ee80f including#221/#222, exact Core6 Hiyori, dedicated video, normal push and ready; author merges",
         "Remove previously mixed lipsync product changes by inverse patch; preserve history and local installed120ms until independent shared PR",
         "Do not start LLM task phase2 before author merges#217",
-        "Latest user: sync main1ab5d38/#227; #225 still open/draft, do not merge it. Main VRM/scene numeric behavior authoritative; stop on ambiguous conflicts."
+        "Latest user: sync main1ab5d38/#227; #225 still open/draft, do not merge it. Main VRM/scene numeric behavior authoritative; stop on ambiguous conflicts.",
+        "2026-10-27: main1012e13 now includes225 bedroom background; resolve reported PR217 conflict, preserve main scene behavior, rerun strict/full/package and all CI.226/Mao remain gated."
       ],
       "done_criteria": [
         "Latest main merged with VRM features retained",
@@ -20,7 +21,7 @@
         "Dedicated Hiyori inspection video delivered locally; no model/private assets committed",
         "Existing PR217 updated/pushed/ready; separate main-based lipsync branch next"
       ],
-      "next": "Normalpush/ready and await all exact-head Linux+WindowsCI, notify author inPR217; author must view01 and merge. PR226/Mao wait for author merging217.",
+      "next": "Merge origin/main1012e13, preserve upstream backdrop/VRM and approved Live2D clocks, stop on ambiguous behavior conflicts; rerun strict+VRM/backdrop/full/package, normalpush and all CI, notify author without merging.",
       "verification": [
         "Merged latest main79ee80f (#221/#222) as8d514b7; retained both VRM and Live2D integration.",
         "Exact same-Core Node5280frames/394224calls/42scenes; browser1030frames/167741calls, all snapshots/four PNG pairs identical and10 reloads clean.",

@@ -1,3 +1,9 @@
+# Current — PR217 conflicts after #225 landed; sync main1012e13
+- User2026-10-27 reports217head27301c0/open/CIgreen butCONFLICTING andmain1012e13notancestor. Cleanlocalfriend/avatar-live2d-adapter matches remote; explicitfetch confirmsmain1012e13nowincludes225bedroombackdrop. PriorCIgreen did not cover this later main.
+- Scope: merge latestmain, preserve upstreamVRM/room/camera/backdrop numeric behavior and approved Live2DPixi clock, resolve only clear conflicts; ask author on uncertain choices. Rerun specified strict tests, all mainVRM/scene/backdrop tests, full test-local/package, normalpush/ready then all Linux+WindowsCI. Never selfmerge/main/forcepush; networkpushretry10s/max5.
+- #226friend/lipsync-fix and separateMao stage3 remain blocked on author merging217, do not sync/start now. Sendagaya remains ignoredmodels_local; no defaultmodel task or model/privateconfig/key commit.01 standalone video alreadyprovided/userforwards; do not claim authorviewed01.
+- Next inspectactualmergeconflicts. No privateconfiguration read or installedapp change.
+
 # Current — PR217 latest-main gates passed; publish and await all CI
 - Merged main1ab5d38/#227 asf73125f; #221/#224 included. #225 stilldraft/unmerged atfetch. Only3state conflicts preserved both histories; no product conflict/behavior choice. VRM beyond approved clock movement +8scene/camera/background modules matchmain byte-for-byte.
 - Verification Evidence: exactadapter+sequence Node5280/394224/42, browser1030/167741/fourPNGpairs/10reloads;9VRM Node +32Python/1skip asset/backdrop; full928Python/3skipped/73Node,syntax194/241,secrets847;package/JSON/py_compile passed. Logswork/pr217-main227-* outsideGit.
