@@ -56,6 +56,7 @@ class AvatarBrain:
         self.inflight = False
         self.next = 0
         self.plans = OrderedDict()
+        self.retired = OrderedDict()
         self.stop_event = threading.Event()
         self.thread = None
 
@@ -95,7 +96,7 @@ class AvatarBrain:
                 for item in self.plans.values():
                     plan = item["plan"]
                     if context_changed or input_changed or (plan["status"] != "executing" and plan["source"] != "reply"):
-                        item["plan"]["status"] = "invalidated"
+                        self._invalidate(item, "scene_changed" if context_changed else "superseded_by_input" if input_changed else "speech_started")
             self.world, self.updated = world, self.clock()
             reason = "idle"
             if old and old["period"] != world["period"]:
@@ -133,7 +134,7 @@ class AvatarBrain:
             if self.world:
                 self.world["idle_sec"] = 0
             for item in self.plans.values():
-                item["plan"]["status"] = "invalidated"
+                self._invalidate(item, "superseded_by_input")
         try:
             yield
         finally:
@@ -158,9 +159,19 @@ class AvatarBrain:
                 config["llm"].pop("api_key", None)
         return config
 
+    def _invalidate(self, item, reason):
+        if item["plan"]["status"] in {"planned", "executing"}:
+            item["plan"]["status"] = "invalidated"
+            item["invalid_reason"] = reason
+            LOG.debug("avatar_brain_invalidated id=%s reason=%s", item["plan"]["id"], reason)
+
     def _prune(self, now):
         for ident in list(self.plans):
             if now - self.plans[ident]["at"] > PLAN_TTL:
+                self.retired[ident] = "expired"
+                if len(self.retired) > MAX_PLANS:
+                    self.retired.popitem(last=False)
+                LOG.debug("avatar_brain_expired id=%s", ident)
                 del self.plans[ident]
 
     def _publish(self, decision, source):
@@ -171,6 +182,7 @@ class AvatarBrain:
         ident = uuid.uuid4().hex
         plan = {"id": ident, "status": "planned", "source": source, **deepcopy(decision)}
         self.plans[ident] = {"plan": plan, "at": now, "acked": set()}
+        LOG.debug("avatar_brain_published id=%s source=%s", ident, source)
         return deepcopy(plan)
 
     def reply_plan(self, config):
@@ -251,12 +263,18 @@ class AvatarBrain:
         with self.lock:
             self._prune(self.clock())
             item = self.plans.get(ident)
-            if not item or not settings(self.config_loader())["enabled"]:
-                return {"ok": False, "error": "unknown_plan"}
+            if not settings(self.config_loader())["enabled"]:
+                return {"ok": False, "error": "disabled", "reason": "disabled"}
+            if not item:
+                reason = self.retired.get(ident, "unknown_plan")
+                return {"ok": False, "error": reason, "reason": reason}
             plan, acked = item["plan"], item["acked"]
             if started is True:
                 if plan["status"] != "planned":
-                    return {"ok": False, "error": "plan_unavailable"}
+                    reason = item.get("invalid_reason", "already_claimed")
+                    LOG.debug("avatar_brain_claim_rejected id=%s reason=%s", ident, reason)
+                    return {"ok": False, "error": reason, "reason": reason}
+                LOG.debug("avatar_brain_claimed id=%s", ident)
                 plan["status"] = "executing"
                 return {"ok": True, "recorded": 0}
             terminal = item.setdefault("outcomes", {})
@@ -271,7 +289,7 @@ class AvatarBrain:
                 if plan["status"] == "invalidated" and status == "completed":
                     continue
                 reason = outcome.get("reason")
-                if not isinstance(reason, str) or reason not in {"done", "unsupported", "invalid", "timeout", "user_input", "scene_changed", "disabled", "error", "disposed"}:
+                if not isinstance(reason, str) or reason not in {"done", "unsupported", "invalid", "timeout", "user_input", "scene_changed", "disabled", "error", "disposed", "not_ready", "invalid_input", "invalid_mapping", "aborted", "replaced", "clock_stalled", "invalid_target", "stopped", "invalid_result"}:
                     reason = "error"
                 terminal[index] = {"status": status, "reason": reason}
                 if status == "completed":

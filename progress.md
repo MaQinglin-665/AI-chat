@@ -1344,3 +1344,25 @@ Verification Evidence: scripts/test-local.ps1 passed: 950 Python / 3 skipped, al
 - 真实本地Hiyori/Mao前后各120秒/1800帧/15fps，60Hz更新，共四段有声成片；30秒待机、四句话、连续三手势、官方/参数交接和恢复，含头部特写/场景名/署名。为了比较同一输入，QA两边均固定官方Idle[0]；两模型实际Core嘴型成对1800帧严格相同，三手势Promise结果前后相同，零页面异常。媒体已解码验证，音轨发声段mean -24.4dB/max -1.8dB。受控SAPI/RMS回放，不冒充真实设备延迟/主观验收。
 - 新增本地QA/音轨工具与说明。工作日志及截图/源帧/录像/SHA均仅仓库外outputs/live2d-motion-natural及work/live2d-motion-natural-*.log。模型、私密配置、Key、录音/媒体不提交；不读取别人配置，不覆盖安装版。
 下一步：正常push本分支、独立PR到main，记录四段草稿录像附件链接，等待当前head全部Linux/WindowsCI后交作者Windows验收；不自行合并，不main/force push。主观自然程度/模型绑定限制和无时间戳时按整次播放限额见docs/live2d-motion-natural.md。
+
+## 2026-10-27 — brain-gesture-vocab-v1 started
+Independent worktree ai_desktop_pet_vocab from origin/main 5669e8a. node_modules copied; no npm ci. Read unified vocabulary contract. No renderer/mapping changes or private configuration access; real validation uses independent config/port and environment key.
+
+### Gesture vocabulary implementation and evidence
+Protocol capability intersection + scene gaze, Promise statuses/AbortSignal/VRM fallback; no renderer/mapping edits. Verification Evidence: final full test-local with isolated D TEMP/TMP:969 Python/3skip,82 Node,syntax/secrets; prior C-temp disk exhaustion and Torch native failure retained in ignored logs, no related product changes. Hiyori real daily300.906s/4calls/4374tokens/5completed gesture ACKs, no real gaze action; video331.52s fully decoded, final screenshot timeout documented. Mao blocked on accessible manifest path; draft only, not complete dual-model acceptance. Report docs/avatar-brain-gesture-vocab.md.
+
+### Mao model and real verification follow-up
+User provided official local Mao and authorized ignored copy. Actual mapping modelChecked:true/no errors or warnings. Daily five-minute run304.52s video,9responses/5753tokens,no page errors but abstain text and no terminal ACKs: not passed as execution. Additional65.397s real-model diagnostic (no product changes) completed wave then look_at left,2ACKs,1response/1044tokens. Both videos decode; local only. Details/limitations in docs/avatar-brain-gesture-vocab.md. Original e60b1bc all CI green. Draft232 remains unmerged; no model/config/media committed.
+
+## PR232 pre-merge reply/claim repair started
+Author authorized narrow abstain filtering, ordinary-reply prompt/body guard and fixed claim refusal diagnostics. Saved raw Mao responses contain standalone abstain tags without brain blocks. Preserve model renderers/mappings/private config. Reproduce lifecycle with isolated synthetic replay then real five-minute run; no claim about old missing receipts without evidence.
+
+Verification Evidence: PR232 reply/claim repairs complete; full D TEMP/TMP test-local978 Python/3skip,82 Node,syntax/secrets pass. Narrow streaming abstain filter, explicit normal-body prompt, error on control-only normal reply; safe fixed claim diagnostics/expiry tombstones. Saved-response four-turn replay8actions completed, historical missing claim not reproduced. Push/CI then same-four-message real Mao5minute run required.
+
+PR232 repair follow-up:10ef902 fullLinux/WindowsCI passed before realMao run. Same4prompts/daily300.953s:4nonempty replies,raw/display abstain0,1plan wave/nod2completedACKs,no rejected/unresolved plan,0page errors.4calls4496tokens~$0.000191652. Video304.12s full decode; private localonly. Historical think/tilt_head never claimed but original reason not recoverable; four-turn replay8complete, no fabricated root cause. Report updated; draft only, no merge.
+
+## 2026-10-27 — PR233 同步作者新合入的 PR232
+发布PR233时发现main已推进到582f19e（执行器词表）。正常merge；仅feature_list/progress/session三个状态文件冲突，保留两边feature及progress历史。主线主动归档的旧handoff继续保存在docs/archive/session-handoff-before-gesture-vocab.md；当前handoff保留本Live2D验收摘要和主线新摘要，不恢复大段已归档历史。所有brain/执行器/主线产品与测试自动合并，未做手工修改；avatarRuntime不在本PR改动中。
+下一步：以新main重跑完整本地/打包检查，确认主线brain/执行器文件逐字节一致；正常push233并等所有CI，不自行合并。四段录像以原5669e8a作修改前基线，Live2D实现未因这次同步改动，原对照保持有效。
+
+Verification Evidence（同步main582f19e/#232后的最终组合）：完整scripts/test-local.ps1通过，978Python/3skip、83Node，语法197/261、secrets887；first-run package、公开样例JSON和py_compile通过。主线brain/执行器/avatarRuntime/VRM文件相对origin/main零diff，严格fixture零diff；Hiyori5280/394224与Mao1440/25850、实际Core6/Mao181030仍通过。四段最终有声MP4已上传既有草稿验收附件，作者须登录写权限查看；本地ZIP与16张比赛过程截图已保存，成片与ZIP校验后清理7200张重复帧释放377MiB。下一步正常push更新PR233并等当前head全部CI；作者Windows验收和合并，本任务不合并。

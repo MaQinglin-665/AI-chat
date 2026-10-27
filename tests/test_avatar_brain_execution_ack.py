@@ -43,3 +43,35 @@ def test_reply_survives_busy_heartbeats_and_runs_with_its_speech():
     assert service.poll()['plans'][0]['id'] == plan['id']
     service.update_world(world(typing=True, idle_sec=0))
     assert service.poll()['plans'] == []
+
+
+def test_renderer_failure_reason_is_preserved_without_raw_details():
+    service = AvatarBrain(config, lambda *a: json.dumps(decision()), lambda *a: None)
+    service.update_world(world())
+    plan = service.think()['decision']
+    service.acknowledge(plan['id'], started=True)
+    service.acknowledge(plan['id'], outcomes=[{'index': 0, 'status': 'failed', 'reason': 'clock_stalled'},
+                                            {'index': 1, 'status': 'failed', 'reason': 'private detail'}])
+    terminal = service.plans[plan['id']]['outcomes']
+    assert terminal[0]['reason'] == 'clock_stalled'
+    assert terminal[1]['reason'] == 'error'
+
+
+def test_claim_refusals_and_expiry_have_fixed_reasons():
+    now = [100.0]
+    service = AvatarBrain(config, lambda *a: json.dumps(decision()), lambda *a: None, clock=lambda: now[0])
+    service.update_world(world())
+    first = service._publish(decision(), 'reply')
+    assert service.acknowledge(first['id'], started=True)['ok']
+    assert service.acknowledge(first['id'], started=True)['reason'] == 'already_claimed'
+    second = service._publish(decision(), 'reply')
+    service.update_world(world(typing=True, idle_sec=0))
+    assert service.acknowledge(second['id'], started=True)['reason'] == 'superseded_by_input'
+    third = service._publish(decision(), 'reply')
+    service.update_world(world(scene='live2d'))
+    assert service.acknowledge(third['id'], started=True)['reason'] == 'scene_changed'
+    fourth = service._publish(decision(), 'reply')
+    now[0] += 301
+    service.poll()
+    assert service.acknowledge(fourth['id'], started=True)['reason'] == 'expired'
+    assert len(service.retired) <= 16

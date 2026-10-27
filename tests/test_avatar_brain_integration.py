@@ -132,3 +132,28 @@ def test_proactive_provider_uses_only_environment_key_and_no_tools(monkeypatch):
     assert calls[0][0]["api_key_env"] == "TEST_ONLY_ENV"
     assert calls[0][0]["max_tokens"] == 480
     assert "private-do-not-use" not in json.dumps(calls)
+
+
+@pytest.mark.parametrize("streaming", [False, True])
+def test_control_only_reply_reports_error_instead_of_empty_bubble(streaming):
+    cfg, calls = config(), []
+    cfg["thinking"] = {"enabled": False}
+    service = AvatarBrain(lambda: cfg, lambda *a: '', lambda *a: None)
+    service.update_world(world())
+    raw = '<abstain /> </abstain>' + OPEN + json.dumps(decision()) + CLOSE
+    def reply(user, history, *, config, **kwargs):
+        deps = runtime_dependencies(llm_runtime.call_llm_impl, config, raw, calls)
+        deps['diagnose_llm_exception_fn'] = lambda exc, cfg: exc
+        return llm_runtime.call_llm_impl(user, history, config=config, **deps)
+    def stream(user, history, *, config, **kwargs):
+        yield from filter_stream(iter(raw), config)
+    recorder = RouteRecorder()
+    _handle('/api/chat_stream' if streaming else '/api/chat', {'message':'你好'}, recorder,
+            avatar_brain_service=service, load_config_func=lambda:cfg,
+            call_llm_func=reply, call_llm_stream_func=stream)
+    if streaming:
+        assert any(p.get('type') == 'error' for p in recorder.sse)
+        assert not any(p.get('type') == 'done' for p in recorder.sse)
+    else:
+        assert recorder.json[-1]['status'] == 500
+        assert 'reply' not in recorder.json[-1]['data']
