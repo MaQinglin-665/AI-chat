@@ -5,6 +5,7 @@ const mapping = require("../web/avatar/mappings/mao.json");
 const driverApi = require("../web/avatar/live2dModelDriver.js");
 const runtime = require("../web/avatar/avatarRuntime.js");
 const assets = require("../web/avatar/live2dAssets.js");
+const rendererApi = require("../web/avatar/live2dRenderer.js");
 function spectrum(f1, f2) {
   return Uint8Array.from({ length: 512 }, (_, i) => 15 + 180 * Math.exp(-(((i * 16000 / 1024 - f1) / 75) ** 2))
     + 140 * Math.exp(-(((i * 16000 / 1024 - f2) / 90) ** 2)));
@@ -50,5 +51,29 @@ function spectrum(f1, f2) {
   host.authFetch = async url => ({ ok: !url.endsWith("texture.png"), json: async () => structuredClone(manifest), blob: async () => new Blob(["x"]) });
   await assert.rejects(assets.prepare("/api/avatar/live2d/Mao.model3.json", host));
   assert.equal(revoked.length, 5, "partial load releases earlier object URL");
+  // Cancelling a configuration load must never report a ready renderer.
+  // Exercise both asynchronous boundaries without requiring model resources.
+  const cancelledBeforeMapping = rendererApi.createRenderer({ state: {}, lifecycle: {
+    load() { throw Error("cancelled mapping must not start model loading"); }
+  } });
+  const earlyLoad = cancelledBeforeMapping.load({ mapping });
+  cancelledBeforeMapping.dispose();
+  assert.equal(await earlyLoad, false, "disposed during mapping load is an explicit failure");
+  const cancelledBeforeDefaultReady = rendererApi.createRenderer({ state: {}, lifecycle: {
+    load() { throw Error("cancelled readiness must not start model loading"); }
+  } });
+  const readyLoad = cancelledBeforeDefaultReady.load({ mapping });
+  await Promise.resolve(); cancelledBeforeDefaultReady.dispose();
+  assert.equal(await readyLoad, false, "disposed while awaiting default mapping readiness");
+  let finish, started, disposed = 0, driverCreated = 0;
+  const loading = new Promise(resolve => { started = resolve; });
+  const cancelledDuringModel = rendererApi.createRenderer({ state: {}, host: {
+    XinyuLive2DModelDriver: { create() { driverCreated++; throw Error("must not create a cancelled driver"); } }
+  }, lifecycle: { load() { started(); return new Promise(resolve => { finish = resolve; }); } } });
+  const lateLoad = cancelledDuringModel.load({ mapping });
+  await loading; cancelledDuringModel.dispose(); cancelledDuringModel.dispose();
+  finish({ model: {}, dispose() { disposed++; } });
+  assert.equal(await lateLoad, false, "late resource completion cannot revive disposed renderer");
+  assert.equal(driverCreated, 0); assert.equal(disposed, 1, "late resources released exactly once");
   console.log("[OK] Mao vowels, mapped expressions/actions/arms, silence/latency and authenticated resources");
 })().catch(error => { console.error(error); process.exitCode = 1; });

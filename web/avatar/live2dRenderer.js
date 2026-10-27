@@ -27,8 +27,9 @@
     async function load(source = {}) {
       if (disposed) throw new Error("Live2D renderer is disposed");
       mapping = await mappingApi.load(source.mapping || mappingApi.DEFAULT_PATH);
-      if (disposed) return;
+      if (disposed) return false;
       await mappingApi.ready();
+      if (disposed) return false;
       state.avatarMapping = mapping;
       resource = await lifecycle.load({ ...source, mapping, beforeCoreUpdate(runLayers) {
         // Called only at the original pre-Core hook, inside the Pixi model tick.
@@ -37,11 +38,13 @@
         if (mapping.driver === "mapped") driver?.update(sanitize(state.avatarIntentFrame));
         else runLayers();
       } });
+      // A model may finish fetching after its renderer was cancelled. Release
+      // that resource and report failure before constructing a driver/runtime.
+      if (disposed) { resource?.dispose(); resource = null; return false; }
       if (mapping.driver === "mapped" && resource?.model) {
         const api = host.XinyuLive2DModelDriver || (typeof require === "function" ? require("./live2dModelDriver.js") : null);
         driver = api.create({ mapping, model: resource.model, expressions: resource.expressions, now: () => host.performance.now() });
       }
-      if (disposed) resource?.dispose();
       return resource !== null;
     }
     function update(frame = {}, options = {}) {

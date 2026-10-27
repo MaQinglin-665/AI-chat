@@ -1,3 +1,16 @@
+# Current — Mao 独立验收本地完成，待推送与 CI
+- 分支 friend/avatar-live2d-mao 直接基于 main9d09edc，不含未合并226。取消加载三种等待边界回归通过；只改取消检查，不改正常时钟/参数顺序。
+- 真实 Mao 五元音/3回退、8表情/8动作、3手势×5阶段和wave停止/到期通过；Mao/Hiyori配置两轮切换、实例/Blob/事件清理通过，零脚本错误，20张截图仅本地 outputs/mao-acceptance。
+- 完整932Python/3skip/74Node、语法194/243、secrets853、package/JSON/compile通过。Hiyori严格5280/394224/42保持，快照未改。
+- 下一步：正常push本分支并开独立PR到main、附到当前聊天，等待Linux/Windows CI；作者Windows实机检查后合并。不得自行合并/main/force push；网络push失败间隔10秒最多5次。
+- #226 已推送8723067/可审查，Linux/Windows全部10项CI成功且无冲突，用户已被告知可试听；不把226混入Mao，不覆盖安装，不提交模型/媒体/私人配置/Key。旧记录保留如下。
+
+# Current — Mao 验收与发现问题修复
+## 2026-10-27 — 独立 Mao 验收开始
+#217 已由作者合并为 main9d09edc。#226已同步该main并推送8723067，全部10项Linux/Windows CI成功且无冲突，已通知用户实际试听，未自行合并。当前新分支friend/avatar-live2d-mao直接从最新origin/main建立，没有fork，也不包含未合并的226。基础Mao适配已随217进入main，本任务只补实际五元音、8表情、3手势、动作和配置切换验收，修复复现问题；保存本地证据后独立PR。模型/私密配置/媒体/Key不提交，不改对话/记忆/外部执行，不覆盖本机安装。
+
+下一步：在真实本地Mao上补强断言并测试配置切换；先复现再修复。完整本地/打包检查后正常push并开独立PR，作者Windows检查后合并。旧记录保留如下。
+
 # Current — PR217 latest-main conflict fixed locally; publish/allCI/GitHub mergeability next
 - User reports27301c0CIgreenbutCONFLICTING aftermain1012e13/#225. Mergedmain1012e13as82ea405; only3state conflicts, preserved both histories + incoming middle notes, no product conflict. Ancestryexit0. Allmainbedroomcontroller/CSS/API/assets and8VRMscene modules preserved; renderer differs onlyapprovedclockownership.
 - Verification Evidence: strict5280frames/394224calls/42scenes; browser1030/167741/fourPNGpairs/10reloads;10mainHiyoriBackdrop/VRMNode +36Python/1skip; full932Python/3skip/74Node,syntax194/243,secrets853;package/JSON/compile pass. Logswork/pr217-main225-* and evidenceoutputs/pr217-main225 outsideGit. No privateconfigread/installedappchange.

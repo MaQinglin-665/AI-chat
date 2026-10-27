@@ -1,6 +1,28 @@
 {
   "features": [
     {
+      "id": "avatar-live2d-mao-acceptance",
+      "name": "Mao real-model acceptance and discovered fixes",
+      "status": "completed",
+      "dependencies": [
+        "avatar-live2d-stage2"
+      ],
+      "scope": [
+        "New friend/avatar-live2d-mao directly from origin/main9d09edc, no unmerged226 dependency",
+        "Real five vowels, eight expressions, three gestures, native actions and Mao/Hiyori configuration switching; fix only reproduced problems"
+      ],
+      "done_criteria": [
+        "Assert actual model outputs and save local screenshots",
+        "Regression and complete local/package gates pass",
+        "Normal push and separate PR to main; no models/config/keys/media committed, author reviews and merges"
+      ],
+      "verification": [
+        "Real official Mao:5 vowels/3fallbacks,8 expressions/8native motions,3gestures×5phases,wave expiry/stop and 4Mao-Hiyori config switches;63authorized/1denied,no page errors;20local screenshots",
+        "Full932Python/3skip/74Node,syntax194/243,secrets853;package/JSON/py_compilepass;strict5280frames/394224calls/42scenarios,baseline unchanged"
+      ],
+      "next": "Normalpush/create separate PR, wait Linux/Windows CI; author Windows check and merge.226 already CIgreen, user listening pending."
+    },
+    {
       "id": "avatar-live2d-pr217-closeout",
       "name": "Rebase integration boundary and exact Hiyori video for PR217",
       "status": "completed",
@@ -851,5 +873,5 @@
       ]
     }
   ],
-  "active_task": "avatar-live2d-pr217-closeout"
+  "active_task": "avatar-live2d-mao-acceptance"
 }
