@@ -1,3 +1,19 @@
+# Current — 长线阶段1已补齐，#228推送/CI后进入词表Draft
+## 长线阶段1补齐 — 2026-10-27
+- 手臂部件选择与摆动从 driver 的专用名字判断迁到 `mao.json` 的 `speechGestureEffects`，driver 只解释通用 parts/partParameters/oscillations。未改数值和调用顺序。
+- 冻结 main9d09edc 的 driver/mapping 原字节及 SHA256；同组1440帧完整序列/全部参数与部件快照严格一致：CI协议25850调用，本机真实Core6/Mao181030调用，无容差。CI不下载Mao，本机模型存在才加跑真实模型；两类证据分开报告。旧Hiyori严格基线不变。
+- 缺目录、清单、moc3、贴图、表情五种条件回归；前端在本地模型描述失败或资源加载失败时显示 models_local/清单/资源/avatar.path/刷新指引，返回null、保留聊天，不吞VRM错误。共享代码仅live2dRuntimeController的本地Live2D失败提示/短路，未改路由/ws或其他渲染器。
+- 40秒/800帧/20fps本机真实Pixi/Core录像：idle/listen/think、五元音（放大口型）、3手势、8表情、真实指针拖拽/松手恢复。带本机SAPI场景/元音音轨；这是受控映射展示，不是原生Windows TTS延迟测量。画面含场景名和Live2D署名；没有模型/媒体进git。
+- 全量scripts/test-local.ps1：937Python通过/3跳过，76Node文件，语法194/246，secrets859；首次运行包和必需JSON/py_compile通过。第一次全量发生一次无关external_agent HTTP本机连接中止，未改其代码；完整重跑通过。20截图/4切换/63授权/1拒绝/0页面错误及拖拽移动断言通过。
+- 录像已作为原仓库的**草稿验收附件**保存，需作者登录并有仓库写权限查看；不发布产品release。链接：https://github.com/MaQinglin-665/AI-chat/releases/tag/untagged-d2ff791d304d9886571a
+- 已知限制：合成频谱/受控元音不能证明真实人声识别率；Mao手势受原模型绑定约束；原生Windows穿透与真实语音仍由作者检查。#226独立且CI已绿，不混入本分支。
+
+下一步从friend/avatar-live2d-mao建立friend/live2d-action-vocab，先提交接口词表文档开Draft再实现；随后从其分支建立模板/校验CI PR。各PR堆叠依赖单独说明；作者合并，不force/mainpush。
+
+# Current — Live2D 长线，阶段1补全#228
+## 2026-10-27 — Live2D 长线任务
+阶段0复核main仍9d09edc，#2268723067包含main且10项CI全成功，无冲突，已通知。阶段1在现有#228补纯映射手臂效果、同Core完整写序列严格对照、缺模型回归与有声40s场景录像。随后从228分支建立动作词表分支，先文档Draft PR再实现；最后从其分支建立新模型模板/校验CI独立PR。允许前一PR开出后继续，不自行合并；每PR记录堆叠依赖、共享代码改动、测试/录像/限制并等Linux与WindowsCI。无配置/Key/模型/媒体提交，无VRM/房间/后端brain改动，不读取私人配置。
+
 # Current — Mao PR #228 已发布，作者 Windows 检查后合并
 ## 发布检查点 — PR #228
 已正常推送 friend/avatar-live2d-mao 并创建可审查 PR：https://github.com/MaQinglin-665/AI-chat/pull/228 （base main9d09edc）。仅7个预期文件；本地工作区干净，未提交模型/配置/媒体。最终真实QA输出20截图/4切换/63授权/1拒绝/0页面异常，截图包仅本地。Linux/Windows CI 的最终状态以 PR 当前提交检查和仓库外 outputs/mao-acceptance/ci-final.json 为准；需要全部成功且无冲突才报告可实机检查，不自行合并。#226 的8723067已全部CI成功，用户试听待定。

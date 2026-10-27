@@ -9,18 +9,22 @@
       ],
       "scope": [
         "New friend/avatar-live2d-mao directly from origin/main9d09edc, no unmerged226 dependency",
-        "Real five vowels, eight expressions, three gestures, native actions and Mao/Hiyori configuration switching; fix only reproduced problems"
+        "Real five vowels, eight expressions, three gestures, native actions and Mao/Hiyori configuration switching; fix only reproduced problems",
+        "2026-10-27 longline stage1: generic mapped arm effects, same-Core exact Mao comparison, missing resources regression, audible labeled40s recording; then stacked vocab Draft PR and template/CI PR."
       ],
       "done_criteria": [
         "Assert actual model outputs and save local screenshots",
         "Regression and complete local/package gates pass",
-        "Normal push and separate PR to main; no models/config/keys/media committed, author reviews and merges"
+        "Normal push and separate PR to main; no models/config/keys/media committed, author reviews and merges",
+        "Mao effects contain no model-specific conditionals; complete ordered sequences strictly match frozen main driver",
+        "Missing folder/manifest/moc/texture yields helpful guide and no crash; audible40s labeled local recording"
       ],
       "verification": [
         "Real official Mao:5 vowels/3fallbacks,8 expressions/8native motions,3gestures×5phases,wave expiry/stop and 4Mao-Hiyori config switches;63authorized/1denied,no page errors;20local screenshots",
-        "Full932Python/3skip/74Node,syntax194/243,secrets853;package/JSON/py_compilepass;strict5280frames/394224calls/42scenarios,baseline unchanged"
+        "Full932Python/3skip/74Node,syntax194/243,secrets853;package/JSON/py_compilepass;strict5280frames/394224calls/42scenarios,baseline unchanged",
+        "Longline stage1: strict1440/25850protocol+1440/181030realCoreMao, missing5resources/guide tests; audible40s800frames w/realdrag, local+draftrelease media; full937/3skip/76Node,syntax194/246,secrets859,packagepass"
       ],
-      "next": "PR228 published on original repository, no fork; verify current-head Linux/Windows CI via GitHub/ci-final.json, then author Windows check and merge.2268723067 CIgreen, user listening pending."
+      "next": "Push228 and monitor current-head Linux/WindowsCI; start stacked action-vocab docs Draft then implement; author Windows checks/merges."
     },
     {
       "id": "avatar-live2d-pr217-closeout",

@@ -12,7 +12,7 @@ const allowed = new Set(["Mao.model3.json", refs.Moc, refs.Physics, refs.Pose, .
   ...refs.Expressions.map(x => x.File), ...Object.values(refs.Motions).flat().map(x => x.File)]);
 const html = `<!doctype html><meta charset="utf-8"><title>馨语桌宠 · Mao 接入验证</title>
 <style>body{margin:0;background:#ede7f0;color:#30283a;font:18px system-ui}canvas{position:absolute;inset:0}aside{position:absolute;left:28px;top:20px;width:340px;z-index:1;line-height:1.7}h1{font-size:26px}output{white-space:pre-wrap}footer{position:absolute;bottom:12px;left:28px;font-size:12px;max-width:360px}</style>
-<canvas id="live2d-canvas"></canvas><aside><h1>馨语桌宠 · Mao</h1><p>阶段 3 · 官方模型本机接入<br>统一意图入口 / 原有 Pixi 时钟</p><output id="status">加载中…</output></aside><footer>模型 © Live2D Inc. / Mao Niziiro<br>使用遵循 Live2D Free Material License 与 Sample Model Terms。此处是本地独立验证场景。</footer>
+<canvas id="live2d-canvas"></canvas><canvas id="mouth-zoom" width="270" height="210" style="display:none;inset:auto;left:28px;top:340px;border:1px solid #a99eaf"></canvas><aside><h1>馨语桌宠 · Mao</h1><p>Mao 官方模型本机接入验收<br>统一意图入口 / 原有 Pixi 时钟</p><output id="status">加载中…</output></aside><footer>模型 © Live2D Inc. / Mao Niziiro<br>使用遵循 Live2D Free Material License 与 Sample Model Terms。此处是本地独立验证场景。</footer>
 <script>window.virtualNow=1000;Object.defineProperty(performance,'now',{value:()=>virtualNow});window.requestAnimationFrame=()=>1;window.cancelAnimationFrame=()=>{};
 window.authFetch=(url,options={})=>fetch(url,{...options,headers:{...options.headers,'X-Local-Model-Test':'authenticated'}});
 window.qaResources={blobs:new Set(),channels:new Set(),listeners:new Map()};
@@ -25,10 +25,12 @@ const add=window.addEventListener.bind(window),remove=window.removeEventListener
 window.addEventListener=(name,fn,...args)=>{if(['resize','avatar-intent','beforeunload'].includes(name)){
  if(!qaResources.listeners.has(name))qaResources.listeners.set(name,new Set());qaResources.listeners.get(name).add(fn);}return add(name,fn,...args);};
 window.removeEventListener=(name,fn,...args)=>{qaResources.listeners.get(name)?.delete(fn);return remove(name,fn,...args);};</script>
-${["vendor/pixi.min.js", "vendor/pixi-unsafe-eval.min.js", "vendor/live2dcubismcore.min.js", "vendor/cubism4.min.js", "avatar/live2dMapping.js", "avatar/vowelEstimator.js", "avatar/live2dAssets.js", "avatar/live2dModelDriver.js", "live2dRuntimeController.js", "avatar/live2dRenderer.js", "avatar/avatarRuntime.js"].map(f => `<script src="/${f}"></script>`).join("")}
+${["vendor/pixi.min.js", "vendor/pixi-unsafe-eval.min.js", "vendor/live2dcubismcore.min.js", "vendor/cubism4.min.js", "avatar/live2dMapping.js", "avatar/vowelEstimator.js", "avatar/live2dAssets.js", "avatar/live2dModelDriver.js", "live2dLayoutController.js", "live2dRuntimeController.js", "avatar/live2dRenderer.js", "avatar/avatarRuntime.js"].map(f => `<script src="/${f}"></script>`).join("")}
 <script>(async()=>{try{
 const state={uiView:'full',config:{},baseTransform:{x:780,y:450,rotation:0},availableMotionGroups:[],ttsAudioLevel:0};
+const layout=TaffyLive2DLayoutController.createController({state,windowObject:window,documentObject:document,performanceObject:performance});
 const controller=TaffyLive2DRuntimeController.createController({state,windowObject:window,documentObject:document,setModelMotionDefinitions(m){state.availableMotionGroups=Object.keys(m.internalModel.motionManager.definitions);},
+ attachDrag:layout.attachDrag,
  placeModel(){const m=state.model;m.anchor.set(.5,.5);m.scale.set(Math.min(570/m.width,820/m.height));m.position.set(780,450);state.baseTransform={x:780,y:450,rotation:0};},setStatus(t){document.getElementById('status').textContent=t;}});
 state.avatarSource={kind:'live2d',path:'/api/avatar/live2d/Mao.model3.json',mapping:'/avatar/mappings/mao.json'};
 await controller.initLive2D();if(!state.model)throw Error('Mao load failed');state.pixiApp.stop();
@@ -39,7 +41,14 @@ for(const method of ['setParameterValueById','addParameterValueById','multiplyPa
 }
 let renderedValues;const coreUpdate=core._model.update.bind(core._model);core._model.update=()=>{
  renderedValues=Object.fromEntries(core._model.parameters.ids.map((id,i)=>[id,core._model.parameters.values[i]]));return coreUpdate();};
-window.QA={state,core,async capture(frame,label){
+window.QA={state,core,step(frame,label){
+ window.dispatchEvent(new CustomEvent('avatar-intent',{detail:{frame}}));
+ for(let i=0;i<3;i++){virtualNow+=1000/60;state.model.update(1000/60);state.pixiApp.renderer.render(state.pixiApp.stage);}
+ const zoom=document.getElementById('mouth-zoom');zoom.style.display=frame.mode==='speak'?'block':'none';
+ if(frame.mode==='speak')zoom.getContext('2d').drawImage(state.pixiApp.view,735,225,90,70,0,0,270,210);
+ document.getElementById('status').textContent=label+'\\n真实 Pixi/Core · 受控意图录像';
+ return {x:state.model.x,y:state.model.y,dragging:!!state.dragData};
+},async capture(frame,label){
  state.avatarRenderer.stopAction();state.model.internalModel.motionManager.stopAllMotions();
  window.dispatchEvent(new CustomEvent('avatar-intent',{detail:{frame}}));
  for(let i=0;i<45;i++){writes.length=0;virtualNow+=1000/60;state.model.update(1000/60);state.pixiApp.renderer.render(state.pixiApp.stage);}
@@ -167,6 +176,40 @@ const server = http.createServer((req, res) => {
     assert.ok(Math.max(...evidence.waveAction.samples) > 20, "wave action raises actual arm");
     assert.ok(Math.abs(evidence.waveAction.samples.at(-1)) < 1e-6, "wave expires and releases arm");
     assert.ok(evidence.waveAction.beforeStop > 1); assert.ok(Math.abs(evidence.waveAction.afterStop) < 1e-6, "stopAction releases arm on next original Pixi update");
+    if (process.argv.includes("--record")) {
+      const framesDir = path.join(output, "recording"); fs.mkdirSync(framesDir, { recursive: true });
+      evidence.recording = { fps: 20, frames: 800, duration: 40, scope: "Isolated real-model controlled input; audio is an aligned local demonstration track, not native speech recognition/latency evidence.", drag: [] };
+      for (let index = 0; index < 800; index++) {
+        const t = index / 20;
+        let label = "idle / 待机", frame = { mode: "idle", face: "neutral", mouth: { open: 0 }, gaze: null };
+        if (t >= 4 && t < 8) { label = "listen / 倾听"; frame.mode = "listen"; frame.gaze = { x: .3, y: .1 }; }
+        else if (t >= 8 && t < 12) { label = "think / 思考"; frame.mode = "think"; frame.face = "thinking"; }
+        else if (t >= 12 && t < 22) {
+          const vowel = ["a", "i", "u", "e", "o"][Math.floor((t - 12) / 2)];
+          label = "speak / 五元音 " + vowel.toUpperCase(); frame.mode = "speak";
+          frame.mouth = { open: .3 + .6 * Math.abs(Math.sin((t - 12) * Math.PI * 3)), vowel };
+        } else if (t >= 22 && t < 28) {
+          const name = ["open_explain", "wave", "light_lift"][Math.floor((t - 22) / 2)];
+          label = "gesture / " + name; frame.speechGesture = { name, phase: ((t - 22) % 2) / 2 };
+        } else if (t >= 28 && t < 32) {
+          frame.face = ["neutral", "happy", "sleepy", "smug", "sad", "shy", "surprised", "angry"][Math.floor((t - 28) * 2)];
+          frame.faceIntensity = 1; label = "face / " + frame.face;
+        } else if (t >= 32 && t < 36) {
+          label = "drag / 原有拖拽逻辑";
+          if (index === 640) { await page.mouse.move(780, 400); await page.mouse.down(); }
+          await page.mouse.move(780 + 80 * Math.sin((t - 32) * Math.PI / 4), 400 + 25 * Math.sin((t - 32) * Math.PI / 2));
+        } else if (t >= 36) {
+          if (index === 720) await page.mouse.up();
+          label = "restore / 松手恢复"; frame.gaze = { x: 0, y: 0 };
+        }
+        const sample = await page.evaluate(([frame, label]) => QA.step(frame, label), [frame, label]);
+        if (t >= 32) evidence.recording.drag.push({ t, ...sample });
+        await page.screenshot({ path: path.join(framesDir, `frame-${String(index).padStart(4, "0")}.jpg`), type: "jpeg", quality: 85 });
+      }
+      assert.ok(evidence.recording.drag.some(p => p.dragging), "recording exercised actual pointer drag");
+      assert.ok(Math.max(...evidence.recording.drag.map(p => p.x)) - Math.min(...evidence.recording.drag.map(p => p.x)) > 20, "model actually moved");
+      assert.equal(evidence.recording.drag.at(-1).dragging, false, "released after recording drag");
+    }
     evidence.switches = [];
     for (const kind of ["hiyori", "mao", "hiyori", "mao"]) {
       const result = await page.evaluate(kind => QA.switchConfig(kind), kind);
