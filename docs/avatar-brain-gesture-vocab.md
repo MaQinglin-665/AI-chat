@@ -43,3 +43,16 @@ Mao 五分钟录像及短补查已完成，具体结果如下；保持草稿供�
 - 成功执行补查：`tmp_ui_smoke/vocab/mao-diag-video/page@9260882aa3976965fe2b6b20e2f32e00.webm`
 
 原实现提交 e60b1bc 的Linux/Windows及其他CI全通过。此轮只更新验收文档，不修改已验证代码；首轮模型异常文本和未回执现象保留为验收限制，请作者看录像后决定后续处理。
+
+
+## PR232 合并前修复：正文与领取诊断
+
+保存的首轮四次普通聊天中，第1/2/4条原始content分别是 `<abstain />\n</abstain>` 或 `<abstain /> </abstain>`，均无avatar-brain控制块，去掉伪标签后正文为空。第3条有正常中文和think/tilt_head控制块。不能把空白归因于控制JSON吞掉正文。原提示使用空say示例，普通聊天只隐含要求可见回复；没有找到明确要求普通聊天输出abstain的指令，无法证明模型内部原因。新增明确区分：普通聊天必须有正文，只有主动思考可沉默，JSON的空say不代表正文可以为空。
+
+过滤仅移除无属性的abstain开/闭/自闭合标签（兼容大小写和空白），保留其他尖括号及标签内容，流式分块同样处理。过滤后仍无正文时，brain普通聊天返回可读错误而非成功空气泡；不编造正文、不增加隐藏重试调用；主动思考的沉默规则不变。
+
+claim被拒或请求抛错时，执行器保留最近32条只含id/status/reason的diagnostics()并console.debug，不包含正文或原始异常。后端返回固定reason：superseded_by_input、scene_changed、expired、already_claimed、disabled、unknown_plan等；过期墓碑最多16条。已完成计划不会被后续输入改写为invalidated。拒绝不伪造“已执行”终态ACK，也不覆盖其他窗口已领取的计划。后端debug记录发布、作废、过期及领取事件，无内容。
+
+历史think/tilt_head计划a7b846a83f3440b780ba40db80bb1a7f在聊天响应中返回，但首轮poll响应均无计划、也没有started请求，所以证据支持“未领取”，不能据此断定claim被拒。旧日志没有作废时间或理由；已无法追溯它是否在第一次可见轮询前被输入作废。不要将推测写为确定根因。相同响应以独立假模型重放四条连续聊天：四计划均领取、八动作均completed，无领取拒绝，未复现首轮问题；此重放不是DeepSeek验收。
+
+回归覆盖abstain各种格式/正文/控制块/任意流分割、普通尖括号保留、普通与主动提示区别、空正文HTTP/SSE错误、固定拒绝原因、过期及前端debug无正文。全量和真实复测结果下方补记。

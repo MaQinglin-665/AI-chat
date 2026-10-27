@@ -18,8 +18,15 @@
     if(['activity','wait'].includes(a.type)&&(!Number.isFinite(a.duration_sec)||a.duration_sec<0||a.duration_sec>LIMITS.maxDuration))return 'invalid';
     return null;
   }
-  function create({world,run,say,ack,control=()=>{},cancel=()=>{}}){
+  function create({world,run,say,ack,control=()=>{},cancel=()=>{},debug=(event)=>root.console?.debug?.('avatar_brain_claim',event)}){
     let queue=[],seen=new Set(),current=null,draining=false,disposed=false;
+    const diagnostics=[];
+    function claimRejected(id,reason){
+      const allowed=new Set(['superseded_by_input','scene_changed','speech_started','expired','already_claimed','disabled','unknown_plan','transport_error']);
+      const event={id,status:'claim_rejected',reason:allowed.has(reason)?reason:'claim_rejected'};
+      diagnostics.push(event);if(diagnostics.length>32)diagnostics.shift();
+      try{debug({...event});}catch(_){}
+    }
     const emit=(id,index,status,reason)=>Promise.resolve(ack({id,outcomes:[{index,status,reason}]})).catch(()=>{});
     async function drain(){
       if(draining||disposed)return;draining=true;
@@ -27,8 +34,8 @@
         const plan=queue.shift(), abort=new AbortController(), snapshot=world();
         current={plan,abort,done:new Set(),reason:'user_input'};
         const item=current;
-        let claim;try{claim=await ack({id:plan.id,started:true});}catch(_){continue;}
-        if(!claim?.ok)continue;
+        let claim;try{claim=await ack({id:plan.id,started:true});}catch(_){claimRejected(plan.id,'transport_error');current=null;continue;}
+        if(!claim?.ok){claimRejected(plan.id,claim?.reason||claim?.error);current=null;continue;}
         if(abort.signal.aborted){
           for(let i=0;i<plan.actions.length;i++)await emit(plan.id,i,'interrupted',item.reason);
           if(plan.say)await emit(plan.id,-1,'interrupted',item.reason);
@@ -73,7 +80,7 @@
       if(current){current.reason=reason;current.abort.abort();}
       for(const plan of queue){plan.actions.forEach((_,i)=>void emit(plan.id,i,'interrupted',reason));if(plan.say)void emit(plan.id,-1,'interrupted',reason);}
       queue=[];cancel();control(false);
-    },dispose(){this.interrupt('disposed');disposed=true;},busy:()=>!!current||queue.length>0};
+    },dispose(){this.interrupt('disposed');disposed=true;},diagnostics:()=>diagnostics.map(x=>({...x})),busy:()=>!!current||queue.length>0};
   }
   const api={create,validate,LIMITS};root.XinyuAvatarBrainExecutor=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;

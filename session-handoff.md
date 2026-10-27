@@ -1,3 +1,7 @@
+# PR232 reply and claim repair — current
+
+Same vocab branch/worktree. User authorized these two fixes, draft only. Full D TEMP/TMP test-local978 Python/3skip,82 Node and syntax/secrets passed. Fixed narrow abstain filtering, normal-response body guard/prompt, fixed claim rejection reasons plus bounded frontend diagnostics/backend lifecycle debug. No renderers/mappings/private config changes. Saved historical plan was never claimed, exact old invalidation cause unavailable; four-turn synthetic replay all8actions completed. Next: push repairs, wait CI, run ignored mao-fixed-record.cjs (real DeepSeek, same four prompts,8193,daily,300s), document every plan/usage and blank/abstain count, update draft only.
+
 # Brain gesture vocabulary — 2026-10-27
 
 Worktree D:/AI/ai_desktop_pet_vocab, branch codex/brain-gesture-vocab-v1, baseline origin/main 5669e8a. User asks draft PR only, no merge. No private config read/write, original ai_desktop_pet prohibited. No changes to VRM/Live2D renderers or mappings.

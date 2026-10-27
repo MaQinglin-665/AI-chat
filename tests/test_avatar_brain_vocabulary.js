@@ -13,6 +13,15 @@ async function rig(renderer){
 }
 (async()=>{
  let serial=1;
+ for(const failure of ['expired','superseded_by_input','already_claimed','throw']){
+  const debug=[];let executed=0;
+  const e=executor.create({world:()=>({kind:'live2d',scene:'live2d',gestures:['nod'],places:[],activities:[]}),run:async()=>executed++,say:async()=>true,
+   ack:async a=>{if(failure==='throw')throw Error('private message');return {ok:false,reason:failure};},debug:x=>debug.push(x)});
+  e.enqueue({id:'d'.repeat(32),say:'private speech',actions:[{type:'gesture',name:'nod'}]});await flush();await flush();
+  assert.equal(executed,0);assert.equal(e.busy(),false);assert.equal(debug[0].reason,failure==='throw'?'transport_error':failure);
+  assert.deepEqual(e.diagnostics(),debug);assert(!JSON.stringify(debug).includes('private'));e.dispose();
+ }
+
  async function execute(r,actions){r.c.executor.enqueue({id:(serial++).toString(16).padStart(32,'0'),actions});for(let i=0;i<20&&r.c.executor.busy();i++)await flush();return r.acks.filter(a=>a.outcomes).map(a=>a.outcomes[0]);}
  for(const [status,reason,expected] of [['completed',undefined,'completed'],['unsupported',undefined,'skipped'],['interrupted','replaced','interrupted'],['failed','clock_stalled','failed']]){
   const r=await rig({kind:'live2d',capabilities:()=>({actions:['old'],gestures:['nod']}),playGesture:async(n,{signal})=>{assert.equal(n,'nod');assert(signal instanceof AbortSignal);return {status,reason};},playAction:()=>assert.fail('legacy must not run')});

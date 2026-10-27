@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 
 LOG = logging.getLogger(__name__)
 MAX_WORLD_BYTES = 4096
@@ -164,7 +165,10 @@ def prompt(world, *, proactive=False):
     if proactive:
         contract += 'Return JSON only. Be a familiar, low-interruption companion. Silence and no action are valid. say <=160 characters. '
     else:
-        contract += ('Keep the normal visible reply and its existing format unchanged. After that reply, optionally append '
+        contract += ('This is ordinary user chat: always provide a non-empty normal visible answer. '
+                     'Only proactive thinking may remain silent. Never output abstain tags. '
+                     'An empty say field applies ONLY to the optional action JSON, not to the visible answer. '
+                     'Keep the normal visible reply and its existing format unchanged. After that reply, optionally append '
                      + OPEN + 'JSON' + CLOSE + '. say must be empty: the visible reply already supplies speech. '
                      'Do not put this control suffix inside natural-conversation tags or expose it in the reply. ')
     return contract + "\nWorld: " + compact(world)
@@ -226,25 +230,53 @@ class ReplyFilter:
         return self.pending if self.control is None else ""
 
 
+class EmptyAbstainFilter:
+    """Only strip attribute-free abstain tags; bound buffering across stream chunks."""
+    pattern = re.compile(r"<\s*/?\s*abstain\s*/?\s*>", re.IGNORECASE)
+
+    def __init__(self):
+        self.pending = ""
+
+    def feed(self, text):
+        output = []
+        for char in text:
+            if char == "<":
+                output.append(self.pending)
+                self.pending = char
+            elif self.pending:
+                self.pending += char
+                if char == ">" or len(self.pending) > 64:
+                    if not self.pattern.fullmatch(self.pending):
+                        output.append(self.pending)
+                    self.pending = ""
+            else:
+                output.append(char)
+        return "".join(output)
+
+    def finish(self):
+        return self.pending
+
+
 def extract_reply(text, config):
-    if not config.get("_avatar_brain_world"):
-        return text
-    parser = ReplyFilter(config)
-    return parser.feed(str(text or "")) + parser.finish()
+    visible = str(text or "")
+    if config.get("_avatar_brain_world"):
+        parser = ReplyFilter(config)
+        visible = parser.feed(visible) + parser.finish()
+    cleaner = EmptyAbstainFilter()
+    return cleaner.feed(visible) + cleaner.finish()
 
 
 def filter_stream(chunks, config):
-    if not config.get("_avatar_brain_world"):
-        yield from chunks
-        return
-    parser = ReplyFilter(config)
+    parser = ReplyFilter(config) if config.get("_avatar_brain_world") else None
+    cleaner = EmptyAbstainFilter()
     for chunk in chunks:
         if chunk == "\x00PRE_FINALIZED\x00":
             yield chunk
         elif isinstance(chunk, str):
-            visible = parser.feed(chunk)
+            visible = cleaner.feed(parser.feed(chunk) if parser else chunk)
             if visible:
                 yield visible
-    tail = parser.finish()
+    tail = cleaner.feed(parser.finish()) if parser else ""
+    tail += cleaner.finish()
     if tail:
         yield tail

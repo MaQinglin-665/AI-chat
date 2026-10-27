@@ -326,3 +326,25 @@ def test_scene_specific_gaze(target):
     assert validate_decision({"actions": [action]}, world())["actions"] == []
     assert validate_decision({"actions": [{"type": "look_at", "target": "window"}]}, world(scene="live2d"))["actions"] == []
     assert "Live2D look_at supports user/left/right/up/down" in prompt(world(scene="live2d"))
+
+
+@pytest.mark.parametrize("tags", ["<abstain>", "<abstain/>", "<abstain /> </abstain>", "<ABSTAIN >", "</ abstain >"])
+def test_abstain_only_tags_and_every_stream_split(tags):
+    control = OPEN + json.dumps(decision()) + CLOSE
+    for suffix in ["", "正常正文 a < b > c", control, control + "正常正文 a < b > c"]:
+        raw = tags + suffix
+        expected = suffix.replace(control, "")
+        cfg = {"_avatar_brain_world": sanitize_world(world())}
+        assert extract_reply(raw, cfg).strip() == expected
+        for split in range(len(raw) + 1):
+            cfg = {"_avatar_brain_world": sanitize_world(world())}
+            assert "".join(filter_stream([raw[:split], raw[split:]], cfg)).strip() == expected
+    for literal in ['a < b > c', '<ordinary>tag</ordinary>', '<abstain reason="x">', '<abstained>', 'left <', '<'+'x'*100+'>']:
+        assert extract_reply(literal, {}) == literal
+        assert "".join(filter_stream(iter(literal), {})) == literal
+
+
+def test_regular_prompt_requires_body_only_proactive_may_be_silent():
+    assert "always provide a non-empty normal visible answer" in prompt(world())
+    assert "Silence and no action are valid" not in prompt(world())
+    assert "Silence and no action are valid" in prompt(world(), proactive=True)

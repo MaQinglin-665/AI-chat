@@ -154,6 +154,8 @@ def call_llm_impl(
             else:
                 raw_reply = call_openai_compatible_fn(llm_cfg, messages)
             raw_reply = extract_reply(raw_reply, config)
+            if config.get("_avatar_brain_world") and not is_auto and not str(raw_reply or "").strip():
+                raise ValueError("模型未返回正常正文，请重试。")
             final = finalize_assistant_reply_fn(
                 config,
                 llm_cfg,
@@ -200,6 +202,8 @@ def call_llm_impl(
         try:
             raw_reply = call_ollama_fn(llm_cfg, messages, model_override=selected_model)
             raw_reply = extract_reply(raw_reply, config)
+            if config.get("_avatar_brain_world") and not is_auto and not str(raw_reply or "").strip():
+                raise ValueError("模型未返回正常正文，请重试。")
             final = finalize_assistant_reply_fn(
                 config,
                 llm_cfg,

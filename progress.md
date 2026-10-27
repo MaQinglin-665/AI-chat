@@ -1338,3 +1338,8 @@ Protocol capability intersection + scene gaze, Promise statuses/AbortSignal/VRM 
 
 ### Mao model and real verification follow-up
 User provided official local Mao and authorized ignored copy. Actual mapping modelChecked:true/no errors or warnings. Daily five-minute run304.52s video,9responses/5753tokens,no page errors but abstain text and no terminal ACKs: not passed as execution. Additional65.397s real-model diagnostic (no product changes) completed wave then look_at left,2ACKs,1response/1044tokens. Both videos decode; local only. Details/limitations in docs/avatar-brain-gesture-vocab.md. Original e60b1bc all CI green. Draft232 remains unmerged; no model/config/media committed.
+
+## PR232 pre-merge reply/claim repair started
+Author authorized narrow abstain filtering, ordinary-reply prompt/body guard and fixed claim refusal diagnostics. Saved raw Mao responses contain standalone abstain tags without brain blocks. Preserve model renderers/mappings/private config. Reproduce lifecycle with isolated synthetic replay then real five-minute run; no claim about old missing receipts without evidence.
+
+Verification Evidence: PR232 reply/claim repairs complete; full D TEMP/TMP test-local978 Python/3skip,82 Node,syntax/secrets pass. Narrow streaming abstain filter, explicit normal-body prompt, error on control-only normal reply; safe fixed claim diagnostics/expiry tombstones. Saved-response four-turn replay8actions completed, historical missing claim not reproduced. Push/CI then same-four-message real Mao5minute run required.

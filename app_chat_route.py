@@ -327,6 +327,8 @@ def _handle_chat_stream_request(
             )
             raw_stream_reply = str(natural_decision.get("reply_text") or "")
         final_reply = raw_stream_reply if model_direct_reply else raw_stream_reply.strip()
+        if chat_config.get("_avatar_brain_world") and not is_auto and not final_reply.strip():
+            raise ValueError("模型未返回正常正文，请重试。")
         runtime_meta = None
         finalize_started_ms = perf_now_ms_func()
         if final_reply and not already_finalized and not model_direct_reply:
