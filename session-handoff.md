@@ -1,3 +1,10 @@
+# Current — 阶段2实现完成，229待push/CI；接阶段3模板
+## 阶段2实现检查点 — #229
+先以2aac49f发布接口文档Draft229，再实现live2dGestures及两模型10词映射。Promise区分completed/interrupted/unsupported/failed，最新支持调用替换、取消/停止/卸载/超时均结束；lookAt支持user/方向/reset/CSS屏幕坐标，参数写入只走原pre-Core。没有手势时严格Hiyori5280/394224、Mao1440/181030保持。共享avatarRuntime仅加可选转发/原事件gesture/look_at字段；无VRM/房间/brain/ws/路由改动。
+Verification Evidence：完整937Python/3skip/77Node，语法194/248，secrets862；首次运行包、必需JSON/compile通过，新增原事件转发断言另行通过。真实Hiyori/Mao各10词全部Promise完成，各311帧15.55秒有声录像，Core前每词口型范围至少0.545592/0.502619；截图已看，口型特写位置已校正。录像已上传原仓库草稿附件（非产品发布，作者登录写权限可见），文件Hiyori-vocabulary-final-20261027.mp4、Mao-vocabulary-final-20261027.mp4。模型/媒体/配置/Key未入git。
+下一步正常push229并等当前提交Linux/WindowsCI；保留Draft供作者接口审阅，依赖228先合并。然后从当前分支建立独立新模型模板/校验CI PR，仍不自行合并。
+
+
 # Current — 阶段2先开文档Draft，再实现词表
 ## 长线阶段2 — 先行接口 Draft
 从阶段1 friend/avatar-live2d-mao9406ea4建立friend/live2d-action-vocab，PR base使用前一分支以便独立审阅，#228先合并后再切换base/syncmain。先提交docs/live2d-action-vocabulary.md的接口/词表/结果/打断/坐标约定并开Draft，随后才实现。此检查点不宣称功能完成。未改VRM/场景/后端brain，后续共享runtime仅增加可选转发/原事件字段，PR单独说明。

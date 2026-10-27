@@ -3,7 +3,7 @@
     {
       "id": "live2d-action-vocabulary",
       "name": "Live2D model-independent gesture vocabulary and lookAt",
-      "status": "in_progress",
+      "status": "completed",
       "dependencies": [
         "avatar-live2d-mao-acceptance"
       ],
@@ -12,7 +12,13 @@
         "Bounded Promise results, replacement/cancel/reset, safe lookAt; mapping-only two-model vocabulary",
         "Speech mouth remains active during gestures; two real-model vocabulary recordings",
         "Full Linux/Windows CI; no self merge or forbidden resources"
-      ]
+      ],
+      "verification": [
+        "Contract Draft2292aac49f before implementation",
+        "All20 model/word results +replacement/cancel/reset/dispose/clock watchdog/invalid mapping/gaze/mouth ownership passed; actual2x311frames 15.55s/audio; min mouth ranges .545592/.502619",
+        "Full937/3skip/77Node,syntax194/248,secrets862;package/JSON/compile pass;strict fixtures unchanged"
+      ],
+      "next": "Push229; verify all current-head Linux/WindowsCI; keepDraft for author interface review; then stacked template/validation CI PR."
     },
     {
       "id": "avatar-live2d-mao-acceptance",

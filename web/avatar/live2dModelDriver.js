@@ -46,7 +46,7 @@
       const vowels = params.vowels || {};
       for (const [name, id] of Object.entries(vowels)) set(id, open > 0.02 && (vowel ? name === vowel : id === params.mouthOpen) ? open : 0);
       if (!Object.keys(vowels).length) set(params.mouthOpen, open);
-      if (frame.speechGesture) gesture(frame.speechGesture.name, frame.speechGesture.phase);
+      if (frame.speechGesture) gesture(frame.speechGesture.name, frame.speechGesture.phase, frame.speechGesture.intensity ?? 1);
       if (action) {
         const phase = (now() - action.started) / action.duration;
         if (phase >= 1) action = null;

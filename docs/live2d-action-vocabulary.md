@@ -84,4 +84,14 @@ window.dispatchEvent(new CustomEvent("avatar-intent", { detail: { look_at: "left
 
 ## 验收与边界
 
-两个模型全部词条均须播放或及时 unsupported；覆盖连续调用、打断、取消、隐藏时钟超时、失败、卸载及说话期间连续口型。模型资源仅本地，录像只作审查附件。待实现与测试后在本节补具体证据；此文档初次提交不宣称功能已实现。
+两个模型全部词条均须播放或及时 unsupported；覆盖连续调用、打断、取消、隐藏时钟超时、失败、卸载及说话期间连续口型。模型资源仅本地，录像只作审查附件。本文件已先以 `2aac49f` 的文档提交开出 Draft #229，再补实现。
+
+2026-10-27 实现证据：两模型20个词均完成；确定性测试覆盖 unsupported 不打断、替换、AbortSignal、stop/reset/dispose、时钟停滞、非法映射/嘴型通道、CSS屏幕坐标及原runtime转发。参数只在原Pixi pre-Core位置写入，定时器只结束请求。映射姿态的强度限制为0..1；内部speechGesture增加可选intensity字段，缺省1，既有调用不变。
+
+真实 Hiyori/Mao 各311帧/15.55秒的完整词表录像均通过10个Promise完成与实际口型变化断言；每词最小口型范围 Hiyori 0.545592、Mao 0.502619（Core计算前实参）。先前在Core计算后读取包装器临时值会得到不适合该验收的数值，QA统一采用原有Core前快照位置；没有放宽口型变化断言或改动Core。画面含词名与口型特写，附本机SAPI词名音轨；不是原生语音延迟测量。
+
+录像位于原仓库的[草稿验收附件](https://github.com/MaQinglin-665/AI-chat/releases/tag/untagged-d2ff791d304d9886571a)，文件名 `Hiyori-vocabulary-final-20261027.mp4` 与 `Mao-vocabulary-final-20261027.mp4`，作者登录且有仓库写权限时可查看；没有发布产品release或提交媒体/模型。
+
+完整 `scripts/test-local.ps1`：937Python通过/3跳过、77Node文件、语法194/248、密钥扫描862；首次运行包和必需JSON/py_compile通过。新增事件转发断言随后单独通过。无手势时Hiyori严格5280帧/394224调用和Mao严格1440帧/181030调用仍一致，原基线未改。
+
+共享代码仅 `avatarRuntime` 的可选方法转发与已有事件的 gesture/look_at 字段，无路由/ws/VRM/房间/后端brain修改。单向事件没有完成ACK；需要结果时须await方法。作者仍需Windows原生操作和真实语音检查；脸/手臂表现受原模型限制，Hiyori挥手是小幅摆臂。
