@@ -150,7 +150,11 @@
       if (intent.speechGesture !== undefined) explicit.speechGesture = intent.speechGesture;
       if (intent.energy !== undefined) explicit.bodyEnergy = intent.energy;
       const sample = hiyoriPerformanceDirector.sample({ ...context, ...explicit, authoredMotionActive,
-        speechGestureAllowed: context.speechGestureAllowed !== false && state.motionEnabled !== false });
+        ...(state.live2dNaturalContext ? { naturalMotion: state.live2dNaturalContext,
+          audioLevel: state.live2dNaturalContext.envelope, bodyEnergy: state.live2dNaturalContext.envelope,
+          speaking: state.live2dNaturalContext.speaking, audioActive: state.live2dNaturalContext.speaking,
+          allowIdle: false } : {}),
+        speechGestureAllowed: !state.live2dNaturalContext && context.speechGestureAllowed !== false && state.motionEnabled !== false });
       for (const id in (sample.parameters || {})) {
         const value = sample.parameters[id];
         const face = mapped().has("face", id);
@@ -1141,6 +1145,7 @@
       state.speechAnimUntil = now + durationMs + 180;
       state.speechAnimSeed = Math.random() * Math.PI * 2;
       state.speechAnimTextLength = cleaned.length;
+      state.live2dSpeechText = cleaned;
       state.speechAnimPunctuation = (cleaned.match(/[，。！？!?、]/g) || []).length;
       state.speechAnimAccentCount = (cleaned.match(/[!?\uFF01\uFF1F]/g) || []).length;
       state.speechAnimStyle = normalizeTalkStyle(style || state.currentTalkStyle || "neutral");
@@ -1441,7 +1446,10 @@
       state.microMotionLastAt = now;
       const style = normalizeTalkStyle(state.currentTalkStyle || state.expressionStyle || "neutral");
       const speechPerformanceCue = getActiveSpeechPerformanceCue(now);
+      const natural = state.live2dNaturalContext;
       const cueMotionActive = !!speechPerformanceCue;
+      // This blend also scales the mouth: retain the original speech lifecycle.
+      // Only body energy/cadence below may use the slower natural envelope.
       const speaking = state.avatarIntentOverrides?.mode !== undefined
         ? state.avatarIntentOverrides.mode === "speak" : (isSpeechMotionActive(now) || cueMotionActive);
       state.speechPerformanceCueMotionActive = cueMotionActive;
@@ -1520,9 +1528,9 @@
       const speechCueBeatBoost = speechPerformanceCue ? speechPerformanceCue.beatBoost : 1;
       const speechCueExpressionBoost = speechPerformanceCue ? speechPerformanceCue.expressionBoost : 1;
       const speechMotionBoost = clampNumber((0.82 + speechMotionStrength * 0.28) * speechCueBodyBoost, 0.6, 2.4);
-      const mouthEnergy = speaking ? clampNumber(Number(state.speechMouthOpen) || 0, 0, 1) : 0;
+      const mouthEnergy = natural ? natural.envelope : speaking ? clampNumber(Number(state.speechMouthOpen) || 0, 0, 1) : 0;
       const audioEnergy = clampNumber(
-        Math.max(Number(state.ttsAudioLevel) || 0, mouthEnergy * 0.56),
+        natural ? natural.envelope : Math.max(Number(state.ttsAudioLevel) || 0, mouthEnergy * 0.56),
         0,
         1
       );
@@ -1538,7 +1546,7 @@
         currentBodyEnergy + (energyInput - currentBodyEnergy) * energyFollow,
         0, 1
       );
-      const rawLevel = clampNumber(Number(state.ttsAudioLevel) || 0, 0, 1);
+      const rawLevel = natural ? natural.envelope : clampNumber(Number(state.ttsAudioLevel) || 0, 0, 1);
       const prevLevel = Number(state.beatPrevLevel) || 0;
       const dLevel = rawLevel - prevLevel;
       const risingLevel = Math.max(0, dLevel);
@@ -1547,7 +1555,7 @@
       const beatThreshold = 0.08;
       state.beatPrevLevel = rawLevel;
       const beatSoftCap = clampNumber((0.32 + motionBlend * 0.5) * speechCueBeatBoost, 0.18, 1.15);
-      if (motionBlend > 0.06 && rawLevel > beatThreshold && beatVelocity > 0.01 && risingLevel > 0.002 && now > Number(state.beatCooldownUntil || 0)) {
+      if (!natural && motionBlend > 0.06 && rawLevel > beatThreshold && beatVelocity > 0.01 && risingLevel > 0.002 && now > Number(state.beatCooldownUntil || 0)) {
         const impulseStrength = clampNumber((beatVelocity - 0.01) / 0.085, 0.05, 0.68);
         const slopeGain = 0.78 + clampNumber(risingLevel * 18, 0, 0.26);
         const currentImpulse = Number(state.beatImpulse) || 0;
@@ -1567,7 +1575,7 @@
         0,
         beatSoftCap
       );
-      const beatNodRaw = Number(state.beatNodSmoothed) || 0;
+      const beatNodRaw = natural ? 0 : Number(state.beatNodSmoothed) || 0;
       const beatNod = smoothMotionOutput("beat_nod", beatNodRaw, {
         rise: 0.24,
         fall: 0.21,
@@ -1617,6 +1625,7 @@
         const phase = 1 - remain / blinkLength;
         blink = Math.sin(Math.min(1, phase) * Math.PI);
       }
+      if (natural) blink = 0; // Natural layer blends expression eyelids, then blinks once.
       if (now >= state.microNextGazeAt) {
         const styleBias = style === "playful" ? 0.34 : (style === "steady" ? 0.16 : 0.24);
         state.microGazeTargetX = clampNumber((Math.random() * 2 - 1) * styleBias, -0.35, 0.35);
@@ -1631,8 +1640,8 @@
       const saccadeWeight = 1 - mouseWeight;
       const finalGazeX = state.avatarIntentOverrides?.gaze?.x ?? (state.mouseGazeCurrentX * mouseWeight + state.microGazeCurrentX * saccadeWeight);
       const finalGazeY = state.avatarIntentOverrides?.gaze?.y ?? (state.mouseGazeCurrentY * mouseWeight + state.microGazeCurrentY * saccadeWeight);
-      const breath = state.avatarIntentOverrides?.breath ?? (Math.sin(now / 1050 + state.microBreathSeed) * 0.5 + 0.5);
-      const sway = Math.sin(now / 860 + state.microBreathSeed * 0.7);
+      const breath = state.avatarIntentOverrides?.breath ?? natural?.breath ?? (Math.sin(now / 1050 + state.microBreathSeed) * 0.5 + 0.5);
+      const sway = natural?.sway ?? Math.sin(now / 860 + state.microBreathSeed * 0.7);
       const ribbon = Math.sin(now / 930 + state.microBreathSeed * 1.3);
       const hair = Math.sin(now / 780 + state.microBreathSeed * 1.9);
       const breathGain = 0.46 - motionBlend * 0.22;
@@ -1770,7 +1779,7 @@
         maxStep: 1.45
       });
       const shoulderSpeechPulse = speaking
-        ? (Math.sin(now / 188 + state.microBreathSeed * 0.9) * 0.5 + 0.5) * upperSpeechEnvelopeOut * (0.12 + bodyEnergy * 0.28)
+        ? ((natural ? natural.sway : Math.sin(now / 188 + state.microBreathSeed * 0.9)) * 0.5 + 0.5) * upperSpeechEnvelopeOut * (0.12 + bodyEnergy * 0.28)
         : 0;
       const shoulderBaseTarget = 0.08
         + breath * (speaking ? (0.2 + audioEnergy * 0.28) * upperShoulderGain : 0.18)
@@ -1781,7 +1790,7 @@
         maxStep: 0.1
       });
       const upperTalkWave = speaking
-        ? Math.sin(now / 192 + state.microBreathSeed * 1.1) * upperSpeechEnvelopeOut * (0.32 + bodyEnergy * 0.68)
+        ? (natural ? natural.roll : Math.sin(now / 192 + state.microBreathSeed * 1.1)) * upperSpeechEnvelopeOut * (0.32 + bodyEnergy * 0.68)
         : 0;
       const upperTalkWaveSmoothed = smoothMotionOutput("param_upper_talk_wave", upperTalkWave, {
         rise: 0.17,
@@ -1821,9 +1830,9 @@
       safeAddParamValue(core, P.bodyAngleX, bodyXBase, 0.13);
       safeAddParamValue(core, P.bodyAngleY, bodyYBase, 0.13);
       safeAddParamValue(core, P.bodyAngleZ, bodyZBase, 0.64);
-      safeAddParamValue(core, P.bodyAngleY, Math.sin(now / 1150 + idleSeed * 0.3) * 0.38 * idleLifeGain, 0.18);
-      safeAddParamValue(core, P.angleY, Math.sin(now / 980 + idleSeed * 0.7) * 0.32 * idleLifeGain, 0.16);
-      safeAddParamValue(core, P.bodyAngleX, Math.sin(now / 1420 + idleSeed * 0.5) * 0.22 * idleLifeGain, 0.14);
+      safeAddParamValue(core, P.bodyAngleY, (natural ? natural.sway : Math.sin(now / 1150 + idleSeed * 0.3)) * 0.38 * idleLifeGain, 0.18);
+      safeAddParamValue(core, P.angleY, (natural ? natural.roll : Math.sin(now / 980 + idleSeed * 0.7)) * 0.32 * idleLifeGain, 0.16);
+      safeAddParamValue(core, P.bodyAngleX, (natural ? natural.sway : Math.sin(now / 1420 + idleSeed * 0.5)) * 0.22 * idleLifeGain, 0.14);
       safeAddParamValue(core, P.breath, 0.22 + breath * 0.42, 0.2);
       safeAddParamValue(core, P.shoulder, shoulderBase, 0.14);
       if (speaking && upperSpeechEnvelopeOut > 0.04) {

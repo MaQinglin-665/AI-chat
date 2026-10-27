@@ -1,6 +1,38 @@
 {
   "features": [
-    {"id": "avatar-brain-executor-v1", "name": "VRM adaptive frames and brain action execution", "status": "completed", "done_criteria": ["Separate adaptive-frame commit, VRM only", "Sequential interruptible actions with terminal ACK and scene restrictions", "Full/CI checks and real 10-minute private acceptance; draft PR only", "Pre-merge empty-reply and camera baseline diagnosis; 3-minute labeled replay"]},
+    {
+      "id": "live2d-motion-natural",
+      "name": "Independent Live2D speech, idle and transition naturalization",
+      "status": "completed",
+      "dependencies": [
+        "live2d-action-vocabulary",
+        "live2d-model-onboarding-template"
+      ],
+      "scope": [
+        "Live2D only; no avatarRuntime, VRM, room, brain or executor edits",
+        "200ms attack/600ms release body-only envelope and sentence/pause-bounded nods; mouth ownership unchanged",
+        "Random nonperiodic idle; smooth transitions across authored/procedural/gesture/expression paths",
+        "Toggle off preserves existing exact ordered-write fixtures; 4x120s audible comparison; local gates and Linux/Windows CI"
+      ],
+      "next": "Normal push independent PR to main; upload four draft review videos, wait all current-head Linux/Windows CI; qinglinMa performs Windows acceptance/merge. No self merge or main/force push.",
+      "verification": [
+        "Python950/3skip;final82Node;syntax197/260;secrets884;first-run package/publicJSON/compile and actual SAPI preparation pass",
+        "4Hz actual driver Hiyori .012994->.000258; exact mouth including pauses; Mao no4Hz; ten-minute stochastic idle, budget/transitions/ownership/off/component restoration regressions pass",
+        "Existing fixtures/SHA/snapshots unchanged: off Hiyori5280/394224; Mao1440/25850 plus actualCore6 local1440/181030 exact",
+        "4x120s/1800frame real local-model audio replay, same authored Idle0 and RMS input: actualCore paired mouth exact, gesture results unchanged, no page errors; decoded MP4s and local SHA evidence"
+      ]
+    },
+    {
+      "id": "avatar-brain-executor-v1",
+      "name": "VRM adaptive frames and brain action execution",
+      "status": "completed",
+      "done_criteria": [
+        "Separate adaptive-frame commit, VRM only",
+        "Sequential interruptible actions with terminal ACK and scene restrictions",
+        "Full/CI checks and real 10-minute private acceptance; draft PR only",
+        "Pre-merge empty-reply and camera baseline diagnosis; 3-minute labeled replay"
+      ]
+    },
     {
       "id": "live2d-model-onboarding-template",
       "name": "New Live2D mapping template and model-reference validator in CI",
@@ -945,5 +977,5 @@
       ]
     }
   ],
-  "active_task": "avatar-brain-executor-v1"
+  "active_task": "live2d-motion-natural"
 }

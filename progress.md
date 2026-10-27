@@ -1329,3 +1329,18 @@ Verification Evidence（本次叠加同步）：从更新后的PR229分支8a9ec9
 ## 2026-10-27 — PR231 accepted main integration
 Merged origin/main d2ab533 after PR228 (501f00f), PR229 (a674d0e), PR230 (d2ab533). Only feature_list.json, progress.md, session-handoff.md conflicted: retained both histories and feature entries, kept executor active. Product/test changes auto-merged; no manual runtime edits.
 Verification Evidence: scripts/test-local.ps1 passed: 950 Python / 3 skipped, all Node suites, Python196/JavaScript255 syntax, secrets879. Hiyori actual model validation passed; Mao/template structure-only because models absent. Required public JSON and py_compile gates passed. Next normal push, ready PR231, all current-head CI, authorized merge commit; keep original brain_exec and local main/private config unchanged.
+
+## 2026-10-27 — Live2D 动作自然化开始
+从最新 origin/main5669e8a 新建 friend/live2d-motion-natural。#226/#228/#229/#230/#231均已由作者合并。当前只做 Live2D 身体/待机/过渡与可关闭叠加，不改 VRM、房间、后端 brain、执行器或公共avatarRuntime；playGesture/lookAt返回值不变。旧“允许合并”历史不适用于本任务，不自行合并PR。
+初查：Hiyori micro-motion存在原始音量上升沿126ms冷却的beatImpulse/beatNod及bodyEnergy路径，director另有680ms音频rise检测；Mao没有同样的逐音节点头路径，保持五元音所有权。先增加独立可关闭自然化层、确定性4Hz/长待机/过渡/严格关闭回归，再录两模型各120秒前后有声对比、完整门禁、PR与全部CI。素材和模型只使用本地已授权官方示例，模型/私密配置/Key/日志/媒体不提交。不读取私人配置、不覆盖本机安装。
+下一步：实现/测试；原始5669e8a相关文件已保存仓库外outputs/live2d-motion-natural/before，供真实前后录像，旧严格fixture不改。
+
+## 2026-10-27 — Live2D 动作自然化完成本地验收，待 PR/CI
+- 从 main5669e8a 建立 friend/live2d-motion-natural。仅 Live2D：新增可关闭的 pre-Core 身体包络/随机待机/完整姿态过渡，映射声明幅度与通道；原 playGesture/lookAt Promise/状态/时长不变，avatarRuntime、VRM/房间/brain/执行器及音频/跨窗口协议未改。
+- Hiyori 原126ms上升沿beat路径在叠加开启时关闭，身体包络180ms保持/200ms attack/600ms release；不写嘴型，保留嘴型使用的原speechMotionBlend生命周期。新随机流独立于legacy Math.random；停用并可恢复SDK固定breath/eyeBlink，官方动作/物理/焦点保留。头身/表情/眼睑/手臂部件的最终姿态平滑交接；内部轻手势不抢显式请求。
+- Verification Evidence：完整Python950通过/3skip；最终全部82 Node文件通过，语法Python197/JS260。最后仅文档示例路径被隐私路径规则拦截，已改环境临时目录写法，规则未放宽，复查secrets884通过。首次运行包、公开样例JSON及py_compile通过。新SAPI音轨准备工具实际运行成功。
+- 4Hz脉冲实际驱动代码：Hiyori头部4Hz幅度0.012994→0.000258，Mao不引入4Hz头抖；嘴型逐帧严格相同，另测两秒句间停顿/恢复也相同。十分钟待机随机间隔/持续移动/种子复现、标点预算/停顿不增预算、替换/停止/官方切换/眼睑/部件过渡、RNG隔离/关闭零写入/组件恢复与坏映射测试通过。
+- 关闭叠加后Hiyori原5280帧/394224有序调用及完整快照严格一致；Mao协议1440/25850、本机真实Core6/Mao1440/181030一致。仅原Hiyori测试输入加false开关，未改frozen fixture、SHA、预期快照或阈值。
+- 真实本地Hiyori/Mao前后各120秒/1800帧/15fps，60Hz更新，共四段有声成片；30秒待机、四句话、连续三手势、官方/参数交接和恢复，含头部特写/场景名/署名。为了比较同一输入，QA两边均固定官方Idle[0]；两模型实际Core嘴型成对1800帧严格相同，三手势Promise结果前后相同，零页面异常。媒体已解码验证，音轨发声段mean -24.4dB/max -1.8dB。受控SAPI/RMS回放，不冒充真实设备延迟/主观验收。
+- 新增本地QA/音轨工具与说明。工作日志及截图/源帧/录像/SHA均仅仓库外outputs/live2d-motion-natural及work/live2d-motion-natural-*.log。模型、私密配置、Key、录音/媒体不提交；不读取别人配置，不覆盖安装版。
+下一步：正常push本分支、独立PR到main，记录四段草稿录像附件链接，等待当前head全部Linux/WindowsCI后交作者Windows验收；不自行合并，不main/force push。主观自然程度/模型绑定限制和无时间戳时按整次播放限额见docs/live2d-motion-natural.md。
