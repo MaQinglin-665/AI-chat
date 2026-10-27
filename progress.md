@@ -1230,3 +1230,7 @@ Verification Evidence: fresh scripts/test-local.ps1 passed (912 passed, 3 skippe
 - 全量scripts/test-local.ps1：937Python通过/3跳过，76Node文件，语法194/246，secrets859；首次运行包和必需JSON/py_compile通过。第一次全量发生一次无关external_agent HTTP本机连接中止，未改其代码；完整重跑通过。20截图/4切换/63授权/1拒绝/0页面错误及拖拽移动断言通过。
 - 录像已作为原仓库的**草稿验收附件**保存，需作者登录并有仓库写权限查看；不发布产品release。链接：https://github.com/MaQinglin-665/AI-chat/releases/tag/untagged-d2ff791d304d9886571a
 - 已知限制：合成频谱/受控元音不能证明真实人声识别率；Mao手势受原模型绑定约束；原生Windows穿透与真实语音仍由作者检查。#226独立且CI已绿，不混入本分支。
+
+
+## 长线阶段2 — 先行接口 Draft
+从阶段1 friend/avatar-live2d-mao9406ea4建立friend/live2d-action-vocab，PR base使用前一分支以便独立审阅，#228先合并后再切换base/syncmain。先提交docs/live2d-action-vocabulary.md的接口/词表/结果/打断/坐标约定并开Draft，随后才实现。此检查点不宣称功能完成。未改VRM/场景/后端brain，后续共享runtime仅增加可选转发/原事件字段，PR单独说明。

@@ -1,6 +1,20 @@
 {
   "features": [
     {
+      "id": "live2d-action-vocabulary",
+      "name": "Live2D model-independent gesture vocabulary and lookAt",
+      "status": "in_progress",
+      "dependencies": [
+        "avatar-live2d-mao-acceptance"
+      ],
+      "done_criteria": [
+        "Publish contract-only Draft PR before implementation",
+        "Bounded Promise results, replacement/cancel/reset, safe lookAt; mapping-only two-model vocabulary",
+        "Speech mouth remains active during gestures; two real-model vocabulary recordings",
+        "Full Linux/Windows CI; no self merge or forbidden resources"
+      ]
+    },
+    {
       "id": "avatar-live2d-mao-acceptance",
       "name": "Mao real-model acceptance and discovered fixes",
       "status": "completed",
@@ -877,5 +891,5 @@
       ]
     }
   ],
-  "active_task": "avatar-live2d-mao-acceptance"
+  "active_task": "live2d-action-vocabulary"
 }
