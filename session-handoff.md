@@ -1,3 +1,9 @@
+# Current — PR217 latest-main conflict fixed locally; publish/allCI/GitHub mergeability next
+- User reports27301c0CIgreenbutCONFLICTING aftermain1012e13/#225. Mergedmain1012e13as82ea405; only3state conflicts, preserved both histories + incoming middle notes, no product conflict. Ancestryexit0. Allmainbedroomcontroller/CSS/API/assets and8VRMscene modules preserved; renderer differs onlyapprovedclockownership.
+- Verification Evidence: strict5280frames/394224calls/42scenes; browser1030/167741/fourPNGpairs/10reloads;10mainHiyoriBackdrop/VRMNode +36Python/1skip; full932Python/3skip/74Node,syntax194/243,secrets853;package/JSON/compile pass. Logswork/pr217-main225-* and evidenceoutputs/pr217-main225 outsideGit. No privateconfigread/installedappchange.
+- Next normalpush217/ready, awaiteveryLinux+WindowsCI onexacthead AND GitHubmergeable=true/mainstill1012e13, thennotifyauthorinPRcomment. Stop ifuncertainproductconflicts or newer main needsreview; no selfmerge/force/mainpush. Networkpushretry10s/max5.
+- #226friend/lipsync-fix and laterMao stillwaitauthor217merge. No defaultVRM task or model/privateconfig/key commit; Sendagaya remainsignoredmodels_local.01Hiyori standalone videoalreadyprovided,userforwards; neverclaimauthorviewed. Historicalrecordsbelowpreserved.
+
 # Current — PR217 conflicts after #225 landed; sync main1012e13
 - User2026-10-27 reports217head27301c0/open/CIgreen butCONFLICTING andmain1012e13notancestor. Cleanlocalfriend/avatar-live2d-adapter matches remote; explicitfetch confirmsmain1012e13nowincludes225bedroombackdrop. PriorCIgreen did not cover this later main.
 - Scope: merge latestmain, preserve upstreamVRM/room/camera/backdrop numeric behavior and approved Live2DPixi clock, resolve only clear conflicts; ask author on uncertain choices. Rerun specified strict tests, all mainVRM/scene/backdrop tests, full test-local/package, normalpush/ready then all Linux+WindowsCI. Never selfmerge/main/forcepush; networkpushretry10s/max5.

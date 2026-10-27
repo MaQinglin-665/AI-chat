@@ -75,3 +75,14 @@ main 在收尾期间前进到 `2b67452`，已通过 `38f0497` 补入 #217；上�
 - 01 Hiyori录像（约38.4秒，无声）已在聊天单独补发，用户明确“我来转发”。不声称作者已收到或观看；它仍是作者合并前必看项。02–04作者已看过，用户确认改进明显。录像/模型/私密配置未提交。
 
 本检查点随后正常push/ready并等待该提交的Linux与Windows全部CI通过，再在PR评论中通知作者；远端结果以GitHub及仓库外ci-final.json为准。任何PR均不自行合并。#226同步及后续Mao分支工作等作者合并#217；官方CC0Sendagaya仅本地，不作为本次默认角色变更。
+
+
+### 2026-10-27 — 消除 #225 合入后产生的最新 main 冲突
+上轮27301c0的绿色CI覆盖的是main1ab5d38；随后#225合并为main `1012e13`，旧分支因此再次落后并显示CONFLICTING。已正常merge最新main，合并提交 `82ea405`。仅feature_list.json、progress.md、session-handoff.md冲突；保留Git已自动合并的中间日志和双方结尾/功能条目，active_task明确指向本轮217。产品代码无冲突，未取舍任何上游背景行为。
+
+- 最新main祖先检查返回**0**。Core6严格适配/映射测试：**5280帧/394224完整调用/42场景**逐项相同；真实Pixi浏览器**1030帧/167741调用**及四组PNG相同，10次重载清理通过。
+- main新增Hiyori背景与VRM/房间/镜头/绘景专项**10个Node文件**通过；资源/背景Python**36通过/1跳过**。默认关闭、三时段、异步取消/释放、透明桌宠与VRM隔离、阴影坐标、颜色过渡均沿用main测试。
+- main卧室controller/CSS/API/WebP/manifest/README共8个文件逐字节相同，layout里的原函数及3个调用点完整保留；8个VRM场景模块逐字节相同，VRM renderer剔除已批准时钟归属平移后逐字节相同。证据在仓库外outputs/pr217-main225/。
+- 完整scripts/test-local.ps1：**932Python通过/3跳过，74Node文件，语法Python194/JS243，秘密扫描853**；scripts/check_first_run_package.ps1、必需JSON/py_compile通过。没有读取私人配置或覆盖本机安装。
+
+本检查点随后正常push/ready，等待新提交全部Linux+WindowsCI，并核对GitHub不再CONFLICTING及远端main未再次前进后通知作者。01已单独交用户转发，作者仍需观看后决定合并；不自行合并。#226和Mao后续仍等作者合并217，Sendagaya仅本地models_local。没有提交模型/录像/私密配置/Key，无force/mainpush；本次WebP是已经合入main的项目背景资源。
