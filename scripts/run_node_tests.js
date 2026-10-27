@@ -23,6 +23,8 @@ const tests = [
   "tests/test_avatar_painted.js",
   "tests/test_hiyori_backdrop.js",
   "tests/test_avatar_runtime.js",
+  "tests/test_vrm_adaptive_frames.js",
+  "tests/test_avatar_brain_executor.js",
   "tests/test_live2d_avatar_adapter.js",
   "tests/test_live2d_mapping_sequence.js",
   "tests/test_visual_polish_frontend.js",

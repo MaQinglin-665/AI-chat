@@ -1,3 +1,11 @@
+# PR #231 accepted integration — 2026-10-27
+
+User authorized merging #228 → #229 → #230 → #231. First three merged (501f00f, a674d0e, d2ab533). Temporary detached worktree ai_desktop_pet_pr231_merge merges origin/main d2ab533 into PR231 4f0d78a. Only three state files conflicted; both histories retained below, executor remains active. Product files auto-merged. Local tests passed: 950 Python / 3 skipped, all Node/syntax/secrets and JSON/compile gates. Next: normal push to executor branch, ready, all CI, merge commit. Preserve brain_exec, local main and private config. This instruction supersedes historical next steps below.
+
+## Preserved historical records
+
+# Avatar brain executor handoff
+
 # Current — 三条 Live2D PR 顺序同步
 ## 2026-10-27 — PR #230 按叠加顺序同步（本次指令）
 作者已合并 #226；最新 origin/main 为 d63d077。本分支 friend/live2d-model-template 使用 merge 同步；保留三个状态文件双方任务与验证历史，不改写产品逻辑、测试快照或基线。本次记录优先于历史中的待合并 #226 等旧指令。
@@ -156,36 +164,22 @@ Verification Evidence for #224 merge: scripts/test-local.ps1 passed (876 passed,
 - Next normalpush217/ready, awaiteveryLinux+WindowsCI onexacthead AND GitHubmergeable=true/mainstill1012e13, thennotifyauthorinPRcomment. Stop ifuncertainproductconflicts or newer main needsreview; no selfmerge/force/mainpush. Networkpushretry10s/max5.
 - #226friend/lipsync-fix and laterMao stillwaitauthor217merge. No defaultVRM task or model/privateconfig/key commit; Sendagaya remainsignoredmodels_local.01Hiyori standalone videoalreadyprovided,userforwards; neverclaimauthorviewed. Historicalrecordsbelowpreserved.
 
-# Current — PR217 conflicts after #225 landed; sync main1012e13
-- User2026-10-27 reports217head27301c0/open/CIgreen butCONFLICTING andmain1012e13notancestor. Cleanlocalfriend/avatar-live2d-adapter matches remote; explicitfetch confirmsmain1012e13nowincludes225bedroombackdrop. PriorCIgreen did not cover this later main.
-- Scope: merge latestmain, preserve upstreamVRM/room/camera/backdrop numeric behavior and approved Live2DPixi clock, resolve only clear conflicts; ask author on uncertain choices. Rerun specified strict tests, all mainVRM/scene/backdrop tests, full test-local/package, normalpush/ready then all Linux+WindowsCI. Never selfmerge/main/forcepush; networkpushretry10s/max5.
-- #226friend/lipsync-fix and separateMao stage3 remain blocked on author merging217, do not sync/start now. Sendagaya remains ignoredmodels_local; no defaultmodel task or model/privateconfig/key commit.01 standalone video alreadyprovided/userforwards; do not claim authorviewed01.
-- Next inspectactualmergeconflicts. No privateconfiguration read or installedapp change.
+Worktree: D:/AI/ai_desktop_pet_brain_exec; branch codex/avatar-brain-executor-v1, baseline 9d09edc (#217 merged). Local main remains 0a06554. Never read/change config.local.json or the original ai_desktop_pet checkout.
 
-# Current — PR217 latest-main gates passed; publish and await all CI
-- Merged main1ab5d38/#227 asf73125f; #221/#224 included. #225 stilldraft/unmerged atfetch. Only3state conflicts preserved both histories; no product conflict/behavior choice. VRM beyond approved clock movement +8scene/camera/background modules matchmain byte-for-byte.
-- Verification Evidence: exactadapter+sequence Node5280/394224/42, browser1030/167741/fourPNGpairs/10reloads;9VRM Node +32Python/1skip asset/backdrop; full928Python/3skipped/73Node,syntax194/241,secrets847;package/JSON/py_compile passed. Logswork/pr217-main227-* outsideGit.
-- Standalone01Hiyori38.4sMP4 supplied, user explicitly forwards it. Author has not yet confirmed viewing01; required before merge. Author already viewed02–04. No model/media/private config/key changes. Existing installed120ms untouched.
-- Next normalpush friend/avatar-live2d-adapter, ready217, wait everyLinux+WindowsCI on exacthead and notifyauthor inPRcomment. Never selfmerge/main/forcepush. Networkpush retry10s/max5. Then stop until author merges217; no226sync/Mao stage3/defaultVRM task yet. This supersedes historical authorization text below.
+VRM cadence is a separate commit 5125627. Front-end queue/world polling, existing-world execution, speech bridge and terminal ACK are in 1ebd5ea; companion-point completion gets a follow-up fix. See docs/avatar-brain-executor.md and docs/avatar-brain-actions.md.
 
-# Current — author requests fresh PR217 synchronization and full CI
-- Latest authorization: resend separate01 Hiyori38.4s video, then prioritize #217 latest-main merge/strict+all VRM-room-camera-background/full/package tests, normal push/ready and allLinux+WindowsCI; author merges, never self-merge/force/main push. Stop and ask if conflict choice ambiguous.
-- Fetchedmain1ab5d38 includes#221/#224/#227. GitHub#225 stillopen/draft, not merged; leave it out until onmain. Original217ready/open/unmerged0c08c3d. PR226ready/open/unmerged943b690; do not sync it until author merges217. Separate friend/avatar-live2d-mao also waits; do not initiate stage3 now. No model/defaultVRM task; officialCC0Sendagaya stays ignoredmodels_local only.
-- Separate01 localMP4 link provided in chat; no direct author receiving channel available, so do not claim delivered externally. File outputs/馨语桌宠_录像分享包_20261026/01_Hiyori功能检查_约38秒_无声.mp4 hash matches original.
-- Next mergeorigin/main and preserve upstream product behavior exactly; current upstream difference is#227 backend/state/package/tests, no renderer/scene changes. Update verification evidence after actual reruns. Older authorizations below are historical.
+935 Python passed / 3 skipped, all Node/syntax/secrets; first-run package, installer, docs publish and 4 browser checks passed. Final test/CI status is in PR. No npm ci; dependencies copied. The guide wait fix only changes the docs browser test.
 
-# Publication checkpoint — PR217 includes new main #224
-- Latest main2b67452 also merged38f0497. Final full896Python/3skipped,73Node,syntax191/241,secrets843;package and required JSON/compile pass. Exact Node5280/394224/42 and browser1030/167741 complete sequences strictly equal again. Hiyori code/video unchanged by #224. Publish normal push; ready; author decides merge. Then separate lipsync branch from2b67452. No brain phase2.
+Real DeepSeek daily acceptance: complete 600-second run in 612.56-second local-only silent WebM; 5 requests / 4550 tokens, 8 completed actions, 1 interrupted action, no queue timeout or browser exception. Two initial user replies displayed empty-model-content errors; third reply and its actions succeeded. Active speech was not chosen by the proactive model. Do not overstate this as flawless voice/LLM acceptance. Room tested live; other scene restrictions tested automatically.
 
-# Current — PR217 verified for publication; shared lipsync separate
+Private evidence: tmp_ui_smoke/brain-executor/acceptance.json and video/page@cdaf0c9269238c004d33ea5a04a27d95.webm. Never upload these model-bearing images/videos to the PR. Earlier trial folders are failed/discarded evidence, not final acceptance.
 
-- Priority1 complete locally on friend/avatar-live2d-adapter: explicit latest main79ee80f (#221/#222) merged8d514b7, VRM/Live2D/notices/state histories retained. Prior browser timing prototype removed from product through normal inverse patches; original installed120ms remains working locally.
-- Verification Evidence: exact Core6 Node5280/394224/42scenes and browser1030/167741 ordered calls/snapshots strictly equal; four identical PNG pairs/ten reloads. Full861Python/3skipped,72Node,syntax186/239,secrets834;docs4/package/JSON/py_compile passed. Final guard confines painted controls to VRM.
-- Dedicated realHiyori/Pixi/Core6 silent controlled-browser inspection video38.4s at outputs/pr217-closeout/Hiyori-PR217检查录像.mp4; reviewed clear/visible. No native Windows or realTTS timing claim, no media/models/private assets committed.
-- Next publish normal commit/push, update existing PR217 body/ready and deliver video, then create friend/lipsync-fix directly from freshly fetched main. Do not merge/main/force push. LLM task phase2 waits for author merging#217.
-- Shared lipsync: preserve existing FFT1024/25–350ms output latency policy/hidden timer. Generalize event-owned browser mouth across Hiyori/Mao/VRM, test/record before-after separately; strict adapter snapshots belong only to217. Prototype patches outsideGit outputs/lipsync-separated. User has noVRM: first verify official VRoid help CC0 for AvatarSampleD–G or SendagayaShino; neverA–C/privateauthorVRM, model underignored models_local only. User reconfirms priorityHiyori first.
+Draft PR only, do not merge. Author visual review and follow-up diagnosis of empty model replies remain. Preserve inherited pending PRIVATE-regex false-positive follow-up; do not expand scope into that change here.
 
-## Preserved latest-main handoff
+## PR231 pre-merge follow-up (current)
+Read docs/avatar-brain-executor-review.md. The earlier empty-reply uncertainty is resolved for a reproduced case: provider emitted plan before normal speech; ReplyFilter swallowed the trailing text. Fixed, chunk-boundary regressions pass, recorded raw replay restores 3 actions and speech. Ordinary A/B 0/5 each, extra night/window before fix 1/5 empty; after fix A/B 0/5 each. No private config was used.
+
+Existing rest-to-books camera crosses the left wall identically on baseline and PR; no furniture occlusion avoidance exists. Deferred under user's scope. Only new go_to-versus-sit camera framing changed (poseEnabled). Full test gate now 939 passed / 3 skipped, all Node/syntax/secrets pass. New 3-minute browser recording explicitly labels a fixed QA go_to/wait/sit plan and contains real DeepSeek chat; don't claim that fixture was model-selected. Evidence under tmp_ui_smoke/brain-executor-review, never upload private VRM media. Keep PR draft and wait for author.
 
 # Painted accepted integration — 2026-10-26
 

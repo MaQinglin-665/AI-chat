@@ -18,6 +18,11 @@ test('version panel opens and has items', async ({ page }) => {
 
 test('runtime console basic actions work', async ({ page }) => {
   await page.goto('/config.html', { waitUntil: 'domcontentloaded' });
+  // Dismiss the first-visit guide before testing the console controls.
+  const guideClose = page.locator('#onboardingCloseBtn');
+  await expect(guideClose).toBeVisible();
+  await guideClose.click();
+  await expect(page.locator('#onboardingBackdrop')).toBeHidden();
   await page.locator('.runtime-console-toggle').click();
   await expect(page.locator('#runtimeConsolePanel')).toBeVisible();
 

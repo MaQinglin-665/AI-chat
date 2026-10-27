@@ -5140,4 +5140,12 @@ function clearSplitWindowPerformancePhase(input = {}) {
 
 bindRuntimeBridges();
 window.addEventListener("beforeunload", handleBeforeUnload);
-main();
+main().then(async () => {
+  // Shared speech cleanup still uses the existing expression director in VRM mode.
+  // Initialize its local mapping before exposing the new speech/interrupt bridge.
+  await window.XinyuLive2DMapping?.ready();
+  const brain = window.XinyuAvatarBrainController?.start({state, speak,
+    stopSpeech: () => getTTSPlaybackController().stopAllAudioPlayback()});
+  window.__xinyuBrainController = brain;
+  window.addEventListener("beforeunload", () => brain?.dispose(), {once:true});
+});

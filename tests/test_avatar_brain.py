@@ -226,6 +226,28 @@ def test_reply_suffix_every_chunk_boundary_and_no_action_exactness():
     assert extract_reply(text, {}) == text
 
 
+@pytest.mark.parametrize("prefix,suffix", [("", "\n\n来了。坐稳，我听着。"), ("先说一句。", "然后坐下。")])
+def test_control_before_or_inside_reply_preserves_text_at_all_boundaries(prefix, suffix):
+    text = prefix + OPEN + json.dumps(decision()) + CLOSE + suffix
+    clean = sanitize_world(world())
+    cfg = {"_avatar_brain_world": clean}
+    assert extract_reply(text, cfg) == prefix + suffix
+    assert cfg["_avatar_brain_result"]["actions"]
+    for split in range(len(text) + 1):
+        cfg = {"_avatar_brain_world": clean}
+        assert "".join(filter_stream([text[:split], text[split:]], cfg)) == prefix + suffix
+        assert cfg["_avatar_brain_result"]["say"] == ""
+    assert "".join(filter_stream(iter(text), {"_avatar_brain_world": clean})) == prefix + suffix
+
+
+@pytest.mark.parametrize("control", ['broken json', 'x' * 9000])
+def test_invalid_control_does_not_swallow_following_reply(control):
+    cfg = {"_avatar_brain_world": sanitize_world(world())}
+    text = OPEN + control + CLOSE + "普通正文"
+    assert "".join(filter_stream(iter(text), cfg)) == "普通正文"
+    assert not cfg.get("_avatar_brain_result", {}).get("actions")
+
+
 def test_existing_memory_store_respects_opt_out(monkeypatch):
     import memory
     saved = []

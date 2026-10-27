@@ -1,6 +1,24 @@
 (function (root) {
   "use strict";
   // Radians and model-height ratios. Keep all motion/quality tuning here.
+  const ACTION_ARRIVAL_METERS = 0.04;
+  function worldCameraSeat(state, seats) {
+    // go_to only reaches a point; it must not frame a seated body before sit/activity.
+    return state?.poseEnabled === false ? null : seats?.[state?.name];
+  }
+  function worldCameraKey(state, locked) {
+    return state.name + (locked ? ':locked' : ':travel') + (state.poseEnabled === false ? ':standing' : '');
+  }
+  function worldActionComplete(state, action, layout) {
+    if (!state || state.moving) return false;
+    if (action.type === "stand") return state.blend === 0;
+    if (action.type === "go_to") {
+      const target = layout?.activityPoints?.[action.target];
+      return !!target && state.blend === 0 &&
+        Math.hypot(state.position[0]-target[0], state.position[1]-target[1]) <= ACTION_ARRIVAL_METERS;
+    }
+    return state.phase === "activity" && state.blend >= .999;
+  }
   const MOTION = Object.freeze({
     armDrop: 72 * Math.PI / 180, elbowBend: 0.18, elbowInward: 0.055, wristRelax: 0.065,
     chestBreath: 0.032, spineBreath: 0.018, chestExpansion: 0.009, shoulderRise: 0.0025,
@@ -15,7 +33,8 @@
     seed: 23017
   });
   const WORLD_VISUAL = Object.freeze({bookSize:[.13,.018,.19],bookPosition:[0,-.025,.055],bookColor:0x9f7fa9,gazeDistance:2,gazeHeight:.9,chinDrop:.04,chinForward:.07,lapLift:.045,elbowPadding:.025,deskHand:[.32,.775,.08],lookSpine:.65,lookHead:1.1});
-  const QUALITY = Object.freeze({ pixelBudget: 900000, minDpr: 1, maxDpr: 1.25, idleFps: 20, activeFps: 30 });
+  const QUALITY = Object.freeze({ pixelBudget: 900000, minDpr: 1, maxDpr: 1.25, idleFps: 25, activeFps: 60,
+    idleDelayMs: 3000, frameToleranceMs: 0.5, cameraMotionEpsilon: 0.00001 });
   const CAMERA = Object.freeze({ fov: 27, eyeLift: 0.035, bottom: 0.40, top: 1.16, face: 0.91, faceScreenY: 1 / 3 });
   const STANCE = Object.freeze({ yaw: 15 * Math.PI / 180, headReturn: 0.9,
     hipShift: 0.012, hipTilt: 0.035, shoulderTilt: -0.025, shoulderDrop: 0.004,
@@ -259,8 +278,21 @@
     });
   }
 
+  function createFramePacer() {
+    let lastActive = null, lastRender = null, wasActive = false;
+    return { step(now, active) {
+      if (lastActive === null || active) lastActive = now;
+      const fps = now - lastActive < QUALITY.idleDelayMs ? QUALITY.activeFps : QUALITY.idleFps;
+      const wake = active && !wasActive; wasActive = active;
+      const due = lastRender === null || wake || now - lastRender + QUALITY.frameToleranceMs >= 1000 / fps;
+      // Keep the simulation timestamp intact on rate changes; never reset the camera/world clock.
+      if (due) lastRender = now;
+      return { fps, due };
+    } };
+  }
   function startClock(renderer, produceFrame, { state }, host = root) {
     let disposed = false, raf = 0, wakeTimer = 0, lastFrame = 0;
+    const pacer = createFramePacer();
     function tick(now) {
       if (disposed) return;
       if (state.rendererSurfaceActive === false || host.document.hidden) {
@@ -270,10 +302,12 @@
       raf = host.requestAnimationFrame(tick);
       if (state.uiView !== "model") host.sampleTTSAudioLevel?.();
       const frame = produceFrame(now);
-      const fps = frame.mouth?.open > 0.02 || renderer.isAnimating?.() ? QUALITY.activeFps : QUALITY.idleFps;
-      const interval = 1000 / fps, elapsed = now - lastFrame;
-      if (elapsed < interval) return;
-      lastFrame = now - elapsed % interval;
+      const active = !!(frame.mode === "speak" || frame.preparingSpeech || frame.interaction || frame.mouth?.open > 0.02
+        || state.ttsContextSpeaking || state.streamSpeakWorking || state.speechPhase === "speaking"
+        || state.dragData || state.windowDragActive || renderer.isAnimating?.());
+      const cadence = pacer.step(now, active);
+      if (!cadence.due) return;
+      lastFrame = now;
       renderer.update(frame);
     }
     raf = host.requestAnimationFrame(tick);
@@ -289,6 +323,7 @@
     const worldModule = options.worldModule || root.XinyuVRMWorld;
     const seating = options.seatingModule || root.XinyuVRMSeating;
     let activeLayout=null,walkMetrics=null;
+    let brainControlled=false,brainGaze=null;
     const locomotion=(options.locomotionModule||root.XinyuVRMLocomotion)?.create();
     let seatProfile=null,seatMetrics=null,cameraController=null,backSince=null;
     let room = null, legacyLights = null, undoGrade = null, floorY = 0;
@@ -495,7 +530,7 @@
       const now=frame.now ?? root.performance.now();
       if(world && avatarRoot){
         const dt=Math.max(0,Math.min((now-(worldTime??now))/1000,.1));worldTime=now;
-        worldState=world.update(now,{period:period(),interaction:!!frame.interaction || frame.mode==="speak" || !!frame.preparingSpeech});
+        worldState=world.update(now,{period:period(),interaction:!brainControlled && (!!frame.interaction || frame.mode==="speak" || !!frame.preparingSpeech)});
         const pose=worldModule.pose(worldState,modelHeight,vrm.meta?.metaVersion==="0"?-1:1);
         avatarRoot.position.set(worldState.position[0]+pose.offset[0],pose.y,worldState.position[1]+pose.offset[1]);
         avatarRoot.rotation.y=worldState.yaw;
@@ -519,6 +554,10 @@
         avatarRoot.rotation.y = painted.avatarYaw();
         frame = { ...frame, worldPose: paintedModule.stationaryPose(now, frame.interaction || frame.mode === "speak" || frame.preparingSpeech, vrm.meta?.metaVersion === "0" ? -1 : 1) };
       }
+      if(brainGaze && world){
+        const point=activeLayout?.activityPoints?.[brainGaze];
+        frame={...frame,worldGaze:brainGaze==='user'?camera.position.toArray():point?[point[0],modelHeight*.9,point[1]]:null};
+      }
       driver.update(frame);
       room?.setFootPositions?.(seatMetrics ? Object.values(seatMetrics.legs).map(l=>l.ankle) : null);
       if(world && seating){
@@ -526,14 +565,14 @@
         const cameraModule=options.cameraModule || root.XinyuVRMCamera;
         if(cameraModule){
           cameraController ||= cameraModule.create([...camera.position.toArray(),0,cameraHome.targetY,0]);
-          const seated=(activeLayout?.seats||seating.SEATS)[worldState.name];
+          const seated=worldCameraSeat(worldState,activeLayout?.seats||seating.SEATS);
           const locked=active && !worldState.moving && worldState.phase==='activity';
           // Seated framing uses immutable measured stature and the layout seat, not contact-solver corrections.
           const rootHeight=locked && seated && seatProfile ? floorY+seated.surface+seatProfile.padding-seatProfile.hipsY : 0;
           const position=locked && seated ? seated.hip : worldState.position;
           const height=active ? rootHeight+modelHeight*preset.height : cameraHome.targetY;
           const offset=active ? preset.offset : [0,cameraHome.cameraY-cameraHome.targetY,cameraHome.distance];
-          const values=cameraController.update({now,position,height,offset,key:worldState.name+(locked?':locked':':travel'),locked});
+          const values=cameraController.update({now,position,height,offset,key:worldCameraKey(worldState,locked),locked});
           camera.position.set(...values.slice(0,3));camera.lookAt(...values.slice(3));
         }
       }
@@ -562,7 +601,25 @@
       capabilities: () => ({ ...(driver?.capabilities() || { vowels: false, faces: [], actions: [], vrma: false }), fullBody: !!world, locomotion: !!world }),
       playAction: (...args) => driver?.playAction(...args) || false,
       stopAction: () => driver?.stopAction(),
-      isAnimating: () => worldState?.moving || driver?.isAnimating() || false,
+      setBrainControl(value){brainControlled=!!value;if(!value)brainGaze=null;world?.setControlled?.(value);},
+      lookAtWorld(target){brainGaze=target;return target==='user'||!!activeLayout?.activityPoints?.[target];},
+      interruptBrain(){brainControlled=false;brainGaze=null;world?.setControlled?.(false);world?.interrupt();driver?.stopAction();},
+      worldLayout:()=>activeLayout,
+      beginWorldAction(action){
+        if(!world || !["room","handpainted"].includes(room?.metrics()?.preset))return false;
+        if(action.type==="stand")return world.stand();
+        if(action.type==="sit")return world.begin(["rest","desk"].includes(worldState?.name)?worldState.name:"rest");
+        return world.begin(action.target||action.name,{pose:action.type!=="go_to"});
+      },
+      worldActionDone(action){
+        return worldActionComplete(worldState, action, activeLayout);
+      },
+      isAnimating: () => {
+        const c = cameraController?.snapshot();
+        return !!(worldState?.moving || ["prepare", "walk", "rise"].includes(worldState?.phase)
+          || (worldState?.blend > 0 && worldState.blend < 1) || driver?.isAnimating()
+          || c?.value.some((v,i) => Math.abs(v-c.goal[i]) + Math.abs(c.velocity[i]) > QUALITY.cameraMotionEpsilon));
+      },
       metrics: () => ({ loadMs, loadedAt, frames, pixelRatio: renderer?.getPixelRatio(),
         antialias: renderer?.getContext().getContextAttributes()?.antialias,
         drawCalls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles, smallMotion: driver?.motionState(),
@@ -572,7 +629,7 @@
     };
     return avatar;
   }
-  const api = { createRenderer, startClock, createIntentDriver, poseAt, smallMotionAt, randomAt,
+  const api = { createRenderer, startClock, createFramePacer, worldActionComplete, worldCameraSeat, worldCameraKey, createIntentDriver, poseAt, smallMotionAt, randomAt,
     pixelRatioFor, cameraFraming, hitSegments, smoothCutoutEdges, saccadeAt, gradeRoomMaterials, STANCE, EXPRESSION, MOTION, QUALITY, CAMERA, LIGHT };
   root.XinyuVRMRenderer = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

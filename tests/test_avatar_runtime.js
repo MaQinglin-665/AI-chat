@@ -30,7 +30,7 @@ const vrmClock = require('../web/avatar/vrmRenderer.js').startClock;
   assert.equal(state.avatarRuntime.lookAt('left').status,'unsupported');
   assert.equal(root.document.body.dataset.avatarReady,"true");
   for(let t=0;t<=1000;t+=10)frame(t);
-  assert.equal(updates,20);
+  assert.equal(updates,51,'initial three-second active window; 10ms synthetic rAF samples');
   assert.equal(intervals.size,0,'full window does not poll detached cursor');
   state.rendererSurfaceActive=false;frame(1100);
   assert.equal(raf.size,0);assert.equal(timers.size,1);

@@ -1213,6 +1213,21 @@ Verification Evidence: fresh scripts/test-local.ps1 passed (912 passed, 3 skippe
 
 本检查点随后正常push/ready，等待新提交全部Linux+WindowsCI，并核对GitHub不再CONFLICTING及远端main未再次前进后通知作者。01已单独交用户转发，作者仍需观看后决定合并；不自行合并。#226和Mao后续仍等作者合并217，Sendagaya仅本地models_local。没有提交模型/录像/私密配置/Key，无force/mainpush；本次WebP是已经合入main的项目背景资源。
 
+## 2026-10-27 — avatar-brain-executor-v1 started
+Independent worktree from 9d09edc; dependencies copied with robocopy. No npm ci/private config. Two implementation commits; draft PR, no merge.
+
+### Avatar brain phase 2 verification
+- VRM adaptive cadence committed separately (5125627); executor/terminal ACK integration (1ebd5ea), plus companion-point arrival regression fix.
+- 935 Python tests passed / 3 skipped; all Node, syntax/secrets, source-package, installer, docs publish and 4 browser smoke tests passed. CI on 1ebd5ea was entirely green; final-head CI checked in draft PR.
+- Real daily run: 612.56s local-only video, 5 requests, 4550 tokens; 8 completed actions and 1 user interruption. No action timeout/browser exception. Two chat replies showed empty-model-content errors before a successful third reply; not hidden as a successful speech test.
+- Report: docs/avatar-brain-executor.md. Private media remains ignored. No user config/model changes, no main update, no merge. Author visual acceptance pending.
+
+### 2026-10-27 — PR231 pre-merge reply/camera review
+- Ordinary chat A/B 5+5: no empty output. Original request A/B 5+5: no empty output. Night/window reproduction: 1/5 empty with brain enabled; provider content had normal speech AFTER the control block, finish_reason=stop. ReplyFilter swallowed that speech. Fixed bounded block parsing for stream and non-stream, with every-boundary regression tests.
+- Exact failed provider response replay restores speech plus 3 actions. Fresh night/window A/B after fix: 0/5 empty in each group. Raw synthetic-response evidence is ignored and never committed.
+- Base/main vs PR rest-to-books camera trace identical: both cross the left wall for 343/3600 frames. Existing camera collision/occlusion and close framing are deferred, not changed here. New go_to standing-at-seat framing fixed by explicit poseEnabled; sit/random compatibility retained.
+- Full local validation: 939 passed, 3 skipped, all Node/syntax/secrets passed. See docs/avatar-brain-executor-review.md for the bounded real-video test; final CI remains visible in draft PR231. Do not merge.
+
 
 ## 2026-10-27 — 独立 Mao 验收开始
 #217 已由作者合并为 main9d09edc。#226已同步该main并推送8723067，全部10项Linux/Windows CI成功且无冲突，已通知用户实际试听，未自行合并。当前新分支friend/avatar-live2d-mao直接从最新origin/main建立，没有fork，也不包含未合并的226。基础Mao适配已随217进入main，本任务只补实际五元音、8表情、3手势、动作和配置切换验收，修复复现问题；保存本地证据后独立PR。模型/私密配置/媒体/Key不提交，不改对话/记忆/外部执行，不覆盖本机安装。
@@ -1310,3 +1325,7 @@ Verification Evidence（本次叠加同步）：从更新后的PR228分支65e526
 下一步：本地检查后正常推送，按 #228 → #229 → #230 传播合并并核对各自当前提交 Linux/Windows CI。不 rebase、不 force push、不推 main、不自行合并 PR。
 
 Verification Evidence（本次叠加同步）：从更新后的PR229分支8a9ec9e执行merge，含main d63d077；仅progress/session两份状态冲突，保留双方历史，无代码手工取舍。Python源码与已验证943/3skip的228完全相同；test-local -SkipPytest全部79 Node文件、语法195/253、secrets871、真实Hiyori/Mao参数引用与模板结构校验通过；first-run package、样例JSON、py_compile通过。Hiyori5280/394224、Mao协议1440/25850及实际Core6/Mao181030严格序列通过，旧fixture/快照未改。日志work/live2d-stack-230-*.log。待正常push/三条当前head Linux+WindowsCI；作者228→229→230合并，不自动合并。
+
+## 2026-10-27 — PR231 accepted main integration
+Merged origin/main d2ab533 after PR228 (501f00f), PR229 (a674d0e), PR230 (d2ab533). Only feature_list.json, progress.md, session-handoff.md conflicted: retained both histories and feature entries, kept executor active. Product/test changes auto-merged; no manual runtime edits.
+Verification Evidence: scripts/test-local.ps1 passed: 950 Python / 3 skipped, all Node suites, Python196/JavaScript255 syntax, secrets879. Hiyori actual model validation passed; Mao/template structure-only because models absent. Required public JSON and py_compile gates passed. Next normal push, ready PR231, all current-head CI, authorized merge commit; keep original brain_exec and local main/private config unchanged.
