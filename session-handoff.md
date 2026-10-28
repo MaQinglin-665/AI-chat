@@ -1,3 +1,20 @@
+# Brain privacy filter — 2026-10-27
+
+Branch: codex/brain-privacy-filter-v1. Worktree: D:/AI/ai_desktop_pet_privacy. Baseline: origin/main 582f19e (confirmed ancestor). Prior handoff archived in docs/history/session-handoff-before-brain-privacy-20261027.md; historical PR232 instructions are superseded by its merge.
+
+Scope: redact sensitive spans in autonomous-thought context, preserve everyday prose/code. Product change only avatar_brain_context.py. Shared memory filter, frontend, normal replies and user configuration unchanged. Original ai_desktop_pet and config.local.json not accessed. No real credentials or user conversations used.
+
+Files: context module, existing context tests, new privacy tests, docs/avatar-brain-privacy-filter.md, feature_list.json, progress.md, this handoff and its archive. Thirty ordinary and 37 sensitive synthetic cases, truncation/order/context regressions. See report for old rule audit and limitations.
+
+Validation:96 targeted passed;final complete scripts/test-local.ps1 with D TEMP/TMP:1042 Python passed/3 skipped,82 Node suites and syntax/secrets/mapping gates passed. Public JSON and required py_compile gates passed. First-run synthetic fixture scanner rejection resolved without changing scanner or product logic. See progress.md for warnings/limits.
+
+## PR234 follow-up
+User reported four leaks;fixed Bearer ordering, strong English whitespace labels and Chinese separators.139 targeted passed;full D-drive TEMP/TMP gate1085passed/3skipped,82Node suites plus syntax/secrets/mappings passed. Original30+37 corpus preserved;new9 ordinary0false positives,new17 sensitive14→0misses. See updated report. Product change still only context module. Main sync NOT performed;three state conflicts known after PR233 merge.
+
+Next:push follow-up and wait latest-head CI;keep PR234 draft and unmerged,author accepts. No private configuration reads or changes.
+
+## Preserved upstream handoff (historical; PR233 is merged)
+
 # Current — Live2D motion naturalization ready for PR/CI
 ## 2026-10-27 — Live2D 动作自然化完成本地验收，待 PR/CI
 - 从 main5669e8a 建立 friend/live2d-motion-natural。仅 Live2D：新增可关闭的 pre-Core 身体包络/随机待机/完整姿态过渡，映射声明幅度与通道；原 playGesture/lookAt Promise/状态/时长不变，avatarRuntime、VRM/房间/brain/执行器及音频/跨窗口协议未改。
@@ -37,3 +54,8 @@ Author provided D:/AI/local-models/live2d/Mao; copied (not linked) to ignored mo
 更早历史见 docs/archive/session-handoff-before-gesture-vocab.md；本任务仅由作者验收合并。
 
 Verification Evidence（同步main582f19e/#232后的最终组合）：完整scripts/test-local.ps1通过，978Python/3skip、83Node，语法197/261、secrets887；first-run package、公开样例JSON和py_compile通过。主线brain/执行器/avatarRuntime/VRM文件相对origin/main零diff，严格fixture零diff；Hiyori5280/394224与Mao1440/25850、实际Core6/Mao181030仍通过。四段最终有声MP4已上传既有草稿验收附件，作者须登录写权限查看；本地ZIP与16张比赛过程截图已保存，成片与ZIP校验后清理7200张重复帧释放377MiB。下一步正常push更新PR233并等当前head全部CI；作者Windows验收和合并，本任务不合并。
+
+## Current authorization supersedes historical publish instructions
+User explicitly approved merging PR234 after final fix and green CI. Main66326b9 merged here;only three state conflicts resolved preserving both records.159 targeted tests passed;combined full gate pending. No private config read/change.
+
+Final combined verification:1105Python passed/3skipped,83Node suites and all local gates passed using D TEMP/TMP.159 targeted passed. Final code uses bounded label scanning and complete-value redaction. Push and CI-gated authorized merge234 next;prior draft-only instructions superseded by user confirmation.

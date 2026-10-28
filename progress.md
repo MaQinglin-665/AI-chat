@@ -1361,8 +1361,35 @@ Verification Evidence: PR232 reply/claim repairs complete; full D TEMP/TMP test-
 
 PR232 repair follow-up:10ef902 fullLinux/WindowsCI passed before realMao run. Same4prompts/daily300.953s:4nonempty replies,raw/display abstain0,1plan wave/nod2completedACKs,no rejected/unresolved plan,0page errors.4calls4496tokens~$0.000191652. Video304.12s full decode; private localonly. Historical think/tilt_head never claimed but original reason not recoverable; four-turn replay8complete, no fabricated root cause. Report updated; draft only, no merge.
 
+## 2026-10-27 — brain-privacy-filter-v1 started
+Independent worktree from origin/main582f19e; dependencies copied, no npm ci. Only autonomous context redaction and associated tests/docs. Baseline saved under ignored tmp_ui_smoke/privacy; synthetic data only, no private config reads.
+
+## Brain privacy filter — Verification Evidence (2026-10-27)
+
+- Baseline origin/main582f19e; isolated codex/brain-privacy-filter-v1 worktree. Original workspace, local main and config.local.json untouched. No LLM/network calls needed for functional validation; fixtures all synthetic.
+- Old/new same corpus:30 ordinary sentences, old24 false positives/new0;37 sensitive fragments, old13 leaked/new0. Full audit and boundaries:docs/avatar-brain-privacy-filter.md.
+- Targeted privacy/context tests:96 passed. Final `scripts/test-local.ps1` using D-drive TEMP/TMP and PYTEST_DISABLE_PLUGIN_AUTOLOAD=1:1042 Python passed,3 skipped;82 Node suites passed;Python/JS syntax,secrets,Live2D mappings passed. Hiyori model checked;Mao/template structure-only warnings (no model copy needed for this backend change). Doctor has existing optional-dependency/external-CLI warnings.
+- First full attempt passed Python/Node but secret guard flagged a synthetic Windows-user-path literal in a test. Constructed identical synthetic fixture at runtime;final whole gate passed. No suppression or scanner changes.
+- Pre-push public JSON validation and required py_compile passed. Report/test/state files only;no private assets/config/logs staged.
+- Remaining limit:shape-based regex may hide long numeric order IDs/credential-shaped identifiers and cannot infer arbitrary unlabeled short secrets.4096-character source bound still fail-closed. No shared memory/chat/filter changes.
+- Delivery:normal push and draft PR;do not merge;await author acceptance.
+
+## PR234 review follow-up — Verification Evidence (2026-10-27)
+
+- Reproduced Authorization/Bearer ordering leak, short whitespace-separated strong labels and Chinese separator gaps. Fixed only context filter;no config/shared-memory/chat changes.
+- Same fixed corpus against9fb6830:original30 ordinary/37 sensitive no regressions;new9 ordinary false positives0→0;new17 sensitive misses14→0. Includes all7 requested sensitive examples plus10 variants. Report updated with explicit finite-corpus limitation.
+- Targeted139passed,including idempotence/all truncation positions/history and memory safety. Full scripts/test-local.ps1 using D-drive TEMP/TMP:1085passed,3skipped;82Node suites;syntax/secrets/mapping checks passed. Public JSON and required py_compile gates passed. Mapping template/Mao structural-only warnings unchanged;Hiyori model checked.
+- First targeted attempt exposed optional Chinese 了 separator backtracking on repeat filtering;fixed before complete gate. No tests suppressed.
+- Next:push follow-up,wait latest-head CI,keep PR234 draft/unmerged. Main sync/state conflicts from PR233 remain a separate unperformed operation.
 ## 2026-10-27 — PR233 同步作者新合入的 PR232
 发布PR233时发现main已推进到582f19e（执行器词表）。正常merge；仅feature_list/progress/session三个状态文件冲突，保留两边feature及progress历史。主线主动归档的旧handoff继续保存在docs/archive/session-handoff-before-gesture-vocab.md；当前handoff保留本Live2D验收摘要和主线新摘要，不恢复大段已归档历史。所有brain/执行器/主线产品与测试自动合并，未做手工修改；avatarRuntime不在本PR改动中。
 下一步：以新main重跑完整本地/打包检查，确认主线brain/执行器文件逐字节一致；正常push233并等所有CI，不自行合并。四段录像以原5669e8a作修改前基线，Live2D实现未因这次同步改动，原对照保持有效。
 
 Verification Evidence（同步main582f19e/#232后的最终组合）：完整scripts/test-local.ps1通过，978Python/3skip、83Node，语法197/261、secrets887；first-run package、公开样例JSON和py_compile通过。主线brain/执行器/avatarRuntime/VRM文件相对origin/main零diff，严格fixture零diff；Hiyori5280/394224与Mao1440/25850、实际Core6/Mao181030仍通过。四段最终有声MP4已上传既有草稿验收附件，作者须登录写权限查看；本地ZIP与16张比赛过程截图已保存，成片与ZIP校验后清理7200张重复帧释放377MiB。下一步正常push更新PR233并等当前head全部CI；作者Windows验收和合并，本任务不合并。
+
+## PR234 final review and authorized merge preparation — 2026-10-27
+- User clarified:merge after latest-head CI passes. Fixed three further leaks using40-character bounded label scanner;complete candidate values include punctuation,skip nested labels/connectors. Existing explicit-assignment/Bearer coverage preserved.
+- Against2d78b90:30+37+9+17 corpus unchanged;final8 ordinary0false positives;final3 sensitive3→0misses.159 targeted passed;fixed-corpus results only,not universal detection.
+- Normal merge of origin/main66326b9;only feature_list/progress/session conflicts. Feature records deduplicated byID with both additions retained;progress both sides preserved;upstream handoff retained as historical with current authorization explicitly superseding it. No product conflicts/manual changes to upstream product files.
+- Combined full scripts/test-local.ps1 with D TEMP/TMP:1105Python passed,3skipped,83Node suites;syntax,secrets,mappings pass. Hiyori model checked;Mao/template structure-only warnings unchanged. Public JSON/required py_compile gates pass. No private config/model/key changes.
+- Next:normal push,ready234,wait Linux+Windows/all checks at exact new head,merge commit/admin only;fetch to confirm origin/main. No direct main/force push.
