@@ -36,6 +36,10 @@ def dispatch_get(self, context):
         import avatar_backdrops
         avatar_backdrops.dispatch(self, load_config(), context["ROOT_DIR"], path_only)
         return
+    if path_only == "/api/avatar/motions" or path_only.startswith("/api/avatar/motions/"):
+        import avatar_motions
+        avatar_motions.dispatch(self, context["ROOT_DIR"], path_only)
+        return
     if path_only in {"/api/avatar", "/api/avatar/model.vrm"} or path_only.startswith("/api/avatar/live2d/"):
         import avatar_assets
         avatar_assets.dispatch(self, load_config(), context["ROOT_DIR"], path_only)

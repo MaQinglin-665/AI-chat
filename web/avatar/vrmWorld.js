@@ -1,6 +1,6 @@
 (function(root) {
   "use strict";
-  const TUNING = Object.freeze({ seed: 218, activityMin: 60000, activityMax: 180000,
+  const TUNING = Object.freeze({ seed: 218, activityMin: 15000, activityMax: 45000,
     resumeMin: 20000, resumeMax: 40000, speed: 0.48, radius: 0.22, blendMs: 700,
     turnSpeed: 1.8, returnDistance: 1.8, strideHz: 1.35, legSwing: 0.38, armSwing: 0.18,
     walkBounce: 0.006, cameraRate: 2.0, cameraTravel: 0.7, sitLower: 0.29,
@@ -138,7 +138,7 @@
           if(curvature>.001)wanted=Math.min(wanted,Math.sqrt((TUNING.turnSpeed*MOTION.curveSpeedFactor/curvature)**2+2*MOTION.braking*Math.max(0,ahead-MOTION.brakeBuffer)));
           ahead+=length;heading=nextHeading;
         }
-        if(Math.abs(turnDelta)>MOTION.headingSlowAngle)wanted=0;
+        if(Math.abs(turnDelta)>(speed<MOTION.minSpeed ? .08 : MOTION.headingSlowAngle))wanted=0;
         const oldSpeed=speed,rate=wanted>speed?MOTION.acceleration:MOTION.braking;
         speed+=Math.sign(wanted-speed)*Math.min(Math.abs(wanted-speed),rate*stepDt);
         let move=Math.min(remaining,(oldSpeed+speed)*.5*stepDt);
@@ -173,39 +173,11 @@
       add("hips",{x:0,y:s*MOTION.hipTwist,z:s*MOTION.hipRoll,px:0,py:0});
       add("spine",{y:-s*MOTION.hipTwist,z:-s*MOTION.hipRoll});
       add("head",{x:0,y:0,z:-s*MOTION.hipRoll*MOTION.headCompensation});
-    } else if(activity==="window"){
-      add("leftUpperArm",{x:TUNING.windowArm*facing,z:TUNING.windowArmSide*facing});add("leftLowerArm",{y:TUNING.windowElbow*facing});
-      add("head",{y:Math.sin(t*TUNING.windowHeadHz)*TUNING.windowHeadYaw+(TUNING.windowLookBackYaw*Math.sin(Math.PI*Math.max(0,(t%TUNING.lookBackPeriod-TUNING.windowLookBackAt)/(TUNING.lookBackPeriod-TUNING.windowLookBackAt)))**2),x:TUNING.windowHeadPitch*facing});
-    } else if(activity==="books"){
-      const reach=Math.max(0,1-t/TUNING.reachDuration);book=reach===0;
-      add("rightUpperArm",{x:TUNING.readRightArm*facing,z:(TUNING.readRightSide-reach*TUNING.reachLift)*facing});add("rightLowerArm",{y:TUNING.readRightElbow*facing});
-      add("leftUpperArm",{x:TUNING.readLeftArm*facing,z:TUNING.readLeftSide*facing});add("leftLowerArm",{y:TUNING.readLeftElbow*facing});add("head",{x:TUNING.readHeadPitch*facing});
-      add("rightHand",{z:Math.sin(t*TUNING.pageHz)*TUNING.readTurn});
-    } else if(activity==="rest"||activity==="desk"){
-      y=-height*TUNING.sitLower;offset=activity==="rest"?[TUNING.restOffset,0]:[TUNING.deskOffset,0];
-      for(const side of ["left","right"]){add(side+"UpperLeg",{x:TUNING.sitThigh*facing});add(side+"LowerLeg",{x:TUNING.sitKnee*facing});}
-      add("hips",{y:0,z:Math.sin(t*TUNING.sitSwayHz)*TUNING.poseSway});
-      add("leftUpperArm",{x:TUNING.sitLeftArm*facing,z:TUNING.sitLeftSide*facing});add("leftLowerArm",{y:TUNING.sitLeftElbow*facing});
-      add("rightUpperArm",{x:TUNING.sitRightArm*facing,z:TUNING.sitRightSide*facing});add("rightLowerArm",{y:TUNING.sitRightElbow*facing});
-      add("head",{x:TUNING.sitHeadPitch*facing,z:Math.sin(t*TUNING.sitHeadHz)*TUNING.poseSway});
-      if(activity==="desk")add("rightHand",{z:Math.sin(t*TUNING.writeHz)*TUNING.writeWrist});
-    } else if(activity==="stretch"){
-      const rise=.5+.5*Math.sin(t*TUNING.stretchHz);add("leftUpperArm",{z:(-TUNING.armRest+rise*TUNING.stretchRaise)*facing});add("rightUpperArm",{z:(TUNING.armRest-rise*TUNING.stretchRaise)*facing});
-      add("chest",{x:TUNING.stretchChest*rise*facing});
-    } else if(activity==="yawn"){
-      add("rightUpperArm",{x:TUNING.yawnArm*facing,z:TUNING.yawnSide*facing});add("rightLowerArm",{y:TUNING.yawnElbow*facing});add("head",{x:TUNING.yawnHead*facing});
-    } else if(activity==="hum"){add("hips",{y:0,z:Math.sin(t*TUNING.humHz)*TUNING.humHip});add("head",{z:Math.sin(t*TUNING.humHz+TUNING.humPhase)*TUNING.humHead});}
-    const hands={};
-    if(!state.moving && CONTACT[activity]){
-      CONTACT[activity].forEach((p,i)=>{const side=activity==="yawn"?"right":i===0?"left":"right";
-        hands[side]=[p[0],activity==="window"?p[1]:activity==="desk"&&i===1?p[1]-y:p[1]*height,p[2]];
-        if(activity==="books" && side==="right"){
-          const reach=Math.max(0,1-t/TUNING.reachDuration);
-          hands[side][1]+=(height*TUNING.reachHeight-hands[side][1])*reach;
-          hands[side][2]+=(TUNING.reachDistance-hands[side][2])*reach;
-        }
-      });
+    } else if(activity==='rest'||activity==='desk'){
+      y=-height*TUNING.sitLower;offset=activity==='rest'?[TUNING.restOffset,0]:[TUNING.deskOffset,0];
+      for(const side of ['left','right']){add(side+'UpperLeg',{x:TUNING.sitThigh*facing});add(side+'LowerLeg',{x:TUNING.sitKnee*facing});}
     }
+    const hands={};
     return { bones, hands, turnHead:state.headTurn||0,turnChest:state.chestTurn||0,prepare:state.phase==="prepare"?MOTION.preparationLean*Math.sin(Math.min(1,state.age/(MOTION.turnDelay+MOTION.pauseMax))*Math.PI):0, y:y*(state.moving?1:state.blend),offset:offset.map(v=>v*state.blend),book,
       weight:state.moving?walkWeight:state.blend };
   }

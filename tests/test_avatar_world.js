@@ -15,7 +15,7 @@ assert.deepEqual(sequence(17),sequence(17));assert.notDeepEqual(sequence(17),seq
 const seq=sequence(17);assert(seq.length>=5);assert(seq.every((s,i)=>i===0||s!==seq[i-1]));
 const events=[],world=W.create({emit:e=>events.push(e)});world.update(0);assert(world.begin('books'));let state;
 for(let t=100;t<20000;t+=100)state=world.update(t);
-assert.equal(state.name,'books');assert.equal(state.phase,'activity');assert(W.pose(state).book);
+assert.equal(state.name,'books');assert.equal(state.phase,'activity');assert.equal(W.pose(state).book,false);assert.deepEqual(W.pose(state).hands,{});
 assert.deepEqual(W.pose(state),W.pose({...state}));
 state=world.update(20000,{interaction:true});assert.equal(state.name,'accompany');assert(events.some(e=>e.stage==='end'&&e.name==='books'));
 world.update(20100);const until=world.snapshot().holdUntil;assert(until>=40100&&until<=60100);
