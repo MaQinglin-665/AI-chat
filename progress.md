@@ -1358,3 +1358,11 @@ Independent worktree from origin/main582f19e; dependencies copied, no npm ci. On
 - Pre-push public JSON validation and required py_compile passed. Report/test/state files only;no private assets/config/logs staged.
 - Remaining limit:shape-based regex may hide long numeric order IDs/credential-shaped identifiers and cannot infer arbitrary unlabeled short secrets.4096-character source bound still fail-closed. No shared memory/chat/filter changes.
 - Delivery:normal push and draft PR;do not merge;await author acceptance.
+
+## PR234 review follow-up — Verification Evidence (2026-10-27)
+
+- Reproduced Authorization/Bearer ordering leak, short whitespace-separated strong labels and Chinese separator gaps. Fixed only context filter;no config/shared-memory/chat changes.
+- Same fixed corpus against9fb6830:original30 ordinary/37 sensitive no regressions;new9 ordinary false positives0→0;new17 sensitive misses14→0. Includes all7 requested sensitive examples plus10 variants. Report updated with explicit finite-corpus limitation.
+- Targeted139passed,including idempotence/all truncation positions/history and memory safety. Full scripts/test-local.ps1 using D-drive TEMP/TMP:1085passed,3skipped;82Node suites;syntax/secrets/mapping checks passed. Public JSON and required py_compile gates passed. Mapping template/Mao structural-only warnings unchanged;Hiyori model checked.
+- First targeted attempt exposed optional Chinese 了 separator backtracking on repeat filtering;fixed before complete gate. No tests suppressed.
+- Next:push follow-up,wait latest-head CI,keep PR234 draft/unmerged. Main sync/state conflicts from PR233 remain a separate unperformed operation.

@@ -8,4 +8,7 @@ Files: context module, existing context tests, new privacy tests, docs/avatar-br
 
 Validation:96 targeted passed;final complete scripts/test-local.ps1 with D TEMP/TMP:1042 Python passed/3 skipped,82 Node suites and syntax/secrets/mapping gates passed. Public JSON and required py_compile gates passed. First-run synthetic fixture scanner rejection resolved without changing scanner or product logic. See progress.md for warnings/limits.
 
-Next:publish as draft PR and wait for author acceptance;never merge. Local main and private config remain untouched. Any further privacy formats require explicit regressions;no real private evidence is needed.
+## PR234 follow-up
+User reported four leaks;fixed Bearer ordering, strong English whitespace labels and Chinese separators.139 targeted passed;full D-drive TEMP/TMP gate1085passed/3skipped,82Node suites plus syntax/secrets/mappings passed. Original30+37 corpus preserved;new9 ordinary0false positives,new17 sensitive14→0misses. See updated report. Product change still only context module. Main sync NOT performed;three state conflicts known after PR233 merge.
+
+Next:push follow-up and wait latest-head CI;keep PR234 draft and unmerged,author accepts. No private configuration reads or changes.

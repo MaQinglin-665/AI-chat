@@ -17,6 +17,24 @@ LABEL_VALUE = re.compile(
     r'(?P<sep>["\']?\s*(?:[:=：]|是|为)\s*)' + _VALUE
 )
 TOKEN_VALUE = re.compile(r'(?i)(?P<label>\bbearer\s+)(?P<value>[A-Za-z0-9._~+/=-]+)')
+AUTH_VALUE = re.compile(
+    r'(?i)\bauthorization["\']?\s*[:=：]\s*'
+    r'(?P<value>bearer\s+[A-Za-z0-9._~+/=-]+)'
+)
+STRONG_SPACE_VALUE = re.compile(
+    r'(?i)(?<![A-Za-z0-9_])(?:password|passwd|pwd|api[_ -]?key|'
+    r'access[_ -]?token|secret[_ -]?key|authorization)\b[ \t]+' + _VALUE
+)
+# Case variation alone must not hide ordinary password-management vocabulary.
+ORDINARY_LABEL_VALUES = frozenset({
+    'reset', 'validation', 'required', 'optional', 'change', 'settings', 'manager',
+    'management', 'policy', 'example', 'authentication', 'authorization', 'credentials',
+})
+CHINESE_VALUE = re.compile(
+    r'(?:密码|口令|密钥|令牌)[ \t]*'
+    r'(?:(?:现在|目前|刚刚|已经|暂时|临时|新|旧|原来|最近)[ \t]*){0,2}'
+    r'(?:就是|设成|改成|叫|是|为|[:=：])(?:了)?(?!了)[ \t]*' + _VALUE
+)
 URL_VALUE = re.compile(
     r'(?i)(?P<label>[?&#](?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|key|secret|password)=)'
     r'(?P<value>[^&#\s"\'<>，。；]+)'
@@ -53,12 +71,24 @@ def _hide_value(match):
     return prefix + REDACTED + suffix
 
 
+def _hide_secret_shaped_value(match):
+    value = match.group('value').strip('"\'')
+    mixed_case = any(c.islower() for c in value) and any(c.isupper() for c in value)
+    if (len(value) >= 6 and value.casefold() not in ORDINARY_LABEL_VALUES
+            and (any(c.isdigit() for c in value) or mixed_case)):
+        return _hide_value(match)
+    return match.group(0)
+
+
 def clean_text(value, limit):
     if not isinstance(value, str) or len(value) > MAX_SOURCE_CHARS:
         return ""
     # Redact the full source BEFORE any summary/memory length limit is applied.
-    for rule in (QUOTED_PATH, URL_VALUE, URL_LOGIN, LABEL_VALUE, TOKEN_VALUE):
+    # Consume complete authorization schemes before generic labels can hide only
+    # "Bearer" and orphan the credential. Chinese long separators precede "是".
+    for rule in (QUOTED_PATH, URL_VALUE, URL_LOGIN, AUTH_VALUE, TOKEN_VALUE, CHINESE_VALUE, LABEL_VALUE):
         value = rule.sub(_hide_value, value)
+    value = STRONG_SPACE_VALUE.sub(_hide_secret_shaped_value, value)
     value = PRIVATE.sub(REDACTED, value)
     return " ".join(value.split())[:max(0, limit)]
 

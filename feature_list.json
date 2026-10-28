@@ -9,7 +9,7 @@
         "Redact sensitive spans before truncation; preserve ordinary words/code",
         "20+ everyday and 3+ per sensitive category tests; full local gate; draft PR"
       ],
-      "verification": "96 targeted tests; full D-drive TEMP/TMP gate:1042 passed,3 skipped;82 Node suites;syntax,secrets,mapping checks passed. Draft PR only."
+      "verification": "Review follow-up:139 targeted passed;full D TEMP/TMP gate1085 passed,3 skipped;82 Node suites;syntax/secrets/mappings passed. Original30+37 retained,new9 ordinary/new17 sensitive correct. Draft PR234,await CI and author."
     },
     {
       "id": "brain-gesture-vocab-v1",

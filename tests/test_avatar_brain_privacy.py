@@ -54,17 +54,54 @@ CASES = [
 ]
 
 
-@pytest.mark.parametrize("text", ORDINARY)
+NEW_ORDINARY = [
+    "secret sauce 是番茄酱", "password reset 链接过期了", "key point 是先做测试",
+    "password Reset 链接过期了", "password Validation is useful",
+    "api key management is important", "access token policy is documented",
+    "secret key settings are documented", "密码怎么设置比较安全？",
+]
+NEW_CASES = [
+    ("authorization", "Authorization: Bearer abc.def.ghi", "Authorization: " + REDACTED),
+    ("space", "password Abc12345", "password " + REDACTED),
+    ("space", "api key abcDEF1234567890xyz", "api key " + REDACTED),
+    ("chinese", "密码就是我生日0815", "密码就是" + REDACTED),
+    ("chinese", "我的 wifi 密码改成了 qwer1234", "我的 wifi 密码改成了 " + REDACTED),
+    ("token", "token 是 ghp_xxxx1234abcd", "token 是 " + REDACTED),
+    ("bearer", "Bearer eyJhbGciOi.xxx.yyy", "Bearer " + REDACTED),
+] + [
+    ("space", label + " AbcdefGh", label + " " + REDACTED)
+    for label in ("passwd", "pwd", "access token", "secret key", "authorization")
+] + [
+    ("chinese", label + sep + " demo123", label + sep + " " + REDACTED)
+    for label, sep in (("口令", "叫"), ("密钥", "设成"), ("令牌", "目前改成了"),
+                       ("密码", "现在就是"), ("密码", ":"))
+]
+
+
+@pytest.mark.parametrize("text", ORDINARY + NEW_ORDINARY)
 def test_everyday_text_preserved(text):
     assert clean_text(text, 4096) == text
 
 
-@pytest.mark.parametrize("category,fragment,expected", CASES)
+@pytest.mark.parametrize("category,fragment,expected", CASES + NEW_CASES)
 def test_only_sensitive_span_hidden(category, fragment, expected):
     source = "刚才聊到 " + fragment + "，我们继续看月亮。"
     safe = "刚才聊到 " + expected + "，我们继续看月亮。"
     assert clean_text(source, 4096) == safe
     assert clean_text(safe, 4096) == safe
+
+
+@pytest.mark.parametrize("category,fragment,expected", NEW_CASES)
+def test_new_formats_do_not_leak_through_context_or_truncation(category, fragment, expected):
+    for limit in range(len(fragment) + 1):
+        assert clean_text(fragment, limit) == expected[:limit]
+    captured = []
+    def retrieve(cfg, query, history):
+        captured.append((query, history))
+        return [{"text": fragment + "，继续看月亮"}]
+    output = build_context({}, [{"role": "user", "content": fragment}], retrieve=retrieve)
+    assert fragment not in output and fragment not in str(captured)
+    assert expected in output and "继续看月亮" in output
 
 
 def test_redaction_precedes_truncation_and_reaches_both_context_sources():
