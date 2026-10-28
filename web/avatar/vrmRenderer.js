@@ -1,5 +1,6 @@
 (function (root) {
   "use strict";
+  const naturalMotion = root.XinyuVRMMotionNatural || (typeof require === "function" ? require("./vrmMotionNatural.js") : null);
   // Radians and model-height ratios. Keep all motion/quality tuning here.
   const ACTION_ARRIVAL_METERS = 0.04;
   function worldCameraSeat(state, seats) {
@@ -104,10 +105,10 @@
     }
     return null;
   }
-  function poseAt(now, { seed = MOTION.seed, facing = 1, height = 1.6, level = 0, action = null } = {}) {
+  function poseAt(now, { seed = MOTION.seed, facing = 1, height = 1.6, bodyEnvelope = 0, speechPitch = 0, action = null } = {}) {
     const t = Math.max(0, now) / 1000, phase = randomAt(seed, 100) * Math.PI * 2;
     const breath = Math.sin(t * 1.6), sway = Math.sin(t * 0.42 + phase);
-    const speech = clamp(level), small = smallMotionAt(t, seed);
+    const speech = clamp(bodyEnvelope), small = smallMotionAt(t, seed);
     const pose = {};
     const node = n => (pose[n] ||= { x: 0, y: 0, z: 0, px: 0, py: 0, scaleY: 1 });
     node("hips").px = (STANCE.hipShift + sway * MOTION.weightShift) * height;
@@ -119,7 +120,7 @@
     node("chest").scaleY = 1 + breath * MOTION.chestExpansion;
     node("head").y = -STANCE.yaw * STANCE.headReturn + (Math.sin(t * 0.51 + phase) + Math.sin(t * 0.83) * MOTION.headYawSecondary) * MOTION.headYaw;
     node("head").z = (Math.sin(t * 0.37) + Math.sin(t * 0.91 + phase) * MOTION.headTiltSecondary) * MOTION.headTilt;
-    node("head").x = (Math.sin(t * 0.63 + phase) * MOTION.headPitch + Math.sin(t * 7.1) * speech * MOTION.speechNod) * facing;
+    node("head").x = (Math.sin(t * 0.63 + phase) * MOTION.headPitch + speechPitch) * facing;
     for (const [side, sign] of [["left", -1], ["right", 1]]) {
       node(side + "Shoulder").py = (breath * MOTION.shoulderRise - STANCE.shoulderDrop) * height;
       node(side + "UpperArm").z = sign * facing * (MOTION.armDrop + breath * MOTION.armSway + sway * MOTION.armSway * sign);
@@ -192,6 +193,8 @@
       position: bone(name)?.position?.clone?.(), scale: bone(name)?.scale?.clone?.() }]));
     const vowelNames = [...new Set(Object.values(vowels))], faceNames = [...new Set(Object.values(faces))];
     let action = null, lastNow = null, startedAt = null, lastSmallMotion = null;
+    const speechBody = naturalMotion.createSpeech({seed:seed ^ 0x5ab39});
+    let speechMotion = {active:false};
     const supportedActions = ["nod", "small_nod", "nod_double", "wave"];
     function stopAction() { action = null; }
     function playAction(name, { intensity = 1 } = {}) {
@@ -209,7 +212,11 @@
         action.phase = (now - action.start) / (action.name === "wave" ? 1800 : 900);
         if (action.phase >= 1) stopAction();
       }
-      const pose = poseAt(elapsed, { seed, facing, height, level: frame.mouth?.open || 0, action });
+      const speechState = options.state || {};
+      const cue = frame.speech || {id: `${speechState.ttsPlaybackGeneration||0}:${speechState.speechAnimStartedAt||0}`,
+        index:speechState.avatarBrowserSpeech?.boundaryIndex,text:speechState.live2dSpeechText||''};
+      speechMotion = speechBody.update(now, frame.mouth?.open || 0, cue, !!action);
+      const pose = poseAt(elapsed, { seed, facing, height, bodyEnvelope:speechMotion.envelope, speechPitch:speechMotion.pitch, action });
       lastSmallMotion = pose.smallMotion;
       for (const name of names) {
         const n = bone(name), base = rest.get(name);
@@ -257,7 +264,7 @@
       if(frame.solveContacts) frame.solveContacts();
       vrm.update?.(delta);
     }
-    return { update, playAction, stopAction, isAnimating: () => !!action,
+    return { update, playAction, stopAction, isAnimating: () => !!action || speechMotion.active,
       motionState: () => lastSmallMotion, capabilities: () => ({
         vowels: Object.values(vowels).every(supports), armGestures: bone("rightUpperArm") ? ["wave"] : [],
         fullBody: false, locomotion: false, faces: Object.keys(faces).filter(name => supports(faces[name])),
@@ -445,7 +452,7 @@
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       const gl = renderer.getContext();
       smoothCutoutEdges(vrm.scene, gl.getParameter(gl.SAMPLES));
-      driver = createIntentDriver(vrm, source.mapping || {}, { height, seed: options.seed });
+      driver = createIntentDriver(vrm, source.mapping || {}, { height, seed: options.seed, state:options.state });
       loadedAt = root.performance?.now?.() || 0; loadMs = loadedAt - began;
     }
     function updateHitAreas(width, height, cameraOverride = camera) {

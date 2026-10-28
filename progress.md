@@ -1393,3 +1393,10 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 - Normal merge of origin/main66326b9;only feature_list/progress/session conflicts. Feature records deduplicated byID with both additions retained;progress both sides preserved;upstream handoff retained as historical with current authorization explicitly superseding it. No product conflicts/manual changes to upstream product files.
 - Combined full scripts/test-local.ps1 with D TEMP/TMP:1105Python passed,3skipped,83Node suites;syntax,secrets,mappings pass. Hiyori model checked;Mao/template structure-only warnings unchanged. Public JSON/required py_compile gates pass. No private config/model/key changes.
 - Next:normal push,ready234,wait Linux+Windows/all checks at exact new head,merge commit/admin only;fetch to confirm origin/main. No direct main/force push.
+
+
+## 2026-10-28 — VRM motion naturalization v1 started
+Confirmed origin/main42ae9ea and created isolated motion worktree; robocopy dependencies, no npm ci/private config. Audited instantaneous mouth-driven body and60–180s activity holds. First independent commit will isolate speech body envelope, preserve mouth and camera.
+
+### Step0 verification
+Separate body-only200ms attack/600ms95%-release envelope with180ms syllable hold; seeded1–2nod budget per sentence, conservative utterance budget without timed punctuation. Mouth values unchanged. New4Hz spectral/release/budget/RNG/real-driver mouth tests plus existing VRM/runtime/brain-executor/camera tests passed. Legacy instantaneous-level test now explicitly tests bodyEnvelope; no threshold weakened.

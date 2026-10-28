@@ -69,7 +69,7 @@ for (const version of ["0", "1"]) for (const action of ["wave", "nod", "small_no
 }
 assert.deepEqual(poseAt(12345,{seed:42}), poseAt(12345,{seed:42}));
 assert.notDeepEqual(poseAt(12345,{seed:42}), poseAt(12345,{seed:43}));
-assert(poseAt(1000,{level:1}).bones.spine.x > poseAt(1000,{level:0}).bones.spine.x);
+assert(poseAt(1000,{bodyEnvelope:1}).bones.spine.x > poseAt(1000,{bodyEnvelope:0}).bones.spine.x);
 for (let i=1;i<100;i++) {
   const interval=MOTION.smallPeriod + MOTION.smallJitter*(randomAt(42,i*3)-randomAt(42,(i-1)*3));
   assert(interval>=8 && interval<=20);
