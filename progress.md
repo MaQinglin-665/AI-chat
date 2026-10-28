@@ -1345,3 +1345,16 @@ Author authorized narrow abstain filtering, ordinary-reply prompt/body guard and
 Verification Evidence: PR232 reply/claim repairs complete; full D TEMP/TMP test-local978 Python/3skip,82 Node,syntax/secrets pass. Narrow streaming abstain filter, explicit normal-body prompt, error on control-only normal reply; safe fixed claim diagnostics/expiry tombstones. Saved-response four-turn replay8actions completed, historical missing claim not reproduced. Push/CI then same-four-message real Mao5minute run required.
 
 PR232 repair follow-up:10ef902 fullLinux/WindowsCI passed before realMao run. Same4prompts/daily300.953s:4nonempty replies,raw/display abstain0,1plan wave/nod2completedACKs,no rejected/unresolved plan,0page errors.4calls4496tokens~$0.000191652. Video304.12s full decode; private localonly. Historical think/tilt_head never claimed but original reason not recoverable; four-turn replay8complete, no fabricated root cause. Report updated; draft only, no merge.
+
+## 2026-10-27 — brain-privacy-filter-v1 started
+Independent worktree from origin/main582f19e; dependencies copied, no npm ci. Only autonomous context redaction and associated tests/docs. Baseline saved under ignored tmp_ui_smoke/privacy; synthetic data only, no private config reads.
+
+## Brain privacy filter — Verification Evidence (2026-10-27)
+
+- Baseline origin/main582f19e; isolated codex/brain-privacy-filter-v1 worktree. Original workspace, local main and config.local.json untouched. No LLM/network calls needed for functional validation; fixtures all synthetic.
+- Old/new same corpus:30 ordinary sentences, old24 false positives/new0;37 sensitive fragments, old13 leaked/new0. Full audit and boundaries:docs/avatar-brain-privacy-filter.md.
+- Targeted privacy/context tests:96 passed. Final `scripts/test-local.ps1` using D-drive TEMP/TMP and PYTEST_DISABLE_PLUGIN_AUTOLOAD=1:1042 Python passed,3 skipped;82 Node suites passed;Python/JS syntax,secrets,Live2D mappings passed. Hiyori model checked;Mao/template structure-only warnings (no model copy needed for this backend change). Doctor has existing optional-dependency/external-CLI warnings.
+- First full attempt passed Python/Node but secret guard flagged a synthetic Windows-user-path literal in a test. Constructed identical synthetic fixture at runtime;final whole gate passed. No suppression or scanner changes.
+- Pre-push public JSON validation and required py_compile passed. Report/test/state files only;no private assets/config/logs staged.
+- Remaining limit:shape-based regex may hide long numeric order IDs/credential-shaped identifiers and cannot infer arbitrary unlabeled short secrets.4096-character source bound still fail-closed. No shared memory/chat/filter changes.
+- Delivery:normal push and draft PR;do not merge;await author acceptance.

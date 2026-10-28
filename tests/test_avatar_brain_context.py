@@ -41,10 +41,10 @@ def test_fake_model_receives_last_three_rounds_and_relevant_memory(history):
 
 
 @pytest.mark.parametrize("private", [
-    "api_key=do-not-send", "我的密码是abc", "Token abc", "private config setting",
-    "D:/AI/private/model.vrm", r"C:\private\secret.txt", "/home/me/data", "../private/data",
-    r"\\server\share\model", ".env", "config.local.json", '{"private":"value"}',
-    "sk-testplaceholder", "gho_testplaceholder", "aVeryLongUnlabelledCredential123456789",
+    "api_key=do-not-send", "我的密码是abc", "Bearer abc",
+    "D:/AI/private/model.vrm", r"C:\private\secret.txt", "/home/me/data",
+    r"\\server\share\model", "sk-testplaceholder", "gho_testplaceholder",
+    "aVeryLongUnlabelledCredential123456789",
     "普通话" * 30 + " api_key=outside-summary-cutoff",
 ])
 def test_sensitive_history_and_memories_never_enter_context(private, caplog):
@@ -53,7 +53,7 @@ def test_sensitive_history_and_memories_never_enter_context(private, caplog):
         result = build_context(config(), history, retrieve=lambda *a: [{"text": private}, {"text": "喜欢月亮"}])
     assert private not in result and private not in caplog.text
     assert "喜欢月亮" in result
-    assert clean_text(private, 30) == ""
+    assert "[已隐藏]" in clean_text(private, 4096)
 
 
 def test_summary_memory_bounds_and_missing_or_broken_memory():

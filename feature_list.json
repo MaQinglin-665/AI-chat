@@ -1,6 +1,17 @@
 {
   "features": [
     {
+      "id": "brain-privacy-filter-v1",
+      "name": "Context privacy span redaction without everyday false positives",
+      "status": "completed",
+      "done_criteria": [
+        "Audit previous rules and synthetic before/after corpus",
+        "Redact sensitive spans before truncation; preserve ordinary words/code",
+        "20+ everyday and 3+ per sensitive category tests; full local gate; draft PR"
+      ],
+      "verification": "96 targeted tests; full D-drive TEMP/TMP gate:1042 passed,3 skipped;82 Node suites;syntax,secrets,mapping checks passed. Draft PR only."
+    },
+    {
       "id": "brain-gesture-vocab-v1",
       "name": "Connect model gesture vocabulary to brain executor",
       "status": "in_progress",
@@ -965,5 +976,5 @@
       ]
     }
   ],
-  "active_task": "brain-gesture-vocab-v1"
+  "active_task": "brain-privacy-filter-v1"
 }

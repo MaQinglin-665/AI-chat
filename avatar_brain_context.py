@@ -3,26 +3,64 @@ import json
 import re
 
 from history_summary import sanitize_history
-from memory_text import looks_sensitive_memory_text
 
 SUMMARY_CHARS = 300
 MEMORY_CHARS = 120
 MAX_MEMORIES = 2
 MAX_SOURCE_CHARS = 4096
-# Conservative whole-message exclusion: do not let truncation split a secret/path.
-PRIVATE = re.compile(
-    r"(?i)(\b(?:key|token|config|password|secret)\b|api[_ -]?key|密钥|令牌|密码|配置|路径|"
-    r"[/\\]|[{}\[\]]|[a-z]:|\b[\w.-]+\.(?:json|env|vrm|vrma|py|js|txt|yaml|toml|ini|pem)\b|"
-    r"\b(?:sk|pk|gho|ghp|github_pat)[_-]|\.[a-z][a-z0-9_-]{1,12}\b|[A-Za-z0-9_+=-]{24,})"
+# Span rules deliberately avoid bare topic words, punctuation and file names.
+REDACTED = "[已隐藏]"
+_VALUE = r'(?P<value>"[^"\r\n]*"|\'[^\'\r\n]*\'|[^\s,;，；。！？!？<>\[\]{}"\'&]+)'
+LABEL_VALUE = re.compile(
+    r'(?i)(?P<label>(?<![A-Za-z0-9_])(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|token|key|'
+    r'password|passwd|pwd|secret|authorization)\b|密钥|令牌|密码|口令)'
+    r'(?P<sep>["\']?\s*(?:[:=：]|是|为)\s*)' + _VALUE
 )
+TOKEN_VALUE = re.compile(r'(?i)(?P<label>\bbearer\s+)(?P<value>[A-Za-z0-9._~+/=-]+)')
+URL_VALUE = re.compile(
+    r'(?i)(?P<label>[?&#](?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|key|secret|password)=)'
+    r'(?P<value>[^&#\s"\'<>，。；]+)'
+)
+URL_LOGIN = re.compile(r'(?i)(?P<label>https?://)(?P<value>[^/\s:@]+:[^/\s@]+)(?=@)')
+# Match quoted absolute paths first, so spaces inside a personal directory stay private.
+_PATH_START = r'(?:[A-Za-z]:[\\/]|\\\\[^\\\s]+\\|/(?:home|Users|root|var|etc)/)'
+QUOTED_PATH = re.compile(r'(?P<quote>["\'])(?P<value>' + _PATH_START + r'.*?)(?P=quote)', re.I)
+PRIVATE = re.compile(
+    r'(?<![A-Za-z0-9_])(?:sk|pk|gho|ghp|github_pat)[_-][A-Za-z0-9_-]{4,}'
+    r'|(?<![A-Za-z0-9_])(?:AKIA[A-Z0-9]{16}|AIza[A-Za-z0-9_-]{30,}|xox[baprs]-[A-Za-z0-9-]{10,})'
+    r'|(?<![A-Za-z0-9_])eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}'
+    r'|(?<![A-Za-z0-9_])(?=[A-Za-z0-9_+=-]{24,}(?![A-Za-z0-9_]))(?=[A-Za-z0-9_+=-]*[A-Za-z])'
+    r'(?=(?:[A-Za-z_+=-]*\d){4})[A-Za-z0-9_+=-]{24,}'
+    r'|[A-Za-z0-9.!#$%&\'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+'
+    r'|(?<!\d)(?:\+?86[ -]?)?1[3-9]\d[ -]?\d{4}[ -]?\d{4}(?!\d)'
+    r'|(?<!\w)\+\d{1,3}[ -]?(?:\(\d{2,4}\)|\d{2,4})[ -]?\d{3,4}[ -]?\d{4}(?!\d)'
+    r'|(?<!\d)(?:\(\d{3}\)[ -]?|\d{3}[ -])\d{3}[ -]\d{4}(?!\d)'
+    r'|(?<!\d)\d{17}[Xx](?!\w)'
+    r'|(?<!\d)\d{13,19}(?!\d)'
+    r'|(?<!\d)(?:\d{4}[ -]){3,4}\d{1,4}(?!\d)'
+    r'|(?<![A-Za-z0-9_])(?:[A-Za-z]:[\\/]Users[\\/]|/(?:home|Users)/)'
+    r'[^\\/\r\n"\'<>，。；！？,;\[\]{}]+[\\/][^\s"\'<>，。；！？,;\[\]{}]*'
+    r'|(?<![A-Za-z0-9_])' + _PATH_START + r'[^\s"\'<>，。；！？,;\[\]{}]*', re.I
+)
+
+
+def _hide_value(match):
+    value = match.group('value')
+    prefix = match.group(0)[:match.start('value') - match.start()]
+    suffix = match.group(0)[match.end('value') - match.start():]
+    if value.startswith(('"', "'")) and value[-1:] == value[:1]:
+        return prefix + value[0] + REDACTED + value[-1] + suffix
+    return prefix + REDACTED + suffix
 
 
 def clean_text(value, limit):
     if not isinstance(value, str) or len(value) > MAX_SOURCE_CHARS:
         return ""
-    if looks_sensitive_memory_text(value) or PRIVATE.search(value):
-        return ""
-    return " ".join(value.split())[:limit]
+    # Redact the full source BEFORE any summary/memory length limit is applied.
+    for rule in (QUOTED_PATH, URL_VALUE, URL_LOGIN, LABEL_VALUE, TOKEN_VALUE):
+        value = rule.sub(_hide_value, value)
+    value = PRIVATE.sub(REDACTED, value)
+    return " ".join(value.split())[:max(0, limit)]
 
 
 def recent_history(raw):
