@@ -1393,3 +1393,17 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 - Normal merge of origin/main66326b9;only feature_list/progress/session conflicts. Feature records deduplicated byID with both additions retained;progress both sides preserved;upstream handoff retained as historical with current authorization explicitly superseding it. No product conflicts/manual changes to upstream product files.
 - Combined full scripts/test-local.ps1 with D TEMP/TMP:1105Python passed,3skipped,83Node suites;syntax,secrets,mappings pass. Hiyori model checked;Mao/template structure-only warnings unchanged. Public JSON/required py_compile gates pass. No private config/model/key changes.
 - Next:normal push,ready234,wait Linux+Windows/all checks at exact new head,merge commit/admin only;fetch to confirm origin/main. No direct main/force push.
+
+## 2026-10-28 — 浏览器语音 Live2D 文本元音：准备与数据来源阻塞
+- 从最新 origin/main42ae9ea（包含66326b9）新建 friend/live2d-text-vowels。已读 AGENTS/状态/交接，未读私人配置，未修改产品代码。
+- 按用户“不能联网查询”约束，仅离线检查仓库、工作区依赖、npm/pip 缓存、bundled runtime 及现有 Node/Python 依赖；未找到可核实许可的拼音库或普通汉字拼音数据，未下载任何依赖或数据。依用户“找不到合适许可的库就停下问”要求，已询问是否允许仅开发阶段下载官方包核实许可、运行时离线，或由用户提供离线包与许可。等待明确答复，不以等待时间推定同意。
+- 已确认 boundary 回调接收原始 SpeechSynthesisEvent，现有跨窗口协议/统一 runtime 会清空 browser vowel；后续需覆盖独立模型窗口，并保留 VRM/非 browser 路径及 Hiyori 严格序列。
+- Verification Evidence：Node 运行 test_browser_lip_sync.js、test_lip_sync_bridge_frontend.js、test_live2d_avatar_adapter.js、test_live2d_mapping_sequence.js 全部通过。Core6/Hiyori 严格5280帧、394224次有序写入、42场景一致。尚无新实现，无新录像、完整检查或 PR/CI 完成声明。
+- 仅更新 feature_list/progress/session-handoff 用于续接；未提交、push 或开 PR。下一步先解决离线拼音数据/许可来源，再继续实现和验收。
+
+## 2026-10-28 — 浏览器文本元音实现与本地验收完成
+- 用户明确允许从官方包下载/核实许可，运行时必须离线。下载npm官方pinyin-pro3.29.5，核实包内MIT与完整原LICENSE；只派生GB2312一级3755常用字韵母，11763字节JSON，完整许可随数据保留，SHA256与来源在THIRD_PARTY_NOTICES。总运行时净增加23223字节，不引入完整库/联网查询。
+- browserLipSync保留原开合公式/生命周期，额外收集原生boundary有界词计划，沿用rate/delayMs；Live2D适配器原pre-Core处补vowel与80ms权重交叉淡变，标点闭嘴。Hiyori不加载新模块；分析音频的TTS完整参数写入不变。既有taffy-speech增加可忽略元数据消息、墙钟转换及900ms租约；新token空计划清旧标点，连续朗读缺boundary时不会冻结。未改avatarRuntime/appStartup/播放控制器/VRM/房间/brain/执行器，未新增参数写入RAF。
+- Verification Evidence：完整scripts/test-local.ps1为1105Python通过/3skip、85Node文件通过。最后跨窗口连续token保护调整后再次完整前端门禁85Node通过、syntax199Python/267JS、secrets900、真实Hiyori/Mao引用通过；first-run package、公开JSON与必需py_compile通过。新测试含原main42ae9ea的14400个browser开合采样精确SHA256；Hiyori5280帧394224次有序写入、Mao协议1440/25850与本机Core6/Mao1440/181030严格一致，旧fixtures/快照零修改。日志work/text-vowels-full.log、text-vowels-final-node.log、text-vowels-package.log。
+- 实际本机浏览器Huihui语音读取三段文本，各录前后，共六段约10～12秒MP4，原生15～16个boundary；WASAPI仅回录系统输出，非后配音/非分析器。修改前I/U/E/O始终0，中文修改后五通道均出现。全部解码与非静音RMS检查通过；按截图捕获时钟对齐原录音，六段上传既有GitHub草稿验收资料，本地另有约5.5MiB转发ZIP。来源、录制限制和链接见docs/live2d-browser-text-vowels.md。用户询问声音后确认全部录制/浏览器进程已结束，后续只静音检查，再录制须先告知。
+- 仍是文本近似：新词不先于boundary+delay，不能声称未知词内音素精确对齐；单字多音、英文/数字/罕见字回退与截图帧率限制已写报告。未读/提交私人配置、Key或模型，音视频不进仓库。下一步commit/正常push/独立PR及同head全部CI；本任务不合并。
