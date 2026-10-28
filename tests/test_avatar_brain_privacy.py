@@ -78,12 +78,24 @@ NEW_CASES = [
 ]
 
 
-@pytest.mark.parametrize("text", ORDINARY + NEW_ORDINARY)
+FINAL_ORDINARY = [
+    "secret sauce 是番茄酱", "password reset 链接过期了", "key point 是先做测试",
+    "我的密码不告诉你", "密码太长了记不住", "密码学这门课挺难的",
+    "我把令牌放进背包了", "他说 key 很重要",
+]
+FINAL_CASES = [
+    ("connector", "the password is hunter22", "the password is " + REDACTED),
+    ("nested-label", "bearer token 是 abcd1234efgh", "bearer token 是 " + REDACTED),
+    ("symbols", "PWD=Zz9!xq", "PWD=" + REDACTED),
+]
+
+
+@pytest.mark.parametrize("text", ORDINARY + NEW_ORDINARY + FINAL_ORDINARY)
 def test_everyday_text_preserved(text):
     assert clean_text(text, 4096) == text
 
 
-@pytest.mark.parametrize("category,fragment,expected", CASES + NEW_CASES)
+@pytest.mark.parametrize("category,fragment,expected", CASES + NEW_CASES + FINAL_CASES)
 def test_only_sensitive_span_hidden(category, fragment, expected):
     source = "刚才聊到 " + fragment + "，我们继续看月亮。"
     safe = "刚才聊到 " + expected + "，我们继续看月亮。"
@@ -91,7 +103,7 @@ def test_only_sensitive_span_hidden(category, fragment, expected):
     assert clean_text(safe, 4096) == safe
 
 
-@pytest.mark.parametrize("category,fragment,expected", NEW_CASES)
+@pytest.mark.parametrize("category,fragment,expected", NEW_CASES + FINAL_CASES)
 def test_new_formats_do_not_leak_through_context_or_truncation(category, fragment, expected):
     for limit in range(len(fragment) + 1):
         assert clean_text(fragment, limit) == expected[:limit]
@@ -121,3 +133,18 @@ def test_redaction_precedes_truncation_and_reaches_both_context_sources():
 def test_source_limit_stays_fail_closed():
     assert clean_text("普通" * 4096, 300) == ""
     assert clean_text(None, 300) == ""
+
+
+def test_bounded_scan_consumes_full_value_and_stops_at_sentence_boundary():
+    from avatar_brain_context import LABEL_SCAN_CHARS
+    secret = "a1!@#$%" * 10
+    assert clean_text("pwd " + secret + " 继续", 4096) == "pwd " + REDACTED + " 继续"
+    outside = "password" + " " * LABEL_SCAN_CHARS + "a1!z"
+    assert clean_text(outside, 4096) == "password a1!z"
+    ordinary = "password reset，下一句话编号为 a1!z"
+    assert clean_text(ordinary, 4096) == ordinary
+
+
+@pytest.mark.parametrize("connector", ["is", "was", "are", "=", ":"])
+def test_generic_connector_and_punctuation_value(connector):
+    assert clean_text("refresh token " + connector + " ab!@#$% 结束", 4096) == "refresh token " + connector + " " + REDACTED + " 结束"
