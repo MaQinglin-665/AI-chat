@@ -1,4 +1,5 @@
 {
+  "active_task": "brain-privacy-filter-v1",
   "features": [
     {
       "id": "brain-privacy-filter-v1",
@@ -9,7 +10,8 @@
         "Redact sensitive spans before truncation; preserve ordinary words/code",
         "20+ everyday and 3+ per sensitive category tests; full local gate; draft PR"
       ],
-      "verification": "Review follow-up:139 targeted passed;full D TEMP/TMP gate1085 passed,3 skipped;82 Node suites;syntax/secrets/mappings passed. Original30+37 retained,new9 ordinary/new17 sensitive correct. Draft PR234,await CI and author."
+      "verification": "Final159 targeted passed;combined full D TEMP/TMP gate1105passed/3skipped,83Node suites;syntax/secrets/mappings passed. All fixed corpus correct;author approved merge after latest-head CI.",
+      "next": "Ready PR234 and merge commit after all latest-head CI passes (explicit author authorization)."
     },
     {
       "id": "brain-gesture-vocab-v1",
@@ -974,7 +976,29 @@
         "Separate main2b67452 branch; #217 already ready at0c08c3d; original local installed120ms unchanged.",
         "2026-10-27 main9d09edcmerged3aafe90;real3modelcurrentcode/nooverlay passes;full938/3skip/75Node,syntax195/246,secrets858;package/JSON/compilepass;existingfixtures/snapshotsunchanged,newexplicitprecedence+provider-vowelisolation assertions."
       ]
+    },
+    {
+      "id": "live2d-motion-natural",
+      "name": "Independent Live2D speech, idle and transition naturalization",
+      "status": "completed",
+      "dependencies": [
+        "live2d-action-vocabulary",
+        "live2d-model-onboarding-template"
+      ],
+      "scope": [
+        "Live2D only; no avatarRuntime, VRM, room, brain or executor edits",
+        "200ms attack/600ms release body-only envelope and sentence/pause-bounded nods; mouth ownership unchanged",
+        "Random nonperiodic idle; smooth transitions across authored/procedural/gesture/expression paths",
+        "Toggle off preserves existing exact ordered-write fixtures; 4x120s audible comparison; local gates and Linux/Windows CI"
+      ],
+      "next": "PR233 open/ready with four uploaded draft review videos; normal push merge then verify all current-head CI. Author Windows acceptance/merge only.",
+      "verification": [
+        "Python950/3skip;final82Node;syntax197/260;secrets884;first-run package/publicJSON/compile and actual SAPI preparation pass",
+        "4Hz actual driver Hiyori .012994->.000258; exact mouth including pauses; Mao no4Hz; ten-minute stochastic idle, budget/transitions/ownership/off/component restoration regressions pass",
+        "Existing fixtures/SHA/snapshots unchanged: off Hiyori5280/394224; Mao1440/25850 plus actualCore6 local1440/181030 exact",
+        "4x120s/1800frame real local-model audio replay, same authored Idle0 and RMS input: actualCore paired mouth exact, gesture results unchanged, no page errors; decoded MP4s and local SHA evidence",
+        "Main582f19e/#232 merged; full978Python/3skip/83Node,syntax197/261,secrets887,package/JSON/compile pass; upstreambrain/executor/runtime/VRM and frozenfixtures zero diff"
+      ]
     }
-  ],
-  "active_task": "brain-privacy-filter-v1"
+  ]
 }

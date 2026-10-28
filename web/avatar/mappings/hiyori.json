@@ -656,5 +656,36 @@
     "idle_reset": {
       "durationMs": 0
     }
+  },
+  "naturalMotion": {
+    "enabled": true,
+    "bodyChannels": [
+      "angleX",
+      "angleY",
+      "angleZ",
+      "bodyAngleX",
+      "bodyAngleY",
+      "bodyAngleZ",
+      "shoulder"
+    ],
+    "idleStrength": 1,
+    "idlePose": {
+      "angleX": 1.6,
+      "angleY": 1.1,
+      "bodyAngleX": 0.7
+    },
+    "speechPose": {},
+    "nodPose": {
+      "angleY": -2.2,
+      "bodyAngleY": 0.6
+    },
+    "idleGestures": [
+      "tilt_head",
+      "think"
+    ],
+    "idleIntervalMs": [
+      14000,
+      30000
+    ]
   }
 }

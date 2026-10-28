@@ -4,7 +4,7 @@
   const directorApi = () => root.TaffyHiyoriPerformanceDirector || (typeof require === "function" ? require("../hiyoriPerformanceDirector.js") : null);
   const unit = value => Math.max(0, Math.min(1, Number(value)));
   function createRenderer({ state, lifecycle, host = root } = {}) {
-    let mapping, resource, clock, driver, gestures, disposed = false;
+    let mapping, resource, clock, driver, gestures, natural, naturalApi, disposed = false;
     function sanitize(frame) {
       const value = {};
       if (!frame || typeof frame !== "object") return value;
@@ -31,6 +31,12 @@
       if (disposed) return false;
       await mappingApi.ready();
       if (disposed) return false;
+      if (mapping.naturalMotion) {
+        naturalApi = host.XinyuLive2DMotionNatural || root.XinyuLive2DMotionNatural;
+        if (!naturalApi && typeof require === "function") naturalApi = require("./live2dMotionNatural.js");
+        if (!naturalApi) { await import("./live2dMotionNatural.js"); naturalApi = root.XinyuLive2DMotionNatural; }
+        if (disposed) return false;
+      }
       state.avatarMapping = mapping;
       resource = await lifecycle.load({ ...source, mapping, beforeCoreUpdate(runLayers) {
         // Called only at the original pre-Core hook, inside the Pixi model tick.
@@ -38,6 +44,11 @@
         clock?.(host.performance.now());
         const sample = gestures?.sample();
         const originalFrame = state.avatarIntentFrame, originalOverrides = state.avatarIntentOverrides;
+        natural?.prepare(host.performance.now(), originalFrame, {
+          gestureActive: gestures?.isActive(), gazeOwned: gestures?.ownsGaze(),
+          actionActive: !!state.hiyoriDirector?.action || !!state.hiyoriDirector?.outgoingAction
+            || host.performance.now() < Number(state.live2dNaturalActionUntil || 0)
+        });
         try {
           if (sample) {
             state.avatarIntentFrame = { ...originalFrame, ...sample.frame };
@@ -46,6 +57,7 @@
           if (mapping.driver === "mapped") driver?.update(sanitize(state.avatarIntentFrame));
           else runLayers();
           for (const [id, value] of sample?.parameters || []) resource?.model?.internalModel.coreModel.addParameterValueById(id, value);
+          natural?.apply();
         } finally {
           state.avatarIntentFrame = originalFrame; state.avatarIntentOverrides = originalOverrides;
         }
@@ -60,6 +72,7 @@
       const gesturesApi = host.XinyuLive2DGestures || root.XinyuLive2DGestures || (typeof require === "function" ? require("./live2dGestures.js") : null);
       if (resource && gesturesApi) gestures = gesturesApi.create({ mapping, state, host,
         canvas: resource.app?.view || host.document?.getElementById?.("live2d-canvas"), stopLegacy: stopAction });
+      if (resource?.model && naturalApi) natural = naturalApi.create({ mapping, state, model: resource.model, expressions: resource.expressions });
       return resource !== null;
     }
     function update(frame = {}, options = {}) {
@@ -74,6 +87,7 @@
     function playAction(name, { intensity = 1 } = {}) {
       if (disposed || !mapping || !Object.hasOwn(mapping.actions || {}, name)) return false;
       const action = mapping.actions[name];
+      state.live2dNaturalActionUntil = host.performance.now() + (action.durationMs || 4000);
       if (driver) return driver.playAction(name, { intensity: Number.isFinite(intensity) ? unit(intensity) : 1 });
       if (action.type !== "procedural") return false;
       return directorApi().createController({ state, mapping, performanceObject: host.performance })
@@ -82,6 +96,7 @@
     function stopAction() {
       gestures?.stop();
       driver?.stopAction();
+      state.live2dNaturalActionUntil = 0;
       if (!state.hiyoriDirector) return;
       state.hiyoriDirector.action = null;
       state.hiyoriDirector.outgoingAction = null;
@@ -89,7 +104,8 @@
     function dispose() {
       if (disposed) return;
       disposed = true; clock = null;
-      gestures?.dispose(); driver?.dispose(); resource?.dispose();
+      gestures?.dispose(); natural?.dispose(); driver?.dispose(); resource?.dispose();
+      delete state.live2dNaturalActionUntil;
       delete state.avatarIntentFrame; delete state.avatarIntentOverrides;
     }
     return { kind: "live2d", load, dispose, update, playAction, stopAction,

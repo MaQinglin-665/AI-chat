@@ -56,7 +56,9 @@ async function harness(core, CubismModel, before) {
     constructor() { this.ticker = ticker; this.stage = { addChild() {} }; this.view = canvas; } destroy() {}
   }, live2d: { Live2DModel: { from: async () => display } } };
   window.Live2DCubismCore = core;
-  const state = { uiView: "full", baseTransform: { y: 0, rotation: 0 }, availableMotionGroups: [], config: { model_path: "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json" },
+  // The naturalization overlay is intentionally different. Compare the original
+  // ordered writes with that optional layer explicitly OFF; never update fixtures.
+  const state = { live2dNaturalMotionEnabled: false, uiView: "full", baseTransform: { y: 0, rotation: 0 }, availableMotionGroups: [], config: { model_path: "/models/hiyori_pro_t11/hiyori_pro_t11.model3.json" },
     modelProfileName: "hiyori_pro_t11", ttsPlaybackGeneration: 1, expressionEnabled: true, motionEnabled: true,
     ttsAudioLevel: 0, speechMouthOpen: 0, expressionStrength: 1, currentTalkStyle: "neutral" };
   let speaking = false;

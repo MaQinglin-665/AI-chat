@@ -283,5 +283,44 @@
     "idle_reset": {
       "durationMs": 0
     }
+  },
+  "naturalMotion": {
+    "enabled": true,
+    "bodyChannels": [
+      "angleX",
+      "angleY",
+      "angleZ",
+      "bodyX",
+      "bodyY",
+      "bodyZ",
+      "armL1",
+      "armL2",
+      "armL3",
+      "armR1",
+      "armR2",
+      "armR3"
+    ],
+    "idleStrength": 1,
+    "idlePose": {
+      "angleX": 2.3,
+      "angleY": 1.6,
+      "bodyX": 0.9
+    },
+    "speechPose": {
+      "angleZ": 1.8,
+      "bodyY": 0.65
+    },
+    "nodPose": {
+      "angleY": -3.5,
+      "bodyY": 0.65
+    },
+    "idleGestures": [
+      "tilt_head",
+      "think"
+    ],
+    "idleIntervalMs": [
+      14000,
+      30000
+    ]
   }
 }
