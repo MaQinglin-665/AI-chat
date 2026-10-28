@@ -709,13 +709,14 @@
       }
 
       if (mode === "speak" && audible) {
+        const natural = context.naturalMotion;
         const audio = clamp(Number(context.audioLevel) || 0, 0, 1);
         const energy = clamp(Number(context.bodyEnergy) || audio, 0, 1.35);
         const seedPhase = director.seed * 0.001;
-        const headCadence = Math.sin(now / 225 + seedPhase)
+        const headCadence = natural ? natural.roll : Math.sin(now / 225 + seedPhase)
           + Math.sin(now / 510 + seedPhase * 0.63) * 0.22;
-        const shoulderCadence = Math.sin((now - 55) / 238 + seedPhase * 0.91);
-        const bodyPhrase = Math.sin((now - 105) / 720 + seedPhase * 0.7);
+        const shoulderCadence = natural ? natural.sway : Math.sin((now - 55) / 238 + seedPhase * 0.91);
+        const bodyPhrase = natural ? natural.sway : Math.sin((now - 105) / 720 + seedPhase * 0.7);
         // Keep a VTuber-like upper-body presence throughout audible speech.
         // Real audio still controls the energy, while the floor prevents long
         // clauses from looking frozen between syllable peaks.

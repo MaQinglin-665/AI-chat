@@ -214,8 +214,9 @@
             1.36
           );
           const floatSpeed = Math.max(0.72, Math.min(1.4, Number(cadence?.floatSpeed) || 1));
-          const floatY = state.baseTransform.y + Math.sin(t * 1.5 * floatSpeed) * (4 * floatScale);
-          const floatRot = state.baseTransform.rotation + Math.sin(t * 1.2 * floatSpeed) * (0.02 * floatScale);
+          const natural = state.live2dNaturalContext;
+          const floatY = state.baseTransform.y + (natural ? (natural.breath - .5) * 2 : Math.sin(t * 1.5 * floatSpeed)) * (4 * floatScale);
+          const floatRot = state.baseTransform.rotation + (natural ? natural.roll * .4 : Math.sin(t * 1.2 * floatSpeed)) * (0.02 * floatScale);
           state.model.rotation = Number.isFinite(floatRot) ? floatRot : 0;
           state.model.y = Number.isFinite(floatY) ? floatY : state.baseTransform.y;
         }

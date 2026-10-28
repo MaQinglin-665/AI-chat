@@ -22,6 +22,27 @@ function validateMapping(mapping, catalog = null) {
     else parameters.push(value);
   }
   const reference = (alias, where) => { if (typeof mapping.params[alias] !== "string" || !own(mapping.params, alias)) fail(`${where}: unknown parameter alias ${alias}`); };
+  if (mapping.naturalMotion !== undefined) {
+    const n = mapping.naturalMotion;
+    const mouth = new Set([mapping.params.mouthOpen, mapping.params.mouthOpenY, mapping.params.mouthForm,
+      ...Object.values(mapping.params.vowels || {}), ...(mapping.channelGroups?.mouthOpen || []).map(alias => mapping.params[alias])].filter(Boolean));
+    if (!object(n) || typeof n.enabled !== "boolean") fail("naturalMotion: expected object and boolean enabled");
+    else {
+      if (!Array.isArray(n.bodyChannels) || n.bodyChannels.length > 64) fail("naturalMotion.bodyChannels: expected alias list");
+      else for (const alias of n.bodyChannels) { reference(alias, "naturalMotion.bodyChannels"); if (mouth.has(mapping.params[alias])) fail("naturalMotion: mouth ownership violation"); }
+      for (const family of ["idlePose", "speechPose", "nodPose"]) {
+        if (!object(n[family])) { fail(`naturalMotion.${family}: expected pose`); continue; }
+        for (const [alias, value] of Object.entries(n[family])) {
+          reference(alias, `naturalMotion.${family}`);
+          if (!Number.isFinite(value) || Math.abs(value) > 10 || mouth.has(mapping.params[alias])) fail(`naturalMotion.${family}: invalid value or mouth ownership`);
+        }
+      }
+      if (n.idleStrength !== undefined && (!Number.isFinite(n.idleStrength) || n.idleStrength < 0 || n.idleStrength > 1)) fail("naturalMotion.idleStrength: expected 0..1");
+      if (!Array.isArray(n.idleGestures) || n.idleGestures.length > 10 || n.idleGestures.some(name => !mapping.gestureVocabulary?.[name]?.keyframes)) fail("naturalMotion.idleGestures: expected supported keyframe gestures");
+      const interval = n.idleIntervalMs;
+      if (!Array.isArray(interval) || interval.length !== 2 || !interval.every(Number.isFinite) || interval[0] < 8000 || interval[1] < interval[0] || interval[1] > 120000) fail("naturalMotion.idleIntervalMs: expected ordered 8000..120000ms range");
+    }
+  }
   for (const family of ["modePoses","deliveryPoses","speechGesturePoses"]) {
     if (mapping[family] !== undefined && !object(mapping[family])) { fail(`${family}: expected object`); continue; }
     for (const [name, pose] of Object.entries(mapping[family] || {})) {

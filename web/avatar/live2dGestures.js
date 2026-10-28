@@ -97,7 +97,8 @@
       }
       return { frame, parameters };
     }
-    return { playGesture, lookAt, sample, stop(reason = "stopped") { finish("interrupted", reason); },
+    return { playGesture, lookAt, sample, isActive: () => active !== null, ownsGaze: () => gaze !== null,
+      stop(reason = "stopped") { finish("interrupted", reason); },
       dispose() { if (!disposed) { disposed = true; gaze = null; finish("interrupted", "disposed"); } } };
   }
   const api = { create, validateSpec, RANGES }; root.XinyuLive2DGestures = api;
