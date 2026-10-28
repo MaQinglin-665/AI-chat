@@ -1,6 +1,19 @@
 {
-  "active_task": "brain-privacy-filter-v1",
+  "active_task": "vrm-motion-natural-v1",
   "features": [
+    {
+      "id": "vrm-motion-natural-v1",
+      "name": "VRM natural body motion and licensed animation clips",
+      "status": "in_progress",
+      "done_criteria": [
+        "Separate speech-envelope commit; mouth unchanged",
+        "Random idle overlay, clip crossfade, bounded activities and turn-before-walk",
+        "License audit, local loaders, tests and paired five-minute audio recordings",
+        "Full D TEMP/TMP gate, CPU/GPU comparison, draft PR only"
+      ],
+      "verification": "Step0 d4a1192; full D TEMP/TMP test-local:1109 passed/3 skipped,85 Node suites; real glTF nine-activity 60s-each simulation and real Mixer crossfade/ownership; first-run package passed. Local paired ~300s audible videos;60fps CPU/GPU evidence in motion doc.",
+      "next": "Draft PR236 open; wait author acceptance of local videos/CMU candidates. Do not merge."
+    },
     {
       "id": "brain-privacy-filter-v1",
       "name": "Context privacy span redaction without everyday false positives",

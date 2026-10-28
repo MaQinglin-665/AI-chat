@@ -28,9 +28,11 @@ assert.equal(driver.playAction("unknown"), false);
 assert.equal(driver.playAction("wave"), true);
 driver.update({now: 100}); driver.update({now: 700});
 assert.notEqual(nodes.rightUpperArm.rotation.z, 1.15);
-driver.stopAction(); driver.update({now: 800}); assert.equal(nodes.rightUpperArm.rotation.z, poseAt(800).bones.rightUpperArm.z);
+driver.stopAction(); driver.update({now: 800}); assert.notEqual(nodes.rightUpperArm.rotation.z, poseAt(800).bones.rightUpperArm.z);
+driver.update({now: 1100}); assert.equal(nodes.rightUpperArm.rotation.z, poseAt(1100).bones.rightUpperArm.z);
 driver.playAction("nod"); driver.update({now: 1000}); driver.update({now: 1200}); assert.notEqual(nodes.head.rotation.x, 0);
-driver.stopAction(); driver.update({now: 1300}); assert.equal(nodes.head.rotation.x, poseAt(1300).bones.head.x);
+driver.stopAction(); driver.update({now: 1300}); assert.notEqual(nodes.head.rotation.x, poseAt(1300).bones.head.x);
+driver.update({now: 1600}); assert.equal(nodes.head.rotation.x, poseAt(1600).bones.head.x);
 assert(!driver.capabilities().faces.includes("surprised")); assert(driver.capabilities().vowels);
 assert.equal(frameFromState({uiView:"model", _broadcastSpeechUpdatedAt:100, ttsAudioLevel:0.8}, 200).mouth.open, 0.8);
 assert.equal(frameFromState({uiView:"model", _broadcastSpeechUpdatedAt:100, ttsAudioLevel:0.8}, 1200).mouth.open, 0);
@@ -69,7 +71,7 @@ for (const version of ["0", "1"]) for (const action of ["wave", "nod", "small_no
 }
 assert.deepEqual(poseAt(12345,{seed:42}), poseAt(12345,{seed:42}));
 assert.notDeepEqual(poseAt(12345,{seed:42}), poseAt(12345,{seed:43}));
-assert(poseAt(1000,{level:1}).bones.spine.x > poseAt(1000,{level:0}).bones.spine.x);
+assert(poseAt(1000,{bodyEnvelope:1}).bones.spine.x > poseAt(1000,{bodyEnvelope:0}).bones.spine.x);
 for (let i=1;i<100;i++) {
   const interval=MOTION.smallPeriod + MOTION.smallJitter*(randomAt(42,i*3)-randomAt(42,(i-1)*3));
   assert(interval>=8 && interval<=20);
@@ -90,10 +92,10 @@ assert(hitSegments(12,50,[{ax:10,ay:10,bx:10,by:90,radius:5}]));
 assert(!hitSegments(20,50,[{ax:10,ay:10,bx:10,by:90,radius:5}]));
 console.log("Standing pose, action recovery, deterministic motion, camera and constant-size hit tests passed.");
 
-// Numeric snapshot contains only generated bone offsets, never model data.
+// Updated for the intended independent random idle layer; no model data.
 const snapshot = poseAt(12345,{seed:42}).bones;
-assert.deepEqual(Object.values(snapshot.head).map(v=>+v.toFixed(6)), [0.000443,-0.306413,-0.035889,0,0,1]);
-assert.deepEqual(Object.values(snapshot.hips).map(v=>+v.toFixed(6)), [0,0.261799,0.025334,0.011467,0.002311,1]);
+assert.deepEqual(Object.values(snapshot.head).map(v=>+v.toFixed(6)), [-0.010191,-0.253594,-0.012421,0,0,1]);
+assert.deepEqual(Object.values(snapshot.hips).map(v=>+v.toFixed(6)), [0,0.261799,0.028146,0.013717,0.002311,1]);
 
 const { smoothCutoutEdges } = require("../web/avatar/vrmRenderer.js");
 const cutout={alphaTest:0.5,transparent:false}, outline={alphaTest:0.5,transparent:false,isOutline:true};

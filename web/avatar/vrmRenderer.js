@@ -1,5 +1,6 @@
 (function (root) {
   "use strict";
+  const naturalMotion = root.XinyuVRMMotionNatural || (typeof require === "function" ? require("./vrmMotionNatural.js") : null);
   // Radians and model-height ratios. Keep all motion/quality tuning here.
   const ACTION_ARRIVAL_METERS = 0.04;
   function worldCameraSeat(state, seats) {
@@ -104,10 +105,10 @@
     }
     return null;
   }
-  function poseAt(now, { seed = MOTION.seed, facing = 1, height = 1.6, level = 0, action = null } = {}) {
+  function poseAt(now, { seed = MOTION.seed, facing = 1, height = 1.6, bodyEnvelope = 0, speechPitch = 0, action = null } = {}) {
     const t = Math.max(0, now) / 1000, phase = randomAt(seed, 100) * Math.PI * 2;
-    const breath = Math.sin(t * 1.6), sway = Math.sin(t * 0.42 + phase);
-    const speech = clamp(level), small = smallMotionAt(t, seed);
+    const idle=naturalMotion.idleAt(t,seed), breath=idle.breath, sway=idle.sway;
+    const speech = clamp(bodyEnvelope), small = smallMotionAt(t, seed);
     const pose = {};
     const node = n => (pose[n] ||= { x: 0, y: 0, z: 0, px: 0, py: 0, scaleY: 1 });
     node("hips").px = (STANCE.hipShift + sway * MOTION.weightShift) * height;
@@ -117,9 +118,9 @@
     node("spine").x = (breath * MOTION.spineBreath + speech * MOTION.speechLean) * facing;
     node("chest").x = (breath * MOTION.chestBreath + speech * MOTION.speechLean * MOTION.chestSpeechRatio) * facing;
     node("chest").scaleY = 1 + breath * MOTION.chestExpansion;
-    node("head").y = -STANCE.yaw * STANCE.headReturn + (Math.sin(t * 0.51 + phase) + Math.sin(t * 0.83) * MOTION.headYawSecondary) * MOTION.headYaw;
-    node("head").z = (Math.sin(t * 0.37) + Math.sin(t * 0.91 + phase) * MOTION.headTiltSecondary) * MOTION.headTilt;
-    node("head").x = (Math.sin(t * 0.63 + phase) * MOTION.headPitch + Math.sin(t * 7.1) * speech * MOTION.speechNod) * facing;
+    node("head").y = -STANCE.yaw * STANCE.headReturn + idle.headYaw * MOTION.headYaw;
+    node("head").z = idle.headTilt * MOTION.headTilt;
+    node("head").x = (idle.headPitch * MOTION.headPitch + speechPitch) * facing;
     for (const [side, sign] of [["left", -1], ["right", 1]]) {
       node(side + "Shoulder").py = (breath * MOTION.shoulderRise - STANCE.shoulderDrop) * height;
       node(side + "UpperArm").z = sign * facing * (MOTION.armDrop + breath * MOTION.armSway + sway * MOTION.armSway * sign);
@@ -191,12 +192,17 @@
     const rest = new Map(names.map(name => [name, { rotation: bone(name)?.rotation?.clone?.(),
       position: bone(name)?.position?.clone?.(), scale: bone(name)?.scale?.clone?.() }]));
     const vowelNames = [...new Set(Object.values(vowels))], faceNames = [...new Set(Object.values(faces))];
-    let action = null, lastNow = null, startedAt = null, lastSmallMotion = null;
+    let action = null, retiring = null, lastNow = null, startedAt = null, lastSmallMotion = null;
+    const speechBody = naturalMotion.createSpeech({seed:seed ^ 0x5ab39});
+    let speechMotion = {active:false};
     const supportedActions = ["nod", "small_nod", "nod_double", "wave"];
-    function stopAction() { action = null; }
+    function stopAction() {
+      if(action && action.phase>0 && action.phase<1)retiring={action:{...action},at:lastNow};
+      action = null;
+    }
     function playAction(name, { intensity = 1 } = {}) {
       if (!supportedActions.includes(name) || !bone(name === "wave" ? "rightUpperArm" : "head")) return false;
-      action = { name, intensity: clamp(intensity), start: null };
+      stopAction();action = { name, intensity: clamp(intensity), start: null };
       return true;
     }
     function update(frame = {}) {
@@ -209,7 +215,21 @@
         action.phase = (now - action.start) / (action.name === "wave" ? 1800 : 900);
         if (action.phase >= 1) stopAction();
       }
-      const pose = poseAt(elapsed, { seed, facing, height, level: frame.mouth?.open || 0, action });
+      const speechState = options.state || {};
+      const cue = frame.speech || {id: `${speechState.ttsPlaybackGeneration||0}:${speechState.speechAnimStartedAt||0}`,
+        index:speechState.avatarBrowserSpeech?.boundaryIndex,text:speechState.live2dSpeechText||''};
+      speechMotion = speechBody.update(now, frame.mouth?.open || 0, cue, !!action);
+      const pose = poseAt(elapsed, { seed, facing, height, bodyEnvelope:speechMotion.envelope, speechPitch:speechMotion.pitch, action });
+      if(retiring){
+        const fraction=clamp((now-retiring.at)/350),weight=1-fraction*fraction*(3-2*fraction);
+        if(!weight)retiring=null;
+        else{
+          const base=poseAt(elapsed,{seed,facing,height}),old=poseAt(elapsed,{seed,facing,height,action:retiring.action});
+          for(const [name,value] of Object.entries(old.bones))for(const axis of ['x','y','z']){
+            if(pose.bones[name])pose.bones[name][axis]+=((value[axis]||0)-(base.bones[name]?.[axis]||0))*weight;
+          }
+        }
+      }
       lastSmallMotion = pose.smallMotion;
       for (const name of names) {
         const n = bone(name), base = rest.get(name);
@@ -231,6 +251,22 @@
           if (base.scale) n.scale.y *= offset.scaleY;
         }
       }
+      if (frame.applyClips) {
+        frame.applyClips(delta);
+        // Mixer owns the authored pose; add body motion once before contact solving.
+        const neutral=poseAt(elapsed,{seed,facing,height});
+        for(const name of names){const n=bone(name),p=pose.bones[name],q=neutral.bones[name];
+          if(!n||!p||!q)continue;
+          const idleWeight=frame.worldState?.moving ? .25 : .5;
+          for(const axis of ['x','y','z'])n.rotation[axis]+=(p[axis]||0)-(q[axis]||0);
+          if(['head','spine','chest'].includes(name)){
+            n.rotation.x+=(q.x||0)*idleWeight;n.rotation.z+=(q.z||0)*idleWeight;
+          }
+          if(name==='head')n.rotation.y+=((q.y||0)+STANCE.yaw*STANCE.headReturn)*idleWeight+(frame.worldPose?.turnHead||0);
+          if(name==='spine')n.rotation.y+=frame.worldPose?.turnChest||0;
+          if(name==='chest')n.rotation.x+=(frame.worldPose?.prepare||0)*facing;
+        }
+      }
       for (const name of vowelNames) set(name, 0);
       const mouth = frame.mouth || {};
       const vowel = mouth.vowel == null ? vowels.a : (Object.hasOwn(vowels, mouth.vowel) ? vowels[mouth.vowel] : null);
@@ -240,10 +276,10 @@
       else if (!frame.face || frame.face === "neutral") set(supports("relaxed") ? "relaxed" : "happy",
         frame.preparingSpeech ? EXPRESSION.preparingSmile : EXPRESSION.idleSmile);
       const blinkCycle = Math.floor(elapsed / 4500);
-      const blinkPhase = (elapsed - blinkCycle * 4500 - 2000 - randomAt(seed, blinkCycle + 1000) * 1200) / 160;
+      const blinkPhase = (elapsed - blinkCycle * 4500 - 2000 - randomAt(seed, blinkCycle + 1000) * 1200) / (120+randomAt(seed,blinkCycle+5000)*100);
       set("blink", frame.blinkSuppressed || blinkPhase < 0 || blinkPhase > 1 ? 0 : Math.sin(blinkPhase * Math.PI));
       if (vrm.lookAt?.target?.position) {
-        const gaze = frame.gaze, t = elapsed / 1000, glance = saccadeAt(t, seed);
+        const gaze = frame.gaze, t = elapsed / 1000, idleEyes=naturalMotion.idleAt(t,seed), glance={x:idleEyes.eyeX,y:idleEyes.eyeY};
         vrm.lookAt.target.position.set((gaze ? clamp(gaze.x, -1, 1) * MOTION.gazeX : 0) * height + glance.x * height,
           height * MOTION.gazeHeight + ((gaze ? clamp(gaze.y, -1, 1) * MOTION.gazeY : 0) + glance.y) * height, height * MOTION.gazeDistance);
       }
@@ -257,7 +293,7 @@
       if(frame.solveContacts) frame.solveContacts();
       vrm.update?.(delta);
     }
-    return { update, playAction, stopAction, isAnimating: () => !!action,
+    return { update, playAction, stopAction, isAnimating: () => !!action || !!retiring || speechMotion.active,
       motionState: () => lastSmallMotion, capabilities: () => ({
         vowels: Object.values(vowels).every(supports), armGestures: bone("rightUpperArm") ? ["wave"] : [],
         fullBody: false, locomotion: false, faces: Object.keys(faces).filter(name => supports(faces[name])),
@@ -316,7 +352,7 @@
   function createRenderer(options = {}) {
     let stopOwnedClock = () => {};
     const vendor = options.vendor || root.XinyuVRMVendor;
-    let vrm = null, driver = null, renderer = null, scene = null, camera = null, generation = 0;
+    let vrm = null, driver = null, renderer = null, scene = null, camera = null, generation = 0, clips = null;
     const canvas = options.canvas;
     let modelHeight = 1.6, hitAreas = [], loadMs = 0, loadedAt = 0, frames = 0;
     let projection = null, avatarRoot = null, world = null, worldState = null, cameraHome = null, worldTime = null, book = null;
@@ -380,6 +416,7 @@
       if(cameraHome && camera){camera.position.set(0,cameraHome.cameraY,cameraHome.distance);camera.lookAt(0,cameraHome.targetY,0);}
       undoGrade?.(); undoGrade = null; legacyLights = null;
       if (root.document?.body) root.document.body.dataset.avatarScene = "none";
+      clips?.dispose(); clips=null;
       driver?.stopAction();
       if (vrm) vendor.VRMUtils.deepDispose(vrm.scene);
       renderer?.dispose(); renderer?.forceContextLoss();
@@ -445,7 +482,9 @@
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       const gl = renderer.getContext();
       smoothCutoutEdges(vrm.scene, gl.getParameter(gl.SAMPLES));
-      driver = createIntentDriver(vrm, source.mapping || {}, { height, seed: options.seed });
+      driver = createIntentDriver(vrm, source.mapping || {}, { height, seed: options.seed, state:options.state });
+      const animationModule=options.animationModule||root.XinyuVRMAnimationClips;
+      if(animationModule){const pending=animationModule.create({vendor,vrm,fetch:options.fetch||root.authFetch||root.fetch});clips=pending;await pending.ready;if(mine!==generation){pending.dispose();return;}}
       loadedAt = root.performance?.now?.() || 0; loadMs = loadedAt - began;
     }
     function updateHitAreas(width, height, cameraOverride = camera) {
@@ -469,54 +508,9 @@
       const T=vendor.THREE;
       if(!pose.hands || !worldModule.CONTACT)return;
       const activity=seating?.active(worldState);
-      const deskSeat=(activeLayout?.seats||seating?.SEATS)?.desk, deskForward=deskSeat?[Math.sin(deskSeat.yaw),Math.cos(deskSeat.yaw)]:[1,0];
       seatMetrics=seating?.apply({T,vrm,avatarRoot,profile:seatProfile,seats:activeLayout?.seats||seating.SEATS,activity,weight:pose.weight,floorY});
       walkMetrics=locomotion?.apply({T,vrm,avatarRoot,profile:seatProfile,state:worldState,floorY,rotateTo:seating.rotateTo});
-      const contacts={...pose.hands};
-      if(seatMetrics){
-        for(const side of ['left','right']){
-          const thigh=vrm.humanoid.getNormalizedBoneNode(side+'UpperLeg').getWorldPosition(new T.Vector3());
-          const knee=vrm.humanoid.getNormalizedBoneNode(side+'LowerLeg').getWorldPosition(new T.Vector3());
-          const target=thigh.lerp(knee,.65);target.y+=WORLD_VISUAL.lapLift;
-          if(activity==='desk'){
-            if(side==='left'){
-              vrm.humanoid.getNormalizedBoneNode('head').getWorldPosition(target);
-              target.y-=WORLD_VISUAL.chinDrop;target.x+=deskForward[0]*WORLD_VISUAL.chinForward;target.z+=deskForward[1]*WORLD_VISUAL.chinForward;
-            }else {target.set(deskSeat.hip[0]+deskForward[0]*WORLD_VISUAL.deskHand[0]-deskForward[1]*WORLD_VISUAL.deskHand[2],floorY+deskSeat.table+(WORLD_VISUAL.deskHand[1]-seating.SEATS.desk.table),deskSeat.hip[1]+deskForward[1]*WORLD_VISUAL.deskHand[0]+deskForward[0]*WORLD_VISUAL.deskHand[2]);}
-          }
-          contacts[side]=avatarRoot.worldToLocal(target).toArray();
-        }
-      }
-      for(const [side,p] of Object.entries(contacts)){
-        const end=vrm.humanoid?.getNormalizedBoneNode?.(side+"Hand");
-        if(!end?.getWorldPosition)continue;
-        avatarRoot.updateMatrixWorld(true);
-        const target=avatarRoot.localToWorld(new T.Vector3(...p)),current=end.getWorldPosition(new T.Vector3());
-        target.lerpVectors(current,target,pose.weight);
-        if(activity==='desk' && side==='left' && seatMetrics){
-          const upper=vrm.humanoid.getNormalizedBoneNode('leftUpperArm'),lower=vrm.humanoid.getNormalizedBoneNode('leftLowerArm');
-          const shoulder=upper.getWorldPosition(new T.Vector3()),elbow=lower.getWorldPosition(new T.Vector3()),hand=end.getWorldPosition(new T.Vector3());
-          const point=seating.tableElbow(shoulder.toArray(),target.toArray(),shoulder.distanceTo(elbow),elbow.distanceTo(hand),floorY+(activeLayout?.seats||seating.SEATS).desk.table+WORLD_VISUAL.elbowPadding,deskForward);
-          if(point){
-            const bend=new T.Vector3(...point).lerpVectors(elbow,new T.Vector3(...point),pose.weight);
-            seating.rotateTo(T,upper,lower,bend);seating.rotateTo(T,lower,end,target);
-            const finger=vrm.humanoid.getNormalizedBoneNode('leftMiddleProximal');
-            if(finger)seating.rotateTo(T,end,finger,end.getWorldPosition(new T.Vector3()).add(new T.Vector3(deskForward[0]*.1,0,deskForward[1]*.1)));
-            seatMetrics.elbow=lower.getWorldPosition(new T.Vector3()).toArray();seatMetrics.chinHand=end.getWorldPosition(new T.Vector3()).toArray();seatMetrics.chinTarget=target.toArray();continue;
-          }
-          seatMetrics.elbowUnreachable=true;
-        }
-        for(let i=0;i<worldModule.CONTACT.iterations;i++){
-          if(end.getWorldPosition(current).distanceTo(target)<worldModule.CONTACT.epsilon)break;
-          for(const joint of ["LowerArm","UpperArm"]){
-            const node=vrm.humanoid.getNormalizedBoneNode(side+joint);if(!node?.parent)continue;
-            const origin=node.getWorldPosition(new T.Vector3());
-            const a=end.getWorldPosition(new T.Vector3()).sub(origin).normalize(),b=target.clone().sub(origin).normalize();
-            const parent=node.parent.getWorldQuaternion(new T.Quaternion()),delta=new T.Quaternion().setFromUnitVectors(a,b);
-            delta.premultiply(parent.clone().invert()).multiply(parent);node.quaternion.premultiply(delta);node.updateMatrixWorld(true);
-          }
-        }
-      }
+
     }
     function update(frame) {
       if (!driver || !renderer) return;
@@ -558,6 +552,8 @@
         const point=activeLayout?.activityPoints?.[brainGaze];
         frame={...frame,worldGaze:brainGaze==='user'?camera.position.toArray():point?[point[0],modelHeight*.9,point[1]]:null};
       }
+      const leg=seatProfile?.legs?.left;
+      frame={...frame,worldState,walkStride:leg?.upper ? .58*(leg.upper+leg.lower)/.74 : .58,applyClips:clips?.metrics().clips ? delta=>clips.update(frame,delta) : null};
       driver.update(frame);
       room?.setFootPositions?.(seatMetrics ? Object.values(seatMetrics.legs).map(l=>l.ankle) : null);
       if(world && seating){
@@ -617,13 +613,13 @@
       isAnimating: () => {
         const c = cameraController?.snapshot();
         return !!(worldState?.moving || ["prepare", "walk", "rise"].includes(worldState?.phase)
-          || (worldState?.blend > 0 && worldState.blend < 1) || driver?.isAnimating()
+          || (worldState?.blend > 0 && worldState.blend < 1) || driver?.isAnimating() || clips?.active()
           || c?.value.some((v,i) => Math.abs(v-c.goal[i]) + Math.abs(c.velocity[i]) > QUALITY.cameraMotionEpsilon));
       },
       metrics: () => ({ loadMs, loadedAt, frames, pixelRatio: renderer?.getPixelRatio(),
         antialias: renderer?.getContext().getContextAttributes()?.antialias,
         drawCalls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles, smallMotion: driver?.motionState(),
-        walking:walkMetrics, seating: seatMetrics, world: worldState, room: painted?.metrics() || room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
+        animation:clips?.metrics(), walking:walkMetrics, seating: seatMetrics, world: worldState, room: painted?.metrics() || room?.metrics(), memory: renderer ? { ...renderer.info.memory } : null }),
       // Reserved for a later animation loader; never silently fetch arbitrary files.
       loadAnimation: async () => false
     };

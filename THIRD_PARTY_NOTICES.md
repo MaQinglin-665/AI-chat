@@ -147,3 +147,9 @@ Changes in Xinyu (2026-10-26):
 ## AI-generated bedroom background images
 
 Files: `web/assets/backgrounds/bedroom/{day,dusk,night}.webp`. User-provided AI-generated images, authorized by the user for repository publication and application packaging on 2026-10-26. Converted from local PNG originals to quality-90 WebP at 2560×1440; originals are not included. Provenance and SHA-256 manifest are beside the assets. This note does not independently verify the generating platform terms or assert a separate CC0 license. These images are unrelated to the CC BY 3D room preset `handpainted`.
+
+## Quaternius Universal Animation Library — free Standard
+
+Nine animation-only clips in `web/assets/animations/quaternius-standard.gltf`: Idle_Loop, Idle_Talking_Loop, Walk_Loop, Walk_Formal_Loop, Sitting_Enter, Sitting_Exit, Sitting_Idle_Loop, Sitting_Talking_Loop, Interact. Source: https://quaternius.itch.io/universal-animation-library ; CC0 1.0, Quaternius (animation collaborator Gonzalo Furnier). Original pack notice: `web/assets/animations/QUATERNIUS-LICENSE.txt`. No meshes, skins, materials, textures, paid pack content, CMU, Mixamo, Bandai Namco or VRoid motion assets are bundled. Extraction/retargeting/loop adjustments and per-clip provenance: [VRM motion documentation](docs/avatar-vrm-motion-natural.md).
+
+`@pixiv/three-vrm-animation` 3.4.4 and the official Mixamo retargeting example: MIT, pixiv Inc.; `web/vendor/vrm/THREE-VRM-ANIMATION-LICENSE.txt`. FBXLoader is part of the existing MIT-licensed three.js 0.180.0 bundle. Local optional animation files retain their original licenses and are excluded from repository/release artifacts.
