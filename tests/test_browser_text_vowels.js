@@ -89,6 +89,7 @@ for (const rate of [.5, 1, 2]) for (const delayMs of [0, 120, 500]) {
   const remote = text.create({state:remoteState,mapping,data,host:{performance:{now:()=>time},Date:{now:()=>50000},
     BroadcastChannel:class{constructor(){receiver=this;}close(){this.closed=true;}}}});
   receiver.onmessage({data:packets.at(-1)});
+  assert.doesNotThrow(()=>receiver.onmessage({data:{...packets.at(-1),plans:[null]}}),"malformed same-channel packet safely ignored");
   receiver.onmessage({data:{type:"speech",speechSenderId:"test-sender",playbackGeneration:1,speechSentAtWallMs:50000,browserMouthActive:true}});
   assert.equal(remote.mouth({open:.6},90119).vowel,null);
   assert.equal(remote.mouth({open:.6},90121).vowel,"a");

@@ -39,7 +39,7 @@
           if (typeof message.sender !== "string" || !Number.isFinite(message.generation) || !Number.isFinite(message.token)
             || !Number.isFinite(message.sentAt) || Math.abs(wall() - message.sentAt) > 10000
             || (remote && message.sentAt < remote.sentAt) || !Array.isArray(message.plans) || message.plans.length > 8
-            || !message.plans.every(plan => typeof plan.text === "string" && plan.text.length <= 32
+            || !message.plans.every(plan => plan && typeof plan.text === "string" && plan.text.length <= 32
               && Number.isFinite(plan.at) && Math.abs(plan.at - message.sentAt) < 30000
               && Number.isFinite(plan.charMs) && plan.charMs >= 70 && plan.charMs <= 900)) return;
           remote = { ...message, plans: message.plans.map(plan => ({ ...plan, at: now() + plan.at - wall() })) };

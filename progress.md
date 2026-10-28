@@ -1407,3 +1407,7 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 - Verification Evidence：完整scripts/test-local.ps1为1105Python通过/3skip、85Node文件通过。最后跨窗口连续token保护调整后再次完整前端门禁85Node通过、syntax199Python/267JS、secrets900、真实Hiyori/Mao引用通过；first-run package、公开JSON与必需py_compile通过。新测试含原main42ae9ea的14400个browser开合采样精确SHA256；Hiyori5280帧394224次有序写入、Mao协议1440/25850与本机Core6/Mao1440/181030严格一致，旧fixtures/快照零修改。日志work/text-vowels-full.log、text-vowels-final-node.log、text-vowels-package.log。
 - 实际本机浏览器Huihui语音读取三段文本，各录前后，共六段约10～12秒MP4，原生15～16个boundary；WASAPI仅回录系统输出，非后配音/非分析器。修改前I/U/E/O始终0，中文修改后五通道均出现。全部解码与非静音RMS检查通过；按截图捕获时钟对齐原录音，六段上传既有GitHub草稿验收资料，本地另有约5.5MiB转发ZIP。来源、录制限制和链接见docs/live2d-browser-text-vowels.md。用户询问声音后确认全部录制/浏览器进程已结束，后续只静音检查，再录制须先告知。
 - 仍是文本近似：新词不先于boundary+delay，不能声称未知词内音素精确对齐；单字多音、英文/数字/罕见字回退与截图帧率限制已写报告。未读/提交私人配置、Key或模型，音视频不进仓库。下一步commit/正常push/独立PR及同head全部CI；本任务不合并。
+
+## 2026-10-28 — PR235已开，等待最终head CI
+- 正常推送friend/live2d-text-vowels，创建并附加PR235（open/非draft/未合并），main仍42ae9ea，GitHub无冲突。六个上传附件的GitHub SHA256与本地逐个一致，本地ZIP5817523字节、6张比赛过程截图已保存。首个head4eeefcc的Linux Node/Python/quality/docs通过，Windows在跑，未宣称全绿。
+- 最终自查补充同channel的null词计划安全忽略，避免非预期消息抛异常；新增断言与文本元音/渲染测试均通过，无正常播放行为改变，不重录声音。净增量比前述多8字节，最终23231字节（22.69KiB）。旧fixtures、avatarRuntime、appStartup、播放控制器与VRM/brain文件仍零diff。下一步推送follow-up，核对最终head全部Linux/Windows CI，不合并。
