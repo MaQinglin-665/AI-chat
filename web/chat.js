@@ -2251,6 +2251,7 @@ function getChatMessageController() {
       resolveStickerPayload,
       recordCharacterPerformanceFeedback,
       onConversationLaneMessage: noteConversationLaneMessage,
+      onChatHistoryRendered: () => externalAgentController?.mountCards(),
       setStatus,
       saveChatHistory: saveChatHistoryToStorage
     });

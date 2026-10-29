@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: '.',
-  testMatch: ['smoke.spec.ts'],
+  testMatch: ['smoke.spec.ts', 'task-cards.spec.ts'],
   timeout: 45_000,
   expect: {
     timeout: 10_000
