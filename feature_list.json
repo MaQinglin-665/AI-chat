@@ -1,11 +1,26 @@
 {
-  "active_task": "live2d-browser-text-vowels",
+  "active_task": "chat-task-cards",
   "features": [
+    {
+      "id": "chat-task-cards",
+      "name": "Inline chat task cards sharing existing task auth, controller and narrator",
+      "status": "in_progress",
+      "done_criteria": [
+        "Approved A design in dark tokens; original SVG mascot and accessible responsive details",
+        "Unique task cards, ordered responses, silent recovery, auth errors and no chat-history contamination",
+        "Research acceptance matrix, actual-app screenshots and temporary-directory workflow recordings, CPU measurements",
+        "Full local gates, Linux/Windows CI, update PR237; author merges only"
+      ],
+      "next": "Implementation delivered in PR237; author Windows review and nativeCLI/DeepSeek validation explicitly deferred to author by user. Keep backend/renderer/private files unchanged; no self merge. Latest-head Linux/Windows result is authoritative in PR Checks/body.",
+      "verification": "Phase2: full1105Python/3skip; final86Node +199Python/271JS syntax/secrets/mappings;7 Chromium card tests plus existing docs smoke; package/JSON/compile checks. Real existing HTTP/auth/Origin/manager/audit/manifests with deterministic temporary-file adapter:2/12/2 moved, no out-of-plan/missing, decoded3silentMP4s and11actual screenshots. Card-only CPU paired3x8s medians102.75off/102.81on,delta+0.06pp; software-rendered baseline effects held constant. Five AI refs are design-only; original SVG/CSS product artwork. Latest-head CI/asset digests in PR237."
+    },
     {
       "id": "live2d-browser-text-vowels",
       "name": "Offline text-driven vowels for browser speech on capable Live2D mappings",
       "status": "in_progress",
-      "dependencies": ["live2d-motion-natural"],
+      "dependencies": [
+        "live2d-motion-natural"
+      ],
       "done_criteria": [
         "Licensed compact offline pinyin data; documented final-to-vowel mapping and size",
         "Delayed sparse-boundary timing, punctuation closure and smooth vowel changes; preserve browser mouth envelope",

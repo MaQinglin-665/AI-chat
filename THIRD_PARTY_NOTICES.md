@@ -8,6 +8,12 @@ This document is a practical release checklist, not legal advice. Before publish
 
 ## Vendored Browser Runtime
 
+### Chat task cards: original code artwork and reference-only images
+
+`web/taskCardMascot.js` contains the project's original SVG Sakura Dango drawing and generic outline file/status icons. The ribbon, stamp and track in `web/taskCards.css` are original CSS. They use no third-party character, branded file logo, icon package, font download or design-image pixels, and follow the repository's MIT license.
+
+The five WebP files under `docs/design/chat-task-cards/` were supplied by the user, who stated that qinglinMa owns the rights and approved their inclusion. **AI generated, design reference only, not product assets.** They are not loaded by the application; no broader third-party image license is inferred. Source filenames and purpose are recorded in that directory's README.
+
 | Paths | Component | Notice |
 | --- | --- | --- |
 | `web/vendor/pixi.min.js`, `docs/live2d/vendor/pixi.min.js` | PixiJS | PixiJS is distributed under the MIT license. Keep upstream license notices when redistributing. Source: https://github.com/pixijs/pixijs |

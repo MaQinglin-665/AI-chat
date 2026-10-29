@@ -26,7 +26,7 @@
       catch (_) { /* Visible task result remains available when speech is unavailable. */ }
       finally { speaking = false; }
     }
-    return { update(task) { if (task) pending = task; return flush(); }, flush, busy };
+    return { update(task) { if (task) pending = task; return flush(); }, prime(task) { if (task) spoken.add(`${task.id}:${task.status}`); }, flush, busy };
   }
   function renderTask(doc, container, task) {
     container.replaceChildren();
@@ -77,60 +77,128 @@
     const modal = doc.getElementById("external-agent-modal");
     if (!modal) return null;
     const el = id => doc.getElementById(`external-agent-${id}`);
-    let task = null, requestBusy = false, polling = false, rendered = "";
+    let task = null, requestBusy = false, polling = false, rendered = "", epoch = 0, loadingList = null;
+    const tasks = new Map(), errors = new Map();
+    let roots = [], formError = null;
+    const taskModel = root.TaffyTaskCardModel || (typeof require === "function" && require("./taskCardModel.js"));
     const narrator = createNarrator({ state, speak, emotion });
+    const subscribers = new Set();
+    function snapshot() { return { tasks: [...tasks.values()].sort((a, b) => (a.created_at || 0) - (b.created_at || 0)), errors: Object.fromEntries(errors), roots: [...roots], busy: requestBusy, formError }; }
+    function accept(value, silent = false) {
+      if (!value || !/^[a-f0-9]{32}$/.test(value.id || "")) return;
+      tasks.set(value.id, value); task = value;
+      if (silent) narrator.prime(value); else narrator.update(value);
+    }
     async function api(suffix = "", body) {
       const response = await authFetch(`/api/agent/task${suffix}`, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || "任务服务暂不可用");
+      let data;
+      try { data = await response.json(); } catch (_) { data = {}; }
+      if (!response.ok || !data.ok) { const error = new Error("任务服务暂不可用"); error.status = response.status; error.code = data.code; throw error; }
       return data;
     }
+    function report(error, id) {
+      const value = { status: error.status || 0, code: error.code || "", message: taskModel.errorMessage(error) };
+      if (id) errors.set(id, value); else formError = value;
+      el("error").textContent = value.message;
+    }
     function draw() {
+      el("error").textContent = errors.get(task?.id)?.message || formError?.message || "";
       if(modal.dataset)modal.dataset.taskStatus=task?.status || "new";
-      const signature = JSON.stringify(task);
+      const signature = JSON.stringify(task && { ...task, progress_count: undefined, updated_at: undefined });
       if (signature !== rendered) { renderTask(doc, el("result"), task); rendered = signature; }
-      el("approve").hidden = task?.status !== "awaiting_approval";
+      el("approve").hidden = task?.status !== "awaiting_approval" || !!errors.get(task?.id);
       el("cancel").hidden = !task || terminal.has(task.status);
-      el("approve").disabled = requestBusy;
-      el("cancel").disabled = requestBusy || !!task?.cancel_requested;
+      el("approve").disabled = requestBusy || errors.get(task?.id)?.status === 404;
+      el("approve").textContent = view && task && taskModel.model(task).large ? "查看完整清单并审批" : "批准以上完整计划并执行";
+      el("cancel").disabled = requestBusy || !!task?.cancel_requested || errors.get(task?.id)?.status === 404;
       el("create").textContent = task?.status === "failed" ? "重新规划" : "生成计划（不执行）";
       el("create").disabled = requestBusy || !!(task && !terminal.has(task.status)) || !el("workdir").value;
-      if (task) narrator.update(task);
+      const value = snapshot(); view?.render(value); for (const fn of subscribers) fn(value);
     }
-    async function run(action) {
+    async function run(action, id) {
       if (requestBusy) return;
-      requestBusy = true; el("error").textContent = ""; draw();
-      try { task = (await action()).task; }
-      catch (error) { el("error").textContent = error.message; }
-      finally { requestBusy = false; draw(); }
+      ++epoch; requestBusy = true; el("error").textContent = "";
+      if (id) errors.delete(id); else formError = null;
+      draw();
+      let createdId;
+      try { const data = await action(); accept(data.task); if (data.task) { errors.delete(data.task.id); if (!id) { createdId = data.task.id; view?.created(); } } }
+      catch (error) { report(error, id); }
+      finally { requestBusy = false; draw(); if (createdId) view?.reveal(createdId); }
     }
-    async function open(goal = "") {
+    async function hydrate() {
+      if (requestBusy) return;
+      if (loadingList) return loadingList;
+      const version = epoch;
+      loadingList = (async () => {
+        try {
+          const data = await api();
+          if (version !== epoch) return;
+          roots = Array.isArray(data.allowed_roots) ? data.allowed_roots : [];
+          const selected = task?.id;
+          for (const row of data.tasks || []) {
+            // Initial recovery is silent; a known task's later phase is a real update.
+            const known = tasks.get(row.id); accept(row, !known || known.status === row.status);
+          }
+          task = [...tasks.values()].find(row => !terminal.has(row.status)) || tasks.get(selected) || task;
+          const previous = el("workdir").value;
+          el("workdir").replaceChildren();
+          for (const path of roots) { const opt = doc.createElement("option"); opt.value = path; opt.textContent = path; el("workdir").appendChild(opt); }
+          if (roots.includes(previous)) el("workdir").value = previous;
+          formError = null;
+        } catch (error) { if (version === epoch) report(error); }
+        finally { loadingList = null; draw(); }
+      })();
+      return loadingList;
+    }
+    async function openManager(goal = "") {
       modal.hidden = false;
       if (goal) el("goal").value = goal;
       el("error").textContent = "";
-      try {
-        const data = await api();
-        el("workdir").replaceChildren();
-        for (const path of data.allowed_roots) { const opt = doc.createElement("option"); opt.value = path; opt.textContent = path; el("workdir").appendChild(opt); }
-        task = data.tasks.find(row => !terminal.has(row.status)) || task;
-      } catch (error) { el("error").textContent = error.message; }
+      await hydrate();
       draw(); el("goal").focus();
     }
+    function create(goal, workdir) {
+      if (!goal.trim() || !roots.includes(workdir) || [...tasks.values()].some(row => !terminal.has(row.status))) return;
+      el("goal").value = goal; el("workdir").value = workdir;
+      return run(() => api("", { goal, workdir }));
+    }
+    function approve(id) {
+      const value = tasks.get(id);
+      if (value?.status !== "awaiting_approval" || !value.plan || value.cancel_requested || errors.has(id)) return;
+      return run(() => api(`/${id}/approve`, {}), id);
+    }
+    function cancel(id) {
+      const value = tasks.get(id);
+      if (!value || terminal.has(value.status) || value.cancel_requested || errors.get(id)?.status === 404) return;
+      return run(() => api(`/${id}/cancel`, {}), id);
+    }
+    async function refresh(id) {
+      if (requestBusy || polling || !tasks.has(id)) return;
+      const version = epoch; polling = true;
+      try {
+        const value = (await api(`/${id}`)).task;
+        if (version === epoch) { accept(value); errors.delete(id); draw(); }
+      } catch (error) { if (version === epoch) { report(error, id); draw(); } }
+      finally { polling = false; }
+    }
+    const view = root.TaffyTaskCardView?.createView({ document: doc, actions: { create, approve, cancel, refresh, hydrate, openManager } });
+    function open(goal = "") { if (view) { modal.hidden = true; view.showComposer(goal); } else return openManager(goal); }
     el("btn").addEventListener("click", () => open());
     el("close").addEventListener("click", () => { modal.hidden = true; });
-    el("create").addEventListener("click", () => run(() => api("", { goal: el("goal").value, workdir: el("workdir").value })));
-    el("approve").addEventListener("click", () => task && run(() => api(`/${task.id}/approve`, {})));
-    el("cancel").addEventListener("click", () => task && run(() => api(`/${task.id}/cancel`, {})));
+    el("create").addEventListener("click", () => create(el("goal").value, el("workdir").value));
+    el("approve").addEventListener("click", () => task && (view && taskModel.model(task).large ? view.showDetails(task.id) : approve(task.id)));
+    el("cancel").addEventListener("click", () => task && cancel(task.id));
     modal.addEventListener("keydown", event => { if (event.key === "Escape") modal.hidden = true; });
     interval(async () => {
       narrator.flush();
-      if (!task || terminal.has(task.status) || polling || requestBusy) return;
-      polling = true;
-      try { task = (await api(`/${task.id}`)).task; draw(); }
-      catch (error) { el("error").textContent = error.message; }
-      finally { polling = false; }
+      const active = [...tasks.values()].find(row => !terminal.has(row.status));
+      if (active) await refresh(active.id);
     }, 1000);
-    return { open, offerDelegation(text) { if (!isDelegation(text)) return false; open(text); return true; } };
+    if (view) hydrate();
+    return { open, openManager, hydrate, create, approve, cancel, refresh, snapshot,
+      mountCards() { view?.mount(); },
+      subscribe(fn) { subscribers.add(fn); fn(snapshot()); return () => subscribers.delete(fn); },
+      offerDelegation(text) { if (!isDelegation(text)) return false; open(text); return true; } };
   }
   const api = { createController, createNarrator, renderTask, isDelegation, speechFor };
   root.TaffyExternalAgent = api;

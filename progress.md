@@ -1426,3 +1426,14 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 - 梳理了既有5个HTTP契约、7后端状态与取消中/鉴权错误等局部提示、一次活动任务、100项内存历史、progress_count非百分比、更新签名不能只看updated_at、通用external-agent审批卡已有排除、既有authFetch/Origin/token链。提出共用store/1秒轮询、唯一task.id卡片、动作与旧GET互斥、完整计划审批与结果警告、静默hydrate、历史不入LLM/翻译/TTS/记忆。无需后端接口/权限改动。浅色当前不是成品功能，需作者确认聊天局部主题绑定。
 - Verification Evidence：技能源码lint0FAIL/0WARN；6个方案/主题真实浏览器在1440/768/390逐一检查最终0FAIL/0WARN；320/360/760加长路径无横溢、pageerror0、外网/任务请求0。既有test_external_agent_frontend.js通过。4份新增Markdown的本地引用无缺失；16PNG CRC/解压与ZIP复查通过；secrets904、公用JSON/必需py_compile通过。没有改产品/测试/fixture，故本地未重复完整运行时套件（CI仍会运行原有门禁）。
 - 本阶段仅Markdown/PNG；feature_list.json按用户“只放文档和截图”约束未改，活动状态在本Markdown交接。接下来正常push并开DraftPR，核对最新headCI；然后等qinglinMa确认A/B/C、工作弹窗保留、窄屏详情与浅色范围，不实现、不ready、不合并。阶段2真实流程录像明确待确认后再录，静态截图不冒充功能验收。
+
+## 2026-10-29 — 聊天任务卡片阶段2获批
+- 作者确认A、深色token、窄卡同窗详情、旧弹窗共享controller/store/narrator；开始同分支PR237实现。收到5张AI设计参考（权利归qinglinMa），只转WebP用于文档，不作产品素材。第6张路径待补。
+- 只改聊天/任务前端和验证文档；不动后端/权限/Origin/Electron/模型。测试仅临时目录，初期静音；真实录像前先告知。
+
+## 2026-10-29 — 聊天任务卡片阶段2实现与验收
+- 实施A/深色token与原创SVG樱花团子。卡片/旧弹窗共用Map状态、原authFetch、单飞轮询和narrator；epoch防旧GET回滚，静默恢复，任务不入聊天history/翻译/TTS/记忆。窄卡与大清单走同窗完整详情；大清单DOM无批准，预览前5项；风险/错误直接显示。没有Python/Origin/权限/API/渲染器/房间/brain/执行器/Electron改动。
+- 用户确认只有5张参考图，WebP仅作设计参考（权利归qinglinMa），不作产品素材；11张实际应用截图和对照报告已完成。3段静音真实页面/现有接口临时文件流程均完成，实际移动2/12/2文件、内容逐字核对一致、无计划外/缺项；3MP4解码通过，录像在既有验收草稿附件和本地约7.2MiBZIP，不进Git。执行端为确定性测试适配器，非LLM；用户明确同意作者电脑补原生CLI/DeepSeek验收，本机CLI0.163低于0.164且无进程测试凭据，未读私人配置。
+- Verification Evidence：完整test-local1105Python通过/3skip；最终86Node、199Python/271JS语法、secrets/mappings通过；7项Chromium卡片测试、原docs smoke、first-run package、公开JSON/必需py_compile和diff检查结果见PR。严格旧模型fixtures不改。视觉例外仅作者明确要求的星形/发光/光泽渐变/路径mono；其余真实浏览器检查。
+- CPU：独立软件渲染Chromium、全局motion固定，只切卡片动画，3对8秒样本，关102.75%/开102.81%单核口径，差+0.06pp处于短测噪声。原场景动画基础高占用保留，不以全局reduced-motion混合差异冒充卡片开销。原始实验仅留本地。
+- 下一步：正常推送并更新PR237，核对最新head全部Linux/Windows检查；CI记录在PR说明/Checks，作者Windows与原生执行器验收后决定合并，不自行合并。

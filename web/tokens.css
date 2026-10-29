@@ -11,4 +11,27 @@
   --radius-control: 12px;
   --radius-pill: 999px;
   --font-ui: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  /* Task cards: opaque dark surfaces; mint is reserved for completed status. */
+  --task-surface: #271B33;
+  --task-raised: #33243F;
+  --task-soft: #493253;
+  --task-count: #523652;
+  --task-control: #64436C;
+  --task-glow: rgba(255, 141, 183, .17);
+  --task-shadow: rgba(12, 6, 20, .42);
+  --task-pink-light: #FFD0E4;
+  --task-pink-deep: #E977A7;
+  --task-on-pink: #34162B;
+  --task-amber: #F3C27A;
+  --task-on-amber: #422910;
+  --task-mint: #AFE6CA;
+  --task-on-mint: #163B30;
+  --task-coral: #FFABAD;
+  --task-coral-bg: #58303F;
+  --task-quiet: #D0BEDD;
+  --task-on-quiet: #392B46;
+  --task-dango-cream: #FFF1F6;
+  --task-dango-face: #513444;
+  --task-dango-blush: #F8AECA;
+  --task-dango-sweat: #B9D5EF;
 }
