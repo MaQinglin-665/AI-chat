@@ -1415,3 +1415,14 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 ## 2026-10-28 — 最终审查交接
 - 已正常推送保护提交21930d6。初始产品提交4eeefcc的10/10检查（push与PR两套Linux/Windows/Node/Quality/Docs）已实际全部success且可合并无冲突，证据保存；21930d6的Linux检查也已通过，Windows在该次快照仍运行，最终只以PR235最新head检查为准。
 - 此次只更新状态交接，不改产品/测试/素材；功能实现与本地验收完成，feature暂保持in_progress，等待作者Windows试听验收。最终最新head检查和具体SHA会写入PR235描述及本地ci-final/publication，避免用旧head绿色冒充新head。作者决定合并，本任务不合并。录像已经结束，不再启动任何有声播放。
+
+## 2026-10-29 — 聊天任务卡片：仅调研设计阶段开始
+- 最新main be25324（作者已合并235），工作区干净，新建friend/chat-task-cards。按AGENTS读交接/feature/progress；用户明确本阶段“只放文档和截图”，因此不修改feature_list.json或任何产品源文件，任务状态先记Markdown文档。静态原型源和生成脚本只留本地输出目录，PR只含文档和截图。
+- 已核对chat.js委派拦截、externalAgentController/private单任务/1s轮询、index弹窗/controlCenter、chatMessageController历史分栏、apiClient鉴权及后端公开任务字段/审批取消状态。发现当前工作页是弹窗而非独立Electron工作窗口，progress_count为事件计数，不代表百分比，计划字段/核对警告必须保留在审批/结果界面。
+- 采用design-taste-frontend的app-screen设计检查流程，按用户品牌要求保留项目现有色彩/字体，不改全局主题或渲染器。下一步完成三方案深浅色/窄屏截图、接口/状态/去重/鉴权错误设计和DraftPR，再停下等qinglinMa确认。
+
+## 2026-10-29 — 聊天任务卡片：阶段1设计交付
+- 新增docs/chat-task-cards/README.md、research.md、visual-review.md、截图清单及16PNG。A完整内联（推荐）、B紧凑任务条、C卡片+同窗口详情，各深浅色/桌面/窄屏，加审批详情2张与十种状态参考2张。所有目标、目录、命令、进度和结果是合成示例，原型/脚本只在outputs及work辅助目录，不进入产品源。没有真实任务、音频或私人数据访问。
+- 梳理了既有5个HTTP契约、7后端状态与取消中/鉴权错误等局部提示、一次活动任务、100项内存历史、progress_count非百分比、更新签名不能只看updated_at、通用external-agent审批卡已有排除、既有authFetch/Origin/token链。提出共用store/1秒轮询、唯一task.id卡片、动作与旧GET互斥、完整计划审批与结果警告、静默hydrate、历史不入LLM/翻译/TTS/记忆。无需后端接口/权限改动。浅色当前不是成品功能，需作者确认聊天局部主题绑定。
+- Verification Evidence：技能源码lint0FAIL/0WARN；6个方案/主题真实浏览器在1440/768/390逐一检查最终0FAIL/0WARN；320/360/760加长路径无横溢、pageerror0、外网/任务请求0。既有test_external_agent_frontend.js通过。4份新增Markdown的本地引用无缺失；16PNG CRC/解压与ZIP复查通过；secrets904、公用JSON/必需py_compile通过。没有改产品/测试/fixture，故本地未重复完整运行时套件（CI仍会运行原有门禁）。
+- 本阶段仅Markdown/PNG；feature_list.json按用户“只放文档和截图”约束未改，活动状态在本Markdown交接。接下来正常push并开DraftPR，核对最新headCI；然后等qinglinMa确认A/B/C、工作弹窗保留、窄屏详情与浅色范围，不实现、不ready、不合并。阶段2真实流程录像明确待确认后再录，静态截图不冒充功能验收。
