@@ -4,7 +4,7 @@
   const directorApi = () => root.TaffyHiyoriPerformanceDirector || (typeof require === "function" ? require("../hiyoriPerformanceDirector.js") : null);
   const unit = value => Math.max(0, Math.min(1, Number(value)));
   function createRenderer({ state, lifecycle, host = root } = {}) {
-    let mapping, resource, clock, driver, gestures, natural, naturalApi, disposed = false;
+    let mapping, resource, clock, driver, gestures, natural, naturalApi, textVowels, disposed = false;
     function sanitize(frame) {
       const value = {};
       if (!frame || typeof frame !== "object") return value;
@@ -38,6 +38,14 @@
         if (disposed) return false;
       }
       state.avatarMapping = mapping;
+      if (mapping.capabilities?.vowels) {
+        let api = host.XinyuBrowserTextVowels || root.XinyuBrowserTextVowels;
+        if (!api && typeof require === "function") api = require("./browserTextVowels.js");
+        if (!api) { await import("./browserTextVowels.js"); api = root.XinyuBrowserTextVowels; }
+        const data = await api.load(host);
+        if (disposed) return false;
+        textVowels = api.create({ state, host, mapping, data });
+      }
       resource = await lifecycle.load({ ...source, mapping, beforeCoreUpdate(runLayers) {
         // Called only at the original pre-Core hook, inside the Pixi model tick.
         if (mapping.driver === "mapped" && state.uiView !== "model") host.sampleTTSAudioLevel?.();
@@ -54,7 +62,12 @@
             state.avatarIntentFrame = { ...originalFrame, ...sample.frame };
             state.avatarIntentOverrides = { ...originalOverrides, ...sample.frame };
           }
-          if (mapping.driver === "mapped") driver?.update(sanitize(state.avatarIntentFrame));
+          if (mapping.driver === "mapped") {
+            const frame = sanitize(state.avatarIntentFrame);
+            const mouth = textVowels?.mouth(frame.mouth, host.performance.now());
+            if (mouth) frame.mouth = mouth;
+            driver?.update(frame);
+          }
           else runLayers();
           for (const [id, value] of sample?.parameters || []) resource?.model?.internalModel.coreModel.addParameterValueById(id, value);
           natural?.apply();
@@ -104,7 +117,7 @@
     function dispose() {
       if (disposed) return;
       disposed = true; clock = null;
-      gestures?.dispose(); natural?.dispose(); driver?.dispose(); resource?.dispose();
+      gestures?.dispose(); natural?.dispose(); textVowels?.dispose(); driver?.dispose(); resource?.dispose();
       delete state.live2dNaturalActionUntil;
       delete state.avatarIntentFrame; delete state.avatarIntentOverrides;
     }
