@@ -8,6 +8,12 @@ This document is a practical release checklist, not legal advice. Before publish
 
 ## Vendored Browser Runtime
 
+### Chat task cards: original code artwork and reference-only images
+
+`web/taskCardMascot.js` contains the project's original SVG Sakura Dango drawing and generic outline file/status icons. The ribbon, stamp and track in `web/taskCards.css` are original CSS. They use no third-party character, branded file logo, icon package, font download or design-image pixels, and follow the repository's MIT license.
+
+The five WebP files under `docs/design/chat-task-cards/` were supplied by the user, who stated that qinglinMa owns the rights and approved their inclusion. **AI generated, design reference only, not product assets.** They are not loaded by the application; no broader third-party image license is inferred. Source filenames and purpose are recorded in that directory's README.
+
 | Paths | Component | Notice |
 | --- | --- | --- |
 | `web/vendor/pixi.min.js`, `docs/live2d/vendor/pixi.min.js` | PixiJS | PixiJS is distributed under the MIT license. Keep upstream license notices when redistributing. Source: https://github.com/pixijs/pixijs |
@@ -147,6 +153,16 @@ Changes in Xinyu (2026-10-26):
 ## AI-generated bedroom background images
 
 Files: `web/assets/backgrounds/bedroom/{day,dusk,night}.webp`. User-provided AI-generated images, authorized by the user for repository publication and application packaging on 2026-10-26. Converted from local PNG originals to quality-90 WebP at 2560×1440; originals are not included. Provenance and SHA-256 manifest are beside the assets. This note does not independently verify the generating platform terms or assert a separate CC0 license. These images are unrelated to the CC BY 3D room preset `handpainted`.
+
+## pinyin-pro — offline Live2D common-character finals
+
+- Upstream: https://github.com/zh-lx/pinyin-pro (author zh-lx), npm version **3.29.5**, MIT.
+- Official source archive: https://registry.npmjs.org/pinyin-pro/-/pinyin-pro-3.29.5.tgz
+- Archive SHA-256: `00e9d2961bb0ba2d247ba5090c242ecbf3793473c9f66f0c69af7248dd4616b4`.
+- Derived file: `web/avatar/data/pinyinCommon.json`, **11,763 bytes**, SHA-256 `8753bd92d411d178c7d579b1177a15406c5802c15136070bca156e33d4baf36c`.
+- Change: extract only GB2312 level-1's 3,755 common characters, take the library's common single-character toneless final, group characters by final. Full library/code/phrase dictionaries are not shipped or installed at runtime. Dominant visual vowel mapping is application code, not a phonetic claim.
+- Original MIT copyright/permission/warranty notice is preserved verbatim in `web/avatar/data/pinyin-pro.LICENSE.txt` and must accompany this data in distributions. Copyright (c) 2022-present zh-lx.
+- Reproduction: unpack the official archive locally, then run `node scripts/build_live2d_pinyin_data.cjs <unpacked-package-directory>`. That generator performs no network access. Package/license downloads were authorized for development; application lookup uses only the packaged local file.
 
 ## Quaternius Universal Animation Library — free Standard
 

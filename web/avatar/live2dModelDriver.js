@@ -44,7 +44,11 @@
       if (Number.isFinite(frame.energy)) add(params.bodyY, unit(frame.energy));
       const open = unit(frame.mouth?.open), vowel = open > 0.02 ? frame.mouth?.vowel : null;
       const vowels = params.vowels || {};
-      for (const [name, id] of Object.entries(vowels)) set(id, open > 0.02 && (vowel ? name === vowel : id === params.mouthOpen) ? open : 0);
+      for (const [name, id] of Object.entries(vowels)) {
+        const textWeight = frame.mouth?.source === "browser-text" && Number.isFinite(frame.mouth.weights?.[name]) ? unit(frame.mouth.weights[name]) : null;
+        set(id, textWeight !== null ? (open > .02 ? open * textWeight : 0)
+          : open > 0.02 && (vowel ? name === vowel : id === params.mouthOpen) ? open : 0);
+      }
       if (!Object.keys(vowels).length) set(params.mouthOpen, open);
       if (frame.speechGesture) gesture(frame.speechGesture.name, frame.speechGesture.phase, frame.speechGesture.intensity ?? 1);
       if (action) {

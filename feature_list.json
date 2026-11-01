@@ -15,6 +15,35 @@
       "next": "Draft PR236 open; wait author acceptance of local videos/CMU candidates. Do not merge."
     },
     {
+      "id": "chat-task-cards",
+      "name": "Inline chat task cards sharing existing task auth, controller and narrator",
+      "status": "in_progress",
+      "done_criteria": [
+        "Approved A design in dark tokens; original SVG mascot and accessible responsive details",
+        "Unique task cards, ordered responses, silent recovery, auth errors and no chat-history contamination",
+        "Research acceptance matrix, actual-app screenshots and temporary-directory workflow recordings, CPU measurements",
+        "Full local gates, Linux/Windows CI, update PR237; author merges only"
+      ],
+      "next": "PR237 six review fixes implemented and verified locally (2026-11-01); confirm latest-head Linux/Windows CI and author review/merge. NativeCLI/DeepSeek remains author-side by user decision; no self merge.",
+      "verification": "2026-11-01: six review fixes; full1105Python/3skip,86Node,199Python/271JS syntax,secrets911 and Hiyori/Mao mapping checks;15 Chromium tests (11cards+4docs); first-run package/publicJSON/py_compile/diff checks;1440/768/390 inspection0findings with approved design exceptions. All11actual screenshots refreshed plus cancelled=12; old16static PNG/index deleted,5authorWebP retained,links/hashes checked. Latest-head CI evidence in PR237 Checks/body."
+    },
+    {
+      "id": "live2d-browser-text-vowels",
+      "name": "Offline text-driven vowels for browser speech on capable Live2D mappings",
+      "status": "in_progress",
+      "dependencies": [
+        "live2d-motion-natural"
+      ],
+      "done_criteria": [
+        "Licensed compact offline pinyin data; documented final-to-vowel mapping and size",
+        "Delayed sparse-boundary timing, punctuation closure and smooth vowel changes; preserve browser mouth envelope",
+        "Only capable Live2D browser speech; analysed TTS, Hiyori exact baseline and VRM unchanged",
+        "Targeted/full tests, three audible Mao browser-speech before/after recordings, Linux/Windows CI and independent PR"
+      ],
+      "verification": "2026-10-28: official pinyin-pro3.29.5/MIT checked;3755-character offline finals11763bytes, runtime final net23231bytes. Full1105Python/3skip/85Node passed;final85Node and syntax199/267,secrets900,realHiyori/Mao mapping and first-run package/JSON/compile passed. Frozen14400browser-opening samples exact;Hiyori5280/394224, Mao1440/25850 and actualCore6/Mao1440/181030 exact;old fixtures untouched. Six native-browser Huihui/WASAPI audible before/after MP4s decoded/non-silent,remoteSHA256equal. First codehead4eeefcc10/10CIpassed;followup21930d6safe-ignore-null targeted tests and Linux checks passed. Latest-head CI result lives in PR235Checks/description. No private/model/shared-runtime/VRM/brain changes.",
+      "next": "Implementation complete in open/non-draft PR235;review acceptance pending. Confirm latest-head Linux/Windows/all PR Checks,then authorWindows listening/review and author decision to merge. Do not merge. Recording finished;no more audible playback without first notifying user."
+    },
+    {
       "id": "brain-privacy-filter-v1",
       "name": "Context privacy span redaction without everyday false positives",
       "status": "completed",

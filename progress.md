@@ -1394,6 +1394,59 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 - Combined full scripts/test-local.ps1 with D TEMP/TMP:1105Python passed,3skipped,83Node suites;syntax,secrets,mappings pass. Hiyori model checked;Mao/template structure-only warnings unchanged. Public JSON/required py_compile gates pass. No private config/model/key changes.
 - Next:normal push,ready234,wait Linux+Windows/all checks at exact new head,merge commit/admin only;fetch to confirm origin/main. No direct main/force push.
 
+## 2026-10-28 — 浏览器语音 Live2D 文本元音：准备与数据来源阻塞
+- 从最新 origin/main42ae9ea（包含66326b9）新建 friend/live2d-text-vowels。已读 AGENTS/状态/交接，未读私人配置，未修改产品代码。
+- 按用户“不能联网查询”约束，仅离线检查仓库、工作区依赖、npm/pip 缓存、bundled runtime 及现有 Node/Python 依赖；未找到可核实许可的拼音库或普通汉字拼音数据，未下载任何依赖或数据。依用户“找不到合适许可的库就停下问”要求，已询问是否允许仅开发阶段下载官方包核实许可、运行时离线，或由用户提供离线包与许可。等待明确答复，不以等待时间推定同意。
+- 已确认 boundary 回调接收原始 SpeechSynthesisEvent，现有跨窗口协议/统一 runtime 会清空 browser vowel；后续需覆盖独立模型窗口，并保留 VRM/非 browser 路径及 Hiyori 严格序列。
+- Verification Evidence：Node 运行 test_browser_lip_sync.js、test_lip_sync_bridge_frontend.js、test_live2d_avatar_adapter.js、test_live2d_mapping_sequence.js 全部通过。Core6/Hiyori 严格5280帧、394224次有序写入、42场景一致。尚无新实现，无新录像、完整检查或 PR/CI 完成声明。
+- 仅更新 feature_list/progress/session-handoff 用于续接；未提交、push 或开 PR。下一步先解决离线拼音数据/许可来源，再继续实现和验收。
+
+## 2026-10-28 — 浏览器文本元音实现与本地验收完成
+- 用户明确允许从官方包下载/核实许可，运行时必须离线。下载npm官方pinyin-pro3.29.5，核实包内MIT与完整原LICENSE；只派生GB2312一级3755常用字韵母，11763字节JSON，完整许可随数据保留，SHA256与来源在THIRD_PARTY_NOTICES。总运行时净增加23223字节，不引入完整库/联网查询。
+- browserLipSync保留原开合公式/生命周期，额外收集原生boundary有界词计划，沿用rate/delayMs；Live2D适配器原pre-Core处补vowel与80ms权重交叉淡变，标点闭嘴。Hiyori不加载新模块；分析音频的TTS完整参数写入不变。既有taffy-speech增加可忽略元数据消息、墙钟转换及900ms租约；新token空计划清旧标点，连续朗读缺boundary时不会冻结。未改avatarRuntime/appStartup/播放控制器/VRM/房间/brain/执行器，未新增参数写入RAF。
+- Verification Evidence：完整scripts/test-local.ps1为1105Python通过/3skip、85Node文件通过。最后跨窗口连续token保护调整后再次完整前端门禁85Node通过、syntax199Python/267JS、secrets900、真实Hiyori/Mao引用通过；first-run package、公开JSON与必需py_compile通过。新测试含原main42ae9ea的14400个browser开合采样精确SHA256；Hiyori5280帧394224次有序写入、Mao协议1440/25850与本机Core6/Mao1440/181030严格一致，旧fixtures/快照零修改。日志work/text-vowels-full.log、text-vowels-final-node.log、text-vowels-package.log。
+- 实际本机浏览器Huihui语音读取三段文本，各录前后，共六段约10～12秒MP4，原生15～16个boundary；WASAPI仅回录系统输出，非后配音/非分析器。修改前I/U/E/O始终0，中文修改后五通道均出现。全部解码与非静音RMS检查通过；按截图捕获时钟对齐原录音，六段上传既有GitHub草稿验收资料，本地另有约5.5MiB转发ZIP。来源、录制限制和链接见docs/live2d-browser-text-vowels.md。用户询问声音后确认全部录制/浏览器进程已结束，后续只静音检查，再录制须先告知。
+- 仍是文本近似：新词不先于boundary+delay，不能声称未知词内音素精确对齐；单字多音、英文/数字/罕见字回退与截图帧率限制已写报告。未读/提交私人配置、Key或模型，音视频不进仓库。下一步commit/正常push/独立PR及同head全部CI；本任务不合并。
+
+## 2026-10-28 — PR235已开，等待最终head CI
+- 正常推送friend/live2d-text-vowels，创建并附加PR235（open/非draft/未合并），main仍42ae9ea，GitHub无冲突。六个上传附件的GitHub SHA256与本地逐个一致，本地ZIP5817523字节、6张比赛过程截图已保存。首个head4eeefcc的Linux Node/Python/quality/docs通过，Windows在跑，未宣称全绿。
+- 最终自查补充同channel的null词计划安全忽略，避免非预期消息抛异常；新增断言与文本元音/渲染测试均通过，无正常播放行为改变，不重录声音。净增量比前述多8字节，最终23231字节（22.69KiB）。旧fixtures、avatarRuntime、appStartup、播放控制器与VRM/brain文件仍零diff。下一步推送follow-up，核对最终head全部Linux/Windows CI，不合并。
+
+## 2026-10-28 — 最终审查交接
+- 已正常推送保护提交21930d6。初始产品提交4eeefcc的10/10检查（push与PR两套Linux/Windows/Node/Quality/Docs）已实际全部success且可合并无冲突，证据保存；21930d6的Linux检查也已通过，Windows在该次快照仍运行，最终只以PR235最新head检查为准。
+- 此次只更新状态交接，不改产品/测试/素材；功能实现与本地验收完成，feature暂保持in_progress，等待作者Windows试听验收。最终最新head检查和具体SHA会写入PR235描述及本地ci-final/publication，避免用旧head绿色冒充新head。作者决定合并，本任务不合并。录像已经结束，不再启动任何有声播放。
+
+## 2026-10-29 — 聊天任务卡片：仅调研设计阶段开始
+- 最新main be25324（作者已合并235），工作区干净，新建friend/chat-task-cards。按AGENTS读交接/feature/progress；用户明确本阶段“只放文档和截图”，因此不修改feature_list.json或任何产品源文件，任务状态先记Markdown文档。静态原型源和生成脚本只留本地输出目录，PR只含文档和截图。
+- 已核对chat.js委派拦截、externalAgentController/private单任务/1s轮询、index弹窗/controlCenter、chatMessageController历史分栏、apiClient鉴权及后端公开任务字段/审批取消状态。发现当前工作页是弹窗而非独立Electron工作窗口，progress_count为事件计数，不代表百分比，计划字段/核对警告必须保留在审批/结果界面。
+- 采用design-taste-frontend的app-screen设计检查流程，按用户品牌要求保留项目现有色彩/字体，不改全局主题或渲染器。下一步完成三方案深浅色/窄屏截图、接口/状态/去重/鉴权错误设计和DraftPR，再停下等qinglinMa确认。
+
+## 2026-10-29 — 聊天任务卡片：阶段1设计交付
+- 新增docs/chat-task-cards/README.md、research.md、visual-review.md、截图清单及16PNG。A完整内联（推荐）、B紧凑任务条、C卡片+同窗口详情，各深浅色/桌面/窄屏，加审批详情2张与十种状态参考2张。所有目标、目录、命令、进度和结果是合成示例，原型/脚本只在outputs及work辅助目录，不进入产品源。没有真实任务、音频或私人数据访问。
+- 梳理了既有5个HTTP契约、7后端状态与取消中/鉴权错误等局部提示、一次活动任务、100项内存历史、progress_count非百分比、更新签名不能只看updated_at、通用external-agent审批卡已有排除、既有authFetch/Origin/token链。提出共用store/1秒轮询、唯一task.id卡片、动作与旧GET互斥、完整计划审批与结果警告、静默hydrate、历史不入LLM/翻译/TTS/记忆。无需后端接口/权限改动。浅色当前不是成品功能，需作者确认聊天局部主题绑定。
+- Verification Evidence：技能源码lint0FAIL/0WARN；6个方案/主题真实浏览器在1440/768/390逐一检查最终0FAIL/0WARN；320/360/760加长路径无横溢、pageerror0、外网/任务请求0。既有test_external_agent_frontend.js通过。4份新增Markdown的本地引用无缺失；16PNG CRC/解压与ZIP复查通过；secrets904、公用JSON/必需py_compile通过。没有改产品/测试/fixture，故本地未重复完整运行时套件（CI仍会运行原有门禁）。
+- 本阶段仅Markdown/PNG；feature_list.json按用户“只放文档和截图”约束未改，活动状态在本Markdown交接。接下来正常push并开DraftPR，核对最新headCI；然后等qinglinMa确认A/B/C、工作弹窗保留、窄屏详情与浅色范围，不实现、不ready、不合并。阶段2真实流程录像明确待确认后再录，静态截图不冒充功能验收。
+
+## 2026-10-29 — 聊天任务卡片阶段2获批
+- 作者确认A、深色token、窄卡同窗详情、旧弹窗共享controller/store/narrator；开始同分支PR237实现。收到5张AI设计参考（权利归qinglinMa），只转WebP用于文档，不作产品素材。第6张路径待补。
+- 只改聊天/任务前端和验证文档；不动后端/权限/Origin/Electron/模型。测试仅临时目录，初期静音；真实录像前先告知。
+
+## 2026-10-29 — 聊天任务卡片阶段2实现与验收
+- 实施A/深色token与原创SVG樱花团子。卡片/旧弹窗共用Map状态、原authFetch、单飞轮询和narrator；epoch防旧GET回滚，静默恢复，任务不入聊天history/翻译/TTS/记忆。窄卡与大清单走同窗完整详情；大清单DOM无批准，预览前5项；风险/错误直接显示。没有Python/Origin/权限/API/渲染器/房间/brain/执行器/Electron改动。
+- 用户确认只有5张参考图，WebP仅作设计参考（权利归qinglinMa），不作产品素材；11张实际应用截图和对照报告已完成。3段静音真实页面/现有接口临时文件流程均完成，实际移动2/12/2文件、内容逐字核对一致、无计划外/缺项；3MP4解码通过，录像在既有验收草稿附件和本地约7.2MiBZIP，不进Git。执行端为确定性测试适配器，非LLM；用户明确同意作者电脑补原生CLI/DeepSeek验收，本机CLI0.163低于0.164且无进程测试凭据，未读私人配置。
+- Verification Evidence：完整test-local1105Python通过/3skip；最终86Node、199Python/271JS语法、secrets/mappings通过；7项Chromium卡片测试、原docs smoke、first-run package、公开JSON/必需py_compile和diff检查结果见PR。严格旧模型fixtures不改。视觉例外仅作者明确要求的星形/发光/光泽渐变/路径mono；其余真实浏览器检查。
+- CPU：独立软件渲染Chromium、全局motion固定，只切卡片动画，3对8秒样本，关102.75%/开102.81%单核口径，差+0.06pp处于短测噪声。原场景动画基础高占用保留，不以全局reduced-motion混合差异冒充卡片开销。原始实验仅留本地。
+- 下一步：正常推送并更新PR237，核对最新head全部Linux/Windows检查；CI记录在PR说明/Checks，作者Windows与原生执行器验收后决定合并，不自行合并。
+
+## 2026-11-01 — PR237 验收修订开始
+- 作者要求六项前端/文档修订：委派短标题、批准状态文案、失败/取消布局与合并错误框、移除裁切花瓣、窄屏双行路径、清理旧静态稿。保持现有鉴权/API/轮询，补回归测试和实际截图，完整门禁及最新head CI后交作者合并。
+
+## 2026-11-01 — PR237 六项修订与本地验证
+- taskCardModel/controller共用委派识别、去前缀短标题及完整正文一次；成功approve响应和执行证据区分已批准，过期查看原计划，failed/expired主按钮重新规划。失败/取消吉祥物→粗体结论→一句原因，多错误单框；核对提示严格按计划外>0/缺项/verification_error。删除左越界花瓣，窄详情保留双行路径/箭头/文件夹。只有任务前端/测试/状态/文档变化，未动后台/鉴权/Origin/渲染器/依赖。
+- 作者要求删除的旧静态稿16PNG及索引已移除；当前5WebP作者参考不改，11实际应用图全部重拍另补已取消=12PNG，SHA256/链接核对通过。真实web/index+原HTTP/manager/鉴权/审计，仅自建临时文件和本地隔离确定性适配器，静音、pageerror0；未碰个人目录或配置。原生CLI按用户已确认继续由作者补验，旧录像标注修订前日期，不冒充新视觉。
+- Verification Evidence：scripts/test-local.ps1通过1105Python/3skip（112.18s）、86Node文件、199Python/271JS语法、secrets911及本机映射；check_first_run_package.ps1通过；公开JSON/必需py_compile、Markdown本地链接、图片数量/摘要和diff检查通过。Chromium15项通过（新增4项验收回归、原7卡片及4docs）；1440/768/390视觉inspection0findings，保留原作者设计例外。详情签名排除progress/updated_at以保留阅读焦点，最终浏览器回归另核对。
+- 下一步正常push同分支并更新PR237描述/实际图，核对最新head Linux/Windows全部CI后告知；保持未合并，作者操作。日志和捕获工具只留仓库外work/outputs，不提交。
+
 
 ## 2026-10-28 — VRM motion naturalization v1 started
 Confirmed origin/main42ae9ea and created isolated motion worktree; robocopy dependencies, no npm ci/private config. Audited instantaneous mouth-driven body and60–180s activity holds. First independent commit will isolate speech body envelope, preserve mouth and camera.
