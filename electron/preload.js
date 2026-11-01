@@ -1,6 +1,10 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  roomState: () => ipcRenderer.invoke("room-state"),
+  openRoom: options => ipcRenderer.invoke("room-open",options),
+  onRoomActive: cb => ipcRenderer.on("room-active",(_e,value)=>cb(value)),
+  onRoomTurn: cb => ipcRenderer.on("room-turn",(_e,value)=>cb(value)),
   moveWindowBy: (dx, dy) => ipcRenderer.send("window-move-by", dx, dy),
   resizeWindow: (w, h) => ipcRenderer.send("window-resize", w, h),
   minimizeWindow: () => ipcRenderer.send("window-minimize"),

@@ -1,4 +1,8 @@
-# Current — Godot bedroom on draft PR 238
+# Current — voiced Godot room on draft PR 238
+
+Review [phase 4 measurements](godot_room/PHASE4-REPORT.md), public keyframes and the ignored local recording tmp_ui_smoke/godot-room-phase4-voice-electron.mp4. Browser speech uses the matched installed Windows voice. Await author review.
+
+## Earlier — Godot bedroom on draft PR 238
 
 Review [phase 3 evidence](godot_room/PHASE3-REPORT.md) and the ignored local video tmp_ui_smoke/godot-room-phase3-deepseek-30fps.mp4. The bed is look-only until the art owner adds a Seat and sit affordance. Do not merge without author review.
 

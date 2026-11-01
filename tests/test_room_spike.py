@@ -83,3 +83,56 @@ def test_room_speech_omits_stage_directions():
     assert spoken("（坐下）晚安。(挥手)") == "晚安。"
     assert spoken("（走过去）") == ""
     assert spoken("") == ""
+
+
+def test_user_turn_is_one_request_and_uses_current_state(monkeypatch):
+    import memory
+    import app_room_spike as room
+    calls = []
+    monkeypatch.setattr(memory, "build_manual_persona_card_block", lambda:"温柔")
+    monkeypatch.setattr(memory, "build_persona_memory_block", lambda:"喜欢看书")
+    monkeypatch.setattr(memory, "select_memory_items_for_prompt", lambda *_:[{"text":"喜欢窗边"}])
+    def provider(cfg, messages):
+        calls.append(messages)
+        yield '{"reply":"（走过去）好呀，我这就过去。","action":"go_to(sofa)","steps":["sit_on(sofa)"],"goal":"坐在旁边"}'
+    monkeypatch.setattr(room, "iter_openai_chat_stream", provider)
+    world={"ai":[1,0,0],"user":[0,0,0],"objects":{"sofa":["sit"]},"ai_state":"walking","user_near":"sofa"}
+    result=room.user_turn({}, {"world":world,"message":"来坐","history":[]})
+    assert len(calls)==1 and "walking" in calls[0][-1]["content"] and "喜欢窗边" in calls[0][-1]["content"]
+    assert result=={"reply":"好呀，我这就过去。","action":{"action":"go_to","target":"sofa"},
+                    "steps":[{"action":"sit_on","target":"sofa"}],"goal":"坐在旁边"}
+
+
+def test_invalid_user_plan_cannot_leave_a_spoken_promise():
+    import pytest
+    from app_room_spike import parse_turn
+    result=parse_turn('{"reply":"我这就去","action":"sit_on(bed)"}',{"bed":["look"]})
+    assert result["action"]["action"]=="idle" and result["steps"]==[] and "这就去" not in result["reply"]
+    with pytest.raises(ValueError):
+        parse_turn('{"reply":"（走过去）","action":"idle"}',{})
+
+def test_room_goal_description_is_bounded_and_visible():
+    from app_room_spike import snapshot
+    state = snapshot({"user":[0,0,0], "ai":[0,0,0], "goal":{"description":"一起到窗边看月亮"*15}})
+    assert 0 < len(state["goal"]["description"]) <= 48
+
+
+def test_room_conversation_removes_unsupported_past_trip(monkeypatch):
+    import app_room_spike as room
+    import memory
+    monkeypatch.setattr(memory, "build_manual_persona_card_block", lambda:"")
+    monkeypatch.setattr(memory, "build_persona_memory_block", lambda:"")
+    monkeypatch.setattr(memory, "select_memory_items_for_prompt", lambda *_:[])
+    monkeypatch.setattr(room, "iter_openai_chat_stream", lambda *_:iter(['{"reply":"我刚从窗边回来。","action":"idle","steps":[]}']))
+    turn=room.user_turn({},{"message":"窗外有什么？","world":{"user":[0,0,0],"ai":[0,0,0],"period":"night"}})
+    assert "回来" not in turn["reply"] and "月亮" in turn["reply"]
+
+def test_room_recap_only_uses_known_events_and_keeps_speakers_distinct():
+    from app_room_spike import recent_room_recap, ground_recap
+    records=[{"role":"assistant","content":"【房间离场记录】没有你入座的记录。我的已完成动作：走到书架；坐到沙发。"}]
+    assert recent_room_recap(records, "你好") is None
+    facts=recent_room_recap(records, "刚才我们在房间做了什么")
+    assert facts == {"user_sat": False, "steps":["走到书架","坐到沙发"]}
+    assert "你自己坐床边" not in ground_recap("我坐到沙发，你自己坐床边。",facts)
+    assert ground_recap("你走到书架前看了看，然后挪到沙发坐下。我跟着你。我们聊了书。",facts) == "我去了书架，坐到了沙发。我们聊了书。"
+    assert ground_recap("你让我去沙发坐着。",None) == "你让我去沙发坐着。"

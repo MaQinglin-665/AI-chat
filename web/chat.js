@@ -4571,7 +4571,7 @@ function shouldAttemptServerTTS() { return getTTSPlaybackController().shouldAtte
 function markServerTTSRecovered() { return getTTSPlaybackController().markServerTTSRecovered(); }
 async function speakByServer(text, opts = {}) { return getTTSPlaybackController().speakByServer(text, opts); }
 async function speakByBrowser(text, opts = {}) { return getTTSPlaybackController().speakByBrowser(text, opts); }
-async function speak(text, opts = {}) { return getTTSPlaybackController().speak(text, opts); }
+async function speak(text, opts = {}) { if(state.godotRoomActive)return false; return getTTSPlaybackController().speak(text, opts); }
 
 function getStreamTtsQueueController() {
   const boundary = getChatTtsBoundary();
@@ -5142,6 +5142,34 @@ function clearSplitWindowPerformancePhase(input = {}) {
 bindRuntimeBridges();
 window.addEventListener("beforeunload", handleBeforeUnload);
 main().then(async () => {
+  const api=window.electronAPI;
+  if(api?.roomState) {
+    const button=document.getElementById("enter-room-btn");
+    const sync=active=>{
+      state.godotRoomActive=!!active;
+      if(button)button.disabled=!!active;
+      if(active) {
+        window.__xinyuBrainController?.executor?.interrupt("entered_room");
+        getTTSPlaybackController().stopAllAudioPlayback();
+        window.speechSynthesis?.cancel();
+      }
+    };
+    api.onRoomActive(sync);
+    api.onRoomTurn(({message,reply})=>{
+      if(message) appendMessage("user",message,{syncHistory:true});
+      appendMessage("assistant",reply,{syncHistory:true});
+    });
+    const availability=await api.roomState().catch(()=>({enabled:false,active:false}));
+    if(button && availability.enabled) {
+      button.hidden=false;
+      button.addEventListener("click",async()=>{
+        try {
+          await api.openRoom({provider:state.ttsProvider,voice:(state.ttsVoice||chooseTTSVoice())?.name||"",history:state.history});
+        } catch { appendMessage("assistant","房间启动失败，请检查 Godot 安装或导出包。",{category:"system",persist:false}); }
+      });
+    }
+    sync(availability.active);
+  }
   // Shared speech cleanup still uses the existing expression director in VRM mode.
   // Initialize its local mapping before exposing the new speech/interrupt bridge.
   await window.XinyuLive2DMapping?.ready();

@@ -2,11 +2,14 @@ extends CharacterBody3D
 var agent := NavigationAgent3D.new()
 var body: Node3D
 var motion := preload("res://locomotion.gd").new()
-var bubble := Label3D.new()
+var caption := preload("res://room_caption.gd").new()
+var voice := preload("res://room_voice.gd").new()
+var bubble: Label:
+	get: return caption.label
 var follow := false
 var sitting := false
 var seat_object: Node3D
-var bubble_time := 0.
+
 var seat_exit := Vector3.ZERO
 var look_target: Node3D
 var destination := ""
@@ -41,13 +44,8 @@ func _ready():
 	contact.actor=self
 	skeleton.add_child(contact)
 	skeleton.add_child(gaze)
-	bubble.position.y = 2.04
-	bubble.no_depth_test = true
-	bubble.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	bubble.font_size = 22
-	bubble.pixel_size = .002
-	add_child(bubble)
+	add_child(caption)
+	add_child(voice)
 	look_target = player
 
 func approach(node: Node3D):
@@ -105,9 +103,6 @@ func move_safe(safe: Vector3):
 	move_and_slide()
 
 func _physics_process(delta):
-	bubble_time -= delta
-	bubble.visible = bubble_time > 0
-	bubble.position.y = 1.68 if sitting else 2.04
 	if NavigationServer3D.map_get_iteration_id(agent.get_navigation_map()) == 0: return
 	last_follow -= delta
 	var distance = global_position.distance_to(player.global_position)
@@ -142,11 +137,8 @@ func _physics_process(delta):
 		body.rotation.y = lerp_angle(body.rotation.y,atan2(facing.x,facing.z),1-exp(-delta*4))
 
 func speak(text: String, emotion: String):
-	bubble.text = text
-	bubble_time = clampf(2. + text.length()*.22, 3., 26.)
-	bubble.visible = not text.is_empty()
-	bubble.width = 400
-	bubble.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	caption.show_line(text)
+	voice.utter(text)
 	var face = body.find_child("Face",true,false)
 	for i in range(face.get_blend_shape_count()):
 		if str(face.mesh.get_blend_shape_name(i)).ends_with("Fcl_ALL_Joy"):
