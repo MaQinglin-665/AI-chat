@@ -1,0 +1,1582 @@
+{
+	"bed": {
+		"approach": {
+			"global_position": [
+				-1.399999976158142,
+				0.0,
+				1.3200000524520874
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/bed/Interaction/Approach",
+			"position": [
+				1.649999976158142,
+				-0.3799999952316284,
+				-0.5
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				-3.049999952316284,
+				0.3799999952316284,
+				1.8200000524520874
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "bed"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/bed",
+			"position": [
+				-3.049999952316284,
+				0.3799999952316284,
+				1.8200000524520874
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				-3.049999952316284,
+				0.3799999952316284,
+				1.8200000524520874
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					1.649999976158142,
+					-0.3799999952316284,
+					-0.5
+				],
+				"id": "bed"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/bed/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"bedside": {
+		"approach": {
+			"global_position": [
+				-1.0,
+				0.0,
+				2.5999999046325684
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/bedside/Interaction/Approach",
+			"position": [
+				0.6499999761581421,
+				-0.30000001192092896,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				-1.649999976158142,
+				0.30000001192092896,
+				2.5999999046325684
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "bedside"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/bedside",
+			"position": [
+				-1.649999976158142,
+				0.30000001192092896,
+				2.5999999046325684
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				-1.649999976158142,
+				0.30000001192092896,
+				2.5999999046325684
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					0.6499999761581421,
+					-0.30000001192092896,
+					0.0
+				],
+				"id": "bedside"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/bedside/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"book": {
+		"approach": {
+			"global_position": [
+				1.0999999046325684,
+				0.0,
+				-2.0999999046325684
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/book/Interaction/Approach",
+			"position": [
+				-0.800000011920929,
+				-0.8700000047683716,
+				0.6499999761581421
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				1.899999976158142,
+				0.8700000047683716,
+				-2.75
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look",
+					"pick_up"
+				],
+				"id": "book"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/book",
+			"position": [
+				1.899999976158142,
+				0.8700000047683716,
+				-2.75
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				1.899999976158142,
+				0.8700000047683716,
+				-2.75
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look",
+					"pick_up"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					-0.800000011920929,
+					-0.8700000047683716,
+					0.6499999761581421
+				],
+				"id": "book"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/book/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"chair": {
+		"approach": {
+			"global_position": [
+				1.4000000953674316,
+				0.0,
+				-1.9500000476837158
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/chair/Interaction/Approach",
+			"position": [
+				-1.0,
+				-0.23000000417232513,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				2.4000000953674316,
+				0.23000000417232513,
+				-1.9500000476837158
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"sit",
+					"look"
+				],
+				"id": "chair"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/chair",
+			"position": [
+				2.4000000953674316,
+				0.23000000417232513,
+				-1.9500000476837158
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				2.4000000953674316,
+				0.23000000417232513,
+				-1.9500000476837158
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"sit",
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					-1.0,
+					-0.23000000417232513,
+					0.0
+				],
+				"id": "chair",
+				"seat": "Seat",
+				"seat_position": [
+					0.0,
+					0.23000000417232513,
+					0.0
+				],
+				"seat_yaw": 3.141592653589793
+			},
+			"path": "/root/BedroomArt/WalkableRoom/chair/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"seat": {
+			"global_position": [
+				2.4000000953674316,
+				0.46000000834465027,
+				-1.9500000476837158
+			],
+			"global_rotation": [
+				0.0,
+				-3.141592502593994,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/chair/Interaction/Seat",
+			"position": [
+				0.0,
+				0.23000000417232513,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				3.1415927410125732,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"desk": {
+		"approach": {
+			"global_position": [
+				1.1000001430511475,
+				0.0,
+				-2.6500000953674316
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/desk/Interaction/Approach",
+			"position": [
+				-1.2999999523162842,
+				-0.7599999904632568,
+				0.25
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				2.4000000953674316,
+				0.7599999904632568,
+				-2.9000000953674316
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "desk"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/desk",
+			"position": [
+				2.4000000953674316,
+				0.7599999904632568,
+				-2.9000000953674316
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				2.4000000953674316,
+				0.7599999904632568,
+				-2.9000000953674316
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					-1.2999999523162842,
+					-0.7599999904632568,
+					0.25
+				],
+				"id": "desk"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/desk/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"floor_lamp": {
+		"approach": {
+			"global_position": [
+				-0.5999999642372131,
+				0.0,
+				-2.0999999046325684
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/floor_lamp/Interaction/Approach",
+			"position": [
+				0.949999988079071,
+				-0.75,
+				0.4000000059604645
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				-1.5499999523162842,
+				0.75,
+				-2.5
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "floor_lamp"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/floor_lamp",
+			"position": [
+				-1.5499999523162842,
+				0.75,
+				-2.5
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				-1.5499999523162842,
+				0.75,
+				-2.5
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					0.949999988079071,
+					-0.75,
+					0.4000000059604645
+				],
+				"id": "floor_lamp"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/floor_lamp/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"plant": {
+		"approach": {
+			"global_position": [
+				2.950000047683716,
+				0.0,
+				3.0999999046325684
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/plant/Interaction/Approach",
+			"position": [
+				-0.699999988079071,
+				-0.44999998807907104,
+				0.8999999761581421
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				3.6500000953674316,
+				0.44999998807907104,
+				2.200000047683716
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "plant"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/plant",
+			"position": [
+				3.6500000953674316,
+				0.44999998807907104,
+				2.200000047683716
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				3.6500000953674316,
+				0.44999998807907104,
+				2.200000047683716
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					-0.699999988079071,
+					-0.44999998807907104,
+					0.8999999761581421
+				],
+				"id": "plant"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/plant/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"rug": {
+		"approach": {
+			"global_position": [
+				1.5499999523162842,
+				0.0,
+				0.6499999761581421
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/rug/Interaction/Approach",
+			"position": [
+				1.7999999523162842,
+				-0.008999999612569809,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				-0.25,
+				0.008999999612569809,
+				0.6499999761581421
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "rug"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/rug",
+			"position": [
+				-0.25,
+				0.008999999612569809,
+				0.6499999761581421
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				-0.25,
+				0.008999999612569809,
+				0.6499999761581421
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					1.7999999523162842,
+					-0.008999999612569809,
+					0.0
+				],
+				"id": "rug"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/rug/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"shelf": {
+		"approach": {
+			"global_position": [
+				2.9800002574920654,
+				0.0,
+				-0.20000000298023224
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/shelf/Interaction/Approach",
+			"position": [
+				-1.0499999523162842,
+				-0.9800000190734863,
+				0.20000000298023224
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				4.03000020980835,
+				0.9800000190734863,
+				-0.4000000059604645
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "shelf"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/shelf",
+			"position": [
+				4.03000020980835,
+				0.9800000190734863,
+				-0.4000000059604645
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				4.03000020980835,
+				0.9800000190734863,
+				-0.4000000059604645
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					-1.0499999523162842,
+					-0.9800000190734863,
+					0.20000000298023224
+				],
+				"id": "shelf"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/shelf/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"sofa": {
+		"approach": {
+			"global_position": [
+				-3.0,
+				0.0,
+				0.0
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/sofa/Interaction/Approach",
+			"position": [
+				0.0,
+				-0.25,
+				1.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				-3.0,
+				0.25,
+				-1.0
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"sit",
+					"look"
+				],
+				"id": "sofa"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/sofa",
+			"position": [
+				-3.0,
+				0.25,
+				-1.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				-3.0,
+				0.25,
+				-1.0
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"sit",
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					0.0,
+					-0.25,
+					1.0
+				],
+				"id": "sofa",
+				"seat": "Seat",
+				"seat_position": [
+					0.0,
+					0.25,
+					0.07999999821186066
+				],
+				"seat_yaw": 0.0
+			},
+			"path": "/root/BedroomArt/WalkableRoom/sofa/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"seat": {
+			"global_position": [
+				-3.0,
+				0.5,
+				-0.9200000166893005
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/sofa/Interaction/Seat",
+			"position": [
+				0.0,
+				0.25,
+				0.07999999821186066
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"wall_art_0": {
+		"approach": {
+			"global_position": [
+				0.3499999940395355,
+				0.0,
+				-2.7699999809265137
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/wall_art_0/Interaction/Approach",
+			"position": [
+				0.0,
+				-1.850000023841858,
+				1.100000023841858
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				0.3499999940395355,
+				1.850000023841858,
+				-3.869999885559082
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "wall_art_0"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/wall_art_0",
+			"position": [
+				0.3499999940395355,
+				1.850000023841858,
+				-3.869999885559082
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				0.3499999940395355,
+				1.850000023841858,
+				-3.869999885559082
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					0.0,
+					-1.850000023841858,
+					1.100000023841858
+				],
+				"id": "wall_art_0"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/wall_art_0/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"wall_art_1": {
+		"approach": {
+			"global_position": [
+				1.149999976158142,
+				0.0,
+				-2.7699999809265137
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/wall_art_1/Interaction/Approach",
+			"position": [
+				0.0,
+				-2.200000047683716,
+				1.100000023841858
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				1.149999976158142,
+				2.200000047683716,
+				-3.869999885559082
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "wall_art_1"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/wall_art_1",
+			"position": [
+				1.149999976158142,
+				2.200000047683716,
+				-3.869999885559082
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				1.149999976158142,
+				2.200000047683716,
+				-3.869999885559082
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					0.0,
+					-2.200000047683716,
+					1.100000023841858
+				],
+				"id": "wall_art_1"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/wall_art_1/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"window": {
+		"approach": {
+			"global_position": [
+				-2.4000000953674316,
+				0.0,
+				-2.880000114440918
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/window/Interaction/Approach",
+			"position": [
+				-0.44999998807907104,
+				-1.9600000381469727,
+				1.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				-1.9500000476837158,
+				1.9600000381469727,
+				-3.880000114440918
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "window"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/window",
+			"position": [
+				-1.9500000476837158,
+				1.9600000381469727,
+				-3.880000114440918
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				-1.9500000476837158,
+				1.9600000381469727,
+				-3.880000114440918
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					-0.44999998807907104,
+					-1.9600000381469727,
+					1.0
+				],
+				"id": "window"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/window/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	},
+	"window_plant": {
+		"approach": {
+			"global_position": [
+				-3.696000099182129,
+				0.0,
+				-2.8299999237060547
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+
+			},
+			"path": "/root/BedroomArt/WalkableRoom/window_plant/Interaction/Approach",
+			"position": [
+				-0.19599999487400055,
+				-1.156000018119812,
+				0.7200000286102295
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"body": {
+			"global_position": [
+				-3.5,
+				1.156000018119812,
+				-3.549999952316284
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"id": "window_plant"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/window_plant",
+			"position": [
+				-3.5,
+				1.156000018119812,
+				-3.549999952316284
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		},
+		"marker": {
+			"global_position": [
+				-3.5,
+				1.156000018119812,
+				-3.549999952316284
+			],
+			"global_rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"metadata": {
+				"affordances": [
+					"look"
+				],
+				"approach": "Approach",
+				"approach_position": [
+					-0.19599999487400055,
+					-1.156000018119812,
+					0.7200000286102295
+				],
+				"id": "window_plant"
+			},
+			"path": "/root/BedroomArt/WalkableRoom/window_plant/Interaction",
+			"position": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"rotation": [
+				0.0,
+				0.0,
+				0.0
+			],
+			"scale": [
+				1.0,
+				1.0,
+				1.0
+			]
+		}
+	}
+}

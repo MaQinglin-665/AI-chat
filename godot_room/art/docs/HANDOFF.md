@@ -20,3 +20,7 @@
 程序几何在_ready生成，编辑器tscn根场景没有预打包可拖动的家具子节点。仅平地导航，新增台阶/二层需改顶面过滤。主线接入Seat/Approach Marker后还应按身高校准坐姿、起身与占用点；当前截图不等于新版自动入座的完整视觉验收。性能仅离线单角色、未包含Electron/双角色/自主行为/后端长测。godot-vrm既有already_processed导入字典键诊断未修改插件。作者在自己的主线验收美术、三套灯光、Marker接入和实际行走后决定合并，本任务不合并。
 
 最新提交CI在Draft PR Checks/说明，保持以最新head为准；所有进程和录制均应在交付前结束，本任务无录像。
+
+## 后续polish任务（2026-11-01）
+
+当前分支friend/godot-room-art-polish，从9368749新建，仅art/。原始Marker已冻结，三预设前后与小物图已保存。地板已证实为冷补光宽高光问题，不改光源/主线行为。43导航多边形、14交互点、584采样仍通过。详见[POLISH](POLISH.md)。用户反馈不限帧测试卡顿，已停止该方式，后续图形检查默认30fps，不再重复不限帧跑分。完整test-local已通过（1111 Python/3跳过、86 Node、202 Python/271 JS语法），公开JSON/py_compile通过；最终verify及主线导航/共享目标回归通过。PR和CI收尾中，最新CI见Draft PR Checks；禁止自行合并。

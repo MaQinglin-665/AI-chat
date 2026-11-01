@@ -29,3 +29,14 @@
 [已有day/dusk/night卧室背景](../../web/assets/backgrounds/bedroom/README.md)：qinglinMa的AI生成图，按用户要求仅参考温馨配色、布艺/木材、夜景与暖灯关系。不是本模块贴图或素材来源，没有把参考图复制到art/。新美术的CC0声明不适用于这些参考图或其他上游文件。
 
 技术接口依据：[Godot导航烘焙](https://docs.godotengine.org/en/4.6/tutorials/navigation/navigation_using_navigationmeshes.html)、[光源](https://docs.godotengine.org/en/4.6/classes/class_light3d.html)、[渲染计时](https://docs.godotengine.org/en/4.6/classes/class_renderingserver.html)。这些链接用于说明API含义，不作为美术授权来源。
+
+## 本次polish新增（9368749之后）
+
+以下为本PR原创程序几何/着色器，AI辅助，qinglinMa维护；沿用[CC0 1.0](LICENSE-CC0.txt)。无下载素材、外部贴图或背景图像素。
+
+| 内容 | 来源 | 作者/许可 |
+| --- | --- | --- |
+| 月夜山水、樱花枝、暮色山水五幅画 | [painting.gdshader](https://github.com/MaQinglin-665/AI-chat/blob/friend/godot-room-art-polish/godot_room/art/painting.gdshader) | 本PR原创、AI辅助，CC0 1.0 |
+| 城市圆形光点与柔和光晕 | [window.gdshader](https://github.com/MaQinglin-665/AI-chat/blob/friend/godot-room-art-polish/godot_room/art/window.gdshader) | 同上 |
+| 哑光地板、两盆植物、睡熊、茶杯/本子/笔 | [bedroom.gd](https://github.com/MaQinglin-665/AI-chat/blob/friend/godot-room-art-polish/godot_room/art/bedroom.gd) / [wood.gdshader](https://github.com/MaQinglin-665/AI-chat/blob/friend/godot-room-art-polish/godot_room/art/wood.gdshader) | 同上 |
+| 前后、诊断和小物截图 | [polish/](docs/polish/) | 本模块原创场景及既有CC0 Shino的实际引擎画面，无私人桌面 |

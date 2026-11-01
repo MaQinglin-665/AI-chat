@@ -28,6 +28,7 @@ func _ready():
 	plant("window_plant",Vector3(-3.5,1.03,-3.55),.28)
 	build_rug()
 	wall_art()
+	build_lived_in_details()
 	build_lighting()
 	set_lighting_preset(lighting_preset)
 	set_quality_profile(quality_profile)
@@ -71,7 +72,12 @@ func interaction(node: StaticBody3D, approach: Vector3, seat := Vector3.ZERO, ya
 
 func build_shell():
 	var floor = body("floor",Vector3(0,-.10,0),Vector3(9,.2,8))
-	g.box(floor,Vector3.ZERO,Vector3(9,.2,8),g.wood("a77b58"),.01,"OakFloor")
+	# Matte oiled oak: the old dielectric highlight desaturated the cool-lit half.
+	# Duplicate only the floor material; other wood and all light presets are unchanged.
+	var floor_wood=g.wood("a77b58").duplicate()
+	floor_wood.set_shader_parameter("wood_roughness",.90)
+	floor_wood.set_shader_parameter("specular_strength",0.0)
+	g.box(floor,Vector3.ZERO,Vector3(9,.2,8),floor_wood,.01,"OakFloor")
 	# Thin plank grooves are geometry, not a texture. Zero animation/time dependence.
 	var groove = g.material("99775e")
 	for i in range(23):
@@ -243,23 +249,86 @@ func wall_art():
 		var spec=paintings[index]
 		var frame=body("wall_art_"+str(index),spec[0],Vector3(spec[1].x,spec[1].y,.05),["look"])
 		g.box(frame,Vector3.ZERO,Vector3(spec[1].x,spec[1].y,.05),g.wood("ab8c70"),.015)
-		g.box(frame,Vector3(0,0,.035),Vector3(spec[1].x-.06,spec[1].y-.06,.016),g.material("766f91"),.005)
-		g.sphere(frame,Vector3(.12,.19,.052),Vector3(.12,.12,.012),g.material("dfbea8"))
-		for i in range(4):
-			var hill=g.sphere(frame,Vector3(-.21+i*.14,-.17,.055),Vector3(.25,.24+i*.035,.012),g.material("9c91ad" if i%2 else "b29cb7"))
-			hill.rotation_degrees.z=i*12
+		painting(frame,Vector3(0,0,.041),spec[1]-Vector2(.06,.06),index)
 		interaction(frame,Vector3(0,-spec[0].y,1.1))
 	# Left-wall framed linen panels and an herb ledge, original geometry only.
 	for i in range(3):
 		var panel=body("bed_panel_"+str(i),Vector3(-4.39,1.70,1.1+i*.54),Vector3(.05,.78,.45))
 		g.box(panel,Vector3.ZERO,Vector3(.05,.78,.45),g.wood("a98b72"),.012)
-		g.box(panel,Vector3(.035,0,0),Vector3(.025,.70,.37),g.material(["b6a0ad","a1a0b4","b8ad9e"][i]),.008)
-		for j in range(3):g.sphere(panel,Vector3(.055,-.15+j*.12,-.10+j*.08),Vector3(.012,.17,.12),g.material("d9c7bb"))
+		var print_node=painting(panel,Vector3(.041,0,0),Vector2(.37,.70),i)
+		print_node.rotation.y=PI*.5
 	# A quiet string of tiny warm beads; no animation or expensive light per bead.
 	for i in range(23):
 		var x=-4.2+i*.38
 		var y=2.98-.14*sin(i*.285)
 		g.sphere(region,Vector3(x,y,-3.80),Vector3(.035,.045,.035),g.material("e8ba7f",.7,.22))
+
+func painting(parent: Node3D, pos: Vector3, size: Vector2, design: int) -> MeshInstance3D:
+	var mat=ShaderMaterial.new()
+	mat.shader=preload("res://art/painting.gdshader")
+	mat.set_shader_parameter("design",design)
+	var quad=QuadMesh.new()
+	quad.size=size
+	return g.mesh_node(parent,quad,pos,mat,"OriginalPrint")
+
+func decorative_plant(id: String, pos: Vector3, height: float):
+	# These pots are on existing furniture, outside walking/approach footprints.
+	# They are scenery only: do not register or modify any interaction Marker.
+	var pot=Node3D.new()
+	pot.name=id
+	region.add_child(pot)
+	pot.position=pos+Vector3(0,height*.5,0)
+	g.cylinder(pot,Vector3(0,-height*.5+.11,0),.12,.17,.22,g.material("c99a88"))
+	g.cylinder(pot,Vector3(0,-height*.5+.22,0),.155,.155,.012,g.material("55443d"))
+	for i in range(9):
+		var angle=i*2.399
+		var top=height*(.60+(i%3)*.17)
+		var x=sin(angle)*.13
+		var z=cos(angle)*.13
+		var stem=g.cylinder(pot,Vector3(x*.5,-height*.5+(.22+top)*.5,z*.5),.007,.004,top-.22,g.material("526b51"))
+		stem.rotation_degrees=Vector3(cos(angle)*15,0,-sin(angle)*15)
+		g.leaf(pot,Vector3(x,-height*.5+top,z),Vector3(.17,.045,.30),Vector3(-25,rad_to_deg(angle),15),g.material("6d8763" if i%2 else "8f9e74"))
+
+func build_lived_in_details():
+	decorative_plant("decor_window_fern",Vector3(-.85,1.078,-3.65),.66)
+	decorative_plant("decor_shelf_fern",Vector3(4.0,1.98,.05),.67)
+	# Original small sleepy bear on the duvet, away from bed's standing approach.
+	var bed=objects.bed
+	var cream=g.material("dfc4ab")
+	var cocoa=g.material("604745")
+	var plush=Node3D.new()
+	plush.name="DuvetBear"
+	bed.add_child(plush)
+	plush.position=Vector3(-.46,.55,-.38)
+	g.sphere(plush,Vector3(0,0,0),Vector3(.28,.33,.23),cream)
+	g.sphere(plush,Vector3(0,.23,0),Vector3(.29,.26,.23),cream)
+	for side in [-1,1]:
+		g.sphere(plush,Vector3(side*.12,.34,0),Vector3(.10,.11,.075),cream)
+		g.sphere(plush,Vector3(side*.12,-.12,.06),Vector3(.12,.10,.14),cream)
+		g.sphere(plush,Vector3(side*.17,.02,.015),Vector3(.095,.18,.10),cream)
+		g.box(plush,Vector3(side*.055,.25,.111),Vector3(.04,.009,.012),cocoa,.003)
+	g.sphere(plush,Vector3(0,.205,.12),Vector3(.035,.025,.02),cocoa)
+	g.box(plush,Vector3(0,.105,.01),Vector3(.27,.045,.245),g.material("b87d93"),.014)
+	# Ceramic mug, tea surface and ring handle, all original unbranded geometry.
+	var desk=objects.desk
+	var ceramic=g.material("d8b2ae",.92)
+	g.cylinder(desk,Vector3(.62,.075,.17),.12,.12,.018,g.material("c9ab8c"))
+	g.cylinder(desk,Vector3(.62,.16,.17),.073,.084,.16,ceramic)
+	g.cylinder(desk,Vector3(.62,.245,.17),.075,.075,.009,g.material("694b3d"))
+	var ring=TorusMesh.new()
+	ring.inner_radius=.035
+	ring.outer_radius=.052
+	ring.rings=12
+	ring.ring_segments=12
+	var handle=g.mesh_node(desk,ring,Vector3(.725,.17,.17),ceramic,"MugHandle")
+	handle.rotation.x=PI*.5
+	# Notebook stays separate from the pre-existing pick_up book and keyboard.
+	g.box(desk,Vector3(-.66,.083,.22),Vector3(.30,.027,.29),g.material("83948f"),.008,"NotebookCover")
+	g.box(desk,Vector3(-.66,.101,.22),Vector3(.27,.012,.26),g.material("e7dac4"),.003)
+	for i in range(6):
+		g.box(desk,Vector3(-.66,.109,.14+i*.028),Vector3(.20,.001,.002),g.material("b4ab9e"),.0003)
+	var pen=g.cylinder(desk,Vector3(-.50,.115,.22),.007,.007,.23,g.material("755a73"))
+	pen.rotation.x=PI*.5
 
 func practical(parent: Node3D, pos: Vector3, energy: float, light_range: float):
 	var light:=OmniLight3D.new()

@@ -84,3 +84,7 @@ capture写8张实际引擎截图到art/docs，包含三套灯光同机位、多�
 ## 当前交接
 
 任务A独立PR239已完成10/10 CI，本分支没有混入该PR的修改。本任务保持Draft、base为codex/godot-room-spike，由qinglinMa验收合并。未修改companion/player/bridge/locomotion、后端、根状态文件或私人配置。验证细节和限制见docs；Godot-vrm已知的导入字典键诊断属于上游spike，未借美术任务修改插件。
+
+## 9368749之后的美术打磨
+
+[最新同机位对照、地板诊断、交互契约和性能报告](docs/POLISH.md)。上面的REVIEW/PERFORMANCE保留为首次接入记录。polish只改art/，没有room.gd接线或Marker调整。新增植物和小物是家具表面的非交互装饰，不增加地面碰撞。新截图/诊断脚本默认30fps，不覆盖before证据。tools/fixtures/interaction-contract.json为冻结原契约，verify不会自动更新；以后主线批准变更时应审核旧值/新值再显式更新。
