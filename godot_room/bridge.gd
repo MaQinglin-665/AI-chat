@@ -15,6 +15,8 @@ func _ready():
 	room = get_parent()
 	player = room.get_node("Player")
 	ai = room.get_node("Companion")
+	previous_user = player.global_position
+	observed_position = ai.global_position
 	player.spoke.connect(chat)
 	player.interacted.connect(func(_id, act): event({"sit":"sat","stand_up":"stood","gave":"gave"}.get(act,"idle")))
 	if not token.is_empty(): event("entered")
@@ -31,6 +33,7 @@ var since_step := 0.
 var utility_clock := 15.
 var source := ""
 var observed_position := Vector3.ZERO
+var previous_user := Vector3.ZERO
 var goal_id := 0
 var generation := 0
 var session := str(Time.get_unix_time_from_system())
@@ -141,10 +144,15 @@ func advance(delta):
 	elif since_step>18.: finish("failed","unreachable")
 
 func _process(delta):
-	var near_now=ai.position.distance_to(player.position)<2.
+	var distance=ai.position.distance_to(player.position)
+	var near_now=distance<(2.6 if nearby else 1.8)
+	var user_travel=(player.position-previous_user).slide(Vector3.UP)
+	var user_radial=user_travel.dot((player.position-ai.position).slide(Vector3.UP).normalized())
+	previous_user=player.position
 	if nearby!=near_now:
 		nearby=near_now
-		event("near" if nearby else "left")
+		if (nearby and user_radial<-.001) or (not nearby and user_radial>.001):
+			event("near" if nearby else "left")
 	var walking=ai.own_state=="walking"
 	last_move=0. if (ai.position-observed_position).slide(Vector3.UP).length()>.001 else last_move+delta
 	observed_position=ai.position

@@ -25,6 +25,10 @@ func run():
 	check(abs(bridge.ai.position.x-p.position.x)>.45,"use adjacent cushion")
 	check(bridge.receipts.size()==2,"one terminal receipt per step")
 	bridge.accept({"action":{"action":"idle","seconds":10}},"autonomous")
+	var protected_id=bridge.goal_id
+	bridge.utility_clock=-1
+	for i in range(12): await physics_frame
+	check(bridge.goal_id==protected_id and bridge.current.action=="idle","utility cannot replace running goal")
 	bridge.event("spoke")
 	check(bridge.goal.status=="interrupted" and bridge.steps.is_empty(),"clear interrupted goal")
 	p.position=room.objects.chair.position
