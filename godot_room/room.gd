@@ -80,3 +80,5 @@ func _ready():
 	companion.name = "Companion"
 	companion.position = Vector3(-1,0,-2)
 	add_child(companion)
+
+	add_child(preload("res://bridge.gd").new())
