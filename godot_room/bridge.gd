@@ -9,6 +9,7 @@ var countdown := 1.
 var nearby := false
 var thinking := false
 var chatting := false
+var connecting := false
 var pending := "entered"
 
 func _ready():
@@ -19,7 +20,29 @@ func _ready():
 	observed_position = ai.global_position
 	player.spoke.connect(chat)
 	player.interacted.connect(func(_id, act): event({"sit":"sat","stand_up":"stood","gave":"gave"}.get(act,"idle")))
+	if OS.has_environment("XINYU_ROOM_TICKET"):
+		connecting=true
+		token=OS.get_environment("XINYU_ROOM_TICKET")
+		var session_info=await request("room/session",{})
+		token=str(session_info.get("token",""))
+		history=session_info.get("history",[])
+		connecting=false
+		if token.is_empty():
+			get_tree().quit(2)
+			return
+		watch_parent()
 	if not token.is_empty(): event("entered")
+
+func watch_parent():
+	var failures=0
+	while is_inside_tree():
+		await get_tree().create_timer(5.).timeout
+		if not is_inside_tree(): return
+		var result=await request("room/alive",{})
+		failures=0 if result.get("ok") else failures+1
+		if failures>=2:
+			get_tree().quit()
+			return
 
 var needs := {"energy":.75,"boredom":.45,"curiosity":.68,"closeness":.35,"solitude":.30}
 var receipts := []
@@ -70,7 +93,7 @@ func nearest_landmark(pos: Vector3):
 	return nearest
 
 func status_value():
-	return {"event":"idle","user":vec(player.position),"ai":vec(ai.position),"objects":capabilities(),"recent_destinations":recent_destinations(),"speech_balance":speech_balance,
+	return {"period":room.period,"event":"idle","user":vec(player.position),"ai":vec(ai.position),"objects":capabilities(),"recent_destinations":recent_destinations(),"speech_balance":speech_balance,
 		"user_state":"sit" if player.seated else "typing" if player.entry.visible else "walk" if player.velocity.length()>.15 else "stand",
 		"ai_state":ai.own_state,"needs":needs.duplicate(),"last_move_sec":int(last_move),
 		"ai_near":str(ai.seat_object.name) if ai.sitting and ai.seat_object else nearest_landmark(ai.position),"user_near":str(player.seat_object.name) if player.seated and player.seat_object else nearest_landmark(player.position),"goal":goal.duplicate(),"last":last.duplicate(),"activity":activity.slice(-3),"receipts":receipts.duplicate(true)}
@@ -98,6 +121,8 @@ func finish(status,why):
 	ack(status,why)
 	goal.status=status
 	goal.reason=why
+	if source=="user" and status=="completed" and OS.has_environment("XINYU_ROOM_TICKET"):
+		request("room/receipt",{"steps":goal.steps,"user_state":"sit" if player.seated else "stand"})
 	steps.clear()
 	current={}
 	ai.follow=false
@@ -133,7 +158,7 @@ func accept(plan, owner):
 	source=owner
 	steps=[plan.action]+plan.get("goal",[])
 	var end=steps.back()
-	goal={"action":end.action,"target":end.get("target",""),"status":"accepted","steps":steps.duplicate(true)}
+	goal={"description":plan.get("description",""),"action":end.action,"target":end.get("target",""),"status":"accepted","steps":steps.duplicate(true)}
 	print("ACCEPT ",goal_id," ",owner," ",JSON.stringify(steps)," needs=",JSON.stringify(needs)," say=",str(plan.get("say","")).length()," tick=",Time.get_ticks_msec()," reason=",str(plan.get("thought","")).left(60))
 	begin_step()
 
@@ -194,7 +219,7 @@ func _process(delta):
 	advance(delta)
 	countdown-=delta
 	utility_clock-=delta
-	if chatting or player.entry.visible or not current.is_empty(): return
+	if connecting or chatting or player.entry.visible or not current.is_empty(): return
 	if not token.is_empty() and not thinking and (pending!="" or countdown<=0):
 		think()
 	elif utility_clock<=0 and not thinking:
@@ -220,7 +245,8 @@ func vec(v):
 func request(route: String, payload: Dictionary):
 	var http := HTTPRequest.new()
 	add_child(http)
-	http.timeout = 100. if route == "chat" else 20.
+	http.max_redirects=0
+	http.timeout = 2. if route=="room/alive" else 20.
 	var begin = Time.get_ticks_msec()
 	var error = http.request("http://127.0.0.1:%d/api/%s" % [port,route],
 		["Authorization: Bearer "+token,"Content-Type: application/json","Origin: http://127.0.0.1:%d"%port],
@@ -230,7 +256,7 @@ func request(route: String, payload: Dictionary):
 		return {}
 	var response = await http.request_completed
 	http.queue_free()
-	print("room_http ",route," ",response[1]," ms=",Time.get_ticks_msec()-begin)
+	if route!="room/alive": print("room_http ",route," ",response[1]," ms=",Time.get_ticks_msec()-begin)
 	if response[1] != 200: return {}
 	var data = JSON.parse_string(response[3].get_string_from_utf8())
 	return data if data is Dictionary else {}
@@ -257,6 +283,7 @@ func think(message := ""):
 		if message: goal={"status":"failed","reason":"unavailable"}
 		return
 	var decision=result.intent
+	if data.event=="entered" and not decision.get("say",""): decision.say="你来啦。"
 	if not message:
 		speech_balance=clampi(speech_balance+(-1 if not decision.get("say","") else 1),-5,5)
 	accept(decision,"user" if message else "autonomous")
@@ -293,15 +320,17 @@ func chat(message):
 	if chatting or token.is_empty(): return
 	var user_started=Time.get_ticks_msec()
 	event("spoke")
+	# This event belongs to the combined turn. Do not also schedule an autonomous call for it.
+	pending=""
+	countdown=randf_range(20,55)
 	chatting = true
-	while thinking: await get_tree().process_frame
-	await think(message)
-	var reply = await preload("res://room_chat.gd").new().send(self,port,token,{"message":message,"history":history,"room":status_value()},ai.speak)
-	chatting = false
-
-	print("CHAT_GROUND ",goal_id," ",goal.status if goal.has("status") else "none"," reply_chars=",reply.length()," user_total_ms=",Time.get_ticks_msec()-user_started)
-	if reply:
+	var result=await request("room/turn",{"message":message,"history":history,"world":status_value()})
+	var reply=str(result.get("reply",""))
+	if reply and result.get("action") is Dictionary:
+		accept({"action":result.action,"goal":result.get("steps",[]),"description":result.get("goal","")},"user")
 		ai.speak(reply,"neutral")
 		history.append({"role":"user","content":message})
 		history.append({"role":"assistant","content":reply})
 		history = history.slice(-6)
+	print("ROOM_TURN visible_ms=",Time.get_ticks_msec()-user_started," displayed=",not reply.is_empty())
+	chatting=false

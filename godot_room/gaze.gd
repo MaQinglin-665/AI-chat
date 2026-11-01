@@ -1,6 +1,7 @@
 extends SkeletonModifier3D
 
 var target: Node3D
+var speech_envelope := 0.
 var gesture := ""
 var began := 0
 
@@ -30,6 +31,12 @@ func _process_modification():
 			var angle := -1.6 if bone == "RightUpperArm" else -1.1+.22*sin(phase*TAU*3)
 			arm.basis = Basis(Vector3.BACK,angle*envelope)*arm.basis
 			skel.set_bone_global_pose(idx,arm)
+	if speech_envelope>.001:
+		var chest=skel.find_bone("Chest")
+		if chest>=0:
+			var upper=skel.get_bone_global_pose(chest)
+			upper.basis=Basis(Vector3.RIGHT,-.032*speech_envelope)*upper.basis
+			skel.set_bone_global_pose(chest,upper)
 	for bone in ["Head","LeftEye","RightEye"]:
 		var index := skel.find_bone(bone)
 		if index < 0: continue

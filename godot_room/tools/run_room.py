@@ -50,7 +50,7 @@ def main():
                 self.send_error(404)
 
             def do_POST(self):
-                if self.path not in ("/api/room/intent", "/api/chat", "/api/chat_stream"):
+                if self.path not in ("/api/room/intent", "/api/room/turn", "/api/tts", "/api/chat", "/api/chat_stream"):
                     self.send_error(404)
                     return
                 super().do_POST()

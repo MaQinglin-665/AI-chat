@@ -413,6 +413,7 @@
     }
 
     function shouldSkipAutoChat() {
+      if (state.godotRoomActive) return true;
       if (state.chatBusy) {
         return true;
       }
@@ -1329,6 +1330,7 @@
     }
 
     function dispatchAutoChatContext(context = {}) {
+      if (state.godotRoomActive) return Promise.resolve(false);
       const speechGate = getAutoCompanionSpeechGate();
       const mindInterrupt = String(context.mindAction || "").toLowerCase() === "interrupt"
         && Number(context.mindDecision?.confidence || 0) >= 0.65;

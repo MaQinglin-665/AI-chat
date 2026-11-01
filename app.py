@@ -1813,9 +1813,9 @@ class PetHandler(SimpleHTTPRequestHandler):
             self._send_json(get_social_cognition_state(load_config())); return
         if self._reject_invalid_api_token(path_only):
             return
-        if path_only == "/api/room/intent":
+        if path_only in ("/api/room/intent", "/api/room/turn"):
             from app_room_spike import dispatch
-            dispatch(self, load_config())
+            dispatch(self, load_config(), turn=path_only == "/api/room/turn", remember=remember_interaction)
             return
         if path_only in app_avatar_brain.ROUTES:
             app_avatar_brain.dispatch(self, path_only, app_avatar_brain.get_service(load_config))

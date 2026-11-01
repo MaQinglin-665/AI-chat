@@ -1,6 +1,7 @@
 param(
     [string]$Version,
-    [string]$OutputDir = "dist"
+    [string]$OutputDir = "dist",
+    [string]$RoomExportDirectory
 )
 
 $ErrorActionPreference = "Stop"
@@ -240,6 +241,16 @@ $pathsToCopy = @(
 
 foreach ($path in @($pathsToCopy + $packageRootPythonFiles)) {
     Copy-PathIfExists $path $stageRoot
+}
+
+# Optional, explicit staging of a reviewed Windows export. Never sweep the build directory.
+if ($RoomExportDirectory) {
+    $roomStage = New-Item -ItemType Directory -Force -Path (Join-Path $stageRoot "godot_room")
+    foreach ($fileName in @("Room.exe", "Room.pck")) {
+        $sourceFile = Join-Path $RoomExportDirectory $fileName
+        if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) { throw "Missing Godot export: $fileName" }
+        Copy-Item -LiteralPath $sourceFile -Destination $roomStage.FullName
+    }
 }
 
 $runtimeDirs = @(

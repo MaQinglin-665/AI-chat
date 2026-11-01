@@ -36,6 +36,11 @@ if (
   app.disableHardwareAcceleration();
 }
 
+let roomSession = null;
+let roomStarting = false;
+const roomProject = path.join(ROOT_DIR,"godot_room");
+const roomDev = !app.isPackaged && fs.existsSync(path.join(roomProject,"project.godot"));
+const roomEnabled = roomDev || earlyRuntimeConfig?.room_spike?.enabled === true;
 let pythonProc = null;
 let managedQwenTtsProc = null;
 let pythonStdoutStream = null;
@@ -571,7 +576,8 @@ function buildPythonProcessEnv(pythonExecutable) {
   const apiTokenEnvName = String(serverCfg.api_token_env || "TAFFY_API_TOKEN").trim() || "TAFFY_API_TOKEN";
   const releaseMode = !!app.isPackaged;
   env.TAFFY_RELEASE_MODE = releaseMode ? "1" : "0";
-  if (releaseMode) {
+  if (roomEnabled) env.XINYU_ELECTRON_ROOM = "1";
+  if (releaseMode || roomEnabled) {
     const requireApiToken = serverCfg.require_api_token !== false;
     const explicitToken = String(serverCfg.api_token || "").trim();
     const envToken = String(env[apiTokenEnvName] || "").trim();
@@ -1229,8 +1235,8 @@ function isChatStageActive() {
 }
 
 function syncCompanionSurfaceVisibility() {
-  const stageActive = isChatStageActive();
-  const petActive = !stageActive;
+  const occupied = !!roomSession || roomStarting;
+  const {stageActive,petActive} = require("./roomSession").surfaceActivity(isChatStageActive(),occupied);
   if (modelWindow && !modelWindow.isDestroyed()) {
     try {
       if (petActive) {
@@ -1398,9 +1404,51 @@ ipcMain.on("live2d-render-metrics", (event, rawPayload) => {
   logServerOut(`[Live2D] Render metrics ${JSON.stringify(safe)}`);
 });
 
+function isRoomOwner(event) {
+  return chatWindow && event.sender === chatWindow.webContents
+    && event.senderFrame === event.sender.mainFrame && new URL(event.senderFrame.url).origin === SERVER_URL;
+}
+function roomChanged(active) {
+  for (const win of [chatWindow,modelWindow]) {
+    if (win && !win.isDestroyed()) win.webContents.send("room-active",active);
+  }
+  syncCompanionSurfaceVisibility();
+}
+ipcMain.handle("room-state", event => ({enabled:!!(roomEnabled && isRoomOwner(event)), active:!!roomSession || roomStarting}));
+ipcMain.handle("room-open", async (event, options={}) => {
+  if (!roomEnabled || !isRoomOwner(event) || roomStarting || roomSession) return false;
+  const env={};
+  for (const k of ["PATH","SystemRoot","TEMP","TMP","APPDATA","LOCALAPPDATA","USERPROFILE","WINDIR"]) {
+    if(process.env[k]) env[k]=process.env[k];
+  }
+  roomStarting=true;
+  roomChanged(true);
+  try {
+    const runtimeRoot=app.isPackaged ? process.resourcesPath : ROOT_DIR;
+    const command=!roomDev ? path.join(runtimeRoot,"godot_room","Room.exe")
+      : process.env.XINYU_GODOT || (process.platform==="win32" ? "Godot_v4.6.3-stable_win64.exe" : "godot");
+    if(!roomDev && (!fs.existsSync(command) || !fs.existsSync(path.join(runtimeRoot,"godot_room","Room.pck")))) {
+      throw Error("缺少房间导出包");
+    }
+    const history=Array.isArray(options.history)?options.history.slice(-12).filter(x=>x && ["user","assistant"].includes(x.role) && typeof x.content==="string").map(x=>({role:x.role,content:x.content.slice(0,500)})):[];
+    roomSession=await require("./roomSession").openRoom({backend:SERVER_URL,apiToken:resolveRuntimeApiToken(),
+      command,args:roomDev?["--path",roomProject]:[],env,history,
+      provider:options.provider==="browser"?"browser":"server",voice:String(options.voice||"").slice(0,140),
+      onTurn:(message,reply)=>{if(chatWindow&&!chatWindow.isDestroyed())chatWindow.webContents.send("room-turn",{message,reply});},
+      onReceipt:reply=>{if(chatWindow&&!chatWindow.isDestroyed())chatWindow.webContents.send("room-turn",{reply});},
+      onClosed:()=>{roomSession=null;roomStarting=false;roomChanged(false);}
+    });
+    roomStarting=false;
+    return true;
+  } catch {
+    roomStarting=false;roomSession=null;roomChanged(false);
+    throw Error("无法进入房间，请检查本机 Godot、导出包和后端连接。");
+  }
+});
 ipcMain.handle("window-lock-get", async () => !!windowLocked);
 ipcMain.handle("get-api-token", async () => resolveRuntimeApiToken());
 ipcMain.handle("surface-active-get", async (event) => {
+  if (roomSession || roomStarting) return false;
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win === modelWindow) {
     return !!(modelWindow && !modelWindow.isDestroyed() && !isChatStageActive());
@@ -1455,6 +1503,7 @@ ipcMain.on("subtitle-hide", (_event, payload) => {
 
 app.on("before-quit", () => {
   isAppQuitting = true;
+  roomSession?.close();
   if (windowStateSaveTimer) {
     clearTimeout(windowStateSaveTimer);
     windowStateSaveTimer = null;
