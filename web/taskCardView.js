@@ -58,8 +58,13 @@
       parent.replaceChildren();
       for (const row of rows) {
         const li = make("li", `task-file task-file-${row.kind}`, undefined, parent);
-        li.appendChild(art.icon(doc, "file")); make("code", "task-path", row.from, li);
-        if (row.to) { make("span", "task-file-arrow", "╌╌→", li).setAttribute("aria-label", "移动到"); li.appendChild(art.icon(doc, "folder")); make("code", "task-path", row.to, li); }
+        const from = make("span", "task-file-source", undefined, li);
+        from.appendChild(art.icon(doc, "file")); make("code", "task-path", row.from, from);
+        if (row.to) {
+          const to = make("span", "task-file-destination", undefined, li);
+          make("span", "task-file-arrow", "→", to).setAttribute("aria-label", "移动到");
+          to.appendChild(art.icon(doc, "folder")); make("code", "task-path", row.to, to);
+        }
         else make("span", "task-file-kind", { create: "新增", modify: "修改", delete: "删除" }[row.kind], li);
       }
       if (!rows.length) make("li", "task-file-empty", "没有文件清单项", parent);
@@ -72,10 +77,16 @@
       if (task.plan?.needs_network) warn("计划需要联网。批准不会放宽当前网络限制。");
       // approval_warnings is an object in the existing API, not an array of prose.
       // The plan-derived delete/risk/network strips above cover those public flags.
-      if (task.error) warn(String(task.error.message || task.error) + (task.error.detail?.message ? `：${task.error.detail.message}` : ""));
-      if (task.verification_error) warn(String(task.verification_error));
-      if (model.needsReview) warn("执行结果需要核对，不能视为完全按计划完成。请展开查看计划外变更和未观察到项。");
       if (task.warning_count) warn(`执行期间有 ${Number(task.warning_count)} 条提示，请查看核对详情。`);
+    }
+    function errors(parent, task, model, localError) {
+      const messages = [task.error && String(task.error.message || task.error), task.error?.detail?.message,
+        task.verification_error, model.needsReview && "执行结果需要核对，不能视为完全按计划完成。请展开查看计划外变更和未观察到项。", localError?.message].filter(Boolean);
+      parent.replaceChildren(); parent.hidden = !messages.length;
+      if (messages.length) {
+        const ul = make("ul", "", undefined, parent);
+        for (const message of new Set(messages)) make("li", "", String(message), ul);
+      }
     }
     function plan(parent, task, model, full) {
       parent.replaceChildren();
@@ -115,8 +126,10 @@
       const summary = make("p", "task-goal", "", el);
       const dir = make("p", "task-directory", undefined, el); dir.appendChild(art.icon(doc, "folder")); make("span", "", "工作目录", dir); const path = make("code", "task-path", "", dir);
       const warn = make("div", "task-warnings", undefined, el);
-      const error = make("div", "task-error", undefined, el); error.setAttribute("role", "alert");
       const illustration = make("div", "task-illustration", undefined, el);
+      const conclusion = make("strong", "task-conclusion", "", el);
+      const reason = make("p", "task-reason", "", el);
+      const error = make("div", "task-error", undefined, el); error.setAttribute("role", "alert");
       const progress = make("p", "task-progress", "", el); progress.setAttribute("aria-live", "off");
       const count = make("div", "task-counts", undefined, el);
       const body = make("div", "task-plan", undefined, el);
@@ -129,20 +142,20 @@
       const refresh = button("刷新状态", () => actions.refresh(task.id), footer);
       const note = make("p", "task-note", "", el);
       const stamp = make("span", "task-stamp", "完成", el); stamp.setAttribute("aria-hidden", "true");
-      const card = { el, top, time, peek, title, badge, summary, path, warn, error, illustration, progress, count, body, disclosure, resultBody, footer, approve, details, cancel, retry, refresh, note, stamp, visible: !intersection, narrow: true };
+      const card = { el, top, time, peek, title, badge, summary, path, warn, error, illustration, conclusion, reason, progress, count, body, disclosure, resultBody, footer, approve, details, cancel, retry, refresh, note, stamp, visible: !intersection, narrow: true };
       cards.set(task.id, card); intersection?.observe(el); resize?.observe(el); return card;
     }
     function update(card, force = false) {
       const task = snapshot.tasks.find(item => item.id === card.el.dataset.taskId); if (!task) return;
-      const model = M.model(task), error = snapshot.errors[task.id]; card.model = model;
-      const signature = JSON.stringify([task, error, card.narrow]);
+      const model = M.model(task, card.model?.approved || snapshot.approvedTaskIds?.includes(task.id)), error = snapshot.errors[task.id]; card.model = model;
+      const signature = JSON.stringify([task, error, card.narrow, model.approved]);
       if (force || signature !== card.signature) {
         card.signature = signature; const previousStatus = card.el.dataset.status;
         card.el.dataset.status = model.status; card.el.dataset.narrow = String(card.narrow);
         card.el.setAttribute("aria-label", `${model.title}，${model.label[0]}`);
         text(card.title, model.title);
         text(card.time, Number(task.created_at) ? new Date(task.created_at * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "");
-        text(card.summary, task.plan?.summary || task.goal_summary || "正在准备任务计划。"); text(card.path, task.workdir || "未提供");
+        text(card.summary, model.goal); text(card.path, task.workdir || "未提供");
         if (previousStatus !== model.status) { card.badge.replaceChildren(art.icon(doc, model.label[1]), doc.createTextNode(model.label[0])); }
         card.badge.dataset.tone = model.label[2];
         const artSignature = `${model.status}:${!!error}:${model.counts.delete > 0}`;
@@ -158,7 +171,12 @@
         card.illustration.hidden = model.status === "awaiting_approval" && !error;
         const warningSignature = JSON.stringify([task.plan, task.error, task.verification_error, task.warning_count, model.needsReview]);
         if (card.warningSignature !== warningSignature) { card.warningSignature = warningSignature; warnings(card.warn, task, model); }
-        card.error.hidden = !error; text(card.error, error?.message || "");
+        errors(card.error, task, model, error);
+        const stopped = ["failed", "cancelled"].includes(model.status);
+        card.conclusion.hidden = card.reason.hidden = !stopped;
+        text(card.conclusion, model.status === "cancelled" ? "任务已停止。" : "这次没有完成任务。");
+        text(card.reason, model.status === "cancelled" ? "取消不会撤销已经发生的文件变更。" : String(task.error?.message || "任务未能完成，请展开查看执行详情。").split(/(?<=[。！？])/)[0]);
+        card.progress.hidden = stopped;
         card.progress.textContent = model.status === "executing" ? `正在执行你批准的计划～ 已收到 ${Number(task.progress_count) || 0} 条进度更新` : model.status === "cancel_pending" ? "已提交取消请求，正在等待执行进程停止。取消不会撤销已经发生的文件变更。" : model.status === "completed" ? (model.needsReview ? "执行已结束，文件核对有异常，请查看详情。" : task.changes ? "执行已结束，文件变化已核对。" : "执行已结束，暂未取得核对结果。") : model.status === "failed" ? "这次没有完成任务。" : model.status === "expired" ? "这份计划已过期，不能再批准。请重新生成计划。" : model.status === "cancelled" ? "任务已停止。取消不会撤销已经发生的文件变更。" : model.status === "planning" ? "正在生成计划，等待你审批后才执行。" : "计划已生成，等你决定。";
         const countValues = model.terminal && task.changes ? model.actualCounts : model.counts;
         const countSignature = JSON.stringify(countValues);
@@ -175,10 +193,14 @@
         if (card.approve.hidden) card.approve.remove();
         else if (!card.approve.parentNode) card.footer.insertBefore(card.approve, card.details);
         card.details.hidden = !task.plan || model.status === "cancel_pending";
-        card.details.textContent = model.large && model.canApprove ? "✦ 查看完整清单并审批" : model.status === "executing" || model.terminal ? "✦ 查看已批准的计划" : "✦ 查看完整计划";
+        card.details.textContent = model.large && model.canApprove ? "✦ 查看完整清单并审批" : model.approved ? "查看已批准的计划" : model.terminal ? "查看原计划" : "✦ 查看完整计划";
         if (model.status === "awaiting_approval" && !card.narrow && !model.large && !error) card.details.hidden = true;
         card.cancel.hidden = !model.canCancel; card.cancel.textContent = model.status === "cancel_pending" ? "正在取消…" : "取消任务";
         card.retry.hidden = !model.terminal;
+        const replanPrimary = ["failed", "expired"].includes(model.status);
+        card.retry.classList.toggle("task-primary", replanPrimary);
+        card.details.classList.toggle("task-primary", !replanPrimary);
+        if (replanPrimary) card.footer.insertBefore(card.retry, card.footer.firstChild);
         card.refresh.hidden = !error;
         card.note.textContent = model.canApprove ? "本次批准仅适用于此完整计划。你可以继续聊天，任务会在这张卡片里更新～" : !M.states[task.status] ? "任务状态尚未识别，当前仅供查看，请刷新确认。" : "";
         card.stamp.hidden = model.status !== "completed" || model.needsReview;
@@ -208,25 +230,26 @@
     function drawPanel(force = false) {
       if (!panelId) return;
       const task = snapshot.tasks.find(item => item.id === panelId); if (!task) return;
-      const model = M.model(task), error = snapshot.errors[task.id];
-      const signature = JSON.stringify([task.plan, task.planned_moves, task.status, task.cancel_requested, task.changes, error]);
+      const model = M.model(task, cards.get(task.id)?.model?.approved || snapshot.approvedTaskIds?.includes(task.id)), error = snapshot.errors[task.id];
+      const signature = JSON.stringify([{ ...task, progress_count: undefined, updated_at: undefined }, error, model.approved]);
       if (force || panel.dataset.signature !== signature) {
         const focused = doc.activeElement, wasInside = panel.contains(focused), focusedText = focused?.textContent;
         const scroll = panelBody.scrollTop;
         const openCommands = panelBody.querySelector(".task-commands")?.open;
         panel.dataset.signature = signature; panelBody.replaceChildren();
         make("h3", "", model.title, panelBody);
-        make("p", "", task.goal_summary || task.plan?.summary || "", panelBody);
+        make("p", "task-goal", model.goal, panelBody);
         make("code", "task-path", task.workdir, panelBody);
         make("p", "task-muted", "仅批准此工作目录中的完整计划。", panelBody);
         warnings(make("div", "", undefined, panelBody), task, model);
-        if (error) make("p", "task-error", error.message, panelBody).setAttribute("role", "alert");
+        const errorBox = make("div", "task-error", undefined, panelBody); errorBox.setAttribute("role", "alert"); errors(errorBox, task, model, error);
         stats(make("div", "task-counts", undefined, panelBody), model.counts);
         plan(make("div", "", undefined, panelBody), task, model, true);
         if (model.terminal) result(make("div", "", undefined, panelBody), task);
         let foot = panel.querySelector(".task-detail-actions");
         if (!foot) foot = make("footer", "task-detail-actions", undefined, panel);
         foot.replaceChildren();
+        if (["failed", "expired"].includes(model.status)) button("重新规划", () => { closeDetails(); showComposer(task.goal_summary || "", task.workdir); }, foot, true);
         if (model.canApprove && !error) button("✦ 批准完整计划并执行", () => actions.approve(task.id), foot, true).dataset.action = "approve";
         if (model.canCancel) button(model.status === "cancel_pending" ? "正在取消…" : "取消任务", () => actions.cancel(task.id), foot).dataset.action = "cancel";
         if (error) button("刷新状态", () => actions.refresh(task.id), foot);

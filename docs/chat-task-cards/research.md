@@ -119,11 +119,11 @@ completed只表示执行结束。`changes.out_of_plan_count>0`、planned_not_obs
 
 ## 阶段2建议文件范围
 
-只考虑web前端：externalAgentController/对应CSS、新任务卡视图模块（如taskCardView.js）、chat.js薄接线、chatMessageController/聊天重绘边界、必要的index脚本加载与chat样式；增加对应前端测试。名字为建议，尚未创建这些模块。
+只考虑web前端：externalAgentController/对应CSS、新任务卡视图模块（如taskCardView.js）、chat.js薄接线、chatMessageController/聊天重绘边界、必要的index脚本加载与chat样式；增加对应前端测试。现已按此边界实施，具体文件见implementation.md。
 
 不改VRM/Live2D/房间、后端brain/执行器、external_agent.py、app_external_agent.py、权限/鉴权/Origin规则或electron窗口创建。若分析后确认需后端接口，先停下问qinglinMa。不要借新卡片把任务外部执行和普通聊天默认混为自动执行。
 
-## 阶段2验收矩阵（本阶段不声称通过）
+## 阶段2验收矩阵（实施结果见implementation.md）
 
 | 组别 | 要验证的行为 |
 | --- | --- |
@@ -134,7 +134,7 @@ completed只表示执行结束。`changes.out_of_plan_count>0`、planned_not_obs
 | 结果真实性 | 移动不双算新增/删除；计划外、未观察到、核对失败醒目；取消/失败不冒充回滚或全部成功 |
 | 数据隔离 | 卡片/命令不进入普通聊天history/翻译/TTS/记忆；原narrator每阶段一次；恶意goal/文件名/错误只显示文本 |
 | 恢复安全 | 初次列表hydrate不重播旧任务；未知状态/缺计划保持只读，不展示可批准按钮；过期以服务回查为准 |
-| 布局/可访问性 | 两种theme、320/360/390px卡宽、760px窗、1440px视图、超长路径/命令、键盘/焦点、44px按钮、不横溢、不抢滚动 |
-| 真实录像 | 深浅色各一段：从聊天明确发起→选目录生成计划→卡片待批→批准→真实进度→结束核对；启动任何语音前先告知使用者 |
+| 布局/可访问性 | 仅作者确认的深色、320/360/390px卡宽、760px窗、1440px视图、超长路径/命令、键盘/焦点、44px按钮、不横溢、不抢滚动 |
+| 真实录像 | 深色流程：从聊天明确发起→选目录生成计划→卡片待批→批准→真实进度→结束核对；启动任何语音前先告知使用者 |
 
-阶段1只交付本设计文档与静态截图，Draft PR后停止；作者确认前不写实现或录制冒充真实流程的演示。
+作者已确认A/深色，阶段2实现和验证记录见[报告](implementation.md)。旧静态稿已按验收意见清理；当前参考与实际图片见[设计参考](../design/chat-task-cards/README.md)和[实际截图](actual/README.md)。

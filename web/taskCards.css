@@ -20,7 +20,6 @@
   clip-path: polygon(5% 0,100% 0,94% 100%,0 100%,3% 58%,0 65%); transform: rotate(-2deg); font-size: 13px;
 }
 .task-time { font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
-.task-card::before { content: ""; position: absolute; left: -8px; top: 80px; width: 9px; height: 16px; background: var(--sakura); border-radius: 80% 0 80% 10%; transform: rotate(-30deg); pointer-events: none; }
 .task-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px; }
 .task-heading h3, .task-composer h3, .task-detail-body h3 { font: 700 22px/1.35 var(--font-ui); font-family: var(--font-ui) !important; margin: 0; overflow-wrap: anywhere; }
 .task-status {
@@ -53,11 +52,10 @@
 .task-plan-steps li { margin: 8px 0; padding-left: 4px; overflow-wrap: anywhere; }
 .task-plan-steps li::marker { color: var(--sakura); font-weight: 700; }
 .task-card[data-narrow="true"] .task-plan-steps, .task-card[data-narrow="true"] .task-plan > .task-commands { display: none; }
-.task-card[data-narrow="true"] .task-file:not(.task-file-move) .task-file-kind { grid-column: 2; white-space: nowrap; }
 .task-files { list-style: none; padding: 4px 12px; margin: 8px 0; background: var(--task-raised); border-radius: 16px; }
-.task-file { display: grid; grid-template-columns: 18px minmax(0,1fr) 42px 18px minmax(0,1fr); align-items: center; gap: 6px; min-height: 44px; padding: 8px 0; }
+.task-file { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.15fr); align-items: center; gap: 6px; min-height: 44px; padding: 8px 0; }
 .task-file + .task-file { border-top: 1px solid var(--line); }
-.task-file:not(.task-file-move) { grid-template-columns: 18px minmax(0,1fr) auto; }
+.task-file:not(.task-file-move) { grid-template-columns: minmax(0,1fr) auto; }
 .task-file > .task-icon { color: var(--task-pink-light); }
 .task-file-arrow { color: var(--ink-muted); white-space: nowrap; text-align: center; }
 .task-file-empty { padding: 10px 0; color: var(--ink-muted); }
@@ -113,9 +111,8 @@
   .task-heading h3 { font-size: 20px; }
   .task-counts { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .task-actions { flex-direction: column; align-items: stretch; }
-  .task-file { grid-template-columns: 18px minmax(0,1fr); }
+  .task-file { grid-template-columns: minmax(0,1fr); }
   .task-file-arrow { grid-column: 1; }
-  .task-file > .task-icon:nth-of-type(2) { display: none; }
 }
 @media (max-width: 480px) {
   .task-card { padding: 20px 16px; }
@@ -123,10 +120,8 @@
   .task-detail-body, .task-detail-actions { padding: 16px; }
   .task-detail-actions > .task-button { width: 100%; }
   .task-detail-panel .task-counts { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .task-detail-panel .task-file { grid-template-columns: 18px minmax(0,1fr); }
+  .task-detail-panel .task-file { grid-template-columns: minmax(0,1fr); }
   .task-detail-panel .task-file-arrow { grid-column: 1; }
-  .task-detail-panel .task-file > .task-icon:nth-of-type(2) { display: none; }
-  .task-detail-panel .task-file:not(.task-file-move) .task-file-kind { grid-column: 2; white-space: nowrap; }
 }
 /* No animation objects are created when paused: no hidden compositor loops. */
 @media (prefers-reduced-motion: no-preference) {
@@ -140,3 +135,10 @@
 @keyframes task-star { to { transform: rotate(360deg); } }
 @keyframes task-run { to { transform: translateY(-3px) rotate(2deg); } }
 @keyframes task-track { to { transform: translateX(-40px); } }
+.task-file-source { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.task-file-destination { display: grid; grid-template-columns: 24px 18px minmax(0,1fr); align-items: center; gap: 6px; min-width: 0; }
+.task-file-source > .task-icon, .task-file-destination > .task-icon { color: var(--task-pink-light); }
+.task-error ul { margin: 0; padding-left: 18px; }
+.task-error li + li { margin-top: 6px; }
+.task-conclusion { display: block; text-align: center; font-size: 20px; margin: 12px 0 6px; }
+.task-reason { text-align: center; margin: 6px 0 14px; overflow-wrap: anywhere; }

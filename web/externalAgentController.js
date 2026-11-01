@@ -2,7 +2,10 @@
   "use strict";
   const terminal = new Set(["completed", "failed", "cancelled", "expired"]);
   const labels = { planning: "正在规划", awaiting_approval: "等待你的批准", executing: "正在执行", completed: "执行结束", failed: "未能完成", cancelled: "已取消", expired: "计划已过期" };
-  function isDelegation(text) { return /^(?:请)?(?:帮我去做|交给馨语去做|帮我(?:把.+)?整理)/.test(String(text).trim()); }
+  function isDelegation(text) {
+    const model = root.TaffyTaskCardModel || (typeof require === "function" && require("./taskCardModel.js"));
+    return model.isDelegation(text);
+  }
   function speechFor(task) {
     const plan = task.plan || {};
     if (task.changes?.out_of_plan_count) return "核对时发现了计划外的文件变更，请先查看单独列出的清单；这次不能当作完全按计划完成。";
@@ -78,14 +81,15 @@
     if (!modal) return null;
     const el = id => doc.getElementById(`external-agent-${id}`);
     let task = null, requestBusy = false, polling = false, rendered = "", epoch = 0, loadingList = null;
-    const tasks = new Map(), errors = new Map();
+    const tasks = new Map(), errors = new Map(), approvedIds = new Set();
     let roots = [], formError = null;
     const taskModel = root.TaffyTaskCardModel || (typeof require === "function" && require("./taskCardModel.js"));
     const narrator = createNarrator({ state, speak, emotion });
     const subscribers = new Set();
-    function snapshot() { return { tasks: [...tasks.values()].sort((a, b) => (a.created_at || 0) - (b.created_at || 0)), errors: Object.fromEntries(errors), roots: [...roots], busy: requestBusy, formError }; }
+    function snapshot() { return { tasks: [...tasks.values()].sort((a, b) => (a.created_at || 0) - (b.created_at || 0)), errors: Object.fromEntries(errors), approvedTaskIds: [...approvedIds], roots: [...roots], busy: requestBusy, formError }; }
     function accept(value, silent = false) {
       if (!value || !/^[a-f0-9]{32}$/.test(value.id || "")) return;
+      if (taskModel.wasApproved(value)) approvedIds.add(value.id);
       tasks.set(value.id, value); task = value;
       if (silent) narrator.prime(value); else narrator.update(value);
     }
@@ -115,13 +119,13 @@
       el("create").disabled = requestBusy || !!(task && !terminal.has(task.status)) || !el("workdir").value;
       const value = snapshot(); view?.render(value); for (const fn of subscribers) fn(value);
     }
-    async function run(action, id) {
+    async function run(action, id, approving = false) {
       if (requestBusy) return;
       ++epoch; requestBusy = true; el("error").textContent = "";
       if (id) errors.delete(id); else formError = null;
       draw();
       let createdId;
-      try { const data = await action(); accept(data.task); if (data.task) { errors.delete(data.task.id); if (!id) { createdId = data.task.id; view?.created(); } } }
+      try { const data = await action(); if (approving && data.task) approvedIds.add(data.task.id); accept(data.task); if (data.task) { errors.delete(data.task.id); if (!id) { createdId = data.task.id; view?.created(); } } }
       catch (error) { report(error, id); }
       finally { requestBusy = false; draw(); if (createdId) view?.reveal(createdId); }
     }
@@ -165,7 +169,7 @@
     function approve(id) {
       const value = tasks.get(id);
       if (value?.status !== "awaiting_approval" || !value.plan || value.cancel_requested || errors.has(id)) return;
-      return run(() => api(`/${id}/approve`, {}), id);
+      return run(() => api(`/${id}/approve`, {}), id, true);
     }
     function cancel(id) {
       const value = tasks.get(id);

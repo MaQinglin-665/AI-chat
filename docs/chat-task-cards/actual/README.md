@@ -1,17 +1,20 @@
 # 实际应用截图来源
 
-2026-10-29；实际web/index.html聊天页，深色，原有背景不改。内容仅为自建临时资料。执行端为确定性测试适配器，原鉴权/Origin/任务状态/审计/文件核对保持；不是LLM执行证明。详情见[阶段2报告](../implementation.md)。顶部文字为验收标注。
+2026-11-01 PR237验收修订后重拍全部截图。实际web/index.html聊天页，深色，原背景不改；内容仅为自建临时资料。执行端为隔离的确定性测试适配器，原鉴权/Origin/任务状态/审计/文件核对保持；不是LLM或原生CLI证明。全部静音，顶部文字为验收标注。[报告](../implementation.md)。
+
+标题、失败、过期与390px详情均已更新；另补已取消，检查吉祥物→粗体结论→一句原因。失败/取消测试若确实有未观察到的计划项，仍按真实核对结果提示需核对；不会为了截图隐藏异常。
 
 | 文件 | 字节数 | SHA256 |
 | --- | ---: | --- |
-| [01-inline-workflow-approval.png](01-inline-workflow-approval.png) | 197708 | `483adbf11495541a026b76c79aa9e23b1a6d9c77bd0cb2e13f1b904b5eef2e9f` |
-| [01-inline-workflow-completed.png](01-inline-workflow-completed.png) | 178460 | `5aedb83d61ac578eb650d067b21f41e4b021bdb939ff43edd7af4850bb921396` |
-| [01-inline-workflow-running.png](01-inline-workflow-running.png) | 173113 | `9c6d433f4a4eb7cdb7bdf9e4b3ef19613ded922616e2ebd9fd342f192960f6fa` |
-| [02-large-plan-workflow-approval.png](02-large-plan-workflow-approval.png) | 218435 | `54ee2fe4240d531219994fe6287be509c40d3dd3315fbdd1c6023349b813c1ce` |
-| [02-large-plan-workflow-details.png](02-large-plan-workflow-details.png) | 233316 | `5b87eaa9596c5b29d5eb72434440a9f26b2be382527ff214075da18ff2afa8a5` |
-| [03-narrow-workflow-approval.png](03-narrow-workflow-approval.png) | 142707 | `55ba76054e705352c8e2573a62349ef592093691e9cb7aa2b0d7c0b42e65a9f1` |
-| [03-narrow-workflow-details.png](03-narrow-workflow-details.png) | 76016 | `f84c1d46104b0d27d68026e265174ff0044f846b1f610e715a74d7436172a61a` |
-| [04-cancel-pending.png](04-cancel-pending.png) | 228638 | `87cb87350dad686c59a1ea70badadf4200fe02b7658d575514f5cd73f106d299` |
-| [05-auth-failure.png](05-auth-failure.png) | 216224 | `68dd42949a3aef8a97440074229602d112896981dd30fa40dd79f2b91fb77ecd` |
-| [05-expired.png](05-expired.png) | 211705 | `b32c3263bb2c33ce537cf241232c11f0d0e77cc8988c3790e5b269502a429b82` |
-| [05-failed.png](05-failed.png) | 209816 | `ddacccc7ae67f8d9ad1dd4c7594d1b923fb691b4fe90d97534e8c14c4b6d0976` |
+| [01-inline-workflow-approval.png](01-inline-workflow-approval.png) | 196033 | `b819f257bf9cb3713ca5211173eb74e6c0587d75b95d76795a8a473b37aecda8` |
+| [01-inline-workflow-completed.png](01-inline-workflow-completed.png) | 176663 | `3b55744188f1d75cfd00ef1155311ecaf8f5e0f133e4b4943af3846fddf3965f` |
+| [01-inline-workflow-running.png](01-inline-workflow-running.png) | 169962 | `6bb2aeaf50b46d30db1cbe0eed201f4781b729a8b781c4eccc68a8af49eb8f94` |
+| [02-large-plan-workflow-approval.png](02-large-plan-workflow-approval.png) | 215860 | `f44e9297ad7688da73bc8033e3f5645579af62a89e26659881339ab29cefa72f` |
+| [02-large-plan-workflow-details.png](02-large-plan-workflow-details.png) | 231950 | `7905596e0bbde1c72f959a2e9ea9fbb072c1e07f65987266ea47797b1fb2aec1` |
+| [03-narrow-workflow-approval.png](03-narrow-workflow-approval.png) | 144368 | `396d4fb8bf3cf0fb02a215faa75b8b068d99a4cfe95ef13001407670bddcb545` |
+| [03-narrow-workflow-details.png](03-narrow-workflow-details.png) | 73332 | `c1bbea2f7e5d712df4d5693c53cb97dbe3d53d0d4b351943ab8fb5da689750dc` |
+| [04-cancel-pending.png](04-cancel-pending.png) | 223855 | `2516a50f2f94bb4ef0466f6a42afd4afba5413d856ba58ab765d8bc7cddbdb68` |
+| [04-cancelled.png](04-cancelled.png) | 213229 | `b5a7769b398cbf175b675139ec0e0ec60a65c41ade2910b3f35fca74d2602888` |
+| [05-auth-failure.png](05-auth-failure.png) | 219208 | `e94c75dbeed88f355a3d9001cc85bea6255d8ed2e2f20dd367316f394c7c5f59` |
+| [05-expired.png](05-expired.png) | 210629 | `dbb843d50072ca26100619caf6f08371959abcf215b695dcff4c02be907114b4` |
+| [05-failed.png](05-failed.png) | 210607 | `23859553ca3496ee50ba295d94a44786a8e3acc9b9b624684fb872e9336c52a1` |

@@ -11,8 +11,8 @@
         "Research acceptance matrix, actual-app screenshots and temporary-directory workflow recordings, CPU measurements",
         "Full local gates, Linux/Windows CI, update PR237; author merges only"
       ],
-      "next": "Implementation delivered in PR237; author Windows review and nativeCLI/DeepSeek validation explicitly deferred to author by user. Keep backend/renderer/private files unchanged; no self merge. Latest-head Linux/Windows result is authoritative in PR Checks/body.",
-      "verification": "Phase2: full1105Python/3skip; final86Node +199Python/271JS syntax/secrets/mappings;7 Chromium card tests plus existing docs smoke; package/JSON/compile checks. Real existing HTTP/auth/Origin/manager/audit/manifests with deterministic temporary-file adapter:2/12/2 moved, no out-of-plan/missing, decoded3silentMP4s and11actual screenshots. Card-only CPU paired3x8s medians102.75off/102.81on,delta+0.06pp; software-rendered baseline effects held constant. Five AI refs are design-only; original SVG/CSS product artwork. Latest-head CI/asset digests in PR237."
+      "next": "PR237 six review fixes implemented and verified locally (2026-11-01); confirm latest-head Linux/Windows CI and author review/merge. NativeCLI/DeepSeek remains author-side by user decision; no self merge.",
+      "verification": "2026-11-01: six review fixes; full1105Python/3skip,86Node,199Python/271JS syntax,secrets911 and Hiyori/Mao mapping checks;15 Chromium tests (11cards+4docs); first-run package/publicJSON/py_compile/diff checks;1440/768/390 inspection0findings with approved design exceptions. All11actual screenshots refreshed plus cancelled=12; old16static PNG/index deleted,5authorWebP retained,links/hashes checked. Latest-head CI evidence in PR237 Checks/body."
     },
     {
       "id": "live2d-browser-text-vowels",

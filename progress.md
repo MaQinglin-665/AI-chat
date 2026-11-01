@@ -1437,3 +1437,12 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 - Verification Evidence：完整test-local1105Python通过/3skip；最终86Node、199Python/271JS语法、secrets/mappings通过；7项Chromium卡片测试、原docs smoke、first-run package、公开JSON/必需py_compile和diff检查结果见PR。严格旧模型fixtures不改。视觉例外仅作者明确要求的星形/发光/光泽渐变/路径mono；其余真实浏览器检查。
 - CPU：独立软件渲染Chromium、全局motion固定，只切卡片动画，3对8秒样本，关102.75%/开102.81%单核口径，差+0.06pp处于短测噪声。原场景动画基础高占用保留，不以全局reduced-motion混合差异冒充卡片开销。原始实验仅留本地。
 - 下一步：正常推送并更新PR237，核对最新head全部Linux/Windows检查；CI记录在PR说明/Checks，作者Windows与原生执行器验收后决定合并，不自行合并。
+
+## 2026-11-01 — PR237 验收修订开始
+- 作者要求六项前端/文档修订：委派短标题、批准状态文案、失败/取消布局与合并错误框、移除裁切花瓣、窄屏双行路径、清理旧静态稿。保持现有鉴权/API/轮询，补回归测试和实际截图，完整门禁及最新head CI后交作者合并。
+
+## 2026-11-01 — PR237 六项修订与本地验证
+- taskCardModel/controller共用委派识别、去前缀短标题及完整正文一次；成功approve响应和执行证据区分已批准，过期查看原计划，failed/expired主按钮重新规划。失败/取消吉祥物→粗体结论→一句原因，多错误单框；核对提示严格按计划外>0/缺项/verification_error。删除左越界花瓣，窄详情保留双行路径/箭头/文件夹。只有任务前端/测试/状态/文档变化，未动后台/鉴权/Origin/渲染器/依赖。
+- 作者要求删除的旧静态稿16PNG及索引已移除；当前5WebP作者参考不改，11实际应用图全部重拍另补已取消=12PNG，SHA256/链接核对通过。真实web/index+原HTTP/manager/鉴权/审计，仅自建临时文件和本地隔离确定性适配器，静音、pageerror0；未碰个人目录或配置。原生CLI按用户已确认继续由作者补验，旧录像标注修订前日期，不冒充新视觉。
+- Verification Evidence：scripts/test-local.ps1通过1105Python/3skip（112.18s）、86Node文件、199Python/271JS语法、secrets911及本机映射；check_first_run_package.ps1通过；公开JSON/必需py_compile、Markdown本地链接、图片数量/摘要和diff检查通过。Chromium15项通过（新增4项验收回归、原7卡片及4docs）；1440/768/390视觉inspection0findings，保留原作者设计例外。详情签名排除progress/updated_at以保留阅读焦点，最终浏览器回归另核对。
+- 下一步正常push同分支并更新PR237描述/实际图，核对最新head Linux/Windows全部CI后告知；保持未合并，作者操作。日志和捕获工具只留仓库外work/outputs，不提交。

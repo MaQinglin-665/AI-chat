@@ -1,7 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const M = require("../web/taskCardModel.js");
-const { createController } = require("../web/externalAgentController.js");
+const { createController, isDelegation } = require("../web/externalAgentController.js");
 const chat = require("../web/chatMessageController.js");
 const task = (status = "awaiting_approval") => ({ id: "a".repeat(32), status, goal_summary: "整理测试材料", workdir: "approved", created_at: 1, progress_count: 0, approval_warnings: { deletes: [], high_risk: false, needs_network: false },
   plan: { summary: "保留内容", steps: ["检查", "整理"], commands: ["example"], risk: "low", needs_network: false,
@@ -38,6 +38,35 @@ async function main() {
   assert(M.model({ ...task(), plan: { ...task().plan, files_to_create: Array.from({ length: 11 }, (_, i) => `file${i}`) } }).large);
   for (const status of [401, 403, 404, 409, 500, 0]) assert(M.errorMessage({ status }).length > 10);
 
+  for (const [goal, title] of [
+    ["帮我去做整理课程资料，保留原文件内容。", "整理课程资料"],
+    ["请交给馨语去做：整理课程资料，保留原文件内容。", "整理课程资料"],
+    ["帮我把课程资料整理到分类目录，保留原文件内容。", "课程资料整理到分类目录"],
+    ["请帮我整理课程资料，保留原文件内容。", "整理课程资料"]
+  ]) {
+    assert(isDelegation(goal)); assert.equal(isDelegation(goal), M.isDelegation(goal));
+    assert.equal(M.model({ ...task(), goal_summary: goal }).title, title);
+    assert.equal(M.model({ ...task(), goal_summary: goal }).goal, goal);
+  }
+  for (const goal of ["帮我解释一下", "请问整理资料怎么做", "整理课程资料"]) assert.equal(isDelegation(goal), false);
+  assert.equal(M.shortTitle("整理课程资料"), "任务计划", "short complete goal is not duplicated as a heading");
+  assert(M.shortTitle("帮我去做" + "很长的任务".repeat(20)).length <= 19);
+  for (const status of ["failed", "cancelled", "expired", "awaiting_approval"]) {
+    assert.equal(M.model({ ...task(status), confirmation_id: "pre-approval-id" }).approved, false);
+    assert.equal(M.model(task(status)).needsReview, false);
+  }
+  for (const count of [0, "0", -1, null]) assert.equal(M.model({ ...task("failed"), changes: { out_of_plan_count: count } }).needsReview, false);
+  assert(M.model({ ...task("failed"), changes: { out_of_plan_count: 1 } }).needsReview);
+  assert(M.model(task("executing")).approved); assert(M.model(task("completed")).approved);
+  assert(M.model({ ...task("failed"), changes: {} }).approved);
+
+  // A fast worker can fail before the successful approve response is rendered.
+  const fastFailure = setup(async (url, options) => response(options.method ? { ok: true, task: task("failed") } : { ok: true, tasks: [task()], allowed_roots: ["approved"] }), true);
+  await tick(); await fastFailure.controller.approve(task().id);
+  assert.deepEqual(fastFailure.controller.snapshot().approvedTaskIds, [task().id]);
+  const preApprovalFailure = setup(async () => response({ ok: true, tasks: [task("failed")], allowed_roots: ["approved"] }), true);
+  await tick(); assert.deepEqual(preApprovalFailure.controller.snapshot().approvedTaskIds, []);
+
   let current = task(), failure = null;
   const context = setup(async (url, options) => {
     if (failure) return response({ ok: false }, failure);
@@ -51,7 +80,7 @@ async function main() {
     failure = status; await context.controller.approve(current.id);
     assert.equal(context.controller.snapshot().tasks[0].plan.summary, "保留内容");
     // Clear previous failure via an explicit successful read before trying a new action.
-    assert(context.controller.snapshot().errors[current.id]); failure = null; await context.controller.refresh(current.id);
+    assert(context.controller.snapshot().errors[current.id]); assert.deepEqual(context.controller.snapshot().approvedTaskIds, []); failure = null; await context.controller.refresh(current.id);
   }
   assert.equal(context.calls.filter(call => call.url.endsWith("approve")).length, 5, "no automatic approval retry");
   await context.controller.approve(current.id); assert.equal(context.controller.snapshot().tasks[0].status, "executing");

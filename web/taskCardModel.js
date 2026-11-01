@@ -28,16 +28,32 @@
   function counts(rows) {
     return Object.fromEntries(["move", "create", "modify", "delete"].map(kind => [kind, rows.filter(row => row.kind === kind).length]));
   }
-  function model(task) {
+  // Keep chat interception and title cleanup on the same delegation grammar.
+  const delegation = /^(?:请)?(?:帮我去做|交给馨语去做|帮我(?:把.+)?整理)/;
+  function isDelegation(value) { return delegation.test(String(value).trim()); }
+  function shortTitle(goal) {
+    const original = String(goal || "").trim();
+    const content = isDelegation(original) ? original.replace(/^(?:请)?(?:帮我去做|交给馨语去做|帮我把|帮我)[\s，,:：]*/, "") : original;
+    const first = content.split(/[，,。；;！!？?\n]/)[0].trim();
+    const title = first.length > 18 ? `${first.slice(0, 18)}…` : first;
+    // The complete goal belongs in the body, including when it is already short.
+    return !title || title === original ? "任务计划" : title;
+  }
+  function wasApproved(task) {
+    // confirmation_id exists before approval and is deliberately not evidence.
+    return ["executing", "completed"].includes(task.status) || !!task.changes || !!task.verification_error;
+  }
+  function model(task, approved = false) {
     const status = task.cancel_requested && !terminal.has(task.status) ? "cancel_pending" : task.status;
     const rows = files(task);
     const actual = files(task, true);
     const missing = Object.values(task.changes?.planned_not_observed || {}).some(value => array(value).length);
-    const needsReview = !!(task.verification_error || task.changes?.out_of_plan_count || missing);
+    const needsReview = !!(task.verification_error || Number(task.changes?.out_of_plan_count) > 0 || missing);
     return { status, label: states[status] || ["状态待确认", "alert", "quiet"], terminal: terminal.has(task.status),
       rows, counts: counts(rows), actual, actualCounts: counts(actual), needsReview, large: rows.length > 10,
       canApprove: status === "awaiting_approval" && !!task.plan, canCancel: states[task.status] && !terminal.has(task.status),
-      title: String(task.goal_summary || task.plan?.summary || "馨语的任务").slice(0, 36) };
+      approved: approved || wasApproved(task), goal: String(task.goal_summary || task.plan?.summary || "正在准备任务计划。"),
+      title: shortTitle(task.goal_summary || task.plan?.summary) };
   }
   function errorMessage(error) {
     if (error.status === 401) return "身份验证未通过，操作没有成功。计划已保留，请重新连接后刷新状态。";
@@ -46,7 +62,7 @@
     if (error.status === 409) return "任务状态已变化或另有活动任务，操作没有成功。请刷新状态后查看。";
     return "未能确认任务状态，计划已保留。请检查连接后刷新；创建和批准不会自动重试。";
   }
-  const api = { terminal, states, files, counts, model, errorMessage };
+  const api = { terminal, states, files, counts, isDelegation, shortTitle, wasApproved, model, errorMessage };
   root.TaffyTaskCardModel = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

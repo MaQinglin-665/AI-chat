@@ -133,3 +133,77 @@ test('lane remount and resized container keep task identity and plan text select
   await expect(page.locator('#assistant-chat-log .task-card')).toHaveCount(1);
   await expect(page.locator('.task-card')).toHaveAttribute('data-narrow', 'true');
 });
+
+
+test('review: delegation title and complete goal appear once in card and detail', async ({ page }) => {
+  await setup(page, 390); const task = makeTask();
+  task.goal_summary = '帮我把课程资料整理到分类目录，保留原文件内容。';
+  await render(page, task);
+  await expect(page.locator('.task-heading h3')).toHaveText('课程资料整理到分类目录');
+  await expect(page.locator('.task-card .task-goal')).toHaveText(task.goal_summary);
+  await page.getByRole('button', { name: '✦ 查看完整计划' }).click();
+  await expect(page.locator('.task-detail-body h3')).toHaveText('课程资料整理到分类目录');
+  await expect(page.locator('.task-detail-body .task-goal')).toHaveText(task.goal_summary);
+  expect((await page.locator('.task-detail-body').innerText()).split(task.goal_summary)).toHaveLength(2);
+});
+
+test('review: expired and failed prioritize replanning; approval evidence survives terminal update', async ({ page }) => {
+  await setup(page);
+  for (const status of ['expired', 'failed']) {
+    await render(page, makeTask(status));
+    await expect(page.locator('.task-card .task-primary')).toHaveText('重新规划');
+    await expect(page.getByRole('button', { name: '查看原计划', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '查看已批准的计划', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: '查看原计划', exact: true }).click();
+    await expect(page.locator('.task-detail-actions .task-primary')).toHaveText('重新规划');
+    await page.keyboard.press('Escape');
+  }
+  await render(page, makeTask('executing'));
+  await render(page, makeTask('failed'));
+  await expect(page.getByRole('button', { name: '查看已批准的计划', exact: true })).toBeVisible();
+  await expect(page.locator('.task-card .task-primary')).toHaveText('重新规划');
+});
+
+test('review: failed/cancelled illustration, conclusion and reason; errors use one visible list', async ({ page }) => {
+  await setup(page);
+  const task: any = makeTask('failed');
+  task.error = { message: '目标目录已有同名文件。', detail: { message: '请检查目标路径后重新规划。' } };
+  task.verification_error = '无法读取核对信息。';
+  await render(page, task, { [task.id]: { status: 401, message: '身份验证未通过。' } });
+  await expect(page.locator('.task-card .task-error')).toHaveCount(1);
+  await expect(page.locator('.task-card .task-error li')).toHaveCount(5);
+  await expect(page.locator('.task-conclusion')).toHaveText('这次没有完成任务。');
+  await expect(page.locator('.task-reason')).toHaveText('目标目录已有同名文件。');
+  expect(await page.locator('.task-card').evaluate(el => {
+    const art = el.querySelector('.task-illustration')!, conclusion = el.querySelector('.task-conclusion')!, reason = el.querySelector('.task-reason')!;
+    return art.nextElementSibling === conclusion && conclusion.nextElementSibling === reason && getComputedStyle(conclusion).fontWeight === '700';
+  })).toBeTruthy();
+  for (const status of ['failed', 'cancelled']) {
+    await render(page, makeTask(status));
+    await expect(page.locator('.task-conclusion')).toBeVisible();
+    await expect(page.locator('.task-reason')).toBeVisible();
+    await expect(page.locator('.task-card')).not.toContainText('执行结果需要核对');
+    await expect(page.locator('.task-card .task-error')).toBeHidden();
+  }
+  for (const changes of [{ out_of_plan_count: 1 }, { planned_not_observed: { created: ['missing.txt'] } }]) {
+    await render(page, { ...makeTask('failed'), changes });
+    await expect(page.locator('.task-card .task-error')).toContainText('执行结果需要核对');
+  }
+  expect(await page.locator('.task-card').evaluate(el => getComputedStyle(el, '::before').content)).toBe('none');
+});
+
+test('review: narrow move paths keep source row and arrow/folder destination row', async ({ page }) => {
+  await setup(page, 390); const task: any = makeTask();
+  task.planned_moves = [{ from: '原路径/课程大纲.txt', to: '目标资料/课程大纲.txt' }];
+  task.plan.files_to_create = [task.planned_moves[0].to];
+  await render(page, task); await page.getByRole('button', { name: '✦ 查看完整计划' }).click();
+  const row = page.locator('.task-detail-panel .task-file-move');
+  await expect(row.locator('.task-file-source .task-path')).toHaveText(task.planned_moves[0].from);
+  await expect(row.locator('.task-file-destination .task-file-arrow')).toHaveText('→');
+  await expect(row.locator('.task-file-destination .task-icon-folder')).toBeVisible();
+  await expect(row.locator('.task-file-destination .task-path')).toHaveText(task.planned_moves[0].to);
+  expect(await row.evaluate(el => {
+    const from = el.querySelector('.task-file-source')!.getBoundingClientRect(), to = el.querySelector('.task-file-destination')!.getBoundingClientRect();
+    return to.top >= from.bottom && to.left === from.left && el.scrollWidth <= el.clientWidth;
+  })).toBeTruthy();
+});
