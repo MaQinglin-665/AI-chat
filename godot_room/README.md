@@ -1,5 +1,7 @@
 # Godot room spike
 
+[第四阶段：进入有声房间、口型测量和回到桌宠](PHASE4-REPORT.md)
+
 [第三阶段：新卧室、双人座位和流式聊天](PHASE3-REPORT.md)
 
 [第二阶段：自主行动验收与录像时间线](PHASE2-REPORT.md)

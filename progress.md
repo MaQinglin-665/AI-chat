@@ -1,5 +1,9 @@
 # Progress
 
+## Godot room phase 4
+
+The desktop launcher, scoped room ticket, shared chat history and a single model call for speech and actions are wired to the real bedroom. See [phase 4 acceptance](godot_room/PHASE4-REPORT.md) for the 30 fps recording, measured lip onset and CPU/RSS.
+
 ## Godot room phase 3
 
 Bedroom interaction now uses 14 art markers. Tested 1.15 m seat spacing, matching forward directions and >0.91 m eye clearance to posed meshes. See [phase 3 live measurements](godot_room/PHASE3-REPORT.md).
