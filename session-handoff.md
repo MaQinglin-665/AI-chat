@@ -1,3 +1,8 @@
+# Current — Godot room spike, 2026-11-01
+Draft PR238. Worktree D:/AI/ai_desktop_pet_godot. Review godot_room/SPIKE-REPORT.md and ignored tmp_ui_smoke/godot-room-deepseek-5min.mp4. Known limits: conversational bias, incomplete multi-step seating, foot contact at phase boundaries, isolated run uses synthetic navigation inputs and real DeepSeek. Await author acceptance.
+
+## Previous task records
+
 # Current: PR237 review fixes — 2026-11-01
 Branch friend/chat-task-cards, clean baseline ce6a30c; author requests six frontend/doc fixes. Six fixes complete; all12 actual screenshots refreshed and old16 prototypes/index removed;5authorWebP retained. Full1105Python/3skip,86Node,15browser,syntax/secrets/mappings,package/JSON/compile passed. Keep existing auth/Origin/API; no backend/renderers/private config changes. Next normal push/update PR237 and confirm latest-head Linux/Windows CI. No self merge/main/force push. NativeCLI acceptance remains explicitly deferred to author.
 

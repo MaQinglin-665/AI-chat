@@ -40,7 +40,17 @@ func _ready():
 		for z in [-3.2,-2.6]:
 			box("leg",Vector3(x,.36,z),Vector3(.09,.72,.09),Color("#79573f"))
 	box("chair",Vector3(2.4,.23,-1.95),Vector3(.55,.46,.55),Color("#ba9373"),["sit"])
-	box("shelf",Vector3(4.05,.9,-.4),Vector3(.55,1.8,1.5),Color("#89664f"),["look"])
+	box("shelf",Vector3(4.32,.9,-.4),Vector3(.08,1.8,1.5),Color("#89664f"),["look"])
+	for level in range(4):
+		var height := .10 + level*.52
+		box("shelf_board", Vector3(4.03,height,-.4),Vector3(.57,.055,1.5),Color("#916e57"))
+		for book in range(6):
+			var h := .23+.035*(book%3)
+			var tint := Color.from_hsv(fmod(book*.21+level*.13,1.),.28,.62)
+			box("spine",Vector3(4.0,height+h*.5+.03,-1.+book*.17),Vector3(.28,h,.12),tint)
+	box("chair_back",Vector3(2.4,.67,-1.69),Vector3(.55,.45,.07),Color("#ad8463"))
+	box("sill",Vector3(-2.1,1.11,-3.82),Vector3(1.87,.07,.22),Color("#a58877"))
+	box("mullion",Vector3(-2.1,1.8,-3.85),Vector3(.045,1.35,.06),Color("#c7bbc4"))
 	box("book",Vector3(2.2,.86,-2.8),Vector3(.24,.07,.18),Color("#78455b"),["look","pick_up"])
 	box("window",Vector3(-2.1,1.8,-3.9),Vector3(1.7,1.35,.04),Color("#94bdda"),["look"])
 	var env := Environment.new()
@@ -63,6 +73,7 @@ func _ready():
 	add_child(light)
 	var nav := NavigationMesh.new()
 	nav.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
+	nav.agent_max_climb = .2
 	nav.agent_radius = .375
 	nav.cell_size = .125
 	nav.cell_height = .1

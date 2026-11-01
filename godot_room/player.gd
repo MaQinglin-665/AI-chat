@@ -11,6 +11,7 @@ var gait := preload("res://locomotion.gd").new()
 var avatar: Node3D
 var third_person := false
 var seated := false
+var held_book: StaticBody3D
 var before_seat := Vector3.ZERO
 var focus: Object
 
@@ -82,6 +83,15 @@ func _unhandled_input(event):
 				global_position = before_seat
 				aim.position.y = 1.48
 				interacted.emit("", "stand_up")
+			elif held_book and focus == get_parent().get_node("Companion"):
+				var receiver = focus.find_child("GeneralSkeleton",true,false)
+				var hand := BoneAttachment3D.new()
+				receiver.add_child(hand)
+				hand.bone_name = "RightHand"
+				held_book.reparent(hand)
+				held_book.transform = Transform3D.IDENTITY
+				held_book = null
+				interacted.emit("book","gave")
 			elif focus and focus.has_meta("affordances"):
 				var actions = focus.get_meta("affordances")
 				if "sit" in actions:
@@ -90,6 +100,12 @@ func _unhandled_input(event):
 					global_position = focus.global_position + Vector3(0,.29,0)
 					aim.position.y = .8
 					interacted.emit(str(focus.name),"sit")
+				elif "pick_up" in actions:
+					held_book = focus
+					held_book.collision_layer = 0
+					held_book.reparent(aim)
+					held_book.position = Vector3(.2,-.22,-.45)
+					interacted.emit("book","pick_up")
 				else: interacted.emit(str(focus.name),actions[0])
 
 func _physics_process(delta):

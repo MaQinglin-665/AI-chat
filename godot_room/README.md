@@ -11,3 +11,5 @@ On 4.6.3 the motion probe recorded about 13–15 degrees of rotation at skirt en
 - Sendagaya Shino, pixiv, CC0. Official notice: https://vroid.pixiv.help/hc/en-us/articles/360013482714-Sendagaya-Shino . Source model: https://github.com/madjin/vrm-samples/blob/master/vroid/beta/Sendagaya_Shino.vrm . Embedded title and CC0 metadata verified.
 
 Animations: Quaternius Universal Animation Library Standard, CC0 1.0, official listing https://quaternius.itch.io/universal-animation-library . glTF distribution https://github.com/J-Ponzo/gltf-universal-animation-library . Original license in animations/LICENSE.txt. Godot strips _Loop from imported names. Retargeting maps DEF bones to VRM human bones with rest-basis conjugation and transfers vertical hips displacement. Navigation drives horizontal translation.
+
+[完整验收报告和同角度对比](SPIKE-REPORT.md)

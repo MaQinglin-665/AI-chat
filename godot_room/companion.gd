@@ -11,6 +11,7 @@ var posture_change := 0
 var sit_target: Node3D
 var player: CharacterBody3D
 var last_follow := 0.
+var contact := preload("res://foot_contact.gd").new()
 var gaze := preload("res://gaze.gd").new()
 var glance_after := 6.
 var own_state := "idle"
@@ -29,11 +30,14 @@ func _ready():
 	add_child(agent)
 	agent.radius = .30
 	agent.avoidance_enabled = true
-	agent.target_desired_distance = .18
+	agent.target_desired_distance = .32
 	agent.velocity_computed.connect(move_safe)
 	body.add_child(motion)
 	motion.configure(body)
-	body.find_children("*","Skeleton3D",true,false)[0].add_child(gaze)
+	var skeleton = body.find_children("*","Skeleton3D",true,false)[0]
+	contact.actor=self
+	skeleton.add_child(contact)
+	skeleton.add_child(gaze)
 	bubble.position.y = 1.88
 	bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	bubble.font_size = 22
@@ -45,7 +49,8 @@ func approach(node: Node3D):
 	if sitting: stand()
 	var offset = (global_position-node.global_position).slide(Vector3.UP).normalized()
 	var distance = 1.3 if node == player else .85
-	agent.target_position = node.global_position + offset * distance
+	var approach_point = node.global_position + offset * distance
+	agent.target_position = Vector3(approach_point.x,global_position.y,approach_point.z)
 	destination = str(node.name)
 	own_state = "walking"
 
@@ -108,3 +113,12 @@ func _physics_process(delta):
 	var facing = speed if speed.length() > .05 else global_position.direction_to(look_target.global_position) if look_target else Vector3.ZERO
 	if facing.length() > .05 and not sitting:
 		body.rotation.y = lerp_angle(body.rotation.y,atan2(facing.x,facing.z),1-exp(-delta*4))
+
+func speak(text: String, emotion: String):
+	bubble.text = text.left(100)
+	bubble.width = 420
+	bubble.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var face = body.find_child("Face",true,false)
+	for i in range(face.get_blend_shape_count()):
+		if str(face.mesh.get_blend_shape_name(i)).ends_with("Fcl_ALL_Joy"):
+			face.set_blend_shape_value(i,.45 if emotion == "happy" else 0.)

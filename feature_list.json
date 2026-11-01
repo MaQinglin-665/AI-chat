@@ -1,6 +1,13 @@
 {
-  "active_task": "chat-task-cards",
+  "active_task": "godot-room-spike",
   "features": [
+    {
+      "id": "godot-room-spike",
+      "name": "Shared Godot room feasibility experiment",
+      "status": "in_progress",
+      "verification": "Godot 4.6.3, CC0 Shino + Standard locomotion, bounded authenticated intent/chat, 300-second real DeepSeek tour, x64 export smoke. Multi-step autonomy and foot contact remain under review.",
+      "next": "Author review in draft PR 238; see godot_room/SPIKE-REPORT.md."
+    },
     {
       "id": "chat-task-cards",
       "name": "Inline chat task cards sharing existing task auth, controller and narrator",

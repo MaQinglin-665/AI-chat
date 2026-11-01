@@ -18,7 +18,7 @@ func _ready():
 	player = room.get_node("Player")
 	ai = room.get_node("Companion")
 	player.spoke.connect(chat)
-	player.interacted.connect(func(_id, act): event({"sit":"sat","stand_up":"stood","pick_up":"gave"}.get(act,"idle")))
+	player.interacted.connect(func(_id, act): event({"sit":"sat","stand_up":"stood","gave":"gave"}.get(act,"idle")))
 	if not token.is_empty(): event("entered")
 
 func event(reason):
@@ -45,20 +45,21 @@ func vec(v: Vector3):
 	return [v.x,v.y,v.z]
 
 func visible():
-	var ids := []
+	var ids := {}
 	var start: Vector3 = ai.global_position + Vector3.UP*1.45
 	for id in room.objects:
 		var obj = room.objects[id]
 		var ray := PhysicsRayQueryParameters3D.create(start,obj.global_position)
 		ray.exclude = [ai.get_rid()]
 		var hit := get_viewport().world_3d.direct_space_state.intersect_ray(ray)
-		if hit.is_empty() or hit.collider == obj: ids.append(id)
+		if hit.is_empty() or hit.collider == obj:
+			ids[id] = {"position":vec(obj.global_position),"affordances":obj.get_meta("affordances")}
 	return ids
 
 func request(route: String, payload: Dictionary):
 	var http := HTTPRequest.new()
 	add_child(http)
-	http.timeout = 35.
+	http.timeout = 100. if route == "chat" else 20.
 	var begin = Time.get_ticks_msec()
 	var error = http.request("http://127.0.0.1:%d/api/%s" % [port,route],
 		["Authorization: Bearer "+token,"Content-Type: application/json","Origin: http://127.0.0.1:%d"%port],
@@ -90,7 +91,7 @@ func execute(intent):
 	var target = intent.get("target","")
 	var obj = room.objects.get(target) if target is String else null
 	if target is String and target == "user": obj = player
-	print("room_decision ",intent.action)
+	print("room_decision ",intent.action," target=",str(intent.get("target","")))
 	match intent.action:
 		"follow_user","approach_user":
 			ai.follow = intent.action == "follow_user"
@@ -110,8 +111,8 @@ func execute(intent):
 				ai.agent.target_position = Vector3(target[0],0,target[2])
 				ai.own_state = "walking"
 		"stand_up": ai.stand()
-		"gesture": ai.motion.playback.travel("Interact")
-		"say": ai.bubble.text = str(intent.text).left(100)
+		"gesture": ai.gaze.play(intent.name)
+		"say": ai.speak(str(intent.text),str(intent.get("emotion","neutral")))
 
 func chat(message):
 	event("spoke")
@@ -121,7 +122,7 @@ func chat(message):
 	chatting = false
 	var reply = str(data.get("reply",""))
 	if reply:
-		ai.bubble.text = reply.left(100)
+		ai.speak(reply,"neutral")
 		history.append({"role":"user","content":message})
 		history.append({"role":"assistant","content":reply})
 		history = history.slice(-6)

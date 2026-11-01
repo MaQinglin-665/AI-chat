@@ -1446,3 +1446,8 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 - 作者要求删除的旧静态稿16PNG及索引已移除；当前5WebP作者参考不改，11实际应用图全部重拍另补已取消=12PNG，SHA256/链接核对通过。真实web/index+原HTTP/manager/鉴权/审计，仅自建临时文件和本地隔离确定性适配器，静音、pageerror0；未碰个人目录或配置。原生CLI按用户已确认继续由作者补验，旧录像标注修订前日期，不冒充新视觉。
 - Verification Evidence：scripts/test-local.ps1通过1105Python/3skip（112.18s）、86Node文件、199Python/271JS语法、secrets911及本机映射；check_first_run_package.ps1通过；公开JSON/必需py_compile、Markdown本地链接、图片数量/摘要和diff检查通过。Chromium15项通过（新增4项验收回归、原7卡片及4docs）；1440/768/390视觉inspection0findings，保留原作者设计例外。详情签名排除progress/updated_at以保留阅读焦点，最终浏览器回归另核对。
 - 下一步正常push同分支并更新PR237描述/实际图，核对最新head Linux/Windows全部CI后告知；保持未合并，作者操作。日志和捕获工具只留仓库外work/outputs，不提交。
+
+## Godot room spike — 2026-11-01
+Draft PR238. Forward+ on Godot4.6.3/godot-vrm2.1.0; 4.7.2 plugin parse errors. Verified Shino spring joints and facial shapes, 24 nav polygons, retargeted walk/sit/stand, authenticated real DeepSeek chat/intent, 300s viewport recording, same-camera comparison and Windows release export. Ten calls/6394 tokens during final tour. Explicit user instruction prompted real go_to(chair) in a separate run; AI stopped at chair. Automatic user-side input; no human-input acceptance claimed. Report godot_room/SPIKE-REPORT.md. Local-only video/build/logs ignored. Await author review.
+
+Final local verification: scripts/test-local.ps1 (D-drive TEMP/TMP) 1108 Python passed, 3 skipped, 86 Node suites. Godot target bounds, disabled/token gates, nav/seat/stand, camera collision/jump/POV, release startup and full video decode checked separately. Support-foot horizontal P95 after pelvis correction 1.3mm on this trajectory. Isolated listeners stopped.
