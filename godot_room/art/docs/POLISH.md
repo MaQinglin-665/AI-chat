@@ -1,5 +1,7 @@
 # 卧室美术打磨验收
 
+**当前审核修订见[REVIEW-FOLLOWUP](REVIEW-FOLLOWUP.md)**：棕色无衣泰迪、唯一获准的床沿Seat、扶手外侧搭毯。下文零交互变化/性能是首次验收记录；现在仅例外扩展bed，其余13个交互点及bed原Approach仍严格一致，after已刷新。
+
 [草稿PR #241](https://github.com/MaQinglin-665/AI-chat/pull/241)。基线：`9368749`（含 #240），已普通merge最新目标ac5b967，目标 `codex/godot-room-spike`，分支 `friend/godot-room-art-polish`。2026-11-01，同一台 Windows 电脑、Godot 4.6.3。只改 `godot_room/art/`，本目录保存状态与交接，遵守用户范围限制，不改根状态文件。
 
 ## 改动和边界
@@ -81,12 +83,12 @@ CPU为实际Godot子进程CPU时间/墙钟时间/32线程，非console启动器�
 
 ## 证据图SHA256
 
-- `after-bed.png`：`29288dc6142f1980219a303835f94d86028ee5da896f44121add8bee7b596215`
-- `after-day.png`：`a672ecf3c90b42881c3b1e6842dcf7b482310c8e5de77c65e90b1a0f1d6f05fe`
-- `after-desk.png`：`66070b736c94b9f6a4015a8b0961c99b9aaed66ddb2a2453726b66f1ad0c6b1d`
-- `after-dusk.png`：`dab14b9a6b5f78bb4d1647c323ccc0dbcab6ee29384b0396a29cfbf64946a221`
-- `after-night.png`：`32c717cc3b575ce2c77d1e3dd678577e6563b6d044cca53a5913b6f4225d793f`
-- `after-wide.png`：`2a350b5b0f88240d66111410d0ef66674425ade577067ad87f9d4b33da71a6f9`
+- `after-bed.png`：`13f24054a59cc52dd0989fe9fdeb323d64235bba39474dd001e1e8453e9000a8`
+- `after-day.png`：`01f57ff37cf331075dc555a5c8bd2fad3ea24b0fc266cd6d2fd4044f757b6499`
+- `after-desk.png`：`454c7c8610807c33974d87ab0ad17b010f6947e2d2861b3bac1da474591e272f`
+- `after-dusk.png`：`55283caae6ed67fe2aa1a660c4a9b9cb00f6e23363163b7b4ff5a446189d1f76`
+- `after-night.png`：`a06df903eb82735642bc8609fbd6fb77eb36b229708665f7b32f58a3859a4fef`
+- `after-wide.png`：`f7b104073a9ea2f107676097f11ee6ba1fb81354c4e759ac07e637adbdb3f082`
 - `after-window.png`：`145286a82afc806a5d780a4c81d3d3eefead1339611c9fa343feac0955912398`
 - `before-day.png`：`062341fe8198acadf0b62c69adfb78b563a253b9544d8fc0414b3edbedbb10bb`
 - `before-dusk.png`：`6bbfe09237e71cf5aa7683c1556555b2a55ef1db6ae425e933d30840572aae9e`

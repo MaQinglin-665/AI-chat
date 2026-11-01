@@ -110,14 +110,15 @@ func build_sofa():
 		var pillow=g.box(sofa,Vector3(side*.60,.47,-.24),Vector3(.44,.42,.16),g.material("d8b3b9" if side==1 else "ded2c9"),.065)
 		pillow.rotation_degrees.z=side*-11
 		for z in [-.34,.34]:g.cylinder(sofa,Vector3(side*.86,-.17,z),.045,.04,.16,g.wood("74513e"))
-	# Small woven throw draped over one arm.
-	g.box(sofa,Vector3(.67,.27,.30),Vector3(.44,.045,.43),g.material("ad7890"),.015)
-	g.box(sofa,Vector3(.67,.07,.50),Vector3(.44,.38,.045),g.material("ad7890"),.015)
-	for i in range(8):g.box(sofa,Vector3(.49+i*.05,-.15,.51),Vector3(.012,.11,.014),g.material("c29ab0"),.005)
+	# Fold over the OUTSIDE of the right arm, leaving both shin corridors clear.
+	g.box(sofa,Vector3(1.045,.602,-.08),Vector3(.25,.018,.68),g.material("ad7890"),.007,"ThrowTop")
+	g.box(sofa,Vector3(1.155,.24,-.08),Vector3(.018,.70,.68),g.material("ad7890"),.007,"ThrowOuter")
+	for i in range(8):
+		g.box(sofa,Vector3(1.166,-.15,-.37+i*.082),Vector3(.012,.09,.014),g.material("c29ab0"),.004,"ThrowFringe"+str(i))
 	interaction(sofa,Vector3(0,-.25,1.0),Vector3(0,.25,.08),0.0)
 
 func build_bed():
-	var bed=body("bed",Vector3(-3.05,.38,1.82),Vector3(1.85,.75,2.52),["look"])
+	var bed=body("bed",Vector3(-3.05,.38,1.82),Vector3(1.85,.75,2.52),["look","sit"])
 	var oak=g.wood("9e7456")
 	g.box(bed,Vector3(0,-.14,0),Vector3(1.85,.28,2.52),oak,.065)
 	g.box(bed,Vector3(0,.28,-1.20),Vector3(1.90,1.1,.13),oak,.055)
@@ -130,7 +131,11 @@ func build_bed():
 		for z in [-.97,.97]:g.cylinder(bed,Vector3(side*.76,-.28,z),.05,.045,.20,oak)
 	g.box(bed,Vector3(0,.40,.65),Vector3(1.82,.035,.58),g.material("a37c99"),.015)
 	for stripe in range(12):g.box(bed,Vector3(-.83+stripe*.15,.42,.65),Vector3(.016,.008,.55),g.material("d1afc5"),.003)
-	interaction(bed,Vector3(1.65,-.38,-.5))
+	# Keep the original standing approach; sit along the room-facing (+X) edge.
+	interaction(bed,Vector3(1.65,-.38,-.5),Vector3(.82,.375,-.20),PI*.5)
+	var bed_seat=interaction_markers.bed.get_node("Seat")
+	bed_seat.set_meta("id","bed_edge_seat")
+	bed_seat.set_meta("affordances",["sit"])
 	var side=body("bedside",Vector3(-1.65,.30,2.6),Vector3(.50,.60,.48),["look"])
 	g.box(side,Vector3.ZERO,Vector3(.5,.6,.48),oak,.035)
 	g.box(side,Vector3(0,.10,.248),Vector3(.43,.19,.035),g.material("c2a68d"),.012)
@@ -294,21 +299,23 @@ func build_lived_in_details():
 	decorative_plant("decor_shelf_fern",Vector3(4.0,1.98,.05),.67)
 	# Original small sleepy bear on the duvet, away from bed's standing approach.
 	var bed=objects.bed
-	var cream=g.material("dfc4ab")
+	var fur=g.material("805b43")
+	var muzzle=g.material("c5a187")
 	var cocoa=g.material("604745")
 	var plush=Node3D.new()
 	plush.name="DuvetBear"
 	bed.add_child(plush)
 	plush.position=Vector3(-.46,.55,-.38)
-	g.sphere(plush,Vector3(0,0,0),Vector3(.28,.33,.23),cream)
-	g.sphere(plush,Vector3(0,.23,0),Vector3(.29,.26,.23),cream)
+	g.sphere(plush,Vector3(0,0,0),Vector3(.28,.33,.23),fur)
+	g.sphere(plush,Vector3(0,.23,0),Vector3(.29,.26,.23),fur)
 	for side in [-1,1]:
-		g.sphere(plush,Vector3(side*.12,.34,0),Vector3(.10,.11,.075),cream)
-		g.sphere(plush,Vector3(side*.12,-.12,.06),Vector3(.12,.10,.14),cream)
-		g.sphere(plush,Vector3(side*.17,.02,.015),Vector3(.095,.18,.10),cream)
+		g.sphere(plush,Vector3(side*.12,.34,0),Vector3(.10,.11,.075),fur)
+		g.sphere(plush,Vector3(side*.12,-.12,.06),Vector3(.12,.10,.14),fur)
+		g.sphere(plush,Vector3(side*.17,.02,.015),Vector3(.095,.18,.10),fur)
 		g.box(plush,Vector3(side*.055,.25,.111),Vector3(.04,.009,.012),cocoa,.003)
-	g.sphere(plush,Vector3(0,.205,.12),Vector3(.035,.025,.02),cocoa)
-	g.box(plush,Vector3(0,.105,.01),Vector3(.27,.045,.245),g.material("b87d93"),.014)
+	g.sphere(plush,Vector3(0,.205,.122),Vector3(.13,.085,.045),muzzle)
+	g.sphere(plush,Vector3(0,.218,.149),Vector3(.030,.023,.018),cocoa)
+	g.sphere(plush,Vector3(0,-.005,.113),Vector3(.16,.18,.02),muzzle)
 	# Ceramic mug, tea surface and ring handle, all original unbranded geometry.
 	var desk=objects.desk
 	var ceramic=g.material("d8b2ae",.92)

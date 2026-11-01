@@ -26,3 +26,7 @@
 当前分支friend/godot-room-art-polish，从9368749新建，仅art/。原始Marker已冻结，三预设前后与小物图已保存。地板已证实为冷补光宽高光问题，不改光源/主线行为。43导航多边形、14交互点、584采样仍通过。详见[POLISH](POLISH.md)。用户反馈不限帧测试卡顿，已停止该方式，后续图形检查默认30fps，不再重复不限帧跑分。完整test-local已通过（1113 Python/3跳过、86 Node、202 Python/271 JS语法），公开JSON/py_compile通过；最终verify及主线导航/共享目标回归通过。已推送[Draft PR #241](https://github.com/MaQinglin-665/AI-chat/pull/241)，最新CI见该PR Checks；禁止自行合并。
 
 最新收尾：已普通merge作者ac5b967，无冲突，PR相对最新base仍只有art/。全量本地检查再次通过；最终美术verify通过。截图/性能仍是同一原始art基线9368749的有效对照（作者两笔提交未改art）。新版整房间另加载玩家模型，本次未启动；旧整房间回归证据明确标为9368749，最新模型组合由作者验收。
+
+## PR241合并前修订（当前）
+
+已普通merge作者5e10022，只改art/。棕色无衣泰迪；仅bed新增look/sit和Seat（bed_edge_seat），其Approach及其余13个交互点严格不变。搭毯移扶手外侧。原fixture未覆盖；verify43多边形/14路线/584采样、独立contract和18反例通过；Shino右坐垫搭毯-小腿包络裕量0.381m。4张审核图、7张after更新，30fps静音无私模。完整test-local通过（1118 Python/3跳过、87 Node；语法/secret/mapping），最终CI见PR最新head，未重跑不限帧。后端bed sit白名单留主线接入。完整metadata和限制见REVIEW-FOLLOWUP.md。保持Draft，不自行合并。

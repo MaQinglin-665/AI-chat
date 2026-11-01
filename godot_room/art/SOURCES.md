@@ -40,3 +40,5 @@
 | 城市圆形光点与柔和光晕 | [window.gdshader](https://github.com/MaQinglin-665/AI-chat/blob/friend/godot-room-art-polish/godot_room/art/window.gdshader) | 同上 |
 | 哑光地板、两盆植物、睡熊、茶杯/本子/笔 | [bedroom.gd](https://github.com/MaQinglin-665/AI-chat/blob/friend/godot-room-art-polish/godot_room/art/bedroom.gd) / [wood.gdshader](https://github.com/MaQinglin-665/AI-chat/blob/friend/godot-room-art-polish/godot_room/art/wood.gdshader) | 同上 |
 | 前后、诊断和小物截图 | [polish/](docs/polish/) | 本模块原创场景及既有CC0 Shino的实际引擎画面，无私人桌面 |
+
+PR241审核补充：玩偶改为棕色无上衣原创泰迪（无角色标志），仍为本模块原创CC0几何。Shino坐姿和旧搭毯参数复原控制图见docs/REVIEW-FOLLOWUP.md；无外部图片或模型。

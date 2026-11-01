@@ -49,7 +49,7 @@ var seat = marker.get_node(marker.get_meta("seat"))
 var contact = seat.global_transform # +Z为面朝方向；宿主按角色髋部/身高对齐
 ```
 
-沙发sit/look；椅子sit/look；书本look/pick_up；其他物件look。不包含approve、执行命令或后端权限含义。marker不代表自动执行动作，动作选择、占用和状态仍由主线决定。
+沙发sit/look；椅子sit/look；床沿look/sit；书本look/pick_up；其他物件look。不包含approve、执行命令或后端权限含义。marker不代表自动执行动作，动作选择、占用和状态仍由主线决定。
 
 ## 新增家具
 
@@ -88,3 +88,7 @@ capture写8张实际引擎截图到art/docs，包含三套灯光同机位、多�
 ## 9368749之后的美术打磨
 
 [最新同机位对照、地板诊断、交互契约和性能报告](docs/POLISH.md)。上面的REVIEW/PERFORMANCE保留为首次接入记录。polish只改art/，没有room.gd接线或Marker调整。新增植物和小物是家具表面的非交互装饰，不增加地面碰撞。新截图/诊断脚本默认30fps，不覆盖before证据。tools/fixtures/interaction-contract.json为冻结原契约，verify不会自动更新；以后主线批准变更时应审核旧值/新值再显式更新。
+
+## PR241审核补充
+
+[最新审核修订与床沿metadata](docs/REVIEW-FOLLOWUP.md)：沿用bed ID，新增床沿Seat（子Marker id=bed_edge_seat），只给bed增加sit，原Approach与其余13个交互点不变；总数仍14。原fixture不覆盖；tools/check_interaction_contract.gd核对唯一批准差异及18反例。泰迪为棕色无上衣，搭毯移扶手外侧。图形验收30fps，后端bed sit白名单由主线另行接入。
