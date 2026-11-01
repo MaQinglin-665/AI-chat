@@ -33,6 +33,7 @@ const tests = [
   "tests/test_live2d_mapping_sequence.js",
   "tests/test_visual_polish_frontend.js",
   "tests/test_external_agent_frontend.js",
+  "tests/test_task_cards.js",
   "tests/test_readiness_resources.js",
   "tests/test_galgame_player.js",
   "tests/test_galgame_chat_integration.js",

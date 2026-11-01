@@ -1,11 +1,26 @@
 {
-  "active_task": "live2d-browser-text-vowels",
+  "active_task": "chat-task-cards",
   "features": [
+    {
+      "id": "chat-task-cards",
+      "name": "Inline chat task cards sharing existing task auth, controller and narrator",
+      "status": "in_progress",
+      "done_criteria": [
+        "Approved A design in dark tokens; original SVG mascot and accessible responsive details",
+        "Unique task cards, ordered responses, silent recovery, auth errors and no chat-history contamination",
+        "Research acceptance matrix, actual-app screenshots and temporary-directory workflow recordings, CPU measurements",
+        "Full local gates, Linux/Windows CI, update PR237; author merges only"
+      ],
+      "next": "PR237 six review fixes implemented and verified locally (2026-11-01); confirm latest-head Linux/Windows CI and author review/merge. NativeCLI/DeepSeek remains author-side by user decision; no self merge.",
+      "verification": "2026-11-01: six review fixes; full1105Python/3skip,86Node,199Python/271JS syntax,secrets911 and Hiyori/Mao mapping checks;15 Chromium tests (11cards+4docs); first-run package/publicJSON/py_compile/diff checks;1440/768/390 inspection0findings with approved design exceptions. All11actual screenshots refreshed plus cancelled=12; old16static PNG/index deleted,5authorWebP retained,links/hashes checked. Latest-head CI evidence in PR237 Checks/body."
+    },
     {
       "id": "live2d-browser-text-vowels",
       "name": "Offline text-driven vowels for browser speech on capable Live2D mappings",
       "status": "in_progress",
-      "dependencies": ["live2d-motion-natural"],
+      "dependencies": [
+        "live2d-motion-natural"
+      ],
       "done_criteria": [
         "Licensed compact offline pinyin data; documented final-to-vowel mapping and size",
         "Delayed sparse-boundary timing, punctuation closure and smooth vowel changes; preserve browser mouth envelope",

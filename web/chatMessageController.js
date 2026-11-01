@@ -150,7 +150,7 @@
     function syncConversationHistoryFromChatRecords() {
       const records = Array.isArray(state.chatRecords) ? state.chatRecords : [];
       const convo = records
-        .filter((item) => item && item.kind !== "sticker" && (item.role === "user" || item.role === "assistant"))
+        .filter((item) => item && item.kind !== "sticker" && item.kind !== "task" && (item.role === "user" || item.role === "assistant"))
         .map((item) => ({
           role: item.role,
           content: String(item.content || "").trim()
@@ -191,7 +191,7 @@
     }
 
     function normalizeChatRecord(item) {
-      if (!item || typeof item !== "object") {
+      if (!item || typeof item !== "object" || item.kind === "task") {
         return null;
       }
       const role = item.role === "user" ? "user" : "assistant";
@@ -830,6 +830,7 @@
       }
       const previousTs = { user: 0, assistant: 0 };
       for (const item of state.chatRecords) {
+        if (item.kind === "task") continue;
         const timestamp = parseMessageTimestamp(item.timestamp);
         const role = item.role === "user" ? "user" : "assistant";
         if (shouldInsertTimeDivider(previousTs[role], timestamp)) {
@@ -855,6 +856,7 @@
       }
       scrollMessageLane("user");
       scrollMessageLane("assistant");
+      deps.onChatHistoryRendered?.();
     }
 
     function loadChatHistoryFromStorage() {
