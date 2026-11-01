@@ -134,4 +134,5 @@ def test_room_recap_only_uses_known_events_and_keeps_speakers_distinct():
     facts=recent_room_recap(records, "刚才我们在房间做了什么")
     assert facts == {"user_sat": False, "steps":["走到书架","坐到沙发"]}
     assert "你自己坐床边" not in ground_recap("我坐到沙发，你自己坐床边。",facts)
-    assert ground_recap("你让我去沙发坐着。",facts) == "你让我去沙发坐着。"
+    assert ground_recap("你走到书架前看了看，然后挪到沙发坐下。我跟着你。我们聊了书。",facts) == "我去了书架，坐到了沙发。我们聊了书。"
+    assert ground_recap("你让我去沙发坐着。",None) == "你让我去沙发坐着。"

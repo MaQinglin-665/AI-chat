@@ -194,11 +194,21 @@ def recent_room_recap(history, question):
 
 
 def ground_recap(text, facts):
-    # Do not attribute an unobserved user posture to the visitor in a recap.
-    if not facts or facts["user_sat"] or not re.search(r"你(?:自己|则|就|也|一直|还|当时|后来|在那儿|在床边|在沙发上|在椅子上|已经|正|坐着)?(?:坐|躺|瘫)", text):
+    if not facts:
         return text
-    actions = "，".join(facts["steps"])
-    return ("我" + actions + "。我们边聊边待了一会儿。" if actions else "我们在房间里聊了一会儿。")
+    # The engine owns physical facts. Render those directly rather than
+    # inferring a grammatical subject from the model's free-form Chinese.
+    phrases = {"走到":"去了", "看向":"看了看", "坐到":"坐到了"}
+    steps = [phrases[item[:2]] + item[2:] for item in facts["steps"]]
+    physical = ("我" + "，".join(steps) + "。" if steps else "我们在房间里待了一会儿。")
+    if facts["user_sat"]:
+        physical += "你也坐下来过。"
+    # Keep conversational recollections, but never copy a second, unverified
+    # account of movement or posture alongside the physical record.
+    topics = [clause.strip() for clause in re.split(r"[。！？]", text)
+              if re.search("聊|谈|说到|提到", clause)
+              and not re.search("坐|站|走|挪|去|看|靠|躺|翻|递|拿|跟着|床边", clause)]
+    return physical + ("。".join(topics[:2]) + "。" if topics else "")
 
 
 TURN_POLICY = """你是与用户同处房间的馨语。用角色的日常中文简短回答。当前姿态、位置、目标和回执优先于往事。
