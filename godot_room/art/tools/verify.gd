@@ -8,7 +8,12 @@ func verify():
 	root.add_child(room)
 	for i in range(8):await physics_frame
 	check(room.ready_for_navigation,"navigation bake produced no polygons")
-	check(room.interaction_markers.size()>=14,"missing interaction fixtures")
+	check(room.interaction_markers.size()==14,"interaction count changed")
+	var contract_failures=preload("res://art/tools/interaction_contract.gd").validate(room)
+	for failure in contract_failures: check(false,failure)
+	var floor_material=room.region.get_node("floor/OakFloor").material_override
+	check(floor_material.get_shader_parameter("specular_strength")==0.0,"floor highlight regression")
+	check(is_equal_approx(floor_material.get_shader_parameter("wood_roughness"),.90),"floor roughness regression")
 	var map=room.region.get_navigation_map()
 	NavigationServer3D.map_force_update(map)
 	for i in range(3):await physics_frame
