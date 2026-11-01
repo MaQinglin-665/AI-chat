@@ -1,0 +1,4 @@
+Original bedroom geometry, materials, shaders and decoration authored for this contribution are dedicated to the public domain under CC0 1.0 Universal.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+No web bedroom reference image pixels, imported third-party furniture, private avatar or texture data are included in these assets. Godot, the upstream VRM/MToon plugins, Shino and locomotion animation retain their separate existing licenses; they are not relicensed by this notice.

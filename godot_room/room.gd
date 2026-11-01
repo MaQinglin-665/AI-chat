@@ -27,6 +27,14 @@ func box(id: String, center: Vector3, size: Vector3, color: Color, actions := []
 	return body
 
 func _ready():
+	if ResourceLoader.exists("res://art/bedroom.tscn"):
+		var art = load("res://art/bedroom.tscn").instantiate()
+		add_child(art)
+		region.free() # Discard the unused legacy region before adopting the art scene.
+		region = art.region
+		objects = art.objects
+		spawn_actors()
+		return
 	add_child(region)
 	box("floor",Vector3(0,-.1,0),Vector3(9,.2,8),Color("#bc967b"))
 	box("back",Vector3(0,1.6,-4),Vector3(9,3.2,.15),Color("#b8a8bf"))
@@ -82,6 +90,9 @@ func _ready():
 	region.bake_navigation_mesh(false)
 	print("room navigation polygons ",nav.get_polygon_count()," interactables ",objects.keys())
 
+	spawn_actors()
+
+func spawn_actors():
 	var player = preload("res://player.gd").new()
 	player.name = "Player"
 	player.position = Vector3(0,0,2.8)
