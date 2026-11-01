@@ -246,6 +246,7 @@ func vec(v):
 
 func request(route: String, payload: Dictionary):
 	var http := HTTPRequest.new()
+	http.use_threads=true
 	add_child(http)
 	http.max_redirects=0
 	http.timeout = 2. if route=="room/alive" else 20.

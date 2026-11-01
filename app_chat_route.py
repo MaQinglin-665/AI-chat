@@ -106,7 +106,7 @@ def _build_chat_config(
         facts = recent_room_recap(body.get("room_recap"), user_message)
         if facts:
             resolved["_room_recap"] = facts
-            resolved["_room_context"] = "回顾刚才的房间，用第一人称自然概括下面的一两个事实，可以合并或省略琐碎步骤；不能把我的动作归给用户，不臆测道具。不要逐项复述内部记录：" + str(recap_choices(facts))
+            resolved["_room_context"] = "回顾刚才的房间，用第一人称自然概括下面的一两个主要事实，优先提坐下等活动，再提观景，可以合并或省略走近等琐碎步骤；不能把我的动作归给用户，不臆测道具。不要逐项复述内部记录：" + str(recap_choices(facts))
     if not is_auto and (resolved.get("room_spike") or {}).get("enabled") is True and isinstance(body.get("room"), dict):
         from app_room_spike import chat_context
         resolved["_room_context"] = chat_context(body["room"])

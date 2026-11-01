@@ -70,6 +70,7 @@ func play_sentence(text:String,id:int) -> bool:
 	var bridge=actor.get_parent().get_node("Bridge")
 	if bridge.token.is_empty(): return false
 	var http=HTTPRequest.new()
+	http.use_threads=true
 	http.timeout=35.
 	add_child(http)
 	var headers=["Authorization: Bearer "+bridge.token,"Content-Type: application/json","Origin: http://127.0.0.1:%d"%bridge.port]

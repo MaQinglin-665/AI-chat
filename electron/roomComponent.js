@@ -17,7 +17,8 @@ const PIN = Object.freeze({
 });
 
 function allowedRedirect(location) {
-  const url = new URL(location);
+  let url;
+  try { url = new URL(location); } catch { return false; }
   return url.protocol==="https:" && !url.username && !url.password && !url.port &&
     url.hostname==="release-assets.githubusercontent.com" &&
     url.pathname.startsWith("/github-production-release-asset/1217591333/");
