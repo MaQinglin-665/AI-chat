@@ -1,6 +1,6 @@
 # 卧室美术打磨验收
 
-基线：`9368749`（含 #240），目标 `codex/godot-room-spike`，分支 `friend/godot-room-art-polish`。2026-11-01，同一台 Windows 电脑、Godot 4.6.3。只改 `godot_room/art/`，本目录保存状态与交接，遵守用户范围限制，不改根状态文件。
+[草稿PR #241](https://github.com/MaQinglin-665/AI-chat/pull/241)。基线：`9368749`（含 #240），目标 `codex/godot-room-spike`，分支 `friend/godot-room-art-polish`。2026-11-01，同一台 Windows 电脑、Godot 4.6.3。只改 `godot_room/art/`，本目录保存状态与交接，遵守用户范围限制，不改根状态文件。
 
 ## 改动和边界
 
@@ -70,14 +70,14 @@ CPU为实际Godot子进程CPU时间/墙钟时间/32线程，非console启动器�
 
 ## 体积、来源、限制
 
-新增运行贴图0张、外部依赖0个。运行美术源文件约增7KiB；含14张PNG、冻结契约等，art/约3.81→9.74MiB，增约5.93MiB，低于30MB预算。按文件长度估算，非git压缩增量。无模型、引擎、导出包、录像、日志或原始采样提交。
+新增运行贴图0张、外部依赖0个。运行美术源文件约增8.5KiB；含14张PNG、冻结契约等，art/约3.81→9.74MiB，增约5.93MiB，低于30MB预算。按文件长度估算，非git压缩增量。无模型、引擎、导出包、录像、日志或原始采样提交。
 
 所有新增几何/绘画为本PR原创程序内容、AI辅助，按本模块CC0声明提供；无参考图像素。见[素材清单](../SOURCES.md)。公开Shino仅沿用spike现有CC0模型。小物不支持拾取，叶片不单独碰撞；作者需在主线房间检查实际行走和观感，由作者决定合并。
 
 ## Verification Evidence / 当前交接
 
 - 已通过原始基线verify、最终场景图形编译和实际截图检查；最终交互契约严格一致、43多边形、14路线、584胶囊采样。
-- 完整scripts/test-local.ps1通过：1111个Python通过、3跳过；全部86个Node测试文件通过；202个Python/271个JS语法检查通过；公开JSON和所需py_compile通过。新增文件暂存后再次运行secret scan与diff检查。
+- 完整scripts/test-local.ps1通过：1111个Python通过、3跳过；全部86个Node测试文件通过；202个Python/271个JS语法检查通过；公开JSON和所需py_compile通过。新增文件暂存后secret scan通过（928文件），diff检查通过。
 - Godot4.6.3本地最终verify通过；check_navigation通过（位移3.389m、Sitting_Idle后起身Idle）；check_shared_goals通过（沙发入座、占用拒绝、用户打断和utility目标不抢占）。
 - GitHub Linux/Windows等检查以草稿PR最新head的Checks为准；该CI不运行Godot引擎，以上Godot证据为本机实际运行。PR保持Draft，base为codex/godot-room-spike，由作者验收合并。
 

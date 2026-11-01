@@ -23,4 +23,4 @@
 
 ## 后续polish任务（2026-11-01）
 
-当前分支friend/godot-room-art-polish，从9368749新建，仅art/。原始Marker已冻结，三预设前后与小物图已保存。地板已证实为冷补光宽高光问题，不改光源/主线行为。43导航多边形、14交互点、584采样仍通过。详见[POLISH](POLISH.md)。用户反馈不限帧测试卡顿，已停止该方式，后续图形检查默认30fps，不再重复不限帧跑分。完整test-local已通过（1111 Python/3跳过、86 Node、202 Python/271 JS语法），公开JSON/py_compile通过；最终verify及主线导航/共享目标回归通过。PR和CI收尾中，最新CI见Draft PR Checks；禁止自行合并。
+当前分支friend/godot-room-art-polish，从9368749新建，仅art/。原始Marker已冻结，三预设前后与小物图已保存。地板已证实为冷补光宽高光问题，不改光源/主线行为。43导航多边形、14交互点、584采样仍通过。详见[POLISH](POLISH.md)。用户反馈不限帧测试卡顿，已停止该方式，后续图形检查默认30fps，不再重复不限帧跑分。完整test-local已通过（1111 Python/3跳过、86 Node、202 Python/271 JS语法），公开JSON/py_compile通过；最终verify及主线导航/共享目标回归通过。已推送[Draft PR #241](https://github.com/MaQinglin-665/AI-chat/pull/241)，最新CI见该PR Checks；禁止自行合并。
