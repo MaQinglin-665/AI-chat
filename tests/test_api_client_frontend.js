@@ -83,11 +83,53 @@ async function testAuthFetchAddsAndRefreshesToken() {
   assert.strictEqual(calls[0].token, null);
 }
 
+async function testInlineAuthFeedbackOnlyChangesPresentation() {
+  const reports = [], requests = [];
+  globalThis.TaffyStageFeedback = { startupFailure: value => reports.push(value) };
+  globalThis.location = { origin: "http://127.0.0.1:8123", search: "" };
+  globalThis.localStorage = createStorage({ taffy_api_token: "fixture-token" });
+  globalThis.__TAFFY_API_TOKEN = "fixture-token";
+  globalThis.electronAPI = { getApiToken: async () => "fixture-token" };
+  let status = 401;
+  globalThis.fetch = async (input, init) => { requests.push(init); return { status }; };
+  await api.resolveApiToken(true);
+  assert.equal((await api.authFetch("/api/agent/task/id/approve", { method: "POST" }, { authErrorSurface: "inline" })).status, 401);
+  assert.equal(reports.length, 0);
+  assert.equal(requests.length, 1, "unchanged token does not retry a POST");
+  assert.equal(requests[0].headers.get("X-Taffy-Token"), "fixture-token");
+  assert.equal(requests[0].authErrorSurface, undefined, "UI option is not passed to native fetch");
+  await api.authFetch("/api/chat", {});
+  assert.deepEqual(reports, ["HTTP 401"], "other callers retain the global authentication message");
+  status = 500;
+  await api.authFetch("/api/agent/task", {}, { authErrorSurface: "inline" });
+  assert.deepEqual(reports, ["HTTP 401", "HTTP 500"], "inline auth does not hide service failures");
+  delete globalThis.TaffyStageFeedback;
+}
+
+async function testChatRequestBridgeForwardsFeedback() {
+  const source = require("node:fs").readFileSync(path.resolve(__dirname, "../web/chat.js"), "utf8");
+  const wrapper = source.match(/async function authFetch\(input,[\s\S]*?(?=\nwindow.addEventListener\("taffy-agent-confirm")/)[0];
+  const calls = [], handler = (...args) => { calls.push(args); return { status: 401 }; };
+  const context = { API_CLIENT: { authFetch: handler }, window: {}, fetch: handler };
+  require("node:vm").runInNewContext(wrapper + ";this.bridge = authFetch;", context);
+  const init = { method: "POST" }, feedback = { authErrorSurface: "inline" };
+  await context.bridge("/api/agent/task/id/approve", init, feedback);
+  assert.strictEqual(calls[0][2], feedback);
+  delete context.API_CLIENT.authFetch; context.window.authFetch = handler;
+  await context.bridge("/api/agent/task/id/approve", init, feedback);
+  assert.strictEqual(calls[1][2], feedback);
+  delete context.window.authFetch;
+  await context.bridge("/api/agent/task/id/approve", init, feedback);
+  assert.equal(calls[2].length, 2, "native fetch fallback never receives a presentation option");
+}
+
 async function main() {
   assert.strictEqual(api.isApiRequestTarget("/api/chat"), true);
   assert.strictEqual(api.isApiRequestTarget("/config.json"), false);
   await testTokenResolutionOrder();
   await testAuthFetchAddsAndRefreshesToken();
+  await testInlineAuthFeedbackOnlyChangesPresentation();
+  await testChatRequestBridgeForwardsFeedback();
   console.log("API client frontend checks passed.");
 }
 
