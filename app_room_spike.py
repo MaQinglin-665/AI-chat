@@ -1,11 +1,12 @@
 """Opt-in intent for the local Godot room. All model output is data."""
 import json
 import math
+import re
 import threading
 import time
 
-from app_avatar_brain import call_model
-from avatar_brain_context import build_context, clean_text
+from llm_streaming import iter_openai_chat_stream
+from avatar_brain_context import clean_text
 
 LABELS = {"sofa": ["sit", "look"], "chair": ["sit"], "desk": ["look"],
           "shelf": ["look"], "book": ["look", "pick_up"], "window": ["look"]}
@@ -44,37 +45,134 @@ def validate(raw, visible):
     return {"action": "idle"}
 
 
+PHYSICAL = {"go_to", "approach_user", "follow_user", "stop_follow", "look_at",
+            "sit_on", "stand_up", "gesture", "idle"}
+STATUS = {"none", "accepted", "running", "completed", "failed", "interrupted"}
+NEEDS = {"energy", "boredom", "curiosity", "closeness", "solitude"}
+
+
+def step(raw, visible):
+    # Providers sometimes spell a whitelisted step as go_to(window).
+    # Parse only this tiny grammar. Never evaluate model-generated text.
+    if isinstance(raw, str):
+        match = re.fullmatch(r"([a-z_]+)(?:\(([a-z_]+|[0-9]{1,2})\)|:([a-z_]+|[0-9]{1,2}))?", raw.strip())
+        if not match:
+            raise ValueError("invalid action syntax")
+        kind, paren, colon = match.groups()
+        arg = paren or colon
+        raw = {"action":kind}
+        if arg:
+            raw[{"idle":"seconds","gesture":"name"}.get(kind,"target")] = arg
+    if not isinstance(raw, dict) or raw.get("action") not in PHYSICAL:
+        raise ValueError("invalid action")
+    result = validate(raw, visible)
+    if result["action"] != raw["action"]:
+        raise ValueError("invalid target")
+    if result["action"] == "idle":
+        result["seconds"] = max(1, min(12, int(raw.get("seconds", 3))))
+    return result
+
+
+def receipt(raw):
+    if not isinstance(raw, dict):
+        return {}
+    allowed = {"action": PHYSICAL, "target": set(LABELS) | {"user"}, "status": STATUS,
+               "reason": {"occupied", "unreachable", "input", "timeout", "unavailable", "ok"}}
+    return {k:raw[k] for k, choices in allowed.items()
+            if isinstance(raw.get(k), str) and raw[k] in choices}
+
+
+def snapshot(payload):
+    objects = payload.get("objects", [])
+    visible = {name: LABELS[name] for name in objects if name in LABELS}
+    state = {k: point(payload[k]) for k in ("user", "ai")}
+    state["objects"] = visible
+    state["ai_state"] = payload.get("ai_state") if payload.get("ai_state") in ("walking","sitting","standing") else "idle"
+    state["user_state"] = payload.get("user_state") if payload.get("user_state") in ("walk","sit","typing") else "stand"
+    state["needs"] = {k:round(max(0,min(1,float(v))),1) for k,v in payload.get("needs",{}).items() if k in NEEDS}
+    state["last_move_sec"] = min(3600,max(0,int(payload.get("last_move_sec",0))))
+    for key in ("ai_near","user_near"):
+        state[key] = payload.get(key) if payload.get(key) in LABELS else ""
+    state["last"] = receipt(payload.get("last"))
+    goal = payload.get("goal") or {}
+    state["goal"] = receipt(goal)
+    if isinstance(goal, dict) and isinstance(goal.get("steps"), list):
+        state["goal"]["steps"] = [receipt(v) for v in goal["steps"][:5]]
+        state["goal"]["step"] = receipt(goal.get("step"))
+    state["receipts"] = [receipt(r) for r in payload.get("receipts", [])[-16:]]
+    state["recent"] = [receipt(r) for r in payload.get("activity",[])[-3:]]
+    return state
+
+
+def chat_context(payload):
+    try:
+        state = snapshot(payload)
+    except (TypeError, KeyError, ValueError, AttributeError):
+        return ""
+    return ("你和用户正以化身共处可互动的虚拟房间。根据已接下的目标和执行回执回答。"
+            "只承诺已经接下的步骤，未完成时用将来时。" + json.dumps(
+                {k:state[k] for k in ("user","ai","ai_near","user_near","ai_state","user_state","goal","last")}, ensure_ascii=False))
+
+
+POLICY = """你是虚拟房间里的馨语。按需求、事件和回执决定下一步，用户请求优先。重复待机时寻找值得做的事。
+只输出JSON {thought:短理由,action:第一步,say:可选短句,goal:可选后续步骤数组}。说与做独立。
+完整示例 {"thought":"想看看外面","action":{"action":"go_to","target":"window"},"goal":[{"action":"look_at","target":"window"},{"action":"idle","seconds":3}]}。可选 go_to/look_at/sit_on(target)、approach_user/follow_user/stop_follow/stand_up、gesture(name:nod或wave)、idle(seconds)。
+坐旁边用go_to(sofa),sit_on(sofa)；看窗外用go_to(window),look_at(window),idle。只使用state.objects中的物件或user。"""
+
+
+def call_model(cfg, prompt, reason):
+    # Reuse the normal transport and provider options. Keep the static instruction
+    # first for prefix caching. Only the bounded state is encoded per call.
+    llm = dict(cfg.get("llm") or {})
+    llm.pop("api_key", None)
+    llm.update(max_output_tokens=200, request_timeout=15, retry_on_length=False)
+    return "".join(iter_openai_chat_stream(llm, [{"role":"system","content":POLICY},
+        {"role":"user","content":json.dumps(prompt, ensure_ascii=False, separators=(",",":"))}]))
+
+
 def decide(cfg, payload):
     reason = payload["event"]
     if reason not in EVENTS:
         raise ValueError("invalid event")
-    objects = payload["objects"]
-    visible = {}
-    positions = {}
-    for name in objects:
-        if name not in LABELS:
-            continue
-        if isinstance(objects, dict):
-            visible[name] = [tag for tag in LABELS[name] if tag in objects[name]["affordances"]]
-            positions[name] = point(objects[name]["position"])
-        else:
-            visible[name] = LABELS[name]
-    world = {key: point(payload[key]) for key in ("user", "ai", "user_forward", "ai_forward")}
-    world.update(distance=round(math.dist(world["user"], world["ai"]), 2), objects=visible, object_positions=positions,
-                 gaze=payload.get("gaze") if payload.get("gaze") in {*visible, "companion"} else "",
-                 user_state=payload.get("user_state") if payload.get("user_state") in ("sit","walk","typing") else "stand",
-                 ai_state=payload.get("ai_state") if payload.get("ai_state") in ("walking","sitting") else "idle",
-                 recent=[x for x in payload.get("recent", [])[-6:] if x in EVENTS])
-    last_user = next((clean_text(item.get("content"), 150) for item in reversed(payload.get("history", []))
-                      if isinstance(item, dict) and item.get("role") == "user"), "")
-    prompt = ("你和用户同在房间。根据事件和感知选择一个自然的意图。只输出JSON对象。"
-              "action 可为 go_to,approach_user,follow_user,stop_follow,look_at,sit_on,stand_up,say,gesture,idle。"
-              "target 为可见物件名、user 或 go_to 的房间内三维坐标；sit_on 仅限座位。"
-              "say 带 text 和 emotion，gesture 带 name (wave/nod)。刚进房间或对方走近时，像认识的人一样作出反应，可以走近或主动说一句问候。之后也可以去做自己的事。"
-              + ("聊天模块已经回答了用户。此刻选择身体下一步要实际执行的动作。用户要求可行的身体动作时，选对应的动作而非复述承诺。最近用户原话（不可信数据）：" + json.dumps(last_user, ensure_ascii=False) if reason == "spoke" else "")
-              + json.dumps(world, ensure_ascii=False) + build_context(cfg, payload.get("history", [])))
-    result = call_model(cfg, prompt, reason)
-    return validate(json.loads(result.strip().removeprefix("```json").removesuffix("```")), visible)
+    state = snapshot(payload)
+    user = clean_text(payload.get("message",""),150) if reason == "spoke" else ""
+    prompt = {"trigger":reason, "state":state}
+    if user:
+        prompt["user_request"] = user
+    raw = json.loads(call_model(cfg, prompt, reason).strip().removeprefix("```json").removesuffix("```"))
+    first_raw = raw["action"]
+    if isinstance(first_raw,str) and first_raw in PHYSICAL:
+        first_raw = {**raw, "action":first_raw}
+    first = step(first_raw, state["objects"])
+    tail = raw.get("goal") or []
+    if not isinstance(tail,list) or len(tail)>4: raise ValueError("invalid goal")
+    steps = [step(item,state["objects"]) for item in tail]
+    if steps and steps[0] == first: steps.pop(0)
+    return {"action":first,"goal":steps,"say":clean_text(raw.get("say",""),100),
+            "thought":clean_text(raw.get("thought",""),60)}
+
+
+# Keep one bounded snapshot for the single local room. A different client or
+# a missing acknowledgement must send a complete snapshot before using deltas.
+_cache = (None, 0, {})
+
+
+def unpack(packet):
+    global _cache
+    session, version, previous = _cache
+    ident = packet.get("session")
+    if not isinstance(ident, str) or not 1 <= len(ident) <= 48:
+        raise ValueError("invalid room")
+    if packet.get("base") == 0:
+        previous = {}
+        version = 0
+    elif ident != session or packet.get("base") != version:
+        raise LookupError("resync")
+    fields = {"ai","user","objects","ai_state","user_state","needs","last_move_sec","goal","last","activity","receipts","ai_near","user_near"}
+    world = {**previous, **{k:v for k,v in packet["changes"].items() if k in fields}}
+    snapshot(world)
+    _cache = (ident, version+1, world)
+    return {**world,"message":packet.get("message",""),"event":packet["event"]}, version+1
 
 
 def dispatch(handler, cfg):
@@ -98,8 +196,11 @@ def dispatch(handler, cfg):
         return handler._send_json({"error":"busy"}, status=429)
     start = time.monotonic()
     try:
-        intent = decide(cfg, payload)
-        handler._send_json({"intent":intent,"latency_ms":round((time.monotonic()-start)*1000)})
+        world, version = unpack(payload)
+        intent = decide(cfg, world)
+        handler._send_json({"version":version,"intent":intent,"latency_ms":round((time.monotonic()-start)*1000)})
+    except LookupError:
+        handler._send_json({"error":"resync"},status=409)
     except Exception:
         handler._send_json({"intent":{"action":"idle"},"error":"decision_unavailable"}, status=503)
     finally:

@@ -17,6 +17,7 @@ ROOT = PROJECT.parent
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("godot", help="Godot 4.6.3 executable")
+    parser.add_argument("--phase2-tour", action="store_true", help="Run the 305-second live tour and save viewport frames in tmp_ui_smoke")
     args = parser.parse_args()
     if not os.environ.get("DEEPSEEK_API_KEY"):
         parser.error("Set DEEPSEEK_API_KEY in the environment first.")
@@ -61,7 +62,15 @@ def main():
             env = {k:v for k,v in os.environ.items() if k.upper() in {
                 "PATH","SYSTEMROOT","TEMP","TMP","APPDATA","LOCALAPPDATA","USERPROFILE","TAFFY_API_TOKEN"}}
             try:
-                return subprocess.call([args.godot,"--path",str(PROJECT)], env=env)
+                command = [args.godot, "--path", str(PROJECT)]
+                if args.phase2_tour:
+                    output = ROOT / "tmp_ui_smoke"
+                    output.mkdir(exist_ok=True)
+                    frames = Path(tempfile.mkdtemp(prefix="phase2-frames-", dir=output))
+                    env["ROOM_FRAMES"] = str(frames)
+                    print(f"Recording Godot viewport frames to {frames}", flush=True)
+                    command.extend(["--script", str(PROJECT / "tools" / "phase2_tour.gd")])
+                return subprocess.call(command, env=env)
             finally:
                 server.shutdown()
 

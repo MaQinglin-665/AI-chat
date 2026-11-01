@@ -1,4 +1,8 @@
-# Current — Godot room spike, 2026-11-01
+# Current — Godot room autonomy, draft PR 238
+
+See [phase 2 measurements](godot_room/PHASE2-REPORT.md), eight frames and ignored tmp_ui_smoke/godot-room-phase2-deepseek-30fps.mp4. Await author review.
+
+## Earlier spike, 2026-11-01
 Draft PR238. Worktree D:/AI/ai_desktop_pet_godot. Review godot_room/SPIKE-REPORT.md and ignored tmp_ui_smoke/godot-room-deepseek-5min.mp4. Known limits: conversational bias, incomplete multi-step seating, foot contact at phase boundaries, isolated run uses synthetic navigation inputs and real DeepSeek. Await author acceptance.
 
 ## Previous task records

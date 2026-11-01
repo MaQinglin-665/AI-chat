@@ -1,5 +1,7 @@
 # Godot room spike
 
+[第二阶段：自主行动验收与录像时间线](PHASE2-REPORT.md)
+
 Run with Godot 4.6.3. From this directory run `godot --headless --editor --import`, then `godot --fixed-fps 60 --script res://import_probe.gd`. The probe renders frames under docs/spike and measures spring-joint rotation relative to its parent during body translation and head turning.
 
 Godot 4.7.2 (ed1daf0bf) rejects missing returns in godot-vrm 2.1.0's VRMC_springBone, VRMC_materials_mtoon and VRMC_materials_hdr_emissiveMultiplier scripts. Plugin initialization fails at the first springBone.new(). The two subsequent null-extension diagnostics occur while parsing glTF and enumerating supported extensions. Geometry imports but the secondary node has no script. Godot 4.6.3 (7d41c59c4) instead produces a working VRMSecondary and 149 skeleton bones. Its importer still reports a missing vrm/already_processed dictionary key.

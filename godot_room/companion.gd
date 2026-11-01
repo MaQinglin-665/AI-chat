@@ -5,6 +5,7 @@ var motion := preload("res://locomotion.gd").new()
 var bubble := Label3D.new()
 var follow := false
 var sitting := false
+var seat_exit := Vector3.ZERO
 var look_target: Node3D
 var destination := ""
 var posture_change := 0
@@ -50,11 +51,18 @@ func approach(node: Node3D):
 	var offset = (global_position-node.global_position).slide(Vector3.UP).normalized()
 	var distance = 1.3 if node == player else .85
 	var approach_point = node.global_position + offset * distance
+	if node.name == &"sofa":
+		var cushion := 0.
+		if player.seated: cushion=.68 if player.position.x <= node.position.x else -.68
+		approach_point=node.global_position + Vector3(cushion,0,.85)
+	elif node.name == &"chair":
+		approach_point=node.global_position+Vector3(-.8,0,0)
 	agent.target_position = Vector3(approach_point.x,global_position.y,approach_point.z)
 	destination = str(node.name)
 	own_state = "walking"
 
 func stand():
+	if sitting: global_position=seat_exit
 	posture_change += 1
 	sitting = false
 	body.position.y = 0
@@ -67,11 +75,15 @@ func stand():
 		own_state = "idle"
 
 func sit():
+	seat_exit=global_position
 	sitting = true
 	posture_change += 1
 	var revision = posture_change
 	own_state = "sitting"
-	global_position = Vector3(sit_target.position.x,0,sit_target.position.z+.16)
+	var offset := 0.
+	if sit_target.name == &"sofa" and player.seated:
+		offset = .68 if player.position.x <= sit_target.position.x else -.68
+	global_position = Vector3(sit_target.position.x+offset,0,sit_target.position.z+.16)
 	sit_target = null
 	motion.playback.travel("Sitting_Enter")
 	await get_tree().create_timer(1.1).timeout
@@ -98,12 +110,14 @@ func _physics_process(delta):
 	elif own_state == "walking":
 		own_state = "idle"
 		motion.playback.travel("Idle")
-		if sit_target: sit()
+		if sit_target:
+			if (position-agent.target_position).slide(Vector3.UP).length()<.45: sit()
+			else: sit_target=null
 	if own_state == "idle":
 		glance_after -= delta
-		if distance < 2.:
+		if distance < 2. and get_parent().get_node("Bridge").current.is_empty():
 			look_target = player
-		elif glance_after <= 0:
+		elif glance_after <= 0 and get_parent().get_node("Bridge").current.is_empty():
 			look_target = get_parent().objects.values().pick_random()
 			glance_after = randf_range(5,13)
 		if distance < .85:

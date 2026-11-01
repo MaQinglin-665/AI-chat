@@ -1,5 +1,9 @@
 # Progress
 
+## Godot room phase 2
+
+Real DeepSeek tour: 6/9 autonomous decisions started with movement, 2/2 user goals completed, intent P50 2.18 s. See [evidence and limitations](godot_room/PHASE2-REPORT.md).
+
 History: [archive](docs/archive/2026-10-23-progress.md).
 
 ## 2026-10-23 — Developer readiness
