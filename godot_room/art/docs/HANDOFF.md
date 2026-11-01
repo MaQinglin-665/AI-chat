@@ -8,7 +8,7 @@
 
 ## Verification Evidence
 
-- 同步90fbedc后完整scripts/test-local.ps1：1111Python通过/3跳过、86Node、202Python/271JS语法、secrets925及本机映射通过。公开JSON、必需py_compile、首次打包check_first_run_package和diff检查通过。较早e4526ba的1108Python不是最终证据，最终以1111项为准。
+- 同步90fbedc后完整scripts/test-local.ps1：1113Python通过/3跳过、86Node、202Python/271JS语法、secrets925及本机映射通过。公开JSON、必需py_compile、首次打包check_first_run_package和diff检查通过。较早e4526ba的1108Python不是最终证据，最终以1113项为准。
 - Godot4.6.3 actual：art/tools/verify.gd通过，43个烘焙多边形，14个Marker从入口连通，584个0.30m胶囊路径采样无碰撞；非法灯光/画质值不改状态。verify显式同步导航服务器，不在网格尚未生效时假报不可达。
 - 作者最新check_shared_goals.gd通过：相邻沙发、占用拒绝、用户打断、本地utility不抢运行中目标；check_navigation通过：位移3.389m后Sitting_Idle，起身Idle；check_player通过：弹簧臂靠墙缩短、跳跃顶点约0.909m并回第一人称。所有验收子进程清空TAFFY_API_TOKEN或不创建bridge，不调用LLM/后端。
 - 实际截图8张，三预设固定#238机位、多个角度/站立/坐姿、真实NavigationMesh。PNG摘要见REVIEW。只用公开CC0 Shino；原嵌入贴图最大2K，无模型改动。坐姿镜头按Seat点校准原动画的髋部，不冒充已改主线入座算法。
@@ -23,4 +23,6 @@
 
 ## 后续polish任务（2026-11-01）
 
-当前分支friend/godot-room-art-polish，从9368749新建，仅art/。原始Marker已冻结，三预设前后与小物图已保存。地板已证实为冷补光宽高光问题，不改光源/主线行为。43导航多边形、14交互点、584采样仍通过。详见[POLISH](POLISH.md)。用户反馈不限帧测试卡顿，已停止该方式，后续图形检查默认30fps，不再重复不限帧跑分。完整test-local已通过（1111 Python/3跳过、86 Node、202 Python/271 JS语法），公开JSON/py_compile通过；最终verify及主线导航/共享目标回归通过。已推送[Draft PR #241](https://github.com/MaQinglin-665/AI-chat/pull/241)，最新CI见该PR Checks；禁止自行合并。
+当前分支friend/godot-room-art-polish，从9368749新建，仅art/。原始Marker已冻结，三预设前后与小物图已保存。地板已证实为冷补光宽高光问题，不改光源/主线行为。43导航多边形、14交互点、584采样仍通过。详见[POLISH](POLISH.md)。用户反馈不限帧测试卡顿，已停止该方式，后续图形检查默认30fps，不再重复不限帧跑分。完整test-local已通过（1113 Python/3跳过、86 Node、202 Python/271 JS语法），公开JSON/py_compile通过；最终verify及主线导航/共享目标回归通过。已推送[Draft PR #241](https://github.com/MaQinglin-665/AI-chat/pull/241)，最新CI见该PR Checks；禁止自行合并。
+
+最新收尾：已普通merge作者ac5b967，无冲突，PR相对最新base仍只有art/。全量本地检查再次通过；最终美术verify通过。截图/性能仍是同一原始art基线9368749的有效对照（作者两笔提交未改art）。新版整房间另加载玩家模型，本次未启动；旧整房间回归证据明确标为9368749，最新模型组合由作者验收。

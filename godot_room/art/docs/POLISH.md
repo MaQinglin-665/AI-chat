@@ -1,6 +1,6 @@
 # 卧室美术打磨验收
 
-[草稿PR #241](https://github.com/MaQinglin-665/AI-chat/pull/241)。基线：`9368749`（含 #240），目标 `codex/godot-room-spike`，分支 `friend/godot-room-art-polish`。2026-11-01，同一台 Windows 电脑、Godot 4.6.3。只改 `godot_room/art/`，本目录保存状态与交接，遵守用户范围限制，不改根状态文件。
+[草稿PR #241](https://github.com/MaQinglin-665/AI-chat/pull/241)。基线：`9368749`（含 #240），已普通merge最新目标ac5b967，目标 `codex/godot-room-spike`，分支 `friend/godot-room-art-polish`。2026-11-01，同一台 Windows 电脑、Godot 4.6.3。只改 `godot_room/art/`，本目录保存状态与交接，遵守用户范围限制，不改根状态文件。
 
 ## 改动和边界
 
@@ -49,12 +49,10 @@
 
 ```text
 godot --headless --path godot_room --script res://art/tools/verify.gd
-godot --headless --path godot_room --script res://check_navigation.gd
-godot --headless --path godot_room --script res://check_shared_goals.gd
 godot --path godot_room --position -16000,-16000 --max-fps 30 --script res://art/tools/capture_polish.gd -- after
 ```
 
-主线行为检查清空测试进程的TAFFY_API_TOKEN，不连接后端。截图脚本只创建美术场景、公开模型和已有动画，不创建player/bridge，不发声。新截图和诊断脚本默认30fps；诊断输出user://，不覆盖冻结证据。capture_polish拒绝before参数，避免误用新场景覆盖改前图。
+早期9368749主线行为检查清空测试进程的TAFFY_API_TOKEN，不连接后端。截图脚本只创建美术场景、公开模型和已有动画，不创建player/bridge，不发声。新截图和诊断脚本默认30fps；诊断输出user://，不覆盖冻结证据。capture_polish拒绝before参数，避免误用新场景覆盖改前图。
 
 ## 同机性能（使用已完成短测，不重复跑分）
 
@@ -77,8 +75,8 @@ CPU为实际Godot子进程CPU时间/墙钟时间/32线程，非console启动器�
 ## Verification Evidence / 当前交接
 
 - 已通过原始基线verify、最终场景图形编译和实际截图检查；最终交互契约严格一致、43多边形、14路线、584胶囊采样。
-- 完整scripts/test-local.ps1通过：1111个Python通过、3跳过；全部86个Node测试文件通过；202个Python/271个JS语法检查通过；公开JSON和所需py_compile通过。新增文件暂存后secret scan通过（928文件），diff检查通过。
-- Godot4.6.3本地最终verify通过；check_navigation通过（位移3.389m、Sitting_Idle后起身Idle）；check_shared_goals通过（沙发入座、占用拒绝、用户打断和utility目标不抢占）。
+- 完整scripts/test-local.ps1通过：1113个Python通过、3跳过；全部86个Node测试文件通过；202个Python/271个JS语法检查通过；公开JSON和所需py_compile通过。新增文件暂存后secret scan通过（929文件），diff检查通过。
+- Godot4.6.3在同步ac5b967后最终verify通过。check_navigation（位移3.389m、坐下/起身）和check_shared_goals（占用/打断/utility）为9368749的实际回归证据；新版主线整房间默认加载另一玩家模型，本任务只用公开Shino，未重跑新版双角色整房间检查，留作者集成验收。
 - GitHub Linux/Windows等检查以草稿PR最新head的Checks为准；该CI不运行Godot引擎，以上Godot证据为本机实际运行。PR保持Draft，base为codex/godot-room-spike，由作者验收合并。
 
 ## 证据图SHA256
