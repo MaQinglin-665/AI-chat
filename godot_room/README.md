@@ -1,5 +1,7 @@
 # Godot room spike
 
+[第三阶段：新卧室、双人座位和流式聊天](PHASE3-REPORT.md)
+
 [第二阶段：自主行动验收与录像时间线](PHASE2-REPORT.md)
 
 Run with Godot 4.6.3. From this directory run `godot --headless --editor --import`, then `godot --fixed-fps 60 --script res://import_probe.gd`. The probe renders frames under docs/spike and measures spring-joint rotation relative to its parent during body translation and head turning.

@@ -1,5 +1,9 @@
 # Progress
 
+## Godot room phase 3
+
+Bedroom interaction now uses 14 art markers. Tested 1.15 m seat spacing, matching forward directions and >0.91 m eye clearance to posed meshes. See [phase 3 live measurements](godot_room/PHASE3-REPORT.md).
+
 ## Godot room phase 2
 
 Real DeepSeek tour: 6/9 autonomous decisions started with movement, 2/2 user goals completed, intent P50 2.18 s. See [evidence and limitations](godot_room/PHASE2-REPORT.md).
