@@ -1,7 +1,8 @@
 config_version=5
 [application]
-config/name="VRM Import Spike"
+run/main_scene="res://room.tscn"
+config/name="Xinyu Shared Room"
 [editor_plugins]
 enabled=PackedStringArray("res://addons/Godot-MToon-Shader/plugin.cfg", "res://addons/vrm/plugin.cfg")
 [rendering]
-renderer/rendering_method="gl_compatibility"
+renderer/rendering_method="forward_plus"
