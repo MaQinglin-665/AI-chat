@@ -1152,6 +1152,8 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto
         )
         if brain_block:
             base_prompt = merge_prompt_with_memory(base_prompt, brain_block)
+    if config.get("_room_context"):
+        base_prompt = merge_prompt_with_memory(base_prompt, config["_room_context"])
     conversation_context_block = _build_conversation_context_prompt_block(
         config.get("_conversation_context") if isinstance(config, dict) else None,
         user_message,

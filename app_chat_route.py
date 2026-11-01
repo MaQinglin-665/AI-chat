@@ -99,6 +99,10 @@ def _build_chat_config(
         is_auto=is_auto,
     )
     resolved = dict(chat_config or {})
+    resolved.pop("_room_context", None)
+    if not is_auto and (resolved.get("room_spike") or {}).get("enabled") is True and isinstance(body.get("room"), dict):
+        from app_room_spike import chat_context
+        resolved["_room_context"] = chat_context(body["room"])
     resolved.pop("_galgame_context", None)
     resolved.pop("_galgame_stream_segments", None)
     galgame_context = sanitize_galgame_context(body.get("galgame"))
