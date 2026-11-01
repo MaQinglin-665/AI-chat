@@ -75,3 +75,8 @@ func _ready():
 	player.name = "Player"
 	player.position = Vector3(0,0,2.8)
 	add_child(player)
+
+	var companion = preload("res://companion.gd").new()
+	companion.name = "Companion"
+	companion.position = Vector3(-1,0,-2)
+	add_child(companion)
