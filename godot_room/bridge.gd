@@ -67,6 +67,8 @@ func capabilities():
 	var caps := {}
 	for id in room.markers:
 		caps[id] = room.markers[id].get_meta("affordances")
+	for id in room.seat_targets:
+		caps[id]=["sit"]
 	return caps
 
 var last_move := 0.
@@ -148,7 +150,7 @@ func begin_step():
 				ack("completed","ok")
 				begin_step()
 			return
-	if current.action=="sit_on" and room.seat_for(room.objects.get(target),ai).is_empty():
+	if current.action=="sit_on" and room.seat_for(room.target_object(target),ai).is_empty():
 		finish("failed","occupied")
 		return
 	execute(current)
@@ -172,7 +174,7 @@ func advance(delta):
 			var where:Vector3
 			if target is Array: where=Vector3(target[0],0,target[2])
 			elif target=="user": where=player.position
-			else: where=room.objects[target].position
+			else: where=room.target_object(target).position
 			var gap=(ai.position-where).slide(Vector3.UP).length()
 			if target=="user": done=gap<1.9
 			else: done=ai.own_state!="walking" and (ai.position-ai.agent.target_position).slide(Vector3.UP).length()<.45
@@ -288,7 +290,7 @@ func think():
 
 func execute(intent):
 	var target = intent.get("target","")
-	var obj = room.objects.get(target) if target is String else null
+	var obj = room.target_object(target) if target is String else null
 	if target is String and target == "user": obj = player
 	print("room_decision ",intent.action," target=",str(intent.get("target","")))
 	match intent.action:

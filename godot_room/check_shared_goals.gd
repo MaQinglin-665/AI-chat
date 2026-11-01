@@ -15,7 +15,19 @@ func run():
 	bridge.utility_clock=9999
 	for i in range(5): await physics_frame
 	var p=bridge.player
-	check(not p.take_seat(room.objects.bed),"bed has no Seat marker")
+	check(bridge.capabilities().has("bed_edge_seat"),"discover bed seat from metadata")
+	bridge.accept({"action":{"action":"go_to","target":"bed_edge_seat"},"goal":[{"action":"sit_on","target":"bed_edge_seat"}]},"autonomous")
+	for i in range(1200):
+		await physics_frame
+		if bridge.current.is_empty(): break
+	check(bridge.goal.status=="completed" and bridge.ai.sitting and bridge.ai.seat_object==room.objects.bed,"Shino sits on bed edge")
+	check(not p.take_seat(room.objects.bed),"occupied bed edge")
+	bridge.accept({"action":{"action":"stand_up"}},"autonomous")
+	for i in range(240):
+		await physics_frame
+		if bridge.current.is_empty(): break
+	check(not bridge.ai.sitting and bridge.goal.status=="completed","Shino stands from bed edge")
+	bridge.receipts.clear()
 	check(p.take_seat(room.objects.sofa),"player sofa seat")
 	var facing=-p.camera.global_basis.z
 	bridge.accept({"action":{"action":"go_to","target":"sofa"},"goal":[{"action":"sit_on","target":"sofa"}]},"user")

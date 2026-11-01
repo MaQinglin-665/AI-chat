@@ -58,8 +58,17 @@ func utter(text):
 	started_speech=false
 	measured=false
 	reset_mouth()
+	var split=RegEx.new()
+	split.compile("[^。！？!?；;，,\\n]+[。！？!?；;，,]*")
+	var sentences=split.search_all(text)
+	for sentence in sentences:
+		if id!=serial: return
+		# Prepare the next clause while the current one is audible.
+		if not await play_sentence(sentence.get_string(),id): return
+
+func play_sentence(text:String,id:int) -> bool:
 	var bridge=actor.get_parent().get_node("Bridge")
-	if bridge.token.is_empty(): return
+	if bridge.token.is_empty(): return false
 	var http=HTTPRequest.new()
 	http.timeout=35.
 	add_child(http)
@@ -67,14 +76,14 @@ func utter(text):
 	http.max_redirects=0
 	if http.request("http://127.0.0.1:%d/api/tts"%bridge.port,headers,HTTPClient.METHOD_POST,JSON.stringify({"text":text}))!=OK:
 		http.queue_free()
-		return
+		return false
 	actor.caption.extend_for_audio(http.timeout)
 	var response=await http.request_completed
 	http.queue_free()
-	if id!=serial: return
+	if id!=serial: return false
 	if response[1]!=200:
 		actor.caption.fallback_to_text()
-		return
+		return false
 	var data: PackedByteArray=response[3]
 	var audio: AudioStream
 	if data.slice(0,4).get_string_from_ascii()=="RIFF":
@@ -85,17 +94,22 @@ func utter(text):
 		audio=AudioStreamMP3.load_from_buffer(data)
 	if not audio:
 		actor.caption.fallback_to_text()
-		return
-	cues=[]
+		return false
+	var next_cues=[]
 	for header in response[2]:
 		if header.to_lower().begins_with("x-room-visemes:"):
 			var parsed=JSON.parse_string(header.substr(header.find(":")+1))
-			if parsed is Array: cues=parsed
+			if parsed is Array: next_cues=parsed
 		if header.to_lower().begins_with("x-room-match:"): print("ROOM_VOICE_MATCH ",header.substr(header.find(":")+1).strip_edges())
 		if header.to_lower().begins_with("x-room-voice:"):
 			print("ROOM_VOICE ",header.substr(header.find(":")+1).strip_edges().uri_decode())
+	while playing and id==serial: await get_tree().process_frame
+	if id!=serial: return false
+	cues=next_cues
+	actor.caption.extend_for_audio(audio.get_length())
 	start_audio(audio)
 	actor.caption.extend_for_audio(audio.get_length()+AudioServer.get_output_latency())
+	return true
 
 func start_audio(audio: AudioStream):
 	stop()

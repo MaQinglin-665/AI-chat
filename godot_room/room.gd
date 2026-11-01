@@ -5,6 +5,7 @@ var art
 var region
 var objects := {}
 var markers := {}
+var seat_targets := {}
 var period := ""
 var period_check := 0.
 
@@ -16,6 +17,10 @@ func _ready():
 		var id = marker.get_meta("id")
 		markers[id] = marker
 		objects[id] = marker.get_parent()
+		if marker.has_meta("seat"):
+			var seat=marker.get_node(marker.get_meta("seat"))
+			if seat.has_meta("id"):
+				seat_targets[seat.get_meta("id")] = objects[id]
 	refresh_period()
 	spawn_actors()
 
@@ -32,6 +37,9 @@ func _process(delta):
 	if period_check <= 0:
 		refresh_period()
 		period_check = 20.
+
+func target_object(id):
+	return objects.get(id,seat_targets.get(id))
 
 func marker_for(obj):
 	return markers.get(obj.get_meta("id", "")) if obj else null
@@ -50,7 +58,7 @@ func seat_for(obj, actor):
 		if shape is CollisionShape3D and shape.shape is BoxShape3D:
 			width = shape.shape.size.x
 			break
-	var shared = width >= 2 * MIN_CUSHION_WIDTH
+	var shared = not marker.get_node(marker.get_meta("seat")).has_meta("id") and width >= 2 * MIN_CUSHION_WIDTH
 	var other = get_node_or_null("Companion" if actor.name == &"Player" else "Player")
 	if not shared and other and other.seat_object == obj: return {}
 	if shared:

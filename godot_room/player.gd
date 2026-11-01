@@ -41,7 +41,9 @@ func _ready():
 	var hud := CanvasLayer.new()
 	add_child(hud)
 	hud.add_child(hint)
-	hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	hint.position += Vector2(18,-54)
+	hint.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	hud.add_child(entry)
 	entry.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	entry.custom_minimum_size.x = 420

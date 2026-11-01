@@ -171,3 +171,17 @@ Godot Engine 4.6.3 is MIT-licensed. The editor and export template are obtained 
 - Sendagaya Shino by pixiv, CC0. Source and embedded license were checked for the only VRM in this project. https://vroid.pixiv.help/hc/en-us/articles/360013482714-Sendagaya-Shino
 - Quaternius Universal Animation Library Standard, CC0. Original glTF and binary, runtime retargeting in Godot. https://quaternius.itch.io/universal-animation-library . Distribution and license in godot_room/README.md and godot_room/animations/LICENSE.txt.
 - The room uses code-generated primitives. The three.js comparison uses the repository's existing KayKit room and CC0 Shino.
+
+## Optional Godot bedroom component
+
+The component is distributed separately from the desktop installer. Shino, Vita, the animation library and plugins are stored as ordinary Git objects. No Git LFS client is required.
+
+| Component | Author | License and source |
+|---|---|---|
+| Godot Engine 4.6.3 and its Windows export runtime | Juan Linietsky, Ariel Manzur and Godot contributors | [MIT and bundled library licenses](https://godotengine.org/license/). The component ZIP includes the engine's own copyright and license inventory. |
+| godot-vrm 2.1.0 | V-Sekai contributors and VRM Consortium | [Source and MIT notice](https://github.com/V-Sekai/godot-vrm/tree/v2.1.0-assetlib) |
+| Godot MToon shader | V-Sekai contributors, Masataka SUMI | [Upstream](https://github.com/V-Sekai/Godot-MToon-Shader), [MIT notice](godot_room/addons/Godot-MToon-Shader/LICENSE) |
+| Sendagaya Shino | pixiv Inc. | [Author's CC0 notice](https://vroid.pixiv.help/hc/en-us/articles/360013482714), [VRM source](https://github.com/madjin/vrm-samples/blob/master/vroid/beta/Sendagaya_Shino.vrm) |
+| Vita, β Ver AvatarSample_3 | pixiv Inc. | [Author's CC0 notice](https://vroid.pixiv.help/hc/en-us/articles/360014900113), [VRM source](https://github.com/madjin/vrm-samples/blob/master/vroid/beta/Vita.vrm) |
+| Universal Animation Library, Standard | Quaternius | [CC0 animation library](https://quaternius.itch.io/universal-animation-library), [glTF distribution](https://github.com/J-Ponzo/gltf-universal-animation-library) |
+| Procedural bedroom and shaders | Project art contributors, maintained by qinglinMa | [Asset inventory](godot_room/art/SOURCES.md), [CC0 declaration](godot_room/art/LICENSE-CC0.txt) |
