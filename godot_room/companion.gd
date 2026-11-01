@@ -11,7 +11,8 @@ var posture_change := 0
 var sit_target: Node3D
 var player: CharacterBody3D
 var last_follow := 0.
-var noticed := false
+var gaze := preload("res://gaze.gd").new()
+var glance_after := 6.
 var own_state := "idle"
 
 func _ready():
@@ -32,6 +33,7 @@ func _ready():
 	agent.velocity_computed.connect(move_safe)
 	body.add_child(motion)
 	motion.configure(body)
+	body.find_children("*","Skeleton3D",true,false)[0].add_child(gaze)
 	bubble.position.y = 1.88
 	bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	bubble.font_size = 22
@@ -92,6 +94,16 @@ func _physics_process(delta):
 		own_state = "idle"
 		motion.playback.travel("Idle")
 		if sit_target: sit()
+	if own_state == "idle":
+		glance_after -= delta
+		if distance < 2.:
+			look_target = player
+		elif glance_after <= 0:
+			look_target = get_parent().objects.values().pick_random()
+			glance_after = randf_range(5,13)
+		if distance < .85:
+			speed = player.global_position.direction_to(global_position).slide(Vector3.UP).normalized()*.5
+	gaze.target = look_target
 	agent.velocity = speed
 	var facing = speed if speed.length() > .05 else global_position.direction_to(look_target.global_position) if look_target else Vector3.ZERO
 	if facing.length() > .05 and not sitting:

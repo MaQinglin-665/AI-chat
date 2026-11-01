@@ -31,7 +31,7 @@ func run():
 			camera.look_at_from_position(Vector3(0,1.49,.8), Vector3(0,1.42,0))
 			for j in range(face.get_blend_shape_count()):
 				var shape = str(face.mesh.get_blend_shape_name(j))
-				if "JOY" in shape.to_upper() or shape == "Fcl_MTH_A":
+				if shape.ends_with("Fcl_ALL_Joy"):
 					face.set_blend_shape_value(j, .8)
 					print("expression ", shape)
 		if i >= 80:

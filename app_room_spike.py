@@ -26,7 +26,10 @@ def validate(raw, visible):
     if action in ("idle", "approach_user", "follow_user", "stop_follow", "stand_up"):
         return {"action": action}
     if action == "go_to" and isinstance(target, list):
-        x, _, z = point(target)
+        try:
+            x, _, z = point(target)
+        except ValueError:
+            return {"action": "idle"}
         if abs(x) <= 4 and abs(z) <= 3.5:
             return {"action": action, "target": [x, 0, z]}
     if isinstance(target, str) and (

@@ -7,6 +7,7 @@ var arm := SpringArm3D.new()
 var camera := Camera3D.new()
 var entry := LineEdit.new()
 var hint := Label.new()
+var gait := preload("res://locomotion.gd").new()
 var avatar: Node3D
 var third_person := false
 var seated := false
@@ -23,6 +24,8 @@ func _ready():
 	add_child(collider)
 	avatar = preload("res://models/Shino.vrm").instantiate()
 	add_child(avatar)
+	avatar.add_child(gait)
+	gait.configure(avatar)
 	avatar.rotation.y = PI
 	avatar.visible = false
 	add_child(aim)
@@ -101,6 +104,7 @@ func _physics_process(delta):
 	if not seated:
 		velocity.y -= 9.8*delta
 		move_and_slide()
+	gait.playback.travel("Sitting_Idle" if seated else "Walk" if direction.length_squared() > .01 else "Idle")
 	var origin := camera.global_position
 	var query := PhysicsRayQueryParameters3D.create(origin,origin-camera.global_basis.z*(2.2+arm.get_hit_length()))
 	query.exclude = [get_rid()]
