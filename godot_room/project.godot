@@ -6,3 +6,7 @@ config/name="Xinyu Shared Room"
 enabled=PackedStringArray("res://addons/Godot-MToon-Shader/plugin.cfg", "res://addons/vrm/plugin.cfg")
 [rendering]
 renderer/rendering_method="forward_plus"
+
+[navigation]
+3d/default_cell_size=0.125
+3d/default_cell_height=0.1

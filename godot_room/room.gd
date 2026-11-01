@@ -70,3 +70,8 @@ func _ready():
 	region.navigation_mesh = nav
 	region.bake_navigation_mesh(false)
 	print("room navigation polygons ",nav.get_polygon_count()," interactables ",objects.keys())
+
+	var player = preload("res://player.gd").new()
+	player.name = "Player"
+	player.position = Vector3(0,0,2.8)
+	add_child(player)
