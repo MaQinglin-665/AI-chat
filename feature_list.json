@@ -1,6 +1,18 @@
 {
-  "active_task": "chat-task-cards",
+  "active_task": "task-card-polish",
   "features": [
+    {
+      "id": "task-card-polish",
+      "name": "Deduplicate task failure reason and inline authentication feedback",
+      "status": "in_progress",
+      "done_criteria": [
+        "Failure reason once on card, details retain full error",
+        "Task-local auth feedback without global overlay; unchanged token and retry behavior",
+        "Regression tests, actual screenshots, latest-head Linux/Windows CI and independent PR; no merge"
+      ],
+      "verification": "FullPython1105passed/3skip; final86Node,199Python/271JS syntax,secrets/mappings;17browser tests;real401 local-only and reason-once screenshots; publicJSON/compile/diff. Auth implementation unchanged. Latest-head CI in independent PR.",
+      "next": "Normal push/new PR to main; confirm latest-head Linux/Windows CI. Author merges only. Then taskB on isolated spike-based branch."
+    },
     {
       "id": "chat-task-cards",
       "name": "Inline chat task cards sharing existing task auth, controller and narrator",

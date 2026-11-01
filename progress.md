@@ -1446,3 +1446,10 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 - 作者要求删除的旧静态稿16PNG及索引已移除；当前5WebP作者参考不改，11实际应用图全部重拍另补已取消=12PNG，SHA256/链接核对通过。真实web/index+原HTTP/manager/鉴权/审计，仅自建临时文件和本地隔离确定性适配器，静音、pageerror0；未碰个人目录或配置。原生CLI按用户已确认继续由作者补验，旧录像标注修订前日期，不冒充新视觉。
 - Verification Evidence：scripts/test-local.ps1通过1105Python/3skip（112.18s）、86Node文件、199Python/271JS语法、secrets911及本机映射；check_first_run_package.ps1通过；公开JSON/必需py_compile、Markdown本地链接、图片数量/摘要和diff检查通过。Chromium15项通过（新增4项验收回归、原7卡片及4docs）；1440/768/390视觉inspection0findings，保留原作者设计例外。详情签名排除progress/updated_at以保留阅读焦点，最终浏览器回归另核对。
 - 下一步正常push同分支并更新PR237描述/实际图，核对最新head Linux/Windows全部CI后告知；保持未合并，作者操作。日志和捕获工具只留仓库外work/outputs，不提交。
+
+## 2026-11-01 — 任务A：任务卡片小修开始
+- 最新origin/main40c4d4c已含PR237，建立friend/task-card-polish。先修原因重复、局部鉴权提示与全局遮挡，不改认证/Origin/重试逻辑，补测试和真实截图后独立PR/CI。任务B后续独立分支，不混入本PR。
+
+## 2026-11-01 — 任务A实现与验证
+- taskCardView原因已显示则错误框去重，保留后续句和详情完整错误；apiClient仅显示选项，existing-card请求使用inline，chat薄包装转发。authFetchImpl/鉴权头/刷新/重试/Origin完全不改，无卡片的启动失败及其他页面仍保留全局提示。
+- Verification Evidence：完整Python1105通过/3skip；最终86Node、199Python/271JS语法、secrets/mappings；17项Chromium通过。真实index+原HTTP/manager临时文件适配器，确认原因一次/401全局隐藏/pageerror0，2张实际截图重拍及SHA更新，公开JSON/必需compile/diff通过。初次Node因Windows编辑LF→CRLF触发源码断言，恢复LF后通过，未修改旧断言。未动后端/模型/渲染器/依赖/私人文件。接下来正常push独立PR/CI，作者合并；任务B不混入。
