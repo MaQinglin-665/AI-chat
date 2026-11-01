@@ -126,3 +126,12 @@ def test_room_conversation_removes_unsupported_past_trip(monkeypatch):
     monkeypatch.setattr(room, "iter_openai_chat_stream", lambda *_:iter(['{"reply":"我刚从窗边回来。","action":"idle","steps":[]}']))
     turn=room.user_turn({},{"message":"窗外有什么？","world":{"user":[0,0,0],"ai":[0,0,0],"period":"night"}})
     assert "回来" not in turn["reply"] and "月亮" in turn["reply"]
+
+def test_room_recap_only_uses_known_events_and_keeps_speakers_distinct():
+    from app_room_spike import recent_room_recap, ground_recap
+    records=[{"role":"assistant","content":"【房间离场记录】没有你入座的记录。我的已完成动作：走到书架；坐到沙发。"}]
+    assert recent_room_recap(records, "你好") is None
+    facts=recent_room_recap(records, "刚才我们在房间做了什么")
+    assert facts == {"user_sat": False, "steps":["走到书架","坐到沙发"]}
+    assert "你自己坐床边" not in ground_recap("我坐到沙发，你自己坐床边。",facts)
+    assert ground_recap("你让我去沙发坐着。",facts) == "你让我去沙发坐着。"

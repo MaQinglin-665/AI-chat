@@ -175,6 +175,32 @@ def decide(cfg, payload):
             "thought":clean_text(raw.get("thought",""),60)}
 
 
+def recent_room_recap(history, question):
+    """Import only the small physical vocabulary emitted by the Electron host."""
+    if "房间" not in question or not re.search("刚|之前|上次|回忆|记得|做了", question):
+        return None
+    if not isinstance(history, list):
+        return None
+    pattern = r"【房间离场记录】(观察到你入座|没有你入座的记录)。我的已完成动作：(.{1,240})。"
+    actions = r"(?:走到|坐到|看向)(?:窗边|沙发|椅子|书桌|书架|你身边)"
+    for item in reversed(history[-16:]):
+        if not isinstance(item, dict) or item.get("role") != "assistant":
+            continue
+        match = re.fullmatch(pattern, str(item.get("content","")))
+        if match:
+            steps = [x for x in re.split("[，；]", match[2]) if re.fullmatch(actions, x)]
+            return {"user_sat": match[1]=="观察到你入座", "steps": list(dict.fromkeys(steps))}
+    return None
+
+
+def ground_recap(text, facts):
+    # Do not attribute an unobserved user posture to the visitor in a recap.
+    if not facts or facts["user_sat"] or not re.search(r"你(?:自己|则|就|也|一直|还|当时|后来|在那儿|在床边|在沙发上|在椅子上|已经|正|坐着)?(?:坐|躺|瘫)", text):
+        return text
+    actions = "，".join(facts["steps"])
+    return ("我" + actions + "。我们边聊边待了一会儿。" if actions else "我们在房间里聊了一会儿。")
+
+
 TURN_POLICY = """你是与用户同处房间的馨语。用角色的日常中文简短回答。当前姿态、位置、目标和回执优先于往事。
 普通问候、聊书或问景色不等于要求移动，可选 idle。窗外只描述给定的时段，不臆测天气或手上的书。不要推测刚才从哪来。\n只输出 JSON {reply,action,steps,goal}。action/steps 用 {"action":"go_to","target":"sofa"} 这样的对象；不需要行动时 action={"action":"idle"}, steps=[]。reply 必须是正常口语，不含括号旁白；可以承诺将要做的事，不能说尚未发生的事已经完成。
 action 是首个身体动作，steps 是后续步骤数组，goal 是简短目标。只可用 go_to/look_at/sit_on(target)、approach_user、

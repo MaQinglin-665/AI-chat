@@ -8,6 +8,8 @@ var began := 0
 var shape_indices := {}
 var face: MeshInstance3D
 var analyser
+var mix_probe := AudioEffectCapture.new()
+var output_onset := -1
 var envelope := 0.
 var mouth := 0.
 var cues := []
@@ -16,7 +18,6 @@ var pcm_channels := 1
 var pcm_rate := 0
 var measured := false
 var started_speech := false
-var speech_id := 0
 
 func _ready():
 	actor=get_parent()
@@ -31,6 +32,7 @@ func _ready():
 	var effect=AudioEffectSpectrumAnalyzer.new()
 	effect.fft_size=AudioEffectSpectrumAnalyzer.FFT_SIZE_256
 	AudioServer.add_bus_effect(bus_index,effect)
+	AudioServer.add_bus_effect(bus_index,mix_probe)
 	analyser=AudioServer.get_bus_effect_instance(bus_index,0)
 	face=actor.body.find_child("Face",true,false)
 	if face:
@@ -108,7 +110,9 @@ func start_audio(audio: AudioStream):
 	AudioServer.remove_bus_effect(bus_index,0)
 	var fresh=AudioEffectSpectrumAnalyzer.new()
 	fresh.fft_size=AudioEffectSpectrumAnalyzer.FFT_SIZE_256
-	AudioServer.add_bus_effect(bus_index,fresh)
+	AudioServer.add_bus_effect(bus_index,fresh,0)
+	mix_probe.clear_buffer()
+	output_onset=-1
 	analyser=AudioServer.get_bus_effect_instance(bus_index,0)
 	stream=audio
 	began=Time.get_ticks_msec()
@@ -137,7 +141,17 @@ func reset_mouth():
 func _process(delta):
 	var clock_seconds=(Time.get_ticks_msec()-began)*.001
 	var cursor=minf(clock_seconds,get_playback_position()+AudioServer.get_time_since_last_mix())-AudioServer.get_output_latency()
-	var audible=playing and not muted and cursor>=0.
+	var buffered=mix_probe.get_frames_available()
+	if buffered>0:
+		var mixed=mix_probe.get_buffer(buffered)
+		if playing and output_onset<0:
+			for i in mixed.size():
+				if mixed[i].length()>.002:
+					var age=(mixed.size()-i)/AudioServer.get_mix_rate()+AudioServer.get_time_since_last_mix()
+					output_onset=maxi(began,Time.get_ticks_msec()-roundi(1000.*age))+roundi(AudioServer.get_output_latency()*1000.)
+					print("ROOM_MIX onset_ms=",output_onset)
+					break
+	var audible=playing and not muted and cursor>=0. and output_onset>=0 and Time.get_ticks_msec()>=output_onset
 	var level=0.
 	if audible and analyser:
 		if pcm_rate>0:

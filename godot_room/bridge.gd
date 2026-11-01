@@ -261,33 +261,30 @@ func request(route: String, payload: Dictionary):
 	var data = JSON.parse_string(response[3].get_string_from_utf8())
 	return data if data is Dictionary else {}
 
-func think(message := ""):
+func think():
 	thinking=true
 	var serial=generation
 	var data=status_value()
-	data.event="spoke" if message else pending if pending else "idle"
-	data.message=message
+	data.event=pending if pending else "idle"
+	data.message=""
 	pending=""
 	var changes={}
 	for key in data:
 		if key not in ["event","message"] and (version==0 or data[key]!=previous.get(key)): changes[key]=data[key]
 	var receipt_count=receipts.size()
-	var result=await request("room/intent",{"session":session,"base":version,"changes":changes,"event":data.event,"message":message})
+	var result=await request("room/intent",{"session":session,"base":version,"changes":changes,"event":data.event,"message":""})
 	version=int(result.get("version",0))
 	previous=data.duplicate(true)
 	if version>0: receipts=receipts.slice(receipt_count)
 	thinking=false
 	countdown=randf_range(20,55)
 	if serial!=generation: return
-	if not result.has("intent"):
-		if message: goal={"status":"failed","reason":"unavailable"}
-		return
+	if not result.has("intent"): return
 	var decision=result.intent
 	if data.event=="entered" and not decision.get("say",""): decision.say="你来啦。"
-	if not message:
-		speech_balance=clampi(speech_balance+(-1 if not decision.get("say","") else 1),-5,5)
-	accept(decision,"user" if message else "autonomous")
-	if not message and decision.get("say",""): ai.speak(decision.say,"neutral")
+	speech_balance=clampi(speech_balance+(-1 if not decision.get("say","") else 1),-5,5)
+	accept(decision,"autonomous")
+	if decision.get("say",""): ai.speak(decision.say,"neutral")
 
 func execute(intent):
 	var target = intent.get("target","")
