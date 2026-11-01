@@ -28,6 +28,24 @@ var current := {}
 var goal := {}
 var last := {}
 var activity := []
+var visits := {}
+var speech_balance := 0
+const FOLLOW_TRIGGER_DISTANCE := 3.2
+const REVISIT_COOLDOWN := 60.
+
+func recent_destinations():
+	var recent := []
+	for id in visits:
+		if Time.get_ticks_msec() * .001 - visits[id] < REVISIT_COOLDOWN:
+			recent.append(id)
+	return recent
+
+func capabilities():
+	var caps := {}
+	for id in room.markers:
+		caps[id] = room.markers[id].get_meta("affordances")
+	return caps
+
 var last_move := 0.
 var since_step := 0.
 var utility_clock := 15.
@@ -45,16 +63,17 @@ func nearest_landmark(pos: Vector3):
 	var distance=2.5
 	for id in room.objects:
 		var gap=(room.objects[id].position-pos).slide(Vector3.UP).length()
+		if id=="rug": continue
 		if gap<distance:
 			distance=gap
 			nearest=id
 	return nearest
 
 func status_value():
-	return {"event":"idle","user":vec(player.position),"ai":vec(ai.position),"objects":room.objects.keys(),
+	return {"event":"idle","user":vec(player.position),"ai":vec(ai.position),"objects":capabilities(),"recent_destinations":recent_destinations(),"speech_balance":speech_balance,
 		"user_state":"sit" if player.seated else "typing" if player.entry.visible else "walk" if player.velocity.length()>.15 else "stand",
 		"ai_state":ai.own_state,"needs":needs.duplicate(),"last_move_sec":int(last_move),
-		"ai_near":nearest_landmark(ai.position),"user_near":nearest_landmark(player.position),"goal":goal.duplicate(),"last":last.duplicate(),"activity":activity.slice(-3),"receipts":receipts.duplicate(true)}
+		"ai_near":str(ai.seat_object.name) if ai.sitting and ai.seat_object else nearest_landmark(ai.position),"user_near":str(player.seat_object.name) if player.seated and player.seat_object else nearest_landmark(player.position),"goal":goal.duplicate(),"last":last.duplicate(),"activity":activity.slice(-3),"receipts":receipts.duplicate(true)}
 
 func event(reason):
 	pending = reason
@@ -95,7 +114,16 @@ func begin_step():
 	goal.status="running"
 	ack("running","")
 	var target=current.get("target","")
-	if current.action=="sit_on" and target=="chair" and player.seated and player.position.distance_to(room.objects.chair.position)<1.:
+	# Reaffirming the adjacent seat should never stand the companion up
+	# to navigate back to the same cushion.
+	if ai.sitting and (target==str(ai.seat_object.name) or (target=="user" and ai.seat_object==player.seat_object)):
+		if current.action in ["go_to","sit_on"]:
+			if steps.is_empty(): finish("completed","ok")
+			else:
+				ack("completed","ok")
+				begin_step()
+			return
+	if current.action=="sit_on" and room.seat_for(room.objects.get(target),ai).is_empty():
 		finish("failed","occupied")
 		return
 	execute(current)
@@ -132,6 +160,8 @@ func advance(delta):
 		_: done=since_step>1.2
 	if done:
 		if current.action in ["go_to","follow_user","approach_user"]:
+			var id=current.get("target","user")
+			if id is String: visits[id]=Time.get_ticks_msec()*.001
 			ai.follow=false
 			ai.own_state="idle"
 			ai.motion.playback.travel("Idle")
@@ -173,7 +203,15 @@ func _process(delta):
 		if ai.sitting and needs.boredom>.55: small={"action":"stand_up"}
 		elif ai.sitting and randf()<.5:
 			ai.body.rotation.y+=randf_range(-.12,.12)
-		elif not nearby and needs.closeness>.55 and randf()<needs.closeness: small={"action":"approach_user"}
+		elif needs.closeness>.55 and randf()<needs.closeness:
+			small={"action":"approach_user"} if distance>FOLLOW_TRIGGER_DISTANCE and "user" not in recent_destinations() else {"action":"look_at","target":"user"}
+		elif not ai.sitting and randf()<needs.curiosity+needs.solitude:
+			var choices = ["shelf","window","chair"].filter(func(id): return id not in recent_destinations() and (id!="chair" or player.seat_object!=room.objects.chair))
+			if not choices.is_empty():
+				var target=choices.pick_random()
+				var next={"action":"sit_on" if target=="chair" else "look_at","target":target}
+				accept({"action":{"action":"go_to","target":target},"goal":[next,{"action":"idle","seconds":8}]},"utility")
+				return
 		accept({"action":small},"utility")
 
 func vec(v):
@@ -219,6 +257,8 @@ func think(message := ""):
 		if message: goal={"status":"failed","reason":"unavailable"}
 		return
 	var decision=result.intent
+	if not message:
+		speech_balance=clampi(speech_balance+(-1 if not decision.get("say","") else 1),-5,5)
 	accept(decision,"user" if message else "autonomous")
 	if not message and decision.get("say",""): ai.speak(decision.say,"neutral")
 
@@ -251,14 +291,15 @@ func execute(intent):
 
 func chat(message):
 	if chatting or token.is_empty(): return
+	var user_started=Time.get_ticks_msec()
 	event("spoke")
 	chatting = true
 	while thinking: await get_tree().process_frame
 	await think(message)
-	var data = await request("chat",{"message":message,"history":history,"room":status_value()})
+	var reply = await preload("res://room_chat.gd").new().send(self,port,token,{"message":message,"history":history,"room":status_value()},ai.speak)
 	chatting = false
-	var reply = str(data.get("reply",""))
-	print("CHAT_GROUND ",goal_id," ",goal.status if goal.has("status") else "none"," reply_chars=",reply.length())
+
+	print("CHAT_GROUND ",goal_id," ",goal.status if goal.has("status") else "none"," reply_chars=",reply.length()," user_total_ms=",Time.get_ticks_msec()-user_started)
 	if reply:
 		ai.speak(reply,"neutral")
 		history.append({"role":"user","content":message})

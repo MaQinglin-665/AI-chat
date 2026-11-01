@@ -18,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("godot", help="Godot 4.6.3 executable")
     parser.add_argument("--phase2-tour", action="store_true", help="Run the 305-second live tour and save viewport frames in tmp_ui_smoke")
+    parser.add_argument("--phase3-tour", action="store_true", help="Record the bedroom acceptance route")
     args = parser.parse_args()
     if not os.environ.get("DEEPSEEK_API_KEY"):
         parser.error("Set DEEPSEEK_API_KEY in the environment first.")
@@ -49,7 +50,7 @@ def main():
                 self.send_error(404)
 
             def do_POST(self):
-                if self.path not in ("/api/room/intent", "/api/chat"):
+                if self.path not in ("/api/room/intent", "/api/chat", "/api/chat_stream"):
                     self.send_error(404)
                     return
                 super().do_POST()
@@ -63,13 +64,14 @@ def main():
                 "PATH","SYSTEMROOT","TEMP","TMP","APPDATA","LOCALAPPDATA","USERPROFILE","TAFFY_API_TOKEN"}}
             try:
                 command = [args.godot, "--path", str(PROJECT)]
-                if args.phase2_tour:
+                if args.phase2_tour or args.phase3_tour:
+                    phase = "phase3" if args.phase3_tour else "phase2"
                     output = ROOT / "tmp_ui_smoke"
                     output.mkdir(exist_ok=True)
-                    frames = Path(tempfile.mkdtemp(prefix="phase2-frames-", dir=output))
+                    frames = Path(tempfile.mkdtemp(prefix=f"{phase}-frames-", dir=output))
                     env["ROOM_FRAMES"] = str(frames)
                     print(f"Recording Godot viewport frames to {frames}", flush=True)
-                    command.extend(["--script", str(PROJECT / "tools" / "phase2_tour.gd")])
+                    command.extend(["--script", str(PROJECT / "tools" / f"{phase}_tour.gd")])
                 return subprocess.call(command, env=env)
             finally:
                 server.shutdown()

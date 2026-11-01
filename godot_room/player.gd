@@ -8,6 +8,7 @@ var camera := Camera3D.new()
 var entry := LineEdit.new()
 var hint := Label.new()
 var gait := preload("res://locomotion.gd").new()
+var seat_object: Node3D
 var avatar: Node3D
 var third_person := false
 var seated := false
@@ -23,7 +24,7 @@ func _ready():
 	collider.shape = capsule
 	collider.position.y = .825
 	add_child(collider)
-	avatar = preload("res://models/Shino.vrm").instantiate()
+	avatar = preload("res://models/Vita.vrm").instantiate()
 	add_child(avatar)
 	avatar.add_child(gait)
 	gait.configure(avatar)
@@ -35,6 +36,7 @@ func _ready():
 	arm.spring_length = 0
 	arm.add_excluded_object(get_rid())
 	arm.add_child(camera)
+	camera.near = .08
 	camera.current = true
 	var hud := CanvasLayer.new()
 	add_child(hud)
@@ -59,7 +61,8 @@ func send_message(text: String):
 func _unhandled_input(event):
 	if entry.visible: return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		rotate_y(-event.relative.x * .002)
+		if seated: aim.rotate_y(-event.relative.x * .002)
+		else: rotate_y(-event.relative.x * .002)
 		aim.rotation.x = clamp(aim.rotation.x-event.relative.y*.002,-1.25,1.25)
 	if event is InputEventMouseButton and event.pressed:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -80,6 +83,9 @@ func _unhandled_input(event):
 		KEY_E:
 			if seated:
 				seated = false
+				seat_object = null
+				avatar.position.y = 0
+				aim.rotation.y = 0
 				global_position = before_seat
 				aim.position.y = 1.48
 				interacted.emit("", "stand_up")
@@ -92,14 +98,10 @@ func _unhandled_input(event):
 				held_book.transform = Transform3D.IDENTITY
 				held_book = null
 				interacted.emit("book","gave")
-			elif focus and focus.has_meta("affordances"):
-				var actions = focus.get_meta("affordances")
+			elif focus and get_parent().marker_for(focus):
+				var actions = get_parent().marker_for(focus).get_meta("affordances")
 				if "sit" in actions:
-					before_seat = global_position
-					seated = true
-					global_position = focus.global_position + Vector3(0,.29,0)
-					aim.position.y = .8
-					interacted.emit(str(focus.name),"sit")
+					take_seat(focus)
 				elif "pick_up" in actions:
 					held_book = focus
 					held_book.collision_layer = 0
@@ -107,6 +109,29 @@ func _unhandled_input(event):
 					held_book.position = Vector3(.2,-.22,-.45)
 					interacted.emit("book","pick_up")
 				else: interacted.emit(str(focus.name),actions[0])
+
+func take_seat(obj):
+	var seat = get_parent().seat_for(obj,self)
+	if seat.is_empty(): return false
+	before_seat = get_parent().approach_point(obj)
+	seat_object = obj
+	seated = true
+	global_position = seat.pose.origin
+	rotation.y = seat.pose.basis.get_euler().y + PI
+	aim.rotation.x = 0
+	aim.position.y = .74
+	avatar.position.y = -.35
+	align_seated_hips(obj)
+	gait.playback.travel("Sitting_Idle")
+	interacted.emit(str(obj.name),"sit")
+	return true
+
+func align_seated_hips(obj):
+	await get_tree().create_timer(.6).timeout
+	if seat_object!=obj: return
+	var skeleton: Skeleton3D = avatar.find_children("*","Skeleton3D",true,false)[0]
+	var hips=skeleton.to_global(skeleton.get_bone_global_pose(skeleton.find_bone("Hips")).origin)
+	avatar.position.y += global_position.y+.08-hips.y
 
 func _physics_process(delta):
 	var direction := Vector3.ZERO
@@ -120,7 +145,7 @@ func _physics_process(delta):
 	if not seated:
 		velocity.y -= 9.8*delta
 		move_and_slide()
-	gait.playback.travel("Sitting_Idle" if seated else "Walk" if direction.length_squared() > .01 else "Idle")
+	gait.playback.travel("Sitting_Idle" if seated else "Walk" if direction.length_squared()>.01 else "Idle")
 	var origin := camera.global_position
 	var query := PhysicsRayQueryParameters3D.create(origin,origin-camera.global_basis.z*(2.2+arm.get_hit_length()))
 	query.exclude = [get_rid()]

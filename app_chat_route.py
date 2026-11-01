@@ -382,6 +382,9 @@ def _handle_chat_stream_request(
             first_delta_ms = perf_now_ms_func() - llm_started_ms
             for visible_chunk in _iter_natural_reply_chunks(final_reply):
                 send_sse_func({"type": "delta", "text": visible_chunk})
+        if chat_config.get("_room_context"):
+            from app_room_spike import spoken
+            final_reply = spoken(final_reply)
         done_payload = {"type": "done", "reply": final_reply}
         if public_natural_decision is not None:
             done_payload["conversation_decision"] = public_natural_decision
@@ -526,6 +529,9 @@ def _handle_chat_request(
             reply, runtime_meta = apply_character_runtime_reply_func(chat_config, reply)
             reply = apply_character_brain_reply_text_func(chat_config, user_message, reply)
         runtime_ms = perf_now_ms_func() - runtime_started_ms
+        if chat_config.get("_room_context"):
+            from app_room_spike import spoken
+            reply = spoken(reply)
         payload = {"reply": str(reply or "")}
         public_natural_decision = public_natural_conversation_decision(
             natural_decision

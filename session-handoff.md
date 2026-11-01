@@ -1,4 +1,8 @@
-# Current — Godot room autonomy, draft PR 238
+# Current — Godot bedroom on draft PR 238
+
+Review [phase 3 evidence](godot_room/PHASE3-REPORT.md) and the ignored local video tmp_ui_smoke/godot-room-phase3-deepseek-30fps.mp4. The bed is look-only until the art owner adds a Seat and sit affordance. Do not merge without author review.
+
+## Earlier — Godot room autonomy, draft PR 238
 
 See [phase 2 measurements](godot_room/PHASE2-REPORT.md), eight frames and ignored tmp_ui_smoke/godot-room-phase2-deepseek-30fps.mp4. Await author review.
 
