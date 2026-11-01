@@ -114,3 +114,8 @@ avatar-brain-usage.json
 avatar-brain-usage.lock
 *.vrm
 *.vrma
+
+/godot_room/.godot/
+/godot_room/build/
+/tmp_ui_smoke/
+!/godot_room/models/Shino.vrm
