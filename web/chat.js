@@ -1806,12 +1806,12 @@ async function resolveApiToken(forceRefresh = false) {
   return "";
 }
 
-async function authFetch(input, init = {}) {
+async function authFetch(input, init = {}, feedback = {}) {
   if (typeof API_CLIENT.authFetch === "function") {
-    return API_CLIENT.authFetch(input, init);
+    return API_CLIENT.authFetch(input, init, feedback);
   }
   if (typeof window.authFetch === "function" && window.authFetch !== authFetch) {
-    return window.authFetch(input, init);
+    return window.authFetch(input, init, feedback);
   }
   return fetch(input, init);
 }

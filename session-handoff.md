@@ -15,6 +15,9 @@ Draft PR238. Worktree D:/AI/ai_desktop_pet_godot. Review godot_room/SPIKE-REPORT
 
 ## Previous task records
 
+# Current: task-card-polish — 2026-11-01
+Branch friend/task-card-polish from latest main40c4d4c (PR237 merged). TaskA implementation complete: reason dedup; existing-card auth feedback inline with chat wrapper forwarding. AuthFetchImpl unchanged. FullPython1105/3skip,final86Node and syntax/secrets/mappings,17browser,2actual screenshots. Next normal push/new PR/latest-head CI; no self merge. TaskB later isolated friend/godot-room-art from codex/godot-room-spike; only art/ plus minimal room loader, author behavior untouched. No private configs/keys/models/logs/export packages/videos.
+
 # Current: PR237 review fixes — 2026-11-01
 Branch friend/chat-task-cards, clean baseline ce6a30c; author requests six frontend/doc fixes. Six fixes complete; all12 actual screenshots refreshed and old16 prototypes/index removed;5authorWebP retained. Full1105Python/3skip,86Node,15browser,syntax/secrets/mappings,package/JSON/compile passed. Keep existing auth/Origin/API; no backend/renderers/private config changes. Next normal push/update PR237 and confirm latest-head Linux/Windows CI. No self merge/main/force push. NativeCLI acceptance remains explicitly deferred to author.
 

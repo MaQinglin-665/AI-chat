@@ -20,7 +20,7 @@ function setup(handler, useView = false) {
   const elements = {}, calls = [], speeches = []; let poll;
   if (useView) global.TaffyTaskCardView = { createView: () => ({ render() {}, showComposer() {}, mount() {}, created() {}, reveal() {} }) };
   const controller = createController({ document: { getElementById: id => elements[id] ||= new Element(), createElement: () => new Element() },
-    authFetch: async (url, options) => { calls.push({ url, options }); return handler(url, options); },
+    authFetch: async (url, options, feedback) => { calls.push({ url, options, feedback }); return handler(url, options); },
     state: { speakingEnabled: true }, speak: async text => speeches.push(text), interval: fn => { poll = fn; } });
   delete global.TaffyTaskCardView;
   return { controller, calls, speeches, poll: () => poll(), elements };
@@ -74,6 +74,7 @@ async function main() {
     current = { ...current, status: url.endsWith("cancel") ? "cancelled" : "executing" }; return response({ ok: true, task: current });
   }, true);
   await tick(); assert.equal(context.speeches.length, 0, "restoring tasks is silent");
+  assert.equal(context.calls[0].feedback.authErrorSurface, "global", "startup list failures without a card retain global feedback");
   for (let i = 0; i < 100; i++) await context.poll();
   assert.equal(context.controller.snapshot().tasks.length, 1); assert.equal(context.speeches.length, 0);
   for (const status of [401, 403, 404, 409, 500]) {
@@ -83,6 +84,7 @@ async function main() {
     assert(context.controller.snapshot().errors[current.id]); assert.deepEqual(context.controller.snapshot().approvedTaskIds, []); failure = null; await context.controller.refresh(current.id);
   }
   assert.equal(context.calls.filter(call => call.url.endsWith("approve")).length, 5, "no automatic approval retry");
+  assert(context.calls.filter(call => call.url.endsWith("approve")).every(call => call.feedback.authErrorSurface === "inline"), "known cards show their own authentication error");
   await context.controller.approve(current.id); assert.equal(context.controller.snapshot().tasks[0].status, "executing");
   assert.equal(context.speeches.length, 1); await context.controller.cancel(current.id);
   assert.equal(context.controller.snapshot().tasks[0].status, "cancelled");
@@ -108,6 +110,9 @@ async function main() {
   const nonJson = setup(async () => ({ ok: false, status: 403, json: async () => { throw new SyntaxError("not JSON"); } }), true);
   await tick(); assert.equal(nonJson.controller.snapshot().formError.status, 403);
   assert.equal(nonJson.calls.length, 1);
+  const legacy = setup(async () => response({ ok: true, tasks: [task()], allowed_roots: ["approved"] }));
+  await legacy.controller.hydrate();
+  assert(legacy.calls.every(call => call.feedback.authErrorSurface === "global"), "legacy surface retains global feedback");
   const state = { chatRecords: [{ role: "user", content: "hello" }, { kind: "task", role: "assistant", content: "private plan" }], history: [] };
   const messages = chat.createController({ state }); messages.syncConversationHistoryFromChatRecords();
   assert.deepEqual(state.history, [{ role: "user", content: "hello" }]); assert.equal(messages.normalizeChatRecord(state.chatRecords[1]), null);

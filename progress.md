@@ -1463,3 +1463,10 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 Draft PR238. Forward+ on Godot4.6.3/godot-vrm2.1.0; 4.7.2 plugin parse errors. Verified Shino spring joints and facial shapes, 24 nav polygons, retargeted walk/sit/stand, authenticated real DeepSeek chat/intent, 300s viewport recording, same-camera comparison and Windows release export. Ten calls/6394 tokens during final tour. Explicit user instruction prompted real go_to(chair) in a separate run; AI stopped at chair. Automatic user-side input; no human-input acceptance claimed. Report godot_room/SPIKE-REPORT.md. Local-only video/build/logs ignored. Await author review.
 
 Final local verification: scripts/test-local.ps1 (D-drive TEMP/TMP) 1108 Python passed, 3 skipped, 86 Node suites. Godot target bounds, disabled/token gates, nav/seat/stand, camera collision/jump/POV, release startup and full video decode checked separately. Support-foot horizontal P95 after pelvis correction 1.3mm on this trajectory. Isolated listeners stopped.
+
+## 2026-11-01 — 任务A：任务卡片小修开始
+- 最新origin/main40c4d4c已含PR237，建立friend/task-card-polish。先修原因重复、局部鉴权提示与全局遮挡，不改认证/Origin/重试逻辑，补测试和真实截图后独立PR/CI。任务B后续独立分支，不混入本PR。
+
+## 2026-11-01 — 任务A实现与验证
+- taskCardView原因已显示则错误框去重，保留后续句和详情完整错误；apiClient仅显示选项，existing-card请求使用inline，chat薄包装转发。authFetchImpl/鉴权头/刷新/重试/Origin完全不改，无卡片的启动失败及其他页面仍保留全局提示。
+- Verification Evidence：完整Python1105通过/3skip；最终86Node、199Python/271JS语法、secrets/mappings；17项Chromium通过。真实index+原HTTP/manager临时文件适配器，确认原因一次/401全局隐藏/pageerror0，2张实际截图重拍及SHA更新，公开JSON/必需compile/diff通过。初次Node因Windows编辑LF→CRLF触发源码断言，恢复LF后通过，未修改旧断言。未动后端/模型/渲染器/依赖/私人文件。接下来正常push独立PR/CI，作者合并；任务B不混入。

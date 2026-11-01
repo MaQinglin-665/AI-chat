@@ -94,7 +94,7 @@
       if (silent) narrator.prime(value); else narrator.update(value);
     }
     async function api(suffix = "", body) {
-      const response = await authFetch(`/api/agent/task${suffix}`, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const response = await authFetch(`/api/agent/task${suffix}`, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, { authErrorSurface: view && tasks.has(suffix.split("/")[1]) ? "inline" : "global" });
       let data;
       try { data = await response.json(); } catch (_) { data = {}; }
       if (!response.ok || !data.ok) { const error = new Error("任务服务暂不可用"); error.status = response.status; error.code = data.code; throw error; }

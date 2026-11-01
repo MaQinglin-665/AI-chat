@@ -171,7 +171,7 @@ test('review: failed/cancelled illustration, conclusion and reason; errors use o
   task.verification_error = '无法读取核对信息。';
   await render(page, task, { [task.id]: { status: 401, message: '身份验证未通过。' } });
   await expect(page.locator('.task-card .task-error')).toHaveCount(1);
-  await expect(page.locator('.task-card .task-error li')).toHaveCount(5);
+  await expect(page.locator('.task-card .task-error li')).toHaveCount(4);
   await expect(page.locator('.task-conclusion')).toHaveText('这次没有完成任务。');
   await expect(page.locator('.task-reason')).toHaveText('目标目录已有同名文件。');
   expect(await page.locator('.task-card').evaluate(el => {
@@ -206,4 +206,45 @@ test('review: narrow move paths keep source row and arrow/folder destination row
     const from = el.querySelector('.task-file-source')!.getBoundingClientRect(), to = el.querySelector('.task-file-destination')!.getBoundingClientRect();
     return to.top >= from.bottom && to.left === from.left && el.scrollWidth <= el.clientWidth;
   })).toBeTruthy();
+});
+
+
+test('polish: reason is shown once; extra error sentences and complete details survive', async ({ page }) => {
+  await setup(page); const task: any = makeTask('failed');
+  task.error = { message: '演示目标目录中已有同名文件。', detail: { message: '请检查目标路径。' } };
+  await render(page, task);
+  await expect(page.locator('.task-reason')).toHaveText(task.error.message);
+  await expect(page.locator('.task-card .task-error')).not.toContainText(task.error.message);
+  await expect(page.locator('.task-card .task-error')).toContainText('请检查目标路径。');
+  expect((await page.locator('.task-card').innerText()).split(task.error.message)).toHaveLength(2);
+  await page.getByRole('button', { name: '查看原计划', exact: true }).click();
+  await expect(page.locator('.task-detail-panel .task-error')).toContainText(task.error.message);
+  await page.keyboard.press('Escape');
+  task.error = { message: '演示目标目录中已有同名文件。请检查目录后重新规划。' };
+  await render(page, task);
+  await expect(page.locator('.task-card .task-error')).toHaveText('请检查目录后重新规划。');
+  task.error = { message: '演示目标目录中已有同名文件' };
+  await render(page, task); await expect(page.locator('.task-card .task-error')).toBeHidden();
+});
+
+test('polish: task auth failure stays local while the original HTTP result is preserved', async ({ page }) => {
+  await page.goto('/'); await setup(page);
+  await page.addScriptTag({ content: source('apiClient.js') });
+  await page.addScriptTag({ content: source('externalAgentController.js') });
+  await page.evaluate(async (task: any) => {
+    const w = window as any; w.taskView.dispose();
+    const modal = document.createElement('section'); modal.id = 'external-agent-modal'; document.body.appendChild(modal);
+    for (const id of ['btn', 'close', 'error', 'result', 'approve', 'cancel', 'create', 'goal', 'workdir']) {
+      const el = document.createElement(id === 'workdir' ? 'select' : 'div'); el.id = 'external-agent-' + id; modal.appendChild(el);
+    }
+    w.feedback = []; w.requests = []; w.TaffyStageFeedback = { startupFailure: (value: any) => w.feedback.push(value) };
+    w.localStorage?.clear();
+    w.fetch = async (_url: any, init: any) => { w.requests.push(init); return init?.method ? { ok: false, status: 401, json: async () => ({ ok: false }) } : { ok: true, status: 200, json: async () => ({ ok: true, tasks: [task], allowed_roots: [task.workdir] }) }; };
+    w.controller = w.TaffyExternalAgent.createController({ document, authFetch: w.authFetch, state: { speakingEnabled: false }, speak() {}, interval() {} });
+    await w.controller.hydrate(); await w.controller.approve(task.id);
+  }, makeTask());
+  await expect(page.locator('.task-card .task-error')).toContainText('身份验证未通过');
+  expect(await page.evaluate(() => (window as any).feedback)).toEqual([]);
+  await page.evaluate(async () => { (window as any).fetch = async () => ({ status: 401 }); await (window as any).authFetch('/api/chat'); });
+  expect(await page.evaluate(() => (window as any).feedback)).toEqual(['HTTP 401']);
 });
