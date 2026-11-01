@@ -2,7 +2,7 @@
 # installed voice to an in-memory mono WAV. Only the parent process reads stdout.
 $ErrorActionPreference = 'Stop'
 [Console]::InputEncoding = [Text.UTF8Encoding]::new($false)
-$inputData = [Console]::In.ReadToEnd() | ConvertFrom-Json
+
 Add-Type -AssemblyName System.Speech
 $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
 Add-Type -ReferencedAssemblies System.Speech -TypeDefinition @"
@@ -22,8 +22,11 @@ public class RoomVisemes {
 "@
 $marks = New-Object RoomVisemes
 $marks.Bind($synth)
-$buffer = New-Object System.IO.MemoryStream
 try {
+  while ($null -ne ($line = [Console]::ReadLine())) {
+    $inputData = $line | ConvertFrom-Json
+    $buffer = New-Object System.IO.MemoryStream
+    $marks.Marks.Clear()
     $voices = @($synth.GetInstalledVoices() | Where-Object Enabled | ForEach-Object VoiceInfo)
     $requested = (([string]$inputData.voice -split ' - ')[0] -replace ' Desktop$', '').Trim()
     $voice = $voices | Where-Object { ($_.Name -replace ' Desktop$', '') -eq $requested } | Select-Object -First 1
@@ -34,5 +37,8 @@ try {
     $synth.SetOutputToWaveStream($buffer)
     $synth.Speak([string]$inputData.text)
     $synth.SetOutputToNull()
-    [Console]::Out.Write((@{voice=$voice.Name; matched=$matched; visemes=@($marks.Marks.ToArray()); audio=[Convert]::ToBase64String($buffer.ToArray())} | ConvertTo-Json -Compress))
-} finally { $buffer.Dispose(); $synth.Dispose() }
+    [Console]::Out.WriteLine((@{voice=$voice.Name; matched=$matched; visemes=@($marks.Marks.ToArray()); audio=[Convert]::ToBase64String($buffer.ToArray())} | ConvertTo-Json -Compress))
+    [Console]::Out.Flush()
+    $buffer.Dispose()
+  }
+} finally { $synth.Dispose() }

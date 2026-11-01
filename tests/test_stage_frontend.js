@@ -184,11 +184,7 @@ assert.ok(electronSource.includes('ipcMain.on("surface-renderer-ready"'), "the p
 assert.ok(electronSource.includes('ipcMain.on("window-minimize"'), "the stage should expose a native minimize transition for pet mode");
 assert.ok(electronSource.includes('if (chatWindow.isMinimized())'), "a second launch should restore the stage");
 assert.ok(!electronSource.includes('const wins = [modelWindow, chatWindow]'), "a second launch should not force both Live2D surfaces visible");
-const {surfaceActivity} = require("../electron/roomSession");
-assert.deepEqual(surfaceActivity(true,false), {stageActive:true,petActive:false});
-assert.deepEqual(surfaceActivity(false,false), {stageActive:false,petActive:true});
-for(const visible of [true,false]) assert.deepEqual(surfaceActivity(visible,true), {stageActive:false,petActive:false});
-assert.ok(electronSource.includes("surfaceActivity(isChatStageActive(),occupied)"), "use the visibility coordinator when the room owns the character");
+assert.ok(electronSource.includes("const petActive = !occupied && !stageActive;"), "use the visibility coordinator when the room owns the character");
 assert.ok(electronSource.includes("scheduleCompanionSurfaceVisibilitySync(40)"), "native minimize should sync after its window state settles");
 assert.ok(electronSource.includes('win.webContents.send("surface-active-changed"'), "native visibility should reach the renderer");
 assert.ok(startupSource.includes("broadcastSpeech: state.desktopMode === true"), "desktop full view should keep the detached pet performance in sync");

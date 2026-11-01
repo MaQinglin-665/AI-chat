@@ -10,32 +10,42 @@ function killTree(child) {
   if (process.platform === "win32") spawnSync("taskkill.exe", ["/pid", String(child.pid), "/t", "/f"], {windowsHide:true, stdio:"ignore"});
   else child.kill();
 }
-function windowsVoice(text, voice, signal) {
-  return new Promise((resolve,reject) => {
-    const env = Object.fromEntries(["SystemRoot","WINDIR","PATH","TEMP","TMP","USERPROFILE","APPDATA","LOCALAPPDATA"].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));
-    // Electron can read inside an ASAR; the system PowerShell executable cannot.
-    const script=fs.readFileSync(path.join(__dirname,"roomSpeech.ps1"),"utf8");
-    const encoded=Buffer.from(script,"utf16le").toString("base64");
-    const ps = spawn("powershell.exe", ["-NoProfile","-NonInteractive","-EncodedCommand",encoded],
-      {windowsHide:true, env, stdio:["pipe","pipe","ignore"], signal});
-    const chunks = [];
-    ps.stdout.on("data", b => chunks.push(b));
-    ps.once("error", reject);
-    ps.stdin.on("error", reject);
-    ps.once("close", code => {
-      try {
-        if (code) throw Error("voice_unavailable");
-        const v=JSON.parse(Buffer.concat(chunks).toString("utf8"));
-        resolve({audio:Buffer.from(v.audio,"base64"), voice:v.voice, matched:v.matched, visemes:(v.visemes||[]).slice(0,350).map(s=>{const [t,vowel]=s.split(":");return [Number(t),vowel];})});
-      } catch(e) { reject(e); }
-    });
-    ps.stdin.end(JSON.stringify({text,voice}));
+// One synthesizer per room. Requests are bounded and answered in input order.
+function warmVoice() {
+  const readline=require("node:readline");
+  const env=Object.fromEntries(["SystemRoot","WINDIR","PATH","TEMP","TMP","USERPROFILE","APPDATA","LOCALAPPDATA"].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));
+  const encoded=Buffer.from(fs.readFileSync(path.join(__dirname,"roomSpeech.ps1"),"utf8"),"utf16le").toString("base64");
+  const proc=spawn("powershell.exe",["-NoProfile","-NonInteractive","-EncodedCommand",encoded],{windowsHide:true,env,stdio:["pipe","pipe","ignore"]});
+  const waiting=[];
+  let closed=false;
+  function close() {
+    if(closed)return;
+    closed=true;
+    for(const item of waiting.splice(0)){clearTimeout(item.timer);item.reject(Error("voice_unavailable"));}
+    killTree(proc);
+  }
+  readline.createInterface({input:proc.stdout}).on("line",line=>{
+    const item=waiting.shift();
+    if(!item)return;
+    clearTimeout(item.timer);
+    try {
+      const v=JSON.parse(line);
+      item.resolve({audio:Buffer.from(v.audio,"base64"),voice:v.voice,matched:v.matched,visemes:(v.visemes||[]).slice(0,350).map(s=>{const [t,vowel]=s.split(":");return [Number(t),vowel];})});
+    } catch {item.reject(Error("voice_unavailable"));}
   });
+  proc.on("error",close);proc.on("exit",close);proc.stdin.on("error",close);
+  return {close,synthesize(text,voice) {
+    return new Promise((resolve,reject)=>{
+      if(closed || waiting.length>=4)return reject(Error("voice_unavailable"));
+      waiting.push({resolve,reject,timer:setTimeout(close,20000)});
+      proc.stdin.write(JSON.stringify({text,voice})+"\n");
+    });
+  }};
 }
 async function openRoom({backend, apiToken, command, args, env, provider, voice, history, onTurn, onReceipt, onClosed, launch=spawn}) {
   if (!apiToken || new URL(backend).hostname!=="127.0.0.1") throw Error("房间需要已鉴权的本机后端");
   const ticket=fresh(), session=fresh(), expires=Date.now()+30000;
-  let redeemed=false, closed=false, child, timer;
+  let redeemed=false, closed=false, child, timer, nativeVoice;
   let turns=0, observedUser=false, userSat=false;
   const completed=[];
   function observePosture(state) {
@@ -64,18 +74,18 @@ async function openRoom({backend, apiToken, command, args, env, provider, voice,
       if(req.url==="/api/room/intent") observePosture(body.changes?.user_state);
       if(req.url==="/api/room/receipt") {
         observePosture(body.user_state);
-        const places={window:"窗边",sofa:"沙发",chair:"椅子",desk:"书桌",shelf:"书架",user:"你身边"};
+        const places={window:"窗边",sofa:"沙发",chair:"椅子",desk:"书桌",shelf:"书架",user:"你身边",bed_edge_seat:"床沿"};
         const actions={go_to:"走到",look_at:"看向",sit_on:"坐到"};
         const parts=(Array.isArray(body.steps)?body.steps:[]).slice(0,5).filter(s=>Object.hasOwn(places,s?.target)&&Object.hasOwn(actions,s?.action)).map(s=>actions[s.action]+places[s.target]);
         if(parts.length) {
           completed.push(parts.join("，"));
           if(completed.length>6)completed.shift();
-          onReceipt?.("刚才在房间里，我"+parts.join("，")+"。");
+
         }
         return respond(200,{ok:true});
       }
       if(req.url==="/api/tts" && provider==="browser") {
-        const result=await windowsVoice(String(body.text||"").slice(0,400),voice,AbortSignal.any([abort.signal,AbortSignal.timeout(20000)]));
+        const result=await nativeVoice.synthesize(String(body.text||"").slice(0,400),voice);
         res.writeHead(200,{"Content-Type":"audio/wav","X-Room-Voice":encodeURIComponent(result.voice),"X-Room-Match":String(result.matched),"X-Room-Visemes":JSON.stringify(result.visemes)});
         return res.end(result.audio);
       }
@@ -95,13 +105,14 @@ async function openRoom({backend, apiToken, command, args, env, provider, voice,
     if(closed)return;
     closed=true;clearTimeout(timer);abort.abort();server.close();server.closeAllConnections();
     killTree(child);
+    nativeVoice?.close();
     if(turns && observedUser) {
-      const posture=userSat ? "观察到你入座" : "没有你入座的记录";
-      onReceipt?.("【房间离场记录】"+posture+"。我的已完成动作："+(completed.join("；")||"没有物件动作回执")+"。");
+      onReceipt?.({user_sat:userSat,steps:[...new Set(completed.flatMap(x=>x.split("，")))].slice(-15)});
     }
     onClosed();
   }
   try {
+    if(provider==="browser")nativeVoice=warmVoice();
     child=launch(command,args,{windowsHide:false,env:{...env,XINYU_ROOM_PORT:String(server.address().port),XINYU_ROOM_TICKET:ticket},stdio:"ignore"});
     child.once("exit",close);child.once("error",close);
     await new Promise((resolve,reject)=>{child.once("spawn",resolve);child.once("error",reject);});
@@ -109,7 +120,4 @@ async function openRoom({backend, apiToken, command, args, env, provider, voice,
     return {close,pid:child.pid};
   } catch(e){close();throw e;}
 }
-function surfaceActivity(stageVisible,roomOpen) {
-  return {stageActive:!roomOpen && stageVisible,petActive:!roomOpen && !stageVisible};
-}
-module.exports={openRoom,windowsVoice,surfaceActivity};
+module.exports={openRoom,warmVoice};

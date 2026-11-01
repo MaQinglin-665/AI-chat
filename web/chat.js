@@ -5160,12 +5160,25 @@ main().then(async () => {
       appendMessage("assistant",reply,{syncHistory:true});
     });
     const availability=await api.roomState().catch(()=>({enabled:false,active:false}));
-    if(button && availability.enabled) {
-      button.hidden=false;
+    state.roomRecap=availability.recap||null;
+    api.onRoomContext?.(facts=>{state.roomRecap=facts;});
+    const row=document.getElementById("room-setting-row");
+    const toggle=document.getElementById("room-experiment-toggle");
+    if(row && toggle && state.uiView==="full") {
+      row.hidden=false;
+      toggle.checked=availability.enabled;
+      toggle.addEventListener("change",async()=>{
+        toggle.checked=await api.setRoomEnabled(toggle.checked);
+        if(button)button.hidden=!toggle.checked;
+        if(!toggle.checked)state.roomRecap=null;
+      });
+    }
+    if(button) {
+      button.hidden=!availability.enabled;
       button.addEventListener("click",async()=>{
         try {
           await api.openRoom({provider:state.ttsProvider,voice:(state.ttsVoice||chooseTTSVoice())?.name||"",history:state.history});
-        } catch { appendMessage("assistant","房间启动失败，请检查 Godot 安装或导出包。",{category:"system",persist:false}); }
+        } catch(error) { const status=document.getElementById("room-launch-status"); status.hidden=false; status.textContent=String(error.message).replace(/^.*?Error: /,""); }
       });
     }
     sync(availability.active);

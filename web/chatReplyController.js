@@ -2281,6 +2281,7 @@
         ) {
           state.naturalConversationAmbient = null;
         }
+        if (!isAuto && state.roomRecap && /刚才|刚刚|上次|之前|房间里/.test(payload.message)) payload.room_recap=state.roomRecap;
         if (Object.keys(conversationContext).length) {
           payload.conversation_context = conversationContext;
         }

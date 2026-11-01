@@ -3,11 +3,14 @@ on:
   pull_request:
     paths: ['godot_room/**', '.github/workflows/godot-room.yml', 'scripts/build-room-component.py']
   push:
-    tags: ['room-component-*', 'v*']
+    tags: ['room-component-*']
+  release:
+    types: [published]
 permissions:
   contents: read
 jobs:
   verify:
+    if: github.event_name != 'release' || !startsWith(github.event.release.tag_name, 'room-component-')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -58,6 +61,5 @@ jobs:
           if [[ "$TAG" == room-component-* ]]; then
             gh release create "$TAG" component/* --repo "$REPO" --verify-tag --prerelease --latest=false --title "实验房间组件 $TAG" --notes "Windows x64 可选组件。下载校验值见附件。"
           else
-            for i in {1..30}; do gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1 && break; sleep 10; done
             gh release upload "$TAG" component/* --repo "$REPO"
           fi

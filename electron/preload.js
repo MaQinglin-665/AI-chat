@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  setRoomEnabled: value=>ipcRenderer.invoke("room-toggle",value===true),
+  onRoomContext: cb=>ipcRenderer.on("room-context",(_event,value)=>cb(value)),
   roomState: () => ipcRenderer.invoke("room-state"),
   openRoom: options => ipcRenderer.invoke("room-open",options),
   onRoomActive: cb => ipcRenderer.on("room-active",(_e,value)=>cb(value)),

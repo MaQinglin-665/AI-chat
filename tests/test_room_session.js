@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const {once} = require("node:events");
 const {spawn} = require("node:child_process");
 const http = require("node:http");
-const {openRoom,windowsVoice} = require("../electron/roomSession");
+const {openRoom} = require("../electron/roomSession");
 
 (async()=>{
   const upstream=http.createServer((req,res)=>{
@@ -20,8 +20,8 @@ const {openRoom,windowsVoice} = require("../electron/roomSession");
       endpoint="http://127.0.0.1:"+opts.env.XINYU_ROOM_PORT;boot=opts.env.XINYU_ROOM_TICKET;
       child=spawn(cmd,args,opts);return child;
     }});
-  async function post(route,bearer,origin=endpoint) {
-    return fetch(endpoint+route,{method:"POST",headers:{Authorization:"Bearer "+bearer,Origin:origin},body:JSON.stringify({message:"你好",world:{user_state:"stand"}})});
+  async function post(route,bearer,origin=endpoint,body={message:"你好",world:{user_state:"stand"}}) {
+    return fetch(endpoint+route,{method:"POST",headers:{Authorization:"Bearer "+bearer,Origin:origin},body:JSON.stringify(body)});
   }
   try {
     assert.equal((await post("/api/room/session",boot,"http://example.invalid")).status,403);
@@ -33,10 +33,12 @@ const {openRoom,windowsVoice} = require("../electron/roomSession");
     assert.equal((await post("/api/room/turn",boot)).status,403);
     assert.equal((await post("/api/config",token)).status,403);
     assert.equal((await post("/api/room/turn",token)).status,200);
+    assert.equal((await post("/api/room/receipt",token,endpoint,{steps:[{action:"sit_on",target:"bed_edge_seat"}]})).status,200);
+    assert.deepEqual(receipts,[]);
     assert.deepEqual(turns,[["你好","你好"]]);
     const done=once(child,"exit");session.close();await done;
     assert.equal(closed,1);
-    assert.ok(receipts.at(-1).includes("没有你入座的记录"));
+    assert.deepEqual(receipts.at(-1),{user_sat:false,steps:["坐到床沿"]});
     await assert.rejects(post("/api/room/turn",token));
     assert.throws(()=>process.kill(child.pid,0));
   } finally {session.close();upstream.close();upstream.closeAllConnections();}

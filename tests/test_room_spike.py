@@ -129,10 +129,18 @@ def test_room_conversation_removes_unsupported_past_trip(monkeypatch):
 
 def test_room_recap_only_uses_known_events_and_keeps_speakers_distinct():
     from app_room_spike import recent_room_recap, ground_recap
-    records=[{"role":"assistant","content":"【房间离场记录】没有你入座的记录。我的已完成动作：走到书架；坐到沙发。"}]
-    assert recent_room_recap(records, "你好") is None
-    facts=recent_room_recap(records, "刚才我们在房间做了什么")
-    assert facts == {"user_sat": False, "steps":["走到书架","坐到沙发"]}
-    assert "你自己坐床边" not in ground_recap("我坐到沙发，你自己坐床边。",facts)
-    assert ground_recap("你走到书架前看了看，然后挪到沙发坐下。我跟着你。我们聊了书。",facts) == "我去了书架，坐到了沙发。我们聊了书。"
-    assert ground_recap("你让我去沙发坐着。",None) == "你让我去沙发坐着。"
+    facts=recent_room_recap({"user_sat":False,"steps":["走到书架","坐到沙发","执行命令"]},"刚才我们做了什么")
+    assert facts["steps"]==["走到书架","坐到沙发"]
+    assert recent_room_recap([], "刚才呢") is None
+    assert recent_room_recap(facts,"我刚才说的是哪个编程语言？") is None
+    assert ground_recap("我去沙发坐了坐。你翻书。",facts)=="我去沙发坐了坐。"
+    assert ground_recap("嗯，我去沙发坐了坐。",facts)=="嗯，我去沙发坐了坐。"
+    assert ground_recap("刚才我在沙发坐了坐，挺放松的。",facts)=="刚才我在沙发坐了坐，挺放松的。"
+    assert "窗边坐" not in ground_recap("我去了窗边坐一会儿。",facts)
+    assert ground_recap("你好",None)=="你好"
+
+
+def test_bed_edge_is_an_explicit_visible_seat():
+    from app_room_spike import validate
+    assert validate({"action":"sit_on","target":"bed_edge_seat"},{"bed_edge_seat":["sit"]})["action"]=="sit_on"
+    assert validate({"action":"sit_on","target":"bed_edge_seat"},{})["action"]=="idle"

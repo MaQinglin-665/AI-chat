@@ -193,7 +193,7 @@
     const coalesceInlineStickerRecords = deps.coalesceInlineStickerRecords;
     const parseMessageTimestamp = deps.parseMessageTimestamp;
     const trimChatRecords = deps.trimChatRecords;
-    const normalizedRecords = parsed
+    const normalizedRecords = parsed.filter(item=>!(item?.role==="assistant" && /^(?:【房间离场记录】|刚才在房间里，我(?:(?:走到|坐到|看向)(?:窗边|沙发|椅子|书桌|书架|你身边)，?)+。$)/.test(item.content||"")))
       .map((item) => typeof normalizeChatRecord === "function" ? normalizeChatRecord(item) : item)
       .filter(Boolean)
       .filter((item) => !isSystemHistoryRecord(item));
