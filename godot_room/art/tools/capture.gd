@@ -49,6 +49,7 @@ func capture():
 	var hips=skeleton.to_global(skeleton.get_bone_global_pose(skeleton.find_bone("Hips")).origin)
 	# Retargeted hip pivot is above the actual seat contact; align the visual only.
 	model.position.y=seat.global_position.y+.08-hips.y
+	print("ART_SEAT_CALIBRATION seat_y=",seat.global_position.y," hip_y=",hips.y," root_y=",model.position.y)
 	camera.look_at_from_position(Vector3(-.35,1.45,1.35),Vector3(-3,1.0,-.95))
 	await shot("05-shino-sofa-night")
 	room.ceiling.hide()

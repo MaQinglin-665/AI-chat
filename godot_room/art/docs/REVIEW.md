@@ -32,11 +32,11 @@
 
 | 图片 | 字节数 | SHA256 |
 | --- | ---: | --- |
-| [01-comparison-day.png](01-comparison-day.png) | 385905 | `b11d217e15359681794b98112d9bc9262e5c816d8b15ef06929f7ed4b5508d40` |
-| [01-comparison-dusk.png](01-comparison-dusk.png) | 488119 | `b516be81cc3bdd0c3d972f0a013cf53bb572db0930270eedbb245b98a0da4e01` |
-| [01-comparison-night.png](01-comparison-night.png) | 512725 | `81ac803c46d22a0202a35711e72e29047b985223ac1cddec12eeae031b8085b8` |
-| [02-room-wide-night.png](02-room-wide-night.png) | 530996 | `ccfcdf642587e65bf143049c92ff9002dfd9a19e10ca4b37b3542c0adc8fe7ce` |
-| [03-bed-and-textiles.png](03-bed-and-textiles.png) | 334622 | `27162283a08c611e5b923fdd5fb31d8822df6688de5782d62926ecc3d2b12144` |
-| [04-desk-and-shelf.png](04-desk-and-shelf.png) | 560682 | `d29de6f6a53c097dac7991cd49430ad8462c898bd60d84b64a65de7dec4b2c14` |
-| [05-shino-sofa-night.png](05-shino-sofa-night.png) | 380387 | `0979b20ff0c6f8a33dbf8171652c0e13cbc10a71678c2cc09fe3d7a10657b062` |
-| [06-baked-navigation.png](06-baked-navigation.png) | 757926 | `5872a6214d6b03c5aebf6f5003a2a7054d5cb4854766839d0e7fa1cfb3c3d82f` |
+| [01-comparison-day.png](01-comparison-day.png) | 384165 | `94ee62db9a352e6616fbe8f55170b4c37b2930be25244e6b6e65c1abbb571566` |
+| [01-comparison-dusk.png](01-comparison-dusk.png) | 486062 | `c032d17eab6641d0b7e0002c422f8bec86b7398421b0751d74ef90a987ea2952` |
+| [01-comparison-night.png](01-comparison-night.png) | 510944 | `d9f6cc5ee5c6edc02663c5d47776f64dc9a185b17c4296bc160700f2a0ef2523` |
+| [02-room-wide-night.png](02-room-wide-night.png) | 529067 | `7c071a0e4974a18260b2d5ce82e486fba5af92ad8931bbc0a89024965dec7d0c` |
+| [03-bed-and-textiles.png](03-bed-and-textiles.png) | 334936 | `f5dae28882552197cfa2af655888e9454fbc96c54c0237bb790edc8bdfb02151` |
+| [04-desk-and-shelf.png](04-desk-and-shelf.png) | 561139 | `39dc3fb12047a98bfc10377b167d5d6f25e576410a32217adebc5c0e0b69dd3a` |
+| [05-shino-sofa-night.png](05-shino-sofa-night.png) | 376433 | `dc7355fe3abe0ef9e38a005194c5edb7a6fe595273967f44c1c509e1071fcfb9` |
+| [06-baked-navigation.png](06-baked-navigation.png) | 756896 | `dc1310583795cacaf391725d9a2e6d0b0757533ca5db29b15edc131fbeb717de` |

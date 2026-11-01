@@ -100,15 +100,15 @@ func build_sofa():
 	g.box(sofa,Vector3(0,.52,-.45),Vector3(2.12,.66,.20),fabric,.075)
 	for side in [-1,1]:
 		g.box(sofa,Vector3(side*1.03,.28,0),Vector3(.22,.62,1.04),fabric,.09)
-		g.box(sofa,Vector3(side*.48,.24,.035),Vector3(.91,.22,.82),cushion,.08)
-		var pillow=g.box(sofa,Vector3(side*.60,.55,-.24),Vector3(.44,.42,.16),g.material("d8b3b9" if side==1 else "ded2c9"),.065)
+		g.box(sofa,Vector3(side*.48,.14,.035),Vector3(.91,.22,.82),cushion,.08)
+		var pillow=g.box(sofa,Vector3(side*.60,.47,-.24),Vector3(.44,.42,.16),g.material("d8b3b9" if side==1 else "ded2c9"),.065)
 		pillow.rotation_degrees.z=side*-11
 		for z in [-.34,.34]:g.cylinder(sofa,Vector3(side*.86,-.17,z),.045,.04,.16,g.wood("74513e"))
 	# Small woven throw draped over one arm.
-	g.box(sofa,Vector3(.67,.37,.30),Vector3(.44,.045,.43),g.material("ad7890"),.015)
-	g.box(sofa,Vector3(.67,.17,.50),Vector3(.44,.38,.045),g.material("ad7890"),.015)
-	for i in range(8):g.box(sofa,Vector3(.49+i*.05,-.05,.51),Vector3(.012,.11,.014),g.material("c29ab0"),.005)
-	interaction(sofa,Vector3(0,-.25,1.0),Vector3(0,.35,.08),0.0)
+	g.box(sofa,Vector3(.67,.27,.30),Vector3(.44,.045,.43),g.material("ad7890"),.015)
+	g.box(sofa,Vector3(.67,.07,.50),Vector3(.44,.38,.045),g.material("ad7890"),.015)
+	for i in range(8):g.box(sofa,Vector3(.49+i*.05,-.15,.51),Vector3(.012,.11,.014),g.material("c29ab0"),.005)
+	interaction(sofa,Vector3(0,-.25,1.0),Vector3(0,.25,.08),0.0)
 
 func build_bed():
 	var bed=body("bed",Vector3(-3.05,.38,1.82),Vector3(1.85,.75,2.52),["look"])
@@ -153,11 +153,11 @@ func build_desk():
 	for row in range(3):
 		for col in range(11):g.box(desk,Vector3(-.26+col*.047,.12,.17+row*.047),Vector3(.035,.012,.033),g.material("ded4d3"),.005)
 	var chair=body("chair",Vector3(2.4,.23,-1.95),Vector3(.66,1.05,.74),["sit","look"],Vector3(0,.295,.03))
-	g.box(chair,Vector3(0,.20,0),Vector3(.64,.17,.62),g.material("bd9da9"),.065)
+	g.box(chair,Vector3(0,.145,0),Vector3(.64,.17,.62),g.material("bd9da9"),.065)
 	g.box(chair,Vector3(0,.52,.28),Vector3(.62,.59,.09),g.material("b399ab"),.04)
 	for x in [-.23,.23]:
 		for z in [-.22,.22]:g.cylinder(chair,Vector3(x,-.04,z),.032,.032,.35,oak)
-	interaction(chair,Vector3(-1.0,-.23,0),Vector3(0,.29,0),PI)
+	interaction(chair,Vector3(-1.0,-.23,0),Vector3(0,.23,0),PI)
 	interaction(desk,Vector3(-1.3,-.76,.25))
 	var book=body("book",Vector3(1.90,.87,-2.75),Vector3(.27,.08,.21),["look","pick_up"])
 	g.box(book,Vector3.ZERO,Vector3(.27,.08,.21),g.material("8c536c"),.01)
