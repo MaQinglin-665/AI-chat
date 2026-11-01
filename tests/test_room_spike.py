@@ -65,3 +65,21 @@ def test_room_context_is_request_local_and_opt_in():
     assert "_room_context" not in resolve(False,{"room":world})
     assert "_room_context" not in resolve(True,{})
     assert "chair" in resolve(True,{"room":world})["_room_context"]
+
+
+def test_bedroom_marker_capabilities_and_current_posture():
+    from app_room_spike import snapshot, chat_context, validate
+    world = {"ai":[0,0,0],"user":[0,0,0],"ai_state":"sitting","ai_near":"sofa",
+             "objects":{"bed":["look"],"sofa":["look","sit"],"rug":["look"]},
+             "recent_destinations":["bed","missing"],"speech_balance":50}
+    state = snapshot(world)
+    assert validate({"action":"sit_on","target":"bed"}, state["objects"]) == {"action":"idle"}
+    assert state["recent_destinations"] == ["bed"] and state["speech_balance"] == 5
+    assert "sitting" in chat_context(world) and "sofa" in chat_context(world)
+
+
+def test_room_speech_omits_stage_directions():
+    from app_room_spike import spoken
+    assert spoken("（坐下）晚安。(挥手)") == "晚安。"
+    assert spoken("（走过去）") == ""
+    assert spoken("") == ""

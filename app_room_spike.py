@@ -10,6 +10,14 @@ from avatar_brain_context import clean_text
 
 LABELS = {"sofa": ["sit", "look"], "chair": ["sit"], "desk": ["look"],
           "shelf": ["look"], "book": ["look", "pick_up"], "window": ["look"]}
+LABELS.update({key: ["look"] for key in ("bed", "bedside", "floor_lamp", "plant", "window_plant", "rug", "wall_art_0", "wall_art_1")})
+
+
+def spoken(text):
+    """Keep spoken text only. Room clients also apply this to stream previews."""
+    return re.sub(r"[（(][^()（）]*[）)]", "", str(text or "")).strip()
+
+
 EVENTS = {"entered", "near", "left", "sat", "stood", "spoke", "gave", "idle"}
 LOCK = threading.Lock()
 
@@ -86,7 +94,14 @@ def snapshot(payload):
     objects = payload.get("objects", [])
     visible = {name: LABELS[name] for name in objects if name in LABELS}
     state = {k: point(payload[k]) for k in ("user", "ai")}
+    if isinstance(objects, dict):
+        for name, labels in visible.items():
+            values = objects[name]
+            caps = values.get("affordances", []) if isinstance(values, dict) else values
+            visible[name] = [cap for cap in labels if isinstance(caps, list) and cap in caps]
     state["objects"] = visible
+    state["recent_destinations"] = [x for x in payload.get("recent_destinations", [])[-6:] if isinstance(x,str) and x in (*visible,"user")]
+    state["speech_balance"] = max(-5, min(5, int(payload.get("speech_balance", 0))))
     state["ai_state"] = payload.get("ai_state") if payload.get("ai_state") in ("walking","sitting","standing") else "idle"
     state["user_state"] = payload.get("user_state") if payload.get("user_state") in ("walk","sit","typing") else "stand"
     state["needs"] = {k:round(max(0,min(1,float(v))),1) for k,v in payload.get("needs",{}).items() if k in NEEDS}
@@ -110,12 +125,13 @@ def chat_context(payload):
     except (TypeError, KeyError, ValueError, AttributeError):
         return ""
     return ("你和用户正以化身共处可互动的虚拟房间。根据已接下的目标和执行回执回答。"
-            "只承诺已经接下的步骤，未完成时用将来时。" + json.dumps(
+            "只说一句自然的短话。当前姿态、位置优先于旧历史，已坐下就别说刚从某处过来。禁止括号动作旁白。不复述移动过程。" + json.dumps(
                 {k:state[k] for k in ("user","ai","ai_near","user_near","ai_state","user_state","goal","last")}, ensure_ascii=False))
 
 
 POLICY = """你是虚拟房间里的馨语。按需求、事件和回执决定下一步，用户请求优先。重复待机时寻找值得做的事。
-只输出JSON {thought:短理由,action:第一步,say:可选短句,goal:可选后续步骤数组}。说与做独立。
+只输出JSON {thought:短理由,action:第一步,say:可选短句,goal:可选后续步骤数组}。说与做独立。安静陪伴时不必每次说话，约半数自主决定省略say。speech_balance为正说明最近说得多，优先安静；为负说明已安静较久，适合时可以说一句。说话只说一句自然短句，不使用括号旁白，不复述正在做的动作。
+自主时降低recent_destinations中过去一分钟已去过地点的优先级；用户明确要求时照做。独处可以去书桌椅坐一会儿、窗边看景、书架前看书。
 完整示例 {"thought":"想看看外面","action":{"action":"go_to","target":"window"},"goal":[{"action":"look_at","target":"window"},{"action":"idle","seconds":3}]}。可选 go_to/look_at/sit_on(target)、approach_user/follow_user/stop_follow/stand_up、gesture(name:nod或wave)、idle(seconds)。
 坐旁边用go_to(sofa),sit_on(sofa)；看窗外用go_to(window),look_at(window),idle。只使用state.objects中的物件或user。"""
 
@@ -139,6 +155,8 @@ def decide(cfg, payload):
     prompt = {"trigger":reason, "state":state}
     if user:
         prompt["user_request"] = user
+    elif state["recent_destinations"]:
+        prompt["destination_weights"] = {name: 0.2 if name in state["recent_destinations"] else 1 for name in state["objects"]}
     raw = json.loads(call_model(cfg, prompt, reason).strip().removeprefix("```json").removesuffix("```"))
     first_raw = raw["action"]
     if isinstance(first_raw,str) and first_raw in PHYSICAL:
@@ -148,7 +166,7 @@ def decide(cfg, payload):
     if not isinstance(tail,list) or len(tail)>4: raise ValueError("invalid goal")
     steps = [step(item,state["objects"]) for item in tail]
     if steps and steps[0] == first: steps.pop(0)
-    return {"action":first,"goal":steps,"say":clean_text(raw.get("say",""),100),
+    return {"action":first,"goal":steps,"say":spoken(clean_text(raw.get("say",""),100)),
             "thought":clean_text(raw.get("thought",""),60)}
 
 
@@ -168,7 +186,7 @@ def unpack(packet):
         version = 0
     elif ident != session or packet.get("base") != version:
         raise LookupError("resync")
-    fields = {"ai","user","objects","ai_state","user_state","needs","last_move_sec","goal","last","activity","receipts","ai_near","user_near"}
+    fields = {"recent_destinations","speech_balance","ai","user","objects","ai_state","user_state","needs","last_move_sec","goal","last","activity","receipts","ai_near","user_near"}
     world = {**previous, **{k:v for k,v in packet["changes"].items() if k in fields}}
     snapshot(world)
     _cache = (ident, version+1, world)

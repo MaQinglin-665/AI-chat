@@ -5,6 +5,8 @@ var motion := preload("res://locomotion.gd").new()
 var bubble := Label3D.new()
 var follow := false
 var sitting := false
+var seat_object: Node3D
+var bubble_time := 0.
 var seat_exit := Vector3.ZERO
 var look_target: Node3D
 var destination := ""
@@ -39,7 +41,9 @@ func _ready():
 	contact.actor=self
 	skeleton.add_child(contact)
 	skeleton.add_child(gaze)
-	bubble.position.y = 1.88
+	bubble.position.y = 2.04
+	bubble.no_depth_test = true
+	bubble.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	bubble.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	bubble.font_size = 22
 	bubble.pixel_size = .002
@@ -49,15 +53,8 @@ func _ready():
 func approach(node: Node3D):
 	if sitting: stand()
 	var offset = (global_position-node.global_position).slide(Vector3.UP).normalized()
-	var distance = 1.3 if node == player else .85
-	var approach_point = node.global_position + offset * distance
-	if node.name == &"sofa":
-		var cushion := 0.
-		if player.seated: cushion=.68 if player.position.x <= node.position.x else -.68
-		approach_point=node.global_position + Vector3(cushion,0,.85)
-	elif node.name == &"chair":
-		approach_point=node.global_position+Vector3(-.8,0,0)
-	agent.target_position = Vector3(approach_point.x,global_position.y,approach_point.z)
+	var approach_point = player.global_position + offset * 1.35 if node == player else get_parent().approach_point(node)
+	agent.target_position = approach_point
 	destination = str(node.name)
 	own_state = "walking"
 
@@ -65,6 +62,7 @@ func stand():
 	if sitting: global_position=seat_exit
 	posture_change += 1
 	sitting = false
+	seat_object = null
 	body.position.y = 0
 	motion.playback.travel("Sitting_Exit")
 	own_state = "standing"
@@ -80,14 +78,26 @@ func sit():
 	posture_change += 1
 	var revision = posture_change
 	own_state = "sitting"
-	var offset := 0.
-	if sit_target.name == &"sofa" and player.seated:
-		offset = .68 if player.position.x <= sit_target.position.x else -.68
-	global_position = Vector3(sit_target.position.x+offset,0,sit_target.position.z+.16)
+	var seat = get_parent().seat_for(sit_target,self)
+	if seat.is_empty():
+		sit_target = null
+		stand()
+		return
+	seat_object = sit_target
+	var pose: Transform3D = seat.pose
+	global_position = Vector3(pose.origin.x,0,pose.origin.z)
+	body.rotation.y = pose.basis.get_euler().y
 	sit_target = null
 	motion.playback.travel("Sitting_Enter")
 	await get_tree().create_timer(1.1).timeout
-	if revision == posture_change: motion.playback.travel("Sitting_Idle")
+	if revision != posture_change: return
+	motion.playback.travel("Sitting_Idle")
+	await get_tree().create_timer(.3).timeout
+	if revision != posture_change: return
+	var skeleton: Skeleton3D = body.find_children("*","Skeleton3D",true,false)[0]
+	var hips = skeleton.to_global(skeleton.get_bone_global_pose(skeleton.find_bone("Hips")).origin)
+	body.position.y += pose.origin.y + .08 - hips.y
+
 
 func move_safe(safe: Vector3):
 	if sitting: return
@@ -95,6 +105,9 @@ func move_safe(safe: Vector3):
 	move_and_slide()
 
 func _physics_process(delta):
+	bubble_time -= delta
+	bubble.visible = bubble_time > 0
+	bubble.position.y = 1.68 if sitting else 2.04
 	if NavigationServer3D.map_get_iteration_id(agent.get_navigation_map()) == 0: return
 	last_follow -= delta
 	var distance = global_position.distance_to(player.global_position)
@@ -129,8 +142,10 @@ func _physics_process(delta):
 		body.rotation.y = lerp_angle(body.rotation.y,atan2(facing.x,facing.z),1-exp(-delta*4))
 
 func speak(text: String, emotion: String):
-	bubble.text = text.left(100)
-	bubble.width = 420
+	bubble.text = text
+	bubble_time = clampf(2. + text.length()*.22, 3., 26.)
+	bubble.visible = not text.is_empty()
+	bubble.width = 400
 	bubble.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var face = body.find_child("Face",true,false)
 	for i in range(face.get_blend_shape_count()):
