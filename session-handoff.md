@@ -1,6 +1,7 @@
 # Current — Godot phase 5, PR238
 
-[Phase 5 report](godot_room/PHASE5-REPORT.md). Separate rc2 Release pinned and verified; room opt-in, typed private receipts, segmented voice, bed-edge seat and release build complete. Next: restore window control, record two voiced room turns and desktop recap on rc2, measure speech latency, append final frames and report. The isolated phase5-review profile already has the verified download. Author handles merge.
+[Phase 5 report](godot_room/PHASE5-REPORT.md). Stable release downloaded to a clean profile in 79.12s. Real bed/window turns and grounded recap verified. Review frames 06–11 and local tmp_ui_smoke/phase5-stable/room-v1.0.0-review.mp4. Await author review.
+
 
 # Earlier — voiced Godot room on draft PR 238
 

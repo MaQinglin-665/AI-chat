@@ -6,7 +6,7 @@
       "name": "Shared Godot room feasibility experiment",
       "status": "in_progress",
       "verification": "Godot 4.6.3, CC0 Shino + Standard locomotion, bounded authenticated intent/chat, 300-second real DeepSeek tour, x64 export smoke. Phase 2: real 305-second tour, 6/9 autonomous first actions moved, 2/2 user goals completed.",
-      "next": "Phase 5: rc2 release download and bed-edge sit/stand verified. See godot_room/PHASE5-REPORT.md. Finish rc2 voiced recording and speech latency measurement after desktop control reconnects."
+      "next": "Stable v1.0.0 complete file manifest and real 194.67s voiced acceptance verified. Review godot_room/PHASE5-REPORT.md; measured speech P50 3.68s (n=2). Author decides merge."
     },
     {
       "id": "task-card-polish",

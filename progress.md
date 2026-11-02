@@ -1474,3 +1474,7 @@ Final local verification: scripts/test-local.ps1 (D-drive TEMP/TMP) 1108 Python 
 ## Godot phase 5 — optional component and private recap
 
 #241 merged at a78ed4b; main 25142ed merged with only three state conflicts. Godot 4.6.3 CI checked bed-edge navigation, sit/stand, interaction and speech. Published separate rc2 component; fresh Electron profile downloaded and launched it in 201s. Receipts kept out of chat; rc1 measured speech P50 3.05s (n=2). Tests: 1119 Python passed/3 skipped, 89 Node, syntax/secrets/mappings, first-run package passed. Installer delta +26,621 B, no Room.exe/PCK/VRM in payload. Final rc2 voiced video and latency pending window control recovery. Report: godot_room/PHASE5-REPORT.md. PR238 review only.
+
+## Room v1.0.0 final review
+
+Eight-file manifest checked after extraction and at launch. Original ZIP promoted to stable Release. Real download 79.12s, voiced capture 194.67s, six screenshots and successful bed/window recap. Speech P50 3.68s (n=2). Python 1120 passed/3 skipped; Godot CI passed. See godot_room/PHASE5-REPORT.md; author decides merge.
