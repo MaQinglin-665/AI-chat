@@ -10,3 +10,6 @@ renderer/rendering_method="forward_plus"
 [navigation]
 3d/default_cell_size=0.125
 3d/default_cell_height=0.1
+
+[audio]
+driver/enable_input=true

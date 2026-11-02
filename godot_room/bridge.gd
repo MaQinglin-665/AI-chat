@@ -19,6 +19,7 @@ func _ready():
 	previous_user = player.global_position
 	observed_position = ai.global_position
 	player.spoke.connect(chat)
+	add_child(preload("res://room_ptt.gd").new())
 	player.interacted.connect(func(_id, act): event({"sit":"sat","stand_up":"stood","gave":"gave"}.get(act,"idle")))
 	if OS.has_environment("XINYU_ROOM_TICKET"):
 		connecting=true
@@ -201,6 +202,9 @@ func advance(delta):
 	elif since_step>18.: finish("failed","unreachable")
 
 func _process(delta):
+	if release_ms>0 and ai.voice.output_onset>=release_ms:
+		print("ROOM_PTT_FIRST_AUDIO_MS ",ai.voice.output_onset-release_ms)
+		release_ms=0
 	var distance=ai.position.distance_to(player.position)
 	var near_now=distance<(2.6 if nearby else 1.8)
 	var user_travel=(player.position-previous_user).slide(Vector3.UP)
@@ -221,7 +225,7 @@ func _process(delta):
 	advance(delta)
 	countdown-=delta
 	utility_clock-=delta
-	if connecting or chatting or player.entry.visible or not current.is_empty(): return
+	if connecting or chatting or listening or speaking_lines or player.entry.visible or not current.is_empty(): return
 	if not token.is_empty() and not thinking and (pending!="" or countdown<=0):
 		think()
 	elif utility_clock<=0 and not thinking:
@@ -324,7 +328,9 @@ func chat(message):
 	pending=""
 	countdown=randf_range(20,55)
 	chatting = true
+	var typed_epoch=voice_epoch
 	var result=await request("room/turn",{"message":message,"history":history,"world":status_value()})
+	if typed_epoch!=voice_epoch:return
 	var reply=str(result.get("reply",""))
 	if reply and result.get("action") is Dictionary:
 		accept({"action":result.action,"goal":result.get("steps",[]),"description":result.get("goal","")},"user")
@@ -333,4 +339,93 @@ func chat(message):
 		history.append({"role":"assistant","content":reply})
 		history = history.slice(-6)
 	print("ROOM_TURN visible_ms=",Time.get_ticks_msec()-user_started," displayed=",not reply.is_empty())
+	chatting=false
+
+
+var voice_epoch:=0
+var listening:=false
+var interrupted:=false
+var speaking_lines:=false
+var line_queue:=[]
+var received_lines:=0
+var release_ms:=0
+var last_reaction:=""
+var reaction_count:=0
+
+func reaction_for(text):
+	var options=[]
+	if "厉害" in text or "漂亮" in text: options=["诶，真的？","咳，听见啦。"]
+	elif "翻车" in text or "紧张" in text: options=["啊……","嗯，我听着。"]
+	elif "土豆" in text: options=["土豆？","噗，那个书名！"]
+	elif "好消息" in text or "跑通" in text: options=["成啦？","诶！"]
+	elif "剧透" in text: options=["等下，别翻！","嗯？最后一页？"]
+	elif "队长" in text: options=["到！","诶，我带队？"]
+	elif interrupted: options=["嗯，你说。","好，先听你的。"]
+	if options.is_empty(): return ""
+	if reaction_count%3==2:
+		reaction_count+=1
+		return ""
+	options.erase(last_reaction)
+	last_reaction=options.pick_random()
+	reaction_count+=1
+	return last_reaction
+
+func interrupt_for_voice():
+	release_ms=0
+	interrupted=chatting or speaking_lines or ai.voice.playing
+	voice_epoch+=1
+	generation+=1
+	listening=true
+	chatting=false
+	speaking_lines=false
+	line_queue.clear()
+	ai.voice.serial+=1
+	ai.voice.stop()
+	ai.voice.reset_mouth()
+	ai.caption.show_line("")
+	ai.get_node("Expression").show_emotion("平静")
+
+func enqueue_line(line,epoch):
+	if epoch!=voice_epoch or not line is Dictionary or str(line.get("text","")).is_empty():return
+	received_lines+=1
+	line_queue.append(line)
+	if not speaking_lines:play_lines(epoch)
+
+func play_lines(epoch):
+	speaking_lines=true
+	var id=ai.voice.serial
+	while not line_queue.is_empty() and epoch==voice_epoch:
+		var line=line_queue.pop_front()
+		if ai.voice.muted:
+			ai.caption.show_line(line.text)
+			ai.get_node("Expression").show_emotion(line.emotion)
+		else:
+			await ai.voice.play_sentence(line.text,id,line.emotion)
+	if epoch==voice_epoch:speaking_lines=false
+
+func voice_chat(text,release_time):
+	var epoch=voice_epoch
+	release_ms=release_time
+	ai.voice.measured=false
+	received_lines=0
+	event("spoke")
+	pending=""
+	countdown=35.
+	chatting=true
+	ai.get_node("Expression").show_emotion("思考")
+	var payload={"message":text,"history":history,"world":status_value(),"interrupted":interrupted,"stream":true}
+	var reaction=reaction_for(text)
+	if reaction:
+		line_queue.append({"text":reaction,"emotion":"平静"})
+		play_lines(epoch)
+	var result=await preload("res://room_turn_stream.gd").run(self,payload,epoch)
+	if epoch!=voice_epoch:return
+	var reply=str(result.get("reply",""))
+	if not reply.is_empty():
+		for line in result.get("lines",[]).slice(received_lines):enqueue_line(line,epoch)
+		if result.get("action") is Dictionary:accept({"action":result.action,"goal":result.get("steps",[]),"description":result.get("goal","")},"user")
+		history.append({"role":"user","content":text})
+		history.append({"role":"assistant","content":reply})
+		history=history.slice(-12)
+	else:ai.caption.mute_hint.text="这句没接上 · 按住 T 重试"
 	chatting=false

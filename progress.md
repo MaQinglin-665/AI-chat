@@ -1478,3 +1478,6 @@ Final local verification: scripts/test-local.ps1 (D-drive TEMP/TMP) 1108 Python 
 ## Room v1.0.0 final review
 
 Eight-file manifest checked after extraction and at launch. Original ZIP promoted to stable Release. Real download 79.12s, voiced capture 194.67s, six screenshots and successful bed/window recap. Speech P50 3.68s (n=2). Python 1120 passed/3 skipped; Godot CI passed. See godot_room/PHASE5-REPORT.md; author decides merge.
+
+## Room alive — 2026-11-02
+Isolated loopback backend, random per-run token, local ASR weights. Held-key capture, authenticated streaming transcription, cancel/replace, tagged spoken clauses and VRM expression layer. Controlled 180s/30fps H264+AAC recording stays local; 8 turns first onset P50/P90 1.25/4.18s, 7 body turns 3.75/4.55s. CER4/77 on7 synthetic questions. 20 matched model comparisons, five strongest/weakest in docs/room-alive-review.md. Await author physical-microphone rehearsal; draft only.

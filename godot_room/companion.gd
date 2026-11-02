@@ -46,6 +46,7 @@ func _ready():
 	skeleton.add_child(gaze)
 	add_child(caption)
 	add_child(voice)
+	add_child(preload("res://expression.gd").new())
 	look_target = player
 
 func approach(node: Node3D):
