@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  roomAvatarLabels: ()=>ipcRenderer.invoke("room-avatar-labels"),
+  selectRoomAvatar: (role,reset)=>ipcRenderer.invoke("room-avatar-select",role,reset===true),
   setRoomEnabled: value=>ipcRenderer.invoke("room-toggle",value===true),
   onRoomContext: cb=>ipcRenderer.on("room-context",(_event,value)=>cb(value)),
   roomState: () => ipcRenderer.invoke("room-state"),

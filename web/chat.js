@@ -5169,6 +5169,22 @@ main().then(async () => {
     if(row && toggle && state.uiView==="full") {
       row.hidden=false;
       toggle.checked=availability.enabled;
+      const settings=document.getElementById("room-avatar-settings");
+      if(settings && availability.customAvatars && api.roomAvatarLabels) {
+        const labels=await api.roomAvatarLabels();
+        settings.hidden=false;
+        for(const role of ["companion","player"]) {
+          const name=settings.querySelector('[data-room-name="'+role+'"]');
+          name.textContent=labels[role]||name.textContent;
+          for(const action of ["select","reset"]) settings.querySelector('[data-room-'+action+'="'+role+'"]').onclick=async()=>{
+            const status=settings.querySelector("small");
+            try {
+              const value=await api.selectRoomAvatar(role,action==="reset");
+              if(value){name.textContent=value;status.textContent="下次进入房间时生效。";}
+            } catch {status.textContent="无法选择模型，请检查文件是否可读且不超过 200 MiB。";}
+          };
+        }
+      }
       toggle.addEventListener("change",async()=>{
         toggle.checked=await api.setRoomEnabled(toggle.checked);
         if(button)button.hidden=!toggle.checked;

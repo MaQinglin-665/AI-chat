@@ -1417,7 +1417,17 @@ function roomChanged(active) {
   }
   syncCompanionSurfaceVisibility();
 }
-ipcMain.handle("room-state", event => ({enabled:roomEnabled() && isRoomOwner(event), active:!!roomSession || roomStarting, recap:isRoomOwner(event)?roomRecap:null}));
+const roomAvatars = require("./roomAvatars");
+ipcMain.handle("room-avatar-labels", event => roomDev && isRoomOwner(event) ? roomAvatars.labels(app.getPath("userData")) : {});
+ipcMain.handle("room-avatar-select", async (event,role,reset) => {
+  if (!roomDev || !isRoomOwner(event) || !["companion","player"].includes(role)) return null;
+  const root=app.getPath("userData");
+  if(reset===true) return roomAvatars.save(root,role,"");
+  const result=await dialog.showOpenDialog(chatWindow,{properties:["openFile"],filters:[{name:"VRM",extensions:["vrm"]}]});
+  if(result.canceled || !isRoomOwner(event)) return null;
+  return roomAvatars.save(root,role,result.filePaths[0]);
+});
+ipcMain.handle("room-state", event => ({customAvatars:roomDev && isRoomOwner(event), enabled:roomEnabled() && isRoomOwner(event), active:!!roomSession || roomStarting, recap:isRoomOwner(event)?roomRecap:null}));
 ipcMain.handle("room-toggle", async (event,value) => {
   if (!isRoomOwner(event)) return false;
   if (roomStarting || roomSession) return roomEnabled();
@@ -1452,7 +1462,7 @@ ipcMain.handle("room-open", async (event, options={}) => {
     if (!command) { roomStarting=false; roomChanged(false); return false; }
     const history=Array.isArray(options.history)?options.history.slice(-12).filter(x=>x && ["user","assistant"].includes(x.role) && typeof x.content==="string").map(x=>({role:x.role,content:x.content.slice(0,500)})):[];
     roomSession=await require("./roomSession").openRoom({backend:SERVER_URL,apiToken:resolveRuntimeApiToken(),
-      command,args:roomDev?["--path",roomProject]:[],env,history,
+      command,args:roomDev?["--path",roomProject]:[],env:roomDev?{...env,...roomAvatars.environment(app.getPath("userData"))}:env,history,
       provider:options.provider==="browser"?"browser":"server",voice:String(options.voice||"").slice(0,140),
       onTurn:(message,reply)=>{if(chatWindow&&!chatWindow.isDestroyed())chatWindow.webContents.send("room-turn",{message,reply});},
       onReceipt:facts=>{roomRecap=facts;if(chatWindow&&!chatWindow.isDestroyed())chatWindow.webContents.send("room-context",facts);},

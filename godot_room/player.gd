@@ -24,7 +24,7 @@ func _ready():
 	collider.shape = capsule
 	collider.position.y = .825
 	add_child(collider)
-	avatar = preload("res://models/Vita.vrm").instantiate()
+	avatar = preload("res://avatar_loader.gd").create("PLAYER", preload("res://models/Vita.vrm"))
 	add_child(avatar)
 	avatar.add_child(gait)
 	gait.configure(avatar)

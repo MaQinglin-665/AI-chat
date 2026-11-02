@@ -6,7 +6,6 @@ var serial := 0
 var bus_index := -1
 var began := 0
 var shape_indices := {}
-var face: MeshInstance3D
 var analyser
 var mix_probe := AudioEffectCapture.new()
 var output_onset := -1
@@ -34,11 +33,12 @@ func _ready():
 	AudioServer.add_bus_effect(bus_index,effect)
 	AudioServer.add_bus_effect(bus_index,mix_probe)
 	analyser=AudioServer.get_bus_effect_instance(bus_index,0)
-	face=actor.body.find_child("Face",true,false)
-	if face:
-		for i in face.get_blend_shape_count():
-			for vowel in ["A","I","U","E","O"]:
-				if str(face.mesh.get_blend_shape_name(i)).ends_with("Fcl_MTH_"+vowel): shape_indices[vowel]=i
+	var presets := {"A":"aa","I":"ih","U":"ou","E":"ee","O":"oh"}
+	for vowel in presets:
+		var bindings = preload("res://avatar_loader.gd").expression_bindings(actor.body,presets[vowel])
+		if not bindings.is_empty(): shape_indices[vowel]=bindings
+
+
 
 func _exit_tree():
 	if bus_index>=0:
@@ -150,7 +150,7 @@ func pcm_level(seconds: float):
 	return sqrt(energy/maxi(n,1))
 
 func reset_mouth():
-	for vowel in shape_indices: face.set_blend_shape_value(shape_indices[vowel],0)
+	for vowel in shape_indices: apply_vowel(vowel,0)
 	mouth=0.
 
 func _process(delta):
@@ -180,7 +180,8 @@ func _process(delta):
 		for cue in cues:
 			if cue is Array and cue.size()==2 and float(cue[0])<=ms and str(cue[1]) in shape_indices: target=str(cue[1])
 	mouth=lerpf(mouth,level,1-exp(-delta*38))
-	for vowel in shape_indices: face.set_blend_shape_value(shape_indices[vowel],mouth if vowel==target and audible else 0.)
+	for vowel in shape_indices: apply_vowel(vowel,0.)
+	if audible and shape_indices.has(target): apply_vowel(target,mouth)
 	envelope=lerpf(envelope,1. if audible else 0.,1-exp(-delta*3.))
 	actor.gaze.speech_envelope=envelope
 	if audible and mouth>.012 and not measured:
@@ -189,3 +190,6 @@ func _process(delta):
 	if started_speech and not playing:
 		started_speech=false
 		actor.caption.audio_finished()
+
+func apply_vowel(vowel, weight):
+	for bind in shape_indices[vowel]: bind[0].set_blend_shape_value(bind[1],weight*bind[2])
