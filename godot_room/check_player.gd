@@ -6,6 +6,16 @@ func run():
 	root.add_child(room)
 	var player = room.get_node("Player")
 	for i in range(10): await physics_frame
+	var mirror=Camera3D.new()
+	var hidden_parts=0
+	for mesh in player.avatar.find_children("*","MeshInstance3D",true,false):
+		if mesh.layers==(1 << (player.HEAD_LAYER-1)): hidden_parts+=1
+	var layers_ok=hidden_parts>=2 and mirror.get_cull_mask_value(player.HEAD_LAYER) and not player.camera.get_cull_mask_value(player.HEAD_LAYER)
+	mirror.free()
+	if not layers_ok:
+		push_error("Player head must be visible to the mirror only in first person")
+		quit(4)
+		return
 	var toggle := InputEventKey.new()
 	toggle.keycode = KEY_V
 	toggle.pressed = true
@@ -24,5 +34,5 @@ func run():
 	if highest < .4 or not player.is_on_floor(): quit(2); return
 	toggle.keycode = KEY_V
 	player._unhandled_input(toggle)
-	print("first person restored ",not player.avatar.visible)
-	quit(0 if not player.avatar.visible else 3)
+	print("first person restored ",player.avatar.visible and not player.camera.get_cull_mask_value(player.HEAD_LAYER))
+	quit(0 if player.avatar.visible and not player.camera.get_cull_mask_value(player.HEAD_LAYER) else 3)

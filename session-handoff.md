@@ -1,3 +1,7 @@
+# Current — experimental room experience v2
+
+Branch codex/room-experience-v2, base 9194f8d. Run the development project to review movement, F2 FOV, proximity interactions and spatial sound. Review the acceptance evidence in godot_room/docs/experience-v2. Mirror cameras should include layer 19. Author reviews the draft PR.
+
 # Current — Godot phase 5, PR238
 
 [Phase 5 report](godot_room/PHASE5-REPORT.md). Stable release downloaded to a clean profile in 79.12s. Real bed/window turns and grounded recap verified. Review frames 06–11 and local tmp_ui_smoke/phase5-stable/room-v1.0.0-review.mp4. Await author review.

@@ -185,3 +185,5 @@ The component is distributed separately from the desktop installer. Shino, Vita,
 | Vita, β Ver AvatarSample_3 | pixiv Inc. | [Author's CC0 notice](https://vroid.pixiv.help/hc/en-us/articles/360014900113), [VRM source](https://github.com/madjin/vrm-samples/blob/master/vroid/beta/Vita.vrm) |
 | Universal Animation Library, Standard | Quaternius | [CC0 animation library](https://quaternius.itch.io/universal-animation-library), [glTF distribution](https://github.com/J-Ponzo/gltf-universal-animation-library) |
 | Procedural bedroom and shaders | Project art contributors, maintained by qinglinMa | [Asset inventory](godot_room/art/SOURCES.md), [CC0 declaration](godot_room/art/LICENSE-CC0.txt) |
+
+The four room footfalls are original procedurally synthesized sounds for this project (noise, damped oscillators, no sampled recordings). They are dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). See [audio/steps/LICENSE.txt](godot_room/audio/steps/LICENSE.txt).

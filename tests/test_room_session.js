@@ -34,11 +34,14 @@ const {openRoom} = require("../electron/roomSession");
     assert.equal((await post("/api/config",token)).status,403);
     assert.equal((await post("/api/room/turn",token)).status,200);
     assert.equal((await post("/api/room/receipt",token,endpoint,{steps:[{action:"sit_on",target:"bed_edge_seat"}]})).status,200);
+    for(const experience of ["read","high_five","irrelevant free text"]) {
+      assert.equal((await post("/api/room/receipt",token,endpoint,{experience})).status,200);
+    }
     assert.deepEqual(receipts,[]);
     assert.deepEqual(turns,[["你好","你好"]]);
     const done=once(child,"exit");session.close();await done;
     assert.equal(closed,1);
-    assert.deepEqual(receipts.at(-1),{user_sat:false,steps:["坐到床沿"]});
+    assert.deepEqual(receipts.at(-1),{user_sat:false,steps:["坐到床沿","read","high_five"]});
     await assert.rejects(post("/api/room/turn",token));
     assert.throws(()=>process.kill(child.pid,0));
   } finally {session.close();upstream.close();upstream.closeAllConnections();}

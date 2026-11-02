@@ -1478,3 +1478,7 @@ Final local verification: scripts/test-local.ps1 (D-drive TEMP/TMP) 1108 Python 
 ## Room v1.0.0 final review
 
 Eight-file manifest checked after extraction and at launch. Original ZIP promoted to stable Release. Real download 79.12s, voiced capture 194.67s, six screenshots and successful bed/window recap. Speech P50 3.68s (n=2). Python 1120 passed/3 skipped; Godot CI passed. See godot_room/PHASE5-REPORT.md; author decides merge.
+
+## Room experience v2
+
+Added opt-in streaming room turns, ordered sentence audio, shared activity receipts, close-range interactions, procedural gaze/breath/fingers, acceleration, FOV setting and CC0 spatial steps. Godot 4.6.3 headless navigation, player/mirror layers, goals, speech, art and contract checks passed. See the experience-v2 recording report for live results.

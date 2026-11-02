@@ -51,20 +51,34 @@ func _unhandled_key_input(event):
 		AudioServer.set_bus_mute(bus_index,muted)
 		actor.caption.set_muted(muted)
 
-func utter(text):
+var sentence_queue := []
+var draining := false
+
+func begin_queue():
 	serial+=1
-	var id=serial
+	sentence_queue.clear()
+	draining=false
 	stop()
 	started_speech=false
 	measured=false
 	reset_mouth()
+	return serial
+
+func utter(text):
+	var id=begin_queue()
 	var split=RegEx.new()
-	split.compile("[^。！？!?；;，,\\n]+[。！？!?；;，,]*")
-	var sentences=split.search_all(text)
-	for sentence in sentences:
-		if id!=serial: return
-		# Prepare the next clause while the current one is audible.
-		if not await play_sentence(sentence.get_string(),id): return
+	split.compile("[^。！？!?；;，,\n]+[。！？!?；;，,]*")
+	for sentence in split.search_all(text):
+		enqueue_sentence(sentence.get_string(),id)
+
+func enqueue_sentence(text:String,id:int):
+	if serial!=id or text.is_empty(): return
+	sentence_queue.append(text)
+	if draining: return
+	draining=true
+	while serial==id and not sentence_queue.is_empty():
+		await play_sentence(sentence_queue.pop_front(),id)
+	if serial==id: draining=false
 
 func play_sentence(text:String,id:int) -> bool:
 	var bridge=actor.get_parent().get_node("Bridge")

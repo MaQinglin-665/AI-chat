@@ -150,3 +150,43 @@ def test_room_recap_keeps_completed_bed_seat_when_window_is_also_present():
     facts = {"user_sat": False, "steps": ["走到床沿", "坐到床沿", "走到窗边", "看向窗边"]}
     recap = ground_recap("我看了看窗边。", facts)
     assert "床沿" in recap and "窗边" in recap
+
+
+def test_streaming_room_reply_emits_before_next_model_chunk(monkeypatch):
+    import app_room_spike as room
+    emitted = []
+    def model(*_):
+        yield '{"action":"idle","reply":"我在呢。"}\n'
+        assert emitted == [{"sentence":"我在呢。"}]
+        yield "一起看看窗外吧。"
+    monkeypatch.setattr(room, "iter_openai_chat_stream", model)
+    result = room.user_turn({}, {"message":"在吗","world":{"ai":[0,0,0],"user":[1,0,0]}}, emitted.append)
+    assert result["reply"] == "我在呢。一起看看窗外吧。"
+    assert emitted[-1] == {"sentence":"一起看看窗外吧。"}
+
+
+def test_room_experience_recap_only_accepts_known_facts():
+    from app_room_spike import EXPERIENCE_FACTS, recent_room_recap, ground_recap
+    facts = recent_room_recap({"steps":[*EXPERIENCE_FACTS,"forged"]},"刚才我们做了什么？")
+    assert facts["steps"] == list(EXPERIENCE_FACTS)
+    recap = ground_recap("随意编造的动作", {"steps":["gave","high_five"]})
+    assert "你把书递给了我" in recap and "击了掌" in recap
+
+
+def test_room_stream_previews_safe_reply_field_once(monkeypatch):
+    import app_room_spike as room
+    events = []
+    def model(*_):
+        yield '{"reply":"晚上好。",'
+        assert events == [{"sentence":"晚上好。"}]
+        yield '"action":"idle"}'
+    monkeypatch.setattr(room, "iter_openai_chat_stream", model)
+    result = room.user_turn({}, {"message":"晚上好","world":{"ai":[0,0,0],"user":[1,0,0]}}, events.append)
+    assert result["reply"] == "晚上好。" and len(events) == 1
+
+
+def test_past_interaction_question_uses_the_requested_experience():
+    from app_room_spike import recent_room_recap
+    facts={"steps":["read","offered","high_five","nap"]}
+    assert recent_room_recap(facts,"刚才我们击掌了吗？")["steps"] == ["high_five"]
+    assert recent_room_recap(facts,"我刚才看的编程语言叫什么？") is None
