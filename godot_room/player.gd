@@ -103,7 +103,7 @@ func can_greet():
 	return offset.length()<2.2 and (-camera.global_basis.z).dot(offset.normalized())>.5
 
 func _unhandled_input(event):
-	if entry.visible or settings.visible: return
+	if entry.visible or settings.visible or choices.visible: return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if seated: aim.rotate_y(-event.relative.x * .002)
 		else: rotate_y(-event.relative.x * .002)
@@ -206,3 +206,4 @@ func _physics_process(delta):
 	elif seated: hint.text = "E · 起身"
 	elif focus and focus.has_meta("affordances"): hint.text = "E · " + str(focus.name)
 	elif get_parent().has_node("Companion") and global_position.distance_to(get_parent().get_node("Companion").global_position) < 2.2: hint.text = "Enter · 交谈"
+	hint.text += "  ·  F2 视野"

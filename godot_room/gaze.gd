@@ -17,12 +17,27 @@ func play(name: String):
 	began = Time.get_ticks_msec()
 
 
+func reach(skel:Skeleton3D, side:String, goal:Vector3, weight:float):
+	var hand=skel.find_bone(side+"Hand")
+	if hand<0: return
+	for pass_index in 3:
+		for joint in ["LowerArm","UpperArm"]:
+			var idx=skel.find_bone(side+joint)
+			if idx<0: continue
+			var pose=skel.get_bone_global_pose(idx)
+			var before=skel.get_bone_global_pose(hand).origin-pose.origin
+			var after=goal-pose.origin
+			if before.length_squared()<.00001 or after.length_squared()<.00001: continue
+			var rotation=Quaternion(before.normalized(),after.normalized())
+			pose.basis=Basis(Quaternion.IDENTITY.slerp(rotation,weight*.72))*pose.basis
+			skel.set_bone_global_pose(idx,pose)
+
 func _process_modification():
 	if not is_instance_valid(target): return
 	var skel := get_skeleton()
 	var head := skel.find_bone("Head")
 	if head < 0: return
-	var aim := skel.to_local(target.global_position + Vector3.UP * 1.2) - skel.get_bone_global_pose(head).origin
+	var aim := skel.to_local(target.global_position + Vector3.UP * (0. if pastime=="read" else 1.2)) - skel.get_bone_global_pose(head).origin
 	if aim.length_squared() < .001: return
 	var phase := clampf((Time.get_ticks_msec()-began)/1100.,0,1)
 	var envelope := sin(PI*phase)
@@ -81,6 +96,15 @@ func _process_modification():
 			if gesture=="high_five" and phase<1.: angle=1.55*envelope if side<0 else 0.
 			arm.basis=Basis(Vector3.BACK,side*angle*weight)*arm.basis
 			skel.set_bone_global_pose(idx,arm)
+	if pastime=="yawn":
+		var mouth=skel.get_bone_global_pose(head).origin+Vector3(-.045,-.045,.095)
+		reach(skel,"Right",mouth,weight*(1.-smoothstep(3.2,4.,t)))
+	elif pastime=="read":
+		var chest_idx=skel.find_bone("Chest")
+		if chest_idx>=0:
+			var page=skel.get_bone_global_pose(chest_idx).origin+Vector3(0,-.055,.21)
+			reach(skel,"Right",page+Vector3(-.07,0,0),weight)
+			reach(skel,"Left",page+Vector3(.07,0,0),weight)
 	if speech_envelope>.001:
 		var chest=skel.find_bone("Chest")
 		if chest>=0:

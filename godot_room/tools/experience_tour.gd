@@ -1,10 +1,45 @@
 extends "res://tools/phase4_tour.gd"
 # A repeatable coverage tour. Schedule activities explicitly; their navigation,
 # poses and receipts use production logic. Dialogue uses the live backend.
+var observer:Camera3D
+# The first 25 seconds use the real player camera. For the activity close-ups,
+# use a separate observer camera; do not change player aim, interactions or AI.
+func frame_activity(t):
+	if not observer:
+		observer=Camera3D.new()
+		room.add_child(observer)
+		observer.fov=48.
+	var kind=ai.pastime
+	var closeup=kind in ["read","nap","yawn","tidy","stretch","window_idle","shared_window"] or t>=25. and t<30.
+	if not closeup:
+		if observer.current: p.camera.make_current()
+		return
+	var target:Vector3=ai.global_position+Vector3.UP*(.91 if ai.sitting else 1.15)
+	if kind=="nap":
+		target=room.objects.bed.global_position+Vector3.UP*.48
+	var offset=ai.body.global_basis.z.slide(Vector3.UP).normalized()
+	if kind=="nap": offset=(Vector3(0,0,.4)-target).slide(Vector3.UP).normalized()
+	var eye=target+Vector3.UP*.12
+	var best=eye
+	for angle in [.55,-.55,1.05,-1.05,1.7,-1.7,PI]:
+		var candidate=target+offset.rotated(Vector3.UP,angle)*1.65+Vector3.UP*(1.65 if kind=="nap" else .42)
+		var ray=PhysicsRayQueryParameters3D.create(eye,candidate)
+		ray.exclude=[ai.get_rid()]
+		var hit=room.get_world_3d().direct_space_state.intersect_ray(ray)
+		if hit.is_empty():
+			best=candidate
+			break
+		var safe=eye.lerp(hit.position,.86)
+		if safe.distance_squared_to(eye)>best.distance_squared_to(eye): best=safe
+	observer.global_position=best
+	observer.look_at(target,Vector3.UP)
+	observer.make_current()
+
 func _physics_process(dt):
 	if not p: return false
 	var t=(Time.get_ticks_msec()-started)*.001
 	var bridge=room.get_node("Bridge")
+	frame_activity(t)
 	if t<1.0: return false
 	if t<12:
 		if once("opening"):
@@ -59,4 +94,4 @@ func _physics_process(dt):
 
 func schedule(bridge,kind):
 	if not bridge.current.is_empty(): bridge.finish("interrupted","tour_transition")
-	bridge.start_activity(kind)
+	bridge.start_activity(kind,"bed_edge_seat" if kind=="read" else "")

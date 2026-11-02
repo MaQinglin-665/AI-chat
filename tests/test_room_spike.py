@@ -183,3 +183,10 @@ def test_room_stream_previews_safe_reply_field_once(monkeypatch):
     monkeypatch.setattr(room, "iter_openai_chat_stream", model)
     result = room.user_turn({}, {"message":"晚上好","world":{"ai":[0,0,0],"user":[1,0,0]}}, events.append)
     assert result["reply"] == "晚上好。" and len(events) == 1
+
+
+def test_past_interaction_question_uses_the_requested_experience():
+    from app_room_spike import recent_room_recap
+    facts={"steps":["read","offered","high_five","nap"]}
+    assert recent_room_recap(facts,"刚才我们击掌了吗？")["steps"] == ["high_five"]
+    assert recent_room_recap(facts,"我刚才看的编程语言叫什么？") is None

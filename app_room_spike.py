@@ -193,13 +193,23 @@ EXPERIENCE_FACTS = {
 
 
 def recent_room_recap(raw, question):
-    if not isinstance(raw, dict) or not re.search(r"(?:刚才|刚刚|上次|之前).{0,18}(?:房间|做了什么|干了什么|干嘛)|房间.{0,12}(?:做了什么|干了什么|记得|回顾)", question):
+    topics = {"书": {"read","tidy","gave","offered"}, "掌":{"high_five"},
+              "摸头":{"head_pat"}, "窗":{"window_idle","shared_window"},
+              "睡":{"nap","woke"}, "醒":{"woke"}, "懒腰":{"stretch"},
+              "哈欠":{"yawn"}, "叫你":{"called"}}
+    requested = set().union(*(values for word, values in topics.items() if word in question))
+    retrospective = re.search(r"刚才|刚刚|上次|之前|房间里", question)
+    general = re.search(r"(?:刚才|刚刚|上次|之前).{0,18}(?:房间|做了什么|干了什么|干嘛)|房间.{0,12}(?:做了什么|干了什么|记得|回顾)",question)
+    if not isinstance(raw, dict) or not (general or requested and retrospective):
         return None
     steps = raw.get("steps")
     if not isinstance(steps, list):
         return None
     pattern = r"(?:走到|坐到|看向)(?:窗边|沙发|床沿|椅子|书桌|书架|你身边)"
     valid = [s for s in steps[-32:] if isinstance(s,str) and (s in EXPERIENCE_FACTS or re.fullmatch(pattern,s))]
+    if requested and not general:
+        valid = [fact for fact in valid if fact in requested]
+        if not valid: return None
     return {"user_sat":raw.get("user_sat") is True,"steps":list(dict.fromkeys(valid))}
 
 
@@ -303,6 +313,12 @@ def user_turn(cfg, payload, emit=None):
             "\n第一行直接说一句简短口语，不带引号或标签，先回应用户，不承诺未验证的行动。"
             "第二行仅输出身体计划 JSON，例如 {\"action\":\"idle\"}。如有补充口语，第三行起每句一行。"
         )
+        # Autonomous needs and retry counters do not help a spoken user turn.
+        dialogue_world = {key: world[key] for key in
+                          ("objects","period","ai_near","user_near","ai_state","user_state","goal","activity","receipts")
+                          if key in world}
+        messages[1]["content"] = json.dumps({"world": dialogue_world, "context":context, "message":msg},
+                                             ensure_ascii=False, separators=(",",":"))
         pending = ""
         preview = ""
         def publish(event):
@@ -319,7 +335,7 @@ def user_turn(cfg, payload, emit=None):
             if len(pending) > 4096:
                 raise ValueError("oversized room turn")
             if turn is None and not preview:
-                sentence = re.match(r"^([^{}\[\]\n\r`]{1,100}?[。？！!?])", pending.strip())
+                sentence = re.match(r"^([^{}\[\]\n\r`]{1,100}?[，,。？！!?])", pending.strip())
                 if sentence and not re.search("去|走|坐|拿|递|站|回来",sentence[1]):
                     preview = grounded_turn({"reply":spoken(clean_text(sentence[1],300))},world,msg)["reply"]
                     if preview: emit({"sentence":preview})

@@ -37,7 +37,9 @@ var sleep_blend := 0.
 func take_book(item:StaticBody3D):
 	if book or not item: return false
 	if not hand_socket:
-		var skeleton:Skeleton3D=body.find_children("*","Skeleton3D",true,false)[0]
+		var rigs=body.find_children("*","Skeleton3D",true,false)
+		if rigs.is_empty() or rigs[0].find_bone("RightHand")<0: return false
+		var skeleton:Skeleton3D=rigs[0]
 		hand_socket=BoneAttachment3D.new()
 		skeleton.add_child(hand_socket)
 		hand_socket.bone_name="RightHand"
@@ -75,6 +77,7 @@ func start_pastime(kind:String):
 		sleep_origin=body.transform
 		sleep_blend=0.
 		motion.playback.travel("Idle")
+	if kind=="read": look_target=book
 	if kind=="tidy": motion.playback.travel("Interact")
 	return true
 

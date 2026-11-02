@@ -63,9 +63,12 @@ func offer_to_user():
 	ai.speak("这本给你看看。","happy")
 	return true
 
-func start_activity(kind):
+func start_activity(kind, fallback_seat=""):
 	var sequence=[]
 	var target={"read":["bed_edge_seat","sofa"].pick_random(),"nap":"bed_edge_seat","tidy":"shelf","window_idle":"window","shared_window":"window"}.get(kind,"")
+	if kind=="read":
+		if fallback_seat: target=fallback_seat
+		elif room.seat_for(room.target_object(target),ai).is_empty(): target="sofa" if target=="bed_edge_seat" else "bed_edge_seat"
 	if kind=="read" and not ai.book:
 		if player.held_book: return false
 		sequence.append({"action":"go_to","target":"book"})
@@ -87,7 +90,7 @@ func start_activity(kind):
 	sequence.append({"action":"pastime","name":kind,"seconds":4 if kind in ["stretch","yawn"] else 12})
 	generation+=1
 	previous_pastime=kind
-	accept({"action":sequence.pop_front(),"goal":sequence},"utility")
+	accept({"action":sequence.pop_front(),"goal":sequence,"description":"read_retry" if fallback_seat else kind},"utility")
 	return true
 
 func watch_parent():
@@ -177,6 +180,11 @@ func ack(status, why):
 	print("ACK ",goal_id," ",source," ",JSON.stringify(last))
 
 func finish(status,why):
+	var alternate=""
+	if source=="utility" and goal.get("description")=="read" and status=="failed" and why in ["unreachable","occupied"]:
+		var target=current.get("target","")
+		if target in ["bed_edge_seat","sofa"]:
+			alternate="sofa" if target=="bed_edge_seat" else "bed_edge_seat"
 	ack(status,why)
 	ai.end_pastime()
 	goal.status=status
@@ -191,6 +199,7 @@ func finish(status,why):
 		ai.own_state="idle"
 		ai.motion.playback.travel("Idle")
 	print("GOAL ",goal_id," ",source," ",status," ",why)
+	if alternate: start_activity("read",alternate)
 
 func begin_step():
 	current=steps.pop_front()
@@ -425,7 +434,9 @@ func stream_turn(payload: Dictionary):
 					bytes=bytes.slice(end+1)
 					if packet is Dictionary:
 						if packet.get("sentence") is String:
-							if speech_id<0: speech_id=ai.voice.begin_queue()
+							if speech_id<0:
+								print("ROOM_SENTENCE tick=",Time.get_ticks_msec())
+								speech_id=ai.voice.begin_queue()
 							caption_text+=packet.sentence
 							ai.caption.show_line(caption_text)
 							ai.voice.enqueue_sentence(packet.sentence,speech_id)
