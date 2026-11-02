@@ -3,7 +3,7 @@ on:
   pull_request:
     paths: ['godot_room/**', '.github/workflows/godot-room.yml', 'scripts/build-room-component.py']
   push:
-    tags: ['room-component-*']
+    tags: ['room-component-*-rc*']
   release:
     types: [published]
 permissions:

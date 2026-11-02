@@ -1,6 +1,7 @@
 """Build the Windows x64 room component from a clean checkout, independently of the pet installer."""
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -38,3 +39,10 @@ with tempfile.TemporaryDirectory() as tmp:
 digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
 (args.out / "room-SHA256SUMS.txt").write_text(f"{digest}  {artifact.name}\n", encoding="ascii")
 print(f"{artifact.stat().st_size} bytes; SHA256 {digest}")
+
+with ZipFile(artifact) as archive:
+    manifest = {
+        info.filename: {"size": info.file_size, "sha256": hashlib.sha256(archive.read(info)).hexdigest()}
+        for info in sorted(archive.infolist(), key=lambda entry: entry.filename)
+    }
+(args.out / "room-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

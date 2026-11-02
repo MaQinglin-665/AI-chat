@@ -10,17 +10,50 @@ const {pipeline} = require("node:stream/promises");
 const {setTimeout:delay} = require("node:timers/promises");
 
 const PIN = Object.freeze({
-  url: "https://github.com/MaQinglin-665/AI-chat/releases/download/room-component-v1.0.0-rc2/xinyu-room-windows-x64.zip",
+  url: "https://github.com/MaQinglin-665/AI-chat/releases/download/room-component-v1.0.0/xinyu-room-windows-x64.zip",
   size: 74047830,
   sha256: "f98a2ea84cbc125f60cbc3f2443984e4fef03eb73d569454c2f9441bfcb3c324",
-  files: {"Room.exe":"91724f15024a3a545e28ccd83134403d31ce2323a38e51c95e4dfa282f732ab6", "Room.pck":"1f92125f8c55b233cd4fe453b3303bf44c4dc712d59f2110ac94dde9f9e7eb0e"}
+  files: {
+  "Godot-LICENSES.txt": {
+    "size": 98019,
+    "sha256": "603960fe512cd236c19f897a3d46a577e2e6c0021b5a6427e3bf7817bf06e3cb"
+  },
+  "Room.exe": {
+    "size": 104659456,
+    "sha256": "91724f15024a3a545e28ccd83134403d31ce2323a38e51c95e4dfa282f732ab6"
+  },
+  "Room.pck": {
+    "size": 39830196,
+    "sha256": "1f92125f8c55b233cd4fe453b3303bf44c4dc712d59f2110ac94dde9f9e7eb0e"
+  },
+  "THIRD_PARTY_NOTICES.md": {
+    "size": 18514,
+    "sha256": "e39c9720d34c8deb213bad2e88ab88c3b126240a2cefeea25d79f3a440d0030e"
+  },
+  "licenses/CC0.txt": {
+    "size": 7048,
+    "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+  },
+  "licenses/MToon.txt": {
+    "size": 1141,
+    "sha256": "fd0a82d7d32ad7e39948363114587a3290252ee9a57da0da1582f1e9f0e602f5"
+  },
+  "licenses/bedroom.txt": {
+    "size": 487,
+    "sha256": "65f930665d59a1b798adbeab8bbd68638ef1fb6c16b591fe7c59d1016cae8658"
+  },
+  "licenses/godot-vrm.txt": {
+    "size": 1391,
+    "sha256": "d39666c721f8453445364e66a08d0edec6fbc5b8e30ee1d9d710e84a3094c101"
+  }
+}
 });
 
 function allowedRedirect(location) {
   let url;
   try { url = new URL(location); } catch { return false; }
   return url.protocol==="https:" && !url.username && !url.password && !url.port &&
-    url.hostname==="release-assets.githubusercontent.com" &&
+    ["release-assets.githubusercontent.com","objects.githubusercontent.com"].includes(url.hostname) &&
     url.pathname.startsWith("/github-production-release-asset/1217591333/");
 }
 
@@ -101,10 +134,10 @@ async function* openAsset(net) {
 async function verifiedFile(file, expected) {
   try {
     const st=await fs.promises.lstat(file);
-    if (!st.isFile()) return false;
+    if (!st.isFile() || st.nlink !== 1 || st.size !== expected.size) return false;
     const hash=createHash("sha256");
     for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
-    return hash.digest("hex")===expected;
+    return hash.digest("hex")===expected.sha256;
   } catch(error) {
     if(error.code==="ENOENT")return false;
     throw error;
@@ -123,12 +156,33 @@ async function install(root, confirm, download, extract, pin) {
   const parent=path.join(root,"room-components");
   const destination=path.join(parent,pin.sha256);
   async function valid(dir) {
-    for(const [name,digest] of Object.entries(pin.files)) {
-      if (!await verifiedFile(path.join(dir,name),digest)) return false;
+    const names = Object.keys(pin.files);
+    const seen = new Set();
+    async function visit(prefix) {
+      const directory = path.join(dir, prefix);
+      const stat = await fs.promises.lstat(directory);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) return false;
+      for (const entry of await fs.promises.readdir(directory, {withFileTypes:true})) {
+        const name = prefix ? prefix + "/" + entry.name : entry.name;
+        if (entry.isDirectory() && names.some(file => file.startsWith(name + "/"))) {
+          if (!await visit(name)) return false;
+        } else {
+          if (!entry.isFile() || !Object.hasOwn(pin.files,name) ||
+              !await verifiedFile(path.join(dir,name),pin.files[name])) return false;
+          seen.add(name);
+        }
+      }
+      return true;
     }
-    return true;
+    return await visit("") && seen.size === names.length;
   }
-  if(await valid(destination)) return path.join(destination,"Room.exe");
+  try {
+    if (await valid(destination)) return path.join(destination,"Room.exe");
+    await fs.promises.rm(destination,{recursive:true,force:true});
+    throw Error("房间组件清单校验失败，请再次进入以重新下载");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   if (!await confirm(pin.size)) return null;
   await fs.promises.mkdir(parent,{recursive:true});
   const scratch=await fs.promises.mkdtemp(path.join(parent,".install-"));

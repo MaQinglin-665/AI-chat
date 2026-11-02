@@ -144,3 +144,9 @@ def test_bed_edge_is_an_explicit_visible_seat():
     from app_room_spike import validate
     assert validate({"action":"sit_on","target":"bed_edge_seat"},{"bed_edge_seat":["sit"]})["action"]=="sit_on"
     assert validate({"action":"sit_on","target":"bed_edge_seat"},{})["action"]=="idle"
+
+def test_room_recap_keeps_completed_bed_seat_when_window_is_also_present():
+    from app_room_spike import ground_recap
+    facts = {"user_sat": False, "steps": ["走到床沿", "坐到床沿", "走到窗边", "看向窗边"]}
+    recap = ground_recap("我看了看窗边。", facts)
+    assert "床沿" in recap and "窗边" in recap

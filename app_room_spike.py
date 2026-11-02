@@ -219,9 +219,11 @@ def ground_recap(text, facts):
         action="坐到" if re.search("坐|歇|休息",clause) else "看向" if re.search("看|望",clause) else "走到" if re.search("去|到",clause) else None
         if action and (not last_dest or action+last_dest not in facts["steps"]):
             safe=False
-    if safe and last_dest:return text
+    if safe and last_dest and not ("坐到床沿" in facts["steps"] and "床沿" not in text):return text
     picked=[next((phrase for phrase in pair if phrase.removeprefix("我") in text),"") for pair in choices]
     picked=[phrase for phrase in picked if phrase][:2] or [pair[0] for pair in choices[-1:]]
+    if "坐到床沿" in facts["steps"] and not any("床沿" in phrase for phrase in picked):
+        picked = ["我在床沿坐了会儿", *picked][:2]
     if not picked:
         return "我们刚才在房间里聊了会儿。"
     return picked[0] + ("，后来"+picked[1].removeprefix("我") if len(picked)>1 else "")+"。"
