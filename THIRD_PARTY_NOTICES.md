@@ -163,6 +163,13 @@ Files: `web/assets/backgrounds/bedroom/{day,dusk,night}.webp`. User-provided AI-
 - Change: extract only GB2312 level-1's 3,755 common characters, take the library's common single-character toneless final, group characters by final. Full library/code/phrase dictionaries are not shipped or installed at runtime. Dominant visual vowel mapping is application code, not a phonetic claim.
 - Original MIT copyright/permission/warranty notice is preserved verbatim in `web/avatar/data/pinyin-pro.LICENSE.txt` and must accompany this data in distributions. Copyright (c) 2022-present zh-lx.
 - Reproduction: unpack the official archive locally, then run `node scripts/build_live2d_pinyin_data.cjs <unpacked-package-directory>`. That generator performs no network access. Package/license downloads were authorized for development; application lookup uses only the packaged local file.
+
+## Quaternius Universal Animation Library — free Standard
+
+Nine animation-only clips in `web/assets/animations/quaternius-standard.gltf`: Idle_Loop, Idle_Talking_Loop, Walk_Loop, Walk_Formal_Loop, Sitting_Enter, Sitting_Exit, Sitting_Idle_Loop, Sitting_Talking_Loop, Interact. Source: https://quaternius.itch.io/universal-animation-library ; CC0 1.0, Quaternius (animation collaborator Gonzalo Furnier). Original pack notice: `web/assets/animations/QUATERNIUS-LICENSE.txt`. No meshes, skins, materials, textures, paid pack content, CMU, Mixamo, Bandai Namco or VRoid motion assets are bundled. Extraction/retargeting/loop adjustments and per-clip provenance: [VRM motion documentation](docs/avatar-vrm-motion-natural.md).
+
+`@pixiv/three-vrm-animation` 3.4.4 and the official Mixamo retargeting example: MIT, pixiv Inc.; `web/vendor/vrm/THREE-VRM-ANIMATION-LICENSE.txt`. FBXLoader is part of the existing MIT-licensed three.js 0.180.0 bundle. Local optional animation files retain their original licenses and are excluded from repository/release artifacts.
+
 ## Experimental shared Godot room
 
 Godot Engine 4.6.3 is MIT-licensed. The editor and export template are obtained separately from https://godotengine.org/download/archive/ . Engine license and bundled dependency notices: https://godotengine.org/license/ .

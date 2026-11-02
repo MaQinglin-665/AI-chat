@@ -1459,6 +1459,24 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 - Verification Evidence：scripts/test-local.ps1通过1105Python/3skip（112.18s）、86Node文件、199Python/271JS语法、secrets911及本机映射；check_first_run_package.ps1通过；公开JSON/必需py_compile、Markdown本地链接、图片数量/摘要和diff检查通过。Chromium15项通过（新增4项验收回归、原7卡片及4docs）；1440/768/390视觉inspection0findings，保留原作者设计例外。详情签名排除progress/updated_at以保留阅读焦点，最终浏览器回归另核对。
 - 下一步正常push同分支并更新PR237描述/实际图，核对最新head Linux/Windows全部CI后告知；保持未合并，作者操作。日志和捕获工具只留仓库外work/outputs，不提交。
 
+
+## 2026-10-28 — VRM motion naturalization v1 started
+Confirmed origin/main42ae9ea and created isolated motion worktree; robocopy dependencies, no npm ci/private config. Audited instantaneous mouth-driven body and60–180s activity holds. First independent commit will isolate speech body envelope, preserve mouth and camera.
+
+### Step0 verification
+Separate body-only200ms attack/600ms95%-release envelope with180ms syllable hold; seeded1–2nod budget per sentence, conservative utterance budget without timed punctuation. Mouth values unchanged. New4Hz spectral/release/budget/RNG/real-driver mouth tests plus existing VRM/runtime/brain-executor/camera tests passed. Legacy instantaneous-level test now explicitly tests bodyEnvelope; no threshold weakened.
+
+## 2026-10-28 — VRM motion naturalization v1 implementation and validation
+- Speech-only fix is separate commit d4a1192. Second change adds seeded idle overlay, authored AnimationMixer clips with350ms crossfade, additive speech/gesture ownership, interrupted-gesture fade,15–45s activity variants, turn-before-step and stride scaling. Executor/brain/Live2D/camera algorithms unchanged; shared edits only avatar script registration,4-line GET route, vendor build.
+- Bundled9animation-only clips from official free Quaternius Standard CC0, source hash embedded; no model mesh/skin/material/texture. Actual Standard FBX parsed43clips locally. Local Mixamo/Quaternius FBX/glTF and VRMA allowlist loader, embedded resources only, fallback/disposal. Other source assets not redistributed. Per-clip credits, licenses, local preparation and CMU candidate estimates in docs/avatar-vrm-motion-natural.md.
+- Verification Evidence: full scripts/test-local.ps1 with D-drive TEMP/TMP passed1109Python/3skipped and85Node suites; syntax,secrets,mapping checks pass. Added real shipped-glTF retarget+Mixer test:9activities x60s, every10s has mapped-body motion; crossfade, static-track contamination, coexistence, missing assets and disposal pass. Follow-up full Node runner passed. First-run package passed including new asset/parser/licenses. Public example/package JSON and required py_compile passed.
+- One intermediate gate accidentally collected generated package/test copies under TEMP during package smoke. Added pytest.ini testpaths=tests; reran full gate successfully with unchanged1109 count. No product test failure hidden. Initial extra Node loader test needed AbortSignal in its VM browser shim, then passed.
+- Controlled renderer comparison uses baseline42ae9ea versus current,1280x850, same4SAPI sentences and timeline:idle60s,speech,window100s,sofa145s,stand210s,books230s,end300s. Before299.962s/after300.000s,H264+AAC. Files only ignored tmp_ui_smoke/motion/{before,after}.mp4; private VRM read in place. This is deterministic browser renderer playback, not a live LLM conversation or Electron end-to-end test.
+- CPU/GPU sampling uses #231 method:Chrome process CPU-time deltas per11s (one core=100%),Windows per-PID3D GPU counters10x1s, actual~60fps, no recording/test/encoder overlap. Raw local performance.json; summary in motion doc.
+- Remaining acceptance: author reviews naturalness/model-specific cloth/hand contacts; unsupported daily acts intentionally idle+gaze; arbitrary A-pose/other skeleton naming and third-party local mocap need calibration. Camera unchanged; existing close idle framing can crop lower legs. Keep draft/unmerged; do not publish private screenshots/video.
+
+- Delivery: implementation e709f8d pushed; draft PR236 https://github.com/MaQinglin-665/AI-chat/pull/236 open, mergeable, CI started; no merge. Final60fps comparison CPU idle56.12→54.18%,walking56.61→57.34% (one core);GPU2.248→2.226%,1.981→1.934%. Local after.mp4 exactly300.000s. Await author acceptance.
+
 ## Godot room spike — 2026-11-01
 Draft PR238. Forward+ on Godot4.6.3/godot-vrm2.1.0; 4.7.2 plugin parse errors. Verified Shino spring joints and facial shapes, 24 nav polygons, retargeted walk/sit/stand, authenticated real DeepSeek chat/intent, 300s viewport recording, same-camera comparison and Windows release export. Ten calls/6394 tokens during final tour. Explicit user instruction prompted real go_to(chair) in a separate run; AI stopped at chair. Automatic user-side input; no human-input acceptance claimed. Report godot_room/SPIKE-REPORT.md. Local-only video/build/logs ignored. Await author review.
 
