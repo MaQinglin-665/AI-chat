@@ -55,7 +55,7 @@ async function openRoom({backend, apiToken, command, args, env, provider, voice,
     }
   }
   const abort=new AbortController();
-  const allowed=new Set(["/api/room/intent","/api/room/turn","/api/room/receipt","/api/room/alive","/api/tts"]);
+  const allowed=new Set(["/api/room/intent","/api/room/turn","/api/room/receipt","/api/room/alive","/api/asr_stream","/api/asr_pcm","/api/tts"]);
   const server=http.createServer(async (req,res) => {
     function respond(code,value) { res.writeHead(code,{"Content-Type":"application/json"}); res.end(JSON.stringify(value)); }
     try {
@@ -66,10 +66,14 @@ async function openRoom({backend, apiToken, command, args, env, provider, voice,
       if(!valid || req.headers.authorization!=="Bearer "+(boot?ticket:session)) return respond(403,{});
       if(boot) { redeemed=true; clearTimeout(timer); req.resume(); return respond(200,{token:session,history}); }
       if(req.url==="/api/room/alive"){req.resume();return respond(200,{ok:true});}
-      const limit=req.url==="/api/room/turn"?32768:16384;
+      const limit=req.url==="/api/asr_pcm"?560000:req.url==="/api/asr_stream"?48000:req.url==="/api/room/turn"?32768:16384;
       const parts=[];let size=0;
       for await(const part of req) { size+=part.length; if(size>limit)return respond(413,{});parts.push(part); }
       const body=JSON.parse(Buffer.concat(parts).toString("utf8"));
+      if(req.url==="/api/asr_stream"){
+        if(typeof body.session_id!=="string" || body.session_id.length>96)return respond(400,{});
+        body.session_id="room-"+crypto.createHmac("sha256",session).update(body.session_id).digest("hex");
+      }
       if(req.url==="/api/room/turn") observePosture(body.world?.user_state);
       if(req.url==="/api/room/intent") observePosture(body.changes?.user_state);
       if(req.url==="/api/room/receipt") {
@@ -91,6 +95,20 @@ async function openRoom({backend, apiToken, command, args, env, provider, voice,
       }
       const upstream=await fetch(backend+req.url,{method:"POST",redirect:"error",signal:AbortSignal.any([abort.signal,AbortSignal.timeout(40000)]),
         headers:{Origin:backend,Authorization:"Bearer "+apiToken,"Content-Type":"application/json"},body:JSON.stringify(body)});
+      if (body.stream===true && req.url==="/api/room/turn" && upstream.ok && upstream.headers.get("content-type")?.includes("ndjson")) {
+        res.writeHead(200,{"Content-Type":"application/x-ndjson"});
+        const decoder=new TextDecoder(); let tail="";
+        for await(const chunk of upstream.body) {
+          if(res.destroyed) break;
+          res.write(chunk);tail+=decoder.decode(chunk,{stream:true});
+          const records=tail.split("\n");tail=records.pop();
+          for(const record of records){
+            const reply=JSON.parse(record).done?.reply;
+            if(reply&&!closed){turns++;onTurn(body.message,reply);}
+          }
+        }
+        return res.end();
+      }
       const data=Buffer.from(await upstream.arrayBuffer());
       if(upstream.ok && req.url==="/api/room/turn") {
         const {reply}=JSON.parse(data.toString("utf8"));

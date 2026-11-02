@@ -1,6 +1,13 @@
 {
-  "active_task": "godot-room-spike",
+  "active_task": "room-alive",
   "features": [
+    {
+      "id": "room-alive",
+      "name": "Room push-to-talk, spoken turns and VRM expressions",
+      "status": "in_progress",
+      "verification": "8 controlled audio turns, first audio P50/P90 1.25/4.18s, body 3.75/4.55s, CER 4/77; 20 synthetic before/after dialogue cases. See docs/room-alive-review.md.",
+      "next": "Draft PR / author rehearsal with a physical microphone."
+    },
     {
       "id": "godot-room-spike",
       "name": "Shared Godot room feasibility experiment",

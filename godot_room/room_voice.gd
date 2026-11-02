@@ -66,7 +66,7 @@ func utter(text):
 		# Prepare the next clause while the current one is audible.
 		if not await play_sentence(sentence.get_string(),id): return
 
-func play_sentence(text:String,id:int) -> bool:
+func play_sentence(text:String,id:int,emotion:String="") -> bool:
 	var bridge=actor.get_parent().get_node("Bridge")
 	if bridge.token.is_empty(): return false
 	var http=HTTPRequest.new()
@@ -108,6 +108,9 @@ func play_sentence(text:String,id:int) -> bool:
 	if id!=serial: return false
 	cues=next_cues
 	actor.caption.extend_for_audio(audio.get_length())
+	if not emotion.is_empty():
+		actor.caption.show_line(text)
+		actor.get_node("Expression").show_emotion(emotion)
 	start_audio(audio)
 	actor.caption.extend_for_audio(audio.get_length()+AudioServer.get_output_latency())
 	return true

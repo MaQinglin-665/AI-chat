@@ -1,3 +1,7 @@
+# Room alive — draft acceptance
+
+Baseline 9194f8d. [Review report](docs/room-alive-review.md). Listen to the local 180s recording in tmp_ui_smoke/alive/final/room-alive.mp4. Hold T to talk. Real DeepSeek + local streaming ASR and SAPI were exercised with synthetic spoken input; physical microphone rehearsal pending. Keep the PR draft.
+
 # Current — Godot phase 5, PR238
 
 [Phase 5 report](godot_room/PHASE5-REPORT.md). Stable release downloaded to a clean profile in 79.12s. Real bed/window turns and grounded recap verified. Review frames 06–11 and local tmp_ui_smoke/phase5-stable/room-v1.0.0-review.mp4. Await author review.
