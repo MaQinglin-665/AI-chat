@@ -15,6 +15,31 @@ Draft PR https://github.com/MaQinglin-665/AI-chat/pull/236 is open and attached;
 
 ## Upstream handoff at 40c4d4c
 
+# Current — Godot phase 5, PR238
+
+[Phase 5 report](godot_room/PHASE5-REPORT.md). Stable release downloaded to a clean profile in 79.12s. Real bed/window turns and grounded recap verified. Review frames 06–11 and local tmp_ui_smoke/phase5-stable/room-v1.0.0-review.mp4. Await author review.
+
+
+# Earlier — voiced Godot room on draft PR 238
+
+Review [phase 4 measurements](godot_room/PHASE4-REPORT.md), public keyframes and the ignored local recording tmp_ui_smoke/godot-room-phase4-voice-electron.mp4. Browser speech uses the matched installed Windows voice. Await author review.
+
+## Earlier — Godot bedroom on draft PR 238
+
+Review [phase 3 evidence](godot_room/PHASE3-REPORT.md) and the ignored local video tmp_ui_smoke/godot-room-phase3-deepseek-30fps.mp4. The bed is look-only until the art owner adds a Seat and sit affordance. Do not merge without author review.
+
+## Earlier — Godot room autonomy, draft PR 238
+
+See [phase 2 measurements](godot_room/PHASE2-REPORT.md), eight frames and ignored tmp_ui_smoke/godot-room-phase2-deepseek-30fps.mp4. Await author review.
+
+## Earlier spike, 2026-11-01
+Draft PR238. Worktree D:/AI/ai_desktop_pet_godot. Review godot_room/SPIKE-REPORT.md and ignored tmp_ui_smoke/godot-room-deepseek-5min.mp4. Known limits: conversational bias, incomplete multi-step seating, foot contact at phase boundaries, isolated run uses synthetic navigation inputs and real DeepSeek. Await author acceptance.
+
+## Previous task records
+
+# Current: task-card-polish — 2026-11-01
+Branch friend/task-card-polish from latest main40c4d4c (PR237 merged). TaskA implementation complete: reason dedup; existing-card auth feedback inline with chat wrapper forwarding. AuthFetchImpl unchanged. FullPython1105/3skip,final86Node and syntax/secrets/mappings,17browser,2actual screenshots. Next normal push/new PR/latest-head CI; no self merge. TaskB later isolated friend/godot-room-art from codex/godot-room-spike; only art/ plus minimal room loader, author behavior untouched. No private configs/keys/models/logs/export packages/videos.
+
 # Current: PR237 review fixes — 2026-11-01
 Branch friend/chat-task-cards, clean baseline ce6a30c; author requests six frontend/doc fixes. Six fixes complete; all12 actual screenshots refreshed and old16 prototypes/index removed;5authorWebP retained. Full1105Python/3skip,86Node,15browser,syntax/secrets/mappings,package/JSON/compile passed. Keep existing auth/Origin/API; no backend/renderers/private config changes. Next normal push/update PR237 and confirm latest-head Linux/Windows CI. No self merge/main/force push. NativeCLI acceptance remains explicitly deferred to author.
 

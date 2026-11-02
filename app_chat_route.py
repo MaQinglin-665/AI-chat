@@ -99,6 +99,17 @@ def _build_chat_config(
         is_auto=is_auto,
     )
     resolved = dict(chat_config or {})
+    resolved.pop("_room_context", None)
+    resolved.pop("_room_recap", None)
+    if not is_auto and body.get("room_recap"):
+        from app_room_spike import recent_room_recap, recap_choices
+        facts = recent_room_recap(body.get("room_recap"), user_message)
+        if facts:
+            resolved["_room_recap"] = facts
+            resolved["_room_context"] = "回顾刚才的房间，用第一人称自然概括下面的一两个主要事实，优先提坐下等活动，再提观景，可以合并或省略走近等琐碎步骤；不能把我的动作归给用户，不臆测道具。不要逐项复述内部记录：" + str(recap_choices(facts))
+    if not is_auto and (resolved.get("room_spike") or {}).get("enabled") is True and isinstance(body.get("room"), dict):
+        from app_room_spike import chat_context
+        resolved["_room_context"] = chat_context(body["room"])
     resolved.pop("_galgame_context", None)
     resolved.pop("_galgame_stream_segments", None)
     galgame_context = sanitize_galgame_context(body.get("galgame"))
@@ -312,7 +323,7 @@ def _handle_chat_stream_request(
             delta_chars += len(chunk)
             if first_delta_ms < 0:
                 first_delta_ms = perf_now_ms_func() - llm_started_ms
-            if not natural_buffering:
+            if not natural_buffering and not chat_config.get("_room_recap"):
                 event = {"type": "delta", "text": chunk}
                 directed = chat_config.get("_galgame_stream_segments")
                 if directed and directed[-1]["text"] == chunk:
@@ -367,6 +378,11 @@ def _handle_chat_stream_request(
         public_natural_decision = public_natural_conversation_decision(
             natural_decision
         )
+        if chat_config.get("_room_recap"):
+            from app_room_spike import ground_recap, spoken
+            final_reply = ground_recap(spoken(final_reply), chat_config["_room_recap"])
+            if not natural_buffering and final_reply:
+                send_sse_func({"type":"delta","text":final_reply})
         if natural_buffering and final_reply:
             target_delay_ms = int(
                 (public_natural_decision or {}).get("thinking_delay_ms") or 0
@@ -378,6 +394,9 @@ def _handle_chat_stream_request(
             first_delta_ms = perf_now_ms_func() - llm_started_ms
             for visible_chunk in _iter_natural_reply_chunks(final_reply):
                 send_sse_func({"type": "delta", "text": visible_chunk})
+        if chat_config.get("_room_context"):
+            from app_room_spike import spoken
+            final_reply = spoken(final_reply)
         done_payload = {"type": "done", "reply": final_reply}
         if public_natural_decision is not None:
             done_payload["conversation_decision"] = public_natural_decision
@@ -522,6 +541,12 @@ def _handle_chat_request(
             reply, runtime_meta = apply_character_runtime_reply_func(chat_config, reply)
             reply = apply_character_brain_reply_text_func(chat_config, user_message, reply)
         runtime_ms = perf_now_ms_func() - runtime_started_ms
+        if chat_config.get("_room_context"):
+            from app_room_spike import spoken
+            reply = spoken(reply)
+            if chat_config.get("_room_recap"):
+                from app_room_spike import ground_recap
+                reply = ground_recap(reply, chat_config["_room_recap"])
         payload = {"reply": str(reply or "")}
         public_natural_decision = public_natural_conversation_decision(
             natural_decision

@@ -74,7 +74,7 @@
     function input(){lastInput=Date.now();inputUntil=lastInput+SETTINGS.inputHoldMs;if(executor.busy())executor.interrupt();void poll();}
     function event(e){const d=e.detail||{};if(d.type==='activity')events=[...events.slice(-2),{type:'activity',name:d.name,stage:d.stage}];}
     async function poll(){
-      if(disposed||polling||!renderer()||!['full','model'].includes(state.uiView))return;
+      if(state.godotRoomActive||disposed||polling||!renderer()||!['full','model'].includes(state.uiView))return;
       polling=true;
       try{
         for(const [key,body] of pending){const response=await request('ack',body);if(response)pending.delete(key);}
@@ -84,7 +84,7 @@
         enabled=result.enabled===true;
         if(!enabled){if(executor.busy())executor.interrupt('disabled');return;}
         const plans=await request('poll',{});
-        if(Date.now()>=inputUntil&&!disposed)for(const plan of plans.plans||[])executor.enqueue(plan);
+        if(Date.now()>=inputUntil&&!disposed&&!state.godotRoomActive)for(const plan of plans.plans||[])executor.enqueue(plan);
       }catch(_){/* No model/network error UI; random life continues. */}
       finally{polling=false;}
     }

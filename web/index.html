@@ -40,6 +40,7 @@
   <header class="app-titlebar" aria-label="&#x99A8;&#x8BED;&#x684C;&#x5BA0;">
     <span class="app-titlebar-mark" aria-hidden="true"></span>
     <span class="app-titlebar-name">&#x99A8;&#x8BED;&#x684C;&#x5BA0;</span>
+    <button id="enter-room-btn" type="button" hidden>进入房间</button><span id="room-launch-status" role="status" hidden></span>
   </header>
   <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;pointer-events:none"><defs>
     <filter id="hiyori-color-grade" color-interpolation-filters="sRGB"><feColorMatrix id="hiyori-color-matrix" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" /></filter>
@@ -374,6 +375,7 @@
       </div>
 
       <div class="config-switch-body">
+        <label id="room-setting-row" hidden><input id="room-experiment-toggle" type="checkbox"> 实验功能 · 进入 3D 房间</label>
         <section id="hiyori-backdrop-options" class="config-switch-section" hidden>
           <h3>Hiyori 场景</h3>
           <label class="config-switch-check"><input type="checkbox" id="hiyori-backdrop-enabled" /><span>卧室背景</span></label>

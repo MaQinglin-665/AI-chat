@@ -146,10 +146,13 @@
     }
   }
 
-  async function authFetch(input, init = {}) {
+  async function authFetch(input, init = {}, feedback = {}) {
     try {
       const response = await authFetchImpl(input, init);
-      if (isApiRequestTarget(input) && (response.status === 401 || response.status >= 500))
+      // Presentation only: callers rendering their own auth error avoid a second overlay.
+      // authFetchImpl still owns exactly the same token refresh and request retries.
+      const inlineAuth = feedback.authErrorSurface === "inline" && [401, 403].includes(response.status);
+      if (isApiRequestTarget(input) && !inlineAuth && (response.status === 401 || response.status >= 500))
         root.TaffyStageFeedback?.startupFailure(`HTTP ${response.status}`);
       return response;
     } catch (err) {

@@ -79,13 +79,20 @@
       // The plan-derived delete/risk/network strips above cover those public flags.
       if (task.warning_count) warn(`执行期间有 ${Number(task.warning_count)} 条提示，请查看核对详情。`);
     }
-    function errors(parent, task, model, localError) {
+    function errors(parent, task, model, localError, shownReason = "") {
       const messages = [task.error && String(task.error.message || task.error), task.error?.detail?.message,
         task.verification_error, model.needsReview && "执行结果需要核对，不能视为完全按计划完成。请展开查看计划外变更和未观察到项。", localError?.message].filter(Boolean);
-      parent.replaceChildren(); parent.hidden = !messages.length;
-      if (messages.length) {
+      const normalize = value => String(value).trim().replace(/[。.!！?？]+$/, "");
+      const unique = [...new Set(messages.map(message => {
+        const value = String(message).trim();
+        if (shownReason && normalize(value) === normalize(shownReason)) return "";
+        // Preserve any extra sentences; only remove the reason already above the box.
+        return /[。！？]$/.test(shownReason) && value.startsWith(shownReason) ? value.slice(shownReason.length).trim() : value;
+      }).filter(Boolean))];
+      parent.replaceChildren(); parent.hidden = !unique.length;
+      if (unique.length) {
         const ul = make("ul", "", undefined, parent);
-        for (const message of new Set(messages)) make("li", "", String(message), ul);
+        for (const message of unique) make("li", "", message, ul);
       }
     }
     function plan(parent, task, model, full) {
@@ -171,12 +178,12 @@
         card.illustration.hidden = model.status === "awaiting_approval" && !error;
         const warningSignature = JSON.stringify([task.plan, task.error, task.verification_error, task.warning_count, model.needsReview]);
         if (card.warningSignature !== warningSignature) { card.warningSignature = warningSignature; warnings(card.warn, task, model); }
-        errors(card.error, task, model, error);
         const stopped = ["failed", "cancelled"].includes(model.status);
         card.conclusion.hidden = card.reason.hidden = !stopped;
         text(card.conclusion, model.status === "cancelled" ? "任务已停止。" : "这次没有完成任务。");
         text(card.reason, model.status === "cancelled" ? "取消不会撤销已经发生的文件变更。" : String(task.error?.message || "任务未能完成，请展开查看执行详情。").split(/(?<=[。！？])/)[0]);
         card.progress.hidden = stopped;
+        errors(card.error, task, model, error, stopped ? card.reason.textContent : "");
         card.progress.textContent = model.status === "executing" ? `正在执行你批准的计划～ 已收到 ${Number(task.progress_count) || 0} 条进度更新` : model.status === "cancel_pending" ? "已提交取消请求，正在等待执行进程停止。取消不会撤销已经发生的文件变更。" : model.status === "completed" ? (model.needsReview ? "执行已结束，文件核对有异常，请查看详情。" : task.changes ? "执行已结束，文件变化已核对。" : "执行已结束，暂未取得核对结果。") : model.status === "failed" ? "这次没有完成任务。" : model.status === "expired" ? "这份计划已过期，不能再批准。请重新生成计划。" : model.status === "cancelled" ? "任务已停止。取消不会撤销已经发生的文件变更。" : model.status === "planning" ? "正在生成计划，等待你审批后才执行。" : "计划已生成，等你决定。";
         const countValues = model.terminal && task.changes ? model.actualCounts : model.counts;
         const countSignature = JSON.stringify(countValues);
