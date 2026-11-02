@@ -24,7 +24,7 @@ var own_state := "idle"
 
 func _ready():
 	player = get_parent().get_node("Player")
-	body = preload("res://models/Shino.vrm").instantiate()
+	body = preload("res://avatar_loader.gd").create("COMPANION", preload("res://models/Shino.vrm"))
 	add_child(body)
 	var collision := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
