@@ -47,6 +47,7 @@ async function openRoom({backend, apiToken, command, args, env, provider, voice,
   const ticket=fresh(), session=fresh(), expires=Date.now()+30000;
   let redeemed=false, closed=false, child, timer, nativeVoice;
   let turns=0, observedUser=false, userSat=false;
+  const experiences=new Set(["read", "nap", "tidy", "window_idle", "shared_window", "stretch", "yawn", "called", "gave", "offered", "head_pat", "high_five", "woke"]);
   const completed=[];
   function observePosture(state) {
     if(["sit","stand","walk","typing"].includes(state)) {
@@ -77,9 +78,14 @@ async function openRoom({backend, apiToken, command, args, env, provider, voice,
         const places={window:"窗边",sofa:"沙发",chair:"椅子",desk:"书桌",shelf:"书架",user:"你身边",bed_edge_seat:"床沿"};
         const actions={go_to:"走到",look_at:"看向",sit_on:"坐到"};
         const parts=(Array.isArray(body.steps)?body.steps:[]).slice(0,5).filter(s=>Object.hasOwn(places,s?.target)&&Object.hasOwn(actions,s?.action)).map(s=>actions[s.action]+places[s.target]);
+        if(experiences.has(body.experience)) parts.push(body.experience);
         if(parts.length) {
-          completed.push(parts.join("，"));
-          if(completed.length>6)completed.shift();
+          for (const fact of parts) {
+            const prior=completed.indexOf(fact);
+            if (prior>=0) completed.splice(prior,1);
+            completed.push(fact);
+          }
+          if(completed.length>32)completed.splice(0,completed.length-32);
 
         }
         return respond(200,{ok:true});
@@ -91,6 +97,25 @@ async function openRoom({backend, apiToken, command, args, env, provider, voice,
       }
       const upstream=await fetch(backend+req.url,{method:"POST",redirect:"error",signal:AbortSignal.any([abort.signal,AbortSignal.timeout(40000)]),
         headers:{Origin:backend,Authorization:"Bearer "+apiToken,"Content-Type":"application/json"},body:JSON.stringify(body)});
+      if (req.url==="/api/room/turn" && upstream.ok && body.stream===true &&
+          upstream.headers.get("content-type")?.startsWith("application/x-ndjson")) {
+        res.writeHead(200,{"Content-Type":"application/x-ndjson"});
+        const decoder=new TextDecoder();
+        let pending="";
+        for await (const chunk of upstream.body) {
+          pending+=decoder.decode(chunk,{stream:true});
+          let index;
+          while ((index=pending.indexOf("\n"))>=0) {
+            const line=pending.slice(0,index);
+            pending=pending.slice(index+1);
+            const event=JSON.parse(line);
+            if (event.turn?.reply && !closed) { turns++; onTurn(body.message,event.turn.reply); }
+            res.write(line+"\n");
+          }
+          if (pending.length>8192) throw Error("invalid room stream");
+        }
+        return res.end();
+      }
       const data=Buffer.from(await upstream.arrayBuffer());
       if(upstream.ok && req.url==="/api/room/turn") {
         const {reply}=JSON.parse(data.toString("utf8"));
@@ -106,8 +131,8 @@ async function openRoom({backend, apiToken, command, args, env, provider, voice,
     closed=true;clearTimeout(timer);abort.abort();server.close();server.closeAllConnections();
     killTree(child);
     nativeVoice?.close();
-    if(turns && observedUser) {
-      onReceipt?.({user_sat:userSat,steps:[...new Set(completed.flatMap(x=>x.split("，")))].slice(-15)});
+    if((turns || completed.length) && observedUser) {
+      onReceipt?.({user_sat:userSat,steps:completed.slice()});
     }
     onClosed();
   }

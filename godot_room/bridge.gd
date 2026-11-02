@@ -19,7 +19,7 @@ func _ready():
 	previous_user = player.global_position
 	observed_position = ai.global_position
 	player.spoke.connect(chat)
-	player.interacted.connect(func(_id, act): event({"sit":"sat","stand_up":"stood","gave":"gave"}.get(act,"idle")))
+	player.interacted.connect(on_interaction)
 	if OS.has_environment("XINYU_ROOM_TICKET"):
 		connecting=true
 		token=OS.get_environment("XINYU_ROOM_TICKET")
@@ -32,6 +32,63 @@ func _ready():
 			return
 		watch_parent()
 	if not token.is_empty(): event("entered")
+
+var shared_window_cooldown := 0.
+var previous_pastime := ""
+
+func experience_fact(kind):
+	print("ROOM_FACT ",kind," tick=",Time.get_ticks_msec())
+	activity.append({"action":kind,"status":"completed"})
+	activity=activity.slice(-6)
+	if OS.has_environment("XINYU_ROOM_TICKET"):
+		request("room/receipt",{"experience":kind,"user_state":"sit" if player.seated else "stand"})
+
+func on_interaction(_id,act):
+	if act in ["called","gave","head_pat","high_five"]:
+		event("spoke")
+		pending=""
+		ai.look_target=player
+		match act:
+			"called":
+				accept({"action":{"action":"approach_user"}},"user")
+			"gave": ai.speak("谢谢，我来拿吧。","happy")
+			"head_pat": ai.gaze.play("nod")
+			"high_five": ai.gaze.play("high_five")
+		experience_fact(act)
+	else: event({"sit":"sat","stand_up":"stood"}.get(act,"idle"))
+
+func offer_to_user():
+	if not ai.offer_book(): return false
+	experience_fact("offered")
+	ai.speak("这本给你看看。","happy")
+	return true
+
+func start_activity(kind):
+	var sequence=[]
+	var target={"read":["bed_edge_seat","sofa"].pick_random(),"nap":"bed_edge_seat","tidy":"shelf","window_idle":"window","shared_window":"window"}.get(kind,"")
+	if kind=="read" and not ai.book:
+		if player.held_book: return false
+		sequence.append({"action":"go_to","target":"book"})
+		sequence.append({"action":"take_book","target":"book"})
+	if target:
+		if kind in ["read","nap"] and room.seat_for(room.target_object(target),ai).is_empty(): return false
+		if kind=="shared_window":
+			var direction=(room.objects.window.global_position-player.global_position).slide(Vector3.UP).normalized()
+			var offset=direction.cross(Vector3.UP)*1.1
+			var nav=room.region.get_navigation_map()
+			var left=NavigationServer3D.map_get_closest_point(nav,player.global_position+offset)
+			var right=NavigationServer3D.map_get_closest_point(nav,player.global_position-offset)
+			var spot=left if left.distance_to(ai.position)<right.distance_to(ai.position) else right
+			if spot.distance_to(player.position)<.75: return false
+			sequence.append({"action":"go_to","target":vec(spot)})
+		else:
+			sequence.append({"action":"go_to","target":target})
+		sequence.append({"action":"sit_on" if kind in ["read","nap"] else "look_at","target":target})
+	sequence.append({"action":"pastime","name":kind,"seconds":4 if kind in ["stretch","yawn"] else 12})
+	generation+=1
+	previous_pastime=kind
+	accept({"action":sequence.pop_front(),"goal":sequence},"utility")
+	return true
 
 func watch_parent():
 	var failures=0
@@ -121,6 +178,7 @@ func ack(status, why):
 
 func finish(status,why):
 	ack(status,why)
+	ai.end_pastime()
 	goal.status=status
 	goal.reason=why
 	if source=="user" and status=="completed" and OS.has_environment("XINYU_ROOM_TICKET"):
@@ -143,7 +201,7 @@ func begin_step():
 	var target=current.get("target","")
 	# Reaffirming the adjacent seat should never stand the companion up
 	# to navigate back to the same cushion.
-	if ai.sitting and (target==str(ai.seat_object.name) or (target=="user" and ai.seat_object==player.seat_object)):
+	if ai.sitting and target is String and (target==str(ai.seat_object.name) or (target=="user" and ai.seat_object==player.seat_object)):
 		if current.action in ["go_to","sit_on"]:
 			if steps.is_empty(): finish("completed","ok")
 			else:
@@ -176,13 +234,14 @@ func advance(delta):
 			elif target=="user": where=player.position
 			else: where=room.target_object(target).position
 			var gap=(ai.position-where).slide(Vector3.UP).length()
-			if target=="user": done=gap<1.9
+			if target is String and target=="user": done=gap<1.9
 			else: done=ai.own_state!="walking" and (ai.position-ai.agent.target_position).slide(Vector3.UP).length()<.45
 			if since_step>1. and ai.own_state!="walking" and not done:
 				finish("failed","unreachable")
 				return
 		"sit_on": done=ai.sitting and ai.motion.playback.get_current_node()=="Sitting_Idle"
 		"stand_up": done=not ai.sitting and ai.own_state=="idle"
+		"pastime": done=since_step>=current.seconds
 		"idle": done=since_step>=current.get("seconds",3)
 		_: done=since_step>1.2
 	if done:
@@ -202,6 +261,12 @@ func advance(delta):
 
 func _process(delta):
 	var distance=ai.position.distance_to(player.position)
+	if ai.pastime=="nap" and distance<2.:
+		finish("interrupted","woke_near_user")
+		ai.stand()
+		ai.look_target=player
+		experience_fact("woke")
+	shared_window_cooldown=maxf(0.,shared_window_cooldown-delta)
 	var near_now=distance<(2.6 if nearby else 1.8)
 	var user_travel=(player.position-previous_user).slide(Vector3.UP)
 	var user_radial=user_travel.dot((player.position-ai.position).slide(Vector3.UP).normalized())
@@ -226,6 +291,15 @@ func _process(delta):
 		think()
 	elif utility_clock<=0 and not thinking:
 		utility_clock=randf_range(14,35)
+		if ai.book and nearby and randf()<.4 and offer_to_user():
+			return
+		if shared_window_cooldown<=0. and player.position.distance_to(room.approach_point(room.objects.window))<1.4:
+			shared_window_cooldown=60.
+			if randf()<.65 and start_activity("shared_window"): return
+		if needs.energy<.4 and not nearby and start_activity("nap"): return
+		var candidates=["read","tidy","window_idle","stretch","yawn"]
+		candidates.erase(previous_pastime)
+		if randf()<.7 and start_activity(candidates.pick_random()): return
 		var small={"action":"look_at","target":["shelf","window"].pick_random()}
 		if ai.sitting and needs.boredom>.55: small={"action":"stand_up"}
 		elif ai.sitting and randf()<.5:
@@ -295,6 +369,12 @@ func execute(intent):
 	if target is String and target == "user": obj = player
 	print("room_decision ",intent.action," target=",str(intent.get("target","")))
 	match intent.action:
+		"take_book":
+			if player.held_book or not ai.take_book(room.objects.book):
+				finish("failed","book_unavailable")
+		"pastime":
+			if ai.start_pastime(intent.name): experience_fact(intent.name)
+			else: finish("failed","unavailable")
 		"follow_user","approach_user":
 			ai.follow = intent.action == "follow_user"
 			ai.approach(player)
@@ -316,6 +396,48 @@ func execute(intent):
 		"gesture": ai.gaze.play(intent.name)
 		"say": ai.speak(str(intent.text),str(intent.get("emotion","neutral")))
 
+# HTTPRequest buffers the whole response. Poll the loopback stream by frame so
+# a complete UTF-8 line can start synthesis before the model finishes.
+func stream_turn(payload: Dictionary):
+	var client := HTTPClient.new()
+	if client.connect_to_host("127.0.0.1",port)!=OK: return {}
+	var deadline := Time.get_ticks_msec()+23000
+	var sent := false
+	var bytes := PackedByteArray()
+	var result := {}
+	var speech_id := -1
+	var caption_text := ""
+	while Time.get_ticks_msec()<deadline:
+		if client.poll()!=OK: break
+		match client.get_status():
+			HTTPClient.STATUS_CONNECTED:
+				if sent: break
+				var headers=PackedStringArray(["Authorization: Bearer "+token,"Content-Type: application/json","Origin: http://127.0.0.1:%d"%port])
+				if client.request(HTTPClient.METHOD_POST,"/api/room/turn",headers,JSON.stringify(payload))!=OK: break
+				sent=true
+			HTTPClient.STATUS_BODY:
+				if client.get_response_code()!=200: break
+				bytes.append_array(client.read_response_body_chunk())
+				if bytes.size()>16384: break
+				var end=bytes.find(10)
+				while end>=0:
+					var packet=JSON.parse_string(bytes.slice(0,end).get_string_from_utf8())
+					bytes=bytes.slice(end+1)
+					if packet is Dictionary:
+						if packet.get("sentence") is String:
+							if speech_id<0: speech_id=ai.voice.begin_queue()
+							caption_text+=packet.sentence
+							ai.caption.show_line(caption_text)
+							ai.voice.enqueue_sentence(packet.sentence,speech_id)
+						if packet.get("turn") is Dictionary: result=packet.turn
+					end=bytes.find(10)
+			HTTPClient.STATUS_CONNECTING, HTTPClient.STATUS_REQUESTING, HTTPClient.STATUS_RESOLVING:
+				pass
+			_: break
+		await get_tree().process_frame
+	client.close()
+	return result
+
 func chat(message):
 	if chatting or token.is_empty(): return
 	var user_started=Time.get_ticks_msec()
@@ -324,13 +446,13 @@ func chat(message):
 	pending=""
 	countdown=randf_range(20,55)
 	chatting = true
-	var result=await request("room/turn",{"message":message,"history":history,"world":status_value()})
+	var result=await stream_turn({"stream":true,"message":message,"history":history,"world":status_value()})
 	var reply=str(result.get("reply",""))
 	if reply and result.get("action") is Dictionary:
 		accept({"action":result.action,"goal":result.get("steps",[]),"description":result.get("goal","")},"user")
-		ai.speak(reply,"neutral")
 		history.append({"role":"user","content":message})
 		history.append({"role":"assistant","content":reply})
 		history = history.slice(-6)
+	print("ROOM_SEND tick=",user_started)
 	print("ROOM_TURN visible_ms=",Time.get_ticks_msec()-user_started," displayed=",not reply.is_empty())
 	chatting=false

@@ -22,6 +22,62 @@ var gaze := preload("res://gaze.gd").new()
 var glance_after := 6.
 var own_state := "idle"
 
+var hand_socket: BoneAttachment3D
+var book: StaticBody3D
+var pastime := ""
+var sleep_origin := Transform3D.IDENTITY
+var desired_velocity := Vector3.ZERO
+var turn_delay := 0.
+var blink_in := 3.1
+var blink_phase := 1.
+var blink_face: MeshInstance3D
+var blink_index := -1
+var sleep_blend := 0.
+
+func take_book(item:StaticBody3D):
+	if book or not item: return false
+	if not hand_socket:
+		var skeleton:Skeleton3D=body.find_children("*","Skeleton3D",true,false)[0]
+		hand_socket=BoneAttachment3D.new()
+		skeleton.add_child(hand_socket)
+		hand_socket.bone_name="RightHand"
+	book=item
+	book.collision_layer=0
+	book.reparent(hand_socket)
+	book.transform=Transform3D(Basis(Vector3.RIGHT,-.45),Vector3(.02,.04,.04))
+	return true
+
+func offer_book():
+	if not book or player.held_book or position.distance_to(player.position)>2.2: return false
+	book.reparent(player.aim)
+	book.transform=Transform3D(Basis.IDENTITY,Vector3(.2,-.22,-.45))
+	player.held_book=book
+	book=null
+	gaze.play("wave")
+	return true
+
+func end_pastime():
+	if pastime=="tidy": motion.playback.travel("Idle")
+	if pastime=="nap":
+		body.transform=sleep_origin
+		motion.playback.travel("Sitting_Idle")
+	gaze.pastime=""
+	pastime=""
+
+func start_pastime(kind:String):
+	end_pastime()
+	if kind=="nap" and (not sitting or seat_object!=get_parent().target_object("bed_edge_seat")): return false
+	if kind=="read" and (not book or not sitting): return false
+	pastime=kind
+	gaze.pastime=kind
+	gaze.began=Time.get_ticks_msec()
+	if kind=="nap":
+		sleep_origin=body.transform
+		sleep_blend=0.
+		motion.playback.travel("Idle")
+	if kind=="tidy": motion.playback.travel("Interact")
+	return true
+
 func _ready():
 	player = get_parent().get_node("Player")
 	body = preload("res://models/Shino.vrm").instantiate()
@@ -33,6 +89,13 @@ func _ready():
 	collision.shape = capsule
 	collision.position.y = .8
 	add_child(collision)
+	add_child(preload("res://footsteps.gd").new())
+	blink_face=body.find_child("Face",true,false)
+	if blink_face:
+		for i in blink_face.get_blend_shape_count():
+			if str(blink_face.mesh.get_blend_shape_name(i)).ends_with("Fcl_EYE_Close"):
+				blink_index=i
+				break
 	add_child(agent)
 	agent.radius = .30
 	agent.avoidance_enabled = true
@@ -50,6 +113,8 @@ func _ready():
 
 func approach(node: Node3D):
 	if sitting: stand()
+	look_target=node
+	turn_delay=.18
 	var offset = (global_position-node.global_position).slide(Vector3.UP).normalized()
 	var approach_point = player.global_position + offset * 1.35 if node == player else get_parent().approach_point(node)
 	agent.target_position = approach_point
@@ -57,6 +122,7 @@ func approach(node: Node3D):
 	own_state = "walking"
 
 func stand():
+	end_pastime()
 	if sitting: global_position=seat_exit
 	posture_change += 1
 	sitting = false
@@ -106,9 +172,25 @@ func _physics_process(delta):
 	if NavigationServer3D.map_get_iteration_id(agent.get_navigation_map()) == 0: return
 	last_follow -= delta
 	var distance = global_position.distance_to(player.global_position)
+	blink_in-=delta
+	if blink_in<=0:
+		blink_in=randf_range(2.5,6.1)
+		blink_phase=0.
+	blink_phase=minf(1.,blink_phase+delta/.19)
+	if blink_index>=0:
+		blink_face.set_blend_shape_value(blink_index,1. if pastime=="nap" else sin(PI*blink_phase))
+	turn_delay=maxf(0.,turn_delay-delta)
 	if follow and distance > 1.65 and last_follow <= 0:
 		approach(player)
 		last_follow = .8
+	if pastime=="nap":
+		sleep_blend=minf(1.,sleep_blend+delta)
+		var bed=get_parent().target_object("bed_edge_seat")
+		var inward:Vector3=(bed.global_position-global_position).slide(Vector3.UP).normalized()
+		var axis=Vector3.UP.cross(inward)
+		if axis.length_squared()>.01:
+			body.basis=Basis(axis.normalized(),1.48*smoothstep(0.,1.,sleep_blend))*sleep_origin.basis
+			body.position=sleep_origin.origin.lerp(Vector3.UP*get_parent().seat_for(bed,self).pose.origin.y+inward*.28,smoothstep(0.,1.,sleep_blend))
 	var speed := Vector3.ZERO
 	if own_state == "walking" and not agent.is_navigation_finished():
 		speed = global_position.direction_to(agent.get_next_path_position()).slide(Vector3.UP).normalized() * 1.25
@@ -130,10 +212,16 @@ func _physics_process(delta):
 			glance_after = randf_range(5,13)
 		if distance < .85:
 			speed = player.global_position.direction_to(global_position).slide(Vector3.UP).normalized()*.5
+	if own_state=="walking":
+		var remaining=global_position.distance_to(agent.target_position)
+		speed=speed.limit_length(sqrt(2.*3.8*remaining))
+	if turn_delay>0: speed=Vector3.ZERO
+	desired_velocity=desired_velocity.move_toward(speed,delta*(2.6 if speed.length()>desired_velocity.length() else 4.2))
 	gaze.target = look_target
-	agent.velocity = speed
+	gaze.relaxed=own_state=="idle" and pastime.is_empty()
+	agent.velocity = desired_velocity if not sitting else Vector3.ZERO
 	var facing = speed if speed.length() > .05 else global_position.direction_to(look_target.global_position) if look_target else Vector3.ZERO
-	if facing.length() > .05 and not sitting:
+	if facing.length() > .05 and not sitting and turn_delay<=0:
 		body.rotation.y = lerp_angle(body.rotation.y,atan2(facing.x,facing.z),1-exp(-delta*4))
 
 func speak(text: String, emotion: String):

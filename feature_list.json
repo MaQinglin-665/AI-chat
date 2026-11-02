@@ -1,6 +1,12 @@
 {
-  "active_task": "godot-room-spike",
+  "active_task": "room-experience-v2",
   "features": [
+    {
+      "id": "room-experience-v2",
+      "status": "in_progress",
+      "name": "Shared room activities, responsive speech and embodied controls",
+      "next": "Author reviews the voiced five-minute tour, room feel and mirror-camera integration."
+    },
     {
       "id": "godot-room-spike",
       "name": "Shared Godot room feasibility experiment",

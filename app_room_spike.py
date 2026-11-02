@@ -86,7 +86,7 @@ def step(raw, visible):
 def receipt(raw):
     if not isinstance(raw, dict):
         return {}
-    allowed = {"action": PHYSICAL, "target": set(LABELS) | {"user"}, "status": STATUS,
+    allowed = {"action": PHYSICAL | set(EXPERIENCE_FACTS), "target": set(LABELS) | {"user"}, "status": STATUS,
                "reason": {"occupied", "unreachable", "input", "timeout", "unavailable", "ok"}}
     return {k:raw[k] for k, choices in allowed.items()
             if isinstance(raw.get(k), str) and raw[k] in choices}
@@ -175,6 +175,23 @@ def decide(cfg, payload):
             "thought":clean_text(raw.get("thought",""),60)}
 
 
+EXPERIENCE_FACTS = {
+    "read": "我坐着读了会儿书",
+    "nap": "我在床上小睡了一会儿",
+    "tidy": "我整理了一下书架",
+    "window_idle": "我在窗边发了会儿呆",
+    "shared_window": "我们一起看了窗外",
+    "stretch": "我伸了个懒腰",
+    "yawn": "我打了个哈欠",
+    "called": "你叫了我的名字",
+    "gave": "你把书递给了我",
+    "offered": "我把书递给了你",
+    "head_pat": "你轻轻摸了摸我的头",
+    "high_five": "我们击了掌",
+    "woke": "你走近时我醒了"
+}
+
+
 def recent_room_recap(raw, question):
     if not isinstance(raw, dict) or not re.search(r"(?:刚才|刚刚|上次|之前).{0,18}(?:房间|做了什么|干了什么|干嘛)|房间.{0,12}(?:做了什么|干了什么|记得|回顾)", question):
         return None
@@ -182,7 +199,7 @@ def recent_room_recap(raw, question):
     if not isinstance(steps, list):
         return None
     pattern = r"(?:走到|坐到|看向)(?:窗边|沙发|床沿|椅子|书桌|书架|你身边)"
-    valid = [s for s in steps[:15] if isinstance(s,str) and re.fullmatch(pattern,s)]
+    valid = [s for s in steps[-32:] if isinstance(s,str) and (s in EXPERIENCE_FACTS or re.fullmatch(pattern,s))]
     return {"user_sat":raw.get("user_sat") is True,"steps":list(dict.fromkeys(valid))}
 
 
@@ -190,6 +207,9 @@ def recap_choices(facts):
     # Summarize each destination once. Sitting or looking subsumes the approach.
     choices = {}
     for step_name in facts["steps"]:
+        if step_name in EXPERIENCE_FACTS:
+            choices[step_name] = [EXPERIENCE_FACTS[step_name]]
+            continue
         verb, dest = step_name[:2], step_name[2:]
         phrases = {"走到":[f"我去了{dest}",f"我到{dest}那边去了"],
                    "看向":[f"我看了看{dest}",f"我朝{dest}看了一眼"],
@@ -219,6 +239,9 @@ def ground_recap(text, facts):
         action="坐到" if re.search("坐|歇|休息",clause) else "看向" if re.search("看|望",clause) else "走到" if re.search("去|到",clause) else None
         if action and (not last_dest or action+last_dest not in facts["steps"]):
             safe=False
+    experiences = [EXPERIENCE_FACTS[key] for key in facts["steps"] if key in EXPERIENCE_FACTS]
+    if experiences:
+        return "，后来".join(experiences[-2:]) + "。"
     if safe and last_dest and not ("坐到床沿" in facts["steps"] and "床沿" not in text):return text
     picked=[next((phrase for phrase in pair if phrase.removeprefix("我") in text),"") for pair in choices]
     picked=[phrase for phrase in picked if phrase][:2] or [pair[0] for pair in choices[-1:]]
@@ -259,7 +282,7 @@ def parse_turn(raw, visible):
     return {"reply":reply, "action":first, "steps":steps, "goal":clean_text(value.get("goal"), 48)}
 
 
-def user_turn(cfg, payload):
+def user_turn(cfg, payload, emit=None):
     from avatar_brain_context import build_context, recent_history
     from memory import build_manual_persona_card_block, build_persona_memory_block
     msg = clean_text(payload.get("message"), 300)
@@ -274,7 +297,85 @@ def user_turn(cfg, payload):
     llm.update(max_output_tokens=180, retry_on_length=False, request_timeout=18)
     messages = [{"role":"system","content":"\n".join(filter(None, [*persona, TURN_POLICY]))},
                 {"role":"user","content":json.dumps({"world":world,"context":context,"message":msg},ensure_ascii=False,separators=(",",":"))}]
+    if emit:
+        messages[0]["content"] = messages[0]["content"].replace("只输出 JSON {reply,action,steps,goal}", "按下面流式协议输出").replace("reply 必须", "正文必须")
+        messages[0]["content"] += (
+            "\n第一行直接说一句简短口语，不带引号或标签，先回应用户，不承诺未验证的行动。"
+            "第二行仅输出身体计划 JSON，例如 {\"action\":\"idle\"}。如有补充口语，第三行起每句一行。"
+        )
+        pending = ""
+        preview = ""
+        def publish(event):
+            nonlocal preview
+            if preview and event.get("sentence", "").startswith(preview):
+                remainder = event["sentence"][len(preview):]
+                preview = ""
+                if not remainder: return
+                event = {"sentence":remainder}
+            emit(event)
+        turn = None
+        for chunk in iter_openai_chat_stream(llm, messages):
+            pending += chunk
+            if len(pending) > 4096:
+                raise ValueError("oversized room turn")
+            if turn is None and not preview:
+                sentence = re.match(r"^([^{}\[\]\n\r`]{1,100}?[。？！!?])", pending.strip())
+                if sentence and not re.search("去|走|坐|拿|递|站|回来",sentence[1]):
+                    preview = grounded_turn({"reply":spoken(clean_text(sentence[1],300))},world,msg)["reply"]
+                    if preview: emit({"sentence":preview})
+                field = re.match(r'^\s*\{\s*"reply"\s*:\s*', pending)
+                if field:
+                    try:
+                        value, _ = json.JSONDecoder().raw_decode(pending[field.end():])
+                    except ValueError:
+                        value = None
+                    # A promise must wait for its accompanying validated action.
+                    if isinstance(value, str) and not re.search("去|来|走|坐|拿|站|带|给|递|摸|击掌", value):
+                        preview = grounded_turn({"reply":spoken(clean_text(value,300))},world,msg)["reply"]
+                        if preview: emit({"sentence":preview})
+            while "\n" in pending:
+                line, pending = pending.split("\n", 1)
+                turn = consume_sentence(line, turn, world, msg, publish)
+        turn = consume_sentence(pending, turn, world, msg, publish)
+        if not turn:
+            raise ValueError("empty room turn")
+        return turn
     turn = parse_turn("".join(iter_openai_chat_stream(llm, messages)), world["objects"])
+    return grounded_turn(turn, world, msg)
+
+
+def consume_sentence(line, turn, world, msg, emit):
+    if not line.strip():
+        return turn
+    if line.strip().startswith("```"):
+        return turn
+    if turn is None:
+        if line.lstrip().startswith("{"):
+            turn = grounded_turn(parse_turn(line, world["objects"]), world, msg)
+        else:
+            text = spoken(clean_text(line, 300))
+            if not text: return None
+            turn = grounded_turn({"reply":text,"action":{"action":"idle","seconds":2},"steps":[],"goal":""},world,msg)
+        emit({"sentence": turn["reply"]})
+    elif line.lstrip().startswith("{"):
+        try:
+            plan = json.loads(line)
+            plan["reply"] = turn["reply"]
+            parsed = parse_turn(json.dumps(plan), world["objects"])
+            turn.update({key:parsed[key] for key in ("action","steps","goal")})
+        except (TypeError, ValueError):
+            pass
+    else:
+        text = spoken(clean_text(line, max(0, 300 - len(turn["reply"]))))
+        if text and not any(c in text for c in "{}[]"):
+            sentence = grounded_turn({"reply": text}, world, msg)["reply"]
+            if len(turn["reply"]) + len(sentence) <= 300:
+                emit({"sentence": sentence})
+                turn["reply"] += sentence
+    return turn
+
+
+def grounded_turn(turn, world, msg):
     # A prior approach point does not prove a trip back or a completed seat.
     unsupported_return = re.search(r"(?:刚|才|已经)从.{1,12}(?:回来|过来|回到)", turn["reply"])
     unsupported_seat = world["ai_state"] != "sitting" and re.search(r"我(?:已经|正|现在)?坐在", turn["reply"])
@@ -327,10 +428,26 @@ def dispatch(handler, cfg, *, turn=False, remember=None):
         return handler._send_json({"error":"invalid_world"}, status=400)
     if turn:
         try:
-            result = user_turn(cfg, payload)
+            streaming = payload.get("stream") is True
+            if streaming:
+                handler.send_response(200)
+                handler.send_header("Content-Type", "application/x-ndjson")
+                handler.send_header("Connection", "close")
+                handler.end_headers()
+                handler.close_connection = True
+                def emit(event):
+                    handler.wfile.write((json.dumps(event, ensure_ascii=False) + "\n").encode())
+                    handler.wfile.flush()
+                result = user_turn(cfg, payload, emit)
+                emit({"turn": result})
+            else:
+                result = user_turn(cfg, payload)
         except Exception:
+            if streaming:
+                return
             return handler._send_json({"error":"turn_unavailable"}, status=503)
-        handler._send_json(result)
+        if not streaming:
+            handler._send_json(result)
         if remember:
             try:
                 remember(cfg, clean_text(payload["message"], 300), result["reply"], is_auto=False)
