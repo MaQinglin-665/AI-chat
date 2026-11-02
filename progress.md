@@ -1,5 +1,17 @@
 # Progress
 
+## Godot room phase 4
+
+The desktop launcher, scoped room ticket, shared chat history and a single model call for speech and actions are wired to the real bedroom. See [phase 4 acceptance](godot_room/PHASE4-REPORT.md) for the 30 fps recording, measured lip onset and CPU/RSS.
+
+## Godot room phase 3
+
+Bedroom interaction now uses 14 art markers. Tested 1.15 m seat spacing, matching forward directions and >0.91 m eye clearance to posed meshes. See [phase 3 live measurements](godot_room/PHASE3-REPORT.md).
+
+## Godot room phase 2
+
+Real DeepSeek tour: 6/9 autonomous decisions started with movement, 2/2 user goals completed, intent P50 2.18 s. See [evidence and limitations](godot_room/PHASE2-REPORT.md).
+
 History: [archive](docs/archive/2026-10-23-progress.md).
 
 ## 2026-10-23 — Developer readiness
@@ -1447,9 +1459,22 @@ Verification Evidence（同步main582f19e/#232后的最终组合）：完整scri
 - Verification Evidence：scripts/test-local.ps1通过1105Python/3skip（112.18s）、86Node文件、199Python/271JS语法、secrets911及本机映射；check_first_run_package.ps1通过；公开JSON/必需py_compile、Markdown本地链接、图片数量/摘要和diff检查通过。Chromium15项通过（新增4项验收回归、原7卡片及4docs）；1440/768/390视觉inspection0findings，保留原作者设计例外。详情签名排除progress/updated_at以保留阅读焦点，最终浏览器回归另核对。
 - 下一步正常push同分支并更新PR237描述/实际图，核对最新head Linux/Windows全部CI后告知；保持未合并，作者操作。日志和捕获工具只留仓库外work/outputs，不提交。
 
+## Godot room spike — 2026-11-01
+Draft PR238. Forward+ on Godot4.6.3/godot-vrm2.1.0; 4.7.2 plugin parse errors. Verified Shino spring joints and facial shapes, 24 nav polygons, retargeted walk/sit/stand, authenticated real DeepSeek chat/intent, 300s viewport recording, same-camera comparison and Windows release export. Ten calls/6394 tokens during final tour. Explicit user instruction prompted real go_to(chair) in a separate run; AI stopped at chair. Automatic user-side input; no human-input acceptance claimed. Report godot_room/SPIKE-REPORT.md. Local-only video/build/logs ignored. Await author review.
+
+Final local verification: scripts/test-local.ps1 (D-drive TEMP/TMP) 1108 Python passed, 3 skipped, 86 Node suites. Godot target bounds, disabled/token gates, nav/seat/stand, camera collision/jump/POV, release startup and full video decode checked separately. Support-foot horizontal P95 after pelvis correction 1.3mm on this trajectory. Isolated listeners stopped.
+
 ## 2026-11-01 — 任务A：任务卡片小修开始
 - 最新origin/main40c4d4c已含PR237，建立friend/task-card-polish。先修原因重复、局部鉴权提示与全局遮挡，不改认证/Origin/重试逻辑，补测试和真实截图后独立PR/CI。任务B后续独立分支，不混入本PR。
 
 ## 2026-11-01 — 任务A实现与验证
 - taskCardView原因已显示则错误框去重，保留后续句和详情完整错误；apiClient仅显示选项，existing-card请求使用inline，chat薄包装转发。authFetchImpl/鉴权头/刷新/重试/Origin完全不改，无卡片的启动失败及其他页面仍保留全局提示。
 - Verification Evidence：完整Python1105通过/3skip；最终86Node、199Python/271JS语法、secrets/mappings；17项Chromium通过。真实index+原HTTP/manager临时文件适配器，确认原因一次/401全局隐藏/pageerror0，2张实际截图重拍及SHA更新，公开JSON/必需compile/diff通过。初次Node因Windows编辑LF→CRLF触发源码断言，恢复LF后通过，未修改旧断言。未动后端/模型/渲染器/依赖/私人文件。接下来正常push独立PR/CI，作者合并；任务B不混入。
+
+## Godot phase 5 — optional component and private recap
+
+#241 merged at a78ed4b; main 25142ed merged with only three state conflicts. Godot 4.6.3 CI checked bed-edge navigation, sit/stand, interaction and speech. Published separate rc2 component; fresh Electron profile downloaded and launched it in 201s. Receipts kept out of chat; rc1 measured speech P50 3.05s (n=2). Tests: 1119 Python passed/3 skipped, 89 Node, syntax/secrets/mappings, first-run package passed. Installer delta +26,621 B, no Room.exe/PCK/VRM in payload. Final rc2 voiced video and latency pending window control recovery. Report: godot_room/PHASE5-REPORT.md. PR238 review only.
+
+## Room v1.0.0 final review
+
+Eight-file manifest checked after extraction and at launch. Original ZIP promoted to stable Release. Real download 79.12s, voiced capture 194.67s, six screenshots and successful bed/window recap. Speech P50 3.68s (n=2). Python 1120 passed/3 skipped; Godot CI passed. See godot_room/PHASE5-REPORT.md; author decides merge.

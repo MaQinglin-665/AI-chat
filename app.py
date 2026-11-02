@@ -1152,6 +1152,8 @@ def _build_base_prompt(config, user_message, history, llm_cfg, provider, is_auto
         )
         if brain_block:
             base_prompt = merge_prompt_with_memory(base_prompt, brain_block)
+    if config.get("_room_context"):
+        base_prompt = merge_prompt_with_memory(base_prompt, config["_room_context"])
     conversation_context_block = _build_conversation_context_prompt_block(
         config.get("_conversation_context") if isinstance(config, dict) else None,
         user_message,
@@ -1810,6 +1812,10 @@ class PetHandler(SimpleHTTPRequestHandler):
         if path_only == "/api/social_cognition":
             self._send_json(get_social_cognition_state(load_config())); return
         if self._reject_invalid_api_token(path_only):
+            return
+        if path_only in ("/api/room/intent", "/api/room/turn"):
+            from app_room_spike import dispatch
+            dispatch(self, load_config(), turn=path_only == "/api/room/turn", remember=remember_interaction)
             return
         if path_only in app_avatar_brain.ROUTES:
             app_avatar_brain.dispatch(self, path_only, app_avatar_brain.get_service(load_config))

@@ -1,0 +1,65 @@
+name: Godot room
+on:
+  pull_request:
+    paths: ['godot_room/**', '.github/workflows/godot-room.yml', 'scripts/build-room-component.py']
+  push:
+    tags: ['room-component-*-rc*']
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.event_name != 'release' || !startsWith(github.event.release.tag_name, 'room-component-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install verified Godot 4.6.3 editor
+        run: |
+          curl --fail --location --retry 3 -o /tmp/editor.zip https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.x86_64.zip
+          echo 'd0bc2113065e481c9c2c2b2c37daa4e8be3fe9e27f0ab9ab0b6096e9a37907f3  /tmp/editor.zip' | sha256sum -c
+          unzip -q /tmp/editor.zip -d /tmp/godot-bin
+          sudo install -m 755 /tmp/godot-bin/Godot_v4.6.3-stable_linux.x86_64 /usr/local/bin/godot
+      - name: Import and exercise navigation, seats and interaction contract
+        run: |
+          godot --headless --editor --path godot_room --import
+          for test in check_navigation check_player check_shared_goals check_room_speech art/tools/verify art/tools/check_interaction_contract; do
+            timeout 100 godot --headless --path godot_room --script "res://$test.gd"
+          done
+      - name: Cross-export Windows component
+        if: github.ref_type == 'tag'
+        run: |
+          curl --fail --location --retry 3 -o /tmp/templates.tpz https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_export_templates.tpz
+          echo '3fbe2c0e2dec9d537ab9ec97bcf8da91dcf23357fc51f67092dd068d839290a8  /tmp/templates.tpz' | sha256sum -c
+          dest="$HOME/.local/share/godot/export_templates/4.6.3.stable"
+          mkdir -p "$dest"
+          unzip -jo /tmp/templates.tpz 'templates/windows_release_x86_64.exe' -d "$dest"
+          python scripts/build-room-component.py --out /tmp/component
+      - uses: actions/upload-artifact@v4
+        if: github.ref_type == 'tag'
+        with:
+          name: room-component
+          path: /tmp/component/*
+  attach:
+    if: github.ref_type == 'tag'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: room-component
+          path: component
+      - name: Attach ZIP and checksum without replacing existing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ "$TAG" == room-component-* ]]; then
+            gh release create "$TAG" component/* --repo "$REPO" --verify-tag --prerelease --latest=false --title "实验房间组件 $TAG" --notes "Windows x64 可选组件。下载校验值见附件。"
+          else
+            gh release upload "$TAG" component/* --repo "$REPO"
+          fi

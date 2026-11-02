@@ -163,3 +163,25 @@ Files: `web/assets/backgrounds/bedroom/{day,dusk,night}.webp`. User-provided AI-
 - Change: extract only GB2312 level-1's 3,755 common characters, take the library's common single-character toneless final, group characters by final. Full library/code/phrase dictionaries are not shipped or installed at runtime. Dominant visual vowel mapping is application code, not a phonetic claim.
 - Original MIT copyright/permission/warranty notice is preserved verbatim in `web/avatar/data/pinyin-pro.LICENSE.txt` and must accompany this data in distributions. Copyright (c) 2022-present zh-lx.
 - Reproduction: unpack the official archive locally, then run `node scripts/build_live2d_pinyin_data.cjs <unpacked-package-directory>`. That generator performs no network access. Package/license downloads were authorized for development; application lookup uses only the packaged local file.
+## Experimental shared Godot room
+
+Godot Engine 4.6.3 is MIT-licensed. The editor and export template are obtained separately from https://godotengine.org/download/archive/ . Engine license and bundled dependency notices: https://godotengine.org/license/ .
+
+- V-Sekai godot-vrm, v2.1.0-assetlib (7a743c81571592e4d08b3f9995427dada787106b). MIT, including the MToon shader distribution. Original notices are in godot_room/addons/vrm/LICENSE and godot_room/addons/Godot-MToon-Shader/LICENSE. https://github.com/V-Sekai/godot-vrm
+- Sendagaya Shino by pixiv, CC0. Source and embedded license were checked for the initial spike avatar. https://vroid.pixiv.help/hc/en-us/articles/360013482714-Sendagaya-Shino
+- Quaternius Universal Animation Library Standard, CC0. Original glTF and binary, runtime retargeting in Godot. https://quaternius.itch.io/universal-animation-library . Distribution and license in godot_room/README.md and godot_room/animations/LICENSE.txt.
+- The room uses code-generated primitives. The three.js comparison uses the repository's existing KayKit room and CC0 Shino.
+
+## Optional Godot bedroom component
+
+The component is distributed separately from the desktop installer. Shino, Vita, the animation library and plugins are stored as ordinary Git objects. No Git LFS client is required.
+
+| Component | Author | License and source |
+|---|---|---|
+| Godot Engine 4.6.3 and its Windows export runtime | Juan Linietsky, Ariel Manzur and Godot contributors | [MIT and bundled library licenses](https://godotengine.org/license/). The component ZIP includes the engine's own copyright and license inventory. |
+| godot-vrm 2.1.0 | V-Sekai contributors and VRM Consortium | [Source and MIT notice](https://github.com/V-Sekai/godot-vrm/tree/v2.1.0-assetlib) |
+| Godot MToon shader | V-Sekai contributors, Masataka SUMI | [Upstream](https://github.com/V-Sekai/Godot-MToon-Shader), [MIT notice](godot_room/addons/Godot-MToon-Shader/LICENSE) |
+| Sendagaya Shino | pixiv Inc. | [Author's CC0 notice](https://vroid.pixiv.help/hc/en-us/articles/360013482714), [VRM source](https://github.com/madjin/vrm-samples/blob/master/vroid/beta/Sendagaya_Shino.vrm) |
+| Vita, β Ver AvatarSample_3 | pixiv Inc. | [Author's CC0 notice](https://vroid.pixiv.help/hc/en-us/articles/360014900113), [VRM source](https://github.com/madjin/vrm-samples/blob/master/vroid/beta/Vita.vrm) |
+| Universal Animation Library, Standard | Quaternius | [CC0 animation library](https://quaternius.itch.io/universal-animation-library), [glTF distribution](https://github.com/J-Ponzo/gltf-universal-animation-library) |
+| Procedural bedroom and shaders | Project art contributors, maintained by qinglinMa | [Asset inventory](godot_room/art/SOURCES.md), [CC0 declaration](godot_room/art/LICENSE-CC0.txt) |

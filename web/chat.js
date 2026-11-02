@@ -4571,7 +4571,7 @@ function shouldAttemptServerTTS() { return getTTSPlaybackController().shouldAtte
 function markServerTTSRecovered() { return getTTSPlaybackController().markServerTTSRecovered(); }
 async function speakByServer(text, opts = {}) { return getTTSPlaybackController().speakByServer(text, opts); }
 async function speakByBrowser(text, opts = {}) { return getTTSPlaybackController().speakByBrowser(text, opts); }
-async function speak(text, opts = {}) { return getTTSPlaybackController().speak(text, opts); }
+async function speak(text, opts = {}) { if(state.godotRoomActive)return false; return getTTSPlaybackController().speak(text, opts); }
 
 function getStreamTtsQueueController() {
   const boundary = getChatTtsBoundary();
@@ -5142,6 +5142,49 @@ function clearSplitWindowPerformancePhase(input = {}) {
 bindRuntimeBridges();
 window.addEventListener("beforeunload", handleBeforeUnload);
 main().then(async () => {
+  const api=window.electronAPI;
+  if(api?.roomState) {
+    const button=document.getElementById("enter-room-btn");
+    const sync=active=>{
+      state.godotRoomActive=!!active;
+      if(button)button.disabled=!!active;
+      const switchInput=document.getElementById("room-experiment-toggle");
+      if(switchInput)switchInput.disabled=!!active;
+      if(active) {
+        window.__xinyuBrainController?.executor?.interrupt("entered_room");
+        getTTSPlaybackController().stopAllAudioPlayback();
+        window.speechSynthesis?.cancel();
+      }
+    };
+    api.onRoomActive(sync);
+    api.onRoomTurn(({message,reply})=>{
+      if(message) appendMessage("user",message,{syncHistory:true});
+      appendMessage("assistant",reply,{syncHistory:true});
+    });
+    const availability=await api.roomState().catch(()=>({enabled:false,active:false}));
+    state.roomRecap=availability.recap||null;
+    api.onRoomContext?.(facts=>{state.roomRecap=facts;});
+    const row=document.getElementById("room-setting-row");
+    const toggle=document.getElementById("room-experiment-toggle");
+    if(row && toggle && state.uiView==="full") {
+      row.hidden=false;
+      toggle.checked=availability.enabled;
+      toggle.addEventListener("change",async()=>{
+        toggle.checked=await api.setRoomEnabled(toggle.checked);
+        if(button)button.hidden=!toggle.checked;
+        if(!toggle.checked)state.roomRecap=null;
+      });
+    }
+    if(button) {
+      button.hidden=!availability.enabled;
+      button.addEventListener("click",async()=>{
+        try {
+          await api.openRoom({provider:state.ttsProvider,voice:(state.ttsVoice||chooseTTSVoice())?.name||"",history:state.history});
+        } catch(error) { const status=document.getElementById("room-launch-status"); status.hidden=false; status.textContent=String(error.message).replace(/^.*?Error: /,""); }
+      });
+    }
+    sync(availability.active);
+  }
   // Shared speech cleanup still uses the existing expression director in VRM mode.
   // Initialize its local mapping before exposing the new speech/interrupt bridge.
   await window.XinyuLive2DMapping?.ready();
