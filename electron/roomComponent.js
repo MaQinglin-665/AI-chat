@@ -10,10 +10,10 @@ const {pipeline} = require("node:stream/promises");
 const {setTimeout:delay} = require("node:timers/promises");
 
 const PIN = Object.freeze({
-  url: "https://github.com/MaQinglin-665/AI-chat/releases/download/room-component-v1.0.0-rc1/xinyu-room-windows-x64.zip",
-  size: 74047690,
-  sha256: "90884a8ce3793c53f84c9baf8828c038c1ce6b1fb947e404e558461bc4778fdd",
-  files: {"Room.exe":"91724f15024a3a545e28ccd83134403d31ce2323a38e51c95e4dfa282f732ab6", "Room.pck":"8b45df980e36dce28a05e5879a4990071fea68eafdc16dc0ce0734880e17232e"}
+  url: "https://github.com/MaQinglin-665/AI-chat/releases/download/room-component-v1.0.0-rc2/xinyu-room-windows-x64.zip",
+  size: 74047830,
+  sha256: "f98a2ea84cbc125f60cbc3f2443984e4fef03eb73d569454c2f9441bfcb3c324",
+  files: {"Room.exe":"91724f15024a3a545e28ccd83134403d31ce2323a38e51c95e4dfa282f732ab6", "Room.pck":"1f92125f8c55b233cd4fe453b3303bf44c4dc712d59f2110ac94dde9f9e7eb0e"}
 });
 
 function allowedRedirect(location) {

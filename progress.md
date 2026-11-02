@@ -1470,3 +1470,7 @@ Final local verification: scripts/test-local.ps1 (D-drive TEMP/TMP) 1108 Python 
 ## 2026-11-01 — 任务A实现与验证
 - taskCardView原因已显示则错误框去重，保留后续句和详情完整错误；apiClient仅显示选项，existing-card请求使用inline，chat薄包装转发。authFetchImpl/鉴权头/刷新/重试/Origin完全不改，无卡片的启动失败及其他页面仍保留全局提示。
 - Verification Evidence：完整Python1105通过/3skip；最终86Node、199Python/271JS语法、secrets/mappings；17项Chromium通过。真实index+原HTTP/manager临时文件适配器，确认原因一次/401全局隐藏/pageerror0，2张实际截图重拍及SHA更新，公开JSON/必需compile/diff通过。初次Node因Windows编辑LF→CRLF触发源码断言，恢复LF后通过，未修改旧断言。未动后端/模型/渲染器/依赖/私人文件。接下来正常push独立PR/CI，作者合并；任务B不混入。
+
+## Godot phase 5 — optional component and private recap
+
+#241 merged at a78ed4b; main 25142ed merged with only three state conflicts. Godot 4.6.3 CI checked bed-edge navigation, sit/stand, interaction and speech. Published separate rc2 component; fresh Electron profile downloaded and launched it in 201s. Receipts kept out of chat; rc1 measured speech P50 3.05s (n=2). Tests: 1119 Python passed/3 skipped, 89 Node, syntax/secrets/mappings, first-run package passed. Installer delta +26,621 B, no Room.exe/PCK/VRM in payload. Final rc2 voiced video and latency pending window control recovery. Report: godot_room/PHASE5-REPORT.md. PR238 review only.

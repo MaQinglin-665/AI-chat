@@ -5148,6 +5148,8 @@ main().then(async () => {
     const sync=active=>{
       state.godotRoomActive=!!active;
       if(button)button.disabled=!!active;
+      const switchInput=document.getElementById("room-experiment-toggle");
+      if(switchInput)switchInput.disabled=!!active;
       if(active) {
         window.__xinyuBrainController?.executor?.interrupt("entered_room");
         getTTSPlaybackController().stopAllAudioPlayback();

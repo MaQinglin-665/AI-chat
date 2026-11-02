@@ -1,4 +1,8 @@
-# Current — voiced Godot room on draft PR 238
+# Current — Godot phase 5, PR238
+
+[Phase 5 report](godot_room/PHASE5-REPORT.md). Separate rc2 Release pinned and verified; room opt-in, typed private receipts, segmented voice, bed-edge seat and release build complete. Next: restore window control, record two voiced room turns and desktop recap on rc2, measure speech latency, append final frames and report. The isolated phase5-review profile already has the verified download. Author handles merge.
+
+# Earlier — voiced Godot room on draft PR 238
 
 Review [phase 4 measurements](godot_room/PHASE4-REPORT.md), public keyframes and the ignored local recording tmp_ui_smoke/godot-room-phase4-voice-electron.mp4. Browser speech uses the matched installed Windows voice. Await author review.
 

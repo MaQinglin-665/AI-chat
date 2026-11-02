@@ -1419,7 +1419,8 @@ function roomChanged(active) {
 }
 ipcMain.handle("room-state", event => ({enabled:roomEnabled() && isRoomOwner(event), active:!!roomSession || roomStarting, recap:isRoomOwner(event)?roomRecap:null}));
 ipcMain.handle("room-toggle", async (event,value) => {
-  if (!isRoomOwner(event) || roomStarting || roomSession) return false;
+  if (!isRoomOwner(event)) return false;
+  if (roomStarting || roomSession) return roomEnabled();
   if (value===true) {
     if(!resolveRuntimeApiToken()) {
       const answer=await dialog.showMessageBox(chatWindow,{type:"question",buttons:["启用并重启","取消"],cancelId:1,defaultId:1,
