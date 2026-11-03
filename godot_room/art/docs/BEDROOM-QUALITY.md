@@ -65,4 +65,4 @@
 
 ## 交接
 
-当前代码、三套烘焙、截图、素材许可、本地验证完成。下一步：普通推送friend/bedroom-quality到origin，创建base=main的Draft PR，确认Linux/Windows及Godot CI；作者Windows审阅/决定合并。继续工作先读本报告和art/README.md；不要恢复客厅/阳台/天气，不要修改Marker或角色脚本。重生成静态资源必须同时重烘焙三套，步骤见README。
+当前代码、三套烘焙、截图、素材许可、本地验证完成，已普通推送origin并创建base=main的[Draft PR #246](https://github.com/MaQinglin-665/AI-chat/pull/246)。补充低档卸载恢复宿主比例的实际检查也通过。下一步：确认最新提交的Linux/Windows/Godot CI，然后由作者在Windows审阅并决定合并；远端结果以PR Checks为准。继续工作先读本报告和art/README.md；不要恢复客厅/阳台/天气，不要修改Marker或角色脚本。重生成静态资源必须同时重烘焙三套，步骤见README。
