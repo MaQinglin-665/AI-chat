@@ -1,0 +1,2 @@
+# Official source receipts are byte hashes; never rewrite glTF line endings.
+models/**/*.gltf -text

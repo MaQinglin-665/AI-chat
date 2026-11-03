@@ -1,0 +1,56 @@
+{
+  "base": "9194f8dad0858afe65062d68f98c71a6d309bb23",
+  "new_art_bytes_including_screenshots_approx": 29010712,
+  "frozen_marker_count": 14,
+  "marker_changes": [],
+  "baked_users_per_period": 206,
+  "manual_character_probes": 5,
+  "navigation_polygons": 43,
+  "capsule_samples": 584,
+  "negative_controls": 18,
+  "sources_verified": 27,
+  "textures_verified": 25,
+  "maximum_texture_dimension": 2048,
+  "screenshots": {
+    "after-day.png": {
+      "sha256": "99191dc803891461048c5da2eac93c3fd4b1138bb1b01533eadfe92dab03aba7",
+      "bytes": 928269
+    },
+    "after-dusk.png": {
+      "sha256": "1f39270ab13dc009d7be35fe39291c123bff37d60f99ebc5cddca4b9c20f68d6",
+      "bytes": 884067
+    },
+    "after-high-wide.png": {
+      "sha256": "f371da8eb43f6dbd0e3a229b06b00b6ff723125991de0a43c72e53176be60689",
+      "bytes": 762707
+    },
+    "after-mirror-two.png": {
+      "sha256": "d8a267d087f867879db06c623c39489e1c9dc1d79d7cef38feb9c4b3fc851c77",
+      "bytes": 627251
+    },
+    "after-mirror.png": {
+      "sha256": "0d19567faf47d549ff95d284045f5cea4781f439e566038ac579d65cf0441209",
+      "bytes": 771219
+    },
+    "after-night.png": {
+      "sha256": "61dd3796c93d1e0dd71112fc107971112fb445f0e8dcb9250af0907a1a9d1ba7",
+      "bytes": 828223
+    },
+    "after-sofa.png": {
+      "sha256": "0ee57d6a84c6d7df47e98a071c34c506e9c073815bcb3f0a332c767c51f3c70e",
+      "bytes": 787170
+    },
+    "before-day.png": {
+      "sha256": "651bf660a6f869d3f28513736aaea778e7339031370bd55bbfb22d6358570f7c",
+      "bytes": 376529
+    },
+    "before-dusk.png": {
+      "sha256": "a5bd02122ef744000f0de6efb941ac3e2b6f37462d1cc984869f9cb917e6cc23",
+      "bytes": 485429
+    },
+    "before-night.png": {
+      "sha256": "1ab7aefb7349fc9f18206a3d2282c151aa91c6d6e802e5e9acd998241fe9e9cd",
+      "bytes": 514345
+    }
+  }
+}

@@ -1,6 +1,24 @@
 # 素材来源与许可
 
-本次没有下载外部家具或图片贴图。下表列出全部新美术来源：本PR的原创程序几何和着色器，AI辅助编写，维护者qinglinMa；按[CC0 1.0声明](LICENSE-CC0.txt)提供，可再分发。没有从网页参考图提取像素/网格，也没有引用Booth/VRChat资产。
+## 当前 bedroom-quality 新增（2026-11-03）
+
+家具与PBR均从 Poly Haven 官方下载，官方声明所有资产为 [CC0](https://polyhaven.com/license)。本地完整下载URL、作者、原始SHA256见 [assets/sources.json](assets/sources.json)，运行时不联网。原始文件不改写；中性亚麻、净灰泥、哑光粗糙度、玫瑰色皮革为脚本生成的CC0派生版本，见 tools/prepare_pbr.py。家具只改变视觉，原碰撞和14组交互Marker均不动。
+
+| 素材 | 官方来源 | 作者 | 许可 / 使用 |
+| --- | --- | --- | --- |
+| sofa_02 | [sofa_02](https://polyhaven.com/a/sofa_02) | Kirill Sannikov | CC0；1K glTF/PBR |
+| modern_arm_chair_01 | [modern_arm_chair_01](https://polyhaven.com/a/modern_arm_chair_01) | Vibrant Nordic | CC0；1K glTF/PBR |
+| wooden_table_02 | [wooden_table_02](https://polyhaven.com/a/wooden_table_02) | Serhii Khromov | CC0；1K glTF/PBR |
+| wood_floor | [wood_floor](https://polyhaven.com/a/wood_floor) | Dimitrios Savva | CC0；2K |
+| white_plaster_02 | [white_plaster_02](https://polyhaven.com/a/white_plaster_02) | Rob Tuytel | CC0；1K |
+| rough_linen | [rough_linen](https://polyhaven.com/a/rough_linen) | colormass, Rico Cilliers | CC0；1K |
+| 褶皱床品/窗帘、镜框和镜面着色器 | 本目录 quality_builder.gd / planar_mirror.gd / mirror.gdshader | 原创程序几何、AI辅助，qinglinMa维护 | CC0，沿用本目录声明 |
+| 城市底噪、空调底噪、台灯点击 | [生成器](tools/generate_audio.py) / [音效说明](audio/README.md) | 本贡献原创合成，无第三方采样 | CC0 |
+| 三套光照贴图、当前截图 | [quality/](quality/) / [docs/quality/](docs/quality/) | 本场景与已有CC0千驮谷筱的实际Godot输出 | 对应上述CC0来源 |
+
+## 以下为首次接入 / #241 的历史来源记录
+
+首次接入时没有下载外部家具或图片贴图；当前新增以本页上方清单为准。下表列出全部新美术来源：本PR的原创程序几何和着色器，AI辅助编写，维护者qinglinMa；按[CC0 1.0声明](LICENSE-CC0.txt)提供，可再分发。没有从网页参考图提取像素/网格，也没有引用Booth/VRChat资产。
 
 | 素材 | 来源链接 | 作者/来源 | 许可 |
 | --- | --- | --- | --- |

@@ -11,6 +11,7 @@ func verify():
 	check(room.interaction_markers.size()==14,"interaction count changed")
 	var contract_failures=preload("res://art/tools/interaction_contract.gd").validate(room)
 	for failure in contract_failures: check(false,failure)
+	for failure in preload("res://art/tools/quality_contract.gd").validate(room):check(false,failure)
 	var floor_material=room.region.get_node("floor/OakFloor").material_override
 	check(floor_material.get_shader_parameter("specular_strength")==0.0,"floor highlight regression")
 	check(is_equal_approx(floor_material.get_shader_parameter("wood_roughness"),.90),"floor roughness regression")
