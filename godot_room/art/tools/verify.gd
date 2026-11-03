@@ -11,6 +11,7 @@ func verify():
 	check(room.interaction_markers.size()==14,"interaction count changed")
 	var contract_failures=preload("res://art/tools/interaction_contract.gd").validate(room)
 	for failure in contract_failures: check(false,failure)
+	for failure in preload("res://art/tools/quality_contract.gd").validate(room):check(false,failure)
 	var floor_material=room.region.get_node("floor/OakFloor").material_override
 	check(floor_material.get_shader_parameter("specular_strength")==0.0,"floor highlight regression")
 	check(is_equal_approx(floor_material.get_shader_parameter("wood_roughness"),.90),"floor roughness regression")
@@ -59,7 +60,11 @@ func verify():
 	check(not room.set_lighting_preset("invalid") and room.lighting_preset=="night","invalid preset changed scene")
 	check(room.set_quality_profile("low") and not room.key_light.shadow_enabled,"low profile shadow budget")
 	check(room.set_quality_profile("balanced") and room.key_light.shadow_enabled,"balanced profile restore")
-	print("ART_VERIFY ",JSON.stringify({"polygons":room.region.navigation_mesh.get_polygon_count(),"approach_offsets":distances,"capsule_samples":samples_checked,"failures":failures}))
+	var polygons=room.region.navigation_mesh.get_polygon_count()
+	var host_scale=room.quality_art.original_scale if room.quality_art else root.scaling_3d_scale
+	room.set_quality_profile("low")
 	room.free()
 	await process_frame
+	check(is_equal_approx(root.scaling_3d_scale,host_scale),"removing art did not restore host render scale")
+	print("ART_VERIFY ",JSON.stringify({"polygons":polygons,"approach_offsets":distances,"capsule_samples":samples_checked,"failures":failures}))
 	quit(0 if failures.is_empty() else 1)

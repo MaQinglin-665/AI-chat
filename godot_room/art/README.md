@@ -1,31 +1,30 @@
 # 温馨卧室美术模块
 
-基于Godot 4.6.3 / godot-vrm 2.1.0的独立房间美术。当前已普通merge最新spike90fbedc（作者自主行为第二期），保留全部作者改动。入口是[bedroom.tscn](bedroom.tscn)，由[bedroom.gd](bedroom.gd)构建圆角木家具、布艺、植物、窗景和照明；几何缓存/共享材质见[geometry.gd](geometry.gd)。不创建角色、相机、网络或行为计时器，不调用后端。
+当前版本 bedroom-quality 基于 main 9194f8d，仅修改 art/。保留14组交互Marker、metadata、局部/世界位置、朝向和全部碰撞；未改 room.gd、角色、用户、语音、后端。历史接入和 #241 证据保留在 docs/REVIEW.md、POLISH.md、REVIEW-FOLLOWUP.md；当前结果以 [质感报告](docs/BEDROOM-QUALITY.md) 为准。
 
-仅修改art/以及room.gd的11行最小加载接线。用户限定目录优先于根AGENTS状态文件要求，本任务进度、验证与交接记录在此目录，不修改根feature/progress/handoff。角色/行为代码继续由主线负责。
+入口仍是 bedroom.tscn。bedroom.gd 构建原碰撞/Marker，再加载 quality/bedroom-static.scn 视觉层：CC0沙发/椅子/书桌、Poly Haven PBR地板/墙面/亚麻、原创褶皱床品/窗帘和镜框。quality_visuals=false保留原程序视觉，供离线生成器使用。材质和光照贴图已随仓库提供，运行时不下载、生成UV2或烘焙。
 
-## 场景与灯光接口
+## 灯光、画质与操作
 
 ```gdscript
-var art = load("res://art/bedroom.tscn").instantiate()
-art.lighting_preset = "night" # 也可在添加后调用setter
+var art=load("res://art/bedroom.tscn").instantiate()
 add_child(art)
-art.set_lighting_preset("day") # day / dusk / night；未知值返回false且不改变状态
-art.set_quality_profile("low") # balanced / low；low关闭主光实时阴影
+art.set_lighting_preset("night") # day / dusk / night，三份独立LightmapGI
+art.set_quality_profile("medium") # high / medium / low；balanced兼容为medium
+art.quality_art.mirror.set_enabled(false) # 真实镜面开关
 ```
 
-三套环境/主光/补光/灯具/窗景一起切换。夜间是默认，暖色台灯、床头灯和落地灯；窗面使用不含HDR高亮的原创天空着色器，不再靠高能量窗面照亮人物。主光采用柔化的方向阴影，另一方向的补光保持角色正面可读。只一个光源投影，点光不投影，不启用SSAO/SDFGI/体积雾；没有动态灯光循环。
+F6切换时段，F7切换画质，F8开关镜面，L开关台灯并播放轻点击声；文本输入获得焦点时不拦截按键。M仍由主线语音控制使用，美术不处理它。空间/时间/天气连续变化仍暂停，本周提供三档；主线已有的时段调用无需改动。
 
-low只管理本模块主光阴影，不改变共享Viewport或全局项目设置。集显可用启动参数`--rendering-method mobile`；窗口分辨率/MSAA由宿主决定，低开销验收使用960×540/MSAA关闭。默认独显验收1280×720/2×MSAA/Forward+。没有自动更改显卡、驱动或系统电源设置。
+| 档位 | 光照/后期 | 镜面 | 内部3D分辨率 |
+| --- | --- | --- | --- |
+| high | 三套GI、角色探针、泛光、SSAO/SSIL、柔和体积窗光、暖调色 | 512×1024、最多15Hz | 宿主原比例 |
+| medium（默认） | GI/探针、泛光、SSAO、调色 | 384×768、最多10Hz | 宿主原比例 |
+| low | GI/探针、简化法线细节；关闭实时主光阴影、泛光、SSAO/SSIL/体积光 | 默认关闭；F8可开启192×384/5Hz | 宿主比例×0.70，2D文字不缩放 |
 
-可整体替换bedroom.tscn，也可在构建函数中替换单件家具。当前为确定性程序几何，场景树在_ready生成；编辑器静态场景文件只含根节点，细节不是手工可拖动的已打包子场景。若后续转成美术DCC/手工子场景，保留下面的接口即可。
+SSAO/SSIL/体积光仅Forward+使用；Mobile启动默认选low。移除美术场景会恢复宿主原3D缩放比例。镜面复用同一个World3D，反射实际角色；镜面自身不进反射相机。只在正面、6m内、进入视野且窗口未最小化时更新，不是预录视频。静态PBR ReflectionProbe只捕获一次，与镜面及角色的LightmapProbe是三种不同用途。
 
-## 与旧入口的兼容
-
-- `region: NavigationRegion3D`为本模块的可行走区域。
-- `objects: Dictionary<String, StaticBody3D>`保留原`sofa / chair / desk / shelf / book / window`ID，供当前player/companion/bridge读取；这些节点仍有affordances metadata。位置与原型主要家具一致，新增bed、bedside、plant、rug、floor_lamp等。
-- room.gd在_ready优先加载此场景，采用region/objects，再调用原样移出的spawn_actors；旧方块房间作为无美术场景时的回退。释放未使用的旧region，避免孤立RID。
-- **没有改变现有角色的坐姿算法。** 主线目前仍按旧body.position处理入座；新增Marker接口供主线下一步接入。坐姿截图只在离线美术验收中按Seat标记对齐公开模型，不代表已经修改了主线的自动入座算法。
+环境声音见 [音效说明](audio/README.md)：原创CC0合成底噪，默认极轻；QA统一设 XINYU_ART_MUTE=1 并用Dummy音频驱动，不会播放TTS/录音。台灯直射和灯罩发光可关闭，不把可开关的灯罩排入静态烘焙。
 
 ## 必须保留的交互标记
 
@@ -65,30 +64,33 @@ var contact = seat.global_transform # +Z为面朝方向；宿主按角色髋部/
 
 bake_navigation从真实静态碰撞体烘焙，针对本场景的平地契约去除高度超过0.35m的家具顶面孤岛，避免导航把床和沙发顶部当步行区域。当前43个多边形；验证脚本显式等待导航服务器同步，14个接近点全部从入口连通，水平吸附误差≤0.10m，584次0.30m胶囊沿路径碰撞检查无穿透。导航表面约高于地板0.2m为Recast栅格结果；不把这个偏移强加给物理角色根节点。若增加楼梯/二层，必须替换平地过滤规则并重新验收。
 
-## 本地验收
-
-以下只运行公开Shino、几何/导航/动画；不启动bridge、不读取Key、不连接后端。Godot可执行文件放仓库外，不提交下载包或导出包。
+## 本地验证和重新烘焙
 
 ```text
+python godot_room/art/tools/validate_quality_assets.py
 godot --headless --editor --path godot_room --import
-godot --headless --path godot_room --script res://art/tools/verify.gd
-godot --headless --path godot_room --script res://check_navigation.gd
-godot --path godot_room --position -16000,-16000 --script res://art/tools/capture.gd
-godot --path godot_room --disable-vsync --script res://art/tools/benchmark.gd -- balanced dgpu
+godot --headless --audio-driver Dummy --path godot_room --script res://art/tools/verify.gd
+godot --headless --audio-driver Dummy --path godot_room --script res://art/tools/check_interaction_contract.gd
 ```
 
-capture写8张实际引擎截图到art/docs，包含三套灯光同机位、多个室内角度、千驮谷筱坐姿和真实烘焙网格；不录视频/声音。坐姿演示沿用上游的Quaternius坐姿动画，只在验收脚本中按Seat点校准髋部。
+verify同时运行quality_contract：CC0原始SHA256、2K上限、全部206个烘焙绑定、5个人物区域探针、三时段切换、画质/缩放恢复、镜面世界与防递归、台灯及输入焦点保护。原导航/交互契约继续校验14个接近点及584次胶囊路径采样；冻结的交互fixture不改。
 
-[截图与同机位对照](docs/REVIEW.md)、[性能与体积](docs/PERFORMANCE.md)、[素材来源与许可](SOURCES.md)。预算：新房间不含任何贴图，所有新美术源文件/截图远低于30MB；原Shino嵌入贴图最大2048×2048，不新增/修改模型。
+重新制作资源：开发机需Godot 4.6.3编辑器、Python/Pillow（仅材质准备和资产QA使用，产品不依赖Pillow）。prepare_bake_project.py在指定仓库外目录创建隔离工程，只映射art/，不导入角色、私人模型或后端；Windows使用目录junction，烘焙产生的art资源会写回工作区。
 
-## 当前交接
+```text
+python godot_room/art/tools/prepare_pbr.py
+python godot_room/art/tools/generate_audio.py
+python godot_room/art/tools/prepare_bake_project.py <仓库外烘焙目录>
+godot --headless --path <烘焙目录> --max-fps 30 --script res://art/tools/generate_quality.gd
+godot --editor --path <烘焙目录> --max-fps 30 -- --quality-bake
+```
 
-任务A独立PR239已完成10/10 CI，本分支没有混入该PR的修改。本任务保持Draft、base为codex/godot-room-spike，由qinglinMa验收合并。未修改companion/player/bridge/locomotion、后端、根状态文件或私人配置。验证细节和限制见docs；Godot-vrm已知的导入字典键诊断属于上游spike，未借美术任务修改插件。
+生成器从原碰撞场景提取/替换视觉，ArrayMesh展开UV2（约0.07m/texel），三次反弹、Medium/128 rays、非方向性光照贴图与SH探针。最终每层atlas≤2048；EXR竖向打包多层，整体图高不代表单层贴图分辨率。**重新生成静态场景后必须重烘焙全部三套**，不可只替换scene保留旧的节点绑定。不要在运行中的产品里启用烘焙插件。
 
-## 9368749之后的美术打磨
+capture_quality_before.gd保护已有基线不覆盖；after工具生成真实Godot截图。基线来自未改视觉的9194f8d；对比同机位1280×720、FOV50、2×MSAA、medium。截图设 XINYU_ART_MUTE=1，限制30fps并自动退出。性能工具单独限制60fps，--output必须是绝对路径，示例及结果见质感报告；不再运行旧的无限帧benchmark工具。
 
-[最新同机位对照、地板诊断、交互契约和性能报告](docs/POLISH.md)。上面的REVIEW/PERFORMANCE保留为首次接入记录。polish只改art/，没有room.gd接线或Marker调整。新增植物和小物是家具表面的非交互装饰，不增加地面碰撞。新截图/诊断脚本默认30fps，不覆盖before证据。tools/fixtures/interaction-contract.json为冻结原契约，verify不会自动更新；以后主线批准变更时应审核旧值/新值再显式更新。
+## 与主线集成
 
-## PR241审核补充
+objects、region、interaction_markers和灯光setter仍按原接口提供。美术不拥有玩家/角色时钟、行为、语音、LLM或网络，也不新增交互Marker。镜面相机只服务镜面视口，主相机仍属于主线。quality层不创建或更改角色；千驮谷筱只由离线截图/测量脚本实例化。现有安装的可选Room组件不会因本分支改动自动升级，作者验收后需按主线发布流程构建新组件。
 
-[最新审核修订与床沿metadata](docs/REVIEW-FOLLOWUP.md)：沿用bed ID，新增床沿Seat（子Marker id=bed_edge_seat），只给bed增加sit，原Approach与其余13个交互点不变；总数仍14。原fixture不覆盖；tools/check_interaction_contract.gd核对唯一批准差异及18反例。泰迪为棕色无上衣，搭毯移扶手外侧。图形验收30fps，后端bed sit白名单由主线另行接入。
+[当前质感与性能报告](docs/BEDROOM-QUALITY.md) · [素材与许可](SOURCES.md) · [历史初次接入](docs/REVIEW.md) · [历史#241](docs/REVIEW-FOLLOWUP.md)

@@ -1,0 +1,13 @@
+# Allow only the three reviewed public CC0 furniture packages here.
+# The repository's root models/ and models_local/ protections remain unchanged.
+!models/
+models/*
+!models/sofa_02/
+!models/modern_arm_chair_01/
+!models/wooden_table_02/
+*.vrm
+
+# Exact CC0 mesh buffers required by these three reviewed glTF files.
+!models/sofa_02/sofa_02.bin
+!models/modern_arm_chair_01/modern_arm_chair_01.bin
+!models/wooden_table_02/wooden_table_02.bin

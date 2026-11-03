@@ -12,7 +12,9 @@ var practicals: Array[OmniLight3D] = []
 var window_material := ShaderMaterial.new()
 var ready_for_navigation := false
 var ceiling: MeshInstance3D
-@export_enum("balanced", "low") var quality_profile := "balanced"
+@export_enum("high", "medium", "low", "balanced") var quality_profile := "medium"
+@export var quality_visuals := true
+var quality_art: Node3D
 
 func _ready():
 	region.name = "WalkableRoom"
@@ -30,7 +32,12 @@ func _ready():
 	wall_art()
 	build_lived_in_details()
 	build_lighting()
+	if quality_visuals and ResourceLoader.exists("res://art/quality/bedroom-static.scn"):
+		quality_art=preload("res://art/bedroom_quality.gd").new()
+		add_child(quality_art)
+		quality_art.install(self)
 	set_lighting_preset(lighting_preset)
+	if RenderingServer.get_current_rendering_method()=="mobile" and quality_profile=="medium":quality_profile="low"
 	set_quality_profile(quality_profile)
 	bake_navigation()
 
@@ -393,12 +400,14 @@ func set_lighting_preset(preset: String) -> bool:
 	window_material.set_shader_parameter("zenith",Color(settings[7]))
 	window_material.set_shader_parameter("horizon",Color(settings[8]))
 	window_material.set_shader_parameter("night",settings[9])
+	if quality_art:quality_art.set_period(preset)
 	return true
 
 func set_quality_profile(profile: String) -> bool:
-	if profile not in ["balanced","low"]: return false
-	quality_profile=profile
-	key_light.shadow_enabled=profile!="low"
+	if profile not in ["high","medium","low","balanced"]:return false
+	quality_profile="medium" if profile=="balanced" else profile
+	key_light.shadow_enabled=quality_profile!="low"
+	if quality_art:quality_art.set_quality(quality_profile)
 	return true
 
 func bake_navigation():

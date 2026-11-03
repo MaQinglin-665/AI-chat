@@ -1,0 +1,89 @@
+{
+  "production_high": {
+    "cap": 60,
+    "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "renderer": "forward_plus",
+    "resolution": "(1280, 720)",
+    "results": [
+      {
+        "draw_calls": 553.0,
+        "fps": 60.0024000960038,
+        "frame_ms_p50": 16.666,
+        "frame_ms_p95": 16.707,
+        "frame_ms_p99": 16.961,
+        "main_cpu_ms_p95": 1.10399997234344,
+        "main_gpu_ms_p95": 2.83899998664856,
+        "mirror_enabled": true,
+        "profile": "high",
+        "render_scale": 1.0
+      }
+    ],
+    "samples_per_profile": 240
+  },
+  "dummy_driver_all_profiles": {
+    "cap": 60,
+    "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "renderer": "forward_plus",
+    "resolution": "(1280, 720)",
+    "results": [
+      {
+        "draw_calls": 553.0,
+        "fps": 59.9964302124024,
+        "frame_ms_p50": 15.721,
+        "frame_ms_p95": 29.603,
+        "frame_ms_p99": 30.447,
+        "main_cpu_ms_p95": 1.28400003910065,
+        "main_gpu_ms_p95": 2.77699995040894,
+        "mirror_enabled": true,
+        "profile": "high",
+        "render_scale": 1.0
+      },
+      {
+        "draw_calls": 553.0,
+        "fps": 59.9820953445397,
+        "frame_ms_p50": 15.505,
+        "frame_ms_p95": 29.936,
+        "frame_ms_p99": 30.99,
+        "main_cpu_ms_p95": 1.18700003623962,
+        "main_gpu_ms_p95": 2.45099997520447,
+        "mirror_enabled": true,
+        "profile": "medium",
+        "render_scale": 1.0
+      },
+      {
+        "draw_calls": 209.0,
+        "fps": 59.9199469508736,
+        "frame_ms_p50": 15.623,
+        "frame_ms_p95": 29.979,
+        "frame_ms_p99": 30.649,
+        "main_cpu_ms_p95": 0.815999984741211,
+        "main_gpu_ms_p95": 0.533999979496002,
+        "mirror_enabled": false,
+        "profile": "low",
+        "render_scale": 0.699999988079071
+      }
+    ],
+    "samples_per_profile": 240
+  },
+  "mobile_low": {
+    "cap": 60,
+    "gpu": "AMD Radeon(TM) 610M",
+    "renderer": "mobile",
+    "resolution": "(960, 540)",
+    "results": [
+      {
+        "draw_calls": 139.0,
+        "fps": 60.0255258548698,
+        "frame_ms_p50": 16.665,
+        "frame_ms_p95": 18.849,
+        "frame_ms_p99": 25.519,
+        "main_cpu_ms_p95": 0.899999976158142,
+        "main_gpu_ms_p95": 8.07900047302246,
+        "mirror_enabled": false,
+        "profile": "low",
+        "render_scale": 0.699999988079071
+      }
+    ],
+    "samples_per_profile": 240
+  }
+}
